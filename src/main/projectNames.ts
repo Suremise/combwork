@@ -2,7 +2,7 @@ import { existsSync } from 'original-fs'
 import { basename, dirname, join, resolve } from 'path'
 import { HIVE_DIR } from '../shared/defaults'
 import { isProjectId } from '../shared/projectIds'
-import { readKeptJson, withFileLock, writeKeptJson } from './fsutil'
+import { readKeptJson, retryWhileSaving, withFileLock, writeKeptJson } from './fsutil'
 import { msg } from '../shared/i18n'
 import { hiveError } from './hiveError'
 import { createLogger, userText } from './logger'
@@ -108,9 +108,9 @@ export async function noteNames(ws: WorkspaceService, seen: ProjectSeen[]): Prom
   // Nothing new since the record was last read: no file work at all (this runs with every read of the ids).
   const now = cached(ws)
   if (now && seen.every((s) => now.projects[s.id] && now.projects[s.id].name === basename(s.path))) return []
-  return withFileLock(fileOf(path), async () => {
+  return retryWhileSaving(() => withFileLock(fileOf(path), async () => {
     if (life.aborted || ws.path !== path) return []
-    const j = readJournal(await readKeptJson<unknown>(fileOf(path), null))
+    const j = readJournal(await readKeptJson<unknown>(fileOf(path), null, { unsettled: 'throw' }))
     const added: RenameEntry[] = []
     const batch = j.seq + 1
     const at = new Date().toISOString()
@@ -150,7 +150,7 @@ export async function noteNames(ws: WorkspaceService, seen: ProjectSeen[]): Prom
     remember(ws, life, j)
     for (const r of added) log.info(`${userText(r.from)} was renamed ${userText(r.to)}: what keeps it by its name or path follows it`)
     return added
-  })
+  }))
 }
 
 /**
@@ -181,17 +181,17 @@ export async function noteFormerName(ws: WorkspaceService, id: string, folder: s
   if (!path || !isProjectId(id) || !name(folder)) return
   const life = ws.lifetime
   const gone = (): boolean => life.aborted || ws.lifetime !== life || ws.path !== path
-  await withFileLock(fileOf(path), async () => {
+  await retryWhileSaving(() => withFileLock(fileOf(path), async () => {
     if (gone()) throw hiveError(CLOSED, undefined, { kind: 'conflict' })
-    const j = readJournal(await readKeptJson<unknown>(fileOf(path), null))
+    const j = readJournal(await readKeptJson<unknown>(fileOf(path), null, { unsettled: 'throw' }))
     if (gone()) throw hiveError(CLOSED, undefined, { kind: 'conflict' })
     const now = ws.projectIdsNow().byId.get(id)
     const p = j.projects[id] ?? (now ? (j.projects[id] = { name: basename(now), former: [] }) : null)
-    if (!p) throw hiveError(msg({ id: 'worktrees.names.projectGone', defaultMessage: 'That project is no longer in the workspace.', description: "An error: the project whose name was being recorded was removed from the workspace meanwhile." }))
+    if (!p) throw hiveError(msg({ id: 'worktrees.names.projectGone', defaultMessage: 'That project is no longer in the workspace.', description: "An error: the project whose name was being recorded was removed from the workspace meanwhile." }), undefined, { kind: 'notFound' })
     if (same(p.name, folder) || p.former.some((n) => same(n, folder))) return remember(ws, life, j)
     // The oldest of its names: it had it before any Hive saw it renamed from.
     p.former = [...p.former.slice(0, MAX_FORMER - 1), folder]
     await writeKeptJson(fileOf(path), j)
     remember(ws, life, j)
-  })
+  }))
 }

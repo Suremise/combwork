@@ -1,0 +1,314 @@
+{
+  "activity.agents": {
+    "defaultMessage": "{n, plural, =0 {All agents} one {# agent} other {# agents}}",
+    "description": "A menu button above the Activity tab's agent tabs: which agents have a tab (several can be ticked); with none ticked, all."
+  },
+  "activity.all": {
+    "defaultMessage": "All",
+    "description": "The first entry of the Activity tab's Agents and Cards menus: no filter, everything."
+  },
+  "activity.block.asked": {
+    "defaultMessage": "{other, select, yes {Edit waiting for your OK: {file} is locked by an agent of another project} other {Edit waiting for your OK: {file} is locked by agent {holder}}}",
+    "description": "In the Activity tab, under Now: Hive's file lock (Ask me) holds the agent's edit of a file another agent is editing until the user allows it. {file} is the file's path; {holder} the agent editing it."
+  },
+  "activity.block.blocked": {
+    "defaultMessage": "{other, select, yes {Edit blocked: {file} is locked by an agent of another project} other {Edit blocked: {file} is locked by agent {holder}}}",
+    "description": "In the Activity tab, under Now: Hive's file lock blocked the agent's edit of a file another agent is editing, while that stands. {file} is the file's path; {holder} the agent editing it."
+  },
+  "activity.block.for": {
+    "defaultMessage": "Hive's file lock · {time}",
+    "description": "The second line of a lock block in the Activity tab: what blocked the edit, and for how long it has stood ({time}, such as \"2 min\")."
+  },
+  "activity.block.tip": {
+    "defaultMessage": "Shown while the lock stands: it goes once the other agent finishes, the agent tries again or moves on, or its turn ends. Its history is in the agent's ⋯ → Hooks…",
+    "description": "Tooltip on a lock block in the Activity tab. ⋯ → Hooks… is the agent menu item: keep the arrow and the dots."
+  },
+  "activity.cards": {
+    "defaultMessage": "{n, plural, =0 {All cards} one {# card} other {# cards}}",
+    "description": "A menu button above the Activity tab: only the agents working on these cards in progress have a tab (several can be ticked); with none ticked, all."
+  },
+  "activity.cardsLabel": {
+    "defaultMessage": "Cards",
+    "description": "A label in the Activity tab's details: the cards a session worked on."
+  },
+  "activity.closeDetails": {
+    "defaultMessage": "Close details",
+    "description": "Tooltip of the button closing the Activity tab's details panel."
+  },
+  "activity.column": {
+    "defaultMessage": "{column, select, hold {On Hold} todo {Todo} doing {Active} review {Review} passed {Approved} done {Done} other {{column}}}",
+    "description": "A card node's second line in the Activity tree: its board column. Use the board's column names."
+  },
+  "activity.cpuLabel": {
+    "defaultMessage": "CPU time",
+    "description": "A label in the Activity tab's details (HI-2111): the processor time a process has used."
+  },
+  "activity.details": {
+    "defaultMessage": "Details",
+    "description": "The Activity tab's details panel, for screen readers."
+  },
+  "activity.empty": {
+    "defaultMessage": "Nothing is running. Start an agent to see what it runs here.",
+    "description": "The Activity tab when no agent of the project runs anything (with Hide finished on, idle agents have no tab)."
+  },
+  "activity.emptyFiltered": {
+    "defaultMessage": "Nothing is running for this filter.",
+    "description": "The Activity tab, filtered to agents or cards, when none of them runs anything."
+  },
+  "activity.endButton": {
+    "defaultMessage": "End Process…",
+    "description": "A button in the Activity tab's details: ends this one process of the agent's, after a confirmation (…)."
+  },
+  "activity.endDetail": {
+    "defaultMessage": "Only this process ends, and only while it is still the one listed here. What it started keeps running, and the agent may see its command fail.",
+    "description": "Detail of the confirmation before ending one of an agent's processes from the Activity tab."
+  },
+  "activity.endFailed": {
+    "defaultMessage": "Could not end the process",
+    "description": "An error's title: ending a process from the Activity tab failed."
+  },
+  "activity.endIt": {
+    "defaultMessage": "End It…",
+    "description": "A button in the Activity tab's details for a process the agent's command left running (HI-2111): ends it, after a confirmation (…)."
+  },
+  "activity.endMessage": {
+    "defaultMessage": "End {label} (process {pid})?",
+    "description": "The confirmation before ending one of an agent's processes. {label} is what it runs, {pid} its id."
+  },
+  "activity.endTitle": {
+    "defaultMessage": "End this process?",
+    "description": "Title of the confirmation before ending one of an agent's processes from the Activity tab."
+  },
+  "activity.ended": {
+    "defaultMessage": "Ended {label}",
+    "description": "A notification: the process ({label}: what it ran) was ended from the Activity tab."
+  },
+  "activity.endedNode": {
+    "defaultMessage": "Ended",
+    "description": "A node's second line in the Activity tab, live, once its process or session ended: it fades out, then leaves."
+  },
+  "activity.heading": {
+    "defaultMessage": "Activity",
+    "description": "The Activity tab's heading: what the project's agents are running now, a tab per agent."
+  },
+  "activity.hideFinished": {
+    "defaultMessage": "Hide finished",
+    "description": "A checkbox above the Activity tab (on by default): agents with nothing running (not running, or idle with no process or background task) have no tab."
+  },
+  "activity.input": {
+    "defaultMessage": "Input",
+    "description": "A heading in the Activity tab's details: the node's input exactly (a prompt, a tool call's input, a command line), with secrets masked."
+  },
+  "activity.lastAction": {
+    "defaultMessage": "Last action",
+    "description": "A heading in the Activity tab's details: what the node did last (a reply, a tool call's result, an agent's status)."
+  },
+  "activity.lastActive": {
+    "defaultMessage": "Last active",
+    "description": "A label in the Activity tab's details: when a session was last active."
+  },
+  "activity.live": {
+    "defaultMessage": "Play",
+    "description": "A button above the Activity tab while it is frozen (as it always opens): goes live, showing updates as they come."
+  },
+  "activity.liveTip": {
+    "defaultMessage": "Go live: show what runs as it changes. The tab opens frozen, a snapshot of when you opened it.",
+    "description": "Tooltip of the Activity tab's Play button (shown while frozen)."
+  },
+  "activity.loadFailed": {
+    "defaultMessage": "Could not load the activity: {error}",
+    "description": "The Activity tab when the project's sessions couldn't be read. {error} is the reason."
+  },
+  "activity.loading": {
+    "defaultMessage": "Loading…",
+    "description": "The Activity tab, or a detail in it, while it loads."
+  },
+  "activity.noPrompt": {
+    "defaultMessage": "(no prompt text)",
+    "description": "A turn node in the Activity tree whose prompt has no text (only images, say)."
+  },
+  "activity.notEnded": {
+    "defaultMessage": "{why, select, notOwn {{label} is no longer one of this agent's processes: nothing was ended.} cli {{label} is the agent's CLI: use Stop to end it.} other {{label} could not be ended: it may still run.}}",
+    "description": "A notification after End Process in the Activity tab when it didn't end it: it had ended or isn't the agent's (notOwn), it is the agent's CLI (cli), or ending it failed. {label} is what it runs."
+  },
+  "activity.notRunning": {
+    "defaultMessage": "Not running",
+    "description": "In the Activity tab, under Now, for an agent that isn't running."
+  },
+  "activity.nowHeading": {
+    "defaultMessage": "Now",
+    "description": "A heading in the Activity tab, over what an agent is doing in its turn now: its prompt, then the tool call under way (or thinking, or writing)."
+  },
+  "activity.openCard": {
+    "defaultMessage": "Open Card",
+    "description": "A button in the Activity tab's details: opens the card."
+  },
+  "activity.openSession": {
+    "defaultMessage": "Open in Sessions Tab",
+    "description": "A button in the Activity tab's details: opens the session's transcript in the Sessions tab."
+  },
+  "activity.orphanFact": {
+    "defaultMessage": "The process that started it has exited, and it has run for over ten minutes. The agent is told; Hive doesn’t end it.",
+    "description": "The value beside Left running in the Activity tab's details (HI-2111): why this process counts as left running."
+  },
+  "activity.orphanFor": {
+    "defaultMessage": "Left running · process {pid} · running {time} · CPU {cpu}",
+    "description": "A process node's second line in the Activity tab when the agent's command left it running, the shell that started it gone (HI-2111): its process id ({pid}), how long it has run ({time}: \"12 min\") and the processor time it has used ({cpu}: \"3 min\")."
+  },
+  "activity.orphanLabel": {
+    "defaultMessage": "Left running",
+    "description": "A label in the Activity tab's details (HI-2111): the process was left running by the agent's command."
+  },
+  "activity.parentLabel": {
+    "defaultMessage": "Started by process",
+    "description": "A label in the Activity tab's details: the id of the process that started this one."
+  },
+  "activity.pause": {
+    "defaultMessage": "Pause",
+    "description": "A button above the Activity tab while it is live: freezes it as it is (updates wait, counted in the pill)."
+  },
+  "activity.pauseTip": {
+    "defaultMessage": "Freeze it as it is: updates wait until you refresh or play.",
+    "description": "Tooltip of the Activity tab's Pause button (shown while live)."
+  },
+  "activity.pidLabel": {
+    "defaultMessage": "Process id",
+    "description": "A label in the Activity tab's details: a process's id."
+  },
+  "activity.pill": {
+    "defaultMessage": "{n, plural, one {# update · Refresh} other {# updates · Refresh}}",
+    "description": "A pill above the Activity tab while it is frozen: how many updates came since its snapshot; clicking it takes a new one. Keep \"Refresh\" as the action."
+  },
+  "activity.pillTip": {
+    "defaultMessage": "Take a new snapshot with what came since. It stays frozen.",
+    "description": "Tooltip of the Activity tab's updates pill."
+  },
+  "activity.process": {
+    "defaultMessage": "Process {pid}",
+    "description": "A process node's second line in the Activity tree. {pid} is its process id."
+  },
+  "activity.processFor": {
+    "defaultMessage": "Process {pid} · running {time}",
+    "description": "A process node's second line in the Activity tab: its process id ({pid}) and how long it has run ({time}: \"4 min\", \"1 h 5 min\")."
+  },
+  "activity.processesHeading": {
+    "defaultMessage": "Processes",
+    "description": "A heading in the Activity tab, over the processes an agent started (test runs, servers, scripts)."
+  },
+  "activity.promptFor": {
+    "defaultMessage": "Prompt · {time} ago",
+    "description": "The line under an agent's prompt in the Activity tab: when it was given, as a duration ({time}: \"4 min\")."
+  },
+  "activity.reading": {
+    "defaultMessage": "Reading the sessions…",
+    "description": "Beside the Activity tab's heading while the project's sessions are read (the tree shows running agents meanwhile)."
+  },
+  "activity.refresh": {
+    "defaultMessage": "Refresh",
+    "description": "Tooltip of the Activity tab's refresh button: takes a new snapshot of what runs now."
+  },
+  "activity.role": {
+    "defaultMessage": "{role, select, builder {builder} other {reviewer}}",
+    "description": "Beside an agent's name in the Activity tab when a card's builder and reviewer are both shown: its role on the card. Lower case."
+  },
+  "activity.showAgent": {
+    "defaultMessage": "Show Agent",
+    "description": "A button in the Activity tab's details: shows the agent's terminal."
+  },
+  "activity.showOwn": {
+    "defaultMessage": "{n, plural, =0 {Show the agent’s own processes} one {Show the agent’s own process (#)} other {Show the agent’s own processes (#)}}",
+    "description": "A checkbox beside the Activity tab's Processes heading: also shows the agent's own processes (its CLI, the terminal hosting it, Hive's tool server for it), hidden by default. {n}: how many are hidden."
+  },
+  "activity.started": {
+    "defaultMessage": "Started",
+    "description": "A label in the Activity tab's details: when a turn, tool call, task or process started."
+  },
+  "activity.state": {
+    "defaultMessage": "{state, select, working {Working} waiting {Waiting for you} failed {Failed or stalled} done {Done} other {Idle}}",
+    "description": "A node's state in the Activity tree: working, waiting for you, failed (or stalled), done, idle."
+  },
+  "activity.statusLabel": {
+    "defaultMessage": "Status",
+    "description": "A label in the Activity tab's details: the node's state."
+  },
+  "activity.subagentsHeading": {
+    "defaultMessage": "Subagents and background tasks",
+    "description": "A heading in the Activity tab, over an agent's subagents and the background tasks it left running (a command, a monitor)."
+  },
+  "activity.tabsLabel": {
+    "defaultMessage": "Agents",
+    "description": "The Activity tab's row of agent tabs (one per running agent), for screen readers."
+  },
+  "activity.task": {
+    "defaultMessage": "{type, select, subagent {Background subagent} command {Background command} monitor {Monitor} workflow {Workflow} other {Background task}}",
+    "description": "A background task node in the Activity tree: what kind it is."
+  },
+  "activity.thinking": {
+    "defaultMessage": "Thinking…",
+    "description": "In the Activity tab, what an agent is doing when it works with no tool call under way and nothing written yet in its turn."
+  },
+  "activity.toolFor": {
+    "defaultMessage": "{summary} · {time}",
+    "description": "A tool call node's second line in the Activity tab while it runs: what it does ({summary}, from the agent, such as a command) and how long it has run so far ({time}: \"40 s\", \"4 min\")."
+  },
+  "activity.workspace.agentIn": {
+    "defaultMessage": "{project} · {agent}",
+    "description": "An entry of the Activity view's Agents menu: an agent ({agent}) and its project ({project})."
+  },
+  "activity.workspace.assistant": {
+    "defaultMessage": "Assistant",
+    "description": "The Assistant's group heading among the Activity view's agent tabs (its tabs grouped by project; the Hive Assistant is its own group)."
+  },
+  "activity.workspace.cardNobody": {
+    "defaultMessage": "Nobody is working on {card} now. The card has its history.",
+    "description": "Activity's workspace level opened from a card ({card}: its key) when no running agent works on it now: past work is read on the card itself."
+  },
+  "activity.workspace.clearCard": {
+    "defaultMessage": "Show every agent",
+    "description": "Tooltip of the button on Activity's \"Working on HI-12\" chip: drops the card's filter."
+  },
+  "activity.workspace.empty": {
+    "defaultMessage": "Nothing is running in this workspace. Start an agent to see what it runs here.",
+    "description": "Activity's workspace level when no agent of any project runs anything."
+  },
+  "activity.workspace.forCard": {
+    "defaultMessage": "Card {card}",
+    "description": "A chip above Activity's workspace level when it was opened from a card, naming the filter (not saying anyone works on it): only the agents working on that card ({card}: its key, such as HI-12) now have tabs."
+  },
+  "activity.workspace.heading": {
+    "defaultMessage": "Activity",
+    "description": "Activity's workspace level (the activity bar's Activity view): what every project's agents run now, their tabs grouped by project."
+  },
+  "activity.workspace.noWorkspace": {
+    "defaultMessage": "Open a workspace to see what its agents run.",
+    "description": "The Activity view's sidebar with no workspace open."
+  },
+  "activity.workspace.panelTip": {
+    "defaultMessage": "What the workspace's agents run now. The whole workspace shows every project's running agents together; a project opens its own Activity tab.",
+    "description": "The info tip beside the Activity view's sidebar heading."
+  },
+  "activity.workspace.projectTip": {
+    "defaultMessage": "Open {project}'s Activity tab.",
+    "description": "Tooltip of a project's row in the Activity view's sidebar: opens that project's own Activity tab. {project} is its name."
+  },
+  "activity.workspace.projects": {
+    "defaultMessage": "Projects",
+    "description": "A section heading in the Activity view's sidebar, over a row per project."
+  },
+  "activity.workspace.showIn": {
+    "defaultMessage": "Show in Activity",
+    "description": "A button in a Progress panel run's details, and an entry of a lane's menu: opens Activity's workspace level on that run's agent (or the lane's builder and reviewer), what it runs now."
+  },
+  "activity.workspace.whole": {
+    "defaultMessage": "Whole workspace",
+    "description": "A row of the Activity view's sidebar: every project's running agents together (as Performance's Whole workspace)."
+  },
+  "activity.workspace.wholeTip": {
+    "defaultMessage": "Every project's running agents, grouped by project, and the Assistant when it runs.",
+    "description": "Tooltip of the Activity view's Whole workspace row."
+  },
+  "activity.writing": {
+    "defaultMessage": "Writing…",
+    "description": "In the Activity tab, what an agent is doing when it works with no tool call under way, after it started writing its reply."
+  }
+}

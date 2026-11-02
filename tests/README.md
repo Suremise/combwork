@@ -3,13 +3,19 @@
 Unit tests (Vitest) are the `*.test.ts` files here: `npm test`, or `npx vitest run <file>` for one. The end-to-end
 suites are in [e2e](e2e/README.md) and the agent-behaviour scenarios in [scenarios](scenarios/README.md). Helpers:
 `tempDir()` (`tempDir.ts`) for a test's folders, `pathAliases.ts` for another name for one, `noGlobalGit.ts` (unit
-tests run git with no global config, as CI does), and `electron-stub.ts` standing in for `electron`.
+tests run git with no global config, as CI does), `cliHomes.ts` (each test file gets empty Claude Code, Codex and
+Copilot homes, never the user's, whatever the shell sets: HI-1703), `loggerListeners.ts` (takes off the process
+listeners a test's fresh load of the logger added: HI-1728), and `electron-stub.ts` standing in for `electron`.
 
-Unit tests' temp folders are in the test area, `%LOCALAPPDATA%\hive-test\tmp` (#992), not `%TEMP%`: Hive's Antivirus
+Test runs' temp folders are in the test area, `%LOCALAPPDATA%\hive-test\tmp` (#992), not `%TEMP%`: Hive's Antivirus
 scanning setting covers the test area, and thousands of folders made and removed in `%TEMP%` kept Defender busy.
-`tempDir()` makes them there, and `vitest.config.ts` makes it the run's temp folder (`TEMP`, `TMP`) too, so Vitest's own
-copies of the modules, Hive's code under test and the programs tests start (git) put theirs there. Each run has its own
-folder there, `run-<random>`, removed once the run has ended (`tempRun.ts`, #995), with whatever Hive's code wrote
+`tempDir()` makes them there, and `vitest.config.ts` makes it the run's temp folder (`TEMP`, `TMP`, `TMPDIR`) too, so
+Vitest's own copies of the modules, Hive's code under test and the programs tests start (git) put theirs there. The e2e
+and scenario runners do the same for their suites (HI-2102: Playwright's `playwright-artifacts-*`, the test copies of
+Hive, the CLIs), and remove theirs as they exit (an e2e run with `--record` keeps it). Each run has its own folder
+there, `run-<pid>-<random>` (`runTemp.mts`), and a run's start removes those older than a day whose run has ended, as the board's evidence rules allow
+(`e2e/evidence.cjs`: nothing an open card cites, nothing while the board can't be read). A
+unit run's is removed once the run has ended (`tempRun.ts`, #995), with whatever Hive's code wrote
 late; and every folder `tempDir()` makes is removed when its test file ends (`tempCleanup.ts`), after the file's own
 `afterAll` hooks, so a run doesn't grow as it goes: close what holds files in it (watchers, services, processes) in the
 test or its hooks, or the run warns that it was left behind. `npm run test:clean` and the e2e and scenario runners sweep what is older than a day (e2e/README.md,
@@ -26,6 +32,37 @@ adopts what it runs (#543) and the one that follows it before it joins its packa
 unless `HIVE_TEST_STORE_PWSH=1` is set (#1027). Run from a Store PowerShell, which is every Codex agent's shell, they can
 end that shell and every other Store PowerShell on the PC, other agents' commands included; why is #1056. Opt in only
 where no one else's Store PowerShell runs (a Windows Sandbox, or a machine of your own with no Codex agents running).
+
+## Isolation: never alone, never the shell's (moved from AGENTS.md, HI-2013)
+
+Tests never assume they're alone on the machine or inherit their shell.
+- What a run uses of its own comes from the run context (`e2e/runContext.cjs`, `lanes.mjs`, `build.mjs`): environments
+  from an allowlist (`lib.hiveEnv()` for a test Hive, `lib.childEnv()` for the hive MCP server or `hive-progress`), a
+  lane's ports and folders, the CLI test homes, and the dev build under a lock per worktree.
+- Never build a child's environment from `process.env`. Give every child the runners, `lib.cjs` or the harness start
+  themselves an `env` (`runContext.baseEnv()` for git and the build), so a shell's `GIT_DIR` or `NODE_OPTIONS` can't
+  reach it (unit tests fail); a setting a run must pass on goes in `PASS_ENV`.
+- After changing the runner, `lib.cjs`, the run context or the scenario harness, run `npm run e2e:concurrency` (and
+  `-- --heavy` after changing `slots.mjs`).
+- At most two heavy runs (a full or `--repeat` e2e run, more than five scenarios, a full unit run) go at once on the
+  machine (`heavySlots` in `%LOCALAPPDATA%\hive-test\config.json` changes it, for the whole machine: e2e/README.md): a
+  third waits, not hung, printing who holds the slots ("e2e: waiting for a test slot" in Progress; `--no-wait` fails at
+  once).
+- Temp folders come from `tempDir()`, by long, real paths, in `%LOCALAPPDATA%\hive-test\tmp`, never under
+  `os.tmpdir()` (a unit test fails): CI's is the 8.3 form `C:\Users\RUNNER~1\…` and Hive compares real paths, so such
+  tests failed on CI only. Another name for a folder comes from `pathAliases.ts`: `junction()` works on any machine,
+  `shortPath()` only where the volume makes 8.3 names.
+- Unit tests run git with none of the shell's `GIT_*` variables (`cleanGitEnv.ts`) and no global config, as CI does
+  (`noGlobalGit.ts`): a test whose Hive code commits or merges sets its repository's own `user.name` and `user.email`.
+- e2e suites use `lib.cjs` and work under `%LOCALAPPDATA%\hive-test\e2e` (each runner's suites in its lane's
+  `lanes\<k>\<suite>`, so runners in different worktrees don't collide), never the real clipboard, profile or
+  `~/.codex`.
+- Probes of your own (scripts, screenshots, profiles outside a suite) and redirected output take a new folder each run,
+  from `lib.probeDir()` (in `hive-test\scratch`) or your scratchpad, never in the lanes or logs, the project, a worktree
+  or beside one (the worktrees' parent folder), or a project's `.codex`, `.claude` or `.agents` (a stray `.codex` with a
+  reviewer's probe stopped every Codex agent's commands, #509; logs left beside worktrees outlived them). The runners
+  prune what tests leave in `hive-test`, keeping what an open card cites by path (`npm run test:clean`, e2e/README.md
+  Housekeeping).
 
 ## Tests wait for conditions, never for time
 

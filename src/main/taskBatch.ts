@@ -4,13 +4,15 @@ import { COLUMN_CHOICES, isTaskColumn } from '../shared/tasks'
 import * as assistant from './assistantControl'
 import { ChangeRefused } from './assistantControl'
 import * as tasks from './tasks'
+import { recordingChanges } from './assistantChanges'
 import { cardAgent, knownAgent } from './activityTargets'
+import { cardRef } from '../shared/projectKeys'
 
 /**
  * The fields a batch takes besides its card numbers and reply. A title, comment, decision or link is one card's: a batch
  * never archives, edits a decision or deletes (those stay the user's, on one card).
  */
-const BATCH_FIELDS = ['numbers', 'column', 'position', 'blocked', 'labels', 'addLabels', 'removeLabels', 'agent', 'reply']
+const BATCH_FIELDS = ['numbers', 'column', 'position', 'blocked', 'labels', 'addLabels', 'removeLabels', 'agent', 'override', 'reply']
 
 /** The card numbers and the fields of a batch request, checked before anything changes or is counted. */
 export function batchRequest(body: any): { numbers: number[]; patch: tasks.BatchPatch } {
@@ -42,6 +44,13 @@ export function batchRequest(body: any): { numbers: number[]; patch: tasks.Batch
     patch[k] = body[k]
   }
   if (body.agent !== undefined) patch.agent = body.agent ? String(body.agent) : null
+  // The Assistant's reason for moving the cards across their workflow rules (#1265): one, for every card of the batch.
+  if (body.override !== undefined && body.override !== null) {
+    const reason = typeof body.override === 'object' ? body.override.reason : undefined
+    if (typeof reason !== 'string' || !reason.trim()) throw new ChangeRefused(400, 'override is { "reason": "<why>" }, the reason not empty.')
+    if (body.column === undefined) throw new ChangeRefused(400, 'override goes with column: it is the reason for moving the cards across their rules.')
+    patch.override = { reason: reason.trim() }
+  }
   if (!Object.keys(patch).length) throw new ChangeRefused(400, 'Give what to change on the cards: column, position, blocked, labels, addLabels, removeLabels or agent.')
   return { numbers, patch }
 }
@@ -53,27 +62,26 @@ const clip = (s: string, max: number): string => {
 
 /**
  * A batch the Assistant asks for, through the Assistant's change boundary (assistantControl's admit, which assistantChange
- * uses for a single change too): its control level is checked and the batch counts as one change against this message's
- * limit, however many cards it has (#488: a bulk move never stops part-way for the limit), before any card changes. Each
+ * uses for a single change too): its control level is checked before any card changes. Each
  * card is then written only if the guard still passes after its last read, under its own lock: the control level and the session that asked must still allow it (the user may have turned the
  * level down, or the Assistant been restarted, while the batch waited for a card). A card refused for any reason is left
- * as it was, and every card, changed or refused, is recorded in the activity list on its own. The batch stays counted when
- * some of its cards are refused, as a refused single change does. Returns each card's outcome, in the order given.
+ * as it was, and every card, changed or refused, is recorded in the activity list on its own. Returns each card's outcome, in the order given.
  */
 export async function assistantBatch(ws: string, token: string, numbers: number[], patch: tasks.BatchPatch, actor: tasks.TaskActor): Promise<tasks.BatchItem[]> {
   const column = typeof patch.column === 'string' ? { column: patch.column } : {}
   const guard = assistant.admit(ws, token, 'agents', `change ${numbers.length} card${numbers.length === 1 ? '' : 's'} on the board`, { kind: 'update-tasks', cards: numbers, ...column })
-  const items = await tasks.updateTasks(numbers, patch, actor, { commit: guard })
+  // Each card's change recorded for undo as it is saved (#1282): a change of its own, in this message's group.
+  const items = await recordingChanges(ws, 'update-tasks', `change ${numbers.length} card${numbers.length === 1 ? '' : 's'} on the board`, () => tasks.updateTasks(numbers, patch, actor, { commit: guard }))
   // Each card's line names its card, its project and the agent it is with (#763): a viewer follows a bulk move card by
   // card. A refused card: the agent it was to be given, if there is one.
   for (const i of items) {
     if (i.card) {
       const agent = await cardAgent(i.card)
-      assistant.record(ws, { kind: 'update-tasks', card: i.number, column: i.card.column, ...(i.card.project ? { project: i.card.project } : {}), ...(agent ? { agent } : {}) }, `#${i.number} ${clip(i.card.title, 60)}: ${i.said.join(', ') || 'no change'}`)
+      assistant.record(ws, { kind: 'update-tasks', card: i.number, column: i.card.column, ...(i.card.project ? { project: i.card.project } : {}), ...(agent ? { agent } : {}) }, `${cardRef(i.number)} ${clip(i.card.title, 60)}: ${i.said.join(', ') || 'no change'}`)
     } else {
       const was = await tasks.getTask(i.number).catch(() => null)
       const agent = typeof patch.agent === 'string' ? await knownAgent(was?.project, patch.agent) : undefined
-      assistant.record(ws, { kind: 'update-tasks', card: i.number, ...column, ...(was?.project ? { project: was.project } : {}), ...(agent ? { agent } : {}) }, `#${i.number}: change`, i.error ?? 'refused', { reason: 'Refused' })
+      assistant.record(ws, { kind: 'update-tasks', card: i.number, ...column, ...(was?.project ? { project: was.project } : {}), ...(agent ? { agent } : {}) }, `${cardRef(i.number)}: change`, i.error ?? 'refused', { reason: 'Refused' })
     }
   }
   return items

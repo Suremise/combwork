@@ -3,8 +3,10 @@ import type { IPty } from '@lydell/node-pty'
 import { sendPty } from './events'
 import { argsForLog, createLogger, userText } from './logger'
 import { allProviders } from './providers'
-import { launchGate, type GateWord } from './launchGate'
+import { launchGate, type GateWord, type LaunchGate } from './launchGate'
 import { envWithCliFolders } from './freshPath'
+import { advanced } from './advanced'
+import { TERMINAL_TYPE } from '../shared/advanced'
 
 const log = createLogger('pty')
 const MAX_BUFFER = 512 * 1024
@@ -25,6 +27,8 @@ interface PtyEntry {
   refresh?: ReturnType<typeof setTimeout>
   /** The size the window gave it during a refresh, which it ends at. */
   wanted?: { cols: number; rows: number }
+  /** Its launch gate (launchGate.ts), until the command has had its word. */
+  gate?: LaunchGate
 }
 
 const entries = new Map<string, PtyEntry>()
@@ -86,7 +90,11 @@ export function startSize(key: string): { cols: number; rows: number } {
 
 export interface SpawnOptions {
   file: string
-  args: string[]
+  /**
+   * Its arguments; on Windows, one string is a command line passed as written (node-pty quotes an array's arguments
+   * CRT-style, turning a `"` in one into `\"`, which `cmd /s /c` doesn't read: #1454).
+   */
+  args: string[] | string
   cwd: string
   env: Record<string, string>
   cols?: number
@@ -145,6 +153,24 @@ export function childEnv(extra: Record<string, string> = {}): Record<string, str
   return { ...envWithCliFolders(env), ...extra }
 }
 
+/**
+ * A session terminal's environment with its type named as Hive's terminal is (HI-2004, `hive.sessions.terminalType`):
+ * TERM=xterm-256color unless the environment names one already (the user's own, or the session's), and no
+ * WT_SESSION inherited from a Windows Terminal Hive was opened from. So the CLIs draw the same however Hive was opened.
+ * Off, the environment as given.
+ */
+export function withTerminalType(env: Record<string, string>, on = advanced.get<boolean>(TERMINAL_TYPE), platform: NodeJS.Platform = process.platform): Record<string, string> {
+  if (!on) return env
+  // Windows' names are case-insensitive (HR3's round 1): a `Term` or `wt_session` is the same variable, as PATH is (freshPath.ts).
+  const same = (k: string, name: string): boolean => (platform === 'win32' ? k.toUpperCase() === name : k === name)
+  const rest = Object.fromEntries(Object.entries(env).filter(([k]) => !same(k, 'WT_SESSION')))
+  const terms = Object.keys(rest).filter((k) => same(k, 'TERM'))
+  if (!terms.length) return { ...rest, TERM: 'xterm-256color' }
+  // One TERM, the last given: a session's or connection's own is spread over the one inherited, whatever its case.
+  for (const k of terms.slice(0, -1)) delete rest[k]
+  return rest
+}
+
 /** An argument as logged: bearer tokens hidden (Codex's hooks carry one), long values shortened. */
 export function forLog(arg: string): string {
   const safe = arg.replace(/(Bearer\s+)[A-Za-z0-9._~+/=-]{8,}/gi, '$1***').replace(/(HIVE_[A-Z_]*TOKEN=)\S+/g, '$1***')
@@ -154,9 +180,10 @@ export function forLog(arg: string): string {
 export function spawnPty(key: string, opts: SpawnOptions): IPty {
   // i18n-ignore: a guard for Hive's own code (callers refuse a second start first, in their own words); the key is internal
   if (entries.has(key)) throw new Error(`A process is already running for ${key}`)
-  log.info(`spawn ${userText(key)}: ${opts.file} ${JSON.stringify(argsForLog(opts.args.map(forLog)))}`)
+  log.info(`spawn ${userText(key)}: ${opts.file} ${JSON.stringify(typeof opts.args === 'string' ? userText(forLog(opts.args)) : argsForLog(opts.args.map(forLog)))}`)
   const size = startSize(key)
-  const gate = opts.track && process.platform === 'win32' ? launchGate(opts.file, opts.args, opts.env) : null
+  const env = withTerminalType(opts.env)
+  const gate = opts.track && process.platform === 'win32' ? launchGate(opts.file, opts.args, env) : null
   let proc: IPty
   try {
     proc = pty.spawn(gate?.file ?? opts.file, gate?.args ?? opts.args, {
@@ -164,7 +191,7 @@ export function spawnPty(key: string, opts: SpawnOptions): IPty {
       cols: opts.cols ?? size.cols,
       rows: opts.rows ?? size.rows,
       cwd: opts.cwd,
-      env: gate?.env ?? opts.env,
+      env: gate?.env ?? env,
       useConptyDll: false
     })
   } catch (e) {
@@ -173,7 +200,7 @@ export function spawnPty(key: string, opts: SpawnOptions): IPty {
   }
   const prior = opts.continueBuffer ? carried.get(key) ?? [] : []
   carried.delete(key)
-  const entry: PtyEntry = { proc, onResize: opts.onResize, buffer: [...prior], size: prior.reduce((n, s) => n + s.length, 0) }
+  const entry: PtyEntry = { proc, onResize: opts.onResize, buffer: [...prior], size: prior.reduce((n, s) => n + s.length, 0), ...(gate ? { gate } : {}) }
   entries.set(key, entry)
   proc.onData((data) => {
     entry.buffer.push(data)
@@ -252,10 +279,15 @@ function setSize(key: string, e: PtyEntry, cols: number, rows: number): void {
   }
 }
 
-/** A terminal's process's size now, for a view that shows it: drawn at any other size, its output lands in the wrong places. */
-export function ptySize(key: string): { cols: number; rows: number } | null {
+/**
+ * A terminal's process's size now, for a view that shows it: drawn at any other size, its output lands in the wrong
+ * places. With no process (yet), the size the next one starts at (startSize): a session's view is made at its start,
+ * before its process is spawned, and asks once, so a hidden one (never fitted) would otherwise keep xterm's 80 × 24
+ * while its process draws at its own size (HI-2250).
+ */
+export function ptySize(key: string): { cols: number; rows: number } {
   const e = entries.get(key)
-  return e ? { cols: e.proc.cols, rows: e.proc.rows } : null
+  return e ? { cols: e.proc.cols, rows: e.proc.rows } : startSize(key)
 }
 
 /**
@@ -287,6 +319,26 @@ export function hasPty(key: string): boolean {
 }
 
 /**
+ * Resolves once the terminal's process has exited and its `onExit` has run (at once with none), or with false after
+ * `boundMs` (a kill that never ended it), its listener then let go. Called before the kill, so its exit can't be missed.
+ */
+export function ptyGone(key: string, boundMs: number): Promise<boolean> {
+  const e = entries.get(key)
+  if (!e) return Promise.resolve(true)
+  return new Promise((resolve) => {
+    // Registered after spawnPty's own listener, so it runs after the entry is gone and its onExit has run.
+    const listener = e.proc.onExit(() => {
+      clearTimeout(timer)
+      resolve(true)
+    })
+    const timer = setTimeout(() => {
+      listener.dispose()
+      resolve(entries.get(key) !== e)
+    }, boundMs)
+  })
+}
+
+/**
  * Stops a terminal's process, once. On Windows node-pty closes the pseudoconsole a moment after kill() (it first asks
  * which processes are attached), and a second kill before the first has finished closes it again: that corrupts the
  * heap and Hive's main process dies, with nothing in its log (#297). It happened whenever a session being stopped was
@@ -298,6 +350,10 @@ export function killPty(key: string): void {
   if (!e || e.killed) return
   e.killed = true
   log.info(`kill ${userText(key)} (process ${e.proc.pid})`)
+  // A command not yet started never starts now (HI-1819): started as its console closes, it would miss the close and
+  // run on without one. The gate is told before the kill, so it ends on its own if the kill can't reach it.
+  // i18n-ignore: the launch gate's reason, printed in the terminal by its script in English (launchGate.ts, CLI-facing)
+  e.gate?.stop('its terminal was closed before it started')
   logConsoleKills(key, e.proc)
   try {
     e.proc.kill()

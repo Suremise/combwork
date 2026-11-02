@@ -5,7 +5,7 @@
 import { existsSync, readFileSync, writeFileSync } from 'fs'
 import { join } from 'path'
 import { afterEach, describe, expect, it, vi } from 'vitest'
-import { ADVANCED_DEFS, advancedDef, advancedFileText, advancedRow, checkAdvanced, cliFacing, parseAdvancedFile, sampleMiss, type AdvancedDef } from '../src/shared/advanced'
+import { ADVANCED_DEFS, advancedDef, advancedFileText, advancedUnit, advancedRow, checkAdvanced, cliFacing, parseAdvancedFile, sampleMiss, type AdvancedDef } from '../src/shared/advanced'
 import { CLAUDE_FOOTER_MODES } from '../src/shared/claude'
 import { COPILOT_FOOTER_MODES } from '../src/shared/copilot'
 import { SETTINGS_CATALOG, checkSettingValue, settingDefault, settingEntry, settingPatch, settingValue, settingValueText } from '../src/shared/settingsCatalog'
@@ -62,6 +62,12 @@ describe('advanced defaults', () => {
     }
   })
 
+  it("every number's unit has a label for beside its box (#1281), and a number of seconds says s", () => {
+    for (const d of ADVANCED_DEFS.filter((x) => x.unit)) expect(advancedUnit(d), d.id).toBeTruthy()
+    expect(advancedUnit(def('codex.mcp.startupTimeoutSeconds'))).toBe('s')
+    expect(advancedUnit(def('hive.showDeveloperFeatures'))).toBeNull()
+  })
+
   it('every CLI-facing default has recorded samples, each found in its fixture, and reads every one', () => {
     for (const d of ADVANCED_DEFS.filter(cliFacing)) {
       expect(d.samples?.length, `${d.id} has no recorded sample`).toBeGreaterThan(0)
@@ -108,6 +114,20 @@ describe('advanced defaults', () => {
 })
 
 describe('an override', () => {
+  // A choice (#1292: the OSC 52 policy): one of its values, as advanced.json and the tools write them.
+  it('takes one of a choice\'s values, any case, shown by its name; anything else refused, listing them', async () => {
+    const { advancedShown, advancedText } = await import('../src/shared/advanced')
+    const policy = def('hive.terminal.osc52')
+    expect(policy).toMatchObject({ kind: 'choice', default: 'allow', applies: 'now' })
+    expect(policy.choices!.map((c) => c.value)).toEqual(['allow', 'ask', 'block'])
+    expect(checkAdvanced(policy, 'ask')).toEqual({ value: 'ask' })
+    expect(checkAdvanced(policy, ' Block ')).toEqual({ value: 'block' })
+    expect(checkAdvanced(policy, 'maybe')).toMatchObject({ error: 'A CLI putting text on the clipboard takes one of allow, ask, block.' })
+    expect(checkAdvanced(policy, true)).toMatchObject({ error: expect.any(String) })
+    expect(advancedText(policy, 'ask')).toBe('ask')
+    expect(advancedShown(policy, 'ask')).toBe('Ask each time')
+  })
+
   it('takes a pattern that compiles and finds something, text, a field name, names, a whole number in range', () => {
     const trust = def('claude-code.trust.prompt')
     expect(checkAdvanced(trust, 'trust (this|the) folder')).toEqual({ value: 'trust (this|the) folder' })
@@ -147,11 +167,11 @@ describe('an override', () => {
   it('is used when it checks out; else the default, saying why; a workspace\'s own comes first where one is taken', () => {
     const lanes = def('hive.progress.lanesShown')
     const state = (values: Record<string, unknown>, workspace: Record<string, unknown> | null = null) => ({ values, madeFor: {}, workspace, cli: {} })
-    expect(advancedRow(lanes, null).value).toBe(4)
+    expect(advancedRow(lanes, null).value).toBe(6)
     expect(advancedRow(lanes, state({ 'hive.progress.lanesShown': 6 })).value).toBe(6)
     expect(advancedRow(lanes, state({ 'hive.progress.lanesShown': 6 }, { 'hive.progress.lanesShown': 2 })).value).toBe(2)
     const bad = advancedRow(lanes, state({ 'hive.progress.lanesShown': 'six' }))
-    expect(bad.value).toBe(4)
+    expect(bad.value).toBe(6)
     expect(bad.problem).toMatch(/whole number/)
     const badOwn = advancedRow(lanes, state({ 'hive.progress.lanesShown': 6 }, { 'hive.progress.lanesShown': 99 }))
     expect(badOwn.value).toBe(6)
@@ -215,6 +235,17 @@ describe('the advanced store', () => {
     await s.set('hive.mcp.replySeconds', 300)
     await s.set('claude-code.trust.prompt', null)
     expect(read(file)).toEqual({ format: 1, values: {}, madeFor: {} })
+  })
+
+  it('a retired setting (the Connections preview, HI-1774) is dropped as read, never unknown, and gone at the next write; a real unknown one stays', async () => {
+    const { s, dir, file } = store()
+    writeFileSync(file, JSON.stringify({ format: 1, values: { 'hive.accounts.preview': true, 'hive.nope': 1, 'hive.mcp.replySeconds': 400 }, madeFor: { 'hive.accounts.preview': { version: null, value: true } } }))
+    expect(parseAdvancedFile(readFileSync(file, 'utf8'))).toEqual({ values: { 'hive.nope': 1, 'hive.mcp.replySeconds': 400 }, madeFor: {}, unknown: ['hive.nope'] })
+    s.load(dir)
+    expect(s.state(null).unknown).toEqual(['hive.nope'])
+    await s.set('hive.mcp.replySeconds', 600)
+    expect(read(file)).toEqual({ format: 1, values: { 'hive.nope': 1, 'hive.mcp.replySeconds': 600 }, madeFor: {} })
+    await expect(s.set('hive.accounts.preview', true)).rejects.toThrow('No advanced setting')
   })
 
   it('reads a file edited by hand: a changed CLI-facing value is made for the CLI installed now; an invalid one falls back', async () => {
@@ -363,6 +394,18 @@ describe('the advanced store', () => {
     await vi.waitFor(() => expect(s.state(null).fileError).toMatch(/isn't valid JSON/), { timeout: 10_000 })
     expect(s.number('hive.mcp.replySeconds')).toBe(900)
     await expect(s.set('hive.mcp.replySeconds', 600)).rejects.toThrow('Fix advanced.json')
+    // Through the Agent API (the Assistant's PATCH /v1/settings/:id reaches this set): a refusal by the file's state, 409
+    // with its words and the caller's error in metrics, never Hive's 500 (HI-1952 round 1); so is a reset of them all.
+    const { apiErrorReply } = await import('../src/main/servers')
+    const { apiOutcome } = await import('../src/main/metrics')
+    for (const refused of [await s.set('hive.mcp.replySeconds', 600).catch((e: unknown) => e), await s.resetAll().catch((e: unknown) => e)]) {
+      const reply = apiErrorReply(refused)
+      expect(reply.status, String(refused)).toBe(409)
+      expect(reply.body.error).toMatch(/^advanced\.json isn't valid JSON.*Fix (or delete )?advanced\.json/s)
+      expect(apiOutcome({ finished: true, status: reply.status, waiting: false })).toBe('client-error')
+    }
+    // No setting by that id: 404.
+    expect(apiErrorReply(await s.set('hive.nope', 1).catch((e: unknown) => e)).status).toBe(404)
     // The broken file is left for the user to fix.
     expect(readFileSync(file, 'utf8')).toBe('{ "values": { "hive.mcp.replySeconds": 9')
   })
@@ -502,6 +545,41 @@ describe('the adapters and the hive MCP server use them', () => {
     expect(parseClaudePlanUsage(renamed, now)).toEqual(before)
   })
 
+  it("counts Claude Code's recorded background subagents, and under a renamed status and fields once the overrides name them (#1584)", async () => {
+    const dir = tempDir('hive-advanced-subagents-')
+    advanced.load(dir)
+    const { claudeBackgroundTasks } = await import('../src/main/providers/claude/background')
+    const recorded = fixtureText('tests/fixtures/advanced/subagent-launch-claude-2.1.310.jsonl') + fixtureText('tests/fixtures/advanced/subagent-resume-claude-2.1.309.jsonl')
+    const summary = (text: string): string[] => claudeBackgroundTasks(text).map((e) => `${e.kind} ${e.id}${e.kind === 'start' ? ` ${e.description ?? ''}${e.resumed ? ' resumed' : ''}` : ''}`)
+    const before = summary(recorded)
+    expect(before).toEqual(['start ab1827f13c285365d Review pl translations part A', 'end ab1827f13c285365d', 'start a152e8fb710ad64b4  resumed'])
+    // As if Claude Code renamed them: the status, the id, the description and the resume's field.
+    const renamed = recorded.replace(/"async_launched"/g, '"background_started"').replace(/"agentId"/g, '"subagentId"').replace(/"description"/g, '"task"').replace(/"resumedAgentId"/g, '"resumedSubagentId"')
+    expect(summary(renamed)).toEqual(['end ab1827f13c285365d'])
+    await advanced.set('claude-code.subagent.launched', 'background_started')
+    await advanced.set('claude-code.subagent.idField', 'subagentId')
+    await advanced.set('claude-code.subagent.descriptionField', 'task')
+    await advanced.set('claude-code.subagent.resumedField', 'resumedSubagentId')
+    expect(summary(renamed)).toEqual(before)
+  })
+
+  it("counts Codex's recorded subagent, and under a renamed item, kind and fields once the overrides name them (#1584)", async () => {
+    const dir = tempDir('hive-advanced-codex-subagents-')
+    advanced.load(dir)
+    const { codexBackgroundTasks } = await import('../src/main/providers/codex/background')
+    const recorded = fixtureText('tests/fixtures/advanced/subagent-codex-0.164.0.jsonl')
+    const summary = (text: string): string[] => codexBackgroundTasks(text).map((e) => `${e.kind} ${e.id}${e.kind === 'start' ? ` ${e.description}` : ''}`)
+    const before = summary(recorded)
+    expect(before).toEqual(['start 01a16de6-2c40-7ef2-b882-f6423230efbe /root/sleep_task', 'end 01a16de6-2c40-7ef2-b882-f6423230efbe'])
+    const renamed = recorded.replace(/"SubAgentActivity"/g, '"SubagentEvent"').replace(/"kind": "started"/g, '"kind": "spawned"').replace(/"agent_thread_id"/g, '"thread"').replace(/"agent_path"/g, '"task_path"')
+    expect(summary(renamed)).toEqual([])
+    await advanced.set('codex.subagent.item', 'SubagentEvent')
+    await advanced.set('codex.subagent.started', 'spawned')
+    await advanced.set('codex.subagent.threadField', 'thread')
+    await advanced.set('codex.subagent.taskField', 'task_path')
+    expect(summary(renamed)).toEqual(before)
+  })
+
   it('takes an override at once (patterns, the placeholder, a sign-in error) and at the next launch (hooks, title, tool timeout)', async () => {
     const dir = tempDir('hive-advanced-adapters-')
     advanced.load(dir)
@@ -589,7 +667,7 @@ describe("the Assistant's settings catalog", () => {
       const e = settingEntry(`advanced.${d.id}`)
       expect(e, d.id).toBeTruthy()
       expect(e!.hidden).toBe(true)
-      expect(e!.docs).toBe('Advanced settings')
+      expect(e!.docs).toBe('advanced-settings')
       expect(!!settingEntry(`workspace.advanced.${d.id}`), d.id).toBe(!!d.workspace)
       expect(e!.restart === 'sessions', d.id).toBe(d.applies === 'sessions')
     }
@@ -613,13 +691,9 @@ describe("the Assistant's settings catalog", () => {
     expect(settingValue(lanes, {} as never, null, {})).toBeNull()
     expect(checkSettingValue(lanes, 'inherit')).toEqual({ value: null })
     expect(settingPatch(lanes, 6)).toEqual({ advanced: { id: 'hive.progress.lanesShown', scope: 'workspace', value: 6 } })
-    // Agents per project (#562): Settings' and a workspace's own, 1–24.
-    const agents = settingEntry('workspace.advanced.hive.agents.perProject')!
-    expect(agents.scope).toBe('workspace')
-    expect(settingEntry('advanced.hive.agents.perProject')).toMatchObject({ min: 1, max: 24 })
-    expect(checkSettingValue(agents, 24)).toEqual({ value: 24 })
-    expect(checkSettingValue(agents, 25)).toMatchObject({ error: expect.any(String) })
-    expect(settingPatch(agents, 20)).toEqual({ advanced: { id: 'hive.agents.perProject', scope: 'workspace', value: 20 } })
+    // Agents per project (#562) is Maximum agents, a workflow option, since HI-2001 (agentLimit.test.ts).
+    expect(settingEntry('workspace.advanced.hive.agents.perProject')).toBeUndefined()
+    expect(settingEntry('advanced.hive.agents.perProject')).toBeUndefined()
     // The developer features switch keeps its key and entry in Hive's settings, with its advanced value's text.
     expect(settingEntry('advanced.showDeveloperFeatures')).toMatchObject({ hidden: true, type: 'boolean', title: def('hive.showDeveloperFeatures').title, desc: def('hive.showDeveloperFeatures').desc })
     expect(settingEntry('advanced.hive.showDeveloperFeatures')).toBeUndefined()

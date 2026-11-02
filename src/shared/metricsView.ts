@@ -110,6 +110,8 @@ export interface PerfTotals {
   denied: number
   /** Failed requests other than cancelled ones (errors and refusals). */
   errors: number
+  /** Replies that said to ask again (an isolated check waiting for a check copy, HI-1831): counted, never failed. */
+  waits: number
   requestBytes: number
   responseBytes: number
   latency: Timed
@@ -139,9 +141,11 @@ export function totals(s: PerfSelection): PerfTotals {
   let failed = 0
   let cancelled = 0
   let denied = 0
+  let waits = 0
   for (const a of s.api) {
     mergeTimed(latency, a)
-    if (a.outcome !== 'ok') failed += a.count
+    if (a.outcome === 'waiting') waits += a.count
+    else if (a.outcome !== 'ok') failed += a.count
     if (a.outcome === 'cancelled') cancelled += a.count
     if (a.outcome === 'denied') denied += a.count
   }
@@ -154,6 +158,7 @@ export function totals(s: PerfSelection): PerfTotals {
     cancelled,
     denied,
     errors: failed - cancelled,
+    waits,
     requestBytes: sum(s.api, (a) => a.requestBytes),
     responseBytes: sum(s.api, (a) => a.responseBytes),
     latency,
@@ -184,6 +189,7 @@ export interface RouteRow {
   requests: number
   failed: number
   cancelled: number
+  waits: number
   p50: number | null
   p95: number | null
   requestBytes: number
@@ -195,10 +201,11 @@ export function byRoute(api: ApiSeries[]): RouteRow[] {
   const rows = new Map<string, RouteRow & { t: Timed }>()
   for (const a of api) {
     const key = `${a.method} ${a.route}`
-    const r = rows.get(key) ?? { key, route: a.route, method: a.method, requests: 0, failed: 0, cancelled: 0, p50: null, p95: null, requestBytes: 0, responseBytes: 0, t: emptyTimed() }
+    const r = rows.get(key) ?? { key, route: a.route, method: a.method, requests: 0, failed: 0, cancelled: 0, waits: 0, p50: null, p95: null, requestBytes: 0, responseBytes: 0, t: emptyTimed() }
     rows.set(key, r)
     mergeTimed(r.t, a)
-    if (a.outcome !== 'ok') r.failed += a.count
+    if (a.outcome === 'waiting') r.waits += a.count
+    else if (a.outcome !== 'ok') r.failed += a.count
     if (a.outcome === 'cancelled') r.cancelled += a.count
     r.requestBytes += a.requestBytes
     r.responseBytes += a.responseBytes
@@ -241,6 +248,46 @@ export function byTool(mcp: McpSeries[]): ToolRow[] {
  * current choice) even without any, so it can always be seen and changed. The page asks Hive for every provider's
  * (the filter narrows its own sections only), so picking one never hides the others (#270).
  */
+/**
+ * The hive tool list a start, per role and workflow role (HI-2063): its series merged across projects. Each average is
+ * over the starts that measured it (tools and bytes: every start; characters: those of a bridge from HI-2049 on; parts:
+ * from HI-2063 on), null where none did (unknown, never zero). `schemaChars` is the rest of the parts' characters: the
+ * schemas and the list's structure (names, types, keys, punctuation, escapes).
+ */
+export interface ToolListRow {
+  role: CatalogSeries['role']
+  workflow: CatalogSeries['workflow']
+  starts: number
+  tools: number
+  bytes: number
+  chars: number | null
+  descriptionChars: number | null
+  paramChars: number | null
+  schemaChars: number | null
+}
+
+export function toolListRows(catalog: CatalogSeries[]): ToolListRow[] {
+  const by = new Map<string, CatalogSeries>()
+  for (const c of catalog) {
+    const key = `${c.role} ${c.workflow ?? 'unknown'}`
+    const t = by.get(key) ?? { role: c.role, workflow: c.workflow ?? 'unknown', starts: 0, tools: 0, toolsBytes: 0, toolsChars: 0, charStarts: 0, partStarts: 0, partToolsChars: 0, descriptionChars: 0, paramChars: 0 }
+    for (const k of ['starts', 'tools', 'toolsBytes', 'toolsChars', 'charStarts', 'partStarts', 'partToolsChars', 'descriptionChars', 'paramChars'] as const) t[k] += c[k] ?? 0
+    by.set(key, t)
+  }
+  const per = (n: number, of: number): number | null => (of ? n / of : null)
+  return [...by.values()].map((t) => ({
+    role: t.role,
+    workflow: t.workflow,
+    starts: t.starts,
+    tools: per(t.tools, t.starts) ?? 0,
+    bytes: per(t.toolsBytes, t.starts) ?? 0,
+    chars: per(t.toolsChars, t.charStarts),
+    descriptionChars: per(t.descriptionChars, t.partStarts),
+    paramChars: per(t.paramChars, t.partStarts),
+    schemaChars: per(t.partToolsChars - t.descriptionChars - t.paramChars, t.partStarts)
+  }))
+}
+
 export function providersIn(r: MetricsReport, chosen = ''): string[] {
   const ids = new Set<string>()
   for (const p of r.providers) ids.add(p.provider)

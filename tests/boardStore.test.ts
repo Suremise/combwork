@@ -1,12 +1,15 @@
 // The board in SQLite (#1017): the database layer (settings, migrations, a file from a newer Hive), the move of the cards'
 // files into it (once, checked, the folder kept as a backup and a stub left for older versions), cards an older Hive saved
 // meanwhile, Export Board to JSON (an export read back is the same board), and the window's board with archived cards in short.
-import { existsSync, mkdirSync, readdirSync, readFileSync, writeFileSync } from 'fs'
-import { join, sep } from 'path'
+import { existsSync, mkdirSync, readdirSync, readFileSync, unlinkSync, writeFileSync } from 'fs'
+import { join, resolve, sep } from 'path'
 import { afterAll, afterEach, beforeAll, describe, expect, it, vi } from 'vitest'
 import * as electron from 'electron'
 import { DatabaseSync } from 'node:sqlite'
+import { junction, shortPath } from './pathAliases'
 import { tempDir } from './tempDir'
+import { leftByAKill, refusedNow, whileMapped } from './mappedShm'
+import { journalSettings } from '../src/shared/journal'
 import type { BoardNotice } from '../src/main/boardStore'
 
 const base = tempDir('hive-board-store-')
@@ -14,10 +17,13 @@ const base = tempDir('hive-board-store-')
 const HUNG_MS = 10_000
 ;(electron.app as unknown as { getPath: () => string }).getPath = () => join(base, 'profile')
 
-const { createWorkspaceService, disposeWorkspaceService, inWorkspace } = await import('../src/main/workspace')
+const { createWorkspaceService, disposeWorkspaceService, inWorkspace, WorkspaceService } = await import('../src/main/workspace')
 const tasks = await import('../src/main/tasks')
+const journal = await import('../src/main/journal')
 const store = await import('../src/main/boardStore')
-const { backupTo, openDb, schemaVersion } = await import('../src/main/db')
+const { backupTo, OPEN_IO_RETRY_MS, openDb, schemaVersion, untilOpenable } = await import('../src/main/db')
+const { renameRetrying } = await import('../src/main/fsutil')
+const { refusal } = await import('../src/main/openingFence')
 
 const user = { kind: 'user' } as const
 let n = 0
@@ -118,6 +124,178 @@ describe('the database layer (db.ts)', () => {
     } finally {
       db.close()
     }
+  })
+
+  // SQLite's own error, as node:sqlite throws it: an I/O error has errcode 10 (or an extended code of it).
+  const sqliteError = (errcode: number, message: string): Error => Object.assign(new Error(message), { code: 'ERR_SQLITE_ERROR', errcode })
+
+  it('an open that fails with an I/O error is tried again, and opens once the error has gone (HI-2179)', () => {
+    const file = join(base, `layer-${++n}`, 'x.db')
+    const steps = [{ version: 1, name: 'one', up: (d: DatabaseSync) => d.exec('CREATE TABLE a (x)') }]
+    // As just after a Hive ended without quitting: the first two opens fail (4618: SQLITE_IOERR_SHMOPEN).
+    let failing = 2
+    const retries: number[] = []
+    const db = openDb(file, {
+      migrations: steps,
+      hiveVersion: '1',
+      setup: () => {
+        if (failing-- > 0) throw sqliteError(4618, 'disk I/O error')
+      },
+      onIoRetry: (e, ms) => {
+        expect(e.message).toBe('disk I/O error')
+        retries.push(ms)
+      }
+    })
+    try {
+      expect(retries).toEqual(OPEN_IO_RETRY_MS.slice(0, 2))
+      expect(schemaVersion(db.writer)).toBe(1)
+    } finally {
+      db.close()
+    }
+  })
+
+  it('an I/O error that stays fails the open after its retries, and any other error at once', () => {
+    const file = join(base, `layer-${++n}`, 'x.db')
+    const steps = [{ version: 1, name: 'one', up: (d: DatabaseSync) => d.exec('CREATE TABLE a (x)') }]
+    const retries: number[] = []
+    expect(() => openDb(file, { migrations: steps, hiveVersion: '1', setup: () => { throw sqliteError(10, 'disk I/O error') }, onIoRetry: (_e, ms) => retries.push(ms) })).toThrow('disk I/O error')
+    expect(retries).toEqual(OPEN_IO_RETRY_MS)
+    retries.length = 0
+    expect(() => openDb(file, { migrations: steps, hiveVersion: '1', setup: () => { throw sqliteError(11, 'database disk image is malformed') }, onIoRetry: (_e, ms) => retries.push(ms) })).toThrow('malformed')
+    expect(retries).toEqual([])
+    // Closed each time it failed: the file opens now.
+    openDb(file, { migrations: steps, hiveVersion: '1' }).close()
+  })
+
+  it('a file closed cleanly is openable at once, its files unchanged (HI-2199)', async () => {
+    const file = join(base, `layer-${++n}`, 'x.db')
+    openDb(file, { migrations: [{ version: 1, name: 'one', up: (d: DatabaseSync) => d.exec('CREATE TABLE a (x)') }], hiveVersion: '1' }).close()
+    const before = readdirSync(join(file, '..')).sort()
+    const told: Error[] = []
+    expect(await untilOpenable(file, { onWait: (e) => told.push(e) })).toBe(0)
+    expect(told).toEqual([])
+    expect(readdirSync(join(file, '..')).sort()).toEqual(before)
+  })
+})
+
+// --- HI-2199: a Hive that ended without quitting leaves the board's -shm, which another process can still have mapped.
+
+/** A workspace whose board has a card ("Kept"), left as a Hive ended from outside leaves it. */
+async function killedWorkspace(): Promise<{ ws: string; file: string }> {
+  const ws = workspaceWith()
+  const first = await open(ws)
+  await inWorkspace(first, () => tasks.createTask({ title: 'Kept', project: 'p' }, user))
+  await disposeWorkspaceService(first)
+  store.closeBoard(ws)
+  const file = join(ws, '.hive', 'hive.db')
+  await leftByAKill(file)
+  return { ws, file }
+}
+
+describe.runIf(process.platform === 'win32')('a board whose -shm another process still maps (HI-2199)', () => {
+  afterEach(() => {
+    store.boardTestHooks.openableWait = null
+    journal.journalTestHooks.openableWait = null
+  })
+
+  it("the workspace's open waits for it to be let go, then opens the board, instead of opening without it", async () => {
+    const { ws, file } = await killedWorkspace()
+    const waits: string[] = []
+    store.boardTestHooks.openableWait = (p) => waits.push(p)
+    await whileMapped(base, `${file}-shm`, async (release) => {
+      // The first connection's truncation of the -shm is refused.
+      expect(refusedNow(file)).toBe(1546)
+      const opening = open(ws)
+      await vi.waitFor(() => expect(waits).toEqual([resolve(ws)]), { timeout: HUNG_MS, interval: 20 })
+      release()
+      const w = await opening
+      expect((await inWorkspace(w, () => tasks.allTasks(w))).map((c) => c.title)).toContain('Kept')
+    })
+  })
+
+  it("the Assistant's journal too (HI-2200): the open waits for it to be let go, then the journal opens with its entries", async () => {
+    const ws = workspaceWith()
+    const first = await open(ws)
+    const home = first.assistantHome
+    const settings = journalSettings({ enabled: true })
+    journal.writeEntry(home, settings, { kind: 'event', summary: 'Kept in the journal' }, 'hive')
+    await disposeWorkspaceService(first)
+    const file = journal.journalFile(home)
+    await leftByAKill(file)
+    const waits: string[] = []
+    journal.journalTestHooks.openableWait = (h) => waits.push(h)
+    await whileMapped(base, `${file}-shm`, async (release) => {
+      expect(refusedNow(file)).toBe(1546)
+      const opening = open(ws)
+      await vi.waitFor(() => expect(waits).toEqual([home]), { timeout: HUNG_MS, interval: 20 })
+      release()
+      const w = await opening
+      expect(journal.recall(w.assistantHome, {}).map((e) => e.summary)).toContain('Kept in the journal')
+    })
+  })
+
+  it('a close while the open waits ends the wait at once, and the open goes no further', async () => {
+    const { ws, file } = await killedWorkspace()
+    const waits: string[] = []
+    store.boardTestHooks.openableWait = (p) => waits.push(p)
+    const w = createWorkspaceService()
+    opened.push(w)
+    await whileMapped(base, `${file}-shm`, async () => {
+      const opening = w.open(ws).then(() => 'opened', (e: Error) => e.message)
+      await vi.waitFor(() => expect(waits).toEqual([resolve(ws)]), { timeout: HUNG_MS, interval: 20 })
+      await w.close()
+      // Still mapped: the wait ended for the close, not for the file.
+      expect(await opening).toMatch(/closed/)
+      expect(refusedNow(file)).toBe(1546)
+      expect(w.path).toBeNull()
+    })
+  })
+
+  it("another workspace opened in the same window while the open waits: the old open is refused, and the new one is the window's", async () => {
+    const { ws, file } = await killedWorkspace()
+    const other = workspaceWith()
+    const waits: string[] = []
+    store.boardTestHooks.openableWait = (p) => waits.push(p)
+    const w = createWorkspaceService()
+    opened.push(w)
+    const events: (string | null)[] = []
+    const listener = (s: WS): void => {
+      if (s === w) events.push(s.path)
+    }
+    WorkspaceService.openedListeners.add(listener)
+    try {
+      await whileMapped(base, `${file}-shm`, async () => {
+        const opening = w.open(ws).then((info) => `opened ${info.path}`, (e: Error) => e.message)
+        await vi.waitFor(() => expect(waits).toEqual([resolve(ws)]), { timeout: HUNG_MS, interval: 20 })
+        const info = await w.open(other)
+        expect(info.path).toBe(resolve(other))
+        expect(await opening).toMatch(/closed/)
+        expect(w.path).toBe(resolve(other))
+        expect(events).toEqual([resolve(other)])
+      })
+    } finally {
+      WorkspaceService.openedListeners.delete(listener)
+    }
+  })
+
+  it('waits only for an I/O error, and as long as its bound', async () => {
+    const file = join(base, `layer-${++n}`, 'x.db')
+    mkdirSync(join(file, '..'), { recursive: true })
+    await leftByAKill(file)
+    await whileMapped(base, `${file}-shm`, async () => {
+      const told: number[] = []
+      const waited = await untilOpenable(file, { onWait: (e) => told.push((e as { errcode?: number }).errcode ?? 0), boundMs: 300 })
+      expect(told).toEqual([1546])
+      expect(waited).toBeGreaterThanOrEqual(300)
+      // An aborted wait tries nothing more.
+      const gone = new AbortController()
+      gone.abort()
+      expect(await untilOpenable(file, { signal: gone.signal, onWait: () => told.push(0) })).toBeLessThan(HUNG_MS)
+      expect(told).toEqual([1546])
+    })
+    // Let go: at once, and the file opens.
+    expect(await untilOpenable(file)).toBeLessThan(HUNG_MS)
+    openDb(file, { migrations: [], hiveVersion: '1' }).close()
   })
 })
 
@@ -470,6 +648,153 @@ describe("the window's board (#1017)", () => {
     // The Agent API's reads (listTasks, getTask) never carry the window's short form.
     expect((await inWorkspace(w, () => tasks.listTasks({ archived: true })))[0].summary).toBeUndefined()
     expect(JSON.stringify(await inWorkspace(w, () => tasks.getTask(2, w)))).toBe(JSON.stringify(full.find((c) => c.number === 2)))
+  })
+})
+
+describe('a board opened under another name for its folder (#1402)', () => {
+  /** Another name for `ws`: a junction (removed by `drop`), or its 8.3 short name (null where the volume makes none). */
+  const aliasOf = (kind: 'junction' | '8.3', ws: string): { path: string; drop: () => void } | null => {
+    if (kind === '8.3') {
+      const s = shortPath(ws)
+      return s ? { path: s, drop: () => undefined } : null
+    }
+    const path = junction(ws, join(base, `alias-${++n}`))
+    return { path, drop: () => unlinkSync(path) }
+  }
+  /** The window's board, opened as it is first used (by its window's spelling). */
+  const useBoard = (w: WS) => inWorkspace(w, () => tasks.listTasks({}))
+  const fenced = (ws: string): boolean => refusal(join(ws, '.hive', 'hive.db')) !== null
+  /** The next number in the stub older versions read, and the profiles' presence markers there. */
+  const stubNext = (ws: string): number => JSON.parse(readFileSync(join(ws, '.hive', 'tasks', 'board.json'), 'utf8')).next
+  const markers = (ws: string): string[] => (existsSync(join(ws, '.hive', 'open')) ? readdirSync(join(ws, '.hive', 'open')) : [])
+  /** Nothing holds the folder: it can be moved (Windows refuses while a connection has its database open). */
+  async function moves(ws: string): Promise<void> {
+    await renameRetrying(ws, `${ws}-moved`)
+    expect(existsSync(join(`${ws}-moved`, '.hive', 'hive.db'))).toBe(true)
+  }
+
+  for (const kind of ['junction', '8.3'] as const) {
+    it(`${kind}: the window opened by the real path, a board opened only by the other name (as deliveries can), closed with the window`, async ({ skip }) => {
+      const ws = workspaceWith()
+      const alias = aliasOf(kind, ws)
+      if (!alias) return skip('this volume makes no 8.3 names')
+      try {
+        const w = await open(ws)
+        store.workspaceDb(alias.path)
+        expect(store.boardOpen(alias.path)).toBe(true)
+        await w.close()
+        expect(store.boardOpen(alias.path)).toBe(false)
+      } finally {
+        alias.drop()
+      }
+      await moves(ws)
+    })
+
+    it(`${kind}: the window opened by the other name, a board opened by the real path, both closed with the window`, async ({ skip }) => {
+      const ws = workspaceWith()
+      const alias = aliasOf(kind, ws)
+      if (!alias) return skip('this volume makes no 8.3 names')
+      try {
+        const w = await open(alias.path)
+        await useBoard(w)
+        store.workspaceDb(ws)
+        expect([store.boardOpen(alias.path), store.boardOpen(ws)]).toEqual([true, true])
+        await w.close()
+        expect([store.boardOpen(alias.path), store.boardOpen(ws)]).toEqual([false, false])
+      } finally {
+        alias.drop()
+      }
+      await moves(ws)
+    })
+  }
+
+  it('the junction the window opened by removed before it closes: its other boards close all the same (HR6 round 1)', async () => {
+    const ws = workspaceWith()
+    const alias = aliasOf('junction', ws)!
+    const w = await open(alias.path)
+    await useBoard(w)
+    store.workspaceDb(ws)
+    alias.drop()
+    await w.close()
+    expect([store.boardOpen(alias.path), store.boardOpen(ws)]).toEqual([false, false])
+    expect(fenced(ws)).toBe(true)
+    await moves(ws)
+  })
+
+  it("the junction the window opened by pointed at another window's workspace before it closes: that one keeps its board and stays unfenced (HR6 round 1)", async () => {
+    const [ws, other] = [workspaceWith(), workspaceWith()]
+    const alias = aliasOf('junction', ws)!
+    try {
+      const w = await open(alias.path)
+      await useBoard(w)
+      store.workspaceDb(ws)
+      const w2 = await open(other)
+      await useBoard(w2)
+      alias.drop()
+      junction(other, alias.path)
+      await w.close()
+      expect([store.boardOpen(alias.path), store.boardOpen(ws), store.boardOpen(other)]).toEqual([false, false, true])
+      expect([fenced(ws), fenced(other)]).toEqual([true, false])
+      await w2.close()
+    } finally {
+      unlinkSync(alias.path)
+    }
+    await moves(ws)
+  })
+
+  it("the junction the window opened by pointed at another window's workspace: the close writes nothing there and leaves its presence marker (HR6 round 2)", async () => {
+    const [ws, other] = [workspaceWith(), workspaceWith()]
+    const alias = aliasOf('junction', ws)!
+    try {
+      const w = await open(alias.path)
+      for (const t of ['One', 'Two', 'Three']) await inWorkspace(w, () => tasks.createTask({ title: t, project: 'p' }, user))
+      const w2 = await open(other)
+      await useBoard(w2)
+      const before = { stub: stubNext(other), markers: markers(other) }
+      expect(before.markers).toHaveLength(1)
+      expect(stubNext(ws)).toBe(4)
+      alias.drop()
+      junction(other, alias.path)
+      await w.close()
+      expect({ stub: stubNext(other), markers: markers(other) }).toEqual(before)
+      expect(markers(ws)).toEqual([])
+      expect(store.boardOpen(other)).toBe(true)
+      await w2.close()
+    } finally {
+      unlinkSync(alias.path)
+    }
+  })
+
+  it("a lease's board under another name of a workspace a window holds is the window's (#1395: by its place), kept as the lease ends with the presence marker, and closed with the window (HR6 round 2)", async () => {
+    const ws = workspaceWith()
+    const w = await open(ws)
+    await useBoard(w)
+    expect(markers(ws)).toHaveLength(1)
+    const alias = aliasOf('junction', ws)!
+    try {
+      store.leaseDb(alias.path).release()
+      expect([store.boardOpen(ws), store.boardOpen(alias.path)]).toEqual([true, true])
+      expect(markers(ws)).toHaveLength(1)
+      await w.close()
+      expect([store.boardOpen(ws), store.boardOpen(alias.path)]).toEqual([false, false])
+      expect(markers(ws)).toEqual([])
+    } finally {
+      alias.drop()
+    }
+  })
+
+  it("a lease's board under another name of a workspace no window holds closes as the lease ends, leaving no presence marker (#1395)", () => {
+    const ws = workspaceWith()
+    const alias = aliasOf('junction', ws)!
+    try {
+      const lease = store.leaseDb(alias.path)
+      expect(markers(ws)).toHaveLength(1)
+      lease.release()
+      expect([store.boardOpen(ws), store.boardOpen(alias.path)]).toEqual([false, false])
+      expect(markers(ws)).toEqual([])
+    } finally {
+      alias.drop()
+    }
   })
 })
 

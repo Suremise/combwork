@@ -2,7 +2,6 @@
 // shows (main's for lostLines, which main words for the removal's confirmation); reuseNote is also the Agent API's, so
 // it words its text in English unless given the window's tr().
 import type { UnusedWorktree, WorktreeReuse } from './types'
-import type { TemplateDeleted } from './templates'
 import { tr } from './i18n'
 import { msg } from './i18n/msg'
 
@@ -22,9 +21,11 @@ const M = {
   pickMerged: msg({ id: 'workspace.unused.pickMerged', defaultMessage: 'merged, clean', description: "An unused worktree in the Changes tab's picker: merged and with no changes. Lower case." }),
   pickWork: msg({ id: 'workspace.unused.pickWork', defaultMessage: 'holds work', description: "An unused worktree in the Changes tab's picker: it holds work that is nowhere else. Lower case." }),
   pickNotChecked: msg({ id: 'workspace.unused.pickNotChecked', defaultMessage: 'not checked', description: "An unused worktree in the Changes tab's picker: git couldn't check it. Lower case." }),
-  aboutUnused: msg({ id: 'workspace.changes.aboutUnused', defaultMessage: "Worktrees no agent of {project} works in: kept when their agent was removed, or made outside Hive (by an agent's own git worktree add, say). Open one to see its changes and merge them, or give it to an agent.{known, select, yes { Those merged into {into} and clean can go with their branches; the others hold work that is nowhere else.} other {}}", description: "The Changes tab's Unused worktrees page, at the top. Keep git worktree add as it is; {into} is the main branch." }),
-  aboutUnusedOne: msg({ id: 'workspace.changes.aboutUnusedOne', defaultMessage: "An unused worktree: everything on {branch} that isn't on {into}. Merge it, or go back to Unused worktrees to give it to an agent or remove it.", description: "The Changes tab, over an unused worktree's changes. Unused worktrees is the page's name." }),
+  aboutUnused: msg({ id: 'workspace.changes.aboutUnusedShort', defaultMessage: 'Worktrees no agent of {project} works in: open one to see its changes and merge them, or remove it.', description: "The Changes tab's Unused worktrees page, at the top, in one sentence (#1314; its ⓘ says where they come from and what Remove does)." }),
+  aboutUnusedTip: msg({ id: 'workspace.changes.aboutUnusedTip', defaultMessage: "Kept when their agent was removed (by hand, or when a template's agents replaced it), or made outside Hive (by an agent's own git worktree add, say). Loading a template gives none of them to its agents.{known, select, yes { Those merged into {into} and clean can go with their branches; the others hold work that is nowhere else.} other {}}", description: "The ⓘ beside Unused worktrees' heading: where they come from and which can be removed. Keep git worktree add as it is; {into} is the main branch." }),
+  aboutUnusedOne: msg({ id: 'workspace.changes.aboutUnusedOne', defaultMessage: "An unused worktree: everything on {branch} that isn't on {into}. Merge it, or go back to Unused worktrees to remove it.", description: "The Changes tab, over an unused worktree's changes. Unused worktrees is the page's name." }),
   aboutAgent: msg({ id: 'workspace.changes.aboutAgent', defaultMessage: "{agent}'s worktree: everything on {branch} since it left {base}. Merge… brings it into {base}.", description: "The Changes tab, over an agent's worktree's changes. Merge… is the button." }),
+  aboutSlot: msg({ id: 'workspace.changes.aboutSlot', defaultMessage: '{is, select, carried {{agent} works in {name}, the slot kept for it} other {{agent} builds in {name}}}: {known, select, yes {everything on its branch since it left {base}.} other {what isn\'t committed there yet.}}', description: "The Changes tab, over the changes in the slot an agent works in (#1569): a slot it builds a card in, or the slot kept for it (its own worktree from before 1.0); {name} is the slot's name, such as slot-b; {base} the branch its work started from. Glossary: slot." }),
   aboutProject: msg({ id: 'workspace.changes.aboutProject', defaultMessage: "The project folder: what isn't committed yet, from you or the agents working in the folder itself (those without a worktree).", description: "The Changes tab, over the project folder's changes." }),
   lostCommits: msg({ id: 'workspace.unused.lostCommits', defaultMessage: '{count, plural, one {# commit} other {# commits}} on {branch} not on {known, select, yes {{into}} other {any other branch}}', description: "What removing an unused worktree anyway loses: a line of the confirmation's list." }),
   lostDetached: msg({ id: 'workspace.unused.lostDetached', defaultMessage: '{count, plural, one {# commit on no branch (only its detached HEAD has it)} other {# commits on no branch (only its detached HEAD has them)}}', description: "What removing an unused worktree anyway loses: a line of the confirmation's list." }),
@@ -36,13 +37,16 @@ const M = {
   upTo: msg({ id: 'workspace.reuse.upTo', defaultMessage: 'reused {branch}, brought up to {base} at {commit}', description: 'After adding an agent: it works in an unused worktree again, brought up to {base} (main) at commit {commit}. Lower case: it follows the agent.' }),
   alreadyAt: msg({ id: 'workspace.reuse.alreadyAt', defaultMessage: 'reused {branch}, already at {base}', description: 'After adding an agent: it works in an unused worktree again, already up to {base} (main). Lower case: it follows the agent.' }),
   summary: msg({ id: 'workspace.unused.summary', defaultMessage: '{count, plural, one {# unused worktree} other {# unused worktrees}} ({merged, number} merged)', description: "The Overview's line on a project's unused worktrees." }),
+  kindSlot: msg({ id: 'workspace.unused.kind.slot', defaultMessage: 'free slot beyond the pool', description: "What an unused worktree is (#1450): one of Hive's slots, free and set up, beyond the number the project needs now. Lower case: a badge after its name." }),
+  kindDirtySlot: msg({ id: 'workspace.unused.kind.dirtySlot', defaultMessage: 'slot with changes, not lent', description: "What an unused worktree is (#1450): one of Hive's slots, left with uncommitted or untracked files and lent to no card. Lower case: a badge after its name." }),
+  kindCarried: msg({ id: 'workspace.unused.kind.carried', defaultMessage: "agent's old worktree, given up", description: "What an unused worktree is (#1450): an agent's 0.9 worktree Hive carried into the slots (a carried lease), whose lease has ended. Lower case: a badge after its name." }),
+  kindHome: msg({ id: 'workspace.unused.kind.home', defaultMessage: 'retired home, no conversation left', description: "What an unused worktree is (#1450): an agent's old folder kept so its conversations could resume (a reviewer's old worktree, say), none of which can now. Lower case: a badge after its name." }),
+  kindQueue: msg({ id: 'workspace.unused.kind.queue', defaultMessage: "merge queue's old folder, not needed now", description: "What an unused worktree is (#1644): a folder the merge queue tested merges in, kept after its last merge, which no merge waiting or card in progress needs now (the queue makes a new one when it does). Lower case: a badge after its name. Glossary: merge queue." }),
   workNotice: msg({ id: 'workspace.unused.workNotice', defaultMessage: "{count, plural, one {# unused worktree has} other {# unused worktrees have}} work that isn't on {known, select, yes {{into}} other {the main branch}}", description: "The Changes tab's notice on unused worktrees holding work." }),
-  hintTitle: msg({ id: 'workspace.unused.hintTitle', defaultMessage: '{count, plural, one {# unused worktree} other {# unused worktrees}} in {many, select, yes {{projects, plural, one {# project} other {# projects}}} other {{project}}}', description: "A notice after deleting a template whose worktree agents left unused worktrees: how many, and in which project (or how many projects)." }),
-  hintDetail: msg({ id: 'workspace.unused.hintDetail', defaultMessage: "The template's worktree agents worked in them. Deleting the template left them as they are: review them in Changes.", description: 'Under the notice of unused worktrees left by a deleted template. Changes is the Git tab\'s page.' })
 }
 
-/** The user guide's heading on kept worktrees. */
-export const UNUSED_WORKTREES_GUIDE = 'Unused worktrees' // i18n-ignore: a heading of the user guide (English until the guide is translated, D2)
+/** The id of the user guide's heading on kept worktrees. */
+export const UNUSED_WORKTREES_GUIDE = 'unused-worktrees' // i18n-ignore: a user guide heading's id (#1535)
 
 /** Whether it holds work that is nowhere else: commits not on the main branch, or uncommitted files. */
 export const holdsWork = (w: UnusedWorktree): boolean => !w.check.removable && ((w.check.ahead ?? 0) > 0 || (w.check.dirty ?? 0) > 0)
@@ -51,7 +55,7 @@ export const holdsWork = (w: UnusedWorktree): boolean => !w.check.removable && (
 export function unusedState(w: UnusedWorktree): string {
   const c = w.check
   if (c.removable) return tr(M.merged, { into: c.into ?? '' })
-  const parts = [(c.ahead ?? 0) > 0 ? (w.branch ? tr(M.commitsNotOn, { count: c.ahead!, known: c.into ? 'yes' : 'no', into: c.into ?? '' }) : tr(M.commitsNoBranch, { count: c.ahead! })) : '', (c.dirty ?? 0) > 0 ? tr(M.changedFiles, { count: c.dirty! }) : ''].filter(Boolean)
+  const parts = [(c.ahead ?? 0) > 0 ? (w.branch || w.slot ? tr(M.commitsNotOn, { count: c.ahead!, known: c.into ? 'yes' : 'no', into: c.into ?? '' }) : tr(M.commitsNoBranch, { count: c.ahead! })) : '', (c.dirty ?? 0) > 0 ? tr(M.changedFiles, { count: c.dirty! }) : ''].filter(Boolean)
   return parts.length ? parts.join(' · ') : (c.reason ?? tr(M.notChecked))
 }
 
@@ -63,16 +67,47 @@ export function originLabel(w: Pick<UnusedWorktree, 'origin'>): string {
   return o.agentName ? tr(M.was, { agent: o.agentName }) : tr(M.madeByHive)
 }
 
-/** One unused worktree in the Changes tab's picker (#476): "hive/b4 · was B4 · holds work". */
+/** Its name in lists (#1450): a slot's name (its branch after it, when it has one), else its branch, else "(detached)". */
+export function unusedName(w: Pick<UnusedWorktree, 'branch' | 'slot'>): string {
+  if (w.slot) return w.branch ? `${w.slot} · ${w.branch}` : w.slot
+  return w.branch ?? tr(M.detached)
+}
+
+/** What it is to Hive's pools, in a few words (#1450), or '' for a worktree no agent works in. */
+export function kindLabel(w: Pick<UnusedWorktree, 'kind'>): string {
+  switch (w.kind) {
+    case 'slot':
+      return tr(M.kindSlot)
+    case 'dirtySlot':
+      return tr(M.kindDirtySlot)
+    case 'carried':
+      return tr(M.kindCarried)
+    case 'home':
+      return tr(M.kindHome)
+    case 'queue':
+      return tr(M.kindQueue)
+    default:
+      return ''
+  }
+}
+
+/** Whether it is one of the slot pool's (#1450): removed only by its guarded clean-up, never given to an agent. */
+export const isSlotRow = (w: Pick<UnusedWorktree, 'slot'>): boolean => !!w.slot
+
+/** One unused worktree in the Changes tab's picker (#476): "hive/b4 · was B4 · holds work", "slot-b · slot with changes, not lent · …". */
 export function unusedPickerLabel(w: UnusedWorktree): string {
-  return [w.branch ?? tr(M.detached), originLabel(w), tr(w.check.removable ? M.pickMerged : holdsWork(w) ? M.pickWork : M.pickNotChecked)].filter(Boolean).join(' · ')
+  return [unusedName(w), kindLabel(w) || originLabel(w), tr(w.check.removable ? M.pickMerged : holdsWork(w) ? M.pickWork : M.pickNotChecked)].filter(Boolean).join(' · ')
 }
 
 /** What each page of the Changes tab shows, in one sentence at the top of the page's right side (#476). */
 export const CHANGES_ABOUT = {
-  unused: (project: string, into: string | null): string => tr(M.aboutUnused, { project, known: into ? 'yes' : 'no', into: into ?? '' }),
+  unused: (project: string): string => tr(M.aboutUnused, { project }),
+  /** Where unused worktrees come from and which can go (#1314: the ⓘ beside the heading, the page saying one sentence). */
+  unusedTip: (into: string | null): string => tr(M.aboutUnusedTip, { known: into ? 'yes' : 'no', into: into ?? '' }),
   unusedOne: (branch: string, into: string): string => tr(M.aboutUnusedOne, { branch, into }),
   agent: (name: string, branch: string, base: string): string => tr(M.aboutAgent, { agent: name, branch, base }),
+  /** An agent's slot, or the slot kept for it (#1569). */
+  slot: (agent: string, is: 'slot' | 'carried', name: string, base: string | null): string => tr(M.aboutSlot, { agent, is, name, known: base ? 'yes' : 'no', base: base ?? '' }),
   get project(): string {
     return tr(M.aboutProject)
   }
@@ -112,15 +147,6 @@ export function reuseNote(r: WorktreeReuse, t?: Tr): string {
   return t ? t(M.alreadyAt, { branch: r.branch, base: r.base }) : `reused ${r.branch}, already at ${r.base}` // i18n-ignore: the Agent API's reply and the log (English)
 }
 
-/**
- * Files whose change means a reused worktree runs the project's worktree setup again (#456): the lockfiles of the usual
- * package managers. A worktree brought up to the base without one of them changing doesn't (its node_modules is there).
- */
-const SETUP_FILES = /(^|\/)(package-lock\.json|npm-shrinkwrap\.json|yarn\.lock|pnpm-lock\.yaml|bun\.lockb?|Cargo\.lock|go\.sum|poetry\.lock|uv\.lock|Pipfile\.lock|Gemfile\.lock|composer\.lock|packages\.lock\.json)$/i
-
-/** Whether any of these changed files (git's paths) is a lockfile, so a reused worktree's setup runs again (#456). */
-export const lockfileChanged = (files: readonly string[]): boolean => files.some((f) => SETUP_FILES.test(f.trim()))
-
 /** The Overview's line (#400): "7 unused worktrees (7 merged)", or null with none. */
 export function unusedSummary(list: UnusedWorktree[]): string | null {
   if (!list.length) return null
@@ -136,17 +162,45 @@ export function unusedWorkNotice(list: UnusedWorktree[]): string | null {
   return tr(M.workNotice, { count: n, known: into ? 'yes' : 'no', into: into ?? '' })
 }
 
-/**
- * The one notice after deleting a template whose worktree agents left unused worktrees (#353), or null: "3 unused
- * worktrees in hive", with the project to review (the one with most).
- */
-export function templateWorktreesHint(left: TemplateDeleted, nameOf: (path: string) => string): { title: string; detail: string; project: string } | null {
-  const list = [...left.unusedWorktrees].filter((u) => u.count > 0).sort((a, b) => b.count - a.count)
-  if (!list.length) return null
-  const n = list.reduce((sum, u) => sum + u.count, 0)
-  return {
-    title: tr(M.hintTitle, { count: n, many: list.length === 1 ? 'no' : 'yes', projects: list.length, project: list.length === 1 ? nameOf(list[0].project) : '' }),
-    detail: tr(M.hintDetail),
-    project: list[0].project
-  }
+/** A slot as Unused Worktrees decides from it (#1450): its state, last use, and what holds it now. */
+export interface SlotSeen {
+  name: string
+  state: string
+  usedAt: string
+  /** An open lease (a card's, a lane's or a carried one). */
+  leased: boolean
+  /** An operation, a job not settled, or a writer (a session) in it. */
+  busy: boolean
+  /** Its newest lease was a carried one that has ended (#1441's adopted worktree, given up). */
+  carriedEnded: boolean
 }
+
+/**
+ * Which of a project's slots Unused Worktrees lists, and as what (#1450): never one that is lent, protected by an open
+ * carried lease, or busy. A carried folder whose lease ended (`carried`); a slot left with changes and no lease
+ * (`dirtySlot`); free ready slots beyond the pool's `size`, the least recently used first (`slot`). Any other state
+ * (being made or removed, gone) isn't listed.
+ */
+export function slotsListed(slots: readonly SlotSeen[], size: number): Map<string, 'slot' | 'dirtySlot' | 'carried'> {
+  const out = new Map<string, 'slot' | 'dirtySlot' | 'carried'>()
+  const free = slots.filter((s) => !s.leased && !s.busy)
+  for (const s of free) {
+    if (s.carriedEnded && (s.state === 'ready' || s.state === 'dirty')) out.set(s.name, 'carried')
+    else if (s.state === 'dirty') out.set(s.name, 'dirtySlot')
+  }
+  let over = slots.length - size
+  for (const s of free.filter((x) => x.state === 'ready' && !out.has(x.name)).sort((a, b) => a.usedAt.localeCompare(b.usedAt))) {
+    if (over-- <= 0) break
+    out.set(s.name, 'slot')
+  }
+  return out
+}
+
+/**
+ * Whether a retired home is listed (#1450): only once no conversation can resume there any more, no session record of
+ * an agent the project still has being in it.
+ */
+export function homeListed(home: string, sessions: readonly { cwd?: string | null; agentId?: string | null }[], agents: ReadonlySet<string>, same: (a: string, b: string) => boolean): boolean {
+  return !sessions.some((s) => !!s.cwd && !!s.agentId && agents.has(s.agentId) && same(s.cwd, home))
+}
+

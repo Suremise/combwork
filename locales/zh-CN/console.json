@@ -32,7 +32,7 @@
   "console.flight.what.pattern": "与你的模式匹配的事件：{event}",
   "console.flight.what.safeguardStop": "安全机制拦截了一条回复",
   "console.flight.what.safeguardStopOn": "安全机制拦截了 {model} 的一条回复",
-  "console.flight.what.stalled": "在一轮工作中 {seconds, number} 秒无响应：状态未知",
+  "console.flight.what.stalled": "在一个回合中 {seconds, number} 秒无响应：状态未知",
   "console.flight.what.unknownEvent": "钩子 {event}，Hive 不认识的事件",
   "console.flight.what.unknownEventFields": "钩子 {event}，Hive 不认识的事件，含 Hive 不认识的字段：{fields}",
   "console.flight.what.unknownFields": "含 Hive 不认识的字段的钩子：{fields}",

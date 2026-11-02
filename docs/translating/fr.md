@@ -38,10 +38,12 @@ Translate the meaning, not the words, and keep the result as short and plain.
   the glossary's kept names keep theirs.
 - **A trailing `…`** (the command asks something before it acts) stays, with no space before it: *Retirer
   l’agent…*. Always the single character …, never three dots.
-- **Column headings:** *Suspendu*, *À faire*, *En cours*, *Relecture*, *Validé*, *Terminé*. In running text name the
-  column (*dans la colonne Relecture*, *passe en Terminé*).
+- **Column headings** (the board's stages, [glossary-1.0](../../locales/glossary-1.0.md) 2.2): *Suspendu*, *À faire*,
+  *En cours* (Active, was Doing), *Relecture*, *Validé* (Approved, was Passed), *Fusion en cours* (Merging, a stage
+  inside Validé), *Terminé*. In running text name the column (*dans la colonne Relecture*, *passe en Terminé*,
+  *revient en Validé*), never an agreed participle (*jusqu’à ce qu’elle passe en Terminé*, not *soit Terminée*).
 - **Where things are:** paths through menus and settings keep Hive's arrows, with each name as Hive shows it in
-  French: *Paramètres → Fournisseurs*, *Aide → Configuration des agents*.
+  French: *Paramètres → Fournisseurs*, *Aide → Configuration des fournisseurs*.
 
 ## Grammar
 
@@ -90,12 +92,33 @@ English, it says so.
 | persona (now: working mode) | mode (mode de travail) | The Assistant's personas became *modes*; the old *persona* is *personnage*. |
 | task board / board | tableau des tâches / tableau | The *Tasks* tab is *Tâches*. |
 | card | carte | Never *tâche* in running text. |
-| On Hold / Todo / Doing / Review / Passed / Done | Suspendu / À faire / En cours / Relecture / Validé / Terminé | *Terminé* means merged; *Validé*, passed review but not merged. |
+| On Hold / Todo / Active / Review / Approved / Merging / Done | Suspendu / À faire / En cours / Relecture / Validé / Fusion en cours / Terminé | Categories and stages (1.0). *Active* was *Doing*, *Approved* was *Passed*: the French words didn't change. *Terminé* means merged (or accepted); *Validé*, approved but not merged. |
+| category / stage | catégorie / étape | |
+| Version Control (the tab) / version control | Gestion de versions / gestion de versions | The tab was *Git*. *None* (no version control) is *Aucune*. |
+| workflow / workflow options | flux de travail / options du flux de travail | |
+| preset: Solo / Pair / Team / Custom | préréglage : Solo / Binôme / Équipe / Personnalisé | |
+| rule / old rules | règle / anciennes règles | *Rule* is what the user reads for a gate. |
+| target branch / repository root | branche cible / racine du dépôt | *Up to date* (with the target): *à jour*. |
+| revision / change / same change | révision / modification / la même modification | *Carries over*: *reste valable*. |
+| check / checks before review / merge checks | vérification / vérifications avant relecture / vérifications de fusion | A run of a check *réussit* or *échoue*. |
+| verdict: pass / fail | verdict : validée / refusée | Of a review (*relecture validée*, *relecture refusée*); the noun for a pass is *validation*. A pass is never an *approbation*. *Stale* (a pass): *périmée*. |
+| approval / Approve / your OK | approbation / Approuver / ton accord | Only the user's OK, never a reviewer's pass. |
+| For you: Decide / Test / Approve / Sign in | Pour toi : Décider / Tester / Approuver / Se connecter | |
+| review copy | copie de relecture | Never *revue*. |
+| refused / override / Move anyway | refusé / dérogation / Déplacer quand même | |
+| returned (to its builder) | renvoyée | Of a card. |
+| no-code card / before 1.0 / outside Hive | carte sans code / antérieure à 1.0 / hors de Hive | |
+| Work (a card's section) | Travail | |
+| paused (a lane) / Pause queue / Resume queue | en pause / Suspendre la file / Reprendre la file | A paused merge queue is *suspendue*. |
+| merge queue / test merge | file de fusion / fusion d’essai | *La file de fusion vers {target}*, never *de {target}*. |
+| slot / pool / ready | emplacement / groupe / prêt | *Slot* is masculine (*l’emplacement {slot}*). A pool of reviewers is *le groupe de relecteurs*. |
+| project key | clé du projet | |
+| uncommitted / committed | non commité / commité | Never *validé*, which is the Approved stage and a pass. |
 | decision | décision | |
 | blocked / stalled | bloquée / à l’arrêt | Of a card. |
-| builder / reviewer | auteur / relecteur | The builder is who does the card's work (not who created it: *créée par*). A review is a *relecture*; to review, *relire*. A review's *verdict* is *verdict*. |
-| card loop / lane / round | boucle de cartes / couloir / tour | |
-| merge slot | créneau de fusion | |
+| builder / reviewer / either | auteur / relecteur / les deux | The builder is who does the card's work (not who created it: *créée par*; never *constructeur*). A review is a *relecture*; to review, *relire*. A review's *verdict* is *verdict*. |
+| card loop / lane / round / Start lane… | boucle de cartes / couloir / tour / Démarrer un couloir… | |
+| merge slot | créneau de fusion | An agent's turn to merge. From 1.0, cards Hive merges go through the merge queue (*file de fusion*, above). |
 | inbox / message / wake | boîte de réception / message / réveiller | *Wake* as a noun is *réveil*. A card *watch* is a *surveillance* (*surveiller*). |
 | handover / shared notes | passation / notes partagées | |
 | skill / template | compétence / modèle | A skill's own name (`work-on-card`) is kept. |

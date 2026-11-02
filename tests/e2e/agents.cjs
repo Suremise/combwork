@@ -3,6 +3,8 @@
 // conflicting), remove. Throwaway profile, throwaway git project in the work folder.
 // The agents run the fake Claude Code (fake-claude/, #195), never sent a prompt; that a real Claude Code session
 // starts in a worktree is claude-real's. Clipboard untouched.
+// Dev build only (#1580): it starts this checkout's Electron itself, and Reviewer is a 0.9 worktree agent
+// (agents:testLegacy, refused by a packaged build): adding one is part of what it tests.
 const lib = require('./lib.cjs')
 const { _electron } = require('playwright-core')
 const fs = require('fs'), path = require('path')
@@ -11,7 +13,12 @@ const scratch = lib.WORK, userData = path.join(scratch, 'agents-profile')
 // Outside the repository, so its CLAUDE.md (which imports AGENTS.md) doesn't apply to the test sessions (#174).
 const ws = path.join(scratch, 'agents-ws')
 const wtRoot = `${ws}.worktrees`
-for (const d of [userData, ws, wtRoot]) fs.rmSync(d, { recursive: true, force: true })
+// The worktree's setup command quotes a path with a space (#1454: node-pty passed its quotes to cmd as \", so it failed).
+const setupDir = path.join(scratch, 'agents setup')
+for (const d of [userData, ws, wtRoot, setupDir]) fs.rmSync(d, { recursive: true, force: true })
+fs.mkdirSync(setupDir, { recursive: true })
+const setupScript = path.join(setupDir, 'setup.cjs')
+fs.writeFileSync(setupScript, "console.log('HIVE-SETUP-RAN ' + JSON.stringify(process.argv.slice(2)))\n")
 const proj = path.join(ws, 'demo')
 fs.mkdirSync(proj, { recursive: true })
 // Git in the test repository, waiting out the Hive under test's own git (lib.git, #199).
@@ -44,7 +51,7 @@ const shot = (page, n) => page.screenshot({ path: path.join(scratch, `agents-${n
   const project = async () => (await inv('workspace:refresh')).projects.find((p) => p.name === 'demo')
   await inv('workspace:open', ws); await sleep(800)
   await page.getByText('demo', { exact: true }).first().click(); await sleep(500)
-  await inv('project:updateConfig', proj, { worktreeSetup: 'echo HIVE-SETUP-RAN' })
+  await inv('project:updateConfig', proj, { worktreeSetup: `"${process.execPath}" "${setupScript}" "two words"` })
 
   // --- Agent 1 alone (added: projects start with none): the strip shows, with Add Agent
   const a1 = await lib.addAgent(inv, proj)
@@ -55,7 +62,7 @@ const shot = (page, n) => page.screenshot({ path: path.join(scratch, `agents-${n
   // --- Add Agent 2 in the project folder and Agent 3 in a new worktree
   const a2 = await inv('agents:add', proj, { location: 'project' })
   check('Agent 2 added', a2.name === 'Agent 2' && !a2.worktree, JSON.stringify(a2))
-  const a3 = await inv('agents:add', proj, { location: 'new-worktree', name: 'Reviewer', model: 'sonnet' })
+  const a3 = await inv('agents:testLegacy', proj, { location: 'new-worktree', name: 'Reviewer', model: 'sonnet' })
   check('worktree agent added', !!a3.worktree && a3.worktree.branch === 'hive/agents-ws/demo/reviewer', JSON.stringify(a3.worktree))
   const wtPath = a3.worktree.path
   check('worktree next to the workspace', path.resolve(wtPath).toLowerCase() === path.resolve(wtRoot, 'demo', 'reviewer').toLowerCase(), wtPath)
@@ -79,6 +86,9 @@ const shot = (page, n) => page.screenshot({ path: path.join(scratch, `agents-${n
     return b.includes('HIVE-SETUP-RAN') ? b : null
   }, 20000)) ?? (await inv('pty:buffer', `session:${proj.toLowerCase()}#${a3.id}`))
   check('setup command ran in the agent terminal', buf3.includes('HIVE-SETUP-RAN'))
+  // Its quoted path with a space and its quoted argument reached the program as typed (#1454).
+  const flat3 = lib.plainText(buf3).replace(/[ ]+/g, '')
+  check('setup command with a quoted path ran as typed', flat3.includes('HIVE-SETUP-RAN["twowords"]'), flat3.slice(flat3.indexOf('HIVE-SETUP-RAN'), flat3.indexOf('HIVE-SETUP-RAN') + 60))
   await lib.acceptClaudeTrust(inv, proj, a3.id, 25000)
   // Both sessions up (past starting: the CLI's SessionStart arrived).
   const up = (ids) => lib.until(async () => {
@@ -155,13 +165,14 @@ const shot = (page, n) => page.screenshot({ path: path.join(scratch, `agents-${n
   await sleep(400)
   p = await project()
   check('locked files published', JSON.stringify(p.agents.find((a) => a.id === a1.id).live.lockedFiles) === '["app.txt"]', JSON.stringify(p.agents.find((a) => a.id === a1.id).live.lockedFiles))
-  await inv('project:updateConfig', proj, { fileLocks: 'ask' }); await inv('workspace:refresh')
+  // File locks is the project's workflow option (HI-1766).
+  await lib.setOwnOptions(inv, proj, { fileLocks: 'ask' }); await inv('workspace:refresh')
   r = await pre(l2.sessionId)
   check('ask mode asks', r.hookSpecificOutput?.permissionDecision === 'ask')
-  await inv('project:updateConfig', proj, { fileLocks: 'warn' }); await inv('workspace:refresh')
+  await lib.setOwnOptions(inv, proj, { fileLocks: 'warn' }); await inv('workspace:refresh')
   r = await pre(l2.sessionId)
   check('warn mode adds context', !!r.hookSpecificOutput?.additionalContext && !r.hookSpecificOutput.permissionDecision)
-  await inv('project:updateConfig', proj, { fileLocks: 'inherit' }); await inv('workspace:refresh')
+  await lib.setOwnOptions(inv, proj, { fileLocks: undefined }); await inv('workspace:refresh')
   // Agent 1's turn ends: its claims are released
   await hook({ session_id: l1.sessionId, hook_event_name: 'Stop' }); await sleep(300)
   r = await pre(l2.sessionId)
@@ -190,7 +201,7 @@ const shot = (page, n) => page.screenshot({ path: path.join(scratch, `agents-${n
   check('worktree changes since base', cs.files.some((f) => f.path === 'review.md') && cs.files.some((f) => f.path === 'README.md'), cs.files.map((f) => f.path + ':' + f.status).join(' '))
   const d = await inv('git:diff', wtPath, 'review.md', 'main')
   check('diff against base', d.original === '' && d.modified.includes('Review notes'))
-  await page.locator('.tabs .tab', { hasText: 'Git' }).click(); await lib.until(async () => (await page.locator('.root-select').count()) > 0, 10000)
+  await page.locator('.tabs .tab', { hasText: 'Version Control' }).click(); await lib.until(async () => (await page.locator('.root-select').count()) > 0, 10000)
   await page.locator('.root-select').first().selectOption(a3.id); await lib.until(async () => (await page.getByText('review.md').count()) > 0, 10000)
   check('Changes tab shows worktree files', await page.getByText('review.md').count() > 0)
   await shot(page, '6-changes')
@@ -203,7 +214,11 @@ const shot = (page, n) => page.screenshot({ path: path.join(scratch, `agents-${n
   g('commit -q -am "main change"')
   fs.writeFileSync(path.join(wtPath, 'README.md'), '# Demo\n\nline one changed by reviewer\n')
   const mainHead = g('rev-parse HEAD').trim()
-  const conflict = await inv('agents:merge', proj, a3.id, { squash: true, message: 'Reviewer work', cleanup: false })
+  // Uncommitted files aren't merged (#1347): refused, counted, nothing committed for the agent.
+  const dirty = await inv('agents:merge', proj, a3.id, { squash: true, message: 'Reviewer work', cleanup: false })
+  check('a dirty worktree is refused, its files counted', !dirty.ok && dirty.uncommitted === 1 && g('status --porcelain', wtPath).includes('README.md'), JSON.stringify(dirty))
+  g('add -A', wtPath); g('commit -q -m "reviewer readme"', wtPath)
+  const conflict =await inv('agents:merge', proj, a3.id, { squash: true, message: 'Reviewer work', cleanup: false })
   check('conflict reported', !conflict.ok && conflict.conflicts?.includes('README.md'), JSON.stringify(conflict))
   check('main untouched after conflict', g('rev-parse HEAD').trim() === mainHead && g('status --porcelain').trim() === '')
   // Resolve on the branch by taking main's version, then merge cleanly

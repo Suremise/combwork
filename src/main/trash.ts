@@ -3,6 +3,7 @@ import { appendFile, mkdir, rename } from 'original-fs/promises'
 import { existsSync } from 'original-fs'
 import { app, shell } from 'electron'
 import { createLogger, userText } from './logger'
+import { takesTestSeams } from './testQuiet'
 
 const log = createLogger('trash')
 
@@ -10,13 +11,14 @@ const log = createLogger('trash')
  * Hive's one way to delete what the user can see (files, notes, skills, templates, cards, backups, projects): to the
  * Recycle Bin, so it can be restored (#414). Nothing in main calls `shell.trashItem` itself (tests/trash.test.ts).
  *
- * Test copies of Hive never touch the user's Recycle Bin: an unpackaged build with HIVE_TEST_TRASH_DIR (the run
- * context gives every test copy one, in the suite's own folder) or with a test profile (HIVE_USER_DATA: then
- * `<profile>/test-trash`) moves the item into that folder instead, and notes it in `trash.jsonl` there, so suites can
- * check it arrived. `npm run dev` (no test profile) and the installed app use the Recycle Bin.
+ * Test copies of Hive never touch the user's Recycle Bin: an unpackaged build, or a quiet packaged one (HIVE_TEST_QUIET=1,
+ * which the suites start dist\win-unpacked with: takesTestSeams, #1599), with HIVE_TEST_TRASH_DIR (the run context gives
+ * every test copy one, in the suite's own folder) or with a test profile (HIVE_USER_DATA: then `<profile>/test-trash`)
+ * moves the item into that folder instead, and notes it in `trash.jsonl` there, so suites can check it arrived.
+ * `npm run dev` (no test profile) and the installed app (never quiet) use the Recycle Bin.
  */
 export function testTrashDir(env: NodeJS.ProcessEnv = process.env, packaged = app.isPackaged): string | null {
-  if (packaged) return null
+  if (!takesTestSeams(env, packaged)) return null
   if (env.HIVE_TEST_TRASH_DIR) return env.HIVE_TEST_TRASH_DIR
   return env.HIVE_USER_DATA ? join(env.HIVE_USER_DATA, 'test-trash') : null
 }

@@ -1,8 +1,10 @@
 // The attention inbox: the status bar's "n need you" and its popover (oldest first, a click goes to the agent), the
 // Projects badge and the project list's counts. A finish on screen is seen at once; one in another project stays
-// until its pane is shown; a waiting agent stays until answered; an idle worktree agent with unmerged work is listed
-// to review, not counted. The agents run the fake Claude Code (fake-claude/). Dev build, throwaway profile, workspace
+// until its pane is shown, told quietly beside the count ("1 finished", #1632), never as a need; a waiting agent (at a
+// prompt) needs you until answered; an idle worktree agent with unmerged work is listed to review, not counted. The agents run the fake Claude Code (fake-claude/). Dev build, throwaway profile, workspace
 // and CLAUDE_CONFIG_DIR.
+// Dev build only (#1580): it starts this checkout's Electron itself, and Two is a 0.9 worktree agent
+// (agents:testLegacy, refused by a packaged build).
 const lib = require('./lib.cjs')
 const { _electron } = require('playwright-core')
 const fs = require('fs')
@@ -27,6 +29,8 @@ const shot = (page, name) => page.screenshot({ path: path.join(lib.WORK, `inbox-
 ;(async () => {
   for (const d of [userData, ws, ws + '.worktrees', claudeHome]) fs.rmSync(d, { recursive: true, force: true })
   fs.mkdirSync(claudeHome, { recursive: true })
+  // Every read of the agents' input recorded, for typeLine (#1560).
+  lib.logFakeInput(claudeHome)
   for (const p of [alpha, beta]) {
     lib.gitProject(p)
     git(p, 'config', 'user.email', 't@t')
@@ -86,8 +90,11 @@ const shot = (page, name) => page.screenshot({ path: path.join(lib.WORK, `inbox-
     await until(async () => String(await inv('pty:buffer', lib.ptyKey(proj, id))).includes(`Done: ${id} turn ${n}`), HUNG_MS)
     await lib.sleep(600)
   }
-  const item = page.locator('.statusbar .inbox-item')
+  const item = page.locator('.statusbar .inbox-item:not(.inbox-finished)')
   const itemText = async () => ((await item.count()) ? (await item.innerText()).trim() : '')
+  // The quiet item beside it (#1632): agents finished since you last looked.
+  const finishedItem = page.locator('.statusbar .inbox-finished')
+  const finishedText = async () => ((await finishedItem.count()) ? (await finishedItem.innerText()).trim() : '')
   const rows = page.locator('.inbox-panel .inbox-row')
   const rowNames = async () => (await rows.locator('.inbox-name').allInnerTexts()).map((t) => t.trim())
   const projectsBadge = async () => {
@@ -129,14 +136,21 @@ const shot = (page, name) => page.screenshot({ path: path.join(lib.WORK, `inbox-
   check('a waiting agent on screen still needs you', !!(await until(async () => (await itemText()) === '1 needs you', 5000)), await itemText())
   await turn(alpha, one.id)
   check('a finish in another project stays unseen', (await live(alpha, one.id))?.unseen === true)
-  check('the status bar says 2 need you', !!(await until(async () => (await itemText()) === '2 need you', 5000)), await itemText())
-  check('the Projects badge says 2', (await projectsBadge()) === '2', await projectsBadge())
-  check('each project shows its count', (await needCount('alpha')) === '1' && (await needCount('beta')) === '1', `${await needCount('alpha')} ${await needCount('beta')}`)
+  // #1632's case: one agent at a prompt, another finished: 1 needs you, and the finish told apart.
+  check('the status bar says 1 needs you: the finish is not a need', !!(await until(async () => (await itemText()) === '1 needs you' && (await finishedText()) === '1 finished', 5000)), `${await itemText()} | ${await finishedText()}`)
+  const needTip = await lib.hoverTip(page, item, (t) => t.includes('1 agent needs you'))
+  check('…its tooltip says what it counts: cards and agents, each once (HI-1931)', needTip.includes('1 agent needs you'), needTip)
+  const finishedTip = await lib.hoverTip(page, finishedItem, (t) => t.startsWith('Agents that finished'))
+  check('…and the quiet item what it counts', finishedTip.startsWith('Agents that finished since you last looked'), finishedTip)
+  await page.mouse.move(5, 5)
+  check('the Projects badge says 1', (await projectsBadge()) === '1', await projectsBadge())
+  check('each project counts what needs you', (await needCount('alpha')) === '' && (await needCount('beta')) === '1', `${await needCount('alpha')} ${await needCount('beta')}`)
+  await shot(page, '0-statusbar')
 
   // The compact sidebar: a count on each project's square.
   await page.keyboard.press('Control+Alt+B')
   const railCounts = () => page.locator('.rail-project .project-need-count').allInnerTexts()
-  check('the compact sidebar shows the counts too', !!(await until(async () => JSON.stringify(await railCounts()) === '["1","1"]', HUNG_MS)), JSON.stringify(await railCounts()))
+  check('the compact sidebar shows the counts too', !!(await until(async () => JSON.stringify(await railCounts()) === '["1"]', HUNG_MS)), JSON.stringify(await railCounts()))
   await shot(page, '0-rail')
   await page.keyboard.press('Control+Alt+B')
   await until(async () => (await page.locator('.rail-project').count()) === 0, HUNG_MS)
@@ -145,6 +159,8 @@ const shot = (page, name) => page.screenshot({ path: path.join(lib.WORK, `inbox-
   check('the popover lists them oldest first', !!(await until(async () => JSON.stringify(await rowNames()) === JSON.stringify(['beta · Three', 'alpha · One']), HUNG_MS)), JSON.stringify(await rowNames()))
   check('…saying what each is doing', (await rows.nth(0).locator('.inbox-state').innerText()).startsWith('Needs input') && (await rows.nth(1).locator('.inbox-state').innerText()) === 'Finished')
   check('…and how long ago', (await rows.nth(1).locator('.inbox-time').innerText()) === 'just now')
+  const sections = await page.locator('.inbox-panel .inbox-section').allInnerTexts()
+  check('…the finished apart, under their own heading', JSON.stringify(sections.map((t) => t.trim().toUpperCase())) === JSON.stringify(['NEED YOU (1)', 'FINISHED (1)']), JSON.stringify(sections))
   await shot(page, '1-popover')
 
   // A click goes to the agent, which is then seen.
@@ -152,7 +168,7 @@ const shot = (page, name) => page.screenshot({ path: path.join(lib.WORK, `inbox-
   check('the popover closes', !!(await until(async () => (await page.locator('.inbox-panel').count()) === 0, HUNG_MS)))
   check('alpha is shown', !!(await until(async () => (await page.locator('.project-row.selected', { hasText: 'alpha' }).count()) === 1, HUNG_MS)))
   check('One is seen once shown', !!(await until(async () => (await live(alpha, one.id))?.unseen === false, 5000)))
-  check('one left: Three, still waiting', !!(await until(async () => (await itemText()) === '1 needs you', 5000)), await itemText())
+  check('one left: Three, still waiting', !!(await until(async () => (await itemText()) === '1 needs you' && (await finishedText()) === '', 5000)), `${await itemText()} | ${await finishedText()}`)
 
   // A finish while the window is minimised is unseen until the window comes back.
   await setFocus(false)
@@ -181,7 +197,7 @@ const shot = (page, name) => page.screenshot({ path: path.join(lib.WORK, `inbox-
   check('…not counted', (await itemText()) === '1 needs you', await itemText())
   await shot(page, '2-review')
   await review.getByRole('button', { name: 'Changes' }).click()
-  check('Changes opens the Git tab at Changes', !!(await until(async () => (await page.locator('.tab.active', { hasText: 'Git' }).count()) === 1 && (await page.locator('.git-sections button.active', { hasText: 'Changes' }).count()) === 1, HUNG_MS)))
+  check('Changes opens the Git tab at Changes', !!(await until(async () => (await page.locator('.tab.active', { hasText: 'Version Control' }).count()) === 1 && (await page.locator('.git-sections button.active', { hasText: 'Changes' }).count()) === 1, HUNG_MS)))
 
   // Answering Three: nothing needs you, and the status bar says what is left to review.
   await lib.acceptClaudeTrust(inv, beta, three.id)

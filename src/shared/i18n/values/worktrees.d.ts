@@ -2,24 +2,21 @@
 // global script, so its interface merges with every other area's (shared/i18n/msg.ts).
 interface HiveMessageValues {
   'worktrees.agent.badPlacement': undefined
+  'worktrees.agent.badWorkflowRole': undefined
   'worktrees.agent.chooseMove': undefined
-  'worktrees.agent.chooseTree': undefined
-  'worktrees.agent.detached': undefined
+  'worktrees.agent.effortRefused': { chosen: string; model: string | number; effort: string | number }
   'worktrees.agent.enterName': undefined
   'worktrees.agent.gone': undefined
   'worktrees.agent.nameTaken': { name: string | number }
-  'worktrees.agent.noBase': undefined
-  'worktrees.agent.noGitForTree': { problem: string | number }
-  'worktrees.agent.noGitToCheck': { problem: string | number }
   'worktrees.agent.noTree': undefined
-  'worktrees.agent.notATree': undefined
+  'worktrees.agent.notPinned': undefined
+  'worktrees.agent.providerChangedMeanwhile': { agent: string | number }
   'worktrees.agent.removing': undefined
   'worktrees.agent.roleTooLong': { max: string | number }
   'worktrees.agent.sharedTree': undefined
   'worktrees.agent.stopForProvider': undefined
   'worktrees.agent.stopToMerge': { agent: string | number }
   'worktrees.agent.stopToRemove': undefined
-  'worktrees.agent.treeRemoved': undefined
   'worktrees.agent.treeShared': undefined
   'worktrees.agent.unknownProvider': { provider: string | number }
   'worktrees.badBranchName': { branch: string | number }
@@ -30,16 +27,22 @@ interface HiveMessageValues {
   'worktrees.gitProblem': { problem: string | number }
   'worktrees.listBranches': { why: string | number }
   'worktrees.merge.cantCheck': { folder: string | number }
-  'worktrees.merge.commitFailed': { why: string | number }
+  'worktrees.merge.caseAlias': { branch: string | number; other: string | number }
   'worktrees.merge.detached': undefined
+  'worktrees.merge.intoItself': { branch: string | number }
+  'worktrees.merge.noTarget': { branch: string | number }
   'worktrees.merge.notRemoved': undefined
   'worktrees.merge.nothing': { why: string | number }
   'worktrees.merge.sameBranch': { branch: string | number }
   'worktrees.merge.staged': undefined
+  'worktrees.merge.targetElsewhere': { branch: string | number; folder: string | number }
+  'worktrees.merge.targetMoved': { branch: string | number }
+  'worktrees.merge.uncommitted': { files: number }
   'worktrees.merge.unknownFiles': undefined
   'worktrees.missing.noAgent': undefined
   'worktrees.missing.noBranch': { agent: string | number; branch: string | number }
   'worktrees.missing.noTree': { agent: string | number }
+  'worktrees.missing.slotFailed': { slot: string | number; agent: string | number; why: string | number }
   'worktrees.missing.stillListed': { folder: string | number }
   'worktrees.missing.stopFirst': { agent: string | number }
   'worktrees.missing.thereRecreate': { agent: string | number; folder: string | number }
@@ -52,17 +55,10 @@ interface HiveMessageValues {
   'worktrees.names.projectGone': undefined
   'worktrees.readBranch': { folder: string | number; why: string | number }
   'worktrees.readOriginHead': { why: string | number }
-  'worktrees.reuse.beingRemoved': undefined
   'worktrees.reuse.cantCheck': { base: string | number }
-  'worktrees.reuse.gitBusy': undefined
-  'worktrees.reuse.inUse': undefined
-  'worktrees.reuse.movedAside': { folder: string | number; aside: string | number }
   'worktrees.reuse.notChecked': undefined
   'worktrees.reuse.notMerged': { n: number; base: string | number }
-  'worktrees.reuse.resetFailed': { base: string | number; why: string | number }
-  'worktrees.reuse.taken': undefined
   'worktrees.reuse.uncommitted': { n: number }
-  'worktrees.reuse.unreadable': undefined
   'worktrees.statusFailed': undefined
   'worktrees.unknownError': undefined
   'worktrees.why.cantCheck': { branch: string | number }

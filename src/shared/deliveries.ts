@@ -7,6 +7,7 @@
  */
 import type { InboxBrief, InboxSummary } from './types'
 import { inboxNotice } from './doorbell'
+import { cardRef } from './projectKeys'
 
 /** What a delivery is: a task, a re-brief (a message for the work it is on), a card event, the user's answer, a handover, a control notice. */
 export const DELIVERY_KINDS = ['task', 'rebrief', 'card-event', 'answer', 'handover', 'control'] as const
@@ -42,9 +43,10 @@ export type DeliveryState = (typeof DELIVERY_STATES)[number]
 /**
  * Who a delivery is from. The Assistant's names its workspace and the launch that sent it: its permission is worked out
  * again from those and the settings at every step (never a token or a closure, which can't be saved), and a launch that
- * has ended sends nothing more (#645). Hive's own (board events) and the user's need no more.
+ * has ended sends nothing more (#645). Hive's own (board events) and the user's need no more. An agent's (HI-1866: its
+ * request for the Assistant on a card) names its project and id, so whoever reads it knows which agent asked.
  */
-export type DeliverySender = { kind: 'assistant'; name: string; workspace: string; launch: string } | { kind: 'hive'; name: string } | { kind: 'user'; name: string }
+export type DeliverySender = { kind: 'assistant'; name: string; workspace: string; launch: string } | { kind: 'hive'; name: string } | { kind: 'user'; name: string } | { kind: 'agent'; name: string; project: string; agentId: string }
 
 export interface DeliveryRecord {
   /** Short and unique in its project ("m12"): what the agent acks. */
@@ -95,6 +97,11 @@ export interface DeliveryRecord {
   need?: 'free' | 'stalled'
   /** Only for this launch of its agent (a mode notice, a lock's go-ahead): it expires once that launch has ended. */
   forRun?: string
+  /**
+   * The durable action that made it (`card_actions.id`, SPEC §16.4.5): one delivery per action, never two (the unique
+   * `deliveries.action`), so an action run again (a restart, another Hive) finds it and makes nothing.
+   */
+  action?: number
 }
 
 /**
@@ -171,25 +178,39 @@ export interface InboxItem {
 /** The unread deliveries as the inbox lists them, oldest first: a card's events in one item, where its first one was. */
 export function inboxItems(records: readonly DeliveryRecord[]): InboxItem[] {
   const out: InboxItem[] = []
-  const byCard = new Map<number, { item: InboxItem; bodies: string[] }>()
+  const byCard = new Map<number, { item: InboxItem; events: DeliveryRecord[] }>()
   for (const r of [...records].filter(isUnread).sort((a, b) => a.seq - b.seq)) {
     if (r.kind === 'card-event' && r.card) {
       const had = byCard.get(r.card)
       if (had) {
         had.item.ids.push(r.id)
-        had.bodies.push(r.body)
+        had.events.push(r)
         if (!had.item.from.split(' and ').includes(r.from.name)) had.item.from += ` and ${r.from.name}`
         continue
       }
       const item: InboxItem = { ids: [r.id], kind: r.kind, from: r.from.name, card: r.card, text: '', at: r.created }
-      byCard.set(r.card, { item, bodies: [r.body] })
+      byCard.set(r.card, { item, events: [r] })
       out.push(item)
       continue
     }
     out.push({ ids: [r.id], kind: r.kind, from: r.from.name, ...(r.card ? { card: r.card } : {}), text: r.body, at: r.created })
   }
-  for (const { item, bodies } of byCard.values()) item.text = bodies.length === 1 && bodies[0] ? bodies[0] : `${bodies.length} ${bodies.length === 1 ? 'change' : 'changes'}, read the card`
+  for (const { item, events } of byCard.values()) item.text = coalesced(events)
   return out
+}
+
+/**
+ * A card's events in one line: one as it is; several counted. HI-2087: led by the merge queue's latest return of the
+ * card (its line marked so where it was made: `meta.queueReturn`) while it still says where the work is, that is while
+ * nothing but comments on it came after (`meta.commentOnly`: the queue's own comment, say); a later move, verdict, merge
+ * or removal is newer than the return, so the count again.
+ */
+function coalesced(events: readonly DeliveryRecord[]): string {
+  if (events.length === 1 && events[0].body) return events[0].body
+  const i = events.findLastIndex((r) => r.meta?.queueReturn === true)
+  const counted = `${events.length} ${events.length === 1 ? 'change' : 'changes'}, read the card`
+  if (i < 0 || !events.slice(i + 1).every((r) => r.meta?.commentOnly === true)) return counted
+  return `${events[i].body} (with ${events.length - 1} more ${events.length === 2 ? 'change' : 'changes'}: read the card)`
 }
 
 const idList = (ids: readonly string[]): string => ids.join(', ')
@@ -213,14 +234,15 @@ export function offerLine(records: readonly DeliveryRecord[], watchLabel: string
 export function inboxText(items: readonly InboxItem[], unacked: readonly string[]): string {
   const older = unacked.length ? `Received before, not acked yet: ${idList(unacked)}.` : ''
   if (!items.length) return `Nothing new.${older ? ` ${older}` : ''}`
-  const rows = items.map((i) => `${i.ids.join(',')} · ${i.from}${i.card ? ` · #${i.card}` : ''}: ${i.text}`)
+  const rows = items.map((i) => `${i.ids.join(',')} · ${i.from}${i.card ? ` · ${cardRef(i.card)}` : ''}: ${i.text}`)
   return [`${items.length} new:`, ...rows, ...(older ? [older] : []), 'Ack each with hive_inbox (ack: its ids) once you have acted on it.'].join('\n')
 }
 
-/** hive_inbox ack's reply. */
-export function ackText(acked: readonly string[], unknown: readonly string[], unread: readonly string[] = []): string {
+/** hive_inbox ack's reply; `reading`: with read: true (#1531), the ids not read yet are in the read that follows. */
+export function ackText(acked: readonly string[], unknown: readonly string[], unread: readonly string[] = [], reading = false): string {
   const a = acked.length ? `Acked ${idList(acked)}.` : 'Nothing acked.'
-  const notRead = unread.length ? ` Not read yet: ${idList(unread)}: read ${unread.length === 1 ? 'it' : 'them'} with hive_inbox first.` : ''
+  const it = unread.length === 1 ? 'it' : 'them'
+  const notRead = unread.length ? (reading ? ` Not read before: ${idList(unread)}, not acked: ack ${it} once you have acted on ${it}.` : ` Not read yet: ${idList(unread)}: read ${it} with hive_inbox first.`) : ''
   return `${a}${notRead}${unknown.length ? ` Not in your inbox: ${idList(unknown)}.` : ''}`
 }
 
@@ -234,7 +256,7 @@ export function inboxSummary(records: readonly DeliveryRecord[], now: number, ov
   const unread: InboxBrief[] = records
     .filter(isUnread)
     .sort((a, b) => a.seq - b.seq)
-    .map((r) => ({ id: r.id, from: r.from.name, text: clip(r.body || (r.card ? `#${r.card} changed` : ''), 120), at: r.created, state: r.state, ...(r.card ? { card: r.card } : {}) }))
+    .map((r) => ({ id: r.id, from: r.from.name, text: clip(r.body || (r.card ? `${cardRef(r.card)} changed` : ''), 120), at: r.created, state: r.state, ...(r.card ? { card: r.card } : {}) }))
   const overdue = records.filter((r) => isOverdue(r, now, overdueMs)).length
   return unread.length || overdue ? { unread, overdue } : undefined
 }
@@ -284,6 +306,7 @@ function readSender(v: unknown): DeliverySender | null {
   const s = v as Record<string, unknown>
   if (!str(s.name, 200) || !s.name) return null
   if (s.kind === 'assistant') return str(s.workspace, 1024) && s.workspace && str(s.launch, 200) ? { kind: 'assistant', name: s.name, workspace: s.workspace, launch: s.launch } : null
+  if (s.kind === 'agent') return str(s.project, 300) && s.project && str(s.agentId, 128) && s.agentId ? { kind: 'agent', name: s.name, project: s.project, agentId: s.agentId } : null
   if (s.kind === 'hive' || s.kind === 'user') return { kind: s.kind, name: s.name }
   return null
 }
@@ -311,6 +334,7 @@ export function readDelivery(v: unknown): DeliveryRecord | null {
   if (r.detail !== undefined && !str(r.detail, DELIVERY_DETAIL_MAX_CHARS)) return null
   if (r.agentName !== undefined && !str(r.agentName, 300)) return null
   if (r.offerRun !== undefined && !str(r.offerRun, 200)) return null
+  if (r.action !== undefined && !(Number.isInteger(r.action) && (r.action as number) > 0)) return null
   const out: DeliveryRecord = { id: r.id, seq: r.seq as number, agentId: r.agentId, conversation: (r.conversation as string | null) || null, kind: r.kind as DeliveryKind, from, body: r.body, state: r.state as DeliveryState, created: r.created, expires: r.expires }
   if (r.agentName) out.agentName = r.agentName as string
   if (r.card) out.card = r.card as number
@@ -322,6 +346,7 @@ export function readDelivery(v: unknown): DeliveryRecord | null {
   for (const k of ['again', 'source', 'ref', 'forRun'] as const) if (r[k]) out[k] = r[k] as string
   if (r.need) out.need = r.need as 'free' | 'stalled'
   if (r.meta) out.meta = { ...(r.meta as Record<string, string | number | boolean>) }
+  if (r.action) out.action = r.action as number
   return out
 }
 

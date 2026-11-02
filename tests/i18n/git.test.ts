@@ -93,8 +93,8 @@ describe('git missing or too old', () => {
   it('reads as before in English, and how to fix it', () => {
     expect(gitProblemText({ state: 'missing' })).toBe("Git isn't installed (or isn't on Hive's PATH)")
     expect(gitProblemText({ state: 'old', version: '2.16.0' })).toBe('Git 2.16.0 is too old for Hive (it needs 2.38 or later)')
-    expect(gitFixText({ state: 'old', version: '2.30.0' })).toBe('Update Git for Windows to 2.38 or later, then Check again in Agent Setup.')
-    expect(gitFixText({ state: 'missing' })).toBe('Install Git for Windows (2.38 or later), or add the folder holding git.exe to your PATH, then Check again in Agent Setup (no need to restart Hive).')
+    expect(gitFixText({ state: 'old', version: '2.30.0' })).toBe('Update Git for Windows to 2.38 or later, then Check again in Provider Setup.')
+    expect(gitFixText({ state: 'missing' })).toBe('Install Git for Windows (2.38 or later), or add the folder holding git.exe to your PATH, then Check again in Provider Setup (no need to restart Hive).')
   })
 
   it("lists what an older git loses, by how old it is", () => {
@@ -102,7 +102,7 @@ describe('git missing or too old', () => {
     expect(gitOldText('2.37.0')).toBe(`With Git 2.37.0: ${base}.`)
     expect(gitOldText('2.29.0')).toBe(`With Git 2.29.0: ${base}; moving a workspace can't repair its worktrees.`)
     expect(gitOldText('2.26.0')).toBe(`With Git 2.26.0: ${base}; Remove All and loading a template keep the branches of the worktrees they remove; moving a workspace can't repair its worktrees.`)
-    expect(gitOldText('2.16.0')).toBe("Hive's git commands fail with Git 2.16.0: worktrees, merging, the Git tab and the unmerged counts don't work.")
+    expect(gitOldText('2.16.0')).toBe("Hive's git commands fail with Git 2.16.0: worktrees, merging, the Version Control tab's Git sections and the unmerged counts don't work.")
   })
 
   it("stays English for the main process's errors, whatever the window's language", () => {
@@ -138,7 +138,7 @@ describe('the sentences once built by hand read as before, in English', () => {
       'Git is cherry-picking: finish or abort it in a terminal.',
       'Tracks origin/main: 1 commit to push, nothing to pull.',
       'As of the last fetch, 5m ago. Hive never fetches by itself.',
-      'Click for Git → Branches & remotes.'
+      'Click for Version Control → Branches & remotes.'
     ])
     expect(gitStatusTip(summary({ upstream: { name: 'origin/main', remote: 'origin', ahead: 3, behind: 2 }, remotes: ['origin'] }), null)).toContain('Tracks origin/main: 3 commits to push, 2 commits to pull.')
     // #915: the counts are numbers in the window's language.

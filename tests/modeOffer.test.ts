@@ -23,11 +23,16 @@ vi.mock('../src/main/events', async (original) => {
 
 const base = tempDir('hive-modeoffer-')
 ;(electron.app as unknown as { getPath: () => string }).getPath = () => join(base, 'profile')
+// A test copy on its CLI test home (tests/cliHomes.ts), as an e2e run is: its agents start with no connection (the
+// seam, HI-1755; connections are on for everyone since HI-1774).
+process.env.HIVE_USER_DATA = join(base, 'profile')
+process.env.HIVE_TEST_CLI_HOME_CONNECTION = '1'
 
 const { createWorkspaceService, disposeWorkspaceService, inWorkspace } = await import('../src/main/workspace')
 const { sessions } = await import('../src/main/sessions')
 const { providerService } = await import('../src/main/providerService')
 const { config } = await import('../src/main/config')
+const accounts = await import('../src/main/accounts')
 
 const wsPath = join(base, 'ws')
 const p = join(wsPath, 'amberlight')
@@ -37,7 +42,8 @@ let w: ReturnType<typeof createWorkspaceService>
 const run = <T>(fn: () => Promise<T>): Promise<T> => inWorkspace(w, fn)
 /** A refresh of the project's agents, as the window's after a session starts or stops. */
 const refresh = () => run(async () => sessions.liveInfo(p, await w.projectConfig(p)))
-const setMode = (mode: string) => run(() => w.mutateProjectConfig(p, (c) => ({ agents: c.agents.map((a) => ({ ...a, permissionMode: mode })) })))
+// Its mode is its connection's (HI-2106): changed as the connection dialog changes it (HI-2122).
+const setMode = (mode: string) => run(async () => accounts.updateConnection((await w.projectConfig(p)).agents.find((a) => a.id === 'amb1')!.connection!, { permissionMode: mode as never }))
 /** Bounds a hung run only: the offer is sent 400 ms after the refresh that makes it. */
 const HUNG_MS = 10000
 const offered = () => s.modeOffers.size > 0 || s.modeOfferTimer !== null

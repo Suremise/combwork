@@ -18,15 +18,17 @@ const check = (name, ok, extra = '') => {
   console.log(`${ok ? 'PASS' : 'FAIL'} ${name}${ok || !extra ? '' : ` (${extra})`}`)
 }
 
-// The tips in the order they show, and the second agent's tip, from the source.
+// The tips in the order they show, and the second agent's tip, from the source, with any spacing between an entry's
+// fields (one written `'language',group` was missed, so never marked seen, and showed instead: #1337).
 const src = fs.readFileSync(path.join(lib.ROOT, 'src', 'shared', 'tips.ts'), 'utf8')
-const ORDER = [...src.matchAll(/\{ id: '([^']+)', group: '[^']+', order: (\d+)/g)].sort((a, b) => Number(a[2]) - Number(b[2])).map((m) => m[1])
+const ORDER = [...src.matchAll(/\{\s*id: '([^']+)',\s*group: '[^']+',\s*order: (\d+)/g)].sort((a, b) => Number(a[2]) - Number(b[2])).map((m) => m[1])
 const MOMENT = /'second-agent': '([^']+)'/.exec(src)?.[1]
 // A title in English, or a message's English (#767): `title: msg({ id: '…', defaultMessage: '…'`.
+const ENTRY = (id) => `\\{\\s*id: '${id}',\\s*group: '[^']+',\\s*order: \\d+,\\s*title: `
 const TITLE = (id) =>
-  new RegExp(`\\{ id: '${id}', group: '[^']+', order: \\d+, title: '([^']+)'`).exec(src)?.[1] ??
-  new RegExp(`\\{ id: '${id}', group: '[^']+', order: \\d+, title: "([^"]+)"`).exec(src)?.[1] ??
-  new RegExp(`\\{ id: '${id}', group: '[^']+', order: \\d+, title: msg\\(\\{ id: '[^']+', defaultMessage: (?:'([^']+)'|"([^"]+)")`).exec(src)?.slice(1).find(Boolean)
+  new RegExp(`${ENTRY(id)}'([^']+)'`).exec(src)?.[1] ??
+  new RegExp(`${ENTRY(id)}"([^"]+)"`).exec(src)?.[1] ??
+  new RegExp(`${ENTRY(id)}msg\\(\\{ id: '[^']+', defaultMessage: (?:'([^']+)'|"([^"]+)")`).exec(src)?.slice(1).find(Boolean)
 
 ;(async () => {
   for (const d of [userData, wsA, wsB]) fs.rmSync(d, { recursive: true, force: true })

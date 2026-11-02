@@ -9,11 +9,7 @@ The workspace's shared note `conventions/engineering-quality.md` (`hive_read_sha
 
 ## Workspaces and windows
 
-Each window has its own workspace. Calls without a path (`workspace.path`, `skillsDir`) need the current work's workspace:
-
-- IPC and Agent API calls have it;
-- background code uses `workspaceOf(projectPath)` or `inWorkspace(ws, fn)`;
-- window-specific events go through `emitTo(win, …)`.
+Each window has its own workspace: AGENTS.md (Gotchas: Several windows) says which calls need the current work's workspace and how background code and window events get theirs.
 
 ## Scope and authorisation
 
@@ -24,12 +20,12 @@ A project agent is known by its own token, never by what a request says. Every r
 - events (filtered per client);
 - skills listings.
 
-The Assistant's changes go through `assistantChange()` (control level, 30 per message, recorded). A rejected request reveals nothing about what it couldn't reach: a 404 looks the same as a missing item.
+The Assistant's changes go through `assistantChange()` (control level, recorded for undo). A rejected request reveals nothing about what it couldn't reach: a 404 looks the same as a missing item.
 
 ## Locks and races
 
 - Check ownership and permission inside the same lock as the write, against the record as it is then, for every item of a batch. A check made before the lock doesn't count.
-- Kept files (`project.json`, `workspace.json`, `config.json`) and session records (in hive.db) change only through their locked helpers (`mutateProjectConfig`, `mutateSessions`, `writeKeptJson`).
+- Kept files and session records change only through their locked helpers (AGENTS.md, Gotchas: Kept files, project.json / sessions).
 - A slow call can see its world change: an agent stopped, a card moved, a window closed. Check again after each await that matters.
 
 ## Files Hive manages
@@ -42,6 +38,14 @@ The Assistant's changes go through `assistantChange()` (control level, 30 per me
   - deletions go to the Recycle Bin when the user could want them back.
 - Storage clean-up previews and then applies exactly what was previewed, checked again at apply time.
 
+## Main's thread
+
+AGENTS.md's gotcha: main's thread carries every keystroke. Moving work off it:
+- The pattern to copy is the repository lock's (HI-1680): `src/main/repoLockWorker.ts` runs the unchanged core, `repoLock.ts`'s `LockThread` talks to it (its code runs in-process in unit tests), and it is a build entry in `electron.vite.config.ts`. The usage history's worker (#1106) is the larger example. A queue in the worker keeps calls in order where they must stay so.
+- Only where it makes sense: small, fast work stays on main, where a worker's messaging would cost more than it saves.
+- The evidence is hive.log's "main process was busy" and "on main's thread" warnings, which name what was under way (often waiting, not the cause), or a stall you measured. Measure before and after (main's longest stall, and a keystroke's echo where typing suffers, as `tests/e2e/repolocktyping.cjs` does), and put the numbers on the card.
+- Asynchronous file calls don't hold the thread but share the process's 16-thread libuv pool with every window and worker (`threadPool.ts`, HI-1702): keep bulk file work a few calls at a time (`atMost`), and read hive.log's "A file call took … to end" as the pool full or the disk slow (timed off main's thread, so not main being busy).
+
 ## Resources
 
 - Watchers, caches, event clients and lists that grow with use need a bound: a size, a TTL, or a disconnect when a client stops reading.
@@ -49,7 +53,7 @@ The Assistant's changes go through `assistantChange()` (control level, 30 per me
 
 ## Privacy
 
-- User text in log lines goes through `userText()`.
+- User text in log lines goes through `userText()` (AGENTS.md, Logging).
 - Transcript fixtures have personal text removed.
 - Diagnostics redact names and paths.
 

@@ -6,7 +6,7 @@
 // working on the card hears of a decision recorded meanwhile in its next reply, also from a tool that isn't the board's
 // (its own token; the real hive MCP server adds the line). The dialog's Save keeps everything typed in it (#432): a
 // decision being written is recorded as the user's, a comment posted, both once each, a change to a decision saved,
-// and a failed save leaves the dialog open with the words, also through Move to Doing, whose Try Again writes nothing
+// and a failed save leaves the dialog open with the words, also through Move to Active, whose Try Again writes nothing
 // twice; a decision changed to nothing is refused; Add Decision and Comment stand out while their box has text,
 // saying Save adds them too. The agent runs the fake Claude Code. Both themes. Dev build, throwaway profile, workspace
 // and CLAUDE_CONFIG_DIR.
@@ -72,7 +72,7 @@ const check = (name, ok, extra = '') => {
 
   // The user records one in the dialog.
   await tile.click()
-  const dialog = page.locator('.dialog', { hasText: `#${n}` })
+  const dialog = lib.cardDialog(page, await lib.cardLabel(inv, n))
   await until(async () => (await dialog.count()) === 1, 5000)
   const section = dialog.locator('.task-decisions')
   const above = await page.evaluate(() => {
@@ -168,7 +168,7 @@ const check = (name, ok, extra = '') => {
   // --- Save keeps everything typed in the dialog (#432), on a card of its own.
   const m = (await inv('tasks:create', { title: 'Password reset', project: 'alpha' })).number
   const mTile = page.locator(`.task-card[data-task="${m}"]`)
-  const mDialog = page.locator('.dialog', { hasText: `#${m}` })
+  const mDialog = lib.cardDialog(page, await lib.cardLabel(inv, m))
   const open = async () => {
     await until(async () => (await mTile.count()) === 1, 5000)
     await mTile.click()
@@ -239,8 +239,8 @@ const check = (name, ok, extra = '') => {
   await page.keyboard.press('Escape')
   await until(async () => (await mDialog.count()) === 0, 5000)
 
-  // Save into Doing goes through Move to Doing, which saves the drafts first; its Try Again writes nothing twice.
-  const moveDialog = page.locator('.dialog', { hasText: `Move #${m} to Doing` })
+  // Save into Active goes through Move to Active, which saves the drafts first; its Try Again writes nothing twice.
+  const moveDialog = page.locator('.dialog', { hasText: `Move ${await lib.cardLabel(inv, m)} to Active` })
   const viaMoveToDoing = async (fail) => {
     await mDialog.locator('select').nth(2).selectOption('doing')
     await mDialog.locator('.dialog-footer').getByRole('button', { name: 'Save', exact: true }).click()
@@ -266,7 +266,7 @@ const check = (name, ok, extra = '') => {
   await open()
   await mDialog.getByLabel('New decision').fill('Reset mails name the app.')
   await mDialog.getByLabel('New comment').fill('Moving it on.')
-  check('Move to Doing with both drafts, the comment failing once: Try Again moves it', await viaMoveToDoing('tasks:comment*1'))
+  check('Move to Active with both drafts, the comment failing once: Try Again moves it', await viaMoveToDoing('tasks:comment*1'))
   const doing = await card(m)
   check('…with the decision recorded once and the comment posted once', doing.decisions.length === decisionsBefore + 1 && doing.decisions.filter((d) => d.text === 'Reset mails name the app.').length === 1 && doing.comments.filter((c) => c.text === 'Moving it on.').length === 1 && doing.comments.length === commentsBefore + 1, JSON.stringify({ decisions: doing.decisions.map((d) => d.text), comments: doing.comments.map((c) => c.text) }))
   await inv('tasks:update', m, { column: 'todo' })
@@ -274,8 +274,9 @@ const check = (name, ok, extra = '') => {
   await until(async () => (await page.locator(`[data-column="todo"] .task-card[data-task="${m}"]`).count()) === 1, 5000)
   await open()
   await mDialog.getByLabel('New comment').fill('Second try.')
-  // The move itself fails once (after the comment was posted): Try Again posts nothing again.
-  check('Move to Doing with a comment, the move failing once: Try Again moves it', await viaMoveToDoing('tasks:update*1'))
+  // The move itself fails once (after the comment was posted): Try Again posts nothing again. The window's moves go
+  // through tasks:move since #1275 (#1333).
+  check('Move to Active with a comment, the move failing once: Try Again moves it', await viaMoveToDoing('tasks:move*1'))
   check('…with the comment posted once', (await card(m)).comments.filter((c) => c.text === 'Second try.').length === 1 && (await card(m)).decisions.length === decisionsBefore + 1)
 
   // An agent on the card: its next reply flags a decision recorded since it read the card, whatever tool it called.
@@ -283,7 +284,9 @@ const check = (name, ok, extra = '') => {
   await inv('session:start', alpha, { agentId: coder.id })
   check('Coder starts', !!(await until(async () => (await inv('session:live')).some((x) => x.agentId === coder.id && ['ready', 'waiting'].includes(x.status)), 20000)))
   const launch = fs.readFileSync(path.join(claudeHome, 'fake-launches.jsonl'), 'utf8').trim().split('\n').map((l) => JSON.parse(l)).at(-1)
-  const coderToken = launch.env.HIVE_API_TOKEN
+  const coderToken = launch.token
+  // HI-2262: its session has the token's file, never the token in its environment (an `env` listing printed it).
+  check("Coder's session has HIVE_API_TOKEN_FILE and its token, never HIVE_API_TOKEN", !!launch.env?.HIVE_API_TOKEN_FILE && /^[0-9a-f]{64}$/.test(coderToken ?? '') && !('HIVE_API_TOKEN' in (launch.env ?? {})), JSON.stringify(Object.keys(launch.env ?? {})))
   const asCoder = async (p, method = 'GET', body) => {
     const res = await fetch(`http://127.0.0.1:${PORT}${p}`, { method, headers: { Authorization: `Bearer ${coderToken}`, 'X-Hive-Workspace': encodeURIComponent(ws), 'Content-Type': 'application/json' }, ...(body ? { body: JSON.stringify(body) } : {}) })
     const notice = res.headers.get('x-hive-notice')
@@ -293,27 +296,38 @@ const check = (name, ok, extra = '') => {
   check("the agent's read of its card has no flag", (await asCoder(`/v1/tasks/${n}`)).notice === null)
   await lib.sleep(20)
   await inv('tasks:update', n, { decision: 'Errors stay on screen until fixed.' })
+  // Notices name the card by its key with the number the tools take (#1219): its own key, from the board.
+  const named = `${(await card(n)).key}`
+  check('the card has a key of its project', /^[A-Z]{2,4}-\d+$/.test(named), named)
   const status = await asCoder('/v1/projects/alpha')
-  check('a decision recorded since: its next reply, from a tool that is not the board, flags it', status.status === 200 && status.notice === `[Hive] #${n} has 1 new decision since you last read it: read the card (hive_read_task) at your next checkpoint.`, JSON.stringify(status))
+  check('a decision recorded since: its next reply, from a tool that is not the board, flags it', status.status === 200 && status.notice === `[Hive] ${named} has 1 new decision since you last read it: read the card (hive_read_task) at your next checkpoint.`, JSON.stringify(status))
   // Through the real hive MCP server, as the agent's tools see it: the reply ends with the line.
   const viaMcp = JSON.parse(
     execFileSync(process.execPath, [path.join(lib.ROOT, 'out', 'main', 'hive-mcp.js')], {
       input: JSON.stringify({ jsonrpc: '2.0', id: 1, method: 'tools/call', params: { name: 'hive_project_status', arguments: {} } }) + '\n',
-      env: lib.childEnv({ HIVE_API_URL: `http://127.0.0.1:${PORT}`, HIVE_WORKSPACE: ws, HIVE_API_TOKEN: coderToken, HIVE_API_TOKEN_FILE: '', HIVE_PROJECT: 'alpha', HIVE_AGENT_ID: coder.id }),
+      env: lib.childEnv({ HIVE_API_URL: `http://127.0.0.1:${PORT}`, HIVE_WORKSPACE: ws, HIVE_API_TOKEN_FILE: lib.tokenFile(coderToken), HIVE_PROJECT: 'alpha', HIVE_AGENT_ID: coder.id }),
       timeout: 60000
     })
       .toString()
       .split('\n')[0]
   ).result
-  check('…and hive_project_status ends with it', !viaMcp.isError && viaMcp.content[0].text.endsWith(`\n[Hive] #${n} has 1 new decision since you last read it: read the card (hive_read_task) at your next checkpoint.`), viaMcp.content?.[0]?.text?.slice(-200))
+  check('…and hive_project_status ends with it', !viaMcp.isError && viaMcp.content[0].text.endsWith(`\n[Hive] ${named} has 1 new decision since you last read it: read the card (hive_read_task) at your next checkpoint.`), viaMcp.content?.[0]?.text?.slice(-200))
   await asCoder(`/v1/tasks/${n}`)
+  // Its read in full is recorded as a fact (#1216): the decision generation that reply gave it, the card's newest.
+  const received = await until(async () => {
+    const facts = await inv('tasks:facts', n)
+    const newest = Math.max(0, ...facts.filter((f) => f.kind === 'Decision').map((f) => f.data.generation))
+    const got = facts.filter((f) => f.kind === 'DecisionsReceived' && f.data.agent === coder.id).at(-1)
+    return got && newest > 0 && got.data.generation === newest ? got : null
+  }, 10000)
+  check('the read in full records DecisionsReceived at the generation the reply gave (#1216)', !!received, JSON.stringify(received))
   check('read in full, it is no longer flagged', (await asCoder('/v1/projects/alpha')).notice === null)
   // The call that moves the card on (to Review) still hears of a decision it hasn't read: the card was its own when the
   // call began.
   await lib.sleep(20)
   await inv('tasks:update', n, { decision: 'One message per field.' })
   const moved = await asCoder(`/v1/tasks/${n}`, 'PATCH', { column: 'review', reply: 'short' })
-  check('moving the card to Review with a decision unread: that reply flags it', moved.status === 200 && moved.notice === `[Hive] #${n} has 1 new decision since you last read it: read the card (hive_read_task) at your next checkpoint.`, JSON.stringify(moved))
+  check('moving the card to Review with a decision unread: that reply flags it', moved.status === 200 && moved.notice === `[Hive] ${named} has 1 new decision since you last read it: read the card (hive_read_task) at your next checkpoint.`, JSON.stringify(moved))
   check('…and once out of its hands, its next replies say nothing more', (await asCoder('/v1/projects/alpha')).notice === null)
 
   await app.close()

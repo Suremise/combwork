@@ -4,6 +4,7 @@ import { PROVIDERS, isProviderEnabled } from '@shared/providers'
 import { usesOwnPrices } from '@shared/prices'
 import { PERIODS, activeIn, costText, periodFrom, stackedDaily, sumUsage, totalTokens, type DayTotal, type UsageGroup } from '@shared/usageTotals'
 import { call, errorMessage } from '../api'
+import { oneAtATime, withinTime } from '@shared/coalesce'
 import { selectProject } from '../actions'
 import { get, revealAgent, set, setAssistantOpen, setProjectTab, showView, useLanguage, useStore } from '../store'
 import { cx, formatNumber, formatTokens, timeAgo } from '../util'
@@ -19,8 +20,14 @@ import { formatDayLabel } from '@shared/dates'
 
 /** Live updates come at most this often (the usage history has running sessions about every minute, #1106). */
 const LIVE_REFRESH_MS = 15_000
+/** A load with no answer by then shows as failed, with Retry (#1646). */
+const LOAD_LIMIT_MS = 60_000
+
+/** A running agent's project in its label (HI-1679): dropped first in a narrow row, so the agent's name stays whole. */
+const projectPart = (c: React.ReactNode[]): React.ReactNode => <span className="running-project">{c}</span>
 
 const M = {
+  noAnswer: msg({ id: 'workspace.overview.noAnswer', defaultMessage: 'no answer after {seconds, number} s', description: "Why the workspace's usage could not be loaded: Hive read it for this long without finishing. Shown as {error} in \"Could not load {what}: {error}\", with Retry." }),
   costTip: msg({ id: 'workspace.overview.costTip', defaultMessage: 'What this work would have cost at API prices: reported by the provider where it does (Claude Code), else estimated by Hive from token counts and the prices in Settings → the provider. On a subscription you are not charged this; it shows how heavy the work was.', description: "The Workspace Overview: tooltip on API-equivalent cost." }),
   assistant: msg({ id: 'workspace.overview.assistant', defaultMessage: 'Assistant', description: "The Workspace Overview: the Hive Assistant's row and series (beside the projects)." }),
   chartLabel: msg({ id: 'workspace.overview.chartLabel', defaultMessage: 'Tokens per day by project', description: "The Workspace Overview's chart, for screen readers." }),
@@ -55,7 +62,7 @@ const M = {
   prompts: msg({ id: 'workspace.overview.prompts', defaultMessage: 'Prompts', description: "A figure's title: prompts sent." }),
   compactions: msg({ id: 'workspace.overview.compactions', defaultMessage: '{count, plural, one {# compaction} other {# compactions}}', description: 'Under Prompts: how many times sessions were compacted.' }),
   runningHeading: msg({ id: 'workspace.overview.runningHeading', defaultMessage: 'Running now', description: "The Workspace Overview: the heading over the agents running now." }),
-  agentLabel: msg({ id: 'workspace.overview.agentLabel', defaultMessage: '{project} · {agent}', description: 'A running agent in the Workspace Overview: its project and name.' }),
+  agentLabel: msg({ id: 'workspace.overview.agentLabel', defaultMessage: '<in>{project} · </in>{agent}', description: 'A running agent in the Workspace Overview: its project and name. <in>…</in> holds the project part (keep the tags around it, with its separator): in a narrow row it is dropped first, so the agent’s name stays whole.' }),
   byProject: msg({ id: 'workspace.overview.byProject', defaultMessage: 'By project', description: "The Workspace Overview: the heading over the table by project." }),
   openAssistant: msg({ id: 'workspace.overview.openAssistant', defaultMessage: 'Open the Assistant view', description: "The table by project: the Assistant's row, for screen readers." }),
   openProject: msg({ id: 'workspace.overview.openProject', defaultMessage: "Open {project}'s Overview", description: "The table by project: a project's row, for screen readers." }),
@@ -91,22 +98,29 @@ function useWorkspaceUsage(): () => void {
   )
   const last = useRef(0)
   const timer = useRef<ReturnType<typeof setTimeout> | null>(null)
-  const loads = useRef(0)
+  // One load at a time (#1646): one slower than the updates asking for it is still shown.
+  const serial = useRef(oneAtATime())
+  const latest = useRef<() => void>(() => undefined)
   const load = useCallback(() => {
     if (timer.current) clearTimeout(timer.current)
     timer.current = null
     last.current = Date.now()
-    const n = ++loads.current
     const asked = get().workspace?.path ?? ''
-    call('workspace:usage')
-      .then((u) => {
-        // A newer load, or another workspace in this window meanwhile: not this one's to show.
-        if (n !== loads.current || u.workspacePath !== get().workspace?.path) return
-        set({ workspaceUsage: u, workspaceUsageAt: Date.now(), workspaceUsageError: null })
-      })
-      // Said in the view (in place of the figures, or over the last ones), not a toast on every live refresh.
-      .catch((e) => n === loads.current && asked === get().workspace?.path && set({ workspaceUsageError: { workspacePath: asked, error: errorMessage(e) } }))
+    serial.current.run(
+      asked,
+      () =>
+        withinTime(call('workspace:usage'), LOAD_LIMIT_MS, () => tr(M.noAnswer, { seconds: LOAD_LIMIT_MS / 1000 }))
+          .then((u) => {
+            // Another workspace in this window meanwhile: not this one's to show.
+            if (u.workspacePath !== get().workspace?.path) return
+            set({ workspaceUsage: u, workspaceUsageAt: Date.now(), workspaceUsageError: null })
+          })
+          // Said in the view (in place of the figures, or over the last ones), not a toast on every live refresh.
+          .catch((e) => asked === get().workspace?.path && set({ workspaceUsageError: { workspacePath: asked, error: errorMessage(e) } })),
+      () => latest.current()
+    )
   }, [])
+  latest.current = load
   useEffect(() => {
     load()
     return () => {
@@ -340,7 +354,7 @@ export function WorkspaceOverviewView() {
                     key={`${p.path}#${a.id}`}
                     project={p}
                     a={a}
-                    label={isAssistant ? tr(M.assistant) : tr(M.agentLabel, { project: p.name, agent: a.name })}
+                    label={isAssistant ? tr(M.assistant) : Children.toArray(tRich<React.ReactNode>(M.agentLabel, { project: p.name, agent: a.name, in: projectPart }))}
                     assistant={isAssistant}
                     onOpen={() => {
                       if (isAssistant) return setAssistantOpen(true)

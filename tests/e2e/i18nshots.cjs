@@ -78,6 +78,7 @@ module.exports = { languagesFrom, loadCases, LANG_TAG }
 // Loaded by tests/i18nshots.test.ts for the two helpers above; run, it is the suite.
 if (require.main === module) {
   const lib = require('./lib.cjs')
+  const { execFileSync } = require('child_process')
   const layout = require('./layoutReport.cjs')
   const { _electron } = require('playwright-core')
   const shots = path.join(lib.WORK, 'i18nshots-shots')
@@ -98,12 +99,15 @@ if (require.main === module) {
     const claudeHome = path.join(lib.WORK, `i18nshots-${lang}-claude-home`)
     for (const d of [userData, ws]) fs.rmSync(d, { recursive: true, force: true })
     for (const d of [dir, alpha]) fs.mkdirSync(d, { recursive: true })
+    // A Git project from the start (#1416: Hive records the version control it finds, and shows Git's sections for Git
+    // only); the cases add its commits.
+    execFileSync('git', ['init', '-q', '-b', 'main'], { cwd: alpha, env: lib.gitEnv(), stdio: 'pipe' })
     const cenv = lib.fakeClaude(userData, claudeHome, [alpha])
     const cfgFile = path.join(userData, 'config.json')
     const cfg = JSON.parse(fs.readFileSync(cfgFile, 'utf8'))
     cfg.settings.general = { ...cfg.settings.general, confirmOnQuit: 'never', showTips: false }
     // Banners for agents finishing while the window is focused (stubbed), and the Windows notifications it would show.
-    cfg.settings.notifications = { ...cfg.settings.notifications, chimeEnabled: false, desktopNotifications: true, notifyOnFinished: true, notifyOnWaiting: true, whileFocused: 'inApp', bannerSeconds: 60 }
+    cfg.settings.notifications = { ...cfg.settings.notifications, chimeEnabled: false, desktopNotifications: true, notifyOnFinished: true, notifyOnWaiting: true, bannerSeconds: 60 }
     // The Progress panel's runs come in through the Agent API, as a script's would.
     cfg.settings.agentApi = { ...cfg.settings.agentApi, enabled: true }
     fs.writeFileSync(cfgFile, JSON.stringify(cfg, null, 2))
@@ -145,6 +149,11 @@ if (require.main === module) {
         agents,
         claudeHome,
         hungMs: HUNG_MS,
+        /**
+         * Text a case writes into Hive as a user would, and where Hive shows it (a selector), so English left skips it
+         * there (HI-1915: a template named "Pair", a blocked reason "Waiting for the release").
+         */
+        authored: (text, within) => english?.authored.push({ text, within }),
         /** Runs a command by its id, as the menu does (App.tsx's menu-command event). */
         command: (id, ...args) => app.evaluate(({ BrowserWindow }, ev) => BrowserWindow.getAllWindows()[0].webContents.send('hive:event', ev), { type: 'menu-command', command: id, args }),
         /** The Agent API, with the test copy's token. */

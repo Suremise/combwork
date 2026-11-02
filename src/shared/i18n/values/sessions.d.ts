@@ -28,6 +28,7 @@ interface HiveMessageValues {
   'sessions.bulk.done': { action: string; n: number }
   'sessions.bulk.doneSkipped': { action: string; n: number; skipped: number; why: string | number }
   'sessions.bulk.failed': { action: string; kind: string }
+  'sessions.bulk.progress': { action: string; kind: string; done: number; total: number }
   'sessions.bulk.skipCount': { reason: string; n: number }
   'sessions.bulk.skipNote': { running: number }
   'sessions.bulk.skipReason': { reason: string }
@@ -36,6 +37,7 @@ interface HiveMessageValues {
   'sessions.cards.workedOn': undefined
   'sessions.chips.dismiss': { file: string | number }
   'sessions.chips.label': undefined
+  'sessions.chips.toCard': { file: string | number }
   'sessions.cleanup.age': { age: string }
   'sessions.cleanup.archive': undefined
   'sessions.cleanup.archiveSummary': undefined
@@ -99,6 +101,7 @@ interface HiveMessageValues {
   'sessions.list.infoAssistant': undefined
   'sessions.list.new': { kind: string }
   'sessions.list.noneHere': { kind: string }
+  'sessions.list.othersLoading': undefined
   'sessions.list.refresh': undefined
   'sessions.list.what': { kind: string }
   'sessions.marker.cantResume': undefined
@@ -110,6 +113,7 @@ interface HiveMessageValues {
   'sessions.menu.showAgent': { agent: string | number }
   'sessions.menu.showAssistant': undefined
   'sessions.origin.agent': { agent: string | number; id: string | number }
+  'sessions.origin.named': { is: string; name: string | number }
   'sessions.origin.noAgent': undefined
   'sessions.origin.projectFolder': undefined
   'sessions.origin.ranIn': { folder: string | number }
@@ -120,8 +124,9 @@ interface HiveMessageValues {
   'sessions.rename.failed': undefined
   'sessions.rename.title': undefined
   'sessions.resume.addsTip': undefined
-  'sessions.resume.agentDetail': { where: string; branch: string | number; running: string }
+  'sessions.resume.agentDetail': { where: string; branch: string | number; place: string | number; running: string }
   'sessions.resume.menuHeader': undefined
+  'sessions.resume.startFresh': undefined
   'sessions.row.archived': undefined
   'sessions.row.backup': undefined
   'sessions.row.backupTip': { cli: string | number }
@@ -148,10 +153,14 @@ interface HiveMessageValues {
   'sessions.tool.empty': undefined
   'sessions.tool.error': undefined
   'sessions.tool.errorBadge': undefined
+  'sessions.tool.exitCode': { code: string | number }
   'sessions.tool.input': undefined
   'sessions.tool.loadFailed': undefined
   'sessions.tool.noResult': undefined
   'sessions.tool.result': undefined
+  'sessions.tool.scriptFailedCalls': { n: number }
+  'sessions.tool.scriptKindCalls': { kind: string; n: number }
+  'sessions.tool.scriptMcpCalls': { n: number; server: string | number }
   'sessions.tool.showAll': { n: number }
   'sessions.tree.both': { n: number; subs: number }
   'sessions.tree.none': undefined

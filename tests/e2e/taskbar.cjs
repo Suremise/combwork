@@ -1,5 +1,6 @@
-// The taskbar button when agents need you: a badge with the count (setOverlayIcon, recorded in the test build's
-// main process) and the count in the window title; it clears once the agent has been looked at. An agent starting
+// The taskbar button when something needs you: a badge with the count (setOverlayIcon, recorded in the test build's
+// main process) and the count in the window title; an agent that only finished is never counted (#1632), one at a
+// permission prompt is until it goes on. An agent starting
 // to wait for input while the window is in the background flashes the button (recorded to the notify log; the window's
 // focus is faked), and both settings turn these off. The agents are the fake Claude Code. Dev build, throwaway
 // profile, workspace and CLAUDE_CONFIG_DIR.
@@ -85,22 +86,27 @@ const until = async (fn, ms = 10000) => {
   }
   check('no count while nothing needs you', !/^\(\d/.test(await title()))
 
-  // --- Beta's agent finishes while alpha is shown: it needs you.
+  // --- Beta's agent finishes while alpha is shown: told quietly in the status bar, never counted (#1632).
   await send(beta, two, 'go')
-  check('the title shows the count', !!(await until(async () => (await title()).startsWith('(1) '), 10000)), await title())
-  const badge = await until(async () => (await overlay())?.png && (await overlay()), 5000)
-  check('the taskbar button gets a badge', !!badge?.png && badge.desc === '1 agent needs you', JSON.stringify(badge?.desc))
-  if (badge?.png) fs.writeFileSync(path.join(lib.WORK, 'taskbar-badge-1.png'), Buffer.from(badge.png, 'base64'))
+  const finishedShown = await until(async () => (await page.locator('.statusbar .inbox-finished').count()) === 1, 10000)
+  check('a finish alone: no count in the title (#1632)', !!finishedShown && !/^\(\d/.test(await title()), await title())
+  check('…and no badge', (await overlay())?.png == null)
   check('finishing never flashes the button', (await flashes()).length === 0)
 
-  // --- Looking at it clears both (the window really focused: an agent is seen once its pane shows in a focused window).
-  // Focused as the test says (Windows won't give a background app the focus while another window has it).
+  // --- An agent at a permission prompt needs you: the count and the badge, until it goes on (the window focused, as
+  // the test says: Windows won't give a background app the focus while another window has it; so no flash).
   await app.evaluate(({ BrowserWindow }) => {
     globalThis.__focused = true
     BrowserWindow.getAllWindows()[0].emit('focus')
   })
   await page.getByText('beta', { exact: true }).first().click()
-  check('looking at the agent clears the count', !!(await until(async () => !/^\(\d/.test(await title()), 8000)), await title())
+  await send(beta, two, 'ask waitfile taskbar-go')
+  check('the title shows the count', !!(await until(async () => (await title()).startsWith('(1) '), 10000)), await title())
+  const badge = await until(async () => (await overlay())?.png && (await overlay()), 5000)
+  check('the taskbar button gets a badge', !!badge?.png && badge.desc === '1 needs you', JSON.stringify(badge?.desc))
+  if (badge?.png) fs.writeFileSync(path.join(lib.WORK, 'taskbar-badge-1.png'), Buffer.from(badge.png, 'base64'))
+  fs.writeFileSync(path.join(claudeHome, 'taskbar-go'), '')
+  check('once it goes on, the count clears', !!(await until(async () => !/^\(\d/.test(await title()), 8000)), await title())
   check('and the badge', !!(await until(async () => (await overlay())?.png === null, 5000)))
 
   // --- An agent asking for input while the window is in the background flashes the button.

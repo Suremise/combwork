@@ -1,50 +1,61 @@
 import { Children, useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { AssistantMark } from '../components/AssistantMark'
-import { CardChip } from '../components/CardChip'
+import { CardChip, WatchedCardChip, WatchedCardChips } from '../components/CardChip'
+import { cardsWait } from '../components/watchLine'
 import { KeybindingsEditor } from '../components/Keybindings'
-import type { CompactionEvent, GitDiff, GitStatus, McpServerInfo, MemorySource, PlanLimit, ProjectConfig, ProjectInfo, ProviderId, SessionListItem, SessionUsage, SkillInfo, UnusedWorktree } from '@shared/types'
+import type { CompactionEvent, GitDiff, GitStatus, McpServerInfo, MemorySource, PlanLimit, PlanUsage, ProjectConfig, ProjectInfo, ProviderId, SessionListItem, SessionUsage, SkillInfo, UnusedWorktree } from '@shared/types'
 import { unpricedModel, unpricedText, usesOwnPrices } from '@shared/prices'
 import { formatDateTime, formatDayLabel } from '@shared/dates'
-import { agentChoosesMcp, agentGetsMcp, agentMcpText, serverOnIn } from '@shared/agentMcp'
+import { agentChoosesMcp, agentGetsMcp, agentMcpText, serverAddedIn } from '@shared/agentMcp'
 import { gitFixText, gitProblemText } from '@shared/gitTool'
 import { UnusedHeading, UnusedWorkNotice, UnusedWorktreesLine, UnusedWorktreesSection, useUnusedWorktrees } from '../components/UnusedWorktrees'
 import { PERIODS, activeIn, costText, dailyTotals, moneyLabel, periodFrom, sumUsage, type DayTotal, type Period, type Totals } from '@shared/usageTotals'
-import { FILE_LOCK_MODES, contextPercent, turnPushedCompaction, effectiveModelLabel, mergeBlocked, modelLabel } from '@shared/defaults'
-import { useAgentLimit } from '../advanced'
-import { PROVIDERS, contextLines, defaultProviderLabel, isProviderEnabled, modeDescription, offeredModes, permissionLabel, projectDefaultProvider, projectProviderConfig, providerDescriptor, providerName, providerSettings } from '@shared/providers'
+import { agentLimitText, contextPercent, turnPushedCompaction, mergeBlocked } from '@shared/defaults'
+import { useAdvancedValue, useAgentLimit } from '../advanced'
+import { INBOX_PROJECT_KEY, INBOX_SWITCHES, INBOX_SWITCH_ID, type InboxSwitch } from '@shared/inboxSwitches'
+import { PROVIDERS, contextLines, isProviderEnabled, permissionLabel, providerDescriptor, providerName } from '@shared/providers'
 import { instructionsStarter } from '@shared/projectTabs'
-import { EffortPicker, ModelPicker } from '../components/ModelPicker'
-import { effortText, runsAsName } from '@shared/models'
-import { PROJECT_SETTINGS_SECTIONS, settingEntry, shownSetting, type SettingsSectionInfo } from '@shared/settingsCatalog'
+import { PROJECT_KEY_DESC, PROJECT_SETTINGS_SECTIONS, settingEntry, shownSetting, type SettingsSectionInfo } from '@shared/settingsCatalog'
 import { shownText } from '@shared/advanced'
-import { LANE_MAX_ROUNDS, LOOP_WAIT_MAX_HOURS, loopDefaults } from '@shared/lanes'
 import { NumberField } from '../components/NumberField'
-import { StorageView } from '../components/Storage'
+import { CardCleanupSetting, StorageView } from '../components/Storage'
+import { CARD_CLEANUP_DEFAULT } from '@shared/cardCleanup'
 import { TaskStrip } from '../components/Board'
 import { ProviderIcon } from '../components/ProviderIcon'
-import { confirmDangerousMode } from '../components/PermissionMode'
 import * as actions from '../actions'
 import { call, errorMessage } from '../api'
 import { DocEditor } from '../components/DocEditor'
 import { DiffView } from '../components/Editors'
+import { COMPARE_ROOT, CompareGroup, ComparePage, compareRoot, parseCompareRoot, useCompareLines } from '../components/ChangesCompare'
+import { LEFTOVERS_ROOT, LeftoversOption, LeftoversPage, useLeftovers } from '../components/ChangesLeftovers'
+import { useGitRead } from './GitTab'
 import { PaneResizer, usePaneSize } from '../components/Resizer'
 import { DataTable, useDateColumns, type DataColumn } from '../components/DataTable'
-import { Icon, IconButton, InfoTip, LoadFailed, SearchInput, sentences, StaleNote, statusText, StatusDot, Switch, Tooltip } from '../components/ui'
+import { Icon, IconButton, InfoTip, LoadFailed, SearchInput, sentences, StaleNote, statusText, StatusDot, Tooltip } from '../components/ui'
+import { cliReadyOf, ConnectionMark, connectionCli, connectionLine, firstReadyConnection, useConnections } from '../components/ConnectionChoice'
+import { connectionOf } from '@shared/connectionLabel'
+import { useConnectionsInUse } from '../connectionUsage'
+import { connectionsApply } from '@shared/accounts'
 import { languageFor } from '../monacoLang'
 import { useScopedLoad } from '../scopedLoad'
-import { addSkill, deleteSkill, editInWorkspace, otherLocal, SKILL_LEVEL_TIP, SkillDetail, SkillRow } from '../components/Skills'
-import { CHANGES_ABOUT, unusedPickerLabel } from '@shared/unusedWorktrees'
-import { agentProviderOf, confirm, notify, openInSessionsTab, set, setActivity, showView, UNUSED_ROOT, unusedRoot, useDateStyle, useFocusedAgent, useLanguage, useStore } from '../store'
+import { oneAtATime, withinTime } from '@shared/coalesce'
+import { addSkill, deleteSkill, DeliveredSwitch, editInWorkspace, otherLocal, SKILL_LEVEL_TIP, SkillDetail, SkillRow } from '../components/Skills'
+import { CHANGES_ABOUT, unusedName, unusedPickerLabel } from '@shared/unusedWorktrees'
+import { agentProviderOf, confirm, notify, projectKeyOf, openInSessionsTab, set, setActivity, showView, UNUSED_ROOT, unusedRoot, useDateStyle, useFocusedAgent, useLanguage, useStore } from '../store'
 import { rememberProjectPref } from '../projectPrefs'
+import { keyProblemText } from '../projectKeys'
 import { HiveVcsNotice } from '../components/HiveVcsNotice'
 import { InitRepoButton } from '../components/InitRepo'
 import { MergeSlotList, projectSlots, useMergeSlots } from '../components/MergeSlots'
 import { cx, formatDuration, formatNumber, formatTokens, resetsIn, timeAgo } from '../util'
 import { useLiveUsage, useNow } from '../usage'
 import { fmt, msg, tr, tRich } from '@shared/i18n'
+import { samePath } from '@shared/movePaths'
+import { agentFolder, awayFromProject, legacyOf, placeText, workFolderOf } from '../agentPlace'
 
 const M = {
   loading: msg({ id: 'project.loading', defaultMessage: 'Loading…', description: 'A project tab while its data loads.' }),
+  noAnswer: msg({ id: 'project.overview.noAnswer', defaultMessage: 'no answer after {seconds, number} s', description: 'Why the sessions could not be loaded: Hive listed them for this long without finishing. Shown as {error} in "Could not load the sessions: {error}", with Retry.' }),
   sessionsTarget: msg({ id: 'project.overview.sessionsTarget', defaultMessage: 'the sessions', description: 'What could not be read in the Overview tab: shown in "Could not load {what}: {error}" and "Could not refresh {what}; last updated …".' }),
   tokensPerDay: msg({ id: 'project.chart.label', defaultMessage: 'Tokens per day', description: "Accessible name of the Overview's chart of tokens per day." }),
   dayTip: msg({ id: 'project.chart.dayTip', defaultMessage: '{day}: {tokens} tokens · {cost} · {prompts, plural, one {# prompt} other {# prompts}}', description: 'Tooltip on a day of the chart. {day} is the date, {tokens} a token count such as 1.2M, {cost} a cost.' }),
@@ -144,6 +155,9 @@ const M = {
   limitResets: msg({ id: 'project.limit.resets', defaultMessage: 'used · resets {when}', description: 'Under a plan limit\'s percent. {when} is when it resets: "in 2 h 5 min", or a day and time.' }),
   limitTip: msg({ id: 'project.limit.tip', defaultMessage: "How much of your plan’s {window, select, fiveHour {5-hour} weekly {weekly} other {{label}}} allowance is used, across all your {provider} sessions (not just Hive).", description: 'The (i) beside a plan limit.' }),
   planLimits: msg({ id: 'project.limit.heading', defaultMessage: '{plan, select, none {Plan limits, account-wide, as of {when}} other {Plan limits ({plan}), account-wide, as of {when}}}', description: "Above the plan limits. {plan} is the plan's name (none when unknown); {when} how long ago they were reported." }),
+  limitTipConnection: msg({ id: 'project.limit.tipConnection', defaultMessage: "How much of the plan’s {window, select, fiveHour {5-hour} weekly {weekly} other {{label}}} allowance is used on {name}, across all its sessions (not just Hive's).", description: 'The (i) beside a plan limit of one connection (HI-1756): {name} is the connection, a sign-in the user named ("Max 1").' }),
+  noConnectionLimits: msg({ id: 'project.limit.noneConnection', defaultMessage: 'Its limits appear after the next message in a session on {name}.', description: 'Under a connection ({name}: "Max 1", a sign-in the user named) in the plan limits (HI-1756), before any of its limits were reported.' }),
+  noConnectionsOn: msg({ id: 'project.limit.noConnections', defaultMessage: 'No {provider} account is on in this workspace. Turn one on in Settings → Accounts & Connections to see its plan limits here.', description: 'In place of the plan limits (HI-1756) when the workspace has no account on for the coding agent ({provider}). Settings → Accounts & Connections names a section.' }),
   noLimits: msg({ id: 'project.limit.none', defaultMessage: "{provider} reports your plan’s limits while a session runs; they appear here after the next message in any {provider} session. Accounts that use an API key have no plan limits.", description: 'In place of the plan limits before any were reported.' })
 }
 
@@ -151,18 +165,19 @@ const C = {
   gitStatus: msg({ id: 'project.changes.status', defaultMessage: '{status, select, M {Modified} A {Added} D {Deleted} R {Renamed} C {Copied} U {Conflict} untracked {Untracked} other {{status}}}', description: "A changed file's git status, in its tooltip in the Changes list." }),
   staged: msg({ id: 'project.changes.staged', defaultMessage: '{status} (staged): {path}', description: "Tooltip on a changed file that is staged. {status} is its status, such as Modified." }),
   unstaged: msg({ id: 'project.changes.unstaged', defaultMessage: '{status}: {path}', description: 'Tooltip on a changed file. {status} is its status, such as Modified.' }),
-  pickerTip: msg({ id: 'project.changes.pickerTip', defaultMessage: 'Unused worktrees, a worktree an agent works in, or the project folder', description: "Tooltip on the Changes tab's folder picker." }),
+  pickerTip: msg({ id: 'project.changes.pickerTip', defaultMessage: 'Two branches compared, unused worktrees, a worktree an agent works in, or the project folder', description: "Tooltip on the Changes tab's picker." }),
   unusedGroup: msg({ id: 'project.changes.unusedGroup', defaultMessage: 'Unused worktrees (no agent works in them)', description: "A group of the Changes tab's folder picker." }),
   unusedLooking: msg({ id: 'project.changes.unusedLooking', defaultMessage: 'Unused worktrees (looking…)', description: "The picker's entry for all unused worktrees while Hive lists them." }),
   unusedCount: msg({ id: 'project.changes.unusedCount', defaultMessage: 'Unused worktrees ({count})', description: "The picker's entry for all unused worktrees." }),
   unusedFailed: msg({ id: 'project.changes.unusedFailed', defaultMessage: "Unused worktrees (couldn't list)", description: "The picker's entry for all unused worktrees when listing them failed." }),
   inUseGroup: msg({ id: 'project.changes.inUseGroup', defaultMessage: 'Worktrees in use', description: "A group of the Changes tab's folder picker: agents' worktrees." }),
   agentWorktree: msg({ id: 'project.changes.agentWorktree', defaultMessage: "{agent}'s worktree · {branch}", description: "An agent's worktree in the picker. {branch} is its git branch." }),
+  agentSlot: msg({ id: 'project.changes.agentSlot', defaultMessage: '{agent} · {place}{known, select, yes { · {branch}} other {}}', description: "An agent's slot in the picker (#1569): the agent, where it works ({place}: \"in slot-b\", or \"carried: hb2\" for the slot kept for it) and its git branch ({branch}), when known. Glossary: slot." }),
   projectGroup: msg({ id: 'project.changes.projectGroup', defaultMessage: 'Project folder', description: "A group of the Changes tab's folder picker." }),
   projectFolder: msg({ id: 'project.changes.projectFolder', defaultMessage: 'Project folder · {branch}', description: "The project folder in the picker. {branch} is its git branch (or the project's name)." }),
   worktreeOf: msg({ id: 'project.changes.worktreeOf', defaultMessage: "{agent}'s worktree", description: "Who the changes shown are: an agent's worktree." }),
   cantShow: msg({ id: 'project.changes.cantShow', defaultMessage: "{problem}, so Hive can't show {project}'s changes.", description: 'The Changes tab when git cannot run. {problem} says why, such as "Git isn\'t installed (or isn\'t on Hive\'s PATH)".' }),
-  agentSetup: msg({ id: 'project.changes.agentSetup', defaultMessage: 'Agent Setup', description: 'Button: opens Agent Setup, which checks git and says how to fix it.' }),
+  agentSetup: msg({ id: 'project.changes.agentSetup', defaultMessage: 'Provider Setup', description: 'Button: opens Provider Setup, which checks git and says how to fix it.' }),
   retry: msg({ id: 'project.retry', defaultMessage: 'Retry', description: 'Button: tries again.' }),
   changes: msg({ id: 'project.changes.heading', defaultMessage: 'Changes', description: "Heading of the Changes list (the Git tab's Changes section)." }),
   lookingUnused: msg({ id: 'project.changes.lookingTip', defaultMessage: 'Looking for unused worktrees…', description: 'Tooltip on the refresh button while Hive looks for unused worktrees.' }),
@@ -219,6 +234,7 @@ const C = {
   skillsHeading: msg({ id: 'project.skills.heading', defaultMessage: 'Skills available to agents', description: "Heading of the project's Skills tab list." }),
   skillsTarget: msg({ id: 'project.skills.target', defaultMessage: 'the skills', description: 'What could not be read in the Skills tab: shown in "Could not load {what}: {error}" and "Could not refresh {what}; last updated …".' }),
   hiveGroup: msg({ id: 'project.skills.hive', defaultMessage: 'Hive', description: "The group of Hive's own skills (the workspace's). Usually kept as Hive." }),
+  deliveredNote: msg({ id: 'project.skills.deliveredNote', defaultMessage: "Each switch says whether this project's agents get the skill (Delivered to agents), from their next session. A skill switched off in the Skills view is off in every project.", description: "Under the Hive skills in a project's Skills tab: what the switch beside each skill does. Delivered to agents is the switch's name; the Skills view is the workspace's list of skills." }),
   noHiveSkills: msg({ id: 'project.skills.noHive', defaultMessage: 'No Hive skills in this workspace.', description: 'Under the Hive group when it is empty.' }),
   editInWorkspace: msg({ id: 'project.skills.editInWorkspace', defaultMessage: "Edit in the workspace's Skills view (Hive skills are shared by every project)", description: 'Tooltip on the button beside a Hive skill.' }),
   assistantOnly: msg({ id: 'project.skills.assistantOnly', defaultMessage: "{count, plural, one {# Hive skill is for the Hive Assistant only, so it isn't listed: this project's agents don't get it.} other {# Hive skills are for the Hive Assistant only, so they aren't listed: this project's agents don't get them.}}", description: 'Under the Hive skills, when some are for the Hive Assistant alone.' }),
@@ -238,9 +254,13 @@ const C = {
   givenAll: msg({ id: 'project.mcp.givenAll', defaultMessage: 'Given to every agent', description: "Under an MCP server in a project's MCP tab, once agents choose their own servers." }),
   givenTo: msg({ id: 'project.mcp.givenTo', defaultMessage: 'Given to {agents} only', description: 'Under an MCP server: the agents that get it, as a list.' }),
   givenNone: msg({ id: 'project.mcp.givenNone', defaultMessage: 'Given to no agent (each chose others)', description: 'Under an MCP server no agent gets.' }),
-  mcpHeading: msg({ id: 'project.mcp.heading', defaultMessage: 'Workspace MCP servers', description: "Heading in a project's MCP tab." }),
+  mcpHeading: msg({ id: 'project.mcp.headingAdded', defaultMessage: 'Added servers', description: "Heading in a project's MCP tab (HI-2059): the workspace's MCP servers added to this project." }),
+  addServer: msg({ id: 'project.mcp.addServer', defaultMessage: 'Add Server…', description: "A button in a project's MCP tab and the Hive Assistant's view (HI-2059): opens the picker of the workspace's MCP servers to add." }),
+  remove: msg({ id: 'project.mcp.remove', defaultMessage: 'Remove', description: "A button on an MCP server added to a project or the Hive Assistant (HI-2059): it no longer runs there (it stays in the workspace)." }),
+  removeLabel: msg({ id: 'project.mcp.removeLabel', defaultMessage: 'Remove {name} from {project}', description: "Accessible name of Remove on an MCP server in a project's MCP tab (HI-2059). {name} is the server, {project} the project." }),
+  noneAdded: msg({ id: 'project.mcp.noneAdded', defaultMessage: "No servers added. Add one to give this project's agents its tools.", description: "A project's MCP tab (HI-2059) when no MCP server is added to it." }),
   mcpTarget: msg({ id: 'project.mcp.target', defaultMessage: "the workspace's MCP servers", description: 'What could not be read in the MCP tab: shown in "Could not load {what}: {error}" and "Could not refresh {what}; last updated …".' }),
-  noServers: msg({ id: 'project.mcp.none', defaultMessage: 'No MCP servers in this workspace.', description: "A project's MCP tab when the workspace has none." }),
+  noServers: msg({ id: 'project.mcp.noneInWorkspace', defaultMessage: 'The workspace has no MCP servers yet.', description: "A project's MCP tab (HI-2059) when the workspace has no MCP servers to add." }),
   manage: msg({ id: 'project.mcp.manage', defaultMessage: 'Manage MCP servers', description: 'Link: opens the workspace\'s MCP view.' }),
   invalid: msg({ id: 'project.mcp.invalid', defaultMessage: 'invalid', description: "Badge on an MCP server whose file can't be read." }),
   definedByProject: msg({ id: 'project.mcp.definedByProject', defaultMessage: 'Defined by the project (disabled)', description: "Heading in a project's MCP tab: servers in the project's own agent config." }),
@@ -254,17 +274,18 @@ const C = {
 const bold = (c: React.ReactNode[]): React.ReactNode => <strong>{c}</strong>
 
 const S = {
+  keyLabel: msg({ id: 'project.key.label', defaultMessage: 'Project key', description: "Accessible name of the project key box (Project Settings): 2–4 letters such as AM that the project's cards are named by." }),
+  keyChange: msg({ id: 'project.key.change', defaultMessage: 'Change', description: 'Button beside the project key box (Project Settings): makes the key typed the project’s.' }),
+  keyFailed: msg({ id: 'project.key.failed', defaultMessage: 'Could not change the project key', description: "An error's title: changing a project's key failed." }),
+  keyChanged: msg({ id: 'project.key.changed', defaultMessage: 'Its cards are named {key} now; {old} still finds them.', description: "A notification after a project's key changed. {key} and {old}: the new and the old key (letters such as AM)." }),
+  keyWillAlias: msg({ id: 'project.key.willAlias', defaultMessage: 'Its cards will be named {key}-12; {old}-12 will still find them.', description: 'Under the project key box while a new key is typed (Project Settings). {key} is the key typed, {old} the key it has: AM-12 style card names.' }),
+  keyAliases: msg({ id: 'project.key.aliases', defaultMessage: 'Its old keys, which still find its cards: {keys}', description: "Under the project key box (Project Settings): the project's earlier keys, joined (AM and AMB), which still name its cards." }),
+  keyNone: msg({ id: 'project.key.none', defaultMessage: 'Hive gives it a key once its board is open.', description: "Project Settings, in place of the project key box: the project has no key yet (its board hasn't been opened or upgraded)." }),
   overrides: msg({ id: 'project.settings.overrides', defaultMessage: 'Overrides the global default', description: 'Tooltip on the mark beside a project setting that is not Inherit.' }),
-  now: msg({ id: 'project.settings.now', defaultMessage: '{desc} Now: {current}', description: "A setting's description followed by what the value in use does. {desc} is the description; {current} what is in use." }),
   turnedOff: msg({ id: 'project.agents.turnedOff', defaultMessage: '{provider} is turned off in Settings → Providers', description: "Tooltip on an agent's provider icon when the provider is turned off." }),
   off: msg({ id: 'project.agents.off', defaultMessage: '{provider} (off)', description: "A provider's name when it is turned off in Settings → Providers (an agent's provider, and the Provider list)." }),
   projectFolder: msg({ id: 'project.agents.projectFolder', defaultMessage: 'project folder', description: 'Where an agent works when it has no worktree.' }),
-  ownModel: msg({ id: 'project.agents.ownModel', defaultMessage: 'model {model}', description: "One of an agent's own settings, in a list." }),
-  ownEffort: msg({ id: 'project.agents.ownEffort', defaultMessage: 'effort {effort}', description: "One of an agent's own settings, in a list." }),
-  own200k: msg({ id: 'project.agents.own200k', defaultMessage: '{on, select, yes {200K context on} other {200K context off}}', description: "One of an agent's own settings, in a list. Keep 200K." }),
   ownMcp: msg({ id: 'project.agents.ownMcp', defaultMessage: 'MCP servers {servers}', description: "One of an agent's own settings, in a list: which MCP servers it gets." }),
-  ownSettings: msg({ id: 'project.agents.ownSettings', defaultMessage: 'Own settings: {settings}', description: "Under an agent: the settings it sets for itself, as a list." }),
-  projectSettings: msg({ id: 'project.agents.projectSettings', defaultMessage: 'Project settings ({model})', description: "Under an agent that uses the project's settings. {model} is the model it runs." }),
   agentSettings: msg({ id: 'project.agents.settings', defaultMessage: 'Agent settings…', description: "Tooltip on an agent's settings button." }),
   merge: msg({ id: 'project.agents.merge', defaultMessage: 'Merge…', description: "Tooltip on a worktree agent's merge button." }),
   remove: msg({ id: 'project.agents.remove', defaultMessage: 'Remove agent…', description: "Tooltip on an agent's remove button (asks first)." }),
@@ -272,24 +293,18 @@ const S = {
   saveFailed: msg({ id: 'project.settings.saveFailed', defaultMessage: 'Could not save project settings', description: 'Title of an error notification.' }),
   never: msg({ id: 'project.settings.never', defaultMessage: 'never', description: 'A global setting turned off, shown in "Inherit (never)".' }),
   megabytes: msg({ id: 'project.settings.megabytes', defaultMessage: '{count, number} MB', description: 'A size in megabytes.' }),
-  providerDefault: msg({ id: 'project.settings.providerDefault', defaultMessage: '{provider} default', description: "The provider's own default model, in \"Inherit (Claude Code default)\"." }),
   inherit: msg({ id: 'project.settings.inherit', defaultMessage: 'Inherit ({value})', description: 'The choice that takes the global (or workspace) setting. {value} is what that is now.' }),
   inheritNewline: msg({ id: 'project.settings.inheritList', defaultMessage: 'Inherit:\n{value}', description: "Placeholder of a box that takes a list when it is empty: Inherit, then the global list on the lines after it. Keep the line break." }),
   on: msg({ id: 'project.settings.on', defaultMessage: 'On', description: 'A choice: on.' }),
   offChoice: msg({ id: 'project.settings.off', defaultMessage: 'Off', description: 'A choice: off.' }),
   onLower: msg({ id: 'project.settings.onLower', defaultMessage: 'on', description: 'A global setting that is on, shown in "Inherit (on)".' }),
   offLower: msg({ id: 'project.settings.offLower', defaultMessage: 'off', description: 'A global setting that is off, shown in "Inherit (off)".' }),
-  sessionsIn: msg({ id: 'project.settings.sessionsIn', defaultMessage: 'Sessions in {project} will run every command, edit and network call without asking.', description: "The confirmation before choosing a no-guardrails permission mode for a project's sessions ({project}: the project's name)." }),
   compactAbove: msg({ id: 'project.settings.compactAbove', defaultMessage: 'Suggest compacting above', description: 'Accessible name of the number box of tokens above which compacting is suggested.' }),
   neverChoice: msg({ id: 'project.settings.neverChoice', defaultMessage: 'Never', description: 'A choice: the warning or suggestion is off.' }),
   warnOver: msg({ id: 'project.settings.warnOver', defaultMessage: 'Warn when a transcript is over', description: 'Accessible name of the number box of megabytes above which a transcript is flagged.' }),
-  wake: msg({ id: 'project.settings.wake', defaultMessage: 'Wake reviewers and builders', description: "Accessible name of the card-loop wakes switch." }),
-  rounds: msg({ id: 'project.settings.rounds', defaultMessage: 'Rounds', description: 'Accessible name of the card-loop rounds box.' }),
-  waitHours: msg({ id: 'project.settings.waitHours', defaultMessage: 'Wait (hours)', description: "Accessible name of the card-loop wait box." }),
-  hours: msg({ id: 'project.settings.hours', defaultMessage: '{count} h', description: 'Hours, short, as in "Inherit (6 h)".' }),
   openHive: msg({ id: 'project.settings.openHive', defaultMessage: 'Open .hive folder', description: "Button: opens the project's .hive folder. Keep .hive." }),
   resetTitle: msg({ id: 'project.settings.resetTitle', defaultMessage: 'Reset project settings?', description: 'Title of the confirmation before resetting the project settings.' }),
-  resetMessage: msg({ id: 'project.settings.resetMessage', defaultMessage: "The default provider, each provider’s model, effort, permission mode, context and extra arguments, the chime, the compact threshold, the transcript size warning, file locks, worktree setup and the card-loop rounds and wait go back to Inherit, and loop wakes back on. Agents and skill and MCP opt-outs are kept.", description: 'The confirmation before resetting the project settings.' }),
+  resetMessage: msg({ id: 'project.settings.resetMessage', defaultMessage: "The default provider, each provider’s model, effort, permission mode, context and extra arguments, the chime, the fresh-start suggestion, the compact threshold, the transcript size warning, file locks, worktree setup and the card-loop rounds and wait go back to Inherit, and loop wakes back on. Agents and skill and MCP opt-outs are kept.", description: 'The confirmation before resetting the project settings.' }),
   reset: msg({ id: 'project.settings.reset', defaultMessage: 'Reset', description: "The reset confirmation's button." }),
   resetButton: msg({ id: 'project.settings.resetButton', defaultMessage: 'Reset to defaults', description: 'Button: resets the project settings (asks first).' }),
   search: msg({ id: 'project.settings.search', defaultMessage: 'Search {project} settings', description: "Placeholder of Project Settings' search box." }),
@@ -308,6 +323,8 @@ export const limitWindow = (l: PlanLimit): string => (l.windowMinutes === 300 ? 
 const LIVE_REFRESH_MS = 15_000
 /** While the usage history is reading sessions a list shows (#1106), the list is read again this soon after it tells. */
 const PENDING_RELOAD_MS = 1_500
+/** A listing with no answer by then shows as failed, with Retry (#1646). */
+const LIST_LIMIT_MS = 60_000
 
 /**
  * The project's sessions with their usage, for the Overview and the Sessions tab. Updates follow
@@ -315,26 +332,53 @@ const PENDING_RELOAD_MS = 1_500
  * only on reload(). Only while a view using it is shown.
  */
 const NO_SESSIONS: SessionListItem[] = []
+/** A listing as shown: `othersLoading` while it is Hive's own sessions alone, the others still being read (HI-1681). */
+type SessionsData = { list: SessionListItem[]; kept: SessionListItem[]; othersLoading?: boolean }
 
 export function useSessions(project: ProjectInfo) {
   const mode = useStore((s) => s.settings?.sessions.overviewRefresh ?? 'live')
-  const usageVersion = useStore((s) => s.usageVersion[project.path] ?? 0)
   // A project's tabs stay mounted while another view (Notes, Settings…) is shown: they don't update then.
   const shown = useStore((s) => s.activity === 'projects' || s.workspace?.assistant?.path === project.path)
   // This project's sessions, and deleted sessions' usage (totals count it, lists don't show it). A failed load: views
   // say so (with this project's sessions from before, if any), not "no sessions".
-  const sessions = useScopedLoad<{ list: SessionListItem[]; kept: SessionListItem[] }>(project.path)
+  const sessions = useScopedLoad<SessionsData>(project.path)
+  const haveList = useRef(false)
+  haveList.current = !!sessions.data
   const last = useRef(0)
   const timer = useRef<ReturnType<typeof setTimeout> | null>(null)
+  // One listing at a time (#1646): with listings slower than the updates asking for them (a busy disk, hundreds of
+  // sessions), each newer one dropped the one under way and none was ever shown.
+  const serial = useRef(oneAtATime())
+  const latest = useRef<() => void>(() => undefined)
   const { load: loadScoped } = sessions
   const load = useCallback(() => {
     if (timer.current) clearTimeout(timer.current)
     timer.current = null
     last.current = Date.now()
     const path = project.path
-    // Deleted sessions' usage only adds to the totals: without it they are a little low, which beats no list.
-    loadScoped(path, () => Promise.all([call('session:list', path), call('session:keptUsage', path).catch(() => [])]).then(([list, kept]) => ({ list, kept })))
+    serial.current.run(
+      path,
+      () => {
+        // Deleted sessions' usage only adds to the totals: without it they are a little low, which beats no list.
+        const kept = call('session:keptUsage', path).catch(() => [] as SessionListItem[])
+        const list = Promise.all([call('session:list', path), kept]).then(([items, k]): SessionsData => ({ list: items, kept: k }))
+        const bounded = withinTime(list, LIST_LIMIT_MS, () => tr(M.noAnswer, { seconds: LIST_LIMIT_MS / 1000 }))
+        if (haveList.current) {
+          loadScoped(path, () => bounded)
+          return bounded
+        }
+        // Nothing shown yet (HI-1681): Hive's own sessions first, from its records, while the sessions its CLIs keep for
+        // the project's folders are read (seconds on a busy disk with hundreds of them); the whole list follows. Shown
+        // only while the whole list's load runs, which alone says how it ended (its time limit too); without deleted
+        // sessions' usage meanwhile, which only adds to totals.
+        const own = call('session:list', path, { own: true }).then((items): SessionsData => ({ list: items, kept: NO_SESSIONS, othersLoading: true }))
+        loadScoped(path, () => bounded, own)
+        return bounded
+      },
+      () => latest.current()
+    )
   }, [project.path, loadScoped])
+  latest.current = load
   useEffect(() => {
     load()
     return () => {
@@ -344,29 +388,44 @@ export function useSessions(project: ProjectInfo) {
   // Live: a change (usage, or an agent starting or stopping) reloads, at most every LIVE_REFRESH_MS.
   // A card moving into an agent's Doing too: its session records it ("Worked on #5").
   const doingKey = useStore((s) => s.tasks.filter((c) => c.column === 'doing' && c.agent && c.project.toLowerCase() === project.name.toLowerCase()).map((c) => `${c.number}:${c.agent}`).join(','))
-  const liveKey = `${usageVersion}|${doingKey}|${project.agents.map((a) => `${a.live?.sessionId ?? ''}:${a.live?.status ?? ''}:${a.live?.sessionName ?? ''}`).join(',')}`
-  useEffect(() => {
+  const liveKey = `${doingKey}|${project.agents.map((a) => `${a.live?.sessionId ?? ''}:${a.live?.status ?? ''}:${a.live?.sessionName ?? ''}`).join(',')}`
+  const live = (): void => {
     if (mode !== 'live' || !last.current || !shown) return
     const wait = last.current + LIVE_REFRESH_MS - Date.now()
     if (wait <= 0) load()
     else if (!timer.current) timer.current = setTimeout(load, wait)
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [liveKey, mode, shown])
+  }
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  useEffect(live, [liveKey, mode, shown])
   // Sessions the usage history didn't have yet (#1106): their figures follow soon after the worker has them (it says so,
-  // usageVersion; else the next look), whatever the update setting: that's the list's first load finishing, not a refresh.
+  // usage-changed; else the next look), whatever the update setting: that's the list's first load finishing, not a refresh.
   const pending = sessions.data?.list.some((i) => i.pending) ?? false
+  const pendingTimer = useRef<ReturnType<typeof setTimeout> | null>(null)
+  const pendingSoon = (): void => {
+    if (pendingTimer.current) clearTimeout(pendingTimer.current)
+    pendingTimer.current = pending && shown ? setTimeout(load, PENDING_RELOAD_MS) : null
+  }
   useEffect(() => {
-    if (!pending || !shown) return
-    const t = setTimeout(load, PENDING_RELOAD_MS)
-    return () => clearTimeout(t)
+    pendingSoon()
+    return () => {
+      if (pendingTimer.current) clearTimeout(pendingTimer.current)
+    }
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [usageVersion, sessions.at, pending, shown])
+  }, [sessions.at, pending, shown])
+  // The usage history's changes, followed without rendering the view again for each (HI-1681): its first import tells
+  // of every session, and each render of a list of hundreds held the window up, the list read meanwhile shown seconds late.
+  const onUsage = useRef(() => undefined as void)
+  onUsage.current = () => {
+    live()
+    pendingSoon()
+  }
+  useEffect(() => useStore.subscribe((s, prev) => (s.usageVersion[project.path] ?? 0) !== (prev.usageVersion[project.path] ?? 0) && onUsage.current()), [project.path])
   useEffect(() => {
     if (mode !== 'minute' || !shown) return
     const t = setInterval(load, 60_000)
     return () => clearInterval(t)
   }, [mode, load, shown])
-  return { items: sessions.data?.list ?? null, kept: sessions.data?.kept ?? NO_SESSIONS, reload: load, loadedAt: sessions.at, error: sessions.error }
+  return { items: sessions.data?.list ?? null, kept: sessions.data?.kept ?? NO_SESSIONS, othersLoading: sessions.data?.othersLoading ?? false, reload: load, loadedAt: sessions.at, error: sessions.error }
 }
 
 
@@ -409,10 +468,11 @@ export function DailyChart({ days }: { days: DayTotal[] }) {
   )
 }
 
-/** The agent a session belongs to: its worktree's agent, else the agent recorded for it ('?' when none). */
+/** The agent a session belongs to: the agent whose 0.9 worktree it ran in, else the agent recorded for it ('?' when none). */
 function sessionAgent(project: ProjectInfo, s: SessionListItem): string {
-  if (s.cwd && s.cwd.toLowerCase() !== project.path.toLowerCase()) return project.agents.find((a) => a.worktree?.path.toLowerCase() === s.cwd!.toLowerCase())?.id ?? '?'
-  return s.agentId ?? '?'
+  const cwd = s.cwd
+  const own = cwd && !samePath(cwd, project.path) ? project.agents.find((a) => { const l = legacyOf(a); return !!l && samePath(l.path, cwd) }) : undefined
+  return own?.id ?? s.agentId ?? '?'
 }
 
 /** The project's usage for a period: one summary, what runs now, each provider, each agent, then one agent's session. */
@@ -509,7 +569,7 @@ export function OverviewTab({ project }: { project: ProjectInfo }) {
         {project.agents.length > 1 && (
           <>
             <h2 className="section">{tr(M.byAgent)}</h2>
-            <AgentsByUsage rows={project.agents.map((a) => ({ id: a.id, name: a.name, provider: agentProviderOf(project, a), t: sumUsage(inPeriod.filter((i) => sessionAgent(project, i) === a.id), from) }))} />
+            <AgentsByUsage rows={project.agents.map((a) => ({ id: a.id, name: a.name, provider: agentProviderOf(a), t: sumUsage(inPeriod.filter((i) => sessionAgent(project, i) === a.id), from) }))} />
           </>
         )}
 
@@ -557,7 +617,7 @@ function AgentsByUsage({ rows }: { rows: AgentRow[] }) {
 }
 
 /** One running agent: provider, model, mode, status, context used and cost so far. `onOpen` makes it a link. */
-export function RunningAgent({ project, a, label, onOpen, assistant }: { project: ProjectInfo; a: ProjectInfo['agents'][number]; label?: string; onOpen?: () => void; assistant?: boolean }) {
+export function RunningAgent({ project, a, label, onOpen, assistant }: { project: ProjectInfo; a: ProjectInfo['agents'][number]; label?: React.ReactNode; onOpen?: () => void; assistant?: boolean }) {
   const live = a.live!
   const usage = useLiveUsage(project, a.id)
   const settings = useStore((s) => s.settings)
@@ -566,11 +626,14 @@ export function RunningAgent({ project, a, label, onOpen, assistant }: { project
   const pct = contextPercent(ctx, window)
   const cost = live.costUsd ?? usage?.costUsd ?? null
   const estimated = live.costUsd !== undefined ? !!live.costEstimated : !!usage?.costEstimated
+  const status = statusText(live)
+  // Waiting on cards (HI-1679): their chips, as a working agent's card, and the status says what for; its hover the whole.
+  const wait = cardsWait(live, status)
   return (
     <div className={cx('running-row', onOpen && 'clickable')} onClick={onOpen} role={onOpen ? 'button' : undefined}>
       {/* The Assistant's own status icon (#399), its status in the tooltip as a dot's is. */}
       {assistant ? (
-        <Tooltip content={statusText(live)}>
+        <Tooltip content={status}>
           <AssistantMark status={live.status} unseen={live.unseen} />
         </Tooltip>
       ) : (
@@ -578,8 +641,14 @@ export function RunningAgent({ project, a, label, onOpen, assistant }: { project
       )}
       <ProviderIcon provider={live.provider} />
       <div className="grow">
-        <div>
-          <strong>{label ?? a.name}</strong> <span className="faint">{statusText(live)}</span> <CardChip project={project} a={a} />
+        {/* One line (HI-1679): the status gives way with "…", the chip after it never wraps and keeps its key whole. */}
+        <div className="running-line">
+          <strong>{label ?? a.name}</strong>
+          <ConnectionMark own={a.connection} provider={live.provider} launched={live.launchedConnection} className="faint running-connection" />
+          <Tooltip content={status}>
+            <span className="faint running-status">{wait ? wait.line : status}</span>
+          </Tooltip>
+          {!wait ? <CardChip project={project} a={a} /> : wait.cards.length === 1 ? <WatchedCardChip number={wait.cards[0]} /> : <WatchedCardChips cards={wait.cards} status={status} />}
         </div>
         <div className="faint small">
           {[live.modelName ?? usage?.model ?? null, live.permissionMode ? permissionLabel(live.provider, live.permissionMode, tr) : null, live.planMode ? tr(M.plan) : null].filter(Boolean).join(' · ')}
@@ -711,7 +780,7 @@ function SessionDetails({ project, items }: { project: ProjectInfo; items: Sessi
               <select className="select" aria-label={tr(M.agent)} value={agent.id} onChange={(e) => setPickedId(e.target.value)}>
                 {project.agents.map((a) => (
                   <option key={a.id} value={a.id}>
-                    {a.name} · {providerName(agentProviderOf(project, a))}
+                    {a.name} · {providerName(agentProviderOf(a))}
                   </option>
                 ))}
               </select>
@@ -817,15 +886,49 @@ function SessionDetails({ project, items }: { project: ProjectInfo; items: Sessi
   )
 }
 
-/** One provider's subscription limits (account-wide), as its sessions last reported them. */
+/**
+ * One provider's subscription limits (account-wide), as its sessions last reported them. With connections (HI-1756,
+ * the preview on), a CLI that has them lists each of its connections on in this workspace or in use by its sessions,
+ * named, each that login's own limits.
+ */
 export function PlanLimits({ provider }: { provider: ProviderId }) {
   const kept = useStore((s) => s.planUsage[provider])
+  const byConnection = useStore((s) => s.connectionPlanUsage)
+  const view = useConnections()
+  const inUse = useConnectionsInUse()
   const now = useNow(60000)
+  const p = providerDescriptor(provider)
+  if (connectionsApply(view, provider)) {
+    const ids = [...new Set([...(view.workspace[provider]?.on ?? []), ...inUse.filter((c) => c.provider === provider).map((c) => c.id)])]
+    if (!ids.length) return <p className="hint">{tr(M.noConnectionsOn, { provider: p.name })}</p>
+    return (
+      <>
+        {ids.map((id) => {
+          const c = view.connections.find((x) => x.id === id)
+          const name = c?.name ?? inUse.find((x) => x.id === id)?.name ?? id
+          const email = c?.observed?.email ?? c?.accepted?.email
+          return (
+            <div key={id} className="plan-connection-limits" data-plan-connection={id}>
+              <div className="plan-connection-name">
+                <strong>{name}</strong>
+                {email && <span className="faint"> {email}</span>}
+              </div>
+              <LimitCards kept={byConnection[id]} now={now} tip={(l) => tr(M.limitTipConnection, { window: limitWindow(l), label: l.label, name })} none={tr(M.noConnectionLimits, { name })} />
+            </div>
+          )
+        })}
+      </>
+    )
+  }
+  return <LimitCards kept={kept} now={now} tip={(l) => tr(M.limitTip, { window: limitWindow(l), label: l.label, provider: providerName(provider) })} none={tr(M.noLimits, { provider: p.name })} />
+}
+
+/** A CLI's or a connection's limits as cards, or `none` before any is current. */
+function LimitCards({ kept, now, tip, none }: { kept: PlanUsage | undefined; now: number; tip: (l: PlanLimit) => string; none: string }) {
   // A limit whose reset has passed with no new report isn't shown as it was (#383).
   const usage = kept && { ...kept, limits: kept.limits.filter((l) => !l.resetsAt || Date.parse(l.resetsAt) > now) }
-  const p = providerDescriptor(provider)
-  const card = (id: ProviderId, l: PlanLimit): React.ReactNode => (
-    <Card key={l.id} title={tr(M.limitTitle, { window: limitWindow(l), label: `${l.label.charAt(0).toUpperCase()}${l.label.slice(1)}` })} value={fmt.percent(l.usedPercent / 100)} sub={l.resetsAt ? tr(M.limitResets, { when: resetsIn(l.resetsAt) }) : tr(M.limitUsed)} tip={tr(M.limitTip, { window: limitWindow(l), label: l.label, provider: providerName(id) })} accent={l.usedPercent >= 80}>
+  const card = (l: PlanLimit): React.ReactNode => (
+    <Card key={l.id} title={tr(M.limitTitle, { window: limitWindow(l), label: `${l.label.charAt(0).toUpperCase()}${l.label.slice(1)}` })} value={fmt.percent(l.usedPercent / 100)} sub={l.resetsAt ? tr(M.limitResets, { when: resetsIn(l.resetsAt) }) : tr(M.limitUsed)} tip={tip(l)} accent={l.usedPercent >= 80}>
       <div className={cx('meter', l.usedPercent >= 95 ? 'danger' : l.usedPercent >= 80 && 'caution')}>
         <div style={{ width: `${Math.min(100, l.usedPercent)}%` }} />
       </div>
@@ -836,10 +939,10 @@ export function PlanLimits({ provider }: { provider: ProviderId }) {
       <div className="faint small overview-plan">
         {tr(M.planLimits, { plan: usage.plan || 'none', when: timeAgo(usage.updatedAt) })}
       </div>
-      <div className="cards">{usage.limits.map((l) => card(provider, l))}</div>
+      <div className="cards">{usage.limits.map(card)}</div>
     </>
   ) : (
-    <p className="hint">{tr(M.noLimits, { provider: p.name })}</p>
+    <p className="hint">{none}</p>
   )
 }
 
@@ -863,16 +966,19 @@ function ChangesSplit({ listWidth, children }: { listWidth: number; children: Re
  * Whose changes the Changes tab shows (#476): the unused worktrees first (all, or one, each with who made it), then the
  * worktrees agents work in, then the project folder, last (agents working in the folder itself, and you).
  */
-function ChangesPicker({ project, value, onChange, unused, looking, listed }: { project: ProjectInfo; value: string; onChange: (id: string) => void; unused: UnusedWorktree[]; looking: boolean; listed: boolean }) {
-  const inUse = project.agents.filter((a) => a.worktree)
+function ChangesPicker({ project, value, onChange, unused, looking, listed, compare, leftovers }: { project: ProjectInfo; value: string; onChange: (id: string) => void; unused: UnusedWorktree[]; looking: boolean; listed: boolean; compare: ReturnType<typeof useCompareLines>; leftovers: number }) {
+  // The folders agents work in (#1569): a slot, the slot kept for one, or a 0.9 worktree, each once; a free slot's
+  // changes are under the unused worktrees.
+  const inUse = project.agents.flatMap((a) => { const own = workFolderOf(a); return own ? [{ a, own }] : [] }).filter((x, i, all) => all.findIndex((y) => samePath(y.own.path, x.own.path)) === i)
   return (
     <div className="root-row">
       <Tooltip content={tr(C.pickerTip)}>
         <select className="select root-select changes-picker" value={value} onChange={(e) => onChange(e.target.value)}>
+          {compare.lines && compare.lines.branches.length > 1 && <CompareGroup lines={compare.lines} value={value} last={leftovers > 0 || value === LEFTOVERS_ROOT ? <LeftoversOption count={leftovers} /> : null} />}
           <optgroup label={tr(C.unusedGroup)}>
             <option value={UNUSED_ROOT}>{looking ? tr(C.unusedLooking) : listed ? tr(C.unusedCount, { count: unused.length }) : tr(C.unusedFailed)}</option>
             {unused
-              .filter((w) => w.branch)
+              .filter((w) => w.branch || w.slot)
               .map((w) => (
                 <option key={w.path} value={unusedRoot(w.path)}>
                   {unusedPickerLabel(w)}
@@ -881,9 +987,9 @@ function ChangesPicker({ project, value, onChange, unused, looking, listed }: { 
           </optgroup>
           {inUse.length > 0 && (
             <optgroup label={tr(C.inUseGroup)}>
-              {inUse.map((a) => (
+              {inUse.map(({ a, own }) => (
                 <option key={a.id} value={a.id}>
-                  {tr(C.agentWorktree, { agent: a.name, branch: a.worktree!.branch })}
+                  {a.place.is === 'legacy' ? tr(C.agentWorktree, { agent: a.name, branch: own.branch ?? '' }) : tr(C.agentSlot, { agent: a.name, place: placeText(a.place) ?? '', known: own.branch ? 'yes' : 'no', branch: own.branch ?? '' })}
                 </option>
               ))}
             </optgroup>
@@ -916,19 +1022,31 @@ export function ChangesTab({ project: owner }: { project: ProjectInfo }) {
   // ones), else the project folder. Not known yet (no agent's worktree, no list yet): Unused worktrees, looking, until
   // a list says whether there are any. A listing that failed says nothing: the page stays, with the error and Retry,
   // until one succeeds (only a list that came back empty means the project folder).
-  const hasWorktrees = owner.agents.some((a) => a.worktree) || unusedList.length > 0
+  const hasWorktrees = owner.agents.some((a) => workFolderOf(a)) || unusedList.length > 0
   const resolving = !hasWorktrees && !unusedData
-  const shownId = rootId ?? (hasWorktrees || resolving ? UNUSED_ROOT : '')
+  // Two branches compared (HI-1824): by default the project's integration line against main, when it has one; until the
+  // branches are read, nothing is chosen for it.
+  const compare = useCompareLines(owner)
+  const integration = compare.lines?.integration && compare.lines.main ? compareRoot(compare.lines.main, compare.lines.integration) : null
+  const shownId = rootId ?? integration ?? (!compare.known ? COMPARE_ROOT : hasWorktrees || resolving ? UNUSED_ROOT : '')
+  const compared = parseCompareRoot(shownId)
+  // The branches nothing uses now (HI-1823), as Branches & remotes reads them.
+  const infoRead = useGitRead('git:leftovers', owner)
+  const leftovers = useLeftovers(owner, infoRead.data)
   const listingUnused = shownId === UNUSED_ROOT
-  const spare = shownId.startsWith(`${UNUSED_ROOT}:`) ? (unusedList.find((w) => unusedRoot(w.path) === shownId && w.branch) ?? null) : null
-  // A worktree agent's changes are everything on its branch since it left its base branch; an unused one's, since the
+  const spare = shownId.startsWith(`${UNUSED_ROOT}:`) ? (unusedList.find((w) => unusedRoot(w.path) === shownId && (w.branch || w.slot)) ?? null) : null
+  // An agent's folder's changes (its slot, the slot kept for it or its 0.9 worktree, #1569) are everything on its branch
+  // since it left its base branch (only what isn't committed when the base isn't known); an unused one's, since the
   // branch it would merge into.
-  const agent = owner.agents.find((a) => a.id === shownId && a.worktree)
-  const root = agent?.worktree?.path ?? spare?.path ?? owner.path
-  const base = agent?.worktree?.base ?? spare?.check.into ?? undefined
+  const agent = owner.agents.find((a) => a.id === shownId && workFolderOf(a))
+  const own = agent ? workFolderOf(agent) : null
+  // Its 0.9 worktree: Merge… merges it (the agent's merge); a slot's branch is merged as a branch, as an unused slot's.
+  const legacy = agent ? legacyOf(agent) : null
+  const root = own?.path ?? spare?.path ?? owner.path
+  const base = own?.base ?? spare?.check.into ?? undefined
   const project = agent || spare ? { ...owner, path: root } : owner
-  // Who the worktree is, in its labels: the agent, or the unused worktree's branch.
-  const whose = agent ? tr(C.worktreeOf, { agent: agent.name }) : spare ? spare.branch! : null
+  // Who the worktree is, in its labels: the agent's 0.9 worktree, its slot, or the unused worktree's branch.
+  const whose = agent ? (legacy ? tr(C.worktreeOf, { agent: agent.name }) : (agent.place.name ?? agent.name)) : spare ? unusedName(spare) : null
 
   const [statusError, setStatusError] = useState<string | null>(null)
   const [diffTry, setDiffTry] = useState(0)
@@ -978,7 +1096,11 @@ export function ChangesTab({ project: owner }: { project: ProjectInfo }) {
     }
   }, [file, root, base, status, key, diffTry])
   const choose = (id: string): void => set((s) => ({ changesRoot: { ...s.changesRoot, [owner.path]: id } }))
-  const selector = hasWorktrees || shownId ? <ChangesPicker project={owner} value={shownId} onChange={choose} unused={unusedList} looking={unusedLoading && !unusedData} listed={!!unusedData} /> : null
+  const selector = hasWorktrees || shownId || (compare.lines?.branches.length ?? 0) > 1 ? <ChangesPicker project={owner} value={shownId} onChange={choose} unused={unusedList} looking={unusedLoading && !unusedData} listed={!!unusedData} compare={compare} leftovers={leftovers.count} /> : null
+  if (shownId === COMPARE_ROOT) return <div className="empty-state"><Icon name="loading" spin />{tr(M.loading)}</div>
+  if (shownId === LEFTOVERS_ROOT) return <LeftoversPage project={owner} read={infoRead} selector={selector} listWidth={listWidth} onCompare={(b, h) => choose(compareRoot(b, h))} />
+  if (compared) return <ComparePage project={owner} base={compared.base} head={compared.head} lines={compare.lines} selector={selector} listWidth={listWidth} onPick={(b, h) => choose(compareRoot(b, h))} />
+
   // Not "not a git repository": git can't run, so Hive can't tell (#346). Whichever page is shown.
   const gitMissing = (problem: string, retry: () => void): React.ReactNode => (
     <div className="empty-state changes-git-missing" style={{ paddingTop: '15vh' }}>
@@ -1000,7 +1122,7 @@ export function ChangesTab({ project: owner }: { project: ProjectInfo }) {
   // unused worktrees page has its own header, UnusedHeading).
   const about = (
     <div className="changes-about changes-page-head" data-about={spare ? 'unused-one' : agent ? 'agent' : 'project'}>
-      {spare ? CHANGES_ABOUT.unusedOne(spare.branch!, spare.check.into ?? tr(C.mainBranch)) : agent ? CHANGES_ABOUT.agent(agent.name, agent.worktree!.branch, agent.worktree!.base) : CHANGES_ABOUT.project}
+      {spare ? CHANGES_ABOUT.unusedOne(unusedName(spare), spare.check.into ?? tr(C.mainBranch)) : agent && legacy ? CHANGES_ABOUT.agent(agent.name, legacy.branch, legacy.base) : agent ? CHANGES_ABOUT.slot(agent.name, agent.place.is === 'carried' ? 'carried' : 'slot', agent.place.name ?? '', own?.base ?? null) : CHANGES_ABOUT.project}
     </div>
   )
 
@@ -1086,8 +1208,9 @@ export function ChangesTab({ project: owner }: { project: ProjectInfo }) {
         <div className="pane-header" style={{ paddingLeft: 14 }}>
           {tr(C.changes)} <span className="badge" style={{ marginLeft: 6 }}>{status.files.length}</span>
           <div className="actions">
-            {agent && <IconButton icon="git-merge" title={mergeBlocked(agent.name, agent.live?.status) ?? tr(C.mergeAgent, { agent: agent.name })} disabled={!!mergeBlocked(agent.name, agent.live?.status)} onClick={() => set({ mergeFor: { project: owner.path, agentId: agent.id } })} />}
-            {spare && !spare.check.removable && <IconButton icon="git-merge" title={tr(C.mergeBranch, { branch: spare.branch! })} onClick={() => set({ mergeFor: { project: owner.path, agentId: '', worktree: { path: spare.path, branch: spare.branch! } } })} />}
+            {agent && !legacy && own?.branch && <IconButton icon="git-merge" action="merge-slot" title={tr(C.mergeBranch, { branch: own.branch })} onClick={() => set({ branchMergeFor: { project: owner.path, branch: own.branch! } })} />}
+            {agent && legacy && <IconButton icon="git-merge" action="merge-agent" title={mergeBlocked(agent.name, agent.live?.status) ?? tr(C.mergeAgent, { agent: agent.name })} disabled={!!mergeBlocked(agent.name, agent.live?.status)} onClick={() => set({ mergeFor: { project: owner.path, agentId: agent.id } })} />}
+            {spare?.branch && !spare.check.removable && <IconButton icon="git-merge" action="merge-unused" title={tr(C.mergeBranch, { branch: spare.branch! })} onClick={() => set(spare.slot ? { branchMergeFor: { project: owner.path, branch: spare.branch! } } : { mergeFor: { project: owner.path, agentId: '', worktree: { path: spare.path, branch: spare.branch! } } })} />}
             <IconButton icon="refresh" title={tr(M.refresh)} onClick={load} />
           </div>
         </div>
@@ -1102,13 +1225,13 @@ export function ChangesTab({ project: owner }: { project: ProjectInfo }) {
           </div>
         )}
         <div className="muted" style={{ padding: '0 14px 8px', fontSize: 12 }}>
-          <Icon name="git-branch" /> {status.branch} {whose ? <span className="faint">{tr(C.sinceLeft, { base: base ?? '' })}</span> : <>{status.ahead > 0 && `↑${status.ahead}`} {status.behind > 0 && `↓${status.behind}`}</>}
+          <Icon name="git-branch" /> {status.branch} {whose && base ? <span className="faint">{tr(C.sinceLeft, { base: base ?? '' })}</span> : <>{status.ahead > 0 && `↑${status.ahead}`} {status.behind > 0 && `↓${status.behind}`}</>}
         </div>
         <div className="pane-body">
-          {status.files.length === 0 && <div className="pane-empty">{agent ? tr(C.noAgentChanges, { branch: agent.worktree!.branch }) : spare ? tr(C.nothingOn, { branch: spare.branch ?? '', base: base ?? '' }) : tr(C.clean)}</div>}
+          {status.files.length === 0 && <div className="pane-empty">{agent && own?.branch ? tr(C.noAgentChanges, { branch: own.branch }) : agent ? tr(C.clean) : spare ? tr(C.nothingOn, { branch: unusedName(spare), base: base ?? '' }) : tr(C.clean)}</div>}
           {status.files.map((f) => (
             <Tooltip block key={f.path} content={tr(f.staged ? C.staged : C.unstaged, { status: tr(C.gitStatus, { status: f.status === '?' ? 'untracked' : f.status }), path: f.path })}>
-              <div className={cx('row', file === f.path && 'selected')} style={{ width: '100%' }} onClick={() => setFile(f.path)}>
+              <div className={cx('row', file === f.path && 'selected')} data-path={f.path} style={{ width: '100%' }} onClick={() => setFile(f.path)}>
                 <span className="label">{f.path.split('/').pop()}</span>
                 <span className="desc" style={{ flex: 1, minWidth: 0 }}>{f.path.includes('/') ? f.path.slice(0, f.path.lastIndexOf('/')) : ''}</span>
                 <span className={cx('git-status', f.status === '?' ? 'U' : f.status)}>{f.status === '?' ? 'U' : f.status /* i18n-ignore: git's status letter */}</span>
@@ -1198,7 +1321,7 @@ export function MemoryTab({ project }: { project: ProjectInfo }) {
   const sel = sources.find((s) => `${s.provider}:${s.id}` === selected)
   // One pair of groups per provider the project uses (or, with none yet, every enabled provider).
   const settings = useStore((s) => s.settings)
-  const used = new Set(project.agents.map((a) => agentProviderOf(project, a)))
+  const used = new Set(project.agents.map((a) => agentProviderOf(a)))
   const providers = PROVIDERS.filter((p) => used.has(p.id) || (isProviderEnabled(settings, p.id) && sources.some((s) => s.provider === p.id && s.exists)))
   // With agents of more than one provider: one shared AGENTS.md instead of a file per CLI.
   const usedIds = [...used].sort()
@@ -1321,11 +1444,13 @@ export function ProjectSkillsTab({ project }: { project: ProjectInfo }) {
 
   const providers = PROVIDERS.filter((p) => isProviderEnabled(settings, p.id))
   const ids = providers.map((p) => p.id)
-  // One provider's skills at a time (#118): the one last shown for this project, else the project's default provider,
-  // else the first turned on.
+  // One provider's skills at a time (#118): the one last shown for this project, else the CLI of the first usable
+  // connection (HI-2121, decision A: what a new agent runs), else the first turned on.
   const key = project.path.toLowerCase()
   const remembered = useStore((s) => s.skillsProvider[key])
-  const fallback = projectDefaultProvider(project.config, settings)
+  const connections = useConnections()
+  const cliFound = useStore((s) => s.providers)
+  const fallback = connectionCli(connections, firstReadyConnection(connections, settings, cliReadyOf(cliFound)).id)
   const shown = providers.find((p) => p.id === remembered) ?? providers.find((p) => p.id === fallback) ?? providers[0]
   const showProvider = (id: ProviderId): void => rememberProjectPref('skillsProvider', key, id)
   // Hive skills (the workspace's, the same in every project) start open at the top; the provider's skills folded under
@@ -1345,7 +1470,7 @@ export function ProjectSkillsTab({ project }: { project: ProjectInfo }) {
     const r = await addSkill(mode, { kind: 'local', projectPath: project.path, provider }, otherLocal(project.path, provider, ids))
     if (r) setSelected(r.path)
   }
-  const row = (sk: SkillInfo, actionsFor?: React.ReactNode) => <SkillRow key={sk.path} skill={sk} selected={selected === sk.path} onSelect={() => setSelected(sk.path)} actionsFor={actionsFor} />
+  const row = (sk: SkillInfo, actionsFor?: React.ReactNode, delivered?: React.ReactNode) => <SkillRow key={sk.path} skill={sk} selected={selected === sk.path} onSelect={() => setSelected(sk.path)} actionsFor={actionsFor} delivered={delivered} />
   const group = (title: string, tip: string, items: SkillInfo[], extra?: React.ReactNode, empty?: string) => (
     <>
       <div className="skill-group">
@@ -1384,9 +1509,11 @@ export function ProjectSkillsTab({ project }: { project: ProjectInfo }) {
             hive.map((sk) =>
               row(
                 sk,
-                <IconButton icon="go-to-file" title={tr(C.editInWorkspace)} onClick={() => editInWorkspace(sk)} />
+                <IconButton icon="go-to-file" title={tr(C.editInWorkspace)} onClick={() => editInWorkspace(sk)} />,
+                !sk.problem && sk.bundled !== 'missing' ? <DeliveredSwitch skill={sk} projectPath={project.path} /> : undefined
               )
             )}
+          {skills && hiveOpen && hive.length > 0 && <div className="pane-empty skills-delivered-note">{tr(C.deliveredNote)}</div>}
           {skills && hiveOpen && assistantOnly > 0 && (
             <div className="pane-empty assistant-only-note">
               {sentences(tr(C.assistantOnly, { count: assistantOnly }), <a onClick={() => showView('skills')}>{tr(C.seeThem)}</a>)}
@@ -1441,7 +1568,7 @@ export function ProjectSkillsTab({ project }: { project: ProjectInfo }) {
       </div>
       <div className="split-main">
         {current ? (
-          <SkillDetail key={current.path} skill={current} where="project" onDeleted={() => setSelected(null)} />
+          <SkillDetail key={current.path} skill={current} where="project" projectPath={project.path} onDeleted={() => setSelected(null)} />
         ) : (
           <div className="empty-state" style={{ paddingTop: '14vh' }}>
             <Icon name="sparkle" />
@@ -1466,6 +1593,8 @@ export function ProjectMcpTab({ project }: { project: ProjectInfo }) {
   const load = useCallback(() => loadScoped(wsPath, () => call('mcp:list')), [wsPath, loadScoped])
   useEffect(load, [load, version])
   const hiveOn = !!(settings?.agentApi.enabled && settings.agentApi.provideHiveMcp && api?.running)
+  // Only the servers added here (HI-2059): a broken definition still named in its list stays, to be removed.
+  const added = (servers ?? []).filter((m) => serverAddedIn({ ...m, def: m.def ?? {} }, project.path))
   // Which agents get a server, once any agent has a choice of its own (#537, Agent Settings → MCP servers).
   const choosing = project.agents.some((a) => agentChoosesMcp(a))
   const givenTo = (name: string): string | null => {
@@ -1476,8 +1605,14 @@ export function ProjectMcpTab({ project }: { project: ProjectInfo }) {
   return (
     <div className="scroll-page">
       <div className="page-narrow">
-        <h2 className="section">{tr(C.mcpHeading)}</h2>
-        <p className="hint">{tr(msg({ id: 'mcp.tab.hint', defaultMessage: "Every MCP server in the workspace is available here: turn on the ones this project's agents need. A server runs here only while it is on in the workspace too (its switch in the MCP view).", description: "Under Workspace MCP servers in a project's MCP tab." }))}</p>
+        <div className="flex mcp-section-head">
+          <h2 className="section">{tr(C.mcpHeading)}</h2>
+          <span style={{ flex: 1 }} />
+          <button className="btn small" data-action="mcp-add" disabled={!servers} onClick={() => void actions.addMcpServer(project)}>
+            <Icon name="add" /> {tr(C.addServer)}
+          </button>
+        </div>
+        <p className="hint">{tr(msg({ id: 'mcp.tab.hintAdded', defaultMessage: "The workspace's MCP servers this project's agents get. Add one from the workspace's servers; Remove takes it off this project only.", description: "Under Added servers in a project's MCP tab (HI-2059)." }))}</p>
         <ChangesApplyNote project={project} />
         {error && servers && <StaleNote what={tr(C.mcpTarget)} error={error} at={loaded.at} onRetry={load} />}
         {!servers ? (
@@ -1492,25 +1627,27 @@ export function ProjectMcpTab({ project }: { project: ProjectInfo }) {
           <p className="hint">
             {tr(C.noServers)} <a onClick={() => setActivity('mcp')}>{tr(C.manage)}</a>
           </p>
+        ) : !added.length ? (
+          <p className="hint" data-mcp-none-added="">
+            {tr(C.noneAdded)}
+          </p>
         ) : (
           <div className="toggle-list">
-            {servers.map((m) => {
-              const on = serverOnIn(m, project.config.mcp)
-              // The project's own choice (#1093), kept while the workspace has the server off.
-              const chosen = project.config.mcp.enabled.includes(m.name)
-              const gated = !m.globallyEnabled && !m.error
+            {added.map((m) => {
               const given = givenTo(m.name)
               return (
-                <div key={m.name} className={cx('toggle-item', !on && 'disabled')} data-mcp={m.name} data-gated={gated || undefined}>
+                <div key={m.name} className="toggle-item" data-mcp={m.name}>
                   <Icon name={m.def?.url ? 'globe' : 'plug'} />
                   <div className="ti-text">
                     <div className="ti-name">
-                      {m.name} <span className="badge">{tr(msg({ id: 'mcp.tab.workspaceBadge', defaultMessage: 'workspace', description: "A badge on a server in a project's MCP tab: it is one of the workspace's servers." }))}</span> {gated && <span className="badge mcp-gated">{tr(actions.MCP_OFF_IN_WORKSPACE)}</span>} {m.error && <span className="badge error">{tr(C.invalid)}</span>}
+                      {m.name} {m.error && <span className="badge error">{tr(C.invalid)}</span>}
                     </div>
-                    <div className="ti-desc">{m.error ?? m.def?.description ?? m.def?.command}</div>
-                    {on && given && <div className="ti-desc">{given}</div>}
+                    <div className="ti-desc">{actions.mcpErrorText(m) ?? m.def?.description ?? m.def?.command}</div>
+                    {given && <div className="ti-desc">{given}</div>}
                   </div>
-                  <Switch checked={chosen} disabled={!!m.error} label={tr(msg({ id: 'mcp.tab.switch', defaultMessage: '{name} on in {project}', description: "A server's switch in a project's MCP tab, for screen readers. {name} is the server, {project} the project." }), { name: m.name, project: project.name })} onChange={(v) => void actions.setMcpServerInProject(project, m, v)} />
+                  <button className="btn small subtle" data-action="mcp-remove" aria-label={tr(C.removeLabel, { name: m.name, project: project.name })} onClick={() => void actions.removeMcpServer(project, m)}>
+                    {tr(C.remove)}
+                  </button>
                 </div>
               )
             })}
@@ -1519,7 +1656,7 @@ export function ProjectMcpTab({ project }: { project: ProjectInfo }) {
         {project.unmanagedMcp.length > 0 && (
           <>
             <h2 className="section">{tr(C.definedByProject)}</h2>
-            <p className="hint">{tr(msg({ id: 'mcp.tab.projectDefined', defaultMessage: "These servers are in the project's own agent config (such as .mcp.json). Hive starts sessions with only workspace servers, so they stay disabled until copied to the workspace, which turns them on here.", description: "Under Defined by the project in a project's MCP tab. Keep .mcp.json as it is." }))}</p>
+            <p className="hint">{tr(msg({ id: 'mcp.tab.projectDefinedAdded', defaultMessage: "These servers are in the project's own agent config (such as .mcp.json). Hive starts sessions with only workspace servers, so they stay disabled until copied to the workspace, which adds them here.", description: "Under Defined by the project in a project's MCP tab (HI-2059: copying one to the workspace adds it to this project). Keep .mcp.json as it is." }))}</p>
             <div className="toggle-list">
               {project.unmanagedMcp.map((n) => (
                 <div key={n} className="toggle-item disabled">
@@ -1570,9 +1707,9 @@ function SettingRow({ title, desc, tip, children, modified }: { title: string; d
   )
 }
 
-type ProjectSection = 'agents' | 'sessions' | 'loops' | 'storage' | 'keys' | 'advanced' | `provider:${string}`
+type ProjectSection = 'general' | 'agents' | 'sessions' | 'storage' | 'keys' | 'advanced'
 
-const PROJECT_SECTION_ICONS: Record<string, string> = { agents: 'organization', sessions: 'history', loops: 'sync', storage: 'database', keys: 'keyboard', advanced: 'tools' }
+const PROJECT_SECTION_ICONS: Record<string, string> = { general: 'settings-gear', agents: 'organization', sessions: 'history', storage: 'database', keys: 'keyboard', advanced: 'tools' }
 
 // Each section's label and description are shown from its messages (text), in the window's language when it renders;
 // label and desc stay the catalogue's English, for the Assistant's tools.
@@ -1599,37 +1736,29 @@ interface ProjectSettingDef {
   render: () => React.ReactNode
 }
 
-/** A text or number field that saves when it loses focus (or on Enter). */
-function DraftInput({ value, onCommit, ...rest }: { value: string; onCommit: (v: string) => void } & Omit<React.InputHTMLAttributes<HTMLInputElement>, 'value' | 'onChange'>) {
-  const [draft, setDraft] = useState(value)
-  useEffect(() => setDraft(value), [value])
-  return <input {...rest} value={draft} onChange={(e) => setDraft(e.target.value)} onBlur={() => draft !== value && onCommit(draft)} onKeyDown={(e) => e.key === 'Enter' && (e.target as HTMLInputElement).blur()} />
-}
-
-function DraftTextarea({ value, onCommit, ...rest }: { value: string; onCommit: (v: string) => void } & Omit<React.TextareaHTMLAttributes<HTMLTextAreaElement>, 'value' | 'onChange'>) {
-  const [draft, setDraft] = useState(value)
-  useEffect(() => setDraft(value), [value])
-  return <textarea {...rest} value={draft} onChange={(e) => setDraft(e.target.value)} onBlur={() => draft !== value && onCommit(draft)} />
-}
+const CHOOSE_CONNECTIONS = msg({ id: 'project.agents.chooseConnections', defaultMessage: 'Choose Connections…', description: "Button on Project Settings → Agents (HI-2109): opens a dialog choosing the connections (named setups on accounts: model, effort, mode) of the project's agents, by role or one by one, nothing else changed." })
 
 function AgentList({ project }: { project: ProjectInfo }) {
   const settings = useStore((s) => s.settings)
-  const limit = useAgentLimit()
-  const providers = useStore((s) => s.providers)
-  const cfg = project.config
+  // Its connection as a start resolves it (HI-2108, decision H), whose values its row sums up.
+  const connections = useConnections()
+  const connectionFor = (a: ProjectInfo['agents'][number], provider: ProviderId) => {
+    const shown = connectionOf(a.connection, provider, undefined, connections)
+    const id = shown?.desired.ok ? shown.desired.id : a.connection
+    return id ? connections?.connectionRows?.find((c) => c.id === id) : undefined
+  }
+  const limit = useAgentLimit(project)
   return (
     <div className="agent-list">
       {project.agents.map((a) => {
-        const provider = agentProviderOf(project, a)
-        const model = effectiveModelLabel(provider, a.model || projectProviderConfig(cfg, provider).model, providerSettings(settings, provider).defaultModel, providers[provider])
-        const overrides = [
-          a.model && tr(S.ownModel, { model: modelLabel(a.model, provider) }),
-          a.effort && tr(S.ownEffort, { effort: a.effort }),
-          a.permissionMode && permissionLabel(provider, a.permissionMode, tr),
-          a.use200kContext !== undefined && tr(S.own200k, { on: a.use200kContext ? 'yes' : 'no' }),
-          agentChoosesMcp(a) && tr(S.ownMcp, { servers: agentMcpText(a) })
-        ].filter((x): x is string => !!x)
+        const provider = agentProviderOf(a)
+        const conn = connectionFor(a, provider)
+        // Its connection's values (its model, effort, context, mode), and its own MCP servers when it has a choice of them.
+        const line = [(conn && connectionLine(connections, conn, settings)) || providerName(provider), agentChoosesMcp(a) ? tr(S.ownMcp, { servers: agentMcpText(a) }) : ''].filter(Boolean).join(' · ')
         const off = !isProviderEnabled(settings, provider)
+        // Its 0.9 worktree's branch, else where it works (#1442: "in slot-b", "carried: hb2"), else the project folder.
+        const own = legacyOf(a)
+        const place = placeText(a.place)
         return (
           <div key={a.id} className={cx('agent-list-row', off && 'off')} data-agent={a.id}>
             <StatusDot live={a.live} active={project.active} />
@@ -1640,29 +1769,90 @@ function AgentList({ project }: { project: ProjectInfo }) {
             </Tooltip>
             <div className="grow">
               <div>
-                <strong>{a.name}</strong> <span className="faint">{off ? tr(S.off, { provider: providerName(provider) }) : providerName(provider)}</span>{' '}
-                {a.worktree ? (
+                <strong>{a.name}</strong>{' '}
+                <span className="faint">{off ? tr(S.off, { provider: providerName(provider) }) : <ConnectionMark own={a.connection} provider={provider} launched={a.live?.launchedConnection} fallback={providerName(provider)} />}</span>{' '}
+                {own ? (
                   <span className="agent-branch">
-                    <Icon name="git-branch" /> {a.worktree.branch}
+                    <Icon name="git-branch" /> {own.branch}
+                  </span>
+                ) : place ? (
+                  <span className="faint agent-place" data-place={a.place.is}>
+                    {place}
                   </span>
                 ) : (
                   <span className="faint">{tr(S.projectFolder)}</span>
                 )}
               </div>
               <div className="faint small">
-                {overrides.length ? tr(S.ownSettings, { settings: fmt.list(overrides, 'unit') }) : tr(S.projectSettings, { model })}
-                {a.worktree && <> · {a.worktree.path}</>}
+                {line}
+                {awayFromProject(a) && <> · {agentFolder(a)}</>}
               </div>
             </div>
             <IconButton icon="settings" title={tr(S.agentSettings)} onClick={() => set({ agentSettingsFor: { project: project.path, agentId: a.id } })} />
-            {a.worktree && <IconButton icon="git-merge" title={mergeBlocked(a.name, a.live?.status) ?? tr(S.merge)} disabled={!!mergeBlocked(a.name, a.live?.status)} onClick={() => set({ mergeFor: { project: project.path, agentId: a.id } })} />}
+            {own && <IconButton icon="git-merge" title={mergeBlocked(a.name, a.live?.status) ?? tr(S.merge)} disabled={!!mergeBlocked(a.name, a.live?.status)} onClick={() => set({ mergeFor: { project: project.path, agentId: a.id } })} />}
             <IconButton icon="close" title={tr(S.remove)} className="act-remove" action="remove-agent" onClick={() => void actions.removeAgent(project.path, a.id)} />
           </div>
         )
       })}
-      <button className="btn subtle small" disabled={project.agents.length >= limit} onClick={() => set({ addAgentFor: project.path })}>
-        <Icon name="add" /> {tr(S.addAgent)}
-      </button>
+      {/* At its Maximum agents (HI-2058): disabled, saying why and where it is raised. */}
+      <Tooltip content={project.agents.length >= limit ? agentLimitText(tr, limit) : null}>
+        <button className="btn subtle small" disabled={project.agents.length >= limit} onClick={() => set({ addAgentFor: project.path })}>
+          <Icon name="add" /> {tr(S.addAgent)}
+        </button>
+      </Tooltip>
+      {/* HI-2109: the template picker over these agents, changing only their connections. */}
+      {project.agents.length > 0 && (
+        <button className="btn subtle small" data-action="choose-connections" onClick={() => void actions.chooseConnections(project.path)}>
+          <Icon name="plug" /> {tr(CHOOSE_CONNECTIONS)}
+        </button>
+      )}
+    </div>
+  )
+}
+
+/**
+ * The project's key (#1221): typed and checked as it changes, saved with Enter, Change or leaving the box; its old keys
+ * under it, which still find its cards. A board that can't be changed (read-only, waiting for its upgrade) shows it only.
+ */
+function ProjectKeyField({ project }: { project: ProjectInfo }) {
+  const keys = useStore((s) => s.projectKeys.find((k) => k.projectPath.toLowerCase() === project.path.toLowerCase()) ?? null)
+  const readOnly = useStore((s) => !!s.boardState?.readOnly)
+  const [draft, setDraft] = useState(keys?.key ?? '')
+  const [busy, setBusy] = useState(false)
+  useEffect(() => setDraft(keys?.key ?? ''), [keys?.key])
+  const k = draft.trim().toUpperCase()
+  const changed = !!k && k !== keys?.key
+  const problem = changed ? keyProblemText(k, project.path) : null
+  const save = async (): Promise<void> => {
+    if (!changed || problem || busy) return
+    setBusy(true)
+    const done = await actions.attempt(tr(S.keyFailed), () => call('project:setKey', project.path, k))
+    setBusy(false)
+    if (done) notify('success', tr(S.keyChanged, { key: done, old: keys?.key ?? '' }))
+  }
+  if (!keys) return <span className="faint">{tr(S.keyNone)}</span>
+  return (
+    <div className="project-key-field">
+      <div className="flex">
+        <input
+          className={cx('input', 'mono', problem && 'invalid')}
+          value={draft}
+          maxLength={4}
+          spellCheck={false}
+          disabled={readOnly || busy}
+          aria-label={tr(S.keyLabel)}
+          aria-invalid={!!problem}
+          onChange={(e) => setDraft(e.target.value.toUpperCase())}
+          onKeyDown={(e) => {
+            if (e.key === 'Enter') void save()
+            if (e.key === 'Escape') setDraft(keys.key)
+          }}
+        />
+        <button className="btn" disabled={!changed || !!problem || busy || readOnly} onClick={() => void save()}>
+          {tr(S.keyChange)}
+        </button>
+      </div>
+      {problem ? <div className="field-error">{problem}</div> : changed ? <div className="field-hint">{tr(S.keyWillAlias, { old: keys.key, key: k })}</div> : keys.aliases.length > 0 && <div className="field-hint">{tr(S.keyAliases, { keys: fmt.list(keys.aliases) })}</div>}
     </div>
   )
 }
@@ -1671,8 +1861,7 @@ export function ProjectSettingsTab({ project }: { project: ProjectInfo }) {
   // Its sections and rows are formatted here: a change of language shows them in it at once.
   useLanguage()
   const settings = useStore((s) => s.settings)
-  const installs = useStore((s) => s.providers)
-  const [section, setSection] = useState<ProjectSection>('agents')
+  const [section, setSection] = useState<ProjectSection>('general')
   const [query, setQuery] = useState('')
   // Opened on a section from elsewhere (Settings → Workspace's Storage links).
   const jump = useStore((s) => s.projectSettingsJump)
@@ -1683,124 +1872,32 @@ export function ProjectSettingsTab({ project }: { project: ProjectInfo }) {
     set({ projectSettingsJump: null })
   }, [jump, project.path])
   const cfg = project.config
-  // The workspace's card-loop rounds and wait (Settings → Workspace), which this project inherits (#412).
-  const workspaceLoops = loopDefaults({ loops: useStore((s) => s.workspace?.config.loops) })
+  // Its key, for Project key's example (#1221).
+  const ownKey = useStore((s) => projectKeyOf(s, project.path))
+  // Settings → Advanced's inbox switches, which this project's Inherit follows (#1432).
+  const inboxGlobals: Record<InboxSwitch, boolean> = {
+    checkpoints: useAdvancedValue<boolean>(INBOX_SWITCH_ID.checkpoints),
+    stopContinuation: useAdvancedValue<boolean>(INBOX_SWITCH_ID.stopContinuation),
+    idleWakes: useAdvancedValue<boolean>(INBOX_SWITCH_ID.idleWakes)
+  }
   if (!settings) return null
   const update = async (patch: Partial<ProjectConfig>): Promise<void> => {
     await actions.attempt(tr(S.saveFailed), () => call('project:updateConfig', project.path, patch))
     await actions.refreshWorkspace()
   }
-  const lockMode = cfg.fileLocks === 'inherit' ? settings.agents.fileLocks : cfg.fileLocks
-  /** A file lock mode's name or what it does, in the window's language (#861); its id if it isn't one. */
-  const lockShown = (mode: string, part: 'label' | 'description'): string => {
-    const m = FILE_LOCK_MODES.find((x) => x.value === mode)
-    return m ? tr(m.text[part]) : mode
-  }
-  const globalDefault = defaultProviderLabel(settings, tr)
   const globalCompact = settings.sessions.compactSuggestTokens ? fmt.number(settings.sessions.compactSuggestTokens) : tr(S.never)
   const globalWarn = settings.sessions.transcriptWarnMB ? tr(S.megabytes, { count: settings.sessions.transcriptWarnMB }) : tr(S.never)
   const inherit = (value: string | number): string => tr(S.inherit, { value })
 
-  /** A project's model, effort, mode and arguments for one provider. */
-  const providerDefs = (id: ProviderId): ProjectSettingDef[] => {
-    const p = providerDescriptor(id)
-    const pc = projectProviderConfig(cfg, id)
-    const g = providerSettings(settings, id)
-    const sect = `provider:${id}` as ProjectSection
-    const save = (patch: Partial<typeof pc>): Promise<void> => actions.updateProjectProvider(project.path, id, patch)
-    const globalModel = g.defaultModel ? runsAsName(id, g.defaultModel, installs[id]) : tr(S.providerDefault, { provider: p.name })
-    // The model this project's agents run unless they choose one, whose effort levels the picker offers (#125).
-    const runModel = (pc.model && pc.model !== 'inherit' ? pc.model : g.defaultModel) || installs[id]?.defaultModel || null
-    const globalEffort = effortText(id, g.defaultEffort, runModel, installs[id], settings, tr)
-    const modes = offeredModes(id, settings)
-    const mode = pc.permissionMode === 'inherit' ? g.defaultPermissionMode : pc.permissionMode
-    return [
-      {
-        section: sect,
-        key: `${id}.model`,
-        ...rowText(`project.${id}.model`),
-        modified: pc.model !== 'inherit',
-        render: () => <ModelPicker provider={id} value={pc.model} base={{ value: 'inherit', label: inherit(globalModel) }} onChange={(v) => void save({ model: v })} />
-      },
-      {
-        section: sect,
-        key: `${id}.effort`,
-        ...rowText(`project.${id}.effort`),
-        modified: pc.effort !== 'inherit',
-        render: () => <EffortPicker provider={id} model={runModel} value={pc.effort} base={{ value: 'inherit', label: inherit(globalEffort) }} onChange={(v) => void save({ effort: v })} />
-      },
-      {
-        section: sect,
-        key: `${id}.permissionMode`,
-        ...rowText(`project.${id}.permissionMode`),
-        // What the mode in use does, after what the setting is.
-        desc: tr(S.now, { desc: rowText(`project.${id}.permissionMode`).desc, current: modeDescription(id, mode, tr) }),
-        modified: pc.permissionMode !== 'inherit',
-        render: () => (
-          <select
-            className="select"
-            value={modes.some((m) => m.value === pc.permissionMode) ? pc.permissionMode : 'inherit'}
-            onChange={async (e) => {
-              const v = e.target.value
-              if (v !== 'inherit' && !(await confirmDangerousMode(id, v, { message: tr(S.sessionsIn, { project: project.name }) }))) return
-              await save({ permissionMode: v })
-            }}
-          >
-            <option value="inherit">{inherit(permissionLabel(id, g.defaultPermissionMode, tr))}</option>
-            {modes.map((m) => (
-              <option key={m.value} value={m.value}>
-                {permissionLabel(id, m.value, tr)}
-              </option>
-            ))}
-          </select>
-        )
-      },
-      ...(p.capabilities.contextLimit
-        ? [
-            {
-              section: sect,
-              key: `${id}.use200kContext`,
-              ...rowText(`project.${id}.use200kContext`),
-              modified: (pc.use200kContext ?? 'inherit') !== 'inherit',
-              render: () => (
-                <select className="select" value={pc.use200kContext ?? 'inherit'} onChange={(e) => void save({ use200kContext: e.target.value as 'inherit' | 'on' | 'off' })}>
-                  <option value="inherit">{inherit(tr(g.use200kContext ? S.on : S.offChoice))}</option>
-                  <option value="on">{tr(S.on)}</option>
-                  <option value="off">{tr(S.offChoice)}</option>
-                </select>
-              )
-            }
-          ]
-        : []),
-      {
-        section: sect,
-        key: `${id}.extraArgs`,
-        ...rowText(`project.${id}.extraArgs`),
-        modified: !!pc.extraArgs,
-        // i18n-ignore: an example of the CLI's own arguments
-        render: () => <DraftInput className="input mono" value={pc.extraArgs} placeholder="--add-dir ../lib" onCommit={(v) => void save({ extraArgs: v })} />
-      }
-    ]
-  }
-
   const defs: ProjectSettingDef[] = [
     {
-      section: 'agents',
-      key: 'defaultProvider',
-      ...rowText('project.defaultProvider'),
-      modified: cfg.defaultProvider !== 'inherit',
-      render: () => (
-        <select className="select" value={cfg.defaultProvider} onChange={(e) => void update({ defaultProvider: e.target.value })}>
-          <option value="inherit">{inherit(globalDefault)}</option>
-          {PROVIDERS.map((p) => (
-            <option key={p.id} value={p.id}>
-              {isProviderEnabled(settings, p.id) ? p.name : tr(S.off, { provider: p.name })}
-            </option>
-          ))}
-        </select>
-      )
+      section: 'general',
+      key: 'key',
+      ...rowText('project.key'),
+      // Its example in this project's own key.
+      desc: tr(PROJECT_KEY_DESC, { example: `${ownKey ?? 'AM'}-12` }),
+      render: () => <ProjectKeyField project={project} />
     },
-    ...PROVIDERS.flatMap((p) => providerDefs(p.id)),
     {
       section: 'sessions',
       key: 'compactSuggestTokens',
@@ -1851,32 +1948,49 @@ export function ProjectSettingsTab({ project }: { project: ProjectInfo }) {
       )
     },
     {
-      section: 'loops',
-      key: 'loopWakes',
-      ...rowText('project.loopWakes'),
-      modified: !cfg.loopWakes,
-      render: () => <Switch checked={cfg.loopWakes} label={tr(S.wake)} onChange={(v) => void update({ loopWakes: v })} />
+      // Suggest a fresh start (#1437): this project's own of Settings → Notifications'.
+      section: 'sessions',
+      key: 'suggestFreshStart',
+      ...rowText('project.suggestFreshStart'),
+      modified: (cfg.suggestFreshStart ?? 'inherit') !== 'inherit',
+      render: () => (
+        <select className="select" data-setting="suggestFreshStart" value={cfg.suggestFreshStart ?? 'inherit'} onChange={(e) => void update({ suggestFreshStart: e.target.value as ProjectConfig['suggestFreshStart'] })}>
+          <option value="inherit">{inherit(tr(settings.notifications.suggestFreshStart !== false ? S.onLower : S.offLower))}</option>
+          <option value="on">{tr(S.on)}</option>
+          <option value="off">{tr(S.offChoice)}</option>
+        </select>
+      )
     },
-    {
-      section: 'loops',
-      key: 'loopRounds',
-      ...rowText('project.loopRounds'),
-      modified: cfg.loopRounds !== null,
-      render: () => <NumberField value={cfg.loopRounds} min={1} max={LANE_MAX_ROUNDS} step={1} label={tr(S.rounds)} inherit={inherit(workspaceLoops.rounds)} onCommit={(v) => update({ loopRounds: v })} />
-    },
-    {
-      section: 'loops',
-      key: 'loopWaitHours',
-      ...rowText('project.loopWaitHours'),
-      modified: cfg.loopWaitHours !== null,
-      render: () => <NumberField value={cfg.loopWaitHours} min={1} max={LOOP_WAIT_MAX_HOURS} step={1} label={tr(S.waitHours)} inherit={inherit(tr(S.hours, { count: workspaceLoops.waitHours }))} onCommit={(v) => update({ loopWaitHours: v })} />
-    },
+    // Carrying on (#1432): this project's own of Settings → Advanced's inbox switches.
+    ...INBOX_SWITCHES.map((which): ProjectSettingDef => {
+      const key = INBOX_PROJECT_KEY[which]
+      return {
+        section: 'sessions',
+        key,
+        ...rowText(`project.${key}`),
+        modified: cfg[key] !== 'inherit',
+        render: () => (
+          <select className="select" data-setting={key} value={cfg[key]} onChange={(e) => void update({ [key]: e.target.value as ProjectConfig[typeof key] })}>
+            <option value="inherit">{inherit(tr(inboxGlobals[which] ? S.onLower : S.offLower))}</option>
+            <option value="on">{tr(S.on)}</option>
+            <option value="off">{tr(S.offChoice)}</option>
+          </select>
+        )
+      }
+    }),
     {
       section: 'storage',
       key: 'storage',
       ...rowText('project.storage'),
       wide: true,
       render: () => <StorageView path={project.path} />
+    },
+    {
+      section: 'storage',
+      key: 'cardAttachmentCleanup',
+      ...rowText('project.cardAttachmentCleanup'),
+      modified: cfg.cardAttachmentCleanup !== CARD_CLEANUP_DEFAULT,
+      render: () => <CardCleanupSetting path={project.path} name={project.name} value={cfg.cardAttachmentCleanup} onChange={(v) => void update({ cardAttachmentCleanup: v })} />
     },
     {
       section: 'keys',
@@ -1891,40 +2005,6 @@ export function ProjectSettingsTab({ project }: { project: ProjectInfo }) {
       ...rowText('project.agents'),
       wide: true,
       render: () => <AgentList project={project} />
-    },
-    {
-      section: 'agents',
-      key: 'fileLocks',
-      ...rowText('project.fileLocks'),
-      desc: tr(S.now, { desc: rowText('project.fileLocks').desc, current: lockShown(lockMode, 'description') }),
-      modified: cfg.fileLocks !== 'inherit',
-      render: () => (
-        <select className="select" value={cfg.fileLocks} onChange={(e) => void update({ fileLocks: e.target.value as ProjectConfig['fileLocks'] })}>
-          <option value="inherit">{inherit(lockShown(settings.agents.fileLocks, 'label'))}</option>
-          {FILE_LOCK_MODES.map((m) => (
-            <option key={m.value} value={m.value}>
-              {tr(m.text.label)}
-            </option>
-          ))}
-        </select>
-      )
-    },
-    {
-      section: 'agents',
-      key: 'worktreeCopy',
-      ...rowText('project.worktreeCopy'),
-      modified: cfg.worktreeCopy !== null,
-      render: () => (
-        <DraftTextarea className="input mono" rows={3} value={cfg.worktreeCopy ?? ''} placeholder={tr(S.inheritNewline, { value: settings.agents.worktreeCopy })} onCommit={(v) => void update({ worktreeCopy: v.trim() ? v : null })} />
-      )
-    },
-    {
-      section: 'agents',
-      key: 'worktreeSetup',
-      ...rowText('project.worktreeSetup'),
-      modified: !!cfg.worktreeSetup,
-      // i18n-ignore: an example command
-      render: () => <DraftInput className="input mono" value={cfg.worktreeSetup} placeholder="npm install" onCommit={(v) => void update({ worktreeSetup: v.trim() })} />
     },
     {
       section: 'advanced',
@@ -1945,7 +2025,7 @@ export function ProjectSettingsTab({ project }: { project: ProjectInfo }) {
           className="btn subtle"
           onClick={async () => {
             if (await confirm({ title: tr(S.resetTitle), message: tr(S.resetMessage), confirmLabel: tr(S.reset) }))
-              void update({ defaultProvider: 'inherit', providers: {}, chime: 'inherit', compactSuggestTokens: null, transcriptWarnMB: null, fileLocks: 'inherit', worktreeCopy: null, worktreeSetup: '', loopWakes: true, loopRounds: null, loopWaitHours: null })
+              void update({ chime: 'inherit', suggestFreshStart: 'inherit', inboxCheckpoints: 'inherit', inboxStopContinuation: 'inherit', inboxIdleWakes: 'inherit', compactSuggestTokens: null, transcriptWarnMB: null, fileLocks: 'inherit', worktreeCopy: null, worktreeSetup: '', loopWakes: true, loopRounds: null, loopWaitHours: null, loopStepWaitMinutes: null })
           }}
         >
           <Icon name="discard" /> {tr(S.resetButton)}
@@ -1956,7 +2036,8 @@ export function ProjectSettingsTab({ project }: { project: ProjectInfo }) {
 
   const q = query.trim().toLowerCase()
   const visible = defs.filter((d) => (q ? `${d.title} ${d.desc} ${d.tip ?? ''} ${d.key}`.toLowerCase().includes(q) : d.section === section))
-  const groups = PROJECT_SECTIONS.map((s) => ({ ...s, items: visible.filter((d) => d.section === s.id) })).filter((g) => g.items.length)
+  const sections = PROJECT_SECTIONS
+  const groups = sections.map((s) => ({ ...s, items: visible.filter((d) => d.section === s.id) })).filter((g) => g.items.length)
 
   return (
     <div className="settings">
@@ -1976,7 +2057,7 @@ export function ProjectSettingsTab({ project }: { project: ProjectInfo }) {
       <HiveVcsNotice project={project} />
       <div className="settings-body">
         <div className="settings-nav">
-          {PROJECT_SECTIONS.map((s) => (
+          {sections.map((s) => (
             <div
               key={s.id}
               className={cx('row', !q && section === s.id && 'selected')}

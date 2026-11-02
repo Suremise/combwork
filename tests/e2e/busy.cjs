@@ -26,6 +26,8 @@ const check = (name, ok, extra = '') => {
 ;(async () => {
   for (const d of [userData, ws, claudeHome]) fs.rmSync(d, { recursive: true, force: true })
   fs.mkdirSync(claudeHome, { recursive: true })
+  // Every read of the agents' input recorded, for typeLine (#1560).
+  lib.logFakeInput(claudeHome)
   lib.gitProject(alpha)
   fs.mkdirSync(path.join(ws, 'beta'), { recursive: true })
   fs.writeFileSync(path.join(claudeHome, 'fake-trusted.json'), JSON.stringify([alpha.toLowerCase()]))
@@ -57,7 +59,8 @@ const check = (name, ok, extra = '') => {
   }
   const card = async (n) => (await inv('tasks:list')).find((c) => c.number === n)
   const tile = (n) => page.locator(`.task-card[data-task="${n}"]`)
-  const cardDialog = (n) => page.locator('.dialog', { has: page.locator('.dialog-header h2', { hasText: new RegExp(`^#${n}$`) }) })
+  // Its title names it alone: its key, or #n for a card with no key (HI-1661).
+  const cardDialog = (c) => lib.cardDialog(page, c.key ?? `#${c.number}`)
   const question = page.locator('.dialog', { hasText: 'Discard unsaved changes?' })
   const project = async () => (await inv('workspace:get')).projects.find((p) => p.name === 'alpha')
 
@@ -69,7 +72,7 @@ const check = (name, ok, extra = '') => {
 
   // --- Unsaved edits (#29) ---
   await tile(c1.number).click()
-  const d1 = cardDialog(c1.number)
+  const d1 = cardDialog(c1)
   await d1.waitFor({ timeout: 5000 })
   await page.keyboard.press('Escape')
   check('an unchanged card closes at once', !!(await until(async () => (await d1.count()) === 0, HUNG_MS)))
@@ -98,10 +101,10 @@ const check = (name, ok, extra = '') => {
   await d1.locator('input[placeholder^="Cards to finish first"]').fill('#999')
   await d1.getByRole('button', { name: 'Save and Start…' }).click()
   check('a failed save shows the error in the dialog', !!(await until(async () => /no card #999/.test(await d1.locator('.dialog-error').innerText().catch(() => '')), 5000)))
-  check('and starts nothing', (await page.locator('.dialog', { hasText: `Start #${c1.number}` }).count()) === 0 && (await card(c1.number)).description === 'Old description.')
+  check('and starts nothing', (await page.locator('.dialog', { hasText: `Start ${c1.key ?? `#${c1.number}`}` }).count()) === 0 && (await card(c1.number)).description === 'Old description.')
   await d1.locator('input[placeholder^="Cards to finish first"]').fill('')
   await d1.getByRole('button', { name: 'Save and Start…' }).click()
-  const startDialog = page.locator('.dialog', { hasText: `Start #${c1.number}` })
+  const startDialog = page.locator('.dialog', { hasText: `Start ${c1.key ?? `#${c1.number}`}` })
   check('Save and Start saves, then asks which agent', !!(await until(async () => (await startDialog.count()) === 1, 5000)) && (await card(c1.number)).description.startsWith('EDITED'))
 
   // --- Start is busy (#34): spinner, can't close, runs once ---
@@ -129,7 +132,7 @@ const check = (name, ok, extra = '') => {
 
   // --- Comment: posted once, Save with a draft keeps it ---
   await tile(c2.number).click()
-  const d2 = cardDialog(c2.number)
+  const d2 = cardDialog(c2)
   await d2.waitFor({ timeout: 5000 })
   await d2.locator('.task-comment-new textarea').fill('A comment draft')
   await page.keyboard.press('Escape')
@@ -144,7 +147,7 @@ const check = (name, ok, extra = '') => {
 
   // --- Delete: the question stays with a spinner until it's done ---
   await d2.getByRole('button', { name: 'Delete' }).click()
-  const del = page.locator('.dialog', { hasText: `Delete #${c2.number}?` })
+  const del = page.locator('.dialog', { hasText: `Delete ${c2.key ?? `#${c2.number}`}?` })
   await del.waitFor({ timeout: 3000 })
   await del.locator('.dialog-footer button').last().click()
   check('Delete shows Deleting…', !!(await until(async () => /Deleting…/.test(await del.innerText().catch(() => '')), HUNG_MS)))
@@ -169,9 +172,8 @@ const check = (name, ok, extra = '') => {
   const live = async () => (await inv('session:live')).find((s) => s.agentId === agent.id)
   // One typed exchange, so the conversation has usage to show: 30 in context (its 20 input and 10 output).
   await until(async () => ['ready', 'finished'].includes((await live())?.status), 15000)
-  await inv('pty:write', lib.ptyKey(alpha, agent.id), 'hello')
-  await lib.sleep(300)
-  await inv('pty:write', lib.ptyKey(alpha, agent.id), String.fromCharCode(13))
+  // Typed again if a wake of Hive's disturbed it (lib.typeLine, #1560).
+  await lib.typeLine(inv, lib.ptyKey(alpha, agent.id), claudeHome, null, 'hello', { live })
   check('the first conversation shows its usage', !!(await until(async () => /\bctx 30\b/.test(await footer.innerText().catch(() => '')), 15000)), await footer.innerText().catch(() => ''))
   const first = (await live())?.sessionId
   // Its usage is now slow to read: a new conversation shows a placeholder, never the old one's numbers.

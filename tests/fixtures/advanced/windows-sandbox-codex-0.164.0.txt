@@ -1,0 +1,17 @@
+Codex 0.164.0's values for windows.sandbox (HI-1893): its source at rust-v0.164.0 = 6aaac694803004a63c6f393d153c96d22521a6b9,
+codex-rs/config/src/types.rs lines 186-199 (kebab-case in config.toml and -c: "elevated", "unelevated", "mxc"). Not a run of Codex.
+
+#[serde(rename_all = "kebab-case")]
+pub enum WindowsSandboxModeToml {
+    Elevated,
+    Unelevated,
+    Mxc,
+}
+
+#[derive(Serialize, Deserialize, Debug, Clone, Default, PartialEq, Eq, JsonSchema)]
+#[schemars(deny_unknown_fields)]
+pub struct WindowsToml {
+    pub sandbox: Option<WindowsSandboxModeToml>,
+    /// False blocks both explicit MXC configuration and automatic selection.
+    pub allow_mxc: Option<bool>,
+}

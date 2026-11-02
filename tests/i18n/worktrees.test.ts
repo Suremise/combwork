@@ -4,7 +4,7 @@
 // Agent API (`notReused`) and data for the window (`notReusedText`). Reasons and a merge's errors only the window reads
 // (a check, a removal, a merge) are in its language.
 import { execFileSync } from 'child_process'
-import { mkdirSync, readFileSync, writeFileSync } from 'fs'
+import { mkdirSync, readFileSync, rmSync, writeFileSync } from 'fs'
 import { join, resolve } from 'path'
 import { afterAll, afterEach, beforeAll, describe, expect, it } from 'vitest'
 import * as electron from 'electron'
@@ -14,13 +14,12 @@ const base = tempDir('hive-i18n-worktrees-')
 ;(electron.app as unknown as { getPath: () => string }).getPath = () => join(base, 'profile')
 
 const { setLanguage } = await import('../../src/shared/i18n')
-const { englishText, shownText } = await import('../../src/shared/advanced')
 const { createWorkspaceService, disposeWorkspaceService, inWorkspace } = await import('../../src/main/workspace')
 const wt = await import('../../src/main/worktrees')
 const agents = await import('../../src/main/projectAgents')
-const { recreateWorktree, unlinkMissingWorktree } = await import('../../src/main/agentWorktree')
+const { PruneBlocked, recreateWorktree, unlinkMissingWorktree } = await import('../../src/main/agentWorktree')
 const { shownError, windowError } = await import('../../src/main/hiveError')
-const { addedForAgents, apiErrorReply } = await import('../../src/main/servers')
+const { apiErrorReply } = await import('../../src/main/servers')
 
 const ROOT = resolve(__dirname, '../..')
 const EN = JSON.parse(readFileSync(join(ROOT, 'locales/en/worktrees.json'), 'utf8')) as Record<string, { defaultMessage: string; description: string }>
@@ -95,12 +94,13 @@ describe("agents' and worktrees' refusals: English for agents as before, the win
     const notRepo = tempDir('hive-not-a-repo-')
     const cases: [Error, string | RegExp, number, string | RegExp | null][] = [
       [await caught(run(() => agents.addAgent(proj, { name: 'P', location: 'project', provider: 'nope' }))), 'Unknown provider "nope".', 400, 'Unbekannter Anbieter „nope“.'],
-      [await caught(run(() => agents.addAgent(proj, { name: 'Q', location: 'existing-worktree' }))), 'Choose a worktree.', 500, 'Wähle einen Worktree.'],
-      [await caught(run(() => agents.addAgent(proj, { name: 'R', location: 'existing-worktree', worktreePath: notRepo }))), 'That folder is not a worktree of this project.', 500, null],
+      // 1.0 (#1451): no agent is pinned to a worktree, new or existing.
+      [await caught(run(() => agents.addAgent(proj, { name: 'Q', location: 'existing-worktree', worktreePath: notRepo }))), 'Agents aren’t pinned to worktrees in 1.0: slots are lent per card or lane.', 400, null],
+      [await caught(run(() => agents.addAgent(proj, { name: 'R', location: 'new-worktree' }))), 'Agents aren’t pinned to worktrees in 1.0: slots are lent per card or lane.', 400, null],
       [await caught(run(() => agents.moveAgent(proj, 'nope', 0))), 'That agent no longer exists.', 404, 'Diesen Agenten gibt es nicht mehr.'],
       [await caught(run(() => agents.moveAgent(proj, 'a1', Number.NaN))), 'Choose where to move the agent.', 500, null],
-      [await caught(run(() => agents.updateAgent(proj, 'a1', { name: ' ' }))), 'Enter a name.', 500, 'Gib einen Namen ein.'],
-      [await caught(run(() => agents.updateAgent(proj, 'a1', { role: 'x'.repeat(200) }))), /^A role is at most \d+ characters\.$/, 500, /^Eine Rolle hat höchstens \d+ Zeichen\.$/],
+      [await caught(run(() => agents.updateAgent(proj, 'a1', { name: ' ' }))), 'Enter a name.', 400, 'Gib einen Namen ein.'],
+      [await caught(run(() => agents.updateAgent(proj, 'a1', { role: 'x'.repeat(200) }))), /^A role is at most \d+ characters\.$/, 400, /^Eine Rolle hat höchstens \d+ Zeichen\.$/],
       [await caught(run(() => agents.branchStatus(proj, 'a1'))), 'This agent works in the project folder, not a worktree.', 500, 'Dieser Agent arbeitet im Projektordner, nicht in einem Worktree.'],
       [await caught(wt.uniqueBranch(proj, 'main/x')), "Git can't make the branch main/x: a branch main is in the way. Choose another branch.", 500, 'Git kann den Branch main/x nicht anlegen: der Branch main ist im Weg.'],
       [await caught(wt.createWorktree(proj, join(treesRoot, 'bad'), 'bad..name', 'main')), '"bad..name" is not a valid branch name.', 500, '„bad..name“ ist kein gültiger Branch-Name.'],
@@ -112,7 +112,8 @@ describe("agents' and worktrees' refusals: English for agents as before, the win
       expect(e.message).toMatch(english)
       expect(apiErrorReply(e).body.error).toBe(e.message)
       expect(apiErrorReply(e).status, e.message).toBe(status)
-      expect(apiErrorReply(new Error(e.message)).status, `${e.message}: the status its English always gave`).toBe(status)
+      // Except the refusals HI-1952 gave a kind, which answered 500 (no pattern matched their English): now 400.
+      if (!/^(Enter a name\.|A role is at most)/.test(e.message)) expect(apiErrorReply(new Error(e.message)).status, `${e.message}: the status its English always gave`).toBe(status)
       // The window (IPC's conversion): in its language, or English where this test has no translation.
       expect((windowError(e) as Error).message).toMatch(german ?? english)
       expect(shownError(e)).toMatch(german ?? english)
@@ -132,19 +133,13 @@ describe("agents' and worktrees' refusals: English for agents as before, the win
 })
 
 describe('an unused worktree not reused: English for the Agent API, data for the window', () => {
-  it("says why in English (notReused), and the window says it in its language, the Add Agent dialog's look too", async () => {
+  it("the Add Agent dialog's look says why in the window's language (1.0 adds no agent in one: #1451), and so does a removal", async () => {
     setLanguage('de', GERMAN)
     const t = { path: join(treesRoot, 'b1'), branch: 'hive/b1' }
     await wt.createWorktree(proj, t.path, t.branch, 'main')
     commit(t.path, 'ahead.txt')
     const look = await run(() => agents.worktreeMatch(proj, 'hive/b1', 'main', 'B1'))
     expect(look).toMatchObject({ branch: 'hive/b1', reusable: false, why: '1 Commit nicht in main gemergt' })
-    const def = await run(() => agents.addAgent(proj, { name: 'B1', location: 'new-worktree', reuseWorktree: true }))
-    expect(def.reuse).toMatchObject({ branch: 'hive/b1', reused: false, base: 'main', notReused: '1 commit not merged into main' })
-    expect(englishText(def.reuse!.notReusedText!)).toBe('1 commit not merged into main')
-    expect(shownText(def.reuse!.notReusedText!)).toBe('1 Commit nicht in main gemergt')
-    // The Agent API's reply leaves the window's text out.
-    expect(addedForAgents(def).reuse).toEqual({ branch: 'hive/b1', reused: false, base: 'main', notReused: '1 commit not merged into main' })
 
     // Removing that worktree is the window's: why it is kept, in its language (unmerged commits, and a file now too).
     writeFileSync(join(t.path, 'dirty.txt'), 'x')
@@ -152,6 +147,33 @@ describe('an unused worktree not reused: English for the Agent API, data for the
     expect(check).toMatchObject({ removable: false, ahead: 1, dirty: 1, reason: '1 Commit nicht in main gemergt und 1 nicht committete Datei' })
     setLanguage('en', {})
     expect((await wt.worktreeCheck(proj, { ...t, base: 'main' })).reason).toBe('1 commit not merged into main and 1 uncommitted file')
+  })
+
+  it("a recreate git's prune refuses carries the worktrees git named, not those Hive thinks missing (#1313)", async () => {
+    // Third's folder is gone (to recreate); Second, missing to Hive, has no git registration left; an unmanaged worktree
+    // made outside Hive lost its folder: only that one is what git's prune would forget.
+    const third = join(treesRoot, 'third')
+    const ext = join(base, 'external-blocker')
+    await wt.createWorktree(proj, third, 'hive/third', 'main')
+    git(proj, 'worktree', 'add', '-q', '-b', 'ext', ext)
+    const before = await run(() => w.projectConfig(proj))
+    await run(() =>
+      w.mutateProjectConfig(proj, (c) => ({
+        agents: [...(c.agents ?? []), { id: 'a2', name: 'Second', worktree: { path: join(treesRoot, 'second'), branch: 'hive/second', base: 'main' } }, { id: 'a3', name: 'Third', worktree: { path: third, branch: 'hive/third', base: 'main' } }]
+      }))
+    )
+    try {
+      rmSync(third, { recursive: true, force: true })
+      rmSync(ext, { recursive: true, force: true })
+      const e = await caught(run(() => recreateWorktree(proj, 'a3')))
+      expect(e).toBeInstanceOf(PruneBlocked)
+      expect((e as InstanceType<typeof PruneBlocked>).blockers.map((p) => p.toLowerCase())).toEqual([ext.toLowerCase()])
+      expect(e.message).toMatch(/which would also drop git's link to .*external-blocker \(missing too\)\. Locate, recreate or remove that worktree first\./)
+    } finally {
+      await run(() => w.mutateProjectConfig(proj, () => ({ agents: before.agents })))
+      git(proj, 'worktree', 'prune')
+      git(proj, 'branch', '-D', 'ext', 'hive/third')
+    }
   })
 
   it("a merge's errors are the window's, in its language", async () => {

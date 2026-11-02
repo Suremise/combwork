@@ -176,6 +176,19 @@ export const USAGE_MIGRATIONS: Migration[] = [
           PRIMARY KEY (scope, key)
         ) STRICT, WITHOUT ROWID;
       `)
+  },
+  {
+    version: 2,
+    name: 'usage-reports-ignored',
+    // A session that ran on a server connection (HI-1772): its CLI's cost reports never counted. Set once, never cleared.
+    up: (db) => db.exec('ALTER TABLE usage_sessions ADD COLUMN reports_ignored INTEGER NOT NULL DEFAULT 0') // i18n-ignore: SQL
+  },
+  {
+    version: 3,
+    name: 'usage-cost-free',
+    // Free (HI-1772, Darren 27 Oct): a session that ran only on servers on this PC. Each set once, never cleared:
+    // server_local (a run on one), not_local (a run anywhere else, which wins for good).
+    up: (db) => db.exec('ALTER TABLE usage_sessions ADD COLUMN server_local INTEGER NOT NULL DEFAULT 0; ALTER TABLE usage_sessions ADD COLUMN not_local INTEGER NOT NULL DEFAULT 0') // i18n-ignore: SQL
   }
 ]
 
@@ -203,10 +216,15 @@ export interface Cursor {
   source: string
   /** The holds its rows were shared out by (null: none recorded). */
   holdsKey: string | null
+  /** Its CLI's cost reports aren't counted (HI-1772: it ran on a server connection): set once, never cleared. */
+  reportsIgnored: boolean
+  /** A run of it was on a server on this PC; one was anywhere else (HI-1772): each set once, never cleared. */
+  serverLocal: boolean
+  notLocal: boolean
 }
 
 export function cursorOf(db: DatabaseSync, scope: string, session: string): Cursor | null {
-  const s = db.prepare('SELECT path, size, mtime, offset, state, state_offset, state_shape, state_version, state_check, state_at, source, holds_key FROM usage_sessions WHERE scope = ? AND session = ?').get(scope, session) as Record<string, unknown> | undefined // i18n-ignore: SQL
+  const s = db.prepare('SELECT path, size, mtime, offset, state, state_offset, state_shape, state_version, state_check, state_at, source, holds_key, reports_ignored, server_local, not_local FROM usage_sessions WHERE scope = ? AND session = ?').get(scope, session) as Record<string, unknown> | undefined // i18n-ignore: SQL
   if (!s) return null
   const sums = db.prepare('SELECT coalesce(sum(requests), 0) AS q, coalesce(sum(input + output + cache_write + cache_read), 0) AS t FROM usage_rows WHERE scope = ? AND session = ?').get(scope, session) as { q: number; t: number } // i18n-ignore: SQL
   return {
@@ -223,8 +241,17 @@ export function cursorOf(db: DatabaseSync, scope: string, session: string): Curs
     requests: sums.q,
     tokens: sums.t,
     source: s.source as string,
-    holdsKey: (s.holds_key as string | null) ?? null
+    holdsKey: (s.holds_key as string | null) ?? null,
+    reportsIgnored: s.reports_ignored === 1,
+    serverLocal: s.server_local === 1,
+    notLocal: s.not_local === 1
   }
+}
+
+/** A session's locality facts set (HI-1772): each only ever set, never cleared; nothing else of it changed. */
+export function markLocality(db: DatabaseSync, scope: string, session: string, o: { serverLocal: boolean; notLocal: boolean }): void {
+  if (o.serverLocal) db.prepare('UPDATE usage_sessions SET server_local = 1 WHERE scope = ? AND session = ?').run(scope, session) // i18n-ignore: SQL
+  if (o.notLocal) db.prepare('UPDATE usage_sessions SET not_local = 1 WHERE scope = ? AND session = ?').run(scope, session) // i18n-ignore: SQL
 }
 
 /** Who a session was, as its record has it. */
@@ -257,6 +284,11 @@ export interface SessionWrite extends SessionMeta {
   rows: LedgerRow[]
   /** Its baseline, when it changed (null: as it is). */
   baseline: BaselineDay[] | null
+  /** Written without its CLI's cost reports (HI-1772): the session is marked so for good. */
+  reportsIgnored?: boolean
+  /** A run on a server on this PC, or anywhere else (HI-1772): each marks the session for good. */
+  serverLocal?: boolean
+  notLocal?: boolean
 }
 
 /**
@@ -292,6 +324,10 @@ export function writeSession(db: DatabaseSync, w: SessionWrite, expect: { offset
       s.title, s.customTitle ?? null, s.model, s.cliVersion, s.reasoningTokens ?? 0, s.contextTokens ?? 0, s.contextInputTokens ?? null, s.lastOutputTokens ?? null, s.contextWindow ?? null,
       s.cacheTtlSeconds ?? 0, s.firstActivity, s.lastActivity, s.userMessages ?? 0, s.lastPrompt, premiumOf(s), w.timeline ? w.timeline.step : null, at
     )
+    // One way (HI-1772): a write that ignores the CLI's cost reports marks the session so; none ever unmarks it.
+    if (w.reportsIgnored) db.prepare('UPDATE usage_sessions SET reports_ignored = 1 WHERE scope = ? AND session = ?').run(w.scope, w.session) // i18n-ignore: SQL
+    if (w.serverLocal) db.prepare('UPDATE usage_sessions SET server_local = 1 WHERE scope = ? AND session = ?').run(w.scope, w.session) // i18n-ignore: SQL
+    if (w.notLocal) db.prepare('UPDATE usage_sessions SET not_local = 1 WHERE scope = ? AND session = ?').run(w.scope, w.session) // i18n-ignore: SQL
     if (w.state === 'clear') clearState(db, w.scope, w.session)
     else if (w.state) db.prepare('UPDATE usage_sessions SET state = ?, state_offset = ?, state_shape = ?, state_version = ?, state_check = ?, state_at = ? WHERE scope = ? AND session = ?').run(w.state.data, w.state.offset, w.state.shape, w.state.version, w.state.check, at, w.scope, w.session) // i18n-ignore: SQL
     return true
@@ -446,13 +482,15 @@ const placeholders = (n: number): string => Array.from({ length: n }, () => '?')
 const keyOf = (r: Rec): string => `${r.scope as string}\0${r.session as string}`
 
 /** Rows of a table for some scopes (all: null) or one session, grouped by session in their order. */
-function grouped<T>(db: DatabaseSync, table: string, where: { scopes: string[] | null } | { scope: string; session: string }, order: string, map: (r: Rec) => T): Map<string, T[]> {
+function grouped<T>(db: DatabaseSync, table: string, where: { scopes: string[] | null } | { scope: string; session: string } | { scope: string; sessions: string[] }, order: string, map: (r: Rec) => T): Map<string, T[]> {
   const [sql, args] =
-    'session' in where
-      ? [`WHERE scope = ? AND session = ?`, [where.scope, where.session]] // i18n-ignore: SQL
-      : where.scopes
-        ? [`WHERE scope IN (${placeholders(where.scopes.length)})`, where.scopes] // i18n-ignore: SQL
-        : ['', []]
+    'sessions' in where
+      ? [`WHERE scope = ? AND session IN (${placeholders(where.sessions.length)})`, [where.scope, ...where.sessions]] // i18n-ignore: SQL
+      : 'session' in where
+        ? [`WHERE scope = ? AND session = ?`, [where.scope, where.session]] // i18n-ignore: SQL
+        : where.scopes
+          ? [`WHERE scope IN (${placeholders(where.scopes.length)})`, where.scopes] // i18n-ignore: SQL
+          : ['', []]
   const out = new Map<string, T[]>()
   for (const r of db.prepare(`SELECT * FROM ${table} ${sql} ORDER BY scope, session, ${order}`).all(...args) as Rec[]) { // i18n-ignore: SQL
     const k = keyOf(r)
@@ -496,7 +534,9 @@ function summaryOf(s: Rec, compactions: CompactionEvent[], guards: Rec[]): Usage
     lastPrompt: (s.last_prompt as string | null) ?? null,
     ...(Object.keys(stops).length ? { safeguards: stops } : {}),
     ...(Object.keys(asked).length ? { safeguardsAsked: asked } : {}),
-    ...(premium !== null ? { premiumRequests: premium } : {})
+    ...(premium !== null ? { premiumRequests: premium } : {}),
+    // Free (HI-1772): it ran only on servers on this PC.
+    ...(s.server_local === 1 && s.not_local !== 1 ? { costFree: true as const } : {})
   } as UsageSummary
 }
 
@@ -544,18 +584,86 @@ export function cardRows(db: DatabaseSync, cards: number[]): (SessionMeta & { ro
   return rows.map((r) => ({ ...metaOf(r), row: rowOf(r) }))
 }
 
-/** Sessions of a scope with their timelines (for spans of time no card has: a lane's), who each was and its summary. */
-export function storedTimelines(db: DatabaseSync, scope: string): (SessionMeta & { summary: UsageSummary; timeline: UsageTimeline | null; firstActivity: string | null; lastActivity: string | null })[] {
-  const where = { scopes: [scope] }
+/**
+ * Sessions of a scope with their timelines (for spans of time no card has: a lane's), who each was and its summary; only
+ * those named in `sessions` when given (HI-1906: a card's, by its ledger rows, not every session of the scope).
+ */
+export function storedTimelines(db: DatabaseSync, scope: string, sessions?: string[]): (SessionMeta & { summary: UsageSummary; timeline: UsageTimeline | null; firstActivity: string | null; lastActivity: string | null })[] {
+  if (sessions && !sessions.length) return []
+  const where = sessions ? { scope, sessions } : { scopes: [scope] }
   const rows = grouped(db, 'usage_timeline', where, 'seq', (r) => r)
   const charges = grouped(db, 'usage_charges', where, 'seq', (r) => r.usd as number)
   const compactions = grouped(db, 'usage_compactions', where, 'seq', compactionOf)
   const guards = grouped(db, 'usage_safeguards', where, 'kind, key', (r) => r)
-  return (db.prepare('SELECT * FROM usage_sessions WHERE scope = ?').all(scope) as Rec[]).map((s) => { // i18n-ignore: SQL
+  const list = sessions ? db.prepare(`SELECT * FROM usage_sessions WHERE scope = ? AND session IN (${placeholders(sessions.length)})`).all(scope, ...sessions) : db.prepare('SELECT * FROM usage_sessions WHERE scope = ?').all(scope) // i18n-ignore: SQL
+  return (list as Rec[]).map((s) => {
     const k = keyOf(s)
     const summary = summaryOf(s, compactions.get(k) ?? [], guards.get(k) ?? [])
     return { ...metaOf(s), summary, timeline: timelineOf((s.timeline_step as number | null) ?? null, rows.get(k) ?? [], charges.get(k) ?? []), firstActivity: summary.firstActivity, lastActivity: summary.lastActivity }
   })
+}
+
+// ---------------------------------------------------------------------------
+// The roll-up of old sessions' timelines (HI-1648), and the space it frees given back.
+// ---------------------------------------------------------------------------
+
+/**
+ * The sessions whose timeline is finer than `step` and whose last activity is before `before` (an ISO time), oldest
+ * first, at most `limit`: what a roll-up merges into `step`s. A session with no last activity, or one that isn't a time,
+ * is left alone (when it ran can't be told).
+ */
+export function rollUpCandidates(db: DatabaseSync, before: string, step: number, limit: number): { scope: string; session: string }[] {
+  return db.prepare('SELECT scope, session FROM usage_sessions WHERE timeline_step IS NOT NULL AND timeline_step < ? AND julianday(last_activity) < julianday(?) ORDER BY julianday(last_activity) LIMIT ?').all(step, before, limit) as { scope: string; session: string }[] // i18n-ignore: SQL
+}
+
+/**
+ * One session's timeline merged into steps of `step` (`merge`: shared/usageTimeline.ts coarsenTimeline), in a
+ * transaction of its own, so a close midway leaves it rolled up or as it was. Checked again inside it, as the session is
+ * then: still finer than `step` and last active before `before` (a resumed session is left alone). Its rows before and
+ * after; null when it was left alone.
+ */
+export function rollUpSession(db: DatabaseSync, scope: string, session: string, before: string, step: number, merge: (t: UsageTimeline) => UsageTimeline): { rows: number; merged: number } | null {
+  return transaction(db, () => {
+    // Old as rollUpCandidates tells it (julianday), so a session it picks is never refused here for how its time is written.
+    const s = db.prepare('SELECT timeline_step, coalesce(julianday(last_activity) < julianday(?), 0) AS old FROM usage_sessions WHERE scope = ? AND session = ?').get(before, scope, session) as { timeline_step: number | null; old: number } | undefined // i18n-ignore: SQL
+    if (!s || s.timeline_step === null || s.timeline_step >= step || !s.old) return null
+    const where = { scope, session }
+    const k = `${scope}\0${session}`
+    const t = timelineOf(s.timeline_step, grouped(db, 'usage_timeline', where, 'seq', (r) => r).get(k) ?? [], grouped(db, 'usage_charges', where, 'seq', (r) => r.usd as number).get(k) ?? [])
+    if (!t) return null
+    const merged = merge(t)
+    db.prepare('DELETE FROM usage_timeline WHERE scope = ? AND session = ?').run(scope, session) // i18n-ignore: SQL
+    db.prepare('DELETE FROM usage_charges WHERE scope = ? AND session = ?').run(scope, session) // i18n-ignore: SQL
+    putTimeline(db, scope, session, merged)
+    db.prepare('UPDATE usage_sessions SET timeline_step = ? WHERE scope = ? AND session = ?').run(merged.step, scope, session) // i18n-ignore: SQL
+    return { rows: t.rows.length, merged: merged.rows.length }
+  })
+}
+
+/** The file's size in pages and bytes, and its free pages. */
+export function fileSpace(db: DatabaseSync): { pages: number; free: number; pageSize: number } {
+  const pages = (db.prepare('PRAGMA page_count').get() as { page_count: number }).page_count // i18n-ignore: SQL
+  const free = (db.prepare('PRAGMA freelist_count').get() as { freelist_count: number }).freelist_count // i18n-ignore: SQL
+  const pageSize = (db.prepare('PRAGMA page_size').get() as { page_size: number }).page_size // i18n-ignore: SQL
+  return { pages, free, pageSize }
+}
+
+/** Whether the file gives its free pages back as it is told to (auto_vacuum incremental). */
+export const vacuumsIncrementally = (db: DatabaseSync): boolean => (db.prepare('PRAGMA auto_vacuum').get() as { auto_vacuum: number }).auto_vacuum === 2 // i18n-ignore: SQL
+
+/**
+ * Gives the file's free pages back to the disk (HI-1648). A file made before this, with auto_vacuum off, is vacuumed
+ * whole once, which turns it to incremental (the whole file written again: once); after that only its free pages go.
+ * Then the WAL is checkpointed, truncating it, so the file shrinks now rather than when Hive closes it. Whether it was
+ * the whole vacuum.
+ */
+export function giveSpaceBack(db: DatabaseSync): boolean {
+  if (db.isTransaction) throw new Error('giveSpaceBack inside a transaction') // i18n-ignore: a mistake in Hive's code, logged
+  const whole = !vacuumsIncrementally(db)
+  if (whole) db.exec('PRAGMA auto_vacuum = INCREMENTAL; VACUUM')
+  else db.exec('PRAGMA incremental_vacuum')
+  db.exec('PRAGMA wal_checkpoint(TRUNCATE)')
+  return whole
 }
 
 /** A session of a scope as a sweep and the card attribution see it: where it was read, whose it was, the holds its rows were shared out by. */

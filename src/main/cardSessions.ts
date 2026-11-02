@@ -6,7 +6,7 @@ import { agentDoingCards, agentReviewCards } from '../shared/tasks'
 import type { LiveSessionState, StoredText, TaskCard } from '../shared/types'
 import { coalesced } from './coalesce'
 import { createLogger } from './logger'
-import { allTasks, commentAsHive } from './tasks'
+import { allTasks, commentAsHive, liveCardHeads } from './tasks'
 import { workspaceFor, type WorkspaceService } from './workspace'
 
 const log = createLogger('cards')
@@ -18,7 +18,7 @@ const log = createLogger('cards')
  */
 export async function recordCards(ws: WorkspaceService, projectPath: string, agentId: string, sessionId: string, still?: () => boolean, board?: TaskCard[]): Promise<void> {
   if (ws.isAssistantHome(projectPath)) return
-  const all = board ?? (await allTasks(ws, { archived: false }))
+  const all = board ?? (await liveCardHeads(ws))
   const project = basename(projectPath)
   const cards = [
     ...agentDoingCards(all, project, agentId).map((c) => ({ number: c.number, title: c.title })),
@@ -28,7 +28,7 @@ export async function recordCards(ws: WorkspaceService, projectPath: string, age
   // Worked on and reviewed are kept apart: an agent can review a card it once worked on.
   const has = (list: { number: number; review?: true }[] | undefined, c: { number: number; review?: true }): boolean => !!list?.some((h) => h.number === c.number && !!h.review === !!c.review)
   // Most board changes add nothing (a comment, another agent's card): check before taking the file's lock.
-  const now = (await ws.sessionsFile(projectPath)).sessions.find((s) => s.id === sessionId)
+  const now = await ws.sessionRecord(projectPath, sessionId)
   if (!now || cards.every((c) => has(now.cards, c))) return
   await ws.mutateSessions(projectPath, (f) => {
     const rec = f.sessions.find((s) => s.id === sessionId)
@@ -45,7 +45,8 @@ export async function recordLiveCards(workspacePath: string, live: LiveSessionSt
   if (!ws?.path) return
   const running = live.filter((s) => s.sessionId && !s.settingUp && workspaceFor(s.projectPath) === ws)
   if (!running.length) return
-  const all = await allTasks(ws, { archived: false })
+  // The live cards' heads (HI-1690): a card's number, title, column, agent and reviewer are all a record needs.
+  const all = await liveCardHeads(ws)
   for (const s of running) {
     await recordCards(ws, s.projectPath, s.agentId, s.sessionId!, undefined, all).catch((e) => log.warn(`Could not record the cards of session ${s.sessionId}`, e))
   }

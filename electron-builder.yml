@@ -10,13 +10,18 @@ files:
   - out/**
   - package.json
   - '!**/*.map'
+  - '!out/identity/**'
 extraResources:
   - from: resources
     to: resources
+  # What the build is (#1647, scripts/appIdentity.mjs): local or a release, its version and commit.
+  - from: out/identity/build-identity.json
+    to: build-identity.json
 asarUnpack:
   - '**/node_modules/@lydell/node-pty*/**'
   - out/main/hive-mcp.js
   - out/main/hive-progress.js
+  - out/main/hive-close-runner.js
   # Code hive-mcp.js (or hive-progress.js) shares with the main process (e.g. shared/hiveGuidance.ts) is split into chunks,
   # which the CLIs load from outside the asar too.
   - out/main/chunks/**

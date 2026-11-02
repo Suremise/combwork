@@ -3,7 +3,7 @@
 // clone's push shows nothing until Fetch); Pull fast-forwards; New branch… switches to it and Push sets its upstream;
 // a branch's Switch is disabled, with why, while an agent works in the project folder; History lists the commits and
 // Create tag… tags the commit; Add remote… adds one, and a GitHub remote with a personal email warns; a project without
-// git shows the setup notes. Remotes are local bare repositories in the suite's folder (never a real remote), git's
+// git (None, #1416) says so under the header, Initialise repository… shown once Git is chosen (HI-1905). Remotes are local bare repositories in the suite's folder (never a real remote), git's
 // global config is the suite's own (GIT_CONFIG_GLOBAL), and the agent is the fake Claude Code. Dev build, throwaway
 // profile and workspace.
 const lib = require('./lib.cjs')
@@ -31,7 +31,7 @@ const shot = (page, name) => page.screenshot({ path: path.join(lib.WORK, `gitvie
   for (const d of [userData, ws, remote, other, claudeHome]) fs.rmSync(d, { recursive: true, force: true })
   // The suite's own global git config: a personal address, as most users have (the GitHub warning's case).
   fs.writeFileSync(globalConfig, '[user]\n\tname = Test User\n\temail = test.user@example.com\n[init]\n\tdefaultBranch = main\n[core]\n\tautocrlf = false\n')
-  const gitEnv = { ...lib.baseEnv(), GIT_CONFIG_GLOBAL: globalConfig }
+  const gitEnv = lib.gitEnv({ GIT_CONFIG_GLOBAL: globalConfig })
   const g = (cwd, ...a) => execFileSync('git', a, { cwd, env: gitEnv, encoding: 'utf8' }).trim()
   fs.mkdirSync(alpha, { recursive: true })
   fs.mkdirSync(path.join(ws, 'beta'), { recursive: true })
@@ -57,7 +57,7 @@ const shot = (page, name) => page.screenshot({ path: path.join(lib.WORK, `gitvie
   check('the status bar shows branch · remote · ahead/behind', !!(await lib.until(async () => (await text(item)).includes('main · origin · ↑0 ↓0'), HUNG_MS)), await text(item))
   await item.click()
   const branches = page.locator('[data-git-branches]')
-  check('it opens Git → Branches & remotes', !!(await lib.until(async () => (await branches.count()) === 1, HUNG_MS)) && (await page.locator('.tab.active', { hasText: 'Git' }).count()) === 1)
+  check('it opens Git → Branches & remotes', !!(await lib.until(async () => (await branches.count()) === 1, HUNG_MS)) && (await page.locator('.tab.active', { hasText: 'Version Control' }).count()) === 1)
   check('the current branch and its upstream', !!(await lib.until(async () => (await text(branches.locator('[data-git-head]'))) === 'main' && (await text(branches.locator('[data-git-upstream]'))).includes('origin/main · ↑0 ↓0'), HUNG_MS)))
   check("it says it's never fetched (Hive never fetches by itself)", /Never fetched\. Hive never fetches by itself/.test(await text(branches.locator('[data-git-fetched]'))), await text(branches.locator('[data-git-fetched]')))
   await shot(page, '1-branches')
@@ -118,7 +118,16 @@ const shot = (page, name) => page.screenshot({ path: path.join(lib.WORK, `gitvie
   await add.locator('#git-form-name').fill('gh')
   await add.locator('#git-form-url').fill('https://github.com/example/alpha.git')
   await add.getByRole('button', { name: 'Add', exact: true }).click()
-  check('Add remote… adds it', !!(await lib.until(async () => (await branches.locator('[data-remote="gh"]').count()) === 1, HUNG_MS)) && g(alpha, 'remote').includes('gh'))
+  const added = !!(await lib.until(async () => (await branches.locator('[data-remote="gh"]').count()) === 1, HUNG_MS)) && g(alpha, 'remote').includes('gh')
+  // HI-1854: under load it was added but never shown (a git read of the view's never answered): what was on screen, git's
+  // remotes, and whether the view's read was still under way (its reload button turning).
+  let notAdded = ''
+  if (!added) {
+    await shot(page, 'add-remote-failed')
+    const reading = (await branches.locator('[data-action="reload-branches"] .spin').count()) > 0
+    notAdded = `dialogs: ${JSON.stringify(await page.locator('.dialog').allInnerTexts())}; git remote: ${JSON.stringify(g(alpha, 'remote'))}; the view still reading: ${reading}`
+  }
+  check('Add remote… adds it', added, notAdded)
   const warning = branches.locator('[data-identity-warning]')
   check('a personal email on a GitHub remote warns', !!(await lib.until(async () => /show test\.user@example\.com to anyone/.test(await text(warning)), HUNG_MS)), await text(warning))
   check('the identity used is the global one', (await text(branches.locator('[data-identity-used="email"]'))) === 'test.user@example.com')
@@ -142,17 +151,50 @@ const shot = (page, name) => page.screenshot({ path: path.join(lib.WORK, `gitvie
   check('Create tag… tags the commit and pushes it', !!(await lib.until(async () => (await history.locator('[data-tag="v0.1"]').count()) === 1, HUNG_MS)) && g(remote, 'tag', '--list').includes('v0.1'))
   await shot(page, '4-history')
 
-  // --- Changes is still the default section's content.
+  // --- #1643: the project's work goes to release (its target), 25 commits past main, made as a terminal would.
+  let tip = g(alpha, 'rev-parse', 'main')
+  for (let i = 1; i <= 25; i++) tip = g(alpha, 'commit-tree', `${tip}^{tree}`, '-p', tip, '-m', `release work ${i}`)
+  g(alpha, 'branch', 'release', tip)
+  await inv('workflow:setOptions', alpha, { preset: null, options: { target: 'release' } })
+  await history.locator('[data-action="reload-history"]').click()
+  const onPage = async (ref, page_, n) => (await history.getAttribute('data-history-ref')) === ref && (await history.getAttribute('data-history-page')) === String(page_) && (await history.locator('.git-commit').count()) === n
+  check('History opens on the target, release, 20 commits a page', !!(await lib.until(() => onPage('refs/heads/release', 1, 20), HUNG_MS)) && (await text(history.locator('.git-commit').first())).includes('release work 25') && /Page 1 of 2/.test(await text(history.locator('.table-paging'))), await text(history.locator('h2').first()))
+  check('…its picker names it the target, and lists main and origin’s', (await history.locator('[data-history-branch] option:checked').innerText()) === 'release · target' && (await history.locator('[data-history-branch] option[value="refs/heads/main"]').innerText()) === 'main · project folder' && (await history.locator('[data-history-branch] option[value="refs/remotes/origin/main"]').count()) === 1)
+  for (const t of ['dark', 'light']) {
+    await inv('settings:update', { appearance: { theme: t } })
+    await lib.until(() => page.evaluate((x) => document.documentElement.dataset.theme === x, t), HUNG_MS)
+    await page.mouse.move(5, 5)
+    // The earlier notices closed, and the pager in view: the page as it shows.
+    for (const close of await page.locator('.toast .toast-close, .toast button[aria-label="Close"]').all()) await close.click().catch(() => undefined)
+    await lib.until(async () => (await page.locator('.toast').count()) === 0, HUNG_MS)
+    await history.locator('[data-history-branch]').scrollIntoViewIfNeeded()
+    await page.screenshot({ path: path.join(lib.WORK, `gitview-5-history-target-${t}.png`) })
+    await history.locator('.table-paging').scrollIntoViewIfNeeded()
+    await page.screenshot({ path: path.join(lib.WORK, `gitview-6-history-pager-${t}.png`) })
+  }
+  await inv('settings:update', { appearance: { theme: 'dark' } })
+  await history.getByRole('button', { name: 'Next page', exact: true }).click()
+  check('Next page: the older commits, back to the first', !!(await lib.until(() => onPage('refs/heads/release', 2, 7), HUNG_MS)) && (await text(history.locator('.git-commit').last())).includes('first commit'), await text(history))
+  await history.locator('[data-history-branch]').selectOption('refs/heads/main')
+  check('the picker shows main: its own commits, from its first page', !!(await lib.until(() => onPage('refs/heads/main', 1, 2), HUNG_MS)) && (await history.locator('.table-paging').count()) === 0)
+
+  // --- Changes: with a target set (release, above), it opens on the target compared with main (HI-1824); the project
+  // folder in its picker shows the working tree.
   await page.locator('.git-sections button', { hasText: 'Changes' }).click()
-  check('Changes shows the working tree', !!(await lib.until(async () => (await page.locator('.split-list .pane-header', { hasText: 'Changes' }).count()) === 1, HUNG_MS)))
+  const comparing = page.locator('[data-compare-page]')
+  check('Changes opens on the target compared with main', !!(await lib.until(async () => (await comparing.count()) === 1 && (await comparing.getAttribute('data-compare-base')) === 'main' && (await comparing.getAttribute('data-compare-head')) === 'release', HUNG_MS)))
+  await page.locator('select.changes-picker').selectOption('')
+  check('its project folder shows the working tree', !!(await lib.until(async () => (await page.locator('.split-list .pane-header', { hasText: 'Changes' }).count()) === 1, HUNG_MS)))
 
   // --- A project without git.
   await page.getByText('beta', { exact: true }).first().click()
-  await page.locator('.tabs .tab', { hasText: 'Git' }).click()
-  const notes = page.locator('[data-git-setup]')
-  check('a project without git says so, with the setup notes and Initialise repository…', !!(await lib.until(async () => /beta isn't a git repository/.test(await text(notes)) && (await notes.locator('[data-git-init]').count()) === 1, HUNG_MS)), await text(notes))
+  await page.locator('.tabs .tab', { hasText: 'Version Control' }).click()
+  const notes = page.locator('[data-vc-init]')
+  check('a project without git (None) says so, with only Workflow and no Initialise repository… (HI-1905: Git’s)', !!(await lib.until(async () => /has no version control/.test(await text(page.locator('[data-vc-fact]'))) && JSON.stringify(await page.locator('.git-sections [role="tab"]').evaluateAll((b) => b.map((x) => x.getAttribute('data-section')))) === '["workflow"]', HUNG_MS)) && (await notes.count()) === 0, await text(page.locator('.vc-view')))
   check('and has no status bar item', (await item.count()) === 0)
   await shot(page, '5-no-git')
+  await page.locator('[data-vc-head] [data-platform="git"]').click()
+  check('Git chosen there: Initialise repository…', !!(await lib.until(async () => (await notes.locator('[data-git-init]').count()) === 1, HUNG_MS)), await text(page.locator('.vc-view')))
 
   await app.close()
   console.log(failed ? `${failed} check(s) failed` : 'all checks passed')

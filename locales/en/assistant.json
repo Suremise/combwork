@@ -1,4 +1,80 @@
 {
+  "assistant.banner.connectionSetup": {
+    "defaultMessage": "No {cli} account is on in this workspace, so the Assistant can't start. Add one and sign it in.",
+    "description": "Banner in the Assistant panel when its coding agent CLI ({cli}: \"Claude Code\") has no account (a sign-in or server) on in the workspace (HI-1774; HI-2108): it can't start until one is."
+  },
+  "assistant.chooseConnections.agent": {
+    "defaultMessage": "Agent",
+    "description": "Choose Connections' table (HI-2109): the column of the project's agents."
+  },
+  "assistant.chooseConnections.next": {
+    "defaultMessage": "After",
+    "description": "Choose Connections' table (HI-2109): the connection each agent gets with the choices below (the same as Now when kept)."
+  },
+  "assistant.chooseConnections.now": {
+    "defaultMessage": "Now",
+    "description": "Choose Connections' table (HI-2109): the connection each agent has now."
+  },
+  "assistant.chooseConnections.otherCli": {
+    "defaultMessage": "{agent} runs: another coding agent’s connection only while it is stopped",
+    "description": "Why a connection is greyed out in Choose Connections (HI-2109): the agent ({agent}) is running and that connection is another coding agent CLI's (its conversations stay with its CLI)."
+  },
+  "assistant.chooseConnections.role": {
+    "defaultMessage": "Role",
+    "description": "Choose Connections' table (HI-2109): each agent's role in the workflow (glossary: workflow role)."
+  },
+  "assistant.chooseConnections.running": {
+    "defaultMessage": "running",
+    "description": "Choose Connections' table (HI-2109), under a running agent's name: it runs now (it keeps its old connection until it restarts). Lower case."
+  },
+  "assistant.hiveTemplates.pair": {
+    "defaultMessage": "Pair",
+    "description": "Name of one of Hive's own agent templates: a builder and a reviewer. Like the preset Pair."
+  },
+  "assistant.hiveTemplates.pairOne": {
+    "defaultMessage": "Pair: one provider",
+    "description": "Name of one of Hive's own agent templates: a builder and a reviewer on the same coding agent (provider: Claude Code, Codex…)."
+  },
+  "assistant.hiveTemplates.pairOneText": {
+    "defaultMessage": "A builder and a reviewer, both Claude Code: for when only one coding agent is installed.",
+    "description": "Description of Hive's template Pair: one provider (glossary: builder, reviewer)."
+  },
+  "assistant.hiveTemplates.pairText": {
+    "defaultMessage": "A builder (Claude Code) and a reviewer (Codex) that reviews its cards.",
+    "description": "Description of Hive's template Pair (glossary: builder, reviewer)."
+  },
+  "assistant.hiveTemplates.solo": {
+    "defaultMessage": "Solo",
+    "description": "Name of one of Hive's own agent templates: one builder (glossary: builder). Like the preset Solo."
+  },
+  "assistant.hiveTemplates.soloText": {
+    "defaultMessage": "One builder (Claude Code), working alone.",
+    "description": "Description of Hive's template Solo (glossary: builder)."
+  },
+  "assistant.hiveTemplates.team3": {
+    "defaultMessage": "Team 3×3",
+    "description": "Name of one of Hive's own agent templates: three builders and three reviewers. Keep 3×3."
+  },
+  "assistant.hiveTemplates.team3Text": {
+    "defaultMessage": "Three builders (Claude Code), each with its own reviewer (Codex).",
+    "description": "Description of Hive's template Team 3×3 (glossary: builder, reviewer)."
+  },
+  "assistant.hiveTemplates.team6": {
+    "defaultMessage": "Team 6×6",
+    "description": "Name of one of Hive's own agent templates: six builders and six reviewers. Keep 6×6."
+  },
+  "assistant.hiveTemplates.team6Pool": {
+    "defaultMessage": "Team 6 + pool",
+    "description": "Name of one of Hive's own agent templates: six builders and a shared pool of reviewers."
+  },
+  "assistant.hiveTemplates.team6PoolText": {
+    "defaultMessage": "Six builders (Claude Code) and two reviewers (Codex) shared by all of them.",
+    "description": "Description of Hive's template Team 6 + pool (glossary: builder, reviewer)."
+  },
+  "assistant.hiveTemplates.team6Text": {
+    "defaultMessage": "Six builders (Claude Code), each with its own reviewer (Codex), on two pages.",
+    "description": "Description of Hive's template Team 6×6 (glossary: builder, reviewer)."
+  },
   "assistant.journal.allKinds": {
     "defaultMessage": "All kinds",
     "description": "The journal browser's kind filter: every kind of entry."
@@ -10,6 +86,50 @@
   "assistant.journal.allSources": {
     "defaultMessage": "Hive and the Assistant",
     "description": "The journal browser's source filter: entries written by either."
+  },
+  "assistant.journal.build.built": {
+    "defaultMessage": "Built Hive {version} ({kind}) from {commit} on {branch}",
+    "description": "A journal entry Hive writes when Hive itself is built from its source code: {version} its version (1.0.0-rc.1), {kind} what kind of build (baseline, release candidate…), {commit} the commit's short id, {branch} the git branch."
+  },
+  "assistant.journal.build.builtAt": {
+    "defaultMessage": "Built: {when}",
+    "description": "In a journal entry for a build of Hive: when it was built ({when}, a date and time)."
+  },
+  "assistant.journal.build.builtDetached": {
+    "defaultMessage": "Built Hive {version} ({kind}) from {commit}",
+    "description": "As \"Built Hive {version} ({kind}) from {commit} on {branch}\", for a build made from no branch."
+  },
+  "assistant.journal.build.installer": {
+    "defaultMessage": "Installer: {path}",
+    "description": "In a journal entry for a build of Hive: where its installer file is ({path}, a folder path on this computer)."
+  },
+  "assistant.journal.build.kind.baseline": {
+    "defaultMessage": "baseline",
+    "description": "A kind of build of Hive itself: the 1.0 build installed for daily use before any release, in a journal line such as \"Built Hive 1.0.0-rc.1 (baseline) from 1fef5341 on 1.0.0\"."
+  },
+  "assistant.journal.build.kind.beta": {
+    "defaultMessage": "beta",
+    "description": "A kind of build of Hive itself, in a journal line such as \"Built Hive 1.0.0-beta.1 (beta) from 1fef5341 on main\"."
+  },
+  "assistant.journal.build.kind.rc": {
+    "defaultMessage": "release candidate",
+    "description": "A kind of build of Hive itself, in a journal line such as \"Built Hive 1.0.0-rc.2 (release candidate) from 1fef5341 on 1.0.0\"."
+  },
+  "assistant.journal.build.kind.release": {
+    "defaultMessage": "release",
+    "description": "A kind of build of Hive itself, in a journal line such as \"Uploaded a draft of Hive 1.0.0 (release) from 1fef5341 on main\"."
+  },
+  "assistant.journal.build.uploaded": {
+    "defaultMessage": "Uploaded a draft of Hive {version} ({kind}) from {commit} on {branch}",
+    "description": "A journal entry Hive writes when a release of Hive itself is built and uploaded as a draft GitHub release: {version} its version, {kind} what kind of build (release, release candidate…), {commit} the commit's short id, {branch} the git branch."
+  },
+  "assistant.journal.build.uploadedDetached": {
+    "defaultMessage": "Uploaded a draft of Hive {version} ({kind}) from {commit}",
+    "description": "As \"Uploaded a draft of Hive {version} ({kind}) from {commit} on {branch}\", for a build made from no branch."
+  },
+  "assistant.journal.build.uploadedNote": {
+    "defaultMessage": "Uploaded to a draft GitHub release (npm run release).",
+    "description": "In a journal entry for a build of Hive: it was uploaded as a draft release on GitHub. npm run release is a command: keep it as it is."
   },
   "assistant.journal.cancel": {
     "defaultMessage": "Cancel",
@@ -335,17 +455,25 @@
     "defaultMessage": "Agent names are unique across the workspace: change the marked names first.",
     "description": "Load template: why its button can't be used yet."
   },
+  "assistant.loadNames.filledNote": {
+    "defaultMessage": "Agent names are unique across the workspace, and {count, plural, one {this name is} other {these names are}} taken already: {names} (projects: {projects}). {count, plural, one {A free name is} other {Free names are}} filled in below. Change any name you like.",
+    "description": "Load template, above the plan: some of the template's names are taken by other projects' agents ({projects} lists the projects, {names} the names; {count} how many), so free names were filled in for them. Each sentence whole, the verb never agreeing with a list (HI-1585: glossary §1 rules 3 and 4)."
+  },
+  "assistant.loadNames.overMax": {
+    "defaultMessage": "It has {count, number} agents, and this project’s workflow allows {max, plural, one {# agent} other {# agents}}: raise Maximum agents first, or load it with its workflow.",
+    "description": "Load template (HI-2058), why its button can't be used: the template's agents ({count}) are more than the project's Maximum agents ({max}), and its workflow, which would raise it, isn't applied. Maximum agents is a name in the window: as translated there."
+  },
   "assistant.loadNames.sameTwice": {
     "defaultMessage": "Another of its agents has this name.",
     "description": "Load template, under a name box: another of the template's agents is given the same name."
   },
+  "assistant.loadNames.savesMax": {
+    "defaultMessage": "Maximum agents goes from {now, number} to {next, number} for this project, saved with its agents.",
+    "description": "Load template (HI-2058), with its workflow applied: the template's own Maximum agents ({next}) is saved with its agents, in place of the project's ({now}). Maximum agents is a name in the window: as translated there."
+  },
   "assistant.loadNames.taken": {
     "defaultMessage": "{project} has an agent called {name}.",
     "description": "Load template, under a name box: an agent of another project has that name."
-  },
-  "assistant.loadNames.takenNote": {
-    "defaultMessage": "Agent names are unique across the workspace, and {projects} already {count, plural, one {has an agent} other {has agents}} called {names}: give {count, plural, one {it} other {them}} other names below.",
-    "description": "Load template, above the plan: some of the template's names are taken. {projects} lists the projects, {names} the names; {count} is how many names."
   },
   "assistant.mcpSecret.argument": {
     "defaultMessage": "An argument starting \"{start}…\" looks like a literal secret.",
@@ -476,7 +604,7 @@
     "description": "The name of a mode of the Hive Assistant that ships with Hive: it takes a release through its checklist. Shown in its menus and the Assistant view; keep it short."
   },
   "assistant.modes.shippedDescription.coordinator": {
-    "defaultMessage": "Runs the work across the agents: state first, short status tables, lane prompts from settled cards, decisions only when they are real.",
+    "defaultMessage": "Runs the work across the agents: state first, facts looked up before asked, short status tables, lane prompts from settled cards, decisions only when they are real.",
     "description": "What a mode of the Hive Assistant that ships with Hive (Coordinator) is for, in a line: under its name in the mode menu and the Assistant view."
   },
   "assistant.modes.shippedDescription.planner": {
@@ -488,7 +616,7 @@
     "description": "What a mode of the Hive Assistant that ships with Hive (QA triager) is for, in a line: under its name in the mode menu and the Assistant view."
   },
   "assistant.modes.shippedDescription.releaseManager": {
-    "defaultMessage": "Takes a release through its checklist: notes, licences, packaged checks; the version, tags and publishing only when asked.",
+    "defaultMessage": "Takes a release through the project's release path, stage by stage: notes, licences, packaged checks; each build, version, merge, tag and publish only when asked.",
     "description": "What a mode of the Hive Assistant that ships with Hive (Release manager) is for, in a line: under its name in the mode menu and the Assistant view."
   },
   "assistant.modes.shipsMissing": {
@@ -528,7 +656,7 @@
     "description": "The hidden Assistant panel's bell: a question waits for you."
   },
   "assistant.panel.attention": {
-    "defaultMessage": "{kind, select, waiting {is waiting for you} question {has a question for you} safeguard {changed models after a safeguard stop} other {has finished}}",
+    "defaultMessage": "{kind, select, waiting {is waiting for you} signin {needs you to sign in} question {has a question for you} error {was stopped by an error} failed {couldn't start} safeguard {changed models after a safeguard stop} other {has finished}}",
     "description": "The Assistant's overview: what an agent that needs you is doing, after its project and name. Lower case: it follows them."
   },
   "assistant.panel.attentionDismiss": {
@@ -546,6 +674,10 @@
   "assistant.panel.chooseMode": {
     "defaultMessage": "Choose a mode",
     "description": "Tooltip on the Assistant's mode button when it has none."
+  },
+  "assistant.panel.cliOwnConnection": {
+    "defaultMessage": "its mode is the CLI's own setting, and the Assistant needs to know its mode",
+    "description": "Why a connection is greyed out in Assistant Settings' choice of connection (HI-2108): its permission mode is \"The CLI's own setting\" (Hive passes none), and the Assistant's Control relies on knowing its mode. A clause, lower case."
   },
   "assistant.panel.codingAgent": {
     "defaultMessage": "Coding agent",
@@ -567,6 +699,10 @@
     "defaultMessage": "Compacting the conversation…",
     "description": "Tooltip on Compact while the conversation is compacted."
   },
+  "assistant.panel.connectionRestart": {
+    "defaultMessage": "The Assistant restarts on the connection chosen and resumes this conversation.",
+    "description": "Confirmation before a running Assistant moves to another connection of the same coding agent CLI (HI-2108): it restarts in it and carries on the conversation."
+  },
   "assistant.panel.conversations": {
     "defaultMessage": "Conversations",
     "description": "A button: a menu of the Assistant's past conversations."
@@ -583,6 +719,14 @@
     "defaultMessage": "Default ({name})",
     "description": "Assistant Settings: the mode that follows Settings → Assistant ({name}: that mode)."
   },
+  "assistant.panel.deliverFailed": {
+    "defaultMessage": "Could not deliver the Assistant's inbox",
+    "description": "An error's title: typing the line that tells the Assistant of what waits in its inbox (Deliver Now) failed."
+  },
+  "assistant.panel.deliverNow": {
+    "defaultMessage": "Deliver Now",
+    "description": "Menu item in the Assistant's ⋯ menu, shown while the setting Wake an idle agent is off: types the line telling it of what waits in its inbox into its terminal, once."
+  },
   "assistant.panel.doneBy": {
     "defaultMessage": "Done by the Assistant",
     "description": "The heading of the list of what the Assistant did (a count follows)."
@@ -591,17 +735,33 @@
     "defaultMessage": "The conversation has ended.",
     "description": "The Assistant's panel after its conversation ended."
   },
-  "assistant.panel.forWorkspace": {
-    "defaultMessage": "For this workspace. Anything left at <i>Default</i> follows <link>Settings → Assistant</link>.",
-    "description": "Assistant Settings, at the top. <i> is italic (the choice Default); <link> opens Settings → Assistant."
+  "assistant.panel.fold": {
+    "defaultMessage": "Fold the Assistant panel",
+    "description": "An item of the Assistant panel's More (⋯) menu, and its header's button: folds the panel to a strip at the window's edge; the Assistant keeps running. Fold as the Progress panel's button says it."
   },
-  "assistant.panel.hide": {
-    "defaultMessage": "Hide the Assistant",
-    "description": "An item of the Assistant panel's More (⋯) menu: hides the panel; the Assistant keeps running."
+  "assistant.panel.foldTip": {
+    "defaultMessage": "{hasKey, select, yes {Fold the Assistant panel ({key})} other {Fold the Assistant panel}}",
+    "description": "Tooltip of the button in the Assistant panel's header that folds it to a strip at the window's edge, with its shortcut ({key}: \"Ctrl+Alt+I\")."
+  },
+  "assistant.panel.forWorkspace": {
+    "defaultMessage": "For this workspace. Its connection holds its model, effort and permission mode; a mode left at <i>Default</i> follows <link>Settings → Assistant</link>.",
+    "description": "Assistant Settings, at the top (HI-2108). <i> is italic (the choice Default of the Mode list); <link> opens Settings → Assistant."
   },
   "assistant.panel.inactive": {
     "defaultMessage": "{count, plural, one {# inactive project} other {# inactive projects}}",
     "description": "The Assistant's overview: a row that shows the inactive projects folded into it."
+  },
+  "assistant.panel.inboxLine": {
+    "defaultMessage": "{id} · {from}: {text}",
+    "description": "An item of the Assistant's inbox in its ⋯ menu: its id, who it is from ({from}) and the start of its text ({text}). No preposition before the name (glossary §1 rule 4)."
+  },
+  "assistant.panel.inboxTip": {
+    "defaultMessage": "{n, plural, one {An item} other {# items}} in the Assistant's inbox that it hasn't fetched or acked yet: offered as its next line once it is idle, or read with hive_inbox.",
+    "description": "The heading of the Assistant's ⋯ menu's list of what it hasn't read in its inbox ({n}: how many). hive_inbox is a tool's name: keep it."
+  },
+  "assistant.panel.inboxTipNoWakes": {
+    "defaultMessage": "{n, plural, one {An item} other {# items}} in the Assistant's inbox that it hasn't fetched or acked yet",
+    "description": "The heading of the Assistant's ⋯ menu's list of what it hasn't read in its inbox, when the setting Wake an idle agent (Settings → Advanced) is off (a hint line under it says so; {n}: how many)."
   },
   "assistant.panel.listFailed": {
     "defaultMessage": "Could not list conversations",
@@ -691,9 +851,21 @@
     "defaultMessage": "No projects in this workspace yet.",
     "description": "The Assistant's overview with no projects."
   },
+  "assistant.panel.noWakesHint": {
+    "defaultMessage": "Wake an idle agent is off, so nothing is typed by itself. Deliver Now types the line once.",
+    "description": "A hint line under the heading of the Assistant's ⋯ menu's list of its unread inbox, when the setting Wake an idle agent (Settings → Advanced) is off. Wake an idle agent names a setting and Deliver Now a menu item below: use their names as Hive shows them."
+  },
   "assistant.panel.noneRunning": {
     "defaultMessage": "no agents running",
     "description": "The Assistant's workspace section: a project none of whose agents run. Lower case."
+  },
+  "assistant.panel.notDelivered": {
+    "defaultMessage": "The Assistant wasn't told now",
+    "description": "A notice's title: Deliver Now couldn't type the line into the Assistant's terminal now."
+  },
+  "assistant.panel.notDeliveredDetail": {
+    "defaultMessage": "It isn't idle, or you are typing in its terminal. What waits stays in its inbox: try again once it's idle.",
+    "description": "The detail of the notice that Deliver Now could not type the line into the Assistant now."
   },
   "assistant.panel.notDone": {
     "defaultMessage": "Not done: {error}",
@@ -704,8 +876,8 @@
     "description": "Tooltip on Compact before anything was said."
   },
   "assistant.panel.openCard": {
-    "defaultMessage": "{known, select, yes {Open card #{number}, in {column}} other {Open card #{number}}}",
-    "description": "A card chip in the Assistant's status line, for screen readers ({column}: \"Review\")."
+    "defaultMessage": "{known, select, yes {Open card {number}, in {column}} other {Open card {number}}}",
+    "description": "A card chip in the Assistant's status line, for screen readers ({number}: the card's name, its key, such as AM-12, or #12 for a card with none; {column}: \"Review\")."
   },
   "assistant.panel.openNow": {
     "defaultMessage": "open now",
@@ -718,6 +890,10 @@
   "assistant.panel.provider": {
     "defaultMessage": "Coding agent: {provider}",
     "description": "A line of an agent's tooltip in the Assistant's workspace section ({provider}: \"Claude Code\")."
+  },
+  "assistant.panel.providerOn": {
+    "defaultMessage": "Coding agent: {provider} · {connection}",
+    "description": "A line of an agent's tooltip in the Assistant's workspace section, with Connections on (HI-1769): its CLI ({provider}: \"Claude Code\") and the connection it runs on or would start on ({connection}: \"Max 1\", with ⟳ when it runs on another than the one chosen, or why none can run it)."
   },
   "assistant.panel.railLabel": {
     "defaultMessage": "Hive Assistant",
@@ -775,25 +951,9 @@
     "defaultMessage": "Resume \"{name}\", {when}",
     "description": "Tooltip on Resume: the conversation and when it was last active ({when}: \"3 hours ago\")."
   },
-  "assistant.panel.revert": {
-    "defaultMessage": "Revert",
-    "description": "A button beside a setting the Assistant changed: puts the old value back."
-  },
-  "assistant.panel.revertFailed": {
-    "defaultMessage": "Could not revert the setting",
-    "description": "An error notice: a setting the Assistant changed couldn't be put back; the reason follows."
-  },
-  "assistant.panel.revertLabel": {
-    "defaultMessage": "Revert {setting} to {value}",
-    "description": "The Revert button, for screen readers ({setting}: the setting's path; {value}: its old value)."
-  },
-  "assistant.panel.reverted": {
-    "defaultMessage": "reverted",
-    "description": "Beside a setting the Assistant changed that was put back."
-  },
   "assistant.panel.reviewing": {
-    "defaultMessage": "Reviewing #{number} {title}",
-    "description": "An agent's tooltip in the Assistant's overview: a card it reviews."
+    "defaultMessage": "Reviewing {number} {title}",
+    "description": "An agent's tooltip in the Assistant's overview: a card it reviews ({number}: its name, its key, such as AM-12, or #12 for a card with none; {title}: its title)."
   },
   "assistant.panel.running": {
     "defaultMessage": "{count} running",
@@ -887,13 +1047,17 @@
     "defaultMessage": "Start a new conversation (⋯ → New Conversation) to keep things quick.",
     "description": "The Assistant's footer, in the tooltip of a long conversation's size. ⋯ is the More button; New Conversation its menu item."
   },
+  "assistant.panel.unreadCount": {
+    "defaultMessage": "{n, plural, one {# unread} other {# unread}}",
+    "description": "Read out with the Assistant's ⋯ button: how many items in its inbox it hasn't fetched or acked yet. Keep it short."
+  },
   "assistant.panel.watches": {
     "defaultMessage": "<b>{name}</b> watches over this workspace: ask it what the agents are doing, about any project, or for a plan or a review.",
     "description": "The Assistant's panel before it starts. {name} is its mode (Overseer…) or The Assistant; <b> is bold."
   },
   "assistant.panel.workingOn": {
-    "defaultMessage": "Working on #{number} {title}",
-    "description": "An agent's tooltip in the Assistant's overview: a card it works on."
+    "defaultMessage": "Working on {number} {title}",
+    "description": "An agent's tooltip in the Assistant's overview: a card it works on ({number}: its name, its key, such as AM-12, or #12 for a card with none; {title}: its title)."
   },
   "assistant.panel.workspace": {
     "defaultMessage": "Workspace",
@@ -1019,13 +1183,25 @@
     "defaultMessage": "Mark as Working On",
     "description": "A project's right-click menu: makes it active."
   },
+  "assistant.sidebar.mcpCatalogue": {
+    "defaultMessage": "Catalogue",
+    "description": "The MCP view's second tab (HI-545): servers from the MCP catalogues, to install."
+  },
+  "assistant.sidebar.mcpInstalled": {
+    "defaultMessage": "Installed",
+    "description": "The MCP view's first tab (HI-545): the workspace's servers."
+  },
+  "assistant.sidebar.mcpNoMatch": {
+    "defaultMessage": "No server matches.",
+    "description": "The MCP view (HI-2059) when no server matches its search and filter."
+  },
   "assistant.sidebar.mcpServers": {
     "defaultMessage": "MCP Servers",
     "description": "The heading of the MCP sidebar: the workspace's MCP servers."
   },
-  "assistant.sidebar.mcpTip": {
-    "defaultMessage": "MCP servers deployed to the workspace (.hive/mcp) are available to every project and run in a project only when on here (its switch, which asks for the projects) and on in that project's MCP tab. Changes apply to new sessions.",
-    "description": "Tooltip on MCP Servers. Keep .hive/mcp as it is."
+  "assistant.sidebar.mcpTipAdded": {
+    "defaultMessage": "MCP servers deployed to the workspace (.hive/mcp) are available to every project and the Hive Assistant, and run only where they are added: a project's MCP tab, the Assistant's view, or Add to… here. Changes apply to new sessions.",
+    "description": "Tooltip on MCP Servers (HI-2059). Keep .hive/mcp as it is; \"MCP tab\" and \"Add to…\" as Hive shows them."
   },
   "assistant.sidebar.needYou": {
     "defaultMessage": "{count, plural, one {# agent needs you} other {# agents need you}}",
@@ -1299,6 +1475,14 @@
     "defaultMessage": "Workspace",
     "description": "The MCP sidebar: the section of the workspace's servers."
   },
+  "assistant.sidebar.workspaceNotes": {
+    "defaultMessage": "Workspace notes",
+    "description": "The pinned first row of Shared Notes: the note Hive gives every agent when it starts (notes about this machine). Keep Workspace notes in English: it is the note's name (its file is Workspace notes.md) and what agents are told."
+  },
+  "assistant.sidebar.workspaceNotesTip": {
+    "defaultMessage": "Notes about this machine (a full path, a local tool's version) that every agent gets when it starts, on every coding agent and in any folder. Kept in .hive/shared, out of git.",
+    "description": "Tooltip on the pinned Workspace notes row of Shared Notes. Keep .hive/shared as it is."
+  },
   "assistant.skills.add": {
     "defaultMessage": "Add",
     "description": "The Add Skill from File dialog: its button."
@@ -1407,6 +1591,26 @@
     "defaultMessage": "Deleted from this workspace",
     "description": "A badge over a skill of Hive's own that was deleted from the workspace."
   },
+  "assistant.skills.delivered.failed": {
+    "defaultMessage": "Couldn't change whether agents get {name}",
+    "description": "A notice: switching a skill on or off for agents (Delivered to agents) failed. {name} is the skill."
+  },
+  "assistant.skills.delivered.offInWorkspace": {
+    "defaultMessage": "Off in the workspace's Skills view, so no project's agents get it. Turn it on there first.",
+    "description": "Tooltip on a Hive skill's switch in a project's Skills tab, shown off and disabled: the skill is switched off for the whole workspace."
+  },
+  "assistant.skills.delivered.switch": {
+    "defaultMessage": "{name} delivered to agents",
+    "description": "A Hive skill's switch in the Skills view and a project's Skills tab (Delivered to agents), for screen readers: whether agents are given the skill. {name} is the skill."
+  },
+  "assistant.skills.delivered.tipProject": {
+    "defaultMessage": "Delivered to agents: on, this project's agents get this skill from their next session; off, they don't, and Hive removes its copies at their next launch.",
+    "description": "Tooltip on a Hive skill's switch in a project's Skills tab."
+  },
+  "assistant.skills.delivered.tipWorkspace": {
+    "defaultMessage": "Delivered to agents: on, every project's agents get this skill from their next session; off, none of them do, and Hive removes its copies at their next launch.",
+    "description": "Tooltip on a Hive skill's switch in the workspace's Skills view."
+  },
   "assistant.skills.editInWorkspace": {
     "defaultMessage": "Edit in workspace",
     "description": "A button over a Hive skill in a project: opens it in the Skills view."
@@ -1422,6 +1626,18 @@
   "assistant.skills.fileTitle": {
     "defaultMessage": "Add Skill from File",
     "description": "The Add Skill from File dialog's title."
+  },
+  "assistant.skills.files": {
+    "defaultMessage": "Files of {skill}",
+    "description": "Accessible name of the row of tabs above a skill's page, one tab per file of the skill ({skill}: the skill's name): its SKILL.md and the reference files it links."
+  },
+  "assistant.skills.filesMore": {
+    "defaultMessage": "Only the first {count, number} files are shown.",
+    "description": "Shown after a skill's file tabs when the skill's folder has more files than Hive lists ({count}: how many are shown)."
+  },
+  "assistant.skills.filesTip": {
+    "defaultMessage": "SKILL.md is what an agent reads when it uses the skill. The other files are read only when SKILL.md's link to them is needed.",
+    "description": "Tooltip on the tabs of a skill's files: an agent reads SKILL.md whenever it uses the skill, and each reference file only when it follows SKILL.md's link to it."
   },
   "assistant.skills.levelHive": {
     "defaultMessage": "Hive",
@@ -1515,6 +1731,10 @@
     "defaultMessage": "Run work across the workspace's agents as the Hive Assistant: cards, briefs, starting agents, waiting, handing over, stalled cards. Use when asked to get agents working, start or continue a card, or check progress.",
     "description": "What a skill that ships with Hive (coordinate-agents) is for: under its name in the Skills view and a project's Skills tab. Keep Hive Assistant as Hive names it."
   },
+  "assistant.skills.shipped.generalist": {
+    "defaultMessage": "General work done well: understand first, change carefully, prove it works, report honestly. Use when no other skill fits.",
+    "description": "What a skill that ships with Hive (generalist) is for: under its name in the Skills view and a project's Skills tab. It is for work outside the board's skills, such as whatever the user asks an agent in its pane."
+  },
   "assistant.skills.shipped.handover": {
     "defaultMessage": "Write a handover so a later session or another agent can carry on cold. Use when asked to wrap up for later, hand over or stop for the day. Readying a branch to merge is merge-ready.",
     "description": "What a skill that ships with Hive (handover) is for: under its name in the Skills view and a project's Skills tab. merge-ready is another skill's name: keep it as it is."
@@ -1528,8 +1748,8 @@
     "description": "What a skill that ships with Hive (licence-audit) is for: under its name in the Skills view and a project's Skills tab. Vendored files are other people's files a package carries inside it."
   },
   "assistant.skills.shipped.mergeReady": {
-    "defaultMessage": "Get a branch ready to review and merge in Hive: commit the task's work, run the checks, compare with the base, summarise. Use when asked to finish up or get a branch or worktree ready to merge. Merging and pushing stay separate.",
-    "description": "What a skill that ships with Hive (merge-ready) is for: under its name in the Skills view and a project's Skills tab. Branch, worktree, commit, merge and push are git's terms."
+    "defaultMessage": "Get a branch ready to merge and merge it when asked, through the merge slot: commit, run the checks, compare with the base. Use when asked to finish up, ready a branch, or merge one (\"merge X into Y\", \"merge this lane\").",
+    "description": "What a skill that ships with Hive (merge-ready) is for: under its name in the Skills view and a project's Skills tab. Branch, worktree, commit, merge and push are git's terms. The merge slot is Hive's turn-taking for merges into a branch; the quoted requests are examples of what a user asks."
   },
   "assistant.skills.shipped.pickUp": {
     "defaultMessage": "Continue earlier work from its handover, checking it against the current state. Use when asked to continue, resume or pick up previous work, or to read a handover. Not for every new session.",
@@ -1540,7 +1760,7 @@
     "description": "What a skill that ships with Hive (review-agent-work) is for: under its name in the Skills view and a project's Skills tab. Review is a column of the task board: use its name as the board shows it."
   },
   "assistant.skills.shipped.runLanes": {
-    "defaultMessage": "Run a team as the Hive Assistant: builder and reviewer lanes on card loops, planned by files, briefed and watched to their end. Use when there are three or more agents, builder and reviewer pairs or worktree agents, when asked for lanes, or woken about one.",
+    "defaultMessage": "Run a team as the Hive Assistant: builder and reviewer lanes on card loops, planned by files, briefed and watched to their end. Use when there are three or more agents or several builder and reviewer pairs, when asked for lanes, or woken about one.",
     "description": "What a skill that ships with Hive (run-lanes) is for: under its name in the Skills view and a project's Skills tab. A lane is a builder and a reviewer taking cards in turn (a card loop): use the words Hive uses for them."
   },
   "assistant.skills.shipped.splitWork": {
@@ -1556,12 +1776,12 @@
     "description": "What a skill that ships with Hive (tune-settings) is for: under its name in the Skills view and a project's Skills tab."
   },
   "assistant.skills.shipped.useHiveApi": {
-    "defaultMessage": "Call Hive's local HTTP API from a script or tool, or debug a hive tool against it. Use only when automating Hive over HTTP: for ordinary board, notes and handover work the hive tools are enough.",
+    "defaultMessage": "A hive tool's cases in detail (tools.md), and Hive's HTTP API for scripts. Use when a tool's description isn't enough, or to automate Hive over HTTP: board and notes work uses the tools.",
     "description": "What a skill that ships with Hive (use-hive-api) is for: under its name in the Skills view and a project's Skills tab. Keep HTTP and API; hive tools are the tools Hive gives agents (hive_…), keep hive in lower case."
   },
   "assistant.skills.shipped.workOnCard": {
-    "defaultMessage": "Carry a card from Hive's task board through its work, from Doing to Review with a summary. Use when given a card to work on (\"work on #12\", a card Hive started you on, more work on one back from Review). Not for reviewing one, nor a card loop (card-loop).",
-    "description": "What a skill that ships with Hive (work-on-card) is for: under its name in the Skills view and a project's Skills tab. card-loop is another skill's name: keep it. Doing and Review are columns of the task board: use their names as the board shows them. \"work on #12\" is what you would ask an agent: translate it."
+    "defaultMessage": "Carry a card from Hive's task board through its work, from Active to Review with a summary. Use when given a card to work on (\"work on AM-12\", a card Hive started you on, more work on one back from Review). Not for reviewing one, nor a card loop (card-loop).",
+    "description": "What a skill that ships with Hive (work-on-card) is for: under its name in the Skills view and a project's Skills tab. card-loop is another skill's name: keep it. Active and Review are stages of the task board (glossary 2.2): use their names as the board shows them. \"work on AM-12\" is what you would ask an agent: translate it."
   },
   "assistant.skills.shipped.workspaceNote": {
     "defaultMessage": "Record a lasting decision, convention or gotcha in the workspace's shared notes. Use when asked to remember or document something for later, or when other agents will need what you learned. Not for work in progress.",
@@ -1679,10 +1899,6 @@
     "defaultMessage": "Agent {n} has no name (or one over 60 characters).",
     "description": "Why a template file can't be used: its agent number {n} (1, 2…) has no usable name."
   },
-  "assistant.template.badContext": {
-    "defaultMessage": "{name}'s context setting isn't one Hive can use.",
-    "description": "Why a template file can't be used: an agent's 200K context setting isn't on or off."
-  },
   "assistant.template.badMcp": {
     "defaultMessage": "{name}'s MCP servers aren't a list Hive can use.",
     "description": "Why a template file can't be used: an agent's list of MCP servers."
@@ -1691,17 +1907,25 @@
     "defaultMessage": "Its name is missing or longer than {max} characters.",
     "description": "Why a template file can't be used: the template's name."
   },
-  "assistant.template.badProvider": {
-    "defaultMessage": "{name}'s coding agent isn't one Hive can use ({given, select, yes {{provider}} other {none}}).",
-    "description": "Why a template file can't be used: an agent's coding agent (Claude Code, Codex…) is no id Hive could know. {name} is the agent; {provider} what the file says; none when it says nothing."
+  "assistant.template.badPairs": {
+    "defaultMessage": "Its pairs of builders and reviewers name agents it doesn’t have, or an agent twice.",
+    "description": "Why a template file can't be used: its list of builders paired with reviewers (glossary: builder, reviewer) doesn't match its agents."
   },
-  "assistant.template.badSetting": {
-    "defaultMessage": "{name}'s {setting, select, model {model} effort {effort} other {permissionMode}} isn't one Hive can use.",
-    "description": "Why a template file can't be used: an agent's model, effort or permission mode is no value a coding agent takes. Keep permissionMode as it is (the file's field)."
+  "assistant.template.badRole": {
+    "defaultMessage": "{name}'s role in the workflow isn't builder, reviewer, either or generalist.",
+    "description": "Why a template file can't be used: an agent's role in the workflow (glossary: builder, reviewer, either) is none of the three. Keep builder, reviewer and either as they are (the file's values)."
   },
-  "assistant.template.longRole": {
-    "defaultMessage": "{name}'s role is over {max} characters.",
-    "description": "Why a template file can't be used: an agent's role is too long."
+  "assistant.template.badToken": {
+    "defaultMessage": "{name} uses {token}: an agent’s name may only hold '{key}' (the project’s key) and '{n}' (its number among the agents with that name).",
+    "description": "Why a template file can't be used: an agent's name pattern ({name}) holds {token}, a token Hive doesn't know. The quoted '{key}' and '{n}' are shown as {key} and {n}: keep them, with their straight quotes, as they are."
+  },
+  "assistant.template.from09": {
+    "defaultMessage": "This template is from Hive 0.9 and can't be loaded in 1.0. Recreate it from your agents with Save as Template.",
+    "description": "Why a template file can't be used: Hive 0.9 made it (its agents had worktrees of their own; 1.0's don't). Save as Template is a command: as Hive names it."
+  },
+  "assistant.template.longNote": {
+    "defaultMessage": "The note of agent {name} is over {max, number} characters.",
+    "description": "Why a template file can't be used: an agent's note (what it is for, in the user's words) is too long. {max} is the limit, a number. A noun before the name (glossary §1 rule 4)."
   },
   "assistant.template.newer": {
     "defaultMessage": "It was made by a newer version of Hive: update Hive to use it.",
@@ -1727,65 +1951,85 @@
     "defaultMessage": "It has {count} agents; a project can have up to {max}.",
     "description": "Why a template file can't be used: more agents than any project can have."
   },
-  "assistant.template.tooManyHere": {
-    "defaultMessage": "It has {count} agents, and this project can have up to {limit} (Settings → Advanced → Agents per project).",
-    "description": "Why a template can't be loaded into this project: it has more agents than the project allows. Keep the setting's path as Settings shows it."
+  "assistant.templateConnections.all": {
+    "defaultMessage": "all agents",
+    "description": "Stands for {who} in \"Connection for {who}\" (HI-2109): the Same for all choice. Lower case."
+  },
+  "assistant.templateConnections.heading": {
+    "defaultMessage": "Connections",
+    "description": "Heading of the Load template and Choose Connections dialogs' section choosing which connection (a named setup on an account: model, effort, mode) the agents run on (HI-2109)."
+  },
+  "assistant.templateConnections.keep": {
+    "defaultMessage": "Keep each one’s",
+    "description": "Choose Connections (HI-2109): the first choice of a role's (or all agents') connection: each agent keeps the connection it has."
+  },
+  "assistant.templateConnections.keepOwn": {
+    "defaultMessage": "Keep its own ({name})",
+    "description": "Choose Connections (HI-2109), an agent's own row: it keeps the connection it has ({name})."
+  },
+  "assistant.templateConnections.label": {
+    "defaultMessage": "Connection for {who}",
+    "description": "Accessible name of a connection choice in the Connections section (HI-2109): {who} is all agents, a role's agents (\"Builders\") or an agent's name."
+  },
+  "assistant.templateConnections.none": {
+    "defaultMessage": "No connection is usable in this workspace yet: agents get one once you add an account in Settings → Accounts & Connections.",
+    "description": "The Connections section (HI-2109) when no connection is usable in this workspace: agents loaded now are made without one, and get one once an account is added. Settings → Accounts & Connections names a section: use its translated names."
+  },
+  "assistant.templateConnections.notOffered": {
+    "defaultMessage": "it can’t be used for these agents",
+    "description": "Why a connection is greyed out in the Connections section (HI-2118): Hive offers it elsewhere but not to these agents (its coding agent CLI is off or not installed, or its account is off here). A short clause, lower case, after the connection's name and a dash."
+  },
+  "assistant.templateConnections.perAgent": {
+    "defaultMessage": "Per agent",
+    "description": "A disclosure in the Connections section (HI-2109): opens a connection choice for each agent, over its role's."
+  },
+  "assistant.templateConnections.roleChoice": {
+    "defaultMessage": "Same as its role",
+    "description": "The first choice of an agent's own connection (Per agent, HI-2109): it takes the connection chosen for its role."
+  },
+  "assistant.templateConnections.roleRow": {
+    "defaultMessage": "{role, select, builder {Builders} reviewer {Reviewers} either {Either} other {Generalists}}",
+    "description": "A row of the Connections section (HI-2109): the agents of one role in the workflow (glossary: builder, reviewer, either, generalist), as a plural group. either: the agents that build or review."
+  },
+  "assistant.templateConnections.same": {
+    "defaultMessage": "Same for all",
+    "description": "A tick box in the Connections section (HI-2109): one connection for every agent, in place of one per role."
+  },
+  "assistant.templateConnections.suggests": {
+    "defaultMessage": "suggests {cli}",
+    "description": "Beside a role's connection choice in Load template (HI-2109): the coding agent CLI the template suggests for that role ({cli}: \"Codex\"), which chose the connection first offered. Lower case."
   },
   "assistant.templateLoad.afterLoad": {
-    "defaultMessage": "{removed, select, yes {Their conversations stay in the Sessions tab, and their open cards go back (Doing ones to Todo). The layout becomes the template's.} other {The layout becomes the template's.}}",
-    "description": "Load template, the last note: what happens to the agents that go (when some do) and to the project's layout. Sessions, Doing and Todo as Hive names them."
+    "defaultMessage": "{removed, select, yes {Their conversations stay in the Sessions tab, and their open cards go back (Active ones to Todo). The layout becomes the template's.} other {The layout becomes the template's.}}",
+    "description": "Load template, the last note: what happens to the agents that go (when some do) and to the project's layout. Sessions, Active and Todo as Hive names them."
   },
-  "assistant.templateLoad.branchKeptTitle": {
-    "defaultMessage": "{count, plural, one {An old worktree's branch was kept} other {# old worktrees' branches were kept}}",
-    "description": "After loading a template: old worktrees whose folder went but whose branch stayed."
+  "assistant.templateLoad.cliDefaults": {
+    "defaultMessage": "{cli} defaults",
+    "description": "What a connection runs (HI-2109) when it sets no model, effort or mode of its own: its coding agent CLI's ({cli}: \"Claude Code\") defaults."
+  },
+  "assistant.templateLoad.connectionLine": {
+    "defaultMessage": "{name} ({values})",
+    "description": "A connection (HI-2109) with what it runs, in brackets: {name} is its name (\"Claude · High\"), {values} its model, effort and mode (\"Opus · High · Auto\"). Japanese and Chinese: full-width brackets, no space before them."
   },
   "assistant.templateLoad.createdHeading": {
     "defaultMessage": "Created:",
     "description": "Load template's confirmation, as text: the heading over the template's agents."
   },
-  "assistant.templateLoad.createdLine": {
-    "defaultMessage": "{name}{hasRole, select, yes { — {role}} other {}}{replaces, select, yes { (new)} other {}}: {provider}, {settings}",
-    "description": "Load template's confirmation, as text: an agent the template brings, after a bullet: its role, (new) when it replaces an agent of the same name, its coding agent ({provider}) and its model · effort · mode ({settings})."
+  "assistant.templateLoad.createdOn": {
+    "defaultMessage": "{name}{hasRole, select, yes { — {role}} other {}}{replaces, select, yes { (new)} other {}}: {connection}",
+    "description": "Load template's confirmation, as text (HI-2109): an agent the template brings, after a bullet: its role, (new) when it replaces an agent of the same name, and the connection it is given ({connection}: its name and what it runs, \"Claude · High (Opus · High · Auto)\")."
   },
-  "assistant.templateLoad.folderOnly": {
-    "defaultMessage": "{branch}: its folder was removed, but the branch was kept{hasWhy, select, yes { ({why})} other {}}.",
-    "description": "After loading a template, a line of the details: an old worktree whose branch stayed, and why."
-  },
-  "assistant.templateLoad.isDefault": {
-    "defaultMessage": "{setting} (default)",
-    "description": "A new agent's model, effort or mode that the template leaves to the project's or Hive's defaults: {setting} is what it comes to here (\"Opus 5.5\", \"High\")."
-  },
-  "assistant.templateLoad.keptLine": {
-    "defaultMessage": "{branch}: kept{hasWhy, select, yes { ({why})} other {}}.",
-    "description": "After loading a template, a line of the details: an old worktree that stayed, and why."
-  },
-  "assistant.templateLoad.keptTitle": {
-    "defaultMessage": "{count, plural, one {An old worktree was kept} other {# old worktrees were kept}}",
-    "description": "After loading a template: some old worktrees you chose to remove couldn't be."
-  },
-  "assistant.templateLoad.newLine": {
-    "defaultMessage": "own worktree on {branch} (from {base}) in {path}{hasNote, select, yes { ({note})} other {}}",
-    "description": "Load template's confirmation, as text, under a new agent: its own new worktree, on branch {branch} made from {base}, in folder {path}."
-  },
-  "assistant.templateLoad.newWhy": {
-    "defaultMessage": "new: {why}",
-    "description": "Load template, after a new agent's worktree: why it gets a new one rather than the old one of its name ({why}: \"hive/claude has 1 uncommitted file\")."
+  "assistant.templateLoad.noConnection": {
+    "defaultMessage": "no connection",
+    "description": "Load template's confirmation (HI-2109), in place of an agent's connection: none can run it here. Lower case."
   },
   "assistant.templateLoad.oldKept": {
     "defaultMessage": "its worktree and branch {branch} stay{hasWhy, select, yes {: {why}} other {}}",
     "description": "Load template, beside an agent that goes: its worktree is kept. {why} says why (\"2 commits not merged into main\"). Lower case: it follows the agent's name in brackets."
   },
-  "assistant.templateLoad.oldRemovable": {
-    "defaultMessage": "its worktree and branch {branch}, merged into {known, select, yes {{into}} other {the main branch}} and clean, stay unless you tick below",
-    "description": "Load template, beside an agent that goes: its worktree could be removed (a tick box below the list). {into} is the branch its work is merged into. Lower case: it follows the agent's name in brackets."
-  },
-  "assistant.templateLoad.oldReused": {
-    "defaultMessage": "its worktree on {branch} goes on with the new {name}",
-    "description": "Load template, beside an agent that goes: a new agent of the same name ({name}) works in its worktree (on branch {branch}) again. Lower case: it follows the agent's name in brackets."
-  },
-  "assistant.templateLoad.ownLine": {
-    "defaultMessage": "own worktree",
-    "description": "Load template's confirmation, as text, under a new agent: it works in a worktree of its own."
+  "assistant.templateLoad.pairedWith": {
+    "defaultMessage": "paired: {name}",
+    "description": "Load template, under an agent's role: the agent it is paired with ({name}): a builder's reviewer, or a reviewer's builder. Lower case. The name after a colon (glossary §1 rule 4)."
   },
   "assistant.templateLoad.removedHeading": {
     "defaultMessage": "Removed:",
@@ -1795,109 +2039,105 @@
     "defaultMessage": "{name}{hasNote, select, yes { ({note})} other {}}{replaced, select, yes {: replaced by a new agent with the same name} other {}}",
     "description": "Load template's confirmation, as text: an agent that goes, after a bullet. {note} is what happens to its worktree."
   },
-  "assistant.templateLoad.removedWith": {
-    "defaultMessage": "Removed with {count, plural, one {its branch} other {their branches}}: {branches}.",
-    "description": "After loading a template, a line of the details: the worktrees that went whole, by branch."
-  },
-  "assistant.templateLoad.reuseLine": {
-    "defaultMessage": "reuses its worktree on {branch} in {path} (clean; its branch is left as it is)",
-    "description": "Load template's confirmation, as text, under a new agent: it works in an old worktree again."
-  },
-  "assistant.templateLoad.setup": {
-    "defaultMessage": "Each new worktree runs the project's setup command ({command}) before its agent first starts.",
-    "description": "Load template, a note under the list: {command} is the project's setup command (\"npm install\")."
-  },
-  "assistant.templateLoad.wholeDetail": {
-    "defaultMessage": "{branches}, with {count, plural, one {its branch} other {their branches}}: merged and clean.",
-    "description": "After loading a template: {branches} lists the removed worktrees by branch."
-  },
-  "assistant.templateLoad.wholeTitle": {
-    "defaultMessage": "Removed {count, plural, one {an old worktree} other {# old worktrees}}",
-    "description": "After loading a template: the old worktrees you chose to remove went, with their branches."
+  "assistant.templateLoad.roleLine": {
+    "defaultMessage": "{role}{paired, select, yes { (paired: {name})} other {}}",
+    "description": "Load template's confirmation, as text: an agent's role in the workflow ({role}: Builder, Reviewer, Either) and the agent it is paired with ({name}). The name after a colon (glossary §1 rule 4)."
   },
   "assistant.templatePlan.agent": {
     "defaultMessage": "Agent",
     "description": "Load template's table: the column of the agents' names."
   },
-  "assistant.templatePlan.codingAgent": {
-    "defaultMessage": "Coding agent",
-    "description": "Load template's table: the column of each agent's CLI (Claude Code, Codex…)."
-  },
-  "assistant.templatePlan.created": {
-    "defaultMessage": "Created",
-    "description": "Load template: the heading over the template's agents."
-  },
-  "assistant.templatePlan.default": {
-    "defaultMessage": "(default)",
-    "description": "Load template's table, after a model, effort or mode: the template leaves it to the project's or Hive's defaults."
-  },
-  "assistant.templatePlan.effort": {
-    "defaultMessage": "Effort",
-    "description": "Load template's table: a column (the model's reasoning effort)."
-  },
-  "assistant.templatePlan.folder": {
-    "defaultMessage": "project folder",
-    "description": "Load template's table, Where: the agent works in the project's folder."
+  "assistant.templatePlan.connection": {
+    "defaultMessage": "Connection",
+    "description": "Load template's table (HI-2109): the column of the connection each agent runs on (a named setup on an account: model, effort, mode), as chosen in the Connections section under it."
   },
   "assistant.templatePlan.fromTip": {
     "defaultMessage": "Its name in the template",
     "description": "Load template's table: tooltip on an agent's name as the template has it, beside the box for its new name."
   },
-  "assistant.templatePlan.mode": {
-    "defaultMessage": "Mode",
-    "description": "Load template's table: a column (the permission mode)."
-  },
-  "assistant.templatePlan.model": {
-    "defaultMessage": "Model",
-    "description": "Load template's table: a column."
-  },
   "assistant.templatePlan.nameLabel": {
     "defaultMessage": "Name of agent {n}",
     "description": "Load template's table: the accessible name of the box for agent number {n}'s name."
-  },
-  "assistant.templatePlan.newBadge": {
-    "defaultMessage": "new",
-    "description": "Load template's table: a badge on an agent that replaces one of the same name."
-  },
-  "assistant.templatePlan.newTip": {
-    "defaultMessage": "A new worktree in {path}, from {base}",
-    "description": "Load template's table: tooltip on a new worktree ({path}: its folder; {base}: the branch it starts from)."
   },
   "assistant.templatePlan.noteSentence": {
     "defaultMessage": "{note}.",
     "description": "Load template, under an agent that goes: what happens to its worktree ({note}), as a sentence (its first letter made a capital). Use your language's full stop."
   },
-  "assistant.templatePlan.ownOn": {
-    "defaultMessage": "own worktree {branch}",
-    "description": "Load template's table, Where: the agent's new worktree, on branch {branch}."
+  "assistant.templatePlan.role": {
+    "defaultMessage": "Role",
+    "description": "Load template's table: the column of each agent's role in the workflow (Builder, Reviewer, Either; glossary: workflow role)."
   },
-  "assistant.templatePlan.ownWorktree": {
-    "defaultMessage": "own worktree",
-    "description": "Load template's table, Where: the agent gets a worktree of its own."
+  "assistant.templatePlan.state": {
+    "defaultMessage": "Change",
+    "description": "Load template's table (#1315): the column saying what happens to each agent (replaced, new, removed)."
   },
-  "assistant.templatePlan.removed": {
-    "defaultMessage": "Removed",
-    "description": "Load template: the heading over the agents that go."
+  "assistant.templatePlan.stateNew": {
+    "defaultMessage": "new",
+    "description": "Load template's table, the Change column: an agent the project doesn't have yet. Lower case, a badge."
   },
-  "assistant.templatePlan.replaced": {
-    "defaultMessage": "(replaced by a new agent with the same name)",
-    "description": "Load template, after an agent that goes."
+  "assistant.templatePlan.stateNewTip": {
+    "defaultMessage": "An agent the project doesn’t have yet.",
+    "description": "Load template's table: tooltip on new."
   },
-  "assistant.templatePlan.reuseTip": {
-    "defaultMessage": "Works in its worktree again: {path} (clean; its branch is left as it is)",
-    "description": "Load template's table: tooltip on a worktree worked in again ({path}: its folder)."
+  "assistant.templatePlan.stateRemoved": {
+    "defaultMessage": "removed",
+    "description": "Load template's table, the Change column: a project agent the template has none of: it goes. Lower case, a badge."
   },
-  "assistant.templatePlan.reuses": {
-    "defaultMessage": "reuses {branch}",
-    "description": "Load template's table, Where: the agent works in an old worktree again, on branch {branch}."
+  "assistant.templatePlan.stateRemovedTip": {
+    "defaultMessage": "The template has no agent of this name, so this one goes.",
+    "description": "Load template's table: tooltip on removed."
   },
-  "assistant.templatePlan.where": {
-    "defaultMessage": "Where",
-    "description": "Load template's table: a column (the folder or worktree each agent works in)."
+  "assistant.templatePlan.stateReplaced": {
+    "defaultMessage": "replaced",
+    "description": "Load template's table, the Change column: the template's agent replaces the project's agent of the same name. Lower case, a badge."
   },
-  "assistant.templatePlan.withNote": {
-    "defaultMessage": "{thing} <faint>{note}</faint>",
-    "description": "Load template: a name or a setting ({thing}), then a note about it in brackets ({note}, which brings its brackets: \"(default)\"), greyed. Keep the <faint> tags around {note}. Japanese and Chinese: no space before full-width brackets."
+  "assistant.templatePlan.stateReplacedTip": {
+    "defaultMessage": "A new agent with these settings replaces the agent of the same name.",
+    "description": "Load template's table: tooltip on replaced."
+  },
+  "assistant.templateWorkflow.alsoGit": {
+    "defaultMessage": "It has a workflow for Git too, used once this project uses Git.",
+    "description": "The Load template dialog (HI-1910): a project with no version control loads the template's None workflow; it also has a Git one."
+  },
+  "assistant.templateWorkflow.apply": {
+    "defaultMessage": "Also apply its workflow (Version Control → Workflow opens with it filled in, to save there)",
+    "description": "A tick box in the Load template dialog (HI-1910), ticked by default: after loading the agents, the project's Version Control tab opens at Workflow with the template's options filled in but not saved. Glossary: workflow."
+  },
+  "assistant.templateWorkflow.change": {
+    "defaultMessage": "{option}: {now} → {next}",
+    "description": "The Load template dialog (HI-1910): a workflow option ({option}, its title) with its value now ({now}) and the template's ({next})."
+  },
+  "assistant.templateWorkflow.changes": {
+    "defaultMessage": "{n, plural, =0 {Its workflow for {platform} matches this project’s options.} one {Its workflow for {platform} changes # option:} other {Its workflow for {platform} changes # options:}}",
+    "description": "The Load template dialog (HI-1910): how many of the project's workflow options the template's would change ({n}); the list follows. {platform}: None or Git, as Hive names them."
+  },
+  "assistant.templateWorkflow.dropped": {
+    "defaultMessage": "{count, plural, one {Its workflow for {platforms} can’t be used (made by another version of Hive, or changed by hand), so it isn’t applied.} other {Its workflows for {platforms} can’t be used (made by another version of Hive, or changed by hand), so they aren’t applied.}}",
+    "description": "The Load template dialog and the Templates view (HI-1910): the template's workflow sections for {platforms} (None, Git: a list; {count} of them) have values Hive can't use, so they are left out."
+  },
+  "assistant.templateWorkflow.head": {
+    "defaultMessage": "Workflow",
+    "description": "The Load template dialog (HI-1910): the heading of the part about the template's workflow options. Glossary: workflow."
+  },
+  "assistant.templateWorkflow.identityOff": {
+    "defaultMessage": "It turns the project identity on, but this project’s git config has no name and email, so it stays off.",
+    "description": "The Load template dialog (HI-1910): the template's workflow has the project identity on (G12: commits as the repository's identity), but this project's git config has none. Glossary: identity."
+  },
+  "assistant.templateWorkflow.needsGit": {
+    "defaultMessage": "Its workflow is for Git, and this project has no version control yet. Set up Git first, or untick the box above to load only its agents.",
+    "description": "The Load template dialog (HI-1910): the template has only a Git workflow and the project has no version control. Set up Git… is the button beside it. Glossary: workflow."
+  },
+  "assistant.templateWorkflow.noCommand": {
+    "defaultMessage": "{count, plural, one {This project has no command for the check {checks}: add it in Version Control → Workflow before cards need it.} other {This project has no commands for the checks {checks}: add them in Version Control → Workflow before cards need them.}}",
+    "description": "The Load template dialog (HI-1910): the template's workflow names checks ({checks}, a list of names; {count} of them) this project has no command for. A template keeps check names, never commands. Glossary: check."
+  },
+  "assistant.templateWorkflow.noSection": {
+    "defaultMessage": "It has no workflow for {platform}, so this project’s options stay as they are.",
+    "description": "The Load template dialog (HI-1910): the template's workflow sections don't include the project's version control ({platform}: None or Git)."
+  },
+  "assistant.templateWorkflow.setUpGit": {
+    "defaultMessage": "Set Up Git…",
+    "description": "A button in the Load template dialog (HI-1910): closes it and opens the project's Version Control tab on Git's page, with Initialise repository…; once Git is set up, the dialog opens again. The … says another step follows: keep it."
   },
   "assistant.templates.aProject": {
     "defaultMessage": "a project",
@@ -1979,33 +2219,13 @@
     "defaultMessage": "Agent",
     "description": "A template's table: the agents' names."
   },
-  "assistant.templates.colCodingAgent": {
-    "defaultMessage": "Coding agent",
-    "description": "A template's table: each agent's CLI (Claude Code, Codex…)."
-  },
-  "assistant.templates.colEffort": {
-    "defaultMessage": "Effort",
-    "description": "A template's table: a column (the model's reasoning effort)."
-  },
-  "assistant.templates.colMode": {
-    "defaultMessage": "Mode",
-    "description": "A template's table: a column (the permission mode)."
-  },
-  "assistant.templates.colModel": {
-    "defaultMessage": "Model",
-    "description": "A template's table: the column of each agent's model."
-  },
   "assistant.templates.colRole": {
     "defaultMessage": "Role",
     "description": "A template's table: each agent's role."
   },
-  "assistant.templates.colWorksIn": {
-    "defaultMessage": "Works in",
-    "description": "A template's table: where each agent works."
-  },
-  "assistant.templates.context200k": {
-    "defaultMessage": "200K context",
-    "description": "A template's table, after the model: the agent uses the model's 200K-token context. Keep 200K."
+  "assistant.templates.colSuggests": {
+    "defaultMessage": "Suggests",
+    "description": "A template's table (HI-2109): the coding agent CLI each agent suggests (Claude Code, Codex…), which only preselects a connection on it when the template is loaded. A short column heading."
   },
   "assistant.templates.continue": {
     "defaultMessage": "Continue",
@@ -2014,10 +2234,6 @@
   "assistant.templates.copyAgent": {
     "defaultMessage": "Copy {name}",
     "description": "The template editor: a button on an agent's row."
-  },
-  "assistant.templates.default": {
-    "defaultMessage": "Default",
-    "description": "A template's agent's model, effort or mode when it is left to the project's or Hive's defaults."
   },
   "assistant.templates.delete": {
     "defaultMessage": "Delete",
@@ -2132,16 +2348,24 @@
     "description": "A notice after a template was saved as a file; the file's path follows."
   },
   "assistant.templates.exportedDetail": {
-    "defaultMessage": "It holds the agents' settings and roles and the layout: no paths, sessions or names. Import it into any Hive.",
+    "defaultMessage": "It holds the agents' roles, notes and settings and the layout: no paths, sessions or names of people. Import it into any Hive.",
     "description": "Under Template exported, after the file's path."
   },
   "assistant.templates.fullTip": {
-    "defaultMessage": "A template can have up to {limit} agents, as many as a project (Settings → Advanced → Agents per project)",
-    "description": "Tooltip on Add Agent when the template is full. Keep the setting's path as Settings shows it."
+    "defaultMessage": "A template can have up to {limit, number} agents, the most a project can have",
+    "description": "Tooltip on Add Agent when the template is full: {limit} is the most agents a project can have (24)."
   },
   "assistant.templates.gone": {
     "defaultMessage": "That template is no longer there.",
     "description": "The Templates view: the selected template was deleted or moved."
+  },
+  "assistant.templates.hive": {
+    "defaultMessage": "Hive",
+    "description": "A badge, a group and a filter: Hive's own templates (#1436, shipped with Hive, read-only)."
+  },
+  "assistant.templates.hiveSummary": {
+    "defaultMessage": "{count, plural, one {# agent} other {# agents}}, {layout}. One of Hive's own templates: read-only. <b>Duplicate…</b> copies it into the workspace or a project to change it.",
+    "description": "Over one of Hive's own templates' agents: how many, its layout (\"two columns layout\"). <b> is bold; Duplicate… is the button."
   },
   "assistant.templates.import": {
     "defaultMessage": "Import",
@@ -2225,7 +2449,7 @@
   },
   "assistant.templates.mcpServers": {
     "defaultMessage": "MCP servers: {servers}",
-    "description": "A template's table, under Works in: the MCP servers an agent chose."
+    "description": "A template's table, under an agent's coding agent: the MCP servers it chose."
   },
   "assistant.templates.moveDown": {
     "defaultMessage": "Move {name} down",
@@ -2263,6 +2487,10 @@
     "defaultMessage": "No projects",
     "description": "A notice: Load into Project with no projects in the workspace."
   },
+  "assistant.templates.noSuggestion": {
+    "defaultMessage": "Any",
+    "description": "A template's table, the Suggests column (HI-2109): the agent suggests no coding agent CLI (the first connection in the order is offered)."
+  },
   "assistant.templates.noWorkspace": {
     "defaultMessage": "Open a workspace to see its templates.",
     "description": "The Templates view with no workspace open."
@@ -2270,6 +2498,10 @@
   "assistant.templates.noWorkspaceTemplates": {
     "defaultMessage": "No workspace templates.",
     "description": "Under Workspace, when the workspace has no templates."
+  },
+  "assistant.templates.noneHive": {
+    "defaultMessage": "Hive's own templates couldn't be listed.",
+    "description": "The Templates view, under Hive, when none of Hive's own templates is listed (shouldn't happen)."
   },
   "assistant.templates.noneOfItsOwn": {
     "defaultMessage": "No templates of its own.",
@@ -2283,9 +2515,9 @@
     "defaultMessage": "Not saved",
     "description": "A badge on a template open in its editor with unsaved changes."
   },
-  "assistant.templates.ownWorktree": {
-    "defaultMessage": "Its own worktree",
-    "description": "A template's table, Works in: the agent gets a worktree of its own."
+  "assistant.templates.pairedWith": {
+    "defaultMessage": "paired: {name}",
+    "description": "A template's table, under an agent's role: the agent it is paired with ({name}). Lower case. The name after a colon (glossary §1 rule 4)."
   },
   "assistant.templates.panelHint": {
     "defaultMessage": "Save a project's agents as a template from its Session tab (<b>Save Template…</b>). Export one to share it; Import brings one in.",
@@ -2298,10 +2530,6 @@
   "assistant.templates.project": {
     "defaultMessage": "Project",
     "description": "Load into Project: the label of the list of projects."
-  },
-  "assistant.templates.projectFolder": {
-    "defaultMessage": "The project folder",
-    "description": "A template's table, Works in: the agent works in the project's folder."
   },
   "assistant.templates.refresh": {
     "defaultMessage": "Refresh",
@@ -2334,10 +2562,6 @@
   "assistant.templates.replace": {
     "defaultMessage": "Replace",
     "description": "Import, a template of that name is there: replace it."
-  },
-  "assistant.templates.review": {
-    "defaultMessage": "Review",
-    "description": "A button on the notice of unused worktrees left by a deleted template's agents: opens the list."
   },
   "assistant.templates.rowDesc": {
     "defaultMessage": "{count, plural, one {# agent} other {# agents}} · {layout} layout",
@@ -2375,6 +2599,14 @@
     "defaultMessage": "\"{name}\" was saved again since you started editing it, so these changes can't be saved over it.",
     "description": "The template editor, when the template was saved elsewhere meanwhile."
   },
+  "assistant.templates.suggests": {
+    "defaultMessage": "Suggests the {preset} preset: loading it offers to switch the project’s workflow options to it.{pool, select, yes { Its reviewers are a pool shared by every builder.} other {}}",
+    "description": "Over a template's agents: the workflow preset it suggests ({preset}: Solo, Pair, Team); pool when its reviewers are shared by all builders rather than one per lane. Glossary: preset, workflow, reviewer, builder, lane."
+  },
+  "assistant.templates.suggestsTip": {
+    "defaultMessage": "A template keeps no connection, model or effort: loading it offers the first connection on this coding agent, and you choose.",
+    "description": "Tooltip on the Suggests column heading of a template's table (HI-2109)."
+  },
   "assistant.templates.summary": {
     "defaultMessage": "{count, plural, one {# agent} other {# agents}}, {layout}{hasSaved, select, yes {, saved {when}} other {}}. Kept in {scope, select, workspace {the workspace, for every project} other {{project}, for that project only}}. Change it with <b>Edit…</b>, or save a project's agents again under the same name.",
     "description": "Over a template's agents: how many, its layout (\"two columns layout\"), when it was saved ({when}: \"3 days ago\"), and where it is kept. <b> is bold; Edit… is the button."
@@ -2392,8 +2624,8 @@
     "description": "Where to keep a template: a project, in a list."
   },
   "assistant.templates.tip": {
-    "defaultMessage": "A template is a project's agents (settings and roles) and layout, saved under a name: the workspace's are for every project, a project's are its own (kept in its .hive, out of git). Export one to share it as a file.",
-    "description": "Tooltip on Templates (the Templates view and a project's Templates tab). Keep .hive as it is."
+    "defaultMessage": "A template is a project's agents (their roles in the workflow and settings) and layout, saved under a name. Hive's own are read-only: duplicate one to change it. The workspace's are for every project, a project's are its own (kept in its .hive, out of git). Export one to share it as a file.",
+    "description": "Tooltip on Templates (the Templates view and a project's Templates tab). Keep .hive as it is. Glossary: workflow role."
   },
   "assistant.templates.title": {
     "defaultMessage": "Templates",
@@ -2419,9 +2651,313 @@
     "defaultMessage": "\"{name}\", in {scope, select, workspace {the workspace} other {{project}}}.",
     "description": "Under Template duplicated or Template imported: the template and where it is kept ({project}: a project's name)."
   },
+  "assistant.templates.workflowAbsent": {
+    "defaultMessage": "none",
+    "description": "The Templates view (HI-1910): a short word after a version control's tab (None, Git) whose workflow section the template doesn't have."
+  },
+  "assistant.templates.workflowAllOff": {
+    "defaultMessage": "All off",
+    "description": "The Templates view's template editor (HI-1910): a drop-down entry filling the workflow section with every check and balance off (as the Workflow section's All off)."
+  },
+  "assistant.templates.workflowEditHint": {
+    "defaultMessage": "To set options one by one, set them in a project’s Version Control → Workflow, then save its agents as a template under this name. A preset fills in its rules here, keeping the check names.",
+    "description": "The Templates view's template editor (HI-1910), under the workflow section: how to set individual options (in a project, then Save as Template), and what Fill from a preset does. Glossary: workflow, preset, check."
+  },
+  "assistant.templates.workflowFill": {
+    "defaultMessage": "Fill from a preset",
+    "description": "The Templates view's template editor (HI-1910): the accessible name of the drop-down that fills this version control's workflow section from a preset (Solo, Pair, Team, All off), its check names kept."
+  },
+  "assistant.templates.workflowFillChoose": {
+    "defaultMessage": "Fill from a preset…",
+    "description": "The Templates view's template editor (HI-1910): the drop-down's first entry, before a preset is chosen."
+  },
+  "assistant.templates.workflowHead": {
+    "defaultMessage": "Workflow",
+    "description": "The Templates view (HI-1910): the heading of a template's workflow options, a tab for each version control (None, Git). Glossary: workflow."
+  },
+  "assistant.templates.workflowNone": {
+    "defaultMessage": "No workflow for {platform}: loading it leaves a {platform} project’s options as they are.",
+    "description": "The Templates view (HI-1910): the template has no workflow section for this version control ({platform}: None or Git)."
+  },
+  "assistant.templates.workflowPlatforms": {
+    "defaultMessage": "Workflow for",
+    "description": "The Templates view (HI-1910): the accessible name of the tabs choosing which version control's workflow (None, Git) a template's section shows."
+  },
+  "assistant.templates.workflowPreset": {
+    "defaultMessage": "{preset, select, none {Not from a preset.} other {From the preset {name}.}}",
+    "description": "The Templates view (HI-1910): which preset a template's workflow section started from ({name}: Solo, Pair, Team), or none. Glossary: preset."
+  },
+  "assistant.templates.workflowRemove": {
+    "defaultMessage": "Remove",
+    "description": "The Templates view's template editor (HI-1910): a button removing this version control's workflow section from the template."
+  },
   "assistant.templates.workspace": {
     "defaultMessage": "Workspace",
     "description": "A badge, a group and a filter: the workspace's templates (for every project)."
+  },
+  "assistant.undo.askFinal": {
+    "defaultMessage": "{n, plural, one {# change can't be undone, such as a prompt that was sent: it is listed with why.} other {# changes can't be undone, such as prompts that were sent: they are listed with why.}}",
+    "description": "Under the question before a message's changes are undone, when some of them can't be."
+  },
+  "assistant.undo.askMessage": {
+    "defaultMessage": "Changes made since by you or an agent are kept.",
+    "description": "The question before the Assistant's changes for a message are undone: what someone changed afterwards isn't overwritten."
+  },
+  "assistant.undo.askTitle": {
+    "defaultMessage": "{n, plural, one {Undo # change?} other {Undo # changes?}}",
+    "description": "The question before every change the Assistant made for a message is undone."
+  },
+  "assistant.undo.card": {
+    "defaultMessage": "{card}: {fields}",
+    "description": "A change the Assistant made to a card ({card}: the card, \"#12 Fix the login\"; {fields}: what it changed, \"labels and column\")."
+  },
+  "assistant.undo.changed": {
+    "defaultMessage": "{fields} changed since",
+    "description": "Why undo left part of a change of the Assistant's as it is: someone (the user or an agent) changed it afterwards ({fields}: \"labels\", \"title and column\")."
+  },
+  "assistant.undo.dismiss": {
+    "defaultMessage": "Close what the undo did",
+    "description": "A button that closes the note under a message saying what its undo did."
+  },
+  "assistant.undo.ended": {
+    "defaultMessage": "the lane has ended",
+    "description": "Why undo left a change of the Assistant's to a lane (a card loop's record): the lane is over. Lower case."
+  },
+  "assistant.undo.error": {
+    "defaultMessage": "failed: {error}",
+    "description": "Why undo didn't put back part of a change of the Assistant's: it failed ({error}: Hive's reason, in English). Lower case; Undo is offered again."
+  },
+  "assistant.undo.failed": {
+    "defaultMessage": "Could not undo the Assistant's change",
+    "description": "An error notice: undoing a change the Assistant made failed; the reason follows."
+  },
+  "assistant.undo.field": {
+    "defaultMessage": "{field, select, title {title} description {description} labels {labels} blocked {blocked} blockedBy {blocked by} links {links} agent {agent} column {column} project {project} created {the card} cards {cards} reviewer {reviewer} rounds {rounds} waitMinutes {wait} name {name} provider {provider} connection {connection} model {model} effort {effort} permissionMode {permission mode} use200kContext {context size} mcpServers {MCP servers} lastSessionId {conversation} value {value} removed {removed models} run {the run} agents {agents} layout {layout} workflow {workflow options} other {{field}}}",
+    "description": "What part of something the Assistant changed (lower case, listed after a card or in why undo kept it): a card's title, labels, column…; a lane's cards, reviewer, rounds, wait; an agent's provider, model, effort…; a setting's value; run: an agent it started; agents, layout, workflow: a project's agents, page layout and workflow options a template's load replaced (HI-1502). Select keys: the field."
+  },
+  "assistant.undo.final": {
+    "defaultMessage": "Can't be undone",
+    "description": "Beside a change of the Assistant's that undo can't take back (a prompt sent, a comment); its tooltip says why."
+  },
+  "assistant.undo.gone": {
+    "defaultMessage": "it's gone",
+    "description": "Why undo left a change of the Assistant's: the card, lane or agent it was about no longer exists. Lower case."
+  },
+  "assistant.undo.kept": {
+    "defaultMessage": "Kept",
+    "description": "Beside a change of the Assistant's that undo left as it is (someone changed it since, or it is gone); its tooltip says why."
+  },
+  "assistant.undo.made": {
+    "defaultMessage": "Made {card}",
+    "description": "A card the Assistant made ({card}: \"#12 Fix the login\"); undo archives it."
+  },
+  "assistant.undo.message": {
+    "defaultMessage": "Your message at {time}: {n, plural, one {# change} other {# changes}}",
+    "description": "The heading of the Assistant's changes made for one message of the user's ({time}: when it was sent, a time, or a date and time before today; {n}: how many changes)."
+  },
+  "assistant.undo.messageNone": {
+    "defaultMessage": "Your message at {time}",
+    "description": "The heading of what the Assistant did for one message of the user's when it changed nothing ({time}: when it was sent)."
+  },
+  "assistant.undo.partly": {
+    "defaultMessage": "Partly undone",
+    "description": "Beside a change of the Assistant's when undo put back some of it and kept the rest (someone changed it since); its tooltip says what."
+  },
+  "assistant.undo.resultAlready": {
+    "defaultMessage": "{n, plural, one {# undone before} other {# undone before}}",
+    "description": "What an undo of a message's changes did: how many were undone already."
+  },
+  "assistant.undo.resultFinal": {
+    "defaultMessage": "{n, plural, one {# can't be undone:} other {# can't be undone:}}",
+    "description": "What an undo of a message's changes did: how many it couldn't take back, each listed after it with why."
+  },
+  "assistant.undo.resultKept": {
+    "defaultMessage": "{n, plural, one {# kept as it is:} other {# kept as they are:}}",
+    "description": "What an undo of a message's changes did: how many it left, each listed after it with why."
+  },
+  "assistant.undo.resultLine": {
+    "defaultMessage": "{change}: {why}",
+    "description": "A change in what an undo did ({change}: the change; {why}: why it was kept, or can't be undone)."
+  },
+  "assistant.undo.resultUndone": {
+    "defaultMessage": "{n, plural, one {# change undone} other {# changes undone}}",
+    "description": "What an undo of a message's changes did: how many it put back."
+  },
+  "assistant.undo.undo": {
+    "defaultMessage": "Undo",
+    "description": "A button: undoes a change the Assistant made (on its row), or every change it made for a message (on the message's heading)."
+  },
+  "assistant.undo.undoChange": {
+    "defaultMessage": "Undo: {change}",
+    "description": "A change's Undo button, for screen readers ({change}: the change, as its row says it)."
+  },
+  "assistant.undo.undoMessage": {
+    "defaultMessage": "Undo the changes for your message at {time}",
+    "description": "A message's Undo button, for screen readers ({time}: when the message was sent)."
+  },
+  "assistant.undo.undoneAt": {
+    "defaultMessage": "Undone {when}",
+    "description": "Beside a change of the Assistant's that was undone ({when}: \"5 minutes ago\", lower case)."
+  },
+  "assistant.undo.why.agentAdded": {
+    "defaultMessage": "An agent it added stays: remove it in the project's agents if it isn't wanted.",
+    "description": "Why a change of the Assistant's can't be undone: it added an agent to a project."
+  },
+  "assistant.undo.why.agentStopped": {
+    "defaultMessage": "An agent it stopped isn't started again by undo: start it if it should run.",
+    "description": "Why a change of the Assistant's can't be undone: it stopped an agent."
+  },
+  "assistant.undo.why.ask": {
+    "defaultMessage": "Its question stays under For you: answer or dismiss it there.",
+    "description": "What of a question the Assistant asked on a card stays when it is undone. For you: the board's section of what waits on the user (glossary)."
+  },
+  "assistant.undo.why.cannot": {
+    "defaultMessage": "Its request stays under For you: answer or dismiss it there.",
+    "description": "What of a request the Assistant made on a card stays when it is undone. For you: the board's section of what waits on the user (glossary)."
+  },
+  "assistant.undo.why.cardPlace": {
+    "defaultMessage": "The card's place in its column isn't put back.",
+    "description": "Why part of a change of the Assistant's can't be undone: it moved a card up or down its column."
+  },
+  "assistant.undo.why.cardsOrder": {
+    "defaultMessage": "The cards' order isn't put back.",
+    "description": "Why a change of the Assistant's can't be undone: it put cards in order in a column."
+  },
+  "assistant.undo.why.comment": {
+    "defaultMessage": "A comment stays: undo doesn't take back what was said.",
+    "description": "Why part of a change of the Assistant's can't be undone: a comment on a card."
+  },
+  "assistant.undo.why.connectionChanged": {
+    "defaultMessage": "A connection it changed isn't changed back: edit it in Settings → Accounts & Connections.",
+    "description": "Why a change of the Assistant's can't be undone (HI-2108): it changed a connection's name, model, effort, context or mode. Settings → Accounts & Connections names a section."
+  },
+  "assistant.undo.why.connectionMade": {
+    "defaultMessage": "A connection it made stays: remove it in Settings → Accounts & Connections if it isn't wanted.",
+    "description": "Why a change of the Assistant's can't be undone (HI-2108): it made a connection (a named setup of model, effort and mode on an account that agents choose). Settings → Accounts & Connections names a section."
+  },
+  "assistant.undo.why.context": {
+    "defaultMessage": "The doc sections to read first stay as set.",
+    "description": "Why part of a change of the Assistant's can't be undone: it set a card's doc sections to read first."
+  },
+  "assistant.undo.why.decision": {
+    "defaultMessage": "A decision it recorded stays: only you change or remove decisions.",
+    "description": "Why part of a change of the Assistant's can't be undone: it recorded the user's decision on a card."
+  },
+  "assistant.undo.why.declarePaths": {
+    "defaultMessage": "The paths it declared stay with the card.",
+    "description": "What of the Assistant declaring a card's paths stays when it is undone."
+  },
+  "assistant.undo.why.freshRetried": {
+    "defaultMessage": "A lane agent's new conversation tried again isn't stopped by undo: end the lane if it isn't wanted.",
+    "description": "Why a change of the Assistant's can't be undone (HI-2034): it retried a lane agent's new conversation, which Hive had stopped trying to start. Glossary: lane, conversation."
+  },
+  "assistant.undo.why.handOver": {
+    "defaultMessage": "A hand-over can't be undone: the work went to the other agent.",
+    "description": "Why a change of the Assistant's can't be undone: it handed an agent's work over to another."
+  },
+  "assistant.undo.why.laneEnded": {
+    "defaultMessage": "A lane that ended stays ended: start it again if it should go on.",
+    "description": "Why a change of the Assistant's can't be undone: it ended a lane (a card loop's record)."
+  },
+  "assistant.undo.why.laneReorderNow": {
+    "defaultMessage": "A card a lane reorder applied now put back stays in Todo: undo puts back only the lane's order.",
+    "description": "What of the Assistant's lane reorder applied now (HI-1995) stays when it is undone: the card it put back in the Todo column stays there; undo restores only the order of the lane's cards."
+  },
+  "assistant.undo.why.message": {
+    "defaultMessage": "A message that was sent can't be taken back.",
+    "description": "Why a change of the Assistant's can't be undone: it sent an agent a message."
+  },
+  "assistant.undo.why.nothing": {
+    "defaultMessage": "It changed nothing undo puts back.",
+    "description": "Why a change of the Assistant's can't be undone: nothing it did is something undo puts back."
+  },
+  "assistant.undo.why.projectClosed": {
+    "defaultMessage": "A project it closed stays closed: open it again if it is wanted.",
+    "description": "Why a change of the Assistant's can't be undone: it closed (deactivated) a project."
+  },
+  "assistant.undo.why.projectMade": {
+    "defaultMessage": "A project it made stays: remove it from Hive if it isn't wanted.",
+    "description": "Why a change of the Assistant's can't be undone: it created a project."
+  },
+  "assistant.undo.why.projectOpened": {
+    "defaultMessage": "A project it opened stays open: close it if it isn't wanted.",
+    "description": "Why a change of the Assistant's can't be undone: it opened (activated) a project."
+  },
+  "assistant.undo.why.prompt": {
+    "defaultMessage": "A prompt that was sent can't be taken back.",
+    "description": "Why a change of the Assistant's can't be undone: it prompted an agent."
+  },
+  "assistant.undo.why.putBack": {
+    "defaultMessage": "Its reason stays as a comment.",
+    "description": "What of the Assistant putting a card back stays when it is undone: the reason it gave."
+  },
+  "assistant.undo.why.queuePaused": {
+    "defaultMessage": "A merge queue it paused stays paused: resume it if it should run.",
+    "description": "Why a change of the Assistant's can't be undone: it paused a project's merge queue."
+  },
+  "assistant.undo.why.queueResumed": {
+    "defaultMessage": "A merge queue it resumed isn't paused again: pause it if it shouldn't run.",
+    "description": "Why a change of the Assistant's can't be undone: it resumed a project's merge queue."
+  },
+  "assistant.undo.why.removedFromQueue": {
+    "defaultMessage": "Taking it out of the merge queue stays in the card's work: it is queued again only by Retry merge or a new approval.",
+    "description": "What of the Assistant taking a card out of the merge queue stays when it is undone. Retry merge: a command on the card (use it as Hive shows it)."
+  },
+  "assistant.undo.why.reportMerge": {
+    "defaultMessage": "The merge it reported stays in the card's work.",
+    "description": "What of a merge the Assistant reported stays when it is undone."
+  },
+  "assistant.undo.why.request": {
+    "defaultMessage": "Its request to the builder stays as a comment.",
+    "description": "What of a request the Assistant made to a card's builder stays when it is undone."
+  },
+  "assistant.undo.why.retriedMerge": {
+    "defaultMessage": "Its Retry merge stays in the card's work.",
+    "description": "What of the Assistant's Retry merge on a card (a command that queues a returned card again) stays when it is undone."
+  },
+  "assistant.undo.why.slotReleased": {
+    "defaultMessage": "A slot it released isn't kept or held again: the next work that needs a slot may take it.",
+    "description": "Why a change of the Assistant's can't be undone: it released a slot (a folder cards are built in) that was kept for an agent or held by an agent's ended session."
+  },
+  "assistant.undo.why.start": {
+    "defaultMessage": "Its start stays in the card's work: undo moves the card back, it doesn't unstart it.",
+    "description": "What of a card's start by the Assistant stays when it is undone."
+  },
+  "assistant.undo.why.startReview": {
+    "defaultMessage": "The review it started stays in the card's work.",
+    "description": "What of a review the Assistant started stays when it is undone."
+  },
+  "assistant.undo.why.submit": {
+    "defaultMessage": "Its submission stays in the card's work.",
+    "description": "What of a card's submission for review by the Assistant stays when it is undone."
+  },
+  "assistant.undo.why.teamPaused": {
+    "defaultMessage": "A team it paused stays paused: resume it if it should go on.",
+    "description": "Why a change of the Assistant's can't be undone (HI-2081): it paused its workspace's team before an update (Hive starts no card and wakes no agent until it resumes)."
+  },
+  "assistant.undo.why.teamResumed": {
+    "defaultMessage": "A team it resumed isn't paused again: pause it if it should wait.",
+    "description": "Why a change of the Assistant's can't be undone (HI-2081): it resumed its workspace's team, which was paused before an update."
+  },
+  "assistant.undo.why.templateCards": {
+    "defaultMessage": "The cards and lanes of the agents a template replaced stay as the load left them (cards put back, lanes ended): undo doesn't give them back.",
+    "description": "What of the Assistant loading a template into a project (it replaced the project's agents) stays when it is undone: the replaced agents' open cards were put back and their lanes ended (HI-1502)."
+  },
+  "assistant.undo.why.verdict": {
+    "defaultMessage": "Its verdict stays in the card's work, and its round with it.",
+    "description": "What of a review verdict by the Assistant stays when it is undone."
+  },
+  "assistant.undo.why.withdrawn": {
+    "defaultMessage": "Messages it withdrew aren't sent again.",
+    "description": "Why a change of the Assistant's can't be undone: it withdrew messages waiting for an agent."
+  },
+  "assistant.undo.working": {
+    "defaultMessage": "Undoing…",
+    "description": "The Undo button of the question while the changes are being undone."
+  },
+  "assistant.view.addMcp": {
+    "defaultMessage": "Add Server…",
+    "description": "The Assistant view's MCP Servers section (HI-2059): the + button that opens the picker of the workspace's servers to add."
   },
   "assistant.view.allAttachments": {
     "defaultMessage": "All Attachments",
@@ -2451,6 +2987,14 @@
     "defaultMessage": "What the Assistant keeps in its journal (decisions, plans, what happened and why) and Hive's own facts. Search it, correct it, or forget what you'd rather it didn't keep.",
     "description": "The Assistant view: the info tip of its Journal section."
   },
+  "assistant.view.mcp": {
+    "defaultMessage": "MCP Servers",
+    "description": "The Assistant view (HI-2059): the section of the workspace's MCP servers added for the Assistant. MCP is a protocol's name: keep it."
+  },
+  "assistant.view.mcpTip": {
+    "defaultMessage": "The workspace's MCP servers the Assistant gets, as a project's MCP tab has them: add one with +, Remove takes it off the Assistant only. Applies from its next session.",
+    "description": "The Assistant view: the info tip of its MCP Servers section (HI-2059). \"MCP tab\" as Hive names it; + is the add button."
+  },
   "assistant.view.modes": {
     "defaultMessage": "Modes",
     "description": "The Assistant view: the section of the Assistant's modes (how it works: Advisor, Builder…)."
@@ -2458,6 +3002,10 @@
   "assistant.view.newMode": {
     "defaultMessage": "New Mode…",
     "description": "The Assistant view, Modes: a button that creates a mode."
+  },
+  "assistant.view.noMcp": {
+    "defaultMessage": "No servers added.",
+    "description": "The Assistant view's MCP Servers section (HI-2059) when none is added for the Assistant."
   },
   "assistant.view.noWorkspace": {
     "defaultMessage": "Open a workspace to see its Assistant.",
@@ -2478,6 +3026,10 @@
   "assistant.view.refresh": {
     "defaultMessage": "Refresh",
     "description": "The Assistant view, Modes: a button that reads the modes again."
+  },
+  "assistant.view.removeMcp": {
+    "defaultMessage": "Remove {name} from the Assistant",
+    "description": "The Assistant view's MCP Servers section (HI-2059): the button on a server that removes it from the Assistant. {name} is the server."
   },
   "assistant.view.showPanel": {
     "defaultMessage": "Show the Assistant's panel",

@@ -9,6 +9,7 @@ import { readFlightWhat, type FlightWhat } from '../shared/flightRecorder'
 import { providerService } from './providerService'
 import { createLogger, userText } from './logger'
 import { englishError, hiveError, shownError } from './hiveError'
+import { requireMasking } from './keyCoverage'
 import { msg } from '../shared/i18n'
 
 /**
@@ -230,6 +231,8 @@ export function startRecording(wc: WebContents, source: ConsoleSource, workspace
   const slot = slotOf(wc)
   const gen = ++slot.gen
   return serial(slot, async () => {
+    // Not while server connections' keys can't be masked (HI-1772): nothing is written.
+    await requireMasking()
     // The window's own wish first, then whether it is still open and this start still its newest.
     const wanted = (): boolean => stillWanted() && !wc.isDestroyed() && slot.gen === gen
     if (!wanted()) throw cancelled()
@@ -333,6 +336,8 @@ async function reserve(dir: string, at: Date, kind: string): Promise<{ fh: FileH
  * recordings are never removed). Returns what it wrote.
  */
 export async function saveCapture(c: { source: Pick<ConsoleSource, 'kind' | 'label' | 'provider'>; events: ConsoleEvent[]; trigger: string; what: string; whatText?: FlightWhat; keep: number }): Promise<ConsoleRecordingInfo> {
+  // Not while server connections' keys can't be masked (HI-1772): nothing is written.
+  await requireMasking()
   const dir = recordingsDir()
   await mkdir(dir, { recursive: true })
   const at = new Date()

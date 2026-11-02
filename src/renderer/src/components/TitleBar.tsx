@@ -6,7 +6,7 @@ import { useStore } from '../store'
 import { basename, cx, formatKeybinding, recentNote, recentTip } from '../util'
 import { Icon, Tooltip, useContextMenu } from './ui'
 import * as actions from '../actions'
-import { useInbox } from '../inbox'
+import { useNeedsYou } from '../inbox'
 import { badgeText, windowTitle } from '@shared/taskbar'
 import { PROJECT_MENU } from '@shared/projectTabs'
 import { appName as nameOf } from '@shared/appName'
@@ -37,9 +37,9 @@ function drawBadge(count: number, scale: number): string {
   return c.toDataURL('image/png').split(',')[1]
 }
 
-/** The window title (Alt+Tab, the taskbar) and the taskbar badge, with how many agents need you in this window. */
+/** The window title (Alt+Tab, the taskbar) and the taskbar badge, with what needs you in this window (For you, #1632). */
 function useTaskbarCount(title: string): void {
-  const needYou = useInbox().needYou.length
+  const needYou = useNeedsYou().count
   const on = useStore((s) => s.settings?.notifications.taskbarCount ?? true)
   const count = on ? needYou : 0
   useEffect(() => {
@@ -74,15 +74,24 @@ function useTitleFit(bar: RefObject<HTMLDivElement | null>, menus: RefObject<HTM
       const right = a.offsetLeft - TITLE_GAP
       const room = right - left
       if (room < TITLE_MIN) return setStyle({ visibility: 'hidden' })
-      // scrollWidth is the whole title's width, however narrow it is shown.
-      const width = Math.min(t.scrollWidth, room)
+      // The whole title's width, however narrow it is shown, rounded up: scrollWidth rounds a fractional width
+      // (197.09 px) down, and the ellipsis then took its last letters with room to spare (HI-2319).
+      const range = document.createRange()
+      range.selectNodeContents(t)
+      const width = Math.min(Math.ceil(range.getBoundingClientRect().width), room)
       const centred = (b.clientWidth - width) / 2
       setStyle({ left: Math.min(Math.max(centred, left), right - width), maxWidth: width })
     }
     fit()
     const ro = new ResizeObserver(fit)
     for (const el of [b, m, a]) ro.observe(el)
-    return () => ro.disconnect()
+    // Measured again once the fonts have loaded, as a fallback font's width isn't the title's.
+    let gone = false
+    void document.fonts?.ready.then(() => !gone && fit())
+    return () => {
+      gone = true
+      ro.disconnect()
+    }
   }, [bar, menus, end, titleEl, title])
   return style
 }
@@ -112,7 +121,7 @@ const MENUS: MenuDef[] = [
   {
     id: 'help',
     label: msg({ id: 'shell.menu.help', defaultMessage: 'Help', description: "A menu of the title bar's menu bar." }),
-    items: ['help.docs', 'help.api', 'help.shortcuts', 'help.tips', 'help.releaseNotes', 'help.improveTranslation', '-', 'help.agentSetup', 'help.checkProviders', '-', 'view.devTools', 'help.devConsole', 'view.reload', 'help.logs', 'help.diagnostics', '-', 'help.checkUpdates', 'help.about']
+    items: ['help.docs', 'help.api', 'help.shortcuts', 'help.tips', 'help.releaseNotes', 'help.improveTranslation', '-', 'help.agentSetup', 'help.checkProviders', '-', 'view.devTools', 'help.devConsole', 'view.reload', 'help.logs', 'help.diagnostics', 'help.restoreBoard09', '-', 'help.checkUpdates', 'help.about']
   }
 ]
 
@@ -131,7 +140,8 @@ export function TitleBar() {
   const [recentOpen, setRecentOpen] = useState(false)
   // Right-click on a recent workspace: Remove from Recent (#144). Outside the menu, so it stays when the menu closes.
   const recentMenu = useContextMenu()
-  const workspace = useStore((s) => s.workspace)
+  // Its name only (HI-1806): the workspace's every change would render the title bar again.
+  const workspaceName = useStore((s) => s.workspace?.name)
   const selected = useStore((s) => s.selectedProject)
   const recent = useStore((s) => s.recent)
   const menuRef = useRef<HTMLDivElement>(null)
@@ -165,7 +175,7 @@ export function TitleBar() {
   const appName = useStore((s) => nameOf(!s.appInfo || s.appInfo.isPackaged))
   const pinned = useStore((s) => s.alwaysOnTop)
   const pinKey = commandKeybinding('view.alwaysOnTop')
-  const title = [selected ? basename(selected) : null, workspace?.name, appName].filter(Boolean).join(' — ')
+  const title = [selected ? basename(selected) : null, workspaceName, appName].filter(Boolean).join(' — ')
   useTaskbarCount(title)
   const barRef = useRef<HTMLDivElement>(null)
   const menubarRef = useRef<HTMLDivElement>(null)

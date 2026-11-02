@@ -19,8 +19,12 @@ const TURN_MS = 180000
 const SHOWN_MS = 30000
 // Codex 0.163 calls MCP tools from one script (Hive's transcript: "Script"), whose result waits for every call in it:
 // its screen says each call done, with its reply ("Called", redrawn over "Calling" as its last letters).
-const LISTED = /ed hive\.hive_list_projects\s*└\s*demo \(on/
-const CREATED = /ed hive\.hive_create_task\s*└\s*#\d+ created in Todo/
+// Codex redraws a line by moving the cursor over letters that didn't change, and plainText makes each move a space: any
+// letter of a reply can read as a space ("DE-1 crea ed in Todo", HI-2210).
+const gappy = (text) => [...text].map((c) => (c === ' ' ? ' ' : `[${c.replace(/[\\\]^-]/g, '\\$&')} ]`)).join('')
+const LISTED = new RegExp(`ed hive\\.hive_list_projects\\s*└\\s*${gappy('demo')} \\(on`)
+// Its reply names the card by its key alone (#1219, HI-1661): "DE-1 created in Todo".
+const CREATED = new RegExp(`ed hive\\.hive_create_task\\s*└\\s*([A-Z]{2,4}-\\d+) ${gappy('created in Todo')}`)
 const record = {}
 let failed = 0
 const check = (name, ok, extra = '') => {
@@ -150,7 +154,18 @@ const stamped = (text) => (fs.existsSync(stampLog) ? fs.readFileSync(stampLog, '
     // The Assistant on Codex: its Hive tools, a read and a change within Control, without being asked.
     const home = (await inv('workspace:refresh')).assistant.path
     lib.trustForCodex(home)
-    await inv('agents:update', home, 'assistant', small)
+    // In Ask (on-request), not its Approve for me, whose reviewer would decide a tool outside its subset itself: here
+    // Codex asks the user, so the subset's tools are seen running unasked and the others asking.
+    // On Codex first: its CLI follows its account's (HI-2122), and setLaunch sets values on the account it is on.
+    const { provider, ...launch } = small
+    await inv('agents:update', home, 'assistant', { provider })
+    await lib.setLaunch(inv, home, 'assistant', { ...launch, permissionMode: 'ask' })
+    // A native server named hive in the Codex config of the folder the Assistant works in (the workspace's, trusted here),
+    // approving every tool and the note's tool by name: Codex merges it into Hive's key by key, and Hive's approvals must
+    // still win (#1281).
+    lib.trustForCodex(ws)
+    fs.mkdirSync(path.join(ws, '.codex'), { recursive: true })
+    fs.writeFileSync(path.join(ws, '.codex', 'config.toml'), '[mcp_servers.hive]\ncommand = "node"\nargs = ["native.js"]\ndefault_tools_approval_mode = "approve"\ntools = { hive_write_shared_note = { approval_mode = "approve" } }\n')
     const akey = lib.ptyKey(home, 'assistant')
     await lib.cliStep('the Assistant on Codex', { session: akey }, async () => {
       await inv('session:start', home, { agentId: 'assistant' })
@@ -180,6 +195,34 @@ const stamped = (text) => (fs.existsSync(stampLog) ? fs.readFileSync(stampLog, '
       const card = (await inv('tasks:list')).find((t) => t.title === 'MCP approval check')
       record.assistant.cardMade = card ? { number: card.number, project: card.project } : null
       check('Assistant: the card is on the board, in demo', card?.project === 'demo', JSON.stringify(record.assistant.cardMade))
+      const [, key] = CREATED.exec(shown) ?? []
+      check('Assistant: the reply named that card, by its key', !!card && key === card.key, JSON.stringify({ key, card: card && { key: card.key, number: card.number } }))
+
+      // A Hive tool outside its Control subset (#1174, #1281: Codex pre-approves only the subset, per tool): writing a
+      // shared note asks, as on Claude Code and Copilot. Cancelled here, so nothing is written.
+      if (!done) return
+      const note = path.join(ws, '.hive', 'shared', 'notes', 'mcp-approval-check.md')
+      const notePrompt = 'Write a shared note at notes/mcp-approval-check.md containing the word check, with hive_write_shared_note. Make no other tool calls, then reply DONE.'
+      check('Assistant: the note prompt is taken', (await lib.sendPrompt(inv, akey, notePrompt, { submitted: async () => ['working', 'waiting'].includes((await live(home, 'assistant'))?.status) })) > 0)
+      const asking = await lib.until(async () => {
+        const a = await live(home, 'assistant')
+        if (a?.status === 'waiting') return a
+        return a?.status === 'finished' ? 'finished without asking' : null
+      }, TURN_MS, 500)
+      record.assistant.noteAsk = typeof asking === 'object' && asking ? { status: asking.status, message: asking.statusMessage ?? null } : asking
+      await page.screenshot({ path: path.join(scratch, 'mcpapproval-assistant-note.png') })
+      check('Assistant: Codex asks before hive_write_shared_note (outside its Control subset)', typeof asking === 'object' && !!asking && /hive_write_shared_note/.test(asking.statusMessage ?? ''), JSON.stringify(record.assistant.noteAsk))
+      check('…and the note is not written while it asks', !fs.existsSync(note))
+      // The native server named hive was read (its folder's Codex config), and Hive's approvals won over its own.
+      const hiveLog = fs.readFileSync(path.join(userData, 'logs', 'hive.log'), 'utf8')
+      check("…with the folder's own Codex config approving every hive tool (read: Hive's log names it)", /Codex has an MCP server named hive in .*\.codex[\\/]config\.toml⁩?: Hive's own hive server is used instead/.test(hiveLog), hiveLog.split('\n').filter((line) => /named hive/.test(line)).slice(-2).join(' / '))
+      if (typeof asking === 'object' && asking) {
+        // Cancel the tool call (Esc, as its question says): the turn ends and nothing is written.
+        await inv('pty:write', akey, '\x1b')
+        const ended = await lib.until(async () => ['finished', 'ready'].includes((await live(home, 'assistant'))?.status), TURN_MS, 500)
+        check('…cancelled: the turn ends', !!ended, (await live(home, 'assistant'))?.status)
+        check('…and no note was written', !fs.existsSync(note))
+      }
     })
     await inv('session:stop', home, 'assistant')
     await lib.until(async () => !(await live(home, 'assistant')), 30000, 500)

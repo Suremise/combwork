@@ -174,7 +174,7 @@ const until = async (fn, ms = 10000) => {
   await page.screenshot({ path: path.join(lib.WORK, 'ctxpercent-autocompact-env.png') })
   fs.rmSync(path.join(claudeHome, 'settings.json'), { force: true })
   // A --settings file in the agent's own arguments (#273): the command line's settings, over the project's.
-  await inv('project:updateProvider', alpha, 'claude-code', { extraArgs: '--settings cli-settings.json' })
+  await lib.setProjectLaunch(inv, alpha, 'claude-code', { extraArgs: '--settings cli-settings.json' })
   await restartWith(path.join(alpha, 'cli-settings.json'), { autoCompactWindow: 250000 })
   check('a window in a --settings file of its arguments: read at launch, and why (#273)', JSON.stringify((await live())?.autoCompact) === JSON.stringify({ window: 250000, source: 'autoCompactWindow in --settings cli-settings.json' }), JSON.stringify((await live())?.autoCompact))
   // Hive merges the user's --settings into its own launch settings and passes that alone (#330): the status line still
@@ -184,14 +184,14 @@ const until = async (fn, ms = 10000) => {
   const lastLaunch = fs.readFileSync(path.join(claudeHome, 'fake-launches.jsonl'), 'utf8').trim().split('\n').map((l) => JSON.parse(l)).pop()
   const given = lastLaunch?.opts?.['--settings'] ? JSON.parse(fs.readFileSync(lastLaunch.opts['--settings'], 'utf8')) : null
   check("…given Hive's settings file, with Hive's hooks and status line and the user's setting merged in (#330)", path.dirname(lastLaunch?.opts?.['--settings'] ?? '').toLowerCase().startsWith(path.join(userData, 'launches').toLowerCase()) && given?.autoCompactWindow === 250000 && !!given?.hooks?.Stop && !!given?.statusLine, JSON.stringify(lastLaunch?.opts))
-  await inv('project:updateProvider', alpha, 'claude-code', { extraArgs: '' })
+  await lib.setProjectLaunch(inv, alpha, 'claude-code', { extraArgs: '' })
   fs.rmSync(path.join(alpha, 'cli-settings.json'), { force: true })
   // --setting-sources leaving the project's files out (#333): Hive doesn't read them either, so the window set there
   // isn't shown (Claude Code 2.1.292 reads only the sources it names).
-  await inv('project:updateProvider', alpha, 'claude-code', { extraArgs: '--setting-sources=user' })
+  await lib.setProjectLaunch(inv, alpha, 'claude-code', { extraArgs: '--setting-sources=user' })
   await restartWith(localSettings, { autoCompactWindow: 150000 })
   check("a window in a project file --setting-sources leaves out: not read, Claude Code's default (#333)", (await live())?.autoCompact?.window === null && (await live())?.autoCompact?.source === null && /its default for this window/.test(await tip.innerText().catch(() => '')), JSON.stringify((await live())?.autoCompact))
-  await inv('project:updateProvider', alpha, 'claude-code', { extraArgs: '' })
+  await lib.setProjectLaunch(inv, alpha, 'claude-code', { extraArgs: '' })
   fs.rmSync(localSettings, { force: true })
   await page.mouse.move(5, 5)
 

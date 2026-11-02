@@ -2,8 +2,11 @@ import { closeSync, existsSync, openSync, readSync, renameSync } from 'original-
 import { join, resolve } from 'path'
 import { createHash } from 'crypto'
 import { config } from './config'
+import { placeKey } from './fsutil'
 import { createLogger, userText } from './logger'
-import { keepAsBackup, readStore, saveStore } from './storeRows'
+import { keepAsBackup } from './storeBackup'
+import { readTable, saveTable } from './storeTables'
+import { dbGeneration, onDbReplaced, upgradeWaiting } from './boardStore'
 import { englishText } from '../shared/advanced'
 import { msg } from '../shared/i18n'
 import { hiveError } from './hiveError'
@@ -31,12 +34,13 @@ import {
   type Timed,
   type TrendPoint
 } from '../shared/metrics'
+import type { LaunchWorkflow } from '../shared/workflow/roles'
 
 /**
  * Hive's performance metrics, one store per open workspace (shared/metrics.ts has the contract). Recording is a few
  * map updates into the current hour's bucket; nothing is read from disk on the request path. Buckets are hourly for 7
  * days, then folded into days, kept 30 days, and saved (debounced) in the workspace's database (#1019: `.hive/hive.db`,
- * a row a bucket through storeRows.ts, so a save writes the buckets that changed, the hour under way, and appends a new
+ * a bucket and its series in their typed tables since #1212, storeTables.ts, so a save writes the buckets that changed, the hour under way, and appends a new
  * one; `.hive/metrics/metrics.json` before, moved in by the first save), which is git-ignored and machine-local. Every dimension comes from a fixed set (route templates, Hive's tool names, provider ids), each
  * bucket has caps on projects and series, the store has a cap on buckets whichever way the clock moves, and the file
  * has a size cap: what doesn't fit is dropped and counted. The saved file is untrusted input: size-checked before it
@@ -124,9 +128,10 @@ function drop(b: Bucket, owner: string, n = 1): void {
 const SKILL_COUNTS = ['sharedScans', 'hits', 'misses', 'invalidations', 'tooLarge', 'files', 'bytes', 'headerBytes', 'entries'] as const
 const emptySkills = (): SkillServiceSeries => ({ scans: emptyTimed(), sharedScans: 0, hits: 0, misses: 0, invalidations: 0, tooLarge: 0, files: 0, bytes: 0, headerBytes: 0, entries: 0 })
 const GUIDANCE_COUNTS = ['launches', 'guidanceBytes', 'guidanceChars', 'customBytes', 'customChars', 'roleBytes', 'roleChars', 'modeBytes', 'modeChars', 'skills', 'skillCatalogBytes', 'skillBytes', 'skillsNotDelivered', 'skillsUnmeasured'] as const
-const CATALOG_COUNTS = ['starts', 'tools', 'toolsBytes'] as const
+const CATALOG_COUNTS = ['starts', 'tools', 'toolsBytes', 'toolsChars', 'charStarts', 'partStarts', 'partToolsChars', 'descriptionChars', 'paramChars'] as const
 const newBucket = (start: number, span: Bucket['span']): Bucket => ({ start, span, projects: dict(), workspace: emptyPart(), skills: emptySkills(), dropped: 0, droppedBy: dict(), series: 0 })
-const emptyGuidance = (provider: string, role: GuidanceSeries['role']): GuidanceSeries => ({ provider, role, launches: 0, guidanceBytes: 0, guidanceChars: 0, customBytes: 0, customChars: 0, roleBytes: 0, roleChars: 0, modeBytes: 0, modeChars: 0, skills: 0, skillCatalogBytes: 0, skillBytes: 0, skillsNotDelivered: 0, skillsUnmeasured: 0 })
+const emptyCatalog = (role: CatalogSeries['role'], workflow: CatalogSeries['workflow']): CatalogSeries => ({ role, workflow, starts: 0, tools: 0, toolsBytes: 0, toolsChars: 0, charStarts: 0, partStarts: 0, partToolsChars: 0, descriptionChars: 0, paramChars: 0 })
+const emptyGuidance = (provider: string, role: GuidanceSeries['role'], workflow: GuidanceSeries['workflow']): GuidanceSeries => ({ provider, role, workflow, launches: 0, guidanceBytes: 0, guidanceChars: 0, customBytes: 0, customChars: 0, roleBytes: 0, roleChars: 0, modeBytes: 0, modeChars: 0, skills: 0, skillCatalogBytes: 0, skillBytes: 0, skillsNotDelivered: 0, skillsUnmeasured: 0 })
 
 // ---------------------------------------------------------------------------
 // Labels: each from a fixed set. Anything else is "(other)", so a label never grows or carries what it shouldn't.
@@ -143,7 +148,10 @@ const TOOLS = new Set<string>([...HIVE_TOOLS, START_VIEW_METRIC])
 const PROVIDER_IDS = new Set<string>(PROVIDERS.map((p) => p.id))
 const METHODS = new Set(['GET', 'POST', 'PUT', 'PATCH', 'DELETE'])
 const ROLES = new Set(['agent', 'assistant', 'api', 'viewer', 'unknown'])
-const OUTCOMES = new Set(['ok', 'client-error', 'denied', 'server-error', 'cancelled'])
+const WORKFLOWS = new Set<string>(['builder', 'reviewer', 'either', 'none'])
+/** A series' workflow side as saved: one Hive records, else `unknown` (saved before HI-2049, or not one it knows). */
+const workflowOf = (v: unknown): GuidanceSeries['workflow'] => (typeof v === 'string' && WORKFLOWS.has(v) ? (v as LaunchWorkflow) : 'unknown')
+const OUTCOMES = new Set(['ok', 'client-error', 'denied', 'server-error', 'cancelled', 'waiting'])
 const OTHER = '(other)'
 const inSet = (set: Set<string>, v: unknown): string => (typeof v === 'string' && set.has(v) ? v : OTHER)
 /** The longest project label kept as it is; a longer name gets a bounded label of its own (projectLabel). */
@@ -240,14 +248,18 @@ function readPart(v: unknown, b: Bucket, owner: string): PartData {
     const c = readCounts(s, GUIDANCE_COUNTS, ['skillsNotDelivered', 'skillsUnmeasured', 'customBytes', 'customChars', 'roleBytes', 'roleChars', 'modeBytes', 'modeChars'])
     if (!c || (s.role !== 'agent' && s.role !== 'assistant')) return
     const provider = inSet(PROVIDER_IDS, s.provider)
-    const key = `${provider} ${s.role}`
-    const g = part.guidance[key] ?? (room() ? (part.guidance[key] = emptyGuidance(provider, s.role)) : null)
+    const workflow = workflowOf(s.workflow)
+    const key = `${provider} ${s.role} ${workflow}`
+    const g = part.guidance[key] ?? (room() ? (part.guidance[key] = emptyGuidance(provider, s.role, workflow)) : null)
     if (g) for (const k of GUIDANCE_COUNTS) g[k] += c[k]
   })
   each(o.catalog, (s) => {
-    const c = readCounts(s, CATALOG_COUNTS)
-    if (!c || (s.role !== 'agent' && s.role !== 'assistant')) return
-    const g = part.catalog[s.role] ?? (room() ? (part.catalog[s.role] = { role: s.role, starts: 0, tools: 0, toolsBytes: 0 }) : null)
+    // Saved before HI-2049: bytes only, so none of its starts has its characters; before HI-2063, none has their parts.
+    const c = readCounts(s, CATALOG_COUNTS, ['toolsChars', 'charStarts', 'partStarts', 'partToolsChars', 'descriptionChars', 'paramChars'])
+    if (!c || (s.role !== 'agent' && s.role !== 'assistant') || c.charStarts > c.starts || c.partStarts > c.charStarts || c.partToolsChars > c.toolsChars || c.descriptionChars + c.paramChars > c.partToolsChars) return
+    const workflow = workflowOf(s.workflow)
+    const key = `${s.role} ${workflow}`
+    const g = part.catalog[key] ?? (room() ? (part.catalog[key] = emptyCatalog(s.role, workflow)) : null)
     if (g) for (const k of CATALOG_COUNTS) g[k] += c[k]
   })
   return part
@@ -370,8 +382,11 @@ class Store {
   private importing = false
   /** What is saved couldn't be read (the database unavailable): nothing is saved over it. */
   private unreadable = false
+  /** The workspace database's generation it was read from (#1207 round 2): a save from an older one is refused. */
+  private gen = 0
   constructor(readonly file: string) {
     this.workspace = resolve(file, '..', '..', '..')
+    this.gen = dbGeneration(this.workspace)
     this.load()
     const now = clock.now()
     if (this.roll(now)) this.changed()
@@ -430,10 +445,10 @@ class Store {
    */
   private load(): void {
     try {
-      const saved = readStore(this.workspace, 'metrics')
+      const saved = readTable(this.workspace, 'metrics')
       if (saved.meta.has('imported')) {
         const num = (k: string): unknown => (saved.meta.has(k) ? JSON.parse(saved.meta.get(k)!) : undefined)
-        this.fromSaved({ buckets: saved.rows.map((r) => JSON.parse(r.doc) as unknown), observed: num('observed'), evictedThrough: num('evictedThrough'), renamesApplied: num('renamesApplied') })
+        this.fromSaved({ buckets: saved.docs, observed: num('observed'), evictedThrough: num('evictedThrough'), renamesApplied: num('renamesApplied') })
         if (existsSync(this.file)) {
           log.warn("A metrics.json was found after the metrics moved into the workspace database (an older Hive's): kept as a backup, not read")
           keepAsBackup(this.file)
@@ -565,8 +580,20 @@ class Store {
     return this.saving
   }
 
+  /**
+   * Whether the workspace's board waits for its upgrade to 1.0 (HI-1694): it takes no writes ("attempt to write a readonly
+   * database"), so nothing is saved meanwhile; the upgrade replaces the database, and what is observed after it is saved.
+   */
+  private waiting(): boolean {
+    try {
+      return upgradeWaiting(this.workspace)
+    } catch {
+      return false
+    }
+  }
+
   private async write(): Promise<void> {
-    if (!this.dirty || this.unreadable) return
+    if (!this.dirty || this.unreadable || this.waiting()) return
     this.dirty = false
     this.roll(clock.now())
     try {
@@ -581,22 +608,20 @@ class Store {
         else this.observed.shift()
         text = json()
       }
-      // A row a bucket, placed by its start: one leaving the front moves no other (#1019).
-      const keys = new Set<string>()
-      const rows = this.buckets.map((b) => {
-        let key = `${b.span}:${b.start}`
-        while (keys.has(key)) key += '#'
-        keys.add(key)
-        return { key, ord: b.start, doc: JSON.stringify(b) }
-      })
+      // A row a bucket, by its span and start: one leaving the front moves no other (#1019, #1212).
+      const rows = this.buckets
       const importing = this.importing
-      await saveStore(this.workspace, 'metrics', '', rows, {
+      const gen = this.gen
+      const replaced = (): void => {
+        if (gen !== dbGeneration(this.workspace)) throw new Error("the workspace's database was replaced since these metrics were read: not saved over it") // i18n-ignore: logged
+      }
+      await saveTable(this.workspace, 'metrics', rows, {
         observed: JSON.stringify(this.observed),
         evictedThrough: this.evictedThrough ? String(this.evictedThrough) : null,
         renamesApplied: this.renamesApplied ? String(this.renamesApplied) : null,
         // The first save after metrics.json was read moves it in: marked in the same transaction, then the file kept.
         ...(importing ? { imported: JSON.stringify({ at: new Date(now).toISOString(), rows: rows.length, file: this.file }) } : {})
-      })
+      }, replaced)
       if (importing) {
         this.importing = false
         if (existsSync(this.file)) keepAsBackup(this.file)
@@ -604,6 +629,26 @@ class Store {
     } catch (e) {
       log.warn('Could not save the performance metrics', e)
     }
+  }
+
+  /**
+   * The workspace's database was replaced (#1207 round 2: the upgrade to 1.0, a restore): what is in memory, read from
+   * the file before (saves failed while the upgrade waited), goes for what the file has now; observing starts again.
+   */
+  reread(): void {
+    if (this.timer) clearTimeout(this.timer)
+    this.timer = null
+    this.gen = dbGeneration(this.workspace)
+    this.buckets = []
+    this.observed = []
+    this.evictedThrough = 0
+    this.renamesApplied = 0
+    this.importing = false
+    this.unreadable = false
+    this.dirty = false
+    this.sealed = true
+    this.load()
+    this.touch(clock.now())
   }
 
   /** Everything goes, observation too: from now on is all a report covers. */
@@ -657,12 +702,12 @@ function mergePart(bucket: Bucket, a: PartData, b: PartData, capped: boolean, ow
     t.bytes += v.bytes
   }
   for (const [k, v] of Object.entries(b.guidance)) {
-    const t = a.guidance[k] ?? (room() ? (a.guidance[k] = emptyGuidance(v.provider, v.role)) : null)
+    const t = a.guidance[k] ?? (room() ? (a.guidance[k] = emptyGuidance(v.provider, v.role, v.workflow)) : null)
     if (!t) continue
     for (const f of GUIDANCE_COUNTS) t[f] += v[f] ?? 0
   }
   for (const [k, v] of Object.entries(b.catalog)) {
-    const t = a.catalog[k] ?? (room() ? (a.catalog[k] = { role: v.role, starts: 0, tools: 0, toolsBytes: 0 }) : null)
+    const t = a.catalog[k] ?? (room() ? (a.catalog[k] = emptyCatalog(v.role, v.workflow)) : null)
     if (!t) continue
     for (const f of CATALOG_COUNTS) t[f] += v[f]
   }
@@ -690,8 +735,14 @@ const live = new Set<Store>()
  * order and an older snapshot can never overwrite a newer one. A store is forgotten after its final save if nobody
  * reopened it meanwhile.
  */
-const byFile = new Map<string, { store: Store; lifetime: AbortSignal }>()
+const byFile = new Map<string, { store: Store; lifetime: AbortSignal; place: string }>()
 const fileKey = (file: string): string => (process.platform === 'win32' ? resolve(file).toLowerCase() : resolve(file))
+// The workspace's database replaced (the upgrade to 1.0, a restore): its store reads what the file has now.
+// Under every spelling of the workspace, by the place each store's handle recorded as it entered (#1456).
+onDbReplaced((workspacePath, place) => {
+  const key = fileKey(join(workspacePath, '.hive', 'metrics', 'metrics.json'))
+  for (const store of new Set([...byFile].filter(([k, o]) => k === key || o.place === place).map(([, o]) => o.store))) store.reread()
+})
 /** Saves started by a workspace closing, still going (quitting waits for them). */
 const closing = new Set<Promise<void>>()
 
@@ -733,7 +784,8 @@ export function metricsHandle(w: WorkspaceService | null | undefined): MetricsHa
   // The same file's store if one is still here (saving after its workspace closed): reused, under this lifetime.
   const shared = byFile.get(key)
   const store = shared?.store ?? new Store(file)
-  const owner = { store, lifetime }
+  // Its workspace's place resolved as it enters (#1456).
+  const owner = { store, lifetime, place: placeKey(w.path) }
   byFile.set(key, owner)
   const entry: MetricsHandle = { lifetime, store }
   stores.set(w, entry)
@@ -835,6 +887,17 @@ function series<T>(b: Bucket, owner: string, map: Record<string, T>, key: string
 // Recording. Each one is cheap and never throws: metrics must not break a request or a launch.
 // ---------------------------------------------------------------------------
 
+/**
+ * How an Agent API request ended: cancelled if its reply wasn't finished (the client went away), waiting if it answered
+ * with a wait (HI-1831: resolve's 409 while no check copy is free, which says to ask again), else by its status.
+ */
+export function apiOutcome(r: { finished: boolean; status: number; waiting: boolean }): MetricOutcome {
+  if (!r.finished) return 'cancelled'
+  if (r.waiting) return 'waiting'
+  const s = r.status
+  return s < 400 ? 'ok' : s === 401 || s === 403 ? 'denied' : s < 500 ? 'client-error' : 'server-error'
+}
+
 export function recordApi(h: MetricsHandle | null, project: string | null, r: { route: string; method: string; role: ApiSeries['role']; outcome: MetricOutcome; requestBytes: number; responseBytes: number; ms: number }): void {
   try {
     const at = bucketOf(h)
@@ -888,11 +951,24 @@ export function recordMcp(h: MetricsHandle | null, project: string | null, role:
   return true
 }
 
-/** The bridge's tool list as one session start sent it to its CLI. */
-export function recordCatalog(h: MetricsHandle | null, project: string | null, role: CatalogSeries['role'], c: { tools: unknown; toolsBytes: unknown }): boolean {
+/**
+ * The bridge's tool list as one session start sent it to its CLI, on the workflow side of the launch it reported for
+ * (HI-2049: that launch's own, `unknown` when Hive doesn't know it). A bridge from before HI-2049 sends no `toolsChars`:
+ * its start counts in `starts`, not `charStarts`; one from before HI-2063 sends no parts: in `charStarts`, not
+ * `partStarts`. Parts come both or neither, with the characters, and add up to no more than them.
+ */
+export function recordCatalog(h: MetricsHandle | null, project: string | null, role: CatalogSeries['role'], workflow: CatalogSeries['workflow'], c: { tools: unknown; toolsBytes: unknown; toolsChars?: unknown; descriptionChars?: unknown; paramChars?: unknown }): boolean {
+  const int = (v: unknown): number | null => {
+    const n = count(v, 10_000_000)
+    return n !== null && Number.isInteger(n) ? n : null
+  }
   const tools = count(c.tools, MCP_REPORT_LIMITS.tools)
-  const toolsBytes = count(c.toolsBytes, 10_000_000)
-  if (tools === null || toolsBytes === null || !Number.isInteger(tools) || !Number.isInteger(toolsBytes)) return false
+  const toolsBytes = int(c.toolsBytes)
+  const toolsChars = c.toolsChars === undefined ? undefined : int(c.toolsChars)
+  if (tools === null || toolsBytes === null || toolsChars === null || !Number.isInteger(tools)) return false
+  const hasParts = c.descriptionChars !== undefined || c.paramChars !== undefined
+  const parts = hasParts ? { description: int(c.descriptionChars), param: int(c.paramChars) } : null
+  if (parts && (toolsChars === undefined || parts.description === null || parts.param === null || parts.description + parts.param > toolsChars)) return false
   try {
     const at = bucketOf(h)
     if (!at) return true
@@ -902,11 +978,22 @@ export function recordCatalog(h: MetricsHandle | null, project: string | null, r
       at.store.changed()
       return true
     }
-    const s = series(at.b, ownerOf(project), part.catalog, role, () => ({ role, starts: 0, tools: 0, toolsBytes: 0 }))
+    const side = workflowOf(workflow)
+    const s = series(at.b, ownerOf(project), part.catalog, `${role} ${side}`, () => emptyCatalog(role, side))
     if (s) {
       s.starts++
       s.tools += tools
       s.toolsBytes += toolsBytes
+      if (toolsChars !== undefined) {
+        s.toolsChars += toolsChars
+        s.charStarts++
+      }
+      if (parts && toolsChars !== undefined) {
+        s.partStarts++
+        s.partToolsChars += toolsChars
+        s.descriptionChars += parts.description!
+        s.paramChars += parts.param!
+      }
     }
     at.store.changed()
   } catch (err) {
@@ -923,7 +1010,8 @@ export function recordLaunch(h: MetricsHandle | null, project: string | null, g:
     const part = partOf(at.b, project)
     if (!part) return at.store.changed()
     const provider = inSet(PROVIDER_IDS, g.provider)
-    const s = series(at.b, ownerOf(project), part.guidance, `${provider} ${g.role}`, () => emptyGuidance(provider, g.role))
+    const workflow = workflowOf(g.workflow)
+    const s = series(at.b, ownerOf(project), part.guidance, `${provider} ${g.role} ${workflow}`, () => emptyGuidance(provider, g.role, workflow))
     if (s) {
       s.launches++
       for (const f of GUIDANCE_COUNTS) if (f !== 'launches') s[f] += Math.max(0, Math.floor(g[f]))
@@ -1022,7 +1110,7 @@ function trendOf(inRange: Bucket[], from: number, to: number, parts: (b: Bucket)
   const start = to - first > slots * step ? Math.floor((to - (slots - 1) * step) / step) * step : first
   const points: TrendPoint[] = Array.from({ length: slots }, (_, i) => {
     const a = start + i * step
-    return { start: new Date(a).toISOString(), observedMs: overlap(observed, Math.max(a, from), Math.min(a + step, to)), requests: 0, failed: 0, cancelled: 0, requestBytes: 0, responseBytes: 0, toolCalls: 0, toolChars: 0, launches: 0, guidanceBytes: 0 }
+    return { start: new Date(a).toISOString(), observedMs: overlap(observed, Math.max(a, from), Math.min(a + step, to)), requests: 0, failed: 0, cancelled: 0, waits: 0, requestBytes: 0, responseBytes: 0, toolCalls: 0, toolChars: 0, launches: 0, guidanceBytes: 0 }
   })
   for (const b of inRange) {
     const pt = points[Math.floor((b.start - start) / step)]
@@ -1030,7 +1118,8 @@ function trendOf(inRange: Bucket[], from: number, to: number, parts: (b: Bucket)
     for (const part of parts(b)) {
       for (const a of Object.values(part.api)) {
         pt.requests += a.count
-        if (a.outcome !== 'ok') pt.failed += a.count
+        if (a.outcome === 'waiting') pt.waits += a.count
+        else if (a.outcome !== 'ok') pt.failed += a.count
         if (a.outcome === 'cancelled') pt.cancelled += a.count
         pt.requestBytes += a.requestBytes
         pt.responseBytes += a.responseBytes

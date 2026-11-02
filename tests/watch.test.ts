@@ -2,17 +2,19 @@
 // hook steps, and the watches themselves (main/watches.ts): a watch is kept in the workspace, fires once when a watched
 // card changes or its limit passes, wakes its agent only when it is idle and the user isn't typing (else later), and
 // ends on wake or cancel. The sessions are stand-ins here (the e2e cardloop suite runs real ones).
-import { readCard } from './boardDb'
+import { readCard, writeCard } from './boardDb'
 import { moveFolder } from './moveFolder'
 import { closeAllBoards } from '../src/main/boardStore'
-import { existsSync, mkdirSync, readdirSync, readFileSync, renameSync, rmSync, writeFileSync } from 'fs'
+import { existsSync, mkdirSync, readdirSync, readFileSync, rmSync, writeFileSync } from 'fs'
 import { basename, join } from 'path'
 import { afterAll, describe, expect, it, vi } from 'vitest'
 import * as electron from 'electron'
-import { alreadyThere, changesBetween, decodeSince, encodeSince, limitLine, markOf, movedIntoSince, readCondition, returnRound, WAKE_MAX_BYTES, wakeAbout, wakeLine, wakeLines, carriedOver, changesSince, entryWithin, seenOf, watchLabel, cardChange, LANES_RUNNING_TAIL, withLanesTail } from '../src/shared/watch'
+import { alreadyThere, loopWakeLine, changesBetween, decodeSince, encodeSince, limitLine, markOf, movedIntoSince, readCondition, returnRound, WAKE_MAX_BYTES, wakeAbout, wakeLine, wakeLines, carriedOver, changesSince, entryWithin, seenOf, watchLabel, cardChange, LANES_RUNNING_TAIL, withLanesTail, brief, handoffsSince, hearsHandoffs } from '../src/shared/watch'
 import { taskWaitText } from '../src/shared/toolReplies'
+import { resubmittedText, returnedWake } from '../src/main/workflow/queueState'
 import { hookStep } from '../src/main/hookStatus'
 import type { TaskCard } from '../src/shared/types'
+import type { WatchCondition } from '../src/shared/watch'
 import { tempDir } from './tempDir'
 import { putStoreDocs, storeDocs, storeMeta } from './storeDocs'
 import { follow, toldOf } from './followDoorbell'
@@ -139,6 +141,76 @@ describe('what counts as a change', () => {
     expect(changesSince(sent, { ...base, watcher: undefined }, cond)).toEqual(['comment'])
   })
 
+  it("the watcher's own moves aren't news; another's are (HI-2015: a builder's submission moving its card into Review woke its watch)", () => {
+    const h = (m: number, what: string, by: string) => ({ at: at(m), by, what })
+    const doing = cardOf({ column: 'doing', agent: 'a1', history: [h(1, 'Moved to Doing', 'B (alpha)')], comments: [] })
+    const base = { mark: markOf(doing), seen: seenOf(doing), since: at(1), watcher: 'B (alpha)' }
+    const anyMove = { changes: ['verdict' as const, 'column' as const, 'comment' as const] }
+    const sent = { ...doing, column: 'review' as const, history: [...doing.history, h(2, 'Moved to Review', 'B (alpha)')] }
+    expect(changesSince(sent, base, anyMove)).toEqual([])
+    // Nor a move into the column it waits for, of its own.
+    expect(changesSince(sent, base, { changes: ['column'], column: 'review', moveInto: true })).toEqual([])
+    // Another's move counts: the reviewer's verdict sending it back, a move into Passed.
+    const back = { ...sent, column: 'passed' as const, history: [...sent.history, h(3, 'Review passed', 'R (alpha)'), h(3, 'Moved to Passed', 'R (alpha)')] }
+    expect(changesSince(back, base, anyMove)).toEqual(['column', 'verdict'])
+    expect(changesSince(back, base, { changes: ['column'], column: 'passed', moveInto: true })).toEqual(['column'])
+    // Without a watcher (the Assistant's watches), every move counts as before.
+    expect(changesSince(sent, { ...base, watcher: undefined }, anyMove)).toEqual(['column'])
+  })
+
+  it('a watch on any move counts a card that left and came back by another, not by its own moves alone (HI-2143: HR2 on HI-2122)', () => {
+    const h = (m: number, what: string, by: string) => ({ at: at(m), by, what })
+    // HR2's watch begun in Review, before its pass.
+    const review = cardOf({ column: 'review', agent: 'a1', history: [h(1, 'Moved to Review', 'B (alpha)'), h(2, 'Started reviewing', 'R (alpha)')] })
+    const base = { mark: markOf(review), seen: seenOf(review), since: at(2), watcher: 'R (alpha)' }
+    const anyMove = { changes: ['column' as const] }
+    // Its pass, and the queue's return in its name: its own moves, no news.
+    const returned = { ...review, column: 'doing' as const, history: [...review.history, h(3, 'Review passed', 'R (alpha)'), h(3, 'Moved to Passed', 'R (alpha)'), h(4, 'Moved to Doing', 'R (alpha)')] }
+    expect(changesSince(returned, base, anyMove)).toEqual([])
+    // Submitted again: in Review as when the watch began, but moved there by the builder.
+    const again = { ...returned, column: 'review' as const, history: [...returned.history, h(5, 'Moved to Review', 'B (alpha)')] }
+    expect(changesSince(again, base, anyMove)).toEqual(['column'])
+    // Back where it was by its own moves only: still no news.
+    const own = { ...review, history: [...review.history, h(3, 'Moved to Doing', 'R (alpha)'), h(4, 'Moved to Review', 'R (alpha)')] }
+    expect(changesSince(own, base, anyMove)).toEqual([])
+  })
+
+  it("a reviewer's request and the user's decisions count for a watch that counts a verdict, a move or a comment; not for one waiting only for a column, nor the watcher's own (#1272, #912)", () => {
+    const h = (m: number, what: string, by: string) => ({ at: at(m), by, what })
+    const review = cardOf({ column: 'review', agent: 'a1', history: [h(1, 'Moved to Review', 'B (alpha)'), h(2, 'Started reviewing', 'R (alpha)')], comments: [{ at: at(1), by: 'B (alpha)', text: 'Round 1 ready' }] })
+    const base = { mark: markOf(review), seen: seenOf(review), since: at(2), watcher: 'B (alpha)' }
+    // #912's case: the builder's watch asked for its verdict and Passed only, not comments.
+    const builder = { changes: ['verdict' as const, 'column' as const], column: 'passed' as const, moveInto: true as const }
+    const asked = { ...review, history: [...review.history, h(3, 'Asked the builder: "Which commit?"', 'R (alpha)')], comments: [...review.comments, { at: at(3), by: 'R (alpha)', text: 'Which commit?' }] }
+    expect(changesSince(asked, base, builder)).toEqual(['request'])
+    // With comments counted too: the comment and the request, one wake.
+    expect(changesSince(asked, base, { changes: ['verdict', 'column', 'comment'], column: 'passed', moveInto: true })).toEqual(['comment', 'request'])
+    for (const what of ['Recorded a decision: "Keep it short"', 'Changed a decision to "Shorter" (was "Keep it short")', 'Removed a decision: "Shorter"']) {
+      expect(changesSince({ ...review, history: [...review.history, h(3, what, 'You')] }, base, builder)).toEqual(['decision'])
+      // Any of verdict, column or comment, and a watch on any change.
+      expect(changesSince({ ...review, history: [...review.history, h(3, what, 'Assistant')] }, base, { changes: ['comment'] })).toEqual(['decision'])
+      expect(changesSince({ ...review, history: [...review.history, h(3, what, 'Assistant')] }, base, { changes: [] })).toEqual(['decision'])
+    }
+    // A reviewer waiting only for the card to arrive in Review, and a watch on its agent only: neither counts them.
+    const decided = { ...asked, history: [...asked.history, h(4, 'Recorded a decision: "Keep it short"', 'You')] }
+    expect(changesSince(decided, { ...base, watcher: 'R (alpha)' }, { changes: ['column'], column: 'review' })).toEqual([])
+    expect(changesSince(decided, base, { changes: ['agent'] })).toEqual([])
+    // Its own request (the reviewer's watch after asking) and a decision it wrote down itself aren't news to it.
+    expect(changesSince(asked, { ...base, watcher: 'R (alpha)' }, { changes: ['comment'] })).toEqual([])
+    expect(changesSince({ ...review, history: [...review.history, h(3, 'Recorded a decision: "Keep it short"', 'B (alpha)')] }, base, builder)).toEqual([])
+    // A wait that compares marks (a bounded wait) finds them by the history since it began.
+    expect(handoffsSince(decided, at(2), builder)).toEqual(['request', 'decision'])
+    expect(handoffsSince(decided, at(3), builder)).toEqual(['decision'])
+    expect(handoffsSince(decided, at(2), { changes: ['column'], column: 'review' })).toEqual([])
+    expect(handoffsSince(null, at(2), builder)).toEqual([])
+    expect(hearsHandoffs({ changes: ['column'], column: 'passed', moveInto: true })).toBe(true)
+    expect(hearsHandoffs({ changes: ['column'], column: 'review' })).toBe(false)
+    // The wake line says so, with the request's words as the latest comment; the short form too.
+    const line = wakeLine({ ...cardChange(7, decided, ['request', 'decision']), about: wakeAbout(decided, ['request', 'decision'], 'a1') })
+    expect(line).toBe('[Hive] #7 is in Review (its reviewer asks you something; a new decision from the user: read its decisions); latest comment by R (alpha): "Which commit?". Your card watch has ended: carry on (hive_read_task with latestComment for the comment in full).')
+    expect(brief(cardChange(7, decided, ['request']))).toBe('#7 in Review, a request')
+  })
+
   it('an entry exactly like the one seen (time, author, words) is still a new one; the one seen is never counted again (#224)', () => {
     const e = (what: string, id?: string) => ({ at: at(2), by: 'R (alpha)', what, ...(id ? { id } : {}) })
     const cond = { changes: ['verdict' as const, 'comment' as const] }
@@ -237,6 +309,54 @@ describe('what counts as a change', () => {
     expect(readCondition({ cards: [1], column: 'archive' })).toMatch(/column must be/)
   })
 
+  it("HI-2087: a card the merge queue returned: the line leads with the return and its reason, never the review's pass; alone or with others", () => {
+    const c = cardOf({ column: 'doing', comments: [{ at: at(5), by: 'HR1 (hive)', text: 'Round 2: PASSED — no findings' }] })
+    const back = '#7 came back from the merge queue: a conflict with main in src/main/bundledHistory.json. Merge main into your worktree, resolve the conflict, commit and submit again (hive_submit).'
+    const returned = { ...cardChange(7, c, ['column']), about: { owner: null, verdict: null, queueReturn: back } }
+    const line = wakeLine(returned)
+    expect(line).toBe(`[Hive] ${back.slice(0, -1)}. Your card watch has ended: carry on (hive_read_task with latestComment for the comment in full).`)
+    expect(line).not.toMatch(/PASSED|latest comment by/)
+    expect(Buffer.byteLength(JSON.stringify(line))).toBeLessThanOrEqual(WAKE_MAX_BYTES)
+    // With another card: still its reason first.
+    const other = cardChange(8, cardOf({ column: 'review' }), ['column'])
+    expect(wakeLines([returned, other])).toMatch(/^\[Hive\] #7 came back from the merge queue: a conflict with main in src\/main\/bundledHistory\.json[.;]/)
+    // The queue's own wake (a loop wake's note, HB2's on HI-2046): the return first too, not the column and the pass.
+    const passed = { ...cardChange(7, c, ['column']), about: { owner: null, verdict: { passed: true, by: 'HR1 (hive)' } } }
+    const note = loopWakeLine(passed, 'note', back)
+    expect(note).toBe(`[Hive] ${back.slice(0, -1)}. This is your card in its loop: carry on (hive_read_task with latestComment for the comment in full).`)
+    // Within the wake's bytes (HR3's round 1 finding 2), whatever the return carries: output in another script (three
+    // bytes a character), paths with quotes and backslashes (escaped in JSON). The card, why and what to do stay whole.
+    const failed = { entry: 'HI-7/e1', revision: 'a', target: 'main', reason: 'checks' as const, transient: false, check: 'typecheck', logPath: 'C:\\logs\\"quoted"\\check.log', log: `型エラー: "x" \\ y ${'型'.repeat(150)}\n`.repeat(20) }
+    const big = returnedWake('HI-7', failed)
+    for (const l of [wakeLine({ ...returned, about: { owner: null, verdict: null, queueReturn: big } }), loopWakeLine(passed, 'note', big)]) {
+      expect(Buffer.byteLength(JSON.stringify(l))).toBeLessThanOrEqual(WAKE_MAX_BYTES)
+      expect(l).not.toMatch(/\n/)
+      expect(l).toMatch(/^\[Hive\] HI-7 came back from the merge queue: the merge check typecheck failed on the merged result\. .*… Fix it in your worktree, commit and submit again \(hive_submit\)\. (Your card watch has ended|This is your card in its loop)/)
+    }
+    // Another note of Hive's (a stale pass) is quoted after where the card is, as before.
+    expect(loopWakeLine(passed, 'note', '#7: its pass is stale')).toMatch(/^\[Hive\] #7 is in Doing: HR1 \(hive\) passed it; latest comment by HR1 \(hive\): "Round 2: PASSED — no findings"\. Hive: "#7: its pass is stale"/)
+  })
+
+  it("HI-2143: a card submitted again after the merge queue returned it: its reviewer's line leads with the return and the files resolved, never its own pass", () => {
+    const c = cardOf({ column: 'review', agentName: 'HB1', comments: [{ at: at(5), by: 'HR2 (hive)', text: 'Pass: submission 38. No blocking findings.' }] })
+    const hunk = (line: number) => ({ line, before: [], ours: ['a'], theirs: ['b'], after: [] })
+    const conflict = { entry: 'HI-2122/e1', revision: 'a', target: '1.0.0', reason: 'conflict' as const, transient: false, files: ['src/main/projectAgents.ts', 'tests/providerDetect.test.ts'], conflicts: { oursIs: 'target' as const, files: [{ file: 'src/main/projectAgents.ts', hunks: [hunk(447)] }, { file: 'tests/providerDetect.test.ts', hunks: [hunk(78), hunk(89)] }] } }
+    const again = resubmittedText('HI-2122', conflict as never, 'HB1')
+    expect(again).toBe('HI-2122 is back in Review after the merge queue returned it (a conflict with 1.0.0 in src/main/projectAgents.ts (1 conflict, line 447), tests/providerDetect.test.ts (2 conflicts, lines 78 and 89)); HB1 resolved it and submitted it again: review the resolution')
+    const change = { ...cardChange(7, c, ['column']), about: { ...wakeAbout(c, ['column'], 'r1'), resubmitted: again } }
+    // Its own watch's line, and Hive's loop wake for it.
+    expect(wakeLine(change)).toBe(`[Hive] ${again}. Your card watch has ended: carry on (hive_read_task with latestComment for the comment in full).`)
+    expect(loopWakeLine(change, 'review')).toBe(`[Hive] ${again}. You review this card in its loop: carry on with it (hive_read_task with latestComment for the comment in full).`)
+    expect(wakeLines([change, cardChange(8, cardOf({ number: 8, column: 'doing' }), ['column'])])).toMatch(/^\[Hive\] HI-2122 is back in Review after the merge queue returned it \(a conflict with 1\.0\.0 in src\/main\/projectAgents\.ts/)
+    // A merge check that failed: what changed, not a resolution; many files: within the line, one line.
+    expect(resubmittedText('HI-9', { entry: 'e', revision: 'a', target: 'main', reason: 'checks', transient: false, check: 'typecheck' }, 'HB1')).toBe('HI-9 is back in Review after the merge queue returned it (the merge check typecheck failed on the merged result); HB1 changed it and submitted it again: review what changed')
+    const many = resubmittedText('HI-9', { ...conflict, files: Array.from({ length: 40 }, (_, i) => `src/${'深'.repeat(30)}/f${i}.ts`), conflicts: undefined } as never, 'HB1')
+    const l = loopWakeLine({ ...change, about: { ...change.about, resubmitted: many } }, 'review')
+    expect(Buffer.byteLength(JSON.stringify(l))).toBeLessThanOrEqual(WAKE_MAX_BYTES)
+    expect(l).not.toMatch(/\n/)
+    expect(l).toMatch(/^\[Hive\] HI-9 is back in Review after the merge queue returned it \(a conflict with 1\.0\.0 in .* and \d+ more\); HB1 resolved it/)
+  })
+
   it('the wake line is one short line with the card, its column and the latest comment; the reply is lean', () => {
     const c = cardOf({ column: 'review', comments: [{ at: at(5), by: 'Codex (hive)', text: '\n  Review round 2: FAILED — two findings\n1. …' }] })
     const line = wakeLine(cardChange(7, c, ['column']), 1)
@@ -247,6 +367,22 @@ describe('what counts as a change', () => {
     expect(wakeLine(cardChange(7, cardOf({ archived: true }), 'gone'))).toMatch(/^\[Hive\] #7 was archived \(off the board: only the user brings it back\)\. Your card watch has ended/)
     expect(taskWaitText({ changes: [{ number: 7, column: 'gone', changes: 'gone', by: null, comment: null, archived: true }] })).toBe('#7 was archived')
     expect(limitLine({ cards: [7, 8], changes: [] }, 120)).toMatch(/No change on #7, #8 in 2 h/)
+    // HI-2295: a card in Review is said to be there; only the others ask the agent to tell the user.
+    expect(limitLine({ cards: [7], changes: [] }, 30)).toBe('[Hive] No change on #7 in 30 min: your card watch has ended. Tell the user (hive_notify) and ask what to do.')
+    expect(limitLine({ cards: [7], changes: [] }, 30, [], [{ number: 7, state: 'reviewing', reviewer: 'CR1 (cli)' }])).toBe("[Hive] No change on #7 in 30 min: your card watch has ended. #7 is in Review, being reviewed by CR1 (cli). Watch #7 again for its verdict (in a card loop, Hive wakes you with it); don't tell the user about it.")
+    expect(limitLine({ cards: [7], changes: [] }, 30, [], [{ number: 7, state: 'pool' }])).toMatch(/#7 is in Review, waiting for the reviewer pool to give it to a reviewer\. Watch #7 again/)
+    expect(limitLine({ cards: [7], changes: [] }, 30, [], [{ number: 7, state: 'assigned', reviewer: 'CR2' }])).toMatch(/the reviewer pool gave it to CR2, who hasn't started yet\. Watch #7/)
+    expect(limitLine({ cards: [7], changes: [] }, 30, [], [{ number: 7, state: 'review' }])).not.toMatch(/tell the user \(hive_notify\)/)
+    // Mixed: the card in Review, and the rest told as before.
+    expect(limitLine({ cards: [7, 8], changes: [] }, 30, [], [{ number: 7, state: 'pool' }])).toMatch(/don't tell the user about it; for the rest, tell the user \(hive_notify\) and ask what to do\.$/)
+    // With a card that left the watch: dropped first, as before.
+    expect(limitLine({ cards: [7, 8], changes: [] }, 30, [{ number: 9, why: 'done', detail: null }])).toMatch(/^\[Hive\] #9 is in Done \(your watch on it ended\)\. No change on #7, #8 in 30 min: your card watch has ended\. Drop the first from your list; for the rest, tell the user \(hive_notify\) and ask what to do\.$/)
+    expect(limitLine({ cards: [7], changes: [] }, 30, [{ number: 9, why: 'done', detail: null }], [{ number: 7, state: 'review' }])).toMatch(/Drop the first from your list; watch #7 again for its verdict \(in a card loop, Hive wakes you with it\); don't tell the user about it\.$/)
+    // Many cards with long names still fit, shortened.
+    const many = Array.from({ length: 20 }, (_, i) => i + 100)
+    const long = limitLine({ cards: many, changes: [] }, 30, [], many.map((number) => ({ number, state: 'reviewing' as const, reviewer: 'R'.repeat(60) })))
+    expect(Buffer.byteLength(JSON.stringify(long))).toBeLessThanOrEqual(WAKE_MAX_BYTES)
+    expect(long).toMatch(/are in Review\. Watch/)
     expect(watchLabel({ cards: [7], column: 'review' })).toBe('Waiting for #7 → Review')
     expect(taskWaitText({ watching: 'Waiting for #7 → Review', limitAt: 'x' })).toMatch(/End your turn now/)
     expect(taskWaitText({ timedOut: true, since: '@1;' })).toBe('No change.\nsince: @1;')
@@ -378,8 +514,20 @@ describe('watches (main/watches.ts)', async () => {
     await watches.evaluateWatches(w)
     await watches.settled()
   }
+  /**
+   * A card failed by its reviewer (`by`, as history names it) as before HI-1946, when a failed card stayed in Review for
+   * its fixes: a card failed then may still be there (#214, #434). Today's verdict sends it back to Doing, so the card is
+   * written as that rule left it, in one change: its review ended, "Review failed" in its history, still in Review.
+   */
+  const failedInReview = async (w: Parameters<typeof watches.evaluateWatches>[0], num: number, by: string): Promise<void> => {
+    const doc = readCard(w, num)
+    const when = new Date().toISOString()
+    const history = [...(doc.history as unknown[]), { at: when, by, what: 'Review failed', whatText: { id: 'tasks.history.reviewFailed' }, id: `failed-${num}-${Date.now()}` }]
+    const { review: _review, ...rest } = doc
+    await writeCard(w, num, { ...rest, history, updatedAt: when })
+  }
   const { sessions } = await import('../src/main/sessions')
-  const { storeTestHooks } = await import('../src/main/storeRows')
+  const { tableTestHooks: storeTestHooks } = await import('../src/main/storeTables')
   /** The watches a workspace has saved (#1018: rows in its database, what watches.json's `watches` held). */
   // oxlint-disable-next-line typescript/no-explicit-any -- saved entries read as JSON, as the file's were
   const savedOf = (path: string): any[] => storeDocs(path, 'watches')
@@ -615,6 +763,30 @@ describe('watches (main/watches.ts)', async () => {
     }
   })
 
+  it("a watch's label names its card by key, read outside any request too (HI-1688)", async () => {
+    const path = join(base, `ws-${++n}`)
+    for (const p of ['alpha', 'beta']) {
+      mkdirSync(join(path, p, '.hive'), { recursive: true })
+      writeFileSync(join(path, p, '.hive', 'project.json'), JSON.stringify({ version: 2, agents: [{ id: 'a1', name: 'Builder' }] }))
+    }
+    const w = createWorkspaceService()
+    await w.open(path)
+    const { keyProjects } = await import('../src/main/projectKeys')
+    await inWorkspace(w, () => keyProjects(w))
+    const alpha = join(path, 'alpha')
+    fake(alpha)
+    const mine = await inWorkspace(w, () => tasks.createTask({ title: 'Mine', project: 'alpha' }, user))
+    expect(mine.key).toMatch(/^[A-Z]{2,4}-\d+$/)
+    const r = await watches.registerWatch(w, alpha, 'a1', { cards: [mine.number], changes: ['column'], column: 'review' })
+    const label = `Waiting for ${mine.key} → Review`
+    expect(r).toMatchObject({ watching: { label } })
+    // As the Agent API's status, the project list and the inbox's offer line read it: outside any request, no names of
+    // their own (before HI-1688 it said "#N" there).
+    expect(watches.watchFor(alpha, 'a1')?.label).toBe(label)
+    await watches.settled()
+    await disposeWorkspaceService(w)
+  })
+
   it('fires once when a watched card changes, waking an idle agent; a column already reached answers at once', async () => {
     const { w, alpha } = await open()
     const st = fake(alpha)
@@ -639,6 +811,125 @@ describe('watches (main/watches.ts)', async () => {
     const r2 = await watches.registerWatch(w, alpha, 'a1', { cards: [c.number], changes: ['column'], column: 'doing' })
     expect(r2).toMatchObject({ already: { number: c.number, column: 'doing' } })
     expect(watches.watchFor(alpha, 'a1')).toBeNull()
+    await disposeWorkspaceService(w)
+  })
+
+  it('started from a card as an intent left it (#1639): a change made before the watch was in place fires it', async () => {
+    const { w, alpha } = await open()
+    const st = fake(alpha)
+    const c = await inWorkspace(w, () => tasks.createTask({ title: 'A', project: 'alpha', agent: 'a1', column: 'review' }, user))
+    // The card as the builder's submission left it, and then the reviewer's verdict before Hive armed the watch.
+    const submitted = await inWorkspace(w, () => tasks.getTask(c.number, w))
+    await inWorkspace(w, () => tasks.updateTask(c.number, { column: 'doing' }, { kind: 'agent', name: 'Reviewer (alpha)' }, { comment: 'Round 1: FAILED\n1. Add a test.' }))
+    const cond = (): WatchCondition => ({ cards: [c.number], changes: ['verdict', 'column', 'comment'], column: 'passed', moveInto: true })
+    const r = await watches.registerWatch(w, alpha, 'a1', cond(), 360, { card: submitted, at: submitted.updatedAt })
+    expect(r).toMatchObject({ watching: { label: expect.any(String) } })
+    await evaluated(w)
+    expect(st.typed).toHaveLength(1)
+    expect(st.told[0]).toMatch(new RegExp(`^\\[Hive\\] #${c.number} is in Doing; latest comment by Reviewer \\(alpha\\): "Round 1: FAILED"`))
+    // Without it, the same watch starts from the card as it is now: nothing to tell.
+    await watches.registerWatch(w, alpha, 'a1', cond(), 360)
+    await evaluated(w)
+    expect(st.typed).toHaveLength(1)
+    await watches.cancelWatch(w, alpha, 'a1')
+    await disposeWorkspaceService(w)
+  })
+
+  it("started from the watcher's own last change to the card in its launch (HI-2302): a reply between its question and its watch fires it", async () => {
+    const { w, alpha } = await open()
+    const st = fake(alpha)
+    // a1 reviews here; its launch began before the card's story.
+    const live = sessions.liveFor
+    let launched = new Date(Date.now() - 60_000).toISOString()
+    Object.assign(sessions, { liveFor: (p: string, id: string) => (live(p, id) ? ({ ...live(p, id), startedAt: launched } as never) : null) })
+    const asker = { kind: 'agent', name: 'Builder (alpha)' } as const
+    const other = { kind: 'agent', name: 'Reviewer (alpha)' } as const
+    const cond = (): WatchCondition => ({ cards: [c.number], changes: ['comment', 'column'] })
+    const c = await inWorkspace(w, () => tasks.createTask({ title: 'A', project: 'alpha', agent: 'a2', column: 'review' }, user))
+    // PE-39: the question, the answer, and only then the watch.
+    await inWorkspace(w, () => tasks.commentTask(c.number, 'Please attach the logs.', asker))
+    await inWorkspace(w, () => tasks.commentTask(c.number, 'Logs attached.', other))
+    await watches.registerWatch(w, alpha, 'a1', cond())
+    await evaluated(w)
+    expect(st.typed).toHaveLength(1)
+    expect(st.told[0]).toContain('latest comment by Reviewer (alpha): "Logs attached."')
+    // The answer after the watch began fires it, as before.
+    st.status = 'watching'
+    await inWorkspace(w, () => tasks.commentTask(c.number, 'And the screenshots?', asker))
+    await watches.registerWatch(w, alpha, 'a1', cond())
+    await evaluated(w)
+    expect(st.typed).toHaveLength(1)
+    await inWorkspace(w, () => tasks.commentTask(c.number, 'Attached too.', other))
+    await evaluated(w)
+    expect(st.typed).toHaveLength(2)
+    expect(st.told[1]).toContain('latest comment by Reviewer (alpha): "Attached too."')
+    // Its own change from before its launch doesn't reach back (a card no wake told it of): the watch starts from now.
+    st.status = 'watching'
+    const d = await inWorkspace(w, () => tasks.createTask({ title: 'B', project: 'alpha', agent: 'a2', column: 'review' }, user))
+    await inWorkspace(w, () => tasks.commentTask(d.number, 'A question from an earlier launch.', asker))
+    await inWorkspace(w, () => tasks.commentTask(d.number, 'An answer from before this launch.', other))
+    launched = new Date(Date.now() + 1000).toISOString()
+    await watches.registerWatch(w, alpha, 'a1', { cards: [d.number], changes: ['comment', 'column'] })
+    await evaluated(w)
+    expect(st.typed).toHaveLength(2)
+    await watches.cancelWatch(w, alpha, 'a1')
+    Object.assign(sessions, { liveFor: live })
+    await disposeWorkspaceService(w)
+  })
+
+  it("started from the watcher's own last change, a reassignment by someone else after it still counts (HI-2302, HR1's round 1 finding)", async () => {
+    const { w, alpha } = await open()
+    const st = fake(alpha)
+    const live = sessions.liveFor
+    const launched = new Date(Date.now() - 60_000).toISOString()
+    Object.assign(sessions, { liveFor: (p: string, id: string) => (live(p, id) ? ({ ...live(p, id), startedAt: launched } as never) : null) })
+    const asker = { kind: 'agent', name: 'Builder (alpha)' } as const
+    const other = { kind: 'agent', name: 'Reviewer (alpha)' } as const
+    const agentWatch = (card: number): WatchCondition => ({ cards: [card], changes: ['agent'] })
+    // No wake told it of the card: its own comment, then the user takes the card from a2, then the watch.
+    const c = await inWorkspace(w, () => tasks.createTask({ title: 'A', project: 'alpha', agent: 'a2', column: 'review' }, user))
+    await inWorkspace(w, () => tasks.commentTask(c.number, 'Please attach the logs.', asker))
+    await inWorkspace(w, () => tasks.updateTask(c.number, { agent: null }, user))
+    await watches.registerWatch(w, alpha, 'a1', agentWatch(c.number))
+    await evaluated(w)
+    expect(st.typed).toHaveLength(1)
+    // After a wake that told it of the card (a2's): its own comment, a reassignment, then the watch.
+    st.status = 'watching'
+    const d = await inWorkspace(w, () => tasks.createTask({ title: 'B', project: 'alpha', agent: 'a2', column: 'review' }, user))
+    await watches.registerWatch(w, alpha, 'a1', { cards: [d.number], changes: ['comment'] })
+    await inWorkspace(w, () => tasks.commentTask(d.number, 'Ready.', other))
+    await evaluated(w)
+    expect(st.typed).toHaveLength(2)
+    st.status = 'watching'
+    await inWorkspace(w, () => tasks.commentTask(d.number, 'Please attach the logs.', asker))
+    await inWorkspace(w, () => tasks.updateTask(d.number, { agent: null }, user))
+    await watches.registerWatch(w, alpha, 'a1', agentWatch(d.number))
+    await evaluated(w)
+    expect(st.typed).toHaveLength(3)
+    // Its own change after the reassignment: nothing new since, so nothing fires.
+    st.status = 'watching'
+    const e = await inWorkspace(w, () => tasks.createTask({ title: 'C', project: 'alpha', agent: 'a2', column: 'review' }, user))
+    await inWorkspace(w, () => tasks.updateTask(e.number, { agent: null }, user))
+    await inWorkspace(w, () => tasks.commentTask(e.number, 'Noted.', asker))
+    await watches.registerWatch(w, alpha, 'a1', agentWatch(e.number))
+    await evaluated(w)
+    expect(st.typed).toHaveLength(3)
+    // HI-2315: the same, both in one millisecond (a loaded machine wrote them back to back): the card's later change is
+    // still told apart, so nothing fires.
+    st.status = 'watching'
+    const f = await inWorkspace(w, () => tasks.createTask({ title: 'D', project: 'alpha', agent: 'a2', column: 'review' }, user))
+    vi.useFakeTimers({ toFake: ['Date'], now: Date.now() })
+    try {
+      await inWorkspace(w, () => tasks.updateTask(f.number, { agent: null }, user))
+      await inWorkspace(w, () => tasks.commentTask(f.number, 'Noted.', asker))
+    } finally {
+      vi.useRealTimers()
+    }
+    await watches.registerWatch(w, alpha, 'a1', agentWatch(f.number))
+    await evaluated(w)
+    expect(st.typed).toHaveLength(3)
+    await watches.cancelWatch(w, alpha, 'a1')
+    Object.assign(sessions, { liveFor: live })
     await disposeWorkspaceService(w)
   })
 
@@ -695,6 +986,74 @@ describe('watches (main/watches.ts)', async () => {
     await disposeWorkspaceService(w)
   })
 
+  it("its limit on a card in Review says it is there and who reviews it, with no 'tell the user' (HI-2295)", async () => {
+    const { w, alpha } = await open()
+    const st = fake(alpha)
+    const c = await inWorkspace(w, () => tasks.createTask({ title: 'A', project: 'alpha', agent: 'a1' }, user))
+    const doc = readCard(w, c.number)
+    await writeCard(w, c.number, { ...doc, column: 'review', updatedAt: new Date().toISOString() })
+    await watches.registerWatch(w, alpha, 'a1', { cards: [c.number], changes: ['verdict'] }, 30)
+    await watches.tick(Date.now() + 31 * 60_000)
+    await vi.waitFor(() => expect(st.told).toHaveLength(1), { timeout: HUNG_MS })
+    expect(st.told[0]).toMatch(/No change on #\d+ in 30 min: your card watch has ended\. #\d+ is in Review, waiting for its reviewer\. Watch #\d+ again for its verdict/)
+    expect(st.told[0]).not.toMatch(/tell the user \(hive_notify\)/)
+    // Being reviewed: named.
+    await writeCard(w, c.number, { ...readCard(w, c.number), review: { agent: 'a2', agentName: 'Reviewer', since: new Date().toISOString() }, updatedAt: new Date().toISOString() })
+    st.status = 'watching'
+    await watches.registerWatch(w, alpha, 'a1', { cards: [c.number], changes: ['verdict'] }, 30)
+    await watches.tick(Date.now() + 31 * 60_000)
+    await vi.waitFor(() => expect(st.told).toHaveLength(2), { timeout: HUNG_MS })
+    expect(st.told[1]).toMatch(/#\d+ is in Review, being reviewed by Reviewer\./)
+    expect(st.told[1]).not.toMatch(/tell the user \(hive_notify\)/)
+    // Back in Doing: the line as before.
+    await writeCard(w, c.number, { ...readCard(w, c.number), column: 'doing', review: undefined, updatedAt: new Date().toISOString() })
+    st.status = 'watching'
+    await watches.registerWatch(w, alpha, 'a1', { cards: [c.number], changes: ['verdict'] }, 30)
+    await watches.tick(Date.now() + 31 * 60_000)
+    await vi.waitFor(() => expect(st.told).toHaveLength(3), { timeout: HUNG_MS })
+    expect(st.told[2]).toMatch(/your card watch has ended\. Tell the user \(hive_notify\) and ask what to do\.$/)
+    await disposeWorkspaceService(w)
+  })
+
+  it('a limit that fired while the agent was busy is told as its card is when handed over: moved to Review, reviewed, sent back (HI-2295)', async () => {
+    const { w, alpha } = await open()
+    const st = fake(alpha)
+    const c = await inWorkspace(w, () => tasks.createTask({ title: 'A', project: 'alpha', agent: 'a1' }, user))
+    const put = (over: Record<string, unknown>) => writeCard(w, c.number, { ...readCard(w, c.number), ...over, updatedAt: new Date().toISOString() })
+    // Doing → Review while the line is held: told in Review.
+    await put({ column: 'doing' })
+    await watches.registerWatch(w, alpha, 'a1', { cards: [c.number], changes: ['verdict'] }, 30)
+    st.status = 'working'
+    await watches.tick(Date.now() + 31 * 60_000)
+    expect(st.typed).toEqual([])
+    await put({ column: 'review' })
+    st.status = 'watching'
+    await watches.tick(Date.now() + 31 * 60_000)
+    await vi.waitFor(() => expect(st.told).toHaveLength(1), { timeout: HUNG_MS })
+    expect(st.told[0]).toMatch(/#\d+ is in Review, waiting for its reviewer\. Watch #\d+ again for its verdict/)
+    expect(st.told[0]).not.toMatch(/tell the user \(hive_notify\)/)
+    // A reviewer starts while the line is held: named.
+    await watches.registerWatch(w, alpha, 'a1', { cards: [c.number], changes: ['verdict'] }, 30)
+    st.status = 'working'
+    await watches.tick(Date.now() + 31 * 60_000)
+    await put({ review: { agent: 'a2', agentName: 'Reviewer', since: new Date().toISOString() } })
+    st.status = 'watching'
+    await watches.tick(Date.now() + 31 * 60_000)
+    await vi.waitFor(() => expect(st.told).toHaveLength(2), { timeout: HUNG_MS })
+    expect(st.told[1]).toMatch(/#\d+ is in Review, being reviewed by Reviewer\./)
+    // Review → Doing while the line is held: the line as before, no stale Review.
+    await watches.registerWatch(w, alpha, 'a1', { cards: [c.number], changes: ['verdict'] }, 30)
+    st.status = 'working'
+    await watches.tick(Date.now() + 31 * 60_000)
+    await put({ column: 'doing', review: undefined })
+    st.status = 'watching'
+    await watches.tick(Date.now() + 31 * 60_000)
+    await vi.waitFor(() => expect(st.told).toHaveLength(3), { timeout: HUNG_MS })
+    expect(st.told[2]).toMatch(/your card watch has ended\. Tell the user \(hive_notify\) and ask what to do\.$/)
+    expect(st.told[2]).not.toMatch(/in Review/)
+    await disposeWorkspaceService(w)
+  })
+
   it('its limit with no change wakes it to say so; cancel ends it; it is kept on disk and read back', async () => {
     const { w, path, alpha } = await open()
     const st = fake(alpha)
@@ -742,15 +1101,15 @@ describe('watches (main/watches.ts)', async () => {
     const r = await watches.registerWatch(w, alpha, 'a1', { cards: [passed.number], ...verdictOrPassed })
     expect(r).toEqual({ already: expect.objectContaining({ number: passed.number, column: 'passed', changes: ['column'] }) })
     expect(watches.watchFor(alpha, 'a1')).toBeNull()
-    // A card in Review after a failed review: "→ Review" holds, whoever asks (its reviewer, the card's own agent, the
-    // Assistant) and whatever its history.
+    // A card in Review after a failed review (one failed before HI-1946, still there): "→ Review" holds, whoever asks (its
+    // reviewer, the card's own agent, the Assistant) and whatever its history.
     const failed = await inWorkspace(w, () => tasks.createTask({ title: 'C', project: 'alpha', agent: 'a2', column: 'review' }, user))
     const rev = { kind: 'agent', name: 'R (alpha)', self: { project: 'alpha', agentId: 'a1' }, scope: 'alpha' } as const
     await inWorkspace(w, () => tasks.updateTask(failed.number, { review: 'start' }, rev))
     const intoReview = { cards: [failed.number], changes: ['column' as const], column: 'review' as const, moveInto: true as const }
     // Its reviewer, mid-review.
     expect(await watches.registerWatch(w, alpha, 'a1', intoReview)).toEqual({ already: expect.objectContaining({ number: failed.number, column: 'review' }) })
-    await inWorkspace(w, () => tasks.updateTask(failed.number, { review: 'failed' }, rev, { comment: 'Round 1: FAILED' }))
+    await failedInReview(w, failed.number, 'R (alpha)')
     for (const [host, id] of [[alpha, 'a1'], [alpha, 'a2'], [w.assistantHome, 'assistant']] as const) {
       expect(await watches.registerWatch(w, host, id, intoReview)).toEqual({ already: expect.objectContaining({ number: failed.number, column: 'review' }) })
       expect(watches.watchFor(host, id)).toBeNull()
@@ -771,7 +1130,7 @@ describe('watches (main/watches.ts)', async () => {
     await disposeWorkspaceService(w)
   })
 
-  it('a failed card its agent returns for review without leaving Review wakes the reviewer waiting for it to come back (#214)', async () => {
+  it('a failed card its agent returns for review without leaving Review wakes the reviewer waiting for it to come back (#214; a card failed before HI-1946)', async () => {
     const { w, alpha } = await open()
     const st = fake(alpha)
     // a1 reviews here (the stand-in session); a2 did the work.
@@ -784,7 +1143,7 @@ describe('watches (main/watches.ts)', async () => {
     // after it: both wait, and its own verdict doesn't wake it.
     const back = { cards: [c.number], changes: ['column' as const], column: 'review' as const, moveInto: true as const, fresh: true as const }
     expect('watching' in (await watches.registerWatch(w, alpha, 'a1', back))).toBe(true)
-    await inWorkspace(w, () => tasks.updateTask(c.number, { review: 'failed' }, rev, { comment: 'Round 1: FAILED' }))
+    await failedInReview(w, c.number, 'Builder (alpha)')
     await evaluated(w)
     expect(st.typed).toEqual([])
     expect('watching' in (await watches.registerWatch(w, alpha, 'a1', back))).toBe(true)
@@ -839,7 +1198,7 @@ describe('watches (main/watches.ts)', async () => {
         vi.useRealTimers()
         watches.testHooks.settleMs = 0
       }
-      expect(st.told[0]).toMatch(new RegExp(`^\\[Hive\\] #${a} is in Review: Reviewer \\(alpha\\) passed it \\(latest comment by Reviewer \\(alpha\\): "Round 1: PASSED"\\); #${b} is in Review: Reviewer \\(alpha\\) failed it \\(latest comment by Reviewer \\(alpha\\): "Round 1: FAILED"\\)\\. Your card watch has ended`))
+      expect(st.told[0]).toMatch(new RegExp(`^\\[Hive\\] #${a} is in Review: Reviewer \\(alpha\\) passed it \\(latest comment by Reviewer \\(alpha\\): "Round 1: PASSED"\\); #${b} is in Doing: Reviewer \\(alpha\\) failed it \\(latest comment by Reviewer \\(alpha\\): "Round 1: FAILED"\\)\\. Your card watch has ended`))
       await disposeWorkspaceService(w)
     })
 
@@ -859,8 +1218,9 @@ describe('watches (main/watches.ts)', async () => {
       const r = await watches.registerWatch(w, alpha, 'a1', { cards: [b], ...verdictOrDone })
       expect('watching' in r).toBe(true)
       await vi.waitFor(() => expect(st.told).toHaveLength(2), { timeout: HUNG_MS })
-      expect(st.told[1]).toMatch(new RegExp(`^\\[Hive\\] #${b} is in Review: Reviewer \\(alpha\\) failed it`))
-      // After that wake, the builder's own work (a comment, a move to Doing and back) isn't news to its next watch…
+      expect(st.told[1]).toMatch(new RegExp(`^\\[Hive\\] #${b} is in Doing: Reviewer \\(alpha\\) failed it`))
+      // After that wake, the builder's own work (a comment in Doing, where the failure sent it, and a move back to Review)
+      // isn't news to its next watch…
       st.status = 'watching'
       await inWorkspace(w, () => tasks.updateTask(b, { column: 'doing' }, builder, { comment: 'Fixing' }))
       await inWorkspace(w, () => tasks.updateTask(b, { column: 'review' }, builder, { comment: 'Fixed' }))
@@ -872,6 +1232,38 @@ describe('watches (main/watches.ts)', async () => {
       await evaluated(w)
       expect(st.typed).toHaveLength(3)
       expect(st.told[2]).toContain('latest comment by Reviewer (alpha): "Looking at it"')
+      await disposeWorkspaceService(w)
+    })
+
+    it("HI-2016: a failed verdict's move back to Doing is its own, however slowly its lines are written: the wake says it failed", async () => {
+      const { w, alpha } = await open()
+      const st = fake(alpha)
+      const [, b] = await twoInReview(w)
+      await watches.registerWatch(w, alpha, 'a1', { cards: [b], ...verdictOrDone })
+      // A loaded machine between the verdict's lines (the flake's cause): the clock moves on by a millisecond each read.
+      const RealDate = Date
+      let tick = 0
+      ;(globalThis as { Date: DateConstructor }).Date = class extends RealDate {
+        constructor(...args: unknown[]) {
+          if (args.length) super(...(args as [number]))
+          else super(RealDate.now() + tick++)
+        }
+        static now(): number {
+          return RealDate.now() + tick++
+        }
+      } as DateConstructor
+      try {
+        await verdict(w, b, 'failed')
+      } finally {
+        ;(globalThis as { Date: DateConstructor }).Date = RealDate
+      }
+      await vi.waitFor(() => expect(st.told).toHaveLength(1), { timeout: HUNG_MS })
+      expect(st.told[0]).toMatch(new RegExp(`^\\[Hive\\] #${b} is in Doing: Reviewer \\(alpha\\) failed it`))
+      // One change, one time: its lines share it, so its move is known as its own.
+      const card = await inWorkspace(w, () => tasks.getTask(b, w))
+      const failed = card.history.findLast((h) => h.what.startsWith('Review failed'))!
+      const moved = card.history.findLast((h) => h.what.startsWith('Moved to Doing'))!
+      expect(moved.at).toBe(failed.at)
       await disposeWorkspaceService(w)
     })
 
@@ -890,7 +1282,7 @@ describe('watches (main/watches.ts)', async () => {
         st.status = 'watching'
         await watches.registerWatch(w, alpha, 'a1', { cards: [b], ...verdictOrDone })
         await vi.waitFor(() => expect(st.told).toHaveLength(2), { timeout: HUNG_MS })
-        expect(st.told[1]).toContain(`#${b} is in Review: Reviewer (alpha) failed it`)
+        expect(st.told[1]).toContain(`#${b} is in Doing: Reviewer (alpha) failed it`)
       } finally {
         vi.useRealTimers()
       }
@@ -908,14 +1300,15 @@ describe('watches (main/watches.ts)', async () => {
         await verdict(w, b, 'failed')
         await evaluated(w)
         expect(st.typed).toHaveLength(1)
-        expect(st.told[0]).toMatch(new RegExp(`#${a} is in Review: Reviewer \\(alpha\\) passed it.*#${b} is in Review: Reviewer \\(alpha\\) failed it`))
-        // Reviewed again and failed again, word for word, in the same millisecond as the first failure.
+        expect(st.told[0]).toMatch(new RegExp(`#${a} is in Review: Reviewer \\(alpha\\) passed it.*#${b} is in Doing: Reviewer \\(alpha\\) failed it`))
+        // Submitted again, reviewed again and failed again, word for word, in the same millisecond as the first failure.
+        await inWorkspace(w, () => tasks.updateTask(b, { column: 'review' }, builder))
         await inWorkspace(w, () => tasks.updateTask(b, { review: 'start' }, rev))
         await verdict(w, b, 'failed')
         st.status = 'watching'
         await watches.registerWatch(w, alpha, 'a1', { cards: [b], ...verdictOrDone })
         await vi.waitFor(() => expect(st.told).toHaveLength(2), { timeout: HUNG_MS })
-        expect(st.told[1]).toContain(`#${b} is in Review: Reviewer (alpha) failed it`)
+        expect(st.told[1]).toContain(`#${b} is in Doing: Reviewer (alpha) failed it`)
         // The failure the wake told isn't told again: watching once more without a new change, nothing comes.
         st.status = 'watching'
         await watches.registerWatch(w, alpha, 'a1', { cards: [b], ...verdictOrDone })
@@ -978,6 +1371,228 @@ describe('watches (main/watches.ts)', async () => {
     const answer = await watches.registerWatch(w, alpha, 'a1', { cards: [c.number], changes: ['column'], column: 'review' })
     expect(answer).toHaveProperty('already')
     expect(watches.watchFor(alpha, 'a1')).toBeNull()
+    await disposeWorkspaceService(w)
+  })
+
+  it('HI-2153: a watch set on a card already in Done or archived answers at once with its state, whatever it waits for; none is kept', async () => {
+    const { w, alpha } = await open()
+    fake(alpha)
+    const done = await inWorkspace(w, () => tasks.createTask({ title: 'Merged', project: 'alpha', column: 'done' }, user))
+    for (const cond of [{ changes: ['column' as const] }, { changes: ['comment' as const, 'verdict' as const] }, { changes: ['column' as const], column: 'review' as const }]) {
+      expect(await watches.registerWatch(w, alpha, 'a1', { cards: [done.number], ...cond })).toMatchObject({ already: { number: done.number, column: 'done' } })
+      expect(watches.watchFor(alpha, 'a1')).toBeNull()
+    }
+    const archived = await inWorkspace(w, () => tasks.createTask({ title: 'Archived', project: 'alpha' }, user))
+    await inWorkspace(w, () => tasks.archiveTask(archived.number, true))
+    expect(await watches.registerWatch(w, alpha, 'a1', { cards: [archived.number], changes: ['comment'] })).toMatchObject({ already: { number: archived.number, changes: 'gone', archived: true } })
+    expect(watches.watchFor(alpha, 'a1')).toBeNull()
+    await disposeWorkspaceService(w)
+  })
+
+  it("HI-2197: a new conversation ends the agent's watch from before, its wake cancelled before it returns; the next conversation's watch stays", async () => {
+    const { w, path, alpha } = await open()
+    const st = fake(alpha)
+    // Not fired: removed and saved without it.
+    const c = await inWorkspace(w, () => tasks.createTask({ title: 'Old card', project: 'alpha', column: 'passed' }, user))
+    await watches.registerWatch(w, alpha, 'a1', { cards: [c.number], changes: ['column'] })
+    await watches.endConversationWatch(alpha, 'a1')
+    expect(watches.watchFor(alpha, 'a1')).toBeNull()
+    expect(savedOf(path)).toEqual([])
+    // Fired and handed over, its line typed but never taken (HB3's: its input blocked): the old conversation's watch.
+    const takes = sessions.sendPrompt
+    Object.assign(sessions, {
+      sendPrompt: async (_p: string, _id: string, text: string, guard?: () => void) => {
+        guard?.()
+        st.typed.push(text)
+        st.status = 'finished'
+      }
+    })
+    writer.testHooks.takeMs = 20
+    await watches.registerWatch(w, alpha, 'a1', { cards: [c.number], changes: ['column'] })
+    await inWorkspace(w, () => tasks.updateTask(c.number, { column: 'done' }, user))
+    await evaluated(w)
+    expect(st.typed).toHaveLength(1)
+    const wake = savedOf(path)[0].fired.delivery as string
+    expect((await deliveries.deliveriesOf(alpha, 'a1')).find((r) => r.id === wake)?.state).toBe('offered')
+    // Its wake's cancel held: the end isn't over until it is done.
+    let release = (): void => undefined
+    let holding = false
+    watches.testHooks.beforeWakeCancel = () => {
+      holding = true
+      return new Promise<void>((r) => (release = r))
+    }
+    try {
+      let over = false
+      const ending = watches.endConversationWatch(alpha, 'a1').then(() => (over = true))
+      await vi.waitFor(() => expect(holding).toBe(true), { timeout: HUNG_MS })
+      expect(over).toBe(false)
+      expect(watches.watchFor(alpha, 'a1')).toBeNull()
+      expect((await deliveries.deliveriesOf(alpha, 'a1')).find((r) => r.id === wake)?.state).not.toBe('cancelled')
+      // The new conversation's own watch, set while the old wake's cancel is still under way, isn't the one it ends.
+      const mine = await inWorkspace(w, () => tasks.createTask({ title: 'New card', project: 'alpha', column: 'doing' }, user))
+      await watches.registerWatch(w, alpha, 'a1', { cards: [mine.number], changes: ['comment'] })
+      release()
+      await ending
+      expect((await deliveries.deliveriesOf(alpha, 'a1')).find((r) => r.id === wake)?.state).toBe('cancelled')
+      expect(watches.watchFor(alpha, 'a1')?.cards).toEqual([mine.number])
+    } finally {
+      watches.testHooks.beforeWakeCancel = undefined
+      Object.assign(sessions, { sendPrompt: takes })
+      writer.testHooks.takeMs = undefined
+      await writer.settled()
+      await disposeWorkspaceService(w)
+    }
+  })
+
+  it('HI-2197: a start resumes or carries on its own work and keeps its watch; any other start ends it before it launches', async () => {
+    const { w, alpha } = await open()
+    const s = sessions as unknown as { startReserved: unknown; conversationEnds: (p: string, id: string) => Promise<void> }
+    const was = { startReserved: s.startReserved, conversationEnds: s.conversationEnds }
+    const order: string[] = []
+    let release = (): void => undefined
+    s.conversationEnds = async (_p, id) => {
+      order.push(`ends ${id}`)
+      await new Promise<void>((r) => (release = r))
+    }
+    s.startReserved = async (_p: string, id: string, _l: string, opts: { resumeId?: string }) => {
+      order.push(`launch ${id}${opts.resumeId ? ' resumed' : ''}`)
+      return { agentId: id } as never
+    }
+    try {
+      // A new conversation (a lane's brief, a placement's, a handover from another agent): its old watch ended first.
+      const fresh = inWorkspace(w, () => sessions.start(alpha, { agentId: 'a1', prompt: 'Your next card', handedOverFrom: 'other-agents-session' }))
+      await vi.waitFor(() => expect(order).toEqual(['ends a1']), { timeout: HUNG_MS })
+      release()
+      await fresh
+      expect(order).toEqual(['ends a1', 'launch a1'])
+      // A resume, and an agent's handover to itself: the same work goes on, its watch kept.
+      order.length = 0
+      await inWorkspace(w, () => sessions.start(alpha, { agentId: 'a1', resumeId: '3554f946-b2e3-4971-8ecf-732c805ef95a' }))
+      await inWorkspace(w, () => sessions.start(alpha, { agentId: 'a1', prompt: 'Read the handover', handedOverFrom: 'its-own-session', keepWatch: true }))
+      expect(order).toEqual(['launch a1 resumed', 'launch a1'])
+    } finally {
+      Object.assign(s, was)
+      await disposeWorkspaceService(w)
+    }
+  })
+
+  it("HI-2197: an old watch that can't be ended stops the start: nothing launched, the watch and its wake kept for the next try, the start's reservation released", async () => {
+    const { w, path, alpha } = await open()
+    const st = fake(alpha)
+    const takes = sessions.sendPrompt
+    // Its wake typed but never taken (HB3's: its input blocked), so the wake stays offered.
+    Object.assign(sessions, {
+      sendPrompt: async (_p: string, _id: string, text: string, guard?: () => void) => {
+        guard?.()
+        st.typed.push(text)
+        st.status = 'finished'
+      }
+    })
+    writer.testHooks.takeMs = 20
+    const s = sessions as unknown as { startReserved: unknown; conversationEnds: (p: string, id: string) => Promise<void> }
+    const was = { startReserved: s.startReserved, conversationEnds: s.conversationEnds }
+    const launched: string[] = []
+    s.conversationEnds = watches.endConversationWatch
+    s.startReserved = async (_p: string, id: string) => (launched.push(id), { agentId: id } as never)
+    const c = await inWorkspace(w, () => tasks.createTask({ title: 'Old card', project: 'alpha', column: 'passed' }, user))
+    await watches.registerWatch(w, alpha, 'a1', { cards: [c.number], changes: ['column'] })
+    // Its watch can't be saved without it (a full disk, a locked database).
+    storeTestHooks.failSave = (store) => store === 'watches'
+    try {
+      await expect(inWorkspace(w, () => sessions.start(alpha, { agentId: 'a1', prompt: 'Your next card' }))).rejects.toThrow(/Could not end the watch \(its conversation ended\)/)
+      expect(launched).toEqual([])
+      expect(watches.watchFor(alpha, 'a1')?.cards).toEqual([c.number])
+      expect(savedOf(path)).toHaveLength(1)
+      expect(sessions.pendingStart(alpha, 'a1')).toBeFalsy()
+      // Its cancel failing too (the inbox's save): the start fails, and nothing launches.
+      storeTestHooks.failSave = null
+      watches.testHooks.beforeWakeCancel = async () => {
+        throw new Error('the inbox could not be saved')
+      }
+      await watches.cancelWatch(w, alpha, 'a1')
+      await watches.registerWatch(w, alpha, 'a1', { cards: [c.number], changes: ['column'] })
+      await inWorkspace(w, () => tasks.updateTask(c.number, { column: 'done' }, user))
+      await evaluated(w)
+      const wake = savedOf(path)[0]?.fired?.delivery as string
+      expect(wake).toMatch(/^m\d+$/)
+      await expect(inWorkspace(w, () => sessions.start(alpha, { agentId: 'a1', prompt: 'Your next card' }))).rejects.toThrow(/inbox could not be saved/)
+      expect(launched).toEqual([])
+      expect((await deliveries.deliveriesOf(alpha, 'a1')).find((r) => r.id === wake)?.state).toBe('offered')
+      // The watch put back, so the next try ends both.
+      expect(watches.watchFor(alpha, 'a1')?.cards).toEqual([c.number])
+      expect(savedOf(path)[0]?.fired?.delivery).toBe(wake)
+      expect(sessions.pendingStart(alpha, 'a1')).toBeFalsy()
+      // Released: the next start, once nothing fails, ends the watch and cancels its wake, then goes ahead.
+      watches.testHooks.beforeWakeCancel = undefined
+      await inWorkspace(w, () => sessions.start(alpha, { agentId: 'a1', prompt: 'Your next card' }))
+      expect(launched).toEqual(['a1'])
+      expect(watches.watchFor(alpha, 'a1')).toBeNull()
+      expect((await deliveries.deliveriesOf(alpha, 'a1')).find((r) => r.id === wake)?.state).toBe('cancelled')
+    } finally {
+      storeTestHooks.failSave = null
+      watches.testHooks.beforeWakeCancel = undefined
+      Object.assign(s, was)
+      Object.assign(sessions, { sendPrompt: takes })
+      writer.testHooks.takeMs = undefined
+      await writer.settled()
+      await disposeWorkspaceService(w)
+    }
+  })
+
+  it("HI-2153: Archive All counts a watch on a card in work as someone on it, never a stale one on a card in Done", async () => {
+    const { w, alpha } = await open()
+    const { cardBusy } = await import('../src/main/cardBusy')
+    const inReview = await inWorkspace(w, () => tasks.createTask({ title: 'Watched', project: 'alpha', column: 'review' }, user))
+    const merged = await inWorkspace(w, () => tasks.createTask({ title: 'Merged', project: 'alpha', column: 'done' }, user))
+    // A2 is running and its watch (from before HI-2153, or not yet ended) names both cards.
+    const was = { liveStates: sessions.liveStates, watchFor: sessions.watchFor }
+    Object.assign(sessions, {
+      liveStates: () => [{ projectPath: alpha, agentId: 'a2', agentName: 'Reviewer', status: 'watching' }],
+      watchFor: (p: string, id: string) => (p.toLowerCase() === alpha.toLowerCase() && id === 'a2' ? { cards: [inReview.number, merged.number] } : null)
+    })
+    try {
+      expect(cardBusy(w, inReview)).toBe('Reviewer is watching it')
+      expect(cardBusy(w, merged)).toBeNull()
+    } finally {
+      Object.assign(sessions, was)
+      await disposeWorkspaceService(w)
+    }
+  })
+
+  it('HI-2153: a watch on a card that reaches Done ends, also one that waits only for comments or another column; one saved on a Done card ends at the next check', async () => {
+    const { w, path, alpha } = await open()
+    const st = fake(alpha)
+    for (const cond of [{ changes: ['comment' as const] }, { changes: ['column' as const], column: 'passed' as const }]) {
+      st.status = 'watching'
+      const c = await inWorkspace(w, () => tasks.createTask({ title: 'Card', project: 'alpha', column: 'review' }, user))
+      await watches.registerWatch(w, alpha, 'a1', { cards: [c.number], ...cond })
+      const before = st.told.length
+      await inWorkspace(w, () => tasks.updateTask(c.number, { column: 'done' }, user))
+      await evaluated(w)
+      await vi.waitFor(() => expect(st.told).toHaveLength(before + 1), { timeout: HUNG_MS })
+      expect(st.told.at(-1)).toMatch(new RegExp(`^\\[Hive\\] #${c.number} is in Done \\(your watch on it ended\\)`))
+      await vi.waitFor(() => expect(watches.watchFor(alpha, 'a1')).toBeNull(), { timeout: HUNG_MS })
+    }
+    // Saved before HI-2153 on a card already Done, waiting for a column change that never comes (HR2 on HI-2148).
+    st.status = 'watching'
+    const c = await inWorkspace(w, () => tasks.createTask({ title: 'Stale', project: 'alpha', column: 'review' }, user))
+    await watches.registerWatch(w, alpha, 'a1', { cards: [c.number], changes: ['column'] })
+    const data = savedOf(path)
+    await watches.cancelWatch(w, alpha, 'a1')
+    const merged = await inWorkspace(w, () => tasks.updateTask(c.number, { column: 'done' }, user))
+    await evaluated(w)
+    // Its view of the card ends with it in Done: no change since will ever fire it.
+    data[0].marks[c.number] = markOf(merged)
+    data[0].seen[c.number] = seenOf(merged)
+    await putSaved(path, data)
+    watches.forgetWatches(w)
+    const before = st.told.length
+    await vi.waitFor(async () => {
+      await evaluated(w)
+      expect(st.told).toHaveLength(before + 1)
+    }, { timeout: HUNG_MS })
+    expect(st.told.at(-1)).toMatch(new RegExp(`^\\[Hive\\] #${c.number} is in Done \\(your watch on it ended\\)`))
+    await vi.waitFor(() => expect(watches.watchFor(alpha, 'a1')).toBeNull(), { timeout: HUNG_MS })
     await disposeWorkspaceService(w)
   })
 
@@ -1445,7 +2060,7 @@ describe('watches (main/watches.ts)', async () => {
     // Renamed while Hive was closed: read back, the watch is the project's under its new name.
     await disposeWorkspaceService(w)
     const gamma = join(path, 'gamma')
-    renameSync(alpha, gamma)
+    await moveFolder(alpha, gamma)
     fake(gamma)
     const w2 = createWorkspaceService()
     await w2.open(path)
@@ -1474,7 +2089,7 @@ describe('watches (main/watches.ts)', async () => {
     const before = savedOf(path)[0]
     await disposeWorkspaceService(w)
     // alpha leaves the workspace, and a new alpha comes, with an agent of the same id.
-    renameSync(alpha, join(path, '..', `${basename(path)}-alpha-elsewhere`))
+    await moveFolder(alpha, join(path, '..', `${basename(path)}-alpha-elsewhere`))
     mkdirSync(join(alpha, '.hive'), { recursive: true })
     writeFileSync(join(alpha, '.hive', 'project.json'), JSON.stringify({ version: 2, agents: [{ id: 'a1', name: 'Someone else' }] }))
     fake(alpha)
@@ -1497,7 +2112,7 @@ describe('watches (main/watches.ts)', async () => {
     await putSaved(path, saved)
     await disposeWorkspaceService(w)
     const gamma = join(path, 'gamma')
-    renameSync(alpha, gamma)
+    await moveFolder(alpha, gamma)
     fake(gamma)
     const w2 = createWorkspaceService()
     await w2.open(path)
@@ -1545,9 +2160,11 @@ describe('watches (main/watches.ts)', async () => {
     const c = await inWorkspace(w, () => tasks.createTask({ title: 'A', project: 'alpha' }, user))
     await watches.registerWatch(w, alpha, 'a1', { cards: [c.number], changes: ['comment'] })
     const gamma = join(path, 'gamma')
-    renameSync(alpha, gamma)
+    // Tried again while Windows holds the folder a moment (#1365: EPERM under load, Hive's own watchers or a scanner).
+    await moveFolder(alpha, gamma)
     const st = fake(gamma)
-    await new Promise((r) => setTimeout(r, 1100))
+    // Once Hive's project ids have the folder by its new name (they're read again a second on, #508), not after a time.
+    await vi.waitFor(async () => expect((await w.projectIds()).byPath.has(gamma.toLowerCase())).toBe(true), { timeout: HUNG_MS })
     await inWorkspace(w, () => tasks.commentTask(c.number, 'Ready', user))
     await evaluated(w)
     expect(st.told).toEqual([expect.stringContaining(`#${c.number}`)])

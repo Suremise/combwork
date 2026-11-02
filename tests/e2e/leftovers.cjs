@@ -92,7 +92,14 @@ const lingering = () => (fs.existsSync(lingerFile) ? fs.readFileSync(lingerFile,
     const earlyListed = await lib.until(async () => (await listed())?.processes.length === early.length && (await listed()), 15000)
     check('a process the CLI started the moment it ran, on the first launch, is listed', early.length === 1 && !!earlyListed && earlyListed.processes[0].pid === early[0], JSON.stringify({ early, earlyListed }))
     check('ended through the API, it is gone', (await inv('session:settleLeftovers', proj, agent.id, 'end')) === 1 && (await lib.until(() => early.every((p) => !alive(p)), 10000)))
-    check('and so is the notification offering to end it', await lib.until(async () => (await page.locator('.toast', { hasText: 'left 1 process running' }).count()) === 0, 5000))
+    // Its notice's offer goes with them (HI-2320, HI-2372): it loses its buttons and says they have ended. The entry
+    // itself stays its time to be read (Popups.tsx), and a test window is never focused, so it isn't waited out.
+    const earlyToast = page.locator('.toast', { hasText: 'left 1 process running' })
+    check(
+      'and so is the notification offering to end it',
+      await lib.until(async () => (await earlyToast.locator('button', { hasText: /End Them|Keep Running/ }).count()) === 0 && (await earlyToast.filter({ hasText: 'They have ended' }).count()) > 0, 5000),
+      JSON.stringify(await earlyToast.allInnerTexts().catch(() => []))
+    )
 
     // Ask: listed, shown in the pane header and a notification; End ends exactly them.
     const two = await leaveRunning(2)

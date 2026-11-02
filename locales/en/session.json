@@ -75,9 +75,21 @@
     "defaultMessage": "The agent stopped before Compact was sent.",
     "description": "Compact failed: the agent stopped or restarted while Hive typed the command."
   },
+  "session.compact.userTyped": {
+    "defaultMessage": "You typed in the agent's terminal while Hive was sending Compact, so it wasn't sent: what you typed stays.",
+    "description": "Compact failed: the user typed in the agent's terminal while Hive was clearing its input or typing the command, so Hive stopped."
+  },
   "session.compact.waiting": {
     "defaultMessage": "The agent is waiting for your answer. Compact after it has finished.",
     "description": "Compact is refused: the agent waits for the user."
+  },
+  "session.connection.fallback": {
+    "defaultMessage": "{why, select, missing {The connection chosen for it was removed} other {Its connection {wanted} is off in this workspace}}, so it started on {name}, its CLI's first usable one here. Choose another in its Agent Settings.",
+    "description": "A notice (HI-2108) when an agent starts on another connection than its own: its own was removed, or is on an account turned off in this workspace ({wanted}: its name). {name} is the account it started on. Agent Settings names a dialog."
+  },
+  "session.connection.fallbackTitle": {
+    "defaultMessage": "{agent} runs on another connection",
+    "description": "A notice's title (HI-2108): an agent started on another connection than its own (its own is off in this workspace, or was removed). {agent} is the agent."
   },
   "session.error.agentGone": {
     "defaultMessage": "That agent no longer exists.",
@@ -219,6 +231,14 @@
     "defaultMessage": "Its CLI is still writing its transcript. Try again in a moment.",
     "description": "A session is left alone (archive, delete) for a moment: its coding agent is still writing its transcript."
   },
+  "session.keyRefused.body": {
+    "defaultMessage": "Replace {name}'s key in Settings → Accounts & Connections, then Resume in the project's header carries them on.",
+    "description": "The notification that a server connection's ({name}) API key was refused. Settings → Accounts & Connections names a section; Resume is a button in the project's header."
+  },
+  "session.keyRefused.title": {
+    "defaultMessage": "{n, plural, one {{agent} stopped: {name}'s key was refused} other {# agents stopped: {name}'s key was refused}}",
+    "description": "A notification's title: the server of a server connection ({name}) refused its API key, so agents on it stopped. {n} is how many agents, {agent} the first one's name."
+  },
   "session.leftovers.body": {
     "defaultMessage": "{processes}. {n, plural, one {It was started by the agent and may hold the project's folder or ports.} other {They were started by the agent and may hold the project's folder or ports.}}",
     "description": "The notice of processes an agent left running. {processes} lists them (\"node serve.js, 4 × tail -f …\"); {n} is how many."
@@ -319,6 +339,10 @@
     "defaultMessage": "The agent is asking you something. Answer it first, then switch the mode.",
     "description": "Switching an agent's permission mode is refused: it waits for the user's answer."
   },
+  "session.mode.assistantCliOwn": {
+    "defaultMessage": "The Assistant can't use the CLI's own setting: its Control setting relies on knowing the mode it runs in. Choose one of the CLI's modes.",
+    "description": "Switching the Hive Assistant to the permission choice \"The CLI's own setting\" is refused. Control is the name of an Assistant setting."
+  },
   "session.mode.ended": {
     "defaultMessage": "The session ended before Hive could switch it to {mode}.",
     "description": "Switching a running agent's permission mode failed: its session ended. {mode} is the mode's name."
@@ -415,6 +439,18 @@
     "defaultMessage": "The agent has finished its task.",
     "description": "The notification that an agent finished, when it left no last message to show."
   },
+  "session.notice.hooksMissingTitle": {
+    "defaultMessage": "Hive isn't hearing from {agent}'s hooks",
+    "description": "A notification's title: an agent's coding agent has stopped sending Hive its hooks (the calls that tell Hive what it is doing). {agent} is the agent."
+  },
+  "session.notice.lineLost": {
+    "defaultMessage": "A screen of its CLI took it before it was sent. Send it again if it is still wanted: {text}",
+    "description": "The notification that a line Hive typed into an agent was lost (a screen of its coding agent took it). {text} is the line, as Hive typed it."
+  },
+  "session.notice.lineLostTitle": {
+    "defaultMessage": "{agent} didn't get a line Hive typed",
+    "description": "A notification's title: a line Hive typed into an agent's terminal (a message, a prompt) was taken by a screen of its coding agent before it was sent, so the agent never got it. {agent} is the agent."
+  },
   "session.notice.longConversation": {
     "defaultMessage": "{agent}: long conversation",
     "description": "A notice's title: an agent's transcript has grown past the size set in Settings → Sessions. {agent} is the agent."
@@ -463,6 +499,14 @@
     "defaultMessage": "Waiting for your input",
     "description": "The notification that an agent waits for the user, when its CLI didn't say what for."
   },
+  "session.orphan.body": {
+    "defaultMessage": "Process {pid}: the shell that started it has exited. Activity lists it, with End It; the agent is told too.",
+    "description": "The notice that an agent left a process running (HI-2111). {pid} is its process id. Activity is a tab of Hive's; End It is a button there."
+  },
+  "session.orphan.title": {
+    "defaultMessage": "{agent} left {command} running for {time}",
+    "description": "A notice's title (HI-2111): a process an agent's command started is still running with the shell that started it gone. {agent} is the agent's name; {command} what the process runs, cut short; {time} how long it has run (\"12 min\")."
+  },
   "session.plan.asking": {
     "defaultMessage": "The agent is asking you something. Answer it first.",
     "description": "Turning Plan mode on or off is refused: the agent waits for the user."
@@ -474,6 +518,18 @@
   "session.plan.typing": {
     "defaultMessage": "Hive is typing a line into this agent. Try again in a moment.",
     "description": "Turning Plan mode on or off is refused for a moment: Hive is typing into the terminal."
+  },
+  "session.prompt.cliAsks": {
+    "defaultMessage": "Its CLI shows a question for you: nothing is typed into it until you answer it there.",
+    "description": "Typing into an agent is refused: its coding agent shows a question of its own on its screen (such as Claude Code's offer to teach auto mode about your environment), which the keys would answer."
+  },
+  "session.prompt.inputBlocked": {
+    "defaultMessage": "Something on its screen is taking its keys: nothing is typed into it until you answer it there.",
+    "description": "Typing into an agent is refused: keys Hive typed into its coding agent's input didn't reach it (a dialog or question of the coding agent's own takes them)."
+  },
+  "session.prompt.inputNotCleared": {
+    "defaultMessage": "Its input couldn't be seen empty after Hive cleared it: nothing is typed into it until it can be.",
+    "description": "Typing into an agent is refused (a message's notice is put off and tried again; Compact fails): Hive pressed keys to clear the draft in its coding agent's input, and didn't see the input empty afterwards."
   },
   "session.prompt.untaken": {
     "defaultMessage": "Its CLI hasn't taken the line Hive typed before; nothing more is typed until it does.",
@@ -510,6 +566,10 @@
   "session.purge.unread": {
     "defaultMessage": "Hive couldn't record what the session used, so it is kept.",
     "description": "Purge left a session alone: Hive couldn't save its usage in the usage history, which the totals keep."
+  },
+  "session.restartMode.didntStop": {
+    "defaultMessage": "{agent} didn't stop in time, so it wasn't restarted in the new mode. Try again once it has stopped.",
+    "description": "Switching a running agent's permission mode (it restarts in the new mode) is refused: the agent ({agent}, its name) was told to stop but hadn't ended yet, so nothing was started."
   },
   "session.setup.failed": {
     "defaultMessage": "The setup command exited with code {code}. Its output is in the agent's terminal. Fix it and start the agent again, or start it without setup.",
@@ -564,12 +624,8 @@
     "description": "Resuming an archived session is refused (Sessions tab: Unarchive)."
   },
   "session.start.args": {
-    "defaultMessage": "{problem} Fix it in Project Settings or Settings → {provider}.",
-    "description": "Starting an agent is refused: its extra arguments are wrong. {problem} says why, as a sentence; {provider} is the coding agent's name (its Settings section)."
-  },
-  "session.start.argsAssistant": {
-    "defaultMessage": "{problem} Fix it in Settings → Assistant.",
-    "description": "Starting the Assistant is refused: its extra arguments are wrong. {problem} says why, as a sentence."
+    "defaultMessage": "{problem} Fix it in its connection, {connection}, in Settings → Accounts & Connections.",
+    "description": "Starting an agent or the Assistant is refused: its connection's extra arguments are wrong (HI-2140). {problem} says why, as a sentence; {connection} is the connection's name, as in Settings → Accounts & Connections."
   },
   "session.start.beingOpened": {
     "defaultMessage": "This conversation is already being opened in another agent.",
@@ -595,6 +651,14 @@
     "defaultMessage": "{why}, so its agents can't start now.",
     "description": "Starting an agent is refused while something changes its project. {why} says what, as a sentence without its full stop (\"This project is being removed\")."
   },
+  "session.start.moveFailed": {
+    "defaultMessage": "Hive couldn't move {project}'s model settings to its agents: {error}. Start it again.",
+    "description": "Starting an agent is refused (HI-1770): moving its project's own model, effort and context settings onto the project's agents (connections now hold the defaults) failed. {project} is the project's name, {error} why (often in English). It is tried again at the next start."
+  },
+  "session.start.openCommands": {
+    "defaultMessage": "This workspace's open commands are still running: agents start once they're done or you move on.",
+    "description": "Starting an agent is refused while the commands the user set to run as the workspace opens are running (Settings → Workspace → When this workspace opens, run), shown in a dialog with Don't wait."
+  },
   "session.start.openIn": {
     "defaultMessage": "This conversation is already open in {agent}. An agent can only resume a session no other agent is running.",
     "description": "Resuming a conversation is refused: another agent is running it. {agent} is that agent's name."
@@ -608,8 +672,8 @@
     "description": "Starting a project's only agent is refused: it runs already."
   },
   "session.start.providerMissing": {
-    "defaultMessage": "{resuming, select, yes {{provider} is required to resume this conversation. Install it from Help → Agent Setup.} other {{provider} is required to run {agent}. Install it from Help → Agent Setup.}}",
-    "description": "Starting an agent is refused: its coding agent's CLI isn't installed. {provider} is the coding agent's name (Claude Code), {agent} the agent's; {resuming} says whether it resumes a conversation. Help → Agent Setup is a menu command."
+    "defaultMessage": "{resuming, select, yes {{provider} is required to resume this conversation. Install it from Help → Provider Setup.} other {{provider} is required to run {agent}. Install it from Help → Provider Setup.}}",
+    "description": "Starting an agent is refused: its coding agent's CLI isn't installed. {provider} is the coding agent's name (Claude Code), {agent} the agent's; {resuming} says whether it resumes a conversation. Help → Provider Setup is a menu command."
   },
   "session.start.providerOff": {
     "defaultMessage": "{provider} is turned off. {resuming, select, yes {Turn it on in Settings → Providers to resume this conversation.} other {Turn it on in Settings → Providers to run {agent}.}}",
@@ -622,6 +686,18 @@
   "session.start.repairing": {
     "defaultMessage": "Hive is repairing this moved workspace: start the agent when Repair has finished.",
     "description": "Starting an agent is refused while Repair… fixes a moved workspace's paths."
+  },
+  "session.start.slotBusy": {
+    "defaultMessage": "{slot} still has another session in it, or processes one left running there. {agent} can start there once they have ended.",
+    "description": "Starting or resuming an agent in a slot (a worktree Hive lends to a card) is refused (#1434): another session (of a card that has ended, or of another Hive) still runs in it, or processes a session left running there aren't known to have ended. {slot} is the slot's name (\"slot-b\"), {agent} the agent's."
+  },
+  "session.start.slotChanged": {
+    "defaultMessage": "{slot} isn't {agent}'s any more: its card or lane ended, or another agent's work has it. Start or resume {agent} again.",
+    "description": "Starting or resuming an agent in a slot (a worktree Hive lends to a card) is refused (#1434): the slot's lease ended or changed hands while the start was getting ready. {slot} is the slot's name (\"slot-b\"), {agent} the agent's."
+  },
+  "session.start.slotSetup": {
+    "defaultMessage": "{slot} is still being set up. {agent} can start there once it is ready.",
+    "description": "Starting or resuming an agent in a slot (a worktree Hive lends to a card) is refused (#1434): Hive is still setting the slot up (its setup or install command runs), or a command of it hasn't ended yet. {slot} is the slot's name (\"slot-b\"), {agent} the agent's."
   },
   "session.start.subSession": {
     "defaultMessage": "That session is a {kind} {provider} ran for another session, not a conversation: it can't be resumed.",
@@ -679,9 +755,29 @@
     "defaultMessage": "Asks whether to trust this folder",
     "description": "An agent's status: its CLI asks, before it starts, whether to trust the project's folder."
   },
+  "session.status.cliAsks": {
+    "defaultMessage": "{provider} asks: {question}",
+    "description": "An agent's status: its coding agent ({provider}, e.g. Claude Code) shows a question of its own on its screen and waits for the user to answer it there. {question} is the question, in the coding agent's own words (English)."
+  },
   "session.status.compacting": {
     "defaultMessage": "Compacting the conversation…",
     "description": "An agent's status while its CLI summarises the conversation to free up context space."
+  },
+  "session.status.connectionKeepsDropping": {
+    "defaultMessage": "Stopped: its connection keeps dropping",
+    "description": "An agent's status once Hive stopped resuming it: its connection dropped again after several resumes in an hour."
+  },
+  "session.status.connectionNotBack": {
+    "defaultMessage": "Stopped: its connection didn't come back",
+    "description": "An agent's status once Hive stopped waiting for its connection to come back."
+  },
+  "session.status.failedTurn": {
+    "defaultMessage": "The turn ended on an error",
+    "description": "An agent's status when its CLI ended its turn on an error (an API connection error, say) without saying what."
+  },
+  "session.status.inputBlocked": {
+    "defaultMessage": "Something on its screen is taking its keys: answer it there, then Try again",
+    "description": "An agent's status: Hive typed into its coding agent's input and nothing reached it (a dialog or question of the coding agent's own, which Hive doesn't recognise, takes the keys). The user answers it in the agent's terminal. Try again is the button beside this status: keep its name as it is translated there."
   },
   "session.status.safeguardAsks": {
     "defaultMessage": "A safety classifier stopped a response: {provider} asks what to do",
@@ -706,6 +802,18 @@
   "session.status.tasksDropped": {
     "defaultMessage": "{minutes, plural, one {Stopped counting its background tasks after # minute} other {Stopped counting its background tasks after # minutes}}",
     "description": "An agent's status: Hive stopped counting the background tasks it started after the time limit in Settings. {minutes} is that limit."
+  },
+  "session.status.waitingForConnection": {
+    "defaultMessage": "Waiting for the connection…",
+    "description": "An agent's status while Hive waits for its CLI's connection to come back, to resume it (Settings → Advanced, Resume agents after a connection drops)."
+  },
+  "session.switch.waits": {
+    "defaultMessage": "{why}. Hive resumes it once the slot is free.",
+    "description": "The notice that an agent's switch of connection waits (HI-2304): {why} says what holds its slot, in English (\"slot-a is held by WindowsSandboxServer, left running by MB1's last run\"), without its full stop."
+  },
+  "session.switch.waitsTitle": {
+    "defaultMessage": "{agent}'s switch of connection waits for {slot}",
+    "description": "A notice's title (HI-2304): an agent was stopped to switch it to another connection (account), and Hive can't resume it yet because its slot (a worktree Hive lends it, \"slot-a\") is still held. {agent} is the agent's name."
   },
   "session.tracker.body": {
     "defaultMessage": "{reason}. {detail} Help → Copy Diagnostics says why.",

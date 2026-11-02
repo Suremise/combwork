@@ -1,9 +1,16 @@
 // Generated from locales/en/files.json: do not edit. Each message's placeholders and their types, for tr(): a
 // global script, so its interface merges with every other area's (shared/i18n/msg.ts).
 interface HiveMessageValues {
+  'files.attach.cardArchived': undefined
+  'files.attach.cardsKept': undefined
+  'files.attach.openCard': { card: string | number }
+  'files.attach.toCard': undefined
   'files.attachments.all': undefined
   'files.attachments.archived': { host: string }
   'files.attachments.archivedBadge': undefined
+  'files.attachments.cardEmpty': undefined
+  'files.attachments.cardFailed': undefined
+  'files.attachments.cardTab': undefined
   'files.attachments.copyImage': undefined
   'files.attachments.copyImageFailed': undefined
   'files.attachments.deleteDetail': undefined
@@ -31,11 +38,16 @@ interface HiveMessageValues {
   'files.attachments.noneHintAssistant': undefined
   'files.attachments.openFolder': undefined
   'files.attachments.openTranscript': { host: string }
+  'files.attachments.paneEmpty': undefined
+  'files.attachments.paneTab': undefined
   'files.attachments.refreshTarget': undefined
   'files.attachments.running': { host: string }
   'files.attachments.runningBadge': undefined
+  'files.attachments.sessionsKept': undefined
+  'files.attachments.tabs': undefined
   'files.attachments.title': undefined
   'files.attachments.total': { host: string; total: number; groups: number }
+  'files.attachments.totalWithCards': { total: number; cards: number; sessions: number; groups: number }
   'files.attachments.unnamed': { host: string; id: string | number }
   'files.attachments.view': undefined
   'files.collapseAll': undefined
@@ -89,6 +101,7 @@ interface HiveMessageValues {
   'files.image.actualSize': undefined
   'files.image.fit': undefined
   'files.insertIntoSession': undefined
+  'files.links.title': undefined
   'files.loading': undefined
   'files.menu.copy': undefined
   'files.menu.copyPath': undefined
@@ -106,6 +119,7 @@ interface HiveMessageValues {
   'files.refresh': undefined
   'files.reveal': undefined
   'files.revealInExplorer': undefined
+  'files.root.place': { agent: string | number; place: string | number }
   'files.root.projectFolder': undefined
   'files.root.tip': undefined
   'files.root.worktree': { agent: string | number; branch: string | number }
@@ -127,6 +141,7 @@ interface HiveMessageValues {
   'files.view.gone': undefined
   'files.view.htmlPreview': undefined
   'files.view.image': undefined
+  'files.view.notUtf8': undefined
   'files.view.openInApp': undefined
   'files.view.overwrite': undefined
   'files.view.pdf': undefined
@@ -141,7 +156,9 @@ interface HiveMessageValues {
   'files.viewer.newer': undefined
   'files.viewer.noPreview': undefined
   'files.viewer.older': undefined
+  'files.viewer.openInApp': undefined
   'files.viewer.position': { index: number; count: number }
   'files.viewer.readFailed': { error: string | number }
+  'files.viewer.removeFromCard': undefined
   'files.viewer.tooLarge': undefined
 }

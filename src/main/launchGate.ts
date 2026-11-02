@@ -85,12 +85,14 @@ export interface LaunchGate {
   env: Record<string, string>
   /** The gate's process is known: it is told `word` once that has settled (a rejection refuses, with its message). */
   open(word: Promise<GateWord>): void
+  /** The terminal is being killed: the gate is told to stop, whatever word comes later (none if it had its word). */
+  stop(reason: string): void
   /** The terminal has exited (or never started): the pipe closes. */
   close(): void
 }
 
 /** A gate for this command (Windows): listening on its pipe until the gate has had its word. */
-export function launchGate(file: string, args: string[], env: Record<string, string>): LaunchGate {
+export function launchGate(file: string, args: string[] | string, env: Record<string, string>): LaunchGate {
   const name = `hive-gate-${randomBytes(16).toString('hex')}`
   let socket: Socket | null = null
   let said: string | null = null
@@ -112,14 +114,20 @@ export function launchGate(file: string, args: string[], env: Record<string, str
   return {
     file: POWERSHELL,
     args: GATE_ARGS,
-    env: { ...env, HIVE_GATE_PIPE: name, HIVE_GATE_FILE: file, HIVE_GATE_ARGS: commandLineOf(args) },
+    env: { ...env, HIVE_GATE_PIPE: name, HIVE_GATE_FILE: file, HIVE_GATE_ARGS: typeof args === 'string' ? args : commandLineOf(args) },
     open(word) {
       void word
         .catch((e: unknown): GateWord => ({ go: false, reason: e instanceof Error ? e.message : String(e) }))
         .then((w) => {
+          if (said !== null) return
           said = w.go ? 'go' : `stop ${w.reason.replace(/[\r\n]+/g, ' ')}`
           tell()
         })
+    },
+    stop(reason) {
+      if (said !== null) return
+      said = `stop ${reason.replace(/[\r\n]+/g, ' ')}`
+      tell()
     },
     close() {
       server?.close()

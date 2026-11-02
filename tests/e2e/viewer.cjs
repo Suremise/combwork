@@ -16,6 +16,8 @@ const path = require('path')
 const { createHash } = require('crypto')
 // The longest a wait here waits for what it waits on: a bound for a hung run, never how long it should take (#570).
 const HUNG_MS = 30000
+// The Agent API's version as the code under test has it (servers.ts), not a copy here that lags the next bump (HI-1847).
+const API_VERSION = Number(/export const API_VERSION = (\d+)/.exec(fs.readFileSync(path.join(__dirname, '..', '..', 'src', 'main', 'servers.ts'), 'utf8'))[1])
 
 const userData = path.join(lib.WORK, 'viewer-profile')
 const ws = path.join(lib.WORK, 'viewer-ws')
@@ -110,7 +112,7 @@ function stream(token) {
 
   // --- Discovery: the address, never a token.
   const found = await lib.until(readDiscovery, HUNG_MS)
-  check('the discovery file names the running API', found?.app === 'Hive' && found.url === BASE && found.port === PORT && found.api === 5 && typeof found.pid === 'number', JSON.stringify(found))
+  check('the discovery file names the running API', found?.app === 'Hive' && found.url === BASE && found.port === PORT && found.api === API_VERSION && typeof found.pid === 'number', JSON.stringify({ found, API_VERSION }))
   const discoveryText = fs.readFileSync(discovery, 'utf8')
   check('…and holds no token', !/token"\s*:/i.test(discoveryText) && !discoveryText.includes(apiToken), discoveryText)
   check('its health check answers', (await fetch(`${found.url}/v1/health`).then((r) => r.json())).ok === true)
@@ -131,7 +133,7 @@ function stream(token) {
   const viewer = made.token
   const as = (method, route, body) => api(method, route, body, viewer)
   const status = await as('GET', '/v1/status')
-  check('GET /v1/status says who it is: a read-only viewer of the workspace', status.status === 200 && status.body.caller?.role === 'viewer' && status.body.caller.name === 'Apiary' && status.body.caller.readOnly === true && status.body.api?.version === 5, JSON.stringify(status.body?.caller))
+  check('GET /v1/status says who it is: a read-only viewer of the workspace', status.status === 200 && status.body.caller?.role === 'viewer' && status.body.caller.name === 'Apiary' && status.body.caller.readOnly === true && status.body.api?.version === API_VERSION, JSON.stringify({ caller: status.body?.caller, api: status.body?.api, API_VERSION }))
 
   // --- An agent, for the merge slot, its activity and its own token's stream.
   await page.keyboard.press('Escape')
@@ -143,7 +145,7 @@ function stream(token) {
   const launchesFile = path.join(claudeHome, 'fake-launches.jsonl')
   const annToken = await lib.until(() => {
     const lines = fs.existsSync(launchesFile) ? fs.readFileSync(launchesFile, 'utf8').split('\n').filter((l) => l.trim().endsWith('}')) : []
-    return lines.map((l) => JSON.parse(l)).filter((l) => l.cwd.toLowerCase() === alpha.toLowerCase()).at(-1)?.env?.HIVE_API_TOKEN
+    return lines.map((l) => JSON.parse(l)).filter((l) => l.cwd.toLowerCase() === alpha.toLowerCase()).at(-1)?.token
   }, HUNG_MS)
   check("the agent's own token is known", !!annToken)
   const card = (await api('POST', '/v1/tasks', { title: 'Show the office', project: 'alpha' })).body?.number
@@ -163,7 +165,12 @@ function stream(token) {
   const documented = (method) => routesIn(docText, method)
   // The routes the reference says are the Assistant's only: the tables after a line saying so.
   const assistantTables = [...docText.matchAll(/^.*the Assistant's only.*\n\n((?:\|.*\n?)+)/gim)].map((m) => m[1]).join('\n')
-  const assistantGets = routesIn(assistantTables, 'GET')
+  // …and whole sections whose first paragraph says they are (Templates, HI-1502: "The Hive Assistant's alone").
+  const assistantSections = docText
+    .split(/^(?=#{2,3} )/m)
+    .filter((s) => /Assistant's (?:only|alone)/i.test(s.split(/\n\n/)[1] ?? ''))
+    .join('\n')
+  const assistantGets = routesIn(assistantTables + '\n' + assistantSections, 'GET')
   const gets = documented('GET').filter((r) => r !== '/v1/events' && !assistantGets.includes(r))
   check('the reference lists the GET routes', gets.length >= 20 && gets.includes('/v1/progress'), gets.join(' '))
   check("…and which are the Assistant's only", assistantGets.includes('/v1/journal/x') && !assistantGets.includes('/v1/progress'), assistantGets.join(' '))
@@ -303,7 +310,7 @@ function stream(token) {
   check('…and ending it', !!(await act((a) => a.kind === 'lane-end' && a.lane === laneId && a.ok)), shown())
   await api('POST', '/v1/projects/beta/activate', {}, assistantToken)
   check('turning a project on names it', !!(await act((a) => a.kind === 'activate-project' && a.project === 'beta' && a.ok)), shown())
-  await api('PATCH', `/v1/projects/alpha/agents/${ann.id}`, { effort: '' }, assistantToken)
+  await api('PATCH', `/v1/projects/alpha/agents/${ann.id}`, { workflowRole: 'builder' }, assistantToken)
   check("changing an agent's settings names it", !!(await act((a) => a.kind === 'update-agent' && a.ok && a.agent?.id === ann.id)), shown())
   // An agent added whose start then fails, the error carrying a private value (round 3: a lower-level error can quote
   // anything): the stream says it in Hive's own words; the Assistant's panel keeps the error.

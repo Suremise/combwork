@@ -1,0 +1,70 @@
+== a draft typed, wrapped onto four rows
+ ▐▛███▛█   Claude Code v2.1.312
+▝▜██████▀  Opus 5.5 · API Usage Billing
+ ▝▝   ▝▝   C:\work\alpha
+
+⚠ Remote managed settings failed to load (authentication rejected (401)) · no remote policy applied · /status for
+  details
+
+────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────
+❯ a draft the user left in the input, typed and not sent, long enough to wrap onto three rows of the box: more words
+  of the draft more words of the draft more words of the draft more words of the draft more words of the draft more
+  words of the draft more words of the draft more words of the draft more words of the draft more words of the draft
+  and its end
+────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────
+  ⏸ manual mode on                                                                                  ◐ medium · /effort
+
+== after Ctrl+U 1
+ ▐▛███▛█   Claude Code v2.1.312
+▝▜██████▀  Opus 5.5 · API Usage Billing
+ ▝▝   ▝▝   C:\work\alpha
+
+⚠ Remote managed settings failed to load (authentication rejected (401)) · no remote policy applied · /status for
+  details
+
+────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────
+❯ a draft the user left in the input, typed and not sent, long enough to wrap onto three rows of the box: more words
+  of the draft more words of the draft more words of the draft more words of the draft more words of the draft more
+  words of the draft more words of the draft more words of the draft more words of the draft more words of the draft
+────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────
+  ⏸ manual mode on                                                                        Ctrl+Y to paste deleted text
+
+== after Ctrl+U 2
+ ▐▛███▛█   Claude Code v2.1.312
+▝▜██████▀  Opus 5.5 · API Usage Billing
+ ▝▝   ▝▝   C:\work\alpha
+
+⚠ Remote managed settings failed to load (authentication rejected (401)) · no remote policy applied · /status for
+  details
+
+────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────
+❯ a draft the user left in the input, typed and not sent, long enough to wrap onto three rows of the box: more words
+  of the draft more words of the draft more words of the draft more words of the draft more words of the draft more
+────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────
+  ⏸ manual mode on                                                                        Ctrl+Y to paste deleted text
+
+== after Ctrl+U 3
+ ▐▛███▛█   Claude Code v2.1.312
+▝▜██████▀  Opus 5.5 · API Usage Billing
+ ▝▝   ▝▝   C:\work\alpha
+
+⚠ Remote managed settings failed to load (authentication rejected (401)) · no remote policy applied · /status for
+  details
+
+────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────
+❯ a draft the user left in the input, typed and not sent, long enough to wrap onto three rows of the box: more words
+────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────
+  ⏸ manual mode on                                                                        Ctrl+Y to paste deleted text
+
+== after Ctrl+U 4
+ ▐▛███▛█   Claude Code v2.1.312
+▝▜██████▀  Opus 5.5 · API Usage Billing
+ ▝▝   ▝▝   C:\work\alpha
+
+⚠ Remote managed settings failed to load (authentication rejected (401)) · no remote policy applied · /status for
+  details
+
+────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────
+❯
+────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────
+  ⏸ manual mode on · ? for shortcuts · ← for agents                                       Ctrl+Y to paste deleted text

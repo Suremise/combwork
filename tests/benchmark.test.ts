@@ -9,7 +9,7 @@ import { createRequire } from 'module'
 import { join } from 'path'
 import { afterAll, describe, expect, it } from 'vitest'
 import * as electron from 'electron'
-import { BENCHMARK_LIMITS, EXPORT_MEASURES, SCENARIO_MEASURES, USAGE_MEASURES, aboutOf, compareArtifacts, compareScopeOf, factsOf, keptAbout, keptLabel, parseArtifact, readEntry, readKept, summaryOf, type Artifact, type CompareScope, type KeptEntry, type ParseResult } from '../src/shared/benchmark'
+import { BENCHMARK_LIMITS, EXPORT_MEASURES, SCENARIO_MEASURES, USAGE_MEASURES, aboutOf, compareArtifacts, compareScopeOf, exportMeasure, factsOf, keptAbout, keptLabel, parseArtifact, readEntry, readKept, sideMeasureLabel, summaryOf, type Artifact, type CompareScope, type KeptEntry, type ParseResult } from '../src/shared/benchmark'
 import { englishText, shownText } from '../src/shared/advanced'
 import { setLanguage } from '../src/shared/i18n'
 import { tempDir } from './tempDir'
@@ -369,6 +369,63 @@ describe('Performance exports', () => {
   })
 })
 
+describe('HI-2049: Performance exports by workflow role', () => {
+  const guidance = (workflow: string | undefined, launches: number, bytes: number) => ({ provider: 'claude-code', role: 'agent', ...(workflow ? { workflow } : {}), launches, guidanceBytes: bytes, customBytes: 0, roleBytes: 0, modeBytes: 0, skillCatalogBytes: 0 })
+  /** An export whose only project has these launches and tool lists (the rest of its parts as exportFile makes them). */
+  const withLaunches = (g: object[], catalog: object[]): Artifact => {
+    const f = JSON.parse(exportFile({ requests: { alpha: 10 } }))
+    f.report.projects.alpha.guidance = g
+    f.report.projects.alpha.catalog = catalog
+    f.report.workspace.guidance = []
+    return art(parseArtifact(JSON.stringify(f), WS))
+  }
+  const row = (c: ReturnType<typeof compareArtifacts>, key: string) => c.rows!.find((r) => r.key === key)
+
+  it("a summary keeps each role's launches, guidance and tool lists; launches recorded before it are the role not recorded", () => {
+    const a = withLaunches([guidance('builder', 4, 4000), guidance('reviewer', 2, 3000), guidance(undefined, 1, 900)], [{ role: 'agent', workflow: 'builder', starts: 4, tools: 160, toolsBytes: 40400, toolsChars: 40000, charStarts: 4 }, { role: 'agent', workflow: 'reviewer', starts: 2, tools: 80, toolsBytes: 20000, toolsChars: 19800, charStarts: 2 }])
+    expect(a.summary!.totals).toMatchObject({ launches: 7, 'launches.builder': 4, 'launches.reviewer': 2, 'launches.unknown': 1, 'guidanceBytes.builder': 4000, 'guidanceBytes.reviewer': 3000, toolListStarts: 6, toolListChars: 59800, 'toolListChars.builder': 40000, 'toolListStarts.reviewer': 2 })
+  })
+
+  it('Compare shows each role’s launches, guidance a launch and tool list a launch, only for roles either side has', () => {
+    const a = withLaunches([guidance('builder', 4, 4000), guidance('reviewer', 2, 3000)], [{ role: 'agent', workflow: 'builder', starts: 4, tools: 160, toolsBytes: 40400, toolsChars: 40000, charStarts: 4 }, { role: 'agent', workflow: 'reviewer', starts: 2, tools: 80, toolsBytes: 20000, toolsChars: 20000, charStarts: 2 }])
+    const b = withLaunches([guidance('builder', 4, 3600), guidance('reviewer', 2, 3000)], [{ role: 'agent', workflow: 'builder', starts: 4, tools: 160, toolsBytes: 36400, toolsChars: 36000, charStarts: 4 }, { role: 'agent', workflow: 'reviewer', starts: 2, tools: 80, toolsBytes: 20000, toolsChars: 20000, charStarts: 2 }])
+    const c = compareArtifacts(a, b)
+    expect(c.comparable).toBe(true)
+    expect(row(c, 'guidancePerLaunch.builder')).toMatchObject({ base: { mean: 1000 }, run: { mean: 900 }, delta: -100 })
+    expect(row(c, 'toolListPerLaunch.builder')).toMatchObject({ base: { mean: 10000 }, run: { mean: 9000 } })
+    expect(row(c, 'toolListPerLaunch.reviewer')).toMatchObject({ base: { mean: 10000 }, run: { mean: 10000 }, delta: 0 })
+    expect(row(c, 'toolListPerLaunch')).toMatchObject({ base: { mean: 60000 / 6 }, run: { mean: 56000 / 6 } })
+    expect(row(c, 'launches.reviewer')).toMatchObject({ delta: 0 })
+    expect(c.rows!.some((r) => r.key.endsWith('.either') || r.key.endsWith('.none') || r.key.endsWith('.unknown'))).toBe(false)
+    // Each row's measure, and the role it is for, for the window.
+    expect(exportMeasure('toolListPerLaunch.reviewer')).toMatchObject({ def: { key: 'toolListPerLaunch', unit: 'chars' }, side: 'reviewer' })
+    expect(exportMeasure('requests.reviewer')).toBeUndefined()
+    expect(englishText(sideMeasureLabel('Guidance a launch', 'none'))).toBe('Guidance a launch · no workflow role')
+  })
+
+  it("a tool list's characters average over the starts that had them: one from before, bytes only, isn't a zero", () => {
+    const mixed = withLaunches([guidance('builder', 3, 3000)], [{ role: 'agent', workflow: 'builder', starts: 3, tools: 120, toolsBytes: 30300, toolsChars: 10000, charStarts: 1 }, { role: 'agent', starts: 5, tools: 200, toolsBytes: 50000 }])
+    expect(mixed.summary!.totals).toMatchObject({ toolListStarts: 1, toolListChars: 10000, 'toolListStarts.builder': 1 })
+    expect(mixed.summary!.totals['toolListStarts.unknown']).toBe(0)
+    const c = compareArtifacts(mixed, mixed)
+    expect(row(c, 'toolListPerLaunch')).toMatchObject({ base: { mean: 10000 } })
+    expect(row(c, 'toolListPerLaunch.builder')).toMatchObject({ base: { mean: 10000 } })
+    // Only bytes on both sides: no value, not zero.
+    const old = withLaunches([guidance(undefined, 2, 2000)], [{ role: 'agent', starts: 2, tools: 80, toolsBytes: 20000 }])
+    expect(row(compareArtifacts(old, old), 'toolListPerLaunch')).toMatchObject({ base: null, run: null, delta: null })
+  })
+
+  it('a summary kept before it has none of these: its rows are unknown, never zero', () => {
+    const now = withLaunches([guidance('builder', 4, 4000)], [{ role: 'agent', workflow: 'builder', starts: 4, tools: 160, toolsBytes: 40400, toolsChars: 40000, charStarts: 4 }])
+    const kept = JSON.parse(JSON.stringify(now))
+    kept.summary.totals = Object.fromEntries(Object.entries(kept.summary.totals).filter(([k]) => !k.includes('.') && !k.startsWith('toolList')))
+    const before = readKept(kept)!
+    const c = compareArtifacts(before, now)
+    for (const k of ['toolListPerLaunch', 'launches.builder', 'guidancePerLaunch.builder', 'toolListPerLaunch.builder']) expect(row(c, k), k).toMatchObject({ incomplete: true, delta: null })
+    expect(row(c, 'guidancePerLaunch')).toMatchObject({ incomplete: false, delta: 0 })
+  })
+})
+
 describe('the scenario harness writes what the app reads (tests/scenarios/benchmark.cjs)', () => {
   const { benchmarkOf, pruneResults, saveBaseline, resultsFolder, measuresOf, LIMITS } = require_('./scenarios/benchmark.cjs')
   const meta = { fixturesVersion: 5, provider: 'fake-codex', model: '(default)', effort: '(default)', mode: 'full-access', repeats: 2, source: { head: 'abc1234', dirty: null }, guidance: 'g1', when: '2026-10-03T12:00:00.000Z', spentUsd: 0, budgetUsd: 2 }
@@ -391,6 +448,16 @@ describe('the scenario harness writes what the app reads (tests/scenarios/benchm
     guidance: { atStart: { revision: 'g1' }, delivered: { guidance: 'g1', skills: { 'work-on-card': 'rev-a' } } },
     metricsOverheadMs: 12,
     ...extra
+  })
+
+  it("the tool list's characters only when every start in the scenario had them (HI-2049): else unknown", () => {
+    const withLists = (n: number, catalog: object[]) => ({ ...report(n), projects: { alpha: { ...report(n).projects.alpha, catalog } } })
+    const all = measuresOf(withLists(0, []), withLists(1, [{ starts: 2, toolsBytes: 200, toolsChars: 190, charStarts: 2 }]), {}, null)
+    expect(all).toMatchObject({ toolListBytes: 200, toolListChars: 190 })
+    expect(all).not.toHaveProperty('toolListCharStarts')
+    const some = measuresOf(withLists(0, []), withLists(1, [{ starts: 2, toolsBytes: 200, toolsChars: 95, charStarts: 1 }]), {}, null)
+    expect(some.toolListBytes).toBe(200)
+    expect(some).not.toHaveProperty('toolListChars')
   })
 
   it('the measures leave out the harness’s own requests; its artifact parses, with checks, coverage, revisions and Unicode intact', () => {
@@ -422,6 +489,14 @@ describe('the scenario harness writes what the app reads (tests/scenarios/benchm
     expect(benchmarkOf(meta, Array.from({ length: 30 }, (_, i) => result('one', i)), '0.3.1').scenarios[0].samples.length).toBe(LIMITS.samples)
   })
 
+  it('records a scenario’s observations in its sample, never as checks: a false one leaves it passed (#1611)', () => {
+    const observed = result('seven', 1, { observations: [{ name: 'read the coordinate-agents skill', value: false, detail: '' }] })
+    const sample = benchmarkOf(meta, [observed], '0.3.1').scenarios[0].samples[0]
+    expect([sample.ok, sample.passed, sample.failed, sample.observations]).toEqual([true, 2, 0, [{ name: 'read the coordinate-agents skill', value: false }]])
+    expect(art(parseArtifact(JSON.stringify(benchmarkOf(meta, [observed], '0.3.1')), WS)).scenarios![0].samples[0].ok).toBe(true)
+    expect(benchmarkOf(meta, [result('seven', 1)], '0.3.1').scenarios[0].samples[0]).not.toHaveProperty('observations')
+  })
+
   it('keeps the newest runs in folders of their own; never overwrites a baseline, even saved three times in a second', () => {
     const dir = tempDir('hive-results-')
     try {
@@ -447,6 +522,148 @@ describe('the scenario harness writes what the app reads (tests/scenarios/benchm
       expect(() => saveBaseline(baselines, 'same', join(dir, 'missing.json'))).toThrow()
       expect(JSON.parse(readFileSync(join(baselines, 'same.json'), 'utf8')).i).toBe(2)
       expect(() => saveBaseline(baselines, '../escape', src)).toThrow(/baseline name/)
+    } finally {
+      rmSync(dir, { recursive: true, force: true })
+    }
+  })
+
+  it("never prunes a results folder a live runner holds, nor counts it; a dead runner's goes by age (HI-2234)", () => {
+    const { resultsHeld, releaseResults } = require_('./scenarios/benchmark.cjs')
+    const dir = tempDir('hive-results-held-')
+    try {
+      // The oldest run is still going (pid 101, alive), as HI-2190's two-hour Codex trials were; then 40 short runs.
+      const running = resultsFolder(dir, '2026-10-31T14-27-32-codex', 101)
+      const finished = resultsFolder(dir, '2026-10-31T14-28-00-fake', 202)
+      for (let i = 0; i < 40; i++) mkdirSync(join(dir, `2026-10-31T15-${String(i).padStart(2, '0')}-00-fake`))
+      const alive = (pid: number) => pid === 101
+      expect(resultsHeld(running, alive)).toBe(true)
+      expect(resultsHeld(finished, alive)).toBe(false)
+      pruneResults(dir, 29, () => null, alive)
+      const left = readdirSync(dir).sort()
+      // The held folder stays besides the newest 29; the dead runner's folder went with the other older ones.
+      expect(left).toHaveLength(30)
+      expect(left[0]).toBe('2026-10-31T14-27-32-codex')
+      expect(left).not.toContain('2026-10-31T14-28-00-fake')
+      // Let go (the run ended), it counts with the model trials (HI-2236): the only one, so it stays.
+      releaseResults(running)
+      expect(resultsHeld(running, alive)).toBe(false)
+      pruneResults(dir, 29, () => null, alive)
+      expect(readdirSync(dir)).toContain('2026-10-31T14-27-32-codex')
+      expect(readdirSync(dir)).toHaveLength(30)
+    } finally {
+      rmSync(dir, { recursive: true, force: true })
+    }
+  })
+
+  it('keeps the newest fake runs and, counted apart, the newest model trials: fake runs never push a paid one out (HI-2236)', () => {
+    const { resultsKind } = require_('./scenarios/benchmark.cjs')
+    expect(['fake', 'fake-codex', 'fake-copilot', 'fake-2', 'fake-codex-3'].map((p) => resultsKind(`2026-10-31T14-27-32-${p}`))).toEqual(['fake', 'fake', 'fake', 'fake', 'fake'])
+    expect(['codex', 'claude-code', 'copilot', 'codex-2'].map((p) => resultsKind(`2026-10-31T14-27-32-${p}`))).toEqual(['model', 'model', 'model', 'model'])
+    const dir = tempDir('hive-results-kinds-')
+    try {
+      const at = (h: number, m: number) => `2026-10-31T${String(h).padStart(2, '0')}-${String(m).padStart(2, '0')}-00`
+      // A finished model trial, then 40 fake runs of each fake provider in turn after it.
+      mkdirSync(join(dir, `${at(14, 27)}-codex`))
+      const fakes = ['fake', 'fake-codex', 'fake-copilot']
+      for (let i = 0; i < 40; i++) mkdirSync(join(dir, `${at(15 + Math.floor(i / 60), i % 60)}-${fakes[i % 3]}`))
+      pruneResults(dir)
+      const left = readdirSync(dir).sort()
+      expect(left).toContain(`${at(14, 27)}-codex`)
+      expect(left.filter((n) => resultsKind(n) === 'fake')).toEqual(left.filter((n) => n.includes('-fake')).slice(-LIMITS.resultsKept))
+      expect(left).toHaveLength(LIMITS.resultsKept + 1)
+      // Model trials beyond their own 30 go oldest first, the fake runs untouched.
+      for (let i = 0; i < 32; i++) mkdirSync(join(dir, `${at(16 + Math.floor(i / 60), i % 60)}-${i % 2 ? 'claude-code' : 'codex'}`))
+      pruneResults(dir)
+      const after = readdirSync(dir).sort()
+      const models = after.filter((n) => resultsKind(n) === 'model')
+      expect(models).toHaveLength(LIMITS.resultsKept)
+      expect(models[0]).toBe(`${at(16, 2)}-codex`)
+      expect(after.filter((n) => resultsKind(n) === 'fake')).toEqual(left.filter((n) => resultsKind(n) === 'fake'))
+    } finally {
+      rmSync(dir, { recursive: true, force: true })
+    }
+  })
+
+  it('a run whose results folder is removed under it makes it again with everything it had written (HI-2234)', () => {
+    const { writeResults, resultsHeld } = require_('./scenarios/benchmark.cjs')
+    const dir = tempDir('hive-results-gone-')
+    try {
+      const out = resultsFolder(dir, '2026-10-31T14-27-32-codex')
+      const written = new Map<string, string>()
+      let said = 0
+      const save = (name: string, data: string) => {
+        writeResults(out, name, data, {
+          rewrite: () => {
+            for (const [n, d] of written) writeFileSync(join(out, n), d)
+          },
+          onRecreated: () => said++
+        })
+        written.set(name, data)
+      }
+      save('results.json', '{"results":[1]}')
+      save('notes.md', 'kept')
+      rmSync(out, { recursive: true, force: true })
+      save('results.json', '{"results":[1,2]}')
+      expect(said).toBe(1)
+      expect(readFileSync(join(out, 'results.json'), 'utf8')).toBe('{"results":[1,2]}')
+      expect(readFileSync(join(out, 'notes.md'), 'utf8')).toBe('kept')
+      // Held again, so no other run's prune takes it.
+      expect(resultsHeld(out)).toBe(true)
+      save('summary.md', 'done')
+      expect(said).toBe(1)
+    } finally {
+      rmSync(dir, { recursive: true, force: true })
+    }
+  })
+
+  it('a results folder removed as the write is made, or during the recovery, is made again; only ENOENT is retried, a bounded number of times (HI-2234)', () => {
+    const { writeResults, resultsHeld, WRITE_ATTEMPTS } = require_('./scenarios/benchmark.cjs')
+    const dir = tempDir('hive-results-race-')
+    try {
+      const out = resultsFolder(dir, '2026-10-31T14-27-32-codex')
+      writeFileSync(join(out, 'results.json'), 'old')
+      const files = () => readdirSync(out).sort()
+      // Removed between the folder being there and the write landing: the first write meets ENOENT.
+      let removals = 1
+      let said = 0
+      const racing = (p: string, d: string) => {
+        if (removals-- > 0) rmSync(out, { recursive: true, force: true })
+        writeFileSync(p, d)
+      }
+      const rewrite = () => writeFileSync(join(out, 'results.json'), 'old')
+      writeResults(out, 'summary.md', 'new', { rewrite, onRecreated: () => said++, write: racing })
+      expect([files(), said, resultsHeld(out)]).toEqual([['results.json', 'runner.json', 'summary.md'], 1, true])
+      expect(readFileSync(join(out, 'summary.md'), 'utf8')).toBe('new')
+
+      // Removed again while the recovery puts the earlier files back: it starts over, and writes only once all are back.
+      rmSync(out, { recursive: true, force: true })
+      let duringRewrite = 1
+      said = 0
+      const interrupted = () => {
+        if (duringRewrite-- > 0) rmSync(out, { recursive: true, force: true })
+        rewrite()
+      }
+      writeResults(out, 'summary.md', 'newer', { rewrite: interrupted, onRecreated: () => said++ })
+      expect([files(), said]).toEqual([['results.json', 'runner.json', 'summary.md'], 2])
+      expect(readFileSync(join(out, 'results.json'), 'utf8')).toBe('old')
+
+      // Any other error is thrown at once, with no recovery.
+      said = 0
+      const denied = () => {
+        throw Object.assign(new Error('denied'), { code: 'EPERM' })
+      }
+      expect(() => writeResults(out, 'summary.md', 'x', { rewrite, onRecreated: () => said++, write: denied })).toThrow(/denied/)
+      expect(said).toBe(0)
+
+      // A folder that keeps going is given up on after WRITE_ATTEMPTS writes, with the ENOENT.
+      let writes = 0
+      const alwaysGone = (p: string, d: string) => {
+        writes++
+        rmSync(out, { recursive: true, force: true })
+        writeFileSync(p, d)
+      }
+      expect(() => writeResults(out, 'summary.md', 'x', { rewrite, write: alwaysGone })).toThrow(expect.objectContaining({ code: 'ENOENT' }))
+      expect(writes).toBe(WRITE_ATTEMPTS)
     } finally {
       rmSync(dir, { recursive: true, force: true })
     }

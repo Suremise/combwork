@@ -1,11 +1,13 @@
 import { Children, useCallback, useEffect, useState } from 'react'
 import type { HiddenProject, ProjectInfo, ProjectRemoval, ProjectRemovalInfo } from '@shared/types'
+import { folderWhat } from '@shared/projectFolders'
 import { call, errorMessage } from '../api'
 import { clearEditorDraftsUnder, hasEditorDraftsUnder } from '../editorDrafts'
 import { useScopedLoad } from '../scopedLoad'
 import { loadTasks, notify, set, useStore } from '../store'
 import { cx, timeAgo } from '../util'
 import { BusyButton, Icon, LoadFailed, Modal, useBusy } from './ui'
+import { ItemTable, ShortPath, type ItemRow } from './ItemTable'
 import { fmt, msg, tr, tRich, type Msg } from '@shared/i18n'
 
 const CHOICES: { id: ProjectRemoval; label: Msg; icon: string; summary: Msg }[] = [
@@ -25,7 +27,7 @@ const CHOICES: { id: ProjectRemoval; label: Msg; icon: string; summary: Msg }[] 
     id: 'delete',
     label: msg({ id: 'workspace.removal.delete', defaultMessage: 'Delete', description: "Remove Project: a choice, and the dialog's button for it." }),
     icon: 'trash',
-    summary: msg({ id: 'workspace.removal.deleteSummary', defaultMessage: 'The project folder, its worktrees and its handovers go to the Recycle Bin, and its cards are deleted.', description: 'Remove Project: what Delete does.' })
+    summary: msg({ id: 'workspace.removal.deleteSummary', defaultMessage: 'The project folder, its worktrees, slots and copies, and its handovers go to the Recycle Bin, and its cards are deleted.', description: 'Remove Project: what Delete does.' })
   }
 ]
 
@@ -42,15 +44,30 @@ const M = {
   deleting: msg({ id: 'workspace.removal.deleting', defaultMessage: 'Moving to the Recycle Bin…', description: "Remove Project's button while it deletes." }),
   looking: msg({ id: 'workspace.removal.looking', defaultMessage: 'Looking at what the project has…', description: 'Remove Project while it reads what the project has.' }),
   touches: msg({ id: 'workspace.removal.touches', defaultMessage: 'What it touches', description: "Remove Project: the heading over what the choice does to the project's things." }),
-  running: msg({ id: 'workspace.removal.running', defaultMessage: '{count, plural, one {# running agent} other {# running agents}}: stopped first (their conversations are kept).', description: 'Remove Project, what it touches.' }),
-  folder: msg({ id: 'workspace.removal.folder', defaultMessage: 'The folder {path}: {how, select, delete {to the Recycle Bin.} remove {stays where it is.} other {stays, hidden from Hive.}}', description: 'Remove Project, what it touches: the project folder, for the choice made.' }),
-  noHandovers: msg({ id: 'workspace.removal.noHandovers', defaultMessage: 'No handovers in the shared notes.', description: 'Remove Project, what it touches.' }),
-  handovers: msg({ id: 'workspace.removal.handovers', defaultMessage: '{count, plural, one {# handover} other {# handovers}} in the shared notes: {how, select, hide {left where they are.} remove {packed into the folder, then moved to the Recycle Bin.} other {to the Recycle Bin.}}', description: "Remove Project, what it touches: the project's handovers, for the choice made." }),
-  noCards: msg({ id: 'workspace.removal.noCards', defaultMessage: 'No cards on the board.', description: 'Remove Project, what it touches.' }),
-  cards: msg({ id: 'workspace.removal.cards', defaultMessage: '{count, plural, one {# card} other {# cards}} on the board{archived, plural, =0 {} other { (and # archived)}}: {how, select, delete {deleted.} remove {archived, and a copy packed into the folder.} other {archived until you restore it.}}', description: "Remove Project, what it touches: the project's cards, for the choice made." }),
-  worktrees: msg({ id: 'workspace.removal.worktrees', defaultMessage: '{count, plural, one {# worktree} other {# worktrees}}: {how, select, hide {left as they are.} remove {removed with their branches, once nothing in them is unmerged.} other {to the Recycle Bin.}}', description: "Remove Project, what it touches: the agents' worktrees (each follows), for the choice made." }),
-  worktree: msg({ id: 'workspace.removal.worktree', defaultMessage: '{agent} ({branch}){hasError, select, yes {: {error}} other {}}{ahead, plural, =0 {} one {: # commit not merged} other {: # commits not merged}}{dirty, plural, =0 {} other {{ahead, plural, =0 {:} other {,}} {dirty, plural, one {# uncommitted file} other {# uncommitted files}}}}', description: "Remove Project: an agent's worktree, and what in it isn't merged." }),
-  transcripts: msg({ id: 'workspace.removal.transcripts', defaultMessage: "The coding agents' own transcripts (in ~/.claude and ~/.codex) are left alone.", description: 'Remove Project, what it touches. Keep the paths as they are.' }),
+  colWhat: msg({ id: 'workspace.removal.colWhat', defaultMessage: 'What', description: "Remove Project's What it touches table (#1316), a column: the project's things (its folder, handovers, cards…)." }),
+  colHappens: msg({ id: 'workspace.removal.colHappens', defaultMessage: 'What happens', description: "Remove Project's What it touches table, a column: what the choice made does to each." }),
+  running: msg({ id: 'workspace.removal.runningAgents', defaultMessage: '{count, plural, one {# running agent} other {# running agents}}', description: 'Remove Project, What it touches, the What column: the running agents.' }),
+  runningHow: msg({ id: 'workspace.removal.runningHow', defaultMessage: 'stopped first; their conversations are kept', description: 'Remove Project, What it touches, What happens to the running agents.' }),
+  folder: msg({ id: 'workspace.removal.folderThing', defaultMessage: 'Folder', description: "Remove Project, What it touches, the What column: the project's folder (its name follows; the full path on hover)." }),
+  folderHow: msg({ id: 'workspace.removal.folderHow', defaultMessage: '{how, select, delete {to the Recycle Bin} remove {stays where it is} other {stays, hidden from Hive}}', description: 'Remove Project, What it touches, What happens to the project folder, for the choice made.' }),
+  handovers: msg({ id: 'workspace.removal.handoversThing', defaultMessage: '{count, plural, =0 {No handovers} one {# handover} other {# handovers}}', description: "Remove Project, What it touches, the What column: the project's handovers in the shared notes." }),
+  handoversHow: msg({ id: 'workspace.removal.handoversHow', defaultMessage: '{how, select, hide {left in the shared notes} remove {packed into the folder, then moved to the Recycle Bin} other {to the Recycle Bin}}', description: "Remove Project, What it touches, What happens to the project's handovers, for the choice made." }),
+  cards: msg({ id: 'workspace.removal.cardsThing', defaultMessage: '{count, plural, =0 {No cards} one {# card} other {# cards}}{archived, plural, =0 {} other { (and # archived)}}', description: "Remove Project, What it touches, the What column: the project's cards on the board, and its archived ones." }),
+  cardsHow: msg({ id: 'workspace.removal.cardsHow', defaultMessage: '{how, select, delete {deleted} remove {archived, and a copy packed into the folder} other {archived until you restore it}}', description: "Remove Project, What it touches, What happens to the project's cards, for the choice made." }),
+  folders: msg({ id: 'workspace.removal.foldersThing', defaultMessage: '{count, plural, one {# slot, copy or old folder} other {# slots, copies and old folders}}', description: "Remove Project, What it touches, the What column (#1447): the project's slots (working folders Hive lends to cards), review copies and old reviewer folders, each on a row under it." }),
+  foldersHow: msg({ id: 'workspace.removal.foldersHow', defaultMessage: '{how, select, hide {left as they are} delete {to the Recycle Bin, with what is in them} other {removed when clean and merged; the rest stay, listed}}', description: "Remove Project, What it touches, what happens to the project's slots, copies and old folders for the choice made (#1447): Hive removes those with nothing to lose, and keeps the others." }),
+  folderRemoved: msg({ id: 'workspace.removal.folderRemoved', defaultMessage: 'removed', description: "Remove Project, What it touches (#1447): a slot or copy that goes, nothing in it being lost." }),
+  folderKept: msg({ id: 'workspace.removal.folderKept', defaultMessage: 'kept: {why}', description: "Remove Project, What it touches (#1447): a slot, copy or old folder that stays, and why ({why}: a clause, such as \"2 files in it aren't committed\")." }),
+  deleteBlocked: msg({ id: 'workspace.removal.deleteBlocked', defaultMessage: "Delete can't go ahead while a slot or old folder listed above stops it.", description: "Remove Project, with Delete chosen (#1447): why its button is off: a slot or old folder in the list says why it stops Delete." }),
+  folderTrashed: msg({ id: 'workspace.removal.folderTrashed', defaultMessage: 'to the Recycle Bin', description: "Remove Project, What it touches, with Delete chosen (#1447): a slot, copy or old folder goes to the Recycle Bin with the project, with whatever is in it." }),
+  folderBlocks: msg({ id: 'workspace.removal.folderBlocks', defaultMessage: 'stops Delete: {why}', description: "Remove Project, What it touches, with Delete chosen (#1447): a slot or old folder that stops Delete, and why ({why}: a clause)." }),
+  folderLeft: msg({ id: 'workspace.removal.folderLeft', defaultMessage: 'left as it is', description: "Remove Project, What it touches, with Hide chosen (#1447): a slot, copy or old folder isn't touched." }),
+  worktrees: msg({ id: 'workspace.removal.worktreesThing', defaultMessage: '{count, plural, one {# worktree} other {# worktrees}}', description: "Remove Project, What it touches, the What column: the agents' worktrees (each on a row under it)." }),
+  worktreesHow: msg({ id: 'workspace.removal.worktreesHow', defaultMessage: '{how, select, hide {left as they are} remove {removed with their branches, once nothing in them is unmerged} other {to the Recycle Bin}}', description: "Remove Project, What it touches, What happens to the agents' worktrees, for the choice made." }),
+  worktree: msg({ id: 'workspace.removal.worktreeThing', defaultMessage: '{agent} ({branch})', description: "Remove Project, What it touches: an agent's worktree, by the agent ({agent}) and its branch ({branch}), under the worktrees' row." }),
+  worktreeWork: msg({ id: 'workspace.removal.worktreeWork', defaultMessage: '{hasError, select, yes {{error}} other {{ahead, plural, =0 {{dirty, plural, =0 {nothing unmerged} one {# uncommitted file} other {# uncommitted files}}} one {# commit not merged{dirty, plural, =0 {} one {, # uncommitted file} other {, # uncommitted files}}} other {# commits not merged{dirty, plural, =0 {} one {, # uncommitted file} other {, # uncommitted files}}}}}}', description: "Remove Project, What it touches: what in an agent's worktree isn't merged ({error}: why git couldn't check it)." }),
+  transcripts: msg({ id: 'workspace.removal.transcriptsThing', defaultMessage: "Coding agents' transcripts", description: "Remove Project, What it touches, the What column: the coding agents' own conversation files." }),
+  transcriptsHow: msg({ id: 'workspace.removal.transcriptsHow', defaultMessage: 'left alone (in ~/.claude and ~/.codex)', description: "Remove Project, What it touches, What happens to the coding agents' own transcripts. Keep the paths as they are." }),
   blocked: msg({ id: 'workspace.removal.blocked', defaultMessage: "Merge or discard the work in {agents}'s worktree first: a worktree can't go with the project folder.{unchecked, select, yes { Git couldn't check one, so Hive can't tell whether anything would be lost.} other {}}", description: "Remove Project: why Remove from Hive can't go yet ({agents}: the agents whose worktrees hold work)." }),
   drafts: msg({ id: 'workspace.removal.drafts', defaultMessage: 'Files of this project have unsaved edits in Hive. They are lost.', description: 'Remove Project, before Delete.' }),
   typeName: msg({ id: 'workspace.removal.typeName', defaultMessage: 'Type <b>{name}</b> to delete it.', description: "Remove Project, before Delete: type the project's name in the box below. <b> is bold." }),
@@ -83,6 +100,56 @@ const bold = (c: React.ReactNode[]): React.ReactNode => <strong>{c}</strong>
 /** What came back, or is packed: handovers, cards, or both, for M.what (cards are "board cards" in it). */
 const whatArgs = (handovers: number, cards: number): { which: 'both' | 'handovers' | 'cards' | 'none'; handovers: number; cards: number } => ({ which: handovers && cards ? 'both' : handovers ? 'handovers' : cards ? 'cards' : 'none', handovers, cards })
 
+/**
+ * What Remove Project touches (#1316, from the #1307 audit), as an item table: a row a thing (its count, or the folder by
+ * its name with the full path on hover and copied whole) and what the choice made does to it; each agent's worktree on a
+ * row under the worktrees', its unmerged work in the warning colour when it matters.
+ */
+function touchRows(info: ProjectRemovalInfo, how: ProjectRemoval): ItemRow[] {
+  const row = (key: string, item: React.ReactNode, text: string, happens: string, className?: string): ItemRow => ({ key, item, text, cells: [{ content: <span title={happens}>{happens}</span>, text: happens }], ...(className ? { className } : {}) })
+  const rows: ItemRow[] = []
+  if (info.running > 0) rows.push(row('running', tr(M.running, { count: info.running }), tr(M.running, { count: info.running }), tr(M.runningHow)))
+  rows.push(
+    row(
+      'folder',
+      <>
+        {tr(M.folder)} <ShortPath path={info.path} className="removal-folder" />
+      </>,
+      `${tr(M.folder)} ${info.path}`,
+      tr(M.folderHow, { how })
+    )
+  )
+  const handovers = tr(M.handovers, { count: info.handovers.length })
+  rows.push(row('handovers', handovers, handovers, info.handovers.length ? tr(M.handoversHow, { how }) : '—'))
+  const cards = tr(M.cards, { count: info.cards, archived: info.archivedCards })
+  rows.push(row('cards', cards, cards, info.cards + info.archivedCards ? tr(M.cardsHow, { how }) : '—'))
+  if (info.worktrees.length) {
+    const trees = tr(M.worktrees, { count: info.worktrees.length })
+    rows.push(row('worktrees', trees, trees, tr(M.worktreesHow, { how })))
+    for (const w of info.worktrees) {
+      const name = tr(M.worktree, { agent: w.agent, branch: w.branch })
+      const work = tr(M.worktreeWork, { hasError: w.error ? 'yes' : 'no', error: w.error ?? '', ahead: w.ahead ?? 0, dirty: w.dirty ?? 0 })
+      rows.push(row(`worktree#${w.path}`, <span title={w.path}>{name}</span>, name, work, cx('removal-sub', !!(w.ahead || w.dirty || w.error) && how !== 'hide' && 'warn-text')))
+    }
+  }
+  // Its slots, copies and old reviewer folders (#1447): what the guarded clean-up would do to each, kept ones first.
+  const folders = [...(info.folders ?? [])].sort((a, b) => Number(!(how === 'delete' ? a.blocksDelete : a.kept)) - Number(!(how === 'delete' ? b.blocksDelete : b.kept)))
+  if (folders.length) {
+    const things = tr(M.folders, { count: folders.length })
+    rows.push(row('folders', things, things, tr(M.foldersHow, { how })))
+    for (const f of folders) {
+      const name = folderWhat(f.of)
+      // Delete (#1447, HR1's round 1): every one goes to the Recycle Bin with the project, unless one stops Delete.
+      const happens = how === 'hide' ? tr(M.folderLeft) : how === 'delete' ? (f.blocksDelete ? tr(M.folderBlocks, { why: f.blocksDelete }) : tr(M.folderTrashed)) : f.kept ? tr(M.folderKept, { why: f.kept }) : tr(M.folderRemoved)
+      const warn = how === 'delete' ? !!f.blocksDelete : !!f.kept && how !== 'hide'
+      rows.push(row(`folder#${f.path}`, <span title={f.path}>{name}</span>, name, happens, cx('removal-sub', warn && 'warn-text')))
+    }
+  }
+  const transcripts = tr(M.transcripts)
+  rows.push(row('transcripts', transcripts, transcripts, tr(M.transcriptsHow), 'faint'))
+  return rows
+}
+
 /** Project → Remove Project…: hide it, remove it from Hive (keeping its files), or delete it. */
 export function RemoveProjectDialog() {
   const path = useStore((s) => s.removeProjectFor)
@@ -109,7 +176,7 @@ export function RemoveProjectDialog() {
   const close = (): void => set({ removeProjectFor: null })
   const unmerged = info?.worktrees.filter((w) => w.ahead || w.dirty || w.error) ?? []
   const drafts = hasEditorDraftsUnder(path)
-  const blocked = how === 'remove' && unmerged.length > 0
+  const blocked = (how === 'remove' && unmerged.length > 0) || (how === 'delete' && !!info?.folders?.some((f) => f.blocksDelete))
   const ready = !!info && !blocked && (how !== 'delete' || typed.trim().toLowerCase() === info.name.toLowerCase())
 
   const go = async (): Promise<void> => {
@@ -166,28 +233,10 @@ export function RemoveProjectDialog() {
             ))}
           </div>
           <div className="agent-dialog-h">{tr(M.touches)}</div>
-          <ul className="removal-list">
-            {info.running > 0 && <li>{tr(M.running, { count: info.running })}</li>}
-            <li>{tr(M.folder, { path: info.path, how })}</li>
-            <li>{info.handovers.length === 0 ? tr(M.noHandovers) : tr(M.handovers, { count: info.handovers.length, how })}</li>
-            <li>{info.cards + info.archivedCards === 0 ? tr(M.noCards) : tr(M.cards, { count: info.cards, archived: info.archivedCards, how })}</li>
-            {info.worktrees.length > 0 && (
-              <li>
-                {tr(M.worktrees, { count: info.worktrees.length, how })}
-                <ul>
-                  {info.worktrees.map((w) => (
-                    <li key={w.path} className={cx(!!(w.ahead || w.dirty || w.error) && how !== 'hide' && 'warn-text')}>
-                      {tr(M.worktree, { agent: w.agent, branch: w.branch, hasError: w.error ? 'yes' : 'no', error: w.error ?? '', ahead: w.ahead ?? 0, dirty: w.dirty ?? 0 })}
-                    </li>
-                  ))}
-                </ul>
-              </li>
-            )}
-            <li className="faint">{tr(M.transcripts)}</li>
-          </ul>
+          <ItemTable first={M.colWhat} columns={[{ label: M.colHappens }]} rows={touchRows(info, how)} className="fill removal-list" />
           {blocked && (
             <div className="banner warn">
-              <Icon name="warning" /> {tr(M.blocked, { agents: fmt.list(unmerged.map((w) => w.agent)), unchecked: unmerged.some((w) => w.error) ? 'yes' : 'no' })}
+              <Icon name="warning" /> {how === 'delete' ? tr(M.deleteBlocked) : tr(M.blocked, { agents: fmt.list(unmerged.map((w) => w.agent)), unchecked: unmerged.some((w) => w.error) ? 'yes' : 'no' })}
             </div>
           )}
           {drafts && how === 'delete' && (

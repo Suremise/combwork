@@ -1,17 +1,23 @@
-import { agentLaunchSettings, modeOption, offeredModes, permissionLabel, projectProviderConfig, providerDescriptor, providerSettings, shownText } from '@shared/providers'
+import { agentLaunchSettings, canSwitchModeLive, modeBadgeLabel, modeOption, offeredModes, permissionLabel, providerDescriptor, shownText } from '@shared/providers'
+import { modeInEffect } from '@shared/cliOwnMode'
 import { msg, tr } from '@shared/i18n'
-import type { AgentInfo, AppSettings, PermissionMode, ProjectInfo, ProviderId } from '@shared/types'
+import { useState } from 'react'
+import type { AgentInfo, AppSettings, Connection, PermissionMode, ProjectInfo, ProviderId } from '@shared/types'
+import type { ConnectionsView } from '@shared/accounts'
+import { useConnections } from './ConnectionChoice'
+import { ConnectionDialog } from './ConnectionDefaults'
 import * as actions from '../actions'
 import { call } from '../api'
 import { commandKeybinding } from '../commands'
-import { agentProviderOf, confirm, findProject, notify, set, useLanguage, useStore } from '../store'
+import { agentProviderOf, confirm, findProject, isAssistantPath, notify, set, useLanguage, useStore } from '../store'
 import { cx, formatKeybinding } from '../util'
 import { ContextMenu, Icon, Tooltip, type MenuEntry } from './ui'
 
-/** The mode an agent's next session starts in: its own setting, else the project's, else the global default. */
+/** The mode an agent's next session starts in: its connection's (HI-2106), else its CLI's default. */
 export function configuredMode(project: ProjectInfo, a: AgentInfo | null | undefined, settings: AppSettings | null): PermissionMode {
-  if (!settings) return providerDescriptor(agentProviderOf(project, a)).defaultPermissionMode
-  return agentLaunchSettings(a ?? project.agents[0], project.config, settings).permissionMode
+  if (!settings) return providerDescriptor(agentProviderOf(a)).defaultPermissionMode
+  const agent = a ?? project.agents[0]
+  return agentLaunchSettings(agentProviderOf(agent), agent, settings).permissionMode
 }
 
 /** What the agent is in now if it runs (as its CLI reports it), else what it will start in. */
@@ -50,7 +56,7 @@ async function switchLive(project: ProjectInfo, a: AgentInfo, mode: PermissionMo
   const desc = providerDescriptor(p)
   if (!(await confirmDangerousMode(p, mode, a.name))) return
   // Live whenever the provider can (#1014: Codex's Full Access too, after the confirmation); a restart only when it can't.
-  if (desc.capabilities.liveModeSwitch !== 'none' && desc.canSwitchLive(mode, live.permissionMode, null)) {
+  if (canSwitchModeLive(desc, mode, live.permissionMode, null)) {
     const r = await actions.attempt(tr(msg({ id: 'agents.permission.switchFailed', defaultMessage: 'Could not switch the permission mode', description: "An error's title: switching a running agent's permission mode failed." })), () => call('session:setMode', project.path, a.id, mode))
     if (!r || r.ok) return
     if (!r.restart) return notify('warning', tr(msg({ id: 'agents.permission.notSwitched', defaultMessage: 'Permission mode not switched', description: "A notification's title: Hive couldn't switch a running agent's permission mode (the message says why)." })), r.message)
@@ -70,29 +76,43 @@ async function switchLive(project: ProjectInfo, a: AgentInfo, mode: PermissionMo
   await actions.attempt(tr(msg({ id: 'agents.permission.restartFailed', defaultMessage: 'Could not restart the session', description: "An error's title: restarting an agent's session in another permission mode failed." })), () => call('session:restartInMode', project.path, a.id, mode))
 }
 
-async function setForNewSessions(project: ProjectInfo, a: AgentInfo, provider: ProviderId, mode: PermissionMode | 'inherit'): Promise<void> {
-  const where = { message: tr(msg({ id: 'agents.permission.newSessionsOf', defaultMessage: 'New sessions of {name} will run every command, edit and network call without asking.', description: "The confirmation before choosing a no-guardrails permission mode for an agent's or a project's new sessions ({name}: the agent's or the project's name)." }), { name: a.permissionMode ? a.name : project.name }) }
-  if (mode !== 'inherit' && !(await confirmDangerousMode(provider, mode, where))) return
-  if (a.permissionMode) {
-    await actions.attempt(tr(msg({ id: 'agents.permission.saveFailed', defaultMessage: 'Could not save', description: "An error's title: saving an agent's permission mode for new sessions failed." })), () => call('agents:update', project.path, a.id, { permissionMode: mode === 'inherit' ? undefined : mode }))
-    await actions.refreshWorkspace()
-  } else await actions.updateProjectProvider(project.path, provider, { permissionMode: mode })
+/**
+ * Moves a stopped agent to another of its account's connections (HI-2122, the user's option 1): as Agent Settings does,
+ * after confirming a no-guardrails mode the connection has.
+ */
+async function chooseConnection(project: ProjectInfo, a: AgentInfo, provider: ProviderId, c: Connection): Promise<void> {
+  if (c.permissionMode && !(await confirmDangerousMode(provider, c.permissionMode, a.name))) return
+  await actions.attempt(tr(msg({ id: 'agents.permission.saveFailed', defaultMessage: 'Could not save', description: "An error's title: saving an agent's permission mode for new sessions failed." })), () => call('agents:update', project.path, a.id, { connection: c.id }))
+  await actions.refreshWorkspace()
 }
 
-function menuItems(project: ProjectInfo, a: AgentInfo, settings: AppSettings): MenuEntry[] {
-  const provider = agentProviderOf(project, a)
+function menuItems(project: ProjectInfo, a: AgentInfo, settings: AppSettings, view: ConnectionsView | null, onEdit: (account: string, connection: string) => void): MenuEntry[] {
+  const provider = agentProviderOf(a)
   const desc = providerDescriptor(provider)
-  const modes = offeredModes(provider, settings)
+  const modes = offeredModes(provider, settings, isAssistantPath(project.path))
   const many = project.agents.length > 1
   const live = a.live
   if (live && !live.settingUp) {
     const cur = live.permissionMode
     const asking = live.status === 'waiting'
+    // Started in the CLI's own setting (#1284): Hive doesn't know its mode, so every choice restarts the session.
+    const cliOwn = !!modeOption(provider, cur)?.cliOwn
     return [
       { header: true, label: many ? tr(msg({ id: 'agents.permission.menuAgent', defaultMessage: 'Permission mode — {agent}', description: "The permission mode menu's heading, for one of several agents ({agent}: its name)." }), { agent: a.name }) : tr(msg({ id: 'agents.permission.menu', defaultMessage: 'Permission mode', description: "The permission mode menu's heading." })) },
+      // A short line and its why under it, which wraps (the menu's details), so the menu keeps its width.
+      ...(cliOwn
+        ? [
+            {
+              label: tr(msg({ id: 'agents.permission.cliOwnNoSwitchTitle', defaultMessage: "Hive can't switch this session's mode", description: "In a running agent's permission mode menu, for a session started in \"The CLI's own setting\" (Hive passed no mode): a short line saying no mode switches live. Keep it short." })),
+              detail: tr(msg({ id: 'agents.permission.cliOwnNoSwitch', defaultMessage: "It started in the CLI's own setting, so Hive doesn't know which mode it is in. A choice here restarts it.", description: "In a running agent's permission mode menu, under \"Hive can't switch this session's mode\" (a session started in \"The CLI's own setting\", Hive passed no mode): why, and what a choice does." })),
+              icon: 'info',
+              disabled: true
+            }
+          ]
+        : []),
       ...(asking ? [{ label: tr(msg({ id: 'agents.permission.answerFirst', defaultMessage: 'The agent is asking you something: answer it first', description: 'In the permission mode menu, while the agent waits for an answer: its mode can be switched once it is answered.' })), icon: 'warning', disabled: true }] : []),
       ...modes.map((m): MenuEntry => {
-        const liveOk = desc.capabilities.liveModeSwitch !== 'none' && desc.canSwitchLive(m.value, cur, null)
+        const liveOk = canSwitchModeLive(desc, m.value, cur, null)
         return {
           label: shownText(m.label, m.text?.label, tr),
           icon: m.value === cur ? 'check' : 'blank',
@@ -119,28 +139,27 @@ function menuItems(project: ProjectInfo, a: AgentInfo, settings: AppSettings): M
       { label: tr(msg({ id: 'agents.permission.sessionOnly', defaultMessage: 'Switches this session only. Settings decide the mode new sessions start in.', description: "The last line of a running agent's permission mode menu." })), disabled: true }
     ]
   }
-  const configured = configuredMode(project, a, settings)
-  const own = !!a.permissionMode
-  const projectMode = projectProviderConfig(project.config, provider).permissionMode
-  const projectShown = projectMode === 'inherit' ? providerSettings(settings, provider).defaultPermissionMode : projectMode
-  const inheritLabel = own
-    ? tr(msg({ id: 'agents.permission.useProjects', defaultMessage: "Use the project's ({mode})", description: "In a stopped agent's permission mode menu: use its project's mode for new sessions ({mode}: that mode's name)." }), { mode: permissionLabel(provider, projectShown, tr) })
-    : tr(msg({ id: 'agents.permission.inherit', defaultMessage: 'Inherit (Settings: {mode})', description: "In a stopped agent's permission mode menu: new sessions follow the mode set in Settings ({mode}: its name)." }), { mode: permissionLabel(provider, providerSettings(settings, provider).defaultPermissionMode, tr) })
-  const isInherit = own ? false : projectMode === 'inherit'
+  // Stopped (HI-2122): its mode is its connection's (decision B), so the menu offers its account's connections, each with
+  // its mode, the current one ticked; picking one moves it there (nothing is made for it), and the last item edits its own.
+  const current = view?.connectionRows?.find((c) => c.id === a.connection)
+  const rows = current ? (view?.connectionRows ?? []).filter((c) => c.account === current.account) : []
+  const header: MenuEntry = { header: true, label: tr(msg({ id: 'agents.permission.connectionNewSessions', defaultMessage: '{agent}: connection for new sessions', description: "The heading of a stopped agent's permission mode menu (HI-2122): its mode is its connection's, so the menu lists its account's connections, each with its mode ({agent}: its name)." }), { agent: a.name }) }
+  if (!current) return [header, { label: tr(msg({ id: 'agents.permission.noConnection', defaultMessage: 'No connection yet: choose one in Agent Settings', description: "In a stopped agent's permission mode menu (HI-2122) when it has no connection (its CLI has no account on here yet). Agent Settings names a dialog." })), icon: 'info', disabled: true }]
   return [
+    header,
+    ...rows.map((c): MenuEntry => ({
+      label: c.name,
+      icon: c.id === current.id ? 'check' : 'blank',
+      detail: permissionLabel(provider, c.permissionMode ?? desc.defaultPermissionMode, tr),
+      disabled: c.id === current.id,
+      onClick: () => void chooseConnection(project, a, provider, c)
+    })),
+    { separator: true },
     {
-      header: true,
-      label: own
-        ? tr(msg({ id: 'agents.permission.agentNewSessions', defaultMessage: '{agent}: mode for new sessions', description: "The heading of a stopped agent's permission mode menu, when the agent has its own mode ({agent}: its name)." }), { agent: a.name })
-        : tr(msg({ id: 'agents.permission.projectNewSessions', defaultMessage: '{project}: {provider} mode for new sessions', description: "The heading of a stopped agent's permission mode menu: the project's mode ({project}: its name) for its CLI ({provider})." }), { project: project.name, provider: desc.name })
-    },
-    { label: inheritLabel, icon: isInherit ? 'check' : 'blank', onClick: () => void setForNewSessions(project, a, provider, 'inherit') },
-    ...modes.map((m): MenuEntry => ({
-      label: shownText(m.label, m.text?.label, tr),
-      icon: !isInherit && m.value === configured ? 'check' : 'blank',
-      detail: shownText(m.description, m.text?.description, tr),
-      onClick: () => void setForNewSessions(project, a, provider, m.value)
-    }))
+      label: tr(msg({ id: 'agents.permission.editConnection', defaultMessage: 'Edit "{connection}"…', description: "The last item of a stopped agent's permission mode menu (HI-2122): opens the connection dialog for its connection ({connection}: its name), where its mode is changed for every agent on it. The … says a dialog opens: keep it." }), { connection: current.name }),
+      icon: 'edit',
+      onClick: () => onEdit(current.account, current.id)
+    }
   ]
 }
 
@@ -150,10 +169,16 @@ export function ModeMenuHost() {
   const menu = useStore((s) => s.modeMenu)
   const project = useStore((s) => findProject(s, s.modeMenu?.project))
   const settings = useStore((s) => s.settings)
-  if (!menu || !project || !settings) return null
-  const a = project.agents.find((x) => x.id === menu.agentId)
-  if (!a) return null
-  return <ContextMenu x={menu.x} y={menu.y} above={menu.above} items={menuItems(project, a, settings)} onClose={() => set({ modeMenu: null })} />
+  const view = useConnections()
+  // The connection dialog its last item opens (HI-2122), kept open once the menu has closed.
+  const [editing, setEditing] = useState<{ account: string; connection: string } | null>(null)
+  const a = menu && project ? project.agents.find((x) => x.id === menu.agentId) : undefined
+  return (
+    <>
+      {menu && project && settings && a && <ContextMenu x={menu.x} y={menu.y} above={menu.above} items={menuItems(project, a, settings, view, (account, connection) => setEditing({ account, connection }))} onClose={() => set({ modeMenu: null })} />}
+      {editing && <ConnectionDialog account={editing.account} connection={editing.connection} onClose={() => setEditing(null)} />}
+    </>
+  )
 }
 
 /** The permission mode as a clickable badge (project header), chip (pane header) or status bar item. */
@@ -161,17 +186,19 @@ export function ModeBadge({ project, a, variant }: { project: ProjectInfo; a: Ag
   const settings = useStore((s) => s.settings)
   useLanguage()
   if (!a) return null
-  const provider = agentProviderOf(project, a)
+  const provider = agentProviderOf(a)
   const mode = currentMode(project, a, settings)
   const option = modeOption(provider, mode)
-  const bypass = !!option?.danger
+  // Marked by the mode in effect: on the CLI's own setting, one without guardrails its CLI showed (#1284).
+  const bypass = !!modeOption(provider, (a.live ? modeInEffect(a.live) : undefined) ?? mode)?.danger
   const label = a.live?.modeSwitching
     ? tr(msg({ id: 'agents.permission.switching', defaultMessage: 'Switching to {mode}…', description: "The permission mode badge while Hive switches the running session to another mode ({mode}: its name)." }), { mode: permissionLabel(provider, a.live.modeSwitching, tr) })
     : a.live?.planMode
-      ? tr(msg({ id: 'agents.permission.withPlan', defaultMessage: '{mode} · Plan', description: "The permission mode badge of a running session with Plan mode on (Codex): its mode ({mode}: its name), then Plan. Keep it short." }), { mode: permissionLabel(provider, mode, tr) })
-      : permissionLabel(provider, mode, tr)
+      ? tr(msg({ id: 'agents.permission.withPlan', defaultMessage: '{mode} · Plan', description: "The permission mode badge of a running session with Plan mode on (Codex): its mode ({mode}: its name), then Plan. Keep it short." }), { mode: modeBadgeLabel(provider, mode, tr) })
+      : modeBadgeLabel(provider, mode, tr)
   const kb = commandKeybinding('session.permissionMode')
-  const cycles = providerDescriptor(provider).capabilities.liveModeSwitch === 'cycle'
+  // Shift+Tab still cycles the CLI's modes in one on its own setting, but Hive can't say where it starts (#1284).
+  const cycles = providerDescriptor(provider).capabilities.liveModeSwitch === 'cycle' && !option?.cliOwn
   const note = a.live && !a.live.modeSwitching && option?.cliNote ? shownText(option.cliNote, option.text?.cliNote, tr) : undefined
   const tip = tr(
     msg({ id: 'agents.permission.badgeTip', defaultMessage: '{live, select, yes {Permission mode of the running session} other {Permission mode new sessions start in}}: {mode}.{note, select, none {} other { {note}}} Click to change{key, select, none {} other { ({key})}}.{cycles, select, yes { You can also press Shift+Tab in the terminal.} other {}}{plan, select, yes { Shift+Tab in the terminal turns Plan mode on and off.} other {}}', description: "Tooltip of an agent's permission mode badge: whose mode it is (the running session's, or new sessions'), the mode ({mode}), why the CLI's own screen names it differently ({note}; none: leave that branch empty), the shortcut that opens the menu ({key}; none: empty), and whether Shift+Tab switches it in the terminal. Shift+Tab is a key: keep it." }),

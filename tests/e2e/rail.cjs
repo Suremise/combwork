@@ -32,8 +32,26 @@ const becomes = async (fn) => !!(await lib.until(fn, HUNG_MS))
   check('starts full', (await sbWidth()) === 280 && (await page.locator('.rail').count()) === 0)
   await page.locator('.pane-header .icon-btn[aria-label^="Compact Sidebar"]').first().click()
   check('button compacts', await becomes(async () => (await sbWidth()) === 48 && (await page.locator('.rail').count()) === 1), `(${await sbWidth()})`)
-  const labels = await page.locator('.rail-initials').allTextContents()
-  check('initials', JSON.stringify(labels) === JSON.stringify(['Hi', 'WD', 'AS', 'No']), JSON.stringify(labels))
+  // Each tile shows its project's key (#1221), given from the folder's name.
+  const keysShown = ['HI', 'WE', 'AP', 'NO']
+  const labels = await lib.until(async () => { const l = await page.locator('.rail-initials').allTextContents(); return JSON.stringify(l) === JSON.stringify(keysShown) && l }, HUNG_MS) || (await page.locator('.rail-initials').allTextContents())
+  check('the tiles show the projects’ keys', JSON.stringify(labels) === JSON.stringify(keysShown), JSON.stringify(labels))
+  // 3- and 4-letter keys shrink to fit: the tiles keep their size and the rail its width (#1221). Screenshots of 2, 3
+  // and 4 letters, in both themes.
+  const tileSize = () => page.locator('.rail-project').evaluateAll((els) => els.map((e) => `${Math.round(e.getBoundingClientRect().width)}x${Math.round(e.getBoundingClientRect().height)}`).join(' '))
+  const sizesBefore = await tileSize()
+  await inv('project:setKey', path.join(ws, 'web-dashboard'), 'WEB')
+  await inv('project:setKey', path.join(ws, 'apiServer'), 'APIS')
+  const longKeys = ['HI', 'WEB', 'APIS', 'NO']
+  check('a changed key shows on its tile', await becomes(async () => JSON.stringify(await page.locator('.rail-initials').allTextContents()) === JSON.stringify(longKeys)), JSON.stringify(await page.locator('.rail-initials').allTextContents()))
+  const fits = await page.locator('.rail-initials').evaluateAll((els) => els.map((e) => ({ text: e.textContent, inside: e.scrollWidth <= e.parentElement.clientWidth, cls: e.className })))
+  check('3 and 4 letters fit their tile, smaller', fits.every((f) => f.inside) && /rail-initials-3/.test(fits[1].cls) && /rail-initials-4/.test(fits[2].cls) && !/rail-initials-\d/.test(fits[0].cls), JSON.stringify(fits))
+  check('…without changing the tiles or the rail', (await tileSize()) === sizesBefore && (await sbWidth()) === 48, `${sizesBefore} → ${await tileSize()}, ${await sbWidth()}`)
+  for (const theme of ['dark', 'light']) {
+    await page.evaluate((t) => document.documentElement.setAttribute('data-theme', t), theme)
+    await page.locator('.rail').screenshot({ path: path.join(scratch, `rail-keys-${theme}.png`) })
+  }
+  await page.evaluate(() => document.documentElement.setAttribute('data-theme', 'dark'))
   check('separator between active and other', (await page.locator('.rail-sep').count()) === 1)
   check('saved', await becomes(async () => (await inv('ui:get')).sidebarCompact === true))
 

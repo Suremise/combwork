@@ -92,6 +92,7 @@ export function buildSessionTree(items: readonly SessionListItem[], opts: Sessio
 
   const providers = new Map<ProviderId, SessionNode[]>()
   for (const r of roots) providers.set(r.item.provider, [...(providers.get(r.item.provider) ?? []), r])
+  // In Hive's order (HI-2139), a provider this Hive doesn't know last.
   const order = (p: ProviderId): number => {
     const i = PROVIDERS.findIndex((d) => d.id === p)
     return i < 0 ? PROVIDERS.length : i

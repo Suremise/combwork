@@ -14,6 +14,7 @@ const base = tempDir('hive-review-')
 const { createWorkspaceService, disposeWorkspaceService, inWorkspace } = await import('../src/main/workspace')
 const tasks = await import('../src/main/tasks')
 const { recordCards } = await import('../src/main/cardSessions')
+const { boardOpen } = await import('../src/main/boardStore')
 type WS = ReturnType<typeof createWorkspaceService>
 
 const user = { kind: 'user' } as const
@@ -51,6 +52,19 @@ describe('reviewing a card', () => {
   /** A card Coder did, waiting in Review. */
   const done = (title = 'Fix it') => run(() => tasks.createTask({ title, project: 'alpha', agent: 'c1', column: 'review' }, user))
   const history = (c: { history: { by: string; what: string }[] }) => c.history.map((h) => `${h.by}: ${h.what}`)
+  /**
+   * Reviewed and failed as before HI-1946, when a failed card stayed in Review for its fixes: a card failed then is still
+   * there, and is returned for review by its agent's move (#214). Today's verdict sends it back to Doing; the card is put
+   * back as that rule left it (in Review, no move to Doing, no builder hold from it).
+   */
+  const failedInReview = async (n: number): Promise<void> => {
+    await run(() => tasks.updateTask(n, { review: 'start' }, reviewer))
+    await run(() => tasks.updateTask(n, { review: 'failed' }, reviewer))
+    const doc = readCard(w, n)
+    const lines = doc.history as { what: string }[]
+    const held = (doc.held as { role: string; to?: string }[] | undefined) ?? []
+    await writeCard(w, n, { ...doc, column: 'review', history: lines.filter((h, i) => !(i === lines.length - 1 && h.what.startsWith('Moved to Doing'))), held: held.filter((h) => h.role !== 'build' || h.to) })
+  }
 
   it('a reviewer marks the card it reviews; the card stays in Review with the agent that did the work', async () => {
     const c = await done()
@@ -75,12 +89,14 @@ describe('reviewing a card', () => {
     await expect(run(() => tasks.updateTask(c.number, { review: 'failed' }, third))).rejects.toThrow(/Reviewer is reviewing/)
   })
 
-  it('the verdict ends the review; the card stays in Review, or goes to Done when asked in the same change', async () => {
+  it('the verdict ends the review; failed, the card goes back to Doing with its builder (HI-1946); passed, it stays in Review or goes to Done when asked in the same change', async () => {
     const a = await done()
     await run(() => tasks.updateTask(a.number, { review: 'start' }, reviewer))
     const failed = await run(() => tasks.updateTask(a.number, { review: 'failed' }, reviewer))
-    expect([failed.column, failed.agent, failed.review]).toEqual(['review', 'c1', undefined])
-    expect(history(failed).at(-1)).toBe('Reviewer (alpha): Review failed')
+    expect([failed.column, failed.agent, failed.review]).toEqual(['doing', 'c1', undefined])
+    expect(history(failed).slice(-2)).toEqual(['Reviewer (alpha): Review failed', 'Reviewer (alpha): Moved to Doing'])
+    // Its builder holds it again for its fixes; the reviewer's hold ended.
+    expect(failed.held?.map((h) => [h.name, h.role, !!h.to])).toEqual([['Reviewer', 'review', true], ['Coder', 'build', false]])
     const b = await done()
     await run(() => tasks.updateTask(b.number, { review: 'start' }, reviewer))
     const passed = await run(() => tasks.updateTask(b.number, { review: 'passed', column: 'done' }, reviewer))
@@ -90,10 +106,7 @@ describe('reviewing a card', () => {
 
   it('a failed card its agent (or the user) moves to Review without it leaving is returned for review, round by round (#214)', async () => {
     const c = await done('Returned')
-    const fail = async () => {
-      await run(() => tasks.updateTask(c.number, { review: 'start' }, reviewer))
-      await run(() => tasks.updateTask(c.number, { review: 'failed' }, reviewer))
-    }
+    const fail = () => failedInReview(c.number)
     const move = async (who: Parameters<typeof tasks.updateTask>[2]) => {
       const said: string[] = []
       const card = await run(() => tasks.updateTask(c.number, { column: 'review' }, who, { said }))
@@ -113,7 +126,7 @@ describe('reviewing a card', () => {
     // Under review again: not returnable meanwhile.
     await run(() => tasks.updateTask(c.number, { review: 'start' }, reviewer))
     expect((await move(coder)).said).toEqual([])
-    await run(() => tasks.updateTask(c.number, { review: 'failed' }, reviewer))
+    await fail()
     // Fixed through Doing as before: an ordinary move back, and nothing to return after it.
     await run(() => tasks.updateTask(c.number, { column: 'doing' }, coder))
     expect((await move(coder)).said).toEqual(['Moved to Review'])
@@ -133,10 +146,7 @@ describe('reviewing a card', () => {
       await run(() => tasks.updateTask(c.number, patch, who, { said: out }))
       return out
     }
-    const fail = async () => {
-      await run(() => tasks.updateTask(c.number, { review: 'start' }, reviewer))
-      await run(() => tasks.updateTask(c.number, { review: 'failed' }, reviewer))
-    }
+    const fail = () => failedInReview(c.number)
     await fail()
     // Another agent giving it to itself: the assignment doesn't make the return its own.
     expect(await said({ agent: 't1', column: 'review' }, third)).toEqual(['Given to Third'])
@@ -226,6 +236,19 @@ describe('reviewing a card', () => {
     expect(history(fixing)).toContain('Third (alpha): Given to Third')
   })
 
+  it("its reviewer's own move back to Doing leaves the card its builder's (HI-1832); the review stops", async () => {
+    const c = await done()
+    await run(() => tasks.updateTask(c.number, { review: 'start' }, reviewer))
+    const back = await run(() => tasks.updateTask(c.number, { column: 'doing' }, reviewer))
+    expect([back.column, back.agent, back.agentName, back.review]).toEqual(['doing', 'c1', 'Coder', undefined])
+    expect(history(back)).toContain('Reviewer (alpha): Review by Reviewer stopped')
+    expect(history(back).some((h) => h.includes('Given to'))).toBe(false)
+    // An agent that never reviewed it still takes it, as before.
+    const d = await done('Another')
+    await run(() => tasks.updateTask(d.number, { review: 'start' }, reviewer))
+    expect((await run(() => tasks.updateTask(d.number, { column: 'doing' }, third))).agent).toBe('t1')
+  })
+
   it('moving the card to another project stops the review', async () => {
     const c = await done()
     await run(() => tasks.updateTask(c.number, { review: 'start' }, reviewer))
@@ -247,6 +270,33 @@ describe('reviewing a card', () => {
     expect((await run(() => tasks.getTask(theirs.number))).review?.agent).toBe('t1')
     // Ending again does nothing.
     expect(await run(() => tasks.endReviews('alpha', 'r1', 'its session ended', w))).toEqual([])
+  })
+
+  it("as the workspace opens again, the reviews of a reviewer whose session ended as it closed end (#1392); a running one's stay", async () => {
+    const mine = await done('Left by a close')
+    const theirs = await done('Still reviewed')
+    await run(() => tasks.updateTask(mine.number, { review: 'start' }, reviewer))
+    await run(() => tasks.updateTask(theirs.number, { review: 'start' }, third))
+    // The window switches away and back; Reviewer's session ended meanwhile, its end never reaching the board.
+    const other = join(base, 'ws-other')
+    mkdirSync(other, { recursive: true })
+    await w.open(other)
+    await w.open(wsPath)
+    const ended = await tasks.endReviewsWithoutSession(w, (p, agentId) => p === 'alpha' && agentId === 't1')
+    expect(ended).toContain(mine.number)
+    expect(ended).not.toContain(theirs.number)
+    const a = await run(() => tasks.getTask(mine.number))
+    expect([a.review, a.column, a.agent]).toEqual([undefined, 'review', 'c1'])
+    expect(history(a).at(-1)).toBe('Hive: Review by Reviewer stopped: its session ended')
+    expect((await run(() => tasks.getTask(theirs.number))).review?.agent).toBe('t1')
+    // A reviewer whose session started between the listing and its card's change keeps its review.
+    const started = await done('Started meanwhile')
+    await run(() => tasks.updateTask(started.number, { review: 'start' }, reviewer))
+    let asked = 0
+    expect(await tasks.endReviewsWithoutSession(w, (_p, agentId) => agentId === 't1' || (agentId === 'r1' && asked++ > 0))).toEqual([])
+    expect((await run(() => tasks.getTask(started.number))).review?.agent).toBe('r1')
+    // Nothing left to end: nothing changes.
+    expect(await tasks.endReviewsWithoutSession(w, () => true)).toEqual([])
   })
 
   it('a card file from before reviews, or with a damaged review, reads as not being reviewed', async () => {
@@ -272,5 +322,36 @@ describe('reviewing a card', () => {
     const cards = (await w.sessionsFile(alpha)).sessions.find((s) => s.id === sid)?.cards ?? []
     expect(cards.filter((x) => x.number === c.number)).toEqual([{ number: c.number, title: 'Recorded', review: true }])
     expect(cards.filter((x) => x.number === own.number)).toEqual([{ number: own.number, title: 'Its own work' }])
+  })
+})
+
+describe("a session's end ends its reviews on its own workspace's board (#1381)", () => {
+  let w: WS
+  const closedWs = join(base, 'closed')
+  const otherWs = join(base, 'other')
+  beforeAll(async () => {
+    // The same project name and agent ids in both: workspaceOf's fallback would end the other's reviews.
+    for (const ws of [closedWs, otherWs]) project(ws, 'alpha', [{ id: 'c1', name: 'Coder' }, { id: 'r1', name: 'Reviewer' }])
+    w = createWorkspaceService()
+  })
+  afterAll(async () => disposeWorkspaceService(w))
+  const run = <T>(fn: () => Promise<T>): Promise<T> => inWorkspace(w, fn)
+  const reviewed = async (): Promise<number> => {
+    const c = await run(() => tasks.createTask({ title: 'Reviewed', project: 'alpha', agent: 'c1', column: 'review' }, user))
+    await run(() => tasks.updateTask(c.number, { review: 'start' }, reviewer))
+    return c.number
+  }
+
+  it("leaves another window's cards alone, and the closed workspace's board closed, once its window switched away", async () => {
+    await w.open(closedWs)
+    await reviewed()
+    await w.open(otherWs)
+    const theirs = await reviewed()
+    expect(tasks.endExitedReviews(join(closedWs, 'alpha'), 'r1')).toBeNull()
+    expect((await run(() => tasks.getTask(theirs))).review?.agent).toBe('r1')
+    expect(boardOpen(closedWs)).toBe(false)
+    // Its own workspace's: ended.
+    await expect(tasks.endExitedReviews(join(otherWs, 'alpha'), 'r1')).resolves.toEqual([theirs])
+    expect((await run(() => tasks.getTask(theirs))).review).toBeUndefined()
   })
 })

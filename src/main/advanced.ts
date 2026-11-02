@@ -3,7 +3,7 @@ import { watch, type FSWatcher } from 'original-fs'
 import { readFile } from 'original-fs/promises'
 import { readFileSync } from 'original-fs'
 import { join } from 'path'
-import { ADVANCED_DEFS, advancedDef, advancedFileText, advancedRegExp, advancedRow, checkAdvanced, cliFacing, literalRegExp, parseAdvancedFile, withValues, type AdvancedDef, type AdvancedState, type MadeFor, type Text } from '../shared/advanced'
+import { ADVANCED_DEFS, LEGACY_ADVANCED, advancedDef, advancedFileText, advancedRegExp, advancedRow, checkAdvanced, cliFacing, literalRegExp, parseAdvancedFile, withValues, type AdvancedDef, type AdvancedState, type MadeFor, type Text } from '../shared/advanced'
 import { msg } from '../shared/i18n'
 import { HiveError, hiveError } from './hiveError'
 import type { AppSettings, ProviderId } from '../shared/types'
@@ -243,8 +243,8 @@ export class AdvancedStore {
   /** Sets an override now: only inside transact (or set), in a change's turn. */
   async setNow(id: string, raw: unknown): Promise<void> {
     const def = advancedDef(id)
-    if (!def) throw hiveError(msg({ id: 'service.advanced.unknown', defaultMessage: 'No advanced setting "{id}".', description: 'An error changing an advanced setting: Hive has none with the id {id}.' }), { id })
-    if (this.fileError) throw hiveError(msg({ id: 'service.advanced.fixFirst', defaultMessage: '{problem} Fix advanced.json (Settings → Advanced → Open advanced.json) before changing settings here.', description: "An error changing an advanced setting while advanced.json (a file name: keep it) can't be read; {problem} says why, a sentence. Settings → Advanced → Open advanced.json is where to open it: use its translated names." }), { problem: this.fileText() })
+    if (!def) throw hiveError(msg({ id: 'service.advanced.unknown', defaultMessage: 'No advanced setting "{id}".', description: 'An error changing an advanced setting: Hive has none with the id {id}.' }), { id }, { kind: 'notFound' })
+    if (this.fileError) throw hiveError(msg({ id: 'service.advanced.fixFirst', defaultMessage: '{problem} Fix advanced.json (Settings → Advanced → Open advanced.json) before changing settings here.', description: "An error changing an advanced setting while advanced.json (a file name: keep it) can't be read; {problem} says why, a sentence. Settings → Advanced → Open advanced.json is where to open it: use its translated names." }), { problem: this.fileText() }, { kind: 'conflict' })
     const values = { ...this.values }
     const madeFor = { ...this.madeFor }
     if (raw === null || raw === undefined) {
@@ -252,7 +252,7 @@ export class AdvancedStore {
       delete madeFor[id]
     } else {
       const checked = checkAdvanced(def, raw)
-      if ('error' in checked) throw new HiveError(checked.errorText)
+      if ('error' in checked) throw new HiveError(checked.errorText, { kind: 'invalid' })
       if (JSON.stringify(checked.value) === JSON.stringify(def.default)) {
         // The default itself is no override.
         delete values[id]
@@ -270,7 +270,7 @@ export class AdvancedStore {
     return this.serial(async () => {
       const def = advancedDef(id)
       if (!def || !cliFacing(def) || this.values[id] === undefined) return
-      if (this.fileError) throw new HiveError(this.fileText())
+      if (this.fileError) throw new HiveError(this.fileText(), { kind: 'conflict' })
       await this.write(this.values, { ...this.madeFor, [id]: { version: this.cli[def.group as ProviderId] ?? null, value: this.values[id] } })
     })
   }
@@ -279,9 +279,23 @@ export class AdvancedStore {
    * Removes every override (Settings → Advanced → Reset all settings), keeping ids this Hive doesn't know. Refused while
    * the file can't be read, which it would overwrite.
    */
+  /** A setting no longer listed but kept in advanced.json (LEGACY_ADVANCED), as the file has it: undefined when unset. */
+  legacy(id: string): unknown {
+    return LEGACY_ADVANCED.has(id) ? this.values[id] : undefined
+  }
+
+  /** Drops a setting kept in advanced.json (LEGACY_ADVANCED) once it has moved (HI-2001); nothing while the file can't be read. */
+  dropLegacy(id: string): Promise<void> {
+    return this.serial(async () => {
+      if (!LEGACY_ADVANCED.has(id) || !(id in this.values) || this.fileError) return
+      const { [id]: _gone, ...values } = this.values
+      await this.write(values, this.madeFor)
+    })
+  }
+
   resetAll(): Promise<void> {
     return this.serial(async () => {
-      if (this.fileError) throw hiveError(msg({ id: 'service.advanced.fixOrDelete', defaultMessage: '{problem} Fix or delete advanced.json first (Settings → Advanced → Open advanced.json).', description: "An error resetting every advanced setting while advanced.json (a file name: keep it) can't be read; {problem} says why, a sentence. Settings → Advanced → Open advanced.json is where to open it: use its translated names." }), { problem: this.fileText() })
+      if (this.fileError) throw hiveError(msg({ id: 'service.advanced.fixOrDelete', defaultMessage: '{problem} Fix or delete advanced.json first (Settings → Advanced → Open advanced.json).', description: "An error resetting every advanced setting while advanced.json (a file name: keep it) can't be read; {problem} says why, a sentence. Settings → Advanced → Open advanced.json is where to open it: use its translated names." }), { problem: this.fileText() }, { kind: 'conflict' })
       await this.write(Object.fromEntries(Object.entries(this.values).filter(([id]) => !advancedDef(id))), {})
     })
   }

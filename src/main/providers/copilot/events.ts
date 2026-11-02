@@ -4,7 +4,7 @@ import type { DayUsage, SessionUsage, TranscriptItem, TranscriptTool, UsageToken
 import { addTokens, emptyDay, localDay } from '../../../shared/usageDays'
 import { TimelineBuilder, pendingRows, secondOf, spreadTokens, type PendingRequest } from '../../../shared/usageTimeline'
 import { isSessionId } from '../../../shared/defaults'
-import { placeMatcher } from '../../fsutil'
+import { placeMatcher } from '../../places'
 import { COPILOT } from '../../../shared/copilot'
 import { formatToolInput } from '../claude/conversation'
 import { NOTICE_TEXT, firstLine, noticeOf, shortPath, type NewItem } from '../conversation'
@@ -68,8 +68,9 @@ export const copilotDetailsMemo = (): CopilotDetailsMemo => ({ denied: false })
  * Session details from appended events: model, effort, the credits used so far and the premium requests (running
  * totals), a refused sign-in, when its Stop hooks were answered, and when the user last interrupted a turn (`interruptedAt`), for which no hook fires: an
  * abort (Esc on a command's dialog, or while it works), or a turn that ends on the user's refusal of a path prompt
- * (Esc on "Path permission needed": permission.completed denied interactively, then assistant.turn_end, and neither
- * an abort nor agentStop; #475). An interrupt the user's next prompt follows in the same events is history: that
+ * (Esc on "Path permission needed": permission.completed denied interactively, then assistant.turn_end, and no
+ * agentStop; #475. Up to 1.0.98 no abort followed; 1.0.104 and 1.0.105 add one, user_initiated, after the turn's end,
+ * which moves interruptedAt to it: tests/fixtures/copilot/refusal-1.0.105.jsonl, HI-1945). An interrupt the user's next prompt follows in the same events is history: that
  * prompt's hook has already said the agent works again. `memo` is the launch's own, kept between reads (a refusal and
  * its turn's end can come in two).
  */
@@ -83,6 +84,9 @@ export function eventsDetails(text: string, memo: CopilotDetailsMemo = copilotDe
     memo.denied = false
     refusedEnd = null
     delete out.interruptedAt
+    // A turn after a failed one: that failure is history.
+    delete out.turnFailed
+    delete out.turnFailedAt
   }
   for (const line of text.split('\n')) {
     const r = parseLine(line)
@@ -156,6 +160,10 @@ export function eventsDetails(text: string, memo: CopilotDetailsMemo = copilotDe
           out.signIn = refused
           if (typeof r.timestamp === 'string') out.signInAt = r.timestamp
           else delete out.signInAt
+        } else if (typeof d.errorType === 'string' && advanced.pattern('copilot.turnFailed.errorType').test(d.errorType)) {
+          // A model call given up on after its retries (HI-1960): the turn is over, failed, and no Stop comes.
+          out.turnFailed = typeof d.message === 'string' ? d.message.trim() : ''
+          out.turnFailedAt = typeof r.timestamp === 'string' ? r.timestamp : new Date().toISOString()
         }
         break
       }
@@ -671,7 +679,7 @@ export async function readWorkspace(home: string, sessionId: string): Promise<Co
  * The sessions the CLI keeps for a folder (its workspace.yaml's cwd), newest change first: those with a conversation
  * (an events.jsonl with something in it; the CLI makes a folder for every launch, also one that ends before a prompt).
  */
-export async function listCopilotSessions(home: string, folder: string): Promise<ExternalSession[]> {
+export async function listCopilotSessions(home: string, folder: string, skip?: (id: string) => boolean): Promise<ExternalSession[]> {
   // Copilot records the cwd as it was given; Hive may spell the folder another way now (a junction, an 8.3 name, #493).
   const here = placeMatcher(folder)
   let ids: string[]
@@ -682,11 +690,12 @@ export async function listCopilotSessions(home: string, folder: string): Promise
   }
   const out: ExternalSession[] = []
   for (const id of ids) {
+    if (skip?.(id)) continue
     const ws = await readWorkspace(home, id)
     if (!ws || !here(ws.cwd)) continue
     const path = copilotEventsPath(home, id)
     const s = await stat(path).catch(() => null)
-    if (s && s.size > 0) out.push({ id, transcriptPath: path, modified: s.mtime.toISOString() })
+    if (s && s.size > 0) out.push({ id, transcriptPath: path, modified: s.mtime.toISOString(), bytes: s.size, mtimeMs: s.mtimeMs })
   }
   return out.sort((a, b) => b.modified.localeCompare(a.modified))
 }

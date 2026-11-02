@@ -8,7 +8,7 @@ const ws = path.join(scratch, 'resize-ws')
 for (const d of [userData, ws]) fs.rmSync(d, { recursive: true, force: true })
 fs.mkdirSync(path.join(ws, 'demo'), { recursive: true })
 fs.writeFileSync(path.join(ws, 'demo', 'README.md'), '# Demo\n\nSome text.\n')
-require('child_process').execSync('git init -q', { cwd: path.join(ws, 'demo') })
+require('child_process').execSync('git init -q', { cwd: path.join(ws, 'demo'), env: lib.gitEnv() })
 const sleep = (ms) => new Promise((r) => setTimeout(r, ms))
 const HUNG_MS = 15000
 let pass = 0, fail = 0
@@ -21,6 +21,10 @@ const check = (name, ok, extra = '') => { if (ok) pass++; else fail++; console.l
   await lib.appReady(page)
   const inv = (ch, ...a) => page.evaluate(([c, x]) => window.hive.invoke(c, ...x), [ch, a])
   await inv('workspace:open', ws); await sleep(800)
+  // "How do you work?" answered (#1423), as a user does once: its step, shown once the form is read, moves what is dragged.
+  await inv('workflow:presetNotNow', path.join(ws, 'demo'), 'git')
+  // …and the window has the answer (the refresh it makes), before anything is measured.
+  await lib.until(async () => (await page.evaluate(() => window.hive.invoke('workspace:refresh')))?.projects.find((p) => p.name === 'demo')?.config.workflow?.presetAsked === 'notNow', 10000)
   await page.getByText('demo', { exact: true }).first().click(); await sleep(400)
 
   const drag = async (handle, dx) => {
@@ -32,11 +36,13 @@ const check = (name, ok, extra = '') => { if (ok) pass++; else fail++; console.l
   }
   const width = (sel) => page.locator(sel).first().evaluate((e) => Math.round(e.getBoundingClientRect().width))
 
-  for (const [tab, key, def] of [['Sessions', 'sessions', 320], ['Files', 'files', 360], ['Git', 'changes', 280], ['Memory', 'memory', 280]]) {
+  for (const [tab, key, def] of [['Sessions', 'sessions', 320], ['Files', 'files', 360], ['Version Control', 'changes', 280], ['Memory', 'memory', 280]]) {
     if (tab === 'Memory') await lib.openMoreTab(page, tab)
     else await page.locator('.tabs .tab', { hasText: tab }).first().click()
     const list = '.tab-body:visible .split-list'
     await lib.until(async () => (await page.locator('.tabs .tab.active .tab-label').innerText().catch(() => '')).trim() === tab && (await page.locator(list).count()) > 0, 10000)
+    // Version Control's header finishes once its workflow form is read (its link): measured after, not while it lays out.
+    if (tab === 'Version Control') await lib.until(async () => (await page.locator('[data-action="vc-workflow"]').count()) === 1, 10000)
     const w0 = await width(list)
     check(`${tab} default width`, Math.abs(w0 - def) <= 1, `(${w0})`)
     await drag(page.locator(`${list} > .pane-resizer`).first(), 120)
@@ -77,14 +83,14 @@ const check = (name, ok, extra = '') => { if (ok) pass++; else fail++; console.l
   // Persistence across a reload (#717: under load it failed once, with nothing to say why). Each step waits for what the
   // next needs: the Git tab's divider drawn before the drag, the width saved before the reload, the list at its width after.
   const gitList = '.tab-body:visible .split-list'
-  await page.locator('.tabs .tab', { hasText: 'Git' }).first().click()
+  await page.locator('.tabs .tab', { hasText: 'Version Control' }).first().click()
   await lib.until(async () => (await page.locator(`${gitList} > .pane-resizer`).count()) > 0, HUNG_MS)
   await drag(page.locator(`${gitList} > .pane-resizer`).first(), 60)
   const savedGit = await lib.until(async () => (await inv('ui:get')).panes?.changes ?? null, HUNG_MS)
   check('Git width saved before the reload', Math.abs(savedGit - 340) <= 3, `(${savedGit})`)
   await page.reload(); await lib.appReady(page)
   await page.getByText('demo', { exact: true }).first().click()
-  await page.locator('.tabs .tab', { hasText: 'Git' }).first().click()
+  await page.locator('.tabs .tab', { hasText: 'Version Control' }).first().click()
   const gitWidth = async () => ((await page.locator(gitList).count()) > 0 ? width(gitList) : null)
   const kept = await lib.until(async () => { const w = await gitWidth(); return w !== null && Math.abs(w - 340) <= 3 ? w : null }, HUNG_MS)
   check('width kept after reload', !!kept, `(${kept ?? await gitWidth()})`)

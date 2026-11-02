@@ -3,8 +3,8 @@ import { join } from 'path'
 import { ASSISTANT_AGENT_ID, ASSISTANT_DIR } from '../shared/assistant'
 import { HIVE_DIR } from '../shared/defaults'
 import { readKeptJson } from './fsutil'
-import { journalSettings, inScope, type JournalEdit, type JournalFilter, type JournalForgetPreview, type JournalForgetResult, type JournalSettings, type LinkType } from '../shared/journal'
-import { browseEntry, closeJournal, deleteEntry, deleteJournal, forgetJournal, forgetPreview, journalFile, journalFileBytes, journalSize, onJournalChange, pruneJournal, updateEntry, writeEntry } from './journal'
+import { JOURNAL_LIMITS, journalSettings, inScope, type JournalEdit, type JournalFilter, type JournalForgetPreview, type JournalForgetResult, type JournalSettings, type LinkType } from '../shared/journal'
+import { browseEntry, closeJournal, deleteEntry, deleteJournal, forgetJournal, forgetPreview, journalFile, journalFileBytes, journalSize, leaveEntry, onJournalChange, pruneJournal, updateEntry, writeEntry, writeEntryOnce } from './journal'
 import { emit } from './events'
 import { createLogger } from './logger'
 import type { WorkspaceService } from './workspace'
@@ -40,6 +40,13 @@ export function journalStatus(ws: WorkspaceService): { settings: JournalSettings
 
 /** Changes the settings; the Assistant is told what changed (its tools follow a turn on or off at its next start, Darren's decision on #1031). */
 export async function setJournalSettings(ws: WorkspaceService, patch: Partial<JournalSettings>): Promise<JournalSettings> {
+  // A number out of range is refused, not raised to the minimum (HI-2345): raised, a blank box's 0 tightened the
+  // retention or cap and pruned at once. journalSettings() still makes what is saved safe when it is read.
+  const whole = (v: unknown, min: number, max: number): boolean => typeof v === 'number' && Number.isInteger(v) && v >= min && v <= max
+  if ('retentionDays' in patch && !whole(patch.retentionDays, JOURNAL_LIMITS.minRetentionDays, JOURNAL_LIMITS.maxRetentionDays))
+    throw new Error(`Keep everyday entries for: a whole number of days from ${JOURNAL_LIMITS.minRetentionDays} to ${JOURNAL_LIMITS.maxRetentionDays}. Nothing was changed.`)
+  if ('capMB' in patch && patch.capMB !== null && !whole(patch.capMB, JOURNAL_LIMITS.minCapMB, JOURNAL_LIMITS.maxCapMB))
+    throw new Error(`Size cap: no limit, or a whole number of MB from ${JOURNAL_LIMITS.minCapMB} to ${JOURNAL_LIMITS.maxCapMB}. Nothing was changed.`)
   // Worked out in the save's turn, from the settings as they are then (#1031 round 1): changes made at once (two
   // windows) each keep the other's fields, and what is told is what this save changed.
   let was: JournalSettings | null = null
@@ -120,14 +127,15 @@ export interface Fact {
 
 /**
  * A fact for a workspace by its folder, open or not (an unexpected close is found before its workspace opens): its
- * settings read from its workspace.json.
+ * settings read from its workspace.json. One no window holds is written on a transient open (#1395: leaveEntry), never
+ * admitted for it.
  */
 export async function journalFactAt(workspacePath: string, fact: Fact): Promise<void> {
   const saved = await readKeptJson<{ journal?: unknown }>(join(workspacePath, HIVE_DIR, 'workspace.json'), {})
   const s = journalSettings(saved.journal)
   if (!s.enabled || !inScope(s, 'event')) return
   try {
-    writeEntry(join(workspacePath, HIVE_DIR, ASSISTANT_DIR), s, { kind: 'event', ...fact, tags: ['hive', ...(fact.tags ?? [])] }, 'hive')
+    leaveEntry(join(workspacePath, HIVE_DIR, ASSISTANT_DIR), s, { kind: 'event', ...fact, tags: ['hive', ...(fact.tags ?? [])] }, 'hive')
   } catch (e) {
     log.warn('recording a fact in the journal', e)
   }
@@ -135,14 +143,17 @@ export async function journalFactAt(workspacePath: string, fact: Fact): Promise<
 
 /**
  * Records a fact in the workspace's journal: only while it is on and its scope has events; never fails what it records
- * (a fact that can't be written is logged).
+ * (a fact that can't be written is logged). With `once`, a fact the journal already has (the same summary and detail,
+ * linked to it) isn't written again, and counts as recorded.
  */
-export function journalFact(ws: WorkspaceService | null | undefined, fact: Fact): boolean {
+export function journalFact(ws: WorkspaceService | null | undefined, fact: Fact, once?: { type: LinkType; ref: string }): boolean {
   if (!ws?.path) return false
   const s = journalSettingsOf(ws)
   if (!s.enabled || !inScope(s, 'event')) return false
   try {
-    writeEntry(ws.assistantHome, s, { kind: 'event', ...fact, tags: ['hive', ...(fact.tags ?? [])] }, 'hive')
+    const input = { kind: 'event', ...fact, tags: ['hive', ...(fact.tags ?? [])] }
+    if (once) writeEntryOnce(ws.assistantHome, s, input, 'hive', once)
+    else writeEntry(ws.assistantHome, s, input, 'hive')
     return true
   } catch (e) {
     log.warn('recording a fact in the journal', e)

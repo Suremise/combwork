@@ -1,17 +1,24 @@
 import { app } from 'electron'
-import { basename } from 'path'
+import { basename, join } from 'path'
 import { projectAgents } from '../shared/defaults'
 import type { LiveSessionState } from '../shared/types'
 import { HISTORY, storedText } from '../shared/taskHistory'
 import { cardReadsBy, newDecisionsOn } from './decisionNotices'
+import { recordDecisionsReceived } from './workflow/recorder'
 import { onHiveEvent } from './events'
 import { coalesced } from './coalesce'
 import { createLogger, userText } from './logger'
 import { sessions } from './sessions'
-import { noteOnCard } from './tasks'
-import { createDelivery, fromSource, offerNow, registerSource } from './deliveries'
+import { getTask, noteOnCard } from './tasks'
+import { actionDelivered, createDelivery, fromSource, offerNow, registerSource } from './deliveries'
+import { cardReviewer, wakesOn } from './loopWakes'
+import { onAction } from './workflow/actionWorker'
+import { watchCovers, watchToldDecisions } from './watches'
+import type { ActionRow } from './workflow/factStore'
 import { isWaiting } from '../shared/deliveries'
 import { openWorkspaces, workspaceFor, type WorkspaceService } from './workspace'
+import { cardRef } from '../shared/projectKeys'
+import { scopeOfHost, withCardNames } from './projectKeys'
 
 /**
  * Decisions reach an agent waiting for the user (#401). An agent asks the user, and its turn ends; the user answers
@@ -55,12 +62,47 @@ onHiveEvent((e) => {
 /** Whether an agent may be told now: its turn has ended, nobody types there, no line of Hive's waits. */
 const ready = (st: LiveSessionState | null): boolean => !!st && (st.status === 'ready' || st.status === 'finished')
 
-/** The line: "[Hive] #392 has 4 new decisions from the user: read them (hive_read_task) and carry on." */
-export function decisionLine(cards: Map<number, { count: number }>): string {
-  const parts = [...cards].map(([n, d]) => `#${n} has ${d.count} new decision${d.count === 1 ? '' : 's'}`)
+/**
+ * The line: "[Hive] #392 has 4 new decisions from the user: read them (hive_read_task) and carry on." `reviewing`: the
+ * cards the agent only reviews (another agent's: a loop's wake to its reviewer). When they are all of them, the line asks
+ * for a read before its next verdict (HI-2261: told to "carry on from where you asked", a reviewer that had asked nothing
+ * made the decided change itself), never to carry on.
+ */
+export function decisionLine(cards: Map<number, { count: number }>, reviewing: ReadonlySet<number> = new Set()): string {
+  const parts = [...cards].map(([n, d]) => `${cardRef(n)} has ${d.count} new decision${d.count === 1 ? '' : 's'}`)
   const them = parts.length === 1 && [...cards.values()][0].count === 1 ? 'it' : 'them'
-  return `[Hive] ${parts.join(', ')} from the user: read ${them} (hive_read_task) and carry on from where you asked.`
+  const reviewer = cards.size > 0 && [...cards.keys()].every((n) => reviewing.has(n))
+  return `[Hive] ${parts.join(', ')} from the user: read ${them} (hive_read_task) ${reviewer ? `before your next verdict on ${cards.size === 1 ? 'it' : 'them'}.` : 'and carry on from where you asked.'}`
 }
+
+/** The cards among `cards` that are another agent's, so `agentId` only reviews them (decisionLine's `reviewing`). */
+export async function reviewingOf(ws: WorkspaceService, agentId: string, cards: Map<number, unknown>): Promise<Set<number>> {
+  const out = new Set<number>()
+  for (const n of cards.keys()) {
+    const card = await getTask(n, ws).catch(() => null)
+    if (card?.agent && card.agent !== agentId) out.add(n)
+  }
+  return out
+}
+
+/**
+ * A line's decisions less what the agent's own card watch tells it (#1272: one wake per event): a card whose watch
+ * counts them is left out; one whose watch's line told some has only those recorded or changed since counted (by their
+ * history entries' places, never their times), and is left out when none is. What is left is the line's. `self`: the
+ * agent's board name.
+ */
+async function leftToWatches<T extends { count: number }>(ws: WorkspaceService, projectPath: string, agentId: string, self: string, cards: Map<number, T>): Promise<Map<number, T>> {
+  for (const [n, d] of [...cards]) {
+    const card = await getTask(n, ws).catch(() => null)
+    const byWatch = card ? watchToldDecisions(projectPath, agentId, card, self) : null
+    if (!byWatch) continue
+    if (byWatch === 'all' || !byWatch.untold) cards.delete(n)
+    else cards.set(n, { ...d, count: Math.min(d.count, byWatch.untold) })
+  }
+  return cards
+}
+/** Whether a watch of the agent's counts a card's decisions now (a decision has no column: any will do). */
+const watchHearsDecisions = (projectPath: string, agentId: string, n: number): boolean => watchCovers(projectPath, agentId, n, 'decision', 'review')
 
 /** The decisions are the user's: Hive relays them. */
 const USER = { kind: 'user', name: 'the user' } as const
@@ -84,8 +126,8 @@ const decodeCards = (v: unknown): Map<number, { count: number; latest: number }>
     })
   )
 /** The decisions of a line that fit its delivery's context (400 characters): those it says, the rest told by a next line. */
-function fitting(cards: Map<number, { count: number; latest: number }>): Map<number, { count: number; latest: number }> {
-  const out = new Map<number, { count: number; latest: number }>()
+function fitting<T extends { count: number; latest: number }>(cards: Map<number, T>): Map<number, T> {
+  const out = new Map<number, T>()
   for (const [n, d] of cards) {
     const next = new Map(out).set(n, d)
     if (encodeCards(next).length > 400) break
@@ -114,17 +156,20 @@ registerSource('decision', {
     // What the line is worked out from: the board and the agent's reads as they are now.
     const gen = genOf(ws)
     const reads = cardReadsBy(agent)
-    const cards = fitting(await newDecisionsOn(ws, agent, self, told.get(keyOf(host, r.agentId))))
+    // A decision wake's line (#1266) also tells its cards where only their loop makes them the agent's (`loop`).
+    const loop = loopOf(r)
+    const cards = fitting(await leftToWatches(ws, host, r.agentId, self, await newDecisionsOn(ws, agent, self, told.get(keyOf(host, r.agentId)), loop)))
     if (!cards.size) return { cancel: 'nothing new to tell' }
     // This version: its line, and what its receipt tells (saved with it), and what its holds compares with.
     const v = ++versions
     made.set(madeKey(host, r.id, v), { ws, gen, reads })
     if (made.size > 500) made.delete(made.keys().next().value!)
-    return { body: decisionLine(cards), meta: { v, cards: encodeCards(cards), self } }
+    // `gens`: each card's decision generation as this line was made from it, what its receipt records as received (#1216).
+    return { body: decisionLine(cards, await reviewingOf(ws, r.agentId, cards)), meta: { v, cards: encodeCards(cards), self, gens: [...cards].map(([n, d]) => `${n}:${d.generation}`).join(','), ...(loop.size ? { loop: [...loop].join(',') } : {}) } }
   },
   holds: (r, host) => {
     const m = made.get(madeKey(host, r.id, r.meta?.v))
-    return !!m && openWorkspaces().includes(m.ws) && genOf(m.ws) === m.gen && cardReadsBy({ projectPath: host, agentId: r.agentId }) === m.reads
+    return !!m && openWorkspaces().includes(m.ws) && genOf(m.ws) === m.gen && cardReadsBy({ projectPath: host, agentId: r.agentId }) === m.reads && ![...decodeCards(r.meta?.cards).keys()].some((n) => watchHearsDecisions(host, r.agentId, n))
   },
   received: (r, host) => {
     made.delete(madeKey(host, r.id, r.meta?.v))
@@ -140,6 +185,11 @@ registerSource('decision', {
     told.set(key, known)
     if (told.size > 500) told.delete(told.keys().next().value!)
     log.info(`Told ${userText(self)} of new decisions on ${[...cards.keys()].map((n) => `#${n}`).join(', ')}`)
+    // What it received, as a fact on each card (#1216): the decisions the line was made from.
+    for (const x of typeof r.meta?.gens === 'string' && r.meta.gens ? r.meta.gens.split(',') : []) {
+      const [n, g] = x.split(':').map(Number)
+      if (Number.isInteger(n) && Number.isInteger(g) && g > 0) void recordDecisionsReceived(ws, r.agentId, n, g)
+    }
     void Promise.all([...cards].map(([n, d]) => noteOnCard(n, storedText(HISTORY.decisionsTold, { agent: self, count: d.count }), ws).catch((e) => log.warn(`noting on #${n} that decisions were told`, e))))
   },
   ended: (r, host) => {
@@ -148,7 +198,12 @@ registerSource('decision', {
 })
 
 /** Gives one agent a line of the decisions new to it, if it may be told now: a delivery, one per agent, offered now. */
-async function tell(ws: WorkspaceService, projectPath: string, agentId: string): Promise<void> {
+/** Tells an agent of new decisions (tellNamed), naming cards by key, its workspace's (#1219). */
+function tell(ws: WorkspaceService, projectPath: string, agentId: string): Promise<void> {
+  return withCardNames(ws, () => tellNamed(ws, projectPath, agentId), scopeOfHost(projectPath))
+}
+
+async function tellNamed(ws: WorkspaceService, projectPath: string, agentId: string): Promise<void> {
   const key = keyOf(projectPath, agentId)
   if (telling.has(key) || ws.isAssistantHome(projectPath)) return
   // Not ready (working, on background tasks, watching, a prompt shown, stopped): the end of its turn checks again. Its
@@ -159,17 +214,67 @@ async function tell(ws: WorkspaceService, projectPath: string, agentId: string):
   try {
     // A line offered and not read yet (#650: its doorbell rang) is made again from the board when the agent reads it, so
     // it tells these decisions too: not a second line beside it.
-    if (fromSource(projectPath, 'decision').some((r) => r.agentId === agentId && r.state === 'offered')) return
+    // A decision wake's line waiting (#1266, made by an action) is made again from the board when it is offered, with its
+    // loop's card: not replaced by this one, which would lose that card.
+    if (fromSource(projectPath, 'decision').some((r) => r.agentId === agentId && (r.state === 'offered' || (r.action !== undefined && isWaiting(r))))) return
     const self = await boardSelf(ws, projectPath, agentId)
     if (!self) return
-    const cards = fitting(await newDecisionsOn(ws, agent, self, told.get(key)))
+    const cards = fitting(await leftToWatches(ws, projectPath, agentId, self, await newDecisionsOn(ws, agent, self, told.get(key))))
     if (!cards.size) return
     // Made again from the decisions as they are when it is offered (one waiting is that one).
-    await createDelivery(projectPath, { agentId, agentName: self, kind: 'answer', from: USER, card: [...cards.keys()][0], body: decisionLine(cards), source: 'decision', ref: 'decisions', replace: true, need: 'free', meta: { cards: encodeCards(cards), self } })
+    await createDelivery(projectPath, { agentId, agentName: self, kind: 'answer', from: USER, card: [...cards.keys()][0], body: decisionLine(cards, await reviewingOf(ws, agentId, cards)), source: 'decision', ref: 'decisions', replace: true, need: 'free', meta: { cards: encodeCards(cards), self } })
     await offerNow(projectPath, agentId)
   } finally {
     telling.delete(key)
   }
+}
+
+/**
+ * A `wakeOnDecision` action (#1266, S5; #587's gap): a decision recorded on a card in a loop wakes its builder (`to:
+ * builder`, the card's agent) and, while the card is in Review or Passed, its reviewer (`to: reviewer`: the lane's, else
+ * the last), whether or not they are waiting for the user: a watching agent too, which a decision line never reached
+ * before. The line is the decision line, made with the action's id (made once), and made again from the board when it
+ * is offered, as every decision line is. Not to whoever recorded it, not where the project turned loop wakes off, and
+ * only when the decisions are new to that agent.
+ */
+async function decisionFromAction(a: ActionRow, from: WorkspaceService): Promise<void> {
+  if (!from.path) return
+  const card = await getTask(a.card, from).catch(() => null)
+  if (!card?.project || card.archived) return
+  const projectPath = join(from.path, card.project)
+  const ws = workspaceFor(projectPath)
+  if (!ws?.isProjectPath(projectPath) || !openWorkspaces().includes(ws) || !(await wakesOn(ws, projectPath))) return
+  if (actionDelivered(projectPath, a.id)) return
+  const to = a.payload.to === 'reviewer' ? await cardReviewer(ws, projectPath, card) : card.agent ? { id: card.agent, name: '' } : null
+  if (!to || a.payload.by === `agent:${to.id}`) return
+  await withCardNames(
+    ws,
+    async () => {
+      const self = await boardSelf(ws, projectPath, to.id)
+      if (!self) return
+      // One line per agent, telling every card a decision wake waiting for it was for, this one's too: the one waiting is
+      // replaced (cancelled, its action done) by this one, which carries its cards on.
+      const loop = new Set([a.card, ...fromSource(projectPath, 'decision').filter((r) => r.agentId === to.id && r.action !== undefined && isWaiting(r)).flatMap((r) => [...loopOf(r)])])
+      // Its own card watch's cards that tell it of their decisions (#1272) are left to that watch.
+      const cards = fitting(await leftToWatches(ws, projectPath, to.id, self, await newDecisionsOn(ws, { projectPath, agentId: to.id }, self, told.get(keyOf(projectPath, to.id)), loop)))
+      if (!cards.size) return
+      try {
+        await createDelivery(projectPath, { agentId: to.id, agentName: self, kind: 'answer', from: USER, card: a.card, body: decisionLine(cards, await reviewingOf(ws, to.id, cards)), source: 'decision', ref: 'decisions', replace: true, meta: { cards: encodeCards(cards), self, loop: [...loop].join(',') }, action: a.id })
+      } catch (e) {
+        // Another Hive made it meanwhile (the unique row refused this one's): delivered.
+        if (!actionDelivered(projectPath, a.id)) throw e
+        return
+      }
+      await offerNow(projectPath, to.id)
+    },
+    scopeOfHost(projectPath)
+  )
+}
+
+/** The cards a decision wake's line is for (`meta.loop`, comma-separated), none for another decision line. */
+function loopOf(r: { meta?: Record<string, string | number | boolean> }): Set<number> {
+  const v = r.meta?.loop
+  return new Set((typeof v === 'number' ? [v] : typeof v === 'string' ? v.split(',').map(Number) : []).filter((n) => Number.isInteger(n) && n > 0))
 }
 
 /** Every running project agent of a workspace that may be told. */
@@ -197,6 +302,8 @@ let started = false
 export function initDecisionWakes(): void {
   if (started) return
   started = true
+  // Its delivery carries the action's id: run until marked, made once.
+  onAction('wakeOnDecision', (a, ws) => decisionFromAction(a, ws), 'delivered')
   onHiveEvent((e) => {
     if (e.type === 'tasks-changed') {
       const ws = openWorkspaces().find((w) => w.path && w.path.toLowerCase() === e.workspacePath.toLowerCase())

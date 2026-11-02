@@ -1,3 +1,5 @@
+import { activityTurns, type ActivityDetail, type ActivityTurns } from '../shared/activity'
+import { maskText } from '../shared/redact'
 import { open, stat } from 'original-fs/promises'
 import type { ProviderId, Transcript, TranscriptItem, TranscriptSearchResult, TranscriptTool } from '../shared/types'
 import { TRANSCRIPT_WINDOW, assertSessionId } from '../shared/defaults'
@@ -11,6 +13,7 @@ import { sessions } from './sessions'
 import { setViewing, whileReading } from './transcriptReads'
 import { workspace } from './workspace'
 import { isGz, readBytes, readTranscript } from './transcriptFiles'
+import { toolForDisplay } from './transcriptDisplay'
 
 /** The Sessions tab's refusals, in the window's language (#850). */
 const M = {
@@ -39,8 +42,6 @@ const versionOf = (e: Entry): string => (isGz(e.path) ? `gz:${e.stamp}` : String
 const MAX_CACHED = 6
 /** How much of a transcript is read at a time. */
 const READ_CHUNK = 4 * 1024 * 1024
-/** Tool input and output longer than this are shortened in transcript:read; transcript:tool has the full text. */
-const DISPLAY_LIMIT = 4000
 const cache = new Map<string, Entry>()
 
 async function readRange(path: string, from: number, to: number): Promise<Buffer> {
@@ -126,17 +127,11 @@ async function parseNow(projectPath: string, sessionId: string, key: string): Pr
   return e
 }
 
-const clip = (s: string): string => (s.length > DISPLAY_LIMIT ? s.slice(0, DISPLAY_LIMIT) : s)
-
 function forDisplay(item: TranscriptItem): TranscriptItem {
   // Hive's own notices in the language the window shows (#797); the cache keeps them as data.
   if (item.kind === 'notice') return item.message ? { ...item, text: shownNotice(item) } : item
   if (item.kind !== 'tool') return item
-  const t = item.tool
-  const tool: TranscriptTool = { ...t, input: clip(t.input), result: t.result === null ? null : clip(t.result) }
-  if (t.input.length > DISPLAY_LIMIT) tool.inputLength = t.input.length
-  if (t.result && t.result.length > DISPLAY_LIMIT) tool.resultLength = t.result.length
-  return { ...item, tool }
+  return { ...item, tool: toolForDisplay(item.tool) }
 }
 
 export const transcripts = {
@@ -151,6 +146,25 @@ export const transcripts = {
     const total = e.parser.items.length
     const from = Math.max(0, Math.min(total, opts.from ?? total - TRANSCRIPT_WINDOW))
     return { sessionId, size: e.size, version, total, from, items: e.parser.items.slice(from).map(forDisplay) }
+  },
+
+  /** A session's latest turns for the Activity tab (#1254), from the same parse; null when the file hasn't changed since knownVersion. */
+  async turns(projectPath: string, sessionId: string, knownVersion?: string): Promise<ActivityTurns | null> {
+    const e = await parsed(projectPath, sessionId)
+    const version = versionOf(e)
+    if (knownVersion !== undefined && knownVersion === version) return null
+    return { sessionId, version, ...activityTurns(e.parser.items) }
+  },
+
+  /**
+   * An item's whole text for the Activity tab's details (#1254): a prompt, or a tool call's input and result, as written
+   * (line breaks kept, nothing cut), masked like the log. Null when the item isn't a prompt or a tool call.
+   */
+  async detail(projectPath: string, sessionId: string, itemId: number): Promise<ActivityDetail | null> {
+    const item = (await parsed(projectPath, sessionId)).parser.items[itemId]
+    if (item?.kind === 'user') return { input: maskText(item.text), result: null }
+    if (item?.kind === 'tool') return { input: maskText(item.tool.input), result: item.tool.result === null ? null : maskText(item.tool.result) }
+    return null
   },
 
   async tool(projectPath: string, sessionId: string, itemId: number): Promise<TranscriptTool> {

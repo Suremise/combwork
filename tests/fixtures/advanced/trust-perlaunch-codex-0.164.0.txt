@@ -1,0 +1,10 @@
+Codex 0.164.0 in the Codex test home (CODEX_HOME), each run in a 120 x 40 pty in a new git repository, no prompt
+sent, no sign-in; ended at its trust question or after 10 s (HI-1870 and HI-1871 probes, 27 Oct 2026). Trust was
+given only per launch, with -c; the test home's config.toml was the same before and after each run (compared).
+
+codex --no-daemon -c projects={'C:\work\alpha-wt'={trust_level="trusted"}}    (cwd C:\work\alpha-wt)
+  no trust question: at its prompt
+codex --no-daemon -c projects={'C:\work\alpha'={trust_level="trusted"}}       (cwd C:\work\alpha\sub, a subfolder)
+  no trust question: at its prompt
+codex --no-daemon -c projects={'C:\work\alpha'={trust_level="trusted"}}       (cwd C:\work\gamma, another repository)
+  Trust this folder? Codex can read, edit, and run files here

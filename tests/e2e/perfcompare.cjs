@@ -121,7 +121,10 @@ const check = (name, ok, extra = '') => {
   const ownExport = (file, requests, chars, hoursAgo) => {
     const to = new Date(Date.now() - hoursAgo * 3_600_000).toISOString()
     const from = new Date(Date.parse(to) - 86_400_000).toISOString()
-    const workspace = { api: [{ route: '/v1/tasks', method: 'GET', role: 'api', outcome: 'ok', count: requests, requestBytes: requests * 10, responseBytes: requests * 100 }], mcp: [{ tool: 'hive_list_tasks', role: 'assistant', mode: 'compact', outcome: 'ok', count: 2, chars }], guidance: [] }
+    // The Assistant's launch and its tool list: no workflow role (HI-2049).
+    const guidance = [{ provider: 'claude-code', role: 'assistant', workflow: 'none', launches: 1, guidanceBytes: 4000, customBytes: 0, roleBytes: 500, modeBytes: 300, skillCatalogBytes: 200 }]
+    const catalog = [{ role: 'assistant', workflow: 'none', starts: 1, tools: 40, toolsBytes: 20100, toolsChars: 20000, charStarts: 1 }]
+    const workspace = { api: [{ route: '/v1/tasks', method: 'GET', role: 'api', outcome: 'ok', count: requests, requestBytes: requests * 10, responseBytes: requests * 100 }], mcp: [{ tool: 'hive_list_tasks', role: 'assistant', mode: 'compact', outcome: 'ok', count: 2, chars }], guidance, catalog }
     fs.writeFileSync(file, JSON.stringify({ schema: 'hive-metrics/1', app: { version: '0.0.0' }, exportedAt: to, report: { scope: { kind: 'workspace' }, from, to, filters: { own: true }, coverage: { observedMs: 3_600_000, rangeMs: 86_400_000 }, projects: {}, workspace } }))
     return file
   }
@@ -129,6 +132,8 @@ const check = (name, ok, extra = '') => {
   await importFile(ownExport(path.join(lib.WORK, 'perfcompare-own-after.json'), 30, 900, 2))
   const measures = page.locator(`${pageSel} .perf-comparison .data-table`)
   check('two own-work exports compare, measure by measure', !!(await until(async () => (await measures.locator('tbody tr').count()) > 3, HUNG_MS)))
+  const names = (await measures.locator('tbody tr td:first-child').allInnerTexts()).map((t) => t.trim())
+  check('…with the tool list a launch, and each workflow role’s launches apart (HI-2049)', ['Tool list a launch', 'Guidance a launch · no workflow role', 'Tool list a launch · no workflow role'].every((n) => names.includes(n)) && !names.some((n) => /builders/.test(n)), JSON.stringify(names))
   const changes = async () => (await measures.locator('tbody tr td:last-child').allInnerTexts()).map((t) => { const m = /\(([+-]?[\d.]+)%\)/.exec(t); return m ? Number(m[1]) : null })
   await measures.locator('th button', { hasText: 'Change' }).click()
   const sortedChanges = (await changes()).filter((x) => x !== null)

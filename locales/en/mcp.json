@@ -1,122 +1,470 @@
 {
-  "mcp.addFile.message": {
-    "defaultMessage": "Adds {file} to the workspace (.hive/mcp){files, plural, =0 {} one {, with its file in a folder of its own} other {, with its # files in a folder of its own}}, turned off. Turn it on in the MCP view to choose the projects it runs in. It runs:",
-    "description": "Add MCP Server from File, above the command the server runs. {file} is the file added; {files} how many files a .zip brings. Keep .hive/mcp as it is."
+  "mcp.add.busy": {
+    "defaultMessage": "Adding…",
+    "description": "The Add server picker’s Add button while it works."
   },
-  "mcp.addFile.replaceDetail": {
-    "defaultMessage": "Replace moves it (and the folder of one added from a .zip) to the Recycle Bin and adds this one, turned off: projects that had the old one on lose it. Or choose another name.",
-    "description": "When a server of that name exists, under Replace or Choose Another Name."
+  "mcp.add.button": {
+    "defaultMessage": "Add",
+    "description": "The Add server picker (HI-2059): the button that adds the chosen server."
+  },
+  "mcp.add.message": {
+    "defaultMessage": "The workspace’s servers not added here yet. Sessions started from now on get the one you add.",
+    "description": "The Add server picker (HI-2059), above its search and list: the workspace servers not added to this project (or the Hive Assistant); new sessions start the one added."
+  },
+  "mcp.add.title": {
+    "defaultMessage": "Add a server to {project}",
+    "description": "Title of the Add server picker (HI-2059) in a project's MCP tab. {project} is the project."
+  },
+  "mcp.add.titleAssistant": {
+    "defaultMessage": "Add a server for the Hive Assistant",
+    "description": "Title of the Add server picker (HI-2059) in the Hive Assistant's view."
+  },
+  "mcp.addFile.messageAdded": {
+    "defaultMessage": "Adds {file} to the workspace (.hive/mcp){files, plural, =0 {} one {, with its file in a folder of its own} other {, with its # files in a folder of its own}}, added to no project yet. Add it where it should run: a project’s MCP tab, the Hive Assistant’s view, or Add to… here. It runs:",
+    "description": "Add MCP Server from File (HI-2059), above the command the server runs. {file} is the file added; {files} how many files a .zip brings. Keep .hive/mcp as it is; \"MCP tab\" and \"Add to…\" as Hive shows them."
+  },
+  "mcp.addFile.replaceDetailAdded": {
+    "defaultMessage": "Replace moves it (and the folder of one added from a .zip) to the Recycle Bin and adds this one to no project yet: projects and the Hive Assistant that had the old one lose it. Or choose another name.",
+    "description": "When a server of that name exists, under Replace or Choose Another Name (HI-2059)."
+  },
+  "mcp.catalog.allSources": {
+    "defaultMessage": "All sources",
+    "description": "The Catalogue's source picker (HI-545): every catalogue."
+  },
+  "mcp.catalog.badName": {
+    "defaultMessage": "Server names may contain letters, numbers, \"-\" and \"_\" (max 64 characters). \"hive\" is reserved.",
+    "description": "An error installing a catalogue server (HI-545) under a name a server can't have."
+  },
+  "mcp.catalog.badgeInstalled": {
+    "defaultMessage": "Installed",
+    "description": "A badge on a catalogue server (HI-545): it is installed."
+  },
+  "mcp.catalog.badgeNeeds": {
+    "defaultMessage": "Can't run here",
+    "description": "A badge on a catalogue server (HI-545): this PC doesn't meet one of its requirements."
+  },
+  "mcp.catalog.badgeOther": {
+    "defaultMessage": "Name in use",
+    "description": "A badge on a catalogue server (HI-545): a server of the same name, not from this catalogue, is installed."
+  },
+  "mcp.catalog.badgeUpdate": {
+    "defaultMessage": "Update to {version}",
+    "description": "A badge on a catalogue server (HI-545): a newer version is available."
+  },
+  "mcp.catalog.cantRun": {
+    "defaultMessage": "This PC doesn't meet a requirement above, so it can't be installed.",
+    "description": "A catalogue server's view (HI-545) when a requirement Hive checked is not met: Install is greyed out."
+  },
+  "mcp.catalog.check.app": {
+    "defaultMessage": "{value}",
+    "description": "A requirement of a catalogue server (HI-545) given in the catalogue's own words ({value}, as it is): Hive can't check it."
+  },
+  "mcp.catalog.check.build": {
+    "defaultMessage": "Windows build {value} or later",
+    "description": "A requirement of a catalogue server (HI-545): the lowest Windows build ({value}, a number)."
+  },
+  "mcp.catalog.check.docker": {
+    "defaultMessage": "Docker",
+    "description": "A requirement of a catalogue server (HI-545): Docker installed."
+  },
+  "mcp.catalog.check.edition": {
+    "defaultMessage": "Windows {value}",
+    "description": "A requirement of a catalogue server (HI-545): the Windows editions it needs ({value}: Pro, Enterprise…)."
+  },
+  "mcp.catalog.check.feature": {
+    "defaultMessage": "{value} turned on",
+    "description": "A requirement of a catalogue server (HI-545): a Windows optional feature ({value}, its name as Windows gives it, e.g. Windows Sandbox) that must be turned on."
+  },
+  "mcp.catalog.check.node": {
+    "defaultMessage": "Node.js {value} or later",
+    "description": "A requirement of a catalogue server (HI-545): the lowest Node.js version on PATH ({value})."
+  },
+  "mcp.catalog.check.os": {
+    "defaultMessage": "Runs on {value}",
+    "description": "A requirement of a catalogue server (HI-545): the systems it runs on ({value}: windows, macos, linux, as the catalogue names them)."
+  },
+  "mcp.catalog.expired": {
+    "defaultMessage": "That download has expired: choose Install or Update again.",
+    "description": "An error installing or updating a server from an MCP catalogue (HI-545): the download made for it was dropped (too old, or the window closed)."
+  },
+  "mcp.catalog.failed": {
+    "defaultMessage": "Could not get {name}",
+    "description": "An error's title (HI-545): downloading or checking a server from an MCP catalogue for Install or Update failed. {name} is the server."
+  },
+  "mcp.catalog.filter": {
+    "defaultMessage": "Show",
+    "description": "Accessible name of the Catalogue's filter (HI-545): which servers to show."
+  },
+  "mcp.catalog.filterAll": {
+    "defaultMessage": "All",
+    "description": "The Catalogue's filter (HI-545): every server."
+  },
+  "mcp.catalog.filterInstalled": {
+    "defaultMessage": "Installed",
+    "description": "The Catalogue's filter (HI-545): servers installed."
+  },
+  "mcp.catalog.filterMeets": {
+    "defaultMessage": "Runs on this PC",
+    "description": "The Catalogue's filter (HI-545): servers whose requirements this PC meets (or Hive can't check)."
+  },
+  "mcp.catalog.filterNotInstalled": {
+    "defaultMessage": "Not installed",
+    "description": "The Catalogue's filter (HI-545): servers not installed yet."
+  },
+  "mcp.catalog.filterUpdates": {
+    "defaultMessage": "Updates available",
+    "description": "The Catalogue's filter (HI-545): installed servers with a newer version."
+  },
+  "mcp.catalog.folder": {
+    "defaultMessage": "{name}'s zip doesn't hold a folder named {name}: not installed.",
+    "description": "An error installing a server from an MCP catalogue (HI-545): the zip is not laid out as catalogues require (one top folder named after the server)."
+  },
+  "mcp.catalog.from": {
+    "defaultMessage": "From {source}",
+    "description": "A catalogue server's view (HI-545): the catalogue it is in."
+  },
+  "mcp.catalog.gone": {
+    "defaultMessage": "{name} isn't in its catalogue any more: refresh the list.",
+    "description": "An error installing or updating a server from an MCP catalogue (HI-545): the catalogue read last no longer lists it."
+  },
+  "mcp.catalog.homepage": {
+    "defaultMessage": "Homepage",
+    "description": "A catalogue server's view (HI-545): opens its page in the browser."
+  },
+  "mcp.catalog.http": {
+    "defaultMessage": "{url} answered {status}.",
+    "description": "An error downloading from an MCP catalogue (HI-545): the server answered with an HTTP error {status} (a number such as 404)."
+  },
+  "mcp.catalog.installAction": {
+    "defaultMessage": "Install…",
+    "description": "A catalogue server's view (HI-545): downloads, checks and shows it, before installing."
+  },
+  "mcp.catalog.installButton": {
+    "defaultMessage": "Install",
+    "description": "Button (HI-545): installs the catalogue server."
+  },
+  "mcp.catalog.installMessageName": {
+    "defaultMessage": "Downloaded and checked against its catalogue. It is added to the workspace under this name, and to no project yet. It runs:",
+    "description": "The question before installing a catalogue server (HI-545), above the name box and what it runs: its download matched its catalogue; installed, it runs nowhere until added."
+  },
+  "mcp.catalog.installTitle": {
+    "defaultMessage": "Install {name} {version}?",
+    "description": "Title of the question before installing a server from an MCP catalogue (HI-545). {name} is the server, {version} its version."
+  },
+  "mcp.catalog.installed": {
+    "defaultMessage": "Installed {name}",
+    "description": "A notification's title (HI-545): a catalogue server was installed."
+  },
+  "mcp.catalog.installedAt": {
+    "defaultMessage": "Installed: {version}",
+    "description": "A catalogue server's view (HI-545): the version installed."
+  },
+  "mcp.catalog.installedNext": {
+    "defaultMessage": "It runs nowhere yet: Add to… in its view adds it to the projects (and the Hive Assistant) that need it.",
+    "description": "Under \"Installed {name}\" (HI-545): what to do next. Add to… is the button in the server's view in the MCP view."
+  },
+  "mcp.catalog.loading": {
+    "defaultMessage": "Reading the catalogues…",
+    "description": "The MCP view's Catalogue while it reads the catalogues (HI-545)."
+  },
+  "mcp.catalog.mismatch": {
+    "defaultMessage": "{name}'s download doesn't match its catalogue (its size or checksum differ): not installed.",
+    "description": "An error installing a server from an MCP catalogue (HI-545): the zip downloaded is not the one the catalogue describes, so Hive used none of it. {name} is the server."
+  },
+  "mcp.catalog.more": {
+    "defaultMessage": "Show more ({left, number} left)",
+    "description": "A button under a catalogue source (HI-545): loads its next servers. {left} is how many more match."
+  },
+  "mcp.catalog.needs": {
+    "defaultMessage": "{name} can't run on this PC: {needs}.",
+    "description": "An error installing a server from an MCP catalogue (HI-545): a requirement Hive checked is not met. {needs} lists them."
+  },
+  "mcp.catalog.no": {
+    "defaultMessage": "Not met",
+    "description": "A requirement's state in a catalogue server's view (HI-545), for screen readers."
+  },
+  "mcp.catalog.noMatch": {
+    "defaultMessage": "No server matches.",
+    "description": "A catalogue source in the Catalogue (HI-545) with no server for the search and filter."
+  },
+  "mcp.catalog.none": {
+    "defaultMessage": "No catalogues are on. Turn ours on, or add one, in Settings → MCP Catalogues.",
+    "description": "The Catalogue (HI-545) with every source off. Settings → MCP Catalogues as Hive names it."
+  },
+  "mcp.catalog.notInstalled": {
+    "defaultMessage": "{name} isn't installed from this catalogue: install it instead.",
+    "description": "An error updating a server from an MCP catalogue (HI-545): no server of the name came from it."
+  },
+  "mcp.catalog.notRead": {
+    "defaultMessage": "Couldn't read this catalogue: {reason}",
+    "description": "An MCP catalogue source in the MCP view (HI-545) that could not be read or is not a catalogue Hive reads. {reason} says why (as the network, the file or the checker said it, in English)."
+  },
+  "mcp.catalog.ok": {
+    "defaultMessage": "Met",
+    "description": "A requirement's state in a catalogue server's view (HI-545), for screen readers."
+  },
+  "mcp.catalog.pick": {
+    "defaultMessage": "Select a server in the Catalogue to see what it needs and install it.",
+    "description": "The MCP view's main area with the Catalogue tab and nothing selected (HI-545)."
+  },
+  "mcp.catalog.placesChanged": {
+    "defaultMessage": "Where {name} is added changed while the update waited: look again.",
+    "description": "An error updating a server from an MCP catalogue (HI-545): a project (or the Hive Assistant) gained or lost the server after the Update dialog showed where it is added, so nothing was changed."
+  },
+  "mcp.catalog.redirects": {
+    "defaultMessage": "Too many redirects downloading {url}.",
+    "description": "An error downloading from an MCP catalogue (HI-545): more than 5 redirects. {url} is the address asked for."
+  },
+  "mcp.catalog.refreshAgain": {
+    "defaultMessage": "Refresh (↻) to list this catalogue again: Hive keeps only so many in memory.",
+    "description": "A catalogue source in the MCP view's Catalogue (HI-545) whose list Hive no longer holds (too much in memory): ↻ reads it again."
+  },
+  "mcp.catalog.requires": {
+    "defaultMessage": "Requirements",
+    "description": "A catalogue server's view (HI-545): the heading of what it needs on this PC."
+  },
+  "mcp.catalog.scheme": {
+    "defaultMessage": "{url} leads to an address this source may not use (only https for an https catalogue).",
+    "description": "An error downloading from an MCP catalogue (HI-545): a redirect led away from https (to http or a file). {url} is where it led."
+  },
+  "mcp.catalog.search": {
+    "defaultMessage": "Search the catalogues",
+    "description": "The MCP view's Catalogue (HI-545): its search box (by name, description and tags)."
+  },
+  "mcp.catalog.size": {
+    "defaultMessage": "Download: {size}",
+    "description": "A catalogue server's view (HI-545): the size of its zip."
+  },
+  "mcp.catalog.skipped": {
+    "defaultMessage": "{n, plural, one {# entry skipped: not as catalogues give a server} other {# entries skipped: not as catalogues give a server}}",
+    "description": "Under a catalogue source (HI-545): entries Hive left out because they are not valid."
+  },
+  "mcp.catalog.source": {
+    "defaultMessage": "Source",
+    "description": "Accessible name of the Catalogue's source picker (HI-545)."
+  },
+  "mcp.catalog.sourceTaken": {
+    "defaultMessage": "That catalogue is listed already.",
+    "description": "An error adding an MCP catalogue source (HI-545): it is in the list already."
+  },
+  "mcp.catalog.sourceUrl": {
+    "defaultMessage": "A catalogue is an https:// or file:// address of its catalog.json.",
+    "description": "An error adding an MCP catalogue source (Settings → MCP Catalogues, HI-545): the address is neither."
+  },
+  "mcp.catalog.timeout": {
+    "defaultMessage": "{url} took too long (over {seconds, number} s).",
+    "description": "An error downloading from an MCP catalogue (HI-545): no complete answer within the time limit (Settings → Advanced)."
+  },
+  "mcp.catalog.tooLarge": {
+    "defaultMessage": "{url} is larger than its catalogue says ({max, number} bytes at most): not used.",
+    "description": "An error downloading from an MCP catalogue (HI-545): the download went past the size its catalogue gives, or the limit. {url} is the address."
+  },
+  "mcp.catalog.tooManySources": {
+    "defaultMessage": "Hive lists at most {max, number} catalogues of your own: remove one first.",
+    "description": "An error adding an MCP catalogue source (Settings → MCP Catalogues, HI-545): the list is full."
+  },
+  "mcp.catalog.unknown": {
+    "defaultMessage": "Hive can't check this: make sure it's there",
+    "description": "A requirement's state in a catalogue server's view (HI-545): Hive can't check it on this PC."
+  },
+  "mcp.catalog.unvetted": {
+    "defaultMessage": "Servers from this source aren't checked by Hive. Look at what one runs before you install it.",
+    "description": "A note under a catalogue source the user added (HI-545), shown once: Hive does not vet its servers."
+  },
+  "mcp.catalog.updateAction": {
+    "defaultMessage": "Update to {version}…",
+    "description": "A catalogue server's view (HI-545): downloads the newer version and shows what changes, before updating."
+  },
+  "mcp.catalog.updateButton": {
+    "defaultMessage": "Update",
+    "description": "Button (HI-545): updates the catalogue server to the new version."
+  },
+  "mcp.catalog.updateMessage": {
+    "defaultMessage": "{where}: those places keep it, your values for its environment and headers too. What it runs changes (− now, + after):",
+    "description": "The question before updating a catalogue server (HI-545), above the lines of what it runs that change. {where} says where it is added (\"Added in hive\", \"Not added anywhere\")."
+  },
+  "mcp.catalog.updateSame": {
+    "defaultMessage": "{where}: those places keep it, your values for its environment and headers too. What it runs stays the same:",
+    "description": "The question before updating a catalogue server (HI-545) whose command stays the same, above what it runs. {where} says where it is added."
+  },
+  "mcp.catalog.updateTitle": {
+    "defaultMessage": "Update {name} from {from} to {to}?",
+    "description": "Title of the question before updating a catalogue server (HI-545). {from} and {to} are its versions."
+  },
+  "mcp.catalog.updated": {
+    "defaultMessage": "Updated {name} to {version}",
+    "description": "A notification's title (HI-545): a catalogue server was updated."
+  },
+  "mcp.catalog.workspaceGone": {
+    "defaultMessage": "The workspace closed before {name} was installed: nothing was written.",
+    "description": "An error installing or updating a server from an MCP catalogue (HI-545): the workspace it was for closed while it downloaded."
   },
   "mcp.enable.all": {
-    "defaultMessage": "All",
-    "description": "The MCP server enable dialog: a button that ticks every project."
+    "defaultMessage": "All projects",
+    "description": "The MCP view’s Add to… dialog: a button that ticks every project (not the Hive Assistant, which has its own box)."
   },
-  "mcp.enable.confirmButton": {
-    "defaultMessage": "Turn On",
-    "description": "Button: turns the MCP server on in the workspace and the projects ticked."
-  },
-  "mcp.enable.confirmMessage": {
-    "defaultMessage": "New sessions in the projects you tick start it. It runs:",
-    "description": "The confirmation before an MCP server is turned on in the workspace, above the command it runs and the projects to tick."
-  },
-  "mcp.enable.confirmTitle": {
-    "defaultMessage": "Turn on {name}?",
-    "description": "Title of the confirmation before an MCP server is turned on in the workspace. {name} is the server."
-  },
-  "mcp.enable.noProjects": {
-    "defaultMessage": "The workspace has no projects yet: turn it on in a project's MCP tab once there is one.",
-    "description": "The MCP server enable dialog when the workspace has no projects to choose."
+  "mcp.enable.assistant": {
+    "defaultMessage": "Hive Assistant",
+    "description": "The MCP view’s Add to… dialog: the box that adds the server for the Hive Assistant, after the projects."
   },
   "mcp.enable.none": {
-    "defaultMessage": "None",
-    "description": "The MCP server enable dialog: a button that unticks every project."
+    "defaultMessage": "No projects",
+    "description": "The MCP view’s Add to… dialog: a button that unticks every project (not the Hive Assistant, which has its own box)."
   },
-  "mcp.enable.projects": {
-    "defaultMessage": "Turn on in",
-    "description": "The MCP server enable dialog: the label above the projects to tick."
-  },
-  "mcp.enable.projectsLabel": {
-    "defaultMessage": "Projects to turn it on in",
-    "description": "Accessible name of the list of projects to tick in the MCP server enable dialog."
+  "mcp.error.cannotClear": {
+    "defaultMessage": "Couldn't read the settings of {project}, so {name} wasn't changed: it may still be added there. Try again once the project can be read.",
+    "description": "An error replacing, creating or deleting an MCP server (HI-2059): a project's settings file could not be read, so Hive could not make sure the server is removed there, and changed nothing. {project} is the project's folder name, {name} the server."
   },
   "mcp.error.invalidName": {
     "defaultMessage": "Invalid server name",
     "description": "An error: an MCP server name Hive refuses."
   },
-  "mcp.error.noServer": {
-    "defaultMessage": "The workspace has no MCP server named {name}.",
-    "description": "An error turning a server on in a project. {name} is its name."
+  "mcp.error.noProject": {
+    "defaultMessage": "{project} is no longer a project in this workspace.",
+    "description": "An error adding an MCP server to a project, or removing it (HI-2059): the project was removed or moved meanwhile. {project} is its folder name."
   },
-  "mcp.import.changed": {
-    "defaultMessage": "{count, plural, one {{names} changed in the project's config after you saw it, so it was copied turned off: check what it runs and turn it on with its switch in the MCP view.} other {{names} changed in the project's config after you saw them, so they were copied turned off: check what they run and turn them on with their switches in the MCP view.}}",
+  "mcp.error.noServerAdd": {
+    "defaultMessage": "The workspace has no MCP server named {name}.",
+    "description": "An error adding a server to a project or the Hive Assistant. {name} is its name."
+  },
+  "mcp.import.added": {
+    "defaultMessage": "Added to {project} for new sessions.",
+    "description": "After Copy to workspace (HI-2059): where the copied servers are added."
+  },
+  "mcp.import.changedAdded": {
+    "defaultMessage": "{count, plural, one {{names} changed in the project's config after you saw it, so it was copied but not added: check what it runs and add it in the project's MCP tab.} other {{names} changed in the project's config after you saw them, so they were copied but not added: check what they run and add them in the project's MCP tab.}}",
     "description": "After Copy to workspace, when servers changed between the confirmation and the copy. {names} lists them, {count} how many."
   },
-  "mcp.import.confirmButton": {
-    "defaultMessage": "Copy and Turn On",
-    "description": "Button: copies the project's MCP servers to the workspace and turns them on in the project."
+  "mcp.import.confirmButtonAdded": {
+    "defaultMessage": "Copy and Add",
+    "description": "Button (HI-2059): copies the project's MCP servers to the workspace and adds them to the project."
   },
-  "mcp.import.confirmMessage": {
-    "defaultMessage": "{count, plural, one {It is turned on in {project} straight away; other projects can turn it on in their MCP tab. It runs:} other {They are turned on in {project} straight away; other projects can turn them on in their MCP tab. They run:}}",
+  "mcp.import.confirmMessageAdded": {
+    "defaultMessage": "{count, plural, one {It is added to {project} straight away; other projects can add it in their MCP tab. It runs:} other {They are added to {project} straight away; other projects can add them in their MCP tab. They run:}}",
     "description": "Copy to workspace's confirmation, above what the servers run. {count} is how many; {project} the project they come from."
   },
   "mcp.import.confirmTitle": {
     "defaultMessage": "{count, plural, one {Copy {name} to the workspace?} other {Copy # MCP servers to the workspace?}}",
     "description": "Title of Copy to workspace's confirmation. {count} servers a project defines in its own config; {name} the one when there is one."
   },
-  "mcp.import.on": {
-    "defaultMessage": "On in {project} for new sessions.",
-    "description": "After Copy to workspace: where the copied servers are on."
-  },
   "mcp.import.readFailed": {
     "defaultMessage": "Could not read the servers",
     "description": "An error's title: reading the MCP servers a project defines in its own config failed."
   },
-  "mcp.list.allOffTip": {
-    "defaultMessage": "Off in the workspace: it runs nowhere. Click to turn it on and choose the projects it runs in.",
-    "description": "The tooltip of a server's switch in the MCP view while it is off in the workspace."
+  "mcp.picker.added": {
+    "defaultMessage": "Added somewhere",
+    "description": "The MCP servers' filter: servers added to a project or the Hive Assistant."
   },
-  "mcp.list.allOnTip": {
-    "defaultMessage": "On in the workspace: it runs in the projects that have it on (new sessions). Click to turn it off everywhere; the projects keep their choices for when it is on again.",
-    "description": "The tooltip of a server's switch in the MCP view while it is on in the workspace."
+  "mcp.picker.all": {
+    "defaultMessage": "All",
+    "description": "The MCP servers' filter: every server."
   },
-  "mcp.list.allSwitch": {
-    "defaultMessage": "{name}: on in the workspace",
-    "description": "A server's switch in the MCP view, for screen readers. {name} is the server."
+  "mcp.picker.allAdded": {
+    "defaultMessage": "Every server in the workspace is added here already.",
+    "description": "The Add server picker (HI-2059) when every workspace server is added to this project or the Hive Assistant."
   },
-  "mcp.project.updateFailed": {
-    "defaultMessage": "Could not update the server",
-    "description": "An error's title: turning an MCP server on or off in a project failed."
+  "mcp.picker.choose": {
+    "defaultMessage": "Choose a server to see what it runs.",
+    "description": "The Add server picker (HI-2059) before a server is chosen; Add stays greyed out until one is."
   },
-  "mcp.tab.hint": {
-    "defaultMessage": "Every MCP server in the workspace is available here: turn on the ones this project's agents need. A server runs here only while it is on in the workspace too (its switch in the MCP view).",
-    "description": "Under Workspace MCP servers in a project's MCP tab."
+  "mcp.picker.errors": {
+    "defaultMessage": "With problems",
+    "description": "The MCP view's filter: servers whose definition Hive can't use."
   },
-  "mcp.tab.projectDefined": {
-    "defaultMessage": "These servers are in the project's own agent config (such as .mcp.json). Hive starts sessions with only workspace servers, so they stay disabled until copied to the workspace, which turns them on here.",
-    "description": "Under Defined by the project in a project's MCP tab. Keep .mcp.json as it is."
+  "mcp.picker.filter": {
+    "defaultMessage": "Show",
+    "description": "Accessible name of the filter beside the MCP servers' search box (All, Added somewhere, Added nowhere)."
   },
-  "mcp.tab.switch": {
-    "defaultMessage": "{name} on in {project}",
-    "description": "A server's switch in a project's MCP tab, for screen readers. {name} is the server, {project} the project."
+  "mcp.picker.noMatch": {
+    "defaultMessage": "No server matches.",
+    "description": "The MCP servers' list when nothing matches the search and filter."
   },
-  "mcp.tab.workspaceBadge": {
-    "defaultMessage": "workspace",
-    "description": "A badge on a server in a project's MCP tab: it is one of the workspace's servers."
+  "mcp.picker.nowhere": {
+    "defaultMessage": "Added nowhere",
+    "description": "The MCP servers' filter: servers added to no project and not to the Hive Assistant."
   },
-  "mcp.view.allProjects": {
-    "defaultMessage": "Workspace",
-    "description": "Beside the switch in an MCP server's view that turns it on or off in the workspace (on: it runs in the projects that have it on)."
+  "mcp.picker.runs": {
+    "defaultMessage": "It runs:",
+    "description": "The Add server picker (HI-2059): above what the chosen server runs (its command, address, folder, environment)."
   },
-  "mcp.where.none": {
-    "defaultMessage": "On in no project",
-    "description": "Where an MCP server is on, under it in the MCP view: on in the workspace, but no project has it on."
+  "mcp.picker.search": {
+    "defaultMessage": "Search by name, description or tag",
+    "description": "The search box of the MCP view and of the Add server picker (HI-2059): finds servers by their name, description or tags."
   },
-  "mcp.where.off": {
-    "defaultMessage": "Off in the workspace",
-    "description": "Where an MCP server is on, under it in the MCP view, and beside a project's switch for it in its MCP tab: the workspace has it off, so it runs in no project."
+  "mcp.places.addedIn": {
+    "defaultMessage": "Added: {places}",
+    "description": "After Add to… (HI-2059) failed in part: the places the server was added to. {places} lists projects (and the Hive Assistant)."
   },
-  "mcp.where.some": {
-    "defaultMessage": "On in {projects}",
-    "description": "Where an MCP server is on, under it in the MCP view. {projects} lists the projects."
+  "mcp.places.button": {
+    "defaultMessage": "Save",
+    "description": "The MCP view’s Add to… dialog (HI-2059): the button that adds the server where ticked and removes it where unticked."
+  },
+  "mcp.places.failedIn": {
+    "defaultMessage": "Not changed in {place}: {error}",
+    "description": "After Add to… (HI-2059) failed in part: a place where the change could not be written, and why ({error}, as Hive or Windows said it)."
+  },
+  "mcp.places.message": {
+    "defaultMessage": "Sessions started from now on get it wherever it is ticked; unticking removes it there. It runs:",
+    "description": "The MCP view’s Add to… dialog (HI-2059), above the command the server runs and the projects (and the Hive Assistant) to tick."
+  },
+  "mcp.places.noProjects": {
+    "defaultMessage": "The workspace has no projects yet: add it in a project's MCP tab once there is one.",
+    "description": "The MCP view’s Add to… dialog (HI-2059) when the workspace has no projects to choose."
+  },
+  "mcp.places.partial": {
+    "defaultMessage": "{name} was changed in only some places",
+    "description": "A warning's title after the MCP view's Add to… (HI-2059): some of the places could not be written; the message says which changed and which didn't. {name} is the server."
+  },
+  "mcp.places.projects": {
+    "defaultMessage": "Added to",
+    "description": "The MCP view’s Add to… dialog (HI-2059): the label above the projects to tick."
+  },
+  "mcp.places.projectsLabel": {
+    "defaultMessage": "Projects to add it to",
+    "description": "Accessible name of the list of projects to tick in the MCP view’s Add to… dialog (HI-2059)."
+  },
+  "mcp.places.removedFrom": {
+    "defaultMessage": "Removed: {places}",
+    "description": "After Add to… (HI-2059) failed in part: the places the server was removed from. {places} lists projects (and the Hive Assistant)."
+  },
+  "mcp.places.title": {
+    "defaultMessage": "Add {name} to…",
+    "description": "Title of the dialog in the MCP view (HI-2059) that chooses the projects, and the Hive Assistant, an MCP server is added to. {name} is the server."
+  },
+  "mcp.tab.hintAdded": {
+    "defaultMessage": "The workspace's MCP servers this project's agents get. Add one from the workspace's servers; Remove takes it off this project only.",
+    "description": "Under Added servers in a project's MCP tab (HI-2059)."
+  },
+  "mcp.tab.projectDefinedAdded": {
+    "defaultMessage": "These servers are in the project's own agent config (such as .mcp.json). Hive starts sessions with only workspace servers, so they stay disabled until copied to the workspace, which adds them here.",
+    "description": "Under Defined by the project in a project's MCP tab (HI-2059: copying one to the workspace adds it to this project). Keep .mcp.json as it is."
+  },
+  "mcp.view.addTo": {
+    "defaultMessage": "Add to…",
+    "description": "A button in an MCP server's view (HI-2059): chooses the projects, and the Hive Assistant, it is added to."
+  },
+  "mcp.where.addedAssistantOnly": {
+    "defaultMessage": "Added for the Hive Assistant only",
+    "description": "Where an MCP server is added (HI-2059), under it in the MCP view: for the Hive Assistant, in no project."
+  },
+  "mcp.where.addedNone": {
+    "defaultMessage": "Not added anywhere",
+    "description": "Where an MCP server is added (HI-2059), under it in the MCP view: no project and not the Hive Assistant, so it runs nowhere."
+  },
+  "mcp.where.addedSome": {
+    "defaultMessage": "Added in {projects}",
+    "description": "Where an MCP server is added (HI-2059), under it in the MCP view. {projects} lists the projects."
+  },
+  "mcp.where.addedSomeAndAssistant": {
+    "defaultMessage": "Added in {projects} and for the Hive Assistant",
+    "description": "Where an MCP server is added (HI-2059), under it in the MCP view: in some projects and for the Hive Assistant. {projects} lists the projects."
+  },
+  "mcp.where.assistantName": {
+    "defaultMessage": "the Hive Assistant",
+    "description": "Where an MCP server is added (HI-2059), in a list of places beside project names."
+  },
+  "mcp.where.hidden": {
+    "defaultMessage": "{n, plural, one {# hidden project} other {# hidden projects}}",
+    "description": "Where an MCP server is added (HI-2059), after the projects named: the hidden projects it is added to."
   }
 }

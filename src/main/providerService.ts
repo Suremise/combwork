@@ -3,16 +3,18 @@ import { app } from 'electron'
 import type { AgentInstallInfo, ModelCatalog, ProviderId, ProviderTask } from '../shared/types'
 import { observedEffortKey } from '../shared/models'
 import { autoProviderPending, isProviderEnabled, providerSettings, setInstalledCheck } from '../shared/providers'
-import { shownInstallInfo, toSpawnable } from './providers/common'
+import { shownInstallInfo, toSpawnable, withoutAccountEnv, withServerEnv } from './providers/common'
 import { allProviders, provider } from './providers'
 import type { KeySteps, UpdateRetry } from './providers/types'
 import { msg, onLanguageChange, tr } from '../shared/i18n'
 import { hiveError } from './hiveError'
 import { config } from './config'
+import { advanced } from './advanced'
 import { noteCliFolder, refreshPath } from './freshPath'
 import { emit, toast } from './events'
 import { createLogger } from './logger'
 import { childEnv, hasPty, killPty, spawnPty, startSize, writePty } from './ptyHost'
+import { connectionsManaged } from './connectionSeam'
 import { KeyGate } from './taskKeys'
 import { KeysStopped, PickNotFound, typeKeySteps } from './keySteps'
 import { compareTested, noteSelectedCli, testedVersion } from './testedClis'
@@ -79,7 +81,9 @@ class ProviderService {
    * "default"), else the model last seen in a session started without a model choice.
    */
   private resolveDefaultModel(id: ProviderId, catalog?: ModelCatalog | null): string | null {
-    return provider(id).configuredDefaultModel() ?? catalog?.defaultModel ?? config.get().observedDefaultModel[id] ?? null
+    // Its connections' settings are each their own (HI-1755: a launch reads its connection's); ~/.claude's isn't theirs.
+    const own = connectionsManaged(id) ? null : provider(id).configuredDefaultModel()
+    return own ?? catalog?.defaultModel ?? config.get().observedDefaultModel[id] ?? null
   }
 
   /** The efforts sessions started without an effort choice ran with, per model (the CLI's own defaults). */
@@ -186,8 +190,8 @@ class ProviderService {
   /** detected(), refusing when Hive is still looking: what calls it would otherwise commit to a guess (#506). */
   async settle(id?: ProviderId): Promise<void> {
     if (await this.detected(id)) return
-    if (!id) throw hiveError(msg({ id: 'service.providers.stillLookingAll', defaultMessage: 'Hive is still looking for the coding agent CLIs. Try again in a moment.', description: "An error: Hive hasn't finished finding the coding agent CLIs installed (it does when it starts), so it can't choose one yet." }))
-    throw hiveError(msg({ id: 'service.providers.stillLooking', defaultMessage: 'Hive is still looking for {cli}. Try again in a moment.', description: "An error: Hive hasn't finished finding the coding agent CLI {cli} (\"Codex\"), so it can't use it yet." }), { cli: provider(id).descriptor.name })
+    if (!id) throw hiveError(msg({ id: 'service.providers.stillLookingAll', defaultMessage: 'Hive is still looking for the coding agent CLIs. Try again in a moment.', description: "An error: Hive hasn't finished finding the coding agent CLIs installed (it does when it starts), so it can't choose one yet." }), undefined, { kind: 'conflict' })
+    throw hiveError(msg({ id: 'service.providers.stillLooking', defaultMessage: 'Hive is still looking for {cli}. Try again in a moment.', description: "An error: Hive hasn't finished finding the coding agent CLI {cli} (\"Codex\"), so it can't use it yet." }), { cli: provider(id).descriptor.name }, { kind: 'conflict' })
   }
 
   /**
@@ -217,7 +221,7 @@ class ProviderService {
       const slow = app.isPackaged ? 0 : Number((process.env.HIVE_TEST_SLOW_DETECT ?? '').split(',').find((x) => x.startsWith(`${id}=`))?.slice(id.length + 1) ?? 0)
       if (slow > 0) await new Promise((r) => setTimeout(r, slow))
       const found = await adapter.locate()
-      // Its folder on the PATH of what Hive starts, so its sessions and terminals find the CLI Agent Setup found (#1103).
+      // Its folder on the PATH of what Hive starts, so its sessions and terminals find the CLI Provider Setup found (#1103).
       if (this.refreshes.get(id) === run) noteCliFolder(id, found.path)
       // Found is known before its version, models and sign-in are: Automatic's pick needs only that (#506).
       if (found.path && this.refreshes.get(id) === run && !this.info(id).found) this.set(id, { ...this.info(id), found: true, path: found.path })
@@ -352,6 +356,28 @@ class ProviderService {
     return key
   }
 
+  /**
+   * Signs an account's folder in (HI-980): the CLI's own login in a terminal of Hive's, with the folder as its home
+   * (`env`), and nothing typed into it: the user signs in through the CLI's flow. One per account: a second start gets
+   * the open one's key. `onExit` once it ends. The CLI's own sign-in state isn't changed by it (that is ~/.claude's).
+   */
+  runAccountLogin(id: ProviderId, accountId: string, env: Record<string, string>, onExit: (code: number) => void, setUp?: { env: Record<string, string>; cwd: string }): string {
+    const adapter = provider(id)
+    const info = this.info(id)
+    if (!info.path) throw hiveError(msg({ id: 'service.providers.notInstalled', defaultMessage: '{cli} is not installed.', description: 'An error running a coding agent CLI\'s task (update, sign-in, setup): the CLI {cli} ("Codex") is not installed.' }), { cli: adapter.descriptor.name }, { kind: 'conflict' })
+    const key = `task:${id}:login:${accountId}`
+    if (hasPty(key)) return key
+    // The connection's own sign-in where the CLI has one (HI-1757), without the variables it would read as a login. A
+    // server connection's Set Up (HI-1772) runs the CLI itself instead, with its server's variables, for its first-run
+    // screens: the user answers them in the CLI's own way.
+    const home = env[adapter.descriptor.capabilities.connections?.homeEnv ?? '']
+    const cmd = setUp ? { file: info.path, args: (home && adapter.connectionSetUpArgs?.(home)) || [] } : (adapter.accountLoginCommand?.(info.path) ?? adapter.loginCommand(info.path))
+    const s = toSpawnable(cmd.file, cmd.args)
+    log.info(`${adapter.descriptor.name} ${setUp ? 'set-up' : 'sign-in'} for account ${accountId}`)
+    spawnPty(key, { file: s.file, args: s.args, cwd: setUp?.cwd ?? homedir(), env: withServerEnv(setUp?.env, withoutAccountEnv(adapter, childEnv(env))), onExit })
+    return key
+  }
+
   /** Starts a provider task in a terminal and returns its terminal key. */
   runProviderTask(id: ProviderId, task: ProviderTask, retryUpdate = false): string {
     const adapter = provider(id)
@@ -363,11 +389,11 @@ class ProviderService {
       const cmd = adapter.installCommand()
       return this.runTask(id, task, cmd.file, cmd.args, `${name} install`, undefined, shown) // i18n-ignore: the task's name in the log
     }
-    if (!info.path) throw hiveError(msg({ id: 'service.providers.notInstalled', defaultMessage: '{cli} is not installed.', description: 'An error running a coding agent CLI\'s task (update, sign-in, setup): the CLI {cli} ("Codex") is not installed.' }), { cli: name })
+    if (!info.path) throw hiveError(msg({ id: 'service.providers.notInstalled', defaultMessage: '{cli} is not installed.', description: 'An error running a coding agent CLI\'s task (update, sign-in, setup): the CLI {cli} ("Codex") is not installed.' }), { cli: name }, { kind: 'conflict' })
     if (task === 'update') {
       if (this.liveSessionCount(id) > 0) throw hiveError(msg({ id: 'service.providers.stopFirst', defaultMessage: 'Stop all running {cli} agents before updating it.', description: 'An error updating the coding agent CLI {cli} ("Codex") while agents run it.' }), { cli: name }, { kind: 'conflict' })
       const pending = this.updateRetries.get(id)
-      if (retryUpdate && (!pending || pending.path !== info.path || pending.version !== info.version)) throw hiveError(msg({ id: 'service.providers.retryUnavailable', defaultMessage: 'This update retry is no longer available. Check again, then try Update.', description: 'Agent Setup error when a user tries to retry an update whose failure is no longer current. Check again and Update are buttons.' }), undefined, { kind: 'conflict' })
+      if (retryUpdate && (!pending || pending.path !== info.path || pending.version !== info.version)) throw hiveError(msg({ id: 'service.providers.retryUnavailable', defaultMessage: 'This update retry is no longer available. Check again, then try Update.', description: 'Provider Setup error when a user tries to retry an update whose failure is no longer current. Check again and Update are buttons.' }), undefined, { kind: 'conflict' })
       if (hasPty(`task:${id}:${task}`)) return `task:${id}:${task}`
       const cmd = retryUpdate ? pending!.retry.command : adapter.updateCommand(info.path)
       const key = this.runTask(id, task, cmd.file, cmd.args, `${name} update`, undefined, shown, (code) => { // i18n-ignore: the task's name in the log
@@ -380,10 +406,12 @@ class ProviderService {
       return key
     }
     if (task === 'login') {
+      // Signed in per connection (HI-1755): its sign-in is Settings → Accounts & Connections', never ~/.claude's.
+      if (connectionsManaged(id)) throw hiveError(msg({ id: 'service.providers.signInConnections', defaultMessage: '{cli} signs in per account: sign in from Settings → Accounts & Connections.', description: 'An error: Provider Setup was asked to sign a coding agent CLI ({cli}: "Claude Code") in, but its logins are accounts (Settings → Accounts & Connections names a section).' }), { cli: name }, { kind: 'conflict' })
       const cmd = adapter.loginCommand(info.path)
       return this.runTask(id, task, cmd.file, cmd.args, `${name} sign-in`, undefined, shown) // i18n-ignore: the task's name in the log
     }
-    if (!adapter.setupCommand) throw hiveError(msg({ id: 'service.providers.noSetup', defaultMessage: '{cli} has no setup task.', description: 'An error: the coding agent CLI {cli} ("Codex") has no setup task for Hive to run.' }), { cli: name })
+    if (!adapter.setupCommand) throw hiveError(msg({ id: 'service.providers.noSetup', defaultMessage: '{cli} has no setup task.', description: 'An error: the coding agent CLI {cli} ("Codex") has no setup task for Hive to run.' }), { cli: name }, { kind: 'invalid' })
     const cmd = adapter.setupCommand(info.path)
     return this.runTask(id, task, cmd.file, cmd.args, `${name} setup`, cmd.keys ? { keys: cmd.keys, ready: cmd.readyPattern, busyTitle: cmd.busyTitle, busyScreen: cmd.busyScreen, done: cmd.done } : undefined, shown)
   }
@@ -391,6 +419,15 @@ class ProviderService {
 
 export const providerService = new ProviderService()
 onLanguageChange(() => providerService.relabel())
+
+// A CLI is checked again when an advanced setting its check depends on changes (ProviderAdapter.locateSettings).
+const locateValues = (): Map<ProviderId, string> => new Map(allProviders().map((p) => [p.id, JSON.stringify((p.locateSettings ?? []).map((id) => advanced.get(id)))]))
+let lastLocateValues = locateValues()
+advanced.onChange(() => {
+  const now = locateValues()
+  for (const [id, v] of now) if (v !== lastLocateValues.get(id) && providerService.info(id).found) void providerService.refresh(id)
+  lastLocateValues = now
+})
 
 // Automatic's default provider (#474) follows what this process found.
 setInstalledCheck((id) => {

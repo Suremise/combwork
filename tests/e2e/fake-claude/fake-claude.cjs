@@ -15,14 +15,17 @@
 //   (1 s, or N seconds for "work N"), and ends with a reply and Stop. "newfield": its UserPromptSubmit carries a
 //   top-level field Claude Code doesn't send (hive_test_new_field: true), as a CLI update adding one would (#698). "edit <file>" first sends PreToolUse for
 //   an Edit of that file and records the tool call. "background N" starts a background command that ends after
-//   N seconds; its task notification then starts a turn by itself, as in Claude Code. "pad N" adds N KB to the
+//   N seconds; its task notification then starts a turn by itself, as in Claude Code. "subagent N" (once or more)
+//   launches a subagent in the background that finishes after N seconds, told the same way (#1584). "pad N" adds N KB to the
 //   transcript. "context N": the reply's request reports N input tokens, so the session's context is about N. "ask" first asks for permission (a permission_prompt Notification), then carries on by itself.
 //   It connects the launch's hive MCP server as it starts (#865: the real server, which tells Hive it has connected);
-//   with fake-mcp-hold-<agent> in its home, only once the test makes fake-mcp-go-<agent>.
+//   with fake-mcp-hold-<agent> in its home, only once the test makes fake-mcp-go-<agent>. With fake-start-hold-<agent>,
+//   its session doesn't start (no SessionStart: Hive sees it starting) until fake-start-go-<agent> (HI-1707: never ready).
 //   "holduntil NAME": the turn doesn't end until the test makes a file NAME in its home (CLAUDE_CONFIG_DIR).
 //   "askwhen NAME": the permission prompt once the test makes a file NAME in its home (#667), not after a set time.
 //   "waitfile NAME" as a step ("waitfile go then hive hive_inbox {}"): the steps after it wait for that file.
-//   "shell: <command line>" runs a command in cmd with the session's environment (fake-shell.jsonl records it).
+//   "shell: <command line>" runs a command in cmd with the session's environment (fake-shell.jsonl records it; its
+//   standard error so far is in its agent's file while it runs, shellStderr.cjs, HI-1816).
 //   "planusage F W": its status line reports the plan's limits as Claude Code's does (rate_limits: the 5-hour at F%,
 //   the weekly at W%), with reset times every session of the machine agrees on (#383).
 //   "linger N" leaves N processes running after it ends, as an agent's preview server or tail -f does (#507): each a
@@ -32,7 +35,8 @@
 //   through the session's hive-progress shim, as a Codex agent once did (#542): cmd → hive-progress → a lingering node
 //   (linger.cjs; its pid in fake-progress-linger.jsonl in its home), and ends its turn once that node runs (#1100: as
 //   an agent's command has started by then; fake-progress-delay-ms.txt in its home (N) starts it N ms late, as under load).
-//   "progress-linger nowait" ends its turn at once, the command still to start (#1134).
+//   "progress-linger nowait" ends its turn at once, the command still to start (#1134). "hidden-linger" leaves one as
+//   "linger 1" does, but its command line names no test folder (HI-2217; its pid in fake-hidden-linger.jsonl).
 //   "devapp" leaves a dev copy of an Electron app running, as an agent's dev launch of Hive did (#614): Electron's
 //   executable with Playwright's --inspect=0 --remote-debugging-port=0 and a copy of devapp in its home (a hidden window; quits after two
 //   minutes, in case), started through a detached node that exits at once (linger.cjs); its pid in fake-devapp.jsonl.
@@ -66,7 +70,8 @@
 //   cache expires: PreCompact (auto), a compaction boundary, and once the test makes fake-idle-compact-done-<agent>,
 //   SessionStart (compact), PostCompact (auto) and "Compacted while idle, before the prompt cache expired";
 //   fake-recap-<agent> makes it write a recap (an away_summary), which sends no hook of Hive's. Each file is taken
-//   (removed) when acted on.
+//   (removed) when acted on. While fake-nohooks-<agent> is in its home it sends no hook and no status line at all, as
+//   when a CLI update broke them or a policy turned them off (#1336); it works on as before.
 // - Turns, as Claude Code 2.1.296 has them (#648): each prompt (and each turn it begins by itself) has its own id, which
 //   its hooks carry (prompt_id); its screen shows a spinner with "esc to interrupt" while it works and "✻ Worked for Ns ·
 //   done H:MM" above its input once done. "latetool": a Read whose PostToolUse reaches Hive after the turn's Stop.
@@ -82,6 +87,13 @@
 //   hook), and the idle notification follows as after a turn. Answered so, it stays on its model and records nothing
 //   (as HB3's stop); "safeguardpromptswitch" is answered "Switch automatically": its record of the flagged request
 //   (model_refusal_fallback, for the session) and the model it switched to (Opus 4.8, or Sonnet 5.5 if on Opus 4.8).
+// - Its offer to teach auto mode, as Claude Code 2.1.312 made it to HB4 (HI-1959): "envsetup": after its turn's Stop,
+//   "Teach auto mode about your environment?" on a cleared screen, with no hook; keys go to it, not the input: Esc puts
+//   it off (its input back, empty), Enter answers it (recorded in fake-envsetup.jsonl). With fake-input-box.txt in its
+//   home at its start, its input is 2.1.312's box (a rule, `❯` and a no-break space, a rule below). "envsetupunder": the
+//   same offer as 2.1.314 draws it (HI-2191), under its input box and footer, the empty box kept above it; "swallow": a
+//   dialog of its own Hive doesn't know ("Choose how long replies are kept?"), drawn and answered the same way. The test making
+//   fake-clear-line-<agent> clears its input line while idle, as that screen took HB4's wake.
 // - Notices (#650), as Claude Code 2.1.296 takes them: context in a PostToolUse or Stop reply reaches "the model", and a
 //   Stop answered with context (or a block) carries the turn on to another Stop with stop_hook_active. Each notice
 //   ("[Hive] …") is logged in fake-notices.jsonl (agent, where, text). With fake-follow-notices.txt in its home (any
@@ -97,6 +109,9 @@
 //   mode its system prompt is in ("# Your mode: <name>", the Hive Assistant's) at the end of its reply. With
 //   fake-resume-draw.json ({ "ms": N }) in CLAUDE_CONFIG_DIR, a resumed session loses each Enter for its first N ms,
 //   keeping what was typed, as Claude Code can while it draws a long conversation.
+// - A prompt with "netdown" ends its turn as Claude Code 2.1.312 does when its API can't be reached after its retries
+//   (HI-1612, tests/fixtures/advanced/stopfailure-connection-claude-2.1.312.json): the ECONNREFUSED message, then a
+//   StopFailure hook (error server_error) instead of Stop.
 // - Ctrl+C twice, or "/exit", ends it with SessionEnd.
 // - With fake-signin.json in CLAUDE_CONFIG_DIR saying { "expired": true } (read each time; one test home, so one sign-in
 //   for all its agents, #309), it acts out an expired sign-in as Claude Code 2.1.291 does: `auth status --json` says
@@ -105,6 +120,9 @@
 //   and carries the failed turn on by itself, as Claude Code did: a tool call (PostToolUse), then the reply and Stop.
 //   With "atLaunch": true as well, it stops before its session starts, as Claude Code 2.1.296 did with an OAuth session
 //   it couldn't refresh: "Failed to authenticate: OAuth session expired and could not be refreshed", exit 1 (#577).
+//   With "late": true instead, nothing shows it until a prompt is sent: the prompt isn't taken (no turn, no hook) and
+//   "Not logged in · Run /login" shows under it, as Claude Code's status line did in #1321.
+// - "/crash" typed in it exits with 1 at once, a CLI crashing by itself (HI-1881's stopped pane says so).
 // - `--model fail-start` makes it refuse to start, printing an error and exiting with 1, as Claude Code does for an
 //   argument it rejects.
 // - `-p --input-format stream-json` answers the Agent SDK's initialize control request with Claude Code 2.1.289's
@@ -118,6 +136,7 @@ const path = require('path')
 const { randomUUID } = require('crypto')
 const { spawn } = require('child_process')
 const { callHiveTool, connectHive, parseHiveStep, isDoorbell, doorbellIsWork, inboxRows } = require('../fake-bridge.cjs')
+const { shellStderrFile } = require('./shellStderr.cjs')
 
 const args = process.argv.slice(2)
 if (args[0] === '--version') {
@@ -138,6 +157,15 @@ function signedOut() {
     return false
   }
 }
+/** The expired sign-in shows only once a prompt is sent, which it doesn't take (fake-signin.json { "expired": true, "late": true }, #1321). */
+function expiredLate() {
+  try {
+    const s = JSON.parse(fs.readFileSync(path.join(process.env.CLAUDE_CONFIG_DIR || '', 'fake-signin.json'), 'utf8'))
+    return s.expired === true && s.late === true
+  } catch {
+    return false
+  }
+}
 /** The expired sign-in stops it at launch (fake-signin.json { "expired": true, "atLaunch": true }, #577). */
 function expiredAtLaunch() {
   try {
@@ -148,6 +176,40 @@ function expiredAtLaunch() {
   }
 }
 // As Claude Code prints it: indented JSON, and exit 1 when it isn't logged in (#577).
+// An account's folder (HI-980: one in an accounts folder; a suite may trust folders in it, fake-trusted.json, as a sign-in would): `auth login` signs it in as fake-login-as.json beside the
+// accounts folder says ({ email, orgId }), writing fake-account.json (and .claude.json, as a sign-in changes it), with no
+// browser; `auth status` answers from fake-account.json, signed out without one.
+const accountHome = process.env.CLAUDE_CONFIG_DIR || ''
+const accountFolder = !!accountHome && path.basename(path.dirname(accountHome)).toLowerCase() === 'accounts'
+if (args[0] === 'auth' && accountFolder) {
+  const file = path.join(accountHome, 'fake-account.json')
+  if (args[1] === 'login') {
+    let as = { email: 'fake@example.com', orgId: 'org-fake' }
+    try {
+      as = JSON.parse(fs.readFileSync(path.join(accountHome, '..', 'fake-login-as.json'), 'utf8'))
+    } catch {
+      // The default identity.
+    }
+    console.log('Opening the browser to sign in… (the fake opens none)')
+    // `hold` (HI-1870): waits for the browser that never comes, until its terminal is closed, signing nothing in.
+    if (as.hold) return void setInterval(() => undefined, 60_000)
+    fs.writeFileSync(file, JSON.stringify(as))
+    fs.writeFileSync(path.join(accountHome, '.claude.json'), JSON.stringify({ oauthAccount: { emailAddress: as.email } }))
+    console.log(`Signed in as ${as.email}`)
+    process.stdout.write('', () => process.exit(0))
+    return
+  }
+  let acct = null
+  try {
+    acct = JSON.parse(fs.readFileSync(file, 'utf8'))
+  } catch {
+    // Signed out.
+  }
+  const base = { authMethod: acct ? 'claude.ai' : 'none', apiProvider: 'firstParty', analyticsDisabled: false, projectsDirectory: path.join(accountHome, 'projects'), configDirectory: accountHome }
+  console.log(JSON.stringify(acct ? { loggedIn: true, ...base, email: acct.email, orgId: acct.orgId, orgName: 'Fake Org', subscriptionType: 'max' } : { loggedIn: false, ...base }, null, 2))
+  process.stdout.write('', () => process.exit(acct ? 0 : 1))
+  return
+}
 if (args[0] === 'auth') {
   const out = signedOut()
   console.log(JSON.stringify(out ? { loggedIn: false, authMethod: 'none' } : { loggedIn: true, authMethod: 'claude.ai' }, null, 2))
@@ -204,7 +266,7 @@ if (!home) {
 }
 
 // Options that take a value, so the first task (the last plain argument) can be told apart.
-const WITH_VALUE = new Set(['--session-id', '--resume', '--name', '--plugin-dir', '--mcp-config', '--settings', '--append-system-prompt-file', '--allowedTools', '--model', '--effort', '--permission-mode', '--system-prompt-snapshot'])
+const WITH_VALUE = new Set(['--session-id', '--resume', '--name', '--plugin-dir', '--mcp-config', '--settings', '--append-system-prompt-file', '--allowedTools', '--model', '--effort', '--permission-mode', '--system-prompt-snapshot', '--add-dir'])
 const opts = {}
 let firstPrompt = ''
 for (let i = 0; i < args.length; i++) {
@@ -238,8 +300,37 @@ function runMode() {
 }
 // What it was started with, for suites that check the launch: the options, Claude Code's own variables and the
 // Agent API token Hive gave it.
-const launchEnv = Object.fromEntries(Object.entries(process.env).filter(([k]) => k.startsWith('CLAUDE_CODE_') || k.startsWith('HIVE_API_TOKEN')))
-fs.appendFileSync(path.join(home, 'fake-launches.jsonl'), JSON.stringify({ cwd: process.cwd(), sessionId, pid: process.pid, parent: process.ppid, opts, env: launchEnv }) + '\n')
+// A server connection's (HI-1772): its ANTHROPIC_* variables too, a dummy key among them (a disposable test log).
+const launchEnv = Object.fromEntries(Object.entries(process.env).filter(([k]) => k.startsWith('CLAUDE_CODE_') || k.startsWith('ANTHROPIC_') || k.startsWith('HIVE_API_TOKEN') || k === 'HIVE_AGENT' || k === 'CLAUDE_CONFIG_DIR'))
+// The agent's own token, as its launch's file held it at the start (HI-2262: the session has the file, never the token
+// in its environment; read now, as the file goes when the run ends). Null without one.
+const launchToken = (() => {
+  try {
+    return process.env.HIVE_API_TOKEN_FILE ? (JSON.parse(fs.readFileSync(process.env.HIVE_API_TOKEN_FILE, 'utf8')).token ?? null) : null
+  } catch {
+    return null
+  }
+})()
+fs.appendFileSync(path.join(home, 'fake-launches.jsonl'), JSON.stringify({ cwd: process.cwd(), sessionId, pid: process.pid, parent: process.ppid, opts, env: launchEnv, token: launchToken }) + '\n')
+// In a connection's folder (HI-1870: its Set Up, or an agent's first launch there): its first-run screens answered at
+// once, as Claude Code records them in the folder's .claude.json (tests/fixtures/advanced/onboarding-claude-2.1.311.jsonl).
+if (accountFolder) {
+  const file = path.join(accountHome, '.claude.json')
+  let j = {}
+  try {
+    j = JSON.parse(fs.readFileSync(file, 'utf8'))
+  } catch {
+    // None yet.
+  }
+  // Run in a folder outside its own (HI-1870: Set Up opened where it isn't trusted yet): its trust question answered Yes,
+  // recorded under the folder's real path as Claude Code does (forward slashes; tests/fixtures/advanced/trust-entry-*).
+  const cwd = fs.realpathSync.native(process.cwd())
+  const here = path.relative(accountHome, cwd).startsWith('..') ? cwd.replace(/\\/g, '/') : null
+  const projects = j.projects ?? {}
+  if (j.hasCompletedOnboarding !== true || (here && projects[here]?.hasTrustDialogAccepted !== true)) {
+    fs.writeFileSync(file, JSON.stringify({ ...j, hasCompletedOnboarding: true, ...(here ? { projects: { ...projects, [here]: { ...projects[here], hasTrustDialogAccepted: true } } } : {}) }))
+  }
+}
 // How it ended, in fake-exits.jsonl in its home (#551): its own exit with the code, or an error it didn't catch (then
 // exit 1, as Node would). A launch with no line there was ended by Ctrl+C, its console closing or a kill.
 const exitLog = (entry) => {
@@ -295,13 +386,65 @@ fs.mkdirSync(path.dirname(transcript), { recursive: true })
 
 /** Writes to its screen; counts the writes, so a busy line can be taken back only if nothing came after it. */
 let writes = 0
-const out = (s) => {
+/**
+ * Whether the idle input box is drawn, the cursor at its line's end (HI-1979): what is written meanwhile goes above it
+ * and the box is drawn again under it, as Claude Code keeps its box at the bottom (a notice written into the box's
+ * rule made two boxes read as one). liftBox and dropBox draw it (set once the input line's layout is known, below).
+ */
+let boxShown = false
+let liftBox = () => ''
+let dropBox = () => ''
+/** Writes as it is, the box or not (what draws the box itself). */
+const rawOut = (s) => {
   writes++
   return process.stdout.write(s)
 }
+const out = (s) => {
+  if (!boxShown) return rawOut(s)
+  rawOut(liftBox())
+  const r = rawOut(s)
+  rawOut(dropBox())
+  // The box drawn again holds the whole line, what was typed and not drawn yet too.
+  undrawn = null
+  return r
+}
+/** The box goes (a prompt sent, a turn begun): what comes next is written where it was, with no box under it. */
+const takeBox = () => {
+  if (!boxShown) return
+  rawOut(liftBox())
+  boxShown = false
+}
 const sleep = (ms) => new Promise((r) => setTimeout(r, ms))
 const now = () => new Date().toISOString()
-const write = (entry) => fs.appendFileSync(transcript, JSON.stringify({ sessionId, cwd, timestamp: now(), ...entry }) + '\n')
+/**
+ * Each entry is chained to the one before by parentUuid, and a user entry carries its turn's promptId (the prompt_id its
+ * hooks send), as Claude Code 2.1.306 writes them: what Hive joins a transcript turn to its hooks by (#1371).
+ */
+let lastUuid = null
+const write = (entry) => {
+  const uuid = entry.uuid ?? randomUUID()
+  const turn = entry.type === 'user' && promptId ? { promptId } : {}
+  fs.appendFileSync(transcript, JSON.stringify({ parentUuid: lastUuid, sessionId, cwd, timestamp: now(), ...turn, ...entry, uuid }) + '\n')
+  lastUuid = uuid
+}
+
+/**
+ * "ratelimited" (HI-1973): its model request refused with a 429 twice, as Claude Code 2.1.312 records each try in its
+ * transcript (a system api_error entry: its try of 10, the wait before the next, the error's status; tests/fixtures/
+ * advanced/retry-claude-2.1.312.jsonl), sending no hook. It waits, as Claude Code does for its retry, until
+ * fake-retried-<agent> is in its home (taken), then goes on with its turn.
+ */
+async function rateLimited() {
+  const error = { message: '429 {"type":"error","error":{"type":"rate_limit_error","message":"Number of request tokens has exceeded your per-minute rate limit"}}', status: 429, formatted: '429 Number of request tokens has exceeded your per-minute rate limit', connection: null, isNetworkDown: false, rateLimits: null, noResponse: null }
+  // Its first wait, then the second try: written apart, as Claude Code's are.
+  for (const [attempt, wait] of [[1, 1000], [2, 600_000]]) {
+    write({ isSidechain: false, type: 'system', subtype: 'api_error', level: 'error', error, retryInMs: wait, retryAttempt: attempt, maxRetries: 10, source: 'request_retry', userType: 'external', entrypoint: 'cli', version: '2.1.312' })
+    if (attempt === 1) await sleep(wait)
+  }
+  const go = path.join(home, `fake-retried-${String(process.env.HIVE_AGENT || 'agent').replace(/[^\w-]/g, '_')}`)
+  while (!fs.existsSync(go)) await sleep(100)
+  fs.rmSync(go, { force: true })
+}
 
 /** The turn under way: each prompt's own id, which its hooks carry (prompt_id), as Claude Code 2.1.296's do (#648). */
 let promptId = null
@@ -321,8 +464,14 @@ const hookFailed = (event, entry) => {
   }
 }
 
+/**
+ * Its hooks are off (#1336: a CLI update that broke them, a managed policy that turned them off): while fake-nohooks-<agent>
+ * is in its home (read at each hook, so a test can turn them off mid-session), no hook is sent, nor its status line.
+ */
+const hooksOff = () => fs.existsSync(path.join(home, `fake-nohooks-${String(process.env.HIVE_AGENT || 'agent').replace(/[^\w-]/g, '_')}`))
+
 async function hook(event, extra = {}) {
-  if (!hookUrl) return null
+  if (!hookUrl || hooksOff()) return null
   try {
     const res = await fetch(hookUrl, {
       method: 'POST',
@@ -406,8 +555,14 @@ function shell(cmd) {
     const p = spawn(process.env.ComSpec || 'cmd.exe', ['/d', '/s', '/c', `"${cmd}"`], { cwd: process.cwd(), env: process.env, windowsVerbatimArguments: true, windowsHide: true })
     let stdout = ''
     let stderr = ''
+    // Its standard error so far, for a test waiting on what a command says before it ends (HI-1816).
+    const live = home ? shellStderrFile(home, process.env.HIVE_AGENT) : null
+    if (live) fs.writeFileSync(live, '')
     p.stdout.on('data', (d) => (stdout += d))
-    p.stderr.on('data', (d) => (stderr += d))
+    p.stderr.on('data', (d) => {
+      stderr += d
+      if (live) fs.appendFileSync(live, d)
+    })
     p.on('close', (code) => {
       if (home) fs.appendFileSync(path.join(home, 'fake-shell.jsonl'), JSON.stringify({ agent: process.env.HIVE_AGENT || 'agent', cmd, code, stdout, stderr }) + '\n')
       resolve()
@@ -446,6 +601,7 @@ let refused = null
 /** Which Enter since its line was begun sent the prompt running now (#664): 1 for the first, null for one not typed. */
 let promptEnter = null
 async function runPrompt(text, enter = null) {
+  takeBox()
   busy = true
   promptEnter = enter
   promptId = randomUUID()
@@ -456,6 +612,15 @@ async function runPrompt(text, enter = null) {
   busyDrawn = writes
   write({ type: 'user', uuid: randomUUID(), message: { role: 'user', content: text } })
   await hook('UserPromptSubmit', { prompt: text, ...(/\bnewfield\b/i.test(text) ? { hive_test_new_field: true } : {}) })
+  if (/\bnetdown\b/i.test(text)) {
+    const said = 'API Error: Connection refused — a firewall or proxy may be blocking it (ECONNREFUSED)'
+    write({ type: 'assistant', requestId: `req_${randomUUID().slice(0, 8)}`, message: { model: '<synthetic>', content: [{ type: 'text', text: said }] }, isApiErrorMessage: true })
+    out(`\r\n● ${said}\r\n`)
+    await hook('StopFailure', { error: 'server_error', last_assistant_message: said })
+    busy = false
+    promptLine()
+    return
+  }
   if (signedOut()) {
     const said = 'Login expired · Please run /login'
     refused = text
@@ -512,6 +677,7 @@ async function runPrompt(text, enter = null) {
       for (const end = Date.now() + 120_000; !fs.existsSync(go) && Date.now() < end; ) await sleep(100)
     }
     for (const m of step.matchAll(/\bskill\s+([a-z0-9][\w-]*)/gi)) readSkill(m[1])
+    for (const m of step.matchAll(/\bskillref\s+([a-z0-9][\w-]*)\s+([\w.-]+\.md)/gi)) readSkillRef(m[1], m[2])
     const move = /\bboardmove\s+(\d+)\s+(\w+)/i.exec(step)
     if (move) await boardPatch(Number(move[1]), { column: move[2].toLowerCase() })
     const review = /\bboardreview\s+(\d+)\s+(\w+)(?:\s+(hold|todo|doing|review|passed|done)\b)?/i.exec(step)
@@ -521,6 +687,7 @@ async function runPrompt(text, enter = null) {
     const call = parseHiveStep(step)
     if (call) await hiveCall(call.tool, call.args)
     if (/\bcheckpoint\b/i.test(step)) await checkpoint()
+    if (/\bratelimited\b/i.test(step)) await rateLimited()
     // "shell: <command line>": runs it in cmd with the session's environment (PATH, HIVE_*), as an agent's shell
     // would; the agent, command, exit code and output go to fake-shell.jsonl in its home.
     const sh = /\bshell:\s*(.+)$/i.exec(step)
@@ -538,8 +705,10 @@ async function runPrompt(text, enter = null) {
   }
   const background = /\bbackground\s+(\d+)/i.exec(text)
   if (background) await startBackgroundTask(Number(background[1]))
+  for (const [k, m] of [...text.matchAll(/\bsubagent\s+(\d+)/gi)].entries()) await startSubagent(Number(m[1]), k + 1)
   const linger = /(?<!-)\blinger\s+(\d+)/i.exec(text)
   if (linger) leaveRunning(Number(linger[1]))
+  if (/\bhidden-linger\b/i.test(text)) leaveUnnamedRunning()
   if (/\bprogress-linger\b/i.test(text)) await leaveProgressRunning(!/\bnowait\b/i.test(text))
   if (/\bdevapp\b/i.test(text)) leaveAppRunning()
   const secs = Number(/\bwork\s+(\d+)/i.exec(text)?.[1] ?? 1)
@@ -557,6 +726,12 @@ async function runPrompt(text, enter = null) {
   if (late) await hook('PreToolUse', late)
   await endTurn(`Done: ${text}${mode}`, Number(/\bcontext\s+(\d+)/i.exec(text)?.[1] ?? 20), /\bloststop\b/i.test(text), { late, carryOn: /\bstopcontinue\b/i.test(text) })
   if (/\bsafeguardprompt(switch)?\b/i.test(text)) await safeguardPrompt(/\bsafeguardpromptswitch\b/i.test(text))
+  if (/\benvsetup\b/i.test(text)) envSetup()
+  if (/\benvsetupunder\b/i.test(text)) envSetup(ENV_SETUP_TITLE)
+  if (/\bswallow\b/i.test(text)) envSetup(SWALLOW_TITLE)
+  // "statusmodel ID": the status line reports the model it runs as ID, as Claude Code's does (HI-1772: a server's model).
+  const statusModel = /\bstatusmodel\s+(\S+)/i.exec(text)
+  if (statusModel) await statusLine({ model: { id: statusModel[1], display_name: statusModel[1] } })
   // "window N": the status line reports a context window of N tokens, as Claude Code's does.
   const contextWindow = /\bwindow\s+(\d+)/i.exec(text)
   if (contextWindow) await statusLine({ context_window: { context_window_size: Number(contextWindow[1]) } })
@@ -564,7 +739,7 @@ async function runPrompt(text, enter = null) {
 
 /** Posts a status line, as Claude Code's statusLine command does (Hive's curl command, with the launch's auth file). */
 async function statusLine(body) {
-  if (!hookUrl) return
+  if (!hookUrl || hooksOff()) return
   await fetch(`${hookUrl}&statusline`, {
     method: 'POST',
     headers: { Authorization: commandAuth(), 'Content-Type': 'application/json' },
@@ -613,6 +788,48 @@ async function safeguardPrompt(switchTo) {
   await hook('Notification', { notification_type: 'permission_prompt', message: 'Claude needs your permission' })
 }
 
+/**
+ * "envsetup": after its turn's Stop it offers to teach auto mode about the environment, as Claude Code 2.1.312 did to
+ * HB4 (HI-1959): its question on a cleared screen, and no hook. While it shows, keys go to it, not to the input: Esc puts
+ * it off (the screen cleared, its input back, empty), Enter answers it (Yes: recorded in fake-envsetup.jsonl, which a
+ * suite checks Hive never does), anything else is taken by it and lost.
+ */
+let envSetupOpen = false
+/** The title of the dialog shown under its input box, while it shows (null: none, or 2.1.312's on a cleared screen). */
+let envSetupUnder = null
+/**
+ * The dialog under its input box and footer, from the box's own row (its cursor there, the box empty) and back to it:
+ * moved back by rows, not saved and restored, as the dialog may scroll the screen (boxBelow's reason).
+ */
+const underDialog = () => `\x1b[2B\r\n${RULE}\r\n  ${envSetupUnder}\r\n\r\n  Auto mode works better when it knows your environment. Takes about a minute.\r\n\r\n  ❯ 1. Yes\r\n    2. Not now\r\n    3. Don't show again\r\n\r\n  Enter to confirm · Esc to cancel\x1b[12A\r\x1b[2C`
+const ENV_SETUP_TITLE = 'Teach auto mode about your environment?'
+/** "swallow" (HI-2191): a dialog of its own Hive doesn't know, drawn as 2.1.314 draws the offer, taking the keys the same way. */
+const SWALLOW_TITLE = 'Choose how long replies are kept?'
+/**
+ * `under`: as Claude Code 2.1.314 draws it (HI-2191, recorded), under its input box and footer, the box (empty) kept above
+ * it; the dialog titled `under`. Otherwise 2.1.312's, on a cleared screen.
+ */
+function envSetup(under = null) {
+  envSetupOpen = true
+  envSetupUnder = under
+  if (under) {
+    rawOut(underDialog())
+    return
+  }
+  // In place of its input box, which the cleared screen takes with it (HI-1979: not drawn back under the question).
+  boxShown = false
+  out("\x1b[2J\x1b[H Teach auto mode about your environment?\r\n\r\n Auto mode works better when it knows your environment. Takes about a minute.\r\n\r\n ❯ 1. Yes\r\n   2. Not now\r\n   3. Don't show again\r\n\r\n Enter to select · ↑/↓ to navigate · Esc to cancel\r\n")
+}
+function envSetupAnswered(answer) {
+  envSetupOpen = false
+  envSetupUnder = null
+  if (home) fs.appendFileSync(path.join(home, 'fake-envsetup.jsonl'), JSON.stringify({ agent: process.env.HIVE_AGENT || 'agent', answer, at: new Date().toISOString() }) + '\n')
+  line = ''
+  enters = 0
+  out('\x1b[2J\x1b[H')
+  promptLine()
+}
+
 /** Reads a Hive skill as Claude Code's Skill tool does, recording the call and its answer in the transcript. */
 function readSkill(name) {
   const id = `toolu_skill_${randomUUID().slice(0, 8)}`
@@ -620,6 +837,23 @@ function readSkill(name) {
   const text = opts['--plugin-dir'] && fs.existsSync(file) ? fs.readFileSync(file, 'utf8') : null
   write({ type: 'assistant', requestId: `req_${id}`, message: { model, content: [{ type: 'tool_use', id, name: 'Skill', input: { skill: `hive:${name}` } }], usage: { input_tokens: 10, output_tokens: 5 } } })
   write({ type: 'user', message: { role: 'user', content: [{ type: 'tool_result', tool_use_id: id, content: text ?? `Unknown skill: hive:${name}`, is_error: text === null }] } })
+}
+
+/**
+ * Follows a skill's link to one of its reference files (HI-2011), as Claude Code does: the link found in the delivered
+ * SKILL.md, resolved against the skill's folder, and the file read with the Read tool (lines numbered, as Read shows
+ * them). A SKILL.md without that link reads nothing there: the read fails, as a link that isn't there would.
+ */
+function readSkillRef(name, file) {
+  const id = `toolu_ref_${randomUUID().slice(0, 8)}`
+  const dir = path.join(opts['--plugin-dir'] ?? '', 'skills', name)
+  const skill = opts['--plugin-dir'] && fs.existsSync(path.join(dir, 'SKILL.md')) ? fs.readFileSync(path.join(dir, 'SKILL.md'), 'utf8') : ''
+  const linked = skill.includes(`](${file})`) || skill.includes(`](./${file})`)
+  const target = linked ? path.resolve(dir, file) : path.join(dir, `no-link-to-${file}`)
+  const text = fs.existsSync(target) ? fs.readFileSync(target, 'utf8') : null
+  write({ type: 'assistant', requestId: `req_${id}`, message: { model, content: [{ type: 'tool_use', id, name: 'Read', input: { file_path: target } }], usage: { input_tokens: 10, output_tokens: 5 } } })
+  const numbered = text === null ? `File does not exist: ${target}` : text.split(/\r?\n/).map((l, i) => `${String(i + 1).padStart(6)}\t${l}`).join('\n')
+  write({ type: 'user', message: { role: 'user', content: [{ type: 'tool_result', tool_use_id: id, content: numbered, is_error: text === null }] } })
 }
 
 /** Calls a hive tool through the launch's own hive MCP server; the call and its reply go in the transcript. */
@@ -750,6 +984,14 @@ function take(name) {
 /** What Claude Code does by itself while idle (#612): a compaction before the prompt cache expires, and a recap. */
 async function whileIdle() {
   if (busy) return
+  // fake-clear-line-<agent>: its input line goes, as when a screen of Claude Code's took it (HI-1959: the offer to teach
+  // auto mode ate HB4's wake), its input drawn back empty.
+  if (take('fake-clear-line')) {
+    line = ''
+    enters = 0
+    out('\x1b[2J\x1b[H')
+    promptLine()
+  }
   if (take('fake-recap')) {
     write({ type: 'system', subtype: 'away_summary', content: 'The fake did its turns. (disable recaps in /config)', isMeta: false })
     out('\r\n※ recap: the fake did its turns.\r\n')
@@ -792,18 +1034,71 @@ async function startBackgroundTask(secs) {
     promptId = randomUUID()
     turnStarted = Date.now()
     const note = `<task-notification>\n<task-id>${task}</task-id>\n<tool-use-id>${id}</tool-use-id>\n<status>completed</status>\n<summary>Background command "Run the tests" completed (exit code 0)</summary>\n</task-notification>`
-    write({ type: 'user', message: { role: 'user', content: note } })
+    write({ type: 'user', origin: { kind: 'task-notification' }, promptSource: 'system', message: { role: 'user', content: note } })
     await hook('UserPromptSubmit', { prompt: note })
     await sleep(1500)
     await endTurn(`The background task ${task} has finished.`)
   }, secs * 1000)
 }
 
+/**
+ * A subagent the Agent tool runs in the background for `secs` seconds (#1584), recorded as Claude Code 2.1 records one
+ * (an `async_launched` result with its agentId). Its end is told as a background command's is: a notification that
+ * starts a turn by itself.
+ */
+async function startSubagent(secs, k) {
+  const id = `toolu_${randomUUID().slice(0, 8)}`
+  const agentId = `a${randomUUID().replace(/-/g, '').slice(0, 16)}`
+  const description = `Review part ${k}`
+  const input = { description, prompt: 'Review the change.', subagent_type: 'general-purpose', run_in_background: true }
+  await hook('PreToolUse', { tool_name: 'Agent', tool_input: input, tool_use_id: id })
+  write({ type: 'assistant', requestId: `req_${id}`, message: { model, content: [{ type: 'tool_use', id, name: 'Agent', input }], usage: { input_tokens: 10, output_tokens: 5 } } })
+  write({ type: 'user', message: { role: 'user', content: [{ type: 'tool_result', tool_use_id: id, content: [{ type: 'text', text: `Async agent launched successfully.\nagentId: ${agentId}` }] }] }, toolUseResult: { isAsync: true, status: 'async_launched', agentId, description, resolvedModel: model, prompt: input.prompt, canContinueAgent: true } })
+  await hook('PostToolUse', { tool_name: 'Agent', tool_input: input, tool_use_id: id })
+  setTimeout(async () => {
+    for (let i = 0; i < 600 && isBusy(); i++) await sleep(200)
+    busy = true
+    promptId = randomUUID()
+    turnStarted = Date.now()
+    const note = `<task-notification>\n<task-id>${agentId}</task-id>\n<tool-use-id>${id}</tool-use-id>\n<status>completed</status>\n<summary>Agent "${description}" finished</summary>\n</task-notification>`
+    write({ type: 'queue-operation', operation: 'enqueue', content: note })
+    write({ type: 'user', origin: { kind: 'task-notification' }, promptSource: 'system', message: { role: 'user', content: note } })
+    await hook('UserPromptSubmit', { prompt: note })
+    await sleep(1500)
+    await endTurn(`The subagent ${description} has finished.`)
+  }, secs * 1000)
+}
+
 // Its input and its footer, as Claude Code 2.1.296 marks them (no taller than the fake's prompt before #648).
-const promptLine = () => out('\r\n❯ \r\n  ? for shortcuts\r\n')
-/** While it works: its spinner, then its input and footer below (BUSY_LINES lines down from where it starts). */
-const BUSY = '\r\n✻ Brewing… (esc to interrupt)\r\n❯ \r\n  ? for shortcuts\r\n'
-const BUSY_LINES = 4
+/**
+ * Its input is Claude Code 2.1.312's box (HI-1959; by default since HI-1979, as the real CLI draws it): a rule, `❯`
+ * and a no-break space, the line typed after it, and a rule and its footer below (drawn back after the line changes).
+ * With fake-plain-prompt.txt in its home at its start, `❯ ` on its own, as before.
+ */
+const inputBox = !(home && fs.existsSync(path.join(home, 'fake-plain-prompt.txt')))
+/**
+ * Whether what is typed goes into the box now (HI-1979): while it works, typing goes after its busy lines, as before
+ * (the box under its spinner stays as drawn), so the box is drawn round the line only while it is idle.
+ */
+const boxed = () => inputBox && !busy
+const RULE = '─'.repeat(40)
+/**
+ * The box's rule and footer under its line, the cursor taken back to where the line ends (`col`, its cells on its last
+ * row): moved back two rows rather than saved and restored, as a line feed at the bottom of the screen scrolls it,
+ * and a restored place is then a row lower (HI-1979: a box at the bottom left its rule and footer behind).
+ */
+const boxBelow = (col = lineEnd()) => `\r\n${RULE}\r\n  ? for shortcuts\x1b[2A\r${col > 0 ? `\x1b[${col}C` : ''}`
+const promptLine = () => {
+  // One box: one already shown goes first (HI-1979: an idle compaction's end drew a second over it).
+  takeBox()
+  rawOut(inputBox ? `\r\n${RULE}\r\n❯ ${boxBelow(2)}` : '\r\n❯ \r\n  ? for shortcuts\r\n')
+  boxShown = inputBox
+  // Its dialog under the box (HI-2191, as 2.1.314 draws it) stays under it.
+  if (inputBox && envSetupUnder) rawOut(underDialog())
+}
+/** While it works: its spinner, then its input (the box, empty: HI-1979) and footer below (BUSY_LINES lines down from where it starts). */
+const BUSY = inputBox ? `\r\n✻ Brewing… (esc to interrupt)\r\n${RULE}\r\n❯ \r\n${RULE}\r\n  ? for shortcuts\r\n` : '\r\n✻ Brewing… (esc to interrupt)\r\n❯ \r\n  ? for shortcuts\r\n'
+const BUSY_LINES = inputBox ? 6 : 4
 /** The write after which the busy lines were drawn (taken back at the turn's end only if nothing came since). */
 let busyDrawn = -1
 
@@ -893,22 +1188,105 @@ function drawTrust() {
   out(`\r\nQuick safety check: Do you trust the files in ${cwd}?\r\n ${trustMenu.on === 'No' ? '>' : ' '} No, exit\r\n ${trustMenu.on === 'Yes' ? '>' : ' '} Yes, I trust this folder\r\n Enter to confirm · Esc to cancel\r\n`)
 }
 let ctrlC = 0
+/**
+ * A character's cells as a terminal draws it (HI-1974, HR6's round 1): two for East Asian wide and full-width ones and
+ * pictographs, none for joiners, variation selectors and combining marks, one for the rest.
+ */
+const cells = (ch) => (/\p{M}|\u200d|[\ufe00-\ufe0f]/u.test(ch) ? 0 : /[\u1100-\u115f\u2e80-\u303e\u3041-\u33ff\u3400-\u4dbf\u4e00-\u9fff\ua000-\ua4cf\uac00-\ud7a3\uf900-\ufaff\ufe30-\ufe4f\uff00-\uff60\uffe0-\uffe6]|\p{Extended_Pictographic}/u.test(ch) ? 2 : 1)
+/**
+ * The input line on the screen's rows, each its characters, as the terminal wraps it: at its width by each character's
+ * cells (one that doesn't fit begins the next row) and at its line breaks; begun after the box's `❯ ` (inputBox), else
+ * at the row's start.
+ */
+const lineLayout = () => {
+  const cols = process.stdout.columns || 80
+  const rows = [[]]
+  let x = boxed() ? 2 : 0
+  for (const ch of line) {
+    if (ch === '\n') {
+      rows.push([])
+      x = 0
+      continue
+    }
+    const w = cells(ch)
+    if (x + w > cols) {
+      rows.push([])
+      x = 0
+    }
+    rows[rows.length - 1].push(ch)
+    x += w
+  }
+  return rows
+}
+/** The screen rows the input line takes (lineLayout). */
+const lineRows = () => lineLayout().length
+/** The column where the input line ends on its last row (lineLayout): what boxBelow takes the cursor back to. */
+const lineEnd = () => {
+  const rows = lineLayout()
+  const cells0 = rows.length === 1 && boxed() ? 2 : 0
+  return Math.min((process.stdout.columns || 80) - 1, cells0 + rows[rows.length - 1].reduce((n, ch) => n + cells(ch), 0))
+}
+/**
+ * Draws the input line again (after a key took some of it back), from its first row: `rows`, the rows it took before.
+ * In the box, from its top rule, as Claude Code draws its whole box again (HI-1979: a draft taller than the screen
+ * scrolled the rule off, and the box drawn back without it could never be read again).
+ */
+const redrawLine = (rows) => {
+  const box = boxed()
+  const up = rows - 1 + (box ? 1 : 0)
+  rawOut(`\r${up > 0 ? `\x1b[${up}A` : ''}\x1b[J${box ? `${RULE}\r\n❯ ` : ''}${line.replace(/\n/g, '\r\n')}${box ? boxBelow() : ''}`)
+  boxShown = box
+}
+liftBox = () => `\r\x1b[${lineRows()}A\x1b[J`
+dropBox = () => `\r\n${RULE}\r\n❯ ${line.replace(/\n/g, '\r\n')}${boxBelow()}`
+/** In the box (inputBox): the rows its line took as last drawn, while what was typed since isn't drawn yet. */
+let undrawn = null
+/** Draws what was typed into the box since it was last drawn (a read's end, or a key that changes the line otherwise). */
+const drawTyped = () => {
+  if (undrawn === null) return
+  const rows = undrawn
+  undrawn = null
+  redrawLine(rows)
+}
+/** Inside a bracketed paste, which can come in several reads. */
+let inPaste = false
+/** fake-log-input.txt in its home at its start: each read of its input, as it came, goes into fake-input.jsonl there (#1286). */
+const inputLog = home && fs.existsSync(path.join(home, 'fake-log-input.txt')) ? path.join(home, 'fake-input.jsonl') : null
 if (process.stdin.isTTY) process.stdin.setRawMode(true)
 process.stdin.setEncoding('utf8')
 process.stdin.on('data', (data) => {
   lastInput = Date.now()
+  if (inputLog) fs.appendFileSync(inputLog, JSON.stringify({ agent: process.env.HIVE_AGENT || 'agent', data, at: new Date().toISOString() }) + '\n')
   // Down or Up in the trust menu moves its choice (two choices).
   if (trustMenu)
     for (const _ of data.matchAll(/\x1b\[[AB]/g)) {
       trustMenu.on = trustMenu.on === 'No' ? 'Yes' : 'No'
       drawTrust()
     }
-  const chars = data.replace(/\x1b\[[0-9;?]*[ -/]*[@-~]/g, '')
+  // A bracketed paste's start and end stay as a mark each (private-use characters): what is between them is text.
+  const chars = data.replace(/\x1b\[[0-9;?]*[ -/]*[@-~]/g, (m) => (m === '\x1b[200~' ? '\ue000' : m === '\x1b[201~' ? '\ue001' : ''))
   // The read after a slow spell (#597): several characters, not a bracketed paste, are a paste, as in Claude Code.
   const pasted = slowRead && chars.length > 1 && !data.includes('\x1b[200~')
   slowRead = false
   if (pasted && /[\x15\r]/.test(chars)) lostEnters++
   for (const ch of chars) {
+    if (ch === '\ue000' || ch === '\ue001') {
+      inPaste = ch === '\ue000'
+      continue
+    }
+    // Its offer to teach auto mode on screen (HI-1959): Esc puts it off, Enter answers it, the rest it takes.
+    if (envSetupOpen) {
+      if (ch === '\x1b') envSetupAnswered('later')
+      else if (ch === '\r' && !inPaste) envSetupAnswered('accept')
+      continue
+    }
+    // A line break or tab in a bracketed paste is text, as in Claude Code: the line keeps it (#1286).
+    if (inPaste && (ch === '\r' || ch === '\n' || ch === '\t')) {
+      if (boxed() && undrawn === null) undrawn = lineRows()
+      line += ch === '\t' ? ch : '\n'
+      if (!boxed()) out(ch === '\t' ? ch : '\r\n')
+      continue
+    }
     // A Ctrl+U or an Enter in a paste is text: nothing is cleared or sent.
     if (pasted && (ch === '\x15' || ch === '\r')) continue
     if (ch === '\x03') {
@@ -916,11 +1294,19 @@ process.stdin.on('data', (data) => {
       continue
     }
     ctrlC = 0
+    // Any other key draws what was typed into the box first.
+    if (ch < ' ') drawTyped()
     // What is typed shows on its input line, as in Claude Code (a pasted image's path too, #195).
     if (ch === '\x15') {
-      if (line) out('\r\x1b[K')
-      line = ''
-      enters = 0
+      // Only the screen row the cursor is on goes, as in Claude Code 2.1.312 (HI-1974: a narrow pane kept a stopped
+      // wake's first rows, sent with the next): the rows before it stay. At a row begun by a line break, that break goes.
+      if (line) {
+        const rows = lineRows()
+        const last = lineLayout().at(-1)
+        line = last.length ? [...line].slice(0, -last.length).join('') : line.slice(0, -1)
+        redrawLine(rows)
+      }
+      if (!line) enters = 0
     } else if ((ch === '\r' || ch === '\n') && !onEnter && Date.now() < drawingUntil) {
       // Still drawing the resumed conversation: the Enter is lost, what was typed stays on the line (#334).
       continue
@@ -934,9 +1320,17 @@ process.stdin.on('data', (data) => {
         lostEnters--
         continue
       }
+      // Signed out, shown late (#1321): a prompt isn't sent; its status line says so under the line, which stays as typed.
+      if (!onEnter && line.trim() && !line.trim().startsWith('/') && expiredLate()) {
+        out(`\r\n  Not logged in · Run /login\r\n> ${line}`)
+        continue
+      }
       const text = line.trim()
       const enter = enters
-      if (line) out('\r\n')
+      // Sent, the box goes from its top rule (HI-1979): an old one left on screen with its prompt would be read as the
+      // input, as Claude Code's isn't. The prompt shows in the conversation (runPrompt), as before.
+      if (line && boxShown) takeBox()
+      else if (line) out('\r\n')
       line = ''
       enters = 0
       if (onEnter) {
@@ -944,6 +1338,8 @@ process.stdin.on('data', (data) => {
         onEnter = null
         f()
       } else if (text === '/exit') void quit()
+      // A crash, for its stopped pane's "exited with code 1" (HI-1881): not a command Claude Code has.
+      else if (text === '/crash') process.exit(1)
       // /rename: the session's name, as Claude Code keeps it (no hook; Hive sees it in the transcript).
       else if ((text === '/compact' || text.startsWith('/compact ')) && !busy) void compact(text.slice(8).trim())
       else if (text === '/login' && !busy) void login()
@@ -955,19 +1351,30 @@ process.stdin.on('data', (data) => {
       // A prompt sent while it is busy (a turn, a compaction) is dropped: recorded in fake-dropped.jsonl in its home (#725).
       else if (text && home) fs.appendFileSync(path.join(home, 'fake-dropped.jsonl'), JSON.stringify({ agent: process.env.HIVE_AGENT || 'agent', text: text.slice(0, 200), at: new Date().toISOString() }) + '\n')
     } else if (ch === '\x7f' || ch === '\b') {
-      if (line) out('\b \b')
-      line = line.slice(0, -1)
+      // One character, however wide it is drawn or whichever row it is on, as in Claude Code 2.1.312 (HI-1974).
+      if (line) {
+        const rows = lineRows()
+        line = [...line].slice(0, -1).join('')
+        redrawLine(rows)
+      }
     } else if (ch >= ' ') {
       if (!line) enters = 0
+      if (boxed() && undrawn === null) undrawn = lineRows()
       line += ch
-      out(ch)
+      if (!boxed()) out(ch)
     }
   }
+  drawTyped()
 })
 
 /** "linger N": N processes left running after it ends (linger.cjs), started through one that exits at once. */
 function leaveRunning(n) {
   for (let i = 0; i < n; i++) spawn(process.execPath, [path.join(__dirname, 'linger.cjs'), 'starter', path.join(home, 'fake-linger.jsonl'), process.env.HIVE_AGENT || 'agent'], { detached: true, stdio: 'ignore', windowsHide: true }).unref()
+}
+
+/** "hidden-linger": one process left running as "linger 1" leaves it, but naming no test folder (HI-2217; fake-hidden-linger.jsonl). */
+function leaveUnnamedRunning() {
+  spawn(process.execPath, [path.join(__dirname, 'linger.cjs'), 'unnamed-starter', path.join(home, 'fake-hidden-linger.jsonl'), process.env.HIVE_AGENT || 'agent'], { detached: true, stdio: 'ignore', windowsHide: true }).unref()
 }
 
 /** "devapp": a dev copy of an Electron app left running (devapp/main.js), started through one that exits at once (#614). */
@@ -1041,6 +1448,7 @@ async function main() {
       })()
     : null
   void connectHive(hive, held)
+  if (take('fake-start-hold')) while (!take('fake-start-go')) await sleep(100)
   await sessionStart(opts['--resume'] ? 'resume' : 'startup')
   promptLine()
   setInterval(() => void whileIdle(), 200)

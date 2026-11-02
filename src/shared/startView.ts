@@ -6,6 +6,7 @@
  */
 
 import { utf8Bytes as bytes } from './metrics'
+import { cardRef } from './projectKeys'
 
 /** The view's most, in UTF-8 bytes: about 2,200 tokens at four bytes a token (#989: ~2–3k tokens). */
 export const START_VIEW_MAX_BYTES = 9000
@@ -116,11 +117,11 @@ const clip = (s: string, n: number, maxBytes = Infinity): string => {
 const COLUMN: Record<string, string> = { todo: 'Todo', doing: 'Doing', review: 'Review', passed: 'Passed', hold: 'On hold', done: 'Done' }
 const columnName = (c: string): string => COLUMN[c] ?? c
 
-const cardLine = (c: ViewCard): string => `- #${c.number} ${columnName(c.column)} · ${c.project}${c.agent ? ` · ${c.agent}` : ''}${c.reviewer ? `, reviewed by ${c.reviewer}` : ''}: ${clip(c.title, TITLE)}`
+const cardLine = (c: ViewCard): string => `- ${cardRef(c.number)} ${columnName(c.column)} · ${c.project}${c.agent ? ` · ${c.agent}` : ''}${c.reviewer ? `, reviewed by ${c.reviewer}` : ''}: ${clip(c.title, TITLE)}`
 
 const entryLine = (e: ViewEntry): string => `- #${e.id} ${e.at.slice(0, 10)} ${e.kind}${e.project ? ` (${e.project})` : ''}${e.importance >= 2 ? ' !' : ''}: ${clip(e.summary, SUMMARY)}`
 
-const laneLine = (l: ViewLane): string => `- ${l.builder}${l.reviewer ? `/${l.reviewer}` : ''} (${l.project}): ${l.state === 'paused' && l.pausedOn ? `paused on #${l.pausedOn}` : l.current ? `on #${l.current}, ${l.state}` : l.state}`
+const laneLine = (l: ViewLane): string => `- ${l.builder}${l.reviewer ? `/${l.reviewer}` : ''} (${l.project}): ${l.state === 'paused' && l.pausedOn ? `paused on ${cardRef(l.pausedOn)}` : l.current ? `on ${cardRef(l.current)}, ${l.state}` : l.state}`
 
 interface Section {
   title: string
@@ -147,7 +148,7 @@ export function startView(v: StartViewInput): string {
   const head = `[Hive] Where things stand, ${why} (${when}): a snapshot from the board, lanes, agents and your journal. Check the live state before acting on it.`
   const foot = 'More with hive_journal_recall (small first; hive_journal_entry for one in full): the journal skill says how.'
 
-  const cards = v.blocked.map((c) => ({ hold: c.column === 'hold', line: `- #${c.number} (${c.project}, ${columnName(c.column)}${c.agent ? `, ${c.agent}` : ''}) blocked: ${clip(c.blocked ?? '', REASON)}` }))
+  const cards = v.blocked.map((c) => ({ hold: c.column === 'hold', line: `- ${cardRef(c.number)} (${c.project}, ${columnName(c.column)}${c.agent ? `, ${c.agent}` : ''}) blocked: ${clip(c.blocked ?? '', REASON)}` }))
   const asking = v.agents.filter((a) => a.status === 'waiting' || a.status === 'signin').map((a) => ({ hold: false, line: `- ${a.name} (${a.project}) ${a.status === 'signin' ? 'needs signing in' : 'waits for the user'}${a.asking ? `: ${clip(a.asking, REASON)}` : ''}` }))
   // Within its cap, as it always was (#1078: a small board's view doesn't change); past it, agents asking now first, then
   // blocked cards by urgency, the most recently changed first within each.

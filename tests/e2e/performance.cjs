@@ -29,8 +29,10 @@ const timed = (count, ms) => {
 }
 const apiSeries = (route, role, outcome, count, ms = 8) => ({ route, method: route.includes(':n') ? 'GET' : 'GET', role, outcome, ...timed(count, ms), requestBytes: count * 20, responseBytes: count * 900 })
 const mcpSeries = (tool, count, chars) => ({ tool, role: 'agent', mode: 'compact', outcome: 'ok', ...timed(count, 4), chars: count * chars, bytes: count * chars })
-const launch = (provider, launches) => ({ provider, role: 'agent', launches, guidanceBytes: launches * 3000, guidanceChars: launches * 3000, customBytes: 0, customChars: 0, roleBytes: 0, roleChars: 0, modeBytes: 0, modeChars: 0, skills: launches * 6, skillCatalogBytes: launches * 1200, skillBytes: launches * 40000, skillsNotDelivered: 0, skillsUnmeasured: 0 })
-const part = (api = [], mcp = [], guidance = []) => ({ api: Object.fromEntries(api.map((s, i) => [String(i), s])), mcp: Object.fromEntries(mcp.map((s, i) => [String(i), s])), guidance: Object.fromEntries(guidance.map((s, i) => [String(i), s])), catalog: {} })
+const launch = (provider, launches) => ({ provider, role: 'agent', workflow: 'builder', launches, guidanceBytes: launches * 3000, guidanceChars: launches * 3000, customBytes: 0, customChars: 0, roleBytes: 0, roleChars: 0, modeBytes: 0, modeChars: 0, skills: launches * 6, skillCatalogBytes: launches * 1200, skillBytes: launches * 40000, skillsNotDelivered: 0, skillsUnmeasured: 0 })
+const part = (api = [], mcp = [], guidance = [], catalog = []) => ({ api: Object.fromEntries(api.map((s, i) => [String(i), s])), mcp: Object.fromEntries(mcp.map((s, i) => [String(i), s])), guidance: Object.fromEntries(guidance.map((s, i) => [String(i), s])), catalog: Object.fromEntries(catalog.map((s, i) => [String(i), s])) })
+// Two builder starts' tool lists (HI-2063): 50,000 characters a start, 20,000 of them descriptions and 8,000 parameters'.
+const toolList = { role: 'agent', workflow: 'builder', starts: 2, tools: 80, toolsBytes: 102000, toolsChars: 100000, charStarts: 2, partStarts: 2, partToolsChars: 100000, descriptionChars: 40000, paramChars: 16000 }
 const now = Date.now()
 const hourStart = (t) => Math.floor(t / HOUR) * HOUR
 const bucket = (start, projects, workspace = part()) => ({ start, span: 'hour', projects, workspace, skills: { scans: timed(3, 40), sharedScans: 1, hits: 30, misses: 4, invalidations: 1, tooLarge: 0, files: 40, bytes: 120000, headerBytes: 4000, entries: 60 }, dropped: 0, droppedBy: {} })
@@ -39,7 +41,7 @@ const MORE_TOOLS = ['hive_list_projects', 'hive_project_status', 'hive_session_u
 const buckets = [
   // …and one request past the histogram's last bound (> 10 s), so latency sorts meet an overflow (#305).
   bucket(hourStart(now - 3 * 24 * HOUR), { alpha: part([apiSeries('/v1/tasks', 'agent', 'ok', 100), apiSeries('/v1/projects', 'agent', 'ok', 1, 20000)], MORE_TOOLS.map((t, i) => mcpSeries(t, 1, 100 + i))) }),
-  bucket(hourStart(now - 5 * HOUR), { alpha: part([apiSeries('/v1/tasks', 'agent', 'ok', 20), apiSeries('/v1/tasks/:n', 'agent', 'server-error', 3, 300)], [mcpSeries('hive_list_tasks', 10, 600), mcpSeries('hive_read_task', 4, 2500)], [launch('claude-code', 2)]) }),
+  bucket(hourStart(now - 5 * HOUR), { alpha: part([apiSeries('/v1/tasks', 'agent', 'ok', 20), apiSeries('/v1/tasks/:n', 'agent', 'server-error', 3, 300)], [mcpSeries('hive_list_tasks', 10, 600), mcpSeries('hive_read_task', 4, 2500)], [launch('claude-code', 2)], [toolList]) }),
   bucket(hourStart(now - 1 * HOUR), { alpha: part([apiSeries('/v1/tasks', 'agent', 'ok', 7)]), beta: part([apiSeries('/v1/tasks', 'agent', 'ok', 12)], [mcpSeries('hive_list_tasks', 2, 600)], [launch('codex', 1)]) }, part([apiSeries('/v1/tasks', 'api', 'ok', 5)]))
 ]
 fs.mkdirSync(path.join(ws, '.hive', 'metrics'), { recursive: true })
@@ -138,6 +140,11 @@ const check = (name, ok, extra = '') => {
   check('…then fewest first: the Assistant’s one', (await usageWho()) === 'Assistant,Agents', await usageWho())
   await usage.locator('th button', { hasText: 'Sessions' }).click()
   check('the guidance table has each part', /Core\|Project\|Role\|Mode/i.test((await page.locator('.table-wrap th').allInnerTexts()).join('|')), (await page.locator('.table-wrap th').allInnerTexts()).join('|'))
+  const guidanceTable = page.locator('.performance-page:visible .table-wrap', { has: page.locator('th', { hasText: 'Core' }) }).filter({ has: page.locator('th', { hasText: 'Workflow role' }) })
+  const toolTable = page.locator('.performance-page:visible .table-wrap', { has: page.locator('th', { hasText: 'Descriptions' }) })
+  const toolRow = async () => ((await toolTable.locator('tbody tr').allInnerTexts()).join('|')).replace(/\s+/g, ' ')
+  check('the Hive tool list a start, by workflow role, in its parts (HI-2063)', (await toolTable.count()) === 1 && /Builder 2 40 50,000 20,000 8,000 22,000/.test(await toolRow()), await toolRow())
+  check('…and each launch’s workflow role (HI-2049)', (await guidanceTable.count()) === 1 && (await guidanceTable.locator('tbody tr', { hasText: 'Builder' }).count()) >= 1, (await page.locator('.table-wrap th').allInnerTexts()).join('|'))
   check('cancelled requests are shown apart from failures', /cancelled/.test(await page.locator('.performance-page:visible .card', { hasText: 'API requests' }).innerText()))
   await shot('wide-dark')
 

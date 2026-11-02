@@ -25,6 +25,7 @@ const { extraArgsProblem } = await import('../../src/shared/providers')
 const { capturedText, englishError, errorData, errorText, HiveError, hiveError, shownError, windowError } = await import('../../src/main/hiveError')
 const { addedForAgents, apiErrorReply, entryForAgents, metricsForAgents, replyText } = await import('../../src/main/servers')
 const { registerIpc } = await import('../../src/main/ipc')
+const { config } = await import('../../src/main/config')
 const { createWorkspaceService, disposeWorkspaceService } = await import('../../src/main/workspace')
 
 const ROOT = resolve(__dirname, '../..')
@@ -113,7 +114,12 @@ describe('IPC (#845)', () => {
       const call = (channel: string, ...args: unknown[]): Promise<unknown> => handlers.get(channel)!({ sender: {}, senderFrame: { parent: null } }, ...args)
       setLanguage('de', GERMAN)
       await expect(call('lanes:end', '')).rejects.toThrow(/^Welche Spur beendet werden soll, fehlt$/)
-      await expect(call('project:updateConfig', ws.path, { providers: { 'claude-code': { extraArgs: '--x -- y' } } })).rejects.toThrow(GERMAN['agents.provider.extraArgsDashes'])
+      // A connection's extra arguments (HI-2122: a project has none of its own).
+      config.update((c) => {
+        c.accounts = [{ id: 'acc-x', provider: 'claude-code', kind: 'signIn', name: 'X', createdAt: '' }]
+        c.connections = [{ id: 'c-x', account: 'acc-x', name: 'X' }]
+      })
+      await expect(call('connection:update', 'c-x', { extraArgs: '--x -- y' })).rejects.toThrow(GERMAN['agents.provider.extraArgsDashes'])
       setLanguage('en', {})
       await expect(call('lanes:end', '')).rejects.toThrow(/^Which lane to end is required$/)
       // Not a HiveError (the workspace's own, until E10f converts it): passed on as it is.

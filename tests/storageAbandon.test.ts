@@ -45,7 +45,15 @@ vi.mock('../src/main/workspace', () => ({
     assistantHome,
     listProjectPaths: async () => [...projects.keys()],
     projectConfig: async (p: string) => ({ agents: [{ id: 'tree', name: 'Tree', worktree: { path: projects.get(p) } }] })
-  }
+  },
+  workspaceOf: () => ({ worktreesRoot: join(base, 'worktrees') }),
+  // windows.ts sets it at load: storage reaches it through unusedWorktrees → … → progressService
+  setWorkspaceFallback: () => {}
+}))
+// A 0.9 board (#1451): no slots, so each agent's 0.9 worktree is what is measured.
+vi.mock('../src/main/agentFolders', async (original) => ({
+  ...(await original<typeof import('../src/main/agentFolders')>()),
+  folderFacts: async (projectPath: string) => ({ projectPath, migrated: false, migratedAgents: [], homes: [], slots: [] })
 }))
 
 const { StorageStopped, abandonStorage, abandonWindowStorage, projectStorage, workspaceStorage } = await import('../src/main/storage')

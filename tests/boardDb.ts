@@ -1,6 +1,8 @@
 // The board's cards as tests read and change them by hand (#1017): in the workspace's database, as Hive keeps them now.
 import { DatabaseSync } from 'node:sqlite'
-import { boardChanged, boardFile, boardWrite, cardDoc, deleteCard, putCard } from '../src/main/boardStore'
+import { BOARD_MIGRATIONS, boardChanged, boardFile, boardWrite, cardDoc, deleteCard, putCard } from '../src/main/boardStore'
+import { composeCard, decomposeCard, readCardRows, writeCardRows } from '../src/main/schema/cardRows'
+import { CARDS_STEP } from '../src/main/schema/v1_0'
 import type { WorkspaceService } from '../src/main/workspace'
 
 /** A card's document as saved (what its file held before 0.9); throws when there is no such card. */
@@ -39,7 +41,48 @@ export function removeCard(ws: WorkspaceService, n: number): Promise<void> {
 export function writeCardOutside(workspacePath: string, n: number, doc: Record<string, unknown>): void {
   const db = new DatabaseSync(boardFile(workspacePath), { timeout: 5000 })
   try {
-    db.prepare('INSERT INTO cards (number, doc) VALUES (?, ?) ON CONFLICT(number) DO UPDATE SET doc = excluded.doc').run(n, JSON.stringify(doc))
+    db.exec('PRAGMA foreign_keys = ON')
+    db.exec('BEGIN IMMEDIATE')
+    writeCardRows(db, decomposeCard(n, doc))
+    db.exec('COMMIT')
+  } finally {
+    db.close()
+  }
+}
+
+/**
+ * Puts a 1.0 board's file back as 0.9 left it (#1209): its cards as JSON documents in 0.9's `cards` table (from the
+ * board's own first step), every table of the 1.0 group's steps dropped (#1212's too), 0.9's tables it no longer has made again (store_rows, #1211), and none of them recorded. For a board made by
+ * this Hive (a new file takes every step) that a test needs from before its upgrade. The file must be closed.
+ */
+export function as09(file: string): void {
+  const db = new DatabaseSync(file, { timeout: 5000 })
+  try {
+    const docs = readCardRows(db).map((r) => [r.card.number, JSON.stringify(composeCard(r))] as const)
+    // 0.9's tables, and its cards table with its indexes, as the steps before the 1.0 group make them.
+    const v09 = new DatabaseSync(':memory:')
+    for (const m of BOARD_MIGRATIONS.filter((x) => !x.group)) m.up(v09)
+    const tablesOf = (d: DatabaseSync): string[] => (d.prepare("SELECT name FROM sqlite_master WHERE type = 'table' AND name NOT LIKE 'sqlite_%'").all() as { name: string }[]).map((r) => r.name)
+    const keep = new Set([...tablesOf(v09), 'schema_version'])
+    const ddl = (v09.prepare("SELECT sql FROM sqlite_master WHERE tbl_name = 'cards' AND sql IS NOT NULL ORDER BY type DESC").all() as { sql: string }[]).map((r) => r.sql)
+    // 0.9's tables a 1.0 file no longer has (#1211's step drops store_rows), made again empty, with their indexes.
+    const had = new Set(tablesOf(db))
+    const missing = (v09.prepare("SELECT tbl_name, sql FROM sqlite_master WHERE sql IS NOT NULL AND tbl_name <> 'cards' ORDER BY type DESC").all() as { tbl_name: string; sql: string }[]).filter((r) => !had.has(r.tbl_name)).map((r) => r.sql)
+    v09.close()
+    const cardTables = CARDS_STEP.ddl.map((sql) => /^CREATE TABLE (\w+)/.exec(sql)?.[1]).filter((t): t is string => !!t)
+    db.exec('PRAGMA foreign_keys = OFF')
+    db.exec('BEGIN IMMEDIATE')
+    // The 1.0 card tables (`cards` among them), and every other table of a later step (#1212's on).
+    for (const t of cardTables.reverse()) db.exec(`DROP TABLE ${t}`)
+    // A virtual table's own tables (card_search's, #1237) go with it: each is looked for again before it is dropped.
+    for (const t of tablesOf(db)) if (!keep.has(t) && tablesOf(db).includes(t)) db.exec(`DROP TABLE "${t}"`)
+    for (const sql of ddl) db.exec(sql)
+    for (const sql of missing) db.exec(sql)
+    const put = db.prepare('INSERT INTO cards (number, doc) VALUES (?, ?)')
+    for (const [n, doc] of docs) put.run(n, doc)
+    db.prepare('DELETE FROM schema_version WHERE version >= ?').run(Math.min(...BOARD_MIGRATIONS.filter((m) => m.group === '1.0').map((m) => m.version)))
+    db.exec("DELETE FROM board_meta WHERE key = 'format'")
+    db.exec('COMMIT')
   } finally {
     db.close()
   }
@@ -52,9 +95,9 @@ export const boardLockKey = (workspacePath: string): string => `board-lock:${wor
 export function readCardIn(workspacePath: string, n: number): Record<string, unknown> {
   const db = new DatabaseSync(boardFile(workspacePath), { readOnly: true, timeout: 5000 })
   try {
-    const row = db.prepare('SELECT doc FROM cards WHERE number = ?').get(n) as { doc: string } | undefined
-    if (!row) throw new Error(`no card #${n}`)
-    return JSON.parse(row.doc) as Record<string, unknown>
+    const [r] = readCardRows(db, { numbers: [n] })
+    if (!r) throw new Error(`no card #${n}`)
+    return composeCard(r)
   } finally {
     db.close()
   }

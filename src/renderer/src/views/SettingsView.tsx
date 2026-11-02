@@ -1,16 +1,16 @@
+import { WorkflowLevelForm } from '../components/WorkflowOptions'
 import { JournalSettingsPanel } from '../components/JournalSettings'
-import { useEffect, useMemo, useState } from 'react'
-import type { AppSettings, ChimeSound, EffortLevel, EffortOption, FallbackModel, ModelPrice, PermissionMode, ProviderId, TaskColumn, WorkspaceConfig } from '@shared/types'
+import { HiveCommands, QuitPoint, WorkspaceCommands, WorkspacePoint } from '../components/CommandsSettings'
+import { useCallback, useEffect, useId, useMemo, useState } from 'react'
+import type { AppSettings, ChimeSound, EffortOption, FallbackModel, McpCatalogSettings, ModelPrice, ProviderId, TaskColumn } from '@shared/types'
 import { DEFAULT_COLUMN_COLORS, TASK_COLUMNS, columnColor, columnName } from '@shared/tasks'
 import { DEFAULT_MODE } from '@shared/assistant'
 import { PRICES_CHECKED, SHIPPED_PRICES, listedPriceModels, priceRows } from '@shared/prices'
-import { APP_SETTINGS_CATALOG, SETTINGS_SECTIONS, providerSection, settingDefault, settingPatch, settingValue, SETTINGS_TEXT, shownSetting, type SettingEntry, type SettingsSection, type SettingsSectionInfo } from '@shared/settingsCatalog'
-import { cliDefaultEffort, effortName, fallbackEfforts, fallbackModels, modelCaps, modelSource, modelSourceText, runsAsName } from '@shared/models'
+import { APP_SETTINGS_CATALOG, SETTINGS_SECTIONS, providerSection, settingDefault, settingPatch, settingValue, shownSetting, type SettingEntry, type SettingsSection, type SettingsSectionInfo } from '@shared/settingsCatalog'
+import { fallbackEfforts, fallbackModels, modelSource, modelSourceText } from '@shared/models'
 import type { SettingsPatch } from '@shared/api'
-import { AUTO_PROVIDER, PROVIDERS, defaultProviderLabel, enabledProviders, isProviderEnabled, installSourceText, offeredModes, permissionLabel, providerDescriptor, providerSettings, shownText as providerText } from '@shared/providers'
+import { PROVIDERS, isProviderEnabled, installSourceText, providerDescriptor, providerSettings, shownText as providerText } from '@shared/providers'
 import { modeName, useModes } from '../components/Assistant'
-import { ModeCaveat } from '../components/AgentDialogs'
-import { EffortPicker, ModelPicker } from '../components/ModelPicker'
 import { NumberField } from '../components/NumberField'
 import { ProviderIcon } from '../components/ProviderIcon'
 import * as actions from '../actions'
@@ -22,9 +22,11 @@ import { KeybindingsEditor } from '../components/Keybindings'
 import { HiddenProjectsList } from '../components/ProjectRemoval'
 import { WorkspaceStorageList } from '../components/Storage'
 import { AntivirusPanel } from '../components/Antivirus'
+import { AccountsSettings } from '../components/AccountsSettings'
 import { AdvancedSettings } from '../components/AdvancedSettings'
 import { ADVANCED_DEFS, groupName, shownText, type AdvancedState } from '@shared/advanced'
-import { choose, confirm, get, notify, set, useLanguage, useStore } from '../store'
+import { choose, chooseTab, confirm, get, notify, set, showView, useLanguage, useRememberedTab, useStore, WORKFLOW_DEFAULTS_TAB, WORKFLOW_DEFAULTS_TABS } from '../store'
+import { TabPanel, Tabs } from '../components/Tabs'
 import { fmt, msg, tr, tRich } from '@shared/i18n'
 import { LANGUAGES, SOURCE_LANGUAGE, languageOf } from '@shared/i18n/languages'
 import { LANGUAGE_TEXT } from '@shared/i18n/languageText'
@@ -38,7 +40,7 @@ interface SettingDef extends SettingEntry {
   render?: () => React.ReactNode
 }
 
-const SECTION_ICONS: Record<string, string> = { general: 'settings-gear', updates: 'cloud-download', appearance: 'symbol-color', providers: 'hubot', notifications: 'bell', sessions: 'history', assistant: 'person', workspace: 'root-folder', board: 'project', agents: 'organization', keybindings: 'keyboard', agentApi: 'broadcast', advanced: 'tools' }
+const SECTION_ICONS: Record<string, string> = { general: 'settings-gear', updates: 'cloud-download', appearance: 'symbol-color', providers: 'hubot', accounts: 'plug', notifications: 'bell', sessions: 'history', assistant: 'person', workspace: 'root-folder', board: 'project', workflow: 'git-pull-request', agents: 'organization', keybindings: 'keyboard', mcpCatalogs: 'package', agentApi: 'broadcast', advanced: 'tools' }
 
 const SECTIONS: (SettingsSectionInfo<Section> & { icon: string })[] = SETTINGS_SECTIONS.map((s) => ({ ...s, icon: SECTION_ICONS[s.id] ?? 'blank' }))
 
@@ -47,19 +49,24 @@ const CONTROLS: Record<string, () => React.ReactNode> = {
   'updates.status': () => <UpdateStatusRow />,
   'keybindings.editor': () => <KeybindingsEditor />,
   'providers.list': () => <ProvidersList />,
-  'providers.defaultProvider': () => <DefaultProviderPicker />,
   'general.language': () => <LanguagePicker />,
+  'general.commands': () => <HiveCommands />,
+  'general.onQuit': () => <QuitPoint />,
   'notifications.chimeSound': () => <ChimePicker />,
   'sessions.usageCacheClear': () => <ClearUsageCacheButton />,
   'sessions.resetPerformance': () => <ResetMetricsButton />,
+  'accounts.list': () => <AccountsSettings />,
   'workspace.hiddenProjects': () => <HiddenProjectsList />,
   'workspace.storage': () => <WorkspaceStorageList />,
   'workspace.antivirus': () => <AntivirusPanel />,
+  'workspace.commands': () => <WorkspaceCommands />,
+  'workspace.onOpen': () => <WorkspacePoint which="onOpen" />,
+  'workspace.onClose': () => <WorkspacePoint which="onClose" />,
   'board.colors': () => <ColumnColors />,
-  'assistant.provider': () => <AssistantProviderPicker />,
+  'assistant.mcp': () => <AssistantMcpServers />,
   'assistant.mode': () => <AssistantModePicker />,
   'assistant.journal': () => <JournalSettingsPanel />,
-  ...Object.fromEntries(PROVIDERS.map((p) => [`assistant.provider:${p.id}`, () => <AssistantProviderDefaults provider={p.id} />])),
+  'mcpCatalogs.sources': () => <McpCatalogSources />,
   'agentApi.status': () => <ApiStatus />,
   'agentApi.token': () => <ApiToken />,
   'agentApi.viewers': () => <ViewerTokens />,
@@ -80,10 +87,6 @@ function providerControl(provider: ProviderId, key: string): (() => React.ReactN
       return () => <ProviderToggle provider={provider} />
     case 'status':
       return () => <ProviderStatus provider={provider} />
-    case 'defaultModel':
-      return () => <GlobalModelPicker provider={provider} />
-    case 'defaultEffort':
-      return () => <GlobalEffortPicker provider={provider} />
     case 'modelFallback':
       return () => <ModelFallbackTable provider={provider} />
     case 'effortFallback':
@@ -334,25 +337,8 @@ function EffortFallbackTable({ provider }: { provider: ProviderId }) {
   )
 }
 
-/** Settings → <provider> → Default effort: the levels of the model new sessions run (the default model, else the CLI's). */
-function GlobalEffortPicker({ provider }: { provider: ProviderId }) {
-  const settings = useStore((s) => s.settings)
-  const info = useStore((s) => s.providers[provider])
-  const g = providerSettings(settings, provider)
-  const setting = SETTINGS.find((d) => d.provider === provider && d.key === 'defaultEffort')!
-  const model = g.defaultModel || info?.defaultModel || null
-  const def = modelCaps(provider, model, info, settings).defaultEffort
-  return <EffortPicker provider={provider} model={model} value={g.defaultEffort} base={{ value: '', label: !def ? tr(msg({ id: 'settings.provider.cliDefault', defaultMessage: '{provider} default', description: "The first choice of a model or effort list: the CLI's own default. {provider} is its name." }), { provider: providerDescriptor(provider).name }) : tr(msg({ id: 'settings.provider.cliDefaultIs', defaultMessage: '{provider} default ({which})', description: "The first choice of a model or effort list: the CLI's own default, and which model or level that is. {provider} is its name." }), { provider: providerDescriptor(provider).name, which: effortName(provider, def, settings, tr) }) }} onChange={(v) => void update(setting, v)} />
-}
-
-function GlobalModelPicker({ provider }: { provider: ProviderId }) {
-  const value = useStore((s) => providerSettings(s.settings, provider).defaultModel)
-  const def = SETTINGS.find((d) => d.provider === provider && d.key === 'defaultModel')!
-  return <ModelPicker provider={provider} value={value} base={{ value: '', label: tr(msg({ id: 'settings.provider.cliDefault', defaultMessage: '{provider} default', description: "The first choice of a model or effort list: the CLI's own default. {provider} is its name." }), { provider: providerDescriptor(provider).name }) }} onChange={(v) => void update(def, v)} />
-}
-
-/** A row's value: Hive's settings, or the open workspace's own (Settings → Workspace's card loops, #412). */
-const getValue = (s: AppSettings, def: SettingDef, loops: WorkspaceConfig['loops']): unknown => settingValue(def, s, null, { loops })
+/** A row's value: Hive's settings. */
+const getValue = (s: AppSettings, def: SettingDef): unknown => settingValue(def, s, null)
 
 const defaultValue = (def: SettingDef): unknown => settingDefault(def)
 
@@ -363,6 +349,17 @@ async function saveSettings(patch: SettingsPatch): Promise<void> {
 
 /** A row's text as Settings shows it, in the user's language (#767). */
 const rowText = (d: SettingEntry): { title: string; desc: string; tip: string } => shownSetting(d)
+
+/** A row's ⓘ with its tip, beside a space; nothing for a row without one (HI-2149: an empty tooltip). */
+function RowTip({ d }: { d: SettingEntry }) {
+  const { tip } = rowText(d)
+  return tip ? (
+    <>
+      {' '}
+      <InfoTip text={<span style={{ whiteSpace: 'pre-line' }}>{tip}</span>} />
+    </>
+  ) : null
+}
 
 /** Why a row can't be changed now, as shown; null when it can. */
 function disabledText(d: SettingEntry, settings: AppSettings): string | null {
@@ -381,10 +378,6 @@ async function update(def: SettingDef, value: unknown): Promise<void> {
   if (def.action) return
   const change = settingPatch(def, value)
   if ('settings' in change) return saveSettings(change.settings as SettingsPatch)
-  if ('workspace' in change) {
-    const info = await actions.attempt(tr(msg({ id: 'settings.saveFailed', defaultMessage: 'Could not save setting', description: "An error's title: saving a setting failed." })), () => call('workspace:setLoops', change.workspace))
-    if (info) set({ workspace: info })
-  }
 }
 
 /** Turns a provider on or off. Turning it off with agents running asks whether to stop them. */
@@ -420,9 +413,7 @@ export async function setProviderEnabled(provider: ProviderId, on: boolean): Pro
 }
 
 function Control({ def, settings }: { def: SettingDef; settings: AppSettings }) {
-  // The workspace's own values come from its config: shown again when it changes.
-  const loops = useStore((s) => s.workspace?.config.loops)
-  const value = getValue(settings, def, loops)
+  const value = getValue(settings, def)
   const [draft, setDraft] = useState(String(value ?? ''))
   useEffect(() => setDraft(String(value ?? '')), [value])
   switch (def.type) {
@@ -515,13 +506,16 @@ function ProviderStatus({ provider }: { provider: ProviderId }) {
         {tr(msg({ id: 'settings.provider.checkNow', defaultMessage: 'Check now', description: "Button on a provider's page: looks for its CLI and updates again." }))}
       </button>
       <button className="btn small primary" onClick={() => set({ setupOpen: provider })}>
-        {info.found ? tr(msg({ id: 'settings.provider.manage', defaultMessage: 'Manage', description: "Button on a provider's page: opens Agent Setup for the installed CLI." })) : tr(msg({ id: 'settings.provider.install', defaultMessage: 'Install', description: "Button on a provider's page: opens Agent Setup to install its CLI." }))}
+        {info.found ? tr(msg({ id: 'settings.provider.manage', defaultMessage: 'Manage', description: "Button on a provider's page: opens Provider Setup for the installed CLI." })) : tr(msg({ id: 'settings.provider.install', defaultMessage: 'Install', description: "Button on a provider's page: opens Provider Setup to install its CLI." }))}
       </button>
     </div>
   )
 }
 
-/** Every provider with its on/off switch and install state. */
+/**
+ * Every provider with its on/off switch and install state (HI-2107: no order of its own; the one order is the accounts',
+ * decision A).
+ */
 function ProvidersList() {
   const settings = useStore((s) => s.settings)
   const providers = useStore((s) => s.providers)
@@ -532,7 +526,7 @@ function ProvidersList() {
         const on = isProviderEnabled(settings, p.id)
         const state = !info || info.checking ? tr(msg({ id: 'settings.provider.checking', defaultMessage: 'Checking…', description: "While Hive looks for a provider's CLI (Settings → <provider> → Installation)." })) : !info.found ? tr(msg({ id: 'settings.provider.notInstalledShort', defaultMessage: 'Not installed', description: "Under a provider in Settings → Providers: Hive didn't find its CLI." })) : (info.readiness?.find((r) => r.level === 'error')?.message ?? tr(msg({ id: 'settings.provider.installed', defaultMessage: 'Installed · {version}', description: 'Under a provider in Settings → Providers: its CLI is installed. {version} is its number.' }), { version: info.version ?? '' }))
         return (
-          <div key={p.id} className={cx('provider-row', !on && 'off')}>
+          <div key={p.id} className={cx('provider-row', !on && 'off')} data-provider={p.id}>
             <ProviderIcon provider={p.id} />
             <div className="grow">
               <div>
@@ -551,21 +545,75 @@ function ProvidersList() {
   )
 }
 
-function AssistantProviderPicker() {
-  const settings = useStore((s) => s.settings)
-  const on = enabledProviders(settings)
-  const current = settings?.assistant.provider ?? ''
-  // The window re-renders when what's installed changes: Automatic follows it.
-  useStore((s) => s.providers)
+/** Where the Assistant's MCP servers are chosen now (HI-2059): its own view, on the activity bar. */
+function AssistantMcpServers() {
   return (
-    <select className="select" value={current} onChange={(e) => void saveSettings({ assistant: { provider: e.target.value } })}>
-      <option value="">{tr(msg({ id: 'settings.assistant.defaultProvider', defaultMessage: 'Default provider ({provider})', description: 'The first choice of Settings → Assistant → Provider: the default provider, and which one that is now.' }), { provider: defaultProviderLabel(settings, tr) })}</option>
-      {PROVIDERS.filter((p) => on.includes(p) || p.id === current).map((p) => (
-        <option key={p.id} value={p.id}>
-          {on.includes(p) ? p.name : tr(SETTINGS_TEXT.providerOff, { provider: p.name })}
-        </option>
-      ))}
-    </select>
+    <button className="btn small" data-action="assistant-mcp-view" onClick={() => showView('assistant')}>
+      <Icon name="link-external" /> {tr(msg({ id: 'settings.assistant.mcp.show', defaultMessage: "Show in the Assistant's View", description: "A button in Settings → Assistant → MCP servers (HI-2059): shows the Hive Assistant's view on the activity bar, where its MCP servers are added." }))}
+    </button>
+  )
+}
+
+/** Settings → MCP Catalogues (HI-545): ours first (on or off), then the user's, each on or off, reordered, removed, and one added by its address. */
+function McpCatalogSources() {
+  const saved = useStore((s) => s.settings?.mcpCatalogs ?? null)
+  const [url, setUrl] = useState('')
+  const [error, setError] = useState<string | null>(null)
+  if (!saved) return null
+  const save = (next: McpCatalogSettings): void => {
+    setError(null)
+    void call('mcp:catalogSetSources', next).then(
+      () => set((s) => ({ mcpCatalogVersion: s.mcpCatalogVersion + 1 })),
+      (e) => setError(errorMessage(e))
+    )
+  }
+  const move = (i: number, by: number): void => {
+    const list = [...saved.sources]
+    const [x] = list.splice(i, 1)
+    list.splice(i + by, 0, x)
+    save({ ...saved, sources: list })
+  }
+  return (
+    <div className="mcp-catalog-sources">
+      <div className="toggle-list">
+        <div className="toggle-item" data-catalog-source="ours">
+          <Icon name="package" />
+          <div className="ti-text">
+            <div className="ti-name">{'Suremise/hive-mcp' /* i18n-ignore: the catalogue's name */}</div>
+            <div className="ti-desc">{tr(msg({ id: 'settings.mcpCatalogs.ours', defaultMessage: "Hive's own catalogue, checked by Hive.", description: 'Settings → MCP Catalogues (HI-545): under the name of Hive’s own catalogue (Suremise/hive-mcp).' }))}</div>
+          </div>
+          <Switch checked={saved.oursOn} label={tr(msg({ id: 'settings.mcpCatalogs.oursSwitch', defaultMessage: "Hive's own catalogue listed", description: "Settings → MCP Catalogues (HI-545): the switch of Hive's own catalogue, for screen readers." }))} onChange={(v) => save({ ...saved, oursOn: v })} />
+        </div>
+        {saved.sources.map((s, i) => (
+          <div key={s.url} className="toggle-item" data-catalog-source={s.url}>
+            <Icon name="link" />
+            <div className="ti-text">
+              <div className="ti-name mono">{s.url}</div>
+              <div className="ti-desc">{tr(msg({ id: 'settings.mcpCatalogs.theirs', defaultMessage: "Its servers aren't checked by Hive.", description: 'Settings → MCP Catalogues (HI-545): under a catalogue the user added.' }))}</div>
+            </div>
+            <IconButton icon="arrow-up" disabled={i === 0} title={tr(msg({ id: 'settings.mcpCatalogs.up', defaultMessage: 'Move up', description: 'Settings → MCP Catalogues (HI-545): moves a catalogue up the list.' }))} onClick={() => move(i, -1)} />
+            <IconButton icon="arrow-down" disabled={i === saved.sources.length - 1} title={tr(msg({ id: 'settings.mcpCatalogs.down', defaultMessage: 'Move down', description: 'Settings → MCP Catalogues (HI-545): moves a catalogue down the list.' }))} onClick={() => move(i, 1)} />
+            <IconButton icon="trash" title={tr(msg({ id: 'settings.mcpCatalogs.remove', defaultMessage: 'Remove this catalogue (its servers installed stay)', description: 'Settings → MCP Catalogues (HI-545): removes a catalogue the user added; servers installed from it stay.' }))} onClick={() => save({ ...saved, sources: saved.sources.filter((x) => x.url !== s.url) })} />
+            <Switch checked={s.on} label={tr(msg({ id: 'settings.mcpCatalogs.switch', defaultMessage: '{url} listed', description: 'Settings → MCP Catalogues (HI-545): the switch of a catalogue, for screen readers. {url} is its address.' }), { url: s.url })} onChange={(v) => save({ ...saved, sources: saved.sources.map((x) => (x.url === s.url ? { ...x, on: v } : x)) })} />
+          </div>
+        ))}
+      </div>
+      <form
+        className="flex mcp-catalog-add"
+        onSubmit={(e) => {
+          e.preventDefault()
+          if (!url.trim()) return
+          save({ ...saved, sources: [...saved.sources, { url: url.trim(), on: true }] })
+          setUrl('')
+        }}
+      >
+        <input className="input" value={url} placeholder={'https://example.com/catalog.json' /* i18n-ignore: an example address */} aria-label={tr(msg({ id: 'settings.mcpCatalogs.addLabel', defaultMessage: "A catalogue's address", description: 'Settings → MCP Catalogues (HI-545): the box for the address of a catalogue to add, for screen readers.' }))} onChange={(e) => setUrl(e.target.value)} />
+        <button className="btn small" type="submit" disabled={!url.trim()}>
+          <Icon name="add" /> {tr(msg({ id: 'settings.mcpCatalogs.add', defaultMessage: 'Add Catalogue', description: 'Settings → MCP Catalogues (HI-545): adds the catalogue at the address typed.' }))}
+        </button>
+      </form>
+      {error && <div className="banner danger">{error}</div>}
+    </div>
   )
 }
 
@@ -588,74 +636,6 @@ function AssistantModePicker() {
         <option key={p.id} value={p.id}>
           {p.icon ? `${p.icon} ` : ''}
           {modeName(p)}
-        </option>
-      ))}
-    </select>
-  )
-}
-
-/** The Assistant's model, effort, mode and arguments with one provider. */
-function AssistantProviderDefaults({ provider }: { provider: ProviderId }) {
-  const settings = useStore((s) => s.settings)
-  const p = providerDescriptor(provider)
-  const a = settings?.assistant.providers[provider] ?? { model: '', effort: '', permissionMode: '', extraArgs: '', use200kContext: '' as const }
-  const g = providerSettings(settings, provider)
-  const [args, setArgs] = useState(a.extraArgs)
-  useEffect(() => setArgs(a.extraArgs), [a.extraArgs])
-  const save = (patch: Partial<typeof a>): void => void saveSettings({ assistant: { providers: { [provider]: patch } } } as SettingsPatch)
-  const info = useStore((s) => s.providers[provider])
-  const cliDefault = info?.defaultModel ?? null
-  const runModel = a.model || g.defaultModel || cliDefault
-  // The level itself, "Default (Medium)": effortText's "Medium, default" would say default twice (#911). Not known: "Claude Code's default", no outer "Default (…)" (#916).
-  const effortLevel = g.defaultEffort && g.defaultEffort !== 'inherit' ? g.defaultEffort : modelCaps(provider, runModel, info, settings).defaultEffort
-  const effortLabel = !effortLevel ? cliDefaultEffort(provider, tr) : tr(msg({ id: 'settings.assistant.defaultIs', defaultMessage: 'Default ({value})', description: 'The first choice of a list in Settings → Assistant → With <provider>: what applies when nothing is chosen. {value} says what that is.' }), { value: effortName(provider, effortLevel, settings, tr) })
-  return (
-    <div className="agent-form assistant-defaults">
-      <label>{tr(msg({ id: 'settings.assistantProvider.model.title', defaultMessage: 'Model', description: "A field's title in Settings → Assistant → With <provider>: the Assistant's model." }))}</label>
-      <ModelPicker provider={provider} value={a.model} base={{ value: '', label: g.defaultModel ? tr(msg({ id: 'settings.provider.cliDefaultIs', defaultMessage: '{provider} default ({which})', description: "The first choice of a model or effort list: the CLI's own default, and which model or level that is. {provider} is its name." }), { provider: p.name, which: runsAsName(provider, g.defaultModel, info) }) : tr(msg({ id: 'settings.provider.cliDefault', defaultMessage: '{provider} default', description: "The first choice of a model or effort list: the CLI's own default. {provider} is its name." }), { provider: p.name }) }} onChange={(v) => save({ model: v })} />
-      <label>{tr(msg({ id: 'settings.assistantProvider.effort.title', defaultMessage: 'Effort', description: "A field's title in Settings → Assistant → With <provider>: the Assistant's reasoning effort." }))}</label>
-      <EffortPicker provider={provider} model={runModel} value={a.effort} base={{ value: '', label: effortLabel }} onChange={(v) => save({ effort: v as EffortLevel | '' })} />
-      <label>{tr(msg({ id: 'settings.assistantProvider.permissionMode.title', defaultMessage: 'Permission mode', description: "A field's title in Settings → Assistant → With <provider>: the Assistant's permission mode." }))}</label>
-      <select className="select" value={a.permissionMode} onChange={(e) => save({ permissionMode: e.target.value as PermissionMode | '' })}>
-        <option value="">{tr(msg({ id: 'settings.assistant.defaultIs', defaultMessage: 'Default ({value})', description: 'The first choice of a list in Settings → Assistant → With <provider>: what applies when nothing is chosen. {value} says what that is.' }), { value: permissionLabel(provider, p.assistantMode, tr) })}</option>
-        {offeredModes(provider, settings)
-          .filter((m) => m.value !== p.assistantMode)
-          .map((m) => (
-            <option key={m.value} value={m.value}>
-              {permissionLabel(provider, m.value, tr)}
-            </option>
-          ))}
-      </select>
-      <ModeCaveat provider={provider} mode={a.permissionMode || p.assistantMode} model={a.model || g.defaultModel || cliDefault} />
-      {p.capabilities.contextLimit && (
-        <>
-          <label>{tr(msg({ id: 'settings.assistantProvider.use200kContext.title', defaultMessage: 'Use 200K context (instead of 1M)', description: "A field's title in Settings → Assistant → With <provider>. 200K and 1M are numbers of tokens." }))}</label>
-          <select className="select" value={a.use200kContext ?? ''} onChange={(e) => save({ use200kContext: e.target.value as '' | 'on' | 'off' })}>
-            <option value="">{tr(msg({ id: 'settings.assistant.defaultIs', defaultMessage: 'Default ({value})', description: 'The first choice of a list in Settings → Assistant → With <provider>: what applies when nothing is chosen. {value} says what that is.' }), { value: g.use200kContext ? tr(msg({ id: 'settings.option.on', defaultMessage: 'On', description: 'A choice of a setting that is on or off, beside Inherit or Default.' })) : tr(msg({ id: 'settings.option.off', defaultMessage: 'Off', description: 'A choice of a setting that is on or off, beside Inherit or Default.' })) })}</option>
-            <option value="on">{tr(msg({ id: 'settings.option.on', defaultMessage: 'On', description: 'A choice of a setting that is on or off, beside Inherit or Default.' }))}</option>
-            <option value="off">{tr(msg({ id: 'settings.option.off', defaultMessage: 'Off', description: 'A choice of a setting that is on or off, beside Inherit or Default.' }))}</option>
-          </select>
-        </>
-      )}
-      <label>{tr(msg({ id: 'settings.assistantProvider.extraArgs.title', defaultMessage: 'Extra arguments', description: "A field's title in Settings → Assistant → With <provider>: command-line arguments." }))}</label>
-      <input className="input" value={args} placeholder={tr(msg({ id: 'settings.assistantDefaults.extraArgsPlaceholder', defaultMessage: 'e.g. --verbose', description: 'The empty box\'s placeholder of the setting "Extra arguments". --verbose is an argument: keep it.' }))} onChange={(e) => setArgs(e.target.value)} onBlur={() => args !== a.extraArgs && save({ extraArgs: args.trim() })} />
-    </div>
-  )
-}
-
-function DefaultProviderPicker() {
-  const settings = useStore((s) => s.settings)
-  const on = enabledProviders(settings)
-  const def = SETTINGS.find((d) => d.key === 'defaultProvider')!
-  const current = settings?.defaultProvider ?? ''
-  // Automatic names what it picks now, which follows what's installed.
-  useStore((s) => s.providers)
-  return (
-    <select className="select" value={current} onChange={(e) => void update(def, e.target.value)}>
-      <option value={AUTO_PROVIDER}>{defaultProviderLabel(settings && { ...settings, defaultProvider: AUTO_PROVIDER }, tr)}</option>
-      {PROVIDERS.filter((p) => on.includes(p) || p.id === current).map((p) => (
-        <option key={p.id} value={p.id}>
-          {on.includes(p) ? p.name : tr(SETTINGS_TEXT.providerOff, { provider: p.name })}
         </option>
       ))}
     </select>
@@ -994,6 +974,45 @@ function ResetAll() {
   )
 }
 
+/** Settings → Version Control's workspace part with the open workspace's name (HI-1768). */
+const WORKSPACE_DEFAULTS_NAMED = msg({ id: 'settings.workflow.workspaceDefaultsNamed', defaultMessage: 'Workspace defaults ({workspace})', description: 'The title of the part of Settings → Version Control holding the open workspace’s workflow defaults; {workspace} is its name.' })
+const WORKFLOW_TABS_LABEL = msg({ id: 'settings.workflow.tabs', defaultMessage: 'Workflow defaults', description: "Accessible name of Settings → Version Control's tabs: Hive defaults and the open workspace's (HI-1837)." })
+
+/**
+ * Settings → Version Control's two levels as tabs (HI-1837): Hive defaults and the open workspace's, each its own form
+ * and Save…, the tab last chosen shown. Both forms stay mounted while the section is shown, so switching (or a search
+ * offering only one tab) keeps each draft; a tab with one says so. `rows` are the section's rows the search shows.
+ */
+function WorkflowDefaultsTabs({ rows, searching }: { rows: SettingDef[]; searching: boolean }) {
+  const workspaceName = useStore((s) => s.workspace?.name ?? null)
+  const idBase = useId()
+  const [dirty, setDirty] = useState<Record<string, boolean>>({})
+  const all = SETTINGS.filter((d) => d.id === WORKFLOW_DEFAULTS_TAB.global || (d.id === WORKFLOW_DEFAULTS_TAB.workspace && workspaceName))
+  // Searching: only the parts it finds are offered, the one shown among them.
+  const offered = searching ? all.filter((d) => rows.includes(d)) : all
+  const shown = useRememberedTab(WORKFLOW_DEFAULTS_TABS, offered.map((d) => d.id), WORKFLOW_DEFAULTS_TAB.global)
+  const onDirty = useCallback((id: string, v: boolean): void => setDirty((m) => (!!m[id] === v ? m : { ...m, [id]: v })), [])
+  const onGlobalDirty = useCallback((v: boolean) => onDirty(WORKFLOW_DEFAULTS_TAB.global, v), [onDirty])
+  const onWorkspaceDirty = useCallback((v: boolean) => onDirty(WORKFLOW_DEFAULTS_TAB.workspace, v), [onDirty])
+  const title = (d: SettingDef): string => (d.id === WORKFLOW_DEFAULTS_TAB.workspace && workspaceName ? tr(WORKSPACE_DEFAULTS_NAMED, { workspace: workspaceName }) : rowText(d).title)
+  return (
+    <div className="workflow-defaults-tabs">
+      <Tabs idBase={idBase} label={tr(WORKFLOW_TABS_LABEL)} value={shown} onChange={(id) => chooseTab(WORKFLOW_DEFAULTS_TABS, id)} items={offered.map((d) => ({ id: d.id, label: title(d), unsaved: !!dirty[d.id], attrs: { 'data-setting-tab': d.id } }))} />
+      {all.map((d) => (
+        <TabPanel key={d.id} idBase={idBase} id={d.id} selected={d.id === shown && offered.includes(d)} className="setting wide" data-setting={d.id}>
+          <div className="s-text">
+            <div className="s-desc">
+              {rowText(d).desc}
+              <RowTip d={d} />
+            </div>
+            {d.id === WORKFLOW_DEFAULTS_TAB.global ? <WorkflowLevelForm level="global" onDirty={onGlobalDirty} /> : <WorkflowLevelForm level="workspace" onDirty={onWorkspaceDirty} />}
+          </div>
+        </TabPanel>
+      ))}
+    </div>
+  )
+}
+
 export function SettingsView() {
   const settings = useStore((s) => s.settings)
   const section = useStore((s) => s.settingsSection) as Section
@@ -1002,25 +1021,28 @@ export function SettingsView() {
   const setModifiedOnly = (v: boolean): void => set({ settingsModifiedOnly: v })
   // Modified only lasts while Settings is shown, as it did.
   useEffect(() => () => set({ settingsModifiedOnly: false }), [])
-  const loops = useStore((s) => s.workspace?.config.loops)
   const advanced = useStore((s) => s.advanced)
+  // The open workspace (HI-1768): its defaults' part is named after it, and shown only while one is open.
+  const workspaceName = useStore((s) => s.workspace?.name ?? null)
   // Searching matches the text as shown, in the language shown.
   const shownLanguage = useLanguage()
 
   const visible = useMemo(() => {
     const q = query.trim().toLowerCase()
     return SETTINGS.filter((d) => {
+      if (d.id === 'workflow.workspaceDefaults' && !workspaceName) return false
       if (d.id === 'advanced.values' && (q || modifiedOnly)) return advancedMatches(q, modifiedOnly, advanced)
       // Its English matches as well as what it shows: Settings can be searched in either.
       if (q && !`${d.title} ${d.desc} ${d.tip} ${d.key}${shownLanguage !== SOURCE_LANGUAGE ? ` ${Object.values(rowText(d)).join(' ')}` : ''}`.toLowerCase().includes(q)) return false
-      if (modifiedOnly && (d.type === 'custom' || getValue(settings!, d, loops) === defaultValue(d))) return false
+      if (modifiedOnly && (d.type === 'custom' || getValue(settings!, d) === defaultValue(d))) return false
       if (!q && !modifiedOnly && d.section !== section) return false
       return true
     })
-  }, [query, section, settings, modifiedOnly, loops, advanced, shownLanguage])
+  }, [query, section, settings, modifiedOnly, advanced, shownLanguage, workspaceName])
 
   if (!settings) return null
-  const grouped = SECTIONS.map((s) => ({ ...s, items: visible.filter((d) => d.section === s.id) })).filter((g) => g.items.length)
+  const sections = SECTIONS
+  const grouped = sections.map((s) => ({ ...s, items: visible.filter((d) => d.section === s.id) })).filter((g) => g.items.length)
   // Shown in the user's language: a provider's page is its name.
   const sectionText = (s: (typeof SECTIONS)[number]): { label: string; desc: string } => ({ label: shownText(s.text.label), desc: shownText(s.text.desc) })
   const navIcon = (s: (typeof SECTIONS)[number]): React.ReactNode => (s.provider ? <ProviderIcon provider={s.provider} /> : <Icon name={s.icon} />)
@@ -1036,7 +1058,7 @@ export function SettingsView() {
       </div>
       <div className="settings-body">
         <div className="settings-nav">
-          {SECTIONS.map((s) => (
+          {sections.map((s) => (
             <div key={s.id} className={cx('row', !query && !modifiedOnly && section === s.id && 'selected')} data-section={s.id} onClick={() => {
                 set({ settingsSection: s.id, settingsQuery: '' })
                 setModifiedOnly(false)
@@ -1051,15 +1073,25 @@ export function SettingsView() {
           {grouped.map((g) => (
             <div key={g.id} className="settings-group" data-section={g.id}>
               <h2>{sectionText(g).label}</h2>
-              <p>{sectionText(g).desc}</p>
-              {g.items.map((d) => {
-                const modified = (d.type !== 'custom' || ['defaultModel', 'defaultEffort', 'defaultProvider', 'modelFallback', 'effortFallback'].includes(d.key)) && getValue(settings, d, loops) !== defaultValue(d)
-                return (
+              <p>
+                {sectionText(g).desc}
+                {/* Its only row drawn untitled (HI-2107): its tip here, beside the one description. */}
+                {g.items.length === 1 && g.items[0].untitled && <RowTip d={g.items[0]} />}
+              </p>
+              {g.id === 'workflow' && <WorkflowDefaultsTabs rows={g.items} searching={!!query.trim() || modifiedOnly} />}
+              {g.id !== 'workflow' && g.items.map((d) => {
+                const modified = (d.type !== 'custom' || ['defaultModel', 'defaultEffort', 'modelFallback', 'effortFallback'].includes(d.key)) && getValue(settings, d) !== defaultValue(d)
+                return d.untitled && g.items.length === 1 ? (
+                  <div key={`${d.section}.${d.key}`} className="setting wide" data-setting={d.id}>
+                    <div className="s-text">{d.render?.()}</div>
+                  </div>
+                ) : (
                   d.wide ? (
                     <div key={`${d.section}.${d.key}`} className="setting wide" data-setting={d.id}>
                       <div className="s-text">
                         <div className="s-title">
-                          {rowText(d).title} <InfoTip text={<span style={{ whiteSpace: 'pre-line' }}>{rowText(d).tip}</span>} />
+                          {rowText(d).title}
+                          <RowTip d={d} />
                         </div>
                         {d.desc && <div className="s-desc">{rowText(d).desc}</div>}
                         {d.render?.()}
@@ -1074,7 +1106,8 @@ export function SettingsView() {
                             <span className="modified" />
                           </Tooltip>
                         )}
-                        {rowText(d).title} <InfoTip text={<span style={{ whiteSpace: 'pre-line' }}>{rowText(d).tip}</span>} />
+                        {rowText(d).title}
+                        <RowTip d={d} />
                         {modified && (
                           <IconButton icon="discard" title={tr(msg({ id: 'settings.resetToDefault', defaultMessage: 'Reset to default ({value})', description: 'Button beside a setting changed from its default: puts it back. {value} is the default.' }), { value: defaultShown(d) })} onClick={() => void update(d, defaultValue(d))} />
                         )}

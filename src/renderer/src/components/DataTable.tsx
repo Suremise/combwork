@@ -1,4 +1,4 @@
-import { Fragment, useEffect, useMemo, useState } from 'react'
+import { Fragment, useEffect, useMemo, useState, type ReactNode } from 'react'
 import { PAGE_SIZES, choices, nextSort, rememberedSort, sortPanes, tableView, type ColumnRules, type Sort } from '@shared/tableView'
 import { call } from '../api'
 import { msg, tr } from '@shared/i18n'
@@ -53,7 +53,8 @@ export function DataTable<T>({
   rowClassName,
   detail,
   foot,
-  filterFrom = 0
+  filterFrom = 0,
+  filtersAbove = false
 }: {
   /** Names the table for its remembered rows per page ("compactions"). */
   id: string
@@ -84,6 +85,12 @@ export function DataTable<T>({
   foot?: React.ReactNode
   /** The quick filters show only with more rows than this (a small table needs none), or while one is set. */
   filterFrom?: number
+  /**
+   * The quick filters in a strip above the table, each named by its column's heading, instead of a row under the
+   * headers (HI-1878): for a table that scrolls sideways with its filtered columns last, whose row under the headers
+   * would show an empty band where the narrow view starts and the filters out of sight.
+   */
+  filtersAbove?: boolean
 }) {
   const sizeKey = `table-rows:${id}`
   const saved = useStore((s) => s.panes[sizeKey])
@@ -114,7 +121,9 @@ export function DataTable<T>({
   useEffect(() => {
     if (view.page !== page) setPage(view.page)
   }, [view.page, page])
-  const filtered = Object.values(filters).some((v) => v.trim())
+  // Only the shown columns' filters count: one kept for a column the table no longer has (Keyboard Shortcuts' Category,
+  // inside a category's tab, HI-1838) neither narrows the rows nor says they are filtered.
+  const filtered = columns.some((c) => c.filter && filters[c.key]?.trim())
   const hasFilters = columns.some((c) => c.filter) && (rows.length > filterFrom || filtered)
   // Selecting every row the filters let through, not only this page's.
   const matchingKeys = useMemo(() => (selection ? tableView(rows, columns, { sort: null, filters, page: 1, pageSize: Math.max(1, rows.length) }).rows.map((r, i) => rowKey(r, i)) : []), [selection, rows, columns, filters, rowKey])
@@ -136,6 +145,23 @@ export function DataTable<T>({
     setFilters((f) => ({ ...f, [key]: value }))
     setPage(1)
   }
+  /** A column's quick filter: a choice, or a text box. */
+  const filterControl = (c: DataColumn<T>): ReactNode => {
+    const label = tr(msg({ id: 'shell.table.filterBy', defaultMessage: 'Filter {column}', description: "The name, for screen readers, of a table's filter under a column. {column} is the heading." }), { column: c.header })
+    if (c.filter?.kind === 'choice')
+      return (
+        <select className="select" aria-label={label} value={filters[c.key] ?? ''} onChange={(e) => setFilter(c.key, e.target.value)}>
+          <option value="">{tr(msg({ id: 'shell.table.all', defaultMessage: 'All', description: "A table's column filter's first choice: no filter." }))}</option>
+          {choices(rows, c.filter.value, c.filter.values).map((v) => (
+            <option key={v} value={v}>
+              {c.choiceLabel?.(v) ?? v}
+            </option>
+          ))}
+        </select>
+      )
+    return c.filter ? <SearchInput aria-label={label} placeholder={tr(msg({ id: 'shell.table.filter', defaultMessage: 'Filter', description: "Placeholder of a table's text filter under a column." }))} value={filters[c.key] ?? ''} onChange={(v) => setFilter(c.key, v)} /> : null
+  }
+  const filterRow = hasFilters && !filtersAbove
   const setSize = (n: number): void => {
     set((s) => ({ panes: { ...s.panes, [sizeKey]: n } }))
     void call('ui:setPane', sizeKey, n)
@@ -144,12 +170,24 @@ export function DataTable<T>({
 
   return (
     <div className={cx('data-table', className)}>
+      {hasFilters && filtersAbove && (
+        <div className="table-filter-bar">
+          {columns
+            .filter((c) => c.filter)
+            .map((c) => (
+              <label key={c.key} className="table-filter-item" data-filter={c.key}>
+                <span className="faint">{c.header}</span>
+                {filterControl(c)}
+              </label>
+            ))}
+        </div>
+      )}
       <div className="table-wrap">
         <table className="table">
           <thead>
             <tr>
               {selection && (
-                <th className="table-select" rowSpan={hasFilters ? 2 : 1}>
+                <th className="table-select" rowSpan={filterRow ? 2 : 1}>
                   <input
                     type="checkbox"
                     className="checkbox"
@@ -184,22 +222,12 @@ export function DataTable<T>({
                 )
               })}
             </tr>
-            {hasFilters && (
+            {filterRow && (
               <tr className="table-filters">
                 {columns.map((c) => (
-                  <th key={c.key} className={cx(c.num && 'num')}>
-                    {c.filter?.kind === 'choice' ? (
-                      <select className="select" aria-label={tr(msg({ id: 'shell.table.filterBy', defaultMessage: 'Filter {column}', description: "The name, for screen readers, of a table's filter under a column. {column} is the heading." }), { column: c.header })} value={filters[c.key] ?? ''} onChange={(e) => setFilter(c.key, e.target.value)}>
-                        <option value="">{tr(msg({ id: 'shell.table.all', defaultMessage: 'All', description: "A table's column filter's first choice: no filter." }))}</option>
-                        {choices(rows, c.filter.value, c.filter.values).map((v) => (
-                          <option key={v} value={v}>
-                            {c.choiceLabel?.(v) ?? v}
-                          </option>
-                        ))}
-                      </select>
-                    ) : c.filter ? (
-                      <SearchInput aria-label={tr(msg({ id: 'shell.table.filterBy', defaultMessage: 'Filter {column}', description: "The name, for screen readers, of a table's filter under a column. {column} is the heading." }), { column: c.header })} placeholder={tr(msg({ id: 'shell.table.filter', defaultMessage: 'Filter', description: "Placeholder of a table's text filter under a column." }))} value={filters[c.key] ?? ''} onChange={(v) => setFilter(c.key, v)} />
-                    ) : null}
+                  // The column's class too, so what styles a column (hidden when narrow, sticky) holds for its filter (HI-1838).
+                  <th key={c.key} className={cx(c.num && 'num', c.className)}>
+                    {filterControl(c)}
                   </th>
                 ))}
               </tr>
@@ -268,7 +296,14 @@ export function DataTable<T>({
       </div>
       {/* Also on one page while there are more rows than the fewest per page, so a bigger size can be made smaller again. */}
       {(view.pages > 1 || view.matched > Math.min(...pageSizes)) && (
-        <div className="table-paging" role="navigation" aria-label={tr(msg({ id: 'shell.table.pages', defaultMessage: 'Pages', description: "The name, for screen readers, of a table's page controls." }))}>
+        <Pager
+          page={view.page}
+          pages={view.pages}
+          from={view.from}
+          to={view.to}
+          total={view.matched}
+          onPage={setPage}
+          before={
           <label className="table-page-size">
             {tr(msg({ id: 'shell.table.rowsPerPage', defaultMessage: 'Rows per page', description: "Beside a table's choice of how many rows a page shows." }))}
             <select className="select" value={pageSize} onChange={(e) => setSize(Number(e.target.value))}>
@@ -279,19 +314,32 @@ export function DataTable<T>({
               ))}
             </select>
           </label>
-          <span className="faint table-range">
-            {tr(msg({ id: 'shell.table.range', defaultMessage: '{from, number}–{to, number} of {total, number}', description: 'Under a table: which of its rows the page shows.' }), { from: view.from, to: view.to, total: view.matched })}
-          </span>
-          <div className="grow" />
-          <PageButton label="«" title={tr(msg({ id: 'shell.table.first', defaultMessage: 'First page', description: "A table's button: its first page." }))} disabled={view.page === 1} onClick={() => setPage(1)} />
-          <IconButton icon="chevron-left" title={tr(msg({ id: 'shell.table.previous', defaultMessage: 'Previous page', description: "A table's button." }))} disabled={view.page === 1} onClick={() => setPage(view.page - 1)} />
-          <span className="table-page">
-            {tr(msg({ id: 'shell.table.page', defaultMessage: 'Page {page, number} of {pages, number}', description: 'Under a table: which page it shows.' }), { page: view.page, pages: view.pages })}
-          </span>
-          <IconButton icon="chevron-right" title={tr(msg({ id: 'shell.table.next', defaultMessage: 'Next page', description: "A table's button." }))} disabled={view.page === view.pages} onClick={() => setPage(view.page + 1)} />
-          <PageButton label="»" title={tr(msg({ id: 'shell.table.last', defaultMessage: 'Last page', description: "A table's button: its last page." }))} disabled={view.page === view.pages} onClick={() => setPage(view.pages)} />
-        </div>
+          }
+        />
       )}
+    </div>
+  )
+}
+
+/**
+ * A table's page controls (DataTable's, and Git → History's, #1643): which rows the page shows, then first, previous,
+ * "Page n of m", next and last. `before`: what comes first (DataTable's rows per page).
+ */
+export function Pager({ page, pages, from, to, total, onPage, before }: { page: number; pages: number; from: number; to: number; total: number; onPage: (page: number) => void; before?: React.ReactNode }) {
+  return (
+    <div className="table-paging" role="navigation" aria-label={tr(msg({ id: 'shell.table.pages', defaultMessage: 'Pages', description: "The name, for screen readers, of a table's page controls." }))}>
+      {before}
+      <span className="faint table-range">
+        {tr(msg({ id: 'shell.table.range', defaultMessage: '{from, number}–{to, number} of {total, number}', description: 'Under a table: which of its rows the page shows.' }), { from, to, total })}
+      </span>
+      <div className="grow" />
+      <PageButton label="«" title={tr(msg({ id: 'shell.table.first', defaultMessage: 'First page', description: "A table's button: its first page." }))} disabled={page === 1} onClick={() => onPage(1)} />
+      <IconButton icon="chevron-left" title={tr(msg({ id: 'shell.table.previous', defaultMessage: 'Previous page', description: "A table's button." }))} disabled={page === 1} onClick={() => onPage(page - 1)} />
+      <span className="table-page">
+        {tr(msg({ id: 'shell.table.page', defaultMessage: 'Page {page, number} of {pages, number}', description: 'Under a table: which page it shows.' }), { page, pages })}
+      </span>
+      <IconButton icon="chevron-right" title={tr(msg({ id: 'shell.table.next', defaultMessage: 'Next page', description: "A table's button." }))} disabled={page === pages} onClick={() => onPage(page + 1)} />
+      <PageButton label="»" title={tr(msg({ id: 'shell.table.last', defaultMessage: 'Last page', description: "A table's button: its last page." }))} disabled={page === pages} onClick={() => onPage(pages)} />
     </div>
   )
 }

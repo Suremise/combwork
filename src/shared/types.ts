@@ -1,13 +1,16 @@
 // Types shared by the main process, preload bridge and renderer.
 
+import type { SessionEnd } from './sessionEnd'
 import type { JournalSettings } from './journal'
 import type { Text, TextPart } from './advanced'
 import type { AvOffer } from './antivirus'
-import type { ActivityTarget } from './assistantActivity'
+import type { ActivityKind, ActivityTarget, UndoFinalWhy } from './assistantActivity'
 import type { AttachmentKind } from './attachments'
+import type { AgentProcess } from './agentProcesses'
 import type { StartFailure } from './startFailure'
 import type { TipsState } from './tips'
-import type { TemplateAgent, TemplateScope } from './templates'
+import type { SuggestedPreset, TemplateAgent, TemplateScope } from './templates'
+import type { ConnectionOption } from './templateConnections'
 import type { KeepAwakeSetting } from './keepAwake'
 import type { DateFormat, TimeFormat } from './dates'
 import type { ProjectPref } from './uiPrefs'
@@ -16,6 +19,16 @@ import type { ConsoleEvent, ConsoleRecordingInfo } from './devConsole'
 import type { SafeguardNote, ScreenStop } from './safeguards'
 import type { AgentLeftovers, LeftoverProcessMode } from './agentProcesses'
 import type { UsageTimeline } from './usageTimeline'
+import type { PlatformId, ProjectPlatform } from './platform/descriptors'
+import type { SwitchRefusal } from './platform/switching'
+import type { Contradiction, PresetId, WorkflowOptions } from './workflow/options'
+import type { Refusal } from './workflow/refusals'
+import type { ReviewerMode, WorkflowRole } from './workflow/roles'
+import type { NamedFolder, ResumeHold, ShownPlace } from './agentFolders'
+import type { StageNameProblem } from './workflow/stages'
+import type { TemplateWorkflow, TemplateWorkflowOverlay } from './workflow/templateOptions'
+import type { StageId } from './workflow/facts'
+import type { StageDef } from './workflow/compile'
 
 /**
  * Text read by both the window and agents (#845, E10a of #677). Hive's services throw a `HiveError` (main/hiveError.ts
@@ -65,13 +78,11 @@ export type PermissionMode = string
 /** A reasoning effort id from the agent's provider (e.g. "low", "high", "max"). */
 export type EffortLevel = string
 export type ChimeSound = 'chime' | 'bell' | 'soft' | 'pop'
-/** Settings → Notifications, *While Hive is focused*: Show in Hive, Show nothing, or a Windows notification. */
-export type WhileFocused = 'inApp' | 'nothing' | 'windows'
-/** Settings → Notifications, *Show banners for*. */
-export type BannerScope = 'all' | 'workspace' | 'project'
+/** Settings → Notifications, *Show pop-ups about agents for* (HI-2320: `none`, only in the bell). */
+export type BannerScope = 'all' | 'workspace' | 'project' | 'none'
 export type BannerPosition = 'top-left' | 'top-center' | 'top-right' | 'bottom-left' | 'bottom-center' | 'bottom-right'
 
-/** A notice shown as a banner in the focused window (#157): an agent finished or waiting, or another notice. */
+/** A notice the Agent API's event stream hears of (#620): an agent finished or waiting, or another notice (HI-2320: the window shows it as an entry). */
 export interface Notice {
   id: string
   kind: 'finished' | 'waiting' | 'notice'
@@ -84,6 +95,8 @@ export interface Notice {
   projectPath: string | null
   /** The agent waiting, for a waiting banner to close once it is answered. */
   agentId?: string
+  /** A banner's button (#1437): a command of the window's, with its arguments; its label in the language Hive shows. */
+  action?: { label: string; command: string; args?: unknown[] }
 }
 export type CacheTtlSetting = 'auto' | '5m' | '1h'
 
@@ -135,6 +148,16 @@ export type KeybindingOverrides = Record<string, string | null>
 export interface AppSettings {
   /** The user's changes to the default keyboard shortcuts. */
   keybindings: KeybindingOverrides
+  /** Hive's own commands (HI-1954, Settings → Commands at Hive's level) and When Hive quits, run. */
+  commands: CommandsHive
+  /** The MCP catalogues the MCP view lists servers from (HI-545, Settings → MCP Catalogues). */
+  mcpCatalogs: McpCatalogSettings
+  /** The global default workflow options (SPEC §16.6.6), under each workspace's and project's own; absent: all off. */
+  workflow?: WorkflowDefaults
+  /** The one-time steps settled in Hive's own defaults (HI-1997's `workflow.commitMessageDefault`), each saved with its change. */
+  stepsDone?: string[]
+  /** Hive's default slot options for Git projects (HI-1765), under each workspace's and project's own (`slots`). */
+  slotDefaults?: SlotDefaults
   updates: {
     checkAutomatically: boolean
     downloadAutomatically: boolean
@@ -169,6 +192,8 @@ export interface AppSettings {
     userName: string
     /** The language Hive shows (#767): 'auto' (Windows' display languages) or a language's code (de, pl…). */
     language: string
+    /** HI-1368's When Hive quits, run, as saved before HI-1954: read once into `commands`, then dropped. */
+    onQuit?: CloseCommandSetting
   }
   appearance: {
     theme: ThemeSetting
@@ -182,6 +207,12 @@ export interface AppSettings {
   providers: Record<ProviderId, ProviderSettings>
   /** The provider Add Agent's quick add uses unless the project says otherwise. */
   defaultProvider: ProviderId
+  /**
+   * 0.9's order of the providers (HI-1965), which its Automatic picked from. No list follows it since HI-2139 (Hive's
+   * order): kept read-only in config.json, as defaultProvider is, for the migration's reading of a 0.9 launch
+   * (connectionDefaults.ts' legacyAutoProvider) in workspaces not opened yet. Never written.
+   */
+  providerOrder: ProviderId[]
   notifications: {
     chimeEnabled: boolean
     chimeSound: ChimeSound
@@ -189,19 +220,20 @@ export interface AppSettings {
     desktopNotifications: boolean
     notifyOnFinished: boolean
     notifyOnWaiting: boolean
-    /** While a Hive window is focused: a banner in it, nothing, or a Windows notification (shared/bursts.ts noticeRoute). */
-    whileFocused: WhileFocused
-    /** Which notices the focused window shows as banners: from every window, its workspace, or the project it shows. */
+    /** Which agents' notices the focused window pops up: from every window, its workspace, the project it shows, or none (only in the bell). */
     bannerScope: BannerScope
+    /** Where every pop-up goes (HI-2320). */
     bannerPosition: BannerPosition
-    /** How long a banner for a finished agent (or another notice) stays, in seconds; kept while the pointer is on it. */
+    /** How long a pop-up that closes by itself stays, in seconds; kept while the pointer or the focus is on it, or the window isn't focused. */
     bannerSeconds: number
-    /** Banners for an agent waiting for you stay until handled (clicked, dismissed or answered); off: they close like the others. */
+    /** Pop-ups for an agent waiting for you stay until handled (clicked, dismissed or answered); off: they close like the others. */
     waitingBannerStays: boolean
     /** A badge with the count of agents that need you on the window's taskbar button, and the count in its title. */
     taskbarCount: boolean
     /** Flash the taskbar button when an agent starts waiting for your input and the window isn't focused. */
     flashOnWaiting: boolean
+    /** A notice when a project's work has finished (#1437): a good moment to start its idle agents fresh. A project may set its own. */
+    suggestFreshStart: boolean
   }
   sessions: {
     backupTranscripts: boolean
@@ -242,12 +274,6 @@ export interface AppSettings {
   /** The Hive Assistant's defaults (each workspace's Assistant Settings can override them). */
   assistant: AssistantSettings
   agents: {
-    /** Per-file locks between agents working in the same folder. */
-    fileLocks: FileLockMode
-    /** Git-ignored files copied into new worktrees: glob patterns, one per line or comma separated. */
-    worktreeCopy: string
-    /** Default for merging a worktree agent's branch. */
-    mergeStyle: MergeStyle
     /** How long a background task an agent started counts as running if it never reports its end, in minutes. */
     backgroundTaskMinutes: number
     /** What to do with processes an agent leaves running when it stops: offer to end them, or end them (#507). */
@@ -309,6 +335,66 @@ export type AssistantControl = 'look' | 'agents' | 'projects'
 
 /** Something the Hive Assistant did (or tried), for the list in its panel and hive.log. */
 /** Also its kind and targets (#763, assistantActivity.ts): what the event stream gives viewers instead of the line. */
+/**
+ * What kind of change of the Assistant's undo works on (#1282, SPEC §16.14): a card's fields (or a card it made), a lane
+ * record, an agent's settings, a Hive setting, an agent it started (stopped by undo), or one that can't be undone
+ * (`final`: a prompt or comment sent, a project made), which says why.
+ */
+export type AssistantChangeKind = 'card' | 'lane' | 'agent' | 'setting' | 'started' | 'final'
+
+/** One of the Assistant's changes as kept for undo: its line, what it was about, the fields it set, and whether undone. */
+export interface AssistantChangeRow {
+  id: string
+  /** The user's message it came from. */
+  group: string
+  at: string
+  kind: AssistantChangeKind
+  /** The Assistant's action it came from (its activity kind: `update-task`, `prompt-agent`…), for the window's words. */
+  act: ActivityKind
+  /** The Assistant's change as it said it ("change #12 on the board"), in English. */
+  what: string
+  card?: number
+  project?: string
+  /** The fields it set (a card's `labels`, `column`…; a lane's `cards`; a setting's `value`; `created` for a card it made). */
+  fields: string[]
+  /** Why it can't be undone (a `final` change), in English. */
+  final?: string
+  /** The same reasons as codes, which the window words in its language (#1283: its IPC only). */
+  finalWhy?: UndoFinalWhy[]
+  undoneAt?: string
+  /**
+   * Once undone, what undo did with its fields (#1283): those put back, and those left as they were, with why (someone
+   * changed it since, it is gone, the lane ended). Absent for a change undone before outcomes were kept.
+   */
+  outcome?: { undone: string[]; skipped: { field: string; why: 'changed' | 'gone' | 'ended' }[] }
+}
+
+/** The Assistant's changes for one message of the user's (#1282): when it was sent, and its changes, newest first. */
+export interface AssistantChangeGroup {
+  id: string
+  at: string
+  changes: AssistantChangeRow[]
+}
+
+/**
+ * What undoing one change did: the fields put back (`running`: an agent it started, stopped), and those left as they are,
+ * with why: someone changed it since, the card, lane or agent is gone, the lane has ended, or the change failed (`error`).
+ */
+export interface AssistantUndoResult {
+  change: string
+  act: ActivityKind
+  what: string
+  card?: number
+  undone: string[]
+  skipped: { field: string; why: 'changed' | 'gone' | 'ended' | 'failed'; error?: string }[]
+  /** Why nothing of it can be undone (a `final` change), in English. */
+  final?: string
+  /** The same reasons as codes, which the window words in its language (#1283: its IPC only). */
+  finalWhy?: UndoFinalWhy[]
+  /** It was undone before: nothing more was done. */
+  already?: true
+}
+
 export interface AssistantAction extends Partial<ActivityTarget> {
   id: string
   at: string
@@ -325,6 +411,9 @@ export interface AssistantAction extends Partial<ActivityTarget> {
   revertOf?: string
   /** The line without what it quotes (a prompt, a message): what the Agent API's event stream gives (#620). */
   brief?: string
+  /** The user's message it came from, and when it was sent (#1283: the panel lists it with that message's changes). */
+  group?: string
+  groupAt?: string
 }
 
 /** A setting the Hive Assistant changed, as its activity list shows it and Revert undoes it. */
@@ -475,7 +564,7 @@ export interface WindowState {
 
 export interface AppConfig {
   /** 7 since working modes replaced the shipped personas (#259); 6 since notices show in Hive while it is focused; 3 since the Assistant uses the agents' model and effort (0.3.0); 2 since providers (0.2.0); 1 was Claude Code only. */
-  version: 8
+  version: 9
   settings: AppSettings
   recentWorkspaces: string[]
   /** The workspace of the window focused last (what 0.1 reopened); `windows` has every window. */
@@ -492,6 +581,12 @@ export interface AppConfig {
   renamesApplied?: Record<string, number>
   /** Always on Top: the workspaces (lowercased paths) whose window was left pinned. This machine's, never in .hive. */
   alwaysOnTop?: Record<string, true>
+  /**
+   * Moved workspaces whose records here by folder (the window's pin, the close command's runs) are still to follow them
+   * (HI-2007): one per old folder, `to` where the workspace is now, kept until nothing is left at `from`, tried at each
+   * open and Repair (workspaceMove.ts carryProfile). `failed`: why the last try left something it could have moved.
+   */
+  profileMoves?: ProfileMove[]
   /**
    * Antivirus scanning (#316), this machine's: the exclusions Hive added (resolved paths), Defender's list as last read
    * with administrator rights, and per workspace (lowercased path) the last suggestion (its folders, when and how many
@@ -513,14 +608,26 @@ export interface AppConfig {
     sessionsTree?: Record<string, Record<string, boolean>>
     /** The .hive version control notice each project's Overview no longer shows (#345): the situation dismissed (`hiveVcsKey`), by project path in lower case. */
     hiveVcsNotice?: Record<string, string>
+    /** The connections notice's entries dismissed (HI-1770): `<project path in lower case>|<moved entry's id>`. */
+    connectionsNoticeDismissed?: string[]
+    /** The one-time notice that agents run on connections (HI-1774) was dismissed, or a connection was added: never shown again. */
+    connectionsIntroShown?: boolean
     /** The active projects folded in the Assistant panel's Workspace list (#399), by `assistantFoldKey` (workspace and project path); unfolded ones aren't kept. */
     assistantFold?: Record<string, boolean>
     /** Each workspace's board as the user left it, by workspace path in lower case (#170): collapsed columns, folded cards. */
     boardFold?: Record<string, BoardFold>
+    /**
+     * Each project's Session tab as the user left it (HI-1749: Panes or Tiles, its layout, where its panes are), by
+     * projectViewKey: this user's view, not the project's config, so it is never written to project.json (where another
+     * program holding the file made a view switch fail). A project's project.json from before keeps its view until read.
+     */
+    projectViews?: Record<string, ProjectView>
     /** Each workspace's Progress panel filter (#251), by workspace path in lower case: one project's runs (and agent's), or all. */
     progressFilter?: Record<string, { project: string; agent?: string }>
     /** Each workspace's running lanes in the order the user put them in the Progress panel (#568), by workspace path in lower case: lane ids. */
     laneOrder?: Record<string, string[]>
+    /** The tab each remembered row of tabs last showed (HI-1837: Settings → Version Control's Hive or workspace defaults…), by the row's key. */
+    tabs?: Record<string, string>
   }
   /** Per provider: the model last seen in a session started without a model choice (the CLI's own default). */
   observedDefaultModel: Record<ProviderId, string>
@@ -531,10 +638,43 @@ export interface AppConfig {
   observedDefaultEffort?: Record<ProviderId, Record<string, EffortLevel>>
   /** Per provider: the last good model catalog its CLI gave, keyed by the CLI version, so pickers fill at once on start. */
   modelCatalogs?: Record<ProviderId, ModelCatalog>
-  /** Per provider: the plan usage it last reported (account-wide). */
+  /** Per provider: the plan usage it last reported (account-wide), from sessions not on a connection. */
   planUsage: Record<ProviderId, PlanUsage>
+  /** Per connection (its id, HI-1756): the plan usage its sessions last reported, that login's own limits. */
+  connectionPlanUsage?: Record<string, ConnectionPlanUsage>
+  /**
+   * The usage moves fired (HI-2195), per account and limit: one record per reset period, saying which agents it handled.
+   * Kept until that period's reset passes.
+   */
+  usageMoves?: Record<string, Record<string, UsageMoveRecord>>
   /** Highest warning shown per "provider:limit", and for which reset period. */
   planWarnings: Record<string, { resetsAt: string | null; level: number }>
+  /**
+   * The accounts Hive keeps (HI-980; HI-2106), in one order for all CLIs (decision A): a CLI's first account on in a
+   * workspace is what a launch falls back to there. Before HI-2106 they were `connections`, with their defaults.
+   */
+  accounts?: Account[]
+  /**
+   * The connections (HI-2106): the setups agents and the Assistant choose, each on an account and ordered within it by
+   * their order here; an account's first is its base connection, made with it.
+   */
+  connections?: Connection[]
+  /** One-time changes to this file (HI-2106): `accounts1`, its connections became accounts, and their defaults connections. */
+  migrations?: { accounts1?: AccountsMigration }
+  /** Per provider: the account last chosen as a workspace's default (or launched on). Since HI-1875 only its migration's. */
+  lastUsedConnection?: Partial<Record<ProviderId, string>>
+  /** HI-1875's one-time move (the most recently used default to the top of each CLI's order) is done. */
+  connectionOrderMigrated?: true
+  /**
+   * The CLIs whose old per-CLI model, effort and context (Settings → <CLI> before connections) were given to a
+   * connection (HI-1774): to its first, or to those from before connections had defaults; only once, never again.
+   */
+  connectionDefaultsTaken?: ProviderId[]
+  /**
+   * Server connections' key masking (HI-1772), mirrored with key-coverage.json and never cleared: `ever`, a key was
+   * saved (so fingerprints must exist); `gap`, a reset lost some (masking strict for good).
+   */
+  keyMasking?: { ever?: true; gap?: true }
   /** A version the user chose to skip; automatic checks don't offer it. */
   skippedUpdate?: string
   /** Version that last ran, to say "Hive updated" once after an update. */
@@ -555,6 +695,9 @@ export interface PlanLimit {
 }
 
 /** Subscription limits a provider reported (e.g. a rolling 5-hour window and a weekly limit). */
+/** A connection's plan usage (HI-1756): the login it came from (planUsage.ts usageLogin), so another's never shows as its. */
+export type ConnectionPlanUsage = PlanUsage & { login?: string }
+
 export interface PlanUsage {
   provider: ProviderId
   /** The plan's name when the provider says (e.g. "plus"). */
@@ -563,22 +706,252 @@ export interface PlanUsage {
   updatedAt: string
 }
 
+/** Who an account's folder is signed in as (HI-980): what the CLI's own status says, never a token. */
+export interface ConnectionIdentity {
+  email: string
+  /** The organisation's id: with the email, it tells two logins apart. */
+  orgId: string
+}
+
+/** An account's latest check (HI-980): what the CLI said, or why it couldn't be asked. */
+export interface ConnectionObserved {
+  at: string
+  /** null: the check failed (`error` says why), which never counts as signed out. */
+  loggedIn: boolean | null
+  email?: string
+  orgId?: string
+  /** Its plan, as the CLI names it ("max"). */
+  plan?: string | null
+  /** A check that failed (a timeout, output Hive couldn't read), in English for the log; the last good identity is kept. */
+  error?: string
+  /** Its folder isn't there, or isn't a folder Hive made (replaced from outside). */
+  missing?: boolean
+}
+
+/**
+ * An account (HI-2106, HI-2105's design): a CLI login Hive keeps (HI-980) or a server it reaches (HI-1772), in a folder of
+ * its own under the accounts folder (`<accounts>\<id>\`), linked to the CLI's home by a junction for what all accounts
+ * share; or (`home: 'cli'`) the CLI's own home and sign-in. `accepted` is who the user took it on as; `observed` the
+ * latest check: they differ when its login changed (a /login typed in a pane), which the user answers. Agents don't
+ * choose an account: they choose a connection on one.
+ */
+export interface Account {
+  /** Stable and random ("a-3f9c2e1b"): its folder's name, and its key-store and usage (`connectionPlanUsage`) entries'. A rename never changes it. */
+  id: string
+  provider: ProviderId
+  /**
+   * Where it gets its model (Darren, 27 Oct ~08:55): `signIn`, a login folder of Hive's signed in through the CLI's own
+   * sign-in; `server`, a server it reaches by a base URL, with a key or none (HI-1772: DeepSeek, Ollama…), in a folder of
+   * Hive's too. Absent in a record from before it: signIn.
+   */
+  kind?: 'signIn' | 'server'
+  /** A server account's server (HI-1772). Its key is never here: only in the key store (keyStore.ts). */
+  server?: ServerConnection
+  /**
+   * `cli`: no folder of Hive's but the CLI's own home and sign-in, made by Hive and never removed (HI-2106): Copilot's one
+   * PC-wide sign-in (decision C), and a test copy's CLI test home (the test seam, connectionSeam.ts).
+   */
+  home?: 'cli'
+  /** The user's name for it ("Personal", "Hive overnight"). */
+  name: string
+  createdAt: string
+  accepted?: ConnectionIdentity
+  observed?: ConnectionObserved
+  /** A removal that stopped partway, in English: what is left, for Remove to try again. */
+  leftover?: string
+  /** Its usage move (HI-2195): at this share of a limit, its agents move to another account's connections. Absent: off. */
+  usageMove?: UsageMoveRule
+}
+
+/** Which of an account's limits a usage move watches (HI-2195): the weekly one, the 5-hour one, or whichever gets there first. */
+export type UsageMoveLimit = 'weekly' | 'fiveHour' | 'any'
+
+/** An account's usage move (HI-2195): when `limit` reaches `percent`, its agents move to the account `to` (its id). */
+export interface UsageMoveRule {
+  percent: number
+  limit: UsageMoveLimit
+  to: string
+}
+
+/**
+ * A usage move fired for one limit's reset period (HI-2195): the rule it fired with (`firing` tells two firings apart),
+ * each agent it handled (by `<project id>/<agent id>`: moved, kept on the user's own choice, or given up after failed
+ * writes), the reasons it was noticed for, and failed tries.
+ */
+export interface UsageMoveRecord {
+  resetsAt: string
+  firing: string
+  rule: UsageMoveRule
+  handled: Record<string, 'moved' | 'kept' | 'failed'>
+  noticed?: string[]
+  tries?: Record<string, number>
+}
+
+/**
+ * A connection (HI-2106): a named setup on an account ("Claude · High"), what agents and the Assistant choose. Each value
+ * absent: the CLI decides (its default model, effort and mode, no 200K context, no extra arguments). A server account's
+ * connections take no effort or context: its server's models aren't the CLI's.
+ */
+export interface Connection {
+  /** Stable and random ("c-3f9c2e1b"), never an account's. */
+  id: string
+  /** Its account's id. */
+  account: string
+  name: string
+  model?: string
+  effort?: EffortLevel
+  use200kContext?: boolean
+  permissionMode?: PermissionMode
+  /** Extra command-line arguments, as typed (split at launch: splitArgs). */
+  extraArgs?: string
+}
+
+/** What a connection launches with (HI-2106): two connections on one account with the same values are the same setup. */
+export type LaunchValues = Pick<Connection, 'model' | 'effort' | 'use200kContext' | 'permissionMode' | 'extraArgs'>
+
+/**
+ * A connection as config.json kept it before HI-2106 (HI-980 to HI-1875): an account with its defaults (HI-1770). Read
+ * by the accounts migration only, from its record (`migrations.accounts1.legacy`).
+ */
+export interface LegacyConnection extends Account {
+  /**
+   * Its defaults for the agents on it (HI-1770): what an agent with no model, effort or context of its own ran with.
+   * Absent: not set yet (copied from the CLI's once, `defaultsFrom`); an empty object is the user's (the CLI decides).
+   */
+  defaults?: ConnectionDefaults
+  /** 'cli': `defaults` were still the CLI's per-CLI defaults as copied. */
+  defaultsFrom?: 'cli'
+}
+
+/**
+ * config.json's accounts migration (HI-2106), recorded once: when, and its connections as they were then (`legacy`, read
+ * only), which each workspace's own files are migrated from when it next opens, however much later.
+ */
+export interface AccountsMigration {
+  at: string
+  legacy: LegacyConnection[]
+}
+
+/**
+ * A project's accounts migration (HI-2106), recorded in the write that made it: `unplaced`, agents whose CLI had no
+ * account to make a connection on, by id, with what they would have launched with; the Assistant's home (`assistant`),
+ * the connection made for each CLI it had a setup for in its workspace (its agent holds the active one's), which a change
+ * of its CLI picks.
+ */
+export interface ProjectAccountsMigration {
+  at: string
+  unplaced?: Record<string, LaunchValues>
+  assistant?: Partial<Record<ProviderId, string>>
+}
+
+/** The Claude names a server's model can stand in for (HI-1772): the CLI's aliases. */
+export type ModelAlias = 'opus' | 'sonnet' | 'haiku'
+
+/** One of a server's models (HI-1772): its id at the server, and the aliases it stands in for (each alias at most one model). */
+export interface ServerModel {
+  id: string
+  as?: ModelAlias[]
+  /**
+   * The server runs it elsewhere (HI-1773: an Ollama cloud model, reached through the server on this PC but run on
+   * ollama.com), so its sessions are never free (local). Kept in config only as its server's listing said; what main
+   * sends a window or a launch also has its preset's pattern applied, as set now (withRemote).
+   */
+  remote?: true
+}
+
+/**
+ * A server connection's server (HI-1772): its base URL, its preset (the descriptor's, for its model listing), and its
+ * models, typed or read from it. Nothing secret: a key is in the key store, bound to the URL's origin.
+ */
+export interface ServerConnection {
+  baseUrl: string
+  preset?: string
+  models: ServerModel[]
+  modelsFrom: 'typed' | 'listed'
+}
+
+/** A legacy connection's defaults (HI-1770); each absent: the CLI decides (its own default model, effort; context off). */
+export interface ConnectionDefaults {
+  model?: string
+  effort?: EffortLevel
+  use200kContext?: boolean
+}
+
+/** The field moved from a project onto its agents by the connections migration (HI-1770). */
+export type MovedField = 'model' | 'effort' | 'use200kContext'
+
+/**
+ * A CLI's project overrides moved onto the project's agents (HI-1770, Darren's 26 Oct ~23:25 (2)): when, and each value
+ * an agent was given (`id`: `<cli>:<agentId>:<field>`, stable, for the notice and its dismissal).
+ */
+export interface ConnectionsMoved {
+  at: string
+  moved: { id: string; agent: string; field: MovedField; value: string | boolean }[]
+}
+
+/**
+ * A workspace's accounts for one provider (HI-980; workspace.json's `connections`, whose ids are accounts' since HI-2106):
+ * those on in it, and its default among them (derived, HI-1875; null: none).
+ */
+export interface WorkspaceConnections {
+  on: string[]
+  default: string | null
+}
+
 export interface WorkspaceConfig {
   version: 1
+  /**
+   * The accounts on in this workspace, per provider (HI-980). No entry for a provider: not set up yet (nothing is turned
+   * on by itself); `{ on: [] }`: the user turned them all off. `default` was HI-1875's migration input, ignored since
+   * and removed by the accounts migration (HI-2106).
+   */
+  connections?: Partial<Record<ProviderId, { on: string[]; default?: string | null }>>
+  /**
+   * The Assistant's own account per provider in this workspace (HI-1755), before HI-2106: read once by the accounts
+   * migration (the Assistant's agent then holds its connection), and removed by it.
+   */
+  assistantConnection?: Partial<Record<ProviderId, string | null>>
+  /**
+   * One-time changes to this file (HI-2106): `accounts1`, its own launch sources (`assistantConnection`, each provider's
+   * stored `default`) removed, once its Assistant's home was migrated (its record says what was made).
+   */
+  migrations?: { accounts1?: { at: string } }
   /** Where the workspace was last opened (#146): a different folder now means it was moved, and Repair… is offered. */
   lastPath?: string
+  /**
+   * The folder Hive's profile keeps this workspace's records by (HI-2007: its window's pin, its close command's runs),
+   * set once they have all followed it here. Apart from lastPath, which stays where Repair needs it until Repair is done:
+   * moved again before that, the records are found where they went.
+   */
+  profileAt?: string
   /** The last project rename (#514, `project-names.json`'s number) its hidden and removed projects follow. */
   renamesApplied?: number
   /**
-   * The MCP servers on in the workspace (#1093): its master switch. A server runs in a project only when it is on here
-   * and on in the project (mcpOnInProject). `model` 2: the settings are #1093's (before, `enabled` meant on for all
-   * projects, unless a project turned it off); absent, they are moved to it when the workspace opens.
+   * The workspace's MCP settings. `enabled` was #1093's master switch (the servers on in the workspace): since HI-2059 it
+   * is only read, frozen, for projects not yet converted to added servers (mcpAdded), and never written. `model` 2: the
+   * settings are #1093's (before, `enabled` meant on for all projects, unless a project turned it off); absent, they are
+   * moved to it when the workspace opens.
    */
-  mcp: { enabled: string[]; model?: 2 }
+  mcp: {
+    enabled: string[]
+    model?: 2
+    /**
+     * The servers added for the Hive Assistant (HI-1472, HI-2059: its view's MCP servers), as a project's. Absent until
+     * set or moved from the old Advanced switch; before `assistantModel` 3, #1093's meaning (assistantMcpAdded).
+     */
+    assistant?: string[]
+    /** 3: `assistant` means added (HI-2059), converted once from #1093's meaning. */
+    assistantModel?: 3
+    /** Choices dropped converting to added servers (HI-2059: servers that were off in the workspace), not yet said. */
+    droppedNotice?: number
+  }
+  /**
+   * The Hive skills the workspace's agents aren't given (#1431, Skills → Delivered to agents), by name: every other skill
+   * for their audience is delivered. A project can switch off more (ProjectConfig.skillDelivery), never one on again.
+   */
+  skillDelivery?: SkillDeliveryChoice
   /** Project folders Hive leaves out (Hide, or Remove from Hive while the folder is still in the workspace), by folder name. */
   hiddenProjects?: HiddenProject[]
-  /** Card loops' rounds and wait in hours when a request doesn't say (#412, Settings → Workspace); absent: 10 and 6. */
-  loops?: { rounds?: number; waitHours?: number }
   /** Agent names two projects share from before names were unique (#702), lower case: each said once, while it lasts. */
   flaggedAgentNames?: string[]
   /** The workspace's own advanced values (#367: Settings → Advanced, This workspace), for those a workspace can set. */
@@ -587,6 +960,126 @@ export interface WorkspaceConfig {
   journal?: JournalSettings
   /** The Assistant suggested its journal once, writing a handover while it was off (#1032): never again. */
   journalSuggested?: boolean
+  /** The workspace's default workflow options (SPEC §16.6.6), between the global ones and each project's own. */
+  workflow?: WorkflowDefaults
+  /** The one-time steps settled in this workspace's own defaults (HI-1997's `workflow.commitMessageDefault`), each in the same write as its change. */
+  stepsDone?: string[]
+  /** The workspace's default slot options (HI-1765), between Hive's and each project's own. */
+  slotDefaults?: SlotDefaults
+  /** HI-1368's When this workspace closes, run, as saved before HI-1954: read once into `commands`, then dropped. */
+  onClose?: CloseCommandSetting
+  /** The workspace's own commands (HI-1954, Settings → Commands at its level) and its open and close points. */
+  commands?: CommandsWorkspace
+}
+
+/**
+ * A command of the user's (HI-1954, like JetBrains' External Tools): run by cmd.exe from `folder` (the workspace's folder
+ * when absent), its placeholders filled in (shared/commands.ts fillCommand), by hand or at the points that pick it.
+ */
+export interface CustomCommand {
+  /** `c-` and 8 hex. */
+  id: string
+  name: string
+  command: string
+  folder?: string
+  /** "The commands after this need it": failing, its dialog leads with Stop here; unattended, the list stops there. */
+  needed?: boolean
+}
+
+/** A command a point runs: Hive's or the workspace's, by id. */
+export interface CommandRef {
+  scope: 'hive' | 'workspace'
+  id: string
+}
+
+/** A point's commands, in the order they run. `onUpdate`: close and quit run them too when Hive restarts for an update. */
+export interface CommandPoint {
+  run: CommandRef[]
+  onUpdate?: boolean
+}
+
+/** Hive's commands and When Hive quits, run (its commands only). */
+export interface CommandsHive {
+  list: CustomCommand[]
+  onQuit: CommandPoint
+}
+
+/** A workspace's commands and its points, which may pick Hive's commands too. */
+export interface CommandsWorkspace {
+  list: CustomCommand[]
+  onOpen: CommandPoint
+  onClose: CommandPoint
+}
+
+/**
+ * A command Hive runs as a workspace closes, or as Hive quits (HI-1368), waiting for it with a panel. An object, not a
+ * bare string, so it can later be one of a workspace's named commands without a migration.
+ */
+export interface CloseCommandSetting {
+  /** The command, run by cmd.exe; `{workspace}`, `{name}` and `{reason}` are filled in. Empty: nothing runs. */
+  command: string
+  /** Run it too when Hive restarts to install an update (skipped by default). */
+  onUpdate: boolean
+}
+
+/** Why a close command runs: its `{reason}`. */
+export type CloseReason = 'window' | 'switch' | 'quit' | 'update'
+
+/** A close command's run as its panel shows it (HI-1368): the `close-command` event's and closeCommand:state's. */
+export interface CloseCommandRun {
+  id: string
+  /** 'workspace': this window's workspace's; 'quit': When Hive quits, run. */
+  kind: 'workspace' | 'quit'
+  /** The command as it runs, its placeholders filled in. */
+  command: string
+  startedAt: string
+  /**
+   * saving: its workspace isn't closed and written yet (the spinner, Skip the command, which skips its command and When
+   * Hive quits, the close itself always finishing); running: the command (the spinner, Don't wait); failed: its exit
+   * code (or why), Close; ok and left: the panel goes.
+   */
+  state: 'saving' | 'running' | 'ok' | 'failed' | 'left'
+  /** The workspace's folder name, for the saving step's "Waiting for <workspace> to finish saving…". */
+  workspace?: string
+  /** The saving step's Skip the command was pressed: the command won't run, and the panel stays until the close ends. */
+  skipped?: boolean
+  /** The output's last lines (at most 8, each at most 400 characters). */
+  lines: string[]
+  exitCode: number | null
+  /** Why it failed without an exit code: 'drain' (its workspace's close didn't finish, so it didn't run), 'spawn', 'runner'. */
+  failure?: 'drain' | 'spawn' | 'runner'
+  /** The error, for 'spawn' (the system's text). */
+  error?: string
+  /** Which point runs it (HI-1954): a workspace opening or closing, Hive quitting, or by hand. */
+  point?: 'open' | 'close' | 'quit' | 'manual'
+  /** Its commands, in the order they run (HI-1954); `command`, `lines` and `exitCode` above are the current step's. */
+  steps?: CloseCommandStep[]
+  /**
+   * A failed step waiting for the user's choice (HI-1954): Rerun, Skip it and continue, Stop here, the controls bound to
+   * its step and attempt. `needed`: "The commands after this need it" is ticked, so Stop here leads.
+   */
+  awaiting?: { step: number; attempt: number; needed: boolean } | null
+}
+
+/** A step of a run as its panel shows it (HI-1954). */
+export interface CloseCommandStep {
+  name: string
+  state: 'waiting' | 'running' | 'ok' | 'failed' | 'skipped'
+  exitCode: number | null
+  /** Why it failed with no exit code: a placeholder or folder it couldn't use, or the command not starting. */
+  failure?: 'placeholder' | 'folder' | 'spawn'
+  detail?: string
+  startedAt?: string
+  endedAt?: string
+}
+
+/**
+ * Slot options a level (Hive's, a workspace's) gives the Git projects under it (HI-1765). `copy`: the git-ignored files
+ * copied into each new slot and review copy, glob patterns, comma separated or one per line; left out, the level
+ * inherits; an empty string is none.
+ */
+export interface SlotDefaults {
+  copy?: string
 }
 
 /** A project folder Hive leaves out of the workspace, until it's restored in Settings → Workspace. */
@@ -604,9 +1097,13 @@ export interface HiddenProject {
 /** On Hold, Todo, Doing, Review, Passed, Done (#170): Passed is reviewed and waiting to be merged, Done is merged. */
 export type TaskColumn = 'hold' | 'todo' | 'doing' | 'review' | 'passed' | 'done'
 
+/** A column of the board (#1420): a category's, or `merging`, a stage with a column of its own inside Approved. */
+export type BoardColumnId = TaskColumn | 'merging'
+
 /** A board as the user left it (a view preference, never in the cards' files): collapsed columns and folded cards. */
 export interface BoardFold {
-  columns?: TaskColumn[]
+  /** A category's applies to its stage's column; Merging keeps its own. */
+  columns?: BoardColumnId[]
   cards?: number[]
 }
 
@@ -643,6 +1140,11 @@ export interface ContextProblem {
 export interface TaskCard {
   /** #number, unique in the workspace and never reused. */
   number: number
+  /**
+   * Its key (#1219, #704): its project's key and its number there, `HI-12`; absent for a card with none (a workspace
+   * card, a project with no key yet, a 0.9 board). Worked out when the card is read, never saved with it.
+   */
+  key?: string
   title: string
   /** Markdown. */
   description: string
@@ -706,6 +1208,16 @@ export interface TaskCard {
  * A bulk archive by the user (#351): Archive All in a column, or Archive All Cards. Kept so the batch can be brought back
  * later (Undo, "Unarchive this batch"), each card where it was.
  */
+/**
+ * The board's state for the window (#1207): why it is read-only (saved by a newer Hive, or waiting for its upgrade to 1.0,
+ * which the user is asked for), and when the copy kept from before its upgrade to 1.0 was made (Help → Restore the 0.9
+ * Board Backup… puts it back), if there is one.
+ */
+export interface BoardState {
+  readOnly: 'newer' | 'upgrade' | null
+  backup09: { at: string } | null
+}
+
 export interface ArchiveBatch {
   id: string
   at: string
@@ -742,11 +1254,29 @@ export interface SetAsideCard {
 }
 
 /** What the user asked Archive All for (#351): main checks it again on each card as it is when it is archived. */
+/** Where a window's copy of the board stands (HI-1715): the board's stamp and the mark it last read. */
+export interface TaskCursor {
+  board: string
+  mark: number
+}
+
+/**
+ * A window's board read (HI-1715, `tasks:changes`): the cards changed since its cursor (every card when `full`), the live
+ * ones in full and the archived in short (`summary`), with every card's number (a card not among them is gone) and the
+ * cursor to send next. `stale`: the board was opened again, or the workspace changed, while it was read: read again.
+ */
+export type TaskChanges = { stale: true } | { stale?: false; board: string; mark: number | null; full: boolean; cards: TaskCard[]; numbers: number[] }
+
 export interface ArchiveRequest {
   /** What it was, in a few words (ArchiveBatch.label). */
   label: string
   /** The column it was for; null: the whole board. */
   column: TaskColumn | null
+  /**
+   * The stage it was for, where its category shows several (Approved beside Merging, #1420): a card in another stage
+   * of the column, as its facts say now, stays.
+   */
+  stage?: StageId
   /** The project the board showed (null: every project) and its search: a card that has left them stays. */
   project: string | null
   query: string
@@ -837,10 +1367,31 @@ export interface TaskPatch {
   context?: string[]
   /** Records a decision the user made (#357), attributed to the user whoever records it. Editing or removing one is the user's (tasks:editDecision). */
   decision?: string
+  /**
+   * HI-1932: the card's open requests (For you, their ids) the `decision` answers, closed with it in one write. Only with
+   * a decision and no other field; only the user's or the Assistant's (never an agent's).
+   */
+  answers?: string[]
+  /** HI-1932, set by Hive itself: the id the decision is recorded with (the one its answers name). */
+  decisionId?: string
+  /**
+   * A column move across workflow rules (#1265, SPEC §16.8.4), with why: the Assistant's, required when its move skips
+   * a rule (else refused, naming them); the user's reason, optional. Never an agent's.
+   */
+  override?: { reason: string }
 }
 
-/** Which agent Start gives a card to. */
-export type TaskStartTarget = { kind: 'agent'; agentId: string } | { kind: 'new-agent'; worktree: boolean; name?: string; provider?: ProviderId }
+/**
+ * What the window's move of a card came to (`tasks:move`, #1265): moved (the card as saved; `stopped`: it went only as
+ * far as it could, the step after refused for what no override makes true, such as nothing to submit, §16.8.4), or a
+ * question first (the rules the move would skip: nothing written; move again with `confirm`), or refused. `leftOut`
+ * (HI-2352): a None code card's submission, asked first what its paths leave out: move again with `paths`.
+ */
+export type TaskMoveResult = { moved: TaskCard; stopped?: Refusal } | { ask: string[] } | { leftOut: { paths: string[]; files: string[] } } | { refused: Refusal }
+
+/** Which agent Start gives a card to; a new one runs on `connection` (its id: HI-2121), else the first usable here. */
+/** `worktree` (0.9's own worktree for a new agent) is refused since 1.0 (#1451); the window stops sending it (#1442). */
+export type TaskStartTarget = { kind: 'agent'; agentId: string } | { kind: 'new-agent'; worktree?: boolean; name?: string; connection?: string }
 
 /** How a project leaves Hive (the main menu's Project → Remove Project…). */
 export type ProjectRemoval = 'hide' | 'remove' | 'delete'
@@ -859,6 +1410,11 @@ export interface ProjectRemovalInfo {
   /** Worktree agents: their folder, and work not merged into the project folder (commits ahead, uncommitted files). */
   /** `error`: git couldn't check it, which counts as holding work. */
   worktrees: { agent: string; path: string; branch: string; ahead: number; dirty: number; error?: string }[]
+  /**
+   * Its slots, copies and retired homes (#1447), with what removing the project would do to each: `kept`, why it would
+   * stay (the guarded clean-up's reason, or a home's, or a folder Hive didn't make), or null: removed.
+   */
+  folders?: { of: ProjectFolderOf; path: string; kept: string | null; blocksDelete?: string }[]
 }
 
 /** A project folder holding what Remove from Hive packed into its .hive/removed. */
@@ -871,6 +1427,145 @@ export interface RemovedData {
 
 export type Inherit<T> = 'inherit' | T
 
+/**
+ * Workflow options a level sets for its projects (SPEC §16.6.6: global in config, the workspace's in workspace.json), per
+ * platform: an option unset inherits the level before (the platform's all-off at the bottom, the project's own on top).
+ */
+export type WorkflowDefaults = Partial<Record<PlatformId, Partial<Omit<WorkflowOptions, 'platform'>>>>
+
+/**
+ * A project's workflow options as project.json keeps them (SPEC §16.6.6): the options it sets itself (an option it
+ * doesn't set inherits the workspace's, then Hive's, then the platform's all-off), and the preset they started from.
+ */
+export interface ProjectWorkflow {
+  platform: PlatformId
+  preset: PresetId | null
+  options: Partial<WorkflowOptions>
+  /**
+   * The other platforms' preset, options and answer to "How do you work?", kept while another one is in force so
+   * switching back restores them (#1419). Written with `setKept`, never by replacing `workflow` (#1417's `writeWorkflow`).
+   */
+  kept?: Partial<Record<PlatformId, { preset: PresetId | null; options: Partial<WorkflowOptions>; presetAsked?: PresetAsked }>>
+  /** The answer to "How do you work?" for the platform in force (#1423), written with `setPresetAsked`. */
+  presetAsked?: PresetAsked
+  /**
+   * HI-1697: set by the 1.0 upgrade on a Git project from 0.9, whose merge style and commit message (G6, G19) nobody
+   * chose, and kept: the merge queue asks before its first merge (For you) until the board records a choice (the answer,
+   * or a save that changes either; optionsForm.ts).
+   */
+  mergeAsk?: true
+  /**
+   * HI-1997: Git's commit message (G19) set to Hive's by a choice, not left by a preset: set by `writeWorkflow` when a
+   * write changes it to 'hive', kept while it stays so. The one-time switch to the branch's own keeps such a project's.
+   */
+  commitMessageChosen?: true
+}
+
+/** The answer to "How do you work? Solo / Pair / Team" (#1423): a preset was chosen, or Not now. */
+export type PresetAsked = 'chosen' | 'notNow'
+
+/** A project's stages as the board shows them (#1417, `workflow:stages`): those its options produce, and its own names. */
+export interface ProjectStages {
+  stages: StageDef[]
+  names: Partial<Record<StageDef['id'], string>>
+  /** The preset its options started from (null: none chosen): Solo hides its ended lanes from Pulse (#1421). */
+  preset: PresetId | null
+}
+
+/** Where a workflow option's value came from: the platform's all-off, or the level that set it (§16.6.6). */
+export type WorkflowOptionOrigin = 'platform' | 'global' | 'workspace' | 'project'
+
+/** The Workflow section of Project Settings (#1278): the project's options, what they inherit, and the presets on offer. */
+export interface WorkflowForm {
+  platform: PlatformId
+  /** A level's defaults (#1422: Hive's, the workspace's) rather than a project's options. */
+  level?: WorkflowLevel
+  /** The preset the project's options started from (null: none chosen). */
+  preset: PresetId | null
+  /** The options the project sets itself. */
+  own: Partial<WorkflowOptions>
+  /** The options in force, with where each came from; `invalid` when they fell back to all-off (English, why). */
+  options: WorkflowOptions
+  origins: Record<keyof WorkflowOptions, WorkflowOptionOrigin>
+  invalid: string | null
+  /** What each option would be without the project's own value (the workspace's, Hive's, or all-off), and from where. */
+  inherited: WorkflowOptions
+  inheritedOrigins: Record<keyof WorkflowOptions, WorkflowOptionOrigin>
+  /** The presets offered, in order, each with its options for this project; `needs`: shown unavailable, with why. */
+  presets: { id: PresetId; options: WorkflowOptions }[]
+  /** The project's commit identity from its git config (G12), or null. */
+  identity: { name: string; email: string } | null
+  /** Settings → Advanced → Workflow rules are enforced: off, the options are saved but no rule applies. */
+  enforced: boolean
+}
+
+/**
+ * A change to a project's workflow options: the preset they start from and the options the project sets itself. `base`:
+ * the preset and options the window's form was read with (#1418); a save is refused when the project's are no longer
+ * those (changed meanwhile by the Assistant's tool or another window), never written over them.
+ */
+export interface WorkflowChange {
+  preset: PresetId | null
+  options: Partial<WorkflowOptions>
+  base?: { preset: PresetId | null; options: Partial<WorkflowOptions> }
+}
+
+/** Why options can't be saved: a contradiction or a value not offered yet (their messages), or a reason in English. */
+export type WorkflowProblem = OwnWorkflowProblem | { kind: 'inheritor'; project: string; problem: OwnWorkflowProblem }
+
+/**
+ * A problem of the options being saved themselves; an inheritor's (#1422): a project inheriting a level's change would
+ * have that problem in its own options.
+ */
+export type OwnWorkflowProblem = { kind: 'contradiction'; id: Contradiction } | ({ kind: 'stageName' } & StageNameProblem) | { kind: 'bad'; why: string }
+
+/** The levels of workflow defaults the window edits (#1422): Hive's (config) and the workspace's (workspace.json). */
+export type WorkflowLevel = 'global' | 'workspace'
+
+/**
+ * What saving a level's defaults would do (#1422): its problems (an inheriting project's contradiction among them), the
+ * options it changes, and each project inheriting a changed option, with what changes for it, its running lanes and its
+ * cards in flight (they keep their rules: from the next card).
+ */
+export interface WorkflowLevelCheck extends WorkflowCheck {
+  projects: { name: string; path: string; workspace: { path: string; name: string }; changed: (keyof WorkflowOptions)[]; lanes: { id: string; name: string | null; builder: string }[]; inFlight: { number: number; key: string; title: string }[] }[]
+}
+
+/** What saving a change would do (§16.6.5's warning): its problems, the options it changes, and what keeps the old rules. */
+export interface WorkflowCheck {
+  problems: WorkflowProblem[]
+  changed: (keyof WorkflowOptions)[]
+  /**
+   * Whether the change applies at once to every card (#1417): it changes only names (N5), which aren't rules, so no card
+   * or lane keeps old rules (then `lanes` and `inFlight` are empty).
+   */
+  appliesNow: boolean
+  /** The project's running lanes: their cards keep the rules they started with until the lane ends. */
+  lanes: { id: string; name: string | null; builder: string }[]
+  /** Its cards in flight (started, not done): each keeps its rules, unless the change is applied to it. */
+  inFlight: { number: number; key: string; title: string }[]
+}
+
+/**
+ * What switching a project's version control would do (#1419, §16.6.5's warning): from what to what, why it can't be
+ * made now (null: it can), and the running lanes and cards in flight that keep their platform's rules. A switch is never
+ * applied to cards in flight: a Git card can't finish under None's rules.
+ */
+export interface PlatformSwitchCheck {
+  from: PlatformId
+  to: PlatformId
+  refused: SwitchRefusal | null
+  lanes: { id: string; name: string | null; builder: string }[]
+  inFlight: { number: number; title: string }[]
+  /** None chosen for a folder that is a Git repository: Hive then records no commits or merges for its cards. */
+  gitFolder: boolean
+  /** A card in flight goes through Hive's merge queue (its ruleset's): the queue carries on, and stays shown. */
+  queue: boolean
+}
+
+/** A project's Session tab as this user left it (AppConfig.ui.projectViews, HI-1749): ProjectConfig's view fields. */
+export type ProjectView = Partial<Pick<ProjectConfig, 'sessionView' | 'layout' | 'placement'>>
+
 export interface ProjectConfig {
   /** 2 since 0.2.0: agents are all equal and a project starts with none (0.1's agents are cleared). */
   version: 2
@@ -882,22 +1577,46 @@ export interface ProjectConfig {
   /** Project-scoped shortcut overrides (project, session and agent commands), over the global ones. */
   keybindings?: KeybindingOverrides
   /**
-   * The workspace's MCP servers this project has on (#1093, its MCP tab): each runs here only while it is on in the
-   * workspace too (mcpOnInProject). `disabled` is from before #1093 (a project turning off a server on for all
-   * projects): read once when the workspace's settings are moved to #1093's model, then emptied.
+   * The workspace's MCP servers added to this project (HI-2059, its MCP tab): the ones that run here. `model` 3 says
+   * `enabled` means added; before it is converted, #1093's meaning holds (on here and on in the workspace, mcpAdded).
+   * `disabled` is from before #1093 (a project turning off a server on for all projects): read once when the
+   * workspace's settings are moved to #1093's model, then emptied.
    */
-  mcp: { disabled: string[]; enabled: string[] }
+  mcp: { disabled: string[]; enabled: string[]; model?: 3 }
+  /** The Hive skills this project's agents aren't given (#1431, its Skills tab → Delivered to agents), over the workspace's. */
+  skillDelivery?: SkillDeliveryChoice
   chime: 'inherit' | 'on' | 'off'
-  /** The provider new agents get (Add Agent's quick add); inherit uses the global default. */
+  /** This project's own Suggest a fresh start (#1437), over Settings → Notifications'. */
+  suggestFreshStart: 'inherit' | 'on' | 'off'
+  /** Carrying on (#1432, shared/inboxSwitches.ts): this project's own inbox switches over Settings → Advanced's; inherit uses those. */
+  inboxCheckpoints: 'inherit' | 'on' | 'off'
+  inboxStopContinuation: 'inherit' | 'on' | 'off'
+  inboxIdleWakes: 'inherit' | 'on' | 'off'
+  /**
+   * The provider new agents got (Add Agent's quick add), before HI-2106 (decision A: the one order of accounts instead);
+   * removed by the accounts migration, and only shown until the window's screens follow (HI-2107).
+   */
   defaultProvider: Inherit<ProviderId>
-  /** The project's settings per provider, over the global ones. */
+  /**
+   * The project's settings per provider, over the global ones, before HI-2106: read once by the accounts migration (its
+   * agents' connections then hold them), and removed by it.
+   */
   providers: Record<ProviderId, ProjectProviderConfig>
   /** Overrides settings.sessions.compactSuggestTokens for this project; null inherits. */
   compactSuggestTokens: number | null
   /** Overrides settings.sessions.transcriptWarnMB for this project; null inherits. */
   transcriptWarnMB: number | null
+  /** Archived cards' attachments go this many days after archiving, or never (HI-1842, shared/cardCleanup.ts). */
+  cardAttachmentCleanup: 'off' | '3' | '7' | '30' | '90'
   /** The project's agents, in the order they were added. All are equal; a new project has none. */
   agents: AgentDef[]
+  /**
+   * One-time changes made to the project, recorded with what they did: `connections1`, per CLI, its model, effort and
+   * context overrides moved onto its agents (HI-1770), written with them in one write; `accounts1` (HI-2106), each agent
+   * pointed at the connection it launched with, and the project's and agents' own launch settings removed, in one write
+   * (`unplaced`: agents whose CLI had no account to make one on, by id, with what they would have launched with).
+   */
+  migrations?: { connections1?: Partial<Record<ProviderId, ConnectionsMoved>>; accounts1?: ProjectAccountsMigration }
   /** The Session tab's layout (one for the project, #134); its pages hold as many agents as it has panes. */
   layout: PageLayout
   /**
@@ -910,10 +1629,21 @@ export interface ProjectConfig {
   /** Where the project folder was last opened (#146), as workspace.json's lastPath. */
   lastPath?: string
   /**
+   * The folder Hive's profile keeps this project's view preferences by (HI-2008), set once they have followed it here:
+   * apart from lastPath, which stays where Repair needs it until Repair is done, as workspace.json's profileAt.
+   */
+  profileAt?: string
+  /**
    * Folders that moved (an agent's worktree repaired or recreated at a new place) whose CLI data (copyPathData) isn't
    * all copied yet (#146): kept until a copy works, so Repair tries again, after a restart too.
    */
   pendingCopies?: { from: string; to: string; of: string; owner?: MoveOwner }[]
+  /**
+   * Agents' branches Repair is renaming (#1305), recorded before git's rename and dropped once git, the agent's record
+   * and the cards' lines all have the new name: a rename cut short (a file that couldn't be written) is finished by the
+   * next Repair, whichever of its steps were done.
+   */
+  pendingBranchRenames?: { agentId: string; from: string; to: string }[]
   /**
    * Worktrees kept after their agent was replaced (#289: loading a template) before its first session ran the worktree
    * setup command: an agent that works in one again runs it first (needsSetup), so it isn't lost, nor run twice.
@@ -925,16 +1655,104 @@ export interface ProjectConfig {
    * the only ones Hive takes for this project's. Added when Hive first makes a branch in one; never removed.
    */
   branchSpaces?: string[]
-  fileLocks: Inherit<FileLockMode>
+  /**
+   * The project's version control platform (SPEC §16.3), recorded from detection when Hive makes its project.json and
+   * never switched silently: a different detection later is offered (ProjectInfo's `platform.offer`).
+   */
+  platform?: PlatformId
+  /**
+   * What detection found when the user last switched the platform (#1419, `foundKey`): `git`, `none` or `other:<name>`.
+   * While the folder still shows that, no switch is offered: choosing None for a Git folder isn't asked about again.
+   */
+  platformFound?: string
+  /**
+   * The project's workflow options (SPEC §16.6.6, OP-5): its platform, the preset they came from (null: set one by one,
+   * or the upgrade's), and the options. The upgrade to 1.0 writes them from how the project works today (#1218, §16.17);
+   * read-only in P3 (P4's Version Control tab edits them).
+   */
+  workflow?: ProjectWorkflow
+  /**
+   * The one-time upgrade steps settled in this project (#1445's `workflow.slotsUpToDateFromBeforeP7`), each recorded in
+   * the same write as its change, so a later run can tell it from a choice the user made since, after a failure too.
+   */
+  stepsDone?: string[]
+  /**
+   * From before HI-1766 (Project Settings → Agents → File locks): kept, with the old Card loops keys below, only while the
+   * project has no workflow options to hold them (shared/workflow/preferences.ts); read as its own until then.
+   */
+  fileLocks?: Inherit<FileLockMode>
   /** Overrides settings.agents.worktreeCopy; null inherits. */
   worktreeCopy: string | null
   /** Command run in a new worktree before its agent's first session, e.g. "npm install". */
   worktreeSetup: string
-  /** Hive wakes a card loop's reviewer when a card arrives in Review, and its builder on a verdict (#405). */
-  loopWakes: boolean
-  /** Card loops' rounds and wait in hours for this project (#412); null inherits the workspace's. */
-  loopRounds: number | null
-  loopWaitHours: number | null
+  /**
+   * The project's slot options (#1429, SPEC §16.10.2): the setup command run in a new slot (and again when its lock
+   * files change), the archive command run before Hive removes one, and the git-ignored files copied into a new one.
+   * Each left out reads today's `worktreeSetup`, none, and `worktreeCopy` (which stay as they are, for 0.9.3).
+   */
+  slots?: SlotOptions
+  /** The project's review and check copies (#1435): how many it keeps (left out: the larger of 2 and its reviewers plus one). */
+  copies?: { size?: number }
+  /** From before HI-1766 (Project Settings → Card loops): see `fileLocks`. */
+  loopWakes?: boolean
+  loopRounds?: number | null
+  loopWaitHours?: number | null
+  loopStepWaitMinutes?: number | null
+}
+
+/** One of a project's slots as the window reads it (#1429, slots.ts): its state and its open lease, if any. */
+export interface SlotView {
+  name: string
+  folder: string
+  state: 'creating' | 'ready' | 'lent' | 'dirty' | 'gone' | 'removing'
+  /** Its last setup or install failed: why (in English) and the run's log. */
+  warmError: string | null
+  warmLog: string | null
+  lease: { id: string; kind: 'card' | 'lane' | 'carried'; agent: string; card: number | null; lane: string | null } | null
+  /**
+   * The session run writing in it now (#1434): its agent and the lease it started under, until it has exited. `held`
+   * (#1506): its run is over but its processes aren't known to have ended (nor its Hive running), so only Release Slot…
+   * frees it.
+   */
+  writer: { agent: string; lease: string; held: boolean } | null
+}
+
+/** A slot's writer as Release Slot… shows it (#1506, agentFolders.ts heldWriter). */
+export interface HeldWriter {
+  slot: string
+  agent: string
+  run: string
+  /** The Hive holding it: this one (`self`), or another and whether that one still runs (null: can't be told). */
+  hive: { pid: number; self: boolean; alive: boolean | null }
+  /** Its run is still live in this Hive (its session, or the processes it left still followed): Release is refused. */
+  live: boolean
+  /**
+   * What Hive lists of the processes its run left running: its leftovers (the agent's ⋯ lists them), or, its Hive gone,
+   * the agent's processes that the notice that Hive closed unexpectedly lists and that still run. Null: not known.
+   */
+  processes: { list: AgentProcess[]; more: number; from: 'leftovers' | 'restart' } | null
+  /** Every process listed is Windows' own idle broker (HI-2309: a Sandbox's, none running): releasing it is safe. */
+  idleBrokers?: true
+}
+
+/** One of a project's review and check copies as the window reads it (#1435, copies.ts): its state and its lease not freed. */
+export interface CopyView {
+  name: string
+  folder: string
+  state: 'creating' | 'free' | 'leased' | 'returning' | 'dirty' | 'gone'
+  revision: string | null
+  warmError: string | null
+  lease: { id: string; kind: 'review' | 'check'; card: number; agent: string | null; returned: boolean } | null
+}
+
+/** What a test copy asks of a project's slot pool (`slots:test`, unpackaged builds only: #1429's e2e). */
+export type SlotTestOp = { op: 'lend'; agent: string; card?: number; lane?: string; slot?: string } | { op: 'release'; lease: string; why?: string } | { op: 'tidy'; at?: number } | { op: 'remove'; slot: string } | { op: 'carry'; agent: string; slot: string; folder: string } | { op: 'homes'; folders: string[] } | { op: 'writer'; slot: string; agent: string; run: string; pid: number; started: number } | { op: 'quit'; agent: string }
+
+/** A project's slot options as project.json keeps them (ProjectConfig.slots): each left out falls back (slots.ts). */
+export interface SlotOptions {
+  setup?: string
+  archive?: string
+  copy?: string
 }
 
 export interface ProjectProviderConfig {
@@ -946,58 +1764,58 @@ export interface ProjectProviderConfig {
   use200kContext: Inherit<'on' | 'off'>
 }
 
-/** A worktree an agent works in: its own checkout of the project on its own branch. */
-export interface AgentWorktree {
-  path: string
-  branch: string
-  /** Branch it was created from, and merges back into. */
-  base: string
-}
-
-/** One of a project's agents (up to Agents per project, #562). Settings left undefined follow the project's. */
+/** One of a project's agents (up to 24, #562; the Assistant's up to Maximum agents, HI-2001). Settings left undefined follow the project's. */
 export interface AgentDef {
   /** Random and never reused, so session records of removed agents don't attach to new ones. */
   id: string
   name: string
-  /** The CLI this agent runs. Always stored when the agent is added. */
+  /** The CLI this agent runs: its connection's account's (HI-2106), kept with it. Always stored when the agent is added. */
   provider?: ProviderId
-  worktree?: AgentWorktree
+  /**
+   * Its own model, effort, mode and context before HI-2106: read once by the accounts migration (its connection then
+   * holds them) and removed by it. Stored since only while it has no connection because its CLI has no account here yet,
+   * for the connection it gets once one is (placeUnplaced). In a window's AgentInfo, its connection's values (the
+   * adapter until HI-2108); in a patch or a new agent's options, a change of them: the connection on its account with
+   * them, made if none is.
+   */
   model?: string
   effort?: EffortLevel
   permissionMode?: PermissionMode
-  /** 200K context instead of 1M (capabilities.contextLimit). */
+  /** 200K context instead of 1M (capabilities.contextLimit); as model. */
   use200kContext?: boolean
   /** Session to resume for this agent. */
   lastSessionId?: string
-  /** The worktree's setup command hasn't run successfully yet. */
-  needsSetup?: boolean
   /** The Hive Assistant only: this workspace's mode, over Settings → Assistant. */
   mode?: string
-  /** What the agent is for ("builder", "reviewer"; free text, #126): saved in templates; empty, its name is its role. */
+  /** A note on what the agent is for (free text, #126; shown as Note since #1430): saved in templates. */
   role?: string
+  /** Which side of the workflow it takes (#1430); unset, the guess from its note or name (`agentWorkflowRole`). */
+  workflowRole?: WorkflowRole
+  /**
+   * The agent it is paired with (#1436): a builder's reviewer, or a reviewer's builder, by name, as a template's `pairs`
+   * made it. Start Lane fills in a builder's reviewer from it (#1443).
+   */
+  pairedWith?: string
   /**
    * Only these of the project's MCP servers (#537, shared/agentMcp.ts), saved in templates; absent: all of them. The
    * built-in hive server is given whatever this says.
    */
   mcpServers?: string[]
+  /**
+   * The connection it runs on (HI-2106: a Connection's id; before it, HI-1755, an account's). Its account off in the
+   * workspace, or the connection removed, or none: it launches on its CLI's first usable connection here and says so
+   * (decision H). In a window's AgentInfo, its account's id (the adapter until HI-2108; `connectionId` is the connection's).
+   */
+  connection?: string
 }
 
 /** A change to an agent's settings: empty values (null for use200kContext and mcpServers) clear an override so it follows the project. */
-export type AgentPatch = Partial<Pick<AgentDef, 'name' | 'provider' | 'model' | 'effort' | 'permissionMode' | 'mode' | 'role'>> & { use200kContext?: boolean | null; mcpServers?: string[] | null }
+export type AgentPatch = Partial<Pick<AgentDef, 'name' | 'provider' | 'mode' | 'role'>> & { mcpServers?: string[] | null; workflowRole?: WorkflowRole | null; connection?: string | null }
+
+/** Why a connection can't be an agent's own choice here (HI-1769): removed, another CLI's, or off in its workspace. */
+export type ConnectionProblem = 'missing' | 'otherCli' | 'off'
 
 /** What loading a template into a project would do (#126), and what stops it now. */
-/**
- * What happened to an old worktree the user chose to remove with a template's load (#289, #313): `removed` (the folder
- * went), and `branchKept` when its branch stayed all the same (a ref moved in the last step); `why` it was kept, or why
- * the branch was.
- */
-export interface OldWorktreeOutcome {
-  branch: string
-  removed: boolean
-  branchKept?: true
-  why?: string
-}
-
 export interface TemplateLoadPlan {
   scope: TemplateScope
   file: string
@@ -1005,31 +1823,57 @@ export interface TemplateLoadPlan {
   layout: PageLayout
   /** The project's agents, all removed: running ones and uncommitted worktree work block the load. */
   remove: { id: string; name: string; running: boolean; dirty: number; worktree?: { path: string; branch: string } }[]
-  /** The agents it creates, with the names chosen in the dialog (#702) when it gave some. */
+  /**
+   * The agents it creates, with the names chosen in the dialog (#702) when it gave some, its patterns expanded with the
+   * project's key (#1123 names), each with the CLI it suggests (HI-2109: its connection, chosen in the dialog, says the
+   * one it runs). Each works in the project folder (#1436): where an agent works is the card's or lane's, not the template's.
+   */
   create: TemplateAgent[]
-  /** The template's own names for them, by `create`'s order: what a prefix goes in front of (#702). */
+  /** The template's own names for them, by `create`'s order, expanded with the project's key: what a prefix goes in front of (#702). */
   templateNames: string[]
   /** Created names another project's agent has (#702): the load is refused until they are renamed. */
   taken: { name: string; project: string }[]
+  /** Builders and their reviewers among `create`, by their indexes (#1436): kept as the agents' `pairedWith`. */
+  pairs: { builder: number; reviewer: number }[]
+  /** The preset it suggests (#1436), when the project's options didn't start from it: the dialog offers to switch. */
+  suggestedPreset: SuggestedPreset | null
+  /** G17's choice it suggests (#1436), offered once the Workflow section has it (#1443, #1445); never written by the load. */
+  reviewerMode: ReviewerMode | null
   /**
-   * Where each created agent's worktree is (#268), by `create`'s order: a branch in this project's repository and a folder
-   * in its worktree location; null for an agent in the project folder. `reuse`: a clean worktree of that name it works in
-   * again, its branch left as it is (#289); else a new one, with `notReused` saying why the one of that name can't be.
+   * The connections its agents can be given (HI-2109): those usable in the project's workspace, in the order (its account
+   * on there, its CLI on and installed). Its agents' `provider` is only the CLI they suggest, which preselects one. None
+   * usable: they are made on the CLI they suggest, and get a connection once an account is (as Add Agent's).
    */
-  worktrees: ({ branch: string; path: string; base: string; reuse?: true; notReused?: string } | null)[]
-  /**
-   * The removed agents' worktrees no created agent works in again (#289): `removable` when merged into the main branch
-   * (`mergedInto`) and clean (`worktreeCheck`), which the load can remove with their branches if asked; else kept, `why`.
-   */
-  oldWorktrees: { agent: string; path: string; branch: string; removable: boolean; why?: string }[]
-  /** The main branch the old worktrees were checked against: a removal is refused if it is another by then. */
-  mergedInto: string | null
-  /** The project's worktree setup command, which each new worktree runs before its agent first starts (null: none). */
-  setup: string | null
-  /** Providers the template needs that are off or not installed, and which of its agents need each. */
-  missing: { provider: ProviderId; reason: string; agents: string[]; problem?: 'unknown' | 'off' | 'notInstalled' }[]
+  options: ConnectionOption[]
   /** Why it can't be loaded now (empty: it can). */
   blocked: string[]
+  /** Its workflow (HI-1910) as it meets this project's: null when it has none. */
+  workflow: TemplateLoadWorkflow | null
+  /**
+   * More agents than the project's Maximum agents (HI-2001): `now` is it, `needs` the template's agents. The user's load
+   * goes ahead, and its dialog offers to raise the maximum; the Assistant's is refused (`blocked`). Null when they fit.
+   */
+  maxAgents: { now: number; needs: number } | null
+}
+
+/**
+ * A template's workflow in the Load template dialog (HI-1910): the section for the project's version control, laid
+ * over its options as they are now (`overlay`: the preview; the Workflow form lays the section over them again once it
+ * reads them, to save there), or why none applies.
+ */
+export interface TemplateLoadWorkflow {
+  /** The project's version control. */
+  platform: PlatformId
+  /** The template's usable sections, and those it had that can't be used (said). */
+  sections: PlatformId[]
+  dropped: PlatformId[]
+  /** The section used (Hive's own: its preset as this project's form offers it), or null. */
+  section: TemplateWorkflow | null
+  overlay: TemplateWorkflowOverlay | null
+  /** It has only a Git section and the project has no version control: its workflow needs Git first. */
+  needsGit: boolean
+  /** A None project, the template with both sections: None's is used, and it has a Git one too. */
+  alsoGit: boolean
 }
 
 export interface AgentInfo extends AgentDef {
@@ -1037,7 +1881,29 @@ export interface AgentInfo extends AgentDef {
   restartNeeded: boolean
   /** The session Resume opens for this agent while it isn't running (null: nothing to resume). */
   resume: ResumeTarget | null
+  /** Its adopted worktree's slot, while it holds it under a carried lease (#1441): Release Slot… in its menu ends it. */
+  carriedSlot?: string
+  /** A slot its run that is over still holds as writer, its processes not known ended (#1506): Release Slot… frees it. */
+  heldSlot?: string
+  /** Where it works now (#1442): its running session's folder, else where its next conversation starts. */
+  place: ShownPlace
+  /**
+   * Main's record of its start while it isn't running (HI-1977, HI-1976's): under way (a Start, its slot being prepared,
+   * its session spawning, a restart's resume), or why its last one failed. Absent: neither, or it runs.
+   */
+  start?: AgentStart
+  /** The count of start changes main had made when `start` was read (HI-1977): a change told with a higher one is newer. */
+  startSeq?: number
+  /** Its connection (HI-2106), while `connection` says its account to today's screens: its id and name. */
+  connectionId?: string
+  connectionName?: string
 }
+
+/**
+ * An agent's start as the stall check reads it (HI-1977): under way, why it failed, or why it waits (HI-2304: its slot
+ * held by what another run left running there; English, as Hive says it).
+ */
+export type AgentStart = { starting: true } | { failed: string } | { waiting: string }
 
 export interface ResumeTarget {
   id: string
@@ -1045,28 +1911,37 @@ export interface ResumeTarget {
   lastActiveAt: string
   createdAt?: string
   titleAtRename?: string | null
+  /** Why it can't resume now in the slot it ran in (#1434): Resume All and startup leave an agent with one. */
+  hold?: ResumeHold
+  /** The retired home it resumes in (#1441), by its folder's name, while a new conversation starts elsewhere (#1552). */
+  home?: string
 }
 
 export interface AddAgentOptions {
   name?: string
-  location: 'project' | 'new-worktree' | 'existing-worktree'
+  /** Absent: the project folder (#1442: the window sends none; #1451 refuses a worktree). */
+  location?: 'project' | 'new-worktree' | 'existing-worktree'
   /** new-worktree: branch to create (default hive/<workspace>/<project>/<name>, #703) and the branch to base it on (default the current one). */
   branch?: string
   base?: string
   /** existing-worktree: its folder. */
   worktreePath?: string
+  /** Its CLI when no connection is named (HI-2122): that CLI's first usable connection here. */
   provider?: ProviderId
-  model?: string
-  effort?: EffortLevel
-  permissionMode?: PermissionMode
-  use200kContext?: boolean
   role?: string
+  /** Which side of the workflow it takes (#1430); absent, the guess from its note or name. */
+  workflowRole?: WorkflowRole
   /** Only these of the project's MCP servers (#537); absent: all of them. */
   mcpServers?: string[]
+  /** The connection it runs on (HI-2108: its id), on in the workspace; absent: the first usable here (decision A). */
+  connection?: string
+  /** Run with the write, under project.json's lock (HI-2328: the Assistant's guard): throwing adds nothing. Main only. */
+  check?: () => void
   /**
    * #456: new-worktree, work in the project's unused worktree on that branch instead when it is merged into the base and
    * clean, brought up to the base; existing-worktree, bring the one chosen up to the base when it is merged and clean.
-   * The Add Agent dialog and the Agent API ask for it; templates reuse their own way (#289).
+   * The Add Agent dialog and the Agent API ask for it; templates reuse their own way (#289). 1.0 (#1451): no agent gets a
+   * worktree, so it does nothing.
    */
   reuseWorktree?: boolean
 }
@@ -1164,6 +2039,38 @@ export interface UnusedWorktree {
    * worktrees folder), or not Hive (an agent's own `git worktree add`, a CLI subagent's isolation, the user's).
    */
   origin?: UnusedWorktreeOrigin
+  /**
+   * What it is to Hive's pools (#1450): a free slot beyond the pool's size (`slot`), a slot left with changes and no
+   * lease (`dirtySlot`), a carried folder whose lease ended (`carried`), or a retired home no conversation resumes in
+   * any more (`home`), or a merge queue's folder its queue no longer needs, or one named as the queue names them that it
+   * has no record of (`queue`, #1644; one its queue uses is never listed). Absent: a worktree no agent works in, as before. A slot's kinds are removed only through the
+   * pool's guarded clean-up (never Remove anyway), and aren't given to an agent.
+   */
+  kind?: UnusedWorktreeKind
+  /** Its slot's name (a slot's kinds). */
+  slot?: string
+}
+
+export type UnusedWorktreeKind = 'slot' | 'dirtySlot' | 'carried' | 'home' | 'queue'
+
+/**
+ * A branch the Merge dialog can merge outside cards (#1450, OP-13): a card's line, a carried slot's branch, or any
+ * other local branch; where it is checked out (its slot, when that is one), and the card whose line it is while that
+ * card isn't Done (merged through its card, or here after a confirmation).
+ */
+export interface MergeBranch {
+  name: string
+  kind: 'line' | 'carried' | 'branch'
+  folder?: string
+  slot?: string
+  card?: { number: number; key: string; title: string }
+}
+
+/** The Merge dialog's choices (#1450): the branches to merge, the targets, and the project folder's branch (the default target). */
+export interface MergeBranchList {
+  branches: MergeBranch[]
+  targets: string[]
+  checkedOut: string | null
 }
 
 export type UnusedWorktreeOrigin = { madeBy: 'hive'; agentName?: string } | { madeBy: 'other' }
@@ -1202,6 +2109,10 @@ export interface MergeResult {
   /** Files that would conflict; nothing was changed. */
   conflicts?: string[]
   error?: string
+  /** Refused: the worktree has this many uncommitted files (#1347: only committed work is merged). */
+  uncommitted?: number
+  /** The commit the target is at after the merge (the merge or squash commit; its tip when a squash changed nothing). */
+  mergeCommit?: string
   /** The worktree and branch were removed afterwards. */
   cleanedUp?: boolean
   /** An unused worktree's merge asked to remove it afterwards, but it was kept: why (#400). */
@@ -1212,6 +2123,16 @@ export interface MergeResult {
 }
 
 export interface SessionRecord {
+  /** The connection its latest run launched on (HI-1755), id and name as then; absent: none (a provider without connections). */
+  connection?: { id: string; name: string }
+  /**
+   * A run of it was on a server connection (HI-1772), kept once set: its CLI's own cost reports price the server's model
+   * as a Claude model, so they are never counted (`withoutCostReports`): Hive's estimate by the real model id only.
+   */
+  serverRan?: true
+  /** A run of it was on a server on this PC; one ran anywhere else (HI-1772): each kept once set. Free: the first alone. */
+  serverLocal?: true
+  notLocal?: true
   id: string
   /** The provider that ran it ("claude-code", "codex"). The field name predates providers. */
   agent: ProviderId
@@ -1223,9 +2144,14 @@ export interface SessionRecord {
   agentId?: string
   /** That agent's name then, so a session still says whose it was after the agent is removed (absent in older records). */
   agentName?: string
-  /** Folder it ran in, when not the project folder (a worktree). Claude Code files transcripts by folder. */
+  /**
+   * Folder it ran in: always recorded since #1434 (the project folder too); absent in older records, which ran in the project
+   * folder. Claude Code files transcripts by folder.
+   */
   cwd?: string
   branch?: string
+  /** The slot lease it is bound to (#1434, agentFolders.ts): set when it started in a slot. Read only: its own column. */
+  lease?: string
   /** Where the provider keeps the transcript, when it can't be found from the folder (Codex). */
   transcriptPath?: string
   /** The session whose work was handed over to this one ("Hand Over to…"). */
@@ -1257,6 +2183,12 @@ export interface SessionRecord {
    * told it. A resume in another mode (or with none recorded) tells it the mode once (#334).
    */
   mode?: string
+  /**
+   * Hive gave this conversation instructions of its own at a launch (#1433: the Assistant's role and mode, the Workspace
+   * notes note). Never cleared: a resume of it renders its system prompt fresh, whichever agent resumes it and whatever
+   * that launch gives, so instructions switched off or emptied since leave it (Claude Code keeps a conversation's first).
+   */
+  promptAdded?: true
 }
 
 /**
@@ -1269,6 +2201,9 @@ export interface SubSession {
   parentId: string | null
   kind: string
 }
+
+/** What a background task is (#1584): a command left running, a Monitor, a subagent run in the background, a workflow. */
+export type BackgroundTaskType = 'command' | 'monitor' | 'subagent' | 'workflow'
 
 /** What a bulk action on the Sessions tab does to each session (session:bulk). */
 export type SessionBulkAction = 'archive' | 'unarchive' | 'delete'
@@ -1285,6 +2220,15 @@ export type SessionSkipReason = 'live' | 'in-use' | 'reading' | 'open' | 'extern
 export interface SessionBulkResult {
   done: string[]
   skipped: { id: string; reason: SessionSkipReason; message?: string }[]
+}
+
+/** A bulk action under way on a host's sessions (#1659): how many of them it has been through, done or skipped. */
+export interface SessionBulkProgress {
+  /** Which run: several can run at once on a host (a branch's action started while Clean Up runs). */
+  id: number
+  action: SessionBulkAction
+  done: number
+  total: number
 }
 
 /** background: the agent's turn has ended, but it has background tasks that will start it again when they end. */
@@ -1313,12 +2257,14 @@ export interface RuntimeFacts {
 /** An agent's wake-on-change watch, as its state shows it: the cards and condition, since when, and its overall limit. */
 export interface TaskWatchInfo {
   cards: number[]
-  changes: ('column' | 'comment' | 'verdict' | 'agent' | 'blocked')[]
+  changes: ('column' | 'comment' | 'verdict' | 'agent' | 'blocked' | 'request' | 'decision' | 'step')[]
   column?: TaskColumn
   /** An agent watch's agents, by name (#416: its cards are none). */
   agents?: string[]
   /** A lane watch's lanes, by id, or ["all"] (#531; its cards are those beside the lanes, #726). */
   lanes?: string[]
+  /** Accounts' usage watched beside its cards or lanes, or alone (HI-2195; HI-2285: such a watch waits on more than its cards). */
+  usage?: true
   /** "Waiting for #12 → Review", "Waiting for B6 to finish". */
   label: string
   since: string
@@ -1342,6 +2288,44 @@ export interface InboxSummary {
   overdue: number
 }
 
+/** LiveSessionState.hooksMissing (#1336): since when, what showed it, and why when Hive can tell. */
+export interface HooksMissing {
+  since: string
+  /** start: no hook since its start; prompt: none after a prompt its CLI took; transcript: none for a turn its transcript shows it took (#1371). */
+  after: 'start' | 'prompt' | 'transcript'
+  /** transcript: the turn that showed it, by the transcript's id for it (Claude Code's promptId, Codex's turn_id, Copilot's interactionId). */
+  turn?: string
+  why?: 'refused' | 'off' | 'newer'
+  /** off: the settings that turn them off, as the CLI's adapter names them. */
+  offIn?: string
+}
+
+/**
+ * A CLI waiting to retry its model request (HI-1972), as its own records say (Codex's log): when it was told (`at`, ISO),
+ * the turn's first such wait (`since`), when it tries again (`retryAt`; null when the CLI doesn't say), which try it is
+ * of how many (`max` null when it doesn't say), and the HTTP status that refused it (429: rate-limited), when it names
+ * one. `network`: the provider couldn't be reached at all (for CLIs that say so; Codex's records don't).
+ */
+export interface RetryWait {
+  at: string
+  since: string
+  retryAt: string | null
+  attempt: number
+  max: number | null
+  status: number | null
+  network?: true
+}
+
+/**
+ * The retry waits this launch has finished (HI-1996): how many, their time together (ms), and the latest one (from its
+ * first try, `since`, to when it ended, as RetryWait says), for telling a throttled round from a slow one afterwards.
+ */
+export interface RetryWaited {
+  waits: number
+  ms: number
+  latest: { since: string; ended: string; tries: number; status: number | null; network?: true }
+}
+
 export interface LiveSessionState {
   provider: ProviderId
   /** This launch, until the process exits; hooks name it so they reach the right agent. */
@@ -1350,8 +2334,10 @@ export interface LiveSessionState {
   /** Which of the project's agents this is. */
   agentId: string
   agentName?: string
-  /** Folder the session runs in: the project folder or the agent's worktree. */
+  /** Folder the session runs in: the project folder, a slot (#1434), or the agent's 0.9 worktree. */
   cwd: string
+  /** The slot it runs in (#1434): its name, while it runs under one of its leases. */
+  slot?: string
   /** The provider's session id. Empty until the provider reports it, for providers that choose it themselves. */
   sessionId: string
   /** The mode the session is actually in: from launch, Hive's live switches, Shift+Tab in the terminal (its footer) and hooks. */
@@ -1387,6 +2373,14 @@ export interface LiveSessionState {
    */
   turn?: { state: 'running' | 'over' | 'unknown'; id?: string; silentSince?: string }
   /**
+   * Its CLI is waiting to retry its model request in the running turn (HI-1972: Codex's log after a 429), as Hive last
+   * read it: shown as its status while `retryAt` is ahead (retryWaitCurrent), cleared by its next hook or the turn's end.
+   * With no `retryAt` (HI-1973: Copilot doesn't say), it stands until one of those.
+   */
+  retryWait?: RetryWait
+  /** The retry waits this launch has finished (HI-1996); absent until one has. retryWait is the one under way. */
+  retryWaited?: RetryWaited
+  /**
    * Facts of its runtime besides its turn and background tasks, each set where Hive learns it, never read back from the
    * status word (#648; shared/runtime.ts agentRuntime() gathers them all, and the labels are projected from them).
    */
@@ -1402,10 +2396,39 @@ export interface LiveSessionState {
    * and takes the answer when it comes. It needs you (the attention inbox) until answered.
    */
   question?: { text: string; since: string }
+  /**
+   * Its last turn ended on an error (#1632: a failed stop, such as Claude Code's StopFailure on an API connection
+   * error), with what the CLI said and when: it needs you until its next turn starts. Its status stays as the turn's
+   * end made it (finished), so Hive still prompts and wakes it as an idle agent.
+   */
+  /** `message`: the CLI's words, '' when it said none (the window says the turn ended on an error). */
+  failedTurn?: { message: string; since: string }
   pid?: number
   startedAt: string
   /** Effective settings the session launched with — used to detect "restart to apply". */
   launchSignature: string
+  /**
+   * The connection this run launched on (HI-1755), kept for the run whatever is chosen meanwhile; absent: a provider
+   * without connections (or a test copy on its CLI test home). `note`: why it isn't the one chosen (its choice was off).
+   */
+  launchedConnection?: {
+    id: string
+    name: string
+    note?: 'offFallback' | 'missing' | 'unknownLogin' | 'loginChanged'
+    /** Who it launched as (HI-1756: its plan usage is that login's), as plan usage keeps a login (a hash); absent: unknown. */
+    login?: string
+    /** A server connection's (HI-1772): its models as launched, so the footer shows the real model and what it stands in for, and whether it runs only on this PC (its server is, and none of its models runs elsewhere: HI-1773). */
+    server?: { models: ServerModel[]; local?: boolean }
+  }
+  /**
+   * The model and effort this launch gave its CLI (HI-1996), after the agent's, project's, provider's and connection's
+   * choices; null: none given, so its CLI's own default. What the CLI reports once it runs is `modelId` and `effort`.
+   */
+  launchedWith?: { model: string | null; effort: string | null; /** The model was the agent's own choice, not a default. */ own?: true }
+  /** A switch to the connection it would launch on now waits for its turn to be over (HI-1755). */
+  switchPending?: boolean
+  /** Its conversation ran only on servers on this PC (HI-1772): free, its cost a known $0, shown as "free (local)". */
+  costFree?: boolean
   /**
    * What it was given at launch (GET /v1/projects/{name}): Hive's guidance revision, the content hash of each Hive skill's
    * copy it reads, and why a skill isn't as asked for (a folder of the user's has its name, an old copy kept while in use).
@@ -1425,6 +2448,19 @@ export interface LiveSessionState {
    * Shown in its pane until the CLI takes it or the user types there; nothing more is typed into it meanwhile.
    */
   untakenLine?: { since: string; text: string }
+  /**
+   * Its input takes no keys (HI-2191): keys Hive typed went unanswered while its input box read empty, so something on its
+   * screen takes them. Nothing is typed into it until it is seen to take keys again; its pane offers Try again (`since`
+   * names this block).
+   */
+  inputBlocked?: { since: string }
+  /**
+   * Its CLI's hooks aren't reaching Hive (#1336), this launch: none came within a while of its start (a CLI that sends one
+   * then), or none after a prompt its CLI went to work on (its screen or its records show it). Hive's status for it may be
+   * wrong, so it shows as unknown and nothing is typed into it; any hook clears it. `why` when Hive can tell: Hive
+   * refused its hooks (their token), its settings turn hooks off (`offIn`: where), or it is newer than Hive was tested with.
+   */
+  hooksMissing?: HooksMissing
   /**
    * Its deliveries (#647: messages left for it, main/deliveries.ts) not received yet, and how many are overdue; shown in
    * its pane ("✉ 2 unread"), where the user can cancel those waiting. Absent when there are none.
@@ -1464,6 +2500,8 @@ export interface LiveSessionState {
   settingUp?: boolean
   /** Background tasks the agent started that are still running (commands, Monitors, Codex's background terminals). */
   backgroundTasks?: number
+  /** When its background tasks last ended (ISO: the count went to none), so a review waiting on them starts its clock then (HI-1993). */
+  backgroundEndedAt?: string
   /** The running conversation's transcript size in bytes, once the provider has written one. */
   transcriptBytes?: number
   /** The start of its latest reply, as its last turn's end reported it (shared/tiles.ts replyStart): its tile's last lines (#976). */
@@ -1483,12 +2521,16 @@ export interface ProjectInfo {
   restartNeeded: boolean
   /** Every agent, in the order added, with its running session. */
   agents: AgentInfo[]
+  /** Its slots and retired homes, named (#1442): how the window names a session's or a card's folder. */
+  folders?: NamedFolder[]
   /** MCP servers defined in the project's own config (.mcp.json, .codex/config.toml) that are not deployed to the workspace. */
   unmanagedMcp: string[]
   /** The folder holds what Remove from Hive packed (handovers, board cards), which Hive offers to restore. */
   removedData?: RemovedData | null
   /** Whether its .hive is kept out of version control (#345); absent for the Assistant's home. */
   hiveVcs?: HiveVcs
+  /** Its version control platform, capabilities and detection (SPEC §16.3); absent for the Assistant's home. */
+  platform?: ProjectPlatform
 }
 
 /**
@@ -1521,9 +2563,21 @@ export interface WorkspaceInfo {
 }
 
 /** What moved (#146): the workspace (from its old folder), or only some of its projects. */
+/** A moved workspace's records by folder still to follow it (HI-2007, config.json's `profileMoves`). */
+export interface ProfileMove {
+  from: string
+  to: string
+  failed?: string
+}
+
 export interface WorkspaceMoved {
   /** The workspace's old folder; null when only projects moved (renamed or moved in from elsewhere). */
   from: string | null
+  /**
+   * Old folders whose records by folder (the close command's runs) the last try couldn't all bring here (HI-2007), and
+   * why: Repair tries again. A run still going there isn't one: it follows once it has ended. Absent when there are none.
+   */
+  profile?: { from: string; failed: string }[]
   /** The projects that moved, by name. */
   projects: string[]
   /** Projects that didn't move but have a worktree's sessions or data still to follow it to a new folder (#146). */
@@ -1533,6 +2587,8 @@ export interface WorkspaceMoved {
    * Repair gives them to the project they belong to now. Absent when there are none.
    */
   cards?: MoveCards[]
+  /** How many agents' branches are still named after an old place (#1305), for Repair to rename; absent: none. */
+  branches?: number
 }
 
 /**
@@ -1573,6 +2629,25 @@ export interface MoveHostPlan {
   sessions: number
   /** What a CLI keeps by folder path (Claude Code's transcripts and memory), to copy to the new path's name. */
   folders: PathDataCopy[]
+  /** Agents' branches named after where the workspace or project was (#1305): renamed, their records with them. */
+  branches?: MoveBranch[]
+}
+
+/**
+ * An agent's branch in Hive's form, hive/<workspace>/<project>/<agent>, whose workspace or project part is an old one
+ * (#1305, Darren's decision on #1303: renamed, never offered): `to` is its name here. `remote`: the remote it tracks,
+ * which keeps the old name (pushing under the new one is the user's step). `kept`: why it isn't renamed now
+ * (`exists`: a branch of that name is already there). `pending`: a rename a Repair before began and couldn't finish
+ * (project.json's `pendingBranchRenames`), finished now from where it stopped.
+ */
+export interface MoveBranch {
+  agentId: string
+  agentName: string
+  from: string
+  to: string
+  remote?: string
+  kept?: 'exists'
+  pending?: boolean
 }
 
 /**
@@ -1582,12 +2657,28 @@ export interface MoveHostPlan {
  * branch is gone (`to`: where, if that place can be used); unlink: the agent's worktree link is to be removed;
  * original: the project is still at its old folder too (a copy), which keeps the worktree.
  */
+/**
+ * A folder Hive keeps for a project besides an agent's 0.9 worktree (#1447), as Repair and project removal name it: a
+ * slot (its lease's agent and the cards it held, by key; `carried`: an agent's adopted worktree), a review or check copy,
+ * or a reviewer's retired home (its agent).
+ */
+export type ProjectFolderOf =
+  | { kind: 'slot'; name: string; agent: string | null; cards: string[]; carried: boolean }
+  | { kind: 'copy'; name: string }
+  | { kind: 'home'; agent: string | null }
+
+/**
+ * A worktree Repair looks at: an agent's 0.9 worktree, or (`of`, #1447) one of the project's slots, copies or retired
+ * homes, keyed then as `slot:<name>`, `copy:<name>` or `home:<n>` in `agentId` (`agentName`: its name for the log).
+ * `later`: a free slot or copy not found, made again where it belongs at its next lease.
+ */
 export interface MoveWorktree {
   agentId: string
   agentName: string
   from: string
   to: string | null
-  how: 'moved' | 'stayed' | 'located' | 'missing' | 'recreate' | 'unlink' | 'original'
+  how: 'moved' | 'stayed' | 'located' | 'missing' | 'recreate' | 'unlink' | 'original' | 'later'
+  of?: ProjectFolderOf
   /** missing and recreate: its branch, and whether the branch survives (Recreate) or not (Create a new worktree). */
   branch?: string
   branchExists?: boolean
@@ -1600,6 +2691,8 @@ export interface WorktreeGone {
   branch: string
   base: string
   branchExists: boolean
+  /** A gone slot the agent holds (#1447): its name; Recreate makes it again on its line (`branch`), Release frees it. */
+  slot?: string
 }
 
 /** A CLI's per-path folder copied for a moved folder: files to copy, and files already there with other content (kept). */
@@ -1628,13 +2721,44 @@ export interface MoveOptions {
   unlink?: string[]
   /** Missing worktrees to make again (on their branch, or new from their base). */
   recreate?: string[]
+  /**
+   * Move Hive's Defender exclusions from the moved workspace's old folders to its new ones (#1302): one administrator
+   * prompt, at the end. Only when true (the dialog's box): a Repair asked for otherwise never prompts.
+   */
+  defender?: boolean
 }
 
-/** What Repair did: each line a step, for the dialog and the log. */
+/** What a row of Repair's report is about (#1313): the dialog words it as the plan's What column does. */
+export type MoveReportWhat =
+  | { kind: 'worktree' | 'branch'; agent: string }
+  | { kind: 'folder'; of: ProjectFolderOf }
+  | { kind: 'sessions' }
+  | { kind: 'copy'; provider: ProviderId }
+  | { kind: 'board'; from: string }
+  | { kind: 'saved' | 'recent' | 'working' | 'defender' | 'closeRuns' }
+
+/** A step of Repair's report as a table row (#1313): what, where it was and is, and how it went in a few words. */
+export interface MoveReportRow {
+  /** The project (or the Assistant) it is about, by name; none: the workspace's (Open Recent, Working on, the board). */
+  host?: string
+  what: MoveReportWhat
+  /** Where it was and is: folders (shortened to the part that differs) unless `names` (branches). */
+  was?: string
+  now?: string
+  names?: boolean
+  outcome: 'done' | 'skipped' | 'failed'
+  /** How it went, short (the Result column): "linked again", "couldn't be repaired: …". */
+  result: string
+  /** The step's full sentence, as in done, skipped or failed: the row's tooltip and what a screen reader reads. */
+  line: string
+}
+
+/** What Repair did: each line a step, for the dialog and the log; `rows`, the same steps for the dialog's table. */
 export interface MoveReport {
   done: string[]
   skipped: string[]
   failed: string[]
+  rows: MoveReportRow[]
   /** Nothing is left to repair: the banner goes. */
   complete: boolean
 }
@@ -1669,6 +2793,11 @@ export interface SkillInfo {
 /** Who a Hive skill is for. */
 export type SkillAudience = 'agents' | 'assistant' | 'all'
 
+/** Hive skills switched off for agents (#1431): their names (a hand-edited file may hold anything: skillDelivered reads it). */
+export interface SkillDeliveryChoice {
+  off: string[]
+}
+
 /** Where a new skill goes: the workspace's Hive skills, or a provider's local skills folder in a project. */
 export type SkillTarget = { kind: 'hive' } | { kind: 'local'; projectPath: string; provider: ProviderId }
 
@@ -1680,6 +2809,10 @@ export interface McpServerDef {
   url?: string
   headers?: Record<string, string>
   description?: string
+  /** Words to find it by in the MCP view and the Add server picker (HI-2059): Hive's, never given to the CLIs. */
+  tags?: string[]
+  /** The MCP catalogue it was installed from (HI-545): Hive's, never given to the CLIs. */
+  catalog?: McpCatalogOrigin
   [key: string]: unknown
 }
 
@@ -1690,16 +2823,25 @@ export interface McpServerInfo {
   /** In English, or the reason a read failed as Node gave it; `errorText` is Hive's own as the window shows it (#845). */
   error?: string
   errorText?: Text
-  /** On in the workspace (#1093, its master switch): it runs in the projects that have it on, and nowhere while off. */
-  globallyEnabled: boolean
+  /** The projects it is added to (HI-2059), by path, hidden ones too: it runs in them. The window's only, never an agent's. */
+  projects: string[]
+  /** Added for the Hive Assistant (HI-1472, HI-2059): it runs for it. */
+  assistant: boolean
   secretWarnings: string[]
   /** What it runs, shown before it is enabled (#550): the command or URL, folder, environment and header names. */
   runs: string[]
-  /** Which copy of its definition this is (a replace or an edit changes it): an enable says which it showed. */
+  /** Which copy of its definition this is (a replace or an edit changes it): an Add says which it showed. */
   revision?: string
 }
 
-/** The server an enable showed the user (#550): refused if its definition has been replaced or edited since. */
+/** What Add to… changed (HI-2059), by place (a project's path, or `assistant`), and where it failed, with why. */
+export interface McpPlacesResult {
+  added: string[]
+  removed: string[]
+  failed: { place: string; error: string }[]
+}
+
+/** The server an Add showed the user (#550): refused if its definition has been replaced or edited since. */
 export interface McpShown {
   def: McpServerDef | null
   revision?: string
@@ -1716,6 +2858,89 @@ export interface McpFileServer {
   files: number
   /** A server of this name exists already. */
   exists: boolean
+}
+
+/** A server's requirements in an MCP catalogue (HI-545, catalog.json v1's `requires`). */
+export interface McpCatalogRequires {
+  os: string[]
+  windows?: { editions?: string[]; minBuild?: number; features?: string[] }
+  node?: string
+  docker?: boolean
+  apps?: string[]
+}
+
+/** A server an MCP catalogue offers (HI-545, catalog.json v1), as Hive checked it. */
+export interface McpCatalogServer {
+  name: string
+  version: string
+  description: string
+  tags: string[]
+  requires: McpCatalogRequires
+  homepage?: string
+  zip: { url: string; sha256: string; size: number }
+}
+
+/** One requirement of a catalogue server checked on this PC: met, not met, or not something Hive can check. */
+export interface McpCatalogCheck {
+  kind: 'os' | 'edition' | 'build' | 'feature' | 'node' | 'docker' | 'app'
+  label: string
+  state: 'ok' | 'no' | 'unknown'
+}
+
+/** The catalogue view's filter (HI-545). */
+export type McpCatalogFilter = 'all' | 'notInstalled' | 'installed' | 'updates' | 'meets'
+
+/** A catalogue server in the MCP view: whether it is installed (its version, or `other` for a server of the name not from this catalogue), has an update, and meets this PC. */
+export interface McpCatalogRow extends McpCatalogServer {
+  source: string
+  installed: string | null
+  update: boolean
+  checks: McpCatalogCheck[]
+}
+
+/** A catalogue source's page in the MCP view (HI-545): its rows from `offset`, out of `total` matching. */
+export interface McpCatalogSourcePage {
+  url: string
+  name: string
+  ours: boolean
+  /** Its servers aren't checked by Hive, and the one-time note about it hasn't been shown yet. */
+  noteDue: boolean
+  /** Why it can't be used (not read, not a catalogue Hive reads), in the window's language. */
+  error?: string
+  skipped: number
+  total: number
+  offset: number
+  rows: McpCatalogRow[]
+}
+
+/** Hive's MCP catalogue sources (HI-545): ours first (on unless turned off), then the user's, each on or off. */
+export interface McpCatalogSettings {
+  oursOn: boolean
+  sources: { url: string; on: boolean; noted?: boolean }[]
+}
+
+/** A catalogue server downloaded and checked, held for the user's Install or Update (HI-545). */
+export interface McpCatalogPrepared {
+  id: string
+  source: string
+  server: McpCatalogServer
+  /** What it adds: its definition (moved to its name's folder), what it runs, what to know, its files. */
+  def: McpServerDef
+  runs: string[]
+  secretWarnings: string[]
+  files: number
+  /** Installed from this catalogue entry already, under `name` (an update's: its version, where it is added). */
+  existing: { name: string; version: string; def: McpServerDef | null; revision?: string; runs: string[]; projects: string[]; assistant: boolean } | null
+  /** A server of the entry's own name is in the workspace (from it or not): Install asks to replace it or choose another name. */
+  nameTaken: boolean
+}
+
+/** Where an installed catalogue server came from (HI-545): Hive's own field in its definition, never a CLI's. */
+export interface McpCatalogOrigin {
+  source: string
+  name: string
+  version: string
+  sha256: string
 }
 
 /** A server a project defines in its own config (.mcp.json…), as copying it to the workspace would add it. */
@@ -1791,6 +3016,11 @@ export interface SessionUsage {
    * Hive adds its estimate for them to the reported cost.
    */
   costUnreported?: Pick<SessionUsage, 'inputTokens' | 'outputTokens' | 'cacheWriteTokens' | 'cacheReadTokens'>
+  /**
+   * It ran only on servers on this PC (HI-1772, Darren 27 Oct): free, its cost a known $0, shown as "free (local)"; its
+   * tokens counted as any session's.
+   */
+  costFree?: true
   /** The session's usage by local day (YYYY-MM-DD in this computer's time zone), for periods (see usageDays.ts). */
   days?: Record<string, DayUsage>
   /** From the parser: each cost report's increase and the tokens it covered by day. Hive turns them into day costs and removes them. */
@@ -1870,10 +3100,17 @@ export interface ProjectStorage {
   /** What the backups and the archive hold before compression (#1110: a compressed backup's own size), when any is. */
   sessionsRaw?: number
   archiveRaw?: number
-  /** Files pasted or dropped into sessions (.hive/attachments). */
+  /** Files pasted or dropped into sessions (.hive/attachments, but its cards' folder). */
   attachments: number
-  /** The agents' worktree folders. */
-  worktrees: { agent: string; path: string; bytes: number }[]
+  /** Files kept with cards (HI-1700: .hive/attachments/cards), when there are any; never cleaned up. */
+  cardAttachments?: number
+  /**
+   * The folders agents work in (#1451): each of the project's slots on disk (`slot`, and the agent it is lent to now, if
+   * any), and an agent's 0.9 worktree while its project isn't migrated; each folder once.
+   */
+  worktrees: { agent?: string; path: string; bytes: number; slot?: string }[]
+  /** The project's review and check copies (#1435), one folder, when it has any. */
+  copies?: { path: string; bytes: number }
   /** Worktrees no agent works in (#353), counted in the total. */
   unusedWorktrees?: { path: string; branch: string | null; bytes: number }[]
   total: number
@@ -1976,6 +3213,10 @@ export interface SessionListItem extends Partial<SessionRecord> {
   recache: RecacheEstimate | null
   /** The usage history doesn't have it yet (#1106): its figures follow once the worker has read it (the window is told). */
   pending?: boolean
+  /** The slot it ran in (#1434), if it ran in one of the project's. */
+  slot?: string
+  /** Why it can't resume in its slot now, or that only its own Resume takes the slot (`byHand`); absent: it may. */
+  hold?: ResumeHold
 }
 
 /**
@@ -2006,6 +3247,24 @@ export interface TranscriptTool {
   /** Set when input/result were shortened for display; fetch the full call with transcript:tool. */
   inputLength?: number
   resultLength?: number
+  /**
+   * The calls a Codex code-mode script made, in the order they ended (HI-2240): each a tool of its own, named as the same
+   * call made directly is. Empty for a script that made none (its Codex records calls); absent for any other tool, and
+   * for a script whose calls aren't known (its Codex records none, HI-2246: the scenario checks credit it nothing).
+   */
+  calls?: TranscriptTool[]
+  /**
+   * A Codex code-mode script (its `exec` tool, HI-2246), whatever it is shown as (Script, or the Edit of the patch it
+   * applies): what it did is its `calls`, and with none known, unknown (the scenario checks credit it nothing).
+   */
+  script?: true
+  /** A command's exit code, once it has ended with one (a Codex script's command, HI-2240). */
+  exitCode?: number
+  /**
+   * The folder a command ran in, when its CLI recorded one apart from the command (HI-2264): a Codex script's command's
+   * `cwd`, or the `workdir` of a direct exec_command. Absent when not recorded: it then ran in the session's folder.
+   */
+  cwd?: string
 }
 
 export interface TranscriptImageRef {
@@ -2117,7 +3376,7 @@ export interface AgentInstallInfo {
   authMethod: string | null
   /** The account it is signed in as, when the CLI says without Hive reading a secret (Copilot, #452). */
   account?: string | null
-  /** Short notes Agent Setup shows under the sign-in (Copilot's Free plan runs Auto only). */
+  /** Short notes Provider Setup shows under the sign-in (Copilot's Free plan runs Auto only). */
   notes?: string[]
   checking?: boolean
   /** Candidates skipped because they belong to an editor extension rather than the standalone CLI. */
@@ -2162,7 +3421,7 @@ export interface ReadinessIssue {
   message: string
   /** Button: a provider task Hive runs in a terminal. */
   action?: { label: string; task: ProviderTask }
-  /** Shown in Agent Setup with the button: what the task will ask and how to choose (paragraphs, `code` allowed). */
+  /** Shown in Provider Setup with the button: what the task will ask and how to choose (paragraphs, `code` allowed). */
   detail?: string[]
 }
 
@@ -2181,7 +3440,8 @@ export interface FileEntry {
 
 /** A file opened in the Files tab editor. */
 export interface FileContent {
-  kind: 'text' | 'binary' | 'too-large'
+  /** not-utf8: text that isn't valid UTF-8, never offered for editing (saving would rewrite its bytes, HI-2331). */
+  kind: 'text' | 'binary' | 'too-large' | 'not-utf8'
   text: string
   size: number
   modified: string
@@ -2252,6 +3512,26 @@ export interface ToastAction {
   args?: unknown[]
 }
 
+/**
+ * What a notice is about, which a click on it opens (HI-1961: `hive_notify`'s target): an agent's pane, or a card's
+ * dialog. Its names are as they were when it was shown, for saying it's gone.
+ */
+export type ToastTarget =
+  | { kind: 'agent'; projectPath: string; agentId: string; name: string; project: string }
+  | { kind: 'card'; number: number; label: string; projectPath: string | null; workspacePath: string }
+  /** A project (HI-2320: every entry links to what it is about); `project` its name as shown then. */
+  | { kind: 'project'; projectPath: string; project: string }
+
+/** What an entry is about, which says where it goes and how it behaves (shared/notify.ts, HI-2320). */
+export type NotifyKind = 'needsYou' | 'finished' | 'work' | 'usage' | 'warning' | 'result' | 'transcript' | 'update' | 'quit' | 'tip'
+
+/**
+ * What keeps a window-made entry's buttons live (HI-2320), re-checked by the window as its state changes
+ * (renderer/entryConditions.ts): its buttons go, and the entry says what happened, once it no longer holds.
+ */
+export type EntryCondition =
+  | { kind: 'mcpMissing'; projectPath: string; names: string[] }
+
 export type UpdateStatus = 'disabled' | 'idle' | 'checking' | 'available' | 'downloading' | 'ready' | 'up-to-date' | 'error'
 
 /** Hive's own updates (electron-updater, GitHub Releases). */
@@ -2274,20 +3554,43 @@ export interface UpdateState {
   manual?: boolean
   /** The version found is one the user skipped. */
   skipped?: boolean
+  /** The running build is a local one (#1647: `npm run dist`), with the commit it was built from. */
+  local?: { commit: string | null }
+  /** A published release of the running local build's own version (#1647): offered, never installed by itself. */
+  published?: string
+  /** Why the downloaded update wasn't installed (#1647): the copy on disk couldn't be read, or isn't older. */
+  notInstalled?: 'unreadable' | 'notNewer'
 }
 
+/**
+ * One notification (HI-2320): shown as a pop-up in one window and kept in that window's bell, or kept in the bell only
+ * (`quiet`: told as a Windows notification, or left out of pop-ups by the scope).
+ */
 export interface ToastMessage {
   id: string
   level: ToastLevel
+  /** What it is about (shared/notify.ts); none: from its level (warning and error: warning, else result). */
+  kind?: NotifyKind
   title: string
   message?: string
+  /** Its buttons, shown while it is unresolved, in its pop-up and its bell row alike. */
   actions?: ToastAction[]
+  /** What a click on it opens (HI-1961; a project too, HI-2320). */
+  target?: ToastTarget
   timestamp: string
   source?: string
-  /** Kept in the Notifications panel (the bell) only, not shown as a toast: a notice told another way, or not at all (#157). */
+  /** Kept in the Notifications panel (the bell) only, not shown as a pop-up. */
   quiet?: boolean
-  /** How long the toast stays (ms), when not the usual for its kind (an Undo's ~10 s, #351). */
+  /** How long the pop-up stays (ms), when not the usual for its kind (an Undo's ~10 s, #351). */
   timeoutMs?: number
+  /** The offer its buttons act on, main's (main/notify.ts): resolved by that offer alone, never by a newer one. */
+  offer?: string
+  /** A window-made entry's live condition, which the window re-checks (renderer/entryConditions.ts). */
+  condition?: EntryCondition
+  /** What happened, once its action is done or no longer applies: its buttons are gone and this is shown instead. */
+  resolved?: string
+  /** What one of its buttons did while others are still live (HI-2320), shown above them. */
+  note?: string
 }
 
 export interface AppInfo {
@@ -2348,32 +3651,61 @@ export interface ViewerToken {
   createdAt: string
 }
 
+/**
+ * Where a window's workspace is in opening it (HI-1694), for the steady view the window shows meanwhile: reading its
+ * projects, and after the user said yes to its upgrade to 1.0, the upgrade (the 0.9 board kept as a backup), the cards'
+ * and projects' adoption, and the agents' worktrees adopted as slots. Its bundled skills and modes are brought up to date
+ * after the open, not in it (HI-1705).
+ */
+export interface OpenProgress {
+  /** The workspace's folder, and its name as shown. */
+  path: string
+  name: string
+  step: 'projects' | 'upgrade' | 'adoption' | 'slots'
+}
+
 /** Events pushed from main to renderer. */
 export type HiveEvent =
   | { type: 'workspace-changed'; workspace: WorkspaceInfo | null }
+  /** A workspace's team paused or resumed (HI-2081): its pause now, or null. */
+  | { type: 'team-pause-changed'; workspacePath: string; pause: import('./teamPause').TeamPause | null; was?: import('./teamPause').TeamPause | null }
+  /** The window's workspace opening (HI-1694): its step now, or null once it is done. */
+  | { type: 'workspace-progress'; progress: OpenProgress | null }
   /** The recent workspaces changed (opened, removed, cleared): each window asks for its own view of them (#144). */
   | { type: 'recent-changed' }
   | { type: 'session-status'; state: LiveSessionState }
   /** `failure`: the CLI exited before its session started (and nobody stopped it): why, for the agent's pane. */
-  | { type: 'session-exit'; projectPath: string; agentId: string; sessionId: string; exitCode: number; failure?: StartFailure }
+  | { type: 'session-exit'; projectPath: string; agentId: string; sessionId: string; exitCode: number; failure?: StartFailure; ended?: SessionEnd }
   /** What an agent's stopped launches left running changed (#507): found, ended, kept, or ended by themselves (no processes). */
   | { type: 'agent-leftovers'; leftovers: AgentLeftovers }
   | { type: 'toast'; toast: ToastMessage }
+  /** A notice no longer true (HI-1905: a project's platform notice once detection and the platform agree): every window drops it. */
+  /** Entries whose offer was taken or no longer applies (HI-2320): their buttons go and `outcome` says what happened. */
+  | { type: 'toast-resolved'; ids: string[]; outcome: string }
+  /** One of an entry's buttons done or no longer applying, its others still live (HI-2320): those commands' buttons go, `note` says what happened. */
+  | { type: 'toast-update'; ids: string[]; drop: string[]; note: string }
+  /** How many finishes wait to be told together (HI-2320: no tip while some do). */
+  | { type: 'notify-pending'; finishes: number }
   | { type: 'chime'; projectPath: string; silent?: boolean }
   | { type: 'settings-changed'; settings: AppSettings }
   /** Advanced settings (#367) changed: an override, advanced.json, a workspace's own or an installed CLI's version. */
   | { type: 'advanced-changed' }
   /** One project's view preference saved (ui:setProjectPref): every window's store follows. */
   | { type: 'ui-pref-changed'; pref: ProjectPref; project: string; value: unknown }
+  /** Panes' sizes and states moved to other keys (HI-2008: a moved workspace's): every window's store follows; null removes one. */
+  | { type: 'ui-panes-changed'; panes: Record<string, number | null> }
   /** What the tips know changed (ui:changeTips): every window's store follows. */
   | { type: 'tips-changed'; tips: TipsState }
   | { type: 'provider-install'; provider: ProviderId; info: AgentInstallInfo }
   /** Whether git runs changed (#346): every window's store follows. */
   | { type: 'git-tool'; git: GitTool }
-  | { type: 'menu-command'; command: string; args?: unknown[] }
+  /** `reply`: an entry's button run here for another window (HI-2320), which waits for notice:actionDone with it. */
+  | { type: 'menu-command'; command: string; args?: unknown[]; reply?: string }
   | { type: 'usage-changed'; projectPath: string; sessionId: string }
   /** A workspace's usage history: its one-time import of existing sessions under way, or done (#1106). */
   | { type: 'usage-history'; workspacePath: string; progress: UsageHistoryProgress }
+  /** The bulk actions running on a host's sessions (#1659), each with how far it has got: none once they have all ended. */
+  | { type: 'session-bulk'; projectPath: string; runs: SessionBulkProgress[] }
   | { type: 'notes-changed' }
   /** The workspace's task board changed (its path names the window). */
   | { type: 'tasks-changed'; workspacePath: string }
@@ -2381,6 +3713,8 @@ export type HiveEvent =
   | { type: 'quit-request'; sessions: QuitSession[]; unsaved: string[]; /** Anything but 'app' stops only this window's workspace's sessions. */ scope?: QuitScope }
   /** Hive is waiting for working agents to finish before quitting (or stopped waiting). */
   | { type: 'quit-pending'; pending: boolean; working: number }
+  /** This window's close command (HI-1368): the panel shows it while it runs or failed; null: none (the panel goes). */
+  | { type: 'close-command'; run: CloseCommandRun | null }
   /** How many working agents keep the PC awake (0: it may sleep). */
   | { type: 'keep-awake'; working: number }
   /** Files changed in a project that has a Files or Images tab open. dirs are relative, '' is the root. */
@@ -2394,9 +3728,17 @@ export type HiveEvent =
   | { type: 'assistant-questions'; projectPath: string; questions: AssistantQuestion[] }
   /** An agent was added by the Hive Assistant: the view doesn't move to it. */
   | { type: 'agent-added'; projectPath: string; agentId: string }
+  /**
+   * An agent's start changed (HI-1977): under way, failed with why, or neither (null), as its AgentInfo's `start`; `seq`,
+   * the count of start changes with it, newer than an AgentInfo whose `startSeq` is lower.
+   */
+  | { type: 'agent-start'; projectPath: string; agentId: string; start: AgentStart | null; seq: number }
   /** A worktree agent's unmerged work changed (null: git couldn't check it). */
   | { type: 'branch-status'; projectPath: string; agentId: string; status: AgentBranchStatus | null }
-  | { type: 'plan-usage'; provider: ProviderId; usage: PlanUsage }
+  | { type: 'plan-usage'; provider: ProviderId; usage: PlanUsage; connection?: string }
+  | { type: 'plan-usage-cleared'; connection: string }
+  /** Hive's accounts changed (HI-980: one added, renamed, removed, checked, or a workspace's choice of them): read them again. */
+  | { type: 'connections-changed' }
   | { type: 'window-state'; maximized: boolean; focused: boolean; alwaysOnTop: boolean }
   /** A window opened or closed: how many there are now (File → Exit says it closes them all). */
   | { type: 'windows-changed'; count: number }
@@ -2415,6 +3757,12 @@ export type HiveEvent =
   | { type: 'merge-slots-changed'; workspacePath: string; slots: MergeSlotInfo[] }
   /** A workspace's lanes changed, or one of their cards did (the lanes it lists, as lanes:list gives them). */
   | { type: 'lanes-changed'; workspacePath: string; lanes: LaneInfo[] }
+  /** A target's merge queue changed (#1353): an entry queued, its step, an outcome, a pause; read it with queue:list. */
+  | { type: 'queue-changed'; workspacePath: string; projectPath: string; target: string }
+  /** A project's workflow (project.json's `workflow`: its options, preset, stage names) was written (#1417): views read its stages again. */
+  | { type: 'workflow-changed'; workspacePath: string; projectPath: string }
+  /** A lane ended with every card Done (#1270): once, with what each card brought in (its Integrated result; null: none). */
+  | { type: 'lane-ended'; workspacePath: string; lane: string; project: string; results: { card: number; revision: string | null }[] }
   /** The developer console's new events for the sources this window watches (#636): sent to that window only. */
   /** A window's developer console recording got further, or stopped (#638). */
   | { type: 'console-recording'; recording: ConsoleRecordingInfo }
@@ -2445,6 +3793,14 @@ export interface LaneCard {
   round: number
   /** A review is under way now. */
   reviewing: boolean
+  /** At its round limit, waiting for the user's answer (For you, §16.11.4): its lane pauses on it. */
+  roundLimit?: boolean
+  /**
+   * Held elsewhere (HI-1821), an open card that isn't the lane's own: the id of the agent it is given to on the board
+   * (not the lane's builder), or, given to none, of the running lane that owns it (another lane listing it: the one whose
+   * builder has it, else the newest). Its lane shows it but never takes it, waits on it or keys a queued list change to it.
+   */
+  elsewhere?: string
 }
 
 export interface LaneInfo {
@@ -2454,6 +3810,8 @@ export interface LaneInfo {
   name: string | null
   builder: { id: string; name: string }
   reviewer: { id: string; name: string } | null
+  /** Reviewed by the project's reviewer pool (#1443, G17): `reviewer` is null, and each card goes to a free pooled reviewer. */
+  pool?: boolean
   /** In the lane's order. */
   cards: LaneCard[]
   /** The first card not in Passed or Done (null: none left). */
@@ -2471,10 +3829,124 @@ export interface LaneInfo {
   updatedAt: string
   endedAt: string | null
   mergeCommit: string | null
+  /**
+   * Why a running lane waits, or what it waits on (#1270, SPEC §16.11.4), worked out in main from the board and its
+   * cards' facts; null when it goes on as it is (or has ended). With workflow rules off, only a blocked or held card.
+   */
+  status: LaneStatus | null
+  /** A list change made while a card was in flight, applied at the next card boundary (#1270); null: none. */
+  queued: number[] | null
+  /**
+   * Old rules (#1421, §16.5.4): a running lane whose recorded ruleset isn't its project's current one, so it keeps the
+   * options from before a change until it ends. Never on an ended lane, nor one with none recorded (from before 1.0).
+   */
+  oldRules: boolean
+  /**
+   * A running lane's stages: its recorded ruleset's, in board order (#1421: HR4's round 1), which its cards in Todo take
+   * too; null for an ended lane, or one with none recorded (its project's options now stand in).
+   */
+  stages: StageId[] | null
+  /** The slot a running lane's builder works in (#1438: its lease's), or null (none yet, or slots don't apply). */
+  slot: string | null
+  /** That slot as its row's hover tells it (#1446): its line, ready or being prepared, its lease's start; null with none. */
+  slotInfo?: LaneSlotInfo | null
+  /**
+   * A lane reviewed by the pool (#1443, #1446): who gave its current card's last verdict (and whether it passed), and who
+   * reviews it now, by name; absent for other lanes, or with no current card.
+   */
+  poolReview?: { lastVerdict: { name: string; pass: boolean } | null; reviewing: string | null }
 }
 
-/** Who reported a progress run: a project agent (by its token), the Hive Assistant, or a script with the workspace token. */
-export type ProgressSource = 'agent' | 'assistant' | 'api'
+/**
+ * Why a lane waits (#1270): its card blocked or On Hold, a request for you (For you), the round limit reached, a card
+ * passed but not merged yet (merging: in the merge queue), its pass gone stale (submit again), no reviewer on a card in
+ * Review, or a list change queued after the card in flight. The first four and the merge pause the lane, as does `hooks`
+ * (#1336): its builder's or reviewer's hooks aren't arriving, so Hive can't tell what it does and types nothing into it.
+ * `checkCopy` (#1435): its card's review or isolated check waits for a review or check copy to be free. `slot` (#1438):
+ * the lane has no slot yet (every one is lent), so its builder can't start; it pauses the lane until one is free.
+ * `preparing` (#1446): its slot is being prepared (G15's warming: its setup or an install), which doesn't pause it.
+ * `teamPause` (HI-2081): its workspace's team is paused (before an update): nothing of it starts or is woken until it
+ * resumes; it pauses the lane.
+ */
+export type LaneWaitReason = 'blocked' | 'hold' | 'you' | 'roundLimit' | 'notMerged' | 'merging' | 'stale' | 'reviewer' | 'listChanges' | 'lineUpdate' | 'hooks' | 'checkCopy' | 'slot' | 'preparing' | 'startWait' | 'teamPause'
+
+/**
+ * A running lane's slot as its row shows it (#1446): its name, whether the lane works in its builder's carried slot (a
+ * 0.9 worktree adopted at the upgrade, #1441) rather than one lent to the lane, the current card's line (its branch
+ * there), whether the slot is ready or being prepared (G15's warming, its setup or install), and when its lease began.
+ */
+export interface LaneSlotInfo {
+  name: string
+  carried: boolean
+  line: string | null
+  state: 'ready' | 'preparing'
+  since: string
+}
+
+/** Start lane… from the window (#1280): who builds and reviews, the cards in order, the user's note and a name. */
+export interface LaneStartRequest {
+  builder: string
+  reviewer: string | null
+  /** Reviewed by the project's reviewer pool (#1443: G17 a shared pool), with `reviewer` null. */
+  pool?: boolean
+  cards: number[]
+  note?: string
+  name?: string | null
+  /** For the builder's running lane with a card in flight: the list applied now, that card put back (HI-1995). */
+  applyNow?: boolean
+}
+
+/**
+ * What Start Lane… offers for a project (#1443): with workflow rules on and G17 a shared pool, Pool in its reviewer list
+ * (`pool`: the agents whose role reviews, by id and name); null: one reviewer per lane.
+ */
+export interface LaneStartInfo {
+  pool: { id: string; name: string }[] | null
+}
+
+/** What Start lane… did: the lane recorded, and how each agent started (failed: the lane stays, why said). */
+export interface LaneStartResult {
+  lane: LaneInfo
+  /** `deferred` (HI-2034): in a turn or with a prompt it hadn't taken, so it starts in a new conversation once free (the lane's `freshStart`). */
+  started: { agentId: string; name: string; role: 'builder' | 'reviewer'; how: 'started' | 'fresh' | 'failed' | 'deferred'; why?: string }[]
+  /** Its slot (#1438), or, with none free, why it waits: its agents start once one is. */
+  slot?: string
+  waitingForSlot?: string
+}
+
+export interface LaneStatus {
+  reason: LaneWaitReason
+  /** The card it is about. */
+  card: number | null
+  /** blocked: the card's reason, as the board has it. */
+  blocked?: string
+  /** you: what the user is asked for (the open request's kind, #1279). */
+  ask?: 'approve' | 'decide' | 'test' | 'signIn' | 'other'
+  /** hooks: the agent whose hooks aren't arriving, by name; startWait: the builder. */
+  agent?: string
+  /** startWait (HI-2029): why its card isn't started yet (LaneStartWhy); `fresh` (HI-2034): `agent` is owed its new conversation. */
+  why?: 'busy' | 'watching' | 'queued' | 'failed' | 'refused' | 'fresh' | 'dependencies'
+  /** startWait `dependencies` (HI-2129): the card it depends on that isn't Done yet, by its key. */
+  waitsFor?: string
+  /** startWait `fresh` (HI-2034): no more automatic tries, and why (the user retries it, or ends the lane); the reason a failure gave. */
+  freshBlocked?: 'timeout' | 'uncertain' | 'failed'
+  freshWhy?: string
+  /** preparing (#1446): the slot being prepared. */
+  slot?: string
+  /**
+   * When this wait began (HI-1926, epoch ms): when Hive first saw this reason for this card (and ask), kept while they
+   * stay the same. `atLeast`: Hive didn't see it begin (it was already waiting when this Hive first listed the lane), so
+   * it has waited at least that long.
+   */
+  since?: number
+  atLeast?: boolean
+}
+
+/**
+ * Who reported a progress run: a project agent (by its token), the Hive Assistant, a script with the workspace token, or
+ * Hive itself (its merge queue's checks, #1349: no agent and no token reports them).
+ */
+export type ProgressSource = 'agent' | 'assistant' | 'api' | 'hive'
 
 /**
  * A merge slot (#350): one merge at a time into a project's branch. `holder` is who merges now (an agent, or the user's
@@ -2523,9 +3995,10 @@ export interface ProgressRun {
   agentName: string
   /**
    * `agentName` is a name Hive gave the run, not one its caller has (#872): "Script" for an Agent API script, "Agent"
-   * for a kept run with no name. The window shows it in its language; the Agent API leaves this out (publicRun).
+   * for a kept run with no name, "Hive (slot <name>)" for a slot's warming (#1429, its `slot`). The window shows it in its
+   * language; the Agent API leaves this out (publicRun).
    */
-  defaultName?: 'script' | 'agent'
+  defaultName?: 'script' | 'agent' | 'mergeQueue' | 'slot' | 'copy'
   provider: ProviderId | null
   source: ProgressSource
   title: string
@@ -2573,4 +4046,57 @@ export interface ProgressRun {
    * its program alone, since a command's arguments can hold a token or a prompt.
    */
   titleFromCommand?: true
+  /**
+   * The card it ran for (its number, #1220): named (`hive-progress --card`, `card`), or the reporting agent's card in
+   * Doing when it has one and named none. Absent for a run with no card.
+   */
+  card?: number
+  /** The revision it ran for (a full commit id): named (`--revision`, which must be what's checked out), else the folder's head at the start. */
+  revision?: string
+  /** What was checked out where it ran when it started (a full commit id): the revision it actually tested (SPEC §16.13). */
+  testedCheckout?: string
+  /** The check it was started as (`hive-progress --check <name>`: the project's configured command for that name ran). */
+  check?: string
+  /** The folder it ran in, as its reporter said. */
+  folder?: string
+  /** A finished run for a card (#1222): how it counted as a check of the card's revision (its `CheckRan`). */
+  counts?: RunCheck
+  /** Hive's own run (#1349): nothing was installed before the merge checks (no setup command and no lock file). */
+  noInstall?: true
+  /** Hive's own install run (#1349): the setup command as written, after node_modules was removed (Hive has no clean form of it). */
+  installAsWritten?: true
+  /** Hive's own failed merge check or install that counts as temporary (#1362): why, and the network error code that said so. */
+  transient?: TransientFailure
+  /** Hive's own run warming a slot (#1429: its setup, an install, its archive script): the slot's name. */
+  slot?: string
+  /**
+   * A review or check copy (#1435): Hive's own run warming it, or an agent's isolated check run in it (its details name
+   * it, and it can be stopped from the panel: its processes are in the copy's job).
+   */
+  copy?: string
+}
+
+/**
+ * Why a failed merge check counts as the environment's failure, not the work's (#1349, #1362): it couldn't start, its
+ * program wasn't found, it ran out of time, it was ended from outside, it exited 75 (the project's own "temporary
+ * failure, try again"), or a network error code was in its last 40 lines.
+ */
+export type TransientCause = 'spawn' | 'notFound' | 'timeout' | 'killed' | 'exit75' | 'network'
+
+/** A transient failure's cause, with the network error code found (`network`). */
+export interface TransientFailure {
+  cause: TransientCause
+  code?: string
+}
+
+/** Why a run doesn't count as a check (SPEC §16.13), as its `CheckRan` says. */
+export type CheckWhyNot = 'notCheck' | 'notContained' | 'dirty' | 'changed' | 'moved' | 'revisionChanged'
+
+/** How a run counted as a check: the check's name, and why not when it didn't. */
+export interface RunCheck {
+  name: string
+  counted: boolean
+  whyNot?: CheckWhyNot
+  /** A failed check the card's rules require before a gate (#1279): it blocks that gate (review) for the card. */
+  blocks?: 'review'
 }

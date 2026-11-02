@@ -44,7 +44,7 @@ const check = (name, ok, extra = '') => {
   fs.writeFileSync(cfgFile, JSON.stringify(cfg, null, 2))
 
   const api = await startFakeCopilotApi({ log: apiLog })
-  const env = lib.hiveEnv({ HIVE_USER_DATA: userData, HIVE_API_PORT: lib.port(47831), ...copilotTestEnv(api, copilotDir) })
+  const env = lib.hiveEnv({ HIVE_USER_DATA: userData, HIVE_API_PORT: lib.port(47831), ...copilotTestEnv(api, copilotDir, { above: lib.WORK }) })
   // The folder is trusted already (as "Yes, and remember this folder" saves it): Copilot goes straight to its prompt.
   fs.writeFileSync(path.join(copilotHome, 'config.json'), JSON.stringify({ trustedFolders: [proj] }, null, 2))
   const app = await _electron.launch({ executablePath: lib.ELECTRON, args: [lib.ROOT], cwd: lib.ROOT, env })
@@ -107,13 +107,20 @@ const check = (name, ok, extra = '') => {
       return s && al && d && s.y === d.y ? { s, d, w: (al.x - s.x) / 9 } : null
     }, HUNG_MS, 200)
     check('the reply is on screen', !!at, JSON.stringify(at))
+    // Copilot's own selection as it draws it (on a background colour): the whole text, as a user sees it before copying.
+    const copilotSelected = async () => ((await page.evaluate((k) => window.__hiveTerminalHighlighted(k), key)) ?? []).some((r) => r.trimEnd() === TEXT)
+    // A drag over the text. Without Shift it's Copilot's, which takes its last moves a moment after a key that follows at
+    // once (#1299: Ctrl+C straight after the drag copied "SELE" while the whole text was drawn selected after it), so
+    // it is over once Copilot draws the whole text selected, from none drawn before: true then.
     const drag = async (shift) => {
+      const clear = shift || !!(await lib.until(async () => !(await copilotSelected()), HUNG_MS, 100))
       await page.mouse.move(at.s.x - at.w / 2 + 1, at.s.y)
       if (shift) await page.keyboard.down('Shift')
       await page.mouse.down()
       for (let i = 1; i <= 8; i++) await page.mouse.move(at.s.x + ((at.d.x + 6 * at.w - at.s.x) * i) / 8, at.s.y)
       await page.mouse.up()
       if (shift) await page.keyboard.up('Shift')
+      return shift || (clear && !!(await lib.until(copilotSelected, HUNG_MS, 100)))
     }
     const rightClick = () => page.mouse.click(at.s.x + at.w, at.s.y, { button: 'right' })
     const clickBelow = () => page.mouse.click(at.s.x, at.s.y + 4 * at.w)
@@ -121,7 +128,7 @@ const check = (name, ok, extra = '') => {
     // 1. Copilot's own selection: a drag (reported to Copilot, which tracks the mouse), then Ctrl+C. Copilot copies with
     // an OSC 52 write; the terminal is in use (focused, a key just now), so the text reaches the clipboard.
     const copiedOnScreen = (await screen()).split('copied to clipboard').length
-    await drag(false)
+    check('Copilot draws the drag as its selection, over the whole text', await drag(false), JSON.stringify(await page.evaluate((k) => window.__hiveTerminalHighlighted(k), key)))
     check("the drag makes Copilot's selection, not Hive's", (await hiveSelection()) === '', JSON.stringify(await hiveSelection()))
     await page.keyboard.press('Control+c')
     const got = await lib.until(async () => ((await copied()).length ? await copied() : null), HUNG_MS, 100)
@@ -182,6 +189,37 @@ const check = (name, ok, extra = '') => {
     await writeB64('after a click')
     check('…and taken after a click in the pane', JSON.stringify(await copied()) === JSON.stringify([TEXT, 'after a click']), JSON.stringify(await copied()))
 
+    // 4c. The policy (#1292, Settings → Advanced: A CLI putting text on the clipboard). Block: a write from the pane in
+    // use is refused too. Ask each time: the question shows the text; Don't Copy leaves the clipboard, Copy fills it.
+    const POLICY = 'hive.terminal.osc52'
+    const question = page.locator('.dialog', { hasText: 'Copy to the clipboard?' })
+    // A change reaches the window in its states' batch (HI-1938), after the call answers: a write before it meets the old
+    // policy, refused without a new log line (one per reason a minute).
+    const setPolicy = async (v) => {
+      await inv('advanced:set', POLICY, v)
+      await lib.until(() => page.evaluate(([id, want]) => window.__hiveAdvancedValue(id) === want, [POLICY, v]), HUNG_MS, 100)
+    }
+    await setPolicy('block')
+    await clickBelow()
+    await writeB64('blocked write')
+    check('Block: a write from the pane in use is refused', !!(await lib.until(() => logged(/OSC 52 clipboard write refused \(blocked\)/), HUNG_MS, 100)) && JSON.stringify(await copied()) === JSON.stringify([TEXT, 'after a click']), JSON.stringify(await copied()))
+    await setPolicy('ask')
+    await clickBelow()
+    await writeB64('asked write')
+    check('Ask each time: the question shows the text', !!(await lib.until(async () => (await question.count()) === 1 && (await question.innerText()).includes('asked write'), HUNG_MS, 100)), await question.innerText().catch(() => 'no question'))
+    check("…in the dialog's box, as the text to copy", ((await question.locator('.dialog-list').innerText().catch(() => '')).trim()) === 'asked write' && (await question.locator('.dialog-list button').count()) === 0, await question.innerHTML().catch(() => ''))
+    check('…in monospace, as written (HR4: the plain list had lost it)', /Cascadia Mono|Consolas|monospace/.test(await question.locator('.dialog-list ul').evaluate((el) => getComputedStyle(el).fontFamily)), await question.locator('.dialog-list ul').evaluate((el) => getComputedStyle(el).fontFamily).catch(() => ''))
+    await page.screenshot({ path: path.join(lib.WORK, 'copilotcopy-ask.png') })
+    check('…and nothing is copied while it waits', JSON.stringify(await copied()) === JSON.stringify([TEXT, 'after a click']), JSON.stringify(await copied()))
+    await question.getByRole('button', { name: "Don't Copy" }).click()
+    check("Don't Copy leaves the clipboard as it was", !!(await lib.until(async () => (await question.count()) === 0, HUNG_MS, 100)) && JSON.stringify(await copied()) === JSON.stringify([TEXT, 'after a click']), JSON.stringify(await copied()))
+    await clickBelow()
+    await writeB64('copied when asked')
+    check('…asked again for the next write', !!(await lib.until(async () => (await question.count()) === 1, HUNG_MS, 100)))
+    await question.getByRole('button', { name: 'Copy', exact: true }).click()
+    check('Copy puts the text on the clipboard', !!(await lib.until(async () => JSON.stringify(await copied()) === JSON.stringify([TEXT, 'after a click', 'copied when asked']), HUNG_MS, 100)), JSON.stringify(await copied()))
+    await setPolicy('allow')
+
     // 5. Shift+drag: Hive's own selection, whatever Copilot does with the mouse; Ctrl+C copies it and Copilot never
     // sees the key (no new "copied to clipboard", no interrupt).
     const before = (await screen()).split('copied to clipboard').length
@@ -223,7 +261,7 @@ const check = (name, ok, extra = '') => {
     check('right-click now goes to Copilot', !!(await lib.until(async () => (await rightClickGoesTo()) === 'cli', HUNG_MS, 100)), await rightClickGoesTo())
     const m7 = (await copied()).length
     const reads7 = await reads()
-    await drag(false)
+    check('Copilot draws the drag as its selection again', await drag(false), JSON.stringify(await page.evaluate((k) => window.__hiveTerminalHighlighted(k), key)))
     check("the drag makes Copilot's selection", (await hiveSelection()) === '', JSON.stringify(await hiveSelection()))
     await rightClick()
     const viaCopilot = await lib.until(async () => ((await copied()).length > m7 ? await copied() : null), HUNG_MS, 100)

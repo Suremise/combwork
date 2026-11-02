@@ -1,7 +1,10 @@
 // Generated from locales/en/errors.json: do not edit. Each message's placeholders and their types, for tr(): a
 // global script, so its interface merges with every other area's (shared/i18n/msg.ts).
 interface HiveMessageValues {
+  'errors.assistantUndo.gone': undefined
+  'errors.assistantUndo.which': undefined
   'errors.changes.notFile': { file: string | number; folder: string | number }
+  'errors.commands.otherWorkspace': undefined
   'errors.console.hidden': undefined
   'errors.console.notRecording': undefined
   'errors.console.notSource': undefined
@@ -30,11 +33,13 @@ interface HiveMessageValues {
   'errors.hive.noRepo': undefined
   'errors.hive.notIgnored': undefined
   'errors.image.not': undefined
+  'errors.lane.builderRequired': undefined
   'errors.lane.required': undefined
   'errors.log.gone': { path: string | number }
   'errors.log.none': undefined
   'errors.log.notFullPath': { path: string | number }
   'errors.log.notText': { file: string | number }
+  'errors.merge.queueMerges': { card: string | number }
   'errors.mergeSlot.holdRequired': undefined
   'errors.pref.notProjectPref': undefined
   'errors.pref.notValue': { pref: string | number }

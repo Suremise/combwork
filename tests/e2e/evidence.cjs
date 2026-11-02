@@ -21,6 +21,7 @@ const os = require('os')
 const path = require('path')
 const { execFileSync } = require('child_process')
 const runContext = require('./runContext.cjs')
+const { readCitingDocs } = require('./boardRows.cjs')
 
 /** Areas: folders that hold evidence rather than being it (relative to hive-test). Naming one keeps nothing. */
 const AREAS = new Set(['', 'e2e', 'e2e/lanes', 'e2e/logs', 'e2e/logs/nested', 'scenarios', 'scenarios/lanes', 'scenarios/results', 'scenarios/baselines', 'scratch', 'tmp', 'codex', 'codex/sessions', 'codex/packages', 'codex/cache'])
@@ -74,10 +75,17 @@ function citedBy(rel, cards, children = [], label = 'hive-test') {
   const ancestors = []
   const area = label === 'temp' ? isTempArea : isArea
   for (let k = 1; k < own.length; k++) if (!area(own.slice(0, k).join('/'))) ancestors.push([label, ...own.slice(0, k)])
+  // Each tail ends with the path's last two parts, so a text without them (or, for a child, without `<last>/<child>`)
+  // can't mention one: looked for first, they spare scanning every card for every tail (HI-2365: the clean-up's plan
+  // spent seconds here). The answer is the same.
+  const last = parts.slice(-2).join('/')
+  const kids = children.map((c) => pathText(c))
   for (const { number, text } of cards) {
-    for (const t of tails(parts)) if (mentions(text, t)) return number
-    for (const c of children) for (const t of tails([...parts, pathText(c)])) if (mentions(text, t)) return number
-    for (const a of ancestors) for (const t of tails(a)) if (mentions(text, t, 'end')) return number
+    if (text.includes(parts.at(-1))) {
+      if (text.includes(last)) for (const t of tails(parts)) if (mentions(text, t)) return number
+      for (const c of kids) if (text.includes(`${parts.at(-1)}/${c}`)) for (const t of tails([...parts, c])) if (mentions(text, t)) return number
+    }
+    for (const a of ancestors) if (text.includes(a.slice(-2).join('/'))) for (const t of tails(a)) if (mentions(text, t, 'end')) return number
   }
   return null
 }
@@ -115,8 +123,8 @@ function readDbCards(file) {
     const { DatabaseSync } = require('node:sqlite')
     db = new DatabaseSync(file, { readOnly: true, timeout: 5000 })
     const cards = []
-    for (const row of db.prepare('SELECT number, doc FROM cards').all()) {
-      const c = citing({ ...JSON.parse(row.doc), number: row.number })
+    for (const row of readCitingDocs(db)) {
+      const c = citing({ ...row.doc, number: row.number })
       if (c) cards.push(c)
     }
     return { ok: true, cards }
@@ -162,7 +170,7 @@ function readCards(tasksDir) {
 /**
  * What may be deleted under testRoot, by the board's cards: protects(p) gives why p must stay (`cited by #n`, or that
  * the board can't be read), or null. Built from a board (tasksDir: its database or folder; null: none found, so nothing may go) or from
- * cards given (tests). Every protects() reads the board afresh (about 25 ms), so a deletion is never authorised by
+ * cards given (tests). Every protects() reads the board afresh (a few ms: only the cards that may cite, HI-2364), so a deletion is never authorised by
  * an older look: a card that cites something a moment before it would go keeps it. snapshot() reads it once, for
  * listing many things (the clean-up's plan), never for deleting.
  */

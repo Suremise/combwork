@@ -1,7 +1,8 @@
-import { mkdirSync, rmSync, writeFileSync } from 'fs'
+import { mkdirSync, readFileSync, rmSync, writeFileSync } from 'fs'
 import { join } from 'path'
-import { afterAll, describe, expect, it } from 'vitest'
-import { copilot, copilotHooks, copilotMcpServer } from '../src/main/providers/copilot/adapter'
+import { afterAll, beforeAll, describe, expect, it } from 'vitest'
+import { advanced } from '../src/main/advanced'
+import { copilot, copilotHooks, copilotMcpServer, HIVE_TOOL_NAMES } from '../src/main/providers/copilot/adapter'
 import { COPILOT_ENV_STRIP, copilotEnv } from '../src/main/providers/copilot/home'
 import { parseCopilotModels } from '../src/main/providers/copilot/models'
 import type { LaunchContext } from '../src/main/providers/types'
@@ -33,7 +34,7 @@ describe('Copilot descriptor', () => {
     expect(isKnownProvider('copilot')).toBe(true)
     const d = providerDescriptor('copilot')
     expect(d.name).toBe('GitHub Copilot')
-    expect(d.permissionModes.map((m) => m.value)).toEqual(['ask', 'accept-edits', 'plan', 'autopilot', 'allow-all'])
+    expect(d.permissionModes.map((m) => m.value)).toEqual(['ask', 'accept-edits', 'plan', 'autopilot', 'allow-all', 'cli-own'])
     expect(d.defaultPermissionMode).toBe('accept-edits')
     // Only Autopilot is behind the opt-in: Allow all is Copilot's low-interaction mode, offered to all (#490).
     expect(d.permissionModes.filter((m) => m.danger).map((m) => m.value)).toEqual(['autopilot'])
@@ -114,7 +115,8 @@ describe('Copilot launch', () => {
     expect(COPILOT_ENV_STRIP).toEqual(['GH_TOKEN', 'GITHUB_TOKEN'])
     expect(env?.COPILOT_GITHUB_TOKEN).toBe('github_pat_x')
     expect(env).toMatchObject({ PATH: 'C:\\Windows', HIVE_HOOK_TOKEN: 'tok123', COPILOT_HOOK_ALLOW_LOCALHOST: '1', COPILOT_AUTO_UPDATE: 'false' })
-    expect(env?.COPILOT_CUSTOM_INSTRUCTIONS_DIRS).toBeUndefined()
+    // Its custom instructions: the hive tools' names (#1530).
+    expect(env?.COPILOT_CUSTOM_INSTRUCTIONS_DIRS).toBe(join(ctx.privateDir, 'instructions'))
     // The token never goes on the command line.
     expect(args.join(' ')).not.toContain('tok123')
   })
@@ -189,12 +191,11 @@ describe('Copilot launch', () => {
   it('writes the plugin (hooks with the token), the MCP config and the instructions in the launch’s private folder', async () => {
     const ctx = context({ instructions: 'Role: assistant.', privateDir: join(base, 'private-2') })
     await copilot.prepareLaunch(ctx)
-    const { readFileSync } = await import('fs')
     const hooks = JSON.parse(readFileSync(join(ctx.privateDir, 'plugin', 'hooks.json'), 'utf8'))
     expect(hooks).toEqual(copilotHooks(ctx.hookUrl, 'tok123'))
     expect(JSON.parse(readFileSync(join(ctx.privateDir, 'plugin', 'plugin.json'), 'utf8')).name).toBe('hive-launch')
     expect(JSON.parse(readFileSync(join(ctx.privateDir, 'mcp.json'), 'utf8'))).toEqual({ mcpServers: { hive: { type: 'local', command: 'node', args: ['hive-mcp.js'], env: { HIVE_PROJECT: 'proj' }, tools: ['*'] } } })
-    expect(readFileSync(join(ctx.privateDir, 'instructions', '.github', 'instructions', 'hive.instructions.md'), 'utf8')).toBe("---\napplyTo: '**'\n---\nRole: assistant.\n")
+    expect(readFileSync(join(ctx.privateDir, 'instructions', '.github', 'instructions', 'hive.instructions.md'), 'utf8')).toBe(`---\napplyTo: '**'\n---\n${HIVE_TOOL_NAMES}\n\nRole: assistant.\n`)
   })
 
   it('is ended with Ctrl+C before it is killed, so it writes its token totals (#465)', async () => {
@@ -204,6 +205,9 @@ describe('Copilot launch', () => {
     expect((exit.keys.length - 1) * exit.gapMs).toBeLessThan(exit.graceMs)
     // Killed only if it hangs: it took up to 2.4 s to exit by itself under load, and 2.5 s killed it (#716).
     expect(exit.graceMs).toBeGreaterThanOrEqual(10_000)
+    // Stop types them on conditions (HI-2272): the key that exits once its screen shows the exit armed.
+    expect(exit.armed.test(readFileSync(join(__dirname, 'fixtures', 'advanced', 'exit-armed-copilot-1.0.105.txt'), 'utf8'))).toBe(true)
+    expect(exit.armed.test(readFileSync(join(__dirname, 'fixtures', 'advanced', 'ready-copilot-1.0.95.txt'), 'utf8'))).toBe(false)
     // Quitting Hive or closing a workspace (stopWhereAndWait, 3 s) waits past the grace, for the kill and its exit.
     const { stopWaitMs } = await import('../src/main/sessions')
     expect(stopWaitMs(3000, [exit.graceMs])).toBeGreaterThan(exit.graceMs)
@@ -219,7 +223,6 @@ describe('Copilot launch', () => {
   })
 
   it('takes its exit grace from Settings → Advanced (copilot.exit.graceSeconds), at each stop (#727)', async () => {
-    const { advanced } = await import('../src/main/advanced')
     const { stopWaitMs } = await import('../src/main/sessions')
     advanced.load(tempDir('hive-copilot-advanced-'))
     try {
@@ -283,6 +286,51 @@ describe('Copilot hooks', () => {
     expect(h({ hook_event_name: 'Notification', notification_type: 'agent_idle', message: 'Done' }).event).toEqual({ kind: 'ignore' })
     // Sent also when Allow all approves the call itself: not a person being asked.
     expect(h({ hookName: 'permissionRequest', toolName: 'powershell' }).event).toEqual({ kind: 'ignore' })
+  })
+
+  describe("a question's text (HI-1945)", () => {
+    // Copilot 1.0.105's hooks for ask_user, as recorded: PreToolUse (AskUserQuestion), the Notification saying only
+    // "Information requested", PostToolUse. The question is the PreToolUse's, until the call ends.
+    const [pre, notification, post] = readFileSync(join(__dirname, 'fixtures', 'advanced', 'question-copilot-1.0.105.jsonl'), 'utf8').trim().split(/\r?\n/).map((l) => JSON.parse(l) as Record<string, unknown>)
+    const asked = (message: string) => ({ kind: 'ask', ask: { kind: 'question', blocking: true, message } })
+    // Overridden in a profile of its own, never the user's.
+    beforeAll(() => advanced.load(tempDir('hive-copilot-question-')))
+    afterAll(async () => {
+      await advanced.set('copilot.question.tool', null)
+      await advanced.set('copilot.question.field', null)
+    })
+
+    it("shows the asking tool's question, not Copilot's notice, until the call ends", () => {
+      expect(notification.message).toBe('Information requested')
+      h(pre)
+      expect(h(notification).event).toEqual(asked('Which one should I use?'))
+      // Another session's question isn't this one's.
+      expect(h({ ...notification, sessionId: 'other' }).event).toEqual(asked('Information requested'))
+      h(post)
+      expect(h(notification).event).toEqual(asked('Information requested'))
+      // Stop ends it too, as an unanswered question's turn ends.
+      h(pre)
+      h({ hook_event_name: 'Stop', session_id: pre.session_id })
+      expect(h(notification).event).toEqual(asked('Information requested'))
+    })
+
+    it('follows the advanced settings: the tool name and the question field', async () => {
+      const renamed = { ...pre, tool_name: 'AskHuman', tool_input: { prompt: 'Which file?', message: 'old field' } }
+      h(renamed)
+      expect(h(notification).event).toEqual(asked('Information requested'))
+      await advanced.set('copilot.question.tool', '^AskHuman$')
+      h(renamed)
+      expect(h(notification).event).toEqual(asked('old field'))
+      h({ ...post, tool_name: 'AskHuman' })
+      await advanced.set('copilot.question.field', 'prompt')
+      h(renamed)
+      expect(h(notification).event).toEqual(asked('Which file?'))
+      // The renamed tool's end clears it; the default's name no longer counts.
+      h(post)
+      expect(h(notification).event).toEqual(asked('Which file?'))
+      h({ ...post, tool_name: 'AskHuman' })
+      expect(h(notification).event).toEqual(asked('Information requested'))
+    })
   })
 
   it('tells a refused sign-in from another error that ends the turn', () => {

@@ -76,11 +76,12 @@ if (!signedIn) lib.skip(`environment: Claude Code isn't signed in to its test ho
     /** Starts the agent and has it start `node linger.js <tag>` in the background: its pid, once it runs. */
     const startInBackground = (tag) =>
       lib.cliStep(`the ${tag} turn`, { session: key }, async () => {
+        const launchMark = lib.hiveLogLines(userData).length
         await inv('session:start', proj, { agentId: agent.id })
         await lib.acceptClaudeTrust(inv, proj, agent.id, 60000)
         check(`Claude Code starts (${tag})`, !!(await lib.until(async () => ['ready', 'finished'].includes((await live())?.status), 90000, 500)), lib.plainText(await inv('pty:buffer', key)).slice(-400))
         const prompt = `Use the Bash tool once, with run_in_background set to true, to run: node linger.js ${tag}   Do not wait for it, read its output or check on it. Then reply with the single word STARTED.`
-        await lib.sendPrompt(inv, key, prompt, { submitted: async () => (await live())?.status === 'working' || !!pidOf(tag) })
+        await lib.sendPrompt(inv, key, prompt, { submitted: async () => (await live())?.status === 'working' || !!pidOf(tag), ready: () => lib.hiveToolsConnected(userData, agent.id, launchMark) })
         const pid = await lib.until(() => pidOf(tag), 120000, 500)
         check(`the agent started node linger.js in the background (${tag})`, !!pid && alive(pid), lib.plainText(await inv('pty:buffer', key)).slice(-600))
         // With the task running Claude Code's turn ends in background (it is told when the task ends: backgroundWakes).

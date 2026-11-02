@@ -8,7 +8,8 @@ import { afterAll, describe, expect, it, vi } from 'vitest'
 import * as electron from 'electron'
 import { agentBusy, agentEvent, agentLimitLine, agentPart, agentWakeLine, agentWatchLabel, readSavedAgentCondition, type AgentNow } from '../src/shared/agentWatch'
 import { WAKE_MAX_BYTES, cardChange, cardWakeLine, readCondition, userNameOf, wakeAbout, type WatchCondition } from '../src/shared/watch'
-import { agentWatchText } from '../src/shared/toolReplies'
+import { agentWatchText, taskWaitText } from '../src/shared/toolReplies'
+import { LANE_DEFAULT_EVENTS } from '../src/shared/laneWatch'
 import { tempDir } from './tempDir'
 import { storeDocs } from './storeDocs'
 import { follow } from './followDoorbell'
@@ -142,8 +143,18 @@ describe('what an agent watch counts', () => {
       'Waiting for B6 to finish. End your turn now: Hive types a line into this session when one finishes, waits for the user or stops, or at 2026-10-08T14:00:00.000Z if none does. Nothing runs meanwhile.'
     )
     expect(agentWatchText({ watching: 'Waiting for B6 to finish', limitAt: 'x', replaced: 'Waiting for #12 → Review' })).toMatch(/It replaces your card watch \(waiting for #12 → Review\)\.$/)
+    expect(agentWatchText({ watching: 'Waiting for B6 to finish', limitAt: 'x', dropped: ['R6 (hive)', 'B5 (hive)'] })).toMatch(/It replaces your watch on R6 \(hive\), B5 \(hive\): pass every agent you're following\.$/)
     expect(agentWatchText({ already: ['B6 (hive) is idle: "Done."'] })).toBe('Already: B6 (hive) is idle: "Done.".')
+    expect(agentWatchText({ already: ['B6 (hive) is idle: "Done."'], dropped: ['R6 (hive)'] })).toBe(`Already: B6 (hive) is idle: "Done.". Your watch on R6 (hive) has ended: watch again, passing every agent you're following.`)
+    expect(agentWatchText({ already: ['B6 (hive) is idle: "Done."'], replaced: 'Waiting for #12 → Review' })).toBe('Already: B6 (hive) is idle: "Done.". Your card watch (waiting for #12 → Review) has ended.')
     expect(agentWatchText({ done: 'Cancelled your agent watch.' })).toBe('Cancelled your agent watch.')
+    // HI-1987: replacing a lane watch while its lanes run says what it drops, and the watch that keeps them.
+    expect(agentWatchText({ watching: 'Waiting for LB2 to finish', limitAt: 'x', replaced: 'Waiting on all running lanes', lanesLeft: ['LB1', 'LB2'] })).toMatch(/if none does\. Nothing runs meanwhile\. This replaces your lane watch: 2 running lanes \(LB1, LB2\) are no longer followed\. To follow them as well, watch them with this instead: hive_wait_for_tasks with lanes, and agents or cards\.$/)
+    expect(agentWatchText({ already: ['LB2 (tools) is idle'], lanesLeft: ['LB1'] })).toBe('Already: LB2 (tools) is idle. This replaces your lane watch: 1 running lane (LB1) is no longer followed. To follow them as well, watch them with this instead: hive_wait_for_tasks with lanes, and agents or cards.')
+    expect(taskWaitText({ watching: 'Waiting for #12', limitAt: 'x', lanesLeft: ['LB1'] })).toMatch(/Nothing runs meanwhile\. This replaces your lane watch: 1 running lane \(LB1\)/)
+    expect(taskWaitText({ watching: 'Waiting on all running lanes and LB2', limitAt: 'x', events: [...LANE_DEFAULT_EVENTS], agents: { now: ['LB2 (tools)'], already: ['LB3 (tools) is idle'] } })).toBe(
+      'Waiting on all running lanes and LB2. End your turn now: Hive types a line into this session on a lane event or LB2 (tools) finishing, waiting for the user or stopping, or at x if none comes. Not followed, not working now: LB3 (tools) is idle.'
+    )
   })
 })
 
@@ -226,6 +237,34 @@ describe('agent watches (main/watches.ts)', async () => {
     await watches.tick()
     await watches.settled()
     expect(st.told).toEqual(['[Hive] Reviewer (alpha) finished: "First done." (working again now); Second (alpha) finished: "Second done.". Your agent watch has ended: carry on (hive_agent_activity for more).'])
+    await disposeWorkspaceService(w)
+  })
+
+  // #1346 item 6 (#1530): a second agent watch replaced the first silently, and its agents went unwatched.
+  it('a new agent watch says which agents of the one it replaces it no longer follows', async () => {
+    const { w, alpha } = await open()
+    const st = fake(alpha)
+    move(st, alpha, 'a2', nowOf())
+    move(st, alpha, 'a3', nowOf())
+    expect(await watches.registerAgentWatch(w, alpha, 'a1', { agents: [reviewer(alpha), second(alpha)], ignoreBackground: false })).not.toHaveProperty('dropped')
+    expect(await watches.registerAgentWatch(w, alpha, 'a1', { agents: [second(alpha)], ignoreBackground: false })).toMatchObject({ dropped: ['Reviewer (alpha)'] })
+    // The same agents again, or more: nothing dropped.
+    expect(await watches.registerAgentWatch(w, alpha, 'a1', { agents: [second(alpha), reviewer(alpha)], ignoreBackground: false })).not.toHaveProperty('dropped')
+    // An answer at once (an agent asked about is idle) makes no watch and ends the earlier one whole: every agent it
+    // followed is said, those asked about again included (HR2's #1530 rounds 1 and 2).
+    move(st, alpha, 'a3', nowOf({ status: 'finished', reply: 'Done.' }))
+    const r = await watches.registerAgentWatch(w, alpha, 'a1', { agents: [second(alpha)], ignoreBackground: false })
+    expect(r).toMatchObject({ already: [expect.stringMatching(/^Second \(alpha\)/)], dropped: ['Second (alpha)', 'Reviewer (alpha)'] })
+    expect(savedOf(w.path!)).toEqual([])
+    // Mixed: a watch on the busy Reviewer, then one asked for on Reviewer and the idle Second.
+    expect(await watches.registerAgentWatch(w, alpha, 'a1', { agents: [reviewer(alpha)], ignoreBackground: false })).toHaveProperty('watching')
+    expect(await watches.registerAgentWatch(w, alpha, 'a1', { agents: [reviewer(alpha), second(alpha)], ignoreBackground: false })).toMatchObject({ already: [expect.stringMatching(/^Second \(alpha\)/)], dropped: ['Reviewer (alpha)'] })
+    expect(savedOf(w.path!)).toEqual([])
+    // The same list again once one of them has finished.
+    move(st, alpha, 'a3', nowOf())
+    expect(await watches.registerAgentWatch(w, alpha, 'a1', { agents: [reviewer(alpha), second(alpha)], ignoreBackground: false })).toHaveProperty('watching')
+    move(st, alpha, 'a3', nowOf({ status: 'finished', reply: 'Done again.', prompts: 2 }))
+    expect(await watches.registerAgentWatch(w, alpha, 'a1', { agents: [reviewer(alpha), second(alpha)], ignoreBackground: false })).toMatchObject({ already: [expect.stringMatching(/^Second \(alpha\)/)], dropped: ['Reviewer (alpha)', 'Second (alpha)'] })
     await disposeWorkspaceService(w)
   })
 
@@ -1061,6 +1100,132 @@ describe('agent watches (main/watches.ts)', async () => {
     await disposeWorkspaceService(w)
   })
 
+  it("a watch that can never fire ends: its card merged (Done), or its lane ended or abandoned; not when it counts the move; Done also ends a dependency's, and with the project's loop wakes off (#1475, HI-2153)", async () => {
+    const { w, alpha } = await open()
+    const st = fake(alpha)
+    const user = { kind: 'user' } as const
+    const lanes = await import('../src/main/lanes')
+    const card = async (title: string, column: 'todo' | 'doing' = 'doing') => (await inWorkspace(w, () => tasks.createTask({ title, project: 'alpha', agent: 'a2', column }, user))).number
+    const history = async (num: number) => (await inWorkspace(w, () => tasks.getTask(num, w))).history.map((h) => h.what)
+    const done = 'Your card watch has ended: there is nothing more to wait for on it. Don\'t watch it again; end your turn unless you have other work.'
+    // a1 reviews a2's lane and waits for its card in Review; the card is merged without coming back (the user moved it).
+    const c1 = await card('Merged')
+    const l1 = (await lanes.startLane(w, { project: 'alpha', builder: 'a2', reviewer: 'a1', cards: [c1], by: 'Reviewer (alpha)' })).lane
+    await watches.registerWatch(w, alpha, 'a1', { cards: [c1], changes: ['column'], column: 'review' })
+    await inWorkspace(w, () => tasks.updateTask(c1, { column: 'done' }, user))
+    await watches.evaluateWatches(w)
+    await vi.waitFor(() => expect(st.told).toHaveLength(1), { timeout: HUNG_MS })
+    expect(st.told[0]).toBe(`[Hive] #${c1} is in Done (your watch on it ended). ${done}`)
+    await vi.waitFor(() => expect(watches.watchFor(alpha, 'a1')).toBeNull(), { timeout: HUNG_MS })
+    await vi.waitFor(async () => expect(await history(c1)).toContain("Ended Builder (alpha)'s watch on it: the card is in Done"), { timeout: HUNG_MS })
+    await vi.waitFor(async () => expect((await lanes.getLane(w, l1.id)).state).toBe('ended'), { timeout: HUNG_MS })
+    // A lane abandoned with its card still in Todo: no card changes, and the watch ends all the same.
+    st.status = 'watching'
+    const c2 = await card('Abandoned', 'todo')
+    const l2 = (await lanes.startLane(w, { project: 'alpha', builder: 'a2', reviewer: 'a1', cards: [c2], by: 'Reviewer (alpha)' })).lane
+    await watches.registerWatch(w, alpha, 'a1', { cards: [c2], changes: ['column'], column: 'review' })
+    await watches.evaluateWatches(w)
+    await watches.settled()
+    expect(watches.watchFor(alpha, 'a1')?.cards).toEqual([c2])
+    await lanes.endLane(w, l2.id, { abandoned: true })
+    await watches.evaluateWatches(w)
+    await vi.waitFor(() => expect(st.told).toHaveLength(2), { timeout: HUNG_MS })
+    expect(st.told[1]).toBe(`[Hive] #${c2}'s lane was abandoned (your watch on it ended). ${done}`)
+    await vi.waitFor(async () => expect(await history(c2)).toContain("Ended Builder (alpha)'s watch on it: its lane was abandoned"), { timeout: HUNG_MS })
+    // A watch that counts any column move is told the move to Done as a change, not released.
+    st.status = 'watching'
+    const c3 = await card('Counted')
+    await watches.registerWatch(w, alpha, 'a1', { cards: [c3], changes: ['column'] })
+    await inWorkspace(w, () => tasks.updateTask(c3, { column: 'done' }, user))
+    await watches.evaluateWatches(w)
+    await vi.waitFor(() => expect(st.told).toHaveLength(3), { timeout: HUNG_MS })
+    expect(st.told[2]).toMatch(new RegExp(`^\\[Hive\\] #${c3} \\(Reviewer's card\\) is in Done`))
+    expect(st.told[2]).not.toContain('your watch on it ended')
+    // HI-2153: another agent's card it depends on (no part in it: a watch for Passed) ends in Done too, as does a
+    // reviewer's with the project's loop wakes off (both kept before): nothing more comes of a merged card.
+    st.status = 'watching'
+    const c4 = await card('Dependency')
+    await watches.registerWatch(w, alpha, 'a1', { cards: [c4], changes: ['column'], column: 'passed' })
+    await inWorkspace(w, () => tasks.updateTask(c4, { column: 'done' }, user))
+    await watches.evaluateWatches(w)
+    await vi.waitFor(() => expect(st.told).toHaveLength(4), { timeout: HUNG_MS })
+    expect(st.told[3]).toBe(`[Hive] #${c4} is in Done (your watch on it ended). ${done}`)
+    await vi.waitFor(() => expect(watches.watchFor(alpha, 'a1')).toBeNull(), { timeout: HUNG_MS })
+    st.status = 'watching'
+    await w.mutateProjectConfig(alpha, () => ({ loopWakes: false }))
+    const c5 = await card('Wakes off')
+    await watches.registerWatch(w, alpha, 'a1', { cards: [c5], changes: ['column'], column: 'review' })
+    await inWorkspace(w, () => tasks.updateTask(c5, { column: 'done' }, user))
+    await watches.evaluateWatches(w)
+    await vi.waitFor(() => expect(st.told).toHaveLength(5), { timeout: HUNG_MS })
+    expect(st.told[4]).toBe(`[Hive] #${c5} is in Done (your watch on it ended). ${done}`)
+    await vi.waitFor(() => expect(watches.watchFor(alpha, 'a1')).toBeNull(), { timeout: HUNG_MS })
+    await disposeWorkspaceService(w)
+  })
+
+  it("a lane ended, abandoned or a card merged after the watch fired but before its line is typed is told as that, not as the change; a watch for Done is told the Done, not its lane's end (#1475 round 1 findings)", async () => {
+    const { w, alpha } = await open()
+    const st = fake(alpha)
+    const user = { kind: 'user' } as const
+    const lanes = await import('../src/main/lanes')
+    const card = async (title: string, agent = 'a2') => (await inWorkspace(w, () => tasks.createTask({ title, project: 'alpha', agent, column: 'doing' }, user))).number
+    const over = (one: boolean) => `Your card watch has ended: there is nothing more to wait for on ${one ? 'it' : 'them'}.`
+    for (const how of ['abandoned', 'ended', 'done'] as const) {
+      // a1 reviews a2's lane and awaits its card in Review; it works, so the arrival fires the watch but waits to be typed.
+      st.status = 'watching'
+      const c = await card(`Card ${how}`)
+      const lane = (await lanes.startLane(w, { project: 'alpha', builder: 'a2', reviewer: 'a1', cards: [c], by: 'Reviewer (alpha)' })).lane
+      await watches.registerWatch(w, alpha, 'a1', { cards: [c], changes: ['column'], column: 'review' })
+      st.status = 'working'
+      await inWorkspace(w, () => tasks.updateTask(c, { column: 'review' }, user))
+      await watches.evaluateWatches(w)
+      if (how !== 'abandoned') await inWorkspace(w, () => tasks.updateTask(c, { column: 'done' }, user))
+      if (how !== 'done') await lanes.endLane(w, lane.id, { abandoned: how === 'abandoned' })
+      st.status = 'watching'
+      const before = st.told.length
+      await watches.tick()
+      await vi.waitFor(() => expect(st.told).toHaveLength(before + 1), { timeout: HUNG_MS })
+      // A card merged is told as Done, whether or not its lane has ended yet.
+      expect(st.told.at(-1)).toBe(`[Hive] #${c}${how === 'abandoned' ? "'s lane was abandoned" : ' is in Done'} (your watch on it ended). ${over(true)} Don't watch it again; end your turn unless you have other work.`)
+      await vi.waitFor(() => expect(watches.watchFor(alpha, 'a1')).toBeNull(), { timeout: HUNG_MS })
+    }
+    // Two cards in two lanes: the one that fired is in the lane abandoned before the line is typed; nothing is typed, the
+    // other stays watched, and its arrival is told with the release first.
+    st.status = 'watching'
+    const c1 = await card('One')
+    const c2 = await card('Two', 'a3')
+    const l1 = (await lanes.startLane(w, { project: 'alpha', builder: 'a2', reviewer: 'a1', cards: [c1], by: 'Reviewer (alpha)' })).lane
+    await lanes.startLane(w, { project: 'alpha', builder: 'a3', reviewer: 'a1', cards: [c2], by: 'Second (alpha)' })
+    await watches.registerWatch(w, alpha, 'a1', { cards: [c1, c2], changes: ['column'], column: 'review' })
+    st.status = 'working'
+    await inWorkspace(w, () => tasks.updateTask(c1, { column: 'review' }, user))
+    await watches.evaluateWatches(w)
+    await lanes.endLane(w, l1.id, { abandoned: true })
+    st.status = 'watching'
+    const typed = st.typed.length
+    await watches.tick()
+    await watches.settled()
+    expect(st.typed).toHaveLength(typed)
+    expect(watches.watchFor(alpha, 'a1')?.cards).toEqual([c2])
+    await inWorkspace(w, () => tasks.updateTask(c2, { column: 'review' }, { kind: 'agent', name: 'Second (alpha)', self: { project: 'alpha', agentId: 'a3' }, scope: 'alpha' }))
+    await watches.evaluateWatches(w)
+    await vi.waitFor(() => expect(st.told).toHaveLength(4), { timeout: HUNG_MS })
+    expect(st.told.at(-1)).toMatch(new RegExp(`^\\[Hive\\] #${c1}'s lane was abandoned \\(your watch on it ended\\); #${c2} \\(Second's card\\) is in Review`))
+    // A builder waiting for its own card's Done, with a real lane: merged, then the lane ended, it is told the Done.
+    st.status = 'watching'
+    await watches.cancelWatch(w, alpha, 'a1')
+    const mine = await card('Mine', 'a1')
+    const l3 = (await lanes.startLane(w, { project: 'alpha', builder: 'a1', reviewer: 'a2', cards: [mine], by: 'Builder (alpha)' })).lane
+    await watches.registerWatch(w, alpha, 'a1', { cards: [mine], changes: ['column'], column: 'done' })
+    await inWorkspace(w, () => tasks.updateTask(mine, { column: 'done' }, user))
+    await lanes.endLane(w, l3.id, {})
+    await watches.evaluateWatches(w)
+    await vi.waitFor(() => expect(st.told).toHaveLength(5), { timeout: HUNG_MS })
+    expect(st.told.at(-1)).toMatch(new RegExp(`^\\[Hive\\] #${mine} is in Done`))
+    expect(st.told.at(-1)).not.toMatch(/your watch on it ended|lane ended|nothing more to wait for/)
+    await disposeWorkspaceService(w)
+  })
+
   it('a card released after its watch fired but before the line is typed is told as released; released cards are told with the limit too (#420 round 1 findings)', async () => {
     const { w, alpha } = await open()
     const st = fake(alpha)
@@ -1154,6 +1319,8 @@ describe('agent watches (main/watches.ts)', async () => {
     await watches.settled()
     expect(st.told.at(-1)).not.toMatch(/review was taken from you/)
     st.status = 'watching'
+    // Failed, it went back to Doing (HI-1946): its builder submits it again before it is reviewed again.
+    await inWorkspace(w, () => tasks.updateTask(c4, { column: 'review' }, { kind: 'agent', name: 'Reviewer (alpha)', self: { project: 'alpha', agentId: 'a2' }, scope: 'alpha' }))
     await inWorkspace(w, () => tasks.updateTask(c4, { review: 'start' }, me))
     await watches.registerWatch(w, alpha, 'a1', { cards: [c4], changes: ['verdict'] })
     await inWorkspace(w, () => tasks.endReviews('alpha', 'a1', 'its session ended', w))
@@ -1379,10 +1546,59 @@ describe('agent watches (main/watches.ts)', async () => {
     const agentNow = sessions.agentNow
     sessions.agentNow = (p: string, id: string) => (id === 'b1' ? { status: 'finished', runId: 'r2', prompts: 1, pending: false, statusMessage: null, backgroundTasks: 0, reply: 'Card #9 is done.' } : agentNow(p, id))
     try {
-      expect(await watches.registerAgentWatch(w, alpha, 'a1', { agents: [other], ignoreBackground: false })).toEqual({ already: ['Other (beta) is idle'] })
+      // The card watch it had ends with the answer: said (HR2's #1530 round 1).
+      expect(await watches.registerAgentWatch(w, alpha, 'a1', { agents: [other], ignoreBackground: false })).toEqual({ already: ['Other (beta) is idle'], replaced: `Waiting for #${c.number}` })
     } finally {
       sessions.agentNow = agentNow
     }
     await disposeWorkspaceService(w)
+  })
+
+  // HI-2195: a usage watch, its whole life: started (saved), answered at once when already there, fired by a usage
+  // report and typed, and (HR1's round 1) one read back as its workspace reopens checked at once against the usage kept
+  // now, with no new report.
+  describe('usage watches (HI-2195)', async () => {
+    const { config } = await import('../src/main/config')
+    const { emit } = await import('../src/main/events')
+    // Hive's own wiring of the watches to its events (a usage report among them), as it starts.
+    watches.initWatches()
+    const watch = [{ account: 'a-acct1', name: 'Max 1', percent: 98, limit: 'weekly' as const }]
+    const weekly = (used: number) => ({ provider: 'claude-code' as const, plan: null, limits: [{ id: 'seven_day', label: 'weekly', windowMinutes: 10080, usedPercent: used, resetsAt: new Date(Date.now() + 48 * 3600e3).toISOString() }], updatedAt: new Date().toISOString() })
+    const setUsage = (used: number) => config.update((c) => (c.connectionPlanUsage = { ...c.connectionPlanUsage, 'a-acct1': weekly(used) }))
+
+    it('starts and is saved below the share, answers at once above it, and fires on a report', async () => {
+      const { w, path, alpha } = await open()
+      const st = fake(alpha)
+      setUsage(50)
+      const r = await watches.registerUsageWatch(w, alpha, 'a1', watch)
+      expect(r).toMatchObject({ watching: { label: 'Waiting for usage: Max 1 at 98% of its weekly limit' } })
+      expect(savedOf(path)[0].usage).toEqual(watch)
+      // A report under the share: nothing; one at it: the line, typed once the watcher is idle.
+      setUsage(97)
+      emit({ type: 'plan-usage', provider: 'claude-code', usage: weekly(97), connection: 'a-acct1' })
+      await watches.settled()
+      expect(st.told).toEqual([])
+      setUsage(98.5)
+      emit({ type: 'plan-usage', provider: 'claude-code', usage: weekly(98.5), connection: 'a-acct1' })
+      await vi.waitFor(() => expect(st.told).toEqual([expect.stringMatching(/^\[Hive\] Usage reached: Max 1: weekly 98\.5% \(resets /)]), { timeout: HUNG_MS })
+      // Already there: answered at once, no watch kept.
+      expect(await watches.registerUsageWatch(w, alpha, 'a1', watch)).toMatchObject({ already: [expect.stringMatching(/^Max 1: weekly 98\.5%/)] })
+      expect(savedOf(path)).toEqual([])
+      await disposeWorkspaceService(w)
+    })
+
+    it('one read back as its workspace reopens is checked against the usage kept now, with no new report', async () => {
+      const { w, path, alpha } = await open()
+      const st = fake(alpha)
+      setUsage(50)
+      expect(await watches.registerUsageWatch(w, alpha, 'a1', watch)).toHaveProperty('watching')
+      // Closed; meanwhile another workspace's session reported Max 1 over the share (no event reaches this one).
+      watches.forgetWatches(w)
+      setUsage(99)
+      await watches.stampWatchProjects(w)
+      await vi.waitFor(() => expect(st.told).toEqual([expect.stringMatching(/^\[Hive\] Usage reached: Max 1: weekly 99%/)]), { timeout: HUNG_MS })
+      expect(savedOf(path)).toEqual([])
+      await disposeWorkspaceService(w)
+    })
   })
 })

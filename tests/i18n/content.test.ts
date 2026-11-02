@@ -49,8 +49,8 @@ const GERMAN: Record<string, string> = {
   'content.mcp.set': '{name} (gesetzt)',
   'mcp.error.invalidName': 'Ungültiger Servername',
   'content.templates.noFile': 'Diese Datei ist nicht da.',
-  'content.templates.provider': '{problem, select, unknown {Dieses Hive kennt den Coding-Agenten „{provider}“ nicht (Hive aktualisieren)} off {{provider} ist ausgeschaltet (Einstellungen → Anbieter)} other {{provider} ist nicht installiert (Agent-Einrichtung)}}',
-  'content.templates.neededBy': '{problem, select, unknown {Dieses Hive kennt den Coding-Agenten „{provider}“ nicht (Hive aktualisieren), gebraucht von {agents}.} off {{provider} ist ausgeschaltet (Einstellungen → Anbieter), gebraucht von {agents}.} other {{provider} ist nicht installiert (Agent-Einrichtung), gebraucht von {agents}.}}',
+  'content.templates.connectionUnknown': 'Keine Verbindung „{ref}“ kann jetzt in diesem Arbeitsbereich verwendet werden: wähle eine andere.',
+  'content.templates.connectionChoices': 'Diese Verbindungswahl passt nicht zu ihren Agenten: {keys}. Öffne sie erneut.',
   'content.templates.cantLoad': 'Die Vorlage kann noch nicht geladen werden:',
   'content.templates.nameEach': 'Gib jedem ihrer Agenten einen Namen.',
   'content.templates.cantUse': '„{name}“ kann nicht verwendet werden: {problem}',
@@ -72,7 +72,7 @@ beforeAll(async () => {
   await w.open(wsPath)
   // A template with an agent for Claude Code, kept in the workspace.
   mkdirSync(join(wsPath, '.hive', 'templates'), { recursive: true })
-  writeFileSync(join(wsPath, '.hive', 'templates', 'pair.json'), JSON.stringify({ version: 1, name: 'Pair', savedAt: '', layout: 'auto', agents: [{ name: 'Builder', provider: 'claude-code', worktree: false }] }))
+  writeFileSync(join(wsPath, '.hive', 'templates', 'pair.json'), JSON.stringify({ version: 2, name: 'Pair', savedAt: '', layout: 'auto', agents: [{ name: 'Builder', role: 'builder', provider: 'claude-code' }] }))
   providerService.info = ((id: string) => ({ provider: id, found: true })) as never
 })
 afterAll(() => disposeWorkspaceService(w))
@@ -184,33 +184,22 @@ describe("MCP servers: a definition's error English for the Agent API, the windo
 })
 
 describe("a template's load plan is the window's", () => {
-  it("says why it can't load in the window's language, with the problem as a key, and its refusal in English for the log", async () => {
+  it("says why it can't load in the window's language, and its refusal in English for the log", async () => {
+    // No account here (HI-2109): none offered, and a connection asked for is refused.
     setLanguage('de', GERMAN)
-    config.settings.providers['claude-code'].enabled = false
     const plan = await run(() => templates.templatePlan(proj, 'workspace', 'pair.json'))
-    expect(plan.missing).toEqual([{ provider: 'claude-code', reason: 'Claude Code ist ausgeschaltet (Einstellungen → Anbieter)', agents: ['Builder'], problem: 'off' }])
-    expect(plan.blocked).toEqual(['Claude Code ist ausgeschaltet (Einstellungen → Anbieter), gebraucht von Builder.'])
-    const e = await caught(() => templates.loadTemplate(proj, 'workspace', 'pair.json', []))
-    expect(e.message).toBe("The template can't be loaded yet:\n• Claude Code is turned off (Settings → Providers), needed by Builder.")
-    expect(shownError(e)).toBe('Die Vorlage kann noch nicht geladen werden:\n• Claude Code ist ausgeschaltet (Einstellungen → Anbieter), gebraucht von Builder.')
-    // Not installed, and a coding agent this Hive doesn't know: each its own key.
-    config.settings.providers['claude-code'].enabled = true
-    providerService.info = ((id: string) => ({ provider: id, found: false })) as never
-    try {
-      expect((await run(() => templates.templatePlan(proj, 'workspace', 'pair.json'))).missing[0]).toMatchObject({ problem: 'notInstalled', reason: 'Claude Code ist nicht installiert (Agent-Einrichtung)' })
-    } finally {
-      providerService.info = ((id: string) => ({ provider: id, found: true })) as never
-    }
-    writeFileSync(join(wsPath, '.hive', 'templates', 'later.json'), JSON.stringify({ version: 1, name: 'Later', savedAt: '', layout: 'auto', agents: [{ name: 'G', provider: 'gemini', worktree: false }] }))
+    expect([plan.options, plan.blocked]).toEqual([[], []])
+    const e = await caught(() => templates.loadTemplate(proj, 'workspace', 'pair.json', plan.remove.map((a) => a.id), undefined, undefined, { roles: { builder: 'Claude · High' } }))
+    expect(e.message).toBe('No connection "Claude · High" can be used in this workspace now: choose another.')
+    expect(shownError(e)).toBe('Keine Verbindung „Claude · High“ kann jetzt in diesem Arbeitsbereich verwendet werden: wähle eine andere.')
     setLanguage('en', {})
-    expect((await run(() => templates.templatePlan(proj, 'workspace', 'later.json'))).missing[0]).toMatchObject({ problem: 'unknown', reason: 'This Hive doesn\'t know the coding agent "gemini" (update Hive)' })
   })
 })
 
 describe("a template file's problem: English for the log, the window's text beside it (#870)", () => {
   it("lists a damaged template with its problem in English and as text, and refuses it in English with the window's text", async () => {
     const file = join(wsPath, '.hive', 'templates', 'empty.json')
-    writeFileSync(file, JSON.stringify({ version: 1, name: 'Empty', savedAt: '', layout: 'auto', agents: [] }))
+    writeFileSync(file, JSON.stringify({ version: 2, name: 'Empty', savedAt: '', layout: 'auto', agents: [] }))
     try {
       setLanguage('de', GERMAN)
       const entry = (await run(() => templates.listAllTemplates())).find((t) => t.file === 'empty.json')!
@@ -233,18 +222,17 @@ describe("a template file's problem: English for the log, the window's text besi
 })
 
 describe("lists in the language's way, never joined with English commas", () => {
-  it("lists a template's agents in the window's language, in the plan and its refusal, and English in the refusal's message", async () => {
-    writeFileSync(join(wsPath, '.hive', 'templates', 'crew.json'), JSON.stringify({ version: 1, name: 'Crew', savedAt: '', layout: 'auto', agents: ['Builder', 'Reviewer', 'Tester'].map((name) => ({ name, provider: 'claude-code', worktree: false })) }))
-    config.settings.providers['claude-code'].enabled = false
+  it("lists the connections' keys it doesn't know in the window's language, and English in the refusal's message (HI-2109)", async () => {
+    writeFileSync(join(wsPath, '.hive', 'templates', 'crew.json'), JSON.stringify({ version: 2, name: 'Crew', savedAt: '', layout: 'auto', agents: ['Builder', 'Reviewer', 'Tester'].map((name) => ({ name, role: 'builder', provider: 'claude-code' })) }))
+    const plan = await run(() => templates.templatePlan(proj, 'workspace', 'crew.json'))
+    const load = () => caught(() => templates.loadTemplate(proj, 'workspace', 'crew.json', plan.remove.map((a) => a.id), undefined, undefined, { roles: { builders: 'x', testers: 'x' }, agents: { 9: 'x' } } as never))
     setLanguage('de', GERMAN)
-    expect((await run(() => templates.templatePlan(proj, 'workspace', 'crew.json'))).blocked).toEqual(['Claude Code ist ausgeschaltet (Einstellungen → Anbieter), gebraucht von Builder, Reviewer und Tester.'])
-    const e = await caught(() => templates.loadTemplate(proj, 'workspace', 'crew.json', []))
-    expect(e.message).toBe("The template can't be loaded yet:\n• Claude Code is turned off (Settings → Providers), needed by Builder, Reviewer and Tester.")
-    expect(shownError(e)).toBe('Die Vorlage kann noch nicht geladen werden:\n• Claude Code ist ausgeschaltet (Einstellungen → Anbieter), gebraucht von Builder, Reviewer und Tester.')
+    const e = await load()
+    expect(e.message).toBe("These connection choices don't fit its agents: role builders, role testers and agent 9. Open it again.")
+    expect(shownError(e)).toBe('Diese Verbindungswahl passt nicht zu ihren Agenten: role builders, role testers und agent 9. Öffne sie erneut.')
     // A language with no translation yet still lists in its own way.
     setLanguage('ja', {})
-    expect((await run(() => templates.templatePlan(proj, 'workspace', 'crew.json'))).blocked).toEqual(['Claude Code is turned off (Settings → Providers), needed by Builder、Reviewer、Tester.'])
-    expect(shownError(await caught(() => templates.loadTemplate(proj, 'workspace', 'crew.json', [])))).toContain('needed by Builder、Reviewer、Tester.')
+    expect(shownError(await load())).toContain('role builders、role testers、agent 9')
   })
 
   it("lists an MCP server's variables and headers in the window's language", () => {

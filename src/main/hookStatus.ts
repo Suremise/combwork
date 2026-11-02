@@ -51,6 +51,11 @@ export interface HookStatusInput {
   reviewing: boolean
   /** It waits on its CLI's prompt about a safeguard stop (#606: whether to switch models), which no hook answers. */
   safeguardPrompt: boolean
+  /**
+   * Its latest turn ended on an error (LiveSessionState.failedTurn, #1658). Only the next turn's start clears it, so
+   * while it is set a Stop is that same turn's, come late (after the CLI's own record ended it).
+   */
+  failedTurn?: boolean
 }
 
 export type HookAction =
@@ -95,7 +100,22 @@ export interface HookStep {
   open?: Ask[]
   /** The ask the agent waits on from now on; undefined leaves it. */
   waitingOn?: Ask | null
+  /** A turn that ended on an error (#1632): what the CLI said ('' for nothing) sets it, null clears it, undefined leaves it (a move to working clears it). */
+  failed?: string | null
   actions: HookAction[]
+}
+
+/** A failed turn's status message when the CLI gave no words (#1632): English for agents, its message for the window. */
+const FAILED_TURN = 'The turn ended on an error' // i18n-ignore: a status message in the CLI's place, which agents read (GET /v1/projects)
+const FAILED_TURN_TEXT = msg({ id: 'session.status.failedTurn', defaultMessage: 'The turn ended on an error', description: "An agent's status when its CLI ended its turn on an error (an API connection error, say) without saying what." })
+
+/**
+ * A turn that ended on an error (#1632): its mark (the CLI's words, '' for none) and its status message, the CLI's words
+ * or Hive's own (English for agents, shown in the window's language).
+ */
+export function failedTurnStep(words: string | null | undefined): Pick<HookStep, 'failed' | 'message' | 'messageText'> {
+  const said = words?.trim() ?? ''
+  return said ? { failed: said, message: said } : { failed: '', message: FAILED_TURN, messageText: FAILED_TURN_TEXT }
 }
 
 /** Statuses with no turn running, which a tool of a turn that goes on makes working. */
@@ -215,6 +235,16 @@ export function safeguardAnswered(s: HookStatusInput): HookStep {
   return { next, ...(next === 'ready' ? { message: SAFEGUARD_IDLE_MESSAGE, messageText: SAFEGUARD_IDLE_TEXT } : { message: null }), review: null, ...RESOLVED, actions: ['releaseLocks'] }
 }
 
+/**
+ * The CLI's question by itself while idle is gone from its screen (HI-1959): answered or put off by the user there, with
+ * no hook. The agent waiting on it is idle again (on its background tasks, or ready), nothing open. Nothing while it
+ * doesn't wait.
+ */
+export function idleQuestionGone(s: HookStatusInput): HookStep {
+  if (s.status !== 'waiting') return { next: null, actions: [] }
+  return { next: idleAfter(s, 'ready'), message: null, review: null, ...RESOLVED, actions: [] }
+}
+
 export function hookStep(ev: HookEvent, s: HookStatusInput): HookStep {
   switch (ev.kind) {
     case 'start':
@@ -265,7 +295,13 @@ export function hookStep(ev: HookEvent, s: HookStatusInput): HookStep {
       const next = idleAfter(s, 'finished')
       // An agent waiting on background tasks isn't done: it is told when they end and carries on.
       const notify = next === 'finished' && s.status !== 'finished'
-      return { next, message: null, review: null, ...RESOLVED, actions: ['releaseLocks', ...(notify ? (['notifyFinished'] as const) : []), 'turnEnded'] }
+      // Ended on an error (#1632: an API connection error, a rate limit): it needs you, with the CLI's words, until its
+      // next turn starts; its status stays the turn's end, so it is prompted and woken as any idle agent is.
+      // A turn already marked failed keeps it (#1658, HR5's case 6): its Stop, come after the CLI's own record ended the
+      // turn failed, says nothing of the error and is no good end of it. A good end of a new turn clears it (the turn's
+      // start already did).
+      const failed = ev.failed ? failedTurnStep(ev.lastMessage) : s.failedTurn ? {} : { failed: null, message: null }
+      return { next, ...failed, review: null, ...RESOLVED, actions: ['releaseLocks', ...(notify ? (['notifyFinished'] as const) : []), 'turnEnded'] }
     }
     case 'signIn':
       // The turn is over, on a refused sign-in: nothing runs until the user signs in again. Not finished, so not
@@ -295,13 +331,21 @@ export function hookStep(ev: HookEvent, s: HookStatusInput): HookStep {
     case 'end':
       return { next: 'stopped', question: null, review: null, ...RESOLVED, actions: ['releaseAllLocks', 'clearTasks'] }
     case 'ignore':
+    // A model call the CLI tries again (HI-1973): still working; sessions shows the wait (retryWait).
+    case 'retry':
       return { next: null, actions: [] }
   }
 }
 
 /** Applies a step's status, message, question and review to an agent's state. True when any of them changed (the state needs sending). */
-export function applyStep(st: { status: SessionStatus; statusMessage?: string; statusText?: Text; unseen?: boolean; question?: { text: string; since: string }; review?: string }, step: HookStep, now = new Date().toISOString()): boolean {
+export function applyStep(st: { status: SessionStatus; statusMessage?: string; statusText?: Text; unseen?: boolean; question?: { text: string; since: string }; review?: string; failedTurn?: { message: string; since: string } }, step: HookStep, now = new Date().toISOString()): boolean {
   let changed = false
+  // A failed turn (#1632): set by its end, cleared by a turn that ends well or by the next one starting (below).
+  const failed = step.failed === undefined && step.next === 'working' ? null : step.failed
+  if (failed !== undefined && (failed === null ? !!st.failedTurn : failed !== st.failedTurn?.message)) {
+    st.failedTurn = failed === null ? undefined : { message: failed, since: now }
+    changed = true
+  }
   if (step.review !== undefined && (step.review ?? undefined) !== st.review) {
     st.review = step.review ?? undefined
     changed = true

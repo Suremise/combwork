@@ -1,0 +1,22 @@
+{
+  "cli": "codex-cli 0.163.0",
+  "recorded": "2026-10-23",
+  "note": "The writable roots Codex 0.163.0 tells the model ('The writable roots are …' in its permissions instructions), in workspace-write, with a root of the user's own: as given by -c sandbox_workspace_write.writable_roots and by --add-dir. Paths replaced: the folder C:\\work\\alpha, the user's own root C:\\work\\userroot, a project's copies folder C:\\work\\copies.",
+  "cases": {
+    "userOwn": {
+      "how": "codex debug prompt-input in a new CODEX_HOME whose config.toml has [sandbox_workspace_write] writable_roots = ['C:\\work\\userroot']",
+      "args": [],
+      "roots": ["C:\\work\\userroot", "C:\\work\\alpha"]
+    },
+    "configOverride": {
+      "how": "the same, with Hive's -c override of the key",
+      "args": ["-c", "sandbox_workspace_write.writable_roots=['C:\\work\\copies']"],
+      "roots": ["C:\\work\\copies", "C:\\work\\alpha"]
+    },
+    "addDir": {
+      "how": "codex exec (one prompt) in the Codex test home, the user's own root given as -c sandbox_workspace_write.writable_roots (its config.toml isn't changed), its rollout's permissions instructions read back",
+      "args": ["--add-dir", "C:\\work\\copies"],
+      "roots": ["C:\\work\\copies", "C:\\work\\userroot", "C:\\work\\alpha"]
+    }
+  }
+}

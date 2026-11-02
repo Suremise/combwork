@@ -7,21 +7,27 @@
 //   npm run scenarios -- --provider codex --model gpt-5.6-luna --only work-on-card,review-card
 //   npm run scenarios -- --only work-on-card --signed-out   # the fake signed out: the trial is skipped for the environment
 //   npm run scenarios -- --only work-on-card --signed-out=launch   # its OAuth expired: it exits at launch, skipped too
+//   npm run scenarios -- --only work-on-card --signed-out=late   # signed out, shown only once the prompt is sent: skipped too
 //
 // A trial that Hive shows waiting for a sign-in, or whose CLI says it hit a limit or can't reach its API, is skipped for
 // the environment at once (no checks failed, no cost), and so are the provider's other trials, said once (#302).
 //
 // More than five scenarios, or --repeat, waits for a test slot (tests/e2e/slots.mjs; --no-wait fails at once instead),
-// unless started inside an e2e suite, whose run holds one. A pre-merge run goes first in that queue (#558): --pre-merge,
+// unless started inside an e2e suite, whose run holds one: a few fake runs in all take the side slot, and a real
+// model's run of any size only a model trial's slot (HI-2070). A pre-merge run goes first in that queue (#558): --pre-merge,
 // or one started by the agent holding its project's merge slot. Every run waits for a test lane while all 10 are taken
 // (tests/e2e/lanes.mjs, #707; --no-wait fails at once instead).
 // --budget N (USD, API-equivalent, above 0, default 2) stops a model run once the scenarios so far cost that much, or
 // as soon as a trial reports no cost (the spend can't be checked then; --allow-unknown-cost goes on anyway); --only runs
 // some; --keep leaves each scenario's profile and workspace; --repeat N runs each N times (samples, for spread);
 // --save-baseline NAME keeps this run's benchmark as a named baseline (an older one of that name is kept, not
-// overwritten). Results go to %LOCALAPPDATA%\hive-test\scenarios\results (the newest 30 runs are kept): results.json
+// overwritten). Results go to %LOCALAPPDATA%\hive-test\scenarios\results (the newest 30 fake runs and, counted apart,
+// the newest 30 model trials are kept, besides those a card cites and those a run still writes into: runner.json,
+// HI-2234, HI-2236): results.json
 // (every scenario's checks, skills read, hive calls, versions, usage, measures), benchmark.json (hive-benchmark/1: the
-// Performance page compares two) and summary.md. With a fake provider a failed check fails the run (exit 1); model
+// Performance page compares two) and summary.md; results.json is written as each trial ends (#1457: a run cut short keeps
+// what it had). Run in a Hive agent's session it shows in the Progress panel, a step per trial (--no-progress: not).
+// With a fake provider a failed check fails the run (exit 1); model
 // trials only report (models vary). A dev build that isn't from the source as it is now (tests/e2e/build.mjs) is rebuilt
 // first, so a run (and a baseline) never measures other code.
 //
@@ -32,18 +38,17 @@
 import { createRequire } from 'module'
 import { readFileSync, writeFileSync } from 'fs'
 import { join } from 'path'
-import { devBuild, ensureBuild } from '../e2e/build.mjs'
+import { devBuild, ensureBuildWithSlot } from '../e2e/build.mjs'
 import { LANES, describeHolder, laneWaitLine, lanesFirst, laneWork, waitForLane } from '../e2e/lanes.mjs'
-import { describeClaim, heavySlots, needsSlot, preMerge, waitForSlot, waitLine } from '../e2e/slots.mjs'
+import { buildNeedsCpuSlot, creditFor, preMerge, refusedLine, slotPool, waitForSlot, waitLine, waitSummary } from '../e2e/slots.mjs'
 import { waitForCodexHome } from '../e2e/codexHomeLock.mjs'
 import { autoClean } from '../e2e/clean.mjs'
-import { slotWaitProgress } from '../progressReport.mts'
+import { scenariosProgress, slotWaitProgress } from '../progressReport.mts'
+import { endRunTemp, startRunTemp } from '../runTemp.mts'
 
 const require = createRequire(import.meta.url)
-const lib = require('../e2e/lib.cjs')
-const runContext = require('../e2e/runContext.cjs')
 // What may be deleted (#253): never what a card that isn't Done cites, nothing earlier while the board can't be read.
-const evidence = require('../e2e/evidence.cjs').evidenceFor(lib.ROOT)
+const evidence = require('../e2e/evidence.cjs').evidenceFor(join(import.meta.dirname, '..', '..'))
 const spare = (p) => evidence.protects(p)
 // Without the board nothing a run made could be removed, so copies would pile up (#285): as the e2e runner, it doesn't
 // start (HIVE_TEST_NO_BOARD=1: no board cites test output on this machine).
@@ -51,10 +56,21 @@ if (!evidence.ok) {
   console.error(`Can't tell what the tests may delete: ${evidence.why}. Fix the board, or set HIVE_TEST_NO_BOARD=1 if no Hive board cites test output on this machine.`)
   process.exit(2)
 }
+// The run's own temp folder in hive-test\tmp (HI-2102): the test copies of Hive and the CLIs its scenarios start get it
+// as TEMP (e2e/runContext.cjs ALLOW), not %TEMP%. It goes as the runner exits; its start removes what stopped runs
+// left, as the evidence rules allow. Before lib.cjs loads: Playwright, which the harness runs in this process, takes
+// the temp folder for its playwright-artifacts-* folders as it loads.
+startRunTemp(spare)
+process.on('exit', () => {
+  const failed = endRunTemp()
+  if (failed) console.warn(`The run's temp folder was left behind (the next run's start removes it after a day): ${failed}`)
+})
+const lib = require('../e2e/lib.cjs')
+const runContext = require('../e2e/runContext.cjs')
 const { runScenario, sourceFingerprint, claudeSignedIn, environmentAdvice, CLAUDE_TEST_HOME, PROVIDERS } = require('./harness.cjs')
 const { copilotInstalled } = require('../e2e/fake-copilot-api.cjs')
 const { SCENARIOS, FIXTURES_VERSION } = require('./scenarios.cjs')
-const { benchmarkOf, pruneResults, saveBaseline, resultsFolder, parseBudget, budgetGate, spendText } = require('./benchmark.cjs')
+const { benchmarkOf, pruneResults, saveBaseline, resultsFolder, releaseResults, writeResults, parseBudget, budgetGate, spendText } = require('./benchmark.cjs')
 
 const argv = process.argv.slice(2)
 const arg = (name, fallback) => {
@@ -83,7 +99,8 @@ if (!PROVIDERS[provider]) {
 }
 // The fake Claude Code acting out an expired sign-in: to check that a trial the environment stops is skipped (#302).
 // --signed-out=launch: its OAuth session can't be refreshed, so it exits before its session starts (#577).
-const signedOut = argv.includes('--signed-out=launch') ? 'launch' : argv.includes('--signed-out')
+// --signed-out=late: it shows it isn't logged in only once the prompt is sent, which it doesn't take (#1321).
+const signedOut = argv.includes('--signed-out=launch') ? 'launch' : argv.includes('--signed-out=late') ? 'late' : argv.includes('--signed-out')
 if (signedOut && provider !== 'fake') {
   console.error('--signed-out is for the fake Claude Code (--provider fake) only: a real CLI is never signed out from here.')
   process.exit(2)
@@ -104,34 +121,41 @@ if (notSignedIn) {
 
 const chosen = SCENARIOS.filter((s) => !only?.length || only.includes(s.id))
 // More than a few scenarios (or --repeat) is a heavy run: it waits for a test slot, as the e2e runner's do
-// (tests/e2e/slots.mjs), so runs on this machine don't slow each other until tests time out; not one started inside a
-// suite, whose parent holds a slot (needsSlot, #211). --no-wait: fail at once.
-if (needsSlot({ count: chosen.length, repeat: repeats })) {
-  const queue = slotWaitProgress('scenarios', `npm run scenarios -- ${argv.join(' ')}`.trim(), argv)
+// (tests/e2e/slots.mjs), so runs on this machine don't slow each other until tests time out; a few fake runs in all
+// take the side slot, else a heavy one. A real model's run (a model trial) takes none of those, only a model trial's
+// slot, whatever its size (HI-2070). Not one started inside a suite, whose parent holds a slot (slotPool, #211).
+// --no-wait: fail at once.
+const pool = slotPool({ kind: 'scenarios', count: chosen.length, repeat: repeats, provider })
+if (pool) {
+  const resource = pool === 'model' ? 'a model-trial slot' : 'a test slot'
+  const queue = slotWaitProgress('scenarios', `npm run scenarios -- ${argv.join(' ')}`.trim(), argv, resource)
   let said = ''
   const got = await waitForSlot(runContext.HEAVY_DIR, {
+    pool,
     what: `scenarios: ${chosen.length} (${provider})${repeats > 1 ? ` × ${repeats}` : ''}`,
     root: lib.ROOT,
     wait: !argv.includes('--no-wait'),
     first: preMerge(argv.includes('--pre-merge')),
     onWait: (look) => {
-      const who = look.holders.map((c) => describeClaim(c)).join('; ')
       const line = waitLine(look)
       if (line !== said) console.log(line)
       said = line
-      queue.waiting(who)
+      queue.waitingAs(waitSummary(look))
     }
   })
   if (got.refused) {
-    console.error(`No test slot free (--no-wait): ${heavySlots()} heavy runs at once on this machine, held by ${got.refused.holders.map((c) => describeClaim(c)).join('; ')}.`)
+    console.error(refusedLine(got.refused))
     process.exit(2)
   }
   if (said) {
     const after = `${Math.round(got.waitedMs / 1000)} s`
-    console.log(`Got a test slot after ${after}.`)
-    await queue.finish(`got a test slot after ${after}`)
+    console.log(`Got ${resource} after ${after}.`)
+    await queue.finish(`got ${resource} after ${after}`)
   }
 }
+// What runs inside this run's test Hives (an agent's own test run) has this run's slot as credit, and its parent's
+// (HI-2070): carried into their sessions (runContext CARRIED), so CPU work inside a model trial still asks for a CPU slot.
+process.env.E2E_RUN_SLOTS = creditFor(pool)
 
 // This run's lane: its own folders and Agent API port, so another run at the same time can't remove, open or answer
 // for this one's test Hive. With every lane taken it waits for one (#707), as for a test slot; --no-wait: fail at once.
@@ -161,13 +185,39 @@ if (laneSaid) {
 process.on('exit', lane.release)
 process.on('SIGINT', () => process.exit(130))
 
+// A model trial holds no CPU slot (HI-2070): a build it has to make is CPU work, so it takes a small run's slot (the
+// side slot, else a heavy one) for the build alone, unless what it holds or runs inside covers CPU work.
+const takeBuildSlot = async () => {
+  const buildQueue = slotWaitProgress('scenarios', `npm run scenarios -- ${argv.join(' ')}`.trim(), argv)
+  let said = ''
+  const got = await waitForSlot(runContext.HEAVY_DIR, {
+    pool: 'small',
+    what: `the build for scenarios: ${chosen.length} (${provider})`,
+    root: lib.ROOT,
+    wait: !argv.includes('--no-wait'),
+    onWait: (look) => {
+      const line = waitLine(look)
+      if (line !== said) console.log(line)
+      said = line
+      buildQueue.waitingAs(waitSummary(look))
+    }
+  })
+  if (got.refused) {
+    console.error(refusedLine(got.refused))
+    process.exit(2)
+  }
+  if (said) await buildQueue.finish(`got a test slot after ${Math.round(got.waitedMs / 1000)} s`)
+  return got
+}
+
 // Under the worktree's build lock (build.mjs): an e2e or scenario run started beside this one builds it once. Once it
 // has a lane (#735): a run that waited for one tests the source as it is then, not as it was when it started.
 let build
 try {
-  build = ensureBuild({
+  build = await ensureBuildWithSlot({
     root: lib.ROOT,
-    build: true,
+    needsSlot: buildNeedsCpuSlot({ provider, pool }),
+    takeSlot: takeBuildSlot,
     runBuild: () => {
       console.log('Building (the dev build is not from this source)…')
       devBuild(lib.ROOT)
@@ -193,8 +243,22 @@ const codexLease = !fake && PROVIDERS[provider].provider === 'codex' ? await wai
 const sourceAtStart = sourceFingerprint()
 const stamp = new Date().toISOString().replace(/[:.]/g, '-').slice(0, 19)
 const resultsDir = join(lib.WORK, '..', 'scenarios', 'results')
-pruneResults(resultsDir, 29, spare)
 const out = resultsFolder(resultsDir, `${stamp}-${provider}`)
+// After making its own folder (held, so not counted): the newest 30 of each kind stay besides it (HI-2236).
+pruneResults(resultsDir, undefined, spare)
+// Held while this process runs (runner.json: no other run's prune takes it, HI-2234), let go as it exits.
+process.on('exit', () => releaseResults(out))
+// What the run has written to its folder, by name, so a folder removed under it is made again with all of it.
+const written = new Map()
+const save = (name, data) => {
+  writeResults(out, name, data, {
+    rewrite: () => {
+      for (const [n, d] of written) writeFileSync(join(out, n), d)
+    },
+    onRecreated: () => console.warn(`\nThe results folder was removed during the run: made it again with what the run has so far (${out}).`)
+  })
+  written.set(name, data)
+}
 const results = []
 let spent = 0
 let unknownCostTrials = 0
@@ -204,54 +268,78 @@ const noCostModels = new Set()
 // too, so they are skipped, said once.
 let environment = null
 let saidRest = false
-for (let sample = 1; sample <= repeats; sample++) {
-  for (const sc of chosen) {
-    if (environment) {
-      results.push({ scenario: sc.id, title: sc.title, provider, sample, skipped: `environment: ${environment.why}`, environment: environment.why })
-      if (!saidRest) console.log(`SKIP the other trials: ${environment.why}. To run them: ${environment.advice}.`)
-      saidRest = true
-      continue
-    }
-    const gate = budgetGate({ fake, budget, spentKnown: spent, unknownCostTrials, allowUnknownCost, noCostModels: [...noCostModels] })
-    if (!gate.ok) {
-      results.push({ scenario: sc.id, title: sc.title, provider, sample, skipped: gate.reason })
-      console.log(`SKIP ${sc.id}: ${gate.reason}`)
-      continue
-    }
-    process.stdout.write(`${sc.id} (${provider}${repeats > 1 ? `, ${sample}/${repeats}` : ''})… `)
-    const r = await runScenario(sc, provider, { model, effort, keep, workRoot, port: lane.first, evidence, signedOut, timeoutMs: fake ? 60000 : 360000 })
-    r.sample = sample
-    if (r.environment) {
-      // Not a result of the scenario: no checks, and no cost assumed.
-      environment = { why: r.environment, advice: environmentAdvice(r.environment, provider) }
-      results.push(r)
-      console.log(`SKIP environment: ${r.environment}, ${r.seconds}s${r.kept ? ` (its folder is kept: ${r.kept})` : ''}`)
-      continue
-    }
-    // A trial's cost as reported; none reported is unknown (counted), never $0.
-    if (typeof r.usage?.costUsd === 'number') spent += r.usage.costUsd
-    else if (!fake) {
-      unknownCostTrials++
-      noCostModels.add(r.usage?.model ?? r.model)
-    }
-    results.push(r)
-    const failed = r.checks.filter((c) => c.ok === false)
-    console.log(`${r.error ? `ERROR (${r.error.split('\n')[0]})` : failed.length ? `${failed.length} failed` : 'ok'}, ${r.seconds}s${r.usage?.costUsd ? `, $${r.usage.costUsd.toFixed(3)}` : ''}${r.kept ? ` (its folder is kept: ${r.kept})` : ''}`)
-    for (const c of r.checks) console.log(`  ${c.ok === null ? 'SKIP' : c.ok ? 'PASS' : 'FAIL'} ${c.name}${c.ok === false && c.detail ? ` (${c.detail})` : ''}`)
+/** What the run has so far: its source and settings (`complete` once every trial has run, and checked again then). */
+const metaNow = (complete) => ({
+  fixturesVersion: FIXTURES_VERSION,
+  source: sourceAtStart,
+  ...(complete ? {} : { incomplete: `${results.length} of ${trials.length} trials` }),
+  guidance: results.find((r) => r.guidance?.atStart)?.guidance.atStart.revision ?? null,
+  provider, model: model ?? '(default)', effort: effort ?? '(default)', mode: PROVIDERS[provider].mode, repeats, budgetUsd: budget, when: new Date().toISOString(), spentUsd: Math.round(spent * 1000) / 1000, unknownCostTrials })
+// Each trial's result written as it ends (#1457): a run cut short keeps what it had.
+// Should even that fail (the folder kept going, or another error), the run goes on: what it has stays in memory and the
+// next trial's write tries again; the writes at the end fail the run.
+const keepSoFar = () => {
+  try {
+    save('results.json', JSON.stringify({ meta: metaNow(false), results }, null, 2))
+  } catch (e) {
+    console.warn(`\nCouldn't write results.json so far (${e.code ?? e.message}): the run goes on, and writes it again after the next trial.`)
   }
+}
+// The Progress panel (#1457): a step per trial, named with the results so far, so a long run shows it moving.
+const trials = Array.from({ length: repeats }, (_, k) => chosen.map((sc) => ({ sc, sample: k + 1, name: repeats > 1 ? `${sc.id} (${k + 1}/${repeats})` : sc.id }))).flat()
+const progress = scenariosProgress(trials.map((t) => t.name), provider, argv)
+for (const [i, { sc, sample, name }] of trials.entries()) {
+  progress.start(i, name)
+  if (environment) {
+    results.push({ scenario: sc.id, title: sc.title, provider, sample, skipped: `environment: ${environment.why}`, environment: environment.why })
+    if (!saidRest) console.log(`SKIP the other trials: ${environment.why}. To run them: ${environment.advice}.`)
+    saidRest = true
+    progress.done(sc.id, 0, 'skipped')
+    keepSoFar()
+    continue
+  }
+  const gate = budgetGate({ fake, budget, spentKnown: spent, unknownCostTrials, allowUnknownCost, noCostModels: [...noCostModels] })
+  if (!gate.ok) {
+    results.push({ scenario: sc.id, title: sc.title, provider, sample, skipped: gate.reason })
+    console.log(`SKIP ${sc.id}: ${gate.reason}`)
+    progress.done(sc.id, 0, 'skipped')
+    keepSoFar()
+    continue
+  }
+  process.stdout.write(`${sc.id} (${provider}${repeats > 1 ? `, ${sample}/${repeats}` : ''})… `)
+  const r = await runScenario(sc, provider, { model, effort, keep, workRoot, port: lane.first, evidence, signedOut, timeoutMs: fake ? 60000 : 360000 })
+  r.sample = sample
+  if (r.environment) {
+    // Not a result of the scenario: no checks, and no cost assumed.
+    environment = { why: r.environment, advice: environmentAdvice(r.environment, provider) }
+    results.push(r)
+    console.log(`SKIP environment: ${r.environment}, ${r.seconds}s${r.kept ? ` (its folder is kept: ${r.kept})` : ''}`)
+    progress.done(sc.id, r.seconds * 1000, 'skipped')
+    keepSoFar()
+    continue
+  }
+  // A trial's cost as reported; none reported is unknown (counted), never $0.
+  if (typeof r.usage?.costUsd === 'number') spent += r.usage.costUsd
+  else if (!fake) {
+    unknownCostTrials++
+    noCostModels.add(r.usage?.model ?? r.model)
+  }
+  results.push(r)
+  const failed = r.checks.filter((c) => c.ok === false)
+  console.log(`${r.error ? `ERROR (${r.error.split('\n')[0]})` : failed.length ? `${failed.length} failed` : 'ok'}, ${r.seconds}s${r.usage?.costUsd ? `, $${r.usage.costUsd.toFixed(3)}` : ''}${r.kept ? ` (its folder is kept: ${r.kept})` : ''}`)
+  for (const c of r.checks) console.log(`  ${c.ok === null ? 'SKIP' : c.ok ? 'PASS' : 'FAIL'} ${c.name}${c.ok === false && c.detail ? ` (${c.detail})` : ''}`)
+  // Codex scripts whose calls its rollout didn't record (HI-2235): what they ran can't be seen, so no check credits it.
+  if (r.observed?.codeMode?.unknown) console.log(`  NOTE unobservable: ${r.observed.codeMode.unknown} Codex script(s) whose calls the rollout didn't record; no check credits what they ran`)
+  progress.done(sc.id, r.seconds * 1000, r.error || failed.length ? 'failed' : 'ok')
+  keepSoFar()
 }
 
 const sourceAtEnd = sourceFingerprint()
-const meta = {
-  fixturesVersion: FIXTURES_VERSION,
-  source: sourceAtStart,
-  ...(sourceAtEnd.head !== sourceAtStart.head || sourceAtEnd.dirty !== sourceAtStart.dirty ? { sourceChangedDuringRun: sourceAtEnd } : {}),
-  guidance: results.find((r) => r.guidance?.atStart)?.guidance.atStart.revision ?? null,
-  provider, model: model ?? '(default)', effort: effort ?? '(default)', mode: PROVIDERS[provider].mode, repeats, budgetUsd: budget, when: new Date().toISOString(), spentUsd: Math.round(spent * 1000) / 1000, unknownCostTrials }
-writeFileSync(join(out, 'results.json'), JSON.stringify({ meta, results }, null, 2))
+const meta = { ...metaNow(true), ...(sourceAtEnd.head !== sourceAtStart.head || sourceAtEnd.dirty !== sourceAtStart.dirty ? { sourceChangedDuringRun: sourceAtEnd } : {}) }
+save('results.json', JSON.stringify({ meta, results }, null, 2))
 const appVersion = JSON.parse(readFileSync(join(lib.ROOT, 'package.json'), 'utf8')).version
 const benchmarkFile = join(out, 'benchmark.json')
-writeFileSync(benchmarkFile, JSON.stringify(benchmarkOf(meta, results, appVersion), null, 2))
+save('benchmark.json', JSON.stringify(benchmarkOf(meta, results, appVersion), null, 2))
 if (baselineName) console.log(`Baseline "${baselineName}": ${saveBaseline(join(lib.WORK, '..', 'scenarios', 'baselines'), baselineName, benchmarkFile, spare)}`)
 /** What Hive's own parts cost in the scenario (its measures): tool reply characters, requests, guidance at launch. */
 const hiveCost = (m) => (m ? `${m.toolChars.toLocaleString('en')} chars in ${m.toolCalls} tool calls; ${m.apiRequests} requests; ${(m.coreBytes + m.customBytes + m.roleBytes + m.modeBytes + m.catalogBytes).toLocaleString('en')} B guidance` : 'not measured')
@@ -263,8 +351,8 @@ const row = (r) => {
   return `| ${r.scenario} | ${r.error ? `error: ${r.error.split('\n')[0]}` : failed.length ? `**${failed.length} failed**: ${failed.map((c) => c.name).join('; ')}` : 'pass'} | ${passed}/${r.checks.length}${skipped ? ` (${skipped} skipped)` : ''} | ${r.observed?.skillsRead.join(', ') || '–'} | ${[...new Set(r.observed?.hiveCalls.map((c) => c.tool) ?? [])].join(', ') || '–'} | ${hiveCost(r.measures)} | ${r.usage?.costUsd != null ? `$${r.usage.costUsd.toFixed(3)}` : '–'}, ${r.seconds}s |`
 }
 const cli = results.find((r) => r.cliVersion)?.cliVersion ?? 'unknown'
-writeFileSync(
-  join(out, 'summary.md'),
+save(
+  'summary.md',
   [
     `# Scenarios: ${provider}${model ? ` (${model})` : ''}${repeats > 1 ? `, ${repeats} samples each` : ''}`,
     '',
@@ -277,6 +365,8 @@ writeFileSync(
 )
 console.log(`\nResults: ${out}`)
 const hardFailures = fake ? results.filter((r) => r.error || r.checks?.some((c) => c.ok === false)).length : 0
+const failedTrials = results.filter((r) => r.error || r.checks?.some((c) => c.ok === false)).length
+await progress.finish(!hardFailures, `${results.length - failedTrials - results.filter((r) => r.skipped).length} ok, ${failedTrials} failed${results.some((r) => r.skipped) ? `, ${results.filter((r) => r.skipped).length} skipped` : ''}`, join(out, 'summary.md'))
 codexLease?.release()
 // What tests left in hive-test that is no longer needed (tests/e2e/clean.mjs), this lane's included: let go first.
 lane.release()

@@ -1,0 +1,2 @@
+{"loggedIn": true, "authMethod": "claude.ai", "apiProvider": "firstParty", "analyticsDisabled": false, "projectsDirectory": "C:\\work\\account\\projects", "configDirectory": "C:\\work\\account", "email": "user@example.com", "orgId": "00000000-0000-4000-8000-000000000001", "orgName": "Example's Organization", "subscriptionType": "max"}
+{"loggedIn": false, "authMethod": "none", "apiProvider": "firstParty", "analyticsDisabled": false, "projectsDirectory": "C:\\work\\account\\projects", "configDirectory": "C:\\work\\account"}

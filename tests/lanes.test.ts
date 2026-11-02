@@ -4,10 +4,11 @@
 // abandoned lane keeps its cards as it left them, and a lane is on the card being worked (#512).
 import { mkdirSync, writeFileSync } from 'fs'
 import { join } from 'path'
-import { afterAll, beforeAll, describe, expect, it, vi } from 'vitest'
+import { afterAll, afterEach, beforeAll, describe, expect, it, vi } from 'vitest'
 import * as electron from 'electron'
 import type { HiveEvent, TaskCard } from '../src/shared/types'
-import { allDone, keptLanes, laneLine, laneView, listedLanes, loopDefaults, readLane, readLanes, laneCards, laneNumber, laneName, LANE_LINGER_MS, LANE_KEEP_MS, MAX_LANES, type LaneRecord } from '../src/shared/lanes'
+import { preferencesOf } from '../src/shared/workflow/preferences'
+import { allDone, keptLanes, laneLine, laneNextText, laneView, listedLanes, readLane, readLanes, laneCards, laneNumber, laneName, LANE_LINGER_MS, LANE_KEEP_MS, MAX_LANES, type LaneRecord } from '../src/shared/lanes'
 import { tempDir } from './tempDir'
 import { storeDocs } from './storeDocs'
 // The longest a wait here waits for what it waits on: a bound for a hung run, never how long it should take (#570).
@@ -19,8 +20,16 @@ const base = tempDir('hive-lanes-')
 const { createWorkspaceService, disposeWorkspaceService, inWorkspace } = await import('../src/main/workspace')
 const tasks = await import('../src/main/tasks')
 const lanes = await import('../src/main/lanes')
+
+/** Workflow rules off for one test (#1270: Hive owns the lane while they are on), on again after it. */
+const { advanced } = await import('../src/main/advanced')
+const { ENFORCE } = await import('../src/main/workflow/service')
+const rulesOff = (): Promise<unknown> => advanced.set(ENFORCE, false)
+afterEach(async () => {
+  await advanced.set(ENFORCE, true)
+})
 const { onHiveEvent } = await import('../src/main/events')
-const { saveStore } = await import('../src/main/storeRows')
+const { saveTable } = await import('../src/main/storeTables')
 
 vi.setConfig({ testTimeout: 30_000 })
 
@@ -44,6 +53,69 @@ const rec = (over: Partial<LaneRecord> = {}): LaneRecord => ({
 
 const card = (number: number, column: TaskCard['column'], over: Partial<TaskCard> = {}): TaskCard =>
   ({ number, title: `Card ${number}`, column, project: 'alpha', blocked: null, history: [], comments: [], archived: false, ...over }) as unknown as TaskCard
+
+describe('a lane on slots (#1438)', () => {
+  const cards = new Map([[1, card(1, 'done')], [2, card(2, 'todo')], [3, card(3, 'todo')]])
+
+  it("its slot's details for the row's hover (#1446): lent or carried, its line, ready or preparing, waiting while preparing", () => {
+    const info = { name: 'slot-b', carried: false, line: 'hive/HI/HI-2-lane-hover', state: 'ready' as const, since: '2026-10-23T10:00:00.000Z' }
+    const v = laneView(rec(), cards, undefined, null, undefined, null, undefined, null, null, { slot: 'slot-b', waiting: false, info })
+    expect([v.slot, v.slotInfo, v.status]).toEqual(['slot-b', info, null])
+    // Its builder's carried slot (a 0.9 worktree, #1441): named the same way.
+    const carried = laneView(rec(), cards, undefined, null, undefined, null, undefined, null, null, { slot: 'hb2', waiting: false, info: { ...info, name: 'hb2', carried: true } })
+    expect([carried.slot, carried.slotInfo?.carried]).toEqual(['hb2', true])
+    // Being prepared (G15's warming): said, never pausing, and nothing more pressing hidden by it.
+    const preparing = laneView(rec(), cards, undefined, null, undefined, null, undefined, null, null, { slot: 'slot-b', waiting: false, info: { ...info, state: 'preparing' } })
+    expect([preparing.status, preparing.state]).toEqual([{ reason: 'preparing', card: 2, slot: 'slot-b' }, 'active'])
+    expect(laneLine(preparing)).toContain('waiting: preparing slot-b')
+    const blocked = laneView(rec(), new Map([[1, card(1, 'done')], [2, card(2, 'doing', { blocked: 'Asked the user' })], [3, card(3, 'todo')]]), undefined, null, undefined, null, undefined, null, null, { slot: 'slot-b', waiting: false, info: { ...info, state: 'preparing' } })
+    expect(blocked.status?.reason).toBe('blocked')
+    // Ended: none.
+    expect(laneView(rec({ state: 'ended', endedAt: '2026-10-09T11:00:00.000Z' }), cards, undefined, null, undefined, null, undefined, null, null, { slot: 'slot-b', waiting: false, info }).slotInfo).toBeNull()
+  })
+
+  it("a pool lane's current card (#1446): who gave its last verdict and who reviews it now, by name; other lanes have none", () => {
+    const pool = rec({ reviewer: null, pool: true })
+    const names = new Map([['r1', 'HI-R1'], ['r2', 'HI-R2'], ['b1', 'B1']])
+    const facts = new Map([[2, { stage: 'review' as const, forYou: false, stale: false, rounds: 1, lastVerdict: { reviewer: 'r1', pass: false }, reviewing: 'r2' }]])
+    const live = new Map([[1, card(1, 'done')], [2, card(2, 'review')], [3, card(3, 'todo')]])
+    expect(laneView(pool, live, names, facts).poolReview).toEqual({ lastVerdict: { name: 'HI-R1', pass: false }, reviewing: 'HI-R2' })
+    const waiting = new Map([[2, { ...facts.get(2)!, reviewing: null }]])
+    expect(laneView(pool, live, names, waiting).poolReview).toEqual({ lastVerdict: { name: 'HI-R1', pass: false }, reviewing: null })
+    expect(laneView(rec(), live, names, facts).poolReview).toBeUndefined()
+  })
+
+  it("names its slot, and while it has none and waits for one: paused, 'waiting for a slot'; what waits for the user says more", () => {
+    const v = laneView(rec(), cards, undefined, null, undefined, null, undefined, null, null, { slot: 'slot-b', waiting: false })
+    expect([v.slot, v.status, v.state]).toEqual(['slot-b', null, 'active'])
+    expect(laneLine(v)).toContain('B1 / R1 (alpha, in slot-b)')
+    const waiting = laneView(rec(), cards, undefined, null, undefined, null, undefined, null, null, { slot: null, waiting: true })
+    expect([waiting.state, waiting.status?.reason, waiting.slot]).toEqual(['paused', 'slot', null])
+    expect(laneLine(waiting)).toContain('waiting for a slot')
+    const blocked = laneView(rec(), new Map([[1, card(1, 'doing', { blocked: 'Asked the user' })], [2, card(2, 'todo')], [3, card(3, 'todo')]]), undefined, null, undefined, null, undefined, null, null, { slot: null, waiting: true })
+    expect(blocked.status?.reason).toBe('blocked')
+    // Ended: no slot, no wait.
+    const ended = laneView(rec({ state: 'ended', endedAt: '2026-10-09T11:00:00.000Z' }), cards, undefined, null, undefined, null, undefined, null, null, { slot: 'slot-b', waiting: true })
+    expect([ended.slot, ended.status]).toEqual([null, null])
+  })
+
+  it("hive_lane next says where the next card is built", () => {
+    const v = laneView(rec(), cards, undefined, null, undefined, null, undefined, null, null, { slot: 'slot-b', waiting: false })
+    expect(laneNextText({ lane: v, next: { card: 2, title: 'Card 2', carryOn: false }, waits: null })).toBe('Next: #2 Card 2. Start it: it is built in slot-b, on a new branch Hive makes there.')
+    expect(laneNextText({ lane: v, next: { card: 2, title: 'Card 2', carryOn: true }, waits: null })).toBe('Carry on with #2 Card 2 in slot-b.')
+    const none = laneView(rec(), cards)
+    expect(laneNextText({ lane: none, next: { card: 2, title: 'Card 2', carryOn: false }, waits: null })).toBe('Next: #2 Card 2. Start it.')
+  })
+
+  it('HI-2245: hive_lane next says to hand over a card carried on with commits past its submission, and nothing more without them', () => {
+    const v = laneView(rec(), cards, undefined, null, undefined, null, undefined, null, null, { slot: 'slot-b', waiting: false })
+    const u = [{ card: 2, count: 2, atLeast: false, since: 'ab30f52' }]
+    expect(laneNextText({ lane: v, next: { card: 2, title: 'Card 2', carryOn: true }, waits: null, unsubmitted: u })).toBe('Carry on with #2 Card 2 in slot-b. First hand it over: its line has 2 commits since its submission (ab30f52); hive_submit with followUp: true.')
+    // Another card's fact isn't this one's; with none, the reply is as before.
+    expect(laneNextText({ lane: v, next: { card: 2, title: 'Card 2', carryOn: true }, waits: null, unsubmitted: [{ ...u[0], card: 3 }] })).toBe('Carry on with #2 Card 2 in slot-b.')
+    expect(laneNextText({ lane: v, next: { card: 2, title: 'Card 2', carryOn: true }, waits: null, unsubmitted: [] })).toBe('Carry on with #2 Card 2 in slot-b.')
+  })
+})
 
 describe('a lane against the board', () => {
   it('its current card is the first not passed or done; rounds count failed reviews', () => {
@@ -183,12 +255,18 @@ describe('which lanes are listed and kept', () => {
   })
 })
 
-describe("a card loop's rounds and wait when the request doesn't say (#412)", () => {
-  it("the project's, else the workspace's, else 10 rounds and 6 hours; values out of range are left out", () => {
-    expect(loopDefaults()).toEqual({ rounds: 10, waitHours: 6 })
-    expect(loopDefaults({ loops: { rounds: 4 } })).toEqual({ rounds: 4, waitHours: 6 })
-    expect(loopDefaults({ loops: { rounds: 4, waitHours: 2 } }, { loopRounds: 7, loopWaitHours: null })).toEqual({ rounds: 7, waitHours: 2 })
-    expect(loopDefaults({ loops: { rounds: 0, waitHours: 25 } }, { loopRounds: 2.5, loopWaitHours: -1 })).toEqual({ rounds: 10, waitHours: 6 })
+describe("a card loop's rounds and wait when the request doesn't say (#412, HI-1766: workflow options)", () => {
+  it("the project's, else the workspace's, else Hive's, else 10 rounds and 6 hours; values out of range are passed over", () => {
+    const of = (levels: Parameters<typeof preferencesOf>[1]) => {
+      const v = preferencesOf('git', levels).values
+      return { rounds: v.loopRounds, waitHours: v.loopWaitHours }
+    }
+    expect(of({})).toEqual({ rounds: 10, waitHours: 6 })
+    expect(of({ workspace: { git: { loopRounds: 4 } } })).toEqual({ rounds: 4, waitHours: 6 })
+    expect(of({ global: { git: { loopWaitHours: 2 } }, workspace: { git: { loopRounds: 4 } }, project: { loopRounds: 7 } })).toEqual({ rounds: 7, waitHours: 2 })
+    // Another platform's defaults don't apply.
+    expect(of({ workspace: { none: { loopRounds: 4 } } })).toEqual({ rounds: 10, waitHours: 6 })
+    expect(of({ workspace: { git: { loopRounds: 0, loopWaitHours: 25 } }, project: { loopRounds: 2.5, loopWaitHours: -1 } as never })).toEqual({ rounds: 10, waitHours: 6 })
   })
 })
 
@@ -202,7 +280,7 @@ describe('the lanes service', () => {
   beforeAll(async () => {
     const p = join(wsPath, 'alpha')
     mkdirSync(join(p, '.hive'), { recursive: true })
-    writeFileSync(join(p, '.hive', 'project.json'), JSON.stringify({ version: 2, agents: [{ id: 'b1', name: 'B1' }, { id: 'r1', name: 'R1' }, { id: 'b2', name: 'B2' }] }))
+    writeFileSync(join(p, '.hive', 'project.json'), JSON.stringify({ version: 2, agents: [{ id: 'b1', name: 'B1' }, { id: 'r1', name: 'R1' }, { id: 'b2', name: 'B2' }, { id: 'g1', name: 'G1', workflowRole: 'generalist' }] }))
     w = createWorkspaceService()
     await w.open(wsPath)
     lanes.startLanes()
@@ -220,7 +298,26 @@ describe('the lanes service', () => {
     return fn()
   }
 
+  it("a generalist is never a lane's builder or reviewer: a new lane, a reviewer change and a join are refused, nothing changed (HI-686)", async () => {
+    const [c1, c2] = [await make('Gen one'), await make('Gen two')]
+    const generalist = /G1 is a generalist: it takes no side in the workflow/
+    await expect(lanes.startLane(w, { project: 'alpha', builder: 'g1', reviewer: 'r1', cards: [c1.number], by: 'the Assistant' })).rejects.toMatchObject({ status: 400, message: expect.stringMatching(generalist) })
+    await expect(lanes.startLane(w, { project: 'alpha', builder: 'b2', reviewer: 'g1', cards: [c1.number], by: 'the Assistant' })).rejects.toMatchObject({ status: 400, message: expect.stringMatching(generalist) })
+    expect((await lanes.listLanes(w)).filter((l) => l.builder.id === 'g1' || l.reviewer?.id === 'g1' || l.builder.id === 'b2')).toEqual([])
+    // A running lane: its reviewer not changed to the generalist, and a generalist can't join it.
+    const kept = await lanes.startLane(w, { project: 'alpha', builder: 'b2', reviewer: 'r1', cards: [c1.number], by: 'B2 (alpha)' })
+    await expect(lanes.startLane(w, { project: 'alpha', builder: 'b2', reviewer: 'g1', cards: [c1.number, c2.number], by: 'the Assistant' })).rejects.toMatchObject({ status: 400, message: expect.stringMatching(generalist) })
+    await expect(lanes.joinLane(w, { project: 'alpha', builder: 'b2', reviewer: 'g1', cards: [c1.number], by: 'G1 (alpha)' })).rejects.toMatchObject({ status: 400, message: expect.stringMatching(generalist) })
+    const now = (await lanes.listLanes(w)).find((l) => l.id === kept.lane.id)
+    expect([now?.reviewer?.id, now?.cards.map((x) => x.number)]).toEqual(['r1', [c1.number]])
+    // The other roles as before: an either-role or guessed reviewer still reviews.
+    expect((await lanes.startLane(w, { project: 'alpha', builder: 'b2', reviewer: 'r1', cards: [c1.number, c2.number], by: 'B2 (alpha)' })).did).toBe('updated')
+    await lanes.endLane(w, kept.lane.id, { abandoned: true })
+  })
+
   it('starts a lane, updates it when started again with a card in common, and starts anew with none', async () => {
+    // A list sharing no card is another loop, as with workflow rules off: with them on it edits the running lane (#1270).
+    await rulesOff()
     const [c1, c2, c3] = [await make('One'), await make('Two'), await make('Three')]
     const a = await lanes.startLane(w, { project: 'alpha', builder: 'b1', reviewer: 'r1', cards: [c1.number, c2.number], rounds: 10, waitMinutes: 360, name: 'first', by: 'B1 (alpha)' })
     expect(a.did).toBe('started')
@@ -241,22 +338,32 @@ describe('the lanes service', () => {
     await lanes.endLane(w, c.lane.id, { abandoned: true })
   })
 
-  it("a lane started without rounds or wait takes the project's settings, else the workspace's; given ones win (#412)", async () => {
+  it("a lane started without rounds or wait takes the project's workflow options as they resolve, else the workspace's; given ones win, and a lane keeps what it started with (#412, HI-1766)", async () => {
+    // A list sharing no card is another loop, as with workflow rules off: with them on it edits the running lane (#1270).
+    await rulesOff()
+    const alpha = join(wsPath, 'alpha')
+    const platform = w.info()!.projects.find((p) => p.name === 'alpha')!.platform?.id ?? 'none'
+    const wasWorkflow = (await w.projectConfig(alpha)).workflow
     const [c1, c2, c3] = [await make('L1'), await make('L2'), await make('L3')]
-    const plain = await lanes.startLane(w, { project: 'alpha', builder: 'b2', cards: [c1.number], by: 'B2 (alpha)' })
-    expect([plain.lane.rounds, plain.lane.waitMinutes]).toEqual([10, 360])
-    await w.setLoops({ rounds: 6, waitHours: 3 })
-    const ws = await lanes.startLane(w, { project: 'alpha', builder: 'b2', cards: [c2.number], by: 'B2 (alpha)' })
-    expect([ws.lane.rounds, ws.lane.waitMinutes]).toEqual([6, 180])
-    await w.updateProjectConfig(join(wsPath, 'alpha'), { loopRounds: 8 })
-    const proj = await lanes.startLane(w, { project: 'alpha', builder: 'b2', cards: [c3.number], by: 'B2 (alpha)' })
-    expect([proj.lane.rounds, proj.lane.waitMinutes]).toEqual([8, 180])
-    const given = await lanes.startLane(w, { project: 'alpha', builder: 'b2', cards: [c3.number], rounds: 3, waitMinutes: 60, by: 'B2 (alpha)' })
-    expect([given.lane.rounds, given.lane.waitMinutes]).toEqual([3, 60])
-    await expect(w.setLoops({ rounds: 0 })).rejects.toThrow(/whole number from 1 to 50/)
-    await w.updateProjectConfig(join(wsPath, 'alpha'), { loopRounds: null })
-    await w.setLoops({ rounds: 10, waitHours: 6 })
-    await lanes.endLane(w, given.lane.id, { abandoned: true })
+    try {
+      const plain = await lanes.startLane(w, { project: 'alpha', builder: 'b2', cards: [c1.number], by: 'B2 (alpha)' })
+      expect([plain.lane.rounds, plain.lane.waitMinutes]).toEqual([10, 360])
+      await w.saveWorkspaceConfigWith((c) => ({ workflow: { ...c.workflow, [platform]: { ...c.workflow?.[platform], loopRounds: 6, loopWaitHours: 3 } } }))
+      const ws = await lanes.startLane(w, { project: 'alpha', builder: 'b2', cards: [c2.number], by: 'B2 (alpha)' })
+      expect([ws.lane.rounds, ws.lane.waitMinutes]).toEqual([6, 180])
+      await w.mutateProjectConfig(alpha, (c) => ({ workflow: { platform, preset: null, ...c.workflow, options: { ...(c.workflow?.platform === platform ? c.workflow.options : {}), loopRounds: 8 } } }))
+      const proj = await lanes.startLane(w, { project: 'alpha', builder: 'b2', cards: [c3.number], by: 'B2 (alpha)' })
+      expect([proj.lane.rounds, proj.lane.waitMinutes]).toEqual([8, 180])
+      // The lanes started before keep what they started with.
+      const listed = await lanes.listLanes(w, { all: true })
+      expect(listed.find((l) => l.id === ws.lane.id)).toMatchObject({ rounds: 6, waitMinutes: 180 })
+      const given = await lanes.startLane(w, { project: 'alpha', builder: 'b2', cards: [c3.number], rounds: 3, waitMinutes: 60, by: 'B2 (alpha)' })
+      expect([given.lane.rounds, given.lane.waitMinutes]).toEqual([3, 60])
+      await lanes.endLane(w, given.lane.id, { abandoned: true })
+    } finally {
+      await w.mutateProjectConfig(alpha, () => ({ workflow: wasWorkflow }))
+      await w.saveWorkspaceConfigWith((c) => ({ workflow: { ...c.workflow, [platform]: {} } }))
+    }
   })
 
   it('a reviewer joins its builder’s lane, before or after the builder starts it', async () => {
@@ -272,7 +379,65 @@ describe('the lanes service', () => {
     await expect(lanes.joinLane(w, { project: 'alpha', builder: 'b2', reviewer: 'r1', by: 'R1 (alpha)' })).rejects.toThrow(/no lane running yet/)
   })
 
+  it("HI-2273: a running lane's start naming a reviewer that is no agent is refused, naming its reviewer, and changes nothing; a new lane starts without one", async () => {
+    const [c1, c2, c3] = [await make('U1'), await make('U2'), await make('U3')]
+    const lane = (await lanes.startLane(w, { project: 'alpha', builder: 'b2', reviewer: 'r1', cards: [c1.number, c2.number], by: 'B2 (alpha)' })).lane
+    const guess = { project: 'alpha', builder: 'b2', reviewer: null, unknownReviewer: 'Reviewer', cards: [c1.number, c2.number, c3.number], by: 'B2 (alpha)', ownBuilder: true }
+    await expect(lanes.startLane(w, guess)).rejects.toMatchObject({ status: 404, message: `No agent "Reviewer" in alpha; this lane's reviewer is R1: leave reviewer out to keep it.` })
+    // Its reviewer and list as they were.
+    const after = (await lanes.rawLanes(w)).find((l) => l.id === lane.id)!
+    expect([after.state, after.reviewer?.id, after.cards, after.pending]).toEqual(['active', 'r1', [c1.number, c2.number], undefined])
+    // Applied now too: refused before its card in flight could be put back.
+    await expect(lanes.startLane(w, { ...guess, applyNow: true })).rejects.toThrow(/this lane's reviewer is R1/)
+    // Leaving reviewer out keeps it.
+    expect((await lanes.startLane(w, { project: 'alpha', builder: 'b2', cards: [c1.number, c2.number, c3.number], by: 'B2 (alpha)', ownBuilder: true })).lane.reviewer?.id).toBe('r1')
+    await lanes.endLane(w, lane.id, { abandoned: true })
+    // A lane reviewed by the pool, and one with no reviewer yet, say so.
+    const pool = (await lanes.startLane(w, { project: 'alpha', builder: 'b2', reviewer: null, pool: true, cards: [c1.number], by: 'the user' })).lane
+    await expect(lanes.startLane(w, guess)).rejects.toThrow(`No agent "Reviewer" in alpha; this lane is reviewed by the project's reviewer pool: leave reviewer out.`)
+    expect((await lanes.rawLanes(w)).find((l) => l.id === pool.id)?.pool).toBe(true)
+    await lanes.endLane(w, pool.id, { abandoned: true })
+    // No running lane: it starts without a reviewer, as before (one can join it); started again, refused as one with none.
+    const fresh = await lanes.startLane(w, guess)
+    expect([fresh.did, fresh.lane.reviewer]).toEqual(['started', null])
+    await expect(lanes.startLane(w, guess)).rejects.toThrow(`No agent "Reviewer" in alpha; this lane has no reviewer yet: leave reviewer out, or name an agent of alpha.`)
+    await lanes.endLane(w, fresh.lane.id, { abandoned: true })
+  })
+
+  it("HI-2273: next with no running lane says its lane just ended or was abandoned, never to start one; with none lately, to start one", async () => {
+    const [c1] = [await make('N1')]
+    const ended = (await lanes.startLane(w, { project: 'alpha', builder: 'b2', reviewer: 'r1', cards: [c1.number], by: 'B2 (alpha)' })).lane
+    await lanes.endLane(w, ended.id, {})
+    for (const agent of ['b2', 'r1']) await expect(lanes.laneNext(w, 'alpha', agent)).rejects.toThrow(`Your lane ${ended.id} has ended: all its cards are Done. Nothing more on it: don't start it again; end your turn unless you have other work.`)
+    const abandoned = (await lanes.startLane(w, { project: 'alpha', builder: 'b2', reviewer: 'r1', cards: [c1.number], by: 'B2 (alpha)' })).lane
+    await lanes.endLane(w, abandoned.id, { abandoned: true })
+    await expect(lanes.laneNext(w, 'alpha', 'b2')).rejects.toThrow(`Your lane ${abandoned.id} was abandoned: don't start it again; ask the user if there is more to do.`)
+    // An agent that had no lane: as before.
+    await expect(lanes.laneNext(w, 'alpha', 'g1')).rejects.toThrow('No running lane of yours: start one with hive_lane start, or ask the user')
+  })
+
+  it('a lane reviewed by the pool (#1443): kept with its row, nobody joins it, its builder keeps it; a reviewer named makes it one per lane', async () => {
+    const [c1, c2] = [await make('Q1'), await make('Q2')]
+    const started = await lanes.startLane(w, { project: 'alpha', builder: 'b2', reviewer: null, pool: true, cards: [c1.number, c2.number], by: 'the user' })
+    expect([started.lane.pool, started.lane.reviewer]).toEqual([true, null])
+    expect(laneLine(started.lane)).toContain('B2 / the reviewer pool (alpha)')
+    expect((await lanes.rawLanes(w)).find((l) => l.id === started.lane.id)?.pool).toBe(true)
+    await expect(lanes.joinLane(w, { project: 'alpha', builder: 'b2', reviewer: 'r1', by: 'R1 (alpha)' })).rejects.toThrow(/reviewed by the reviewer pool/)
+    // The builder's own start (card-loop) names no reviewer: the pool stays.
+    const mine = await lanes.startLane(w, { project: 'alpha', builder: 'b2', cards: [c1.number, c2.number], rounds: 3, by: 'B2 (alpha)' })
+    expect([mine.did, mine.lane.id, mine.lane.pool, mine.lane.rounds]).toEqual(['updated', started.lane.id, true, 3])
+    await expect(lanes.startLane(w, { project: 'alpha', builder: 'b2', reviewer: 'r1', pool: true, cards: [c1.number], by: 'B2 (alpha)' })).rejects.toThrow(/no reviewer of its own/)
+    const named = await lanes.startLane(w, { project: 'alpha', builder: 'b2', reviewer: 'r1', cards: [c1.number, c2.number], by: 'B2 (alpha)' })
+    expect([named.lane.id, named.lane.pool, named.lane.reviewer?.id]).toEqual([started.lane.id, undefined, 'r1'])
+    expect(readLane({ ...rec(), reviewer: null, pool: true })?.pool).toBe(true)
+    // A pool beside a reviewer of its own doesn't read back as one.
+    expect(readLane({ ...rec(), pool: true })?.pool).toBeUndefined()
+    await lanes.endLane(w, named.lane.id, { abandoned: true })
+  })
+
   it("a builder's next loop, its last lane's cards passed but not merged: that lane ends (not abandoned), whoever registers first", async () => {
+    // A list sharing no card is another loop, as with workflow rules off: with them on it edits the running lane (#1270).
+    await rulesOff()
     const [p1, p2, n1, n2, m1] = [await make('P1'), await make('P2'), await make('N1'), await make('N2'), await make('M1')]
     const passed = async (...ns: number[]) => {
       for (const n of ns) await run(() => tasks.updateTask(n, { column: 'passed' }, user))
@@ -297,6 +462,8 @@ describe('the lanes service', () => {
   })
 
   it('only its builder or reviewer ends it, among agents; the user and the Assistant may', async () => {
+    // A list changed (or a lane ended) at once, as with workflow rules off: with them on, a change waits for the card boundary (#1270, tests/laneOwnership.test.ts).
+    await rulesOff()
     const c = await make('E1')
     const l = (await lanes.startLane(w, { project: 'alpha', builder: 'b1', reviewer: 'r1', cards: [c.number], by: 'B1 (alpha)' })).lane
     await expect(lanes.endLane(w, l.id, { project: 'alpha', agent: 'b2' })).rejects.toThrow(/builder or reviewer/)
@@ -331,7 +498,7 @@ describe('the lanes service', () => {
     expect(kept?.frozen?.map((c) => c.column)).toEqual(['doing', 'todo'])
     // Without that record (a lane ended before #512, or the record damaged): not recorded, never the board's now.
     delete kept!.frozen
-    await saveStore(wsPath, 'lanes', '', data.map((x) => ({ key: x.id, doc: JSON.stringify(x) })))
+    await saveTable(wsPath, 'lanes', data)
     await run(() => tasks.updateTask(c1.number, { column: 'done' }, user))
     const legacy = await lanes.getLane(w, l.id)
     expect([legacy.state, legacy.current, legacy.cards.map((c) => [c.title, c.column])]).toEqual(['abandoned', null, [['Z1', 'unrecorded'], ['Z2', 'unrecorded']]])

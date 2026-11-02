@@ -1,10 +1,12 @@
 // The task board (.hive/tasks) and removing projects: who may change what, card numbers and order, and what Hide,
 // Remove from Hive and Delete do with a project's cards, handovers and folder (and what restoring brings back).
+// The board's own rules, with the workflow rules off (Settings → Advanced): enforced, agents' moves are intents (#1268,
+// tests/agentMoves.test.ts) and the user's and the Assistant's go through the card's rules (#1265, tests/gates.test.ts).
 import { execFileSync } from 'child_process'
 import { existsSync, mkdirSync, readdirSync, readFileSync, writeFileSync } from 'fs'
 import { rm } from 'fs/promises'
 import { join } from 'path'
-import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
+import { afterAll, afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import * as electron from 'electron'
 import { tempDir } from './tempDir'
 import { boardLockKey, editCard, readCard, removeCard, writeCard, writeCardOutside } from './boardDb'
@@ -23,6 +25,11 @@ const { decisionNotice, newDecisionsOn, noteCardRead } = await import('../src/ma
 const decisionWakes = await import('../src/main/decisionWakes')
 const removal = await import('../src/main/projectRemoval')
 const { sessions } = await import('../src/main/sessions')
+const { advanced } = await import('../src/main/advanced')
+const { ENFORCE } = await import('../src/main/workflow/service')
+advanced.load(join(base, 'profile'))
+await advanced.set(ENFORCE, false)
+afterAll(() => advanced.stop())
 type WS = ReturnType<typeof createWorkspaceService>
 
 const user = { kind: 'user' } as const
@@ -252,7 +259,7 @@ describe('task board', () => {
       for (const column of ['done', 'review'] as const) {
         const e = await refused(c.number, { column })
         expect(e).toBeInstanceOf(tasks.TaskConflictError)
-        expect(e?.message).toMatch(/is in Doing with Agent 1, who is working on it: newer work is in progress/)
+        expect(e?.message).toMatch(/is in Active with agent Agent 1, who is working on it: newer work is in progress/)
       }
       // Taking it and finishing it in one change: still refused (checked on the card as it was).
       expect(await refused(c.number, { agent: 'a2', column: 'done' })).toBeInstanceOf(tasks.TaskConflictError)
@@ -337,9 +344,11 @@ describe('task board', () => {
     // An agent named (or none, with empty) wins.
     const named = await run(async () => tasks.updateTask((await fresh()).number, { column: 'doing', agent: '' }, me))
     expect(named.agent).toBeNull()
-    // The Assistant, the user, a plain Agent API caller and an agent of another project give it to nobody.
+    // The Assistant (with the user's reason for nobody on it, HI-2062), the user, a plain Agent API caller and an agent of
+    // another project give it to nobody.
     for (const who of [assistant, user, agent, { kind: 'agent', name: 'B (beta)', self: { project: 'beta', agentId: 'b1' } } as const]) {
-      expect((await run(async () => tasks.updateTask((await fresh()).number, { column: 'doing' }, who))).agent).toBeNull()
+      const reason = who === assistant ? { override: { reason: 'nobody on it for now' } } : {}
+      expect((await run(async () => tasks.updateTask((await fresh()).number, { column: 'doing', ...reason }, who))).agent).toBeNull()
     }
     // Already in Doing: a move within it isn't taking it.
     expect((await run(() => tasks.updateTask(named.number, { position: 'top' }, me))).agent).toBeNull()
@@ -348,7 +357,8 @@ describe('task board', () => {
     expect((await run(() => tasks.createTask({ title: 'Mine', project: 'alpha', column: 'doing' }, me))).agent).toBe('a1')
     expect((await run(() => tasks.createTask({ title: 'Todo', project: 'alpha' }, me))).agent).toBeNull()
     expect((await run(() => tasks.createTask({ title: 'Nobody', project: 'alpha', column: 'doing', agent: '' }, me))).agent).toBeNull()
-    expect((await run(() => tasks.createTask({ title: 'Theirs', project: 'alpha', column: 'doing' }, assistant))).agent).toBeNull()
+    // The Assistant's, with nobody on it: refused (HI-2062: in Todo, then moved with the user's reason).
+    await expect(run(() => tasks.createTask({ title: 'Theirs', project: 'alpha', column: 'doing' }, assistant))).rejects.toBeInstanceOf(tasks.TaskConflictError)
 
     for (const c of await run(() => tasks.allTasks())) if (['Take me', 'Mine', 'Todo', 'Nobody', 'Theirs'].includes(c.title)) await run(() => tasks.deleteTask(c.number))
   })
@@ -521,13 +531,49 @@ describe('archiving in batches', () => {
     expect(included.archived).toEqual([taken])
   })
 
+  it("a stage column's batch (Approved beside Merging, #1420) takes only the cards in that stage now, by their facts", async () => {
+    const [approved, merging, plain] = [await make('Approved card', 'done'), await make('Merging card', 'done'), await make('Old card', 'done')]
+    // Their stages as their facts say (here: a card moved into Merging while the dialog was open).
+    const stages: Record<number, 'approved' | 'merging' | null> = { [approved]: 'approved', [merging]: 'merging', [plain]: null }
+    await run(() => Promise.all([approved, merging, plain].map((n) => tasks.updateTask(n, { column: 'passed' as never }, user))))
+    const stageOf = (c: { number: number }) => stages[c.number] ?? null
+    const r = await run(() => tasks.archiveBatch([approved, merging, plain], req('All in Passed', { column: 'passed', stage: 'approved' }), user, { stageOf }))
+    // A card with no stage of its own stands in its column's (Approved).
+    expect(r.archived.sort()).toEqual([approved, plain].sort())
+    expect(r.skipped).toEqual([{ number: merging, why: 'moved to Merging' }])
+    // A stage of another column is ignored: the column alone decides.
+    const odd = await run(() => tasks.archiveBatch([merging], req('All in Passed', { column: 'passed', stage: 'active' }), user, { stageOf }))
+    expect(odd.archived).toEqual([merging])
+    // A card whose facts say a stage of another category stands in its column's default stage, as the board shows it.
+    const stray = await make('Stray', 'done')
+    await run(() => tasks.updateTask(stray, { column: 'passed' as never }, user))
+    const strayIn = await run(() => tasks.archiveBatch([stray], req('All in Passed', { column: 'passed', stage: 'approved' }), user, { stageOf: () => 'review' }))
+    expect(strayIn.archived).toEqual([stray])
+  })
+
   it('a card an agent takes while the archive waits is left on the board (race)', async () => {
     const [idle, alsoIdle] = [await make('Idle'), await make('Also idle')]
     const busy = (c: { column: string; agent: string | null }): string | null => (c.column === 'doing' && c.agent ? 'Agent 1 is working on it' : null)
-    // The agent takes the card (under its lock) just as the archive, sent for it as idle, reaches it.
-    const [, inTodo] = await Promise.all([run(() => tasks.updateTask(idle, { column: 'doing', agent: 'a1' }, user)), run(() => tasks.archiveBatch([idle], req('All in Todo', { column: 'todo' }), user, { busy }))])
-    expect([inTodo.archived, inTodo.skipped]).toEqual([[], [{ number: idle, why: 'moved to Doing' }]])
-    const [, board] = await Promise.all([run(() => tasks.updateTask(alsoIdle, { column: 'doing', agent: 'a1' }, user)), run(() => tasks.archiveBatch([alsoIdle], req('All Cards'), user, { busy }))])
+    // The agent takes the card (under its lock) just as the archive, sent for it as idle, reaches it: the archive is sent
+    // once the take is in its change (a move reads its work first, #1216, so which starts first decides nothing).
+    const takeThenArchive = async <T>(n: number, archive: () => Promise<T>): Promise<T> => {
+      let inside!: () => void
+      const entered = new Promise<void>((r) => (inside = r))
+      tasks.taskTestHooks.beforeUpdate = async (x) => {
+        if (x === n) inside()
+      }
+      try {
+        const taking = run(() => tasks.updateTask(n, { column: 'doing', agent: 'a1' }, user))
+        await entered
+        const [, out] = await Promise.all([taking, run(archive)])
+        return out
+      } finally {
+        tasks.taskTestHooks.beforeUpdate = null
+      }
+    }
+    const inTodo = await takeThenArchive(idle, () => tasks.archiveBatch([idle], req('All in Todo', { column: 'todo' }), user, { busy }))
+    expect([inTodo.archived, inTodo.skipped]).toEqual([[], [{ number: idle, why: 'moved to Active' }]])
+    const board = await takeThenArchive(alsoIdle, () => tasks.archiveBatch([alsoIdle], req('All Cards'), user, { busy }))
     expect([board.archived, board.skipped]).toEqual([[], [{ number: alsoIdle, why: 'Agent 1 is working on it' }]])
     for (const n of [idle, alsoIdle]) expect((await run(() => tasks.getTask(n))).archived).toBe(false)
   })
@@ -725,6 +771,24 @@ describe('card decisions', () => {
     expect(decisionWakes.decisionLine(new Map([[7, { count: 1 }], [9, { count: 3 }]]))).toBe('[Hive] #7 has 1 new decision, #9 has 3 new decisions from the user: read them (hive_read_task) and carry on from where you asked.')
   })
 
+  it("the line for a card's reviewer asks it to read before its next verdict, never to carry on (HI-2261)", () => {
+    expect(decisionWakes.decisionLine(new Map([[7, { count: 1 }]]), new Set([7]))).toBe('[Hive] #7 has 1 new decision from the user: read it (hive_read_task) before your next verdict on it.')
+    expect(decisionWakes.decisionLine(new Map([[7, { count: 2 }]]), new Set([7]))).toBe('[Hive] #7 has 2 new decisions from the user: read them (hive_read_task) before your next verdict on it.')
+    expect(decisionWakes.decisionLine(new Map([[7, { count: 1 }], [9, { count: 1 }]]), new Set([7, 9]))).toBe('[Hive] #7 has 1 new decision, #9 has 1 new decision from the user: read them (hive_read_task) before your next verdict on them.')
+    // A card of its own among them: the builder's line, as it has something to carry on with.
+    expect(decisionWakes.decisionLine(new Map([[7, { count: 1 }], [9, { count: 1 }]]), new Set([7]))).toMatch(/and carry on from where you asked\.$/)
+  })
+
+  it("the cards an agent only reviews are those another agent has: its own, or one with nobody on it, aren't (HI-2261)", async () => {
+    const mine = (await run(() => tasks.createTask({ title: 'Mine', project: 'alpha', column: 'doing', agent: 'a1' }, user))).number
+    const theirs = (await run(() => tasks.createTask({ title: 'Theirs', project: 'alpha', column: 'doing', agent: 'r1' }, user))).number
+    const nobody = (await run(() => tasks.createTask({ title: 'Nobody', project: 'alpha' }, user))).number
+    const cards = new Map([[mine, { count: 1 }], [theirs, { count: 1 }], [nobody, { count: 1 }]])
+    expect([...(await decisionWakes.reviewingOf(w, 'a1', cards))]).toEqual([theirs])
+    expect([...(await decisionWakes.reviewingOf(w, 'r1', cards))]).toEqual([mine])
+    for (const n of [mine, theirs]) await run(() => tasks.updateTask(n, { column: 'todo' }, user))
+  })
+
   it('tells an agent waiting for the user of new decisions once each: not while it works, the user types there or a line of Hive waits (#401)', async () => {
     const me = { projectPath: alpha, agentId: 'a1' }
     const n = (await run(() => tasks.createTask({ title: 'Waiting for the user', project: 'alpha', column: 'doing', agent: 'a1' }, user))).number
@@ -902,7 +966,7 @@ describe('card decisions', () => {
     try {
       // Typed: its doorbell, for one decision (#650).
       await decisionWakes.tellNow(w, alpha, 'a1')
-      expect(sent).toEqual([`[Hive] New in your inbox: 1 answer (#${n}) (m1). Call hive_inbox to read it.`])
+      expect(sent).toEqual([`[Hive] New in your inbox: 1 answer (#${n}) (m1). Call hive_inbox to read it, act on it, then ack it.`])
       // Its CLI takes the line and the agent reads its inbox (the receipt), whose save is held; a newer decision then.
       const held = new Promise<void>((r) => (release = r))
       let holding = false
@@ -932,7 +996,7 @@ describe('card decisions', () => {
       status = 'finished'
       await decisionWakes.tellNow(w, alpha, 'a1')
       expect(sent).toHaveLength(2)
-      expect(sent[1]).toBe(`[Hive] New in your inbox: 1 answer (#${n}) (m2). Call hive_inbox to read it.`)
+      expect(sent[1]).toBe(`[Hive] New in your inbox: 1 answer (#${n}) (m2). Call hive_inbox to read it, act on it, then ack it.`)
       taken = 2
       status = 'working'
       expect((await deliveries.readInbox(alpha, 'a1')).items.map((i) => i.text)).toEqual([expect.stringMatching(new RegExp(`#${n} has 1 new decision from the user`))])
@@ -967,7 +1031,7 @@ describe('card decisions', () => {
     writer.testHooks.takeMs = 20
     try {
       await decisionWakes.tellNow(w, alpha, 'a1')
-      expect(sent).toEqual([`[Hive] New in your inbox: 1 answer (#${n}) (m1). Call hive_inbox to read it.`])
+      expect(sent).toEqual([`[Hive] New in your inbox: 1 answer (#${n}) (m1). Call hive_inbox to read it, act on it, then ack it.`])
       // Another decision before it reads, told again (the board's settle, its turn's end): the rung line covers it.
       await laterMs()
       await run(() => tasks.updateTask(n, { decision: 'Close on the counter.' }, assistant))
@@ -1010,7 +1074,7 @@ describe('card decisions', () => {
     try {
       await decisionWakes.tellNow(w, alpha, 'a1')
       expect(saves).toBeGreaterThan(2)
-      expect(sent).toEqual([`[Hive] New in your inbox: 1 answer (#${n}) (m1). Call hive_inbox to read it.`])
+      expect(sent).toEqual([`[Hive] New in your inbox: 1 answer (#${n}) (m1). Call hive_inbox to read it, act on it, then ack it.`])
     } finally {
       deliveries.setBeforeSaveForTests(null)
       writer.testHooks.takeMs = undefined
@@ -1739,13 +1803,23 @@ describe('removal and board under faults', () => {
     const original = s.start
     for (const decision of ['done', 'review'] as const) {
       const c = await run(() => tasks.createTask({ title: `Decide ${decision}`, project: 'decider' }, user))
+      // The launch, once called: failed by `release`. The card is Doing before then, but the Start saves its delivery
+      // before it launches (#1252: released before the launch was called, it was never failed).
       let release: () => void = () => undefined
-      s.start = () => new Promise((_, reject) => (release = () => reject(new Error('launch failed'))))
+      let launched: () => void = () => undefined
+      const launching = new Promise<void>((r) => (launched = r))
+      s.start = () =>
+        new Promise((_, reject) => {
+          release = () => reject(new Error('launch failed'))
+          launched()
+        })
       try {
         const starting = run(() => startTask(c.number, { kind: 'agent', agentId: 'd1' }, user))
         const handled = expect(starting).rejects.toThrow(/launch failed/)
         // Taken (Doing, the agent's) before the launch; the user decides meanwhile; then the launch fails.
-        await expect.poll(async () => (await run(() => tasks.getTask(c.number))).column, { timeout: HUNG_MS }).toBe('doing')
+        // (A Start that fails before it launches fails the test here, with its own error.)
+        await Promise.race([launching, handled])
+        expect((await run(() => tasks.getTask(c.number))).column).toBe('doing')
         await run(() => tasks.updateTask(c.number, { column: decision }, user))
         release()
         await handled
@@ -1776,7 +1850,7 @@ describe('removal and board under faults', () => {
         expect([started.card.column, started.card.agent]).toEqual(['doing', 'r1'])
         expect(started.card.history.at(-1)).toMatchObject({ by: 'Assistant', what: 'Moved to Doing' })
         // Launched with its doorbell (#650), and the task, read from the agent's inbox, says what to do.
-        expect(prompts.at(-1)).toMatch(new RegExp(`^\\[Hive\\] New in your inbox: 1 task \\(#${c.number}\\) \\(m\\d+\\)\\. Call hive_inbox to read it\\.$`))
+        expect(prompts.at(-1)).toMatch(new RegExp(`^\\[Hive\\] New in your inbox: 1 task \\(#${c.number}\\) \\(m\\d+\\)\\. Call hive_inbox to read it, act on it, then ack it\\.$`))
         expect((await deliveries.deliveriesOf(join(wsPath, 'resumer'), 'r1')).at(-1)?.body).toMatch(
           new RegExp(`^Work on task #${c.number} from the Hive task board: Back from ${from}\n\nIt was in ${from === 'review' ? 'Review' : 'Done'} and is back in Doing for more work\\.\n\nAddress the latest review comment\\.$`)
         )
@@ -1981,6 +2055,16 @@ describe('removal and board under faults', () => {
 
 describe('task prompt', () => {
   const card = { number: 7, title: 'Fix it', description: 'The details.', blockedBy: [], comments: [] } as unknown as import('../src/shared/types').TaskCard
+  // A card's start in its own words (#1292, #966 row 30, Darren's choice: only the card's start has a raw variant).
+  it("in its own words: the card's title, the user's note and its description, nothing of Hive's", async () => {
+    const { rawTaskPrompt } = await import('../src/shared/tasks')
+    expect(rawTaskPrompt(card)).toBe('Fix it\n\nThe details.')
+    expect(rawTaskPrompt(card, '  Only the tests. ')).toBe('Fix it\n\nOnly the tests.\n\nThe details.')
+    expect(rawTaskPrompt({ title: ' Fix it ', description: '' }, ' ')).toBe('Fix it')
+    const raw = rawTaskPrompt({ ...card, blockedBy: [3], context: ['docs/A.md'], comments: [{ at: '2026-10-01T10:00:00Z', by: 'You', text: 'x' }] } as never)
+    expect(raw).not.toMatch(/Hive task board|work-on-card|depends on|Read these first|hive_read_task/)
+  })
+
   it('says when a card is back for more work, and puts the note before the card', async () => {
     const { taskPrompt } = await import('../src/shared/tasks')
     expect(taskPrompt(card, false)).toBe('Work on task #7 from the Hive task board: Fix it\n\nThe details.')
@@ -2006,6 +2090,26 @@ describe('task prompt', () => {
     // Without tools it still has the card and the feedback; a long comment is cut, saying so.
     const long = { ...back, comments: [{ at: '2026-10-02T10:00:00Z', by: 'You', text: 'x'.repeat(5000) }] }
     expect(taskPrompt(long, false, { from: 'done' })).toMatch(/x{4000}… \(cut short: hive_read_task has it all\)$/)
+  })
+
+  // HI-2047 (HI-2009's K10): a running lane's builder is pointed at card-loop, not at work-on-card as well.
+  it("names card-loop for a running lane's builder, work-on-card elsewhere", async () => {
+    const { taskPrompt } = await import('../src/shared/tasks')
+    expect(taskPrompt(card, true, { inLane: true })).toBe("Work on task #7 from the Hive task board: Fix it\n\nThe details.\n\nUse the card-loop skill as this lane's builder.")
+    expect(taskPrompt(card, true, { inLane: true })).not.toContain('work-on-card')
+    expect(taskPrompt(card, true, { inLane: false })).toMatch(/Use the work-on-card skill\.$/)
+    expect(taskPrompt(card, false, { inLane: true })).not.toMatch(/card-loop|work-on-card/)
+  })
+
+  it("knows a card is in a running lane only for that lane's builder, in its project", async () => {
+    const { laneBuilds } = await import('../src/shared/lanes')
+    const lane = { state: 'active' as const, project: 'Alpha', builder: { id: 'a-1', name: 'B1' }, cards: [7, 8] }
+    expect(laneBuilds([lane], 'alpha', 'a-1', 7)).toBe(true)
+    expect(laneBuilds([lane], 'alpha', 'a-1', 9)).toBe(false) // not one of its cards
+    expect(laneBuilds([lane], 'alpha', 'a-2', 7)).toBe(false) // another agent (its reviewer, say)
+    expect(laneBuilds([lane], 'beta', 'a-1', 7)).toBe(false) // another project's
+    expect(laneBuilds([{ ...lane, state: 'ended' }], 'alpha', 'a-1', 7)).toBe(false) // ended
+    expect(laneBuilds([], 'alpha', 'a-1', 7)).toBe(false)
   })
 })
 

@@ -1,0 +1,44 @@
+
+  >_ OpenAI Codex (v0.163.0)
+     C:\work\alpha
+
+
+› Call the a tool of the probe MCP server, then call its b tool. Make no other tool calls, then reply DONE.
+
+
+• Called probe.a
+  └ a done
+    + Show details
+
+• Calling probe.b
+    + Show details
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+  Field 1/1
+  Allow the probe MCP server to run tool "b"?
+  › 1. Allow                   Run the tool and continue
+    2. Allow for this session  Run the tool and remember this choice for this session
+    3. Always allow            Run the tool and remember this choice for future tool calls
+    4. Cancel                  Cancel this tool call
+  enter to submit | esc to cancel

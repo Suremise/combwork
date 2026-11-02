@@ -1,6 +1,7 @@
 import type { MergeSlotInfo, ProgressRun, ProgressSnapshot, ProgressTelling } from './types'
 import { formatDateTime } from './dates'
 import { msg } from './i18n/msg'
+import { cardRef } from './projectKeys'
 import { providerName } from './providers'
 import { durationText, type Tr } from './tasks'
 
@@ -29,10 +30,14 @@ export const MAX_STEP_NAME = 120
 export const MAX_COMMAND = 200
 export const MAX_SUMMARY = 500
 export const MAX_LOG_PATH = 400
-/** Recent shows this many ended runs at first; Show all shows the rest it keeps (RECENT_KEPT). */
-export const RECENT_RUNS = 10
 export const MAX_TOTAL = 100_000
 export const MAX_ESTIMATE_MS = 7 * 24 * 3_600_000
+
+/** A run's card as runs name it (#1220): its key, as cardRef names it (HI-1661), `#1061` where no key is known. */
+export const cardRefText = (n: number): string => cardRef(n)
+
+/** The short form of a commit id, as the panel and replies show it. */
+export const shortRevision = (id: string): string => id.slice(0, 7)
 
 /**
  * Whether a run is in the panel's list (else under Recent): a running one; a failed or stale one until the user has
@@ -43,6 +48,17 @@ export function isListed(r: Pick<ProgressRun, 'state' | 'dismissed' | 'finishedA
   if (r.state === 'running') return true
   if (r.state === 'passed' || r.state === 'stopped') return r.finishedAt !== null && now - r.finishedAt < PASSED_SHOWN_MS
   return r.seenAt === null || now - r.seenAt < PASSED_SHOWN_MS
+}
+
+/**
+ * Whether a run shows on Pulse (#1309, the Assistant's change): a run in progress (running, or stopped reporting and not
+ * yet ended), and one that just ended, failed or passed, for a few seconds; then only in Runs (Pulse's line counts the
+ * failures). A dismissed one never.
+ */
+export function onPulse(r: Pick<ProgressRun, 'state' | 'dismissed' | 'finishedAt'>, now: number): boolean {
+  if (r.dismissed) return false
+  if (isOpenRun(r)) return true
+  return r.finishedAt !== null && now - r.finishedAt < PASSED_SHOWN_MS
 }
 
 /** Whether a run has a bar in the folded strip: listed, and not a failure (or stall) the user has already seen. */
@@ -322,6 +338,8 @@ export interface RunDetail {
   label: string
   text: string
   code?: boolean
+  /** A time (ms): the panel shows it relative ("12 minutes ago"), `text` (the date and time in full) on hover (#1309). */
+  at?: number
 }
 
 /**
@@ -329,7 +347,7 @@ export interface RunDetail {
  * project, provider), when it started and ended (in the user's date and time format), how long against what was
  * expected, its steps, its state and why, the exit code and a log the reporter named. `project` is its project's name.
  */
-export function runDetails(r: ProgressRun, project: string | null, now: number, tr: Tr): RunDetail[] {
+export function runDetails(r: ProgressRun, project: string | null, now: number, tr: Tr, cardName: (n: number) => string = cardRefText): RunDetail[] {
   const took = (r.finishedAt ?? now) - r.startedAt
   let steps: string | null = null
   if (r.total !== null) {
@@ -362,10 +380,54 @@ export function runDetails(r: ProgressRun, project: string | null, now: number, 
       : tr(msg({ id: 'board.details.tookTotal', defaultMessage: '{took}{expected, select, none {} other { · expected about {expected}}}', description: "How long a finished run took, in its details (Progress panel): {took} (\"4 min\"), then about how long runs like it take ({expected}, a duration, or none when unknown: keep that branch empty)." }), { took: ran, expected })
   const out: RunDetail[] = [{ label: tr(msg({ id: 'board.details.run', defaultMessage: 'Run', description: "A label in a run's details (Progress panel): the run's title follows." })), text: r.title }]
   if (r.command) out.push({ label: tr(msg({ id: 'board.details.command', defaultMessage: 'Command', description: "A label in a run's details (Progress panel): the command it ran follows." })), text: r.command, code: true })
+  // What it ran for (#1220): its card and the revision (in full, for copying; the row shows it short).
+  if (r.card) out.push({ label: tr(msg({ id: 'board.details.card', defaultMessage: 'Card', description: "A label in a run's details (Progress panel): the card it ran for follows (#1061)." })), text: cardName(r.card) })
+  if (r.revision) out.push({ label: tr(msg({ id: 'board.details.revision', defaultMessage: 'Revision', description: "A label in a run's details (Progress panel): the card's revision follows, the version of the card's work the run was for: a commit id, or for a project with no platform a hash of the card's files' content (not a commit)." })), text: r.revision, code: true })
+  // What it was tested on, when that isn't the card's revision (#1273): a shared folder's head, a reviewer's checkout.
+  // Right after the Revision it qualifies (#1554), before where it ran.
+  if (r.testedCheckout && r.testedCheckout !== r.revision) out.push({ label: tr(msg({ id: 'board.details.testedOn', defaultMessage: 'Tested on', description: "A label in a run's details (Progress panel), shown when it differs from the card's revision: the commit that was checked out where the run ran follows (a commit id)." })), text: r.testedCheckout, code: true })
+  // The folder it ran in, as its reporter said (#1446): the run's own, never where its agent works now.
+  if (r.folder) out.push({ label: tr(msg({ id: 'board.details.folder', defaultMessage: 'Folder', description: "A label in a run's details (Progress panel): the folder it ran in follows (a path), as it was when it ran." })), text: r.folder, code: true })
+  // The review or check copy it ran in (#1435): an isolated check's, or a reviewer's, at exactly that revision; Hive's
+  // setup run in one too (HI-1710), credited to the agent whose lease held it.
+  if (r.copy) out.push({ label: tr(msg({ id: 'board.details.copy', defaultMessage: 'Copy', description: "A label in a run's details (Progress panel): the name of the review or check copy it ran in follows (copy-1): a folder Hive keeps at exactly the card's revision, which nothing else writes." })), text: r.copy })
+  // How it counted as a check of its card's revision (#1222, SPEC §16.13), once it finished.
+  if (r.counts) {
+    const text = r.counts.counted
+      ? tr(msg({ id: 'board.details.countsAsCheck', defaultMessage: 'Counts as check: {name}', description: "A run's details in the Progress panel: the run counts as the card's check named {name} (\"typecheck\", as the project names it)." }), { name: r.counts.name })
+      : tr(
+          msg({
+            id: 'board.details.notCounted',
+            defaultMessage:
+              "Doesn't count as check {name}: {why, select, notCheck {it wasn't started as a check (hive-progress --check), and its command isn't one the project has for a check} notContained {what was checked out doesn't contain the card's revision} dirty {the folder had uncommitted changes when it started or ended} moved {something else was checked out when it ended} changed {files changed in the folder while it ran} revisionChanged {the card's files changed while it ran} other {it can't be told whether its files changed}}",
+            description: "A run's details in the Progress panel: why the run doesn't count as the card's check named {name} (\"typecheck\", or the run's title when it wasn't a check). {why} picks the reason: keep each branch's key as it is."
+          }),
+          { name: r.counts.name, why: r.counts.whyNot ?? 'other' } // i18n-ignore: a select's key, never shown
+        )
+    out.push({ label: tr(msg({ id: 'board.details.check', defaultMessage: 'Check', description: "A label in a run's details (Progress panel): whether it counts as a check of its card follows." })), text })
+  }
+  // The merge queue's checks with nothing installed before them (#1349): said once, on the first check after it.
+  if (r.installAsWritten) out.push({ label: tr(msg({ id: 'board.details.install', defaultMessage: 'Install', description: "A label in a run's details (Progress panel), on one of the merge queue's checks: what was installed before it follows." })), text: tr(msg({ id: 'board.details.installAsWritten', defaultMessage: 'The setup command as written, after removing node_modules: Hive has no clean form of it', description: "A run's details in the Progress panel, on the merge queue's install: Hive ran the project's worktree setup command as it is written (it is not a package manager's plain install, such as npm install, that Hive knows how to run clean), after deleting the queue folder's node_modules so the install starts from scratch." })) })
+  if (r.noInstall) out.push({ label: tr(msg({ id: 'board.details.install', defaultMessage: 'Install', description: "A label in a run's details (Progress panel), on one of the merge queue's checks: what was installed before it follows." })), text: tr(msg({ id: 'board.details.noInstall', defaultMessage: 'Nothing installed: the project has no setup command and no lock file', description: "A run's details in the Progress panel, on one of the merge queue's checks: Hive installed nothing before the checks, because the project has neither a worktree setup command (Project Settings → Agents) nor a package lock file." })) })
+  // A failed merge check or install that counts as temporary (#1362): why, so a network error or a project's exit 75 is visible.
+  if (r.transient) {
+    out.push({
+      label: tr(msg({ id: 'board.details.temporary', defaultMessage: 'Temporary', description: "A label in a run's details (Progress panel), on one of the merge queue's failed checks: why the failure counts as temporary (the environment's, not the work's) follows." })),
+      text: tr(
+        msg({
+          id: 'board.details.transient',
+          defaultMessage:
+            "{cause, select, spawn {It couldn't start} notFound {Its program wasn't found} timeout {It ran out of time} killed {It was ended from outside} exit75 {It exited with code 75, the project's “temporary failure, try again”} other {A network error in its last lines ({code})}}: the card was returned to its builder, who may submit the same revision again (at most twice in a row) instead of a new one.",
+          description: "A run's details in the Progress panel: why a failed merge check counts as temporary, picked by {cause} (keep each branch's key as it is); {code} is the network error code found in its output (ENOTFOUND, ECONNRESET…: keep it as it is). Code 75 is a number: keep it."
+        }),
+        { cause: r.transient.cause, code: r.transient.code ?? '' } // i18n-ignore: a select's key and an error code, never translated
+      )
+    })
+  }
   out.push({ label: tr(msg({ id: 'board.details.agent', defaultMessage: 'Agent', description: "A label in a run's details (Progress panel): the agent that ran it (and its project) follows." })), text: `${runAgentName(r, tr)}${project ? ` · ${project}` : ''}` })
   if (r.provider) out.push({ label: tr(msg({ id: 'board.details.provider', defaultMessage: 'Provider', description: "A label in a run's details (Progress panel): the agent's CLI follows (Claude Code, Codex…)." })), text: providerName(r.provider) })
-  out.push({ label: tr(msg({ id: 'board.details.started', defaultMessage: 'Started', description: "A label in a run's details (Progress panel): a date and time follows." })), text: formatDateTime(r.startedAt) })
-  if (r.finishedAt !== null) out.push({ label: tr(msg({ id: 'board.details.ended', defaultMessage: 'Ended', description: "A label in a run's details (Progress panel): a date and time follows." })), text: formatDateTime(r.finishedAt) })
+  out.push({ label: tr(msg({ id: 'board.details.started', defaultMessage: 'Started', description: "A label in a run's details (Progress panel): a date and time follows." })), text: formatDateTime(r.startedAt), at: r.startedAt })
+  if (r.finishedAt !== null) out.push({ label: tr(msg({ id: 'board.details.ended', defaultMessage: 'Ended', description: "A label in a run's details (Progress panel): a date and time follows." })), text: formatDateTime(r.finishedAt), at: r.finishedAt })
   out.push({ label: tr(msg({ id: 'board.details.took', defaultMessage: 'Took', description: "A label in a run's details (Progress panel): how long it ran follows." })), text: tookText })
   if (steps) out.push({ label: tr(msg({ id: 'board.details.stepsLabel', defaultMessage: 'Steps', description: "A label in a run's details (Progress panel): its steps follow (\"4 of 12 done\")." })), text: steps })
   out.push({ label: tr(msg({ id: 'board.details.stateLabel', defaultMessage: 'State', description: "A label in a run's details (Progress panel): its state follows (Running, Failed…)." })), text: state })
@@ -376,19 +438,23 @@ export function runDetails(r: ProgressRun, project: string | null, now: number, 
 
 /**
  * Who ran a run, as the window shows it (#872): a name Hive gave it (`defaultName`: "Script" for a script, "Agent" for
- * a kept run with no name) in the window's language; a name an agent or the Assistant has stays as it is, "Agent"
+ * a kept run with no name, "Hive (merge queue)" for the queue's own runs, #1349, "Hive (slot <name>)" for a slot's warming,
+ * #1429) in the window's language; a name an agent or the Assistant has stays as it is, "Agent"
  * too. The stored name stays English: agents read it through the Agent API and hive-progress.
  */
-export function runAgentName(r: Pick<ProgressRun, 'agentName' | 'defaultName'>, tr: Tr): string {
+export function runAgentName(r: Pick<ProgressRun, 'agentName' | 'defaultName' | 'slot' | 'copy'>, tr: Tr): string {
   if (r.defaultName === 'script') return tr(msg({ id: 'board.progress.script', defaultMessage: 'Script', description: "Who ran a run in the Progress panel when a script (a program calling Hive's Agent API) ran it, not an agent." }))
   if (r.defaultName === 'agent') return tr(msg({ id: 'board.progress.anAgent', defaultMessage: 'Agent', description: "Who ran a run in the Progress panel when Hive doesn't have the agent's name (an older record)." }))
+  if (r.defaultName === 'mergeQueue') return tr(msg({ id: 'board.progress.mergeQueue', defaultMessage: 'Hive (merge queue)', description: "Who ran a run in the Progress panel when Hive's merge queue ran it itself: a merge check or install on a card's merged result, not an agent (glossary 2.5: merge queue)." }))
+  if (r.defaultName === 'slot' && r.slot) return tr(msg({ id: 'board.progress.slotRun', defaultMessage: 'Hive (slot {slot})', description: "Who ran a run in the Progress panel when Hive ran it itself to set up one of a project's slots (a worktree Hive lends to a card or a lane: its setup command, a dependency install or its archive command), not an agent. {slot} is the slot's name, such as slot-b: keep it as it is." }), { slot: r.slot })
+  if (r.defaultName === 'copy') return tr(msg({ id: 'board.progress.copiesRun', defaultMessage: 'Hive (review copies)', description: "Who ran a run in the Progress panel when Hive ran it itself to set up one of a project's review or check copies (folders at one revision where a reviewer reads a card's work, or an isolated check runs) and no agent's lease held the copy: its setup command or a dependency install. Also an entry of the panel's Agent filter." }))
   return r.agentName
 }
 
 /** A run's details as plain text for pasting (Copy details, #251): a "Label: text" line for each, then its summary. */
-export function runDetailsText(r: ProgressRun, project: string | null, now: number, tr: Tr): string {
+export function runDetailsText(r: ProgressRun, project: string | null, now: number, tr: Tr, cardName: (n: number) => string = cardRefText): string {
   const line = (label: string, text: string): string => tr(msg({ id: 'board.details.line', defaultMessage: '{label}: {text}', description: "A line of a run's details copied as text (Copy details, Progress panel): a label (\"Command\") and its text." }), { label, text })
-  const lines = runDetails(r, project, now, tr).map((d) => line(d.label, d.text))
+  const lines = runDetails(r, project, now, tr, cardName).map((d) => line(d.label, d.text))
   if (r.summary) lines.push(line(tr(msg({ id: 'board.details.summary', defaultMessage: 'Summary', description: "A label in a run's details copied as text (Copy details, Progress panel): the summary its reporter gave follows." })), r.summary))
   return lines.join('\n')
 }
@@ -406,10 +472,14 @@ export const SHOW_ALL: ProgressFilter = { project: ALL_PROJECTS }
 const projectOf = (r: ProgressRun): string => (r.projectPath ? r.projectPath.toLowerCase() : NO_PROJECT)
 const agentOf = (r: ProgressRun): string => r.agentId ?? r.agentName
 
-/** The filter's choices for these runs: each project that has runs, by its name, then "Assistant and scripts" when some run has no project. */
-export function filterChoices(runs: readonly ProgressRun[], nameOf: (projectPath: string) => string, tr: Tr): { value: string; label: string }[] {
+/**
+ * The filter's choices for these runs: each project that has runs (or a merge queue shown, `also`: their folders, #1356),
+ * by its name, then "Assistant and scripts" when some run has no project.
+ */
+export function filterChoices(runs: readonly ProgressRun[], nameOf: (projectPath: string) => string, tr: Tr, also: readonly string[] = []): { value: string; label: string }[] {
   const seen = new Map<string, string>()
   for (const r of runs) if (r.projectPath && !seen.has(projectOf(r))) seen.set(projectOf(r), nameOf(r.projectPath))
+  for (const p of also) if (!seen.has(p.toLowerCase())) seen.set(p.toLowerCase(), nameOf(p))
   const out = [...seen].map(([value, label]) => ({ value, label })).sort((a, b) => a.label.localeCompare(b.label))
   if (runs.some((r) => !r.projectPath)) out.push({ value: NO_PROJECT, label: tr(msg({ id: 'board.filter.noProject', defaultMessage: 'Assistant and scripts', description: "A choice of the Progress panel's project filter: the runs of the Hive Assistant and of scripts, which belong to no project." })) })
   return out
@@ -423,13 +493,15 @@ export function agentChoices(runs: readonly ProgressRun[], project: string, tr: 
 }
 
 /**
- * The filter that applies to these runs: the chosen one while its project (and agent) still has runs and the runs span
- * more than one project; otherwise every run (the filter is hidden when there is nothing to choose between).
+ * The filter that applies to these runs: the chosen one while its project (and agent) still has runs (or a merge queue
+ * shown, `also`: their folders, #1356) and they span more than one project; otherwise every run (the filter is hidden
+ * when there is nothing to choose between). `offered`: the filter shows whatever the count (HI-2165: All projects
+ * hides a queue, so one project is a choice too).
  */
-export function activeFilter(runs: readonly ProgressRun[], chosen: ProgressFilter | undefined): ProgressFilter {
+export function activeFilter(runs: readonly ProgressRun[], chosen: ProgressFilter | undefined, also: readonly string[] = [], offered = false): ProgressFilter {
   if (!chosen || chosen.project === ALL_PROJECTS) return SHOW_ALL
-  const projects = new Set(runs.map(projectOf))
-  if (projects.size < 2 || !projects.has(chosen.project)) return SHOW_ALL
+  const projects = new Set([...runs.map(projectOf), ...also.map((p) => p.toLowerCase())])
+  if ((projects.size < 2 && !offered) || !projects.has(chosen.project)) return SHOW_ALL
   if (chosen.agent && !runs.some((r) => projectOf(r) === chosen.project && agentOf(r) === chosen.agent)) return { project: chosen.project }
   return chosen
 }

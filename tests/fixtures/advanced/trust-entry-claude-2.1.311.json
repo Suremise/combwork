@@ -1,0 +1,34 @@
+{
+  "projects": {
+    "C:/work/alpha": {
+      "allowedTools": "…",
+      "disabledMcpjsonServers": "…",
+      "enabledMcpjsonServers": "…",
+      "hasClaudeMdExternalIncludesApproved": "…",
+      "hasClaudeMdExternalIncludesWarningShown": "…",
+      "hasTrustDialogAccepted": true,
+      "lastAPIDuration": "…",
+      "lastAPIDurationWithoutRetries": "…",
+      "lastCost": "…",
+      "lastDuration": "…",
+      "lastFpsAverage": "…",
+      "lastFpsLow1Pct": "…",
+      "lastGracefulShutdown": "…",
+      "lastLinesAdded": "…",
+      "lastLinesRemoved": "…",
+      "lastModelUsage": "…",
+      "lastSessionId": "…",
+      "lastSessionMetrics": "…",
+      "lastStartTime": "…",
+      "lastToolDuration": "…",
+      "lastTotalCacheCreationInputTokens": "…",
+      "lastTotalCacheReadInputTokens": "…",
+      "lastTotalInputTokens": "…",
+      "lastTotalOutputTokens": "…",
+      "lastTotalWebSearchRequests": "…",
+      "lastVersionBase": "…",
+      "mcpContextUris": "…",
+      "mcpServers": "…"
+    }
+  }
+}

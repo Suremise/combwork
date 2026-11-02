@@ -1,3 +1,4 @@
+import { withCliOwn } from './cliOwnMode'
 import { footerPatterns, lastFooterMode, type FooterModeDef, type FooterPatterns } from './footerModes'
 import { msg } from './i18n/msg'
 import type { Tr } from './tasks'
@@ -225,7 +226,7 @@ export const CLAUDE_DESCRIPTOR: ProviderDescriptor = {
   icon: 'claude',
   setupUrl: 'https://code.claude.com/docs/en/setup',
   pricingUrl: 'https://platform.claude.com/docs/en/about-claude/pricing',
-  permissionModes: CLAUDE_PERMISSION_MODES,
+  permissionModes: withCliOwn(CLAUDE_PERMISSION_MODES),
   defaultPermissionMode: 'auto',
   // Plan mode would block the hive tools.
   assistantMode: 'auto',
@@ -254,9 +255,63 @@ export const CLAUDE_DESCRIPTOR: ProviderDescriptor = {
     lockAsk: true,
     backgroundSessions: true,
     backgroundWakes: true,
+    // SessionStart comes as it starts (once its folder is trusted), before any prompt.
+    startHook: true,
     startupSizeRefresh: false,
     bracketedPaste: true,
-    enterOnceDrawn: false
+    enterOnceDrawn: false,
+    // Its Ctrl+U deletes one wrapped row (HI-1974, seen on 2.1.312).
+    ctrlUClearsRow: true,
+    // --add-dir (2.1.309).
+    extraDirs: true,
+    // Each account a folder of its own (HI-980), its transcripts and memory shared with the others through projects\.
+    connections: {
+      homeEnv: 'CLAUDE_CONFIG_DIR',
+      shared: ['projects'],
+      userHome: '.claude',
+      orgs: true,
+      // A trusted folder covers the folders inside it (HI-1871, measured with 2.1.311): one answer for the workspace.
+      trustInherits: true,
+      setUp: msg({ id: 'providers.claude.connections.setUp', defaultMessage: "Set Up runs Claude Code on this connection for its one-time first-run questions (its look, its notes) and to trust this workspace's folders. Answer them in the terminal.", description: "Settings → Accounts & Connections, above a Claude Code connection's Set Up terminal and on one that still needs it: what Set Up is for. Set Up names a button." }),
+      // A server of the user's (HI-1772), as Claude Code's environment variables reference has it (checked 27 Oct 2026):
+      // the key as a bearer token (ANTHROPIC_API_KEY would ask to be approved first, in a pane).
+      server: {
+        baseUrlEnv: 'ANTHROPIC_BASE_URL',
+        keyEnv: 'ANTHROPIC_AUTH_TOKEN',
+        keylessToken: 'none',
+        modelEnv: 'ANTHROPIC_MODEL',
+        aliasEnv: { opus: 'ANTHROPIC_DEFAULT_OPUS_MODEL', sonnet: 'ANTHROPIC_DEFAULT_SONNET_MODEL', haiku: 'ANTHROPIC_DEFAULT_HAIKU_MODEL' },
+        subagentEnv: 'CLAUDE_CODE_SUBAGENT_MODEL',
+        listing: { path: 'v1/models', list: 'data', id: 'id' },
+        presets: [
+          // DeepSeek's Claude Code guide (api-docs.deepseek.com/quick_start/agent_integrations/claude_code, 27 Oct 2026):
+          // its recommended models for each alias. (Its server also maps any claude-opus* name to deepseek-v4-pro, a
+          // fallback Hive doesn't rely on: v4-pro is listed for the user to map.)
+          {
+            id: 'deepseek',
+            name: 'DeepSeek',
+            baseUrl: 'https://api.deepseek.com/anthropic',
+            models: [{ id: 'deepseek-flash[1m]', as: ['opus', 'sonnet'] }, { id: 'deepseek-flash', as: ['haiku'] }, { id: 'deepseek-v4-pro' }],
+            listing: { path: '/models', list: 'data', id: 'id' },
+            docs: 'https://api-docs.deepseek.com/quick_start/agent_integrations/claude_code'
+          },
+          // Ollama's Anthropic-compatible API, as its Claude Code guide sets it up (docs.ollama.com/integrations/claude-code,
+          // checked 27 Oct 2026 with Ollama 0.33.1, HI-1773): no key, its models those it has pulled. A cloud model, run on
+          // ollama.com through this server, has `remote_host` in the listing (ollama/api/types.go's ListModelResponse); a
+          // typed one is told by its tag. The guide recommends a 64K context or more.
+          {
+            id: 'ollama',
+            name: 'Ollama', // i18n-ignore: a product's name
+            baseUrl: 'http://localhost:11434',
+            keyless: true,
+            listing: { path: '/api/tags', list: 'models', id: 'name', remote: 'remote_host' },
+            remoteModels: 'claude-code.connections.remoteModels',
+            contextAdvice: 64_000,
+            docs: 'https://docs.ollama.com/integrations/claude-code'
+          }
+        ]
+      }
+    }
   },
   reservedKeys: ['MOD+B', 'MOD+K', 'MOD+O', 'MOD+R', 'MOD+T', 'MOD+G'],
   instructionsFile: 'CLAUDE.md',
@@ -265,12 +320,12 @@ export const CLAUDE_DESCRIPTOR: ProviderDescriptor = {
     'The installer runs `irm https://claude.ai/install.ps1 | iex` in PowerShell and installs to `%USERPROFILE%\\.local\\bin`. After installing, sign in with your Claude account (Pro, Max, Team or Enterprise) or an Anthropic Console account. If the CLI is installed somewhere else, set its path in Settings → Claude Code.', // i18n-ignore: English, as main's notices use it (text has the window's)
   extensionNote:
     "You have the Claude Code extension for VS Code (or a similar editor). Hive doesn't use it — the extension's built-in copy moves with every extension update and can't be updated on its own. Install the CLI; your extension keeps working as before.", // i18n-ignore: English, as main's notices use it (text has the window's)
-  signInHelp: 'Type /login in one of its agents’ terminals (that agent then carries on by itself), or use Help → Agent Setup → Claude Code → Sign in.', // i18n-ignore: English for main's notices (text has the window's)
+  signInHelp: 'Type /login in one of its agents’ terminals (that agent then carries on by itself), or use Help → Provider Setup → Claude Code → Sign in.', // i18n-ignore: English for main's notices (text has the window's)
   safeguardHelp: 'In its terminal: /feedback reports a false positive, /model switches back, and /config sets whether it switches models by itself when a message is flagged.', // i18n-ignore: English, the same as its message (text has it: a card comment stores the message, #866)
   text: {
-    installNote: msg({ id: 'agents.claude.installNote', defaultMessage: 'The installer runs `irm https://claude.ai/install.ps1 | iex` in PowerShell and installs to `%USERPROFILE%\\.local\\bin`. After installing, sign in with your Claude account (Pro, Max, Team or Enterprise) or an Anthropic Console account. If the CLI is installed somewhere else, set its path in Settings → Claude Code.', description: "Agent Setup → Claude Code: how its installer works. Keep the command and the path in backticks exactly as they are, and the plan names (Pro, Max, Team, Enterprise); Settings → Claude Code is a place in Hive's settings." }),
-    extensionNote: msg({ id: 'agents.claude.extensionNote', defaultMessage: "You have the Claude Code extension for VS Code (or a similar editor). Hive doesn't use it — the extension's built-in copy moves with every extension update and can't be updated on its own. Install the CLI; your extension keeps working as before.", description: 'Agent Setup → Claude Code, when only an editor extension was found: why Hive needs the standalone CLI.' }),
-    signInHelp: msg({ id: 'agents.claude.signInHelp', defaultMessage: 'Type /login in one of its agents’ terminals (that agent then carries on by itself), or use Help → Agent Setup → Claude Code → Sign in.', description: "How to sign in to Claude Code again after its sign-in expired (an agent's pane, a notification). /login is a command: keep it; Help → Agent Setup → Claude Code → Sign in is a menu path in Hive." }),
+    installNote: msg({ id: 'agents.claude.installNote', defaultMessage: 'The installer runs `irm https://claude.ai/install.ps1 | iex` in PowerShell and installs to `%USERPROFILE%\\.local\\bin`. After installing, sign in with your Claude account (Pro, Max, Team or Enterprise) or an Anthropic Console account. If the CLI is installed somewhere else, set its path in Settings → Claude Code.', description: "Provider Setup → Claude Code: how its installer works. Keep the command and the path in backticks exactly as they are, and the plan names (Pro, Max, Team, Enterprise); Settings → Claude Code is a place in Hive's settings." }),
+    extensionNote: msg({ id: 'agents.claude.extensionNote', defaultMessage: "You have the Claude Code extension for VS Code (or a similar editor). Hive doesn't use it — the extension's built-in copy moves with every extension update and can't be updated on its own. Install the CLI; your extension keeps working as before.", description: 'Provider Setup → Claude Code, when only an editor extension was found: why Hive needs the standalone CLI.' }),
+    signInHelp: msg({ id: 'agents.claude.signInHelp', defaultMessage: 'Type /login in one of its agents’ terminals (that agent then carries on by itself), or use Help → Provider Setup → Claude Code → Sign in.', description: "How to sign in to Claude Code again after its sign-in expired (an agent's pane, a notification). /login is a command: keep it; Help → Provider Setup → Claude Code → Sign in is a menu path in Hive." }),
     safeguardHelp: msg({ id: 'agents.claude.safeguardHelp', defaultMessage: 'In its terminal: /feedback reports a false positive, /model switches back, and /config sets whether it switches models by itself when a message is flagged.', description: "What to do after Claude Code's safety classifier stopped a response (an agent's safeguard note). /feedback, /model and /config are commands: keep them." }),
     modelPlaceholder: msg({ id: 'agents.claude.modelPlaceholder', defaultMessage: 'Full model ID, e.g. claude-opus-5-5 or claude-opus-4-6[1m]', description: 'Placeholder of the custom model ID box (Claude Code). Keep the model IDs exactly as they are.' })
   },

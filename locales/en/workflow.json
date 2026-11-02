@@ -1,0 +1,2126 @@
+{
+  "workflow.approveNote": {
+    "defaultMessage": "{becomes, select, decision {Note (optional): also recorded as your decision} reason {Note (optional): the reason for what the agent asked} other {Note (optional): added as your comment}}",
+    "description": "The label and placeholder of an optional text box beside Approve (For you, the card dialog's merge queue): a note sent with the approval. It says what the note becomes: on an agent's question (decision), one of the card's decisions as well as the user's comment; on a question that offers one action (reason), the reason for that action; on Hive's own requests (other), the user's comment on the card. Keep the select keys as they are; translate each choice. Glossary: decision."
+  },
+  "workflow.contradiction.committedNeedsFolder": {
+    "defaultMessage": "“Committed is done” needs everyone in the project folder.",
+    "description": "Why workflow options cannot be saved: “Committed is done” was chosen while each card has its own folder."
+  },
+  "workflow.contradiction.focusedNeedsRunner": {
+    "defaultMessage": "Each card’s focused tests need the command that runs them.",
+    "description": "Why workflow options cannot be saved (G20): “Each card’s focused tests” is on but the project has no command to run them (its runner, focused.run)."
+  },
+  "workflow.contradiction.hiveMergesNeedsGit": {
+    "defaultMessage": "Merging needs Git: without version control, work is accepted where it is.",
+    "description": "Why workflow options cannot be saved: a merge option was set for a project with no version control."
+  },
+  "workflow.contradiction.mergeNeedsSlots": {
+    "defaultMessage": "When Hive or the agent merges, each card needs its own folder.",
+    "description": "Why workflow options cannot be saved: a merging option was chosen while everyone works in the project folder."
+  },
+  "workflow.contradiction.noneHasNoSlots": {
+    "defaultMessage": "Without version control, everyone works in the project folder.",
+    "description": "Why workflow options cannot be saved: separate folders per card were set for a project with no version control."
+  },
+  "workflow.contradiction.okWithReview": {
+    "defaultMessage": "Your OK before merging is already part of review by you.",
+    "description": "Why workflow options cannot be saved: the user's OK before merging was set while the user already reviews."
+  },
+  "workflow.contradiction.poolNeedsAgent": {
+    "defaultMessage": "A shared pool of reviewers needs review by reviewer agents.",
+    "description": "Why workflow options cannot be saved: “Reviewers” was set to a shared pool (reviewer agents lanes share) without review by reviewer agents."
+  },
+  "workflow.contradiction.quorumNeedsAgent": {
+    "defaultMessage": "Two reviewers per card need review by reviewer agents.",
+    "description": "Why workflow options cannot be saved: two reviewers per card were set without reviewer agents."
+  },
+  "workflow.contradiction.selfReview": {
+    "defaultMessage": "“Nobody reviews their own work” can't be off while a reviewer agent checks the work.",
+    "description": "Why workflow options in the Version Control tab cannot be saved: the no-self-review option was turned off while a reviewer agent is required."
+  },
+  "workflow.contradiction.subfolderTarget": {
+    "defaultMessage": "This project is inside a larger repository: name the branch its work merges into.",
+    "description": "Why workflow options cannot be saved (OP-29): Hive or the agent merges, but the project is a subfolder of a bigger Git repository and its own options name no target branch (merges would affect the whole repository)."
+  },
+  "workflow.contradiction.upToDateNeedsSlots": {
+    "defaultMessage": "Slots are brought up to date only when each card has its own folder.",
+    "description": "Why workflow options cannot be saved: “Slots are brought up to date before each card” (G15) was set while everyone works in the project folder (glossary 2.5: slot)."
+  },
+  "workflow.forYou.decidedAfterMerge": {
+    "defaultMessage": "{card} was decided after it merged: does it need a follow-up?",
+    "description": "A For you request (Decide): a decision was recorded on the card while its work was being merged, so the merged work didn't see it. {card} is a card key like AM-12."
+  },
+  "workflow.forYou.focusedSkip": {
+    "defaultMessage": "{card}’s focused tests were skipped at its merge: {tests}. Merge it with them skipped?",
+    "description": "A For you request (Approve, G20, HI-1367): the merge queue ran the card’s focused tests ({tests}: test names, each with why it was skipped in brackets, as its project’s runner said) and some were skipped for their environment (a usage limit, a sign-in, the network). Approve merges the card with them skipped; Decline returns it. The card’s reviewer agent is asked too."
+  },
+  "workflow.forYou.lineAsk": {
+    "defaultMessage": "{line} still has {card}'s work, squashed into {target}: approve and Hive brings the branch up to date once, or decline and do it yourself before {next} starts.",
+    "description": "A For you request (approve or decline, §16.19.2): Settings → Advanced has Hive ask before moving an agent's branch after a squash merge. Approving lets Hive move it this once (git reset --keep, which never overwrites uncommitted work); declining leaves it to the user. {line} a branch name; {card} and {next} card keys like AM-12; {target} the branch merged into."
+  },
+  "workflow.forYou.lineRefused": {
+    "defaultMessage": "Git wouldn't bring {line} up to date with {target}: {reason}. {next} starts once the branch is up to date.",
+    "description": "A For you request (Decide, §16.19.2): Hive tried to move the builder's branch after a squash merge and git refused; the lane waits. {line} a branch name, {target} the branch merged into, {reason} git's own message (English), {next} a card key."
+  },
+  "workflow.forYou.lineUnfinished": {
+    "defaultMessage": "Hive's move of {line} to {to} didn't finish and couldn't be put back. Bring the branch to {target} with its files and index clean, or back where it was: {next} starts once it is settled.",
+    "description": "A For you request (Decide, §16.19.2): moving the builder's branch failed part way and Hive couldn't undo it, so the branch, its files or its index may disagree; the lane waits. {line} a branch name, {to} a short commit id, {target} the branch merged into, {next} a card key."
+  },
+  "workflow.forYou.lineWork": {
+    "defaultMessage": "{line} has work that isn't in {target}: {commits}. Decide what happens to it: {next} starts once the branch is up to date.",
+    "description": "A For you request (Decide, §16.19.2): the builder's branch has commits that weren't merged (made after the card was approved, say), so Hive won't move the branch and lose them; the lane waits. {line} a branch name, {target} the branch merged into, {commits} a list of short commit ids with their subjects, {next} a card key."
+  },
+  "workflow.forYou.mergeChoice": {
+    "defaultMessage": "How should Hive merge {project}'s cards into {target}? Choose the merge style and the commit message: until now Hive made a merge commit with its own message (the card's key and title, with trailers). The merge queue waits for your answer.",
+    "description": "A For you request (Decide, HI-1697): a project from before Hive 1.0 reached the merge queue for the first time, and nobody chose how its cards are merged, so the queue asks. {project} is a project's name, {target} the branch merged into. Merge style and Commit message are workflow options' names (glossary 2.6): use their words. Trailers: git's “Key: value” lines at a message's end."
+  },
+  "workflow.forYou.newDecision": {
+    "defaultMessage": "{card} has a new decision: your review again?",
+    "description": "A For you request: the user decided something new on a card in Review, so their review is asked again. {card} is a card key like AM-12."
+  },
+  "workflow.forYou.okBefore": {
+    "defaultMessage": "{card} is approved: OK to merge?",
+    "description": "A For you request: the card passed review and waits for the user's OK before it merges (glossary 2.3: approval). {card} is a card key like AM-12."
+  },
+  "workflow.forYou.passedReview": {
+    "defaultMessage": "{card} passed review: your OK?",
+    "description": "A For you request: reviewer agents passed the card, and the user reviews after them (A reviewer agent, then you). {card} is a card key like AM-12."
+  },
+  "workflow.forYou.queueAdvance": {
+    "defaultMessage": "{card} is tested and ready to merge: update {target} in {folder} now?",
+    "description": "A For you request (Approve, §16.9.2): the merge queue has merged and checked the card's work, and waits for the user's OK before it updates the branch {target}, which is checked out in the folder {folder} (its files change there). Settings → Advanced → Merge into a checked-out branch: Ask each time. {card} is a card key like AM-12."
+  },
+  "workflow.forYou.queueStuck": {
+    "defaultMessage": "{card}'s merge into {target} stopped part way in {folder}, with {files, plural, one {# file} other {# files}} left between the two, and Hive changes nothing more there. The card's Work section lists each file and its side, and the commands to copy. {how, select, both {To finish it, run {finish} (PowerShell) in {project}; to undo it, run {undo} (PowerShell) in {folder}.} finish {To finish it, run {finish} (PowerShell) in {folder}.} undo {To undo it, run {undo} (PowerShell) in {folder}.} other {Its files are neither as they were nor as merged: put them right by hand.}} Then answer here, and the queue looks again.",
+    "description": "A For you request (Decide, §16.9.2's terminal state): the merge queue was updating the branch {target}, checked out in the folder {folder}, and something (a crash, another program) left it half done, so the merge queue for {target} is paused until the user settles it. {card} is a card key like AM-12; {files} how many files the merge left part way; the card's Work section is a section of the card's dialog (glossary 2.4: work); {project} the project folder; {finish} and {undo} are git commands for PowerShell (keep them exactly, with (PowerShell) after them). Translate each choice of {how}; keep the codes before the braces."
+  },
+  "workflow.forYou.review": {
+    "defaultMessage": "{card} waits for your review",
+    "description": "A For you request: the card waits for the user to review it (Version Control → Work is reviewed before it is merged: You). {card} is a card key like AM-12."
+  },
+  "workflow.forYou.roundLimit": {
+    "defaultMessage": "{card} failed {rounds, plural, one {# review} other {# reviews}}: carry on with more rounds, split it, accept it with follow-ups, or take it over?",
+    "description": "A For you request (Decide): the card reached its card loop's round limit (Settings → Card loops), so its loop pauses until the user chooses one of four ways on. {card} is a card key like AM-12; {rounds} the reviews it failed (a number)."
+  },
+  "workflow.forYou.slotDirty": {
+    "defaultMessage": "{card} is Done, but {slot} has uncommitted changes, so it stays on {line}. Commit or discard them there: Hive then detaches the slot at {target}, ready for its next card.",
+    "description": "A For you request (Decide, HI-2014): a card reached Done while its slot (a reused working folder, such as slot-b) had uncommitted changes, so Hive left the slot on the card's branch {line} instead of detaching it at the target branch {target}. {card} is a card key like AM-12; {slot}, {line} and {target} are names, kept as they are."
+  },
+  "workflow.forYouKind": {
+    "defaultMessage": "{kind, select, approve {Approve} decide {Decide} test {Test} signIn {Sign in} other {Other}}",
+    "description": "The kind of a request for the user (For you), shown as its label: approve something, decide something, test something, sign in somewhere, or anything else. Translate each choice; keep the codes before the braces."
+  },
+  "workflow.form.addCheck": {
+    "defaultMessage": "Add Check",
+    "description": "A button under the checks of “Checks pass before review”."
+  },
+  "workflow.form.allOff": {
+    "defaultMessage": "All off",
+    "description": "A choice beside the presets in the Workflow section: every rule off (SPEC §16.6.4)."
+  },
+  "workflow.form.allOffSummary": {
+    "defaultMessage": "No review, nothing checked, everyone in the project folder: cards move freely, and Hive still records what happens.",
+    "description": "What the choice “All off” sets up, under its name in the Workflow section."
+  },
+  "workflow.form.appliesNow": {
+    "defaultMessage": "Only the stage names change: names aren’t rules, so they apply now, to every card.",
+    "description": "The message of the dialog before saving workflow options when only stage names change (glossary 2.2: stage)."
+  },
+  "workflow.form.cantSave": {
+    "defaultMessage": "These options can’t be saved:",
+    "description": "Above the reasons the workflow options can’t be saved, each a sentence of its own."
+  },
+  "workflow.form.carried": {
+    "defaultMessage": "Agents’ old worktrees finish their current work first: {agents}. Then they work in slots too.",
+    "description": "Under “Where cards are built” (G11) while agents still hold their worktrees from before 1.0 (#1441), kept until their current card or lane ends. {agents} is a list of agent names (glossary 2.5: slot)."
+  },
+  "workflow.form.changeLine": {
+    "defaultMessage": "{option}: {from} → {to}",
+    "description": "A line of the list of what changes, in the dialog before saving workflow options: an option’s name, its value now and its new value."
+  },
+  "workflow.form.changedMeanwhile": {
+    "defaultMessage": "The workflow options changed meanwhile, so nothing was saved. They’re shown as they are now.",
+    "description": "A notification: saving the Workflow section was refused because the options changed after it was read (in another window, or by the Hive Assistant); the section reloads them."
+  },
+  "workflow.form.changesHead": {
+    "defaultMessage": "What changes:",
+    "description": "In the dialog before saving workflow options: above the list of options that change, each with its old and new value."
+  },
+  "workflow.form.checkCommand": {
+    "defaultMessage": "Command",
+    "description": "The placeholder of a check’s command field (Project Settings → Workflow → Checks pass before review)."
+  },
+  "workflow.form.checkName": {
+    "defaultMessage": "Name",
+    "description": "The placeholder of a check’s name field (Project Settings → Workflow → Checks pass before review)."
+  },
+  "workflow.form.closePreview": {
+    "defaultMessage": "Close",
+    "description": "A button in a preset’s preview: closes it without changing the form."
+  },
+  "workflow.form.confirmMessage": {
+    "defaultMessage": "The new options apply from the next card that starts.",
+    "description": "The message of the dialog before saving workflow options."
+  },
+  "workflow.form.confirmTitle": {
+    "defaultMessage": "Save Workflow Options",
+    "description": "The title of the dialog before saving workflow options."
+  },
+  "workflow.form.copied": {
+    "defaultMessage": "Workflow options copied",
+    "description": "A notification: the workflow options were copied to the clipboard."
+  },
+  "workflow.form.copy": {
+    "defaultMessage": "Copy as JSON",
+    "description": "The button copying the project’s workflow options as JSON, to paste into another project."
+  },
+  "workflow.form.defaultBranch": {
+    "defaultMessage": "The repository’s default branch",
+    "description": "The placeholder of the target branch field in Project Settings → Workflow: left empty, the default branch."
+  },
+  "workflow.form.discard": {
+    "defaultMessage": "Discard Changes",
+    "description": "The button dropping unsaved changes to the workflow options."
+  },
+  "workflow.form.fileLocksNote": {
+    "defaultMessage": "Applies to agents working in the same folder, outside a slot.",
+    "description": "Under the workflow option “File locks”: a slot is a folder Hive lends to a card or its lane (glossary 2.5: slot), so agents in different slots never share a file."
+  },
+  "workflow.form.focusedPick": {
+    "defaultMessage": "Command that chooses the tests (optional)",
+    "description": "The placeholder and label of a field under “Each card’s focused tests” (G20) in Project Settings → Workflow: the project’s command that lists the tests a change needs. Left empty, each card’s builder names its tests."
+  },
+  "workflow.form.focusedRun": {
+    "defaultMessage": "Command that runs them",
+    "description": "The placeholder and label of a field under “Each card’s focused tests” (G20) in Project Settings → Workflow: the project’s command that runs a list of tests."
+  },
+  "workflow.form.folders": {
+    "defaultMessage": "Folders and files, separated by commas",
+    "description": "The placeholder of the field “What the work is” (folders and files left out)."
+  },
+  "workflow.form.from.global": {
+    "defaultMessage": "From Hive defaults",
+    "description": "Where a workflow option’s value comes from: Hive’s own default."
+  },
+  "workflow.form.from.here": {
+    "defaultMessage": "Set here",
+    "description": "Where a workflow default’s value comes from, in Settings → Workflow defaults or Settings → Workspace: set at this level."
+  },
+  "workflow.form.from.platform": {
+    "defaultMessage": "Default",
+    "description": "Where a workflow option’s value comes from: nobody set it (every rule off)."
+  },
+  "workflow.form.from.preset": {
+    "defaultMessage": "From the preset",
+    "description": "Where a workflow option’s value comes from: the preset chosen."
+  },
+  "workflow.form.from.project": {
+    "defaultMessage": "Set for this project",
+    "description": "Where a workflow option’s value comes from: set in this project."
+  },
+  "workflow.form.from.workspace": {
+    "defaultMessage": "From the workspace",
+    "description": "Where a workflow option’s value comes from: the workspace’s default."
+  },
+  "workflow.form.fromTemplateDraft": {
+    "defaultMessage": "Filled in from the template {template}: these options aren’t saved yet. Check them, then Save… (they apply from the next card), or Discard Changes.",
+    "description": "A note atop the Workflow section (HI-1910, HI-2083) after loading a template whose workflow was applied and saved nothing of it: its options are filled in but not saved. Save… and Discard Changes are the buttons below: as translated there."
+  },
+  "workflow.form.fromTemplateMax": {
+    "defaultMessage": "Filled in from the template {template}. Its Maximum agents ({max, number}) is saved already, with its agents; the other options aren’t saved yet. Check them, then Save… (they apply from the next card), or Discard Changes.",
+    "description": "A note atop the Workflow section (HI-2083) after loading a template whose workflow was applied: the load saved its Maximum agents ({max}) with its agents (HI-2058), the rest is filled in but not saved. Maximum agents, Save… and Discard Changes are names in the form: as translated there."
+  },
+  "workflow.form.heir": {
+    "defaultMessage": "Project {project}: {options}",
+    "description": "A project inheriting a change of workflow defaults, in the dialog before saving them: its name, then the options that change for it, as a list."
+  },
+  "workflow.form.heirCards": {
+    "defaultMessage": "{n, plural, one {Its card in flight keeps the old rules:} other {Its # cards in flight keep the old rules:}}",
+    "description": "Under a project inheriting a change of workflow defaults, in the dialog before saving them: its cards already started, listed below (glossary 2.1: old rules)."
+  },
+  "workflow.form.heirElsewhere": {
+    "defaultMessage": "Project {project} (workspace {workspace}): {options}",
+    "description": "A project of another open workspace inheriting a change of Hive’s workflow defaults, in the dialog before saving them: its name, its workspace’s name, then the options that change for it, as a list."
+  },
+  "workflow.form.heirLanes": {
+    "defaultMessage": "{n, plural, one {Its running lane keeps the old rules until it ends:} other {Its # running lanes keep the old rules until they end:}}",
+    "description": "Under a project inheriting a change of workflow defaults, in the dialog before saving them, above a list of those lanes (glossary 2.1: old rules)."
+  },
+  "workflow.form.heirs": {
+    "defaultMessage": "{n, plural, one {This project inherits the change:} other {These # projects inherit the change:}}",
+    "description": "In the dialog before saving workflow defaults, above the projects that use them (they don’t set the changed options themselves)."
+  },
+  "workflow.form.hoursValue": {
+    "defaultMessage": "{n, plural, one {# hour} other {# hours}}",
+    "description": "The value of the workflow option “Wait (hours)” (Card loops) in words, as in the Inherit box and a preset preview."
+  },
+  "workflow.form.identity": {
+    "defaultMessage": "Commits as {name} <{email}>.",
+    "description": "Under “Commits use the project’s identity”: the identity used, from git config."
+  },
+  "workflow.form.identityValue": {
+    "defaultMessage": "On, as {name} <{email}>",
+    "description": "A value of “Commits use the project’s identity” in the list of what changes before saving workflow options: on, with the name and email commits use."
+  },
+  "workflow.form.inFlight": {
+    "defaultMessage": "{n, plural, one {This card in flight keeps the old rules. Tick it to apply the new options to it now.} other {These cards in flight keep the old rules. Tick one to apply the new options to it now.}}",
+    "description": "In the dialog before saving workflow options, above the cards already started (glossary 2.1: old rules). Ticking a card records an override on it."
+  },
+  "workflow.form.inherit": {
+    "defaultMessage": "Inherit",
+    "description": "A button beside a workflow option set for this project: stop setting it here, and use the workspace’s or Hive’s value."
+  },
+  "workflow.form.inheritTip": {
+    "defaultMessage": "Use the inherited value: {value}",
+    "description": "The tooltip of the Inherit button of a workflow option. {value} is the value it would have."
+  },
+  "workflow.form.inheritor": {
+    "defaultMessage": "Project {project} inherits these options, and the change would make its options contradict each other:",
+    "description": "Why saving workflow defaults was refused: a project inheriting them would have contradictory options. Its reason follows on its own line. {project} is its name."
+  },
+  "workflow.form.invalid": {
+    "defaultMessage": "These options can’t be used, so every rule is off in this project:",
+    "description": "A note atop Project Settings → Workflow: the saved options contradict each other or can’t be read; the reason follows."
+  },
+  "workflow.form.labels": {
+    "defaultMessage": "Labels, separated by commas",
+    "description": "The placeholder of the labels field of “Your OK before merging”."
+  },
+  "workflow.form.labelsValue": {
+    "defaultMessage": "Cards with these labels: {labels}",
+    "description": "A value of “Your OK before merging” in the list of what changes before saving workflow options. {labels} is a list of card labels."
+  },
+  "workflow.form.lane": {
+    "defaultMessage": "Builder {builder}: {name}",
+    "description": "A running lane in the dialog before saving workflow options: its builder agent and its name."
+  },
+  "workflow.form.laneUnnamed": {
+    "defaultMessage": "Builder {builder}",
+    "description": "A running lane without a name in the dialog before saving workflow options: its builder agent."
+  },
+  "workflow.form.lanes": {
+    "defaultMessage": "{n, plural, one {This running lane keeps the old rules until it ends:} other {These running lanes keep the old rules until they end:}}",
+    "description": "In the dialog before saving workflow options, above a list of lanes (glossary 2.1: old rules)."
+  },
+  "workflow.form.levelConfirm": {
+    "defaultMessage": "Projects that don’t set these options themselves use the new defaults from their next card.",
+    "description": "The message of the dialog before saving workflow defaults (Settings → Workflow defaults or Settings → Workspace)."
+  },
+  "workflow.form.levelForGit": {
+    "defaultMessage": "The defaults of Git projects.",
+    "description": "Beside the None · Git choice above workflow defaults, while Git is chosen."
+  },
+  "workflow.form.levelForNone": {
+    "defaultMessage": "The defaults of projects without version control.",
+    "description": "Beside the None · Git choice above workflow defaults, while None is chosen."
+  },
+  "workflow.form.levelGit": {
+    "defaultMessage": "Git",
+    "description": "The choice of the defaults for Git projects (glossary 2.1: keep)."
+  },
+  "workflow.form.levelNone": {
+    "defaultMessage": "None",
+    "description": "The choice of the defaults for projects without version control (glossary 2.1: None)."
+  },
+  "workflow.form.levelPlatform": {
+    "defaultMessage": "Version control",
+    "description": "Accessible name of the None · Git choice above workflow defaults: which version control’s defaults are shown (glossary 2.1)."
+  },
+  "workflow.form.loadFailed": {
+    "defaultMessage": "Couldn’t read the workflow options: {error}",
+    "description": "An error showing Project Settings → Workflow. {error} says why."
+  },
+  "workflow.form.loopsReadNote": {
+    "defaultMessage": "Read when a loop starts: a loop already running keeps its own, and one started with its own (“rounds: 5, wait: 2h”) keeps those.",
+    "description": "Under the workflow options “Rounds” and “Wait (hours)” (Card loops), when a change applies. “rounds: 5, wait: 2h” is what the user types to an agent: keep it in English."
+  },
+  "workflow.form.minutesValue": {
+    "defaultMessage": "{n, plural, one {# minute} other {# minutes}}",
+    "description": "The value of the workflow option “Design check wait (minutes)” (Card loops) in words, as in the Inherit box."
+  },
+  "workflow.form.neverOff.fileLocks": {
+    "defaultMessage": "File locks, while their own setting has them on.",
+    "description": "A protection that stays on with every rule off: agents can’t edit one file at once (its own setting decides)."
+  },
+  "workflow.form.neverOff.folderGit": {
+    "defaultMessage": "No branch switch, pull or other git that changes the folder while an agent works there.",
+    "description": "A protection that stays on with every rule off."
+  },
+  "workflow.form.neverOff.indexLock": {
+    "defaultMessage": "Hive never deletes git’s index.lock.",
+    "description": "A protection that stays on with every rule off. Keep index.lock (a file name)."
+  },
+  "workflow.form.neverOff.queue": {
+    "defaultMessage": "The merge queue moves a target branch only if nothing else moved it meanwhile.",
+    "description": "A protection that stays on with every rule off (glossary 2.1: merge queue)."
+  },
+  "workflow.form.neverOffHead": {
+    "defaultMessage": "What never turns off, to keep your work safe:",
+    "description": "Above the list of protections that stay on with every rule off (SPEC §16.6.4), in the Workflow section."
+  },
+  "workflow.form.noChanges": {
+    "defaultMessage": "No option changes: only the preset they started from.",
+    "description": "In the dialog before saving workflow options, when no option’s value changes."
+  },
+  "workflow.form.noChecks": {
+    "defaultMessage": "No checks.",
+    "description": "Under “Checks pass before review” when it has none."
+  },
+  "workflow.form.noHeirs": {
+    "defaultMessage": "No project inherits the change now: each sets these options itself, or none uses this version control.",
+    "description": "In the dialog before saving workflow defaults, when no open project uses the changed options."
+  },
+  "workflow.form.noIdentity": {
+    "defaultMessage": "No name and email are set in git config yet.",
+    "description": "Under “Commits use the project’s identity” when git has no identity configured."
+  },
+  "workflow.form.noPreset": {
+    "defaultMessage": "No preset chosen",
+    "description": "The Workflow section’s preset line when the options didn’t start from a preset (glossary 2.1: preset)."
+  },
+  "workflow.form.noneValue": {
+    "defaultMessage": "None",
+    "description": "An empty value in the list of what changes before saving workflow options: no checks, no commands, no folders."
+  },
+  "workflow.form.notEnforced": {
+    "defaultMessage": "Workflow rules aren’t enforced (Settings → Advanced). These options are saved, and apply once the rules are enforced again.",
+    "description": "A note atop Project Settings → Workflow while the switch \"Workflow rules are enforced\" is off."
+  },
+  "workflow.form.off": {
+    "defaultMessage": "Off",
+    "description": "A workflow option’s value: off."
+  },
+  "workflow.form.on": {
+    "defaultMessage": "On",
+    "description": "A workflow option’s value: on."
+  },
+  "workflow.form.openAdvanced": {
+    "defaultMessage": "Open Advanced",
+    "description": "A button beside the note that workflow rules aren’t enforced: opens Settings → Advanced."
+  },
+  "workflow.form.overMax": {
+    "defaultMessage": "This project has {count, plural, one {# agent} other {# agents}}: none is removed, but no agent can be added until it has fewer than {max, number}.",
+    "description": "Under the workflow option “Maximum agents” (HI-2001) when the project already has more agents ({count}) than it is set to ({max}): nobody can add one (HI-2058), neither the user nor the Assistant."
+  },
+  "workflow.form.paste": {
+    "defaultMessage": "Paste JSON…",
+    "description": "The button pasting workflow options copied from another project."
+  },
+  "workflow.form.pasteApply": {
+    "defaultMessage": "Use These Options",
+    "description": "The confirm button of the dialog pasting workflow options."
+  },
+  "workflow.form.pasteBad": {
+    "defaultMessage": "That isn’t workflow options copied from Hive.",
+    "description": "An error pasting workflow options: the text isn’t the JSON Hive copies."
+  },
+  "workflow.form.pasteMessage": {
+    "defaultMessage": "Paste options copied from a project with the same version control. They replace the form’s, to save afterwards.",
+    "description": "The message of the dialog pasting workflow options as JSON."
+  },
+  "workflow.form.pastePlatform": {
+    "defaultMessage": "These options are for another version control.",
+    "description": "An error pasting workflow options: they were copied from a project with another version control."
+  },
+  "workflow.form.pasteTitle": {
+    "defaultMessage": "Paste Workflow Options",
+    "description": "The title of the dialog pasting workflow options as JSON."
+  },
+  "workflow.form.preset": {
+    "defaultMessage": "Preset",
+    "description": "A row of Project Settings → Workflow (glossary 2.1: preset): one choice that fills in every option."
+  },
+  "workflow.form.presetDesc": {
+    "defaultMessage": "Fills in every option at once. Changing an option afterwards makes it Custom.",
+    "description": "Under the row \"Preset\" of Project Settings → Workflow. Custom is a preset’s name: as translated there."
+  },
+  "workflow.form.presetsLabel": {
+    "defaultMessage": "Presets",
+    "description": "Accessible name of the list of presets in the Workflow section (glossary 2.1: preset)."
+  },
+  "workflow.form.previewChanges": {
+    "defaultMessage": "{n, plural, =0 {Nothing here changes.} one {Marked: the option it changes here.} other {Marked: the # options it changes here.}}",
+    "description": "In a preset’s preview in the Workflow section: how many of the options it sets differ from the form now (those are marked)."
+  },
+  "workflow.form.previewHead": {
+    "defaultMessage": "What {preset} sets, and why:",
+    "description": "Above the list of options a preset sets, in its preview in the Workflow section (glossary 2.1: preset). {preset} is its name."
+  },
+  "workflow.form.previewNow": {
+    "defaultMessage": "Now: {value}",
+    "description": "In a preset’s preview, beside an option it changes: its value in the form now."
+  },
+  "workflow.form.readOnly": {
+    "defaultMessage": "{agents} can’t be given review copies by their coding agent, so they review the builder’s folder read-only.",
+    "description": "Under “Reviewers” (G17) when some reviewing agents use a coding agent that Hive can’t give review copies (folders at the exact revision, glossary 2.5: review copy). {agents} is a list of agent names."
+  },
+  "workflow.form.removeCheck": {
+    "defaultMessage": "Remove",
+    "description": "The tooltip of the button removing a check from “Checks pass before review”."
+  },
+  "workflow.form.save": {
+    "defaultMessage": "Save…",
+    "description": "The button saving the workflow options (it shows what changes first)."
+  },
+  "workflow.form.saveBlocked": {
+    "defaultMessage": "Resolve what the options say first.",
+    "description": "The tooltip of Save… in the Workflow section while some options contradict each other (their reasons are shown under them)."
+  },
+  "workflow.form.saved": {
+    "defaultMessage": "Workflow options saved",
+    "description": "A notification: the workflow options were saved."
+  },
+  "workflow.form.stageName": {
+    "defaultMessage": "Name of the stage {stage}",
+    "description": "Accessible name of a stage’s name box under “Stage names” (glossary 2.2: stage). {stage} is its default name."
+  },
+  "workflow.form.stageNamesValue": {
+    "defaultMessage": "{n, plural, =0 {The default names} one {# stage renamed} other {# stages renamed}}",
+    "description": "A value of “Stage names” in the list of what changes before saving workflow options, and in a preset’s preview (glossary 2.2: stage)."
+  },
+  "workflow.form.startedFrom": {
+    "defaultMessage": "Custom, started from {preset}",
+    "description": "Project Settings → Workflow: the options were changed after a preset was chosen. {preset} is its name."
+  },
+  "workflow.form.stepWaitNote": {
+    "defaultMessage": "A design left unchecked longer shows its card as stalled; one already posted keeps its wait.",
+    "description": "Under the workflow option “Design check wait (minutes)” (Card loops), when a change applies."
+  },
+  "workflow.form.templateIdentityOff": {
+    "defaultMessage": "The template turns the project identity on, but this project’s git config has no name and email, so it stays off.",
+    "description": "A note atop the Workflow section (HI-1910), with a template's options filled in: it turns the project identity (G12) on, but the project's git config has none. Glossary: identity."
+  },
+  "workflow.form.templateNoCommand": {
+    "defaultMessage": "{count, plural, one {This project has no command for the check {checks} yet: add it under Checks before cards need it.} other {This project has no commands for the checks {checks} yet: add them under Checks before cards need them.}}",
+    "description": "A note atop the Workflow section (HI-1910), with the template's options filled in: checks ({checks}, a list of names; {count} of them) have no command in this project. Checks is the group below: as translated there. Glossary: check."
+  },
+  "workflow.form.templateOtherPlatform": {
+    "defaultMessage": "The workflow of {template} is for {platform}, and {project} doesn’t use it now, so it wasn’t filled in.",
+    "description": "A notification (HI-1910): a loaded template's workflow ({template}) is for a version control ({platform}: None or Git) the project ({project}) no longer uses (switched meanwhile)."
+  },
+  "workflow.form.use": {
+    "defaultMessage": "Use {preset}",
+    "description": "A button in a preset’s preview: fills the form with it (saved only with Save…). {preset} is its name."
+  },
+  "workflow.group.checks": {
+    "defaultMessage": "Checks",
+    "description": "A heading of the Workflow section: the options about the checks that must pass (glossary 2.3: checks)."
+  },
+  "workflow.group.loops": {
+    "defaultMessage": "Card loops",
+    "description": "A heading of the Workflow section: how card loops run, a builder and a reviewer taking cards in turn (glossary: card loop)."
+  },
+  "workflow.group.merging": {
+    "defaultMessage": "Merging",
+    "description": "A heading of the Workflow section (Git): the options about how and where work is merged."
+  },
+  "workflow.group.review": {
+    "defaultMessage": "Review",
+    "description": "A heading of the Version Control tab’s Workflow section: the options about reviewing a card’s work."
+  },
+  "workflow.group.stages": {
+    "defaultMessage": "Stages",
+    "description": "A heading of the Workflow section: the names of the board’s stages (glossary 2.2: stage)."
+  },
+  "workflow.group.team": {
+    "defaultMessage": "Team",
+    "description": "A heading of the Workflow section: how many agents the project has (its team, HI-2001)."
+  },
+  "workflow.group.where": {
+    "defaultMessage": "Where cards are built",
+    "description": "A heading of the Workflow section (Git): the options about the folders cards are built in and the commits made there (glossary 2.6, G11)."
+  },
+  "workflow.group.work": {
+    "defaultMessage": "The work",
+    "description": "A heading of the Workflow section for a project without version control: what a card’s work is, and when cards start."
+  },
+  "workflow.mergeChoice.answer": {
+    "defaultMessage": "{styleTitle}: {style}. {messageTitle}: {message}.",
+    "description": "The user's answer to the merge queue's question before an upgraded project's first merge, kept on the card as the user's own comment: the two workflow options they chose, each its name ({styleTitle}: Merge style; {messageTitle}: Commit message) and the value chosen ({style}: Squash, say; {message}: a value of Commit message). The names and values are the workflow options' own texts, already translated: arrange them as your language writes such a list."
+  },
+  "workflow.move.answer": {
+    "defaultMessage": "Answer",
+    "description": "A move on a card, named in a refused move: the user's answer to a For you request (Approve, Decline, a reply)."
+  },
+  "workflow.move.declarePaths": {
+    "defaultMessage": "Set the card's paths",
+    "description": "A move on a card, named in a refused move: saying which files are its work (a project without version control)."
+  },
+  "workflow.move.loopStep": {
+    "defaultMessage": "Card loop step",
+    "description": "A move on a card, named in a refused move (#1382): a step between a card loop's builder and reviewer that moves nothing (a design posted for a check, its answer)."
+  },
+  "workflow.move.move": {
+    "defaultMessage": "Move",
+    "description": "A move on a card, named in a refused move: dragging it to another column."
+  },
+  "workflow.move.putBack": {
+    "defaultMessage": "Put back",
+    "description": "A move on a card, named in a refused move: putting a started card back in Todo."
+  },
+  "workflow.move.removeFromQueue": {
+    "defaultMessage": "Remove from queue",
+    "description": "A move on a card, named in a refused move: the user taking it out of the merge queue."
+  },
+  "workflow.move.reportMerge": {
+    "defaultMessage": "Report the merge",
+    "description": "A move on a card, named in a refused move: the agent saying it merged the work."
+  },
+  "workflow.move.retryMerge": {
+    "defaultMessage": "Retry merge",
+    "description": "A move on a card, named in a refused move: the user's Retry merge on the merge queue's card."
+  },
+  "workflow.move.start": {
+    "defaultMessage": "Start",
+    "description": "A move on a card, named in a refused move (\"… isn't possible from there\"): starting work on it."
+  },
+  "workflow.move.startReview": {
+    "defaultMessage": "Start review",
+    "description": "A move on a card, named in a refused move: a reviewer beginning a review."
+  },
+  "workflow.move.submit": {
+    "defaultMessage": "Submit for review",
+    "description": "A move on a card, named in a refused move: sending its work to Review."
+  },
+  "workflow.move.verdict": {
+    "defaultMessage": "Verdict",
+    "description": "A move on a card, named in a refused move: a reviewer passing or failing it (glossary 2.3: verdict)."
+  },
+  "workflow.option.commands.desc": {
+    "defaultMessage": "The command each named check runs. A run counts as the check only when it runs that command.",
+    "description": "What the workflow setting “Check commands” does."
+  },
+  "workflow.option.commands.title": {
+    "defaultMessage": "Check commands",
+    "description": "A workflow setting: the command each named check runs (the checks of “Checks pass before review”)."
+  },
+  "workflow.option.commitMessage.desc": {
+    "defaultMessage": "The message of the commit the merge queue makes: Hive’s names the card’s key and title and adds Hive’s trailers, and the branch’s own uses the message its commits have, with no card key or trailers, while Hive still knows which card it merged.",
+    "description": "What the workflow option “Commit message” does (glossary 2.1: merge queue). Trailers are git’s name for the “Key: value” lines at the end of a commit message: keep the word if your language’s git terms do."
+  },
+  "workflow.option.commitMessage.title": {
+    "defaultMessage": "Commit message",
+    "description": "A workflow option (glossary 2.6, G19): the message of the commit Hive’s merge queue makes when it merges a card (a merge commit, or a squash’s one commit)."
+  },
+  "workflow.option.dependenciesDone.desc": {
+    "defaultMessage": "A card that waits for others can’t start before their work is in.",
+    "description": "What the workflow option “Cards start only when the cards they wait for are merged” does."
+  },
+  "workflow.option.dependenciesDone.none": {
+    "defaultMessage": "Cards start only when the cards they wait for are done",
+    "description": "A workflow option for a project without version control (glossary 2.6, N6)."
+  },
+  "workflow.option.dependenciesDone.title": {
+    "defaultMessage": "Cards start only when the cards they wait for are merged",
+    "description": "A workflow option (glossary 2.6, G14)."
+  },
+  "workflow.option.excluded.desc": {
+    "defaultMessage": "The whole project folder, apart from these folders and files (.hive always).",
+    "description": "What the workflow option “What the work is” does: the folders and files listed are left out of a card’s work."
+  },
+  "workflow.option.excluded.title": {
+    "defaultMessage": "What the work is",
+    "description": "A workflow option for a project without version control (glossary 2.6, N4)."
+  },
+  "workflow.option.fileLocks.desc": {
+    "defaultMessage": "What happens when an agent tries to edit a file another agent in the same folder is editing.",
+    "description": "What the workflow option “File locks” does."
+  },
+  "workflow.option.fileLocks.title": {
+    "defaultMessage": "File locks",
+    "description": "A workflow option (glossary 2.6, N7): what happens when two agents in the same folder edit the same file."
+  },
+  "workflow.option.finish.desc": {
+    "defaultMessage": "When a card is done: once Hive’s merge queue has merged it, once its agent has merged it and Hive finds the work in the target branch, once it is committed, or whenever it is moved there.",
+    "description": "What the workflow option “Who merges” does (glossary 2.1: merge queue)."
+  },
+  "workflow.option.finish.title": {
+    "defaultMessage": "Who merges",
+    "description": "A workflow option (glossary 2.6, G5)."
+  },
+  "workflow.option.focusedTests.desc": {
+    "defaultMessage": "When a card is submitted, the project’s command chooses the tests its change needs (or its builder names them, for its reviewer to check), and the merge queue runs them on the merged result, moving the target only once they pass.",
+    "description": "What the workflow option “Each card’s focused tests pass on the merged result” does (glossary 2.1: merge queue)."
+  },
+  "workflow.option.focusedTests.title": {
+    "defaultMessage": "Each card’s focused tests pass on the merged result",
+    "description": "A workflow option (glossary 2.6, G20): the tests a card’s change needs are chosen when it is submitted, and Hive’s merge queue runs them on its work merged with the target branch."
+  },
+  "workflow.option.folder.desc": {
+    "defaultMessage": "In its own folder, a slot Hive lends to the card or its lane, each card is built on a branch of its own, apart from other agents’ work; in the project folder, everyone sees each other’s unfinished changes.",
+    "description": "What the workflow option “Where cards are built” does (glossary 2.5: slot, a worktree Hive lends to a card or a lane)."
+  },
+  "workflow.option.folder.title": {
+    "defaultMessage": "Where cards are built",
+    "description": "A workflow option (glossary 2.6, G11)."
+  },
+  "workflow.option.identity.desc": {
+    "defaultMessage": "Commits are made with the name and email from the project’s git config (else your global one).",
+    "description": "What the workflow option “Commits use the project’s identity” does."
+  },
+  "workflow.option.identity.title": {
+    "defaultMessage": "Commits use the project’s identity",
+    "description": "A workflow option (glossary 2.6, G12)."
+  },
+  "workflow.option.loopRounds.desc": {
+    "defaultMessage": "How many rounds a card gets in a card loop (a build and its review each) before its agents stop and ask you, when the loop doesn’t say.",
+    "description": "What the workflow option “Rounds” does (Card loops)."
+  },
+  "workflow.option.loopRounds.title": {
+    "defaultMessage": "Rounds",
+    "description": "A workflow option, under Card loops: how many rounds (a build and its review) a card gets before its agents ask you."
+  },
+  "workflow.option.loopStepWaitMinutes.desc": {
+    "defaultMessage": "How many minutes, up to 4 hours, a card loop’s builder waits for its reviewer to check a design it posted before it goes ahead as posted.",
+    "description": "What the workflow option “Design check wait (minutes)” does (Card loops). A design: the plan a builder posts on its card before building."
+  },
+  "workflow.option.loopStepWaitMinutes.title": {
+    "defaultMessage": "Design check wait (minutes)",
+    "description": "A workflow option, under Card loops: how long a builder waits for its reviewer to check a design it posted."
+  },
+  "workflow.option.loopWaitHours.desc": {
+    "defaultMessage": "How many hours, up to a day, an agent in a card loop waits with no change before it tells you, when the loop doesn’t say.",
+    "description": "What the workflow option “Wait (hours)” does (Card loops)."
+  },
+  "workflow.option.loopWaitHours.title": {
+    "defaultMessage": "Wait (hours)",
+    "description": "A workflow option, under Card loops: how many hours an agent in a card loop waits with no change before it tells you."
+  },
+  "workflow.option.loopWakes.desc": {
+    "defaultMessage": "When a card with a reviewer arrives in Review, Hive wakes the reviewer, and on the review’s verdict the card’s builder; off, only the agents’ own card watches wake them.",
+    "description": "What the workflow option “Wake reviewers and builders” does."
+  },
+  "workflow.option.loopWakes.title": {
+    "defaultMessage": "Wake reviewers and builders",
+    "description": "A workflow option, under Card loops: Hive wakes the agents of a card loop for its handoffs (glossary: card loop)."
+  },
+  "workflow.option.maxAgents.desc": {
+    "defaultMessage": "Your team size: the most agents this project has, whoever adds them (you, the Assistant or a program using the Agent API), and lowering it removes none.",
+    "description": "What the workflow option “Maximum agents” does (HI-2058: it binds the user too). Agent API is the name of a Hive feature."
+  },
+  "workflow.option.maxAgents.title": {
+    "defaultMessage": "Maximum agents",
+    "description": "A workflow option (HI-2001): the most agents the project has, its team size. Nobody adds agents past it: the user, the Hive Assistant or a program (HI-2058)."
+  },
+  "workflow.option.mergeChecks.desc": {
+    "defaultMessage": "Hive’s merge queue runs these named commands on the card’s work merged with the target branch, and moves the target only once each one has passed.",
+    "description": "What the workflow option “Checks pass on the merged result” does (glossary 2.1: merge queue)."
+  },
+  "workflow.option.mergeChecks.title": {
+    "defaultMessage": "Checks pass on the merged result",
+    "description": "A workflow option (glossary 2.6, G9): named commands Hive’s merge queue runs on a card’s work merged with the target branch."
+  },
+  "workflow.option.mergeInstall.desc": {
+    "defaultMessage": "Before the checks on the merged result, the merge queue installs the dependencies afresh, and always does when the lock file or manifests changed.",
+    "description": "What the workflow option “Install dependencies from scratch” does. Lock file: as in the glossary (G15 value)."
+  },
+  "workflow.option.mergeInstall.title": {
+    "defaultMessage": "Install dependencies from scratch",
+    "description": "A workflow option (G9’s install): when the merge queue installs the project’s dependencies afresh before the merge checks."
+  },
+  "workflow.option.noSelfReview.desc": {
+    "defaultMessage": "Always on while a reviewer agent checks the work.",
+    "description": "What the workflow option “Nobody reviews their own work” does."
+  },
+  "workflow.option.noSelfReview.title": {
+    "defaultMessage": "Nobody reviews their own work",
+    "description": "A workflow option (glossary 2.6, G2 and N2)."
+  },
+  "workflow.option.okBefore.desc": {
+    "defaultMessage": "A card waits for your OK before it is merged: never, only cards with these labels, or every card.",
+    "description": "What the workflow option “Your OK before merging” does."
+  },
+  "workflow.option.okBefore.title": {
+    "defaultMessage": "Your OK before merging",
+    "description": "A workflow option (glossary 2.6, G10)."
+  },
+  "workflow.option.preChecks.desc": {
+    "defaultMessage": "A card goes to review only once each of these named commands has passed on its work.",
+    "description": "What the workflow option “Checks pass before review” does."
+  },
+  "workflow.option.preChecks.title": {
+    "defaultMessage": "Checks pass before review",
+    "description": "A workflow option (glossary 2.6, G3 and N3): named commands that must pass before a card goes to review."
+  },
+  "workflow.option.pushTarget.desc": {
+    "defaultMessage": "After each merge, the merge queue pushes the target branch to the remote it tracks (or the only remote, or origin), never forced, and pauses, saying why, when the push is refused or fails.",
+    "description": "What the workflow option “Push the target branch after merging” does (glossary 2.1: merge queue). Origin is git’s usual name for a remote: keep it."
+  },
+  "workflow.option.pushTarget.title": {
+    "defaultMessage": "Push the target branch after merging",
+    "description": "A workflow option (glossary 2.6, G18): after Hive’s merge queue merges a card, it pushes the target branch to its remote."
+  },
+  "workflow.option.review.desc": {
+    "defaultMessage": "A card goes to Review when its builder submits it and moves on only once it passes, waiting for your OK after the reviewer when you check too.",
+    "description": "What the workflow option “Work is reviewed before it’s merged” does."
+  },
+  "workflow.option.review.none": {
+    "defaultMessage": "Who checks the work before it’s done",
+    "description": "A workflow option for a project without version control (glossary 2.6, N1)."
+  },
+  "workflow.option.review.shared": {
+    "defaultMessage": "Work is reviewed before it’s done",
+    "description": "The workflow option G1 when everyone works in the project folder, where the work is on the target meanwhile (glossary 2.6, G1 shared folder)."
+  },
+  "workflow.option.review.title": {
+    "defaultMessage": "Work is reviewed before it’s merged",
+    "description": "A workflow option (glossary 2.6, G1): who reviews a card’s work before it is merged."
+  },
+  "workflow.option.reviewerMode.desc": {
+    "defaultMessage": "One reviewer per lane, or a shared pool: Hive gives each card submitted in a pool lane, oldest first, to the next free reviewer that didn’t build it.",
+    "description": "What the workflow option “Reviewers” does (glossary 2.6, G17; glossary: lane, pool)."
+  },
+  "workflow.option.reviewerMode.title": {
+    "defaultMessage": "Reviewers",
+    "description": "A workflow option (glossary 2.6, G17): whether each lane has its own reviewer agent or the lanes share a pool of reviewers."
+  },
+  "workflow.option.reviewers.desc": {
+    "defaultMessage": "With two, both must pass the same change.",
+    "description": "What the workflow option “Reviewers per card” does."
+  },
+  "workflow.option.reviewers.title": {
+    "defaultMessage": "Reviewers per card",
+    "description": "A workflow option (glossary 2.6, G1b): how many reviewer agents must pass a card."
+  },
+  "workflow.option.sameness.desc": {
+    "defaultMessage": "With Same change, a pass carries over to a clean rebase or squash of the same change; with Exact revision only, any new revision makes it stale.",
+    "description": "What the workflow option “A pass survives a clean rebase” does."
+  },
+  "workflow.option.sameness.title": {
+    "defaultMessage": "A pass survives a clean rebase",
+    "description": "A workflow option (glossary 2.6, G4)."
+  },
+  "workflow.option.sharedFolderWarning.desc": {
+    "defaultMessage": "A submit warns, never refuses, when its commit takes in files another agent is editing in the project folder.",
+    "description": "What the workflow option “Warn when a commit includes another agent’s files” does."
+  },
+  "workflow.option.sharedFolderWarning.title": {
+    "defaultMessage": "Warn when a commit includes another agent’s files",
+    "description": "A workflow option (glossary 2.6, G16)."
+  },
+  "workflow.option.slotsUpToDate.desc": {
+    "defaultMessage": "Before a card starts in a slot, the slot is brought to the latest work of the target branch, and its dependencies are installed again when the lock file changed.",
+    "description": "What the workflow option “Slots are brought up to date before each card” does (glossary 2.5: slot; lock file, as in the G15 value)."
+  },
+  "workflow.option.slotsUpToDate.title": {
+    "defaultMessage": "Slots are brought up to date before each card",
+    "description": "A workflow option (glossary 2.6, G15; glossary 2.5: slot): before a card starts in a slot, the slot is brought to the target branch’s latest work."
+  },
+  "workflow.option.stageNames.desc": {
+    "defaultMessage": "Rename any stage the board shows: a name changes no rule and applies at once.",
+    "description": "What the workflow option “Stage names” does (glossary 2.2: stage)."
+  },
+  "workflow.option.stageNames.title": {
+    "defaultMessage": "Stage names",
+    "description": "A workflow option (glossary 2.6, N5; glossary 2.2: stage): your own names for the board’s stages."
+  },
+  "workflow.option.stopOwnRuns.desc": {
+    "defaultMessage": "A card goes to review only once its builder’s own runs and background commands have stopped.",
+    "description": "What the workflow option “Agents stop what they started before review” does."
+  },
+  "workflow.option.stopOwnRuns.title": {
+    "defaultMessage": "Agents stop what they started before review",
+    "description": "A workflow option (glossary 2.6, G13)."
+  },
+  "workflow.option.strict.desc": {
+    "defaultMessage": "When the target branch has moved on since the review, the merge queue brings the work up to date in its own folder first, and returns the card if that conflicts or makes a different change.",
+    "description": "What the workflow option “Work is up to date with its target branch before it merges” does (glossary 2.1: merge queue; Squash is the merge style’s value)."
+  },
+  "workflow.option.strict.title": {
+    "defaultMessage": "Work is up to date with its target branch before it merges",
+    "description": "A workflow option (glossary 2.6, G8, strict): a card’s work must contain the target branch’s latest commit before it is merged; Hive’s merge queue brings it up to date itself."
+  },
+  "workflow.option.style.desc": {
+    "defaultMessage": "How a card’s work is merged into the target branch.",
+    "description": "What the workflow option “Merge style” does."
+  },
+  "workflow.option.style.title": {
+    "defaultMessage": "Merge style",
+    "description": "A workflow option (glossary 2.6, G6)."
+  },
+  "workflow.option.target.desc": {
+    "defaultMessage": "The branch a card’s work is merged into: the repository’s default branch when left empty.",
+    "description": "What the workflow option “Work merges into” does."
+  },
+  "workflow.option.target.title": {
+    "defaultMessage": "Work merges into",
+    "description": "A workflow option (glossary 2.6, G7): the target branch."
+  },
+  "workflow.preset.custom": {
+    "defaultMessage": "Custom",
+    "description": "The workflow preset shown when the options no longer match a preset (glossary 2.1)."
+  },
+  "workflow.preset.note.teamFocused": {
+    "defaultMessage": "Team runs each card’s focused tests on the merged result when the project has a command that runs them: set it under Each card’s focused tests.",
+    "description": "Under the preset choice of Project Settings → Workflow while Team is chosen (glossary 2.1: Team; G20: Each card’s focused tests is an option’s name, as translated there)."
+  },
+  "workflow.preset.pair": {
+    "defaultMessage": "Pair",
+    "description": "A workflow preset (glossary 2.1): a builder and a reviewer."
+  },
+  "workflow.preset.pairAgent": {
+    "defaultMessage": "Pair (the agent merges)",
+    "description": "A workflow preset (glossary 2.1, Pair): a builder and a reviewer, and the builder merges each card itself."
+  },
+  "workflow.preset.solo": {
+    "defaultMessage": "Solo",
+    "description": "A workflow preset (glossary 2.1): one person, one agent at a time, no reviewer."
+  },
+  "workflow.preset.team": {
+    "defaultMessage": "Team",
+    "description": "A workflow preset (glossary 2.1): several builders and reviewers, stricter checks."
+  },
+  "workflow.presetsNotice.choose": {
+    "defaultMessage": "Choose…",
+    "description": "A button of the one-time presets notice: opens the first project’s Version Control tab at Workflow."
+  },
+  "workflow.presetsNotice.notNow": {
+    "defaultMessage": "Not Now",
+    "description": "A button of the one-time presets notice: dismisses it for good."
+  },
+  "workflow.presetsNotice.text": {
+    "defaultMessage": "{n, plural, one {{projects} works} other {{projects} work}} as before this version. A preset sets up a workflow in one click: who reviews the work, which checks pass first and who merges.",
+    "description": "The one-time notice after the upgrade to 1.0 (glossary 2.1: preset, workflow). {projects} is a list of project names; {n} how many."
+  },
+  "workflow.refused.approval.given.change": {
+    "defaultMessage": "This rule is set in Version Control → Your OK before merging.",
+    "description": "Where the rule that waits for the user's OK is changed."
+  },
+  "workflow.refused.approval.given.message": {
+    "defaultMessage": "{card} waits for the OK before merging.",
+    "description": "A refused move: the user has to approve the card first (glossary 2.3: approval; Version Control → Your OK before merging)."
+  },
+  "workflow.refused.approval.given.next": {
+    "defaultMessage": "Wait for the OK, given on the card or in For you.",
+    "description": "The next step after a move refused for want of the user’s approval."
+  },
+  "workflow.refused.card.plainNumber.message": {
+    "defaultMessage": "A plain number is not a card reference.",
+    "description": "A refused intent: the card was named by a bare number."
+  },
+  "workflow.refused.card.plainNumber.next": {
+    "defaultMessage": "Name the card by its key: {key}.",
+    "description": "How to name a card instead of a bare number: by its key, {key} (such as AM-12)."
+  },
+  "workflow.refused.check.revisionMismatch.message": {
+    "defaultMessage": "{revision} isn't what's checked out here.",
+    "description": "A refused check run: the revision named is not the checked-out one."
+  },
+  "workflow.refused.check.revisionMismatch.next": {
+    "defaultMessage": "Run the check where {revision} is checked out, or without a revision.",
+    "description": "The next step after a check run named the wrong revision."
+  },
+  "workflow.refused.done.contained.change": {
+    "defaultMessage": "This rule is set in Version Control → Who merges.",
+    "description": "Where the rule that checks a merge is changed."
+  },
+  "workflow.refused.done.contained.message": {
+    "defaultMessage": "{card} at {revision} isn't in {target}.",
+    "description": "A refused Done: the approved revision is not in the target branch. {target} is a branch name."
+  },
+  "workflow.refused.done.contained.next": {
+    "defaultMessage": "Merge {revision} into {target}, then report the merge again.",
+    "description": "The next step after a refused report of a merge."
+  },
+  "workflow.refused.evidence.changed.message": {
+    "defaultMessage": "What Hive read for {card} changed while it decided.",
+    "description": "A refused intent: a branch head, a file or another card the rule depends on changed between Hive's reading it and recording the move. {card} is a card key."
+  },
+  "workflow.refused.evidence.changed.next": {
+    "defaultMessage": "Try again: Hive reads it afresh.",
+    "description": "The next step after a refusal because what a rule read changed meanwhile."
+  },
+  "workflow.refused.integrate.approved.message": {
+    "defaultMessage": "{card} at {revision} isn't approved: {why}",
+    "description": "A refused merge: the revision lacks the passes or approvals its rules need. {why} is a whole sentence saying what's missing."
+  },
+  "workflow.refused.integrate.approved.next": {
+    "defaultMessage": "Submit it for review.",
+    "description": "The next step after a merge refused for want of approval."
+  },
+  "workflow.refused.integrate.checksPassed.change": {
+    "defaultMessage": "This rule is set in Version Control → Checks pass on the merged result.",
+    "description": "Where the merge checks are changed."
+  },
+  "workflow.refused.integrate.checksPassed.message": {
+    "defaultMessage": "The merge checks failed on {card}'s merged result.",
+    "description": "A merge returned: the merge checks failed on the test merge."
+  },
+  "workflow.refused.integrate.checksPassed.next": {
+    "defaultMessage": "Fix the failures, commit and submit the new revision.",
+    "description": "The next step after failed merge checks."
+  },
+  "workflow.refused.integrate.upToDate.change": {
+    "defaultMessage": "This rule is set in Version Control → Work is up to date before it merges.",
+    "description": "Where the strict rule is changed."
+  },
+  "workflow.refused.integrate.upToDate.message": {
+    "defaultMessage": "{card} at {revision} doesn't contain {target}'s head.",
+    "description": "A refused merge (strict): the revision is behind its target. {target} is a branch name."
+  },
+  "workflow.refused.integrate.upToDate.next": {
+    "defaultMessage": "The merge queue brings it up to date itself.",
+    "description": "What happens next after the strict up-to-date rule refuses."
+  },
+  "workflow.refused.lane.lineBehind.change": {
+    "defaultMessage": "Settings → Advanced → Bring an agent's branch up to date after a squash merge says whether Hive moves it or asks first.",
+    "description": "Where it is decided whether Hive moves the branch itself or asks the user first (a setting name: use it as Hive shows it)."
+  },
+  "workflow.refused.lane.lineBehind.message": {
+    "defaultMessage": "{card} can't start yet: {line} still has {earlier}'s work, which was squashed into {target}.",
+    "description": "A refused start (§16.19.2): the builder's branch (in its own worktree) still has the previous card's commits, which were merged into the target as one squashed commit, so the next card's change would include them. {card} and {earlier} are card keys like AM-12; {line} a branch name; {target} the branch merged into."
+  },
+  "workflow.refused.lane.lineBehind.next": {
+    "defaultMessage": "{reader, select, you {Leave it as it is: Hive brings {line} up to date with {target} once the agent is idle, or asks you first, and tells the agent when {card} can start.} other {Leave it as it is: Hive brings {line} up to date with {target} once you are idle, or asks the user, and tells you when {card} can start.}}",
+    "description": "The next step after a start refused because the branch still has squashed work: wait (end the turn); Hive moves the branch, or asks the user first, and says when the card can start. {line} a branch name, {target} the branch merged into, {card} a card key. {reader} (select): you is the window's wording, other the agent's (the user named as the user); translate both whole sentences."
+  },
+  "workflow.refused.lane.oneAtATime.change": {
+    "defaultMessage": "A lane always takes one card at a time; turning off Settings → Advanced → Workflow rules are enforced turns every rule off.",
+    "description": "Where the rule that a lane takes one card at a time is changed: it has no option of its own; the switch that turns every workflow rule off (a setting name: use it as Hive shows it)."
+  },
+  "workflow.refused.lane.oneAtATime.message": {
+    "defaultMessage": "{card} can't start yet: {earlier}, before it in its lane, isn't Done.",
+    "description": "A refused start (glossary 2.4): a lane takes one card at a time, so a card starts only once the cards before it in its lane are Done. {card} and {earlier} are card keys like AM-12."
+  },
+  "workflow.refused.lane.oneAtATime.next": {
+    "defaultMessage": "Finish {earlier} first: once it is Done, the lane goes on to {card}.",
+    "description": "The next step after a start refused because an earlier card of the lane is not Done. {card} and {earlier} are card keys like AM-12."
+  },
+  "workflow.refused.loop.followUpChecked.message": {
+    "defaultMessage": "{card}: a follow-up waits for its reviewer's check, with no going ahead without it.",
+    "description": "A refused going ahead unchecked (#1467): what waits is a follow-up (a change asked of reviewed work, such as a screenshot's), which only its reviewer's answer settles. {card} is a card key."
+  },
+  "workflow.refused.loop.followUpChecked.next": {
+    "defaultMessage": "{reader, select, you {The agent waits for the reviewer's ok or gaps; if none comes, it asks you.} other {Wait for the reviewer's ok or gaps; if none comes, ask the user.}}",
+    "description": "The next step after going ahead with a follow-up unchecked (#1467). ok and gaps are the reviewer's answers, as agents name them: keep them as they are. {reader} (select): you is the window's wording, other the agent's (the user named as the user); translate both whole sentences."
+  },
+  "workflow.refused.loop.followUpMerging.message": {
+    "defaultMessage": "{card} is being merged now: a follow-up can no longer take it out of the merge queue.",
+    "description": "A refused follow-up (#1623): a follow-up on a queued card takes it out of the merge queue first, but the queue has already begun merging this one. {card} is a card key."
+  },
+  "workflow.refused.loop.followUpMerging.next": {
+    "defaultMessage": "Wait for the merge; if the follow-up is still needed, put it on a new card.",
+    "description": "The next step after a follow-up refused because the card is being merged now (#1623)."
+  },
+  "workflow.refused.loop.noReviewer.message": {
+    "defaultMessage": "{card} has no reviewer to check it: it is in no lane with a reviewer, and nobody has reviewed it yet.",
+    "description": "A refused design or follow-up posted for a check (#1382, #1467): nobody can be woken to check it. {card} is a card key. A lane: a card loop's record of its builder and reviewer."
+  },
+  "workflow.refused.loop.noReviewer.next": {
+    "defaultMessage": "Start a lane for the card with a reviewer, or say it in a comment instead.",
+    "description": "The next step after a design or follow-up refused for want of a reviewer (#1382, #1467)."
+  },
+  "workflow.refused.loop.noStep.message": {
+    "defaultMessage": "{card} has no design or follow-up waiting for its check.",
+    "description": "A refused card loop step (#1382, #1467): an answer (OK, gaps) or going ahead when no design or follow-up posted by its builder waits for its reviewer's check. A follow-up: a change asked of reviewed work, such as a screenshot's. {card} is a card key."
+  },
+  "workflow.refused.loop.noStep.next": {
+    "defaultMessage": "Read the card: it may have been answered, or the card moved on.",
+    "description": "The next step after a card loop step with nothing to answer (#1382): what was posted for the check may have been answered."
+  },
+  "workflow.refused.loop.roundLimit.message": {
+    "defaultMessage": "{card} reached its round limit: it goes on once its round-limit question is answered.",
+    "description": "A refused submission or move: the card failed as many reviews as its card loop allows (Settings → Card loops), and Hive asked how to go on (For you); until that question is answered, its loop is paused. Read by agents and shown in the window alike: it names no one (never \"the user\"). {card} is a card key."
+  },
+  "workflow.refused.loop.roundLimit.next": {
+    "defaultMessage": "The question is on the card (For you): once it is answered, Hive wakes the agents waiting on it.",
+    "description": "The next step while a card waits at its round limit for its question (For you, a label: use it as Hive shows it) to be answered. Read by agents and shown in the window alike: it names no one (never \"the user\"); Hive then wakes the agents that wait on the card."
+  },
+  "workflow.refused.loop.staleStep.message": {
+    "defaultMessage": "{card}: that is about {design}, but the one waiting for its check now is {waiting}.",
+    "description": "A refused answer to a design or follow-up, or going ahead with a design (#1382, #1467): it names an earlier one than the one waiting now, so it can't settle it. {card} is a card key; {design} and {waiting} are their ids, such as AM-12/s40."
+  },
+  "workflow.refused.loop.staleStep.next": {
+    "defaultMessage": "Read the card's latest comment and answer the one it names.",
+    "description": "The next step after an answer to an earlier design or follow-up (#1382, #1467)."
+  },
+  "workflow.refused.loop.stepNotHere.message": {
+    "defaultMessage": "{step, select, followUp {{card} is in {stage}: a follow-up is posted for its check once the work is in review or has passed it.} other {{card} is in {stage}: a design is posted for its check before the work goes to review.}}",
+    "description": "A refused card loop step (#1382, #1467): a design was posted for a card that isn't being worked on (not in Doing), or a follow-up (a change asked of reviewed work, such as a screenshot's) for a card that isn't in Review or Passed. {card} is a card key; {stage} the stage it is in; step (select): followUp, or other for a design. Translate each sentence."
+  },
+  "workflow.refused.loop.stepNotHere.next": {
+    "defaultMessage": "{step, select, followUp {Send the work to review, or say it in a comment.} other {Post it while the card is being worked on, or say it in a comment.}}",
+    "description": "The next step after a design posted for a card that is not being worked on, or a follow-up for a card not in Review or Passed (#1382, #1467). step (select): followUp, or other for a design. Translate each sentence."
+  },
+  "workflow.refused.loop.stepNotYours.message": {
+    "defaultMessage": "{side, select, builder {Only the builder of {card} posts its design or follow-up, or goes ahead with a design.} other {Only the reviewer of {card} checks its design or follow-up.}}",
+    "description": "A refused card loop step (#1382, #1467): the agent isn't on the side of the loop the step belongs to (a reviewer posting a design or a follow-up, a builder answering its own). A follow-up: a change asked of reviewed work (such as a screenshot's), ready for the reviewer's check. {card} is a card key; side (select): builder or reviewer, whose step it is. Translate each sentence."
+  },
+  "workflow.refused.loop.stepNotYours.next": {
+    "defaultMessage": "{side, select, builder {Leave it to the card's builder; a reviewer answers with ok or gaps.} other {Leave it to the card's reviewer; nobody checks their own work.}}",
+    "description": "The next step after a refused card loop step from the wrong side (#1382, #1467). side: builder or reviewer, the agent the step belongs to. ok and gaps are the reviewer's answers, as agents name them: keep them as they are."
+  },
+  "workflow.refused.loop.tooEarly.change": {
+    "defaultMessage": "How long is set in Project Settings → Card loops → Design check wait.",
+    "description": "Where the wait for a design check is changed (#1382). Names of settings: keep them as Hive shows them."
+  },
+  "workflow.refused.loop.tooEarly.message": {
+    "defaultMessage": "{card}: its design's check is due in {minutes, plural, one {# minute} other {# minutes}}.",
+    "description": "A refused going ahead with a design before its reviewer's check is due (#1382, Card loops → Design check wait). {card} is a card key; {minutes} how many minutes are left."
+  },
+  "workflow.refused.loop.tooEarly.next": {
+    "defaultMessage": "Wait for the answer; with none by then, go ahead as posted.",
+    "description": "The next step after going ahead with a design too early (#1382)."
+  },
+  "workflow.refused.merge.hiveMerges.change": {
+    "defaultMessage": "This rule is set in Version Control → Who merges. A card keeps the rules it started with.",
+    "description": "Where the rule that Hive merges cards is changed; a card keeps the rules it started under unless the change is applied to it."
+  },
+  "workflow.refused.merge.hiveMerges.message": {
+    "defaultMessage": "Hive merges {card}: agents don't merge it or report its merge.",
+    "description": "A refused report of a merge, or a claim of the merge slot, for a card whose rules say Hive merges it (the merge queue). {card} is a card key like AM-12."
+  },
+  "workflow.refused.merge.hiveMerges.next": {
+    "defaultMessage": "Once it is approved, the merge queue merges it and moves it to Done: wait for that, or for it to come back.",
+    "description": "The next step after a refused merge of a card Hive merges, when it isn't in the merge queue yet."
+  },
+  "workflow.refused.merge.hiveMerges.nextMerged": {
+    "defaultMessage": "The merge queue has merged it already: nothing is left to do.",
+    "description": "The next step after a refused merge of a card Hive has already merged."
+  },
+  "workflow.refused.merge.hiveMerges.nextPaused": {
+    "defaultMessage": "{reader, select, you {It is in the merge queue for {target}, which is paused until you resume it; it moves to Done once merged, or comes back.} other {It is in the merge queue for {target}, which is paused until it is resumed: wait for Done, or for it to come back.}}",
+    "description": "The next step after a refused merge of a card in a paused merge queue. {target} is a branch name. {reader} (select): you is the window's wording, other the agent's (the user named as the user); translate both whole sentences."
+  },
+  "workflow.refused.merge.hiveMerges.nextPausedAnswer": {
+    "defaultMessage": "{reader, select, you {It is in the merge queue for {target}, which is paused until you answer in For you; it moves to Done once merged, or comes back.} other {It is in the merge queue for {target}, which is paused until the user answers in For you: wait for Done, or for it to come back.}}",
+    "description": "The next step after a refused merge of a card in a merge queue paused for the user's answer (in For you: whether to update the branch now, or how to settle a merge Hive couldn't finish). {target} is a branch name. {reader} (select): you is the window's wording, other the agent's (the user named as the user); translate both whole sentences."
+  },
+  "workflow.refused.merge.hiveMerges.nextPausedFix": {
+    "defaultMessage": "{reader, select, you {It is in the merge queue for {target}, which is paused until you fix what stopped it and resume it; it moves to Done once merged, or comes back.} other {It is in the merge queue for {target}, which is paused until the user fixes what stopped it and resumes it: wait for Done, or for it to come back.}}",
+    "description": "The next step after a refused merge of a card in a merge queue paused by something only the user can fix (an error from git, say), then Resume. {target} is a branch name. {reader} (select): you is the window's wording, other the agent's (the user named as the user); translate both whole sentences."
+  },
+  "workflow.refused.merge.hiveMerges.nextPausedFolder": {
+    "defaultMessage": "{reader, select, you {It is in the merge queue for {target}, which is paused until you put right the folder {target} is checked out in and resume it; it moves to Done once merged, or comes back.} other {It is in the merge queue for {target}, which is paused until the user puts right the folder {target} is checked out in and resumes it: wait for Done, or for it to come back.}}",
+    "description": "The next step after a refused merge of a card in a merge queue paused for the folder its branch is checked out in (on another branch, files staged or changed, agents at work there). {target} is a branch name. {reader} (select): you is the window's wording, other the agent's (the user named as the user); translate both whole sentences."
+  },
+  "workflow.refused.merge.hiveMerges.nextPausedRules": {
+    "defaultMessage": "{reader, select, you {It is in the merge queue for {target}, which paused while workflow rules were off and moves on once they are enforced again (if they already are, once you resume it); it moves to Done once merged, or comes back.} other {It is in the merge queue for {target}, which paused while workflow rules were off and moves on once they are enforced again (if they already are, once the user resumes it): wait for Done, or for it to come back.}}",
+    "description": "The next step after a refused merge of a card in a merge queue that paused while the workflow rules were turned off: Hive resumes it when they are turned on again. {target} is a branch name. {reader} (select): you is the window's wording, other the agent's (the user named as the user); translate both whole sentences."
+  },
+  "workflow.refused.merge.hiveMerges.nextQueued": {
+    "defaultMessage": "It is in the merge queue for {target} (position {n, number}) and moves to Done once merged: wait for that, or for it to come back.",
+    "description": "The next step after a refused merge of a card Hive merges, waiting in the merge queue. {target} is a branch name; {n} its place in the queue (1 is next)."
+  },
+  "workflow.refused.merge.hiveMerges.nextReturned": {
+    "defaultMessage": "It came back from the merge queue: fix it in your worktree, commit and submit again.",
+    "description": "The next step after a refused merge of a card the merge queue returned to its builder (a conflict, failed checks, a hook)."
+  },
+  "workflow.refused.merge.hiveMerges.nextStale": {
+    "defaultMessage": "Its pass is stale: its line changed since it passed review (it is at {current}). Submit it again for review; it is queued once it passes again.",
+    "description": "The next step after a refused merge of a card Hive merges, approved but its pass stale: its branch has commits the review didn't cover. {current} is a commit's short hash."
+  },
+  "workflow.refused.merge.hiveMerges.nextTesting": {
+    "defaultMessage": "The merge queue is merging it into {target} now and moves it to Done once merged: wait for that, or for it to come back.",
+    "description": "The next step after a refused merge of a card the merge queue is testing or merging now. {target} is a branch name."
+  },
+  "workflow.refused.move.doingNobody.message": {
+    "defaultMessage": "{card} would be in {stage} with nobody on it{also, select, yes {, and the move skips: {rules}} other {}}.",
+    "description": "A refused move into the Active stage by the Hive Assistant (HI-2062): the card {card} (its key, like AM-12) would have no agent on it. {stage} is the stage's name. {also} (select): yes when the move also skips other rules, listed in {rules}; translate both branches."
+  },
+  "workflow.refused.move.doingNobody.next": {
+    "defaultMessage": "{reader, select, you {Choose nobody on it, an agent on it, or an agent started on it.} other {Ask the user which they want: nobody on it (move it again with override and their reason), an agent on it (agent), or an agent started on it (hive_start_task).}}",
+    "description": "The next step after the Assistant's move into Active was refused for leaving nobody on the card: the user chooses nobody on it, an agent given the card, or an agent started on it. override, agent and hive_start_task are names of a call's fields and a tool: keep them as they are. {reader} (select): you is the window's wording, other the agent's (the user named as the user); translate both whole sentences."
+  },
+  "workflow.refused.move.needsOverride.change": {
+    "defaultMessage": "{reader, select, you {These rules are set in Version Control, where you can change them.} other {These rules are set in Version Control, where the user can change them.}}",
+    "description": "Where the rules a move would skip are changed: the project's Version Control tab (a tab name: use it as Hive shows it). {reader} (select): you is the window's wording, other the agent's (the user named as the user); translate both whole sentences."
+  },
+  "workflow.refused.move.needsOverride.message": {
+    "defaultMessage": "Moving {card} to {stage} skips: {rules}.",
+    "description": "A move that skips rules: {rules} lists the rule names."
+  },
+  "workflow.refused.move.needsOverride.next": {
+    "defaultMessage": "{reader, select, you {Moving it anyway needs your reason: one you gave for it, or one you give once told which rules this skips.} other {Move it anyway only with the user's reason. One they gave with their request is enough (\"I merged it by hand\", say): move it again with override and that reason, in their words. With none, tell them which rules this skips and ask for theirs.}}",
+    "description": "The next step for a move that skips rules (said to the Hive Assistant): move anyway (an override) only with the user's own reason, given with the request (then the agent moves it at once, HI-2260) or after being told which rules the move skips. {reader} (select): you is the window's wording, other the agent's (the user named as the user); translate both whole sentences."
+  },
+  "workflow.refused.move.noStage.change": {
+    "defaultMessage": "A project's steps follow its options in Version Control.",
+    "description": "Where the stages a project has are set: its Version Control options (a tab name: use it as Hive shows it)."
+  },
+  "workflow.refused.move.noStage.message": {
+    "defaultMessage": "{card} can't go to {stage}: this project's rules have no such step.",
+    "description": "A refused move: the card was moved to a board stage the project's workflow rules don't have (Review with no review, say). {card} is a card key, {stage} a stage name."
+  },
+  "workflow.refused.move.noStage.next": {
+    "defaultMessage": "Move it to one of its steps: {stages}.",
+    "description": "The next step after a move to a stage the rules lack: the stages they have. {stages} lists stage names."
+  },
+  "workflow.refused.move.notFromHere.message": {
+    "defaultMessage": "{card} is in {stage}: {move} isn't possible from there.",
+    "description": "A refused intent: not possible from the stage the card is in. {stage} is a stage name, {move} the intent."
+  },
+  "workflow.refused.move.notFromHere.next": {
+    "defaultMessage": "From {stage}, use: {moves}.",
+    "description": "The next step: the intents possible from the stage. {moves} lists them."
+  },
+  "workflow.refused.move.notFromHere.nextBuilder": {
+    "defaultMessage": "It waits for its reviewer's verdict: wait for that, which brings it back if there is more to do.",
+    "description": "The next step after a card's builder was refused a move while the card waits in Review for its reviewer (#1604): the review's verdict comes first. Read by agents and shown in the window alike: it names no one."
+  },
+  "workflow.refused.move.notFromHere.nextBuilderSubmit": {
+    "defaultMessage": "A change asked for while it is in Review, committed: submit it again with followUp: true, which keeps it in Review for its reviewer to check. Anything else waits for its reviewer's verdict.",
+    "description": "The next step after a card's builder submitted it again while it waits in Review (HI-1832): the verdict comes first, but a change the reviewer asked for is submitted as a follow-up. followUp is the tool's option, as agents type it: keep it as it is. Read by agents and shown in the window alike: it names no one."
+  },
+  "workflow.refused.move.notFromHere.nextDone": {
+    "defaultMessage": "{reader, select, you {It's finished. More work on it that you ask for takes it back to Doing; separate follow-up work goes on a new card.} other {It's finished. More work on it that the user asked for: move it back with hive_update_task (column: doing), then work on it as usual. Separate follow-up work goes on a new card (hive_create_task).}}",
+    "description": "The next step after an agent's start or submit was refused on a card in Done (HI-2227): more work on that card the user asked for moves it back to Doing; separate follow-up work is a new card. hive_update_task, hive_create_task and column: doing are a tool, its argument and value: keep them as they are. Doing is a column name: use it as Hive shows it. {reader} (select): you is the window's wording, other the agent's (the user named as the user); translate both whole sentences."
+  },
+  "workflow.refused.move.notFromHere.nextNone": {
+    "defaultMessage": "Nothing waits to be done there now.",
+    "description": "The next step after a refused move when nothing is possible from the card's stage (the request it answered is no longer open)."
+  },
+  "workflow.refused.move.notFromHere.nextReviewer": {
+    "defaultMessage": "{back, select, yes {Its review is over: it went back for more work. Leave it where it is, with no verdict, and wait for it to come back to Review.} other {Its review is over: it has moved on from Review. Leave it where it is, with no verdict.}}",
+    "description": "The next step after a reviewer's review or verdict was refused because the card is no longer in Review (#1604): its review ended. back (select): yes when the card went back to be worked on (Todo or Active), other when it moved on (approved, merged). Review is a stage name: use it as Hive shows it. Read by agents and shown in the window alike: it names no one. Translate each sentence."
+  },
+  "workflow.refused.move.useIntent.message": {
+    "defaultMessage": "Agents don't move cards between columns.",
+    "description": "A refused column move by an agent: agents act by intent."
+  },
+  "workflow.refused.move.useIntent.next": {
+    "defaultMessage": "Use the {intent} intent instead.",
+    "description": "The next step after a refused column move: {intent} is the intent to use."
+  },
+  "workflow.refused.paths.excluded.message": {
+    "defaultMessage": "{card}: {path} is in {folder}, which a project without version control leaves out of its work.",
+    "description": "A refused declaration of a card's paths (#1511): in a project without version control (None), a card's paths are the files of its work; {path} is under {folder} (node_modules, .venv, .git, .hive or a folder the project excludes), which never counts as work. {card} is a card key like AM-12."
+  },
+  "workflow.refused.paths.excluded.next": {
+    "defaultMessage": "Declare only the files of the work, outside {folder}: a card's paths narrow the project's work, never widen it.",
+    "description": "The next step after a refused declaration of a card's paths: name files outside the excluded folder {folder} (#1511)."
+  },
+  "workflow.refused.platform.unknown.message": {
+    "defaultMessage": "{card}: Hive couldn't read {what}, so the rule {rule} can't be checked.",
+    "description": "A refused move: a fact a rule needs could not be read (git missing, folder gone). {what} says what, {rule} the rule id."
+  },
+  "workflow.refused.platform.unknown.next": {
+    "defaultMessage": "Check Provider Setup or the folder, then try again.",
+    "description": "The next step when Hive could not read what a rule needs."
+  },
+  "workflow.refused.platform.unknown.nextGone": {
+    "defaultMessage": "{reader, select, you {The project's Git repository is gone: restore it, or switch the project to None in its Version Control tab (from the next card).} other {The project's Git repository is gone: ask the user to restore it, or to switch the project to None in its Version Control tab (from the next card).}}",
+    "description": "The next step when a card was refused because its Git repository was removed or moved: the user restores it, or switches the project to None (no version control) in the Version Control tab, which applies to cards started after. Read by agents and shown in the window. {reader} (select): you is the window's wording, other the agent's (the user named as the user); translate both whole sentences."
+  },
+  "workflow.refused.queue.advancing.message": {
+    "defaultMessage": "{card} is being merged into {target} now: it can no longer be taken out of the merge queue.",
+    "description": "A refused Remove from queue: the merge queue has begun moving the target to the card's merge (it finishes even after a restart). {card} is a card key, {target} a branch name."
+  },
+  "workflow.refused.queue.advancing.next": {
+    "defaultMessage": "Wait for the merge to finish. If the change isn't wanted, revert it in {target}.",
+    "description": "The next step after a refused Remove from queue while the card is being merged. {target} is a branch name."
+  },
+  "workflow.refused.requeue.allowed.change": {
+    "defaultMessage": "Retry merge on the merge queue retries it once.",
+    "description": "Who can override a refused requeue: the user, with Retry merge on the merge queue (glossary 2.5: merge queue)."
+  },
+  "workflow.refused.requeue.allowed.message": {
+    "defaultMessage": "{card} at {revision} can't go back into the merge queue unchanged: {why}",
+    "description": "A refused resubmission into the merge queue. {card} is a card key, {revision} a short revision id, {why} one of the requeue reasons below, a whole sentence."
+  },
+  "workflow.refused.requeue.allowed.next": {
+    "defaultMessage": "Fix the failure, commit and submit the new revision.",
+    "description": "The next step after a refused unchanged requeue."
+  },
+  "workflow.refused.review.decisionsReceived.message": {
+    "defaultMessage": "{card} has a decision you haven't read.",
+    "description": "A refused review or verdict: the card has a newer decision than the reviewer has received."
+  },
+  "workflow.refused.review.decisionsReceived.next": {
+    "defaultMessage": "Read it, judge whether the work meets it, then give your verdict.",
+    "description": "The next step after a refused verdict for an unread decision."
+  },
+  "workflow.refused.review.headMoved.message": {
+    "defaultMessage": "{card}'s line has moved since it was submitted: it was submitted at {submitted}, and its head is now {head}, a different change. A pass covers only the revision submitted.",
+    "description": "A refused passing verdict (HI-1763): the card's branch has new commits since the revision under review (a follow-up, say). {card} is the card's key; {submitted} and {head} are commits' short hashes."
+  },
+  "workflow.refused.review.headMoved.next": {
+    "defaultMessage": "A commit you asked for: ask its builder to submit {head} as a follow-up (hive_request_builder), which keeps it in Review with no round counted, then start your review again. Otherwise give a failing verdict saying so (hive_verdict, pass: false), and its builder submits it as the next round.",
+    "description": "The next step after a pass refused because the branch moved on (HI-1763, HI-1832): a commit the reviewer asked for is submitted by the builder as a follow-up (the card stays in Review, no round counted) and reviewed again; any other is failed so the builder submits it as a new round. {head} is a commit's short hash; keep the tool names and the argument as they are."
+  },
+  "workflow.refused.review.noSubmission.message": {
+    "defaultMessage": "{card} has nothing submitted to review.",
+    "description": "A refused review: the card has no submission."
+  },
+  "workflow.refused.review.noSubmission.next": {
+    "defaultMessage": "Wait for its builder to submit it.",
+    "description": "The next step when there is nothing to review."
+  },
+  "workflow.refused.review.notAuthor.change": {
+    "defaultMessage": "Only Move anyway, on the card, skips this rule.",
+    "description": "Who can override the no-self-review rule: only the user, moving the card anyway (glossary 2.4: override, Move anyway)."
+  },
+  "workflow.refused.review.notAuthor.message": {
+    "defaultMessage": "You worked on {card}, so you can't review it.",
+    "description": "A refused review: the reviewer is one of the agents who built the card."
+  },
+  "workflow.refused.review.notAuthor.next": {
+    "defaultMessage": "Leave the review to another reviewer.",
+    "description": "The next step after a refused self-review."
+  },
+  "workflow.refused.start.dependenciesIntegrated.change": {
+    "defaultMessage": "This rule is set in Version Control → Cards start only when the cards they wait for are merged.",
+    "description": "Where the rule that refused starting a card before the cards it waits for are done is changed."
+  },
+  "workflow.refused.start.dependenciesIntegrated.message": {
+    "defaultMessage": "{card} can't start: {waitsFor} isn't done yet.",
+    "description": "A refused start of a card. {card} and {waitsFor} are card keys (AM-12): the card waits for {waitsFor}'s work to be merged or accepted."
+  },
+  "workflow.refused.start.dependenciesIntegrated.next": {
+    "defaultMessage": "Wait for {waitsFor} to be done, or work on another card.",
+    "description": "The next step after a refused start: {waitsFor} is the card key it waits for."
+  },
+  "workflow.refused.start.notBlocked.change": {
+    "defaultMessage": "This rule is set in Version Control → Cards start only when the cards they wait for are done.",
+    "description": "Where the rule that refused starting a blocked card is changed."
+  },
+  "workflow.refused.start.notBlocked.message": {
+    "defaultMessage": "{card} can't start: it is blocked ({reason}).",
+    "description": "A refused start of a card. {card} is a card key like AM-12; {reason} is why the card is blocked, in the words given."
+  },
+  "workflow.refused.start.notBlocked.next": {
+    "defaultMessage": "Wait for it to be unblocked, or work on another card.",
+    "description": "The next step after a refused start of a blocked card."
+  },
+  "workflow.refused.start.slotAvailable.change": {
+    "defaultMessage": "This is set in Version Control → Where cards are built.",
+    "description": "Where the rule that refused starting for want of a slot is changed."
+  },
+  "workflow.refused.start.slotAvailable.message": {
+    "defaultMessage": "{card} can't start: no slot is free.",
+    "description": "A refused start: every working folder (slot) is lent to other work. {card} is a card key."
+  },
+  "workflow.refused.start.slotAvailable.next": {
+    "defaultMessage": "Wait for a slot to be free.",
+    "description": "The next step after a refused start for want of a slot."
+  },
+  "workflow.refused.submit.checksPassed.change": {
+    "defaultMessage": "This rule is set in Version Control → Checks pass before review.",
+    "description": "Where the rule that refused a submit for a missing check is changed."
+  },
+  "workflow.refused.submit.checksPassed.message": {
+    "defaultMessage": "Review refused: {check} hasn't passed on {revision}.{why, select, notCheck { Its last run passed but didn't count: it wasn't the check's configured command.} notContained { Its last run passed but didn't count: what it ran on doesn't contain the revision.} dirty { Its last run passed but didn't count: the folder had uncommitted changes{files, select, none {} other { ({files})}}.} moved { Its last run passed but didn't count: something else was checked out by its end.} changed { Its last run passed but didn't count: files changed in the folder while it ran{files, select, none {} other { ({files})}}.} revisionChanged { Its last run passed but didn't count: the card's files changed while it ran.} other {}}",
+    "description": "A refused submit: a configured check has no passing counted run on the revision. {check} is the check name, {revision} a short revision id. {why} picks why its last run there didn't count (#1654; keep each branch's key as it is; 'other': it didn't run there, or failed, and nothing is added); {files} lists the paths that changed, or is 'none' (keep the key)."
+  },
+  "workflow.refused.submit.checksPassed.next": {
+    "defaultMessage": "{why, select, dirty {Commit or remove the uncommitted changes, run {command} again, then submit again.} changed {{copy, select, yes {Run {command} again with nothing else writing in the folder, or add --isolated to run it in a check copy of its own, then submit again.} other {Run {command} again with nothing else writing in the folder, then submit again.}}} notContained {Run {command} in the card's own folder, at its revision, then submit again.} other {Run {command}, then submit again.}}",
+    "description": "The next step after a refused submit for a missing check: {command} is the command to run. {why} picks the remedy for why its last run didn't count (#1654; keep each branch's key as it is); {copy} is 'yes' where a check copy (--isolated, kept as typed) can be used."
+  },
+  "workflow.refused.submit.clean.change": {
+    "defaultMessage": "This rule comes with review and merging in Version Control.",
+    "description": "Where the rule that refused a submit with uncommitted changes comes from."
+  },
+  "workflow.refused.submit.clean.message": {
+    "defaultMessage": "{card} can't go to review: {folder} has uncommitted changes ({files}).",
+    "description": "A refused submit: the working folder has uncommitted changes. {folder} is a folder path, {files} a list of file paths."
+  },
+  "workflow.refused.submit.clean.next": {
+    "defaultMessage": "Commit the card's changes, then submit for review again; if you were asked only to submit it (not to do the card), ask the user before committing. Changes that aren't the card's: ask before removing them.",
+    "description": "The next step after a refused submit for review with uncommitted changes (HI-1618, HI-2227, HI-2257): an agent doing the card commits its work; one asked only to submit it asks the user before committing; changes that aren't the card's are removed only once asked about."
+  },
+  "workflow.refused.submit.decisionsReceived.message": {
+    "defaultMessage": "{card} has a decision you haven't read.",
+    "description": "A refused submit: the card has a newer decision than the builder has received."
+  },
+  "workflow.refused.submit.decisionsReceived.next": {
+    "defaultMessage": "Read it, check your work against it, then submit.",
+    "description": "The next step after a refused submit for an unread decision."
+  },
+  "workflow.refused.submit.empty.message": {
+    "defaultMessage": "{card}: nothing committed to review.",
+    "description": "A refused submit for review: the card's line has no commit since it started (git's words: nothing committed). {card} is a card key."
+  },
+  "workflow.refused.submit.empty.messageForUser": {
+    "defaultMessage": "Nothing is committed to review yet.",
+    "description": "A refused move of a card to Review by the user (a drag on the board): the card's line has no commit since it started. Shown under a title that names the card and the column, so it doesn't name them."
+  },
+  "workflow.refused.submit.empty.next": {
+    "defaultMessage": "{changes, select, yes {Commit the card's work, then submit for review again; if you were asked only to submit it (not to do the card), ask the user before committing.} none {Its folder has no changes either. A card that needs none (it only runs or checks something, or its work is already there) is no-code: ask for that with hive_ask_user (action noCode), or hive_ask_assistant where it's already decided. Otherwise make its change, commit it and submit again.} other {Commit the card's work, then submit for review again; if you were asked only to submit it (not to do the card), ask the user before committing. A card that needs no change is no-code: ask for that with hive_ask_user (action noCode).}}",
+    "description": "The next step after a refused submit for review with nothing committed (HI-2227, HI-2257). {changes} (select): yes when the card's folder has uncommitted changes (an agent doing the card commits them; one asked only to submit it asks the user first), none when it has none (a card needing no change is made no-code by the user, asked with the tools named), other when unknown. hive_ask_user, hive_ask_assistant and noCode are names of tools and an option: keep them as they are; translate each branch's whole sentences."
+  },
+  "workflow.refused.submit.empty.nextForUser": {
+    "defaultMessage": "Commit the card's work, then move it again.",
+    "description": "The next step after the user's move of a card to Review was refused with nothing committed: commit the work, then move the card again."
+  },
+  "workflow.refused.submit.focusedChosen.change": {
+    "defaultMessage": "This rule is set in Version Control → Each card’s focused tests.",
+    "description": "Where the rule that refused a submit for focused tests (G20) is changed."
+  },
+  "workflow.refused.submit.focusedChosen.message": {
+    "defaultMessage": "Review refused: {card}'s focused tests couldn't be chosen for {revision}: {state, select, tooBroad {its project's picker says the change needs every test.} other {{why, select, noPicker {the project has no picker.} timedOut {its project's picker took too long.} badOutput {its project's picker gave output Hive can't read.} tooMany {its project's picker named too many tests.} moved {its folder moved to another revision while the picker ran.} dirty {its folder had uncommitted changes.} changed {files changed in its folder while the picker ran.} noChange {its change couldn't be read.} other {its project's picker failed.}}}}",
+    "description": "A refused submit (G20, HI-1367): the tests the card's change needs couldn't be chosen. {card} is its key, {revision} a short commit id; {state} and {why} pick the reason (keep each branch's key as it is)."
+  },
+  "workflow.refused.submit.focusedChosen.next": {
+    "defaultMessage": "Name the tests the change needs with tests on submit, for the reviewer to check, or fix what stopped the picker, then submit again.",
+    "description": "The next step after a refused submit for focused tests (G20), addressed to the agent: tests is the submit tool’s argument, kept as typed."
+  },
+  "workflow.refused.submit.followUpNotBuilder.message": {
+    "defaultMessage": "{card}'s follow-up is its builder's to submit: you aren't building it.",
+    "description": "A refused follow-up submission (HI-1832: a commit its reviewer asked for, submitted while the card is in Review): only the agent building the card submits one. {card} is a card key."
+  },
+  "workflow.refused.submit.followUpNotBuilder.next": {
+    "defaultMessage": "Leave it to its builder, or say what you found in a comment.",
+    "description": "The next step after a follow-up submission refused because the agent is not the card's builder (HI-1832)."
+  },
+  "workflow.refused.submit.identity.change": {
+    "defaultMessage": "This rule is set in Version Control → Commits use the project's identity.",
+    "description": "Where the identity rule is changed."
+  },
+  "workflow.refused.submit.identity.message": {
+    "defaultMessage": "{missing, select, yes {{card} can't be submitted: its commits must use the project's identity, and git has none set for the project.} other {{card}: commit {commit} isn't authored with the project's identity ({email}).}}",
+    "description": "A refused submit: a commit's author email isn't the project's, as git config has it now. {missing} (select; keep the keys): yes when git has no identity (name and email) for the project at all. {commit} is a short commit id, {email} the project's email address."
+  },
+  "workflow.refused.submit.identity.next": {
+    "defaultMessage": "{missing, select, yes {Set the project's identity in Version Control → Branches & remotes → Commit identity (or with {command}), then submit again.} other {Set the identity, run {command}, then submit again.}}",
+    "description": "The next step after a refused submit for a commit's identity: {command} is the git command to use (kept as typed). {missing} (select; keep the keys): yes when git has no identity for the project; Version Control → Branches & remotes → Commit identity is where Hive's window sets it (use the names Hive shows for the tab, its section and heading)."
+  },
+  "workflow.refused.submit.notDuplicate.message": {
+    "defaultMessage": "{card} is already submitted at {revision} and waits for review or merging.",
+    "description": "A refused submit: the same revision is already waiting. {card} is a card key, {revision} a short revision id."
+  },
+  "workflow.refused.submit.notDuplicate.next": {
+    "defaultMessage": "Wait for its review or merge.",
+    "description": "The next step after a refused duplicate submission."
+  },
+  "workflow.refused.submit.ownRunsStopped.change": {
+    "defaultMessage": "This rule is set in Version Control → Agents stop what they started before review.",
+    "description": "Where the rule about stopping runs before review is changed."
+  },
+  "workflow.refused.submit.ownRunsStopped.message": {
+    "defaultMessage": "{card}: runs you started are still going ({runs}).",
+    "description": "A refused submit: the agent still has runs going. {runs} lists their titles."
+  },
+  "workflow.refused.submit.ownRunsStopped.next": {
+    "defaultMessage": "Stop them or let them finish, then submit again.",
+    "description": "The next step after a refused submit while runs are going."
+  },
+  "workflow.refused.submit.ready.message": {
+    "defaultMessage": "{card} at {revision} has unresolved conflicts: {files}.",
+    "description": "A refused submit: the revision stores conflicts. {files} lists file paths."
+  },
+  "workflow.refused.submit.ready.next": {
+    "defaultMessage": "Resolve the conflicts, then submit again.",
+    "description": "The next step after a refused submit of a conflicted revision."
+  },
+  "workflow.refused.submit.sameRevisionNote.message": {
+    "defaultMessage": "{revision} was already reviewed.",
+    "description": "A refused submit: the same revision again without a note."
+  },
+  "workflow.refused.submit.sameRevisionNote.next": {
+    "defaultMessage": "Submit it again with a note saying what changed in your answer, or commit a new revision.",
+    "description": "The next step when submitting a reviewed revision again."
+  },
+  "workflow.refused.submit.trailer.change": {
+    "defaultMessage": "Each card in its own folder needs no trailers: Version Control → Where cards are built.",
+    "description": "Where the setting that needs commit trailers is changed."
+  },
+  "workflow.refused.submit.trailer.message": {
+    "defaultMessage": "{card}: commit {commit} has no card trailer, and another card's agent works in this folder.",
+    "description": "A refused submit in a shared folder: a commit lacks the Hive-Card trailer. {commit} is a short commit id."
+  },
+  "workflow.refused.submit.trailer.next": {
+    "defaultMessage": "Run {command}, then submit again.",
+    "description": "The next step after a refused submit for a missing trailer: {command} is the git command to run."
+  },
+  "workflow.refused.submit.unchanged.message": {
+    "defaultMessage": "{card}: its files haven't changed since it started.",
+    "description": "A refused submit for review in a project with no version control: none of the card's files changed. {card} is a card key."
+  },
+  "workflow.refused.submit.unchanged.next": {
+    "defaultMessage": "Change the card's files, then submit it for review.",
+    "description": "The next step after a refused submit for review in a project with no version control, nothing changed."
+  },
+  "workflow.refused.verdict.currentSubmission.message": {
+    "defaultMessage": "Submission {submission} isn't {card}'s latest.",
+    "description": "A refused verdict: it names an older submission. {submission} is its number."
+  },
+  "workflow.refused.verdict.currentSubmission.next": {
+    "defaultMessage": "Review the latest submission, {latest}.",
+    "description": "The next step after a verdict on an old submission: {latest} is the latest submission number."
+  },
+  "workflow.refused.verdict.reviewing.message": {
+    "defaultMessage": "You haven't started a review of {card}'s submission {submission}.",
+    "description": "A refused verdict: the reviewer never started reviewing that submission. {submission} is its number."
+  },
+  "workflow.refused.verdict.reviewing.next": {
+    "defaultMessage": "Start the review first, then give your verdict.",
+    "description": "The next step after a verdict without a started review."
+  },
+  "workflow.refused.why.passes": {
+    "defaultMessage": "{n, number} of {q, plural, one {# reviewer} other {# reviewers}} passed it.",
+    "description": "The {why} of a refused merge: not enough distinct reviewers passed the revision. {n} and {q} are numbers."
+  },
+  "workflow.refused.why.requeueLimit": {
+    "defaultMessage": "it was sent back unchanged {n, plural, one {# time} other {# times}} already.",
+    "description": "The {why} of a refused requeue: the limit of unchanged requeues was reached. {n} is how many."
+  },
+  "workflow.refused.why.requeueNotTransient": {
+    "defaultMessage": "its last merge failed for a reason in the work (a conflict, red checks or a hook), which needs a new revision.",
+    "description": "The {why} of a refused requeue: the merge failure wasn't transient. Starts lower case: it follows a colon."
+  },
+  "workflow.refused.why.stale": {
+    "defaultMessage": "its pass is stale.",
+    "description": "The {why} of a refused merge or requeue: the revision's pass no longer holds."
+  },
+  "workflow.refused.why.userOk": {
+    "defaultMessage": "it waits for the OK before merging.",
+    "description": "The {why} of a refused merge: the user's approval is missing."
+  },
+  "workflow.roundChoice": {
+    "defaultMessage": "{choice, select, carryOn {Carry on} split {Split it} accept {Accept with follow-ups} takeOver {Take it over} other {{choice}}}",
+    "description": "One of the user's four choices when a card reaches its card loop's round limit: carry on with more review rounds, split the card into smaller ones, accept the work as it is with follow-up cards, or take the work over themselves. Translate each choice; keep the codes before the braces."
+  },
+  "workflow.rule.approval.given": {
+    "defaultMessage": "Your OK before merging",
+    "description": "A rule of the workflow, named where a move skips or can't check it (glossary 2.6: G10)."
+  },
+  "workflow.rule.card.kind": {
+    "defaultMessage": "A card's kind is set when it is made",
+    "description": "A rule of the workflow, named where a change skips it: a card is code or no code (a decision, a write-up, a trial) from when it is made; changing it later is an exception the user makes (glossary: override)."
+  },
+  "workflow.rule.done.contained": {
+    "defaultMessage": "Hive checks the merge",
+    "description": "A rule of the workflow, named where a move skips or can't check it: a card is done only when its work is in its target (glossary 2.6: G5)."
+  },
+  "workflow.rule.integrate.approved": {
+    "defaultMessage": "Work is reviewed before it's merged",
+    "description": "A rule of the workflow, named where a move skips or can't check it (glossary 2.6: G1)."
+  },
+  "workflow.rule.integrate.checksPassed": {
+    "defaultMessage": "Checks pass on the merged result",
+    "description": "A rule of the workflow, named where a move skips or can't check it (glossary 2.6: G9)."
+  },
+  "workflow.rule.integrate.upToDate": {
+    "defaultMessage": "Work is up to date before it merges",
+    "description": "A rule of the workflow, named where a move skips or can't check it (glossary 2.6: G8, without the branch name)."
+  },
+  "workflow.rule.move.doingNobody": {
+    "defaultMessage": "A card in Active has someone on it, unless you say otherwise",
+    "description": "A rule of the workflow, named where a move skips it (HI-2062): the Hive Assistant moves a card into Active with nobody on it only with the user's reason (glossary: override). Active is a stage's name."
+  },
+  "workflow.rule.requeue.allowed": {
+    "defaultMessage": "Unchanged work is queued again only after a failure outside it",
+    "description": "A rule of the workflow, named where a move skips or can't check it: work goes back into the merge queue unchanged only after a merge failed for a reason outside the work (a network error, a timeout)."
+  },
+  "workflow.rule.review.decisionsReceived": {
+    "defaultMessage": "The reviewer has read every decision",
+    "description": "A rule of the workflow, named where a move skips or can't check it (glossary 2.5: reviewer)."
+  },
+  "workflow.rule.review.notAuthor": {
+    "defaultMessage": "Nobody reviews their own work",
+    "description": "A rule of the workflow, named where a move skips or can't check it (glossary 2.6: N2, G2)."
+  },
+  "workflow.rule.start.dependenciesIntegrated": {
+    "defaultMessage": "Cards start only when the cards they wait for are done",
+    "description": "A rule of the workflow, named where a move skips or can't check it (glossary 2.6: N6, G14)."
+  },
+  "workflow.rule.start.notBlocked": {
+    "defaultMessage": "Blocked cards don't start",
+    "description": "A rule of the workflow, named where a move skips or can't check it."
+  },
+  "workflow.rule.start.slotAvailable": {
+    "defaultMessage": "Each card in its own folder",
+    "description": "A rule of the workflow, named where a move skips or can't check it (glossary 2.6: G11 values): a card starts only when a folder is free."
+  },
+  "workflow.rule.submit.checksPassed": {
+    "defaultMessage": "Checks pass before review",
+    "description": "A rule of the workflow, named where a move skips or can't check it (glossary 2.6: N3, G3)."
+  },
+  "workflow.rule.submit.clean": {
+    "defaultMessage": "Work is committed before review",
+    "description": "A rule of the workflow, named where a move skips or can't check it."
+  },
+  "workflow.rule.submit.decisionsReceived": {
+    "defaultMessage": "The builder has read every decision",
+    "description": "A rule of the workflow, named where a move skips or can't check it: the agent who built the card has read every decision on it (glossary 2.5: builder)."
+  },
+  "workflow.rule.submit.focusedChosen": {
+    "defaultMessage": "Each card’s focused tests are chosen before review",
+    "description": "A rule of the workflow, named where a move skips or can’t check it (G20, HI-1367): the tests a card’s change needs are chosen, or named by its builder, when it is submitted."
+  },
+  "workflow.rule.submit.identity": {
+    "defaultMessage": "Commits use the project's identity",
+    "description": "A rule of the workflow, named where a move skips or can't check it (glossary 2.6: G12)."
+  },
+  "workflow.rule.submit.notDuplicate": {
+    "defaultMessage": "Work is submitted once",
+    "description": "A rule of the workflow, named where a move skips or can't check it: the same revision isn't submitted twice."
+  },
+  "workflow.rule.submit.ownRunsStopped": {
+    "defaultMessage": "Agents stop what they started before review",
+    "description": "A rule of the workflow, named where a move skips or can't check it (glossary 2.6: G13)."
+  },
+  "workflow.rule.submit.ready": {
+    "defaultMessage": "Work has no unresolved conflicts",
+    "description": "A rule of the workflow, named where a move skips or can't check it."
+  },
+  "workflow.rule.submit.trailer": {
+    "defaultMessage": "Commits name their card",
+    "description": "A rule of the workflow, named where a move skips or can't check it: in a shared folder, each commit names its card."
+  },
+  "workflow.rule.verdict.currentSubmission": {
+    "defaultMessage": "A verdict is on the latest submission",
+    "description": "A rule of the workflow, named where a move skips or can't check it (glossary 2.3: verdict)."
+  },
+  "workflow.rule.verdict.reviewing": {
+    "defaultMessage": "A verdict follows a review",
+    "description": "A rule of the workflow, named where a move skips or can't check it: a reviewer starts a review before giving a verdict (glossary 2.3: verdict)."
+  },
+  "workflow.slots.archive": {
+    "defaultMessage": "Archive script",
+    "description": "A setting under “Slots and copies”: the command Hive runs in a slot before removing it."
+  },
+  "workflow.slots.archiveDesc": {
+    "defaultMessage": "Runs in a slot before Hive removes it. If it fails, the slot is kept.",
+    "description": "What the setting “Archive script” does (glossary 2.5: slot)."
+  },
+  "workflow.slots.branches": {
+    "defaultMessage": "Branches & remotes",
+    "description": "A link from “Slots in use and ready” to the Version Control tab’s Branches & remotes section, where each slot’s line is (its name as translated there)."
+  },
+  "workflow.slots.carried": {
+    "defaultMessage": "{agent}’s old worktree, finishing its current work",
+    "description": "What a slot holds, in the list under “Slots and copies”: an agent’s worktree from before 1.0, kept for it until its current card or lane ends (#1441). {agent} is its name."
+  },
+  "workflow.slots.copiesDefault": {
+    "defaultMessage": "{n, number} (the default)",
+    "description": "The placeholder of the setting “Review and check copies” while it isn’t set: the number Hive keeps."
+  },
+  "workflow.slots.copiesNow": {
+    "defaultMessage": "{n, plural, =0 {No copies yet.} one {# copy now, {leased, number} in use.} other {# copies now, {leased, number} in use.}}",
+    "description": "Under the setting “Review and check copies”: how many copies the project has now, and how many are leased."
+  },
+  "workflow.slots.copiesSize": {
+    "defaultMessage": "Review and check copies",
+    "description": "A setting under “Slots and copies”: how many review and check copies the project keeps (glossary 2.5: review copy)."
+  },
+  "workflow.slots.copiesSizeDesc": {
+    "defaultMessage": "How many copies the project keeps, each at exactly one revision, for reviewers and isolated checks. Empty keeps the larger of two and its reviewers plus one. They use the setup script.",
+    "description": "What the setting “Review and check copies” does (glossary 2.5: review copy; isolated checks: hive-progress --check --isolated)."
+  },
+  "workflow.slots.copy": {
+    "defaultMessage": "Files copied into new slots",
+    "description": "A setting under “Slots and copies”: the git-ignored files copied from the project folder into each new slot."
+  },
+  "workflow.slots.copyDesc": {
+    "defaultMessage": "Git-ignored files copied from the project folder into each new slot, one pattern per line, such as .env files.",
+    "description": "What the setting “Files copied into new slots” does (glossary 2.5: slot)."
+  },
+  "workflow.slots.desc": {
+    "defaultMessage": "These are saved as you change them, apart from the options above.",
+    "description": "Under the heading “Slots and copies”: its settings save at once, unlike the workflow options, which are saved with Save…."
+  },
+  "workflow.slots.fromSetup": {
+    "defaultMessage": "From the project’s setup command before 1.0",
+    "description": "Where the setting “Setup script” comes from while it isn’t set: the setup command the project had for agents’ worktrees before Hive 1.0."
+  },
+  "workflow.slots.heading": {
+    "defaultMessage": "Slots and copies",
+    "description": "A heading of the Version Control tab’s Workflow section (Git): the project’s slots (worktrees Hive lends to cards and lanes) and its review and check copies (glossary 2.5: slot, review copy)."
+  },
+  "workflow.slots.held": {
+    "defaultMessage": "Held by an ended session of agent {agent}",
+    "description": "In the list of slots (Version Control → Slots and copies): the agent's ({agent}) last session there has ended, but Hive doesn't know that everything it started has, so nothing else uses the slot until it is released (#1506). A noun before the name (glossary §1 rule 4)."
+  },
+  "workflow.slots.inUse": {
+    "defaultMessage": "Slots in use and ready",
+    "description": "A read-only list under “Slots and copies”: the project’s slots, what each is lent to, and those ready (glossary 2.5: slot)."
+  },
+  "workflow.slots.inherit": {
+    "defaultMessage": "Inherit",
+    "description": "A button beside a slot setting set for this project: stop setting it here, and use the inherited value again (the workspace’s, Hive’s or the default)."
+  },
+  "workflow.slots.lentCard": {
+    "defaultMessage": "{agent}, for {card}",
+    "description": "What a slot is lent to, in the list under “Slots and copies”: the builder agent {agent} (its name) for the card {card} (its key, HI-12)."
+  },
+  "workflow.slots.lentLane": {
+    "defaultMessage": "{agent}, for a lane",
+    "description": "What a slot is lent to, in the list under “Slots and copies”: the builder agent {agent} (its name) for its lane (glossary: lane)."
+  },
+  "workflow.slots.levelInherit": {
+    "defaultMessage": "Inherit",
+    "description": "A button beside a slot default set at this level (Settings → Workflow defaults or Settings → Workspace): stop setting it here, and use the inherited value (Hive’s, or the default)."
+  },
+  "workflow.slots.levelNone": {
+    "defaultMessage": "Set here: none",
+    "description": "Where a slot default’s value comes from, in Settings → Workflow defaults or Settings → Workspace: this level sets it to nothing (no files are copied), over the value it would inherit."
+  },
+  "workflow.slots.noSlots": {
+    "defaultMessage": "No slots yet: one is made when a card starts.",
+    "description": "Under “Slots in use and ready” when the project has no slot yet."
+  },
+  "workflow.slots.none": {
+    "defaultMessage": "None",
+    "description": "A slot script that isn’t set: nothing runs."
+  },
+  "workflow.slots.off": {
+    "defaultMessage": "Off",
+    "description": "A setting’s value: off."
+  },
+  "workflow.slots.on": {
+    "defaultMessage": "On",
+    "description": "A setting’s value: on."
+  },
+  "workflow.slots.openAdvanced": {
+    "defaultMessage": "Open Advanced",
+    "description": "A button beside “Reviewers review in review copies”: opens Settings → Advanced."
+  },
+  "workflow.slots.release": {
+    "defaultMessage": "Release…",
+    "description": "A button beside a held slot in the list of slots: asks, then frees it for other work (#1506)."
+  },
+  "workflow.slots.reviewCopies": {
+    "defaultMessage": "Reviewers review in review copies",
+    "description": "A read-only row under “Slots and copies”: the setting of Settings → Advanced with this name (as translated there)."
+  },
+  "workflow.slots.reviewCopiesDesc": {
+    "defaultMessage": "Set in Settings → Advanced, for every project.",
+    "description": "Under the row “Reviewers review in review copies” of “Slots and copies”: where it is changed."
+  },
+  "workflow.slots.saveFailed": {
+    "defaultMessage": "Couldn’t save the slot settings",
+    "description": "An error saving a setting under “Slots and copies”."
+  },
+  "workflow.slots.setHere": {
+    "defaultMessage": "Set for this project",
+    "description": "Where a slot setting’s value comes from: set in this project."
+  },
+  "workflow.slots.setNone": {
+    "defaultMessage": "Set for this project: none",
+    "description": "Where a slot setting’s value comes from: this project sets it to nothing (no script runs, no files are copied), over the value it would inherit."
+  },
+  "workflow.slots.setup": {
+    "defaultMessage": "Setup script",
+    "description": "A setting under “Slots and copies”: the command Hive runs in a new slot, and again when its lock files change (glossary 2.5: slot)."
+  },
+  "workflow.slots.setupDesc": {
+    "defaultMessage": "Runs in a new slot, and again in a slot whose lock files changed since its last install, e.g. npm ci. Review and check copies run it too.",
+    "description": "What the setting “Setup script” does (glossary 2.5: slot, review copy; lock file)."
+  },
+  "workflow.slots.state.creating": {
+    "defaultMessage": "Being set up",
+    "description": "A slot’s state in the list under “Slots and copies”."
+  },
+  "workflow.slots.state.dirty": {
+    "defaultMessage": "Has changes left in it",
+    "description": "A slot’s state in the list under “Slots and copies”: it has uncommitted or untracked files, so it isn’t lent until clean."
+  },
+  "workflow.slots.state.gone": {
+    "defaultMessage": "Folder missing",
+    "description": "A slot’s state in the list under “Slots and copies”: its folder is gone (Hive recreates it)."
+  },
+  "workflow.slots.state.lent": {
+    "defaultMessage": "In use",
+    "description": "A slot’s state in the list under “Slots and copies”: lent to a card or a lane."
+  },
+  "workflow.slots.state.ready": {
+    "defaultMessage": "Ready",
+    "description": "A slot’s state in the list under “Slots and copies”: free, set up."
+  },
+  "workflow.slots.state.removing": {
+    "defaultMessage": "Being removed",
+    "description": "A slot’s state in the list under “Slots and copies”."
+  },
+  "workflow.slots.useNone": {
+    "defaultMessage": "Set to none",
+    "description": "A button beside a slot setting this project inherits (from the workspace, Hive’s settings or before 1.0): set it to nothing for this project (no script runs, no files are copied)."
+  },
+  "workflow.stage.active": {
+    "defaultMessage": "Active",
+    "description": "A stage of the board (glossary 2.2: Active, was Doing): cards being worked on."
+  },
+  "workflow.stage.approved": {
+    "defaultMessage": "Approved",
+    "description": "A stage of the board (glossary 2.2: Approved, was Passed): cards whose work passed review (or your OK) and isn’t merged yet."
+  },
+  "workflow.stage.done": {
+    "defaultMessage": "Done",
+    "description": "A stage of the board (glossary 2.2: Done): cards whose work is merged, or accepted."
+  },
+  "workflow.stage.hold": {
+    "defaultMessage": "On Hold",
+    "description": "A stage of the board (glossary 2.2: On Hold): parked cards nobody picks up until the user moves them on."
+  },
+  "workflow.stage.merging": {
+    "defaultMessage": "Merging",
+    "description": "A stage of the board inside Approved (glossary 2.2: Merging): cards in Hive's merge queue."
+  },
+  "workflow.stage.review": {
+    "defaultMessage": "Review",
+    "description": "A stage of the board (glossary 2.2: Review): cards waiting for, or in, review."
+  },
+  "workflow.stage.todo": {
+    "defaultMessage": "Todo",
+    "description": "A stage of the board (glossary 2.2: Todo): cards not started."
+  },
+  "workflow.stageName.control": {
+    "defaultMessage": "The name of {stage} has a character that can’t be shown (a line break or a tab).",
+    "description": "Why workflow options cannot be saved: a stage’s name has a control character. {stage} is the stage’s default name (glossary 2.2)."
+  },
+  "workflow.stageName.duplicate": {
+    "defaultMessage": "The name of {stage} is already another stage’s name.",
+    "description": "Why workflow options cannot be saved: two stages would have the same name. {stage} is the default name of the stage renamed (glossary 2.2)."
+  },
+  "workflow.stageName.empty": {
+    "defaultMessage": "The name of {stage} can’t be empty: remove it to use the default name.",
+    "description": "Why workflow options cannot be saved: a stage was given an empty name. {stage} is the stage’s default name (glossary 2.2)."
+  },
+  "workflow.stageName.long": {
+    "defaultMessage": "The name of {stage} is longer than {max, number} characters.",
+    "description": "Why workflow options cannot be saved: a stage’s name is too long. {stage} is the stage’s default name (glossary 2.2), {max} the most characters it takes."
+  },
+  "workflow.summary.git.pair": {
+    "defaultMessage": "A reviewer agent passes each card, then Hive’s merge queue merges it once the checks pass on the merged result.",
+    "description": "What the Pair preset sets up, for a Git project (glossary 2.1: Pair, merge queue)."
+  },
+  "workflow.summary.git.pairAgent": {
+    "defaultMessage": "A reviewer agent passes each card, then its builder merges it and Hive checks the work is in the target.",
+    "description": "What the preset “Pair (the agent merges)” sets up (glossary 2.1: Pair)."
+  },
+  "workflow.summary.git.solo": {
+    "defaultMessage": "Everyone in the project folder, no review: a card is done once it’s committed.",
+    "description": "What the Solo preset sets up, for a Git project (glossary 2.1: Solo)."
+  },
+  "workflow.summary.git.team": {
+    "defaultMessage": "Pair with stricter checks: the unit tests too, a clean install before every merge, and your OK for cards labelled ui or release.",
+    "description": "What the Team preset sets up, for a Git project (glossary 2.1: Team, Pair)."
+  },
+  "workflow.summary.none.pair": {
+    "defaultMessage": "A reviewer agent checks each card, after the quick checks pass.",
+    "description": "What the Pair preset sets up, for a project without version control."
+  },
+  "workflow.summary.none.solo": {
+    "defaultMessage": "No review: a card is done when its builder submits it.",
+    "description": "What the Solo preset sets up, for a project without version control."
+  },
+  "workflow.summary.none.team": {
+    "defaultMessage": "A reviewer agent, then you, check each card, after the quick checks and the tests pass.",
+    "description": "What the Team preset sets up, for a project without version control."
+  },
+  "workflow.unreadable.branch": {
+    "defaultMessage": "the branch checked out in {folder}",
+    "description": "What Hive couldn't read, the object of \"Hive couldn't read …\". {folder} is a folder path."
+  },
+  "workflow.unreadable.branchedOff": {
+    "defaultMessage": "where {a} and {b} branched off",
+    "description": "What Hive couldn't read, the object of \"Hive couldn't read …\": the commit two lines of work have in common. {a} and {b} are commit ids or branch names."
+  },
+  "workflow.unreadable.branchedOffTarget": {
+    "defaultMessage": "where the work branched off its target",
+    "description": "What Hive couldn't read, the object of \"Hive couldn't read …\": the commit the card's work and the branch it merges into have in common."
+  },
+  "workflow.unreadable.cardPathsFiles": {
+    "defaultMessage": "the card's paths: they hold over {n, plural, one {# file} other {# files}}",
+    "description": "What Hive couldn't read, the object of \"Hive couldn't read …\": the files a card names hold too many files. {n} is the limit."
+  },
+  "workflow.unreadable.cardPathsSize": {
+    "defaultMessage": "the card's paths: they hold over {n, number} GB",
+    "description": "What Hive couldn't read, the object of \"Hive couldn't read …\": the files a card names are too large. {n} is a size in gigabytes (GB, of 1024 MB): write the unit as your language does."
+  },
+  "workflow.unreadable.change": {
+    "defaultMessage": "the change from {from} to {to}",
+    "description": "What Hive couldn't read, the object of \"Hive couldn't read …\" (glossary 2.3: change). {from} and {to} are short commit ids."
+  },
+  "workflow.unreadable.changeFingerprint": {
+    "defaultMessage": "the change's fingerprint",
+    "description": "What Hive couldn't read, the object of \"Hive couldn't read …\": what tells a change apart from others (glossary 2.3: change)."
+  },
+  "workflow.unreadable.commitsOf": {
+    "defaultMessage": "the commits of {range}",
+    "description": "What Hive couldn't read, the object of \"Hive couldn't read …\". {range} is a Git range of commits, like a1b2c3d..e4f5a6b."
+  },
+  "workflow.unreadable.commitsOn": {
+    "defaultMessage": "the commits on {target}",
+    "description": "What Hive couldn't read, the object of \"Hive couldn't read …\". {target} is a branch name."
+  },
+  "workflow.unreadable.commitsSince": {
+    "defaultMessage": "the commits of {revision} since {base}",
+    "description": "What Hive couldn't read, the object of \"Hive couldn't read …\". {revision} and {base} are short commit ids."
+  },
+  "workflow.unreadable.contains": {
+    "defaultMessage": "whether {revision} is in {target}",
+    "description": "What Hive couldn't read, the object of \"Hive couldn't read …\". {revision} and {target} are short commit ids."
+  },
+  "workflow.unreadable.defaultBranch": {
+    "defaultMessage": "the default branch of {folder}",
+    "description": "What Hive couldn't read, the object of \"Hive couldn't read …\": the branch work merges into by default. {folder} is a folder path."
+  },
+  "workflow.unreadable.deliverables": {
+    "defaultMessage": "the work in {project}: it has over {n, plural, one {# file} other {# files}}",
+    "description": "What Hive couldn't read, the object of \"Hive couldn't read …\": a project without version control has too many files to read its work. {project} is a project name, {n} the limit."
+  },
+  "workflow.unreadable.files": {
+    "defaultMessage": "the files of {revision}",
+    "description": "What Hive couldn't read, the object of \"Hive couldn't read …\": the files as they are at a revision. {revision} is a commit id or name."
+  },
+  "workflow.unreadable.filesChanged": {
+    "defaultMessage": "the files changed from {from} to {to}",
+    "description": "What Hive couldn't read, the object of \"Hive couldn't read …\". {from} and {to} are short commit ids."
+  },
+  "workflow.unreadable.folderFor": {
+    "defaultMessage": "a folder for {branch}",
+    "description": "What Hive couldn't make, the object of \"Hive couldn't read …\": a working folder (a Git worktree) for a branch. {branch} is its name."
+  },
+  "workflow.unreadable.gitFolder": {
+    "defaultMessage": "the Git folder of {folder}",
+    "description": "What Hive couldn't read, the object of \"Hive couldn't read …\": the repository's .git folder. {folder} is a folder path."
+  },
+  "workflow.unreadable.head": {
+    "defaultMessage": "the latest commit in {where}",
+    "description": "What Hive couldn't read, the object of \"Hive couldn't read …\": the commit checked out in a folder, or at the tip of a branch. {where} is a folder path or a branch name."
+  },
+  "workflow.unreadable.history": {
+    "defaultMessage": "the history of {target}",
+    "description": "What Hive couldn't read, the object of \"Hive couldn't read …\": the commits of a branch. {target} is a branch name."
+  },
+  "workflow.unreadable.holdsChange": {
+    "defaultMessage": "whether {where} holds the change",
+    "description": "What Hive couldn't read, the object of \"Hive couldn't read …\": whether the card's change is already in a commit or branch (glossary 2.3: change). {where} is a short commit id or a branch name."
+  },
+  "workflow.unreadable.ignored": {
+    "defaultMessage": "what Git ignores in {folder}",
+    "description": "What Hive couldn't read, the object of \"Hive couldn't read …\": the files Git is told to leave out. {folder} is a folder path."
+  },
+  "workflow.unreadable.line": {
+    "defaultMessage": "the branch {branch}",
+    "description": "What Hive couldn't read, the object of \"Hive couldn't read …\": a Git branch. {branch} is its name."
+  },
+  "workflow.unreadable.pathOutside": {
+    "defaultMessage": "the path {path}, which is outside the project",
+    "description": "What Hive couldn't read, the object of \"Hive couldn't read …\": a card's path that isn't in its project. {path} is the path."
+  },
+  "workflow.unreadable.replay": {
+    "defaultMessage": "{revision} applied onto {onto}",
+    "description": "What Hive couldn't read, the object of \"Hive couldn't read …\": the result of applying a revision's change onto another commit. {revision} and {onto} are short commit ids."
+  },
+  "workflow.unreadable.replayedFiles": {
+    "defaultMessage": "the files of the change applied again",
+    "description": "What Hive couldn't read, the object of \"Hive couldn't read …\": the result of applying the change again on another commit, to tell whether two revisions are the same change."
+  },
+  "workflow.unreadable.revision": {
+    "defaultMessage": "the revision {revision}",
+    "description": "What Hive couldn't read, the object of \"Hive couldn't read …\" (glossary 2.3: revision). {revision} is a commit id or name."
+  },
+  "workflow.unreadable.revisionIn": {
+    "defaultMessage": "the revision in {folder}",
+    "description": "What Hive couldn't read, the object of \"Hive couldn't read …\": the revision checked out in a folder (glossary 2.3: revision). {folder} is a folder path."
+  },
+  "workflow.unreadable.state": {
+    "defaultMessage": "the state of {folder}",
+    "description": "What Hive couldn't read, the object of \"Hive couldn't read …\": whether a merge or rebase is going on in the folder. {folder} is a folder path."
+  },
+  "workflow.unreadable.target": {
+    "defaultMessage": "the target branch {target}",
+    "description": "What Hive couldn't read, the object of \"Hive couldn't read …\": the branch the work merges into. {target} is its name."
+  },
+  "workflow.unreadable.uncommitted": {
+    "defaultMessage": "the uncommitted changes in {folder}",
+    "description": "What Hive couldn't read, the object of \"Hive couldn't read …\". {folder} is a folder path."
+  },
+  "workflow.unreadable.worktrees": {
+    "defaultMessage": "the worktrees of {folder}",
+    "description": "What Hive couldn't read, the object of \"Hive couldn't read …\": the Git worktrees of a repository. {folder} is its folder path."
+  },
+  "workflow.unreadable.writes": {
+    "defaultMessage": "the files written in {folder}",
+    "description": "What Hive couldn't read, the object of \"Hive couldn't read …\": which files changed in a folder. {folder} is a folder path."
+  },
+  "workflow.value.commitMessage.branch": {
+    "defaultMessage": "The branch’s own, with no card key or trailers",
+    "description": "A value of the workflow option “Commit message” (glossary 2.6, G19): the commit takes the message the branch’s commits have (with several, the first one’s subject and each one’s message), never the card’s key or Hive’s trailers. Trailers: git’s “Key: value” lines at a message’s end."
+  },
+  "workflow.value.commitMessage.hive": {
+    "defaultMessage": "Hive’s: the card’s key and title, with trailers",
+    "description": "A value of the workflow option “Commit message” (glossary 2.6, G19): the commit is titled with the card’s key and title (HI-12: Fix the login) and ends with Hive’s trailers (Hive-Card: HI-12 and others). Trailers: git’s “Key: value” lines at a message’s end."
+  },
+  "workflow.value.finish.agentMerges": {
+    "defaultMessage": "The agent merges, Hive checks",
+    "description": "A value of the workflow option “Who merges” (glossary 2.6, G5)."
+  },
+  "workflow.value.finish.committed": {
+    "defaultMessage": "Committed is done",
+    "description": "A value of the workflow option “Who merges” (glossary 2.6, G5)."
+  },
+  "workflow.value.finish.hiveMerges": {
+    "defaultMessage": "Hive merges",
+    "description": "A value of the workflow option “Who merges” (glossary 2.6, G5)."
+  },
+  "workflow.value.finish.notChecked": {
+    "defaultMessage": "Not checked",
+    "description": "A value of the workflow option “Who merges” (glossary 2.6, G5)."
+  },
+  "workflow.value.folder.project": {
+    "defaultMessage": "Everyone in the project folder",
+    "description": "A value of the workflow option “Where cards are built” (glossary 2.6, G11)."
+  },
+  "workflow.value.folder.slots": {
+    "defaultMessage": "Each card in its own folder",
+    "description": "A value of the workflow option “Where cards are built” (glossary 2.6, G11). The folder is a slot, a worktree Hive lends to the card or its lane (glossary 2.5: slot)."
+  },
+  "workflow.value.mergeInstall.always": {
+    "defaultMessage": "Before every merge",
+    "description": "A value of the workflow option “Install dependencies from scratch”: before each card’s merge checks."
+  },
+  "workflow.value.mergeInstall.onManifestChange": {
+    "defaultMessage": "When the lock file or manifests change",
+    "description": "A value of the workflow option “Install dependencies from scratch”: only when the project’s lock file or package manifests changed (glossary: lock file, as in the G15 value)."
+  },
+  "workflow.value.okBefore.every": {
+    "defaultMessage": "Every card",
+    "description": "A value of the workflow option “Your OK before merging” (glossary 2.6, G10)."
+  },
+  "workflow.value.okBefore.labels": {
+    "defaultMessage": "Cards with these labels",
+    "description": "A value of the workflow option “Your OK before merging” (glossary 2.6, G10)."
+  },
+  "workflow.value.okBefore.never": {
+    "defaultMessage": "Never",
+    "description": "A value of the workflow option “Your OK before merging” (glossary 2.6, G10)."
+  },
+  "workflow.value.review.agent": {
+    "defaultMessage": "A reviewer agent",
+    "description": "A value of the workflow option for review (glossary 2.6, G1 and N1)."
+  },
+  "workflow.value.review.agentThenYou": {
+    "defaultMessage": "A reviewer agent, then you",
+    "description": "A value of the workflow option for review (glossary 2.6, G1 and N1)."
+  },
+  "workflow.value.review.none": {
+    "defaultMessage": "No review",
+    "description": "A value of the workflow option “Work is reviewed before it’s merged” (glossary 2.6, G1)."
+  },
+  "workflow.value.review.noneNone": {
+    "defaultMessage": "No one",
+    "description": "A value of the workflow option “Who checks the work before it’s done”, for a project without version control (glossary 2.6, N1)."
+  },
+  "workflow.value.review.you": {
+    "defaultMessage": "You",
+    "description": "A value of the workflow option for review: you review (glossary 2.6, G1 and N1)."
+  },
+  "workflow.value.reviewerMode.lane": {
+    "defaultMessage": "One per lane",
+    "description": "A value of the workflow option “Reviewers” (glossary 2.6, G17): each lane has its own reviewer agent."
+  },
+  "workflow.value.reviewerMode.pool": {
+    "defaultMessage": "A shared pool",
+    "description": "A value of the workflow option “Reviewers” (glossary 2.6, G17): lanes share a pool of reviewer agents, each card going to the next free one."
+  },
+  "workflow.value.sameness.change": {
+    "defaultMessage": "Same change",
+    "description": "A value of the workflow option “A pass survives a clean rebase” (glossary 2.6, G4)."
+  },
+  "workflow.value.sameness.exact": {
+    "defaultMessage": "Exact revision only",
+    "description": "A value of the workflow option “A pass survives a clean rebase” (glossary 2.6, G4)."
+  },
+  "workflow.value.style.merge": {
+    "defaultMessage": "Merge commit",
+    "description": "A value of the workflow option “Merge style” (glossary 2.6, G6)."
+  },
+  "workflow.value.style.rebase": {
+    "defaultMessage": "Rebase and fast-forward",
+    "description": "A value of the workflow option “Merge style” (glossary 2.6, G6; #1184): Hive’s merge queue rebases the card’s commits onto the target branch and moves the branch forward to them, so the history stays linear, with no merge commit."
+  },
+  "workflow.value.style.squash": {
+    "defaultMessage": "Squash",
+    "description": "A value of the workflow option “Merge style” (glossary 2.6, G6)."
+  },
+  "workflow.why.commitMessage": {
+    "defaultMessage": "Card titles can name people and details a public history shouldn’t keep; choose Hive’s for the card’s key, linking each merge to its card.",
+    "description": "Why the presets set “Commit message” to the branch’s own (HI-1997), and what choosing Hive’s (the card’s key and title, with trailers) gives instead."
+  },
+  "workflow.why.dependenciesDone": {
+    "defaultMessage": "It’s cheap, and no card is built on work that isn’t in yet.",
+    "description": "Why every preset turns on “Cards start only when the cards they wait for are merged” (or done)."
+  },
+  "workflow.why.excluded": {
+    "defaultMessage": "Dependencies and build output aren’t part of what a card delivers.",
+    "description": "Why the presets leave node_modules and .venv out of “What the work is” (no version control)."
+  },
+  "workflow.why.finish": {
+    "defaultMessage": "Merged through Hive’s queue, red work never reaches the target branch; working solo, a card is done once it’s committed.",
+    "description": "Why the presets set “Who merges” as they do (glossary 2.1: merge queue)."
+  },
+  "workflow.why.focusedTests": {
+    "defaultMessage": "Each card’s own tests on the merged result catch what its change breaks there, without running every test for every card.",
+    "description": "Why Team turns on “Each card’s focused tests pass on the merged result” when the project has the command that runs them."
+  },
+  "workflow.why.folder": {
+    "defaultMessage": "Pairs and teams build in parallel, each card apart from the others.",
+    "description": "Why the presets set “Where cards are built” as they do (Solo: the project folder)."
+  },
+  "workflow.why.identity": {
+    "defaultMessage": "Commits name the project’s identity, whoever’s computer made them.",
+    "description": "Why Pair and Team turn on “Commits use the project’s identity”."
+  },
+  "workflow.why.maxAgents": {
+    "defaultMessage": "Each preset is for a team of its size (one agent solo, a builder and a reviewer as a pair), so the Assistant never adds agents you didn’t plan for.",
+    "description": "Why the presets set “Maximum agents” as they do (Solo: 1; Pair: 2; Team: 12)."
+  },
+  "workflow.why.mergeChecks": {
+    "defaultMessage": "The checks run on the work as it will be once merged, not only as it was built.",
+    "description": "Why the presets set “Checks pass on the merged result” when Hive merges."
+  },
+  "workflow.why.mergeInstall": {
+    "defaultMessage": "A clean install before every merge catches a dependency that only worked on the builder’s machine.",
+    "description": "Why Team installs dependencies from scratch before every merge."
+  },
+  "workflow.why.noSelfReview": {
+    "defaultMessage": "A builder never passes its own work.",
+    "description": "Why the presets turn on “Nobody reviews their own work” wherever there is a reviewer."
+  },
+  "workflow.why.okBefore": {
+    "defaultMessage": "Some work needs your eyes before it ships, such as screenshots and release steps.",
+    "description": "Why Team asks for your OK on cards labelled ui or release."
+  },
+  "workflow.why.preChecks": {
+    "defaultMessage": "Cheap checks before review catch most of the rounds that would be lost, and a team adds its tests.",
+    "description": "Why the presets set “Checks pass before review” as they do (Pair: the quick checks; Team: the tests too)."
+  },
+  "workflow.why.pushTarget": {
+    "defaultMessage": "Pushing reaches your remote and its sign-in, so it stays yours unless you turn it on.",
+    "description": "Why the presets leave “Push the target branch after merging” off."
+  },
+  "workflow.why.review": {
+    "defaultMessage": "A pair exists to review: a second agent catches what the builder missed, while working solo you read the card’s work yourself.",
+    "description": "Why the presets set “Work is reviewed before it’s merged” as they do (Solo: no review; Pair and Team: a reviewer agent)."
+  },
+  "workflow.why.reviewerMode": {
+    "defaultMessage": "One reviewer per lane keeps the work with a reviewer who has seen its earlier rounds; a shared pool suits a large team.",
+    "description": "Why Pair and Team set “Reviewers” to One per lane (glossary 2.6, G17; glossary: lane, pool)."
+  },
+  "workflow.why.reviewers": {
+    "defaultMessage": "One reviewer is enough for most work; a second doubles the cost.",
+    "description": "Why the presets set “Reviewers per card” to 1."
+  },
+  "workflow.why.sameness": {
+    "defaultMessage": "A clean rebase doesn’t change what was reviewed, so the pass still counts.",
+    "description": "Why every preset sets “A pass survives a clean rebase” to Same change."
+  },
+  "workflow.why.sharedFolderWarning": {
+    "defaultMessage": "In a shared folder, one agent’s commit can take in another’s half-done files.",
+    "description": "Why Solo turns on “Warn when a commit includes another agent’s files”."
+  },
+  "workflow.why.slotsUpToDate": {
+    "defaultMessage": "Each card starts from the latest work, so no card is built on an old copy of the target branch.",
+    "description": "Why Pair and Team turn on “Slots are brought up to date before each card” (glossary 2.5: slot)."
+  },
+  "workflow.why.stopOwnRuns": {
+    "defaultMessage": "A run left going would keep changing or testing the work under review.",
+    "description": "Why Pair and Team turn on “Agents stop what they started before review”."
+  },
+  "workflow.why.strict": {
+    "defaultMessage": "The merge queue tests the merged result anyway, so this mostly changes the history’s shape.",
+    "description": "Why the presets leave “Work is up to date with its target branch before it merges” off."
+  },
+  "workflow.why.style": {
+    "defaultMessage": "A merge commit keeps each card’s own commits, as Hive has always merged.",
+    "description": "Why the presets set “Merge style” to Merge commit."
+  },
+  "workflow.why.target": {
+    "defaultMessage": "Finished work goes to the repository’s default branch; working solo, to the branch the project is on.",
+    "description": "Why the presets set “Work merges into” as they do."
+  }
+}

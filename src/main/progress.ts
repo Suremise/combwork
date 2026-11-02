@@ -1,5 +1,5 @@
 import { randomUUID } from 'crypto'
-import type { ProgressRun, ProgressSource, ProviderId } from '../shared/types'
+import type { CheckWhyNot, ProgressRun, ProgressSource, ProviderId, RunCheck, TransientCause, TransientFailure } from '../shared/types'
 import { MAX_COMMAND, MAX_ESTIMATE_MS, MAX_LOG_PATH, MAX_OPEN_PER_OWNER, MAX_OPEN_PER_WORKSPACE, MAX_STEP_NAME, MAX_SUMMARY, MAX_TITLE, MAX_TOTAL, RECENT_KEPT, isOpenRun, isOverdue, timeLeft } from '../shared/progress'
 import { PROVIDERS } from '../shared/providers'
 
@@ -15,6 +15,17 @@ export type ProgressCaller =
   | { source: 'agent'; workspacePath: string; projectPath: string; agentId: string; agentName: string; provider: ProviderId | null }
   | { source: 'assistant'; workspacePath: string; agentName: string; provider: ProviderId | null }
   | { source: 'api'; workspacePath: string }
+  /**
+   * Hive's own runs (#1349): its merge queue's checks for a project; `noInstall`, nothing was installed before them;
+   * `installAsWritten`, an install run as written (no clean form of it).
+   */
+  | { source: 'hive'; workspacePath: string; projectPath: string; noInstall?: boolean; installAsWritten?: boolean; slot?: string; copy?: string; reviewer?: CopyHolder }
+
+/** The agent whose lease held a review copy as Hive's run in it started (HI-1710): the run is credited to it. */
+export interface CopyHolder {
+  agentId: string
+  agentName: string
+}
 
 /** Whether reports are taken now, and a number that changes every time that setting changes (off, or on again). */
 export interface ProgressGate {
@@ -75,6 +86,26 @@ export interface ProgressDeps {
 
 const key = (p: string): string => p.toLowerCase()
 
+/** The stored name of Hive's own runs (#1349); the window shows it in its language (`defaultName`). */
+export const HIVE_RUNS = 'Hive (merge queue)' // i18n-ignore: a run's stored name, which agents read too
+/** The stored name of a slot's warming runs (#1429), "Hive (slot slot-b)"; the window shows it in its language. */
+export const slotRunsName = (slot: string): string => `Hive (slot ${slot})` // i18n-ignore: a run's stored name, which agents read too
+/**
+ * The stored name of a review or check copy's warming runs (#1435) when no lease names its agent: one name for the pool
+ * (HI-1710: it was "Hive (copy copy-1)", a filter entry a copy, which the window showed as "copy copy").
+ */
+export const COPIES_RUNS = 'Hive (review copies)' // i18n-ignore: a run's stored name, which agents read too
+/** A copy's name as a kept run may hold it (copies.ts names them so). */
+const COPY_NAME = /^copy-\d{1,4}$/
+/**
+ * Hive's own run's stored name and default name: a slot's; a copy's, credited to the agent whose lease held it
+ * (HI-1710), else the copies'; else the merge queue's.
+ */
+const hiveName = (slot: string | null | undefined, copy: string | null | undefined, holder?: CopyHolder | null): Pick<ProgressRun, 'agentName' | 'defaultName' | 'slot' | 'copy'> =>
+  slot ? { agentName: slotRunsName(slot), defaultName: 'slot', slot } : copy ? (holder ? { agentName: holder.agentName, copy } : { agentName: COPIES_RUNS, defaultName: 'copy', copy }) : { agentName: HIVE_RUNS, defaultName: 'mergeQueue' }
+/** A slot's name as a kept run may hold it (slots.ts names them so). */
+const SLOT_NAME = /^[\w.-]{1,60}$/
+
 /** Optional integer field: undefined when absent, else a whole number in range (400 otherwise). */
 function int(v: unknown, name: string, min: number, max: number): number | undefined {
   if (v === undefined || v === null) return undefined
@@ -93,7 +124,7 @@ function text(v: unknown, name: string, max: number): string | undefined {
 }
 
 const KEPT_STATES = new Set<unknown>(['passed', 'failed', 'stale', 'stopped'])
-const SOURCES = new Set<unknown>(['agent', 'assistant', 'api'])
+const SOURCES = new Set<unknown>(['agent', 'assistant', 'api', 'hive'])
 
 /** A kept text field, cut to its limit, or null when it isn't text. */
 const keptText = (v: unknown, max: number): string | null => (typeof v === 'string' ? text(v, '', max) || null : null)
@@ -120,16 +151,22 @@ export function keptRuns(saved: unknown, workspacePath: string): ProgressRun[] {
     ids.add(id)
     const source = r.source as ProgressSource
     const named = keptText(r.agentName, MAX_TITLE)
+    const slot = source === 'hive' && typeof r.slot === 'string' && SLOT_NAME.test(r.slot) ? r.slot : null
+    const copy = typeof r.copy === 'string' && COPY_NAME.test(r.copy) ? r.copy : null
+    // A copy's warming run credited to its lease's agent (HI-1710): kept with that agent's id and name.
+    const keptHolder = source === 'hive' && copy && !slot ? keptText(r.agentId, 200) : null
+    const holder = keptHolder && named && r.defaultName !== 'copy' && named !== COPIES_RUNS && !named.startsWith('Hive (') ? { agentId: keptHolder, agentName: named } : null
     out.push({
       id,
       workspacePath,
-      projectPath: source === 'agent' ? keptText(r.projectPath, 1000) : null,
-      agentId: source === 'agent' ? keptText(r.agentId, 200) : null,
-      agentName: named ?? (source === 'api' ? 'Script' : 'Agent'), // i18n-ignore: a run's stored name for a script, which agents read too
-      // A script's name is always Hive's (scripts don't name themselves, start()); an agent's only when it has none, or
-      // when Hive's "Agent" was saved with its mark (a nameless run kept before: this file is read again after a save).
-      ...(source === 'api' ? (named === null || named === 'Script' ? { defaultName: 'script' as const } : {}) : named === null || (named === 'Agent' && r.defaultName === 'agent') ? { defaultName: 'agent' as const } : {}),
-      provider: PROVIDERS.some((p) => p.id === r.provider) ? (r.provider as ProviderId) : null,
+      projectPath: source === 'agent' || source === 'hive' ? keptText(r.projectPath, 1000) : null,
+      agentId: source === 'agent' ? keptText(r.agentId, 200) : (holder?.agentId ?? null),
+      agentName: source === 'hive' ? hiveName(slot, copy, holder).agentName : (named ?? (source === 'api' ? 'Script' : 'Agent')), // i18n-ignore: a run's stored name for a script, which agents read too
+      // A script's name is always Hive's (scripts don't name themselves, start()), as is the merge queue's; an agent's
+      // only when it has none, or when Hive's "Agent" was saved with its mark (a nameless run kept before: this file is
+      // read again after a save).
+      ...(source === 'hive' ? hiveName(slot, copy, holder) : source === 'api' ? (named === null || named === 'Script' ? { defaultName: 'script' as const } : {}) : named === null || (named === 'Agent' && r.defaultName === 'agent') ? { defaultName: 'agent' as const } : {}),
+      provider: source !== 'hive' && PROVIDERS.some((p) => p.id === r.provider) ? (r.provider as ProviderId) : null,
       source,
       title,
       command: keptText(r.command, MAX_COMMAND),
@@ -153,10 +190,69 @@ export function keptRuns(saved: unknown, workspacePath: string): ProgressRun[] {
       expectedMs: keptNumber(r.expectedMs),
       exitCode: keptNumber(r.exitCode),
       logPath: keptText(r.logPath, MAX_LOG_PATH),
-      ...(r.titleFromCommand === true ? { titleFromCommand: true as const } : {})
+      ...(r.titleFromCommand === true ? { titleFromCommand: true as const } : {}),
+      ...(source === 'hive' && r.noInstall === true ? { noInstall: true as const } : {}),
+      ...(source === 'hive' && r.installAsWritten === true ? { installAsWritten: true as const } : {}),
+      ...runFor(keptFor(r)),
+      ...(source !== 'hive' && copy ? { copy } : {}),
+      ...keptCounts(r.counts),
+      ...(source === 'hive' ? keptTransient(r.transient) : {})
     })
   }
   return out
+}
+
+/** What a run runs for (#1220): each part only when it has one. */
+export type RunFor = Partial<Record<'revision' | 'testedCheckout' | 'check' | 'folder' | 'copy', string | null>> & { card?: number | null }
+
+/** The fields a run gets for `f`, leaving out what it hasn't. */
+function runFor(f: RunFor): Pick<ProgressRun, 'card' | 'revision' | 'testedCheckout' | 'check' | 'folder' | 'copy'> {
+  return {
+    ...(f.card ? { card: f.card } : {}),
+    ...(f.revision ? { revision: f.revision } : {}),
+    ...(f.testedCheckout ? { testedCheckout: f.testedCheckout } : {}),
+    ...(f.check ? { check: f.check } : {}),
+    ...(f.folder ? { folder: f.folder } : {}),
+    ...(f.copy ? { copy: f.copy } : {})
+  }
+}
+
+const WHY_NOT = new Set<string>(['notCheck', 'notContained', 'dirty', 'changed', 'moved', 'revisionChanged'])
+
+const CAUSES = new Set<string>(['spawn', 'notFound', 'timeout', 'killed', 'exit75', 'network'])
+
+/** Why Hive's own failed run counts as temporary (#1362), checked: a known cause, and a network error code (letters, digits, _). */
+export function keptTransient(v: unknown): Pick<ProgressRun, 'transient'> {
+  if (!v || typeof v !== 'object') return {}
+  const t = v as Record<string, unknown>
+  if (typeof t.cause !== 'string' || !CAUSES.has(t.cause)) return {}
+  const code = typeof t.code === 'string' && /^\w{1,64}$/.test(t.code) ? { code: t.code } : {}
+  return { transient: { cause: t.cause as TransientCause, ...code } satisfies TransientFailure }
+}
+
+/** How a kept run counted as a check (#1222), checked: a check's name, counted or a known reason. */
+function keptCounts(v: unknown): Pick<ProgressRun, 'counts'> {
+  if (!v || typeof v !== 'object') return {}
+  const c = v as Record<string, unknown>
+  const name = keptText(c.name, MAX_TITLE)
+  if (!name || typeof c.counted !== 'boolean') return {}
+  const gate = c.blocks === 'review' ? { blocks: 'review' as const } : {}
+  if (c.counted) return { counts: { name, counted: true, ...gate } }
+  return typeof c.whyNot === 'string' && WHY_NOT.has(c.whyNot) ? { counts: { name, counted: false, whyNot: c.whyNot as CheckWhyNot, ...gate } } : {}
+}
+
+const COMMIT_ID = /^[0-9a-f]{40}(?:[0-9a-f]{24})?$/
+
+/** What a kept run ran for, checked like the rest of the file: a commit id is a full one, a card a whole number. */
+function keptFor(r: Record<string, unknown>): RunFor {
+  const commit = (v: unknown): string | null => (typeof v === 'string' && COMMIT_ID.test(v) ? v : null)
+  return {
+    card: Number.isSafeInteger(r.card) && (r.card as number) > 0 ? (r.card as number) : null,
+    revision: commit(r.revision),
+    testedCheckout: commit(r.testedCheckout),
+    check: typeof r.check === 'string' && /^[\w.:-]{1,60}$/.test(r.check) ? r.check : null,
+    folder: keptText(r.folder, 1000)
+  }
 }
 
 /** A workspace's list (newest first) with at most RECENT_KEPT ended runs: the oldest ended ones go; open ones stay. */
@@ -271,7 +367,8 @@ export class ProgressStore {
     return null
   }
 
-  start(caller: ProgressCaller, body: Record<string, unknown>): ProgressRun {
+  /** `link`: what it runs for (#1220: its card, revision, check and folder), resolved and checked by the caller. */
+  start(caller: ProgressCaller, body: Record<string, unknown>, link: RunFor = {}): ProgressRun {
     // Every field is checked before anything changes.
     const title = text(body.title, 'title', MAX_TITLE)
     if (!title) throw new ProgressError(400, 'title is required') // i18n-ignore: the Agent API's progress replies, which agents and hive-progress read
@@ -292,11 +389,11 @@ export class ProgressStore {
     const run: ProgressRun = {
       id: randomUUID(),
       workspacePath: caller.workspacePath,
-      projectPath: caller.source === 'agent' ? caller.projectPath : null,
-      agentId: caller.source === 'agent' ? caller.agentId : null,
-      agentName: caller.source === 'api' ? 'Script' : caller.agentName, // i18n-ignore: a run's stored name for a script, which agents read too
-      ...(caller.source === 'api' ? { defaultName: 'script' as const } : {}),
-      provider: caller.source === 'api' ? null : caller.provider,
+      projectPath: caller.source === 'agent' || caller.source === 'hive' ? caller.projectPath : null,
+      agentId: caller.source === 'agent' ? caller.agentId : caller.source === 'hive' && caller.copy && !caller.slot && caller.reviewer ? caller.reviewer.agentId : null,
+      agentName: caller.source === 'api' ? 'Script' : caller.source === 'hive' ? hiveName(caller.slot, caller.copy, caller.reviewer).agentName : caller.agentName, // i18n-ignore: a run's stored name for a script, which agents read too
+      ...(caller.source === 'api' ? { defaultName: 'script' as const } : caller.source === 'hive' ? hiveName(caller.slot, caller.copy, caller.reviewer) : {}),
+      provider: caller.source === 'api' || caller.source === 'hive' ? null : caller.provider,
       source: caller.source as ProgressSource,
       title,
       command: command || null,
@@ -321,7 +418,10 @@ export class ProgressStore {
       expectedMs: estimateMs ?? null,
       exitCode: null,
       logPath: null,
-      ...(body.titleFromCommand === true ? { titleFromCommand: true as const } : {})
+      ...(body.titleFromCommand === true ? { titleFromCommand: true as const } : {}),
+      ...(caller.source === 'hive' && caller.noInstall ? { noInstall: true as const } : {}),
+      ...(caller.source === 'hive' && caller.installAsWritten ? { installAsWritten: true as const } : {}),
+      ...runFor(link)
     }
     this.runs.set(key(caller.workspacePath), [run, ...list])
     this.flush(caller.workspacePath, [run.id])
@@ -394,10 +494,21 @@ export class ProgressStore {
     run.seenAt = null
     if (exitCode !== undefined) run.exitCode = exitCode
     if (logPath) run.logPath = logPath
+    // Why Hive's own failed run counts as temporary (#1362): only Hive's runs say it.
+    if (caller.source === 'hive' && run.state === 'failed') Object.assign(run, keptTransient(body.transient))
     if (run.state === 'passed' && run.total !== null) run.step = run.total
     if (run.state === 'failed') this.unseenFailure.add(key(run.workspacePath))
     this.ended(run.workspacePath)
     return run
+  }
+
+  /** How a finished run counted as a check (#1222): kept with it, and the window hears. */
+  noteCheck(workspacePath: string, id: string, c: RunCheck): void {
+    const run = this.runs.get(key(workspacePath))?.find((r) => r.id === id)
+    if (!run || run.finishedAt === null) return
+    run.counts = { ...(c.counted ? { name: c.name, counted: true } : { name: c.name, counted: false, ...(c.whyNot ? { whyNot: c.whyNot } : {}) }), ...(c.blocks ? { blocks: c.blocks } : {}) }
+    this.mark(key(workspacePath), [id])
+    this.ended(workspacePath)
   }
 
   /**
@@ -439,6 +550,8 @@ export class ProgressStore {
           continue
         }
         if (r.state !== 'running') continue
+        // Hive's own runs have no reporter to fall quiet: Hive ends each one itself (its time limit included).
+        if (r.source === 'hive') continue
         const stopped = r.source !== 'api' && !this.deps.ownerRunning(r)
         if (stopped || isOverdue(r, now)) {
           r.state = 'stale'
@@ -518,9 +631,14 @@ export class ProgressStore {
     this.ended(workspacePath)
   }
 
-  /** Whether a caller may change a run: its own agent, the Assistant its own, a script any in its workspace. */
+  /**
+   * Whether a caller may change a run: its own agent, the Assistant its own, a script any in its workspace but Hive's,
+   * and Hive (its merge queue) only its own for that project.
+   */
   private owns(caller: ProgressCaller, r: ProgressRun, forLimit = false): boolean {
     if (key(r.workspacePath) !== key(caller.workspacePath)) return false
+    if (caller.source === 'hive') return r.source === 'hive' && key(r.projectPath ?? '') === key(caller.projectPath)
+    if (r.source === 'hive') return false
     if (caller.source === 'api') return forLimit ? r.source === 'api' : true
     if (caller.source === 'assistant') return r.source === 'assistant'
     return r.source === 'agent' && r.agentId === caller.agentId && key(r.projectPath ?? '') === key(caller.projectPath)

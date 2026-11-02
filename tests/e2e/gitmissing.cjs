@@ -1,6 +1,6 @@
 // Git missing (#346): a test copy whose PATH has no git (through the run context's environment, never the machine's)
-// says so wherever git matters, never "not a git repository": Agent Setup's Git row (Git not found, with the fix and
-// Git for Windows), the status bar, Add Agent's New worktree, the Changes tab, the Merge dialog. Remove All's opt-in deletion keeps the worktree, with the reason. A repository with a worktree agent, made
+// says so wherever git matters, never "not a git repository": Provider Setup's Git row (Git not found, with the fix and
+// Git for Windows), the status bar, the Changes tab, the Merge dialog. Remove All's opt-in deletion keeps the worktree, with the reason. A repository with a worktree agent, made
 // with the suite's own git before Hive starts. Throwaway profile and workspace, quiet; no agent is started.
 const lib = require('./lib.cjs')
 const fs = require('fs')
@@ -60,11 +60,11 @@ function pathWithoutGit() {
   const item = page.locator('.statusbar .status-item.warn', { hasText: 'Git' })
   check('the status bar shows it', !!(await lib.until(async () => (await item.count()) === 1, 10000)))
 
-  // --- Agent Setup: the Git row, both themes.
+  // --- Provider Setup: the Git row, both themes.
   await item.click()
-  const setup = page.locator('.dialog', { hasText: 'Agent Setup' })
+  const setup = page.locator('.dialog', { hasText: 'Provider Setup' })
   const row = setup.locator('.setup-git[data-git="missing"]')
-  check("the status bar item opens Agent Setup, with Git's row", !!(await lib.until(async () => (await row.count()) === 1, 10000)))
+  check("the status bar item opens Provider Setup, with Git's row", !!(await lib.until(async () => (await row.count()) === 1, 10000)))
   const rowText = await row.innerText().catch(() => '')
   check('…"Git not found", the fix and Git for Windows', rowText.includes('Git not found') && rowText.includes('Install Git for Windows') && (await row.locator('button', { hasText: 'Git for Windows' }).count()) === 1, rowText)
   await shot('setup-dark')
@@ -72,30 +72,27 @@ function pathWithoutGit() {
   await shot('setup-light')
   await theme('dark')
   await page.keyboard.press('Escape')
-  check('Escape closes Agent Setup', !!(await lib.until(async () => (await setup.count()) === 0, HUNG_MS)))
+  check('Escape closes Provider Setup', !!(await lib.until(async () => (await setup.count()) === 0, HUNG_MS)))
 
-  // --- Add Agent: New worktree is off, and says why.
+  // --- Add Agent: nothing in it needs git (#1442: no worktree choice), so it opens as usual.
   const info = await inv('agents:gitInfo', repo)
   check('gitInfo: git missing, not "not a repository"', info.isRepo === false && info.gitProblem === MISSING, JSON.stringify(info))
   await page.getByText('repo', { exact: true }).first().click()
   await lib.addMenuRun(page, 'Configure Agent and Add…')
   const add = page.locator('.dialog', { hasText: 'Add an agent' })
   await lib.until(async () => (await add.count()) === 1, 5000)
-  const worktree = add.locator('.choice', { hasText: 'New worktree' })
-  // The dialog asks for the project's git info once it opens: until that answers, the choice shows its usual text (#466).
-  const told = await lib.until(async () => (await worktree.innerText().catch(() => '')).includes(MISSING), 10000)
-  const wtText = await worktree.innerText().catch(() => '')
-  check('Add Agent: New worktree disabled, saying git is missing', !!told && (await worktree.locator('input:disabled').count()) === 1 && wtText.includes(MISSING) && !wtText.includes('Needs a git repository'), wtText)
+  check('Add Agent: no worktree choice to turn off (#1442)', (await add.locator('.choice', { hasText: /New worktree|Existing worktree/ }).count()) === 0 && (await add.locator('[data-where-note]').count()) === 1, await add.innerText())
   await shot('addagent')
   await page.keyboard.press('Escape')
   await lib.until(async () => (await add.count()) === 0, HUNG_MS)
   const refused = await inv('agents:add', repo, { name: 'Nope', provider: 'claude-code', location: 'new-worktree' }).then(() => null, (e) => String(e?.message ?? e))
-  check('adding a worktree agent anyway is refused, saying git is missing', !!refused && refused.includes(MISSING), refused ?? 'added')
+  // 1.0 (#1451) pins no agent to a worktree: refused whether git runs or not.
+  check('adding a worktree agent anyway is refused', !!refused && /pinned to worktrees/.test(refused), refused ?? 'added')
 
   // --- The Changes tab.
   const status = await inv('git:status', repo)
   check('git:status: git missing, not "not a repository"', status.gitProblem === MISSING, JSON.stringify(status))
-  await page.locator('.tab', { hasText: 'Git' }).click()
+  await page.locator('.tab', { hasText: 'Version Control' }).click()
   const view = page.locator('.changes-git-missing')
   check('the Changes tab says git is missing, with the fix', !!(await lib.until(async () => (await view.count()) === 1, 8000)) && (await view.innerText()).includes(MISSING) && (await page.getByText('is not a git repository').count()) === 0, await view.innerText().catch(() => ''))
   await shot('changes-dark')

@@ -23,6 +23,8 @@ const journal = await import('../src/main/journal')
 const service = await import('../src/main/journalService')
 const { assistantStartView } = await import('../src/main/startView')
 const { ClaudeCodeAdapter } = await import('../src/main/providers/claude/adapter')
+const { advanced } = await import('../src/main/advanced')
+const { ASSISTANT_START_VIEW } = await import('../src/shared/advanced')
 
 vi.setConfig({ testTimeout: 30_000 })
 const user = { kind: 'user' } as const
@@ -313,6 +315,19 @@ describe('the state view in a workspace', () => {
     await service.setJournalSettings(w, { enabled: false })
     expect(await run(() => assistantStartView(w, live, 'startup'))).toBeNull()
     await service.setJournalSettings(w, { enabled: true })
+  })
+
+  it("gives nothing with Settings → Advanced's start view off (#1286), and the view again with it on", async () => {
+    const get = advanced.get.bind(advanced)
+    const off = vi.spyOn(advanced, 'get').mockImplementation(((id: string, ws?: Record<string, unknown> | null) => (id === ASSISTANT_START_VIEW ? false : get(id, ws))) as typeof advanced.get)
+    try {
+      expect(await run(() => assistantStartView(w, live, 'startup'))).toBeNull()
+      expect(await run(() => assistantStartView(w, live, 'compact'))).toBeNull()
+    } finally {
+      off.mockRestore()
+    }
+    expect(advanced.get<boolean>(ASSISTANT_START_VIEW)).toBe(true)
+    expect(await run(() => assistantStartView(w, live, 'startup'))).toMatch(/^\[Hive\] Where things stand/)
   })
 
   it("is carried by Claude Code's SessionStart reply", () => {

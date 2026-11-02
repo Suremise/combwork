@@ -5,10 +5,11 @@
 // two worktrees missing, recreating one is refused rather than pruning the other's link. A recorded place that can't be
 // used (a drive that isn't there): made at the agent's default place, its session following it. Dev build, throwaway profile
 // and workspace, the fake Claude Code; quiet.
+// Dev build only (#1580): it starts this checkout's Electron itself, and its agents are 0.9 worktree agents
+// (agents:testLegacy, refused by a packaged build): recreating a 0.9 worktree is what it tests.
 const lib = require('./lib.cjs')
 const { _electron } = require('playwright-core')
 const { execFileSync } = require('child_process')
-const { baseEnv } = require('./runContext.cjs')
 const fs = require('fs')
 const path = require('path')
 const { sessionsOf, putSessions } = require('./storeDocs.cjs')
@@ -18,7 +19,7 @@ const ws = path.join(lib.WORK, 'wtrecreate-ws')
 const proj = path.join(ws, 'gamma')
 const wtRoot = path.join(`${ws}.worktrees`, 'gamma')
 const same = (a, b) => !!a && !!b && path.resolve(a).toLowerCase() === path.resolve(b).toLowerCase()
-const git = (cwd, args) => execFileSync('git', ['-c', 'user.email=t@t', '-c', 'user.name=t', ...args], { cwd, env: baseEnv(), encoding: 'utf8' })
+const git = (cwd, args) => execFileSync('git', ['-c', 'user.email=t@t', '-c', 'user.name=t', ...args], { cwd, env: lib.gitEnv(), encoding: 'utf8' })
 let failed = 0
 const check = (name, ok, extra = '') => {
   if (!ok) failed++
@@ -38,7 +39,7 @@ const check = (name, ok, extra = '') => {
   const inv = (ch, ...a) => page.evaluate(([c, x]) => window.hive.invoke(c, ...x), [ch, a])
   await lib.openWorkspace(inv, page, ws)
   await inv('project:updateConfig', proj, { worktreeSetup: 'echo HIVE-SETUP-RAN' })
-  const add = (name) => inv('agents:add', proj, { location: 'new-worktree', name })
+  const add = (name) => inv('agents:testLegacy', proj, { location: 'new-worktree', name })
   const keeper = await add('Keeper')
   const gone = await add('Gone')
   const p1 = await add('Pair One')

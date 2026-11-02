@@ -1,9 +1,10 @@
-import { execFile } from 'child_process'
 import { existsSync } from 'original-fs'
-import { delimiter, join } from 'path'
+import { delimiter, dirname, join, win32 } from 'path'
 import { gitProblemEnglish, gitStateOf, parseGitVersion, type GitTool } from '../shared/gitTool'
 import { emit } from './events'
-import { createLogger } from './logger'
+import { git } from './git'
+import type { LauncherEnv } from './gitWorker'
+import { createLogger, userText } from './logger'
 
 const log = createLogger('git')
 
@@ -11,10 +12,50 @@ const log = createLogger('git')
  * Whether git itself runs (#346), separate from whether a folder is a repository: `git --version` on Hive's own PATH
  * (a Start-menu launch can have a different PATH from a terminal), kept until checked again. Every git call Hive makes
  * keeps it true: one that can't start git marks it missing at once, and one that runs while it says missing checks
- * again. Not in git.ts, which reports to it.
+ * again. Not in git.ts, which reports to it (and runs its check: the two import each other, used only in calls).
  */
 let current: GitTool = { state: 'unknown' }
 let checking: Promise<GitTool> | null = null
+
+/**
+ * HI-2137: the git Hive starts, and the environment it gets. PATH's `git`, unless that is exactly Git for Windows'
+ * launcher (`<root>\cmd\git.exe`), which starts the real git as a second process: then that real git, started directly
+ * (one process start fewer per git, about 7.6 ms each, HI-2124), in the environment the launcher would have given it
+ * (LauncherEnv), so hooks find the same tools first. Found by checkGit, used by every git Hive starts (the worker, the merge queue's git
+ * host and launcher); one that can't be started any more falls back to PATH's (gitExeGone).
+ */
+export interface GitExe {
+  exe: string
+  launcherEnv?: LauncherEnv
+}
+/** Git from PATH, as Windows finds it. */
+export const PATH_GIT: GitExe = { exe: 'git' }
+let started: GitExe = PATH_GIT
+
+/** The git Hive starts (HI-2137). */
+export function gitExe(): GitExe {
+  return started
+}
+
+/** Where Git for Windows keeps the real git, under its root: `git --exec-path` is `<root>/<this>/libexec/git-core`. */
+const MINGW = ['mingw64', 'clangarm64', 'mingw32']
+/** Git for Windows' launcher: `<root>\cmd\git.exe`. */
+const LAUNCHER = /\\cmd\\git\.exe$/i
+
+/**
+ * HI-2137: the real git behind Git for Windows' launcher, from where PATH's git is (`onPath`) and what it says its
+ * exec-path is: only for the launcher itself (`<root>\cmd\git.exe`) whose exec-path is under the same root, and whose
+ * real git is there. Null for anything else (a wrapper, git.com, another git), which Hive starts from PATH as before.
+ */
+export function realGitBehind(onPath: string | null, execPath: string): GitExe | null {
+  if (!onPath || !LAUNCHER.test(onPath)) return null
+  const root = dirname(dirname(onPath))
+  const at = win32.normalize(execPath.trim())
+  const mingw = MINGW.find((m) => at.toLowerCase() === join(root, m, 'libexec', 'git-core').toLowerCase())
+  if (!mingw) return null
+  const real = join(at, 'git.exe')
+  return existsSync(real) ? { exe: real, launcherEnv: { pathFirst: [join(root, mingw, 'bin'), join(root, 'usr', 'bin')].join(delimiter), msystem: mingw.toUpperCase() } } : null
+}
 
 /** Git as last checked. */
 export function gitTool(): GitTool {
@@ -51,25 +92,63 @@ export function gitOnPath(env: NodeJS.ProcessEnv = process.env): string | null {
   return null
 }
 
-/** Runs `git --version` (one check at a time) and records what it found. */
+/**
+ * Runs `git --version` through `git()`, like every git call Hive makes (SPEC §16.3.1), one check at a time, and records
+ * what it found. HI-2137: PATH's git each time, and the git Hive starts found again with it.
+ */
 export function checkGit(): Promise<GitTool> {
-  checking ??= new Promise<GitTool>((res) => {
-    execFile('git', ['--version'], { windowsHide: true, timeout: 10_000, encoding: 'utf8' }, (err, stdout) => {
-      const path = gitOnPath() ?? undefined
-      const version = parseGitVersion(stdout ?? '')
-      const code = (err as NodeJS.ErrnoException | null)?.code
-      const next: GitTool = version
-        ? { state: gitStateOf(version), version, ...(path ? { path } : {}) }
-        : typeof code === 'string' && code !== 'ETIMEDOUT' && code !== 'ERR_CHILD_PROCESS_STDIO_MAXBUFFER'
-          ? { state: 'missing' }
-          : { state: 'unknown', error: err ? err.message.split(/\r?\n/)[0] : `git --version said "${(stdout ?? '').trim().slice(0, 80)}"` } // i18n-ignore: git's own answer, quoted as git's errors are (it is logged too)
-      set(next)
-      res(next)
-    })
+  checking ??= git(process.cwd(), ['--version'], undefined, undefined, { timeout: 10_000, exe: PATH_GIT.exe }).then(async (r) => {
+    const path = gitOnPath() ?? undefined
+    started = r.ok && parseGitVersion(r.out) ? await realGit(r.out, path ?? null) : PATH_GIT
+    const version = parseGitVersion(r.out)
+    const next: GitTool = version
+      ? { state: gitStateOf(version), version, ...(path ? { path } : {}) }
+      : r.missing
+        ? { state: 'missing' }
+        : { state: 'unknown', error: r.timedOut ? 'git --version took too long' : r.ok ? `git --version said "${r.out.trim().slice(0, 80)}"` : (r.err.split(/\r?\n/)[0] || `exit code ${r.code}`) } // i18n-ignore: git's own answer, quoted as git's errors are (it is logged too)
+    set(next)
+    return next
   }).finally(() => {
     checking = null
   })
   return checking
+}
+
+/** A git command of gitTool's own check, run by `exe`: its output, or null when it failed. */
+type CheckRun = (exe: string, args: string[]) => Promise<string | null>
+const checkRun: CheckRun = async (exe, args) => {
+  const r = await git(process.cwd(), args, undefined, undefined, { timeout: 10_000, exe })
+  return r.ok ? r.out : null
+}
+
+/**
+ * HI-2137: the real git behind PATH's when PATH's (`onPath`) is Git for Windows' launcher and the real one gives the same
+ * `--version` (`said`), else PATH's.
+ */
+export async function realGit(said: string, onPath: string | null, run: CheckRun = checkRun): Promise<GitExe> {
+  if (process.platform !== 'win32' || !onPath || !LAUNCHER.test(onPath)) return PATH_GIT
+  const at = await run(PATH_GIT.exe, ['--exec-path'])
+  const real = at !== null ? realGitBehind(onPath, at) : null
+  if (!real) return PATH_GIT
+  const same = (await run(real.exe, ['--version'])) ?? ''
+  if (same.trim() !== said.trim()) {
+    log.warn(`Git for Windows' git.exe beside its launcher said ${JSON.stringify(same.trim().slice(0, 80))}, not ${JSON.stringify(said.trim())}: Hive starts git through the launcher`)
+    return PATH_GIT
+  }
+  log.info(`Git: starting ${userText(real.exe)} directly, not through its launcher`)
+  return real
+}
+
+/**
+ * HI-2137: from a command that couldn't start the real git it was given, `tried` (git() and the merge queue, each of
+ * which then runs that command once more with PATH's git): when Hive still starts that one (uninstalled, moved), it
+ * starts PATH's from now on and checks git again. A command that found it gone after another did changes nothing here.
+ */
+export function gitExeGone(tried: string): void {
+  if (tried === PATH_GIT.exe || tried !== started.exe) return
+  log.warn(`Git: ${userText(tried)} couldn't be started: starting git from PATH, and checking it again`)
+  started = PATH_GIT
+  void checkGit()
 }
 
 /** From git(): it couldn't start git at all. */
@@ -88,6 +167,7 @@ export function noteGitRan(): void {
 }
 
 /** For tests. */
-export function setGitToolForTests(t: GitTool): void {
+export function setGitToolForTests(t: GitTool, e: GitExe = PATH_GIT): void {
   current = t
+  started = e
 }

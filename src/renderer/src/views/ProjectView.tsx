@@ -1,15 +1,19 @@
 import { Children, useCallback, useEffect, useLayoutEffect, useRef, useState } from 'react'
 import type { ProjectInfo } from '@shared/types'
-import { agentLaunchSettings, defaultProviderWarning, isProviderEnabled, modeOption, providerName } from '@shared/providers'
+import { agentLaunchSettings, isProviderEnabled, modeOption, providerName } from '@shared/providers'
+import { cliReadyOf, connectionCli, firstReadyConnection } from '@shared/connectionLabel'
+import { modeInEffect } from '@shared/cliOwnMode'
 import { agentsToResume, stalledOnSignIn } from '@shared/resumeAll'
 import { batchCounts } from '@shared/startAll'
+import { hooksMissingNote } from '@shared/runtime'
 import { MAIN_TABS, MORE_TABS, tabCommand } from '@shared/projectTabs'
-import { mostUrgent, projectAgentStates, projectStateShort, projectStateSummary } from '@shared/agentState'
+import { allStopped, mostUrgent, projectAgentStates, projectStateShort, projectStateSummary } from '@shared/agentState'
 import { fmt, msg, tr, tRich } from '@shared/i18n'
 import hexUrl from '../assets/icon.svg'
 import * as actions from '../actions'
-import { call } from '../api'
-import { commandKeybinding } from '../commands'
+import { call, errorMessage } from '../api'
+import { needsConnection, NoConnectionBanner, offeredConnections, useConnections } from '../components/ConnectionChoice'
+import { commandKeybinding, runCommand } from '../commands'
 import { AddAgentButton, PANE_FOOTER, PANE_HEADER, PaneChrome, RESUME_TINT, ResumeButton, SessionToolbar, TerminalLayer, usePanes, useWidth } from '../components/AgentPanes'
 import { terminalMinWidth } from '../components/TerminalView'
 import { AgentTiles, TILE_STRIP, useTileStripWidth } from '../components/AgentTiles'
@@ -17,16 +21,18 @@ import { paneColumnsFor, projectSessionView, tileStripRoom } from '@shared/defau
 import { Icon, IconButton, Switch, Tooltip, useContextMenu, useFolds, type MenuEntry } from '../components/ui'
 import { StateMark } from '../components/StateMark'
 import { ProjectAgentsTable, useAgentsText } from '../components/AgentsTable'
-import { agentProviderOf, projectKey, set, setProjectTab, tileFocusOf, useFocusedAgent, useLanguage, useStore, type ProjectTab } from '../store'
+import { agentProviderOf, notify, projectKey, set, setProjectTab, tileFocusOf, useFocusedAgent, useLanguage, useProjectStarting, useStarting, useStore, startingLabel, type ProjectTab } from '../store'
 import { carriesFiles, cx, formatKeybinding } from '../util'
 import { AttachmentsTab, FilesTab } from './FilesTab'
-import { GitTab } from './GitTab'
+import { VersionControl } from './VersionControl'
 import { MemoryTab, OverviewTab, ProjectMcpTab, ProjectSettingsTab, ProjectSkillsTab } from './ProjectTabs'
 import { ProjectTemplatesTab } from '../components/Templates'
 import { PerformanceTab } from './Performance'
+import { ActivityTab } from './ActivityTab'
 import { SessionsTab } from './SessionsTab'
 import { ErrorBoundary } from '../components/ErrorBoundary'
 import { ProjectTasksTab } from '../components/Board'
+import { useStartBlocked } from '../components/BoardUpgrade'
 import { RemovedDataBanner } from '../components/ProjectRemoval'
 
 // The tabs the strip shows, in order, then More ▾ with the others (#1043): the title bar's Project menu has them all,
@@ -35,10 +41,13 @@ const TABS = MAIN_TABS
 
 const M = {
   moreTabs: msg({ id: 'project.tabs.more', defaultMessage: 'More', description: "The last of a project's tabs: opens a menu of its other tabs (Memory, Skills, Templates, MCP). When one of them is open, the button shows its name instead. Keep it short." }),
+  moreSettings: msg({ id: 'project.tabs.moreSettings', defaultMessage: 'Project Settings…', description: "The last item of the project tabs' More ▾ menu, after a separator (HI-1840): opens the project's settings. Keep the …." }),
   moreTip: msg({ id: 'project.tabs.moreTip', defaultMessage: "The project's {tabs}", description: "Tooltip on the project tabs' More ▾ button. {tabs} lists the tabs in its menu, such as Memory, Skills, Templates and MCP." }),
   tabTip: msg({ id: 'project.tabs.tip', defaultMessage: '{tab} ({key})', description: "A project tab's tooltip with its keyboard shortcut. {tab} is the tab's name, {key} the shortcut, such as Alt+4." }),
+  noAccount: msg({ id: 'project.empty.noAccount', defaultMessage: 'No account is on in this workspace — Settings → Accounts & Connections', description: "Warning on the Session tab of a project with no agents (HI-2108): no account (a sign-in or server a coding agent CLI uses) is on in this workspace, so a new agent has no connection to run on. Settings → Accounts & Connections: name it as Settings does." }),
+  noCli: msg({ id: 'project.empty.noCli', defaultMessage: 'No account on here has its coding agent CLI installed — Help → Provider Setup', description: "Warning on the Session tab of a project with no agents (HI-2132): accounts are on in this workspace, but none of their CLIs (Claude Code, Codex…) is installed, so a new agent can't run. Help → Provider Setup is the menu item." }),
   providerOff: msg({ id: 'project.empty.providerOff', defaultMessage: '{provider} is turned off — Settings → Providers', description: "Warning on the Session tab when the agent's provider is turned off. Settings → Providers: name it as Settings does." }),
-  providerMissing: msg({ id: 'project.empty.providerMissing', defaultMessage: '{provider} is required — Help → Agent Setup', description: "Warning on the Session tab when the agent's CLI isn't installed. Help → Agent Setup is the menu item." }),
+  providerMissing: msg({ id: 'project.empty.providerMissing', defaultMessage: '{provider} is required — Help → Provider Setup', description: "Warning on the Session tab when the agent's CLI isn't installed. Help → Provider Setup is the menu item." }),
   sessionEnded: msg({ id: 'project.session.ended', defaultMessage: 'The session has ended. Resume it, or start a new one.', description: "Over an agent's terminal when its session has ended." }),
   resume: msg({ id: 'project.session.resume', defaultMessage: 'Resume', description: 'Button: resumes the last session.' }),
   newSession: msg({ id: 'project.session.new', defaultMessage: 'New Session', description: 'Button: starts a new session (adding an agent first when there is none).' }),
@@ -65,6 +74,7 @@ const M = {
   stopAgent: msg({ id: 'project.header.stopAgent', defaultMessage: 'Stop Agent', description: "The project header's button when one agent is running." }),
   stopMany: msg({ id: 'project.header.stopMany', defaultMessage: 'Stop ({count})', description: "The project header's button: stops every running agent. {count} is how many." }),
   stopTip: msg({ id: 'project.header.stopAllTip', defaultMessage: '{count, plural, one {Stop the running agent} other {Stop all # running agents}}', description: "Tooltip and accessible name of the project header's Stop ({count}) button." }),
+  startFreshIdle: msg({ id: 'project.header.startFreshIdle', defaultMessage: 'Start Fresh (Idle Agents)…', description: "The project header's Agents ▾ menu (#1437): gives each idle running agent a new conversation, after one question listing who will and who won't. The … says it asks first: keep it." }),
   startNew: msg({ id: 'project.header.startNew', defaultMessage: '{many, select, yes {Start New ({count})} other {Start New}}', description: "The project header's Agents ▾ menu: starts a fresh session for each agent. {count} is how many (shown with several agents)." }),
   archiveNew: msg({ id: 'project.header.archiveNew', defaultMessage: '{many, select, yes {Archive and Start New ({count})} other {Archive and Start New}}', description: "The project header's Agents ▾ menu: archives each agent's session and starts a fresh one." }),
   removeAllMenu: msg({ id: 'project.header.removeAllMenu', defaultMessage: '{many, select, yes {Remove All ({count})…} other {Remove Agent…}}', description: "The project header's Agents ▾ menu (or its ⋯ menu when narrow): removes every agent (it asks first)." }),
@@ -79,6 +89,8 @@ const M = {
   terminal: msg({ id: 'project.menu.terminal', defaultMessage: 'Terminal', description: "The project header's ⋯ menu: opens a terminal in the project folder." }),
   projectSettings: msg({ id: 'project.menu.settings', defaultMessage: 'Project Settings', description: "The project header's ⋯ menu." }),
   removeProject: msg({ id: 'project.menu.remove', defaultMessage: 'Remove Project…', description: "The project header's ⋯ menu: removes the project from the workspace (asks first)." }),
+  restartWhenDone: msg({ id: 'project.banner.restartWhenDone', defaultMessage: 'Restart When Its Turn Is Over', description: "Button on the restart banner of an agent running on another connection than the one chosen now (HI-1755): it ends once its turn is over and carries on, on the new connection." }),
+  switchFailed: msg({ id: 'project.banner.switchFailed', defaultMessage: "Couldn't arrange the restart", description: "An error's title: Restart When Its Turn Is Over failed." }),
   restartNeeded: msg({ id: 'project.banner.restartNeeded', defaultMessage: "Skills, MCP servers or settings changed since {many, select, yes {{agent}'s} other {this}} session started. Restart the session to apply them — the conversation continues.", description: "Banner over a running session whose skills, MCP servers or settings changed. {agent} is the focused agent's name (when there are several)." }),
   restart: msg({ id: 'project.banner.restart', defaultMessage: 'Restart session', description: 'Button in that banner.' }),
   unmanagedMcp: msg({ id: 'project.banner.unmanagedMcp', defaultMessage: 'This project defines MCP servers that are not in the workspace: <b>{names}</b>. They stay disabled until copied to the workspace.', description: 'Banner of a project with MCP servers of its own. {names} is their names. <b> is bold.' }),
@@ -183,11 +195,18 @@ function ProjectTabStrip({ project, tab, live }: { project: ProjectInfo; tab: Pr
   const moreTab = MORE_TABS.find((t) => t.id === tab)
   const moreLabel = moreTab ? tr(moreTab.label) : tr(M.moreTabs)
   const moreIcon = moreTab?.icon ?? 'ellipsis'
-  const moreItems = (): MenuEntry[] =>
-    MORE_TABS.map((t) => {
-      const kb = commandKeybinding(tabCommand(t.id))
-      return { label: tr(t.label), icon: t.icon, keybinding: kb ? formatKeybinding(kb) : undefined, onClick: () => setProjectTab(project.path, t.id) }
-    })
+  const moreItems = (): MenuEntry[] => {
+    const settingsKb = commandKeybinding('project.tab.settings')
+    return [
+      ...MORE_TABS.map((t) => {
+        const kb = commandKeybinding(tabCommand(t.id))
+        return { label: tr(t.label), icon: t.icon, keybinding: kb ? formatKeybinding(kb) : undefined, onClick: () => setProjectTab(project.path, t.id) }
+      }),
+      // Then Project Settings (HI-1840): an action, its command's, never one of More ▾'s tabs (so never its label).
+      { separator: true },
+      { label: tr(M.moreSettings), icon: 'settings', keybinding: settingsKb ? formatKeybinding(settingsKb) : undefined, onClick: () => runCommand('project.tab.settings') }
+    ]
+  }
   const fitRef = useRef<TabFit>('labels')
   let fit = fitRef.current
   if (widths && width > 0 && widths.labelled.length === MORE_AT + 1) {
@@ -266,22 +285,44 @@ function SessionEmpty({ project, framed }: { project: ProjectInfo; framed: boole
   const focused = useFocusedAgent(project)
   // Unbound in Keyboard Shortcuts: no key to show.
   const newKey = commandKeybinding('session.new')
-  // With no agent, the provider new agents get: Automatic's follows what's installed, so this re-renders with it.
   const providers = useStore((s) => s.providers)
   const settings = useStore((s) => s.settings)
-  const provider = agentProviderOf(project, focused)
+  const view = useConnections()
+  const offered = !focused && view ? offeredConnections(view, settings) : []
+  // With no agent, the connection a new one gets (decision A: the first usable, its CLI installed); none while Hive is
+  // still looking for a CLI before it.
+  const ready = offered.length ? firstReadyConnection(view, settings, cliReadyOf(providers)) : null
+  // The focused agent's provider, else the new agent's (its connection's CLI; Automatic's pick where none is usable),
+  // and what Hive found of its CLI.
+  const provider = (!focused && connectionCli(view, ready?.id)) || agentProviderOf(focused)
   const info = providers[provider]
   const on = isProviderEnabled(settings, provider)
-  // An agent's own provider by name; with none, only what the project's default needs (#474).
-  const warning = focused
+  // No agent and no account on here (HI-2108): a new agent has no connection to run on. Not for a test copy on a CLI test home.
+  const noAccount = !focused && !!view && !offered.length && !view.testHome.length
+  // Accounts on here but none on an installed CLI: a new agent can't run.
+  const noCli = !!ready && !ready.id && !ready.checking
+  // An agent's own provider by name; with none, what a new agent's connection needs.
+  const warning = noAccount
+    ? tr(M.noAccount)
+    : focused
     ? !on
       ? tr(M.providerOff, { provider: providerName(provider) })
       : info && !info.checking && !info.found
         ? tr(M.providerMissing, { provider: providerName(provider) })
         : null
-    : defaultProviderWarning(project.config, settings, (id) => providers[id])?.text ?? null
+    : noCli
+      ? tr(M.noCli)
+      : null
   const epoch = useStore((s) => (focused ? s.sessionEpoch[projectKey(project.path, focused.id)] : undefined))
   const ended = epoch !== undefined
+  // Its workspace's 1.0 upgrade waits (#1230): no session can start.
+  const startBlocked = useStartBlocked()
+  // From the click until the session runs (#1177): the focused agent's, or with no agent, the one being added.
+  const agentStarting = useStarting(project.path, focused?.id ?? null)
+  const addingStarting = useProjectStarting(project.path)
+  const starting = focused ? agentStarting : addingStarting
+  const resuming = starting?.kind === 'resume'
+  const startingNew = starting?.kind === 'start'
   // An ended session keeps its terminal; the pane shows the Resume bar over it.
   if (ended) return null
   const many = project.agents.length > 1
@@ -291,11 +332,11 @@ function SessionEmpty({ project, framed }: { project: ProjectInfo; framed: boole
         <>
           <Icon name="debug-disconnect" />
           <span className="grow">{tr(M.sessionEnded)}</span>
-          <button className="btn act-resume solid" onClick={() => void actions.resumeLast(project.path)}>
-            <Icon name="debug-continue" /> {tr(M.resume)}
+          <button className="btn act-resume solid" disabled={!!startBlocked || !!starting} aria-busy={resuming || undefined} title={startBlocked ?? undefined} onClick={() => void actions.resumeLast(project.path)}>
+            <Icon name={resuming ? 'loading' : 'debug-continue'} spin={resuming} /> {resuming ? startingLabel(starting) : tr(M.resume)}
           </button>
-          <button className="btn act-start" onClick={() => void actions.newSession(project.path)}>
-            <Icon name="add" /> {tr(M.newSession)}
+          <button className="btn act-start" disabled={!!startBlocked || !!starting} aria-busy={startingNew || undefined} title={startBlocked ?? undefined} onClick={() => void actions.newSession(project.path)}>
+            <Icon name={startingNew ? 'loading' : 'add'} spin={startingNew} /> {startingNew ? startingLabel(starting) : tr(M.newSession)}
           </button>
         </>
       ) : (
@@ -317,8 +358,8 @@ function SessionEmpty({ project, framed }: { project: ProjectInfo; framed: boole
             </p>
           )}
           <div className="btns">
-            <button className="btn act-start solid" onClick={() => void actions.newSession(project.path)}>
-              <Icon name="add" /> {tr(M.newSession)} {newKey && <kbd style={{ marginLeft: 6 }}>{formatKeybinding(newKey)}</kbd>}
+            <button className="btn act-start solid" disabled={!!startBlocked || !!starting} aria-busy={startingNew || undefined} title={startBlocked ?? undefined} onClick={() => void actions.newSession(project.path)}>
+              <Icon name={startingNew ? 'loading' : 'add'} spin={startingNew} /> {startingNew ? startingLabel(starting) : tr(M.newSession)} {newKey && <kbd style={{ marginLeft: 6 }}>{formatKeybinding(newKey)}</kbd>}
             </button>
             {focused ? <ResumeButton project={project} a={focused} className={RESUME_TINT} label={tr(M.resumeLast)} /> : <AddAgentButton project={project} className="tint-amber" />}
             <button className="btn subtle" onClick={() => setProjectTab(project.path, 'sessions')}>
@@ -399,6 +440,8 @@ export function ProjectView({ visible }: { visible: boolean }) {
   const agentsDescription = useAgentsText(project)
   const cards = useStore((s) => s.tasks)
   const startFailures = useStore((s) => s.startFailures)
+  // An agent starting or resuming (#1177): what would start it again waits.
+  const anyStarting = !!useProjectStarting(project?.path ?? '')
 
   if (!workspace) return null
 
@@ -451,16 +494,19 @@ export function ProjectView({ visible }: { visible: boolean }) {
   // Agents ▾ (#974): every agent at once, after one confirmation (#216), Remove All last after a line (#291); with one
   // agent, no count. In ⋯ when cramped.
   const batch: MenuEntry[] = [
-    ...(counts.startNew ? [{ label: tr(M.startNew, { many: yes, count: counts.startNew }), icon: 'add', action: 'start' as const, disabled: startingAll, onClick: () => void actions.startNewAll(project.path) }] : []),
-    ...(counts.archive ? [{ label: tr(M.archiveNew, { many: yes, count: counts.archive }), icon: 'archive', action: 'archive-start' as const, disabled: archivingAll, onClick: () => void actions.startNewAll(project.path, true) }] : []),
+    ...(counts.startNew ? [{ label: tr(M.startNew, { many: yes, count: counts.startNew }), icon: 'add', action: 'start' as const, disabled: startingAll || anyStarting, onClick: () => void actions.startNewAll(project.path) }] : []),
+    // Start Fresh (Idle Agents) (#1437): only the idle running ones, after one question saying who and why not.
+    ...(running.length ? [{ label: tr(M.startFreshIdle), icon: 'refresh', action: 'start' as const, disabled: !!runningActions[`startFreshIdle:${project.path}`] || anyStarting, onClick: () => void actions.startFreshIdle(project.path) }] : []),
+    ...(counts.archive ? [{ label: tr(M.archiveNew, { many: yes, count: counts.archive }), icon: 'archive', action: 'archive-start' as const, disabled: archivingAll || anyStarting, onClick: () => void actions.startNewAll(project.path, true) }] : []),
     ...(project.agents.length
       ? [...(counts.startNew || counts.archive ? [{ separator: true as const }] : []), { label: tr(M.removeAllMenu, { many: yes, count: project.agents.length }), icon: 'trash', action: 'remove' as const, disabled: removingAll, onClick: () => void actions.removeAllAgents(project.path) }]
       : [])
   ]
   const dangerous = settings
     ? project.agents.flatMap((a) => {
-        const l = agentLaunchSettings(a, project.config, settings)
-        const m = modeOption(l.provider, a.live?.permissionMode ?? l.permissionMode)
+        const l = agentLaunchSettings(agentProviderOf(a), a, settings)
+        // The mode in effect: on the CLI's own setting, the one its CLI showed (#1284).
+        const m = modeOption(l.provider, (a.live ? modeInEffect(a.live) : undefined) ?? l.permissionMode)
         return m?.danger ? [many ? tr(M.dangerousMode, { agent: a.name, mode: m.label }) : m.label] : []
       })
     : []
@@ -485,7 +531,8 @@ export function ProjectView({ visible }: { visible: boolean }) {
           {states.length > 0 && (
             <Tooltip content={<ProjectAgentsTable project={project} />} className="agents-tip" focus>
               <span tabIndex={0} aria-description={agentsDescription || undefined} className="badge project-state">
-                <StateMark state={mostUrgent(states)} decorative />
+                {/* Every agent stopped: the stopped mark, grey (HI-1908), as the session toolbar's chip has it. */}
+                <StateMark state={mostUrgent(states)} decorative className={allStopped(project.agents, states) ? 'stopped' : undefined} />
                 <span className="badge-text">{shortState ? projectStateShort(project.agents, states) : projectStateSummary(project.agents, states)}</span>
               </span>
             </Tooltip>
@@ -502,7 +549,7 @@ export function ProjectView({ visible }: { visible: boolean }) {
           )}
           {resumable.length > 0 && !runInMenu && (
             <Tooltip content={resumeTip}>
-              <button className="btn act-resume quiet" disabled={resuming} aria-busy={resuming || undefined} aria-label={resumeTip} onClick={() => void actions.resumeAllAgents(project.path)}>
+              <button className="btn act-resume quiet" disabled={resuming || anyStarting} aria-busy={resuming || undefined} aria-label={resumeTip} onClick={() => void actions.resumeAllAgents(project.path)}>
                 <Icon name={resuming ? 'loading' : 'debug-continue'} spin={resuming} />
                 {!tight && ` ${resuming ? tr(M.resuming) : resumeLabel}`}
                 {tight && resumable.length > 1 && <span className="btn-count">{resumable.length}</span>}
@@ -536,7 +583,7 @@ export function ProjectView({ visible }: { visible: boolean }) {
               menu.open(e, [
                 // At the narrowest (#1051), what folded away, in the header's order: Active, Resume, Stop, Agents ▾'s.
                 ...(activeInMenu ? [{ label: tr(M.active), icon: project.active ? 'check' : undefined, detail: tr(project.active ? M.workingOn : M.notWorkingOn), onClick: () => void actions.setProjectActive(project.path, !project.active) }] : []),
-                ...(runInMenu && resumable.length ? [{ label: resumeTip, icon: 'debug-continue', action: 'resume' as const, disabled: resuming, onClick: () => void actions.resumeAllAgents(project.path) }] : []),
+                ...(runInMenu && resumable.length ? [{ label: resumeTip, icon: 'debug-continue', action: 'resume' as const, disabled: resuming || anyStarting, onClick: () => void actions.resumeAllAgents(project.path) }] : []),
                 ...(runInMenu && running.length ? [{ label: stopTip, icon: 'stop-circle', action: 'stop' as const, onClick: () => void actions.stopAllAgents(project.path) }] : []),
                 ...(activeInMenu ? [{ separator: true as const }] : []),
                 ...(cramped && batch.length ? [...batch, { separator: true as const }] : []),
@@ -552,14 +599,30 @@ export function ProjectView({ visible }: { visible: boolean }) {
         </div>
       </div>
 
+      {/* Its hooks aren't reaching Hive (#1336): its status may be wrong; a restart with working hooks clears it. */}
+      {live?.hooksMissing && (
+        <div className="banner warn hooks-missing">
+          <Icon name="warning" /> {hooksMissingNote(live, tr)}
+          <button className="btn small primary" onClick={() => void restart()}>
+            {tr(M.restart)}
+          </button>
+        </div>
+      )}
       {focusedAgent?.restartNeeded && live && (
         <div className="banner warn">
           <Icon name="refresh" /> {tr(M.restartNeeded, { many: yes, agent: focusedAgent.name })}
           <button className="btn small primary" onClick={() => void restart()}>
             {tr(M.restart)}
           </button>
+          {/* A connection to switch to (HI-1755): once its turn is over, never mid-turn. */}
+          {live.launchedConnection && !live.switchPending && (
+            <button className="btn small" onClick={() => void call('session:switchConnection', project.path, focusedAgent.id).catch((e) => notify('error', tr(M.switchFailed), errorMessage(e)))}>
+              {tr(M.restartWhenDone)}
+            </button>
+          )}
         </div>
       )}
+      <ConnectionSetupBanner project={project} />
       <RemovedDataBanner project={project} />
       {project.unmanagedMcp.length > 0 && (
         <div className="banner warn">
@@ -595,7 +658,8 @@ export function ProjectView({ visible }: { visible: boolean }) {
           {tab === 'sessions' && <SessionsTab project={project} />}
           {tab === 'files' && <FilesTab project={project} />}
           {tab === 'images' && <AttachmentsTab project={project} />}
-          {tab === 'changes' && <GitTab project={project} />}
+          {tab === 'changes' && <VersionControl project={project} />}
+          {tab === 'activity' && <ActivityTab key={project.path} project={project} />}
           {tab === 'memory' && <MemoryTab project={project} />}
           {tab === 'skills' && <ProjectSkillsTab project={project} />}
           {tab === 'templates' && <ProjectTemplatesTab project={project} />}
@@ -609,3 +673,16 @@ export function ProjectView({ visible }: { visible: boolean }) {
   )
 }
 
+/**
+ * Asks for a connection (HI-1755, Darren's 1a): in a project whose agents' CLI has connections but none is on in its
+ * workspace, nothing of that CLI starts (it never falls back to the CLI's own login): Add a Connection opens Settings →
+ * Connections. Not asked for a test copy on its CLI test home.
+ */
+function ConnectionSetupBanner({ project }: { project: ProjectInfo }) {
+  useLanguage()
+  const view = useConnections()
+  const settings = useStore((s) => s.settings)
+  const cli = [...new Set(project.agents.map((a) => agentProviderOf(a)))].find((p) => needsConnection(view, p))
+  if (!cli || !settings) return null
+  return <NoConnectionBanner cli={cli} />
+}

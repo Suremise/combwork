@@ -49,6 +49,17 @@ export function ownSpaces(home: BranchHome): string[] {
 }
 
 /**
+ * The workspace parts that name this place now: the workspace's own, and those Hive numbered from it (ws-2, ws-3:
+ * `chooseSpace`). A part recorded under a name the workspace had before (Scratch-2, now it is Tools) is still the
+ * project's (`ownSpaces`: its branches are its own) but no longer a name for here (#1305).
+ */
+export function currentSpaces(home: BranchHome): string[] {
+  const own = ownSpaces(home)
+  const stem = `${own[0].toLowerCase()}-`
+  return own.filter((s, i) => i === 0 || (s.toLowerCase().startsWith(stem) && /^\d+$/.test(s.slice(stem.length))))
+}
+
+/**
  * The workspace part for this project's new branches in a repository that has `branches` (#703 rounds 2 and 3), and
  * whether it is a new one to record. Git can't make hive/ws/alpha/b1 while a branch hive/ws exists (an agent once
  * called "ws" had it) or hive/ws/alpha does, case aside on Windows: such a part is blocked. Stable once chosen:
@@ -65,7 +76,8 @@ export function chooseSpace(home: BranchHome, branches: readonly string[]): { sp
   const blocked = (s: string): boolean => lower.includes(`hive/${s}`.toLowerCase()) || lower.includes(`hive/${s}/${p}`.toLowerCase())
   const used = (s: string): boolean => lower.some((b) => b.startsWith(`hive/${s}/${p}/`.toLowerCase()))
   const own = ownSpaces(home)
-  const recorded = own.slice(1)
+  // Only the parts that name this place now (#1305): one recorded under the workspace's old name isn't taken again.
+  const recorded = currentSpaces(home).slice(1)
   const last = recorded[recorded.length - 1]
   for (const s of [...(last ? [last] : []), own[0], ...recorded]) if (!blocked(s)) return { space: s, isNew: false }
   const owned = new Set(own.map((s) => s.toLowerCase()))
@@ -81,6 +93,24 @@ export const agentPart = (agent: string): string => refPart(slugify(agent), 'age
 /** The branch Hive makes for an agent's new worktree: hive/<workspace>/<project>/<agent>, in `space` when given. */
 export function hiveBranch(home: BranchHome, agent: string): string {
   return `hive/${home.space ?? workspacePart(home)}/${projectPart(home)}/${agentPart(agent)}`
+}
+
+/**
+ * The name an agent's branch takes here (#1305, Darren's decision on #1303: renamed at Repair, never offered): a branch
+ * in the full form whose workspace part isn't one naming this place now (`currentSpaces`) or whose project part isn't this
+ * project's, named after where the workspace or project was, moves to `home`: its workspace part becomes `home.space`
+ * (the one its new branches take, `chooseSpace`) when it was another, its project part this project's; its agent part,
+ * numbered or not, stays (renaming an agent is its own step). Null when it is already named for here, or isn't Hive's
+ * full form (hive/<agent> from before #703 names no place).
+ */
+export function branchHere(branch: string, home: BranchHome): string | null {
+  const full = /^hive\/([^/]+)\/([^/]+)\/([^/]+)$/.exec(branch)
+  if (!full) return null
+  const spaces = currentSpaces(home)
+  const spaceHere = spaces.some((s) => s.toLowerCase() === full[1].toLowerCase())
+  const projectHere = full[2].toLowerCase() === projectPart(home).toLowerCase()
+  if (spaceHere && projectHere) return null
+  return `hive/${spaceHere ? full[1] : (home.space ?? spaces[0])}/${projectPart(home)}/${full[3]}`
 }
 
 /** The branch Hive made before #703 for an agent of that name, exactly: hive/<its slug> (B--1: hive/b--1). */

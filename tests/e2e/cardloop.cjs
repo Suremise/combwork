@@ -27,6 +27,8 @@ const check = (name, ok, extra = '') => {
 ;(async () => {
   for (const d of [userData, ws, claudeHome]) fs.rmSync(d, { recursive: true, force: true })
   fs.mkdirSync(claudeHome, { recursive: true })
+  // Every read of the agents' input recorded, for typeLine (#1560).
+  lib.logFakeInput(claudeHome)
   lib.gitProject(alpha)
   fs.writeFileSync(path.join(claudeHome, 'fake-trusted.json'), JSON.stringify([alpha.toLowerCase()]))
   lib.enableProviders(userData)
@@ -62,7 +64,7 @@ const check = (name, ok, extra = '') => {
   const card = async (n) => (await inv('tasks:list')).find((c) => c.number === n)
   const wakes = (agent) => {
     const f = path.join(claudeHome, 'fake-wakes.jsonl')
-    return (fs.existsSync(f) ? fs.readFileSync(f, 'utf8').trim().split('\n').filter(Boolean).map((l) => JSON.parse(l)) : []).filter((w) => !agent || w.agent === agent)
+    return (fs.existsSync(f) ? fs.readFileSync(f, 'utf8').trim().split('\n').filter(Boolean).map((l) => JSON.parse(l)) : []).filter((w) => !agent || w.agent === agent).map((w) => ({ ...w, raw: w.text, text: lib.unkey(w.text) }))
   }
   const script = (agent, lines) => fs.writeFileSync(path.join(claudeHome, `fake-wakes-${agent}.txt`), lines.join('\n') + '\n')
   const start = async (id) => {
@@ -79,16 +81,19 @@ const check = (name, ok, extra = '') => {
     if (!typers.has(id)) typers.set(id, lib.fakePrompts(inv, lib.ptyKey(alpha, id), () => live(id), { home: claudeHome }))
     await typers.get(id).type(text)
   }
-  const wait = (n, extra) => `hive hive_wait_for_tasks ${JSON.stringify({ cards: Array.isArray(n) ? n : [n], ...extra, wake: true })}`
+  // Cards as `#N`, their workspace numbers: a plain number reading as another card's key is refused (HI-2197).
+  const wait = (n, extra) => `hive hive_wait_for_tasks ${JSON.stringify({ cards: (Array.isArray(n) ? n : [n]).map((x) => `#${x}`), ...extra, wake: true })}`
 
   await page.getByText('alpha', { exact: true }).first().click()
   const builder = await lib.addAgent(inv, alpha, { name: 'Builder' })
   const reviewer = await lib.addAgent(inv, alpha, { name: 'Reviewer' })
-  const c1 = (await inv('tasks:create', { title: 'First card', project: 'alpha', agent: builder.id })).number
+  const first = await inv('tasks:create', { title: 'First card', project: 'alpha', agent: builder.id })
+  const c1 = first.number
   const c2 = (await inv('tasks:create', { title: 'Second card', project: 'alpha', agent: builder.id })).number
   const built = (n) => `boardmove ${n} doing then ${wait(n, { changes: ['verdict', 'column'], column: 'passed' })} then boardmove ${n} review then boardcomment ${n}`
-  // What each does when woken, in order: c1 passes first time; c2 fails once, then passes.
-  script('Builder', [built(c2), built(c2), 'work 1'])
+  // What each does when woken, in order: c1 passes first time; c2 fails once, then passes. A lane's next card starts once
+  // the one before it is Done (#1270, OP-36; agents' moves are intents, #1268): the builder reports c1 merged first.
+  script('Builder', [`boardmove ${c1} done then ${built(c2)}`, built(c2), 'work 1'])
   script('Reviewer', [
     `boardreview ${c1} start then boardreview ${c1} passed passed then ${wait(c2, { column: 'review' })}`,
     `boardreview ${c2} start then ${wait(c2, { column: 'review', fresh: true })} then boardreview ${c2} failed`,
@@ -96,15 +101,24 @@ const check = (name, ok, extra = '') => {
   ])
   await start(reviewer.id)
   await start(builder.id)
+  // The builder busy on other work first (watching a card of its own): the lane the reviewer's join makes then waits to
+  // start c1, saying why, and the builder registers its lane and starts c1 itself (HI-2029: Hive starts a lane's first
+  // card on its builder once the builder is free).
+  const elsewhere = (await inv('tasks:create', { title: 'Elsewhere', project: 'alpha' })).number
+  await say(builder.id, wait(elsewhere, { column: 'done' }))
+  await until(async () => (await live(builder.id))?.status === 'watching', HUNG_MS)
 
   // The reviewer joins the builder's lane first (#483): Hive makes the lane, which the builder's own start then updates.
   // Then it waits for c1 to arrive in Review: watching, never idle.
   const lane = (body) => `hive hive_lane ${JSON.stringify(body)}`
+  // The project's own Card loops rounds and wait (workflow options since HI-1766): the lane the join makes takes them.
+  await lib.setOwnOptions(inv, alpha, { loopRounds: 7, loopWaitHours: 5 })
   await say(reviewer.id, `${lane({ action: 'join', builder: 'Builder', cards: [c1, c2] })} then ${wait(c1, { column: 'review' })}`)
   const watching = await until(async () => (await live(reviewer.id))?.status === 'watching', HUNG_MS)
   const st = await live(reviewer.id)
-  check('the reviewer is watching: status watching, with what for', !!watching && st?.watch?.label === `Waiting for #${c1} → Review`, JSON.stringify({ status: st?.status, watch: st?.watch }))
-  check('its header says so', !!(await until(async () => (await page.locator('.pane-status.watching', { hasText: `Waiting for #${c1} → Review` }).count()) >= 1, 5000)))
+  check('the reviewer is watching: status watching, with what for', !!watching && st?.watch?.label === `Waiting for ${first.key} → Review`, JSON.stringify({ status: st?.status, watch: st?.watch }))
+  // The window words the watch itself (HI-1679): the card by its key, where the Agent API's label above has its number.
+  check('its header says so', !!(await until(async () => (await page.locator('.pane-status.watching', { hasText: `Waiting for ${first.key} → Review` }).count()) >= 1, 5000)))
   await page.screenshot({ path: path.join(lib.WORK, 'cardloop-watching.png') })
   /** Whether the watching header's ⋯ (Cancel Card Watch is in its menu, #977) is on screen where a click lands on it (not clipped or covered). */
   const cancelHit = (agentName) =>
@@ -126,9 +140,10 @@ const check = (name, ok, extra = '') => {
   await lib.fitWindow(app, page, { width: 1500, height: 900 })
   await lib.sleep(500)
   const activity = await api('GET', `/v1/projects/alpha/agents/Reviewer/activity`)
-  check('the Agent API reports it watching, with the cards', activity.body?.status === 'watching' && activity.body?.watching?.cards?.[0] === c1 && activity.body?.statusMessage === `Waiting for #${c1} → Review`, JSON.stringify(activity.body).slice(0, 200))
+  check('the Agent API reports it watching, with the cards', activity.body?.status === 'watching' && activity.body?.watching?.cards?.[0] === c1 && activity.body?.statusMessage === `Waiting for ${first.key} → Review`, JSON.stringify(activity.body).slice(0, 200))
   // Every status reply says what it waits for: project status, the project list and its short rows.
-  const label = `Waiting for #${c1} → Review`
+  // By its key everywhere (HI-1688): the Agent API's status, the project list and its short rows.
+  const label = `Waiting for ${first.key} → Review`
   const status = (await api('GET', '/v1/projects/alpha')).body?.agents?.find((a) => a.name === 'Reviewer')
   check('project status: watching, statusMessage and the watch', status?.status === 'watching' && status?.statusMessage === label && status?.watching?.cards?.[0] === c1 && status?.watching?.column === 'review', JSON.stringify(status))
   const listed = (await api('GET', '/v1/projects')).body?.find((p) => p.name === 'alpha')?.agents?.find((a) => a.name === 'Reviewer')
@@ -147,7 +162,7 @@ const check = (name, ok, extra = '') => {
     return r
   }
   const dormant = await quitDialog()
-  check('quit dialog: the watcher names its card; no waiting for a card nobody works on', dormant.rows.includes(`#${c1}`) && !dormant.waitOffered, JSON.stringify(dormant))
+  check('quit dialog: the watcher names its card; no waiting for a card nobody works on', dormant.rows.includes(`${first.key}`) && !dormant.waitOffered, JSON.stringify(dormant))
   await inv('tasks:update', c1, { column: 'doing', agent: builder.id })
   check('a card with another agent in Doing keeps quitting waiting', !!(await until(async () => (await quitDialog()).waitOffered, 8000)))
   let closed = false
@@ -170,13 +185,17 @@ const check = (name, ok, extra = '') => {
 
   const joined = (await api('GET', '/v1/lanes')).body?.[0]
   check('the reviewer joining made the lane (#483): the builder, the reviewer, the cards in order', joined?.builder?.name === 'Builder' && joined?.reviewer?.name === 'Reviewer' && joined?.cards?.map((c) => c.number).join() === `${c1},${c2}` && joined?.state === 'active' && joined?.current === c1, JSON.stringify(joined))
+  check('…with the project’s own rounds and wait, as its workflow options resolve (HI-1766)', joined?.rounds === 7 && joined?.waitMinutes === 300, JSON.stringify({ rounds: joined?.rounds, waitMinutes: joined?.waitMinutes }))
+  // Its first card not started while its builder watches other work, and the lane says so (HI-2029).
+  const waitsStart = await until(async () => (await api('GET', '/v1/lanes')).body?.[0]?.status, HUNG_MS)
+  check('…its first card waits to start while the builder watches other work, the lane saying so (HI-2029)', waitsStart?.reason === 'startWait' && waitsStart?.why === 'watching' && waitsStart?.card === c1 && (await card(c1))?.column === 'todo', JSON.stringify({ waitsStart, c1: (await card(c1))?.column }))
   // The builder registers its lane (the same one, now with its rounds and wait), works c1, watching for its verdict
   // before moving it to Review; then the loop runs by itself.
   await say(builder.id, `${lane({ action: 'start', cards: [c1, c2], reviewer: 'Reviewer', rounds: 3, waitMinutes: 240, name: 'two cards' })} then ${built(c1)}`)
   const registered = await until(async () => (await api('GET', '/v1/lanes')).body?.find((l) => l.rounds === 3), HUNG_MS)
   check("the builder's start updated that lane: one lane, its rounds, wait and name", (await api('GET', '/v1/lanes')).body?.length === 1 && registered?.id === joined?.id && registered?.waitMinutes === 240 && registered?.name === 'two cards' && registered?.startedBy === 'Reviewer (alpha)', JSON.stringify(registered))
-  const done = await until(async () => (await card(c1))?.column === 'passed' && (await card(c2))?.column === 'passed', 90000)
-  check('both cards end in Passed (#170)', !!done, JSON.stringify({ c1: (await card(c1))?.column, c2: (await card(c2))?.column }))
+  const done = await until(async () => (await card(c1))?.column === 'done' && (await card(c2))?.column === 'passed', 90000)
+  check('c1 ends in Done (reported merged before c2 began), c2 in Passed (#170)', !!done, JSON.stringify({ c1: (await card(c1))?.column, c2: (await card(c2))?.column }))
   await until(async () => wakes('Builder').length >= 3 && (await live(builder.id))?.status === 'finished', 20000)
   const bw = wakes('Builder').map((w) => w.text)
   const rw = wakes('Reviewer').map((w) => w.text)
@@ -184,21 +203,31 @@ const check = (name, ok, extra = '') => {
   // The reviewer watches the builder's cards: each wake says whose card it is (#143).
   check("the reviewer was woken once per arrival: c1, c2, c2 again, each naming the builder's card", rw.length === 3 && rw[0].includes(`#${c1} (Builder's card) is in Review`) && rw[1].includes(`#${c2} (Builder's card) is in Review`) && rw[2].includes(`#${c2} (Builder's card) is in Review`), JSON.stringify(rw))
   // The builder's own cards: no owner, the reviewer and its verdict named (#143); Passed isn't called unmerged on its own card.
-  check("the builder's wakes name the reviewer's verdict: passed, failed, passed", bw.length === 3 && bw[0].includes(`#${c1} is in Passed: Reviewer (alpha) passed it;`) && bw[1].includes(`#${c2} is in Review: Reviewer (alpha) failed it;`) && bw[2].includes(`#${c2} is in Passed: Reviewer (alpha) passed it;`), JSON.stringify(bw))
+  // A failed card is back in Doing with its builder (HI-1946).
+  check("the builder's wakes name the reviewer's verdict: passed, failed, passed", bw.length === 3 && bw[0].includes(`#${c1} is in Passed: Reviewer (alpha) passed it;`) && bw[1].includes(`#${c2} is in Doing: Reviewer (alpha) failed it;`) && bw[2].includes(`#${c2} is in Passed: Reviewer (alpha) passed it;`), JSON.stringify(bw))
+  check('…naming the card by key alone (#1219, HI-1661)', wakes().some((w) => lib.KEYED.test(w.raw ?? '')), JSON.stringify(wakes().slice(-2).map((w) => w.raw)))
   // A pass is one call (verdict, move to Passed and comment): the wake names that comment, not the builder's before it (#138).
   const passed = 'latest comment by Reviewer (alpha): "Fake review: passed."'
   check("the builder's wakes on a pass name the reviewer's comment from the same call", bw.length === 3 && bw[0].includes(passed) && bw[2].includes(passed), JSON.stringify(bw))
   const h2 = (await card(c2)).history.map((h) => h.what)
   check('c2: failed once, then passed (two rounds)', h2.filter((x) => x === 'Review failed').length === 1 && h2.filter((x) => x === 'Review passed').length === 1, h2.join(' | '))
   check('c1 passed first time', (await card(c1)).history.filter((h) => h.what === 'Review failed').length === 0)
+  // Each move left its facts (#1216), over IPC: c2's start, two submissions, two reviews and their verdicts, its moves.
+  const facts2 = await inv('tasks:facts', c2)
+  const kinds2 = facts2.map((f) => f.kind)
+  const subs2 = facts2.filter((f) => f.kind === 'Submitted')
+  const verdicts2 = facts2.filter((f) => f.kind === 'Verdict')
+  check("c2's facts: Started by the builder, then two submissions (rounds 1, 2), each reviewed and given its verdict", kinds2[0] === 'Started' && facts2[0].data.builder && subs2.length === 2 && subs2.map((f) => f.data.round).join() === '1,2' && kinds2.filter((k) => k === 'ReviewStarted').length === 2 && verdicts2.map((f) => f.data.pass).join() === 'false,true', JSON.stringify(kinds2))
+  check('…each verdict on the submission before it, by the reviewer agent', verdicts2.every((v, i) => v.data.submission === subs2[i].seq && v.actor.startsWith('agent:')), JSON.stringify(verdicts2.map((v) => [v.actor, v.data.submission])))
+  check('…its moves recorded as the agents asked them (intent), ending in Passed (approved)', facts2.filter((f) => f.kind === 'Moved').at(-1)?.data.to === 'approved' && facts2.filter((f) => f.kind === 'Moved').every((f) => f.data.cause === 'intent'), JSON.stringify(facts2.filter((f) => f.kind === 'Moved').map((f) => f.data)))
   const passedAt = (await card(c1)).history.find((h) => h.what === 'Review passed')?.at ?? ''
   const c2Doing = (await card(c2)).history.find((h) => h.what.startsWith('Moved to Doing'))?.at ?? ''
   check('in order: c1 passed before c2 was begun', !!passedAt && !!c2Doing && passedAt < c2Doing, JSON.stringify({ passedAt, c2Doing }))
   const end = await until(async () => (await live(builder.id))?.status === 'finished' && (await live(reviewer.id))?.status === 'finished', 15000)
   check('at the end neither is watching', !!end, JSON.stringify({ b: (await live(builder.id))?.status, r: (await live(reviewer.id))?.status }))
-  // The lane as the window has it: every card passed (c2 in two rounds), still running until they're merged.
+  // The lane as the window has it: c1 Done, c2 passed in two rounds, still running until it is merged.
   const passedLane = (await inv('lanes:list')).find((l) => l.id === joined?.id)
-  check('the lane: both cards Passed, c2 took two rounds, nothing current, still active', passedLane?.state === 'active' && passedLane?.current === null && passedLane?.cards.map((c) => `${c.column}:${c.round}`).join() === 'passed:1,passed:2', JSON.stringify(passedLane))
+  check('the lane: c1 Done, c2 Passed after two rounds, nothing current, still active', passedLane?.state === 'active' && passedLane?.current === null && passedLane?.cards.map((c) => `${c.column}:${c.round}`).join() === 'done:1,passed:2', JSON.stringify(passedLane))
   // Merged (Done): the lane ends by itself and stays listed for now, with when it ended.
   await inv('tasks:update', c1, { column: 'done' })
   await inv('tasks:update', c2, { column: 'done' })
@@ -264,8 +293,10 @@ const check = (name, ok, extra = '') => {
   await until(async () => (await live(third.id))?.status === 'finished', HUNG_MS)
   // Cancel Card Watch in its ⋯ (#977): the watch ends, the status is finished again, and a change wakes nothing. A longer
   // label (three cards) in a narrow pane (three panes, under 340 px each): ⋯ stays clickable, and Cancel is chosen there.
-  await say(third.id, wait([c3, c1, c2], { changes: ['comment'] }))
-  await until(async () => (await live(third.id))?.status === 'watching', HUNG_MS)
+  // Cards not in Done: a watch on one already there answers at once and never watches (HI-2153), as c1 and c2 are now.
+  const open = [(await inv('tasks:create', { title: 'Open one', project: 'alpha' })).number, (await inv('tasks:create', { title: 'Open two', project: 'alpha' })).number]
+  await say(third.id, wait([c3, ...open], { changes: ['comment'] }))
+  check('Third watches three cards', !!(await until(async () => (await live(third.id))?.watch?.cards?.length === 3 && (await live(third.id))?.status === 'watching', HUNG_MS)), JSON.stringify(await live(third.id)))
   await page.keyboard.press('Control+3')
   await lib.sleep(500)
   await app.evaluate(({ BrowserWindow }) => BrowserWindow.getAllWindows()[0]?.webContents.setZoomFactor(1))

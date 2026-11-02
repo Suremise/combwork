@@ -3,17 +3,17 @@
     "defaultMessage": "The panes can't be placed like that in this layout.",
     "description": "An error: saving where the user put the agents' panes in a layout (dragging a pane to another cell) was given a layout or places Hive doesn't know."
   },
+  "worktrees.agent.badWorkflowRole": {
+    "defaultMessage": "A role in the workflow is builder, reviewer, either or generalist.",
+    "description": "An error: an agent's role in the workflow was given as something else. builder, reviewer, either and generalist are values: keep them in English."
+  },
   "worktrees.agent.chooseMove": {
     "defaultMessage": "Choose where to move the agent.",
     "description": "An error: an agent was to be moved in the project's order, with no place given."
   },
-  "worktrees.agent.chooseTree": {
-    "defaultMessage": "Choose a worktree.",
-    "description": "An error: a new agent was to work in an existing worktree, and none was chosen."
-  },
-  "worktrees.agent.detached": {
-    "defaultMessage": "That worktree is not on a branch (detached HEAD).",
-    "description": "An error: the worktree chosen for a new agent has no branch checked out. detached HEAD is git's term."
+  "worktrees.agent.effortRefused": {
+    "defaultMessage": "{chosen, select, yes {{model}} other {The CLI's default model}} doesn't take {effort} effort. Choose one of the levels it takes.",
+    "description": "An error saving an agent's (or a connection's) settings (HI-2106): the model that would run (its name, {model}, when one is chosen; else the CLI's own default) has no such reasoning effort level ({effort}: \"max\")."
   },
   "worktrees.agent.enterName": {
     "defaultMessage": "Enter a name.",
@@ -27,25 +27,17 @@
     "defaultMessage": "There is already an agent called \"{name}\".",
     "description": "An error: the project already has an agent with the name {name}."
   },
-  "worktrees.agent.noBase": {
-    "defaultMessage": "The project folder is not on a branch. Choose the branch to start from.",
-    "description": "An error: a new agent's worktree needs a branch to start from, and the project folder has none checked out."
-  },
-  "worktrees.agent.noGitForTree": {
-    "defaultMessage": "{problem}, so Hive can't make a worktree.",
-    "description": "An error: a new agent's worktree can't be made because git can't run ({problem} says why)."
-  },
-  "worktrees.agent.noGitToCheck": {
-    "defaultMessage": "{problem}, so Hive can't check that worktree.",
-    "description": "An error: the worktree chosen for a new agent can't be checked because git can't run ({problem} says why)."
-  },
   "worktrees.agent.noTree": {
     "defaultMessage": "This agent works in the project folder, not a worktree.",
     "description": "An error: something only a worktree agent has (its branch's state, a merge) was asked of an agent working in the project folder."
   },
-  "worktrees.agent.notATree": {
-    "defaultMessage": "That folder is not a worktree of this project.",
-    "description": "An error: the folder chosen for a new agent to work in isn't one of the project's git worktrees."
+  "worktrees.agent.notPinned": {
+    "defaultMessage": "Agents aren’t pinned to worktrees in 1.0: slots are lent per card or lane.",
+    "description": "An error: an agent was to be added in a worktree of its own (a new or an existing one), which 1.0 doesn't do: Hive lends a working folder (a slot) to each card or lane instead (glossary 2.5: slot, lane)."
+  },
+  "worktrees.agent.providerChangedMeanwhile": {
+    "defaultMessage": "{agent}'s provider was changed meanwhile: nothing was changed. Try again.",
+    "description": "An error saving an agent's settings (HI-1771): its provider (coding agent CLI) was changed by something else while this change was being saved, so nothing was saved. {agent} is its name."
   },
   "worktrees.agent.removing": {
     "defaultMessage": "That worktree is already being removed or merged.",
@@ -70,10 +62,6 @@
   "worktrees.agent.stopToRemove": {
     "defaultMessage": "Stop the agent before removing it.",
     "description": "An error: a running agent can't be removed."
-  },
-  "worktrees.agent.treeRemoved": {
-    "defaultMessage": "That worktree is being removed, or was just removed.",
-    "description": "An error: the worktree a new agent was to work in is being removed, or was removed while it was being added."
   },
   "worktrees.agent.treeShared": {
     "defaultMessage": "another agent works in it",
@@ -115,13 +103,21 @@
     "defaultMessage": "Git couldn't check the worktree for uncommitted changes (git status failed in {folder}). Fix it, then merge again.",
     "description": "Why nothing was merged: git couldn't say what is uncommitted in the worktree's folder {folder}."
   },
-  "worktrees.merge.commitFailed": {
-    "defaultMessage": "Could not commit the agent's changes: {why}",
-    "description": "Why nothing was merged: the worktree's uncommitted changes couldn't be committed first. {why} is git's message."
+  "worktrees.merge.caseAlias": {
+    "defaultMessage": "The branches {branch} and {other} differ only in case, which Windows can't tell apart, so nothing was merged. Rename one of them, then merge.",
+    "description": "Why nothing was merged: two branches ({branch}, {other}) have names that differ only in upper and lower case, and Windows treats them as one."
   },
   "worktrees.merge.detached": {
     "defaultMessage": "The project folder is not on a branch (detached HEAD). Check out the branch to merge into first.",
     "description": "Why nothing was merged: the project folder has no branch checked out. detached HEAD is git's term."
+  },
+  "worktrees.merge.intoItself": {
+    "defaultMessage": "{branch} can't be merged into itself.",
+    "description": "Why nothing was merged: the branch to merge into is the worktree's own branch {branch}."
+  },
+  "worktrees.merge.noTarget": {
+    "defaultMessage": "There is no branch {branch} to merge into.",
+    "description": "Why nothing was merged: the branch to merge into ({branch}) does not exist."
   },
   "worktrees.merge.notRemoved": {
     "defaultMessage": "Merged, but the worktree was not removed",
@@ -129,7 +125,7 @@
   },
   "worktrees.merge.nothing": {
     "defaultMessage": "Nothing was merged: {why}.",
-    "description": "Why nothing was merged: git couldn't read the project folder's branch. {why} says why."
+    "description": "Why nothing was merged: git couldn't read the project folder's branch, or failed while merging. {why} says why (git's message)."
   },
   "worktrees.merge.sameBranch": {
     "defaultMessage": "The project folder has {branch} checked out.",
@@ -138,6 +134,18 @@
   "worktrees.merge.staged": {
     "defaultMessage": "The project folder has staged changes. Commit or unstage them before merging.",
     "description": "Why nothing was merged: changes are staged (git add) in the project folder."
+  },
+  "worktrees.merge.targetElsewhere": {
+    "defaultMessage": "{branch} is checked out in {folder}. Merge there, or check out another branch in that folder first.",
+    "description": "Why nothing was merged: the branch to merge into ({branch}) is checked out in another folder ({folder}) than the project folder."
+  },
+  "worktrees.merge.targetMoved": {
+    "defaultMessage": "{branch} changed while Hive was merging into it. Nothing was merged: merge again.",
+    "description": "Why nothing was merged: the branch merged into ({branch}) moved on meanwhile (another merge or commit)."
+  },
+  "worktrees.merge.uncommitted": {
+    "defaultMessage": "Nothing was merged: {files, plural, one {# file in the worktree isn't committed} other {# files in the worktree aren't committed}}. Commit or stash {files, plural, one {it} other {them}} in the worktree, then merge.",
+    "description": "Why nothing was merged: the worktree has uncommitted files ({files}: how many). Hive merges only committed work; stash is git's word (git stash)."
   },
   "worktrees.merge.unknownFiles": {
     "defaultMessage": "(unknown files)",
@@ -154,6 +162,10 @@
   "worktrees.missing.noTree": {
     "defaultMessage": "{agent} doesn't work in a worktree.",
     "description": "An error: the agent {agent} (its name) works in the project folder, so it has no worktree to recreate or unlink."
+  },
+  "worktrees.missing.slotFailed": {
+    "defaultMessage": "Slot {slot} of agent {agent} couldn't be made again: {why}",
+    "description": "An error: a slot lent to the agent {agent} (its name), whose folder was gone, couldn't be made again ({slot}: the slot's name; {why}: why, often git's message in English). A noun before the name (glossary §1 rule 4)."
   },
   "worktrees.missing.stillListed": {
     "defaultMessage": "git still lists {folder} as a worktree (it may be locked): unlock it, or run git worktree prune, then try again.",
@@ -203,25 +215,9 @@
     "defaultMessage": "git couldn't read origin/HEAD ({why})",
     "description": "An error: git couldn't read which branch is the remote's main branch (origin/HEAD, git's name: keep it); {why} is git's reason."
   },
-  "worktrees.reuse.beingRemoved": {
-    "defaultMessage": "it is being removed or merged",
-    "description": "Why an unused worktree isn't reused for a new agent: it is being removed or merged right now. A clause, lower case."
-  },
   "worktrees.reuse.cantCheck": {
     "defaultMessage": "git couldn't check it against {base}",
     "description": "Why an unused worktree isn't reused for a new agent: git couldn't check whether it is merged into the branch {base}. A clause, lower case."
-  },
-  "worktrees.reuse.gitBusy": {
-    "defaultMessage": "git is busy in it",
-    "description": "Why an unused worktree isn't reused for a new agent: git is working in it (a lock file). A clause, lower case."
-  },
-  "worktrees.reuse.inUse": {
-    "defaultMessage": "a program is using it",
-    "description": "Why an unused worktree isn't reused for a new agent: a program has it open (Windows won't let it be moved). A clause, lower case."
-  },
-  "worktrees.reuse.movedAside": {
-    "defaultMessage": "Hive moved {folder} aside to check it and couldn't move it back: it is at {aside}.",
-    "description": "An error: to check nothing used an unused worktree, Hive renamed its folder {folder} and couldn't rename it back; it is now at {aside}."
   },
   "worktrees.reuse.notChecked": {
     "defaultMessage": "not checked",
@@ -231,21 +227,9 @@
     "defaultMessage": "{n, plural, one {# commit} other {# commits}} not merged into {base}",
     "description": "Why an unused worktree isn't reused for a new agent: commits on its branch that the branch {base} doesn't have. A clause, lower case; it may be joined with the uncommitted files in a list."
   },
-  "worktrees.reuse.resetFailed": {
-    "defaultMessage": "git couldn't bring it up to {base} ({why})",
-    "description": "Why an unused worktree isn't reused for a new agent: git couldn't move it to the branch {base}; {why} is git's message. A clause, lower case."
-  },
-  "worktrees.reuse.taken": {
-    "defaultMessage": "another agent is taking it",
-    "description": "Why an unused worktree isn't reused for a new agent: another agent being added is taking it. A clause, lower case."
-  },
   "worktrees.reuse.uncommitted": {
     "defaultMessage": "{n, plural, one {# uncommitted file} other {# uncommitted files}}",
     "description": "Why an unused worktree isn't reused for a new agent: files changed in it and not committed. A clause, lower case; it may be joined with the unmerged commits in a list."
-  },
-  "worktrees.reuse.unreadable": {
-    "defaultMessage": "git couldn't read it",
-    "description": "Why an unused worktree isn't reused for a new agent: git couldn't read where its locks are. A clause, lower case."
   },
   "worktrees.statusFailed": {
     "defaultMessage": "git status failed in its folder",

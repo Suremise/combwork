@@ -1,4 +1,4 @@
-import { Children, useCallback, useEffect, useMemo, useRef, useState } from 'react'
+import { Children, useCallback, useEffect, useId, useMemo, useRef, useState } from 'react'
 import type { AttachmentContent, FileEntry, ProjectInfo, SessionAttachment, SessionAttachmentGroup } from '@shared/types'
 import { ATTACHMENT_KIND_ICON, ATTACHMENT_KINDS, attachmentLabel, type AttachmentKind } from '@shared/attachments'
 import { providerDescriptor } from '@shared/providers'
@@ -11,8 +11,12 @@ import { discardDrafts, draftsUnder, FILES_TEXT, FileView, hasDraft, moveDrafts,
 import { PaneResizer, usePaneSize } from '../components/Resizer'
 import { pasteIntoTerminal } from '../components/TerminalView'
 import { Icon, IconButton, InfoTip, LoadFailed, Modal, SearchInput, StaleNote, Tooltip, useContextMenu, type MenuEntry } from '../components/ui'
-import { confirm, filesListeners, focusedAgentId, get, notify, openInSessionsTab, projectKey, set, setProjectTab, showAgent, useDateStyle, useStore } from '../store'
+import { cardLabelOf, chooseTab, confirm, filesListeners, useRememberedTab, focusedAgentId, get, notify, openInSessionsTab, projectKey, set, setProjectTab, showAgent, useDateStyle, useStore } from '../store'
+import { attachToCardMenu, CARD_ATTACH_TEXT, CardAttachmentSection, removeCardAttachmentAsked, shownCardGroups, useProjectCardAttachments } from '../components/CardAttachments'
+import type { CardAttachment } from '@shared/cardAttachments'
+import { TabPanel, Tabs } from '../components/Tabs'
 import { useScopedLoad } from '../scopedLoad'
+import { agentFolder, awayFromProject, legacyOf, placeText } from '../agentPlace'
 import { cx, formatBytes, formatKeybinding, HIVE_FILES_MIME, IMAGE_EXT, imageUrl, quotePath, timeAgo } from '../util'
 
 const parentOf = (rel: string): string => (rel.includes('/') ? rel.slice(0, rel.lastIndexOf('/')) : '')
@@ -25,8 +29,10 @@ const faint = (chunks: React.ReactNode[]): React.ReactNode => <span className="f
 const rich = (m: Msg, values: Parameters<typeof tRich<React.ReactNode>>[1]): React.ReactNode[] => Children.toArray(tRich<React.ReactNode>(m, values))
 
 const M = {
-  rootTip: msg({ id: 'files.root.tip', defaultMessage: 'Show the project folder, or the worktree a worktree agent works in', description: "Tooltip on the Files tab's folder picker, shown when agents work in worktrees." }),
+  attachToCard: msg({ id: 'files.attach.toCard', defaultMessage: 'Attach to a card', description: "A session attachment's menu entry in the Attachments tab (HI-1700): opens a menu of the project's cards, to copy the file to one." }),
+  rootTip: msg({ id: 'files.root.tip', defaultMessage: 'Show the project folder, or the folder an agent works in: its slot or worktree', description: "Tooltip on the Files tab's folder picker, shown when agents work outside the project folder (in slots, Hive's worktrees lent to cards, or their own worktrees from before 1.0)." }),
   projectFolder: msg({ id: 'files.root.projectFolder', defaultMessage: 'Project folder', description: "The Files tab's folder picker: the project's own folder." }),
+  agentPlace: msg({ id: 'files.root.place', defaultMessage: '{agent} · {place}', description: "The Files tab's folder picker: the folder an agent works in. {agent} is the agent's name, {place} where (agents.place.short: \"in slot-b\", \"carried: hb2\", \"home: hr4\")." }),
   agentWorktree: msg({ id: 'files.root.worktree', defaultMessage: "{agent}'s worktree · {branch}", description: "The Files tab's folder picker: a worktree agent's folder. {agent} is the agent's name, {branch} its git branch." }),
   gitStatus: msg({ id: 'files.git.status', defaultMessage: '{status, select, M {Modified} A {Added} D {Deleted} R {Renamed} U {Untracked} C {Copied} other {{status}}}', description: "A file's git status in the Files tab's details, after its letter. Translate the words, not the letters that pick them." }),
   gitInFolder: msg({ id: 'files.git.inFolder', defaultMessage: '{status} (contains changes)', description: "A folder's git status in the Files tab's details: {status} is the first change inside it, such as Modified." }),
@@ -111,7 +117,15 @@ const M = {
   total: msg({ id: 'files.attachments.total', defaultMessage: '{host, select, assistant {{total, number} in {groups, plural, one {# conversation} other {# conversations}}} other {{total, number} in {groups, plural, one {# session} other {# sessions}}}}', description: 'Beside the Attachments heading: how many attachments, in how many sessions (conversations for the Hive Assistant).' }),
   openFolder: msg({ id: 'files.attachments.openFolder', defaultMessage: 'Open Attachments Folder', description: "Tooltip on the button that opens the attachments' folder in File Explorer." }),
   descAssistant: msg({ id: 'files.attachments.descAssistant', defaultMessage: 'Files pasted or dropped into the Assistant, by conversation.', description: "Under the Hive Assistant's Attachments heading." }),
-  desc: msg({ id: 'files.attachments.desc', defaultMessage: "Files pasted or dropped into this project's agents' sessions, by session.", description: "Under a project's Attachments heading." }),
+  desc: msg({ id: 'files.attachments.desc', defaultMessage: "Files kept with this project's cards, and files pasted or dropped into its agents' sessions.", description: "Under a project's Attachments heading (HI-1700: cards' files, then sessions')." }),
+  totalWithCards: msg({ id: 'files.attachments.totalWithCards', defaultMessage: '{total, plural, one {# file} other {# files}} · {cards, number} on cards, {sessions, number} in {groups, plural, one {# session} other {# sessions}}', description: "Beside a project's Attachments heading when its cards keep files too (HI-1700): how many files in all, how many on cards, and how many in how many sessions." }),
+  sessionsKept: msg({ id: 'files.attachments.sessionsKept', defaultMessage: 'Kept with their session: Clean Up and Purge can remove them with it.', description: "Atop a project's Attachments tab's Pane attachments (HI-1700, HI-1841): the files pasted or dropped into sessions." }),
+  tabs: msg({ id: 'files.attachments.tabs', defaultMessage: 'Attachments', description: "Accessible name of a project's Attachments tab's two tabs (HI-1841): Pane attachments and Card attachments." }),
+  paneTab: msg({ id: 'files.attachments.paneTab', defaultMessage: 'Pane attachments', description: "A tab of a project's Attachments tab (HI-1841): the files pasted or dropped into its agents' panes (sessions), by conversation." }),
+  cardTab: msg({ id: 'files.attachments.cardTab', defaultMessage: 'Card attachments', description: "A tab of a project's Attachments tab (HI-1841): the files kept with the project's cards, by card." }),
+  paneEmpty: msg({ id: 'files.attachments.paneEmpty', defaultMessage: 'Nothing pasted or dropped into a pane yet.', description: "Pane attachments (a tab of a project's Attachments tab, HI-1841) with no files." }),
+  cardEmpty: msg({ id: 'files.attachments.cardEmpty', defaultMessage: "No files kept with this project's cards yet. Paste or drop files into a card's description or a comment.", description: "Card attachments (a tab of a project's Attachments tab, HI-1841) with no files." }),
+  cardFailed: msg({ id: 'files.attachments.cardFailed', defaultMessage: "The cards' attachments couldn't be read.", description: "Card attachments (a tab of a project's Attachments tab, HI-1841) when reading them failed." }),
   show: msg({ id: 'files.attachments.filters', defaultMessage: 'Show', description: "Accessible name of the Attachments tab's filter buttons (All, Images, PDFs…)." }),
   all: msg({ id: 'files.attachments.all', defaultMessage: 'All', description: 'Attachments filter: every kind. Followed by a count.' }),
   archivedHeading: msg({ id: 'files.attachments.archived', defaultMessage: '{host, select, assistant {Archived conversations} other {Archived sessions}}', description: "Heading over the archived sessions' attachments." }),
@@ -123,7 +137,9 @@ const M = {
   newer: msg({ id: 'files.viewer.newer', defaultMessage: 'Newer (←)', description: "Tooltip on the attachment viewer's left arrow. Keep the arrow." }),
   older: msg({ id: 'files.viewer.older', defaultMessage: 'Older (→)', description: "Tooltip on the attachment viewer's right arrow. Keep the arrow." }),
   readFailed: msg({ id: 'files.viewer.readFailed', defaultMessage: "Couldn't read it: {error}", description: "The attachment viewer when the file can't be read. {error} is why (from Windows, may be English)." }),
-  noPreview: msg({ id: 'files.viewer.noPreview', defaultMessage: 'No preview for this kind of file. Reveal it, or insert it into a session.', description: 'The attachment viewer for a file it cannot show. Reveal and Insert into Session are its buttons.' }),
+  noPreview: msg({ id: 'files.viewer.noPreview', defaultMessage: 'No preview for this kind of file. Show it in its folder, or insert it into a session.', description: 'The attachment viewer for a file it cannot show. Show in Folder and Insert into Session are its buttons (the second only while an agent runs).' }),
+  openInApp: msg({ id: 'files.viewer.openInApp', defaultMessage: 'Open in Its App', description: "A button in the attachment viewer (HI-1958), for an image or a PDF only: opens it in the program Windows opens that kind of file with (its photo viewer, its PDF reader), for zooming, printing and the like. Other kinds of file are never opened (nothing attached is ever run): they get Show in Folder instead." }),
+  removeFromCard: msg({ id: 'files.viewer.removeFromCard', defaultMessage: 'Remove from Card', description: "A button in the attachment viewer for a card's attachment (HI-1958): takes the file off its card (to the Recycle Bin), after asking. A session's attachment has Delete there instead." }),
   tooLarge: msg({ id: 'files.viewer.tooLarge', defaultMessage: 'Too large to preview here. Reveal it to open it in another program.', description: 'The attachment viewer for a file too large to show.' })
 }
 
@@ -163,8 +179,8 @@ async function insertIntoSession(project: ProjectInfo, paths: string[]): Promise
 }
 
 /**
- * A project as a tab sees it: the folder shown (the project folder, or a worktree agent's worktree)
- * and, as `live`, the session that Insert into Session pastes into — the worktree's agent, else the
+ * A project as a tab sees it: the folder shown (the project folder, or the folder an agent works in: its slot, home or
+ * 0.9 worktree, #1442) and, as `live`, the session that Insert into Session pastes into — that folder's agent, else the
  * focused agent if it works in the project folder, else the first agent (none in a project without agents).
  */
 type ViewProject = ProjectInfo & { target?: { path: string; agentId: string | null } }
@@ -174,16 +190,16 @@ function sessionTarget(p: ViewProject): { path: string; agentId: string | null }
 }
 
 export function projectView(project: ProjectInfo, rootAgent?: string): ViewProject {
-  const wt = project.agents.find((a) => a.id === rootAgent && a.worktree)
-  if (wt) return { ...project, path: wt.worktree!.path, branch: wt.worktree!.branch, live: wt.live, target: { path: project.path, agentId: wt.id } }
+  const away = project.agents.find((a) => a.id === rootAgent && awayFromProject(a))
+  if (away) return { ...project, path: agentFolder(away), branch: away.place.branch ?? project.branch, live: away.live, target: { path: project.path, agentId: away.id } }
   const focused = project.agents.find((a) => a.id === focusedAgentId(project))
-  const agent = focused && !focused.worktree ? focused : project.agents[0]
+  const agent = focused && !awayFromProject(focused) ? focused : project.agents[0]
   return { ...project, live: agent?.live ?? null, target: { path: project.path, agentId: agent?.id ?? null } }
 }
 
-/** Picks whose folder the Files tab shows when agents work in worktrees. Renders nothing otherwise. */
+/** Picks whose folder the Files tab shows when agents work outside the project folder (#1442). Renders nothing otherwise. */
 export function RootSelector({ project, value, onChange }: { project: ProjectInfo; value: string | undefined; onChange: (agentId: string) => void }) {
-  const worktrees = project.agents.filter((a) => a.worktree)
+  const worktrees = project.agents.filter((a) => awayFromProject(a))
   if (!worktrees.length) return null
   const known = worktrees.some((a) => a.id === value)
   return (
@@ -193,7 +209,7 @@ export function RootSelector({ project, value, onChange }: { project: ProjectInf
           <option value="">{tr(M.projectFolder)}</option>
           {worktrees.map((a) => (
             <option key={a.id} value={a.id}>
-              {tr(M.agentWorktree, { agent: a.name, branch: a.worktree!.branch })}
+              {legacyOf(a) ? tr(M.agentWorktree, { agent: a.name, branch: legacyOf(a)!.branch }) : tr(M.agentPlace, { agent: a.name, place: placeText(a.place) ?? '' })}
             </option>
           ))}
         </select>
@@ -976,6 +992,19 @@ const dayKey = (iso: string): string => new Date(iso).toDateString()
  * conversation): what was pasted or dropped into sessions, with filters by kind. Clicking a group's name opens that
  * session's transcript.
  */
+/** The Attachments tab's two tabs (HI-1841): what was pasted or dropped into panes, and what is kept with cards. */
+type AttachTab = 'pane' | 'card'
+const ATTACH_TABS: AttachTab[] = ['pane', 'card']
+const ATTACH_TABS_KEY = 'attachments'
+const NO_KINDS: Record<AttachTab, AttachmentKind | null> = { pane: null, card: null }
+
+/** How many of each kind a list of groups has: a filter is offered for each kind present. */
+const kindCounts = (groups: { attachments: { kind: AttachmentKind }[] }[]): Map<AttachmentKind, number> => {
+  const c = new Map<AttachmentKind, number>()
+  for (const g of groups) for (const a of g.attachments) c.set(a.kind, (c.get(a.kind) ?? 0) + 1)
+  return c
+}
+
 export function AttachmentsTab({ project: owner, assistant = false }: { project: ProjectInfo; assistant?: boolean }) {
   useStore((s) => s.focusedAgent[owner.path])
   useDateStyle()
@@ -988,13 +1017,38 @@ export function AttachmentsTab({ project: owner, assistant = false }: { project:
   const all = loaded.data
   const error = loaded.error
   const [viewing, setViewing] = useState<SessionAttachment | null>(null)
-  const [filter, setFilter] = useState<AttachmentKind | null>(null)
-  // What is open in the viewer, and the filter, are the last project's.
+  // A card attachment open in the same viewer (HI-1958).
+  const [viewingCard, setViewingCard] = useState<CardAttachment | null>(null)
+  // Each tab's own kind filter (HI-1841).
+  const [filters, setFilters] = useState<Record<AttachTab, AttachmentKind | null>>(NO_KINDS)
+  // The tab shown when it isn't the remembered one: a link's (kept after its jump), or Pane attachments while the
+  // project has no card attachments; for this project only. A click on a tab clears it and is remembered.
+  const [shownTab, setShownTab] = useState<{ project: string; tab: AttachTab } | null>(null)
+  // What is open in the viewer, and the filters, are the last project's.
   useEffect(() => {
     setViewing(null)
-    setFilter(null)
+    setViewingCard(null)
+    setFilters(NO_KINDS)
   }, [project.path])
   const menu = useContextMenu()
+  const tabsId = useId()
+  // The project's cards' attachments (HI-1700), Card attachments' (HI-1841); the Assistant has none, and no tabs.
+  const cardFiles = useProjectCardAttachments(assistant ? null : project.path)
+  const cardCount = cardFiles.groups.reduce((n, g) => n + g.attachments.length, 0)
+  const remembered = useRememberedTab<AttachTab>(ATTACH_TABS_KEY, ATTACH_TABS, 'pane')
+  const tab: AttachTab = assistant ? 'pane' : shownTab?.project === project.path ? shownTab.tab : remembered
+  const chooseAttachTab = (t: AttachTab): void => {
+    setShownTab(null)
+    chooseTab(ATTACH_TABS_KEY, t)
+  }
+  // Opening on Card attachments with none yet: Pane attachments, once the cards' files have been read (never while they
+  // load or failed); a click on Card attachments afterwards stays there.
+  const fellBack = useRef<string | null>(null)
+  useEffect(() => {
+    if (assistant || !cardFiles.loaded || fellBack.current === project.path) return
+    fellBack.current = project.path
+    if (remembered === 'card' && !cardCount) setShownTab((t) => (t?.project === project.path ? t : { project: project.path, tab: 'pane' }))
+  }, [assistant, cardFiles.loaded, cardCount, remembered, project.path])
 
   const { load: loadScoped } = loaded
   const load = useCallback(() => {
@@ -1006,21 +1060,33 @@ export function AttachmentsTab({ project: owner, assistant = false }: { project:
     if (dirs.some((d) => d === '.hive' || d.startsWith('.hive/attachments'))) load()
   })
 
-  // How many of each kind there are: a filter is offered for each kind present.
-  const counts = useMemo(() => {
-    const c = new Map<AttachmentKind, number>()
-    for (const g of all ?? []) for (const a of g.attachments) c.set(a.kind, (c.get(a.kind) ?? 0) + 1)
-    return c
-  }, [all])
+  // How many of each kind the tab shown has: a filter is offered for each kind present, counting only its own files.
+  const counts = useMemo(() => kindCounts(tab === 'card' ? cardFiles.groups : (all ?? [])), [tab, all, cardFiles.groups])
+  const filter = filters[tab]
+  const setFilter = (k: AttachmentKind | null): void => setFilters((f) => ({ ...f, [tab]: k }))
   // A filter whose kind is all gone shows everything again.
   const shownKind = filter && counts.get(filter) ? filter : null
+  // Pane attachments' filter, for its groups and the viewer (whose files are Pane attachments' only).
+  const paneKind = tab === 'pane' ? shownKind : filters.pane
   const groups = useMemo(
-    () => (all ?? []).map((g) => ({ ...g, attachments: g.attachments.filter((a) => !shownKind || a.kind === shownKind) })).filter((g) => g.attachments.length),
-    [all, shownKind]
+    () => (all ?? []).map((g) => ({ ...g, attachments: g.attachments.filter((a) => !paneKind || a.kind === paneKind) })).filter((g) => g.attachments.length),
+    [all, paneKind]
   )
   // Same order as on screen: current sessions first, archived last.
   const flat = useMemo(() => [...groups.filter((g) => !g.archived), ...groups.filter((g) => g.archived)].flatMap((g) => g.attachments), [groups])
   const total = useMemo(() => (all ?? []).reduce((n, g) => n + g.attachments.length, 0), [all])
+  // Card attachments' filter, and the files its tab shows, in their order: the card viewer's arrows go through these.
+  const cardKind = tab === 'card' ? shownKind : filters.card
+  const cardGroups = useMemo(() => shownCardGroups(cardFiles.groups, cardKind), [cardFiles.groups, cardKind])
+  const cardFlat = useMemo(() => cardGroups.flatMap((g) => g.attachments), [cardGroups])
+  /** A card attachment taken off its card from the viewer, after asking: the viewer goes on to the next one shown. */
+  const removeCard = async (a: CardAttachment): Promise<void> => {
+    const g = cardGroups.find((x) => x.card === a.card)
+    if (!(await removeCardAttachmentAsked(g?.key ?? `#${a.card}`, a))) return
+    const i = cardFlat.findIndex((x) => x.id === a.id)
+    setViewingCard((v) => (v?.id === a.id ? (cardFlat[i + 1] ?? cardFlat[i - 1] ?? null) : v))
+    await cardFiles.reload()
+  }
 
   const remove = async (a: SessionAttachment): Promise<void> => {
     const ok = await confirm({ title: tr(M.trashTitle), message: tr(M.attachDeleteMessage, { name: a.name }), detail: tr(M.attachDeleteDetail), confirmLabel: tr(M.trashButton), danger: true })
@@ -1039,7 +1105,7 @@ export function AttachmentsTab({ project: owner, assistant = false }: { project:
     const ok = await confirm({
       title: tr(M.groupDeleteTitle, { count: n }),
       message: tr(M.groupDeleteMessage, { count: n, name: g.name ?? g.sessionId.slice(0, 8) }),
-      detail: tr(M.groupDeleteDetail, { filtered: shownKind ? 'yes' : 'no', host }),
+      detail: tr(M.groupDeleteDetail, { filtered: paneKind ? 'yes' : 'no', host }),
       confirmLabel: tr(M.trashButton),
       danger: true
     })
@@ -1062,9 +1128,13 @@ export function AttachmentsTab({ project: owner, assistant = false }: { project:
     const id = a.path.split(/[\\/]/).slice(-2)[0]
     return owner.agents.some((x) => x.live?.sessionId === id)
   }
-  const menuFor = (a: SessionAttachment): MenuEntry[] => [
+  const menuFor = (a: SessionAttachment, at?: { x: number; y: number }): MenuEntry[] => [
     { label: tr(M.view), icon: 'eye', onClick: () => setViewing(a) },
     ...(project.live ? [{ label: tr(M.insertIntoSession), icon: 'terminal', onClick: () => void insertIntoSession(project, [a.path]) }] : []),
+    // Copied to a card (HI-1700), so it outlives the session's Clean Up.
+    ...(!assistant && at
+      ? [{ label: tr(M.attachToCard), icon: 'pinned', more: true, onClick: () => { const s = get(); menu.openAt(at.x, at.y, attachToCardMenu({ hostPath: project.path, project: project.name, agentId: null, path: a.path, name: shownName(a.name), cards: s.tasks, label: (t) => cardLabelOf(s, t.number) })) } }]
+      : []),
     { separator: true },
     ...(a.kind === 'image' ? [{ label: tr(M.copyImage), icon: 'copy', onClick: () => void actions.attempt(tr(M.copyImageFailed), () => call('attachments:copyImage', a.path)) }] : []),
     { label: tr(M.copyPath), icon: a.kind === 'image' ? 'blank' : 'copy', onClick: () => copyText(a.path) },
@@ -1076,8 +1146,35 @@ export function AttachmentsTab({ project: owner, assistant = false }: { project:
     running(a) ? { label: tr(M.delete), icon: 'trash', disabled: true, detail: tr(M.running, { host }) } : { label: tr(M.delete), icon: 'trash', danger: true, onClick: () => void remove(a) }
   ]
 
+  // A link's jump (HI-1841), for this project only: its tab shown (and kept), that tab's filter back to All so its target
+  // shows; then, in a render that has both (never the page as it was: HR5's round 1), the target scrolled to and
+  // flashed once drawn, and the jump done. A target that isn't there once the files are read (no attachments in that
+  // session) leaves the tab shown.
+  const jump = useStore((s) => s.attachmentsJump)
+  const pageRef = useRef<HTMLDivElement>(null)
+  const [preparedJump, setPreparedJump] = useState<number | null>(null)
+  useEffect(() => {
+    if (assistant || !jump || jump.project !== project.path) return
+    setShownTab({ project: project.path, tab: jump.tab })
+    setFilters((f) => (f[jump.tab] ? { ...f, [jump.tab]: null } : f))
+    setPreparedJump(jump.nonce)
+  }, [assistant, jump, project.path])
+  useEffect(() => {
+    if (assistant || !jump || jump.project !== project.path || preparedJump !== jump.nonce || tab !== jump.tab || filters[jump.tab]) return
+    const sel = jump.tab === 'card' ? `[data-card="${jump.card}"]` : `[data-session="${CSS.escape(jump.session)}"]`
+    const target = pageRef.current?.querySelector<HTMLElement>(`[role="tabpanel"][data-tab-panel="${jump.tab}"] ${sel}`)
+    const read = jump.tab === 'card' ? cardFiles.loaded || cardFiles.failed : !!all
+    if (!target && !read) return
+    if (target) {
+      target.scrollIntoView({ block: 'start' })
+      target.classList.add('jumped')
+      window.setTimeout(() => target.classList.remove('jumped'), 1500)
+    }
+    set({ attachmentsJump: null })
+  })
+
   if (!all) return error ? <LoadFailed what={tr(M.attachmentsLoadTarget)} error={error} onRetry={load} /> : <div className="empty-state"><Icon name="loading" spin />{tr(M.loading)}</div>
-  if (!all.length && !error) {
+  if (!all.length && !error && !cardCount && cardFiles.loaded) {
     return (
       <div className="empty-state" style={{ paddingTop: '15vh' }}>
         <Icon name="attach" />
@@ -1096,7 +1193,7 @@ export function AttachmentsTab({ project: owner, assistant = false }: { project:
     const [first, last] = [Math.min(...times), Math.max(...times)]
     const oneDay = daysAgo(first, new Date(last)) === 0
     return (
-      <section key={g.sessionId} className="image-group">
+      <section key={g.sessionId} className="image-group" data-session={g.sessionId}>
         <div className="image-group-head">
           <Icon name="comment-discussion" />
           <Tooltip content={tr(M.openTranscript, { host })}>
@@ -1127,7 +1224,7 @@ export function AttachmentsTab({ project: owner, assistant = false }: { project:
                   data-kind={a.kind}
                   draggable
                   onClick={() => setViewing(a)}
-                  onContextMenu={(e) => menu.open(e, menuFor(a))}
+                  onContextMenu={(e) => menu.open(e, menuFor(a, { x: e.clientX, y: e.clientY }))}
                   onDragStart={(e) => {
                     e.dataTransfer.setData(HIVE_FILES_MIME, JSON.stringify({ project: project.path, paths: [a.path] }))
                     e.dataTransfer.setData('text/plain', quotePath(a.path))
@@ -1155,20 +1252,21 @@ export function AttachmentsTab({ project: owner, assistant = false }: { project:
   }
 
   return (
-    <div className="scroll-page images-page">
+    <div className="scroll-page images-page" ref={pageRef}>
       <div className="images-toolbar">
         <h2>{tr(M.attachments)}</h2>
         <InfoTip text={tr(assistant ? M.infoAssistant : M.info)} />
-        <span className="faint">{tr(M.total, { host, total, groups: all.length })}</span>
+        <span className="faint">{!assistant && cardCount ? tr(M.totalWithCards, { total: total + cardCount, cards: cardCount, sessions: total, groups: all.length }) : tr(M.total, { host, total, groups: all.length })}</span>
         <div className="grow" />
         <IconButton icon="refresh" title={tr(M.refresh)} action="refresh-attachments" onClick={load} />
         <IconButton icon="folder-opened" title={tr(M.openFolder)} onClick={() => void call('app:openPath', `${project.path}\\.hive\\attachments`)} />
       </div>
       <p className="hint images-desc">{tr(assistant ? M.descAssistant : M.desc)}</p>
+      {!assistant && <Tabs<AttachTab> idBase={`${tabsId}-attach`} className="attachment-tabs" label={tr(M.tabs)} value={tab} onChange={chooseAttachTab} items={[{ id: 'pane', label: tr(M.paneTab), icon: 'comment-discussion', count: total }, { id: 'card', label: tr(M.cardTab), icon: 'checklist', count: cardCount }]} />}
       {counts.size > 1 && (
         <div className="attachment-filters" role="group" aria-label={tr(M.show)}>
           <button className={cx('attachment-filter', !shownKind && 'selected')} aria-pressed={!shownKind} onClick={() => setFilter(null)}>
-            {tr(M.all)} <span className="faint">{total}</span>
+            {tr(M.all)} <span className="faint">{tab === 'card' ? cardCount : total}</span>
           </button>
           {ATTACHMENT_KINDS.filter((k) => counts.get(k)).map((k) => (
             <button key={k} className={cx('attachment-filter', shownKind === k && 'selected')} aria-pressed={shownKind === k} data-kind={k} onClick={() => setFilter(shownKind === k ? null : k)}>
@@ -1177,35 +1275,73 @@ export function AttachmentsTab({ project: owner, assistant = false }: { project:
           ))}
         </div>
       )}
-      {error && <StaleNote what={tr(M.attachmentsRefreshTarget)} error={error} at={loaded.at} onRetry={load} />}
-      {current.map(renderGroup)}
-      {archived.length > 0 && (
-        <>
-          <h3 className="images-archived">
-            <Icon name="archive" /> {tr(M.archivedHeading, { host })}
-          </h3>
-          {archived.map(renderGroup)}
-        </>
+      {/* Each tab its own page (HI-1841); the Assistant's view has Pane attachments alone, without tabs. */}
+      {!assistant && (
+        <TabPanel idBase={`${tabsId}-attach`} id="card" selected={tab === 'card'} data-tab-panel="card">
+          {cardCount ? <CardAttachmentSection groups={cardFiles.groups} kind={cardKind} reload={cardFiles.reload} onOpen={setViewingCard} /> : <div className="empty-state attachment-tab-empty">{cardFiles.loaded ? tr(M.cardEmpty) : cardFiles.failed ? tr(M.cardFailed) : <Icon name="loading" spin />}</div>}
+        </TabPanel>
       )}
+      <PanePanel assistant={assistant} idBase={`${tabsId}-attach`} selected={tab === 'pane'}>
+        {error && <StaleNote what={tr(M.attachmentsRefreshTarget)} error={error} at={loaded.at} onRetry={load} />}
+        {!assistant && !all.length && <div className="empty-state attachment-tab-empty">{tr(M.paneEmpty)}</div>}
+        {!assistant && all.length > 0 && <p className="hint">{tr(M.sessionsKept)}</p>}
+        {current.map(renderGroup)}
+        {archived.length > 0 && (
+          <>
+            <h3 className="images-archived">
+              <Icon name="archive" /> {tr(M.archivedHeading, { host })}
+            </h3>
+            {archived.map(renderGroup)}
+          </>
+        )}
+      </PanePanel>
       {viewing && (
         <AttachmentViewer
           host={project.path}
-          attachment={viewing}
-          attachments={flat}
+          item={viewing}
+          items={flat}
+          view={(a) => paneViewed(project.path, a)}
           live={!!project.live}
           // Worked out for the one shown, so it follows navigation and its session starting or stopping (main refuses too).
-          deleteBlocked={running(viewing) ? tr(M.running, { host }) : null}
+          remove={{ label: tr(M.delete), blocked: running(viewing) ? tr(M.running, { host }) : null }}
           onNavigate={setViewing}
           onClose={() => setViewing(null)}
           onInsert={(a) => {
             setViewing(null)
             void insertIntoSession(project, [a.path])
           }}
-          onDelete={(a) => void remove(a)}
+          onRemove={(a) => void remove(a)}
+        />
+      )}
+      {viewingCard && (
+        <AttachmentViewer
+          host={project.path}
+          item={viewingCard}
+          items={cardFlat}
+          view={cardViewed}
+          live={!!project.live}
+          remove={{ label: tr(M.removeFromCard), blocked: null }}
+          onNavigate={setViewingCard}
+          onClose={() => setViewingCard(null)}
+          onInsert={(a) => {
+            setViewingCard(null)
+            void insertIntoSession(project, [a.path])
+          }}
+          onRemove={(a) => void removeCard(a)}
         />
       )}
       {menu.element}
     </div>
+  )
+}
+
+/** Pane attachments' page: a tab's panel in a project, the page itself in the Assistant's view (no tabs). */
+function PanePanel({ assistant, idBase, selected, children }: { assistant: boolean; idBase: string; selected: boolean; children: React.ReactNode }) {
+  if (assistant) return <>{children}</>
+  return (
+    <TabPanel idBase={idBase} id="pane" selected={selected} data-tab-panel="pane">
+      {children}
+    </TabPanel>
   )
 }
 
@@ -1215,33 +1351,62 @@ const ATTACHMENT_FILTER_LABEL: Record<AttachmentKind, Msg> = { image: M.images, 
 /** A kept attachment's own name, without the time Hive put in front of it ("2026-10-12_09-30-00_report.pdf" is "report.pdf"). */
 const shownName = (name: string): string => name.replace(/^\d{4}-\d{2}-\d{2}_\d{2}-\d{2}-\d{2}_/, '')
 
-function AttachmentViewer({
+/**
+ * What the attachment viewer shows (HI-1958): a session's attachment or a card's, as one. `read` gives its text for a
+ * preview (a session's through its host, a card's by its card and id, never a path main didn't list).
+ */
+interface Viewed {
+  path: string
+  /** Its name as shown, its kind, its size and the time in its title. */
+  name: string
+  kind: AttachmentKind
+  size: number
+  when: string
+  /** Its file is gone (a card's: its row outlived it). */
+  missing: boolean
+  read: () => Promise<AttachmentContent>
+}
+
+/** A session's attachment in the viewer. */
+const paneViewed = (host: string, a: SessionAttachment): Viewed => ({ path: a.path, name: shownName(a.name), kind: a.kind, size: a.size, when: attachmentTime(a), missing: false, read: () => call('attachments:read', host, a.path) })
+/** A card's attachment in the viewer (HI-1958). */
+const cardViewed = (a: CardAttachment): Viewed => ({ path: a.path, name: a.name, kind: a.kind, size: a.size, when: formatDateTime(a.at), missing: !!a.missing, read: () => call('cards:readAttachment', a.card, a.id) })
+
+/**
+ * The attachment viewer (pane and card attachments alike, HI-1958): the one shown, arrows through the others shown,
+ * and its actions. An image or a PDF opens in its app; any other kind is shown in its folder, never opened (#387:
+ * nothing attached is ever run; Darren's decision on HI-1958). `remove`: its label (Delete, Remove from Card) and why it
+ * can't be now, or null.
+ */
+function AttachmentViewer<T>({
   host,
-  attachment,
-  attachments,
+  item,
+  items,
+  view,
   live,
-  deleteBlocked,
+  remove,
   onNavigate,
   onClose,
   onInsert,
-  onDelete
+  onRemove
 }: {
-  /** The session host whose attachment it is. */
+  /** The folder whose previews read it (a session host, or the card's project). */
   host: string
-  attachment: SessionAttachment
-  attachments: SessionAttachment[]
+  item: T
+  items: T[]
+  view: (t: T) => Viewed
   live: boolean
-  /** Why this one can't be deleted now (its session is running), or null. */
-  deleteBlocked: string | null
-  onNavigate: (a: SessionAttachment) => void
+  remove: { label: string; blocked: string | null }
+  onNavigate: (t: T) => void
   onClose: () => void
-  onInsert: (a: SessionAttachment) => void
-  onDelete: (a: SessionAttachment) => void
+  onInsert: (t: T) => void
+  onRemove: (t: T) => void
 }) {
-  const i = attachments.findIndex((x) => x.path === attachment.path)
+  const shown = view(item)
+  const i = items.findIndex((x) => view(x).path === shown.path)
   // The list is newest first, so "previous" (left) is the newer one.
-  const prev = attachments[i - 1]
-  const next = attachments[i + 1]
+  const prev = items[i - 1]
+  const next = items[i + 1]
   useEffect(() => {
     const onKey = (e: KeyboardEvent): void => {
       if (e.key === 'ArrowLeft' && prev) onNavigate(prev)
@@ -1252,11 +1417,12 @@ function AttachmentViewer({
     window.addEventListener('keydown', onKey)
     return () => window.removeEventListener('keydown', onKey)
   }, [prev, next, onNavigate])
-  const image = attachment.kind === 'image'
+  const image = shown.kind === 'image'
+  const opens = image || shown.kind === 'pdf'
   return (
     <Modal
-      title={`${attachmentTime(attachment)} · ${shownName(attachment.name)}`}
-      icon={fileNameIcon(attachment.name)}
+      title={`${shown.when} · ${shown.name}`}
+      icon={shown.missing ? 'warning' : fileNameIcon(shown.name)}
       onClose={onClose}
       wide
       // Sized to what it shows, with its own controls: it stays put (#133).
@@ -1264,26 +1430,35 @@ function AttachmentViewer({
       footer={
         <>
           <span className="faint" style={{ marginRight: 'auto' }}>
-            {tr(M.position, { index: i + 1, count: attachments.length })} · {formatBytes(attachment.size)}
+            {tr(M.position, { index: i + 1, count: items.length })} · {formatBytes(shown.size)}
           </span>
-          <Tooltip content={deleteBlocked}>
-            <button className="btn subtle danger-text" disabled={!!deleteBlocked} aria-description={deleteBlocked ?? undefined} onClick={() => onDelete(attachment)}>
-              <Icon name="trash" /> {tr(M.delete)}
+          <Tooltip content={remove.blocked}>
+            <button className="btn subtle danger-text" data-action="viewer-remove" disabled={!!remove.blocked} aria-description={remove.blocked ?? undefined} onClick={() => onRemove(item)}>
+              <Icon name="trash" /> {remove.label}
             </button>
           </Tooltip>
-          <button className="btn subtle" onClick={() => void call('app:showInFolder', attachment.path)}>
-            <Icon name="folder-opened" /> {tr(FILES_TEXT.reveal)}
-          </button>
-          <button className="btn subtle" onClick={() => copyText(attachment.path)}>
-            {tr(M.copyPath)}
-          </button>
-          {image && (
-            <button className="btn subtle" onClick={() => void actions.attempt(tr(M.copyImageFailed), () => call('attachments:copyImage', attachment.path))}>
+          {!shown.missing &&
+            (opens ? (
+              <button className="btn subtle" data-action="viewer-open" onClick={() => void call('app:openPath', shown.path)}>
+                <Icon name="link-external" /> {tr(M.openInApp)}
+              </button>
+            ) : (
+              <button className="btn subtle" data-action="viewer-show" onClick={() => void call('app:showInFolder', shown.path)}>
+                <Icon name="folder-opened" /> {tr(CARD_ATTACH_TEXT.show)}
+              </button>
+            ))}
+          {!shown.missing && (
+            <button className="btn subtle" onClick={() => copyText(shown.path)}>
+              {tr(M.copyPath)}
+            </button>
+          )}
+          {image && !shown.missing && (
+            <button className="btn subtle" onClick={() => void actions.attempt(tr(M.copyImageFailed), () => call('attachments:copyImage', shown.path))}>
               <Icon name="copy" /> {tr(M.copyImage)}
             </button>
           )}
-          {live && (
-            <button className="btn primary" onClick={() => onInsert(attachment)}>
+          {live && !shown.missing && (
+            <button className="btn primary" onClick={() => onInsert(item)}>
               <Icon name="terminal" /> {tr(M.insertIntoSession)}
             </button>
           )}
@@ -1292,12 +1467,19 @@ function AttachmentViewer({
     >
       <div className="image-viewer">
         <IconButton icon="chevron-left" title={tr(M.newer)} disabled={!prev} onClick={() => prev && onNavigate(prev)} />
-        {image ? (
+        {shown.missing ? (
+          <div className="attachment-frame" data-missing>
+            <div className="attachment-none">
+              <Icon name="warning" />
+              {tr(CARD_ATTACH_TEXT.missing)}
+            </div>
+          </div>
+        ) : image ? (
           <div className="image-frame">
-            <img src={imageUrl(attachment.path)} alt={attachment.name} />
+            <img src={imageUrl(shown.path)} alt={shown.name} />
           </div>
         ) : (
-          <AttachmentFrame host={host} attachment={attachment} />
+          <AttachmentFrame host={host} attachment={shown} />
         )}
         <IconButton icon="chevron-right" title={tr(M.older)} disabled={!next} onClick={() => next && onNavigate(next)} />
       </div>
@@ -1306,16 +1488,19 @@ function AttachmentViewer({
 }
 
 /** An attachment that isn't an image, previewed as the Files tab would (a PDF, Markdown, a CSV's table) or as text. */
-function AttachmentFrame({ host, attachment }: { host: string; attachment: SessionAttachment }) {
+function AttachmentFrame({ host, attachment }: { host: string; attachment: Viewed }) {
   const fromDisk = previewsFromDisk(attachment.name)
   const [content, setContent] = useState<AttachmentContent | null>(null)
   const [failed, setFailed] = useState<string | null>(null)
+  // Its read as of this render: the effect runs again for another file, never for a new function of the same one.
+  const read = useRef(attachment.read)
+  read.current = attachment.read
   useEffect(() => {
     setContent(null)
     setFailed(null)
     if (fromDisk || attachment.kind === 'file') return
     let live = true
-    call('attachments:read', host, attachment.path).then(
+    read.current().then(
       (c) => live && setContent(c),
       (e) => live && setFailed(errorMessage(e))
     )

@@ -29,7 +29,8 @@ async function history(ctx) {
   await ctx.command('view.board')
   await (await shown(ctx, page.locator(`.board-view .task-card[data-task="${c.number}"]`), 'the card on the board')).click()
   const dialog = await shown(ctx, page.locator('.dialog[role="dialog"]'), "the card's dialog")
-  await (await shown(ctx, dialog.locator('.task-section-h.clickable'), "the dialog's History heading")).click()
+  // History by its own hook: Work's heading (#1224) is clickable too, and comes first (#1318).
+  await (await shown(ctx, dialog.locator('.task-section-h[data-section="history"]'), "the dialog's History heading")).click()
   await shown(ctx, dialog.locator('.task-history > div'), "the card's history")
   await dialog.locator('.task-history').scrollIntoViewIfNeeded()
   return dialog

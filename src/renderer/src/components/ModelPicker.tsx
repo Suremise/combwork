@@ -2,8 +2,8 @@ import { useEffect, useState } from 'react'
 import { fmt, msg, tr } from '@shared/i18n'
 import { providerDescriptor, shownText, type ModelOption } from '@shared/providers'
 import { modelLabel } from '@shared/defaults'
-import { effortName, modelCaps, modelGroups } from '@shared/models'
-import type { ProviderId } from '@shared/types'
+import { connectionModels, effortName, modelCaps, modelGroups } from '@shared/models'
+import type { Account, ProviderId } from '@shared/types'
 import { useLanguage, useStore } from '../store'
 import { Icon } from './ui'
 
@@ -12,10 +12,12 @@ import { Icon } from './ui'
  * Settings (for Claude Code as shipped: latest aliases, pinned versions, older versions hidden until asked for), and a
  * custom model ID. `base` is the option meaning "no choice here" (Inherit, or the CLI's default).
  */
-export function ModelPicker({ provider, value, base, onChange }: { provider: ProviderId; value: string; base: ModelOption; onChange: (value: string) => void }) {
+export function ModelPicker({ provider, value, base, onChange, connection }: { provider: ProviderId; value: string; base: ModelOption; onChange: (value: string) => void; connection?: Pick<Account, 'kind' | 'server'> }) {
   useLanguage()
   const p = providerDescriptor(provider)
-  const info = useStore((s) => s.providers[provider])
+  // A connection's own models (HI-1770: by its kind), else the CLI's.
+  const cliInfo = useStore((s) => s.providers[provider])
+  const info = connection ? connectionModels(connection, cliInfo, tr) : cliInfo
   const settings = useStore((s) => s.settings)
   const groups = modelGroups(provider, info, settings, tr)
   const presets = groups.filter((g) => !g.unavailable).flatMap((g) => g.models)
@@ -93,9 +95,10 @@ export function ModelPicker({ provider, value, base, onChange }: { provider: Pro
  * model takes, else the provider's fallback list. A choice the model doesn't take stays chosen and says so, rather
  * than being changed behind the user's back: the CLI decides what to do with it (#125).
  */
-export function EffortPicker({ provider, model, value, base, onChange }: { provider: ProviderId; model: string | null | undefined; value: string; base: ModelOption; onChange: (value: string) => void }) {
+export function EffortPicker({ provider, model, value, base, onChange, connection }: { provider: ProviderId; model: string | null | undefined; value: string; base: ModelOption; onChange: (value: string) => void; connection?: Pick<Account, 'kind' | 'server'> }) {
   useLanguage()
-  const info = useStore((s) => s.providers[provider])
+  const cliInfo = useStore((s) => s.providers[provider])
+  const info = connection ? connectionModels(connection, cliInfo, tr) : cliInfo
   const settings = useStore((s) => s.settings)
   const caps = modelCaps(provider, model, info, settings)
   const providerName = providerDescriptor(provider).name

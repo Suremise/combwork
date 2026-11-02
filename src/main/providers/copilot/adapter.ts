@@ -12,8 +12,12 @@ import { config } from '../../config'
 import { writeJsonAtomic } from '../../fsutil'
 import { createLogger, userText } from '../../logger'
 import { AGENTS_SKILLS, agentsSkillCopyPath, compareVersions, exportSubtitleText, hookIds, promptArg, runsThroughCmd, syncAgentsSkills, toSpawnable, userMemoryLabel } from '../common'
-import type { CatalogRead, CommandSpec, ConversationParserLike, ExternalSession, LaunchContext, LiveDetails, LockDecision, NormalizedHook, ProviderAdapter, SkillDelivery, SkillRoots, UsageParser } from '../types'
-import { copilotEnv, copilotHome } from './home'
+import { rowsOfHooksTable } from '../../hookListing'
+import type { CatalogRead, CommandSpec, ConversationParserLike, ExternalSession, LaunchContext, LaunchHooks, LiveDetails, LockDecision, NormalizedHook, ProviderAdapter, SkillDelivery, SkillRoots, TranscriptTurn, UsageParser } from '../types'
+import { copilotEnv, copilotHome, noAutoUpdateArgs } from './home'
+import { launchOverrides } from '../../advancedValues'
+import { overrideId } from '../../../shared/advanced'
+import { copilotTranscriptTurns } from './turns'
 import { CopilotConversationParser, CopilotUsageParser, copilotDetailsMemo, copilotEventsPath, copilotImageData, eventsDetails, listCopilotSessions, parseEvents, workspaceInfo, type CopilotDetailsMemo } from './events'
 import { readCopilotModels } from './models'
 import { copilotInstallCommand, copilotLatestVersion, copilotLoginCommand, copilotReadiness, copilotUpdateCommand, copilotUpdateRetry, locateCopilot } from './install'
@@ -30,6 +34,12 @@ const log = createLogger('copilot')
  */
 const HOOK_EVENTS = ['SessionStart', 'UserPromptSubmit', 'PreToolUse', 'PostToolUse', 'PostToolUseFailure', 'Notification', 'Stop', 'ErrorOccurred', 'PreCompact', 'SessionEnd'] as const // i18n-ignore: Copilot's hook event names
 
+/**
+ * The line Copilot's sessions get about the hive tools' names (#1346 item 7): Copilot names an MCP server's tools
+ * "<server>-<tool>", so a model told hive_inbox searched for it 18 times. Only Copilot's custom instructions carry it.
+ */
+export const HIVE_TOOL_NAMES = 'This CLI names the hive tools "hive-<tool>": where Hive says hive_inbox, call hive-hive_inbox.' // i18n-ignore: agent-facing guidance
+
 /** Copilot's file tools, as its hooks name them (Edit: path, old_str, new_str; Write: path, file_text; 1.0.93). */
 const EDIT_TOOL = /^(edit|write|create|str_replace\w*|multi_?edit)$/i
 
@@ -42,6 +52,18 @@ export function copilotHooks(hookUrl: string, token: string): Record<string, unk
     hooks[ev] = [{ type: 'http', url: hookUrl, headers: { Authorization: `Bearer ${token}` }, timeoutSec: advanced.number(ev === 'PreToolUse' ? 'copilot.hooks.preToolUseTimeoutSeconds' : 'copilot.hooks.timeoutSeconds') }] // i18n-ignore: an HTTP header Copilot sends
   }
   return { version: 1, hooks }
+}
+
+/**
+ * Why a Copilot model call it tries again failed, from its message (HI-1973, `copilot.retry.message`'s named groups): the
+ * HTTP status (a valid one only, 100–599), or 429 for a rate limit's words (Copilot 1.0.105's hook gives the service's
+ * own error body, with no status: "Rate limit reached for requests"), and whether its service couldn't be reached.
+ * None: a failure Hive can't name.
+ */
+export function copilotRetryOf(message: string): { status: number | null; network: boolean } {
+  const m = advanced.pattern('copilot.retry.message').exec(message)
+  const status = Number(m?.groups?.status)
+  return { status: Number.isInteger(status) && status >= 100 && status <= 599 ? status : m?.groups?.limited ? 429 : null, network: !!m?.groups?.network }
 }
 
 /** A workspace MCP server (Claude Code's JSON format, as Hive keeps them) in Copilot's mcp-config format. */
@@ -103,10 +125,17 @@ export class CopilotAdapter implements ProviderAdapter {
   readonly id = COPILOT
   readonly descriptor = COPILOT_DESCRIPTOR
   /**
+   * The question an ask_user call asks, per Copilot session, from its PreToolUse until the call ends (HI-1945): from
+   * 1.0.104 its elicitation_dialog Notification says only "Information requested", so the question comes from here.
+   */
+  private readonly questions = new Map<string, string>()
+  /**
    * A parent Copilot session's identity, when Hive runs inside one: none known. The sign-in tokens Copilot would use are
    * taken out of Copilot's own environment instead (home.ts COPILOT_ENV_STRIP): this list applies to every child.
    */
   readonly envToStrip: string[] = []
+  /** Copilot is checked in its sessions' environment (copilotEnv), which these switches change. */
+  readonly locateSettings = [overrideId(COPILOT, 'stripGitHubTokens'), overrideId(COPILOT, 'noAutoUpdate')]
   readonly compactFailure = null
   // SessionStart only comes with the first prompt: its footer ("… · / commands · …") means it is up. Both patterns are
   // advanced settings (#367).
@@ -118,11 +147,13 @@ export class CopilotAdapter implements ProviderAdapter {
     return advanced.pattern('copilot.trust.prompt')
   }
   // Copilot writes a session's token totals (session.shutdown) only as it exits by itself (#465). Ctrl+C cancels what
-  // runs (a turn, a dialog), and twice in a row exits ("ctrl+c again to exit"); three cover a turn or dialog first. It
-  // took 1.7-2.4 s from the first key to exit under load (#716), so the kill waits 10 s by default: only for one that
-  // hangs. The grace is an advanced setting (#727), read at each stop.
-  get exitKeys(): { keys: string[]; gapMs: number; graceMs: number } {
-    return { keys: ['\x03', '\x03', '\x03'], gapMs: 400, graceMs: advanced.number('copilot.exit.graceSeconds') * 1000 }
+  // runs (a turn, a dialog), and twice in a row exits ("ctrl+c again to exit"); three cover a turn or dialog first, at a
+  // lane's end (quit), where its turn is over. Stop types them on conditions instead (HI-2272, exitKeys.ts): a key that
+  // arrived as a cancelled turn wound down was lost under load, and with it the exit. It took 1.7-2.4 s from the first
+  // key to exit under load (#716), so the kill waits 10 s by default: only for one that hangs. The grace and the hint
+  // are advanced settings (#727), read at each stop.
+  get exitKeys(): { keys: string[]; gapMs: number; graceMs: number; armed: RegExp } {
+    return { keys: ['\x03', '\x03', '\x03'], gapMs: 400, graceMs: advanced.number('copilot.exit.graceSeconds') * 1000, armed: advanced.pattern('copilot.exit.armed') }
   }
 
   // Installation, readiness and the install, update and sign-in tasks (#452).
@@ -201,6 +232,16 @@ export class CopilotAdapter implements ProviderAdapter {
     return join(ctx.privateDir, 'instructions')
   }
 
+  /**
+   * This launch's custom instructions: the Hive Assistant's role and mode, and Hive's guidance when Copilot won't show
+   * the hive server's instructions (their switch off, #1167: without --allow-all-mcp-server-instructions it leaves them
+   * out, whatever the server is called), then the Workspace notes note (#1433).
+   */
+  private customInstructions(ctx: LaunchContext): string {
+    const names = ctx.mcpServers.hive ? HIVE_TOOL_NAMES : ''
+    return [launchOverrides(ctx.overrides, COPILOT, 'allMcpInstructions') ? '' : ctx.mcpServers.hive ? ctx.guidance : '', names, ctx.instructions ?? '', ctx.notes ?? ''].map((t) => t.trim()).filter(Boolean).join('\n\n')
+  }
+
   async prepareLaunch(ctx: LaunchContext): Promise<Record<string, SkillDelivery>> {
     const delivered = await syncAgentsSkills(ctx, this.descriptor.name)
     const plugin = this.pluginDir(ctx)
@@ -216,11 +257,12 @@ export class CopilotAdapter implements ProviderAdapter {
     // The servers' own env and headers may hold secrets: the launch's private folder, never the project (#345).
     await writeJsonAtomic(join(ctx.privateDir, 'mcp.json'), { mcpServers: servers })
     // The Hive Assistant's role and mode. Hive's guidance itself comes with the hive MCP server's instructions, which
-    // Copilot shows with --allow-all-mcp-server-instructions.
-    if (ctx.instructions?.trim()) {
+    // Copilot shows with --allow-all-mcp-server-instructions; with that switched off, here too (customInstructions).
+    const custom = this.customInstructions(ctx)
+    if (custom) {
       const dir = join(this.instructionsDir(ctx), '.github', 'instructions')
       await mkdir(dir, { recursive: true })
-      await writeFile(join(dir, 'hive.instructions.md'), `---\napplyTo: '**'\n---\n${ctx.instructions.trim()}\n`)
+      await writeFile(join(dir, 'hive.instructions.md'), `---\napplyTo: '**'\n---\n${custom}\n`)
     }
     return delivered
   }
@@ -243,32 +285,43 @@ export class CopilotAdapter implements ProviderAdapter {
     args.push('--plugin-dir', this.pluginDir(ctx))
     args.push('--additional-mcp-config', `@${join(ctx.privateDir, 'mcp.json')}`)
     // Hive's guidance is the hive MCP server's instructions: Copilot includes only allowlisted servers' without this.
-    args.push('--allow-all-mcp-server-instructions')
+    if (launchOverrides(ctx.overrides, COPILOT, 'allMcpInstructions')) args.push('--allow-all-mcp-server-instructions')
     // Only the workspace's MCP servers, as for the other CLIs: Copilot's built-in GitHub servers and the user's and the
-    // project's own are turned off for Hive's sessions (never by editing their config).
-    args.push('--disable-builtin-mcps')
-    for (const name of this.otherMcpServers(ctx.cwd)) if (!ctx.mcpServers[name]) args.push('--disable-mcp-server', name)
+    // project's own are turned off for Hive's sessions (never by editing their config). Switched off (#1281), they load
+    // too: the --additional-mcp-config servers win over Copilot's own of the same name (1.0.100), hive included, and are
+    // never disabled by name (--disable-mcp-server <name> would turn Hive's off with the user's).
+    if (launchOverrides(ctx.overrides, COPILOT, 'mcpIsolation')) {
+      args.push('--disable-builtin-mcps')
+      for (const name of this.otherMcpServers(ctx.cwd)) if (!ctx.mcpServers[name]) args.push('--disable-mcp-server', name)
+    }
     // Hive's own tools run without asking in every mode, as for the other CLIs: the Agent API decides what an agent may
     // do with them. The Assistant only the ones its Control settings let it use without asking (trustedHiveTools).
     // Copilot's patterns: <server> for all its tools, <server>(<tool>) for one (#468).
-    if (ctx.mcpServers.hive) {
+    // Switched off (#1281), none: Copilot asks per its own mode.
+    if (ctx.mcpServers.hive && launchOverrides(ctx.overrides, COPILOT, 'preApproveHiveTools')) {
       if (ctx.trustedHiveTools) for (const t of ctx.trustedHiveTools) args.push(`--allow-tool=hive(${t})`)
       else args.push('--allow-tool=hive')
     }
     if (ctx.model) args.push('--model', ctx.model)
     if (ctx.effort) args.push('--reasoning-effort', ctx.effort)
-    args.push(...copilotModeFlags(ctx.permissionMode || COPILOT_DESCRIPTOR.defaultPermissionMode, ctx.cwd))
-    args.push('--no-auto-update')
+    const mode = ctx.permissionMode || COPILOT_DESCRIPTOR.defaultPermissionMode
+    args.push(...copilotModeFlags(mode, ctx.cwd))
+    // Folders it may also work in (#1439: a reviewer's review copies), its edits there approved as in its own folder.
+    for (const d of ctx.extraDirs ?? []) {
+      args.push('--add-dir', d)
+      if (mode === 'accept-edits') args.push(...copilotModeFlags(mode, d))
+    }
+    args.push(...noAutoUpdateArgs(launchOverrides(ctx.overrides, COPILOT, 'noAutoUpdate')))
     // Never --mouse or --no-mouse (#737): Copilot saves either into the user's own settings (~/.copilot/settings.json),
     // changing their Copilot outside Hive. It keeps its own mouse handling: Shift+drag makes the terminal's selection.
     args.push(...ctx.extraArgs)
     // A first task: Copilot starts interactive and runs it (after the folder-trust question, if it asks one).
     if (ctx.initialPrompt) args.push('-i', promptArg(executable, ctx.initialPrompt))
     const s = toSpawnable(executable, args)
-    const env = copilotEnv(ctx.env)
+    const env = copilotEnv(ctx.env, launchOverrides(ctx.overrides, COPILOT, 'noAutoUpdate'), launchOverrides(ctx.overrides, COPILOT, 'stripGitHubTokens'))
     // Hive's hook server is plain http on 127.0.0.1, which Copilot allows for hooks only with this.
     env.COPILOT_HOOK_ALLOW_LOCALHOST = '1'
-    if (ctx.instructions?.trim()) {
+    if (this.customInstructions(ctx)) {
       const own = this.instructionsDir(ctx)
       const theirs = Object.entries(env).find(([k]) => k.toUpperCase() === 'COPILOT_CUSTOM_INSTRUCTIONS_DIRS')
       if (theirs) delete env[theirs[0]]
@@ -287,11 +340,11 @@ export class CopilotAdapter implements ProviderAdapter {
   }
 
   startHint(text: string): StartHint | null {
-    if (/Failed to read MCP config file/i.test(text)) return { hint: tr(msg({ id: 'providers.copilot.hint.mcp', defaultMessage: "Copilot couldn't read the MCP configuration Hive gave it: start it again.", description: "Why GitHub Copilot didn't start, in the agent's pane, with a button that goes where it says. Agent Settings, Agent Setup and Settings → … are Hive's names: use them as shown." })), fix: 'terminal' }
-    if (/\bmodel\b/i.test(text) && /not found|invalid|unknown|not available|not supported|does not exist/i.test(text)) return { hint: tr(msg({ id: 'providers.copilot.hint.model', defaultMessage: "Copilot doesn't offer this model to this account (Copilot Free runs Auto only): choose another in Agent Settings.", description: "Why GitHub Copilot didn't start, in the agent's pane, with a button that goes where it says. Agent Settings, Agent Setup and Settings → … are Hive's names: use them as shown." })), fix: 'agent-settings' }
-    if (/unexpected argument|unrecognized|invalid value|for more information, try '--help'|error: the argument/i.test(text)) return { hint: tr(msg({ id: 'providers.copilot.hint.args', defaultMessage: 'Copilot refused an argument: check Extra arguments in Agent Settings and Settings → GitHub Copilot.', description: "Why GitHub Copilot didn't start, in the agent's pane, with a button that goes where it says. Agent Settings, Agent Setup and Settings → … are Hive's names: use them as shown." })), fix: 'agent-settings' }
-    if (/\/login|copilot login|not (logged|signed) in|unauthorized|bad credentials|401/i.test(text)) return { hint: tr(msg({ id: 'providers.copilot.hint.signIn', defaultMessage: "Copilot isn't signed in: sign in as Agent Setup shows, then start it again.", description: "Why GitHub Copilot didn't start, in the agent's pane, with a button that goes where it says. Agent Settings, Agent Setup and Settings → … are Hive's names: use them as shown." })), fix: 'agent-setup' }
-    if (/is not recognized|ENOENT|cannot find/i.test(text)) return { hint: tr(msg({ id: 'providers.copilot.hint.broken', defaultMessage: 'Copilot looks broken or missing: check it in Agent Setup.', description: "Why GitHub Copilot didn't start, in the agent's pane, with a button that goes where it says. Agent Settings, Agent Setup and Settings → … are Hive's names: use them as shown." })), fix: 'agent-setup' }
+    if (/Failed to read MCP config file/i.test(text)) return { hint: tr(msg({ id: 'providers.copilot.hint.mcp', defaultMessage: "Copilot couldn't read the MCP configuration Hive gave it: start it again.", description: "Why GitHub Copilot didn't start, in the agent's pane, with a button that goes where it says. Agent Settings, Provider Setup and Settings → … are Hive's names: use them as shown." })), fix: 'terminal' }
+    if (/\bmodel\b/i.test(text) && /not found|invalid|unknown|not available|not supported|does not exist/i.test(text)) return { hint: tr(msg({ id: 'providers.copilot.hint.model', defaultMessage: "Copilot doesn't offer this model to this account (Copilot Free runs Auto only): choose another in Agent Settings.", description: "Why GitHub Copilot didn't start, in the agent's pane, with a button that goes where it says. Agent Settings, Provider Setup and Settings → … are Hive's names: use them as shown." })), fix: 'agent-settings' }
+    if (/unexpected argument|unrecognized|invalid value|for more information, try '--help'|error: the argument/i.test(text)) return { hint: tr(msg({ id: 'providers.copilot.hint.args', defaultMessage: 'Copilot refused an argument: check Extra arguments in Agent Settings and Settings → GitHub Copilot.', description: "Why GitHub Copilot didn't start, in the agent's pane, with a button that goes where it says. Agent Settings, Provider Setup and Settings → … are Hive's names: use them as shown." })), fix: 'agent-settings' }
+    if (/\/login|copilot login|not (logged|signed) in|unauthorized|bad credentials|401/i.test(text)) return { hint: tr(msg({ id: 'providers.copilot.hint.signIn', defaultMessage: "Copilot isn't signed in: sign in as Provider Setup shows, then start it again.", description: "Why GitHub Copilot didn't start, in the agent's pane, with a button that goes where it says. Agent Settings, Provider Setup and Settings → … are Hive's names: use them as shown." })), fix: 'agent-setup' }
+    if (/is not recognized|ENOENT|cannot find/i.test(text)) return { hint: tr(msg({ id: 'providers.copilot.hint.broken', defaultMessage: 'Copilot looks broken or missing: check it in Provider Setup.', description: "Why GitHub Copilot didn't start, in the agent's pane, with a button that goes where it says. Agent Settings, Provider Setup and Settings → … are Hive's names: use them as shown." })), fix: 'agent-setup' }
     return null
   }
 
@@ -313,6 +366,7 @@ export class CopilotAdapter implements ProviderAdapter {
     }
     const tool = String(body.tool_name ?? '')
     const input = body.tool_input && typeof body.tool_input === 'object' ? body.tool_input : {}
+    const session = out.sessionId ?? ''
     switch (event) {
       case 'SessionStart':
         out.event = { kind: 'start', source: typeof body.source === 'string' ? body.source : null }
@@ -324,10 +378,18 @@ export class CopilotAdapter implements ProviderAdapter {
         out.event = { kind: 'toolStart' }
         const file: unknown = input.path ?? input.file_path
         if (EDIT_TOOL.test(tool) && typeof file === 'string' && file) out.editedPaths = [file]
+        // ask_user, which its hooks name AskUserQuestion (1.0.105): its question in tool_input.message. Both advanced settings.
+        const question: unknown = input[advanced.get<string>('copilot.question.field')]
+        if (advanced.pattern('copilot.question.tool').test(tool) && typeof question === 'string' && question) {
+          // At most a few sessions ask at once: one never answered (a CLI killed mid-question) mustn't grow it for ever.
+          if (this.questions.size >= 50) this.questions.delete(this.questions.keys().next().value!)
+          this.questions.set(session, question)
+        }
         break
       }
       case 'PostToolUse':
       case 'PostToolUseFailure':
+        if (advanced.pattern('copilot.question.tool').test(tool)) this.questions.delete(session)
         out.event = { kind: 'toolEnd' }
         break
       case 'Notification': {
@@ -335,10 +397,11 @@ export class CopilotAdapter implements ProviderAdapter {
         const kind = String(body.notification_type ?? '')
         const message = typeof body.message === 'string' ? body.message : ''
         if (kind === 'permission_prompt') out.event = { kind: 'ask', ask: { kind: 'permission', blocking: true, message: message || 'Copilot asks for permission' } } // i18n-ignore: a status message in the CLI's place, which agents read (GET /v1/projects)
-        else if (kind === 'elicitation_dialog') out.event = { kind: 'ask', ask: { kind: 'question', blocking: true, message: message || 'Copilot asks a question' } } // i18n-ignore: a status message in the CLI's place, which agents read (GET /v1/projects)
+        else if (kind === 'elicitation_dialog') out.event = { kind: 'ask', ask: { kind: 'question', blocking: true, message: this.questions.get(session) || message || 'Copilot asks a question' } } // i18n-ignore: a status message in the CLI's place, which agents read (GET /v1/projects)
         break
       }
       case 'Stop':
+        this.questions.delete(session)
         out.event = { kind: 'stop', lastMessage: typeof body.last_assistant_message === 'string' ? body.last_assistant_message : null }
         break
       case 'ErrorOccurred': {
@@ -348,16 +411,30 @@ export class CopilotAdapter implements ProviderAdapter {
         const recoverable = body.recoverable ?? body.is_recoverable
         if (message && advanced.pattern('copilot.signIn.hookMessage').test(message)) out.event = { kind: 'signIn', message }
         else if (recoverable === false) out.event = { kind: 'stop', lastMessage: message, failed: true }
+        // A model call it tries again (HI-1973): the turn goes on, waiting to retry; why, from its message.
+        else if (recoverable === true && advanced.pattern('copilot.retry.context').test(String(body.error_context ?? ''))) out.event = { kind: 'retry', ...copilotRetryOf(message ?? '') }
         break
       }
       case 'PreCompact':
         out.event = { kind: 'compactStart', trigger: String(body.trigger ?? 'auto') }
         break
       case 'SessionEnd':
+        this.questions.delete(session)
         out.event = { kind: 'end' }
         break
     }
     return out
+  }
+
+  /**
+   * The launch's hooks (HI-982): Hive's, as its launch plugin passes them (copilotHooks). Copilot may load others too
+   * (the folder's, its own plugins'), which Hive doesn't read: said so, never listed as none.
+   */
+  launchHooks(ctx: LaunchContext): LaunchHooks {
+    const token = ctx.env.HIVE_HOOK_TOKEN ?? ''
+    const hive = rowsOfHooksTable(copilotHooks(ctx.hookUrl, token).hooks, { source: 'plugin', status: 'passed', observed: true }, [token])
+    const rows = hive.rows.map((r) => ({ ...r, source: 'hive' as const }))
+    return { listing: { basis: 'launch', rows, notes: [{ kind: 'othersUnread' }] }, receivers: Object.fromEntries(rows.map((r) => [r.event, r.type])) }
   }
 
   /** Claude Code's reply format, which Copilot honours for PascalCase PreToolUse (deny, and ask: its own dialog). */
@@ -411,6 +488,13 @@ export class CopilotAdapter implements ProviderAdapter {
     return eventsDetails(appended, (memo.copilot ??= copilotDetailsMemo()) as CopilotDetailsMemo)
   }
 
+  /** Turns by interaction (its hooks carry no turn id: joined by time), #1371. */
+  transcriptTurns(appended: string, memo: Record<string, unknown>): TranscriptTurn[] {
+    return copilotTranscriptTurns(appended, memo)
+  }
+
+  readonly turnsJoin = 'time'
+
   // -------------------------------------------------------------------------
   // Transcripts: COPILOT_HOME/session-state/<id>/events.jsonl, with workspace.yaml beside it
   // -------------------------------------------------------------------------
@@ -431,8 +515,8 @@ export class CopilotAdapter implements ProviderAdapter {
   }
 
   /** The sessions Copilot keeps for this folder (their workspace.yaml's cwd), with a conversation in them (events.ts). */
-  listSessions(folder: string): Promise<ExternalSession[]> {
-    return listCopilotSessions(copilotHome(), folder)
+  listSessions(folder: string, skip?: (id: string) => boolean): Promise<ExternalSession[]> {
+    return listCopilotSessions(copilotHome(), folder, skip)
   }
 
   async subSessionOf(): Promise<SubSession | null> {

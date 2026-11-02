@@ -13,7 +13,11 @@ import { shownText } from '@shared/advanced'
 import { providerDescriptor, providerName } from '@shared/providers'
 import { safeguardText } from '@shared/safeguards'
 import { placeTip, type Box } from '@shared/tipPlacement'
+import { placeMenu } from '@shared/menuPlacement'
 import { msg, tr, tRich, type Msg } from '@shared/i18n'
+import { watchStatus } from './watchLine'
+import { dialogOpened } from '../windowHealth'
+import { headingId, slugOf } from '@shared/docSections'
 
 export function Icon({ name, className, title, spin }: { name: string; className?: string; title?: string; spin?: boolean }) {
   return <i className={cx('codicon', `codicon-${name}`, spin && 'spin', className)} title={title} aria-hidden={!title} />
@@ -198,6 +202,14 @@ export function OneLineTitle({ text, className }: { text: string; className?: st
 const TipParent = createContext<((inner: boolean) => void) | null>(null)
 
 /**
+ * HI-2052: the hover tooltip showing now, so only one shows at a time: another one showing hides it, unless it is
+ * around the new one (an outer tooltip gives way to an inner one by TipParent, and shows again when the inner one goes).
+ */
+let hovered: { owner: object; wrap: HTMLElement; hide: () => void } | null = null
+/** Whether a hover tooltip holds the slot, and whether its anchor is still in the page, for tests (HI-2084). */
+;(window as unknown as { __hiveHoveredTip?: () => { connected: boolean } | null }).__hiveHoveredTip = () => (hovered ? { connected: hovered.wrap.isConnected } : null)
+
+/**
  * Two sentences one after the other, each with its own full stop, spaced as the language does: a space in English,
  * none in Japanese or Chinese (#893). Either can be markup.
  */
@@ -213,6 +225,9 @@ export function sentences(first: ReactNode, second: ReactNode): ReactNode[] {
  */
 export function Tooltip({ content, children, delay = 350, block, side, focus, className }: { content: ReactNode; children: ReactNode; delay?: number; block?: boolean; side?: 'right'; focus?: boolean; className?: string }) {
   const ref = useRef<HTMLSpanElement>(null)
+  // Who holds the hovered slot (HI-2084): this tooltip for as long as it is mounted. Its anchor's ref is already null when
+  // its unmount's cleanup runs, so the slot is released by this, never by the anchor.
+  const owner = useRef({})
   const tipRef = useRef<HTMLDivElement>(null)
   const [anchor, setAnchor] = useState<Box | null>(null)
   const [placed, setPlaced] = useState<{ left: number; top: number } | null>(null)
@@ -227,11 +242,20 @@ export function Tooltip({ content, children, delay = 350, block, side, focus, cl
     return () => parent(false)
   }, [parent, shown])
   const timer = useRef<number | undefined>(undefined)
-  const show = (): void => {
+  // Shown by the pointer (else by the keyboard's focus): only then does the pointer's leaving close it.
+  const byHover = useRef(false)
+  const show = (how: 'hover' | 'focus'): void => {
     window.clearTimeout(timer.current)
     timer.current = window.setTimeout(() => {
-      const r = ref.current?.getBoundingClientRect()
-      if (!r) return
+      const wrap = ref.current
+      const r = wrap?.getBoundingClientRect()
+      if (!wrap || !r) return
+      byHover.current = how === 'hover'
+      if (byHover.current) {
+        // HI-2052: one hover tooltip at a time (an outer one stays, given way to this one by TipParent).
+        if (hovered && hovered.wrap !== wrap && !hovered.wrap.contains(wrap)) hovered.hide()
+        hovered = { owner: owner.current, wrap, hide }
+      }
       setPlaced(null)
       setFit('normal')
       setAnchor({ left: r.left, top: r.top, right: r.right, bottom: r.bottom })
@@ -239,11 +263,37 @@ export function Tooltip({ content, children, delay = 350, block, side, focus, cl
   }
   const hide = (): void => {
     window.clearTimeout(timer.current)
+    if (hovered?.owner === owner.current) hovered = null
     setAnchor(null)
     setPlaced(null)
     setFit('normal')
   }
-  useEffect(() => () => window.clearTimeout(timer.current), [])
+  useEffect(
+    () => () => {
+      window.clearTimeout(timer.current)
+      if (hovered?.owner === owner.current) hovered = null
+    },
+    []
+  )
+  // HI-2052: shown by the pointer, it closes once the pointer is over anything but what it wraps, however that got away
+  // from under it (moved, re-laid out: no mouseleave comes for a still pointer). The tip itself takes no pointer events.
+  useEffect(() => {
+    if (!shown || !byHover.current) return
+    const moved = (e: PointerEvent): void => {
+      if (!ref.current?.contains(e.target as Node)) hide()
+    }
+    document.addEventListener('pointermove', moved, { capture: true, passive: true })
+    return () => document.removeEventListener('pointermove', moved, { capture: true })
+  }, [shown])
+  // Shown, Esc hides it (WCAG 1.4.13: dismissable without moving the pointer or the focus), as the lanes' legend needs (#1421).
+  useEffect(() => {
+    if (!shown) return
+    const key = (e: KeyboardEvent): void => {
+      if (e.key === 'Escape') hide()
+    }
+    document.addEventListener('keydown', key, true)
+    return () => document.removeEventListener('keydown', key, true)
+  }, [shown])
   // Before it paints, and again when its content changes while shown (placed by its new size; set only on a change).
   useLayoutEffect(() => {
     const el = tipRef.current
@@ -263,10 +313,10 @@ export function Tooltip({ content, children, delay = 350, block, side, focus, cl
       className="tip-wrap"
       style={block ? { display: 'flex' } : undefined}
       ref={ref}
-      onMouseEnter={show}
+      onMouseEnter={() => show('hover')}
       onMouseLeave={hide}
       onMouseDown={hide}
-      onFocus={focus ? (e) => (e.target as Element).matches(':focus-visible') && show() : undefined}
+      onFocus={focus ? (e) => (e.target as Element).matches(':focus-visible') && show('focus') : undefined}
       onBlur={focus ? hide : undefined}
     >
       <TipParent.Provider value={setInner}>{children}</TipParent.Provider>
@@ -283,6 +333,8 @@ export function Tooltip({ content, children, delay = 350, block, side, focus, cl
 }
 
 export function InfoTip({ text }: { text: ReactNode }) {
+  // No text, no ⓘ: an icon that opens an empty tooltip (HI-2149).
+  if (text == null || text === '' || text === false) return null
   return (
     <Tooltip content={text} delay={100}>
       <Icon name="info" className="info-icon" />
@@ -321,6 +373,53 @@ export function StaleNote({ what, error, at, onRetry }: { what: string; error: s
       </button>
     </div>
   )
+}
+
+const COPY_CODE = {
+  copy: msg({ id: 'shell.copyCode.copy', defaultMessage: 'Copy {code}', description: 'Tooltip of the small Copy button beside a command or path shown as code (Provider Setup, say): {code} is exactly what it copies.' }),
+  label: msg({ id: 'shell.copyCode.label', defaultMessage: 'Copy', description: 'The accessible name of the small Copy button beside a command or path shown as code. Keep it short.' }),
+  copied: msg({ id: 'shell.copyCode.copied', defaultMessage: 'Copied', description: 'Shown for a moment beside a command or path after its Copy button copied it.' })
+}
+
+/**
+ * A command or path shown as code, with a small Copy button beside it (#1204) that copies exactly it, nothing around it,
+ * and says Copied for a moment.
+ */
+export function CopyableCode({ code }: { code: string }) {
+  const [copied, setCopied] = useState(false)
+  useEffect(() => {
+    if (!copied) return
+    const t = setTimeout(() => setCopied(false), 1500)
+    return () => clearTimeout(t)
+  }, [copied])
+  return (
+    <span className="copy-code">
+      <code>{code}</code>
+      <button
+        type="button"
+        className="copy-code-btn"
+        data-copy-code={code}
+        aria-label={tr(COPY_CODE.label)}
+        title={tr(COPY_CODE.copy, { code })}
+        onClick={() => {
+          void navigator.clipboard.writeText(code).then(() => setCopied(true), () => undefined)
+        }}
+      >
+        <Icon name={copied ? 'check' : 'copy'} />
+      </button>
+      {copied && (
+        <span className="copy-code-done" role="status">
+          {tr(COPY_CODE.copied)}
+        </span>
+      )}
+    </span>
+  )
+}
+
+/** Text with `code` and **bold** spans, as provider notes are written: each code span copyable on its own (#1204). */
+export function CodeText({ text }: { text: string }) {
+  const code = (s: string, k: number) => s.split('`').map((part, i) => (i % 2 ? <CopyableCode key={`${k}.${i}`} code={part} /> : <span key={`${k}.${i}`}>{part}</span>))
+  return <>{text.split('**').map((part, k) => (k % 2 ? <strong key={k}>{code(part, k)}</strong> : code(part, k)))}</>
 }
 
 export function IconButton({
@@ -470,12 +569,22 @@ export const STATUS_TEXT: Readonly<Record<SessionStatus | 'idle', string>> = Obj
  * unknown, working…); when no turn runs, Hive's policy words: what its watch waits for, its status message, finished or
  * ready, with any background tasks it is running.
  */
-export function statusText(live: Pick<LiveSessionState, 'status' | 'statusMessage' | 'statusText' | 'mergeSlot' | 'mergeSlotText' | 'backgroundTasks' | 'question' | 'watch' | 'turn' | 'runtime'>): string {
+/** A server connection's refused key (HI-1772), where a sign-in connection's agent needs sign-in. */
+const KEY_REFUSED = {
+  status: msg({ id: 'shell.status.keyRefused', defaultMessage: 'Key refused', description: "An agent's status: its server connection's API key was refused by the server (where a signed-in connection would need sign-in)." }),
+  carryOn: msg({ id: 'shell.keyRefused.then', defaultMessage: "{name}'s key was refused. Replace it in Settings → Accounts & Connections, then Resume in the project's header carries on the agents it stopped.", description: "Tooltip of an agent whose server connection's ({name}) API key was refused, its second line. Settings → Accounts & Connections names a section; Resume is a button in the project's header." }),
+  stopped: msg({ id: 'shell.keyRefused.stopped', defaultMessage: "Its turn stopped when {name}'s key was refused. Resume in the project's header carries it on.", description: "Tooltip of an agent whose turn stopped because its server connection's ({name}) API key was refused." })
+}
+
+export function statusText(live: Pick<LiveSessionState, 'status' | 'statusMessage' | 'statusText' | 'mergeSlot' | 'mergeSlotText' | 'backgroundTasks' | 'question' | 'watch' | 'turn' | 'runtime' | 'launchedConnection'>): string {
   const text = ((): string => {
+    // On a server connection (HI-1772) there is no sign-in: its key was refused.
+    if (live.status === 'signin' && live.launchedConnection?.server) return tr(KEY_REFUSED.status)
     const projected = live.runtime ? runtimeLabel(live) : unknownStateText(live)
     if (projected) return projected
-    // Waiting on cards: what for ("Waiting for #12 → Review").
-    if (live.status === 'watching' && live.watch) return live.watch.label
+    // Waiting on cards: what for, in the window's words and its card names ("Waiting for HI-12 → Review", HI-1679: never
+    // the watch's `label`, the English agents read).
+    if (live.status === 'watching' && live.watch) return watchStatus(live.watch)
     // Hive's own words in the window's language (#847), or the CLI's as they came.
     if (live.statusMessage) return shownStatusMessage(live)!
     // At the merge slot (#350): waiting for it, or merging.
@@ -545,12 +654,16 @@ export function SafeguardMark({ live }: { live: Pick<LiveSessionState, 'safeguar
  * For the tooltips of an agent whose turn a refused sign-in stopped (#309): what its CLI said and how to sign in again
  * (while it needs sign-in), then that Resume (n) carries it on. Null for any other agent.
  */
-export function signInNote(live: Pick<LiveSessionState, 'status' | 'signIn' | 'provider'> | null | undefined): string | null {
+export function signInNote(live: Pick<LiveSessionState, 'status' | 'signIn' | 'provider' | 'launchedConnection'> | null | undefined): string | null {
   if (!live?.signIn) return null
   const d = providerDescriptor(live.provider)
   // Hive's own message in the window's language (#847), else what the CLI said, as it said it.
   const message = live.signIn.messageText ? shownText(live.signIn.messageText) : live.signIn.message
   const said = message.length > 160 ? `${message.slice(0, 160)}…` : message
+  // On a server connection (HI-1772): its key was refused, replaced in Settings → Accounts & Connections (no sign-in).
+  const server = live.launchedConnection?.server ? live.launchedConnection.name : null
+  if (server && live.status === 'signin') return [tr(msg({ id: 'shell.signIn.said', defaultMessage: '{provider} says: {said}', description: "Tooltip of an agent that needs sign-in, its first line. {provider} is the coding agent's name; {said} what its CLI said, as it said it." }), { provider: d.name, said }), tr(KEY_REFUSED.carryOn, { name: server })].join('\n')
+  if (server && (live.status === 'ready' || live.status === 'finished')) return tr(KEY_REFUSED.stopped, { name: server })
   // Two lines: what the CLI said, then how to carry on (a message keeps no line break).
   if (live.status === 'signin')
     return [
@@ -753,6 +866,8 @@ export function Modal({
 }) {
   const busyNow = useRef(busy)
   busyNow.current = busy
+  // Open: where the window is, for hive.log's long-task and hang lines (HI-1775).
+  useEffect(() => dialogOpened(title), [title])
   // Escape runs this render's onClose, never an earlier one's: a dialog whose fields fill in after it opens would
   // otherwise answer an Escape with its first render's view of them (#288).
   const onCloseNow = useRef(onClose)
@@ -862,26 +977,85 @@ export function Modal({
 }
 
 marked.setOptions({ gfm: true, breaks: false })
-// GitHub-style heading ids, so the docs' #links work in Hive as they do on GitHub.
+// GitHub-style heading ids, so the docs' #links work in Hive as they do on GitHub; a heading's explicit id
+// (`<a id="git"></a>`, #1535) is its id instead, and its empty anchor is dropped.
 marked.use({
   renderer: {
     heading({ tokens, depth, text }) {
-      const id = text.toLowerCase().replace(/<[^>]*>/g, '').replace(/[^\p{L}\p{N}\s-]/gu, '').trim().replace(/\s/g, '-')
-      return `<h${depth} id="${id}">${this.parser.parseInline(tokens)}</h${depth}>\n` // i18n-ignore: HTML, not text
+      const id = headingId(text) ?? slugOf(text)
+      const inner = this.parser.parseInline(tokens).replace(/\s*<a\s+id="[^"]*"\s*>\s*<\/a>/gi, '')
+      return `<h${depth} id="${id}">${inner}</h${depth}>\n` // i18n-ignore: HTML, not text
     }
   }
 })
 
-export function Markdown({ source, className, onLink }: { source: string; className?: string; onLink?: (href: string) => boolean }) {
-  const html = DOMPurify.sanitize(marked.parse(source, { async: false }) as string)
+/** Card references Markdown links to their cards (#1221): where each is in a text, the card it names, and opening one. */
+export interface MarkdownCards {
+  find: (text: string) => { start: number; end: number; number: number }[]
+  title: (n: number) => string | null
+  open: (n: number) => void
+}
+
+/**
+ * Wraps the card references in rendered Markdown's text in links (`hive-card:N`), never inside a link, code or a code
+ * block. Done on the sanitized HTML, whose text nodes only gain links of Hive's own scheme.
+ */
+function linkCards(html: string, cards: MarkdownCards): string {
+  const doc = new DOMParser().parseFromString(`<body>${html}</body>`, 'text/html')
+  const walker = doc.createTreeWalker(doc.body, NodeFilter.SHOW_TEXT)
+  const texts: Text[] = []
+  for (let n = walker.nextNode(); n; n = walker.nextNode()) if (!(n.parentElement?.closest('a, code, pre'))) texts.push(n as Text)
+  for (const t of texts) {
+    const text = t.data
+    const found = cards.find(text)
+    if (!found.length) continue
+    const frag = doc.createDocumentFragment()
+    let at = 0
+    for (const m of found) {
+      frag.append(text.slice(at, m.start))
+      const a = doc.createElement('a')
+      a.setAttribute('href', `hive-card:${m.number}`)
+      a.className = 'card-ref'
+      const title = cards.title(m.number)
+      if (title) a.setAttribute('title', title)
+      a.textContent = text.slice(m.start, m.end)
+      frag.append(a)
+      at = m.end
+    }
+    frag.append(text.slice(at))
+    t.replaceWith(frag)
+  }
+  return doc.body.innerHTML
+}
+
+/**
+ * Markdown, sanitized. `cards`: card references (AM-12, #1061) link to their cards, as in a card's description and comments.
+ * `breaks`: a single line break is kept (#1637: an agent's question written line by line), not run into its paragraph.
+ */
+export function Markdown({ source, className, onLink, cards, breaks, images }: { source: string; className?: string; onLink?: (href: string) => boolean; cards?: MarkdownCards; breaks?: boolean; images?: (src: string) => string | null }) {
+  const clean = DOMPurify.sanitize(marked.parse(source, { async: false, ...(breaks ? { breaks: true } : {}) }) as string)
+  const html = cards ? linkCards(clean, cards) : clean
+  // Images the caller gives a source of its own once shown (HI-1700: a card's attachments, by a relative placeholder the
+  // sanitiser keeps; their hive-img: and blob: URLs it wouldn't).
+  const ref = useRef<HTMLDivElement>(null)
+  useLayoutEffect(() => {
+    if (!images || !ref.current) return
+    for (const img of ref.current.querySelectorAll('img')) {
+      const to = images(img.getAttribute('src') ?? '')
+      if (to) img.setAttribute('src', to)
+    }
+  }, [html, images])
   return (
     <div
+      ref={ref}
       className={cx('markdown', className)}
       onClick={(e) => {
         const a = (e.target as HTMLElement).closest('a')
         if (!a) return
         const href = a.getAttribute('href') ?? ''
         e.preventDefault()
+        const card = /^hive-card:(\d+)$/.exec(href)
+        if (card && cards) return cards.open(Number(card[1]))
         if (onLink?.(href)) return
         if (/^https?:/.test(href)) void window.hive.invoke('app:openExternal', href)
         else if (href.startsWith('#')) document.getElementById(href.slice(1))?.scrollIntoView({ behavior: 'smooth' })
@@ -950,15 +1124,18 @@ export function ContextMenu({ x, y, above, items, keyboard, onClose }: { x: numb
   useLayoutEffect(() => {
     const r = ref.current?.getBoundingClientRect()
     if (!r) return
-    const fits = y + r.height + 8 <= window.innerHeight
-    setPos({ x: Math.min(x, window.innerWidth - r.width - 8), y: fits || above === undefined ? Math.min(y, window.innerHeight - r.height - 8) : Math.max(8, above - r.height - 4) })
+    setPos(placeMenu({ x, y, above }, r, { width: window.innerWidth, height: window.innerHeight }))
   }, [x, y, above])
   useEffect(() => {
     const close = (e: MouseEvent): void => {
       if (!ref.current?.contains(e.target as Node)) onClose()
     }
     const key = (e: KeyboardEvent): void => {
-      if (e.key === 'Escape') return onClose()
+      // Taken: what listens after it (the focus view's Escape back to the tiles, #1053) leaves it alone.
+      if (e.key === 'Escape') {
+        e.preventDefault()
+        return onClose()
+      }
       const order = items.map((it, i) => (choosable(it) ? i : -1)).filter((i) => i >= 0)
       const at = order.indexOf(activeRef.current)
       const it = items[activeRef.current]

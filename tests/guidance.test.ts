@@ -11,17 +11,27 @@ import { taskPrompt } from '../src/shared/tasks'
 import { ASSISTANT_ONLY_TOOLS, assistantTools } from '../src/shared/assistantTools'
 import { parseSkillFrontmatter, skillFor } from '../src/main/skills'
 import type { SkillAudience, TaskCard } from '../src/shared/types'
+import { WORKSPACE_NOTES_PATH } from '../src/shared/workspaceNotes'
+import type { Finisher, ReviewBy } from '../src/shared/workflow/options'
 
 const ROOT = join(__dirname, '..')
 const SKILLS = join(ROOT, 'resources', 'skills')
-const catalog = new Map<string, { audience: SkillAudience; description: string; text: string }>()
+/**
+ * Each bundled skill: its SKILL.md (`skill`), its reference files beside it (HI-2011: SKILL.md as a contents page, the
+ * rest read only when needed), and `text`, all of them together, which the checks of what the skills say read, so a
+ * rule moved into a reference file is still checked.
+ */
+const catalog = new Map<string, { audience: SkillAudience; description: string; skill: string; refs: Map<string, string>; others: string[]; text: string }>()
 for (const name of readdirSync(SKILLS)) {
-  const text = readFileSync(join(SKILLS, name, 'SKILL.md'), 'utf8')
-  const fm = parseSkillFrontmatter(text)
-  catalog.set(name, { audience: fm.audience!, description: fm.description ?? '', text })
+  const skill = readFileSync(join(SKILLS, name, 'SKILL.md'), 'utf8')
+  const fm = parseSkillFrontmatter(skill)
+  const entries = readdirSync(join(SKILLS, name), { withFileTypes: true }).filter((e) => e.name !== 'SKILL.md')
+  const refs = new Map(entries.filter((e) => e.isFile() && e.name.endsWith('.md')).map((e) => [e.name, readFileSync(join(SKILLS, name, e.name), 'utf8')]))
+  const others = entries.filter((e) => !(e.isFile() && e.name.endsWith('.md'))).map((e) => e.name)
+  catalog.set(name, { audience: fm.audience!, description: fm.description ?? '', skill, refs, others, text: [skill, ...refs.values()].join('\n\n') })
 }
 /** Every hive tool the MCP server defines. */
-const TOOLS = [...readFileSync(join(ROOT, 'src', 'main', 'mcp', 'hive-mcp.ts'), 'utf8').matchAll(/name: '(hive_\w+)'/g)].map((m) => m[1])
+const TOOLS = [...readFileSync(join(ROOT, 'src', 'main', 'mcp', 'hive-mcp.ts'), 'utf8').matchAll(/(?:name: |\bintent\(\s*)'(hive_\w+)'/g)].map((m) => m[1])
 const skillsNamed = (text: string): string[] => [...text.matchAll(/\b([a-z]+(?:-[a-z]+)+) skill/g)].map((m) => m[1])
 const toolsNamed = (text: string): string[] => [...new Set([...text.matchAll(/\bhive_[a-z_]+/g)].map((m) => m[0]))]
 
@@ -41,16 +51,59 @@ describe('the session contract', () => {
     for (const n of [agent, assistant, controlRules('agents')].flatMap(skillsNamed)) expect(catalog.has(n), n).toBe(true)
   })
 
+  it('names only the skills delivered: one switched off leaves the contract, the rest stay (#1431)', () => {
+    const named = (text: string): string[] => [...catalog.keys()].filter((n) => n.includes('-') && new RegExp(`\\b${n}\\b`).test(text))
+    const all = named(agent)
+    for (const off of all) {
+      const without = hiveInstructions('web', 'agent', true, new Set([off]))
+      expect(named(without), off).toEqual(all.filter((n) => n !== off))
+      // The board rules stay whatever is switched off.
+      expect(without, off).toMatch(/Board rules \(Hive's, whatever a skill says, or if it is missing\)/)
+    }
+    expect(named(hiveInstructions('web', 'agent', true, new Set(all)))).toEqual([])
+  })
+
   it('keeps the board boundaries a session needs when its skills are missing', () => {
     expect(agent).toMatch(/or if it is missing/)
-    expect(agent).toMatch(/Working on a card: move it to doing first \(also when it is back from review\), then to review with a comment saying what you did/)
-    expect(agent).toMatch(/Reviewing a card is not working on it: it stays in review with its agent/)
-    expect(agent).toMatch(/then failed, or passed with column passed/)
-    expect(agent).toMatch(/If it leaves review meanwhile, your review is over: leave the card where it is \(not back to review or on to passed\)/)
-    expect(agent).toMatch(/Done means merged: move a card to done only once its work is merged \(in the project folder: committed\), or when the user asks/)
-    expect(agent).toMatch(/On hold is the user's: never move cards in or out unasked/)
+    // #1529 (P8): the intents, and that Hive enforces the rest (§16.8): what the project's rules refuse is the refusal's to say.
+    for (const t of ['hive_start_card', 'hive_submit', 'hive_start_review', 'hive_verdict', 'hive_report_merge']) expect(agent, t).toContain(t)
+    expect(agent).toMatch(/Hive refuses what the project's rules don't allow, saying why and what to do next/)
+    // HI-2010: a column move's translation is its reply's to say, and checkHold refuses an agent putting a card On Hold;
+    // taking one out isn't refused, so that half stays.
+    expect(agent).not.toMatch(/is translated into its intent/)
+    expect(agent).toMatch(/Never take a card out of On Hold unasked/)
     expect(agent).toMatch(/Add cards for follow-up work rather than doing it unasked/)
     expect(agent).toMatch(/use the hive tools for them, not the file system/)
+  })
+
+  // #1529 (#903): a fresh user's Claude agents read their inbox and never acked, so it showed overdue. Every CLI gets the contract.
+  // HI-2010: the overdue mark is Hive's (deliveries.ts), so the contract no longer explains it.
+  it('says read, act, then ack, to agents and the Assistant', () => {
+    for (const text of [agent, assistant]) {
+      expect(text).toMatch(/read it with hive_inbox, act on it, then ack it \(hive_inbox with ack\) before you wait or end your turn\./)
+      expect(text).not.toMatch(/within 30 minutes/)
+    }
+  })
+
+  // #1529 (P8): whether a card needs review, who merges and how many rounds are the project's options, its kind and
+  // hive.workflow.enforce: the contract names the intents and leaves each case to Hive's reply or refusal. Every session
+  // gets the same contract, so each line reads right for a solo user with the rules off as for a Git team with them on.
+  it('stays conditional where the gates are: no round count, no review or merge stated as the rule', () => {
+    for (const text of [agent, hiveInstructions('web', 'agent', false)]) {
+      // hive.workflow.enforce off: no round limit, no one card at a time, lane edits at once.
+      expect(text).not.toMatch(/\b\d+ rounds?\b|\bround limit\b|\bone (?:card )?at a time\b/i)
+      // Review off or by the user: a card can finish on submit, with no reviewer.
+      expect(text).not.toMatch(/\b(?:move|moves) (?:it|a card|the card) to (?:doing|review|passed|done)\b|\ba reviewer (?:is|gets|takes)\b/i)
+      // Finish not checked, or no version control: Done isn't proven merged; a no-code card has no commit.
+      expect(text).not.toMatch(/\bDone (?:means|=|is) merged\b|\bonce it passes\b|\bcommit(?:ted|s)?\b|\bHEAD\b/i)
+      // Cards built in the shared project folder: the folder line names it beside slots and review copies.
+      expect(text).toMatch(/Hive sets your folder \(the project's, a card's or lane's slot, or the review copy a review names\)/)
+      expect(text).toMatch(/hive_report_merge for a merge you made/)
+    }
+  })
+
+  it("says a missing skill isn't needed, before the board rules it points to (HI-2265)", () => {
+    expect(agent).toMatch(/A missing skill isn't needed: do the work by the board rules below\.[\s\S]*Board rules/)
   })
 
   it('names only hive tools that exist', () => {
@@ -62,9 +115,13 @@ describe('the session contract', () => {
     // hive-progress line added about 180, #170's On Hold, Passed and Done-means-merged about 80, #476's worktree
     // boundary about 160, #509's scratch rule about 220, #613's stop-what-you-start line about 260, #650's inbox line
     // about 280 (and 160 for the Assistant's), #817's long-documents line about 110 (both), #1129's Done in the project
-    // folder about 35.
-    expect(withLatestHandover(agent, 'handovers/2026-10-03-web-auth-refactor.md').length).toBeLessThan(2800)
-    expect(assistant.length).toBeLessThan(710)
+    // folder about 35. #1529 (P8) held the agent's at its 1.0.0 size (2,656 characters, 2,787 with a handover): the
+    // board rules became the intents and Hive's refusals, and #903's act-then-ack line came in within it; the
+    // Assistant's grew by that line, about 140. HI-686's route to the generalist skill (Darren's design: the contract
+    // points to it) added 15 ("; for other work, use generalist", the shortest that reads).
+    expect(agent.length).toBeLessThanOrEqual(2671)
+    expect(withLatestHandover(agent, 'handovers/2026-10-03-web-auth-refactor.md').length).toBeLessThanOrEqual(2802)
+    expect(assistant.length).toBeLessThan(820)
     for (const level of ['look', 'agents', 'projects'] as const) expect(controlRules(level).length).toBeLessThan(1200)
     const card = { number: 7, title: 'T', description: 'D', blockedBy: [], comments: [] } as unknown as TaskCard
     expect(taskPrompt(card, true).length - taskPrompt(card, false).length).toBeLessThan(40)
@@ -73,28 +130,111 @@ describe('the session contract', () => {
   it("adds the journal's rule and scope while the journal is on, and nothing while it is off (#1032)", () => {
     expect(withJournal(assistant, null)).toBe(assistant)
     const on = withJournal(assistant, ['decision', 'plan'])
-    expect(on.startsWith(assistant)).toBe(true)
-    const rule = on.slice(assistant.length)
+    // HI-2048 (K12): its skills line leaves out handover while the journal is on; the rest is as it was.
+    const skillsOff = assistant.split('\n').find((l) => l.startsWith("Hive's skills cover"))!
+    expect(skillsOff).toMatch(/, handover, pick-up and workspace-note\.$/)
+    const skillsOn = on.split('\n').find((l) => l.startsWith("Hive's skills cover"))!
+    expect(skillsOn).toMatch(/, pick-up and workspace-note\.$/)
+    expect(skillsOn).not.toMatch(/handover/)
+    const base = assistant.replace(skillsOff, skillsOn)
+    expect(on.startsWith(base)).toBe(true)
+    const rule = on.slice(base.length)
     expect(rule).toMatch(/the journal skill/)
     expect(rule).toMatch(/Its scope \(what the user lets you store\): decision, plan, and weekly digests/)
-    expect(rule).toMatch(/It replaces your handovers: asked for one, say why it isn't needed/)
+    // Only the case where the user still wants one; saying why it isn't needed is the journal skill's (#989).
+    expect(rule).toMatch(/It replaces your handovers: one the user still wants \(for another agent or a person\) is the handover skill's\./)
+    expect(rule).not.toMatch(/isn't needed/)
+    expect(catalog.get('journal')?.text).toMatch(/asked for one, say so in a line/)
+    // An agent's contract has no such line: it only gains the rule.
+    const agentContract = hiveInstructions('web')
+    expect(withJournal(agentContract, ['decision']).startsWith(agentContract)).toBe(true)
     expect(catalog.get('journal')?.audience).toBe('assistant')
     for (const t of toolsNamed(rule)) expect(assistantTools('projects', false, true), t).toContain(t)
     expect(journalRule(['decision', 'plan', 'event', 'incident', 'insight', 'preference', 'moment']).length).toBeLessThan(600)
   })
 })
 
+// #1529 (P8, AGENTS.md's one owner per rule): a rule a skill owns is stated once in everything a session of that role
+// reads (its contract, the skills it gets, the tools' descriptions), and never in the contract, which points to the skill.
+describe('one owner per rule', () => {
+  const RULES: [string, RegExp][] = [
+    ['Done means merged', /\bDone (?:means|=|is) merged\b|\bwhich means merged\b/gi],
+    ["Passed isn't merged", /\bPassed (?:isn't|is not|means it passed review, not that it's) merged\b|\breviewed, (?:not merged|waiting to be merged)\b/gi],
+    ['wait with a watch', /\bwait with a watch\b/gi]
+  ]
+  // Places stating one besides its owner today, until lanes A and B (#1524–#1528) and #1530 rewrite them. The list only
+  // shrinks: one no longer stating it fails until it's taken off.
+  const NOT_YET: Record<string, string[]> = {}
+  const tools = readFileSync(join(ROOT, 'src', 'main', 'mcp', 'hive-mcp.ts'), 'utf8')
+  const descriptions = [...tools.matchAll(/description:\s*(?:ASSISTANT\s*\?\s*)?(["'`])((?:\\.|(?!\1).)*)\1(?:\s*:\s*(["'`])((?:\\.|(?!\3).)*)\3)?/g)].map((m) => `${m[2]}\n${m[4] ?? ''}`).join('\n')
+  const places = (role: 'agent' | 'assistant'): [string, string][] => [
+    ['contract', role === 'agent' ? hiveInstructions('web') : [hiveInstructions('', 'assistant'), controlRules('projects', true), journalRule(['decision'])].join('\n')],
+    ...[...catalog].filter(([, s]) => skillFor(s.audience, role)).map(([name, s]): [string, string] => [name, s.text]),
+    ['tool descriptions', descriptions]
+  ]
+
+  for (const role of ['agent', 'assistant'] as const) {
+    it(`states each skill-owned rule once for the ${role}, never in the contract`, () => {
+      for (const [rule, re] of RULES) {
+        const stating = places(role).filter(([, text]) => (text.match(re) ?? []).length > 0).map(([place]) => place)
+        expect(stating, `${role}: ${rule}`).not.toContain('contract')
+        const extra = NOT_YET[`${role}: ${rule}`] ?? []
+        for (const p of extra) expect(stating, `${role}: ${rule} is no longer in ${p}: take it off NOT_YET`).toContain(p)
+        expect(stating.filter((p) => !extra.includes(p)).length, `${role}: ${rule} in ${stating.join(', ')}`).toBeLessThanOrEqual(1)
+      }
+    })
+  }
+  // "Done means merged" is Hive's now (report merge's containment check) and depends on the card's kind (#1524: a no-code
+  // card is Done with no merge), so no text states it whole; the others stay guidance an agent reads somewhere.
+  it('keeps each rule that is still guidance somewhere an agent reads it', () => {
+    for (const [rule, re] of RULES.filter(([r]) => r !== 'Done means merged')) expect(places('agent').some(([, text]) => (text.match(re) ?? []).length > 0), rule).toBe(true)
+  })
+})
+
+// #1530 (P8): the tools' texts say arguments, side effects and refusals as Hive enforces them, and stay true for every
+// project's options (no version control, review off, merges not checked, a shared folder); #1346's text fixes.
+describe("the tools' descriptions", () => {
+  const tools = readFileSync(join(ROOT, 'src', 'main', 'mcp', 'hive-mcp.ts'), 'utf8')
+  const toolsDetail = readFileSync(join(ROOT, 'resources', 'skills', 'use-hive-api', 'tools.md'), 'utf8')
+  it('describe moves as the intents, with no workflow stated as the rule', () => {
+    // The old moves are one sentence of hive_update_task's (HI-2012: its cases in use-hive-api's tools.md): translated
+    // where the rules apply, as asked elsewhere.
+    expect(tools).toMatch(/Moves are the intent tools' \(hive_start_card, hive_submit, hive_verdict…\): a column here is taken as one, and the reply names it\./)
+    expect(toolsDetail).toMatch(/moves are the intent tools' \(`hive_start_card`, `hive_submit`, `hive_start_review`, `hive_verdict`, `hive_report_merge`, `hive_put_back`\)\. Where the project's workflow rules apply, `column` and `review` here are taken as those intents/)
+    // A revision isn't always a commit, nor the folder's head (a shared folder, no version control, a no-code card).
+    expect(tools).not.toMatch(/the head of the card's folder|The revision it is about \(a commit\)/)
+    expect(tools).toMatch(/Report a card's work merged, where its agent merges it or merges aren't checked/)
+  })
+  it("point to use-hive-api's tools.md for their detail, which names only tools there are (HI-2012)", () => {
+    const names = new Set([...tools.matchAll(/name: '(hive_\w+)'|intent\(\s*'(hive_\w+)'/g)].map((m) => m[1] ?? m[2]))
+    const named = new Set([...toolsDetail.matchAll(/`(hive_\w+)`/g)].map((m) => m[1]))
+    expect(names.size).toBeGreaterThan(40)
+    for (const n of named) expect(names, n).toContain(n)
+    // Each tool whose description sends the caller to tools.md has its detail there.
+    const pointing = [...tools.matchAll(/name: '(hive_\w+)',\s*description:[^\n]*\n?[^\n]*\(detail: use-hive-api, tools\.md\)/g)].map((m) => m[1])
+    expect(pointing.length).toBeGreaterThan(5)
+    for (const n of pointing) expect(named, n).toContain(n)
+  })
+  it("carry #1346's text fixes: a lane watch takes lanes only; a decision nudges the Assistant's journal", () => {
+    expect(tools).toMatch(/for a lane, pass lanes only, not its cards\./)
+    expect(toolsDetail).toMatch(/For a lane, pass `lanes` only:\*\* adding its cards wakes you on every move\./)
+    expect(tools).toMatch(/ASSISTANT && JOURNAL && typeof a\.decision === 'string'[^\n]*Note it in your journal \(hive_journal_write\)\./)
+  })
+})
+
 describe('the bundled skills', () => {
   it('each names itself after its folder, says who it is for, and has a description that says when to use it', () => {
     for (const [name, s] of catalog) {
-      expect(parseSkillFrontmatter(s.text).name, name).toBe(name)
+      expect(parseSkillFrontmatter(s.skill).name, name).toBe(name)
       expect(['agents', 'assistant', 'all'], name).toContain(s.audience)
       expect(s.description.length, name).toBeGreaterThan(80)
       expect(s.description.length, name).toBeLessThan(260)
       expect(s.description, name).toMatch(/\bUse (when|only when)\b/)
     }
     // Every session sees the name and description of each skill for it (agents', or the Assistant's): together they stay small.
-    for (const role of ['agent', 'assistant'] as const) expect([...catalog.values()].filter((s) => skillFor(s.audience, role)).reduce((n, s) => n + s.description.length, 0), role).toBeLessThan(2000)
+    // HI-686's generalist skill added about 120 to the agents' (the shortest description the rules above allow says it).
+    // HI-2012 gave the Assistant use-hive-api (the hive tools' detail, moved out of their descriptions): about 190 more.
+    for (const [role, max] of [['agent', 2100], ['assistant', 2200]] as const) expect([...catalog.values()].filter((s) => skillFor(s.audience, role)).reduce((n, s) => n + s.description.length, 0), role).toBeLessThan(max)
   })
 
   it('name only skills that exist and reach the same audience', () => {
@@ -120,6 +260,23 @@ describe('the bundled skills', () => {
     }
   })
 
+  it("tell no agent to use a worktree of its own or to review in the builder's folder (#1444: P7's slots and review copies)", () => {
+    const own = /\b(?:its|your|their|an agent's) (?:own )?(?:git )?worktree\b|\bown (?:git )?worktree\b|\bagents? with (?:its|their) own\b/i
+    const builders = /\breview\w* (?:in|from) (?:the )?builder's (?:worktree|folder|slot)\b/i
+    const tools = readFileSync(join(ROOT, 'src', 'main', 'mcp', 'hive-mcp.ts'), 'utf8')
+    const descriptions = [...tools.matchAll(/description:\s*(?:ASSISTANT\s*\?\s*)?(["'`])((?:\\.|(?!\1).)*)\1/g)].map((m) => m[2])
+    expect(descriptions.length).toBeGreaterThan(50)
+    for (const [name, s] of catalog) {
+      expect(s.text, name).not.toMatch(own)
+      expect(s.text, name).not.toMatch(builders)
+    }
+    for (const d of descriptions) {
+      expect(d).not.toMatch(own)
+      expect(d).not.toMatch(builders)
+    }
+    for (const text of [hiveInstructions('web'), hiveInstructions('', 'assistant')]) expect(text).not.toMatch(own)
+  })
+
   it('link only to files inside their own folder', () => {
     for (const [name, s] of catalog) {
       for (const m of s.text.matchAll(/\]\(([^)#]+)(#[^)]*)?\)/g)) {
@@ -131,9 +288,36 @@ describe('the bundled skills', () => {
     }
   })
 
+  // HI-2011 (Darren, 29 Oct: one rule for every skill, so it scales): a CLI loads SKILL.md whenever the skill is used
+  // and its other files only when needed, deeper links being skimmed. So SKILL.md stays a short contents page, and
+  // what is needed only sometimes is in reference files it links, one level deep.
+  it('keep SKILL.md to 4,000 characters, with reference files beside it, each linked from SKILL.md and linking none', () => {
+    const links = (text: string): string[] => [...text.matchAll(/\]\(([^)#\s]+)(?:#[^)]*)?\)/g)].map((m) => m[1]).filter((t) => !/^[a-z]+:/i.test(t))
+    for (const [name, s] of catalog) {
+      expect(s.skill.replace(/\r\n/g, '\n').length, `${name}'s SKILL.md`).toBeLessThanOrEqual(4000)
+      // Only Markdown files at the top of the folder: no subfolders, nothing else.
+      expect(s.others, name).toEqual([])
+      const linked = links(s.skill).map((t) => t.replace(/^\.\//, ''))
+      const heads = new Set<string>()
+      for (const [file, text] of s.refs) {
+        expect(linked, `${name}: SKILL.md links ${file}`).toContain(file)
+        expect(links(text), `${name}/${file} links no file (one level deep)`).toEqual([])
+        // Its first line, a heading of its own: what a read of it is known by (the scenarios' skillRefsRead).
+        const head = text.split(/\r?\n/)[0]
+        expect(head, `${name}/${file} starts with a heading`).toMatch(/^# \S/)
+        expect(heads.has(head) || s.skill.split(/\r?\n/).includes(head), `${name}/${file}: its heading is its own`).toBe(false)
+        heads.add(head)
+      }
+    }
+    // card-loop by role: a builder never needs the reviewer's half.
+    expect([...catalog.get('card-loop')!.refs.keys()]).toEqual(expect.arrayContaining(['builder.md', 'reviewer.md']))
+  })
+
   // A question for the user blocks the card as well as telling them (#840): a lane watch wakes on a card becoming
   // blocked, never on a comment, so a reviewer's question left as a comment sat unseen for over an hour (#805).
-  it("stop for the user's answer by blocking the card and telling them, then clear it once they decide", () => {
+  // Since #1274 (P4's intents): a question for the user is a request under For you (hive_ask_user), recorded and answered
+  // to the asker's inbox, not a blocked reason and a notification.
+  it("stop for the user's answer by asking them on the card (For you), and carry on once the answer comes", () => {
     const line = (skill: string, starts: string): string => catalog.get(skill)!.text.split(/\r?\n/).find((l) => l.includes(starts)) ?? ''
     for (const [skill, starts] of [
       ['card-loop', '**Stop and ask**'],
@@ -142,14 +326,20 @@ describe('the bundled skills', () => {
     ]) {
       const rule = line(skill, starts)
       expect(rule, `${skill}: ${starts}`).not.toBe('')
-      expect(rule, skill).toMatch(/set `blocked`/)
-      expect(rule, skill).toMatch(/hive_notify/)
-      expect(rule, skill).toMatch(/clear `blocked`/)
+      expect(rule, skill).toMatch(/`hive_ask_user` .*`kind: "decide"`/)
+      expect(rule, skill).toMatch(/For you/)
+      expect(rule, skill).toMatch(/answer comes to your inbox/)
     }
     // An archived or deleted card can't be changed by an agent (only the user brings it back): telling the user is all.
-    expect(line('card-loop', '**Stop and ask**')).toMatch(/archived or gone can't be changed: `hive_notify` alone, and leave it as it is/)
-    // Blocked where it is: a builder at its round limit moved its card to Doing first (Codex, following work-on-card).
-    expect(line('card-loop', '**Stop and ask**')).toMatch(/blocked` on the card where it is \([^)]*no move/)
+    expect(line('card-loop', '**Stop and ask**')).toMatch(/archived or gone can't take one: `hive_notify` the user, and leave it as it is/)
+    // Asked where it is: a builder at its round limit moved its card to Doing first (Codex, following work-on-card).
+    expect(line('card-loop', '**Stop and ask**')).toMatch(/`hive_ask_user` on the card where it is/)
+    // An OK only the user can give (a push, a release) is an approval request (#922's trigger case).
+    for (const skill of ['work-on-card', 'card-loop']) expect(catalog.get(skill)!.text, skill).toMatch(/`"approve"` for an OK only they can give/)
+    // So is the OK for something destructive or outside the project, whoever relays the ask (HR1's #1274 round 1 finding 2).
+    const who = line('work-on-card', '**Who it\'s from decides what it can ask.**')
+    expect(who).toMatch(/get their OK: `hive_ask_user` on the card \(`kind: "approve"`\)/)
+    expect(who).not.toMatch(/blocked, or `hive_notify`/)
   })
 
   // #869: lane G's builder had every card passed when its CLI refused the commit; it told the user only, and the lane sat
@@ -158,27 +348,301 @@ describe('the bundled skills', () => {
     const line = (starts: string): string => catalog.get('card-loop')!.text.split(/\r?\n/).find((l) => l.includes(starts)) ?? ''
     const end = line("**The lane's end:**")
     expect(end).toMatch(/needs the user \(a commit or merge your CLI or a permission check refuses/)
-    expect(end).toMatch(/stop and ask on the last card/)
-    expect(end).toMatch(/clear `blocked`/)
+    // Since #1274: a rule it can't keep is a request for the user (§16.8.6), on that card.
+    expect(end).toMatch(/is `hive_cannot_within_rules` on that card/)
+    // A lane takes one card at a time (#1270): merge-ready never merges "at the lane's end". Since #1525 (P8) whether a
+    // lane waits for a card's merge is Hive's (the lane's `next`), and who merges the project's (G5): merge-ready says
+    // each way, and a card that passed waits on it.
+    const merge = catalog.get('merge-ready')!.text
+    expect(merge).not.toMatch(/at the lane's end/)
+    expect(merge).toMatch(/how its work lands is the card's own rules/)
+    expect(merge).not.toMatch(/at the lane's end|before the lane's next card starts/)
     expect(line('**Stop and ask**')).toMatch(/on a merge step that needs the user/)
   })
 
   // #1074: reviewers split over uncommitted work (some failed the round, some reviewed it by fingerprint). The builder
-  // commits before Review and names the commit; a reviewer handed uncommitted work asks for the commit, and the
-  // builder's watch counts comments so the request wakes it.
-  it('the builder commits before Review and the reviewer asks for a commit rather than failing on that alone', () => {
+  // commits each round and names the commit; a reviewer handed uncommitted work asks for the commit, and the
+  // builder's watch counts comments so the request wakes it. Since #1524 (P8): a submission is a revision, and the rule
+  // that it is committed is the project's gate, so the skill says what to do, not the rule.
+  it('the builder commits each round and the reviewer asks for a commit rather than failing on that alone', () => {
     const text = catalog.get('card-loop')!.text
     const line = (starts: string): string => text.split(/\r?\n/).find((l) => l.startsWith(starts)) ?? ''
-    expect(line('1. Do its work')).toMatch(/\*\*Commit the card's work before moving it to Review\*\*, every round, and name the commit/)
-    expect(line('2. Review it')).toMatch(/\*\*Review the commit the builder names\.\*\* Work sent uncommitted .* isn't a failed round on that alone/)
-    expect(line('- builder: the card')).toMatch(/changes: \["verdict", "column", "comment"\]/)
-    expect(line('- reviewer, after asking for a commit')).toMatch(/changes: \["comment"\]/)
-    // run-lanes' sample brief agrees, leaving the procedure to card-loop (a brief saying "commit once it passes" undid it).
+    // In Git only (HR1's #1524 round 1 finding 1): a no-code card submits a summary, a project without version control its files' state.
+    expect(line('1. Do its work')).toMatch(/for a code card in Git, commit each round's work and name the commit in its summary; a no-code card has nothing to commit/)
+    expect(line('2. Review it')).toMatch(/`hive_start_review` names what to review \(a revision, or a no-code card's summary\)\. For a code card in Git, work that revision doesn't hold \(uncommitted, or no commit named\) isn't a failed round on that alone/)
+    expect(line('Your watch, your card in Review: the card')).toMatch(/changes: \["verdict", "column", "comment"\]/)
+    // #1639: after a submission or a failed verdict in a lane, Hive arms the watch and the reply says so.
+    expect(text).toMatch(/After a submission or a failed verdict in your lane, Hive watches the card for you/)
+    expect(line('- after asking the builder for something')).toMatch(/changes: \["comment"\]/)
+    // run-lanes' sample brief leaves the procedure to card-loop and the rules to Hive (a brief saying "commit once it
+    // passes" undid it; since #1527 a submission's commit is Hive's to check, so the brief says nothing of it).
     const brief = catalog.get('run-lanes')!.text
-    expect(brief).toMatch(/Commit each round on your branch before sending the card to Review \(card-loop\)\./)
+    expect(brief).toMatch(/Use card-loop as the builder\./)
     expect(brief).not.toMatch(/After each card passes: commit/)
     // A reviewer that reads only review-agent-work is pointed there (haiku passed uncommitted work so).
-    expect(catalog.get('review-agent-work')!.text).toMatch(/In a card loop, review the commit its builder names: work sent uncommitted gets a request for a commit, not a verdict \(card-loop, Reviewer\)\./)
+    // The revision start review names is the one reviewed (HR1's #1525 round 1 finding 1): a summary naming another
+    // commit gets a question, never a review of that commit.
+    expect(catalog.get('review-agent-work')!.text).toMatch(/What start review names is what you review, and what your verdict is recorded against: if the builder's summary names another commit, ask the builder \(`hive_request_builder`\) rather than review that one\./)
+    // Since HI-2011 in its reference file for edge cases (other-targets.md).
+    expect(catalog.get('review-agent-work')!.text).toMatch(/For a code card in Git, work that revision doesn't hold \(sent uncommitted\) gets a request for a commit \(`hive_request_builder`\), not a verdict \(card-loop, Reviewer\)\./)
+  })
+})
+
+// #1524 (P8, SPEC §16.17): work-on-card and card-loop describe the intents and the gates; what a gate owns isn't stated
+// again as a rule (the design note's §10, "Becomes a gate"), and where the outcome depends on the project's options, the
+// card's kind or the rules' switch, they say it depends rather than state one case as the rule.
+// Rules a gate now owns, as the skills used to state them: each phrase was in a bundled skill before P8.
+const GATE_RULES: [string, RegExp][] = [
+  ['commit before Review', /\bcommit (the card's work )?before (Review|submitting|moving it)\b/i],
+  ['review the exact commit', /\breview the commit (the|its) builder names\b/i],
+  ['dependencies done before start', /\bcards it depends on \(`blockedBy`\) that aren't done block it\b/i],
+  ['no cards into a running lane', /\b(a running loop never sees a card added|no cards? (in)?to a running lane)\b/i],
+  ['Passed is not merged', /\bPassed means it passed review, not that it's merged\b/i],
+  ['Done = merged, moved by the agent', /\bmove (your|the|a) card (there|to `?done`?) once its work is merged\b/i],
+  ['a decision wakes the lane', /\brecorded decision wakes (nobody|no one)\b/i],
+  ['a late message reopens nothing', /\blate message\b/i],
+  ['old column moves as the way to work', /\bmove (it|the card|a card) to `?(doing|review|passed|done)`?(?! with `hive_update_task`)/i],
+  ['the old review parameter', /\breview: "(start|passed|failed)"/],
+  ['ending the lane with a merge commit', /\bmergeCommit\b|\babandoned: true\b/]
+]
+describe('the skills follow the gates (#1524)', () => {
+  const GATED = ['work-on-card', 'card-loop']
+  it("state no rule a gate owns", () => {
+    for (const name of GATED) for (const [rule, re] of GATE_RULES) expect(catalog.get(name)!.text, `${name}: ${rule}`).not.toMatch(re)
+  })
+
+  it('name the intent tools, each one an agent has', () => {
+    const intents = ['hive_start_card', 'hive_submit', 'hive_put_back', 'hive_report_merge', 'hive_ask_user', 'hive_cannot_within_rules']
+    const loop = ['hive_start_review', 'hive_verdict', 'hive_request_builder', 'hive_loop_step', 'hive_lane']
+    const named = (name: string): string[] => toolsNamed(catalog.get(name)!.text)
+    expect(named('work-on-card')).toEqual(expect.arrayContaining(intents))
+    // Finishing (report merge among its ways) is work-on-card's, which card-loop points to.
+    expect(named('card-loop')).toEqual(expect.arrayContaining([...loop, 'hive_start_card', 'hive_submit', 'hive_ask_user', 'hive_cannot_within_rules']))
+    for (const t of [...intents, ...loop]) {
+      expect(TOOLS, t).toContain(t)
+      expect(ASSISTANT_ONLY_TOOLS, t).not.toContain(t)
+    }
+  })
+
+  it('stay conditional where the gates are: review off, the rules off, a no-code card, the lane\'s rounds', () => {
+    const woc = catalog.get('work-on-card')!.text
+    const loop = catalog.get('card-loop')!.text
+    // Review off: submitting moves the card on past Review.
+    expect(woc).toMatch(/or on past it where the project has no review/)
+    // The rules off: nothing is refused, and nothing counts rounds.
+    expect(woc).toMatch(/With the rules switched off nothing is refused/)
+    const limit = loop.split(/\r?\n/).find((l) => l.includes('**The round limit**')) ?? ''
+    expect(limit).toMatch(/the lane's rounds/)
+    expect(limit).toMatch(/Where the project's rules are enforced, Hive counts/)
+    expect(limit).toMatch(/With the rules off nothing counts them/)
+    // What a submission is depends on two separate dimensions, the platform and the card's kind (HR1's #1524 findings:
+    // round 1's 1 and 3, round 2's 1): only a code card in Git has a commit, its default the card's own revision (in a
+    // shared folder not the folder's head); a no-code card submits its summary on either platform.
+    const SUBMITS: [platform: 'Git' | 'None', kind: 'code' | 'no-code', says: RegExp][] = [
+      ['Git', 'code', /for a code card in Git, a revision, by default the card's own \(its line's head, or its newest commit in a folder shared with other agents; the reply names it\), so commit what it should hold first/],
+      ['Git', 'no-code', /for a no-code card, such as a decision or a write-up, its summary alone/],
+      ['None', 'code', /without version control, the state of the card's files \(`paths`\)/],
+      ['None', 'no-code', /for a no-code card, such as a decision or a write-up, its summary alone/]
+    ]
+    for (const [platform, kind, says] of SUBMITS) expect(woc, `${platform} × ${kind}`).toMatch(says)
+    expect(woc).not.toMatch(/by default your folder's head/)
+    expect(loop).toMatch(/a no-code card has nothing to commit/)
+    // Review decides where a submission goes, and only a reviewer agent asks for a missing commit (in Git, code only).
+    const REVIEW: [review: 'agent' | 'user' | 'off', skill: string, says: RegExp][] = [
+      ['agent', 'card-loop', /`hive_start_review` names what to review \(a revision, or a no-code card's summary\)/],
+      ['user', 'work-on-card', /The reply says where the card went: Review/],
+      ['off', 'work-on-card', /or on past it where the project has no review/]
+    ]
+    for (const [review, skill, says] of REVIEW) expect(catalog.get(skill)!.text, `review ${review}`).toMatch(says)
+    // Every clause telling an agent to commit, or about a commit to name or ask for, is scoped to a code card in Git,
+    // never to Git alone. Clauses split at sentence, semicolon and colon breaks outside parentheses.
+    const clauses = (text: string): string[] => {
+      const out: string[] = []
+      let depth = 0
+      let cur = ''
+      for (let i = 0; i < text.length; i++) {
+        const ch = text[i]
+        if (ch === '(') depth++
+        if (ch === ')') depth = Math.max(0, depth - 1)
+        if (ch === '\n' || (depth === 0 && /[.;:]/.test(ch) && /\s/.test(text[i + 1] ?? ''))) {
+          out.push(cur)
+          cur = ''
+        } else cur += ch
+      }
+      return [...out, cur]
+    }
+    for (const name of GATED) {
+      const commits = clauses(catalog.get(name)!.text).filter((c) => /\bcommit (each|it|what)\b|\(committed\b|\bnaming the commit\b|\bno commit named\b/i.test(c))
+      expect(commits.length, name).toBeGreaterThan(0)
+      for (const c of commits) expect(c, name).toMatch(/\bfor a code card in Git\b/i)
+    }
+    // The check catches what round 2 left: "in Git" alone.
+    expect(clauses('Fix the findings (committed, in Git), then submit.').every((c) => !/\(committed\b/.test(c) || /for a code card in Git/.test(c))).toBe(false)
+    // Who finishes is the project's: every supported way, none stated as the rule (finding 2: Not checked).
+    expect(woc).toMatch(/how it finishes is the project's: the reply, then `hive_read_task`, says what's next/)
+    expect(woc).toMatch(/Where Hive merges, the card's `merge` follows it through the queue/)
+    expect(woc).toMatch(/Where you merge, use merge-ready, then `hive_report_merge` with the merge commit/)
+    expect(woc).toMatch(/Where merges aren't checked, `hive_report_merge` says it's finished, with no merge to prove/)
+    expect(woc).toMatch(/Where the user's OK comes first, it waits for them/)
+    expect(woc).toMatch(/Where the work is done once committed, accepted \(no version control\) or reviewed, and for a no-code card, it finishes on its own/)
+    expect(loop).toMatch(/its finish is the project's, and the card says what's next \(work-on-card, Finish\)/)
+    // A lane one card at a time is the project's rule, said so.
+    expect(loop).toMatch(/where the project's rules hold a lane to one card at a time/)
+    for (const name of GATED) {
+      const text = catalog.get(name)!.text
+      // No round count or wait written in: they are the lane's (the project's Card loops settings).
+      expect(text, name).not.toMatch(/\b\d+ rounds?\b|\brounds: \d+|\b\d+ hours\b/)
+      // Never "Done when it passes" (or the like) without the card's kind and the project's finish.
+      expect(text, name).not.toMatch(/\b(done|finished) (when|once) it passes\b/i)
+      expect(text, name).not.toMatch(/\bmoves? (it|the card) to Passed\b/)
+    }
+  })
+
+  it('read, act, then ack the inbox, for every CLI, and say why', () => {
+    const woc = catalog.get('work-on-card')!.text
+    expect(woc).toMatch(/1\. \*\*Read it then\*\*[\s\S]*2\. \*\*Act on each\*\*[\s\S]*3\. \*\*Then ack it\*\*/)
+    expect(woc).toMatch(/Reading isn't acking, whatever CLI you run in: one not acked within 30 minutes shows as overdue/)
+    expect(catalog.get('card-loop')!.text).toMatch(/`hive_inbox` first[^.]*act, then ack/)
+  })
+
+  // HI-2011's split added only each reference file's heading and SKILL.md's list of them: the rules were moved, not added.
+  it('stay smaller than before P8 (work-on-card 8,991 and card-loop 15,776 characters), reference files and all (LF)', () => {
+    // Round 2: each list also says where its files are (beside SKILL.md), as a model looked in its working folder.
+    expect(catalog.get('work-on-card')!.text.replace(/\r/g, '').length).toBeLessThan(9850)
+    expect(catalog.get('card-loop')!.text.replace(/\r/g, '').length).toBeLessThan(11850)
+  })
+})
+
+// #1525 (P8): review-agent-work and merge-ready on the intents, the review copy and the merge queue; what Hive enforces
+// is a line pointing at its refusal, and who finishes a card (G5) is the project's, each way said.
+describe('the review and merge skills follow the gates (#1525)', () => {
+  const review = (): string => catalog.get('review-agent-work')!.text
+  const merge = (): string => catalog.get('merge-ready')!.text
+
+  it('state no rule a gate owns, outside a card with no workflow', () => {
+    for (const name of ['review-agent-work', 'merge-ready']) {
+      for (const l of catalog.get(name)!.text.split(/\r?\n/)) {
+        // Only the line for a card with no workflow, which still reviews on the board (`review: "start"`).
+        if (l.startsWith('- **A card with no workflow**')) continue
+        for (const [rule, re] of GATE_RULES) expect(l, `${name}: ${rule}`).not.toMatch(re)
+      }
+    }
+  })
+
+  it('review in the review copy start review names, with each command run there, and give the verdict by intent', () => {
+    const text = review()
+    expect(toolsNamed(text)).toEqual(expect.arrayContaining(['hive_start_review', 'hive_verdict', 'hive_request_builder', 'hive_ask_user']))
+    expect(text).toMatch(/`hive_start_review`: its reply names what to review \(a revision with its base and files, or a no-code card's summary/)
+    expect(text).toMatch(/Review there, never in the builder's slot or folder/)
+    // #1559's decision: guidance, not another start folder.
+    expect(text).toMatch(/run every command with the review copy as its working directory: change into it first/)
+    // #1443: a pooled reviewer's start is its assignment, no lane to join.
+    expect(text).toMatch(/A reviewer from the project's pool is told of each card it is given in its inbox: that is its start/)
+    // #533: the run records Hive keeps of the revision are checked, not repeated.
+    expect(text).toMatch(/the runs Hive recorded as the card's checks of that revision/)
+  })
+
+  it("say where the rules decide, never one case as the rule: self-review, the latest submission, a second reviewer, the user's OK", () => {
+    const text = review()
+    expect(text).toMatch(/Where the project's rules forbid it, Hive refuses a review of work you built/)
+    expect(text).toMatch(/Where the rules hold, a verdict on a submission that isn't the latest, or with a decision on the card you haven't read, is refused, saying what to do/)
+    expect(text).toMatch(/Hive moves it on by the project's rules \(another reviewer's pass where it asks for two, the user's OK, its merge, or Done\): the reply says where/)
+    // A convention (G4's screenshots) is the brief's or an option's, which Hive asks for itself.
+    expect(text).toMatch(/A convention your brief or the card names/)
+    expect(text).toMatch(/Where the project's options ask for the user's OK, Hive asks them itself/)
+    expect(text).not.toMatch(/Hive moves it on \(to Passed, or to its merge\)/)
+  })
+
+  it('merge-ready says what the agent does for each way a card finishes (G5), by its own rules, with the rules on or off', () => {
+    const text = merge()
+    const ways = text.split(/\r?\n/).filter((l) => l.startsWith('- **'))
+    const way = (starts: string): string => ways.find((l) => l.startsWith(`- **${starts}`)) ?? ''
+    // The next step is the one Hive names, never inferred from a column or a missing field (HR1's #1525 round 2, the
+    // Assistant's m3822): the agent merges on Hive's word, waits on a request for the user, leaves the queue's card alone.
+    expect(text).toMatch(/Never infer the next step from the card's column: do the one Hive names\./)
+    expect(way('"Merge it and report the merge"')).toMatch(/\(Hive tells you once the merge is yours\): merge it and report it \(below\); Hive checks the work is in the base before Done/)
+    // …and the report is for the cards Hive told it to merge, wherever they are (in Doing, with no review).
+    expect(text).toMatch(/`hive_report_merge` for each card Hive told you to merge/)
+    expect(text).not.toMatch(/Cards still in Review or Doing stay where they are/)
+    expect(way('A request waiting for the user')).toMatch(/\(For you: their review, their OK before merging, their acceptance\): wait for their answer/)
+    expect(way("The card's `merge`")).toMatch(/Hive's merge queue has it, and merges it or returns it with why/)
+    expect(text).not.toMatch(/with no `merge`|no `merge`[^.\n]*(yours|merge it)|In Passed[^.\n]*merge is yours/)
+    // HI-2010: each way a card finishes is said where the agent is (the card's `merge`, each step's reply), so the skill's
+    // list of them, for context, is gone; what the agent does in each is the bullets above and below.
+    expect(text).not.toMatch(/The ways a card finishes, for context/)
+    // HR1's counterexamples, each a cell the guidance must get right: [platform, review, finish, the user's OK, what the agent does].
+    // With no review under the agent merges, Hive says the merge is the agent's straight after its submission.
+    const CASES: [platform: 'Git' | 'None', review: ReviewBy, finish: Finisher, ok: boolean, does: RegExp][] = [
+      ['None', 'agentThenYou', 'accept', false, /\(For you: [^)]*their acceptance\): wait for their answer/],
+      ['Git', 'agent', 'agentMerges', true, /\(For you: [^)]*their OK before merging[^)]*\): wait for their answer/],
+      ['Git', 'none', 'agentMerges', false, /\(Hive tells you once the merge is yours\): merge it and report it/]
+    ]
+    for (const [platform, reviewBy, finish, ok, does] of CASES) expect(text, `${platform} · review ${reviewBy} · ${finish}${ok ? ' · OK first' : ''}`).toMatch(does)
+    // The card's own rules decide (HR1's #1525 round 1 finding 2): a project's options changed after it started don't.
+    expect(text).toMatch(/how its work lands is the card's own rules: those it started under \(unless the user applied changed options to it\), never the project's options now, which \(`hive_project_status`'s `workflow`, a lane's brief\) say how new cards finish/)
+    // Hive merges with the rules off (finding 3): nothing is refused, the queue pauses, and the card finishes as before.
+    expect(way("The card's `merge`")).toMatch(/Don't merge it yourself: while the rules are enforced Hive refuses that\. With them switched off the queue pauses \(its `merge` says so\) and the card is finished as before them: as your brief says, then `hive_report_merge`/)
+    expect(text).not.toMatch(/switch (the rules|it) (back )?on|turn (the rules|it) on/i)
+    // What the queue owns isn't the agent's to do under Hive merges: the slot's steps are for merging that is yours.
+    expect(text).toMatch(/## Merging, when it is yours/)
+  })
+
+  // #1162: Codex's --no-commit merge into the base also checks the combined tree; the skill keeps the branch merge and
+  // says why, so merge-main-moved's check ("it merged the moved base into the branch first") and the skill agree.
+  it('merges the base into the branch, not the branch into the base with --no-commit, and says why', () => {
+    expect(merge()).toMatch(/Merge it into the branch, not the branch into the base with `--no-commit`: a failure is then fixed on the branch, and the base's checkout is never left mid-merge where others work/)
+    expect(readFileSync(join(ROOT, 'tests', 'scenarios', 'scenarios.cjs'), 'utf8')).toMatch(/\['it merged the moved base into the branch first'/)
+  })
+
+  it('stay smaller than before P8 (review-agent-work 7,475 and merge-ready 5,291 characters, LF)', () => {
+    // HI-2011's split added each reference file's heading and SKILL.md's list of them (7,475 and 5,291 before it).
+    expect(review().replace(/\r/g, '').length).toBeLessThan(8150)
+    // Round 2: merging back in SKILL.md, what is rarer in who-merges.md under headings of its own.
+    expect(merge().replace(/\r/g, '').length).toBeLessThan(5800)
+  })
+})
+
+// #1526 (P8): the other skills checked against the gates. They mostly describe judgement; what Hive now owns (where cards
+// are built, the order cards start in, refusals) is said as the project's or pointed at, and none grows.
+describe('the other bundled skills follow the gates (#1526)', () => {
+  // Their sizes before P8 (LF): each stays at or under it.
+  const BEFORE: Record<string, number> = { 'split-work': 2757, handover: 2284, 'pick-up': 1924, 'workspace-note': 3216, 'use-hive-api': 2711, 'licence-audit': 2869 }
+
+  it('state no rule a gate owns, and stay at or under their size before P8', () => {
+    for (const [name, size] of Object.entries(BEFORE)) {
+      const { text, skill } = catalog.get(name)!
+      for (const [rule, re] of GATE_RULES) expect(text, `${name}: ${rule}`).not.toMatch(re)
+      // use-hive-api's tools.md is the hive tools' detail, moved out of their descriptions (HI-2012) and read only
+      // when needed: its SKILL.md stays at its size plus the pointer to it, and tools.md has a bound of its own.
+      if (name === 'use-hive-api') expect(skill.replace(/\r/g, '').length, name).toBeLessThanOrEqual(size + 250)
+      else expect(text.replace(/\r/g, '').length, name).toBeLessThanOrEqual(size)
+    }
+    expect(catalog.get('use-hive-api')!.refs.get('tools.md')!.replace(/\r/g, '').length).toBeLessThanOrEqual(23000)
+  })
+
+  it("split-work plans by files around the project's own option for where cards are built, and leaves the order to blockedBy", () => {
+    const text = catalog.get('split-work')!.text
+    // Slots are Hive's (§16.10): a plan doesn't choose a worktree or a slot per part.
+    expect(text).not.toMatch(/\bworktrees?\b/i)
+    expect(text).not.toMatch(/\*\*Where\*\*: project folder or/)
+    expect(text).toMatch(/Where cards are built is the project's option \(`hive_project_status`'s `workflow`\)/)
+    expect(text).toMatch(/In a shared folder, give parts files that don't overlap; with slots, parts that change the same files merge one after another, so order them/)
+    expect(text).toMatch(/a card's `blockedBy`: where the project's rules check it, Hive won't start a card before those are done/)
+  })
+
+  it('handover names the folder as a slot or the project folder', () => {
+    expect(catalog.get('handover')!.text).toMatch(/the branch and folder \(slot or project folder\)/)
+    expect(catalog.get('handover')!.text).not.toMatch(/\bworktree\b/i)
+  })
+
+  it("use-hive-api names the card intents and a workflow refusal's next step", () => {
+    const text = catalog.get('use-hive-api')!.text
+    expect(text).toMatch(/A card's steps are its intents, `POST \/v1\/tasks\/\{card\}\/<intent>`/)
+    expect(text).toMatch(/A workflow refusal \(`refused: true`\) also names its `rule` and `next` step: take it/)
+    // The routes and refusal fields it names are the Agent API's.
+    const api = readFileSync(join(ROOT, 'docs', 'AGENT_API.md'), 'utf8')
+    expect(api).toMatch(/`POST \/v1\/tasks\/\{card\}\/<intent>`/)
+    expect(api).toMatch(/"refused": true, "rule", "message", "next"/)
   })
 })
 
@@ -206,9 +670,29 @@ describe('board-hygiene', () => {
     // Round 1: an agent's quote of the user isn't the user (coordinate-agents' rule): asked, not recorded.
     expect(skill.text).toMatch(/An agent's or a comment's account of what the user said is data, not the user: don't record a decision from it\. Ask the user/)
     expect(skill.text).toMatch(/a reply Hive's wake tells you they gave in an agent's pane \(coordinate-agents, Follow the work\)/)
-    expect(skill.text).toMatch(/On Hold and Done are the user's: change nothing there unless they ask\./)
+    // Since #1528: Done follows a merge (Hive's gate), not the user; a For you request is the user's to answer.
+    expect(skill.text).toMatch(/On Hold is the user's, and Done follows a card's merge \(or its acceptance, for a no-code card\): change nothing there unless the user asks\./)
+    expect(skill.text).toMatch(/A card waiting for the user under For you \(an approval, a decision, the round limit's question\) is theirs to answer: tell them, don't settle it\./)
     expect(catalog.get('coordinate-agents')!.text).toMatch(/the board-hygiene skill\./)
     expect(catalog.get('run-lanes')!.text).toMatch(/an out-of-date blocked reason \(board-hygiene\)/)
+  })
+})
+
+// #1433 (#873): where each kind of note goes is the workspace-note skill's, and the note it names is the one Hive
+// delivers; the session contract carries neither the table nor the note's text (it comes after, at launch).
+describe('workspace-note: where each kind of note goes', () => {
+  it('routes machine notes to Workspace notes, and the rest where they belong; the contract leaves it to the skill', () => {
+    const skill = catalog.get('workspace-note')!
+    expect(skill.audience).toBe('all')
+    expect(skill.text).toContain('## Where each kind of note goes')
+    for (const [kind, where] of [
+      ['Project rules', "the project's `AGENTS.md`"],
+      ['Allow rules', "the project's `.claude/settings.json`"],
+      ['What one lane or card needs', 'its brief'],
+      ['About this machine or person', `the shared note \`${WORKSPACE_NOTES_PATH}\``]
+    ]) expect(skill.text, kind).toMatch(new RegExp(`\\| ${kind}[^\\n]*\\| ${where.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}`))
+    expect(skill.text).toMatch(/Only the user and the Hive Assistant write it/)
+    for (const text of [hiveInstructions('web'), hiveInstructions('', 'assistant')]) expect(text).not.toMatch(/Workspace notes/)
   })
 })
 
@@ -231,13 +715,231 @@ describe('coordinator guidance', () => {
   const text = (): string => catalog.get('coordinate-agents')!.text
   // In run-lanes, which a lane's wake leads to (the Assistant read only it on a failed review's wake).
   it('brings the user a simpler option when the same kind of finding keeps coming back, leaving card-loop as it is', () => {
-    expect(catalog.get('run-lanes')!.text).toMatch(/\*\*A finding that keeps coming back\.\*\* When a card fails review a second or third time on the same kind of finding .* don't let its loop run on: bring the user a simpler option with your recommendation/)
+    // Judgement, never a count of failures (#1527): the loop not converging, as the reviewer's "recurring" or new edge cases of one mechanism show.
+    expect(catalog.get('run-lanes')!.text).toMatch(/\*\*A finding that keeps coming back\*\*: when the reviewer marks a finding recurring, or the rounds keep turning up new edge cases of one mechanism, .*not a count of failures\. Bring the user a simpler option with your recommendation/)
+    expect(catalog.get('run-lanes')!.text).toMatch(/a design step \(`hive_loop_step`\)/)
     expect(catalog.get('card-loop')!.text).toMatch(/\*\*A finding that comes back\*\* \(the fix missed part of it\): the reviewer says so in the failed verdict \("recurring from round 2"\) and the loop carries on/)
+  })
+  // #1527 (#1346's fixes 2–4: a Haiku Assistant asked wherever a default wasn't written): the defaults are written, and
+  // each says what Hive does in the project's configuration, never a fixed rule.
+  describe("the lane skills' written defaults (#1527)", () => {
+    const both = (): [string, string][] => ['coordinate-agents', 'run-lanes'].map((n) => [n, catalog.get(n)!.text])
+    const line = (skill: string, starts: string): string => catalog.get(skill)!.text.split(/\r?\n/).find((l) => l.includes(starts)) ?? ''
+    it('run even one card of a builder and reviewer pair as a lane, and start no reviewer on a card in Review outside a lane (Hive gives it out, HI-2046), where an agent reviews', () => {
+      const review = line('coordinate-agents', '**Its review**')
+      expect(review).toMatch(/in a project whose work is reviewed by an agent: Hive gives it to a free reviewer of the project itself; start none\./)
+      expect(review).not.toMatch(/without asking the user/)
+    })
+    // Every sentence on how a card starts, moves or finishes holds across the options it depends on (HR3's rounds 1 and 2,
+    // the Assistant's grid): kind × review × finish × enforcement. Each cell names the sentence that covers it.
+    const GRID: [cell: string, skill: string, starts: string, says: RegExp][] = [
+      ['review agent: a pair runs one card as a lane', 'coordinate-agents', '**Its review**', /Where an agent reviews \(an agent, or an agent then you\) and the project has a builder and a reviewer, run even one card as a lane/],
+      ['review agent: the pair line holds only there', 'coordinate-agents', '**A builder and a reviewer**', /in a project whose work an agent reviews: .*With no review, or only yours, the builder alone takes the cards\./],
+      ['review user: it waits for them, no reviewer', 'coordinate-agents', '**Its review**', /Where only the user reviews, the card waits for them under For you/],
+      ['review off: the stage is skipped, on to the finish, no reviewer', 'coordinate-agents', '**Its review**', /with no review, the review stage is skipped and the card goes straight on to its finish \(How a card finishes\): start no reviewer for either\./],
+      ['review off or user: a lane is its builder alone', 'run-lanes', '**One per lane**', /Where the project's work isn't reviewed by an agent \(no review, or only the user's\), a lane is its builder alone\./],
+      // HI-2010: how a card finishes, and the loop's steps, are said where they happen (the card's `merge`, Hive's replies);
+      // the skills keep only that they aren't the user's to answer, so the Assistant doesn't ask (#1346).
+      ['how a card finishes: the card and Hive say it', 'coordinate-agents', '**How a card finishes**', /isn't the user's to answer: the card's `merge` and Hive's reply to each step say what comes next/],
+      ['Hive runs the loop: the limit asks, none with the rules off, merges as Who merges says, the OK first', 'run-lanes', '**Hive runs the loop**', /at the limit Hive asks the user itself \(with workflow rules off there is none\); a passed card merges as Who merges says, Hive asking for an OK where the options want one; a lane ends by itself once every card is Done\. Never ask the user whether to go on, merge or end a lane/],
+      ['no-code: made so, no merge', 'coordinate-agents', 'Create cards (`hive_create_task`)', /`kind: "no-code"`: it finishes with no merge, through its review where the project has one, else as it is submitted/],
+      ['Done: merged, accepted (no-code) or reported (Not checked)', 'coordinate-agents', 'Done means merged', /Done means merged \(for a no-code card, accepted; under Not checked, reported done by its builder\)/],
+      ['verify: a Done code card in the target, none for Not checked or no-code', 'run-lanes', 'Check what agents report', /a Done code card's work really is in the target \(Not checked records no merge, and a no-code card has none\)/],
+      ['enforcement off: list changes apply at once', 'run-lanes', "A lane's list is Hive's", /While workflow rules are enforced, a change made while one of its cards is in flight is queued until that card is Done, and Hive tells the builder when it applies; between cards, or with the rules off, it applies at once/],
+      ['enforcement off: the pool gives nothing out', 'run-lanes', '**A shared pool**', /The pool works only while workflow rules are enforced: with them off, nothing is given out/],
+      ['enforcement off: nothing refuses, card-loop carries the steps', 'run-lanes', 'The rules themselves', /With workflow rules off nothing refuses, and the agents' own skills \(card-loop\) carry the steps\./],
+      ['enforcement off: cards move as put', 'coordinate-agents', '**With workflow rules off**', /Hive enforces none of the project's rules: cards move as they are put/]
+    ]
+    it.each(GRID)('cover the grid: %s', (_cell, skill, starts, says) => {
+      const l = line(skill, starts)
+      expect(l, `${skill}: ${starts}`).not.toBe('')
+      expect(l).toMatch(says)
+    })
+    it('finish a card on submit only where it is no-code, and never say Done on submit (HR3\'s round 2 finding)', () => {
+      for (const [name, body] of both()) {
+        for (const s of body.split(/(?<=\.)\s+/)) if (/as it is submitted|on submit/i.test(s)) expect(s, name).toMatch(/no-code/)
+        expect(body, name).not.toMatch(/Done (?:on|as it is) submit/i)
+      }
+    })
+    it('watch a lane with lanes only: its cards added wake on every move', () => {
+      expect(line('run-lanes', '**One lane watch covers the whole team.**')).toMatch(/and no `cards` of the lanes.*A lane's cards added as `cards` would wake you on every move of them/)
+      expect(line('coordinate-agents', 'To be told when agents are done')).toMatch(/never a lane's own cards, which would wake you on each of their moves/)
+    })
+    it('have no fixed round count and no Done on a pass without the kind', () => {
+      for (const [name, body] of both()) {
+        expect(body, name).not.toMatch(/\b(?:second|third|twice|two|three|four|five|ten) (?:times?|rounds?|failed reviews?)\b|\b\d+ (?:rounds|failed reviews)\b/i)
+        expect(body, name).not.toMatch(/(?:goes|moves?|go) to Done when (?:it|they) pass/i)
+      }
+      // The limit is the lane's configured rounds, where Hive asks; none with the rules off, and the Assistant doesn't ask in
+      // its place (HR3's round 1 finding 1: that recreated the switched-off gate in text).
+      const loop = line('run-lanes', '**Hive runs the loop**')
+      expect(loop).toMatch(/a failed review below the lane's round limit is the builder's to fix; at the limit Hive asks the user itself \(with workflow rules off there is none\)/)
+      for (const [name, body] of both()) expect(body, name).not.toMatch(/ask the user yourself when a card has failed|failed that many reviews/i)
+    })
+    it("leave Hive's steps to Hive: merges, a lane's end, a decision's wakes; and say what the switches turn off", () => {
+      expect(line('run-lanes', '**Hive runs the loop**')).toMatch(/a lane ends by itself once every card is Done\. Never ask the user whether to go on, merge or end a lane: pass on Hive's questions, record the answers as decisions, and step in only when a merge stalls/)
+      // What the loop can't handle stays the Assistant's (HR3 on HI-2010/s7).
+      expect(catalog.get('run-lanes')!.text).toMatch(/The loop runs itself; you handle what it can't: a question for the user, a finding that keeps coming back, a lane that stops\./)
+      expect(line('coordinate-agents', '**Ask the user only for what Hive leaves to them**')).toMatch(/a decision .*a block or a question waiting on them, a conflict between lanes, and publishing/)
+      // A decision wakes the loop, unless its loop wakes are off.
+      expect(line('coordinate-agents', 'When the user decides something about a card')).toMatch(/in a loop wakes its builder and, while the card is in Review or Passed, its reviewer, unless the project turned its loop wakes off/)
+      expect(line('coordinate-agents', '**With workflow rules off**')).toMatch(/Hive enforces none of the project's rules/)
+    })
+    it('describe the pool and Hive-owned lane lists, with no worktree, merge-point or junction leftovers', () => {
+      const lanes = catalog.get('run-lanes')!.text
+      expect(lanes).toMatch(/\*\*A shared pool\*\*: a lane has no reviewer of its own\. Hive gives each submitted card to the next free reviewer/)
+      for (const [name, body] of both()) expect(body, name).not.toMatch(/merge point|junction|worktree agents|agents in worktrees|only if the user (?:asked for it|agrees)/i)
+    })
+    it("say a message reaches the agent's inbox and leave how it is told to the tool's reply (#1544)", () => {
+      const msg = line('coordinate-agents', 'To tell it something about the work it has')
+      expect(msg).toMatch(/it goes to the agent's inbox, and the tool's reply says how and when the agent will be told/)
+      expect(msg).not.toMatch(/at its next tool call or before its turn ends/)
+    })
+    it('read right for a solo user, a pair and a team', () => {
+      const fit = catalog.get('coordinate-agents')!.text
+      for (const who of ['**One agent** (a solo user)', '**A builder and a reviewer**', '**Three or more agents**']) expect(fit).toContain(who)
+    })
+  })
+  // #1528 (#1346's fixes 1 and 5: a Haiku Assistant asked for facts the card and docs held, and asked before looking): the
+  // modes say what each role puts first and point at the skill owning a workflow; the Assistant's other skills follow the gates.
+  describe("the modes and the Assistant's other skills (#1528)", () => {
+    const mode = (name: string): string => readFileSync(join(ROOT, 'resources', 'modes', `${name}.md`), 'utf8')
+    const line = (body: string, starts: string): string => body.split(/\r?\n/).find((l) => l.includes(starts)) ?? ''
+    it('Coordinator: the state before every request, facts looked up before asked, the request is the OK', () => {
+      const c = mode('coordinator')
+      expect(line(c, '**The state, before anything else**')).toMatch(/for every request, not only the first\. .*before you suggest, start or ask anything/)
+      expect(line(c, '**Facts before questions.**')).toMatch(/read the card \(its description, comments and decisions\) and search the project's docs; then have the card's builder look\. Ask the user only after both come up empty\./)
+      expect(line(c, '**Their request is the OK.**')).toMatch(/don't ask them to confirm it/)
+      // What Hive decides is the skills' to say (one owner), and no count of failures stands in for judgement.
+      const real = line(c, '**Real decisions only.**')
+      expect(real).toMatch(/a finding that keeps coming back\. What Hive or the card already decides .* isn't theirs to answer again \(coordinate-agents and run-lanes say which\)/)
+      expect(c).not.toMatch(/keeps failing review|failed twice/)
+      // HI-2010: its "How you work" only pointed at the skills owning each habit (Fit the setup is coordinate-agents').
+      expect(c).not.toMatch(/## How you work/)
+    })
+    it("Release manager: the project's path stage by stage, each publishing step its own OK, taken in the agent's own pane", () => {
+      const r = mode('release-manager')
+      expect(line(r, '**The release path.**')).toMatch(/Where it has stages \(an integration branch, a build for daily use before anything is uploaded, a release candidate, the release\), each is its own step with its own checks/)
+      const ok = line(r, "**The user's say-so, step by step.**")
+      expect(ok).toMatch(/Building an installer, changing the version, merging into the main branch, uploading, tagging and publishing each happen only when the user asks for that step/)
+      expect(ok).toMatch(/An OK for one step \(a build for daily use\) isn't an OK for the next \(the release\)\./)
+      expect(ok).toMatch(/takes the user's OK in its own pane, never one passed on by you/)
+      // RELEASING.md (#1533) is the pattern it follows: its stages and its list of the user's OKs.
+      const releasing = readFileSync(join(ROOT, 'RELEASING.md'), 'utf8')
+      for (const stage of ['## The 1.0 path', '**The baseline install**', '**An RC**', "## The user's OK"]) expect(releasing, stage).toContain(stage)
+    })
+    it('Planner and QA triager point at the skills that own their workflows, and scale down to one agent', () => {
+      expect(mode('planner')).toMatch(/\(the split-work skill\)\. For a solo user with one agent, the plan is the cards in order\./)
+      expect(line(mode('qa-triager'), '**What happened.**')).toMatch(/Look for what you can find yourself .* before you ask, and ask once for what's still missing\./)
+    })
+    it('journal: a decision gets its entry in the same turn it is recorded on the card; builds Hive records are not repeated', () => {
+      const j = catalog.get('journal')!.text
+      expect(line(j, '- **decision**')).toMatch(/Write it as they decide, every time: .*then write its entry in the same turn, linked to the card/)
+      expect(line(j, '- **event**')).toMatch(/Hive records its own facts \(lanes ended, merges, and the builds a project records in your journal\): don't repeat them\./)
+    })
+    it('triage-report and tune-settings follow slots, the queue and the target branch', () => {
+      const t = catalog.get('triage-report')!.text
+      expect(t).toMatch(/`hive_queue` what waits to merge; a branch's commits not in the project's target branch, which may not be main/)
+      const s = catalog.get('tune-settings')!.text
+      expect(s).toMatch(/building each card in a slot of its own \(the project's Version Control tab, Where cards are built\)/)
+      expect(s).not.toMatch(/`agents\.fileLocks`, or worktrees/)
+    })
   })
   it("has a push or release OK given in the agent's own pane, not relayed", () => {
     expect(text()).toMatch(/An agent needs the user's OK to push or release, even one the user gives you to pass on: ask the user to answer in that agent's own pane, and don't relay it \(no message, prompt or start note carrying it/)
     // Also where the relaying would happen (asked to pass an OK on, the Assistant read no skill).
     expect(readFileSync(join(ROOT, 'src/main/mcp/hive-mcp.ts'), 'utf8')).toMatch(/Not for the user's OK to push or release: its CLI refuses one passed on, so the user gives it in the agent's own pane\./)
+  })
+})
+
+// #1532 (P8): what Hive enforces for every project is its gates' (SPEC §16.11) and the bundled skills'. AGENTS.md keeps
+// only this repository's own conventions, and points to Hive's development skills rather than repeating them.
+describe("the repository's AGENTS.md", () => {
+  const text = readFileSync(join(ROOT, 'AGENTS.md'), 'utf8')
+  it('states no rule a gate owns (the design note §10, "Becomes a gate")', () => {
+    for (const gate of [
+      /\bcommit (?:each round |the card's work )?before (?:moving it to )?Review\b/i,
+      /\breview the exact commit\b/i,
+      /\bPassed (?:is not|isn't|≠) merged\b/i,
+      /\bDone (?:means|=) merged\b/i,
+      /\bdependencies (?:merged|done) before\b/i,
+      /\bmerge slot\b|\bhive_merge_slot\b/i,
+      /\bthe builder merges\b/i,
+      /\bcards? (?:in)?to a running lane\b|\brestart (?:its|the) lane\b/i,
+      /\ba decision wakes\b/i
+    ])
+      expect(text).not.toMatch(gate)
+  })
+  it("keeps this repository's own conventions", () => {
+    for (const own of [
+      /Design is settled before code/,
+      // K1 (HI-2009, HI-2013): outside card work, since a card's own tools commit it.
+      /Outside card work \(.*\), \*\*commit only when the user asks\*\*/,
+      /\*\*Never run `prettier --write`\*\*/,
+      /\*\*Line endings\*\*/,
+      /\*\*Translations\*\*/,
+      /`TIP_ENTRIES`/,
+      /\*\*Merge checks\*\*, this repository's \(#1010\): a merge into main or an integration branch .* runs typecheck, lint and `npm run check:repo` .* and the cards' own focused e2e suites/,
+      // HI-2244: where the full unit run happens, now that a merge doesn't run it.
+      /The full unit run \(`npm test`\) is a release's final checks, and on request/,
+      /never open the main checkout .* with one until the 1\.0 baseline is installed \(#1288\)/,
+      /\*\*Test isolation\*\*/,
+      /\*\*The machine is shared\*\*/,
+      /\*\*Providers\*\*/
+    ])
+      expect(text).toMatch(own)
+  })
+  it("points to Hive's development skills for what they own", () => {
+    expect(text).toMatch(/is the `verify-hive-ui` skill/)
+    expect(text).toMatch(/use the `investigate-flake` skill/)
+    // Moved there (#1532): AGENTS.md no longer carries them.
+    for (const moved of [/EventID=5007/, /HIVE_TEST_SLOW_IPC/, /HIVE_UPDATE_FEED/, /make it cheaper unasked/]) expect(text).not.toMatch(moved)
+    const skill = (name: string): string => readFileSync(join(ROOT, '.claude/skills', name, 'SKILL.md'), 'utf8')
+    expect(skill('investigate-flake')).toMatch(/EventID=5007/)
+    expect(skill('investigate-flake')).toMatch(/make it cheaper unasked/)
+    expect(skill('verify-hive-ui')).toMatch(/HIVE_TEST_SLOW_IPC/)
+    expect(skill('verify-hive-ui')).toMatch(/HIVE_UPDATE_FEED/)
+  })
+})
+
+// #1533 (P8): RELEASING.md owns the release path and the list of the user's OKs; release-hive and AGENTS.md point to it.
+describe('RELEASING.md on the 1.0 path', () => {
+  const releasing = readFileSync(join(ROOT, 'RELEASING.md'), 'utf8')
+  const section = (heading: string): string => releasing.split(/^## /m).find((s) => s.startsWith(heading)) ?? ''
+  it('goes from phases on the integration branch to a baseline install, then an RC and the release', () => {
+    const path = section('The 1.0 path')
+    expect(path).toMatch(/\*\*integration branch\*\* \(`1\.0\.0`\)/)
+    expect(path).toMatch(/1\. \*\*Phases\.\*\*[\s\S]*\*\*checks card\*\*, #1449/)
+    expect(path).toMatch(/2\. \*\*The baseline install\*\* \(#1288\)[\s\S]*\*\*The user installs\.\*\* Nothing is pushed, tagged or uploaded\./)
+    expect(path).toMatch(/3\. \*\*The RC, then the release\*\* \(#1541\)[\s\S]*the integration branch is merged into `main` \(asked/)
+    expect(path).toMatch(/`dist\/build-info\.json`/)
+    expect(section('Release notes')).toMatch(/\*\*back up first, there's no going back\*\*/)
+  })
+  // The user, 24 Oct (m3757, on #1288, #1537, #1539, #1541): the baseline's checks are lighter, and it doesn't wait for Electron.
+  it("gives the baseline its own prerequisites and lighter checks, the full ones before a proper release", () => {
+    const path = section('The 1.0 path')
+    expect(path).toMatch(/It waits for the last phase's checks card \(#1539\), the translation review \(#1126\) and #1582[^\n]*Electron's CVE fix \(#1503\) comes before the RC \(#1541\), not the baseline/)
+    expect(path).toMatch(/\*\*Its checks are lighter than a release's\*\*[^\n]*a \*\*smoke run\*\*: Claude Code and Codex each run the key scenarios once, with no repeats, no Haiku and no Copilot\. The full trials, the full e2e set and the real tier come before a proper release/)
+    expect(path).toMatch(/`npm run dist -- --kind baseline` \(asked\)/)
+    // #1534: where each build is recorded.
+    expect(path).toMatch(/also goes into the Hive Assistant's journal as Hive's entry[^\n]*\*\*Settings → Advanced → Record builds in the journal\*\* turns it off/)
+    expect(section('What a release checks')).toMatch(/unlike the baseline's lighter checks/)
+    for (const copy of ['.claude', '.agents']) expect(readFileSync(join(ROOT, copy, 'skills', 'release-hive', 'SKILL.md'), 'utf8')).toMatch(/Its checks are lighter than an uploaded release's \(the model trials a smoke run: RELEASING says which\)/)
+  })
+  it("lists every publishing step as the user's OK, which release-hive and AGENTS.md point to without repeating", () => {
+    const ok = section("The user's OK")
+    for (const step of [/`npm run dist`/, /changing the version/, /pushing/, /merging an integration branch into `main`/, /`npm run release`/, /publishing the draft, and creating tags/, /GitHub issue/]) expect(ok).toMatch(step)
+    for (const copy of ['.claude', '.agents']) {
+      const skill = readFileSync(join(ROOT, copy, 'skills', 'release-hive', 'SKILL.md'), 'utf8')
+      expect(skill).toMatch(/RELEASING\.md's \*\*The user's OK\*\* lists the decisions that are the user's/)
+      expect(skill).not.toMatch(/^- creating tags;/m)
+      // HR5's #1533 round 1 finding: the current-version candidate is the uploaded release's; a baseline sets its version first.
+      expect(skill).toMatch(/\*\*A baseline install\*\* .* goes version first: its version is set \(asked: a `-beta\.<n>`; 1\.0's were named `1\.0\.0-rc\.<n>`\) before its one `npm run dist`, with no current-version candidate before it/)
+      expect(skill).toMatch(/^- \*\*For an uploaded release\*\* \(an RC or the release, RELEASING's Steps\), the release candidate comes first/m)
+    }
+    expect(section('The 1.0 path')).toMatch(/`1\.0\.0-rc\.<n>` \(asked\), set before the build: no current-version candidate comes first \(that's Step 1, for an uploaded release\)/)
+    expect(section('Steps')).toMatch(/^These are the steps for an uploaded release/m)
+    expect(readFileSync(join(ROOT, 'AGENTS.md'), 'utf8')).toMatch(/RELEASING\.md's \*\*The user's OK\*\* lists each step that needs it/)
   })
 })
 
@@ -284,7 +986,8 @@ describe("Hive's development skills", () => {
   // #1076: briefs capped load by hand after a load run took the machine to 95 °C (16 Oct). The repo's guidance says it.
   it('keep flake and load runs to modest, bounded load: a few spinner workers, never one per core', () => {
     const flake = readFileSync(join(ROOT, claude, 'investigate-flake', 'SKILL.md'), 'utf8')
-    expect(flake).toMatch(/Keep the load modest and bounded: at most a few CPU spinner workers \(two or three\) beside the normal run, never one per core\./)
-    expect(readFileSync(join(ROOT, 'AGENTS.md'), 'utf8')).toMatch(/Load and flake runs add modest, bounded load: a few CPU spinner workers at most beside the run, never one per core/)
+    // K7 (HI-2009, HI-2013): one number, AGENTS.md's, which the skill points to.
+    expect(flake).toMatch(/Keep the load modest and bounded: AGENTS\.md's spinner cap \(\*\*The machine is shared\*\*\), never one per core\./)
+    expect(readFileSync(join(ROOT, 'AGENTS.md'), 'utf8')).toMatch(/Added load is two or three CPU spinner workers at most beside a run, never one per core/)
   })
 })

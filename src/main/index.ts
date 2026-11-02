@@ -1,20 +1,35 @@
+// First: the thread pool's size is set before anything uses it (HI-1702).
+import './threadPool'
 import { initWatches, onWatchedCardsMoved, watchKeepsQuitWaiting } from './watches'
 import { initLoopWakes } from './loopWakes'
+import { migrateAgentsPerProject } from './workflow/preferences'
+import { settleGlobalCommitMessage } from './workflow/commitMessageStep'
 import { initLoopCheck } from './loopCheck'
 import { initDeliveries } from './deliveries'
+import { initReviewsOnOpen } from './reviewsOnOpen'
+import { initSkillCopies } from './skillCopies'
+import { offNames } from '../shared/skillDelivery'
 import { initInboxNotices } from './inboxNotices'
+import { startOrphanWatch, stopOrphanWatch } from './orphanProcesses'
 import { initDecisionWakes } from './decisionWakes'
+// The user's answers given to the Assistant too (HI-1734): its delivery source, registered at start.
+import './answerRelay'
+import './assistantAsk'
+import { initWorkflowNotices } from './workflowNotices'
 import { initDevConsole } from './devConsoleSources'
 import { flightRecorder } from './flightRecorder'
 import { initAssistantModes } from './assistantMode'
-import { app, BrowserWindow, dialog, Menu, nativeTheme, Notification, protocol, screen, session, shell } from 'electron'
+import { app, BrowserWindow, dialog, Menu, nativeTheme, protocol, screen, session, shell } from 'electron'
 import { execFile } from 'child_process'
 import { appendFileSync, createReadStream, existsSync } from 'original-fs'
 import { basename, join, resolve, sep } from 'path'
 import { appendFile, readFile, stat } from 'original-fs/promises'
 import { Readable } from 'stream'
-import type { AppInfo, McpServerDef, QuitChoice, QuitScope, QuitSession, TaskCard, WindowState } from '../shared/types'
+import type { AppInfo, CloseReason, McpServerDef, QuitChoice, QuitScope, QuitSession, TaskCard, WindowState } from '../shared/types'
 import { providerService } from './providerService'
+import { initConnections } from './accounts'
+import { initConnectionMoves } from './connectionMoves'
+import { initUsageMoves } from './usageMoves'
 import { checkGit } from './gitTool'
 import { handoverSession, hiveInstructions, withJournal, withLatestHandover, wrapsLongCommands } from '../shared/hiveGuidance'
 import { handoversFor } from './notes'
@@ -28,30 +43,51 @@ import { setDateStyle } from '../shared/dates'
 import { SERVABLE_EXT, servableType, unwatchAll } from './files'
 import { movedAttachment } from './attachmentsFolder'
 import { config } from './config'
+import { loadCoverage, startCoverage, startCoverageEarly } from './keyCoverage'
 import { closeConsoleWindows, sendToConsoles } from './consoleWindow'
-import { allTasks, archiveOldDone, endReviews } from './tasks'
+import { allTasks, archiveOldDone, endExitedReviews } from './tasks'
+import { queueCleanupEverywhere } from './cardAttachmentCleanup'
 import { agentCardText } from '../shared/agentTable'
 import { emit, emitTo, onHiveEvent, toast } from './events'
 import { advanced, bindAdvancedSettings, mcpAdvancedEnv } from './advanced'
 import { GPU_SWITCH, advancedAtStart, relaunchArgs, startGpu } from './gpu'
-import { HARDWARE_ACCELERATION_OFF, HEAP_SNAPSHOT_NEAR_LIMIT } from '../shared/advanced'
+import { HARDWARE_ACCELERATION_OFF, HEAP_SNAPSHOT_NEAR_LIMIT, HIVE_GUIDANCE } from '../shared/advanced'
 import { startHeapSnapshots, startMemoryLog } from './memory'
 import { recordLiveCardsSoon } from './cardSessions'
 import { closeAllBoards, onBoardNotice } from './boardStore'
 import { closeAllJournals } from './journal'
-import { registerIpc } from './ipc'
+import { registerIpc, requestingWindow } from './ipc'
 import { watchRenderer } from './rendererWatch'
 import { startPowerWatch } from './power'
 import { startTaskbarFlash } from './taskbar'
 import { setTitleBarColors, trackTitleBar } from './titleBar'
 import { placeOnDisplay } from './windowBounds'
 import { startBranchWatch } from './branchWatch'
+import { startObserving, stopObserving } from './platform/watching'
+import { startReconciling, stopReconciling } from './workflow/reconciler'
+import { queueFolderNeeded, releaseQueueRunners } from './workflow/queueRunner'
+import { stopCodexChecks } from './codexChecks'
+import { queueLive, startQueueHosts, stopQueueHosts } from './workflow/queueHost'
+import { poolFor, startSlots, stopSlots } from './slotsApp'
+import { setQueueNeed, setSlotPools } from './unusedWorktrees'
+import { quitSlotCards, startSlotCards, stopSlotCards } from './slotCards'
+import { startFinishPath } from './finishPath'
+import { startLaneBriefs, stopLaneBriefs } from './laneBriefs'
+import { startSlotMigration, stopSlotMigration } from './slotMigration'
+import { startReviewerPool, stopReviewerPool } from './reviewerPool'
+import { startFreshNudges } from './freshStarts'
+import { startCopies, stopCopies } from './copiesApp'
+import { startReviewCopies, stopReviewCopies } from './reviewCopies'
+import { setAgentBusy, startLineUpdates } from './workflow/lineUpdates'
+import { startLockRecords } from './workflow/lockRecord'
+import { setQueueLive, setRunsGoing, workflowFor } from './workflow/service'
+import { isOpenRun } from '../shared/progress'
 import { createLogger, userText, logsDir } from './logger'
 import { killAll } from './ptyHost'
-import { allLeftovers, closeProcessTracking, leftoversSaved, leftoversSettled, restoreLeftovers, settleAllLeftovers, settleLeftovers, warmProcessTracking } from './agentProcesses'
+import { allLeftovers, closeProcessTracking, leftoversOffer, leftoversSaved, leftoversSettled, recordEndedLaunches, restoreLeftovers, settleAllLeftovers, settleLeftovers, warmProcessTracking } from './agentProcesses'
 import { leftoversSummary } from '../shared/agentProcesses'
 import { installShims } from './progressReporters/shims'
-import { insideArchive, onCorruptFile } from './fsutil'
+import { insideArchive, onCorruptFile, renameDiagnostics } from './fsutil'
 import { apiEnv, assistantApiUrl, startApiServer, startHookServer } from './servers'
 import { clearDiscovery, clearDiscoveryNow } from './apiDiscovery'
 import { clearHookAuth } from './hookTokens'
@@ -60,13 +96,19 @@ import { sessions } from './sessions'
 import { usageHistory } from './usageHistory'
 import { notificationIcon } from './paths'
 import { createTray, destroyTray, resourcesDir, setTrayPendingQuit, showWindow } from './tray'
-import { keepOffScreen, offScreenOrigin, showOsNotification, testQuiet } from './testQuiet'
+import { keepOffScreen, offScreenOrigin, testQuiet } from './testQuiet'
+import { COMMIT_WATCH_ARG } from '../shared/commitWatch'
 import { pinFollower } from './pin'
-import { closedNotice, focusedHive, routeAppNotice, setFocusedHive, startNoticeResolver } from './notices'
-import { initUpdater, installNow } from './updater'
+import { closedNotice, startNoticeResolver } from './notices'
+import { setNotifyHost, tell } from './notify'
+import { initUpdater, installNow, installsOnQuit } from './updater'
 import { flushMetrics } from './metrics'
 import { watchMainStalls } from './mainStalls'
-import { createWorkspaceService, disposeWorkspaceService, inWorkspace, openWorkspaces, workspace, workspaceFor, workspaceOf, type WorkspaceService } from './workspace'
+import { fileHolders } from './fileHolders'
+import { onAgentStartChange, startSeq } from './agentStarts'
+import { agentStartOf, setStallRuns, withAgentStarts } from './cardStall'
+import { createWorkspaceService, disposeWorkspaceService, inWorkspace, openWorkspaces, workspace, workspaceFor, workspaceOf, WorkspaceService } from './workspace'
+import { closeWithCommand, quitCommandPlanned, quitRunsAny, runQuitCommand, type RunOutcome } from './closeCommand/closeCommands'
 import { journalSettingsOf } from './journalService'
 import { assistantStartView } from './startView'
 import { hiveWindows, lastFocused, TITLE_BAR_OVERLAY, registerWindow, unregisterWindow, windowForPath, type HiveWindow } from './windows'
@@ -75,12 +117,19 @@ import { agentTokenFile } from './agentTokens'
 import { progress, setTaskbarTestHook, startProgress } from './progressService'
 import { startMergeSlots } from './mergeSlotHost'
 import { startLanes } from './lanes'
+import { startLaneStarts } from './laneStarts'
 import { startHandOverCheck } from './handOverCheck'
+import { startLaunchSides } from './launchSides'
 import { checkInstallDir } from './installDir'
 import { exitBy, logCrashDumps, startCrashDumps, startExitLog } from './exitLog'
-import { checkLastRun, startRunMarker, startupStep, tellUnexpectedClose } from './lastRun'
+import { checkLastRun, lastUnexpectedClose, startRunMarker, startupStep, tellUnexpectedClose } from './lastRun'
+import { initRestartRecovery, loadRestartRecord, recordClosing, startRestartRecovery, stopRestartRecovery, stopWatchingRestartRequests, watchRestartRequests } from './restartResume'
+import type { RestartReason } from '../shared/restartResume'
+import { startOutageResume } from './outageResume'
+import { startRetryNotice } from './retryNotice'
 import { chooseStartLanguage, languageInfo, startI18n, switchLanguage } from './i18n'
 import { fmt, msg, tr } from '../shared/i18n'
+import { clearSavedPauses } from './teamPause'
 
 const log = createLogger('main')
 let quitting = false
@@ -91,6 +140,8 @@ let quitting = false
 // productName, "Hive Desktop", but users' settings and conversations are in %APPDATA%\Hive (#443).
 if (process.env.HIVE_USER_DATA) app.setPath('userData', process.env.HIVE_USER_DATA)
 else app.setPath('userData', join(app.getPath('appData'), profileFolder(app.isPackaged)))
+// Key masking as the profile's files say, before the first line is logged (HI-1855): strict only where a key may be.
+startCoverageEarly()
 // Every way out from here on is logged (#985).
 startExitLog()
 
@@ -213,7 +264,9 @@ function createWindow(opts: { workspacePath?: string | null; bounds?: WindowStat
       backgroundThrottling: false,
       // Enables Chromium's built-in PDF viewer for the Files tab preview.
       plugins: true,
-      spellcheck: false
+      spellcheck: false,
+      // A test copy's watch on React's commits (HI-1387): the preload passes it on to the page.
+      additionalArguments: testQuiet() ? [COMMIT_WATCH_ARG] : []
     }
   })
   trackTitleBar(win, titleBarColors())
@@ -373,6 +426,8 @@ let pendingQuit = false
 let installOnQuit = false
 /** Restart Hive was chosen (#676: a value that applies when Hive restarts): start again after quitting. */
 let relaunchOnQuit = false
+/** An installer asked Hive to close for an install (HI-1707): the quit records its agents as an install's. */
+let quitReason: RestartReason | null = null
 
 /** The running sessions of every window, or of one workspace. */
 const quitSessions = (ws?: WorkspaceService): QuitSession[] =>
@@ -431,8 +486,8 @@ function ask(e: HiveWindow, req: { sessions: QuitSession[]; unsaved: string[]; s
 
 async function requestQuit(opts: { force?: boolean } = {}): Promise<void> {
   if (quitting) return
-  // Already waiting to quit: asking again means "now".
-  if (pendingQuit) return quitNow(true)
+  // Already waiting to quit: asking again means "now", after the final look at unsaved files (HI-2336).
+  if (pendingQuit) return finishPendingQuit()
   const asking = hiveWindows().find((e) => e.question)
   if (asking) {
     // A dialog is already open: just bring it forward.
@@ -495,7 +550,10 @@ async function stopWorkspaceAgents(from: BrowserWindow, scope: 'workspace' | 'sw
   // Also cancels agents still starting (not listed: they have no session yet). No new one starts until the
   // workspace has closed or switched (ipc clears the flag).
   e.ws.closing = true
-  await sessions.stopWhereAndWait((s) => workspaceFor(s.projectPath) === e.ws, 3000)
+  await sessions.stopWhereAndWait((s) => workspaceFor(s.projectPath) === e.ws, 3000, 'closed')
+  // Their slot writers released while the workspace is open (HI-2299: released after it closed, they failed). Each
+  // waits for its run's job to be seen empty (about 2 s), so a bound of 5 s, as the quit's look has.
+  await sessions.writersSettled(5000, (p) => workspaceFor(p) === e.ws)
   return true
 }
 
@@ -516,10 +574,15 @@ async function requestCloseWindow(e: HiveWindow, done: AlreadyAsked = {}): Promi
     if (choice === 'cancel') return
   }
   e.ws.closing = true
-  await sessions.stopWhereAndWait((s) => workspaceFor(s.projectPath) === e.ws, 3000)
+  await sessions.stopWhereAndWait((s) => workspaceFor(s.projectPath) === e.ws, 3000, 'closed')
+  // Their slot writers released while the workspace is open (HI-2299: released after it closed, they failed). Each
+  // waits for its run's job to be seen empty (about 2 s), so a bound of 5 s, as the quit's look has.
+  await sessions.writersSettled(5000, (p) => workspaceFor(p) === e.ws)
   saveWindowsWithout(e)
+  // Its workspace closed here, its close command run in it while it is still shown (HI-1368), then the window goes.
+  await closeWithCommand(e.ws, 'window', e.win).catch((err) => log.warn("closing the window's workspace", err))
   e.closing = true
-  e.win.close()
+  if (!e.win.isDestroyed()) e.win.close()
 }
 
 /**
@@ -564,8 +627,40 @@ function cancelPendingQuit(): void {
 function checkPendingQuit(): void {
   if (!pendingQuit) return
   const working = workingCount()
-  if (working === 0) void quitNow(true)
+  if (working === 0) void finishPendingQuit()
   else emit({ type: 'quit-pending', pending: true, working })
+}
+
+/** The pending quit's final look at unsaved files under way (HI-2336): repeated session events open its dialog once. */
+let finishingPendingQuit: Promise<void> | null = null
+
+/**
+ * A pending quit going ahead (the last agent finished, or Quit Now while it waits; HI-2336): a window reopened during
+ * the wait may hold edits made since the quit was asked for, so each window with unsaved files asks about them first,
+ * as quitting does (save or discard). Cancel there keeps Hive running (the pending quit is cancelled). Once at a time.
+ */
+function finishPendingQuit(): Promise<void> {
+  if (finishingPendingQuit) {
+    const asking = hiveWindows().find((e) => e.question)
+    if (asking) showWindow(asking.win)
+    log.info('Pending quit: its final look at unsaved files is already asking; brought forward, not asked again')
+    return finishingPendingQuit
+  }
+  finishingPendingQuit = (async () => {
+    try {
+      for (const e of hiveWindows().filter((x) => x.unsaved.length > 0)) {
+        if (!pendingQuit || quitting) return
+        const choice = await ask(e, { sessions: [], unsaved: e.unsaved, scope: 'app' })
+        if (choice === 'cancel') return cancelPendingQuit()
+        // Close this window only: its files are dealt with; the quit still waits for the rest.
+        if (choice === 'window') return void closeWindowOnly(e, { unsaved: true })
+      }
+      if (pendingQuit && !quitting) await quitNow(true)
+    } finally {
+      finishingPendingQuit = null
+    }
+  })()
+  return finishingPendingQuit
 }
 
 async function quitNow(tellUser: boolean): Promise<void> {
@@ -574,32 +669,64 @@ async function quitNow(tellUser: boolean): Promise<void> {
   saveWindows()
   quitting = true
   const stopped = sessions.liveCount()
-  // Quitting without a dialog (or after waiting): say where the sessions went, as other notices are told (a banner in
-  // the window you are using while it is still open, a Windows notification with Hive in the background, or nothing).
+  // Quitting without a dialog (or after waiting): say where the sessions went, as a Windows notification when no Hive
+  // window is focused (HI-2320: its windows are closing, so never a pop-up; nothing while you are looking at Hive).
   if (tellUser && stopped > 0) {
     const { title, body, apiTitle } = closedNotice(stopped)
-    routeAppNotice(
-      title,
-      body,
-      () => {
-        if (Notification.isSupported()) showOsNotification(new Notification({ title, icon: notificationIcon(), body, silent: true }), title, body)
-      },
-      apiTitle
-    )
+    tell({ kind: 'quit', title, message: body, apiTitle, onWindowsClick: () => undefined })
   }
+  // The slots' passes (#1628): none starts as the sessions stop (no builder placed), and one running ends before the
+  // boards close (will-quit); what it didn't get to is the next start's.
+  const slotsQuiet = quitSlotCards()
+  // The agents that were working, watching or in a lane (HI-1707): recorded for the next start, and told when Hive is
+  // restarting for an update, an install or a restart (an ordinary quit is offered back at the next start instead).
+  stopRestartRecovery()
+  stopWatchingRestartRequests()
+  const reason: RestartReason = quitReason ?? (installOnQuit || installsOnQuit() ? 'update' : relaunchOnQuit ? 'restart' : 'quit')
+  await recordClosing(reason).catch((e) => log.warn('recording the agents as Hive closes', e))
   await sessions.stopAllAndWait(3000)
   await quitLeftovers()
+  // The stopped runs' slot writers released before the workspaces close (HI-1801): their outcomes are known by now.
+  await sessions.writersSettled(3000)
+  // The merge queues' runners: their processes ended and their leases given up, so another Hive can run them at once.
+  await releaseQueueRunners()
+  // Codex's checks (HI-1757): those under way settled, each held one's end tried once more (bounded); what is left ends
+  // with its job (kill on close) as Hive exits.
+  await stopCodexChecks().catch((e) => log.warn("ending Codex's checks as Hive closes", e))
+  await slotsQuiet
   await usageHistory.stop()
   await progress.saveNow().catch(() => undefined)
   await flushMetrics().catch(() => undefined)
+  // The close commands (HI-1368), each window's and then When Hive quits, waited for as their panels say.
+  await closeCommandsOnQuit(reason === 'update' ? 'update' : 'quit').catch((e) => log.warn('running the close commands as Hive quits', e))
   await config.flush()
   // Apps that find Hive by its discovery file stop looking for this one (#620).
   await clearDiscovery()
-  if (installOnQuit) installNow()
+  // A downloaded update installs here, at the end of the quit, never for one cancelled (#1647: only over an older copy).
+  if (installOnQuit) installNow(true)
+  else if (installsOnQuit()) installNow(relaunchOnQuit)
   else {
     if (relaunchOnQuit) relaunch()
     exitBy('app.quit', relaunchOnQuit ? 'quitting to restart' : 'quitting', () => app.quit())
   }
+}
+
+/**
+ * The close commands as Hive quits (HI-1368): only when a window's workspace or When Hive quits has one; otherwise the
+ * quit goes on as before, its databases closed by will-quit. Every window's workspace closes at once, each command run
+ * in its window once its saving step is done, then When Hive quits in the last one used: not run if a workspace's close
+ * failed, or the user didn't wait for one to finish saving (its Don't wait, the only way past a saving step).
+ */
+async function closeCommandsOnQuit(reason: CloseReason): Promise<void> {
+  const entries = hiveWindows()
+  const global = config.settings.commands
+  if (!quitRunsAny(entries.map((e) => e.ws), global)) return
+  // When Hive quits runs only once every workspace has closed and drained, theirs with a command or not (HR6's round 1).
+  // No timer: each window's saving step shows, and its Don't wait is the user's (Darren's decision, 28 Oct ~14:15).
+  const drain = quitCommandPlanned(global, reason)
+  const outcomes = await Promise.all(entries.map((e) => closeWithCommand(e.ws, reason, e.win, { drain }).catch((err): RunOutcome => (log.warn("closing a window's workspace as Hive quits", err), 'notDrained'))))
+  const last = lastFocused() ?? entries[0]
+  await runQuitCommand(global, reason, last?.win ?? null, outcomes.includes('notDrained') ? 'failed' : outcomes.includes('leftSaving') ? 'left' : null)
 }
 
 /** Starts Hive again once this one has quit, as it was started but for the once-only --disable-gpu. */
@@ -644,7 +771,11 @@ async function quitLeftovers(): Promise<void> {
     // Not asked: left running, and still listed for the next start (#614).
     if (end || asking) await settleAllLeftovers(end ? 'end' : 'keep')
   }
+  // The runs seen ended, the stopped launches' jobs looked at until empty (at most 5 s), kept (HI-1886): the next start
+  // settles their slot writers if their releases aren't written before Hive exits.
+  await recordEndedLaunches().catch((e) => log.warn('keeping the ended runs for their slot writers as Hive quits', e))
   await leftoversSaved()
+  stopOrphanWatch()
   closeProcessTracking()
 }
 
@@ -656,18 +787,25 @@ async function offerRestoredLeftovers(): Promise<void> {
   for (const l of await restoreLeftovers()) {
     if (config.settings.agents.leftoverProcesses === 'end' && (await settleLeftovers(l.projectPath, l.agentId, 'end').then(() => true, () => false))) continue
     const n = l.processes.length + l.more
+    // Its buttons act on exactly what it lists (HI-2320).
+    const offer = leftoversOffer(l.projectPath, l.agentId)
     toast(
       'warning',
       tr(msg({ id: 'main.leftovers.restoredTitle', defaultMessage: '{n, plural, one {{agent} left # process running} other {{agent} left # processes running}}', description: 'A notice at start: processes an agent started before Hive last closed still run. {agent} is the agent (or project) name; {n} how many.' }), { agent: l.agentName || basename(l.projectPath), n }),
       tr(msg({ id: 'main.leftovers.restoredBody', defaultMessage: "{n, plural, one {{processes}. It was started by the agent before Hive last closed, and may hold the project's folder or ports.} other {{processes}. They were started by the agent before Hive last closed, and may hold the project's folder or ports.}}", description: 'The notice at start about processes an agent left running. {processes} lists them ("node serve.js, 2 × tail -f capture.log"); {n} is how many.' }), { processes: leftoversSummary(l, undefined, { tr, list: fmt.list }), n }),
       [
-        { label: tr(msg({ id: 'main.leftovers.end', defaultMessage: 'End Them', description: 'Button: ends the processes the agents left running.' })), command: 'session.settleLeftovers', args: [l.projectPath, l.agentId, 'end'] },
-        { label: tr(msg({ id: 'main.leftovers.keep', defaultMessage: 'Keep Running', description: 'Button: leaves the processes an agent left running.' })), command: 'session.settleLeftovers', args: [l.projectPath, l.agentId, 'keep'] }
+        { label: tr(msg({ id: 'main.leftovers.end', defaultMessage: 'End Them', description: 'Button: ends the processes the agents left running.' })), command: 'session.settleLeftovers', args: [l.projectPath, l.agentId, 'end', offer] },
+        { label: tr(msg({ id: 'main.leftovers.keep', defaultMessage: 'Keep Running', description: 'Button: leaves the processes an agent left running.' })), command: 'session.settleLeftovers', args: [l.projectPath, l.agentId, 'keep', offer] }
       ],
-      l.projectPath
+      l.projectPath,
+      { kind: 'agent', projectPath: l.projectPath, agentId: l.agentId, name: l.agentName || basename(l.projectPath), project: basename(l.projectPath) },
+      { offer }
     )
   }
 }
+
+/** Archived cards' attachments past their project's days (HI-1842), once a day (also on open: ipc.ts). */
+const CARD_CLEANUP_EVERY_MS = 86_400_000
 
 /** Archives Done cards past Settings → Board's days in every open workspace (also on open: ipc.ts). */
 function archiveOldDoneEverywhere(): void {
@@ -704,7 +842,7 @@ function wireSettingsEffects(): void {
     }
     if (JSON.stringify(s.agentApi) !== JSON.stringify(prev.agentApi)) void startApiServer().then(refreshAll)
     // Session settings changed: refresh "restart to apply", and offer to switch running agents to a new permission mode.
-    else if (JSON.stringify(s.providers) !== JSON.stringify(prev.providers) || s.defaultProvider !== prev.defaultProvider || JSON.stringify(s.assistant) !== JSON.stringify(prev.assistant)) refreshAll()
+    else if (JSON.stringify(s.providers) !== JSON.stringify(prev.providers) || JSON.stringify(s.assistant) !== JSON.stringify(prev.assistant)) refreshAll()
     for (const p of PROVIDERS) {
       const now = providerSettings(s, p.id)
       const before = providerSettings(prev, p.id)
@@ -781,10 +919,17 @@ const ALLOWED_PERMISSIONS = new Set(['clipboard-read', 'clipboard-sanitized-writ
 
 app.whenReady().then(async () => {
   config.load()
+  // Server connections' key masking (HI-1772): what is known at once, then the fingerprints read (strict meanwhile).
+  startCoverage()
+  void loadCoverage()
   // Before anything shows text: notifications, the tray and dialogs in the user's language (#767).
   await startI18n(config.settings)
   // Advanced settings (#367): advanced.json's overrides, followed as it changes.
   advanced.load()
+  // Agents per project from before HI-2001: Maximum agents in Hive's workflow defaults now.
+  await migrateAgentsPerProject()
+  // HI-1997: Hive's own workflow defaults' commit message from a preset, switched once to the branch's own.
+  await settleGlobalCommitMessage()
   // Show developer features is one of them too, kept under its settings key: the file and the setting stay one value.
   bindAdvancedSettings(config)
   // The developer console's flight recorder (#698): its triggers are advanced settings, followed as they change.
@@ -812,15 +957,39 @@ app.whenReady().then(async () => {
   log.info(`Hive ${app.getVersion()} starting (Electron ${process.versions.electron}; ${MARKED_LOG})`)
   logCrashDumps()
   // The last run's marker (#984): still there, it ended without quitting; then this run's own.
+  // The agents a restart or quit recorded (HI-1707), read first: the unexpected-close notice leaves those to it.
+  loadRestartRecord()
+  // A team pause is this run's only (HI-2156): what an earlier build saved of one goes, and Hive starts unpaused.
+  clearSavedPauses()
   checkLastRun()
   startRunMarker()
+  initRestartRecovery()
+  // Agents whose turn a dropped connection ended, resumed once it is back (HI-1612; Settings → Advanced, off by default).
+  startOutageResume()
+  // An agent waiting long to retry its model request: the Assistant told (HI-1973).
+  startRetryNotice()
+  // An installer asking Hive to close for an install (installer.nsh): the agents are recorded and told, then Hive quits.
+  watchRestartRequests(() => {
+    quitReason = 'install'
+    void quitNow(false)
+  })
   // The main process's memory, now and every 5 minutes, and a snapshot before it runs out if the setting says so (#1005).
   startMemoryLog()
   startHeapSnapshots(app.getPath('userData'), heapSnapshots)
   watchMainStalls()
+  // A replace that gave up because the file was held says which processes had it open (HI-1749).
+  renameDiagnostics.holders = fileHolders
   setInterval(archiveOldDoneEverywhere, 3_600_000).unref()
+  setInterval(queueCleanupEverywhere, CARD_CLEANUP_EVERY_MS).unref()
 
-  workspace.setLiveProvider((p, cfg, scope) => sessions.liveInfo(p, cfg, scope))
+  // Each agent's start as main's stall check reads it (HI-1977), so the board's Stalled mark agrees; a change is told at
+  // once, before the card's move it comes with (a refresh of the project came after it, and the mark showed meanwhile),
+  // and the project read again so its kept info (a window loading it) has it too.
+  workspace.setLiveProvider(async (p, cfg, scope) => withAgentStarts(p, await sessions.liveInfo(p, cfg, scope)))
+  onAgentStartChange((p, agentId) => {
+    emit({ type: 'agent-start', projectPath: p, agentId, start: agentStartOf(p, agentId) ?? null, seq: startSeq() })
+    workspaceFor(p)?.scheduleRefresh()
+  })
   sessions.apiEnv = apiEnv
   // hive-progress on every session's PATH (#137): shims in Hive's bin folder, timings beside them.
   void installShims(join(app.getPath('userData'), 'bin'), { exec: process.execPath, script: unpackedScript('hive-progress.js'), data: join(app.getPath('userData'), 'progress') }).then((dir) => {
@@ -878,6 +1047,8 @@ app.whenReady().then(async () => {
         ...(agentId ? { HIVE_AGENT_ID: agentId } : {}),
         // Whether its instructions tell it to run long commands through hive-progress unasked.
         HIVE_PROGRESS_COMMANDS: wrapsLongCommands(config.settings.general) ? '1' : '0',
+        // Whether it gives Hive's guidance as its instructions (#1285: Settings → Advanced, Hive's guidance for agents).
+        HIVE_GUIDANCE: advanced.get<boolean>(HIVE_GUIDANCE) ? '1' : '0',
         HIVE_DEV_CONSOLE: s.devConsole === true ? '1' : '0',
         // Its reply timeout and wait caps (#367: Settings → Advanced).
         ...mcpAdvancedEnv(),
@@ -890,8 +1061,14 @@ app.whenReady().then(async () => {
   initLoopWakes()
   initLoopCheck()
   initDeliveries()
+  initReviewsOnOpen()
+  // Hive's skill copies in folders no session of Hive's works in (#1431), as each workspace opens.
+  initSkillCopies((folder) => sessions.runningIn(folder))
   initInboxNotices()
+  // What agents' commands leave running while they run (HI-2111).
+  startOrphanWatch()
   initDecisionWakes()
+  initWorkflowNotices()
   initDevConsole()
   initAssistantModes()
   // A watcher stops keeping a pending quit waiting when the card it waits on leaves another agent's work (no wake comes).
@@ -903,9 +1080,13 @@ app.whenReady().then(async () => {
         const journal = journalSettingsOf(workspaceOf(projectPath))
         return withJournal(hiveInstructions('', 'assistant'), journal.enabled ? journal.scope : null)
       }
+      // Hive's tools without its guidance (#1285, #966 row 13): the Assistant above always has its own.
+      if (!advanced.get<boolean>(HIVE_GUIDANCE)) return ''
       const project = basename(projectPath)
       const latest = (await handoversFor(workspace, project))[0]
-      return withLatestHandover(hiveInstructions(project, 'agent', wrapsLongCommands(config.settings.general)), latest?.relPath)
+      // Naming only the skills its agents get (#1431).
+      const off = new Set([...offNames(workspace.config.skillDelivery), ...offNames((await workspace.projectConfig(projectPath)).skillDelivery)])
+      return withLatestHandover(hiveInstructions(project, 'agent', wrapsLongCommands(config.settings.general), off), latest?.relPath)
     })
   // The Assistant's state view at each start and after each compaction, while its journal is on (#1032).
   sessions.startContext = async (state, source) => {
@@ -940,24 +1121,100 @@ app.whenReady().then(async () => {
   sessions.assistantInstructions = (projectPath, agent) => inWorkspace(workspaceOf(projectPath), () => assistantInstructions(assistantModeId(agent, config.settings), config.settings.assistant?.control ?? 'projects', config.settings.assistant?.changeSettings === true))
   // A project's notifications and focus checks use the window showing it.
   sessions.setWindowProvider((projectPath) => (projectPath ? windowForPath(projectPath)?.win : null) ?? lastFocused()?.win ?? null)
-  // The window the user is using, for in-app banners (#157): visible, not minimised, focused.
-  setFocusedHive(() => {
-    const e = hiveWindows().find((x) => !x.win.isDestroyed() && x.win.isVisible() && !x.win.isMinimized() && x.win.isFocused())
-    return e ? { win: e.win, workspacePath: e.ws.path, projectPath: e.showing } : null
+  // The one notification system's windows (HI-2320): the one the user is using (visible, not minimised, focused) owns
+  // what is told; with none, the one showing the entry's workspace (or a source path's), else the last focused.
+  setNotifyHost({
+    focused: () => {
+      const e = hiveWindows().find((x) => !x.win.isDestroyed() && x.win.isVisible() && !x.win.isMinimized() && x.win.isFocused())
+      return e ? { win: e.win, workspacePath: e.ws.path, projectPath: e.showing } : null
+    },
+    fallback: (projectPath, source) => (projectPath ? windowForPath(projectPath) : null)?.win ?? (source && /[\\/]/.test(source) ? windowForPath(source)?.win : null) ?? lastFocused()?.win ?? null,
+    workspaceOf: (projectPath) => workspaceOf(projectPath)?.path ?? null,
+    // A result of a window's request is told in that window (HI-2355).
+    requester: requestingWindow,
+    // A toast's source that is a project (its folder): the entry's link (HI-2320).
+    projectAt: (p) => {
+      try {
+        return workspaceOf(p)?.info()?.projects.find((x) => x.path.toLowerCase() === p.toLowerCase())?.path ?? null
+      } catch {
+        return null
+      }
+    }
   })
-  sessions.setFocusedWindowProvider(focusedHive)
-  // An agent no longer waiting for you: its waiting banner closes, in whichever window shows it.
+  // An agent no longer waiting for you: its entries say so, in whichever window owns them.
   startNoticeResolver()
   providerService.setLiveSessionCounter((p) => sessions.liveCount(p))
   // Agents stopped by a refused sign-in can carry on once the CLI is signed in again (#309).
   providerService.onSignedIn((p) => sessions.signedInAgain(p, true))
+  // Connections (HI-980, HI-1755): new workspaces' defaults and the watches on their logins. Waited for: their order's
+  // one-time move (HI-1875) is done before any workspace opens or the Agent API starts.
+  await initConnections()
+  initConnectionMoves()
+  initUsageMoves()
 
   // Hook auth files of an earlier run of Hive: their tokens died with it (#345).
   await clearHookAuth()
+  // A launch's side of the workflow for its metrics (HI-2049): before the Agent API or a window can start an agent.
+  startLaunchSides()
   await startHookServer()
-  await startApiServer()
+  // After an unexpected close, its port is tried again for a few seconds (HI-2196): the copy just ended may still hold
+  // it. Awaited, so the agents resumed after it launch with the API's address.
+  await startApiServer({ retryInUse: !!lastUnexpectedClose() })
   wireSettingsEffects()
   startBranchWatch()
+  // The platform watcher (#1214): the open workspaces' repositories and folders.
+  startObserving()
+  // What it sees reconciled with the cards' facts: recorded (#1217), and acted on with the rules enforced (#1263).
+  startReconciling()
+  // A workspace closing gives up its merge queues' leases (#1360): their processes ended, then their rows deleted.
+  WorkspaceService.closingTasks.add((path) => releaseQueueRunners((r) => !!r.cfg.workspace && r.cfg.workspace.toLowerCase() === path.toLowerCase()))
+  // The merge queue (#1348): a host per project and target, started by enqueue actions and as workspaces open.
+  startQueueHosts()
+  // The slot pools (#1429): their idle slots tidied every hour.
+  startSlots()
+  // Unused Worktrees reads the slots through those pools (#1450, #1519).
+  setSlotPools(poolFor)
+  // …and asks whether a merge queue still needs a folder it kept (#1644): no workflow known, it does.
+  setQueueNeed(async (ws, projectPath, target) => {
+    const wf = await workflowFor(ws, projectPath)
+    return wf ? queueFolderNeeded(wf, target) : true
+  })
+  // Cards on slots (#1438): a start lends its builder a slot and makes its line there, Done or put back gives it back.
+  startSlotCards()
+  startFinishPath()
+  // Lanes' briefs outside slots, delivered once per revision (HI-1795).
+  startLaneBriefs()
+  // Agents' worktrees adopted as slots at the 1.0 upgrade (#1441): which projects are migrated, and their retired homes.
+  startSlotMigration()
+  startReviewerPool()
+  // The nudge to start fresh when a project's work has finished (#1437).
+  startFreshNudges()
+  // Review and check copies (#1435): returning ones looked at again every 30 s, idle ones tidied every hour.
+  startCopies()
+  startReviewCopies()
+  // The queue's order as agents read it (#1354): this Hive's entry testing now, at its step.
+  setQueueLive(queueLive)
+  // An agent's branch brought up to date between a lane's cards after a squash merge (#1271, SPEC §16.19.2), once the
+  // agent is idle: in a turn (working, starting, asking a permission, its background tasks running) or given a prompt
+  // its CLI hasn't taken yet, it is busy.
+  setAgentBusy((project, agent) => {
+    const now = sessions.agentNow(project, agent)
+    return !!now && (now.pending || ['starting', 'working', 'waiting', 'background'].includes(now.status))
+  })
+  startLineUpdates()
+  // G16 (#1481): each agent's file locks recorded on its current card.
+  startLockRecords()
+  // What an agent has going, which its submission waits for with "its own runs stopped" (#1265, G13): its open
+  // Progress runs and its CLI's background tasks.
+  setRunsGoing((project, agent) => {
+    const p = project.toLowerCase()
+    const runs = openWorkspaces().flatMap((w) => (w.path ? progress.list(w.path) : [])).filter((r) => r.source === 'agent' && r.agentId === agent && r.projectPath?.toLowerCase() === p && isOpenRun(r))
+    const tasks = sessions.agentNow(project, agent)?.backgroundTasks ?? 0
+    return [...runs.map((r) => r.title), ...(tasks ? [`its background tasks (${tasks})`] : [])] // i18n-ignore: agent-facing: what a refused submit names
+  })
+
+  // A review waiting on its builder's Progress run for the card isn't stalled (HI-1993).
+  setStallRuns((wsPath) => progress.list(wsPath))
 
   // The usage history (#1106): its tick for running sessions; each workspace's import starts as it opens.
   usageHistory.start()
@@ -995,6 +1252,8 @@ app.whenReady().then(async () => {
   startProgress()
   startMergeSlots()
   startLanes()
+  // A lane's next card, started on its builder once the card before it is Done (HI-1990).
+  startLaneStarts()
   startHandOverCheck()
   // Test builds can record the taskbar's progress calls, which the page can't see.
   if (!app.isPackaged && process.env.HIVE_TEST_TASKBAR_LOG) {
@@ -1016,15 +1275,18 @@ app.whenReady().then(async () => {
       for (const r of corruptReports.splice(0)) showCorrupt(...r)
       void offerRestoredLeftovers().catch((e) => log.warn('offering what agents left running before Hive restarted', e))
       void tellUnexpectedClose().catch((e) => log.warn('telling Hive closed unexpectedly', e))
+      void startRestartRecovery().catch((e) => log.warn('resuming the agents a restart recorded', e))
     }, 1500)
   })
   if (!first) {
     void offerRestoredLeftovers().catch((e) => log.warn('offering what agents left running before Hive restarted', e))
     void tellUnexpectedClose().catch((e) => log.warn('telling Hive closed unexpectedly', e))
+    void startRestartRecovery().catch((e) => log.warn('resuming the agents a restart recorded', e))
   }
   createTray(() => lastFocused()?.win ?? null, {
     quit: () => void requestQuit(),
-    quitNow: () => void quitNow(true),
+    // While a quit waits, Quit Now still asks about files edited since (HI-2336).
+    quitNow: () => void (pendingQuit ? finishPendingQuit() : quitNow(true)),
     cancelPendingQuit
   })
   onHiveEvent((e) => {
@@ -1038,9 +1300,7 @@ app.whenReady().then(async () => {
     // A card moved to Doing (or was given to a running agent): its session records it.
     if (e.type === 'tasks-changed') void recordLiveCardsSoon(e.workspacePath, () => sessions.liveStates())
     // A reviewer whose session ended isn't reviewing any more: its cards stop showing it.
-    if (e.type === 'session-exit' && !workspaceOf(e.projectPath).isAssistantHome(e.projectPath)) {
-      void endReviews(basename(e.projectPath), e.agentId, 'its session ended', workspaceOf(e.projectPath)).catch(() => undefined) // i18n-ignore: card history, kept in English (E10b)
-    }
+    if (e.type === 'session-exit') void endExitedReviews(e.projectPath, e.agentId)?.catch((err) => log.warn('ending the reviews of a session that ended', err))
   })
   initUpdater({
     restart: () => {
@@ -1068,8 +1328,19 @@ app.on('will-quit', () => {
   // Any other way out (the updater's install, a renderer crash's quit) clears it too.
   clearDiscoveryNow()
   killAll()
+  stopOrphanWatch()
   closeProcessTracking()
   unwatchAll()
+  stopObserving()
+  stopReconciling()
+  stopQueueHosts()
+  stopSlotCards()
+  stopLaneBriefs()
+  stopSlotMigration()
+  stopReviewerPool()
+  stopSlots()
+  stopCopies()
+  stopReviewCopies()
   flightRecorder.stop()
   advanced.stop()
   destroyTray()

@@ -8,7 +8,7 @@ import { existsSync, mkdirSync, readFileSync, rmSync, statSync, utimesSync, writ
 import { delimiter, join } from 'path'
 import { afterAll, afterEach, beforeAll, describe, expect, it, vi } from 'vitest'
 import * as electron from 'electron'
-import { holdsWork, lostByRemoving, originLabel, templateWorktreesHint, unusedPickerLabel, unusedState, unusedSummary, unusedWorkNotice } from '../src/shared/unusedWorktrees'
+import { holdsWork, lostByRemoving, originLabel, unusedPickerLabel, unusedState, unusedSummary, unusedWorkNotice } from '../src/shared/unusedWorktrees'
 import type { UnusedWorktree } from '../src/shared/types'
 import { junction, shortPath } from './pathAliases'
 import { tempDir } from './tempDir'
@@ -30,14 +30,15 @@ vi.mock('../src/main/git', async (importOriginal) => {
   return { ...real, git: ((cwd, args, ...rest) => (failing?.(args) ? failed() : real.git(cwd, args, ...rest))) as typeof real.git }
 })
 
-const { PREVIEW_MS, mergeUnused, removalPreview, removeUnusedWorktree, unusedBranchStatus, unusedWorktreeCounts, unusedWorktrees, unusedWorktreesNamed } = await import('../src/main/unusedWorktrees')
+const { PREVIEW_MS, hiveWorktreeOf, mergeUnused, removalPreview, removeUnusedWorktree, setQueueNeed, unusedBranchStatus, unusedWorktreeCounts, unusedWorktrees } = await import('../src/main/unusedWorktrees')
 const { createWorktree } = await import('../src/main/worktrees')
 const { addAgent, reserveForRemoval, worktreeChecks } = await import('../src/main/projectAgents')
 const { gitTestHooks } = await import('../src/main/git')
 const { gitOnPath, setGitToolForTests } = await import('../src/main/gitTool')
-const templates = await import('../src/main/templates')
 // Paths compared as places: git lists the long names of folders Hive may know by short (8.3) ones, as on CI (#389).
-const { placeKey, withFileLock } = await import('../src/main/fsutil')
+const { fileLockDepth, placeKey, withFileLock } = await import('../src/main/fsutil')
+const { commonGitDir } = await import('../src/main/repoLock')
+const { REPO_LOCK_FILE } = await import('../src/main/repoLockCore')
 
 // Real git work, not a wait (#555): a test here runs 20 to 70 git commands, about 35 ms each alone, about 0.3 s each and
 // up to 1.3 s under a full unit run beside other runs (measured: 12 s for one test, against 2 s alone), and more under
@@ -191,6 +192,139 @@ describe('listing', () => {
     expect(d).toMatchObject({ branch: null, check: { removable: false, reason: 'it is not on a branch (detached HEAD)', dirty: 0 } })
     expect((await run(() => removeUnusedWorktree(proj, t.path))).deleted).toBe(false)
     expect(existsSync(t.path)).toBe(true)
+  })
+
+  it("the merge queue's folder is never listed while its queue uses it: a running runner holds it (#1360), or the queue still needs it (#1644)", async () => {
+    const { FactStore } = await import('../src/main/workflow/factStore')
+    const { boardWrite } = await import('../src/main/boardStore')
+    const store = FactStore.forBoard(w, { project: 'proj', key: 'proj' })
+    const lease = `ab${++n}`
+    const t = join(root, `queue-0123456789ab-${lease}`)
+    git(proj, 'worktree', 'add', '-q', '--detach', t)
+    const needs: string[] = []
+    let need: boolean | Error = false
+    setQueueNeed(async (_ws, p, target) => {
+      needs.push(`${placeKey(p) === placeKey(proj) ? 'proj' : p}:${target}`)
+      if (need instanceof Error) throw need
+      return need
+    })
+    try {
+      const held = { target: 'main', lease, token: 't1', profile: 'Hive-Dev', pid: process.pid, started: 1, takenAt: '2026-10-21T00:00:00.000Z', renewedAt: '2026-10-21T00:00:00.000Z' }
+      await run(() => boardWrite(w, async () => store.takeQueueLease(held, null) && store.setQueueFolder({ folder: t, target: 'main', lease })))
+      // Its runner merging in it: not listed, not removable, even though nothing else needs it.
+      expect(await find(t)).toBeUndefined()
+      await expect(run(() => removalPreview(proj, t))).rejects.toThrow(/Hive doesn't remove it/)
+      expect(existsSync(t)).toBe(true)
+      // Its Hive crashed (the lease names a process that has ended): the queue's, while the queue needs it.
+      const ended = execFileSync(process.execPath, ['-e', 'process.stdout.write(String(process.pid))'], { encoding: 'utf8', env: { SystemRoot: process.env.SystemRoot ?? '' } })
+      await run(() => boardWrite(w, async () => store.takeQueueLease({ ...held, token: 't2', pid: Number(ended) }, 't1')))
+      need = true
+      expect(await find(t)).toBeUndefined()
+      // Released cleanly and kept warm for the next merge (Darren's case): still the queue's while it needs it.
+      await run(() => boardWrite(w, async () => store.dropQueueLease(lease, 't2') && store.setQueueFolder({ folder: t, target: 'main', lease: null })))
+      expect(await find(t)).toBeUndefined()
+      await expect(run(() => removalPreview(proj, t))).rejects.toThrow(/Hive doesn't remove it/)
+      // Whether it does can't be said: kept, never offered.
+      need = new Error('no workflow')
+      expect(await find(t)).toBeUndefined()
+      // Nothing waits to merge into main any more: left over, listed as the queue's.
+      need = false
+      expect(await find(t)).toMatchObject({ branch: null, kind: 'queue' })
+      expect((await run(() => removalPreview(proj, t))).path).toBeTruthy()
+      expect(needs).toContain('proj:main')
+      // No way of asking (the app not wired): the queue needs it.
+      setQueueNeed(null)
+      expect(await find(t)).toBeUndefined()
+    } finally {
+      setQueueNeed(null)
+      await run(() => boardWrite(w, async () => store.dropQueueFolder(t)))
+    }
+    // A folder named as the queue names them, with no record of it: listed as the queue's, never as a plain worktree.
+    expect(await find(t)).toMatchObject({ kind: 'queue' })
+  })
+
+  it("Remove anyway never deletes a queue folder a runner claims while the removal checks it (HR4's #1644 round 1); one claimed for removal loses its record", async () => {
+    const { FactStore } = await import('../src/main/workflow/factStore')
+    const { boardWrite } = await import('../src/main/boardStore')
+    const store = FactStore.forBoard(w, { project: 'proj', key: 'proj' })
+    const lease = `ac${++n}`
+    const t = join(root, `queue-0123456789ab-${lease}`)
+    git(proj, 'worktree', 'add', '-q', '--detach', t)
+    const runner = (token: string): Parameters<typeof store.takeQueueLease>[0] => ({ target: 'main', lease, token, profile: 'Hive-Dev', pid: process.pid, started: 1, takenAt: '2026-10-25T00:00:00.000Z', renewedAt: '2026-10-25T00:00:00.000Z' })
+    const takes = (token: string): void => {
+      store.takeQueueLease(runner(token), null)
+      store.setQueueFolder({ folder: t, target: 'main', lease })
+    }
+    const frees = (token: string): Promise<unknown> => run(() => boardWrite(w, async () => store.dropQueueLease(lease, token) && store.setQueueFolder({ folder: t, target: 'main', lease: null })))
+    const recorded = (): boolean => store.queueFolders().some((f) => placeKey(f.folder) === placeKey(t))
+    await run(() => boardWrite(w, async () => store.setQueueFolder({ folder: t, target: 'main', lease: null })))
+    try {
+      // A runner takes it while the removal asks whether the queue needs it (HR4's repro): kept, its record too.
+      setQueueNeed(async () => false)
+      let preview = await run(() => removalPreview(proj, t))
+      let acquired = false
+      setQueueNeed(async () => {
+        if (!acquired) await boardWrite(w, async () => takes('during-need'))
+        acquired = true
+        return false
+      })
+      expect(await run(() => removeUnusedWorktree(proj, t, { force: preview.token }))).toMatchObject({ deleted: false })
+      expect([acquired, existsSync(t), recorded()]).toEqual([true, true, true])
+      await frees('during-need')
+      // Later still: after every check of the listing, as its contents are read again (the claim alone stops it).
+      setQueueNeed(async () => false)
+      preview = await run(() => removalPreview(proj, t))
+      // The runner's write is asked for there, so it holds the board's lock before the removal's claim asks for it.
+      let late: Promise<unknown> | null = null
+      failing = (args) => {
+        if (!late && args[0] === 'symbolic-ref' && args.includes('--short')) late = run(() => boardWrite(w, async () => takes('during-snapshot')))
+        return false
+      }
+      expect(await run(() => removeUnusedWorktree(proj, t, { force: preview.token }))).toEqual({ deleted: false, reason: 'the merge queue is using it' })
+      failing = null
+      await late
+      expect([!!late, existsSync(t), recorded()]).toEqual([true, true, true])
+      await frees('during-snapshot')
+      // An ended runner's process not seen gone yet (a duty of its lease): it may be in the folder, so it stays.
+      await run(() => boardWrite(w, async () => store.setQueueFolder({ folder: t, target: 'main', lease })))
+      await run(() => boardWrite(w, async () => store.addQueueProc({ lease, target: 'main', pid: 1, startAfter: 0, startBefore: 1, what: 'job' })))
+      expect(await find(t)).toBeUndefined()
+      await run(() => boardWrite(w, async () => store.dropQueueProc(lease, 1)))
+      // Nothing has it: removed, and its record goes with it, so no runner takes the folder after.
+      preview = await run(() => removalPreview(proj, t))
+      expect(await run(() => removeUnusedWorktree(proj, t, { force: preview.token }))).toEqual({ deleted: true })
+      expect([existsSync(t), recorded()]).toEqual([false, false])
+    } finally {
+      failing = null
+      setQueueNeed(null)
+      await run(() => boardWrite(w, async () => store.dropQueueFolder(t)))
+    }
+  })
+
+  it("a review copy is never listed; a folder named as the queue names them, with no record, is listed as the queue's (#1644)", async () => {
+    const copy = join(root, 'copies', `copy-${++n}`)
+    git(proj, 'worktree', 'add', '-q', '--detach', copy)
+    const q = join(root, `queue-0123456789ab-cd${n}`)
+    git(proj, 'worktree', 'add', '-q', '--detach', q)
+    expect(await find(copy)).toBeUndefined()
+    expect(await find(q)).toMatchObject({ kind: 'queue' })
+  })
+
+  it("Branches & remotes' groups (HI-1710): a review copy is Hive's 'copy', a queue folder its 'queue', anything else no one of Hive's", async () => {
+    const copy = join(root, 'copies', `copy-${++n}`)
+    const q = join(root, `queue-0123456789ab-ef${n}`)
+    const plain = await tree(`plain${n}`)
+    const of = (path: string): Promise<'copy' | 'queue' | null> => run(async () => hiveWorktreeOf(proj, path))
+    expect(await of(copy)).toBe('copy')
+    // As git may list it: another case, the other slash.
+    expect(await of(copy.toUpperCase().replace(/\\/g, '/'))).toBe('copy')
+    expect(await of(q)).toBe('queue')
+    expect(await of(plain.path)).toBeNull()
+    expect(await of(proj)).toBeNull()
+    // Named like one, but not in the project's own folder of Hive's worktrees: not Hive's.
+    expect(await of(join(base, 'elsewhere', 'copies', 'copy-1'))).toBeNull()
+    expect(await of(join(base, 'elsewhere', 'queue-0123456789ab-ef1'))).toBeNull()
+    expect(await of(join(root, 'copies-old', 'copy-1'))).toBeNull()
   })
 
   // Read-only check loops share one operation's reads (#733): the project's worktree list, its main branch (its branches
@@ -508,31 +642,39 @@ describe('in the Changes tab (#400)', () => {
     expect(branches()).not.toContain(t.branch)
   })
 
-  it('fenced while it waits its turn: an agent given it meanwhile is refused, and the merge goes on unchanged', async () => {
+  it('fenced while it waits its turn: an agent given it meanwhile is refused (1.0: always, #1451), and the merge goes on unchanged', async () => {
     agents([])
     const t = await tree(`fenced${++n}`)
     commit(t.path, `f${n}.txt`)
     const head = git(proj, 'rev-parse', 'main')
-    // Another merge into this project folder holds its turn, so this one waits after it was checked.
-    let done!: () => void
-    const other = withFileLock(join(w.assertProject(proj), '.git', 'hive-merge'), () => new Promise<void>((r) => (done = r)))
+    // Another merge into this repository holds its turn (its repository lock, held in this process as withRepoLock
+    // holds it: HI-2147, a file name from before #1347 fenced nothing), so this one waits after it was checked. Let go
+    // of whatever fails below, and the merge settled, so no later test here waits on the real lock behind it.
+    let release!: () => void
+    const held = new Promise<void>((r) => (release = r))
+    const lock = join(await commonGitDir(proj), REPO_LOCK_FILE)
+    const other = withFileLock(lock, () => held)
     const merging = run(() => mergeUnused(proj, t.path, { squash: false, message: `Work from ${t.branch}`, cleanup: false }))
-    // Meanwhile Add Agent picks it as an existing worktree: refused, the project's agents unchanged.
-    await expect(run(() => addAgent(proj, { name: 'Late', location: 'existing-worktree', worktreePath: t.path }))).rejects.toThrow(/being removed, or was just removed/)
-    expect(JSON.parse(readFileSync(join(proj, '.hive', 'project.json'), 'utf8')).agents).toEqual([])
-    // A second merge or a removal of it waits for neither: refused while this one has it.
-    await expect(run(() => mergeUnused(proj, t.path, { squash: false, message: 'twice', cleanup: false }))).rejects.toThrow(/already being removed or merged/)
-    expect(await run(() => removeUnusedWorktree(proj, t.path))).toMatchObject({ deleted: false, reason: 'That worktree is already being removed or merged.' })
-    expect(git(proj, 'rev-parse', 'main')).toBe(head)
-    done()
-    await other
+    try {
+      await vi.waitFor(() => expect(fileLockDepth(lock)).toBe(2), { timeout: GIT_HUNG_MS, interval: 20 })
+      // Meanwhile Add Agent picks it as an existing worktree: refused (no agent is pinned to a worktree in 1.0), the
+      // project's agents unchanged.
+      await expect(run(() => addAgent(proj, { name: 'Late', location: 'existing-worktree', worktreePath: t.path }))).rejects.toThrow(/aren’t pinned to worktrees/)
+      expect(JSON.parse(readFileSync(join(proj, '.hive', 'project.json'), 'utf8')).agents).toEqual([])
+      // A second merge or a removal of it waits for neither: refused while this one has it.
+      await expect(run(() => mergeUnused(proj, t.path, { squash: false, message: 'twice', cleanup: false }))).rejects.toThrow(/already being removed or merged/)
+      expect(await run(() => removeUnusedWorktree(proj, t.path))).toMatchObject({ deleted: false, reason: 'That worktree is already being removed or merged.' })
+      expect(git(proj, 'rev-parse', 'main')).toBe(head)
+    } finally {
+      release()
+      await other
+      await merging.catch(() => undefined)
+    }
+    await vi.waitFor(() => expect(fileLockDepth(lock)).toBe(0), { timeout: GIT_HUNG_MS, interval: 20 })
     expect(await merging).toMatchObject({ ok: true })
     expect(existsSync(join(proj, `f${n}.txt`))).toBe(true)
     expect(existsSync(t.path)).toBe(true)
     expect(branches()).toContain(t.branch)
-    // Once over, it can be given to an agent again.
-    const late = await run(() => addAgent(proj, { name: 'Later', location: 'existing-worktree', worktreePath: t.path }))
-    expect(placeKey(late.worktree!.path)).toBe(placeKey(t.path))
     agents([])
   })
 
@@ -566,26 +708,6 @@ describe('without git (#346)', () => {
   })
 })
 
-describe("a deleted template's worktree agents", () => {
-  it('finds the unused worktrees named after them, numbered ones too; deleting the template touches none', async () => {
-    n++
-    const a = await tree(`claudette${n}`)
-    const b = await tree(`claudette${n}-2`)
-    const other = await tree(`someone${n}`)
-    const found = await run(() => unusedWorktreesNamed(proj, [`Claudette${n}`, 'Nobody']))
-    expect(found.map(placeKey).sort()).toEqual([a.path, b.path].map(placeKey).sort())
-    expect(found.map(placeKey)).not.toContain(placeKey(other.path))
-
-    const t = { version: 1, name: `Trio ${n}`, savedAt: '2026-10-06T10:00:00.000Z', layout: 'auto', agents: [{ name: `Claudette${n}`, provider: 'claude-code', worktree: true }, { name: 'Folder', provider: 'claude-code', worktree: false }] }
-    mkdirSync(join(proj, '.hive', 'templates'), { recursive: true })
-    writeFileSync(join(proj, '.hive', 'templates', `trio-${n}.json`), JSON.stringify(t))
-    const left = await run(() => templates.deleteTemplate({ scope: 'project', project: proj, file: `trio-${n}.json` }))
-    expect(left.unusedWorktrees).toEqual([{ project: proj, count: 2 }])
-    expect(existsSync(a.path) && existsSync(b.path)).toBe(true)
-    expect(templateWorktreesHint(left, () => 'proj')).toMatchObject({ title: '2 unused worktrees in proj', project: proj })
-  })
-})
-
 describe('what the window says', () => {
   const wt = (check: UnusedWorktree['check'], extra: Partial<UnusedWorktree> = {}): UnusedWorktree => ({ path: 'C:\\w\\x', branch: 'hive/x', check, ...extra })
   it("the Overview's line counts them and the merged ones (#400)", () => {
@@ -603,8 +725,5 @@ describe('what the window says', () => {
   it('nothing to remove anyway when git could not count it', () => {
     expect(lostByRemoving(wt({ removable: false, into: 'main', reason: "git couldn't check hive/x" }))).toBeNull()
     expect(unusedState(wt({ removable: false, into: 'main', reason: "git couldn't check hive/x" }))).toBe("git couldn't check hive/x")
-  })
-  it('no template hint without unused worktrees', () => {
-    expect(templateWorktreesHint({ unusedWorktrees: [] }, () => 'x')).toBeNull()
   })
 })

@@ -19,6 +19,8 @@ const lanes = await import('../src/main/lanes')
 const journal = await import('../src/main/journal')
 const service = await import('../src/main/journalService')
 const deliveries = await import('../src/main/deliveries')
+const { workflowFor } = await import('../src/main/workflow/service')
+const { runFinish } = await import('../src/main/finishPath')
 
 vi.setConfig({ testTimeout: 30_000 })
 type WS = ReturnType<typeof createWorkspaceService>
@@ -46,9 +48,16 @@ describe('the journal in a workspace', () => {
   const run = <T>(fn: () => Promise<T>): Promise<T> => inWorkspace(w, fn)
   const home = (): string => w.assistantHome
   /** A new card moved into Done by the user. */
+  /** A card moved into Done, and its finish run (HI-2014: it writes the journal's fact), as the actions worker runs it. */
+  const finished = async (n: number): Promise<void> => {
+    const alpha = join(wsPath, 'alpha')
+    const wf = (await workflowFor(w, alpha))!
+    await runFinish(w, wf, alpha, n, wf.state(wf.store.cardByKey(`#${n}`)!).finished!.seq)
+  }
   const doneCard = async (title: string): Promise<void> => {
     const c = await run(() => tasks.createTask({ title, project: 'alpha' }, user))
     await run(() => tasks.updateTask(c.number, { column: 'done' }, user))
+    await finished(c.number)
   }
   const facts = (): string[] => (existsSync(journal.journalFile(home())) ? journal.recall(home(), { limit: 50 }).filter((r) => r.source === 'hive').map((r) => r.summary) : [])
   /** What the Assistant was told (its inbox's bodies). */
@@ -81,10 +90,11 @@ describe('the journal in a workspace', () => {
     const [c1, c2] = [await run(() => tasks.createTask({ title: 'One', project: 'alpha' }, user)), await run(() => tasks.createTask({ title: 'Two', project: 'alpha' }, user))]
     const l = await run(() => lanes.startLane(w, { project: 'alpha', builder: 'b1', reviewer: 'r1', cards: [c1.number, c2.number], name: 'storage', by: 'B1 (alpha)' }))
     await run(() => tasks.updateTask(c1.number, { column: 'done' }, user))
+    await finished(c1.number)
     await run(() => lanes.endLane(w, l.lane.id, { mergeCommit: '45b5696b' }))
     expect(facts().reverse()).toEqual([
       `Lane "storage" started: B1 / R1, #${c1.number}, #${c2.number}`,
-      `#${c1.number} "One" is Done (merged), moved there by You`,
+      `#${c1.number} "One" is Done (moved there on the board), by You`,
       `Lane "storage" ended, merged at 45b5696b: B1 / R1, #${c1.number}, #${c2.number}`
     ])
     // Linked and marked: the merge is important and points at its commit and cards.
@@ -123,6 +133,13 @@ describe('the journal in a workspace', () => {
     const db = new DatabaseSync(journal.journalFile(home()))
     db.prepare('UPDATE entries SET at = ? WHERE id = ?').run(new Date(Date.now() - 60 * 86_400_000).toISOString(), id)
     db.close()
+    // A number out of range (a blank box's 0, a 1, text, a fraction) is refused, never raised to the minimum and
+    // pruned to (HI-2345): the entry and the saved settings stay.
+    const kept = service.journalSettingsOf(w)
+    for (const bad of [{ retentionDays: 0 }, { retentionDays: 1 }, { retentionDays: Number.NaN }, { retentionDays: 30.5 }, { retentionDays: '30' as unknown as number }, { capMB: 0 }, { capMB: 1 }, { capMB: 20_000 }])
+      await expect(service.setJournalSettings(w, bad), JSON.stringify(bad)).rejects.toThrow(/Nothing was changed/)
+    expect(service.journalSettingsOf(w)).toEqual(kept)
+    expect(journal.readEntry(home(), id)).not.toBeNull()
     await service.setJournalSettings(w, { retentionDays: 30 })
     expect(journal.readEntry(home(), id)).toBeNull()
     await service.deleteWorkspaceJournal(w)

@@ -6,10 +6,11 @@ import { englishText, shownText, type TextPart } from '../../shared/advanced'
 import { msg, tr } from '../../shared/i18n'
 import type { AgentInstallInfo, ReadinessIssue, RecacheEstimate, SessionUsage } from '../../shared/types'
 import { readFirstLineOf } from '../transcriptFiles'
-import { cleanSwaps, contentHash, ContentTooLarge, COPY_MARKER, CopyFailed, LinkNotCopied, removePath, sourceProblem, swapIn, tooBigToDeliver, withFileLock } from '../fsutil'
+import { cleanSwaps, contentHash, ContentTooLarge, COPY_MARKER, CopyFailed, LinkNotCopied, sourceProblem, swapIn, swapOut, tooBigToDeliver, withFileLock } from '../fsutil'
 import { createLogger, userText } from '../logger'
 import { hiveError } from '../hiveError'
-import type { HookIds, LaunchContext, SkillDelivery } from './types'
+import { git } from '../git'
+import type { HookIds, LaunchContext, SkillCopyBook, SkillCopyRecord, SkillDelivery } from './types'
 
 const log = createLogger('providers')
 
@@ -21,12 +22,15 @@ export function readFirstLine(path: string, max = 1 << 20): Promise<string> {
 
 /** Helpers shared by provider adapters. */
 
-export function run(file: string, args: string[], timeoutMs = 15000, env?: NodeJS.ProcessEnv): Promise<{ stdout: string; stderr: string; code: number }> {
+/** `ended`: it didn't exit by itself (its timeout ended it, or it couldn't start): its code says nothing then. */
+export function run(file: string, args: string[], timeoutMs = 15000, env?: NodeJS.ProcessEnv): Promise<{ stdout: string; stderr: string; code: number; ended?: true }> {
   const shell = /\.(cmd|bat)$/i.test(file)
   return new Promise((resolve) => {
     execFile(file, args, { timeout: timeoutMs, windowsHide: true, shell, encoding: 'utf8', env }, (err, stdout, stderr) => {
-      const code = err ? ((err as NodeJS.ErrnoException & { code?: number }).code as unknown as number) || 1 : 0
-      resolve({ stdout: stdout ?? '', stderr: stderr ?? '', code: typeof code === 'number' ? code : 1 })
+      const raw = err ? (err as NodeJS.ErrnoException & { code?: number | string }).code : 0
+      const code = err ? (raw as unknown as number) || 1 : 0
+      const ended = !!err && (!!(err as { killed?: boolean }).killed || typeof raw !== 'number')
+      resolve({ stdout: stdout ?? '', stderr: stderr ?? '', code: typeof code === 'number' ? code : 1, ...(ended ? { ended: true as const } : {}) })
     })
   })
 }
@@ -189,6 +193,13 @@ export function hookIds(body: Record<string, any>, fields: { turn: string; call:
   return { turn: id(body[fields.turn]), call: id(body[fields.call]), sub: fields.sub ? id(body[fields.sub]) : null, continued: body.stop_hook_active === true }
 }
 
+/** Remembers `value` for a launch (`key`), keeping only the latest 16: a launch stopped part-way never takes its own. */
+export function keepBounded<V>(map: Map<string, V>, key: string, value: V): void {
+  map.delete(key)
+  map.set(key, value)
+  while (map.size > 16) map.delete(map.keys().next().value!)
+}
+
 /** Estimates how many tokens resuming a session will write to the prompt cache (providers with a cache TTL). */
 export function recacheEstimate(usage: SessionUsage, ttlOverride: 'auto' | '5m' | '1h', now = Date.now()): RecacheEstimate {
   const ttlSeconds = ttlOverride === '5m' ? 300 : ttlOverride === '1h' ? 3600 : usage.cacheTtlSeconds
@@ -263,10 +274,17 @@ async function syncAgentsSkillsNow(ctx: LaunchContext, cli: string): Promise<Rec
   if (!ctx.skills.length && !existsSync(dir)) return out
   await mkdir(dir, { recursive: true })
   // Under the same lock as the swaps: Hive's own leftovers only (dot-folders named for a swap).
-  await cleanSwaps(dir)
+  await cleanSwaps(dir, unchangedCopy)
+  const own = await ownCopies(ctx.cwd, ctx.projectPath, ctx.copies)
   for (const f of await readdir(dir).catch(() => [] as string[])) {
-    // A copy Hive no longer gives that can't be removed now (a file in it open) goes at a later launch.
-    if (f.startsWith('hive-') && !wanted.has(f) && (await skillMarker(join(dir, f))) !== null) await removePath(join(dir, f)).catch((e) => log.warn(`Could not remove ${userText(f)} for ${cli}; trying again next time`, e))
+    // A copy Hive no longer gives (switched off, deleted or renamed) goes only when it is Hive's own, unchanged (#1431),
+    // and no other session of Hive's works in the folder (it may be reading it): asked for each copy, inside the lock.
+    // One kept now (a reader there, or a file in it open) goes at a later launch with the folder to itself, or when the
+    // last session there ends (as Settings → Advanced says).
+    if (!f.startsWith('hive-') || wanted.has(f) || ctx.othersHere?.()) continue
+    const skill = f.slice('hive-'.length)
+    const revision = await own(skill)
+    if (revision) await retireCopy(ctx.cwd, skill, revision, ctx.copies).catch((e) => log.warn(`Could not remove ${userText(f)} for ${cli}; trying again next time`, e))
   }
   for (const [folder, s] of wanted) {
     // One skill's failure is its own: the others are still delivered, and each record says what the CLI reads.
@@ -276,19 +294,111 @@ async function syncAgentsSkillsNow(ctx: LaunchContext, cli: string): Promise<Rec
       log.warn(`Could not copy skill ${userText(s.name)} for ${cli}`, e)
       out[s.name] = await keptCopy(join(dir, folder), 'it could not be copied') // i18n-ignore: the skills' launch record, which agents read (the Agent API's status): guidance.ts
     }
+    // Hive's record of the copy (#1431): only one that is exactly what Hive wrote (its content its marker's hash), so a
+    // copy edited since keeps its old record and is never taken for Hive's own.
+    const revision = out[s.name].revision
+    if (ctx.copies && revision && (await skillMarker(join(dir, folder))) === revision) await ctx.copies.record(ctx.cwd, ctx.projectPath, s.name, revision).catch((e) => log.warn(`Could not record Hive's copy of ${userText(s.name)} for ${cli}`, e))
   }
   // Keeping the copies out of git: a failure here changes nothing about what was delivered.
   await excludeCopies(ctx.cwd).catch((e) => log.warn(`Could not add Hive's ${cli} skill copies to git's exclude file`, e))
   return out
 }
 
+/**
+ * Which copies in a folder's .agents/skills are Hive's own to remove (#1431): the copy's marker says Hive made it, Hive's
+ * record says so too, and its content is still the revision recorded (unchanged since delivery), so neither a user's
+ * skill nor a copy edited since is ever removed. A marked copy without a record (made before records) whose content is
+ * still its marker's hash is provably Hive's and unchanged: it is recorded then. Records that can't be read: none is.
+ * Without a book (tests), the marker and content alone decide. Each answer is the revision the copy may be removed at
+ * (null: it stays), which retireCopy checks again as it goes: an edit made meanwhile keeps it.
+ */
+async function ownCopies(folder: string, project: string, book: SkillCopyBook | undefined): Promise<(skill: string) => Promise<string | null>> {
+  const records = book ? await book.of(folder).catch((e) => (log.warn("Could not read Hive's record of its skill copies", e), null)) : undefined
+  return async (skill) => {
+    if (records === null) return null
+    const dest = agentsSkillCopyPath(folder, skill)
+    const marker = await skillMarker(dest)
+    // No marker: the user's. An empty one, from before hashes: whether it was changed can't be told.
+    if (!marker) return null
+    const now = await contentHash(dest).catch(() => null)
+    if (!now) return null
+    if (!records) return now === marker ? now : null
+    const rec = records.get(skill.toLowerCase())
+    if (rec) return now === rec.revision ? now : null
+    if (now !== marker) return null
+    await book!.record(folder, project, skill, now)
+    return now
+  }
+}
+
+/**
+ * Removes Hive's copy of a skill in a folder only while it is still `revision` (swapOut: checked under Hive's editors'
+ * file locks, again once moved aside and just before it goes, so an edit made since ownCopies looked keeps it, put back
+ * or kept beside it as a conflict copy), then its record. One already gone just loses its record; one edited meanwhile
+ * keeps its record, whose revision no longer matches, so it is never taken for Hive's own again.
+ */
+async function retireCopy(folder: string, skill: string, revision: string, book: SkillCopyBook | undefined): Promise<void> {
+  const dest = agentsSkillCopyPath(folder, skill)
+  if (existsSync(dest)) await swapOut(dest, revision)
+  await book?.forget(folder, skill)
+}
+
+/**
+ * cleanSwaps' test in .agents/skills: what a crash left aside is removed only while it is a Hive copy whose content is
+ * still its marker's hash; anything else is kept beside it as a conflict copy.
+ */
+async function unchangedCopy(aside: string): Promise<boolean> {
+  const marker = await skillMarker(aside)
+  return !!marker && (await contentHash(aside).catch(() => null)) === marker
+}
+
+/**
+ * Removes Hive's own skill copies from a folder's .agents/skills (#1431: the last of Hive's sessions there ended, a lease
+ * ended, a slot is about to go, or at start for folders whose sessions are gone), under syncAgentsSkills' lock, so a
+ * launch meanwhile wins: `busy` is asked inside the lock, and a folder a session of Hive's is in keeps every copy. Only
+ * Hive's own copies go (ownCopies); a user's skill, a copy edited since, and anything else in the folder stay. Records of
+ * copies no longer there are dropped. Says which skills' copies were removed.
+ */
+export async function removeHiveCopies(folder: string, project: string, book: SkillCopyBook | undefined, busy: () => boolean): Promise<string[]> {
+  const dir = join(folder, AGENTS_SKILLS)
+  return withFileLock(dir, async () => {
+    if (busy()) return []
+    const recorded = book ? await book.of(folder).catch(() => new Map<string, SkillCopyRecord>()) : new Map<string, SkillCopyRecord>()
+    if (!existsSync(dir)) {
+      for (const r of recorded.values()) await book?.forget(folder, r.skill).catch(() => undefined)
+      return []
+    }
+    await cleanSwaps(dir, unchangedCopy)
+    const own = await ownCopies(folder, project, book)
+    const names = new Set([...recorded.values()].map((r) => r.skill))
+    for (const f of await readdir(dir).catch(() => [] as string[])) if (f.startsWith('hive-')) names.add(f.slice('hive-'.length))
+    const removed: string[] = []
+    for (const skill of names) {
+      try {
+        if (!existsSync(agentsSkillCopyPath(folder, skill))) await book?.forget(folder, skill)
+        else {
+          const revision = await own(skill)
+          if (!revision) continue
+          await retireCopy(folder, skill, revision, book)
+          removed.push(skill)
+        }
+      } catch (e) {
+        // In use (a CLI run on its own there has a file open): it stays, and goes at a later clean-up.
+        log.warn(`Could not remove Hive's copy of ${userText(skill)} from ${userText(folder)}; trying again later`, e)
+      }
+    }
+    return removed
+  })
+}
+
 /** One skill into its folder in .agents/skills (under syncAgentsSkills' lock): what the CLI reads of it afterwards. */
 async function deliverSkill(s: LaunchContext['skills'][number], dest: string, folder: string, cli: string): Promise<SkillDelivery> {
   // One identity for the source, Hive's copies and their markers: contentHash, which counts links (never following
   // them) and leaves the marker out. A marker from before (another hash) just means one more copy.
+  // The launch's settings' read of the source where they had one (HI-2268: hashed again only when its files changed).
   let hash: string
   try {
-    hash = await contentHash(s.sourcePath)
+    hash = s.revision || (await contentHash(s.sourcePath))
   } catch (e) {
     // Not copied. Hive's copy from an earlier launch stays, and is what the CLI reads: its revision is what reached the
     // session. A folder of the user's with the name is theirs, not a delivery. Too big lasts until the skill is
@@ -341,8 +451,8 @@ async function deliverSkill(s: LaunchContext['skills'][number], dest: string, fo
 
 /** Keeps Hive's copies (and a swap's dot-folders) out of git, in the repository's info/exclude. */
 export async function excludeCopies(cwd: string): Promise<void> {
-  const common = await run('git', ['-C', cwd, 'rev-parse', '--git-common-dir'], 5000)
-  const gitDir = common.code === 0 ? common.stdout.trim() : ''
+  const common = await git(cwd, ['rev-parse', '--git-common-dir'], undefined, undefined, { timeout: 5000 })
+  const gitDir = common.ok ? common.out.trim() : ''
   if (!gitDir) return
   const exclude = join(isAbsolute(gitDir) ? gitDir : resolvePath(cwd, gitDir), 'info', 'exclude')
   const text = await readFile(exclude, 'utf8').catch(() => '')
@@ -384,18 +494,18 @@ export function shownInstallInfo(info: AgentInstallInfo): AgentInstallInfo {
 }
 
 const READINESS = {
-  notInstalled: msg({ id: 'providers.readiness.notInstalled', defaultMessage: '{provider} is not installed.', description: "Agent Setup and Settings → Providers: Hive didn't find the coding agent's CLI. {provider} is its name (Claude Code)." }),
-  signedOut: msg({ id: 'providers.readiness.signedOut', defaultMessage: '{provider} is not signed in.', description: "Agent Setup and Settings → Providers: the coding agent's CLI has no sign-in. {provider} is its name." }),
-  update: msg({ id: 'providers.readiness.update', defaultMessage: '{provider} {version} is available.', description: 'Agent Setup and Settings → Providers: a newer version of the coding agent is out. {provider} is its name, {version} the version.' }),
-  install: msg({ id: 'providers.action.install', defaultMessage: 'Install', description: "Agent Setup's button: installs the coding agent's CLI in a terminal." }),
-  signIn: msg({ id: 'providers.action.signIn', defaultMessage: 'Sign in', description: "Agent Setup's button: signs the coding agent's CLI in, in a terminal." }),
-  updateAction: msg({ id: 'providers.action.update', defaultMessage: 'Update', description: "Agent Setup's button: updates the coding agent's CLI in a terminal." })
+  notInstalled: msg({ id: 'providers.readiness.notInstalled', defaultMessage: '{provider} is not installed.', description: "Provider Setup and Settings → Providers: Hive didn't find the coding agent's CLI. {provider} is its name (Claude Code)." }),
+  signedOut: msg({ id: 'providers.readiness.signedOut', defaultMessage: '{provider} is not signed in.', description: "Provider Setup and Settings → Providers: the coding agent's CLI has no sign-in. {provider} is its name." }),
+  update: msg({ id: 'providers.readiness.update', defaultMessage: '{provider} {version} is available.', description: 'Provider Setup and Settings → Providers: a newer version of the coding agent is out. {provider} is its name, {version} the version.' }),
+  install: msg({ id: 'providers.action.install', defaultMessage: 'Install', description: "Provider Setup's button: installs the coding agent's CLI in a terminal." }),
+  signIn: msg({ id: 'providers.action.signIn', defaultMessage: 'Sign in', description: "Provider Setup's button: signs the coding agent's CLI in, in a terminal." }),
+  updateAction: msg({ id: 'providers.action.update', defaultMessage: 'Update', description: "Provider Setup's button: updates the coding agent's CLI in a terminal." })
 }
 
-/** The CLI isn't installed: install it from Agent Setup. */
+/** The CLI isn't installed: install it from Provider Setup. */
 export const notInstalledIssue = (provider: string): ReadinessIssue => ({ id: 'not-installed', level: 'error', message: installText({ m: READINESS.notInstalled, values: { provider } }), action: { label: installText(READINESS.install), task: 'install' } })
 
-/** The CLI isn't signed in: sign in from Agent Setup, with what that does (`detail`). */
+/** The CLI isn't signed in: sign in from Provider Setup, with what that does (`detail`). */
 export const signedOutIssue = (provider: string, detail?: TextPart[]): ReadinessIssue => ({
   id: 'signed-out',
   level: 'error',
@@ -420,3 +530,35 @@ export const exportSubtitleText = (provider: string, session: string, project: s
 
 /** The Memory view's label for the user's own instructions file, which every project's agents read. */
 export const userMemoryLabel = (file: string): string => tr(USER_MEMORY, { file })
+
+const CONNECTION_MEMORY = msg({ id: 'providers.memory.connection', defaultMessage: '{file} of connection {name} (its agents, all projects)', description: "In the Memory view: a connection's own instructions file (HI-1755), which the agents running on that connection read in every project. {file} is its name (CLAUDE.md), {name} the connection's name (\"Personal\")." })
+/** The Memory view's label for a connection's own instructions file (HI-1755). */
+export const connectionMemoryLabel = (file: string, name: string): string => tr(CONNECTION_MEMORY, { file, name })
+
+/**
+ * An environment for running a CLI on a connection (HI-1757): without the variables it would read as a login instead.
+ * `adapter` null (not on a connection): the environment as it is.
+ */
+export function withoutAccountEnv<T extends Record<string, string | undefined>>(adapter: { accountEnvDrop?(): readonly string[]; accountEnvDropPattern?(): RegExp } | null, env: T): T {
+  const drop = adapter?.accountEnvDrop?.() ?? []
+  const pattern = adapter?.accountEnvDropPattern?.() ?? null
+  if (!drop.length && !pattern) return env
+  const out = { ...env }
+  // Windows' variable names aren't case-sensitive: any spelling of one goes (a pattern is matched on the name in
+  // capitals, as well as as written).
+  const names = new Set(drop.map((k) => k.toUpperCase()))
+  for (const k of Object.keys(out)) if (names.has(k.toUpperCase()) || (pattern && (pattern.test(k) || pattern.test(k.toUpperCase())))) delete out[k]
+  return out
+}
+
+/**
+ * An environment with a server connection's own variables set (HI-1772: its server, models and key), any spelling of
+ * the same names before them gone. `vars` undefined: the environment as it is.
+ */
+export function withServerEnv<T extends Record<string, string | undefined>>(vars: Record<string, string> | undefined, env: T): T {
+  if (!vars) return env
+  const names = new Set(Object.keys(vars).map((k) => k.toUpperCase()))
+  const out = { ...env }
+  for (const k of Object.keys(out)) if (names.has(k.toUpperCase())) delete out[k]
+  return { ...out, ...vars }
+}

@@ -33,6 +33,8 @@ describe('saving pane placements', () => {
   })
   afterEach(() => disposeWorkspaceService(w))
   const saved = () => JSON.parse(readFileSync(file, 'utf8'))
+  /** The project's view (its layout and placement), as this user's UI state keeps it (HI-1749: not in project.json). */
+  const view = () => inWorkspace(w, () => w.projectConfig(alpha))
   const order = () => saved().agents.map((a: { id: string }) => a.id).join(',')
   // As adding and removing agents change them (addAgent, removeAgent, templates: all through mutateProjectConfig).
   const add = (id: string) => w.mutateProjectConfig(alpha, (now) => ({ agents: [...now.agents, agent(id)] }))
@@ -41,9 +43,9 @@ describe('saving pane placements', () => {
   it('saves the cells and the order as they read; an automatic layout becomes chosen', async () => {
     await start(['One', 'Two'])
     expect(await inWorkspace(w, () => placePanes(alpha, 'grid6', [null, 'Two', 'One']))).toEqual([null, 'Two', 'One'])
-    expect(saved().placement.grid6).toEqual([null, 'Two', 'One'])
+    expect((await view()).placement!.grid6).toEqual([null, 'Two', 'One'])
     expect(order()).toBe('Two,One')
-    expect(saved().layout).toBe('columns2')
+    expect((await view()).layout).toBe('columns2')
     expect(saved().worktreeSetup).toBe('npm ci')
   })
 
@@ -59,34 +61,34 @@ describe('saving pane placements', () => {
   it('agents added take a cell and keep it; one removed leaves its cell empty (add, add, remove)', async () => {
     await start(['One', 'Two'], [null, 'One', 'Two'])
     await add('Three')
-    expect(saved().placement.grid6).toEqual(['Three', 'One', 'Two'])
+    expect((await view()).placement!.grid6).toEqual(['Three', 'One', 'Two'])
     await add('Four')
-    expect(saved().placement.grid6).toEqual(['Three', 'One', 'Two', 'Four'])
+    expect((await view()).placement!.grid6).toEqual(['Three', 'One', 'Two', 'Four'])
     await remove('One')
-    expect(saved().placement.grid6).toEqual(['Three', null, 'Two', 'Four'])
+    expect((await view()).placement!.grid6).toEqual(['Three', null, 'Two', 'Four'])
   })
 
   it("a change of order (another layout's move, Tiles) moves no agent's cell", async () => {
     await start(['Two', 'Three', 'Four'], ['Three', null, 'Two', 'Four'])
     await inWorkspace(w, () => moveAgent(alpha, 'Four', 0))
     expect(order()).toBe('Four,Two,Three')
-    expect(saved().placement.grid6).toEqual(['Three', null, 'Two', 'Four'])
+    expect((await view()).placement!.grid6).toEqual(['Three', null, 'Two', 'Four'])
   })
 
   it("names gone and agents added meanwhile: a gone one's cell is empty, an added one takes a cell", async () => {
     await start(['Two', 'Three', 'Four', 'Five'], ['Three', null, 'Two', 'Four'])
     // Placed as the window last saw them: One (gone since) and without Five (added since).
     expect(await inWorkspace(w, () => placePanes(alpha, 'columns2', ['Two', 'One', 'Three', 'Four']))).toEqual(['Two', 'Five', 'Three', 'Four'])
-    expect(saved().placement.columns2).toEqual(['Two', 'Five', 'Three', 'Four'])
+    expect((await view()).placement!.columns2).toEqual(['Two', 'Five', 'Three', 'Four'])
     expect(order()).toBe('Two,Five,Three,Four')
     // The grid of six's placement takes Five in too, in its first empty cell.
-    expect(saved().placement.grid6).toEqual(['Three', 'Five', 'Two', 'Four'])
+    expect((await view()).placement!.grid6).toEqual(['Three', 'Five', 'Two', 'Four'])
   })
 
   it('kept across a restart', async () => {
     await start(['One', 'Two'])
     await inWorkspace(w, () => placePanes(alpha, 'grid6', [null, null, 'Two', null, 'One']))
-    const before = saved().placement
+    const before = (await view()).placement!
     expect(before.grid6).toEqual([null, null, 'Two', null, 'One'])
     disposeWorkspaceService(w)
     w = createWorkspaceService()

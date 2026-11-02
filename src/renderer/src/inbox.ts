@@ -1,7 +1,11 @@
 import { useMemo } from 'react'
 import { inbox, type Inbox, type InboxItem } from '@shared/inbox'
+import { needYou, type NeedYou } from '@shared/needYou'
+import { agentDoingCards, agentReviewCards } from '@shared/tasks'
+import type { ForYouItem } from '@shared/workflow/workView'
 import { call } from './api'
-import { NO_PROJECTS, agentsOnScreen, findProject, get, projectKey, revealAgent, set, setAssistantOpen, showGit, showView, useStore } from './store'
+import { useForYou } from './forYou'
+import { NO_PROJECTS, agentsOnScreen, findProject, get, projectKey, revealAgent, set, setAssistantOpen, showVersionControl, showView, useStore } from './store'
 
 /** The window's attention inbox (shared/inbox.ts): agents that need you, and worktree agents with work to review. */
 export function useInbox(): Inbox {
@@ -10,6 +14,27 @@ export function useInbox(): Inbox {
   const branches = useStore((s) => s.branchStatus)
   const failures = useStore((s) => s.startFailures)
   return useMemo(() => inbox(projects, assistant, (path, id) => branches[projectKey(path, id)], (path, id) => failures[projectKey(path, id)]), [projects, assistant, branches, failures])
+}
+
+/**
+ * What needs you (#1632): what For you lists, the cards' requests (an approval, a decision, a question) and the agents
+ * stopped in their panes (a prompt, a sign-in, a question, an error, a failed start); finished agents are apart. Counted
+ * as things (HI-1931, `needYou`): each card with requests once, each agent once, one on a counted card under it.
+ */
+export function useNeedsYou(): Inbox & { requests: ForYouItem[]; grouped: NeedYou; count: number } {
+  const box = useInbox()
+  const requests = useForYou().summary.items
+  const tasks = useStore((s) => s.tasks)
+  return useMemo(() => {
+    const cardsOf = (a: InboxItem): number[] => [...agentDoingCards(tasks, a.projectName, a.agentId), ...agentReviewCards(tasks, a.projectName, a.agentId)].map((c) => c.number)
+    const grouped = needYou(requests, box.needYou, cardsOf)
+    return { ...box, requests, grouped, count: grouped.count }
+  }, [box, requests, tasks])
+}
+
+/** Opens a card's request (For you) in its dialog. */
+export function openRequest(item: ForYouItem): void {
+  set({ inboxOpen: false, taskOpen: item.card })
 }
 
 /** Goes to an inbox item's agent; the Assistant's opens its panel. */
@@ -27,7 +52,7 @@ export function openInboxItem(item: InboxItem): void {
 export function openInboxChanges(item: InboxItem): void {
   set((s) => ({ inboxOpen: false, selectedProject: item.projectPath, changesRoot: { ...s.changesRoot, [item.projectPath]: item.agentId } }))
   showView('projects')
-  showGit(item.projectPath, 'changes')
+  showVersionControl(item.projectPath, 'changes')
 }
 
 export function openInboxMerge(item: InboxItem): void {

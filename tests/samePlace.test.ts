@@ -153,7 +153,9 @@ describe('places by real path (#455)', () => {
       process.env.HIVE_TEST_TRASH_DIR = trashDir
       try {
         const agents = [agent('z', alias(q, 'q-delete')), agent('y', alias(outer, 'outer-delete')), agent('x', alias(q2, 'q2-delete')), agent('s', alias(spare, 'spare-delete'))]
-        writeFileSync(join(q, '.hive', 'project.json'), JSON.stringify({ version: 2, agents }))
+        // Under project.json's lock, as Hive writes it (#1238): written beside it, a write the opened workspace began
+        // before (its project ids, 250 ms on) put back the config from before, and Delete found no agents.
+        await w2.mutateProjectConfig(q, () => ({ agents }))
         const { warnings } = await inWorkspace(w2, () => removeProject(q, 'delete'))
         expect(warnings).toEqual([expect.stringMatching(/^Left alone: Z's worktree .*contains the project/), expect.stringMatching(/^Left alone: Y's worktree .*contains the project/), expect.stringMatching(/^Left alone: X's worktree .*another project/)])
         // What went: the project, and the one worktree that was safe (by the name the agent had for it).
@@ -219,8 +221,9 @@ describe('places by real path (#455)', () => {
     }
     const edit = (st: Record<string, unknown>) =>
       inWorkspace(w, async () => sessions.preToolUse(st.runId as string, { hook_event_name: 'PreToolUse', session_id: st.sessionId, cwd: proj, tool_name: 'apply_patch', tool_input: { command: '*** Begin Patch\n*** Update File: a.txt\n@@\n+x\n*** End Patch' } }))
-    const was = config.settings.agents.fileLocks
-    config.settings.agents.fileLocks = 'warn'
+    // File locks as Hive's workflow default (HI-1766), for either platform the project is detected as.
+    const was = config.settings.workflow
+    config.settings.workflow = { none: { fileLocks: 'warn' }, git: { fileLocks: 'warn' } }
     try {
       const holder = running('lh', named)
       const editor = running('le', proj)
@@ -229,7 +232,7 @@ describe('places by real path (#455)', () => {
       const reply = JSON.stringify(await edit(editor))
       expect(reply).toContain('is also editing a.txt right now')
     } finally {
-      config.settings.agents.fileLocks = was
+      config.settings.workflow = was
       for (const id of ['lh', 'le']) {
         s.live.delete(`${proj.toLowerCase()}#${id}`)
         s.runs.delete(`run-${id}`)

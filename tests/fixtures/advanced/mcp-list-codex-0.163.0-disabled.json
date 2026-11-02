@@ -1,0 +1,21 @@
+[
+  {
+    "name": "userfake",
+    "enabled": false,
+    "disabled_reason": null,
+    "transport": {
+      "type": "stdio",
+      "command": "node",
+      "args": [
+        "-e",
+        "setInterval(()=>{},1000)"
+      ],
+      "env": null,
+      "env_vars": [],
+      "cwd": null
+    },
+    "startup_timeout_sec": null,
+    "tool_timeout_sec": null,
+    "auth_status": "unsupported"
+  }
+]

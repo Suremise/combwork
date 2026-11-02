@@ -1,15 +1,19 @@
 // The Progress panel's merge card and lanes (#484), on fake Claude Code agents: idle, it is as before (no merge card,
-// divider or lanes); lanes show pinned to the bottom, one row each with a segmented bar coloured and patterned by each
+// divider or lanes); lanes show right after the runs (#1309: Pulse lays out top to bottom, no gap), one row each with a segmented bar coloured and patterned by each
 // card's column, blocked reason and review rounds, folding a long lane's finished cards into "✓ n", one lane only as
 // tall as it is, four rows before the list scrolls and the section's top edge dragged (or Up and Down) for more or fewer
 // in whole lanes, never squeezing the runs, double-click for four, kept folded and through a restart (#569), running lanes first, the card being worked as current, an ended or abandoned lane frozen as it was left
 // (#512), hover text (with what a failed review's underline and the hatching mean, #706), a click opening the card, and the section folding to its bar; running lanes
 // put in the user's order (#568): dragged with a line where they go (the list scrolled, and scrolling near its edge), Alt+Up and Alt+Down said to screen
-// readers, the context menu, a new lane on top, a finished one to the very bottom, kept through a restart, and the usual order again; while an agent holds the merge slot, a
+// readers, the context menu, a new lane on top, a finished one to the very bottom, kept through a restart, and the usual order again; a lane's
+// queued list change shown in the Lanes tab, gone once it applies (HI-2151); while an agent holds the merge slot, a
 // card in the merge colour on top (holder, branch → main, its running step, time, who waits) with a divider, folding to
 // one line; a short, zoomed window keeps the lanes inside the panel and a run readable. Screenshots of the idle, lanes,
 // merging and short states in both themes. The lanes are #483's, started through the Agent API. Dev build, throwaway
 // profile, workspace and CLAUDE_CONFIG_DIR.
+// Dev build only (#1580): it starts this checkout's Electron itself, and B1 and B3 are 0.9 worktree agents
+// (agents:testLegacy, refused by a packaged build). Idle and outside slots, each gets its lane in a new conversation
+// (HI-2232), so a new token: the suite reads it again from that launch (HI-2254).
 const lib = require('./lib.cjs')
 const { _electron } = require('playwright-core')
 const fs = require('fs')
@@ -63,18 +67,29 @@ const until = (fn, ms = 10000) => lib.until(fn, ms, 150)
   for (const a of [b1, r1, b3]) await inv('session:start', alpha, { agentId: a.id })
   const statuses = async () => (await Promise.all([b1, r1, b3].map((a) => live(a.id)))).map((s) => s?.status)
   check('the agents start', !!(await until(async () => (await statuses()).every((s) => s === 'ready'), 45000)), JSON.stringify(await statuses()))
-  const launches = fs.readFileSync(path.join(claudeHome, 'fake-launches.jsonl'), 'utf8').trim().split('\n').map((l) => JSON.parse(l))
-  // Each agent's token, by the folder it runs in (B1 and B3 in their worktrees).
-  const tokenOf = (a) => launches.filter((l) => l.cwd.toLowerCase() === (a.worktree?.path ?? alpha).toLowerCase()).at(-1)?.env?.HIVE_API_TOKEN
+  // The fake CLI's launches as now (each launch has its own token): read again where an agent is relaunched.
+  const launchesNow = () => fs.readFileSync(path.join(claudeHome, 'fake-launches.jsonl'), 'utf8').trim().split('\n').map((l) => JSON.parse(l))
+  const launchesOf = (a) => launchesNow().filter((l) => l.cwd.toLowerCase() === (a.worktree?.path ?? alpha).toLowerCase())
+  // Each agent's token, by the folder it runs in (B1 and B3 in their worktrees): its latest launch's.
+  const tokenOf = (a) => launchesOf(a).at(-1)?.token
   const api = async (token, method, route, body) => {
     const r = await fetch(`http://127.0.0.1:${PORT}${route}`, { method, headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' }, ...(body ? { body: JSON.stringify(body) } : {}) })
     return { status: r.status, body: await r.json().catch(() => null) }
   }
-  const [t1, tr, t3] = [tokenOf(b1), tokenOf(r1), tokenOf(b3)]
-  check('each agent has its own token', !!t1 && !!tr && !!t3 && new Set([t1, tr, t3]).size === 3, JSON.stringify(launches.map((l) => l.cwd)))
+  const tr = tokenOf(r1)
+  // B1's and B3's change once their lanes give them new conversations (HI-2232, below).
+  let [t1, t3] = [tokenOf(b1), tokenOf(b3)]
+  check('each agent has its own token', !!t1 && !!tr && !!t3 && new Set([t1, tr, t3]).size === 3, JSON.stringify(launchesNow().map((l) => l.cwd)))
 
   // --- The board a lane reads: B1's eight cards, each somewhere else.
-  const make = async (title, column = 'todo', agent = b1.id) => (await inv('tasks:create', { title, project: 'alpha', column, agent })).number
+  // Each card's name as the window gives it (#1221): its key.
+  const keyOf = new Map()
+  const K = (n) => keyOf.get(n) ?? `#${n}`
+  const make = async (title, column = 'todo', agent = b1.id) => {
+    const c = await inv('tasks:create', { title, project: 'alpha', column, agent })
+    keyOf.set(c.number, c.key)
+    return c.number
+  }
   const lane1 = []
   for (const t of ['Lane data', 'Lane tools', 'Panel layout', 'Segment colours', 'Merge card', 'Lane hover', 'Docs and tip', 'Screenshots']) lane1.push(await make(t, 'doing'))
   const [n1, n2, n3, n4, n5, n6, n7, n8] = lane1
@@ -85,7 +100,6 @@ const until = (fn, ms = 10000) => lib.until(fn, ms, 150)
   }
   await toReview(n1)
   await verdict(n1, 'passed')
-  await inv('tasks:update', n1, { column: 'done' })
   await toReview(n2)
   await verdict(n2, 'passed')
   // #3: failed once, back in Review for round 2. #4: failed, being fixed in Doing.
@@ -100,10 +114,9 @@ const until = (fn, ms = 10000) => lib.until(fn, ms, 150)
   await inv('tasks:update', n7, { column: 'hold' })
   await inv('tasks:update', n8, { column: 'todo' })
   check('the board is set up', back.status === 200, JSON.stringify(back))
-  // A long lane: 18 cards done, 4 to do.
+  // A long lane: 18 cards done (once it has started, below), 4 to do.
   const long = []
   for (let i = 0; i < 22; i++) long.push(await make(`Long ${i + 1}`, 'todo', b3.id))
-  for (const n of long.slice(0, 18)) await inv('tasks:update', n, { column: 'done' })
   await inv('tasks:update', long[18], { column: 'doing' })
   const short = [await make('Small fix', 'review', r1.id), await make('Follow-up', 'todo', r1.id)]
 
@@ -135,6 +148,9 @@ const until = (fn, ms = 10000) => lib.until(fn, ms, 150)
     if (r.status !== 200) check(`lane of ${builder} starts`, false, JSON.stringify(r))
     return r.body?.lane?.id
   }
+  // B1 quiet first (idle, nothing of Hive's being typed into it or waiting to be): the board set-up above sends it card
+  // events, and taking them as its lane starts would make its new conversation owed (or leave it as it is, mid-turn).
+  check('B1 is quiet before its lane starts', !!(await until(async () => lib.agentQuiet(PORT, 'alpha', await live(b1.id), tr), 45000)), JSON.stringify(await live(b1.id)))
   const l1 = await startLane('B1', 'R1', 'lanes and loops', lane1)
   const section = panel.locator('.progress-lanes')
   const list = section.locator('.progress-lanes-list')
@@ -150,24 +166,41 @@ const until = (fn, ms = 10000) => lib.until(fn, ms, 150)
   const showsWhole = (f, n) => f.whole === n && (n >= f.bottoms.length ? f.scroll <= f.client + 1 : Math.abs(f.tops[n] - f.client) <= 1 && f.scroll > f.client + 4)
   // Only as tall as the lane, its margin and the list's padding (6 px each).
   check('one lane: the section is only as tall as it is', !!(await until(async () => (await section.locator('.progress-lane').count()) === 1 && showsWhole(await fit(), 1), HUNG_MS)) && (await fit()).client <= (await fit()).bottoms[0] + 12, JSON.stringify(await fit().catch(() => null)))
+  // B3 quiet too, for the same reason: its 22 cards, made above, send it card events of its own.
+  check('B3 is quiet before its lane starts', !!(await until(async () => lib.agentQuiet(PORT, 'alpha', await live(b3.id), tr), 45000)), JSON.stringify(await live(b3.id)))
   const l2 = await startLane('B3', 'R1', 'a long lane', long)
+  // B1 and B3, idle builders outside slots, are given their new lanes in new conversations (HI-2232), so each has a new
+  // launch and token: the merge slot's claims below are their new launches'.
+  const renewedNow = async (a) => launchesOf(a).length === 2 && ['ready', 'finished'].includes((await live(a.id))?.status)
+  const renewal = async (a) => JSON.stringify({ launches: launchesOf(a).length, status: (await live(a.id))?.status })
+  check('B1 and B3, idle outside slots, get their lanes in new conversations', !!(await until(async () => (await renewedNow(b1)) && (await renewedNow(b3)), HUNG_MS)), `${await renewal(b1)} ${await renewal(b3)}`)
+  t1 = tokenOf(b1)
+  t3 = tokenOf(b3)
   const l3 = await startLane('R1', null, null, short)
   const l4 = await startLane('B5', 'R1', 'merged earlier', [n1, n2])
   const l5 = await startLane('B6', null, 'given up', [n5, n8])
+  // Cards merged while their lanes run (HI-2176): a lane started leaves out a card already Done (HI-2097), so #1 and
+  // the long lane's first 18 go to Done only now.
+  await inv('tasks:update', n1, { column: 'done' })
+  for (const n of long.slice(0, 18)) await inv('tasks:update', n, { column: 'done' })
   const ended = await api(workspaceToken, 'POST', `/v1/lanes/${l4}/end`, { mergeCommit: 'abc1234' })
   const dropped = await api(workspaceToken, 'POST', `/v1/lanes/${l5}/end`, { abandoned: true })
   const l6 = await startLane('B7', 'R1', 'six of six', [await make('Seventh lane, one', 'doing')])
   const l7 = await startLane('B8', 'R1', 'one more', [await make('Eighth lane, one', 'todo')])
   check('seven lanes started, one ended and one abandoned', [l1, l2, l3, l4, l5, l6, l7].every(Boolean) && ended.body?.state === 'ended' && dropped.body?.state === 'abandoned', JSON.stringify([ended, dropped]))
   const order = () => section.locator('.progress-lane').evaluateAll((els) => els.map((e) => e.getAttribute('data-lane')))
-  // Running lanes first, newest first, then the paused one (#512), then the ended and abandoned ones in the order they
-  // finished, the latest last (#568).
-  const wantOrder = [l7, l6, l2, l1, l3, l4, l5]
+  // Running lanes first, newest first, then the paused ones (#512) newest first: R1's (its current card blocked) and
+  // B1's (one card at a time, #1270: its card in Passed isn't merged while later ones wait), then the ended and abandoned
+  // ones in the order they finished, the latest last (#568).
+  const wantOrder = [l7, l6, l2, l3, l1, l4, l5]
   check('the lanes show, a row each: running first (newest first), then paused, then ended and abandoned as they finished', !!(await until(async () => (await order()).join() === wantOrder.join(), HUNG_MS)), JSON.stringify({ got: await order(), want: wantOrder }))
   const row1 = section.locator(`.progress-lane[data-lane="${l1}"]`)
   const top1 = await row1.locator('.progress-lane-top').innerText()
   // #3 is back in Review while #4 is being fixed in Doing: the lane is on #4, the card being built (#512).
-  check('a lane says its pair, name, the card being worked and finished/total', /B1 \/ R1/.test(top1) && /lanes and loops/.test(top1) && new RegExp(`#${n4}\\b`).test(top1) && /2\/8/.test(top1), top1)
+  // #2 passed but not merged (the rules on, one card at a time): why it waits takes the name's room (#1279), the name is
+  // in its accessible name.
+  const label1 = (await row1.getAttribute('aria-label')) ?? ''
+  check('a lane says its pair, why it waits, the card being worked and finished/total; its name in its accessible name', /B1 \/ R1/.test(top1) && top1.includes(`waiting: ${K(n2)} not merged`) && new RegExp(`${K(n4)}\\b`).test(top1) && /2\/8/.test(top1) && /lanes and loops/.test(label1), JSON.stringify({ top1, label1 }))
   const segClass = async (n) => (await row1.locator(`.lane-seg[data-card="${n}"]`).getAttribute('class')) ?? ''
   const want = { [n1]: 'done', [n2]: 'passed', [n3]: 'review', [n4]: 'doing', [n5]: 'todo', [n6]: 'blocked', [n7]: 'blocked', [n8]: 'todo' }
   const got = {}
@@ -177,23 +210,32 @@ const until = (fn, ms = 10000) => lib.until(fn, ms, 150)
   const widths = await row1.locator('.lane-seg').evaluateAll((els) => els.map((e) => Math.round(e.getBoundingClientRect().width)))
   check('segments are equal widths', Math.max(...widths) - Math.min(...widths) <= 1, JSON.stringify(widths))
   // Each state its own pattern as well as colour: no two states draw the same.
-  const looks = await row1.locator('.lane-seg').evaluateAll((els) => els.map((e) => { const s = getComputedStyle(e); return `${s.backgroundImage}|${s.backgroundColor}|${s.boxShadow}|${s.animationName}` }))
+  const looks = await row1.locator('.lane-seg').evaluateAll((els) => els.map((e) => { const s = getComputedStyle(e); return `${s.backgroundImage}|${s.backgroundColor}|${s.boxShadow}|${getComputedStyle(e, '::before').animationName}` }))
   const byState = {}
   lane1.forEach((n, i) => (byState[want[n]] = looks[i]))
   check('every state looks different', new Set(Object.values(byState)).size === Object.keys(byState).length, JSON.stringify(byState))
   check('doing is animated, and the others are not', /lane-stripes/.test(byState.doing) && Object.entries(byState).every(([k, v]) => k === 'doing' || !/lane-stripes/.test(v)))
+  // Under reduced motion the stripes stand still (#1629: they move on the segment's ::before).
+  await page.emulateMedia({ reducedMotion: 'reduce' })
+  const reduced = await row1.locator(`.lane-seg[data-card="${n4}"]`).evaluate((e) => getComputedStyle(e, '::before').animationName)
+  await page.emulateMedia({ reducedMotion: 'no-preference' })
+  check('…and still under reduced motion', reduced === 'none', reduced)
   const row2 = section.locator(`.progress-lane[data-lane="${l2}"]`)
   check("a long lane folds its finished cards into one '✓ n'", ((await row2.locator('.lane-seg.finished').innerText().catch(() => '')) === '✓ 18') && (await row2.locator('.lane-seg[data-card]').count()) === 4)
-  check('a paused, an ended and an abandoned lane say so', /paused/.test(await section.locator(`[data-lane="${l3}"]`).innerText()) && /merged/.test(await section.locator(`[data-lane="${l4}"]`).innerText()) && /abandoned/.test(await section.locator(`[data-lane="${l5}"]`).innerText()))
-  // Four rows show whole before it scrolls (#569); the fifth starts at the bottom edge and scrolls.
-  check('four lanes show by default, then the list scrolls', showsWhole(await fit(), 4), JSON.stringify(await fit()))
-  await shoot('lanes-four')
+  // A paused lane says why in the paused colour (#1279), and that it is paused in its accessible name.
+  const paused3 = section.locator(`[data-lane="${l3}"]`)
+  check('a paused, an ended and an abandoned lane say so', /paused/.test((await paused3.getAttribute('aria-label')) ?? '') && (await paused3.locator('.progress-lane-why.paused').count()) === 1 && /merged/.test(await section.locator(`[data-lane="${l4}"]`).innerText()) && /abandoned/.test(await section.locator(`[data-lane="${l5}"]`).innerText()))
+  // Six rows show whole before it scrolls (#569; six since HI-1673); the seventh starts at the bottom edge and scrolls.
+  check('six lanes show by default, then the list scrolls', showsWhole(await fit(), 6), JSON.stringify(await fit()))
+  await shoot('lanes-six')
   // The section's top edge (#569): a splitter whose value is the lanes shown.
   const edge = section.locator('.progress-lanes-edge')
   const edgeSays = async () => ({ now: await edge.getAttribute('aria-valuenow'), text: await edge.getAttribute('aria-valuetext'), max: await edge.getAttribute('aria-valuemax') })
-  check('its top edge is a focusable splitter saying how many lanes show', (await edge.getAttribute('role')) === 'separator' && (await edge.getAttribute('tabindex')) === '0' && JSON.stringify(await edgeSays()) === JSON.stringify({ now: '4', text: '4 of 7 lanes shown', max: '7' }), JSON.stringify(await edgeSays()))
+  const edgeMin = async () => Number(await edge.getAttribute('aria-valuemin'))
+  check('its top edge is a focusable splitter saying how many lanes show', (await edge.getAttribute('role')) === 'separator' && (await edge.getAttribute('tabindex')) === '0' && JSON.stringify(await edgeSays()) === JSON.stringify({ now: '6', text: '6 of 7 lanes shown', max: '7' }), JSON.stringify(await edgeSays()))
   const pitch = (await fit()).tops[1] - (await fit()).tops[0]
-  const drag = async (dy) => {
+  /** Drags the edge by dy (px), the rows it should snap to between the splitter's range (its floor: HI-1673). */
+  const press = async (dy) => {
     const b = await edge.boundingBox()
     const x = b.x + b.width / 2
     const y = b.y + b.height / 2
@@ -202,17 +244,40 @@ const until = (fn, ms = 10000) => lib.until(fn, ms, 150)
     await page.mouse.move(x, y + dy / 2, { steps: 4 })
     await page.mouse.move(x, y + dy, { steps: 4 })
     await page.mouse.up()
+    return b
+  }
+  const drag = async (dy, what) => {
+    const was = await edgeSays()
+    const rows = Math.max(await edgeMin(), Math.min(Number(was.max), Math.round(Number(was.now) - dy / pitch)))
+    const b = await edge.boundingBox()
+    const x = b.x + b.width / 2
+    const y = b.y + b.height / 2
+    await page.mouse.move(x, y)
+    await page.mouse.down()
+    await page.mouse.move(x, y + dy / 2, { steps: 4 })
+    await page.mouse.move(x, y + dy, { steps: 4 })
+    await page.mouse.up()
+    // Its result kept and drawn before anything reads where the edge is: a drag right after another pressed where the
+    // edge had been, not yet moved by the first one's lanes, and so dragged nothing (#1235). Checked, so a drag that
+    // missed fails here rather than being made good by the next one.
+    const done = await until(async () => (await kept()) === rows && (await edgeSays()).now === String(rows), HUNG_MS)
+    check(`the drag ${what} is kept and drawn (${rows} shown)`, !!done, JSON.stringify({ was, dy, kept: await kept(), says: await edgeSays(), box: b, now: await edge.boundingBox() }))
   }
   const kept = () => page.evaluate((w) => window.hive.invoke('ui:get').then((ui) => ui.panes?.[`progress-lanes-rows:${w.toLowerCase()}`] ?? null), ws)
-  // Dragged up by a lane and a half: snaps to six; down by just under one: five.
-  await drag(-pitch * 1.6)
-  check('dragging the top edge up shows more lanes, whole ones', !!(await until(async () => showsWhole(await fit(), 6), HUNG_MS)) && (await edgeSays()).now === '6', JSON.stringify({ fit: await fit(), pitch }))
-  check('…kept for the workspace', !!(await until(async () => (await kept()) === 6, HUNG_MS)), String(await kept()))
-  await drag(pitch * 0.9)
-  check('…and down, fewer', !!(await until(async () => showsWhole(await fit(), 5), HUNG_MS)), JSON.stringify(await fit()))
+  // Its floor (HI-1673, Darren): with more lanes than six, a drag never shows fewer than six.
+  check('the splitter ranges from six (the floor) to the lanes there are', (await edgeMin()) === 6 && (await edgeSays()).max === '7', JSON.stringify({ min: await edgeMin(), says: await edgeSays() }))
+  // Dragged up by just under one: seven, kept.
+  await drag(-pitch * 0.9, 'up just under a lane')
+  check('dragging the top edge up shows more lanes, whole ones', !!(await until(async () => showsWhole(await fit(), 7), HUNG_MS)) && (await edgeSays()).now === '7', JSON.stringify({ fit: await fit(), pitch }))
+  check('…kept for the workspace', !!(await until(async () => (await kept()) === 7, HUNG_MS)), String(await kept()))
+  // From seven, dragged down two lanes and a half: it stops at the floor, six, kept and drawn (HR5's round 1: from
+  // above the floor, so the drag is seen to take effect).
+  await press(pitch * 2.5)
+  await page.mouse.move(5, 5)
+  check('dragging the top edge down never shows fewer than six', !!(await until(async () => (await kept()) === 6 && showsWhole(await fit(), 6) && (await edgeSays()).now === '6', HUNG_MS)), JSON.stringify({ kept: await kept(), fit: await fit(), says: await edgeSays(), pitch }))
   // All the way up: no more than there are, and the runs keep their room.
   const body = () => panel.locator('.progress-body').evaluate((el) => el.getBoundingClientRect().height)
-  await drag(-2000)
+  await drag(-2000, 'all the way up')
   check('…up to all the lanes there are, with no empty space under them', !!(await until(async () => showsWhole(await fit(), 7), HUNG_MS)) && (await edgeSays()).now === '7', JSON.stringify(await fit()))
   check('…while the runs keep their room', (await body()) >= 119, String(await body()))
   await shoot('lanes-all')
@@ -231,7 +296,8 @@ const until = (fn, ms = 10000) => lib.until(fn, ms, 150)
     const says = await edgeSays()
     return { f, says, body: await body(), ax: await axEdge() }
   }
-  const honest = (q, n) => showsWhole(q.f, n) && q.says.now === String(n) && q.says.max === String(n) && q.says.text === `${n} of 7 lanes shown` && q.body >= 119 && !!q.ax && Number(q.ax.value) === n && Number(q.ax.max) === n
+  // The lanes take priority (HI-1673): squeezed to the floor or below, the runs give way rather than keep their room.
+  const honest = (q, n) => showsWhole(q.f, n) && q.says.now === String(n) && q.says.max === String(n) && q.says.text === `${n} of 7 lanes shown` && (n <= 6 || q.body >= 119) && !!q.ax && Number(q.ax.value) === n && Number(q.ax.max) === n
   await lib.fitWindow(app, page, { width: 1400, height: 600 })
   await zoomTo(1.5)
   let tight = null
@@ -240,7 +306,7 @@ const until = (fn, ms = 10000) => lib.until(fn, ms, 150)
     tight = q
     return q.f.whole > 0 && q.f.whole < 7 && honest(q, q.f.whole)
   }, HUNG_MS)
-  check('kept seven, squeezed: whole lanes that fit, the runs keep their room, and the splitter says what shows and the most that fit', !!settles && (await kept()) === 7, JSON.stringify({ tight, kept: await kept() }))
+  check('kept seven, squeezed: whole lanes that fit, the runs giving way first, and the splitter says what shows and the most that fit', !!settles && (await kept()) === 7, JSON.stringify({ tight, kept: await kept() }))
   const fits = tight?.f.whole ?? 0
   await shoot('lanes-squeezed')
   await edge.focus()
@@ -265,39 +331,47 @@ const until = (fn, ms = 10000) => lib.until(fn, ms, 150)
   await until(async () => (await page.evaluate(() => window.innerHeight)) === 600, HUNG_MS)
   // Measured for the short window before the edge is dragged, and the drag's result waited for, not read once (#601).
   await until(async () => Number((await edgeSays()).max) < 7, HUNG_MS)
-  await drag(pitch)
-  await drag(-2000)
+  // What the edge said and where it was around each drag, for a failure's detail.
+  const trace = []
+  const snap = async (at) => trace.push({ at, says: await edgeSays(), kept: await kept(), box: await edge.boundingBox(), f: await fit(), body: await body() })
+  await snap('before')
+  // Its range there: the floor and the most that fit (HI-1673); a drag stays within it.
+  await press(pitch)
+  await page.mouse.move(5, 5)
+  await snap('after down')
+  await press(-2000)
+  await page.mouse.move(5, 5)
+  await snap('after up')
   let shortFit = null
   const shortOk = await until(async () => {
     shortFit = { f: await fit(), body: await body() }
-    return shortFit.f.whole < 7 && showsWhole(shortFit.f, shortFit.f.whole) && shortFit.body >= 119 && shortFit.body < 119 + pitch
+    // Six (the floor) whole, the runs giving way to them if they must (HI-1673), never more than fit.
+    return shortFit.f.whole === 6 && showsWhole(shortFit.f, 6)
   }, HUNG_MS)
-  check('in a short window, dragged to the top, the runs keep their room and the list ends at a whole lane', !!shortOk, JSON.stringify({ shortFit, says: await edgeSays() }))
+  check('in a short window, dragged either way, the floor shows whole and the list ends at a whole lane', !!shortOk, JSON.stringify({ shortFit, says: await edgeSays(), trace }))
   await lib.fitWindow(app, page, { width: 1400, height: 850 })
   await until(async () => (await page.evaluate(() => window.innerHeight)) === 850, HUNG_MS)
-  // Double-click: back to four, and nothing kept.
+  // Double-click: back to six, and nothing kept.
   await edge.dblclick()
-  check('double-clicking the top edge goes back to four', !!(await until(async () => showsWhole(await fit(), 4) && (await kept()) === null, HUNG_MS)), JSON.stringify({ fit: await fit(), kept: await kept() }))
-  // Keyboard: Up a lane more, Down one fewer, saying so.
+  check('double-clicking the top edge goes back to six', !!(await until(async () => showsWhole(await fit(), 6) && (await kept()) === null, HUNG_MS)), JSON.stringify({ fit: await fit(), kept: await kept() }))
+  // Keyboard: Up a lane more, Down one fewer, never below the floor, saying so.
   await edge.focus()
   await page.keyboard.press('ArrowUp')
-  check('focused, Up shows a lane more and says so', !!(await until(async () => showsWhole(await fit(), 5) && (await kept()) === 5, HUNG_MS)) && (await edgeSays()).text === '5 of 7 lanes shown', JSON.stringify(await edgeSays()))
+  check('focused, Up shows a lane more and says so', !!(await until(async () => showsWhole(await fit(), 7) && (await kept()) === 7, HUNG_MS)) && (await edgeSays()).text === '7 of 7 lanes shown', JSON.stringify(await edgeSays()))
   await shoot('lanes-edge-focused')
   await page.keyboard.press('ArrowDown')
   await page.keyboard.press('ArrowDown')
-  check('…Down, fewer', !!(await until(async () => showsWhole(await fit(), 3), HUNG_MS)) && (await edgeSays()).text === '3 of 7 lanes shown', JSON.stringify(await edgeSays()))
-  await page.keyboard.press('ArrowUp')
-  await page.keyboard.press('ArrowUp')
-  check('…and back to five', !!(await until(async () => showsWhole(await fit(), 5) && (await kept()) === 5, HUNG_MS)), JSON.stringify(await fit()))
+  check('…Down, fewer, but never below six', !!(await until(async () => showsWhole(await fit(), 6) && (await kept()) === 6, HUNG_MS)) && (await edgeSays()).text === '6 of 7 lanes shown', JSON.stringify(await edgeSays()))
   // Ended and abandoned lanes are still: nothing in them animates, and they show no current card.
-  const still = await section.locator(`[data-lane="${l4}"] .lane-seg, [data-lane="${l5}"] .lane-seg`).evaluateAll((els) => els.map((e) => getComputedStyle(e).animationName))
+  const still = await section.locator(`[data-lane="${l4}"] .lane-seg, [data-lane="${l5}"] .lane-seg`).evaluateAll((els) => els.map((e) => getComputedStyle(e, '::before').animationName))
   check('ended and abandoned lanes never animate, and name no current card', still.length === 4 && still.every((a) => a === 'none') && (await section.locator(`[data-lane="${l4}"] .progress-lane-current, [data-lane="${l5}"] .progress-lane-current`).count()) === 0, JSON.stringify(still))
   const panelBox = await panel.boundingBox()
   const sectionBox = await section.boundingBox()
-  check('the lanes are pinned to the bottom of the panel', Math.abs(sectionBox.y + sectionBox.height - (panelBox.y + panelBox.height)) <= 2, JSON.stringify({ panelBox, sectionBox }))
+  const runsBox = await panel.locator('.progress-tab-pulse > .progress-body').boundingBox()
+  check('the lanes sit at the bottom of the panel, the runs right above them (HI-1673, as #484 had them)', Math.abs(sectionBox.y - (runsBox.y + runsBox.height)) <= 2 && Math.abs(sectionBox.y + sectionBox.height - (panelBox.y + panelBox.height)) <= 2, JSON.stringify({ panelBox, runsBox, sectionBox }))
   // Hover: the card and its round.
   await row1.locator(`.lane-seg[data-card="${n3}"]`).hover()
-  const tip = page.locator('.tip', { hasText: `#${n3} Panel layout` })
+  const tip = page.locator('.tip', { hasText: `${K(n3)} Panel layout` })
   check('hovering a segment shows the card and its round', !!(await until(async () => (await tip.count()) === 1, HUNG_MS)) && /Review, round 2/.test(await tip.innerText()), await page.locator('.tip').allInnerTexts().then((t) => t.join(' | ')))
   await row1.locator(`.lane-seg[data-card="${n4}"]`).hover()
   check("…and a failed one's", !!(await until(async () => /round 1 failed review/.test((await page.locator('.tip').allInnerTexts()).join(' ')), HUNG_MS)))
@@ -305,13 +379,13 @@ const until = (fn, ms = 10000) => lib.until(fn, ms, 150)
   // What the marks mean (#706): the red underline's failed round and the reviewer's gist, the hatching's reason, in the
   // hover and in the segment's accessible name. A screenshot of each hover in both themes.
   const marks = [
-    [n4, 'failed', [`#${n4}: review failed (round 1): waiting for round 2`, 'Reviewer: Round 1: FAILED: 1 finding: the hover clips']],
-    [n6, 'blocked', [`#${n6}: blocked: Waiting for a design decision`]],
-    [n7, 'hold', [`#${n7}: On Hold: waiting for you to move it on`]]
+    [n4, 'failed', [`${K(n4)}: review failed (round 1): waiting for round 2`, 'Reviewer: Round 1: FAILED: 1 finding: the hover clips']],
+    [n6, 'blocked', [`${K(n6)}: blocked: Waiting for a design decision`]],
+    [n7, 'hold', [`${K(n7)}: On Hold: waiting for you to move it on`]]
   ]
   for (const [n, what, lines] of marks) {
     const seg = row1.locator(`.lane-seg[data-card="${n}"]`)
-    const tipOf = page.locator('.tip', { hasText: `#${n} ` })
+    const tipOf = page.locator('.tip', { hasText: `${K(n)} ` })
     const notes = async () => tipOf.locator('.lane-seg-note').allInnerTexts().catch(() => [])
     await page.mouse.move(0, 0)
     await seg.hover()
@@ -332,6 +406,34 @@ const until = (fn, ms = 10000) => lib.until(fn, ms, 150)
     }
     await inv('settings:update', { appearance: { theme: 'dark' } })
   }
+  // What the cards' facts say (#1225), from the moves above: the revision under review and the last verdict on its
+  // revision, a passed card's verdict, and a Done card's merge commit (the ended lane's own record: no merge fact).
+  const head7 = String(lib.git(alpha, ['rev-parse', 'HEAD'])).trim().slice(0, 7)
+  const workLines = async (row, n) => page.locator('.tip', { hasText: `${K(n)} ` }).locator('.lane-seg-work').allInnerTexts().catch(() => [])
+  const work = [
+    [row1, n3, 'review', (l) => l.includes(`Under review: ${head7}`) && l.some((x) => x.startsWith(`Last verdict: failed on ${head7}`))],
+    [row1, n2, 'passed', (l) => l.some((x) => x.startsWith(`Last verdict: passed on ${head7}`))],
+    [section.locator(`.progress-lane[data-lane="${l4}"]`), n1, 'merged', (l) => l.includes('Merged as abc1234')]
+  ]
+  for (const [row, n, what, ok] of work) {
+    const seg = row.locator(`.lane-seg[data-card="${n}"]`)
+    await page.mouse.move(0, 0)
+    await seg.hover()
+    check(`hovering the ${what} segment says what its facts say`, !!(await until(async () => ok(await workLines(row, n)), HUNG_MS)), JSON.stringify(await workLines(row, n)))
+    if (what === 'merged') continue
+    for (const theme of ['dark', 'light']) {
+      await inv('settings:update', { appearance: { theme } })
+      await until(async () => (await page.evaluate(() => document.documentElement.dataset.theme)) === theme, HUNG_MS)
+      const shown = await until(async () => {
+        if (ok(await workLines(row, n))) return true
+        await seg.hover()
+        return false
+      }, HUNG_MS)
+      check(`${theme}: the ${what} hover with its facts shows for its screenshot`, !!shown)
+      await page.screenshot({ path: path.join(shots, `hover-work-${what}-${theme}.png`) })
+    }
+    await inv('settings:update', { appearance: { theme: 'dark' } })
+  }
   await page.mouse.move(0, 0)
   // A click opens the card.
   await row1.locator(`.lane-seg[data-card="${n6}"]`).click()
@@ -339,13 +441,14 @@ const until = (fn, ms = 10000) => lib.until(fn, ms, 150)
   check('a click on a segment opens its card', !!(await until(async () => (await dialog.locator('.task-title-input').inputValue().catch(() => '')) === 'Lane hover', 5000)))
   await page.keyboard.press('Escape')
   await until(async () => (await dialog.count()) === 0, HUNG_MS)
-  // Folded to its bar, still at the bottom; and back.
+  // Folded to its bar, still right after the runs; and back.
   await section.locator('.progress-lanes-bar').click()
   const foldedBox = await section.boundingBox()
-  check('the lanes fold to their bar, at the bottom', (await list.count()) === 0 && foldedBox.height < 40 && Math.abs(foldedBox.y + foldedBox.height - (panelBox.y + panelBox.height)) <= 2, JSON.stringify(foldedBox))
+  const runsNow = await panel.locator('.progress-tab-pulse > .progress-body').boundingBox()
+  check('the lanes fold to their bar, after the runs', (await list.count()) === 0 && foldedBox.height < 40 && Math.abs(foldedBox.y - (runsNow.y + runsNow.height)) <= 2, JSON.stringify({ foldedBox, runsNow }))
   await section.locator('.progress-lanes-bar').click()
   check('…and open again', !!(await until(async () => (await list.count()) === 1, HUNG_MS)))
-  check('…with the lanes chosen', !!(await until(async () => showsWhole(await fit(), 5), HUNG_MS)), JSON.stringify(await fit()))
+  check('…with the lanes chosen', !!(await until(async () => showsWhole(await fit(), 6), HUNG_MS)), JSON.stringify(await fit()))
 
   // --- Merging: B1 holds the slot, running its full test set; B3 waits.
   const run = await api(t1, 'POST', '/v1/progress', { title: 'Full test set', total: 146, step: 112, stepName: 'mergeslot', estimateMs: 600000 })
@@ -354,15 +457,14 @@ const until = (fn, ms = 10000) => lib.until(fn, ms, 150)
   // B3's token works while its launch runs; a 401 here means it ended (#601): say whether it still runs, and its launches.
   const b3Now = async () => {
     const now = await live(b3.id)
-    const all = fs.readFileSync(path.join(claudeHome, 'fake-launches.jsonl'), 'utf8').trim().split('\n').map((l) => JSON.parse(l))
-    return { status: now?.status ?? 'not running', runId: now?.runId ?? null, launches: all.filter((l) => l.cwd.toLowerCase() === (b3.worktree?.path ?? alpha).toLowerCase()).length }
+    return { status: now?.status ?? 'not running', runId: now?.runId ?? null, launches: launchesOf(b3).length }
   }
   check('B1 holds the slot and B3 waits', run.status === 200 && claim.body?.held === true && wait.body?.held === false, JSON.stringify([run, claim, wait, ...(wait.status === 401 ? [{ b3: await b3Now() }] : [])]))
   const mergeCard = panel.locator('.progress-merge-card')
   check('a merge card shows on top', !!(await until(async () => (await mergeCard.count()) === 1, HUNG_MS)))
   const branch = b1.worktree?.branch
   const text = await mergeCard.innerText()
-  check('it says who merges which cards, branch → main, the current step, time and who waits', new RegExp(`B1 is merging #${n8}`).test(text) && text.includes(`${branch} → main`) && /Full test set · 113 of 146: mergeslot/.test(text) && /so far · \d+ min left/.test(text) && /Waiting: B3/.test(text), `${branch} | ${text}`)
+  check('it says who merges which cards, branch → main, the current step, time and who waits', new RegExp(`B1 is merging ${K(n8)}`).test(text) && text.includes(`${branch} → main`) && /Full test set · 113 of 146: mergeslot/.test(text) && /so far · \d+ min left/.test(text) && /Waiting: B3/.test(text), `${branch} | ${text}`)
   check('with a divider under it', (await panel.locator('.progress-divider').count()) === 1)
   const colours = await page.evaluate(() => {
     const card = getComputedStyle(document.querySelector('.progress-merge-card')).borderTopColor
@@ -384,8 +486,8 @@ const until = (fn, ms = 10000) => lib.until(fn, ms, 150)
   await mergeCard.getByRole('button', { name: 'Show the merge in full' }).click()
   check('…and opens again', !!(await until(async () => (await mergeCard.locator('.progress-merge-branch').count()) === 1, HUNG_MS)))
 
-  // --- A short window, zoomed in (1000×650 at 150%): the merge card and the lanes give way, the lanes stay inside the
-  // panel at its bottom, and a run is still there to read and click. Both themes.
+  // --- A short window, zoomed in (1000×650 at 150%): the lanes take priority (HI-1673, Darren): they stay inside the
+  // panel at its bottom, whole lanes, and the runs give way above them. Both themes.
   await lib.fitWindow(app, page, { width: 1000, height: 650 })
   const zoom = (f) => app.evaluate(({ webContents }, z) => webContents.getAllWebContents().filter((w) => w.getType() === 'window').forEach((w) => w.setZoomFactor(z)), f)
   await zoom(1.5)
@@ -399,14 +501,11 @@ const until = (fn, ms = 10000) => lib.until(fn, ms, 150)
     })
     const inside = box.lanes && box.panel && box.lanes.bottom <= box.panel.bottom + 1 && box.lanes.top >= box.panel.top && Math.abs(box.lanes.bottom - box.panel.bottom) <= 2
     check(`${theme}, short and zoomed: the lanes stay inside the panel, at its bottom, with their bar`, !!inside && !!box.bar && box.bar.height > 20, JSON.stringify(box))
-    const runShows = box.run && box.body && box.body.height >= 60 && box.run.top >= box.body.top - 1 && box.run.top + 40 <= box.body.bottom
-    check(`${theme}, short and zoomed: a run still shows`, !!runShows, JSON.stringify(box))
+    const runsAbove = box.body && box.body.bottom <= box.lanes.top + 1
+    check(`${theme}, short and zoomed: the runs give way above the lanes`, !!runsAbove, JSON.stringify(box))
+    const whole = await list.evaluate((el) => { const r = el.getBoundingClientRect(); return [...el.querySelectorAll('.progress-lane')].filter((x) => { const b = x.getBoundingClientRect(); return b.top >= r.top - 1 && b.bottom <= r.bottom + 1 }).length })
+    check(`${theme}, short and zoomed: …and the lanes show whole`, whole >= 1, String(whole))
     await page.screenshot({ path: path.join(shots, `small-zoom-${theme}.png`) })
-    const run1 = panel.locator('.progress-run').first()
-    await run1.locator('.progress-title').click()
-    check(`${theme}, short and zoomed: …and opens its details when clicked`, !!(await until(async () => /\bopen\b/.test((await run1.getAttribute('class')) ?? ''), HUNG_MS)))
-    await run1.locator('.progress-title').click()
-    await until(async () => !/\bopen\b/.test((await run1.getAttribute('class')) ?? ''), HUNG_MS)
   }
   await zoom(1)
   await inv('settings:update', { appearance: { theme: 'dark' } })
@@ -417,7 +516,7 @@ const until = (fn, ms = 10000) => lib.until(fn, ms, 150)
   const turn = await until(async () => (await inv('mergeSlots:list')).find((s) => s.holder?.name === 'B3' && !s.holder.taken), 5000)
   check("released, B3's turn (not taken yet) shows no card or divider", !!turn && !!(await until(async () => (await panel.locator('.progress-merge, .progress-divider').count()) === 0, HUNG_MS)), JSON.stringify(await inv('mergeSlots:list')))
   const again = await api(t3, 'POST', '/v1/projects/alpha/merge-slot/claim', { branch: 'main', cards: [long[18]], timeoutSeconds: 0 })
-  check('once B3 claims it, its card shows', again.body?.held === true && !!(await until(async () => new RegExp(`B3 is merging #${long[18]}`).test(await mergeCard.innerText().catch(() => '')), HUNG_MS)))
+  check('once B3 claims it, its card shows', again.body?.held === true && !!(await until(async () => new RegExp(`B3 is merging ${K(long[18])}`).test(await mergeCard.innerText().catch(() => '')), HUNG_MS)))
   await api(t3, 'POST', '/v1/projects/alpha/merge-slot/release', { branch: 'main' })
   check('free: the merge card and divider go', !!(await until(async () => (await panel.locator('.progress-merge, .progress-divider').count()) === 0, HUNG_MS)))
 
@@ -427,28 +526,29 @@ const until = (fn, ms = 10000) => lib.until(fn, ms, 150)
   // …but not the abandoned lane's (#512): B6's lane had #5 in Todo when it was given up, and B1's lane works it now.
   const row5 = section.locator(`.progress-lane[data-lane="${l5}"]`)
   const seg5 = (await row5.locator(`.lane-seg[data-card="${n5}"]`).getAttribute('class')) ?? ''
-  check('the abandoned lane keeps the card as it left it, unanimated, while another lane works it', /\btodo\b/.test(seg5) && !/\bdoing\b/.test(seg5) && (await row5.locator(`.lane-seg[data-card="${n5}"]`).evaluate((e) => getComputedStyle(e).animationName)) === 'none', seg5)
+  check('the abandoned lane keeps the card as it left it, unanimated, while another lane works it', /\btodo\b/.test(seg5) && !/\bdoing\b/.test(seg5) && (await row5.locator(`.lane-seg[data-card="${n5}"]`).evaluate((e) => getComputedStyle(e, '::before').animationName)) === 'none', seg5)
   await row5.locator(`.lane-seg[data-card="${n5}"]`).hover()
   check("…and its hover says it's as the lane left it", !!(await until(async () => /when the lane ended/.test((await page.locator('.tip').allInnerTexts()).join(' ')), HUNG_MS)))
   // R1's lane was paused on its blocked card; its builder moves on to the next one: working, not paused, on that card.
   const row3 = section.locator(`.progress-lane[data-lane="${l3}"]`)
   await inv('tasks:update', short[1], { column: 'doing' })
-  check('a builder that moves on past a blocked card: the lane is running, on the card being worked', !!(await until(async () => { const t = await row3.locator('.progress-lane-top').innerText(); return !/paused/.test(t) && new RegExp(`#${short[1]}\\b`).test(t) }, HUNG_MS)), await row3.locator('.progress-lane-top').innerText())
+  check('a builder that moves on past a blocked card: the lane is running, on the card being worked', !!(await until(async () => { const t = await row3.locator('.progress-lane-top').innerText(); return !/paused/.test(t) && new RegExp(`${K(short[1])}\\b`).test(t) }, HUNG_MS)), await row3.locator('.progress-lane-top').innerText())
   check('…its blocked card still flagged in its segment', /\bblocked\b/.test((await row3.locator(`.lane-seg[data-card="${short[0]}"]`).getAttribute('class')) ?? ''))
   // Running again, it sorts with the running lanes, newest first (it was started after B1's and B3's).
   check('…and moves up among the running lanes', !!(await until(async () => (await order()).join() === [l7, l6, l3, l2, l1, l4, l5].join(), HUNG_MS)), JSON.stringify(await order()))
   // A lane ended without a record of its cards (ended before #512 kept one, or the record damaged): B5's merged lane,
-  // its record taken out of what is saved (#1018: the workspace's database). Its card #2 moving on in B1's lane shows there
+  // its record taken out of what is saved (#1018, #1212: the workspace's database). Its card #2 moving on in B1's lane shows there
   // only; B5's says not recorded.
-  const { storeDocs, putStoreDoc } = require('./storeDocs.cjs')
+  const { storeDocs, forgetLaneCards } = require('./storeDocs.cjs')
   const old = storeDocs(ws, 'lanes').find((x) => x.id === l4)
   check("an ended lane's cards are kept with it", Array.isArray(old?.frozen) && old.frozen.map((c) => c.column).join() === 'done,passed', JSON.stringify(old?.frozen))
-  delete old.frozen
-  putStoreDoc(ws, 'lanes', l4, old)
+  forgetLaneCards(ws, l4)
   await inv('tasks:update', n2, { column: 'review' })
   const row4 = section.locator(`.progress-lane[data-lane="${l4}"]`)
   const seg4 = async () => (await row4.locator(`.lane-seg[data-card="${n2}"]`).getAttribute('class')) ?? ''
-  check("without that record, the merged lane says its cards weren't recorded, not where the board has them now", !!(await until(async () => /\bunrecorded\b/.test(await seg4()), HUNG_MS)) && !/\breview\b/.test(await seg4()) && /\breview\b/.test((await row1.locator(`.lane-seg[data-card="${n2}"]`).getAttribute('class')) ?? ''), await seg4())
+  // Both rows waited for: B1's shows the move once lanes-changed reaches it, which may come after B5's (#1270 round 3).
+  const seg1 = async () => (await row1.locator(`.lane-seg[data-card="${n2}"]`).getAttribute('class')) ?? ''
+  check("without that record, the merged lane says its cards weren't recorded, not where the board has them now", !!(await until(async () => /\bunrecorded\b/.test(await seg4()) && /\breview\b/.test(await seg1()), HUNG_MS)) && !/\breview\b/.test(await seg4()), JSON.stringify([await seg4(), await seg1()]))
   check('…its count unknown, and no current card', /–\/2/.test(await row4.locator('.progress-lane-top').innerText()) && (await row4.locator('.progress-lane-current').count()) === 0, await row4.locator('.progress-lane-top').innerText())
   await row4.locator(`.lane-seg[data-card="${n2}"]`).hover()
   check('…and its hover says so', !!(await until(async () => /not recorded: the lane ended before Hive kept where its cards were/.test((await page.locator('.tip').allInnerTexts()).join(' ')), HUNG_MS)))
@@ -505,7 +605,7 @@ const until = (fn, ms = 10000) => lib.until(fn, ms, 150)
     await page.mouse.move(held.x, held.y)
     await page.mouse.up()
   }
-  // All seven lanes shown for the drags (the edge, End), so the list doesn't scroll under them; five again after.
+  // All seven lanes shown for the drags (the edge, End), so the list doesn't scroll under them; six again after.
   await edge.focus()
   await page.keyboard.press('End')
   await until(async () => showsWhole(await fit(), 7), HUNG_MS)
@@ -539,8 +639,7 @@ const until = (fn, ms = 10000) => lib.until(fn, ms, 150)
   check('…and dropped there, nothing moves', await ordered([...mine, l4, l5]), JSON.stringify(await order()))
   await edge.focus()
   await page.keyboard.press('ArrowDown')
-  await page.keyboard.press('ArrowDown')
-  check('(five lanes shown again)', !!(await until(async () => showsWhole(await fit(), 5) && (await kept()) === 5, HUNG_MS)), JSON.stringify(await fit()))
+  check('(six lanes shown again)', !!(await until(async () => showsWhole(await fit(), 6) && (await kept()) === 6, HUNG_MS)), JSON.stringify(await fit()))
   // The list scrolled to its end (l3 at the top of what shows): a drag in the middle of it lands where it was dropped.
   await list.evaluate((el) => (el.scrollTop = el.scrollHeight))
   await until(async () => (await scrollTop()) > 0, HUNG_MS)
@@ -606,6 +705,12 @@ const until = (fn, ms = 10000) => lib.until(fn, ms, 150)
 
   // --- Hive restarted: the workspace's lanes chosen (five) are kept (#569).
   await app.close().catch(() => undefined)
+  // The lanes' agents were in running lanes: Hive offers to resume them (its restart record), in a notice that can cover
+  // the lane menu (HI-1809: Usual Order's click timed out under it). Answered Don't Resume, below, until the record is
+  // gone (nothing left to offer) and no offer shows.
+  const restartRecord = path.join(userData, 'restart.json')
+  const offered = fs.existsSync(restartRecord)
+  console.log(`INFO restart record before the restart: ${offered ? 'yes' : 'no'}`)
   const app2 = await _electron.launch({ executablePath: lib.ELECTRON, args: [lib.ROOT], cwd: lib.ROOT, env })
   const page2 = await app2.firstWindow()
   page2.on('pageerror', (e) => check('no page errors after the restart', false, e.message))
@@ -613,14 +718,29 @@ const until = (fn, ms = 10000) => lib.until(fn, ms, 150)
   await lib.appReady(page2)
   const inv2 = (ch, ...a) => page2.evaluate(([c, x]) => window.hive.invoke(c, ...x), [ch, a])
   if (!(await page2.evaluate((n) => document.title.includes(n), path.basename(ws)))) await lib.openWorkspace(inv2, page2, ws)
+  if (offered) {
+    const dontResume = page2.locator('.toast').getByRole('button', { name: "Don't Resume", exact: true })
+    const answered = await until(async () => {
+      if (await dontResume.count()) await dontResume.first().click().catch(() => undefined)
+      return !fs.existsSync(restartRecord) && (await dontResume.count()) === 0
+    }, 30000)
+    // Its outcome then shows for the usual time, counted only while the window is focused (Popups.tsx), and a test
+    // window never is: closed with its × as the user would (HI-2370).
+    const outcome = page2.locator('.toast.resolved .popup-close')
+    const closed = await until(async () => {
+      if (await outcome.count()) await outcome.first().click().catch(() => undefined)
+      return (await outcome.count()) === 0
+    }, 10000)
+    check("the offer to resume the lanes' agents answered Don't Resume, and gone", !!answered && !!closed, String(fs.existsSync(restartRecord)))
+  }
   if (!(await until(async () => (await page2.locator('.progress-panel').count()) === 1, 5000))) await page2.locator('.progress-rail').click()
   const edge2 = page2.locator('.progress-lanes-edge')
   const rowsAfter = async () => {
     const now = await edge2.getAttribute('aria-valuenow').catch(() => null)
-    const f = await page2.locator('.progress-lanes-list').evaluate((el) => ({ client: el.clientHeight, sixthTop: [...el.querySelectorAll('.progress-lane')][5]?.getBoundingClientRect().top - el.getBoundingClientRect().top })).catch(() => null)
+    const f = await page2.locator('.progress-lanes-list').evaluate((el) => ({ client: el.clientHeight, seventhTop: [...el.querySelectorAll('.progress-lane')][6]?.getBoundingClientRect().top - el.getBoundingClientRect().top })).catch(() => null)
     return { now, f }
   }
-  check('after a restart, the lanes chosen are kept', !!(await until(async () => { const r = await rowsAfter(); return r.now === '5' && !!r.f && Math.abs(r.f.sixthTop - r.f.client) <= 1 }, 20000)), JSON.stringify(await rowsAfter()))
+  check('after a restart, the lanes chosen are kept', !!(await until(async () => { const r = await rowsAfter(); return r.now === '6' && !!r.f && Math.abs(r.f.seventhTop - r.f.client) <= 1 }, 20000)), JSON.stringify(await rowsAfter()))
   const order2 = () => page2.locator('.progress-lane').evaluateAll((els) => els.map((e) => e.getAttribute('data-lane')))
   check("…and the user's order of lanes (#568)", !!(await until(async () => (await order2()).join() === [...mine, l4, l5, l6].join(), HUNG_MS)), JSON.stringify(await order2()))
   // The usual order again, from a lane's context menu: running ones newest first; nothing kept.
@@ -629,6 +749,40 @@ const until = (fn, ms = 10000) => lib.until(fn, ms, 150)
   const usualOrder = [l8, l7, l3, l2, l1, l4, l5, l6]
   const saved2 = () => page2.evaluate((w) => window.hive.invoke('ui:get').then((ui) => ui.laneOrder?.[w.toLowerCase()] ?? null), ws)
   check('Usual Order puts the lanes back, and keeps no order', !!(await until(async () => (await order2()).join() === usualOrder.join() && (await saved2()) === null, HUNG_MS)), JSON.stringify({ order: await order2(), saved: await saved2() }))
+
+  // --- A lane's queued list change in the Lanes tab (HI-2151): B10's lane, its first card in flight, changed to add a
+  // card and reorder the rest, so Hive queues it behind that card. The tab says what it will do under the lane's bar;
+  // once that card is Done the change applies and the line goes.
+  const panel2 = page2.locator('.progress-panel')
+  const b10 = await lib.addAgent(inv2, alpha, { name: 'B10' })
+  const make2 = async (title, column) => {
+    const c = await inv2('tasks:create', { title, project: 'alpha', column, agent: b10?.id })
+    keyOf.set(c.number, c.key)
+    return c.number
+  }
+  const [q1, q2, q3] = [await make2('Queued one', 'doing'), await make2('Queued two', 'todo'), await make2('Queued three', 'todo')]
+  const l9 = await startLane('B10', 'R1', 'queued change', [q1, q2, q3])
+  const q4 = await make2('Queued four', 'todo')
+  const change = await api(workspaceToken, 'POST', '/v1/lanes', { project: 'alpha', builder: 'B10', reviewer: 'R1', cards: [q1, q4, q3, q2] })
+  const laneNow = async () => (await inv2('lanes:list')).find((l) => l.id === l9)
+  check('a list change to a lane with its card in flight is queued', change.status === 200 && !!(await until(async () => (await laneNow())?.queued?.join() === [q1, q4, q3, q2].join(), HUNG_MS)), JSON.stringify({ change, lane: await laneNow() }))
+  await panel2.locator('.progress-tab[data-tab="lanes"]').click()
+  const queuedLine = panel2.locator(`.progress-tab-lanes .progress-lane[data-lane="${l9}"] .progress-lane-queued`)
+  const wantLine = `Next, once ${K(q1)} is Done: ${K(q4)} added, new order: ${K(q1)}, ${K(q4)}, ${K(q3)}, ${K(q2)}`
+  check('the Lanes tab shows the queued change under the lane', !!(await until(async () => ((await queuedLine.count()) === 1 ? (await queuedLine.innerText()).trim() : '') === wantLine, HUNG_MS)), JSON.stringify({ got: await queuedLine.innerText().catch(() => null), want: wantLine }))
+  check('…its whole text in its title', (await queuedLine.getAttribute('title')) === wantLine)
+  check('…and no other lane shows one', (await panel2.locator('.progress-lane-queued').count()) === 1)
+  await queuedLine.scrollIntoViewIfNeeded()
+  for (const theme of ['dark', 'light']) {
+    await inv2('settings:update', { appearance: { theme } })
+    await until(async () => (await page2.evaluate(() => document.documentElement.dataset.theme)) === theme, HUNG_MS)
+    await lib.sleep(250)
+    await page2.screenshot({ path: path.join(shots, `lanes-queued-${theme}.png`) })
+  }
+  await inv2('settings:update', { appearance: { theme: 'dark' } })
+  await inv2('tasks:update', q1, { column: 'done' })
+  check('once its card is Done, the change applies', !!(await until(async () => { const l = await laneNow(); return !!l && l.queued === null && l.cards.map((c) => c.number).join() === [q1, q4, q3, q2].join() }, HUNG_MS)), JSON.stringify(await laneNow()))
+  check('…and the line goes', !!(await until(async () => (await queuedLine.count()) === 0, HUNG_MS)))
   await app2.close().catch(() => undefined)
   console.log(failed ? `\n${failed} FAILED` : '\nAll passed')
   process.exit(failed ? 1 : 0)

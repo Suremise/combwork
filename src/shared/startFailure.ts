@@ -6,7 +6,7 @@
 import type { SessionStatus } from './types'
 import { msg, tr } from './i18n'
 
-/** Where the hint's fix is: the agent's settings (model, extra arguments), Agent Setup (install, sign-in), or its terminal. */
+/** Where the hint's fix is: the agent's settings (model, extra arguments), Provider Setup (install, sign-in), or its terminal. */
 export type StartFix = 'agent-settings' | 'agent-setup' | 'terminal'
 
 export interface StartHint {

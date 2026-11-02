@@ -107,6 +107,10 @@
     "defaultMessage": "{action, select, archive {Could not archive the {kind, select, conversation {conversations} other {sessions}}} unarchive {Could not unarchive the {kind, select, conversation {conversations} other {sessions}}} other {Could not delete the {kind, select, conversation {conversations} other {sessions}}}}",
     "description": "An error's title: archiving, unarchiving or deleting many sessions (the Hive Assistant's: conversations) failed."
   },
+  "sessions.bulk.progress": {
+    "defaultMessage": "{action, select, archive {{kind, select, conversation {Archiving {done, number} of {total, plural, one {# conversation} other {# conversations}}…} other {Archiving {done, number} of {total, plural, one {# session} other {# sessions}}…}}} unarchive {{kind, select, conversation {Unarchiving {done, number} of {total, plural, one {# conversation} other {# conversations}}…} other {Unarchiving {done, number} of {total, plural, one {# session} other {# sessions}}…}}} other {{kind, select, conversation {Deleting {done, number} of {total, plural, one {# conversation} other {# conversations}}…} other {Deleting {done, number} of {total, plural, one {# session} other {# sessions}}…}}}}",
+    "description": "While many sessions are archived, unarchived or deleted at once (Clean Up, or a branch's Archive All): how many of them ({done}) of how many ({total}) it has been through so far. The Hive Assistant's: conversations."
+  },
   "sessions.bulk.skipCount": {
     "defaultMessage": "{reason, select, live {{n, plural, one {# running} other {# running}}} inUse {{n, plural, one {# in use} other {# in use}}} reading {{n, plural, one {# being read by Hive} other {# being read by Hive}}} open {{n, plural, one {# open in another Hive window} other {# open in other Hive windows}}} external {{n, plural, one {# started outside Hive} other {# started outside Hive}}} shown {{n, plural, one {# open here} other {# open here}}} current {{n, plural, one {# current Assistant conversation} other {# current Assistant conversations}}} other {{n, plural, one {# failed} other {# failed}}}}",
     "description": "How many sessions were passed over for one reason, listed after \"n skipped:\" (\"2 running, 1 in use\"). {reason} picks why: running, files in use, Hive is reading it, open in another Hive window, started outside Hive, open in this tab, the Hive Assistant's current conversation, or it failed (other)."
@@ -138,6 +142,10 @@
   "sessions.chips.label": {
     "defaultMessage": "Attached to this prompt",
     "description": "The attachment chips' accessible name, over an agent's terminal: files attached to the prompt being written."
+  },
+  "sessions.chips.toCard": {
+    "defaultMessage": "Attach {file} to a card",
+    "description": "An attachment chip's button (its accessible name, HI-1700): copies the file ({file}: its name) to a card, the agent's or another, from a menu."
   },
   "sessions.cleanup.age": {
     "defaultMessage": "{age, select, day {24 hours ago} week {7 days ago} other {30 days ago}}",
@@ -391,6 +399,10 @@
     "defaultMessage": "{kind, select, conversation {No conversations here: tick Archived to see archived ones.} other {No sessions here: tick Archived to see archived ones.}}",
     "description": "The Sessions list when every session is archived (the Hive Assistant's: conversations). Archived is the checkbox above it: use its translation."
   },
+  "sessions.list.othersLoading": {
+    "defaultMessage": "Looking for sessions started outside Hive…",
+    "description": "Above the Sessions list while it shows Hive's own sessions and is still reading the sessions the CLIs keep for the project's folders (started in a terminal or an editor)."
+  },
   "sessions.list.refresh": {
     "defaultMessage": "Refresh",
     "description": "Tooltip of the Sessions tab's refresh button: reads the list again."
@@ -435,6 +447,10 @@
     "defaultMessage": "Agent {agent} ({id}).",
     "description": "A session's origin hover (the Sessions tab): the agent that ran it, by name ({agent}) and id ({id})."
   },
+  "sessions.origin.named": {
+    "defaultMessage": "{is, select, slot {Slot · {name}} other {Home · {name}}}",
+    "description": "Where a session ran (the Sessions tab): in one of the project's slots (a working folder Hive lends to cards; {name} is its name, such as slot-b) or a reviewer's retired home ({name}: its folder's name, such as hr4). Glossary: slot."
+  },
   "sessions.origin.noAgent": {
     "defaultMessage": "No agent recorded (adopted, or from before Hive recorded agents).",
     "description": "A session's origin hover (the Sessions tab): Hive has no record of which agent ran it."
@@ -476,12 +492,16 @@
     "description": "Tooltip of Resume when no agent can run the session: Resume adds one."
   },
   "sessions.resume.agentDetail": {
-    "defaultMessage": "{where, select, worktree {worktree · {branch}} other {project folder}}{running, select, yes { · running, its current session stops first} other {}}",
-    "description": "Under an agent in the Resume in menu: where it works (a worktree and its branch, or the project folder; lower case), and, when it runs, that its current session stops first."
+    "defaultMessage": "{where, select, worktree {worktree · {branch}} place {{place}} other {project folder}}{running, select, yes { · running, its current session stops first} other {}}",
+    "description": "Under an agent in the Resume in menu: where it works (its worktree from before 1.0 and its branch; a slot, carried slot or home ({place}: agents.place.short, such as \"in slot-b\"); or the project folder; lower case), and, when it runs, that its current session stops first."
   },
   "sessions.resume.menuHeader": {
     "defaultMessage": "Resume in",
     "description": "The heading of the menu of agents a session can resume in."
+  },
+  "sessions.resume.startFresh": {
+    "defaultMessage": "Start Fresh with a Handover",
+    "description": "Button over a session's transcript that can't resume where it ran (#1434: its slot holds other work): opens Hand Over to… for its agent, which starts a new conversation from a handover."
   },
   "sessions.row.archived": {
     "defaultMessage": "archived",
@@ -587,6 +607,10 @@
     "defaultMessage": "error",
     "description": "A badge on a tool call in a transcript that failed. Lower case; keep it short."
   },
+  "sessions.tool.exitCode": {
+    "defaultMessage": "exit code {code}",
+    "description": "A badge on a command a Codex script ran, in a transcript (HI-2240): the exit code it ended with ({code}: a number such as 0 or 1, shown as it is). Lower case; keep it short."
+  },
   "sessions.tool.input": {
     "defaultMessage": "Input",
     "description": "Label above a tool call's input in a transcript."
@@ -602,6 +626,18 @@
   "sessions.tool.result": {
     "defaultMessage": "Result",
     "description": "Label above a tool call's result in a transcript."
+  },
+  "sessions.tool.scriptFailedCalls": {
+    "defaultMessage": "{n, plural, one {# failed} other {# failed}}",
+    "description": "The last part of a folded Codex script's line in a transcript (HI-2240), after \"3 hive calls, 1 command\": how many of the script's calls failed."
+  },
+  "sessions.tool.scriptKindCalls": {
+    "defaultMessage": "{kind, select, command {{n, plural, one {# command} other {# commands}}} edit {{n, plural, one {# edit} other {# edits}}} image {{n, plural, one {# image view} other {# image views}}} other {{n, plural, one {# other call} other {# other calls}}}}",
+    "description": "Part of a folded Codex script's line in a transcript (HI-2240), in a list such as \"3 hive calls, 1 command, 2 edits\": how many calls of one kind the script made. {kind}: shell commands it ran, file edits it made, images it looked at, or (other) any other tool calls."
+  },
+  "sessions.tool.scriptMcpCalls": {
+    "defaultMessage": "{n, plural, one {# {server} call} other {# {server} calls}}",
+    "description": "Part of a folded Codex script's line in a transcript (HI-2240), in a list such as \"3 hive calls, 1 command, 2 edits\": how many calls the script made to one MCP server's tools ({server}: the server's name, such as hive, not translated)."
   },
   "sessions.tool.showAll": {
     "defaultMessage": "Show all ({n, plural, one {# character} other {# characters}})",

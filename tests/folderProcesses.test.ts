@@ -1,6 +1,7 @@
 import { spawn, type ChildProcess } from 'child_process'
+import { EventEmitter } from 'events'
 import { createRequire } from 'module'
-import { existsSync, mkdirSync, readdirSync, readFileSync, rmSync } from 'fs'
+import { existsSync, mkdirSync, readdirSync, readFileSync, rmSync, writeFileSync } from 'fs'
 import { join } from 'path'
 import { afterAll, describe, expect, it, vi } from 'vitest'
 import { tempDir } from './tempDir'
@@ -8,7 +9,7 @@ import { tempDir } from './tempDir'
 type Proc = { pid: number; parent?: number; commandLine: string; started: number }
 type Tree = { pid: number; started: number }[]
 const req = createRequire(import.meta.url)
-const { namesFolder, namesFile, ownedBy, descendantsIn, stillRunning, processes, endExactly, suspendExactly, suspensions, childrenFirst, stopProcessesIn, identify, stillSame, endTreeExactly, endChildTree } = req('./e2e/folderProcesses.cjs') as {
+const { namesFolder, namesFile, ownedBy, descendantsIn, stillRunning, filetimeMs, leftoverIdentities, processes, endExactly, suspendExactly, suspensions, childrenFirst, stopProcessesIn, identify, stillSame, endTreeExactly, endChildTree } = req('./e2e/folderProcesses.cjs') as {
   processes: () => Proc[]
   endExactly: (targets: Tree) => number
   suspendExactly: (targets: Tree, resume?: boolean) => { done: Tree; failed: { pid: number; why: string }[] }
@@ -19,6 +20,8 @@ const { namesFolder, namesFile, ownedBy, descendantsIn, stillRunning, processes,
   ownedBy: (list: Proc[], folder: string, since?: number, self?: number) => number[]
   descendantsIn: (list: Proc[], root: number) => Tree
   stillRunning: (list: Proc[], tree: Tree) => number[]
+  filetimeMs: (created: string | undefined) => number | null
+  leftoverIdentities: (list: Proc[], leftovers: { processes: { pid: number; created?: string }[] }[] | undefined) => Tree
   stopProcessesIn: (folder: string, since?: number, tree?: Tree) => number
   identify: (pids: number[]) => Tree
   stillSame: (ids: Tree) => number[]
@@ -78,6 +81,33 @@ describe("a scenario's leftover processes (#542, #402)", () => {
     // Once Hive closed: 103 still runs, 102 ended, and 101's pid now belongs to another process.
     const after = [list[3], { pid: 101, parent: 7, started: 5000, commandLine: 'someone else' }, list[5]]
     expect(stillRunning(after, tree)).toEqual([103])
+  })
+
+  it("what Hive lists as its agents' leftovers: those processes by pid and start time, never a pid given to another since (HI-2217)", () => {
+    // 2026-10-31T09:49:34.123Z as a FILETIME, and as ms.
+    const at = Date.parse('2026-10-31T09:49:34.123Z')
+    const ft = (ms: number, extra = 0n): string => String(BigInt(ms) * 10000n + 116444736000000000n + extra)
+    expect(filetimeMs(ft(at, 9999n))).toBe(at)
+    expect(filetimeMs('not a time')).toBeNull()
+    expect(filetimeMs(undefined)).toBeNull()
+    const list = [
+      { pid: 90676, parent: 89920, started: at, commandLine: 'find.exe / -name cache.js' },
+      { pid: 75552, parent: 30344, started: at + 1, commandLine: 'head.exe' },
+      { pid: 4242, parent: 1, started: at + 60_000, commandLine: 'someone else, given the pid since' }
+    ]
+    const leftovers = [
+      { projectPath: 'C:\\alpha', agentId: 'a-1', agentName: 'Coder', more: 0, since: '', processes: [
+        { pid: 90676, name: 'find.exe', label: 'find / -name cache.js', created: ft(at) },
+        // Its start time 1 ms off (the two clocks' rounding): the same process.
+        { pid: 75552, name: 'head.exe', label: 'head', created: ft(at) },
+        { pid: 4242, name: 'node.exe', label: 'node x', created: ft(at) },
+        { pid: 777, name: 'gone.exe', label: 'gone', created: ft(at) },
+        { pid: 90676, name: 'find.exe', label: 'no start time' }
+      ] }
+    ]
+    expect(leftoverIdentities(list, leftovers)).toEqual([{ pid: 90676, started: at }, { pid: 75552, started: at + 1 }])
+    expect(leftoverIdentities(list, [])).toEqual([])
+    expect(leftoverIdentities(list, undefined)).toEqual([])
   })
 
   it('children are ended before their parents, which can take them with them (#615)', () => {
@@ -280,6 +310,153 @@ describe("a scenario's leftover processes (#542, #402)", () => {
       if (!exited()) parent.kill()
     }
   }, 60000)
+})
+
+// HI-1453: a test copy of Hive that outlived its suite (12 h, its runner gone). Each copy is recorded as it starts, and
+// the runner ends those still running as the processes recorded (pid and start time): nothing else, never by name or by a
+// command line (the Assistant's design call in round 3), never another process given the pid since. What only looks
+// like a copy is listed for a person. The real processes: the harnessleftovers e2e.
+describe("a suite's test copies of Hive (HI-1453)", () => {
+  type Copy = { pid: number; started: number; profile?: string | null }
+  const { COPIES_FILE, recordCopy, recordedCopies, copiesIn, lookLikeCopies, launchedCopy } = req('./e2e/folderProcesses.cjs') as {
+    COPIES_FILE: string
+    recordCopy: (dir: string, copy: Copy) => void
+    recordedCopies: (dir: string, depth?: number) => Copy[]
+    copiesIn: (list: Proc[], copies: Copy[]) => Proc[]
+    lookLikeCopies: (list: Proc[], folders: string[]) => Proc[]
+    launchedCopy: (list: Proc[], launcher: number, from: number) => Proc | null
+  }
+  const lane = 'C:\\t\\hive-test\\e2e\\lanes\\1'
+
+  it('are read back from the folder and its own (a nested runner), a line cut short or without a start time skipped', () => {
+    const dir = tempDir('hive-copies-')
+    recordCopy(dir, { pid: 10, started: 1500, profile: join(dir, 'p') })
+    mkdirSync(join(dir, 'suite', 'nested', 'inner'), { recursive: true })
+    recordCopy(join(dir, 'suite', 'nested', 'inner'), { pid: 11, started: 3500 })
+    writeFileSync(join(dir, 'suite', COPIES_FILE), '{"pid": 13, "from": 1000, "to": 2000}\n{"pid": 12, "sta\n')
+    expect(recordedCopies(dir).map((c) => c.pid).sort()).toEqual([10, 11])
+    expect(recordedCopies(dir, 1).map((c) => c.pid)).toEqual([10])
+  })
+
+  it('are the processes with their pid and start time, never a process given the pid since, however soon', () => {
+    const list: Proc[] = [
+      { pid: 10, commandLine: 'electron.exe .', started: 1500 },
+      // The recorded copy (started 1500) has ended, and its pid went to another process 2 ms after: never it.
+      { pid: 42, commandLine: 'node unrelated.js', started: 1502 },
+      { pid: 12, commandLine: 'electron.exe .', started: 2601 }
+    ]
+    const copies = [
+      { pid: 10, started: 1500 },
+      { pid: 42, started: 1500 },
+      // 1 ms apart: how the CIM and .NET start times round (endExactly's tolerance).
+      { pid: 12, started: 2600 }
+    ]
+    expect(copiesIn(list, copies).map((p) => p.pid)).toEqual([10, 12])
+  })
+
+  it("the one recorded is the launcher shell's child started since, found by the process tree alone (no command line)", () => {
+    const list: Proc[] = [
+      { pid: 5, parent: 1, commandLine: '', started: 1000 },
+      // A child from before the shell started (a parent id reused): not its.
+      { pid: 6, parent: 5, commandLine: '', started: 900 },
+      { pid: 8, parent: 5, commandLine: '', started: 1020 }
+    ]
+    expect(launchedCopy(list, 5, 1000)?.pid).toBe(8)
+    // No shell in between: the launcher itself.
+    expect(launchedCopy([{ pid: 9, parent: 1, commandLine: '', started: 2000 }], 9, 1990)?.pid).toBe(9)
+    // The launcher's pid naming a process older than the launch (it ended, the pid was reused): nothing recorded.
+    expect(launchedCopy([{ pid: 5, parent: 1, commandLine: '', started: 500 }, { pid: 8, parent: 5, commandLine: '', started: 1020 }], 5, 1000)).toBeNull()
+    expect(launchedCopy([], 5, 1000)).toBeNull()
+  })
+
+  // HR5's round 3: the launcher (Playwright's shell) exiting and its pid going to another process before the background
+  // listing returns. Trusted only while Node shows no exit of the launcher, checked after the listing (round 4's design).
+  describe('recorded only while the launcher is still the process Node holds (recordMainProcess)', () => {
+    const { recordMainProcess } = req('./e2e/folderProcesses.cjs') as {
+      recordMainProcess: (dir: string, launcher: unknown, from: number, profile: string | null, list: () => Promise<Proc[]>) => Promise<void>
+    }
+    type Launcher = EventEmitter & { pid: number; exitCode: number | null; signalCode: string | null }
+    const launcherOf = (pid: number): Launcher => Object.assign(new EventEmitter(), { pid, exitCode: null, signalCode: null })
+    /** Node's exit as it comes: exitCode set first, then 'exit'. */
+    const exit = (l: Launcher) => {
+      l.exitCode = 0
+      l.emit('exit', 0, null)
+    }
+    const deferred = () => {
+      let resolve!: (list: Proc[]) => void
+      let reject!: (e: Error) => void
+      const promise = new Promise<Proc[]>((res, rej) => ((resolve = res), (reject = rej)))
+      return { promise, resolve, reject }
+    }
+    const recorded = (dir: string) => (existsSync(join(dir, COPIES_FILE)) ? readFileSync(join(dir, COPIES_FILE), 'utf8') : '')
+    // The shell (pid 42, started 1000) and its Electron (8, started 1020).
+    const shellNow: Proc[] = [
+      { pid: 42, parent: 1, commandLine: '', started: 1000 },
+      { pid: 8, parent: 42, commandLine: '', started: 1020 }
+    ]
+    // The shell has exited and its pid went to another program (started 2500), which has a child of its own.
+    const reused: Proc[] = [
+      { pid: 42, parent: 1, commandLine: 'user-app.exe', started: 2500 },
+      { pid: 77, parent: 42, commandLine: 'user-app-helper.exe', started: 2600 }
+    ]
+
+    it.runIf(process.platform === 'win32')("the launcher's child, by its pid and start time, while the launcher runs; the exit listener removed", async () => {
+      const dir = tempDir('hive-record-')
+      const l = launcherOf(42)
+      const d = deferred()
+      const done = recordMainProcess(dir, l, 1000, 'p', () => d.promise)
+      expect(l.listenerCount('exit')).toBe(1)
+      d.resolve(shellNow)
+      await done
+      expect(recorded(dir)).toBe(`${JSON.stringify({ pid: 8, started: 1020, profile: 'p' })}\n`)
+      expect(l.listenerCount('exit')).toBe(0)
+    })
+
+    it.runIf(process.platform === 'win32')('nothing, when the launcher exits while the listing is under way, its pid now a later process with a child', async () => {
+      const dir = tempDir('hive-record-')
+      const l = launcherOf(42)
+      const d = deferred()
+      const done = recordMainProcess(dir, l, 1000, 'p', () => d.promise)
+      exit(l)
+      d.resolve(reused)
+      await done
+      expect(recorded(dir)).toBe('')
+      expect(l.listenerCount('exit')).toBe(0)
+      // Its 'exit' alone, before Node's exitCode is seen, is enough too.
+      const l2 = launcherOf(42)
+      const d2 = deferred()
+      const done2 = recordMainProcess(dir, l2, 1000, 'p', () => d2.promise)
+      l2.emit('exit', 0, null)
+      d2.resolve(reused)
+      await done2
+      expect(recorded(dir)).toBe('')
+    })
+
+    it.runIf(process.platform === 'win32')('nothing, when the launcher had exited already, is missing, or the listing fails', async () => {
+      const dir = tempDir('hive-record-')
+      let listed = 0
+      const list = async () => (listed++, shellNow)
+      const gone = launcherOf(42)
+      gone.exitCode = 1
+      await recordMainProcess(dir, gone, 1000, 'p', list)
+      await recordMainProcess(dir, null, 1000, 'p', list)
+      await recordMainProcess(dir, { pid: undefined }, 1000, 'p', list)
+      expect(listed).toBe(0)
+      const l = launcherOf(42)
+      await expect(recordMainProcess(dir, l, 1000, 'p', async () => Promise.reject(new Error('powershell failed')))).rejects.toThrow('powershell failed')
+      expect(l.listenerCount('exit')).toBe(0)
+      expect(recorded(dir)).toBe('')
+    })
+  })
+
+  it('what only looks like a copy in a folder (for the report, never ended) has a profile flag and names the folder', () => {
+    const list: Proc[] = [
+      { pid: 1, commandLine: `"electron.exe" "--hive-test-profile=${lane}\\a\\profile"`, started: 1 },
+      { pid: 2, commandLine: `photos.exe ${lane}\\x\\shot.png`, started: 1 },
+      { pid: 3, commandLine: `electron.exe --hive-test-profile=${lane}0\\x\\profile`, started: 1 }
+    ]
+    expect(lookLikeCopies(list, [lane]).map((p) => p.pid)).toEqual([1])
+  })
 })
 
 // #603: a remembered pid ended after its process had gone can be another's by then (a concurrent run's Vitest worker,

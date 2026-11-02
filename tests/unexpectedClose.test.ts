@@ -41,6 +41,8 @@ describe('the running marker (#984)', () => {
     const read = parseRunMarker(marker({ processes: many }))?.processes ?? []
     expect(read.length).toBe(MAX_MARKER_LAUNCHES)
     expect(read.every((l) => l.processes.length === MAX_MARKER_PROCESSES)).toBe(true)
+    // Each launch's run (#1506: Release Slot… lists a held writer's own run only); one too long or not text is left out.
+    expect(parseRunMarker(marker({ processes: [{ ...launch, runId: 'r-1' }, { ...launch, runId: 'x'.repeat(101) }, { ...launch, runId: 7 }] }))?.processes).toEqual([{ ...launch, runId: 'r-1' }, launch, launch])
   })
 
   it('names each project once, in the order met', () => {
@@ -67,6 +69,11 @@ describe('the notice (#984)', () => {
     expect(text).toMatch(/One was resumed, as Settings → Sessions says\. One couldn't resume: R1 \(Codex is turned off\)\.$/)
     expect(text).not.toMatch(/Nothing was resumed/)
     expect(resumeFailedLine({ resumed: [], failed: [{ name: 'A', error: 'x' }, { name: 'B', error: 'y' }] })).toBe("2 couldn't resume: A (x) and B (y).")
+  })
+
+  it("leaves a conversation whose slot is free or holds other work (#1434), and says so", () => {
+    const text = unexpectedCloseText({ lastSeen, agents: [agent('B1', 'hive'), agent('B2', 'hive')], dump: false, merges: [] }, { resumed: [], failed: [], held: [{ name: 'B1', hold: { is: 'byHand', slot: 'slot-a', how: 'take', lease: 'l1' } }, { name: 'B2', hold: { is: 'reused', slot: 'slot-b', card: 14, lane: null } }] })
+    expect(text).toMatch(/None was resumed\. 2 were left stopped: B1 \(its slot is free\. Resume it by hand to take it\) and B2 \(its slot now holds #14's work\)\.$/)
   })
 
   it('names a crash dump, and each merge left half done with the folder it was in', () => {

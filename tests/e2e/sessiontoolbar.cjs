@@ -38,7 +38,7 @@ const check = (name, ok, extra = '') => {
     await lib.openWorkspace(inv, page, ws)
     await lib.waitForProvider(inv)
     const live = async (id) => (await inv('session:live')).find((s) => s.projectPath.toLowerCase() === alpha.toLowerCase() && s.agentId === id)
-    const projectCfg = (p) => JSON.parse(fs.readFileSync(path.join(p, '.hive', 'project.json'), 'utf8'))
+    const projectCfg = (p) => lib.projectConfig(userData, p) // with this user's view over it (HI-1749)
     const select = async (name) => {
       await page.locator('.project-row', { hasText: name }).first().click()
       await lib.until(async () => (await page.locator('.project-header h1').innerText().catch(() => '')) === name, HUNG_MS)
@@ -63,7 +63,7 @@ const check = (name, ok, extra = '') => {
     check('no agent tabs are left (#975)', (await page.locator('.agent-tab, .agent-strip').count()) === 0)
     const chip = page.locator('.session-toolbar .summary-chip')
     const chipText = () => page.locator('.session-toolbar .summary-chip-text').innerText().catch(() => '')
-    check('the summary chip: 1 waiting · 1 working · 2 idle', !!(await lib.until(async () => (await chipText()) === '1 waiting · 1 working · 2 idle', HUNG_MS)), await chipText())
+    check('the summary chip: 1 waiting · 1 working · 2 stopped (Y and Z not running, as the header counts them: HI-1908)', !!(await lib.until(async () => (await chipText()) === '1 waiting · 1 working · 2 stopped', HUNG_MS)), await chipText())
     check("…with the most urgent state's mark, a diamond", (await chip.locator('.state-mark.waiting').count()) === 1 && /\bwaiting\b/.test((await chip.getAttribute('class')) ?? ''))
     for (const theme of ['dark', 'light']) {
       await inv('settings:update', { appearance: { theme } })
@@ -197,7 +197,7 @@ const check = (name, ok, extra = '') => {
     const f = await lib.addAgent(inv, alpha, { name: 'F', model: 'fail-start' })
     await inv('session:start', alpha, { agentId: f.id }).catch(() => undefined)
     const headerLine = () => page.locator('.project-header .project-state .badge-text').innerText().catch(() => '')
-    check('a failed launch: the chip counts it stalled', !!(await lib.until(async () => (await chipText()) === '1 waiting · 1 stalled · 1 working · 2 idle', HUNG_MS)), await chipText())
+    check('a failed launch: the chip counts it stalled', !!(await lib.until(async () => (await chipText()) === '1 waiting · 1 stalled · 1 working · 2 stopped', HUNG_MS)), await chipText())
     // Y and Z never started: the header counts them stopped, apart from the idle ones Stop counts (#1035).
     check("…and so does the header's state line, Y and Z counted as stopped", (await headerLine()) === '1 waiting · 1 stalled · 1 working · 2 stopped', await headerLine())
     await chip.click()
@@ -207,7 +207,7 @@ const check = (name, ok, extra = '') => {
     check("…its list: F second (after W), a square, Stalled · failed to start: <why>", order === 'W,F,X,Y,Z' && fEntry.mark.includes('stalled') && fEntry.detail.startsWith("Stalled · failed to start: error: option '--model <model>' argument 'fail-start' is invalid"), `${order} ${JSON.stringify(fEntry)}`)
     await page.keyboard.press('Escape')
     await lib.until(async () => (await page.locator('.menu').count()) === 0, HUNG_MS)
-    await inv('agents:update', alpha, f.id, { model: '' })
+    await lib.setLaunch(inv, alpha, f.id, { model: '' })
     await inv('session:start', alpha, { agentId: f.id })
     await lib.until(async () => ['ready', 'waiting'].includes((await live(f.id))?.status), HUNG_MS)
     check('fixed and started: no longer stalled', !!(await lib.until(async () => !/stalled/.test(await chipText()) && !/stalled/.test(await headerLine()), HUNG_MS)), `${await chipText()} / ${await headerLine()}`)

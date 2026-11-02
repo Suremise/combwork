@@ -1,24 +1,30 @@
 import type { IBufferLine, ILink, ILinkProvider, Terminal } from '@xterm/xterm'
 import { findPaths, pathCandidates, resolveLink, type LinkRoot, type LinkTarget, type PathMatch } from '@shared/fileLinks'
+import { msg, tr } from '@shared/i18n'
 import { call } from './api'
 import { get, isAssistantPath, set, setProjectTab, showView } from './store'
+import { agentFolder, awayFromProject } from './agentPlace'
 
-/** The workspace's projects and agent worktrees, where file links may lead. */
+/** The hover of a file path's link in a terminal. */
+const LINK_TITLE = msg({ id: 'files.links.title', defaultMessage: 'Open in Files · Ctrl+click', description: "The hover of a file path in a terminal (an agent's output): Ctrl+click opens the file in the project's Files tab. Files is the tab's name: use it as the tab is named." })
+
+/** The workspace's projects and the folders their agents work in (slots, homes, 0.9 worktrees: #1442), where file links may lead. */
 function linkRoots(): LinkRoot[] {
   const out: LinkRoot[] = []
   for (const p of get().workspace?.projects ?? []) {
     out.push({ path: p.path, project: p.path, agentId: null })
-    for (const a of p.agents) if (a.worktree) out.push({ path: a.worktree.path, project: p.path, agentId: a.id })
+    for (const a of p.agents) if (awayFromProject(a)) out.push({ path: agentFolder(a), project: p.path, agentId: a.id })
   }
   return out
 }
 
-/** The folder an agent's relative paths are from: its worktree or project; the Assistant's are the workspace's. */
+/** The folder an agent's relative paths are from: where it works (#1442); the Assistant's are the workspace's. */
 function linkBase(projectPath: string, agentId: string | undefined): string | null {
   const s = get()
   if (isAssistantPath(projectPath)) return s.workspace?.path ?? null
   const p = s.workspace?.projects.find((x) => x.path === projectPath)
-  return p?.agents.find((a) => a.id === agentId)?.worktree?.path ?? p?.path ?? null
+  const a = p?.agents.find((x) => x.id === agentId)
+  return (a ? agentFolder(a) : null) ?? p?.path ?? null
 }
 
 /** Each file's path as spelled on disk (null: not a file), remembered for a few seconds so hovering doesn't ask main on every move. */
@@ -106,7 +112,8 @@ export function fileLinkProvider(term: Terminal, context: () => { projectPath?: 
             activate: (e) => {
               if (e.ctrlKey || e.metaKey) openFileLink(target, m.line, m.col)
             },
-            hover: () => host()?.setAttribute('title', 'Open in Files · Ctrl+click'),
+            // Translated as it shows, so a language changed since the terminal opened applies (HI-2346).
+            hover: () => host()?.setAttribute('title', tr(LINK_TITLE)),
             leave: () => host()?.removeAttribute('title')
           }))
         callback(links.length ? links : undefined)

@@ -3,6 +3,10 @@
     "defaultMessage": "Add Agent",
     "description": "Button: adds an agent to the project."
   },
+  "project.agents.chooseConnections": {
+    "defaultMessage": "Choose Connections…",
+    "description": "Button on Project Settings → Agents (HI-2109): opens a dialog choosing the connections (named setups on accounts: model, effort, mode) of the project's agents, by role or one by one, nothing else changed."
+  },
   "project.agents.merge": {
     "defaultMessage": "Merge…",
     "description": "Tooltip on a worktree agent's merge button."
@@ -11,33 +15,13 @@
     "defaultMessage": "{provider} (off)",
     "description": "A provider's name when it is turned off in Settings → Providers (an agent's provider, and the Provider list)."
   },
-  "project.agents.own200k": {
-    "defaultMessage": "{on, select, yes {200K context on} other {200K context off}}",
-    "description": "One of an agent's own settings, in a list. Keep 200K."
-  },
-  "project.agents.ownEffort": {
-    "defaultMessage": "effort {effort}",
-    "description": "One of an agent's own settings, in a list."
-  },
   "project.agents.ownMcp": {
     "defaultMessage": "MCP servers {servers}",
     "description": "One of an agent's own settings, in a list: which MCP servers it gets."
   },
-  "project.agents.ownModel": {
-    "defaultMessage": "model {model}",
-    "description": "One of an agent's own settings, in a list."
-  },
-  "project.agents.ownSettings": {
-    "defaultMessage": "Own settings: {settings}",
-    "description": "Under an agent: the settings it sets for itself, as a list."
-  },
   "project.agents.projectFolder": {
     "defaultMessage": "project folder",
     "description": "Where an agent works when it has no worktree."
-  },
-  "project.agents.projectSettings": {
-    "defaultMessage": "Project settings ({model})",
-    "description": "Under an agent that uses the project's settings. {model} is the model it runs."
   },
   "project.agents.remove": {
     "defaultMessage": "Remove agent…",
@@ -59,6 +43,14 @@
     "defaultMessage": "Change",
     "description": "Button in that banner: opens Project Settings."
   },
+  "project.banner.connectionSetup": {
+    "defaultMessage": "No {cli} account is on in this workspace, so its agents can't start. Add one and sign it in.",
+    "description": "Banner in a project whose agents' CLI ({cli}: \"Claude Code\") has no account (a sign-in or server) on in the workspace (HI-1755; HI-2108)."
+  },
+  "project.banner.connectionSetupAdd": {
+    "defaultMessage": "Add an Account",
+    "description": "Button on the banner asking for an account (HI-2108): opens Settings → Accounts & Connections."
+  },
   "project.banner.copyToWorkspace": {
     "defaultMessage": "Copy to workspace",
     "description": "Button: copies the project's own MCP servers to the workspace."
@@ -78,6 +70,14 @@
   "project.banner.restartNeeded": {
     "defaultMessage": "Skills, MCP servers or settings changed since {many, select, yes {{agent}'s} other {this}} session started. Restart the session to apply them — the conversation continues.",
     "description": "Banner over a running session whose skills, MCP servers or settings changed. {agent} is the focused agent's name (when there are several)."
+  },
+  "project.banner.restartWhenDone": {
+    "defaultMessage": "Restart When Its Turn Is Over",
+    "description": "Button on the restart banner of an agent running on another connection than the one chosen now (HI-1755): it ends once its turn is over and carries on, on the new connection."
+  },
+  "project.banner.switchFailed": {
+    "defaultMessage": "Couldn't arrange the restart",
+    "description": "An error's title: Restart When Its Turn Is Over failed."
   },
   "project.banner.unmanagedMcp": {
     "defaultMessage": "This project defines MCP servers that are not in the workspace: <b>{names}</b>. They stay disabled until copied to the workspace.",
@@ -268,8 +268,12 @@
     "description": "Under Cache writes."
   },
   "project.changes.agentSetup": {
-    "defaultMessage": "Agent Setup",
-    "description": "Button: opens Agent Setup, which checks git and says how to fix it."
+    "defaultMessage": "Provider Setup",
+    "description": "Button: opens Provider Setup, which checks git and says how to fix it."
+  },
+  "project.changes.agentSlot": {
+    "defaultMessage": "{agent} · {place}{known, select, yes { · {branch}} other {}}",
+    "description": "An agent's slot in the picker (#1569): the agent, where it works ({place}: \"in slot-b\", or \"carried: hb2\" for the slot kept for it) and its git branch ({branch}), when known. Glossary: slot."
   },
   "project.changes.agentWorktree": {
     "defaultMessage": "{agent}'s worktree · {branch}",
@@ -372,8 +376,8 @@
     "description": "Tooltip on the button that opens the changed file."
   },
   "project.changes.pickerTip": {
-    "defaultMessage": "Unused worktrees, a worktree an agent works in, or the project folder",
-    "description": "Tooltip on the Changes tab's folder picker."
+    "defaultMessage": "Two branches compared, unused worktrees, a worktree an agent works in, or the project folder",
+    "description": "Tooltip on the Changes tab's picker."
   },
   "project.changes.projectFolder": {
     "defaultMessage": "Project folder · {branch}",
@@ -527,9 +531,141 @@
     "defaultMessage": "unknown time",
     "description": "In \"Open the … compaction of {when}…\" when its time is not known."
   },
+  "project.compare.about": {
+    "defaultMessage": "What {head} changes since it left {base}: its commits that {base} hasn’t, and the files they change. Read from git, nothing checked out.",
+    "description": "The sentence at the top of the Changes tab's comparison of two branches."
+  },
+  "project.compare.base": {
+    "defaultMessage": "Against",
+    "description": "A label in the Changes tab's comparison: the branch it is compared with."
+  },
+  "project.compare.binary": {
+    "defaultMessage": "A binary file: its changes can’t be shown.",
+    "description": "In place of a file's diff in the Changes tab's comparison: the file isn't text."
+  },
+  "project.compare.commitTip": {
+    "defaultMessage": "{hash}\n{author} <{email}>\n{when}",
+    "description": "Tooltip on a commit in the Changes tab's comparison: its whole hash, its author and when."
+  },
+  "project.compare.commits": {
+    "defaultMessage": "Commits",
+    "description": "A switch in the Changes tab's comparison: each side's commits."
+  },
+  "project.compare.commitsHint": {
+    "defaultMessage": "On the right: {head}’s commits that {base} hasn’t, then {base}’s that {head} hasn’t.",
+    "description": "The left caption of the Changes tab's comparison while it shows the commits: each side's commits are listed on the right."
+  },
+  "project.compare.counts": {
+    "defaultMessage": "{head} has {ahead, plural, one {# commit} other {# commits}} {base} hasn’t; {base} has {behind, plural, one {# commit} other {# commits}} {head} hasn’t.",
+    "description": "The line under the branches in the Changes tab's comparison: how many commits each has that the other hasn't."
+  },
+  "project.compare.cut": {
+    "defaultMessage": "Only the first {shown, number} of {total, number} files are listed.",
+    "description": "Under the Changes tab's comparison's files when there are more than Hive lists."
+  },
+  "project.compare.diffFailed": {
+    "defaultMessage": "Couldn't show this file's changes: {error}",
+    "description": "An error in the Changes tab's comparison: a file's diff couldn't be read."
+  },
+  "project.compare.files": {
+    "defaultMessage": "Files",
+    "description": "A switch in the Changes tab's comparison: the changed files."
+  },
+  "project.compare.filesHint": {
+    "defaultMessage": "The files {head} changes since it left {base}. Swap to see {base}’s.",
+    "description": "Above the files in the Changes tab's comparison: they are only the branch's own changes, since the commit where it left the other."
+  },
+  "project.compare.group": {
+    "defaultMessage": "Branches (compared, nothing checked out)",
+    "description": "A group of the Changes tab's picker: comparisons of two branches, read without checking anything out."
+  },
+  "project.compare.head": {
+    "defaultMessage": "Branch",
+    "description": "A label in the Changes tab's comparison: the branch whose changes are shown."
+  },
+  "project.compare.inline": {
+    "defaultMessage": "Inline",
+    "description": "A button in the Changes tab's comparison: shows a diff in one column."
+  },
+  "project.compare.load": {
+    "defaultMessage": "the comparison",
+    "description": "What couldn't be read, in an error in the Changes tab: the comparison of two branches."
+  },
+  "project.compare.loading": {
+    "defaultMessage": "Comparing {head} with {base}…",
+    "description": "While the Changes tab compares two branches."
+  },
+  "project.compare.loadingDiff": {
+    "defaultMessage": "Loading the diff…",
+    "description": "While a file's diff in the Changes tab's comparison is read."
+  },
+  "project.compare.moreFiles": {
+    "defaultMessage": "Show more ({shown, number} of {total, number})",
+    "description": "A button under the Changes tab's comparison's files: lists more of them."
+  },
+  "project.compare.noFiles": {
+    "defaultMessage": "{head} changes no files since it left {base}.",
+    "description": "The Changes tab's comparison when the branch changes nothing."
+  },
+  "project.compare.none": {
+    "defaultMessage": "None.",
+    "description": "Under a heading of the Changes tab's comparison's commits: there are none."
+  },
+  "project.compare.onlyHead": {
+    "defaultMessage": "On {head}, not on {base}",
+    "description": "A heading in the Changes tab's comparison: the commits the branch {head} has that {base} hasn't."
+  },
+  "project.compare.option": {
+    "defaultMessage": "{head} ↔ {base}",
+    "description": "A comparison in the Changes tab's picker: the branch {head} against {base}."
+  },
+  "project.compare.parted": {
+    "defaultMessage": "They parted at {commit}.",
+    "description": "In the Changes tab's comparison: the commit where the two branches' histories split."
+  },
+  "project.compare.refresh": {
+    "defaultMessage": "Compare again",
+    "description": "A button in the Changes tab's comparison: reads both branches again."
+  },
+  "project.compare.retry": {
+    "defaultMessage": "Try again",
+    "description": "A button after an error in the Changes tab."
+  },
+  "project.compare.selectFile": {
+    "defaultMessage": "Select a file to see what {head} changed in it.",
+    "description": "The Changes tab's comparison with no file chosen."
+  },
+  "project.compare.sideBySide": {
+    "defaultMessage": "Side by side",
+    "description": "A button in the Changes tab's comparison: shows a diff as two columns."
+  },
+  "project.compare.slotOption": {
+    "defaultMessage": "{slot} · {card, select, none {free} other {{card}}} · {branch}",
+    "description": "A slot in the Changes tab's picker: its name {slot}, the card it is lent to ({card}; none: free, no card) and its branch {branch}."
+  },
+  "project.compare.slotsGroup": {
+    "defaultMessage": "Slots (each one’s branch, compared)",
+    "description": "A group of the Changes tab's picker: the project's slots (working folders lent to cards), each opening its branch compared with where it merges."
+  },
+  "project.compare.status": {
+    "defaultMessage": "{status, select, M {Modified} A {Added} D {Deleted} T {Type changed} other {{status}}}: {path}",
+    "description": "Tooltip on a file in the Changes tab's comparison: how the branch changed it."
+  },
+  "project.compare.swap": {
+    "defaultMessage": "Swap the branches",
+    "description": "A button in the Changes tab's comparison: compares the other way round."
+  },
+  "project.compare.unrelated": {
+    "defaultMessage": "They share no history: the files are {base} against {head}.",
+    "description": "In the Changes tab's comparison: the two branches have no commit in common."
+  },
   "project.cost.belowCent": {
     "defaultMessage": "< {cent}",
     "description": "A cost under one cent. {cent} is one cent in dollars, such as \"$0.01\"."
+  },
+  "project.cost.freeLocal": {
+    "defaultMessage": "free (local)",
+    "description": "The cost of sessions run only on a model server on this PC (Ollama, for example): nothing (HI-1772). Lower case, short: it stands where a cost such as \"$1.20\" would."
   },
   "project.cost.tip": {
     "defaultMessage": "What this work would have cost at API prices: reported by the provider where it does (Claude Code), else estimated by Hive from token counts and the prices in Settings → the provider. On a subscription you are not charged this; it shows how heavy the work was.",
@@ -542,6 +678,10 @@
   "project.cost.unpriced": {
     "defaultMessage": "Hive has no API price for {model}, so it can't estimate this session's cost. Add one in Settings → {provider} → API prices.",
     "description": "Tooltip on a cost shown as Unknown. {model} is the model; {provider} the provider (Claude Code, Codex…). Settings → {provider} → API prices is where prices are set: name it as Settings does."
+  },
+  "project.cost.withFree": {
+    "defaultMessage": "{cost} + free (local)",
+    "description": "A total cost (\"$1.20\") that also covers sessions run only on a model server on this PC (Ollama, for example), which cost nothing (HI-1772)."
   },
   "project.empty.addAgent": {
     "defaultMessage": "Add an agent to work on {project}: Add Agent adds a {provider} agent with its default settings (▾ to choose another provider, a worktree or settings). New Session adds one and starts it.",
@@ -559,9 +699,17 @@
     "defaultMessage": "Mark as working on",
     "description": "Button: marks the project as one you are working on."
   },
+  "project.empty.noAccount": {
+    "defaultMessage": "No account is on in this workspace — Settings → Accounts & Connections",
+    "description": "Warning on the Session tab of a project with no agents (HI-2108): no account (a sign-in or server a coding agent CLI uses) is on in this workspace, so a new agent has no connection to run on. Settings → Accounts & Connections: name it as Settings does."
+  },
   "project.empty.noAgents": {
     "defaultMessage": "No agents yet",
     "description": "Heading of the Session tab of a project with no agents, and the tooltip of its status badge."
+  },
+  "project.empty.noCli": {
+    "defaultMessage": "No account on here has its coding agent CLI installed — Help → Provider Setup",
+    "description": "Warning on the Session tab of a project with no agents (HI-2132): accounts are on in this workspace, but none of their CLIs (Claude Code, Codex…) is installed, so a new agent can't run. Help → Provider Setup is the menu item."
   },
   "project.empty.noSession": {
     "defaultMessage": "No session running",
@@ -576,8 +724,8 @@
     "description": "Heading of the Session tab when the focused agent (of several) has no session running. {agent} is its name."
   },
   "project.empty.providerMissing": {
-    "defaultMessage": "{provider} is required — Help → Agent Setup",
-    "description": "Warning on the Session tab when the agent's CLI isn't installed. Help → Agent Setup is the menu item."
+    "defaultMessage": "{provider} is required — Help → Provider Setup",
+    "description": "Warning on the Session tab when the agent's CLI isn't installed. Help → Provider Setup is the menu item."
   },
   "project.empty.providerOff": {
     "defaultMessage": "{provider} is turned off — Settings → Providers",
@@ -647,6 +795,10 @@
     "defaultMessage": "Resuming…",
     "description": "The project header's Resume button while it runs."
   },
+  "project.header.startFreshIdle": {
+    "defaultMessage": "Start Fresh (Idle Agents)…",
+    "description": "The project header's Agents ▾ menu (#1437): gives each idle running agent a new conversation, after one question listing who will and who won't. The … says it asks first: keep it."
+  },
   "project.header.startNew": {
     "defaultMessage": "{many, select, yes {Start New ({count})} other {Start New}}",
     "description": "The project header's Agents ▾ menu: starts a fresh session for each agent. {count} is how many (shown with several agents)."
@@ -667,13 +819,117 @@
     "defaultMessage": "You are working on this project",
     "description": "Tooltip on the project header's Active switch, on."
   },
+  "project.key.aliases": {
+    "defaultMessage": "Its old keys, which still find its cards: {keys}",
+    "description": "Under the project key box (Project Settings): the project's earlier keys, joined (AM and AMB), which still name its cards."
+  },
+  "project.key.change": {
+    "defaultMessage": "Change",
+    "description": "Button beside the project key box (Project Settings): makes the key typed the project’s."
+  },
+  "project.key.changed": {
+    "defaultMessage": "Its cards are named {key} now; {old} still finds them.",
+    "description": "A notification after a project's key changed. {key} and {old}: the new and the old key (letters such as AM)."
+  },
+  "project.key.failed": {
+    "defaultMessage": "Could not change the project key",
+    "description": "An error's title: changing a project's key failed."
+  },
+  "project.key.form": {
+    "defaultMessage": "A key is 2 to 4 letters, A to Z.",
+    "description": "Why a project key typed can't be used (New Project dialog, Project Settings): it isn't 2–4 letters A–Z."
+  },
+  "project.key.label": {
+    "defaultMessage": "Project key",
+    "description": "Accessible name of the project key box (Project Settings): 2–4 letters such as AM that the project's cards are named by."
+  },
+  "project.key.none": {
+    "defaultMessage": "Hive gives it a key once its board is open.",
+    "description": "Project Settings, in place of the project key box: the project has no key yet (its board hasn't been opened or upgraded)."
+  },
+  "project.key.prefix": {
+    "defaultMessage": "{key} and {other}, another project’s key, begin alike: no key can be the start of another.",
+    "description": "Why a project key typed can't be used: {key} and another project's key {other} (letters such as AM and AMB) would be one the start of the other."
+  },
+  "project.key.taken": {
+    "defaultMessage": "{key} is another project’s key, or was: a key stays with its project for good.",
+    "description": "Why a project key typed can't be used: {key} (letters such as AM) belongs to another project now or did before (its old keys stay its aliases)."
+  },
+  "project.key.willAlias": {
+    "defaultMessage": "Its cards will be named {key}-12; {old}-12 will still find them.",
+    "description": "Under the project key box while a new key is typed (Project Settings). {key} is the key typed, {old} the key it has: AM-12 style card names."
+  },
+  "project.leftovers.about": {
+    "defaultMessage": "Branches nothing uses now: not {target} or the default branch, not checked out in a worktree or slot, and no open card’s. A Done or archived card’s branch, an agent’s from before slots, or one of no card. Delete removes only the branch, and Hive checks again first that nothing uses it.",
+    "description": "The sentence at the top of the Changes tab's leftover branches. {target} is the branch the project's work merges into."
+  },
+  "project.leftovers.ahead": {
+    "defaultMessage": "{n, plural, one {# commit not in {target}} other {# commits not in {target}}}",
+    "description": "On a leftover branch in the Changes tab: how many of its commits {target} hasn't."
+  },
+  "project.leftovers.compare": {
+    "defaultMessage": "Compare",
+    "description": "A button on a leftover branch in the Changes tab: compares it with the target before deciding."
+  },
+  "project.leftovers.compareTip": {
+    "defaultMessage": "Compare {branch} with {target}",
+    "description": "Tooltip of a leftover branch's Compare button in the Changes tab."
+  },
+  "project.leftovers.delete": {
+    "defaultMessage": "Delete…",
+    "description": "A button on a leftover branch in the Changes tab: deletes it, after a confirmation."
+  },
+  "project.leftovers.entry": {
+    "defaultMessage": "Leftover branches ({n, number})",
+    "description": "An entry of the Changes tab's picker: the branches nothing uses now, {n} of them."
+  },
+  "project.leftovers.heading": {
+    "defaultMessage": "Leftover branches",
+    "description": "The heading of the Changes tab's page of branches nothing uses now."
+  },
+  "project.leftovers.load": {
+    "defaultMessage": "the branches",
+    "description": "What couldn't be read, in an error on the Changes tab's leftover branches."
+  },
+  "project.leftovers.loading": {
+    "defaultMessage": "Reading the branches…",
+    "description": "While the Changes tab's leftover branches are read."
+  },
+  "project.leftovers.merged": {
+    "defaultMessage": "Merged into {target}",
+    "description": "A group of the Changes tab's leftover branches: those whose commits are all in {target}, so deleting them loses nothing."
+  },
+  "project.leftovers.none": {
+    "defaultMessage": "None here.",
+    "description": "Under a group of the Changes tab's leftover branches that has none."
+  },
+  "project.leftovers.notCounted": {
+    "defaultMessage": "commits not in {target}: not counted",
+    "description": "On a leftover branch in the Changes tab when Hive didn't count its commits (too many)."
+  },
+  "project.leftovers.refresh": {
+    "defaultMessage": "Read the branches again",
+    "description": "A button on the Changes tab's leftover branches: reads them again (a branch changed outside Hive)."
+  },
+  "project.leftovers.unmerged": {
+    "defaultMessage": "Not in {target}",
+    "description": "A group of the Changes tab's leftover branches: those with commits {target} hasn't."
+  },
   "project.limit.heading": {
     "defaultMessage": "{plan, select, none {Plan limits, account-wide, as of {when}} other {Plan limits ({plan}), account-wide, as of {when}}}",
     "description": "Above the plan limits. {plan} is the plan's name (none when unknown); {when} how long ago they were reported."
   },
+  "project.limit.noConnections": {
+    "defaultMessage": "No {provider} account is on in this workspace. Turn one on in Settings → Accounts & Connections to see its plan limits here.",
+    "description": "In place of the plan limits (HI-1756) when the workspace has no account on for the coding agent ({provider}). Settings → Accounts & Connections names a section."
+  },
   "project.limit.none": {
     "defaultMessage": "{provider} reports your plan’s limits while a session runs; they appear here after the next message in any {provider} session. Accounts that use an API key have no plan limits.",
     "description": "In place of the plan limits before any were reported."
+  },
+  "project.limit.noneConnection": {
+    "defaultMessage": "Its limits appear after the next message in a session on {name}.",
+    "description": "Under a connection ({name}: \"Max 1\", a sign-in the user named) in the plan limits (HI-1756), before any of its limits were reported."
   },
   "project.limit.resets": {
     "defaultMessage": "used · resets {when}",
@@ -682,6 +938,10 @@
   "project.limit.tip": {
     "defaultMessage": "How much of your plan’s {window, select, fiveHour {5-hour} weekly {weekly} other {{label}}} allowance is used, across all your {provider} sessions (not just Hive).",
     "description": "The (i) beside a plan limit."
+  },
+  "project.limit.tipConnection": {
+    "defaultMessage": "How much of the plan’s {window, select, fiveHour {5-hour} weekly {weekly} other {{label}}} allowance is used on {name}, across all its sessions (not just Hive's).",
+    "description": "The (i) beside a plan limit of one connection (HI-1756): {name} is the connection, a sign-in the user named (\"Max 1\")."
   },
   "project.limit.title": {
     "defaultMessage": "{window, select, fiveHour {5-hour limit} weekly {Weekly limit} other {{label} limit}}",
@@ -694,6 +954,10 @@
   "project.loading": {
     "defaultMessage": "Loading…",
     "description": "A project tab while its data loads."
+  },
+  "project.mcp.addServer": {
+    "defaultMessage": "Add Server…",
+    "description": "A button in a project's MCP tab and the Hive Assistant's view (HI-2059): opens the picker of the workspace's MCP servers to add."
   },
   "project.mcp.builtIn": {
     "defaultMessage": "Built-in",
@@ -719,9 +983,9 @@
     "defaultMessage": "Given to {agents} only",
     "description": "Under an MCP server: the agents that get it, as a list."
   },
-  "project.mcp.heading": {
-    "defaultMessage": "Workspace MCP servers",
-    "description": "Heading in a project's MCP tab."
+  "project.mcp.headingAdded": {
+    "defaultMessage": "Added servers",
+    "description": "Heading in a project's MCP tab (HI-2059): the workspace's MCP servers added to this project."
   },
   "project.mcp.hiveDesc": {
     "defaultMessage": "Lets agents see other projects, read and write shared notes, create handovers and notify you.",
@@ -735,9 +999,13 @@
     "defaultMessage": "Manage MCP servers",
     "description": "Link: opens the workspace's MCP view."
   },
-  "project.mcp.none": {
-    "defaultMessage": "No MCP servers in this workspace.",
-    "description": "A project's MCP tab when the workspace has none."
+  "project.mcp.noneAdded": {
+    "defaultMessage": "No servers added. Add one to give this project's agents its tools.",
+    "description": "A project's MCP tab (HI-2059) when no MCP server is added to it."
+  },
+  "project.mcp.noneInWorkspace": {
+    "defaultMessage": "The workspace has no MCP servers yet.",
+    "description": "A project's MCP tab (HI-2059) when the workspace has no MCP servers to add."
   },
   "project.mcp.off": {
     "defaultMessage": "Off",
@@ -746,6 +1014,14 @@
   "project.mcp.onAll": {
     "defaultMessage": "On for all sessions",
     "description": "Badge on Hive's own MCP server when it is on."
+  },
+  "project.mcp.remove": {
+    "defaultMessage": "Remove",
+    "description": "A button on an MCP server added to a project or the Hive Assistant (HI-2059): it no longer runs there (it stays in the workspace)."
+  },
+  "project.mcp.removeLabel": {
+    "defaultMessage": "Remove {name} from {project}",
+    "description": "Accessible name of Remove on an MCP server in a project's MCP tab (HI-2059). {name} is the server, {project} the project."
   },
   "project.mcp.target": {
     "defaultMessage": "the workspace's MCP servers",
@@ -899,6 +1175,10 @@
     "defaultMessage": "No agents.",
     "description": "The By agent table when there are none."
   },
+  "project.overview.noAnswer": {
+    "defaultMessage": "no answer after {seconds, number} s",
+    "description": "Why the sessions could not be loaded: Hive listed them for this long without finishing. Shown as {error} in \"Could not load the sessions: {error}\", with Retry."
+  },
   "project.overview.period": {
     "defaultMessage": "Period",
     "description": "Accessible name of the Overview's period buttons (Today, 7 days…)."
@@ -1015,10 +1295,6 @@
     "defaultMessage": "Global settings",
     "description": "Link: opens Settings."
   },
-  "project.settings.hours": {
-    "defaultMessage": "{count} h",
-    "description": "Hours, short, as in \"Inherit (6 h)\"."
-  },
   "project.settings.inherit": {
     "defaultMessage": "Inherit ({value})",
     "description": "The choice that takes the global (or workspace) setting. {value} is what that is now."
@@ -1042,10 +1318,6 @@
   "project.settings.noMatch": {
     "defaultMessage": "No settings match.",
     "description": "Project Settings when the search finds nothing."
-  },
-  "project.settings.now": {
-    "defaultMessage": "{desc} Now: {current}",
-    "description": "A setting's description followed by what the value in use does. {desc} is the description; {current} what is in use."
   },
   "project.settings.off": {
     "defaultMessage": "Off",
@@ -1071,10 +1343,6 @@
     "defaultMessage": "Overrides the global default",
     "description": "Tooltip on the mark beside a project setting that is not Inherit."
   },
-  "project.settings.providerDefault": {
-    "defaultMessage": "{provider} default",
-    "description": "The provider's own default model, in \"Inherit (Claude Code default)\"."
-  },
   "project.settings.reset": {
     "defaultMessage": "Reset",
     "description": "The reset confirmation's button."
@@ -1084,16 +1352,12 @@
     "description": "Button: resets the project settings (asks first)."
   },
   "project.settings.resetMessage": {
-    "defaultMessage": "The default provider, each provider’s model, effort, permission mode, context and extra arguments, the chime, the compact threshold, the transcript size warning, file locks, worktree setup and the card-loop rounds and wait go back to Inherit, and loop wakes back on. Agents and skill and MCP opt-outs are kept.",
+    "defaultMessage": "The default provider, each provider’s model, effort, permission mode, context and extra arguments, the chime, the fresh-start suggestion, the compact threshold, the transcript size warning, file locks, worktree setup and the card-loop rounds and wait go back to Inherit, and loop wakes back on. Agents and skill and MCP opt-outs are kept.",
     "description": "The confirmation before resetting the project settings."
   },
   "project.settings.resetTitle": {
     "defaultMessage": "Reset project settings?",
     "description": "Title of the confirmation before resetting the project settings."
-  },
-  "project.settings.rounds": {
-    "defaultMessage": "Rounds",
-    "description": "Accessible name of the card-loop rounds box."
   },
   "project.settings.saveFailed": {
     "defaultMessage": "Could not save project settings",
@@ -1102,18 +1366,6 @@
   "project.settings.search": {
     "defaultMessage": "Search {project} settings",
     "description": "Placeholder of Project Settings' search box."
-  },
-  "project.settings.sessionsIn": {
-    "defaultMessage": "Sessions in {project} will run every command, edit and network call without asking.",
-    "description": "The confirmation before choosing a no-guardrails permission mode for a project's sessions ({project}: the project's name)."
-  },
-  "project.settings.waitHours": {
-    "defaultMessage": "Wait (hours)",
-    "description": "Accessible name of the card-loop wait box."
-  },
-  "project.settings.wake": {
-    "defaultMessage": "Wake reviewers and builders",
-    "description": "Accessible name of the card-loop wakes switch."
   },
   "project.settings.warnOver": {
     "defaultMessage": "Warn when a transcript is over",
@@ -1130,6 +1382,10 @@
   "project.skills.delete": {
     "defaultMessage": "Delete skill",
     "description": "Tooltip on the delete button beside a local skill."
+  },
+  "project.skills.deliveredNote": {
+    "defaultMessage": "Each switch says whether this project's agents get the skill (Delivered to agents), from their next session. A skill switched off in the Skills view is off in every project.",
+    "description": "Under the Hive skills in a project's Skills tab: what the switch beside each skill does. Delivered to agents is the switch's name; the Skills view is the workspace's list of skills."
   },
   "project.skills.editInWorkspace": {
     "defaultMessage": "Edit in the workspace's Skills view (Hive skills are shared by every project)",
@@ -1195,6 +1451,10 @@
     "defaultMessage": "User",
     "description": "A group of a provider's skills: in your user profile."
   },
+  "project.tab.activity": {
+    "defaultMessage": "Activity",
+    "description": "A project's tab: its live work as a tree, card → agent → session → turn → tool call, with subagents and processes."
+  },
   "project.tab.attachments": {
     "defaultMessage": "Attachments",
     "description": "A project's tab: what was pasted or dropped into its sessions."
@@ -1202,10 +1462,6 @@
   "project.tab.files": {
     "defaultMessage": "Files",
     "description": "A project's tab: its files."
-  },
-  "project.tab.git": {
-    "defaultMessage": "Git",
-    "description": "A project's tab: its git changes, history and branches. Usually kept as Git."
   },
   "project.tab.mcp": {
     "defaultMessage": "MCP",
@@ -1247,9 +1503,17 @@
     "defaultMessage": "Templates",
     "description": "A project's tab: templates of agents and cards."
   },
+  "project.tab.versionControl": {
+    "defaultMessage": "Version Control",
+    "description": "A project's tab (renamed from Git): its version control, workflow options, changes, history and branches. Glossary 2.1: Version Control (the tab)."
+  },
   "project.tabs.more": {
     "defaultMessage": "More",
     "description": "The last of a project's tabs: opens a menu of its other tabs (Memory, Skills, Templates, MCP). When one of them is open, the button shows its name instead. Keep it short."
+  },
+  "project.tabs.moreSettings": {
+    "defaultMessage": "Project Settings…",
+    "description": "The last item of the project tabs' More ▾ menu, after a separator (HI-1840): opens the project's settings. Keep the …."
   },
   "project.tabs.moreTip": {
     "defaultMessage": "The project's {tabs}",

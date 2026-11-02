@@ -111,8 +111,8 @@ fs.mkdirSync(shots, { recursive: true })
   check("a dropped PDF's and zip's paths reach the input line, copies kept with the session", !!pdfs && pdfs[0].endsWith('_q3 report.pdf') && fs.readdirSync(imgDir).length === 4, (await typed()).slice(-400))
   check('their chips: PDF, and the zip by path', !!(await lib.until(async () => JSON.stringify((await chips()).slice(2)) === JSON.stringify(['q3 report.pdf | PDF', 'logs.zip | File · by path']), HUNG_MS)), JSON.stringify(await chips()))
   await page.screenshot({ path: path.join(shots, '2-chips.png') })
-  // A chip's × dismisses it (its path stays in the prompt).
-  await page.locator('.attachment-chip', { hasText: 'logs.zip' }).locator('.attachment-chip-close').click()
+  // A chip's × dismisses it (its path stays in the prompt). By its name: Attach to a card (HI-1700) shares its class.
+  await page.locator('.attachment-chip', { hasText: 'logs.zip' }).getByRole('button', { name: 'Dismiss logs.zip' }).click()
   check("× dismisses a chip", !!(await lib.until(async () => (await chips()).length === 3, HUNG_MS)), JSON.stringify(await chips()))
 
   // A large file is asked about first; cancelled, nothing is pasted or copied.
@@ -155,6 +155,19 @@ fs.mkdirSync(shots, { recursive: true })
   check('viewer: … and moving back disables it again', !!(await lib.until(() => del.isDisabled(), HUNG_MS)), await viewerTitle())
   await page.keyboard.press('Escape')
   await lib.until(async () => (await page.locator('.image-viewer').count()) === 0, HUNG_MS)
+  await tab('Session').click()
+
+  // Its ⋯ menu's Show Session's Attachments (HI-1841): the Attachments tab on Pane attachments at this running session's
+  // files, its own session's, nothing started.
+  const liveBefore = await inv('session:live')
+  const sessionId = liveBefore.find((l) => l.agentId === agent.id)?.sessionId
+  const entries = await lib.agentMenu(page, agent.name)
+  check("the agent's menu offers Show Session's Attachments", entries.some((e) => e.startsWith("Show Session's Attachments")), JSON.stringify(entries))
+  await page.locator('.menu .menu-item', { hasText: "Show Session's Attachments" }).click()
+  const own = page.locator(`[role="tabpanel"][data-tab-panel="pane"] .image-group[data-session="${sessionId}"]`)
+  check("…opens Pane attachments at its session's files", !!(await lib.until(async () => (await page.locator('.attachment-tabs [role="tab"][data-tab="pane"]').getAttribute('aria-selected')) === 'true' && (await own.isVisible()) && (await own.locator('.badge', { hasText: 'Running' }).count()) === 1, HUNG_MS)), String(sessionId))
+  check('…starting nothing', JSON.stringify((await inv('session:live')).map((l) => l.sessionId)) === JSON.stringify(liveBefore.map((l) => l.sessionId)))
+  await page.screenshot({ path: path.join(shots, '3-show-session-attachments.png') })
   await tab('Session').click()
 
   // Sending the prompt (Enter) clears its chips.

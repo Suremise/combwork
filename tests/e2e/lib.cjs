@@ -11,12 +11,13 @@ const { execFileSync, execSync } = require('child_process')
 const { _electron } = require('playwright-core')
 
 // The run context (runContext.cjs): the environments of everything a suite starts, its folders and the CLI test homes.
-const { TEST_ROOT, WORK, CODEX_HOME, CLAUDE_TEST_HOME, hiveEnv, childEnv, baseEnv, isHiveEnv, isUserCliHome, trashDir } = require('./runContext.cjs')
+const { TEST_ROOT, WORK, CODEX_HOME, CLAUDE_TEST_HOME, hiveEnv, childEnv, baseEnv, isHiveEnv, isUserCliHome, trashDir, TEST_GIT_IDENTITY, gitConfig, writeGitConfig, gitEnv: contextGitEnv, isUserGitConfig } = require('./runContext.cjs')
 
 const ROOT = path.resolve(__dirname, '..', '..')
 /** Electron's executable (the electron package resolves to its path in plain Node). */
 const ELECTRON = require('electron')
 const { windowsCodesIn } = require('./windowsExits.cjs')
+const { readDocs, writeDoc } = require('./boardRows.cjs')
 // WORK: where suites keep their profiles, workspaces and screenshots. Stable, so Claude Code trusts its folders once.
 fs.mkdirSync(WORK, { recursive: true })
 
@@ -61,16 +62,16 @@ function trashed(match = '') {
 }
 
 /**
- * A card of a workspace's board as Hive saved it (#1017: in .hive\hive.db, the card's JSON document), read on a
+ * A card of a workspace's board as Hive saved it (in .hive\hive.db: its JSON document, from 1.0's tables, #1209), read on a
  * connection of its own (read-only; Hive writing meanwhile is fine). Throws when there is no such card.
  */
 function readCard(ws, n) {
   const { DatabaseSync } = require('node:sqlite')
   const db = new DatabaseSync(path.join(ws, '.hive', 'hive.db'), { readOnly: true, timeout: 5000 })
   try {
-    const row = db.prepare('SELECT doc FROM cards WHERE number = ?').get(n)
+    const [row] = readDocs(db, [n])
     if (!row) throw new Error(`no card #${n} in ${ws}`)
-    return JSON.parse(row.doc)
+    return row.doc
   } finally {
     db.close()
   }
@@ -81,7 +82,7 @@ function writeCard(ws, n, doc) {
   const { DatabaseSync } = require('node:sqlite')
   const db = new DatabaseSync(path.join(ws, '.hive', 'hive.db'), { timeout: 5000 })
   try {
-    db.prepare('INSERT INTO cards (number, doc) VALUES (?, ?) ON CONFLICT(number) DO UPDATE SET doc = excluded.doc').run(n, JSON.stringify(doc))
+    writeDoc(db, n, doc)
   } finally {
     db.close()
   }
@@ -96,6 +97,15 @@ function probeDir(name = 'probe', root = TEST_ROOT) {
   const stamp = `${d.getFullYear()}${two(d.getMonth() + 1)}${two(d.getDate())}-${two(d.getHours())}${two(d.getMinutes())}${two(d.getSeconds())}`
   fs.mkdirSync(base, { recursive: true })
   return fs.mkdtempSync(path.join(base, `${label}-${stamp}-`))
+}
+/**
+ * A token in a file of its own, as Hive gives a session its token (HI-2262: HIVE_API_TOKEN_FILE, never HIVE_API_TOKEN):
+ * its path, for a child's HIVE_API_TOKEN_FILE. `dir`: where (a new probe folder by default).
+ */
+function tokenFile(token, dir = probeDir('token')) {
+  const file = path.join(dir, `token-${process.pid}-${Date.now()}-${Math.random().toString(36).slice(2, 8)}.json`)
+  fs.writeFileSync(file, JSON.stringify({ token }))
+  return file
 }
 /**
  * A suite's Agent API port, as a string: the runner's (HIVE_E2E_PORT, one per suite running at the same time, so suites
@@ -234,6 +244,8 @@ function fakeClaude(userData, home, trusted = []) {
   fs.rmSync(home, { recursive: true, force: true })
   fs.mkdirSync(home, { recursive: true })
   fs.writeFileSync(path.join(home, 'fake-trusted.json'), JSON.stringify(trusted.map((f) => f.toLowerCase())))
+  // Its input log on, for typeLine (#1560).
+  logFakeInput(home)
   return { CLAUDE_CONFIG_DIR: home }
 }
 
@@ -280,12 +292,16 @@ async function openWorkspace(inv, page, ws, ms = 20000) {
 }
 
 /**
- * Starts the dev build with a test profile. Returns { app, page, inv } (inv calls an IPC channel). readyMs bounds the
- * wait for its window to be ready; one that isn't is closed and the failure thrown.
+ * Starts the dev build with a test profile, or the packaged Hive.exe HIVE_EXE names (the Sandbox upgrade checks run
+ * boardupgrade and upgradelane against an installed build that way, #1227). Returns { app, page, inv } (inv calls an
+ * IPC channel). readyMs bounds the wait for its window to be ready; one that isn't is closed and the failure thrown.
  */
 async function launch({ userData, env = {}, viewport = { width: 1400, height: 850 }, readyMs = 90000 }) {
+  const exe = process.env.HIVE_EXE
+  if (exe && !launch.said) console.log(`Hive: ${exe} (HIVE_EXE), not the dev build`)
+  launch.said = !!exe
   // The run context's environment (quiet, tips off, the suite's port) with the profile and the suite's own variables.
-  const app = await _electron.launch({ executablePath: ELECTRON, args: [ROOT], cwd: ROOT, env: hiveEnv({ HIVE_USER_DATA: userData, ...env }) }).catch((e) => {
+  const app = await _electron.launch({ executablePath: exe || ELECTRON, args: exe ? [] : [ROOT], cwd: ROOT, env: hiveEnv({ HIVE_USER_DATA: userData, ...env }) }).catch((e) => {
     // Electron that failed to start (0xc0000142 under heavy load, #599): its exit code said with what it means.
     const said = windowsCodesIn(e?.message)
     if (said.length && e instanceof Error) e.message = `${e.message}\nWindows: ${said.join('; ')}`
@@ -322,9 +338,71 @@ async function waitForProvider(inv, provider = 'claude-code', timeoutMs = 60000)
   throw new Error(`${provider}: still looking for it after ${timeoutMs / 1000} s`)
 }
 
-/** Adds an agent (Claude Code in the project folder unless told otherwise); returns its definition. */
-function addAgent(inv, proj, opts = {}) {
-  return inv('agents:add', proj, { location: 'project', provider: 'claude-code', ...opts })
+/** What a connection sets, by the name an agent's own settings had before HI-2122 (the launch values). */
+const LAUNCH_KEYS = ['model', 'effort', 'permissionMode', 'use200kContext', 'extraArgs']
+
+/**
+ * Adds an agent (Claude Code in the project folder unless told otherwise); returns its definition. One in a worktree of
+ * its own (`location`: new-worktree or existing-worktree) is a 0.9 agent, as an upgraded project has one: 1.0 adds none
+ * (#1451), so the test copies' channel makes it (`agents:testLegacy`). A model, effort, permission mode, 200K context or
+ * extra arguments given are its connection's since HI-2122 (an agent has none of its own): it gets the connection on its
+ * account with them (setLaunch).
+ */
+async function addAgent(inv, proj, opts = {}) {
+  const legacy = opts.location === 'new-worktree' || opts.location === 'existing-worktree'
+  const values = Object.fromEntries(LAUNCH_KEYS.filter((k) => opts[k] !== undefined).map((k) => [k, opts[k]]))
+  const rest = Object.fromEntries(Object.entries(opts).filter(([k]) => !LAUNCH_KEYS.includes(k)))
+  const def = await inv(legacy ? 'agents:testLegacy' : 'agents:add', proj, { location: 'project', provider: 'claude-code', ...rest })
+  return Object.values(values).some((v) => v !== '' && v !== null && v !== false) ? setLaunch(inv, proj, def.id, values) : def
+}
+
+/**
+ * Gives an agent a model, effort, permission mode, 200K context or extra arguments (HI-2122: they are its connection's):
+ * the connection on its account with its current connection's values and these over them ('' or null: the CLI's own),
+ * one already there if any, else one made (connection:add, as the connection dialog makes it); then the agent is
+ * pointed at it. Returns the agent as saved. Its CLI must have an account here (a test home's counts).
+ */
+async function setLaunch(inv, proj, agentId, values) {
+  // Anything else (a provider: HI-2210) would be dropped unseen, leaving the agent on its account's CLI.
+  const other = Object.keys(values).filter((k) => !LAUNCH_KEYS.includes(k))
+  if (other.length) throw new Error(`setLaunch: not launch values: ${other.join(', ')} (change an agent's CLI with agents:update first)`)
+  const rows = (await inv('connections:list')).connectionRows
+  const agent = savedAgents(proj).find((a) => a.id === agentId)
+  const current = rows.find((c) => c.id === agent?.connection)
+  if (!current) throw new Error(`setLaunch: ${agentId} has no connection to start from (saved: ${JSON.stringify(agent ?? null)})`)
+  const next = Object.fromEntries(LAUNCH_KEYS.filter((k) => current[k] !== undefined).map((k) => [k, current[k]]))
+  for (const [k, v] of Object.entries(values)) {
+    if (v === '' || v === null || v === undefined || v === false || v === 'inherit') delete next[k]
+    else next[k] = v
+  }
+  const same = (c) => LAUNCH_KEYS.every((k) => (c[k] ?? null) === (next[k] ?? null))
+  let target = rows.find((c) => c.account === current.account && same(c))
+  if (!target) {
+    const taken = new Set(rows.filter((c) => c.account === current.account).map((c) => c.name.toLowerCase()))
+    const label = LAUNCH_KEYS.filter((k) => next[k] !== undefined).map((k) => (next[k] === true ? '200K' : String(next[k]))).join(' · ') || 'CLI defaults'
+    let name = `Test · ${label}`
+    for (let n = 2; taken.has(name.toLowerCase()); n++) name = `Test · ${label} (${n})`
+    target = await inv('connection:add', current.account, { name, ...Object.fromEntries(LAUNCH_KEYS.map((k) => [k, next[k] ?? null])) })
+  }
+  return inv('agents:update', proj, agentId, { connection: target.id })
+}
+
+/**
+ * setLaunch for each of a project's agents on one CLI, as Project Settings' provider page did before HI-2122: there are
+ * no project-wide launch values, only each agent's connection.
+ */
+async function setProjectLaunch(inv, proj, provider, values) {
+  for (const a of savedAgents(proj)) if (a.provider === provider) await setLaunch(inv, proj, a.id, values)
+}
+
+/**
+ * A project's agents (or the Assistant home's) as saved in its project.json, which agents:add and agents:update have
+ * written by the time they answer (HI-2249). Never a workspace:refresh: a refresh that read a project before a later
+ * write to it (the accounts migration's at a workspace's open, HI-2106) answers with the refresh before it (#999), from
+ * before an agent just added was there, or with its connection before a change.
+ */
+function savedAgents(proj) {
+  return JSON.parse(fs.readFileSync(path.join(proj, '.hive', 'project.json'), 'utf8')).agents ?? []
 }
 
 /** Makes a project's only agent (removing any others first): for suites that reuse a workspace. */
@@ -567,10 +645,23 @@ _electron.launch = async (...args) => {
     // The suite's empty one is made here (Codex refuses a CODEX_HOME that doesn't exist).
     fs.mkdirSync(env[k], { recursive: true })
   }
+  // Its git's global config, the suite's (#1466): without one its git reads the user's ~/.gitconfig, and the user's name
+  // and email show in its screens. The work folder's is written here, with the test identity.
+  if (!env.GIT_CONFIG_GLOBAL) throw new Error("A test Hive needs GIT_CONFIG_GLOBAL (hiveEnv gives the suite's, with a test identity): without it its git reads the user's ~/.gitconfig (#1466)")
+  if (isUserGitConfig(env.GIT_CONFIG_GLOBAL)) throw new Error(`A test Hive's GIT_CONFIG_GLOBAL is the user's own (${env.GIT_CONFIG_GLOBAL}): give it the suite's (#1466)`)
+  if (env.GIT_CONFIG_GLOBAL === gitConfig()) writeGitConfig(env.GIT_CONFIG_GLOBAL)
+  const packaged = testExecutable(args[0].executablePath ?? ELECTRON) === 'packaged'
   // Its profile on its command line (#614), which Hive ignores: the runner stops what names a suite's folder once the
   // suite ends, and a test Hive's own line names only the checkout, so a suite killed before closing its Hive (HB1's,
   // 10 Oct) left it running for a day. Chromium's own processes already name it (--user-data-dir).
   if (env.HIVE_USER_DATA) args[0] = { ...args[0], args: [...(args[0].args ?? []), `--hive-test-profile=${env.HIVE_USER_DATA}`] }
+  if (packaged) {
+    args[0] = { ...args[0], args: [...args[0].args, ...PACKAGED_ARGS], env: { ...env, ...NO_UPDATE_CHECK } }
+    unmaximized(env.HIVE_USER_DATA)
+    noUpdateChecks(env.HIVE_USER_DATA)
+    if (env.HIVE_USER_DATA) packagedLaunches.push({ profile: env.HIVE_USER_DATA, since: new Date().toISOString() })
+  }
+  const from = Date.now()
   const app = await launchElectron(...args)
   // An app.evaluate reaches main through Node's inspector, which runs it at once even while main's JS is running: in a
   // V8 interrupt, in the middle of whatever main was doing. A function that calls into Hive (a window event, a setting)
@@ -590,7 +681,292 @@ _electron.launch = async (...args) => {
     )
   apps.add(app)
   app.on('close', () => apps.delete(app))
+  watchCommitBursts(app)
+  if (packaged) {
+    const shown = await app.evaluate(keepPackagedQuiet).catch((e) => ({ error: e.message }))
+    if (!Array.isArray(shown) || shown.length) {
+      await app.close().catch(() => undefined)
+      throw new Error(`A packaged test Hive (${args[0].executablePath}) couldn't be kept off the screen (#1253): ${Array.isArray(shown) ? `its windows were shown before it was reached (${shown.join(', ')})` : shown.error}`)
+    }
+  }
+  // Recorded by its pid and when it started (HI-1453), in the folder its runner gave the suite: whatever ends the run, the
+  // runner ends each copy still running once the suite has ended, and the next run's start those an earlier run left.
+  // Its main process's own pid: Playwright starts Electron through `cmd.exe /c` on Windows, so app.process() is that
+  // shell, which ends with a killed suite while Hive runs on outside the suite's job (how one ran 12 h): the shell's
+  // child, by the process tree alone, trusted only while this process holds the shell's handle (it hasn't exited). Looked
+  // up in the background, so the launch returns as it did: only a record, which never fails or holds up the suite. A
+  // copy whose record isn't made (in time, or at all) is never ended by the runner, only listed.
+  if (process.env.HIVE_E2E_DIR) recordMainProcess(WORK, app.process(), from, env.HIVE_USER_DATA ?? null).catch(() => undefined)
   return app
+}
+
+// React's commits in the suite's test copies (HI-1387, HI-1865). Each window of a test copy says each new largest burst
+// on its console (src/shared/commitWatch.ts: `<marker> <n>`, n commits within 250 ms), small ones too, and each new
+// longest commit chain (commits with nothing from outside between them: a setState-in-useEffect loop's shape). The
+// suite's largest of each is said once as it exits, for the run's output (run.mjs), and once at the time it first
+// reaches React's nested-update limit. The burst is recorded only: input makes bursts as large as a loop's (HI-1864).
+// The chain fails the suite at the limit (HI-1865: a full run's normal suites stayed at 8 or under), unless the suite
+// accepts its chain (acceptCommitChain: commitburst's deliberate loop).
+const COMMIT_BURST_MARKER = '[hive commit burst]'
+const COMMIT_CHAIN_MARKER = '[hive commit chain]'
+const COMMIT_BURST_LIMIT = 50
+/**
+ * A suite's record of its windows' bursts: each window's own largest, from its console lines and read once from the page
+ * as it is watched (one said before the listener was there isn't said again); the suite's, the largest of them, null
+ * while no window has reported (no watch there, which isn't a burst of 0). onFirst: once, when the first window
+ * reports; onReach(n): once, when the suite's first reaches the limit. Never throws into the suite: only a record.
+ * marker and read: the count's console marker and its field in the page's `__hiveCommitBurst()` (the chain's: HI-1865).
+ */
+function burstWatcher({ onFirst = () => {}, onReach = () => {}, marker = COMMIT_BURST_MARKER, read = 'max' } = {}) {
+  const perWindow = new Map()
+  let largest = null
+  const note = (page, n) => {
+    if (!Number.isInteger(n) || n < 0 || n <= (perWindow.get(page) ?? -1)) return
+    perWindow.set(page, n)
+    const before = largest
+    if (before !== null && n <= before) return
+    largest = n
+    if (before === null) onFirst()
+    if ((before ?? -1) < COMMIT_BURST_LIMIT && n >= COMMIT_BURST_LIMIT) onReach(n)
+  }
+  const fromText = (text) => {
+    const s = String(text)
+    if (!s.startsWith(marker)) return null
+    const n = Number(s.slice(marker.length).trim())
+    return Number.isInteger(n) ? n : null
+  }
+  const watch = (page) => {
+    try {
+      page.on('console', (m) => {
+        try {
+          const n = fromText(m.text())
+          if (n !== null) note(page, n)
+        } catch {
+          // Only a record: never the suite's failure.
+        }
+      })
+    } catch {
+      // As above.
+    }
+    // What the page reached before the listener was there: its own count, read once.
+    try {
+      Promise.resolve(page.evaluate((field) => window.__hiveCommitBurst?.()[field], read)).then(
+        (n) => {
+          if (typeof n === 'number') note(page, n)
+        },
+        () => undefined
+      )
+    } catch {
+      // As above.
+    }
+  }
+  return {
+    watch,
+    watchApp(app) {
+      try {
+        for (const page of app.windows()) watch(page)
+        app.on('window', watch)
+      } catch {
+        // As above.
+      }
+    },
+    largest: () => largest,
+    windows: () => [...perWindow.values()]
+  }
+}
+const bursts = burstWatcher({
+  onFirst: () => process.once('exit', () => console.log(`INFO React commit burst: the largest was ${bursts.largest()} commits within 250 ms (recorded only: a suite fails on its commit chain, HI-1865)`)),
+  onReach: (n) => console.log(`INFO React commit burst: ${n} commits within 250 ms, React's nested-update limit: recorded only (a suite fails on its commit chain, HI-1865)`)
+})
+/** Why the suite's commit chain at the limit is expected (acceptCommitChain), or null: then the chain fails it. */
+let chainAccepted = null
+const chains = burstWatcher({
+  marker: COMMIT_CHAIN_MARKER,
+  read: 'chain',
+  onFirst: () => process.once('exit', chainVerdict),
+  onReach: (n) => console.log(`INFO React commit chain: ${n} commits with nothing from outside between them, React's nested-update limit: the suite fails as it exits unless it accepts its chain (HI-1865)`)
+})
+/**
+ * The suite's commit chain, as it exits (HI-1865): its longest, said; at React's nested-update limit, a FAIL line and
+ * exit code 1 (an exit listener sets it even after the suite's own process.exit(0)), unless the suite accepted it.
+ */
+function chainVerdict() {
+  const n = chains.largest()
+  if (n < COMMIT_BURST_LIMIT) return console.log(`INFO React commit chain: the longest was ${n} commits with nothing from outside between them (a suite fails at ${COMMIT_BURST_LIMIT}, React's nested-update limit, HI-1865)`)
+  if (chainAccepted !== null) return console.log(`INFO React commit chain: the longest was ${n} commits with nothing from outside between them, at React's nested-update limit (${COMMIT_BURST_LIMIT}), accepted by the suite: ${chainAccepted} (HI-1865)`)
+  console.log(`FAIL React commit chain: the longest was ${n} commits with nothing from outside between them, at React's nested-update limit (${COMMIT_BURST_LIMIT}): a render loop, such as a setState per commit in a useEffect (#1366, HI-1865)`)
+  process.exitCode = 1
+}
+/** A suite whose test copies make a chain at the limit on purpose (commitburst's loop) says so, and why: it doesn't fail. */
+const acceptCommitChain = (why) => {
+  if (typeof why !== 'string' || !why.trim()) throw new Error('acceptCommitChain needs the reason the chain is expected')
+  chainAccepted = why
+}
+/** The suite's largest burst so far (0 while no window has reported). */
+const commitBursts = () => bursts.largest() ?? 0
+/** The suite's longest commit chain so far (0 while no window has reported). */
+const commitChains = () => chains.largest() ?? 0
+const watchCommitBursts = (app) => {
+  bursts.watchApp(app)
+  chains.watchApp(app)
+}
+
+/** The Hives a suite may never start (#1253): the installed app (the one hosting the agents, with its own profile and app ID). */
+const INSTALLED = [path.join(process.env.LOCALAPPDATA ?? '', 'Programs', 'Hive'), path.join(process.env.PROGRAMFILES ?? 'C:\\Program Files', 'Hive')]
+/** A folder's path as compared: real (a junction resolved), lower case, no trailing separator. */
+const comparable = (p) => {
+  let real = path.resolve(p)
+  try {
+    real = fs.realpathSync.native(real)
+  } catch {
+    // Not there (yet): its path as given.
+  }
+  return real.replace(/[\\/]+$/, '').toLowerCase()
+}
+const inside = (file, dir) => {
+  const [f, d] = [comparable(file), comparable(dir)]
+  return f === d || f.startsWith(d + path.sep)
+}
+
+/**
+ * Which Hive a suite starts: 'dev' (this checkout's Electron, the dev build) or 'packaged' (a Hive.exe: this checkout's
+ * dist\win-unpacked, the main checkout's 0.9 one boardupgrade and upgradelane use, one in the test folders, or what
+ * HIVE_E2E_HIVE09 or HIVE_EXE name). Never the installed Hive, nor one from anywhere else (#1253): it would open the user's
+ * app on their screen. Throws for those.
+ */
+function testExecutable(exe) {
+  if (comparable(exe) === comparable(ELECTRON)) return 'dev'
+  if (INSTALLED.some((d) => d && inside(exe, d))) throw new Error(`A test may never start the installed Hive (${exe}): use this checkout's build, or a 0.9 build's win-unpacked folder (HIVE_E2E_HIVE09) (#1253)`)
+  const named = [ROOT, TEST_ROOT, process.env.HIVE_E2E_HIVE09, process.env.HIVE_EXE && path.dirname(process.env.HIVE_EXE)].filter(Boolean)
+  if (named.some((d) => inside(exe, d))) return 'packaged'
+  // Asked of git only now: in Windows Sandbox the checkout is a mapped copy, not a repository (#1227).
+  const main = /^worktree (.+)$/m.exec(git(ROOT, 'worktree list --porcelain'))?.[1]
+  if (!main || !inside(exe, path.join(main, 'dist', 'win-unpacked'))) throw new Error(`A test starts Hive from this checkout, its dist, the main checkout's dist\\win-unpacked or the test folders, never ${exe} (#1253)`)
+  return 'packaged'
+}
+
+/**
+ * What a packaged test Hive starts with (#1253): --hidden (Hive makes its windows but never shows them, as when started at
+ * sign-in: 0.9 too), so nothing is on screen before keepPackagedQuiet reaches it; and Chromium's occlusion tracking off,
+ * so its windows, once shown off screen, still draw (main does that itself for a quiet copy).
+ */
+const PACKAGED_ARGS = ['--hidden', '--disable-features=CalculateNativeWinOcclusion']
+
+/**
+ * A profile saved with its window maximised: Hive would maximise it as it starts, and maximising shows a hidden window.
+ * A packaged test Hive's profile is set not to (#1253). Kept files' copies (.bak) are left: config.json is read first.
+ */
+function unmaximized(profile) {
+  const file = profile && path.join(profile, 'config.json')
+  if (!file || !fs.existsSync(file)) return
+  try {
+    const cfg = JSON.parse(fs.readFileSync(file, 'utf8'))
+    if (!cfg.window?.maximized) return
+    cfg.window.maximized = false
+    fs.writeFileSync(file, JSON.stringify(cfg, null, 2))
+  } catch {
+    // Unreadable: Hive starts with its defaults.
+  }
+}
+
+/**
+ * A packaged test Hive never checks GitHub for updates (#1332): each check fetches the release's latest.yml, which
+ * GitHub counts as a download. 1.0 doesn't for HIVE_TEST_QUIET=1 (hiveEnv); a released build (0.9) can't be changed, so
+ * its first check, 30 s after it starts, is put off as far as a timer goes (about 24.8 days: HIVE_UPDATE_DELAY, which
+ * every build reads), and a profile it has saved has automatic checks off, so it schedules no 6-hourly check either.
+ */
+const NO_UPDATE_CHECK = { HIVE_UPDATE_DELAY: String(2 ** 31 - 1) }
+function noUpdateChecks(profile) {
+  const file = profile && path.join(profile, 'config.json')
+  // A new profile is left alone: a config.json of settings alone would read as one from before every migration.
+  if (!file || !fs.existsSync(file)) return
+  try {
+    const cfg = JSON.parse(fs.readFileSync(file, 'utf8'))
+    if (cfg.settings?.updates?.checkAutomatically === false) return
+    cfg.settings = { ...cfg.settings, updates: { ...cfg.settings?.updates, checkAutomatically: false } }
+    fs.writeFileSync(file, JSON.stringify(cfg, null, 2))
+  } catch {
+    // Unreadable: Hive starts with its defaults, and HIVE_UPDATE_DELAY still puts its check off.
+  }
+}
+
+/**
+ * The guard (#1332): when a suite ends, the log of each packaged Hive it started (hive.log and its older copy) must show
+ * no update check since that launch (electron-updater's "Checking for update", in Hive's [updates] scope), or the suite
+ * fails, whatever it said.
+ */
+const packagedLaunches = []
+function updateChecksLogged({ profile, since }) {
+  const found = []
+  for (const name of ['hive.1.log', 'hive.log']) {
+    let text = ''
+    try {
+      text = fs.readFileSync(path.join(profile, 'logs', name), 'utf8')
+    } catch {
+      continue
+    }
+    for (const line of text.split('\n')) if (line.slice(0, 24) >= since && /\[updates\] Checking for update/.test(line)) found.push(line.trim())
+  }
+  return found
+}
+process.on('exit', () => {
+  const found = packagedLaunches.flatMap(updateChecksLogged)
+  if (!found.length) return
+  console.error(`FAILED: a packaged test Hive checked GitHub for updates (#1332):\n${found.join('\n')}`)
+  process.exitCode = 1
+})
+
+/**
+ * Run in a packaged test Hive's main process as soon as Playwright reaches it (#1253), making it quiet from outside, as
+ * a dev test copy is from inside (testQuiet): a released build can't be changed, and isn't quiet. Its windows go off
+ * screen (kept there however they're moved), unfocusable and off the taskbar, then are shown without taking the focus
+ * (they draw, for screenshots); a window shown, focused, maximised, raised or flashed later stays off screen; Windows
+ * notifications aren't shown, and its message boxes answer as cancelled. Returns the titles of the windows already shown
+ * when it was reached: none, or the launch fails.
+ */
+function keepPackagedQuiet(electron) {
+  const { app, BrowserWindow, Notification, dialog } = electron
+  const shown = BrowserWindow.getAllWindows().filter((w) => w.isVisible()).map((w) => w.getTitle() || 'untitled')
+  // Electron's screen only once a window is made: Playwright can reach main before the app is ready, when screen isn't
+  // usable yet (it threw inside 0.9's window's constructor, and no window was made).
+  const displays = () => electron.screen.getAllDisplays().map((d) => d.bounds)
+  const onScreen = (b) => displays().some((d) => b.x < d.x + d.width && b.x + b.width > d.x && b.y < d.y + d.height && b.y + b.height > d.y)
+  const proto = BrowserWindow.prototype
+  const showInactive = proto.showInactive
+  const quiet = (win) => {
+    if (win.isDestroyed() || win.hiveTestQuiet) return
+    win.hiveTestQuiet = true
+    const away = () => {
+      if (win.isDestroyed()) return
+      const b = win.getBounds()
+      if (onScreen(b)) win.setPosition(Math.min(...displays().map((d) => d.x)) - b.width - 8000, Math.min(...displays().map((d) => d.y)))
+    }
+    away()
+    win.setFocusable(false)
+    win.setSkipTaskbar(true)
+    win.on('move', away)
+    win.on('resize', away)
+  }
+  proto.show = proto.showInactive = function () {
+    quiet(this)
+    showInactive.call(this)
+  }
+  for (const m of ['focus', 'maximize', 'moveTop', 'flashFrame', 'setAlwaysOnTop']) proto[m] = () => undefined
+  Notification.prototype.show = () => undefined
+  const answer = (a, b) => (b ?? a)?.cancelId ?? 0
+  dialog.showMessageBox = async (a, b) => ({ response: answer(a, b), checkboxChecked: false })
+  dialog.showMessageBoxSync = answer
+  dialog.showErrorBox = () => undefined
+  // One made later, hidden too (--hidden), is shown once it has drawn, as Hive shows its own.
+  app.on('browser-window-created', (_e, win) => {
+    quiet(win)
+    win.once('ready-to-show', () => win.isDestroyed() || showInactive.call(win))
+  })
+  for (const win of BrowserWindow.getAllWindows()) {
+    quiet(win)
+    showInactive.call(win)
+  }
+  return shown
 }
 
 /**
@@ -700,41 +1076,226 @@ async function cliStep(name, opts, fn) {
   return value
 }
 
+/** Whether a terminal's output (pty:buffer) last turned bracketed paste on rather than off. */
+const pasteOn = (raw) => raw.lastIndexOf('\x1b[?2004h') > raw.lastIndexOf('\x1b[?2004l')
+
 /**
  * Types a prompt into a CLI's terminal (pty key) and presses Enter until it is submitted: submitted() turns true (the
- * session working, say) within waitMs. Under load a CLI can take the prompt, written at once, as a paste and the Enter
- * right after it as a new line in it, or drop what was typed while it was still drawing (#190): if the text is in the
- * terminal, Enter is pressed again; if not, it is typed again over a cleared line (Ctrl+U). Up to `tries` times; returns
- * the attempt that worked (1 = the first), or 0.
+ * session working, say) within waitMs. Each attempt types as Hive does (sessions.sendPrompt): Ctrl+U as a write of its
+ * own to clear the input (in a write with the text it can become part of it, doubling a retried prompt: #1168, #1547),
+ * then the prompt, then Enter. submitted() is checked before each retry, so a prompt taken late isn't sent twice.
+ * - Pasted (a CLI with bracketed paste on, the prompt not a slash command): an attempt not taken is pasted again whole.
+ *   The paste's end mark keeps its Enter an Enter, so what is left in the input is never the prompt plus a new line,
+ *   and a CLI that emptied its input as a notice came (Claude Code's "You've used N% of your weekly limit" just after
+ *   start, #1148, #1556) gets the prompt again rather than an Enter on nothing.
+ * - Typed: a CLI can take typing read in one go as a paste, and the Enter right after it as a new line in it (#190):
+ *   when this attempt's text was drawn, the next attempt is Enter alone (typed again, the prompt would follow that new
+ *   line); when it wasn't (dropped while the CLI drew), or on the last attempt, it is typed again.
+ * ready(), if given, is waited for (within waitMs) before the first attempt: the CLI able to take a prompt
+ * (hiveToolsConnected); not ready by then, it is typed anyway and said. Up to `tries` times; returns the attempt that
+ * worked (1 = the first), or 0.
  */
-async function sendPrompt(inv, key, text, { submitted, tries = 3, waitMs = 20000 } = {}) {
+async function sendPrompt(inv, key, text, { submitted, ready = null, tries = 3, waitMs = 20000 } = {}) {
   const raw = async () => (await inv('pty:buffer', key).catch(() => '')) ?? ''
+  if (ready && !(await until(ready, waitMs, 250))) console.log(`INFO sendPrompt: not ready within ${waitMs / 1000} s, typed anyway`)
+  let echoed = false
   for (let attempt = 1; attempt <= tries; attempt++) {
-    // Text seen on screen is taken to be still in the input (an Enter it didn't take is pressed again). The terminal's
-    // output is everything ever drawn, so text a CLI drew and then cleared (redrawing its input as a notice came, #981)
-    // counts as seen too: the last attempt types it again whatever was seen, so no run is left pressing Enter on nothing.
-    const typed = attempt > 1 && attempt < tries && plainText(await raw()).includes(text.slice(0, 30))
+    if (attempt > 1 && (await submitted())) return attempt - 1
+    // A slash command is typed (pasted, it would be sent as a message), as is any prompt to a CLI without it on.
+    const paste = pasteOn(await raw()) && !text.startsWith('/')
+    const enterOnly = !paste && echoed && attempt < tries
     const mark = (await raw()).length
-    if (attempt === 1) await inv('pty:write', key, text)
-    else if (!typed) await inv('pty:write', key, `\x15${text}`)
+    if (!enterOnly) {
+      await inv('pty:write', key, '\x15')
+      await sleep(150)
+      await inv('pty:write', key, paste ? `\x1b[200~${text}\x1b[201~` : text)
+    }
     // Deliberate pause, not a wait for a state: a CLI takes an Enter that comes within its paste window as part of the
     // text (a new line, not a submit), and nothing on screen says when that window ends: Copilot shows the line at once
     // and still takes an Enter right after it as part of the paste (tried in #527). submitted() is the check.
     await sleep(400)
-    // Whether the CLI drew the text after this attempt's write: said for an attempt not taken (#981's evidence).
-    const echoed = plainText((await raw()).slice(mark)).includes(text.slice(0, 30))
+    // Whether the CLI drew the text after this attempt's write (#981's evidence; for a typed prompt, what the next
+    // attempt does), and whether it is on the screen's last input line ("> …") now: read from the output as drawn, so a
+    // guess at the screen, said for an attempt not taken.
+    echoed = !enterOnly && plainText((await raw()).slice(mark)).includes(text.slice(0, 30))
     await inv('pty:write', key, '\r')
     if (await until(submitted, waitMs, 500)) return attempt
-    console.log(`INFO sendPrompt attempt ${attempt} not taken: ${attempt === 1 || !typed ? 'typed' : 'Enter only (its text seen before)'}, echoed ${echoed ? 'yes' : 'no'}; screen ends: ${JSON.stringify(plainText(await raw()).slice(-300))}`)
+    const screen = plainText(await raw())
+    const input = screen.slice(screen.lastIndexOf('> ') + 2)
+    console.log(`INFO sendPrompt attempt ${attempt} not taken: ${enterOnly ? 'Enter only (typed, its text drawn before)' : `${paste ? 'pasted' : 'typed'}, echoed ${echoed ? 'yes' : 'no'}`}, ${input.includes(text.slice(0, 30)) ? 'its text on the last input line' : 'its text not on the last input line'}; screen ends: ${JSON.stringify(screen.slice(-300))}`)
   }
   return 0
 }
+
+/**
+ * Whether Hive's log in a test profile (HIVE_USER_DATA) says an agent's hive tools connected (#865), at or after
+ * `since` (a line count from hiveLogLines, so a relaunch's own connect is waited for): a ready() for sendPrompt into a
+ * just-started Claude Code, as Hive itself types nothing before it (sessions.hiveToolsSettled).
+ */
+const hiveLogLines = (userData) => {
+  try {
+    return fs.readFileSync(path.join(userData, 'logs', 'hive.log'), 'utf8').split('\n')
+  } catch {
+    return []
+  }
+}
+const hiveToolsConnected = (userData, agentId, since = 0) => hiveLogLines(userData).slice(since).some((l) => l.includes(`⁨${agentId}⁩'s hive tools connected`))
 
 /**
  * The longest a fake Claude Code's prompt waits to be taken, or its turn to end: a bound for a hung run, never how long
  * it should take (#570). Under load the fake took a prompt 10 s after it was typed (#672).
  */
 const TURN_HUNG_MS = 60000
+
+/** Whether a fake Claude Code takes a prompt now, by its session:live entry: idle, its turn not running. */
+const FAKE_IDLE = (s) => ['ready', 'finished', 'watching', 'background'].includes(s?.status) && s?.turn?.state !== 'running'
+
+/**
+ * Turns on the fake Claude Code's input log in its home (CLAUDE_CONFIG_DIR): each read of its input goes into
+ * fake-input.jsonl there (#1286), which typeLine() reads. Before the fake starts: it looks for the switch only then.
+ */
+function logFakeInput(home) {
+  fs.mkdirSync(home, { recursive: true })
+  fs.writeFileSync(path.join(home, 'fake-log-input.txt'), '')
+}
+
+/**
+ * Types a line into a fake Claude Code (pty `key`, its home `home`, the agent's name `agent`, or null for live()'s
+ * agentName: its HIVE_AGENT, which the fake's records carry) that Hive may type a wake
+ * into at the same moment (#1553, #1560): the wake's Ctrl+U clears the line, or the two lines mix, or the line lands
+ * while the agent is busy with the wake and is dropped (fake-dropped.jsonl). So its Enter goes only once the CLI has
+ * read the line whole (fake-input.jsonl: logFakeInput() before the fake starts), the line counts only when nothing
+ * else was on it (since the last Enter or Ctrl+U) or between it and its Enter, and it is typed again when it was
+ * disturbed, dropped, or not taken within `hungMs`.
+ * - live(): the agent's session:live entry. The line is taken once its turn is another than just before it was typed
+ *   (each attempt's own, so a wake's turn before it doesn't count): a turn's start, not its end, so a line whose
+ *   command runs long isn't typed again.
+ * - taken(): true once the line was taken, instead (a run it starts showing in Progress, the agent working on a
+ *   held turn): something seen as the line starts, never as its work ends. One of live and taken is required.
+ * - ready(): waited for before each attempt; with live and no ready, until the fake takes prompts (idle, its turn not
+ *   running, as fakePrompts has it). Not ready within `hungMs`, the line is typed anyway (and said why); with `strict`
+ *   (HI-1918), never: that attempt is lost unready, nothing typed, and the next one waits again.
+ * - A slash command (/rename, /compact) starts no turn: taken once it was read intact and not dropped.
+ * - disturb: for the suite that shows the helper types again (progressreport), the first attempt disturbed as a wake
+ *   would: 'enter', a Ctrl+U between the line and its Enter; 'before', a wake's text on the line (read) before it.
+ * Returns { attempt, lost }: the attempt taken (1 = the first; 0 if none of `tries` was), and why each before it wasn't.
+ */
+/**
+ * Whether Hive has nothing waiting to type into an agent (HI-1918): none of its deliveries waiting to be offered (queued,
+ * or uncertain: to be offered again), as GET …/deliveries reads them with a token of its project (its own). One offered
+ * is typed already (a doorbell, or a launch's first prompt, which stays offered until the agent reads its inbox: never
+ * waited for). With the agent idle and its composer free (Hive not typing a line into it now, `agentQuiet`), for
+ * typeLine's ready with `strict`.
+ */
+async function inboxQuiet(apiPort, project, agent, token) {
+  const rows = await inboxPending(apiPort, project, agent, token)
+  return !!rows && rows.every((d) => d.state === 'offered')
+}
+
+/**
+ * Whether Hive will type nothing into an agent now or next (HI-1918): idle (ready or finished), its composer free (no
+ * line of Hive's being typed, just typed or confirmed: RuntimeFacts.composer), and nothing waiting to be offered
+ * (inboxQuiet). `state` is its session:live entry.
+ */
+async function agentQuiet(apiPort, project, state, token) {
+  if (!state || !['ready', 'finished'].includes(state.status) || state.runtime?.composer !== 'free') return false
+  return inboxQuiet(apiPort, project, state.agentName, token)
+}
+
+/**
+ * Whether an agent a lane gave a new conversation (HI-2232: an idle builder outside slots, whose first turn is the lane's
+ * brief) is done with that brief, so a line typed into it now is taken: a new conversation (its sessionId isn't
+ * `before`), its turn over, and quiet (agentQuiet). Quiet alone isn't the brief done (HI-2350, HI-2357): Hive answers a
+ * hook before it handles it, so under load the brief's UserPromptSubmit can reach its status after the CLI has read its
+ * inbox, and the conversation looks ready, its composer free and nothing waiting, while the brief runs; a line typed
+ * then is dropped (fake-dropped.jsonl). `state` is its session:live entry.
+ */
+async function laneBriefDone(apiPort, project, state, before, token) {
+  return !!state && state.sessionId !== before && state.turn?.state === 'over' && agentQuiet(apiPort, project, state, token)
+}
+
+/** An agent's unread deliveries (id, kind, state, offered), or null when they can't be read. */
+async function inboxPending(apiPort, project, agent, token) {
+  const res = await fetch(`http://127.0.0.1:${apiPort}/v1/projects/${encodeURIComponent(project)}/agents/${encodeURIComponent(agent)}/deliveries?limit=200`, { headers: { Authorization: `Bearer ${token}` } }).catch(() => null)
+  if (!res?.ok) return null
+  const v = await res.json().catch(() => null)
+  return v ? (v.deliveries ?? []).filter((d) => d.state === 'queued' || d.state === 'offered' || d.state === 'uncertain').map((d) => ({ id: d.id, kind: d.kind, state: d.state, offered: d.offered ?? null, text: d.text })) : null
+}
+
+async function typeLine(inv, key, home, agent, text, { live = null, taken = null, ready = null, strict = false, tries = 3, hungMs = TURN_HUNG_MS, disturb = null } = {}) {
+  if (!live && !taken) throw new Error('typeLine: give it live or taken')
+  if (!fs.existsSync(path.join(home, 'fake-log-input.txt'))) throw new Error(`typeLine: the fake's input log is off in ${home} (lib.logFakeInput before it starts)`)
+  const name = agent ?? (live ? (await live())?.agentName : null)
+  if (!name) throw new Error(`typeLine: no agent name for ${key} (its session isn't live)`)
+  if (live && !ready) ready = async () => FAKE_IDLE((await live()) ?? null)
+  const jsonl = (f) => (fs.existsSync(path.join(home, f)) ? fs.readFileSync(path.join(home, f), 'utf8').trim().split('\n').filter(Boolean).map((l) => JSON.parse(l)) : []).filter((r) => r.agent === name)
+  // All the agent's CLI has read, its key sequences (a bracketed paste's marks) left out: what is on its line as the
+  // suite types can have come before (a wake's Ctrl+U and text, read just before the suite's line, #1560).
+  const readAll = () => jsonl('fake-input.jsonl').map((r) => r.data).join('').replace(/\x1b\[[0-9;?]*[ -/]*[@-~]/g, '')
+  const lost = []
+  for (let attempt = 1; attempt <= tries; attempt++) {
+    if (ready && !(await until(ready, hungMs, 250))) {
+      // Strict: a line typed while it isn't ready is the race it waits out, so none is (HI-1918).
+      if (strict) {
+        lost.push(`not ready within ${hungMs / 1000} s, not typed`)
+        continue
+      }
+      lost.push(`not ready within ${hungMs / 1000} s, typed anyway`)
+    }
+    const turn = async () => (await live())?.turn?.id ?? null
+    const turnBefore = live && !taken ? await turn() : null
+    const took = async () => (taken ? await taken() : text.startsWith('/') || (await turn()) !== turnBefore)
+    const from = readAll().length
+    const readSince = () => readAll().slice(from)
+    const dropped = jsonl('fake-dropped.jsonl').length
+    // Its line empty first: a wake Hive is typing (its Ctrl+U and text read, its Enter not yet) is let finish. Bounded:
+    // what never clears is typed over, and seen as disturbed below.
+    await until(() => readAll().split(/[\r\x15]/).pop() === '', hungMs)
+    if (disturb === 'before' && attempt === 1) {
+      const wake = '[Hive] A wake typed as the suite types.'
+      await inv('pty:write', key, wake)
+      await until(() => readSince().includes(wake), hungMs)
+    }
+    await inv('pty:write', key, text)
+    // Read whole before its Enter (the fake reads a line, as a CLI does).
+    if (!(await until(() => readSince().includes(text), hungMs))) {
+      lost.push('never read')
+      continue
+    }
+    if (disturb === 'enter' && attempt === 1) {
+      await inv('pty:write', key, '\x15')
+      await until(() => readSince().includes(`${text}\x15`), hungMs)
+    }
+    await inv('pty:write', key, '\r')
+    const read = await until(() => {
+      const s = readAll()
+      const i = s.indexOf(text, from)
+      return i >= 0 && s.indexOf('\r', i) >= 0 ? s : null
+    }, hungMs)
+    // Intact: nothing on the line before it (since the last Enter or Ctrl+U, however long before it was read), and
+    // nothing between it and its Enter.
+    const at = read ? read.indexOf(text, from) : -1
+    const intact = !!read && read.slice(0, at).split(/[\r\x15]/).pop() === '' && read.slice(at + text.length, read.indexOf('\r', at)) === ''
+    if (!intact) {
+      lost.push(`disturbed: ${JSON.stringify((read ?? readAll()).slice(Math.max(0, from - 200)))}`)
+      continue
+    }
+    const droppedNow = () => jsonl('fake-dropped.jsonl').slice(dropped).some((r) => text.includes(r.text.slice(0, 50)))
+    await until(async () => droppedNow() || (await took()), hungMs, 250)
+    // Dropped first: a wake's turn can pass for the line's (the agent working).
+    if (droppedNow()) {
+      lost.push('dropped while busy')
+      continue
+    }
+    if (await took()) {
+      if (lost.length) console.log(`(${name}'s line typed again: ${lost.join('; ')})`)
+      return { attempt, lost }
+    }
+    lost.push(`not taken within ${hungMs / 1000} s`)
+  }
+  console.log(`(${name}'s line not taken: ${lost.join('; ')})`)
+  return { attempt: 0, lost }
+}
 
 /**
  * Prompts typed into the fake Claude Code (fake-claude/) in a session (pty `key`; `live()` gives its session:live entry),
@@ -758,10 +1319,9 @@ const TURN_HUNG_MS = 60000
  */
 function fakePrompts(inv, key, live, { hungMs = TURN_HUNG_MS, home = null, why = null } = {}) {
   const screen = async () => (await inv('pty:buffer', key).catch(() => '')) ?? ''
-  const idle = (s) => ['ready', 'finished', 'watching', 'background'].includes(s?.status) && s?.turn?.state !== 'running'
   const takesPrompts = async () => {
     const b = await screen()
-    return idle(await live()) && b.lastIndexOf('✻ Worked for') >= b.lastIndexOf('(esc to interrupt)')
+    return FAKE_IDLE(await live()) && b.lastIndexOf('✻ Worked for') >= b.lastIndexOf('(esc to interrupt)')
   }
   /** Its conversation from item `from` on (all of it by default), as the Sessions tab reads it. */
   const conversation = async (from) => {
@@ -777,9 +1337,14 @@ function fakePrompts(inv, key, live, { hungMs = TURN_HUNG_MS, home = null, why =
     if (looks > 1) console.log(`  (it took prompts again ${Date.now() - t} ms after ${short(text)} was due)`)
     const before = (await live())?.turn?.id ?? null
     const items = (await conversation()).total
-    await inv('pty:write', key, text)
-    await sleep(300) // on purpose: the fake reads a typed line before its Enter, as a CLI does
-    await inv('pty:write', key, '\r')
+    // With the fake's input log on (lib.fakeClaude turns it on), typed as typeLine types (a wake of Hive's may disturb
+    // it, #1560); without, a pause before its Enter, on purpose: the fake reads a typed line before its Enter, as a CLI does.
+    if (home && fs.existsSync(path.join(home, 'fake-log-input.txt'))) await typeLine(inv, key, home, null, text, { live, ready: takesPrompts, hungMs })
+    else {
+      await inv('pty:write', key, text)
+      await sleep(300)
+      await inv('pty:write', key, '\r')
+    }
     return { text, before, items }
   }
   const over = async ({ text, before, items }) => {
@@ -838,7 +1403,7 @@ function git(cwd, cmd, { timeoutMs = 15_000, ...opts } = {}) {
   for (;;) {
     try {
       const o = { cwd, encoding: 'utf8', stdio: 'pipe', ...opts }
-      const out = Array.isArray(cmd) ? execFileSync('git', cmd, { env: baseEnv(), ...o }) : execSync(`git ${cmd}`, { env: baseEnv(), ...o })
+      const out = Array.isArray(cmd) ? execFileSync('git', cmd, { env: gitEnv(), ...o }) : execSync(`git ${cmd}`, { env: gitEnv(), ...o })
       // Said in the suite's log, so a run shows how often the race happens.
       if (tries) console.log(`(git ${Array.isArray(cmd) ? cmd.join(' ') : cmd}: waited ${Date.now() - start} ms for another git's lock)`)
       return out
@@ -850,11 +1415,33 @@ function git(cwd, cmd, { timeoutMs = 15_000, ...opts } = {}) {
   }
 }
 
+/** A suite's git on its fixtures: its test Hive's config (runContext.gitEnv, #1466), written first, as a suite's git may run before any Hive starts. */
+function gitEnv(vars = {}) {
+  writeGitConfig(gitConfig())
+  return contextGitEnv(vars)
+}
+
 /** A git repository with one commit. */
+/**
+ * A project's config as Hive reads it (HI-1749): its project.json with this user's view of it over it (Panes or Tiles, the
+ * layout and pane placement), which the test profile's ui-state.json keeps by the project's id (else its folder), not
+ * project.json. A view saved shows here a moment after Hive has it (ui-state.json is written about 300 ms later).
+ */
+function projectConfig(userData, projectPath) {
+  const cfg = JSON.parse(fs.readFileSync(path.join(projectPath, '.hive', 'project.json'), 'utf8'))
+  let views = {}
+  try {
+    views = JSON.parse(fs.readFileSync(path.join(userData, 'ui-state.json'), 'utf8')).projectViews ?? {}
+  } catch {
+    // None saved yet.
+  }
+  return { ...cfg, ...(views[`id:${cfg.id}`] ?? views[`path:${path.resolve(projectPath).toLowerCase()}`]) }
+}
+
 function gitProject(dir, files = { 'a.ts': 'export const a = 1\n' }) {
   fs.mkdirSync(dir, { recursive: true })
   for (const [f, text] of Object.entries(files)) fs.writeFileSync(path.join(dir, f), text)
-  const run = (...a) => execFileSync('git', ['-c', 'user.email=t@t', '-c', 'user.name=t', '-c', 'core.autocrlf=false', ...a], { cwd: dir, env: baseEnv() })
+  const run = (...a) => execFileSync('git', ['-c', 'user.email=t@t', '-c', 'user.name=t', '-c', 'core.autocrlf=false', ...a], { cwd: dir, env: gitEnv() })
   run('init', '-q')
   run('add', '.')
   run('commit', '-qm', 'init')
@@ -903,7 +1490,7 @@ function codexHook(runId) {
 
 // What still runs from a test's own folder after its Hive closed (#542): folderProcesses.cjs.
 // A process by its identity (pid and start time), never by a remembered pid alone (#603).
-const { processTree, stopProcessesIn, identify, stillSame, endExactly, endTreeExactly, endChildTree } = require('./folderProcesses.cjs')
+const { processTree, stopProcessesIn, identify, stillSame, endExactly, endTreeExactly, endChildTree, recordMainProcess } = require('./folderProcesses.cjs')
 
 /**
  * Whether process `pid` still runs: false only when Windows says there is no such process (ESRCH). Any other error
@@ -937,6 +1524,27 @@ function pathWithoutStoreAliases(parent = process.env) {
 }
 
 /** A real PNG (a w×h gradient) for image previews, pastes and drops. */
+/**
+ * Text agents read with its cards named by number, as before keys (#1219): "AL-1" becomes "#1", so a suite's checks of
+ * card numbers stay as they were; each suite checks the keyed form itself (KEYED). Only for a suite whose cards are all
+ * one project's, made in order, so a key's digits are its card's number (HI-1661: texts name cards by key alone); a
+ * suite where they differ fails its checks, never passes them wrongly. A branch's key (hive/AL/AL-1-…) stays as it is.
+ */
+const unkey = (text) => (typeof text === 'string' ? text.replace(/(?<![\w/-])[A-Z]{2,4}-(\d+)\b(?!-)/g, '#$1') : text)
+/** A card as the window names it (#1221): its key, else #n (a workspace card, or one the board doesn't have). */
+async function cardLabel(inv, n) {
+  const c = (await inv('tasks:list')).find((x) => x.number === n)
+  return c?.key || `#${n}`
+}
+/**
+ * The card dialog of the card named `label` (its key, else #n: cardLabel), its title naming it alone (HI-1661). Its
+ * text runs on from the title ("AL-1Login form"), so only another digit after it, or a key's letter or digit before
+ * it, makes another card's name.
+ */
+const cardDialog = (page, label) => page.locator('.dialog', { hasText: new RegExp(`(?<![A-Z0-9#-])${label.replace(/[#-]/g, '\\$&')}(?!\\d)`) })
+/** A card named by its key alone in agents' text (HI-1661): "AL-1", never "AL-1 (#1)". */
+const KEYED = /\b[A-Z]{2,4}-\d+\b(?! \(#\d)/
+
 function samplePng(w = 64, h = 40) {
   const zlib = require('zlib')
   const raw = Buffer.alloc((w * 3 + 1) * h)
@@ -999,21 +1607,43 @@ async function haikuAutoMode(inv, host, agentId = 'assistant', timeoutMs = 15000
 }
 
 /**
- * Settings → Assistant's warning about Auto with Haiku (#129): there exactly when the CLI says Auto isn't offered
- * (saying the session runs in Manual), none when it says it is, the shipped guess ("may not offer") when it doesn't say.
- * Opens Settings → Assistant (Ctrl+,), waits for its model and mode defaults, then for the warning to be as it should
- * (the window may still be taking in what the CLI said: the shipped guess first). Returns [ok, what it found].
+ * The connection dialog's warning about Auto with Haiku (#129; HI-2145: model and mode are a connection's since
+ * HI-2108): there exactly when the CLI says Auto isn't offered (saying the session runs in Manual), none when it says
+ * it is, the shipped guess ("may not offer") when it doesn't say. Opens Settings → Accounts & Connections (Ctrl+,),
+ * Edit… on a Claude Code account's first connection, chooses Haiku and Auto there, waits for the warning to be as it
+ * should (the window may still be taking in what the CLI said: the shipped guess first), then cancels, saving
+ * nothing. Returns [ok, what it found].
  */
 async function haikuAutoCaveat(page, autoOffered, timeoutMs = 10000) {
-  await page.keyboard.press('Control+,')
-  const nav = page.locator('.settings-nav .row', { hasText: 'Assistant' }).first()
-  await nav.waitFor({ timeout: timeoutMs })
-  await nav.click()
-  await page.locator('.assistant-defaults').first().waitFor({ timeout: timeoutMs })
-  const caveat = () => page.locator('.mode-caveat', { hasText: 'Auto with Haiku' }).allInnerTexts()
-  const right = (c) => (autoOffered === true ? !c.length : autoOffered === false ? c.length === 1 && /doesn't offer Auto with Haiku.*runs in Manual/.test(c[0]) : c.length === 1 && /may not offer Auto with Haiku/.test(c[0]))
-  const ok = !!(await until(async () => right(await caveat()), timeoutMs))
-  return [ok, JSON.stringify(await caveat())]
+  // A Hive account on Claude Code (the view's `connections`: HI-2106 kept the old name); a test copy on its CLI test home
+  // has none listed (that home isn't shown in Settings), so one is added for the look, never signed in, and removed after.
+  // The warning depends on what the CLI said about its models, not on the account.
+  const inv = (ch, ...a) => page.evaluate(([c, x]) => window.hive.invoke(c, ...x), [ch, a])
+  const listed = (await inv('connections:list')).connections.find((a) => a.provider === 'claude-code')
+  const account = listed ?? (await inv('connections:add', 'claude-code', 'Auto with Haiku'))
+  const form = page.locator('[data-connection-form]')
+  try {
+    await page.keyboard.press('Control+,')
+    const nav = page.locator('.settings-nav .row[data-section="accounts"]')
+    await nav.waitFor({ timeout: timeoutMs })
+    await nav.click()
+    const row = page.locator(`[data-connections-of="${account.id}"] [data-connection]`).first()
+    await row.locator('[data-action="connection-menu"]').click({ timeout: timeoutMs })
+    await page.locator('.menu .menu-item', { hasText: 'Edit…' }).first().click({ timeout: timeoutMs })
+    await form.waitFor({ timeout: timeoutMs })
+    await form.locator('select').first().selectOption('haiku', { timeout: timeoutMs })
+    await form.locator('select[data-mode]').selectOption('auto', { timeout: timeoutMs })
+    const caveat = () => form.locator('.mode-caveat', { hasText: 'Auto with Haiku' }).allInnerTexts()
+    const right = (c) => (autoOffered === true ? !c.length : autoOffered === false ? c.length === 1 && /doesn't offer Auto with Haiku.*runs in Manual/.test(c[0]) : c.length === 1 && /may not offer Auto with Haiku/.test(c[0]))
+    const ok = !!(await until(async () => right(await caveat()), timeoutMs))
+    return [ok, JSON.stringify(await caveat())]
+  } finally {
+    if (await form.count()) {
+      await page.locator('.dialog').last().getByRole('button', { name: 'Cancel' }).click({ timeout: timeoutMs }).catch(() => undefined)
+      await form.waitFor({ state: 'detached', timeout: timeoutMs }).catch(() => undefined)
+    }
+    if (!listed) await inv('connections:remove', account.id)
+  }
 }
 
 /**
@@ -1033,6 +1663,30 @@ async function agentsMenuRun(page, label, ms = 10000) {
   const items = await agentsMenu(page, ms)
   if (!items.includes(label)) throw new Error(`Agents ▾ has no "${label}": ${JSON.stringify(items)}`)
   await page.locator('.menu .menu-item').filter({ hasText: new RegExp(`^\\s*${label.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}\\s*$`) }).first().click()
+}
+
+/**
+ * Sets some of a project's own workflow options as the form's Save does, its other own options and preset kept (HI-1766:
+ * card loops and file locks are options): `undefined` inherits again.
+ */
+async function setOwnOptions(inv, projectPath, patch) {
+  const form = await inv('workflow:form', projectPath)
+  const options = Object.fromEntries(Object.entries({ ...form.own, ...patch }).filter(([, v]) => v !== undefined))
+  return inv('workflow:setOptions', projectPath, { preset: form.preset, options, base: { preset: form.preset, options: form.own } }, { applyTo: [] })
+}
+
+/**
+ * Sets Maximum agents (HI-2001, before Settings → Advanced → Agents per project) at a level, for None and Git, as the
+ * Workflow defaults' Save does, the level's other options kept: 'global' (Hive's), 'workspace' (this one's own), or a
+ * project's folder (its own options). `null` inherits again.
+ */
+async function setMaxAgents(inv, n, level = 'global') {
+  if (level !== 'global' && level !== 'workspace') return setOwnOptions(inv, level, { maxAgents: n ?? undefined })
+  for (const platform of ['none', 'git']) {
+    const form = await inv('workflow:levelForm', level, platform)
+    const options = Object.fromEntries(Object.entries({ ...form.own, maxAgents: n ?? undefined }).filter(([, v]) => v !== undefined))
+    await inv('workflow:setLevel', level, platform, { preset: form.preset, options, base: { preset: form.preset, options: form.own } })
+  }
 }
 
 /** Opens the project's settings from the header's ⋯ (#974: Settings left the tab strip), and waits for them. */
@@ -1096,4 +1750,4 @@ async function addMenuRun(page, label, then, ms = 10000) {
   await menuEntry(page, then).click()
 }
 
-module.exports = { readCard, writeCard, addMenuRun, agentCount, agentMenu, agentsMenu, agentsMenuRun, menuEntry, openMoreTab, openProjectSettings, paneHeader, showAgent, ROOT, ELECTRON, WORK, CODEX_HOME, CLAUDE_TEST_HOME, TRASH, trashed, tidyUp, ownClaudeHome, probeDir, hiveEnv, childEnv, baseEnv, git, GIT_LOCKED, plainText, trustChoice, haikuAutoMode, haikuAutoCaveat, sleep, port, until, hoverTip, quitWatch, appReady, openWorkspace, hadEstimate, fitWindow, enableProviders, fakeClaude, launch, waitForProvider, addAgent, soloAgent, ptyKey, acceptClaudeTrust, acceptRelaunchTrust, withFileLock, trustForCodex, gitProject, codexSignedIn, pathWithoutStoreAliases, launchDir, launchHook, codexHook, processTree, stopProcessesIn, identify, stillSame, endExactly, endTreeExactly, endChildTree, processRunning, samplePng, environmentProblem, environmentProblems, storePwshRefusals, stepVerdict, checked, cliStep, sendPrompt, TURN_HUNG_MS, fakePrompts, skip }
+module.exports = { projectConfig, tokenFile, commitBursts, commitChains, acceptCommitChain, watchCommitBursts, burstWatcher, unkey, KEYED, cardLabel, cardDialog, readCard, writeCard, addMenuRun, agentCount, agentMenu, agentsMenu, agentsMenuRun, menuEntry, openMoreTab, openProjectSettings, setOwnOptions, setMaxAgents, paneHeader, showAgent, ROOT, ELECTRON, WORK, CODEX_HOME, CLAUDE_TEST_HOME, TRASH, TEST_GIT_IDENTITY, trashed, tidyUp, ownClaudeHome, probeDir, hiveEnv, childEnv, baseEnv, gitEnv, git, GIT_LOCKED, plainText, trustChoice, haikuAutoMode, haikuAutoCaveat, sleep, port, until, hoverTip, quitWatch, appReady, openWorkspace, hadEstimate, fitWindow, enableProviders, fakeClaude, launch, waitForProvider, addAgent, setLaunch, setProjectLaunch, soloAgent, ptyKey, acceptClaudeTrust, acceptRelaunchTrust, withFileLock, trustForCodex, gitProject, codexSignedIn, pathWithoutStoreAliases, launchDir, launchHook, codexHook, processTree, stopProcessesIn, identify, stillSame, endExactly, endTreeExactly, endChildTree, processRunning, testExecutable, keepPackagedQuiet, PACKAGED_ARGS, NO_UPDATE_CHECK, noUpdateChecks, updateChecksLogged, samplePng, environmentProblem, environmentProblems, storePwshRefusals, stepVerdict, checked, cliStep, sendPrompt, hiveLogLines, hiveToolsConnected, TURN_HUNG_MS, logFakeInput, inboxQuiet, inboxPending, agentQuiet, laneBriefDone, typeLine, fakePrompts, skip }

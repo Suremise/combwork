@@ -7,7 +7,9 @@
 // A busy round resumes the CLI only once Hive's log shows the whole line written (Copilot: its Enter too; Codex: Hive
 // waiting for it to be drawn), so the round always tests input read in one go; Codex's wait to be drawn is set long
 // (Settings → Advanced) so that it can't end while the CLI is suspended. Processes are suspended and resumed only as
-// the processes they were when listed (folderProcesses.suspensions), never by a pid alone.
+// the processes they were when listed (folderProcesses.suspensions), never by a pid alone. Last, a doorbell put off
+// part-way (HI-1974): held before its Enter in a narrow pane while idle wakes are turned off, it is taken back
+// whole, and the next one goes alone.
 // Codex: the signed-in test home (a few short turns, low effort). Copilot: offline against the stand-in model (no cost).
 // Dev build, throwaway profile and workspace.
 const lib = require('../lib.cjs')
@@ -28,6 +30,8 @@ module.exports = async function run(provider) {
   const ws = path.join(lib.WORK, `${name}-ws`)
   const proj = path.join(ws, 'alpha')
   const cliDir = path.join(lib.WORK, `${name}-cli`)
+  // While it is there, a line Hive typed waits before its Enter (HI-1974's round).
+  const hold = path.join(lib.WORK, `${name}-hold`)
   // The Assistant (the fake Claude Code), whose token leaves the messages: only the Assistant may, through the API.
   const claudeHome = path.join(lib.WORK, `${name}-claude-home`)
   const PORT = Number(lib.port(47962))
@@ -59,9 +63,10 @@ module.exports = async function run(provider) {
     cliEnv = { CODEX_HOME: lib.CODEX_HOME, PATH: lib.pathWithoutStoreAliases() }
   } else {
     api = await startFakeCopilotApi({ log: path.join(cliDir, 'api.jsonl') })
-    cliEnv = copilotTestEnv(api, cliDir)
+    cliEnv = copilotTestEnv(api, cliDir, { above: lib.WORK })
   }
-  const env = lib.hiveEnv({ HIVE_USER_DATA: userData, HIVE_API_PORT: String(PORT), HIVE_TEST_TIPS: 'off', CLAUDE_CONFIG_DIR: claudeHome, ...cliEnv })
+  fs.rmSync(hold, { force: true })
+  const env = lib.hiveEnv({ HIVE_USER_DATA: userData, HIVE_API_PORT: String(PORT), HIVE_TEST_TIPS: 'off', HIVE_TEST_HOLD_TYPED: hold, CLAUDE_CONFIG_DIR: claudeHome, ...cliEnv })
   const app = await _electron.launch({ executablePath: lib.ELECTRON, args: [lib.ROOT], cwd: lib.ROOT, env })
   const page = await app.firstWindow()
   page.on('pageerror', (e) => check('no page errors', false, e.message))
@@ -86,7 +91,7 @@ module.exports = async function run(provider) {
       const r = await fetch(`http://127.0.0.1:${PORT}${route}`, { method, headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' }, ...(body ? { body: JSON.stringify(body) } : {}) })
       return { status: r.status, body: await r.json().catch(() => null) }
     }
-    const def = await inv('agents:add', proj, { name: 'Tester', provider, location: 'project', ...(provider === 'codex' ? { model: 'gpt-6-luna', effort: 'low' } : {}) })
+    const def = await lib.addAgent(inv, proj, { name: 'Tester', provider, location: 'project', ...(provider === 'codex' ? { model: 'gpt-6-luna', effort: 'low' } : {}) })
     const id = def.id
     const live = async () => (await inv('session:live')).find((s) => s.agentId === id)
     const idle = async () => ['ready', 'finished'].includes((await live())?.status)
@@ -105,6 +110,17 @@ module.exports = async function run(provider) {
       for (const r of roots) for (const t of [{ pid: r.pid, started: r.started }, ...descendantsIn(list, r.pid)]) ids.set(t.pid, t)
       return [...ids.values()]
     }
+    /** What the agent's pane shows now (its terminal's lines, as drawn). */
+    const screen = async (key) => ((await page.evaluate((k) => window.__hiveTerminalLines(k), key)) ?? []).join('\n')
+    const paneCols = async (key) => (await page.evaluate((k) => window.__hiveTerminalState(k), key))?.cols
+    /**
+     * The doorbells for a message on its screen (`delivery`: one of them), however its rows were wrapped: by its "(m4).
+     * Call hive_inbox", as a doorbell's first row can have other text drawn in it (Copilot's time, what Codex drew there
+     * at its width before).
+     */
+    const copies = async (key, delivery) => (await screen(key)).replace(/\s+/g, '').split(`(${delivery}).Callhive_inbox`).length - 1
+    /** The deliveries whose doorbells its screen shows. */
+    const doorbellIds = async (key) => [...(await screen(key)).replace(/\s+/g, '').matchAll(/\((m\d+)\)\.Callhive_inbox/g)].map((x) => x[1])
     /** Hive has written the whole line into the agent: its Enter too (Woke), or, for Codex, waiting for it to be drawn. */
     const written = (from) => hiveLog().split('\n').slice(from).some((l) => (l.includes(id) && /\[watches\] Woke /.test(l)) || /the line Hive typed is in; Enter once it shows/.test(l))
 
@@ -154,7 +170,45 @@ module.exports = async function run(provider) {
         check(`${what}: nothing is marked as not taken`, !(await live())?.untakenLine)
       })
     }
+
+    // A doorbell put off part-way (HI-1974): typed into a narrow pane, so it wraps, held before its Enter
+    // (HIVE_TEST_HOLD_TYPED), and no longer wanted meanwhile (idle wakes turned off). What Hive typed is taken back whole
+    // (one Ctrl+U clears the whole line in Codex and Copilot), and the next doorbell goes alone.
+    await lib.cliStep('a doorbell put off part-way', { session: lib.ptyKey(proj, id) }, async () => {
+      const key = lib.ptyKey(proj, id)
+      check('put off: the agent is idle first', !!(await lib.until(idle, HUNG_MS, 300)), JSON.stringify(await live()))
+      // A narrow window, so the doorbell wraps in its pane, and the CLI is as wide as the pane that shows it.
+      await page.getByText('alpha', { exact: true }).first().click()
+      await lib.fitWindow(app, page, { width: 640, height: 900 })
+      check('put off: its pane is narrow, and the CLI as wide', !!(await lib.until(async () => (await page.evaluate(() => window.__hiveTerminalsFitted())) && (await paneCols(key)) <= 60 && (await inv('pty:size', key))?.cols === (await paneCols(key)), HUNG_MS, 300)), JSON.stringify({ pane: await paneCols(key), pty: await inv('pty:size', key) }))
+      const earlier = new Set(await doorbellIds(key))
+      const lines = wakeLines().length
+      const logLines = hiveLog().split('\n').length - 1
+      const since = (re) => hiveLog().split('\n').slice(logLines).some((l) => re.test(l))
+      fs.writeFileSync(hold, '')
+      const left = callApi('POST', `/v1/projects/alpha/agents/Tester/message`, { text: 'Last round: nothing to do. Read this, ack it, and reply with just: ok' })
+      check('put off: its doorbell is typed, and held before its Enter', !!(await lib.until(() => since(/the line Hive typed is held before its Enter/), HUNG_MS, 100)))
+      // Its delivery's id, from the line in its input (the message's reply waits for the line).
+      const m = await lib.until(async () => (await doorbellIds(key)).find((x) => !earlier.has(x)), HUNG_MS, 300)
+      check('put off: …it shows in its input', !!m && (await copies(key, m)) === 1, await screen(key))
+      await inv('advanced:set', 'hive.inbox.idleWakes', false)
+      check('put off: idle wakes turned off, the doorbell is put off part-way', !!(await lib.until(() => since(/put off: It is no longer wanted/), HUNG_MS, 100)))
+      check('put off: …what Hive typed is taken back whole', !!m && !!(await lib.until(async () => (await copies(key, m)) === 0, HUNG_MS, 300)), await screen(key))
+      fs.rmSync(hold, { force: true })
+      await inv('advanced:set', 'hive.inbox.idleWakes', null)
+      const outcome = await lib.until(() => wakeLines().slice(lines).find((l) => /was taken after \d+ ms|wasn't taken/.test(l)), HUNG_MS, 300)
+      check('put off: idle wakes on again, the next doorbell is typed and taken', !!outcome && /was taken after/.test(outcome), wakeLines().slice(lines).join(' | '))
+      const r = await left
+      const read = await lib.until(async () => {
+        const inbox = (await callApi('GET', '/v1/projects/alpha/agents/Tester/activity')).body?.inbox
+        return !!inbox?.deliveries?.some((d) => d.id === r.body?.id && (d.state === 'received' || d.state === 'acked'))
+      }, HUNG_MS, 500)
+      check('put off: …the agent reads the message', read, JSON.stringify(r.body))
+      // In its conversation once: a copy left behind would show this message's doorbell twice, glued to the one sent.
+      check('put off: …and the doorbell it was sent is alone', !!r.body?.id && (await copies(key, r.body.id)) === 1, await screen(key))
+    })
   } finally {
+    fs.rmSync(hold, { force: true })
     // What is still suspended (a round stopped part-way) is resumed; what can't be is ended, by its identity, so the
     // test's Hive can close and no CLI is left suspended.
     const left = paused.release()

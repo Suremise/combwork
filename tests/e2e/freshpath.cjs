@@ -2,7 +2,7 @@
 // (the run context's, without the folders that have one) and a stand-in for the registry's PATH
 // (HIVE_TEST_REGISTRY_PATH: test copies never read the machine's). Then the suite "installs" the fake Codex as an
 // installer does: a folder of its own with codex.cmd, added to the registry's PATH (the stand-in, changed in Hive's main
-// process while it runs). Agent Setup's Check again finds it there (via PATH), Hive's own PATH has the folder, and a new
+// process while it runs). Provider Setup's Check again finds it there (via PATH), Hive's own PATH has the folder, and a new
 // Codex agent starts with it, its session's PATH holding the folder too. Then a tool is "installed" the same way with no
 // Check again (#821): a Sign in task's terminal and the agent started again after it get its folder, as Hive reads the
 // registry's PATH before it starts a process. No real CLI is installed: the fake Codex is tests/e2e/fake-codex.
@@ -20,7 +20,7 @@ const bin = path.join(lib.WORK, 'freshpath-bin')
 const tool = path.join(lib.WORK, 'freshpath-tool')
 const seen = path.join(lib.WORK, 'freshpath-seen.jsonl')
 const alpha = path.join(ws, 'alpha')
-// The fake's version, so Agent Setup's answer is known to be this copy.
+// The fake's version, so Provider Setup's answer is known to be this copy.
 const VERSION = '0.160.472'
 let failed = 0
 const check = (name, ok, extra = '') => {
@@ -76,11 +76,11 @@ function pathWithoutCodex() {
 
   await page.keyboard.press('Control+Shift+P')
   await lib.sleep(300)
-  await page.keyboard.type('Agent Setup')
+  await page.keyboard.type('Provider Setup')
   await lib.sleep(300)
   await page.keyboard.press('Enter')
-  const setup = page.locator('.dialog', { hasText: 'Agent Setup' })
-  check('Agent Setup opens', !!(await lib.until(async () => (await setup.count()) === 1, 10000)))
+  const setup = page.locator('.dialog', { hasText: 'Provider Setup' })
+  check('Provider Setup opens', !!(await lib.until(async () => (await setup.count()) === 1, 10000)))
   await setup.locator('.setup-tab', { hasText: 'Codex' }).click()
   await setup.locator('button', { hasText: 'Check again' }).click()
   const after = await lib.until(async () => {
@@ -90,7 +90,7 @@ function pathWithoutCodex() {
   check('Check again finds the new Codex on the PATH, without restarting Hive', !!after && after.source === 'PATH' && after.version === VERSION, JSON.stringify(after ?? (await codexInfo())))
   check('…and it is ready (installed)', !!after && !(after.readiness ?? []).some((r) => r.id === 'not-installed'), JSON.stringify(after?.readiness))
   const shows = await lib.until(async () => (await setup.innerText()).includes(`Codex ${VERSION}`), 10000)
-  check('Agent Setup shows it found, via PATH', !!shows && (await setup.innerText()).includes('found via PATH'), (await setup.innerText()).slice(0, 300))
+  check('Provider Setup shows it found, via PATH', !!shows && (await setup.innerText()).includes('found via PATH'), (await setup.innerText()).slice(0, 300))
   await page.screenshot({ path: path.join(lib.WORK, 'freshpath-setup.png') })
   const hivePath = await app.evaluate(() => process.env.PATH ?? process.env.Path ?? '')
   check("Hive's own PATH has the folder, after its own folders", hivePath.toLowerCase().endsWith(bin.toLowerCase()) && hivePath.toLowerCase().startsWith(hidden.split(path.delimiter)[0].toLowerCase()), hivePath.slice(-200))

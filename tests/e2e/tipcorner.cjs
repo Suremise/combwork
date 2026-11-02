@@ -110,7 +110,7 @@ const check = (name, ok, extra = '') => {
   // --- The Assistant hidden, an agent's session ended: the card is in the window's corner, above the pane's bar.
   // Hidden from the header's ⋯ (#979: the header's own Hide button went into it).
   await header.getByRole('button', { name: 'More', exact: true }).click()
-  await page.locator('.menu .menu-item', { hasText: 'Hide the Assistant' }).click()
+  await page.locator('.menu .menu-item', { hasText: 'Fold the Assistant panel' }).click()
   await until(async () => (await panel.count()) === 0, 5000)
   await page.getByText('alpha', { exact: true }).first().click()
   const coder = await lib.addAgent(inv, alpha, { name: 'Coder' })

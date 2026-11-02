@@ -1,0 +1,14 @@
+{
+  "tabs.unsaved": {
+    "defaultMessage": "Unsaved changes",
+    "description": "Tooltip of the dot on a tab whose page has changes not saved yet (Settings → Version Control's Hive defaults, say), and read out with the tab's name."
+  },
+  "tabs.unsavedNamed": {
+    "defaultMessage": "{tab} (unsaved changes)",
+    "description": "A tab's accessible name while its page has changes not saved yet; {tab} is its name."
+  },
+  "tabs.withNote": {
+    "defaultMessage": "{tab} ({note})",
+    "description": "A dimmed tab's accessible name: {tab} is its name, {note} why it is dimmed (a CLI turned off, say)."
+  }
+}

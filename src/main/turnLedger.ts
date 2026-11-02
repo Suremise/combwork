@@ -47,6 +47,12 @@ export interface Turn {
   state: TurnState
   /** When its first hook reached Hive (ms, as it arrived, not as it was handled): records from before it are earlier turns'. */
   startedAt: number
+  /**
+   * When it last went on after it had stopped (ms, as the hook arrived): Hive continuing its Stop, or a new tool call
+   * after it (#1658); none while it runs as it began. The CLI's record of its end from before then is the end of the
+   * work it went on from, not of this run. (Its start sets none: its hooks may reach Hive after the CLI's own records.)
+   */
+  runFrom?: number
   /** Its tool calls started and not ended: their ids, or a count of those without one. */
   calls: Set<string>
   unnamedCalls: number
@@ -58,6 +64,11 @@ export interface Turn {
   continued: number
   /** How it ended (for the log): 'stop', 'interrupt', 'idle', 'transcript', 'screen', 'user'… */
   endedBy?: string
+  /**
+   * It took over the id of a compaction the CLI began itself (HI-1916), and no compaction of its own has begun since: a
+   * compaction's end or SessionStart under its id is still that compaction's (old news). A compaction start is its own.
+   */
+  fromCompaction?: true
 }
 
 export interface TurnLedger {
@@ -134,10 +145,11 @@ function begin(ledger: TurnLedger, id: string | null, now: number): Turn {
   return ledger.active
 }
 
-/** The latest turn, over, goes on (a start of it: rule 1). */
-function reopen(t: Turn): void {
+/** The latest turn, over, goes on (a start of it: rule 1), from `now`. */
+function reopen(t: Turn, now: number): void {
   t.state = 'running'
   t.endedBy = undefined
+  t.runFrom = now
 }
 
 function addCall(ledger: TurnLedger, t: Turn, call: string | null): void {
@@ -181,6 +193,13 @@ export function admit(ledger: TurnLedger, ev: HookEvent, ids: HookIds, opts: { h
     // once and ends once: a start of it again, or its news once it is over, is stale; the launch's SessionEnd isn't.
     const k = ledger.compaction
     if (turn === k?.id) {
+      // Codex 0.164 can run the turn that follows a compaction it began itself under that compaction's id (HI-1916: HR5,
+      // resumed into a full context on 27 Oct, had all its turn's hooks dropped here). Its prompt begins that turn, the
+      // compaction still under way or over; anything else of a turn before that prompt stays stale.
+      if (ev.kind === 'prompt') {
+        begin(ledger, turn, now).fromCompaction = true
+        return { verdict: 'apply', event: ev, note: 'a turn under the id of a compaction the CLI began itself' } // i18n-ignore: the turn ledger's reasons, for the log and the developer console's event data (recorded like a log), stay English (#1104)
+      }
       if (!launchWide) return { verdict: 'stale', why: `${what(ev)} under a compaction's id` } // i18n-ignore: the turn ledger's reasons, for the log and the developer console's event data (recorded like a log), stay English (#1104)
       if (ev.kind === 'compactStart') return { verdict: 'stale', why: k.open ? 'a repeated compaction start' : 'a compaction start of a compaction that is over' } // i18n-ignore: the turn ledger's reasons, for the log and the developer console's event data (recorded like a log), stay English (#1104)
       if (!k.open && ev.kind !== 'end') return { verdict: 'stale', why: `${what(ev)} of a compaction that is over` } // i18n-ignore: the turn ledger's reasons, for the log and the developer console's event data (recorded like a log), stay English (#1104)
@@ -208,6 +227,13 @@ export function admit(ledger: TurnLedger, ev: HookEvent, ids: HookIds, opts: { h
   }
   // Launch-wide hooks (naming the latest turn, or none); the CLI's session ending is the launch's.
   if (launchWide) {
+    // The compaction a turn took the id of (HI-1916): until a compaction of the turn's own begins (its PreCompact, which
+    // the CLI sends first), an end or SessionStart under the id is that one's, late or repeated, and old news. From a
+    // start on, its compactions are handled as any turn's (HR6's round 1: one later in a long turn is a real one).
+    if (turn && a?.fromCompaction && running) {
+      if (ev.kind === 'compactStart') a.fromCompaction = undefined
+      else if (ev.kind === 'compactEnd' || ev.kind === 'start') return { verdict: 'stale', why: `${what(ev)} of the compaction its turn took the id of` } // i18n-ignore: the turn ledger's reasons, for the log and the developer console's event data (recorded like a log), stay English (#1104)
+    }
     if (ev.kind === 'end') end(ledger, 'end')
     return { verdict: 'apply', event: ev }
   }
@@ -240,7 +266,7 @@ export function admit(ledger: TurnLedger, ev: HookEvent, ids: HookIds, opts: { h
       if (!a) return { verdict: 'apply', event: ev }
       // The latest turn, over: a call it never started is a start of it, and it goes on; one it started is no start.
       if (ids.call && a.callsSeen.has(ids.call)) return { verdict: 'stale', why: 'a tool start of a call its turn started before it ended' } // i18n-ignore: the turn ledger's reasons, for the log and the developer console's event data (recorded like a log), stay English (#1104)
-      reopen(a)
+      reopen(a, now)
       addCall(ledger, a, ids.call)
       return { verdict: 'apply', event: { ...ev, resumes: true }, note: 'a new tool call after its Stop: its turn goes on' } // i18n-ignore: the turn ledger's reasons, for the log and the developer console's event data (recorded like a log), stay English (#1104)
     }
@@ -263,7 +289,8 @@ export function admit(ledger: TurnLedger, ev: HookEvent, ids: HookIds, opts: { h
       t.stops++
       if (opts.hiveContinued) {
         // Hive's own continuation is a start of it (rule 1).
-        if (t.state === 'over') reopen(t)
+        if (t.state === 'over') reopen(t, now)
+        else t.runFrom = now
         t.continued++
         return { verdict: 'continued' }
       }
@@ -298,10 +325,14 @@ export function openCalls(ledger: TurnLedger): number {
   return a && a.state === 'running' ? a.calls.size + a.unnamedCalls : 0
 }
 
-/** Whether the CLI's own record that turn `turn` is over (its id as its hooks name turns) is about the turn Hive has running. */
-export function reconciles(ledger: TurnLedger, turn: string): boolean {
+/**
+ * Whether the CLI's own record that turn `turn` is over (its id as its hooks name turns), recorded `at` (ms), is about
+ * the turn Hive has running: that turn, and its current run (#1658: one recorded before Hive continued it, or a new
+ * tool call reopened it, is the end of the work it went on from).
+ */
+export function reconciles(ledger: TurnLedger, turn: string, at?: number): boolean {
   const a = ledger.active
-  return !!a && a.state === 'running' && a.id === turn
+  return !!a && a.state === 'running' && a.id === turn && !(a.runFrom !== undefined && at !== undefined && at < a.runFrom)
 }
 
 /**
@@ -314,6 +345,23 @@ export function unheardStop(ledger: TurnLedger, stopEnds: readonly number[]): bo
   const a = ledger.active
   if (!a || a.state !== 'running' || a.id !== null) return false
   return stopEnds.filter((t) => t >= a.startedAt).length > a.stops
+}
+
+/**
+ * Which turn a failure the CLI's records report belongs to (#1632, Codex's rollout): the turn it names (`turn`, as its
+ * hooks name turns), else, for a CLI whose records name none, the latest turn begun before it was recorded (`at`, ms);
+ * and of that turn, its latest run (#1658): a failure recorded before the turn last went on (Hive continued its Stop, a
+ * new tool call reopened it) ended the work it went on from, not this run. `running`/`over`: the latest turn's run,
+ * still running or over; `older`: a turn or run before it (a newer one has begun, so the failure is history);
+ * `unknown`: no turn of it seen yet (its hooks may still come), so nothing can be decided.
+ */
+export function failureTurn(ledger: TurnLedger, rec: { turn: string | null; at: number }): TurnState | 'older' | 'unknown' {
+  const a = ledger.active
+  if (!a) return 'unknown'
+  if (rec.turn !== null && a.id !== null) {
+    if (a.id !== rec.turn) return ledger.seen.has(rec.turn) ? 'older' : 'unknown'
+  } else if (rec.at < a.startedAt) return 'older'
+  return a.runFrom !== undefined && rec.at < a.runFrom ? 'older' : a.state
 }
 
 /** Ends the running turn on other evidence than a hook (`by`: the CLI's records, its screen, the user). */

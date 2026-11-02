@@ -8,7 +8,7 @@ import type { AgentInfo, LiveSessionState, ProjectInfo, TaskCard } from './types
  * word, a question, a stall, a card blocked on the user); it detects nothing of its own.
  * - waiting: waiting for you (a permission prompt, a question, a sign-in, a card blocked on you): a diamond;
  * - stalled: nothing will move it on (its CLI failed, or failed to start, its turn has been silent with its state
- *   unknown, or it left the cards it loops on unwatched): a square;
+ *   unknown, its hooks aren't arriving, or it left the cards it loops on unwatched): a square;
  * - working: a turn, its start, a compaction or background tasks running: a pulsing dot;
  * - idle: ready, finished, watching cards, stopped or no session: a ring.
  */
@@ -27,26 +27,26 @@ export interface AgentStateExtras {
   failedToStart?: boolean
 }
 
-type StateFields = Pick<LiveSessionState, 'status' | 'question' | 'turn' | 'notWatching'>
+type StateFields = Pick<LiveSessionState, 'status' | 'question' | 'turn' | 'notWatching'> & Partial<Pick<LiveSessionState, 'hooksMissing'>>
 
 /** The state an agent's mark shows; no session at all is idle. */
 export function agentState(live: StateFields | null | undefined, extras: AgentStateExtras = {}): AgentState {
   if (asksYou(live) || extras.blocked) return 'waiting'
   if (extras.stalled || (extras.failedToStart && !live)) return 'stalled'
   if (!live) return 'idle'
-  if (live.status === 'error' || live.turn?.state === 'unknown' || (live.notWatching?.length ?? 0) > 0) return 'stalled'
+  if (live.status === 'error' || live.turn?.state === 'unknown' || live.hooksMissing || (live.notWatching?.length ?? 0) > 0) return 'stalled'
   if (live.status === 'working' || live.status === 'starting' || live.status === 'background') return 'working'
   return 'idle'
 }
 
 /**
  * What the board says of an agent: a card it has in Doing or Review blocked on the user, or one in Doing while it isn't
- * running (the board's stalledReason for an agent still there).
+ * running (the board's stalledReason for an agent still there): one whose start is under way isn't (HI-1977).
  */
-export function boardExtras(projectName: string, agent: Pick<AgentInfo, 'id' | 'live'>, cards: readonly Pick<TaskCard, 'project' | 'agent' | 'column' | 'blocked' | 'archived'>[]): AgentStateExtras {
+export function boardExtras(projectName: string, agent: Pick<AgentInfo, 'id' | 'live' | 'start'>, cards: readonly Pick<TaskCard, 'project' | 'agent' | 'column' | 'blocked' | 'archived'>[]): AgentStateExtras {
   const name = projectName.toLowerCase()
   const mine = cards.filter((c) => !c.archived && c.agent === agent.id && c.project.toLowerCase() === name && (c.column === 'doing' || c.column === 'review'))
-  return { blocked: mine.some((c) => !!c.blocked), stalled: !agent.live && mine.some((c) => c.column === 'doing') }
+  return { blocked: mine.some((c) => !!c.blocked), stalled: !agent.live && !(agent.start && 'starting' in agent.start) && mine.some((c) => c.column === 'doing') }
 }
 
 /**
@@ -110,6 +110,14 @@ export function projectStateSummary(agents: readonly Pick<AgentInfo, 'live'>[], 
   const stopped = (s: AgentState, i: number): boolean => s === 'idle' && !agents[i]?.live
   const n = states.filter(stopped).length
   return [stateSummary(states.filter((s, i) => !stopped(s, i)), true), n ? tr(STOPPED_COUNT, { n }) : ''].filter(Boolean).join(' · ')
+}
+
+/**
+ * Whether every agent shown is stopped (idle, with no session running; HI-1908): its summary's mark is then the stopped
+ * one, grey, as its pane's and tile's marks are (HI-1881). Presentation only: the states stay as they are.
+ */
+export function allStopped(agents: readonly Pick<AgentInfo, 'live'>[], states: readonly AgentState[]): boolean {
+  return states.length > 0 && states.every((s, i) => s === 'idle' && !agents[i]?.live)
 }
 
 /**

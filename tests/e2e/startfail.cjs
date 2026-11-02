@@ -89,7 +89,7 @@ const check = (name, ok, extra = '') => {
 
   // --- Fixed, Retry starts it, and the failure goes.
   // Saved by the time agents:update returns, and Retry starts it from what's saved.
-  await inv('agents:update', alpha, agent.id, { model: '' })
+  await lib.setLaunch(inv, alpha, agent.id, { model: '' })
   await bar.getByRole('button', { name: 'Retry' }).click()
   check('Retry starts it again', !!(await until(async () => (await live())?.status === 'ready', 15000)))
   check('the failure is gone once it starts', !!(await until(async () => (await bar.count()) === 0 && !/Failed to start/.test(await text(header)) && (await header.locator('.state-mark.stalled').count()) === 0, HUNG_MS)))
@@ -101,30 +101,44 @@ const check = (name, ok, extra = '') => {
   check('a stop shows no failure', !!(await until(async () => (await pane.locator('.session-ended:not(.start-failed)').count()) === 1, HUNG_MS)) && (await bar.count()) === 0)
   await page.screenshot({ path: path.join(lib.WORK, 'startfail-3-stopped.png') })
 
-  // --- A bare "--" in extra arguments (#523): Hive passes the task after its own, so Project Settings refuses one, and
-  // one saved before (an older Hive's project.json) stops the launch, saying why, before the CLI starts.
+  // --- A bare "--" in extra arguments (#523): Hive passes the task after its own, so a connection's are refused with
+  // one (HI-2122: extra arguments are a connection's), and one saved before (a config.json edited by hand) stops the
+  // launch, saying why, before the CLI starts.
   const refused = 'Hive passes the task after "--"; remove it from extra arguments.'
-  const saving = await inv('project:updateProvider', alpha, 'claude-code', { extraArgs: '--allowedTools Read Bash --' }).then(() => '', (e) => String(e?.message ?? e))
-  check('Project Settings refuses a bare "--", saying why', saving.includes(refused), saving)
-  const projectFile = path.join(alpha, '.hive', 'project.json')
-  const pj = JSON.parse(fs.readFileSync(projectFile, 'utf8'))
-  check('and keeps what was saved', !(pj.providers?.['claude-code']?.extraArgs ?? '').includes('--allowedTools'), JSON.stringify(pj.providers))
-  await inv('project:updateProvider', alpha, 'claude-code', { extraArgs: '--append-system-prompt=--' })
-  check('an option whose value is "--" is written with "="', JSON.parse(fs.readFileSync(projectFile, 'utf8')).providers?.['claude-code']?.extraArgs === '--append-system-prompt=--')
-  fs.writeFileSync(projectFile, JSON.stringify({ ...pj, providers: { ...pj.providers, 'claude-code': { ...pj.providers?.['claude-code'], extraArgs: '--allowedTools Read Bash --' } } }, null, 2))
-  await inv('workspace:refresh')
-  const started = await inv('session:start', alpha, { agentId: agent.id, prompt: 'Work on card #12' }).then(() => '', (e) => String(e?.message ?? e))
-  check('a saved bare "--" stops the launch, saying why', started.includes(refused) && started.includes('Fix it in Project Settings or Settings → Claude Code.'), started)
-  check('and the CLI never started', !(await live()))
+  const connectionOf = () => JSON.parse(fs.readFileSync(path.join(alpha, '.hive', 'project.json'), 'utf8')).agents.find((x) => x.id === agent.id).connection
+  const saved = () => JSON.parse(fs.readFileSync(cfgFile, 'utf8')).connections.find((c) => c.id === connectionOf())
+  const before = connectionOf()
+  const saving = await lib.setLaunch(inv, alpha, agent.id, { extraArgs: '--allowedTools Read Bash --' }).then(() => '', (e) => String(e?.message ?? e))
+  check('a connection with a bare "--" is refused, saying why', saving.includes(refused), saving)
+  check('and the agent keeps its connection', connectionOf() === before, connectionOf())
+  await lib.setLaunch(inv, alpha, agent.id, { extraArgs: '--append-system-prompt=--' })
+  check('an option whose value is "--" is written with "="', saved()?.extraArgs === '--append-system-prompt=--', JSON.stringify(saved()))
+  await app.close()
+  const cfgNow = JSON.parse(fs.readFileSync(cfgFile, 'utf8'))
+  cfgNow.connections.find((c) => c.id === connectionOf()).extraArgs = '--allowedTools Read Bash --'
+  fs.writeFileSync(cfgFile, JSON.stringify(cfgNow, null, 2))
+  const again = await _electron.launch({ executablePath: lib.ELECTRON, args: [lib.ROOT], cwd: lib.ROOT, env })
+  const page2 = await again.firstWindow()
+  page2.on('pageerror', (e) => check('no page errors', false, e.message))
+  await lib.fitWindow(again, page2, { width: 1400, height: 850 })
+  await lib.appReady(page2)
+  const inv2 = (ch, ...a) => page2.evaluate(([c, x]) => window.hive.invoke(c, ...x), [ch, a])
+  await lib.openWorkspace(inv2, page2, ws)
+  await page2.getByText('alpha', { exact: true }).first().click()
+  const started = await inv2('session:start', alpha, { agentId: agent.id, prompt: 'Work on card #12' }).then(() => '', (e) => String(e?.message ?? e))
+  // …and where to fix it: its connection, by name, in Settings → Accounts & Connections (HI-2140).
+  const fixIn = `Fix it in its connection, ${cfgNow.connections.find((c) => c.id === connectionOf()).name}, in Settings → Accounts & Connections.`
+  check('a saved bare "--" stops the launch, saying why and naming its connection', started.includes(refused) && started.includes(fixIn), started)
+  check('and the CLI never started', !(await inv2('session:live')).some((x) => x.projectPath.toLowerCase() === alpha.toLowerCase() && x.agentId === agent.id))
   // Started from the window, the refusal shows as a notification.
   // New Session from its ⋯ (#977: the header shows Resume in Stop's place while it has a session to resume).
-  await header.getByRole('button', { name: 'More', exact: true }).click()
-  await page.locator('.menu .menu-item', { hasText: 'New Session' }).click()
-  const notice = page.locator('.toast', { hasText: refused })
-  check('the window shows why', !!(await until(async () => (await notice.count()) === 1, HUNG_MS)), JSON.stringify(await page.locator('.toast').allInnerTexts()))
-  await page.screenshot({ path: path.join(lib.WORK, 'startfail-4-dashes.png') })
+  await page2.locator('.pane-header-bar', { hasText: 'Starter' }).getByRole('button', { name: 'More', exact: true }).click()
+  await page2.locator('.menu .menu-item', { hasText: 'New Session' }).click()
+  const notice = page2.locator('.toast', { hasText: refused })
+  check('the window shows why', !!(await until(async () => (await notice.count()) === 1, HUNG_MS)), JSON.stringify(await page2.locator('.toast').allInnerTexts()))
+  await page2.screenshot({ path: path.join(lib.WORK, 'startfail-4-dashes.png') })
 
-  await app.close()
+  await again.close()
   console.log(failed ? `${failed} check(s) failed` : 'All checks passed')
   process.exit(failed ? 1 : 0)
 })().catch((e) => {

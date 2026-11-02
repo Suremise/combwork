@@ -3,7 +3,7 @@ import { cp, lstat, mkdir, readdir, readFile, rename, rmdir, stat, writeFile } f
 import { basename, dirname, extname, join, relative, resolve, sep } from 'path'
 import { HIVE_DIR, assertSessionId } from '../shared/defaults'
 import type { AttachmentContent, FileContent, FileEntry, SessionAttachment, SessionAttachmentGroup } from '../shared/types'
-import { attachmentKind } from '../shared/attachments'
+import { attachmentKind, isSessionFolder } from '../shared/attachments'
 import { attachmentsDir, movedAttachment } from './attachmentsFolder'
 import { emit } from './events'
 import { heldOpen, insideReal, isInUse, trashAllOrNothing, withFileLock } from './fsutil'
@@ -312,7 +312,22 @@ export async function readText(projectPath: string, rel: string): Promise<FileCo
   const n = Math.min(buf.length, 8000)
   for (let i = 0; i < n; i++) if (buf[i] === 0) return { kind: 'binary', text: '', bom: false, ...meta }
   const bom = buf.length >= 3 && buf[0] === 0xef && buf[1] === 0xbb && buf[2] === 0xbf
-  return { kind: 'text', text: buf.toString('utf8', bom ? 3 : 0), bom, ...meta }
+  const text = decodeUtf8(buf.subarray(bom ? 3 : 0))
+  // Not UTF-8 (a Windows-1252 file, say): decoding it would put U+FFFD in place of its bytes, and saving would
+  // write those over them (HI-2331), so it isn't offered for editing.
+  if (text === null) return { kind: 'not-utf8', text: '', bom: false, ...meta }
+  return { kind: 'text', text, bom, ...meta }
+}
+
+const utf8Strict = new TextDecoder('utf-8', { fatal: true, ignoreBOM: true })
+
+/** The bytes as text, or null when they aren't valid UTF-8. */
+export function decodeUtf8(bytes: Uint8Array): string | null {
+  try {
+    return utf8Strict.decode(bytes)
+  } catch {
+    return null
+  }
 }
 
 export async function writeText(projectPath: string, rel: string, text: string, expectedModified: string | null, bom: boolean): Promise<{ modified: string; size: number }> {
@@ -475,7 +490,7 @@ async function attachmentAt(projectPath: string, path: string): Promise<{ root: 
   const root = await attachmentsRoot(projectPath)
   const abs = resolve(path)
   const parts = root ? relative(root, abs).split(sep) : []
-  if (!root || parts.length !== 2 || parts[0] === '..') throw hiveError(msg({ id: 'service.files.notAttachment', defaultMessage: 'Not a session attachment', description: "An error opening or deleting a session's attachment: the path isn't a file in a session's attachments folder." }))
+  if (!root || parts.length !== 2 || parts[0] === '..' || !isSessionFolder(parts[0])) throw hiveError(msg({ id: 'service.files.notAttachment', defaultMessage: 'Not a session attachment', description: "An error opening or deleting a session's attachment: the path isn't a file in a session's attachments folder." }))
   return { root, sessionId: assertSessionId(parts[0]), abs }
 }
 
@@ -487,7 +502,8 @@ export async function listAttachments(projectPath: string): Promise<SessionAttac
   const records = new Map((await workspace.sessionsFile(projectPath)).sessions.map((s) => [s.id, s]))
   const groups: SessionAttachmentGroup[] = []
   for (const d of await readdir(root, { withFileTypes: true }).catch(() => [])) {
-    if (!d.isDirectory()) continue
+    // The cards' folder (HI-1700) is listed with the cards, never as a session.
+    if (!d.isDirectory() || !isSessionFolder(d.name)) continue
     const attachments: SessionAttachment[] = []
     for (const f of await readdir(join(root, d.name), { withFileTypes: true }).catch(() => [])) {
       if (!f.isFile()) continue
@@ -504,7 +520,8 @@ export async function listAttachments(projectPath: string): Promise<SessionAttac
   return groups.sort((a, b) => b.attachments[0].name.localeCompare(a.attachments[0].name))
 }
 
-const MAX_ATTACHMENT_TEXT = 2 * 1024 * 1024
+/** The most of an attachment's text the viewer previews (a session's, or a card's: HI-1958). */
+export const MAX_ATTACHMENT_TEXT = 2 * 1024 * 1024
 
 /** A kept attachment's text for the viewer's previews (text, CSV, Markdown, code): 'binary' or 'too-large' otherwise. */
 export async function readAttachment(projectPath: string, path: string): Promise<AttachmentContent> {
@@ -542,6 +559,7 @@ export async function trashAttachment(projectPath: string, path: string): Promis
 export async function trashAttachmentGroup(projectPath: string, sessionId: string): Promise<number> {
   projectPath = workspace.assertSessionHost(projectPath)
   assertSessionId(sessionId)
+  if (!isSessionFolder(sessionId)) throw hiveError(M.notKept)
   const root = await attachmentsRoot(projectPath)
   if (!root) throw hiveError(M.notKept)
   const dir = join(root, sessionId)

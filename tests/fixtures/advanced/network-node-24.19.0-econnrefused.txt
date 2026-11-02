@@ -1,0 +1,21 @@
+node:events:487
+      throw er; // Unhandled 'error' event
+      ^
+
+Error: connect ECONNREFUSED 127.0.0.1:9
+    at TCPConnectWrap.afterConnect [as oncomplete] (node:net:1864:16)
+Emitted 'error' event on ClientRequest instance at:
+    at emitErrorEvent (node:_http_client:112:11)
+    at Socket.socketErrorListener (node:_http_client:745:5)
+    at Socket.emit (node:events:509:28)
+    at emitErrorNT (node:internal/streams/destroy:170:8)
+    at emitErrorCloseNT (node:internal/streams/destroy:129:3)
+    at process.processTicksAndRejections (node:internal/process/task_queues:90:21) {
+  errno: -4078,
+  code: 'ECONNREFUSED',
+  syscall: 'connect',
+  address: '127.0.0.1',
+  port: 9
+}
+
+Node.js v24.19.0

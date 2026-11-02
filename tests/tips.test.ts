@@ -4,7 +4,8 @@ import { readFileSync } from 'fs'
 import { join } from 'path'
 import { describe, expect, it } from 'vitest'
 import { tr } from '../src/shared/i18n'
-import { EMPTY_TIPS_STATE, TIP_ENTRIES, TIP_GROUPS, TIP_MOMENTS, TIPS, applyTipsChange, localDay, nextTip, sawTip, tipForMoment, tipForToday, tipsChange, tipsState, usedCommand, type Tip, type TipsChange, type TipsState } from '../src/shared/tips'
+import { docOutline } from '../src/shared/docSections'
+import { EMPTY_TIPS_STATE, TIP_ENTRIES, TIP_GROUPS, TIP_MOMENTS, TIPS, applyTipsChange, localDay, nextTip, queuedToday, quietNow, sawTip, TYPING_QUIET_MS, tipForMoment, tipForToday, tipsChange, tipsState, usedCommand, type Tip, type TipsChange, type TipsState } from '../src/shared/tips'
 
 const t = (id: string, command?: string, knownBy?: string[]): Tip => ({ id, group: 'Sessions', order: 0, title: id, text: id, command, knownBy })
 const tips = [t('a', 'cmd.a'), t('b'), t('c', 'cmd.c'), t('d', 'cmd.d', [])]
@@ -54,9 +55,10 @@ describe('choosing a tip', () => {
 
 describe('the tips', () => {
   const guide = readFileSync(join(__dirname, '..', 'docs', 'USER_GUIDE.md'), 'utf8')
-  const headings = new Set([...guide.matchAll(/^#{1,4} (.+)$/gm)].map((m) => m[1].trim()))
+  // Learn more goes by a heading's explicit id (#1535), never its text.
+  const headings = new Set(docOutline(guide).filter((h) => h.fixed).map((h) => h.slug))
 
-  it('have unique ids, known groups, short texts and a heading of the user guide behind Learn more', () => {
+  it('have unique ids, known groups, short texts and the id of a user guide heading behind Learn more', () => {
     expect(TIPS.length).toBeGreaterThanOrEqual(25)
     expect(new Set(TIPS.map((x) => x.id)).size).toBe(TIPS.length)
     for (const tip of TIPS) {
@@ -106,5 +108,31 @@ describe('changes from several windows', () => {
     expect(tipsChange({ moment: 'second-agent' })).toEqual({ moment: 'second-agent' })
     expect(tipsChange({ shownOn: '2026-10-06' })).toEqual({ shownOn: '2026-10-06' })
     for (const bad of [null, 'a', [], {}, { seen: '' }, { seen: 1 }, { seen: 'a', used: 'b' }, { moment: 'toString' }, { moment: 'nope' }, { shownOn: 'today' }, { tips: { seen: [] } }]) expect(tipsChange(bad)).toBeUndefined()
+  })
+})
+
+// HI-2320 (Darren: "tips should be shown at a time that nothing else is going on only, otherwise they are ignored").
+describe('a tip only when nothing else goes on (quietNow)', () => {
+  const now = 1_000_000
+  const quiet = { focused: true, popups: 0, finishesPending: 0, waiting: 0, lastKeyAt: null, now }
+
+  it('quiet: the window focused, no pop-up showing or queued, no finishes about to be told, nobody waiting, no typing', () => {
+    expect(quietNow(quiet)).toBe(true)
+    expect(quietNow({ ...quiet, lastKeyAt: now - TYPING_QUIET_MS })).toBe(true)
+  })
+
+  it('each of them alone holds a tip back', () => {
+    expect(quietNow({ ...quiet, focused: false })).toBe(false)
+    // A pop-up showing, or queued behind "+N more", or paused for the focus: all in the window's list.
+    expect(quietNow({ ...quiet, popups: 1 })).toBe(false)
+    expect(quietNow({ ...quiet, finishesPending: 2 })).toBe(false)
+    expect(quietNow({ ...quiet, waiting: 1 })).toBe(false)
+    expect(quietNow({ ...quiet, lastKeyAt: now - TYPING_QUIET_MS + 1 })).toBe(false)
+  })
+
+  it('a queued tip is for its own day: one that never found a quiet moment is not shown the next', () => {
+    const q = { id: 'agent-layouts', day: '2026-11-02' }
+    expect(queuedToday(q, new Date(2026, 10, 2, 23, 59))).toBe(true)
+    expect(queuedToday(q, new Date(2026, 10, 3, 0, 0))).toBe(false)
   })
 })

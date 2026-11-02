@@ -8,6 +8,10 @@
 // Slugs follow GitHub's rule, one rule for the outline and for references to sections (#818): the heading's text as
 // shown (links as their words, code and emphasis marks dropped), lower case, every character that isn't a letter, a
 // digit, a space, a hyphen or an underscore removed, each space a hyphen. A slug used before gets -1, -2… in order.
+//
+// A heading can carry an explicit id (#1535), an empty anchor anywhere on its line: `## Version Control <a id="git"></a>`.
+// Its slug is then that id, whatever its text, so links to it survive a rename. An HTML anchor rather than `{#git}`:
+// GitHub hides it and still scrolls to `#git`, where `{#git}` would show as text in the guide on GitHub.
 
 /** One heading of a document. */
 export interface DocHeading {
@@ -15,8 +19,12 @@ export interface DocHeading {
   level: number
   /** Its text as shown. */
   text: string
-  /** Its slug, unique in the document. */
+  /** Its slug, unique in the document: its explicit id when it has one. */
   slug: string
+  /** Its slug is an explicit id (`<a id="…"></a>`), kept when its text changes. */
+  fixed?: true
+  /** The explicit id it carries that another heading carries too: no reference names it for sure. */
+  sharedId?: string
   /** Its line, from 1. */
   line: number
   /** Its section's size in characters (the heading line and everything to the next heading of its level or higher). */
@@ -42,6 +50,13 @@ export function slugOf(text: string): string {
     .toLowerCase()
     .replace(/[^\p{L}\p{N}\p{M} _-]/gu, '')
     .replace(/ /g, '-')
+}
+
+const EXPLICIT_ID = /<a\s+id="([^"\s<>]+)"\s*>\s*<\/a>/i
+
+/** A heading's explicit id (`<a id="git"></a>` on its line), or null. */
+export function headingId(raw: string): string | null {
+  return EXPLICIT_ID.exec(raw)?.[1] ?? null
 }
 
 const ATX = /^ {0,3}(#{1,6})(?:[ \t]+(.*?))?(?:[ \t]+#+)?[ \t]*$/
@@ -86,23 +101,35 @@ export function docOutline(md: string): DocHeading[] {
   // Each line's length with its ending (one character: sizes count the text, not CRLF twice).
   const lineSize = lines.map((l, k) => l.length + (k < lines.length - 1 ? 1 : 0))
   const found = headingLines(lines)
-  const used = new Map<string, number>()
+  // Explicit ids are taken first: a heading without one never gets another's id as its slug. An id two headings carry
+  // fixes neither: the first keeps it as its slug, the others are numbered from it, and each is marked `sharedId`.
+  const ids = found.map((h) => headingId(h.raw))
+  const count = new Map<string, number>()
+  for (const id of ids) if (id) count.set(id, (count.get(id) ?? 0) + 1)
+  const used = new Map<string, number>([...count.keys()].map((id) => [id, 0]))
+  const firstTaken = new Set<string>()
   return found.map((h, k) => {
     const text = headingText(h.raw)
+    const id = ids[k]
+    const shared = id && count.get(id)! > 1 ? id : null
     // As github-slugger numbers them: a slug used before gets the next number of its own, skipping any taken.
-    const base = slugOf(h.raw)
+    const base = shared ?? slugOf(h.raw)
     let slug = base
-    while (used.has(slug)) {
-      const n = used.get(base)! + 1
-      used.set(base, n)
-      slug = `${base}-${n}`
+    if (id && !shared) slug = id
+    else if (shared && !firstTaken.has(shared)) firstTaken.add(shared)
+    else {
+      while (used.has(slug)) {
+        const n = (used.get(base) ?? 0) + 1
+        used.set(base, n)
+        slug = `${base}-${n}`
+      }
+      used.set(slug, 0)
     }
-    used.set(slug, 0)
     const next = found.slice(k + 1).find((x) => x.level <= h.level)
     const end = next ? next.at : lines.length
     let size = 0
     for (let l = h.at; l < end; l++) size += lineSize[l]
-    return { level: h.level, text, slug, line: h.at + 1, size }
+    return { level: h.level, text, slug, ...(id && !shared ? { fixed: true as const } : {}), ...(shared ? { sharedId: shared } : {}), line: h.at + 1, size }
   })
 }
 
@@ -110,7 +137,8 @@ export function docOutline(md: string): DocHeading[] {
 export function sectionText(md: string, heading: DocHeading): string {
   const lines = linesOf(md)
   const outline = docOutline(md)
-  const k = outline.findIndex((h) => h.slug === heading.slug)
+  // By its line: the heading itself, whatever slugs the others have.
+  const k = outline.findIndex((h) => h.line === heading.line)
   const next = outline.slice(k + 1).find((x) => x.level <= heading.level)
   return lines.slice(heading.line - 1, next ? next.line - 1 : lines.length).join('\n').replace(/\n+$/, '')
 }
@@ -135,25 +163,31 @@ function distance(a: string, b: string): number {
 /**
  * The heading `asked` names, in this order:
  * - `#<slug>` (no space after `#`): exactly the section with that slug, also the first of several with the same text
- *   (`#setup`; `#setup-1` is the second), as a reference to a section (`file#slug`) names it;
+ *   (`#setup`; `#setup-1` is the second), as a reference to a section (`file#slug`) names it; an explicit id several
+ *   headings carry is ambiguous, listing them;
  * - a heading's text (any case, with or without its `#` marks and a space): that heading; several with that text are
  *   ambiguous, listed each with its own slug;
- * - a slug (`core-contracts`, `setup-1`): that heading.
+ * - a slug (`core-contracts`, `setup-1`): that heading; an explicit id several headings carry is ambiguous, as with `#`.
  * None: the closest headings.
  */
 export function findHeading(outline: DocHeading[], asked: string): SectionMatch {
   const q = asked.trim()
-  if (/^#[^#\s]/.test(q)) {
-    const exact = outline.find((h) => h.slug === q.slice(1) || h.slug === q.slice(1).toLowerCase())
-    return exact ? { heading: exact } : { closest: closest(outline, q.slice(1)) }
-  }
+  if (/^#[^#\s]/.test(q)) return bySlug(outline, q.slice(1)) ?? { closest: closest(outline, q.slice(1)) }
   const text = q.replace(/^#+\s+/, '')
   const plain = (t: string): string => headingText(t).toLowerCase()
   const byText = outline.filter((h) => plain(h.text) === plain(text))
   if (byText.length > 1) return { ambiguous: byText }
   if (byText.length === 1) return { heading: byText[0] }
-  const bySlug = outline.find((h) => h.slug === text || h.slug === text.toLowerCase())
-  return bySlug ? { heading: bySlug } : { closest: closest(outline, text) }
+  return bySlug(outline, text) ?? { closest: closest(outline, text) }
+}
+
+/** The heading a slug names (any case), or null; an explicit id several headings carry names none of them for sure (#1535). */
+function bySlug(outline: DocHeading[], slug: string): SectionMatch | null {
+  const is = (s: string | undefined): boolean => s === slug || s === slug.toLowerCase()
+  const sharing = outline.filter((h) => is(h.sharedId))
+  if (sharing.length) return { ambiguous: sharing }
+  const exact = outline.find((h) => is(h.slug))
+  return exact ? { heading: exact } : null
 }
 
 /** The headings closest to one asked for that none is: containing it or contained in it first, then by edit distance. */

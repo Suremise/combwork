@@ -1,7 +1,7 @@
 // Per-project view preferences are saved one project at a time and merged into what is saved (#245), so a window's
 // stale copy of a map can't drop another window's projects; values are cleaned and bounded.
 import { describe, expect, it } from 'vitest'
-import { MAX_PREF_PROJECTS, MAX_TREE_PREFS, isProjectPref, projectPrefValue, withProjectPref } from '../src/shared/uiPrefs'
+import { MAX_PREF_PROJECTS, MAX_TREE_PREFS, isProjectPref, movedPrefKey, projectPrefValue, withProjectPref } from '../src/shared/uiPrefs'
 
 describe('withProjectPref', () => {
   it("sets one project's value as the newest, keeping the others", () => {
@@ -59,5 +59,25 @@ describe('projectPrefValue', () => {
     expect(['skillsProvider', 'skillsFold', 'sessionsTree', 'hiveVcsNotice', 'assistantFold'].every(isProjectPref)).toBe(true)
     expect(isProjectPref('sidebarWidth')).toBe(false)
     expect(isProjectPref('tips')).toBe(false)
+  })
+})
+
+describe("movedPrefKey (HI-2008: a moved workspace's view preferences)", () => {
+  const from = String.raw`C:\Work\Hive`
+  // With a trailing separator, as a folder can be given.
+  const to = 'D:\\New\\Hive\\'
+  it("puts a project's path, the Assistant's workspace|project and a pane's what:workspace at the new folder", () => {
+    expect(movedPrefKey(String.raw`c:\work\hive\alpha`, from, to)).toBe(String.raw`d:\new\hive\alpha`)
+    expect(movedPrefKey(String.raw`c:\work\hive|c:\work\hive\alpha`, from, to)).toBe(String.raw`d:\new\hive|d:\new\hive\alpha`)
+    expect(movedPrefKey(String.raw`assistant-open:c:\work\hive`, from, to)).toBe(String.raw`assistant-open:d:\new\hive`)
+    expect(movedPrefKey(String.raw`c:\work\hive`, from, to)).toBe(String.raw`d:\new\hive`)
+  })
+  it('a path counts only whole, and a key naming another folder or none is null', () => {
+    expect(movedPrefKey(String.raw`c:\work\hive-two\alpha`, from, to)).toBeNull()
+    expect(movedPrefKey(String.raw`assistant-open:c:\work\hiveb`, from, to)).toBeNull()
+    expect(movedPrefKey(String.raw`c:\other\c:\work\hive`, from, to)).toBeNull()
+    expect(movedPrefKey('table-rows:board', from, to)).toBeNull()
+    expect(movedPrefKey('assistantTop', from, to)).toBeNull()
+    expect(movedPrefKey(String.raw`c:\work\hive\alpha`, '', to)).toBeNull()
   })
 })

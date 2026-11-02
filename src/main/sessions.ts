@@ -1,21 +1,38 @@
+import { endReason, type SessionEnd, type StopCause } from '../shared/sessionEnd'
+import type { ActivityTask } from '../shared/activity'
+import { maskText } from '../shared/redact'
 import { randomUUID, randomBytes } from 'crypto'
+import { StepTimes } from './stepTimes'
 import { fmt, msg, onLanguageChange, tr } from '../shared/i18n'
-import { drawnWaitId, englishText, shownText, withValues, type Text, type TextPart } from '../shared/advanced'
-import { capturedText, hiveError, HiveError, shownError } from './hiveError'
+import { COPIES_REVIEW, PROMPT_AS_TYPED, PROMPT_CLEAR_DRAFT, drawnWaitId, englishText, shownText, withValues, type Text, type TextPart } from '../shared/advanced'
+import { capturedText, errorText, hiveError, HiveError, shownError } from './hiveError'
+import { assertUpgraded } from './boardStore'
 import { advanced } from './advanced'
-import { folderChanging, folderSteady } from './folderFence'
-import { basename, dirname, extname, isAbsolute, join, resolve } from 'path'
+import { overridesNow } from './advancedValues'
+import { folderChanging, folderSteady, inFolder } from './folderFence'
+import { basename, dirname, isAbsolute, join, resolve } from 'path'
 import { copyFile, lstat, mkdir, open, readdir, rename, rm, rmdir, stat, writeFile } from 'original-fs/promises'
 import { constants as fsConstants, existsSync, realpathSync } from 'original-fs'
-import { typedText } from '../shared/terminalInput'
+import { TYPED_NEWLINE_KEYS, typedText } from '../shared/terminalInput'
 import { failedStart, type StartFailure } from '../shared/startFailure'
-import { BrowserWindow, Notification, app, clipboard } from 'electron'
+import { startBegins, startFailed } from './agentStarts'
+import { BrowserWindow, app, clipboard } from 'electron'
 import { ASSISTANT_DIR, ASSISTANT_NAME } from '../shared/assistant'
 import { formatDateTime } from '../shared/dates'
 import { formatSize } from '../shared/units'
+import { backgroundTaskMinutes } from '../shared/tasks'
 import { assistantTools } from '../shared/assistantTools'
 import { HIVE_DIR, isCompacting, agentPtyKey, assertSessionId, cliRename, isSessionId, projectAgents, resumeRecord, transcriptWarnLimit } from '../shared/defaults'
-import { agentLaunchSettings, defaultProviderPending, extraArgsProblem, isProviderEnabled, modeAllowed, permissionLabel, providerDescriptor, providerSettings, splitArgs, tasksWillWake } from '../shared/providers'
+import { defaultPurpose, legacySetupPending, legacyWorktree, namedFolders, type StoredAgent, resumeHold, resumeHome, shownPlace, slotAt, type FolderFacts, type FolderPurpose, type NamedFolder, type FolderSlot, type ResumeHold } from '../shared/agentFolders'
+import { holdText } from '../shared/sessionResume'
+import { coalesced, joined } from '../shared/coalesce'
+import { atMost, whenAll } from '../shared/atMost'
+import { agentPlace, bindSession, claimPlace, ClaimRefused, folderAgent, folderFacts, heldSlots, releaseWriter, settleWriter, slotHeldWords } from './agentFolders'
+import { slotEnv } from './slots'
+import { copiesDirOf, grantsCopies } from './copies'
+import { agentWorkflowRole, launchWorkflow, reviewsWork, type LaunchWorkflow } from '../shared/workflow/roles'
+import { agentLaunchSettings, agentProvider, autoProviderPending, canSwitchModeLive, extraArgsProblem, isProviderEnabled, modeAllowed, permissionLabel, providerDescriptor, providerSettings, splitArgs, tasksWillWake } from '../shared/providers'
+import { isCliOwnMode, modeInEffect } from '../shared/cliOwnMode'
 import { resolvedModel } from '../shared/models'
 import type {
   AutoCompactSetting,
@@ -32,10 +49,13 @@ import type {
   ProviderId,
   InboxSummary,
   SessionBulkAction,
+  SessionBulkProgress,
   SessionBulkResult,
   Attached,
   AttachmentPlan,
   SessionListItem,
+  NotifyKind,
+  ToastTarget,
   SessionRecord,
   SessionSkipReason,
   SubSession,
@@ -46,21 +66,26 @@ import type {
   ToastAction
 } from '../shared/types'
 import { provider as providerAdapter, allProviders } from './providers'
-import { recacheEstimate } from './providers/common'
+import { runSwitch, SlotHeld, SwitchIntents, type SwitchOp, type UsageIntent } from './connectionSwitch'
+import { agentLaunchView, allAccounts, allConnections, checkAccount, firstUsableAccount, getConnection, launchOnChosen, onConnectionSignedIn, setAccountSessions, type LaunchConnection } from './accounts'
+import { effortUsable, ensureMigrated, migrationDue } from './connectionMoves'
+import { resolveAgentConnection } from '../shared/accounts'
+import { recacheEstimate, withoutAccountEnv, withServerEnv } from './providers/common'
 import { GZ, compressFile, decompressTo, expandBackup, isGz } from './transcriptFiles'
 import { usesOwnPrices } from '../shared/prices'
-import { priceUsage } from '../shared/usageDays'
-import type { Ask, HookEvent, LaunchContext, LaunchSkill, ProviderAdapter, SkillDelivery } from './providers/types'
+import { priceUsage, withCostFree } from '../shared/usageDays'
+import type { Ask, BackgroundTaskType, ExternalSession, HookEvent, LaunchContext, LaunchHooks, LaunchSkill, ProviderAdapter, SkillDelivery } from './providers/types'
+import { HOOK_FIRED_MAX, HOOK_SHORT_MAX, clip, type ActivityHookBlock, type HookFired, type SessionHooks } from '../shared/hooks'
 import { providerService } from './providerService'
 import { config } from './config'
-import { emit, emitTo, tellListeners, toast } from './events'
-import { presentWindow, showOsNotification, testNotifyLog, testQuiet } from './testQuiet'
+import { emit, emitTo, onHiveEvent, toast } from './events'
+import { presentWindow, testNotifyLog, testQuiet } from './testQuiet'
 import { hashText, heldOpen, insideReal, isInUse, placeRelative, removePath, samePlace, treeSignature, syncCopy, syncCopyLocked, syncCopyNow, trashAllOrNothing, withFileLock } from './fsutil'
 import { createLogger, hookJournal, userText } from './logger'
-import { COMPACTING_TEXT } from '../shared/runtime'
-import { applyStep, compactionOver, expireTasks, hookStep, idleAfter, markedIdle, safeguardAnswered, SAFEGUARD_IDLE_MESSAGE, startupScreen, startupWatched, titleStep, type HookStatusInput, type HookStep } from './hookStatus'
+import { COMPACTING_TEXT, HOOKS_MISSING_NOTE, addRetryWaited, retryWaitCurrent } from '../shared/runtime'
+import { applyStep, compactionOver, expireTasks, failedTurnStep, hookStep, idleAfter, idleQuestionGone, markedIdle, safeguardAnswered, SAFEGUARD_IDLE_MESSAGE, startupScreen, startupWatched, titleStep, type HookStatusInput, type HookStep } from './hookStatus'
 import { memoModel, memoTools, memoTurn, noteSafeguard, safeguardComment, safeguardText, seenInTurn, withScreenStops, type GuardTurns, type SafeguardEvent, type ScreenStop } from '../shared/safeguards'
-import { admit, describe as describeTurn, endRunning, expectInjected, heard, newLedger, openCalls, reconciles, silentFor, unheardStop, type ScreenReading, type TurnLedger } from './turnLedger'
+import { admit, describe as describeTurn, endRunning, expectInjected, failureTurn, heard, newLedger, openCalls, reconciles, silentFor, unheardStop, type ScreenReading, type TurnLedger } from './turnLedger'
 import { Compaction } from './compaction'
 import { lastTitle } from './terminalTitle'
 import { asksYou } from '../shared/inbox'
@@ -68,22 +93,29 @@ import type { DeliveryHooks, NewDelivery } from './deliveries'
 import { readyFor } from './readiness'
 import { HAND_OVER_TEXT, handOverNow } from '../shared/handOver'
 import { NOTICE_PREFIX } from '../shared/doorbell'
-import { FinishBatcher, finishedApiTitle, finishedNotice, noticeRoute, type FocusedHive, type NoticeRoute } from '../shared/bursts'
+import { FinishBatcher, finishedApiTitle, finishedNotice } from '../shared/bursts'
+import { notifyRoute, type NotifyRoute } from '../shared/notify'
+import { askOffer, focusedHive, notifyPending, offerOpen, resolveOffer, resolveOffers, tell } from './notify'
+import { OUTCOME } from './outcomes'
 import type { SlotNote } from './mergeSlots'
 import { commentOnDoingCards, recordCards } from './cardSessions'
 import { listMcp, toLaunchDef } from './mcp'
-import { agentGetsMcp, serverOnIn } from '../shared/agentMcp'
-import { launchEnded, leftoversOf, noteUntracked, settleLeftovers, STOPPED_BEFORE_START, trackingProblemText, trackingReady, trackLaunch, type TrackResult } from './agentProcesses'
+import { agentGetsMcp, assistantMcpAdded, serverOnIn } from '../shared/agentMcp'
+import { launchEnded, leftoversOf, leftoversOffer, noteUntracked, settleLeftovers, STOPPED_BEFORE_START, trackingProblemText, trackingReady, trackLaunch, type TrackResult } from './agentProcesses'
 import type { GateWord } from './launchGate'
 import { leftoversSummary, processCount } from '../shared/agentProcesses'
-import { childEnv, killPty, refreshPty, spawnPty, startSize, writePty } from './ptyHost'
+import { childEnv, hasPty, killPty, refreshPty, spawnPty, startSize, writePty } from './ptyHost'
 import { refreshPathBeforeStart } from './freshPath'
 import { TerminalScreen } from './terminalScreen'
+import { heldLineLost } from './heldLine'
 import { KeysStopped, PickNotFound, typeKeySteps } from './keySteps'
 import { withBinOnPath } from './progressReporters/shims'
 import { hiveSkills, parseSkillFrontmatter, skillFor } from './skills'
+import { copyBook, sessionEnded } from './skillCopies'
+import { workspaceNotesFor } from './workspaceNotes'
+import { skillOff } from '../shared/skillDelivery'
+import { samePath } from '../shared/movePaths'
 import { GUIDANCE_REVISION, launchParts, launchRecord } from './guidance'
-import { notificationIcon } from './paths'
 import { reportPlanUsage } from './planUsage'
 import { devConsole, sessionSourceId } from './devConsole'
 import { flightRecorder } from './flightRecorder'
@@ -94,18 +126,30 @@ import { revisionOf } from './revisions'
 import { metricsHandle, recordLaunch } from './metrics'
 import { headerOf } from './revisions'
 import { utf8Bytes } from '../shared/metrics'
-import { inWorkspace, workspace, workspaceFor, workspaceOf, type SessionsFile } from './workspace'
+import { cardNamesOf, scopeOfHost } from './projectKeys'
+import { inWorkspace, workspace, workspaceFor, workspaceOf, WorkspaceService, type SessionsFile } from './workspace'
+import { ServerMarks } from './serverMarks'
 import { usageHistory, type StoredUsage } from './usageHistory'
 import { journalSettingsOf } from './journalService'
 import { endAgentToken, newAgentToken } from './agentTokens'
-import { endHookToken, newHookToken } from './hookTokens'
+import { endHookToken, hooksRefused, newHookToken } from './hookTokens'
+import { lookAtTurns, type TurnsReading } from './turnsReader'
+import { hookSeen, hookTurn, hooksMissing, newHooksWatch, noteHooksMissing, promptSent, SeenOnce, transcriptReset, transcriptTurns, turnHeard, type HooksWatch } from './hooksHealth'
 import { beingRead, viewingWindows } from './transcriptReads'
 import { trash } from './trash'
-import { attachmentsDir, freeName, ownAttachmentsFolder } from './attachmentsFolder'
+import { attachmentName, attachmentsDir, freeName, ownAttachmentsFolder } from './attachmentsFolder'
 import { attachmentKind } from '../shared/attachments'
 import { replyStart } from '../shared/tiles'
+import { observer } from './platform/observe'
+import { projectPreferences } from './workflow/preferences'
+import { driveExitKeys, type ExitKeysIO } from './exitKeys'
 
 const log = createLogger('sessions')
+
+/** The statuses in which a CLI's exit key cancels a turn (or its dialog) rather than arming its exit (HI-2272). */
+const EXIT_IN_TURN: ReadonlySet<SessionStatus> = new Set<SessionStatus>(['starting', 'working', 'waiting'])
+/** The statuses of an agent in a turn (or starting one): reached from any other, its next turn has begun (HI-2312). */
+const BUSY: ReadonlySet<SessionStatus> = new Set<SessionStatus>(['starting', 'working', 'waiting'])
 
 /**
  * Hive's own words for sessions (#847, E10c of #677): errors (HiveErrors, in the window's language through IPC and in
@@ -114,7 +158,11 @@ const log = createLogger('sessions')
  * replies, deliveries), the log and the developer console stay English.
  */
 const M = {
+  assistantCliOwn: msg({ id: 'session.mode.assistantCliOwn', defaultMessage: "The Assistant can't use the CLI's own setting: its Control setting relies on knowing the mode it runs in. Choose one of the CLI's modes.", description: "Switching the Hive Assistant to the permission choice \"The CLI's own setting\" is refused. Control is the name of an Assistant setting." }),
+  connectionFallbackTitle: msg({ id: 'session.connection.fallbackTitle', defaultMessage: '{agent} runs on another connection', description: "A notice's title (HI-2108): an agent started on another connection than its own (its own is off in this workspace, or was removed). {agent} is the agent." }),
+  connectionFallback: msg({ id: 'session.connection.fallback', defaultMessage: "{why, select, missing {The connection chosen for it was removed} other {Its connection {wanted} is off in this workspace}}, so it started on {name}, its CLI's first usable one here. Choose another in its Agent Settings.", description: "A notice (HI-2108) when an agent starts on another connection than its own: its own was removed, or is on an account turned off in this workspace ({wanted}: its name). {name} is the account it started on. Agent Settings names a dialog." }),
   noSession: msg({ id: 'session.error.noSession', defaultMessage: 'No session is running for this agent.', description: "An action on an agent's session is refused: the agent isn't running." }),
+  moveFailed: msg({ id: 'session.start.moveFailed', defaultMessage: "Hive couldn't move {project}'s model settings to its agents: {error}. Start it again.", description: "Starting an agent is refused (HI-1770): moving its project's own model, effort and context settings onto the project's agents (connections now hold the defaults) failed. {project} is the project's name, {error} why (often in English). It is tried again at the next start." }),
   stoppedBeforeStart: msg({ id: 'session.error.stoppedBeforeStart', defaultMessage: 'The agent was stopped before it had started.', description: "Starting an agent failed: it was stopped (or its workspace closed) while it was starting." }),
   stoppedBeforePrompt: msg({ id: 'session.error.stoppedBeforePrompt', defaultMessage: 'The agent stopped before the prompt was sent.', description: 'Typing a prompt into an agent failed: it stopped or restarted meanwhile.' }),
   typingBusy: msg({ id: 'session.error.typingBusy', defaultMessage: 'Hive is already typing a prompt into this agent; it is busy.', description: 'An action on an agent is refused: Hive is typing a prompt into it now.' }),
@@ -140,12 +188,12 @@ function setStatus(st: LiveSessionState, text: TextPart | null): void {
 }
 
 /** An agent's place at the merge slot as the window shows it (LiveSessionState.mergeSlotText); `mergeSlot` is its English (shared/mergeSlot.ts). */
-function slotNoteText(note: SlotNote): Text {
+function slotNoteText(note: SlotNote, named: (n: number) => string): Text {
   if ('holding' in note) return withValues(msg({ id: 'session.mergeSlot.holding', defaultMessage: 'Merging into {branch} (merge slot)', description: "An agent's status while it holds the project's merge slot. {branch} is the branch it merges into." }), { branch: note.holding })
   const h = note.waitingFor
   if (!h) return msg({ id: 'session.mergeSlot.waiting', defaultMessage: 'Waiting for the merge slot', description: "An agent's status while it waits for the project's merge slot." })
   if (h.kind === 'user') return msg({ id: 'session.mergeSlot.waitingForYou', defaultMessage: 'Waiting for the merge slot (you are merging)', description: "An agent's status while it waits for the merge slot the user holds (merging from Hive's Merge dialog)." })
-  const cards = h.cards.map((n) => `#${n}`).join(', ')
+  const cards = h.cards.map(named).join(', ')
   if (h.taken)
     return cards
       ? withValues(msg({ id: 'session.mergeSlot.waitingMergingCards', defaultMessage: 'Waiting for the merge slot ({agent} is merging {cards})', description: "An agent's status while it waits for the merge slot another agent holds. {agent} is that agent's name, {cards} the cards it merges (\"#305, #306\")." }), { agent: h.name, cards })
@@ -178,8 +226,34 @@ const retentionDays = (): number | null => {
 const COST_INTERVAL_MS = 30_000
 /** How many of a launch's latest hooks are kept for the log (LiveSession.recentHooks). */
 const RECENT_HOOKS = 8
+
+/** A lock block of a launch (HI-982: LiveSession.hookBlock): its tool call, the file (its lock's key) and the holder's launch. */
+interface HookBlock {
+  runId: string
+  toolUseId: string | null
+  key: string
+  file: string
+  holderLiveId: string
+  holderRunId: string
+  kind: 'blocked' | 'asked'
+  at: number
+}
+
+/**
+ * A hook Hive is handling (HI-982), as it observes it: made when it arrives (observeHook) for its launch, filled in by
+ * its lock decision and the turn ledger, recorded in the launch's history once it is handled (hookHandled).
+ */
+export interface HookObservation {
+  l: LiveSession
+  fired: HookFired
+  started: number
+}
 /** How long after an ask its CLI's screen may take to show it is a safeguard prompt (LiveSession.guardAsk, #606). */
 const GUARD_ASK_MS = 10_000
+/** An agent at its prompt, between turns: where its CLI's question by itself shows (HI-1959). */
+const AT_PROMPT: ReadonlySet<SessionStatus> = new Set<SessionStatus>(['ready', 'finished', 'background', 'watching'])
+/** What a CLI's hooks say that shows it took input or moved by itself (HI-2191): a blocked input is free again. Not its idle notice. */
+const MOVES_INPUT: ReadonlySet<HookEvent['kind']> = new Set<HookEvent['kind']>(['start', 'prompt', 'toolStart', 'toolEnd', 'ask', 'stop', 'interrupt', 'compactStart', 'compactEnd', 'signIn', 'retry'])
 /** How many stops seen only on screen a session's record keeps (SessionRecord.screenStops). */
 const MAX_SCREEN_STOPS = 200
 /**
@@ -188,6 +262,10 @@ const MAX_SCREEN_STOPS = 200
  * Unpackaged test builds can shorten it (HIVE_TEST_SILENT_MS).
  */
 const silentMs = (): number => (!app.isPackaged && Number(process.env.HIVE_TEST_SILENT_MS) > 0 ? Number(process.env.HIVE_TEST_SILENT_MS) : 5 * 60_000)
+/** HI-1972: a running turn with no hook this long has its CLI's records looked at for a retry wait (an adapter may say otherwise)… */
+const DEFAULT_RETRY_LOOK_AFTER_MS = 20_000
+/** …then again at most this often while it stays quiet. */
+const RETRY_LOOK_EVERY_MS = 15_000
 /** How many times silentMs a running turn with a tool call open may be silent before its state is unknown (a long test run). */
 const OPEN_CALL_SILENCE = 12
 /** How many of the CLI's Stop answers (LiveDetails.stopsAnswered) a launch keeps: a turn has few. */
@@ -202,6 +280,9 @@ const MODE_SWITCHES_AT_ONCE = 6
 /** After a kill, how long a CLI's console takes to be gone (its processes listed and ended, then its exit). */
 const KILL_EXIT_MS = 1000
 
+/** The most a start waits for its agent's ended runs' slot writers to be released (HI-1867): a bound for a hung one. */
+const WRITER_SETTLE_MS = 15_000
+
 /**
  * How long stopping sessions waits for them to end: its own timeout, or longer where a CLI is given time to exit by
  * itself before it is killed (an adapter's exitKeys graceMs: Copilot's 10 s, #716), so its kill and exit still come
@@ -214,6 +295,17 @@ export function stopWaitMs(timeoutMs: number, graces: (number | undefined)[]): n
 interface LiveSession {
   state: LiveSessionState
   adapter: ProviderAdapter
+  /**
+   * The conversations this run marked as on a server connection (HI-1772, HI-1829): read without their CLI's cost
+   * reports while the run is live (/clear or /new: each one it moved through). Let go with the run.
+   */
+  serverSids?: Set<string>
+  /** Those whose record was saved with `serverRan`: its record decides once the run is over. */
+  serverSaved?: Set<string>
+  /** Those the CLI started (recordSession wrote, or tried to write, their record): a record to keep once it is over. */
+  serverRecorded?: Set<string>
+  /** Its conversation ran only on servers on this PC (HI-1772), as its record says: free. */
+  costFree?: boolean
   /** The terminal as rendered, for an adapter that reads it (its footer's mode, or a menu to pick from: #396). */
   screen?: TerminalScreen | null
   /** The size refreshes given so far, for a CLI that needs them (capabilities.startupSizeRefresh, #486). */
@@ -240,6 +332,8 @@ interface LiveSession {
   compacting?: Compaction
   /** The user stopped it (e.g. during its worktree setup), so an early exit isn't reported as a failure. */
   stopRequested?: boolean
+  /** Who asked it to stop, as its caller knew it (HI-1881: its pane says why); unset when the caller didn't say. */
+  stopCause?: StopCause
   /** Its CLI is being ended with its exit keys (endProcess): a second stop kills it at once. */
   ending?: boolean
   /** Terminal output tail, to see the CLI ready or asking something at the start. */
@@ -266,6 +360,14 @@ interface LiveSession {
   detailsMemo?: Record<string, unknown>
   /** The last interrupt read from the transcript and acted on (LiveDetails.interruptedAt), so each counts once. */
   interruptedAt?: string
+  /**
+   * A failed turn the transcript recorded (#1632, Codex, whose Stop says nothing of it) and not settled yet: the turn it
+   * names (or when, for records that name none) and the CLI's words. It belongs to that turn only (failureTurn): marked
+   * once that turn is over, ended failed by that turn's Stop, dropped once a newer turn has begun, kept while its turn
+   * is unknown. `failureDone`: the last record settled (applied or dropped), so a record read again isn't a new one.
+   */
+  failure?: { key: string; turn: string | null; at: number; words: string }
+  failureDone?: string
   /** The last compaction end read from the transcript (LiveDetails.compactedAt, #454), so each counts once. */
   compactedAt?: string
   /**
@@ -273,6 +375,18 @@ interface LiveSession {
    * the transcript is dropped if one came after the read began, as that hook says something newer (#475).
    */
   hooksSeen?: number
+  /** Whether its hooks are reaching Hive (#1336, hooksHealth.ts): what the check reads of the launch. */
+  hooksWatch?: HooksWatch
+  /**
+   * Reading its transcript's turns (#1371, readTurns): which conversation and file, how far (a line's end), its first
+   * bytes as they were (a file replaced under the same name has others), and the adapter's memo.
+   */
+  turnsRead?: TurnsReading
+  /** Its transcript's turns were read for this launch already: a later file or conversation is read from its end. */
+  turnsBegun?: boolean
+  /** For the check's why: where its CLI's settings turn hooks off now, and whether it is newer than Hive was tested with. */
+  hooksOffIn?: () => string | null
+  newerThanTested?: boolean
   /** When the cost estimate was last worked out (providers that don't report cost, or the user's prices: #436). */
   costAt?: number
   /** The cost the CLI last reported for this launch, kept while the user's prices are shown instead (#436). */
@@ -291,6 +405,8 @@ interface LiveSession {
    * from when it first became ready (readyAt), for a CLI that never connects it.
    */
   hiveTools?: 'connecting' | 'connected'
+  /** This launch's side of the workflow, as its metrics count it (HI-2049): taken once, as it launched. */
+  workflow?: LaunchWorkflow
   /** When this launch first became ready (or watching, or finished), in ms (#865). */
   readyAt?: number
   /**
@@ -298,6 +414,17 @@ interface LiveSession {
    * (Codex's comes with its first prompt, which may be minutes away behind a question at start), then let go.
    */
   handedOverFrom?: string
+  /** The slot lease it started under (#1434): its session is bound to it once recorded. */
+  lease?: string
+  /** Its slot's environment (HIVE_SLOT, HIVE_SLOT_PORT_BASE) while it runs in one. */
+  slotEnv?: Record<string, string>
+  /** The folders its launch was granted outside its own (#1439: its project's review copies). */
+  extraDirs?: string[]
+  /**
+   * The CLI's version as this run was launched (HI-1327): what a version gate goes by while it runs, not the CLI
+   * installed now (updated or switched since, it isn't this process). Null: not known.
+   */
+  cliVersion?: string | null
   /** Throws if whoever asked for this launch may no longer have it (the Assistant's authority), checked just before spawning. */
   startAllowed?: () => void
   /** The CLI asked something before it started (e.g. whether to trust the folder): shown as waiting for the user. */
@@ -315,8 +442,11 @@ interface LiveSession {
   /** Asks its hooks reported that are still open, and the one it waits on (HookStatusInput). */
   open?: Ask[]
   waitingOn?: Ask | null
-  /** Background tasks started in this launch that haven't ended: id → when it started, and when it expires. */
-  tasks?: Map<string, { at: number; expiresAt?: number }>
+  /**
+   * Background tasks started in this launch that haven't ended: id → when it started, when it expires, what it is and
+   * its CLI's description (a subagent's, #1584: user text).
+   */
+  tasks?: Map<string, { at: number; expiresAt?: number; type?: BackgroundTaskType; description?: string }>
   /** Tasks seen to end, so a start read late doesn't count one again. */
   tasksEnded?: Set<string>
   /** Bytes of the transcript already read for background tasks. */
@@ -352,6 +482,8 @@ interface LiveSession {
   resumed?: boolean
   /** The Hive Assistant's mode (its id) its conversation was last given, started in or told: recorded with it. */
   mode?: string
+  /** This launch gave its conversation instructions of Hive's own (SessionRecord.promptAdded): recorded with it. */
+  promptAdded?: true
   /** Prompts the CLI has reported submitted in this launch (UserPromptSubmit), for sendPrompt's confirm and a wake's (#376). */
   prompts?: number
   /**
@@ -359,6 +491,11 @@ interface LiveSession {
    * prompts taken then. Until the CLI takes it, it is pending (#416).
    */
   typed?: { at: number; prompts: number; from: number }
+  /**
+   * When Hive last pressed Enter for a line of its own (HI-2218), at the key press: a prompt its CLI takes after it, the
+   * user's Enter before it, is Hive's, even while sendPrompt still waits for it to be taken (`typed` is recorded after).
+   */
+  hiveEnterAt?: number
   /**
    * A line of Hive's the user typed into before its CLI took it (#652 round 1 finding 2): the prompt is their draft now, so
    * nothing more is typed into the agent until a prompt is submitted (the CLI's count passes this).
@@ -368,6 +505,14 @@ interface LiveSession {
   lastReply?: string
   /** Its latest hooks (what they were, when, and the status they left), for the log when the CLI turns out idle (#612). */
   recentHooks?: { kind: HookEvent['kind']; at: number; status: SessionStatus }[]
+  /** Its hooks for its Hooks dialog (HI-982): what its launch has (adapter.launchHooks), and what Hive received, newest last. */
+  hooks?: LaunchHooks
+  hookHistory?: HookFired[]
+  /**
+   * Its edit Hive's file lock blocked (or asked the user about) and whose decision stands (HI-982, Activity): the latest
+   * one only, by the tool call, the file and the holder's launch; dropped by what ends that decision (hookBlockNow).
+   */
+  hookBlock?: HookBlock
   /** Its CLI's turns as Hive knows them (#648): which runs and which are over, by the CLI's ids, and when it was last heard. */
   ledger?: TurnLedger
   /** The CLI's own latest record of a turn's end read from its transcript (LiveDetails.turnEnded). */
@@ -376,6 +521,16 @@ interface LiveSession {
   stopsAnswered?: number[]
   /** Its screen's reading of the CLI's turn (idle, working, not sure), for this launch's CLI version (ProviderAdapter.turnScreen). */
   turnScreen?: (screen: string) => 'idle' | 'working' | null
+  /** The environment it was launched with: where its CLI keeps its records (HI-1972, ProviderAdapter.retryWait). */
+  launchEnv?: NodeJS.ProcessEnv
+  /** When its latest hook reached Hive (ms, as it arrived). */
+  lastHookAt?: number
+  /** Its CLI's retry wait (HI-1972, checkRetry): a look under way, when it last looked, and the turn the wait shown is of. */
+  retryLooking?: boolean
+  retryLookedAt?: number
+  retryTurn?: object
+  /** The turn whose retry wait the Assistant was told of (HI-1973): once a turn. */
+  retryTold?: object
   /** Its transcript says its background task ended, which starts a turn of the CLI's own (backgroundWakes), not begun yet in the ledger. */
   woke?: boolean
   /**
@@ -384,7 +539,35 @@ interface LiveSession {
    * clears it.
    */
   confirming?: symbol
+  /**
+   * The deliveries the line marked not taken (`state.untakenLine`) rang for (#1514 round 1 finding): only one of them read
+   * shows that line was taken; another's read (an older line's, taken long ago) leaves the mark. Empty: a line that rang
+   * for none Hive knows.
+   */
+  untakenFor?: readonly string[]
+  /** The line marked not taken, whole (`state.untakenLine` keeps 160 characters): told to the user if it is lost (HI-1959). */
+  untakenText?: string
+  /** Prompts its CLI had taken when the line was marked not taken: one taken since is a sign it was taken (HI-1959). */
+  untakenPrompts?: number
+  /** Its CLI's own question while idle, on its screen (HI-1959): the ask the agent waits on while it shows. */
+  idleAsk?: Ask
+  /** Clears refused in a row because a key wasn't answered while its input box read empty (HI-2191); a clear that empties it resets. */
+  unanswered?: number
+  /**
+   * Its input box taking no keys (HI-2191): INPUT_BLOCKED_AFTER clears in a row refused so, something else on its screen
+   * takes them (a dialog Hive doesn't know). The agent waits for the user with `ask`, and Hive presses no key there until
+   * it is seen to take keys again (inputBlockedDrawn, a hook, Try again), in this run (`runId`). `box`: its box as read
+   * then; `since`: when (ms); `retrying` while Try again's clear runs.
+   */
+  inputBlocked?: { runId: string; ask: Ask; box: string | null; since: number; retrying?: boolean }
+  /** A look at its screen for that question and a lost line is queued (one at a time, however much the CLI draws). */
+  idleChecking?: boolean
+  /** The held line first seen lost (HI-1959): a second look after hive.lostLine.steadySeconds decides. */
+  lostSeen?: { since: string; timer: ReturnType<typeof setTimeout> }
 }
+
+/** Whose sign-in an agent depends on (HI-1755): its provider's, or its provider's and the connection it launched on. */
+export const authScope = (s: Pick<LiveSessionState, 'provider' | 'launchedConnection'>): string => (s.launchedConnection ? `${s.provider}:${s.launchedConnection.id}` : s.provider)
 
 export interface EffectiveSettings {
   provider: ProviderId
@@ -399,6 +582,10 @@ export interface EffectiveSettings {
   extraArgs: string[]
   use200kContext: boolean
   chime: boolean
+  /** The connection it would launch on (HI-1755), `!<why>` when none can be used; null for a provider without connections. */
+  connection: string | null
+  /** That connection's name, for messages (HI-2140); not part of the signature (a rename asks for no restart). */
+  connectionName?: string
 }
 
 /** Files read once for a whole session list (instead of once per session). */
@@ -409,8 +596,12 @@ interface PendingStart {
   resumeId?: string
   /** Set by a stop, workspace close or quit: the start gives up at its next check. */
   cancelled: boolean
+  /** Its launch's run id, from the start (#1434: the slot's writer is reserved for it before its process exists). */
+  runId: string
   /** Settles when the start has finished or given up. */
   done: Promise<unknown>
+  /** The start itself: its state, or why it failed or gave up (HI-1746: what a start that joins it reports). */
+  outcome: Promise<LiveSessionState>
 }
 
 export interface ListContext {
@@ -467,23 +658,66 @@ interface UsageSeen {
   mtime: number
   /** The worker's result, before costs, which follow the prices in the settings. */
   raw: SessionUsage
+  /** Read without its CLI's cost reports, priced as free (HI-1772): a read asking otherwise isn't this one. */
+  reportsIgnored: boolean
+  costFree: boolean
   /** Worked out from raw (with costs); null until asked for again after a price change. */
   usage: SessionUsage | null
 }
 const usageSeen = new Map<string, UsageSeen>()
+/**
+ * Sessions on a server connection (HI-1772) are read without their CLI's cost reports: while a live run marked them
+ * (its `serverSids`), then by their record (`serverRan`). One whose record couldn't be saved is kept here, bounded and
+ * failing closed past its bound (HI-1829, serverMarks.ts).
+ */
+const serverMarks = new ServerMarks((line, host) => log.warn(host ? `${line}: ${userText(host)}` : line))
+/** For tests (HI-1829): the unsaved markers' state. */
+export const serverMarksForTests = (): ServerMarks => serverMarks
 /** Transcripts main keeps the latest usage of (the worker keeps more: Settings → Sessions → Usage cache size). */
 const MAX_USAGE_SEEN = 200
+/** A session listing this slow is logged with where its time went (#1646). */
+const SLOW_LIST_MS = 1000
+/** How many of Hive's sessions a listing looks at at once (#1649): enough to overlap their file checks, not to flood the disk's threads. */
+const LIST_AT_ONCE = 8
+/** Folders (each CLI's) whose other sessions a listing reads at once (HI-1681). */
+const OTHER_FOLDERS_AT_ONCE = 4
+
+/** One session of a bulk action: no reason when it was done, else why it was left alone. */
+type BulkOutcome = { id: string; reason?: SessionSkipReason; message?: string }
+/** How many sessions a bulk action works on at once (#1659). */
+const BULK_AT_ONCE = 4
+/** A bulk action's progress is sent to the windows at most this often, and when it ends (#1659). */
+const BULK_PROGRESS_MS = 250
+
+/** The bulk actions running on each host's sessions, by host path lower-cased, each by its id (#1659). Removed as they end. */
+const bulkRuns = new Map<string, Map<number, SessionBulkProgress>>()
+let bulkRunIds = 0
 
 /**
- * A transcript's size for the Sessions list (#671): a stat, never a read, taken each time the list is (the window keeps
- * the list, and reloads it when it opens or a session changes). Null when it is missing or can't be read.
+ * Tells the windows how far a bulk action on a host's sessions has got (#1659): at the start, as it goes, and once it
+ * ends. Each event lists every run on the host, so one that ends leaves the others shown.
  */
-async function transcriptSize(path: string | null | undefined): Promise<number | null> {
-  if (!path) return null
-  try {
-    return (await stat(path)).size
-  } catch {
-    return null
+function bulkProgress(projectPath: string, action: SessionBulkAction, total: number): { step: () => void; end: () => void } {
+  const key = projectPath.toLowerCase()
+  const runs = bulkRuns.get(key) ?? new Map<number, SessionBulkProgress>()
+  bulkRuns.set(key, runs)
+  const run: SessionBulkProgress = { id: ++bulkRunIds, action, done: 0, total }
+  runs.set(run.id, run)
+  let sent = Date.now()
+  const send = (): void => emit({ type: 'session-bulk', projectPath, runs: [...runs.values()].map((r) => ({ ...r })) })
+  send()
+  return {
+    step() {
+      run.done++
+      if (Date.now() - sent < BULK_PROGRESS_MS && run.done < total) return
+      sent = Date.now()
+      send()
+    },
+    end() {
+      runs.delete(run.id)
+      if (!runs.size) bulkRuns.delete(key)
+      send()
+    }
   }
 }
 
@@ -524,6 +758,135 @@ async function typeInto(key: string, text: string, still: () => boolean = () => 
   }
 }
 
+/** A typed prompt's pieces (HI-1327): its text, and the keys Hive presses for its line breaks. */
+export type TypedSegment = { text: string } | { key: string }
+
+/**
+ * A prompt typed as written into a CLI whose input box takes a key as a new line (HI-1327): its line breaks (CRLF, CR
+ * or LF) as that key, `newline` (a fixed sequence of Hive's, TYPED_NEWLINE_KEYS), and each line as promptInput types it
+ * (a tab a space, the other control characters, escapes included, left out). The key is its own piece, written whole,
+ * so nothing in the text can be taken for one, and no chunk can split it.
+ */
+export function typedPrompt(line: string, newline: string): TypedSegment[] {
+  const out: TypedSegment[] = []
+  line.split(/\r\n?|\n/).forEach((part, i) => {
+    if (i > 0) out.push({ key: newline })
+    const text = promptInput(part, false, true)
+    if (text) out.push({ text })
+  })
+  return out
+}
+
+/**
+ * Types a prompt's pieces (typedPrompt): its text in chunks, each key in one write; `still` checked before each write.
+ * `typed` says what reached the CLI as it goes, the characters written on each line (a key starts the next), so a stop
+ * part-way can take back exactly that (rollbackKeys).
+ */
+async function typeSegments(key: string, segments: readonly TypedSegment[], still: () => boolean, typed: number[]): Promise<void> {
+  for (const s of segments) {
+    if ('text' in s) {
+      const CHUNK = 8
+      for (let i = 0; i < s.text.length; i += CHUNK) {
+        if (!still()) throw hiveError(M.stoppedBeforePrompt)
+        const part = s.text.slice(i, i + CHUNK)
+        writePty(key, part)
+        typed[typed.length - 1] += part.length
+        if (i + CHUNK < s.text.length) await new Promise((r) => setTimeout(r, 10))
+      }
+    } else {
+      if (!still()) throw hiveError(M.stoppedBeforePrompt)
+      writePty(key, s.key)
+      typed.push(0)
+      await new Promise((r) => setTimeout(r, 10))
+    }
+  }
+}
+
+/**
+ * How many Ctrl+U take back what typeSegments typed (`typed`: the characters on each of its lines, the cursor after
+ * the last), in an input box where Ctrl+U deletes to the line's start, or the line break before it at a line's start
+ * (Codex 0.164's kill_line_start: HR6's round 1 of HI-1327): one for each line with text, and one for each line break.
+ * Never more, so nothing before Hive's own text is touched.
+ */
+export function rollbackKeys(typed: readonly number[]): number {
+  return typed.reduce((n, chars, i) => n + (chars > 0 ? 1 : 0) + (i > 0 ? 1 : 0), 0)
+}
+
+/**
+ * How many Backspaces take back a prompt Hive stopped part-way in an input box whose Ctrl+U deletes only the row the
+ * cursor is on (capabilities.ctrlUClearsRow, HI-1974: Claude Code 2.1.312 kept a stopped wake's first rows, and the
+ * next wake was sent after them): one for each code point Hive wrote (`written`: the one-line prompt, or what
+ * typeSegments recorded, each line's UTF-16 units and a key between lines). A Backspace deletes characters, however
+ * wide they are drawn or wherever its rows wrapped (tried on 2.1.312 with CJK text, an emoji sequence and long words).
+ * It never stops short; a character made of several code points can make it press a few more, which delete only a
+ * draft clearing the input was to remove (Settings → Advanced), and nothing in an empty input.
+ */
+export function backspaceKeys(written: string | readonly number[]): number {
+  return typeof written === 'string' ? [...written].length : written.reduce((n, chars, i) => n + chars + (i > 0 ? 1 : 0), 0)
+}
+
+/**
+ * For the wakeputoff suite (unpackaged builds only, HI-1974): a line Hive has typed waits before its Enter while
+ * HIVE_TEST_HOLD_TYPED's file exists, checked as it waits, so what stops a line part-way can stop it there.
+ */
+async function heldTyped(label: string, check: () => void): Promise<void> {
+  const file = app.isPackaged ? undefined : process.env.HIVE_TEST_HOLD_TYPED
+  if (!file || !existsSync(file)) return
+  log.info(`${userText(label)}: the line Hive typed is held before its Enter (a test's)`)
+  while (existsSync(file)) {
+    await new Promise((r) => setTimeout(r, 50))
+    check()
+  }
+}
+
+/**
+ * What Hive writes for a prompt's line (sendPrompt), without control characters, pasted (bracketed) or typed, so
+ * nothing in it can end the paste or press a key (HI-1920: typed, a Ctrl+C in it reached Codex as Ctrl+C). Kept as
+ * written (`asTyped`, #1286), its line breaks go into a paste as the Enter a terminal pastes them with, and typed, each
+ * line break or tab becomes a space (typed, a line break would send the prompt early and a tab complete a word); its
+ * other control characters are left out either way.
+ */
+export function promptInput(line: string, paste: boolean, asTyped: boolean): string {
+  line = withoutInvisible(line)
+  if (!asTyped) return line.replace(/[\x00-\x1f\x7f-\x9f]/g, '')
+  const kept = paste ? line.replace(/\r\n?|\n/g, '\r') : line.replace(/\r\n?|[\n\t]/g, ' ')
+  return kept.replace(paste ? /[\x00-\x08\x0a-\x0c\x0e-\x1f\x7f-\x9f]/g : /[\x00-\x1f\x7f-\x9f]/g, '')
+}
+
+const INVISIBLE = /[\p{Cf}\u{fe00}-\u{fe0f}\u{e0100}-\u{e01ef}]/u
+const PICTOGRAPH = /\p{Extended_Pictographic}/u
+const MODIFIER = /\p{Emoji_Modifier}/u
+const SELECTOR = /[\u{fe0e}\u{fe0f}]/u
+const TAG = /[\u{e0020}-\u{e007f}]/u
+
+/**
+ * A line without its invisible characters (#1547): Unicode's format characters (zero-width spaces and joiners, soft
+ * hyphens, direction marks, a byte order mark) and variation selectors, but for those an emoji is made of (a joiner
+ * between two pictographs, a selector after one or in a keycap, a flag's tags). Claude Code 2.1.309 takes such a
+ * character out of a prompt and leaves the prompt unsent ("Removed 1 invisible character · review and press Enter to
+ * send"), the same characters inside an emoji sent as they are (tried with each: #1547's comment).
+ */
+export function withoutInvisible(line: string): string {
+  if (!INVISIBLE.test(line)) return line
+  const cs = [...line]
+  let out = ''
+  // The last character kept: what an emoji's joiner, selector or tag follows.
+  let prev = ''
+  for (let i = 0; i < cs.length; i++) {
+    const c = cs[i]
+    const next = cs[i + 1] ?? ''
+    const keep =
+      !INVISIBLE.test(c) ||
+      (c === '‍' && (PICTOGRAPH.test(prev) || MODIFIER.test(prev) || SELECTOR.test(prev)) && PICTOGRAPH.test(next)) ||
+      (SELECTOR.test(c) && (PICTOGRAPH.test(prev) || (/^[0-9#*]$/.test(prev) && next === '⃣'))) ||
+      (TAG.test(c) && (prev === '\u{1f3f4}' || TAG.test(prev)))
+    if (!keep) continue
+    out += c
+    prev = c
+  }
+  return out
+}
+
 /**
  * Whether a line Hive is typing has been drawn on an agent's screen (#600): its end (spaces left out, as a CLI wraps
  * it) shows more often than when this was called, before it was typed (a doorbell's end is in its earlier ones too).
@@ -535,12 +898,24 @@ export function drawnLine(screen: Pick<TerminalScreen, 'text'>, line: string): (
   return () => count() > before
 }
 
-/** Runs a worktree's setup command in the agent's terminal (Windows: cmd.exe, elsewhere: sh). */
-function shellCommand(command: string): { file: string; args: string[] } {
-  return process.platform === 'win32' ? { file: process.env.ComSpec || 'cmd.exe', args: ['/d', '/s', '/c', command] } : { file: '/bin/sh', args: ['-c', command] }
+/**
+ * Runs a worktree's setup command in the agent's terminal (Windows: cmd.exe, elsewhere: sh). On Windows as one command
+ * line, `/d /s /c "<command>"`, passed as written (#1454): as arguments, node-pty would quote the command and turn each
+ * `"` in it into `\"`, which cmd doesn't read, so a quoted path reached the program with its quotes in it. With /s, cmd
+ * takes off the outer quotes and runs the command as typed.
+ */
+export function shellCommand(command: string, platform: NodeJS.Platform = process.platform): { file: string; args: string[] | string } {
+  return platform === 'win32' ? { file: process.env.ComSpec || 'cmd.exe', args: `/d /s /c "${command}"` } : { file: '/bin/sh', args: ['-c', command] }
 }
 
-const shownNotifications = new Set<Notification>()
+/** A notice's link to an agent's pane (HI-2320: every entry links to what it is about); the Assistant's opens its panel. */
+function agentTarget(projectPath: string, agentId: string, name: string): ToastTarget {
+  const assistant = workspace.isAssistantHome(projectPath)
+  return { kind: 'agent', projectPath, agentId, name: assistant ? ASSISTANT_NAME : name, project: assistant ? ASSISTANT_NAME : basename(projectPath) }
+}
+
+/** A session's notice kinds as the one notification system's (HI-2320). */
+const NOTIFY_KIND = { finished: 'finished', waiting: 'needsYou', notice: 'work' } as const
 
 /** A new session's automatic name: "<project> · <date>", with the agent's name when the project has several. */
 function autoName(projectPath: string, agent: Pick<AgentDef, 'name'>, count: number): string {
@@ -548,9 +923,45 @@ function autoName(projectPath: string, agent: Pick<AgentDef, 'name'>, count: num
 }
 
 /** How long a background task counts as running at most (Settings → Agents), in minutes. */
-const taskMinutes = (): number => Math.min(480, Math.max(10, Number(config.settings.agents.backgroundTaskMinutes) || 60))
+const taskMinutes = (): number => backgroundTaskMinutes(config.settings.agents.backgroundTaskMinutes)
 
 const liveId = (projectPath: string, agentId: string): string => `${projectPath.toLowerCase()}#${agentId}`
+
+/** Its retry wait over (HI-1972), kept in the launch's tally of them (HI-1996: retryWaited) before it is cleared. */
+function endRetryWait(st: LiveSessionState, now = Date.now()): void {
+  if (!st.retryWait) return
+  st.retryWaited = addRetryWaited(st.retryWaited, st.retryWait, now)
+  st.retryWait = undefined
+}
+
+/** What a start asks for. */
+export interface StartOptions {
+  resumeId?: string
+  name?: string
+  agentId?: string
+  skipSetup?: boolean
+  permissionMode?: PermissionMode
+  prompt?: string
+  allowed?: () => void
+  handedOverFrom?: string
+  /**
+   * HI-2197: a new conversation that carries on the agent's own work (its handover to itself) keeps the watch it had. Any
+   * other start that resumes nothing ends that watch first: it was the old conversation's.
+   */
+  keepWatch?: boolean
+  /** A new conversation's purpose (#1434): where the agent works for it (agentFolders.ts); its role's own when absent. */
+  purpose?: FolderPurpose
+  /** Resume All and startup's resume (#1434): a conversation resumes only where it may now, never taking a free slot. */
+  auto?: boolean
+}
+
+/** Where a start runs: its folder, the slot lease it runs under, and whether it is another agent's 0.9 worktree. */
+interface Place {
+  cwd: string
+  lease: string | null
+  slot: FolderSlot | null
+  foreign: boolean
+}
 
 /**
  * The workspace's skills (their list and each one's revision) and MCP servers, read once for the agents whose launch
@@ -688,6 +1099,24 @@ const USER_REPLY_MS = 15_000
 /** How long a prompt Hive typed counts as pending (the agent just given a task) while its CLI hasn't taken it (#416). */
 const PENDING_MS = 30_000
 
+/** Settings → Advanced: how long a Ctrl+U clearing Claude Code's input has to be answered on its screen (HI-1979). */
+const CLEAR_KEY_WAIT = 'claude-code.prompt.clearKeySeconds'
+/**
+ * The most Ctrl+U clearing an input may press (HI-1979): one deletes a row of a draft, so this is a draft of as many
+ * rows; more ends the try, unseen empty.
+ */
+const CLEAR_KEYS_MOST = 200
+/**
+ * The letter Hive types into an input it reads as empty, and takes back (HI-1979, HR6's round 1): shown alone, the input
+ * was empty when it came. A plain letter: in an empty Claude Code input `/`, `?`, `!`, `#` and `@` each open something.
+ */
+const CLEAR_PROBE = 'x'
+/**
+ * Clears refused in a row, each because a key wasn't answered while its input box read empty, after which the input
+ * counts as blocked (HI-2191): one delivery's tries. A clear answered late but answered resets the count.
+ */
+const INPUT_BLOCKED_AFTER = 3
+
 /**
  * A launch's task on its CLI's command line not taken yet (#712): the CLI is ready at its SessionStart and takes the task
  * only after, so it is pending until its first prompt, at most PENDING_MS after it became ready. Ready shows as watching
@@ -716,11 +1145,17 @@ const CARRY_ON_PROMPT = 'Your last turn stopped because your sign-in had expired
 
 class SessionManager {
   private live = new Map<string, LiveSession>()
+  /** Server markers of runs that have ended, held until their record says so or they are kept (HI-1829: serverRunEnding). */
+  private readonly serverEnding = new Map<string, number>()
   /**
    * CLIs whose sign-in was refused, until signed in again (#309): the user is told once per CLI and expiry (agents
    * stopping later only show it), and the CLI's own check runs again meanwhile, to notice the sign-in.
    */
-  private signedOut = new Map<ProviderId, { gather?: ReturnType<typeof setTimeout>; recheck?: ReturnType<typeof setInterval> }>()
+  /**
+   * Sign-ins refused, by auth scope (authScope: the provider, or the provider and the connection its agents launched on,
+   * HI-1755): one connection signed out never stops, relabels or clears another's agents.
+   */
+  private signedOut = new Map<string, { gather?: ReturnType<typeof setTimeout>; recheck?: ReturnType<typeof setInterval> }>()
   /** runId → liveId: hooks name their launch, so they reach the right agent even before the session id is known. */
   private runs = new Map<string, string>()
   /** The status each state was last sent with, so statusSince moves only when the status changes. */
@@ -746,7 +1181,7 @@ class SessionManager {
     cancel: (host: string, source: string, ref: string | null, why: string) => Promise<number>
   } | null = null
   private delivery(): NonNullable<SessionManager['deliveries']> {
-    if (!this.deliveries) throw hiveError(msg({ id: 'session.error.noDeliveries', defaultMessage: "Hive's delivery service isn't running.", description: "Giving an agent a message failed: the part of Hive that delivers them hasn't started (or has stopped)." }))
+    if (!this.deliveries) throw hiveError(msg({ id: 'session.error.noDeliveries', defaultMessage: "Hive's delivery service isn't running.", description: "Giving an agent a message failed: the part of Hive that delivers them hasn't started (or has stopped)." }), undefined, { kind: 'conflict' })
     return this.deliveries
   }
   hookUrl = ''
@@ -773,6 +1208,8 @@ class SessionManager {
   onAssistantResumed: (projectPath: string, runId: string, sessionId: string, modeId: string) => void = () => undefined
   /** An agent's wake-on-change watch, if it has one (main/watches.ts sets this). */
   watchFor: (projectPath: string, agentId: string) => TaskWatchInfo | null = () => null
+  /** HI-2197: an agent's watch from before ended, as it starts a new conversation (main/watches.ts sets this). */
+  conversationEnds: (projectPath: string, agentId: string) => Promise<void> = async () => undefined
 
   /** The prompts an agent's CLI has taken in this launch, and the launch (#376: was a typed line taken?). Null when not running. */
   promptsTaken(projectPath: string, agentId: string): { runId: string; count: number } | null {
@@ -886,6 +1323,11 @@ class SessionManager {
     if (!l || l.state.runId !== runId || !readyFor(l.state) || this.userMayBeTyping(projectPath, agentId) || this.delivering.has(key) || folderChanging(l.state.cwd)) return false
     // The prompt is the user's draft once they have typed in it (#652 round 1 finding 2): never sent by Hive's Enter.
     if (this.userTypedOverLine(projectPath, agentId)) return false
+    // Nor while its CLI's own question shows (HI-1959): Enter would answer it (HB4's wake answered Claude Code's offer).
+    if (this.cliAsks(projectPath, agentId)) return false
+    // Nor while something on its screen takes its keys (HI-2191).
+    if (this.inputBlocked(projectPath, agentId)) return false
+    l.hiveEnterAt = Date.now()
     writePty(key, '\r')
     return true
   }
@@ -934,7 +1376,7 @@ class SessionManager {
     const st = this.live.get(liveId(projectPath, agentId))?.state
     if (!st) return
     const label = this.label(st)
-    const which = cards.map((n) => `#${n}`).join(', ')
+    const which = cards.map(cardNamesOf(workspaceOf(projectPath), scopeOfHost(projectPath))).join(', ')
     this.notify(
       projectPath,
       withValues(msg({ id: 'session.notice.notWatching', defaultMessage: "{agent} isn't watching {cards}", description: "A notification's title: an agent working through cards in a loop ended its turn without watching them. {agent} is the agent; {cards} the cards (\"#12, #13\")." }), { agent: label, cards: which }),
@@ -963,7 +1405,7 @@ class SessionManager {
     const l = this.live.get(liveId(projectPath, agentId))
     if (!l || l.state.runId !== runId || (l.state.mergeSlot ?? null) === text) return
     l.state.mergeSlot = text ?? undefined
-    l.state.mergeSlotText = text !== null && about ? slotNoteText(about) : undefined
+    l.state.mergeSlotText = text !== null && about ? slotNoteText(about, cardNamesOf(workspaceOf(projectPath), scopeOfHost(projectPath))) : undefined
     this.emitState(l.state)
   }
 
@@ -989,6 +1431,11 @@ class SessionManager {
    * agent, closing its workspace or quitting can cancel a start that hasn't spawned its process yet.
    */
   private starting = new Map<string, PendingStart>()
+  /**
+   * Each run holding a slot's writer (#1434), from its claim until its release is handed on: whether it has spawned a
+   * process (setup or its CLI), and its claim's tracked work, ended once it has (or once its start is given up).
+   */
+  private writers = new Map<string, { projectPath: string; agentId: string; spawned: boolean; done: () => void }>()
   /** Hive is quitting: no new agent starts. */
   private shuttingDown = false
   /** The window showing a project (several windows each show one workspace). */
@@ -996,13 +1443,6 @@ class SessionManager {
 
   setWindowProvider(fn: (projectPath?: string) => BrowserWindow | null): void {
     this.getWindow = fn
-  }
-
-  /** The Hive window the user is using (visible, focused): where in-app banners go (#157). None while Hive is in the background. */
-  private focusedHive: () => (FocusedHive & { win: BrowserWindow }) | null = () => null
-
-  setFocusedWindowProvider(fn: () => (FocusedHive & { win: BrowserWindow }) | null): void {
-    this.focusedHive = fn
   }
 
   key(projectPath: string, agentId: string): string {
@@ -1025,10 +1465,68 @@ class SessionManager {
     return [...this.live.values()].map((l) => l.state)
   }
 
+  /** The background tasks running in a project's agents' launches (#1254, the Activity tab), as their CLIs described them. */
+  backgroundTasks(projectPath: string): ActivityTask[] {
+    return this.projectStates(projectPath).flatMap((state) => {
+      const l = this.live.get(`${projectPath.toLowerCase()}#${state.agentId}`)
+      return [...(l?.tasks ?? new Map()).entries()].map(([id, t]) => ({ agentId: state.agentId, sessionId: state.sessionId, id, ...(t.type ? { type: t.type } : {}), ...(t.description ? { description: maskText(t.description) } : {}), at: t.at }))
+    })
+  }
+
+  /**
+   * A project's sessions for the Activity tab (#1254): from its records and the usage history's titles alone, those
+   * running or active within `hours`; no transcript is looked for or stat'ed (a session's turns are read when it opens),
+   * so it answers in milliseconds where the full listing (list()) takes most of a second with hundreds.
+   */
+  async activitySessions(projectPath: string, hours: number): Promise<SessionListItem[]> {
+    projectPath = workspace.assertSessionHost(projectPath)
+    const file = await workspace.sessionsFile(projectPath)
+    const stored = await usageHistory.storedUsage(projectPath).catch(() => new Map<string, StoredUsage>())
+    const live = new Set(this.projectStates(projectPath).map((s) => s.sessionId))
+    const since = Date.now() - hours * 3600_000
+    const out: SessionListItem[] = []
+    for (const rec of file.sessions) {
+      const kept = stored.get(rec.id)
+      const usage = kept ? this.titled(kept.usage) : null
+      const last = usage?.lastActivity ?? rec.lastActiveAt
+      if (!live.has(rec.id) && (rec.archived || !(Date.parse(last) >= since))) continue
+      const { keptUsage: _kept, ...fields } = rec
+      out.push({ ...fields, provider: recordProvider(rec), source: 'hive', title: usage?.title ?? null, lastActivity: last, hasTranscript: true, hasBackup: false, usage: null, recache: null })
+    }
+    return out
+  }
+
+  /** Whether a session of Hive's runs, or is starting, in a folder (#1431: its skill copies stay while one does). */
+  runningIn(folder: string): boolean {
+    return [...this.live.values()].some((l) => samePath(l.state.cwd, folder))
+  }
+
+  /** runningIn, leaving out one session (by liveId): the launch asking whether another session reads the folder. */
+  othersIn(folder: string, except: string): boolean {
+    return [...this.live].some(([id, l]) => id !== except && samePath(l.state.cwd, folder))
+  }
+
+  /** How many agents of a workspace (its projects', its worktrees', its Assistant's) run or are starting. */
+  agentsIn(workspacePath: string): number {
+    const mine = (p: string): boolean => workspaceFor(p)?.path?.toLowerCase() === workspacePath.toLowerCase()
+    return [...this.live.values()].filter((l) => mine(l.state.projectPath)).length + [...this.starting.values()].filter((p) => mine(p.projectPath)).length
+  }
+
   /** One agent's session; without agentId, the project's first running agent's. */
   liveFor(projectPath: string, agentId?: string): LiveSessionState | null {
     if (agentId) return this.live.get(liveId(projectPath, agentId))?.state ?? null
     return this.projectStates(projectPath)[0] ?? null
+  }
+
+  /** When the agent's turn under way began (its ledger's), or null when it is in none (HI-2167: hive_lane start's safety net). */
+  turnBegan(projectPath: string, agentId: string): number | null {
+    const a = this.live.get(liveId(projectPath, agentId))?.ledger?.active
+    return a && a.state === 'running' ? a.startedAt : null
+  }
+
+  /** The folders a running agent's launch was granted outside its own (#1439: its project's review copies); none if not running. */
+  grantedDirs(projectPath: string, agentId: string): readonly string[] {
+    return this.live.get(liveId(projectPath, agentId))?.extraDirs ?? []
   }
 
   projectStates(projectPath: string): LiveSessionState[] {
@@ -1054,45 +1552,79 @@ class SessionManager {
   }
 
   private async effectiveHere(projectPath: string, agent: AgentDef | undefined, reads: LaunchReads, readPc?: ProjectConfig): Promise<EffectiveSettings> {
+    // A workspace still opening moves its MCP settings first (HI-1472): never a launch without what that gives it.
+    await workspace.mcpSettled()
     const s = config.settings
-    const pc = readPc ?? (await workspace.projectConfig(projectPath))
+    let pc = readPc ?? (await workspace.projectConfig(projectPath))
     const assistant = workspace.isAssistantHome(projectPath)
+    // The accounts migration first (HI-2106: once, under the project's lock), so nothing launches with its agents' old
+    // settings unread and not yet their connections'.
+    if (migrationDue(pc, workspace)) {
+      try {
+        await ensureMigrated(projectPath)
+      } catch (e) {
+        throw hiveError(M.moveFailed, { project: basename(projectPath), error: errorText(e) })
+      }
+      pc = await workspace.projectConfig(projectPath)
+    }
+    // The agent as saved now, whoever migrated it (a start may hold one read before): only its provider as given is kept
+    // (a run's own, pinProvider).
+    const was = agent
+    const fresh = was && projectAgents(pc).find((a) => a.id === was.id)
+    if (was && fresh) agent = { ...fresh, provider: was.provider ?? fresh.provider }
     // Every Hive skill for its audience (SKILL.md's metadata.audience) reaches the session: project agents get those for
-    // agents, the Assistant those for it. There are no skill switches.
+    // agents, unless the workspace or the project switched one off (#1431, Skills → Delivered to agents); the Assistant
+    // gets those for it.
     // A skill whose header is broken or whose audience is unknown reaches nobody: the launch says why (its problems).
     const skills: LaunchSkill[] = []
     const skillHashes: Record<string, string> = {}
     const skillProblems: Record<string, string> = {}
+    const skillsOff: string[] = []
     for (const sk of await reads.skills()) {
       if (sk.problem) {
         skillProblems[sk.name] = sk.problem
         skillHashes[sk.name] = ''
+      } else if (!assistant && skillFor(sk.audience, 'agent') && skillOff(sk.name, workspace.config, pc)) {
+        skillsOff.push(sk.name)
       } else if (skillFor(sk.audience, assistant ? 'assistant' : 'agent')) {
-        skills.push({ name: sk.name, sourcePath: sk.path })
         skillHashes[sk.name] = await reads.revision(sk.path)
+        skills.push({ name: sk.name, sourcePath: sk.path, ...(skillHashes[sk.name] ? { revision: skillHashes[sk.name] } : {}) })
       }
     }
     // The workspace's servers on in the project (#713); the agent's own choice narrows them (#537): all of them unless
     // it names some. Never one named as Hive's own (a hand-made .hive/mcp/hive.json): the CLIs pre-approve that one's tools.
     const forAgent = agent ?? projectAgents(pc)[0]
+    // The Assistant gets the workspace's servers added for it (HI-1472, HI-2059: its view's MCP Servers, as a project's
+    // MCP tab); never a project's.
     const mcpServers: Record<string, McpServerDef> = {}
     for (const m of await reads.servers()) {
-      if (serverOnIn(m, pc.mcp) && m.def && agentGetsMcp(forAgent, m.name) && m.name.toLowerCase() !== 'hive') mcpServers[m.name] = toLaunchDef(m.def, workspace.mcpDir)
+      // Added there (HI-2059), as mcpAdded reads it: a list not yet converted keeps its old meaning.
+      const on = assistant ? !!m.def && assistantMcpAdded(workspace.config.mcp).includes(m.name) : serverOnIn(m, pc.mcp, workspace.config.mcp.enabled)
+      if (on && m.def && agentGetsMcp(forAgent, m.name) && m.name.toLowerCase() !== 'hive') mcpServers[m.name] = toLaunchDef(m.def, workspace.mcpDir)
     }
     const hive = this.hiveMcp(projectPath, agent?.id)
-    if (hive) mcpServers.hive = hive
-    // The Assistant looks after the workspace with Hive's own tools, not the projects' MCP servers.
-    if (assistant) for (const k of Object.keys(mcpServers)) if (k !== 'hive') delete mcpServers[k]
+    // Its instructions name only the skills the session gets (#1431).
+    if (hive) mcpServers.hive = skillsOff.length ? { ...hive, env: { ...hive.env, HIVE_SKILLS_OFF: skillsOff.sort().join(',') } } : hive
 
-    const l = agentLaunchSettings(forAgent, pc, s)
+    // Its connection (HI-2106; the Assistant's too): what it launches with, and the account it launches on, its own or
+    // (decision H) its CLI's first usable here. A change of account asks for a restart; `connection` is null for an
+    // account on the CLI's own home (Copilot's sign-in, a test home).
+    // An Assistant that names no CLI yet (a new workspace's, HI-2108): the first usable account's, as a new agent's
+    // (decision A); Settings' old choice only where none is usable.
+    const cli = assistant && !forAgent?.provider && !forAgent?.connection ? (firstUsableAccount(workspace.config)?.provider ?? agentProvider(forAgent, s)) : agentProvider(forAgent, s)
+    const choice = resolveAgentConnection(workspace.config, cli, forAgent?.connection, allAccounts(), allConnections())
+    const connection = choice.ok ? (choice.account.home ? null : choice.account.id) : `!${choice.why}`
+    const l = agentLaunchSettings(cli, choice.ok ? choice.connection : null, s, choice.ok && choice.account.kind === 'server')
     const extraArgs = l.extraArgs.flatMap((a) => splitArgs(a))
     const chime = pc.chime === 'inherit' ? s.notifications.chimeEnabled : pc.chime === 'on'
-    return { provider: l.provider, skills, skillHashes, skillProblems, mcpServers, model: l.model, effort: l.effort, permissionMode: l.permissionMode, extraArgs, use200kContext: l.use200kContext, chime }
+    // Never the CLI's own setting for the Assistant (#1284: Control relies on knowing its mode), whatever its connection says.
+    const permissionMode = assistant && isCliOwnMode(l.permissionMode) ? providerDescriptor(cli).assistantMode : l.permissionMode
+    return { provider: l.provider, skills, skillHashes, skillProblems, mcpServers, model: l.model, effort: l.effort, permissionMode, extraArgs, use200kContext: l.use200kContext, chime, connection, ...(choice.ok ? { connectionName: choice.connection.name } : {}) }
   }
 
   signature(e: EffectiveSettings): string {
     // The permission mode can be switched live (setPermissionMode), so it doesn't ask for a restart.
-    const { chime: _c, skills: _s, permissionMode: _p, ...rest } = e
+    const { chime: _c, skills: _s, permissionMode: _p, connectionName: _n, ...rest } = e
     return hashText(JSON.stringify(rest))
   }
 
@@ -1100,37 +1632,60 @@ class SessionManager {
    * Every agent of a project with its running session, for ProjectInfo. `scope`: the refresh it is for (#1002), whose
    * projects' running agents share one read of the workspace's skills and servers; without, this call's agents do.
    */
-  async liveInfo(projectPath: string, cfg: ProjectConfig, scope?: object): Promise<{ live: LiveSessionState | null; restartNeeded: boolean; agents: AgentInfo[] }> {
+  async liveInfo(projectPath: string, cfg: ProjectConfig, scope?: object): Promise<{ live: LiveSessionState | null; restartNeeded: boolean; agents: AgentInfo[]; folders: NamedFolder[] }> {
     const reads = scope ? launchReadsOf(scope) : new LaunchReads()
-    const agents: AgentInfo[] = []
-    const records = (await workspace.sessionsFile(projectPath)).sessions
+    // Its sessions, and its slots and leases (#1434: an agent's conversations in its slots, and whether each may resume
+    // now), read at once (HI-1705).
+    const [file, facts] = await whenAll([workspace.sessionsFile(projectPath), folderFacts(projectPath).catch(() => null)])
+    const records = file.sessions
     this.checkSubsOnce(projectPath, records)
     const openIds = new Set(this.projectStates(projectPath).map((s) => s.sessionId).filter(Boolean))
     const ids = new Set(projectAgents(cfg).map((a) => a.id))
-    for (const a of projectAgents(cfg)) {
-      const l = this.live.get(liveId(projectPath, a.id))
-      let restartNeeded = false
-      if (l && !l.state.settingUp) {
-        try {
-          const eff = await this.effective(projectPath, pinProvider(a, l.state.provider), reads, cfg)
-          restartNeeded = this.signature(eff) !== l.state.launchSignature
-          this.noticeModeSetting(l, eff.permissionMode)
-        } catch {
-          // Settings can't be read right now; don't nag.
+    const slotFolders = facts?.slots.map((s) => s.folder) ?? []
+    // Unreadable: no slots or homes, a 0.9 worktree still its agent's (as the contract reads a project not migrated).
+    const shownFacts: FolderFacts = facts ?? { projectPath, migrated: false, migratedAgents: [], homes: [], slots: [] }
+    // Slots held by an agent's run that is over, its processes not known ended (#1506): its ⋯ offers Release Slot….
+    const held = facts?.slots.some((s) => s.writer) ? await heldSlots(projectPath).catch(() => new Map<string, string>()) : new Map<string, string>()
+    // Every agent at once (HI-1705: one after another, each one's place waited behind other windows' file work), in order.
+    const agents: AgentInfo[] = await whenAll(projectAgents(cfg).map(async (a): Promise<AgentInfo> => {
+        const l = this.live.get(liveId(projectPath, a.id))
+        let restartNeeded = false
+        if (l && !l.state.settingUp) {
+          try {
+            const eff = await this.effective(projectPath, pinProvider(a, l.state.provider), reads, cfg)
+            restartNeeded = this.signature(eff) !== l.state.launchSignature
+            this.noticeModeSetting(l, eff.permissionMode)
+          } catch {
+            // Settings can't be read right now; don't nag.
+          }
         }
-      }
-      const provider = agentLaunchSettings(a, cfg, config.settings).provider
-      // The Assistant's sessions ran in the workspace folder, not its home.
-      const folder = workspace.isAssistantHome(projectPath) ? (workspaceOf(projectPath).path ?? projectPath) : projectPath
-      const r = l ? null : resumeRecord(folder, a, records.filter((x) => recordProvider(x) === provider), openIds, ids)
-      agents.push({ ...a, live: l?.state ?? null, restartNeeded, resume: r && { id: r.id, name: r.name, lastActiveAt: r.lastActiveAt, createdAt: r.createdAt, titleAtRename: r.titleAtRename } })
-    }
+        const provider = agentProvider(a, config.settings)
+        // The Assistant's sessions ran in the workspace folder, not its home.
+        const folder = workspace.isAssistantHome(projectPath) ? (workspaceOf(projectPath).path ?? projectPath) : projectPath
+        const r = l ? null : resumeRecord(folder, a, records.filter((x) => recordProvider(x) === provider), openIds, ids, slotFolders)
+        const hold = r && facts ? resumeHold(facts, folderAgent(a), r) : null
+        // Its last conversation resumes in a retired home (#1441), though a new one starts elsewhere: its pane says so (#1552).
+        const home = r && facts ? resumeHome(facts, r) : null
+        // Its adopted worktree's slot (#1441), while it holds it carried.
+        const carried = facts?.slots.find((s) => s.open?.kind === 'carried' && s.open.agent === a.id)?.name
+        // Where it works now, as the window shows it (#1442).
+        const at = await agentPlace(projectPath, a, l ? { cwd: l.state.cwd } : null, shownFacts).catch(() => null)
+        const legacy = legacyWorktree(a)
+        const shown = at ? shownPlace(shownFacts, folderAgent(a), at.now, at.branch, at.target) : { folder: projectPath, is: 'project' as const, name: null, branch: null }
+        // Its 0.9 worktree's base, also for the slot it was carried into while that slot has no target (#1569).
+        const place = (shown.is === 'legacy' || (shown.is === 'carried' && !shown.base)) && legacy?.base ? { ...shown, base: legacy.base } : shown
+        return { ...a, ...agentLaunchView(a, cfg), live: l?.state ?? null, restartNeeded, resume: r && { id: r.id, name: r.name, lastActiveAt: r.lastActiveAt, createdAt: r.createdAt, titleAtRename: r.titleAtRename, ...(hold ? { hold } : {}), ...(home ? { home } : {}) },...(carried ? { carriedSlot: carried } : {}), ...(held.has(a.id) ? { heldSlot: held.get(a.id) } : {}), place }
+    }))
     const primary = agents.find((a) => a.live)
-    return { live: primary?.live ?? null, restartNeeded: primary?.restartNeeded ?? false, agents }
+    return { live: primary?.live ?? null, restartNeeded: primary?.restartNeeded ?? false, agents, folders: namedFolders(shownFacts) }
   }
 
   private backupPath(projectPath: string, sessionId: string, archived = false): string {
-    return join(projectPath, HIVE_DIR, archived ? 'archive' : 'sessions', `${assertSessionId(sessionId)}.jsonl`)
+    return join(this.backupDir(projectPath, archived), `${assertSessionId(sessionId)}.jsonl`)
+  }
+
+  private backupDir(projectPath: string, archived = false): string {
+    return join(projectPath, HIVE_DIR, archived ? 'archive' : 'sessions')
   }
 
   /** Works out usage again (e.g. after price changes, so estimates are recomputed); what was read is kept. */
@@ -1160,9 +1715,10 @@ class SessionManager {
    * A result with costs from the current prices: the provider's report, else (or on top) Hive's estimate, and each day's
    * share. Without its timeline (usageTimeline has it): it stays in the cache, never in the usage passed on.
    */
-  private priced(raw: SessionUsage): SessionUsage {
+  private priced(raw: SessionUsage, costFree = false): SessionUsage {
     const { timeline: _timeline, ...usage } = raw
-    return priceUsage(usage, config.settings)
+    // Free (HI-1772): a known $0, whatever prices the user set; its tokens as read.
+    return costFree ? withCostFree(usage) : priceUsage(usage, config.settings)
   }
 
   /**
@@ -1170,15 +1726,23 @@ class SessionManager {
    * worktree agent's sessions ran in its worktree. The session's own record comes first.
    */
   async providerTranscript(projectPath: string, sessionId: string, ctx?: ListContext): Promise<{ path: string; provider: ProviderId } | null> {
-    const records = ctx?.records ?? (await workspace.sessionsFile(projectPath)).sessions
-    const rec = records.find((s) => s.id === sessionId)
+    // Its own record by its key (HI-1887: a turn's end asks, and read every record each time).
+    const rec = ctx ? ctx.records.find((s) => s.id === sessionId) : await workspace.sessionRecord(projectPath, sessionId)
     const live = this.projectStates(projectPath).find((s) => s.sessionId === sessionId)
     const ids = rec ? [recordProvider(rec)] : live ? [live.provider] : allProviders().map((p) => p.id)
-    const cfg = ctx?.cfg ?? (await workspace.projectConfig(projectPath))
     // Its own folder first, then every folder the host's sessions run in (sessionFolders, where list() finds them: a
-    // sub-session started in a removed agent's worktree, or the Assistant's workspace folder).
-    const folders = [rec?.cwd, ...this.sessionFolders(projectPath, records, cfg)].filter((f): f is string => !!f)
-    const unique = [...new Map(folders.map((f) => [resolve(f).toLowerCase(), f])).values()]
+    // sub-session started in a removed agent's worktree, or the Assistant's workspace folder): those, and the host's
+    // records and settings they come from, read only when its own folder hasn't it.
+    const own = rec?.cwd ? [rec.cwd] : []
+    let others: string[] | undefined
+    const othersOf = async (): Promise<string[]> => {
+      if (others) return others
+      const records = ctx?.records ?? (await workspace.sessionsFile(projectPath)).sessions
+      const cfg = ctx?.cfg ?? (await workspace.projectConfig(projectPath))
+      const seen = new Set(own.map((f) => resolve(f).toLowerCase()))
+      others = [...new Map(this.sessionFolders(projectPath, records, cfg).map((f) => [resolve(f).toLowerCase(), f])).entries()].filter(([k]) => !seen.has(k)).map(([, f]) => f)
+      return others
+    }
     for (const id of ids) {
       let adapter: ProviderAdapter
       try {
@@ -1186,7 +1750,11 @@ class SessionManager {
       } catch {
         continue
       }
-      for (const f of unique) {
+      for (const f of own) {
+        const t = await adapter.transcriptPath(f, sessionId, rec?.transcriptPath)
+        if (t) return { path: t, provider: id }
+      }
+      for (const f of await othersOf()) {
         const t = await adapter.transcriptPath(f, sessionId, rec?.transcriptPath)
         if (t) return { path: t, provider: id }
       }
@@ -1194,9 +1762,11 @@ class SessionManager {
     return null
   }
 
-  async start(projectPath: string, opts: { resumeId?: string; name?: string; agentId?: string; skipSetup?: boolean; permissionMode?: PermissionMode; prompt?: string; allowed?: () => void; handedOverFrom?: string }): Promise<LiveSessionState> {
+  async start(projectPath: string, opts: StartOptions): Promise<LiveSessionState> {
     this.assertStartsAllowed(projectPath)
     projectPath = workspace.assertSessionHost(projectPath)
+    // A start of the user's (not a switch's own resume) replaces a switch of connection waiting for that agent (HI-1755).
+    if (opts.agentId && !this.switchResuming.has(liveId(projectPath, opts.agentId))) this.switches.get(liveId(projectPath, opts.agentId))?.cancel('started by hand') // i18n-ignore: for the log
     if (opts.resumeId !== undefined) assertSessionId(opts.resumeId)
     const agentId = opts.agentId || (await this.soleAgent(projectPath))
     // Again after the await, with nothing awaited before the start is reserved: a fence raised meanwhile holds.
@@ -1207,27 +1777,45 @@ class SessionManager {
     if (this.live.has(id) || this.starting.has(id)) throw hiveError(msg({ id: 'session.start.alreadyRunning', defaultMessage: 'This agent is already running or starting. Stop it first.', description: 'Starting an agent is refused: it runs, or is starting, already.' }), undefined, { kind: 'conflict' })
     // Two terminals on one conversation would both append to its transcript.
     if (opts.resumeId && [...this.starting.values()].some((p) => p.resumeId === opts.resumeId)) throw hiveError(msg({ id: 'session.start.beingOpened', defaultMessage: 'This conversation is already being opened in another agent.', description: 'Resuming a conversation is refused: another agent is starting on it now.' }), undefined, { kind: 'conflict' })
-    if (opts.resumeId && this.cleaning.has(`${projectPath.toLowerCase()}|${opts.resumeId.toLowerCase()}`)) throw hiveError(msg({ id: 'session.start.cleaning', defaultMessage: "Hive is archiving, deleting or cleaning up this session's files. Try again in a moment.", description: "Resuming a conversation is refused for a moment: Hive is moving or removing its files." }))
-    const pending: PendingStart = { projectPath, resumeId: opts.resumeId, cancelled: false, done: Promise.resolve() }
+    if (opts.resumeId && this.cleaning.has(`${projectPath.toLowerCase()}|${opts.resumeId.toLowerCase()}`)) throw hiveError(msg({ id: 'session.start.cleaning', defaultMessage: "Hive is archiving, deleting or cleaning up this session's files. Try again in a moment.", description: "Resuming a conversation is refused for a moment: Hive is moving or removing its files." }), undefined, { kind: 'conflict' })
+    const pending: PendingStart = { projectPath, resumeId: opts.resumeId, cancelled: false, done: Promise.resolve(), outcome: Promise.resolve(null as never), runId: randomBytes(12).toString('hex') }
     this.starting.set(id, pending)
-    const run = this.startReserved(projectPath, agentId, id, opts)
+    // A new start: an earlier one's failure is over (HI-1976). Cleared here, before it runs, never once it settles: its
+    // CLI may exit meanwhile, and that failure (onExit's) must stand (HR6's round 1).
+    startBegins(projectPath, agentId)
+    // A start that takes over a second says where the time went (#1177: a resume waited ~45 s after an upgrade).
+    const times = new StepTimes()
+    // A new conversation (HI-2197): the agent's watch from before ended first, its wake cancelled, before anything launches.
+    const run = (opts.resumeId || opts.keepWatch ? Promise.resolve() : this.conversationEnds(projectPath, agentId)).then(() => this.startReserved(projectPath, agentId, id, opts, times))
     pending.done = run.catch(() => undefined)
+    pending.outcome = run
     try {
       return await run
+    } catch (e) {
+      // Given up before any process of it ran: its slot's writer released now (#1434). One that ran is its exit's.
+      if (!this.writers.get(pending.runId)?.spawned) this.settleWriterOf(pending.runId)
+      throw e
     } finally {
       this.starting.delete(id)
+      const slow = times.slowLine()
+      if (slow) log.info(`${opts.resumeId ? 'Resume' : 'Start'} of ${userText(agentId)} in ${userText(basename(projectPath))} ${slow}`)
     }
   }
 
   /**
    * Refuses a start while Hive quits, while the project's workspace is closing or switching, or while a fence holds the
-   * project (it is being removed, or a template is replacing its agents), or while its workspace's move is being repaired.
+   * project (it is being removed, or a template is replacing its agents), while its workspace's move is being repaired,
+   * or while its workspace's upgrade to 1.0 waits.
    */
   private assertStartsAllowed(projectPath: string): void {
-    if (this.shuttingDown || workspaceFor(projectPath)?.closing) throw hiveError(msg({ id: 'session.start.closing', defaultMessage: "Hive is stopping this workspace's agents, so none can start now.", description: 'Starting an agent is refused: Hive is quitting, or its workspace is closing.' }))
-    if (workspaceFor(projectPath)?.repairingMove) throw hiveError(msg({ id: 'session.start.repairing', defaultMessage: 'Hive is repairing this moved workspace: start the agent when Repair has finished.', description: "Starting an agent is refused while Repair… fixes a moved workspace's paths." }))
+    if (this.shuttingDown || workspaceFor(projectPath)?.closing) throw hiveError(msg({ id: 'session.start.closing', defaultMessage: "Hive is stopping this workspace's agents, so none can start now.", description: 'Starting an agent is refused: Hive is quitting, or its workspace is closing.' }), undefined, { kind: 'conflict' })
+    // Its workspace's upgrade to 1.0 waits (#1207): hive.db takes no writes, so the session couldn't be recorded.
+    const ws = workspaceFor(projectPath)?.path
+    if (ws) assertUpgraded(ws)
+    if (workspaceFor(projectPath)?.openGate?.held) throw hiveError(msg({ id: 'session.start.openCommands', defaultMessage: "This workspace's open commands are still running: agents start once they're done or you move on.", description: "Starting an agent is refused while the commands the user set to run as the workspace opens are running (Settings → Workspace → When this workspace opens, run), shown in a dialog with Don't wait." }), undefined, { kind: 'conflict' })
+    if (workspaceFor(projectPath)?.repairingMove) throw hiveError(msg({ id: 'session.start.repairing', defaultMessage: 'Hive is repairing this moved workspace: start the agent when Repair has finished.', description: "Starting an agent is refused while Repair… fixes a moved workspace's paths." }), undefined, { kind: 'conflict' })
     const why = this.fenced.get(resolve(projectPath).toLowerCase())?.at(-1)
-    if (why) throw hiveError(msg({ id: 'session.start.fenced', defaultMessage: "{why}, so its agents can't start now.", description: "Starting an agent is refused while something changes its project. {why} says what, as a sentence without its full stop (\"This project is being removed\")." }), { why })
+    if (why) throw hiveError(msg({ id: 'session.start.fenced', defaultMessage: "{why}, so its agents can't start now.", description: "Starting an agent is refused while something changes its project. {why} says what, as a sentence without its full stop (\"This project is being removed\")." }), { why }, { kind: 'conflict' })
   }
 
   /** Projects (lower-cased paths) whose agents may not start, and why (one entry for each fence on it). */
@@ -1261,13 +1849,179 @@ class SessionManager {
     return [...this.starting.values()].map((p) => p.projectPath)
   }
 
+  /**
+   * Where a start runs (#1434, agentFolders.ts). A new conversation: where its purpose has the agent work (a reviewer
+   * never in a slot), under that slot's lease. A conversation: where it was made, only while its slot's lease is the
+   * agent's (one writer per slot) and it may resume now; a refused one says why. The user's own Resume of one whose slot
+   * is free (or the agent's own under a later lease) takes the slot for the agent and binds it, in one write; Resume All
+   * and startup's (`auto`) never do. Outside the slots, the project folder and a retired home are any agent's, and a 0.9
+   * worktree only its agent's (`foreign` otherwise).
+   */
+  private async placeFor(projectPath: string, agent: AgentDef, existing: SessionRecord | undefined, opts: StartOptions, run: string): Promise<Place> {
+    const fa = folderAgent(agent)
+    // The agent's own runs that have ended, their writers' releases still being written: its slot is theirs until then.
+    await this.earlierWritersSettled(projectPath, agent.id, WRITER_SETTLE_MS)
+    try {
+      const c = await claimPlace(projectPath, fa, existing ?? null, { purpose: fa.role === 'reviewer' ? 'review' : (opts.purpose ?? defaultPurpose(fa.role)), auto: !!opts.auto, run })
+      // Its slot's writer is this run's from now: released once its processes are known to have ended, or its start is
+      // given up before any ran.
+      if (c.lease && c.slot) this.writers.set(run, { projectPath, agentId: agent.id, spawned: false, done: c.done })
+      else c.done()
+      return c
+    } catch (e) {
+      if (!(e instanceof ClaimRefused)) throw e
+      const w = e.why
+      if (w.is === 'hold') throw new HiveError(holdText(w.hold, agent.name), { kind: 'conflict' })
+      if (w.is === 'closing') throw hiveError(M.stoppedBeforeStart)
+      if (w.is === 'setup') throw hiveError(msg({ id: 'session.start.slotSetup', defaultMessage: '{slot} is still being set up. {agent} can start there once it is ready.', description: "Starting or resuming an agent in a slot (a worktree Hive lends to a card) is refused (#1434): Hive is still setting the slot up (its setup or install command runs), or a command of it hasn't ended yet. {slot} is the slot's name (\"slot-b\"), {agent} the agent's." }), { slot: w.slot, agent: agent.name }, { kind: 'conflict' })
+      // Its slot named (HI-2304): a connection switch's resume waits for that slot to be freed.
+      if (w.is === 'busy') throw Object.assign(hiveError(msg({ id: 'session.start.slotBusy', defaultMessage: '{slot} still has another session in it, or processes one left running there. {agent} can start there once they have ended.', description: "Starting or resuming an agent in a slot (a worktree Hive lends to a card) is refused (#1434): another session (of a card that has ended, or of another Hive) still runs in it, or processes a session left running there aren't known to have ended. {slot} is the slot's name (\"slot-b\"), {agent} the agent's." }), { slot: w.slot, agent: agent.name }, { kind: 'conflict' }), { busySlot: w.slot })
+      throw hiveError(msg({ id: 'session.start.slotChanged', defaultMessage: "{slot} isn't {agent}'s any more: its card or lane ended, or another agent's work has it. Start or resume {agent} again.", description: "Starting or resuming an agent in a slot (a worktree Hive lends to a card) is refused (#1434): the slot's lease ended or changed hands while the start was getting ready. {slot} is the slot's name (\"slot-b\"), {agent} the agent's." }), { slot: w.slot, agent: agent.name }, { kind: 'conflict' })
+    }
+  }
+
+  /**
+   * A run's slot writer handed on, once (#1434): its claim's tracked work ends; with no process of it ever spawned it is
+   * released now, else once its launch's job shows its processes ended (settleWriter), held otherwise.
+   */
+  private settleWriterOf(run: string): void {
+    const w = this.writers.get(run)
+    if (!w) return
+    this.writers.delete(run)
+    // Its claim's tracked work (which a closing pool awaits) ends once its release is written, when nothing of it ran.
+    const settled = w.spawned ? settleWriter(w.projectPath, run) : releaseWriter(w.projectPath, run).finally(() => w.done())
+    // Kept until written: a quit waits for them before its workspaces close (HI-1801).
+    this.writersSettling.add(settled)
+    const entry = { projectPath: w.projectPath, agentId: w.agentId, settled }
+    this.writerSettlingOf.set(run, entry)
+    void settled.finally(() => {
+      this.writersSettling.delete(settled)
+      if (this.writerSettlingOf.get(run) === entry) this.writerSettlingOf.delete(run)
+    })
+  }
+
+  /** Writer releases under way (settleWriterOf): each its write of the release, once its run's outcome is known. */
+  private readonly writersSettling = new Set<Promise<void>>()
+  /** The same, by run, with whose run it was: the agent's next start waits for them (earlierWritersSettled). */
+  private readonly writerSettlingOf = new Map<string, { projectPath: string; agentId: string; settled: Promise<void> }>()
+
+  /**
+   * Once the agent's runs that have ended have their slot writers released (or found held), at most `timeoutMs`
+   * (HI-1867): a lane's start of its builder just after its last run ended (stopped by the start, or exited by itself
+   * moments before) found the slot still written by that run, its release waiting for its processes to be known to have
+   * ended, and was refused. None under way: at once. Another agent's or Hive's writer, or one held (its processes kept
+   * running, or not known to have ended), isn't waited for: the claim refuses it as before.
+   */
+  private async earlierWritersSettled(projectPath: string, agentId: string, timeoutMs: number): Promise<void> {
+    const key = projectPath.toLowerCase()
+    const mine = [...this.writerSettlingOf.values()].filter((e) => e.agentId === agentId && e.projectPath.toLowerCase() === key).map((e) => e.settled.catch(() => undefined))
+    if (!mine.length) return
+    let timer: NodeJS.Timeout | undefined
+    await Promise.race([Promise.all(mine), new Promise<void>((r) => (timer = setTimeout(r, timeoutMs)))])
+    clearTimeout(timer)
+  }
+
+  /**
+   * Once the slot writers of the runs that have ended are released (or found held), at most `timeoutMs` (HI-1801: Hive
+   * quitting closed the workspace before a stopped run's release was written, its outcome known only after the
+   * leftovers' look, so the next start found the slot held by a Hive that had gone). Hive's quit, after the leftovers;
+   * a window's workspace closing, for its own projects' (`which`, HI-2299: closed first, its releases failed).
+   */
+  async writersSettled(timeoutMs: number, which?: (projectPath: string) => boolean): Promise<void> {
+    const pending = (): Promise<void>[] => (which ? [...this.writerSettlingOf.values()].filter((e) => which(e.projectPath)).map((e) => e.settled) : [...this.writersSettling])
+    const all = (async () => {
+      for (let p = pending(); p.length; p = pending()) await Promise.allSettled(p)
+    })()
+    let timer: NodeJS.Timeout | undefined
+    await Promise.race([all, new Promise<void>((r) => (timer = setTimeout(r, timeoutMs)))])
+    clearTimeout(timer)
+  }
+
+  /** A process of a run holding a slot's writer has spawned (#1434): its exit settles it, and its claim's tracked work ends. */
+  private writerSpawned(run: string): void {
+    const w = this.writers.get(run)
+    if (!w) return
+    w.spawned = true
+    w.done()
+  }
+
+  /** The agent's run now (#1434): its live session's, else its start's while being prepared. */
+  runNow(projectPath: string, agentId: string): { run: string; starting: boolean } | null {
+    const l = this.live.get(liveId(projectPath, agentId))
+    if (l) return { run: l.state.runId, starting: false }
+    const p = this.starting.get(liveId(projectPath, agentId))
+    return p ? { run: p.runId, starting: true } : null
+  }
+
+  /**
+   * Whether an agent's conversation may resume now where it was made (#1434, agentFolders.ts): null when it may, else its
+   * hold (startup's resume of the last run leaves and lists one). A conversation not recorded, or an agent gone: null
+   * (its start says why).
+   */
+  async resumeHoldFor(projectPath: string, agentId: string, sessionId: string): Promise<ResumeHold | null> {
+    if (workspace.isAssistantHome(projectPath)) return null
+    const cfg = await workspace.projectConfig(projectPath)
+    const agent = projectAgents(cfg).find((a) => a.id === agentId)
+    const rec = agent ? await workspace.sessionRecord(projectPath, sessionId) : undefined
+    return agent && rec ? resumeHold(await folderFacts(projectPath), folderAgent(agent), rec) : null
+  }
+
+  /** A start of the agent under way (HI-1746): the conversation it resumes (null: a new one) and its outcome. */
+  pendingStart(projectPath: string, agentId: string): { resumeId: string | null; outcome: Promise<LiveSessionState> } | null {
+    const p = this.starting.get(liveId(projectPath, agentId))
+    return p ? { resumeId: p.resumeId ?? null, outcome: p.outcome } : null
+  }
+
+  /**
+   * A resume of `sessionId` refused because the agent is running or starting (HI-1746: Resume All while Hive resumes
+   * that same conversation for a card): 'running' when the agent runs that conversation now, or once a start of it
+   * under way has finished (its failure or cancellation thrown); 'other' when it runs or starts anything else, or nothing.
+   */
+  async joinResume(projectPath: string, agentId: string, sessionId: string): Promise<'running' | 'other'> {
+    projectPath = workspace.assertSessionHost(projectPath)
+    // A start under way first (HR4's round 1): its live state is there before its launch has run, so it is joined by its
+    // outcome, never by that state; then the run it started, still the agent's, in that conversation.
+    const p = this.pendingStart(projectPath, agentId)
+    if (p) {
+      if (p.resumeId !== sessionId) return 'other'
+      const started = await p.outcome
+      const now = this.live.get(liveId(projectPath, agentId))?.state
+      return now?.runId === started.runId && now.sessionId === sessionId ? 'running' : 'other'
+    }
+    return this.live.get(liveId(projectPath, agentId))?.state.sessionId === sessionId ? 'running' : 'other'
+  }
+
+  /**
+   * The conversation a card's placement resumes for its stopped builder (HI-1746): the agent's newest record of its
+   * provider bound to the card's lease, chosen first; then whether it can resume: `held` (resumeHold's, never passed
+   * over for an older one or a new conversation), or `none` only when there is no such record or its transcript is gone.
+   * A read that fails throws (unknown: the placement tries again).
+   */
+  async leaseConversation(projectPath: string, agentId: string, lease: string): Promise<{ is: 'none' } | { is: 'resume'; id: string; name: string } | { is: 'held'; hold: ResumeHold }> {
+    const cfg = await workspace.projectConfig(projectPath)
+    const agent = projectAgents(cfg).find((a) => a.id === agentId)
+    if (!agent) return { is: 'none' }
+    const provider = agentProvider(agent, config.settings)
+    // The agent's records alone, newest first (HI-1236: by its index, not every record of the project).
+    const rec = (await workspace.sessionsOfAgent(projectPath, agentId)).find((r) => r.agentId === agentId && r.lease === lease && !r.archived && !r.sub && recordProvider(r) === provider)
+    if (!rec) return { is: 'none' }
+    // A provider this version doesn't know: nothing it could resume. A lookup that fails throws (unknown: tried again).
+    const adapter = allProviders().find((p) => p.id === provider)
+    if (!adapter) return { is: 'none' }
+    const transcript = await adapter.transcriptPath(rec.cwd ?? projectPath, rec.id, rec.transcriptPath)
+    if (!transcript) return { is: 'none' }
+    const hold = resumeHold(await folderFacts(projectPath), folderAgent(agent), rec)
+    return hold ? { is: 'held', hold } : { is: 'resume', id: rec.id, name: rec.name }
+  }
+
   /** Throws if the start was cancelled while it awaited something (the agent stopped, its workspace closed). */
   private assertStarting(id: string): void {
     if (this.starting.get(id)?.cancelled) throw hiveError(M.stoppedBeforeStart)
   }
 
-  private async startReserved(projectPath: string, agentId: string, id: string, opts: { resumeId?: string; name?: string; skipSetup?: boolean; permissionMode?: PermissionMode; prompt?: string; allowed?: () => void; handedOverFrom?: string }): Promise<LiveSessionState> {
+  private async startReserved(projectPath: string, agentId: string, id: string, opts: StartOptions, times: StepTimes): Promise<LiveSessionState> {
     const { agent, cfg, count } = await this.agentDef(projectPath, agentId)
+    times.mark('agentDef')
     this.assertStarting(id)
     if (this.live.has(id))
       throw count > 1
@@ -1277,49 +2031,63 @@ class SessionManager {
     if (holder) throw hiveError(msg({ id: 'session.start.openIn', defaultMessage: 'This conversation is already open in {agent}. An agent can only resume a session no other agent is running.', description: "Resuming a conversation is refused: another agent is running it. {agent} is that agent's name." }), { agent: holder.agentName ?? msg({ id: 'session.start.anotherAgent', defaultMessage: 'another agent', description: "Stands for an agent whose name isn't known, in the middle of a sentence (\"This conversation is already open in another agent.\")." }) }, { kind: 'conflict' })
     const assistant = workspace.isAssistantHome(projectPath)
     const existing = opts.resumeId ? (await workspace.sessionsFile(projectPath)).sessions.find((s) => s.id === opts.resumeId) : undefined
+    times.mark('sessionsFile')
     this.assertStarting(id)
     // A resume runs the provider its conversation ran in (#506), whatever the agent's provider is now: neither a default
-    // nor a change of the agent's own re-points one. A new conversation following Automatic waits until Hive knows what
-    // is installed.
+    // nor a change of the agent's own re-points one. A new conversation of an agent with no CLI of its own (a new
+    // workspace's Assistant) follows Automatic: it waits until Hive knows what is installed.
     const recorded = opts.resumeId ? await this.resumeProvider(projectPath, opts.resumeId, existing) : null
+    times.mark('resumeProvider')
     this.assertStarting(id)
-    if (!recorded && !agent.provider && defaultProviderPending(cfg, config.settings)) await providerService.settle()
+    if (!recorded && !agent.provider && autoProviderPending(config.settings)) await providerService.settle()
     this.assertStarting(id)
-    const providerId = recorded ?? agentLaunchSettings(agent, cfg, config.settings).provider
+    const providerId = recorded ?? agentProvider(agent, config.settings)
     // At start, Hive may still be looking for that CLI.
     await providerService.settle(providerId)
+    times.mark('providerSettle')
     // The PATH a new process gets now, with what was installed since Hive started (#821).
     await refreshPathBeforeStart()
+    times.mark('refreshPath')
     this.assertStarting(id)
     const adapter = providerAdapter(providerId)
     const name = adapter.descriptor.name
     const resuming = opts.resumeId ? 'yes' : 'no'
     if (!isProviderEnabled(config.settings, providerId)) throw hiveError(msg({ id: 'session.start.providerOff', defaultMessage: '{provider} is turned off. {resuming, select, yes {Turn it on in Settings → Providers to resume this conversation.} other {Turn it on in Settings → Providers to run {agent}.}}', description: "Starting an agent is refused: its coding agent is turned off in Settings → Providers. {provider} is the coding agent's name (Claude Code), {agent} the agent's; {resuming} says whether it resumes a conversation." }), { provider: name, resuming, agent: agent.name }, { kind: 'conflict' })
     const info = providerService.info(providerId)
-    if (!info.found || !info.path) throw hiveError(msg({ id: 'session.start.providerMissing', defaultMessage: '{resuming, select, yes {{provider} is required to resume this conversation. Install it from Help → Agent Setup.} other {{provider} is required to run {agent}. Install it from Help → Agent Setup.}}', description: "Starting an agent is refused: its coding agent's CLI isn't installed. {provider} is the coding agent's name (Claude Code), {agent} the agent's; {resuming} says whether it resumes a conversation. Help → Agent Setup is a menu command." }), { provider: name, resuming, agent: agent.name })
+    if (!info.found || !info.path) throw hiveError(msg({ id: 'session.start.providerMissing', defaultMessage: '{resuming, select, yes {{provider} is required to resume this conversation. Install it from Help → Provider Setup.} other {{provider} is required to run {agent}. Install it from Help → Provider Setup.}}', description: "Starting an agent is refused: its coding agent's CLI isn't installed. {provider} is the coding agent's name (Claude Code), {agent} the agent's; {resuming} says whether it resumes a conversation. Help → Provider Setup is a menu command." }), { provider: name, resuming, agent: agent.name })
     await workspace.ensureProject(projectPath)
-    // The Assistant works in the workspace folder, where it can read every project.
-    const cwd = assistant ? workspaceOf(projectPath).path! : (agent.worktree?.path ?? projectPath)
-    if (!existsSync(cwd)) throw hiveError(msg({ id: 'session.start.worktreeMissing', defaultMessage: "{agent}'s worktree folder is missing: {folder}. Start {agent} from its pane to recreate the worktree on its branch (Repair… if the workspace moved), or remove the agent.", description: "Starting an agent is refused: its git worktree's folder is gone. {agent} is the agent's name, {folder} the folder's path. Repair… is a command." }), { agent: agent.name, folder: cwd })
+    times.mark('ensureProject')
+    // Where it runs (#1434, agentFolders.ts): the Assistant in the workspace folder, where it can read every project; a
+    // conversation where it was made; a new one where its purpose has the agent work, under that slot's lease.
+    const run = this.starting.get(id)!.runId
+    const place: Place = assistant ? { cwd: workspaceOf(projectPath).path!, lease: null, slot: null, foreign: false } : await this.placeFor(projectPath, agent, existing, opts, run)
+    times.mark('folder')
+    this.assertStarting(id)
+    const cwd = place.cwd
+    if (!existsSync(cwd)) throw hiveError(msg({ id: 'session.start.worktreeMissing', defaultMessage: "{agent}'s worktree folder is missing: {folder}. Start {agent} from its pane to recreate the worktree on its branch (Repair… if the workspace moved), or remove the agent.", description: "Starting an agent is refused: its git worktree's folder is gone. {agent} is the agent's name, {folder} the folder's path. Repair… is a command." }), { agent: agent.name, folder: cwd }, { kind: 'conflict' })
 
     if (existing?.archived) throw hiveError(msg({ id: 'session.start.archived', defaultMessage: 'This session is archived. Unarchive it before resuming.', description: 'Resuming an archived session is refused (Sessions tab: Unarchive).' }), undefined, { kind: 'conflict' })
     // A sub-session (a Codex guardian review, say) is not a conversation: never resumed (#239).
     const sub = opts.resumeId ? (existing ? await this.recordSub(projectPath, existing) : (await adapter.listSessions(cwd).catch(() => [])).find((e) => e.id === opts.resumeId)?.sub) : undefined
+    times.mark('recordSub')
     if (sub) throw hiveError(msg({ id: 'session.start.subSession', defaultMessage: "That session is a {kind} {provider} ran for another session, not a conversation: it can't be resumed.", description: "Resuming a session is refused: the coding agent ran it for another session (a guardian review). {kind} is the coding agent's name for it, as it came; {provider} the coding agent's name (Codex)." }), { kind: sub.kind, provider: name }, { kind: 'conflict' })
     this.assertStarting(id)
     // By real paths (#455): the worktree's stored path may have changed form (an 8.3 short name, a junction) since.
-    if (opts.resumeId && existing && !samePlace(existing.cwd ?? projectPath, cwd)) {
+    if (opts.resumeId && existing && place.foreign) {
       throw hiveError(msg({ id: 'session.start.otherFolder', defaultMessage: 'This session ran in {folder}. Resume it with the agent that works in that folder.', description: "Resuming a session is refused: it ran in another folder (another agent's worktree). {folder} is that folder's path." }), { folder: existing.cwd ?? projectPath }, { kind: 'conflict' })
     }
     // Providers that choose their own session id report it once started (see the start hook).
     const sessionId = opts.resumeId ?? (adapter.descriptor.capabilities.fixedSessionId ? randomUUID() : '')
 
     const mode = assistant ? (await this.assistantInstructions(projectPath, agent).catch(() => null))?.mode : undefined
+    times.mark('assistantInstructions')
     // A /rename in the CLI since the session was last named in Hive is the newer name: Hive takes it, and so passes
     // it back with --name rather than its own.
     let adopted: string | null = null
     if (opts.resumeId && existing && (!opts.name?.trim() || opts.name.trim() === existing.name)) {
-      const usage = await this.usage(projectPath, opts.resumeId).catch(() => null)
+      // Never waiting for the usage import's turn on its transcript (#1177): then the name is adopted at a later resume.
+      const usage = await this.usage(projectPath, opts.resumeId, undefined, { noWait: true }).catch(() => null)
+      times.mark('usage')
       adopted = cliRename({ ...existing, usage }, assistant ? ASSISTANT_NAME : basename(projectPath))
       if (adopted) {
         await workspace.upsertSession(projectPath, { id: existing.id, name: adopted, titleAtRename: adopted })
@@ -1328,7 +2096,7 @@ class SessionManager {
     }
     const sessionName = adopted || opts.name?.trim() || existing?.name || (assistant ? `${ASSISTANT_NAME}${mode ? ` · ${mode}` : ''} · ${formatDateTime(new Date())}` : autoName(projectPath, agent, count))
     const key = this.key(projectPath, agentId)
-    const runId = randomBytes(12).toString('hex')
+    const runId = run
     const state: LiveSessionState = {
       provider: providerId,
       runId,
@@ -1343,14 +2111,17 @@ class SessionManager {
       runtime: { lifecycle: 'starting', maintenance: null, attention: null, composer: 'free' },
       startedAt: new Date().toISOString(),
       sessionCreatedAt: existing?.createdAt,
+      ...(place.lease && place.slot ? { slot: place.slot.name } : {}),
       launchSignature: '',
       unseen: false
     }
-    this.live.set(id, { state, adapter, transcriptMtime: '', defaultModel: false, modeTail: '', recognition: new ScreenRecognition(adapter), launchMode: null, configuredMode: undefined, modeOverride: opts.permissionMode, name: sessionName, transcriptPath: existing?.transcriptPath, initialPrompt: opts.prompt?.trim() || undefined, ...(opts.prompt?.trim() ? { launchTask: true as const } : {}), ...(opts.handedOverFrom ? { handedOverFrom: opts.handedOverFrom } : {}), startAllowed: opts.allowed, resumed: !!opts.resumeId })
+    this.live.set(id, { state, adapter, transcriptMtime: '', defaultModel: false, modeTail: '', recognition: new ScreenRecognition(adapter), launchMode: null, configuredMode: undefined, modeOverride: opts.permissionMode, name: sessionName, transcriptPath: existing?.transcriptPath, initialPrompt: opts.prompt?.trim() || undefined, ...(opts.prompt?.trim() ? { launchTask: true as const } : {}), ...(opts.handedOverFrom ? { handedOverFrom: opts.handedOverFrom } : {}), startAllowed: opts.allowed, resumed: !!opts.resumeId, ...(place.lease ? { lease: place.lease } : {}), ...(place.lease && place.slot ? { slotEnv: slotEnv(place.slot) } : {}) })
     this.runs.set(runId, id)
 
     const setup = cfg.worktreeSetup.trim()
-    if (agent.worktree && agent.needsSetup && setup && !opts.skipSetup) {
+    // The agent's own worktree's first setup (also adopted as its carried slot, #1441), never a slot the pool set up.
+    const ownTree = legacyWorktree(agent)
+    if (ownTree && legacySetupPending(agent) && setup && !opts.skipSetup && (!place.slot || samePlace(place.slot.folder, ownTree.path))) {
       // The worktree's setup command runs in the agent's terminal first, then the agent starts there.
       state.settingUp = true
       setStatus(state, withValues(msg({ id: 'session.status.settingUp', defaultMessage: 'Setting up the worktree: {command}', description: "An agent's status while the project's worktree setup command runs in its terminal. {command} is that command, as written." }), { command: setup }))
@@ -1367,9 +2138,11 @@ class SessionManager {
           env: childEnv(),
           quietExit: true,
           // What the setup command starts is the launch's too (an `npm install` left running).
-          ...(tracked ? { track: (pid: number, cancelled: AbortSignal) => trackLaunch({ runId, projectPath, agentId, agentName: agent.name }, pid, cancelled).then((r) => this.launchWord(r)) } : {}),
+          ...(tracked ? { track: (pid: number, cancelled: AbortSignal) => trackLaunch({ runId, projectPath, agentId, agentName: agent.name, gated: true }, pid, cancelled).then((r) => this.launchWord(r)) } : {}),
           onExit: (code) => void this.afterSetup(projectPath, agentId, code, { sessionId, name: sessionName, resume: !!opts.resumeId })
         })
+        // Its setup's process runs now (spawnPty returned, not thrown): its slot's writer is the run's processes' to settle.
+        this.writerSpawned(runId)
       } catch (e) {
         this.forget(id)
         throw e
@@ -1379,7 +2152,7 @@ class SessionManager {
       return state
     }
     try {
-      await this.launch(projectPath, agent, { sessionId, name: sessionName, resume: !!opts.resumeId })
+      await this.launch(projectPath, agent, { sessionId, name: sessionName, resume: !!opts.resumeId }, times)
     } catch (e) {
       this.forget(id)
       emit({ type: 'session-status', state: { ...state, status: 'stopped', runtime: { ...state.runtime!, lifecycle: 'stopped' } } })
@@ -1398,6 +2171,9 @@ class SessionManager {
     if (l && basename(l.state.projectPath) === ASSISTANT_DIR) this.onAssistantExit(l.state.projectPath)
     else if (l) endAgentToken(l.state.projectPath, l.state.agentId, l.state.runId)
     if (l) this.launchEnded(l.state.projectPath, l.state.agentId, l.state.runId)
+    // Its slot's writer (#1434): released now if no process of it ran, else once they are known to have ended.
+    if (l) this.settleWriterOf(l.state.runId)
+    if (l?.state.hooksMissing) noteHooksMissing(l.state.projectPath, l.state.agentId, false)
     this.live.delete(id)
     this.recheckTools(id)
     // A start given up before its process spawned has no exit to wait for.
@@ -1425,26 +2201,205 @@ class SessionManager {
           tr(msg({ id: 'session.setup.failedTitle', defaultMessage: '{project} · {agent}: setup failed', description: "A notice's title: the worktree setup command failed for an agent. {project} is the project, {agent} the agent." }), { project: basename(projectPath), agent: agent.name }),
           tr(msg({ id: 'session.setup.failed', defaultMessage: "The setup command exited with code {code}. Its output is in the agent's terminal. Fix it and start the agent again, or start it without setup.", description: "The notice that a worktree setup command failed. {code} is its exit code." }), { code: String(code) }),
           undefined,
-          projectPath
+          projectPath,
+          agentTarget(projectPath, agent.id, agent.name)
         )
       workspaceOf(projectPath).scheduleRefresh()
       return
     }
-    await workspace.updateAgent(projectPath, agentId, { needsSetup: false }).catch(() => undefined)
+    await workspace.updateLegacyAgent(projectPath, agentId, { needsSetup: false }).catch(() => undefined)
     l.state.settingUp = false
     setStatus(l.state, null)
     try {
-      await this.launch(projectPath, { ...agent, needsSetup: false }, launch)
+      await this.launch(projectPath, ({ ...agent, needsSetup: false } as StoredAgent), launch)
     } catch (e) {
       void this.afterLaunch(l.state.runId, this.label(l.state))
       this.forget(id)
       emit({ type: 'session-status', state: { ...l.state, status: 'stopped', runtime: { ...l.state.runtime!, lifecycle: 'stopped' } } })
-      toast('error', tr(msg({ id: 'session.start.couldNot', defaultMessage: 'Could not start {agent}', description: "A notice's title: an agent failed to start after its worktree setup. {agent} is the agent's name; the error follows." }), { agent: agent.name }), shownError(e), undefined, projectPath)
+      toast('error', tr(msg({ id: 'session.start.couldNot', defaultMessage: 'Could not start {agent}', description: "A notice's title: an agent failed to start after its worktree setup. {agent} is the agent's name; the error follows." }), { agent: agent.name }), shownError(e), undefined, projectPath, agentTarget(projectPath, agent.id, agent.name))
     }
   }
 
   /** Starts the agent's CLI for an agent whose live entry already exists. */
-  private async launch(projectPath: string, agent: AgentDef, opts: { sessionId: string; name: string; resume: boolean }): Promise<void> {
+  /**
+   * Launches on the connection it gets (HI-1755, connectionForLaunch: refused, saying why, when there is none to use), held
+   * until the launch has ended either way: by then its live state keeps the connection from being removed.
+   */
+  private async launch(projectPath: string, agent: AgentDef, opts: { sessionId: string; name: string; resume: boolean }, times?: StepTimes): Promise<void> {
+    const l = this.live.get(liveId(projectPath, agent.id))!
+    this.followConnections()
+    const ws = workspaceOf(projectPath)
+    // On its choice as saved now (not as it was when its start began), looked at again as launchOn's last await.
+    await launchOnChosen({ provider: l.adapter.id, workspaceConfig: ws.path ? ws.config : null, agentName: agent.name, chosen: () => this.chosenConnection(projectPath, agent) }, async (conn, lastLook) => {
+      times?.mark('connection')
+      await this.launchOn(projectPath, agent, opts, times, conn, lastLook)
+    })
+  }
+
+  /**
+   * Why an agent's turn isn't over yet (HI-1706's laneEndHeldNow: slotsApp.ts sets it as it loads, as deliveries.ts sets
+   * `deliveries`, so sessions.ts doesn't import it): a connection switch waits on it. Until set, nothing holds it.
+   */
+  safePointHeld: (projectPath: string, agentId: string, runId: string) => string | null = () => null
+
+  /** Calls fn with a project's folder each time a slot of it may have come free (HI-2304: slotsApp.ts sets it as it loads). */
+  slotFreedWatch: (fn: (projectPath: string) => void) => () => void = () => () => undefined
+
+  /** What holds a slot of the project now, in English (HI-2304, slotHeldWords), or null once nothing of this Hive's does. */
+  private async slotHeldWhy(projectPath: string, slot: string): Promise<string | null> {
+    const cfg = await workspaceOf(projectPath).projectConfig(projectPath).catch(() => null)
+    const agents = cfg ? projectAgents(cfg) : []
+    return slotHeldWords(projectPath, slot, (a) => agents.find((x) => x.id === a)?.name ?? a).catch(() => null)
+  }
+
+  /** Switches of connection waiting for their agent's safe point (HI-1755), by liveId: at most one per agent. */
+  private switches = new Map<string, SwitchOp>()
+  /** Agents whose switch is resuming them now: that start is the switch's, not the user's. */
+  private switchResuming = new Set<string>()
+  /**
+   * What each waiting switch is for (HI-2195, by liveId): `base`, HI-1755's own (a manual or fallback switch), and/or a
+   * usage move, committed at the safe point. A usage move dropped leaves a base switch to go on; one alone ends it.
+   */
+  private switchIntents = new Map<string, SwitchIntents>()
+
+  /**
+   * Switches an agent to the connection it would launch on now, at its next safe point (HI-1755, connectionSwitch.ts):
+   * once its turn is over its CLI is ended with its own exit, and once that run has exited its last session is resumed,
+   * once. 'waiting': one already waits (it resumes on the choice as it is then); 'notRunning': nothing to switch.
+   * `usage` (HI-2195): a usage move, whose commit writes the agent's connection at the safe point; without, the switch is
+   * HI-1755's own. Either joins a switch already waiting (one quit), each kept apart (dropUsageMove).
+   */
+  switchAtSafePoint(projectPath: string, agentId: string, usage?: UsageIntent): 'queued' | 'waiting' | 'notRunning' {
+    projectPath = workspace.assertSessionHost(projectPath)
+    const id = liveId(projectPath, agentId)
+    const waiting = this.switchIntents.get(id)
+    if (this.switches.has(id) && waiting) {
+      if (waiting.join(usage) && usage) void this.switches.get(id)!.done.then((e) => usage.ended(e))
+      return 'waiting'
+    }
+    if (this.switches.has(id)) return 'waiting'
+    const l = this.live.get(id)
+    if (!l || l.state.status === 'stopped') return 'notRunning'
+    const intents = new SwitchIntents(usage)
+    this.switchIntents.set(id, intents)
+    const { runId, sessionId } = l.state
+    const label = userText(this.label(l.state))
+    const hostOpen = (): boolean => !this.shuttingDown && !!workspaceFor(projectPath) && !workspaceFor(projectPath)?.closing
+    // Its run counts until it has left the live sessions (start refuses while it is there, whatever its status): its
+    // session-exit, emitted once it has, is the change that resumes it.
+    const running = (): boolean => this.live.get(id)?.state.runId === runId
+    /** The slot its resume was refused for (HI-2304), while it waits for it. */
+    let heldSlot: string | null = null
+    const op = runSwitch({
+      running,
+      heldNow: () => this.safePointHeld(projectPath, agentId, runId),
+      // A usage move's write, once (HR1: checked under the agent's lock then); rejected, it is dropped alone.
+      commit: () => intents.commit(),
+      quit: () => this.quit(projectPath, agentId, runId, { fenced: hostOpen, why: 'a switch of connection', ready: () => this.safePointHeld(projectPath, agentId, runId) }), // i18n-ignore: for the log
+      resume: async () => {
+        if (!hostOpen()) throw new Error('its workspace closed') // i18n-ignore: for the log
+        // Its slot held when it last tried (HI-2304): looked at first, so a look while it still is starts nothing.
+        if (heldSlot) {
+          const why = await this.slotHeldWhy(projectPath, heldSlot)
+          if (why) throw new SlotHeld(heldSlot, why)
+        }
+        this.switchResuming.add(id)
+        try {
+          await inWorkspace(workspaceOf(projectPath), () => this.start(projectPath, { agentId, ...(sessionId ? { resumeId: sessionId } : {}) }))
+        } catch (e) {
+          const slot = (e as { busySlot?: unknown }).busySlot
+          if (typeof slot !== 'string' || !hostOpen()) throw e
+          heldSlot = slot
+          throw new SlotHeld(slot, (await this.slotHeldWhy(projectPath, slot)) ?? (e as Error).message)
+        } finally {
+          this.switchResuming.delete(id)
+        }
+      },
+      waits: (e) => (e instanceof SlotHeld ? e.why : null),
+      told: (why) => toast('warning', tr(msg({ id: 'session.switch.waitsTitle', defaultMessage: "{agent}'s switch of connection waits for {slot}", description: "A notice's title (HI-2304): an agent was stopped to switch it to another connection (account), and Hive can't resume it yet because its slot (a worktree Hive lends it, \"slot-a\") is still held. {agent} is the agent's name." }), { agent: l.state.agentName ?? this.label(l.state), slot: heldSlot ?? '' }), tr(msg({ id: 'session.switch.waits', defaultMessage: '{why}. Hive resumes it once the slot is free.', description: "The notice that an agent's switch of connection waits (HI-2304): {why} says what holds its slot, in English (\"slot-a is held by WindowsSandboxServer, left running by MB1's last run\"), without its full stop." }), { why }), undefined, projectPath, agentTarget(projectPath, l.state.agentId, l.state.agentName ?? this.label(l.state))),
+      // A slot of its project freed (HI-2304): what its resume waits for, when it does.
+      watch: (look) => {
+        const offEvents = onHiveEvent((e) => {
+          if ((e.type === 'session-status' && e.state.projectPath === projectPath && e.state.agentId === agentId) || (e.type === 'session-exit' && e.projectPath === projectPath && e.agentId === agentId)) look()
+        })
+        const offFreed = this.slotFreedWatch((p) => {
+          if (heldSlot && samePlace(p, projectPath)) look()
+        })
+        return () => {
+          offEvents()
+          offFreed()
+        }
+      },
+      log: (line) => log.info(`${label}: connection switch: ${line}`)
+    })
+    this.switches.set(id, op)
+    l.state.switchPending = true
+    this.emitState(l.state)
+    if (usage) void op.done.then((e) => usage.ended(e))
+    void op.done.then(() => {
+      if (this.switches.get(id) === op) this.switches.delete(id)
+      if (this.switchIntents.get(id) === intents) this.switchIntents.delete(id)
+      const st = this.live.get(id)?.state
+      if (st?.switchPending) {
+        st.switchPending = undefined
+        this.emitState(st)
+      }
+    })
+    return 'queued'
+  }
+
+  /**
+   * Drops an agent's usage move waiting for its safe point (HI-2195: the rule changed, the Advanced switch off, the user's
+   * own choice), never one already committed: a base switch it joined goes on; one alone is cancelled, nothing typed.
+   */
+  dropUsageMove(projectPath: string, agentId: string, why: string): void {
+    const id = liveId(projectPath, agentId)
+    if (this.switchIntents.get(id)?.drop() === 'cancel') this.switches.get(id)?.cancel(why)
+  }
+
+  /** Whether an agent's usage move waits for its safe point (HI-2195). */
+  usageMovePending(projectPath: string, agentId: string): boolean {
+    return !!this.switchIntents.get(liveId(projectPath, agentId))?.usagePending
+  }
+
+  /**
+   * The running agents (and Assistant) of a workspace whose connection isn't the one they would launch on now (HI-1755:
+   * a connection turned off, the default changed, a choice changed), each switched at its next safe point. Returns them.
+   */
+  async switchAffected(workspacePath: string): Promise<{ projectPath: string; agentId: string; result: 'queued' | 'waiting' | 'notRunning' }[]> {
+    const out: { projectPath: string; agentId: string; result: 'queued' | 'waiting' | 'notRunning' }[] = []
+    for (const st of this.liveStates()) {
+      if (!st.launchedConnection || st.status === 'stopped' || workspaceFor(st.projectPath)?.path?.toLowerCase() !== workspacePath.toLowerCase()) continue
+      const host = workspaceOf(st.projectPath)
+      const agent = (await host.projectConfig(st.projectPath).then((pc) => projectAgents(pc).find((a) => a.id === st.agentId)).catch(() => undefined)) ?? undefined
+      const eff = await this.effective(st.projectPath, agent).catch(() => null)
+      if (!eff || eff.connection === st.launchedConnection.id) continue
+      out.push({ projectPath: st.projectPath, agentId: st.agentId, result: this.switchAtSafePoint(st.projectPath, st.agentId) })
+    }
+    return out
+  }
+
+  private connectionsFollowed = false
+  /** Once: connections in use can't be removed, and a connection found signed in again ends its sign-out wait. */
+  private followConnections(): void {
+    if (this.connectionsFollowed) return
+    this.connectionsFollowed = true
+    setAccountSessions((id) => this.liveStates().some((s) => s.launchedConnection?.id === id))
+    onConnectionSignedIn((id) => {
+      const st = this.liveStates().find((s) => s.launchedConnection?.id === id)
+      if (st) this.signedInAgain(authScope(st), true)
+    })
+  }
+
+  /**
+   * The connection an agent (or the Assistant) has chosen, as saved now (HI-1755; HI-2106: a connection's id), read under
+   * the lock its changes take. Undefined: none (its CLI's first usable here).
+   */
+  private async chosenConnection(projectPath: string, agent: AgentDef): Promise<string | null | undefined> {
+    return ((await workspaceOf(projectPath).savedAgent(projectPath, agent.id)) ?? agent).connection
+  }
+
+  private async launchOn(projectPath: string, agent: AgentDef, opts: { sessionId: string; name: string; resume: boolean }, times: StepTimes | undefined, conn: LaunchConnection | null, lastLook: () => Promise<void>): Promise<void> {
     const id = liveId(projectPath, agent.id)
     const l = this.live.get(id)!
     const { state, adapter } = l
@@ -1473,22 +2428,25 @@ class SessionManager {
       // A session restarted before anything was typed has no transcript: start it fresh under the same id
       // where the provider allows choosing it, else as a new session.
       resume = !!(await adapter.transcriptPath(cwd, sessionId, recorded))
+      times?.mark('transcript')
       if (!resume) {
         log.info(`No transcript for ${sessionId}; starting it fresh instead of resuming`)
         if (!adapter.descriptor.capabilities.fixedSessionId) state.sessionId = ''
       }
     }
 
+    // Its workspace's bundled skills and modes, brought up to date after its open (HI-1705), before they are read.
+    await workspaceOf(projectPath).itemsUpToDate()
+    times?.mark('skills up to date')
     const eff = await this.effective(projectPath, pinProvider(agent, state.provider))
+    times?.mark('effective')
     // Extra arguments saved before Settings refused a bare "--" (#523) stop the launch before anything changes.
     const argsProblem = capturedText((t) => extraArgsProblem(eff.extraArgs, t))
     if (argsProblem)
-      throw workspace.isAssistantHome(projectPath)
-        ? hiveError(msg({ id: 'session.start.argsAssistant', defaultMessage: '{problem} Fix it in Settings → Assistant.', description: "Starting the Assistant is refused: its extra arguments are wrong. {problem} says why, as a sentence." }), { problem: argsProblem })
-        : hiveError(msg({ id: 'session.start.args', defaultMessage: '{problem} Fix it in Project Settings or Settings → {provider}.', description: "Starting an agent is refused: its extra arguments are wrong. {problem} says why, as a sentence; {provider} is the coding agent's name (its Settings section)." }), { problem: argsProblem, provider: adapter.descriptor.name })
+      throw hiveError(msg({ id: 'session.start.args', defaultMessage: '{problem} Fix it in its connection, {connection}, in Settings → Accounts & Connections.', description: "Starting an agent or the Assistant is refused: its connection's extra arguments are wrong (HI-2140). {problem} says why, as a sentence; {connection} is the connection's name, as in Settings → Accounts & Connections." }), { problem: argsProblem, connection: eff.connectionName ?? '' }, { kind: 'conflict' })
     l.configuredMode = eff.permissionMode
     let mode = eff.permissionMode
-    if (l.modeOverride && modeAllowed(adapter.id, l.modeOverride, config.settings)) mode = l.modeOverride
+    if (l.modeOverride && modeAllowed(adapter.id, l.modeOverride, config.settings) && !(workspace.isAssistantHome(projectPath) && isCliOwnMode(l.modeOverride))) mode = l.modeOverride
     l.launchMode = mode
     state.permissionMode = mode ?? undefined
     // Given Hive's tools, it takes no line of Hive's until they have connected (#865).
@@ -1500,6 +2458,23 @@ class SessionManager {
     l.mode = !resume ? assistantText?.modeId || undefined : undefined
     // This launch's own hook token (#345): in its environment for HTTP hooks, in a file outside the project for hook commands.
     const hookAuth = await newHookToken(state.runId)
+    times?.mark('tokens')
+    const guidance = await this.hiveGuidance(projectPath).catch(() => '')
+    // The Workspace notes note as it is now (#1433): every agent, whatever its tools or folder; a running one keeps its own.
+    const notes = await workspaceNotesFor(projectPath).catch(() => '')
+    // Instructions of Hive's own given to this conversation at an earlier launch, by any agent (SessionRecord.promptAdded).
+    const promptAddedBefore = resume && (await workspace.sessionsFile(projectPath).catch(() => null))?.sessions.find((s) => s.id === sessionId)?.promptAdded === true
+    if (assistantText?.text.trim() || notes.trim()) l.promptAdded = true
+    // A reviewer's grant of the project's review copies (#1439): one fixed folder, made if new, so it never changes
+    // between submissions. Never in a slot (either building there) nor with review copies off.
+    const copies = copiesDirOf(workspaceOf(projectPath).worktreesRoot, projectPath)
+    const granted = grantsCopies({ capable: adapter.descriptor.capabilities.extraDirs, on: advanced.get(COPIES_REVIEW) !== false, reviews: reviewsWork(agentWorkflowRole(agent)), inProjectFolder: !l.slotEnv && samePlace(cwd, projectPath), assistant: workspace.isAssistantHome(projectPath) })
+    const extraDirs = granted && (await mkdir(copies, { recursive: true }).then(() => true, () => false)) ? [copies] : []
+    l.extraDirs = extraDirs
+    l.cliVersion = info.version ?? null
+    // Its side of the workflow for its metrics (HI-2049), once: its part in the running lanes now, else its own role.
+    l.workflow = workspace.isAssistantHome(projectPath) ? 'none' : launchWorkflow(agentWorkflowRole(agent), await this.laneParts(projectPath, agent.id).catch(() => []))
+    times?.mark('guidance')
     const ctx = {
       projectPath,
       agentId: agent.id,
@@ -1514,19 +2489,29 @@ class SessionManager {
       skills: eff.skills,
       mcpServers: eff.mcpServers,
       model: eff.model,
-      effort: eff.effort,
+      // An effort the model that runs doesn't take (HI-1770: one moved onto it, or a connection's default) is kept, not used.
+      effort: eff.effort && eff.connection && !eff.connection.startsWith('!') && !effortUsable(adapter.id, eff.model, conn, eff.effort) ? null : eff.effort,
       permissionMode: mode,
       extraArgs: eff.extraArgs,
       use200kContext: eff.use200kContext,
+      copies: copyBook(workspaceOf(projectPath)),
+      othersHere: () => this.othersIn(cwd, id),
+      extraDirs,
       hookUrl: `${this.hookUrl}?run=${state.runId}`,
       hookAuthFile: hookAuth.file,
       privateDir: hookAuth.dir,
-      guidance: await this.hiveGuidance(projectPath).catch(() => ''),
+      guidance,
       instructions: assistantText?.text,
+      notes,
+      promptAddedBefore,
+      overrides: overridesNow(adapter.id),
       trustedHiveTools: workspace.isAssistantHome(projectPath) ? assistantTools(config.settings.assistant?.control, config.settings.assistant?.changeSettings === true, journalSettingsOf(workspaceOf(projectPath)).enabled) : undefined,
       initialPrompt: l.initialPrompt,
       allowBackgroundSessions: providerSettings(config.settings, adapter.id).allowBackgroundSessions,
-      env: withBinOnPath(childEnv({
+      ...(conn ? { connectionHome: conn.folder } : {}),
+      // On a connection, without the variables its CLI would read as a login in its place (HI-1757).
+      // A server connection's own variables (HI-1772: its server, models and key) after those left out, for this launch only.
+      env: withBinOnPath(withServerEnv(conn?.server?.env, withoutAccountEnv(conn ? adapter : null, childEnv({
         HIVE_HOOK_TOKEN: hookAuth.token,
         HIVE_PROJECT: basename(projectPath),
         HIVE_PROJECT_PATH: projectPath,
@@ -1535,22 +2520,43 @@ class SessionManager {
         ...(state.sessionId ? { HIVE_SESSION_ID: state.sessionId } : {}),
         HIVE_AGENT: agent.name,
         HIVE_PROVIDER: adapter.id,
+        // Its slot's name and port block (#1429's slotEnv), while it runs in one.
+        ...l.slotEnv,
+        // Its connection's folder as the CLI's home (HI-1755): its login, settings and memory, its transcripts shared.
+        ...(conn ? { [conn.homeEnv]: conn.folder } : {}),
         // Not for the Assistant: it reaches the API through its hive tools, with its own token.
         ...(workspace.isAssistantHome(projectPath) ? {} : this.apiEnv(projectPath, agent.id))
-      }), this.binDir)
+      }))), this.binDir)
     }
     const delivered = await adapter.prepareLaunch(ctx)
+    times?.mark('prepareLaunch')
+    l.launchEnv = ctx.env
     // What the session got, measured on the copies its CLI reads (not their sources: a kept old copy is what it reads).
     const deliveredSizes = await deliveredSkillSizes(adapter, ctx, delivered).catch(() => ({ catalog: 0, bytes: 0, unmeasured: Object.values(delivered).filter((d) => d.revision).length }))
+    times?.mark('skillSizes')
     if (workspace.isAssistantHome(projectPath)) await this.onAssistantLaunch(projectPath)
+    times?.mark('assistantLaunch')
     // Through its gate when its processes can be tracked (#507), else directly, untracked, as said once.
     const tracked = await this.trackingReady()
+    times?.mark('trackingReady')
     // Not while its folder is being changed under it (#646: a Git switch or pull there): it starts once that is done.
     await folderSteady(cwd)
+    times?.mark('folderSteady')
+    // Its connection, the last await (HI-1755): its choice as saved now (read under the lock saves take), resolved again,
+    // must still be the one prepared. From here to the spawn nothing awaits, so no save lands between. Another chosen,
+    // or the one prepared removed: this launch ends, and it starts again on the choice saved now (launchOnChosen).
+    await lastLook()
     // Checked after the last await, just before spawning: stopped, its workspace closed or switched, or the
     // provider turned off while this launch was being prepared, it must not start a process.
     if (l.stopRequested || this.live.get(id) !== l || this.starting.get(id)?.cancelled || !workspaceFor(projectPath) || this.shuttingDown || workspaceFor(projectPath)?.closing) throw hiveError(M.stoppedBeforeStart)
-    if (!isProviderEnabled(config.settings, adapter.id)) throw hiveError(msg({ id: 'session.start.turnedOff', defaultMessage: '{provider} was turned off while {agent} was starting.', description: "Starting an agent failed: its coding agent was turned off in Settings meanwhile. {provider} is the coding agent's name, {agent} the agent's." }), { provider: adapter.descriptor.name, agent: agent.name })
+    // The model and effort it was given (HI-1996), and whether that model was the agent's own choice (else a default).
+    const ownModel = !!ctx.model && !!agent.model && agent.model !== 'inherit' && ctx.model === agent.model
+    state.launchedWith = { model: ctx.model ?? null, effort: ctx.effort ?? null, ...(ownModel ? { own: true as const } : {}) }
+    state.launchedConnection = conn ? { id: conn.id, name: conn.name, ...(conn.note ? { note: conn.note } : {}), ...(conn.login ? { login: conn.login } : {}), ...(conn.server ? { server: { models: conn.server.models, local: conn.server.local } } : {}) } : undefined
+    if (conn?.server && state.sessionId) (l.serverSids ??= new Set()).add(state.sessionId)
+    // Decision H (HI-2108): its connection is off here or gone, so it runs on its CLI's first usable one: said once a launch.
+    if (conn?.note === 'offFallback' || conn?.note === 'missing') toast('warning', tr(M.connectionFallbackTitle, { agent: this.label(state) }), tr(M.connectionFallback, { why: conn.note, wanted: getConnection(agent.connection)?.name ?? '', name: conn.name }), undefined, projectPath, agentTarget(projectPath, state.agentId, this.label(state))) // i18n-ignore: select keys, never shown
+    if (!isProviderEnabled(config.settings, adapter.id)) throw hiveError(msg({ id: 'session.start.turnedOff', defaultMessage: '{provider} was turned off while {agent} was starting.', description: "Starting an agent failed: its coding agent was turned off in Settings meanwhile. {provider} is the coding agent's name, {agent} the agent's." }), { provider: adapter.descriptor.name, agent: agent.name }, { kind: 'conflict' })
     l.startAllowed?.()
     const cmd = adapter.buildCommand(info.path, ctx)
     // What the user should know about this launch: once per agent, folder and notice while Hive runs.
@@ -1558,18 +2564,30 @@ class SessionManager {
     const noticeKey = notice ? `${id}\n${ctx.cwd}\n${notice.title}` : ''
     if (notice && !this.launchNotices.has(noticeKey)) {
       this.launchNotices.add(noticeKey)
-      toast('warning', `${this.label(state)}: ${notice.title}`, notice.message, undefined, projectPath)
+      toast('warning', `${this.label(state)}: ${notice.title}`, notice.message, undefined, projectPath, agentTarget(projectPath, state.agentId, this.label(state)))
     }
     this.checkFolder(projectPath, ctx.cwd)
     // Where it compacts by itself (#242): for the model it runs as, the choice's (an alias resolved) or the CLI's default.
-    const chosenModel = eff.model || info.defaultModel || ''
+    const chosenModel = eff.model || (conn ? adapter.configuredDefaultModel(conn.folder) : null) || info.defaultModel || ''
     // Once the session reports the model it runs, that model alone: another model's window isn't its own.
     const modelsFor = (running?: string): string[] => (running ? [running] : [chosenModel && resolvedModel(info, chosenModel), chosenModel].filter((m): m is string => !!m))
     l.autoCompactFor = adapter.autoCompact ? (running) => adapter.autoCompact!(ctx, cmd, modelsFor(running)) : undefined
     state.autoCompact = l.autoCompactFor?.()
-    l.titleAttention = adapter.titleAttention?.(info.version) ?? undefined
+    // Its hooks, for its Hooks dialog (HI-982): never a reason for the launch to fail.
+    try {
+      l.hooks = adapter.launchHooks?.(ctx, cmd)
+    } catch (e) {
+      log.warn(`${userText(this.label(state))}: its hooks couldn't be listed`, e)
+    }
+    l.hookHistory = []
+    l.hookBlock = undefined
+    l.titleAttention = adapter.titleAttention?.(info.version, ctx) ?? undefined
     l.turnScreen = adapter.turnScreen?.(info.version) ?? undefined
     l.ledger = newLedger()
+    // Whether its hooks reach Hive (#1336), and what can say why they don't.
+    l.hooksWatch = newHooksWatch(Date.now(), !!adapter.descriptor.capabilities.startHook, adapter.transcriptTurns ? (adapter.turnsJoin ?? 'id') : null)
+    l.hooksOffIn = adapter.hooksOffIn ? () => adapter.hooksOffIn!(ctx) : undefined
+    l.newerThanTested = info.tested?.installed === 'newer'
     // What it was given: Hive's guidance revision and each skill as delivered (the Agent API's project status shows
     // them). A skill not delivered as asked (kept old copy, failed copy) leaves it needing a restart.
     // i18n-ignore: what the Agent API's project status says of a skill (agent-facing text stays English)
@@ -1580,10 +2598,11 @@ class SessionManager {
     // Performance metrics: what Hive gave this session, exact sizes. The session contract once (whichever way the
     // provider gets it); the skills that reached it, measured on their copies; the ones asked for that didn't.
     const given = Object.keys(record.skills)
-    const parts = launchParts(ctx.guidance, workspace.isAssistantHome(projectPath) ? 'assistant' : 'agent', basename(projectPath), assistantText)
+    const parts = launchParts(ctx.guidance, workspace.isAssistantHome(projectPath) ? 'assistant' : 'agent', basename(projectPath), assistantText, ctx.notes)
     recordLaunch(metrics, workspace.isAssistantHome(projectPath) ? null : basename(projectPath), {
       provider: adapter.id,
       role: workspace.isAssistantHome(projectPath) ? 'assistant' : 'agent',
+      workflow: l.workflow,
       ...parts,
       skills: given.length,
       skillCatalogBytes: deliveredSizes.catalog,
@@ -1619,6 +2638,8 @@ class SessionManager {
         screen?.write(data, () => {
           this.readFooterMode(l, screen)
           this.screenDrawn(id, l)
+          this.idleScreenDrawn(id, l)
+          this.inputBlockedDrawn(id, l)
         })
         this.watchTitle(id, data)
         this.watchReadyOutput(id, data)
@@ -1630,22 +2651,36 @@ class SessionManager {
         ? {
             track: (pid: number, cancelled: AbortSignal) => {
               state.pid = pid
-              return trackLaunch({ runId: state.runId, projectPath, agentId: agent.id, agentName: agent.name }, pid, cancelled).then((r) => this.launchWord(r))
+              return trackLaunch({ runId: state.runId, projectPath, agentId: agent.id, agentName: agent.name, gated: true }, pid, cancelled).then((r) => this.launchWord(r))
             }
           }
         : {}),
       onExit: (code, output) => {
         screen?.dispose()
-        void this.onExit(projectPath, agent.id, state.runId, code, output)
+        // A server connection's key stays masked until what its exit left (its last output) is handled (HI-1772).
+        // Its server markers go with the run (HI-1829): those its record has, at once; the rest are held from now (before
+        // onExit takes it out of live) until their record says so, or kept if it can't.
+        const ending = this.serverRunEnding(l)
+        void Promise.resolve(this.onExit(projectPath, agent.id, state.runId, code, output)).finally(() => this.serverRunEnded(projectPath, ending))
       }
     })
+    // Its process runs now (spawnPty returned, not thrown): its slot's writer is the run's processes' to settle (#1434).
+    this.writerSpawned(state.runId)
+    // A task on its command line is its first prompt (#1336: a hook should follow it), though it is still starting: no
+    // turn of its own runs yet.
+    if (l.initialPrompt) this.notePrompt(l, true)
     l.initialPrompt = undefined
     l.startAllowed = undefined
-    // After each look at the transcript, the silence check: what the CLI recorded (a turn's end) comes first (#648).
+    // After each look at the transcript, whether its CLI waits to retry (HI-1972), then the silence check: what the CLI
+    // recorded (a turn's end) comes first (#648); then whether its hooks are arriving (#1336).
     l.backupTimer = setInterval(() => {
       void this.backup(projectPath, agent.id)
         .catch((e) => log.warn('transcript look failed', e))
+        .then(() => this.checkRetry(projectPath, agent.id))
+        .then(() => this.checkRetryNotice(projectPath, agent.id))
         .then(() => this.checkSilence(projectPath, agent.id))
+        .then(() => this.checkHooks(projectPath, agent.id))
+        .catch((e) => log.warn('hooks check failed', e))
     }, 5000)
     // The process runs now: failing to record it (a full disk) must not leave it untracked.
     if (state.sessionId) await this.recordSession(projectPath, agent, l).catch((e) => log.warn(`${userText(this.label(state))}: could not record session ${state.sessionId}`, e))
@@ -1670,9 +2705,14 @@ class SessionManager {
    * whatever happens to the launch; the agent's session to resume and its cards only while it is still the agent's
    * launch.
    */
-  private async recordSession(projectPath: string, agent: Pick<AgentDef, 'id' | 'name' | 'worktree'>, l: LiveSession): Promise<void> {
+  private async recordSession(projectPath: string, agent: Pick<AgentDef, 'id' | 'name'>, l: LiveSession): Promise<void> {
     const { state } = l
     const sessionId = state.sessionId
+    // On a server connection (HI-1772), this conversation's usage leaves the CLI's cost reports out from now on.
+    if (state.launchedConnection?.server && sessionId) {
+      ;(l.serverSids ??= new Set()).add(sessionId)
+      ;(l.serverRecorded ??= new Set()).add(sessionId)
+    }
     // A new conversation began with this launch, or (one the CLI switched to) now: its record says so, and the footer
     // names it by the record's time, as the Sessions tab does (#630: a minute apart when recorded after a minute's turn).
     state.sessionCreatedAt ??= state.startedAt
@@ -1690,15 +2730,41 @@ class SessionManager {
       agentName: agent.name,
       // The Assistant's mode its conversation was last given (a resumed one's is unknown until it is told: assistantMode.ts).
       ...(l.mode ? { mode: l.mode } : {}),
+      // Hive's own instructions were given it (#1433): kept, never cleared, so later resumes refresh its prompt.
+      ...(l.promptAdded ? { promptAdded: true as const } : {}),
       // Providers that choose their own ids file transcripts by date, not folder: remember where.
       ...(l.transcriptPath && !l.adapter.descriptor.capabilities.fixedSessionId ? { transcriptPath: l.transcriptPath } : {}),
-      // Where it ran, when not the project folder (a worktree, or the Assistant's workspace folder).
-      ...(state.cwd.toLowerCase() !== projectPath.toLowerCase() ? { cwd: state.cwd } : {}),
-      ...(agent.worktree ? { branch: agent.worktree.branch } : {}),
-      ...(l.handedOverFrom ? { handedOverFrom: l.handedOverFrom } : {})
+      // Where it ran (#1434: always, the project folder too): a conversation resumes only there.
+      cwd: state.cwd,
+      ...(legacyWorktree(agent) ? { branch: legacyWorktree(agent)!.branch } : {}),
+      ...(l.handedOverFrom ? { handedOverFrom: l.handedOverFrom } : {}),
+      // The connection its latest run launched on (HI-1755), id and name as then: what it actually ran on.
+      ...(state.launchedConnection ? { connection: { id: state.launchedConnection.id, name: state.launchedConnection.name } } : {}),
+      // On a server connection (HI-1772), kept once set: its CLI's cost reports are never counted for it.
+      ...(state.launchedConnection?.server ? { serverRan: true as const } : {}),
+      // Free (HI-1772, Darren 27 Oct) only while every run of it was on a server on this PC: kept once set, each.
+      ...(state.launchedConnection?.server?.local ? { serverLocal: true as const } : { notLocal: true as const })
     }, { createdAt: state.sessionCreatedAt })
+    // Its record says it ran on a server (HI-1772, now or in an earlier run): its reads leave the CLI's cost reports out
+    // while it runs; once it exits, its record says so (serverSaved: only once that write succeeded).
+    if (rec.serverRan && sessionId) {
+      ;(l.serverSids ??= new Set()).add(sessionId)
+      ;(l.serverSaved ??= new Set()).add(sessionId)
+      serverMarks.saved(projectPath, sessionId)
+    }
+    // A record of this host saved: those whose record couldn't be saved before are tried again (HI-1829).
+    void this.saveServerMarks(projectPath)
+    // Free as the conversation's record says (this run's flag merged with earlier runs'), never by this run alone.
+    l.costFree = !!rec.serverLocal && !rec.notLocal
+    // The footer follows at once (and liveCost keeps it so): a conversation switched to that ran elsewhere isn't free.
+    if (!!state.costFree !== l.costFree) {
+      state.costFree = l.costFree ? true : undefined
+      this.emitState(state)
+    }
     // The conversation it was meant for has it: one the CLI moves to later (/clear, /new) wasn't handed over.
     l.handedOverFrom = undefined
+    // Started in a slot: bound to the lease it started under (a conversation the CLI moves to later, too).
+    if (l.lease && rec.lease !== l.lease) await bindSession(projectPath, sessionId, l.lease)
     state.sessionCreatedAt = rec.createdAt
     if (!this.owns(l)) return
     // The agent's session to resume (and no other agent's any more), decided under the config's lock as it is written: a
@@ -1715,13 +2781,19 @@ class SessionManager {
     await recordCards(workspaceOf(projectPath), projectPath, agent.id, sessionId, () => this.owns(l)).catch((e) => log.warn(`Could not record the cards of session ${sessionId}`, e))
   }
 
-  /** Stops one agent's session, or every agent of the project when agentId is omitted. */
-  stop(projectPath: string, agentId?: string): void {
+  /**
+   * Stops one agent's session, or every agent of the project when agentId is omitted. `cause`: who asked, when the
+   * caller knows (HI-1881); left out, the pane says just "stopped".
+   */
+  stop(projectPath: string, agentId?: string, cause?: StopCause): void {
     const agents = agentId ? [agentId] : this.projectStates(projectPath).map((s) => s.agentId)
     for (const a of agents) {
+      // A switch of connection waiting for it ends with it (HI-1755): a stop is the user's.
+      this.switches.get(liveId(projectPath, a))?.cancel('stopped')
       const l = this.live.get(liveId(projectPath, a))
       if (l) {
         l.stopRequested = true
+        if (cause) l.stopCause = cause
         this.endProcess(l)
       } else killPty(this.key(projectPath, a))
     }
@@ -1730,10 +2802,116 @@ class SessionManager {
   }
 
   /**
+   * Whether an agent's run `runId` is in a turn as its hooks tell it (HI-1706): the turn ledger's turn still running. A
+   * Stop Hive answered with a continuation (the inbox drain) leaves it running, whatever the status said meanwhile.
+   */
+  turnOpen(projectPath: string, agentId: string, runId: string): boolean {
+    const l = this.live.get(liveId(projectPath, agentId))
+    return !!l && l.state.runId === runId && l.ledger?.active?.state === 'running'
+  }
+
+  /**
+   * Why nothing may be typed into an agent's prompt now (HI-1706's quit), or null: Hive typing into it, a line of Hive's
+   * not taken yet (#430: or confirming, or the user's draft over it), the user typing within the pause, or what the user
+   * typed last not sent (a draft of theirs in its prompt).
+   */
+  inputHeld(projectPath: string, agentId: string): string | null {
+    const l = this.live.get(liveId(projectPath, agentId))
+    if (!l) return null
+    const key = this.key(projectPath, agentId)
+    if (this.delivering.has(key)) return 'Hive is typing into it' // i18n-ignore: a reason for the log
+    if (this.lineBlocked(l)) return "a line Hive typed isn't taken yet" // i18n-ignore: a reason for the log
+    if (this.userMayBeTyping(projectPath, agentId)) return 'the user is typing there' // i18n-ignore: a reason for the log
+    const u = this.userInput.get(key)
+    if (u && !u.enter) return "the user's draft is in its prompt" // i18n-ignore: a reason for the log
+    return null
+  }
+
+  /**
+   * Ends an agent's run `runId` as a person would, at its lane's end (HI-1706): its CLI's quitLine typed, then Enter (or
+   * its exitKeys), and killed if that run still runs after the grace. `fenced` is the caller's own check (its lease, its
+   * slot's writer), asked with the run's before each key and before the kill. `ready` (not forced): why its turn isn't
+   * over after all (the caller's own states), asked with the rest at each key and before Enter, so a turn that begins
+   * meanwhile stops it. 'held': its input is held (inputHeld), or the user typed, a prompt was taken or `ready` said no
+   * while it typed (what it typed cleared again unless the user typed since), the caller looks again; 'gone': that run
+   * or the fence is; 'sent': typed (or already ending). `force` (the caller's deadline): `ready` isn't asked, and a
+   * prompt that can't be typed into is killed rather than typed over; input arriving while it types still stops it.
+   */
+  async quit(projectPath: string, agentId: string, runId: string, o: { fenced: () => boolean; why: string; force?: boolean; ready?: () => string | null; cause?: StopCause }): Promise<'sent' | 'held' | 'gone'> {
+    const { fenced, why, force = false } = o
+    const id = liveId(projectPath, agentId)
+    const key = this.key(projectPath, agentId)
+    const l = this.live.get(id)
+    const same = (): boolean => !!l && this.live.get(id) === l && l.state.runId === runId && fenced()
+    if (!l || !same()) return 'gone'
+    if (l.ending) return 'sent'
+    const label = userText(this.label(l.state))
+    const held = this.inputHeld(projectPath, agentId) ?? (force ? null : (o.ready?.() ?? null))
+    const line = l.adapter.quitLine
+    const keys = l.adapter.exitKeys
+    if (held || (!line && !keys)) {
+      if (held && !force) return 'held'
+      log.info(`${label}: killed (${why}${held ? `; ${held}` : ', its CLI has no exit command'})`)
+      l.stopRequested = true
+      // Who asked, as its caller says (HI-1881: a lane's end says lane; a switch of connection, nothing).
+      l.stopCause = o.cause
+      l.ending = true
+      killPty(key)
+      return 'sent'
+    }
+    // From here, whatever the typing pause says: any input of the user's, any prompt its CLI takes (a turn beginning),
+    // or (not forced) its turn not over after all stops it before the next key and before Enter.
+    const since = Date.now()
+    const prompts = l.prompts ?? 0
+    const guard = (): void => {
+      if (!same()) throw new Error('its run or lease is gone') // i18n-ignore: for the log
+      if (this.userTypedAt(projectPath, agentId) >= since) throw new Error('the user typed there') // i18n-ignore: for the log
+      if ((l.prompts ?? 0) !== prompts) throw new Error('its CLI took a prompt') // i18n-ignore: for the log
+      const not = force ? null : (o.ready?.() ?? null)
+      if (not) throw new Error(not)
+    }
+    // Ending from here: its exit is a stop asked for (not a crash), and Stop meanwhile kills it at once (endProcess).
+    l.stopRequested = true
+    l.stopCause = o.cause
+    l.ending = true
+    try {
+      if (line) {
+        await this.sendPrompt(projectPath, agentId, line.line, guard)
+      } else {
+        for (const k of keys!.keys) {
+          guard()
+          writePty(key, k)
+          await new Promise((r) => setTimeout(r, keys!.gapMs))
+        }
+      }
+    } catch (e) {
+      // Nothing more is typed; sendPrompt cleared what it typed unless the user typed since. Ending no more.
+      if (this.live.get(id) === l) {
+        l.stopRequested = false
+        l.ending = false
+        // Not stopping after all: a later exit is its own (HR5's HI-1881 round 1), not this quit's cause.
+        l.stopCause = undefined
+      }
+      log.info(`${label}: its exit command wasn't typed (${why}): ${(e as Error).message}`)
+      return same() ? 'held' : 'gone'
+    }
+    const graceMs = line?.graceMs ?? keys!.graceMs
+    log.info(`${label}: ${line ? `typed ${line.line}` : 'its exit keys typed'} (${why}); killed if still running in ${Math.round(graceMs / 1000)} s`)
+    setTimeout(() => {
+      if (!same()) return
+      log.info(`${label}: still running ${Math.round(graceMs / 1000)} s after its exit command (${why}): killed`)
+      killPty(key)
+    }, graceMs).unref?.()
+    return 'sent'
+  }
+
+  /**
    * Ends a session's CLI: as a person ends it first, where the provider says how (exitKeys), so it writes what it
    * owes as it exits (Copilot's token totals, #465), and killed if it is still running after a moment. Killed at once
    * while its worktree setup runs, or when it is stopped again while ending. Keys and the kill reach only this
-   * session's terminal: a restart's new one is left alone.
+   * session's terminal: a restart's new one is left alone. Where the adapter says what its screen shows once the exit
+   * is armed, the keys go on conditions (HI-2272, exitKeys.ts): a turn under way cancelled and its end waited for, the
+   * key that exits typed once the hint shows; the kill only for one that hangs.
    */
   private endProcess(l: LiveSession): void {
     const key = this.key(l.state.projectPath, l.state.agentId)
@@ -1742,8 +2920,18 @@ class SessionManager {
     l.ending = true
     const id = liveId(l.state.projectPath, l.state.agentId)
     const same = (): boolean => this.live.get(id) === l
-    exit.keys.forEach((k, i) => setTimeout(() => same() && writePty(key, k), i * exit.gapMs))
     setTimeout(() => same() && killPty(key), exit.graceMs)
+    const armed = exit.armed
+    if (!armed) return void exit.keys.forEach((k, i) => setTimeout(() => same() && writePty(key, k), i * exit.gapMs))
+    const io: ExitKeysIO = {
+      alive: () => same() && hasPty(key),
+      inTurn: () => l.ledger?.active?.state === 'running' || EXIT_IN_TURN.has(l.state.status),
+      armed: () => armed.test(l.screen?.text() ?? ''),
+      // Checked at the write too, as the fixed beat's keys are: never into a restart's terminal.
+      press: () => void (same() && writePty(key, exit.keys[0])),
+      wait: (ms) => new Promise((r) => setTimeout(r, ms))
+    }
+    driveExitKeys(io, exit.gapMs).catch((e) => log.warn(`${userText(this.label(l.state))}: its exit keys stopped: ${(e as Error).message}`))
   }
 
   /** Stops every running agent of one provider (e.g. when the provider is turned off). */
@@ -1768,7 +2956,7 @@ class SessionManager {
    * Stops the sessions matching `which` (e.g. one window's workspace) and waits for them as stopAllAndWait
    * does. Starts in progress for matching projects are cancelled and waited for too.
    */
-  async stopWhereAndWait(which: (s: { projectPath: string }) => boolean, timeoutMs = 3000): Promise<void> {
+  async stopWhereAndWait(which: (s: { projectPath: string }) => boolean, timeoutMs = 3000, cause?: StopCause): Promise<void> {
     const pending = [...this.starting.values()].filter((p) => which(p))
     for (const p of pending) p.cancelled = true
     const chosen = [...this.live.entries()].filter(([, l]) => which(l.state))
@@ -1784,6 +2972,8 @@ class SessionManager {
     )
     for (const [, l] of chosen) {
       l.stopRequested = true
+      // Who asked, as its caller says (HI-1881: a workspace closing says closed); Hive quitting says so itself (endReason).
+      if (cause) l.stopCause ??= cause
       this.endProcess(l)
     }
     const waitMs = stopWaitMs(timeoutMs, chosen.map(([, l]) => l.adapter.exitKeys?.graceMs))
@@ -1802,19 +2992,19 @@ class SessionManager {
     const key = this.key(projectPath, agentId)
     const check = (l: LiveSession | undefined): LiveSession => {
       if (!l || l.state.settingUp) throw hiveError(M.noSession, undefined, { kind: 'conflict' })
-      if (l.compacting) throw hiveError(msg({ id: 'session.compact.already', defaultMessage: 'This session is already compacting.', description: 'Compact is refused: the conversation is being compacted already.' }))
+      if (l.compacting) throw hiveError(msg({ id: 'session.compact.already', defaultMessage: 'This session is already compacting.', description: 'Compact is refused: the conversation is being compacted already.' }), undefined, { kind: 'conflict' })
       if (this.delivering.has(key)) throw hiveError(M.typingBusy, undefined, { kind: 'conflict' })
       // Watching its cards (its turn has ended) may compact: the watch stays.
       if (l.state.status !== 'ready' && l.state.status !== 'finished' && l.state.status !== 'watching') {
         throw l.state.status === 'waiting'
-          ? hiveError(msg({ id: 'session.compact.waiting', defaultMessage: 'The agent is waiting for your answer. Compact after it has finished.', description: 'Compact is refused: the agent waits for the user.' }))
+          ? hiveError(msg({ id: 'session.compact.waiting', defaultMessage: 'The agent is waiting for your answer. Compact after it has finished.', description: 'Compact is refused: the agent waits for the user.' }), undefined, { kind: 'conflict' })
           : hiveError(msg({ id: 'session.compact.busy', defaultMessage: 'The agent is busy. Compact once it has finished.', description: 'Compact is refused: the agent is working.' }), undefined, { kind: 'conflict' })
       }
       return l
     }
     const l = check(this.live.get(id))
     const src = await this.liveTranscript(l)
-    const before = src ? ((await this.usageFor(l.state.projectPath, src, l.state.sessionId, l.state.provider))?.compactions.length ?? 0) : 0
+    const before = src ? ((await this.usageFor(l.state.projectPath, src, l.state.sessionId, l.state.provider, this.costPolicy(l)))?.compactions.length ?? 0) : 0
     // Again: a second Compact or a prompt may have come meanwhile (one at a time, only while idle).
     if (this.live.get(id) !== l) throw hiveError(M.noSession, undefined, { kind: 'conflict' })
     check(l)
@@ -1831,19 +3021,28 @@ class SessionManager {
     const runId = l.state.runId
     // The agent stopped or restarted meanwhile: the rest mustn't reach the new process.
     const same = (): boolean => this.live.get(id) === l && l.state.runId === runId && l.compacting === c
+    // The user typing in its pane meanwhile (HI-1979, HR6's round 1): nothing more is pressed or typed, what they typed
+    // theirs, and Compact isn't sent.
+    const since = Date.now()
+    const stillSame = (): void => {
+      if (!same()) throw hiveError(msg({ id: 'session.compact.stopped', defaultMessage: 'The agent stopped before Compact was sent.', description: 'Compact failed: the agent stopped or restarted while Hive typed the command.' }), undefined, { kind: 'conflict' })
+      if (this.userTypedAt(projectPath, agentId) >= since) throw hiveError(msg({ id: 'session.compact.userTyped', defaultMessage: "You typed in the agent's terminal while Hive was sending Compact, so it wasn't sent: what you typed stays.", description: "Compact failed: the user typed in the agent's terminal while Hive was clearing its input or typing the command, so Hive stopped." }), undefined, { kind: 'conflict' })
+    }
     const pause = async (ms: number): Promise<void> => {
       await new Promise((r) => setTimeout(r, ms))
-      if (!same()) throw hiveError(msg({ id: 'session.compact.stopped', defaultMessage: 'The agent stopped before Compact was sent.', description: 'Compact failed: the agent stopped or restarted while Hive typed the command.' }))
+      stillSame()
     }
     try {
-      writePty(key, '\x15')
-      await pause(150)
-      const text = l.adapter.descriptor.capabilities.compactFocus ? (focus ?? '').replace(/\s+/g, ' ').trim() : ''
+      // Settings → Advanced can leave the CLI's draft in front of it (#1286); cleared as a prompt's is (HI-1979).
+      if (advanced.get<boolean>(PROMPT_CLEAR_DRAFT)) await this.clearInput(l, key, stillSame)
+      // On one line, without control characters (HI-1920): typed key by key, one would press a key.
+      const text = l.adapter.descriptor.capabilities.compactFocus ? promptInput((focus ?? '').replace(/\s+/g, ' ').trim(), false, false) : ''
       // Written in one go, a long line counts as a paste, and pasted input is sent as a message even when
       // it starts with "/compact". So type the command on its own, then the focus in small pieces.
+      stillSame()
       writePty(key, '/compact')
       await pause(150)
-      if (text) await typeInto(key, ` ${text}`, same)
+      if (text) await typeInto(key, ` ${text}`, () => (stillSame(), true))
       await pause(150)
       writePty(key, '\r')
       c.submitted()
@@ -2003,9 +3202,18 @@ class SessionManager {
     if (mode && (mode !== l.state.permissionMode || mode !== l.state.modeObserved)) {
       // i18n-ignore: the developer console's event data, recorded like a log, stays English (#1104)
       devConsole.capture([sessionSourceId(l.state.projectPath, l.state.agentId)], () => ({ kind: 'terminal', name: 'footer mode', provider: l.state.provider, raw: { footer: mode }, made: { permissionMode: mode, was: l.state.permissionMode }, safe: { raw: { footer: true }, made: { permissionMode: true, was: true } }, summary: `terminal footer: mode ${mode}` }))
-      l.state.permissionMode = l.state.modeObserved = mode
+      this.observeMode(l, mode)
       this.emitState(l.state)
     }
+  }
+
+  /**
+   * The mode the CLI showed (its footer, a hook, its transcript): the session's mode from now, except in one launched in
+   * the CLI's own setting (#1284), which keeps saying so: only recorded as seen.
+   */
+  private observeMode(l: LiveSession, mode: PermissionMode): void {
+    l.state.modeObserved = mode
+    if (!isCliOwnMode(l.launchMode)) l.state.permissionMode = mode
   }
 
   /**
@@ -2022,17 +3230,19 @@ class SessionManager {
     const p = st.provider
     const name = l.adapter.descriptor.name
     if (st.permissionMode === mode) return { ok: true }
+    if (workspace.isAssistantHome(projectPath) && isCliOwnMode(mode)) throw hiveError(M.assistantCliOwn, undefined, { kind: 'conflict' })
     if (!modeAllowed(p, mode, config.settings)) throw hiveError(msg({ id: 'session.mode.off', defaultMessage: '{mode} is turned off in Settings → {provider}.', description: "Switching an agent's permission mode is refused: that mode is turned off. {mode} is the mode's name; {provider} the coding agent's (its Settings section)." }), { mode: permissionLabel(p, mode, tr), provider: name }, { kind: 'conflict' })
     const how = l.adapter.descriptor.capabilities.liveModeSwitch
-    if (how === 'none' || !l.adapter.canSwitchLive(mode, st.permissionMode, l.launchMode)) {
+    // Never to or from the CLI's own setting (#1284): Hive doesn't know where such a session started.
+    if (how === 'none' || !canSwitchModeLive(l.adapter.descriptor, mode, st.permissionMode, l.launchMode) || !l.adapter.canSwitchLive(mode, st.permissionMode, l.launchMode)) {
       return { ok: false, restart: true, message: tr(msg({ id: 'session.mode.restart', defaultMessage: "{mode} can't be switched to inside a running session. Restart the session in that mode; the conversation continues.", description: "Switching an agent's permission mode needs a restart. {mode} is the mode's name." }), { mode: permissionLabel(p, mode, tr) }) }
     }
-    if (st.status === 'waiting') throw hiveError(msg({ id: 'session.mode.asking', defaultMessage: 'The agent is asking you something. Answer it first, then switch the mode.', description: "Switching an agent's permission mode is refused: it waits for the user's answer." }))
-    if (st.status === 'starting') throw hiveError(msg({ id: 'session.mode.starting', defaultMessage: 'The session is still starting. Try again in a moment.', description: "Switching an agent's permission mode is refused for a moment: it is starting." }))
+    if (st.status === 'waiting') throw hiveError(msg({ id: 'session.mode.asking', defaultMessage: 'The agent is asking you something. Answer it first, then switch the mode.', description: "Switching an agent's permission mode is refused: it waits for the user's answer." }), undefined, { kind: 'conflict' })
+    if (st.status === 'starting') throw hiveError(msg({ id: 'session.mode.starting', defaultMessage: 'The session is still starting. Try again in a moment.', description: "Switching an agent's permission mode is refused for a moment: it is starting." }), undefined, { kind: 'conflict' })
     const key = this.key(projectPath, agentId)
     // The composer is reserved while the keys go in (#649), as for a line Hive types: none is typed into the menu, nor
     // the keys into a line.
-    if (this.delivering.has(key)) throw hiveError(msg({ id: 'session.mode.typing', defaultMessage: 'Hive is typing a line into this agent. Switch the mode in a moment.', description: "Switching an agent's permission mode is refused for a moment: Hive is typing into its terminal." }))
+    if (this.delivering.has(key)) throw hiveError(msg({ id: 'session.mode.typing', defaultMessage: 'Hive is typing a line into this agent. Switch the mode in a moment.', description: "Switching an agent's permission mode is refused for a moment: Hive is typing into its terminal." }), undefined, { kind: 'conflict' })
     this.delivering.add(key)
     try {
       return await this.switchModeKeys(l, mode, how)
@@ -2050,7 +3260,7 @@ class SessionManager {
     const key = this.key(st.projectPath, st.agentId)
     if (how === 'menu' && l.adapter.modeMenuKeys) {
       // The CLI's own menu (Codex: /permissions). Only while idle: typed into a working agent it would queue.
-      if (st.status === 'working') throw hiveError(msg({ id: 'session.mode.working', defaultMessage: '{provider} is working. Switch the mode once it has finished.', description: "Switching an agent's permission mode is refused while it works. {provider} is the coding agent's name." }), { provider: name })
+      if (st.status === 'working') throw hiveError(msg({ id: 'session.mode.working', defaultMessage: '{provider} is working. Switch the mode once it has finished.', description: "Switching an agent's permission mode is refused while it works. {provider} is the coding agent's name." }), { provider: name }, { kind: 'conflict' })
       const before = st.permissionMode
       st.modeSwitching = mode
       l.switchTail = ''
@@ -2203,19 +3413,98 @@ class SessionManager {
     // xterm's own replies (focus in/out, cursor reports, colour queries) aren't typing.
     const typed = typedText(data)
     if (typed) this.userInput.set(key, { at: Date.now(), enter: typed.endsWith('\r') })
-    if (typed?.includes('\r')) this.userEnter.set(key, Date.now())
+    if (typed?.includes('\r')) {
+      this.userEnter.set(key, Date.now())
+      // A prompt of the user's, perhaps (#1336): a hook should follow it if it starts a turn.
+      const l = [...this.live.values()].find((x) => this.key(x.state.projectPath, x.state.agentId) === key)
+      if (l) this.notePrompt(l)
+    }
   }
+
+  /** A prompt was sent to an agent (#1336): while it is idle (or as its launch's task, `launch`), a hook should follow it. */
+  private notePrompt(l: LiveSession, launch = false): void {
+    const idle = launch || ['ready', 'finished', 'watching', 'background'].includes(l.state.status)
+    if (l.hooksWatch) promptSent(l.hooksWatch, Date.now(), idle)
+  }
+
+  /**
+   * Whether an agent's hooks are arriving (#1336, hooksHealth.ts), at each look at its transcript, in the launch's hook
+   * order (a hook that came first is taken first, and nothing waits on a read): missing, its state is unknown, nothing is
+   * typed into it, its lanes pause, and the user is told once a conversation.
+   */
+  private checkHooks(projectPath: string, agentId: string): Promise<void> {
+    const id = liveId(projectPath, agentId)
+    const l = this.live.get(id)
+    if (!l?.hooksWatch) return Promise.resolve()
+    return this.inHookOrder(l.state.runId, () => {
+      const w = l.hooksWatch
+      const st = l.state
+      if (this.live.get(id) !== l || !w || st.hooksMissing || st.runtime?.lifecycle === 'stopped' || st.runtime?.lifecycle === 'signin') return
+      // Tests hold the check while a file is there (#1371), to let a turn finish before any check looks (unpackaged only).
+      const hold = !app.isPackaged ? process.env.HIVE_TEST_HOOKS_HOLD : undefined
+      if (hold && existsSync(hold)) return
+      // A question at its start (its folder's trust) waits for the user while it is on its screen.
+      const text = l.screen?.text() ?? null
+      const startWaits = st.status === 'waiting' || (!!l.askedAtStart && (text === null || !l.adapter.startupQuestion || l.adapter.startupQuestion.test(text.replace(/\s+/g, ' '))))
+      const after = hooksMissing(w, { startWaits, screen: this.screenTurn(l) }, Date.now(), advanced.number('hive.hooks.missingSeconds') * 1000)
+      if (after) this.hooksGone(l, after)
+    })
+  }
+
+  /** Its hooks aren't arriving (#1336): why if Hive can tell, its state unknown, its lanes paused, the user told once. */
+  private hooksGone(l: LiveSession, after: 'start' | 'prompt' | 'transcript'): void {
+    const st = l.state
+    const offIn = (() => {
+      try {
+        return l.hooksOffIn?.() ?? null
+      } catch {
+        return null
+      }
+    })()
+    const why = hooksRefused(st.runId) ? 'refused' : offIn ? 'off' : l.newerThanTested ? 'newer' : undefined
+    const turn = after === 'transcript' ? l.hooksWatch?.flagged : null
+    st.hooksMissing = { since: new Date().toISOString(), after, ...(turn ? { turn } : {}), ...(why ? { why } : {}), ...(why === 'off' ? { offIn: offIn! } : {}) }
+    this.emitState(st)
+    noteHooksMissing(st.projectPath, st.agentId, true)
+    const label = this.label(st)
+    log.warn(`${userText(label)}: no hooks from ${st.provider} ${after === 'start' ? 'since it started' : after === 'transcript' ? 'for a turn its transcript shows it took' : 'after a prompt it went to work on'}${why ? ` (${why})` : ''}: its status may be wrong, and nothing is typed into it until they come`)
+    hookJournal(`run=${st.runId} (no hook) hooks missing after ${after}${why ? ` (${why})` : ''}`)
+    // Once a conversation (a restart with the same hooks problem says it again only in its pane).
+    if (!this.hooksTold.first(`${st.agentId}\n${st.sessionId || st.runId}`)) return
+    // A toast, kept in Notifications.
+    toast('warning', tr(msg({ id: 'session.notice.hooksMissingTitle', defaultMessage: "Hive isn't hearing from {agent}'s hooks", description: "A notification's title: an agent's coding agent has stopped sending Hive its hooks (the calls that tell Hive what it is doing). {agent} is the agent." }), { agent: label }), tr(HOOKS_MISSING_NOTE, { provider: l.adapter.descriptor.name, why: why ?? 'other', where: offIn ?? '', after }), undefined, st.projectPath, agentTarget(st.projectPath, st.agentId, label)) // i18n-ignore: select keys, never shown
+  }
+
+  /** Its hooks came again (#1336): its status is Hive's to tell again, and its lanes go on. */
+  private hooksBack(l: LiveSession): void {
+    const st = l.state
+    const was = st.hooksMissing
+    st.hooksMissing = undefined
+    this.emitState(st)
+    noteHooksMissing(st.projectPath, st.agentId, false)
+    log.info(`${userText(this.label(st))}: its hooks are arriving again${was ? ` (missing since ${was.since})` : ''}`)
+  }
+
+  /** Agents and conversations told their hooks went missing (#1336): once each while Hive runs, a bounded few (#1369). */
+  private hooksTold = new SeenOnce(500)
 
   /**
    * A line Hive typed into an agent wasn't taken, even after Enter again (#430: its CLI wasn't reading its input). It is
    * marked in its pane, and the user told once; nothing more is typed into it until the CLI takes it or the user types
    * there. Only for this launch.
    */
-  lineNotTaken(projectPath: string, agentId: string, runId: string, text: string, retried = true): void {
+  lineNotTaken(projectPath: string, agentId: string, runId: string, text: string, retried = true, rangFor: readonly string[] = []): void {
     const l = this.live.get(liveId(projectPath, agentId))
     if (!l || l.state.runId !== runId || l.state.untakenLine) return
     l.state.untakenLine = { since: new Date().toISOString(), text: text.replace(/\s+/g, ' ').trim().slice(0, 160) }
+    l.untakenFor = [...rangFor]
+    l.untakenText = text
+    l.untakenPrompts = l.prompts ?? 0
     this.emitState(l.state)
+    // Its screen as it is now, not only at its next draw (HR3's round 1): a dialog that took the line and has closed may
+    // have left the input empty already, and nothing more may be drawn.
+    const id = liveId(projectPath, agentId)
+    if (l.adapter?.idleQuestion && l.screen) void this.inHookOrder(runId, () => (this.live.get(id) === l ? this.lookAtIdleScreen(id, l) : undefined)).catch((e) => log.warn('lost line: check failed', e))
     const label = this.label(l.state)
     const body = retried
       ? msg({ id: 'session.notice.untakenRetried', defaultMessage: "Hive typed it and pressed Enter twice, but its CLI wasn't reading its input. Show it, click its terminal and press Enter.", description: "The notification that an agent's CLI didn't take a line Hive typed into it." })
@@ -2240,6 +3529,18 @@ class SessionManager {
       l.confirming = undefined
       this.noteComposer(l, key)
     }
+  }
+
+  /**
+   * A line Hive typed into an agent, marked not taken, was taken after all (#1514): `delivery`, which that very line rang
+   * for, was read in the same launch (Codex takes a line typed while a turn runs as queued input, with no prompt Hive
+   * sees). The mark goes, so its input isn't held for a line its CLI no longer has. Another line's delivery read leaves it
+   * (round 1 finding: an older line's, read late, says nothing of this one).
+   */
+  lineTaken(projectPath: string, agentId: string, runId: string, delivery: string, why: string): void {
+    const l = this.live.get(liveId(projectPath, agentId))
+    if (!l || l.state.runId !== runId || !l.untakenFor?.includes(delivery)) return
+    this.clearUntaken(l, why)
   }
 
   /** Whether an agent has a line Hive typed that its CLI hasn't taken (#430): nothing more is typed into it meanwhile. */
@@ -2267,6 +3568,10 @@ class SessionManager {
     if (!u) return
     log.info(`${userText(this.label(l.state))}: the line Hive typed is no longer waiting (${why}, ${Math.round((Date.now() - Date.parse(u.since)) / 1000)} s after it was marked)`)
     l.state.untakenLine = undefined
+    l.untakenFor = undefined
+    l.untakenText = undefined
+    l.untakenPrompts = undefined
+    this.dropLostLook(l)
     this.emitState(l.state)
   }
 
@@ -2279,11 +3584,22 @@ class SessionManager {
    */
   userReplied: (projectPath: string, agentId: string, agentName: string, text: string) => void = () => undefined
 
+  /**
+   * A line Hive typed, never taken, was lost from the CLI's input (HI-1959): the deliveries it rang for, of that launch,
+   * are queued again by the delivery service (main/deliveries.ts), so the doorbell rings once more; one read meanwhile
+   * isn't.
+   */
+  lineLost: (projectPath: string, agentId: string, runId: string, deliveries: readonly string[]) => void = () => undefined
+
   private noteUserReply(l: LiveSession, text: string | null | undefined): void {
     const st = l.state
     if (!text?.trim() || text.trim().startsWith('/') || workspace.isAssistantHome(st.projectPath)) return
+    // A launch's task on its command line is its CLI's first prompt (HI-2218, #712), Hive's whatever Enter the user
+    // pressed on its start screen; `prompted` has counted it already.
+    if (l.launchTask && (l.prompts ?? 0) <= 1) return
     const enterAt = this.userEnter.get(this.key(st.projectPath, st.agentId)) ?? 0
-    if (enterAt <= (l.typed?.at ?? 0) || Date.now() - enterAt > USER_REPLY_MS) return
+    // Not when Hive's own Enter came after the user's (HI-2218): its line, reported taken while its typing still waits.
+    if (enterAt <= Math.max(l.typed?.at ?? 0, l.hiveEnterAt ?? 0) || Date.now() - enterAt > USER_REPLY_MS) return
     this.userReplied(st.projectPath, st.agentId, st.agentName ?? st.agentId, text)
   }
 
@@ -2294,6 +3610,12 @@ class SessionManager {
     const s = config.settings.assistant
     if (u.enter && (s?.enterEndsPause ?? true)) return false
     return Date.now() - u.at < (s?.typingPause ?? 15) * 1000
+  }
+
+  /** When userMayBeTyping ends for an agent (ms since the epoch), while it holds; null when it doesn't (HI-2191: a wait for it). */
+  userQuietAt(projectPath: string, agentId: string): number | null {
+    if (!this.userMayBeTyping(projectPath, agentId)) return null
+    return this.userInput.get(this.key(projectPath, agentId))!.at + (config.settings.assistant?.typingPause ?? 15) * 1000
   }
 
   /**
@@ -2318,6 +3640,202 @@ class SessionManager {
     return [...this.locks.values()].filter((x) => x.liveId === id).map((x) => x.path)
   }
 
+  /** Files any agent holds a lock on in a folder (#1351: an agent builds there, so the merge queue doesn't update it). */
+  locksIn(folder: string): string[] {
+    return [...this.locks.values()].filter((x) => inFolder(x.path, folder)).map((x) => x.path)
+  }
+
+  /**
+   * Clears a CLI's input before Hive types into it (Settings → Advanced: Clear the CLI's draft before Hive types). One
+   * Ctrl+U where it clears the whole line, as before. Where it deletes only the row the cursor is on
+   * (capabilities.ctrlUClearsRow, HI-1979: Claude Code 2.1.312), Ctrl+U a key at a time while its input box
+   * (adapter.promptBox) holds anything. Empty is only ever what a key of Hive's draws now, never a box already on the
+   * screen (its redraw may be late, HR6's round 1): a letter typed (CLEAR_PROBE) must show alone in the box, then the
+   * Backspace that takes it back must leave the box empty; a draft left shows the letter at its end, and is cleared with
+   * it. Each key must be answered within Advanced's wait for each key, by the box drawn differently, or, while the box
+   * can't be read (a draft taller than the screen), by the screen changing, which can only go on, never end it. A key not
+   * answered, CLEAR_KEYS_MOST keys, or a box it can't read refuse what was to be typed: nothing of it is written, and
+   * the letter, if it is still there, is taken back unless the user has typed since. `check` runs before each key (the
+   * same run, the caller's guard: the user typing there stops it, their draft theirs).
+   */
+  private async clearInput(l: LiveSession | undefined, key: string, check: () => void): Promise<void> {
+    if (!l?.adapter?.descriptor.capabilities.ctrlUClearsRow) {
+      writePty(key, '\x15')
+      await new Promise((r) => setTimeout(r, 150))
+      check()
+      return
+    }
+    const screen = l.screen
+    const { projectPath, agentId, runId } = l.state
+    const since = Date.now()
+    // The box as drawn (adapter.promptBox): a key that deletes only an empty row (a line break's) changes it too. Empty
+    // is nothing but spacing in it.
+    const drawn = (): string | null => (screen && l.adapter.promptBox ? l.adapter.promptBox(screen.textWithoutDim()) : null)
+    const read = (): string | null => {
+      const box = drawn()
+      return box === null ? null : box.trim() ? box : ''
+    }
+    const words = (box: string | null): string => (box ?? '').replace(/\s+/g, ' ').trim()
+    const notCleared = (why: string): Error => {
+      log.info(`${userText(this.label(l.state))}: its input wasn't seen empty, so nothing is typed into it: ${why}`) // i18n-ignore: why, for the log
+      return hiveError(msg({ id: 'session.prompt.inputNotCleared', defaultMessage: "Its input couldn't be seen empty after Hive cleared it: nothing is typed into it until it can be.", description: "Typing into an agent is refused (a message's notice is put off and tried again; Compact fails): Hive pressed keys to clear the draft in its coding agent's input, and didn't see the input empty afterwards." }), undefined, { kind: 'conflict' })
+    }
+    const waitMs = advanced.number(CLEAR_KEY_WAIT) * 1000
+    // Refused because a key went unanswered while the box read empty (HI-2191): something else may take its keys.
+    let unanswered = false
+    /** The box once the key just pressed is answered: drawn differently from `before`, or null while it can't be read and the screen changed. */
+    const answered = async (keyName: string, before: string | null, shown: string | null): Promise<string | null> => {
+      const t = Date.now()
+      for (;;) {
+        await new Promise((r) => setTimeout(r, 25))
+        const box = read()
+        if (box !== before && box !== null) return box
+        if (before === null && box === null && shown !== null && screen!.text() !== shown) return null
+        if (Date.now() - t > waitMs) {
+          unanswered = before === ''
+          throw notCleared(before === null ? "its input box isn't on the screen" : `${keyName} wasn't answered within ${waitMs} ms (the box read "${userText(words(before).slice(0, 60))}")`) // i18n-ignore: why, for the log
+        }
+      }
+    }
+    /** Presses a key and waits for it to be answered, from the box and the screen as they were before it. */
+    const press = async (data: string, keyName: string, before: string | null): Promise<string | null> => {
+      const shown = screen?.text() ?? null
+      writePty(key, data)
+      return answered(keyName, before, shown)
+    }
+    let box = read()
+    // The letter typed and not taken back yet.
+    let probe = false
+    try {
+      for (let n = 0; ; n++) {
+        if (n >= CLEAR_KEYS_MOST) throw notCleared(`${CLEAR_KEYS_MOST} keys didn't empty it`) // i18n-ignore: why, for the log
+        check()
+        if (box === '') {
+          probe = true
+          box = await press(CLEAR_PROBE, 'A letter typed', box) // i18n-ignore: the key's name, for the log
+          if (words(box) !== CLEAR_PROBE) {
+            // A draft left (its redraw was late), the letter at its end: cleared with it.
+            probe = false
+            continue
+          }
+          check()
+          box = await press('\x7f', 'A Backspace', box)
+          probe = false
+          if (box !== '') throw notCleared(`the letter Hive typed and took back left "${userText(words(box).slice(0, 60))}"`) // i18n-ignore: why, for the log
+          check()
+          l.unanswered = 0
+          return
+        }
+        box = await press('\x15', 'A Ctrl+U', box)
+      }
+    } catch (e) {
+      const same = this.live.get(liveId(projectPath, agentId)) === l && l.state.runId === runId
+      if (probe && same && this.userTypedAt(projectPath, agentId) < since) writePty(key, '\x7f')
+      if (unanswered && same) this.inputUnanswered(l)
+      throw e
+    }
+  }
+
+  /**
+   * Whether something on an agent's screen takes the keys its input box should (HI-2191): nothing is typed into it, and
+   * no Enter pressed, until it is seen to take keys again.
+   */
+  inputBlocked(projectPath: string, agentId: string): boolean {
+    const l = this.live.get(liveId(projectPath, agentId))
+    return !!l?.inputBlocked && l.inputBlocked.runId === l.state.runId
+  }
+
+  /** Its input box as drawn now, as clearInput reads it ('' when empty, null when none is on the screen). */
+  private boxNow(l: LiveSession): string | null {
+    const box = l.screen && l.adapter.promptBox ? l.adapter.promptBox(l.screen.textWithoutDim()) : null
+    return box === null ? null : box.trim() ? box : ''
+  }
+
+  /**
+   * A clear refused because a key went unanswered while its box read empty (HI-2191: Claude Code 2.1.314's offer to teach
+   * auto mode, drawn under the empty box, took Hive's keys 105 times while nobody was told). At INPUT_BLOCKED_AFTER in a
+   * row the input is blocked: the agent waits for the user with why, unless it already waits on something else, whose
+   * reason stays (nothing is typed meanwhile either way).
+   */
+  private inputUnanswered(l: LiveSession): void {
+    l.unanswered = (l.unanswered ?? 0) + 1
+    if (l.unanswered < INPUT_BLOCKED_AFTER || l.inputBlocked) return
+    const st = l.state
+    const id = liveId(st.projectPath, st.agentId)
+    const text = msg({ id: 'session.status.inputBlocked', defaultMessage: 'Something on its screen is taking its keys: answer it there, then Try again', description: "An agent's status: Hive typed into its coding agent's input and nothing reached it (a dialog or question of the coding agent's own, which Hive doesn't recognise, takes the keys). The user answers it in the agent's terminal. Try again is the button beside this status: keep its name as it is translated there." })
+    const ask: Ask = { kind: 'question', blocking: true, message: englishText(text), text }
+    const at = Date.now()
+    l.inputBlocked = { runId: st.runId, ask, box: this.boxNow(l), since: at }
+    st.inputBlocked = { since: new Date(at).toISOString() }
+    log.info(`${userText(this.label(st))}: its input took no key in ${l.unanswered} clears in a row: something on its screen takes them; it waits for the user, and nothing is typed into it until it takes keys again`) // i18n-ignore: for the log
+    const ev: HookEvent = { kind: 'ask', ask }
+    if (AT_PROMPT.has(st.status)) this.carryOut(id, l, hookStep(ev, this.statusInput(l)), 'screen', ev)
+    else this.emitState(st)
+  }
+
+  /**
+   * Its input is seen to take keys again (HI-2191: its box answered the user's key, a hook moved it, or Try again's clear
+   * was answered), in the run it was blocked in: typing goes on, and the agent that waited on it is idle again. Another
+   * reason it waits for (a newer question) stays.
+   */
+  private unblockInput(id: string, l: LiveSession, why: string): void {
+    const b = l.inputBlocked
+    if (!b || this.live.get(id) !== l || l.state.runId !== b.runId) return
+    l.inputBlocked = undefined
+    l.unanswered = 0
+    l.state.inputBlocked = undefined
+    log.info(`${userText(this.label(l.state))}: its input takes keys again (${why})`) // i18n-ignore: for the log
+    if (l.state.status === 'waiting' && l.waitingOn === b.ask) this.carryOut(id, l, idleQuestionGone(this.statusInput(l)), 'screen')
+    else this.emitState(l.state)
+  }
+
+  /**
+   * The screen drawn while its input is blocked (HI-2191): once the user has typed there, a box drawn differently from
+   * when it was blocked took a key of theirs, so the input takes keys. Keys that only move about a dialog leave it so.
+   */
+  private inputBlockedDrawn(id: string, l: LiveSession): void {
+    const b = l.inputBlocked
+    if (!b || b.retrying || this.userTypedAt(l.state.projectPath, l.state.agentId) < b.since) return
+    const box = this.boxNow(l)
+    if (box !== null && box !== b.box) this.unblockInput(id, l, "its input box took the user's key") // i18n-ignore: for the log
+  }
+
+  /**
+   * Try again (HI-2191), the user's, beside a blocked input's status: one clear of its input, as before typing, for the
+   * block `since` names (LiveSessionState.inputBlocked) in its run, one at a time. Answered, typing goes on; not, it stays
+   * blocked. The user's own click, so the pause after they type doesn't hold it (their Esc that put a dialog off is
+   * typing too); a box holding their text took a key already, and is never cleared, and their typing meanwhile stops it.
+   * 'gone': that block is over (or another began); 'busy': a try or a line is being typed.
+   */
+  async retryInput(projectPath: string, agentId: string, since: string): Promise<'clear' | 'blocked' | 'gone' | 'busy'> {
+    const id = liveId(projectPath, agentId)
+    const l = this.live.get(id)
+    const b = l?.inputBlocked
+    if (!l || !b || b.runId !== l.state.runId || l.state.inputBlocked?.since !== since) return 'gone'
+    const key = this.key(projectPath, agentId)
+    if (b.retrying || this.delivering.has(key)) return 'busy'
+    const box = this.boxNow(l)
+    if (box) {
+      this.unblockInput(id, l, 'Try again: its input box holds text') // i18n-ignore: for the log
+      return 'clear'
+    }
+    b.retrying = true
+    this.delivering.add(key)
+    const started = Date.now()
+    try {
+      await this.clearInput(l, key, () => {
+        if (this.live.get(id) !== l || l.inputBlocked !== b || this.userTypedAt(projectPath, agentId) > started) throw hiveError(M.stoppedBeforePrompt)
+      })
+      this.unblockInput(id, l, 'Try again: its input took the key') // i18n-ignore: for the log
+      return 'clear'
+    } catch {
+      return l.inputBlocked === b ? 'blocked' : 'gone'
+    } finally {
+      b.retrying = false
+      this.delivering.delete(key)
+    }
+  }
+
   /** Types a message into an agent's terminal and sends it. */
   /** Agents Hive is typing a prompt into (one at a time each). */
   private delivering = new Set<string>()
@@ -2336,35 +3854,64 @@ class SessionManager {
     if (this.delivering.has(key)) throw hiveError(M.typingBusy, undefined, { kind: 'conflict' })
     // A line typed before isn't taken yet (#430): typing more would clear it, or be lost behind it.
     const waiting = (): void => {
-      if (this.lineBlocked(this.live.get(liveId(projectPath, agentId)))) throw hiveError(msg({ id: 'session.prompt.untaken', defaultMessage: "Its CLI hasn't taken the line Hive typed before; nothing more is typed until it does.", description: "Typing into an agent is refused: its CLI hasn't taken the line Hive typed before." }))
+      if (this.lineBlocked(this.live.get(liveId(projectPath, agentId)))) throw hiveError(msg({ id: 'session.prompt.untaken', defaultMessage: "Its CLI hasn't taken the line Hive typed before; nothing more is typed until it does.", description: "Typing into an agent is refused: its CLI hasn't taken the line Hive typed before." }), undefined, { kind: 'conflict' })
+    }
+    // Its CLI's own question on its screen (HI-1959): it takes the keys, and Enter answers it.
+    const asked = (): void => {
+      if (this.cliAsks(projectPath, agentId)) throw hiveError(msg({ id: 'session.prompt.cliAsks', defaultMessage: 'Its CLI shows a question for you: nothing is typed into it until you answer it there.', description: "Typing into an agent is refused: its coding agent shows a question of its own on its screen (such as Claude Code's offer to teach auto mode about your environment), which the keys would answer." }), undefined, { kind: 'conflict' })
+      // Something on its screen takes its keys (HI-2191): nothing more goes into it until it is seen to take them again.
+      if (this.inputBlocked(projectPath, agentId)) throw hiveError(msg({ id: 'session.prompt.inputBlocked', defaultMessage: 'Something on its screen is taking its keys: nothing is typed into it until you answer it there.', description: "Typing into an agent is refused: keys Hive typed into its coding agent's input didn't reach it (a dialog or question of the coding agent's own takes them)." }), undefined, { kind: 'conflict' })
     }
     waiting()
+    asked()
     this.delivering.add(key)
     this.noteComposer(l, key)
     const same = (): boolean => !!runId && this.live.get(liveId(projectPath, agentId))?.state.runId === runId
     const check = (): void => {
       if (!same()) throw hiveError(M.stoppedBeforePrompt)
       waiting()
+      asked()
       guard?.()
     }
     const since = Date.now()
     let typed = false
+    // What a multi-line prompt typed so far, by line (HI-1327): taken back as exactly that if stopped part-way.
+    let lines: number[] | null = null
+    // What a one-line prompt writes (pasted, or typed in pieces): taken back character by character where Ctrl+U
+    // deletes one wrapped row (backspaceKeys).
+    let typedOut = ''
     let sent: { at: number; prompts: number; from: number } | null = null
+    // Settings → Advanced (#1286): whether Hive clears the CLI's input first (and takes back a prompt it stopped), and
+    // whether it keeps the prompt as written.
+    const clearDraft = advanced.get<boolean>(PROMPT_CLEAR_DRAFT)
+    const asTyped = advanced.get<boolean>(PROMPT_AS_TYPED)
     try {
       check()
-      writePty(key, '\x15')
-      await new Promise((r) => setTimeout(r, 150))
-      check()
+      if (clearDraft) await this.clearInput(l, key, check)
       typed = true
-      const line = text.replace(/\s+/g, ' ').trim()
+      const line = asTyped ? text : text.replace(/\s+/g, ' ').trim()
       // A CLI busy for a moment reads what Hive typed in one go, Ctrl+U and Enter included: Claude Code takes such a
       // read as a paste with those keys in it as text, and then Enter again doesn't send it either (#597). A bracketed
       // paste is text however it arrives. A slash command is still typed: pasted, it is sent as a message.
       // Enter once the CLI has drawn the line (#600: a busy Codex drops an Enter it reads with the line): its end shows
       // on the screen once more than before it was typed.
-      const drawn = l?.screen && l.adapter.descriptor.capabilities.enterOnceDrawn ? drawnLine(l.screen, line) : null
-      if (l?.screen?.bracketedPaste() && l.adapter.descriptor.capabilities.bracketedPaste && !line.startsWith('/')) writePty(key, `\x1b[200~${line.replace(/[\x00-\x1f\x7f-\x9f]/g, '')}\x1b[201~`)
-      else await typeInto(key, line, () => (check(), true))
+      const paste = !!l?.screen?.bracketedPaste() && l.adapter.descriptor.capabilities.bracketedPaste && !line.startsWith('/')
+      // Typed as written into a CLI with a new-line key (HI-1327, Settings → Advanced): its line breaks are that key. A
+      // slash command keeps spaces.
+      // By the CLI's version as this run was launched, never the one installed since (HR6's round 1).
+      const newline = !paste && asTyped && !line.startsWith('/') && l ? l.adapter.typedNewline?.(l.cliVersion ?? null) : null
+      const segments = newline ? typedPrompt(line, TYPED_NEWLINE_KEYS[newline]) : null
+      // What Enter waits to see drawn: the last piece with something visible in it (a line of spaces draws nothing to
+      // find); none, no wait, as for an empty line.
+      const out = segments ? segments.flatMap((s) => ('text' in s && s.text.trim() ? [s.text] : [])).at(-1) ?? '' : promptInput(line, paste, asTyped)
+      const drawn = l?.screen && l.adapter.descriptor.capabilities.enterOnceDrawn && out.trim() ? drawnLine(l.screen, out) : null
+      typedOut = out
+      if (paste) writePty(key, `\x1b[200~${out}\x1b[201~`)
+      else if (segments) {
+        lines = [0]
+        await typeSegments(key, segments, () => (check(), true), lines)
+      } else await typeInto(key, out, () => (check(), true))
+      if (l) await heldTyped(this.label(l.state), check)
       await new Promise((r) => setTimeout(r, 300))
       check()
       if (drawn && !drawn()) {
@@ -2380,10 +3927,14 @@ class SessionManager {
         if (!drawn()) log.info(`${userText(this.label(l!.state))}: the line Hive typed wasn't drawn within ${most} ms: Enter anyway`)
       }
       const before = l?.prompts ?? 0
+      // Hive's line from its Enter (HI-2218): the CLI reports it taken while the confirm below still waits, before `typed`.
+      if (l) l.hiveEnterAt = Date.now()
       writePty(key, '\r')
       // Waiting to be taken from here (#430), for whatever Hive types next: recorded once this call is done with it (its
       // own Enter again below is no line over it; nothing else types meanwhile, it holds `delivering`).
       sent = { at: Date.now(), prompts: before, from: since }
+      // A hook should follow it (#1336), unless it is a command of the CLI's own.
+      if (l && !line.startsWith('/')) this.notePrompt(l)
       // i18n-ignore: the developer console's event data, recorded like a log, stays English (#1104)
       devConsole.capture([sessionSourceId(projectPath, agentId)], () => ({ kind: 'input', name: 'Hive typed a line', provider: l?.state.provider, raw: { text: line }, made: { bracketedPaste: !!l?.screen?.bracketedPaste(), confirm: !!opts.confirm }, summary: `Hive typed a line (${line.length} chars) and Enter` }))
       // confirm: until the CLI reports the prompt submitted. One just resumed and still drawing its conversation can
@@ -2405,10 +3956,30 @@ class SessionManager {
         } catch {
           break
         }
+        if (l) l.hiveEnterAt = Date.now()
         writePty(key, '\r')
       }
     } catch (e) {
-      if (typed && same() && this.userTypedAt(projectPath, agentId) < since) writePty(key, '\x15')
+      if (clearDraft && typed && same() && this.userTypedAt(projectPath, agentId) < since) {
+        // A multi-line prompt: one Ctrl+U for each of its lines with text and each line break, each its own key, so no
+        // line of it is left to go with a later prompt (HR6's round 1 of HI-1327); none past it. A CLI whose Ctrl+U
+        // deletes one wrapped row gets a Backspace for each character instead, a few at a time as typing goes (HI-1974).
+        if (l?.adapter.descriptor.capabilities.ctrlUClearsRow) {
+          const n = backspaceKeys(lines ?? typedOut)
+          for (let i = 0; i < n; i += 8) {
+            if (!same() || this.userTypedAt(projectPath, agentId) >= since) break
+            writePty(key, '\x7f'.repeat(Math.min(8, n - i)))
+            if (i + 8 < n) await new Promise((r) => setTimeout(r, 10))
+          }
+        } else {
+          const n = lines ? rollbackKeys(lines) : 1
+          for (let i = 0; i < n; i++) {
+            if (!same() || this.userTypedAt(projectPath, agentId) >= since) break
+            writePty(key, '\x15')
+            if (i + 1 < n) await new Promise((r) => setTimeout(r, 10))
+          }
+        }
+      }
       throw e
     } finally {
       if (sent && l) l.typed = sent
@@ -2430,7 +4001,7 @@ class SessionManager {
     projectPath = workspace.assertProject(projectPath)
     // To itself: the agent carries on in a new conversation (a long transcript made short again).
     const self = fromAgentId === toAgentId
-    if (!this.hiveMcp(projectPath)) throw hiveError(msg({ id: 'session.handOver.noTools', defaultMessage: 'Handing over needs Hive\'s tools in sessions: turn on "Provide Hive tools to sessions" in Settings → Agent API.', description: 'Hand Over to… is refused: agents need Hive\'s tools to write and read a handover. "Provide Hive tools to sessions" is a setting in Settings → Agent API: keep its name as Hive shows it.' }))
+    if (!this.hiveMcp(projectPath)) throw hiveError(msg({ id: 'session.handOver.noTools', defaultMessage: 'Handing over needs Hive\'s tools in sessions: turn on "Provide Hive tools to sessions" in Settings → Agent API.', description: 'Hand Over to… is refused: agents need Hive\'s tools to write and read a handover. "Provide Hive tools to sessions" is a setting in Settings → Agent API: keep its name as Hive shows it.' }), undefined, { kind: 'conflict' })
     const { agent: to } = await this.agentDef(projectPath, toAgentId)
     const { agent: from } = await this.agentDef(projectPath, fromAgentId)
     // Ending its conversation only while it may (#1057): what the notice, the footer and the dialog offer, checked here
@@ -2445,7 +4016,7 @@ class SessionManager {
     let askedAt = NaN
     let writtenAt = NaN
     if (opts.handover) {
-      if (!source) throw hiveError(msg({ id: 'session.handOver.notRunning', defaultMessage: "{agent} isn't running. Resume it to write a handover, or hand over the latest handover.", description: "Hand Over to… with a new handover is refused: the agent handing over isn't running. {agent} is its name." }), { agent: from.name })
+      if (!source) throw hiveError(msg({ id: 'session.handOver.notRunning', defaultMessage: "{agent} isn't running. Resume it to write a handover, or hand over the latest handover.", description: "Hand Over to… with a new handover is refused: the agent handing over isn't running. {agent} is its name." }), { agent: from.name }, { kind: 'conflict' })
       if (source.status !== 'ready' && source.status !== 'finished') throw hiveError(M.handOverBusy, { agent: from.name }, { kind: 'conflict' })
       // Proof, not status: the target starts only once a handover newer than this one exists, written in the
       // source's own conversation (its header's Session, which Hive writes), not by another agent meanwhile.
@@ -2460,7 +4031,8 @@ class SessionManager {
           ? tr(msg({ id: 'session.handOver.self', defaultMessage: "It continues from it in a new conversation when it's done.", description: 'The notice that an agent writes a handover to itself (Hand Over to… the same agent).' }))
           : tr(msg({ id: 'session.handOver.other', defaultMessage: "{agent} continues from it when it's done.", description: "The notice that an agent writes a handover for another. {agent} is the other agent's name." }), { agent: to.name }),
         undefined,
-        projectPath
+        projectPath,
+        agentTarget(projectPath, from.id, from.name)
       )
       // A handover delivery (#649), given now or not at all.
       askedAt = Date.now()
@@ -2485,12 +4057,12 @@ class SessionManager {
           break
         }
         const st = this.live.get(liveId(projectPath, fromAgentId))?.state
-        if (!st) throw hiveError(msg({ id: 'session.handOver.stopped', defaultMessage: '{agent} stopped before writing a handover.', description: "Hand Over to… failed: the agent handing over stopped. {agent} is its name." }), { agent: from.name })
-        if (st.status === 'waiting') throw hiveError(msg({ id: 'session.handOver.asking', defaultMessage: '{agent} is asking you something before it can write the handover. Answer it, then hand over again without a new handover.', description: "Hand Over to… stopped: the agent handing over waits for the user. {agent} is its name." }), { agent: from.name })
+        if (!st) throw hiveError(msg({ id: 'session.handOver.stopped', defaultMessage: '{agent} stopped before writing a handover.', description: "Hand Over to… failed: the agent handing over stopped. {agent} is its name." }), { agent: from.name }, { kind: 'conflict' })
+        if (st.status === 'waiting') throw hiveError(msg({ id: 'session.handOver.asking', defaultMessage: '{agent} is asking you something before it can write the handover. Answer it, then hand over again without a new handover.', description: "Hand Over to… stopped: the agent handing over waits for the user. {agent} is its name." }), { agent: from.name }, { kind: 'conflict' })
         // Finished without one (the file can land a moment after the turn ends): give it 20 seconds.
         idleSince = st.status === 'finished' || st.status === 'ready' ? idleSince || Date.now() : 0
-        if (idleSince && Date.now() - idleSince > 20_000 && Date.now() - t0 > 30_000) throw hiveError(msg({ id: 'session.handOver.noneWritten', defaultMessage: '{agent} finished without writing a handover. Ask it to write one, then hand over again without a new handover.', description: "Hand Over to… failed: the agent finished its turn without writing a handover. {agent} is its name." }), { agent: from.name })
-        if (Date.now() - t0 > 15 * 60_000) throw hiveError(msg({ id: 'session.handOver.slow', defaultMessage: "{agent} didn't write its handover in 15 minutes.", description: "Hand Over to… gave up waiting for the handover. {agent} is the agent's name." }), { agent: from.name })
+        if (idleSince && Date.now() - idleSince > 20_000 && Date.now() - t0 > 30_000) throw hiveError(msg({ id: 'session.handOver.noneWritten', defaultMessage: '{agent} finished without writing a handover. Ask it to write one, then hand over again without a new handover.', description: "Hand Over to… failed: the agent finished its turn without writing a handover. {agent} is its name." }), { agent: from.name }, { kind: 'conflict' })
+        if (Date.now() - t0 > 15 * 60_000) throw hiveError(msg({ id: 'session.handOver.slow', defaultMessage: "{agent} didn't write its handover in 15 minutes.", description: "Hand Over to… gave up waiting for the handover. {agent} is the agent's name." }), { agent: from.name }, { kind: 'conflict' })
       }
     }
     if (!handover) {
@@ -2516,7 +4088,7 @@ class SessionManager {
       // And with nothing awaited between this and the stop, its launch and its work once more.
       if (!allowed || !sameLaunch() || otherWork()) throw hiveError(M.handOverMomentLost, { agent: from.name, handover }, { kind: 'conflict' })
     }
-    if (self && this.live.has(liveId(projectPath, fromAgentId)) && !(await this.endConversation(projectPath, fromAgentId))) throw hiveError(msg({ id: 'session.handOver.didntStop', defaultMessage: '{agent} didn\'t stop. Stop it, then start it and ask it to read the handover "{handover}".', description: "Handing over to the same agent failed: it didn't stop to start a new conversation. {agent} is its name, {handover} the handover's path in the shared notes." }), { agent: from.name, handover })
+    if (self && this.live.has(liveId(projectPath, fromAgentId)) && !(await this.endConversation(projectPath, fromAgentId))) throw hiveError(msg({ id: 'session.handOver.didntStop', defaultMessage: '{agent} didn\'t stop. Stop it, then start it and ask it to read the handover "{handover}".', description: "Handing over to the same agent failed: it didn't stop to start a new conversation. {agent} is its name, {handover} the handover's path in the shared notes." }), { agent: from.name, handover }, { kind: 'conflict' })
     // The target: given the message in its running session, or started with it as its launch's task (#782), as a task
     // start is. Typed into a CLI that had only just looked ready, it could be lost under load (Codex's screen looks ready
     // before it takes input), and the next hand-over from it was refused.
@@ -2529,7 +4101,7 @@ class SessionManager {
     if (target) {
       await this.delivery().now(projectPath, { ...nd, need: 'free' })
       if (fromSession) await this.linkHandover(projectPath, toAgentId, target.runId, fromSession)
-    } else await this.delivery().launch(projectPath, nd, (line) => this.start(projectPath, { agentId: toAgentId, prompt: line, ...(fromSession ? { handedOverFrom: fromSession } : {}) }))
+    } else await this.delivery().launch(projectPath, nd, (line) => this.start(projectPath, { agentId: toAgentId, prompt: line, ...(fromSession ? { handedOverFrom: fromSession } : {}), ...(self ? { keepWatch: true } : {}) }))
   }
 
   /**
@@ -2552,17 +4124,33 @@ class SessionManager {
    * handover. The caller has checked it is idle; refused while Hive is typing into it or its CLI hasn't taken a prompt
    * Hive typed (ending it would lose that prompt). Nothing awaits before the stop, so the caller's checks still hold.
    * `allowed` throws if the caller may no longer have it (the Assistant's Control or session): checked before the stop,
-   * after it, and just before the new launch spawns.
+   * after it, and just before the new launch spawns. `purpose` (#1434): where the new conversation has the agent work, as
+   * a start's (#1443: a pooled reviewer's review, in the project folder, whatever slot it builds in).
    */
-  async newConversation(projectPath: string, agentId: string, prompt: string, allowed?: () => void): Promise<LiveSessionState> {
+  async newConversation(projectPath: string, agentId: string, prompt: string, allowed?: () => void, purpose?: FolderPurpose): Promise<LiveSessionState> {
     projectPath = workspace.assertProject(projectPath)
     const now = this.agentNow(projectPath, agentId)
-    if (!now) throw hiveError(msg({ id: 'session.newConversation.notRunning', defaultMessage: "It isn't running.", description: 'Giving an agent a task in a new conversation is refused: it isn\'t running.' }))
-    if (now.pending || this.delivering.has(this.key(projectPath, agentId))) throw hiveError(msg({ id: 'session.newConversation.pending', defaultMessage: 'It has just been given a prompt that its CLI has not taken yet.', description: "Giving an agent a task in a new conversation is refused: a prompt Hive typed hasn't been taken yet." }))
+    if (!now) throw hiveError(msg({ id: 'session.newConversation.notRunning', defaultMessage: "It isn't running.", description: 'Giving an agent a task in a new conversation is refused: it isn\'t running.' }), undefined, { kind: 'conflict' })
+    if (now.pending || this.delivering.has(this.key(projectPath, agentId))) throw hiveError(msg({ id: 'session.newConversation.pending', defaultMessage: 'It has just been given a prompt that its CLI has not taken yet.', description: "Giving an agent a task in a new conversation is refused: a prompt Hive typed hasn't been taken yet." }), undefined, { kind: 'conflict' })
     allowed?.()
-    if (!(await this.endConversation(projectPath, agentId))) throw hiveError(msg({ id: 'session.newConversation.didntStop', defaultMessage: "It didn't stop, so no new conversation was started.", description: "Giving an agent a task in a new conversation failed: it didn't stop." }))
+    if (!(await this.endConversation(projectPath, agentId))) throw hiveError(msg({ id: 'session.newConversation.didntStop', defaultMessage: "It didn't stop, so no new conversation was started.", description: "Giving an agent a task in a new conversation failed: it didn't stop." }), undefined, { kind: 'conflict' })
     allowed?.()
-    return this.start(projectPath, { agentId, prompt, allowed })
+    return this.start(projectPath, { agentId, prompt, allowed, ...(purpose ? { purpose } : {}) })
+  }
+
+  /**
+   * Start Fresh (#1437): an idle running agent's conversation ended (it stays in the Sessions tab) and a new one started,
+   * where its new conversations start (agentFolders.ts): null, or why not. `whyNot` (freshStarts.ts) says why it isn't
+   * idle now; it is asked, and Hive typing into it checked, just before the stop with no wait between them
+   * (stopWhereAndWait marks the run stopping before its first wait), so the run stopped is the idle one checked.
+   */
+  async startFresh<W extends string>(projectPath: string, agentId: string, whyNot: () => W | null): Promise<W | 'pending' | null> {
+    projectPath = workspace.assertProject(projectPath)
+    const why = this.delivering.has(this.key(projectPath, agentId)) ? 'pending' : whyNot()
+    if (why) return why
+    if (!(await this.endConversation(projectPath, agentId))) throw hiveError(msg({ id: 'session.newConversation.didntStop', defaultMessage: "It didn't stop, so no new conversation was started.", description: "Giving an agent a task in a new conversation failed: it didn't stop." }), undefined, { kind: 'conflict' })
+    await this.start(projectPath, { agentId })
+    return null
   }
 
   /** Stops a running agent to end its conversation (kept in the Sessions tab): whether it has stopped. */
@@ -2576,11 +4164,11 @@ class SessionManager {
     projectPath = workspace.assertSessionHost(projectPath)
     const l = this.live.get(liveId(projectPath, agentId))
     if (!l || l.state.settingUp) throw hiveError(M.noSession, undefined, { kind: 'conflict' })
-    if (!l.adapter.planToggleKey) throw hiveError(msg({ id: 'session.plan.noToggle', defaultMessage: '{provider} has no Plan mode toggle.', description: "Turning Plan mode on or off is refused: the coding agent has no such toggle. {provider} is its name." }), { provider: l.adapter.descriptor.name })
-    if (l.state.status === 'waiting') throw hiveError(msg({ id: 'session.plan.asking', defaultMessage: 'The agent is asking you something. Answer it first.', description: 'Turning Plan mode on or off is refused: the agent waits for the user.' }))
+    if (!l.adapter.planToggleKey) throw hiveError(msg({ id: 'session.plan.noToggle', defaultMessage: '{provider} has no Plan mode toggle.', description: "Turning Plan mode on or off is refused: the coding agent has no such toggle. {provider} is its name." }), { provider: l.adapter.descriptor.name }, { kind: 'invalid' })
+    if (l.state.status === 'waiting') throw hiveError(msg({ id: 'session.plan.asking', defaultMessage: 'The agent is asking you something. Answer it first.', description: 'Turning Plan mode on or off is refused: the agent waits for the user.' }), undefined, { kind: 'conflict' })
     if (!!l.state.planMode === on) return
     // Not into a line Hive is typing (#649: the composer is reserved meanwhile).
-    if (this.delivering.has(this.key(projectPath, agentId))) throw hiveError(msg({ id: 'session.plan.typing', defaultMessage: 'Hive is typing a line into this agent. Try again in a moment.', description: 'Turning Plan mode on or off is refused for a moment: Hive is typing into the terminal.' }))
+    if (this.delivering.has(this.key(projectPath, agentId))) throw hiveError(msg({ id: 'session.plan.typing', defaultMessage: 'Hive is typing a line into this agent. Try again in a moment.', description: 'Turning Plan mode on or off is refused for a moment: Hive is typing into the terminal.' }), undefined, { kind: 'conflict' })
     writePty(this.key(projectPath, agentId), l.adapter.planToggleKey)
     l.state.planMode = on
     this.emitState(l.state)
@@ -2589,6 +4177,7 @@ class SessionManager {
   /** Stops the agent and resumes the same conversation in another permission mode. */
   async restartInMode(projectPath: string, agentId: string, mode: PermissionMode): Promise<void> {
     projectPath = workspace.assertSessionHost(projectPath)
+    if (workspace.isAssistantHome(projectPath) && isCliOwnMode(mode)) throw hiveError(M.assistantCliOwn, undefined, { kind: 'conflict' })
     const id = liveId(projectPath, agentId)
     const l = this.live.get(id)
     if (!l) throw hiveError(M.noSession, undefined, { kind: 'conflict' })
@@ -2605,13 +4194,65 @@ class SessionManager {
       })
     )
     this.stop(projectPath, agentId)
-    await Promise.race([exited, new Promise((r) => setTimeout(r, 8000))])
+    // Its exit, waited for as long as its CLI's own way of ending may take (stopWaitMs, as stopping waits), never a
+    // fixed 8 s a slow CLI outlasts (HI-1869). Exited, its slot's writer release is under way, and the start below waits
+    // for it (placeFor's earlierWritersSettled, HI-1867), refused only if its processes are kept or not known to end.
+    let timer: NodeJS.Timeout | undefined
+    await Promise.race([exited, new Promise((r) => (timer = setTimeout(r, stopWaitMs(8000, [l.adapter.exitKeys?.graceMs]))))])
+    clearTimeout(timer)
+    // Still running: said so, rather than the start's "already running" (its old run keeps its slot meanwhile).
+    if (this.live.get(id)?.state.runId === l.state.runId) throw hiveError(msg({ id: 'session.restartMode.didntStop', defaultMessage: "{agent} didn't stop in time, so it wasn't restarted in the new mode. Try again once it has stopped.", description: "Switching a running agent's permission mode (it restarts in the new mode) is refused: the agent ({agent}, its name) was told to stop but hadn't ended yet, so nothing was started." }), { agent: l.state.agentName ?? agentId }, { kind: 'conflict' })
     await this.start(projectPath, { resumeId: resumable ? sessionId : undefined, name: sessionName, agentId, permissionMode: mode })
   }
 
   // A changed mode setting applies to new sessions; for running ones, Hive offers to switch them now.
-  private modeOffers = new Map<string, { label: string; mode: string }>()
+  private modeOffers = new Map<string, { id: string; label: string; mode: string; value: PermissionMode }>()
   private modeOfferTimer: NodeJS.Timeout | null = null
+  /**
+   * Switch Now's offers (HI-2320): each running agent it named and the mode it offered that agent (HR2's round 2: its
+   * settings' generation). Gone with the last of them, or superseded by a newer offer for one of them.
+   */
+  private modeOfferAgents = new Map<string, Map<string, PermissionMode>>()
+  private modeOfferSeq = 0
+
+  /** An agent's session ended: a Switch Now offer left with none of its agents running no longer applies (HI-2320). */
+  private modeOfferGone(id: string): void {
+    for (const [offer, ids] of this.modeOfferAgents) {
+      if (!ids.delete(id) || ids.size) continue
+      this.modeOfferAgents.delete(offer)
+      resolveOffer(offer, tr(OUTCOME.modesNextSession))
+    }
+  }
+
+  /**
+   * Switch Now, from its notice (HI-2320): only an offer still open, only the agents it named, and only into the mode it
+   * named for each (HR2's rounds 1 and 2). Settings changed since (another mode for one of them): nothing is switched,
+   * and the notice says so. Checked again at the switch itself (applyModeSettings).
+   */
+  async applyModeOffer(offer: string): Promise<{ switched: string[]; skipped: string[] }> {
+    const offered = this.modeOfferAgents.get(offer)
+    if (!offered) {
+      resolveOffer(offer, tr(OUTCOME.modesNothing))
+      return { switched: [], skipped: [] }
+    }
+    for (const [id, mode] of offered) {
+      const l = this.live.get(id)
+      if (!l) continue
+      const { agent } = await this.agentDef(l.state.projectPath, l.state.agentId).catch(() => ({ agent: null }))
+      const now = agent ? (await this.effective(l.state.projectPath, pinProvider(agent, l.state.provider))).permissionMode : null
+      if (now !== mode) {
+        this.modeOfferAgents.delete(offer)
+        resolveOffer(offer, tr(OUTCOME.modesChanged))
+        return { switched: [], skipped: [] }
+      }
+    }
+    if (!this.modeOfferAgents.has(offer)) return { switched: [], skipped: [] }
+    const r = await this.applyModeSettings(offered)
+    this.modeOfferAgents.delete(offer)
+    const text = r.switched.length || r.skipped.length ? [...r.switched, ...r.skipped].join('\n') : tr(OUTCOME.modesNothing)
+    resolveOffer(offer, text)
+    return r
+  }
 
   private noticeModeSetting(l: LiveSession, mode: PermissionMode | null): void {
     if (!mode || l.configuredMode === undefined || mode === l.configuredMode || mode === l.offeredMode) return
@@ -2621,7 +4262,7 @@ class SessionManager {
       return
     }
     l.offeredMode = mode
-    this.modeOffers.set(liveId(l.state.projectPath, l.state.agentId), { label: this.label(l.state), mode: permissionLabel(l.state.provider, mode, tr) })
+    this.modeOffers.set(liveId(l.state.projectPath, l.state.agentId), { id: liveId(l.state.projectPath, l.state.agentId), label: this.label(l.state), mode: permissionLabel(l.state.provider, mode, tr), value: mode })
     if (this.modeOfferTimer) clearTimeout(this.modeOfferTimer)
     this.modeOfferTimer = setTimeout(() => {
       this.modeOfferTimer = null
@@ -2629,13 +4270,25 @@ class SessionManager {
       this.modeOffers.clear()
       if (!offers.length) return
       const modes = [...new Set(offers.map((o) => o.mode))]
+      // Its offer (HI-2320): live while one of the agents it names still runs this session, each with the mode offered
+      // it. A newer offer for one of them supersedes an older one (HR2's round 2): the settings changed since.
+      for (const [older, ids] of [...this.modeOfferAgents]) {
+        if (!offers.some((o) => ids.has(o.id))) continue
+        this.modeOfferAgents.delete(older)
+        resolveOffer(older, tr(OUTCOME.modesChanged))
+      }
+      const offer = `modes:${++this.modeOfferSeq}`
+      this.modeOfferAgents.set(offer, new Map(offers.map((o) => [o.id, o.value])))
       toast(
         'info',
         tr(msg({ id: 'session.modeOffer.title', defaultMessage: 'Permission mode changed to {modes}', description: "A notice's title: the permission mode in Settings changed for running agents. {modes} is the new mode's name (several joined by \" / \")." }), { modes: modes.join(' / ') }),
         offers.length === 1
           ? tr(msg({ id: 'session.modeOffer.one', defaultMessage: 'Switch {agent} now? Otherwise the new mode applies from its next session.', description: 'The notice that the permission mode setting changed for a running agent. {agent} is the agent.' }), { agent: offers[0].label })
           : tr(msg({ id: 'session.modeOffer.many', defaultMessage: '{n, plural, other {Switch # running agents ({agents}) now? Otherwise the new mode applies from their next session.}}', description: 'The notice that the permission mode setting changed for running agents. {n} is how many (2 or more), {agents} lists them.' }), { n: offers.length, agents: offers.map((o) => o.label).join(', ') }),
-        [{ label: tr(msg({ id: 'session.modeOffer.switch', defaultMessage: 'Switch Now', description: "A notice's button: switches the running agents to the new permission mode now." })), command: 'session.applyPermissionModes' }]
+        [{ label: tr(msg({ id: 'session.modeOffer.switch', defaultMessage: 'Switch Now', description: "A notice's button: switches the running agents to the new permission mode now." })), command: 'session.applyPermissionModes', args: [offer] }],
+        undefined,
+        undefined,
+        { offer }
       )
     }, 400)
   }
@@ -2646,16 +4299,19 @@ class SessionManager {
    * own question (Codex's Full Access warning, up to 10 minutes: #1024) doesn't hold up the others. Reported in the
    * agents' order once all have ended.
    */
-  async applyModeSettings(): Promise<{ switched: string[]; skipped: string[] }> {
+  async applyModeSettings(only?: ReadonlyMap<string, PermissionMode>): Promise<{ switched: string[]; skipped: string[] }> {
     const todo: { l: LiveSession; mode: PermissionMode }[] = []
     for (const l of [...this.live.values()]) {
       const st = l.state
+      if (only && !only.has(liveId(st.projectPath, st.agentId))) continue
       // Still launching: it starts in what the settings say now.
       if (st.settingUp || l.configuredMode === undefined) continue
       const { agent } = await this.agentDef(st.projectPath, st.agentId).catch(() => ({ agent: null }))
       if (!agent) continue
       const mode = (await this.effective(st.projectPath, pinProvider(agent, st.provider))).permissionMode
       if (!mode || mode === l.configuredMode) continue
+      // From a notice: only into the mode it named for this agent (the settings changed since: not this one).
+      if (only && only.get(liveId(st.projectPath, st.agentId)) !== mode) continue
       l.configuredMode = mode
       if (mode !== st.permissionMode) todo.push({ l, mode })
     }
@@ -2685,18 +4341,47 @@ class SessionManager {
   }
 
   /** Stops the CLI's background job holding a conversation, then resumes the conversation in this agent. */
-  async stopBackgroundAndResume(projectPath: string, agentId: string, jobId: string, sessionId: string): Promise<void> {
+  async stopBackgroundAndResume(projectPath: string, agentId: string, jobId: string, sessionId: string, fromOffer?: string): Promise<void> {
     projectPath = workspace.assertSessionHost(projectPath)
-    const { agent, cfg } = await this.agentDef(projectPath, agentId)
-    const rec = (await workspace.sessionsFile(projectPath)).sessions.find((s) => s.id === sessionId)
-    const adapter = providerAdapter((await this.resumeProvider(projectPath, sessionId, rec)) ?? agentLaunchSettings(agent, cfg, config.settings).provider)
-    const info = providerService.info(adapter.id)
-    if (!adapter.stopBackgroundJob || !info.path) throw hiveError(msg({ id: 'session.background.cantStop', defaultMessage: "{provider} can't stop background sessions.", description: "Stop It and Resume is refused: the coding agent can't stop its background service's job. {provider} is its name." }), { provider: adapter.descriptor.name })
-    await adapter.stopBackgroundJob(info.path, jobId)
-    // The job lets go of the conversation as it exits.
-    await new Promise((r) => setTimeout(r, 1500))
-    await this.start(projectPath, { agentId, resumeId: sessionId })
+    // Checked again (HI-2320, HR2's round 1): from its notice, only while that notice's offer (this job, this
+    // conversation) is still open; and never while the agent runs, the conversation already open here again or another.
+    const offer = `bg:${liveId(projectPath, agentId)}#${jobId}#${sessionId}`
+    if (fromOffer !== undefined && (fromOffer !== offer || !offerOpen(offer))) return
+    if (this.bgSettling.has(offer)) return
+    /**
+     * Whether it may still go on (HR2's round 2, checked again after each wait before stopping or starting anything): its
+     * notice's offer, when it came from one, still open; and the agent not running (its conversation open here again, or
+     * another), which resolves the notice instead.
+     */
+    const stillApplies = (): boolean => {
+      if (fromOffer !== undefined && !offerOpen(offer)) return false
+      const running = this.live.get(liveId(projectPath, agentId))
+      if (!running) return true
+      resolveOffer(offer, tr(running.state.sessionId === sessionId ? OUTCOME.openHereAgain : OUTCOME.runsAnother))
+      return false
+    }
+    if (!stillApplies()) return
+    this.bgSettling.add(offer)
+    try {
+      const { agent } = await this.agentDef(projectPath, agentId)
+      const rec = (await workspace.sessionsFile(projectPath)).sessions.find((s) => s.id === sessionId)
+      const adapter = providerAdapter((await this.resumeProvider(projectPath, sessionId, rec)) ?? agentProvider(agent, config.settings))
+      if (!stillApplies()) return
+      const info = providerService.info(adapter.id)
+      if (!adapter.stopBackgroundJob || !info.path) throw hiveError(msg({ id: 'session.background.cantStop', defaultMessage: "{provider} can't stop background sessions.", description: "Stop It and Resume is refused: the coding agent can't stop its background service's job. {provider} is its name." }), { provider: adapter.descriptor.name }, { kind: 'invalid' })
+      await adapter.stopBackgroundJob(info.path, jobId)
+      // The job lets go of the conversation as it exits.
+      await new Promise((r) => setTimeout(r, 1500))
+      if (!stillApplies()) return
+      await this.start(projectPath, { agentId, resumeId: sessionId })
+      resolveOffer(offer, tr(OUTCOME.stoppedAndResumed))
+    } finally {
+      this.bgSettling.delete(offer)
+    }
   }
+
+  /** Stop It and Resume offers whose own action runs now: its outcome says what happened, not the agent starting (HI-2320). */
+  private bgSettling = new Set<string>()
 
   /** Sessions that would be interrupted by quitting: an agent is working or waiting on a prompt. */
   busyStates(): LiveSessionState[] {
@@ -2705,6 +4390,16 @@ class SessionManager {
   }
 
   private async onExit(projectPath: string, agentId: string, runId: string, code: number, output = ''): Promise<void> {
+    // What notices offered about this run no longer applies (HI-2320): its conversation ended here.
+    resolveOffers((o) => o.startsWith(`transcript:${liveId(projectPath, agentId)}#`), tr(OUTCOME.conversationEnded))
+    this.modeOfferGone(liveId(projectPath, agentId))
+    // When and how it ended, as it ended (HR5's HI-1881 round 1): not after the bookkeeping below, which can take a
+    // while (the time would drift, and a quit begun meanwhile would relabel it).
+    const exitAt = new Date().toISOString()
+    const shutting = this.shuttingDown
+    const atExit = this.live.get(liveId(projectPath, agentId))
+    const stopAsked = !!atExit?.stopRequested
+    const causeAtExit = atExit?.stopCause
     const id = liveId(projectPath, agentId)
     const l = this.live.get(id)
     const sessionId = l?.state.sessionId ?? ''
@@ -2716,8 +4411,10 @@ class SessionManager {
         'warning',
         tr(msg({ id: 'session.background.title', defaultMessage: '{agent}: the session is running in the background', description: "A notice's title: the coding agent runs this conversation as a background job, so Hive can't open it. {agent} is the agent." }), { agent: this.label(l.state) }),
         tr(msg({ id: 'session.background.body', defaultMessage: "{provider} moved this conversation into its background service (job {job}), so it can't be opened here until that job is stopped. The conversation is kept.", description: "The notice that a conversation runs as a background job. {provider} is the coding agent's name, {job} the job's id." }), { provider: l.adapter.descriptor.name, job }),
-        [{ label: tr(msg({ id: 'session.background.stopAndResume', defaultMessage: 'Stop It and Resume', description: "A notice's button: stops the coding agent's background job, then resumes the conversation in the agent." })), command: 'session.stopBackgroundAndResume', args: [projectPath, agentId, job, sessionId] }],
-        projectPath
+        [{ label: tr(msg({ id: 'session.background.stopAndResume', defaultMessage: 'Stop It and Resume', description: "A notice's button: stops the coding agent's background job, then resumes the conversation in the agent." })), command: 'session.stopBackgroundAndResume', args: [projectPath, agentId, job, sessionId, `bg:${id}#${job}#${sessionId}`] }],
+        projectPath,
+        { kind: 'agent', projectPath, agentId, name: this.label(l.state), project: basename(projectPath) },
+        { offer: `bg:${id}#${job}#${sessionId}` }
       )
     }
     // Exited before its session started, and nobody stopped it: a failed start, whose reason the pane shows.
@@ -2729,7 +4426,11 @@ class SessionManager {
           { name: l.adapter.descriptor.name, startHint: l.adapter.startHint?.bind(l.adapter) }
         )
       : undefined
-    if (failure) log.warn(`${userText(this.label(l!.state))}: exited with code ${code} before it started: ${userText(failure.reason.replace(/\n/g, ' | '))}`)
+    if (failure) {
+      log.warn(`${userText(this.label(l!.state))}: exited with code ${code} before it started: ${userText(failure.reason.replace(/\n/g, ' | '))}`)
+      // A card's stall says why (HI-1976).
+      startFailed(projectPath, agentId, failure.reason)
+    }
     if (l) {
       if (l.backupTimer) clearInterval(l.backupTimer)
       l.compacting?.end()
@@ -2738,8 +4439,15 @@ class SessionManager {
       this.noteExit(l.state.sessionId)
       this.live.delete(id)
       this.recheckTools(id)
+      // The last of Hive's sessions in its folder: Hive's skill copies there go, as Settings → Advanced says (#1431). Not
+      // as Hive quits: the next start's sweep does it, unless sessions resume there first.
+      if (!this.shuttingDown && !this.runningIn(l.state.cwd)) void sessionEnded(projectPath, l.state.cwd)
+      // Its hooks missing were this launch's (#1336): its lanes go on (a stopped agent is the lane's own business).
+      if (l.state.hooksMissing) noteHooksMissing(projectPath, agentId, false)
     }
     this.runs.delete(runId)
+    // Its slot's writer released once its processes are known to have ended (#1434).
+    this.settleWriterOf(runId)
     // Its hook token ends with it: hooks of an ended launch were ignored anyway (findLaunch).
     endHookToken(runId)
     this.releaseLocks(id)
@@ -2763,7 +4471,10 @@ class SessionManager {
           .catch(() => undefined)
       }
     }
-    emit({ type: 'session-exit', projectPath, agentId, sessionId, exitCode: code, ...(failure ? { failure } : {}) })
+    // Why and when it ended, for its pane (HI-1881): none for a launch that failed (its failed bar says so).
+    const why = l ? endReason({ failed: !!failure, shuttingDown: shutting, stopRequested: stopAsked, cause: causeAtExit, code }) : null
+    const ended: SessionEnd | undefined = l && why ? { runId, startedAt: l.state.startedAt, at: exitAt, why, ...(why === 'crashed' ? { code } : {}) } : undefined
+    emit({ type: 'session-exit', projectPath, agentId, sessionId, exitCode: code, ...(failure ? { failure } : {}), ...(ended ? { ended } : {}) })
     // i18n-ignore: the developer console's event data, recorded like a log, stays English (#1104)
     devConsole.capture([sessionSourceId(projectPath, agentId)], () => ({ kind: 'exit', name: 'exit', provider: l?.state.provider, raw: { exitCode: code }, made: { failedStart: !!failure, stopRequested: !!l?.stopRequested }, summary: `exited with code ${code}${failure ? ' before it started' : ''}` }))
     this.exitWaiters.get(id)?.()
@@ -2821,6 +4532,8 @@ class SessionManager {
     const n = left.processes.length + left.more
     if (!n) return
     const summary = leftoversSummary(left, undefined, { tr, list: fmt.list })
+    // Its buttons act on exactly what it lists (HI-2320): a newer launch's leftovers are another offer.
+    const offer = leftoversOffer(left.projectPath, left.agentId)
     toast(
       'warning',
       tr(msg({ id: 'session.leftovers.title', defaultMessage: '{agent} left {processes} running', description: "A notice's title: an agent's processes still run after it stopped. {agent} is the agent; {processes} how many (\"2 processes\")." }), { agent: label, processes: processCount(n, tr) }),
@@ -2828,10 +4541,12 @@ class SessionManager {
         ? tr(msg({ id: 'session.leftovers.notEndedBody', defaultMessage: "{processes}. {n, plural, one {It was started by the agent and may hold the project's folder or ports. Hive couldn't end it by itself.} other {They were started by the agent and may hold the project's folder or ports. Hive couldn't end them by itself.}}", description: "The notice of processes an agent left running, which Hive tried to end and couldn't. {processes} lists them (\"node serve.js, 4 × tail -f …\"); {n} is how many." }), { processes: summary, n })
         : tr(msg({ id: 'session.leftovers.body', defaultMessage: "{processes}. {n, plural, one {It was started by the agent and may hold the project's folder or ports.} other {They were started by the agent and may hold the project's folder or ports.}}", description: "The notice of processes an agent left running. {processes} lists them (\"node serve.js, 4 × tail -f …\"); {n} is how many." }), { processes: summary, n }),
       [
-        { label: tr(msg({ id: 'session.leftovers.end', defaultMessage: 'End Them', description: "A notice's button: ends the processes the agent left running." })), command: 'session.settleLeftovers', args: [left.projectPath, left.agentId, 'end'] },
-        { label: tr(msg({ id: 'session.leftovers.keep', defaultMessage: 'Keep Running', description: "A notice's button: keeps the processes the agent left running, and stops listing them." })), command: 'session.settleLeftovers', args: [left.projectPath, left.agentId, 'keep'] }
+        { label: tr(msg({ id: 'session.leftovers.end', defaultMessage: 'End Them', description: "A notice's button: ends the processes the agent left running." })), command: 'session.settleLeftovers', args: [left.projectPath, left.agentId, 'end', offer] },
+        { label: tr(msg({ id: 'session.leftovers.keep', defaultMessage: 'Keep Running', description: "A notice's button: keeps the processes the agent left running, and stops listing them." })), command: 'session.settleLeftovers', args: [left.projectPath, left.agentId, 'keep', offer] }
       ],
-      left.projectPath
+      left.projectPath,
+      { kind: 'agent', projectPath: left.projectPath, agentId: left.agentId, name: label, project: basename(left.projectPath) },
+      { offer }
     )
   }
 
@@ -2943,15 +4658,16 @@ class SessionManager {
     }
     emit({ type: 'usage-changed', projectPath, sessionId })
     await this.readDetails(l, src, size, hooks)
+    await this.readTurns(l, src, size).catch((e) => log.warn(`${userText(this.label(l.state))}: reading its transcript's turns`, e))
     this.settleBackground(l, await this.readBackground(l, src, size))
     await this.readSafeguards(l, src)
     if (l.compacting) {
       // Fallback if the compaction hooks never arrive: a new compaction in the transcript.
-      const u = await this.usageFor(l.state.projectPath, src, sessionId, l.state.provider)
+      const u = await this.usageFor(l.state.projectPath, src, sessionId, l.state.provider, this.costPolicy(l))
       if (u) l.compacting?.transcript(u.compactions)
     }
     if (l.defaultModel) {
-      const usage = await this.usageFor(l.state.projectPath, src, sessionId, l.state.provider)
+      const usage = await this.usageFor(l.state.projectPath, src, sessionId, l.state.provider, this.costPolicy(l))
       if (usage?.model) {
         providerService.observeDefaultModel(l.state.provider, usage.model)
         l.defaultModel = false
@@ -2968,15 +4684,26 @@ class SessionManager {
    * transcript's), never recomputed. Without a price or a report the cost is cleared, so it shows as unknown.
    */
   private async liveCost(l: LiveSession, src: string, force: boolean): Promise<void> {
-    const own = usesOwnPrices(l.state.provider, config.settings)
+    // On a server connection (HI-1772) the CLI's report prices its server's model as a Claude model: never used, only
+    // Hive's estimate by the real model's id (unpriced unless the user priced it).
+    const onServer = !!l.state.launchedConnection?.server
+    // Free (HI-1772): only on servers on this PC, the conversation's record says: a known $0, shown as free (local).
+    // Shown as its conversation's policy is now, both ways (a /resume into a conversation that ran elsewhere ends it).
+    if (!!l.state.costFree !== !!l.costFree) {
+      l.state.costFree = l.costFree ? true : undefined
+      this.emitState(l.state)
+    }
+    if (l.costFree) return this.setLiveCost(l, 0, false)
+    const own = onServer || usesOwnPrices(l.state.provider, config.settings)
     if (l.adapter.descriptor.capabilities.reportsCost && !own) return this.setLiveCost(l, l.reportedCost, false)
     if (!force && Date.now() - (l.costAt ?? 0) <= COST_INTERVAL_MS) return
     l.costAt = Date.now()
-    const usage = await this.usageFor(l.state.projectPath, src, l.state.sessionId, l.state.provider)
+    const usage = await this.usageFor(l.state.projectPath, src, l.state.sessionId, l.state.provider, this.costPolicy(l))
     // The settings changed while it was read: the read they started decides.
-    if (usesOwnPrices(l.state.provider, config.settings) !== own || !usage) return
+    if ((onServer || usesOwnPrices(l.state.provider, config.settings)) !== own || !usage) return
     // An estimate is Hive's (the user's prices, or a provider that reports none); anything else is the CLI's report.
     if (usage.costUsd != null && usage.costEstimated) this.setLiveCost(l, usage.costUsd, true)
+    else if (onServer) this.setLiveCost(l, undefined, false)
     else if (own) this.setLiveCost(l, l.reportedCost ?? usage.costUsd ?? undefined, false)
     else this.setLiveCost(l, usage.costUsd ?? undefined, false)
   }
@@ -3028,6 +4755,38 @@ class SessionManager {
   }
 
   /**
+   * Turns the transcript identifies (#1371, hooks health), from what it gained since the last look, for the check to wait
+   * on those no hook names. One reading per conversation and file: this launch's new conversation from its start, any
+   * other (resumed, or switched to, or found later) from its end as it is then, so history never counts (nor does a
+   * turn whose prompt came before the launch began). Another file (its path, a shrink, its first bytes changed) or
+   * conversation starts the reading again, and what it found is let go. Whole lines only; a gap of more than 4 MB
+   * forgets what it knew of the turns (one whose prompt it didn't read is unknown, never a turn). What a read found is
+   * kept only if the launch, conversation and reading are still the ones it read for.
+   */
+  private async readTurns(l: LiveSession, path: string, size: number): Promise<void> {
+    const w = l.hooksWatch
+    const turnsOf = l.adapter.transcriptTurns?.bind(l.adapter)
+    // Still its transcript (a hook may have named another file while the look before this read waited): else it isn't read.
+    if (!w || !turnsOf || l.transcriptPath !== path) return
+    const sessionId = l.state.sessionId
+    const prev = l.turnsRead
+    const look = await lookAtTurns(prev, { path, sessionId, size, fresh: !l.turnsBegun && !l.resumed }, (start, end) => readSpan(path, start, end))
+    // Still this launch, conversation, file and reading (not restarted, switched or read again meanwhile): else what it found goes.
+    if (!look || this.live.get(liveId(l.state.projectPath, l.state.agentId)) !== l || l.state.sessionId !== sessionId || l.transcriptPath !== path || l.turnsRead !== prev) return
+    l.turnsRead = look.reading
+    if (look.restarted) {
+      l.turnsBegun = true
+      this.turnsReset(l, w)
+    }
+    if (look.lines && transcriptTurns(w, turnsOf(look.lines, look.reading.memo), Date.now(), Date.parse(l.state.startedAt)) && l.state.hooksMissing?.after === 'transcript') this.hooksBack(l)
+  }
+
+  /** What its transcript showed of its turns is let go (#1371), and an alarm that evidence raised goes with it. */
+  private turnsReset(l: LiveSession, w: HooksWatch): void {
+    if (transcriptReset(w) && l.state.hooksMissing?.after === 'transcript') this.hooksBack(l)
+  }
+
+  /**
    * Background tasks started or ended in what the transcript gained since the last look (providers that report
    * them). Only this launch's count: tasks from before it ended with the CLI. True if one ended that wakes the CLI (not
    * one it stopped itself).
@@ -3055,7 +4814,9 @@ class SessionManager {
     for (const ev of l.adapter.backgroundTasks(text.slice(0, end + 1), (l.tasksMemo ??= {}))) {
       if (ev.at < since) continue
       if (ev.kind === 'start') {
-        if (!ended.has(ev.id)) tasks.set(ev.id, { at: ev.at, expiresAt: ev.expiresAt })
+        // A start read after its end counts nothing, unless the task starts again (a subagent resumed, #1584).
+        if (ev.resumed) ended.delete(ev.id)
+        if (!ended.has(ev.id)) tasks.set(ev.id, { at: ev.at, expiresAt: ev.expiresAt, type: ev.type, description: ev.description })
         continue
       }
       // A task the agent stopped itself wakes nothing (#640: read after its Stop, it showed HB3 working with no turn).
@@ -3158,7 +4919,7 @@ class SessionManager {
   /** A blocking ask naming no tool, from a CLI that tells a safeguard prompt by its screen (a permission request its own reviewer decides is none). */
   private guardCandidate(l: LiveSession, ev: HookEvent): ev is Extract<HookEvent, { kind: 'ask' }> {
     if (ev.kind !== 'ask' || !ev.ask.blocking || !l.adapter.safeguardAsk) return false
-    return !(ev.ask.kind === 'permission' && l.adapter.descriptor.permissionModes.find((m) => m.value === l.state.permissionMode)?.reviewed)
+    return !(ev.ask.kind === 'permission' && l.adapter.descriptor.permissionModes.find((m) => m.value === modeInEffect(l.state))?.reviewed)
   }
 
   /**
@@ -3252,6 +5013,105 @@ class SessionManager {
     }).catch((e) => log.warn('safeguard: screen check failed', e))
   }
 
+  /**
+   * Whether an agent's CLI shows a question of its own on its screen now (HI-1959: Claude Code's offer to teach auto mode
+   * about the environment): nothing is typed into it meanwhile, and no Enter pressed, which would answer it.
+   */
+  cliAsks(projectPath: string, agentId: string): boolean {
+    const l = this.live.get(liveId(projectPath, agentId))
+    const ask = l?.adapter?.idleQuestion?.bind(l.adapter)
+    const screen = ask ? l!.screen?.text() : null
+    return !!screen && !!ask!(screen)
+  }
+
+  /**
+   * The CLI's screen was drawn, for its question by itself and a held line it took (HI-1959): looked at while the agent
+   * is between turns, waits on that question, or holds a line, one look at a time and in order with the hooks.
+   */
+  private idleScreenDrawn(id: string, l: LiveSession): void {
+    if (!l.adapter.idleQuestion || !l.screen || l.idleChecking) return
+    const st = l.state
+    if (!l.idleAsk && !st.untakenLine && !AT_PROMPT.has(st.status)) return
+    l.idleChecking = true
+    void this.inHookOrder(st.runId, () => {
+      l.idleChecking = false
+      if (this.live.get(id) === l) this.lookAtIdleScreen(id, l)
+    }).catch((e) => log.warn('idle question: screen check failed', e))
+  }
+
+  /**
+   * Its CLI's question by itself (HI-1959), which sends no hook: on its screen between turns, the agent waits for the user
+   * with it, as for any question (For you, a notification, the Assistant's wake); gone, it is idle again. Then the held
+   * line, if any.
+   */
+  private lookAtIdleScreen(id: string, l: LiveSession): void {
+    const st = l.state
+    if (!l.adapter.idleQuestion || !l.screen) return
+    const question = l.adapter.idleQuestion(l.screen.text())
+    if (question && !l.idleAsk && AT_PROMPT.has(st.status)) {
+      const text = withValues(msg({ id: 'session.status.cliAsks', defaultMessage: '{provider} asks: {question}', description: "An agent's status: its coding agent ({provider}, e.g. Claude Code) shows a question of its own on its screen and waits for the user to answer it there. {question} is the question, in the coding agent's own words (English)." }), { provider: l.adapter.descriptor.name, question })
+      const ask: Ask = { kind: 'question', blocking: true, message: englishText(text), text }
+      l.idleAsk = ask
+      log.info(`${userText(this.label(st))}: its CLI asks on its screen: ${question}`)
+      const ev: HookEvent = { kind: 'ask', ask }
+      this.carryOut(id, l, hookStep(ev, this.statusInput(l)), 'screen', ev)
+    } else if (!question && l.idleAsk) {
+      const ask = l.idleAsk
+      l.idleAsk = undefined
+      log.info(`${userText(this.label(st))}: its CLI's question is gone from its screen`)
+      if (st.status === 'waiting' && l.waitingOn === ask) this.carryOut(id, l, idleQuestionGone(this.statusInput(l)), 'screen')
+    }
+    this.lookAtHeldLine(id, l, !!question)
+  }
+
+  /** One look at a held line (heldLineLost): the agent, its screen with dim hints left out, and what was taken since. */
+  private heldLook(l: LiveSession, asked: boolean): boolean {
+    return heldLineLost({ asked, input: l.adapter.promptText?.(l.screen!.textWithoutDim()) ?? null, status: l.state.status, takenSince: (l.prompts ?? 0) > (l.untakenPrompts ?? 0) })
+  }
+
+  /**
+   * A line Hive typed, held as not taken, gone from the CLI's input since (HI-1959: a screen of the CLI's took it): seen
+   * lost, it is looked at again after hive.lostLine.steadySeconds, and any draw meanwhile that says otherwise (a redraw, a
+   * dialog, text in the input, a turn) calls that off.
+   */
+  private lookAtHeldLine(id: string, l: LiveSession, asked: boolean): void {
+    const u = l.state.untakenLine
+    if (!u || !l.adapter.promptText || !this.heldLook(l, asked)) return this.dropLostLook(l)
+    if (l.lostSeen?.since === u.since) return
+    this.dropLostLook(l)
+    const runId = l.state.runId
+    const timer = setTimeout(() => void this.inHookOrder(runId, () => this.lostLineSteady(id, l, u.since)).catch((e) => log.warn('lost line: check failed', e)), advanced.number('hive.lostLine.steadySeconds') * 1000)
+    timer.unref?.()
+    l.lostSeen = { since: u.since, timer }
+  }
+
+  private dropLostLook(l: LiveSession): void {
+    if (l.lostSeen) clearTimeout(l.lostSeen.timer)
+    l.lostSeen = undefined
+  }
+
+  /**
+   * The second look at a held line seen lost (HI-1959): the same launch, the same line, and everything said again (no
+   * question, its input drawn and empty, between turns, nothing taken). Then the hold goes: the deliveries it rang for are
+   * offered again (an unread one is typed again; one read meanwhile isn't), and a line that rang for none is told to the
+   * user with its words, never dropped unseen.
+   */
+  private lostLineSteady(id: string, l: LiveSession, since: string): void {
+    if (this.live.get(id) !== l || l.lostSeen?.since !== since) return
+    l.lostSeen = undefined
+    const st = l.state
+    if (st.untakenLine?.since !== since || !l.screen || !l.adapter.promptText) return
+    if (!this.heldLook(l, !!l.adapter.idleQuestion?.(l.screen.text()))) return
+    const text = l.untakenText ?? st.untakenLine.text
+    const rang = [...(l.untakenFor ?? [])]
+    this.clearUntaken(l, rang.length ? 'gone from its input, nothing taken: what it rang for is offered again' : 'gone from its input, nothing taken: told to the user') // i18n-ignore: for the log
+    // The line it typed is gone, so nothing of it is pending any more (PENDING_MS would hold the next line for it).
+    if (l.typed && (l.prompts ?? 0) <= l.typed.prompts) l.typed = undefined
+    this.noteComposer(l, this.key(st.projectPath, st.agentId))
+    if (rang.length) this.lineLost(st.projectPath, st.agentId, st.runId, rang)
+    else this.notify(st.projectPath, withValues(msg({ id: 'session.notice.lineLostTitle', defaultMessage: "{agent} didn't get a line Hive typed", description: "A notification's title: a line Hive typed into an agent's terminal (a message, a prompt) was taken by a screen of its coding agent before it was sent, so the agent never got it. {agent} is the agent." }), { agent: this.label(st) }), withValues(msg({ id: 'session.notice.lineLost', defaultMessage: 'A screen of its CLI took it before it was sent. Send it again if it is still wanted: {text}', description: "The notification that a line Hive typed into an agent was lost (a screen of its coding agent took it). {text} is the line, as Hive typed it." }), { text }), 'notice', undefined, st.agentId)
+  }
+
   /** Reads the transcript for background tasks now (at a turn's end, before choosing between finished and background). */
   private async refreshBackground(l: LiveSession): Promise<void> {
     const src = await this.liveTranscript(l).catch(() => null)
@@ -3264,7 +5124,10 @@ class SessionManager {
     const minutes = taskMinutes()
     const dropped = l.tasks ? expireTasks(l.tasks, Date.now(), minutes) : []
     for (const id of dropped) log.info(`${userText(this.label(l.state))}: stopped counting background task ${id} after ${minutes} minutes`)
+    const had = l.state.backgroundTasks
     l.state.backgroundTasks = l.tasks?.size || undefined
+    // When they last ended (HI-1993): a review waiting on them starts its stall clock again from then.
+    if (had && !l.state.backgroundTasks) l.state.backgroundEndedAt = new Date().toISOString()
     return dropped.length > 0
   }
 
@@ -3293,7 +5156,7 @@ class SessionManager {
           const stopped = dropped ? withValues(msg({ id: 'session.status.tasksDropped', defaultMessage: '{minutes, plural, one {Stopped counting its background tasks after # minute} other {Stopped counting its background tasks after # minutes}}', description: "An agent's status: Hive stopped counting the background tasks it started after the time limit in Settings. {minutes} is that limit." }), { minutes: taskMinutes() }) : null
           setStatus(st, stopped)
           st.unseen = true
-          this.notify(st.projectPath, withValues(M.finished, { agent: this.label(st) }), stopped ?? msg({ id: 'session.notice.tasksEnded', defaultMessage: 'Its background tasks have ended.', description: "The notification that an agent finished once the background tasks it started ended." }), 'finished', st.agentName)
+          this.notify(st.projectPath, withValues(M.finished, { agent: this.label(st) }), stopped ?? msg({ id: 'session.notice.tasksEnded', defaultMessage: 'Its background tasks have ended.', description: "The notification that an agent finished once the background tasks it started ended." }), 'finished', st.agentName, st.agentId)
         }
         changed = true
       } else if (st.status === 'finished' && l.tasks?.size) {
@@ -3301,6 +5164,10 @@ class SessionManager {
         st.status = 'background'
         st.unseen = false
         changed = true
+      } else if (woke && st.status === 'background') {
+        // One of several ended (subagents a turn started together, #1584): its CLI begins a turn for it while the others
+        // run on, so that wake may open a turn too (turnLedger rule 1).
+        l.woke = true
       }
     }
     if (changed) this.emitState(st)
@@ -3329,18 +5196,37 @@ class SessionManager {
     const project = workspaceOf(st.projectPath).info()?.projects.find((x) => x.path.toLowerCase() === st.projectPath.toLowerCase())
     const limitMB = transcriptWarnLimit(project?.config, Number(config.settings.sessions.transcriptWarnMB) || 0)
     if (!limitMB || bytes < limitMB * 1024 * 1024 || !st.sessionId || l.sizeWarned === st.sessionId) return
+    const assistant = workspace.isAssistantHome(st.projectPath)
+    // In a turn, the notice waits for its end (HI-1695, Darren's option 1): a transcript grows only in a turn, so it is
+    // nearly always crossed then, and the notice made then had no Hand Over to…, never offered again. The look at the
+    // turn's end (or the next one) makes it, once, with the button when the agent may hand over then.
+    if (!assistant && (st.status === 'working' || st.status === 'starting' || st.status === 'waiting')) return
     l.sizeWarned = st.sessionId
     const label = this.label(st)
-    const assistant = workspace.isAssistantHome(st.projectPath)
     log.info(`${userText(label)}: transcript is ${(bytes / 1024 ** 2).toFixed(1)} MB, over ${limitMB} MB`)
     // What it can do (#1057): told, not pushed. Hand Over to… only while it may hand over now (checked again when it is
     // clicked, and by the hand-over); else that it can when it has finished.
     void (assistant ? Promise.resolve(false) : this.handOverAllowed(st.projectPath, st.agentId).catch(() => false)).then((now) => {
       const values = { size: formatSize(bytes), limit: limitMB, when: assistant ? 'assistant' : now ? 'now' : 'other' }
-      const actions: ToastAction[] | undefined = now ? [{ label: tr(msg({ id: 'session.long.handOver', defaultMessage: 'Hand Over to…', description: "A notice's button: hands the agent's work over to a new conversation (the Hand Over to… command)." })), command: 'session.handOverLongConversation', args: [st.projectPath, st.agentId] }] : undefined
-      toast('warning', tr(M.longConversation, { agent: label }), tr(HAND_OVER_TEXT.notice, values), actions, st.projectPath)
-      this.notify(st.projectPath, withValues(M.longConversation, { agent: label }), withValues(HAND_OVER_TEXT.notice, values), 'notice')
+      const actions: ToastAction[] | undefined = now ? [{ label: tr(msg({ id: 'session.long.handOver', defaultMessage: 'Hand Over to…', description: "A notice's button: hands the agent's work over to a new conversation (the Hand Over to… command)." })), command: 'session.handOverLongConversation', args: [st.projectPath, st.agentId, st.sessionId] }] : undefined
+      // Told once (HI-2320: a toast and a routed copy before), its Hand Over to… live while this conversation is.
+      tell({ kind: 'transcript', title: tr(M.longConversation, { agent: label }), message: tr(HAND_OVER_TEXT.notice, values), ...(actions ? { actions, offer: `transcript:${liveId(st.projectPath, st.agentId)}#${st.sessionId}` } : {}), projectPath: st.projectPath, agentId: st.agentId, target: { kind: 'agent', projectPath: st.projectPath, agentId: st.agentId, name: label, project: basename(st.projectPath) } })
     })
+  }
+
+  /**
+   * The agent's parts in its project's running lanes (HI-2049: its launch's side of the workflow): set by launchSides.ts,
+   * which knows the lanes, at startup before any launch.
+   */
+  laneParts: (projectPath: string, agentId: string) => Promise<('builder' | 'reviewer')[]> = async () => []
+
+  /**
+   * The side of the workflow of an agent's launch `runId` (HI-2049), for what its hive server reports: `unknown` once
+   * that launch has ended or another has taken its place, so a late report never takes the next launch's side.
+   */
+  launchSide(projectPath: string, agentId: string, runId: string | null): LaunchWorkflow | 'unknown' {
+    const l = this.live.get(liveId(projectPath, agentId))
+    return l && runId && l.state.runId === runId && l.workflow ? l.workflow : 'unknown'
   }
 
   /** Whether the agent may hand over to a new conversation of its own now (#1057): set by handOverCheck.ts, which knows the lanes. */
@@ -3366,6 +5252,7 @@ class SessionManager {
   private emitState(state: LiveSessionState): void {
     // Its input as Hive holds it now (#648): a line typed or given up since the last report.
     const l = state.projectPath ? this.live.get(liveId(state.projectPath, state.agentId)) : undefined
+    if (l?.state === state) this.recheckOffers(l)
     if (l?.state === state) this.fact(state, { composer: this.composerOf(l) })
     // A launch with its task on its command line: when it first became ready, before a watch shows that as watching (#721).
     if (l?.state === state && l.launchTask && l.launchReadyAt === undefined && (state.status === 'ready' || state.status === 'watching' || state.status === 'finished')) l.launchReadyAt = Date.now()
@@ -3384,7 +5271,11 @@ class SessionManager {
     } else if (!watch && state.status === 'watching') state.status = 'finished'
     // Working or watching again, or a background task of its own will wake it (#521): no longer waiting with no watch (#376).
     if ((state.status !== 'ready' && state.status !== 'finished') || tasksWillWake(state)) state.notWatching = undefined
-    if (this.statusSent.get(state) !== state.status) {
+    const was = this.statusSent.get(state)
+    if (was !== state.status) {
+      // HI-2312: its next turn has started (working, starting or waiting again after its turn's end): a finish of its not
+      // told yet is about a turn that's over, so it isn't told, whatever the new turn ends as (finished, watching).
+      if (was && !BUSY.has(was) && BUSY.has(state.status)) this.dropFinishes(state, state.status)
       this.statusSent.set(state, state.status)
       state.statusSince = new Date().toISOString()
     }
@@ -3415,25 +5306,36 @@ class SessionManager {
     }, SIZE_REFRESH_DELAY_MS)
   }
 
-  /** A CLI refused an agent's sign-in: told once for this expiry, with every agent it has stopped by then. */
-  private signInLost(provider: ProviderId): void {
-    if (this.signedOut.has(provider)) return
+  /**
+   * A CLI refused an agent's sign-in: told once for this expiry, with every agent of its scope it has stopped by then.
+   * A connection's (HI-1755) is checked again through its own folder (checkAccount), never the CLI's own home.
+   */
+  private signInLost(st: LiveSessionState): void {
+    const scope = authScope(st)
+    if (this.signedOut.has(scope)) return
+    const conn = st.launchedConnection?.id
+    const recheck = (): void => {
+      if (conn) void checkAccount(conn).catch(() => undefined)
+      else void providerService.refresh(st.provider, false).catch(() => undefined)
+    }
     const out: { gather?: ReturnType<typeof setTimeout>; recheck?: ReturnType<typeof setInterval> } = {}
-    this.signedOut.set(provider, out)
-    out.gather = setTimeout(() => this.tellSignedOut(provider), SIGNED_OUT_GATHER_MS)
-    // Agent Setup shows it signed out, and the next check that finds it signed in again ends this (providerService).
-    void providerService.refresh(provider, false).catch(() => undefined)
+    this.signedOut.set(scope, out)
+    out.gather = setTimeout(() => this.tellSignedOut(scope), SIGNED_OUT_GATHER_MS)
+    // Provider Setup (or the connection's row) shows it signed out, and the next check that finds it signed in again ends
+    // this (providerService's, or the connection's: onConnectionSignedIn).
+    recheck()
     out.recheck = setInterval(() => {
       // Kept until it is shown signed in again: only when no agent it stopped runs any more (they exited) is there
       // nothing left to tell or carry on, and it ends quietly. An agent trying again (working) still counts.
-      if (!this.liveStates().some((s) => s.provider === provider && s.signIn)) return void this.endSignedOut(provider)
-      void providerService.refresh(provider, false).catch(() => undefined)
+      if (!this.liveStates().some((s) => authScope(s) === scope && s.signIn)) return void this.endSignedOut(scope)
+      recheck()
     }, SIGN_IN_RECHECK_MS)
   }
 
-  private tellSignedOut(provider: ProviderId): void {
-    const waiting = this.liveStates().filter((s) => s.provider === provider && s.status === 'signin')
+  private tellSignedOut(scope: string): void {
+    const waiting = this.liveStates().filter((s) => authScope(s) === scope && s.status === 'signin')
     if (!waiting.length) return
+    const provider = waiting[0].provider
     const d = providerAdapter(provider).descriptor
     const first = waiting[0]
     const title =
@@ -3441,15 +5343,22 @@ class SessionManager {
         ? withValues(msg({ id: 'session.signIn.one', defaultMessage: '{agent} needs you to sign in to {provider}', description: "A notification's title: an agent's CLI sign-in has expired. {agent} is the agent, {provider} the coding agent's name." }), { agent: this.label(first), provider: d.name })
         : withValues(msg({ id: 'session.signIn.many', defaultMessage: '{n, plural, other {# agents need you to sign in to {provider}}}', description: "A notification's title: the CLI sign-in of several agents has expired. {n} is how many (2 or more), {provider} the coding agent's name." }), { n: waiting.length, provider: d.name })
     log.info(`${d.name}: sign-in refused for ${waiting.length} agent(s)`)
+    // A server connection's (HI-1772): its key was refused, replaced in Settings → Accounts & Connections; no sign-in.
+    const server = first.launchedConnection?.server ? first.launchedConnection.name : null
+    if (server) {
+      const keyTitle = withValues(msg({ id: 'session.keyRefused.title', defaultMessage: "{n, plural, one {{agent} stopped: {name}'s key was refused} other {# agents stopped: {name}'s key was refused}}", description: "A notification's title: the server of a server connection ({name}) refused its API key, so agents on it stopped. {n} is how many agents, {agent} the first one's name." }), { n: waiting.length, agent: this.label(first), name: server })
+      this.notify(first.projectPath, keyTitle, withValues(msg({ id: 'session.keyRefused.body', defaultMessage: "Replace {name}'s key in Settings → Accounts & Connections, then Resume in the project's header carries them on.", description: "The notification that a server connection's ({name}) API key was refused. Settings → Accounts & Connections names a section; Resume is a button in the project's header." }), { name: server }), 'waiting', undefined, first.agentId)
+      return
+    }
     this.notify(first.projectPath, title, withValues(msg({ id: 'session.signIn.expired', defaultMessage: "{provider}'s sign-in has expired. {help}", description: "The notification that a CLI's sign-in has expired. {provider} is the coding agent's name; {help} says how to sign in again (a sentence or two)." }), { provider: d.name, help: d.text?.signInHelp ?? d.signInHelp }), 'waiting', undefined, first.agentId)
   }
 
-  private endSignedOut(provider: ProviderId): boolean {
-    const out = this.signedOut.get(provider)
+  private endSignedOut(scope: string): boolean {
+    const out = this.signedOut.get(scope)
     if (!out) return false
     clearTimeout(out.gather)
     clearInterval(out.recheck)
-    this.signedOut.delete(provider)
+    this.signedOut.delete(scope)
     return true
   }
 
@@ -3457,11 +5366,12 @@ class SessionManager {
    * The CLI is signed in again (an agent of it works, its check says so, its Sign in task ended well): agents it
    * stopped are idle again, and Resume (n) carries them on (they keep LiveSessionState.signIn until they do).
    */
-  signedInAgain(provider: ProviderId, checked = false): void {
-    if (!this.endSignedOut(provider)) return
-    // Agent Setup (and its banner) learn it too, unless its own check is what said so.
-    if (!checked) void providerService.refresh(provider, false).catch(() => undefined)
-    const stopped = this.liveStates().filter((s) => s.provider === provider && s.status === 'signin')
+  signedInAgain(scope: string, checked = false): void {
+    if (!this.endSignedOut(scope)) return
+    const provider = scope.split(':')[0] as ProviderId
+    // Provider Setup (and its banner) learn it too, unless its own check is what said so; a connection's is its own.
+    if (!checked && !scope.includes(':')) void providerService.refresh(provider, false).catch(() => undefined)
+    const stopped = this.liveStates().filter((s) => authScope(s) === scope && s.status === 'signin')
     for (const st of stopped) {
       this.fact(st, { lifecycle: 'running', attention: null })
       st.status = 'ready'
@@ -3492,9 +5402,27 @@ class SessionManager {
       return st?.signIn && (st.status === 'ready' || st.status === 'finished' || st.status === 'signin') ? st : null
     }
     const st = stalled()
-    if (!st) throw hiveError(msg({ id: 'session.carryOn.already', defaultMessage: 'It has already carried on.', description: 'Resume is refused for an agent whose turn a refused sign-in stopped: it carried on by itself meanwhile.' }))
+    if (!st) throw hiveError(msg({ id: 'session.carryOn.already', defaultMessage: 'It has already carried on.', description: 'Resume is refused for an agent whose turn a refused sign-in stopped: it carried on by itself meanwhile.' }), undefined, { kind: 'conflict' })
     // A control notice for this launch (#649), given now or not at all: never once it has carried on by itself.
     await this.delivery().now(projectPath, { agentId, kind: 'control', from: HIVE_SENDER, body: CARRY_ON_PROMPT, source: 'carry-on', ref: st.runId, need: 'stalled', forRun: st.runId }, () => !!stalled())
+  }
+
+  /**
+   * An agent whose turn a dropped connection ended, while Hive waits for the connection (HI-1612, outageResume.ts): its
+   * status says what the wait is doing; null puts back the failed turn's own. Only for that launch, still stopped there.
+   */
+  connectionWait(projectPath: string, agentId: string, runId: string, text: TextPart | null): void {
+    const st = this.liveFor(projectPath, agentId)
+    if (!st || st.runId !== runId || !st.failedTurn) return
+    const failed = failedTurnStep(st.failedTurn.message)
+    setStatus(st, text ?? failed.messageText ?? failed.message ?? null)
+    this.emitState(st)
+  }
+
+  /** An agent's name as notices show it ("hive", or "hive · HB2" in a project with several). */
+  agentLabel(projectPath: string, agentId: string): string {
+    const st = this.liveFor(projectPath, agentId)
+    return st ? this.label(st) : agentId
   }
 
   /** The launch a hook call belongs to: named by its run id, else (older launch folders) by session id. */
@@ -3551,6 +5479,22 @@ class SessionManager {
         this.noteTurn(l)
       })
     }
+    // A turn the log says ended on an error (#1632, Codex, whose Stop says nothing of it): of this launch, settled in
+    // order with the hooks by the turn it names, never by whichever turn is current (settleFailure). A read that hooks
+    // overtook is no reason to drop it: the turn it names decides.
+    const at = d.turnFailed !== undefined && d.turnFailedAt ? Date.parse(d.turnFailedAt) : NaN
+    if (at >= Date.parse(l.state.startedAt)) {
+      const rec = { key: `${d.turnFailedTurn ?? ''}@${d.turnFailedAt}`, turn: d.turnFailedTurn ?? null, at, words: d.turnFailed ?? '' }
+      const id = liveId(l.state.projectPath, l.state.agentId)
+      void this.inHookOrder(l.state.runId, () => {
+        if (this.live.get(id) !== l || rec.key === l.failureDone) return
+        l.failure = rec
+        // A CLI that sends no Stop after a failed turn (Copilot, HI-1960): its record ends the running turn, failed, as
+        // that Stop would (failedIfRecorded gives it the CLI's words).
+        if (l.adapter.descriptor.capabilities.failureEndsTurn && l.ledger && failureTurn(l.ledger, rec) === 'running') return this.endTurnFrom(id, l, 'transcript', `${l.adapter.descriptor.name} recorded its turn failed at ${d.turnFailedAt}`) // i18n-ignore: the log and the hook journal (English)
+        this.settleFailure(id, l)
+      })
+    }
     // A turn interrupted without a hook (Copilot): as the interrupt hook would, once per recorded interrupt of this launch.
     // Not after a hook that came once the read began (the CLI carried on, its Stop, a new prompt): that one is newer.
     const interrupted = d.interruptedAt && Date.parse(d.interruptedAt) >= Date.parse(l.state.startedAt) && d.interruptedAt !== l.interruptedAt ? d.interruptedAt : null
@@ -3585,7 +5529,8 @@ class SessionManager {
     const answered = (d.stopsAnswered ?? []).map(Date.parse).filter((t) => t >= started)
     if (answered.length) l.stopsAnswered = [...(l.stopsAnswered ?? []), ...answered].slice(-STOPS_KEPT)
     if (d.turnEnded || answered.length) this.reconcileTurn(l)
-    if (d.planUsage) reportPlanUsage(l.state.provider, d.planUsage, l.state.agentName ?? l.state.agentId)
+    // The connection it launched on (HI-1756): its usage is that login's.
+    if (d.planUsage) reportPlanUsage(l.state.provider, d.planUsage, l.state.agentName ?? l.state.agentId, l.state.launchedConnection)
     const learn = l.defaultEffort
     const learnModel = d.modelId ?? learn?.model
     if (learn && d.effort && learnModel) {
@@ -3596,9 +5541,11 @@ class SessionManager {
     // Running another model than expected: its own auto-compact window, if its settings give it one (#242).
     const autoCompact = d.modelId && d.modelId !== st.modelId && l.autoCompactFor ? l.autoCompactFor(d.modelId) : st.autoCompact
     // The CLI's report is kept; it is shown unless the user chose their prices (#436), and then it isn't an estimate.
-    if (d.costUsd != null) l.reportedCost = d.costUsd
-    const reported = d.costUsd != null && !usesOwnPrices(st.provider, config.settings)
-    const next = { autoCompact, effort: d.effort ?? st.effort, modelName: d.modelName ?? st.modelName, modelId: d.modelId ?? st.modelId, costUsd: reported ? d.costUsd : st.costUsd, costEstimated: reported ? false : st.costEstimated, planMode: d.planMode ?? st.planMode, permissionMode: d.permissionMode ?? st.permissionMode, contextWindow: d.contextWindow ?? st.contextWindow }
+    // On a server connection (HI-1772) never: it prices the server's model as a Claude model.
+    const onServer = !!st.launchedConnection?.server
+    if (d.costUsd != null && !onServer) l.reportedCost = d.costUsd
+    const reported = d.costUsd != null && !onServer && !usesOwnPrices(st.provider, config.settings)
+    const next = { autoCompact, effort: d.effort ?? st.effort, modelName: d.modelName ?? st.modelName, modelId: d.modelId ?? st.modelId, costUsd: reported ? d.costUsd : st.costUsd, costEstimated: reported ? false : st.costEstimated, planMode: d.planMode ?? st.planMode, permissionMode: d.permissionMode && !isCliOwnMode(l.launchMode) ? d.permissionMode : st.permissionMode, contextWindow: d.contextWindow ?? st.contextWindow }
     if (
       next.effort === st.effort &&
       next.modelName === st.modelName &&
@@ -3624,10 +5571,14 @@ class SessionManager {
   // File locks
   // -------------------------------------------------------------------------
 
+  /**
+   * The project's file locks (its workflow option, HI-1766), as its workspace last read it: Hive's, the workspace's or its
+   * own. The Assistant's home isn't a project and shares no folder: off.
+   */
   private lockMode(projectPath: string): FileLockMode {
-    const p = workspaceOf(projectPath).info()?.projects.find((x) => x.path.toLowerCase() === projectPath.toLowerCase())
-    const own = p?.config.fileLocks
-    return own && own !== 'inherit' ? own : config.settings.agents.fileLocks
+    const ws = workspaceOf(projectPath)
+    if (ws.isAssistantHome(projectPath)) return 'off'
+    return projectPreferences(ws, projectPath).fileLocks
   }
 
   /**
@@ -3641,26 +5592,43 @@ class SessionManager {
     if (!found) return null
     const [id, l] = found
     const hook = l.adapter.normalizeHook(body)
+    // Any tool call of its own ends the block its last edit had (HI-982): it went on with something, or tries again.
+    if (hook.event.kind === 'toolStart' && !hook.ids.sub) l.hookBlock = undefined
     if (hook.event.kind !== 'toolStart' || !hook.editedPaths.length) return null
+    const obs = this.hookObs.get(body)
+    // Its decision, as the launch's Hooks dialog shows it, and the block it leaves (Activity, while it stands).
+    const decided = (response: HookFired['response'], why?: string, block?: Omit<HookBlock, 'runId' | 'toolUseId' | 'at'>): void => {
+      if (obs) Object.assign(obs.fired, { response }, why ? { why: clip(why, HOOK_SHORT_MAX).text } : {})
+      if (block) l.hookBlock = { ...block, runId: l.state.runId, toolUseId: hook.ids.call, at: Date.now() }
+    }
     const mode = this.lockMode(l.state.projectPath)
     const base = typeof body.cwd === 'string' && body.cwd ? body.cwd : l.state.cwd
     const files = hook.editedPaths.map((f) => resolve(isAbsolute(f) ? f : join(base, f)))
-    if (mode === 'off') return this.editAccepted(id, files, null)
+    // The folder's write log (#1214): a check running there meanwhile doesn't count, whatever the lock mode.
+    observer.markEdits(files)
+    if (mode === 'off') {
+      decided('allowed')
+      return this.editAccepted(id, files, null)
+    }
     const now = Date.now()
+    // Each file's identity resolved once (HI-1909: a realpath on main's thread each, three times a file before).
+    const keys = new Map(files.map((abs) => [abs, lockKey(abs)]))
     for (const abs of files) {
-      const held = this.locks.get(lockKey(abs))
+      const held = this.locks.get(keys.get(abs)!)
       const holder = held && held.liveId !== id ? this.live.get(held.liveId) : undefined
       if (!holder || now - held!.at >= LOCK_TTL_MS) continue
       const rel = placeRelative(holder.state.cwd, abs) || basename(abs)
       const who = holder.state.agentName ?? 'Another agent' // i18n-ignore: in the lock's replies to the agent (agent-facing)
       log.info(`Lock: ${userText(l.state.agentName)} → ${userText(rel)} held by ${userText(who)} (${mode})`)
+      const block = { key: keys.get(abs)!, file: abs, holderLiveId: held!.liveId, holderRunId: holder.state.runId }
       if (mode === 'warn') {
+        decided('warned', who)
         // i18n-ignore: the lock's reply to the agent (agent-facing)
-        return this.editAccepted(id, files, l.adapter.lockReply({ kind: 'warn', context: `Note: ${who} is also editing ${rel} right now. Check the file's current content before changing it, and keep your edit small.` }))
+        return this.editAccepted(id, files, l.adapter.lockReply({ kind: 'warn', context: `Note: ${who} is also editing ${rel} right now. Check the file's current content before changing it, and keep your edit small.` }), keys)
       }
       if (mode === 'ask' && !l.adapter.descriptor.capabilities.lockAsk) {
         // The CLI can't show its own approval for this, so Hive asks the user and the agent waits.
-        const key = `${id}|${lockKey(abs)}`
+        const key = `${id}|${keys.get(abs)!}`
         if (this.lockAllowed.has(key)) continue
         if (!this.lockAsked.has(key)) {
           this.lockAsked.set(key, ++this.lockSeq)
@@ -3668,37 +5636,41 @@ class SessionManager {
             'warning',
             tr(msg({ id: 'session.lock.title', defaultMessage: '{agent} wants to edit {file}', description: "A notice's title: an agent wants to edit a file another agent is editing (Hive's file locks, Ask me). {agent} is the agent, {file} the file's path in the project." }), { agent: this.label(l.state), file: rel }),
             tr(msg({ id: 'session.lock.body', defaultMessage: '{holder} is editing it right now. Allow {agent} to edit it too?', description: "The notice that an agent wants to edit a file another agent is editing. {holder} is the agent editing it, {agent} the agent asking." }), { holder: holder.state.agentName ?? tr(msg({ id: 'session.lock.anotherAgent', defaultMessage: 'Another agent', description: "Stands for an agent whose name isn't known, at the start of a sentence (\"Another agent is editing it right now.\")." })), agent: l.state.agentName ?? tr(msg({ id: 'session.lock.theAgent', defaultMessage: 'the agent', description: "Stands for an agent whose name isn't known, in the middle of a sentence (\"Allow the agent to edit it too?\")." })) }),
-            [{ label: tr(msg({ id: 'session.lock.allow', defaultMessage: 'Allow', description: "A notice's button: lets the agent edit the file another agent is editing." })), command: 'session.allowLockedEdit', args: [l.state.projectPath, l.state.agentId, abs] }],
-            l.state.projectPath
+            [{ label: tr(msg({ id: 'session.lock.allow', defaultMessage: 'Allow', description: "A notice's button: lets the agent edit the file another agent is editing." })), command: 'session.allowLockedEdit', args: [l.state.projectPath, l.state.agentId, abs, `lock:${key}#${this.lockAsked.get(key)}`] }],
+            l.state.projectPath,
+            { kind: 'agent', projectPath: l.state.projectPath, agentId: l.state.agentId, name: this.label(l.state), project: basename(l.state.projectPath) },
+            { offer: `lock:${key}#${this.lockAsked.get(key)}` }
           )
         }
-        return l.adapter.lockReply({
-          kind: 'deny',
-          // i18n-ignore: the lock's reply to the agent (agent-facing)
-          reason: `${who} is editing ${rel} right now (Hive file lock). Hive has asked the user whether you may edit it too. Stop and wait: don't work around this. When the user says go ahead, try the edit again.`
-        })
+        // i18n-ignore: the lock's reply to the agent (agent-facing)
+        const asked = `${who} is editing ${rel} right now (Hive file lock). Hive has asked the user whether you may edit it too. Stop and wait: don't work around this. When the user says go ahead, try the edit again.`
+        decided('asked', asked, { ...block, kind: 'asked' })
+        return l.adapter.lockReply({ kind: 'deny', reason: asked })
       }
       // i18n-ignore: the lock's reply to the agent, or its CLI's own question (agent- and CLI-facing)
       const reason = `${who} is editing ${rel} right now (Hive file lock). Work on something else, or wait until ${who} has finished its task, then try again.`
+      decided(mode === 'ask' ? 'asked' : 'blocked', reason, { ...block, kind: mode === 'ask' ? 'asked' : 'blocked' })
       return l.adapter.lockReply({ kind: mode === 'ask' ? 'ask' : 'deny', reason })
     }
     let fresh = false
     for (const abs of files) {
-      const key = lockKey(abs)
+      const key = keys.get(abs)!
       const held = this.locks.get(key)
       if (!held || held.liveId !== id) fresh = true
       this.locks.set(key, { liveId: id, at: now, seq: ++this.lockSeq, path: abs })
     }
     if (fresh) this.publishLocks(id)
-    return this.editAccepted(id, files, null)
+    decided('allowed')
+    return this.editAccepted(id, files, null, keys)
   }
 
   /**
    * An edit going ahead (every file in it): the files need no go-ahead any more, whoever held them meanwhile (the
    * holder may have finished before the retry). Returns `reply`.
    */
-  private editAccepted<T>(id: string, files: string[], reply: T): T {
-    for (const abs of files) this.lockGoAhead.delete(`${id}|${lockKey(abs)}`)
+  private editAccepted<T>(id: string, files: string[], reply: T, keys?: ReadonlyMap<string, string>): T {
+    // None waiting (nearly always): no file's identity to resolve.
+    if (this.lockGoAhead.size) for (const abs of files) this.lockGoAhead.delete(`${id}|${keys?.get(abs) ?? lockKey(abs)}`)
     return reply
   }
 
@@ -3707,12 +5679,24 @@ class SessionManager {
    * now if it is idle, else when its turn ends (the toast shows while the blocked agent is still replying, and that
    * turn's end would otherwise drop the allowance with nothing typed).
    */
-  async allowLockedEdit(projectPath: string, agentId: string, path: string): Promise<void> {
+  async allowLockedEdit(projectPath: string, agentId: string, path: string, offer?: string): Promise<void> {
     projectPath = workspace.assertSessionHost(projectPath)
     const id = liveId(projectPath, agentId)
     const l = this.live.get(id)
     if (!l) return
     const key = `${id}|${lockKey(resolve(path))}`
+    // Checked again (HI-2320, HR2's round 1): only the ask its notice offered (`offer`, its sequence), while it is still
+    // open, is answered; an older notice's Allow answers nothing newer, and says it no longer applies.
+    const asked = this.lockAsked.get(key)
+    const current = asked === undefined ? null : `lock:${key}#${asked}`
+    if (!current || this.lockAllowed.has(key) || (offer !== undefined && offer !== current)) {
+      if (offer !== undefined) resolveOffer(offer, tr(OUTCOME.noLongerAsked))
+      else resolveOffers((o) => o.startsWith(`lock:${key}#`), tr(OUTCOME.noLongerAsked))
+      return
+    }
+    resolveOffer(current, tr(OUTCOME.allowed))
+    // The user's answer ends the block it asked about (HI-982).
+    if (l.hookBlock && `${id}|${l.hookBlock.key}` === key) l.hookBlock = undefined
     this.lockAllowed.set(key, ++this.lockSeq)
     this.lockGoAhead.set(key, path)
     this.sendGoAheads(id, l)
@@ -3748,7 +5732,12 @@ class SessionManager {
    */
   private releaseLocks(id: string, before = Infinity): void {
     for (const map of [this.lockAllowed, this.lockAsked]) {
-      for (const [k, seq] of map) if (k.startsWith(`${id}|`) && seq <= before) map.delete(k)
+      for (const [k, seq] of map) {
+        if (!k.startsWith(`${id}|`) || seq > before) continue
+        map.delete(k)
+        // An ask let go unanswered: its notice's Allow goes (HI-2320).
+        if (map === this.lockAsked) resolveOffer(`lock:${k}#${seq}`, tr(OUTCOME.noLongerAsked))
+      }
     }
     // A go-ahead waits for the turn's end, so only releasing everything (the session ended or moved) drops it.
     if (before === Infinity) this.dropGoAheads(id)
@@ -3865,6 +5854,69 @@ class SessionManager {
     }
   }
 
+  /** What Hive observes of each hook it handles (HI-982), by its body, while it handles it. */
+  private hookObs = new WeakMap<object, HookObservation>()
+
+  /**
+   * A hook arriving on its launch's own authenticated route (the hook server, HI-982): its observation, which its lock
+   * decision and the turn ledger fill in, for the launch's Hooks dialog; null when no launch of Hive's has it.
+   */
+  observeHook(runId: string | null, body: Record<string, any>): HookObservation | null {
+    const l = this.findLaunch(runId, body.session_id)?.[1]
+    if (!l?.hookHistory) return null
+    const event = clip(typeof body.hook_event_name === 'string' ? body.hook_event_name : '?', HOOK_SHORT_MAX).text
+    const obs: HookObservation = { l, started: performance.now(), fired: { at: Date.now(), event, receiver: l.hooks?.receivers[event] ?? 'hive', response: 'none', ledger: 'none', ms: 0 } }
+    this.hookObs.set(body, obs)
+    return obs
+  }
+
+  /**
+   * A hook handled (HI-982): its reply (context, where its lock decision said nothing) or its error, and how long Hive
+   * took, kept in its launch's history (the newest HOOK_FIRED_MAX). Never logged: the history is the dialog's alone.
+   */
+  hookHandled(obs: HookObservation, reply: unknown, error?: { step: string; error: unknown }): void {
+    const f = obs.fired
+    if (error) Object.assign(f, { response: 'error', why: clip(`${error.step}: ${error.error instanceof Error ? error.error.message : String(error.error)}`, HOOK_SHORT_MAX).text })
+    else if (f.response === 'none' && reply && typeof reply === 'object' && Object.keys(reply).length) f.response = 'context'
+    f.ms = Math.round(performance.now() - obs.started)
+    const history = obs.l.hookHistory
+    if (!history) return
+    history.push(f)
+    if (history.length > HOOK_FIRED_MAX) history.splice(0, history.length - HOOK_FIRED_MAX)
+  }
+
+  /**
+   * An agent's hooks for its Hooks dialog (HI-982): its launch's (runId), what it has (listed again: the CLI asked now, or
+   * its files compared with the launch's) and what Hive received, newest first. Null when it isn't running.
+   */
+  async sessionHooks(projectPath: string, agentId: string): Promise<SessionHooks | null> {
+    const l = this.live.get(liveId(projectPath, agentId))
+    if (!l?.hooks || !l.hookHistory) return null
+    const { runId, provider } = l.state
+    const listing = l.hooks.now ? await l.hooks.now().catch((e: Error) => ({ ...l.hooks!.listing, notes: [...l.hooks!.listing.notes, { kind: 'cliUnknown' as const, why: clip(e.message, HOOK_SHORT_MAX).text }] })) : l.hooks.listing
+    return { runId, provider, listing, fired: [...l.hookHistory].reverse() }
+  }
+
+  /**
+   * The project's lock blocks standing now (HI-982, Activity): each agent's latest blocked (or asked) edit while the
+   * holder whose lock blocked it, in that launch, still holds the file and the blocked launch hasn't moved on since
+   * (another tool call, the call's end, its turn's end, the user's answer: those drop it). The holder is named only when
+   * it is in the same project.
+   */
+  hookBlocks(projectPath: string): ActivityHookBlock[] {
+    return this.projectStates(projectPath).flatMap((state): ActivityHookBlock[] => {
+      const l = this.live.get(liveId(projectPath, state.agentId))
+      const b = l?.hookBlock
+      if (!l || !b || b.runId !== state.runId) return []
+      const held = this.locks.get(b.key)
+      const holder = held?.liveId === b.holderLiveId ? this.live.get(b.holderLiveId) : undefined
+      if (!holder || holder.state.runId !== b.holderRunId || Date.now() - held!.at >= LOCK_TTL_MS) return []
+      const file = (placeRelative(state.cwd, b.file) || basename(b.file)).replace(/\\/g, '/')
+      const same = holder.state.projectPath.toLowerCase() === projectPath.toLowerCase()
+      return [{ key: `${b.runId}|${b.toolUseId ?? ''}|${b.key}|${b.holderRunId}`, agentId: state.agentId, file, holder: same ? (holder.state.agentName ?? holder.state.agentId) : null, kind: b.kind, at: b.at }]
+    })
+  }
+
   /** Hook calls whose reply waits for its place in the launch's hook order (hookReply), by their body. */
   private noticeReplies = new WeakMap<object, (reply: Record<string, unknown> | null) => void>()
 
@@ -3905,7 +5957,12 @@ class SessionManager {
     const launch = this.findLaunch(runId, body.session_id)?.[1]
     // The launch's hooks before this one: what the old conversation had seen, if this one switches conversations.
     const before = launch?.hooksSeen ?? 0
-    if (launch) launch.hooksSeen = before + 1
+    if (launch) {
+      launch.hooksSeen = before + 1
+      launch.lastHookAt = at
+    }
+    // Its start is heard (#1336); whether it answers a prompt is the turn ledger's to say, in the launch's order.
+    if (launch?.hooksWatch) hookSeen(launch.hooksWatch, at)
     return this.inHookOrder(runId ?? `session:${String(body.session_id ?? '')}`, () => this.handleHookNow(runId, body, arrived, before, reply, at))
   }
 
@@ -3969,12 +6026,15 @@ class SessionManager {
       }
     }
     if (hook.mode && (hook.mode !== st.permissionMode || hook.mode !== st.modeObserved)) {
-      st.permissionMode = st.modeObserved = hook.mode
+      this.observeMode(l, hook.mode)
       this.emitState(st)
     }
     // The turn ledger first (#648): a hook about a turn that is over is old news, and a Stop Hive carried on isn't an end.
     const ledger = (l.ledger ??= newLedger())
     const ids = hook.ids
+    // The transcript turn it names is heard (#1371), whatever the ledger makes of it and whether or not an alarm stands:
+    // it answers that turn and those placed before it (the one transition, hooksHealth's hookTurn).
+    const answered = !!l.hooksWatch && hookTurn(l.hooksWatch, at, ids.turn, hook.event.kind === 'prompt' ? (hook.event.text ?? null) : null)
     const before = st.status
     // A CLI that wakes when its background tasks end begins that turn itself: while its transcript says one just ended
     // (never merely because one runs), a tool call it never saw may open that turn should its prompt hook be lost
@@ -3993,7 +6053,43 @@ class SessionManager {
     const was = ledger.active
     const took = admit(ledger, hook.event, ids, { hiveContinued: continued, woke, now: at })
     if (ledger.active !== was) l.woke = false
+    // Its CLI tries a failed model request again (HI-1973: Copilot's recoverable error): the turn's wait, kept from try to
+    // try while nothing else is heard (its first try's time, the tries counted). The CLI says neither when it tries again
+    // nor how often it will: both unknown, never made up.
+    if (took.verdict !== 'stale' && hook.event.kind === 'retry') {
+      const turn = ledger.active
+      if (turn?.state === 'running') {
+        const prev = l.retryTurn === turn ? st.retryWait : undefined
+        const told = new Date(at).toISOString()
+        st.retryWait = { at: told, since: prev?.since ?? told, retryAt: null, attempt: (prev?.attempt ?? 0) + 1, max: null, status: hook.event.status, ...(hook.event.network ? { network: true as const } : {}) }
+        l.retryTurn = turn
+        this.emitState(st)
+      }
+    }
+    // Its CLI is heard from again (HI-1972): whatever it waited to retry has gone on.
+    else if (took.verdict !== 'stale' && st.retryWait) {
+      endRetryWait(st, at)
+      this.emitState(st)
+    }
+    // What the ledger made of it, for the Hooks dialog (HI-982), apart from Hive's reply: an ignored hook may have had one.
+    const obs = this.hookObs.get(body)
+    if (obs) Object.assign(obs.fired, took.verdict === 'stale' ? { ledger: 'ignored', ledgerWhy: clip(took.why, HOOK_SHORT_MAX).text } : { ledger: took.verdict === 'apply' ? 'applied' : 'continued' })
+    // What ends a lock block's decision (HI-982): the blocked call's end, or its turn's (a new prompt, a stop, the end).
+    const b = l.hookBlock
+    const kind = hook.event.kind
+    if (b && ((kind === 'toolEnd' && !!b.toolUseId && ids.call === b.toolUseId) || (took.verdict !== 'stale' && ['prompt', 'stop', 'signIn', 'interrupt', 'end'].includes(kind)))) l.hookBlock = undefined
+    // A current turn's hook (#1336): the prompt watched is answered, and missing hooks are back. A late hook of a turn
+    // that is over says nothing of a prompt sent since.
+    if (l.hooksWatch) {
+      if (took.verdict !== 'stale') turnHeard(l.hooksWatch)
+      // A flag a transcript turn raised (#1371) is answered only by that turn's hooks or a newer turn's, by identity (above):
+      // the ledger's current turn may be older than it (its hooks are what went missing), so the ledger's verdict doesn't count.
+      const back = st.hooksMissing?.after === 'transcript' ? answered : !!st.hooksMissing && took.verdict !== 'stale'
+      if (back) this.hooksBack(l)
+    }
     let actions: readonly string[] = [took.verdict === 'stale' ? 'stale' : 'continued']
+    // Hive went on with a turn that had been marked failed (#1658): it carries on, so it needs the user no more.
+    if (took.verdict === 'continued' && st.failedTurn) this.carryOut(id, l, { next: null, failed: null, message: null, actions: [] }, 'continued')
     // A prompt about a safeguard stop says why (#606): told so now if the screen shows it, else when it draws it.
     const guard = this.guardCandidate(l, hook.event)
     if (took.verdict === 'apply') {
@@ -4005,7 +6101,8 @@ class SessionManager {
       // Hooks are handled in order, so the next one waits for this read: a turn's end counts the tasks it started.
       if (ev.kind === 'stop') await this.beforeTurnEnd(l, ev.lastMessage)
       if (!current()) return
-      const step = hookStep(ev, this.statusInput(l))
+      const step = hookStep(this.failedIfRecorded(l, ev), this.statusInput(l))
+      if (ev.kind !== 'stop') this.settleFailure(id, l)
       this.carryOut(id, l, step, String(body.hook_event_name ?? ''), ev, arrived)
       actions = step.actions
       if (ev.kind !== 'ignore') (l.recentHooks ??= []).push({ kind: ev.kind, at: Date.now(), status: st.status })
@@ -4058,7 +6155,10 @@ class SessionManager {
       l.turnStarts = [...(l.turnStarts ?? []), a.startedAt].slice(-20)
     }
     const turn: LiveSessionState['turn'] = !a ? undefined : unknown ? { state: 'unknown', ...(a.id ? { id: a.id } : {}), silentSince: new Date(unknown.since).toISOString() } : { state: a.state === 'running' ? 'running' : 'over', ...(a.id ? { id: a.id } : {}) }
-    if (JSON.stringify(turn) === JSON.stringify(st.turn)) return
+    // A retry wait (HI-1972) is its turn's: gone with it, when it ends or another begins.
+    const retryGone = !!st.retryWait && (!a || a !== l.retryTurn || a.state !== 'running')
+    if (retryGone) endRetryWait(st)
+    if (!retryGone && JSON.stringify(turn) === JSON.stringify(st.turn)) return
     st.turn = turn
     this.emitState(st)
   }
@@ -4071,10 +6171,40 @@ class SessionManager {
     if (!l.ledger) return null
     const rec = l.turnRecord
     // i18n-ignore: the log and the hook journal (English)
-    if (rec && reconciles(l.ledger, rec.turn)) return `${l.adapter.descriptor.name} recorded the end of turn ${rec.turn} at ${rec.at}`
+    if (rec && reconciles(l.ledger, rec.turn, Date.parse(rec.at))) return `${l.adapter.descriptor.name} recorded the end of turn ${rec.turn} at ${rec.at}`
     // i18n-ignore: the log and the hook journal (English)
     if (unheardStop(l.ledger, l.stopsAnswered ?? [])) return `${l.adapter.descriptor.name} recorded a Stop of its running turn answered at ${new Date(l.stopsAnswered!.at(-1)!).toISOString()} that never reached Hive`
     return null
+  }
+
+  /**
+   * A turn's end as Hive applies it (#1632), once the turn ledger has it over: the Stop of the turn a recorded failure
+   * names ends it failed, with the CLI's words; a record of an older turn is dropped.
+   */
+  private failedIfRecorded(l: LiveSession, ev: HookEvent): HookEvent {
+    const rec = l.failure
+    if (ev.kind !== 'stop' || !rec || !l.ledger) return ev
+    const where = failureTurn(l.ledger, rec)
+    if (where === 'unknown' || where === 'running') return ev
+    l.failure = undefined
+    l.failureDone = rec.key
+    if (where === 'older' || ev.failed) return ev
+    return { kind: 'stop', lastMessage: rec.words || null, failed: true }
+  }
+
+  /**
+   * Settles a recorded failure (#1632) by the turn it names (failureTurn): that turn over, it is marked failed now; a
+   * newer turn begun, it is dropped; that turn running, its Stop ends it failed (failedIfRecorded); its turn unknown, it
+   * waits. Run in hook order: when it is read, and after each hook. With no turn ledger yet (no hook heard), it waits.
+   */
+  private settleFailure(id: string, l: LiveSession): void {
+    const rec = l.failure
+    if (!rec) return
+    const where = l.ledger ? failureTurn(l.ledger, rec) : 'unknown'
+    if (where === 'unknown' || where === 'running') return
+    l.failure = undefined
+    l.failureDone = rec.key
+    if (where === 'over') this.carryOut(id, l, { next: null, ...failedTurnStep(rec.words), actions: [] }, 'transcript')
   }
 
   /** The CLI recorded the end of the turn Hive has running, whose Stop never came (#642): over, as that Stop would end it, in order with the hooks. */
@@ -4092,7 +6222,7 @@ class SessionManager {
     const before = st.status
     const turn = describeTurn(l.ledger!)
     endRunning(l.ledger!, by)
-    const ev: HookEvent = { kind: 'stop', lastMessage: null }
+    const ev = this.failedIfRecorded(l, { kind: 'stop', lastMessage: null })
     await this.beforeTurnEnd(l, null)
     this.carryOut(id, l, hookStep(ev, this.statusInput(l)), by, ev)
     this.noteTurn(l)
@@ -4108,6 +6238,83 @@ class SessionManager {
   }
 
   /**
+   * Whether its CLI is waiting to retry its model request (HI-1972: Codex after a 429 shows only "Working" for minutes):
+   * once a running turn has had no hook for the adapter's while, its records are looked at, at most every
+   * RETRY_LOOK_EVERY_MS and one look at a time. What a look finds is applied in hook order, only if the same launch and
+   * turn still run and no hook came while it looked (a hook says something newer), and only a newer wait than the one
+   * shown. It turns an unknown turn back to running (its state is known); an expired wait is cleared here, so it never
+   * holds silence handling back.
+   */
+  private checkRetry(projectPath: string, agentId: string): void {
+    const id = liveId(projectPath, agentId)
+    const l = this.live.get(id)
+    if (!l?.ledger) return
+    const st = l.state
+    const now = Date.now()
+    // A wait past (a pushed one too: HI-1973's Copilot, whose adapter has nothing to look at) is cleared here.
+    if (st.retryWait && !retryWaitCurrent(st.retryWait, now)) {
+      endRetryWait(st, now)
+      this.emitState(st)
+    }
+    if (!l.adapter.retryWait || !l.launchEnv) return
+    const turn = l.ledger.active
+    const sessionId = st.sessionId
+    if (!sessionId || !turn || turn.state !== 'running' || st.status !== 'working' || l.retryLooking) return
+    const lastHook = Math.max(l.lastHookAt ?? 0, turn.startedAt)
+    if (now - lastHook < (l.adapter.retryLookAfterMs?.() ?? DEFAULT_RETRY_LOOK_AFTER_MS)) return
+    if (l.retryLookedAt !== undefined && now - l.retryLookedAt < RETRY_LOOK_EVERY_MS) return
+    l.retryLookedAt = now
+    l.retryLooking = true
+    const seen = l.hooksSeen ?? 0
+    void l.adapter
+      .retryWait({ sessionId, env: l.launchEnv, transcriptPath: l.transcriptPath, since: lastHook })
+      .catch((e: unknown) => {
+        log.warn(`${userText(this.label(st))}: could not look for a retry wait`, e)
+        return null
+      })
+      .then((wait) =>
+        this.inHookOrder(st.runId, () => {
+          if (!wait || this.live.get(id) !== l || l.ledger?.active !== turn || turn.state !== 'running' || (l.hooksSeen ?? 0) !== seen || !retryWaitCurrent(wait)) return
+          const prev = l.retryTurn === turn ? st.retryWait : undefined
+          if (prev && Date.parse(wait.at) <= Date.parse(prev.at)) return
+          st.retryWait = { ...wait, since: prev?.since ?? wait.since }
+          l.retryTurn = turn
+          // Known again: waiting to retry, not silent.
+          if (st.turn?.state === 'unknown') {
+            heard(l.ledger)
+            this.noteTurn(l)
+          }
+          this.emitState(st)
+          // i18n-ignore: the log (English)
+          log.info(`${userText(this.label(st))}: ${l.adapter.descriptor.name} is waiting to retry its model request (${wait.status ?? 'no status'}, try ${wait.attempt}${wait.max ? `/${wait.max}` : ''}) until ${wait.retryAt ?? 'it says'}`)
+        })
+      )
+      .finally(() => {
+        l.retryLooking = false
+      })
+  }
+
+  /**
+   * Who is told of a retry wait that goes on (HI-1973): retryNotice.ts sets it, telling the Assistant. Null: nobody.
+   */
+  retryOverdue: ((st: LiveSessionState) => void) | null = null
+
+  /**
+   * A retry wait that has gone on past Settings → Advanced's while (HI-1973, `hive.retry.tellAssistantAfterSeconds`; 0:
+   * never), counted from the turn's first retry: told once a turn (retryOverdue). One that ends sooner tells nothing, and
+   * a later turn's is told again.
+   */
+  private checkRetryNotice(projectPath: string, agentId: string, now = Date.now()): void {
+    const l = this.live.get(liveId(projectPath, agentId))
+    const w = l?.state.retryWait
+    const after = advanced.number('hive.retry.tellAssistantAfterSeconds') * 1000
+    if (!l || !w || !after || !l.retryTurn || l.retryTold === l.retryTurn || !retryWaitCurrent(w, now)) return
+    if (now - Date.parse(w.since) < after) return
+    l.retryTold = l.retryTurn
+    this.retryOverdue?.(l.state)
+  }
+
+  /**
    * A running turn Hive has heard nothing of for a while (silentMs): its end, if the CLI's record or its screen shows it,
    * open tool calls or not (their ends may be lost too); else, after the longer silence an open call allows (a test run
    * can take long), its state is unknown (#648). Unknown isn't idle: nothing is typed into it, and the user can Mark
@@ -4120,6 +6327,8 @@ class SessionManager {
     const quiet = (): boolean => {
       const st = l.state
       const silent = silentFor(l.ledger!)
+      // Its CLI says it waits to retry (HI-1972): its state is known, while that wait is current.
+      if (st.retryWait && retryWaitCurrent(st.retryWait)) return false
       return silent !== null && silent >= silentMs() && st.status === 'working' && !l.compacting && !isCompacting(st)
     }
     if (!quiet()) return
@@ -4180,13 +6389,15 @@ class SessionManager {
       backgroundWakes: l.adapter.descriptor.capabilities.backgroundWakes,
       tasks: l.tasks?.size ?? 0,
       attention: l.titleAttention ? 'title' : 'hooks',
-      reviewed: !!l.adapter.descriptor.permissionModes.find((m) => m.value === st.permissionMode)?.reviewed,
+      // The mode the CLI is in: on the CLI's own setting, the one it showed (#1284).
+      reviewed: !!l.adapter.descriptor.permissionModes.find((m) => m.value === modeInEffect(st))?.reviewed,
       titleAsks: !!l.titleAsks,
       open: l.open ?? [],
       waitingOn: l.waitingOn ?? null,
       question: !!st.question,
       reviewing: !!st.review,
-      safeguardPrompt: this.guardAnswerable(l)
+      safeguardPrompt: this.guardAnswerable(l),
+      failedTurn: !!st.failedTurn
     }
   }
 
@@ -4202,10 +6413,20 @@ class SessionManager {
     const worked = ev?.kind === 'toolStart' || ev?.kind === 'toolEnd' || (ev?.kind === 'stop' && !ev.failed)
     // An agent a refused sign-in stopped tries again (its own prompt, Resume's) and doesn't get through (interrupted, or
     // failed on something else) while the sign-in is still expired: it needs sign-in again, not told as finished.
-    if (st.signIn && this.signedOut.has(st.provider) && (ev?.kind === 'interrupt' || (ev?.kind === 'stop' && ev.failed)))
+    if (st.signIn && this.signedOut.has(authScope(st)) && (ev?.kind === 'interrupt' || (ev?.kind === 'stop' && ev.failed)))
       step = { ...step, next: 'signin', message: null, actions: step.actions.filter((a) => a !== 'notifyFinished') }
+    // Its CLI moved by itself (HI-2191: a prompt taken, a tool, a turn's end, a question of its own): its input is no
+    // longer blocked, and the ask it waited on goes, a newer question's kept.
+    const unblocked = l.inputBlocked && l.inputBlocked.runId === st.runId && ev && cause !== 'screen' && MOVES_INPUT.has(ev.kind) && !(ev.kind === 'prompt' && ev.injected) ? l.inputBlocked : null
+    if (unblocked) {
+      l.inputBlocked = undefined
+      l.unanswered = 0
+      st.inputBlocked = undefined
+      log.info(`${userText(label)}: its input takes keys again (its CLI sent ${ev!.kind})`) // i18n-ignore: for the log
+    }
     if (step.open !== undefined) l.open = step.open
     if (step.waitingOn !== undefined) l.waitingOn = step.waitingOn
+    if (unblocked) l.open = l.open?.filter((a) => a !== unblocked.ask)
     for (const action of step.actions) {
       switch (action) {
         case 'answered':
@@ -4231,7 +6452,8 @@ class SessionManager {
             tr(msg({ id: 'session.autoCompact.title', defaultMessage: '{agent}: compacting conversation', description: "A notice's title: an agent's CLI compacts its conversation by itself. {agent} is the agent." }), { agent: label }),
             tr(msg({ id: 'session.autoCompact.body', defaultMessage: '{provider} is summarising the context to free up space.', description: "The notice that an agent's CLI compacts its conversation by itself. {provider} is the coding agent's name." }), { provider: l.adapter.descriptor.name }),
             undefined,
-            st.projectPath
+            st.projectPath,
+            agentTarget(st.projectPath, st.agentId, label)
           )
           break
         case 'autoCompactIdle':
@@ -4246,7 +6468,7 @@ class SessionManager {
         case 'notifyFinished':
           // Watching its cards isn't finished: nothing for the user to look at.
           if (this.watchFor(st.projectPath, st.agentId)) break
-          this.notify(st.projectPath, withValues(M.finished, { agent: label }), (ev?.kind === 'stop' && ev.lastMessage?.slice(0, 180)) || msg({ id: 'session.notice.finishedBody', defaultMessage: 'The agent has finished its task.', description: "The notification that an agent finished, when it left no last message to show." }), 'finished', st.agentName)
+          this.notify(st.projectPath, withValues(M.finished, { agent: label }), (ev?.kind === 'stop' && ev.lastMessage?.slice(0, 180)) || msg({ id: 'session.notice.finishedBody', defaultMessage: 'The agent has finished its task.', description: "The notification that an agent finished, when it left no last message to show." }), 'finished', st.agentName, st.agentId)
           break
         case 'releaseLocks':
           this.releaseLocks(id, arrived)
@@ -4271,7 +6493,7 @@ class SessionManager {
             const hive = said ? null : withValues(msg({ id: 'session.signIn.notSignedIn', defaultMessage: "{provider} isn't signed in.", description: "Why an agent's turn stopped, when its CLI didn't say: its sign-in was refused. {provider} is the coding agent's name." }), { provider: l.adapter.descriptor.name })
             st.signIn = { message: said || englishText(hive!), since: new Date().toISOString(), ...(hive ? { messageText: hive } : {}) }
           }
-          this.signInLost(st.provider)
+          this.signInLost(st)
           break
         case 'turnEnded':
           // Not awaited: a prompt arriving meanwhile must not be overwritten by this older Stop.
@@ -4290,8 +6512,11 @@ class SessionManager {
     const guarded = this.settleSafeguard(l)
     // A turn's end is reported even when the status stays (its background task count may have changed).
     if (stepped || step.actions.includes('turnEnded') || carriedOn || facts || guarded) this.emitState(st)
+    // At its prompt now: its screen looked at once for its question by itself (HI-2191), which its CLI may have drawn
+    // before this hook was carried out, with nothing drawn since to look at it by.
+    if (stepped && cause !== 'screen' && AT_PROMPT.has(st.status)) this.idleScreenDrawn(id, l)
     // The CLI is signed in again, for its other agents too (this one's status is already set).
-    if (worked) this.signedInAgain(st.provider)
+    if (worked) this.signedInAgain(authScope(st))
     // A turn's end types the go-ahead for an Allow given during it; an interrupt (the user stopping it) drops it.
     if (step.actions.includes('turnEnded')) this.sendGoAheads(id, l)
     else if (step.actions.includes('releaseLocks')) this.dropGoAheads(id)
@@ -4299,6 +6524,9 @@ class SessionManager {
     // i18n-ignore: the log (English)
     const told = step.actions.includes('notifyWaiting') ? 'waits for you' : step.actions.includes('notifyQuestion') ? 'asks a question' : needed && !asksYou(st) ? 'no longer needs you' : null
     if (told) log.debug(`${userText(label)}: ${told} (${cause})`)
+    // Still waiting on the block a hook ended (one that moves no status): idle again; else its new status is shown.
+    if (unblocked && st.status === 'waiting' && l.waitingOn === unblocked.ask) this.carryOut(id, l, idleQuestionGone(this.statusInput(l)), 'screen')
+    else if (unblocked && !stepped) this.emitState(st)
   }
 
   /**
@@ -4356,6 +6584,8 @@ class SessionManager {
     // (#650: one started again meanwhile keeps its own locks, state and session to resume).
     if (!this.owns(l)) return
     log.info(`${userText(this.label(st))}: the CLI moved from session ${old} to ${sessionId}`)
+    // The old conversation's long-conversation notice no longer applies (HI-2320).
+    resolveOffers((o) => o.startsWith(`transcript:${liveId(st.projectPath, st.agentId)}#`), tr(OUTCOME.conversationMoved))
     try {
       const { agent, count } = await this.agentDef(st.projectPath, st.agentId)
       const existing = (await workspace.sessionsFile(st.projectPath)).sessions.find((s) => s.id === sessionId)
@@ -4376,11 +6606,17 @@ class SessionManager {
       // What the old conversation's records said of its turns is no record of the new one's (#648).
       l.turnRecord = undefined
       l.stopsAnswered = undefined
+      // Its turns are read from the new conversation's file (#1371): the old one's are let go.
+      l.turnsRead = undefined
+      if (l.hooksWatch) this.turnsReset(l, l.hooksWatch)
       st.transcriptBytes = undefined
       this.clearTasks(l)
       l.lastBackupAt = undefined
       st.costUsd = undefined
       st.costEstimated = undefined
+      // Free is the new conversation's to say (HI-1772): not until its record does (recordSession, below).
+      st.costFree = undefined
+      l.costFree = false
       l.reportedCost = undefined
       l.costAt = undefined
       this.releaseLocks(liveId(st.projectPath, st.agentId))
@@ -4394,11 +6630,13 @@ class SessionManager {
   }
 
   /**
-   * Tells the user (and for finished/waiting, the chime): a banner in the Hive window they are using, else a Windows
-   * notification (route()). A notice is a warning that needs no sound. Its title and body are formatted in the language
-   * Hive shows; the Agent API's stream gets the title in English (`apiTitle`, #796), and never the body.
+   * Tells the user (and for finished/waiting, the chime), through tell() (main/notify.ts, HI-2320): a pop-up in the
+   * window they are using (kept in its bell), else a Windows notification, as shared/notify.ts's table says. A waiting
+   * agent's entry is its ask's offer, resolved once the agent no longer asks; a notice ('work') needs no sound. Its title
+   * and body are formatted in the language Hive shows; the Agent API's stream gets the title in English (`apiTitle`,
+   * #796), and never the body.
    */
-  private notify(projectPath: string, titleText: Text, bodyText: TextPart, kind: 'finished' | 'waiting' | 'notice', agentName?: string, agentId?: string): void {
+  private notify(projectPath: string, titleText: Text, bodyText: TextPart, kind: 'finished' | 'waiting' | 'notice', agentName?: string, agentId?: string, action?: { label: Text; command: string; args?: unknown[] }): void {
     const title = shownText(titleText)
     const apiTitle = englishText(titleText)
     const body = shownText(bodyText)
@@ -4413,64 +6651,134 @@ class SessionManager {
         })
         .catch((e) => log.warn('chime: settings unavailable', e))
     }
-    if (this.route(projectPath, kind) === 'none') return
+    const notifyKind = NOTIFY_KIND[kind]
     // Finishes that come together are told in one notice ("3 agents finished in hive"); a question is told at once.
     if (kind === 'finished') {
+      const { route, why } = this.routeWhy(projectPath, notifyKind)
+      if (route === 'none') {
+        // i18n-ignore: the log (English)
+        log.info(`Notice finished not told: ${why} (${userText(title)})`)
+        return
+      }
       const assistant = workspace.isAssistantHome(projectPath)
       // i18n-ignore: a fallback name, never seen (every agent that finishes has its name)
-      this.finishes.add({ projectPath, project: assistant ? ASSISTANT_NAME : basename(projectPath), agent: assistant ? ASSISTANT_NAME : (agentName ?? 'Agent'), title, apiTitle, body })
+      this.finishes.add({ projectPath, project: assistant ? ASSISTANT_NAME : basename(projectPath), agent: assistant ? ASSISTANT_NAME : (agentName ?? 'Agent'), ...(agentId ? { agentId } : {}), title, apiTitle, body })
       return
     }
-    this.deliver(projectPath, title, body, kind, agentId, apiTitle)
+    this.deliver(projectPath, title, body, notifyKind, agentId, agentName, apiTitle, action && { label: shownText(action.label), command: action.command, ...(action.args ? { args: action.args } : {}) })
   }
 
-  /** Where a notice about this project goes now: the settings, and the Hive window the user is using (noticeRoute). */
-  private route(projectPath: string, kind: 'finished' | 'waiting' | 'notice'): NoticeRoute {
-    return noticeRoute(config.settings.notifications, kind, this.focusedHive(), { workspacePath: workspaceOf(projectPath)?.path ?? null, projectPath })
+  /**
+   * A notice about a project's work that no one agent gives (#1266: a card's request for the user, a lane's events), told
+   * as every notice is (notify). `action`: its button (#1437: Start Fresh (Idle Agents)), a command of the window's,
+   * shown in its pop-up and bell row while `offer` is open; `kind`: needsYou for a card that needs you (HI-2320), else
+   * work. `target`: what a click opens (a card), else the project.
+   */
+  notice(projectPath: string, title: Text, body: TextPart, action?: { label: Text; command: string; args?: unknown[] }, extra?: { kind?: 'needsYou' | 'work'; offer?: string; target?: ToastTarget }): void {
+    if (!extra?.kind && !extra?.offer && !extra?.target) return this.notify(projectPath, title, body, 'notice', undefined, undefined, action)
+    this.deliver(projectPath, shownText(title), shownText(body), extra.kind ?? 'work', undefined, undefined, englishText(title), action && { label: shownText(action.label), command: action.command, ...(action.args ? { args: action.args } : {}) }, extra)
   }
 
-  /** A banner in the focused window, or a Windows notification, as route() says now; `apiTitle`: its title in English, when `title` is translated. */
-  private deliver(projectPath: string, title: string, body: string, kind: 'finished' | 'waiting' | 'notice', agentId?: string, apiTitle?: string): void {
-    const route = this.route(projectPath, kind)
-    const notice = { id: randomUUID(), kind, title, ...(apiTitle && apiTitle !== title ? { apiTitle } : {}), body, projectPath, ...(agentId ? { agentId } : {}) }
-    if (route === 'windows') {
-      // The Agent API's stream hears of every notice Hive tells, as a banner or a Windows notification (#620).
-      tellListeners({ type: 'notice', notice, windows: true })
-      return this.showNotification(projectPath, title, body)
-    }
-    const at = this.focusedHive()
-    if (route !== 'banner' || !at) return
-    emitTo(at.win, { type: 'notice', notice })
+  /** Where a notice about this project goes now: the settings, and the Hive window the user is using (notifyRoute), with why for the log. */
+  private routeWhy(projectPath: string, kind: NotifyKind): { route: NotifyRoute; why: string } {
+    return notifyRoute(config.settings.notifications, kind, focusedHive(), { workspacePath: workspaceOf(projectPath)?.path ?? null, projectPath })
+  }
+
+  /**
+   * Told by tell() as things are now (HI-2320). A waiting agent's is registered as its ask (askOffer), so the agent no
+   * longer asking resolves it; its link is the agent's pane, or the project. `apiTitle`: its title in English, when
+   * `title` is translated.
+   */
+  private deliver(projectPath: string, title: string, body: string, kind: NotifyKind, agentId?: string, agentName?: string, apiTitle?: string, action?: ToastAction, extra?: { offer?: string; target?: ToastTarget }): void {
+    const assistant = workspace.isAssistantHome(projectPath)
+    const target: ToastTarget | undefined = extra?.target ?? (agentId ? { kind: 'agent', projectPath, agentId, name: assistant ? ASSISTANT_NAME : (agentName ?? this.agentName(projectPath, agentId)), project: assistant ? ASSISTANT_NAME : basename(projectPath) } : undefined)
+    const offer = extra?.offer ?? (kind === 'needsYou' && agentId ? askOffer(projectPath, agentId) : undefined)
+    tell({
+      kind,
+      title,
+      message: body,
+      apiTitle,
+      projectPath,
+      ...(agentId ? { agentId } : {}),
+      ...(target ? { target } : {}),
+      ...(action ? { actions: [action] } : {}),
+      ...(offer ? { offer } : {}),
+      // A Windows notification's click shows what it is about, in the window that has its project.
+      onWindowsClick: () => {
+        const w = this.getWindow(projectPath)
+        if (!w) return
+        presentWindow(w)
+        if (target) emitTo(w, { type: 'menu-command', command: 'notice.openTarget', args: [target] })
+        else emitTo(w, { type: 'menu-command', command: 'project.focus', args: [projectPath] })
+      }
+    })
+  }
+
+  /**
+   * Whether a long-conversation notice's Hand Over to… is for the agent's conversation now (HI-2320): not, its notice
+   * says the agent has a new conversation, and nothing is done.
+   */
+  handOverOfferCurrent(projectPath: string, agentId: string, sessionId: string): boolean {
+    if (this.live.get(liveId(projectPath, agentId))?.state.sessionId === sessionId) return true
+    resolveOffer(`transcript:${liveId(projectPath, agentId)}#${sessionId}`, tr(OUTCOME.conversationMoved))
+    return false
+  }
+
+  /**
+   * An agent running again (its conversation open here, or another): a Stop It and Resume offered for it no longer
+   * applies (HI-2320, the Assistant's scope for round 3: that session over, the entry resolves; no other live checks).
+   */
+  private recheckOffers(l: LiveSession): void {
+    const st = l.state
+    if (st.status === 'starting' || st.status === 'stopped') return
+    const id = liveId(st.projectPath, st.agentId)
+    const mine = (o: string): boolean => o.startsWith(`bg:${id}#`) && !this.bgSettling.has(o)
+    resolveOffers((o) => mine(o) && !o.endsWith(`#${st.sessionId}`), tr(OUTCOME.runsAnother))
+    if (st.sessionId) resolveOffers((o) => mine(o) && o.endsWith(`#${st.sessionId}`), tr(OUTCOME.openHereAgain))
+  }
+
+  /** An agent's name as Hive shows it, for a notice's link (its id when it has gone). */
+  private agentName(projectPath: string, agentId: string): string {
+    return this.live.get(liveId(projectPath, agentId))?.state.agentName ?? agentId
   }
 
   /**
    * Finishes collected by `finishes`, in one notice: those that may still be told (notifications turned off
-   * meanwhile, or left out by the banner scope), counted and opened from what is left, as a banner or a Windows
-   * notification as things are when it is shown.
+   * meanwhile), counted and opened from what is left, as a pop-up or a Windows notification as things are when it is
+   * shown (HI-2320: the focus then picks its window).
    */
-  private readonly finishes = new FinishBatcher((all) => {
-    const items = all.filter((i) => this.route(i.projectPath, 'finished') !== 'none')
-    if (!items.length) return
-    const { title, body } = finishedNotice(items)
-    this.deliver(items[0].projectPath, title, body, 'finished', undefined, finishedApiTitle(items))
-  })
-
-  /** A Windows notification; clicking it shows the project (the first one's, for finishes in several). */
-  private showNotification(projectPath: string, title: string, body: string): void {
-    if (!Notification.isSupported()) return
-    const note = new Notification({ title, body, silent: true, icon: notificationIcon() })
-    // Keep a reference: a garbage-collected Notification no longer delivers its click.
-    shownNotifications.add(note)
-    if (shownNotifications.size > 50) shownNotifications.delete(shownNotifications.values().next().value!)
-    note.on('click', () => {
-      shownNotifications.delete(note)
-      const w = this.getWindow(projectPath)
-      if (w) {
-        presentWindow(w)
-        emitTo(w, { type: 'menu-command', command: 'project.focus', args: [projectPath] })
+  private readonly finishes = new FinishBatcher(
+    (all) => {
+      const items = all.filter((i) => {
+        const { route, why } = this.routeWhy(i.projectPath, 'finished')
+        // i18n-ignore: the log (English)
+        if (route === 'none') log.info(`Notice finished not told: ${why} (${userText(i.title)})`)
+        return route !== 'none'
+      })
+      // Those the pop-up scope leaves out go to the bell as a group of their own, never inside another's pop-up (HI-2320).
+      const quiet = items.filter((i) => this.routeWhy(i.projectPath, 'finished').route === 'bell')
+      for (const group of [items.filter((i) => !quiet.includes(i)), quiet]) {
+        if (!group.length) continue
+        const { title, body } = finishedNotice(group)
+        const one = group.length === 1 ? group[0] : null
+        this.deliver(group[0].projectPath, title, body, 'finished', one?.agentId, one?.agent, finishedApiTitle(group))
       }
-    })
-    if (!showOsNotification(note, title, body)) shownNotifications.delete(note)
+    },
+    Date.now,
+    (n) => notifyPending(n)
+  )
+
+  /**
+   * An agent started its next turn while its finish waited to be told (HI-2312: a Hive delivery typed at its turn's end,
+   * a wake, the user typing): it isn't told. Told then, the notice would arrive as the agent works again, with the last
+   * turn's message, and stand where its next need (a permission prompt) should; its next end is told as any is.
+   */
+  private dropFinishes(st: LiveSessionState, now: SessionStatus): void {
+    const pathKey = st.projectPath.toLowerCase()
+    for (const f of this.finishes.drop((i) => i.agentId === st.agentId && i.projectPath.toLowerCase() === pathKey)) {
+      // i18n-ignore: the log (English)
+      log.info(`Notice finished not told: ${userText(f.agent)} started its next turn first (${now}) (${userText(f.title)})`)
+    }
   }
 
   /** The window showed these agents (all of the project's when none are named). */
@@ -4494,23 +6802,94 @@ class SessionManager {
    * its last read stopped, or (not read in this run: a session resumed after a restart) from its session's saved state in
    * the history of `projectPath`, its host. Unchanged since main last had it, answered here without asking the worker.
    */
-  private async usageFor(projectPath: string, path: string, sessionId: string, provider: ProviderId): Promise<SessionUsage | null> {
+  /**
+   * Whether a session is marked as on a server connection (HI-1772, HI-1829): by a live run of it (any host: a session
+   * can move between agents), or kept as one whose record couldn't be saved (serverMarks.ts).
+   */
+  private serverMarked(projectPath: string, sessionId: string): boolean {
+    for (const l of this.live.values()) if (l.serverSids?.has(sessionId)) return true
+    return !!this.serverEnding.get(sessionId) || serverMarks.ignoresReports(projectPath, sessionId)
+  }
+
+  /**
+   * A run ending (HI-1829), at once as its process exits, before anything awaits or takes it out of live: its markers
+   * that its record doesn't say yet are held (`serverEnding`, by id: a count, for two runs of one conversation ending
+   * together) until serverRunEnded has saved or kept each, so no read between sees one without them. Those its record
+   * says go now.
+   */
+  private serverRunEnding(l: LiveSession): { unsaved: string[]; started: Set<string> } {
+    const unsaved = [...(l.serverSids ?? [])].filter((sid) => !l.serverSaved?.has(sid))
+    const started = l.serverRecorded ?? new Set<string>()
+    for (const sid of unsaved) this.serverEnding.set(sid, (this.serverEnding.get(sid) ?? 0) + 1)
+    l.serverSids = l.serverSaved = l.serverRecorded = undefined
+    return { unsaved, started }
+  }
+
+  /**
+   * A run ended (HI-1829): each marker held for it is saved now: one the CLI started gets a record if its own write
+   * failed; one it never started (marked before the spawn) only if it has a record from an earlier run. One that can't be
+   * saved is kept (serverMarks.ts) before its hold goes, so it is never read without one.
+   */
+  private async serverRunEnded(projectPath: string, ending: { unsaved: string[]; started: Set<string> }): Promise<void> {
+    for (const sid of ending.unsaved) {
+      try {
+        if ((await this.saveServerRan(projectPath, sid, ending.started.has(sid))) === 'failed') serverMarks.add(projectPath, sid)
+      } finally {
+        const n = (this.serverEnding.get(sid) ?? 1) - 1
+        if (n > 0) this.serverEnding.set(sid, n)
+        else this.serverEnding.delete(sid)
+      }
+    }
+  }
+
+  /** A host's sessions whose server record couldn't be saved, tried again a few at a time; each saved is let go. */
+  private async saveServerMarks(projectPath: string): Promise<void> {
+    for (const sid of serverMarks.pending(projectPath).slice(0, 4)) if ((await this.saveServerRan(projectPath, sid, true)) === 'saved') serverMarks.saved(projectPath, sid)
+  }
+
+  /** Writes `serverRan` into a session's record (made, with `create`, if it has none): none when it has none to write. */
+  private async saveServerRan(projectPath: string, sessionId: string, create: boolean): Promise<'saved' | 'none' | 'failed'> {
+    try {
+      const had = await workspace.mutateSessions(projectPath, (f) => {
+        const rec = f.sessions.find((x) => x.id === sessionId)
+        if (rec && !rec.serverRan) rec.serverRan = true
+        return !!rec
+      })
+      if (had) return 'saved'
+      if (!create) return 'none'
+      await workspace.upsertSession(projectPath, { id: sessionId, serverRan: true })
+      return 'saved'
+    } catch (e) {
+      log.warn(`Could not save that ${sessionId} ran on a server connection`, e)
+      return 'failed'
+    }
+  }
+
+  /** A running session's cost policy (HI-1772): on a server connection now, or its record says it ran on one. */
+  private costPolicy(l: LiveSession): { reportsIgnored: boolean; costFree: boolean } {
+    return { reportsIgnored: !!l.state.launchedConnection?.server || (!!l.state.sessionId && this.serverMarked(l.state.projectPath, l.state.sessionId)), costFree: !!l.costFree }
+  }
+
+  private async usageFor(projectPath: string, path: string, sessionId: string, provider: ProviderId, o: { noWait?: boolean; reportsIgnored?: boolean; costFree?: boolean } = {}): Promise<SessionUsage | null> {
+    const costFree = !!o.costFree
+    // A session that ran on a server connection (HI-1772): read without its CLI's cost reports.
+    const reportsIgnored = !!o.reportsIgnored || this.serverMarked(projectPath, sessionId)
     try {
       const s = await stat(path)
       const seen = usageSeen.get(path)
-      if (seen && seen.mtime === s.mtimeMs && seen.size === s.size && seen.sessionId === sessionId && seen.provider === provider) {
+      if (seen && seen.mtime === s.mtimeMs && seen.size === s.size && seen.sessionId === sessionId && seen.provider === provider && seen.reportsIgnored === reportsIgnored && seen.costFree === costFree) {
         // Most recently used last: the oldest go first when there are too many.
         usageSeen.delete(path)
         usageSeen.set(path, seen)
         // Unchanged since it was read: priced again after a price change, not read.
-        return (seen.usage ??= this.priced(seen.raw))
+        return (seen.usage ??= this.priced(seen.raw, costFree))
       }
-      const r = await usageHistory.read(projectPath, path, sessionId, provider)
+      const r = await usageHistory.read(projectPath, path, sessionId, provider, { noWait: o.noWait, reportsIgnored: reportsIgnored || costFree })
       if (!r) return null
       this.checkUnderstood(provider, r.usage, r.size)
       // The title the CLI's own index gives it (Codex's, Copilot's), which the worker's parsers can't read.
       const raw = this.titled(r.usage)
-      const c: UsageSeen = { sessionId, provider, size: r.size, mtime: r.mtime, raw, usage: this.priced(raw) }
+      const c: UsageSeen = { sessionId, provider, size: r.size, mtime: r.mtime, raw, usage: this.priced(raw, costFree), reportsIgnored, costFree }
       usageSeen.delete(path)
       usageSeen.set(path, c)
       if (usageSeen.size > MAX_USAGE_SEEN) usageSeen.delete(usageSeen.keys().next().value!)
@@ -4643,14 +7022,7 @@ class SessionManager {
   private async attachmentFile(projectPath: string, l: LiveSession, name: string | null): Promise<string> {
     // A folder of the host's own all the way down, or it throws: an attachment is never written through a link.
     const dir = await ownAttachmentsFolder(projectPath, l.state.sessionId || `run-${l.state.runId}`)
-    const d = new Date()
-    const pad = (n: number): string => String(n).padStart(2, '0')
-    const stamp = `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}_${pad(d.getHours())}-${pad(d.getMinutes())}-${pad(d.getSeconds())}`
-    // Characters Windows refuses in a name, and control characters, become "_"; a long name keeps its end (the extension).
-    const own = name ? name.replace(/[<>:"/\\|?*\x00-\x1f]/g, '_').replace(/[. ]+$/, '').slice(-100) : ''
-    const ext = own ? extname(own) : '.png'
-    const base = own ? `${stamp}_${own.slice(0, own.length - ext.length)}` : stamp
-    return freeName(dir, `${base}${ext}`, (i) => `-${i + 1}`)
+    return freeName(dir, attachmentName(name), (i) => `-${i + 1}`)
   }
 
   /** Moves a launch's early attachments folder into its session's, when both are folders of the host's own. */
@@ -4716,7 +7088,8 @@ class SessionManager {
    * since the last sweep) is read from its transcript as before and queued for the history; with no transcript left,
    * its kept usage, until the history has imported it.
    */
-  async usage(projectPath: string, sessionId: string, ctx?: ListContext): Promise<SessionUsage | null> {
+  /** `noWait`: a transcript the worker is busy with (the import ingesting it) isn't waited for: its kept usage, or none (#1177). */
+  async usage(projectPath: string, sessionId: string, ctx?: ListContext, o: { noWait?: boolean } = {}): Promise<SessionUsage | null> {
     assertSessionId(sessionId)
     const records = ctx?.records ?? (await workspace.sessionsFile(projectPath)).sessions
     const rec = records.find((s) => s.id === sessionId)
@@ -4725,7 +7098,7 @@ class SessionManager {
     if (running && ctx?.stored) {
       // As its pane has it; unchanged since the last read, the worker isn't asked at all (usageFor).
       const p = await this.anyTranscript(projectPath, sessionId, ctx)
-      if (p) usage = await this.usageFor(projectPath, p, sessionId, await this.sessionProvider(projectPath, sessionId, ctx))
+      if (p) usage = await this.usageFor(projectPath, p, sessionId, await this.sessionProvider(projectPath, sessionId, ctx), { reportsIgnored: !!rec?.serverRan, costFree: !!rec?.serverLocal && !rec?.notLocal })
     }
     if (!usage && (!running || ctx?.stored)) {
       const stored = (ctx?.stored ?? (await usageHistory.storedUsage(projectPath).catch(() => null)))?.get(sessionId)
@@ -4740,7 +7113,7 @@ class SessionManager {
     if (!usage) {
       const p = await this.anyTranscript(projectPath, sessionId, ctx)
       if (!p) return rec?.keptUsage ?? null
-      usage = await this.usageFor(projectPath, p, sessionId, await this.sessionProvider(projectPath, sessionId, ctx))
+      usage = await this.usageFor(projectPath, p, sessionId, await this.sessionProvider(projectPath, sessionId, ctx), { ...o, reportsIgnored: !!rec?.serverRan, costFree: !!rec?.serverLocal && !rec?.notLocal })
       if (usage && rec && !running) void usageHistory.ingest(projectPath, sessionId, { priority: 2, keepState: 'no' }).catch(() => undefined)
     }
     if (usage) usage = withScreenStopsIn(usage, rec?.screenStops)
@@ -4764,18 +7137,74 @@ class SessionManager {
     return title ? { ...usage, title, customTitle: usage.customTitle ?? title } : usage
   }
 
-  async list(projectPath: string): Promise<SessionListItem[]> {
+  /** Listings of Hive's own sessions under way, per host (#1646): see list(). */
+  private listings = coalesced<SessionListItem[]>()
+  /** The listing of Hive's own sessions running now, per host, which `own` joins (HI-1681). */
+  private ownRunning = new Map<string, Promise<SessionListItem[]>>()
+  /** Listings of the other sessions under way, per host (HI-1681): see list(). */
+  private others = joined<{ items: SessionListItem[]; folders: number }>()
+
+  /**
+   * A host's sessions, for its Overview, its Sessions tab and the Agent API: Hive's own, from its records, and the other
+   * sessions its CLIs keep for its folders, read at the same time. One listing of each per host at a time (#1646): a
+   * listing stats each session's files and the CLIs' session folders, and the window asks again as sessions change, so
+   * overlapping ones (61 at once, seen on a 400-session project) shared the disk's threads and each took minutes.
+   * Asked while one runs, callers share one more listing of Hive's sessions, started once it ends, so each gets its
+   * records as they were after it asked; and the other sessions' listing under way (HI-1681): nothing tells Hive when
+   * those change, and one more after it only doubled the wait (19 s and then 10 s, seen while agents started).
+   * `own`: Hive's sessions alone, joining their listing under way, for a view that shows them before the rest.
+   */
+  list(projectPath: string, opts: { own?: boolean } = {}): Promise<SessionListItem[]> {
     projectPath = workspace.assertSessionHost(projectPath)
+    const key = resolve(projectPath).toLowerCase()
+    if (opts.own) return this.ownRunning.get(key) ?? this.ownListing(key, projectPath)
+    return this.listNow(key, projectPath)
+  }
+
+  private ownListing(key: string, projectPath: string): Promise<SessionListItem[]> {
+    return this.listings(key, () => {
+      const p = this.listOwn(projectPath)
+      this.ownRunning.set(key, p)
+      const end = (): void => {
+        if (this.ownRunning.get(key) === p) this.ownRunning.delete(key)
+      }
+      p.then(end, end)
+      return p
+    })
+  }
+
+  private async listNow(key: string, projectPath: string): Promise<SessionListItem[]> {
+    const started = performance.now()
+    let ownMs = 0
+    let othersMs = 0
+    const [own, others] = await Promise.all([
+      this.ownListing(key, projectPath).finally(() => (ownMs = performance.now() - started)),
+      this.others(key, () => this.listOthers(projectPath)).finally(() => (othersMs = performance.now() - started))
+    ])
+    const ids = new Set(own.map((i) => i.id))
+    // A session Hive took on while the other sessions were read is listed once, as Hive's.
+    const items = [...own, ...others.items.filter((i) => !ids.has(i.id))]
+    const ms = performance.now() - started
+    if (ms > SLOW_LIST_MS) {
+      const s = (x: number): string => `${(x / 1000).toFixed(1)} s`
+      log.info(`listing the sessions of ${userText(projectPath)} took ${s(ms)}: Hive's ${own.length} session(s) ${s(ownMs)}, the other sessions in ${others.folders} folder(s) ${s(othersMs)}, read at the same time`)
+    }
+    return items.sort((a, b) => (b.lastActivity ?? '').localeCompare(a.lastActivity ?? ''))
+  }
+
+  /** Hive's own sessions, from its records. */
+  private async listOwn(projectPath: string): Promise<SessionListItem[]> {
     const file = await workspace.sessionsFile(projectPath)
     // Read once for the whole list, not once per session.
     const ctx: ListContext = { records: file.sessions, cfg: await workspace.projectConfig(projectPath), stored: await usageHistory.storedUsage(projectPath).catch(() => new Map()) }
     const ttl = config.settings.sessions.cacheTtl
     const items: SessionListItem[] = []
-    // Deleted sessions stay hidden, though the CLI still has their transcripts.
-    const known = new Set([...file.sessions.map((s) => s.id), ...(file.deleted ?? [])])
     // Records from before sub-sessions were told apart (a guardian review adopted then): found now, and kept on them.
     const found = new Map<string, SubSession>()
-    for (const rec of file.sessions) {
+    // Hive's backups, from its two folders' names (#1649): not four checks per session on main's thread.
+    const backups = await this.backupNames(projectPath)
+    // A few sessions at a time (#1649): each waits on its files, and one after another 400 took a second.
+    const listed = await atMost(LIST_AT_ONCE, file.sessions, async (rec): Promise<SessionListItem> => {
       const provider = recordProvider(rec)
       let transcript: string | null = null
       try {
@@ -4784,12 +7213,15 @@ class SessionManager {
         // A provider this version doesn't know.
       }
       const hasTranscript = !!transcript
-      const hasBackup = this.backupFiles(projectPath, rec.id).length > 0
+      // Its size for the list (#671): a stat, never a read, taken each time the list is; the same stat for its
+      // sub-session check (HI-1681). Null when it is missing or can't be read.
+      const st = transcript ? await stat(transcript).catch(() => null) : null
+      const hasBackup = backups.has(`${rec.id}.jsonl`.toLowerCase()) || backups.has(`${rec.id}.jsonl${GZ}`.toLowerCase())
       const usage = await this.usage(projectPath, rec.id, ctx)
       const { keptUsage: _kept, ...fields } = rec
-      const sub = rec.sub ?? (await this.recordSub(projectPath, rec))
+      const sub = rec.sub ?? (await this.recordSub(projectPath, rec, transcript, st?.mtimeMs))
       if (sub && !rec.sub) found.set(rec.id, sub)
-      items.push({
+      return {
         ...fields,
         ...(sub ? { sub } : {}),
         provider,
@@ -4798,48 +7230,82 @@ class SessionManager {
         lastActivity: usage?.lastActivity ?? rec.lastActiveAt,
         hasTranscript,
         hasBackup,
-        transcriptBytes: await transcriptSize(transcript),
+        transcriptBytes: st?.size ?? null,
         ...(!ctx.stored?.has(rec.id) && (hasTranscript || hasBackup) ? { pending: true } : {}),
         usage,
         recache: usage && providerDescriptor(provider).capabilities.promptCacheTtl ? recacheEstimate(usage, ttl) : null
-      })
-    }
+      }
+    })
+    items.push(...listed)
     if (found.size) await this.keepSubs(projectPath, found)
-    // Sessions started outside Hive in the project folder; and from the other folders its sessions ran in (agents'
-    // worktrees, the Assistant's workspace folder), only the sub-sessions of sessions listed here.
-    const folders = this.sessionFolders(projectPath, file.sessions, ctx.cfg)
-    for (const adapter of allProviders()) {
-      for (const [i, folder] of folders.entries()) {
-        for (const ext of await adapter.listSessions(folder).catch(() => [])) {
-          if (known.has(ext.id) || (i > 0 && !(ext.sub?.parentId && items.some((x) => x.id === ext.sub!.parentId)))) continue
-          known.add(ext.id)
-          // From the usage history only (#1106): one it doesn't have, or has from before its file changed, is queued for the
-          // worker (the window is told when it has it), and shows as the history has it meanwhile, or not yet.
-          const st = await stat(ext.transcriptPath).catch(() => null)
-          const kept = ctx.stored?.get(ext.id)
-          const same = !!st && !!kept?.read.path && samePlace(kept.read.path, ext.transcriptPath) && kept.read.size === st.size && kept.read.mtime === st.mtimeMs
-          const usage = kept ? this.titled(kept.usage) : null
-          if (!same) void usageHistory.ingestExternal(projectPath, { id: ext.id, provider: adapter.id, transcriptPath: ext.transcriptPath }).catch(() => undefined)
-          // Known to be empty: not listed. Not known yet: listed without figures until the worker has it.
-          if (usage && usage.requests === 0) continue
-          items.push({
-            id: ext.id,
-            provider: adapter.id,
-            source: 'external',
-            title: usage?.title ?? null,
-            lastActivity: usage?.lastActivity ?? ext.modified,
-            hasTranscript: true,
-            hasBackup: false,
-            transcriptBytes: st?.size ?? null,
-            ...(same ? {} : { pending: true }),
-            usage,
-            recache: usage && adapter.descriptor.capabilities.promptCacheTtl ? recacheEstimate(usage, ttl) : null,
-            ...(ext.sub ? { sub: ext.sub } : {})
-          })
-        }
+    // Each in a slot (#1434): which, and whether it may resume there now, by its agent (gone: no agent may).
+    const facts = workspace.isAssistantHome(projectPath) ? null : await folderFacts(projectPath).catch(() => null)
+    if (facts?.slots.length) {
+      const agents = new Map(projectAgents(ctx.cfg).map((a) => [a.id, a]))
+      for (const it of items) {
+        const slot = it.cwd ? slotAt(facts, it.cwd) : null
+        if (!slot) continue
+        it.slot = slot.name
+        const a = it.agentId ? agents.get(it.agentId) : undefined
+        const hold = resumeHold(facts, a ? folderAgent(a) : { id: it.agentId ?? '', role: 'builder', legacy: null }, it)
+        if (hold) it.hold = hold
       }
     }
-    return items.sort((a, b) => (b.lastActivity ?? '').localeCompare(a.lastActivity ?? ''))
+    return items
+  }
+
+  /**
+   * Sessions started outside Hive in the project folder; and from the other folders its sessions ran in (agents'
+   * worktrees, the Assistant's workspace folder), only the sub-sessions of sessions listed here. Hive's own sessions'
+   * files, the bulk of those folders, aren't looked at (HI-1681): each CLI leaves them out by id, and reads a folder's
+   * names again only when the folder changed, so a listing opens only new transcripts and stats only the others.
+   */
+  private async listOthers(projectPath: string): Promise<{ items: SessionListItem[]; folders: number }> {
+    const file = await workspace.sessionsFile(projectPath)
+    const cfg = await workspace.projectConfig(projectPath)
+    const stored: Map<string, StoredUsage> = await usageHistory.storedUsage(projectPath).catch(() => new Map())
+    const ttl = config.settings.sessions.cacheTtl
+    // Deleted sessions stay hidden, though the CLI still has their transcripts.
+    const known = new Set([...file.sessions.map((s) => s.id), ...(file.deleted ?? [])])
+    const skip = (id: string): boolean => known.has(id)
+    // Whose sub-sessions are listed from the other folders: Hive's sessions, and the other sessions listed before them.
+    const listed = new Set(file.sessions.map((s) => s.id))
+    const folders = this.sessionFolders(projectPath, file.sessions, cfg)
+    const asks = allProviders().flatMap((adapter) => folders.map((folder, i) => ({ adapter, folder, i })))
+    // A few folders at once: each waits on the disk.
+    const found = await atMost(OTHER_FOLDERS_AT_ONCE, asks, (a) => a.adapter.listSessions(a.folder, skip).catch(() => [] as ExternalSession[]))
+    const items: SessionListItem[] = []
+    for (const [n, { adapter, i }] of asks.entries()) {
+      for (const ext of found[n]) {
+        if (known.has(ext.id) || (i > 0 && !(ext.sub?.parentId && listed.has(ext.sub.parentId)))) continue
+        known.add(ext.id)
+        listed.add(ext.id)
+        // From the usage history only (#1106): one it doesn't have, or has from before its file changed, is queued for the
+        // worker (the window is told when it has it), and shows as the history has it meanwhile, or not yet.
+        const st = ext.bytes !== undefined && ext.mtimeMs !== undefined ? { size: ext.bytes, mtimeMs: ext.mtimeMs } : await stat(ext.transcriptPath).catch(() => null)
+        const kept = stored.get(ext.id)
+        const same = !!st && !!kept?.read.path && samePlace(kept.read.path, ext.transcriptPath) && kept.read.size === st.size && kept.read.mtime === st.mtimeMs
+        const usage = kept ? this.titled(kept.usage) : null
+        if (!same) void usageHistory.ingestExternal(projectPath, { id: ext.id, provider: adapter.id, transcriptPath: ext.transcriptPath }).catch(() => undefined)
+        // Known to be empty: not listed. Not known yet: listed without figures until the worker has it.
+        if (usage && usage.requests === 0) continue
+        items.push({
+          id: ext.id,
+          provider: adapter.id,
+          source: 'external',
+          title: usage?.title ?? null,
+          lastActivity: usage?.lastActivity ?? ext.modified,
+          hasTranscript: true,
+          hasBackup: false,
+          transcriptBytes: st?.size ?? null,
+          ...(same ? {} : { pending: true }),
+          usage,
+          recache: usage && adapter.descriptor.capabilities.promptCacheTtl ? recacheEstimate(usage, ttl) : null,
+          ...(ext.sub ? { sub: ext.sub } : {})
+        })
+      }
+    }
+    return { items, folders: folders.length }
   }
 
   /**
@@ -4852,18 +7318,23 @@ class SessionManager {
       if (f && !out.has(resolve(f).toLowerCase())) out.set(resolve(f).toLowerCase(), f)
     }
     if (workspace.isAssistantHome(projectPath)) add(workspaceOf(projectPath).path)
-    for (const a of projectAgents(cfg)) add(a.worktree?.path)
+    for (const a of projectAgents(cfg)) add(legacyWorktree(a)?.path)
     for (const r of records) add(r.cwd)
     return [...out.values()]
   }
 
-  /** Whether one of Hive's records is a sub-session, from its transcript's first line (the CLI's, else Hive's copy). */
-  private async recordSub(projectPath: string, rec: SessionRecord): Promise<SubSession | null> {
+  /**
+   * Whether one of Hive's records is a sub-session, from its transcript's first line (the CLI's, else Hive's copy).
+   * `transcript`: the CLI's, when the caller has looked it up already (null: it has none), and `mtimeMs` its time, when
+   * the caller has stat'd it.
+   */
+  private async recordSub(projectPath: string, rec: SessionRecord, transcript?: string | null, mtimeMs?: number): Promise<SubSession | null> {
     if (rec.sub) return rec.sub
     try {
       const adapter = providerAdapter(recordProvider(rec))
-      const path = (await adapter.transcriptPath(rec.cwd ?? projectPath, rec.id, rec.transcriptPath).catch(() => null)) ?? this.backupCopy(projectPath, rec.id) ?? this.backupCopy(projectPath, rec.id, true)
-      return path ? await adapter.subSessionOf(path, rec.id) : null
+      const cli = transcript !== undefined ? transcript : await adapter.transcriptPath(rec.cwd ?? projectPath, rec.id, rec.transcriptPath).catch(() => null)
+      const path = cli ?? this.backupCopy(projectPath, rec.id) ?? this.backupCopy(projectPath, rec.id, true)
+      return path ? await adapter.subSessionOf(path, rec.id, path === cli ? mtimeMs : undefined) : null
     } catch {
       return null
     }
@@ -4983,23 +7454,27 @@ class SessionManager {
    * session's transcript (it can still be opened and resumed from there), and only once the usage history has what it
    * used. A session whose only copy is Hive's is never touched (the Assistant for Darren, 20 Oct): deleting those stays
    * the user's (Delete, Clean Up). Running sessions and those whose files are moving are skipped; each is checked again
-   * with its backups locked, just before they go. Returns how many sessions' copies went.
+   * with its backups locked, just before they go. Returns how many sessions' copies went. `signal`: the workspace's
+   * opening it runs in (background housekeeping), ending it when the workspace closes (#1379).
    */
-  async applyRetention(projectPath: string): Promise<number> {
+  async applyRetention(projectPath: string, signal?: AbortSignal): Promise<number> {
     if (!retentionDays()) return 0
-    const recs = (await workspace.sessionsFile(projectPath).catch(() => null))?.sessions ?? []
+    const recs = (await workspace.sessionsFile(projectPath, signal).catch(() => null))?.sessions ?? []
     // Whether a session's copies may go, as things are now: the setting, its record's last activity, not running, with
     // backups, and the CLI still having it. Asked before, and again under its reservation and locks, then once more
     // after what it used is recorded (that waits), just before they go: any of it can change meanwhile.
     // The record is read last, and nothing is awaited between these checks and the copies going.
     const eligible = async (id: string): Promise<boolean> => {
-      if (!(await this.providerTranscript(projectPath, id).catch(() => null))) return false
-      const rec = (await workspace.sessionsFile(projectPath).catch(() => null))?.sessions.find((r) => r.id === id)
+      const cfg = await workspace.projectConfig(projectPath).catch(() => null)
+      const records = cfg && (await workspace.sessionsFile(projectPath, signal).catch(() => null))?.sessions
+      if (!cfg || !records || !(await this.providerTranscript(projectPath, id, { records, cfg }).catch(() => null))) return false
+      const rec = (await workspace.sessionsFile(projectPath, signal).catch(() => null))?.sessions.find((r) => r.id === id)
       const days = retentionDays()
       return !!rec && !!days && Date.now() - Date.parse(rec.lastActiveAt) > days * 86_400_000 && !this.liveAnywhere(id) && this.backupFiles(projectPath, id).length > 0
     }
     let n = 0
     for (const rec of recs) {
+      if (signal?.aborted) break
       const days = retentionDays()
       if (!days || Date.now() - Date.parse(rec.lastActiveAt) <= days * 86_400_000 || !(await eligible(rec.id))) continue
       try {
@@ -5023,13 +7498,15 @@ class SessionManager {
 
   /**
    * Compresses the backups of a host's sessions that ended before this Hive did it (#1110): one at a time, in the
-   * background, the oldest first; those running or active in the last ten minutes are left for their end.
+   * background, the oldest first; those running or active in the last ten minutes are left for their end. `signal`: as
+   * applyRetention's.
    */
-  async compressIdleBackups(projectPath: string): Promise<number> {
-    const recs = (await workspace.sessionsFile(projectPath).catch(() => null))?.sessions ?? []
+  async compressIdleBackups(projectPath: string, signal?: AbortSignal): Promise<number> {
+    const recs = (await workspace.sessionsFile(projectPath, signal).catch(() => null))?.sessions ?? []
     const idle = recs.filter((r) => Date.now() - Date.parse(r.lastActiveAt) > 10 * 60_000).sort((a, b) => (a.lastActiveAt < b.lastActiveAt ? -1 : 1))
     let n = 0
     for (const r of idle) {
+      if (signal?.aborted) break
       if (![false, true].some((archived) => existsSync(this.backupPath(projectPath, r.id, archived)))) continue
       await this.compressBackups(projectPath, r.id)
       n++
@@ -5098,32 +7575,53 @@ class SessionManager {
     // i18n-ignore: refusals no person sees (the window sends only these)
     if (action !== 'archive' && action !== 'unarchive' && action !== 'delete') throw new Error(`Unknown action: ${String(action)}`)
     if (!Array.isArray(sessionIds)) throw new Error('sessionIds: a list of session ids') // i18n-ignore: a refusal no person sees (the window sends a list)
-    const out: SessionBulkResult = { done: [], skipped: [] }
-    for (const id of [...new Set(sessionIds)]) {
-      if (!isSessionId(id)) {
-        out.skipped.push({ id: String(id), reason: 'failed', message: tr(msg({ id: 'session.bulk.notAnId', defaultMessage: 'Not a session id.', description: "Why a session was left alone by Archive or Delete in the Sessions tab: its id isn't one." })) }) // i18n-ignore: a reason's key
-        continue
-      }
-      try {
-        if (action === 'delete') await this.deleteOne(projectPath, id)
-        else if (!(await workspace.sessionsFile(projectPath)).sessions.some((s) => s.id === id)) {
-          out.skipped.push({ id, reason: 'external' }) // i18n-ignore: a reason's key, which the window words
-          continue
-        } else await this.archive(projectPath, id, action === 'archive')
-        out.done.push(id)
-      } catch (e) {
-        // A failure's message in the window's language: bulk is the window's (session:bulk).
-        out.skipped.push(e instanceof SessionInUse ? { id, reason: e.reason } : { id, reason: 'failed', message: shownError(e) }) // i18n-ignore: a reason's key
-      }
+    const ids = [...new Set(sessionIds)]
+    // Hive's own sessions, read once for the whole action (#1659), not once for each.
+    const kept = new Set((await workspace.sessionsFile(projectPath)).sessions.map((s) => s.id))
+    const progress = bulkProgress(projectPath, action, ids.length)
+    let results: BulkOutcome[]
+    try {
+      // A few at a time (#1659): each waits mostly on its files, and one after another 300 took 8 s. Each is still all or
+      // nothing, under its own reservation and locks.
+      results = await atMost(BULK_AT_ONCE, ids, async (id) => {
+        try {
+          return await this.bulkOne(projectPath, action, id, kept)
+        } finally {
+          progress.step()
+        }
+      })
+    } finally {
+      progress.end()
     }
+    const out: SessionBulkResult = { done: results.filter((r) => !r.reason).map((r) => r.id), skipped: results.filter((r): r is SessionBulkResult['skipped'][number] => !!r.reason) }
     log.info(`Sessions: ${action} ${out.done.length}, skipped ${out.skipped.length} (${[...new Set(out.skipped.map((s) => s.reason))].join(', ') || 'none'}) in ${userText(projectPath)}`)
     workspaceOf(projectPath).scheduleRefresh()
     return out
   }
 
+  /** One session of a bulk action (see BulkOutcome). */
+  private async bulkOne(projectPath: string, action: SessionBulkAction, id: string, kept: Set<string>): Promise<BulkOutcome> {
+    if (!isSessionId(id)) return { id: String(id), reason: 'failed', message: tr(msg({ id: 'session.bulk.notAnId', defaultMessage: 'Not a session id.', description: "Why a session was left alone by Archive or Delete in the Sessions tab: its id isn't one." })) } // i18n-ignore: a reason's key
+    try {
+      if (action === 'delete') await this.deleteOne(projectPath, id)
+      else if (!kept.has(id)) return { id, reason: 'external' } // i18n-ignore: a reason's key, which the window words
+      else await this.archive(projectPath, id, action === 'archive')
+      return { id }
+    } catch (e) {
+      // A failure's message in the window's language: bulk is the window's (session:bulk).
+      return e instanceof SessionInUse ? { id, reason: e.reason } : { id, reason: 'failed', message: shownError(e) } // i18n-ignore: a reason's key
+    }
+  }
+
   /** Hive's copies of a session's transcript that exist (the active backup, the archived one). */
   backupFiles(projectPath: string, sessionId: string): string[] {
     return [false, true].flatMap((archived) => [this.backupPath(projectPath, sessionId, archived), this.backupPath(projectPath, sessionId, archived) + GZ]).filter((b) => existsSync(b))
+  }
+
+  /** The names of Hive's copies of a host's transcripts (active and archived), lower-cased: a listing's backupFiles. */
+  private async backupNames(projectPath: string): Promise<Set<string>> {
+    const names = await Promise.all([false, true].map((archived) => readdir(this.backupDir(projectPath, archived)).catch(() => [] as string[])))
+    return new Set(names.flat().map((n) => n.toLowerCase()))
   }
 
   /**
@@ -5336,6 +7834,8 @@ class SessionManager {
         )
       })
     await (expected ? this.whileCleaning(projectPath, sessionId, remove) : this.whileReserved(projectPath, sessionId, remove))
+    // Gone: nothing reads it again, so a server marker kept for it goes too (HI-1829).
+    serverMarks.deleted(projectPath, sessionId)
     for (const a of projectAgents(await workspace.projectConfig(projectPath))) {
       if (a.lastSessionId === sessionId) await workspace.updateAgent(projectPath, a.id, { lastSessionId: undefined }).catch(() => undefined)
     }
@@ -5442,7 +7942,9 @@ class SessionManager {
     assertSessionId(sessionId)
     const src = await this.providerTranscript(projectPath, sessionId)
     const provider = src?.provider ?? 'claude-code'
-    const usage = src ? await this.usageFor(projectPath, src.path, sessionId, provider) : null
+    // As its record says, if it has one (HI-1829): a conversation that ran on a server is never read Claude-priced.
+    const rec = await workspace.sessionRecord(projectPath, sessionId).catch(() => undefined)
+    const usage = src ? await this.usageFor(projectPath, src.path, sessionId, provider, { reportsIgnored: !!rec?.serverRan, costFree: !!rec?.serverLocal && !rec?.notLocal }) : null
     // A sub-session (a Codex guardian review, say) stays one: never an agent's session to resume.
     const sub = src ? (await providerAdapter(provider).listSessions(projectPath).catch(() => [])).find((e) => e.id === sessionId)?.sub : undefined
     await workspace.upsertSession(projectPath, {
@@ -5460,4 +7962,6 @@ class SessionManager {
 }
 
 export const sessions = new SessionManager()
+// A workspace closing (HI-1829): its server markers whose records couldn't be saved can't be kept for its reopening.
+WorkspaceService.closingListeners.add((path) => serverMarks.closing(path))
 onLanguageChange(() => sessions.relabel())

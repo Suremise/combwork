@@ -1,0 +1,208 @@
+/**
+ * Restarts announced and resumed (HI-1707): what Hive records of its agents as it closes, the record's states, the
+ * installer's request to close for an install, and the lines agents are given. Pure: main/restartResume.ts keeps the
+ * record and runs the queue.
+ */
+
+/** Why Hive closed: an installer asked (install), an update installing (update), Restart Hive (restart), or a quit. */
+export type RestartReason = 'install' | 'update' | 'restart' | 'quit'
+
+/**
+ * Where an agent's resume stands. pending: not yet decided at this start (or its workspace isn't open); offered: the
+ * notice offers it, the user decides; queued, starting: in this run's queue; the rest are final.
+ */
+export type RestartState = 'pending' | 'offered' | 'queued' | 'starting' | 'resumed' | 'held' | 'failed' | 'dismissed' | 'skipped'
+
+/** States an entry ends in: a record whose entries are all in one of them is done (removed). */
+export const FINAL_STATES: readonly RestartState[] = ['resumed', 'failed', 'dismissed', 'skipped']
+/** The states the user still has to see: held (its slot), and offered. */
+const OPEN_STATES: readonly RestartState[] = ['pending', 'offered', 'queued', 'starting', 'held']
+
+/** An agent Hive closed under, and where its resume stands: who is resumed (how is the record's `reason`). */
+export interface RestartEntry {
+  workspace: string
+  projectPath: string
+  project: string
+  agentId: string
+  agentName: string
+  provider: string
+  sessionId: string
+  sessionName?: string
+  /** How it was as Hive closed: working, watching (a card loop), waiting, background, or idle in a running lane. */
+  status: string
+  /** The card it was on (its key, else #n), and the card's round then. */
+  card?: { label: string; round?: number }
+  /** The running lane it was the builder or reviewer of. */
+  lane?: { id: string; name: string | null; role: 'builder' | 'reviewer' }
+  /** Hive's version as it closed. */
+  from: string
+  /** When Hive closed. */
+  at: string
+  state: RestartState
+  /** Why it was skipped, held or failed, for the notice. */
+  why?: string
+  /** When it was last changed. */
+  changedAt: string
+}
+
+/**
+ * The record: who (its entries) and how (`reason`, the latest close's: every close overwrites it). An install, an update
+ * or a restart resumes the entries by itself; a quit offers them. Entries carry no reason of their own, so none can
+ * carry an older close's.
+ */
+export interface RestartRecord {
+  version: 1
+  reason: RestartReason
+  entries: RestartEntry[]
+}
+
+const REASONS: readonly RestartReason[] = ['install', 'update', 'restart', 'quit']
+
+/** How long an entry no start has taken up is kept, then skipped. */
+export const ENTRY_EXPIRY_MS = 24 * 60 * 60 * 1000
+/** How long a lane's "isn't running" stall is held for an agent queued to resume, at most. */
+export const STALL_HOLD_MS = 10 * 60 * 1000
+
+/** One agent of one project: an entry for it replaces another for it. */
+export const agentKey = (e: Pick<RestartEntry, 'projectPath' | 'agentId'>): string => `${e.projectPath.toLowerCase()}#${e.agentId}`
+
+export const isFinal = (s: RestartState): boolean => FINAL_STATES.includes(s)
+export const isOpen = (s: RestartState): boolean => OPEN_STATES.includes(s)
+
+/**
+ * A new snapshot (Hive closing again) added to the record, with that close's reason: each agent in it replaces its
+ * earlier entry (it ran in this run, so that entry is out of date), and entries of agents not in it are kept as they
+ * are, so an offer the user hasn't answered isn't lost. Final entries are dropped.
+ */
+export function mergeSnapshot(record: RestartRecord | null, snapshot: readonly RestartEntry[], reason: RestartReason): RestartRecord {
+  const now = new Set(snapshot.map(agentKey))
+  const kept = (record?.entries ?? []).filter((e) => !isFinal(e.state) && !now.has(agentKey(e)))
+  return { version: 1, reason, entries: [...kept, ...snapshot] }
+}
+
+/**
+ * The record as a start finds it: an entry the last run left queued or starting (it ended mid-recovery) is pending
+ * again, to be checked once more before it is queued; one older than ENTRY_EXPIRY_MS is skipped.
+ */
+export function atStart(record: RestartRecord, now: number): RestartRecord {
+  return {
+    version: 1,
+    reason: record.reason,
+    entries: record.entries.map((e) => {
+      if (isOpen(e.state) && now - Date.parse(e.at) > ENTRY_EXPIRY_MS) return { ...e, state: 'skipped', why: 'expired', changedAt: new Date(now).toISOString() }
+      if (e.state === 'queued' || e.state === 'starting') return { ...e, state: 'pending', changedAt: new Date(now).toISOString() }
+      return e
+    })
+  }
+}
+
+/** Whether a record still has anything to do or tell: an entry not final. */
+export const recordOpen = (r: RestartRecord | null): boolean => !!r?.entries.some((e) => !isFinal(e.state))
+
+/** Reads a record from its file's text: null when it isn't one (damaged, another version). */
+export function parseRecord(text: string): RestartRecord | null {
+  try {
+    const v = JSON.parse(text) as Partial<RestartRecord>
+    if (v?.version !== 1 || !Array.isArray(v.entries)) return null
+    const ok = (e: Partial<RestartEntry>): e is RestartEntry => typeof e?.projectPath === 'string' && typeof e.agentId === 'string' && typeof e.sessionId === 'string' && typeof e.state === 'string' && typeof e.at === 'string'
+    // A record with no reason we know offers (a quit's): Hive never resumes by itself on a guess.
+    const reason = REASONS.includes(v.reason as RestartReason) ? (v.reason as RestartReason) : 'quit'
+    return { version: 1, reason, entries: v.entries.filter(ok) }
+  } catch {
+    return null
+  }
+}
+
+// ---------------------------------------------------------------------------
+// The installer's request (installer.nsh): close for an install, bound to this process and this copy.
+// ---------------------------------------------------------------------------
+
+/** The request's file in Hive's profile, the acknowledgement's, and what a request taken is renamed to. */
+export const REQUEST_FILE = 'restart-request.json'
+export const ackFile = (nonce: string): string => `restart-ack-${nonce}.json`
+export const takenFile = (nonce: string): string => `restart-request.${nonce}.taken`
+/** A request is at most this big, and this old. */
+export const REQUEST_MAX_BYTES = 4096
+export const REQUEST_MAX_AGE_MS = 60_000
+/** How far apart this process's start and the request's may be (the installer reads it from Windows, Hive from its uptime). */
+export const START_TOLERANCE_MS = 5_000
+
+const GUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i
+
+export interface RestartRequest {
+  v: 1
+  nonce: string
+  pid: number
+  /** When that process started (UTC, ISO). */
+  pidCreated: string
+  /** The Hive.exe it was started from. */
+  exe: string
+  reason: 'install'
+  /** When the installer wrote it (UTC, ISO). */
+  at: string
+}
+
+/** This process, as a request must name it. */
+export interface RequestTarget {
+  pid: number
+  /** When this process started (ms). */
+  startedAt: number
+  /** This copy's executable, its real path. */
+  exe: string
+  now: number
+  /** Nonces already handled in this run. */
+  seen: ReadonlySet<string>
+}
+
+export type RequestCheck = { ok: true; request: RestartRequest } | { ok: false; why: string; nonce?: string }
+
+/**
+ * Whether a request's text asks this process to close for an install: its size, its form (a GUID nonce before any file
+ * is named after it), this process and its start, this copy's executable (`samePath` compares real paths), and its age.
+ * A nonce already handled is a replay.
+ */
+export function checkRequest(text: string, t: RequestTarget, samePath: (a: string, b: string) => boolean): RequestCheck {
+  if (new TextEncoder().encode(text).length > REQUEST_MAX_BYTES) return { ok: false, why: 'too big' }
+  let v: Partial<RestartRequest>
+  try {
+    v = JSON.parse(text.replace(/^﻿/, '')) as Partial<RestartRequest>
+  } catch {
+    return { ok: false, why: 'malformed (partial or not JSON)' }
+  }
+  if (!v || typeof v !== 'object' || v.v !== 1 || v.reason !== 'install') return { ok: false, why: 'malformed' }
+  if (typeof v.nonce !== 'string' || !GUID.test(v.nonce)) return { ok: false, why: 'malformed (its nonce)' }
+  const nonce = v.nonce
+  if (t.seen.has(nonce.toLowerCase())) return { ok: false, why: 'a replay (already handled)', nonce }
+  if (typeof v.pid !== 'number' || typeof v.pidCreated !== 'string' || typeof v.exe !== 'string' || typeof v.at !== 'string') return { ok: false, why: 'malformed', nonce }
+  if (v.pid !== t.pid) return { ok: false, why: `for another process (${v.pid})`, nonce }
+  const created = Date.parse(v.pidCreated)
+  if (Number.isNaN(created) || Math.abs(created - t.startedAt) > START_TOLERANCE_MS) return { ok: false, why: 'for an earlier process with the same id', nonce }
+  if (!samePath(v.exe, t.exe)) return { ok: false, why: 'for another copy of Hive', nonce }
+  const at = Date.parse(v.at)
+  if (Number.isNaN(at) || t.now - at > REQUEST_MAX_AGE_MS || at - t.now > START_TOLERANCE_MS) return { ok: false, why: 'stale', nonce }
+  return { ok: true, request: v as RestartRequest }
+}
+
+// ---------------------------------------------------------------------------
+// What agents are told (agent-facing: English).
+// ---------------------------------------------------------------------------
+
+/** The line an agent finds in its inbox as Hive closes for an update. */
+export const RESTARTING_LINE = "Hive is restarting for an update. Your work is saved; you'll be resumed." // i18n-ignore: agent-facing
+
+/** "10:00 UTC" from an ISO time. */
+const clock = (iso: string): string => `${iso.slice(11, 16)} UTC`
+
+/**
+ * The first line a resumed agent is given: why Hive restarted, from which version to which and when, what it was on,
+ * and to re-arm its watch if it was waiting.
+ */
+export function resumeNote(e: Pick<RestartEntry, 'from' | 'at' | 'status' | 'card' | 'lane'>, to: string, reason: RestartReason): string {
+  const versions = e.from && e.from !== to ? ` (${e.from} → ${to})` : ''
+  const why = reason === 'quit' ? `Hive was quit and started again${versions}` : reason === 'restart' ? `Hive restarted${versions}` : `Hive restarted for an update${versions}`
+  const on = e.card ? `You were on ${e.card.label}${e.card.round ? `, round ${e.card.round}` : ''}` : ''
+  const lane = e.lane ? `${on ? ',' : 'You were'} in lane '${e.lane.name ?? e.lane.id}' (its ${e.lane.role})` : ''
+  const was = on || lane ? ` ${on}${lane}.` : ''
+  const watch = e.status === 'watching' || e.lane ? ' Carry on: re-arm your card watch if you were waiting.' : ' Carry on where you were.'
+  return `[Hive] ${why} at ${clock(e.at)}; your session was stopped and is resumed now.${was}${watch}` // i18n-ignore: agent-facing
+}

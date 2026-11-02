@@ -2,7 +2,7 @@
 // in its own project.json. The pure rules (which copy keeps an id, whose cards are left under an old name), then a
 // workspace: ids given once, cards stamped once, a rename followed, a copied folder given a new id, and Repair giving
 // cards saved before ids (under a project's old name) to the project they belong to now.
-import { cpSync, existsSync, mkdirSync, readdirSync, readFileSync, writeFileSync } from 'fs'
+import { cpSync, existsSync, mkdirSync, readdirSync, readFileSync, rmSync, writeFileSync } from 'fs'
 import { join } from 'path'
 import { afterAll, beforeAll, describe, expect, it, vi } from 'vitest'
 import * as electron from 'electron'
@@ -15,7 +15,7 @@ import { storeDocs } from './storeDocs'
 const base = tempDir('hive-projectids-')
 ;(electron.app as unknown as { getPath: () => string }).getPath = () => join(base, 'profile')
 
-const { createWorkspaceService, disposeWorkspaceService, inWorkspace } = await import('../src/main/workspace')
+const { configTestHooks, createWorkspaceService, disposeWorkspaceService, inWorkspace } = await import('../src/main/workspace')
 const tasks = await import('../src/main/tasks')
 const lanes = await import('../src/main/lanes')
 const { movePlan, repairMove } = await import('../src/main/workspaceMove')
@@ -442,6 +442,219 @@ describe('what the workspace remembers of projects a read missed is bounded (#55
       await disposeWorkspaceService(w)
     }
   })
+
+  // HI-1668: the root watcher's read (250 ms after a folder changes) listed p4 before it went, and settled after the read
+  // that no longer listed it: the older listing became the projects' ids and what is remembered (4 kept, not 3).
+  it('a read that listed the folders before a later one settles after it: the later listing stands', async () => {
+    const wsPath = join(base, 'ws-overlap')
+    project(wsPath, 'keep')
+    const w = createWorkspaceService()
+    await w.open(wsPath)
+    try {
+      await w.refreshesSettled()
+      const gone = join(wsPath, 'gone')
+      // The older read, the first to list `gone`, is held where it reads it, until the newer one has settled.
+      let release!: () => void
+      const held = new Promise<void>((r) => (release = r))
+      const read = w.projectConfig.bind(w)
+      let holding = true
+      let reached = false
+      w.projectConfig = (async (p: string, o?: never) => {
+        if (holding && p.toLowerCase() === gone.toLowerCase()) {
+          reached = true
+          await held
+        }
+        return read(p, o)
+      }) as typeof w.projectConfig
+      project(wsPath, 'gone')
+      const older = w.projectIds({ fresh: true })
+      await vi.waitFor(() => expect(reached).toBe(true), { timeout: HUNG_MS })
+      await moveFolder(gone, join(base, 'ws-overlap-out'))
+      const newer = await w.projectIds({ fresh: true })
+      expect(newer.byPath.has(gone.toLowerCase())).toBe(false)
+      holding = false
+      release()
+      await older
+      // HI-1817: the older read gave `gone` an id after it had moved, making its folder again; the root watch's read then
+      // listed it, and under load settled before this check.
+      expect(existsSync(gone)).toBe(false)
+      expect(w.projectIdsNow().byPath.has(gone.toLowerCase())).toBe(false)
+      expect(w.projectIdsNow().byPath.size).toBe(1)
+    } finally {
+      await disposeWorkspaceService(w)
+    }
+  })
+
+  // HI-1817 (HR5's round 1): with no later read at all, a project moved out while it was being given its id was made
+  // again by that write: it is given none, whether the move comes before project.json's lock reads it or before it writes.
+  for (const at of ['the read in the lock', 'the write'] as const) {
+    it(`a project moved while it is given its id isn't made again (moved before ${at})`, async () => {
+      const wsPath = join(base, `ws-idmove-${at === 'the write' ? 'write' : 'read'}`)
+      project(wsPath, 'keep')
+      const w = createWorkspaceService()
+      await w.open(wsPath)
+      try {
+        await w.refreshesSettled()
+        const gone = join(wsPath, 'gone')
+        let release!: () => void
+        const held = new Promise<void>((r) => (release = r))
+        let reached = false
+        const hold = async (p: string): Promise<void> => {
+          if (p.toLowerCase() !== gone.toLowerCase() || reached) return
+          reached = true
+          await held
+        }
+        // The listing's read of `gone` is its first; the one in project.json's lock, giving it its id, the second.
+        const read = w.projectConfig.bind(w)
+        let reads = 0
+        w.projectConfig = (async (p: string, o?: never) => {
+          if (at === 'the read in the lock' && p.toLowerCase() === gone.toLowerCase() && ++reads === 2) await hold(p)
+          return read(p, o)
+        }) as typeof w.projectConfig
+        if (at === 'the write') configTestHooks.beforeConfigWrite = hold
+        project(wsPath, 'gone')
+        const ids = w.projectIds({ fresh: true })
+        await vi.waitFor(() => expect(reached).toBe(true), { timeout: HUNG_MS })
+        await moveFolder(gone, join(base, `ws-idmove-out-${at === 'the write' ? 'write' : 'read'}`))
+        release()
+        const index = await ids
+        expect(existsSync(gone)).toBe(false)
+        expect(index.byPath.has(gone.toLowerCase())).toBe(false)
+        expect(w.projectIdsNow().byPath.has(gone.toLowerCase())).toBe(false)
+      } finally {
+        configTestHooks.beforeConfigWrite = undefined
+        await disposeWorkspaceService(w)
+      }
+    })
+  }
+
+  // HI-2045: a refresh that listed a project before it was deleted (the root watcher's, 250 ms after its folder appeared)
+  // found no project.json when it read it, and made the project again (`.hive` with its sessions and archive folders).
+  it("a refresh that listed a project before it was deleted doesn't make its folder again", async () => {
+    const wsPath = join(base, 'ws-deleted-in-refresh')
+    project(wsPath, 'keep')
+    const gone = project(wsPath, 'gone')
+    const w = createWorkspaceService()
+    await w.open(wsPath)
+    try {
+      await w.refreshesSettled()
+      // The refresh is held once it has listed the folders, `gone` among them.
+      let release!: () => void
+      const held = new Promise<void>((r) => (release = r))
+      const list = w.listProjectPaths.bind(w)
+      let reached = false
+      w.listProjectPaths = (async (o?: { hidden?: boolean }) => {
+        const paths = await list(o)
+        if (!reached && paths.some((p) => p.toLowerCase() === gone.toLowerCase())) {
+          reached = true
+          await held
+        }
+        return paths
+      }) as typeof w.listProjectPaths
+      const refresh = w.refresh()
+      await vi.waitFor(() => expect(reached).toBe(true), { timeout: HUNG_MS })
+      rmSync(gone, { recursive: true, force: true })
+      release()
+      await refresh
+      expect(existsSync(gone)).toBe(false)
+    } finally {
+      await disposeWorkspaceService(w)
+    }
+  })
+
+  // HI-2045 (HR2's round 1): deleted later, once `.hive` is there and before its folders and project.json are made, the
+  // project isn't made again either: each is made only inside a folder that is there.
+  it("a project deleted while it is being set up isn't made again by its folders or its project.json", async () => {
+    const wsPath = join(base, 'ws-deleted-in-setup')
+    project(wsPath, 'keep')
+    const w = createWorkspaceService()
+    await w.open(wsPath)
+    try {
+      await w.refreshesSettled()
+      const gone = join(wsPath, 'gone')
+      mkdirSync(gone)
+      // Its exclusion from git starts beside the folders: the project goes then, after `.hive` was made.
+      const exclude = w.ensureGitExclude.bind(w)
+      w.ensureGitExclude = async (p: string) => {
+        if (p.toLowerCase() === gone.toLowerCase()) rmSync(gone, { recursive: true, force: true })
+        else await exclude(p)
+      }
+      await expect(w.ensureProject(gone)).rejects.toMatchObject({ code: 'ENOENT' })
+      expect(existsSync(gone)).toBe(false)
+    } finally {
+      await disposeWorkspaceService(w)
+    }
+  })
+
+  /**
+   * A workspace whose folder listings the test sets (`folders`), with every read of `gone`'s project.json held until
+   * `release` (HR3's probe for HI-1668 round 1): the order reads list and settle in is the test's.
+   */
+  async function heldReads(name: string) {
+    const wsPath = join(base, name)
+    const keep = project(wsPath, 'keep', { id: 'p-111111111111' })
+    const gone = project(wsPath, 'gone', { id: 'p-222222222222' })
+    const w = createWorkspaceService()
+    await w.open(wsPath)
+    await w.refreshesSettled()
+    const state = { folders: [keep] }
+    w.listProjectPaths = async (o: { hidden?: boolean } = {}) => (o.hidden ? [] : [...state.folders])
+    await w.projectIds({ fresh: true })
+    let release!: () => void
+    const held = new Promise<void>((r) => (release = r))
+    let reached = false
+    const read = w.projectConfig.bind(w)
+    w.projectConfig = (async (p: string, o?: never) => {
+      if (p.toLowerCase() === gone.toLowerCase()) {
+        reached = true
+        await held
+      }
+      return read(p, o)
+    }) as typeof w.projectConfig
+    const has = () => w.projectIdsNow().byPath.has(gone.toLowerCase())
+    return { w, keep, gone, state, release, reached: () => reached, has }
+  }
+
+  it('a later listing that finds the folders as already read settles at once: an older read held meanwhile is dropped', async () => {
+    const h = await heldReads('ws-cached')
+    try {
+      const cached = h.w.projectIdsNow()
+      h.state.folders = [h.keep, h.gone]
+      const older = h.w.projectIds({ fresh: true })
+      await vi.waitFor(() => expect(h.reached()).toBe(true), { timeout: HUNG_MS })
+      h.state.folders = [h.keep]
+      const newer = await h.w.projectIds({ fresh: true })
+      // The folders as already read: the standing index itself.
+      expect(newer).toBe(cached)
+      h.release()
+      await older
+      expect(h.has()).toBe(false)
+    } finally {
+      h.release()
+      await disposeWorkspaceService(h.w)
+    }
+  })
+
+  it('a later listing that finds a read of the same folders under way makes it its own: it stands over one settled between', async () => {
+    const h = await heldReads('ws-reuse')
+    try {
+      h.state.folders = [h.keep, h.gone]
+      const first = h.w.projectIds({ fresh: true })
+      await vi.waitFor(() => expect(h.reached()).toBe(true), { timeout: HUNG_MS })
+      // Between: the folders as already read, settled at once.
+      h.state.folders = [h.keep]
+      await h.w.projectIds({ fresh: true })
+      // Latest: `gone` back, the same folders the held read is reading: it shares that read.
+      h.state.folders = [h.keep, h.gone]
+      const latest = h.w.projectIds({ fresh: true })
+      h.release()
+      await Promise.all([first, latest])
+      expect(h.has()).toBe(true)
+    } finally {
+      h.release()
+      await disposeWorkspaceService(h.w)
+    }
+  })
 })
 
 describe('merge holds Hive closed under are told in their project now (#508 round 3)', () => {
@@ -531,6 +744,32 @@ describe('merge holds Hive closed under are told in their project now (#508 roun
       expect(readFileSync(`${file}.before-ids.bak`, 'utf8')).toBe(before)
     } finally {
       await disposeWorkspaceService(w2)
+    }
+  })
+})
+
+describe('a workspace moved with a project renamed (#1305): Working on by the name it has now', () => {
+  it('the plan names the project as it is called now, and Repair marks it so, never its old name', async () => {
+    const before = join(base, 'Scratch')
+    const wsPath = join(base, 'Tools')
+    // juniper, now dialect: moved with its workspace (Scratch → Tools) and renamed while Hive was closed.
+    project(wsPath, 'dialect', { lastPath: join(before, 'juniper') })
+    const w = createWorkspaceService()
+    await w.open(wsPath)
+    try {
+      w.config.lastPath = before
+      await w.saveWorkspaceConfig()
+      const { config } = await import('../src/main/config')
+      config.update((c) => {
+        c.activeProjects[before] = ['juniper']
+      })
+      const plan = await movePlan(w)
+      expect(plan?.working).toEqual(['dialect'])
+      const report = await repairMove(w)
+      expect(report.failed).toEqual([])
+      expect(config.get().activeProjects[wsPath]).toEqual(['dialect'])
+    } finally {
+      await disposeWorkspaceService(w)
     }
   })
 })

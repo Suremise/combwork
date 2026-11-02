@@ -4,7 +4,7 @@
 // Add Agent may find an unused worktree on.
 import { execFileSync } from 'child_process'
 import { describe, expect, it } from 'vitest'
-import { chooseSpace, hiveBranch, hiveBranchNumber, oldHiveBranch, refPart, reusableBranches } from '../src/shared/hiveBranches'
+import { branchHere, chooseSpace, currentSpaces, hiveBranch, hiveBranchNumber, oldHiveBranch, refPart, reusableBranches } from '../src/shared/hiveBranches'
 
 /** Whether git takes `name` as a branch name. */
 const gitTakes = (name: string): boolean => {
@@ -104,5 +104,57 @@ describe('the workspace part for new branches (#703 rounds 2 and 3)', () => {
     // Its own again, if the recorded one is blocked; a further one only when both are.
     expect(chooseSpace(moved, ['hive/ws-2'])).toEqual({ space: 'ws', isNew: false })
     expect(chooseSpace(moved, ['hive/ws-2', 'hive/ws'])).toEqual({ space: 'ws-3', isNew: true })
+  })
+})
+
+describe('a branch named after where its project was (branchHere, #1305)', () => {
+  const tools = { workspace: 'Tools', project: 'dialect', space: 'Tools' }
+  it('a moved and renamed project: both parts follow, the agent part stays', () => {
+    expect(branchHere('hive/Scratch/juniper/jb1', tools)).toBe('hive/Tools/dialect/jb1')
+    expect(branchHere('hive/Scratch/juniper/jb1-2', tools)).toBe('hive/Tools/dialect/jb1-2')
+  })
+  it('only the workspace moved, or only the project renamed: that part follows', () => {
+    expect(branchHere('hive/Scratch/dialect/db1', tools)).toBe('hive/Tools/dialect/db1')
+    expect(branchHere('hive/Tools/juniper/jb1', tools)).toBe('hive/Tools/dialect/jb1')
+  })
+  it('the workspace part its new branches take now (chooseSpace), when another', () => {
+    expect(branchHere('hive/Scratch/dialect/db1', { ...tools, space: 'Tools-2', spaces: ['Tools-2'] })).toBe('hive/Tools-2/dialect/db1')
+  })
+  it("already named for here (case aside), or in one of this project's recorded parts: kept", () => {
+    expect(branchHere('hive/Tools/dialect/db1', tools)).toBeNull()
+    expect(branchHere('hive/tools/DIALECT/db1', tools)).toBeNull()
+    expect(branchHere('hive/Tools-2/dialect/db1', { ...tools, spaces: ['Tools-2'] })).toBeNull()
+  })
+  it("not Hive's full form: kept (hive/<agent> from before #703, a branch of the user's)", () => {
+    expect(branchHere('hive/db1', tools)).toBeNull()
+    expect(branchHere('feature/login', tools)).toBeNull()
+    expect(branchHere('hive/a/b/c/d', tools)).toBeNull()
+  })
+  it("a folder name git refuses is made a ref part, as Hive's branches are", () => {
+    expect(branchHere('hive/Scratch/juniper/jb1', { workspace: 'My Tools', project: 'dialect' })).toBe('hive/My-Tools/dialect/jb1')
+  })
+})
+
+describe('a workspace part recorded under an old name (#1305, HR5 round 1)', () => {
+  // Scratch had a branch in the way, so its project's branches took Scratch-2 (recorded); the workspace is now Tools.
+  const moved = { workspace: 'Tools', project: 'juniper', spaces: ['Scratch-2'] }
+  it('is still the project’s, but no longer a name for here', () => {
+    expect(currentSpaces(moved)).toEqual(['Tools'])
+    expect(currentSpaces({ workspace: 'Tools', project: 'juniper', spaces: ['Scratch-2', 'Tools-2'] })).toEqual(['Tools', 'Tools-2'])
+  })
+  it('new branches take the workspace’s own part, not the old recorded one', () => {
+    expect(chooseSpace(moved, [])).toEqual({ space: 'Tools', isNew: false })
+    expect(chooseSpace({ ...moved, spaces: ['Scratch-2', 'Tools-2'] }, [])).toEqual({ space: 'Tools-2', isNew: false })
+  })
+  it('a branch in it is renamed to the part new branches take now', () => {
+    const space = chooseSpace(moved, []).space
+    expect(branchHere('hive/Scratch-2/juniper/jb1', { ...moved, space })).toBe('hive/Tools/juniper/jb1')
+    // Blocked (a branch hive/Tools there): the next free one, as new branches would.
+    const blocked = chooseSpace(moved, ['hive/Tools'])
+    expect(blocked).toEqual({ space: 'Tools-2', isNew: true })
+    expect(branchHere('hive/Scratch-2/juniper/jb1', { ...moved, space: blocked.space })).toBe('hive/Tools-2/juniper/jb1')
+  })
+  it('one recorded for the workspace as it is now stays as it is', () => {
+    expect(branchHere('hive/Tools-2/juniper/jb1', { workspace: 'Tools', project: 'juniper', spaces: ['Tools-2'], space: 'Tools-2' })).toBeNull()
   })
 })

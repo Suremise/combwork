@@ -26,7 +26,7 @@
 //   --build         build first (npx electron-vite build), only if the build isn't from this source (build.mjs).
 //   --packaged      include the installer's suites (need npm run dist); --no-progress: don't report to Hive.
 //   --no-wait       a heavy run (more than 5 suites, or --repeat) fails at once when every test slot on this machine is
-//                   taken, instead of waiting for one (slots.mjs; heavySlots in hive-test\config.json, default 2); and
+//                   taken, instead of waiting for one (slots.mjs; heavySlots and sideSlots in hive-test\config.json); and
 //                   any run fails at once when every test lane (10) is taken, instead of waiting for one (lanes.mjs, #707).
 //   --pre-merge     a heavy run checking a merge goes first in the queue for a test slot (#558). Not needed in the
 //                   session of an agent holding the merge slot: such a run goes first anyway (slots.mjs holdsMergeSlot).
@@ -45,22 +45,24 @@ import { e2eProgress, slotWaitProgress } from '../progressReport.mts'
 import { SUITES } from './suites.mjs'
 import { affectedSuites, changedFiles, mergeBase } from './affected.mjs'
 import { CLI_LOG, fingerprint, readCliLog, realCliHomes, realCliVersions, recordJson, recordMarkdown, selectionOf } from './record.mjs'
-import { LANG_SUITE, isRealCli, keepLimits, needsDevBuild, packagedStatus, parentSuite, parseArgs, portBase, realNotRun, repeatStatus, resultLines, selectSuites, suiteOutcome } from './runner.mjs'
+import { LANG_SUITE, isRealCli, keepLimits, needsDevBuild, packagedStatus, parentSuite, parseArgs, portBase, realNotRun, repeatStatus, packagedPlan, resultLines, selectSuites, suiteLimitMs, suiteOutcome } from './runner.mjs'
 import { devBuild, ensureBuild } from './build.mjs'
-import { FAILED_KEEP_MS, finishRunDirs, keepSuiteFiles, logsRootFor, markRunFailed, newRunDir, omittedLine, pruneRunDirsReleasing } from './logs.mjs'
+import { FAILED_KEEP_MS, finishRunDirs, keepSuiteFiles, logRetention, logsRootFor, markRunFailed, newRunDir, omittedLine, pruneRunDirsReleasing } from './logs.mjs'
 import { LANES, describeHolder, laneWaitLine, lanesFirst, laneWork, waitForLane } from './lanes.mjs'
-import { describeClaim, heavySlots, needsSlot, preMerge, waitForSlot, waitLine } from './slots.mjs'
+import { endLeftCopies } from './leftCopies.mjs'
+import { SIDE_E2E_JOBS, creditFor, preMerge, refusedLine, slotPool, waitForSlot, waitLine, waitSummary } from './slots.mjs'
 import { usesCodexHome, waitForCodexHome } from './codexHomeLock.mjs'
 import { autoClean, holdLane } from './clean.mjs'
 import { recycleBinCount, recycleBinLine } from './recycleBin.mjs'
 import { readUnpackedInfo } from '../../scripts/distCopy.mjs'
+import { endRunTemp, startRunTemp } from '../runTemp.mts'
 
 const here = dirname(fileURLToPath(import.meta.url))
 const root = join(here, '..', '..')
 const lib = createRequire(import.meta.url)('./lib.cjs')
 const runContext = createRequire(import.meta.url)('./runContext.cjs')
 const { claimedByRuns, clearDir, evidenceFor, findBoard, finishSuiteDir, freshFolder, recordKept, releaseKept } = createRequire(import.meta.url)('./evidence.cjs')
-const { stopProcessesIn, endChildTree } = createRequire(import.meta.url)('./folderProcesses.cjs')
+const { stopProcessesIn, endChildTree, endCopies } = createRequire(import.meta.url)('./folderProcesses.cjs')
 const { describeExit, windowsCodesIn } = createRequire(import.meta.url)('./windowsExits.cjs')
 
 const args = process.argv.slice(2)
@@ -69,7 +71,8 @@ if (opts.error) {
   console.error(opts.error.startsWith('Unknown suite') ? `${opts.error}. Suites: ${SUITES.map((s) => s.name).join(', ')}` : opts.error)
   process.exit(2)
 }
-const { jobs } = opts
+// At most SIDE_E2E_JOBS on the side slot (below).
+let { jobs } = opts
 
 if (opts.fingerprint) {
   console.log(fingerprint(root))
@@ -97,6 +100,16 @@ if (!evidence.ok) {
   console.error(`Can't tell what the tests may delete: ${evidence.why}. Fix the board, or set HIVE_TEST_NO_BOARD=1 if no Hive board cites test output on this machine.`)
   process.exit(2)
 }
+// The run's own temp folder in hive-test\tmp (HI-2102): its suites, Playwright's playwright-artifacts-* folders, the
+// test copies of Hive and the CLIs they start get it as TEMP (runContext.cjs ALLOW), not %TEMP%. It goes as the runner
+// exits, unless the run is recorded for review (kept, as its logs are, until a run's start a day later removes it,
+// while no open card cites it). A run's start removes what stopped runs left, by the same evidence rules.
+const runTemp = startRunTemp((p) => evidence.protects(p))
+process.on('exit', () => {
+  if (opts.record) return console.log(`\nKept the run's temp folder with its record: ${runTemp}`)
+  const failed = endRunTemp()
+  if (failed) console.warn(`The run's temp folder was left behind (the next run's start removes it after a day): ${failed}`)
+})
 
 // --- Which suites.
 let affected = null
@@ -118,31 +131,45 @@ if (!chosen.length) {
   console.log(`\nNo suite to run${opts.affected ? ' for these changes' : ''}.`)
   process.exit(0)
 }
+// A packaged build (HIVE_EXE, the Sandbox checks): a suite that can't run on one would test the dev build and pass for
+// it, so it is NOT RUN, with why, in the output and the record (#1591, runner.mjs suiteDevOnly: the suite and the
+// helpers it uses). The parts of a suite that runs which need the dev build say NOT RUN themselves (queueFixture
+// devSeam). A run where none can run tested nothing: it fails, with its record saying so.
+const packagedExe = process.env.HIVE_EXE || null
+const { devOnly, nothingRan } = packagedPlan(chosen, here, packagedExe)
+if (packagedExe) console.log(`Packaged build: ${packagedExe} (HIVE_EXE)${devOnly.size ? `. NOT RUN, as they would test the dev build: ${devOnly.size} of ${chosen.length} suites (each said with why)` : ''}.\n`)
 
 // --- A heavy run (more than a few suites, or a repeat) waits for a test slot: at most a few go at once on this machine,
-// across every worktree (slots.mjs), so runs don't slow each other until tests time out. A runner started inside a
-// suite never waits (its parent holds one: needsSlot). --no-wait: fail at once instead. A pre-merge run goes first.
+// across every worktree (slots.mjs), so runs don't slow each other until tests time out; a small one (a few suites
+// repeated a few times, HI-2070) takes the side slot, else a heavy one. A runner started inside a suite never waits
+// (its parent holds one: slotPool). --no-wait: fail at once instead. A pre-merge run goes first.
 const nested = !!parentSuite()
-if (needsSlot({ count: chosen.length, repeat: opts.repeat })) {
+const pool = slotPool({ kind: 'e2e', count: chosen.length, repeat: opts.repeat })
+if (pool) {
   const what = `e2e: ${chosen.length} suites${opts.repeat > 1 ? ` × ${opts.repeat}` : ''}`
   const queue = slotWaitProgress('e2e', `npm run e2e -- ${args.join(' ')}`.trim(), args)
   let said = ''
   const got = await waitForSlot(runContext.HEAVY_DIR, {
+    pool,
     what,
     root,
     wait: !opts.noWait,
     first: preMerge(opts.preMerge),
     onWait: (look) => {
-      const who = look.holders.map((c) => describeClaim(c)).join('; ')
       const line = waitLine(look)
       if (line !== said) console.log(line)
       said = line
-      queue.waiting(who)
+      queue.waitingAs(waitSummary(look))
     }
   })
   if (got.refused) {
-    console.error(`No test slot free (--no-wait): ${heavySlots()} heavy runs at once on this machine, held by ${got.refused.holders.map((c) => describeClaim(c)).join('; ')}.`)
+    console.error(refusedLine(got.refused))
     process.exit(2)
+  }
+  // Beside two heavy runs, a side run's suites go at most two at once (HI-2070: four took the machine near full).
+  if (got.pool === 'side' && jobs > SIDE_E2E_JOBS) {
+    console.log(`On the side slot: ${SIDE_E2E_JOBS} suites at once, not ${jobs} (HI-2070).`)
+    jobs = SIDE_E2E_JOBS
   }
   if (said) {
     const after = `${Math.round(got.waitedMs / 1000)} s`
@@ -159,6 +186,16 @@ if (needsSlot({ count: chosen.length, repeat: opts.repeat })) {
 // Before the code's fingerprint and the build (#735): a run that waited tests the source as it is once it has a lane.
 let lane = null
 if (!nested) {
+  // First, the test copies of Hive an earlier run left in lanes no runner holds (HI-1453): one holding a lane's port
+  // kept every later runner off that lane.
+  try {
+    const left = await endLeftCopies(runContext.LANES_DIR, lib.WORK)
+    if (left.ended) console.log(`Ended ${left.ended} process(es) of test copies of Hive an earlier run left running in its lanes (HI-1453).\n`)
+    // Never ended without a record: listed, for a person to look at.
+    if (left.unrecorded.length) console.log(`Still running in lanes no runner holds, with no record of a run starting them (not ended; look at them, HI-1453):\n${left.unrecorded.map((p) => `  ${p.pid}: ${p.commandLine}`).join('\n')}\n`)
+  } catch (e) {
+    console.warn(`Couldn't look for test copies of Hive an earlier run left running (HI-1453): ${e.message}\n`)
+  }
   const queue = slotWaitProgress('e2e', `npm run e2e -- ${args.join(' ')}`.trim(), args, 'a test lane')
   let said = ''
   const got = await waitForLane(runContext.LANES_DIR, {
@@ -197,7 +234,9 @@ const runBuild = () => {
   devBuild(root)
 }
 // Only the installer's suites: they test dist/win-unpacked, not out/ (needsDevBuild), so out/ isn't looked at (#274).
-const devBuildNeeded = needsDevBuild(chosen)
+// Nor when none can run on the packaged build HIVE_EXE names: nothing would use it, and the run's record is still due.
+const runnable = chosen.filter((s) => !devOnly.has(s.name))
+const devBuildNeeded = !nothingRan && needsDevBuild(runnable)
 let buildCheck = { stale: false, built: false, waited: false, why: null }
 try {
   if (devBuildNeeded) buildCheck = ensureBuild({ root, build: opts.build, runBuild })
@@ -238,7 +277,7 @@ if (lane) console.log(`Lane ${lane.lane}: ports ${lane.first}–${lane.last}\n  
  * shell inside the suite's Hive (progressreport does) knows it is inside a suite, and which port to keep clear of.
  */
 const suiteEnv = (name, port, dir) => {
-  const env = runContext.suiteEnv({ name, port, work: dir, runDir: dir ?? lib.WORK, cliLog: dir ? join(dir, CLI_LOG) : null })
+  const env = runContext.suiteEnv({ name, port, work: dir, runDir: dir ?? lib.WORK, cliLog: dir ? join(dir, CLI_LOG) : null, slots: creditFor(pool) })
   // --lang: the languages the i18n screenshot route photographs (it reads E2E_I18N_LANGS; the others are pinned to English).
   if (name === LANG_SUITE && opts.lang.length) env.E2E_I18N_LANGS = opts.lang.join(',')
   return env
@@ -255,8 +294,8 @@ const suiteClis = (dir) => {
  * Each suite has a folder of its own in the lane's, made fresh when it starts (`<suite>`, or `<suite>-2`… while an
  * earlier one is kept). When it passes (or skips), the whole folder goes (#285), unless the board, read as it is then,
  * says it must stay (a card cites it, or the board can't be read: said at the end). When it fails, it stays for a look.
- * What stays is tied to the run (evidence.cjs recordKept) and goes when the run's logs are pruned (KEEP_RUNS, and a
- * failed run a day: logs.mjs), so copies never pile up.
+ * What stays is tied to the run (evidence.cjs recordKept) and goes when the run's logs are pruned (KEEP_RUNS, a day's
+ * runs up to a size, and a failed run a day: logs.mjs), so copies never pile up.
  */
 
 const run = (name, port) =>
@@ -280,11 +319,12 @@ const run = (name, port) =>
     child.stderr.on('data', add)
     // Out of time: the suite and everything it started. Killing only the suite's node leaves its test copy of Hive running,
     // holding the lane's port, and the lane's next suites can't start their Agent API.
+    const limitMs = suiteLimitMs(name, opts.lang)
     const timer = setTimeout(() => {
-      out += '\nFAIL timed out after 10 minutes: the suite and the processes it started were stopped\n'
+      out += `\nFAIL timed out after ${limitMs / 60_000} minutes: the suite and the processes it started were stopped\n`
       // Each as the process it is now, children first (#603): never taskkill /T, which follows parent ids that may be stale.
       if (process.platform !== 'win32' || !endChildTree(child)) child.kill()
-    }, 10 * 60_000)
+    }, limitMs)
     child.on('exit', (code) => {
       clearTimeout(timer)
       // The Windows codes its output names (#599: a child that failed to start or crashed), not its own exit code: its
@@ -293,6 +333,10 @@ const run = (name, port) =>
       const outcome = { ...suiteOutcome({ code, out }), clis: suiteClis(dir), windows }
       // What a suite's agents left running from its folder (a command through hive-progress, a server: #542) would hold
       // the folder and outlive the run: stopped, by command line (its folder, started since the suite did), never by name.
+      // Its test copies of Hive first (HI-1453): those it recorded, as the processes recorded. One not recorded is the
+      // folder's sweep's below (#542), which takes what names the folder and started since the suite did.
+      const copies = dir ? endCopies([dir]).ended : 0
+      if (copies) out += `\n(${copies} process(es) of its test copies of Hive still running after it ended were ended, HI-1453)\n`
       const stopped = dir ? stopProcessesIn(dir, started) : 0
       if (stopped) out += `\n(${stopped} process(es) still running from its folder after it ended were stopped, #542)\n`
       // --keep-files: a passed suite's own files (screenshots, reports) go into the run's log folder before its folder
@@ -360,9 +404,9 @@ const rank = (s) => Math.max(-1, ...(s.needs ?? []).map((n) => NEEDS.indexOf(n))
 const needs = (s, n) => (s.needs ?? []).includes(n)
 const isLast = (s) => !!s.serial || needs(s, 'packaged')
 const isCli = (s) => !isLast(s) && (needs(s, 'claude') || needs(s, 'codex'))
-const sideBySide = jobs === 1 ? [] : chosen.filter((s) => !isLast(s) && !isCli(s))
-const cliLane = jobs === 1 ? [] : chosen.filter(isCli).sort((a, b) => rank(a) - rank(b))
-const last = jobs === 1 ? [...chosen].sort((a, b) => rank(a) - rank(b)) : chosen.filter(isLast).sort((a, b) => rank(a) - rank(b))
+const sideBySide = jobs === 1 ? [] : runnable.filter((s) => !isLast(s) && !isCli(s))
+const cliLane = jobs === 1 ? [] : runnable.filter(isCli).sort((a, b) => rank(a) - rank(b))
+const last = jobs === 1 ? [...runnable].sort((a, b) => rank(a) - rank(b)) : runnable.filter(isLast).sort((a, b) => rank(a) - rank(b))
 const order = [...sideBySide, ...cliLane, ...last].map((s) => s.name)
 const { repeat } = opts
 // One progress run for the whole repeat: a step per suite in each run.
@@ -396,6 +440,10 @@ async function runOnce(k) {
     progress.suite(finished, [...running].map((n) => step(k, n)).join(', '))
   }
   if (repeat > 1) console.log(`\n--- Run ${k} of ${repeat}`)
+  for (const [name, why] of devOnly) {
+    results.push({ name, notRun: why })
+    for (const line of resultLines(name, { notRun: why })) console.log(line)
+  }
 
   function finish(s, r) {
     finished++
@@ -455,9 +503,15 @@ async function runOnce(k) {
   for (const r of results.filter((x) => x.skipped && x.seconds === undefined)) console.log(`${r.name.padEnd(22)}skipped: ${r.skipped}`)
   const failed = results.filter((r) => r.ok === false)
   const minutes = ((Date.now() - startedAt) / 60_000).toFixed(1)
-  const summary = `${results.filter((r) => r.ok).length} passed, ${failed.length} failed, ${results.filter((r) => r.skipped).length} skipped in ${minutes} min`
+  const summary = `${results.filter((r) => r.ok).length} passed, ${failed.length} failed, ${results.filter((r) => r.skipped).length} skipped${devOnly.size ? `, ${devOnly.size} not run (they need the dev build)` : ''} in ${minutes} min`
   console.log(`\n${repeat > 1 ? `Run ${k} of ${repeat}: ` : ''}${summary}. Logs: ${logDir}`)
   if (filesKept.length) console.log(`Kept the screenshots and files of ${filesKept.join(', ')} in ${filesKept.length === 1 ? `${logDir}\\${filesKept[0]}` : `${logDir}\\<suite>`} (--keep-files).`)
+  // React's commit bursts, recorded only (HI-1387): each suite's largest, the largest first.
+  const bursts = results.map((r) => ({ name: r.name, n: Number(/^INFO React commit burst: the largest was (\d+)/m.exec(r.out ?? '')?.[1] ?? 0) })).filter((b) => b.n)
+  if (bursts.length) console.log(`React commit bursts (most commits within 250 ms, recorded only, HI-1387): ${bursts.sort((a, b) => b.n - a.n).map((b) => `${b.name} ${b.n}`).join(', ')}`)
+  // And each suite's longest commit chain (HI-1865: commits with nothing from outside between them), failed at 50 or not.
+  const chains = results.map((r) => ({ name: r.name, n: Number(/^(?:INFO|FAIL) React commit chain: the longest was (\d+)/m.exec(r.out ?? '')?.[1] ?? 0) })).filter((b) => b.n)
+  if (chains.length) console.log(`React commit chains (most commits with nothing from outside between them; a suite fails at 50 unless it accepts its chain, HI-1865): ${chains.sort((a, b) => b.n - a.n).map((b) => `${b.name} ${b.n}`).join(', ')}`)
   // A failed run outlives KEEP_RUNS for a day, with its failed suites' screenshots (#223): a path a builder cites in a
   // card is still there when the reviewer looks.
   if (failed.length) {
@@ -504,15 +558,15 @@ if (opts.record) {
   const status = repeatStatus({ repeat, runs, before: codeBefore, after: fingerprint(root), buildStale: stale, packagedStale: packagedStale ?? packagedCheck() })
   // Each real suite's CLI home (#368): named in the record; one in the user's own home makes it not valid.
   const { homes, own } = realCliHomes(lastRun.results, SUITES)
-  const problems = [...status.problems, ...(own.length ? [`ran a real CLI in the user's own home (never, #368): ${own.join(', ')}`] : [])]
+  const problems = [...(nothingRan ? [nothingRan] : []), ...status.problems, ...(own.length ? [`ran a real CLI in the user's own home (never, #368): ${own.join(', ')}`] : [])]
   recordInvalid = problems.length > 0
   // A record that isn't valid: its run is kept as a failed one's (#223).
   if (recordInvalid) markRunFailed(lastRun.logDir, `record not valid: ${problems.join('; ')}`)
   const when = new Date().toISOString().slice(0, 16).replace('T', ' ')
   // The real CLIs the real suites ran, as their Hive selected them (#365: the release's tested-with manifest).
   const clis = realCliVersions(lastRun.results, SUITES)
-  const md = `${recordMarkdown({ code: codeBefore, when, jobs, results: lastRun.results, logDir: lastRun.logDir, summary, problems, notRun: notRun.map((s) => s.name), runs: repeat > 1 ? Object.assign(runs, { repeat }) : null, clis, homes, selection }).trimEnd()}\n\n${binLine}\n`
-  const json = `${JSON.stringify(recordJson({ code: codeBefore, when, results: lastRun.results, problems, notRun: notRun.map((s) => s.name), clis, selection }), null, 2)}
+  const md = `${recordMarkdown({ code: codeBefore, when, jobs, results: lastRun.results, logDir: lastRun.logDir, summary, problems, notRun: notRun.map((s) => s.name), runs: repeat > 1 ? Object.assign(runs, { repeat }) : null, clis, homes, selection, packaged: packagedExe }).trimEnd()}\n\n${binLine}\n`
+  const json = `${JSON.stringify(recordJson({ code: codeBefore, when, results: lastRun.results, problems, notRun: notRun.map((s) => s.name), clis, selection, packaged: packagedExe }), null, 2)}
 `
   for (const r of runs) {
     writeFileSync(join(r.logDir, 'run-record.md'), md)
@@ -528,8 +582,20 @@ if (opts.record) {
 // card cites (evidence.cjs).
 finishRunDirs(runs.map((r) => r.logDir))
 // A pruned run's kept suite folders go with it, in lanes this runner may work in (its own, still held, or an idle one
-// it claims); in a lane another runner holds they are left for the clean-up (evidence.cjs releaseKept).
+// it claims); in a lane another runner holds they are left for the clean-up (evidence.cjs releaseKept). Runs of the
+// last day are kept too, up to a size (#1595: HIVE_E2E_KEEP_HOURS, HIVE_E2E_KEEP_MB).
+const retention = logRetention()
+if (retention.bad.length) console.log(`\nIgnored ${retention.bad.join(', ')}: not a number of 0 or more (the default is used).`)
+// The runs to prune are listed with one look at the board, and each is looked at afresh just before it goes (HI-2364).
+const look = evidence.snapshot()
 await pruneRunDirsReleasing(logsRoot, undefined, runs.map((r) => r.logDir), undefined, (p) => evidence.protects(p), {
+  listSpare: (p) => look.protects(p),
+  keepMs: retention.keepMs,
+  maxBytes: retention.maxBytes,
+  onOverCap: (names, bytes) =>
+    console.log(`\nThe logs came to ${Math.round(bytes / 1024 / 1024)} MB, over ${Math.round(retention.maxBytes / 1024 / 1024)} MB: pruned ${names.length} run${names.length === 1 ? '' : 's'} of the last ${retention.keepMs / 3_600_000} hours early (${names.slice(0, 3).join(', ')}${names.length > 3 ? ', …' : ''}).`),
+  // Held by something (#1616): kept for a later run to prune; this run's result stays its suites'.
+  onKept: (name, code) => console.log(`\nKept ${join(logsRoot, name)}: something still holds it (${code}), so a later run prunes it.`),
   release: (d) => releaseKept(d, evidence, { hold: (k) => holdLane(runContext.LANES_DIR, k) })
 })
 if (keptAfterPass.length) console.log(`\nKept the folders of ${keptAfterPass.length} passed suite${keptAfterPass.length === 1 ? '' : 's'}: ${keptAfterPass.slice(0, 3).join('; ')}${keptAfterPass.length > 3 ? '; …' : ''}`)
@@ -539,5 +605,7 @@ if (lane) {
   lane.release()
   await autoClean({ root, ev: evidence })
 }
-await progress.finish(lastRun.ok && runs.length === repeat && !recordInvalid, summary, opts.record ? join(lastRun.logDir, 'run-record.md') : lastRun.logDir)
-process.exit(!lastRun.ok || recordInvalid ? 1 : 0)
+if (nothingRan) console.log(`
+It failed: ${nothingRan}.`)
+await progress.finish(lastRun.ok && runs.length === repeat && !recordInvalid && !nothingRan, summary, opts.record ? join(lastRun.logDir, 'run-record.md') : lastRun.logDir)
+process.exit(!lastRun.ok || recordInvalid || nothingRan ? 1 : 0)

@@ -9,6 +9,7 @@ import { splitArgs } from '../src/shared/providers'
 import { readFile, readdir } from 'fs/promises'
 import { assertSessionId, isSessionId, compactThreshold, DEFAULT_APP_CONFIG, DEFAULT_SETTINGS, effectiveModelLabel, mergeDefaults, migrateConfig, modelLabel } from '../src/shared/defaults'
 import { tempDir, tempRoot } from './tempDir'
+import type { StoredAgent } from '../src/shared/agentFolders'
 
 const line = (o: unknown): string => JSON.stringify(o)
 
@@ -224,7 +225,7 @@ describe('providers migration', () => {
 
   it('a fresh install starts with every provider off', () => {
     expect(Object.values(DEFAULT_SETTINGS.providers).every((p) => !p.enabled)).toBe(true)
-    expect(DEFAULT_APP_CONFIG.version).toBe(8)
+    expect(DEFAULT_APP_CONFIG.version).toBe(9)
   })
   it('moves a default persona that went to its working mode, once (#259)', () => {
     // Saved before 0.9.3, as `persona` (#1084).
@@ -259,7 +260,7 @@ describe('providers migration', () => {
   })
   it('moves 0.1 Claude Code settings over and keeps Claude Code on', () => {
     const c = load(v1)
-    expect(c.version).toBe(8)
+    expect(c.version).toBe(9)
     // Automatic (#474), which picks Claude Code: it stays on.
     expect(c.settings.defaultProvider).toBe('auto')
     expect(c.settings.providers['claude-code']).toMatchObject({ enabled: true, executablePath: 'C:\\x\\claude.exe', defaultModel: 'opus', defaultEffort: 'high', defaultPermissionMode: 'acceptEdits', enableDangerousMode: true, extraArgs: '--verbose', checkUpdatesOnLaunch: false })
@@ -283,12 +284,18 @@ describe('providers migration', () => {
     expect(load({ version: 3, ...assistant({ 'claude-code': { model: 'sonnet', effort: 'low', permissionMode: '', extraArgs: '' } }) }).settings.assistant.providers['claude-code']).toMatchObject({ model: 'sonnet', effort: 'low' })
     expect(DEFAULT_SETTINGS.assistant.providers['claude-code']).toMatchObject({ model: '', effort: '' })
   })
-  it('moves a saved Squash merge style to Merge once, then keeps the choice', () => {
-    const style = (raw: Record<string, unknown>) => load(raw).settings.agents.mergeStyle
-    expect(DEFAULT_SETTINGS.agents.mergeStyle).toBe('merge')
-    expect(style({ version: 3, settings: { agents: { mergeStyle: 'squash' } } })).toBe('merge')
-    expect(style({ version: 2, settings: { agents: { mergeStyle: 'squash' } } })).toBe('merge')
-    expect(style({ version: 4, settings: { agents: { mergeStyle: 'squash' } } })).toBe('squash')
+  it("drops Agents & Worktrees' merge style and moves its copy patterns to Hive's slot default, once (HI-1765)", () => {
+    const agents = (raw: Record<string, unknown>) => load(raw).settings.agents as Record<string, unknown>
+    const slots = (raw: Record<string, unknown>) => load(raw).settings.slotDefaults
+    expect(agents({ version: 8, settings: { agents: { mergeStyle: 'squash', worktreeCopy: 'a.env' } } })).not.toHaveProperty('mergeStyle')
+    expect(agents({ version: 8, settings: { agents: { worktreeCopy: 'a.env' } } })).not.toHaveProperty('worktreeCopy')
+    // A chosen value moves over, an empty one (none) too; the old default, saved into every config, doesn't.
+    expect(slots({ version: 8, settings: { agents: { worktreeCopy: 'a.env, b.json' } } })).toEqual({ copy: 'a.env, b.json' })
+    expect(slots({ version: 8, settings: { agents: { worktreeCopy: '' } } })).toEqual({ copy: '' })
+    expect(slots({ version: 8, settings: { agents: { worktreeCopy: '.env*' } } })).toBeUndefined()
+    // A slot default already set stays: the old key never restores itself over it.
+    expect(slots({ version: 8, settings: { slotDefaults: { copy: 'new.env' }, agents: { worktreeCopy: 'old.env' } } })).toEqual({ copy: 'new.env' })
+    expect(slots({ version: 8, settings: { agents: {} } })).toBeUndefined()
   })
   it('moves the old 50 MB transcript warning default to 20 MB once, keeping any other choice', () => {
     const warn = (raw: Record<string, unknown>) => load(raw).settings.sessions.transcriptWarnMB
@@ -301,19 +308,30 @@ describe('providers migration', () => {
     // Once migrated, 50 is the user's choice.
     expect(warn(saved(5, 50))).toBe(50)
   })
-  it('moves everyone to Show in Hive once (Only when Hive is in the background goes), then keeps the choice', () => {
-    const notifications = (raw: Record<string, unknown>) => load(raw).settings.notifications
-    expect(DEFAULT_SETTINGS.notifications.whileFocused).toBe('inApp')
-    for (const onlyWhenUnfocused of [true, false]) {
-      for (const version of [5, 1]) {
-        const n = notifications({ version, settings: { notifications: { onlyWhenUnfocused } } })
-        expect(n.whileFocused, `${version} ${onlyWhenUnfocused}`).toBe('inApp')
-        expect('onlyWhenUnfocused' in n).toBe(false)
-      }
+  it("one notification system (HI-2320, config 9): While Hive is focused goes, Show nothing becomes Only in the bell, top centre moves to bottom right", () => {
+    const notifications = (raw: Record<string, unknown>) => load(raw).settings.notifications as unknown as Record<string, unknown>
+    expect(DEFAULT_SETTINGS.notifications.bannerPosition).toBe('bottom-right')
+    expect('whileFocused' in DEFAULT_SETTINGS.notifications).toBe(false)
+    // Each While Hive is focused × each scope: Show nothing becomes Only in the bell (background Windows notifications
+    // are kept by the routing table, tests/notify.test.ts); Show in Hive and Windows notification keep the scope.
+    for (const bannerScope of ['all', 'workspace', 'project'] as const) {
+      expect(notifications({ version: 8, settings: { notifications: { whileFocused: 'nothing', bannerScope } } }).bannerScope, bannerScope).toBe('none')
+      expect(notifications({ version: 8, settings: { notifications: { whileFocused: 'inApp', bannerScope } } }).bannerScope, bannerScope).toBe(bannerScope)
+      expect(notifications({ version: 8, settings: { notifications: { whileFocused: 'windows', bannerScope } } }).bannerScope, bannerScope).toBe(bannerScope)
     }
-    // Chosen since: kept.
-    expect(notifications({ version: 6, settings: { notifications: { whileFocused: 'windows' } } }).whileFocused).toBe('windows')
-    expect(notifications({ version: 6, settings: { notifications: { whileFocused: 'nothing' } } }).whileFocused).toBe('nothing')
+    for (const whileFocused of ['inApp', 'nothing', 'windows']) expect('whileFocused' in notifications({ version: 8, settings: { notifications: { whileFocused } } }), whileFocused).toBe(false)
+    // Before version 6 everyone was moved to Show in Hive: their old onlyWhenUnfocused says nothing now, and goes.
+    for (const onlyWhenUnfocused of [true, false]) {
+      const n = notifications({ version: 5, settings: { notifications: { onlyWhenUnfocused, bannerScope: 'project' } } })
+      expect(n.bannerScope).toBe('project')
+      expect('onlyWhenUnfocused' in n).toBe(false)
+    }
+    // The old default place moves to the pop-ups' corner; any other place chosen is kept.
+    expect(notifications({ version: 8, settings: { notifications: { bannerPosition: 'top-center' } } }).bannerPosition).toBe('bottom-right')
+    for (const bannerPosition of ['top-left', 'top-right', 'bottom-left', 'bottom-center', 'bottom-right']) expect(notifications({ version: 8, settings: { notifications: { bannerPosition } } }).bannerPosition, bannerPosition).toBe(bannerPosition)
+    // Once migrated, a choice is the user's: top centre chosen since stays.
+    expect(notifications({ version: 9, settings: { notifications: { bannerPosition: 'top-center' } } }).bannerPosition).toBe('top-center')
+    expect(notifications({ version: 9, settings: { notifications: { bannerScope: 'none' } } }).bannerScope).toBe('none')
   })
   it('writes the Claude Code settings where 0.1 reads them', async () => {
     const { withLegacySettings } = await import('../src/shared/defaults')
@@ -344,7 +362,7 @@ describe('providers migration', () => {
     expect(ws).toEqual({ version: 1, mcp: { enabled: ['github'] } })
   })
   it('resolves an agent from its own, the project and the global settings', async () => {
-    const { agentLaunchSettings } = await import('../src/shared/providers')
+    const { legacyLaunchSettings: agentLaunchSettings } = await import('../src/shared/connectionDefaults')
     const settings = mergeDefaults(DEFAULT_SETTINGS, { providers: { 'claude-code': { enabled: true, defaultModel: 'opus', defaultPermissionMode: 'auto' } } })
     const cfg = { defaultProvider: 'inherit', providers: { 'claude-code': { model: 'sonnet', effort: 'inherit', permissionMode: 'inherit', extraArgs: '--x', use200kContext: 'inherit' as const } } }
     expect(agentLaunchSettings({}, cfg, settings)).toMatchObject({ provider: 'claude-code', model: 'sonnet', permissionMode: 'auto', extraArgs: ['--x'] })
@@ -355,7 +373,7 @@ describe('providers migration', () => {
     expect(agentLaunchSettings({ permissionMode: 'full-access' }, cfg, settings).permissionMode).toBe('auto')
   })
   it('resolves the 200K context from the agent, the project and the global setting', async () => {
-    const { agentLaunchSettings } = await import('../src/shared/providers')
+    const { legacyLaunchSettings: agentLaunchSettings } = await import('../src/shared/connectionDefaults')
     const base = { model: 'inherit', effort: 'inherit', permissionMode: 'inherit', extraArgs: '' }
     const project = (use200kContext: 'inherit' | 'on' | 'off') => ({ defaultProvider: 'inherit', providers: { 'claude-code': { ...base, use200kContext }, codex: { ...base, use200kContext } } })
     const on = mergeDefaults(DEFAULT_SETTINGS, { providers: { 'claude-code': { enabled: true, use200kContext: true }, codex: { enabled: true, use200kContext: true } } })
@@ -647,9 +665,9 @@ describe('agents', () => {
   it('lists only the agents added, all equal, in the order added', async () => {
     const { projectAgents } = await import('../src/shared/defaults')
     expect(projectAgents({ agents: [] })).toEqual([])
-    const list = projectAgents({ agents: [{ id: 'a-2', name: 'Reviewer' }, { id: 'a-1', name: 'Lead', worktree: { path: 'x', branch: 'b', base: 'main' } }, null as never] })
+    const list = projectAgents({ agents: [{ id: 'a-2', name: 'Reviewer' }, { id: 'a-1', name: 'Lead', worktree: { path: 'x', branch: 'b', base: 'main' } } as StoredAgent, null as never] })
     expect(list.map((a) => a.name)).toEqual(['Reviewer', 'Lead'])
-    expect(list[1].worktree).toBeDefined()
+    expect((list[1] as StoredAgent).worktree).toBeDefined()
   })
 
   it('gives every agent its own terminal key, and a layout that shows them all', async () => {
@@ -723,7 +741,7 @@ describe('resumeRecord', () => {
     const { resumeRecord } = await import('../src/shared/defaults')
     expect(resumeRecord(P, { id: 'a4', lastSessionId: 'm2' }, records, new Set(['m2']), agents)?.id).toBe('m1')
     expect(resumeRecord(P, { id: 'a4', lastSessionId: 'w1' }, records, new Set(['m1', 'm2']), agents)).toBeNull()
-    expect(resumeRecord(P, { id: 'a2', worktree: { path: WT, branch: 'hive/agent-2', base: 'main' } }, records, new Set(), agents)?.id).toBe('w1')
+    expect(resumeRecord(P, { id: 'a2', worktree: { path: WT, branch: 'hive/agent-2', base: 'main' } } as StoredAgent, records, new Set(), agents)?.id).toBe('w1')
     expect(resumeRecord(P, { id: 'a4', lastSessionId: 'old' }, records, new Set(), agents)?.id).toBe('m2')
   })
 })

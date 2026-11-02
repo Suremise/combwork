@@ -1,50 +1,117 @@
-// A workspace's own settings through the catalog and the settings tools (#412): Settings → Workspace → Card loop rounds
-// and wait, kept in its workspace.json, and Project Settings → Card loops overriding them (null inherits).
+// A workspace's own settings through the catalog and the settings tools: since HI-1766 its card loops' rounds and wait
+// are its workflow defaults (Settings → Workspace's workflow defaults, None and Git), kept in its workspace.json, and a
+// project's own are its workflow options; an old `loops` moves into the defaults as the workspace is read.
 import { mkdirSync, readFileSync, rmSync, writeFileSync } from 'fs'
 import { join } from 'path'
 import { afterAll, describe, expect, it, vi } from 'vitest'
 import * as electron from 'electron'
-import { settingDefault, settingEntry, settingPatch, settingValue } from '../src/shared/settingsCatalog'
+import { settingDefault, settingEntry, settingPatch, settingPath, settingValue } from '../src/shared/settingsCatalog'
 import { DEFAULT_SETTINGS } from '../src/shared/defaults'
 import { tempDir } from './tempDir'
 
-describe('Settings → Workspace → Card loops (#412)', async () => {
+describe("a workspace's card loops, as its workflow defaults (#412, HI-1766)", async () => {
   const base = tempDir('hive-settings-ws-')
   ;(electron.app as unknown as { getPath: () => string }).getPath = () => join(base, 'profile')
   afterAll(() => rmSync(base, { recursive: true, force: true }))
   const { createWorkspaceService, disposeWorkspaceService, inWorkspace } = await import('../src/main/workspace')
   const { applySetting, entryOf, settingDetail, settingRows } = await import('../src/main/settingsTools')
 
-  it('the catalog: workspace values (10 and 6 by default) and project overrides that inherit', () => {
-    const rounds = settingEntry('workspace.loopRounds')!
-    const wait = settingEntry('workspace.loopWaitHours')!
-    expect([rounds.scope, wait.scope]).toEqual(['workspace', 'workspace'])
-    expect([settingDefault(rounds), settingDefault(wait)]).toEqual([10, 6])
-    expect(settingValue(rounds, DEFAULT_SETTINGS, null, { loops: { rounds: 4 } })).toBe(4)
-    expect(settingValue(wait, DEFAULT_SETTINGS, null, null)).toBe(6)
-    expect(settingPatch(wait, 3)).toEqual({ workspace: { waitHours: 3 } })
-    const own = settingEntry('project.loopRounds')!
+  it('the catalog: a level default for each platform that inherits, and a project option that inherits; the old rows are gone', () => {
+    const rounds = settingEntry('workspace.workflow.none.loopRounds')!
+    const wait = settingEntry('workspace.workflow.git.loopWaitHours')!
+    expect([rounds.type, wait.type, rounds.max, wait.max]).toEqual(['number', 'number', 50, 24])
+    expect([settingDefault(rounds), settingDefault(wait)]).toEqual(['inherit', 'inherit'])
+    expect(settingValue(rounds, DEFAULT_SETTINGS, null, { workflow: { none: { loopRounds: 4 } } })).toBe(4)
+    expect(settingPatch(wait, 3)).toEqual({ workflowLevel: { level: 'workspace', platform: 'git', key: 'loopWaitHours', value: 3 } })
+    const own = settingEntry('project.workflow.loopRounds')!
     expect(own.inherits).toBe(true)
-    expect(settingDefault(own)).toBeNull()
+    for (const gone of ['workspace.loopRounds', 'workspace.loopWaitHours', 'project.loopRounds', 'project.loopWakes', 'project.loopStepWaitMinutes', 'project.fileLocks', 'agents.fileLocks', 'project.workflow']) expect(settingEntry(gone)).toBeUndefined()
+    // The hidden workflow rows are the project's Version Control tab's, not a section of Project Settings.
+    expect(settingPath(own)).toBe('Version Control → Workflow → Rounds')
+    // The levels' rows are Settings → Version Control's two parts (HI-1768), their ids as before.
+    expect(settingPath(rounds)).toBe('Settings → Version Control → Workspace defaults → Rounds')
+    expect(settingPath(settingEntry('workflow.git.loopRounds')!)).toBe('Settings → Version Control → Hive defaults → Rounds')
+    expect(settingPath(settingEntry('workflow.git.slotCopy')!)).toBe('Settings → Version Control → Hive defaults → Files copied into new slots')
+    expect(settingPath(settingEntry('workspace.workflow.git.slotCopy')!)).toBe('Settings → Version Control → Workspace defaults → Files copied into new slots')
+    expect([settingEntry('workflow.workspaceDefaults')?.section, settingEntry('workspace.workflowDefaults')]).toEqual(['workflow', undefined])
   })
 
-  it('the settings tools read and change the open workspace’s, saved in its workspace.json', async () => {
+  it('the settings tools read and change the open workspace’s, saved in its workspace.json; an old loops is moved in, an override of the new kind kept', async () => {
     const path = join(base, 'ws')
     mkdirSync(join(path, 'alpha', '.hive'), { recursive: true })
+    mkdirSync(join(path, '.hive'), { recursive: true })
     writeFileSync(join(path, 'alpha', '.hive', 'project.json'), JSON.stringify({ version: 2, agents: [] }))
+    // Saved by a build from before HI-1766: Card loop rounds 4 and wait 2, and Git's wait already set the new way.
+    writeFileSync(join(path, '.hive', 'workspace.json'), JSON.stringify({ loops: { rounds: 4, waitHours: 2 }, workflow: { git: { loopWaitHours: 5 } } }))
     const w = createWorkspaceService()
     await w.open(path)
+    expect(w.config.workflow).toEqual({ none: { loopRounds: 4, loopWaitHours: 2 }, git: { loopRounds: 4, loopWaitHours: 5 } })
+    expect('loops' in w.config).toBe(false)
     await inWorkspace(w, async () => {
-      expect(settingRows({ query: 'card loop' }).find((r) => r.id === 'workspace.loopRounds')).toMatchObject({ value: '10' })
-      const changed = await applySetting(entryOf('workspace.loopRounds'), 7, null)
-      expect([changed.old, changed.new]).toEqual([10, 7])
-      await applySetting(entryOf('workspace.loopWaitHours'), '3', null)
-      expect(settingDetail(entryOf('workspace.loopWaitHours'), null)).toMatchObject({ value: '3', default: '6' })
-      expect(settingRows({ query: 'card loop' }).find((r) => r.id === 'workspace.loopRounds')).toMatchObject({ value: '7', default: '10' })
-      await expect(applySetting(entryOf('workspace.loopRounds'), 99, null)).rejects.toThrow(/1 to 50/)
+      // A plain listing folds the level defaults into one line; a query lists them.
+      expect(settingRows({ query: 'card loop rounds' }).find((r) => r.id === 'workspace.workflow.none.loopRounds')).toMatchObject({ value: '4' })
+      // A row's gist (#1312): the first sentence, cut at a word within 60 characters.
+      for (const r of settingRows({ query: 'compact' })) expect(r.desc.length <= 60 && !/[\s,;:]…$/.test(r.desc)).toBe(true)
+      expect(settingRows({ query: 'compact' }).find((r) => r.id === 'sessions.transcriptWarnMB')?.desc).toBe("Size, in MB, at which a running conversation's transcript…")
+      const changed = await applySetting(entryOf('workspace.workflow.none.loopRounds'), 7, null)
+      expect([changed.old, changed.new]).toEqual([4, 7])
+      await applySetting(entryOf('workspace.workflow.none.loopWaitHours'), '3', null)
+      // Its user guide heading by its id (#1535), given as the heading's text.
+      expect(settingDetail(entryOf('workspace.workflow.none.loopWaitHours'), null)).toMatchObject({ value: '3', default: 'inherit', docs: 'Hive and workspace defaults' })
+      await expect(applySetting(entryOf('workspace.workflow.none.loopRounds'), 99, null)).rejects.toThrow(/1 to 50/)
+      const inherit = await applySetting(entryOf('workspace.workflow.git.loopWaitHours'), null, null)
+      expect([inherit.old, inherit.new]).toEqual([5, 'inherit'])
     })
-    expect(JSON.parse(readFileSync(join(path, '.hive', 'workspace.json'), 'utf8')).loops).toEqual({ rounds: 7, waitHours: 3 })
+    const saved = JSON.parse(readFileSync(join(path, '.hive', 'workspace.json'), 'utf8'))
+    expect(saved.workflow).toEqual({ none: { loopRounds: 7, loopWaitHours: 3 }, git: { loopRounds: 4 } })
+    expect('loops' in saved).toBe(false)
     await disposeWorkspaceService(w)
+    // Read again: nothing moves twice, and nothing comes back.
+    const again = createWorkspaceService()
+    await again.open(path)
+    expect(again.config.workflow).toEqual(saved.workflow)
+    await disposeWorkspaceService(again)
+  })
+
+  it("a project with no workflow options yet and its card loops from before HI-1766: the settings tool and the form read them as its own, and Inherit from either keeps them inherited after reading again (HR5's round 1)", async () => {
+    const { setWorkflowOptions, workflowForm } = await import('../src/main/workflow/optionsForm')
+    const path = join(base, 'ws-legacy')
+    const old = { version: 2, platform: 'none', agents: [], loopRounds: 4, loopWakes: false, fileLocks: 'warn' }
+    const file = (p: string) => join(path, p, '.hive', 'project.json')
+    for (const p of ['tool', 'form']) {
+      mkdirSync(join(path, p, '.hive'), { recursive: true })
+      writeFileSync(file(p), JSON.stringify(old))
+    }
+    const w = createWorkspaceService()
+    await w.open(path)
+    const legacyKeys = (p: string) => ['loopRounds', 'loopWakes', 'fileLocks', 'loopWaitHours', 'loopStepWaitMinutes'].filter((k) => k in JSON.parse(readFileSync(file(p), 'utf8')))
+    await inWorkspace(w, async () => {
+      // The settings tool: it reads the old value the runtime uses, its change says so, and Inherit sticks.
+      const rounds = entryOf('project.workflow.loopRounds')
+      const tool = { name: 'tool', config: await w.projectConfig(join(path, 'tool')) }
+      expect(settingDetail(rounds, tool)).toMatchObject({ value: '4' })
+      const r = await applySetting(rounds, null, join(path, 'tool'))
+      expect([r.old, r.new]).toEqual([4, 'inherit'])
+      expect(legacyKeys('tool')).toEqual([])
+      expect(JSON.parse(readFileSync(file('tool'), 'utf8')).workflow.options).toEqual({ loopWakes: false, fileLocks: 'warn' })
+      // The form: its own options are the old ones; saved without the rounds, they stay inherited.
+      const form = await workflowForm(w, join(path, 'form'))
+      expect(form.own).toEqual({ loopRounds: 4, loopWakes: false, fileLocks: 'warn' })
+      const { loopRounds: _r, ...rest } = form.own
+      await setWorkflowOptions(w, join(path, 'form'), { preset: null, options: rest, base: { preset: form.preset, options: form.own } }, { applyTo: [] })
+      expect(legacyKeys('form')).toEqual([])
+      expect(JSON.parse(readFileSync(file('form'), 'utf8')).workflow.options).toEqual({ loopWakes: false, fileLocks: 'warn' })
+    })
+    await disposeWorkspaceService(w)
+    // Read again: nothing moves back.
+    const again = createWorkspaceService()
+    await again.open(path)
+    for (const p of ['tool', 'form']) {
+      const cfg = await again.projectConfig(join(path, p))
+      expect(cfg.workflow?.options, p).toEqual({ loopWakes: false, fileLocks: 'warn' })
+      expect('loopRounds' in cfg, p).toBe(false)
+    }
+    await disposeWorkspaceService(again)
   })
 
   it('advanced settings (#367): set in advanced.json or the workspace’s own, listed only when changed or asked for', async () => {
@@ -62,7 +129,8 @@ describe('Settings → Workspace → Card loops (#412)', async () => {
         // A plain listing: the advanced ones at their defaults are one line.
         const plain = settingRows({})
         expect(plain.filter((r) => r.id.startsWith('advanced.') && r.id !== 'advanced.showDeveloperFeatures')).toEqual([expect.objectContaining({ id: 'advanced.*', value: expect.stringMatching(/^\d+ more$/), title: 'query "advanced" lists them' })])
-        expect(settingRows({ query: 'advanced trust' }).map((r) => r.id)).toEqual(['advanced.claude-code.trust.prompt', 'advanced.codex.trust.prompt', 'advanced.copilot.trust.prompt'])
+        // Every trust-related advanced setting: each CLI's trust prompt, Claude Code's accounts field (HI-1870), Codex's per-launch trust (HI-1871), Codex's hook listing (HI-982: Hive trusts its hooks by its own hashes without it).
+        expect(settingRows({ query: 'advanced trust' }).map((r) => r.id)).toEqual(['advanced.claude-code.trust.prompt', 'advanced.claude-code.accounts.trustField', 'advanced.codex.trust.perLaunch', 'advanced.codex.trust.prompt', 'advanced.codex.hooks.listMethod', 'advanced.copilot.trust.prompt'])
         const changed = await applySetting(entryOf('advanced.hive.mcp.replySeconds'), 600, null)
         expect([changed.old, changed.new]).toEqual([300, 600])
         expect(JSON.parse(readFileSync(join(profile, 'advanced.json'), 'utf8')).values).toEqual({ 'hive.mcp.replySeconds': 600 })

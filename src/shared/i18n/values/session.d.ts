@@ -20,7 +20,10 @@ interface HiveMessageValues {
   'session.compact.already': undefined
   'session.compact.busy': undefined
   'session.compact.stopped': undefined
+  'session.compact.userTyped': undefined
   'session.compact.waiting': undefined
+  'session.connection.fallback': { why: string; wanted: string | number; name: string | number }
+  'session.connection.fallbackTitle': { agent: string | number }
   'session.error.agentGone': undefined
   'session.error.inUseElsewhere': undefined
   'session.error.noAgents': undefined
@@ -56,6 +59,8 @@ interface HiveMessageValues {
   'session.inUse.reserved': undefined
   'session.inUse.running': undefined
   'session.inUse.writing': undefined
+  'session.keyRefused.body': { name: string | number }
+  'session.keyRefused.title': { n: number; agent: string | number; name: string | number }
   'session.leftovers.body': { processes: string | number; n: number }
   'session.leftovers.end': undefined
   'session.leftovers.keep': undefined
@@ -81,6 +86,7 @@ interface HiveMessageValues {
   'session.mergeSlot.waitingNext': { agent: string | number }
   'session.mergeSlot.waitingNextCards': { agent: string | number; cards: string | number }
   'session.mode.asking': undefined
+  'session.mode.assistantCliOwn': undefined
   'session.mode.ended': { mode: string | number }
   'session.mode.endedUnconfirmed': { provider: string | number; mode: string | number }
   'session.mode.notFound': { what: string | number; mode: string | number }
@@ -105,6 +111,9 @@ interface HiveMessageValues {
   'session.newConversation.pending': undefined
   'session.notice.finished': { agent: string | number }
   'session.notice.finishedBody': undefined
+  'session.notice.hooksMissingTitle': { agent: string | number }
+  'session.notice.lineLost': { text: string | number }
+  'session.notice.lineLostTitle': { agent: string | number }
   'session.notice.longConversation': { agent: string | number }
   'session.notice.needsInput': { agent: string | number }
   'session.notice.notWatching': { agent: string | number; cards: string | number }
@@ -117,9 +126,14 @@ interface HiveMessageValues {
   'session.notice.untakenRetried': undefined
   'session.notice.untakenTitle': { agent: string | number }
   'session.notice.waitingForInput': undefined
+  'session.orphan.body': { pid: string | number }
+  'session.orphan.title': { agent: string | number; command: string | number; time: string | number }
   'session.plan.asking': undefined
   'session.plan.noToggle': { provider: string | number }
   'session.plan.typing': undefined
+  'session.prompt.cliAsks': undefined
+  'session.prompt.inputBlocked': undefined
+  'session.prompt.inputNotCleared': undefined
   'session.prompt.untaken': undefined
   'session.purge.changed': undefined
   'session.purge.cliBack': undefined
@@ -129,6 +143,7 @@ interface HiveMessageValues {
   'session.purge.reading': undefined
   'session.purge.running': undefined
   'session.purge.unread': undefined
+  'session.restartMode.didntStop': { agent: string | number }
   'session.setup.failed': { code: string | number }
   'session.setup.failedTitle': { project: string | number; agent: string | number }
   'session.signIn.again': { provider: string | number }
@@ -142,14 +157,15 @@ interface HiveMessageValues {
   'session.start.alreadyRunning': undefined
   'session.start.anotherAgent': undefined
   'session.start.archived': undefined
-  'session.start.args': { problem: string | number; provider: string | number }
-  'session.start.argsAssistant': { problem: string | number }
+  'session.start.args': { problem: string | number; connection: string | number }
   'session.start.beingOpened': undefined
   'session.start.cleaning': undefined
   'session.start.cliRequired': { provider: string | number }
   'session.start.closing': undefined
   'session.start.couldNot': { agent: string | number }
   'session.start.fenced': { why: string | number }
+  'session.start.moveFailed': { project: string | number; error: string | number }
+  'session.start.openCommands': undefined
   'session.start.openIn': { agent: string | number }
   'session.start.otherFolder': { folder: string | number }
   'session.start.projectRunning': undefined
@@ -157,6 +173,9 @@ interface HiveMessageValues {
   'session.start.providerOff': { provider: string | number; resuming: string; agent: string | number }
   'session.start.removing': undefined
   'session.start.repairing': undefined
+  'session.start.slotBusy': { slot: string | number; agent: string | number }
+  'session.start.slotChanged': { slot: string | number; agent: string | number }
+  'session.start.slotSetup': { slot: string | number; agent: string | number }
   'session.start.subSession': { kind: string | number; provider: string | number }
   'session.start.turnedOff': { provider: string | number; agent: string | number }
   'session.start.worktreeMissing': { agent: string | number; folder: string | number }
@@ -171,13 +190,21 @@ interface HiveMessageValues {
   'session.state.working': undefined
   'session.status.asksAtStart': undefined
   'session.status.asksTrust': undefined
+  'session.status.cliAsks': { provider: string | number; question: string | number }
   'session.status.compacting': undefined
+  'session.status.connectionKeepsDropping': undefined
+  'session.status.connectionNotBack': undefined
+  'session.status.failedTurn': undefined
+  'session.status.inputBlocked': undefined
   'session.status.safeguardAsks': { provider: string | number }
   'session.status.safeguardAsksTools': { provider: string | number; tools: string | number }
   'session.status.safeguardIdle': undefined
   'session.status.settingUp': { command: string | number }
   'session.status.signedInAgain': undefined
   'session.status.tasksDropped': { minutes: number }
+  'session.status.waitingForConnection': undefined
+  'session.switch.waits': { why: string | number }
+  'session.switch.waitsTitle': { agent: string | number; slot: string | number }
   'session.tracker.body': { reason: string | number; detail: string | number }
   'session.tracker.detail': undefined
   'session.tracker.helperFailed': { why: string | number }

@@ -1,11 +1,12 @@
 import { msg, tr } from '@shared/i18n'
 import type { ArchiveResult } from '@shared/types'
 import { call, errorMessage } from './api'
-import { loadTasks, notify, pushToast } from './store'
+import { cardLabelOf, get, loadTasks, notify, pushToast } from './store'
+import { resolveLocal } from './entryConditions'
 
-/** "#3, #4, #5", or the first six and how many more. */
+/** "AM-3, AM-4, #5" (by key where they have one), or the first six and how many more. */
 function numbers(ns: number[]): string {
-  const shown = ns.slice(0, 6).map((n) => `#${n}`).join(', ')
+  const shown = ns.slice(0, 6).map((n) => cardLabelOf(get(), n)).join(', ')
   return ns.length > 6 ? tr(msg({ id: 'board.batch.andMore', defaultMessage: '{cards} and {n, number} more', description: 'Cards that could not be brought back from an archive, cut short: the first six card numbers ({cards}: "#3, #4") and how many more ({n}).' }), { cards: shown, n: ns.length - 6 }) : shown
 }
 
@@ -19,7 +20,7 @@ export function reportArchived(r: ArchiveResult): void {
         n: r.skipped.length,
         why: `${r.skipped
           .slice(0, 4)
-          .map((s) => `#${s.number} ${s.why}`)
+          .map((s) => `${cardLabelOf(get(), s.number)} ${s.why}`)
           .join('; ')}${r.skipped.length > 4 ? '; …' : ''}`
       })
     : undefined
@@ -29,7 +30,9 @@ export function reportArchived(r: ArchiveResult): void {
     level: 'success',
     title: tr(msg({ id: 'board.batch.archived', defaultMessage: 'Archived {n, plural, one {# card} other {# cards}}', description: "A notification's title after Archive All: how many cards it archived. It has an Undo button." }), { n: r.archived.length }),
     message: left,
-    actions: [{ label: tr(msg({ id: 'board.batch.undo', defaultMessage: 'Undo', description: 'Button on the notification after Archive All: brings the archived cards back.' })), command: 'task.undoArchive', args: [r.batch.id] }],
+    // Its Undo names its workspace (HI-2320): pressed while this window shows another, it is refused. What it did is
+    // its own result (unarchiveBatch), checked by main card by card; no live check meanwhile (the Assistant's scope).
+    actions: [{ label: tr(msg({ id: 'board.batch.undo', defaultMessage: 'Undo', description: 'Button on the notification after Archive All: brings the archived cards back.' })), command: 'task.undoArchive', args: [r.batch.id, get().workspace?.path ?? ''] }],
     timestamp: new Date().toISOString(),
     timeoutMs: 10_000
   })
@@ -39,7 +42,12 @@ export function reportArchived(r: ArchiveResult): void {
  * Brings a batch back (Undo, "Unarchive this batch") and says how it went: cards that couldn't come back stay archived
  * with the batch, which is kept so another try brings them. Returns whether every card came back.
  */
-export async function unarchiveBatch(id: string): Promise<boolean> {
+export async function unarchiveBatch(id: string, workspacePath?: string): Promise<boolean> {
+  // From its notice, for its own workspace only (HI-2320): another shown here now, nothing is done.
+  if (workspacePath && workspacePath.toLowerCase() !== (get().workspace?.path ?? '').toLowerCase()) {
+    resolveLocal(`archived-${id}`, tr(msg({ id: 'board.batch.otherWorkspace', defaultMessage: "This archive is another workspace's: undo it there, from its Archived view", description: "What the notification after Archive All says when its Undo is pressed while the window shows another workspace (HI-2320): nothing was brought back. Archived is the archive's view: use its translation." })))
+    return false
+  }
   try {
     const { restored, failed } = await call('tasks:unarchiveBatch', id)
     await loadTasks()
@@ -53,7 +61,11 @@ export async function unarchiveBatch(id: string): Promise<boolean> {
       )
       return false
     }
-    notify('success', tr(msg({ id: 'board.batch.broughtBack', defaultMessage: 'Brought back {n, plural, one {# card} other {# cards}}', description: "A notification's title: unarchiving a batch brought all its cards back to the board." }), { n: restored.length }))
+    const done = tr(msg({ id: 'board.batch.broughtBack', defaultMessage: 'Brought back {n, plural, one {# card} other {# cards}}', description: "A notification's title: unarchiving a batch brought all its cards back to the board." }), { n: restored.length })
+    // From its Archived n cards notice's Undo (HI-2320): that notice says so, in place of its button; else its own notice.
+    const entry = `archived-${id}`
+    if (get().notifications.some((t) => t.id === entry && !t.resolved)) resolveLocal(entry, done)
+    else notify('success', done)
     return true
   } catch (e) {
     notify('error', tr(msg({ id: 'board.batch.backFailed', defaultMessage: 'Could not bring the batch back', description: "An error's title: unarchiving a batch of cards failed." })), errorMessage(e))

@@ -1,5 +1,7 @@
 // Merge… with the repo's own .gitattributes: two worktree branches that each add a CHANGELOG entry at the top of
 // Unreleased merge one after the other with no conflict (merge-tree's check and both kinds of merge), both entries kept.
+// And #1347: a dirty worktree is refused (never committed for it), the merge commit is returned, and a target the
+// project folder hasn't checked out is merged without touching a folder.
 import { execFileSync } from 'child_process'
 import { copyFileSync, readFileSync, rmSync, writeFileSync } from 'fs'
 import { join } from 'path'
@@ -40,11 +42,86 @@ describe('merging CHANGELOG entries from two branches', () => {
   for (const squash of [false, true]) {
     it(`keeps both, with no conflict (${squash ? 'squash' : 'merge commit'})`, async () => {
       const { project, a, b } = await twoBranches()
-      expect(await mergeWorktree(project, a, { squash, message: 'A' })).toEqual({ ok: true })
-      expect(await mergeWorktree(project, b, { squash, message: 'B' })).toEqual({ ok: true })
+      const first = await mergeWorktree(project, a, { squash, message: 'A' })
+      expect(first).toEqual({ ok: true, mergeCommit: run(project, 'rev-parse', 'HEAD').trim() })
+      expect(await mergeWorktree(project, b, { squash, message: 'B' })).toEqual({ ok: true, mergeCommit: run(project, 'rev-parse', 'HEAD').trim() })
       const text = readFileSync(join(project, 'CHANGELOG.md'), 'utf8')
       expect(text).toContain('- Entry from A.\n- Entry from B.\n- Earlier entry.\n')
       expect(run(project, 'status', '--porcelain')).toBe('')
     })
   }
+})
+
+describe('mergeWorktree (#1347)', () => {
+  it('refuses a worktree with uncommitted files, counted, committing nothing', async () => {
+    const { project, a } = await twoBranches()
+    writeFileSync(join(a.path, 'loose.txt'), 'x')
+    writeFileSync(join(a.path, 'CHANGELOG.md'), 'changed')
+    const tip = run(a.path, 'rev-parse', 'HEAD')
+    const main = run(project, 'rev-parse', 'main')
+    const r = await mergeWorktree(project, a, { squash: false, message: 'A' })
+    expect(r).toMatchObject({ ok: false, uncommitted: 2 })
+    expect(r.error).toBe("Nothing was merged: 2 files in the worktree aren't committed. Commit or stash them in the worktree, then merge.")
+    expect(run(a.path, 'rev-parse', 'HEAD')).toBe(tip)
+    expect(run(project, 'rev-parse', 'main')).toBe(main)
+    expect(run(a.path, 'status', '--porcelain')).not.toBe('')
+  })
+
+  for (const squash of [false, true]) {
+    it(`merges into a target checked out nowhere, leaving the project folder as it is (${squash ? 'squash' : 'merge commit'})`, async () => {
+      const { project, a } = await twoBranches()
+      run(project, 'branch', 'release')
+      run(project, 'commit', '-q', '--allow-empty', '-m', 'main moves on')
+      const head = run(project, 'rev-parse', 'HEAD')
+      const r = await mergeWorktree(project, a, { squash, message: 'into release', target: 'release' })
+      const release = run(project, 'rev-parse', 'release').trim()
+      expect(r).toEqual({ ok: true, mergeCommit: release })
+      expect(run(project, 'log', '-1', '--format=%P', 'release').trim().split(' ')).toHaveLength(squash ? 1 : 2)
+      expect(run(project, 'show', 'release:CHANGELOG.md')).toContain('- Entry from A.')
+      expect(run(project, 'rev-parse', 'HEAD')).toBe(head)
+      expect(run(project, 'status', '--porcelain')).toBe('')
+    })
+  }
+
+  it('refuses a target checked out in another folder, and a target that does not exist', async () => {
+    const { project, a, b } = await twoBranches()
+    const r = await mergeWorktree(project, a, { squash: false, message: 'A', target: b.branch })
+    expect(r.ok).toBe(false)
+    expect(r.error).toContain(`${b.branch} is checked out in`)
+    expect(await mergeWorktree(project, a, { squash: false, message: 'A', target: 'nope' })).toEqual({ ok: false, error: 'There is no branch nope to merge into.' })
+  })
+
+  // HR6's round 1: on Windows a ref named in another case is the same branch, so it is routed as that branch.
+  it('a target named in another case is that branch: merged in its folder, or refused, never a bare ref move', async () => {
+    const { project, a, b } = await twoBranches()
+    const merged = await mergeWorktree(project, a, { squash: false, message: 'A', target: 'MAIN' })
+    expect(merged).toEqual({ ok: true, mergeCommit: run(project, 'rev-parse', 'main').trim() })
+    expect(readFileSync(join(project, 'CHANGELOG.md'), 'utf8')).toContain('- Entry from A.')
+    expect(run(project, 'status', '--porcelain')).toBe('')
+    const tipB = run(project, 'rev-parse', b.branch)
+    const elsewhere = await mergeWorktree(project, a, { squash: false, message: 'A', target: b.branch.toUpperCase() })
+    expect(elsewhere.ok).toBe(false)
+    expect(elsewhere.error).toContain(`${b.branch} is checked out in`)
+    expect(run(project, 'rev-parse', b.branch)).toBe(tipB)
+    expect(await mergeWorktree(project, a, { squash: false, message: 'A', target: a.branch.toUpperCase() })).toEqual({ ok: false, error: `${a.branch} can't be merged into itself.` })
+  })
+
+  it('finds conflicts with a target checked out nowhere, and changes nothing', async () => {
+    const { project, a } = await twoBranches()
+    run(project, 'branch', 'release')
+    run(project, 'checkout', '-q', 'release')
+    // Not CHANGELOG.md: the repo's .gitattributes merges it by union, so it never conflicts.
+    writeFileSync(join(project, 'notes.txt'), 'release\n')
+    run(project, 'add', '-A')
+    run(project, 'commit', '-qm', 'release')
+    run(project, 'checkout', '-q', 'main')
+    writeFileSync(join(a.path, 'notes.txt'), 'a\n')
+    run(a.path, 'add', '-A')
+    run(a.path, 'commit', '-qm', 'a notes')
+    run(project, 'checkout', '-q', 'release')
+    run(project, 'checkout', '-q', 'main')
+    const release = run(project, 'rev-parse', 'release')
+    expect(await mergeWorktree(project, a, { squash: true, message: 'A', target: 'release' })).toEqual({ ok: false, conflicts: ['notes.txt'] })
+    expect(run(project, 'rev-parse', 'release')).toBe(release)
+  })
 })

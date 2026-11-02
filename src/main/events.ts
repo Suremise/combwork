@@ -1,6 +1,6 @@
 import type { BrowserWindow } from 'electron'
 import { randomUUID } from 'crypto'
-import type { HiveEvent, ToastAction, ToastLevel, ToastMessage } from '../shared/types'
+import type { HiveEvent, ToastAction, ToastLevel, ToastMessage, ToastTarget } from '../shared/types'
 
 /**
  * Where events and terminal output go. With several windows, each shows one workspace: an event about a
@@ -51,15 +51,28 @@ export function sendPty(channel: 'pty:data' | 'pty:exit', key: string, payload: 
   send(router.forPty(key), channel, key, payload)
 }
 
-/** A message for the Notifications panel only (the bell's history), not shown as a toast: a notice told by routeAppNotice. */
-export function logNotice(level: ToastLevel, title: string, message?: string): ToastMessage {
-  const t: ToastMessage = { id: randomUUID(), level, title, message, timestamp: new Date().toISOString(), quiet: true }
-  emit({ type: 'toast', toast: t })
-  return t
+/** What toast() hands its message to: main/notify.ts tell() (HI-2320: one way to tell the user), set as it loads. */
+export type ToastTeller = (t: { level: ToastLevel; title: string; message?: string; actions?: ToastAction[]; source?: string; target?: ToastTarget; offer?: string; timeoutMs?: number; id?: string }) => { id: string; entry?: ToastMessage }
+
+let teller: ToastTeller | null = null
+
+export function setToastTeller(t: ToastTeller): void {
+  teller = t
 }
 
-export function toast(level: ToastLevel, title: string, message?: string, actions?: ToastAction[], source?: string): ToastMessage {
-  const t: ToastMessage = { id: randomUUID(), level, title, message, actions, source, timestamp: new Date().toISOString() }
+/**
+ * Hive's own message, by its level (warning or error: a warning, else a result; shared/notify.ts), told by tell():
+ * a pop-up in the window the user is using, else in the one `source` (a path) names, else the last focused.
+ * `target`: what a click on it opens (HI-1961: an agent's pane, a card). `offer`: what its buttons act on, so taking
+ * or losing it resolves this entry alone (main/notify.ts resolveOffer). Returns it (nothing shown when routed nowhere).
+ */
+export function toast(level: ToastLevel, title: string, message?: string, actions?: ToastAction[], source?: string, target?: ToastTarget, extra?: { offer?: string; timeoutMs?: number; id?: string }): ToastMessage {
+  if (teller) {
+    const told = teller({ level, title, message, actions, source, target, ...extra })
+    return told.entry ?? { id: told.id, level, title, message, actions, ...(target ? { target } : {}), source, timestamp: new Date().toISOString() }
+  }
+  // Before notify.ts has loaded (never in Hive itself): straight to the windows.
+  const t: ToastMessage = { id: extra?.id ?? randomUUID(), level, title, message, actions, ...(target ? { target } : {}), source, timestamp: new Date().toISOString() }
   emit({ type: 'toast', toast: t })
   return t
 }

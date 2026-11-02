@@ -13,7 +13,16 @@ afterEach(() => vi.useRealTimers())
 
 // What Hive types into agents' terminals, recorded instead (no process runs).
 const typed = vi.hoisted(() => [] as { key: string; data: string }[])
-vi.mock('../src/main/ptyHost', async (original) => ({ ...(await original<object>()), writePty: (key: string, data: string) => typed.push({ key, data }) }))
+// Run as each key is written (a test acting at that moment, as the user typing then).
+const hooks = vi.hoisted(() => ({ onWrite: null as null | ((key: string, data: string) => void) }))
+vi.mock('../src/main/ptyHost', async (original) => ({
+  ...(await original<object>()),
+  writePty: (key: string, data: string) => {
+    typed.push({ key, data })
+    hooks.onWrite?.(key, data)
+  }
+}))
+const { claudeInput } = await import('./claudeInputStandIn')
 
 const claudeFailure = async (): Promise<RegExp | null> => (await import('../src/main/providers/claude/adapter')).claudeCode.compactFailure
 
@@ -150,19 +159,27 @@ describe('SessionManager.compact: typing the /compact', () => {
   const project = join(ws, 'proj')
   const FOCUS = 'x'.repeat(24_000) // 3,000 pieces of 8 every 10 ms: about 30 s, longer than BEGIN_MS
 
-  /** A running Claude Code agent, idle, as SessionManager keeps it (no process: what is typed is recorded). */
-  async function running(runId = 'run-1') {
+  /**
+   * A running Claude Code agent, idle, as SessionManager keeps it (no process: what is typed is recorded). Its input is
+   * Claude Code's box (claudeInputStandIn, fed what is typed into it: HI-1979, Hive types into it only once a key of its
+   * own shows it empty), holding `draft`; or a screen that only ever shows `shows`.
+   */
+  async function running(runId = 'run-1', { draft = '', shows }: { draft?: string; shows?: string } = {}) {
     const { sessions } = await import('../src/main/sessions')
     const { claudeCode } = await import('../src/main/providers/claude/adapter')
     const live = (sessions as unknown as { live: Map<string, unknown> }).live
     const state = { provider: 'claude', runId, projectPath: project, agentId: 'a1', cwd: project, sessionId: '', status: 'ready' as SessionStatus, statusMessage: undefined as string | undefined, startedAt: '', launchSignature: '', unseen: false }
-    const l = { state, adapter: claudeCode, transcriptMtime: '', defaultModel: false, modeTail: '', launchMode: null, configuredMode: null } as { state: typeof state; compacting?: Compaction }
+    const input = claudeInput({ draft, paste: false })
+    input.from(() => typed.filter((t) => t.key === `session:${project.toLowerCase()}#a1`).map((t) => t.data))
+    const screen = shows === undefined ? input.screen : { text: () => shows, textWithoutDim: () => shows, bracketedPaste: () => false }
+    const l = { state, adapter: claudeCode, screen, transcriptMtime: '', defaultModel: false, modeTail: '', launchMode: null, configuredMode: null } as { state: typeof state; compacting?: Compaction }
     live.set(`${project.toLowerCase()}#a1`, l)
-    return { sessions, live, l, state }
+    return { sessions, live, l, state, input }
   }
 
   beforeEach(async () => {
     typed.length = 0
+    hooks.onWrite = null
     const { createWorkspaceService, disposeWorkspaceService } = await import('../src/main/workspace')
     const w = createWorkspaceService()
     w.path = ws
@@ -185,13 +202,62 @@ describe('SessionManager.compact: typing the /compact', () => {
     // Typed in full, then submitted.
     while (!submitted()) await vi.advanceTimersByTimeAsync(10)
     await compact
-    expect(typed.map((t) => t.data).join('')).toBe(`\x15/compact ${FOCUS}\r`)
+    expect(typed.map((t) => t.data).join('')).toBe(`x\x7f/compact ${FOCUS}\r`)
     // The CLI never begins it: BEGIN_MS from the submission (within the last 10 ms), not from the start of typing.
     await vi.advanceTimersByTimeAsync(BEGIN_MS - 20)
     expect([state.status, !!l.compacting]).toEqual(['working', true])
     await vi.advanceTimersByTimeAsync(20)
     expect([state.status, state.statusMessage, l.compacting]).toEqual(['ready', undefined, undefined])
     expect(vi.getTimerCount()).toBe(0)
+  })
+
+  it("Settings → Advanced's draft switch (#1286): on, Ctrl+U clears the CLI's input first; off, none", async () => {
+    const { advanced } = await import('../src/main/advanced')
+    const { PROMPT_CLEAR_DRAFT } = await import('../src/shared/advanced')
+    const { sessions } = await running()
+    const get = advanced.get.bind(advanced)
+    for (const clear of [true, false]) {
+      typed.length = 0
+      const spy = vi.spyOn(advanced, 'get').mockImplementation(((id: string, own?: Record<string, unknown> | null) => (id === PROMPT_CLEAR_DRAFT ? clear : get(id, own))) as typeof advanced.get)
+      try {
+        const compact = sessions.compact(project, 'short', 'a1')
+        while (typed.at(-1)?.data !== '\r') await vi.advanceTimersByTimeAsync(10)
+        await compact
+      } finally {
+        spy.mockRestore()
+      }
+      expect(typed.map((t) => t.data).join(''), `clear ${clear}`).toBe(`${clear ? 'x\x7f' : ''}/compact short\r`)
+      // Ended as the CLI never begins it, so the next one can start.
+      await vi.advanceTimersByTimeAsync(BEGIN_MS + 100)
+    }
+  })
+
+  it("Claude Code's input box not seen empty (HI-1979): Compact is refused after one Ctrl+U, and /compact isn't typed", async () => {
+    const { sessions, l, state } = await running('run-1', { shows: 'no input box on this screen' })
+    const compact = sessions.compact(project, 'short', 'a1')
+    const failed = expect(compact).rejects.toThrow(/couldn't be seen empty/)
+    await vi.advanceTimersByTimeAsync(5_000)
+    await failed
+    expect(typed.map((t) => t.data)).toEqual(['\x15'])
+    // Nothing is left reserved: the agent is as it was, and the next Compact can start.
+    expect([state.status, l.compacting]).toEqual(['ready', undefined])
+  })
+
+  it("the user typing as Compact clears the input (HI-1979, HR6's round 1): no more keys, /compact isn't typed, what's left of the draft stays", async () => {
+    const { sessions, l, state, input } = await running('run-1', { draft: `${'a draft of two rows, '.repeat(4)}end` })
+    // They type as the first Ctrl+U goes in.
+    hooks.onWrite = (key, data) => {
+      if (data !== '\x15') return
+      hooks.onWrite = null
+      sessions.noteUserInput(key, 'y')
+    }
+    const compact = sessions.compact(project, 'short', 'a1')
+    const failed = expect(compact).rejects.toThrow(/You typed in the agent's terminal/)
+    await vi.advanceTimersByTimeAsync(5_000)
+    await failed
+    expect(typed.map((t) => t.data)).toEqual(['\x15'])
+    expect(input.input.text, "the draft's first row").toBe('a draft of two rows, '.repeat(4).slice(0, 58))
+    expect([state.status, l.compacting]).toEqual(['ready', undefined])
   })
 
   it('while Hive types a prompt into the agent, Compact is refused (the two would mix)', async () => {

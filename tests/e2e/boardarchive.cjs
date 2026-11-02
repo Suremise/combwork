@@ -49,10 +49,13 @@ const check = (name, ok, extra = '') => {
   await page.locator('.board-toolbar label', { hasText: 'Archived (35)' }).click()
   const table = page.locator('.archived-cards')
   const rows = table.locator('tbody tr.clickable')
-  const numbers = () => rows.evaluateAll((trs) => trs.map((tr) => Number(tr.querySelector('.task-number')?.textContent?.replace('#', ''))))
+  const numbers = () => rows.evaluateAll((trs) => trs.map((tr) => Number(tr.querySelector('.task-number')?.getAttribute('data-task'))))
+  // A card as the table names it (#1221): its key.
+  const label = (n) => made.find((c) => c.number === n)?.key ?? `#${n}`
   check('Archived shows the archived cards as a table', !!(await until(async () => (await rows.count()) > 0, HUNG_MS)))
   const headers = await table.locator('thead tr').first().locator('th').allInnerTexts()
   check('with its columns: number, title, project, labels, agent, from, archived, created', JSON.stringify(headers.map((h) => h.trim().toUpperCase())) === JSON.stringify(['', '#', 'TITLE', 'PROJECT', 'LABELS', 'AGENT', 'FROM', 'ARCHIVED', 'CREATED', '']), JSON.stringify(headers))
+  check('its cards are named by key (#1221)', (await rows.first().locator('.task-number').innerText()) === made[34].key && /^[A-Z]{2,4}-\d+$/.test(made[34].key ?? ''), await rows.first().locator('.task-number').innerText())
   check('a page of 20, newest archived first', (await rows.count()) === 20 && (await numbers())[0] === made[34].number && (await numbers())[1] === made[33].number, JSON.stringify(await numbers()))
   check('the pages say where they are', /1–20 of 35/.test(await table.locator('.table-range').innerText()) && /Page 1 of 2/.test(await table.locator('.table-page').innerText()))
   await page.screenshot({ path: path.join(lib.WORK, 'boardarchive-dark.png') })
@@ -80,8 +83,8 @@ const check = (name, ok, extra = '') => {
   await filter('Labels').selectOption('ui')
   check('a card shows for any of its labels', !!(await until(async () => (await numbers()).length === 7, HUNG_MS)), JSON.stringify(await numbers()))
   await filter('Labels').selectOption('')
-  await filter('From').selectOption({ label: 'Passed' })
-  check('a choice of the column it was archived from, by its name', !!(await until(async () => (await numbers()).length === 6 && (await rows.allInnerTexts()).every((t) => t.includes('Passed')), HUNG_MS)), JSON.stringify(await numbers()))
+  await filter('From').selectOption({ label: 'Approved' })
+  check('a choice of the column it was archived from, by its name', !!(await until(async () => (await numbers()).length === 6 && (await rows.allInnerTexts()).every((t) => t.includes('Approved')), HUNG_MS)), JSON.stringify(await numbers()))
   await filter('From').selectOption('')
   await filter('#').fill('#1')
   check('a text filter on the number', !!(await until(async () => (await numbers()).every((n) => String(n).startsWith('1')), HUNG_MS)))
@@ -99,7 +102,7 @@ const check = (name, ok, extra = '') => {
   // A row opens its card (archived: read-only, with Bring Back). The table is sorted by number, lowest first, now.
   const firstShown = (await numbers())[0]
   await rows.first().click()
-  const dialog = page.locator('.dialog', { hasText: `#${firstShown}` })
+  const dialog = page.locator('.dialog', { hasText: label(firstShown) })
   check('a row opens its card', !!(await until(async () => (await dialog.count()) === 1, 5000)) && /Archived/.test(await dialog.innerText()))
   await page.keyboard.press('Escape')
   await until(async () => (await dialog.count()) === 0, 5000)
@@ -118,7 +121,7 @@ const check = (name, ok, extra = '') => {
   // doesn't open it.
   const keyCard = made[10]
   const keyRow = async () => rows.nth((await numbers()).indexOf(keyCard.number))
-  const keyDialog = page.locator('.dialog', { hasText: `#${keyCard.number}` })
+  const keyDialog = page.locator('.dialog', { hasText: label(keyCard.number) })
   for (const key of ['Enter', ' ']) {
     await (await keyRow()).focus()
     await page.keyboard.press(key)
@@ -133,7 +136,7 @@ const check = (name, ok, extra = '') => {
 
   // Select several, Unarchive Selected.
   const picks = [made[1], made[2], made[3]]
-  for (const c of picks) await table.getByLabel(`Select #${c.number}`, { exact: true }).check()
+  for (const c of picks) await table.getByLabel(`Select ${label(c.number)}`, { exact: true }).check()
   const bulk = page.getByRole('button', { name: /Unarchive Selected \(3\)/ })
   check('the selection is counted', (await bulk.count()) === 1 && /3 selected/.test(await page.locator('.task-archive-actions').innerText()))
   await bulk.click()

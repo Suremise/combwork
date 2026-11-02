@@ -1,7 +1,9 @@
 // The e2e runner's decisions, kept pure so tests/e2esuites.test.ts can check them without running suites: what the
 // command line asks for (parseArgs), which suites that is (selectSuites), and whether a run record can be trusted
 // (recordStatus). run.mjs does the running.
+import { existsSync, readdirSync, readFileSync, statSync } from 'fs'
 import { createRequire } from 'module'
+import { join, posix } from 'path'
 
 const { exitText } = createRequire(import.meta.url)('./windowsExits.cjs')
 
@@ -15,11 +17,108 @@ export const LANG_SUITE = 'i18nshots'
  * --lang run photographed (#899: about 370 screenshots and 35 MB each, with the reports beside them).
  */
 export const keepLimits = (name, lang = []) => (name === LANG_SUITE && lang.length ? { maxFiles: 100 + 450 * lang.length, maxTotal: (20 + 60 * lang.length) * 1024 * 1024 } : {})
+/**
+ * How long a suite may run before the runner stops it: 10 minutes, but 6 a language for a --lang run of more than one
+ * (HI-2159: a language takes about 3 minutes, so a seven-language run reached four in 10).
+ */
+export const suiteLimitMs = (name, lang = []) => Math.max(10, name === LANG_SUITE ? 6 * lang.length : 0) * 60_000
 /** A language tag as --lang takes it (pl, pt-BR, en-XA); whether Hive has the language, the suite checks by starting it. */
 const LANG_TAG = /^[a-z]{2,3}(?:-[a-z0-9]{2,8})*$/i
 
 /** Whether a suite starts a real CLI (Claude Code, or Codex in its test home): the real tier, opt-in with --real. */
 export const isRealCli = (s) => (s.needs ?? []).some((n) => n === 'claude' || n === 'codex')
+
+/**
+ * The HIVE_TEST_ seams a packaged Hive ignores (src/main reads them in unpackaged builds only, #1591): a suite needing
+ * one tests the dev build's behaviour. tests/e2esuites.test.ts checks every HIVE_TEST_ name src reads is here, in
+ * or in PACKAGED_SEAMS.
+ */
+export const DEV_SEAMS = [
+  'HIVE_TEST_ANTIVIRUS', 'HIVE_TEST_ANTIVIRUS_LOG', 'HIVE_TEST_BLOCK_IPC', 'HIVE_TEST_BOARD_UPGRADE', 'HIVE_TEST_CLI_HOME_CONNECTION', 'HIVE_TEST_CLI_LOG', 'HIVE_TEST_DAY_MS', 'HIVE_TEST_DECISION_SETTLE_MS',
+  'HIVE_TEST_DELIVERY_OVERDUE_MS', 'HIVE_TEST_DETECT_WAIT_MS', 'HIVE_TEST_DROP_HOOKS', 'HIVE_TEST_FAIL_IPC', 'HIVE_TEST_FLIGHT_AFTER_MS',
+  'HIVE_TEST_HOLD_DRAIN', 'HIVE_TEST_HOLD_MERGE_RECOVERY', 'HIVE_TEST_HOLD_TRUST', 'HIVE_TEST_HOLD_TYPED','HIVE_TEST_HOOKS_HOLD', 'HIVE_TEST_IDLE', 'HIVE_TEST_INSTALL_DIR', 'HIVE_TEST_JOB_KILL_FAILS', 'HIVE_TEST_LOG_DIRECT', 'HIVE_TEST_LOOP_GRACE_MS',
+  'HIVE_TEST_MCP_LOG', 'HIVE_TEST_MERGE_CHOICE_CRASH', 'HIVE_TEST_MERGE_HOLD_MS', 'HIVE_TEST_MERGE_SLOT_LOG', 'HIVE_TEST_ORPHAN_MS', 'HIVE_TEST_ORPHAN_POLL_MS', 'HIVE_TEST_PROCESS_TRACKER', 'HIVE_TEST_QUEUE_CRASH',
+  'HIVE_TEST_QUEUE_RACE', 'HIVE_TEST_QUEUE_RETURNS', 'HIVE_TEST_REGISTRY_PATH', 'HIVE_TEST_RELAUNCH_LOG', 'HIVE_TEST_RESOURCES', 'HIVE_TEST_RUN_ON_CLOSE', 'HIVE_TEST_SILENT_MS',
+  'HIVE_TEST_SLOT_CRASH', 'HIVE_TEST_SLOT_MIGRATION', 'HIVE_TEST_SLOW_DETECT', 'HIVE_TEST_SYSTEM_BROKER', 'HIVE_TEST_SYSTEM_BROKER_ACTIVE', 'HIVE_TEST_SLOW_IPC', 'HIVE_TEST_SLOW_LOG_MS', 'HIVE_TEST_STALL_QUIET_MS',
+  'HIVE_TEST_START_VIEW_LOG', 'HIVE_TEST_TASKBAR_LOG', 'HIVE_TEST_TESTED_CLIS', 'HIVE_TEST_TRACKER_HEARD', 'HIVE_TEST_TRACKER_WAIT_MS',
+  'HIVE_TEST_UPGRADE_HOLD', 'HIVE_TEST_WAKE_TAKE_MS'
+]
+/**
+ * The seams a packaged Hive honours too, when quiet (#1253: lib.hiveEnv starts every test copy quiet), among them the two
+ * every test copy is given, HIVE_TEST_TIPS and HIVE_TEST_TRASH_DIR (#1599: takesTestSeams in src/main/testQuiet.ts).
+ */
+export const PACKAGED_SEAMS = ['HIVE_TEST_ASK_LEFTOVERS', 'HIVE_TEST_DIALOG_SNAPSHOT', 'HIVE_TEST_NOTIFY_LOG', 'HIVE_TEST_QUIET', 'HIVE_TEST_TIPS', 'HIVE_TEST_TOKEN_LOG', 'HIVE_TEST_TRASH_DIR']
+/**
+ * The test copies' channels a packaged Hive refuses: 0.9 worktree agents (agents:testLegacy; `{ worktree: true })`, an
+ * agent asked for in a worktree, as q.agent does; a 0.9 template's worktree modes) and slots:test. A worktree agent asked
+ * of agents:add is refused by any 1.0 build (gitmissing checks that), so isn't one.
+ */
+export const TEST_CHANNELS = /agents:testLegacy|slots:test|\{ worktree: true \}\)|['"](new|existing)-worktree['"]/
+
+/** A suite's source as { header (its opening comment, as one line of text), code (its lines that aren't comments) }. */
+export function suiteSource(source) {
+  const lines = source.split(/\r?\n/)
+  const end = lines.findIndex((l) => !l.startsWith('//'))
+  const header = (end < 0 ? lines : lines.slice(0, end)).map((l) => l.replace(/^\/\/\s*/, '')).join(' ')
+  return { header, code: lines.filter((l) => !l.trimStart().startsWith('//')) }
+}
+
+/**
+ * Why a suite can't run on a packaged build (HIVE_EXE), from its source, or null (#1591): its header says "Dev build
+ * only"; it starts this checkout's Electron itself (executablePath: lib.ELECTRON) rather than through lib.launch; or,
+ * unless it handles HIVE_EXE itself (reads it, or q.devSeam: its dev-only parts say NOT RUN and the rest runs), it needs
+ * a dev-only seam or a test channel. Under HIVE_EXE the runner reports such a suite NOT RUN with this reason, so a
+ * dev-build pass is never taken for a packaged one; tests/e2esuites.test.ts uses it for the suites' headers.
+ */
+export function devBuildOnly(source) {
+  const { header, code } = suiteSource(source)
+  if (/Dev build only/.test(header)) return 'its header says "Dev build only"'
+  if (code.some((l) => /executablePath:\s*lib\.ELECTRON\b/.test(l))) return "it starts this checkout's Electron itself (executablePath: lib.ELECTRON), not lib.launch"
+  if (code.some((l) => /process\.env\.HIVE_EXE|\bdevSeam\(/.test(l))) return null
+  const seam = code.flatMap((l) => l.match(/HIVE_TEST_[A-Z0-9_]+/g) ?? []).find((s) => DEV_SEAMS.includes(s))
+  if (seam) return `it needs ${seam}, a test seam a packaged build ignores`
+  const channel = code.filter((l) => !/inv\('agents:add'/.test(l)).map((l) => TEST_CHANNELS.exec(l)?.[0]).find(Boolean)
+  if (channel) return `it uses a test channel a packaged build refuses (${channel})`
+  return null
+}
+
+/** The launch helpers every suite shares: lib.launch honours HIVE_EXE, and the seams they give are every copy's. */
+const SHARED_HELPERS = new Set(['lib.cjs', 'runContext.cjs'])
+
+/**
+ * A suite's files, relative to the suites' folder: its own, those in a folder of its name (i18nshots/), and the helpers
+ * they require by relative path, in turn (wakepaste-cli/run.cjs), apart from SHARED_HELPERS.
+ */
+export function suiteFiles(name, dir) {
+  const files = [`${name}.cjs`]
+  const own = join(dir, name)
+  if (existsSync(own) && statSync(own).isDirectory()) files.push(...readdirSync(own).filter((f) => f.endsWith('.cjs')).sort().map((f) => `${name}/${f}`))
+  for (let i = 0; i < files.length; i++) {
+    for (const m of readFileSync(join(dir, files[i]), 'utf8').matchAll(/require\('(\.\.?\/[^']+\.cjs)'\)/g)) {
+      const f = posix.normalize(posix.join(posix.dirname(files[i]), m[1]))
+      if (!SHARED_HELPERS.has(f) && !files.includes(f) && existsSync(join(dir, f))) files.push(f)
+    }
+  }
+  return files
+}
+
+/**
+ * A run's suites on a packaged build (exe: HIVE_EXE, or none): { devOnly (a Map of each suite NOT RUN to why), nothingRan
+ * (why the run tested nothing, when none of them can run: the run still writes its record, not valid, and fails) }.
+ */
+export function packagedPlan(chosen, dir, exe) {
+  const devOnly = new Map(exe ? chosen.map((s) => [s.name, suiteDevOnly(s.name, dir)]).filter(([, why]) => why) : [])
+  return { devOnly, nothingRan: chosen.length && devOnly.size === chosen.length ? 'no suite chosen can run on a packaged build: nothing was tested' : null }
+}
+
+/** devBuildOnly for a suite and every file it uses (suiteFiles), each judged on its own: the first reason, or null. */
+export function suiteDevOnly(name, dir) {
+  for (const f of suiteFiles(name, dir)) {
+    const why = devBuildOnly(readFileSync(join(dir, f), 'utf8'))
+    if (why) return f === `${name}.cjs` ? why : `${f}: ${why}`
+  }
+  return null
+}
 
 /**
  * The command line: { jobs, all, affected (a base, or null), named, tier, record, fingerprint, build, packaged, noWait, preMerge } or
@@ -127,12 +226,16 @@ export const realNotRun = (suites, chosen) => suites.filter((s) => isRealCli(s) 
  * (#599: a child that failed to start or crashed), each with its meaning, as is its own exit code in the line.
  */
 export function resultLines(name, r) {
+  if (r.notRun) return [`${name.padEnd(22)}NOT RUN  (${r.notRun})`]
   if (r.skipped) return [`${name.padEnd(22)}SKIP  ${r.seconds}s  (${r.skipped})`]
   const failed = r.failed ?? []
-  const head = `${name.padEnd(22)}${r.ok ? 'pass' : 'FAIL'}  ${r.seconds}s${r.ok ? '' : `  (exit ${exitText(r.code)}${failed.length ? `; ${failed.length} failed check${failed.length === 1 ? '' : 's'}` : ''})`}`
-  return [head, ...failed.map((f) => `    ${f.trim()}`), ...(r.ok === false ? (r.windows ?? []).map((w) => `    Windows: ${w}`) : [])]
+  const parts = r.partsNotRun ?? []
+  const partsSaid = parts.length ? `${parts.length} part${parts.length === 1 ? '' : 's'} NOT RUN` : ''
+  const head = `${name.padEnd(22)}${r.ok ? 'pass' : 'FAIL'}  ${r.seconds}s${r.ok ? (partsSaid ? `  (${partsSaid})` : '') : `  (exit ${exitText(r.code)}${failed.length ? `; ${failed.length} failed check${failed.length === 1 ? '' : 's'}` : ''}${partsSaid ? `; ${partsSaid}` : ''})`}`
+  return [head, ...failed.map((f) => `    ${f.trim()}`), ...parts.map((p) => `    NOT RUN ${p}`), ...(r.ok === false ? (r.windows ?? []).map((w) => `    Windows: ${w}`) : [])]
 }
 
+/** partsNotRun: what a suite said it left out (`NOT RUN <what>` lines: a dev-only part on a packaged build, #1591). */
 export function suiteOutcome({ code, out }) {
   const lines = out.split(/\r?\n/)
   const failed = lines.filter((l) => /^\s*FAIL/.test(l))
@@ -141,7 +244,8 @@ export function suiteOutcome({ code, out }) {
   const self = said('SKIPPED')
   const explained = Number(said('SKIPPED-FAILS') ?? 0)
   if (code === 0 && self && failed.length <= explained) return { skipped: self, environment: self.startsWith('environment:') }
-  return { ok, failed }
+  const partsNotRun = lines.map((l) => /^NOT RUN (.+)$/.exec(l.trim())?.[1]).filter(Boolean)
+  return { ok, failed, ...(partsNotRun.length ? { partsNotRun } : {}) }
 }
 
 /**

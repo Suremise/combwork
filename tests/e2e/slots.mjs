@@ -5,12 +5,20 @@
 // A pre-merge run goes first (#558): one started by the agent holding its project's merge slot (holdsMergeSlot), or
 // with --pre-merge. It takes the next free slot before runs that asked earlier for other reasons (a merge shouldn't wait
 // behind flake-proof repeats while every other merge waits behind it), but never stops a run that holds one.
-// A run that isn't heavy (a few suites, a single scenario) never waits, nor does a runner started inside a suite, e2e or
-// scenarios (needsSlot): its parent's run holds a slot, and waiting behind it would never end (#211).
+// A run that isn't heavy (a few suites, a single scenario) never waits, nor does a runner started inside a run that
+// holds a slot of the kind it needs (heldCredit, E2E_RUN_SLOTS): waiting behind its parent would never end (#211).
+//
+// Small runs and model trials (HI-2070): a heavy run within the small-run bound (smallRun in config.json: a few suites
+// repeated a few times, a few fake scenario runs) is small. It takes the side slot (sideSlots, default 1) when that is
+// free, else a heavy slot, else it waits for whichever frees first; heavy runs never take the side slot. A scenario run
+// on a real model (claude-code, codex) is network-bound: it takes no CPU slot, only one of the model trials' own
+// (modelTrials, default 2), which bound API spend and Codex's account-wide rate window. slotPool says which a run takes.
+// On the side slot an e2e run runs at most SIDE_E2E_JOBS suites at once.
 //
 // Claims are files in a folder of the run context (runContext.HEAVY_DIR), as lanes are (lanes.mjs): `slot-<k>.json`
-// for a run holding a slot and `wait-<pid>.json` for one waiting (when it asked; `first` for a pre-merge run), each
-// with its runner's process id, changed only under the claims lock. A crashed run's claim expires: its process is gone (or it is a day old).
+// for a run holding a heavy slot, `side-<k>.json` and `model-<k>.json` for the others, and `wait-<pid>.json` for one
+// waiting (when it asked, which pool; `first` for a pre-merge run), each with its runner's process id, changed only
+// under the claims lock. A crashed run's claim expires: its process is gone (or it is a day old).
 //
 // A run left over (#1008): one started in an agent's session that has ended since (Hive closed under it, the agent
 // stopped or restarted) keeps running, and keeps its slot, while its process lives. Its claim records the agent's launch
@@ -79,6 +87,101 @@ export function isHeavy({ count, repeat = 1 }) {
   return repeat > 1 || count > HEAVY_OVER
 }
 
+/** Small runs' side slots and real-model trials at once (HI-2070), unless config.json or the environment says otherwise. */
+export const DEFAULT_SIDE_SLOTS = 1
+export const DEFAULT_MODEL_TRIALS = 2
+/** The largest small run (HI-2070): e2e suites and their repeats, and fake scenario runs in all (scenarios × repeats). */
+export const DEFAULT_SMALL_RUN = { e2eSuites: 3, e2eRepeat: 3, scenarioRuns: 5 }
+/** Scenario providers that are real models: their runs are model trials. */
+export const MODEL_PROVIDERS = ['claude-code', 'codex']
+
+/**
+ * The side slots, model trials and small-run bound (HI-2070), from the machine's config.json beside heavySlots
+ * (`sideSlots`, a whole number from 0; `modelTrials`, from 1; `smallRun: { e2eSuites, e2eRepeat, scenarioRuns }`, each
+ * from 1), read each time a run asks; HIVE_TEST_SIDE_SLOTS and HIVE_TEST_MODEL_TRIALS override the first two for one run.
+ * A value that isn't one falls back to its default, said in one line (once).
+ */
+export function slotSettings(env = process.env, file = CONFIG_FILE, say = (line) => console.error(line)) {
+  let cfg = {}
+  try {
+    cfg = JSON.parse(readFileSync(file, 'utf8').replace(/^﻿/, '')) ?? {}
+  } catch {
+    // No file, or not JSON: heavySlots says so; the defaults here.
+  }
+  const whole = (v, from) => Number.isInteger(v) && v >= from
+  const pick = (name, variable, def, from) => {
+    const set = env[variable]
+    if (set !== undefined && set !== '') {
+      if (whole(Number(set), from)) return Number(set)
+      sayOnce(say, `Test slots: ${variable}=${JSON.stringify(set)} isn't a whole number from ${from}; it is left out.`)
+    }
+    const v = cfg[name]
+    if (v === undefined) return def
+    if (whole(v, from)) return v
+    sayOnce(say, `Test slots: ${name} ${JSON.stringify(v)} in ${file} isn't a whole number from ${from}; ${def}, the default.`)
+    return def
+  }
+  const side = pick('sideSlots', 'HIVE_TEST_SIDE_SLOTS', DEFAULT_SIDE_SLOTS, 0)
+  const models = pick('modelTrials', 'HIVE_TEST_MODEL_TRIALS', DEFAULT_MODEL_TRIALS, 1)
+  const small = { ...DEFAULT_SMALL_RUN }
+  if (cfg.smallRun !== undefined) {
+    for (const k of Object.keys(DEFAULT_SMALL_RUN)) {
+      const v = cfg.smallRun?.[k]
+      if (v === undefined) continue
+      if (whole(v, 1)) small[k] = v
+      else sayOnce(say, `Test slots: smallRun.${k} ${JSON.stringify(v)} in ${file} isn't a whole number from 1; ${DEFAULT_SMALL_RUN[k]}, the default.`)
+    }
+  }
+  return { side, models, small }
+}
+
+/** Suites an e2e run on the side slot runs at once, at most (HI-2070: beside two heavy runs, never the usual four). */
+export const SIDE_E2E_JOBS = 2
+
+/**
+ * The kinds of slot the run this one was started inside holds for it (HI-2070): 'cpu' (a heavy or side slot) and
+ * 'model' (a model trial's), from E2E_RUN_SLOTS, comma-separated, which the runners set for what they start and which
+ * is carried into a test Hive's sessions (runContext CARRIED). A run inside a suite marked without it (an older runner)
+ * has the CPU credit every nested run had before (#211); a run started outside any has none.
+ */
+export function heldCredit(env = process.env) {
+  if (env.E2E_RUN_SLOTS !== undefined) return new Set(env.E2E_RUN_SLOTS.split(',').filter((k) => k === 'cpu' || k === 'model'))
+  return new Set(parentSuite(env) ? ['cpu'] : [])
+}
+
+/** E2E_RUN_SLOTS for what a run starts: the credit it was given, and the kind of slot it holds now (a pool, or none). */
+export function creditFor(pool, env = process.env) {
+  const credit = heldCredit(env)
+  if (pool === 'model') credit.add('model')
+  else if (pool) credit.add('cpu')
+  return [...credit].sort().join(',')
+}
+
+/**
+ * Whether a scenario run's build needs a CPU slot it doesn't hold (HI-2070): a real model's trial (its own work takes no
+ * CPU slot), with no CPU credit from the slot it took (pool) or what it runs inside, whether it took a model trial's
+ * slot itself or one it runs inside covers it. A fake run's build is covered as its run is (a heavy or side slot, or none
+ * for a light run, as an e2e run's).
+ */
+export function buildNeedsCpuSlot({ provider, pool }, env = process.env) {
+  return MODEL_PROVIDERS.includes(provider) && !creditFor(pool, env).split(',').includes('cpu')
+}
+
+/**
+ * Which slot a run waits for (HI-2070): 'model' for a scenario run on a real model, whatever its size; 'small' for a
+ * heavy run within the small-run bound; 'heavy' for any other heavy run; null for one that waits for none: not heavy,
+ * or started inside a run that holds a slot of the kind it needs (heldCredit: waiting for the parent's own slot would
+ * never end, #211). Only matching credit counts: CPU work inside a model trial still asks for a CPU slot, and a model
+ * trial inside a CPU run for a model trial's. kind: 'e2e' or 'scenarios'.
+ */
+export function slotPool({ kind, count, repeat = 1, provider = '' }, env = process.env, small = slotSettings(env).small) {
+  const credit = heldCredit(env)
+  if (kind === 'scenarios' && MODEL_PROVIDERS.includes(provider)) return credit.has('model') ? null : 'model'
+  if (credit.has('cpu') || !isHeavy({ count, repeat })) return null
+  const within = kind === 'e2e' ? count <= small.e2eSuites && repeat <= small.e2eRepeat : count * repeat <= small.scenarioRuns
+  return within ? 'small' : 'heavy'
+}
+
 /** Vitest options whose value is the next argument (so it is no file filter). */
 const VITEST_VALUE_OPTIONS = ['-c', '--config', '-r', '--root', '--dir', '--reporter', '--outputFile', '--environment', '--pool', '--maxWorkers', '--testTimeout', '--hookTimeout', '--retry', '--bail', '--mode', '--exclude']
 
@@ -112,8 +215,9 @@ export function needsSlot({ count, repeat = 1 }, env = process.env) {
 async function apiGet(path, env, { fetch = globalThis.fetch, timeoutMs = 3000, workspace = env.HIVE_WORKSPACE } = {}) {
   const url = env.HIVE_API_URL?.replace(/\/+$/, '')
   if (!url) return null
-  let token = env.HIVE_API_TOKEN && !env.HIVE_API_TOKEN.includes('${') ? env.HIVE_API_TOKEN : ''
-  if (!token && env.HIVE_API_TOKEN_FILE) {
+  // The session's token file, never HIVE_API_TOKEN (HI-2262: sessions no longer get it).
+  let token = ''
+  if (env.HIVE_API_TOKEN_FILE) {
     try {
       token = String(JSON.parse(readFileSync(env.HIVE_API_TOKEN_FILE, 'utf8')).token ?? '')
     } catch {
@@ -214,14 +318,21 @@ function claims(dir, prefix) {
     })
 }
 
+/** Each kind of slot's claim files (HI-2070): heavy slots keep their old name. */
+export const SLOT_FILE = { heavy: 'slot-', side: 'side-', model: 'model-' }
+/** The pools whose waiting runs queue for each kind of slot: a heavy slot is for heavy and small runs, the side one for small. */
+const QUEUES_FOR = { heavy: ['heavy', 'small'], side: ['small'], model: ['model'] }
+
 /**
  * One look, under the claims lock: takes a slot if one is free and no run ahead of this one is still waiting for it:
- * pre-merge runs (first) are ahead of the others, and among each, those that asked earlier. Returns { slot } (its number), or { holders, ahead }: the claims holding the slots, and how many runs wait ahead of
- * this one. Waiting (wait: true), this run's place in the queue is kept (wait-<pid>.json, with when it first asked);
- * otherwise it leaves no trace. Claims whose runner is gone are removed. session: the agent's launch it was started in
- * (runOwner), recorded in its slot's claim as owner.
+ * pre-merge runs (first) are ahead of the others, and among each, those that asked earlier. pool (slotPool): 'heavy'
+ * takes a heavy slot; 'small' the side slot, else a heavy one; 'model' a model trial's. Returns { slot } (its number,
+ * with pool: 'side' or 'model' for those), or { holders, ahead, pool }: the claims holding the slots it could take (each
+ * with its pool), and how many runs wait ahead of this one for the nearest. Waiting (wait: true), this run's place in
+ * the queue is kept (wait-<pid>.json, with when it first asked); otherwise it leaves no trace. Claims whose runner is
+ * gone are removed. session: the agent's launch it was started in (runOwner), recorded in its slot's claim as owner.
  */
-export async function trySlot(dir, { slots = heavySlots(), owner = process.pid, what = '', root = '', first = false, wait = true, alive = processAlive, now = () => Date.now(), session = runOwner() } = {}) {
+export async function trySlot(dir, { pool = 'heavy', slots = heavySlots(), side, models, owner = process.pid, what = '', root = '', first = false, wait = true, alive = processAlive, now = () => Date.now(), session = runOwner() } = {}) {
   mkdirSync(dir, { recursive: true })
   return withLock(dir, async () => {
     const t = now()
@@ -231,24 +342,34 @@ export async function trySlot(dir, { slots = heavySlots(), owner = process.pid, 
         rmSync(file, { force: true })
         return false
       })
-    const held = live('slot-').map((c) => c.claim)
     const mine = join(dir, `wait-${owner}.json`)
     const waiting = live('wait-').map((c) => c.claim)
-    const me = { ...(waiting.find((c) => c.pid === owner) ?? { pid: owner, at: t, root, what }), first: !!first }
-    const queue = [...waiting.filter((c) => c.pid !== owner), me].sort((a, b) => Number(!!b.first) - Number(!!a.first) || a.at - b.at || a.pid - b.pid)
-    const ahead = queue.indexOf(me)
-    const free = slots - held.length
-    if (ahead < free) {
-      const used = new Set(held.map((c) => c.slot))
-      let k = 0
-      while (used.has(k)) k++
-      writeFileSync(join(dir, `slot-${k}.json`), JSON.stringify({ pid: owner, at: t, slot: k, root, what, ...(first ? { first: true } : {}), ...(session ? { owner: session } : {}) }))
-      rmSync(mine, { force: true })
-      return { slot: k }
+    const me = { ...(waiting.find((c) => c.pid === owner) ?? { pid: owner, at: t, root, what }), first: !!first, pool }
+    const others = waiting.filter((c) => c.pid !== owner)
+    const order = (a, b) => Number(!!b.first) - Number(!!a.first) || a.at - b.at || a.pid - b.pid
+    const settings = pool === 'heavy' ? null : slotSettings()
+    const kinds = pool === 'small' ? [['side', side ?? settings.side], ['heavy', slots]] : pool === 'model' ? [['model', models ?? settings.models]] : [['heavy', slots]]
+    const holders = []
+    let ahead = Infinity
+    for (const [kind, cap] of kinds) {
+      // None of this kind (sideSlots 0): a small run takes a heavy slot, as before there was a side slot.
+      if (!cap) continue
+      const held = live(SLOT_FILE[kind]).map((c) => c.claim)
+      const place = [...others.filter((c) => QUEUES_FOR[kind].includes(c.pool ?? 'heavy')), me].sort(order).indexOf(me)
+      if (place < cap - held.length) {
+        const used = new Set(held.map((c) => c.slot))
+        let k = 0
+        while (used.has(k)) k++
+        writeFileSync(join(dir, `${SLOT_FILE[kind]}${k}.json`), JSON.stringify({ pid: owner, at: t, slot: k, root, what, ...(kind === 'heavy' ? {} : { pool: kind }), ...(first ? { first: true } : {}), ...(session ? { owner: session } : {}) }))
+        rmSync(mine, { force: true })
+        return kind === 'heavy' ? { slot: k } : { slot: k, pool: kind }
+      }
+      holders.push(...held.map((c) => ({ ...c, pool: kind })))
+      ahead = Math.min(ahead, place)
     }
     if (wait) writeFileSync(mine, JSON.stringify(me))
     else rmSync(mine, { force: true })
-    return { holders: held, ahead }
+    return { holders, ahead, pool }
   })
 }
 
@@ -257,16 +378,47 @@ export function describeClaim(c, now = Date.now()) {
   return describeHolder(c, now, 'a heavy run')
 }
 
+/** How many of each kind go at once, for a waiting or refused run of a pool (HI-2070). */
+function capacity(pool, slots, settings) {
+  if (pool === 'model') return `${settings.models} real-model trials at once on this machine, modelTrials`
+  if (pool === 'small' && settings.side) return `a small run: ${settings.side} side and ${slots} heavy slots on this machine, sideSlots and heavySlots`
+  return `${slots} heavy runs at once on this machine, HIVE_TEST_HEAVY_SLOTS`
+}
+
 /** What a waiting run prints at a look that finds no slot (both runners): how many go at once, its place, the holders. */
-export function waitLine({ holders, ahead, first = false }, slots = heavySlots()) {
+export function waitLine({ holders, ahead, first = false, pool = 'heavy' }, slots = heavySlots(), settings = pool === 'heavy' ? null : slotSettings()) {
   const place = first ? `, pre-merge, ${ahead ? `${ahead} pre-merge ahead of this one` : 'next in line'}` : ahead ? `, ${ahead} ahead of this one` : ''
-  return `Waiting for a test slot (${slots} heavy runs at once on this machine, HIVE_TEST_HEAVY_SLOTS)${place}: held by ${holders.map((c) => describeClaim(c)).join('; ') || 'runs just finishing'}.`
+  return `Waiting for ${pool === 'model' ? 'a model-trial slot' : 'a test slot'} (${capacity(pool, slots, settings)})${place}: held by ${holders.map((c) => describeClaim(c)).join('; ') || 'runs just finishing'}.`
+}
+
+/** What a run refused at once (--no-wait) prints (both runners). */
+export function refusedLine({ holders, pool = 'heavy' }, slots = heavySlots(), settings = pool === 'heavy' ? null : slotSettings()) {
+  return `No ${pool === 'model' ? 'model-trial' : 'test'} slot free (--no-wait): ${capacity(pool, slots, settings)}, held by ${holders.map((c) => describeClaim(c)).join('; ')}.`
+}
+
+/** A holder, short, by whose run it is (HI-2070): "HB6's scenarios: 151 (fake)", or "e2e: 4 suites in D:\wt" outside an agent. */
+const holderName = (c) => (c.owner?.agent ? `${c.owner.agent}'s ${c.what || 'run'}` : `${c.what || 'a run'} in ${c.root || 'another worktree'}`)
+
+/**
+ * The Progress panel's wait (HI-2070): what is ahead of this run, never its title as if it were this run's own:
+ * "waiting for a test slot (2 heavy runs ahead: HB6's scenarios: 151 (fake), HB4's e2e: 4 suites × 5)".
+ */
+export function waitSummary({ holders, ahead = 0, pool = 'heavy' }) {
+  const kinds = { heavy: 'heavy', side: 'small', model: 'model-trial' }
+  // In the holders' order, as they are named after.
+  const counts = [...new Set(holders.map((c) => c.pool ?? 'heavy'))].map((k) => {
+    const n = holders.filter((c) => (c.pool ?? 'heavy') === k).length
+    return `${n} ${kinds[k]} ${n === 1 ? 'run' : 'runs'}`
+  })
+  const resource = pool === 'model' ? 'a model-trial slot' : 'a test slot'
+  if (!holders.length) return `waiting for ${resource} (runs just finishing)`
+  return `waiting for ${resource} (${counts.join(' and ')} ahead: ${holders.map(holderName).join(', ')}${ahead ? `; ${ahead} more waiting first` : ''})`
 }
 
 /** The claims holding slots now, read without the lock (for a line to a person, not to take one). */
 function slotHolders(dir, alive = processAlive, now = Date.now()) {
   try {
-    return claims(dir, 'slot-').flatMap(({ claim }) => (claimHeld(claim, alive, now) ? [claim] : []))
+    return Object.values(SLOT_FILE).flatMap((prefix) => claims(dir, prefix).flatMap(({ claim }) => (claimHeld(claim, alive, now) ? [claim] : [])))
   } catch {
     return []
   }
@@ -314,7 +466,7 @@ export async function waitForSlot(dir, { wait = true, pollMs = 2000, onWait = ()
       const r = await trySlot(dir, { ...opts, owner, wait, first: goesFirst })
       if (r.slot !== undefined) {
         await tell(before)
-        const file = join(dir, `slot-${r.slot}.json`)
+        const file = join(dir, `${SLOT_FILE[r.pool ?? 'heavy']}${r.slot}.json`)
         const release = () => {
           try {
             if (JSON.parse(readFileSync(file, 'utf8')).pid === owner) rmSync(file, { force: true })
@@ -323,7 +475,7 @@ export async function waitForSlot(dir, { wait = true, pollMs = 2000, onWait = ()
           }
         }
         process.on('exit', release)
-        return { slot: r.slot, waitedMs: Date.now() - started, release }
+        return { slot: r.slot, pool: r.pool ?? 'heavy', waitedMs: Date.now() - started, release }
       }
       await tell(r.holders)
       if (!wait) return { refused: { ...r, holders: await leftOver(r.holders) } }

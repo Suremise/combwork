@@ -11,9 +11,25 @@
     "defaultMessage": "You",
     "description": "Who made a change or wrote a comment on a card (beside a history line or a comment): the user. Short."
   },
+  "tasks.error.actionGone": {
+    "defaultMessage": "{action, select, done {{card} is already in Done.} noCode {{card} is already no code.} other {{card} isn't blocked.}} Answer the question with a reply instead.",
+    "description": "An error when the user clicks an action an agent's question offered on its card (For you): the card has changed so the action no longer applies. {card} is the card's key (HI-12); keep the select keys as they are. Answer with a reply: type an answer in the box instead."
+  },
   "tasks.error.addOwnOnly": {
     "defaultMessage": "You can add cards only to your project ({project}).",
     "description": "An error: an agent tried to add a card to another project, or to the whole workspace; it adds cards only to its own project ({project}, its folder name)."
+  },
+  "tasks.error.answersNot": {
+    "defaultMessage": "{why, select, open {{request} isn't an open request on {card}.} other {A decision can't answer {request} on {card}: approve, decline or choose it in For you.}}",
+    "description": "An error (HI-1932): a decision named a request ({request}: its id, such as r12) of card {card} (its key) that it can't answer: it isn't open on the card (answered or closed meanwhile), or it is an approval or one of Hive's own requests (a review, the OK before merging, the round limit), which the user answers in For you. Keep the select keys."
+  },
+  "tasks.error.answersNotAgents": {
+    "defaultMessage": "Only the user, or the Assistant recording the user's decision, closes a request for the user.",
+    "description": "An error (HI-1932): an agent recorded a decision naming the card's requests it answers (For you); only the user, or the Hive Assistant writing down the user's own decision, may close them that way."
+  },
+  "tasks.error.answersShape": {
+    "defaultMessage": "answers takes the ids of 1 to {max, number} of the card’s open requests, with a decision and nothing else in the same change.",
+    "description": "An error (HI-1932): a decision naming the card's requests it answers was sent wrongly: answers must list between 1 and {max} request ids (For you's requests), together with the decision's text and no other change. Keep answers as it is (a field's name)."
   },
   "tasks.error.archiveNone": {
     "defaultMessage": "cards: list the cards to archive.",
@@ -24,20 +40,36 @@
     "description": "An error: the list of cards to archive has something other than card numbers in it. \"cards:\" is the name of the call's field: keep it as it is."
   },
   "tasks.error.archived": {
-    "defaultMessage": "#{n} is archived. Only the user can bring it back.",
-    "description": "An error: card #{n} (a number) is archived, so an agent or the Assistant cannot change it; only the user can bring it back from the archive."
+    "defaultMessage": "{card} is archived. Only the user can bring it back.",
+    "description": "An error: card {card} (its key, such as HI-12) is archived, so an agent or the Assistant cannot change it; only the user can bring it back from the archive."
+  },
+  "tasks.error.badAnswer": {
+    "defaultMessage": "That answer doesn't fit the request: approve or decline an approval, answer a question with a reply or a decision, and choose a way on at the round limit (a carry on with 1 to {max} more rounds).",
+    "description": "An error answering a request for the user (For you): what was sent doesn't fit the request's kind. {max} is the most rounds a carry on can add (a number)."
+  },
+  "tasks.error.badKind": {
+    "defaultMessage": "A card is code or no-code, not {kind}.",
+    "description": "An error: a card's kind was given as {kind}; it is code (work in commits, the default) or no-code (a decision, a write-up, a trial). Keep code and no-code as they are (they are values)."
+  },
+  "tasks.error.badReviewSkip": {
+    "defaultMessage": "skipReview is the user's reason the card skips review (text), or false to review it after all.",
+    "description": "An error: a card's skipReview was given as something else than a reason (text) or false. Keep skipReview and false as they are (a field's name and a value)."
+  },
+  "tasks.error.badReviewSkipNew": {
+    "defaultMessage": "A new card reviews as its rules say: give skipReview the user's reason to skip it, or leave it out.",
+    "description": "An error: a card was made with skipReview false. Keep skipReview as it is (a field's name)."
   },
   "tasks.error.batchGone": {
     "defaultMessage": "That batch is no longer kept: unarchive its cards from Archived.",
     "description": "An error: the Archive All batch to bring back is no longer kept (Hive keeps the latest 50); its cards can still be brought back one by one from the board's Archived list."
   },
   "tasks.error.beforeArchived": {
-    "defaultMessage": "#{before} is archived, not in {column, select, hold {On Hold} todo {Todo} doing {Doing} review {Review} passed {Passed} done {Done} other {{column}}}: #{n} can only go before a card in the column it's in.",
-    "description": "An error: card #{n} was to be placed just above card #{before} (numbers), which is archived, not in the column {column} (select: a board column; translate each)."
+    "defaultMessage": "{before} is archived, not in {column, select, hold {On Hold} todo {Todo} doing {Doing} review {Review} passed {Passed} done {Done} other {{column}}}: {card} can only go before a card in the column it's in.",
+    "description": "An error: card {card} was to be placed just above card {before} (their keys, such as HI-12), which is archived, not in the column {column} (select: a board column; translate each)."
   },
   "tasks.error.beforeElsewhere": {
-    "defaultMessage": "#{before} is in {other, select, hold {On Hold} todo {Todo} doing {Doing} review {Review} passed {Passed} done {Done} other {{other}}}, not in {column, select, hold {On Hold} todo {Todo} doing {Doing} review {Review} passed {Passed} done {Done} other {{column}}}: #{n} can only go before a card in the column it's in.",
-    "description": "An error: card #{n} was to be placed just above card #{before} (numbers), which is in the column {other}, not in {column} (select: board columns; translate each)."
+    "defaultMessage": "{before} is in {other, select, hold {On Hold} todo {Todo} doing {Doing} review {Review} passed {Passed} done {Done} other {{other}}}, not in {column, select, hold {On Hold} todo {Todo} doing {Doing} review {Review} passed {Passed} done {Done} other {{column}}}: {card} can only go before a card in the column it's in.",
+    "description": "An error: card {card} was to be placed just above card {before} (their keys, such as HI-12), which is in the column {other}, not in {column} (select: board columns; translate each)."
   },
   "tasks.error.beforeItself": {
     "defaultMessage": "A card can't go before itself.",
@@ -56,8 +88,8 @@
     "description": "An error: a call listed more than {max} cards. \"cards:\" is the name of the call's field: keep it as it is."
   },
   "tasks.error.cardsTwice": {
-    "defaultMessage": "cards: #{n} is listed twice",
-    "description": "An error: the list of cards names card #{n} (a number) twice. \"cards:\" is the name of the call's field: keep it as it is."
+    "defaultMessage": "cards: {card} is listed twice",
+    "description": "An error: the list of cards names card {card} (its key, such as HI-12) twice. \"cards:\" is the name of the call's field: keep it as it is."
   },
   "tasks.error.changeNone": {
     "defaultMessage": "cards: list the card numbers to change.",
@@ -80,12 +112,16 @@
     "description": "An error: the user emptied a decision's text; to take it off the card, remove it."
   },
   "tasks.error.decisionGone": {
-    "defaultMessage": "That decision is no longer on #{n}.",
-    "description": "An error: the decision being changed was removed from card #{n} (a number) meanwhile."
+    "defaultMessage": "That decision is no longer on {card}.",
+    "description": "An error: the decision being changed was removed from card {card} (its key, such as HI-12) meanwhile."
   },
   "tasks.error.decisionsUsers": {
     "defaultMessage": "Only the user changes or removes a card's decisions.",
     "description": "An error: an agent or the Assistant tried to change or remove a decision on a card; only the user does that (they only record them)."
+  },
+  "tasks.error.doingNobodyNew": {
+    "defaultMessage": "A card made in Active needs an agent on it (agent). Ask the user which they want: an agent on it, an agent started on it (make it in Todo, then hive_start_task), or nobody on it (make it in Todo, then move it with override and their reason).",
+    "description": "An error said to the Hive Assistant (HI-2062): it made a card straight into the Active stage with no agent on it. agent, override and hive_start_task are names of a call's fields and a tool: keep them as they are. Active and Todo are stage names."
   },
   "tasks.error.emptyComment": {
     "defaultMessage": "The comment is empty.",
@@ -95,25 +131,33 @@
     "defaultMessage": "The decision is empty.",
     "description": "An error: a decision recorded on a card has no text."
   },
-  "tasks.error.failedStays": {
-    "defaultMessage": "A failed review leaves #{n} in Review: give the verdict without column.",
-    "description": "An error: a failed review also moved card #{n} (a number) out of Review; a failed card stays in Review. \"column\" is the name of the call's field: keep it as it is."
+  "tasks.error.failedToDoing": {
+    "defaultMessage": "A failed review sends {card} back to Doing, to its builder: give the verdict without column.",
+    "description": "An error: a failed review also tried to move card {card} (its key, such as HI-12) somewhere other than Doing; a failed card goes back to Doing, to the agent that built it. \"column\" is the name of the call's field: keep it as it is."
   },
   "tasks.error.holdCard": {
-    "defaultMessage": "Only the user or the Assistant puts cards On Hold: ask the user to park #{n}.",
-    "description": "An error: an agent tried to move card #{n} (a number) On Hold (a board column), which only the user or the Assistant may do."
+    "defaultMessage": "Only the user or the Assistant puts cards On Hold. Where the user has decided to park {card}, ask the Assistant (hive_ask_assistant); otherwise ask the user.",
+    "description": "An error: an agent tried to move card {card} (its key, such as HI-12) On Hold (a board column), which only the user or the Assistant may do (HI-2227): a decision already made goes to the Assistant, hive_ask_assistant (a tool name: keep it as it is), else the user is asked."
   },
   "tasks.error.holdNew": {
-    "defaultMessage": "Only the user or the Assistant puts cards On Hold: ask the user to park it.",
-    "description": "An error: an agent tried to add a card On Hold (a board column), which only the user or the Assistant may do."
+    "defaultMessage": "Only the user or the Assistant puts cards On Hold. Add it to Todo; where the user has decided to park it, ask the Assistant (hive_ask_assistant), otherwise ask the user.",
+    "description": "An error: an agent tried to add a card On Hold (a board column), which only the user or the Assistant may do (HI-2227): add it to Todo, then a decision already made goes to the Assistant, hive_ask_assistant (a tool name: keep it as it is), else the user is asked."
   },
   "tasks.error.inDoingWith": {
-    "defaultMessage": "#{n} is in Doing with {agent}, who is working on it: newer work is in progress, so it can't be moved to {column, select, review {Review} passed {Passed} done {Done} other {{column}}} by another agent. Leave it where it is; {agent} moves it to Review when done, and the user can move it.",
-    "description": "An error: an agent tried to move card #{n} (a number) on to {column} (select: a board column; translate each), but the card is in Doing with another agent ({agent}, its name), whose work is in progress. Doing and Review are board columns."
+    "defaultMessage": "{card} is in {active} with agent {agent}, who is working on it: newer work is in progress, so another agent can't move it to {stage}. Leave it where it is; agent {agent} moves it to {review} when done, and the user can move it.",
+    "description": "An error, read by agents: an agent tried to move card {card} (its key, such as HI-12) on to the stage {stage}, but the card is in {active} with another agent ({agent}, its name), whose work is in progress. {active}, {review} and {stage} are stage names as the board shows them (glossary 2.2)."
   },
   "tasks.error.inDoingWithAnother": {
-    "defaultMessage": "#{n} is in Doing with another agent, who is working on it: newer work is in progress, so it can't be moved to {column, select, review {Review} passed {Passed} done {Done} other {{column}}} by another agent. Leave it where it is; another agent moves it to Review when done, and the user can move it.",
-    "description": "An error: an agent tried to move card #{n} (a number) on to {column} (select: a board column; translate each), but the card is in Doing with another agent (whose name isn't known), whose work is in progress. Doing and Review are board columns."
+    "defaultMessage": "{card} is in {active} with another agent, who is working on it: newer work is in progress, so another agent can't move it to {stage}. Leave it where it is; that agent moves it to {review} when done, and the user can move it.",
+    "description": "An error, read by agents: an agent tried to move card {card} (its key, such as HI-12) on to the stage {stage}, but the card is in {active} with another agent (whose name isn't known), whose work is in progress. {active}, {review} and {stage} are stage names as the board shows them (glossary 2.2)."
+  },
+  "tasks.error.kindNeedsReason": {
+    "defaultMessage": "Changing a card's kind after it is made is an exception to its rules: pass override.reason with the user's reason.",
+    "description": "An error said to the Hive Assistant: it changed a card's kind (code or no-code) after the card was made without giving the user's reason (override.reason: keep it as it is)."
+  },
+  "tasks.error.kindNotAgents": {
+    "defaultMessage": "Agents can't change a card's kind: propose no-code when you make the card, and the user or the Assistant confirms it.",
+    "description": "An error: an agent tried to change a card's kind (code or no-code) after it was made, or to answer a proposed kind; only the user or the Hive Assistant can."
   },
   "tasks.error.labelFieldList": {
     "defaultMessage": "{field} must be a list",
@@ -136,16 +180,20 @@
     "description": "An error: a card was saved with an empty title."
   },
   "tasks.error.noCard": {
-    "defaultMessage": "There is no card #{n}.",
-    "description": "An error: there is no card #{n} (a number) that the caller may see."
+    "defaultMessage": "There is no card {card}.",
+    "description": "An error: there is no card {card} (its key, such as HI-12) that the caller may see."
+  },
+  "tasks.error.noKindProposal": {
+    "defaultMessage": "Nothing proposes a kind for {card}: its kind is {kind}.",
+    "description": "An error: confirming a card's proposed kind, but no agent proposed one (or it was answered already). {card} is the card's key (HI-12); {kind} its kind, code or no-code (values: keep them as they are)."
   },
   "tasks.error.noWorkspace": {
     "defaultMessage": "No workspace is open",
     "description": "An error: a change to the task board needs an open workspace, and there is none."
   },
   "tasks.error.notReviewing": {
-    "defaultMessage": "You aren't reviewing #{n} now: its review ended (the card moved, or your session ended) or never started. Start one with review \"start\" if it is in Review.",
-    "description": "An error: an agent tried to give a verdict on card #{n} (a number), but it has no review going on it. \"review\" and \"start\" are the call's field and value: keep them as they are."
+    "defaultMessage": "You aren't reviewing {card} now: its review ended (the card moved, or your session ended) or never started. Start one with review \"start\" if it is in Review.",
+    "description": "An error: an agent tried to give a verdict on card {card} (its key, such as HI-12), but it has no review going on it. \"review\" and \"start\" are the call's field and value: keep them as they are."
   },
   "tasks.error.onlyUserArchives": {
     "defaultMessage": "Only the user archives cards.",
@@ -164,20 +212,28 @@
     "description": "An error: an agent or the Assistant tried to bring archived cards back onto the board; only the user does that."
   },
   "tasks.error.orderArchived": {
-    "defaultMessage": "#{n} is archived, not in {column, select, hold {On Hold} todo {Todo} doing {Doing} review {Review} passed {Passed} done {Done} other {{column}}}. Only cards already in {column, select, hold {On Hold} todo {Todo} doing {Doing} review {Review} passed {Passed} done {Done} other {{column}}} can be put in order there.",
-    "description": "An error: card #{n} (a number) was listed to be put in order in the column {column}, but it is archived (select: a board column; translate each)."
+    "defaultMessage": "{card} is archived, not in {column, select, hold {On Hold} todo {Todo} doing {Doing} review {Review} passed {Passed} done {Done} other {{column}}}. Only cards already in {column, select, hold {On Hold} todo {Todo} doing {Doing} review {Review} passed {Passed} done {Done} other {{column}}} can be put in order there.",
+    "description": "An error: card {card} (its key, such as HI-12) was listed to be put in order in the column {column}, but it is archived (select: a board column; translate each)."
   },
   "tasks.error.orderChanged": {
-    "defaultMessage": "#{n} changed while the cards were being put in order; read the board again.",
-    "description": "An error: card #{n} (a number) moved or was archived while the cards were being put in order, so the order asked for no longer holds."
+    "defaultMessage": "{card} changed while the cards were being put in order; read the board again.",
+    "description": "An error: card {card} (its key, such as HI-12) moved or was archived while the cards were being put in order, so the order asked for no longer holds."
   },
   "tasks.error.orderElsewhere": {
-    "defaultMessage": "#{n} is in {other, select, hold {On Hold} todo {Todo} doing {Doing} review {Review} passed {Passed} done {Done} other {{other}}}, not in {column, select, hold {On Hold} todo {Todo} doing {Doing} review {Review} passed {Passed} done {Done} other {{column}}}. Only cards already in {column, select, hold {On Hold} todo {Todo} doing {Doing} review {Review} passed {Passed} done {Done} other {{column}}} can be put in order there.",
-    "description": "An error: card #{n} (a number) was listed to be put in order in the column {column}, but it is in the column {other} (select: board columns; translate each)."
+    "defaultMessage": "{card} is in {other, select, hold {On Hold} todo {Todo} doing {Doing} review {Review} passed {Passed} done {Done} other {{other}}}, not in {column, select, hold {On Hold} todo {Todo} doing {Doing} review {Review} passed {Passed} done {Done} other {{column}}}. Only cards already in {column, select, hold {On Hold} todo {Todo} doing {Doing} review {Review} passed {Passed} done {Done} other {{column}}} can be put in order there.",
+    "description": "An error: card {card} (its key, such as HI-12) was listed to be put in order in the column {column}, but it is in the column {other} (select: board columns; translate each)."
   },
   "tasks.error.orderNone": {
     "defaultMessage": "cards: list the card numbers in the order wanted.",
     "description": "An error: a call to put cards in order listed none. \"cards:\" is the name of the call's field: keep it as it is."
+  },
+  "tasks.error.overrideNotAgents": {
+    "defaultMessage": "Agents can't override workflow rules: only the user or the Assistant can.",
+    "description": "An error: an agent passed an override (moving a card across a workflow rule, with a reason); only the user or the Hive Assistant can."
+  },
+  "tasks.error.overrideShape": {
+    "defaultMessage": "An override needs a reason: why the card moves across its rules, as text.",
+    "description": "An error: an override (moving a card across a workflow rule) was passed without its reason as text."
   },
   "tasks.error.ownCardsOnly": {
     "defaultMessage": "You can see only your project's cards ({project}).",
@@ -192,7 +248,7 @@
     "description": "An error: the call gave {field} (the name of its field: blockedBy or links, kept as it is) as something other than a list of card numbers."
   },
   "tasks.error.refsNoCard": {
-    "defaultMessage": "{field}: there is no card #{n}",
+    "defaultMessage": "{field}: there is no card {card}",
     "description": "An error: the list {field} (the name of the call's field: blockedBy or links, kept as it is) names card #{n} (a number), which there is not."
   },
   "tasks.error.refsNotNumber": {
@@ -212,16 +268,40 @@
     "description": "An error: the user, the Assistant or a script tried to start or end a card's review; only an agent of the card's project does that, with its hive tools (a name: keep it)."
   },
   "tasks.error.reviewNotInReview": {
-    "defaultMessage": "#{n} is in {column, select, hold {On Hold} todo {Todo} doing {Doing} passed {Passed} done {Done} other {{column}}}. A card is reviewed in Review; if it needs more work, that is work on it (move it to doing).",
-    "description": "An error: an agent tried to review card #{n} (a number), which is in the column {column} (select: a board column; translate each), not in Review. \"doing\" is the value the call takes: keep it as it is."
+    "defaultMessage": "{card} is in {column, select, hold {On Hold} todo {Todo} doing {Doing} passed {Passed} done {Done} other {{column}}}. A card is reviewed in Review; if it needs more work, that is work on it (move it to doing).",
+    "description": "An error: an agent tried to review card {card} (its key, such as HI-12), which is in the column {column} (select: a board column; translate each), not in Review. \"doing\" is the value the call takes: keep it as it is."
   },
   "tasks.error.reviewOnItsOwn": {
     "defaultMessage": "Start a review on its own: the card stays where it is, with its agent.",
     "description": "An error: a call started a review and also moved the card or gave it to an agent; a review starts on its own."
   },
+  "tasks.error.reviewSkipInReview": {
+    "defaultMessage": "{card} is in Review: whether it skips review is decided before it is submitted. To take it past its review now, the user moves it on (an override, with their reason).",
+    "description": "An error: a card's review skip was to change while the card is in Review. The way past its review is the user's override of the move (dragging it on, or the Assistant moving it with the user's reason). {card} is the card's key (HI-12)."
+  },
+  "tasks.error.reviewSkipNeedsReason": {
+    "defaultMessage": "A card skips review only with the user's reason: pass skipReview with it, in the user's words.",
+    "description": "An error said to the Hive Assistant (or an agent proposing it): it asked for a card to skip its review without a reason. Keep skipReview as it is (a field's name)."
+  },
+  "tasks.error.reviewSkipNotAgents": {
+    "defaultMessage": "Agents can't make a card skip review: propose it when you make the card (skipReview, with your reason), and the user or the Assistant decides.",
+    "description": "An error: an agent tried to make a card skip its review, or to answer a proposal that it skip review, after the card was made; only the user or the Hive Assistant can. Keep skipReview as it is (a field's name)."
+  },
+  "tasks.error.reviewSkipNothing": {
+    "defaultMessage": "{card}'s rules don't review it: there is no review to skip.",
+    "description": "An error: a card was to skip its review, but its project's workflow has no review (Solo, or no workflow). {card} is the card's key (HI-12)."
+  },
+  "tasks.error.reviewSkipNothingNew": {
+    "defaultMessage": "This card's rules don't review it: there is no review to skip.",
+    "description": "An error making a card: it was to skip its review, but its project's workflow has no review (Solo, or no workflow)."
+  },
+  "tasks.error.reviewSkipPast": {
+    "defaultMessage": "{stage, select, done {{card} is Done: it has no review left to skip.} other {{card} is past its review already: there is nothing left to skip.}}",
+    "description": "An error: a card's review skip was to change once the card was past Review (approved, being merged, or Done). {card} is the card's key (HI-12); {stage} its stage (select: done, or another)."
+  },
   "tasks.error.reviewTaken": {
-    "defaultMessage": "{agent} is already reviewing #{n} (since {since} UTC).",
-    "description": "An error: another agent ({agent}, its name) is already reviewing card #{n} (a number), since {since} (a date and time, UTC)."
+    "defaultMessage": "{agent} is already reviewing {card} (since {since} UTC).",
+    "description": "An error: another agent ({agent}, its name) is already reviewing card {card} (its key, such as HI-12), since {since} (a date and time, UTC)."
   },
   "tasks.error.setAsideGone": {
     "defaultMessage": "That set-aside card is gone, or isn't a card: it can only be discarded.",
@@ -268,12 +348,24 @@
     "description": "An error: the call's review was {review}, which it doesn't take. \"start\", \"passed\" and \"failed\" are the values it takes: keep them as they are."
   },
   "tasks.error.unknownTask": {
-    "defaultMessage": "Unknown card #{n}",
-    "description": "An error: there is no card #{n} (a number), or none the caller may see."
+    "defaultMessage": "Unknown card {card}",
+    "description": "An error: there is no card {card} (its key, such as HI-12), or none the caller may see."
   },
   "tasks.error.verdictNotYours": {
-    "defaultMessage": "{agent} is reviewing #{n}: its verdict is its own.",
-    "description": "An error: an agent tried to give a verdict on card #{n} (a number), which another agent ({agent}, its name) is reviewing."
+    "defaultMessage": "{agent} is reviewing {card}: its verdict is its own.",
+    "description": "An error: an agent tried to give a verdict on card {card} (its key, such as HI-12), which another agent ({agent}, its name) is reviewing."
+  },
+  "tasks.history.answerTold": {
+    "defaultMessage": "Told agent {agent} of your answer",
+    "description": "A line in a card's history: Hive told the agent {agent} (its name) of the user's answer to a request for them (For you: an approval, a reply, a decision, a choice at the round limit). A noun before the name (glossary §1 rule 4)."
+  },
+  "tasks.history.answerUntold": {
+    "defaultMessage": "The Hive Assistant couldn't be told of your answer to {agent}'s question: only {agent} has it",
+    "description": "A line in a card's history (and a notification): the user answered a question the agent {agent} (its name) asked on the card; Hive gives such answers to the Hive Assistant too, in case they grant something the agent can't do itself, but the Assistant couldn't be told (its tools are off, or Settings → Assistant → Control doesn't let it change cards)."
+  },
+  "tasks.history.answerUntoldNeed": {
+    "defaultMessage": "{agent} can't {action, select, done {move this card to Done} noCode {make this card no code} skipReview {skip this card's review} other {unblock this card}} by itself, and the Hive Assistant couldn't be told of your answer: do it yourself if you agreed to it",
+    "description": "A line in a card's history (and a notification): the user answered a question the agent {agent} (its name) asked on the card; the card needs something only the user or the Hive Assistant may do (select: translate each; keep the keys), the agent can't, and the Assistant couldn't be told (its tools are off, or Settings → Assistant → Control doesn't let it change cards)."
   },
   "tasks.history.archived": {
     "defaultMessage": "Archived",
@@ -295,6 +387,18 @@
     "defaultMessage": "Archived: {project} was removed from Hive",
     "description": "A line in a card's history: the card was archived because the user removed its project {project} (its folder name) from Hive."
   },
+  "tasks.history.assistantAskUntold": {
+    "defaultMessage": "The Hive Assistant couldn't be told of {agent}'s request on this card: read it in the card's comments and act on it yourself if it needs doing",
+    "description": "A line in a card's history (and a notification), HI-1866: the agent {agent} (its name) asked the Hive Assistant for something on the card, but the request couldn't reach the Assistant (its tools are off, Settings → Assistant → Control doesn't let it change cards, or it went unread too long). The request is the agent's comment on the card."
+  },
+  "tasks.history.assistantAsked": {
+    "defaultMessage": "Asked the Hive Assistant: \"{text}\"",
+    "description": "A line in a card's history (HI-1866): an agent (named beside it) asked the Hive Assistant for something only it or the user can do on the card (put a card On Hold, move it past its rules on the user's answer); {text} is what it asked (cut short). The request went to the Assistant's inbox."
+  },
+  "tasks.history.attachmentsCleaned": {
+    "defaultMessage": "{n, plural, one {Removed # attachment} other {Removed # attachments}} ({names}): this project removes archived cards' attachments {days, plural, one {# day} other {# days}} after archiving (Project Settings → Storage). {n, plural, one {It is} other {They are}} in the Recycle Bin.",
+    "description": "A comment Hive writes on an archived card when it removes the files kept with it: {n} how many, {names} their names (a list), {days} the project's setting (days after the card was archived). Project Settings → Storage is where the setting is: use its translated name."
+  },
   "tasks.history.backWithBatch": {
     "defaultMessage": "Brought back with its batch ({label})",
     "description": "A line in a card's history: the user undid an Archive All, which brought this card back; {label} is the batch's name (\"All in Done\")."
@@ -302,6 +406,14 @@
   "tasks.history.blocked": {
     "defaultMessage": "Blocked: {reason}",
     "description": "A line in a card's history: the card was marked blocked, with this reason ({reason}, written by whoever blocked it)."
+  },
+  "tasks.history.builderReply": {
+    "defaultMessage": "Replied to the reviewer: \"{text}\"",
+    "description": "A line in a card's history (HI-2302): the agent building the card (named beside it) commented on it in Review after its reviewer asked or said something in that round of review, so the reviewer was woken with the reply; {text} is what it said (cut short)."
+  },
+  "tasks.history.closedByDecision": {
+    "defaultMessage": "Closed a question for you with your decision: \"{question}\"",
+    "description": "A line in a card's history (HI-1932): a question waiting for the user (For you) was answered by a decision the user made, recorded on the card (by the user, or by the Hive Assistant writing down the user's words: the history line's author says who). {question} is the question, cut short."
   },
   "tasks.history.context": {
     "defaultMessage": "Read first: {refs}",
@@ -312,8 +424,8 @@
     "description": "A line in a card's history: the card's list of doc sections the agent reads first was cleared."
   },
   "tasks.history.created": {
-    "defaultMessage": "Created in {column, select, hold {On Hold} todo {Todo} doing {Doing} review {Review} passed {Passed} done {Done} other {{column}}}",
-    "description": "A line in a card's history: the card was added, in this column. {column} is a board column (select: On Hold, Todo, Doing, Review, Passed, Done): translate each."
+    "defaultMessage": "Created in {column, select, hold {On Hold} todo {Todo} doing {Active} review {Review} passed {Approved} done {Done} other {{column}}}",
+    "description": "A line in a card's history: the card was added, in this column. {column} is a board column (select: On Hold, Todo, Active, Review, Approved, Done): translate each."
   },
   "tasks.history.decision": {
     "defaultMessage": "Recorded a decision: \"{decision}\"",
@@ -333,11 +445,15 @@
   },
   "tasks.history.dependsOn": {
     "defaultMessage": "Depends on {cards}",
-    "description": "A line in a card's history: the cards that have to be done first were set to these ({cards}: card numbers such as \"#3, #4\")."
+    "description": "A line in a card's history: the cards that have to be done first were set to these ({cards}: card keys such as \"HI-3, HI-4\")."
   },
   "tasks.history.description": {
     "defaultMessage": "Changed the description",
     "description": "A line in a card's history: the card's description was edited."
+  },
+  "tasks.history.followUpSubmitted": {
+    "defaultMessage": "Follow-up submitted for review at {revision}",
+    "description": "A line in a card's history (HI-1832): while the card was in Review, its builder submitted a change its reviewer asked for (a follow-up), which its reviewer reviews now, with no new round. {revision} is a commit's short hash (keep it as it is)."
   },
   "tasks.history.fromOlder": {
     "defaultMessage": "Added from an older Hive, where it was made as #{was}",
@@ -350,6 +466,10 @@
   "tasks.history.imported": {
     "defaultMessage": "Brought back with {project} (it was #{was})",
     "description": "A line in a card's history: the card came back with its removed project {project} (its folder name), under a new number; {was} was its number before."
+  },
+  "tasks.history.kind": {
+    "defaultMessage": "{how, select, made {Made as no code} proposed {Proposed as no code} confirmed {Confirmed as no code} kept {Kept as code} other {Kind changed to {kind, select, code {code} other {no code}}}}",
+    "description": "A line in a card's history (#1277): the card's kind, code (the default) or no code (a decision, a write-up, a trial: no commits): it was made as no code, an agent proposed no code, the user or the Assistant confirmed that or kept it as code, or its kind was changed later (an exception to the rules). Select keys: translate each sentence."
   },
   "tasks.history.labels": {
     "defaultMessage": "Labels: {labels}",
@@ -373,43 +493,55 @@
   },
   "tasks.history.linked": {
     "defaultMessage": "Linked to {cards}",
-    "description": "A line in a card's history: the card's related cards were set to these ({cards}: card numbers such as \"#3, #4\")."
+    "description": "A line in a card's history: the card's related cards were set to these ({cards}: card keys such as \"HI-3, HI-4\")."
   },
   "tasks.history.linksRemoved": {
     "defaultMessage": "Removed the links",
     "description": "A line in a card's history: the card's links to related cards were all removed."
   },
+  "tasks.history.loopStep": {
+    "defaultMessage": "{step, select, design {Posted a design for the reviewer to check} followUp {Posted a follow-up for the reviewer to check} ok {Checked the design: OK} gaps {Checked the design: gaps} okFollowUp {Checked the follow-up: OK} gapsFollowUp {Checked the follow-up: gaps} other {Went ahead with the design unchecked}}: \"{text}\"",
+    "description": "A line in a card's history (#1382, #1467), a step of a card loop: its builder (named beside it) posted a design for its reviewer to check before building (design), or a follow-up of reviewed work for its check, such as a change asked of a screenshot (followUp); the reviewer checked a design and found it OK (ok) or found gaps (gaps), or checked a follow-up so (okFollowUp, gapsFollowUp); or, with no answer in time, the builder went ahead with its design as posted (other). {text} is what they said (cut short). Select keys: translate each sentence."
+  },
   "tasks.history.loopWake": {
-    "defaultMessage": "Woke {agent} {kind, select, review {to review it} other {with its verdict}} (a loop wake)",
-    "description": "A line in a card's history: in a card loop, Hive woke the agent {agent} (its name), as the card arrived in Review for it to review (review), or with its review's verdict (other). \"Card loop\" and \"loop wake\" are Hive's terms."
+    "defaultMessage": "Woke {agent} {kind, select, review {to review it} step {with a card loop step} other {with its verdict}} (a loop wake)",
+    "description": "A line in a card's history: in a card loop, Hive woke the agent {agent} (its name), as the card arrived in Review for it to review (review), with a step of the loop for it (step: its builder's design to check, or its reviewer's answer, #1382), or with its review's verdict (other). \"Card loop\" and \"loop wake\" are Hive's terms."
   },
   "tasks.history.moved": {
-    "defaultMessage": "Moved to {column, select, hold {On Hold} todo {Todo} doing {Doing} review {Review} passed {Passed} done {Done} other {{column}}}",
-    "description": "A line in a card's history: the card was moved to this column. {column} is a board column (select: On Hold, Todo, Doing, Review, Passed, Done): translate each."
+    "defaultMessage": "Moved to {column, select, hold {On Hold} todo {Todo} doing {Active} review {Review} passed {Approved} done {Done} other {{column}}}",
+    "description": "A line in a card's history: the card was moved to this column. {column} is a board column (select: On Hold, Todo, Active, Review, Approved, Done): translate each."
   },
   "tasks.history.movedBefore": {
-    "defaultMessage": "Moved to {column, select, hold {On Hold} todo {Todo} doing {Doing} review {Review} passed {Passed} done {Done} other {{column}}}, before #{before}",
-    "description": "A line in a card's history: the card was moved to this column, just above card #{before} (a number). {column} is a board column (select: On Hold, Todo, Doing, Review, Passed, Done): translate each."
+    "defaultMessage": "Moved to {column, select, hold {On Hold} todo {Todo} doing {Active} review {Review} passed {Approved} done {Done} other {{column}}}, before {before}",
+    "description": "A line in a card's history: the card was moved to this column, just above card {before} (its key, such as HI-12; #12 in lines from before keys). {column} is a board column (select: On Hold, Todo, Active, Review, Approved, Done): translate each."
   },
   "tasks.history.movedBeforeIn": {
-    "defaultMessage": "Moved before #{before} in {column, select, hold {On Hold} todo {Todo} doing {Doing} review {Review} passed {Passed} done {Done} other {{column}}}",
-    "description": "A line in a card's history: within its column, the card was moved just above card #{before} (a number). {column} is a board column (select: On Hold, Todo, Doing, Review, Passed, Done): translate each."
+    "defaultMessage": "Moved before {before} in {column, select, hold {On Hold} todo {Todo} doing {Active} review {Review} passed {Approved} done {Done} other {{column}}}",
+    "description": "A line in a card's history: within its column, the card was moved just above card {before} (its key, such as HI-12; #12 in lines from before keys). {column} is a board column (select: On Hold, Todo, Active, Review, Approved, Done): translate each."
   },
   "tasks.history.movedBottom": {
-    "defaultMessage": "Moved to the bottom of {column, select, hold {On Hold} todo {Todo} doing {Doing} review {Review} passed {Passed} done {Done} other {{column}}}",
-    "description": "A line in a card's history: the card was put last in this column. {column} is a board column (select: On Hold, Todo, Doing, Review, Passed, Done): translate each."
+    "defaultMessage": "Moved to the bottom of {column, select, hold {On Hold} todo {Todo} doing {Active} review {Review} passed {Approved} done {Done} other {{column}}}",
+    "description": "A line in a card's history: the card was put last in this column. {column} is a board column (select: On Hold, Todo, Active, Review, Approved, Done): translate each."
   },
   "tasks.history.movedTop": {
-    "defaultMessage": "Moved to the top of {column, select, hold {On Hold} todo {Todo} doing {Doing} review {Review} passed {Passed} done {Done} other {{column}}}",
-    "description": "A line in a card's history: the card was put first in this column. {column} is a board column (select: On Hold, Todo, Doing, Review, Passed, Done): translate each."
+    "defaultMessage": "Moved to the top of {column, select, hold {On Hold} todo {Todo} doing {Active} review {Review} passed {Approved} done {Done} other {{column}}}",
+    "description": "A line in a card's history: the card was put first in this column. {column} is a board column (select: On Hold, Todo, Active, Review, Approved, Done): translate each."
   },
   "tasks.history.noDependencies": {
     "defaultMessage": "No longer depends on other cards",
     "description": "A line in a card's history: the list of cards that had to be done first was cleared."
   },
+  "tasks.history.notified": {
+    "defaultMessage": "Notified you {event, select, failed {that its review failed} blocked {that it's blocked} stalled {that it has stalled} mergeDue {that every card of lane {lane} passed review, so its merge is due} mergeStalled {that the merge of lane {lane} has stalled} other {that it needs you}}{hasWhy, select, yes {: {why}} other {}}",
+    "description": "A line in a card's history: Hive sent the user a notification about this card (a banner or a Windows notification): its review failed, it is blocked, it has stalled, every card of its lane ({lane}, a label such as “B1 / R1 (greetings)”) passed review so the lane's work can be merged, that merge has stalled, or the card needs the user (an approval, a question) (select: translate each). A lane is Hive's record of a card loop. With hasWhy yes, it ends with what the notification said ({why}): why it is blocked or stalled, or the question (someone's own words, or Hive's own sentence already translated)."
+  },
   "tasks.history.placed": {
-    "defaultMessage": "Placed {place, selectordinal, one {#st} two {#nd} few {#rd} other {#th}} in {column, select, hold {On Hold} todo {Todo} doing {Doing} review {Review} passed {Passed} done {Done} other {{column}}}",
-    "description": "A line in a card's history: an agent put the column's cards in order, and this card is now at place {place} (an ordinal: 2nd, 3rd). {column} is a board column (select: On Hold, Todo, Doing, Review, Passed, Done): translate each."
+    "defaultMessage": "Placed {place, selectordinal, one {#st} two {#nd} few {#rd} other {#th}} in {column, select, hold {On Hold} todo {Todo} doing {Active} review {Review} passed {Approved} done {Done} other {{column}}}",
+    "description": "A line in a card's history: an agent put the column's cards in order, and this card is now at place {place} (an ordinal: 2nd, 3rd). {column} is a board column (select: On Hold, Todo, Active, Review, Approved, Done): translate each."
+  },
+  "tasks.history.queueReturned": {
+    "defaultMessage": "Came back from the merge queue: {reason, select, conflict {a conflict with {target}} checks {the merge check {check} failed on the merged result} checksSome {a merge check failed on the merged result} checksEnv {the merge check {check} failed because of the environment, not the work} install {the install before the merge checks failed} hook {a git hook refused its merge commit} targetMoved {{target} moved while it was being merged} folderBusy {the folder {target} is checked out in was busy} notUpToDate {it isn't up to date with {target}} focused {its focused tests couldn't run on the merged result} other {{reason}}}{files, select, none {} other { (in {files})}}. The card's Work section shows the run.",
+    "description": "A comment Hive writes on a card when the merge queue sends it back to its builder instead of merging it (HI-2087). {reason} says why (select: translate each; keep the keys): a merge conflict with the target branch {target} (a branch name, such as main), a merge check {check} (the check's name, such as typecheck) that failed on the merged result or failed because of the machine or network rather than the code, the install before the checks, a git hook that refused the merge commit, the target branch moving while it was merged, the folder where the target branch is checked out being busy, the card's work not being up to date with the target, or its focused tests. {files} lists the files concerned (file paths, keep them; none: leave that part out). \"Merge queue\" and \"Work section\" are Hive's terms."
   },
   "tasks.history.renamed": {
     "defaultMessage": "Renamed to \"{title}\"",
@@ -419,6 +551,10 @@
     "defaultMessage": "Project: {from} → {to} (renamed or moved)",
     "description": "A line in a card's history, by Repair: the card was given to the project {to}, the new name of its project {from} (folder names), which was renamed or moved."
   },
+  "tasks.history.requestClosed": {
+    "defaultMessage": "{why, select, done {Closed a question for you: the card is in Done} other {Closed a question for you: the agent that asked carried on}}",
+    "description": "A line in a card's history (#1638): a question waiting for the user (For you) was closed without an answer, because the card reached Done, or because the agent that asked moved the card on itself (answered some other way). Keep the select keys."
+  },
   "tasks.history.restored": {
     "defaultMessage": "Brought back: {project} was restored",
     "description": "A line in a card's history: the card came back onto the board because the user restored its project {project} (its folder name)."
@@ -426,6 +562,14 @@
   "tasks.history.returned": {
     "defaultMessage": "Returned for review, round {round}",
     "description": "A line in a card's history: after a failed review, the card was sent back for its next review; {round} is the round's number."
+  },
+  "tasks.history.reviewCopyLeased": {
+    "defaultMessage": "{agent} reviews in {copy} at {revision}",
+    "description": "A line in a card's history (#1439): the reviewer {agent} (its name) reviews in the review copy {copy} (its name, \"copy-2\": keep it as it is), a folder at exactly the revision {revision} (a commit id: keep it as it is)."
+  },
+  "tasks.history.reviewCopyWaiting": {
+    "defaultMessage": "{agent} is waiting for a review copy",
+    "description": "A line in a card's history (#1439): the reviewer {agent} (its name) started reviewing, but every review copy is in use or being set up; Hive gives it one when it can. A review copy: a folder Hive keeps at exactly the revision under review."
   },
   "tasks.history.reviewEnded": {
     "defaultMessage": "Review by {agent} stopped: {why, select, sessionEnded {its session ended} agentRemoved {the agent was removed} other {{why}}}",
@@ -439,6 +583,10 @@
     "defaultMessage": "Review passed",
     "description": "A line in a card's history: the reviewer (named beside it) passed the card's review."
   },
+  "tasks.history.reviewSkip": {
+    "defaultMessage": "{how, select, set {Set to skip review} proposed {Proposed to skip review} confirmed {Confirmed to skip review} kept {Kept with its review} other {Set to be reviewed}}",
+    "description": "A line in a card's history (#1625): whether the card skips its review: it was set to skip review (by the user, or the Assistant with the user's reason), an agent proposed that, the user or the Assistant confirmed it or kept the review, or it was set back to be reviewed. Select keys: translate each sentence."
+  },
   "tasks.history.reviewStarted": {
     "defaultMessage": "Started reviewing",
     "description": "A line in a card's history: an agent (named beside it) began reviewing the card."
@@ -447,9 +595,21 @@
     "defaultMessage": "Review by {agent} stopped",
     "description": "A line in a card's history: the review the agent {agent} (its name) had going on the card ended without a verdict (the card moved on)."
   },
+  "tasks.history.reviewerRequest": {
+    "defaultMessage": "Asked the builder: \"{text}\"",
+    "description": "A line in a card's history: the card's reviewer (named beside it), mid-review, asked the agent building it for something (a commit, a run); {text} is what it asked (cut short). Builder: the agent working on the card."
+  },
   "tasks.history.safeguardStop": {
     "defaultMessage": "**{agent}, after a safeguard stop:** {stops, plural, =0 {} other {A safety classifier stopped a response{model, select, none {} other { on {model}}} at {time}{stops, plural, =1 {} other { (# this session)}}. }}It now runs on {to} instead of {from} (since {since}).{state, select, asks { Its CLI asks what to do about it.} idle { Idle after the stop: give it a nudge.} other {}}{hasTools, select, yes { Before it, its last tool calls: {tools}.} other {}}{hasHelp, select, yes { {help}} other {}}",
     "description": "A comment Hive writes on the cards an agent works on, after its CLI's safety classifier stopped a response and the agent moved to another model. {agent}: the agent's name, in bold (keep the ** marks). Then, when it stopped any ({stops}: how many this session), on which model ({model}: its name; none: leave that branch empty) and when ({time}: \"15:12\"); the model it runs on now ({to}) instead of the old one ({from}) since a time ({since}); whether its CLI asks what to do (asks) or it sits idle (idle); its last tool calls before the stop ({tools}: tool names, keep them); and what to do about it in that CLI ({help}: its own sentence, already translated). Only names, never what was stopped."
+  },
+  "tasks.history.stageRepaired": {
+    "defaultMessage": "Recorded as Done, as the board had it: its workflow still had it in {stage, select, hold {On Hold} todo {Todo} active {Active} review {Review} approved {Approved} merging {Merging} other {{stage}}}",
+    "description": "A line in a card's history, by Hive (HI-1674): the card was in the Done column, but a move had not reached its workflow, which still had it at an earlier stage ({stage}, select: a board stage; translate each); Hive recorded it as Done and closed its open questions."
+  },
+  "tasks.history.startsWithout": {
+    "defaultMessage": "{card} was moved to Done without its work in the target ({reason}): this card can start without it.",
+    "description": "A comment from Hive on a card that depends on another (HI-2014): the user (or the Hive Assistant with the user's reason) moved {card} (a card's key, such as HI-12) to Done by an override, without its work being merged into the target branch; this card no longer waits for it and starts without that work. {reason} is the override's reason, in the words it was given."
   },
   "tasks.history.takenFrom": {
     "defaultMessage": "Taken from {agent}",
@@ -484,16 +644,20 @@
     "description": "A line in a card's history: the card's blocked reason was cleared."
   },
   "tasks.history.watchEnded": {
-    "defaultMessage": "Ended {watcher}'s watch on it: {why, select, blocked {the card is blocked} reviewer {{agent} reviews it} reviewTaken {its review was taken from it} reassigned {reassigned to {agent}} unassigned {reassigned to no agent} other {{why}}}",
-    "description": "A line in a card's history: Hive stopped the agent {watcher} (its name) waiting for the card to change, because the card is blocked, another agent ({agent}) now reviews it, the review it waited for was taken from it, or the card was given to another agent ({agent}) or to none ({why}, select: translate each)."
+    "defaultMessage": "Ended {watcher}'s watch on it: {why, select, blocked {the card is blocked} reviewer {{agent} reviews it} reviewTaken {its review was taken from it} reassigned {reassigned to {agent}} unassigned {reassigned to no agent} done {the card is in Done} laneEnded {its lane ended} laneAbandoned {its lane was abandoned} other {{why}}}",
+    "description": "A line in a card's history: Hive stopped the agent {watcher} (its name) waiting for the card to change, because the card is blocked, another agent ({agent}) now reviews it, the review it waited for was taken from it, the card was given to another agent ({agent}) or to none, the card reached the Done column (its work merged), or the card loop (lane) the agent waited in ended or was abandoned ({why}, select: translate each)."
   },
   "tasks.skipped.movedColumn": {
-    "defaultMessage": "moved to {column, select, hold {On Hold} todo {Todo} doing {Doing} review {Review} passed {Passed} done {Done} other {{column}}}",
-    "description": "Why Archive All left a card on the board (after its number, \"#12 moved to Doing\"): it moved to the column {column} meanwhile (select: a board column; translate each). Lower case: it follows the number."
+    "defaultMessage": "moved to {column, select, hold {On Hold} todo {Todo} doing {Active} review {Review} passed {Approved} done {Done} other {{column}}}",
+    "description": "Why Archive All left a card on the board (after its number, \"#12 moved to Active\"): it moved to the column {column} meanwhile (select: a board column; translate each). Lower case: it follows the number."
   },
   "tasks.skipped.movedProject": {
     "defaultMessage": "moved to another project",
     "description": "Why Archive All left a card on the board (after its number, \"#12 moved to another project\"): it moved to another project meanwhile. Lower case: it follows the number."
+  },
+  "tasks.skipped.movedStage": {
+    "defaultMessage": "moved to {stage}",
+    "description": "Why Archive All of a stage column (Approved beside Merging) left a card on the board (after its number, \"#12 moved to Merging\"): it moved to another stage of the column meanwhile. {stage} is the stage’s name (glossary 2.2). Lower case: it follows the number."
   },
   "tasks.skipped.noMatch": {
     "defaultMessage": "no longer matches the search",
@@ -512,52 +676,56 @@
     "description": "An error: a card can't be started with the agent {agent} (its name) now, because of what it is doing ({status}, select: working, starting, waiting for the user, waiting on background tasks it started, or waiting on cards in a card watch; translate each). Cancel is the button in the agent's header."
   },
   "tasks.start.alreadyStarting": {
-    "defaultMessage": "#{n} is already being started.",
-    "description": "An error: card #{n} (a number) is being started already; a second Start of it is refused."
+    "defaultMessage": "{card} is already being started.",
+    "description": "An error: card {card} (its key, such as HI-12) is being started already; a second Start of it is refused."
   },
   "tasks.start.archived": {
-    "defaultMessage": "#{n} is archived. Bring it back first.",
-    "description": "An error: card #{n} (a number) is archived, so it cannot be started; bring it back onto the board first."
+    "defaultMessage": "{card} is archived. Bring it back first.",
+    "description": "An error: card {card} (its key, such as HI-12) is archived, so it cannot be started; bring it back onto the board first."
   },
   "tasks.start.beingGiven": {
     "defaultMessage": "{agent} is being given another card. Start this one once it's idle, or give it to another agent.",
     "description": "An error: the agent {agent} (its name) is being given another card right now, so this one cannot be started with it."
   },
   "tasks.start.changed": {
-    "defaultMessage": "#{n} changed while it was being started (archived, moved, given to another agent, or its Read first edited): start it again if it should still go.",
-    "description": "An error: the card #{n} (a number) was changed while Hive was starting it (archived, moved to another column or project, given to another agent, deleted, or its Read first doc sections edited), so it wasn't given to the agent. Read first is the card's field: keep its name as the card dialog shows it."
+    "defaultMessage": "{card} changed while it was being started (archived, moved, given to another agent, or its Read first edited): start it again if it should still go.",
+    "description": "An error: the card {card} (its key, such as HI-12) was changed while Hive was starting it (archived, moved to another column or project, given to another agent, deleted, or its Read first doc sections edited), so it wasn't given to the agent. Read first is the card's field: keep its name as the card dialog shows it."
   },
   "tasks.start.movedColumn": {
-    "defaultMessage": "#{n} was moved to {column, select, hold {On Hold} todo {Todo} doing {Doing} review {Review} passed {Passed} done {Done} other {{column}}} meanwhile. Start it again if it's still to do.",
-    "description": "An error: while card #{n} (a number) was being started, it was moved to the column {column} (select: a board column; translate each)."
+    "defaultMessage": "{card} was moved to {column, select, hold {On Hold} todo {Todo} doing {Active} review {Review} passed {Approved} done {Done} other {{column}}} meanwhile. Start it again if it's still to do.",
+    "description": "An error: while card {card} (its key, such as HI-12) was being started, it was moved to the column {column} (select: a board column; translate each)."
   },
   "tasks.start.movedDone": {
-    "defaultMessage": "#{n} was moved to Done meanwhile. Start it again if there is more to do.",
-    "description": "An error: while card #{n} (a number) was being started, it was moved to Done (a board column)."
+    "defaultMessage": "{card} was moved to Done meanwhile. Start it again if there is more to do.",
+    "description": "An error: while card {card} (its key, such as HI-12) was being started, it was moved to Done (a board column)."
   },
   "tasks.start.movedProject": {
-    "defaultMessage": "#{n} moved to {project} meanwhile. Start it again.",
-    "description": "An error: while card #{n} (a number) was being started, it was moved to the project {project} (a folder name)."
+    "defaultMessage": "{card} moved to {project} meanwhile. Start it again.",
+    "description": "An error: while card {card} (its key, such as HI-12) was being started, it was moved to the project {project} (a folder name)."
   },
   "tasks.start.movedWorkspace": {
-    "defaultMessage": "#{n} moved to the workspace meanwhile. Start it again.",
-    "description": "An error: while card #{n} (a number) was being started, it was taken out of its project, to the whole workspace."
+    "defaultMessage": "{card} moved to the workspace meanwhile. Start it again.",
+    "description": "An error: while card {card} (its key, such as HI-12) was being started, it was taken out of its project, to the whole workspace."
   },
   "tasks.start.noProject": {
-    "defaultMessage": "#{n} has no project. Give it one first: the agent works in that project.",
-    "description": "An error: card #{n} (a number) belongs to no project (only the workspace), so no agent can start it; give it a project first."
+    "defaultMessage": "{card} has no project. Give it one first: the agent works in that project.",
+    "description": "An error: card {card} (its key, such as HI-12) belongs to no project (only the workspace), so no agent can start it; give it a project first."
+  },
+  "tasks.start.noSlot": {
+    "defaultMessage": "{card} wasn't started: its project builds each card in a slot, and {active, select, yes {its start has none} other {this start got none}}, so its agent would have worked in the project folder. {active, select, yes {Put it back to Todo, then start it again.} other {The card is back where it was: start it again.}}",
+    "description": "An error: a Start of the card {card} (its key, such as HI-12) was refused. The card's project has each card built in a slot (a working folder of its own), but the card's start has no slot, so the agent would have worked in the project's own folder instead. {active} (select): yes, the card was already Active (in work) with no slot, and must be put back to Todo and started again; other, this start was undone and the card moved back to its column. Translate both."
   },
   "tasks.start.notGiven": {
-    "defaultMessage": "{agent} wasn't given #{n}: {why}.",
-    "description": "An error: the card #{n} (a number) could not be typed into the terminal of the agent {agent} (its name); {why} says why."
+    "defaultMessage": "{agent} wasn't given {card}: {why}.",
+    "description": "An error: the card {card} (its key, such as HI-12) could not be typed into the terminal of the agent {agent} (its name); {why} says why."
   },
   "tasks.start.noteTooLong": {
     "defaultMessage": "The note is too long (at most {max, number} characters).",
     "description": "An error: the note given with a Start (what the agent should do now) is longer than it may be ({max}, a number of characters)."
   },
   "tasks.start.reassigned": {
-    "defaultMessage": "#{n} was given to {who, select, another {another agent} other {nobody}} meanwhile. Start it again if it's still to do.",
-    "description": "An error: while card #{n} (a number) was being started, it was given to another agent, or taken from its agent ({who}, select: translate each)."
+    "defaultMessage": "{card} was given to {who, select, another {another agent} other {nobody}} meanwhile. Start it again if it's still to do.",
+    "description": "An error: while card {card} (its key, such as HI-12) was being started, it was given to another agent, or taken from its agent ({who}, select: translate each)."
   },
   "tasks.start.userTyping": {
     "defaultMessage": "The user has just typed in {agent}'s terminal and may still be writing there. Ask the user first.",

@@ -1,0 +1,90 @@
+{
+  "connections.choice.account": {
+    "defaultMessage": "{account} ({cli})",
+    "description": "A group in the choice of connection (HI-2108): the account the connections under it are on ({account}: its name, \"Personal\") and its coding agent CLI ({cli}: \"Claude Code\")."
+  },
+  "connections.choice.label": {
+    "defaultMessage": "Connection",
+    "description": "Label of the choice of connection an agent runs on (Agent Settings, Add Agent, Settings → Assistant): which login or service runs it."
+  },
+  "connections.choice.new": {
+    "defaultMessage": "New Connection…",
+    "description": "Button beside the choice of connection (Add Agent, HI-2108): opens the connection dialog to make another setup (model, effort, mode) on the chosen connection's account."
+  },
+  "connections.choice.noneCli": {
+    "defaultMessage": "No {cli} account is on in this workspace. Add one in Settings → Accounts & Connections.",
+    "description": "Under the choice of connection when no account of the coding agent CLI it is limited to ({cli}: \"Claude Code\") is on in this workspace (HI-2108). Settings → Accounts & Connections names a section."
+  },
+  "connections.choice.noneHere": {
+    "defaultMessage": "No account is on in this workspace. Add one in Settings → Accounts & Connections.",
+    "description": "Under the choice of connection when no account is on in this workspace (HI-2108). Settings → Accounts & Connections names a section."
+  },
+  "connections.choice.notInstalled": {
+    "defaultMessage": "{cli} isn't installed",
+    "description": "Why a connection is greyed out in the choice of connection (HI-2108 round 1): its coding agent CLI ({cli}: \"Codex\") isn't installed on this PC. A short clause, lower case after the name."
+  },
+  "connections.choice.offHere": {
+    "defaultMessage": "{name} (its account is off here: its CLI's first usable connection runs it)",
+    "description": "A choice of connection that is chosen but on an account turned off in this workspace ({name}: the connection's name) (HI-2108): the agent runs on its CLI's first usable connection instead."
+  },
+  "connections.choice.pick": {
+    "defaultMessage": "Choose a connection",
+    "description": "The first choice of connection when none is chosen yet (HI-2108)."
+  },
+  "connections.choice.removed": {
+    "defaultMessage": "A removed connection (its CLI's first usable one runs it)",
+    "description": "A choice of connection that no longer exists (HI-2108): the agent runs on its CLI's first usable connection until another is chosen."
+  },
+  "connections.choice.unavailable": {
+    "defaultMessage": "{name} — {why}",
+    "description": "A choice of connection that can't be chosen here (HI-2108), greyed out: its name ({name}) and why ({why}, a short clause)."
+  },
+  "connections.intro.add": {
+    "defaultMessage": "Add an Account",
+    "description": "The one-time accounts banner's button (HI-2108): opens Settings → Accounts & Connections."
+  },
+  "connections.intro.dismiss": {
+    "defaultMessage": "Dismiss",
+    "description": "The one-time connections banner's button: hides it for good."
+  },
+  "connections.intro.text": {
+    "defaultMessage": "Agents now run on accounts: add one for {clis} in Settings → Accounts & Connections and sign it in there. Hive no longer uses the sign-in of your own terminal, which stays as it is.",
+    "description": "A one-time banner in the main window (HI-1774; HI-2108): coding agents now each run on an account (a sign-in Hive keeps, Settings → Accounts & Connections) and none has been added yet. {clis} names the coding agent CLIs, joined (\"Claude Code and Codex\")."
+  },
+  "connections.mark.anotherMark": {
+    "defaultMessage": "Running on another connection than the one chosen",
+    "description": "Accessible label of the ⟳ mark beside a running agent's connection in its row (HI-1769)."
+  },
+  "connections.mark.none": {
+    "defaultMessage": "No connection",
+    "description": "An agent's row, in place of its connection (HI-1769): the workspace has no connection on for its CLI, so it can't start. Short."
+  },
+  "connections.mark.noneUsable": {
+    "defaultMessage": "No {cli} account is on in this workspace: it can't start until one is (Settings → Accounts & Connections).",
+    "description": "The hover of an agent's row (HI-2108): no account of its CLI ({cli}: \"Claude Code\") is on in this workspace. Settings → Accounts & Connections names a section."
+  },
+  "connections.mark.offHere": {
+    "defaultMessage": "{wanted} is on an account that's off in this workspace: {name}, its CLI's first usable connection, runs it",
+    "description": "The hover of an agent's connection in its row (HI-2108): its own connection ({wanted}) is on an account turned off in this workspace, so its CLI's first usable connection ({name}) runs it."
+  },
+  "connections.mark.offNoDefault": {
+    "defaultMessage": "{wanted} is off here",
+    "description": "An agent's row, in place of its connection (HI-1769): its own connection ({wanted}) is off in this workspace and no other is on to run it. Short."
+  },
+  "connections.mark.offNoDefaultUsable": {
+    "defaultMessage": "{wanted} is off in this workspace, and no other {cli} account is on: it can't start until one is (Settings → Accounts & Connections).",
+    "description": "The hover of an agent's row (HI-2108): its own connection ({wanted}) is on an account off here and no other account of its CLI ({cli}) is on in this workspace. Settings → Accounts & Connections names a section."
+  },
+  "connections.mark.other": {
+    "defaultMessage": "Runs on {running} until it restarts. Chosen now: {chosen}",
+    "description": "The hover of a running agent's connection in its row (HI-1769, shown with a ⟳ mark): its run is on one connection ({running}) and the one it would start on now is another ({chosen}: a connection's name, or why none can run it). It keeps the one it runs on until it restarts."
+  },
+  "connections.mark.own": {
+    "defaultMessage": "{name}: its own choice",
+    "description": "The hover of an agent's connection in its row (HI-1769): the connection ({name}) was chosen for it in its Agent Settings."
+  },
+  "connections.mark.removed": {
+    "defaultMessage": "The connection chosen for it was removed: {name}, its CLI's first usable connection, runs it until you choose another in its Agent Settings",
+    "description": "The hover of an agent's connection in its row (HI-2108): its connection was removed, so its CLI's first usable connection ({name}) runs it. Agent Settings names a dialog."
+  }
+}

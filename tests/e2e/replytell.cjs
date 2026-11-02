@@ -24,6 +24,8 @@ const check = (name, ok, extra = '') => {
 ;(async () => {
   for (const d of [userData, ws, claudeHome]) fs.rmSync(d, { recursive: true, force: true })
   fs.mkdirSync(claudeHome, { recursive: true })
+  // Every read of the agents' input recorded, for typeLine (#1560).
+  lib.logFakeInput(claudeHome)
   lib.gitProject(alpha)
   fs.writeFileSync(path.join(claudeHome, 'fake-trusted.json'), JSON.stringify([alpha.toLowerCase(), ws.toLowerCase()]))
   lib.enableProviders(userData)
@@ -55,8 +57,14 @@ const check = (name, ok, extra = '') => {
     const f = path.join(claudeHome, 'fake-wakes.jsonl')
     return (fs.existsSync(f) ? fs.readFileSync(f, 'utf8').trim().split('\n').filter(Boolean).map((l) => JSON.parse(l)) : []).filter((w) => w.agent === 'Assistant').map((w) => w.text)
   }
-  /** Types into a terminal as the user does; Enter separately when asked. */
+  /**
+   * Types into a terminal as the user does; Enter separately when asked. Into the Assistant (its watches), typed again if
+   * a wake of Hive's disturbed it (lib.typeLine, #1560). Into the builder not (#1560's exemption): its typing is the
+   * user's reply under test, which a second try would send twice; a pause before its Enter, on purpose: the fake reads
+   * a typed line before its Enter, as a CLI does.
+   */
   const type = async (p, id, text, enter = true) => {
+    if (p === home && enter) return lib.typeLine(inv, lib.ptyKey(p, id), claudeHome, null, text, { live: () => live(p, id) })
     await inv('pty:write', lib.ptyKey(p, id), text)
     if (!enter) return
     await lib.sleep(300)
@@ -67,6 +75,9 @@ const check = (name, ok, extra = '') => {
   await page.getByText('alpha', { exact: true }).first().click()
   const builder = await lib.addAgent(inv, alpha, { name: 'Builder' })
   const card = (await inv('tasks:create', { title: 'Pick the icon', project: 'alpha', agent: builder.id })).number
+  // Wakes name a card by its key with the number the tools take (#1219): its own key, from the board.
+  const named = `${(await inv('tasks:list')).find((c) => c.number === card).key}`
+  check('the card has a key of its project', /^[A-Z]{2,4}-\d+$/.test(named), named)
   await inv('tasks:update', card, { column: 'doing', agent: builder.id })
   await inv('session:start', alpha, { agentId: builder.id })
   await inv('session:start', home, { agentId: 'assistant' })
@@ -86,7 +97,7 @@ const check = (name, ok, extra = '') => {
   check('the reply wakes the Assistant', !!(await until(async () => wakes().length >= 1, 20000)))
   await lib.sleep(2000) // A fixed wait on purpose: this checks that a second line does NOT come.
   const w1 = wakes()
-  check('…once, with the reply, the agent and the card', w1.length === 1 && w1[0].startsWith(`[Hive] User replied to Builder on #${card}: "C, the hive cell"`), JSON.stringify(w1))
+  check('…once, with the reply, the agent and the card', w1.length === 1 && w1[0].startsWith(`[Hive] User replied to Builder on ${named}: "C, the hive cell"`), JSON.stringify(w1))
   await until(async () => (await idle(home, 'assistant')) && (await idle(alpha, builder.id)), 20000)
 
   // A line Hive types into Builder (a task the Assistant gives it, then watches its card) isn't the user's.
@@ -107,7 +118,7 @@ const check = (name, ok, extra = '') => {
   // On again: told, naming the user as Settings → General → Your name says (#426).
   await inv('settings:update', { assistant: { tellReplies: true }, general: { userName: 'Darren' } })
   await type(alpha, builder.id, 'Ship it')
-  check('on again: the next reply is told, by the name in Settings', !!(await until(async () => wakes().length === 2 && wakes()[1].startsWith(`[Hive] Darren replied to Builder on #${card}: "Ship it"`), 20000)), JSON.stringify(wakes().slice(1)))
+  check('on again: the next reply is told, by the name in Settings', !!(await until(async () => wakes().length === 2 && wakes()[1].startsWith(`[Hive] Darren replied to Builder on ${named}: "Ship it"`), 20000)), JSON.stringify(wakes().slice(1)))
 
   // #1099: the Assistant watches Builder while Builder is idle (answered at once: no watch starts) and ends its turn.
   // The user's reply to Builder still reaches it within seconds, as a wake of its own.

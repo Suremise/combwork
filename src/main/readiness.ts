@@ -19,6 +19,8 @@ import type { LiveSessionState } from '../shared/types'
  */
 export function readyFor(st: LiveSessionState | null | undefined, need: DeliveryNeed = 'idle'): boolean {
   if (!st) return false
+  // Its hooks aren't arriving (#1336): Hive can't tell when it is free, nor confirm a line it types.
+  if (st.hooksMissing) return false
   if (!st.runtime) return byStatus(st, need)
   const rt = agentRuntime(st)
   if (!(rt.lifecycle === 'running' || (need === 'stalled' && rt.lifecycle === 'signin'))) return false

@@ -3,7 +3,7 @@ import type { MergeSlotInfo } from '@shared/types'
 import { fmt, msg, tr, tRich } from '@shared/i18n'
 import { attempt } from '../actions'
 import { call } from '../api'
-import { confirm, set, useLanguage, useStore } from '../store'
+import { cardLabelOf, confirm, get, setLoaded, useLanguage, useStore } from '../store'
 import { useNow } from '../usage'
 import { Icon, Tooltip } from './ui'
 
@@ -20,7 +20,7 @@ export function useMergeSlots(): MergeSlotInfo[] {
   useEffect(() => {
     if (!ws) return
     let current = true
-    void call('mergeSlots:list').then((slots) => current && set({ mergeSlots: slots }))
+    void call('mergeSlots:list').then((slots) => current && setLoaded({ mergeSlots: slots }))
     return () => {
       current = false
     }
@@ -52,7 +52,7 @@ export function holderWords(h: Holder, start = false): string {
       ? tr(msg({ id: 'board.slots.youMergingStart', defaultMessage: 'You are merging', description: 'Who holds the merge slot, at the start of a line: the user (merging from the window).' }))
       : tr(msg({ id: 'board.slots.youMerging', defaultMessage: 'you are merging', description: 'Who holds the merge slot, inside a line ("main: you are merging (3 min so far…)"): the user (merging from the window). Lower case.' }))
   }
-  const values = { agent: start ? h.name[0].toUpperCase() + h.name.slice(1) : h.name, cards: h.cards.length ? h.cards.map((n) => `#${n}`).join(', ') : 'none' }
+  const values = { agent: start ? h.name[0].toUpperCase() + h.name.slice(1) : h.name, cards: h.cards.length ? h.cards.map((n) => cardLabelOf(get(), n)).join(', ') : 'none' }
   if (h.taken) return tr(msg({ id: 'board.slots.agentMerging', defaultMessage: '{agent} is merging{cards, select, none {} other { {cards}}}', description: 'Who holds the merge slot: an agent ({agent}) merging, then the cards it merges ({cards}: "#305, #306"; none: leave that branch empty).' }), values)
   return tr(msg({ id: 'board.slots.agentNext', defaultMessage: '{agent} is next to merge{cards, select, none {} other { {cards}}}', description: 'Who holds the merge slot: an agent ({agent}) whose turn it is, not started yet, then the cards it will merge ({cards}: "#305, #306"; none: leave that branch empty).' }), values)
 }

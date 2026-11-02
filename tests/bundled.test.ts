@@ -205,6 +205,28 @@ describe('a workspace', () => {
     }
   })
 
+  it('writes the manifest only when it changes what the file holds (HI-1705: every open wrote it)', async () => {
+    const ws = join(base, 'unchanged')
+    mkdirSync(ws, { recursive: true })
+    const w = await opened(ws)
+    try {
+      await wsMod.inWorkspace(w, () => mod.syncBundled({ fresh: true }))
+      const file = join(ws, '.hive', 'bundled.json')
+      // A mark the sync would overwrite if it wrote the file: still there after one that changes nothing.
+      const text = readFileSync(file, 'utf8')
+      writeFileSync(file, text + ' ')
+      await wsMod.inWorkspace(w, () => mod.syncBundled())
+      expect(readFileSync(file, 'utf8')).toBe(text + ' ')
+      // A manifest from before 0.9.3 (its modes under "personas") is written in today's form, though nothing else changed.
+      const m = JSON.parse(text)
+      writeFileSync(file, JSON.stringify({ skills: m.skills, personas: m.modes }))
+      await wsMod.inWorkspace(w, () => mod.syncBundled())
+      expect(JSON.parse(readFileSync(file, 'utf8'))).toEqual(m)
+    } finally {
+      await wsMod.disposeWorkspaceService(w)
+    }
+  })
+
   it('an older one: untouched copies updated, edited ones and the user’s kept, deleted ones left, new ones added', async () => {
     const ws = join(base, 'older')
     // Hive 0.3's workspace: skills (one untouched old, one edited, one deleted, one a user folder) and no modes folder.
@@ -407,7 +429,10 @@ describe('a workspace', () => {
       expect(forAgents).toEqual(expect.arrayContaining(['my-own', 'work-on-card', 'review-agent-work', 'merge-ready', 'handover', 'split-work']))
       expect(forAgents).not.toContain('coordinate-agents')
       expect(forAssistant).toEqual(expect.arrayContaining(['coordinate-agents', 'split-work', 'handover', 'pick-up', 'workspace-note']))
-      for (const n of ['my-own', 'work-on-card', 'review-agent-work', 'merge-ready', 'use-hive-api']) expect(forAssistant).not.toContain(n)
+      // use-hive-api is for both (HI-2012): its tools.md has the hive tools' cases.
+      expect(forAgents).toContain('use-hive-api')
+      expect(forAssistant).toContain('use-hive-api')
+      for (const n of ['my-own', 'work-on-card', 'review-agent-work', 'merge-ready']) expect(forAssistant).not.toContain(n)
     } finally {
       await wsMod.disposeWorkspaceService(w)
     }
@@ -438,9 +463,10 @@ describe("Codex's copies of a session's skills", () => {
     writeFileSync(join(dir, '.hive-example.hive-old-1-1', 'SKILL.md'), 'v1')
     writeFileSync(join(dir, '.hive-example.hive-old-1-1', '.hive-copy'), JSON.stringify({ hash: 'old' }))
     mkdirSync(join(dir, '.hive-example.hive-new-1-1'), { recursive: true })
-    // And one for a skill the session no longer gets: it comes back as Hive's copy, then goes like any such copy.
+    // And one for a skill the session no longer gets: it comes back as Hive's copy, then goes like any such copy (its
+    // content still its marker's hash: unchanged since Hive made it, #1431).
     mkdirSync(join(dir, '.hive-gone.hive-old-1-2'), { recursive: true })
-    writeFileSync(join(dir, '.hive-gone.hive-old-1-2', '.hive-copy'), JSON.stringify({ hash: 'x' }))
+    writeFileSync(join(dir, '.hive-gone.hive-old-1-2', '.hive-copy'), JSON.stringify({ hash: await contentHash(join(dir, '.hive-gone.hive-old-1-2')) }))
     const out = await sync(cwd, [{ name: 'example', sourcePath: example }])
     expect(readdirSync(dir).sort()).toEqual(['hive-example'])
     expect(readFileSync(join(dir, 'hive-example', 'SKILL.md'), 'utf8')).toBe('v2')

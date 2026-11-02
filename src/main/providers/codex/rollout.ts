@@ -6,8 +6,9 @@ import { isSessionId } from '../../../shared/defaults'
 import { NOTICE_TEXT, firstLine, noticeOf, shortPath, toolLabel, type NewItem } from '../conversation'
 import type { ConversationParserLike, ImageLocation, LiveDetails } from '../types'
 import { advancedValues as advanced } from '../../advancedValues'
-import { countSafeguards } from '../../../shared/safeguards'
-import { codexSafeguards } from './safeguards'
+import { countSafeguards, SAFEGUARD_DEFAULTS } from '../../../shared/safeguards'
+import { codexSafeguards, errorKind } from './safeguards'
+import { cwdOf, scriptCall } from './scriptCalls'
 
 /**
  * Codex's rollout files (~/.codex/sessions/YYYY/MM/DD/rollout-<time>-<id>.jsonl): one JSON record per
@@ -134,6 +135,20 @@ export function rolloutDetails(text: string): LiveDetails {
       } else {
         delete out.signIn
         delete out.signInAt
+      }
+      // A turn that ended on another error (#1632: a lost connection, a server error): it needs the user until the next.
+      // A usage policy's stop is a safeguard's (#606, codexSafeguards), told as one.
+      const policy = p.type === 'task_complete' && (SAFEGUARD_DEFAULTS.codexStop as readonly string[]).includes(errorKind(p.error?.codex_error_info) ?? '')
+      const failed = p.type === 'task_complete' && !refused && !policy && p.error && typeof p.error === 'object' ? p.error : null
+      if (failed) {
+        out.turnFailed = typeof failed.message === 'string' ? failed.message.trim() : ''
+        out.turnFailedAt = typeof r.timestamp === 'string' ? r.timestamp : new Date().toISOString()
+        if (typeof p.turn_id === 'string' && p.turn_id) out.turnFailedTurn = p.turn_id
+        else delete out.turnFailedTurn
+      } else {
+        delete out.turnFailed
+        delete out.turnFailedAt
+        delete out.turnFailedTurn
       }
     }
     if (r.type === 'event_msg' && p.type === 'token_count') {
@@ -325,6 +340,18 @@ export class CodexConversationParser implements ConversationParserLike {
   offset = 0
   private tools = new Map<string, TranscriptTool>()
   private root: string | null
+  /**
+   * The code-mode scripts (HI-2240), in order: each with when it ran (its call's record, then its output's: in epoch
+   * ms; end null while it runs), and its code while it is shown as the Edit of the patch it applies. A call Codex
+   * records as it ends is the script's it started in (HR1's round 1: a command left running ends in a later script).
+   */
+  private scripts: { tool: TranscriptTool; code: string | null; start: number; end: number | null }[] = []
+  private scriptById = new Map<string, (typeof this.scripts)[number]>()
+  /**
+   * Whether this Codex records its calls as items (an `item_completed` event seen, HI-2246): then every script's `calls`
+   * is a list, empty when it made none; until then, and for a Codex that never does, absent (its calls aren't known).
+   */
+  private recorded = false
 
   constructor(projectPath: string | null = null) {
     this.root = projectPath
@@ -344,10 +371,47 @@ export class CodexConversationParser implements ConversationParserLike {
     this.items.push({ ...item, id: this.items.length } as TranscriptItem)
   }
 
-  private tool(callId: string, name: string, input: string, summary: string, ts: string | null): void {
-    const tool: TranscriptTool = { toolUseId: callId, name: toolLabel(name), summary, input, result: null, isError: false, images: [] }
+  private tool(callId: string, name: string, input: string, summary: string, ts: string | null, cwd: string | null = null): void {
+    const tool: TranscriptTool = { toolUseId: callId, name: toolLabel(name), summary, input, result: null, isError: false, images: [], ...(cwd ? { cwd } : {}) }
     this.tools.set(callId, tool)
     this.push({ kind: 'tool', timestamp: ts, tool })
+  }
+
+  /**
+   * The script a call that started at `startedAt` (epoch ms, Codex's `started_at_ms`) ran in: the last one started by
+   * then, if it hadn't ended (HR1's round 1: never just the latest; a command left running ends in a later script).
+   * Without a start, only a script running now (a call recorded as it ends, inside its run). Null: not known.
+   */
+  private scriptOf(startedAt: number | null): (typeof this.scripts)[number] | null {
+    if (startedAt === null) {
+      const last = this.scripts.at(-1)
+      return last && last.end === null ? last : null
+    }
+    for (let i = this.scripts.length - 1; i >= 0; i--) {
+      const s = this.scripts[i]
+      if (!(s.start <= startedAt)) continue
+      return s.end === null || startedAt <= s.end ? s : null
+    }
+    return null
+  }
+
+  /**
+   * A call Codex recorded as it ended (HI-2240), added to the `calls` of the script it started in. A direct call recorded
+   * as an item too (its id the call's own) is shown already; one whose script isn't known is in none (never guessed). A
+   * script shown as the Edit of the patch it applies that did more is shown as the Script it is.
+   */
+  private scriptCall(item: Record<string, any>, startedAt: number | null): void {
+    if (this.tools.has(String(item.id ?? ''))) return
+    const s = this.scriptOf(startedAt)
+    if (!s) return
+    const call = scriptCall(item, this.root)
+    if (!call) return
+    const calls = (s.tool.calls ??= [])
+    calls.push(call)
+    if (s.code !== null && !(calls.length === 1 && call.name === 'Edit')) {
+      Object.assign(s.tool, { name: 'Script', input: s.code, summary: firstLine(s.code).slice(0, 200) }) // i18n-ignore: a tool's name, as agents read it (hive_agent_activity)
+      s.code = null
+    }
   }
 
   private line(text: string, offset: number, length: number): void {
@@ -392,7 +456,7 @@ export class CodexConversationParser implements ConversationParserLike {
           const cmd = Array.isArray(args.command) ? (args.command as string[]).join(' ') : ((args.cmd ?? args.command) as string | undefined)
           const input = shell && typeof cmd === 'string' ? cmd : JSON.stringify(args, null, 2)
           const summary = shell ? firstLine(cmd) : firstLine(Object.values(args).find((v) => typeof v === 'string'))
-          this.tool(String(p.call_id ?? ''), shell ? 'Shell' : name, input, summary.slice(0, 200), ts) // i18n-ignore: a tool's name, as agents read it (hive_agent_activity)
+          this.tool(String(p.call_id ?? ''), shell ? 'Shell' : name, input, summary.slice(0, 200), ts, shell ? cwdOf(args.workdir) : null) // i18n-ignore: a tool's name, as agents read it (hive_agent_activity)
           break
         }
         case 'custom_tool_call': {
@@ -404,12 +468,23 @@ export class CodexConversationParser implements ConversationParserLike {
           if (patch !== null) {
             this.tool(String(p.call_id ?? ''), 'Edit', patch, patchPaths(patch).map((f) => shortPath(f, this.root)).join(', ').slice(0, 200), ts) // i18n-ignore: a tool's name, as agents read it (hive_agent_activity)
           } else this.tool(String(p.call_id ?? ''), name === 'exec' ? 'Script' : name, input, firstLine(input).slice(0, 200), ts) // i18n-ignore: a tool's name, as agents read it (hive_agent_activity)
+          if (name === 'exec') {
+            const script = { tool: this.tools.get(String(p.call_id ?? ''))!, code: scripted !== null ? input : null, start: ts ? Date.parse(ts) : NaN, end: null }
+            // A script whatever it is shown as (HR1 on HI-2246: an Edit made of one that never ran its patch is no call).
+            script.tool.script = true
+            if (this.recorded) script.tool.calls ??= []
+            this.scripts.push(script)
+            this.scriptById.set(String(p.call_id ?? ''), script)
+          }
           break
         }
         case 'function_call_output':
         case 'custom_tool_call_output': {
           const tool = this.tools.get(String(p.call_id ?? ''))
           if (!tool) break
+          // A script's run ends with its output (HI-2240): a call started after it is another's.
+          const script = this.scriptById.get(String(p.call_id ?? ''))
+          if (script) script.end = ts ? Date.parse(ts) : script.start
           const out =
             typeof p.output === 'string'
               ? p.output
@@ -432,7 +507,13 @@ export class CodexConversationParser implements ConversationParserLike {
       const summary = typeof p.message === 'string' ? p.message : null
       this.push({ kind: 'compaction', timestamp: ts, trigger: 'auto', preTokens: 0, postTokens: 0, nextRequestTokens: null, summary })
     } else if (r.type === 'event_msg') {
-      if (p.type === 'turn_aborted') this.push({ ...noticeOf(p.reason === 'interrupted' ? NOTICE_TEXT.interrupted : p.reason ? { m: NOTICE_TEXT.turnEnded, values: { reason: String(p.reason) } } : NOTICE_TEXT.aborted, 'info'), timestamp: ts })
+      if (p.type === 'item_completed' && p.item && typeof p.item === 'object') {
+        // The first item: this Codex records its calls, so a script with none listed made none (the same Codex wrote the scripts before it).
+        if (!this.recorded) for (const sc of this.scripts) sc.tool.calls ??= []
+        this.recorded = true
+        this.scriptCall(p.item, typeof p.started_at_ms === 'number' ? p.started_at_ms : null)
+      }
+      else if (p.type === 'turn_aborted') this.push({ ...noticeOf(p.reason === 'interrupted' ? NOTICE_TEXT.interrupted : p.reason ? { m: NOTICE_TEXT.turnEnded, values: { reason: String(p.reason) } } : NOTICE_TEXT.aborted, 'info'), timestamp: ts })
       else if (p.type === 'error' && typeof p.message === 'string') this.push({ kind: 'notice', timestamp: ts, text: p.message, level: 'error' })
     }
   }

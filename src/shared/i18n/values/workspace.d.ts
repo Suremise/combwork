@@ -1,9 +1,11 @@
 // Generated from locales/en/workspace.json: do not edit. Each message's placeholders and their types, for tr(): a
 // global script, so its interface merges with every other area's (shared/i18n/msg.ts).
 interface HiveMessageValues {
+  'workspace.activity.activity': undefined
   'workspace.activity.assistant': undefined
   'workspace.activity.board': undefined
   'workspace.activity.docs': undefined
+  'workspace.activity.forYou': { n: number }
   'workspace.activity.mcp': undefined
   'workspace.activity.notes': undefined
   'workspace.activity.notifications': undefined
@@ -45,7 +47,10 @@ interface HiveMessageValues {
   'workspace.antivirus.devUntrusted': undefined
   'workspace.antivirus.devUntrustedTip': undefined
   'workspace.antivirus.dontAsk': undefined
+  'workspace.antivirus.excludedNow': undefined
   'workspace.antivirus.folder': undefined
+  'workspace.antivirus.goneHint': { n: number }
+  'workspace.antivirus.goneTitle': undefined
   'workspace.antivirus.hidden': undefined
   'workspace.antivirus.holdsHome': undefined
   'workspace.antivirus.kindTests': undefined
@@ -53,6 +58,8 @@ interface HiveMessageValues {
   'workspace.antivirus.kindWorktrees': undefined
   'workspace.antivirus.live': undefined
   'workspace.antivirus.loadTarget': undefined
+  'workspace.antivirus.moveNotApplied': { missing: number }
+  'workspace.antivirus.moved': { removed: number; added: number }
   'workspace.antivirus.noPrompt': { hasError: string; error: string | number }
   'workspace.antivirus.noReport': undefined
   'workspace.antivirus.noWorkspace': undefined
@@ -97,15 +104,47 @@ interface HiveMessageValues {
   'workspace.antivirus.wholeShare': undefined
   'workspace.antivirus.whyAgents': undefined
   'workspace.antivirus.whySlow': undefined
-  'workspace.banners.dismiss': undefined
+  'workspace.antivirus.wontAsk': undefined
   'workspace.banners.more': { count: string | number }
   'workspace.banners.region': undefined
-  'workspace.banners.showProject': undefined
-  'workspace.banners.showProjectLabel': { title: string | number }
   'workspace.changes.aboutAgent': { agent: string | number; branch: string | number; base: string | number }
   'workspace.changes.aboutProject': undefined
-  'workspace.changes.aboutUnused': { project: string | number; known: string; into: string | number }
+  'workspace.changes.aboutSlot': { is: string; agent: string | number; name: string | number; known: string; base: string | number }
   'workspace.changes.aboutUnusedOne': { branch: string | number; into: string | number }
+  'workspace.changes.aboutUnusedShort': { project: string | number }
+  'workspace.changes.aboutUnusedTip': { known: string; into: string | number }
+  'workspace.closeCommand.close': undefined
+  'workspace.closeCommand.command': undefined
+  'workspace.closeCommand.dontWait': undefined
+  'workspace.closeCommand.dontWaitNote': undefined
+  'workspace.closeCommand.drain': undefined
+  'workspace.closeCommand.elapsed': { time: string | number }
+  'workspace.closeCommand.failed': { kind: string }
+  'workspace.closeCommand.failedExit': { kind: string; code: string | number }
+  'workspace.closeCommand.output': undefined
+  'workspace.closeCommand.runner': undefined
+  'workspace.closeCommand.running': { kind: string }
+  'workspace.closeCommand.saving': { workspace: string | number }
+  'workspace.closeCommand.savingNote': undefined
+  'workspace.closeCommand.skip': undefined
+  'workspace.closeCommand.skipped': undefined
+  'workspace.closeCommand.spawn': { kind: string }
+  'workspace.commands.dontWaitNote': { point: string }
+  'workspace.commands.exitCode': { code: string | number }
+  'workspace.commands.failedExit': { name: string | number; code: string | number }
+  'workspace.commands.folder': { name: string | number }
+  'workspace.commands.neededWarn': undefined
+  'workspace.commands.notRun': undefined
+  'workspace.commands.placeholder': { name: string | number; placeholders: string | number }
+  'workspace.commands.ranFor': { time: string | number }
+  'workspace.commands.rerun': undefined
+  'workspace.commands.running': { point: string; workspace: string | number }
+  'workspace.commands.skipContinue': undefined
+  'workspace.commands.skipped': undefined
+  'workspace.commands.spawn': { name: string | number }
+  'workspace.commands.steps': undefined
+  'workspace.commands.stopHere': undefined
+  'workspace.commands.waiting': undefined
   'workspace.docs.about': { app: string | number }
   'workspace.docs.api': undefined
   'workspace.docs.changelog': undefined
@@ -115,6 +154,9 @@ interface HiveMessageValues {
   'workspace.docs.seeAlso': { file: string | number }
   'workspace.docs.shortcuts': undefined
   'workspace.docs.title': undefined
+  'workspace.folder.copy': { name: string | number }
+  'workspace.folder.home': { hasAgent: string; agent: string | number }
+  'workspace.folder.slot': { carried: string; name: string | number; agent: string | number; hasAgent: string; hasCards: string; cards: string | number }
   'workspace.mcpView.builtIn': undefined
   'workspace.mcpView.builtInText': { hasUrl: string; url: string | number }
   'workspace.mcpView.deleteServer': undefined
@@ -142,56 +184,57 @@ interface HiveMessageValues {
   'workspace.mcpView.tryAsking': undefined
   'workspace.mcpView.whatItDoes': undefined
   'workspace.mcpView.whatItRuns': undefined
-  'workspace.move.board': undefined
+  'workspace.move.branchesBanner': { count: number }
   'workspace.move.cancel': undefined
   'workspace.move.cards': { count: number }
   'workspace.move.cardsBanner': { lines: string | number }
   'workspace.move.cardsLine': { total: number; what: string | number; from: string | number; to: string | number }
   'workspace.move.cardsOld': undefined
   'workspace.move.close': undefined
-  'workspace.move.copy': { count: number; provider: string | number; hasOf: string; of: string | number; to: string | number }
-  'workspace.move.copyNone': { provider: string | number; hasOf: string; of: string | number }
   'workspace.move.createButton': undefined
-  'workspace.move.createNew': { agent: string | number; branch: string | number; to: string | number }
-  'workspace.move.found': { agent: string | number; how: string; to: string | number; located: string }
   'workspace.move.fromWorkspace': { from: string | number }
-  'workspace.move.give': { what: string | number; from: string | number; hasCards: string; cards: string | number; to: string | number }
   'workspace.move.hide': undefined
-  'workspace.move.kept': { count: number; to: string | number; files: string | number; more: number }
   'workspace.move.lanes': { count: number }
   'workspace.move.leftToDo': undefined
   'workspace.move.locate': undefined
-  'workspace.move.missing': { agent: string | number; from: string | number; gone: string }
   'workspace.move.movedFromTo': { from: string | number; to: string | number }
   'workspace.move.nothing': undefined
-  'workspace.move.original': { agent: string | number }
   'workspace.move.owner': { owner: string; agent: string | number }
   'workspace.move.pending': { projects: string | number }
   'workspace.move.problems': undefined
+  'workspace.move.profileBanner': undefined
   'workspace.move.projects': { count: number; name: string | number }
   'workspace.move.projectsMoved': undefined
-  'workspace.move.recent': { to: string | number }
-  'workspace.move.recreate': { agent: string | number; branch: string | number; to: string | number }
   'workspace.move.recreateButton': undefined
   'workspace.move.repair': undefined
   'workspace.move.repairButton': undefined
   'workspace.move.repaired': undefined
   'workspace.move.repairing': undefined
-  'workspace.move.sessions': { count: number }
   'workspace.move.stays': undefined
   'workspace.move.stillPoint': undefined
   'workspace.move.stopFirst': { agents: string | number }
   'workspace.move.title': undefined
   'workspace.move.undo': undefined
-  'workspace.move.unlink': { agent: string | number }
   'workspace.move.unlinkButton': undefined
   'workspace.move.unreadable': { count: number; files: string | number; more: number }
   'workspace.move.untouched': undefined
   'workspace.move.watches': { count: number }
   'workspace.move.working': undefined
-  'workspace.move.workingOn': { projects: string | number }
   'workspace.notes.delete': undefined
   'workspace.notes.select': undefined
+  'workspace.notes.workspaceNotes.assistant': undefined
+  'workspace.notes.workspaceNotes.cut': { max: number; who: string | number }
+  'workspace.notes.workspaceNotes.how': { example: string | number }
+  'workspace.notes.workspaceNotes.off': undefined
+  'workspace.notes.workspaceNotes.template': undefined
+  'workspace.notes.workspaceNotes.title': undefined
+  'workspace.opening.adoption': undefined
+  'workspace.opening.projects': undefined
+  'workspace.opening.slots': undefined
+  'workspace.opening.title': { name: string | number }
+  'workspace.opening.upgrade': undefined
+  'workspace.opening.upgradingTitle': { name: string | number }
+  'workspace.opening.wait': undefined
   'workspace.overview.agentLabel': { project: string | number; agent: string | number }
   'workspace.overview.apiCost': undefined
   'workspace.overview.asReported': undefined
@@ -214,6 +257,7 @@ interface HiveMessageValues {
   'workspace.overview.importingStart': undefined
   'workspace.overview.loadTarget': undefined
   'workspace.overview.loading': undefined
+  'workspace.overview.noAnswer': { seconds: number }
   'workspace.overview.noWorkspace': undefined
   'workspace.overview.nothingUsed': undefined
   'workspace.overview.openAssistant': undefined
@@ -280,19 +324,32 @@ interface HiveMessageValues {
   'workspace.removal.banner': { what: string | number; when: string | number }
   'workspace.removal.blocked': { agents: string | number; unchecked: string }
   'workspace.removal.cancel': undefined
-  'workspace.removal.cards': { count: number; archived: number; how: string }
+  'workspace.removal.cardsHow': { how: string }
+  'workspace.removal.cardsThing': { count: number; archived: number }
+  'workspace.removal.colHappens': undefined
+  'workspace.removal.colWhat': undefined
   'workspace.removal.delete': undefined
+  'workspace.removal.deleteBlocked': undefined
   'workspace.removal.deleteSummary': undefined
   'workspace.removal.deletedDone': { name: string | number }
   'workspace.removal.deleting': undefined
   'workspace.removal.discard': undefined
   'workspace.removal.discardFailed': undefined
   'workspace.removal.drafts': undefined
-  'workspace.removal.folder': { path: string | number; how: string }
+  'workspace.removal.folderBlocks': { why: string | number }
   'workspace.removal.folderGone': undefined
+  'workspace.removal.folderHow': { how: string }
+  'workspace.removal.folderKept': { why: string | number }
+  'workspace.removal.folderLeft': undefined
+  'workspace.removal.folderRemoved': undefined
+  'workspace.removal.folderThing': undefined
+  'workspace.removal.folderTrashed': undefined
+  'workspace.removal.foldersHow': { how: string }
+  'workspace.removal.foldersThing': { count: number }
   'workspace.removal.forget': undefined
   'workspace.removal.forgetFailed': { name: string | number }
-  'workspace.removal.handovers': { count: number; how: string }
+  'workspace.removal.handoversHow': { how: string }
+  'workspace.removal.handoversThing': { count: number }
   'workspace.removal.hiddenDone': { name: string | number }
   'workspace.removal.hide': undefined
   'workspace.removal.hideSummary': undefined
@@ -303,8 +360,6 @@ interface HiveMessageValues {
   'workspace.removal.looking': undefined
   'workspace.removal.modeHidden': undefined
   'workspace.removal.modeRemoved': undefined
-  'workspace.removal.noCards': undefined
-  'workspace.removal.noHandovers': undefined
   'workspace.removal.noWorkspace': undefined
   'workspace.removal.none': undefined
   'workspace.removal.notAll': { name: string | number }
@@ -318,16 +373,84 @@ interface HiveMessageValues {
   'workspace.removal.restoreIn': undefined
   'workspace.removal.restoreThemFailed': undefined
   'workspace.removal.restored': { project: string | number; what: string | number }
-  'workspace.removal.running': { count: number }
+  'workspace.removal.runningAgents': { count: number }
+  'workspace.removal.runningHow': undefined
   'workspace.removal.title': { name: string | number }
   'workspace.removal.touches': undefined
-  'workspace.removal.transcripts': undefined
+  'workspace.removal.transcriptsHow': undefined
+  'workspace.removal.transcriptsThing': undefined
   'workspace.removal.typeName': { name: string | number }
   'workspace.removal.what': { which: string; handovers: number; cards: number }
   'workspace.removal.when': undefined
   'workspace.removal.with': { which: string; handovers: number; cards: number }
-  'workspace.removal.worktree': { agent: string | number; branch: string | number; hasError: string; error: string | number; ahead: number; dirty: number }
-  'workspace.removal.worktrees': { count: number; how: string }
+  'workspace.removal.worktreeThing': { agent: string | number; branch: string | number }
+  'workspace.removal.worktreeWork': { hasError: string; error: string | number; ahead: number; dirty: number }
+  'workspace.removal.worktreesHow': { how: string }
+  'workspace.removal.worktreesThing': { count: number }
+  'workspace.repair.addLater': undefined
+  'workspace.repair.board': { from: string | number }
+  'workspace.repair.branch': { agent: string | number }
+  'workspace.repair.choose': { gone: string }
+  'workspace.repair.chooseFolder': { kind: string; gone: string }
+  'workspace.repair.chooseShort': undefined
+  'workspace.repair.closeRuns': undefined
+  'workspace.repair.conversations': { provider: string | number }
+  'workspace.repair.copy': { count: number; stays: string }
+  'workspace.repair.createShort': undefined
+  'workspace.repair.defender': undefined
+  'workspace.repair.folders': { count: number }
+  'workspace.repair.forget': undefined
+  'workspace.repair.forgetHome': undefined
+  'workspace.repair.forgetShort': undefined
+  'workspace.repair.give': { what: string | number; hasCards: string; cards: string | number; to: string | number }
+  'workspace.repair.hideFolders': undefined
+  'workspace.repair.keptFiles': { count: number }
+  'workspace.repair.keptTip': { count: number; files: string | number; more: number }
+  'workspace.repair.later': undefined
+  'workspace.repair.leaveExclusion': undefined
+  'workspace.repair.listNew': undefined
+  'workspace.repair.markAgain': { projects: string | number }
+  'workspace.repair.moveBox': { count: number }
+  'workspace.repair.moveExclusion': undefined
+  'workspace.repair.moveRuns': { why: string | number }
+  'workspace.repair.needsAdmin': undefined
+  'workspace.repair.noneToMove': undefined
+  'workspace.repair.notFound': undefined
+  'workspace.repair.nothingToCopy': undefined
+  'workspace.repair.nothingToDo': undefined
+  'workspace.repair.now': undefined
+  'workspace.repair.original': undefined
+  'workspace.repair.point': { count: number }
+  'workspace.repair.readingDefender': undefined
+  'workspace.repair.recent': undefined
+  'workspace.repair.recheck': undefined
+  'workspace.repair.recreate': { exists: string; branch: string | number }
+  'workspace.repair.recreateOn': { branch: string | number }
+  'workspace.repair.recreateShort': undefined
+  'workspace.repair.recreateSlot': undefined
+  'workspace.repair.release': undefined
+  'workspace.repair.releaseShort': undefined
+  'workspace.repair.releaseSlot': undefined
+  'workspace.repair.relink': { located: string }
+  'workspace.repair.rename': { remote: string }
+  'workspace.repair.result': undefined
+  'workspace.repair.saved': undefined
+  'workspace.repair.scanned': undefined
+  'workspace.repair.sentence': { what: string | number; hasWas: string; was: string | number; hasNow: string; now: string | number; does: string | number }
+  'workspace.repair.sessions': undefined
+  'workspace.repair.showFolders': undefined
+  'workspace.repair.taken': undefined
+  'workspace.repair.theirs': undefined
+  'workspace.repair.theirsNote': undefined
+  'workspace.repair.unlink': undefined
+  'workspace.repair.unlinkShort': undefined
+  'workspace.repair.unreadableFiles': { count: number }
+  'workspace.repair.was': undefined
+  'workspace.repair.what': undefined
+  'workspace.repair.willDo': undefined
+  'workspace.repair.workingOn': undefined
+  'workspace.repair.workspaceGroup': undefined
+  'workspace.repair.worktree': { agent: string | number }
   'workspace.reuse.alreadyAt': { branch: string | number; base: string | number }
   'workspace.reuse.keptWork': { branch: string | number }
   'workspace.reuse.newTree': { branch: string | number; why: string | number }
@@ -344,6 +467,7 @@ interface HiveMessageValues {
   'workspace.statusBar.apiOn': { url: string | number }
   'workspace.statusBar.asOf': { when: string | number }
   'workspace.statusBar.awakeTip': undefined
+  'workspace.statusBar.connectionLine': { name: string | number; provider: string | number; hasPlan: string; plan: string | number }
   'workspace.statusBar.git': { hasVersion: string; version: string | number }
   'workspace.statusBar.gitOld': { version: string | number; min: string | number }
   'workspace.statusBar.gitProblem': { problem: string | number; fix: string | number }
@@ -368,8 +492,23 @@ interface HiveMessageValues {
   'workspace.storage.backups': undefined
   'workspace.storage.beforeCompression': { size: string | number }
   'workspace.storage.cancel': undefined
+  'workspace.storage.cardAttachments': undefined
+  'workspace.storage.cardCleanup.archived': undefined
+  'workspace.storage.cardCleanup.card': undefined
+  'workspace.storage.cardCleanup.done': { files: number; size: string | number; cards: number }
+  'workspace.storage.cardCleanup.files': { count: number }
+  'workspace.storage.cardCleanup.intro': { days: number }
+  'workspace.storage.cardCleanup.left': { count: number }
+  'workspace.storage.cardCleanup.more': { count: number }
+  'workspace.storage.cardCleanup.move': { count: number; size: string | number }
+  'workspace.storage.cardCleanup.none': undefined
+  'workspace.storage.cardCleanup.now': undefined
+  'workspace.storage.cardCleanup.off': undefined
+  'workspace.storage.cardCleanup.title': { name: string | number }
   'workspace.storage.cleanUp': undefined
+  'workspace.storage.copies': undefined
   'workspace.storage.deletedSession': { id: string | number }
+  'workspace.storage.freeSlot': { slot: string | number }
   'workspace.storage.goneBackups': undefined
   'workspace.storage.goneBackupsDesc': undefined
   'workspace.storage.goneWarning': undefined
@@ -408,6 +547,7 @@ interface HiveMessageValues {
   'workspace.storage.reviewInChanges': undefined
   'workspace.storage.size': undefined
   'workspace.storage.skipped': { count: number }
+  'workspace.storage.slot': { slot: string | number; agent: string | number }
   'workspace.storage.storage': undefined
   'workspace.storage.title': { name: string | number }
   'workspace.storage.total': undefined
@@ -421,8 +561,11 @@ interface HiveMessageValues {
   'workspace.unused.commitsNoBranch': { count: number }
   'workspace.unused.commitsNotOn': { count: number; known: string; into: string | number }
   'workspace.unused.detached': undefined
-  'workspace.unused.hintDetail': undefined
-  'workspace.unused.hintTitle': { count: number; many: string; projects: number; project: string | number }
+  'workspace.unused.kind.carried': undefined
+  'workspace.unused.kind.dirtySlot': undefined
+  'workspace.unused.kind.home': undefined
+  'workspace.unused.kind.queue': undefined
+  'workspace.unused.kind.slot': undefined
   'workspace.unused.lostCommits': { count: number; branch: string | number; known: string; into: string | number }
   'workspace.unused.lostDetached': { count: number }
   'workspace.unused.lostFiles': { count: number; path: string | number }
@@ -445,11 +588,14 @@ interface HiveMessageValues {
   'workspace.unusedList.changed': undefined
   'workspace.unusedList.checkFailed': { refused: string | number; error: string | number }
   'workspace.unusedList.checking': undefined
+  'workspace.unusedList.colBranch': undefined
+  'workspace.unusedList.colFolder': undefined
+  'workspace.unusedList.colLast': undefined
+  'workspace.unusedList.colSize': undefined
+  'workspace.unusedList.colState': undefined
   'workspace.unusedList.detached': undefined
   'workspace.unusedList.gitProblem': { problem: string | number }
-  'workspace.unusedList.give': undefined
   'workspace.unusedList.heading': undefined
-  'workspace.unusedList.headingTip': undefined
   'workspace.unusedList.keptMany': { count: number }
   'workspace.unusedList.keptReason': undefined
   'workspace.unusedList.keptTitle': { name: string | number }
@@ -487,14 +633,19 @@ interface HiveMessageValues {
   'workspace.updates.itemReady': { version: string | number }
   'workspace.updates.later': undefined
   'workspace.updates.latest': { app: string | number; version: string | number }
+  'workspace.updates.localBuild': { version: string | number; hasCommit: string; commit: string | number }
   'workspace.updates.mb': { mb: number }
   'workspace.updates.noNotes': undefined
   'workspace.updates.notChecked': undefined
+  'workspace.updates.notInstalledNotNewer': { version: string | number }
+  'workspace.updates.notInstalledUnreadable': { version: string | number }
   'workspace.updates.off': undefined
   'workspace.updates.ok': undefined
   'workspace.updates.onGitHub': undefined
+  'workspace.updates.openReleasePage': undefined
   'workspace.updates.perSecond': { size: string | number }
   'workspace.updates.progress': { percent: number; done: string | number; total: string | number }
+  'workspace.updates.published': { version: string | number }
   'workspace.updates.ready': { version: string | number }
   'workspace.updates.readyNote': { auto: string; busy: string }
   'workspace.updates.released': { date: string | number }

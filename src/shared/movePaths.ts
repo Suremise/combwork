@@ -14,10 +14,10 @@ export interface PathMove {
 /**
  * Whether a plan has anything for Repair to do or say: a worktree, a session folder, files to copy, files that couldn't
  * be read or copied (kept pending, so Repair says why), files already there with other content (shown once, never
- * overwritten), Open Recent or Working on.
+ * overwritten), Open Recent or Working on, or records by an old folder that couldn't all follow (HI-2007).
  */
 export function moveHasWork(plan: MovePlan): boolean {
-  return plan.recent || plan.working.length > 0 || !!plan.cards?.length || plan.hosts.some((h) => h.worktrees.length > 0 || h.sessions > 0 || h.folders.some((f) => f.copy > 0 || f.kept.length > 0 || !!f.failed?.length))
+  return plan.recent || !!plan.profile?.length || plan.working.length > 0 || !!plan.cards?.length || plan.hosts.some((h) => h.worktrees.length > 0 || h.sessions > 0 || h.folders.some((f) => f.copy > 0 || f.kept.length > 0 || !!f.failed?.length) || !!h.branches?.some((b) => !b.kept))
 }
 
 const trimEnd = (p: string): string => p.replace(/[\\/]+$/, '')

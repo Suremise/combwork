@@ -1,0 +1,16 @@
+Codex 0.164.0 waiting to retry its model request after a 429 (HI-1972): rows of its log database (logs_2.sqlite in
+the CODEX_HOME of connection Codex-1), read read-only on 28 Oct 2026. Columns: ts (Unix s), level, target, thread_id,
+then the end of feedback_log_body (its leading tracing spans cut). Thread and turn ids replaced.
+
+1793199144 WARN codex_core::responses_retry 00000000-0000-4000-8000-000000000001 stream disconnected - retrying sampling request (1/5 in 399.9997619s)... turn_id=00000000-0000-4000-8000-0000000000a1 retries=1 max_retries=5 sampling_error=exceeded retry limit, last status: 429 Too Many Requests
+1793199185 WARN codex_core::responses_retry 00000000-0000-4000-8000-000000000002 stream disconnected - retrying sampling request (1/5 in 357.9998846s)... turn_id=00000000-0000-4000-8000-0000000000a2 retries=1 max_retries=5 sampling_error=exceeded retry limit, last status: 429 Too Many Requests
+1793200145 WARN codex_core::responses_retry 00000000-0000-4000-8000-000000000001 stream disconnected - retrying sampling request (2/5 in 599.999699s)... turn_id=00000000-0000-4000-8000-0000000000a3 retries=2 max_retries=5 sampling_error=exceeded retry limit, last status: 429 Too Many Requests
+
+Its source at rust-v0.164.0: codex-rs/core/src/responses_retry.rs (the module's tracing target,
+codex_core::responses_retry), line 193:
+    "stream disconnected - retrying sampling request ({retries}/{max_retries} in {delay:?})...",
+{delay:?} is a Rust Duration's Debug form: "399.9997619s", or "500ms" under a second.
+The table and its index, as the file has them:
+
+CREATE TABLE logs (id INTEGER PRIMARY KEY AUTOINCREMENT, ts INTEGER NOT NULL, ts_nanos INTEGER NOT NULL, level TEXT NOT NULL, target TEXT NOT NULL, feedback_log_body TEXT, module_path TEXT, file TEXT, line INTEGER, thread_id TEXT, process_uuid TEXT, estimated_bytes INTEGER NOT NULL DEFAULT 0)
+CREATE INDEX idx_logs_thread_id_ts ON logs(thread_id, ts DESC, ts_nanos DESC, id DESC)

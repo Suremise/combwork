@@ -1,5 +1,9 @@
 import { Children, useCallback, useEffect, useRef, useState } from 'react'
 import type { CleanupItem, CleanupOptions, ProjectStorage, WorkspaceStorage } from '@shared/types'
+import { CARD_CLEANUP_CHOICES, cleanupDays, type CardCleanupChoice, type CardCleanupItem } from '@shared/cardCleanup'
+import { settingEntry } from '@shared/settingsCatalog'
+import { shownText } from '@shared/advanced'
+import { formatDateTime } from '@shared/dates'
 import { DEFAULT_CLEANUP } from '@shared/storage'
 import { formatSize } from '@shared/units'
 import { call, errorMessage } from '../api'
@@ -20,7 +24,11 @@ const M = {
   archive: msg({ id: 'workspace.storage.archive', defaultMessage: 'Archive', description: "Storage: Hive's archive folder (.hive/archive)." }),
   beforeCompression: msg({ id: 'workspace.storage.beforeCompression', defaultMessage: '{size} before compression', description: "Storage, beside the size of Hive's transcript backups or archive: what they hold uncompressed ({size}: like 1.2 GB). Ended sessions' backups are compressed." }),
   attachments: msg({ id: 'workspace.storage.attachments', defaultMessage: 'Attachments', description: 'Storage: files pasted or dropped into sessions (.hive/attachments).' }),
-  worktree: msg({ id: 'workspace.storage.worktree', defaultMessage: "{agent}'s worktree", description: "Storage: an agent's worktree." }),
+  cardAttachments: msg({ id: 'workspace.storage.cardAttachments', defaultMessage: 'Card attachments', description: 'Storage (HI-1700): files kept with cards (.hive/attachments/cards). Clean Up and Purge never remove them.' }),
+  agentWorktree: msg({ id: 'workspace.storage.worktree', defaultMessage: "{agent}'s worktree", description: "Storage: an agent's worktree." }),
+  slot: msg({ id: 'workspace.storage.slot', defaultMessage: '{slot}, lent to agent {agent}', description: "Storage (#1451): one of the project's slots (a working folder Hive lends to a card or a lane; {slot} is its name, such as slot-b: keep it as it is), lent now to the agent {agent}. Glossary: slot. A noun before the name (glossary §1 rule 4)." }),
+  freeSlot: msg({ id: 'workspace.storage.freeSlot', defaultMessage: '{slot}, not lent', description: "Storage (#1451): one of the project's slots (a working folder Hive lends to a card or a lane; {slot} is its name, such as slot-b: keep it as it is), kept on disk but lent to no one now. Glossary: slot." }),
+  copies: msg({ id: 'workspace.storage.copies', defaultMessage: 'Review and check copies', description: "Storage (#1451): the folder of the project's review and check copies (folders Hive keeps at one revision for a reviewer, or an isolated check). Glossary: review copy." }),
   unused: msg({ id: 'workspace.storage.unused', defaultMessage: 'Unused worktrees ({count})', description: 'Storage: the worktrees no agent works in, on one line.' }),
   measuring: msg({ id: 'workspace.storage.measuring', defaultMessage: 'Measuring…', description: 'Storage while it measures the folders.' }),
   nothingKept: msg({ id: 'workspace.storage.nothingKept', defaultMessage: 'Nothing kept.', description: "Storage's table when Hive keeps nothing for the project." }),
@@ -65,7 +73,20 @@ const M = {
   noWorkspace: msg({ id: 'workspace.storage.noWorkspace', defaultMessage: 'Open a workspace to see what Hive keeps for it.', description: "Settings → Workspace's storage with no workspace open." }),
   measuringProjects: msg({ id: 'workspace.storage.measuringProjects', defaultMessage: 'Measuring the projects…', description: "Settings → Workspace's storage while it measures." }),
   noProjects: msg({ id: 'workspace.storage.noProjects', defaultMessage: 'No projects.', description: "Settings → Workspace's storage table with no projects." }),
-  workspace: msg({ id: 'workspace.storage.workspace', defaultMessage: 'Workspace', description: "Settings → Workspace's storage table: the last row, the workspace's total." })
+  workspace: msg({ id: 'workspace.storage.workspace', defaultMessage: 'Workspace', description: "Settings → Workspace's storage table: the last row, the workspace's total." }),
+  // HI-1842: archived cards' attachments, removed some days after archiving (Project Settings → Storage).
+  cleanUpNow: msg({ id: 'workspace.storage.cardCleanup.now', defaultMessage: 'Clean Up Now…', description: "Project Settings → Storage, beside the setting \"Remove archived cards' attachments\": opens a dialog listing what it would remove now, to remove it at once." }),
+  cleanUpOff: msg({ id: 'workspace.storage.cardCleanup.off', defaultMessage: 'Choose a number of days first.', description: 'The tooltip of "Clean Up Now…" (Project Settings → Storage) while the setting is Never: there is nothing it would remove.' }),
+  cleanupTitle: msg({ id: 'workspace.storage.cardCleanup.title', defaultMessage: 'Clean Up Card Attachments: {name}', description: 'The dialog of Clean Up Now (Project Settings → Storage): {name} is the project.' }),
+  cleanupIntro: msg({ id: 'workspace.storage.cardCleanup.intro', defaultMessage: 'The files kept with these cards, archived {days, plural, one {# day} other {# days}} ago or more, go to the Recycle Bin. Each card gets a comment saying so. Open and Done cards keep theirs.', description: "The Clean Up Now dialog (Project Settings → Storage), at the top: {days} is the project's setting." }),
+  cleanupCard: msg({ id: 'workspace.storage.cardCleanup.card', defaultMessage: 'Card', description: "The Clean Up Now dialog's table: the column of archived cards (key and title)." }),
+  cleanupArchived: msg({ id: 'workspace.storage.cardCleanup.archived', defaultMessage: 'Archived', description: "The Clean Up Now dialog's table: the column of when each card was archived (\"3 weeks ago\")." }),
+  cleanupFiles: msg({ id: 'workspace.storage.cardCleanup.files', defaultMessage: '{count, plural, one {# file} other {# files}}', description: "The Clean Up Now dialog's table: how many files a card keeps." }),
+  cleanupNone: msg({ id: 'workspace.storage.cardCleanup.none', defaultMessage: 'No archived card is due yet.', description: 'The Clean Up Now dialog when no archived card has been archived long enough.' }),
+  cleanupMove: msg({ id: 'workspace.storage.cardCleanup.move', defaultMessage: 'Move {count, plural, one {# file} other {# files}} ({size}) to the Recycle Bin', description: "The Clean Up Now dialog's button ({size}: \"12 MB\")." }),
+  cleanupMore: msg({ id: 'workspace.storage.cardCleanup.more', defaultMessage: 'More archived cards are due than these {count, number}: Clean Up Now again takes on the next ones.', description: 'The Clean Up Now dialog (Project Settings → Storage), under its list when more archived cards are due than one list takes: {count} is how many it lists.' }),
+  cleanupLeft: msg({ id: 'workspace.storage.cardCleanup.left', defaultMessage: '{count, plural, one {# file was left as it is} other {# files were left as they are}}: changed, moved or brought back from the archive since the list was made.', description: 'Under the notice after Clean Up Now (Project Settings → Storage): files it listed but did not remove, because they or their card changed meanwhile. Running it again does not remove them unless they are due.' }),
+  cleanupDone: msg({ id: 'workspace.storage.cardCleanup.done', defaultMessage: 'Moved {files, plural, one {# file} other {# files}} ({size}) of {cards, plural, one {# archived card} other {# archived cards}} to the Recycle Bin', description: 'A notice after Clean Up Now (Project Settings → Storage): {size} like "12 MB".' })
 }
 
 /** A row of a project's storage: what it is, where, how big. */
@@ -167,7 +188,9 @@ export function StorageView({ path }: { path: string }) {
         { label: tr(M.backups), where: '.hive/sessions', bytes: data.sessions, raw: data.sessionsRaw },
         { label: tr(M.archive), where: '.hive/archive', bytes: data.archive, raw: data.archiveRaw },
         { label: tr(M.attachments), where: '.hive/attachments', bytes: data.attachments },
-        ...data.worktrees.map((w) => ({ label: tr(M.worktree, { agent: w.agent }), where: w.path, bytes: w.bytes })),
+        ...(data.cardAttachments ? [{ label: tr(M.cardAttachments), where: '.hive/attachments/cards', bytes: data.cardAttachments }] : []),
+        ...data.worktrees.map((w) => ({ label: w.slot ? (w.agent ? tr(M.slot, { slot: w.slot, agent: w.agent }) : tr(M.freeSlot, { slot: w.slot })) : tr(M.agentWorktree, { agent: w.agent ?? '' }), where: w.path, bytes: w.bytes })),
+        ...(data.copies ? [{ label: tr(M.copies), where: data.copies.path, bytes: data.copies.bytes }] : []),
         // The worktrees no agent works in (#353), on one line: the Overview lists and tidies them.
         ...(data.unusedWorktrees?.length
           ? [{ label: tr(M.unused, { count: data.unusedWorktrees.length }), where: fmt.list(data.unusedWorktrees.map((w) => w.branch ?? w.path), 'unit'), bytes: data.unusedWorktrees.reduce((n, w) => n + w.bytes, 0), review: data.path }]
@@ -510,5 +533,117 @@ export function WorkspaceStorageList() {
         </div>
       )}
     </div>
+  )
+}
+
+const cardCleanupColumns = (): DataColumn<CardCleanupItem>[] => [
+  {
+    key: 'card',
+    header: tr(M.cleanupCard),
+    cell: (i) => (
+      <span className="card-cleanup-card" title={i.title}>
+        <strong>{i.key ?? `#${i.card}`}</strong> {i.title}
+      </span>
+    ),
+    sortValue: (i) => i.card,
+    filter: { kind: 'text', value: (i) => `${i.key ?? ''} ${i.title} ${i.files.map((f) => f.name).join(' ')}` }
+  },
+  { key: 'archived', header: tr(M.cleanupArchived), cell: (i) => <span title={formatDateTime(i.archivedAt)}>{timeAgo(i.archivedAt)}</span>, sortValue: (i) => i.archivedAt },
+  { key: 'files', header: tr(M.size), num: true, descFirst: true, cell: (i) => `${tr(M.cleanupFiles, { count: i.files.length })}, ${formatSize(i.files.reduce((n, f) => n + f.size, 0))}`, sortValue: (i) => i.files.reduce((n, f) => n + f.size, 0) }
+]
+
+/**
+ * Project Settings → Storage: when archived cards' attachments go (HI-1842: Never, or 3, 7, 30 or 90 days after archiving),
+ * and Clean Up Now…, which lists what goes now and removes it at once.
+ */
+export function CardCleanupSetting({ path, name, value, onChange }: { path: string; name: string; value: CardCleanupChoice; onChange: (v: CardCleanupChoice) => void }) {
+  const [open, setOpen] = useState(false)
+  const options = settingEntry('project.cardAttachmentCleanup')?.options ?? []
+  const off = cleanupDays(value) === null
+  return (
+    <div className="flex card-cleanup-setting">
+      <select className="select" data-setting="cardAttachmentCleanup" value={value} onChange={(e) => onChange(e.target.value as CardCleanupChoice)}>
+        {CARD_CLEANUP_CHOICES.map((c) => (
+          <option key={c} value={c}>
+            {shownText(options.find((o) => o.value === c)?.text ?? c)}
+          </option>
+        ))}
+      </select>
+      <button className="btn small" disabled={off} title={off ? tr(M.cleanUpOff) : undefined} onClick={() => setOpen(true)}>
+        <Icon name="trash" /> {tr(M.cleanUpNow)}
+      </button>
+      {open && <CardCleanupDialog path={path} name={name} days={cleanupDays(value) ?? 0} onClose={() => setOpen(false)} />}
+    </div>
+  )
+}
+
+/** Clean Up Now: the archived cards due now and their files, then each card's files to the Recycle Bin. */
+function CardCleanupDialog({ path, name, days, onClose }: { path: string; name: string; days: number; onClose: () => void }) {
+  const [items, setItems] = useState<CardCleanupItem[] | null>(null)
+  const [plan, setPlan] = useState<{ id: string | null; more: boolean }>({ id: null, more: false })
+  const [error, setError] = useState<string | null>(null)
+  const action = useBusy()
+  useEffect(() => {
+    let live = true
+    call('storage:cardCleanupPreview', path).then(
+      (r) => {
+        if (!live) return
+        setPlan({ id: r.plan, more: r.more })
+        setItems(r.items)
+      },
+      (e) => live && setError(errorMessage(e))
+    )
+    return () => {
+      live = false
+    }
+  }, [path])
+  const files = items?.reduce((n, i) => n + i.files.length, 0) ?? 0
+  const bytes = items?.reduce((n, i) => n + i.files.reduce((t, f) => t + f.size, 0), 0) ?? 0
+  const go = async (): Promise<void> => {
+    if (!items?.length || !plan.id) return
+    const id = plan.id
+    const r = await action.run('clean', () => call('storage:cardCleanup', path, id))
+    if (!r) return
+    const done = r.value
+    notify(done.files ? 'success' : 'info', done.files ? tr(M.cleanupDone, { files: done.files, cards: done.cards, size: formatSize(done.bytes) }) : tr(M.nothingRemoved), done.left ? tr(M.cleanupLeft, { count: done.left }) : undefined)
+    onClose()
+  }
+  return (
+    <Modal
+      title={tr(M.cleanupTitle, { name })}
+      icon="trash"
+      wide
+      onClose={onClose}
+      busy={!!action.busy}
+      error={action.error}
+      footer={
+        <>
+          <button className="btn subtle" onClick={onClose}>
+            {tr(M.cancel)}
+          </button>
+          <BusyButton className="primary" disabled={!items?.length} busy={action.busy === 'clean'} busyLabel={tr(M.movingBusy)} onClick={() => void go()}>
+            {items?.length ? tr(M.cleanupMove, { count: files, size: formatSize(bytes) }) : tr(M.move)}
+          </BusyButton>
+        </>
+      }
+    >
+      <p className="faint" style={{ marginTop: 0 }}>
+        {tr(M.cleanupIntro, { days })}
+      </p>
+      {error ? (
+        <div className="field-error">{error}</div>
+      ) : !items ? (
+        <div className="faint">
+          <Icon name="loading" spin /> {tr(M.looking)}
+        </div>
+      ) : !items.length ? (
+        <div className="faint">{tr(M.cleanupNone)}</div>
+      ) : (
+        <>
+          <DataTable id="storage-card-cleanup" className="card-cleanup-preview" rows={items} columns={cardCleanupColumns()} rowKey={(i) => String(i.card)} defaultPageSize={10} filterFrom={10} empty={tr(M.nothing)} />
+          {plan.more && <p className="faint card-cleanup-more">{tr(M.cleanupMore, { count: items.length })}</p>}
+        </>
+      )}
+    </Modal>
   )
 }

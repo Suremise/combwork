@@ -27,6 +27,8 @@ const until = async (fn, ms = 10000) => {
 ;(async () => {
   for (const d of [userData, ws, claudeHome]) fs.rmSync(d, { recursive: true, force: true })
   for (const d of [alpha, claudeHome]) fs.mkdirSync(d, { recursive: true })
+  // Every read of the agent's input recorded, for typeLine (#1560).
+  lib.logFakeInput(claudeHome)
   fs.writeFileSync(path.join(claudeHome, 'fake-trusted.json'), JSON.stringify([alpha.toLowerCase()]))
   lib.enableProviders(userData)
   const cfgFile = path.join(userData, 'config.json')
@@ -44,6 +46,9 @@ const until = async (fn, ms = 10000) => {
   await lib.appReady(page)
   const inv = (ch, ...a) => page.evaluate(([c, x]) => window.hive.invoke(c, ...x), [ch, a])
   await lib.openWorkspace(inv, page, ws)
+  // The board's own moves, as before 1.0's rules (#1275): its project has every rule off, where Review isn't a stage, so
+  // with the rules enforced the board refuses it (boardgates covers that); turned off, every column is a plain move.
+  await inv('advanced:set', 'hive.workflow.enforce', false)
   await page.getByText('alpha', { exact: true }).first().click()
   const agent = await lib.addAgent(inv, alpha, { name: 'Mover' })
   const key = lib.ptyKey(alpha, agent.id)
@@ -85,24 +90,47 @@ const until = async (fn, ms = 10000) => {
   call = await run('boardmove 1 doing')
   check('an agent moves a card back out of Done', call?.status === 200 && (await card(1)).column === 'doing', JSON.stringify(call))
   check('every move is in its history', JSON.stringify((await moves(1)).slice(-2)) === JSON.stringify(['Mover (alpha): Moved to Done', 'Mover (alpha): Moved to Doing']), JSON.stringify(await moves(1)))
+  // The card dialog says the window's column names (#1458): Active, where agents' English says Doing.
+  await tile.click()
+  const dialog = lib.cardDialog(page, await lib.cardLabel(inv, 1))
+  await dialog.waitFor({ timeout: 5000 })
+  await dialog.locator('.task-section-h[data-section="history"]').click()
+  const history = dialog.locator('.task-history')
+  const shownMoves = async () => (await history.innerText().catch(() => '')).split('\n').filter((l) => / Moved to /.test(l))
+  check("the card's history in the window says Active", !!(await until(async () => (await shownMoves()).some((l) => l.endsWith('Mover (alpha) Moved to Active')), 5000)) && !(await shownMoves()).some((l) => / Moved to (Doing|Passed)$/.test(l)), JSON.stringify(await shownMoves()))
+  await page.keyboard.press('Escape')
+  await dialog.waitFor({ state: 'detached', timeout: 5000 })
 
   // --- The card's prompt still asks for Review when the work is done (and Done only once merged, or when the user asks).
   const n = (await inv('tasks:create', { title: 'Docs', project: 'alpha' })).number
   await inv('tasks:start', n, { kind: 'agent', agentId: agent.id })
   check('Start puts the card in Doing', !!(await until(async () => (await card(n)).column === 'doing', 10000)))
+  // The prompt names the card by its key with the number the tools take (#1219): its own key, from the board.
+  const nName = `${(await card(n)).key}`
+  check('the card has a key of its project', /^[A-Z]{2,4}-\d+$/.test(nName), nName)
   const transcript = path.join(claudeHome, 'projects', alpha.replace(/[^a-zA-Z0-9]/g, '-'), `${(await live()).sessionId}.jsonl`)
   const prompt = await until(async () => {
-    const lines = fs.existsSync(transcript) ? fs.readFileSync(transcript, 'utf8').split('\n').filter((l) => l.includes(`task #${n} `)) : []
+    const lines = fs.existsSync(transcript) ? fs.readFileSync(transcript, 'utf8').split('\n').filter((l) => l.includes(`task ${nName} `)) : []
     // Read from its inbox (#650: the task's doorbell names it; the hive_inbox call's result has its text).
     const content = lines.length ? JSON.parse(lines.at(-1)).message.content : null
     return typeof content === 'string' || content === null ? content : (content.find?.((c) => typeof c.content === 'string')?.content ?? null)
   }, 15000)
-  // The prompt points to the work-on-card skill, which the agent's launch carries, and which says Review when done and
-  // Done only once merged or when the user asks (#170; the session's Hive instructions say it too, for a session without the skill).
+  // The prompt points to the work-on-card skill, which the agent's launch carries, and which says Review when done (by
+  // submitting it, #1274) and Done only once merged (#170). The session's Hive instructions say both too, with "or when the
+  // user asks", for a session without the skill (tests/guidance.test.ts checks those).
   check('the card prompt points to the work-on-card skill', typeof prompt === 'string' && prompt.includes('Use the work-on-card skill.'), String(prompt))
   const skill = path.join(alpha, '.hive', `launch-${agent.id}`, 'plugin', 'skills', 'work-on-card', 'SKILL.md')
-  const skillText = fs.existsSync(skill) ? fs.readFileSync(skill, 'utf8') : ''
-  check('…which says Review when the work is done, and Done once merged or when the user asks', /[Mm]ove it to `review`/.test(skillText) && /`done` means merged: move your card there once its work is merged \(merge-ready\), or when the user asks/.test(skillText), skillText.slice(0, 200))
+  // HI-2011: finishing after review is in its reference file beside SKILL.md, copied with it.
+  const read = (f) => (fs.existsSync(f) ? fs.readFileSync(f, 'utf8') : '')
+  const skillText = read(skill)
+  const afterReview = read(path.join(path.dirname(skill), 'after-review.md'))
+  // By meaning rather than sentence (#1596: #1524's rewording broke a literal): one of its steps submits the work with
+  // `hive_submit`, which takes the card to Review, and one finishes it as Done by reporting the merge commit with
+  // `hive_report_merge`, both through the intent tools rather than a column move.
+  const skillSteps = `${skillText}\n${afterReview}`.split('\n')
+  const submitsToReview = skillSteps.some((l) => l.includes('`hive_submit`') && /\bReview\b/.test(l))
+  const doneOnceMerged = skillSteps.some((l) => /\bDone\b/.test(l) && l.includes('`hive_report_merge`') && /\bmerge commit\b/.test(l))
+  check('…which says Review when the work is done, and Done once merged', submitsToReview && doneOnceMerged, JSON.stringify({ submitsToReview, doneOnceMerged, start: skillText.slice(0, 200) }))
 
   await inv('session:stop', alpha, agent.id).catch(() => undefined)
   await app.close()

@@ -22,7 +22,8 @@ export const BENCHMARK_SCHEMA = 'hive-benchmark/1'
 export const METRICS_EXPORT_SCHEMA = 'hive-metrics/1'
 
 /** Bounds on what is read and kept: an artifact is checked as untrusted input. */
-export const BENCHMARK_LIMITS = { fileBytes: 2 * 1024 * 1024, scenarios: 100, samples: 20, checks: 60, failedChecks: 20, skills: 60, text: 200, kept: 20, projects: 100, series: 2000 }
+// scenarios: 200 since #1444 took the set past 100 (the last ones were dropped from benchmarks).
+export const BENCHMARK_LIMITS = { fileBytes: 2 * 1024 * 1024, scenarios: 200, samples: 20, checks: 60, failedChecks: 20, skills: 60, text: 200, kept: 20, projects: 100, series: 2000, agents: 10 }
 
 /**
  * What a comparison is about: the whole workspace, the workspace's own work (no project's: the Assistant, scripts), or
@@ -62,6 +63,9 @@ const M = {
   realUse: msg({ id: 'performance.compare.note.realUse', defaultMessage: 'Real use isn’t a controlled workload: a change here can be the work that was done, not Hive.', description: 'Performance → Compare, a note on two Performance exports (measurements of real use, not of a fixed test).' }),
   stale: msg({ id: 'performance.compare.note.stale', defaultMessage: '{n, plural, one {# sample} other {# samples}} left out: the session was given other guidance than the run started with (stale).', description: "Performance → Compare, a note on a scenario: samples left out because their session was given another revision of Hive's guidance." }),
   leftOut: msg({ id: 'performance.compare.note.leftOut', defaultMessage: '{n, plural, one {# sample} other {# samples}} left out: {why}.', description: "Performance → Compare, a note on a scenario: samples left out because they didn't complete or couldn't be read. {why} lists why (\"no check ran\", or the test harness's own words, in English)." }),
+  noSplit: msg({ id: 'performance.compare.note.noSplit', defaultMessage: '{side, select, baseline {The baseline has no per-agent figures} run {The run has no per-agent figures} other {Neither side has per-agent figures}}: totals of all agents shown.', description: "Performance → Compare, a note on a scenario (HI-2186): its measures can't be shown for the agent under test apart from the other agents, because a side was measured before Hive split them; the figures shown are every agent's together." }),
+  splitPartial: msg({ id: 'performance.compare.note.splitPartial', defaultMessage: 'Some per-agent figures weren’t measured (the coverage was partial): they are left out, not zero.', description: 'Performance → Compare, a note on a scenario (HI-2186): some of the figures of the agent under test or of the other agents are unknown.' }),
+  fakePerCall: msg({ id: 'performance.compare.note.fakePerCall', defaultMessage: 'With the fake Claude Code or fake Codex, each hive call starts a hive MCP server of its own: API requests and tool-list starts count per call, not per session.', description: "Performance → Compare, a note on a comparison of scenario runs on the scripted fake CLIs (HI-2186): what they do differs from a real CLI. Keep hive (Hive's tools), MCP, Claude Code and Codex." }),
   oneSample: msg({ id: 'performance.compare.note.oneSample', defaultMessage: 'One sample on a side: no spread to judge a change by.', description: 'Performance → Compare, a note on a scenario run only once on a side.' }),
   measuredPartly: msg({ id: 'performance.compare.note.measuredPartly', defaultMessage: '{n, plural, one {# sample} other {# samples}} measured partly (recording off, measurements dropped or missing): sizes aren’t judged.', description: 'Performance → Compare, a note on a scenario.' }),
   skillRevisions: msg({ id: 'performance.compare.note.skillRevisions', defaultMessage: 'The sessions were given different skill revisions.', description: 'Performance → Compare, a note on a scenario: the baseline and the run were given different versions of skills.' }),
@@ -117,6 +121,7 @@ const M = {
   roleAgent: msg({ id: 'performance.compare.filters.role.agent', defaultMessage: 'project agents', description: "A Performance export's Who filter (as Performance's Who menu names it: Project agents), in a list of filters. Lower case." }),
   roleAssistant: msg({ id: 'performance.compare.filters.role.assistant', defaultMessage: 'the Assistant', description: "A Performance export's Who filter (as Performance's Who menu names it: The Assistant), in a list of filters." }),
   roleApi: msg({ id: 'performance.compare.filters.role.api', defaultMessage: 'scripts', description: "A Performance export's Who filter (as Performance's Who menu names it: Scripts), in a list of filters. Lower case." }),
+  sideMeasure: msg({ id: 'performance.compare.sideMeasure', defaultMessage: '{measure} · {side, select, builder {builders} reviewer {reviewers} either {either role} none {no workflow role} other {role not recorded}}', description: "A measure of Performance → Compare of exports for one workflow role's launches (HI-2049): {measure} is the measure's name (\"Guidance a launch\"); then whose launches: builders', reviewers', agents that take either role, those with no workflow role (generalists, the Assistant), or launches recorded before Hive recorded the role. Glossary: builder, reviewer, either, workflow role." }),
   roleViewer: msg({ id: 'performance.compare.filters.role.viewer', defaultMessage: 'viewer apps', description: "A Performance export's Who filter (as Performance's Who menu names it: Viewer apps), in a list of filters. Lower case." })
 }
 
@@ -150,6 +155,7 @@ export const SCENARIO_MEASURES: MeasureDef[] = [
   { key: 'guidanceBytes', label: msg({ id: 'performance.compare.measure.guidanceBytes', defaultMessage: 'Launch guidance', description: 'A measure in Performance → Compare: the size of the guidance Hive gave a session at launch.' }), unit: 'bytes', group: 'context', tip: msg({ id: 'performance.compare.measureTip.guidanceBytes', defaultMessage: 'Core contract, project additions, the Assistant’s role and mode, and the skills’ catalog, at launch.', description: 'Tooltip of the Launch guidance measure in Performance → Compare: its parts.' }) },
   { key: 'guidanceChars', label: msg({ id: 'performance.compare.measure.guidanceChars', defaultMessage: 'Launch guidance (characters)', description: 'A measure in Performance → Compare: the launch guidance counted in characters.' }), unit: 'chars', group: 'context', tip: msg({ id: 'performance.compare.measureTip.guidanceChars', defaultMessage: 'The same parts in characters (UTF-16 code units); the catalog has bytes only.', description: 'Tooltip of the Launch guidance (characters) measure in Performance → Compare.' }) },
   { key: 'toolListBytes', label: msg({ id: 'performance.compare.measure.toolListBytes', defaultMessage: 'Tool list', description: "A measure in Performance → Compare: the size of the list of Hive's tools a session was given." }), unit: 'bytes', group: 'context', tip: msg({ id: 'performance.compare.measureTip.toolListBytes', defaultMessage: 'The hive tools’ names, descriptions and schemas as the CLI got them.', description: 'Tooltip of the Tool list measure in Performance → Compare. Keep hive (the tools\' name).' }) },
+  { key: 'toolListChars', label: msg({ id: 'performance.compare.measure.toolListChars', defaultMessage: 'Tool list (characters)', description: "A measure in Performance → Compare: the size of the list of Hive's tools a session was given, in characters." }), unit: 'chars', group: 'context', tip: msg({ id: 'performance.compare.measureTip.toolListChars', defaultMessage: 'The same list in characters (UTF-16 code units). Unknown for a run from before Hive counted them.', description: 'Tooltip of the Tool list (characters) measure in Performance → Compare.' }) },
   { key: 'toolChars', label: msg({ id: 'performance.compare.measure.toolChars', defaultMessage: 'Tool replies', description: "A measure in Performance → Compare: the size of the replies of Hive's tools." }), unit: 'chars', group: 'context', tip: msg({ id: 'performance.compare.measureTip.toolChars', defaultMessage: 'Characters of the hive tools’ replies, as the model got them.', description: 'Tooltip of the Tool replies measure in Performance → Compare. Keep hive (the tools\' name).' }) },
   { key: 'toolBytes', label: msg({ id: 'performance.compare.measure.toolBytes', defaultMessage: 'Tool replies (bytes)', description: "A measure in Performance → Compare: the size of the replies of Hive's tools, in bytes." }), unit: 'bytes', group: 'context', tip: msg({ id: 'performance.compare.measureTip.toolBytes', defaultMessage: 'UTF-8 bytes of the same replies.', description: 'Tooltip of the Tool replies (bytes) measure in Performance → Compare.' }) },
   { key: 'toolCalls', label: msg({ id: 'performance.compare.measure.toolCalls', defaultMessage: 'Tool calls', description: "A measure in Performance → Compare: how many times agents called Hive's tools." }), unit: 'count', group: 'work', tip: msg({ id: 'performance.compare.measureTip.toolCalls', defaultMessage: 'hive tool calls measured by the bridge.', description: "Tooltip of the Tool calls measure in Performance → Compare. Keep hive (the tools' name); the bridge is Hive's MCP server between the CLI and Hive." }) },
@@ -194,8 +200,34 @@ export const EXPORT_MEASURES: MeasureDef[] = [
   { key: 'toolChars', label: msg({ id: 'performance.compare.measure.exportToolChars', defaultMessage: 'Tool replies', description: "A measure in Performance → Compare of exports: the size of the replies of Hive's tools." }), unit: 'chars', group: 'context', tip: msg({ id: 'performance.compare.measureTip.exportToolChars', defaultMessage: 'Characters, per hour recorded.', description: 'Tooltip of the Tool replies measure in Performance → Compare of exports.' }) },
   { key: 'detailCalls', label: msg({ id: 'performance.compare.measure.exportDetailCalls', defaultMessage: 'Detail calls', description: "A measure in Performance → Compare of exports: calls of Hive's tools that asked for the full reply." }), unit: 'count', group: 'work', tip: PER_HOUR },
   { key: 'launches', label: msg({ id: 'performance.compare.measure.exportLaunches', defaultMessage: 'Launches', description: 'A measure in Performance → Compare of exports: agent sessions started.' }), unit: 'count', group: 'work', tip: PER_HOUR },
-  { key: 'guidancePerLaunch', label: msg({ id: 'performance.compare.measure.exportGuidancePerLaunch', defaultMessage: 'Guidance a launch', description: "A measure in Performance → Compare of exports: the size of Hive's guidance for each session started." }), unit: 'bytes', group: 'context', tip: msg({ id: 'performance.compare.measureTip.exportGuidancePerLaunch', defaultMessage: 'Core, project, the Assistant’s role and mode, and catalog, on average (not per hour).', description: 'Tooltip of the Guidance a launch measure in Performance → Compare of exports: its parts.' }) }
+  { key: 'guidancePerLaunch', label: msg({ id: 'performance.compare.measure.exportGuidancePerLaunch', defaultMessage: 'Guidance a launch', description: "A measure in Performance → Compare of exports: the size of Hive's guidance for each session started." }), unit: 'bytes', group: 'context', tip: msg({ id: 'performance.compare.measureTip.exportGuidancePerLaunch', defaultMessage: 'Core, project, the Assistant’s role and mode, and catalog, on average (not per hour).', description: 'Tooltip of the Guidance a launch measure in Performance → Compare of exports: its parts.' }) },
+  { key: 'toolListPerLaunch', label: msg({ id: 'performance.compare.measure.exportToolListPerLaunch', defaultMessage: 'Tool list a launch', description: "A measure in Performance → Compare of exports (HI-2049): the size of the list of Hive's tools each session was given." }), unit: 'chars', group: 'context', tip: msg({ id: 'performance.compare.measureTip.exportToolListPerLaunch', defaultMessage: 'The hive tools’ names, descriptions and schemas as each session’s CLI got them, in characters, on average (not per hour). Sessions from before Hive counted characters are left out.', description: "Tooltip of the Tool list a launch measure in Performance → Compare of exports. Keep hive (the tools' name)." }) }
 ]
+
+/**
+ * The workflow roles an export's launches are split by (HI-2049): GuidanceSeries and CatalogSeries `workflow`, with
+ * `unknown` for what was recorded before. Each has the per-launch measures below, keyed `<measure>.<role>`.
+ */
+export const WORKFLOW_SIDES = ['builder', 'reviewer', 'either', 'none', 'unknown'] as const
+export type WorkflowSide = (typeof WORKFLOW_SIDES)[number]
+const SIDE_MEASURES = ['launches', 'guidancePerLaunch', 'toolListPerLaunch']
+/** The totals each role keeps, `<total>.<role>`: what its measures are made from. */
+const SIDE_TOTALS = ['launches', 'guidanceBytes', 'toolListStarts', 'toolListChars']
+const sided = (key: string): string[] => WORKFLOW_SIDES.map((side) => `${key}.${side}`)
+const sideOf = (v: unknown): WorkflowSide => (typeof v === 'string' && (WORKFLOW_SIDES as readonly string[]).includes(v) && v !== 'unknown' ? (v as WorkflowSide) : 'unknown')
+
+/** An export comparison row's measure: its own, or one of a workflow role's (`<measure>.<role>`) with that role. */
+export function exportMeasure(key: string): { def: MeasureDef; side?: WorkflowSide } | undefined {
+  const own = EXPORT_MEASURES.find((m) => m.key === key)
+  if (own) return { def: own }
+  const at = key.lastIndexOf('.')
+  const base = EXPORT_MEASURES.find((m) => m.key === key.slice(0, at))
+  const side = key.slice(at + 1)
+  return at > 0 && base && SIDE_MEASURES.includes(base.key) && (WORKFLOW_SIDES as readonly string[]).includes(side) ? { def: base, side: side as WorkflowSide } : undefined
+}
+
+/** A workflow role's measure's name: the measure's, and whose launches. */
+export const sideMeasureLabel = (label: string, side: WorkflowSide): Text => said(M.sideMeasure, { measure: label, side })
 
 // ---------------------------------------------------------------------------
 // Artifacts, as kept (validated and normalised).
@@ -226,6 +258,15 @@ export interface Sample {
   /** A resumed session: its provider usage is the whole conversation's, so it isn't compared. */
   resumed: boolean
   measures: Measures | null
+  /**
+   * The measures of the subject (the Assistant, or the agent under test) and of the other agents apart (HI-2186), each
+   * measured on its own: a key missing from one is unknown there. Absent from samples of a harness before HI-2186.
+   */
+  split?: { subject: Measures; others: Measures }
+  /** The harness couldn't split every measure (incomplete coverage): what it couldn't is left out of `split`. */
+  splitPartial?: boolean
+  /** Each agent's hive calls in the measured window (HI-2186), the subject first. */
+  agents?: AgentCalls[]
   usage: Measures | null
   /** Whether the usage's cost was Hive's estimate. */
   costEstimated: boolean
@@ -315,11 +356,17 @@ export interface Artifact {
   summary?: ExportSummary
 }
 
-const COMPONENT_KEYS = ['coreBytes', 'customBytes', 'roleBytes', 'modeBytes', 'catalogBytes', 'coreChars', 'customChars', 'roleChars', 'modeChars', 'toolBytes', 'toolListBytes']
+const COMPONENT_KEYS = ['coreBytes', 'customBytes', 'roleBytes', 'modeBytes', 'catalogBytes', 'coreChars', 'customChars', 'roleChars', 'modeChars', 'toolBytes', 'toolListBytes', 'toolListChars']
 const DERIVED = new Set(['contextBytes', 'guidanceBytes', 'guidanceChars', 'seconds'])
-const MEASURE_KEYS = new Set([...SCENARIO_MEASURES.map((m) => m.key).filter((k) => !DERIVED.has(k)), ...COMPONENT_KEYS, 'toolMs', 'launches', 'skillsDelivered', 'skillsUnmeasured', 'toolListStarts', 'skillTooLarge', 'dropped', 'skillsRead'])
+const MEASURE_KEYS = new Set([...SCENARIO_MEASURES.map((m) => m.key).filter((k) => !DERIVED.has(k)), ...COMPONENT_KEYS, 'toolMs', 'launches', 'skillsDelivered', 'skillsUnmeasured', 'toolListStarts', 'skillTooLarge', 'dropped', 'skillsRead', 'skillRefsRead'])
+/**
+ * A part's measures (HI-2186: the subject's, the other agents'): the scenario's own, less what isn't any one agent's (the
+ * skill service's work, drops) and what the harness counts for the subject alone (its calls, the skills it read).
+ */
+const NOT_SPLIT = new Set(['hiveCalls', 'hiveCallErrors', 'repeatedCalls', 'skillsRead', 'skillRefsRead', 'skillScans', 'skillHits', 'skillMisses', 'skillInvalidations', 'skillBytesRead', 'skillTooLarge', 'dropped'])
+const SPLIT_KEYS = new Set([...MEASURE_KEYS].filter((k) => !NOT_SPLIT.has(k)))
 const USAGE_KEYS = new Set([...USAGE_MEASURES.map((m) => m.key), 'contextTokens'])
-const EXPORT_KEYS = new Set(['requests', 'failed', 'responseBytes', 'requestBytes', 'toolCalls', 'toolChars', 'detailCalls', 'launches', 'guidanceBytes'])
+const EXPORT_KEYS = new Set(['requests', 'failed', 'responseBytes', 'requestBytes', 'toolCalls', 'toolChars', 'detailCalls', 'launches', 'guidanceBytes', 'toolListStarts', 'toolListChars', ...SIDE_TOTALS.flatMap(sided)])
 
 const text = (v: unknown, max = BENCHMARK_LIMITS.text): string =>
   String(typeof v === 'string' || typeof v === 'number' ? v : '')
@@ -336,6 +383,53 @@ function withModeNames(m: Record<string, unknown> | null): Record<string, unknow
   if (!m || !('personaBytes' in m || 'personaChars' in m)) return m
   const { personaBytes, personaChars, ...rest } = m
   return { ...rest, modeBytes: rest.modeBytes ?? personaBytes, modeChars: rest.modeChars ?? personaChars }
+}
+
+/**
+ * Measures with what adds up from them: the launch guidance and Hive's context, only when every part they add up is
+ * known (a missing part leaves them unknown).
+ */
+function withDerived(m: Measures | null): Measures | null {
+  if (!m) return null
+  const guidance = sum(m, ['coreBytes', 'customBytes', 'roleBytes', 'modeBytes', 'catalogBytes'])
+  const guidanceChars = sum(m, ['coreChars', 'customChars', 'roleChars', 'modeChars'])
+  if (guidance !== null) {
+    m.guidanceBytes = guidance
+    const ctx = sum(m, ['toolListBytes', 'toolBytes'])
+    if (ctx !== null) m.contextBytes = guidance + ctx
+  }
+  if (guidanceChars !== null) m.guidanceChars = guidanceChars
+  return m
+}
+
+/** An agent's calls in a sample (HI-2186), as the harness lists them. */
+export interface AgentCalls {
+  /** Its name in the scenario's fixture, `Assistant`, `unattributed` (not in the fixture) or `overflow` (the rest). */
+  agent: string
+  role: 'assistant' | 'builder' | 'reviewer' | 'agent'
+  side: 'subject' | 'other'
+  hiveCalls: number
+  /** Unknown (absent) where the log can't say. */
+  toolListStarts?: number
+  /** An `overflow` row: how many agents it sums. */
+  agents?: number
+}
+
+const AGENT_ROLES = ['assistant', 'builder', 'reviewer', 'agent'] as const
+
+/** A sample's agent rows: valid ones only, at most BENCHMARK_LIMITS.agents; none (undefined) when there is no list. */
+function readAgents(v: unknown): AgentCalls[] | undefined {
+  if (!Array.isArray(v)) return undefined
+  const out: AgentCalls[] = []
+  for (const x of v.slice(0, BENCHMARK_LIMITS.agents)) {
+    const o = obj(x)
+    const calls = num(o?.hiveCalls)
+    if (!o || typeof o.agent !== 'string' || !o.agent || calls === null || !(AGENT_ROLES as readonly string[]).includes(String(o.role)) || (o.side !== 'subject' && o.side !== 'other')) continue
+    const starts = num(o.toolListStarts)
+    const agents = num(o.agents)
+    out.push({ agent: text(o.agent, 64), role: o.role as AgentCalls['role'], side: o.side, hiveCalls: calls, ...(starts !== null ? { toolListStarts: starts } : {}), ...(agents !== null ? { agents } : {}) })
+  }
+  return out
 }
 
 /** Known measures with valid values only (unknown keys and bad values left out, never guessed or zero-filled). */
@@ -359,19 +453,19 @@ function readSample(v: unknown): Sample | null {
   const o = obj(v)
   if (!o) return null
   const raw = withModeNames(obj(o.measures))
-  let measures = raw ? readMeasures(raw, MEASURE_KEYS) : null
+  let measures = raw ? withDerived(readMeasures(raw, MEASURE_KEYS)) : null
   if (measures) {
-    const guidance = sum(measures, ['coreBytes', 'customBytes', 'roleBytes', 'modeBytes', 'catalogBytes'])
-    const guidanceChars = sum(measures, ['coreChars', 'customChars', 'roleChars', 'modeChars'])
-    if (guidance !== null) {
-      measures.guidanceBytes = guidance
-      const ctx = sum(measures, ['toolListBytes', 'toolBytes'])
-      if (ctx !== null) measures.contextBytes = guidance + ctx
-    }
-    if (guidanceChars !== null) measures.guidanceChars = guidanceChars
     const secs = num(o.seconds) ?? num(raw?.seconds)
     if (secs !== null) measures = { ...measures, seconds: secs }
   }
+  // The subject apart from the other agents (HI-2186): the harness's file has them in its measures, a kept artifact
+  // beside them. Both parts or neither.
+  const parts = obj(o.split) ?? (raw && obj(raw.subject) && obj(raw.others) ? { subject: raw.subject, others: raw.others } : null)
+  const subject = parts ? withDerived(readMeasures(withModeNames(obj(parts.subject)), SPLIT_KEYS)) : null
+  const others = parts ? withDerived(readMeasures(withModeNames(obj(parts.others)), SPLIT_KEYS)) : null
+  const split = subject && others ? { subject, others } : null
+  const splitPartial = o.splitPartial === true || raw?.split === 'partial'
+  const agents = readAgents(o.agents ?? raw?.agents)
   const resumed = o.resumed === true
   const u = !resumed ? (obj(o.usage) ?? obj(raw?.usage)) : null
   const usage = u ? readMeasures(u, USAGE_KEYS) : null
@@ -422,6 +516,9 @@ function readSample(v: unknown): Sample | null {
     stale: o.stale === true,
     resumed,
     measures,
+    ...(split ? { split } : {}),
+    ...(splitPartial ? { splitPartial } : {}),
+    ...(agents ? { agents } : {}),
     usage,
     costEstimated: u?.costEstimated === true || o.costEstimated === true,
     coverage: {
@@ -480,7 +577,12 @@ function readScenarios(v: unknown): ScenarioResult[] {
 }
 
 /** Which totals each kind of series adds to (an unreadable series leaves exactly these unknown). */
-const SERIES_TOTALS: Record<'api' | 'mcp' | 'guidance', string[]> = { api: ['requests', 'failed', 'responseBytes', 'requestBytes'], mcp: ['toolCalls', 'toolChars', 'detailCalls'], guidance: ['launches', 'guidanceBytes'] }
+const SERIES_TOTALS: Record<'api' | 'mcp' | 'guidance' | 'catalog', string[]> = {
+  api: ['requests', 'failed', 'responseBytes', 'requestBytes'],
+  mcp: ['toolCalls', 'toolChars', 'detailCalls'],
+  guidance: ['launches', 'guidanceBytes', ...sided('launches'), ...sided('guidanceBytes')],
+  catalog: ['toolListStarts', 'toolListChars', ...sided('toolListStarts'), ...sided('toolListChars')]
+}
 
 /**
  * A report part's totals added into `t`. A series that is missing, isn't a list, is longer than can be read, or has an
@@ -493,8 +595,10 @@ function partTotals(p: unknown, t: Measures, unknown: Set<string>): void {
     for (const keys of Object.values(SERIES_TOTALS)) for (const k of keys) unknown.add(k)
     return
   }
-  for (const kind of ['api', 'mcp', 'guidance'] as const) {
+  for (const kind of ['api', 'mcp', 'guidance', 'catalog'] as const) {
     const v = o[kind]
+    // A report with no tool lists at all (one written by hand, or by a Hive from before they were counted) has none.
+    if (kind === 'catalog' && v === undefined) continue
     const mark = (...keys: string[]): void => keys.forEach((k) => unknown.add(k))
     if (!Array.isArray(v) || v.length > BENCHMARK_LIMITS.series) {
       mark(...SERIES_TOTALS[kind])
@@ -528,17 +632,33 @@ function partTotals(p: unknown, t: Measures, unknown: Set<string>): void {
           if (x.mode === 'detail') t.detailCalls += n
         }
         add('toolChars', x.chars)
-      } else {
+      } else if (kind === 'guidance') {
+        // Recorded before HI-2049: its role is unknown, never a guess.
+        const side = sideOf(x.workflow)
         add('launches', x.launches)
+        add(`launches.${side}`, x.launches)
         const parts = [x.guidanceBytes, x.customBytes ?? 0, x.roleBytes ?? 0, x.modeBytes ?? x.personaBytes ?? 0, x.skillCatalogBytes].map(num)
-        if (parts.some((n) => n === null)) unknown.add('guidanceBytes')
-        else t.guidanceBytes += (parts as number[]).reduce((a, b) => a + b, 0)
+        if (parts.some((n) => n === null)) mark('guidanceBytes', `guidanceBytes.${side}`)
+        else {
+          const n = (parts as number[]).reduce((a, b) => a + b, 0)
+          t.guidanceBytes += n
+          t[`guidanceBytes.${side}`] += n
+        }
+      } else {
+        // The starts whose characters were counted (`charStarts`): a bridge from before HI-2049 sent bytes only, and
+        // its starts count in neither the characters nor the starts they are averaged over.
+        if (x.toolsChars === undefined && x.charStarts === undefined) continue
+        const side = sideOf(x.workflow)
+        for (const [key, value] of [['toolListStarts', x.charStarts], ['toolListChars', x.toolsChars]] as const) {
+          add(key, value)
+          add(`${key}.${side}`, value)
+        }
       }
     }
   }
 }
 
-const emptyTotals = (): Measures => ({ requests: 0, failed: 0, responseBytes: 0, requestBytes: 0, toolCalls: 0, toolChars: 0, detailCalls: 0, launches: 0, guidanceBytes: 0 })
+const emptyTotals = (): Measures => ({ requests: 0, failed: 0, responseBytes: 0, requestBytes: 0, toolCalls: 0, toolChars: 0, detailCalls: 0, launches: 0, guidanceBytes: 0, toolListStarts: 0, toolListChars: 0, ...Object.fromEntries(SIDE_TOTALS.flatMap(sided).map((k) => [k, 0])) })
 
 /** Whether a report part has any measurement in it (a part that can't be read counts as having some: it isn't empty). */
 const hasData = (p: unknown): boolean => {
@@ -855,10 +975,27 @@ export interface ScenarioComparison {
   failedChecks: string[]
   samples: { base: number; run: number }
   measures: MeasureDelta[]
+  /** Whose the scenario's session is (HI-2186): the Assistant's, or an agent's. */
+  subject: 'assistant' | 'agent'
+  /** The subject's measures and the other agents' apart (HI-2186), when every usable sample on both sides has them. */
+  split: { subject: MeasureDelta[]; others: MeasureDelta[] } | null
+  /** Each agent's hive calls in the measured window, on average a sample (null: unknown), when every sample has them. */
+  agents: AgentCallsDelta[] | null
   usage: MeasureDelta[] | null
   /** In English (tests, code); `notesText` is the same for the window. */
   notes: string[]
   notesText: Text[]
+}
+
+/** An agent's hive calls, baseline and run (HI-2186): null where a side can't say (its rows overflowed). */
+export interface AgentCallsDelta {
+  agent: string
+  role: AgentCalls['role']
+  side: AgentCalls['side']
+  /** An `overflow` row: how many agents it sums, at most. */
+  agents?: number
+  base: number | null
+  run: number | null
 }
 
 export interface Comparison {
@@ -923,7 +1060,8 @@ function compareScenario(id: string, base: ScenarioResult | undefined, run: Scen
   const title = run?.title || base?.title || id
   const zero = { passed: 0, failed: 0, skipped: 0 }
   const empty = { quality: { base: { passed: 0, n: 0 }, run: { passed: 0, n: 0 } }, checks: { base: zero, run: zero }, regressions: [], failedChecks: [] }
-  if (!base || !run) return { id, title, status: base ? 'only-in-base' : 'only-in-run', ...empty, samples: { base: base?.samples.length ?? 0, run: run?.samples.length ?? 0 }, measures: [], usage: null, notes: [], notesText: [] }
+  const subject = (run?.role ?? base?.role) === 'assistant' ? 'assistant' : 'agent'
+  if (!base || !run) return { id, title, status: base ? 'only-in-base' : 'only-in-run', ...empty, samples: { base: base?.samples.length ?? 0, run: run?.samples.length ?? 0 }, measures: [], subject, split: null, agents: null, usage: null, notes: [], notesText: [] }
   const b = base.samples.filter(usable)
   const r = run.samples.filter(usable)
   const notes: Text[] = []
@@ -958,6 +1096,19 @@ function compareScenario(id: string, base: ScenarioResult | undefined, run: Scen
   }
   const failedChecks = [...new Set(r.flatMap((s) => s.failedChecks))].slice(0, BENCHMARK_LIMITS.failedChecks)
   const measures = SCENARIO_MEASURES.map((m) => deltaOf(m.key, b, r, (s) => s.measures?.[m.key]))
+  // The subject apart from the other agents (HI-2186): only when every usable sample on both sides was split; else the
+  // totals alone, and said so.
+  const splitOn = (xs: Sample[]): boolean => xs.length > 0 && xs.every((s) => !!s.split)
+  const split =
+    splitOn(b) && splitOn(r)
+      ? {
+          subject: SCENARIO_MEASURES.filter((m) => SPLIT_SHOWN.has(m.key)).map((m) => deltaOf(m.key, b, r, (s) => s.split?.subject[m.key])),
+          others: SCENARIO_MEASURES.filter((m) => SPLIT_SHOWN.has(m.key)).map((m) => deltaOf(m.key, b, r, (s) => s.split?.others[m.key]))
+        }
+      : null
+  if (!split && b.length && r.length) notes.push(said(M.noSplit, { side: splitOn(b) ? 'run' : splitOn(r) ? 'baseline' : 'both' }))
+  if (split && [...b, ...r].some((s) => s.splitPartial)) notes.push(M.splitPartial)
+  const agents = agentDeltas(b, r)
   // Provider usage: model trials only, and only when every usable sample on both sides reported it.
   let usageRows: MeasureDelta[] | null = null
   if (compareUsage && b.length && r.length) {
@@ -970,7 +1121,7 @@ function compareScenario(id: string, base: ScenarioResult | undefined, run: Scen
   }
   if ([...b, ...r].some((s) => s.resumed)) notes.push(M.resumed)
   const samples = { base: base.samples.length, run: run.samples.length }
-  if (!b.length || !r.length) return { id, title, status: 'incomplete', quality, checks, regressions, failedChecks, samples, measures, usage: usageRows, ...told(notes) }
+  if (!b.length || !r.length) return { id, title, status: 'incomplete', quality, checks, regressions, failedChecks, samples, measures, subject, split, agents, usage: usageRows, ...told(notes) }
   const rate = (q: { passed: number; n: number }): number => q.passed / q.n
   const get = (k: string): MeasureDelta => measures.find((m) => m.key === k)!
   const context = get('contextBytes')
@@ -989,7 +1140,43 @@ function compareScenario(id: string, base: ScenarioResult | undefined, run: Scen
   else status = 'same'
   if (status === 'incomplete') notes.push(M.notJudged)
   if (status === 'better' && context.withinSpread) notes.push(M.withinSpread)
-  return { id, title, status, quality, checks, regressions, failedChecks, samples, measures, usage: usageRows, ...told(notes) }
+  return { id, title, status, quality, checks, regressions, failedChecks, samples, measures, subject, split, agents, usage: usageRows, ...told(notes) }
+}
+
+/** The measures shown for each part (HI-2186): those an agent's work makes, none the harness counts for the subject alone. */
+const SPLIT_SHOWN = new Set(SCENARIO_MEASURES.map((m) => m.key).filter((k) => !NOT_SPLIT.has(k) && k !== 'seconds'))
+
+/**
+ * Each agent's hive calls on average a sample, baseline and run (HI-2186), matched by its fixture identity (name and
+ * role), the subject first. An agent missing from a sample's rows made no call, unless that sample's rows overflowed:
+ * then that side is unknown for it. Null unless every usable sample on both sides listed its agents.
+ */
+function agentDeltas(b: Sample[], r: Sample[]): AgentCallsDelta[] | null {
+  if (!b.length || !r.length || ![...b, ...r].every((s) => s.agents)) return null
+  const key = (a: AgentCalls): string => JSON.stringify([a.agent, a.role])
+  const rows = new Map<string, AgentCallsDelta>()
+  for (const s of [...b, ...r]) for (const a of s.agents!) if (!rows.has(key(a))) rows.set(key(a), { agent: a.agent, role: a.role, side: a.side, base: null, run: null })
+  const mean = (xs: Sample[], k: string): { v: number | null; agents?: number } => {
+    let n = 0
+    let most: number | undefined
+    for (const s of xs) {
+      const row = s.agents!.find((a) => key(a) === k)
+      if (row) {
+        n += row.hiveCalls
+        if (row.agents !== undefined) most = Math.max(most ?? 0, row.agents)
+      } else if (s.agents!.some((a) => a.agent === 'overflow')) return { v: null }
+    }
+    return { v: n / xs.length, ...(most !== undefined ? { agents: most } : {}) }
+  }
+  const rank = (a: AgentCallsDelta): number => (a.side === 'subject' ? 0 : a.agent === 'overflow' ? 3 : a.agent === 'unattributed' ? 2 : 1)
+  return [...rows.entries()]
+    .map(([k, a]) => {
+      const x = mean(b, k)
+      const y = mean(r, k)
+      const most = Math.max(x.agents ?? 0, y.agents ?? 0)
+      return { ...a, base: x.v, run: y.v, ...(most ? { agents: most } : {}) }
+    })
+    .sort((x, y) => rank(x) - rank(y) || x.agent.localeCompare(y.agent, 'en') || x.role.localeCompare(y.role, 'en'))
 }
 
 /** A scenario's notes, in English and as text. */
@@ -1023,6 +1210,8 @@ export function compareArtifacts(base: Artifact, run: Artifact): Comparison {
     if (a.guidance && b.guidance && a.guidance === b.guidance) notes.push(M.sameGuidance)
     const realUsage = a.real && b.real
     if (!realUsage) notes.push(M.fakeUsage)
+    // The scripted fakes start a hive server a call (fake-copilot runs the real Copilot CLI, which keeps one).
+    if ([a, b].some((x) => x.provider === 'fake' || x.provider === 'fake-codex')) notes.push(M.fakePerCall)
     const ids = [...new Set([...base.scenarios.map((s) => s.id), ...run.scenarios.map((s) => s.id)])]
     const scenarios = ids.map((id) =>
       compareScenario(
@@ -1047,14 +1236,23 @@ export function compareArtifacts(base: Artifact, run: Artifact): Comparison {
     if (Math.abs(a.rangeMs - b.rangeMs) > 3_600_000) notes.push(M.rangesDiffer)
     const known = (s: ExportSummary, ...keys: string[]): boolean => keys.every((k) => typeof s.totals[k] === 'number')
     const perHour = (s: ExportSummary, k: string): number[] => (s.observedMs ? [s.totals[k] / (s.observedMs / 3_600_000)] : [])
-    const rows = EXPORT_MEASURES.map((m) => {
-      const keys = m.key === 'guidancePerLaunch' ? ['launches', 'guidanceBytes'] : [m.key]
-      // Unknown on a side (a damaged measurement in its file): shown as unknown, never compared.
-      if (!known(a, ...keys) || !known(b, ...keys)) return { key: m.key, base: null, run: null, delta: null, pct: null, withinSpread: false, incomplete: true }
-      return m.key === 'guidancePerLaunch'
-        ? deltaOf(m.key, a.totals.launches ? [a.totals.guidanceBytes / a.totals.launches] : [], b.totals.launches ? [b.totals.guidanceBytes / b.totals.launches] : [])
-        : deltaOf(m.key, perHour(a, m.key), perHour(b, m.key))
-    })
+    // An average a launch: what it adds up over what it is averaged over (none: no value, not zero).
+    const PER_LAUNCH: Record<string, [string, string]> = { guidancePerLaunch: ['guidanceBytes', 'launches'], toolListPerLaunch: ['toolListChars', 'toolListStarts'] }
+    const row = (key: string, measure: string, suffix = ''): MeasureDelta => {
+      const per = PER_LAUNCH[measure]
+      const keys = (per ?? [measure]).map((k) => k + suffix)
+      // Unknown on a side (a damaged measurement in its file, or a summary kept before it was measured): shown as
+      // unknown, never compared.
+      if (!known(a, ...keys) || !known(b, ...keys)) return { key, base: null, run: null, delta: null, pct: null, withinSpread: false, incomplete: true }
+      const average = (s: ExportSummary): number[] => (s.totals[keys[1]] ? [s.totals[keys[0]] / s.totals[keys[1]]] : [])
+      return per ? deltaOf(key, average(a), average(b)) : deltaOf(key, perHour(a, keys[0]), perHour(b, keys[0]))
+    }
+    const rows = EXPORT_MEASURES.map((m) => row(m.key, m.key))
+    // Each workflow role either side has launches or tool lists of (HI-2049), its own measures.
+    for (const side of WORKFLOW_SIDES) {
+      const has = (s: ExportSummary): boolean => (s.totals[`launches.${side}`] ?? 0) > 0 || (s.totals[`toolListStarts.${side}`] ?? 0) > 0
+      if (has(a) || has(b)) for (const m of SIDE_MEASURES) rows.push(row(`${m}.${side}`, m, `.${side}`))
+    }
     notes.push(M.realUse)
     return { kind: 'export', comparable: reasons.length === 0, ...why(reasons, notes), rows, summary: {} }
   }

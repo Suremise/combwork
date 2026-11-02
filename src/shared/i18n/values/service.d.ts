@@ -10,6 +10,8 @@ interface HiveMessageValues {
   'service.advanced.notObject': { example: string | number }
   'service.advanced.notValues': undefined
   'service.advanced.unknown': { id: string | number }
+  'service.answerRelay.title': { card: string | number }
+  'service.assistantAsk.title': { card: string | number }
   'service.attachments.badFolder': undefined
   'service.attachments.badRecord': { file: string | number }
   'service.attachments.notOwn': { folder: string | number }
@@ -36,6 +38,15 @@ interface HiveMessageValues {
   'service.benchmarks.unwritable': undefined
   'service.benchmarks.why': { why: string }
   'service.benchmarks.wrongScope': undefined
+  'service.cardAttach.moveFailed': { project: string | number; why: string | number }
+  'service.cardAttach.moved': undefined
+  'service.cardAttach.noAttachment': undefined
+  'service.cardAttach.noCard': undefined
+  'service.cardAttach.noProject': { project: string | number }
+  'service.cardAttach.refused': { path: string | number }
+  'service.cardAttach.tooLarge': { name: string | number; max: string | number }
+  'service.cardAttach.tooMuch': { files: number; total: string | number }
+  'service.cardCleanup.stale': undefined
   'service.files.badName': { name: string | number }
   'service.files.exists': { name: string | number }
   'service.files.existsIn': { root: string; name: string | number; folder: string | number }
@@ -48,20 +59,25 @@ interface HiveMessageValues {
   'service.files.notKept': undefined
   'service.files.outside': undefined
   'service.files.throughLink': undefined
+  'service.fsutil.keptBusy': { file: string | number }
   'service.fsutil.notCopied': { name: string | number }
   'service.git.exitCode': { code: string | number }
   'service.git.failed': { command: string | number; why: string | number }
   'service.git.outside': undefined
   'service.git.tooLarge': { kb: number }
+  'service.gitCompare.noBranch': { branch: string | number }
   'service.gitRepo.addFailed': { remote: string | number; why: string | number }
   'service.gitRepo.added': { remote: string | number }
   'service.gitRepo.alreadyOn': { branch: string | number }
   'service.gitRepo.badName': { kind: string; hasName: string; name: string | number }
+  'service.gitRepo.branchKept': { why: string; branch: string | number; target: string | number }
+  'service.gitRepo.branchesDeleted': { n: number; branches: string | number }
   'service.gitRepo.chooseRemote': undefined
   'service.gitRepo.command': { command: string | number; why: string | number }
   'service.gitRepo.createFailed': { name: string | number; why: string | number }
   'service.gitRepo.createdAt': { name: string | number; commit: string | number }
   'service.gitRepo.createdSwitched': { name: string | number }
+  'service.gitRepo.deleteBranchFailed': { branch: string | number; why: string | number }
   'service.gitRepo.detachedPull': undefined
   'service.gitRepo.detachedPush': undefined
   'service.gitRepo.diverged': { branch: string | number; upstream: string | number; ahead: number; behind: number }
@@ -78,15 +94,30 @@ interface HiveMessageValues {
   'service.gitRepo.noRemote': { remote: string | number }
   'service.gitRepo.noRemotes': undefined
   'service.gitRepo.noRemotesFetch': undefined
+  'service.gitRepo.noTarget': { target: string | number }
   'service.gitRepo.noUpstream': { branch: string | number }
+  'service.gitRepo.notOnRemote': { remote: string | number; branch: string | number }
   'service.gitRepo.notRepo': { folder: string | number }
   'service.gitRepo.nothingToPush': undefined
   'service.gitRepo.nothingToTag': undefined
   'service.gitRepo.pullFailed': { why: string | number }
   'service.gitRepo.pulled': { n: number; upstream: string | number }
+  'service.gitRepo.pushAllRefused': { remote: string | number; n: number }
   'service.gitRepo.pushFailed': { to: string | number; why: string | number }
+  'service.gitRepo.pushOutcome': { result: string; refs: string | number }
+  'service.gitRepo.pushUpToDate': { to: string | number; branch: string | number }
   'service.gitRepo.pushed': { branch: string | number; to: string | number }
+  'service.gitRepo.pushedAll': { remote: string | number }
   'service.gitRepo.rejected': { to: string | number; branch: string | number }
+  'service.gitRepo.remoteBranchesDeleted': { n: number; branches: string | number; remote: string | number }
+  'service.gitRepo.remoteDeleteRefused': { remote: string | number; branches: string | number }
+  'service.gitRepo.remoteRemoved': { n: number; remote: string | number; branches: string | number }
+  'service.gitRepo.remoteRenamed': { n: number; from: string | number; to: string | number; branches: string | number }
+  'service.gitRepo.remoteSameName': { remote: string | number }
+  'service.gitRepo.remoteTaken': { remote: string | number }
+  'service.gitRepo.remoteTrackingChanged': { remote: string | number }
+  'service.gitRepo.removeRemoteFailed': { remote: string | number; why: string | number }
+  'service.gitRepo.renameRemoteFailed': { remote: string | number; why: string | number }
   'service.gitRepo.setFailed': { key: string | number; why: string | number }
   'service.gitRepo.switchFailed': { branch: string | number; why: string | number }
   'service.gitRepo.switched': { branch: string | number }
@@ -94,7 +125,27 @@ interface HiveMessageValues {
   'service.gitRepo.tagPushFailed': { commit: string | number; name: string | number; remote: string | number; why: string | number }
   'service.gitRepo.tagged': { commit: string | number; name: string | number }
   'service.gitRepo.taggedPushed': { commit: string | number; name: string | number; remote: string | number }
+  'service.gitRepo.trackedNothing': { branch: string | number }
+  'service.gitRepo.tracking': { pushed: string; branch: string | number; upstream: string | number }
+  'service.gitRepo.untracked': { branch: string | number; upstream: string | number }
   'service.gitRepo.upToDate': { branch: string | number; upstream: string | number }
+  'service.gitRepo.update.agentBusy': { agent: string | number; status: string; folder: string | number; branch: string | number }
+  'service.gitRepo.update.conflict': { how: string; branch: string | number; target: string | number; files: string | number }
+  'service.gitRepo.update.dirty': { folder: string | number; branch: string | number }
+  'service.gitRepo.update.failed': { branch: string | number; target: string | number; why: string | number }
+  'service.gitRepo.update.forwarded': { branch: string | number; target: string | number; commit: string | number }
+  'service.gitRepo.update.isTarget': { branch: string | number }
+  'service.gitRepo.update.merged': { target: string | number; branch: string | number; commit: string | number }
+  'service.gitRepo.update.midOperation': { state: string | number; folder: string | number }
+  'service.gitRepo.update.missed': { branch: string | number; target: string | number }
+  'service.gitRepo.update.moved': { branch: string | number }
+  'service.gitRepo.update.noTarget': { branch: string | number }
+  'service.gitRepo.update.notUndone': { branch: string | number; target: string | number; folder: string | number; state: string; why: string | number }
+  'service.gitRepo.update.notUndoneTemporary': { branch: string | number; target: string | number; folder: string | number; why: string | number }
+  'service.gitRepo.update.queued': { card: string | number; branch: string | number }
+  'service.gitRepo.update.rebased': { branch: string | number; n: number; target: string | number; commit: string | number }
+  'service.gitRepo.update.temporaryLeft': { folder: string | number }
+  'service.gitRepo.update.upToDate': { branch: string | number; target: string | number }
   'service.gitRepo.upstreamGone': { upstream: string | number }
   'service.gitRepo.urlChanged': { remote: string | number }
   'service.gitRepo.urlFailed': { remote: string | number; why: string | number }
@@ -104,8 +155,32 @@ interface HiveMessageValues {
   'service.hiveVcs.exitCode': { code: string | number }
   'service.hiveVcs.noRepo': undefined
   'service.hiveVcs.rmFailed': { why: string | number }
+  'service.intent.noWorkflow': { card: string | number }
+  'service.intent.queueNotAgents': undefined
+  'service.keys.closed': undefined
+  'service.keys.form': undefined
+  'service.keys.notice': { keys: string | number }
+  'service.keys.noticeTitle': undefined
+  'service.keys.prefix': { key: string | number; other: string | number }
+  'service.keys.taken': { key: string | number }
+  'service.keys.unknownProject': undefined
+  'service.laneStart.busy': { status: string; agent: string | number }
+  'service.laneStart.done': { card: string | number }
+  'service.laneStart.needsReviewer': { project: string | number }
+  'service.laneStart.noCards': undefined
+  'service.laneStart.notTheProjects': { card: string | number; project: string | number }
+  'service.laneStart.poolEmpty': { project: string | number }
+  'service.laneStart.poolNotOffered': { project: string | number }
+  'service.laneStart.sameAgent': undefined
+  'service.laneStart.starting': { agent: string | number }
+  'service.laneStart.unknownAgent': { agent: string | number; project: string | number }
+  'service.laneStarts.freshBlockedBody': { why: string; minutes: number; reason: string | number }
+  'service.laneStarts.freshBlockedTitle': { agent: string | number }
   'service.lanes.noWorkspace': undefined
+  'service.lanes.teamPaused': undefined
   'service.lanes.unknown': { id: string | number }
+  'service.mcp.addedDropped': { n: number }
+  'service.mcp.addedTitle': undefined
   'service.metrics.badProvider': undefined
   'service.metrics.badRange': undefined
   'service.metrics.badRole': undefined
@@ -122,6 +197,7 @@ interface HiveMessageValues {
   'service.providers.notInstalled': { cli: string | number }
   'service.providers.pickNotFound': { task: string | number; item: string | number }
   'service.providers.retryUnavailable': undefined
+  'service.providers.signInConnections': { cli: string | number }
   'service.providers.stillLooking': { cli: string | number }
   'service.providers.stillLookingAll': undefined
   'service.providers.stopFirst': { cli: string | number }
@@ -130,21 +206,38 @@ interface HiveMessageValues {
   'service.providers.task': { task: string; cli: string | number }
   'service.providers.taskDone': { task: string | number }
   'service.providers.taskFailed': { task: string | number; code: string | number }
+  'service.slots.notPrepared': { slot: string | number; card: string | number; why: string | number }
+  'service.slots.resumeFailed': { agent: string | number; slot: string | number; card: string | number; why: string | number }
+  'service.slots.resumeHeld': { card: string | number; agent: string | number; slot: string | number; why: string | number }
+  'service.templates.v09': { n: number }
+  'service.templates.v09Title': undefined
   'service.transcripts.busy': undefined
   'service.transcripts.exported': { session: string | number; date: string | number }
   'service.transcripts.imageNotKept': undefined
   'service.transcripts.noImage': undefined
   'service.transcripts.noTool': undefined
   'service.transcripts.none': undefined
+  'service.workflow.changedMeanwhile': undefined
+  'service.workflow.closed': undefined
+  'service.workflow.inheritor': { project: string | number }
+  'service.workflowNotice.blocked': { card: string | number; reason: string | number }
+  'service.workflowNotice.blockedNoReason': { card: string | number }
+  'service.workflowNotice.failed': { card: string | number }
+  'service.workflowNotice.forYou': { card: string | number }
+  'service.workflowNotice.lane': { lane: string | number }
+  'service.workflowNotice.mergeDue': undefined
+  'service.workflowNotice.mergeStalled': undefined
+  'service.workflowNotice.merging': { card: string | number }
+  'service.workflowNotice.notMerged': { card: string | number }
+  'service.workflowNotice.stalled': { card: string | number }
   'service.workspace.advancedNotHere': { setting: string | number }
   'service.workspace.agentGone': undefined
   'service.workspace.badName': { chars: string | number }
   'service.workspace.closed': undefined
+  'service.workspace.connectionGone': { agent: string | number }
   'service.workspace.folderExists': { name: string | number }
   'service.workspace.holdsOpen': { workspace: string | number; folder: string | number; name: string | number }
   'service.workspace.insideOpen': { folder: string | number; workspace: string | number }
-  'service.workspace.loopRounds': { max: string | number }
-  'service.workspace.loopWait': { max: string | number }
   'service.workspace.nameIn': { name: string | number; projects: string | number }
   'service.workspace.namesShared': undefined
   'service.workspace.none': undefined
@@ -152,7 +245,17 @@ interface HiveMessageValues {
   'service.workspace.notProject': { path: string | number }
   'service.workspace.notRoot': { path: string | number }
   'service.workspace.openElsewhere': { folder: string | number }
+  'service.workspace.platformGitFound': { project: string | number }
+  'service.workspace.platformInvalid': { project: string | number; value: string | number }
+  'service.workspace.platformInvalidTitle': { project: string | number }
+  'service.workspace.platformOpen': undefined
+  'service.workspace.platformOtherFound': { vcs: string | number; project: string | number }
+  'service.workspace.platformRepositoryGone': { project: string | number }
+  'service.workspace.platformSettled': undefined
+  'service.workspace.platformTitle': { project: string | number }
   'service.workspace.renameAgent': { project: string | number; agent: string | number }
   'service.workspace.sharedNames': { shared: string | number; project: string | number; agent: string | number; suggestion: string | number }
+  'service.workspace.stillClosing': { name: string | number }
+  'service.workspace.stillOpening': { name: string | number }
   'service.workspace.twoCalled': { name: string | number }
 }

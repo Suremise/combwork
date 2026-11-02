@@ -1,5 +1,6 @@
-import type { AgentDef, AppSettings, AutoCompactSetting, EffortLevel, PermissionMode, ProjectConfig, ProjectProviderConfig, ProviderId, ProviderSettings } from './types'
+import type { AgentDef, AppSettings, AutoCompactSetting, EffortLevel, LaunchValues, ModelAlias, PermissionMode, ProjectConfig, ProjectProviderConfig, ProviderId, ProviderSettings, ServerModel } from './types'
 import type { AttachmentKind } from './attachments'
+import type { TypedNewline } from './terminalInput'
 import { msg, type Msg } from './i18n/msg'
 import type { Tr } from './tasks'
 import { CLAUDE_CODE, CLAUDE_DESCRIPTOR } from './claude'
@@ -20,9 +21,10 @@ export interface ModeText {
   label: Msg
   description: Msg
   cliNote?: Msg
+  short?: Msg
 }
 
-/** A provider's notes in the window's words (Agent Setup, a pane's sign-in and safeguard notes). */
+/** A provider's notes in the window's words (Provider Setup, a pane's sign-in and safeguard notes). */
 export interface ProviderText {
   installNote: Msg
   extensionNote: Msg
@@ -47,6 +49,10 @@ export interface ModeOption {
   reviewed?: boolean
   /** Where the CLI's own screen names the mode differently, why: shown with Hive's mode badge while a session runs in it. */
   cliNote?: string
+  /** A shorter name for the mode badge, where the label is long ("CLI's own"). */
+  short?: string
+  /** The CLI's own setting (cliOwnMode.ts): Hive passes no mode, switches none live, and the Assistant isn't offered it. */
+  cliOwn?: boolean
 }
 
 export interface ModelOption {
@@ -111,6 +117,17 @@ export interface ProviderCapabilities {
    */
   backgroundWakes: boolean
   /**
+   * The CLI sends a hook as it starts, before any prompt (Claude Code's SessionStart; Codex's and Copilot's come with the
+   * first prompt): none within a while of its start means its hooks aren't reaching Hive (#1336).
+   */
+  startHook?: boolean
+  /**
+   * A turn the CLI records as failed sends no Stop (Copilot 1.0.105, HI-1960: every ErrorOccurred of a model call it
+   * gave up on is recoverable, and its turn ends with only a session.error): the record ends the running turn failed.
+   * Without it, a recorded failure waits for the turn's Stop (Codex's).
+   */
+  failureEndsTurn?: boolean
+  /**
    * The CLI draws a full-screen interface that a resize while it starts can leave drawn at the wrong width, until the
    * next resize (Copilot, #486): Hive gives it a size refresh, as resizing the window by hand would, once it has
    * started (its first status), again once it is ready, and after Hive switches its mode live.
@@ -128,6 +145,99 @@ export interface ProviderCapabilities {
    * (typed or bracketed alike: 0.163); Enter again sends it. Drawn, the line is in its prompt, and the Enter sends it.
    */
   enterOnceDrawn: boolean
+  /**
+   * Its input box's Ctrl+U deletes only the row the cursor is on of a line wrapped onto several, not the whole line
+   * (HI-1974: Claude Code 2.1.312; Codex and Copilot clear the line). Hive then presses it once for each row a prompt it
+   * stopped part-way took, or the rest stays in the input and goes with the next prompt. Absent: it clears the line.
+   */
+  ctrlUClearsRow?: boolean
+  /**
+   * The keys its input box takes as a new line rather than a send (HI-1327), which Hive may press for a line break in a
+   * prompt it types when prompts go as typed: the one it presses is the adapter's `typedNewline()` (an Advanced choice).
+   * Absent: a CLI whose prompts go in as a bracketed paste, or none known, and line breaks typed become spaces.
+   */
+  typedNewlines?: readonly TypedNewline[]
+  /**
+   * The CLI can be given folders outside its own to read and write, on its command line (#1439, `LaunchContext.extraDirs`):
+   * how a reviewer reaches the project's review copies. Without it, its reviewers review the builder's folder read-only.
+   */
+  extraDirs: boolean
+  /**
+   * The CLI keeps its login in a home folder given at launch (HI-980: Claude Code's CLAUDE_CONFIG_DIR), so Hive can keep
+   * an account per folder: `homeEnv` names the variable, `shared` the home's folders each account's folder links to by a
+   * junction (the adapter's accountSharedTarget says where), `userHome` the CLI's own home in the user's folder
+   * (`.claude`), which a test home is never (the test seam), and `orgs` whether its sign-in names an organisation, which
+   * an identity then needs to be taken on (false: its email alone, HI-1757). Absent: the CLI has no accounts in Hive.
+   */
+  /**
+   * `setUp` (HI-1870): what the CLI's one-time first-run setup on a connection is, said above its Set Up terminal and on
+   * a connection that still needs it.
+   */
+  connections?: {
+    homeEnv: string
+    shared: readonly string[]
+    userHome: string
+    orgs: boolean
+    setUp: Msg
+    /**
+     * HI-1871: the CLI's trust of a folder covers the folders inside it (measured: Claude Code 2.1.311), so Set Up asks
+     * it once, in the workspace's folder, for every project there. Absent: once per project (Codex: its main root).
+     */
+    trustInherits?: true
+    server?: ServerCaps
+  }
+}
+
+/**
+ * How the CLI reaches a server of the user's (HI-1772: a server connection), when it can: the variables it reads, set
+ * for that launch only. `keylessToken` is a value that isn't secret, set as the key for a local server with none (the
+ * CLI otherwise asks for its login: the probe on HI-1772); `presets` fill Add Connection's form. Absent: the CLI has no
+ * server connections in Hive.
+ */
+export interface ServerCaps {
+  baseUrlEnv: string
+  keyEnv: string
+  keylessToken: string
+  /** The variable naming the model it runs as by default, and each alias's. */
+  modelEnv: string
+  aliasEnv: Record<ModelAlias, string>
+  /** The variable naming its subagents' model: the haiku alias's model. */
+  subagentEnv?: string
+  /** How models are listed when the user asks, without a preset of its own: a path under the base URL, read as `data[].id`. */
+  listing: ServerListing
+  presets: readonly ServerPreset[]
+}
+
+/**
+ * A server's model listing (HI-1772): `path` absolute (from the origin) or relative (under the base URL), the reply's
+ * list, and each entry's id; `remote`, a field an entry the server runs elsewhere has, not empty (HI-1773).
+ */
+export interface ServerListing {
+  path: string
+  list: string
+  id: string
+  remote?: string
+}
+
+/** A preset for Add Connection (HI-1772): a filled form, all of it editable. */
+export interface ServerPreset {
+  id: string
+  name: string
+  baseUrl: string
+  /** Its models, typed: the vendor's recommendation for this CLI (their ids and the aliases each stands in for). */
+  models?: readonly ServerModel[]
+  /** Its models read from the server instead (the user asks), with this listing. */
+  listing?: ServerListing
+  keyless?: boolean
+  /** Where its setup is documented, shown with the preset. */
+  docs?: string
+  /**
+   * The advanced setting (a pattern) for model ids its server runs elsewhere (HI-1773), for models typed rather than
+   * read from it: a model its listing marks remote is remote whatever the pattern says.
+   */
+  remoteModels?: string
+  /** The context length, in tokens, the service recommends for this CLI (HI-1773): shown with the preset, never enforced. */
+  contextAdvice?: number
 }
 
 /** What the CLI said about a model, for modeCaveat. */
@@ -179,9 +289,9 @@ export interface ProviderDescriptor {
    * `known` is what the CLI reported about the model (models.ts modelCaps), which replaces any guess.
    */
   modeCaveat?: (mode: PermissionMode, model: string, known?: ModeCaveatFacts, tr?: Tr) => string | null
-  /** Agent Setup: how the installer works and which accounts can sign in. */
+  /** Provider Setup: how the installer works and which accounts can sign in. */
   installNote: string
-  /** Agent Setup, when only an editor extension's copy was found: why Hive doesn't use it. */
+  /** Provider Setup, when only an editor extension's copy was found: why Hive doesn't use it. */
   extensionNote: string
   /** How to sign in again once its sign-in has expired, while agents wait (the needs sign-in status, #309). */
   signInHelp: string
@@ -339,13 +449,14 @@ export function isProviderEnabled(settings: Pick<AppSettings, 'providers'> | nul
   return isKnownProvider(id) && !!settings?.providers?.[id]?.enabled
 }
 
+/** The providers turned on, in Hive's order (PROVIDERS': HI-2139, no order of the user's). */
 export function enabledProviders(settings: Pick<AppSettings, 'providers'> | null | undefined): ProviderDescriptor[] {
   return PROVIDERS.filter((p) => isProviderEnabled(settings, p.id))
 }
 
 /**
- * Settings → Providers → Default provider left to Hive (#474), the default: new agents use the first provider (in
- * PROVIDERS' order) that is turned on and installed, so a Codex-only or Copilot-only user is never pointed at Claude Code.
+ * A 0.9 default provider left to Hive (#474), as `settings.defaultProvider` keeps it: only the migration reads that
+ * setting (decision A, HI-2132). Automatic's pick lives on as autoProvider, the last resort for an agent with no CLI.
  */
 export const AUTO_PROVIDER = 'auto'
 
@@ -365,8 +476,12 @@ export function setInstalledCheck(fn: (id: ProviderId) => boolean | null): void 
   installedCheck = fn
 }
 
+/** Whether a provider's CLI was found, as this process last heard (installedCheck); null while still looking. */
+export const installedAsHeard = (id: ProviderId): boolean | null => installedCheck(id)
+
 /**
- * Automatic's provider: the first turned on and installed, else the first turned on, else Claude Code. Never from
+ * Automatic's provider, in Hive's order (HI-2139): the first turned on and installed, else the first turned on, else
+ * Claude Code. Never from
  * partial detection (#506): until every turned-on provider has answered (autoProviderPending), this is only a guess for
  * display, the first turned-on provider not known to be missing (never Codex because it answered before Claude Code).
  * What commits to it (a launch, a new agent) waits for detection, and is refused if Hive is still looking.
@@ -381,87 +496,23 @@ export function autoProviderPending(settings: Pick<AppSettings, 'providers'> | n
   return enabledProviders(settings).some((p) => installedCheck(p.id) === null)
 }
 
-/** Whether a project's new agents' provider still waits on detection: its default is Automatic, and that is pending. */
-export function defaultProviderPending(cfg: Pick<ProjectConfig, 'defaultProvider'> | null | undefined, settings: Pick<AppSettings, 'defaultProvider' | 'providers'> | null | undefined): boolean {
-  return !chosenDefaultProvider(cfg, settings) && autoProviderPending(settings)
-}
-
-/** Settings' default provider in words: a provider's name, or "Automatic (Codex)" (what it picks now, when any is on). */
-export function defaultProviderLabel(settings: Pick<AppSettings, 'defaultProvider' | 'providers'> | null | undefined, tr?: Tr): string {
-  const v = settings?.defaultProvider
-  if (v && v !== AUTO_PROVIDER) return providerName(v)
-  const state = !enabledProviders(settings).length ? 'none' : autoProviderPending(settings) ? 'checking' : 'picked'
-  if (tr) return tr(msg({ id: 'agents.provider.automatic', defaultMessage: '{state, select, checking {Automatic (checking…)} picked {Automatic ({provider})} other {Automatic}}', description: "The default provider Automatic (it follows what is installed), in the provider pickers: while Hive checks which CLIs are installed; with the provider it picks now ({provider}: its name); or plain." }), { state, provider: state === 'picked' ? providerName(autoProvider(settings)) : '' })
-  if (state === 'none') return 'Automatic' // i18n-ignore: English without tr (Settings' callers pass tr once converted)
-  return state === 'checking' ? 'Automatic (checking…)' : `Automatic (${providerName(autoProvider(settings))})` // i18n-ignore: English without tr
-}
-
-/** The default the user chose for a project's new agents (its own, else Settings'), or null when it is Automatic. */
-export function chosenDefaultProvider(cfg: Pick<ProjectConfig, 'defaultProvider'> | null | undefined, settings: Pick<AppSettings, 'defaultProvider'> | null | undefined): ProviderId | null {
-  const own = cfg?.defaultProvider
-  if (own && own !== 'inherit' && own !== AUTO_PROVIDER) return own
-  const global = settings?.defaultProvider
-  return global && global !== AUTO_PROVIDER ? global : null
-}
-
-/** The provider a project's new agents use: its own choice, else the global default; Automatic follows what is installed. */
-export function projectDefaultProvider(cfg: Pick<ProjectConfig, 'defaultProvider'> | null | undefined, settings: Pick<AppSettings, 'defaultProvider' | 'providers'> | null | undefined): ProviderId {
-  return chosenDefaultProvider(cfg, settings) ?? autoProvider(settings)
-}
-
 /**
- * What a project with no agents warns about its new agents' provider (#474), or null. A default the user chose (the
- * project's or Settings') that is turned off or isn't installed, by name. With Automatic, only when no provider is
- * turned on, or none of those turned on is installed: a CLI nobody chose is never named. `info` is what Hive found
- * (while it is still looking, nothing is said).
- */
-export function defaultProviderWarning(
-  cfg: Pick<ProjectConfig, 'defaultProvider'> | null | undefined,
-  settings: Pick<AppSettings, 'defaultProvider' | 'providers'> | null | undefined,
-  info: (id: ProviderId) => { found: boolean; checking?: boolean } | undefined,
-  tr?: Tr
-): { text: string; fix: 'providers' | 'setup' } | null {
-  const chosen = chosenDefaultProvider(cfg, settings)
-  const say = (why: 'off' | 'missing' | 'noneOn' | 'noneInstalled', provider = ''): string =>
-    tr
-      ? tr(msg({ id: 'agents.provider.warning', defaultMessage: "{why, select, off {{provider} is turned off — Settings → Providers} missing {{provider} isn't installed — Help → Agent Setup} noneOn {No coding agents are turned on — Settings → Providers} other {No coding agent CLI is installed — Help → Agent Setup}}", description: "A warning about a project's new agents' provider ({provider}: its name): turned off, not installed, none turned on, or no CLI installed. Settings → Providers and Help → Agent Setup are places in Hive where it is fixed." }), { why, provider })
-      : why === 'off'
-        ? `${provider} is turned off — Settings → Providers` // i18n-ignore: English without tr (its caller in another area passes tr once converted)
-        : why === 'missing'
-          ? `${provider} isn't installed — Help → Agent Setup` // i18n-ignore: English without tr
-          : why === 'noneOn'
-            ? 'No coding agents are turned on — Settings → Providers' // i18n-ignore: English without tr
-            : 'No coding agent CLI is installed — Help → Agent Setup' // i18n-ignore: English without tr
-  if (chosen) {
-    if (!isProviderEnabled(settings, chosen)) return { text: say('off', providerName(chosen)), fix: 'providers' }
-    const i = info(chosen)
-    return i && !i.checking && !i.found ? { text: say('missing', providerName(chosen)), fix: 'setup' } : null
-  }
-  const on = enabledProviders(settings)
-  if (!on.length) return { text: say('noneOn'), fix: 'providers' }
-  if (on.some((p) => !info(p.id) || info(p.id)!.checking || info(p.id)!.found)) return null
-  return { text: say('noneInstalled'), fix: 'setup' }
-}
-
-/**
- * The providers Hive's install and setup warnings are about (#474): what new agents use (Settings' default, each
- * project's own, Automatic's pick) and every agent's own. A provider that is only turned on isn't in use: its CLI being
- * missing is no one's problem until something uses it.
+ * The providers Hive's install and setup warnings are about (#474): every agent's own, and what a new agent gets
+ * (decision A: `first`, the CLI of the first usable connection, when there is one). A provider that is only turned on
+ * isn't in use: its CLI being missing is no one's problem until something uses it.
  */
 export function providersInUse(
-  settings: Pick<AppSettings, 'defaultProvider' | 'providers'> | null | undefined,
-  projects: readonly { config: Pick<ProjectConfig, 'defaultProvider'> | null | undefined; agents: readonly Pick<AgentDef, 'provider'>[] }[]
+  settings: Pick<AppSettings, 'providers'> | null | undefined,
+  projects: readonly { agents: readonly Pick<AgentDef, 'provider'>[] }[],
+  first?: ProviderId
 ): Set<ProviderId> {
-  const out = new Set<ProviderId>([projectDefaultProvider(null, settings)])
-  for (const p of projects) {
-    out.add(projectDefaultProvider(p.config, settings))
-    for (const a of p.agents) out.add(agentProvider(a, p.config, settings))
-  }
+  const out = new Set<ProviderId>(first ? [first] : [])
+  for (const p of projects) for (const a of p.agents) out.add(agentProvider(a, settings))
   return out
 }
 
 /**
- * Which providers' problems Hive shows (the banner, the status bar, Agent Setup opening by itself): when none of the
+ * Which providers' problems Hive shows (the banner, the status bar, Provider Setup opening by itself): when none of the
  * providers turned on is installed, that alone (`noneInstalled`: one warning, not one per CLI); else those turned on and
  * in use (providersInUse). `info` is what Hive found. While it is still looking for one not found yet (at start),
  * nothing: Automatic's pick isn't known until then.
@@ -482,11 +533,12 @@ export function providerWarnings(
 }
 
 /**
- * The provider an agent runs: its own (every agent made since 0.2 has one), else the project's default (the
- * Assistant's agent, whose provider is Settings → Assistant's).
+ * The provider an agent runs: its own (every agent has one once its workspace is migrated: HI-2106), else Automatic's
+ * pick. Decision A (HI-2132): no default provider, Settings' or a project's, is read here; a new agent's CLI is its
+ * connection's (main's firstUsableAccount, the window's firstUsableConnection), this only the last resort.
  */
-export function agentProvider(agent: Pick<AgentDef, 'provider'> | null | undefined, cfg: Pick<ProjectConfig, 'defaultProvider'> | null | undefined, settings: Pick<AppSettings, 'defaultProvider' | 'providers'> | null | undefined): ProviderId {
-  return agent?.provider || projectDefaultProvider(cfg, settings)
+export function agentProvider(agent: Pick<AgentDef, 'provider'> | null | undefined, settings: Pick<AppSettings, 'providers'> | null | undefined): ProviderId {
+  return agent?.provider || autoProvider(settings)
 }
 
 export function modeOption(provider: ProviderId, mode: PermissionMode | null | undefined): ModeOption | undefined {
@@ -504,9 +556,9 @@ export function modeCaveat(provider: ProviderId, mode: PermissionMode | '' | nul
 
 /** Where Hive finds a CLI (AgentInstallInfo.source, as the adapters name it) in the window's words; PATH, npm and WinGet are names (#885). */
 const INSTALL_SOURCES: Record<string, Msg> = {
-  settings: msg({ id: 'agents.installSource.settings', defaultMessage: 'Settings', description: "Where Hive found a coding agent's CLI: the path set in Settings (the provider's page). Shown as \"found via Settings\" (Agent Setup), in Help → About and in Settings." }),
-  'native install': msg({ id: 'agents.installSource.native', defaultMessage: 'native install', description: "Where Hive found a coding agent's CLI: the folder its native installer puts it in. Shown as \"found via native install\" (Agent Setup), in Help → About and in Settings." }),
-  'standalone install': msg({ id: 'agents.installSource.standalone', defaultMessage: 'standalone install', description: "Where Hive found a coding agent's CLI: the folder its standalone installer puts it in. Shown as \"found via standalone install\" (Agent Setup), in Help → About and in Settings." })
+  settings: msg({ id: 'agents.installSource.settings', defaultMessage: 'Settings', description: "Where Hive found a coding agent's CLI: the path set in Settings (the provider's page). Shown as \"found via Settings\" (Provider Setup), in Help → About and in Settings." }),
+  'native install': msg({ id: 'agents.installSource.native', defaultMessage: 'native install', description: "Where Hive found a coding agent's CLI: the folder its native installer puts it in. Shown as \"found via native install\" (Provider Setup), in Help → About and in Settings." }),
+  'standalone install': msg({ id: 'agents.installSource.standalone', defaultMessage: 'standalone install', description: "Where Hive found a coding agent's CLI: the folder its standalone installer puts it in. Shown as \"found via standalone install\" (Provider Setup), in Help → About and in Settings." })
 }
 
 /** Where Hive found a CLI, as the window shows it: its source's words, else the source as it is (a name: PATH, npm, WinGet). */
@@ -519,6 +571,13 @@ export function installSourceText(source: string | null | undefined, tr: Tr): st
 export function permissionLabel(provider: ProviderId, mode: PermissionMode, tr?: Tr): string {
   const m = modeOption(provider, mode)
   return m ? (tr ? shownText(m.label, m.text?.label, tr) : m.label) : mode
+}
+
+/** A mode's name on its badge: its short name where it has one ("CLI's own"), else its name (permissionLabel). */
+export function modeBadgeLabel(provider: ProviderId, mode: PermissionMode, tr?: Tr): string {
+  const m = modeOption(provider, mode)
+  if (!m?.short) return permissionLabel(provider, mode, tr)
+  return tr ? shownText(m.short, m.text?.short, tr) : m.short
 }
 
 /** What a mode does: in the window's language with tr (#861), else English; its id when the provider has no such mode. */
@@ -543,9 +602,23 @@ export function labelList(labels: string[], and = 'and'): string {
   return labels.length < 2 ? (labels[0] ?? '') : `${labels.slice(0, -1).join(', ')} ${and} ${labels[labels.length - 1]}`
 }
 
-/** The modes a picker offers: the provider's, without the dangerous one unless it is enabled. */
-export function offeredModes(provider: ProviderId, settings: Pick<AppSettings, 'providers'> | null | undefined): ModeOption[] {
-  return providerDescriptor(provider).permissionModes.filter((m) => !m.danger || providerSettings(settings, provider).enableDangerousMode)
+/**
+ * The modes a picker offers: the provider's, without the dangerous one unless it is enabled. The Hive Assistant's
+ * (`assistant`) never include the CLI's own setting (#1284): Control relies on knowing the mode it runs in.
+ */
+export function offeredModes(provider: ProviderId, settings: Pick<AppSettings, 'providers'> | null | undefined, assistant = false): ModeOption[] {
+  return providerDescriptor(provider).permissionModes.filter((m) => (!m.danger || providerSettings(settings, provider).enableDangerousMode) && !(assistant && m.cliOwn))
+}
+
+/**
+ * Whether a running session can switch to a mode without a restart: the provider's rule (canSwitchLive), never to or
+ * from the CLI's own setting (#1284), where Hive doesn't know the mode the session started in.
+ */
+export function canSwitchModeLive(provider: ProviderId | ProviderDescriptor, target: PermissionMode, current: PermissionMode | undefined, launched: PermissionMode | null | undefined): boolean {
+  const d = typeof provider === 'string' ? providerDescriptor(provider) : provider
+  if (d.capabilities.liveModeSwitch === 'none') return false
+  if ([target, current, launched].some((m) => !!m && !!d.permissionModes.find((o) => o.value === m)?.cliOwn)) return false
+  return d.canSwitchLive(target, current, launched)
 }
 
 export interface AgentLaunchSettings {
@@ -553,7 +626,7 @@ export interface AgentLaunchSettings {
   model: string | null
   effort: EffortLevel | null
   permissionMode: PermissionMode
-  /** Global then project extra arguments, as typed (split by the main process). */
+  /** Its extra arguments, as typed (split by the main process): its connection's (before HI-2106, the CLI's then the project's). */
   extraArgs: string[]
   /** A 200K context window instead of 1M (only for providers with capabilities.contextLimit). */
   use200kContext: boolean
@@ -579,19 +652,16 @@ export function extraArgsProblem(input: string | string[], tr?: Tr): string | nu
   return 'Hive passes the task after "--"; remove it from extra arguments. For an option whose value is "--", write --option=--.' // i18n-ignore: English without tr (main's errors: their area converts them)
 }
 
-/** What an agent launches with: its own overrides, else the project's (for its provider), else the global defaults. */
-export function agentLaunchSettings(agent: Pick<AgentDef, 'provider' | 'model' | 'effort' | 'permissionMode' | 'use200kContext'> | null | undefined, cfg: Pick<ProjectConfig, 'providers' | 'defaultProvider'>, settings: Pick<AppSettings, 'providers' | 'defaultProvider'>): AgentLaunchSettings {
-  const provider = agentProvider(agent, cfg, settings)
-  const g = providerSettings(settings, provider)
-  const pc = projectProviderConfig(cfg, provider)
-  const fallbackMode = modeAllowed(provider, g.defaultPermissionMode, settings) ? g.defaultPermissionMode : providerDescriptor(provider).defaultPermissionMode
-  const projectMode = pc.permissionMode === 'inherit' ? fallbackMode : pc.permissionMode
-  let permissionMode = agent?.permissionMode ?? projectMode
-  if (!modeAllowed(provider, permissionMode, settings)) permissionMode = modeAllowed(provider, projectMode, settings) ? projectMode : fallbackMode
-  const model = agent?.model || (pc.model && pc.model !== 'inherit' ? pc.model : g.defaultModel || null)
-  const effort = agent?.effort || (pc.effort !== 'inherit' ? pc.effort : g.defaultEffort || null)
-  const use200kContext = providerDescriptor(provider).capabilities.contextLimit && (agent?.use200kContext ?? projectUse200k(pc, g))
-  return { provider, model, effort, permissionMode, extraArgs: [g.extraArgs, pc.extraArgs].filter((a) => a && a.trim()), use200kContext }
+/**
+ * What an agent (or the Assistant) launches with (HI-2106): its connection's values, else the CLI's: its own default model
+ * and effort, its default mode (also for a mode it won't take now, a no-guardrails one switched off), a 1M context and no
+ * extra arguments. There are no agent, project or provider layers. A server account's connection (`server`, HI-1772)
+ * takes no effort or context: its server's models aren't the CLI's.
+ */
+export function agentLaunchSettings(provider: ProviderId, values: LaunchValues | null | undefined, settings: Pick<AppSettings, 'providers'> | null | undefined, server = false): AgentLaunchSettings {
+  const d = providerDescriptor(provider)
+  const permissionMode = values?.permissionMode && modeAllowed(provider, values.permissionMode, settings) ? values.permissionMode : d.defaultPermissionMode
+  return { provider, model: values?.model || null, effort: server ? null : values?.effort || null, permissionMode, extraArgs: values?.extraArgs?.trim() ? [values.extraArgs] : [], use200kContext: !server && d.capabilities.contextLimit && !!values?.use200kContext }
 }
 
 /** Whether a project's agents (without their own choice) use a 200K context: the project's choice, else the global one. */

@@ -3,8 +3,9 @@ import { HISTORY } from '../shared/taskHistory'
 import { workStartedAt } from '../shared/tasks'
 import type { TaskCard } from '../shared/types'
 import { onHiveEvent } from './events'
-import { allTasks } from './tasks'
+import { liveDecisionCards } from './tasks'
 import type { WorkspaceService } from './workspace'
+import { cardRef } from '../shared/projectKeys'
 
 /**
  * The "new decision" flag (#357): a hive tool's reply to an agent working on a card (in Doing, its agent), asking the
@@ -32,12 +33,12 @@ export function noteCardRead(agent: { projectPath: string; agentId: string }, n:
 const readSeq = new Map<string, number>()
 export const cardReadsBy = (agent: { projectPath: string; agentId: string }): number => readSeq.get(keyOf(agent)) ?? 0
 
-// The board's live cards as last read, per workspace, until it changes: an agent's every board call shouldn't read every
+// The board's live cards with decisions as last read, per workspace, until it changes: an agent's every board call shouldn't read every
 // card, and never the archived ones (#1107: 945 of them, 13 MB, on a busy board), which have no decisions to tell.
-const boards = new Map<string, Promise<TaskCard[]>>()
+const boards = new Map<string, Promise<{ cards: TaskCard[]; generations: Map<number, number> }>>()
 let changes = 0
 let listening = false
-function board(ws: WorkspaceService): Promise<TaskCard[]> {
+function board(ws: WorkspaceService): Promise<{ cards: TaskCard[]; generations: Map<number, number> }> {
   if (!listening) {
     listening = true
     onHiveEvent((e) => {
@@ -50,7 +51,9 @@ function board(ws: WorkspaceService): Promise<TaskCard[]> {
   let p = boards.get(key)
   if (!p) {
     const at = changes
-    p = allTasks(ws, { archived: false })
+    // With each card's decision generation read with it (#1216): what a line tells, its receipt records. Only the cards
+    // changed since the last read are read again (HI-1789).
+    p = liveDecisionCards(ws)
     boards.set(key, p)
     // A read the board changed under isn't kept for the next call.
     void p.then(
@@ -75,8 +78,12 @@ const blockedAt = (c: TaskCard): number => Date.parse(c.history.findLast((h) => 
  * review's start: starting another round doesn't make unread decisions read); and one back in Review that it reviewed
  * before (its next round: since its last read or verdict).
  */
-function baseline(c: TaskCard, agentId: string, self: string, read: number | undefined): number | null {
+function baseline(c: TaskCard, agentId: string, self: string, read: number | undefined, loop = false): number | null {
   if (c.column === 'doing' && c.agent === agentId) return Math.max(read ?? 0, workStartedAt(c))
+  // A card of its loop that a decision woke it for (#1266, S5: wakeOnDecision): its builder's in Review or Passed too,
+  // and its reviewer's in Passed (since its verdict). Only for that wake's line, never a reply's flag.
+  if (loop && (c.column === 'review' || c.column === 'passed') && c.agent === agentId) return Math.max(read ?? 0, workStartedAt(c))
+  if (loop && c.column === 'passed' && lastVerdict(c, self)) return Math.max(read ?? 0, lastVerdict(c, self))
   if (c.blocked && c.agent === agentId && c.column !== 'done') return Math.max(read ?? 0, blockedAt(c))
   const verdict = lastVerdict(c, self)
   if (c.review?.agent === agentId) return read ?? (verdict || Date.parse(c.review.since) || 0)
@@ -95,21 +102,24 @@ export async function newDecisions(ws: WorkspaceService, agent: { projectPath: s
 
 /**
  * newDecisions, each card with when its newest such decision was made (ms): for a line that tells them (#401). `told`:
- * per card, what an earlier line already told (the latest decision time it covered): only later ones count.
+ * per card, what an earlier line already told (the latest decision time it covered): only later ones count. `loop`: the cards
+ * decision wakes are for (#1266), whose builders and reviewers hear of them in Review and Passed too (baseline).
  */
-export async function newDecisionsOn(ws: WorkspaceService, agent: { projectPath: string; agentId: string }, self: string, told?: Map<number, number>): Promise<Map<number, { count: number; latest: number }>> {
-  const out = new Map<number, { count: number; latest: number }>()
+export async function newDecisionsOn(ws: WorkspaceService, agent: { projectPath: string; agentId: string }, self: string, told?: Map<number, number>, loop?: ReadonlySet<number>): Promise<Map<number, { count: number; latest: number; generation: number }>> {
+  const out = new Map<number, { count: number; latest: number; generation: number }>()
   if (!ws.path) return out
   const project = basename(agent.projectPath).toLowerCase()
   const seen = reads.get(keyOf(agent))
   const t = (iso: string | undefined): number => Date.parse(iso ?? '') || 0
-  for (const c of await board(ws)) {
+  const { cards, generations } = await board(ws)
+  for (const c of cards) {
     if (!c.decisions?.length || c.project.toLowerCase() !== project) continue
-    const base = baseline(c, agent.agentId, self, seen?.get(c.number))
+    const base = baseline(c, agent.agentId, self, seen?.get(c.number), !!loop?.has(c.number))
     if (base === null) continue
     const since = Math.max(base, told?.get(c.number) ?? 0)
     const fresh = c.decisions.filter((d) => t(d.editedAt) > since || (d.recordedBy !== self && t(d.at) > since))
-    if (fresh.length) out.set(c.number, { count: fresh.length, latest: Math.max(...fresh.map((d) => Math.max(t(d.at), t(d.editedAt)))) })
+    // The card's decision generation, read with its decisions: what a receipt of this line records (#1216).
+    if (fresh.length) out.set(c.number, { count: fresh.length, latest: Math.max(...fresh.map((d) => Math.max(t(d.at), t(d.editedAt)))), generation: generations.get(c.number) ?? 0 })
   }
   return out
 }
@@ -120,7 +130,7 @@ export const lastCardRead = (agent: { projectPath: string; agentId: string }, n:
 /** The line for a reply, or null when nothing is new. */
 export function noticeText(cards: Map<number, number>): string | null {
   if (!cards.size) return null
-  const parts = [...cards].map(([n, k]) => `#${n} has ${k} new decision${k === 1 ? '' : 's'}`)
+  const parts = [...cards].map(([n, k]) => `${cardRef(n)} has ${k} new decision${k === 1 ? '' : 's'}`)
   return `[Hive] ${parts.join(', ')} since you last read ${parts.length === 1 ? 'it' : 'them'}: read ${parts.length === 1 ? 'the card' : 'each card'} (hive_read_task) at your next checkpoint.`
 }
 

@@ -94,7 +94,7 @@ async function away(page) {
       return until(async () => (await page.locator('.md-preview code[data-colorized]').count()) === 1, HUNG_MS)
     },
     diff: async (page) => {
-      await page.locator('.tabs .tab', { hasText: 'Git' }).click()
+      await page.locator('.tabs .tab', { hasText: 'Version Control' }).click()
       await page.locator('.split-list .row', { hasText: 'code.ts' }).first().click()
       return until(async () => (await page.locator('.monaco-diff-editor').count()) > 0, HUNG_MS)
     },

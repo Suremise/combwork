@@ -26,11 +26,37 @@ vi.mock('electron', async (importOriginal) => {
 })
 profile.dir = tempDir('hive-agentproc-profile-')
 
+describe('the CLI a lost terminal leaves (HI-1819)', () => {
+  it('is the gate’s child and the command its cmd.exe wrappers run, never what the CLI itself started', async () => {
+    const { orphanedCli } = await import('../src/main/agentProcesses')
+    const p = (pid: number, name: string, parent: number, created: string) => ({ pid, name, label: name, parent, created })
+    const gate = 10
+    const processes = [
+      p(20, 'cmd.exe', gate, '1000'),
+      // A .cmd launcher run from the wrapper: another cmd.exe, then the CLI.
+      p(30, 'cmd.exe', 20, '1001'),
+      p(40, 'node.exe', 30, '1002'),
+      // What the CLI started (a dev server): a leftover, not the CLI.
+      p(50, 'node.exe', 40, '1003'),
+      // A process whose parent id is the wrapper's but which started before it: that id named another process then.
+      p(60, 'node.exe', 20, '999'),
+      // No start time: can't be told from a later process with its id.
+      { pid: 70, name: 'node.exe', label: 'node', parent: gate }
+    ]
+    expect(orphanedCli(processes, gate).map((x) => x.pid)).toEqual([20, 30, 40])
+    // A CLI started directly: only itself.
+    expect(orphanedCli([p(40, 'node.exe', gate, '1'), p(50, 'node.exe', 40, '2')], gate).map((x) => x.pid)).toEqual([40])
+  })
+})
+
 describe('a process as the user recognises it', () => {
   it('drops the executable path and cuts paths in arguments to their last part', () => {
     expect(processLabel('node.exe', '"C:\\Program Files\\nodejs\\node.exe" "C:\\Users\\x\\AppData\\Roaming\\npm\\node_modules\\npm\\bin\\npm-cli.js" run serve')).toBe('node npm-cli.js run serve')
     expect(processLabel('tail.exe', 'C:\\Program Files\\Git\\usr\\bin\\tail.exe -f .cache/capture-1.log')).toBe('tail -f .cache/capture-1.log')
     expect(processLabel('bash.exe', '/usr/bin/bash -c "npm run serve > .cache/serve.log 2>&1"')).toBe('bash -c "npm run serve > .cache/serve.log 2>&1"')
+    // A switch keeps its slash (HI-1743: "cmd d s c"), a path after it still cut.
+    expect(processLabel('cmd.exe', 'C:\\WINDOWS\\system32\\cmd.exe /d /s /c "node -e x"')).toBe('cmd /d /s /c "node -e x"')
+    expect(processLabel('cmd.exe', 'cmd.exe /c C:\\tools\\run.bat')).toBe('cmd /c run.bat')
   })
 
   it('is the name alone without a command line, and short', () => {
@@ -168,6 +194,22 @@ else {
     await endHeld(strangerProc)
   }, 60000)
 
+  it("says each running launch's process's parent state (HI-2111): the exited CLI's child is an orphan, the child's own child isn't", async () => {
+    const { launchLineage, launchEnded, settleLeftovers } = await import('../src/main/agentProcesses')
+    const { isOrphan, parseLineage } = await import('../src/main/orphanProcesses')
+    const out = join(dir, 'lineage.txt')
+    await launch('lineage1', out, 'lin')
+    const pids = pidsIn(out)
+    const lineage = parseLineage((await launchLineage(['lineage1']))?.lineage1)
+    const of = (pid: number) => lineage.find((l) => l.pid === pid)
+    expect(of(pids.child)).toBeDefined()
+    expect(isOrphan(of(pids.child)!)).toBe(true)
+    expect(of(pids.grandchild)).toMatchObject({ parent: pids.child })
+    expect(isOrphan(of(pids.grandchild)!)).toBe(false)
+    await launchEnded('lineage1')
+    await settleLeftovers(dir, 'lin', 'end')
+  })
+
   it("measures the memory running agents take (#562): each running launch's processes, summed", async () => {
     const { agentsMemory, launchEnded, trackLaunch } = await import('../src/main/agentProcesses')
     const out = join(dir, 'mem.txt')
@@ -183,6 +225,35 @@ else {
     await endHeld(cli)
     await launchEnded('mem1')
     expect(await agentsMemory()).toBeNull()
+  }, 60000)
+
+  it("Hive quitting keeps a run as ended for its slot writer only once its job is seen empty, never while what its CLI started still runs (HI-1886)", async () => {
+    const { endedEarlier, launchEnded, recordEndedLaunches, runningProcesses, runTookWriter, trackLaunch } = await import('../src/main/agentProcesses')
+    // Both slots' writers' runs (HI-2299: only those are kept).
+    runTookWriter('quit1')
+    runTookWriter('quit2')
+    // A CLI that started a detached server and exited, its exit not yet seen (Hive quitting): its job isn't empty.
+    const out = join(dir, 'quit1.txt')
+    const cli = spawn(process.execPath, [script, 'cli', out], { stdio: ['pipe', 'ignore', 'ignore'], windowsHide: true })
+    expect(await trackLaunch({ runId: 'quit1', projectPath: dir, agentId: 'q1', agentName: 'Quitter' }, cli.pid!)).toEqual({ tracked: true })
+    cli.stdin!.write('go\n')
+    await new Promise((r) => cli.once('exit', r))
+    expect(await until(() => Object.keys(pidsIn(out)).length === 2, 10000)).toBe(true)
+    // A CLI that ended with nothing left: its job empty.
+    const holderOut = join(dir, 'quit2.txt')
+    const holder = spawn(process.execPath, [script, 'holder', holderOut], { stdio: 'ignore', windowsHide: true })
+    expect(await trackLaunch({ runId: 'quit2', projectPath: dir, agentId: 'q2', agentName: 'Done' }, holder.pid!)).toEqual({ tracked: true })
+    expect(await until(() => !!pidsIn(holderOut).holder, 10000)).toBe(true)
+    await endHeld(holder)
+    const left = (await runningProcesses()).find((l) => l.runId === 'quit1')?.processes ?? []
+    expect(left.map((p) => p.pid).sort()).toEqual(Object.values(pidsIn(out)).sort())
+    await recordEndedLaunches()
+    expect(await endedEarlier('quit2')).toBe(true)
+    expect(await endedEarlier('quit1')).toBe(false)
+    endListed(left)
+    expect(await until(() => Object.values(pidsIn(out)).every((pid) => !alive(pid)), 10000)).toBe(true)
+    await launchEnded('quit1')
+    await launchEnded('quit2')
   }, 60000)
 
   it('tells when a process joins a running launch (#1134), once until its processes are listed again', async () => {
@@ -369,6 +440,43 @@ $r | ConvertTo-Json -Compress
     )
     const out = execFileSync(join(process.env.SystemRoot ?? 'C:\\Windows', 'System32', 'WindowsPowerShell', 'v1.0', 'powershell.exe'), ['-NoProfile', '-NonInteractive', '-ExecutionPolicy', 'Bypass', '-File', probe, src, process.execPath], { windowsHide: true, timeout: 120000 })
     expect(JSON.parse(String(out).trim().split(/\r?\n/).at(-1)!)).toEqual({ inOther: true, added: 'the process has exited', taken: true, followed: true, inJob: false, listed: true, ended: true })
+  }, 120000)
+
+  // HI-2309: "paths" gives each process's executable by id and start time (a system broker is known by it): one whose
+  // id names another process by now, or none, is left out. HI-2304: "running" says which executable names run on the
+  // machine (whether a Windows Sandbox does), from a whole snapshot.
+  it("gives processes' executables by identity, and which executable names run now (HI-2304, HI-2309)", async () => {
+    const { HOST_SOURCE } = await import('../src/main/agentProcesses')
+    const src = join(dir, 'host-running.cs')
+    writeFileSync(src, HOST_SOURCE)
+    const probe = join(dir, 'running.ps1')
+    writeFileSync(
+      probe,
+      `param($src, $node)
+$ErrorActionPreference = 'Stop'
+Add-Type -ReferencedAssemblies System.Management -TypeDefinition (Get-Content -Raw $src)
+$s = [System.Diagnostics.ProcessStartInfo]::new($node, '-e "setTimeout(() => {}, 60000)"'); $s.UseShellExecute = $false; $s.CreateNoWindow = $true
+$a = [System.Diagnostics.Process]::Start($s)
+$r = [ordered]@{}
+$r.added = [HiveJobs]::Add('t', $a.Id)
+$c = [HiveJobs]::CreatedOf($a.Id)
+$r.id = "$($a.Id):$c"
+$r.paths = [HiveJobs]::Paths("$($a.Id):$c,$($a.Id):1,99999991:$c")
+$r.running = [HiveJobs]::Running('NODE.exe,hive-no-such-process-2304.exe')
+$r.ended = [HiveJobs]::Kill('t') -and $a.WaitForExit(10000)
+if (-not $a.HasExited) { Stop-Process -Id $a.Id -Force }
+$r | ConvertTo-Json -Compress
+`
+    )
+    const out = execFileSync(join(process.env.SystemRoot ?? 'C:\\Windows', 'System32', 'WindowsPowerShell', 'v1.0', 'powershell.exe'), ['-NoProfile', '-NonInteractive', '-ExecutionPolicy', 'Bypass', '-File', probe, src, process.execPath], { windowsHide: true, timeout: 120000 })
+    const r = JSON.parse(String(out).trim().split(/\r?\n/).at(-1)!) as { added: string; id: string; paths: string; running: string; ended: boolean }
+    expect(r.added).toBe('ok')
+    expect(r.ended).toBe(true)
+    // Only the process as it is: another start time on its id, or an id no process has, left out.
+    const paths = JSON.parse(r.paths) as Record<string, string>
+    expect(Object.keys(paths)).toEqual([r.id])
+    expect(paths[r.id].toLowerCase()).toBe(process.execPath.toLowerCase())
+    expect(JSON.parse(r.running)).toEqual(['node.exe'])
   }, 120000)
 
   // A packaged app's process (the Store's PowerShell) is in no job for its first few ms, until Windows puts it in its

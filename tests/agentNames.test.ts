@@ -1,7 +1,7 @@
 // Agent names unique across the workspace (#702): the rules (a project's prefix, a suggested name, duplicates from
 // before), and Hive keeping them — Add Agent and its default name, a rename (its own name kept), a template's load
 // (renamed, refused while a name is another project's, a name taken while it stages) and one of its agents (numbered), adds and renames in two projects at once (only one gets the name), duplicates from before flagged
-// once, and why a template couldn't be loaded into a project without git.
+// once, and a template loading into a project without git (#1436: no worktrees, so nothing needs one).
 import { AsyncLocalStorage } from 'async_hooks'
 import { execFileSync } from 'child_process'
 import { mkdirSync, readFileSync, writeFileSync } from 'fs'
@@ -95,8 +95,8 @@ describe('Hive keeps agent names unique across the workspace', () => {
     writeFileSync(join(beta, '.hive', 'project.json'), JSON.stringify({ version: 2, layout: 'auto', agents: [{ id: 'b1', name: 'Old', provider: 'claude-code' }] }))
     writeFileSync(join(plain, '.hive', 'project.json'), JSON.stringify({ version: 2, layout: 'auto', agents: [] }))
     mkdirSync(join(wsPath, '.hive', 'templates'), { recursive: true })
-    writeFileSync(join(wsPath, '.hive', 'templates', 'pair.json'), JSON.stringify({ version: 1, name: 'Pair', layout: 'auto', agents: [{ name: 'B1', provider: 'claude-code', worktree: false }, { name: 'R1', provider: 'claude-code', worktree: false }] }))
-    writeFileSync(join(wsPath, '.hive', 'templates', 'trees.json'), JSON.stringify({ version: 1, name: 'Trees', layout: 'auto', agents: [{ name: 'T1', provider: 'claude-code', worktree: true }, { name: 'Folder', provider: 'claude-code', worktree: false }] }))
+    writeFileSync(join(wsPath, '.hive', 'templates', 'pair.json'), JSON.stringify({ version: 2, name: 'Pair', layout: 'auto', agents: [{ name: 'B1', role: 'builder', provider: 'claude-code' }, { name: 'R1', role: 'reviewer', provider: 'claude-code' }] }))
+    writeFileSync(join(wsPath, '.hive', 'templates', 'trees.json'), JSON.stringify({ version: 2, name: 'Trees', layout: 'auto', agents: [{ name: 'T1', role: 'builder', provider: 'claude-code' }, { name: 'Folder', role: 'reviewer', provider: 'claude-code' }] }))
     w = createWorkspaceService()
     await w.open(wsPath)
     config.settings.providers['claude-code'].enabled = true
@@ -177,7 +177,7 @@ describe('Hive keeps agent names unique across the workspace', () => {
     await expect(run(() => templates.templatePlan(beta, 'workspace', 'pair.json', undefined, ['X', ' x ']))).rejects.toThrow(/Two of its agents would be called "x"/)
     await expect(run(() => templates.templatePlan(beta, 'workspace', 'pair.json', undefined, ['X', ' ']))).rejects.toThrow(/Enter a name for each of its agents/)
     // Renamed: loaded so. This project's own names don't count (the load replaces its agents).
-    const r = await run(() => templates.loadTemplate(beta, 'workspace', 'pair.json', ids(beta), undefined, undefined, ['BEB1', 'BER1']))
+    const r = await run(() => templates.loadTemplate(beta, 'workspace', 'pair.json', ids(beta), undefined, ['BEB1', 'BER1']))
     expect(r.created).toEqual(['BEB1', 'BER1'])
     expect((await run(() => templates.templatePlan(beta, 'workspace', 'pair.json', undefined, ['BEB1', 'BER1']))).taken).toEqual([])
   })
@@ -187,7 +187,7 @@ describe('Hive keeps agent names unique across the workspace', () => {
     templates.testHooks.staged = async (name) => {
       if (name === 'NB1') await add(alpha, 'NR1')
     }
-    await expect(run(() => templates.loadTemplate(beta, 'workspace', 'pair.json', ids(beta), undefined, undefined, ['NB1', 'NR1']))).rejects.toThrow(/NR1 is already an agent in alpha.*Nothing was changed/)
+    await expect(run(() => templates.loadTemplate(beta, 'workspace', 'pair.json', ids(beta), undefined, ['NB1', 'NR1']))).rejects.toThrow(/NR1 is already an agent in alpha.*Nothing was changed/)
     expect(cfgOf(beta)).toEqual(before)
     await run(() => w.mutateProjectConfig(alpha, (c) => ({ agents: c.agents.filter((a) => a.name !== 'NR1') })))
   })
@@ -198,15 +198,20 @@ describe('Hive keeps agent names unique across the workspace', () => {
     expect((await run(() => templates.addAgentFromTemplate(alpha, 'workspace', 'pair.json', 0))).name).toBe('B1 3')
   })
 
-  it('says why a template with worktree agents can\'t be loaded into a project without git; one without them loads', async () => {
-    const plan = await run(() => templates.templatePlan(plain, 'workspace', 'trees.json'))
-    expect(plan.blocked).toEqual(["plain isn't a git repository, so its worktree agent (T1) can't have worktrees of their own. Make it a repository with a first commit, or edit the template to put them in the project folder."])
+  it('a template loads into a project without git, or with no commit yet: its agents work in the project folder (#1436)', async () => {
+    expect((await run(() => templates.templatePlan(plain, 'workspace', 'trees.json'))).blocked).toEqual([])
     expect((await run(() => templates.templatePlan(plain, 'workspace', 'pair.json', undefined, ['PB1', 'PR1']))).blocked).toEqual([])
-    // A repository with no commit yet has no branch to start from.
     const fresh = join(wsPath, 'fresh')
     mkdirSync(join(fresh, '.hive'), { recursive: true })
     execFileSync('git', ['init', '-q', '-b', 'main', fresh])
-    expect((await run(() => templates.templatePlan(fresh, 'workspace', 'trees.json'))).blocked).toEqual([expect.stringMatching(/^fresh isn't on a branch \(a detached HEAD, or no commit yet\)/)])
+    expect((await run(() => templates.templatePlan(fresh, 'workspace', 'trees.json'))).blocked).toEqual([])
+    // The new project made (a refresh writes its project.json) and given its id now, and the refreshes that scheduled run
+    // (HI-1799): left to the workspace's watcher, the id's save landed in a later test after its refresh had read the
+    // projects (#999: that refresh reported the cached workspace).
+    await run(() => w.refresh())
+    await run(() => w.projectIds({ fresh: true }))
+    expect(cfgOf(fresh).id).toMatch(/^p-/)
+    await run(() => w.refreshesSettled())
   })
 
   it('names two projects shared from before are flagged once, with a rename to make, while they last', async () => {

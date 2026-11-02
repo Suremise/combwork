@@ -7,7 +7,7 @@ import { setLanguage, setProblemReporter, tr, type Msg } from '../../src/shared/
 import { keepAwakeText } from '../../src/shared/keepAwake'
 import { badgeDescription } from '../../src/shared/taskbar'
 import { changeOutcome, folderPlan, KIND_LABEL } from '../../src/shared/antivirus'
-import { lostLines, reuseNote, templateWorktreesHint, unusedState, unusedSummary, unusedWorkNotice, CHANGES_ABOUT } from '../../src/shared/unusedWorktrees'
+import { lostLines, reuseNote, unusedState, unusedSummary, unusedWorkNotice, CHANGES_ABOUT } from '../../src/shared/unusedWorktrees'
 import type { UnusedWorktree } from '../../src/shared/types'
 
 // #807: the `workspace` area (the status bar and activity bar, the Workspace Overview, Settings → Workspace's storage,
@@ -110,8 +110,8 @@ describe('the sentences once built by hand read as before, in English', () => {
   it('the status bar and the taskbar', () => {
     expect(keepAwakeText(1)).toBe('Keeping the PC awake: 1 agent working')
     expect(keepAwakeText(3)).toBe('Keeping the PC awake: 3 agents working')
-    expect(badgeDescription(1)).toBe('1 agent needs you')
-    expect(badgeDescription(2)).toBe('2 agents need you')
+    expect(badgeDescription(1)).toBe('1 needs you')
+    expect(badgeDescription(2)).toBe('2 need you')
     expect(tr(m('workspace.statusBar.running'), { count: 4, working: 1, background: 1, waiting: 0 })).toBe('4 running session(s): 1 working, 1 waiting on background tasks, 0 waiting for you')
     expect(tr(m('workspace.statusBar.running'), { count: 1, working: 1, background: 0, waiting: 0 })).toBe('1 running session(s): 1 working, 0 waiting for you')
   })
@@ -123,9 +123,11 @@ describe('the sentences once built by hand read as before, in English', () => {
     expect(unusedSummary([tree({ removable: true }), tree({ ahead: 1 })])).toBe('2 unused worktrees (1 merged)')
     expect(unusedWorkNotice([tree({ ahead: 1 })])).toBe("1 unused worktree has work that isn't on main")
     expect(lostLines({ path: 'D:/x', branch: null, into: null, ahead: 1, dirty: 2 })).toEqual(['1 commit on no branch (only its detached HEAD has it)', '2 uncommitted files in D:/x', 'the files git ignores in its folder (build output, copied .env files)'])
-    expect(templateWorktreesHint({ unusedWorktrees: [{ project: 'p', count: 3 }] }, () => 'hive')?.title).toBe('3 unused worktrees in hive')
-    expect(templateWorktreesHint({ unusedWorktrees: [{ project: 'p', count: 1 }, { project: 'q', count: 2 }] }, () => 'hive')?.title).toBe('3 unused worktrees in 2 projects')
-    expect(CHANGES_ABOUT.unused('hive', null)).toMatch(/^Worktrees no agent of hive works in: .*or give it to an agent\.$/)
+    expect(CHANGES_ABOUT.unused('hive')).toBe('Worktrees no agent of hive works in: open one to see its changes and merge them, or remove it.')
+    expect(CHANGES_ABOUT.unusedTip('main')).toMatch(/^Kept when their agent was removed \(by hand, or when a template's agents replaced it\), .*Loading a template gives none of them to its agents\. Those merged into main and clean can go with their branches; the others hold work that is nowhere else\.$/)
+    expect(CHANGES_ABOUT.unusedTip(null)).not.toMatch(/merged into/)
+    // #1562: 1.0's templates make agents without worktrees, so loading one gives no unused worktree back.
+    expect(CHANGES_ABOUT.unusedTip('main')).not.toMatch(/gives them back/)
   })
 
   it("antivirus: a change's outcome, and the folders", () => {

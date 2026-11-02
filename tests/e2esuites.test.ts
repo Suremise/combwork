@@ -4,9 +4,9 @@
 import { execFileSync, spawn } from 'child_process'
 import { existsSync, mkdirSync, readdirSync, readFileSync, rmSync, unlinkSync, utimesSync, writeFileSync } from 'fs'
 import { userInfo } from 'os'
-import { join } from 'path'
+import { basename, join } from 'path'
 import { pathToFileURL } from 'url'
-import { afterAll, describe, expect, it, vi } from 'vitest'
+import { afterAll, afterEach, describe, expect, it, vi } from 'vitest'
 // @ts-expect-error: plain .mjs modules without types
 import { SUITES } from './e2e/suites.mjs'
 // @ts-expect-error: plain .mjs modules without types
@@ -14,21 +14,21 @@ import { AREAS, DOCS_ONLY, EVERYTHING, REAL_TIER, UNIT_ONLY, affectedSuites, und
 // @ts-expect-error: plain .mjs modules without types
 import { fingerprint } from './e2e/record.mjs'
 // @ts-expect-error: plain .mjs modules without types
-import { isRealCli, keepLimits, needsDevBuild, packagedStatus, parentSuite, parseArgs, portBase, realNotRun, recordStatus, repeatStatus, selectSuites, suiteOutcome } from './e2e/runner.mjs'
+import { DEV_SEAMS, PACKAGED_SEAMS, TEST_CHANNELS, devBuildOnly, isRealCli, keepLimits, needsDevBuild, packagedPlan, packagedStatus, parentSuite, parseArgs, portBase, realNotRun, recordStatus, repeatStatus, resultLines, selectSuites, suiteDevOnly, suiteFiles as filesOfSuite, suiteLimitMs, suiteOutcome, suiteSource } from './e2e/runner.mjs'
 // @ts-expect-error: plain .mjs modules without types
 import { recordJson, recordMarkdown, selectionLine, selectionOf } from './e2e/record.mjs'
 // @ts-expect-error: plain .mjs modules without types
 import { makeDist } from '../scripts/distCopy.mjs'
 // @ts-expect-error: plain .mjs modules without types
-import { buildLock, buildStamp, buildStamped, buildStampedAt, builtOnce, devBuild, ensureBuild } from './e2e/build.mjs'
+import { buildLock, buildStamp, buildStamped, buildStampedAt, builtOnce, devBuild, ensureBuild, ensureBuildWithSlot } from './e2e/build.mjs'
 // @ts-expect-error: plain .mjs modules without types
 import { LANES, LANE_FIRST, LANE_PORTS, claimHeld, claimLane, describeHolder, holdOwnPool, laneHolders, lanePorts, laneWaitLine, lanesFirst, laneWork, pickLane, portFree, waitForLane } from './e2e/lanes.mjs'
 // @ts-expect-error: plain .mjs modules without types
-import { describeClaim, heavySlots, holdsMergeSlot, isFullUnitRun, isHeavy, launchEnded, leftOverCheck, leftOverLine, needsSlot, preMerge, runOwner, trySlot, waitForSlot, waitLine } from './e2e/slots.mjs'
+import { SIDE_E2E_JOBS, buildNeedsCpuSlot, creditFor, describeClaim, heavySlots, heldCredit, holdsMergeSlot, isFullUnitRun, isHeavy, launchEnded, leftOverCheck, leftOverLine, needsSlot, preMerge, refusedLine, runOwner, slotPool, slotSettings, trySlot, waitForSlot, waitLine, waitSummary } from './e2e/slots.mjs'
 // @ts-expect-error: plain .mjs modules without types
 import { addWorktree, invocationDir, keepDir, removeInvocation, removeStale, removeWorktree } from './e2e/tempWorktrees.mjs'
 // @ts-expect-error: plain .mjs modules without types
-import { FAILED_KEEP_MS, FAILED_MAX, KEEP_RUNS, finishRunDirs, keepSuiteFiles, logsRootFor, markRunFailed, newRunDir, pruneRunDirs, runDirActive, runDirsInOrder, runFailedAt } from './e2e/logs.mjs'
+import { FAILED_KEEP_MS, FAILED_MAX, KEEP_HOURS, KEEP_MB, KEEP_RUNS, finishRunDirs, keepSuiteFiles, logRetention, logsRootFor, markRunFailed, newRunDir, pruneRunDirs, pruneRunDirsReleasing, runDirActive, runDirsInOrder, runDirsToPrune, runFailedAt, runStartedAt } from './e2e/logs.mjs'
 import { createRequire } from 'module'
 import { ProgressStore } from '../src/main/progress'
 import { tempDir } from './tempDir'
@@ -52,7 +52,7 @@ describe('the e2e suite list', () => {
 
   it('names suites that exist, and every suite file is listed', () => {
     for (const n of names) expect(existsSync(join(dir, `${n}.cjs`)), n).toBe(true)
-    const helpers = ['lib', 'fake-bridge', 'fake-copilot-api', 'runContext', 'evidence', 'codexDiagnostics', 'folderProcesses', 'storeDocs', 'windowsExits', 'layoutReport']
+    const helpers = ['lib', 'fake-bridge', 'fake-copilot-api', 'runContext', 'evidence', 'codexDiagnostics', 'folderProcesses', 'storeDocs', 'boardRows', 'sessionDeliveryCodec', 'windowsExits', 'layoutReport', 'queueFixture', 'fakeInstall', 'toolLimits']
     const files = execFileSync('git', ['ls-files', 'tests/e2e/*.cjs'], { cwd: root, encoding: 'utf8' })
       .split(/\r?\n/)
       .filter(Boolean)
@@ -63,6 +63,89 @@ describe('the e2e suite list', () => {
 
   it('says why a suite must run alone', () => {
     for (const s of suites) if ('serial' in s) expect(typeof s.serial === 'string' && s.serial.length > 3, s.name).toBe(true)
+  })
+
+  it("suites run on a packaged build, or say in their header why they can't (#1578, #1580, #1591)", () => {
+    // Under HIVE_EXE the runner reports a suite devBuildOnly names NOT RUN, with why, so no header is needed for that
+    // (#1591). Two kinds still say so in their header: one using the test copies' channels, which a packaged Hive
+    // refuses (#1580: 0.9 worktree agents and slots:test, dev-build tests on purpose); and a queue suite, or one #1578
+    // named beside them, that can't run packaged at all, as the packaged checks (#1539) run them. One that handles
+    // HIVE_EXE itself (its dev-only parts say NOT RUN: queueFixture's devSeam) says that in its header.
+    const named = ['agentapislots', 'gitbranchcards', 'mergedialogslots', 'slotreleaseapi', 'templatesv2']
+    const unsaid: string[] = []
+    for (const n of names) {
+      const src = readFileSync(join(dir, `${n}.cjs`), 'utf8')
+      const { header, code } = suiteSource(src)
+      const why = suiteDevOnly(n, dir)
+      const queue = named.includes(n) || code.some((l: string) => /require\('\.\/queueFixture\.cjs'\)/.test(l))
+      const handles = code.some((l: string) => /q\.devSeam\(|process\.env\.HIVE_EXE/.test(l))
+      const channel = handles ? null : code.filter((l: string) => !/inv\('agents:add'/.test(l)).find((l: string) => TEST_CHANNELS.test(l))
+      if (/Dev build only/.test(header)) continue
+      if (channel) unsaid.push(`${n}.cjs: ${TEST_CHANNELS.exec(channel)?.[0]}`)
+      else if (queue && why) unsaid.push(`${n}.cjs: ${why}`)
+      else if (queue && handles && code.some((l: string) => DEV_SEAMS.some((s: string) => l.includes(s))) && !/NOT RUN on a packaged build/.test(header)) unsaid.push(`${n}.cjs: a dev-only part on a packaged build, without "NOT RUN on a packaged build" in its header`)
+    }
+    expect(unsaid).toEqual([])
+  })
+
+  it("names every HIVE_TEST_ seam Hive reads: one a packaged build ignores or honours (#1591, #1599)", () => {
+    const src = execFileSync('git', ['ls-files', 'src'], { cwd: root, encoding: 'utf8' }).split(/\r?\n/).filter((f) => /\.(ts|tsx|mts|cjs|mjs|js)$/.test(f))
+    const read = new Set(src.flatMap((f) => readFileSync(join(root, f), 'utf8').match(/HIVE_TEST_[A-Z0-9_]*[A-Z0-9]/g) ?? []))
+    const listed = [...DEV_SEAMS, ...PACKAGED_SEAMS]
+    expect(new Set(listed).size, 'a seam is in two lists').toBe(listed.length)
+    expect([...read].filter((s) => !listed.includes(s)).sort(), 'add each to DEV_SEAMS (runner.mjs) unless a packaged build honours it').toEqual([])
+    expect(listed.filter((s) => !read.has(s)), 'no longer read by Hive: take it off its list').toEqual([])
+  })
+
+  it('says why a suite would test the dev build on a packaged one (devBuildOnly, #1591)', () => {
+    const hdr = '// A suite.\n'
+    expect(devBuildOnly(`${hdr}const h = await lib.launch({ userData })\n`)).toBe(null)
+    expect(devBuildOnly(`${hdr}// Dev build only: it makes 0.9 worktree agents.\nconst h = await lib.launch({ userData })\n`)).toBe('its header says "Dev build only"')
+    expect(devBuildOnly(`${hdr}const app = await _electron.launch({\n  executablePath: lib.ELECTRON,\n  args: [lib.ROOT] })\n`)).toMatch(/starts this checkout's Electron itself/)
+    // Starting HIVE_EXE when set, or a packaged build by path, is not the dev build.
+    expect(devBuildOnly(`${hdr}_electron.launch({ executablePath: process.env.HIVE_EXE || lib.ELECTRON })\n`)).toBe(null)
+    expect(devBuildOnly(`${hdr}_electron.launch({ executablePath: path.join(lib.ROOT, 'dist/win-unpacked/Hive.exe') })\n`)).toBe(null)
+    expect(devBuildOnly(`${hdr}lib.launch({ env: { HIVE_TEST_SLOW_IPC: 'git:diff=1500' } })\n`)).toBe('it needs HIVE_TEST_SLOW_IPC, a test seam a packaged build ignores')
+    // Seams a packaged build honours (the tips and trash ones every test copy gets too) don't count; nor does a seam in a comment.
+    expect(devBuildOnly(`${hdr}lib.launch({ env: { HIVE_TEST_TIPS: 'off', HIVE_TEST_NOTIFY_LOG: log } })\n  // HIVE_TEST_SLOW_IPC once\n`)).toBe(null)
+    expect(devBuildOnly(`${hdr}await inv('slots:test', 'lend')\n`)).toBe('it uses a test channel a packaged build refuses (slots:test)')
+    expect(devBuildOnly(`${hdr}await inv('agents:add', p, { worktree: true })\n`)).toBe(null)
+    // A suite handling HIVE_EXE itself runs: its dev-only parts say NOT RUN. Starting Electron itself it can't handle.
+    expect(devBuildOnly(`${hdr}if (q.devSeam('S7')) env.HIVE_TEST_QUEUE_CRASH = 'afterFiles'\n`)).toBe(null)
+    expect(devBuildOnly(`${hdr}if (process.env.HIVE_EXE) return\n_electron.launch({ executablePath: lib.ELECTRON })\n`)).toMatch(/Electron itself/)
+  })
+
+  it('judges a suite with the helpers it uses: its own folder and what it requires, not lib.cjs (suiteDevOnly, #1591)', () => {
+    // wakepaste-codex is a few lines handing over to wakepaste-cli/run.cjs, which starts Electron itself.
+    expect(filesOfSuite('wakepaste-codex', dir)).toContain('wakepaste-cli/run.cjs')
+    expect(suiteDevOnly('wakepaste-codex', dir)).toMatch(/^wakepaste-cli\/run\.cjs: it starts this checkout's Electron itself/)
+    // A suite's own folder (i18nshots/) counts; the shared launch helpers don't (lib.cjs honours HIVE_EXE).
+    expect(filesOfSuite('i18nshots', dir)).toEqual(expect.arrayContaining(['i18nshots/main.cjs', 'layoutReport.cjs']))
+    expect(filesOfSuite('p4lane', dir)).not.toContain('lib.cjs')
+    expect(filesOfSuite('wakepaste-codex', dir)).not.toContain('lib.cjs')
+    // A queue suite: queueFixture handles HIVE_EXE (devSeam), so it runs; #1539's packaged suites all do.
+    expect(filesOfSuite('p5lane', dir)).toContain('queueFixture.cjs')
+    for (const n of ['p4lane', 'p5lane', 'reviewcopies', 'mergequeuefolder']) expect(suiteDevOnly(n, dir), n).toBe(null)
+  })
+
+  it('a packaged run of suites none of which can run tested nothing: its record says so and it fails (#1591)', () => {
+    const pick = (...n: string[]) => suites.filter((s) => n.includes(s.name))
+    const exe = 'C:\\sb\\Hive.exe'
+    const none = packagedPlan(pick('cardloop', 'wakepaste-codex'), dir, exe)
+    expect([...none.devOnly.keys()]).toEqual(['cardloop', 'wakepaste-codex'])
+    expect(none.nothingRan).toMatch(/nothing was tested/)
+    const some = packagedPlan(pick('cardloop', 'p4lane'), dir, exe)
+    expect([...some.devOnly.keys()]).toEqual(['cardloop'])
+    expect(some.nothingRan).toBe(null)
+    // Without HIVE_EXE nothing changes.
+    expect(packagedPlan(pick('cardloop'), dir, null)).toEqual({ devOnly: new Map(), nothingRan: null })
+    // run.mjs doesn't stop before its record: the record is not valid for it, and the run fails.
+    const runner = readFileSync(join(dir, 'run.mjs'), 'utf8')
+    expect(runner).toContain('const problems = [...(nothingRan ? [nothingRan] : []),')
+    expect(runner).toContain('process.exit(!lastRun.ok || recordInvalid || nothingRan ? 1 : 0)')
+    expect(runner).not.toMatch(/nothingRan[^\n]*\n[^\n]*process\.exit\(1\)/)
+    // Nor does it need a dev build for suites it won't run (concurrency.mjs runs it in a worktree with none).
+    expect(runner).toContain('const devBuildNeeded = !nothingRan && needsDevBuild(runnable)')
   })
 
   it('no fixed wait of 1 s or more without a reason: wait for the condition (lib.until) instead', () => {
@@ -99,13 +182,13 @@ describe('the suites a change needs (affected.mjs)', () => {
     for (const p of [...areas.flatMap((a) => a.paths), ...(EVERYTHING as string[])]) expect(existsSync(join(root, p.replace(/\/$/, ''))), p).toBe(true)
   })
 
-  it('covers every source file: in an area, or one every suite needs', () => {
+  it('covers every source file: in an area, one every suite needs, or one only the unit tests load', () => {
     const src = execFileSync('git', ['ls-files', 'src'], { cwd: root, encoding: 'utf8' }).split(/\r?\n/).filter(Boolean)
-    for (const f of src) expect(under(f, EVERYTHING) || areas.some((a) => under(f, a.paths)), `${f} is in no area`).toBe(true)
+    for (const f of src) expect(under(f, EVERYTHING) || unitTest(f) || areas.some((a) => under(f, a.paths)), `${f} is in no area`).toBe(true)
   })
 
   it('picks an area’s suites, a suite’s own file, and about for docs the app bundles', () => {
-    expect(affectedSuites(['src/renderer/src/components/Progress.tsx'], names).suites).toEqual(['i18nshots', 'progress', 'progresslanes', 'progressreport', 'progressstates', 'replysize'])
+    expect(affectedSuites(['src/renderer/src/components/Progress.tsx'], names).suites).toEqual(['i18nshots', 'lanesslots', 'progress', 'progressgates', 'progresslanes', 'progressqueue', 'progressreport', 'progressstates', 'progresstabs', 'replysize'])
     expect(affectedSuites(['tests/e2e/carddialog.cjs', 'docs/SPEC.md', 'CHANGELOG.md'], names).suites).toEqual(['about', 'carddialog'])
     expect(affectedSuites(['docs/USER_GUIDE.md'], names).suites).toEqual(['about', 'tipcorner', 'tips'])
     expect(affectedSuites(['README.md'], names).suites).toEqual([])
@@ -115,7 +198,9 @@ describe('the suites a change needs (affected.mjs)', () => {
   it('maps runtime resources and every user of a shared test helper (review round 1)', () => {
     expect(affectedSuites(['resources/skills/card-loop/SKILL.md'], names).suites).toEqual(expect.arrayContaining(['skills', 'skillaudience', 'skilldelivery', 'cardloop']))
     expect(affectedSuites(['resources/modes/planner.md'], names).suites).toEqual(expect.arrayContaining(['assistant', 'assistant-control']))
-    expect(affectedSuites(['tests/e2e/fake-codex/fake-codex.cjs'], names).suites).toEqual(['attention', 'codexfolder', 'defaultprovider', 'flightrecorder', 'footerfit', 'freshpath', 'models', 'providerdetect', 'sessiontree', 'skilldelivery', 'termsize', 'turnledger'])
+    expect(affectedSuites(['tests/e2e/fake-codex/fake-codex.cjs'], names).suites).toEqual(['accounts', 'attachread', 'attention', 'carryingon', 'codexfolder', 'codexnewline', 'codexqueued', 'connectionfirst', 'connections-codex', 'defaultprovider', 'flightrecorder', 'footerfit', 'freshpath', 'hookshealth', 'hookstranscript', 'hooksview', 'models', 'p7lane', 'providerdetect', 'reviewcopies', 'sessiontree', 'skilldelivery', 'slotguidance', 'termsize', 'turnledger', 'wakeputoff', 'workspacenotes'])
+    // The shared tab strip selects every suite driving one, its keyboard and attachment users too (HI-1902).
+    for (const f of ['src/renderer/src/components/Tabs.tsx', 'src/shared/tabs.ts']) expect(affectedSuites([f], names).suites, f).toEqual(expect.arrayContaining(['keys', 'cardattach', 'image', 'vcswitch', 'versioncontrol', 'workflowdefaults', 'advanced']))
     expect(affectedSuites(['tests/e2e/fake-bridge.cjs'], names).all).toBe(true)
     expect(affectedSuites(['resources/tray.png'], names).all).toBe(true)
     expect(affectedSuites(['scripts/build-icons.mjs'], names).all).toBe(true)
@@ -389,6 +474,28 @@ describe('the real tier and environment failures (card #191)', () => {
     expect(recordMarkdown({ code: 'abc', when: 'now', jobs: 4, results: [results[0]], logDir: 'x', summary: 's' })).not.toMatch(/Not run|environment/)
   })
 
+  it('on a packaged build, the record names it, the suites not run and why, and the parts a suite left out (#1591)', () => {
+    const out = 'PASS a\nNOT RUN S34a (main moved just before the swap) needs an unpackaged build: not run with HIVE_EXE\nPASS b\n'
+    const p4 = { name: 'mergequeuefolder', ...suiteOutcome({ code: 0, out }), seconds: 50 }
+    expect(p4).toMatchObject({ ok: true, partsNotRun: ['S34a (main moved just before the swap) needs an unpackaged build: not run with HIVE_EXE'] })
+    expect(resultLines('mergequeuefolder', p4)).toEqual(['mergequeuefolder      pass  50s  (1 part NOT RUN)', '    NOT RUN S34a (main moved just before the swap) needs an unpackaged build: not run with HIVE_EXE'])
+    const why = "it starts this checkout's Electron itself (executablePath: lib.ELECTRON), not lib.launch"
+    expect(resultLines('cardloop', { notRun: why })).toEqual([`cardloop              NOT RUN  (${why})`])
+    const results = [p4, { name: 'cardloop', notRun: why }]
+    const md = recordMarkdown({ code: 'abc', when: 'now', jobs: 4, results, logDir: 'x', summary: '1 passed, 0 failed, 0 skipped, 1 not run', packaged: 'C:\\sb\\Hive.exe' })
+    expect(md).toMatch(/^\*\*e2e run record\*\* .* · packaged build `C:\\sb\\Hive\.exe` \(HIVE_EXE\)$/m)
+    expect(md).toContain(`| cardloop | **NOT RUN**: ${why} | – |`)
+    expect(md).toContain('| mergequeuefolder | pass (1 part NOT RUN) | 50s |')
+    expect(md).toContain('**Not run on the packaged build** (they would test the dev build; why in the table): cardloop.')
+    expect(md).toContain('**Parts not run** (the suite said NOT RUN): mergequeuefolder: S34a')
+    const json = recordJson({ code: 'abc', when: 'now', results, packaged: 'C:\\sb\\Hive.exe' })
+    expect(json.packaged).toBe('C:\\sb\\Hive.exe')
+    expect(json.results).toEqual([expect.objectContaining({ name: 'mergequeuefolder', ok: true, partsNotRun: p4.partsNotRun }), expect.objectContaining({ name: 'cardloop', ok: false, notRun: why })])
+    // A dev run's record has none of it.
+    expect(recordMarkdown({ code: 'abc', when: 'now', jobs: 4, results: [{ name: 'board', ok: true, seconds: 3 }], logDir: 'x', summary: 's' })).not.toMatch(/packaged|NOT RUN|Not run/)
+    expect(recordJson({ code: 'abc', when: 'now', results: [{ name: 'board', ok: true }] })).not.toHaveProperty('packaged')
+  })
+
   it('the record says how its suites were picked (#628): the full set, or what --affected selected and why', () => {
     const results = [{ name: 'board', ok: true, seconds: 3 }]
     const rec = (selection: unknown) => recordMarkdown({ code: 'abc', when: 'now', jobs: 4, results, logDir: 'x', summary: '1 passed', selection })
@@ -609,14 +716,15 @@ describe('whether the dev build is from this source (build.mjs)', () => {
       identity: () => (done.push('identity'), 'id'),
       clear: (d: string) => void done.push(`clear ${d.replace(/\\/g, '/')}`),
       finish: (o: { here: boolean; before: string; after: string }) => (done.push(`finish here=${o.here} ${o.before}->${o.after}`), ['done']),
-      warn: (m: string) => void done.push(`warn ${m.trim()}`)
+      warn: (m: string) => void done.push(`warn ${m.trim()}`),
+      stampApp: (r: string, o: { local: boolean }) => void done.push(`stamp ${r} local=${o.local}`)
     })
     return { done, lines }
   }
 
   it('npm run dist drops the earlier build records before it builds, builds out/ stamped, then packages and finishes', () => {
     const { done, lines } = distSteps()
-    expect(done).toEqual(['identity', 'clear R/dist', 'buildStamped R', 'run npm run build', 'run npx electron-builder --win --publish never', 'identity', 'finish here=true id->id'])
+    expect(done).toEqual(['identity', 'clear R/dist', 'buildStamped R', 'run npm run build', 'stamp R local=true', 'run npx electron-builder --win --publish never', 'identity', 'finish here=true id->id'])
     expect(lines).toEqual(['done'])
   })
 
@@ -644,7 +752,7 @@ describe("the installer's suites check the packaged build they test (#274)", () 
 
   it("a run of only the installer's suites doesn't need the dev build in out/, unless packaged-progress checks it", () => {
     const pk = suites.filter((s) => (s.needs ?? []).includes('packaged'))
-    expect(pk.map((s) => s.name)).toEqual(['packaged', 'packaged-mcp', 'packaged-progress', 'packaged-transcript'])
+    expect(pk.map((s) => s.name)).toEqual(['packaged', 'packaged-mcp', 'packaged-progress', 'packaged-transcript', 'packaged-workers'])
     expect(needsDevBuild(pk, {})).toBe(false)
     expect(needsDevBuild(pk, { HIVE_PROGRESS_CHECK_DEV: '1' })).toBe(true)
     expect(needsDevBuild([...pk, suites.find((s) => s.name === 'board')!], {})).toBe(true)
@@ -826,6 +934,13 @@ describe("each run's own log folder (logs.mjs)", () => {
     expect(keepLimits('board', ['pl'])).toEqual({})
   })
 
+  it("a --lang run's time limit grows with its languages; every other suite keeps 10 minutes (HI-2159)", () => {
+    expect(suiteLimitMs('i18nshots', [])).toBe(10 * 60_000)
+    expect(suiteLimitMs('i18nshots', ['en-XA'])).toBe(10 * 60_000)
+    expect(suiteLimitMs('i18nshots', ['en-XA', 'pl', 'de', 'es', 'fr', 'ja', 'pt-BR'])).toBe(42 * 60_000)
+    expect(suiteLimitMs('board', ['pl', 'de', 'es'])).toBe(10 * 60_000)
+  })
+
   it('a failed run survives ten newer passing runs for a day, with its failed suites’ screenshots, then goes (#223)', () => {
     const runsDir = tempDir('hive-failed-')
     try {
@@ -872,6 +987,84 @@ describe("each run's own log folder (logs.mjs)", () => {
     }
   })
 
+  it('a passing run of the last day survives twenty newer runs; an older one goes (#1595)', () => {
+    const runsDir = tempDir('hive-window-')
+    try {
+      const now = Date.now()
+      const at = (minutesAgo: number) => new Date(now - minutesAgo * 60_000)
+      const old = newRunDir(runsDir, at(25 * 60))
+      const cited = newRunDir(runsDir, at(60))
+      const failed = newRunDir(runsDir, at(59))
+      markRunFailed(failed, 'board')
+      for (let i = 0; i < 20; i++) newRunDir(runsDir, new Date(now - 50 * 60_000 + i * 1000))
+      finishRunDirs(runDirsInOrder(readdirSync(runsDir)).map((n: string) => join(runsDir, n)))
+      expect(runStartedAt(basename(cited))).toBe(Math.floor(at(60).getTime() / 1000) * 1000)
+      // Only the run from before the window goes.
+      expect(runDirsToPrune(runsDir, KEEP_RUNS, [], () => false, () => null, { now })).toEqual([basename(old)])
+      // With no window (HIVE_E2E_KEEP_HOURS=0), the newest ten and the failed run stay, as before.
+      const noWindow = runDirsToPrune(runsDir, KEEP_RUNS, [], () => false, () => null, { now, keepMs: 0 })
+      expect(noWindow).toHaveLength(12)
+      expect(noWindow).toContain(basename(cited))
+      expect(noWindow).not.toContain(basename(failed))
+      // A window of two hours keeps it too; past it, it goes.
+      expect(pruneRunDirs(runsDir, KEEP_RUNS, [], () => false, () => null, { now, keepMs: 2 * 3_600_000 })).toEqual([basename(old)])
+      expect(existsSync(cited)).toBe(true)
+      expect(runDirsToPrune(runsDir, KEEP_RUNS, [], () => false, () => null, { now: now + 2 * 3_600_000, keepMs: 2 * 3_600_000 })).toContain(basename(cited))
+    } finally {
+      rmSync(runsDir, { recursive: true, force: true })
+    }
+  })
+
+  it('past the size cap, the oldest passing runs of the window go first, then failed ones, never the newest ten (#1595)', () => {
+    const runsDir = tempDir('hive-cap-')
+    try {
+      const now = Date.now()
+      const run = (minutesAgo: number) => {
+        const runDir = newRunDir(runsDir, new Date(now - minutesAgo * 60_000))
+        mkdirSync(join(runDir, 'board'))
+        writeFileSync(join(runDir, 'board', 'shot.png'), 'x'.repeat(600))
+        writeFileSync(join(runDir, 'board.log'), 'x'.repeat(400))
+        return basename(runDir)
+      }
+      // The oldest is a failed run; two passing runs after it; then the newest ten. 1000 bytes each.
+      const failed = run(120)
+      markRunFailed(join(runsDir, failed), 'board')
+      const passing = [run(110), run(100)]
+      const newest = Array.from({ length: KEEP_RUNS }, (_, i) => run(90 - i))
+      finishRunDirs(runDirsInOrder(readdirSync(runsDir)).map((n: string) => join(runsDir, n)))
+      const prune = (maxBytes: number) => {
+        const told: [string[], number][] = []
+        const gone = runDirsToPrune(runsDir, KEEP_RUNS, [], () => false, () => null, { now, maxBytes, onOverCap: (early: string[], bytes: number) => told.push([early, bytes]) })
+        return { gone, told }
+      }
+      // 13 006 bytes in all (the failed run's mark is 6).
+      const total = 13_006
+      expect(prune(total)).toEqual({ gone: [], told: [] })
+      // A cap a run below it: the oldest passing run goes, not the older failed one.
+      expect(prune(total - 1000)).toEqual({ gone: [passing[0]], told: [[[passing[0]], total]] })
+      expect(prune(total - 2000).gone).toEqual(passing)
+      // Then the failed one; never the newest ten, however small the cap.
+      expect(prune(total - 2001).gone).toEqual([failed, ...passing])
+      expect(pruneRunDirs(runsDir, KEEP_RUNS, [], () => false, () => null, { now, maxBytes: 0 })).toEqual([failed, ...passing])
+      expect(runDirsInOrder(readdirSync(runsDir))).toEqual(newest)
+    } finally {
+      rmSync(runsDir, { recursive: true, force: true })
+    }
+  })
+
+  it('the window and the cap come from HIVE_E2E_KEEP_HOURS and HIVE_E2E_KEEP_MB (#1595)', () => {
+    expect(logRetention({})).toEqual({ keepMs: KEEP_HOURS * 3_600_000, maxBytes: KEEP_MB * 1024 * 1024, bad: [] })
+    expect(KEEP_HOURS).toBe(24)
+    expect(KEEP_MB).toBe(2048)
+    expect(logRetention({ HIVE_E2E_KEEP_HOURS: '48', HIVE_E2E_KEEP_MB: '512' })).toEqual({ keepMs: 48 * 3_600_000, maxBytes: 512 * 1024 * 1024, bad: [] })
+    expect(logRetention({ HIVE_E2E_KEEP_HOURS: '0', HIVE_E2E_KEEP_MB: ' ' })).toEqual({ keepMs: 0, maxBytes: KEEP_MB * 1024 * 1024, bad: [] })
+    expect(logRetention({ HIVE_E2E_KEEP_HOURS: 'a day', HIVE_E2E_KEEP_MB: '-1' })).toEqual({
+      keepMs: KEEP_HOURS * 3_600_000,
+      maxBytes: KEEP_MB * 1024 * 1024,
+      bad: ['HIVE_E2E_KEEP_HOURS=a day', 'HIVE_E2E_KEEP_MB=-1']
+    })
+  })
+
   it("a run folder counts as still going only while its runner's process is alive (a crashed runner's is pruned)", () => {
     const crashed = tempDir('hive-crash-')
     try {
@@ -884,6 +1077,47 @@ describe("each run's own log folder (logs.mjs)", () => {
       expect(pruneRunDirs(crashed, 0, [], () => false)).toHaveLength(2)
     } finally {
       rmSync(crashed, { recursive: true, force: true })
+    }
+  })
+
+  it.runIf(process.platform === 'win32')("a run folder something still holds is kept and named, never a failure; a later prune removes it (#1616)", async () => {
+    const logs = tempDir('hive-held-')
+    let holder: ReturnType<typeof spawn> | null = null
+    try {
+      const held = newRunDir(logs, new Date(2026, 9, 4, 15, 0, 0))
+      const free = newRunDir(logs, new Date(2026, 9, 4, 15, 0, 1))
+      finishRunDirs([held, free])
+      mkdirSync(join(held, 'suite'))
+      // Another process works in it (a lane's, a scan): Windows refuses to remove a folder a process has as its own. Its
+      // folder is held once the process runs (not yet at 'spawn'), so it says when it does.
+      holder = spawn(process.execPath, ['-e', "process.stdout.write('ready'); process.stdin.resume()"], { cwd: join(held, 'suite'), stdio: ['pipe', 'pipe', 'ignore'], windowsHide: true, env: {} })
+      await new Promise<void>((resolve, reject) => {
+        holder!.once('error', reject).once('exit', (code) => reject(new Error(`the holder ended (${code})`)))
+        holder!.stdout!.once('data', () => resolve())
+      })
+      holder.removeAllListeners('exit')
+      const kept: [string, string][] = []
+      const onKept = (name: string, code: string) => kept.push([name, code])
+      expect(pruneRunDirs(logs, 0, [], () => false, () => null, { onKept })).toEqual([basename(free)])
+      expect(kept).toHaveLength(1)
+      expect(kept[0][0]).toBe(basename(held))
+      expect(['EPERM', 'EBUSY', 'ENOTEMPTY', 'EACCES']).toContain(kept[0][1])
+      expect(existsSync(held)).toBe(true)
+      // The runner's prune keeps it the same way, after releasing what the run kept.
+      const released: string[] = []
+      expect(await pruneRunDirsReleasing(logs, 0, [], () => false, () => null, { onKept, release: async (d: string) => void released.push(basename(d)) })).toEqual([])
+      expect(released).toEqual([basename(held)])
+      expect(kept.map(([n]) => n)).toEqual([basename(held), basename(held)])
+      // Let go: the next prune removes it.
+      const exited = new Promise((resolve) => holder!.once('exit', resolve))
+      holder.stdin!.end()
+      await exited
+      holder = null
+      expect(pruneRunDirs(logs, 0, [], () => false, () => null, { onKept })).toEqual([basename(held)])
+      expect(existsSync(held)).toBe(false)
+    } finally {
+      holder?.kill()
+      rmSync(logs, { recursive: true, force: true, maxRetries: 3, retryDelay: 200 })
     }
   })
 
@@ -1282,6 +1516,137 @@ describe("a restart's trust question (lib.acceptRelaunchTrust, #341)", () => {
   })
 })
 
+describe('the Hives a suite starts (lib.cjs testExecutable, keepPackagedQuiet, #1253)', () => {
+  type Lib = { ROOT: string; ELECTRON: string; PACKAGED_ARGS: string[]; testExecutable: (exe: string) => string; keepPackagedQuiet: (m: object) => string[] }
+  const lib = createRequire(import.meta.url)('./e2e/lib.cjs') as Lib
+
+  it("this checkout's Electron is the dev build; its dist and the test folders' are packaged; the installed Hive and any other are refused", () => {
+    expect(lib.testExecutable(lib.ELECTRON)).toBe('dev')
+    expect(lib.testExecutable(join(lib.ROOT, 'dist', 'win-unpacked', 'Hive.exe'))).toBe('packaged')
+    expect(lib.testExecutable(join(process.env.LOCALAPPDATA ?? '', 'hive-test', 'builds', 'Hive.exe'))).toBe('packaged')
+    expect(() => lib.testExecutable(join(process.env.LOCALAPPDATA ?? '', 'Programs', 'Hive', 'Hive.exe'))).toThrow(/never start the installed Hive/)
+    expect(() => lib.testExecutable(join(process.env.LOCALAPPDATA ?? '', 'programs', 'hive', 'Hive.exe'))).toThrow(/never start the installed Hive/)
+    expect(() => lib.testExecutable('C:\\Elsewhere\\Hive.exe')).toThrow(/never C:\\Elsewhere\\Hive\.exe/)
+    // Started hidden: no window is shown before keepPackagedQuiet reaches it.
+    expect(lib.PACKAGED_ARGS).toContain('--hidden')
+  })
+
+  /** A stand-in for Electron's main-process modules, with one window. */
+  const electron = (visible: boolean) => {
+    const calls: string[] = []
+    const listeners: Record<string, (...a: unknown[]) => void> = {}
+    class BrowserWindow {
+      static all: BrowserWindow[] = []
+      static getAllWindows = () => BrowserWindow.all
+      bounds = { x: 100, y: 100, width: 1200, height: 800 }
+      visible = visible
+      isDestroyed = () => false
+      isVisible = () => this.visible
+      getTitle = () => 'Hive Desktop'
+      getBounds = () => this.bounds
+      setPosition = (x: number, y: number) => void (this.bounds = { ...this.bounds, x, y })
+      setFocusable = (on: boolean) => void calls.push(`focusable ${on}`)
+      setSkipTaskbar = (on: boolean) => void calls.push(`skipTaskbar ${on}`)
+      on = () => undefined
+      once = () => undefined
+    }
+    Object.assign(BrowserWindow.prototype, {
+      show: () => calls.push('show'),
+      showInactive: function (this: BrowserWindow) {
+        this.visible = true
+        calls.push('showInactive')
+      },
+      focus: () => calls.push('focus'),
+      maximize: () => calls.push('maximize'),
+      flashFrame: () => calls.push('flashFrame')
+    })
+    BrowserWindow.all.push(new BrowserWindow())
+    class Notification {
+      show() {
+        calls.push('notification')
+      }
+    }
+    const dialog = { showMessageBox: () => calls.push('dialog'), showErrorBox: () => calls.push('errorBox') }
+    const app = { on: (e: string, f: (...a: unknown[]) => void) => void (listeners[e] = f) }
+    const screen = { getAllDisplays: () => [{ bounds: { x: 0, y: 0, width: 2560, height: 1440 } }, { bounds: { x: -1920, y: 200, width: 1920, height: 1080 } }] }
+    const state = { ready: true }
+    // Electron's screen isn't usable before the app is ready (0.9.3 in Windows Sandbox: "getAllDisplays is not a function").
+    const modules = {
+      app,
+      BrowserWindow,
+      Notification,
+      dialog,
+      get screen() {
+        if (!state.ready) throw new Error('screen before ready')
+        return screen
+      }
+    }
+    return { modules, state, calls, win: BrowserWindow.all[0] as unknown as { bounds: { x: number }; visible: boolean } & Record<string, () => void>, listeners, BrowserWindow }
+  }
+
+  it('reached before the app is ready (no window yet), it uses the screen only once a window is made', () => {
+    const e = electron(false)
+    e.BrowserWindow.all.length = 0
+    e.state.ready = false
+    expect(lib.keepPackagedQuiet(e.modules)).toEqual([])
+    e.state.ready = true
+    const win = new e.BrowserWindow()
+    e.listeners['browser-window-created']({}, win)
+    expect(win.bounds.x).toBe(-1920 - 1200 - 8000)
+  })
+
+  it('its windows go off screen, unfocusable and off the taskbar, then show without the focus; nothing shows, focuses or notifies after', async () => {
+    const e = electron(false)
+    expect(lib.keepPackagedQuiet(e.modules)).toEqual([])
+    expect(e.win.bounds.x).toBe(-1920 - 1200 - 8000)
+    expect(e.calls).toEqual(['focusable false', 'skipTaskbar true', 'showInactive'])
+    e.calls.length = 0
+    e.win.show()
+    e.win.focus()
+    e.win.maximize()
+    e.win.flashFrame()
+    expect(e.calls).toEqual(['showInactive'])
+    e.calls.length = 0
+    ;(new (e.modules.Notification as new () => { show: () => void })()).show()
+    e.modules.dialog.showErrorBox()
+    expect(await (e.modules.dialog.showMessageBox as unknown as (o: object) => Promise<{ response: number }>)({ cancelId: 2 })).toEqual({ response: 2, checkboxChecked: false })
+    expect(e.calls).toEqual([])
+    expect(e.listeners['browser-window-created']).toBeTypeOf('function')
+  })
+
+  it('a window already shown when it is reached is said (the launch then fails)', () => {
+    expect(lib.keepPackagedQuiet(electron(true).modules)).toEqual(['Hive Desktop'])
+  })
+})
+
+describe('packaged test Hives never check GitHub for updates (lib.cjs, #1332)', () => {
+  type Lib = { NO_UPDATE_CHECK: Record<string, string>; noUpdateChecks: (profile: string) => void; updateChecksLogged: (l: { profile: string; since: string }) => string[] }
+  const lib = createRequire(import.meta.url)('./e2e/lib.cjs') as Lib
+
+  it("a 0.9's first check is put off as far as a timer goes", () => {
+    expect(Number(lib.NO_UPDATE_CHECK.HIVE_UPDATE_DELAY)).toBe(2147483647)
+  })
+
+  it("a saved profile gets automatic checks off, its other settings kept; a new one is left alone", () => {
+    const profile = tempDir('hive-noupdates-')
+    lib.noUpdateChecks(profile)
+    expect(existsSync(join(profile, 'config.json'))).toBe(false)
+    writeFileSync(join(profile, 'config.json'), JSON.stringify({ version: 9, settings: { updates: { install: 'manual' }, general: { showTips: true } } }))
+    lib.noUpdateChecks(profile)
+    expect(JSON.parse(readFileSync(join(profile, 'config.json'), 'utf8'))).toEqual({ version: 9, settings: { updates: { install: 'manual', checkAutomatically: false }, general: { showTips: true } } })
+  })
+
+  it('the guard finds a check logged since the launch, in hive.log or its older copy, and only those', () => {
+    const profile = tempDir('hive-noupdates-')
+    mkdirSync(join(profile, 'logs'))
+    const check = '2026-10-21T10:00:05.000Z [INFO] [updates] Checking for update'
+    writeFileSync(join(profile, 'logs', 'hive.1.log'), `2026-10-21T09:00:00.000Z [INFO] [updates] Checking for update\n${check}\n`)
+    writeFileSync(join(profile, 'logs', 'hive.log'), '2026-10-21T10:00:06.000Z [INFO] [updates] Update settings: check off\n')
+    expect(lib.updateChecksLogged({ profile, since: '2026-10-21T10:00:00.000Z' })).toEqual([check])
+    expect(lib.updateChecksLogged({ profile, since: '2026-10-21T11:00:00.000Z' })).toEqual([])
+  })
+})
+
 describe('whether a process still runs (lib.processRunning, #339)', () => {
   const { processRunning } = createRequire(import.meta.url)('./e2e/lib.cjs') as { processRunning: (pid: number) => boolean }
   const failing = (code: string) => () => {
@@ -1309,50 +1674,126 @@ describe('whether a process still runs (lib.processRunning, #339)', () => {
 })
 
 describe('sending a prompt to a CLI until it takes it (lib.sendPrompt, #190)', () => {
-  type Send = (inv: (ch: string, ...a: unknown[]) => Promise<unknown>, key: string, text: string, o: { submitted: () => Promise<boolean>; tries?: number; waitMs?: number }) => Promise<number>
+  type Send = (inv: (ch: string, ...a: unknown[]) => Promise<unknown>, key: string, text: string, o: { submitted: () => boolean | Promise<boolean>; ready?: () => boolean; tries?: number; waitMs?: number }) => Promise<number>
   const { sendPrompt } = createRequire(import.meta.url)('./e2e/lib.cjs') as { sendPrompt: Send }
   const text = 'Use apply_patch to add a file notes.txt containing hi.'
-  /** A terminal that drops the first `dropText` prompts typed and ignores the first `dropEnter` Enters. */
-  const terminal = ({ dropText = 0, dropEnter = 0 }) => {
-    const t = { writes: [] as string[], screen: '', input: '', submitted: false }
+  /**
+   * A terminal that drops the first `dropText` prompts typed and ignores the first `dropEnter` Enters (a new line in
+   * the input instead). With `paste` it has bracketed paste on and reads as Claude Code 2.1.309 does (#1547): each write
+   * is one read, however it was split; a long typed read is a paste, a Ctrl+U in it kept as an invisible character that
+   * leaves the prompt unsent; a Ctrl+U read alone clears the input. With `emptyAfterFirst` it empties its input after
+   * drawing the first prompt, as Claude Code does drawing its weekly limit line just after start (#1148, #1556).
+   */
+  const terminal = ({ dropText = 0, dropEnter = 0, paste = false, emptyAfterFirst = false, prompt = text }) => {
+    const t = { writes: [] as string[], screen: paste ? '\x1b[?2004h' : '', input: '', submitted: false, taken: [] as string[] }
+    let drawn = 0
     const inv = async (ch: string, _key: unknown, data?: unknown) => {
       if (ch === 'pty:buffer') return t.screen
       const d = String(data)
       t.writes.push(d)
-      if (d === '\r') {
+      if (d === '\x15') t.input = ''
+      else if (d === '\r') {
         if (dropEnter-- > 0) t.input += '\n'
-        else if (t.input.trim()) t.submitted = true
+        else if (t.input.trim() && !t.input.includes('\x15')) {
+          t.submitted = true
+          t.taken.push(t.input)
+        }
       } else if (dropText-- <= 0) {
-        t.input = d.replace(/^\x15/, '')
+        const pasted = /^\x1b\[200~([^]*)\x1b\[201~$/.exec(d)
+        t.input = pasted ? pasted[1] : d
         t.screen += `\x1b[2m> ${t.input}`
+        if (emptyAfterFirst && ++drawn === 1) {
+          t.input = ''
+          t.screen += '\r\nYou\'ve used 95% of your weekly limit\r\n> Try "how does <filepath> work?"'
+        }
       }
       return undefined
     }
-    return { t, run: (tries?: number) => sendPrompt(inv, 'k', text, { submitted: async () => t.submitted, waitMs: 50, ...(tries ? { tries } : {}) }) }
+    return { t, run: (tries?: number, o: { submitted?: () => boolean; ready?: () => boolean } = {}) => sendPrompt(inv, 'k', prompt, { submitted: () => t.submitted, waitMs: 50, ...(tries ? { tries } : {}), ...o }) }
   }
+  /** An attempt as typed: Ctrl+U as a write of its own, the prompt (pasted or typed), Enter. */
+  const attempt = (prompt: string, paste: boolean) => ['\x15', paste ? `\x1b[200~${prompt}\x1b[201~` : prompt, '\r']
+  afterEach(() => vi.restoreAllMocks())
 
-  it('taken at once: one prompt, one Enter', async () => {
-    const { t, run } = terminal({})
-    expect(await run()).toBe(1)
-    expect(t.writes).toEqual([text, '\r'])
+  it('taken at once: Ctrl+U on its own, one prompt, one Enter; pasted while the CLI has bracketed paste on', async () => {
+    const typed = terminal({})
+    expect(await typed.run()).toBe(1)
+    expect(typed.t.writes).toEqual(attempt(text, false))
+    const pasted = terminal({ paste: true })
+    expect(await pasted.run()).toBe(1)
+    expect(pasted.t.writes).toEqual(attempt(text, true))
   })
 
-  it('an Enter that became a new line: Enter again, without typing the prompt twice', async () => {
+  it('typed, an Enter that became a new line: Enter again, without typing the prompt twice', async () => {
+    vi.spyOn(console, 'log').mockImplementation(() => undefined)
     const { t, run } = terminal({ dropEnter: 1 })
     expect(await run()).toBe(2)
-    expect(t.writes).toEqual([text, '\r', '\r'])
+    expect(t.writes).toEqual([...attempt(text, false), '\r'])
   })
 
-  it('a prompt dropped while the CLI was drawing: typed again over a cleared line', async () => {
+  it('a prompt dropped while the CLI was drawing: typed again over a cleared input', async () => {
+    vi.spyOn(console, 'log').mockImplementation(() => undefined)
     const { t, run } = terminal({ dropText: 1 })
     expect(await run()).toBe(2)
-    expect(t.writes).toEqual([text, '\r', `\x15${text}`, '\r'])
+    expect(t.writes).toEqual([...attempt(text, false), ...attempt(text, false)])
   })
 
-  it('never taken: 0 after the tries', async () => {
+  it('pasted, an input the CLI emptied after drawing the prompt: pasted again whole, taken once, never Enter on nothing (#1148, #1556)', async () => {
+    const log = vi.spyOn(console, 'log').mockImplementation(() => undefined)
+    const { t, run } = terminal({ paste: true, emptyAfterFirst: true })
+    expect(await run()).toBe(2)
+    expect(t.writes).toEqual([...attempt(text, true), ...attempt(text, true)])
+    expect(t.taken).toEqual([text])
+    expect(String(log.mock.calls[0][0])).toMatch(/^INFO sendPrompt attempt 1 not taken: pasted, echoed yes, its text not on the last input line/)
+  })
+
+  it('with bracketed paste on, a dropped prompt goes again as a paste after a Ctrl+U of its own (#1547)', async () => {
+    vi.spyOn(console, 'log').mockImplementation(() => undefined)
+    const { t, run } = terminal({ dropText: 1, paste: true })
+    expect(await run()).toBe(2)
+    expect(t.writes).toEqual([...attempt(text, true), ...attempt(text, true)])
+  })
+
+  it('a slash command is typed again, never pasted (pasted, it would be sent as a message)', async () => {
+    vi.spyOn(console, 'log').mockImplementation(() => undefined)
+    const { t, run } = terminal({ dropText: 1, paste: true, prompt: '/exit' })
+    expect(await run()).toBe(2)
+    expect(t.writes).toEqual([...attempt('/exit', false), ...attempt('/exit', false)])
+  })
+
+  it('a prompt taken after its attempt gave up is not typed again: submitted() is checked before a retry', async () => {
+    // The CLI took it, but says so only once the attempt's wait is over (a slow hook).
+    let late = false
+    vi.spyOn(console, 'log').mockImplementation(() => {
+      late = true
+    })
+    const { t, run } = terminal({ paste: true })
+    expect(await run(3, { submitted: () => late })).toBe(1)
+    expect(t.writes).toEqual(attempt(text, true))
+  })
+
+  it('waits for ready() before the first attempt, and types anyway, saying so, when it never comes', async () => {
+    const { t, run } = terminal({ paste: true })
+    let polls = 0
+    const ready = () => {
+      // Nothing typed while it isn't ready.
+      expect(t.writes).toEqual([])
+      return ++polls >= 2
+    }
+    expect(await run(3, { ready })).toBe(1)
+    expect(polls).toBe(2)
+    const log = vi.spyOn(console, 'log').mockImplementation(() => undefined)
+    const never = terminal({ paste: true })
+    expect(await never.run(3, { ready: () => false })).toBe(1)
+    expect(String(log.mock.calls[0][0])).toBe('INFO sendPrompt: not ready within 0.05 s, typed anyway')
+    expect(never.t.taken).toEqual([text])
+  })
+
+  it('never taken: 0 after the tries, the last typed again whole', async () => {
+    vi.spyOn(console, 'log').mockImplementation(() => undefined)
     const { t, run } = terminal({ dropEnter: 9 })
     expect(await run(3)).toBe(0)
-    expect(t.writes.filter((w) => w === '\r')).toHaveLength(3)
+    expect(t.writes).toEqual([...attempt(text, false), '\r', ...attempt(text, false)])
   })
 })
 
@@ -1510,6 +1951,11 @@ describe('the run context: what a test starts gets only the allowlist and its ow
     hiveEnv: (vars?: Env, parent?: Env) => Env
     isHiveEnv: (env: unknown) => boolean
     suiteEnv: (o: { name: string; port?: number | null; work?: string | null; runDir: string; cliLog?: string | null }, parent?: Env) => Env
+    TEST_GIT_IDENTITY: { name: string; email: string }
+    gitConfig: (parent?: Env) => string
+    writeGitConfig: (file: string) => void
+    gitEnv: (vars?: Env, parent?: Env) => Env
+    isUserGitConfig: (file: string, parent?: Env) => boolean
   }
   const ctx = createRequire(import.meta.url)('./e2e/runContext.cjs') as Ctx
   /** An agent's shell in Hive, inside an outer hive-progress, in a suite of a runner, with a person's settings. */
@@ -1610,6 +2056,50 @@ describe('the run context: what a test starts gets only the allowlist and its ow
     expect(lib).toMatch(/for \(const k of \['CLAUDE_CONFIG_DIR', 'CODEX_HOME', 'COPILOT_HOME', 'GH_CONFIG_DIR'\]\) \{\s*if \(!env\[k\]\) throw[\s\S]*?if \(isUserCliHome\(env\[k\]\)\) throw/)
   })
 
+  it("every test copy of Hive's git, and its suite's on the fixtures, has the suite's config alone: a test identity, explicit line endings, no user or system config (#1466)", () => {
+    const suite = ctx.suiteEnv({ name: 'gitview', port: 47961, work: 'C:\\lanes\\1\\gitview', runDir: 'C:\\lanes\\1\\gitview' }, parent)
+    // The suite's, whatever the shell had, and no system config; a suite may give its own global one.
+    const fromShell = ctx.hiveEnv({ HIVE_USER_DATA: 'C:\\p' }, { ...suite, GIT_CONFIG_GLOBAL: 'C:\\Users\\t\\.gitconfig', GIT_CONFIG_NOSYSTEM: '0' })
+    expect(fromShell).toMatchObject({ GIT_CONFIG_GLOBAL: 'C:\\lanes\\1\\gitview\\gitconfig', GIT_CONFIG_NOSYSTEM: '1' })
+    expect(ctx.hiveEnv({ HIVE_USER_DATA: 'C:\\p' }, parent).GIT_CONFIG_GLOBAL).toBe(join(ctx.WORK, 'gitconfig'))
+    expect(ctx.hiveEnv({ HIVE_USER_DATA: 'C:\\p', GIT_CONFIG_GLOBAL: 'C:\\w\\empty.gitconfig' }, suite).GIT_CONFIG_GLOBAL).toBe('C:\\w\\empty.gitconfig')
+    // The suite's own git on its fixtures gets the same; a child that isn't git, and the runners' git on the checkout
+    // under test (baseEnv, checked out with the machine's settings), get neither.
+    expect(ctx.gitEnv({}, { ...suite, GIT_CONFIG_GLOBAL: 'C:\\Users\\t\\.gitconfig' })).toMatchObject({ GIT_CONFIG_GLOBAL: 'C:\\lanes\\1\\gitview\\gitconfig', GIT_CONFIG_NOSYSTEM: '1' })
+    expect(has(ctx.gitEnv({}, suite), 'GIT_DIR')).toBe(false)
+    for (const env of [ctx.childEnv({}, suite), ctx.baseEnv(suite)]) for (const k of ['GIT_CONFIG_GLOBAL', 'GIT_CONFIG_NOSYSTEM']) expect(has(env, k), k).toBe(false)
+    // The user's own, however spelled.
+    for (const f of ['C:\\Users\\t\\.gitconfig', 'c:/users/T/.gitconfig', 'C:\\Users\\t\\.config\\git\\config']) expect(ctx.isUserGitConfig(f, parent), f).toBe(true)
+    expect(ctx.isUserGitConfig('C:\\lanes\\1\\gitview\\gitconfig', parent)).toBe(false)
+    // What git reads with them (run with hiveEnv's and gitEnv's environments, outside any repository): the test identity,
+    // autocrlf false, from the suite's file alone.
+    const work = tempDir('hive-gitconfig-')
+    const shell = { ...process.env, HIVE_E2E_DIR: work }
+    for (const env of [ctx.hiveEnv({ HIVE_USER_DATA: join(work, 'profile') }, shell), ctx.gitEnv({}, shell)]) {
+      ctx.writeGitConfig(env.GIT_CONFIG_GLOBAL!)
+      const read = (...a: string[]) => execFileSync('git', ['config', ...a], { cwd: work, env: env as NodeJS.ProcessEnv, encoding: 'utf8' }).trim()
+      expect([read('--global', 'user.name'), read('--global', 'user.email'), read('core.autocrlf')]).toEqual([ctx.TEST_GIT_IDENTITY.name, ctx.TEST_GIT_IDENTITY.email, 'false'])
+      // Every setting from the global scope (GIT_CONFIG_GLOBAL, the suite's file): none from the system or the user's.
+      const scopes = new Set(read('--list', '--show-scope').split(/\r?\n/).map((l) => l.split('\t')[0]))
+      expect([...scopes]).toEqual(['global'])
+    }
+    // lib.cjs refuses a test Hive without one or with the user's, and writes the suite's.
+    const lib = readFileSync(join(root, 'tests', 'e2e', 'lib.cjs'), 'utf8')
+    expect(lib).toMatch(/if \(!env\.GIT_CONFIG_GLOBAL\) throw[\s\S]*?if \(isUserGitConfig\(env\.GIT_CONFIG_GLOBAL\)\) throw[\s\S]*?writeGitConfig\(env\.GIT_CONFIG_GLOBAL\)/)
+    // Every git a suite starts on its fixtures has gitEnv (lib.git does): not the shell's, the allowlist's or none. The
+    // exceptions: evidence's on the checkout under test, and isolation's inside its test Hive (which has hiveEnv's).
+    const suiteFiles = [...readdirSync(dir).filter((f) => f.endsWith('.cjs')).map((f) => join(dir, f)), ...readdirSync(join(dir, 'i18nshots')).filter((f) => f.endsWith('.cjs')).map((f) => join(dir, 'i18nshots', f))]
+    const plain: string[] = []
+    for (const f of suiteFiles)
+      readFileSync(f, 'utf8')
+        .split(/\r?\n/)
+        .forEach((line, i) => {
+          if (/(execSync|execFileSync|spawnSync|spawn)\(\s*['"`]git\b/.test(line) && !/gitEnv/.test(line)) plain.push(`${f.slice(dir.length + 1)}:${i + 1}`)
+        })
+    expect(plain.map((p) => p.replace(/:\d+$/, ''))).toEqual(['evidence.cjs', 'isolation.cjs'])
+    expect(lib).toMatch(/execFileSync\('git', cmd, \{ env: gitEnv\(\), \.\.\.o \}\) : execSync\(`git \$\{cmd\}`, \{ env: gitEnv\(\), \.\.\.o \}\)/)
+  })
+
   it("the CLIs a suite's Hive selects go to a log of the suite's own; the runner starts no CLI of its own (#365)", () => {
     // The runner gives each suite a log in its folder, and the suite's test copies of Hive inherit it (CARRIED).
     const suite = ctx.suiteEnv({ name: 'codex', port: 47961, work: 'C:\\lanes\\1\\codex', runDir: 'C:\\lanes\\1\\codex', cliLog: 'C:\\lanes\\1\\codex\\hive-clis.jsonl' }, parent)
@@ -1704,6 +2194,13 @@ describe('the run context: what a test starts gets only the allowlist and its ow
     const env = ctx.childEnv({ HIVE_API_URL: 'http://127.0.0.1:1', ELECTRON_RUN_AS_NODE: '1' }, parent)
     expect(Object.keys(env).sort()).toEqual(['ELECTRON_RUN_AS_NODE', 'HIVE_API_URL', 'LOCALAPPDATA', 'Path', 'SystemRoot', 'USERPROFILE', 'https_proxy'])
     expect(Object.keys(ctx.baseEnv(parent)).every((k) => ctx.ALLOW.includes(k.toUpperCase()))).toBe(true)
+  })
+
+  it("no child gets the user's Hives' hive-progress shims on its PATH: they run the installed Hive.exe (#1253)", () => {
+    const shell = { APPDATA: 'C:\\Users\\x\\AppData\\Roaming', Path: 'C:\\Windows;C:\\Users\\x\\AppData\\Roaming\\Hive\\bin;C:\\tools;c:\\users\\x\\appdata\\roaming\\hive-dev\\bin\\;C:\\Users\\x\\AppData\\Roaming\\Hive\\bin-other' }
+    for (const env of [ctx.baseEnv(shell), ctx.childEnv({}, shell), ctx.hiveEnv({ HIVE_USER_DATA: 'C:\\p' }, shell)]) {
+      expect(env.Path).toBe('C:\\Windows;C:\\tools;C:\\Users\\x\\AppData\\Roaming\\Hive\\bin-other')
+    }
   })
 
   it('every child the runners and the harness start themselves is given its environment, never left to inherit the shell (#208)', () => {
@@ -2076,12 +2573,17 @@ describe('heavy runs: at most a few at once on the machine, the rest queue in or
     // In a suite's own environment, and in the agent shell of a test Hive it started (which keeps only E2E_RUN_*).
     expect(needsSlot(heavy, { HIVE_E2E_PORT: '47950', E2E_RUN_SUITE: 'progressreport' })).toBe(false)
     expect(needsSlot(heavy, { E2E_RUN_SUITE: 'progressreport', E2E_RUN_DIR: 'C:\\lanes\\0', E2E_RUN_PORT: '47950' })).toBe(false)
-    // Both runners ask needsSlot, never isHeavy alone (the scenario runner did, and queued behind its parent).
+    // Both runners ask slotPool (which asks needsSlot), never isHeavy alone (the scenario runner did, and queued behind
+    // its parent), and wait only when it names a pool.
     for (const f of ['e2e/run.mjs', 'scenarios/run.mjs']) {
       const src = readFileSync(join(__dirname, f), 'utf8')
-      expect(src, f).toMatch(/if \(needsSlot\(\{ count: chosen\.length, repeat: \w+(\.repeat)? \}\)\) \{/)
-      expect(src, f).not.toMatch(/\bisHeavy\b/)
+      expect(src, f).toMatch(/const pool = slotPool\(\{ kind: '(e2e|scenarios)', count: chosen\.length, repeat: \w+(\.repeat)?(, provider)? \}\)\r?\nif \(pool\) \{/)
+      expect(src, f).not.toMatch(/\bisHeavy\b|\bneedsSlot\(/)
     }
+    // A suite's nested heavy run has the suite's CPU credit; a real model's trial inside it still needs a model trial's
+    // slot (HI-2070: only matching credit counts; "a resource-aware rule" below).
+    expect(slotPool({ kind: 'scenarios', count: 1, repeat: 3, provider: 'fake' }, { E2E_RUN_SUITE: 'progressreport' })).toBeNull()
+    expect(slotPool({ kind: 'scenarios', count: 1, repeat: 3, provider: 'codex' }, { E2E_RUN_SUITE: 'progressreport' })).toBe('model')
   })
 
   it('a full unit run is heavy; a focused one, or watch mode, is not (#599)', () => {
@@ -2094,7 +2596,7 @@ describe('heavy runs: at most a few at once on the machine, the rest queue in or
     expect([full(['run'], { watch: true }), full(['run'], { changed: true }), full(['run'], { related: ['src/a.ts'] }), full(['run'], { testNamePattern: /x/ })]).toEqual([false, false, false, false])
     // The unit tests' global setup asks it, with a run started inside a suite left out (its parent's slot counts it).
     const setup = readFileSync(join(__dirname, 'unitSlot.ts'), 'utf8')
-    expect(setup).toMatch(/if \(parentSuite\(\) \|\| !isFullUnitRun\(/)
+    expect(setup).toMatch(/if \(heldCredit\(\)\.has\('cpu'\) \|\| !isFullUnitRun\(/)
     expect(readFileSync(join(__dirname, '..', 'vitest.config.ts'), 'utf8')).toMatch(/globalSetup: \[[^\]]*'tests\/unitSlot\.ts'/)
   })
 
@@ -2115,7 +2617,10 @@ describe('heavy runs: at most a few at once on the machine, the rest queue in or
       if (running === 'down') throw new Error('ECONNREFUSED')
       return { ok: true, json: async () => ({ running }) }
     }
-    const env = { HIVE_API_URL: 'http://127.0.0.1:47821/', HIVE_API_TOKEN: 't', HIVE_PROJECT: 'web', HIVE_AGENT: 'W1', HIVE_RUN_ID: 'run-new' }
+    // The session's token in its file (HI-2262: sessions never get HIVE_API_TOKEN).
+    const tokenFile = join(tmp, 'launch-token.json')
+    writeFileSync(tokenFile, JSON.stringify({ token: 't' }))
+    const env = { HIVE_API_URL: 'http://127.0.0.1:47821/', HIVE_API_TOKEN_FILE: tokenFile, HIVE_PROJECT: 'web', HIVE_AGENT: 'W1', HIVE_RUN_ID: 'run-new' }
     expect(await launchEnded(claim.owner, env, { fetch: api(false) })).toBe(true)
     expect(asked[0]).toEqual({ url: 'http://127.0.0.1:47821/v1/projects/hive/agents/HB2/launches/run-old', workspace: 'D%3A%2Fws' })
     expect(await launchEnded(claim.owner, env, { fetch: api(true) })).toBe(false)
@@ -2262,7 +2767,10 @@ describe('heavy runs: at most a few at once on the machine, the rest queue in or
   })
 
   it("the merge slot holder's run: asked of Hive with the session's own variables; anything else is an ordinary run", async () => {
-    const session = { HIVE_API_URL: 'http://127.0.0.1:1/', HIVE_API_TOKEN: 'tok', HIVE_PROJECT: 'hive', HIVE_AGENT: 'HB4', HIVE_WORKSPACE: 'D:/ws' }
+    // The token from its file, as hive-progress reads it (HI-2262: never HIVE_API_TOKEN).
+    const sessionToken = join(tmp, 'session-token.json')
+    writeFileSync(sessionToken, JSON.stringify({ token: 'tok' }))
+    const session = { HIVE_API_URL: 'http://127.0.0.1:1/', HIVE_API_TOKEN_FILE: sessionToken, HIVE_PROJECT: 'hive', HIVE_AGENT: 'HB4', HIVE_WORKSPACE: 'D:/ws' }
     const calls: { url: string; init: RequestInit }[] = []
     const answer = (body: unknown, ok = true) =>
       (async (url: string, init: RequestInit) => {
@@ -2283,13 +2791,13 @@ describe('heavy runs: at most a few at once on the machine, the rest queue in or
     expect(await holdsMergeSlot(session, { fetch: refused })).toBe(false)
     // Not a Hive agent's session: Hive isn't asked.
     const asked = calls.length
-    for (const k of ['HIVE_API_URL', 'HIVE_PROJECT', 'HIVE_AGENT', 'HIVE_API_TOKEN']) expect(await holdsMergeSlot({ ...session, [k]: '' }, { fetch: answer(holder('HB4')) }), k).toBe(false)
+    for (const k of ['HIVE_API_URL', 'HIVE_PROJECT', 'HIVE_AGENT', 'HIVE_API_TOKEN_FILE']) expect(await holdsMergeSlot({ ...session, [k]: '' }, { fetch: answer(holder('HB4')) }), k).toBe(false)
     expect(calls.length).toBe(asked)
-    // The token from its file, as hive-progress reads it, when the variable isn't set.
-    const file = join(tmp, 'token.json')
-    writeFileSync(file, JSON.stringify({ token: 'from-file' }))
-    expect(await holdsMergeSlot({ ...session, HIVE_API_TOKEN: '', HIVE_API_TOKEN_FILE: file }, { fetch: answer(holder('HB4')) })).toBe(true)
-    expect(calls.at(-1)!.init.headers).toMatchObject({ Authorization: 'Bearer from-file' })
+    // HIVE_API_TOKEN alone is no session's (HI-2262): Hive isn't asked; beside the file, the file's is sent.
+    expect(await holdsMergeSlot({ ...session, HIVE_API_TOKEN_FILE: '', HIVE_API_TOKEN: 'tok' }, { fetch: answer(holder('HB4')) })).toBe(false)
+    expect(calls.length).toBe(asked)
+    expect(await holdsMergeSlot({ ...session, HIVE_API_TOKEN: 'other' }, { fetch: answer(holder('HB4')) })).toBe(true)
+    expect(calls.at(-1)!.init.headers).toMatchObject({ Authorization: 'Bearer tok' })
   })
 
   it('--pre-merge goes first without asking; otherwise Hive is asked again at most every 30 s while the run waits', async () => {
@@ -2327,6 +2835,230 @@ describe('heavy runs: at most a few at once on the machine, the rest queue in or
     expect(got.slot).toBe(0)
     got.release()
     rmSync(join(dir2, 'wait-103.json'))
+  })
+
+  it("the side slot, model trials and the small-run bound (HI-2070): beside heavySlots in config.json, the environment over the first two, else their defaults, saying why", () => {
+    const folder = tempDir('hive-slots-side-')
+    const file = join(folder, 'config.json')
+    const lines: string[] = []
+    const read = (env: Record<string, string> = {}) => slotSettings(env, file, (l: string) => lines.push(l))
+    expect(read()).toEqual({ side: 1, models: 2, small: { e2eSuites: 3, e2eRepeat: 3, scenarioRuns: 5 } })
+    expect(lines).toEqual([])
+    writeFileSync(file, '\uFEFF' + JSON.stringify({ heavySlots: 2, sideSlots: 0, modelTrials: 3, smallRun: { e2eSuites: 2, scenarioRuns: 8 } }))
+    expect(read()).toEqual({ side: 0, models: 3, small: { e2eSuites: 2, e2eRepeat: 3, scenarioRuns: 8 } })
+    expect(read({ HIVE_TEST_SIDE_SLOTS: '2', HIVE_TEST_MODEL_TRIALS: '1' })).toMatchObject({ side: 2, models: 1 })
+    expect(read({ HIVE_TEST_MODEL_TRIALS: '0' }).models).toBe(3)
+    expect(lines).toEqual(['Test slots: HIVE_TEST_MODEL_TRIALS="0" isn\'t a whole number from 1; it is left out.'])
+    writeFileSync(file, JSON.stringify({ sideSlots: -1, modelTrials: 'two', smallRun: { e2eRepeat: 0 } }))
+    expect(read()).toEqual({ side: 1, models: 2, small: { e2eSuites: 3, e2eRepeat: 3, scenarioRuns: 5 } })
+    expect(lines.slice(1)).toEqual([
+      `Test slots: sideSlots -1 in ${file} isn't a whole number from 0; 1, the default.`,
+      `Test slots: modelTrials "two" in ${file} isn't a whole number from 1; 2, the default.`,
+      `Test slots: smallRun.e2eRepeat 0 in ${file} isn't a whole number from 1; 3, the default.`
+    ])
+  })
+
+  it('which slot a run takes (HI-2070): small within the bound, heavy past it, model trials of any size, none for a light run', () => {
+    const small = { e2eSuites: 3, e2eRepeat: 3, scenarioRuns: 5 }
+    const pool = (run: object) => slotPool(run, {}, small)
+    // Light: no slot, as before.
+    expect([pool({ kind: 'e2e', count: 3 }), pool({ kind: 'scenarios', count: 5, provider: 'fake' })]).toEqual([null, null])
+    // Small: a few suites repeated a few times, a few fake scenario runs in all.
+    expect([pool({ kind: 'e2e', count: 1, repeat: 3 }), pool({ kind: 'e2e', count: 3, repeat: 2 }), pool({ kind: 'scenarios', count: 1, repeat: 5, provider: 'fake-copilot' })]).toEqual(['small', 'small', 'small'])
+    // Heavy: past it.
+    expect([pool({ kind: 'e2e', count: 4, repeat: 2 }), pool({ kind: 'e2e', count: 1, repeat: 4 }), pool({ kind: 'e2e', count: 196 }), pool({ kind: 'scenarios', count: 2, repeat: 3, provider: 'fake' }), pool({ kind: 'scenarios', count: 151, provider: 'fake' })]).toEqual(['heavy', 'heavy', 'heavy', 'heavy', 'heavy'])
+    // A real model's run is a model trial, a single scenario too.
+    expect([pool({ kind: 'scenarios', count: 1, provider: 'claude-code' }), pool({ kind: 'scenarios', count: 3, repeat: 3, provider: 'codex' }), pool({ kind: 'scenarios', count: 151, provider: 'codex' })]).toEqual(['model', 'model', 'model'])
+  })
+
+  it('a small run takes the side slot while two heavy runs hold theirs, else a heavy one; a heavy run never takes it (HI-2070)', async () => {
+    const dir2 = newPool()
+    const take = (owner: number, pool: string) => ask(dir2, owner, { pool, side: 1 })
+    expect(await take(101, 'heavy')).toEqual({ slot: 0 })
+    expect(await take(102, 'heavy')).toEqual({ slot: 1 })
+    // A heavy run waits, the side slot free.
+    clock += 10
+    const heavy = await take(103, 'heavy')
+    expect(heavy).toMatchObject({ ahead: 0, pool: 'heavy' })
+    expect(existsSync(join(dir2, 'side-0.json'))).toBe(false)
+    // A small run takes it, though the heavy run asked first; another small one then waits for whichever frees first.
+    expect(await take(104, 'small')).toEqual({ slot: 0, pool: 'side' })
+    expect(JSON.parse(readFileSync(join(dir2, 'side-0.json'), 'utf8'))).toMatchObject({ pid: 104, pool: 'side' })
+    clock += 10
+    const second = await take(105, 'small')
+    expect(second).toMatchObject({ pool: 'small' })
+    expect((second as { holders: { pid: number; pool: string }[] }).holders.map((c) => [c.pid, c.pool])).toEqual([[104, 'side'], [101, 'heavy'], [102, 'heavy']])
+    // A heavy slot freed: the heavy run that asked first takes it, not the small run behind it.
+    rmSync(join(dir2, 'slot-0.json'))
+    expect(await take(105, 'small')).toMatchObject({ pool: 'small' })
+    expect(await take(103, 'heavy')).toEqual({ slot: 0 })
+    // The side slot freed: the small run takes it; the next heavy run still waits for a heavy slot.
+    rmSync(join(dir2, 'side-0.json'))
+    expect(await take(105, 'small')).toEqual({ slot: 0, pool: 'side' })
+    expect(await take(106, 'heavy')).toMatchObject({ ahead: 0, pool: 'heavy' })
+    // No side slot (sideSlots 0): a small run queues for the heavy slots, behind the heavy run that asked first, as before.
+    clock += 10
+    expect(await ask(dir2, 107, { pool: 'small', side: 0 })).toMatchObject({ ahead: 1, holders: [{ pool: 'heavy' }, { pool: 'heavy' }] })
+    // waitForSlot lets the side slot go by its own file.
+    const dir3 = newPool()
+    const got = await waitForSlot(dir3, { pool: 'small', slots: 2, side: 1, owner: 101, alive, now, ...offline })
+    expect([got.slot, got.pool, readdirSync(dir3)]).toEqual([0, 'side', ['side-0.json']])
+    got.release()
+    expect(readdirSync(dir3).filter((f) => f.endsWith('.json'))).toEqual([])
+  })
+
+  it('a resource-aware rule for nested runs (HI-2070): only the credit of the kind of slot the parent holds counts', () => {
+    const small = { e2eSuites: 3, e2eRepeat: 3, scenarioRuns: 5 }
+    const pool = (run: object, env: Record<string, string>) => slotPool(run, env, small)
+    const heavyE2e = { kind: 'e2e', count: 196 }
+    const trial = { kind: 'scenarios', count: 3, repeat: 3, provider: 'codex' }
+    // What each kind of parent gives what it starts: an e2e suite CPU credit (always, as before: #211), a model trial
+    // model credit, and each passes on what it was given.
+    expect([...heldCredit({})]).toEqual([])
+    expect([...heldCredit({ E2E_RUN_SUITE: 'progressreport' })]).toEqual(['cpu'])
+    expect(creditFor('cpu', {})).toBe('cpu')
+    expect(creditFor('model', {})).toBe('model')
+    expect(creditFor('model', { E2E_RUN_SLOTS: 'cpu' })).toBe('cpu,model')
+    expect(creditFor(null, {})).toBe('')
+    expect(creditFor(null, { E2E_RUN_SLOTS: 'model' })).toBe('model')
+    // Inside a model trial (its test Hive's session): heavy CPU work asks for a CPU slot, a nested trial is covered.
+    const inTrial = { E2E_RUN_SUITE: 'real-model-parent', E2E_RUN_PORT: '47950', E2E_RUN_SLOTS: creditFor('model', {}) }
+    expect([pool(heavyE2e, inTrial), pool({ kind: 'e2e', count: 1, repeat: 3 }, inTrial), pool(trial, inTrial)]).toEqual(['heavy', 'small', null])
+    // Inside an e2e suite: CPU work is covered (waiting for its parent's slot would never end), a model trial isn't.
+    const inSuite = { E2E_RUN_SUITE: 'progressreport', E2E_RUN_PORT: '47950', E2E_RUN_SLOTS: creditFor('cpu', {}) }
+    expect([pool(heavyE2e, inSuite), pool(trial, inSuite)]).toEqual([null, 'model'])
+    // Inside a model trial inside an e2e suite: both covered.
+    const both = { ...inSuite, E2E_RUN_SLOTS: creditFor('model', inSuite) }
+    expect([pool(heavyE2e, both), pool(trial, both)]).toEqual([null, null])
+    // An empty credit (a light top-level run's): nothing is covered, even with the suite's marker carried.
+    expect([pool(heavyE2e, { E2E_RUN_SUITE: 'x', E2E_RUN_SLOTS: '' }), pool(trial, { E2E_RUN_SUITE: 'x', E2E_RUN_SLOTS: '' })]).toEqual(['heavy', 'model'])
+    // The runners pass it on: the e2e runner to each suite, the scenario runner into its test Hives (CARRIED).
+    const runContext = createRequire(import.meta.url)('./e2e/runContext.cjs') as { CARRIED: string[]; suiteEnv: (o: object, parent: object) => Record<string, string> }
+    expect(runContext.CARRIED).toContain('E2E_RUN_SLOTS')
+    expect(runContext.suiteEnv({ name: 's', runDir: 'C:/x', slots: 'cpu,model' }, {}).E2E_RUN_SLOTS).toBe('cpu,model')
+    expect(runContext.suiteEnv({ name: 's', runDir: 'C:/x' }, {}).E2E_RUN_SLOTS).toBe('')
+    // Each runner passes on what it holds and was given, never a kind it doesn't hold (HR2's round 2).
+    expect(readFileSync(join(__dirname, 'e2e', 'run.mjs'), 'utf8')).toContain('slots: creditFor(pool) })')
+    expect(readFileSync(join(__dirname, 'e2e', 'run.mjs'), 'utf8')).not.toMatch(/creditFor\('cpu'\)/)
+    expect(readFileSync(join(__dirname, 'scenarios', 'run.mjs'), 'utf8')).toMatch(/process\.env\.E2E_RUN_SLOTS = creditFor\(pool\)/)
+    expect(readFileSync(join(__dirname, 'scenarios', 'run.mjs'), 'utf8')).toMatch(/ensureBuildWithSlot\(\{[\s\S]{0,120}needsSlot: buildNeedsCpuSlot\(\{ provider, pool \}\),\s+takeSlot: takeBuildSlot/)
+  })
+
+  it("composed (HI-2070, HR2's round 2): a light run passes on only what it was given; a model parent's light e2e run's suite gives its heavy child no CPU credit", () => {
+    const runContext = createRequire(import.meta.url)('./e2e/runContext.cjs') as { suiteEnv: (o: object, parent: object) => Record<string, string> }
+    const small = { e2eSuites: 3, e2eRepeat: 3, scenarioRuns: 5 }
+    // What the e2e runner does: its pool from slotPool, then each suite's environment from suiteEnv with creditFor(pool).
+    const e2eRun = (run: object, env: Record<string, string>) => {
+      const pool = slotPool({ kind: 'e2e', ...run }, env, small)
+      return { pool, suite: runContext.suiteEnv({ name: 'inner', port: 48950, runDir: 'C:/x', slots: creditFor(pool, env) }, env) }
+    }
+    // A model trial's test Hive session (the scenario runner's creditFor('model'), carried into it).
+    const trialSession = { E2E_RUN_SUITE: 'real-model-parent', E2E_RUN_PORT: '47950', E2E_RUN_SLOTS: creditFor('model', {}) }
+    const light = e2eRun({ count: 1 }, trialSession)
+    expect(light.pool).toBeNull()
+    expect(light.suite.E2E_RUN_SLOTS).toBe('model')
+    // Its suite's heavy grandchild asks for a CPU slot, and so does a full unit run there; a nested trial is covered.
+    expect(slotPool({ kind: 'e2e', count: 196 }, light.suite, small)).toBe('heavy')
+    expect(heldCredit(light.suite).has('cpu')).toBe(false)
+    expect(slotPool({ kind: 'scenarios', count: 1, provider: 'codex' }, light.suite, small)).toBeNull()
+    // A light top-level run mints no credit either; a heavy one gives its suites CPU credit, as before (#211).
+    expect(e2eRun({ count: 2 }, {}).suite.E2E_RUN_SLOTS).toBe('')
+    expect(slotPool({ kind: 'e2e', count: 196 }, e2eRun({ count: 2 }, {}).suite, small)).toBe('heavy')
+    const heavy = e2eRun({ count: 196 }, {})
+    expect([heavy.pool, heavy.suite.E2E_RUN_SLOTS, slotPool({ kind: 'e2e', count: 196 }, heavy.suite, small)]).toEqual(['heavy', 'cpu', null])
+    // Inside a CPU parent's suite, a model trial's light e2e run passes CPU credit on, with model credit from the trial.
+    expect(e2eRun({ count: 1 }, { E2E_RUN_SLOTS: 'cpu,model', E2E_RUN_SUITE: 'x' }).suite.E2E_RUN_SLOTS).toBe('cpu,model')
+  })
+
+  it("a real model's trial's build takes a CPU slot unless it holds or runs inside one (HI-2070): only a stale build, looked at once no other runner builds", async () => {
+    // Which trials: by the credit after its own slot, whether it took a model slot or one it runs inside covers it.
+    expect(buildNeedsCpuSlot({ provider: 'codex', pool: 'model' }, {})).toBe(true)
+    expect(buildNeedsCpuSlot({ provider: 'codex', pool: null }, { E2E_RUN_SUITE: 'x', E2E_RUN_SLOTS: 'model' })).toBe(true)
+    expect(buildNeedsCpuSlot({ provider: 'claude-code', pool: null }, { E2E_RUN_SUITE: 'x', E2E_RUN_SLOTS: 'cpu,model' })).toBe(false)
+    expect(buildNeedsCpuSlot({ provider: 'codex', pool: 'model' }, { E2E_RUN_SUITE: 'x', E2E_RUN_SLOTS: 'cpu' })).toBe(false)
+    // A fake run's build is covered as its run is.
+    expect([buildNeedsCpuSlot({ provider: 'fake', pool: null }, {}), buildNeedsCpuSlot({ provider: 'fake-codex', pool: 'small' }, {})]).toEqual([false, false])
+    // The order of what happens: a fake ensureBuild (its answers in turn) and a slot that records when it is held.
+    const run = async (slotNeeded: boolean, answers: { stale: boolean; waited?: boolean }[]) => {
+      const steps: string[] = []
+      let held = false
+      const ensure = ({ build }: { build: boolean }) => {
+        steps.push(`${build ? 'build' : 'look'}${held ? ' (slot held)' : ''}`)
+        return { built: build, why: null, waited: false, ...answers.shift()! }
+      }
+      const takeSlot = async () => {
+        steps.push('slot')
+        held = true
+        return { release: () => ((held = false), steps.push('release')) }
+      }
+      const result = await ensureBuildWithSlot({ root: 'C:/wt', runBuild: () => {}, needsSlot: slotNeeded, takeSlot, ensure })
+      return { steps, result, held }
+    }
+    // Model credit only, a stale build: it takes the slot, builds holding it, and lets it go.
+    expect(await run(true, [{ stale: true }, { stale: false }])).toMatchObject({ steps: ['look', 'slot', 'build (slot held)', 'release'], held: false })
+    // A build that became needed while it waited out another runner's (the look waits for the build lock): the same.
+    expect((await run(true, [{ stale: true, waited: true }, { stale: false }])).steps).toEqual(['look', 'slot', 'build (slot held)', 'release'])
+    // Current once looked at: no slot, no build.
+    expect(await run(true, [{ stale: false }])).toMatchObject({ steps: ['look'], result: { stale: false } })
+    // CPU credit with model credit: the build is covered: as before, no slot taken.
+    expect((await run(false, [{ stale: false }])).steps).toEqual(['build'])
+    // The slot is let go when the build throws too.
+    const failing = { steps: [] as string[] }
+    await expect(
+      ensureBuildWithSlot({
+        root: 'C:/wt',
+        runBuild: () => {},
+        needsSlot: true,
+        takeSlot: async () => ({ release: () => failing.steps.push('release') }),
+        ensure: ({ build }: { build: boolean }) => {
+          if (build) throw new Error('build failed')
+          return { stale: true }
+        }
+      })
+    ).rejects.toThrow('build failed')
+    expect(failing.steps).toEqual(['release'])
+  })
+
+  it('an e2e run on the side slot runs at most two suites at once (HI-2070)', () => {
+    expect(SIDE_E2E_JOBS).toBe(2)
+    expect(readFileSync(join(__dirname, 'e2e', 'run.mjs'), 'utf8')).toMatch(/if \(got\.pool === 'side' && jobs > SIDE_E2E_JOBS\) \{[\s\S]{0,200}jobs = SIDE_E2E_JOBS/)
+  })
+
+  it("a real model's trial waits only on its own cap, never for the CPU slots (HI-2070)", async () => {
+    const dir2 = newPool()
+    // Both heavy slots and the side slot held: a model trial takes one of its own at once.
+    await ask(dir2, 101)
+    await ask(dir2, 102)
+    expect(await ask(dir2, 103, { pool: 'small', side: 1 })).toEqual({ slot: 0, pool: 'side' })
+    expect(await ask(dir2, 104, { pool: 'model', models: 2 })).toEqual({ slot: 0, pool: 'model' })
+    expect(await ask(dir2, 105, { pool: 'model', models: 2 })).toEqual({ slot: 1, pool: 'model' })
+    // A third waits for a model trial's slot, naming only those; the CPU slots' queue doesn't count it.
+    clock += 10
+    const third = await ask(dir2, 106, { pool: 'model', models: 2 })
+    expect(third).toMatchObject({ ahead: 0, pool: 'model' })
+    expect((third as { holders: { pid: number }[] }).holders.map((c) => c.pid)).toEqual([104, 105])
+    rmSync(join(dir2, 'slot-0.json'))
+    expect(await ask(dir2, 107)).toEqual({ slot: 0 })
+    rmSync(join(dir2, 'model-1.json'))
+    expect(await ask(dir2, 106, { pool: 'model', models: 2 })).toEqual({ slot: 1, pool: 'model' })
+  })
+
+  it('the wait names what is ahead, by whose run, never as if it were its own (HI-2070)', () => {
+    const at = clock - 12 * 60_000
+    const hb6 = { pid: 101, at, what: 'scenarios: 151 (fake)', root: 'D:/wt/hb6', pool: 'heavy', owner: { project: 'hive', agent: 'HB6', run: 'r6' } }
+    const hb4 = { pid: 102, at, what: 'e2e: 4 suites × 5', root: 'D:/wt/hb4', pool: 'heavy', owner: { project: 'hive', agent: 'HB4', run: 'r4' } }
+    const side = { pid: 103, at, what: 'e2e: 1 suites × 3', root: 'D:/wt/term', pool: 'side' }
+    expect(waitSummary({ holders: [hb6, hb4], ahead: 0, pool: 'heavy' })).toBe("waiting for a test slot (2 heavy runs ahead: HB6's scenarios: 151 (fake), HB4's e2e: 4 suites × 5)")
+    expect(waitSummary({ holders: [side, hb6, hb4], ahead: 2, pool: 'small' })).toBe("waiting for a test slot (1 small run and 2 heavy runs ahead: e2e: 1 suites × 3 in D:/wt/term, HB6's scenarios: 151 (fake), HB4's e2e: 4 suites × 5; 2 more waiting first)")
+    expect(waitSummary({ holders: [{ ...hb6, pool: 'model', what: 'scenarios: 3 (codex) × 3' }], pool: 'model' })).toBe("waiting for a model-trial slot (1 model-trial run ahead: HB6's scenarios: 3 (codex) × 3)")
+    expect(waitSummary({ holders: [], pool: 'heavy' })).toBe('waiting for a test slot (runs just finishing)')
+    // The runner's own line: the heavy one as before; a small run's and a model trial's say what they can take.
+    const settings = { side: 1, models: 2, small: { e2eSuites: 3, e2eRepeat: 3, scenarioRuns: 5 } }
+    expect(waitLine({ holders: [hb6], ahead: 0 }, 2)).toMatch(/^Waiting for a test slot \(2 heavy runs at once on this machine, HIVE_TEST_HEAVY_SLOTS\): held by scenarios: 151 \(fake\) in D:\/wt\/hb6 /)
+    expect(waitLine({ holders: [side, hb6], ahead: 1, pool: 'small' }, 2, settings)).toMatch(/^Waiting for a test slot \(a small run: 1 side and 2 heavy slots on this machine, sideSlots and heavySlots\), 1 ahead of this one: held by e2e: 1 suites × 3 in D:\/wt\/term /)
+    expect(waitLine({ holders: [], ahead: 0, pool: 'model' }, 2, settings)).toBe('Waiting for a model-trial slot (2 real-model trials at once on this machine, modelTrials): held by runs just finishing.')
+    expect(refusedLine({ holders: [hb6], pool: 'model' }, 2, settings)).toMatch(/^No model-trial slot free \(--no-wait\): 2 real-model trials at once on this machine, modelTrials, held by scenarios: 151/)
+    expect(refusedLine({ holders: [hb6] }, 2)).toMatch(/^No test slot free \(--no-wait\): 2 heavy runs at once on this machine, HIVE_TEST_HEAVY_SLOTS, held by scenarios: 151/)
   })
 })
 

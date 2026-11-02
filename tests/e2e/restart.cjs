@@ -47,7 +47,8 @@ const launches = () => fs.readFileSync(path.join(claudeHome, 'fake-launches.json
   check('the session starts', !!(await lib.until(async () => (await inv('session:live')).some((l) => l.status === 'ready'), 30000)))
   await page.screenshot({ path: path.join(shots, '1-started.png') })
 
-  await inv('project:updateConfig', proj, { providers: { 'claude-code': { effort: 'low' } } })
+  // The agent's own effort (a project's isn't read for a CLI with connections, HI-1774).
+  await lib.setLaunch(inv, proj, agent.id, { effort: 'low' })
   await inv('workspace:refresh')
   check('a changed effort offers Restart session', !!(await lib.until(async () => (await page.getByRole('button', { name: 'Restart session' }).count()) > 0, 10000)))
   await page.screenshot({ path: path.join(shots, '2-banner.png') })
@@ -78,7 +79,8 @@ const launches = () => fs.readFileSync(path.join(claudeHome, 'fake-launches.json
   // ("…already has a running session"). Here the workspace's database, where the record is (#1061), is held in a write
   // transaction by another process for a few seconds (less than its busy timeout) while it restarts, so its save waits:
   // the relaunch must still come, with no question.
-  await inv('project:updateConfig', proj, { providers: { 'claude-code': { effort: 'high' } } })
+  // The agent's own effort (a project's isn't read for a CLI with connections, HI-1774).
+  await lib.setLaunch(inv, proj, agent.id, { effort: 'high' })
   await inv('workspace:refresh')
   check('another changed effort offers Restart session', !!(await lib.until(async () => (await page.getByRole('button', { name: 'Restart session' }).count()) > 0, 10000)))
   const dbFile = path.join(ws, '.hive', 'hive.db')

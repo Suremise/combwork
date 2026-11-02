@@ -5,6 +5,8 @@
 // (#819) are flagged on the card's tile and in its dialog with the closest headings, whether saved so or broken by a
 // change before the start, and named in the prompt. The agent is the fake Claude Code. Pictured in both themes. Dev
 // build, throwaway profile, workspace and CLAUDE_CONFIG_DIR.
+// Dev build only (#1580): it starts this checkout's Electron itself, and Tree is a 0.9 worktree agent
+// (agents:testLegacy, refused by a packaged build), whose copy of a file differs from the project's.
 const lib = require('./lib.cjs')
 const { _electron } = require('playwright-core')
 const fs = require('fs')
@@ -80,7 +82,7 @@ const NOTES = '# Notes\n\n## Open questions\n\nWhich QUESTION-MARKER first?\n'
     // Through the hive tools, as an agent sets them.
     const out = execFileSync(process.execPath, [path.join(lib.ROOT, 'out', 'main', 'hive-mcp.js')], {
       input: JSON.stringify({ jsonrpc: '2.0', id: 1, method: 'tools/call', params: { name: 'hive_update_task', arguments: { number: n, context: refs } } }) + '\n',
-      env: lib.childEnv({ HIVE_API_URL: `http://127.0.0.1:${PORT}`, HIVE_WORKSPACE: ws, HIVE_API_TOKEN: token, HIVE_PROJECT: 'alpha' }),
+      env: lib.childEnv({ HIVE_API_URL: `http://127.0.0.1:${PORT}`, HIVE_WORKSPACE: ws, HIVE_API_TOKEN_FILE: lib.tokenFile(token), HIVE_PROJECT: 'alpha' }),
       timeout: 60000
     }).toString()
     const said = JSON.parse(out.split('\n')[0]).result.content[0].text
@@ -175,7 +177,10 @@ const NOTES = '# Notes\n\n## Open questions\n\nWhich QUESTION-MARKER first?\n'
     await broken.getByRole('button', { name: 'Close', exact: true }).click()
     await page.keyboard.press('Escape')
     const discard = page.getByRole('button', { name: 'Discard' })
-    if (await lib.until(async () => (await discard.count()) > 0, 3000)) await discard.click()
+    // Escape either closes the dialog or asks to discard the edit: wait for whichever comes.
+    await lib.until(async () => (await discard.count()) > 0 || (await dialog.count()) === 0, HUNG_MS)
+    if ((await discard.count()) > 0) await discard.click()
+    await lib.until(async () => (await dialog.count()) === 0, HUNG_MS)
 
     // --- Started on an agent: its prompt lists them with their sizes, not their text.
     const agent = await lib.addAgent(inv, alpha, { name: 'Builder' })

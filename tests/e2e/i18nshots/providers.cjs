@@ -1,7 +1,7 @@
 // Screenshot cases for the `providers` area (#797): the provider adapters' user text, reached for the i18nshots route
 // (tests/e2e/i18nshots.cjs has the case format) with locale-independent means only: IPC, command ids and structural
 // hooks, never English text. Codex and GitHub Copilot are turned on for these screens (and off again after): their CLIs
-// are looked for with the test copy's empty homes (lib.cjs gives every test Hive its own), so Agent Setup shows their
+// are looked for with the test copy's empty homes (lib.cjs gives every test Hive its own), so Provider Setup shows their
 // readiness (not installed, or not signed in, or the sandbox to set up), whatever this machine has.
 const fs = require('fs')
 const path = require('path')
@@ -11,7 +11,7 @@ const TALL = 1600
 
 const setProviders = (ctx, on) => ctx.inv('settings:update', { providers: { codex: { enabled: on }, copilot: { enabled: on } } })
 
-/** Agent Setup with Codex's readiness (its tab): what it needs, with its button. */
+/** Provider Setup with Codex's readiness (its tab): what it needs, with its button. */
 async function agentSetup(ctx) {
   const { inv, lib, page, app } = ctx
   await setProviders(ctx, true)
@@ -26,19 +26,19 @@ async function agentSetup(ctx) {
 }
 
 /**
- * Agent Setup on a provider's tab, as its command opens it with the provider's id; `n` is the tab's place in Hive's
+ * Provider Setup on a provider's tab, as its command opens it with the provider's id; `n` is the tab's place in Hive's
  * order (Claude Code, Codex, GitHub Copilot), checked selected.
  */
 async function setupTab(ctx, id, n) {
   await ctx.command('help.agentSetup', id)
   const tab = ctx.page.locator('.dialog .setup-tab').nth(n)
-  if (!(await ctx.lib.until(async () => /\bselected\b/.test((await tab.getAttribute('class').catch(() => null)) ?? ''), ctx.hungMs))) throw new Error(`Agent Setup's ${id} tab was not selected`)
+  if (!(await ctx.lib.until(async () => /\bselected\b/.test((await tab.getAttribute('class').catch(() => null)) ?? ''), ctx.hungMs))) throw new Error(`Provider Setup's ${id} tab was not selected`)
   return ctx.page.locator('.dialog').last()
 }
 
 async function closeSetup(ctx) {
   const { page, lib, app } = ctx
-  if (!(await lib.until(async () => (await page.locator('.dialog').count()) === 0 || (await page.keyboard.press('Escape').then(() => false)), ctx.hungMs))) throw new Error("Agent Setup didn't close")
+  if (!(await lib.until(async () => (await page.locator('.dialog').count()) === 0 || (await page.keyboard.press('Escape').then(() => false)), ctx.hungMs))) throw new Error("Provider Setup didn't close")
   await lib.fitWindow(app, page, WINDOW)
 }
 
@@ -97,7 +97,7 @@ async function closeStray(ctx) {
 async function launchRefused(ctx) {
   const { inv, page } = ctx
   await closeToasts(ctx)
-  await inv('project:updateProvider', ctx.project, 'claude-code', { extraArgs: '--settings' })
+  await ctx.lib.setProjectLaunch(inv, ctx.project, 'claude-code', { extraArgs: '--settings' })
   await ctx.command('project.focus', ctx.project)
   await ctx.command('project.tab.session')
   await ctx.command('session.new')
@@ -107,7 +107,7 @@ async function launchRefused(ctx) {
 /** Its notice closed and the extra arguments taken off again. */
 async function closeLaunchRefused(ctx) {
   await closeToasts(ctx)
-  await ctx.inv('project:updateProvider', ctx.project, 'claude-code', { extraArgs: '' })
+  await ctx.lib.setProjectLaunch(ctx.inv, ctx.project, 'claude-code', { extraArgs: '' })
 }
 
 module.exports = {

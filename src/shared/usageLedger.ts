@@ -319,6 +319,32 @@ export interface BaselineDay {
   covered: UsageTokens
 }
 
+/**
+ * Rows without the CLI's reported charges (HI-1772: a session that ran on a server connection): their counts kept, each
+ * priced by Hive's estimate from its model when shown. A charge Hive estimated is kept as it is (it follows the prices).
+ */
+export function rowsWithoutReports(rows: LedgerRow[]): LedgerRow[] {
+  return rows.map((r) => (r.fixedEstimated || (r.fixedUsd === 0 && tokenSum(r.covered) === 0) ? r : { ...r, fixedUsd: 0, fixedEstimated: false, covered: ZERO() }))
+}
+
+/**
+ * Rows of a free session (HI-1772: it ran only on servers on this PC): each a known $0 charge covering all its tokens,
+ * so every cost made from them (the history, card costs, metrics) is $0 known, never unpriced; its counts kept.
+ */
+export function rowsAsFree(rows: LedgerRow[]): LedgerRow[] {
+  return rows.map((r) => ({ ...r, fixedUsd: 0, fixedEstimated: false, covered: { inputTokens: r.inputTokens, outputTokens: r.outputTokens, cacheWriteTokens: r.cacheWriteTokens, cacheReadTokens: r.cacheReadTokens } }))
+}
+
+/** A free session's baseline (HI-1772): each day a known $0 covering its tokens. */
+export function baselineAsFree(days: BaselineDay[]): BaselineDay[] {
+  return days.map((d) => ({ ...d, costUsd: 0, costEstimated: false, covered: { inputTokens: d.inputTokens, outputTokens: d.outputTokens, cacheWriteTokens: d.cacheWriteTokens, cacheReadTokens: d.cacheReadTokens } }))
+}
+
+/** A baseline without the CLI's reported charges (HI-1772), its counts kept. */
+export function baselineWithoutReports(days: BaselineDay[]): BaselineDay[] {
+  return days.map((d) => (d.costEstimated || (d.costUsd === null && tokenSum(d.covered) === 0) ? d : { ...d, costUsd: null, costEstimated: false, covered: ZERO() }))
+}
+
 /** What a baseline day holds that rows add up to (cost apart). */
 const COUNTS = ['inputTokens', 'outputTokens', 'cacheWriteTokens', 'cacheReadTokens', 'requests', 'prompts', 'compactions'] as const
 
@@ -574,11 +600,6 @@ export type CardHoldFields = Pick<TaskCard, 'number' | 'project' | 'held' | 'his
 
 export const holdsOfCard = (c: Omit<CardHoldFields, 'number' | 'project'>): TaskHold[] => c.held ?? holdsFromHistory(c)
 
-const ms = (iso: string | undefined | null, fallback: number): number => {
-  const t = iso ? Date.parse(iso) : NaN
-  return Number.isFinite(t) ? t : fallback
-}
-
 /**
  * Whether a hold is a session's agent's: by the agent's id; a hold from history with only a name, by the agents named so
  * now (`named`: their ids) or, for a session whose record has no id, the name it kept.
@@ -589,34 +610,100 @@ export function holdIsSessions(h: Pick<TaskHold, 'agent' | 'name'>, s: SessionWh
   return !!s.agentName && s.agentName.toLowerCase() === h.name.toLowerCase()
 }
 
+/** A hold with its times read (NaN: none, or not a time; it is then `now`, as `ms` gives). */
+interface TimedHold {
+  hold: TaskHold
+  from: number
+  to: number
+}
+
 /**
- * The cards a session's agent held in its project (`cards`: the project's, archived ones too), each role apart, with how
- * many cards it held at each time (by the holds' agent name, as cost per card has always shared them): what it used
- * while holding k cards is 1/k each's.
+ * A project's cards' holds worked out once (HI-1748): each card's, with their times read, and the cards each agent name
+ * held. Working them out (from history, for a card no change has saved since #602) is most of what sharing a session's
+ * use out costs; the sessions of a project's agents, each read with `sessionHolds`, share one.
  */
-export function sessionHolds(cards: CardHoldFields[], s: SessionWho, named: (name: string) => string[], now: number): SessionHold[] {
-  const byName = new Map<string, Map<number, Span[]>>()
+export interface HoldIndex {
+  cards: { number: number; holds: TimedHold[] }[]
+  /** By agent name in lower case: each card's holds of that name. */
+  byName: Map<string, Map<number, TimedHold[]>>
+}
+
+const parsed = (iso: string | undefined | null): number => (iso ? Date.parse(iso) : NaN)
+const at = (t: number, now: number): number => (Number.isFinite(t) ? t : now)
+const spanOf = (h: TimedHold, now: number): Span => [at(h.from, now), at(h.to, now)]
+
+/** Each card's holds as holdsOfCard works them out, kept by the card's object (one the board read keeps until it changes). */
+const derived = new WeakMap<CardHoldFields, TaskHold[]>()
+const derivedOf = (c: CardHoldFields): TaskHold[] => {
+  let own = derived.get(c)
+  if (!own) derived.set(c, (own = holdsOfCard(c)))
+  return own
+}
+
+/** Each card's holdsKey, kept by the card's object as `derived` is. */
+const keyed = new WeakMap<CardHoldFields, string>()
+
+/**
+ * A card's holds as text (whose, which role, from when to when): equal for two reads of a card whose holds didn't change,
+ * whatever else of it did (HI-1887: a comment), so a project's cards' keys tell whether its holdIndex is as it was.
+ */
+export function cardHoldsKey(c: CardHoldFields): string {
+  let key = keyed.get(c)
+  if (key === undefined) keyed.set(c, (key = JSON.stringify([c.number, derivedOf(c).map((h) => [h.agent ?? null, h.name, h.role, h.from, h.to ?? null])])))
+  return key
+}
+
+export function holdIndex(cards: CardHoldFields[]): HoldIndex {
+  const index: HoldIndex = { cards: [], byName: new Map() }
   for (const c of cards) {
-    for (const h of holdsOfCard(c)) {
-      const m = byName.get(h.name.toLowerCase()) ?? new Map<number, Span[]>()
-      m.set(c.number, [...(m.get(c.number) ?? []), [ms(h.from, now), ms(h.to, now)]])
-      byName.set(h.name.toLowerCase(), m)
+    const own = derivedOf(c)
+    const holds = own.map((hold) => ({ hold, from: parsed(hold.from), to: parsed(hold.to) }))
+    index.cards.push({ number: c.number, holds })
+    for (const h of holds) {
+      const name = h.hold.name.toLowerCase()
+      let m = index.byName.get(name)
+      if (!m) index.byName.set(name, (m = new Map()))
+      const list = m.get(c.number)
+      if (list) list.push(h)
+      else m.set(c.number, [h])
     }
   }
-  for (const m of byName.values()) for (const [n, spans] of m) m.set(n, mergeSpans(spans))
+  return index
+}
+
+/** Whether a session's agent held any card at some time up to `now`: whether its sessionHolds at `now` has any, without working them out. */
+export function heldAt(index: HoldIndex, s: SessionWho, named: (name: string) => string[], now: number): boolean {
+  for (const c of index.cards) for (const h of c.holds) if (at(h.to, now) > at(h.from, now) && holdIsSessions(h.hold, s, named)) return true
+  return false
+}
+
+/**
+ * The cards a session's agent held in its project (`cards`: the project's, archived ones too, or their holdIndex), each
+ * role apart, with how many cards it held at each time (by the holds' agent name, as cost per card has always shared
+ * them): what it used while holding k cards is 1/k each's.
+ */
+export function sessionHolds(cards: CardHoldFields[] | HoldIndex, s: SessionWho, named: (name: string) => string[], now: number): SessionHold[] {
+  const index = Array.isArray(cards) ? holdIndex(cards) : cards
+  // Each name's cards, their spans merged at `now`: only for the names this session's holds have.
+  const merged = new Map<string, [number, Span[]][]>()
+  const spansOfName = (name: string): [number, Span[]][] => {
+    let m = merged.get(name)
+    if (!m) merged.set(name, (m = [...(index.byName.get(name) ?? [])].map(([n, holds]) => [n, mergeSpans(holds.map((h) => spanOf(h, now)))])))
+    return m
+  }
   const out: SessionHold[] = []
-  for (const c of cards) {
+  for (const c of index.cards) {
     const groups = new Map<string, { role: 'build' | 'review'; name: string; spans: Span[] }>()
-    for (const h of holdsOfCard(c)) {
-      if (!holdIsSessions(h, s, named)) continue
-      const g = groups.get(h.role) ?? { role: h.role, name: h.name, spans: [] }
-      g.spans.push([ms(h.from, now), ms(h.to, now)])
-      groups.set(h.role, g)
+    for (const h of c.holds) {
+      if (!holdIsSessions(h.hold, s, named)) continue
+      const g = groups.get(h.hold.role) ?? { role: h.hold.role, name: h.hold.name, spans: [] }
+      g.spans.push(spanOf(h, now))
+      groups.set(h.hold.role, g)
     }
     for (const g of groups.values()) {
       const spans = mergeSpans(g.spans)
       if (!spans.length) continue
-      const others = [...(byName.get(g.name.toLowerCase())?.entries() ?? [])].filter(([n]) => n !== c.number).map(([, sp]) => sp)
+      const others = spansOfName(g.name.toLowerCase()).filter(([n]) => n !== c.number).map(([, sp]) => sp)
       out.push({ card: c.number, role: g.role, parts: [...sharedSpans(spans, others).entries()] })
     }
   }

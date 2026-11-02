@@ -44,12 +44,12 @@
       }
     },
     {
-      // Node's worker threads (the usage worker, #1106): their postMessage has no target origin (a browser window's has).
-      "files": ["src/main/usageWorker.ts", "src/main/usageHistory.ts"],
+      // Node's worker threads (the usage worker, #1106; the repository lock's, HI-1680; the WAL checkpoints', HI-1691; the log's writer, HI-1730; git's, HI-1783; Codex's log's, HI-1972): their postMessage has no target origin (a browser window's has).
+      "files": ["src/main/usageWorker.ts", "src/main/usageHistory.ts", "src/main/repoLockWorker.ts", "src/main/repoLock.ts", "tests/repoLockWorker.test.ts", "tests/usageWorker.test.ts", "src/main/walCheckpointWorker.ts", "src/main/walCheckpoint.ts", "src/main/logWriter.ts", "src/main/logger.ts", "src/main/gitWorker.ts", "src/main/git.ts", "tests/gitWorker.test.ts", "src/main/codexLogWorker.ts", "src/main/providers/codex/retryLog.ts"],
       "rules": { "unicorn/require-post-message-target-origin": "off" }
     },
     {
-      "files": ["src/main/mcp/hive-mcp.ts", "src/main/progressReporters/hive-progress.ts", "src/main/progressReporters/wrapper.ts", "src/main/progressReporters/report.mts"],
+      "files": ["src/main/mcp/hive-mcp.ts", "src/main/progressReporters/hive-progress.ts", "src/main/progressReporters/wrapper.ts", "src/main/progressReporters/report.mts", "src/main/closeCommand/hive-close-runner.ts", "src/main/closeCommand/runner.ts", "src/main/closeCommand/listRunner.ts"],
       "rules": { "no-restricted-imports": "off" }
     }
   ],

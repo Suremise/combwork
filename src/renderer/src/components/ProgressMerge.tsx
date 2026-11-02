@@ -9,7 +9,9 @@ import { Icon, IconButton, Tooltip } from './ui'
 /**
  * The top of the Progress panel (#484): a card per merge going on (a slot its holder has taken), in its own colour, with who
  * holds it, which branch goes where, the holder's current step (its running progress), how long so far and left, and
- * who waits. It folds up to its first line (remembered per workspace); Release frees a holder that is stuck.
+ * who waits. It folds up to its first line (remembered per workspace); Release frees a holder that is stuck. These are
+ * the merge slot's cards (agents merging under "The agent merges", the user's merges); Hive's merge queue has its own
+ * (ProgressQueue.tsx, #1356), with no Release.
  */
 
 /** Where the merge cards' fold is remembered (`ui.panes`, as the panel's other folds). */
@@ -26,10 +28,15 @@ export function usePanelFold(key: string | null): [boolean, () => void] {
   return [folded, toggle]
 }
 
+/** The merge cards' fold (one for all of them, remembered per workspace). */
+export function useMergeFold(): [boolean, () => void] {
+  const ws = useStore((s) => s.workspace?.path ?? null)
+  return usePanelFold(ws ? foldKey(ws) : null)
+}
+
 export function MergeCards({ slots, projectName, showProject, stepOf, now }: { slots: MergeSlotInfo[]; projectName: (path: string) => string; showProject: boolean; stepOf: (s: MergeSlotInfo) => string | null; now: number }) {
   useLanguage()
-  const ws = useStore((s) => s.workspace?.path ?? null)
-  const [folded, toggle] = usePanelFold(ws ? foldKey(ws) : null)
+  const [folded, toggle] = useMergeFold()
   if (!slots.length) return null
   return (
     <div className="progress-merge" role="region" aria-label={tr(msg({ id: 'board.merge.region', defaultMessage: 'Merging', description: "Accessible name of the top of the Progress panel: a card for each merge going on." }))}>
@@ -40,11 +47,12 @@ export function MergeCards({ slots, projectName, showProject, stepOf, now }: { s
   )
 }
 
-function MergeCard({ slot: s, project, showProject, step, now, folded, onFold }: { slot: MergeSlotInfo; project: string; showProject: boolean; step: string | null; now: number; folded: boolean; onFold: () => void }) {
+export function MergeCard({ slot: s, project, showProject, step, now, folded, onFold }: { slot: MergeSlotInfo; project: string; showProject: boolean; step: string | null; now: number; folded: boolean; onFold: () => void }) {
   // Only taken slots get a card (Progress.tsx).
   const h = s.holder!
-  // The holder's branch, when it is an agent working in its own worktree: "hive/b1 → main".
-  const from = useStore((st) => (h.agentId ? (findProject(st, s.project)?.agents.find((a) => a.id === h.agentId)?.worktree?.branch ?? null) : null))
+  // The holder's branch, when it is an agent working outside the project folder (its slot's card line, or its own
+  // worktree's branch, #1442): "hive/b1 → main".
+  const from = useStore((st) => (h.agentId ? (findProject(st, s.project)?.agents.find((a) => a.id === h.agentId)?.place.branch ?? null) : null))
   const late = h.until < now
   const left = h.until - now
   const sofar = minutesText(now - h.since)

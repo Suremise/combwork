@@ -35,9 +35,11 @@ Translate the meaning, not the words, and keep the result as short and plain.
 - **Capitalisation:** German rules: nouns capitalised, everything else lower case, also in titles, buttons and
   headings. Never copy the English Title Case („Agent-Einstellungen“, not „Agent-Einstellungen Öffnen“).
 - **A trailing `…`** (the command asks something before it acts) stays, without a space: „Agent entfernen…“.
-- **Column headings:** Geparkt (On Hold), Offen (Todo), In Arbeit (Doing), Review (Review), Geprüft (Passed),
-  Erledigt (Done). *Erledigt* means merged, *Geprüft* passed its review and waits to be merged. They are short on
-  purpose: the board shows them in capitals, and *Zurückgestellt* and *Zu erledigen* didn't fit their column's header.
+- **Column headings (stages):** Geparkt (On Hold), Offen (Todo), In Arbeit (Active, was Doing), Review (Review),
+  Genehmigt (Approved, was Passed), Wird gemergt (Merging), Erledigt (Done). *Erledigt* means merged (or accepted),
+  *Genehmigt* passed its review (or your approval) and waits to be merged. Hive 1.0 changed *Geprüft* to *Genehmigt*:
+  *Geprüft* read as "checked" (never *Freigegeben*, which reads as "released"). They are short on purpose: the board
+  shows them in capitals, and *Zurückgestellt* and *Zu erledigen* didn't fit their column's header.
 - **Error titles** („Could not add an agent“): a short statement, „Agent konnte nicht hinzugefügt werden“, or a noun
   phrase where space is tight, „Hinzufügen fehlgeschlagen“.
 - **Shortcuts** use the German key names printed on keyboards where Hive shows them so: *Strg* for Ctrl (Hive's
@@ -96,12 +98,29 @@ English, it is as German developers say it.
 | persona | Persona, Personas | |
 | task board / board | Aufgabenboard / Board | *Board* alone in running text. |
 | card | Karte | Never *Aufgabe* for a card; *Aufgaben* only in *Aufgabenboard* and the *Tasks* tab („Aufgaben“), and for work given to an agent (below). |
-| On Hold / Todo / Doing / Review / Passed / Done | Geparkt / Offen / In Arbeit / Review / Geprüft / Erledigt | In running text: „in Review“, „nach Geprüft verschieben“; *park* a card: „parken“. |
+| On Hold / Todo / Active / Review / Approved / Merging / Done | Geparkt / Offen / In Arbeit / Review / Genehmigt / Wird gemergt / Erledigt | The stages (1.0: *Active* was *Doing*, *Approved* was *Passed*; *Genehmigt*, no longer *Geprüft*). In running text: „in Review“, „nach Genehmigt verschieben“, „Karten in „In Arbeit““ where *in In Arbeit* would stumble; *park* a card: „parken“. |
+| category / stage | Kategorie / Phase | A stage is a board column; each is in one of six fixed categories. |
 | decision | Entscheidung | |
 | blocked / stalled | blockiert / festgefahren | |
-| builder / reviewer | Bearbeiter / Reviewer | Roles of agents in a card loop. |
+| builder / reviewer / either | Bearbeiter / Reviewer / beides | Roles of agents in a card loop and in the workflow. Never *Builder*. |
 | card loop / lane / round | Kartenschleife / Lane / Runde | *Lane* as in Swimlane. |
-| merge slot | Merge-Slot | |
+| merge slot | Merge-Slot | An agent's turn to merge its own branch. |
+| merge queue / test merge / Pause queue, Resume queue | Merge-Warteschlange / Test-Merge / Warteschlange anhalten, Warteschlange fortsetzen | A paused queue is *angehalten*, not *pausiert* (that is a lane). |
+| slot / pool / ready (a slot) | Slot / Pool / bereit | A slot is a working folder Hive lends to a card or lane. |
+| review copy / check copy | Review-Kopie / Check-Kopie | Never *Prüfkopie*. |
+| Version Control (the tab), version control / None | Versionsverwaltung / Keine | „Tab „Versionsverwaltung““; *None* in quotes in running text: „auf „Keine“ umstellen“. |
+| workflow / workflow options / preset (Solo, Pair, Team, Custom) | Workflow / Workflow-Optionen / Voreinstellung (Solo, Paar, Team, Benutzerdefiniert) | |
+| rule / old rules / target branch | Regel / alte Regeln / Zielbranch | *Zielbranch* in one word, genitive *des Zielbranchs*. |
+| revision / change / same change | Revision / Änderung / dieselbe Änderung | |
+| check / checks before review / merge checks | Check / Checks vor dem Review / Merge-Checks | |
+| verdict / pass, fail | Urteil / bestanden, nicht bestanden | A reviewer's pass is never a *Zustimmung*; as a noun, „das bestandene Review“, not *das Bestehen*. |
+| carries over / stale | bleibt gültig / veraltet | |
+| approval / Approve / approved (a card) | Zustimmung / Zustimmen / genehmigt | Never *Freigabe* or *freigegeben*, which read as "released". |
+| For you (Decide, Test, Approve, Sign in) | Für dich (Entscheiden, Testen, Zustimmen, Anmelden) | In running text in quotes: „unter „Für dich““. |
+| refused / returned / override, Move anyway | abgelehnt / zurückgegeben / Ausnahme, Trotzdem verschieben | |
+| no-code card / before 1.0 / outside Hive / work (a card's section) | Karte ohne Code / vor 1.0 / außerhalb von Hive / Arbeit | The section in running text: „im Abschnitt „Arbeit““. |
+| paused (a lane) / round limit | pausiert / Rundengrenze | |
+| project key / deliverables / repository root | Projektschlüssel / Ergebnisse / Repository-Stammordner | |
 | inbox / message / wake | Posteingang / Nachricht / wecken | „Hive weckt den Agenten.“ |
 | handover / shared notes | Übergabe / gemeinsame Notizen | |
 | skill / template | Skill / Vorlage | The skill's own name stays (`work-on-card`). |
@@ -116,16 +135,16 @@ English, it is as German developers say it.
 | conversation / transcript | Unterhaltung / Transkript | |
 | compact, compaction | komprimieren, Komprimierung | The button: „Komprimieren“. |
 | an agent's turn | Durchgang | Not *Runde*, which is a card loop's round. |
-| Inherit (a setting's choice) | Geerbt | „Geerbt (Einstellungen: Plan)“. |
-| Working on (a project) | Aktiv | Not *In Arbeit*, which is the Doing column. |
+| Inherit (a setting's choice) | Geerbt | „Geerbt (Einstellungen: Plan)“. The button that inherits again: „Erben“. |
+| Working on (a project) | Aktiv | Not *In Arbeit*, which is the Active stage. |
 | idle | untätig | „Als untätig markieren“. |
 | memory (a CLI's memory files) | Gedächtnis | The project tab „Gedächtnis“. |
 | background tasks | Hintergrundaufgaben | They aren't cards. |
 | a task (work given to an agent: what the Assistant types into its terminal) | Aufgabe | „eine Aufgabe geben“, „keine neue Aufgabe geben“. Not a card. |
 | backup | Sicherung | |
-| staged | bereitgestellt | As VS Code says. |
+| staged | bereitgestellt | As VS Code says. Never *vorgemerkt*. |
 | watch (a card watch) | Beobachtung, Kartenbeobachtung | |
-| Agent Setup | Agent-Einrichtung | |
+| Provider Setup | Anbieter-Einrichtung | |
 | the shipped modes (Coordinator, Planner, QA triager, Release manager) | Koordinator, Planer, QA-Triage, Release-Manager | As `assistant.modes.shipped.*` shows them. |
 
 Common UI words, for consistency:

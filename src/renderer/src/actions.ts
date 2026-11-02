@@ -1,26 +1,43 @@
 import { basename } from './util'
 import { call, errorMessage } from './api'
 import { agentLimit } from './advanced'
-import { agentOf, agentProviderOf, choose, paneCells, shownLayout, closeTile, confirm, findProject, focusAfterRemoving, focusAgent, runOnce, isAssistantPath, setAssistantOpen, focusedAgentId, get, notify, prompt, revealAgent, set, setActivity, setProjectTab, showAgent, showView, useStore } from './store'
-import { MANY_AGENTS, agentLimitText, chosenLayout, layoutColumns, layoutPanes, moveAgentTo, projectLayout, projectSessionView, sessionInAgentFolder, swapAgentsIn } from '@shared/defaults'
+import { cliReadyOf, firstReadyConnection, offeredConnections } from '@shared/connectionLabel'
+import { agentOf, cancelDialog, agentProviderOf, cardLabelOf, choose, openVersionControl, paneCells, shownLayout, closeTile, confirm, findProject, focusAfterRemoving, focusAgent, runOnce, whileStarting, ADDING_AGENT, isAssistantPath, setAssistantOpen, focusedAgentId, get, notify, prompt, revealAgent, set, setActivity, setProjectTab, showAgent, showView, useStore } from './store'
+import { AGENT_LIMIT_MAX, MANY_AGENTS, OPEN_WORKFLOW_OPTIONS, agentLimitText, chosenLayout, layoutColumns, layoutPanes, moveAgentTo, projectLayout, projectSessionView, sessionInAgentFolder, swapAgentsIn } from '@shared/defaults'
 import { moveToCell, neighbourCell, orderByCells, type CellDirection } from '@shared/paneCells'
-import { defaultProviderPending, isProviderEnabled, projectDefaultProvider, providerName } from '@shared/providers'
-import { agentsToResume, resumeAll, stalledOnSignIn } from '@shared/resumeAll'
+import { autoProvider, autoProviderPending, isKnownProvider, isProviderEnabled, providerName } from '@shared/providers'
+import { agentsToResume, resumeAll, stalledOnSignIn, type ResumeAllResult } from '@shared/resumeAll'
+import { holdShort, holdText } from '@shared/sessionResume'
+import type { FreshRow } from '@shared/freshStarts'
+import type { ResumeHold } from '@shared/agentFolders'
+import { samePath } from '@shared/movePaths'
+import { legacyOf, namedFolder } from './agentPlace'
 import { eachAgent, sessionsToArchive, type BatchResult } from '@shared/startAll'
-import { serverOnIn } from '@shared/agentMcp'
+import { serverAddedIn } from '@shared/agentMcp'
 import { shownText } from '@shared/advanced'
 import { fmt, tr } from '@shared/i18n'
 import { msg } from '@shared/i18n/msg'
 import { HAND_OVER_TEXT } from '@shared/handOver'
-import type { McpServerInfo, OldWorktreeOutcome, ProjectInfo, ProjectProviderConfig, ProviderId, SessionLayout, SessionListItem, SessionView, ToastAction } from '@shared/types'
-import { TEMPLATE_NAME_MAX, type TemplateEntry, type TemplateScope } from '@shared/templates'
-import { oldWorktreesNotice, templateLoadDetail } from '@shared/templateLoad'
+import type { McpCatalogRow, McpServerInfo, ProjectInfo, ProviderId, SessionLayout, SessionListItem, SessionView, TemplateLoadPlan, ToastAction } from '@shared/types'
+import type { TemplateWorkflow } from '@shared/workflow/templateOptions'
+import { TEMPLATE_NAME_MAX, namesFollowKey, templateAgentNames, usesKey, type TemplateEntry, type TemplateScope } from '@shared/templates'
+import { PLATFORM_NAME } from '@shared/platform/switching'
+import { templateLoadDetail } from '@shared/templateLoad'
+import { PRESET_TEXT } from '@shared/workflow/optionTexts'
+import { WORKFLOW_ROLE_TEXT } from '@shared/workflow/roles'
+import { agentNameProblem, nameTaken, nameTakenMessage, suggestTemplateAgentName, workspaceAgentList } from '@shared/agentNames'
 import { formatTokens, type SessionAction } from './util'
+import { movesShown } from './pendingMoves'
 import { createElement } from 'react'
 import { TemplateLoadNames } from './components/TemplateLoad'
+import { ChooseConnectionsBody } from './components/TemplateConnections'
+import { loadFallback, type ConnectionAnswers, type ConnectionsApplied } from '@shared/templateConnections'
 import { McpProjectPicker } from './components/McpProjectPicker'
+import { McpServerPicker } from './components/McpServerPicker'
 import { AgentsDetail, batchAgentsData, projectAgentsData, tableText } from './components/AgentsTable'
 import { clearEditorDraft, clearEditorDraftsUnder } from './editorDrafts'
+import { keyProblemText, keysHeld } from './projectKeys'
+import { cardLabel, normalKey, suggestKey } from '@shared/projectKeys'
 
 /** Runs an async action and shows a toast if it fails. */
 /**
@@ -28,8 +45,11 @@ import { clearEditorDraft, clearEditorDraftsUnder } from './editorDrafts'
  * over now (#1057; Hive checks, knowing the lanes and merge slots as they are: a notice can be old by then), else a notice
  * that it can when it has finished.
  */
-export async function handOverLongConversation(path: string, agentId: string): Promise<void> {
-  if (await call('session:mayHandOverNow', path, agentId).catch(() => false)) set({ handOverFor: { project: path, agentId } })
+export async function handOverLongConversation(path: string, agentId: string, sessionId?: string): Promise<void> {
+  // From its notice, for the conversation it was about (HI-2320): another now, the notice says so, and nothing opens.
+  const may = sessionId ? await call('session:handOverOffer', path, agentId, sessionId).catch(() => 'busy' as const) : (await call('session:mayHandOverNow', path, agentId).catch(() => false)) ? 'ok' : 'busy'
+  if (may === 'stale') return
+  if (may === 'ok') set({ handOverFor: { project: path, agentId } })
   else notify('info', tr(HAND_OVER_TEXT.notNow, { agent: findProject(get(), path)?.agents.find((a) => a.id === agentId)?.name ?? agentId }), tr(HAND_OVER_TEXT.notNowText))
 }
 
@@ -59,7 +79,7 @@ const listFailed = (): string => tr(msg({ id: 'actions.session.listFailed', defa
 
 /** Why a batch couldn't run an agent: its CLI is off or not installed (thrown, then listed in the batch's report). */
 const providerOff = (cli: string): string => tr(msg({ id: 'actions.batch.providerOff', defaultMessage: '{cli} is turned off in Settings → Providers.', description: "Why an agent couldn't start or resume in a batch (Resume All, Start New All): its CLI ({cli}) is turned off. Settings → Providers is where: use its translated names." }), { cli })
-const providerMissing = (cli: string): string => tr(msg({ id: 'actions.batch.providerMissing', defaultMessage: "{cli} isn't installed (Agent Setup).", description: "Why an agent couldn't start or resume in a batch: its CLI ({cli}) isn't installed. Agent Setup is a Help window: use its translated name." }), { cli })
+const providerMissing = (cli: string): string => tr(msg({ id: 'actions.batch.providerMissing', defaultMessage: "{cli} isn't installed (Provider Setup).", description: "Why an agent couldn't start or resume in a batch: its CLI ({cli}) isn't installed. Provider Setup is a Help window: use its translated name." }), { cli })
 
 /** A batch's report: each failure, then the agents it did ({done}: "Resumed: B1, B2"), one a line. */
 function batchReport(failed: readonly { name: string; error: string }[], doneLine: string | null, trail: readonly string[] = []): string {
@@ -111,7 +131,7 @@ export async function saveUnsavedFirst(action: UnsavedAction): Promise<boolean> 
 
 export async function refreshWorkspace(): Promise<void> {
   const ws = await call('workspace:refresh')
-  set({ workspace: ws })
+  set({ workspace: movesShown.keep(ws) })
 }
 
 export async function openWorkspace(path?: string): Promise<void> {
@@ -187,6 +207,9 @@ export async function closeWorkspace(): Promise<void> {
 
 export async function createProject(): Promise<void> {
   if (!get().workspace) return notify('warning', tr(msg({ id: 'actions.project.noWorkspace', defaultMessage: 'Open a workspace first', description: "A warning: a project can't be created without an open workspace." })))
+  // Its key (#1221): suggested from the name as it is typed, until the user types one; checked as it changes.
+  const held = keysHeld()
+  let key = ''
   const name = await prompt({
     title: tr(msg({ id: 'actions.project.newTitle', defaultMessage: 'New Project', description: 'Title of the New Project dialog.' })),
     message: tr(msg({ id: 'actions.project.newMessage', defaultMessage: 'A new folder is created in the workspace. Hive adds its .hive metadata folder automatically.', description: 'The New Project dialog. Keep .hive as it is.' })),
@@ -199,14 +222,27 @@ export async function createProject(): Promise<void> {
           ? tr(msg({ id: 'actions.project.nameChars', defaultMessage: 'Names cannot contain {chars}', description: "Why a new project's name can't be used: it has a character Windows doesn't allow in a folder name ({chars}: the characters)." }), { chars: '< > : " / \\ | ? *' })
           : v.trim().startsWith('.')
             ? tr(msg({ id: 'actions.project.nameDot', defaultMessage: 'Names cannot start with "."', description: "Why a new project's name can't be used: it starts with a dot." }))
-            : null
+            : null,
+    second: {
+      label: tr(msg({ id: 'actions.project.key', defaultMessage: 'Key', description: "The New Project dialog: the label of the project's key box (2–4 letters, such as AM, that its cards are named by: AM-12)." })),
+      hint: (k) => (normalKey(k) ? tr(msg({ id: 'actions.project.keyHint', defaultMessage: 'Its cards are named {first}, {second} and so on. You can change the key later in Project Settings.', description: 'Under the key box of the New Project dialog. {first} and {second} are the first two card names with the key typed, such as AM-1 and AM-2.' }), { first: `${normalKey(k)}-1`, second: `${normalKey(k)}-2` }) : ''),
+      follow: (v) => (v.trim() ? suggestKey(v.trim(), '', held) : ''),
+      // Left empty, Hive suggests one, as for a folder opened.
+      validate: (k) => (k.trim() ? keyProblemText(k, '', held) : null),
+      set: (k) => (key = k)
+    }
   })
   if (!name) return
-  const ws = await attempt(tr(msg({ id: 'actions.project.createFailed', defaultMessage: 'Could not create project', description: "An error's title: creating a project failed." })), () => call('project:create', name.trim()))
+  const ws = await attempt(tr(msg({ id: 'actions.project.createFailed', defaultMessage: 'Could not create project', description: "An error's title: creating a project failed." })), () => call('project:create', name.trim(), normalKey(key) || null))
   if (!ws) return
   const created = ws.projects.find((p) => p.name === name.trim())
   set({ workspace: ws, selectedProject: created?.path ?? get().selectedProject })
   showView('projects')
+  // Its Version Control tab, at "How do you work?" (#1423): no notice for it, the step is in front of the user.
+  if (created) {
+    set({ presetStepShown: [...get().presetStepShown, created.path] })
+    openVersionControl(created.path, 'workflow')
+  }
   notify('success', tr(msg({ id: 'actions.project.created', defaultMessage: 'Project "{name}" created', description: 'A notification: a new project ({name}) was created.' }), { name: name.trim() }))
 }
 
@@ -239,7 +275,7 @@ export async function setProjectActive(path: string, active: boolean): Promise<v
     }
     return call('project:setActive', path, active)
   })
-  if (ws) set({ workspace: ws })
+  if (ws) set({ workspace: movesShown.keep(ws) })
 }
 
 /** Waits until an agent's session (or, without agentId, every agent of the project) has stopped. */
@@ -260,8 +296,8 @@ async function ensureAgent(path: string, agentId: string, resumes?: ProviderId):
   const a = (): ReturnType<typeof agentOf> => agentOf(project(path), agentId)
   // Automatic's pick matters only to an agent that follows it and isn't running (a running one has its provider).
   const provider = await detectedProvider(
-    () => resumes ?? agentProviderOf(project(path), a()),
-    () => !resumes && !a()?.live && !a()?.provider && defaultProviderPending(project(path)?.config, get().settings)
+    () => resumes ?? agentProviderOf(a()),
+    () => !resumes && !a()?.live && !a()?.provider && autoProviderPending(get().settings)
   )
   if (!provider) return false
   const name = providerName(provider)
@@ -284,8 +320,31 @@ async function ensureAgent(path: string, agentId: string, resumes?: ProviderId):
 /**
  * A provider once Hive has looked for the CLIs it depends on (#506), at most 20 s: at start, Automatic's pick (when
  * `auto` says it is used) and whether a CLI is installed aren't known yet, and deciding then would pick the wrong
- * provider or open Agent Setup. Null, said to the user, when Hive is still looking after that: nothing is decided from a guess.
+ * provider or open Provider Setup. Null, said to the user, when Hive is still looking after that: nothing is decided from a guess.
  */
+/**
+ * The connection a new agent gets (firstReadyConnection), once Hive knows whether the CLIs before it are installed: null
+ * (and said) when it still doesn't after 20 s.
+ */
+async function readyConnection(view: Parameters<typeof firstReadyConnection>[0], cli?: ProviderId): Promise<{ id?: string } | null> {
+  const now = (): ReturnType<typeof firstReadyConnection> => firstReadyConnection(view, get().settings, cliReadyOf(get().providers), cli)
+  if (!now().checking) return now()
+  const ok = await new Promise<boolean>((done) => {
+    const stop = (v: boolean): void => {
+      clearTimeout(timer)
+      unsubscribe()
+      done(v)
+    }
+    const timer = setTimeout(() => stop(false), 20_000)
+    const unsubscribe = useStore.subscribe(() => {
+      if (!now().checking) stop(true)
+    })
+  })
+  if (ok) return now()
+  notify('warning', tr(LOOKING.title), tr(LOOKING.message))
+  return null
+}
+
 async function detectedProvider(resolve: () => ProviderId, auto: () => boolean): Promise<ProviderId | null> {
   const settled = (): boolean => {
     const i = get().providers[resolve()]
@@ -304,22 +363,50 @@ async function detectedProvider(resolve: () => ProviderId, auto: () => boolean):
     })
   })
   if (ok) return resolve()
-  notify(
-    'warning',
-    tr(msg({ id: 'actions.provider.lookingTitle', defaultMessage: 'Still looking for the coding agents', description: "A warning's title: Hive hasn't finished finding which coding agent CLIs are installed." })),
-    tr(msg({ id: 'actions.provider.lookingMessage', defaultMessage: 'Hive is still finding out which coding agent CLIs are installed. Try again in a moment.', description: 'Under the warning that Hive is still looking for the coding agent CLIs.' }))
-  )
+  notify('warning', tr(LOOKING.title), tr(LOOKING.message))
   return null
+}
+
+/** Said when Hive hasn't finished finding which CLIs are installed. */
+const LOOKING = {
+  title: msg({ id: 'actions.provider.lookingTitle', defaultMessage: 'Still looking for the coding agents', description: "A warning's title: Hive hasn't finished finding which coding agent CLIs are installed." }),
+  message: msg({ id: 'actions.provider.lookingMessage', defaultMessage: 'Hive is still finding out which coding agent CLIs are installed. Try again in a moment.', description: 'Under the warning that Hive is still looking for the coding agent CLIs.' })
+}
+
+/**
+ * A slot the agent holds whose folder is gone (#1447): made again on its line, with its commits, and the agent started,
+ * its lease kept; or released (the slot is made again at its next lease) when its line is gone or the user prefers.
+ */
+async function goneSlot(path: string, agentId: string, gone: { agentName: string; path: string; branch: string; branchExists: boolean; slot?: string }): Promise<boolean> {
+  const release = { label: tr(msg({ id: 'actions.slot.release', defaultMessage: 'Release the Slot', description: "Button: the agent gives up the slot whose folder is gone; Hive makes the slot again the next time it lends it." })), value: 'release' }
+  const choice = await choose({
+    title: tr(msg({ id: 'actions.slot.goneTitle', defaultMessage: 'The slot is gone', description: "Title of the question when the folder of a slot an agent holds (a working folder Hive lends it for a card or lane) is missing." })),
+    message: gone.branchExists
+      ? tr(msg({ id: 'actions.slot.goneMessage', defaultMessage: "{agent}'s slot {slot} is missing its folder ({path}). Its branch {branch} is still in the repository: make the slot again on it, with its commits, and start?", description: "The question when a slot's ({slot}) folder ({path}) is missing; the agent ({agent}) holds it, and its branch ({branch}) is still there." }), { agent: gone.agentName, slot: gone.slot ?? '', path: gone.path, branch: gone.branch })
+      : tr(msg({ id: 'actions.slot.goneNoBranch', defaultMessage: "{agent}'s slot {slot} is missing its folder ({path}), and its branch is gone too. Release the slot? Hive makes it again the next time it lends it.", description: "The question when a slot's ({slot}) folder ({path}) and its branch are missing; the agent ({agent}) holds it." }), { agent: gone.agentName, slot: gone.slot ?? '', path: gone.path }),
+    detail: tr(msg({ id: 'actions.slot.goneDetail', defaultMessage: 'If the workspace moved, Repair… in its banner can also locate the folder.', description: "Under the question when a slot's folder is missing: Repair… is a button in the workspace's banner." })),
+    choices: gone.branchExists ? [release, { label: tr(msg({ id: 'actions.slot.recreate', defaultMessage: 'Recreate and Start', description: 'Button: makes the slot again on its branch and starts the agent.' })), value: 'recreate' }] : [release]
+  })
+  if (choice === 'release') {
+    await attempt(tr(msg({ id: 'actions.slot.releaseFailed', defaultMessage: 'Could not release the slot', description: "An error's title: releasing a slot whose folder is gone failed." })), () => call('agents:unlinkWorktree', path, agentId))
+    return false
+  }
+  if (choice !== 'recreate') return false
+  return !!(await attempt(tr(msg({ id: 'actions.slot.recreateFailed', defaultMessage: 'Could not make the slot again', description: "An error's title: making a slot whose folder was gone again failed." })), () => call('agents:recreateWorktree', path, agentId)))
 }
 
 /**
  * A worktree agent whose folder is gone (#146): its branch lives in the repository, so the worktree can be made again
- * on it before the agent starts (or, with the branch gone too, made new from its base, or the link removed).
+ * on it before the agent starts (or, with the branch gone too, made new from its base, or the link removed). An agent
+ * whose 0.9 worktree was missing at the 1.0 upgrade isn't migrated (#1441), so this is still its way back; a slot it
+ * holds is #1447's (`goneSlot`).
  */
 async function ensureWorktree(path: string, agentId: string): Promise<boolean> {
-  if (!agentOf(project(path), agentId)?.worktree) return true
+  // Its 0.9 worktree, or a slot it holds (#1447): asked of main for every agent, since a slot isn't on the agent.
+  if (!agentOf(project(path), agentId)) return true
   const gone = await call('agents:missingWorktree', path, agentId).catch(() => null)
   if (!gone) return true
+  if (gone.slot) return goneSlot(path, agentId, gone)
   const setup = tr(msg({ id: 'actions.worktree.setup', defaultMessage: "Hive copies in the files it copies into new worktrees, and the project's worktree setup command, if it has one, runs before the agent starts. Nothing is deleted.", description: "Under the question before recreating an agent's missing worktree: what making it again involves." }))
   if (gone.branchExists) {
     return confirm({
@@ -357,20 +444,37 @@ async function ensureWorktree(path: string, agentId: string): Promise<boolean> {
 export async function quickAddAgent(path: string | null = get().selectedProject, forProvider?: ProviderId): Promise<string | null> {
   if (!path) return null
   const p = project(path)
-  if (p && p.agents.length >= agentLimit()) {
-    notify('warning', tr(msg({ id: 'actions.agent.noRoom', defaultMessage: 'No room for another agent', description: "A warning's title: the project has as many agents as it may have." })), tr(msg({ id: 'actions.agent.noRoomMessage', defaultMessage: '{why} Remove one first.', description: 'Under the warning that a project has no room for another agent: {why} says the limit and where it is set.' }), { why: agentLimitText(agentLimit(), tr) }))
+  const limit = agentLimit(p)
+  if (p && p.agents.length >= limit) {
+    // At its Maximum agents (HI-2058), the way to raise it; at the most any project has, removing one is the only way.
+    const raise = limit < AGENT_LIMIT_MAX ? [{ label: tr(OPEN_WORKFLOW_OPTIONS), command: 'project.openVersionControl', args: [p.path, 'workflow'] }] : undefined
+    notify('warning', tr(msg({ id: 'actions.agent.noRoom', defaultMessage: 'No room for another agent', description: "A warning's title: the project has as many agents as it may have." })), raise ? agentLimitText(tr, limit) : tr(msg({ id: 'actions.agent.noRoomMessage', defaultMessage: '{why} Remove one first.', description: 'Under the warning that a project has no room for another agent: {why} says the limit and where it is set.' }), { why: agentLimitText(tr) }), raise)
     return null
   }
-  const provider = await detectedProvider(
-    () => forProvider ?? projectDefaultProvider(project(path)?.config, get().settings),
-    () => !forProvider && defaultProviderPending(project(path)?.config, get().settings)
-  )
-  if (!provider) return null
-  if (!isProviderEnabled(get().settings, provider) || !get().providers[provider]?.found) {
+  // Decision A (HI-2108): the first usable connection in the order of accounts (a session's CLI's, when resuming one),
+  // its CLI on and installed, as main's firstUsableAccount: waited for while Hive still looks for a CLI before it. Its CLI
+  // follows from it. Connections here but none on an installed CLI: the dialog, which says why. None usable here (no
+  // account on, or a test copy on its CLI test home): the first CLI on and installed, as main's prepareAgent.
+  const view = await call('connections:list').catch(() => null)
+  const first = await readyConnection(view, forProvider)
+  if (!first) return null
+  if (!first.id && offeredConnections(view, get().settings, forProvider).length) {
     set({ addAgentFor: path })
     return null
   }
-  const def = await attempt(tr(msg({ id: 'actions.agent.addFailed', defaultMessage: 'Could not add an agent', description: "An error's title: adding an agent failed." })), () => call('agents:add', path, { location: 'project', provider }))
+  const connection = first.id
+  const provider = connection
+    ? undefined
+    : await detectedProvider(
+        () => forProvider ?? autoProvider(get().settings),
+        () => !forProvider && autoProviderPending(get().settings)
+      )
+  if (!connection && !provider) return null
+  if (provider && (!isProviderEnabled(get().settings, provider) || !get().providers[provider]?.found)) {
+    set({ addAgentFor: path })
+    return null
+  }
+  const def = await attempt(tr(msg({ id: 'actions.agent.addFailed', defaultMessage: 'Could not add an agent', description: "An error's title: adding an agent failed." })), () => call('agents:add', path, connection ? { connection } : { provider: provider ?? undefined }))
   if (!def) return null
   await refreshWorkspace()
   noteManyAgents(path)
@@ -384,14 +488,6 @@ export async function quickAddAgent(path: string | null = get().selectedProject,
 export function noteManyAgents(path: string): void {
   const n = project(path)?.agents.length ?? 0
   if (n === MANY_AGENTS) notify('info', tr(msg({ id: 'actions.agent.manyTitle', defaultMessage: '{n} agents in this project', description: "A notification's title when a project gets its seventh agent ({n})." }), { n }), tr(msg({ id: 'actions.agent.manyMessage', defaultMessage: "Each agent runs its own copy of its CLI (roughly 200–500 MB of memory each), and they all share your plan's usage limits.", description: 'Under the notification that a project has many agents: what each costs.' })))
-}
-
-/** Changes a project's settings for one provider. */
-export async function updateProjectProvider(path: string, provider: ProviderId, patch: Partial<ProjectProviderConfig>): Promise<void> {
-  const p = project(path)
-  if (!p) return
-  await attempt(tr(msg({ id: 'actions.project.saveFailed', defaultMessage: 'Could not save project settings', description: "An error's title: saving a project's settings failed." })), () => call('project:updateProvider', path, provider, patch))
-  await refreshWorkspace()
 }
 
 /** " (Agent 2)" in projects with several agents, else nothing — for dialog wording. */
@@ -436,9 +532,18 @@ function reveal(path: string, agentId: string): void {
 
 export async function newSession(path: string | null = get().selectedProject, agentId?: string, opts: { skipSetup?: boolean } = {}): Promise<void> {
   if (!path) return
-  // A project without agents gets one (the quick add) and starts it.
-  const id = agentId ?? focusedAgentId(project(path)) ?? (await quickAddAgent(path))
-  if (!id) return
+  // Its buttons show it starting from the click until it runs (#1177), while a project without agents gets one (the
+  // quick add) too.
+  const what = { kind: 'start' as const, ...(opts.skipSetup ? { skipSetup: true } : {}) }
+  const known = agentId ?? focusedAgentId(project(path))
+  if (known) return void (await whileStarting(path, known, what, () => startNew(path, known, opts)))
+  await whileStarting(path, ADDING_AGENT, what, async () => {
+    const id = await quickAddAgent(path)
+    if (id) await whileStarting(path, id, what, () => startNew(path, id, opts))
+  })
+}
+
+async function startNew(path: string, id: string, opts: { skipSetup?: boolean }): Promise<void> {
   if (!(await ensureAgent(path, id))) return
   if (!(await stopIfRunning(path, id, { what: 'new' }, 'start'))) return
   const st = await attempt(tr(msg({ id: 'actions.session.startFailed', defaultMessage: 'Could not start session', description: "An error's title: starting a session failed." })), () => call('session:start', path, { agentId: id, skipSetup: opts.skipSetup }))
@@ -451,38 +556,61 @@ export async function newSession(path: string | null = get().selectedProject, ag
  * none does). For the project folder: the agent asked for, else one that isn't running — the agent that last ran it,
  * the focused one, another of its provider, any other in the folder — else the agent that ran it.
  */
-export function resumeTarget(p: ProjectInfo | undefined, item: Pick<SessionListItem, 'agentId' | 'cwd'> & { provider?: ProviderId }, preferred?: string): string | null {
+export function resumeTarget(p: ProjectInfo | undefined, item: Pick<SessionListItem, 'agentId' | 'cwd' | 'slot'> & { provider?: ProviderId }, preferred?: string): string | null {
   if (!p) return preferred ?? null
   // The Hive Assistant's sessions ran in the workspace folder, with its one agent.
   if (isAssistantPath(p.path)) return p.agents[0]?.id ?? null
-  if (item.cwd && item.cwd.toLowerCase() !== p.path.toLowerCase()) return p.agents.find((x) => x.worktree?.path.toLowerCase() === item.cwd!.toLowerCase())?.id ?? null
-  const inFolder = (id: string | undefined): boolean => !!id && p.agents.some((a) => a.id === id && !a.worktree)
+  // One in a slot resumes with its own agent (#1434: one writer per slot), if it is still there.
+  if (item.slot) return p.agents.find((a) => a.id === item.agentId)?.id ?? null
+  // One in a 0.9 worktree resumes with the agent still working there; one in a retired home with its own agent (#1442).
+  const cwd = item.cwd
+  if (cwd && !samePath(cwd, p.path)) return p.agents.find((x) => { const l = legacyOf(x); return !!l && samePath(l.path, cwd) })?.id ?? (namedFolder(p, cwd)?.is === 'home' ? (p.agents.find((a) => a.id === item.agentId)?.id ?? null) : null)
+  // An agent on its 0.9 worktree works only there; any other can resume a conversation of the project folder there.
+  const inFolder = (id: string | undefined): boolean => !!id && p.agents.some((a) => a.id === id && !legacyOf(a))
   const free = (id: string | undefined): boolean => inFolder(id) && !agentOf(p, id!)?.live
   if (inFolder(preferred)) return preferred!
   const recorded = item.agentId
   const focused = focusedAgentId(p) ?? undefined
   if (free(recorded)) return recorded!
   if (free(focused)) return focused!
-  const idle = p.agents.filter((a) => !a.worktree && !a.live)
-  const other = (idle.find((a) => item.provider && agentProviderOf(p, a) === item.provider) ?? idle[0])?.id
-  return other ?? (inFolder(recorded) ? recorded! : (p.agents.find((a) => !a.worktree)?.id ?? null))
+  const idle = p.agents.filter((a) => !legacyOf(a) && !a.live)
+  const other = (idle.find((a) => item.provider && agentProviderOf(a) === item.provider) ?? idle[0])?.id
+  return other ?? (inFolder(recorded) ? recorded! : (p.agents.find((a) => !legacyOf(a))?.id ?? null))
 }
 
-/** Agents that can run a session: those working in the folder it ran in (it runs in its own provider in any of them). */
-export function agentsForSession(p: ProjectInfo, item: Pick<SessionListItem, 'cwd'>): ProjectInfo['agents'] {
+/**
+ * Agents that can run a session: those working in the folder it ran in (it runs in its own provider in any of them); one
+ * in a slot only its own agent (#1434: one writer per slot).
+ */
+export function agentsForSession(p: ProjectInfo, item: Pick<SessionListItem, 'cwd' | 'slot' | 'agentId'>): ProjectInfo['agents'] {
+  if (item.slot) return p.agents.filter((a) => a.id === item.agentId)
   return p.agents.filter((a) => sessionInAgentFolder(p.path, a, item))
 }
 
-export async function resumeSession(path: string, item: Pick<SessionListItem, 'id' | 'recache' | 'title' | 'name' | 'agentId' | 'cwd'> & { provider?: ProviderId }, agentId?: string): Promise<void> {
+type ResumeItem = Pick<SessionListItem, 'id' | 'recache' | 'title' | 'name' | 'agentId' | 'agentName' | 'cwd' | 'slot' | 'hold'> & { provider?: ProviderId }
+
+export async function resumeSession(path: string, item: ResumeItem, agentId?: string): Promise<void> {
+  // Its buttons show it resuming from the click until it runs (#1177): under its agent, or, with none to run it yet,
+  // under the session itself while one is added for it.
+  const target = resumeTarget(project(path), item, agentId)
+  await whileStarting(path, target ?? `${ADDING_AGENT}:${item.id}`, { kind: 'resume', sessionId: item.id }, () => resume(path, item, target, agentId))
+}
+
+/** Resumes it in its agent; `held` is the agent already shown resuming (another one added for it is shown too). */
+async function resume(path: string, item: ResumeItem, held: string | null, agentId?: string): Promise<void> {
   let p = project(path)
   let target = resumeTarget(p, item, agentId)
   // A session from the project folder, and the project has no agent there: add one of its provider.
   const inProjectFolder = !item.cwd || item.cwd.toLowerCase() === path.toLowerCase()
   if (!target && isAssistantPath(path)) return
-  if (!target && inProjectFolder && item.provider && (p?.agents.length ?? 0) < agentLimit()) {
+  if (!target && inProjectFolder && item.provider && (p?.agents.length ?? 0) < agentLimit(p)) {
     target = await quickAddAgent(path, item.provider)
     if (!target) return
     p = project(path)
+  }
+  if (target && target !== held) {
+    const added = target
+    return void (await whileStarting(path, added, { kind: 'resume', sessionId: item.id }, () => resume(path, item, added, added)))
   }
   if (!target) {
     const inWorktree = item.cwd && p && item.cwd.toLowerCase() !== p.path.toLowerCase()
@@ -518,25 +646,48 @@ export async function resumeSession(path: string, item: Pick<SessionListItem, 'i
     if (!choice) return
     if (choice === 'fresh') {
       const archived = await attempt(tr(msg({ id: 'actions.recache.archiveFailed', defaultMessage: '{what, select, conversation {Could not archive conversation} other {Could not archive session}}', description: "An error's title: archiving a session (other) or an Assistant conversation failed." }), { what }), () => call('session:archive', path, item.id, true).then(() => true))
-      if (archived) await newSession(path, target)
+      if (archived) await startNew(path, target, {})
       return
     }
   }
+  // Its slot holds other work, or isn't as it left it (#1434): said with what can be done instead, before anything stops.
+  if (item.hold && item.hold.is !== 'byHand') return heldResume(path, item, item.hold, target)
   if (!(await stopIfRunning(path, target, { what: 'resume' }, 'resume'))) return
   const st = await attempt(tr(msg({ id: 'actions.session.resumeFailed', defaultMessage: 'Could not resume session', description: "An error's title: resuming a session failed." })), () => call('session:start', path, { resumeId: item.id, name: item.name, agentId: target }))
   if (st) reveal(path, target)
 }
 
+/**
+ * A conversation that can't resume where it was made (#1434): why, with its transcript to read (the Sessions tab) or a
+ * fresh start from a handover for its agent (Hand Over to…), whose new conversation starts where the agent works now.
+ */
+function heldResume(path: string, item: ResumeItem, hold: ResumeHold, agentId: string): void {
+  const agent = agentOf(project(path), agentId)?.name ?? item.agentName ?? ''
+  notify('warning', tr(msg({ id: 'actions.resume.heldTitle', defaultMessage: "Can't resume here now", description: "A warning's title (#1434): the conversation can't resume in the slot it ran in (the message says why: its slot holds other work, changed, or its agent builds elsewhere)." })), shownText(holdText(hold, agent)), [
+    { label: tr(msg({ id: 'actions.resume.readTranscript', defaultMessage: 'Read Transcript', description: "A button in the warning that a conversation can't resume where it ran (#1434): opens it in the Sessions tab." })), command: 'session.showTranscript', args: [path, item.id] },
+    { label: tr(msg({ id: 'actions.resume.startFresh', defaultMessage: 'Start Fresh with a Handover', description: "A button in the warning that a conversation can't resume where it ran (#1434): opens Hand Over to… for its agent, which starts a new conversation from a handover." })), command: 'session.handOverTo', args: [path, agentId] }
+  ])
+}
+
 export async function resumeLast(path: string | null = get().selectedProject, agentId?: string): Promise<void> {
   if (!path) return
-  // A project without agents gets one (the quick add), which resumes the latest session it can.
-  const id = agentId ?? focusedAgentId(project(path)) ?? (await quickAddAgent(path))
-  if (!id) return
+  // From the click, while it reads the sessions too (#1177), and while a project without agents gets one (the quick
+  // add), which resumes the latest session it can.
+  const known = agentId ?? focusedAgentId(project(path))
+  const latest = (id: string): Promise<void | undefined> => whileStarting(path, id, { kind: 'resume', sessionId: agentOf(project(path), id)?.resume?.id }, () => resumeLatest(path, id))
+  if (known) return void (await latest(known))
+  await whileStarting(path, ADDING_AGENT, { kind: 'resume' }, async () => {
+    const id = await quickAddAgent(path)
+    if (id) await latest(id)
+  })
+}
+
+async function resumeLatest(path: string, id: string): Promise<void> {
   const p = project(path)
   const a = agentOf(p, id)
   // Hive works out the session in the main process (AgentInfo.resume), skipping any open in another agent.
   const list = a?.resume ? await attempt(listFailed(), () => call('session:list', path)) : []
-  const last = a?.resume ? (list ?? []).find((s) => s.id === a.resume!.id) ?? { id: a.resume.id, name: a.resume.name, title: null, recache: null, agentId: id, cwd: a.worktree?.path, provider: agentProviderOf(p, a) } : null
+  const last = a?.resume ? (list ?? []).find((s) => s.id === a.resume!.id) ?? { id: a.resume.id, name: a.resume.name, title: null, recache: null, agentId: id, cwd: legacyOf(a)?.path, provider: agentProviderOf(a) } : null
   if (!last) {
     notify(
       'info',
@@ -545,7 +696,7 @@ export async function resumeLast(path: string | null = get().selectedProject, ag
     )
     return
   }
-  await resumeSession(path, last, id)
+  await resume(path, last, id, id)
 }
 
 export async function stopSession(path: string | null = get().selectedProject, agentId?: string): Promise<void> {
@@ -604,10 +755,29 @@ export function resumeAllAgents(path: string): Promise<void> {
   return runOnce(`resumeAll:${path}`, () => resumeAll_(path)).then(() => undefined)
 }
 
+/**
+ * Resume All's report of the agents it left (#1434): their conversations can't resume where they were made now (their
+ * slot is free, so only their own Resume takes it; or it holds other work), one line each with why ("• HB2: its slot is
+ * free. Resume it by hand to take it"), and for each a Show that opens the Sessions tab on that conversation, where its
+ * Resume, its transcript and Start Fresh with a Handover are.
+ */
+function heldReport(path: string, held: ResumeAllResult['held']): { title: string; lines: string; actions: ToastAction[] } {
+  return {
+    title: tr(msg({ id: 'actions.resumeAll.heldTitle', defaultMessage: '{n, plural, one {Resume All left one agent} other {Resume All left # agents}}', description: "A notification's title after Resume All (#1434): it left {n} agents stopped, whose conversations can't resume now where they ran (a slot that is free, so only their own Resume takes it, or holds other work); the lines below say why." }), { n: held.length }),
+    lines: held.map((h) => tr(msg({ id: 'actions.resumeAll.heldLine', defaultMessage: '• {agent}: {why}', description: "A line of Resume All's report of the agents it left (#1434): the agent ({agent}) and why, in plain words ({why}: \"its slot is free. Resume it by hand to take it\", \"its slot now holds AM-14's work\", \"after AM-14\")." }), { agent: h.name, why: shownText(holdShort(h.hold)) })).join('\n'),
+    actions: held.map((h) => ({ label: tr(msg({ id: 'actions.resumeAll.show', defaultMessage: 'Show {agent}', description: "A button in Resume All's report of the agents it left (#1434): opens the Sessions tab on that agent's ({agent}) conversation, where it can be resumed by hand, read, or started fresh with a handover." }), { agent: h.name }), command: 'session.showTranscript', args: [path, h.id] }))
+  }
+}
+
 async function resumeAll_(path: string): Promise<void> {
   const p = project(path)
   if (!p) return
   const stopped = agentsToResume(p.agents)
+  const left = p.agents.flatMap((a) => (!a.live && a.resume?.hold ? [{ name: a.name, hold: a.resume.hold, id: a.resume.id }] : []))
+  if (!stopped.length && left.length) {
+    const r = heldReport(path, left)
+    return notify('info', r.title, r.lines, r.actions)
+  }
   if (!stopped.length) return notify('info', tr(msg({ id: 'actions.resumeAll.nothing', defaultMessage: 'Nothing to resume', description: "A notification's title: Resume All found no agent to resume." })), tr(msg({ id: 'actions.resumeAll.nothingMessage', defaultMessage: 'No stopped agent has a session to resume.', description: 'Under the notification that Resume All found nothing to resume.' })))
   const list = (await attempt(listFailed(), () => call('session:list', path))) ?? []
   const cold = stopped.flatMap((a) => {
@@ -630,13 +800,22 @@ async function resumeAll_(path: string): Promise<void> {
   const result = await resumeAll(project(path)?.agents ?? [], async (a) => {
     // Running, stopped mid-turn by a refused sign-in: a short "carry on" (its CLI resumes nothing itself).
     if (stalledOnSignIn(a.live)) return void (await call('session:carryOn', path, a.id))
-    const provider = agentProviderOf(project(path), a)
+    const provider = agentProviderOf(a)
     const name = providerName(provider)
     if (!isProviderEnabled(get().settings, provider)) throw new Error(providerOff(name))
     if (!get().providers[provider]?.found) throw new Error(providerMissing(name))
     try {
-      await call('session:start', path, { resumeId: a.resume!.id, name: a.resume!.name, agentId: a.id })
+      await whileStarting(path, a.id, { kind: 'resume', sessionId: a.resume!.id }, () => call('session:start', path, { resumeId: a.resume!.id, name: a.resume!.name, agentId: a.id, auto: true }))
     } catch (e) {
+      // Hive resuming that same conversation meanwhile (a card's placement, HI-1746): resumed once that start is, its
+      // failure reported as Resume All's. Anything else it runs or starts: the refusal, as before.
+      let joined: 'running' | 'other'
+      try {
+        joined = await call('session:joinResume', path, a.id, a.resume!.id)
+      } catch (j) {
+        throw new Error(errorMessage(j), { cause: j })
+      }
+      if (joined === 'running') return
       throw new Error(errorMessage(e), { cause: e })
     }
   })
@@ -645,8 +824,12 @@ async function resumeAll_(path: string): Promise<void> {
     notify(
       'error',
       tr(msg({ id: 'actions.resumeAll.failed', defaultMessage: '{all, select, yes {{tried, plural, one {Could not resume the agent} other {Could not resume the agents}}} other {{failed} of {tried} agents could not resume}}', description: "An error's title after Resume All: none of the {tried} agents resumed (yes), or {failed} of them didn't." }), { all: result.failed.length === tried ? 'yes' : 'no', failed: result.failed.length, tried }),
-      batchReport(result.failed, result.resumed.length ? tr(msg({ id: 'actions.resumeAll.resumed', defaultMessage: 'Resumed: {agents}', description: "Resume All's report: the agents that did resume ({agents}: their names, listed)." }), { agents: fmt.list(result.resumed, 'unit') }) : null)
+      batchReport(result.failed, result.resumed.length ? tr(msg({ id: 'actions.resumeAll.resumed', defaultMessage: 'Resumed: {agents}', description: "Resume All's report: the agents that did resume ({agents}: their names, listed)." }), { agents: fmt.list(result.resumed, 'unit') }) : null, result.held.length ? [heldReport(path, result.held).lines] : []),
+      result.held.length ? heldReport(path, result.held).actions : undefined
     )
+  } else if (result.held.length) {
+    const r = heldReport(path, result.held)
+    notify('info', r.title, r.lines, r.actions)
   }
 }
 
@@ -657,6 +840,73 @@ async function resumeAll_(path: string): Promise<void> {
  * and only agents with one are listed. One at a time; failures are reported together. A second click while it runs is
  * ignored (the button shows a spinner).
  */
+/**
+ * Start Fresh (Idle Agents) (#1437, #1086): one confirmed step giving each idle running agent of the project a new
+ * conversation (its old one stays in the Sessions tab). The question lists who will and who won't, with why: busy,
+ * waiting, watching, with background tasks, with a card's slot in flight, or stopped (left stopped). Each is checked
+ * again as it starts (main), so one that started work meanwhile is left as it is, and said so.
+ */
+export function startFreshIdle(path: string): Promise<void> {
+  return runOnce(`startFreshIdle:${path}`, () => startFreshIdle_(path)).then(() => undefined)
+}
+
+/** Why an agent doesn't start fresh, in a few words, for Start Fresh's question and report. */
+function freshWhyText(r: FreshRow): string {
+  switch (r.why) {
+    case 'stopped':
+      return tr(msg({ id: 'actions.startFresh.why.stopped', defaultMessage: 'stopped: left stopped', description: "Start Fresh (Idle Agents)' list (#1437): this agent isn't running, and stays stopped." }))
+    case 'working':
+    case 'starting':
+      return tr(msg({ id: 'actions.startFresh.why.working', defaultMessage: 'working: left as it is', description: "Start Fresh (Idle Agents)' list (#1437): this agent is in a turn (or starting), so it keeps its conversation." }))
+    case 'waiting':
+      return tr(msg({ id: 'actions.startFresh.why.waiting', defaultMessage: 'waiting for you: left as it is', description: "Start Fresh (Idle Agents)' list (#1437): this agent is asking the user something, so it keeps its conversation." }))
+    case 'watching':
+      return tr(msg({ id: 'actions.startFresh.why.watching', defaultMessage: 'watching cards: left as it is', description: "Start Fresh (Idle Agents)' list (#1437): this agent waits on a card watch, so it keeps its conversation." }))
+    case 'background':
+      return tr(msg({ id: 'actions.startFresh.why.background', defaultMessage: 'background tasks running: left as it is', description: "Start Fresh (Idle Agents)' list (#1437): this agent has background tasks running, so it keeps its conversation." }))
+    case 'pending':
+      return tr(msg({ id: 'actions.startFresh.why.pending', defaultMessage: 'a prompt not taken yet: left as it is', description: "Start Fresh (Idle Agents)' list (#1437): Hive typed a prompt this agent's CLI hasn't taken yet, so it keeps its conversation." }))
+    case 'lease':
+      return tr(msg({ id: 'actions.startFresh.why.lease', defaultMessage: '{card, select, none {its lane is still in flight} other {{card} is still in flight}}: left as it is', description: "Start Fresh (Idle Agents)' list (#1437): this agent holds a slot for a card ({card}: \"AM-12\") or a lane (none) whose work isn't finished, so it keeps its conversation." }), { card: r.card ? cardLabelOf(get(), r.card) : 'none' })
+    default:
+      return tr(msg({ id: 'actions.startFresh.why.fresh', defaultMessage: 'idle: starts fresh', description: "Start Fresh (Idle Agents)' list (#1437): this agent is idle and gets a new conversation." }))
+  }
+}
+
+async function startFreshIdle_(path: string): Promise<void> {
+  const p = project(path)
+  if (!p?.agents.length) return notify('info', tr(msg({ id: 'actions.startAll.noAgents', defaultMessage: 'No agents', description: "A notification's title: the project has no agents to start." })), tr(msg({ id: 'actions.startAll.noAgentsMessage', defaultMessage: 'Add an agent first.', description: 'Under the notification that the project has no agents.' })))
+  const plan = await attempt(listFailed(), () => call('session:freshPlan', path))
+  if (!plan) return
+  const fresh = plan.filter((r) => !r.why)
+  const line = (r: FreshRow): string => tr(msg({ id: 'actions.startFresh.line', defaultMessage: '• {agent}: {why}', description: "A line of Start Fresh (Idle Agents)' question (#1437): an agent ({agent}) and what happens to it ({why}: \"idle: starts fresh\", \"working: left as it is\")." }), { agent: r.name, why: freshWhyText(r) })
+  if (!fresh.length) return notify('info', tr(msg({ id: 'actions.startFresh.noneTitle', defaultMessage: 'No idle agent to start fresh', description: "A notification's title (#1437): Start Fresh (Idle Agents) found no idle running agent." })), plan.map(line).join('\n'))
+  const ok = await confirm({
+    title: tr(msg({ id: 'actions.startFresh.title', defaultMessage: '{n, plural, one {Start the idle agent fresh?} other {Start # idle agents fresh?}}', description: "Title of Start Fresh (Idle Agents)' question (#1437): {n} idle agents get new conversations." }), { n: fresh.length }),
+    message: tr(msg({ id: 'actions.startFresh.message', defaultMessage: 'Idle agents in {project} start new conversations; their old ones stay in the Sessions tab. The others are left as they are:', description: "Start Fresh (Idle Agents)' question (#1437), above the list of the project's ({project}) agents and what happens to each." }), { project: p.name }),
+    detail: plan.map(line).join('\n'),
+    confirmLabel: tr(msg({ id: 'actions.startFresh.confirm', defaultMessage: 'Start Fresh', description: "Start Fresh (Idle Agents)' button (#1437)." })),
+    action: 'start'
+  })
+  if (!ok) return
+  const left: FreshRow[] = []
+  const result = await eachAgent(
+    fresh.map((r) => ({ ...agentOf(project(path), r.agentId)!, row: r })).filter((a) => a.id),
+    async (a) => {
+      const why = await whileStarting(path, a.id, { kind: 'start' }, () => call('session:startFresh', path, a.id))
+      // Busy again (or stopped) since the question: left as it is.
+      if (why) left.push({ ...a.row, why })
+    }
+  )
+  if (result.failed.length || left.length) {
+    notify(
+      result.failed.length ? 'error' : 'info',
+      tr(msg({ id: 'actions.startFresh.reportTitle', defaultMessage: '{n, plural, one {Started one agent fresh} other {Started # agents fresh}}', description: "A notification's title after Start Fresh (Idle Agents) (#1437): {n} agents got new conversations; the lines say which didn't, and why." }), { n: result.done.length - left.length }),
+      batchReport(result.failed, null, left.map(line))
+    )
+  }
+}
+
 export function startNewAll(path: string, archive = false): Promise<void> {
   return runOnce(`${archive ? 'archiveAll' : 'startNewAll'}:${path}`, () => startNewAll_(path, archive)).then(() => undefined)
 }
@@ -692,14 +942,14 @@ async function startNewAll_(path: string, archive: boolean): Promise<void> {
   for (const a of agents) if (now(a.id)?.live) await call('session:stop', path, a.id).catch(() => undefined)
   await Promise.all(agents.map((a) => waitForStop(path, a.id)))
   const result = await eachAgent(agents, async (a) => {
-    const provider = agentProviderOf(project(path), a)
+    const provider = agentProviderOf(a)
     const name = providerName(provider)
     if (!isProviderEnabled(get().settings, provider)) throw new Error(providerOff(name))
     if (!get().providers[provider]?.found) throw new Error(providerMissing(name))
     try {
       const target = archives.find((x) => x.agent.id === a.id)
       if (target) await call('session:archive', path, target.sessionId, true)
-      await call('session:start', path, { agentId: a.id })
+      await whileStarting(path, a.id, { kind: 'start' }, () => call('session:start', path, { agentId: a.id }))
     } catch (e) {
       throw new Error(errorMessage(e), { cause: e })
     }
@@ -740,31 +990,45 @@ export async function archiveCurrent(path: string | null = get().selectedProject
   if (archived) await newSession(path, id)
 }
 
-/** Deletes a workspace MCP server after asking; true when it was deleted. */
+/** Where a server is added (HI-2059): a project, or the Hive Assistant. */
+export type McpPlace = Pick<ProjectInfo, 'path' | 'name'> | 'assistant'
+
+const MCP_UPDATE_FAILED = msg({ id: 'actions.mcp.updateFailedAdded', defaultMessage: 'Could not update the server', description: "An error's title: adding an MCP server to a project or the Hive Assistant, or removing it, failed." })
+
 /**
- * Turns a workspace MCP server on or off in the workspace (#1093, its master switch). On asks first, showing what it
- * runs (#550) and which projects to turn it on in: those that have it on (their choices, kept while it was off) and the
- * selected project are ticked. Off turns it off everywhere at once and keeps the projects' choices.
+ * Add server… (HI-2059): a picker of the workspace's servers not yet added to a project or the Hive Assistant, the one
+ * chosen showing what it runs (#550) before Add. Refused, in the dialog, if its definition was replaced or edited since
+ * it was listed. It runs there from their next session.
  */
-export async function setMcpServerEnabled(server: Pick<McpServerInfo, 'name' | 'def' | 'revision' | 'runs' | 'secretWarnings'>, on: boolean): Promise<boolean> {
-  let picks: Record<string, boolean> | undefined
-  if (on) {
-    const s = get()
-    const projects = s.workspace?.projects ?? []
-    const initial = projects.filter((p) => p.config.mcp.enabled.includes(server.name) || p.path === s.selectedProject).map((p) => p.path)
-    picks = Object.fromEntries(projects.map((p) => [p.path, initial.includes(p.path)]))
-    const ok = await confirm({
-      title: tr(msg({ id: 'mcp.enable.confirmTitle', defaultMessage: 'Turn on {name}?', description: 'Title of the confirmation before an MCP server is turned on in the workspace. {name} is the server.' }), { name: server.name }),
-      message: tr(msg({ id: 'mcp.enable.confirmMessage', defaultMessage: 'New sessions in the projects you tick start it. It runs:', description: 'The confirmation before an MCP server is turned on in the workspace, above the command it runs and the projects to tick.' })),
-      list: server.runs,
-      content: createElement(McpProjectPicker, { projects, initial, warnings: server.secretWarnings, onChange: (now: Record<string, boolean>) => void (picks = now) }),
-      confirmLabel: tr(msg({ id: 'mcp.enable.confirmButton', defaultMessage: 'Turn On', description: 'Button: turns the MCP server on in the workspace and the projects ticked.' }))
-    })
-    if (!ok) return false
-  }
-  const done = await attempt(tr(msg({ id: 'actions.mcp.updateFailed', defaultMessage: 'Could not update the server', description: "An error's title: turning an MCP server on or off in the workspace failed." })), async () => {
-    // The definition shown: if it was replaced or edited meanwhile, Hive refuses, and the user looks again.
-    await call('mcp:setGlobal', server.name, on, on ? { def: server.def, revision: server.revision } : undefined, picks)
+export async function addMcpServer(place: McpPlace): Promise<boolean> {
+  const servers = await attempt(tr(msg({ id: 'actions.mcp.listFailedPicker', defaultMessage: 'Could not list the servers', description: "An error's title: reading the workspace's MCP servers for the Add server picker failed." })), () => call('mcp:list'))
+  if (!servers) return false
+  const can = servers.filter((m) => !!m.def && !(place === 'assistant' ? m.assistant : serverAddedIn(m, place.path)))
+  let picked: McpServerInfo | null = null
+  const ok = await confirm({
+    title:
+      place === 'assistant'
+        ? tr(msg({ id: 'mcp.add.titleAssistant', defaultMessage: 'Add a server for the Hive Assistant', description: "Title of the Add server picker (HI-2059) in the Hive Assistant's view." }))
+        : tr(msg({ id: 'mcp.add.title', defaultMessage: 'Add a server to {project}', description: "Title of the Add server picker (HI-2059) in a project's MCP tab. {project} is the project." }), { project: place.name }),
+    message: tr(msg({ id: 'mcp.add.message', defaultMessage: 'The workspace’s servers not added here yet. Sessions started from now on get the one you add.', description: 'The Add server picker (HI-2059), above its search and list: the workspace servers not added to this project (or the Hive Assistant); new sessions start the one added.' })),
+    content: createElement(McpServerPicker, { servers: can, onPick: (m: McpServerInfo | null) => (picked = m) }),
+    wide: true,
+    confirmLabel: tr(msg({ id: 'mcp.add.button', defaultMessage: 'Add', description: 'The Add server picker (HI-2059): the button that adds the chosen server.' })),
+    busyLabel: tr(msg({ id: 'mcp.add.busy', defaultMessage: 'Adding…', description: 'The Add server picker’s Add button while it works.' })),
+    run: async () => {
+      const m = picked
+      if (m) await call('mcp:add', place === 'assistant' ? 'assistant' : place.path, m.name, { def: m.def, revision: m.revision })
+    }
+  })
+  set((s) => ({ skillsVersion: s.skillsVersion + 1 }))
+  if (ok) await refreshWorkspace()
+  return ok
+}
+
+/** Removes a server from a project or the Hive Assistant (HI-2059), at once: it is one Add away. */
+export async function removeMcpServer(place: McpPlace, server: Pick<McpServerInfo, 'name'>): Promise<boolean> {
+  const done = await attempt(tr(MCP_UPDATE_FAILED), async () => {
+    await call('mcp:remove', place === 'assistant' ? 'assistant' : place.path, server.name)
     return true
   })
   set((s) => ({ skillsVersion: s.skillsVersion + 1 }))
@@ -773,90 +1037,220 @@ export async function setMcpServerEnabled(server: Pick<McpServerInfo, 'name' | '
 }
 
 /**
- * Turns a workspace MCP server on or off in one project (#1093), the project's own choice: it runs there while it is on
- * in the workspace too, whose enable showed what it runs.
+ * Add to… (the MCP view, HI-2059): which projects, and the Hive Assistant, a server is added to, showing what it runs
+ * (#550): those it is added to are ticked; unticking one removes it there. Files are written one by one, so a failure
+ * midway says what changed and what didn't.
  */
-export async function setMcpServerInProject(target: Pick<ProjectInfo, 'path' | 'name'>, server: Pick<McpServerInfo, 'name'>, on: boolean): Promise<boolean> {
-  const done = await attempt(tr(msg({ id: 'mcp.project.updateFailed', defaultMessage: 'Could not update the server', description: "An error's title: turning an MCP server on or off in a project failed." })), async () => {
-    await call('mcp:setProject', target.path, server.name, on)
-    return true
+export async function chooseMcpPlaces(server: Pick<McpServerInfo, 'name' | 'def' | 'revision' | 'runs' | 'secretWarnings' | 'assistant' | 'projects'>): Promise<boolean> {
+  const projects = get().workspace?.projects ?? []
+  const initial = projects.filter((p) => serverAddedIn(server, p.path)).map((p) => p.path)
+  let picks: Record<string, boolean> = Object.fromEntries(projects.map((p) => [p.path, initial.includes(p.path)]))
+  let forAssistant = server.assistant
+  const ok = await confirm({
+    title: tr(msg({ id: 'mcp.places.title', defaultMessage: 'Add {name} to…', description: 'Title of the dialog in the MCP view (HI-2059) that chooses the projects, and the Hive Assistant, an MCP server is added to. {name} is the server.' }), { name: server.name }),
+    message: tr(msg({ id: 'mcp.places.message', defaultMessage: 'Sessions started from now on get it wherever it is ticked; unticking removes it there. It runs:', description: 'The MCP view’s Add to… dialog (HI-2059), above the command the server runs and the projects (and the Hive Assistant) to tick.' })),
+    list: server.runs,
+    content: createElement(McpProjectPicker, {
+      projects,
+      initial,
+      assistant: server.assistant,
+      warnings: server.secretWarnings,
+      onChange: (now: Record<string, boolean>, assistant: boolean) => {
+        picks = now
+        forAssistant = assistant
+      }
+    }),
+    confirmLabel: tr(msg({ id: 'mcp.places.button', defaultMessage: 'Save', description: 'The MCP view’s Add to… dialog (HI-2059): the button that adds the server where ticked and removes it where unticked.' }))
   })
+  if (!ok) return false
+  // The definition shown: if it was replaced or edited meanwhile, Hive refuses before changing anything.
+  const r = await attempt(tr(MCP_UPDATE_FAILED), () => call('mcp:places', server.name, server.def ? { def: server.def, revision: server.revision } : undefined, picks, forAssistant))
+  if (r?.failed.length) {
+    const place = (p: string): string => (p === 'assistant' ? tr(MCP_ASSISTANT) : (projects.find((x) => samePath(x.path, p))?.name ?? basename(p)))
+    const lines = [
+      ...(r.added.length ? [tr(msg({ id: 'mcp.places.addedIn', defaultMessage: 'Added: {places}', description: 'After Add to… (HI-2059) failed in part: the places the server was added to. {places} lists projects (and the Hive Assistant).' }), { places: fmt.list(r.added.map(place)) })] : []),
+      ...(r.removed.length ? [tr(msg({ id: 'mcp.places.removedFrom', defaultMessage: 'Removed: {places}', description: 'After Add to… (HI-2059) failed in part: the places the server was removed from. {places} lists projects (and the Hive Assistant).' }), { places: fmt.list(r.removed.map(place)) })] : []),
+      ...r.failed.map((f) => tr(msg({ id: 'mcp.places.failedIn', defaultMessage: 'Not changed in {place}: {error}', description: 'After Add to… (HI-2059) failed in part: a place where the change could not be written, and why ({error}, as Hive or Windows said it).' }), { place: place(f.place), error: f.error }))
+    ]
+    notify('warning', tr(msg({ id: 'mcp.places.partial', defaultMessage: '{name} was changed in only some places', description: "A warning's title after the MCP view's Add to… (HI-2059): some of the places could not be written; the message says which changed and which didn't. {name} is the server." }), { name: server.name }), lines.join('\n'))
+  }
   set((s) => ({ skillsVersion: s.skillsVersion + 1 }))
   await refreshWorkspace()
-  return !!done
+  return !!r && !r.failed.length
+}
+
+/** "Hive Assistant", where a server is added. */
+const MCP_ASSISTANT = msg({ id: 'mcp.where.assistantName', defaultMessage: 'the Hive Assistant', description: 'Where an MCP server is added (HI-2059), in a list of places beside project names.' })
+
+// ---------------------------------------------------------------------------
+// MCP catalogues (HI-545): Install and Update, each shown before anything is written.
+// ---------------------------------------------------------------------------
+
+const CATALOG_FAILED = msg({ id: 'mcp.catalog.failed', defaultMessage: 'Could not get {name}', description: "An error's title (HI-545): downloading or checking a server from an MCP catalogue for Install or Update failed. {name} is the server." })
+
+/**
+ * Install (HI-545): the catalogue server downloaded and checked against its catalogue (size, sha256) first, then #550's
+ * Add dialog: what it runs, and its name, another one when it is taken, or Replace only if the user says so. Installed,
+ * it is added to no project yet (HI-2059): its view opens, for Add to….
+ */
+export async function installCatalogServer(row: Pick<McpCatalogRow, 'source' | 'name' | 'version'>): Promise<boolean> {
+  const p = await attempt(tr(CATALOG_FAILED, { name: row.name }), () => call('mcp:catalogPrepare', row.source, row.name))
+  if (!p) return false
+  // #550's Add: what it runs, the name (another if it is taken, or Replace).
+  const picked = await chooseServerName({
+    title: tr(msg({ id: 'mcp.catalog.installTitle', defaultMessage: 'Install {name} {version}?', description: 'Title of the question before installing a server from an MCP catalogue (HI-545). {name} is the server, {version} its version.' }), { name: p.server.name, version: p.server.version }),
+    message: tr(msg({ id: 'mcp.catalog.installMessageName', defaultMessage: 'Downloaded and checked against its catalogue. It is added to the workspace under this name, and to no project yet. It runs:', description: 'The question before installing a catalogue server (HI-545), above the name box and what it runs: its download matched its catalogue; installed, it runs nowhere until added.' })),
+    list: p.runs,
+    detail: p.secretWarnings.join('\n') || undefined,
+    initial: p.server.name,
+    initialTaken: p.nameTaken,
+    confirmLabel: tr(msg({ id: 'mcp.catalog.installButton', defaultMessage: 'Install', description: 'Button (HI-545): installs the catalogue server.' }))
+  })
+  if (!picked) {
+    void call('mcp:catalogDrop', p.id).catch(() => undefined)
+    return false
+  }
+  const done = await attempt(tr(CATALOG_FAILED, { name: row.name }), () => call('mcp:catalogInstall', p.id, picked.name, picked.replace).then(() => true))
+  if (!done) return false
+  set((s) => ({ skillsVersion: s.skillsVersion + 1, mcpCatalogVersion: s.mcpCatalogVersion + 1, mcpTab: 'installed', selectedMcp: picked.name }))
+  notify('success', tr(msg({ id: 'mcp.catalog.installed', defaultMessage: 'Installed {name}', description: "A notification's title (HI-545): a catalogue server was installed." }), { name: picked.name }), tr(msg({ id: 'mcp.catalog.installedNext', defaultMessage: 'It runs nowhere yet: Add to… in its view adds it to the projects (and the Hive Assistant) that need it.', description: 'Under "Installed {name}" (HI-545): what to do next. Add to… is the button in the server\'s view in the MCP view.' })))
+  await refreshWorkspace()
+  return true
+}
+
+/**
+ * Update (HI-545): never automatic. The new version downloaded and checked first; the dialog says the versions, where
+ * it is added (those places keep it) and what it runs, the changed lines marked. If the definition or the places
+ * change before it is applied, Hive writes nothing and the dialog opens again from what is there now.
+ */
+export async function updateCatalogServer(row: Pick<McpCatalogRow, 'source' | 'name' | 'version'>, again = 0): Promise<boolean> {
+  const p = await attempt(tr(CATALOG_FAILED, { name: row.name }), () => call('mcp:catalogPrepare', row.source, row.name))
+  if (!p) return false
+  const ex = p.existing
+  if (!ex) {
+    void call('mcp:catalogDrop', p.id).catch(() => undefined)
+    return installCatalogServer(row)
+  }
+  const now = new Set(ex.runs)
+  const next = new Set(p.runs)
+  const changed = [...ex.runs.filter((l) => !next.has(l)).map((l) => `− ${l}`), ...p.runs.filter((l) => !now.has(l)).map((l) => `+ ${l}`)]
+  const where = mcpWhereText({ def: ex.def ?? {}, projects: ex.projects, assistant: ex.assistant }, get().workspace?.projects ?? [])
+  const ok = await confirm({
+    title: tr(msg({ id: 'mcp.catalog.updateTitle', defaultMessage: 'Update {name} from {from} to {to}?', description: 'Title of the question before updating a catalogue server (HI-545). {from} and {to} are its versions.' }), { name: p.server.name, from: ex.version, to: p.server.version }),
+    message: changed.length
+      ? tr(msg({ id: 'mcp.catalog.updateMessage', defaultMessage: '{where}: those places keep it, your values for its environment and headers too. What it runs changes (− now, + after):', description: 'The question before updating a catalogue server (HI-545), above the lines of what it runs that change. {where} says where it is added ("Added in hive", "Not added anywhere").' }), { where })
+      : tr(msg({ id: 'mcp.catalog.updateSame', defaultMessage: '{where}: those places keep it, your values for its environment and headers too. What it runs stays the same:', description: 'The question before updating a catalogue server (HI-545) whose command stays the same, above what it runs. {where} says where it is added.' }), { where }),
+    list: changed.length ? changed : p.runs,
+    detail: p.secretWarnings.join('\n') || undefined,
+    confirmLabel: tr(msg({ id: 'mcp.catalog.updateButton', defaultMessage: 'Update', description: 'Button (HI-545): updates the catalogue server to the new version.' }))
+  })
+  if (!ok) {
+    void call('mcp:catalogDrop', p.id).catch(() => undefined)
+    return false
+  }
+  const r = await attempt(tr(CATALOG_FAILED, { name: row.name }), () => call('mcp:catalogUpdate', p.id, { def: ex.def, revision: ex.revision }, { projects: ex.projects, assistant: ex.assistant }))
+  set((s) => ({ skillsVersion: s.skillsVersion + 1, mcpCatalogVersion: s.mcpCatalogVersion + 1 }))
+  if (!r) return false
+  if (r.stale) {
+    // Changed while the dialog was open: shown again from what is there now (twice at most).
+    notify('info', r.stale)
+    return again < 2 ? updateCatalogServer(row, again + 1) : false
+  }
+  notify('success', tr(msg({ id: 'mcp.catalog.updated', defaultMessage: 'Updated {name} to {version}', description: "A notification's title (HI-545): a catalogue server was updated." }), { name: p.server.name, version: p.server.version }))
+  await refreshWorkspace()
+  return true
 }
 
 /** Why a workspace MCP server can't be used, in the window's language (#849): Hive's own words, else the JSON reader's as it gave them. */
 export const mcpErrorText = (server: Pick<McpServerInfo, 'error' | 'errorText'>): string | undefined => (server.errorText ? shownText(server.errorText) : server.error)
 
 /**
- * Where a workspace MCP server runs (#1093), in words, from the projects as the window has them: "Off in the
- * workspace", "On in Amberlight" or "On in no project".
+ * Where a workspace MCP server is added (HI-2059), in words, from the projects as the window has them: "Added in
+ * Amberlight", "Added in Amberlight and for the Hive Assistant", "Added for the Hive Assistant only" or "Not added
+ * anywhere". A hidden project it is added to counts, unnamed.
  */
-export function mcpWhereText(server: Pick<McpServerInfo, 'name' | 'def' | 'globallyEnabled'>, projects: readonly ProjectInfo[]): string {
-  if (!server.globallyEnabled) return tr(MCP_OFF_IN_WORKSPACE)
-  const on = projects.filter((p) => serverOnIn(server, p.config.mcp)).map((p) => p.name)
+export function mcpWhereText(server: Pick<McpServerInfo, 'def' | 'projects' | 'assistant'>, projects: readonly ProjectInfo[]): string {
+  const named = projects.filter((p) => serverAddedIn(server, p.path)).map((p) => p.name)
+  const hidden = server.projects.filter((p) => !projects.some((x) => samePath(x.path, p))).length
+  const on = hidden ? [...named, tr(msg({ id: 'mcp.where.hidden', defaultMessage: '{n, plural, one {# hidden project} other {# hidden projects}}', description: 'Where an MCP server is added (HI-2059), after the projects named: the hidden projects it is added to.' }), { n: hidden })] : named
+  const assistant = !!server.def && server.assistant
+  if (on.length && assistant) return tr(msg({ id: 'mcp.where.addedSomeAndAssistant', defaultMessage: 'Added in {projects} and for the Hive Assistant', description: 'Where an MCP server is added (HI-2059), under it in the MCP view: in some projects and for the Hive Assistant. {projects} lists the projects.' }), { projects: fmt.list(on) })
+  if (assistant) return tr(msg({ id: 'mcp.where.addedAssistantOnly', defaultMessage: 'Added for the Hive Assistant only', description: 'Where an MCP server is added (HI-2059), under it in the MCP view: for the Hive Assistant, in no project.' }))
   return on.length
-    ? tr(msg({ id: 'mcp.where.some', defaultMessage: 'On in {projects}', description: 'Where an MCP server is on, under it in the MCP view. {projects} lists the projects.' }), { projects: fmt.list(on) })
-    : tr(msg({ id: 'mcp.where.none', defaultMessage: 'On in no project', description: 'Where an MCP server is on, under it in the MCP view: on in the workspace, but no project has it on.' }))
+    ? tr(msg({ id: 'mcp.where.addedSome', defaultMessage: 'Added in {projects}', description: 'Where an MCP server is added (HI-2059), under it in the MCP view. {projects} lists the projects.' }), { projects: fmt.list(on) })
+    : tr(msg({ id: 'mcp.where.addedNone', defaultMessage: 'Not added anywhere', description: 'Where an MCP server is added (HI-2059), under it in the MCP view: no project and not the Hive Assistant, so it runs nowhere.' }))
 }
 
-/** "Off in the workspace": a server whose workspace switch is off (#1093), so it runs nowhere. */
-export const MCP_OFF_IN_WORKSPACE = msg({ id: 'mcp.where.off', defaultMessage: 'Off in the workspace', description: "Where an MCP server is on, under it in the MCP view, and beside a project's switch for it in its MCP tab: the workspace has it off, so it runs in no project." })
 
 /**
  * Add MCP Server from File (#550): a .json definition, or a .zip of a server folder. The dialog shows what it runs and
- * the name it gets (the file's, editable); a name in use asks to replace it or choose another. It is added off in the
- * workspace and in every project (#1093): turning it on in the workspace chooses the projects.
+ * the name it gets (the file's, editable); a name in use asks to replace it or choose another. It is added to no project
+ * (HI-2059): a project's MCP tab, the Assistant's view or Add to… adds it where it runs.
  */
 export async function addMcpServerFromFile(): Promise<McpServerInfo | null> {
   const file = await attempt(tr(msg({ id: 'actions.mcp.openFailed', defaultMessage: 'Could not open the file', description: "An error's title: picking an MCP server's file failed." })), () => call('mcp:pickFile'))
   if (!file) return null
   const server = await attempt(addServerFailed(), () => call('mcp:previewFile', file))
   if (!server) return null
-  let name = server.name
+  const picked = await chooseServerName({
+    title: tr(msg({ id: 'actions.mcp.addTitle', defaultMessage: 'Add MCP Server from File', description: 'Title of the Add MCP Server from File dialog (the command of the same name). MCP is a name: keep it.' })),
+    message: tr(
+      msg({
+        id: 'mcp.addFile.messageAdded',
+        defaultMessage: 'Adds {file} to the workspace (.hive/mcp){files, plural, =0 {} one {, with its file in a folder of its own} other {, with its # files in a folder of its own}}, added to no project yet. Add it where it should run: a project’s MCP tab, the Hive Assistant’s view, or Add to… here. It runs:',
+        description: 'Add MCP Server from File (HI-2059), above the command the server runs. {file} is the file added; {files} how many files a .zip brings. Keep .hive/mcp as it is; "MCP tab" and "Add to…" as Hive shows them.'
+      }),
+      { file: basename(file), files: server.files }
+    ),
+    list: server.runs,
+    detail: server.secretWarnings.length ? server.secretWarnings.join('\n') : undefined,
+    initial: server.name,
+    initialTaken: server.exists,
+    confirmLabel: tr(msg({ id: 'actions.mcp.add', defaultMessage: 'Add', description: 'Button: adds the MCP server to the workspace.' }))
+  })
+  if (!picked) return null
+  const added = await attempt(addServerFailed(), () => call('mcp:addFromFile', file, picked.name, picked.replace))
+  if (!added) return null
+  set((s) => ({ skillsVersion: s.skillsVersion + 1, selectedMcp: added.name }))
+  await refreshWorkspace()
+  return added
+}
+
+/**
+ * The name a server is added under (#550, HI-545's Install): the prompt shows what it runs, with the name to change; a
+ * name in use asks to Replace that server or choose another. `initialTaken`: whether the name offered is in use. Null
+ * when cancelled.
+ */
+async function chooseServerName(o: { title: string; message: string; list: string[]; detail?: string; initial: string; initialTaken: boolean; confirmLabel: string }): Promise<{ name: string; replace: boolean } | null> {
+  let name = o.initial
   for (;;) {
     const picked = await prompt({
-      title: tr(msg({ id: 'actions.mcp.addTitle', defaultMessage: 'Add MCP Server from File', description: 'Title of the Add MCP Server from File dialog (the command of the same name). MCP is a name: keep it.' })),
-      message: tr(
-        msg({
-          id: 'mcp.addFile.message',
-          defaultMessage: 'Adds {file} to the workspace (.hive/mcp){files, plural, =0 {} one {, with its file in a folder of its own} other {, with its # files in a folder of its own}}, turned off. Turn it on in the MCP view to choose the projects it runs in. It runs:',
-          description: 'Add MCP Server from File, above the command the server runs. {file} is the file added; {files} how many files a .zip brings. Keep .hive/mcp as it is.'
-        }),
-        { file: basename(file), files: server.files }
-      ),
-      list: server.runs,
-      detail: server.secretWarnings.length ? server.secretWarnings.join('\n') : undefined,
+      title: o.title,
+      message: o.message,
+      list: o.list,
+      detail: o.detail,
       placeholder: tr(msg({ id: 'actions.mcp.namePlaceholder', defaultMessage: 'server-name', description: "Placeholder of the server's name box: an example name (lower case, a dash)." })),
       initial: name,
-      confirmLabel: tr(msg({ id: 'actions.mcp.add', defaultMessage: 'Add', description: 'Button: adds the MCP server to the workspace.' })),
+      confirmLabel: o.confirmLabel,
       validate: (v) => (/^[a-zA-Z0-9][a-zA-Z0-9_-]{0,63}$/.test(v.trim()) && v.trim().toLowerCase() !== 'hive' ? null : tr(msg({ id: 'actions.mcp.badName', defaultMessage: 'Use letters, numbers, "-" and "_". "hive" is reserved.', description: "Why an MCP server's name can't be used. Keep \"hive\" as it is: it is the built-in server's name." })))
     })
     if (!picked) return null
     name = picked.trim()
-    const taken = name === server.name ? server.exists : ((await attempt(tr(msg({ id: 'actions.mcp.listFailed', defaultMessage: 'Could not list the servers', description: "An error's title: reading the workspace's MCP servers failed." })), () => call('mcp:list'))) ?? []).some((m) => m.name.toLowerCase() === name.toLowerCase())
-    let replace = false
-    if (taken) {
-      const choice = await choose({
-        title: tr(msg({ id: 'actions.mcp.replaceTitle', defaultMessage: 'Replace {name}?', description: 'Title of the question when the workspace already has an MCP server of that name ({name}).' }), { name }),
-        message: tr(msg({ id: 'actions.mcp.replaceMessage', defaultMessage: 'The workspace has a server named {name}.', description: 'The question when the workspace already has an MCP server of that name ({name}).' }), { name }),
-        detail: tr(msg({ id: 'mcp.addFile.replaceDetail', defaultMessage: 'Replace moves it (and the folder of one added from a .zip) to the Recycle Bin and adds this one, turned off: projects that had the old one on lose it. Or choose another name.', description: 'When a server of that name exists, under Replace or Choose Another Name.' })),
-        danger: true,
-        choices: [
-          { label: tr(msg({ id: 'actions.mcp.rename', defaultMessage: 'Choose Another Name', description: 'Button: goes back to choose another name for the MCP server.' })), value: 'rename' },
-          { label: tr(msg({ id: 'actions.mcp.replace', defaultMessage: 'Replace', description: 'Button: replaces the MCP server of that name.' })), value: 'replace' }
-        ]
-      })
-      if (!choice) return null
-      if (choice === 'rename') continue
-      replace = true
-    }
-    const added = await attempt(addServerFailed(), () => call('mcp:addFromFile', file, name, replace))
-    if (!added) return null
-    set((s) => ({ skillsVersion: s.skillsVersion + 1, selectedMcp: added.name }))
-    await refreshWorkspace()
-    return added
+    const taken = name === o.initial ? o.initialTaken : ((await attempt(tr(msg({ id: 'actions.mcp.listFailed', defaultMessage: 'Could not list the servers', description: "An error's title: reading the workspace's MCP servers failed." })), () => call('mcp:list'))) ?? []).some((m) => m.name.toLowerCase() === name.toLowerCase())
+    if (!taken) return { name, replace: false }
+    const choice = await choose({
+      title: tr(msg({ id: 'actions.mcp.replaceTitle', defaultMessage: 'Replace {name}?', description: 'Title of the question when the workspace already has an MCP server of that name ({name}).' }), { name }),
+      message: tr(msg({ id: 'actions.mcp.replaceMessage', defaultMessage: 'The workspace has a server named {name}.', description: 'The question when the workspace already has an MCP server of that name ({name}).' }), { name }),
+      detail: tr(msg({ id: 'mcp.addFile.replaceDetailAdded', defaultMessage: 'Replace moves it (and the folder of one added from a .zip) to the Recycle Bin and adds this one to no project yet: projects and the Hive Assistant that had the old one lose it. Or choose another name.', description: 'When a server of that name exists, under Replace or Choose Another Name (HI-2059).' })),
+      danger: true,
+      choices: [
+        { label: tr(msg({ id: 'actions.mcp.rename', defaultMessage: 'Choose Another Name', description: 'Button: goes back to choose another name for the MCP server.' })), value: 'rename' },
+        { label: tr(msg({ id: 'actions.mcp.replace', defaultMessage: 'Replace', description: 'Button: replaces the MCP server of that name.' })), value: 'replace' }
+      ]
+    })
+    if (!choice) return null
+    if (choice === 'rename') continue
+    return { name, replace: true }
   }
 }
 
@@ -867,10 +1261,17 @@ const addServerFailed = (): string => tr(msg({ id: 'actions.mcp.addFailed', defa
 const deleteLabel = (): string => tr(msg({ id: 'actions.delete.confirm', defaultMessage: 'Delete', description: 'Button: moves it to the Recycle Bin.' }))
 const deletingLabel = (): string => tr(msg({ id: 'actions.delete.busy', defaultMessage: 'Deleting…', description: 'The Delete button while it works.' }))
 
-export async function deleteMcpServer(name: string): Promise<boolean> {
+/**
+ * Deletes a workspace MCP server after asking, saying where it is added (HI-2059): deleting removes it there too. True
+ * when it was deleted.
+ */
+export async function deleteMcpServer(server: Pick<McpServerInfo, 'name' | 'def' | 'projects' | 'assistant'>): Promise<boolean> {
+  const name = server.name
+  const added = server.projects.length > 0 || server.assistant
   const ok = await confirm({
     title: tr(msg({ id: 'actions.mcp.deleteTitle', defaultMessage: 'Delete MCP server?', description: 'Title of the question before deleting a workspace MCP server.' })),
     message: tr(msg({ id: 'actions.mcp.deleteMessage', defaultMessage: 'Move {name}.json to the Recycle Bin, with its folder if it was added from a .zip? Projects will no longer be able to use it.', description: "The question before deleting a workspace MCP server: its file ({name}.json) goes to the Recycle Bin (Windows' name for it)." }), { name }),
+    detail: added ? tr(msg({ id: 'actions.mcp.deleteAdded', defaultMessage: '{where}: deleting it removes it there too.', description: 'The question before deleting a workspace MCP server (HI-2059), when it is added somewhere: {where} says where, such as "Added in hive and for the Hive Assistant".' }), { where: mcpWhereText({ ...server, def: server.def ?? {} }, get().workspace?.projects ?? []) }) : undefined,
     confirmLabel: deleteLabel(),
     busyLabel: deletingLabel(),
     danger: true,
@@ -912,17 +1313,17 @@ async function cardsOfRemovedAgents(p: ProjectInfo, agents: readonly { id: strin
   const ids = new Set(agents.map((a) => a.id))
   const open = get().tasks.filter((c) => !c.archived && c.column !== 'done' && !!c.agent && ids.has(c.agent) && c.project.toLowerCase() === p.name.toLowerCase())
   if (!open.length) return false
-  const shown = fmt.list(open.slice(0, 5).map((c) => `#${c.number} ${c.title}`), 'unit')
+  const shown = fmt.list(open.slice(0, 5).map((c) => `${cardLabel(c)} ${c.title}`), 'unit')
   const list = open.length > 5 ? tr(msg({ id: 'actions.cards.andMore', defaultMessage: '{cards} and {n} more', description: "A removed agent's open cards, cut short: the first five ({cards}: \"#3 Title, #4 Title\") and how many more ({n})." }), { cards: shown, n: open.length - 5 }) : shown
   const one = agents.length === 1
   const values = { cards: open.length, agents: agents.length, agent: one ? agents[0].name : 'none' }
   const choice = await choose({
     title: tr(msg({ id: 'actions.cards.title', defaultMessage: '{agents, plural, one {{agent} has} other {The # agents have}} {cards, plural, one {# open card} other {# open cards}}', description: 'Title of the question about the open cards of an agent being removed ({agent}: its name), or of {agents} agents (Remove All).' }), values),
     message: list,
-    detail: tr(msg({ id: 'actions.cards.detail', defaultMessage: '{cards, plural, one {Move it back: nobody has it, and if it is in Doing it goes to Todo, ready to start on another agent. Leave it: it keeps showing {agent, select, none {its agent} other {{agent}}} (removed), and in Doing shows as stalled.} other {Move them back: nobody has them, and those in Doing go to Todo, ready to start on another agent. Leave them: they keep showing {agent, select, none {their agent} other {{agent}}} (removed), and those in Doing show as stalled.}}', description: "Under the question about a removed agent's open cards: what Move back and Leave do. Doing and Todo are board columns; {agent} is the agent's name (none when several agents are removed)." }), values),
+    detail: tr(msg({ id: 'actions.cards.detail', defaultMessage: '{cards, plural, one {Move it back: nobody has it, and if it is in Active it goes to Todo, ready to start on another agent. Leave it: it keeps showing {agent, select, none {its agent} other {{agent}}} (removed), and in Active shows as stalled.} other {Move them back: nobody has them, and those in Active go to Todo, ready to start on another agent. Leave them: they keep showing {agent, select, none {their agent} other {{agent}}} (removed), and those in Active show as stalled.}}', description: "Under the question about a removed agent's open cards: what Move back and Leave do. Active and Todo are board columns; {agent} is the agent's name (none when several agents are removed)." }), values),
     choices: [
       { label: tr(msg({ id: 'actions.cards.leave', defaultMessage: '{cards, plural, one {Leave it} other {Leave them}}', description: "Button: leaves a removed agent's open cards as they are." }), values), value: 'leave' },
-      { label: tr(msg({ id: 'actions.cards.release', defaultMessage: '{cards, plural, one {Move it back} other {Move them back}}', description: "Button: takes a removed agent's open cards back (nobody has them; Doing ones go to Todo)." }), values), value: 'release' }
+      { label: tr(msg({ id: 'actions.cards.release', defaultMessage: '{cards, plural, one {Move it back} other {Move them back}}', description: "Button: takes a removed agent's open cards back (nobody has them; Active ones go to Todo)." }), values), value: 'release' }
     ]
   })
   return choice === null ? null : choice === 'release'
@@ -933,19 +1334,23 @@ const moveFailed = (): string => tr(msg({ id: 'actions.agent.moveFailed', defaul
 
 /**
  * Moves an agent to `index` in the project's order (its position afterwards): the strip, its pages and the panes
- * follow. Shown at once, then saved; the agent keeps focus, so the view goes to its page.
+ * follow. Shown at once, then saved; the agent keeps focus, so the view goes to its page (`focus` false: the focus stays
+ * where it is, as in the Tiles view's focus view, whose pane shows another agent, #1053).
  */
-export async function moveAgent(path: string, agentId: string, index: number): Promise<void> {
+export async function moveAgent(path: string, agentId: string, index: number, focus = true): Promise<void> {
   const p = project(path)
   if (!p || isAssistantPath(path) || !agentOf(p, agentId)) return
   const agents = moveAgentTo(p.agents, agentId, index)
   if (agents.every((a, i) => a.id === p.agents[i].id)) return
   // The panes follow the order (#134): what's on screen changes with it.
   set((s) => ({ workspace: s.workspace && { ...s.workspace, projects: s.workspace.projects.map((x) => (x.path === path ? { ...x, agents } : x)) } }))
-  focusAgent(path, agentId)
+  if (focus) focusAgent(path, agentId)
+  // Kept as shown until saved (#1229): a refresh that read the order before the save doesn't put it back meanwhile.
+  const end = movesShown.begin(path, { order: agents.map((a) => a.id) })
   const saved = await attempt(moveFailed(), () => call('agents:move', path, agentId, index))
-  // Puts the tabs back as saved; the move's own error was already shown, and the next refresh catches up anyway.
-  if (!saved) await call('workspace:refresh').then((ws) => set({ workspace: ws })).catch(() => undefined)
+  // Puts the tabs back as saved (refused, or the last of quick moves, one refused); the move's own error was already
+  // shown, and the next refresh catches up anyway.
+  if (end(!!saved) || !saved) await refreshWorkspace().catch(() => undefined)
 }
 
 /**
@@ -959,8 +1364,9 @@ export async function swapAgents(path: string, agentId: string, otherId: string)
   const agents = swapAgentsIn(p.agents, agentId, otherId)
   set((s) => ({ workspace: s.workspace && { ...s.workspace, projects: s.workspace.projects.map((x) => (x.path === path ? { ...x, agents } : x)) } }))
   focusAgent(path, agentId)
+  const end = movesShown.begin(path, { order: agents.map((a) => a.id) })
   const saved = await attempt(moveFailed(), () => call('agents:swap', path, agentId, otherId))
-  if (!saved) await call('workspace:refresh').then((ws) => set({ workspace: ws })).catch(() => undefined)
+  if (end(!!saved) || !saved) await refreshWorkspace().catch(() => undefined)
 }
 
 /** Moves the focused agent (or `agentId`) one place left or right, across pages at their edges. */
@@ -1012,9 +1418,10 @@ export function placeAgent(path: string, agentId: string, target: number): boole
   const agents = orderByCells(p.agents, cells)
   set((s) => ({ workspace: s.workspace && { ...s.workspace, projects: s.workspace.projects.map((x) => (x.path === path ? { ...x, config, agents } : x)) } }))
   focusAgent(path, agentId)
+  const end = movesShown.begin(path, { order: agents.map((a) => a.id), placement: config.placement, layout: config.layout })
   void attempt(moveFailed(), () => call('agents:place', path, layout, cells)).then((saved) => {
-    // Puts the panes back as saved; the move's own error was already shown.
-    if (!saved) void refreshWorkspace()
+    // Puts the panes back as saved (refused, or the last of quick moves, one refused); the move's own error was already shown.
+    if (end(!!saved) || !saved) void refreshWorkspace()
   })
   return true
 }
@@ -1049,26 +1456,44 @@ export function moveAgentPane(dir: CellDirection, path: string | null = get().se
 // Agent templates (#126)
 // ---------------------------------------------------------------------------
 
+/** What a save says it did with the template's workflow (HI-1910): saved for the project's version control, kept from before. */
+const TW = {
+  saved: msg({ id: 'actions.template.workflowSaved', defaultMessage: "It holds this project's workflow for {platform}.", description: "Under the notification that a template was saved (HI-1910): it holds the project's workflow options for its version control ({platform}: None or Git, as Hive names them)." }),
+  kept: msg({ id: 'actions.template.workflowKept', defaultMessage: "{count, plural, one {The workflow for {platforms} it had is kept.} other {The workflows for {platforms} it had are kept.}}", description: "Under the notification that a template was saved over one of the same name (HI-1910): the workflow sections it had for {platforms} (None, Git: a list) are kept, {count} of them." }),
+  changed: msg({ id: 'actions.template.workflowChanged', defaultMessage: 'The template "{template}" changed while it loaded, so its workflow wasn’t filled in. Load it again to see its workflow as it is now.', description: "A warning after loading a template (HI-1910): its workflow section changed between the Load dialog's preview and the load ({template}: its name), so the Workflow form isn't filled in with it." }),
+  none: msg({ id: 'actions.template.workflowNone', defaultMessage: 'It holds no workflow.', description: "Under the notification that a template was saved (HI-1910): saved without the project's workflow, and it had none." })
+}
+
 /**
  * Save Template…: the project's agents and layout under a name, in the project (private) or, ticked, the workspace (for
- * every project). A name already there asks before it is replaced.
+ * every project). A name already there asks before it is replaced. HI-1910: ticked (by default), the project's workflow
+ * too, as its section for the project's version control; the notice says what it holds, and what it kept from before.
  */
 export async function saveTemplate(path: string): Promise<void> {
   const p = project(path)
   if (!p?.agents.length) return notify('info', tr(msg({ id: 'actions.template.noAgents', defaultMessage: 'No agents to save', description: "A notification's title: the project has no agents to save as a template." })), tr(msg({ id: 'actions.template.noAgentsMessage', defaultMessage: 'Add the agents first, then save them as a template.', description: 'Under the notification that there are no agents to save as a template.' })))
   let workspaceScope = false
+  // Names that follow the project's key (HI-B1…) can be kept as patterns (#1440), so the template names its agents from
+  // the key of whichever project it is loaded into; Darren's HB1-style names aren't the key and stay as they are.
+  const key = get().projectKeys.find((k) => k.projectPath.toLowerCase() === path.toLowerCase())?.key ?? null
+  const offerPatterns = namesFollowKey(p.agents.map((a) => a.name), key)
+  let usePatterns = offerPatterns
+  let includeWorkflow = true
+  const platform = p.platform?.id ?? 'none'
   const name = await prompt({
     title: tr(msg({ id: 'actions.template.saveTitle', defaultMessage: 'Save as template', description: 'Title of the Save as Template dialog.' })),
-    message: tr(msg({ id: 'actions.template.saveMessage', defaultMessage: "A template keeps the project's {n, plural, one {agent} other {# agents}} (settings and roles) and its layout, to load into any project later. Sessions and worktrees aren't saved.", description: "The Save as Template dialog: what a template keeps of the project's {n} agents." }), { n: p.agents.length }),
+    message: tr(msg({ id: 'actions.template.saveMessage2', defaultMessage: "A template keeps the project's {n, plural, one {agent} other {# agents}} (settings, roles and notes), its layout and, ticked below, its workflow, to load into any project later. Sessions and worktrees aren't saved.", description: "The Save as Template dialog: what a template keeps of the project's {n} agents (HI-1910: its workflow options, when the box below is ticked). Glossary: workflow." }), { n: p.agents.length }),
     placeholder: tr(msg({ id: 'actions.template.namePlaceholder', defaultMessage: 'Template name', description: "Placeholder of the Save as Template dialog's name box." })),
     confirmLabel: tr(msg({ id: 'actions.template.save', defaultMessage: 'Save', description: 'Button: saves the template.' })),
     validate: (v) => (!v.trim() ? tr(msg({ id: 'actions.template.nameEmpty', defaultMessage: 'Enter a name.', description: "Why a template's name can't be used: it is empty." })) : v.trim().length > TEMPLATE_NAME_MAX ? tr(msg({ id: 'actions.template.nameTooLong', defaultMessage: 'At most {max} characters.', description: "Why a template's name can't be used: it is longer than {max} characters." }), { max: TEMPLATE_NAME_MAX }) : null),
-    check: { label: tr(msg({ id: 'actions.template.everyProject', defaultMessage: 'For every project in the workspace (else for this project only)', description: "A tick box in the Save as Template dialog: the template is the workspace's (ticked) or this project's." })), initial: false, set: (v) => (workspaceScope = v) }
+    check: { label: tr(msg({ id: 'actions.template.everyProject', defaultMessage: 'For every project in the workspace (else for this project only)', description: "A tick box in the Save as Template dialog: the template is the workspace's (ticked) or this project's." })), initial: false, set: (v) => (workspaceScope = v) },
+    check2: offerPatterns ? { label: tr(msg({ id: 'actions.template.usePatterns', defaultMessage: 'Use the project key in names ({example} becomes {pattern}, named from the key of the project it is loaded into)', description: "A tick box in the Save as Template dialog (#1440): agent names that start with this project's key ({example}, e.g. HI-B1) are saved as a pattern ({pattern}: {key}-B{n}), so a project loading the template names them with its own key. Keep {key} and {n} as they are." }), { example: p.agents.map((a) => a.name).find((n) => n.toUpperCase().startsWith(`${key}-`)) ?? `${key}-B1`, pattern: '{key}-B{n}' }), initial: true, set: (v) => (usePatterns = v) } : undefined,
+    check3: { label: tr(msg({ id: 'actions.template.includeWorkflow', defaultMessage: "Include this project's workflow (its rules for {platform}: review, checks by name, merging, stages; never its target branch, check commands or identity's name)", description: "A tick box in the Save as Template dialog (HI-1910), ticked by default: the template keeps the project's workflow options for its version control ({platform}: None or Git, as Hive names them), the rules only. Glossary: workflow, check, target branch, identity." }), { platform: tr(PLATFORM_NAME[platform]) }), initial: true, set: (v) => (includeWorkflow = v) }
   })
   if (name === null) return
   const scope: TemplateScope = workspaceScope ? 'workspace' : 'project'
   const saveFailed = (): string => tr(msg({ id: 'actions.template.saveFailed', defaultMessage: 'Could not save the template', description: "An error's title: saving a template failed." }))
-  let r = await attempt(saveFailed(), () => call('templates:save', path, scope, name, false))
+  let r = await attempt(saveFailed(), () => call('templates:save', path, scope, name, false, usePatterns, includeWorkflow))
   if (r && 'exists' in r) {
     const ok = await confirm({
       title: tr(msg({ id: 'actions.template.replaceTitle', defaultMessage: 'Replace the template?', description: 'Title of the question when a template of that name exists.' })),
@@ -1077,34 +1502,44 @@ export async function saveTemplate(path: string): Promise<void> {
       confirmLabel: tr(msg({ id: 'actions.template.replace', defaultMessage: 'Replace', description: 'Button: replaces the template of that name.' }))
     })
     if (!ok) return
-    r = await attempt(saveFailed(), () => call('templates:save', path, scope, name, true))
+    r = await attempt(saveFailed(), () => call('templates:save', path, scope, name, true, usePatterns, includeWorkflow))
   }
   if (r && 'saved' in r) set((s) => ({ templatesVersion: s.templatesVersion + 1 }))
-  if (r && 'saved' in r) notify('success', tr(msg({ id: 'actions.template.saved', defaultMessage: 'Template saved', description: "A notification's title: the template was saved." })), tr(msg({ id: 'actions.template.savedMessage', defaultMessage: '"{name}" ({n, plural, one {# agent} other {# agents}}), for {scope, select, workspace {the workspace} other {this project}}.', description: "Under the notification that a template ({name}) of {n} agents was saved for the workspace (workspace) or this project (other)." }), { name: r.saved.name, n: r.saved.agents.length, scope }))
+  if (r && 'saved' in r) {
+    // What it holds of the workflow (HI-1910): the section saved now, those kept from the template it replaced, or none.
+    const w = r.workflow
+    const lines = [
+      tr(msg({ id: 'actions.template.savedMessage', defaultMessage: '"{name}" ({n, plural, one {# agent} other {# agents}}), for {scope, select, workspace {the workspace} other {this project}}.', description: "Under the notification that a template ({name}) of {n} agents was saved for the workspace (workspace) or this project (other)." }), { name: r.saved.name, n: r.saved.agents.length, scope }),
+      ...(w.saved ? [tr(TW.saved, { platform: tr(PLATFORM_NAME[w.saved]) })] : []),
+      ...(w.kept.length ? [tr(TW.kept, { count: w.kept.length, platforms: fmt.list(w.kept.map((k) => tr(PLATFORM_NAME[k]))) })] : []),
+      ...(!w.saved && !w.kept.length ? [tr(TW.none)] : [])
+    ]
+    notify('success', tr(msg({ id: 'actions.template.saved', defaultMessage: 'Template saved', description: "A notification's title: the template was saved." })), lines.join(' '))
+  }
 }
 
 /**
  * Loads a template into a project: it replaces every agent, so it says first who goes and who comes. Refused, saying
  * why, while an agent runs, a worktree has uncommitted work or a provider it needs is off or not installed (with a way
- * into Agent Setup or Settings). `from`: the project a project's template is kept in, when it isn't this one (the Templates
- * view loads any template into any project).
+ * into Provider Setup or Settings). `from`: the project a project's template is kept in, when it isn't this one (the Templates
+ * view loads any template into any project). A preset it suggests that the project's options didn't start from is
+ * offered (#1436): ticked, the Version Control tab's Workflow section opens with it chosen, not saved, so what it changes
+ * shows before anything is. HI-1910: a template's workflow for the project's version control is shown, and applied the
+ * same way (ticked by default): the Workflow section opens with it laid over the project's options as it reads them, to
+ * save there. A Git-only workflow in a project with no version control waits for Git: Set Up Git… closes the dialog and
+ * opens Version Control on Git's page (`templatePending`), and the dialog opens again once the project is Git.
  */
 export async function loadTemplate(path: string, entry: Pick<TemplateEntry, 'scope' | 'file' | 'name'>, from?: string): Promise<void> {
   const plan = await attempt(tr(msg({ id: 'actions.template.readFailed', defaultMessage: 'Could not read the template', description: "An error's title: reading a template failed." })), () => call('templates:plan', path, entry.scope, entry.file, from))
   if (!plan) return
   if (plan.blocked.length) {
-    // What each missing provider's problem is (#849), never its reason's words, which are in the window's language.
-    const fix = plan.missing.find((m) => m.problem === 'notInstalled')?.provider ?? null
-    const off = plan.missing.some((m) => m.problem === 'off')
     const where = project(path)?.name
-    const choice = await choose({
+    await choose({
       title: tr(msg({ id: 'actions.template.blockedTitle', defaultMessage: 'Can\'t load "{name}" yet', description: "Title of the message when a template ({name}) can't be loaded now (an agent runs, a provider is off…)." }), { name: plan.name }),
       message: tr(msg({ id: 'actions.template.blockedMessage', defaultMessage: "It can't be loaded into {project, select, none {this project} other {{project}}} yet:", description: "Above the reasons a template can't be loaded into a project ({project}; none when unknown)." }), { project: where ?? 'none' }),
       detail: plan.blocked.map((b) => `• ${b}`).join('\n'),
-      choices: [...(fix ? [{ label: tr(msg({ id: 'actions.template.openSetup', defaultMessage: 'Open Agent Setup', description: 'Button: opens Agent Setup (a Help window) to install a missing CLI.' })), value: 'setup' }] : []), { label: tr(msg({ id: 'actions.template.ok', defaultMessage: 'OK', description: "Button: closes the message that a template can't be loaded yet." })), value: 'ok' }]
+      choices: [{ label: tr(msg({ id: 'actions.template.ok', defaultMessage: 'OK', description: "Button: closes the message that a template can't be loaded yet." })), value: 'ok' }]
     })
-    if (choice === 'setup' && fix) set({ setupOpen: fix })
-    else if (off) notify('warning', tr(msg({ id: 'actions.template.providerOff', defaultMessage: 'A provider it needs is turned off', description: "A warning's title: a template needs a CLI that is turned off." })), tr(msg({ id: 'actions.template.providerOffMessage', defaultMessage: 'Turn it on in Settings → Providers, then load the template again.', description: 'Under the warning that a template needs a CLI that is turned off. Settings → Providers is where: use its translated names.' })), [{ label: openSettingsLabel(), command: 'settings.providers' }])
     return
   }
   const p = project(path)
@@ -1112,49 +1547,171 @@ export async function loadTemplate(path: string, entry: Pick<TemplateEntry, 'sco
   const expected = p.agents.map((a) => a.id)
   // The names its agents get (#702): chosen in the dialog, which greys out its button while one clashes.
   let names = plan.create.map((a) => a.name)
-  const removable = plan.oldWorktrees.filter((w) => w.removable)
-  let removeOld = false
-  let result: { oldWorktrees: OldWorktreeOutcome[] } | undefined
+  // The Connections section's answers (HI-2109), by the names chosen: none for an agent, its role's preselected one.
+  let connections: ConnectionAnswers = {}
+  // Its workflow (HI-1910) replaces the suggestion: shown and applied where it has a section for this project's version
+  // control, waiting for Git where it has only Git's, said where one can't be used (never replaced by the suggestion).
+  const wf = plan.workflow
+  const suggested = wf ? null : plan.suggestedPreset
+  let switchPreset = false
+  let applyWorkflow = true
+  let setUpGit = false
+  // Over its Maximum agents without its workflow (HI-2058): the dialog's link closes it for Version Control → Workflow.
+  let openWorkflow = false
+  // The plan the dialog shows last, and what the load read (HR5's round 1: never a workflow other than the one shown).
+  let shown = plan
+  const got: { loaded: { workflow: TemplateWorkflow | null; maxAgents?: number } | null } = { loaded: null }
   const ok = await confirm({
     title: tr(msg({ id: 'actions.template.loadTitle', defaultMessage: 'Load "{name}"?', description: 'Title of the question before loading a template ({name}) into a project.' }), { name: plan.name }),
     message: plan.remove.length
       ? tr(msg({ id: 'actions.template.loadReplaces', defaultMessage: 'It replaces every agent of {project}.', description: 'The question before loading a template: its agents replace every agent of the project ({project}).' }), { project: p.name })
       : tr(msg({ id: 'actions.template.loadAdds', defaultMessage: 'It adds its agents to {project}.', description: 'The question before loading a template into a project ({project}) with no agents.' }), { project: p.name }),
-    // Who goes and who comes: each new agent's settings, and its new worktree's branch and folder in this project (#268),
-    // as a table (#511), with their names to choose (#702).
-    detail: templateLoadDetail(plan, p.config, get().settings, (id) => get().providers[id]),
-    content: createElement(TemplateLoadNames, { path, scope: entry.scope, file: entry.file, from, initial: plan, onChange: (now: string[]) => void (names = now) }),
+    // Who goes and who comes, each on the connection its role starts on (HI-2109), as a table (#511), with their names to
+    // choose (#702) and the Connections section.
+    detail: templateLoadDetail(plan, (i) => plan.options.find((o) => o.id === loadFallback(plan.create, plan.options)(plan.create[i])) ?? null, get().settings),
+    content: createElement(TemplateLoadNames, {
+      path,
+      scope: entry.scope,
+      file: entry.file,
+      from,
+      initial: plan,
+      onChange: (now: string[]) => void (names = now),
+      onConnections: (now: ConnectionAnswers) => void (connections = now),
+      onWorkflow: (v: boolean) => void (applyWorkflow = v),
+      onOpenWorkflow: () => {
+        openWorkflow = true
+        cancelDialog()
+      },
+      onPlan: (now: TemplateLoadPlan) => void (shown = now),
+      // Closes this dialog (nothing loaded) for Version Control's Git page: never a dialog over a dialog.
+      onSetUpGit: () => {
+        setUpGit = true
+        cancelDialog()
+      }
+    }),
     wide: true,
     scrollDetail: true,
     confirmLabel: tr(msg({ id: 'actions.template.load', defaultMessage: 'Load template', description: 'Button: loads the template into the project.' })),
     busyLabel: tr(msg({ id: 'actions.template.loading', defaultMessage: 'Loading…', description: 'The Load template button while it works.' })),
     danger: plan.remove.length > 0,
-    // The removed agents' worktrees that are merged and clean can go with the load, if ticked (off by default, #289).
-    check: removable.length ? { label: removeOldLabel(removable.map((w) => w.branch), plan.mergedInto), initial: false, set: (v) => (removeOld = v) } : undefined,
+    // The preset it suggests (#1436): off by default, and only ever chosen in the form, never saved from here.
+    check: suggested ? { label: tr(msg({ id: 'actions.template.switchPreset', defaultMessage: 'Also switch this project to {preset}… (opens Version Control → Workflow with it chosen, to save there)', description: "A tick box when loading a template that suggests a preset ({preset}: Solo, Pair or Team, as the presets are named): after loading, the project's Version Control tab opens at Workflow with that preset chosen but not saved. Glossary: preset." }), { preset: tr(PRESET_TEXT[suggested]) }), initial: false, set: (v) => (switchPreset = v) } : undefined,
     run: async () => {
-      result = await call('templates:load', path, entry.scope, entry.file, expected, from, removeOld ? { paths: removable.map((w) => w.path), mergedInto: plan.mergedInto } : undefined, names)
+      // Its workflow ticked: its Maximum agents is saved with its agents (HI-2058), the rest filled in below.
+      got.loaded = await call('templates:load', path, entry.scope, entry.file, expected, from, names, connections, applyWorkflow && !!shown.workflow?.section)
     }
   })
-  if (!ok) return
+  if (!ok) {
+    if (openWorkflow) openVersionControl(path, 'workflow')
+    if (setUpGit) {
+      set({ templatePending: { path, entry: { scope: entry.scope, file: entry.file, name: entry.name }, ...(from ? { from } : {}) }, vcGitPreview: path })
+      openVersionControl(path, 'workflow')
+    }
+    return
+  }
   await refreshWorkspace()
-  const said = oldWorktreesNotice(result?.oldWorktrees ?? [])
-  if (said) notify(said.level, said.title, said.detail)
+  const seen = shown.workflow
+  if (applyWorkflow && seen?.section) {
+    // The section the load read, only if it is the one shown: changed meanwhile, it is said, never filled in.
+    const section = got.loaded?.workflow ?? null
+    if (JSON.stringify(section) !== JSON.stringify(seen.section)) notify('warning', tr(TW.changed, { template: plan.name }))
+    else {
+      // Laid over the project's options as the Workflow form reads them, and left for the user to save (HR5: never here).
+      // Its Maximum agents isn't: the load saved it with the agents (HI-2058), and the form reads it as the project's own.
+      const { maxAgents: _saved, ...rules } = seen.section.options
+      // The Maximum agents it saved, if it did (HI-2083: the form's note says what is saved already).
+      const savedMax = got.loaded?.maxAgents
+      set({ workflowPrefill: { path, preset: seen.section.preset, template: { name: plan.name, platform: seen.platform, section: { ...seen.section, options: rules }, ...(savedMax !== undefined ? { savedMax } : {}) } } })
+      openVersionControl(path, 'workflow')
+    }
+  } else if (suggested && switchPreset) {
+    // Filled in once the form has read the project's options (#1423's way), and left for the user to save.
+    set({ workflowPrefill: { path, preset: suggested } })
+    openVersionControl(path, 'workflow')
+  }
 }
 
-/** The tick box for removing the old worktrees that are merged and clean (#289). */
-function removeOldLabel(branches: string[], into: string | null): string {
-  return tr(msg({ id: 'actions.template.removeOld', defaultMessage: '{n, plural, one {Also remove the old worktree and its branch} other {Also remove # old worktrees and their branches}} (merged into {into, select, none {the main branch} other {{into}}} and clean): {branches}', description: "A tick box when loading a template: also delete the replaced agents' {n} worktrees and branches that are merged into a branch ({into}; none when it isn't known) and have no changes. {branches} lists them." }), { n: branches.length, into: into ?? 'none', branches: branches.join(', ') })
-}
-
-/** Adds one agent of a template, the project's others left alone (a name already taken gets a number). */
-export async function addAgentFromTemplate(path: string, entry: Pick<TemplateEntry, 'scope' | 'file'>, index: number): Promise<void> {
-  const def = await attempt(tr(msg({ id: 'actions.template.addAgentFailed', defaultMessage: 'Could not add the agent', description: "An error's title: adding an agent from a template failed." })), () => call('templates:addAgent', path, entry.scope, entry.file, index))
-  if (!def) return
-  // A clean worktree Hive made for that name, which no agent used, is worked in again rather than a new "-2" (#289).
-  if (def.reused && def.worktree) notify('info', tr(msg({ id: 'actions.template.reusedTitle', defaultMessage: '{agent} works in its worktree again', description: "A notification's title: an agent added from a template ({agent}) works in the clean worktree it had before." }), { agent: def.name }), tr(msg({ id: 'actions.template.reusedMessage', defaultMessage: '{branch} in {path}: it was clean, and its branch is left as it is.', description: 'Under the notification that an agent works in its old worktree again: its branch ({branch}) and folder ({path}).' }), { branch: def.worktree.branch, path: def.worktree.path }))
-  await refreshWorkspace()
+/**
+ * Adds one agent of a template (#1440): a dialog with what it is (its role, and the CLI it suggests) and its name to
+ * choose, starting as the template's (made with this project's key), or a free one when another agent of the workspace
+ * has it; a name taken is refused there, with a free one to use. It runs on its role's preselected connection (HI-2109:
+ * the first on the CLI it suggests), changed afterwards in Agent Settings or with Choose Connections….
+ */
+export async function addAgentFromTemplate(path: string, entry: Pick<TemplateEntry, 'scope' | 'file' | 'agents'>, index: number): Promise<void> {
   const p = project(path)
-  if (p) showAgent(p, def.id, 'select')
+  const a = entry.agents[index]
+  if (!p || !a) return
+  const key = get().projectKeys.find((k) => k.projectPath.toLowerCase() === path.toLowerCase())?.key ?? null
+  const failed = tr(msg({ id: 'actions.template.addAgentFailed', defaultMessage: 'Could not add the agent', description: "An error's title: adding an agent from a template failed." }))
+  // Names made from the project's key that isn't known here: Hive says why (never a guessed key).
+  if (!key && usesKey(entry.agents)) {
+    if (await attempt(failed, () => call('templates:addAgent', path, entry.scope, entry.file, index))) await refreshWorkspace()
+    return
+  }
+  const everyone = workspaceAgentList(get().workspace?.projects)
+  const own = templateAgentNames(entry.agents, key ?? '')[index]
+  const initial = nameTaken(own, everyone) ? suggestTemplateAgentName(own, p.name, key, everyone.map((x) => x.name)) : own
+  const name = await prompt({
+    title: tr(msg({ id: 'actions.template.addTitle', defaultMessage: 'Add an agent from a template', description: 'Title of the dialog that adds one agent of a template to the project (#1440).' })),
+    message: tr(msg({ id: 'actions.template.addSuggests', defaultMessage: '{role}{hasCli, select, yes { · suggests {cli}} other {}}', description: "The dialog adding one agent of a template (HI-2109): what it is: its role in the workflow ({role}: Builder, Reviewer, Either) and the coding agent CLI the template suggests ({cli}), which picks the connection it starts on. Lower case after the dot." }), { role: tr(WORKFLOW_ROLE_TEXT[a.role].name), hasCli: a.provider && isKnownProvider(a.provider) ? 'yes' : 'no', cli: a.provider && isKnownProvider(a.provider) ? providerName(a.provider) : '' }),
+    fieldLabel: tr(msg({ id: 'actions.template.addName', defaultMessage: 'Its name', description: 'The dialog adding one agent of a template: the label of its name box.' })),
+    initial,
+    confirmLabel: tr(msg({ id: 'actions.template.addConfirm', defaultMessage: 'Add Agent', description: "The dialog adding one agent of a template: its button." })),
+    validate: (v) => {
+      const why = agentNameProblem(v, tr)
+      if (why) return why
+      const owner = nameTaken(v.trim(), everyone)
+      return owner ? nameTakenMessage(v.trim(), owner, suggestTemplateAgentName(v.trim(), p.name, key, everyone.map((x) => x.name)), tr) : null
+    }
+  })
+  if (name === null) return
+  const def = await attempt(failed, () => call('templates:addAgent', path, entry.scope, entry.file, index, undefined, name.trim()))
+  if (!def) return
+  await refreshWorkspace()
+  const now = project(path)
+  if (now) showAgent(now, def.id, 'select')
+}
+
+/**
+ * Choose Connections… (HI-2109, on the project's Agents page): the Load template dialog's picker over the project's
+ * existing agents, by their roles; it changes only their connections, nothing loaded or replaced ("high effort for every
+ * builder here"). Each choice starts at "keep each one's". Running agents keep their old connection until they restart:
+ * offered once it's done, as a change of connection is in Settings (each switches once its turn is over).
+ */
+export async function chooseConnections(path: string): Promise<void> {
+  const failed = tr(msg({ id: 'actions.chooseConnections.failed', defaultMessage: 'Could not change the connections', description: "An error's title (HI-2109): Choose Connections failed to read or change the agents' connections." }))
+  const plan = await attempt(failed, () => call('templates:connectionsPlan', path))
+  if (!plan) return
+  const p = project(path)
+  if (!p || !plan.agents.length) return
+  let answers: ConnectionAnswers = {}
+  let done: ConnectionsApplied | null = null
+  const ok = await confirm({
+    title: tr(msg({ id: 'actions.chooseConnections.title', defaultMessage: 'Choose connections for {project}', description: "Title of the Choose Connections dialog (HI-2109): chooses the connections (named setups on accounts: model, effort, mode) of a project's ({project}) agents, by role or one by one." }), { project: p.name }),
+    message: tr(msg({ id: 'actions.chooseConnections.message', defaultMessage: 'Only their connections change: no agent is replaced, and their conversations stay.', description: 'The Choose Connections dialog (HI-2109), under its title: it changes nothing but the agents\' connections.' })),
+    content: createElement(ChooseConnectionsBody, { plan, onAnswers: (now: ConnectionAnswers) => void (answers = now) }),
+    wide: true,
+    confirmLabel: tr(msg({ id: 'actions.chooseConnections.confirm', defaultMessage: 'Apply', description: 'The Choose Connections dialog\'s button (HI-2109): gives the agents the connections chosen.' })),
+    busyLabel: tr(msg({ id: 'actions.chooseConnections.busy', defaultMessage: 'Applying…', description: "The Choose Connections dialog's button while it works (HI-2109)." })),
+    run: async () => {
+      // Bound to the agents the dialog showed (HR3's round 2): changed since, it is refused, nothing changed.
+      done = await call('templates:applyConnections', path, answers, plan.agents.map((a) => a.id))
+    }
+  })
+  if (!ok || !done) return
+  await refreshWorkspace()
+  const r: ConnectionsApplied = done
+  if (r.skipped.length) notify('warning', tr(msg({ id: 'actions.chooseConnections.skipped', defaultMessage: '{count, plural, one {# agent kept its connection} other {# agents kept their connections}}', description: "A warning's title after Choose Connections (HI-2109): some agents ({count}) couldn't be changed." }), { count: r.skipped.length }), r.skipped.map((s) => tr(msg({ id: 'actions.chooseConnections.skippedWhy', defaultMessage: '{agent}: {why, select, running {it runs, and that connection is another coding agent’s: stop it first} other {it was removed meanwhile}}.', description: "Under that warning (HI-2109), one line per agent ({agent}): why its connection didn't change." }), { agent: s.name, why: s.why })).join('\n'))
+  if (!r.restart.length) return
+  const choice = await choose({
+    title: tr(msg({ id: 'actions.chooseConnections.restartTitle', defaultMessage: 'Switch the running agents?', description: 'Title of the question after Choose Connections (HI-2109) changed the connection of agents that are running.' })),
+    message: tr(msg({ id: 'actions.chooseConnections.restartMessage', defaultMessage: '{agents} {count, plural, one {runs on its old connection until it restarts.} other {run on their old connections until they restart.}}', description: 'That question (HI-2109): the running agents ({agents}, a list; {count} of them) keep their old connection until they restart.' }), { agents: fmt.list(r.restart.map((a) => a.name)), count: r.restart.length }),
+    choices: [
+      { label: tr(msg({ id: 'actions.chooseConnections.switch', defaultMessage: 'Switch Them When Their Turn Is Over', description: 'Button (HI-2109): each running agent ends once its turn is over and carries on, on the connection chosen now.' })), value: 'switch' },
+      { label: tr(msg({ id: 'actions.chooseConnections.later', defaultMessage: 'Later', description: 'Button (HI-2109): leaves the running agents on their old connections until they restart.' })), value: 'later' }
+    ]
+  })
+  if (choice === 'switch') await attempt(failed, () => call('connections:switchAffected'))
 }
 
 /** Removes an agent; for a worktree agent, asks whether to keep its worktree and branch. */
@@ -1165,11 +1722,13 @@ export async function removeAgent(path: string, agentId: string): Promise<void> 
   if (a.live && !(await stopIfRunning(path, agentId, { what: 'remove', agent: a.name }, 'remove'))) return
   let deleteWorktree = false
   const removeTitle = (): string => tr(msg({ id: 'actions.remove.title', defaultMessage: 'Remove {agent}?', description: 'Title of the question before removing an agent ({agent}).' }), { agent: a.name })
-  if (a.worktree) {
+  // Its 0.9 worktree (#1442: slots are the pool's, never the agent's): kept or deleted with it.
+  const own = legacyOf(a)
+  if (own) {
     const keep = await confirm({
       title: removeTitle(),
-      message: tr(msg({ id: 'actions.remove.worktreeMessage', defaultMessage: '{agent} works in its own worktree on branch {branch}.', description: 'The question before removing a worktree agent ({agent}): its git branch ({branch}).' }), { agent: a.name, branch: a.worktree.branch }),
-      detail: tr(msg({ id: 'actions.remove.worktreeDetail', defaultMessage: 'Keep the worktree and branch to merge or reuse them later (Add Agent → Existing worktree), or delete both. Its sessions stay in the Sessions tab either way.', description: 'Under the question before removing a worktree agent. Add Agent → Existing worktree is where: use the translated names.' })),
+      message: tr(msg({ id: 'actions.remove.worktreeMessage', defaultMessage: '{agent} works in its own worktree on branch {branch}.', description: 'The question before removing a worktree agent ({agent}): its git branch ({branch}).' }), { agent: a.name, branch: own.branch }),
+      detail: tr(msg({ id: 'actions.remove.worktreeDetail', defaultMessage: 'Keep the worktree and branch to merge them later, or delete both. Its sessions stay in the Sessions tab either way.', description: 'Under the question before removing an agent that works in its own worktree from before 1.0.' })),
       confirmLabel: tr(msg({ id: 'actions.remove.keepWorktree', defaultMessage: 'Keep worktree and branch', description: "Button: removes the agent and keeps its worktree and branch." })),
       cancelLabel: tr(msg({ id: 'actions.remove.deleteThem', defaultMessage: 'Delete them…', description: "Button: goes on to delete the agent's worktree and branch (asks again)." })),
       action: 'remove'
@@ -1177,8 +1736,8 @@ export async function removeAgent(path: string, agentId: string): Promise<void> 
     if (!keep) {
       const del = await confirm({
         title: tr(msg({ id: 'actions.remove.deleteTitle', defaultMessage: 'Delete the worktree and branch?', description: "Title of the question before deleting a removed agent's worktree and branch." })),
-        message: tr(msg({ id: 'actions.remove.deleteMessage', defaultMessage: 'Delete {path} and branch {branch}?', description: "The question before deleting a removed agent's worktree folder ({path}) and git branch ({branch})." }), { path: a.worktree.path, branch: a.worktree.branch }),
-        detail: tr(msg({ id: 'actions.remove.deleteDetail', defaultMessage: "Anything on {branch} that hasn't been merged is lost. Cancel keeps the agent.", description: "Under the question before deleting a worktree and branch ({branch}). Cancel is the dialog's other button." }), { branch: a.worktree.branch }),
+        message: tr(msg({ id: 'actions.remove.deleteMessage', defaultMessage: 'Delete {path} and branch {branch}?', description: "The question before deleting a removed agent's worktree folder ({path}) and git branch ({branch})." }), { path: own.path, branch: own.branch }),
+        detail: tr(msg({ id: 'actions.remove.deleteDetail', defaultMessage: "Anything on {branch} that hasn't been merged is lost. Cancel keeps the agent.", description: "Under the question before deleting a worktree and branch ({branch}). Cancel is the dialog's other button." }), { branch: own.branch }),
         confirmLabel: tr(msg({ id: 'actions.remove.deleteConfirm', defaultMessage: 'Delete worktree and branch', description: "Button: deletes the agent's worktree and branch and removes it." })),
         danger: true
       })
@@ -1194,7 +1753,7 @@ export async function removeAgent(path: string, agentId: string): Promise<void> 
   focusAfterRemoving(p, agentId)
   await refreshWorkspace()
   // Kept, it is an unused worktree now (#353): said once, with where to tidy it.
-  if (a.worktree && !deleteWorktree) notify('info', tr(msg({ id: 'actions.remove.keptTitle', defaultMessage: "{agent}'s worktree is kept", description: "A notification's title: a removed agent's ({agent}) worktree was kept." }), { agent: a.name }), tr(msg({ id: 'actions.remove.keptMessage', defaultMessage: "{branch} in {path}. Git → Changes lists the project's unused worktrees, merged or not.", description: "Under the notification that a removed agent's worktree was kept: its branch ({branch}) and folder ({path}). Git → Changes is a project tab: use its translated names." }), { branch: a.worktree.branch, path: a.worktree.path }), [reviewUnused(path)])
+  if (own && !deleteWorktree) notify('info', tr(msg({ id: 'actions.remove.keptTitle', defaultMessage: "{agent}'s worktree is kept", description: "A notification's title: a removed agent's ({agent}) worktree was kept." }), { agent: a.name }), tr(msg({ id: 'actions.remove.keptMessage', defaultMessage: "{branch} in {path}. Version Control → Changes lists the project's unused worktrees, merged or not.", description: "Under the notification that a removed agent's worktree was kept: its branch ({branch}) and folder ({path}). Version Control → Changes is a project tab: use its translated names." }), { branch: own.branch, path: own.path }), [reviewUnused(path)])
 }
 
 /** A notification's button to the project's unused worktrees (#353). */
@@ -1215,11 +1774,11 @@ export function removeAllAgents(path: string): Promise<void> {
 async function removeAllAgents_(path: string): Promise<void> {
   const p = project(path)
   if (!p || isAssistantPath(path) || !p.agents.length) return
-  const checks = p.agents.some((a) => a.worktree) ? await attempt(tr(msg({ id: 'actions.removeAll.checkFailed', defaultMessage: 'Could not check the worktrees', description: "An error's title: checking whether the agents' worktrees are merged failed (Remove All)." })), () => call('agents:worktreeChecks', path)) : []
+  const checks = p.agents.some((a) => legacyOf(a)) ? await attempt(tr(msg({ id: 'actions.removeAll.checkFailed', defaultMessage: 'Could not check the worktrees', description: "An error's title: checking whether the agents' worktrees are merged failed (Remove All)." })), () => call('agents:worktreeChecks', path)) : []
   if (!checks) return
   const checkOf = (id: string) => checks.find((c) => c.agentId === id)
   const agents = p.agents
-  const trees = agents.filter((a) => a.worktree)
+  const trees = agents.filter((a) => legacyOf(a))
   const removable = trees.filter((a) => checkOf(a.id)?.removable)
   const into = checks.find((c) => c.into)?.into
   let deleteMerged = false
@@ -1241,7 +1800,7 @@ async function removeAllAgents_(path: string): Promise<void> {
     content: createElement(AgentsDetail, { data, note }),
     wide: true,
     check: removable.length
-      ? { label: tr(msg({ id: 'actions.removeAll.deleteMerged', defaultMessage: 'Also delete the worktrees and branches fully merged into {into} with no uncommitted changes: {branches}', description: "Remove All's tick box: also delete the agents' worktrees and branches merged into a branch ({into}) with no changes. {branches} lists them." }), { into: into ?? '', branches: removable.map((a) => a.worktree!.branch).join(', ') }), initial: false, set: (v) => (deleteMerged = v) }
+      ? { label: tr(msg({ id: 'actions.removeAll.deleteMerged', defaultMessage: 'Also delete the worktrees and branches fully merged into {into} with no uncommitted changes: {branches}', description: "Remove All's tick box: also delete the agents' worktrees and branches merged into a branch ({into}) with no changes. {branches} lists them." }), { into: into ?? '', branches: removable.map((a) => legacyOf(a)?.branch ?? '').join(', ') }), initial: false, set: (v) => (deleteMerged = v) }
       : undefined,
     confirmLabel: tr(msg({ id: 'actions.removeAll.confirm', defaultMessage: '{n, plural, one {Remove} other {Remove # agents}}', description: "Remove All's button ({n} agents)." }), { n: agents.length }),
     danger: true,
@@ -1298,13 +1857,67 @@ async function removeAllAgents_(path: string): Promise<void> {
 }
 
 /** Removes a worktree agent together with its worktree and branch. */
+/**
+ * Release Slot… (#1441): an agent's adopted worktree (its carried slot) no longer kept for it, asked first. The folder
+ * and its branch stay; Hive lends it to new work once it is clean, and may rename it to a slot's name.
+ */
+export async function releaseCarriedSlot(path: string, agentId: string): Promise<void> {
+  const a = agentOf(project(path), agentId)
+  if (!a?.carriedSlot) return
+  const ok = await confirm({
+    title: tr(msg({ id: 'actions.releaseSlot.title', defaultMessage: "Release {agent}'s slot {slot}?", description: "Title of the question before releasing an agent's ({agent}) slot ({slot}, such as hb2): its own worktree from before 1.0, kept for it as a slot since the upgrade." }), { agent: a.name, slot: a.carriedSlot }),
+    message: tr(msg({ id: 'actions.releaseSlot.message', defaultMessage: '{slot} stops being kept for {agent}. Its folder and branch stay; Hive lends it to new work once it is clean, and may rename its folder to a slot name.', description: "The question before releasing an agent's ({agent}) slot ({slot}): what happens to it after." }), { agent: a.name, slot: a.carriedSlot }),
+    detail: tr(msg({ id: 'actions.releaseSlot.detail', defaultMessage: "{agent}'s conversations there can be resumed while nothing else uses the slot.", description: "Under the question before releasing an agent's ({agent}) slot." }), { agent: a.name }),
+    confirmLabel: tr(msg({ id: 'actions.releaseSlot.confirm', defaultMessage: 'Release', description: "Button: releases the agent's slot." }))
+  })
+  if (!ok) return
+  await attempt(tr(msg({ id: 'actions.releaseSlot.failed', defaultMessage: "Could not release the slot", description: "An error's title: releasing an agent's slot failed." })), () => call('slots:releaseCarried', path, agentId))
+  await refreshWorkspace()
+}
+
+/**
+ * Release Slot… on a held writer (#1506): a slot an agent's run that is over still holds, its processes not known to have
+ * ended (Hive quit or closed with it running, its processes kept running, or not tracked). Shows who held it and what
+ * Hive lists of its processes, offers to end those first, and releases it once the user confirms; main refuses while
+ * its Hive or run still lives, or when the slot changed meanwhile (the refusal stays in the dialog).
+ */
+export async function releaseHeldSlot(path: string, slot: string): Promise<void> {
+  const w = await attempt(tr(msg({ id: 'actions.releaseHeld.readFailed', defaultMessage: "Could not read the slot's writer", description: "An error's title: Hive couldn't read who holds a slot, before Release Slot…'s question." })), () => call('slots:heldWriter', path, slot))
+  if (!w) return
+  const agent = agentOf(project(path), w.agent)?.name ?? w.agent
+  // Only Windows' own idle Sandbox broker left (HI-2309): releasing is safe, and it is left running unless asked.
+  const idle = !!w.idleBrokers && !!w.processes?.list.length
+  let end = !!w.processes?.list.length && !idle
+  const names = idle ? fmt.list(w.processes!.list.map((p) => p.name.replace(/\.exe$/i, '')), 'unit') : ''
+  const ok = await confirm({
+    title: tr(msg({ id: 'actions.releaseHeld.title', defaultMessage: "Release {agent}'s slot {slot}?", description: "Title of the question before releasing a slot ({slot}, such as slot-b) that an agent's ({agent}) last session there still holds: it has ended, but Hive doesn't know that everything it started has." }), { agent, slot }),
+    message: idle
+      ? tr(msg({ id: 'actions.releaseHeld.messageIdleBroker', defaultMessage: "{slot} is held by {names}, Windows' idle Sandbox broker, left by {agent}'s last session there (run {run}). No Sandbox is running, so releasing it is safe.", description: "Release Slot… (HI-2309): the slot ({slot}) is held only by Windows' own idle Windows Sandbox broker ({names}: its process names, such as WindowsSandboxServer), which the agent's ({agent}) last session left; no Sandbox runs, so nothing can write in the slot through it. {run} is the session's run id (a code such as 3f9a1c…)." }), { slot, names, agent, run: w.run })
+      : w.hive.self
+      ? tr(msg({ id: 'actions.releaseHeld.messageSelf', defaultMessage: "{agent}'s last session in {slot} (run {run}) has ended in this Hive (process {pid}, running), but Hive doesn't know that everything it started there has: until you release it, nothing else uses the slot.", description: "Release Slot…: why the slot ({slot}) is held. The session of the agent ({agent}) ended in this Hive; its processes were kept running or Hive could not follow them. {run} is the session's run id (a code such as 3f9a1c…), {pid} this Hive's process id: they tell one launch from another." }), { agent, slot, run: w.run, pid: w.hive.pid })
+      : tr(msg({ id: 'actions.releaseHeld.messageGone', defaultMessage: "{slot} is held by a session of agent {agent} (run {run}) in a Hive that is no longer running (process {pid}). Hive can't tell whether what it started still runs: until you release it, nothing else uses the slot.", description: "Release Slot…: why the slot ({slot}) is held. The agent ({agent}) ran there in a copy of Hive that quit or closed unexpectedly; {run} is the session's run id (a code such as 3f9a1c…), {pid} that Hive's process id: they tell one launch from another. A noun before the name (glossary §1 rule 4)." }), { agent, slot, run: w.run, pid: w.hive.pid }),
+    ...(w.processes?.list.length ? { list: w.processes.list.map((p) => tr(msg({ id: 'actions.releaseHeld.process', defaultMessage: '{label} (process {pid})', description: "Release Slot…: one process the agent's session left running, as listed: what it runs ({label}, such as node serve.js) and its process id ({pid})." }), { label: p.label, pid: p.pid })), listOnly: true } : {}),
+    detail: idle
+      ? tr(msg({ id: 'actions.releaseHeld.detailIdleBroker', defaultMessage: 'Released, the broker is left running: it is Windows’ own, and closes by itself.', description: "Release Slot… (HI-2309), under the question about a slot held only by Windows' idle Sandbox broker: releasing doesn't end it unless the box below is ticked." }))
+      : w.processes?.list.length
+      ? tr(msg({ id: 'actions.releaseHeld.detailListed', defaultMessage: '{n, plural, one {Hive lists # process its session left running.} other {Hive lists # processes its session left running.}} Released while they run, they may still write in the slot as other work uses it.', description: "Release Slot…: under the list of processes the agent's session left running ({n}: how many)." }), { n: w.processes.list.length + w.processes.more })
+      : tr(msg({ id: 'actions.releaseHeld.detailUnknown', defaultMessage: "Hive doesn't know which of the processes its session started still run. Release it once you know nothing of it still writes in the slot.", description: "Release Slot…: Hive lists no processes the agent's session left running, so it can't say whether any still run." })),
+    ...(w.processes?.list.length ? { check: { label: tr(msg({ id: 'actions.releaseHeld.endFirst', defaultMessage: 'End these processes first', description: "Release Slot…: a tick box, on by default: Hive ends the listed processes before releasing the slot." })), initial: !idle, set: (v: boolean) => (end = v) } } : {}),
+    confirmLabel: tr(msg({ id: 'actions.releaseHeld.confirm', defaultMessage: 'Release', description: 'Button: releases the slot.' })),
+    danger: true,
+    run: () => call('slots:releaseWriter', path, slot, w.run, end)
+  })
+  if (ok) await refreshWorkspace()
+}
+
 export async function discardAgent(path: string, agentId: string): Promise<void> {
   const p = project(path)
   const a = agentOf(p, agentId)
-  if (!p || !a?.worktree) return
+  const own = a ? legacyOf(a) : null
+  if (!p || !a || !own) return
   const ok = await confirm({
     title: tr(msg({ id: 'actions.discard.title', defaultMessage: "Discard {agent}'s work?", description: "Title of the question before deleting a worktree agent's ({agent}) worktree and branch and removing it." }), { agent: a.name }),
-    message: tr(msg({ id: 'actions.discard.message', defaultMessage: 'Delete the worktree {path} and branch {branch}, and remove {agent}?', description: "The question before discarding a worktree agent's ({agent}) work: its worktree folder ({path}) and git branch ({branch})." }), { agent: a.name, path: a.worktree.path, branch: a.worktree.branch }),
+    message: tr(msg({ id: 'actions.discard.message', defaultMessage: 'Delete the worktree {path} and branch {branch}, and remove {agent}?', description: "The question before discarding a worktree agent's ({agent}) work: its worktree folder ({path}) and git branch ({branch})." }), { agent: a.name, path: own.path, branch: own.branch }),
     detail: tr(msg({ id: 'actions.discard.detail', defaultMessage: "Everything on the branch that hasn't been merged is lost. Its sessions stay in the Sessions tab.", description: "Under the question before discarding a worktree agent's work." })),
     confirmLabel: tr(msg({ id: 'actions.discard.confirm', defaultMessage: 'Discard', description: "Button: deletes the agent's worktree and branch and removes it." })),
     danger: true
@@ -1365,8 +1978,8 @@ export async function refreshProviders(): Promise<void> {
   if (!enabled.length) return notify('info', tr(msg({ id: 'actions.providers.noneOn', defaultMessage: 'No providers are turned on', description: "A notification's title: no coding agent CLI is turned on in Settings." })), tr(msg({ id: 'actions.providers.noneOnMessage', defaultMessage: 'Turn on Claude Code or another provider in Settings → Providers.', description: 'Under the notification that no provider is on. Claude Code is a name; Settings → Providers is where: use its translated names.' })), [{ label: openSettingsLabel(), command: 'settings.providers' }])
   for (const info of enabled) {
     const name = providerName(info.provider)
-    if (!info.found) notify('warning', tr(msg({ id: 'actions.providers.notInstalled', defaultMessage: '{cli} not installed', description: "A warning's title: a coding agent CLI ({cli}: \"Codex\") isn't installed." }), { cli: name }), tr(msg({ id: 'actions.providers.notInstalledMessage', defaultMessage: 'Open Help → Agent Setup to install it.', description: "Under the warning that a CLI isn't installed. Help → Agent Setup is a menu command: use its translated names." })), [{ label: tr(msg({ id: 'actions.providers.agentSetup', defaultMessage: 'Agent Setup', description: "A notification's button: opens Agent Setup (a Help window). Keep it short." })), command: 'help.agentSetup' }])
-    else if (info.updateAvailable) notify('info', tr(msg({ id: 'actions.providers.updateTitle', defaultMessage: '{cli} {version} is available', description: "A notification's title: a newer version ({version}) of a CLI ({cli}) is out." }), { cli: name, version: info.latestVersion ?? '' }), tr(msg({ id: 'actions.providers.youHave', defaultMessage: 'You have {version}.', description: 'Under the notification that a newer CLI is out: the installed version ({version}).' }), { version: info.version ?? '' }), [{ label: tr(msg({ id: 'actions.providers.update', defaultMessage: 'Update', description: "A notification's button: opens Agent Setup to update the CLI. Keep it short." })), command: 'help.agentSetup', args: [info.provider] }])
+    if (!info.found) notify('warning', tr(msg({ id: 'actions.providers.notInstalled', defaultMessage: '{cli} not installed', description: "A warning's title: a coding agent CLI ({cli}: \"Codex\") isn't installed." }), { cli: name }), tr(msg({ id: 'actions.providers.notInstalledMessage', defaultMessage: 'Open Help → Provider Setup to install it.', description: "Under the warning that a CLI isn't installed. Help → Provider Setup is a menu command: use its translated names." })), [{ label: tr(msg({ id: 'actions.providers.agentSetup', defaultMessage: 'Provider Setup', description: "A notification's button: opens Provider Setup (a Help window). Keep it short." })), command: 'help.agentSetup' }])
+    else if (info.updateAvailable) notify('info', tr(msg({ id: 'actions.providers.updateTitle', defaultMessage: '{cli} {version} is available', description: "A notification's title: a newer version ({version}) of a CLI ({cli}) is out." }), { cli: name, version: info.latestVersion ?? '' }), tr(msg({ id: 'actions.providers.youHave', defaultMessage: 'You have {version}.', description: 'Under the notification that a newer CLI is out: the installed version ({version}).' }), { version: info.version ?? '' }), [{ label: tr(msg({ id: 'actions.providers.update', defaultMessage: 'Update', description: "A notification's button: opens Provider Setup to update the CLI. Keep it short." })), command: 'help.agentSetup', args: [info.provider] }])
     else notify('success', tr(msg({ id: 'actions.providers.upToDate', defaultMessage: '{cli} is up to date', description: "A notification's title: a CLI ({cli}) is the latest version." }), { cli: name }), tr(msg({ id: 'actions.providers.version', defaultMessage: 'Version {version}', description: 'Under the notification that a CLI is up to date: its version ({version}).' }), { version: info.version ?? '' }))
   }
 }
@@ -1385,15 +1998,15 @@ export async function importProjectMcp(path: string, names: string[]): Promise<v
     title: tr(msg({ id: 'mcp.import.confirmTitle', defaultMessage: '{count, plural, one {Copy {name} to the workspace?} other {Copy # MCP servers to the workspace?}}', description: "Title of Copy to workspace's confirmation. {count} servers a project defines in its own config; {name} the one when there is one." }), { count: servers.length, name: servers[0].name }),
     message: tr(
       msg({
-        id: 'mcp.import.confirmMessage',
-        defaultMessage: '{count, plural, one {It is turned on in {project} straight away; other projects can turn it on in their MCP tab. It runs:} other {They are turned on in {project} straight away; other projects can turn them on in their MCP tab. They run:}}',
+        id: 'mcp.import.confirmMessageAdded',
+        defaultMessage: '{count, plural, one {It is added to {project} straight away; other projects can add it in their MCP tab. It runs:} other {They are added to {project} straight away; other projects can add them in their MCP tab. They run:}}',
         description: "Copy to workspace's confirmation, above what the servers run. {count} is how many; {project} the project they come from."
       }),
       { count: servers.length, project: where }
     ),
     list: servers.flatMap((s) => (many ? s.runs.map((r) => `${s.name}: ${r}`) : s.runs)),
     detail: servers.flatMap((s) => s.secretWarnings).join('\n') || undefined,
-    confirmLabel: tr(msg({ id: 'mcp.import.confirmButton', defaultMessage: 'Copy and Turn On', description: "Button: copies the project's MCP servers to the workspace and turns them on in the project." }))
+    confirmLabel: tr(msg({ id: 'mcp.import.confirmButtonAdded', defaultMessage: 'Copy and Add', description: "Button (HI-2059): copies the project's MCP servers to the workspace and adds them to the project." }))
   })
   if (!ok) return
   const shown = Object.fromEntries(servers.map((s) => [s.name, s.def]))
@@ -1407,13 +2020,13 @@ export async function importProjectMcp(path: string, names: string[]): Promise<v
     off.length
       ? tr(
           msg({
-            id: 'mcp.import.changed',
-            defaultMessage: "{count, plural, one {{names} changed in the project's config after you saw it, so it was copied turned off: check what it runs and turn it on with its switch in the MCP view.} other {{names} changed in the project's config after you saw them, so they were copied turned off: check what they run and turn them on with their switches in the MCP view.}}",
+            id: 'mcp.import.changedAdded',
+            defaultMessage: "{count, plural, one {{names} changed in the project's config after you saw it, so it was copied but not added: check what it runs and add it in the project's MCP tab.} other {{names} changed in the project's config after you saw them, so they were copied but not added: check what they run and add them in the project's MCP tab.}}",
             description: 'After Copy to workspace, when servers changed between the confirmation and the copy. {names} lists them, {count} how many.'
           }),
           { count: off.length, names: fmt.list(off) }
         )
-      : tr(msg({ id: 'mcp.import.on', defaultMessage: 'On in {project} for new sessions.', description: 'After Copy to workspace: where the copied servers are on.' }), { project: where })
+      : tr(msg({ id: 'mcp.import.added', defaultMessage: 'Added to {project} for new sessions.', description: 'After Copy to workspace (HI-2059): where the copied servers are added.' }), { project: where })
   )
 }
 

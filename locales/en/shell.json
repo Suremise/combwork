@@ -119,6 +119,10 @@
     "defaultMessage": "Focus Agent {n}",
     "description": "A command per agent number (the menus, the command palette, Settings → Keyboard Shortcuts), in the Session category. {n} is the agent's place in the strip, 1 to 9."
   },
+  "shell.command.agent.hooks": {
+    "defaultMessage": "Agent Hooks…",
+    "description": "A command (the menus, the command palette, Settings → Keyboard Shortcuts), in the Session category: opens the focused agent's Hooks dialog (the hooks its session has, and what Hive received). The … says it opens a dialog first: keep it."
+  },
   "shell.command.agent.menu": {
     "defaultMessage": "Agent Menu…",
     "description": "A command (the menus, the command palette, Settings → Keyboard Shortcuts), in the Session category: opens the focused agent's ⋯ menu on its pane (everything its pane header doesn't show). The … says it opens a menu first: keep it."
@@ -216,7 +220,7 @@
     "description": "A command (the Help menu, the command palette), in the Help category. {app} is Hive's name."
   },
   "shell.command.help.agentSetup": {
-    "defaultMessage": "Agent Setup…",
+    "defaultMessage": "Provider Setup…",
     "description": "A command (the menus, the command palette, Settings → Keyboard Shortcuts), in the Help category. The … says it opens a dialog first: keep it."
   },
   "shell.command.help.api": {
@@ -255,6 +259,10 @@
     "defaultMessage": "Release Notes",
     "description": "A command (the menus, the command palette, Settings → Keyboard Shortcuts), in the Help category."
   },
+  "shell.command.help.restoreBoard09": {
+    "defaultMessage": "Restore the 0.9 Board Backup…",
+    "description": "A command (the Help menu, the command palette), in the Help category: puts back the copy of the workspace's board Hive kept when it upgraded the board to 1.0, for going back to Hive 0.9. The … says it asks first: keep it."
+  },
   "shell.command.help.shortcuts": {
     "defaultMessage": "Keyboard Shortcuts",
     "description": "A command (the menus, the command palette, Settings → Keyboard Shortcuts), in the Help category."
@@ -274,6 +282,10 @@
   "shell.command.notes.open": {
     "defaultMessage": "Open Shared Note",
     "description": "A command (the menus, the command palette, Settings → Keyboard Shortcuts), in the Notes category. It isn't in the menus or the palette: notifications and buttons run it by its name."
+  },
+  "shell.command.notice.openTarget": {
+    "defaultMessage": "Open What a Notification Is About",
+    "description": "A command (the menus, the command palette, Settings → Keyboard Shortcuts), in the Session category. It isn't in the menus or the palette: a click on a notification runs it by its name, to show the agent's pane or the card it names."
   },
   "shell.command.palette.show": {
     "defaultMessage": "Show All Commands",
@@ -307,6 +319,10 @@
     "defaultMessage": "Open External Terminal Here",
     "description": "A command (the menus, the command palette, Settings → Keyboard Shortcuts), in the Project category."
   },
+  "shell.command.project.openVersionControl": {
+    "defaultMessage": "Open Version Control",
+    "description": "A command, in the Project category: shows a project's Version Control tab (glossary 2.1). It isn't in the menus or the palette: notifications run it by its name (Hive found another version control in a project's folder)."
+  },
   "shell.command.project.previous": {
     "defaultMessage": "Previous Project",
     "description": "A command (the menus, the command palette, Settings → Keyboard Shortcuts), in the Project category."
@@ -319,9 +335,13 @@
     "defaultMessage": "Project Storage and Clean Up…",
     "description": "A command (the menus, the command palette, Settings → Keyboard Shortcuts), in the Project category. The … says it opens a dialog first: keep it."
   },
+  "shell.command.project.tab.activity": {
+    "defaultMessage": "Go to Activity",
+    "description": "A command (the menus, the command palette, Settings → Keyboard Shortcuts), in the Project category: shows the Activity tab, the project's live work as a tree."
+  },
   "shell.command.project.tab.changes": {
-    "defaultMessage": "Go to Git",
-    "description": "A command (the menus, the command palette, Settings → Keyboard Shortcuts), in the Project category."
+    "defaultMessage": "Go to Version Control",
+    "description": "A command (the menus, the command palette, Settings → Keyboard Shortcuts), in the Project category: shows the Version Control tab (glossary 2.1)."
   },
   "shell.command.project.tab.files": {
     "defaultMessage": "Go to Files",
@@ -415,6 +435,10 @@
     "defaultMessage": "Compact Conversation…",
     "description": "A command (the menus, the command palette, Settings → Keyboard Shortcuts), in the Session category. The … says it opens a dialog first: keep it."
   },
+  "shell.command.session.dismissRestart": {
+    "defaultMessage": "Don't Resume the Agents Working When Hive Closed",
+    "description": "A command (the menus, the command palette, Settings → Keyboard Shortcuts), in the Session category: declines the offer to resume the agents that were working when Hive was last quit or restarted. It isn't in the menus or the palette: notifications and buttons run it by its name."
+  },
   "shell.command.session.focusTerminal": {
     "defaultMessage": "Focus Session Terminal",
     "description": "A command (the menus, the command palette, Settings → Keyboard Shortcuts), in the Session category."
@@ -451,9 +475,21 @@
     "defaultMessage": "Resume the Agents Running When Hive Closed",
     "description": "A command (the menus, the command palette, Settings → Keyboard Shortcuts), in the Session category. It isn't in the menus or the palette: notifications and buttons run it by its name."
   },
+  "shell.command.session.resumeRestart": {
+    "defaultMessage": "Resume the Agents Working When Hive Closed",
+    "description": "A command (the menus, the command palette, Settings → Keyboard Shortcuts), in the Session category: resumes the agents that were working when Hive was last quit or restarted. It isn't in the menus or the palette: notifications and buttons run it by its name."
+  },
   "shell.command.session.settleLeftovers": {
     "defaultMessage": "End or Keep the Processes an Agent Left Running",
     "description": "A command (the menus, the command palette, Settings → Keyboard Shortcuts), in the Session category. It isn't in the menus or the palette: notifications and buttons run it by its name."
+  },
+  "shell.command.session.showTranscript": {
+    "defaultMessage": "Read a Session's Transcript",
+    "description": "A command (the menus, the command palette, Settings → Keyboard Shortcuts), in the Session category. It isn't in the menus or the palette: notifications and buttons run it by its name. It opens the Sessions tab on one session (#1434)."
+  },
+  "shell.command.session.startFreshIdle": {
+    "defaultMessage": "Start Fresh (Idle Agents)…",
+    "description": "A command (the menus, the command palette, Settings → Keyboard Shortcuts), in the Session category (#1437): gives each idle running agent of the project a new conversation, after one question. The … says it opens a dialog first: keep it."
   },
   "shell.command.session.startNewAll": {
     "defaultMessage": "Start New (All)…",
@@ -479,6 +515,10 @@
     "defaultMessage": "Switch Between Panes and Tiles",
     "description": "A command (the menus, the command palette, Settings → Keyboard Shortcuts), in the Session category: switches the Session tab between Panes (the agents' terminals) and Tiles (a small tile per agent). Panes and Tiles: as the toggle says them."
   },
+  "shell.command.settings.accounts": {
+    "defaultMessage": "Accounts & Connections",
+    "description": "A command (the menus, the command palette, Settings → Keyboard Shortcuts), in the Preferences category (HI-2107): opens Settings → Accounts & Connections."
+  },
   "shell.command.settings.advanced": {
     "defaultMessage": "Advanced Settings",
     "description": "A command (the menus, the command palette, Settings → Keyboard Shortcuts), in the Preferences category."
@@ -499,6 +539,10 @@
     "defaultMessage": "Choose Coding Agents (Providers)",
     "description": "A command (the menus, the command palette, Settings → Keyboard Shortcuts), in the Preferences category."
   },
+  "shell.command.slot.releaseHeld": {
+    "defaultMessage": "Release a Held Slot",
+    "description": "A command (the menus, the command palette, Settings → Keyboard Shortcuts), in the Session category. It isn't in the menus or the palette: a notice's button runs it by its name (HI-2309), asking first whether to release a slot that Windows' idle Sandbox broker holds."
+  },
   "shell.command.task.new": {
     "defaultMessage": "New Card…",
     "description": "A command (the menus, the command palette, Settings → Keyboard Shortcuts), in the Tasks category. The … says it opens a dialog first: keep it."
@@ -510,6 +554,14 @@
   "shell.command.task.undoArchive": {
     "defaultMessage": "Undo Archive",
     "description": "A command (the menus, the command palette, Settings → Keyboard Shortcuts), in the Tasks category. It isn't in the menus or the palette: notifications and buttons run it by its name."
+  },
+  "shell.command.team.pause": {
+    "defaultMessage": "Pause the Team",
+    "description": "A command (the command palette, Settings → Keyboard Shortcuts), in the Help category (HI-2081): before an update, Hive starts no lane card, wakes no agent with card events and gives no reviews out in every open workspace, and tells each running agent to park (finish its turn, end its runs, commit). The Progress panel's Lanes shows what still runs."
+  },
+  "shell.command.team.resume": {
+    "defaultMessage": "Resume the Team",
+    "description": "A command (the command palette, Settings → Keyboard Shortcuts), in the Help category (HI-2081): lifts the pause of every open workspace, so lanes start their cards and agents are woken again."
   },
   "shell.command.template.addAgent": {
     "defaultMessage": "Add Agent from Template…",
@@ -534,6 +586,10 @@
   "shell.command.update.show": {
     "defaultMessage": "Show Hive Update",
     "description": "A command (the menus, the command palette, Settings → Keyboard Shortcuts), in the Help category."
+  },
+  "shell.command.view.activity": {
+    "defaultMessage": "Show Activity",
+    "description": "A command (the menus, the command palette, Settings → Keyboard Shortcuts), in the View category: Activity's workspace level, what every project's agents run now."
   },
   "shell.command.view.alwaysOnTop": {
     "defaultMessage": "Always on Top",
@@ -707,6 +763,18 @@
     "defaultMessage": "The agent summarises the conversation so far and continues from the summary, which makes every later message cheaper. The full history stays in the session's transcript.",
     "description": "The Compact dialog: what compacting does."
   },
+  "shell.copyCode.copied": {
+    "defaultMessage": "Copied",
+    "description": "Shown for a moment beside a command or path after its Copy button copied it."
+  },
+  "shell.copyCode.copy": {
+    "defaultMessage": "Copy {code}",
+    "description": "Tooltip of the small Copy button beside a command or path shown as code (Provider Setup, say): {code} is exactly what it copies."
+  },
+  "shell.copyCode.label": {
+    "defaultMessage": "Copy",
+    "description": "The accessible name of the small Copy button beside a command or path shown as code. Keep it short."
+  },
   "shell.diagnostics.attach": {
     "defaultMessage": "Attach the newest developer console recording ({when}, {n, plural, one {# event} other {# events}}), its newest events redacted again",
     "description": "A box in Copy Diagnostics. {when} is when the recording started; {n} how many events it has."
@@ -803,6 +871,14 @@
     "defaultMessage": "Undo",
     "description": "An item of the Edit menu."
   },
+  "shell.entry.mcpCopied": {
+    "defaultMessage": "In the workspace now",
+    "description": "What the notice about a project's own MCP servers says once they are all in the workspace (HI-2320), in place of its Copy to workspace button."
+  },
+  "shell.entry.unfinished": {
+    "defaultMessage": "Didn't finish: try again",
+    "description": "What a notification says above its buttons when one of them, run in another Hive window, didn't say it had finished (that window reloaded, closed, or took too long; HI-2320). The buttons stay, to try again."
+  },
   "shell.error.allowEdit": {
     "defaultMessage": "Could not allow the edit",
     "description": "An error's title: allowing an agent's edit of a locked file failed."
@@ -818,6 +894,10 @@
   "shell.error.resumeAfterClose": {
     "defaultMessage": "Could not resume the agents",
     "description": "An error's title: resuming the agents that were running when Hive closed unexpectedly failed."
+  },
+  "shell.error.resumeRestart": {
+    "defaultMessage": "Could not resume the agents",
+    "description": "An error's title: resuming the agents that were working when Hive was last quit or restarted failed."
   },
   "shell.error.stopBackground": {
     "defaultMessage": "Could not stop the background session",
@@ -866,6 +946,14 @@
   "shell.errorBoundary.view": {
     "defaultMessage": "This view ran into a problem and couldn't be shown.",
     "description": "Where a view of the window failed to show."
+  },
+  "shell.keyRefused.stopped": {
+    "defaultMessage": "Its turn stopped when {name}'s key was refused. Resume in the project's header carries it on.",
+    "description": "Tooltip of an agent whose turn stopped because its server connection's ({name}) API key was refused."
+  },
+  "shell.keyRefused.then": {
+    "defaultMessage": "{name}'s key was refused. Replace it in Settings → Accounts & Connections, then Resume in the project's header carries on the agents it stopped.",
+    "description": "Tooltip of an agent whose server connection's ({name}) API key was refused, its second line. Settings → Accounts & Connections names a section; Resume is a button in the project's header."
   },
   "shell.loadFailed": {
     "defaultMessage": "Could not load {what}: {error}",
@@ -951,6 +1039,22 @@
     "defaultMessage": "Permission mode switched",
     "description": "A notice after running agents were switched to their permission mode settings; the agents are listed under it."
   },
+  "shell.noticeTarget.agentGone": {
+    "defaultMessage": "{agent} isn't in {project} any more",
+    "description": "A notice after clicking a notification about an agent (HI-1961): the agent it named ({agent}) has been removed from its project ({project}) since, so its pane can't be shown."
+  },
+  "shell.noticeTarget.cardElsewhere": {
+    "defaultMessage": "{card} is on {workspace}'s board, which isn't open",
+    "description": "A notice after clicking a notification about a card (HI-1961): the card ({card}, its key, e.g. HI-12) is in another workspace ({workspace}, its folder's name), open in no Hive window now, so it can't be opened."
+  },
+  "shell.noticeTarget.cardGone": {
+    "defaultMessage": "{card} isn't on the board any more",
+    "description": "A notice after clicking a notification about a card (HI-1961): the card it named ({card}, its key, e.g. HI-12) has been deleted since, so it can't be opened."
+  },
+  "shell.noticeTarget.projectGone": {
+    "defaultMessage": "{project} isn't in this workspace any more",
+    "description": "A notice after clicking a notification about a project (HI-2320): the project it named ({project}) has been removed from the workspace since, so it can't be shown."
+  },
   "shell.notifications.clearAll": {
     "defaultMessage": "Clear all",
     "description": "Button of the notifications panel: removes every notification."
@@ -975,6 +1079,10 @@
     "defaultMessage": "No matching commands",
     "description": "The command palette when what is typed matches nothing."
   },
+  "shell.palette.openCard": {
+    "defaultMessage": "Open Card: {card} {title}",
+    "description": "A card in the command palette, found by its name: choosing it opens the card. {card} is its name (its key, such as AM-12, or #12 for a card with none), {title} its title (the user’s own words)."
+  },
   "shell.palette.placeholder": {
     "defaultMessage": "Type a command or project name",
     "description": "The command palette's placeholder."
@@ -982,6 +1090,22 @@
   "shell.palette.projectsPlaceholder": {
     "defaultMessage": "Go to project",
     "description": "The command palette's placeholder when it lists projects (Go to Project…)."
+  },
+  "shell.palette.runCommand": {
+    "defaultMessage": "Run Command: {name}",
+    "description": "One of the user's own commands in the command palette (Settings → Commands, HI-1954): choosing it runs it now. {name} is the command's name."
+  },
+  "shell.path.copied": {
+    "defaultMessage": "Path copied",
+    "description": "A notification: a path (a folder or a worktree in a list) was copied to the clipboard in full."
+  },
+  "shell.path.copy": {
+    "defaultMessage": "Copy path",
+    "description": "A list's per-row button: copies the row's full path (a folder or a worktree) to the clipboard."
+  },
+  "shell.path.copyFailed": {
+    "defaultMessage": "Couldn't copy the path",
+    "description": "A notification: copying a path to the clipboard failed."
   },
   "shell.providers.choose": {
     "defaultMessage": "Choose providers",
@@ -997,11 +1121,11 @@
   },
   "shell.providers.setUp": {
     "defaultMessage": "Set up",
-    "description": "A provider's banner's button when Hive names no other action: opens Agent Setup."
+    "description": "A provider's banner's button when Hive names no other action: opens Provider Setup."
   },
   "shell.providers.setup": {
-    "defaultMessage": "Agent Setup",
-    "description": "The banner's button: opens Agent Setup."
+    "defaultMessage": "Provider Setup",
+    "description": "The banner's button: opens Provider Setup."
   },
   "shell.quit.action": {
     "defaultMessage": "{action, select, saveAndClose {Save and close} closeWorkspace {Close workspace} switchWorkspace {Switch workspace} closeWindow {Close window} saveAndQuit {Save and quit} other {Quit}}",
@@ -1137,119 +1261,127 @@
   },
   "shell.setup.checkAgain": {
     "defaultMessage": "Check again",
-    "description": "Agent Setup's button: looks for the CLI, git and updates again."
+    "description": "Provider Setup's button: looks for the CLI, git and updates again."
+  },
+  "shell.setup.connections": {
+    "defaultMessage": "{n, plural, =0 {{cli} signs in per account, and none is on in this workspace yet: add one and sign it in.} one {{cli} signs in per account: # is on in this workspace.} other {{cli} signs in per account: # are on in this workspace.}}",
+    "description": "Provider Setup, for a coding agent CLI ({cli}: \"Claude Code\") that signs in per account (Settings → Accounts & Connections) rather than here (HI-1774; HI-2108). {n} is how many of its accounts are on in the open workspace."
   },
   "shell.setup.docs": {
     "defaultMessage": "{provider} docs",
-    "description": "Agent Setup's button: opens the coding agent's own documentation. {provider} is its name."
+    "description": "Provider Setup's button: opens the coding agent's own documentation. {provider} is its name."
   },
   "shell.setup.done": {
     "defaultMessage": "{what} You can close this window.",
-    "description": "Agent Setup after a task did its job. {what} says what happened."
+    "description": "Provider Setup after a task did its job. {what} says what happened."
   },
   "shell.setup.found": {
     "defaultMessage": "<b>{provider} {version}</b> <muted>— found via {source}</muted>",
-    "description": "Agent Setup: the CLI Hive found. {provider} is its name, {version} its version, {source} where it was found (PATH, an install folder); <b> is bold, <muted> greyed."
+    "description": "Provider Setup: the CLI Hive found. {provider} is its name, {version} its version, {source} where it was found (PATH, an install folder); <b> is bold, <muted> greyed."
   },
   "shell.setup.gitMissing": {
     "defaultMessage": "Git not found",
-    "description": "Agent Setup when Hive finds no git. Git is a name: keep it."
+    "description": "Provider Setup when Hive finds no git. Git is a name: keep it."
   },
   "shell.setup.gitOk": {
-    "defaultMessage": "<b>Git {version}</b> <muted>— for worktrees, merging and the Git tab</muted>",
-    "description": "Agent Setup: the git Hive found. {version} is its version; <b> is bold, <muted> greyed. Git is a name: keep it."
+    "defaultMessage": "<b>Git {version}</b> <muted>— for worktrees, merging and the Version Control tab</muted>",
+    "description": "Provider Setup: the git Hive found. {version} is its version; <b> is bold, <muted> greyed. Git is a name: keep it."
   },
   "shell.setup.gitOld": {
     "defaultMessage": "Git {version} is older than {min}",
-    "description": "Agent Setup when the git found is too old. {version} and {min} are version numbers."
+    "description": "Provider Setup when the git found is too old. {version} and {min} are version numbers."
   },
   "shell.setup.gitOldDetail": {
     "defaultMessage": "{why} Update Git for Windows to {min} or later, then Check again.",
-    "description": "Agent Setup, under a too old git. {why} says why (in English for now); Git for Windows is a product's name; Check again is the dialog's button."
+    "description": "Provider Setup, under a too old git. {why} says why (in English for now); Git for Windows is a product's name; Check again is the dialog's button."
   },
   "shell.setup.gitProblemDetail": {
-    "defaultMessage": "{problem}: worktree agents, merging, the Git tab and the unmerged counts don't work. {fix}",
-    "description": "Agent Setup under a git problem. {problem} and {fix} say what is wrong and what to do (in English for now)."
+    "defaultMessage": "{problem}: worktree agents, merging, the Version Control tab's Git sections and the unmerged counts don't work. {fix}",
+    "description": "Provider Setup under a git problem. {problem} and {fix} say what is wrong and what to do (in English for now)."
   },
   "shell.setup.gitUnknown": {
     "defaultMessage": "Couldn't check Git",
-    "description": "Agent Setup when Hive couldn't run git to check it."
+    "description": "Provider Setup when Hive couldn't run git to check it."
   },
   "shell.setup.gitUnknownDetail": {
-    "defaultMessage": "{error}. Hive needs Git {min} or later for worktrees, merging and the Git tab.",
-    "description": "Agent Setup when git couldn't be checked. {error} is the error, as given."
+    "defaultMessage": "{error}. Hive needs Git {min} or later for worktrees, merging and the Version Control tab.",
+    "description": "Provider Setup when git couldn't be checked. {error} is the error, as given."
   },
   "shell.setup.install": {
     "defaultMessage": "Install {provider}",
-    "description": "Agent Setup's button: installs the CLI. {provider} is its name."
+    "description": "Provider Setup's button: installs the CLI. {provider} is its name."
   },
   "shell.setup.installed": {
     "defaultMessage": "{provider} is installed and Hive has found it: agents you start now can use it, without restarting Hive (the installer's advice to restart your terminal is for terminals already open). Agents already running get the new PATH when they restart.",
-    "description": "Agent Setup, after an install found the coding agent's CLI. {provider} is its name; PATH is a Windows setting: keep it."
+    "description": "Provider Setup, after an install found the coding agent's CLI. {provider} is its name; PATH is a Windows setting: keep it."
   },
   "shell.setup.looking": {
     "defaultMessage": "Looking for {provider}…",
-    "description": "Agent Setup while Hive looks for a CLI. {provider} is its name."
+    "description": "Provider Setup while Hive looks for a CLI. {provider} is its name."
   },
   "shell.setup.lookingForGit": {
     "defaultMessage": "Looking for Git…",
-    "description": "Agent Setup while Hive looks for git."
+    "description": "Provider Setup while Hive looks for git."
   },
   "shell.setup.notFound": {
     "defaultMessage": "The install ended, but Hive can't find {provider}. If the installer reported an error, it's shown below; if it says it worked, Check again, or set {provider}'s path in Settings → {provider}.",
-    "description": "Agent Setup, after an install ended without Hive finding the CLI. {provider} is its name; Check again is the dialog's button."
+    "description": "Provider Setup, after an install ended without Hive finding the CLI. {provider} is its name; Check again is the dialog's button."
   },
   "shell.setup.notInstalled": {
     "defaultMessage": "{provider} is not installed",
-    "description": "Agent Setup when a CLI isn't installed. {provider} is its name."
+    "description": "Provider Setup when a CLI isn't installed. {provider} is its name."
   },
   "shell.setup.notInstalledDetail": {
     "defaultMessage": "Hive runs the standalone {provider} command-line tool in each project. It isn't bundled with Hive — install it with {company}'s official installer.",
-    "description": "Agent Setup, under \"<provider> is not installed\". {provider} is the coding agent's name, {company} its maker's."
+    "description": "Provider Setup, under \"<provider> is not installed\". {provider} is the coding agent's name, {company} its maker's."
   },
   "shell.setup.off": {
     "defaultMessage": "{provider} is turned off, so Hive doesn't run it. <on>Turn it on</on>",
-    "description": "Agent Setup for a provider that is turned off. {provider} is its name; <on> is a link that turns it on."
+    "description": "Provider Setup for a provider that is turned off. {provider} is its name; <on> is a link that turns it on."
+  },
+  "shell.setup.openConnections": {
+    "defaultMessage": "Open Accounts & Connections",
+    "description": "Provider Setup's button (HI-2108): opens Settings → Accounts & Connections, where a coding agent CLI's accounts are added and signed in."
   },
   "shell.setup.rejected": {
     "defaultMessage": "{n, plural, one {Ignored a copy} other {Ignored copies}} bundled with an editor extension ({path}). Hive only uses the standalone CLI.",
-    "description": "Agent Setup when it found a CLI only inside an editor's extension. {n} is how many; {path} is where (one of them)."
+    "description": "Provider Setup when it found a CLI only inside an editor's extension. {n} is how many; {path} is where (one of them)."
   },
   "shell.setup.setUp": {
     "defaultMessage": "{provider} is set up.",
-    "description": "Agent Setup after a setup step. {provider} is the coding agent's name."
+    "description": "Provider Setup after a setup step. {provider} is the coding agent's name."
   },
   "shell.setup.signedIn": {
     "defaultMessage": "{provider} is signed in.",
-    "description": "Agent Setup after signing in. {provider} is the coding agent's name."
+    "description": "Provider Setup after signing in. {provider} is the coding agent's name."
   },
   "shell.setup.signedInAs": {
     "defaultMessage": "{account, select, none {Signed in} other {Signed in as {account}}}{method, select, none {} other { ({method})}}",
-    "description": "A badge in Agent Setup: the CLI is signed in. {account} is the account, {method} how it signed in (none: not known)."
+    "description": "A badge in Provider Setup: the CLI is signed in. {account} is the account, {method} how it signed in (none: not known)."
   },
   "shell.setup.startFailed": {
     "defaultMessage": "Could not start",
-    "description": "An error's title: Agent Setup couldn't start an install, an update or a sign-in."
+    "description": "An error's title: Provider Setup couldn't start an install, an update or a sign-in."
   },
   "shell.setup.tabOff": {
     "defaultMessage": "{provider}<faint> (off)</faint>",
-    "description": "A tab of Agent Setup for a provider that is turned off. {provider} is its name; <faint> is greyed."
+    "description": "A tab of Provider Setup for a provider that is turned off. {provider} is its name; <faint> is greyed."
   },
   "shell.setup.testedAt": {
     "defaultMessage": "Hive's tests ran against {version} on {date}",
-    "description": "Tooltip of Agent Setup's tested-version line. {version} is the CLI's version; {date} when Hive's tests ran."
+    "description": "Tooltip of Provider Setup's tested-version line. {version} is the CLI's version; {date} when Hive's tests ran."
   },
   "shell.setup.title": {
-    "defaultMessage": "Agent Setup",
-    "description": "The title of Help → Agent Setup."
+    "defaultMessage": "Provider Setup",
+    "description": "The title of Help → Provider Setup."
   },
   "shell.setup.upToDate": {
     "defaultMessage": "Up to date",
-    "description": "A badge in Agent Setup: the CLI is the newest version."
+    "description": "A badge in Provider Setup: the CLI is the newest version."
   },
   "shell.setup.updated": {
     "defaultMessage": "{provider} is up to date.",
-    "description": "Agent Setup after an update. {provider} is the coding agent's name."
+    "description": "Provider Setup after an update. {provider} is the coding agent's name."
   },
   "shell.shortcuts.copyPaste": {
     "defaultMessage": "Copy selection / paste",
@@ -1339,6 +1471,10 @@
     "defaultMessage": "No session",
     "description": "An agent's status: it has no session."
   },
+  "shell.status.keyRefused": {
+    "defaultMessage": "Key refused",
+    "description": "An agent's status: its server connection's API key was refused by the server (where a signed-in connection would need sign-in)."
+  },
   "shell.status.question": {
     "defaultMessage": "{status} · has a question for you",
     "description": "An agent's status while it works on with a question for you."
@@ -1362,6 +1498,18 @@
   "shell.status.stopped": {
     "defaultMessage": "Stopped",
     "description": "An agent's status."
+  },
+  "shell.status.teamParked": {
+    "defaultMessage": "Team parked",
+    "description": "The status bar item (HI-2081) once the paused team has parked: nothing runs, so an update can be installed."
+  },
+  "shell.status.teamPaused": {
+    "defaultMessage": "Team paused",
+    "description": "A status bar item while the team is paused before an update (HI-2081): Hive starts no lane card and wakes no agent until it resumes. Click: opens the Progress panel."
+  },
+  "shell.status.teamPausedTip": {
+    "defaultMessage": "The team is paused: no lane starts a card and no agent is woken until you resume it. The Progress panel's Lanes says what still runs.",
+    "description": "Tooltip of the status bar item while the team is paused (HI-2081)."
   },
   "shell.status.waiting": {
     "defaultMessage": "Needs your input",
@@ -1463,6 +1611,10 @@
     "defaultMessage": "How to fix a translation, or add a language, on GitHub",
     "description": "What a command does, on hover in the menus."
   },
+  "shell.tip.help.restoreBoard09": {
+    "defaultMessage": "Puts back the board as it was before its upgrade to 1.0, to go back to Hive 0.9",
+    "description": "What a command does, on hover in the menus."
+  },
   "shell.tip.window.closeQuit": {
     "defaultMessage": "Close the window and quit Hive",
     "description": "What a command does, on hover in the menus. With one window, and Close to tray off."
@@ -1498,5 +1650,17 @@
   "shell.toast.dismiss": {
     "defaultMessage": "Dismiss",
     "description": "Button on a notice in the corner: closes it."
+  },
+  "shell.toast.openAgent": {
+    "defaultMessage": "Open {agent}'s pane",
+    "description": "Tooltip on a notification an agent or the Assistant sent about an agent (HI-1961): clicking it shows that agent's pane (where its terminal is). {agent} is the agent's name."
+  },
+  "shell.toast.openCard": {
+    "defaultMessage": "Open {card}",
+    "description": "Tooltip on a notification an agent or the Assistant sent about a card (HI-1961): clicking it opens the card ({card}, its key, e.g. HI-12)."
+  },
+  "shell.toast.openProject": {
+    "defaultMessage": "Show {project}",
+    "description": "Tooltip on a notification about a project (HI-2320): clicking it shows the project ({project}, its name)."
   }
 }

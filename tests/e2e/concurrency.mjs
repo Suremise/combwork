@@ -12,13 +12,16 @@
 // holds a lane of its own (its own ports and folders) and its own logs folder; each worktree's build is made once (the
 // build lock), stamped as its source (by its runs, or by another checker's started in the same worktree, #282); no build lock is left held; each e2e run's record names its own worktree's code;
 // and the decoy is untouched and no Node process but the runners themselves got the NODE_OPTIONS (#208). --repeat N
-// runs N rounds, stopping at the first that fails.
+// runs N rounds, stopping at the first that fails. Before the rounds, in the second worktree with no dev build yet: a
+// packaged run (HIVE_EXE) whose suites can't run on it makes no build, writes its record (not valid, each suite NOT
+// RUN with why) and fails (#1591).
 //
 // --heavy checks the machine-wide limit on heavy runs instead (slots.mjs), in a pool of slots of its own (so real runs
 // on the machine neither wait for it nor make it wait): three heavy runs (a repeat) started at once from three
 // worktrees with two slots. Checked: two run and the third waits, saying so (and in the Progress panel, through a
 // stand-in for Hive's Agent API), then starts when a slot is let go; no more than two hold slots at any moment; all
-// pass; a run with --no-wait while the slots are taken fails at once, saying who holds them; the slot of a run that
+// pass; a run with --no-wait while the slots are taken fails at once, saying who holds them; with both heavy slots
+// held, a small run takes the side slot and a heavy run is refused (HI-2070: no side slot in the rest); the slot of a run that
 // is killed is taken by the next run without waiting; a pre-merge run (its agent holds the merge slot, as the stand-in
 // says) takes the only slot before two runs that asked earlier, and a killed pre-merge run's place expires (#558); and
 // with the only slot held by a parent run, a heavy scenario run started inside its suite runs without asking for one
@@ -192,7 +195,11 @@ async function heavyRound(k, worktrees) {
     })
   })
   await new Promise((r) => api.listen(0, '127.0.0.1', r))
-  const env = { HIVE_TEST_HEAVY_DIR: pool, HIVE_TEST_HEAVY_SLOTS: '2', HIVE_API_URL: `http://127.0.0.1:${api.address().port}`, HIVE_API_TOKEN: 'agent-token' }
+  // No side slot (HI-2070): these runs are small (two suites, twice), and queue for the heavy slots as heavy runs do.
+  // The agent's token in its file, as a session has it (HI-2262: never HIVE_API_TOKEN).
+  const tokenFile = join(RUN, 'agent-token.json')
+  writeFileSync(tokenFile, JSON.stringify({ token: 'agent-token' }))
+  const env = { HIVE_TEST_HEAVY_DIR: pool, HIVE_TEST_HEAVY_SLOTS: '2', HIVE_TEST_SIDE_SLOTS: '0', HIVE_API_URL: `http://127.0.0.1:${api.address().port}`, HIVE_API_TOKEN_FILE: tokenFile }
   const slots = () => (existsSync(pool) ? readdirSync(pool).filter((f) => /^slot-\d+\.json$/.test(f)).length : 0)
   const waiting = () => (existsSync(pool) ? readdirSync(pool).filter((f) => f.startsWith('wait-')).length : 0)
   // Heavy by repeating: two quick suites, twice.
@@ -216,10 +223,28 @@ async function heavyRound(k, worktrees) {
     const row = reports.findIndex((x) => x.method === 'POST' && x.url === '/v1/progress' && x.body.title === 'e2e: waiting for a test slot')
     const id = `r${row + 1}`
     // What it waits for is the run's `waiting` (#549), set as it starts and updated while it waits.
-    const named = reports.some((x) => ((x.method === 'POST' && reports.indexOf(x) === row) || (x.method === 'PATCH' && x.url === `/v1/progress/${id}`)) && /waiting for a test slot: .*e2e: 2 suites × 2/.test(x.body.waiting ?? ''))
+    // Named as what is ahead of it (HI-2070), never as if the holders' run were its own.
+    const named = reports.some((x) => ((x.method === 'POST' && reports.indexOf(x) === row) || (x.method === 'PATCH' && x.url === `/v1/progress/${id}`)) && /^waiting for a test slot \(2 heavy runs ahead: .*e2e: 2 suites × 2/.test(x.body.waiting ?? ''))
     const ended = reports.some((x) => x.url === `/v1/progress/${id}/finish` && x.body.ok === true && /got a test slot after/.test(x.body.summary ?? ''))
     check('…and showed in the Progress panel as waiting, naming who held the slots, until it got one', row >= 0 && named && ended, JSON.stringify(reports.filter((x) => /waiting|slot/.test(JSON.stringify(x.body))).slice(0, 4)))
     check('every slot is let go at the end', slots() === 0 && waiting() === 0, readdirSync(pool).join(', '))
+
+    // The side slot (HI-2070): with both heavy slots held (by this checker), a small run takes the side slot without
+    // waiting, while a heavy run (more than three suites' repeats) is refused at once: it never takes the side slot.
+    const sided = { ...env, HIVE_TEST_SIDE_SLOTS: '1' }
+    const gates = [await trySlot(pool, { slots: 2, owner: process.pid, what: 'the checker, 1', root }), await trySlot(pool, { slots: 2, owner: process.pid, what: 'the checker, 2', root })]
+    try {
+      let sideHeld = false
+      const sideWatch = setInterval(() => (sideHeld ||= existsSync(pool) && readdirSync(pool).some((f) => /^side-\d+\.json$/.test(f))), 50)
+      const small = await start({ name: 'small run', cwd: root, script: 'tests/e2e/run.mjs', args: [...args.slice(0, -1), '--no-wait'], env: sided })
+      clearInterval(sideWatch)
+      check('a small run takes the side slot while two heavy runs hold theirs, and passes', gates.every((g) => g.slot !== undefined) && sideHeld && small.code === 0 && !/Waiting for a test slot/.test(small.out), `heavy slots ${gates.map((g) => g.slot)}, side held ${sideHeld}, exit ${small.code}: ${small.out.trim().split('\n').at(-1)}`)
+      const big = await start({ name: 'heavy run', cwd: root, script: 'tests/e2e/run.mjs', args: ['isolation', 'about', '--repeat', '4', '--no-wait'], env: sided })
+      check('…while a heavy run never takes the side slot: refused at once, with the side slot free', big.code === 2 && /No test slot free \(--no-wait\): 2 heavy runs at once/.test(big.out) && big.ms < 15_000, `exit ${big.code} in ${big.ms} ms: ${big.out.trim().split('\n').at(-1)}`)
+    } finally {
+      for (const g of gates) rmSync(join(pool, `slot-${g.slot}.json`), { force: true })
+    }
+    check('…and every slot is let go', existsSync(pool) && !readdirSync(pool).some((f) => /^(slot|side|model)-\d+\.json$/.test(f)), readdirSync(pool).join(', '))
 
     // A run killed while it holds a slot: with one slot, the next run takes it without waiting.
     let child
@@ -270,9 +295,13 @@ async function heavyRound(k, worktrees) {
       const one = { ...env, HIVE_TEST_HEAVY_SLOTS: '1' }
       const scenarios = ['--repeat', '2', '--only', SCENARIO, '--no-wait', '--no-progress']
       // What a suite's agent shell keeps of its run context (E2E_RUN_*).
-      const inSuite = { ...one, E2E_RUN_SUITE: 'progressreport', E2E_RUN_DIR: join(pool, 'parent-run'), E2E_RUN_PORT: '47950' }
+      // Its parent's run holds the CPU slot it runs in: E2E_RUN_SLOTS says so (HI-2070).
+      const inSuite = { ...one, E2E_RUN_SUITE: 'progressreport', E2E_RUN_DIR: join(pool, 'parent-run'), E2E_RUN_PORT: '47950', E2E_RUN_SLOTS: 'cpu' }
       const nested = await start({ name: 'nested heavy scenarios', cwd: root, script: 'tests/scenarios/run.mjs', args: scenarios, env: inSuite })
       check('a heavy scenario run inside a suite runs without a slot while its parent holds the only one, even with --no-wait', parent.slot === 0 && nested.code === 0 && !/test slot/i.test(nested.out), `parent slot ${parent.slot}, exit ${nested.code}: ${nested.out.trim().split('\n').slice(-3).join(' / ')}`)
+      // Inside a suite of a light run, which holds no slot (HI-2070): no credit, so it asks for a slot and is refused.
+      const light = await start({ name: 'nested heavy scenarios, light parent', cwd: root, script: 'tests/scenarios/run.mjs', args: scenarios, env: { ...inSuite, E2E_RUN_SLOTS: '' } })
+      check("…while inside a light run's suite (no slot held: no credit) it asks for one, refused at once", light.code === 2 && /No test slot free \(--no-wait\).*held by the parent e2e run/.test(light.out) && light.ms < 15_000, `exit ${light.code} in ${light.ms} ms: ${light.out.trim().split('\n').at(-1)}`)
       const top = await start({ name: 'top-level heavy scenarios', cwd: root, script: 'tests/scenarios/run.mjs', args: scenarios, env: one })
       check('…while the same run at the top level is refused, naming the holder', top.code === 2 && /No test slot free \(--no-wait\).*held by the parent e2e run/.test(top.out) && top.ms < 15_000, `exit ${top.code} in ${top.ms} ms: ${top.out.trim().split('\n').at(-1)}`)
     } finally {
@@ -379,6 +408,30 @@ async function laneWaitCheck(wt) {
   }
 }
 
+/**
+ * A packaged run (HIVE_EXE) of suites none of which can run on it, in the second worktree before anything builds it
+ * (#1591): no dev build is made or needed, and the run still writes its record, not valid ("nothing was tested"), with
+ * each suite NOT RUN and why, and fails. HIVE_EXE names no file: a run that started a Hive would fail on it.
+ */
+async function packagedNothingCheck(wt) {
+  console.log('\n--- A packaged run where no suite chosen can run, with no dev build (#1591)')
+  const built = join(wt, 'out', 'main', 'index.js')
+  check('the second worktree has no dev build yet', !existsSync(built), built)
+  const work = join(RUN, 'packaged-work', 'e2e')
+  const r = await start({ name: 'packaged, nothing runnable', cwd: wt, script: 'tests/e2e/run.mjs', args: ['cardloop', 'wakepaste-codex', '--build', '--record', '--no-progress'], polluted: false, env: { HIVE_EXE: join(RUN, 'no-such', 'Hive.exe'), HIVE_E2E_DIR: work } })
+  check(`${r.name}: fails (nothing was tested)`, r.code === 1, `exit ${r.code}\n${r.out.slice(-800)}`)
+  check(`${r.name}: makes no dev build`, !/^Building \(the dev build/m.test(r.out) && !/No dev build/.test(r.out) && !existsSync(built), r.out.slice(0, 800))
+  const logs = /Logs: `?([^`\r\n]+?)`?$/m.exec(r.out)?.[1]?.trim()
+  const read = (f) => (logs && existsSync(join(logs, f)) ? readFileSync(join(logs, f), 'utf8') : '')
+  const md = read('run-record.md')
+  let json = null
+  try {
+    json = JSON.parse(read('run-record.json'))
+  } catch {}
+  check(`${r.name}: its Markdown record says it is not valid, and why each suite was NOT RUN`, md.startsWith("**Not valid — don't trust this record:** no suite chosen can run on a packaged build: nothing was tested.") && /\| cardloop \| \*\*NOT RUN\*\*: it starts this checkout's Electron itself/.test(md) && /\| wakepaste-codex \| \*\*NOT RUN\*\*: wakepaste-cli\/run\.cjs: /.test(md), md.slice(0, 800) || `no record in ${logs}`)
+  check(`${r.name}: its JSON record too`, json?.valid === false && !!json.packaged && json.results?.length === 2 && json.results.every((x) => x.notRun && !x.ok), JSON.stringify(json)?.slice(0, 800) ?? `no JSON record in ${logs}`)
+}
+
 const made = []
 let decoyHead = null
 try {
@@ -396,6 +449,8 @@ try {
   } else {
     made.push(addWorktree(root, RUN, 'worktree'))
     console.log(`Second worktree: ${made[0]}\nBuild locks: ${BUILD_LOCKS}`)
+    // Before the rounds build that worktree.
+    if (!laneWaitOnly) await packagedNothingCheck(made[0])
   }
   for (let k = 1; k <= repeat; k++) {
     if (heavy) await heavyRound(k, [root, ...made])

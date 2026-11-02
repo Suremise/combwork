@@ -76,7 +76,9 @@ describe('the files area', () => {
       if (/<\w+>/.test(c.defaultMessage)) continue
       const out = tr(M[id], sampleValues(c.defaultMessage))
       expect(out, id).toMatch(/^\[.*\]$/s)
-      expect(out, id).not.toContain(c.defaultMessage.replace(/\{[^}]*\}/g, '').trim() || '\u0000')
+      // Its words are changed; a message with none (files.root.place, "{agent} · {place}") has nothing to change.
+      const text = c.defaultMessage.replace(/\{[^}]*\}/g, '').trim()
+      if (/\p{L}/u.test(text)) expect(out, id).not.toContain(text)
     }
     expect(problems).toEqual([])
   })

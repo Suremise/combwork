@@ -7,6 +7,8 @@ import { commandKeybinding } from '../commands'
 import { set, useStore } from '../store'
 import { cx, formatKeybinding, timeAgo } from '../util'
 import { Icon, Markdown, Modal, Tooltip } from './ui'
+import { M as TEAM, TeamPauseBand, pauseTheTeam, useTeamPaused } from './TeamPause'
+import { useTeamPause } from '../teamPause'
 import { msg, tr } from '@shared/i18n'
 
 const M = {
@@ -47,7 +49,12 @@ const M = {
   restartUpdate: msg({ id: 'workspace.updates.restartUpdate', defaultMessage: 'Restart and Update', description: "The update dialog's button: installs the downloaded update." }),
   details: msg({ id: 'workspace.updates.details', defaultMessage: 'Details', description: 'Settings → Updates: opens the update dialog.' }),
   checkTip: msg({ id: 'workspace.updates.checkTip', defaultMessage: '{hasKey, select, yes {Check GitHub for a newer Hive now ({key})} other {Check GitHub for a newer Hive now}}', description: 'Tooltip on Check Now, with its shortcut ({key}).' }),
-  checkNow: msg({ id: 'workspace.updates.checkNow', defaultMessage: 'Check Now', description: 'Settings → Updates and About: checks for a newer Hive.' })
+  checkNow: msg({ id: 'workspace.updates.checkNow', defaultMessage: 'Check Now', description: 'Settings → Updates and About: checks for a newer Hive.' }),
+  localBuild: msg({ id: 'workspace.updates.localBuild', defaultMessage: 'Local build {version}{hasCommit, select, yes { ({commit})} other {}}', description: 'Settings → Updates and About: the running Hive is a local build (one built on this computer with npm run dist, not a published release), with the commit it was built from.' }),
+  published: msg({ id: 'workspace.updates.published', defaultMessage: 'A published {version} is available. Hive doesn’t install a release of the same version over your local build.', description: "Hive's updates: the user runs a local build, and a published release of the same version exists; it is offered (its page), never installed by itself." }),
+  openReleasePage: msg({ id: 'workspace.updates.openReleasePage', defaultMessage: 'Open Release Page', description: "The update dialog's button: opens that release's page on GitHub in the browser (it doesn't install anything)." }),
+  notInstalledUnreadable: msg({ id: 'workspace.updates.notInstalledUnreadable', defaultMessage: "Version {version} is downloaded, but Hive couldn't read the copy installed on this computer, so it won't replace it.", description: "Hive's updates: a downloaded update isn't installed, since the installed copy couldn't be read (another installer may be replacing it)." }),
+  notInstalledNotNewer: msg({ id: 'workspace.updates.notInstalledNotNewer', defaultMessage: "Version {version} is downloaded, but the copy installed on this computer is the same version or newer, so Hive won't install it.", description: "Hive's updates: a downloaded update isn't installed, since what is installed (a local build, say) isn't older." })
 }
 
 const mb = (bytes?: number): string => (bytes ? tr(M.mb, { mb: bytes / 1024 / 1024 }) : '')
@@ -75,8 +82,10 @@ export function updateSummary(u: UpdateState | null): string {
     case 'downloading':
       return tr(M.downloading, { version: u.version ?? '', percent: Math.round(u.progress?.percent ?? 0) / 100 })
     case 'ready':
+      if (u.notInstalled) return tr(u.notInstalled === 'unreadable' ? M.notInstalledUnreadable : M.notInstalledNotNewer, { version: u.version ?? '' })
       return tr(M.ready, { version: u.version ?? '' })
     case 'up-to-date':
+      if (u.published) return tr(M.published, { version: u.published })
       return tr(M.upToDate, { checked: u.checkedAt ? 'yes' : 'no', when: u.checkedAt ? timeAgo(u.checkedAt) : '' })
     case 'error':
       return u.error ?? tr(M.failed)
@@ -86,9 +95,9 @@ export function updateSummary(u: UpdateState | null): string {
 }
 
 /** Hive's mark as a line drawing in the text colour (hexagon, prompt and cursor), like the status bar's other icons. */
-function HiveMark() {
+export function HiveMark({ className = 'status-hex' }: { className?: string }) {
   return (
-    <svg className="status-hex" viewBox="0 0 512 512" aria-hidden="true" fill="none" stroke="currentColor" strokeWidth="44" strokeLinecap="round" strokeLinejoin="round">
+    <svg className={className} viewBox="0 0 512 512" aria-hidden="true" fill="none" stroke="currentColor" strokeWidth="44" strokeLinecap="round" strokeLinejoin="round">
       <polygon points="478,256 367,448 145,448 34,256 145,64 367,64" />
       <polyline points="170,190 246,256 170,322" />
       <line x1="280" y1="322" x2="348" y2="322" />
@@ -103,7 +112,8 @@ export function UpdateStatusItem() {
   if (!info) return null
   const label = `${appName(info.isPackaged)} ${info.version}`
   const open = (): void => set({ updateOpen: true })
-  if (u && !u.skipped && (u.status === 'available' || u.status === 'downloading' || u.status === 'ready')) {
+  // A downloaded update Hive won't install (#1647: the installed copy isn't older, or unreadable) isn't offered here.
+  if (u && !u.skipped && (u.status === 'available' || u.status === 'downloading' || (u.status === 'ready' && !u.notInstalled))) {
     const version = u.version ?? ''
     const text = u.status === 'available' ? tr(M.itemAvailable, { app: APP_NAME, version }) : u.status === 'downloading' ? tr(M.itemDownloading, { app: APP_NAME, version, percent: Math.round(u.progress?.percent ?? 0) / 100 }) : tr(M.itemReady, { version })
     const tip = u.status === 'ready' ? tr(M.tipReady, { app: APP_NAME, version }) : tr(M.tipHave, { app: APP_NAME, version: info.version })
@@ -129,6 +139,9 @@ export function UpdateDialog() {
   const u = useStore((s) => s.update)
   const settings = useStore((s) => s.settings)
   const working = useStore((s) => s.workspace?.projects.some((p) => p.agents.some((a) => a.live?.status === 'working' || a.live?.status === 'waiting' || a.live?.status === 'background')) ?? false)
+  // The team paused for it (HI-2081): its band here, and Install Now (checked again in main) in place of Restart and Update.
+  const paused = useTeamPaused()
+  const allParked = useTeamPause((s) => !!s.state?.allParked)
   if (!open || !u) return null
   const close = (): void => set({ updateOpen: false })
   const auto = settings?.updates.install === 'auto'
@@ -150,11 +163,28 @@ export function UpdateDialog() {
       )
       break
     case 'up-to-date':
-      body = (
+      body = u.published ? (
+        <p className="update-line">
+          <Icon name="info" /> {tr(M.published, { version: u.published })}
+        </p>
+      ) : (
         <p className="update-line">
           <Icon name="pass-filled" className="ok" /> {tr(M.latest, { app: APP_NAME, version: u.current })}
         </p>
       )
+      if (u.published) {
+        const published = u.published
+        footer = (
+          <>
+            <button className="btn subtle" onClick={() => openReleaseNotes(published)}>
+              <Icon name="link-external" /> {tr(M.openReleasePage)}
+            </button>
+            <button className="btn primary" onClick={close}>
+              {tr(M.ok)}
+            </button>
+          </>
+        )
+      }
       break
     case 'disabled':
       body = (
@@ -219,7 +249,8 @@ export function UpdateDialog() {
           ) : (
             <p className="faint">{tr(M.noNotes)}</p>
           )}
-          {u.status === 'ready' && (
+          {u.status === 'ready' && u.notInstalled && <p className="update-note">{updateSummary(u)}</p>}
+          {u.status === 'ready' && !u.notInstalled && (
             <p className="faint update-note">
               {tr(M.readyNote, { auto: auto ? 'yes' : 'no', busy: working ? 'yes' : 'no' })}
             </p>
@@ -250,7 +281,25 @@ export function UpdateDialog() {
               <Icon name="cloud-download" /> {tr(M.download)}
             </button>
           )}
-          {u.status === 'ready' && (
+          {u.status === 'ready' && !paused && working && (
+            <button className="btn" onClick={() => void pauseTheTeam()}>
+              <Icon name="debug-pause" /> {tr(TEAM.pauseFirst)}
+            </button>
+          )}
+          {u.status === 'ready' && paused && (
+            <button
+              className="btn primary"
+              disabled={!allParked}
+              onClick={() => {
+                void call('team:install').then((r) => {
+                  if (r.installed) close()
+                })
+              }}
+            >
+              <Icon name="debug-restart" /> {tr(TEAM.install)}
+            </button>
+          )}
+          {u.status === 'ready' && !paused && (
             <button
               className="btn primary"
               onClick={() => {
@@ -267,6 +316,7 @@ export function UpdateDialog() {
   }
   return (
     <Modal title={title} icon="cloud-download" onClose={close} footer={footer} wide={!!u.releaseNotes && ['available', 'downloading', 'ready'].includes(u.status)}>
+      {u.status === 'ready' && paused && <TeamPauseBand />}
       <div className="update-dialog">{body}</div>
     </Modal>
   )
@@ -278,7 +328,8 @@ export function UpdateStatusRow() {
   const kb = commandKeybinding('help.checkUpdates')
   return (
     <div className="flex update-status-row" style={{ flexWrap: 'wrap', justifyContent: 'flex-end' }}>
-      <span className={cx('badge', u?.status === 'ready' || u?.status === 'available' ? 'accent' : u?.status === 'up-to-date' ? 'success' : u?.status === 'error' ? 'error' : '')}>{updateSummary(u)}</span>
+      {u?.local && <span className="faint">{tr(M.localBuild, { version: u.current, hasCommit: u.local.commit ? 'yes' : 'no', commit: u.local.commit?.slice(0, 7) ?? '' })}</span>}
+      <span className={cx('badge', u?.status === 'ready' || u?.status === 'available' ? 'accent' : u?.status === 'up-to-date' && !u.published ? 'success' : u?.status === 'error' ? 'error' : '')}>{updateSummary(u)}</span>
       {(u?.status === 'available' || u?.status === 'downloading' || u?.status === 'ready') && (
         <button className="btn small primary" onClick={() => set({ updateOpen: true })}>
           {tr(M.details)}

@@ -59,6 +59,8 @@ const check = (name, ok, extra = '') => {
   await card.getByRole('button', { name: 'Learn more' }).click()
   const target = page.locator('.docs-target')
   check('Learn more opens the user guide at its heading', !!(await until(async () => (await target.count()) === 1 && (await target.innerText()).trim() === 'Long conversations', HUNG_MS)))
+  // By the heading's explicit id (#1535), its empty anchor not shown: a renamed heading keeps the link.
+  check("by the heading's id", (await target.getAttribute('id')) === 'long-conversations' && (await target.locator('a').count()) === 0)
   check('and the card stays beside it', (await card.count()) === 1)
   await page.keyboard.press('Control+Shift+E')
   await card.getByRole('button', { name: 'Close' }).click()

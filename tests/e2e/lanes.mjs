@@ -100,6 +100,13 @@ export async function withLock(dir, fn) {
       mkdirSync(lock)
       break
     } catch (e) {
+      // Windows refuses the folder while one just released is still being deleted (another runner's handle on it, as a
+      // stat): EPERM, at times EACCES (HI-1800: 3 of 36 runners racing for it). Taken again once it is gone, within the
+      // same bound; a folder Hive can't write to at all still fails then.
+      if ((e.code === 'EPERM' || e.code === 'EACCES') && Date.now() - start <= 4 * LOCK_MAX_MS) {
+        await sleep(50)
+        continue
+      }
       if (e.code !== 'EEXIST') throw e
       let age = 0
       try {
@@ -162,6 +169,22 @@ export async function claimLane(dir, { owner = process.pid, root = '', what = ''
       }
       return { lane: k, ...lanePorts(k, portsFrom), release }
     }
+  })
+}
+
+/**
+ * The lanes no running runner holds (HI-1453): no claim, or one whose runner is gone (a day-old claim of a runner still
+ * running is still its, unlike pickLane's). Read under the claims' lock: { lanes, at }, `at` when they were read. What
+ * runs from such a lane's folder and started before `at` was left by a run that ended without ending it; a runner that
+ * claims the lane after `at` starts its own after it.
+ */
+export async function idleLanes(dir, { alive = processAlive, now = () => Date.now() } = {}) {
+  mkdirSync(dir, { recursive: true })
+  return withLock(dir, async () => {
+    const claims = readClaims(dir)
+    const lanes = []
+    for (let k = 0; k < LANES; k++) if (!(Number.isInteger(claims[k]?.pid) && claims[k].pid > 0 && alive(claims[k].pid))) lanes.push(k)
+    return { lanes, at: now() }
   })
 }
 

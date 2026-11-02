@@ -15,6 +15,17 @@ They are not for:
 - what only one project's agents need (that project's `CLAUDE.md` or `AGENTS.md`);
 - copies of a product's specification or docs (link to them instead).
 
+## Where each kind of note goes
+
+| Kind of note | Where it goes |
+|---|---|
+| Project rules true for anyone who works on it | the project's `AGENTS.md` (committed) |
+| Allow rules for a CLI's commands | the project's `.claude/settings.json` |
+| What one lane or card needs | its brief, or the card |
+| About this machine or person: a full path a command needs, a local tool's version | the shared note `Workspace notes.md` |
+
+Hive gives `Workspace notes.md` to every agent at each launch, on every CLI and in any folder, and it stays out of git: never put local paths in a committed file instead. Keep it short (agents get 4 KB of it by default). A `## <project name>` section reaches only that project's agents. Only the user and the Hive Assistant write it: a project agent suggests the change to the user.
+
 ## Steps
 
 1. **Check what exists.** `hive_list_shared_notes`, then read the notes that may cover this already (`hive_read_shared_note`). Updating a note beats adding a near-duplicate.
@@ -32,4 +43,4 @@ They are not for:
    Keep it short, name files, commands and settings exactly, and never include secrets, tokens or personal data.
 4. **Save it** with `hive_write_shared_note`. Rewriting an existing note, pass `expectedRevision`, the revision your read gave, so you never drop a change someone made since. If it is refused, read the note again, merge your change into what is there now, and write with the new revision.
 
-Tell the user in a line which note you created or changed. Without Hive's tools, show the note in your reply and suggest where it goes.
+Tell the user in a line which note you created or changed. No hive tool listed: show the note in your reply and suggest where it goes.

@@ -1,0 +1,16 @@
+.claude.json
+.credentials.json
+.last-cleanup
+.last-update-result.json
+backups
+cache
+file-history
+history.jsonl
+plugins
+projects
+session-env
+sessions
+settings.json
+shell-snapshots
+skills
+state

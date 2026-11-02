@@ -4,7 +4,11 @@
 // See RELEASING.md.
 import { execSync, spawnSync } from 'child_process'
 import { existsSync, readFileSync } from 'fs'
+import { join } from 'path'
+import { fileURLToPath } from 'url'
 import { MANIFEST, manifestStale } from './testedClis.mjs'
+import { recordBuild } from './buildFact.mjs'
+import { writeAppIdentity } from './appIdentity.mjs'
 
 const pkg = JSON.parse(readFileSync(new URL('../package.json', import.meta.url), 'utf8'))
 let token
@@ -39,6 +43,8 @@ const run = (cmd, args) => {
   if (r.status !== 0) process.exit(r.status ?? 1)
 }
 run('npm', ['run', 'build'])
+// A release says so (#1647): its identity file local: false, and its installer never waits for another (installer.nsh).
+writeAppIdentity(fileURLToPath(new URL('..', import.meta.url)), { version: pkg.version, commit: execSync('git rev-parse HEAD').toString().trim(), local: false })
 // Create the draft first: electron-builder uploads the files in parallel and, with no release yet,
 // each upload creates its own draft (you end up with two drafts, the files split between them).
 const tag = `v${pkg.version}`
@@ -52,3 +58,7 @@ if (exists && JSON.parse(view.stdout.toString() || '{}').isDraft !== true) {
 if (!exists) run('gh', ['release', 'create', tag, '--draft', '--title', `"Hive Desktop ${pkg.version}"`, '--notes', '""'])
 run('npx', ['electron-builder', '--win', '--publish', 'always'])
 console.log(`\nDraft release v${pkg.version} uploaded. Review it at https://github.com/Suremise/hive-desktop/releases and publish it there.`)
+// The uploaded build, recorded in Hive's journal (buildFact.mjs, #1534): run() exits first on any failure.
+const root = fileURLToPath(new URL('..', import.meta.url))
+const git = (...a) => execSync(`git ${a.join(' ')}`, { cwd: root }).toString().trim()
+console.log(await recordBuild({ root, version: pkg.version, commit: git('rev-parse', 'HEAD'), branch: git('branch', '--show-current') || null, installer: join(root, 'dist', `Hive-Setup-${pkg.version}.exe`), by: 'release' }))

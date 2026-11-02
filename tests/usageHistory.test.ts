@@ -12,6 +12,11 @@ import type { SessionListItem, SessionUsage } from '../src/shared/types'
 import { tempDir } from './tempDir'
 
 const base = tempDir('hive-usage-history-')
+// The CLIs' homes are the test's own (HI-1666): a list looks in each for sessions started outside Hive, and the user's
+// ~/.codex (a thousand rollouts) took 17 s of it under a full unit run's load.
+process.env.CLAUDE_CONFIG_DIR = join(base, 'claude-home')
+process.env.CODEX_HOME = join(base, 'codex-home')
+process.env.COPILOT_HOME = join(base, 'copilot-home')
 ;(electron.app as unknown as { getPath: () => string }).getPath = () => join(base, 'profile')
 
 const { createWorkspaceService, disposeWorkspaceService, inWorkspace, workspace } = await import('../src/main/workspace')
@@ -240,6 +245,59 @@ describe('the usage history of a workspace', () => {
     } finally {
       reads.mockRestore()
       live.delete(`${p.toLowerCase()}#c1`)
+    }
+  })
+
+  it("a cost read's freshen reads a host's records once for all its running sessions, and records each (HI-1790)", async () => {
+    const ids = [newId(), newId(), newId()]
+    const live = (sessions as unknown as { live: Map<string, unknown> }).live
+    for (const [i, id] of ids.entries()) {
+      write(cliFile(id), transcript(id, [10 * (i + 1)]))
+      await run(() => workspace.upsertSession(p, { id, agent: 'claude-code', agentId: 'c1', name: `running ${i}`, lastActiveAt: new Date(T0).toISOString() }))
+      live.set(`${p.toLowerCase()}#run${i}`, { state: { sessionId: id, projectPath: p, provider: 'claude-code' } })
+    }
+    const records = vi.spyOn(w, 'sessionsFile')
+    cliLookup.mockClear()
+    try {
+      await run(() => usageHistory.freshen(w))
+      expect(records.mock.calls.filter(([host]) => host === p)).toHaveLength(1)
+      // The transcript looked up with the records read (not read again for each).
+      for (const id of ids) expect(cliLookup.mock.calls.find(([, sid]) => sid === id)?.[2]?.records.some((r) => r.id === id)).toBe(true)
+      const items = await run(() => sessions.usageItems(p))
+      expect(ids.map((id) => outputOf(items, id))).toEqual([10, 20, 30])
+    } finally {
+      records.mockRestore()
+      for (const i of ids.keys()) live.delete(`${p.toLowerCase()}#run${i}`)
+    }
+  })
+
+  it('a roll-up waiting behind other jobs leaves a session resumed meanwhile alone: the running ones are read as it goes to the worker (HI-1648 review round 1)', async () => {
+    // Two sessions last active on 12 Oct (over 14 days ago), recorded in full detail.
+    const [resumed, ended] = [newId(), newId()]
+    for (const id of [resumed, ended]) {
+      write(cliFile(id), transcript(id, [5, 6]))
+      await run(() => workspace.upsertSession(p, { id, agent: 'claude-code', agentId: 'c1', name: id, lastActiveAt: new Date(T0).toISOString() }))
+      await run(() => usageHistory.ingest(p, id, { priority: 0, keepState: 'no' }))
+    }
+    const step = async (id: string) => (await run(() => usageHistory.timelines(p))).find((s) => s.session === id)?.timeline?.step
+    expect([await step(resumed), await step(ended)]).toEqual([1, 1])
+    const h = usageHistory as unknown as { enqueue: (k: string, pr: number, q: () => Promise<null>) => Promise<unknown>; rollUp: (ws: unknown, r: unknown) => Promise<void>; rolledUp: Map<string, number> }
+    const live = (sessions as unknown as { live: Map<string, unknown> }).live
+    // The queue held by a job before it; the roll-up queued behind it, then the session resumed while it waits.
+    let open!: () => void
+    const gate = h.enqueue('gate', 0, () => new Promise<null>((r) => (open = () => r(null))))
+    await vi.waitFor(() => expect(open).toBeTypeOf('function'))
+    h.rolledUp.clear()
+    const rolled = run(() => h.rollUp(w, { path: w.path, signal: w.lifetime }))
+    live.set(`${p.toLowerCase()}#resumed`, { state: { sessionId: resumed, projectPath: p, provider: 'claude-code' } })
+    try {
+      open()
+      await gate
+      await rolled
+      expect(await step(ended)).toBe(3600)
+      expect(await step(resumed)).toBe(1)
+    } finally {
+      live.delete(`${p.toLowerCase()}#resumed`)
     }
   })
 

@@ -1,6 +1,8 @@
 // Resume All Agents in the project header: resumes the stopped agents, leaves the running one alone, and reports
 // an agent that can't resume (its worktree folder is gone) while the others still resume. The agents run the fake
 // Claude Code (fake-claude/). Dev build, throwaway profile, workspace and CLAUDE_CONFIG_DIR.
+// Dev build only (#1580): it starts this checkout's Electron itself, and Tree is a 0.9 worktree agent
+// (agents:testLegacy, refused by a packaged build).
 const lib = require('./lib.cjs')
 const { _electron } = require('playwright-core')
 const fs = require('fs')

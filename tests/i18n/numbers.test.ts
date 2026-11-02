@@ -60,7 +60,7 @@ const CASES: [id: string, values: Record<string, string | number>, numbers: numb
   ['settings.agents.backgroundTaskMinutes.tip', { min: N, max: N }, 2],
   ['tips.ui.counter', { n: N, total: N }, 2],
   ['tips.assistantCompact.text', { tokens: N }, 1],
-  ['tips.progressHistory.text', { recent: N, kept: N }, 2],
+  ['tips.progressHistory.text', { kept: N }, 1],
   ['sessions.bulk.andMore', { n: N }, 1],
   ['sessions.bulk.doneSkipped', { action: 'archive', n: N, skipped: N, why: 'x' }, 2],
   ['git.tags.older', { count: N }, 1],
@@ -77,7 +77,6 @@ const CASES: [id: string, values: Record<string, string | number>, numbers: numb
   ['board.duration.hoursMinutes', { h: N, min: 5 }, 1],
   ['actions.duration.hoursMinutes', { h: N, m: 5 }, 1],
   ['panes.runtime.silent', { known: 'yes', minutes: N }, 1],
-  ['board.stalled.reviewWaitSilent', { agent: 'x', card: 7, silent: N, waited: 'x' }, 1],
   ['board.slots.minutes', { n: N }, 1],
   ['service.gitRepo.diverged', { branch: 'x', upstream: 'x', ahead: N, behind: N }, 2],
   ['workspace.move.unreadable', { count: N, files: 'x', more: 0 }, 1]

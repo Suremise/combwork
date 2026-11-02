@@ -1,12 +1,14 @@
+import { randomBytes } from 'crypto'
 import { basename, dirname, extname, join, resolve } from 'path'
 import { copyFile, mkdir, readdir, readFile, rmdir } from 'original-fs/promises'
 import { existsSync } from 'original-fs'
 import { HIVE_DIR, agentPtyKey, projectAgents } from '../shared/defaults'
 import { fmt, msg, tr } from '../shared/i18n'
 import { forgetPtys } from './ptyHost'
-import type { AgentDef, ProjectRemoval, ProjectRemovalInfo, TaskCard } from '../shared/types'
+import type { AgentDef, ProjectFolderOf, ProjectRemoval, ProjectRemovalInfo, TaskCard } from '../shared/types'
 import { config } from './config'
 import { suspendWatching } from './files'
+import { observer } from './platform/observe'
 import { containsPlace, readJson, realPath, removePath, samePlace, writeJsonAtomic } from './fsutil'
 import { createLogger, userText } from './logger'
 import { handoversFor } from './notes'
@@ -15,6 +17,12 @@ import { archiveProjectCards, deleteProjectCards, importCards, projectCards, res
 import { REMOVED_DIR, workspace, type WorkspaceService } from './workspace'
 import * as wt from './worktrees'
 import { trash } from './trash'
+import { boardWrite } from './boardStore'
+import { FactStore } from './workflow/factStore'
+import { forgetProjectQueues } from './workflow/queueRunner'
+import { legacyWorktree, slotsMigrated } from './agentFolders'
+import { deleteBlocks, projectFolders, releaseDelete, removeFolders, reserveDelete, reserveRefusal, trashFolders } from './projectFolders'
+import { folderWhat } from '../shared/projectFolders'
 
 const log = createLogger('projects')
 
@@ -57,7 +65,10 @@ function folderOf(ws: WorkspaceService, projectPath: string): string {
  * not the project itself, nor contain it or the workspace, nor are another project. project.json can be edited by
  * hand: a path it gives is never removed on its word alone. The rest come back as `refused`, with why. Exported for tests.
  */
-export async function checkedWorktrees(ws: WorkspaceService, p: string, agents: AgentDef[]): Promise<{ ok: AgentDef[]; refused: string[] }> {
+export async function checkedWorktrees(ws: WorkspaceService, p: string, all: AgentDef[]): Promise<{ ok: AgentDef[]; refused: string[] }> {
+  // Agents whose 0.9 worktree the slots' migration took over (#1441) are the slots' (removeFolders), not these.
+  const agents: AgentDef[] = []
+  for (const a of all) if (!(await slotsMigrated(p, a.id))) agents.push(a)
   // Real paths, for each check: git lists long names, while the agent's path may use a short (8.3) one such as RUNNER~1
   // or go through a junction (#389, #455).
   const registered = new Set((await wt.listWorktrees(p)).map((w) => realPath(w.path).toLowerCase()))
@@ -65,8 +76,9 @@ export async function checkedWorktrees(ws: WorkspaceService, p: string, agents: 
   const ok: AgentDef[] = []
   const refused: string[] = []
   for (const a of agents) {
-    if (!a.worktree) continue
-    const t = resolve(a.worktree.path)
+    const tree = legacyWorktree(a)
+    if (!tree) continue
+    const t = resolve(tree.path)
     const why = !registered.has(realPath(t).toLowerCase())
       ? tr(msg({ id: 'main.removal.why.notListed', defaultMessage: "git doesn't list it as one of the project's worktrees", description: "Why Hive won't remove or delete an agent's worktree with its project: a clause in brackets (main.removal.refusedTree)." }))
       : containsPlace(t, p) || containsPlace(t, ws.path!)
@@ -87,13 +99,15 @@ export async function removalInfo(projectPath: string): Promise<ProjectRemovalIn
   const cards = await projectCards(ws, name)
   const worktrees: ProjectRemovalInfo['worktrees'] = []
   for (const a of projectAgents(await ws.projectConfig(p))) {
-    if (!a.worktree) continue
+    // Its 0.9 worktree, until the slots' migration took it over (#1441: then it is one of the slots below).
+    const tree = legacyWorktree(a)
+    if (!tree || (await slotsMigrated(p, a.id))) continue
     // Unknown is not clean: a worktree git can't check counts as holding work.
-    const st = await wt.branchStatus(p, a.worktree).then(
+    const st = await wt.branchStatus(p, tree).then(
       (s) => ({ ahead: s.ahead, dirty: s.dirty, error: undefined as string | undefined }),
       (e: Error) => ({ ahead: 0, dirty: 0, error: e.message })
     )
-    worktrees.push({ agent: a.name, path: a.worktree.path, branch: a.worktree.branch, ...st })
+    worktrees.push({ agent: a.name, path: tree.path, branch: tree.branch, ...st })
   }
   return {
     name,
@@ -102,7 +116,9 @@ export async function removalInfo(projectPath: string): Promise<ProjectRemovalIn
     handovers: await handoversOf(ws, name),
     cards: cards.filter((c) => !c.archived).length,
     archivedCards: cards.filter((c) => c.archived).length,
-    worktrees
+    worktrees,
+    // Its slots, copies and old reviewer folders (#1447), with what removing it would do to each.
+    folders: await removeFolders(ws, p, false)
   }
 }
 
@@ -117,6 +133,11 @@ function unmergedWork(worktrees: ProjectRemovalInfo['worktrees']): string | null
       ...(w.dirty ? [tr(msg({ id: 'main.removal.dirty', defaultMessage: '{n, plural, one {# uncommitted file} other {# uncommitted files}}', description: "Work in an agent's worktree that stops Remove from Hive: its files not committed. {n} is how many." }), { n: w.dirty })] : [])
     ])
   return tr(msg({ id: 'main.removal.unmerged', defaultMessage: "Merge or discard the work in {worktrees} first: a worktree can't go with the project folder.", description: "Why Remove from Hive can't go ahead. {worktrees} lists the agents' worktrees with work in them (main.removal.heldTree)." }), { worktrees: fmt.list(held.map((w) => tr(msg({ id: 'main.removal.heldTree', defaultMessage: "{agent}'s worktree ({work})", description: "An agent's worktree with work in it, in the reason Remove from Hive can't go ahead. {work} says what (commits not merged, uncommitted files) or why git couldn't check." }), { agent: w.agent, work: what(w) }))) })
+}
+
+/** The slots, copies and old folders a removal left (#1447), one warning each, with why. */
+function keptWarnings(folders: readonly { of: ProjectFolderOf; path: string; kept: string | null }[]): string[] {
+  return folders.flatMap((f) => (f.kept ? [tr(msg({ id: 'main.removal.folderKept', defaultMessage: 'Left in place: {what} at {path} ({why}).', description: "A warning after Remove from Hive or Delete (#1447): a slot, review copy or old reviewer folder ({what}: its name) that was kept, at {path}, and why ({why}: a clause)." }), { what: folderWhat(f.of), path: f.path, why: f.kept })] : []))
 }
 
 /** Stops the project's agents (and starts in progress) and waits for them, so nothing holds or changes its folders. */
@@ -158,6 +179,8 @@ export async function removeProject(projectPath: string, how: ProjectRemoval): P
       log.info(`Hid ${userText(name)}`)
       return { warnings: [] }
     }
+    // Its merge queues go with it (#1360): this Hive's runners released, their worktrees and records removed.
+    await forgetProjectQueues({ store: FactStore.forBoard(ws, { project: name, key: name }), project: p, root: join(ws.worktreesRoot, name), locked: (fn) => boardWrite(ws, async () => fn()) }).catch((e) => log.warn(`removing ${userText(name)}'s merge queue folders`, e))
     const done = how === 'remove' ? await removeFromHive(ws, p, info, agents) : await deleteProject(ws, p, info, agents)
     // Its agents' terminals' kept sizes and output go with it (#489); a hidden project keeps them.
     forgetPtys(agentPtyKey(p, ''))
@@ -181,8 +204,10 @@ async function removeFromHive(ws: WorkspaceService, p: string, info: ProjectRemo
   await pack(ws, p, info.handovers)
   // Its sessions' records too (#1061): out of the workspace's database, into its folder, which takes them wherever it goes.
   await ws.exportSessions(p)
+  // Its slots and copies (#1447): through their pools' guarded clean-up; what is kept stays, said in the result.
+  const folders = await removeFolders(ws, p, true)
   // The worktrees have nothing left that isn't in the project: they and their agents go.
-  for (const a of ok) await wt.removeWorktree(p, a.worktree!, true)
+  for (const a of ok) await wt.removeWorktree(p, legacyWorktree(a)!, true)
   if (ok.length) {
     const gone = new Set(ok.map((a) => a.id))
     await ws.mutateProjectConfig(p, (now) => ({ agents: now.agents.filter((a) => !gone.has(a.id)) }))
@@ -198,30 +223,64 @@ async function removeFromHive(ws: WorkspaceService, p: string, info: ProjectRemo
   }
   await ws.setHidden(name, 'removed')
   log.info(`Removed ${userText(name)} from Hive (packed ${info.handovers.length} handovers and its cards)`)
-  return { warnings }
+  return { warnings: [...keptWarnings(folders), ...warnings] }
 }
 
 async function deleteProject(ws: WorkspaceService, p: string, info: ProjectRemovalInfo, agents: AgentDef[]): Promise<{ warnings: string[] }> {
   const name = basename(p)
-  const { ok, refused } = await checkedWorktrees(ws, p, agents)
-  const trees = ok.map((a) => a.worktree!.path).filter((t) => existsSync(t))
-  // The folder first: it is what Windows most often can't move (a program has it open), and until it has gone
-  // nothing else is touched, so a refusal leaves the project as it was.
-  const resume = suspendWatching([p, ...trees])
+  // Its slots, copies and old folders (#1447, HR1's round 1): refused before anything is done if one is outside the
+  // project's worktrees folder or held by one of Hive's steps; the rest go to the Recycle Bin after the folder.
+  const folders = await projectFolders(ws, p)
+  // Its id now: its project.json goes with the folder (the slots' rows are kept by it).
+  const id = (await ws.projectConfig(p)).id ?? name
+  const blocked = (items: string[]): Error => new Error(tr(msg({ id: 'main.removal.deleteBlocked', defaultMessage: "Delete can't go ahead: {folders}. Nothing was deleted.", description: "Why Delete refused (#1447): the project's slots or old folders that stop it ({folders}: each one's name and why, a list). Nothing was changed." }), { folders: fmt.list(items) }))
+  const blocks = await deleteBlocks(ws, p, folders)
+  if (blocks.size) throw blocked(folders.filter((f) => blocks.has(f.key)).map((f) => `${folderWhat(f.of)} (${blocks.get(f.key)})`))
+  // Then held, in one write against the rows as they are then (HR1's round 2): no step of any Hive begins on the
+  // project's slots or copies, nor makes one, until Delete has finished with them or let them go.
+  const token = `d-${randomBytes(8).toString('hex')}`
+  const { holder } = await import('./slotsApp')
+  holder.live.add(token)
+  let held = false
   try {
-    await trash(p)
-  } catch (e) {
-    resume()
-    throw new Error(
-      tr(msg({ id: 'main.removal.trashFailed', defaultMessage: 'Could not move {project} to the Recycle Bin: {why}. Close any program using its folder (a terminal, an editor), then try again. Nothing was deleted.', description: "Why Delete failed: the project's folder couldn't go to the Recycle Bin. {why} is the system's message." }), { project: name, why: (e as Error).message }),
-      { cause: e }
-    )
+    const refusal = await reserveDelete(ws, id, folders, token, await holder.self())
+    if (refusal) throw blocked(reserveRefusal(folders, refusal))
+    held = true
+    const { ok, refused } = await checkedWorktrees(ws, p, agents)
+    const trees = ok.map((a) => legacyWorktree(a)!.path).filter((t) => existsSync(t))
+    // The folder first: it is what Windows most often can't move (a program has it open), and until it has gone
+    // nothing else is touched, so a refusal leaves the project as it was (its slots let go, below).
+    const resume = suspendWatching([p, ...trees])
+    // The platform watcher's too (#1214), until the worktrees have gone as well; a refresh then stops following them.
+    const resumeObserving = observer.suspend([p, ...trees])
+    try {
+      await trash(p)
+    } catch (e) {
+      resume()
+      resumeObserving()
+      throw new Error(
+        tr(msg({ id: 'main.removal.trashFailed', defaultMessage: 'Could not move {project} to the Recycle Bin: {why}. Close any program using its folder (a terminal, an editor), then try again. Nothing was deleted.', description: "Why Delete failed: the project's folder couldn't go to the Recycle Bin. {why} is the system's message." }), { project: name, why: (e as Error).message }),
+        { cause: e }
+      )
+    }
+    // From here the project is gone: what can't follow is reported, not undone.
+    const warnings = refused.map((r) => tr(msg({ id: 'main.removal.leftAlone', defaultMessage: 'Left alone: {worktree}.', description: "A warning after Delete: an agent's worktree Hive didn't delete with the project (main.removal.refusedTree)." }), { worktree: r }))
+    // Its slots, copies and old folders follow it to the Recycle Bin, with their work (#1447), their rows with the hold.
+    warnings.push(...(await trashFolders(ws, p, id, folders, token, trash)))
+    held = false
+    return await deleteRest(ws, p, info, name, trees, warnings, resumeObserving)
+  } finally {
+    if (held) await releaseDelete(ws, id, token).catch((e) => log.warn(`Deleting ${userText(name)}: its slots' hold couldn't be let go (the next refresh does)`, e))
+    holder.live.delete(token)
   }
-  // From here the project is gone: what can't follow is reported, not undone.
-  const warnings = refused.map((r) => tr(msg({ id: 'main.removal.leftAlone', defaultMessage: 'Left alone: {worktree}.', description: "A warning after Delete: an agent's worktree Hive didn't delete with the project (main.removal.refusedTree)." }), { worktree: r }))
+}
+
+/** Delete's steps after the project's folder and slots have gone: its agents' worktrees, handovers, cards and records. */
+async function deleteRest(ws: WorkspaceService, p: string, info: ProjectRemovalInfo, name: string, trees: string[], warnings: string[], resumeObserving: () => void): Promise<{ warnings: string[] }> {
   for (const t of trees) {
     await trash(t).catch((e) => warnings.push(tr(msg({ id: 'main.removal.notTrashed', defaultMessage: "{path} couldn't be moved to the Recycle Bin: {why}", description: "A warning after Delete: a worktree or handover note of the project couldn't go to the Recycle Bin. {path} is it, {why} the system's message." }), { path: t, why: (e as Error).message })))
   }
+  resumeObserving()
   for (const rel of info.handovers) {
     await trash(join(ws.sharedDir, rel)).catch((e) => warnings.push(tr(msg({ id: 'main.removal.notTrashed', defaultMessage: "{path} couldn't be moved to the Recycle Bin: {why}", description: "A warning after Delete: a worktree or handover note of the project couldn't go to the Recycle Bin. {path} is it, {why} the system's message." }), { path: rel, why: (e as Error).message })))
   }

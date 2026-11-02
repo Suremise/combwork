@@ -47,7 +47,9 @@ const assistantOnly = bundledForAssistant.length + 1
   skill(skillsDir, 'plain')
   // A misspelt audience: nobody gets it, and the row says so.
   skill(skillsDir, 'misspelt', 'assitant')
-  // A bundled skill for the Assistant, deleted: it's listed (for Restore) with its audience.
+  // A bundled skill for the Assistant, deleted: it's listed (for Restore) with its audience. Bundled skills are added
+  // just after the workspace opens, so it's deleted once it's there.
+  if (!(await lib.until(() => fs.existsSync(path.join(skillsDir, 'coordinate-agents', 'SKILL.md')), 20000))) throw new Error('The bundled coordinate-agents skill was never added')
   await inv('skills:delete', path.join(skillsDir, 'coordinate-agents'))
   await sleep(800)
 

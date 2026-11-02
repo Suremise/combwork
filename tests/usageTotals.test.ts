@@ -48,6 +48,26 @@ function session(days: Record<string, number>, provider: 'claude-code' | 'codex'
   }
 }
 
+describe('free sessions (HI-1772, Darren 27 Oct)', () => {
+  /** A session run only on a server on this PC: a known $0, marked free. */
+  const free = (days: Record<string, number>): SessionListItem => {
+    const s = session(days)
+    for (const d of Object.values(s.usage!.days!)) Object.assign(d, { costUsd: 0, costEstimated: false })
+    Object.assign(s.usage!, { costUsd: 0, costEstimated: false, costFree: true })
+    return s
+  }
+  it('only free: free (local); beside priced ones: their cost, + free (local); tokens counted either way', () => {
+    const all = periodFrom('all', NOW)
+    const only = sumUsage([free({ '2026-10-01': 1000 })], all)
+    expect(only).toMatchObject({ free: 1, priced: 0, unpriced: 0, input: 1000 })
+    expect(costText(only)).toBe('free (local)')
+    const mixed = sumUsage([free({ '2026-10-01': 1000 }), session({ '2026-10-01': 2000 })], all)
+    expect(costText(mixed)).toBe('≈ $2.00 + free (local)')
+    const [day] = dailyTotals([free({ '2026-10-01': 1000 })], '2026-10-01', NOW)
+    expect(costText(day)).toBe('free (local)')
+  })
+})
+
 describe('period totals', () => {
   it('counts only the days in the period', () => {
     const s = session({ '2026-09-20': 500, '2026-09-30': 200, '2026-10-01': 100 })

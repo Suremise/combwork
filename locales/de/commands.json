@@ -1,0 +1,6 @@
+{
+  "commands.migrated.close": "Befehl beim Schließen",
+  "commands.migrated.quit": "Befehl beim Beenden",
+  "commands.run.gone": "Diesen Befehl gibt es nicht mehr.",
+  "commands.run.testCopy": "Dies ist eine Testkopie von Hive: Sie führt deine Befehle nicht aus."
+}

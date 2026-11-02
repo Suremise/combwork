@@ -9,15 +9,19 @@ import { rmSync } from 'fs'
 import { join } from 'path'
 import { afterAll, beforeEach, describe, expect, it, vi } from 'vitest'
 import * as electron from 'electron'
-import type { DeliverySender } from '../src/shared/deliveries'
+import { ackText, isOverdue, type DeliverySender } from '../src/shared/deliveries'
 import { tempDir } from './tempDir'
+import { admitted } from './admitted'
 // The longest a wait here waits for what it waits on: a bound for a hung run, never how long it should take (#570).
 const HUNG_MS = 10000
 
 describe('messages left for agents (#530, #647)', async () => {
   const base = tempDir('hive-messages-')
   ;(electron.app as unknown as { getPath: () => string }).getPath = () => join(base, 'profile')
+  // The hosts' workspace (each host a folder in it), as a window holding it would admit it (#1395).
+  const dismiss = admitted(base)
   afterAll(async () => {
+    dismiss()
     // The workspace database (#1018) is open until its board closes.
     ;(await import('../src/main/boardStore')).closeAllBoards()
     rmSync(base, { recursive: true, force: true })
@@ -64,7 +68,12 @@ describe('messages left for agents (#530, #647)', async () => {
   const states = async (agentId = 'b1') => (await deliveries.deliveriesOf(alpha, agentId)).map((r) => `${r.id} ${r.state}${r.detail ? `: ${r.detail}` : ''}`)
   const tryAll = () => deliveries.offerAllForTests()
   /** The doorbell (#650) naming these deliveries: Hive's fixed words with counts and ids. */
-  const bell = (what: string, ids: string, tail = '') => `[Hive] New in your inbox: ${what} (${ids}). Call hive_inbox to read ${ids.includes(',') ? 'them' : 'it'}.${tail}`
+  const bell = (what: string, ids: string, tail = '') => {
+    const them = ids.includes(',') ? 'them' : 'it'
+    // Anything to ack (not only card events): act on it, then ack (#1530).
+    const ack = /\b(message|task|answer|handover)s?\b/.test(what) ? `, act on ${them}, then ack ${them}` : ''
+    return `[Hive] New in your inbox: ${what} (${ids}). Call hive_inbox to read ${them}${ack}.${tail}`
+  }
   beforeEach(async () => {
     // Each test its own project, so ids start at m1.
     alpha = join(base, `alpha${++n}`)
@@ -145,6 +154,37 @@ describe('messages left for agents (#530, #647)', async () => {
       Object.assign(sessions, { promptsTaken: () => null })
       await vi.waitFor(() => expect(writer.confirmsInFlight()).toBe(0), { timeout: HUNG_MS })
     }
+  })
+
+  // #1531 (#1346 item 7: 80 inbox calls, a read and an ack for each wake): hive_inbox's opt-in combined form acks, then
+  // reads, in one call; ack only and read only are as they were, and nothing is acked by being read.
+  it('ack then read in one call: the ack by its own rules, then what is new, received and never acked; ack only lists and receives nothing', async () => {
+    st.status = 'working'
+    await leave('First.')
+    expect((await deliveries.readInbox(alpha, 'b1')).items.map((x) => x.ids.join())).toEqual(['m1'])
+    // A second arrives while the agent acts on the first: one call acks m1 and gives m2, received only.
+    await leave('Second.')
+    expect(await deliveries.ackThenRead(alpha, 'b1', ['m1'])).toMatchObject({ acked: ['m1'], unknown: [], unread: [], items: [expect.objectContaining({ ids: ['m2'] })], unacked: [] })
+    expect(await states()).toEqual(['m1 acked', 'm2 received'])
+    // Ack only, with a new one waiting: acks, and lists and receives nothing.
+    await leave('Third.')
+    expect(await deliveries.ackDeliveries(alpha, 'b1', ['m2'])).toEqual({ acked: ['m2'], unknown: [], unread: [] })
+    expect((await states()).at(-1)).toBe('m3 queued')
+    // Combined, acking one not read yet: refused unread, then read by the same call (received, not acked).
+    expect(await deliveries.ackThenRead(alpha, 'b1', ['m3'])).toMatchObject({ acked: [], unread: ['m3'], items: [expect.objectContaining({ ids: ['m3'] })] })
+    expect((await states()).at(-1)).toBe('m3 received')
+    // Another agent's id: unknown, revealing nothing, and left as it is.
+    await messages.leaveMessage(alpha, 'b2', 'Other', asst, 'For b2.')
+    expect(await deliveries.ackThenRead(alpha, 'b1', ['m4'])).toEqual({ acked: [], unknown: ['m4'], unread: [], items: [], unacked: ['m3'] })
+    expect(await states('b2')).toEqual(['m4 queued'])
+    // Read and not acked (the agent didn't act): still the agent's, overdue after 30 minutes as before.
+    const m3 = (await deliveries.deliveriesOf(alpha, 'b1')).find((r) => r.id === 'm3')!
+    expect(isOverdue(m3, Date.parse(m3.created) + 31 * 60_000)).toBe(true)
+    // Read only: as before.
+    expect(await deliveries.readInbox(alpha, 'b1')).toEqual({ items: [], unacked: ['m3'] })
+    // The ack line of each form: one not read yet is read first alone, and read by the same call when combined.
+    expect(ackText(['m1'], [], ['m3'])).toBe('Acked m1. Not read yet: m3: read it with hive_inbox first.')
+    expect(ackText(['m1'], ['m9'], ['m3'], true)).toBe('Acked m1. Not read before: m3, not acked: ack it once you have acted on it. Not in your inbox: m9.')
   })
 
   it('offered only once saved: a save that fails types nothing, and a wake waits for the save of what rides it', async () => {

@@ -1,4 +1,5 @@
 // About dialog licence links, the License / Third-Party Notices docs pages, and Help → Copy Diagnostics (redacted preview, copied to a fake clipboard). Throwaway profile.
+// Also the Node Electron bundles, the packaged app's too (the same electron.exe): 24.22.1 or later, CVE-2026-111497's fix (HI-1503).
 const lib = require('./lib.cjs')
 const { _electron } = require('playwright-core')
 const fs = require('fs'), path = require('path')
@@ -28,6 +29,14 @@ const becomes = async (fn) => !!(await lib.until(fn, HUNG_MS))
   page.on('pageerror', (e) => console.log('PAGE ERROR', e.message))
   await lib.fitWindow(app, page, { width: 1300, height: 850 })
   await lib.appReady(page)
+  // Node2Shell (CVE-2026-111497, Node's Brotli decoder): fixed in 24.22.1, so a downgrade of Electron fails here (HI-1503).
+  const node = await app.evaluate(() => process.versions.node)
+  const atLeast = (v, min) => {
+    const [a, b] = [v, min].map((x) => x.split('.').map(Number))
+    const i = a.findIndex((n, k) => n !== b[k])
+    return i < 0 || a[i] > b[i]
+  }
+  check('Electron bundles Node 24.22.1 or later (CVE-2026-111497)', atLeast(node, '24.22.1'), node)
   // Setup dialog may show on a fresh profile; close any modal first.
   await page.keyboard.press('Escape'); await sleep(300)
   await page.evaluate(() => window.hive.invoke('app:info')) // warm
@@ -70,14 +79,22 @@ const becomes = async (fn) => !!(await lib.until(fn, HUNG_MS))
   for (const d of [secretWs, otherWs]) fs.rmSync(d, { recursive: true, force: true })
   lib.gitProject(path.join(secretWs, 'PrivateProject'))
   fs.mkdirSync(path.join(otherWs, 'demo'), { recursive: true })
-  await inv('workspace:open', secretWs); await lib.until(async () => page.evaluate((n) => document.title.includes(n), path.basename(secretWs)), 20000)
+  const openWs = async (ws) => { await inv('workspace:open', ws); await lib.until(async () => page.evaluate((n) => document.title.includes(n), path.basename(ws)), 20000) }
+  // The other workspace opened once first: a workspace's first open logs its setting up (its board's schema steps, the
+  // bundled skills and modes added), which pushed the card's line out of the report's last 50 (HI-1815).
+  await openWs(otherWs)
+  await openWs(secretWs)
   await inv('tasks:create', { title: 'Confidential customer merger notes', project: 'PrivateProject' })
-  await inv('workspace:open', otherWs); await lib.until(async () => page.evaluate((n) => document.title.includes(n), path.basename(otherWs)), 20000)
+  await openWs(otherWs)
   const log = fs.readFileSync(path.join(userData, 'logs', 'hive.log'), 'utf8')
   check('the log has the card and the first workspace', log.includes('Confidential customer merger notes') && log.includes('PrivateProject'))
   const report = await inv('app:diagnostics')
+  const reportLog = report.slice(report.indexOf('### Log'))
+  // What follows is checked on the lines that named them: the report's log reaches back to the card's line.
+  check("the report's log reaches back to the card being created", /created by <text>: <text>/.test(reportLog), reportLog)
+  console.log(`INFO the card's line is ${reportLog.split('\n').reverse().findIndex((l) => /created by <text>/.test(l))} lines from the end of the report's log (of 50)`)
   check('the report has neither', !/Confidential|merger|PrivateProject/i.test(report), report.split('\n').filter((l) => /Confidential|merger|PrivateProject/i.test(l)).join(' | '))
-  check('and says where they were', /created by <text>: <text>/.test(report) && /Opened workspace <(path|workspace)>/.test(report), report.slice(report.indexOf('### Log')))
+  check('and says where they were', /Opened workspace <(path|workspace)>/.test(reportLog), reportLog)
   await app.close()
   console.log(`\n${pass} passed, ${fail} failed`)
   process.exit(fail ? 1 : 0)

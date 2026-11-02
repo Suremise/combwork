@@ -11,8 +11,8 @@ A handover is read cold by someone with none of this conversation. Write it so t
 
 ## Check the state
 
-- **Code**: the branch and folder (worktree or project folder), `git status`, and `git log --oneline -10`. Note what is committed and what isn't.
-- **Checks**: give the results you already have, and say when they were run and against what. If the code changed since a check, say so, or run it again if it's quick. Don't re-run unchanged checks just to write the note: results the user has just given you count too.
+- **Code**: the branch and folder (slot or project folder), `git status`, and `git log --oneline -10`. Note what is committed and what isn't.
+- **Checks**: give the results you already have, and say when they were run and against what. Don't re-run unchanged checks just to write the note: results the user has just given you count too. If the code changed since a check, say so, or run it again if it's quick.
 - **Running work**: anything still going or half-done (a background job, a migration, a file mid-edit).
 
 ## What to write
@@ -20,7 +20,7 @@ A handover is read cold by someone with none of this conversation. Write it so t
 Use these headings. Keep each short and concrete:
 
 - **Goal**: what the work is for, in a sentence or two.
-- **Done**: what was completed, with commits and card numbers.
+- **Done**: what was completed, with commits and card keys.
 - **Current state**: branch, uncommitted changes, and what passes and fails (the key error line, not the log).
 - **Decisions**: choices made and why, especially ones that look odd without context, and what was tried and rejected.
 - **Next steps**: in order, the first small enough to start at once.
@@ -35,6 +35,6 @@ Lasting decisions and conventions belong in the shared notes too (the workspace-
 
 Save it with `hive_create_handover` (title: a few words on the work, content: the note). Hive files it in the workspace's shared notes for this project and writes the header itself (title, project, author, session and date), so start the content at the first heading. The next session is told it exists.
 
-Without Hive's tools, write it to `HANDOVER.md` in the project root and tell the user.
+No hive tool listed: write it to `HANDOVER.md` in the project root and tell the user.
 
 Finish by telling the user, in a line or two, where it is and what the next step is.

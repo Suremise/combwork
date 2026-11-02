@@ -148,8 +148,8 @@ function splitCommandLine(cmd: string): string[] {
   return out
 }
 
-/** A path's last part: C:\a\b\serve.js is serve.js. Anything else as it is. */
-const lastPart = (arg: string): string => (/^(?:[A-Za-z]:)?[\\/]/.test(arg) || /^[A-Za-z]:/.test(arg) ? (arg.replace(/[\\/]+$/, '').split(/[\\/]/).pop() ?? arg) : arg)
+/** A path's last part: C:\a\b\serve.js is serve.js. A switch (`/d`, `/c`: HI-1743, it lost its slash) and anything else as it is. */
+const lastPart = (arg: string): string => (/^\/[A-Za-z?]{1,4}$/.test(arg) ? arg : /^(?:[A-Za-z]:)?[\\/]/.test(arg) || /^[A-Za-z]:/.test(arg) ? (arg.replace(/[\\/]+$/, '').split(/[\\/]/).pop() ?? arg) : arg)
 
 /** A process as the user recognises it: `node npm-cli.js run serve`, `tail -f capture-1.log`. */
 export function processLabel(name: string, commandLine: string): string {

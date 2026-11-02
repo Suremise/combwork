@@ -2,7 +2,10 @@
   "skills": {
     "board-hygiene": [
       "0572c5dcda525e1c",
-      "053f431d60a616b7"
+      "053f431d60a616b7",
+      "1a85f53ba82fca85",
+      "82c7af80f3668358",
+      "f475c950d778e311"
     ],
     "card-loop": [
       "7fca2f34d9b1d72a",
@@ -37,7 +40,31 @@
       "30cf8d5bc1a8668f",
       "952177d545563976",
       "7adbf55394080d73",
-      "b6d8b672c5f02f2b"
+      "b6d8b672c5f02f2b",
+      "639dc5b65a81f330",
+      "b5dbf29738fd6b5e",
+      "3f01c768948a11e9",
+      "39d9d273b6bc93e4",
+      "1877eaf1eb507d01",
+      "6ef57beecb15af04",
+      "8d31b7c8915d2f62",
+      "984e54ba636f7470",
+      "c00cb691a3097f50",
+      "7b54ed90154e16c1",
+      "67ff013d4dbaab85",
+      "c5a926aef47c0113",
+      "2e0f4a65a48f88be",
+      "c7cd2698b43c1bd1",
+      "500d89e52be200d2",
+      "95e59f99dba03f49",
+      "2f86c80b130fd8a6",
+      "da2b0e7afb2d7e63",
+      "28720fd0d4555f1d",
+      "d03e5249477e813d",
+      "1289cc89245ee20e",
+      "8166252c0dd6091c",
+      "6c2838fb53f21025",
+      "b706867be0d1e21f"
     ],
     "coordinate-agents": [
       "148fcb5639058ac2",
@@ -62,17 +89,54 @@
       "f22778f750b9dc74",
       "57d289c5244ba353",
       "919aaea51b50d4cb",
-      "dea7fc62d4b22c0c"
+      "dea7fc62d4b22c0c",
+      "6ee2a37dba0f3acc",
+      "25dbcfd4369f0120",
+      "98ff49055761ad5e",
+      "7c3e418dbb0f3449",
+      "0c7bc3dbf776f8f5",
+      "ae3c0e64bdba1254",
+      "041208d8e8c3d463",
+      "15091a00af840d44",
+      "a280e5c7163545e2",
+      "1ec2224fd77f8a7d",
+      "65db1c7dbe41fd01",
+      "5f28aabab49ec5eb",
+      "338d95629b6adee8",
+      "20bc05a1a0b40f35",
+      "5b62c5f8788cd910",
+      "b46ae8c6e97f7ef1",
+      "14e682ea7664dd82",
+      "2186747d8a0aa25d",
+      "54cf5c3e8af9cfc4",
+      "d7f93900c6e5fff4",
+      "3a190d0006d08bc0",
+      "9f3ef8afe063c1c7",
+      "b597870bfdfd1b2c",
+      "e0ee6f8dadfaf2f9",
+      "83fa33cc271e548d",
+      "e67a6db92725c63c",
+      "7e9438761eb44397"
+    ],
+    "generalist": [
+      "f985d471d38d2ad3"
     ],
     "handover": [
       "60ac1268a067e829",
       "6b3eb6dde4eb5d3e",
-      "a572f4d2c4e027bb"
+      "a572f4d2c4e027bb",
+      "62b5e5908ff9e8ab",
+      "2207319c538f3a27",
+      "0f2e94d46f92f085",
+      "92bbca927581809d"
     ],
     "journal": [
       "a5944f6b716d5f3e",
       "9d8e5f27b9ad5ac3",
-      "a029628dae30f337"
+      "a029628dae30f337",
+      "12049ff66579193d",
+      "1b95a13e5695d92c",
+      "5330da8d664b833b"
     ],
     "licence-audit": [
       "fbeedbd277f91f4c"
@@ -87,11 +151,25 @@
       "f923f04623044ec9",
       "7c5373fb3b8188ef",
       "37caad746773f6b7",
-      "b6edd0be203d07dd"
+      "b6edd0be203d07dd",
+      "f6ae677ba9dcca35",
+      "4075cc21e33b0e98",
+      "3078dd7ecb628b0e",
+      "2ee16ae7daedd798",
+      "329b4c2161e06864",
+      "5643a6a62360608b",
+      "c86311a4b898541d",
+      "9964a916a16e805f",
+      "ea98248c39a31710",
+      "df40e3b7660d462f",
+      "68265551e3d13ad5",
+      "b290d344eac2362b",
+      "df4f56267e90636a"
     ],
     "pick-up": [
       "022c3f69d3c24d7f",
-      "82abbbadff06f698"
+      "82abbbadff06f698",
+      "ccca469fa164f9c7"
     ],
     "review-agent-work": [
       "857a3bd37ac4cc00",
@@ -108,7 +186,17 @@
       "a877e33ad57e2241",
       "b72b97fe71cc0b03",
       "f49acb14b5ca83ca",
-      "45e09d5889cb2557"
+      "45e09d5889cb2557",
+      "5a618ca046967f8c",
+      "df8b3a1fc768f2f0",
+      "92fd66aa8c8dd9fd",
+      "daa55b208bc686eb",
+      "1eebd476ee04b093",
+      "91dca5af12694056",
+      "e5034df97e223faa",
+      "eef3b804197210df",
+      "c3e9cee66dc8af50",
+      "1be4da73a79f9625"
     ],
     "run-lanes": [
       "b42f313edbb95eca",
@@ -121,21 +209,64 @@
       "7c7f5a64ca420f0e",
       "be5d6f7a441bed4a",
       "0d9e752a3c871dd5",
-      "5354696ed20567a2"
+      "5354696ed20567a2",
+      "96f3c7892bcd3335",
+      "42edb8d867523814",
+      "f8538c809baf8438",
+      "c4545aeb8100e1f7",
+      "f54c67f4a590ff1f",
+      "958a0cf8f915bf87",
+      "e94cf7147526eddc",
+      "3fbccefc8d18df3b",
+      "62dc53873ef2f80d",
+      "d808178035ac1e0e",
+      "4c8d3ac4cfba07b6",
+      "0588ac7b28cdf3b9",
+      "56589241fd464bb3",
+      "a8925aeb90fe9e43",
+      "552a4731e1e0daa7",
+      "40131ab709ef1664",
+      "0c9784fe6d51c097",
+      "e862cf20fb3efff8",
+      "22c1355165c8396f"
     ],
     "split-work": [
       "9f3b17bc4a73bdd1",
-      "125641bf5c31d814"
+      "125641bf5c31d814",
+      "d90d1b817013a47a",
+      "05199e999b5b370d"
     ],
     "triage-report": [
       "d854ef7b080ac6e2",
-      "7ca7cd68a3f66813"
+      "7ca7cd68a3f66813",
+      "7c11bbf9bdbbeddb",
+      "6c6b2f5e55874535"
     ],
     "tune-settings": [
-      "734ef492088145a7"
+      "734ef492088145a7",
+      "40332ddcbf85451a",
+      "fb25c931eab39484",
+      "9ce6f9f5debc7bc1"
     ],
     "use-hive-api": [
-      "c0281b780bf4d213"
+      "c0281b780bf4d213",
+      "95f44efcaeeb7901",
+      "453e76048d8a231e",
+      "8c4336c47fd76958",
+      "4e20b9955bc75ccd",
+      "0bd700a39da47af8",
+      "4d07b1c8d6d0991d",
+      "11bdb227cbbdbc45",
+      "2f71608000822e62",
+      "c073109023980d62",
+      "7f199795426715de",
+      "88e8d64fc19c979e",
+      "e24d18486c3bf8f7",
+      "7daf5b060f57f7c9",
+      "e235e5ffebdcd600",
+      "4c48bb1fd0187c26",
+      "90d48f7215c5e690",
+      "c9ba1f5901bef2f8"
     ],
     "work-on-card": [
       "bc38bd6b1cfee0b6",
@@ -153,18 +284,36 @@
       "8587c11c2f301b54",
       "f79430d9c4c40d2c",
       "d0daa68fe452a3b5",
-      "ee422146d337b167"
+      "ee422146d337b167",
+      "ef5bb7f7c351be99",
+      "349233f4a25a8b96",
+      "d9947ba7940ed533",
+      "ff616949365a8ebb",
+      "57486f418d7f4af0",
+      "bd8f7592a7918a01",
+      "08f7f5add6949f6c",
+      "0c39c937f65f9f1a",
+      "4885ad06aa096149",
+      "c73fe7c5955e533a",
+      "eae8d4a5c4a28050",
+      "2c1457871b0060d4",
+      "375851b1e9796c8e",
+      "c44e97bb6650c59c"
     ],
     "workspace-note": [
       "5ecc6339b89ba668",
       "29f86ff346fbe4c1",
-      "1fa474c3748278cb"
+      "1fa474c3748278cb",
+      "0e7764cf38d50e70",
+      "95884a487571db7d"
     ]
   },
   "modes": {
     "coordinator": [
       "2cd699f6b4a7c3b1",
-      "8ab80fcd42401537"
+      "8ab80fcd42401537",
+      "6db5d571e5be0c11",
+      "a7666a2664961fbf"
     ],
     "orchestrator": [
       "21ce0d9749e31d4d",
@@ -180,14 +329,18 @@
       "038463ff624effe4",
       "105748c5136c8384",
       "3eff9745091ff58c",
-      "20e2ba7c90ec0932"
+      "20e2ba7c90ec0932",
+      "a49bb6ce9684d37f",
+      "980b10ce8658eb03"
     ],
     "qa-triager": [
       "1fac81c2d6f4fa25",
-      "f2a025454728a429"
+      "f2a025454728a429",
+      "d7f529987f8e311b"
     ],
     "release-manager": [
-      "bbd2aa88c583d7b0"
+      "bbd2aa88c583d7b0",
+      "2965ab64c0035612"
     ],
     "reviewer": [
       "1e0061343258e607",

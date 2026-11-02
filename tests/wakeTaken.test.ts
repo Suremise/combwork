@@ -155,6 +155,67 @@ describe("a wake's Enter again (#430)", () => {
   })
 })
 
+describe("a line whose CLI took it with no prompt seen: what it rang for was read (#1514, Codex's queued input)", () => {
+  afterEach(() => {
+    live.delete(key)
+    writer.testHooks.takeMs = undefined
+    vi.restoreAllMocks()
+  })
+
+  it('read before Enter again: taken, no Enter again, no mark (RR2 read m157 8 s after it was typed)', async () => {
+    writer.testHooks.takeMs = 50
+    vi.spyOn(sessions, 'promptsTaken').mockReturnValue({ runId: 'run1', count: 0 })
+    const marks = vi.spyOn(sessions, 'lineNotTaken').mockImplementation(() => undefined)
+    const submit = vi.spyOn(sessions, 'submitAgain').mockReturnValue(true)
+    let read = false
+    let taken = 0
+    const done = writer.confirmTaken(project, id, { runId: 'run1', count: 0 }, 'WAKE', { read: () => read, taken: () => void taken++ })
+    read = true
+    expect(await done).toBe(true)
+    expect(taken).toBe(1)
+    expect(submit).not.toHaveBeenCalled()
+    expect(marks).not.toHaveBeenCalled()
+    // Never read, and no prompt: Enter again, then marked, as before.
+    expect(await writer.confirmTaken(project, id, { runId: 'run1', count: 0 }, 'WAKE 2', { read: () => false })).toBe(false)
+    expect(submit).toHaveBeenCalledTimes(1)
+    expect(marks).toHaveBeenCalledTimes(1)
+  })
+
+  it("marked not taken, then what it rang for read: the mark goes, in the launch it was typed into, never another; another line's delivery read leaves it (round 1 finding)", () => {
+    const e: Entry = { state: withFacts({ projectPath: project, agentId: id, agentName: 'Reviewer', runId: 'run1', status: 'ready' }), prompts: 0 }
+    live.set(key, e)
+    // The window is told of its state (a hand-made state has no provider to show it by).
+    const told = vi.spyOn(sessions as unknown as { emitState: (s: unknown) => void }, 'emitState').mockImplementation(() => undefined)
+    // Line B rang for mB and is marked; mA, an older line's (taken by a prompt, its delivery read only now), says nothing of B.
+    sessions.lineNotTaken(project, id, 'run1', '[Hive] New in your inbox: 1 card event (#166) (mB).', true, ['mB'])
+    expect(sessions.lineUntaken(project, id)).toBe(true)
+    told.mockClear()
+    sessions.lineTaken(project, id, 'run1', 'mA', 'mA, which it rang for, was read')
+    expect(sessions.lineUntaken(project, id)).toBe(true)
+    // mB read, but in another launch's name: left.
+    sessions.lineTaken(project, id, 'run0', 'mB', 'mB, which it rang for, was read')
+    expect(sessions.lineUntaken(project, id)).toBe(true)
+    expect(told).not.toHaveBeenCalled()
+    // mB read in its own launch: B was taken.
+    sessions.lineTaken(project, id, 'run1', 'mB', 'mB, which it rang for, was read')
+    expect(sessions.lineUntaken(project, id)).toBe(false)
+    expect(sessions.lineWaiting(project, id)).toBe(false)
+    // A line that rang for nothing Hive knows (its mark has no deliveries): no read clears it.
+    sessions.lineNotTaken(project, id, 'run1', 'A TASK', true)
+    sessions.lineTaken(project, id, 'run1', 'mB', 'mB, which it rang for, was read')
+    expect(sessions.lineUntaken(project, id)).toBe(true)
+  })
+
+  it("a confirmation that ends not taken marks the line with the deliveries it rang for (round 1 finding)", async () => {
+    writer.testHooks.takeMs = 0
+    vi.spyOn(sessions, 'promptsTaken').mockReturnValue({ runId: 'run1', count: 0 })
+    vi.spyOn(sessions, 'submitAgain').mockReturnValue(true)
+    const marks = vi.spyOn(sessions, 'lineNotTaken').mockImplementation(() => undefined)
+    expect(await writer.confirmTaken(project, id, { runId: 'run1', count: 0 }, 'WAKE', { read: () => false, ids: ['m7', 'm8'] })).toBe(false)
+    expect(marks).toHaveBeenCalledWith(project, id, 'run1', 'WAKE', true, ['m7', 'm8'])
+  })
+})
+
 describe("a line of Hive's the user typed into is theirs (#652 round 1 finding 2)", () => {
   const was = config.settings.assistant
   afterEach(() => {
@@ -170,7 +231,7 @@ describe("a line of Hive's the user typed into is theirs (#652 round 1 finding 2
     live.set(key, e)
     return e
   }
-  const BELL = '[Hive] New in your inbox: 1 message (m1). Call hive_inbox to read it.'
+  const BELL = '[Hive] New in your inbox: 1 message (m1). Call hive_inbox to read it, act on it, then ack it.'
 
   for (const pause of [15, 0]) {
     it(`edited and left past the typing pause (${pause} s): no Enter again, and nothing more typed until a prompt is sent`, async () => {

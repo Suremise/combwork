@@ -1,4 +1,4 @@
-import { useEffect, useLayoutEffect, useRef, useState, type RefObject } from 'react'
+import { useEffect, useRef, useState, type RefObject } from 'react'
 import { cornerPlacement } from '@shared/corner'
 import { TIP_GROUP_TEXT, TIP_GROUPS, TIPS, type Tip } from '@shared/tips'
 import { msg, tr, tRich } from '@shared/i18n'
@@ -11,8 +11,8 @@ import { cx, formatKeybinding } from '../util'
 import { Icon, IconButton, Modal, SearchInput, Switch } from './ui'
 
 /**
- * The tip card (bottom right, above the status bar; toasts stack above it) and Help → Tips…. Which tip shows, and
- * when, is in ../tips.ts and @shared/tips.
+ * The tip, as a pop-up of its own quieter style (HI-2320: in Popups.tsx's stack, shown only when nothing else goes on),
+ * and Help → Tips…. Which tip shows, and when, is in ../tips.ts and @shared/tips.
  */
 
 /** A tip's command, when it can run now (Try it). */
@@ -108,10 +108,10 @@ function useOverTerminal(ref: RefObject<HTMLDivElement | null>, on: boolean): bo
 }
 
 /**
- * Keeps the bottom-right corner's tip card and toasts out of the way (@shared/corner): left of the Assistant's panel
- * while it is open, and just above an ended or couldn't-start bar under them, so its buttons can always be clicked.
- * Sets --corner-right and --corner-lift, which both use; worked out again (at most once a frame) as the window, the
- * panel or the bars change.
+ * Keeps the bottom-right pop-ups out of the way (@shared/corner): left of the Assistant's panel while it is open, and
+ * just above an ended or couldn't-start bar under them, so its buttons can always be clicked. Sets --corner-right and
+ * --corner-lift, which the pop-ups use (bottom right; the other places use --corner-right on the right); worked out
+ * again (at most once a frame) as the window, the panel or the bars change.
  */
 export function CornerPlacement() {
   useEffect(() => {
@@ -122,20 +122,28 @@ export function CornerPlacement() {
       // Only on the right is the Assistant's panel in the corner's way.
       const panel = document.querySelector<HTMLElement>('.assistant-panel:not(.on-left)')
       const bars = [...document.querySelectorAll<HTMLElement>('.session-ended')].map((b) => b.getBoundingClientRect()).filter((r) => r.width > 0 && r.height > 0)
-      const card = document.querySelector<HTMLElement>('.tip-card')
-      const toasts = document.querySelector<HTMLElement>('.toasts')
-      // The card is the lowest; with none, the toasts are.
-      const w = card?.offsetWidth || toasts?.offsetWidth || 320
-      const h = card?.offsetHeight || toasts?.offsetHeight || 0
+      // The lowest pop-up, nearest the status bar: what a bar under it would cover.
+      const popups = document.querySelector<HTMLElement>('.popups.at-bottom-right')
+      const lowest = popups?.lastElementChild as HTMLElement | null | undefined
+      const w = popups?.offsetWidth || 380
+      const h = lowest?.offsetHeight || 0
       const { right, lift } = cornerPlacement(window.innerWidth, window.innerHeight, panel ? panel.getBoundingClientRect().left : null, bars, w, h)
-      root.style.setProperty('--corner-right', `${right}px`)
-      root.style.setProperty('--corner-lift', `${lift}px`)
+      // Written only when they change: a property set on the root restyles the whole document, even to the same value (#1629).
+      if (right !== placed.right) root.style.setProperty('--corner-right', `${right}px`)
+      if (lift !== placed.lift) root.style.setProperty('--corner-lift', `${lift}px`)
+      placed = { right, lift }
     }
+    let placed: { right: number | null; lift: number | null } = { right: null, lift: null }
     const soon = (): void => {
       if (!frame) frame = requestAnimationFrame(measure)
     }
+    // A terminal's own DOM (its rows, its input's position) changes with every frame of output: none of it moves the
+    // corner, and measuring for it forced a layout on each frame while agents streamed (#1629).
+    const outsideTerminals = (records: MutationRecord[]): boolean => records.some((r) => !(r.target instanceof Element ? r.target : r.target.parentElement)?.closest('.xterm'))
     measure()
-    const watch = new MutationObserver(soon)
+    const watch = new MutationObserver((records) => {
+      if (outsideTerminals(records)) soon()
+    })
     watch.observe(document.body, { childList: true, subtree: true, attributes: true, attributeFilter: ['class', 'style'] })
     window.addEventListener('resize', soon)
     return () => {
@@ -147,37 +155,50 @@ export function CornerPlacement() {
   return null
 }
 
-export function TipCard() {
+/**
+ * The tip showing, as a pop-up (HI-2320: Popups.tsx's frame, the quieter style): steps aside while a focused terminal
+ * lies under it, so it never covers what you type. Closes for Try it; Learn more opens the guide beside it.
+ */
+export function TipPopup() {
   const id = useStore((s) => s.tipShown)
   const tip = id ? TIPS.find((t) => t.id === id) : undefined
   const ref = useRef<HTMLDivElement>(null)
   const over = useOverTerminal(ref, !!tip)
-  // Toasts stack above the card.
-  useLayoutEffect(() => {
-    const h = tip && !over ? (ref.current?.offsetHeight ?? 0) + 10 : 0
-    document.documentElement.style.setProperty('--tip-space', `${h}px`)
-  })
   if (!tip) return null
   return (
-    <div ref={ref} className={cx('tip-card', over && 'stepped-aside')} role="complementary" aria-label={tr(msg({ id: 'tips.ui.tip', defaultMessage: 'Tip', description: 'The name, for screen readers, of the tip card.' }))} aria-hidden={over || undefined}>
-      <div className="tip-head">
-        <Icon name="lightbulb" />
-        <span className="grow">{tr(msg({ id: 'tips.ui.counter', defaultMessage: '{total, plural, one {Tip · {n, number} of #} other {Tip · {n, number} of #}}', description: "The tip card's heading: which tip ({n}) of how many ({total}) it is. A plural on {total}, for a language whose words change with it." }), { n: TIPS.indexOf(tip) + 1, total: TIPS.length })}</span>
-        <IconButton icon="close" action="close-tip" title={tr(msg({ id: 'tips.ui.close', defaultMessage: 'Close', description: 'Closes the tip card or Help → Tips.' }))} onClick={closeTip} />
-      </div>
-      <div className="tip-title">{words(tip, tip.title)}</div>
-      <div className="tip-text">
-        <TipText tip={tip} />
-      </div>
-      <div className="tip-actions">
-        <TipActions tip={tip} onTry={closeTip} />
-        <button className="btn small subtle" onClick={showNextTip}>
-          {tr(msg({ id: 'tips.ui.next', defaultMessage: 'Next tip', description: 'Button on the tip card: shows the next tip.' }))}
+    <div
+      ref={ref}
+      className={cx('toast', 'popup', 'info', 'kind-tip', 'tip-card', over && 'stepped-aside')}
+      data-kind="tip"
+      role="complementary"
+      aria-label={tr(msg({ id: 'tips.ui.tip', defaultMessage: 'Tip', description: 'The name, for screen readers, of the tip card.' }))}
+      aria-hidden={over || undefined}
+      onKeyDown={(e) => {
+        if (e.key !== 'Escape') return
+        e.stopPropagation()
+        closeTip()
+      }}
+    >
+      <Icon name="lightbulb" className="lead" />
+      <div className="toast-text">
+        <div className="tip-head">
+          <span className="grow">{tr(msg({ id: 'tips.ui.counter', defaultMessage: '{total, plural, one {Tip · {n, number} of #} other {Tip · {n, number} of #}}', description: "The tip card's heading: which tip ({n}) of how many ({total}) it is. A plural on {total}, for a language whose words change with it." }), { n: TIPS.indexOf(tip) + 1, total: TIPS.length })}</span>
+        </div>
+        <div className="toast-title tip-title">{words(tip, tip.title)}</div>
+        <div className="toast-msg tip-text">
+          <TipText tip={tip} />
+        </div>
+        <div className="toast-actions tip-actions">
+          <TipActions tip={tip} onTry={closeTip} />
+          <button className="btn small subtle" onClick={showNextTip}>
+            {tr(msg({ id: 'tips.ui.next', defaultMessage: 'Next tip', description: 'Button on the tip card: shows the next tip.' }))}
+          </button>
+        </div>
+        <button className="link tip-off" onClick={() => void turnOffTips()}>
+          {tr(msg({ id: 'tips.ui.off', defaultMessage: "Don't show tips", description: 'A link on the tip card: turns off the tip when Hive starts.' }))}
         </button>
       </div>
-      <button className="link tip-off" onClick={() => void turnOffTips()}>
-        {tr(msg({ id: 'tips.ui.off', defaultMessage: "Don't show tips", description: 'A link on the tip card: turns off the tip when Hive starts.' }))}
-      </button>
+      <IconButton icon="close" action="close-tip" title={tr(msg({ id: 'tips.ui.close', defaultMessage: 'Close', description: 'Closes the tip card or Help → Tips.' }))} onClick={closeTip} />
     </div>
   )
 }

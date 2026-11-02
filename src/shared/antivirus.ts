@@ -32,6 +32,8 @@ const M = {
   noneLeft: msg({ id: 'workspace.antivirus.noneLeft', defaultMessage: 'None of Hive’s exclusions is in Defender’s list any more: nothing removed.', description: "After Remove exclusions, when there was nothing to remove." }),
   notApplied: msg({ id: 'workspace.antivirus.notApplied', defaultMessage: "Defender accepted the change but {action, select, add {doesn't list {missing, plural, one {one folder} other {# folders}}} other {still lists {missing, plural, one {one folder} other {# folders}}}}: your organisation's settings probably override local exclusions.", description: "After a change to Defender's exclusions that Defender accepted but doesn't show (added ones missing, or removed ones still there)." }),
   added: msg({ id: 'workspace.antivirus.added', defaultMessage: 'Defender no longer scans {count, plural, one {this folder} other {these # folders}}.', description: 'After Add exclusions: done.' }),
+  moved: msg({ id: 'workspace.antivirus.moved', defaultMessage: "Moved Hive's exclusions to the new folders: {removed, plural, =0 {none removed} one {# removed} other {# removed}}, {added, plural, =0 {none added (Defender already skips them)} one {# added} other {# added}}.", description: "After Repair moved Hive's Defender exclusions from a moved workspace's old folders to its new ones (#1302): how many old ones were removed and new ones added." }),
+  moveNotApplied: msg({ id: 'workspace.antivirus.moveNotApplied', defaultMessage: "Defender accepted the change but {missing, plural, one {one folder isn't} other {# folders aren't}} as asked: your organisation's settings probably override local exclusions.", description: "After Repair moved Hive's Defender exclusions (#1302), when Defender doesn't show the change for some folders (an old one still listed, or a new one missing)." }),
   removed: msg({ id: 'workspace.antivirus.removed', defaultMessage: 'Removed {count, plural, one {the exclusion} other {# exclusions}} Hive added.', description: 'After Remove exclusions: done.' }),
   kindWorkspace: msg({ id: 'workspace.antivirus.kindWorkspace', defaultMessage: 'The workspace (every project in it)', description: "A folder Defender may scan, as the antivirus status and Hive's offer name it." }),
   kindWorktrees: msg({ id: 'workspace.antivirus.kindWorktrees', defaultMessage: 'Its worktrees', description: "A folder Defender may scan: the workspace's worktrees folder." }),
@@ -74,6 +76,8 @@ export interface AvPath {
   state: AvPathState
   /** Hive added this exclusion (so Remove may take it away again). */
   addedByHive: boolean
+  /** Defender lists this folder itself, not only a folder holding it (known only when its list is: #1302). */
+  listed?: boolean
   devDrive: AvDevDrive
   /** Why Hive won't offer to exclude it (too broad, or its real location couldn't be established). */
   unsafe?: string
@@ -103,6 +107,17 @@ export interface AntivirusStatus {
   slowed: boolean
   /** The folders an offer is about (the slowed ones), as a key: an offer is made once for each set. */
   offerKey: string
+  /**
+   * Hive's own exclusions of folders that no longer exist (#1389: a workspace moved without Repair moving them, its
+   * prompt declined, a folder deleted): those Defender lists (`excluded`), or with its list hidden every one Hive
+   * recorded (`added`, unconfirmed). Remove Hive's Exclusions… takes them away with the workspace's.
+   */
+  gone?: AvGone[]
+}
+
+export interface AvGone {
+  path: string
+  state: 'excluded' | 'added'
 }
 
 /** The read-only probe's output (main/antivirus.ts probeScript), as untrusted JSON. */
@@ -241,10 +256,26 @@ export interface AdminCheck {
 }
 
 /**
- * The status of a workspace's folders, from the probe. `added`: the exclusions Hive added; `adminCheck`: what was last
- * read with administrator rights, used while the live list is hidden (and for Dev Drives, which only it can confirm).
+ * Hive's exclusions of folders that are gone (#1389), from those it recorded whose folder doesn't exist (`missing`):
+ * the workspace's own folders left out; with Defender's list known, only those it lists itself (exact entries: what
+ * Remove can take away), else every one, unconfirmed.
  */
-export function statusOf(workspacePath: string, probe: AvProbe, folders: { path: string; kind: AvPathKind; unsafe?: string }[], opts: { added: string[]; adminCheck?: AdminCheck | null; now: Date }): AntivirusStatus {
+export function goneExclusions(missing: string[], folders: { path: string }[], known: string[] | null): AvGone[] {
+  const out: AvGone[] = []
+  for (const p of missing) {
+    if (folders.some((f) => normPath(f.path) === normPath(p)) || out.some((g) => normPath(g.path) === normPath(p))) continue
+    if (!known) out.push({ path: p, state: 'added' })
+    else if (listed(p, known)) out.push({ path: p, state: 'excluded' })
+  }
+  return out
+}
+
+/**
+ * The status of a workspace's folders, from the probe. `added`: the exclusions Hive added; `adminCheck`: what was last
+ * read with administrator rights, used while the live list is hidden (and for Dev Drives, which only it can confirm);
+ * `missing`: those of `added` whose folder no longer exists.
+ */
+export function statusOf(workspacePath: string, probe: AvProbe, folders: { path: string; kind: AvPathKind; unsafe?: string }[], opts: { added: string[]; adminCheck?: AdminCheck | null; now: Date; missing?: string[] }): AntivirusStatus {
   const others = (probe.products ?? []).filter((p) => productOn(p.state) && !isDefender(p.name)).map((p) => p.name)
   const d = probe.defender
   // Defender in passive mode (another antivirus is active) or switched off doesn't scan in real time.
@@ -262,12 +293,13 @@ export function statusOf(workspacePath: string, probe: AvProbe, folders: { path:
     const checked = drive ? opts.adminCheck?.devDrives?.[drive] : undefined
     const fs = drive ? probe.volumes[drive] : undefined
     const devDrive: AvDevDrive = checked ?? (fs === undefined || fs === null ? 'unknown' : /^refs$/i.test(fs) ? 'refs' : 'no')
-    return { path: f.path, kind: f.kind, state, addedByHive, devDrive, ...(f.unsafe ? { unsafe: f.unsafe } : {}) }
+    return { path: f.path, kind: f.kind, state, addedByHive, ...(known && listed(f.path, known) ? { listed: true } : {}), devDrive, ...(f.unsafe ? { unsafe: f.unsafe } : {}) }
   })
   const realTime = scan === 'defender' ? d!.realTime : null
   // A trusted Dev Drive in performance mode is scanned lightly; an untrusted one, or performance mode off, is scanned like any other.
   const light = (p: AvPath): boolean => p.devDrive === 'trusted' && probe.performanceMode === true
   const slowedPaths = scan === 'defender' && realTime ? paths.filter((p) => !p.unsafe && p.state !== 'excluded' && p.state !== 'added' && !light(p)) : []
+  const gone = scan === 'defender' ? goneExclusions(opts.missing ?? [], folders, known) : []
   return {
     workspacePath,
     scan,
@@ -279,7 +311,8 @@ export function statusOf(workspacePath: string, probe: AvProbe, folders: { path:
     paths,
     checkedAt: opts.now.toISOString(),
     slowed: slowedPaths.length > 0,
-    offerKey: slowedPaths.map((p) => normPath(p.path)).sort().join('|')
+    offerKey: slowedPaths.map((p) => normPath(p.path)).sort().join('|'),
+    ...(gone.length ? { gone } : {})
   }
 }
 
@@ -356,8 +389,11 @@ export function emptyStatus(workspacePath: string, scan: 'not-applicable' | 'tes
   }
 }
 
-/** What an elevated change does: add or remove exclusions, or read the list with administrator rights. */
-export type AvAction = 'add' | 'remove' | 'check'
+/**
+ * What an elevated change does: add or remove exclusions, read the list with administrator rights, or move Hive's
+ * exclusions from a moved workspace's old folders to its new ones (#1302: remove the old, add the new, in one run).
+ */
+export type AvAction = 'add' | 'remove' | 'check' | 'move'
 
 export type AvOutcome = 'done' | 'refused' | 'policy' | 'error'
 
@@ -396,9 +432,12 @@ export function changeOutcome(action: AvAction, launch: { started: boolean; erro
     if (/^[a-z]$/i.test(drive) && v) devDrives[drive.toUpperCase()] = v
   }
   const extra = { ...(exclusions ? { exclusions } : {}), ...(Object.keys(devDrives).length ? { devDrives } : {}) }
+  // A move asks for both (#1302): `requested` the new folders to add, `removing` Hive's old entries to take away.
+  const removing = action === 'move' ? (pathList(r.removing) ?? []) : action === 'remove' ? requested : []
+  const adding = action === 'remove' ? [] : requested
   // What actually changed, as Defender lists it afterwards (unknown when it wasn't read: nothing claimed).
-  const added = action === 'add' && exclusions ? requested.filter((p) => listed(p, exclusions)) : []
-  const removed = action === 'remove' && exclusions ? requested.filter((p) => !listed(p, exclusions)) : []
+  const added = (action === 'add' || action === 'move') && exclusions ? adding.filter((p) => listed(p, exclusions)) : []
+  const removed = (action === 'remove' || action === 'move') && exclusions ? removing.filter((p) => !listed(p, exclusions)) : []
   const changed = { ...(added.length ? { added } : {}), ...(removed.length ? { removed } : {}) }
   if (r.ok !== true) {
     const error = str(r.error) ?? tr(M.unknownError)
@@ -408,6 +447,11 @@ export function changeOutcome(action: AvAction, launch: { started: boolean; erro
   }
   if (!exclusions) return { outcome: 'error', message: tr(M.unreadable), ...extra }
   if (action === 'check') return { outcome: 'done', message: tr(M.checked), ...extra }
+  if (action === 'move') {
+    const missing = adding.length - added.length + (removing.length - removed.length)
+    if (missing) return { outcome: 'policy', message: tr(M.moveNotApplied, { missing }), ...extra, ...changed }
+    return { outcome: 'done', message: tr(M.moved, { removed: removed.length, added: added.length }), ...extra, ...changed }
+  }
   if (!requested.length) return { outcome: 'done', message: tr(action === 'add' ? M.alreadySkips : M.noneLeft), ...extra }
   const missing = action === 'add' ? requested.length - added.length : requested.length - removed.length
   // A change Defender accepted but doesn't show: a policy keeps local exclusions from applying.
@@ -421,3 +465,53 @@ export const KIND_LABEL: Record<AvPathKind, Msg> = { workspace: M.kindWorkspace,
 
 /** Microsoft's Dev Drive documentation. */
 export const DEV_DRIVE_URL = 'https://learn.microsoft.com/windows/dev-drive/'
+
+/**
+ * Defender and a moved workspace (#1302): its old folders (where it and its worktrees were) and its new ones, each with
+ * whether Defender skips it, and what Repair would change: Hive's own exclusions of the old folders removed (`remove`,
+ * exact entries Hive added) and the new folders that would lose Hive's cover (`add`), in one administrator prompt. Exclusions the user made of the old folders (`theirs`) are only
+ * named, never changed. Null fields when Defender isn't the active antivirus: there's nothing to move.
+ */
+export interface AvMovePlan {
+  scan: AvScan
+  /** Where the states come from (as the Antivirus panel says it), or null: they need administrator rights to know. */
+  exclusionsFrom: 'live' | 'admin-check' | null
+  adminCheckedAt?: string
+  /** The old folders and the new, by kind: the workspace and its worktrees. */
+  old: AvPath[]
+  now: AvPath[]
+  remove: string[]
+  /**
+   * The new folders the move may exclude: the safe ones of a kind that had one of Hive's, and any one Hive's removed
+   * entries cover now (moved inside the old folder). Candidates, whatever they show now: the elevated run adds only
+   * those Defender's live list, once the removals are made, doesn't cover (so an administrator read gone stale, or the
+   * old exclusion covering the new folder, never leaves it scanned).
+   */
+  add: string[]
+  theirs: string[]
+}
+
+/**
+ * The plan from a status read with the old folders among its paths (`oldPaths`, as given: they needn't exist any
+ * more). Never broader than Hive's own: only the entries Hive added are removed, and only folders Hive may offer (not
+ * unsafe: a drive, a share, the home folder…) are added, and only where Hive's cover would otherwise be lost.
+ */
+export function defenderMovePlan(status: AntivirusStatus, oldPaths: string[]): AvMovePlan {
+  const isOld = (p: AvPath): boolean => oldPaths.some((o) => normPath(o) === normPath(p.path))
+  const kinds = (p: AvPath): boolean => p.kind === 'workspace' || p.kind === 'worktrees'
+  const old = status.paths.filter((p) => isOld(p) && kinds(p))
+  const now = status.paths.filter((p) => !isOld(p) && kinds(p))
+  const base = { scan: status.scan, exclusionsFrom: status.exclusionsFrom, ...(status.adminCheckedAt ? { adminCheckedAt: status.adminCheckedAt } : {}), old, now }
+  if (status.scan !== 'defender') return { ...base, remove: [], add: [], theirs: [] }
+  // Only an entry for the old folder itself is stale: one for a folder holding it (D:\Development) may cover the new
+  // folder too, and isn't Hive's to remove nor the user's to be told about. With the list hidden, Hive's own count.
+  const mine = old.filter((p) => p.addedByHive && (p.listed || p.state === 'added'))
+  const moved = new Set(mine.map((p) => p.kind))
+  const remove = mine.map((p) => p.path)
+  return {
+    ...base,
+    remove,
+    add: now.filter((p) => !p.unsafe && (moved.has(p.kind) || covered(p.path, remove))).map((p) => p.path),
+    theirs: old.filter((p) => !p.addedByHive && p.listed).map((p) => p.path)
+  }
+}

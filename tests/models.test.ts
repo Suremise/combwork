@@ -9,7 +9,7 @@ import { parseCodexModels } from '../src/main/providers/codex/models'
 import { catalogLabel, catalogModel, chosenName, cliDefaultEffort, effortText, effortUnknown, fallbackEfforts, fallbackModels, modelCaps, modelGroups, modelSource, modelSourceText, shippedModels } from '../src/shared/models'
 import { tr } from '../src/shared/i18n'
 import { modeCaveat } from '../src/shared/providers'
-import { agentModelShown, effectiveModelLabel, effortLabel } from '../src/shared/defaults'
+import { agentModelShown, effectiveModelLabel, effortLabel, footerChoices } from '../src/shared/defaults'
 import { listedPriceModels, modelPrice, priceRows, usesOwnPrices } from '../src/shared/prices'
 import { config } from '../src/main/config'
 import type { AgentInstallInfo, AppSettings, ModelCatalog, ProviderSettings } from '../src/shared/types'
@@ -153,6 +153,26 @@ describe("an alias and the model it stands for (#248), from Claude Code 2.1.289'
     expect(effectiveModelLabel('claude-code', undefined, '', configured)).toBe('Opus 5.5 (default)')
     // Not in the catalog (or no catalog): as named.
     expect(effectiveModelLabel('claude-code', 'inherit', '', { defaultModel: 'opus' })).toBe('Opus (default)')
+  })
+
+  it("HI-1996: a running session's footer shows its own launch's model and effort (a connection's defaults, settings changed since, an effort left out), never the settings as they are now", () => {
+    const footer = (a: { model?: string; effort?: string }, project: { model?: string; effort?: string }, global: { defaultModel?: string; defaultEffort?: string }, live: Parameters<typeof footerChoices>[3]) => {
+      const c = footerChoices(a, project, global, live)
+      return { model: agentModelShown('claude-code', c.model, c.modelGlobal, info).label, effort: effortLabel('claude-code', undefined, c.effort, c.effortGlobal, 'medium') }
+    }
+    // An inheriting agent its connection launched on Fable at high, while the project and Settings say Sonnet at medium.
+    const stale = { model: 'inherit', effort: 'inherit' }
+    expect(footer({}, stale, { defaultModel: 'sonnet', defaultEffort: 'medium' }, { launchedWith: { model: 'fable', effort: 'high' } })).toEqual({ model: 'Fable 5.1 (default)', effort: 'High' })
+    // The agent's own choice, changed to Haiku after it launched on Opus at high: still Opus at high, its own.
+    expect(footer({ model: 'haiku', effort: 'low' }, {}, {}, { launchedWith: { model: 'opus', effort: 'high', own: true } })).toEqual({ model: 'Opus 5.5', effort: 'High' })
+    // A default it launched on, the agent having chosen Opus since: still the default it runs.
+    expect(footer({ model: 'opus' }, {}, {}, { launchedWith: { model: 'sonnet', effort: 'high' } })).toEqual({ model: 'Sonnet 5.5 (default)', effort: 'High' })
+    // Its effort left out at launch (the model doesn't take it, HI-1770), though one is saved: the model's default.
+    expect(footer({ effort: 'xhigh' }, {}, {}, { launchedWith: { model: 'opus', effort: null } }).effort).toBe('Medium (default)')
+    // Launched with no model: its CLI's default, whatever Settings say now.
+    expect(footer({}, {}, { defaultModel: 'sonnet' }, { launchedWith: { model: null, effort: null } }).model).toBe('Opus 5.5 (default)')
+    // Not running (or a launch from before HI-1996): the settings, for new sessions.
+    expect(footer({}, stale, { defaultModel: 'sonnet', defaultEffort: 'low' }, null)).toEqual({ model: 'Sonnet 5.5 (default)', effort: 'Low' })
   })
 
   it('a running session shows the model it reports, whatever was chosen', () => {

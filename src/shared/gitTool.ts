@@ -25,21 +25,21 @@ export const GIT_REQUIRED = '2.17'
 
 export const GIT_DOWNLOAD = 'https://git-scm.com/download/win'
 
-/** The user guide's heading on git. */
-// i18n-ignore: a user guide heading, found by its English text
-export const GIT_GUIDE = 'Git'
+/** The id of the user guide's heading on git. */
+// i18n-ignore: a user guide heading's id (#1535)
+export const GIT_GUIDE = 'git'
 
 const M = {
   missing: msg({ id: 'git.tool.missing', defaultMessage: "Git isn't installed (or isn't on Hive's PATH)", description: 'Said wherever git is needed when Hive cannot run git. No full stop: some places add more after it.' }),
   tooOld: msg({ id: 'git.tool.tooOld', defaultMessage: 'Git {version} is too old for Hive (it needs {min} or later)', description: 'Said wherever git is needed when the installed git is too old to run. {version} and {min} are git versions. No full stop: some places add more after it.' }),
-  fixOld: msg({ id: 'git.tool.fixOld', defaultMessage: 'Update Git for Windows to {min} or later, then Check again in Agent Setup.', description: 'How to fix a git that is too old. {min} is a git version; Check again is a button in Agent Setup.' }),
-  fixMissing: msg({ id: 'git.tool.fixMissing', defaultMessage: 'Install Git for Windows ({min} or later), or add the folder holding git.exe to your PATH, then Check again in Agent Setup (no need to restart Hive).', description: 'How to fix git missing. {min} is a git version; Check again is a button in Agent Setup.' }),
-  tooOldToRun: msg({ id: 'git.tool.tooOldToRun', defaultMessage: "Hive's git commands fail with Git {version}: worktrees, merging, the Git tab and the unmerged counts don't work.", description: "Agent Setup, for a git too old for any of Hive's git commands. {version} is its version." }),
+  fixOld: msg({ id: 'git.tool.fixOld', defaultMessage: 'Update Git for Windows to {min} or later, then Check again in Provider Setup.', description: 'How to fix a git that is too old. {min} is a git version; Check again is a button in Provider Setup.' }),
+  fixMissing: msg({ id: 'git.tool.fixMissing', defaultMessage: 'Install Git for Windows ({min} or later), or add the folder holding git.exe to your PATH, then Check again in Provider Setup (no need to restart Hive).', description: 'How to fix git missing. {min} is a git version; Check again is a button in Provider Setup.' }),
+  tooOldToRun: msg({ id: 'git.tool.tooOldToRun', defaultMessage: "Hive's git commands fail with Git {version}: worktrees, merging, the Version Control tab's Git sections and the unmerged counts don't work.", description: "Provider Setup, for a git too old for any of Hive's git commands. {version} is its version." }),
   oldLoses: msg({
     id: 'git.tool.oldLoses',
     defaultMessage:
       "{lost, select, recent {With Git {version}: merging can't check for conflicts before it starts (the merge still stops at one); squash-merged branches still count as unmerged, so Remove All and loading a template keep their worktrees; the merge-ready skill can't check a branch for conflicts.} older {With Git {version}: merging can't check for conflicts before it starts (the merge still stops at one); squash-merged branches still count as unmerged, so Remove All and loading a template keep their worktrees; the merge-ready skill can't check a branch for conflicts; moving a workspace can't repair its worktrees.} other {With Git {version}: merging can't check for conflicts before it starts (the merge still stops at one); squash-merged branches still count as unmerged, so Remove All and loading a template keep their worktrees; the merge-ready skill can't check a branch for conflicts; Remove All and loading a template keep the branches of the worktrees they remove; moving a workspace can't repair its worktrees.}}",
-    description: 'Agent Setup: what does not work with an older git that still runs. {version} is its version; {lost} says how old it is (the older, the more is listed). Remove All and merge-ready are names in Hive.'
+    description: 'Provider Setup: what does not work with an older git that still runs. {version} is its version; {lost} says how old it is (the older, the more is listed). Remove All and merge-ready are names in Hive.'
   })
 }
 
@@ -101,7 +101,7 @@ export function gitFixText(t: GitTool | null | undefined): string {
   return t?.state === 'old' ? tr(M.fixOld, { min: GIT_MIN }) : tr(M.fixMissing, { min: GIT_MIN })
 }
 
-/** What doesn't work with an old git that still runs, for Agent Setup. */
+/** What doesn't work with an old git that still runs, for Provider Setup. */
 export function gitOldText(version: string): string {
   if (compareGitVersions(version, GIT_REQUIRED) < 0) return tr(M.tooOldToRun, { version })
   return tr(M.oldLoses, { version, lost: compareGitVersions(version, '2.27') < 0 ? 'oldest' : compareGitVersions(version, '2.30') < 0 ? 'older' : 'recent' })

@@ -1,42 +1,71 @@
-// Workspace MCP servers run in a project only when on in the workspace and on in the project (#1093): adding one adds it
-// off everywhere, with no questions; the workspace switch turns it on with the projects picked, and off keeping the
-// projects' choices; a name used before starts with no project's choice; a server copied from a project's own config is
-// on there; and settings from before (#713's on for all projects, with project.json's disabled lists) move to the model
-// without changing what runs. Each case has a workspace of its own.
+// Workspace MCP servers are available, and run only where they are added (HI-2059): a project's MCP tab adds and removes
+// them, Add showing what one runs (refused if its definition changed since); Add to… in the MCP view sets every project
+// at once, checked before its first write and honest about a write that fails midway. A name used before starts added
+// nowhere; a server copied from a project's own config is added there. Upgrading converts each project's list on its own,
+// keeping what ran (#1093's on in the workspace and on in the project) and dropping a choice the workspace had off: a
+// project not converted keeps its old meaning, so nothing that didn't run starts. Settings from before #1093 still move
+// through it. Each case has a workspace of its own.
 import { mkdirSync, readFileSync, writeFileSync } from 'fs'
 import { join } from 'path'
-import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, it } from 'vitest'
+import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, it, vi } from 'vitest'
 import * as electron from 'electron'
-import { migratedProjectMcp, migratedWorkspaceMcp, mcpOnInProject, serverOnIn } from '../src/shared/agentMcp'
+import { MCP_ADDED_MODEL, mcpAdded, mcpOnInProject, mcpServerShown, migratedProjectMcp, migratedWorkspaceMcp, serverOnIn } from '../src/shared/agentMcp'
 import { tempDir } from './tempDir'
 
 const base = tempDir('hive-mcp-projects-')
-;(electron.app as unknown as { getPath: () => string }).getPath = () => join(base, 'profile')
+const profile = join(base, 'profile')
+;(electron.app as unknown as { getPath: () => string }).getPath = () => profile
+process.env.HIVE_USER_DATA = profile
+// A test copy on its CLI test home: its agents start with no connection (the seam, HI-1755).
+process.env.HIVE_TEST_CLI_HOME_CONNECTION = '1'
 // Never the user's own CLI homes: the Codex and Copilot adapters read their config for a project's own servers.
 process.env.CODEX_HOME = join(base, 'codex-home')
 process.env.COPILOT_HOME = join(base, 'copilot-home')
 
 const { createWorkspaceService, disposeWorkspaceService, inWorkspace } = await import('../src/main/workspace')
 const mcp = await import('../src/main/mcp')
+const { sessions } = await import('../src/main/sessions')
 
-describe('whether a server is on in a project', () => {
-  it('needs it on in the workspace and in the project', () => {
-    expect(mcpOnInProject('godot', [], { disabled: [], enabled: [] })).toBe(false)
-    expect(mcpOnInProject('godot', [], { disabled: [], enabled: ['godot'] })).toBe(false)
-    expect(mcpOnInProject('godot', ['godot'], { disabled: [], enabled: [] })).toBe(false)
-    expect(mcpOnInProject('godot', ['godot'], { disabled: [], enabled: ['godot'] })).toBe(true)
-    expect(mcpOnInProject('godot', ['godot'], null)).toBe(false)
+describe('which servers are added to a project (HI-2059)', () => {
+  it('a converted project: its list as it is', () => {
+    expect(mcpAdded({ enabled: ['godot', 'notes'], model: MCP_ADDED_MODEL }, [])).toEqual(['godot', 'notes'])
+    expect(mcpOnInProject('godot', { enabled: ['godot'], model: MCP_ADDED_MODEL }, undefined)).toBe(true)
   })
 
-  it("turns nothing on from a list Hive can't read", () => {
-    expect(mcpOnInProject('godot', ['godot'], { enabled: 'godot' as never })).toBe(false)
-    expect(mcpOnInProject('godot', 'godot' as never, { enabled: ['godot'] })).toBe(false)
+  it("one not converted keeps #1093's meaning: its own choices the workspace had on, never more", () => {
+    expect(mcpAdded({ disabled: [], enabled: ['godot', 'notes'] }, ['notes'])).toEqual(['notes'])
+    expect(mcpAdded({ disabled: [], enabled: ['godot'] }, [])).toEqual([])
+    expect(mcpAdded(null, ['godot'])).toEqual([])
+  })
+
+  it("adds nothing from a list Hive can't read, its own or the workspace's", () => {
+    expect(mcpAdded({ enabled: 'godot' as never, model: MCP_ADDED_MODEL }, ['godot'])).toEqual([])
+    expect(mcpAdded({ enabled: ['godot'] }, 'godot')).toEqual([])
+    expect(mcpAdded({ enabled: ['godot'] }, { godot: true })).toEqual([])
+    expect(mcpAdded({ enabled: ['godot'], model: 2 as never }, undefined)).toEqual([])
   })
 
   it('needs a definition that can be read', () => {
-    expect(serverOnIn({ name: 'godot', def: null, globallyEnabled: true }, { disabled: [], enabled: ['godot'] })).toBe(false)
-    expect(serverOnIn({ name: 'godot', def: { command: 'node' }, globallyEnabled: true }, { disabled: [], enabled: ['godot'] })).toBe(true)
-    expect(serverOnIn({ name: 'godot', def: { command: 'node' }, globallyEnabled: false }, { disabled: [], enabled: ['godot'] })).toBe(false)
+    const added = { disabled: [] as string[], enabled: ['godot'], model: MCP_ADDED_MODEL as typeof MCP_ADDED_MODEL }
+    expect(serverOnIn({ name: 'godot', def: null }, { ...added, enabled: ['godot'] }, [])).toBe(false)
+    expect(serverOnIn({ name: 'godot', def: { command: 'node' } }, { ...added, enabled: ['godot'] }, [])).toBe(true)
+  })
+
+  it("the MCP view's and the picker's search and filter", () => {
+    const godot = { name: 'godot-b1', def: { description: 'Godot editor B1', tags: ['game', 'Engine'], command: 'node' }, projects: ['C:\\ws\\a'], assistant: false }
+    const notes = { name: 'notes', def: { description: 'Shared notes', command: 'node' }, projects: [], assistant: true }
+    const broken = { name: 'broken', def: null, projects: [], assistant: false, error: 'not JSON' }
+    expect(mcpServerShown(godot, 'engine b1', 'all')).toBe(true)
+    expect(mcpServerShown(godot, 'notes', 'all')).toBe(false)
+    expect(mcpServerShown(notes, 'SHARED', 'added')).toBe(true)
+    expect(mcpServerShown(notes, '', 'nowhere')).toBe(false)
+    expect(mcpServerShown(broken, '', 'nowhere')).toBe(true)
+    expect(mcpServerShown(broken, '', 'errors')).toBe(true)
+    expect(mcpServerShown(godot, '', 'errors')).toBe(false)
+  })
+
+  it("strips Hive's own fields from what a CLI is given", () => {
+    expect(mcp.toLaunchDef({ description: 'd', tags: ['x'], command: 'node', args: ['a.js'] }, 'C:\\ws\\.hive\\mcp')).toEqual({ command: 'node', args: ['a.js'] })
   })
 })
 
@@ -62,13 +91,13 @@ describe('moving settings from before #1093', () => {
   })
 })
 
-describe('MCP servers per project', () => {
+describe('MCP servers per project (HI-2059)', () => {
   const trashDir = join(base, 'trash')
   const was = process.env.HIVE_TEST_TRASH_DIR
   const godot = { description: 'Godot', command: 'node', args: ['godot.js'] }
   // Each case's own workspace, as 0.9.0 left it: github on for all projects and turned off in apiary; notes deployed
-  // and turned on in apiary only; docs deployed and off. Opening it moves it to #1093's model. Nothing a case does
-  // reaches another.
+  // and turned on in apiary only; docs deployed and off. Opening it moves it to #1093's model, then to added servers.
+  // Nothing a case does reaches another.
   let wsPath: string
   let amber: string
   let apiary: string
@@ -76,18 +105,22 @@ describe('MCP servers per project', () => {
   const run = <T>(fn: () => Promise<T> | T): Promise<T> => inWorkspace(w, async () => fn())
   const mcpDir = (): string => join(wsPath, '.hive', 'mcp')
   const json = (path: string) => JSON.parse(readFileSync(path, 'utf8'))
+  const projectMcp = (p: string) => json(join(p, '.hive', 'project.json')).mcp
 
-  /** Which projects have the server on, as a launch decides it. */
-  const onIn = async (name: string): Promise<string[]> =>
-    run(async () => {
-      const m = (await mcp.listMcp()).find((x) => x.name === name)
-      if (!m) return []
-      const out: string[] = []
-      for (const [label, p] of [['amberlight', amber], ['apiary', apiary]] as const) if (serverOnIn(m, (await w.projectConfig(p)).mcp)) out.push(label)
-      return out
-    })
-  const listed = async (name: string) => (await run(() => mcp.listMcp())).find((m) => m.name === name)!
-  const chosen = async (p: string): Promise<string[]> => (await run(() => w.projectConfig(p))).mcp.enabled
+  /** The servers a launch in a project gets (its agent's), but Hive's own: the launch's own reader. */
+  const gets = async (p: string): Promise<string[]> => run(async () => Object.keys((await sessions.effective(p, { id: 'a1', name: 'Builder', provider: 'claude-code' } as never)).mcpServers).filter((n) => n !== 'hive').sort())
+  /** Which projects a server runs in, as a launch decides it. */
+  const onIn = async (name: string): Promise<string[]> => {
+    const out: string[] = []
+    for (const [label, p] of [['amberlight', amber], ['apiary', apiary]] as const) if ((await gets(p)).includes(name)) out.push(label)
+    return out
+  }
+  const listed = async (name: string) => (await run(() => mcp.listMcp(true))).find((m) => m.name === name)!
+  const shown = async (name: string) => {
+    const m = await listed(name)
+    return { def: m.def, revision: m.revision }
+  }
+  const add = async (p: string, name: string) => run(async () => mcp.addMcpTo({ project: p }, name, await shown(name)))
 
   /** A server's file to add, in a folder of its own. */
   const file = (name: string, data: unknown): string => {
@@ -95,10 +128,13 @@ describe('MCP servers per project', () => {
     writeFileSync(join(dir, name), JSON.stringify(data))
     return join(dir, name)
   }
-  /** Turns a server on in the workspace as its enable dialog does: shown, with the projects picked. */
-  const enable = async (name: string, projects: Record<string, boolean> = {}) => {
-    const shown = await listed(name)
-    await run(() => mcp.setMcpGlobal(name, true, { def: shown.def, revision: shown.revision }, projects))
+  const open = async (): Promise<void> => {
+    w = createWorkspaceService()
+    await w.open(wsPath)
+  }
+  const reopen = async (): Promise<void> => {
+    await disposeWorkspaceService(w)
+    await open()
   }
 
   beforeAll(() => {
@@ -108,7 +144,7 @@ describe('MCP servers per project', () => {
     if (was === undefined) delete process.env.HIVE_TEST_TRASH_DIR
     else process.env.HIVE_TEST_TRASH_DIR = was
   })
-  beforeEach(async () => {
+  beforeEach(() => {
     wsPath = tempDir('hive-mcp-projects-ws-')
     amber = join(wsPath, 'amberlight')
     apiary = join(wsPath, 'apiary')
@@ -116,97 +152,229 @@ describe('MCP servers per project', () => {
     for (const p of [amber, apiary]) mkdirSync(join(p, '.hive'), { recursive: true })
     writeFileSync(join(wsPath, '.hive', 'workspace.json'), JSON.stringify({ version: 1, mcp: { enabled: ['github'] } }))
     for (const n of ['github', 'notes', 'docs']) writeFileSync(join(mcpDir(), `${n}.json`), JSON.stringify({ command: 'node', args: [`${n}.js`] }))
-    writeFileSync(join(amber, '.hive', 'project.json'), JSON.stringify({ version: 2, mcp: { disabled: [] } }))
-    writeFileSync(join(apiary, '.hive', 'project.json'), JSON.stringify({ version: 2, mcp: { disabled: ['github'], enabled: ['notes'] } }))
-    w = createWorkspaceService()
-    await w.open(wsPath)
+    const agents = [{ id: 'a1', name: 'Builder', provider: 'claude-code' }]
+    writeFileSync(join(amber, '.hive', 'project.json'), JSON.stringify({ version: 2, chime: 'on', agents, mcp: { disabled: [] } }))
+    writeFileSync(join(apiary, '.hive', 'project.json'), JSON.stringify({ version: 2, agents, mcp: { disabled: ['github'], enabled: ['notes'] } }))
   })
   afterEach(async () => {
+    vi.restoreAllMocks()
     await disposeWorkspaceService(w)
   })
 
-  it('changes nothing that runs at upgrade, and moves the settings once', async () => {
+  it('changes nothing that runs at upgrade, converts each project once, and keeps the rest of its settings', async () => {
+    await open()
     expect(await onIn('github')).toEqual(['amberlight'])
     expect(await onIn('notes')).toEqual(['apiary'])
     expect(await onIn('docs')).toEqual([])
-    expect(json(join(wsPath, '.hive', 'workspace.json')).mcp).toEqual({ enabled: ['github', 'notes'], model: 2 })
-    expect(json(join(amber, '.hive', 'project.json')).mcp).toEqual({ disabled: [], enabled: ['github'] })
-    expect(json(join(apiary, '.hive', 'project.json')).mcp).toEqual({ disabled: [], enabled: ['notes'] })
-    // Opened again: already moved, so a project's choice made since isn't undone.
-    await run(() => mcp.setMcpProject(amber, 'github', false))
-    await disposeWorkspaceService(w)
+    // The workspace's old switch is kept, frozen, for a project not converted; the Assistant's list is converted too.
+    expect(json(join(wsPath, '.hive', 'workspace.json')).mcp).toEqual({ enabled: ['github', 'notes'], model: 2, assistant: [], assistantModel: 3 })
+    expect(projectMcp(amber)).toEqual({ disabled: [], enabled: ['github'], model: 3 })
+    expect(projectMcp(apiary)).toEqual({ disabled: [], enabled: ['notes'], model: 3 })
+    expect(json(join(amber, '.hive', 'project.json')).chime).toBe('on')
+    // Nothing was dropped: no notice due.
+    expect(json(join(wsPath, '.hive', 'workspace.json')).mcp.droppedNotice).toBeUndefined()
+    // Opened again: already converted, so a removal made since isn't undone.
+    await run(() => mcp.removeMcpFrom({ project: amber }, 'github'))
+    await reopen()
+    expect(await onIn('github')).toEqual([])
+  })
+
+  it("drops a choice kept while the workspace had the server off, and says so once", async () => {
+    // #1093's model already: docs remembered in amberlight while the workspace has it off.
+    writeFileSync(join(wsPath, '.hive', 'workspace.json'), JSON.stringify({ version: 1, mcp: { enabled: ['github'], model: 2, assistant: ['docs', 'github'] } }))
+    writeFileSync(join(amber, '.hive', 'project.json'), JSON.stringify({ version: 2, mcp: { disabled: [], enabled: ['docs', 'github'] } }))
+    await open()
+    expect(projectMcp(amber)).toEqual({ disabled: [], enabled: ['github'], model: 3 })
+    expect(json(join(wsPath, '.hive', 'workspace.json')).mcp.assistant).toEqual(['github'])
+    expect(await onIn('docs')).toEqual([])
+    // apiary's notes, which the workspace had off too.
+    expect(w.config.mcp.droppedNotice).toBe(3)
+    const toasts: unknown[] = []
+    vi.spyOn(w, 'emit').mockImplementation((e) => void toasts.push(e))
+    await mcp.sayMcpAddedOnce(w)
+    await mcp.sayMcpAddedOnce(w)
+    expect(toasts).toHaveLength(1)
+    expect(JSON.stringify(toasts[0])).toContain('3 choices kept for servers that were off in the workspace were dropped')
+    expect(json(join(wsPath, '.hive', 'workspace.json')).mcp.droppedNotice).toBeUndefined()
+  })
+
+  it("a project whose conversion fails keeps its old meaning, so a choice the workspace had off never runs, and converts at the next open", async () => {
+    writeFileSync(join(wsPath, '.hive', 'workspace.json'), JSON.stringify({ version: 1, mcp: { enabled: ['github', 'notes'], model: 2 } }))
+    writeFileSync(join(amber, '.hive', 'project.json'), JSON.stringify({ version: 2, agents: [{ id: 'a1', name: 'Builder', provider: 'claude-code' }], mcp: { disabled: [], enabled: ['github'] } }))
+    // apiary remembers docs, off in the workspace.
+    writeFileSync(join(apiary, '.hive', 'project.json'), JSON.stringify({ version: 2, agents: [{ id: 'a1', name: 'Builder', provider: 'claude-code' }], mcp: { disabled: [], enabled: ['docs', 'notes'] } }))
     w = createWorkspaceService()
+    const write = w.mutateProjectConfig.bind(w)
+    // amberlight's write goes through; apiary's fails, after it.
+    const spy = vi.spyOn(w, 'mutateProjectConfig').mockImplementation((p, fn, o) => (p === apiary ? Promise.reject(Object.assign(new Error('EBUSY: locked'), { code: 'EBUSY' })) : write(p, fn, o)))
     await w.open(wsPath)
-    expect(await onIn('github')).toEqual([])
+    spy.mockRestore()
+    expect(projectMcp(amber).model).toBe(3)
+    expect(projectMcp(apiary)).toEqual({ disabled: [], enabled: ['docs', 'notes'] })
+    // Its launch, its listing and the MCP view read it as it ran: notes, never docs.
+    expect(await gets(apiary)).toEqual(['notes'])
+    expect((await listed('docs')).projects).toEqual([])
+    expect((await listed('notes')).projects).toEqual([apiary])
+    // Removing another name from it converts it without bringing docs back.
+    await run(() => mcp.removeMcpFrom({ project: apiary }, 'github'))
+    expect(projectMcp(apiary)).toEqual({ disabled: [], enabled: ['notes'], model: 3 })
+    expect(await gets(apiary)).toEqual(['notes'])
   })
 
-  it("turns the workspace off everywhere, keeping the projects' choices for when it is on again", async () => {
-    await run(() => mcp.setMcpGlobal('github', false))
-    expect(await onIn('github')).toEqual([])
-    expect(await chosen(amber)).toEqual(['github'])
-    await enable('github')
-    expect(await onIn('github')).toEqual(['amberlight'])
+  it('a project not converted at open converts at the next, never starting a server the workspace had off', async () => {
+    writeFileSync(join(wsPath, '.hive', 'workspace.json'), JSON.stringify({ version: 1, mcp: { enabled: ['notes'], model: 2 } }))
+    writeFileSync(join(apiary, '.hive', 'project.json'), JSON.stringify({ version: 2, agents: [{ id: 'a1', name: 'Builder', provider: 'claude-code' }], mcp: { disabled: [], enabled: ['docs', 'notes'] } }))
+    w = createWorkspaceService()
+    const write = w.mutateProjectConfig.bind(w)
+    const spy = vi.spyOn(w, 'mutateProjectConfig').mockImplementation((p, fn, o) => (p === apiary ? Promise.reject(new Error('EPERM')) : write(p, fn, o)))
+    await w.open(wsPath)
+    spy.mockRestore()
+    expect(await gets(apiary)).toEqual(['notes'])
+    await reopen()
+    expect(projectMcp(apiary)).toEqual({ disabled: [], enabled: ['notes'], model: 3 })
+    expect(await gets(apiary)).toEqual(['notes'])
+    expect(w.config.mcp.droppedNotice).toBe(1)
   })
 
-  it('turns a server on in the workspace in the projects picked', async () => {
-    await enable('docs', { [amber]: true, [apiary]: false })
+  it("Add on a project not converted converts it in the same write, adding only what was asked", async () => {
+    writeFileSync(join(wsPath, '.hive', 'workspace.json'), JSON.stringify({ version: 1, mcp: { enabled: ['notes'], model: 2 } }))
+    writeFileSync(join(apiary, '.hive', 'project.json'), JSON.stringify({ version: 2, agents: [{ id: 'a1', name: 'Builder', provider: 'claude-code' }], mcp: { disabled: [], enabled: ['docs', 'notes'] } }))
+    w = createWorkspaceService()
+    const write = w.mutateProjectConfig.bind(w)
+    const spy = vi.spyOn(w, 'mutateProjectConfig').mockImplementation((p, fn, o) => (p === apiary ? Promise.reject(new Error('EPERM')) : write(p, fn, o)))
+    await w.open(wsPath)
+    spy.mockRestore()
+    await add(apiary, 'github')
+    expect(projectMcp(apiary)).toEqual({ disabled: [], enabled: ['github', 'notes'], model: 3 })
+    expect(await gets(apiary)).toEqual(['github', 'notes'])
+  })
+
+  it('adds and removes a server in one project, which runs it from its next session', async () => {
+    await open()
+    await add(amber, 'docs')
     expect(await onIn('docs')).toEqual(['amberlight'])
-    // Picked again: one turned on, one off.
-    await run(() => mcp.setMcpGlobal('docs', false))
-    await enable('docs', { [amber]: false, [apiary]: true })
-    expect(await onIn('docs')).toEqual(['apiary'])
-    expect([await chosen(amber), await chosen(apiary)]).toEqual([['github'], ['docs', 'notes']])
-  })
-
-  it("keeps a project's switch while the workspace has the server off, and runs it nowhere", async () => {
-    await run(() => mcp.setMcpProject(amber, 'docs', true))
-    expect(await chosen(amber)).toContain('docs')
+    expect((await listed('docs')).projects).toEqual([amber])
+    await run(() => mcp.removeMcpFrom({ project: amber }, 'docs'))
     expect(await onIn('docs')).toEqual([])
-    await run(() => mcp.setMcpProject(amber, 'docs', false))
-    expect(await chosen(amber)).not.toContain('docs')
+    expect(projectMcp(amber).enabled).toEqual(['github'])
   })
 
-  it("refuses to turn on a server that has changed since it was shown, or that isn't there", async () => {
-    const shown = await listed('docs')
+  it("refuses to add a server that has changed since it was shown, isn't there, can't be run, or into a folder that isn't a project", async () => {
+    await open()
+    const before = await shown('docs')
     writeFileSync(join(mcpDir(), 'docs.json'), JSON.stringify({ command: 'node', args: ['other.js'] }))
-    await expect(run(() => mcp.setMcpGlobal('docs', true, { def: shown.def, revision: shown.revision }, { [amber]: true }))).rejects.toThrow('has changed since')
-    await expect(run(() => mcp.setMcpGlobal('missing', true))).rejects.toThrow('no MCP server named missing')
-    await expect(run(() => mcp.setMcpProject(apiary, 'missing', true))).rejects.toThrow('no MCP server named missing')
-    // Refused before any project's choice changed.
-    expect(await chosen(amber)).toEqual(['github'])
-    expect(await onIn('docs')).toEqual([])
+    await expect(run(() => mcp.addMcpTo({ project: amber }, 'docs', before))).rejects.toThrow('has changed since')
+    await expect(run(() => mcp.addMcpTo({ project: amber }, 'missing', before))).rejects.toThrow('no MCP server named missing')
+    writeFileSync(join(mcpDir(), 'broken.json'), JSON.stringify({ description: 'neither command nor url' }))
+    await expect(run(async () => mcp.addMcpTo({ project: amber }, 'broken', await shown('broken')))).rejects.toThrow('has changed since')
+    await expect(run(async () => mcp.addMcpTo({ project: join(wsPath, 'elsewhere') }, 'notes', await shown('notes')))).rejects.toThrow()
+    // Nothing changed.
+    expect(projectMcp(amber).enabled).toEqual(['github'])
   })
 
-  it('adds a server off in the workspace and in every project', async () => {
-    await run(() => mcp.addMcpFromFile(file('godot.json', godot), 'godot'))
-    expect((await listed('godot')).globallyEnabled).toBe(false)
-    expect([await chosen(amber), await chosen(apiary)]).toEqual([['github'], ['notes']])
+  it('Add to… adds where ticked and removes where unticked, checking every place before its first write', async () => {
+    await open()
+    let r = await run(async () => mcp.setMcpPlaces('docs', await shown('docs'), { [amber]: true, [apiary]: true }, true))
+    expect(r).toEqual({ added: [amber, apiary, 'assistant'], removed: [], failed: [] })
+    expect(await onIn('docs')).toEqual(['amberlight', 'apiary'])
+    r = await run(async () => mcp.setMcpPlaces('docs', undefined, { [amber]: false, [apiary]: true }, false))
+    expect(r).toEqual({ added: [], removed: [amber, 'assistant'], failed: [] })
+    expect(await onIn('docs')).toEqual(['apiary'])
+    // A place that isn't this workspace's project: refused before anything is written.
+    await expect(run(async () => mcp.setMcpPlaces('docs', await shown('docs'), { [amber]: true, [join(wsPath, 'elsewhere')]: true }))).rejects.toThrow()
+    expect(await onIn('docs')).toEqual(['apiary'])
+    // Changed since it was shown: refused before anything is written, the removals too.
+    const before = await shown('docs')
+    writeFileSync(join(mcpDir(), 'docs.json'), JSON.stringify({ command: 'node', args: ['other.js'] }))
+    await expect(run(() => mcp.setMcpPlaces('docs', before, { [amber]: true, [apiary]: false }))).rejects.toThrow('has changed since')
+    expect(await onIn('docs')).toEqual(['apiary'])
   })
 
-  it("starts a server added under a name used before with no project's choice", async () => {
+  it('Add to… whose second write fails keeps the first and says which changed and which failed', async () => {
+    await open()
+    await add(apiary, 'docs')
+    const write = w.mutateProjectConfig.bind(w)
+    vi.spyOn(w, 'mutateProjectConfig').mockImplementation((p, fn, o) => (p === apiary ? Promise.reject(new Error('EBUSY: resource busy')) : write(p, fn, o)))
+    const r = await run(async () => mcp.setMcpPlaces('docs', await shown('docs'), { [amber]: true, [apiary]: false }))
+    expect(r).toEqual({ added: [amber], removed: [], failed: [{ place: apiary, error: 'EBUSY: resource busy' }] })
+    vi.restoreAllMocks()
+    expect(await onIn('docs')).toEqual(['amberlight', 'apiary'])
+  })
+
+  it('adds a server from a file added nowhere', async () => {
+    await open()
     await run(() => mcp.addMcpFromFile(file('godot.json', godot), 'godot'))
-    await enable('godot', { [amber]: true, [apiary]: true })
-    // Replaced: the new definition is off everywhere, whatever the projects chose for the old one.
+    expect(await listed('godot')).toMatchObject({ projects: [], assistant: false })
+    expect([projectMcp(amber).enabled, projectMcp(apiary).enabled]).toEqual([['github'], ['notes']])
+  })
+
+  it('starts a server added under a name used before added nowhere', async () => {
+    await open()
+    await run(() => mcp.addMcpFromFile(file('godot.json', godot), 'godot'))
+    await add(amber, 'godot')
+    await add(apiary, 'godot')
+    // Replaced: the new definition is added nowhere, wherever the old one was.
     await run(() => mcp.addMcpFromFile(file('godot.json', { ...godot, args: ['godot2.js'] }), 'godot', true))
-    expect((await listed('godot')).globallyEnabled).toBe(false)
-    expect([await chosen(amber), await chosen(apiary)]).toEqual([['github'], ['notes']])
-    // Deleted: every project forgets it, so one added by hand under the name later is on nowhere.
-    await run(() => mcp.setMcpProject(amber, 'godot', true))
+    expect((await listed('godot')).projects).toEqual([])
+    expect([projectMcp(amber).enabled, projectMcp(apiary).enabled]).toEqual([['github'], ['notes']])
+    // Deleted: removed everywhere, so one added by hand under the name later runs nowhere.
+    await add(amber, 'godot')
     await run(() => mcp.deleteMcp('godot'))
-    for (const p of [amber, apiary]) expect(json(join(p, '.hive', 'project.json')).mcp.enabled).not.toContain('godot')
+    for (const p of [amber, apiary]) expect(projectMcp(p).enabled).not.toContain('godot')
     writeFileSync(join(mcpDir(), 'godot.json'), JSON.stringify(godot))
     expect(await onIn('godot')).toEqual([])
   })
 
-  it('creates a new server from the template off everywhere', async () => {
-    await run(() => mcp.setMcpProject(amber, 'docs', true))
-    await run(() => mcp.deleteMcp('docs'))
-    await run(() => mcp.createMcp('docs'))
-    expect((await listed('docs')).globallyEnabled).toBe(false)
-    expect(await chosen(amber)).not.toContain('docs')
+  it("refuses to replace, delete or create a server while a project's settings can't be read, keeping the old one (HI-2059 round 1)", async () => {
+    await open()
+    await run(() => mcp.addMcpFromFile(file('godot.json', godot), 'godot'))
+    await add(amber, 'godot')
+    const read = w.projectConfig.bind(w)
+    const unreadable = (): void => void vi.spyOn(w, 'projectConfig').mockImplementation((p, o) => (p === amber ? Promise.reject(Object.assign(new Error('EACCES: permission denied'), { code: 'EACCES' })) : read(p, o)))
+    unreadable()
+    await expect(run(() => mcp.addMcpFromFile(file('godot.json', { ...godot, args: ['unseen-new-server.js'] }), 'godot', true))).rejects.toThrow("Couldn't read the settings of amberlight, so godot wasn't changed")
+    await expect(run(() => mcp.deleteMcp('godot'))).rejects.toThrow("Couldn't read the settings of amberlight")
+    vi.restoreAllMocks()
+    // Reads back: the old definition is still there and the only one amberlight's launch can get.
+    expect((await listed('godot')).def?.args).toEqual(['godot.js'])
+    expect((await listed('godot')).projects).toEqual([amber])
+    expect(await run(async () => (await sessions.effective(amber, { id: 'a1', name: 'Builder', provider: 'claude-code' } as never)).mcpServers.godot?.args)).toEqual(['godot.js'])
+    // Deleted once it can be read: removed there. Creating one under the name is refused too while it can't be read.
+    await run(() => mcp.deleteMcp('godot'))
+    expect(projectMcp(amber).enabled).not.toContain('godot')
+    unreadable()
+    await expect(run(() => mcp.createMcp('godot'))).rejects.toThrow("Couldn't read the settings of amberlight")
+    vi.restoreAllMocks()
+    expect(await listed('godot')).toBeUndefined()
   })
 
-  it("copies a server from a project's own config on in the workspace and that project when it is what was shown", async () => {
+  it("refuses to replace a server while a project's file is partway through a save, never reading its last good copy (HI-2059 round 2)", async () => {
+    await open()
+    await run(() => mcp.addMcpFromFile(file('godot.json', godot), 'godot'))
+    await add(amber, 'godot')
+    const settings = join(amber, '.hive', 'project.json')
+    const saved = readFileSync(settings, 'utf8')
+    // Another writer is partway through saving amberlight's settings: the file doesn't parse yet.
+    writeFileSync(settings, '{')
+    await expect(run(() => mcp.addMcpFromFile(file('godot.json', { ...godot, args: ['unseen-new-server.js'] }), 'godot', true))).rejects.toThrow("Couldn't read the settings of amberlight, so godot wasn't changed")
+    await expect(run(() => mcp.deleteMcp('godot'))).rejects.toThrow("Couldn't read the settings of amberlight")
+    // The writer finishes: the old definition is the only one amberlight's launch can get.
+    writeFileSync(settings, saved)
+    expect((await listed('godot')).def?.args).toEqual(['godot.js'])
+    expect(await run(async () => (await sessions.effective(amber, { id: 'a1', name: 'Builder', provider: 'claude-code' } as never)).mcpServers.godot?.args)).toEqual(['godot.js'])
+  })
+
+  it('creates a new server from the template added nowhere', async () => {
+    await open()
+    await add(amber, 'docs')
+    await run(() => mcp.deleteMcp('docs'))
+    await run(() => mcp.createMcp('docs'))
+    expect((await listed('docs')).projects).toEqual([])
+    expect(projectMcp(amber).enabled).not.toContain('docs')
+  })
+
+  it("copies a server from a project's own config, added to that project when it is what was shown", async () => {
+    await open()
     const sandbox = { command: 'node', args: ['sandbox.js'] }
     const tools = { command: 'node', args: ['tools.js'] }
     writeFileSync(join(apiary, '.mcp.json'), JSON.stringify({ mcpServers: { sandbox, tools } }))
@@ -215,7 +383,7 @@ describe('MCP servers per project', () => {
       ['sandbox', ['Runs: node sandbox.js']],
       ['tools', ['Runs: node tools.js']]
     ])
-    // tools changed after it was shown: copied, but off.
+    // tools changed after it was shown: copied, but added nowhere.
     const r = await run(() => mcp.importFromProject(apiary, ['sandbox', 'tools'], { sandbox, tools: { command: 'node', args: ['old.js'] } }))
     expect(r).toEqual({ copied: ['sandbox', 'tools'], on: ['sandbox'] })
     expect(await onIn('sandbox')).toEqual(['apiary'])

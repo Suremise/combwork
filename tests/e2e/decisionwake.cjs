@@ -27,6 +27,8 @@ const check = (name, ok, extra = '') => {
   for (const d of [userData, ws, claudeHome]) fs.rmSync(d, { recursive: true, force: true })
   fs.rmSync(mcpLog, { force: true })
   fs.mkdirSync(claudeHome, { recursive: true })
+  // Every read of the agents' input recorded, for typeLine (#1560).
+  lib.logFakeInput(claudeHome)
   lib.gitProject(alpha)
   fs.writeFileSync(path.join(claudeHome, 'fake-trusted.json'), JSON.stringify([alpha.toLowerCase()]))
   lib.enableProviders(userData)
@@ -66,6 +68,9 @@ const check = (name, ok, extra = '') => {
   await page.getByText('alpha', { exact: true }).first().click()
   const agent = await lib.addAgent(inv, alpha, { name: 'Asker' })
   const n = (await inv('tasks:create', { title: 'Pick the shots', project: 'alpha', agent: agent.id })).number
+  // Wakes name the card by its key with the number the tools take (#1219): its own key, from the board.
+  const named = `${(await card(n)).key}`
+  check('the card has a key of its project', /^[A-Z]{2,4}-\d+$/.test(named), named)
   await inv('tasks:update', n, { column: 'doing', agent: agent.id })
   // What it does when Hive's line comes: reads the card's decisions, as work-on-card says.
   fs.writeFileSync(path.join(claudeHome, 'fake-wakes-Asker.txt'), `hive hive_read_task {"number":${n}}\nhive hive_read_task {"number":${n}}\nhive hive_read_task {"number":${n}}\n`)
@@ -84,7 +89,7 @@ const check = (name, ok, extra = '') => {
   await inv('tasks:update', n, { decision: 'Shot 2: close on the counter.' })
   check('one line for the two decisions', !!(await until(async () => wakes().length >= 1, HUNG_MS)), JSON.stringify(wakes()))
   await lib.sleep(4000) // A fixed wait on purpose: this checks that a second line does NOT come.
-  check('…exactly one, naming the card and both', wakes().length === 1 && /^\[Hive\] #\d+ has 2 new decisions from the user: read them \(hive_read_task\) and carry on from where you asked\.$/.test(wakes()[0]) && wakes()[0].startsWith(`[Hive] #${n} `), JSON.stringify(wakes()))
+  check('…exactly one, naming the card and both', wakes().length === 1 && wakes()[0] === `[Hive] ${named} has 2 new decisions from the user: read them (hive_read_task) and carry on from where you asked.`, JSON.stringify(wakes()))
   check('it reads them', !!(await until(async () => reads(n).length >= 1, HUNG_MS)))
   check("the card's history says whom Hive told", !!(await until(async () => (await card(n))?.history.some((h) => h.by === 'Hive' && h.what === 'Told Asker (alpha) of 2 new decisions'), HUNG_MS)), JSON.stringify((await card(n))?.history.map((h) => h.what)))
   await takesPrompts('after the decisions')
@@ -97,7 +102,7 @@ const check = (name, ok, extra = '') => {
   await lib.sleep(4500) // A fixed wait on purpose: this checks that nothing is typed while it works.
   check('nothing typed while it works', wakes().length === 1 && (await live(agent.id))?.status === 'working', JSON.stringify({ wakes: wakes().length, status: (await live(agent.id))?.status }))
   fs.writeFileSync(path.join(claudeHome, 'decisionwake-busy'), '')
-  check('…then one line once its turn ends', !!(await until(async () => wakes().length === 2, HUNG_MS)) && wakes()[1].startsWith(`[Hive] #${n} has 1 new decision from the user: read it`), JSON.stringify(wakes().slice(1)))
+  check('…then one line once its turn ends', !!(await until(async () => wakes().length === 2, HUNG_MS)) && wakes()[1].startsWith(`[Hive] ${named} has 1 new decision from the user: read it`), JSON.stringify(wakes().slice(1)))
   await takesPrompts('after the decision')
 
   // While the user types in its terminal (no Enter): not until the typing pause has passed. The user keeps typing for
@@ -117,7 +122,7 @@ const check = (name, ok, extra = '') => {
   check('nothing typed while the user types there', wakes().length === 2, JSON.stringify(wakes().slice(2)))
   typing.on = false
   await keepTyping
-  check('…then one line once the pause has passed', !!(await until(async () => wakes().length === 3, HUNG_MS)) && /^\[Hive\] #\d+ has 1 new decision/.test(wakes()[2] ?? ''), JSON.stringify(wakes().slice(2)))
+  check('…then one line once the pause has passed', !!(await until(async () => wakes().length === 3, HUNG_MS)) && (wakes()[2] ?? '').startsWith(`[Hive] ${named} has 1 new decision from the user: read it`), JSON.stringify(wakes().slice(2)))
 
   await app.close()
   console.log(failed ? `\n${failed} FAILED` : '\nALL PASSED')

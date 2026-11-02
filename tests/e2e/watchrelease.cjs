@@ -26,6 +26,8 @@ const check = (name, ok, extra = '') => {
 ;(async () => {
   for (const d of [userData, ws, claudeHome]) fs.rmSync(d, { recursive: true, force: true })
   fs.mkdirSync(claudeHome, { recursive: true })
+  // Every read of the agents' input recorded, for typeLine (#1560).
+  lib.logFakeInput(claudeHome)
   lib.gitProject(alpha)
   fs.writeFileSync(path.join(claudeHome, 'fake-trusted.json'), JSON.stringify([alpha.toLowerCase()]))
   lib.enableProviders(userData)
@@ -56,9 +58,8 @@ const check = (name, ok, extra = '') => {
     return (fs.existsSync(f) ? fs.readFileSync(f, 'utf8').trim().split('\n').filter(Boolean).map((l) => JSON.parse(l)) : []).filter((w) => w.agent === agent).map((w) => w.text)
   }
   const say = async (id, text) => {
-    await inv('pty:write', lib.ptyKey(alpha, id), text)
-    await lib.sleep(300)
-    await inv('pty:write', lib.ptyKey(alpha, id), '\r')
+    // Typed again if a wake of Hive's disturbed it (lib.typeLine, #1560).
+    await lib.typeLine(inv, lib.ptyKey(alpha, id), claudeHome, null, text, { live: () => live(id) })
   }
   const watch = (cards, extra) => `hive hive_wait_for_tasks ${JSON.stringify({ cards, ...extra, wake: true })}`
   const idle = async (id) => ['ready', 'finished'].includes((await live(id))?.status)
@@ -78,13 +79,17 @@ const check = (name, ok, extra = '') => {
 
   // The reviewer waits for Builder's card to arrive in Review; the card is given to Other.
   const c1 = await newCard('First')
+  // Wakes name a card by its key with the number the tools take (#1219): its own key, from the board.
+  const named = async (n) => `${(await card(n)).key}`
+  const n1 = await named(c1)
+  check('the card has a key of its project', /^[A-Z]{2,4}-\d+$/.test(n1), n1)
   await say(reviewer.id, watch([c1], { column: 'review' }))
   check('the reviewer watches the card', !!(await until(async () => (await live(reviewer.id))?.status === 'watching', 15000)))
   await inv('tasks:update', c1, { agent: other.id })
   check('given to another agent: the reviewer is woken', !!(await until(async () => wakes('Reviewer').length >= 1, 20000)))
   await lib.sleep(2000) // A fixed wait on purpose: this checks that a second line does NOT come.
   const w1 = wakes('Reviewer')
-  check('…once, saying so, and to carry on', w1.length === 1 && w1[0] === `[Hive] #${c1} was reassigned to Other (your watch on it ended). Your card watch has ended: drop it from your list and carry on with your next card.`, JSON.stringify(w1))
+  check('…once, saying so, and to carry on', w1.length === 1 && w1[0] === `[Hive] ${n1} was reassigned to Other (your watch on it ended). Your card watch has ended: drop it from your list and carry on with your next card.`, JSON.stringify(w1))
   check('…and it no longer waits', !!(await until(() => idle(reviewer.id), 15000)) && !(await live(reviewer.id))?.watch)
   check("the card's history says whose watch ended", !!(await until(async () => (await card(c1))?.history.some((h) => h.by === 'Hive' && h.what === "Ended Reviewer (alpha)'s watch on it: reassigned to Other"), 10000)), JSON.stringify((await card(c1))?.history.map((h) => h.what)))
 
@@ -101,6 +106,7 @@ const check = (name, ok, extra = '') => {
   // Two cards: one blocked stays in the watch, paused (#481), with no wake; unblocked and in Review, it wakes the reviewer.
   const c2 = await newCard('Second')
   const c3 = await newCard('Third')
+  const [n2, n3] = [await named(c2), await named(c3)]
   await say(reviewer.id, watch([c2, c3], { column: 'review' }))
   await until(async () => (await live(reviewer.id))?.status === 'watching', 15000)
   await inv('tasks:update', c2, { blocked: 'Waiting for the user to choose' })
@@ -108,7 +114,7 @@ const check = (name, ok, extra = '') => {
   check('a blocked card stays in a watch on two, with no wake', JSON.stringify((await live(reviewer.id))?.watch?.cards) === JSON.stringify([c2, c3]) && wakes('Reviewer').length === 1, JSON.stringify({ watch: (await live(reviewer.id))?.watch, wakes: wakes('Reviewer').slice(1) }))
   await inv('tasks:update', c2, { blocked: '' })
   await inv('tasks:update', c2, { column: 'review' })
-  check('unblocked and back in Review, it wakes the reviewer', !!(await until(async () => wakes('Reviewer').length === 2, 20000)) && wakes('Reviewer')[1].startsWith(`[Hive] #${c2} (Builder's card) is in Review`), JSON.stringify(wakes('Reviewer').slice(1)))
+  check('unblocked and back in Review, it wakes the reviewer', !!(await until(async () => wakes('Reviewer').length === 2, 20000)) && wakes('Reviewer')[1].startsWith(`[Hive] ${n2} (Builder's card) is in Review`), JSON.stringify(wakes('Reviewer').slice(1)))
   check("…and its history ends nobody's watch", !(await card(c2)).history.some((h) => /^Ended .*'s watch on it/.test(h.what)), JSON.stringify((await card(c2)).history))
 
   // 10 Oct (#521): the wake told the reviewer the card was in Review; before it reviews, the builder takes it back and
@@ -120,7 +126,7 @@ const check = (name, ok, extra = '') => {
   await say(reviewer.id, watch([c2, c3], { column: 'review' }))
   check('the reviewer watches the card again, now in Doing', !!(await until(async () => (await live(reviewer.id))?.status === 'watching', 15000)))
   await inv('tasks:update', c2, { column: 'review' })
-  check('back in Review after a wake that told it there, it wakes the reviewer (#521)', !!(await until(async () => wakes('Reviewer').length === 3, 20000)) && wakes('Reviewer')[2].startsWith(`[Hive] #${c2} (Builder's card) is in Review`), JSON.stringify(wakes('Reviewer').slice(2)))
+  check('back in Review after a wake that told it there, it wakes the reviewer (#521)', !!(await until(async () => wakes('Reviewer').length === 3, 20000)) && wakes('Reviewer')[2].startsWith(`[Hive] ${n2} (Builder's card) is in Review`), JSON.stringify(wakes('Reviewer').slice(2)))
 
   // A card in Review that its watching reviewer hasn't started on shows as stalled once it has waited 15 min (#521): in
   // its lane's row in the Progress panel. The window's clock is moved on 20 min (main's isn't: nothing else changes).
@@ -139,11 +145,13 @@ const check = (name, ok, extra = '') => {
   const marker = lane.locator('.progress-lane-state.stalled')
   check("the lane says it is stalled: its card waits in Review on a reviewer that hasn't started", !!(await until(async () => (await marker.count()) === 1, 15000)))
   await marker.hover()
-  const tip = page.locator('.tip', { hasText: `#${c3}: Reviewer is watching #${c3} but hasn't started reviewing it: in Review for 20 min.` })
+  // The window names the card by key (#1221).
+  const C3 = await lib.cardLabel(inv, c3)
+  const tip = page.locator('.tip', { hasText: `${C3}: Reviewer is watching ${C3} but hasn't started reviewing it: in Review for 20 min.` })
   check('…and its tooltip says why', !!(await until(async () => (await tip.count()) === 1, 5000)), (await page.locator('.tip').allInnerTexts()).join(' | '))
   await page.screenshot({ path: path.join(lib.WORK, 'watchrelease-stalled-lane.png') })
   // The lane's own wake (#405: the watch counts only a verdict) is typed into the reviewer meanwhile: taken first.
-  await until(async () => wakes('Reviewer').some((t) => t.startsWith(`[Hive] #${c3} (Builder's card) is in Review. You review this card`)) && (await idle(reviewer.id)), 20000)
+  await until(async () => wakes('Reviewer').some((t) => t.startsWith(`[Hive] ${n3} (Builder's card) is in Review. You review this card`)) && (await idle(reviewer.id)), 20000)
   await say(reviewer.id, `boardreview ${c3} start`)
   check('…until its review starts', !!(await until(async () => (await marker.count()) === 0, 15000)))
 
@@ -155,11 +163,22 @@ const check = (name, ok, extra = '') => {
   check('…and the lane says it is stalled again', !!(await until(async () => (await marker.count()) === 1, 15000)))
   await page.mouse.move(0, 0)
   await marker.hover()
-  const verdictTip = page.locator('.tip', { hasText: `#${c3}: Reviewer started reviewing #${c3} but has given no verdict, and has only been watching it for 20 min.` })
+  const verdictTip = page.locator('.tip', { hasText: `${C3}: Reviewer started reviewing ${C3} but has given no verdict, and has only been watching it for 20 min.` })
   check('…its tooltip says the review has no verdict', !!(await until(async () => (await verdictTip.count()) === 1, 5000)), (await page.locator('.tip').allInnerTexts()).join(' | '))
   await page.screenshot({ path: path.join(lib.WORK, 'watchrelease-stalled-verdict.png') })
   await inv('tasks:update', c3, { blocked: 'Should the icon be a bee?' })
   check('…until its question blocks the card', !!(await until(async () => (await marker.count()) === 0, 15000)))
+
+  // HI-2080: unblocked, it is stalled again; asking the user instead (For you, hive_ask_user) and watching again, the
+  // reviewer waits on its own question, which isn't a stall.
+  await inv('tasks:update', c3, { blocked: '' })
+  check('unblocked, the lane says it is stalled again', !!(await until(async () => (await marker.count()) === 1, 15000)))
+  await until(() => idle(reviewer.id), 15000)
+  await say(reviewer.id, `hive hive_ask_user ${JSON.stringify({ card: `#${c3}`, kind: 'decide', text: 'Should the icon be a bee?' })}`)
+  check('the reviewer asks the user (For you)', !!(await until(async () => (await inv('tasks:forYou', 'alpha')).items.some((i) => i.card === c3 && i.asker === reviewer.id), 15000)), JSON.stringify((await inv('tasks:forYou', 'alpha')).items))
+  await until(() => idle(reviewer.id), 15000)
+  await say(reviewer.id, watch([c3], { changes: ['verdict'] }))
+  check('…and watching the card again while it waits for the answer, it isn\'t stalled (HI-2080)', !!(await until(async () => (await live(reviewer.id))?.status === 'watching' && (await marker.count()) === 0, 15000)), String(await marker.count()))
 
   await app.close()
   console.log(failed ? `\n${failed} FAILED` : '\nALL PASSED')

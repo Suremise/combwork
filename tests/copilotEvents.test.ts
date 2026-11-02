@@ -248,6 +248,24 @@ describe('Copilot live details', () => {
     expect(interrupted(abort + prompt('2026-10-09T10:01') + refusal('2026-10-09T10:01'))).toBe('2026-10-09T10:01:02.002Z')
   })
 
+  it('reads 1.0.105’s refusal, which an abort follows after the turn’s end, as interrupted however the reads split it (HI-1945)', () => {
+    // Recorded with Copilot 1.0.105 (the copilot e2e suite's refused read): the denial, the tool's failure, the turn's end,
+    // then abort (user_initiated). Interrupted at the turn's end, or at the abort once it is read.
+    const text = readFileSync(join(HOME, 'refusal-1.0.105.jsonl'), 'utf8').replace(/\r\n/g, '\n')
+    const types = text.trim().split('\n').map((l) => JSON.parse(l).type as string)
+    expect(types.slice(-4)).toEqual(['permission.completed', 'tool.execution_complete', 'assistant.turn_end', 'abort'])
+    const END = '2026-10-28T13:03:37.673Z'
+    const ABORT = '2026-10-28T13:03:37.675Z'
+    expect(interrupted(text)).toBe(ABORT)
+    for (const s of splits(text)) {
+      // The read with the abort reports it; split between the turn's end and the abort, the first read already reported the end.
+      expect(s.second ?? s.first, `split after line ${s.at}`).toBe(ABORT)
+      expect(s.first, `split after line ${s.at}`).toBe(s.at === types.length - 1 ? END : s.at === types.length ? ABORT : undefined)
+    }
+    // Followed by the next prompt, it is history.
+    expect(interrupted(text + prompt('2026-10-28T13:04'))).toBeUndefined()
+  })
+
   it('keeps each launch’s refusal to its own memo', () => {
     const lines = refusal('2026-10-09T10:00').split('\n').filter(Boolean)
     const a = copilotDetailsMemo()
@@ -356,7 +374,9 @@ describe('Copilot sessions', () => {
   })
 
   it('lists the sessions with a conversation for a folder', async () => {
-    expect(await listCopilotSessions(HOME, 'C:\\work\\ws2')).toEqual([{ id: REAL, transcriptPath: copilotEventsPath(HOME, REAL), modified: expect.any(String) }])
+    expect(await listCopilotSessions(HOME, 'C:\\work\\ws2')).toEqual([{ id: REAL, transcriptPath: copilotEventsPath(HOME, REAL), modified: expect.any(String), bytes: expect.any(Number), mtimeMs: expect.any(Number) }])
+    // Ids the caller has are left out (HI-1681).
+    expect(await listCopilotSessions(HOME, 'C:\\work\\ws2', (id) => id === REAL)).toEqual([])
     // The folder compares as Windows does.
     expect((await listCopilotSessions(HOME, 'c:\\WORK\\ws1\\')).map((s) => s.id)).toEqual([STUB])
     expect(await listCopilotSessions(HOME, 'C:\\work\\other')).toEqual([])

@@ -54,7 +54,9 @@ export type DocRefCheck = { ref: string; content: string; line: number; size: nu
  * Checks a card's context reference (#818, #819): in the project's folder (`project`: never an agent's worktree; null for a
  * card about the workspace, whose project files can't resolve) or the shared notes (`shared`, for `shared:` references).
  * It resolves when its file is there and readable and, with a #slug, that heading is in it, uniquely: a heading whose
- * text another one has too (a second "Setup" added above it) is `ambiguous`, since which one the slug names can change.
+ * text another one has too (a second "Setup" added above it) is `ambiguous`, since which one the slug names can change;
+ * one with an explicit id (`<a id="setup"></a>`, #1535) is never, and keeps resolving when its text is renamed, unless
+ * another heading carries the same id (a section copied with its anchor): then a reference to any of them is ambiguous.
  * The size is its section's, or the whole document's when it names no heading.
  */
 export async function checkDocRef(project: string | null, shared: string, ref: string): Promise<DocRefCheck> {
@@ -67,10 +69,14 @@ export async function checkDocRef(project: string | null, shared: string, ref: s
   if (!parsed.slug) return { ref, content: r.text, line: 1, size: r.text.length }
   const outline = docOutline(r.text)
   const found = findHeading(outline, `#${parsed.slug}`)
-  if (!('heading' in found)) return { ref, problem: 'noHeading', closest: ('closest' in found ? found.closest : found.ambiguous).slice(0, 3).map((h) => h.slug) }
+  if ('ambiguous' in found) return { ref, problem: 'ambiguous', closest: found.ambiguous.map((h) => h.slug) }
+  if (!('heading' in found)) return { ref, problem: 'noHeading', closest: found.closest.slice(0, 3).map((h) => h.slug) }
   const h = found.heading
+  // A heading with an explicit id is the one its id names, whatever other headings are called (#1535); one of several
+  // carrying the same id, named by its numbered slug, may be another once they move.
+  if (h.sharedId) return { ref, problem: 'ambiguous', closest: outline.filter((x) => x.sharedId === h.sharedId).map((x) => x.slug) }
   const same = outline.filter((x) => x.text.toLowerCase() === h.text.toLowerCase())
-  if (same.length > 1) return { ref, problem: 'ambiguous', closest: same.map((x) => x.slug) }
+  if (!h.fixed && same.length > 1) return { ref, problem: 'ambiguous', closest: same.map((x) => x.slug) }
   return { ref, content: sectionText(r.text, h), line: h.line, size: h.size }
 }
 

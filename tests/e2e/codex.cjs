@@ -22,9 +22,9 @@ function prepare() {
   for (const d of [userData, ws]) fs.rmSync(d, { recursive: true, force: true })
   fs.mkdirSync(proj, { recursive: true })
   fs.writeFileSync(path.join(proj, 'a.ts'), 'export const a = 1\n')
-  execFileSync('git', ['init', '-q'], { cwd: proj })
-  execFileSync('git', ['-c', 'user.email=t@t', '-c', 'user.name=t', 'add', '.'], { cwd: proj })
-  execFileSync('git', ['-c', 'user.email=t@t', '-c', 'user.name=t', 'commit', '-qm', 'init'], { cwd: proj })
+  execFileSync('git', ['init', '-q'], { cwd: proj, env: lib.gitEnv() })
+  execFileSync('git', ['-c', 'user.email=t@t', '-c', 'user.name=t', 'add', '.'], { cwd: proj, env: lib.gitEnv() })
+  execFileSync('git', ['-c', 'user.email=t@t', '-c', 'user.name=t', 'commit', '-qm', 'init'], { cwd: proj, env: lib.gitEnv() })
   // The test Codex home trusts the project folder and has the non-admin sandbox set up (under its lock: lib.cjs).
   lib.trustForCodex(proj, codexHome)
   lib.enableProviders(userData, ['claude-code', 'codex'])
@@ -47,7 +47,7 @@ function prepare() {
   check('no readiness problems (sandbox set up in the test home)', !(info?.readiness ?? []).some((r) => r.level !== 'info'), JSON.stringify(info?.readiness))
 
   await lib.openWorkspace(inv, page, ws)
-  const def = await inv('agents:add', proj, { name: 'Codex', provider: 'codex', location: 'project', model: 'gpt-6-luna', effort: 'low' })
+  const def = await lib.addAgent(inv, proj, { name: 'Codex', provider: 'codex', location: 'project', model: 'gpt-6-luna', effort: 'low' })
   check('agent added with provider codex', def.provider === 'codex')
   await page.getByText('demo', { exact: true }).first().click()
   await sleep(500)

@@ -8,6 +8,10 @@ import { leftoversSummary, progressRunsIn, type AgentProcess } from './agentProc
 import { formatDate, formatTime } from './dates'
 import { fmt, msg, tr } from './i18n'
 import type { ProviderId } from './types'
+import type { ResumeHold } from './agentFolders'
+import { shownText } from './advanced'
+import { holdShort } from './sessionResume'
+import { cardRef } from './projectKeys'
 
 /** An agent running when the marker was last written. */
 export interface RunningAgent {
@@ -44,6 +48,8 @@ export interface LaunchProcesses {
   projectPath: string
   agentId: string
   agentName: string
+  /** The launch's run (#1506: Release Slot… lists these for a held writer of that run only); absent in a marker from before. */
+  runId?: string
   processes: AgentProcess[]
 }
 
@@ -97,7 +103,8 @@ function parseLaunches(v: unknown): LaunchProcesses[] {
       const parent = Number.isSafeInteger(p.parent) && (p.parent as number) > 0 ? { parent: p.parent as number } : {}
       processes.push({ pid: p.pid as number, name, label: str(p.label, 300) ? p.label : name, created: p.created, ...parent, ...run })
     }
-    if (processes.length) out.push({ projectPath: r.projectPath, agentId: r.agentId, agentName: str(r.agentName, 300) ? r.agentName : '', processes })
+    const runId = str(r.runId, 100) && r.runId ? { runId: r.runId } : {}
+    if (processes.length) out.push({ projectPath: r.projectPath, agentId: r.agentId, agentName: str(r.agentName, 300) ? r.agentName : '', ...runId, processes })
   }
   return out
 }
@@ -114,15 +121,28 @@ export interface LeftMerge {
   agentName: string
   branch: string
   cards: number[]
+  /**
+   * Those cards as its own workspace names them (HI-1661: by key), made where the merge is recovered: the notice can hold
+   * several workspaces' merges, and is told outside any of them. Absent: by number.
+   */
+  cardNames?: string[]
   /** The folder the merge was in: the agent's worktree, or the project's main checkout. */
   folder: string
 }
 
-/** What resuming the agents that were running came to: the names resumed, and those that failed with why. */
+/**
+ * What resuming the agents that were running came to: the names resumed, those that failed with why, and those left
+ * (#1434: their conversations can't resume where they were made now, or only by hand).
+ */
 export interface ResumeReport {
   resumed: string[]
   failed: { name: string; error: string }[]
+  held?: { name: string; hold: ResumeHold }[]
 }
+
+/** The agents left to resume by hand, with why in a few words (#1434). */
+export const resumeHeldLine = (held: NonNullable<ResumeReport['held']>): string =>
+  tr(msg({ id: 'main.unexpectedClose.held', defaultMessage: '{n, plural, one {One was left stopped: {agents}.} other {# were left stopped: {agents}.}}', description: "In the notice that Hive closed unexpectedly (#1434): agents whose conversations can't resume now where they ran (their slot is free, or holds other work), left for the user ({agents}: their names, each with why in a few words)." }), { n: held.length, agents: fmt.list(held.map((h) => `${h.name} (${shownText(holdShort(h.hold))})`)) })
 
 /** The agents that couldn't resume, with why. */
 export const resumeFailedLine = (r: ResumeReport): string =>
@@ -234,11 +254,12 @@ export function unexpectedCloseText(c: { lastSeen: string; agents: readonly Runn
   if (r) {
     lines.push(tr(msg({ id: 'main.unexpectedClose.resumed', defaultMessage: '{n, plural, =0 {None was resumed.} one {One was resumed, as Settings → Sessions says.} other {# were resumed, as Settings → Sessions says.}}', description: 'The notice that Hive closed unexpectedly, with "Resume agents after an unexpected close" on: how many of the agents Hive resumed ({n}).' }), { n: r.resumed.length }))
     if (r.failed.length) lines.push(resumeFailedLine(r))
+    if (r.held?.length) lines.push(resumeHeldLine(r.held))
   } else if (c.agents.length) lines.push(tr(msg({ id: 'main.unexpectedClose.notResumed', defaultMessage: 'Nothing was resumed.', description: 'The notice that Hive closed unexpectedly: Hive did not resume the agents that were running (the user chooses).' })))
   if (c.stillRunning?.length) lines.push(stillRunningLine(c.stillRunning, c.kept))
   if (c.dump) lines.push(tr(msg({ id: 'main.unexpectedClose.dump', defaultMessage: 'Hive kept a crash dump of it: Help → Copy Diagnostics names it.', description: 'The notice that Hive closed unexpectedly: a crash dump of that run was saved on this PC.' })))
   for (const m of c.merges) {
-    const cards = fmt.list(m.cards.map((n) => `#${n}`))
+    const cards = fmt.list(m.cardNames ?? m.cards.map(cardRef))
     lines.push(
       m.cards.length
         ? tr(msg({ id: 'main.unexpectedClose.mergeCards', defaultMessage: '{agent} was merging {branch} ({cards}): check {folder} for a merge left half done (git status there) before the next merge.', description: 'The notice that Hive closed unexpectedly: an agent ({agent}) held the merge slot for a branch ({branch}) for cards ({cards}); {folder} is where the merge was (its worktree or the main checkout).' }), { agent: m.agentName, branch: m.branch, cards, folder: m.folder })

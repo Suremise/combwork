@@ -228,7 +228,10 @@ export function findUnbounded(text) {
       }
     }
     args.push(src.slice(start, j).trim())
-    if (/^\s*(=>|\{|:)/.test(src.slice(j + 1, j + 10))) continue
+    // A definition's arrow, body or return type follows its parameters; a wait awaited, returned or in an expression is a
+    // call whatever follows it (#1400: `x ? await until(fn) : null`'s `:` is the ternary's).
+    const called = /(?:\bawait|\breturn|\bvoid|[=(,?:!&|+])\s*$/.test(src.slice(Math.max(0, m.index - 20), m.index))
+    if (!called && /^\s*(=>|\{|:)/.test(src.slice(j + 1, j + 10))) continue
     const bound = args.filter(Boolean)[1]
     const number = (v) => /^[\d_]+$/.test(v)
     const short = (v) => number(v) && Number(v.replace(/_/g, '')) < MIN_BOUND_MS

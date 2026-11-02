@@ -5,6 +5,8 @@
 // opt-in box deletes only merged, clean ones (unmerged work is kept even ticked); a failure is reported with the rest
 // still removed. Cancel changes nothing. Fake Claude Code (fake-claude/), throwaway profile, workspace and
 // CLAUDE_CONFIG_DIR; a quiet test copy. Two projects: alpha (the default) and beta (the box ticked, one removal failing).
+// Dev build only (#1580): it starts this checkout's Electron itself, and Merged and Unmerged are 0.9 worktree agents
+// (agents:testLegacy, refused by a packaged build): what Remove All does with their worktrees is part of what it tests.
 const lib = require('./lib.cjs')
 const { _electron } = require('playwright-core')
 const fs = require('fs')
@@ -26,6 +28,8 @@ const check = (name, ok, extra = '') => {
 ;(async () => {
   for (const d of [userData, ws, claudeHome, `${ws}.worktrees`]) fs.rmSync(d, { recursive: true, force: true })
   fs.mkdirSync(claudeHome, { recursive: true })
+  // Every read of the agents' input recorded, for typeLine (#1560).
+  lib.logFakeInput(claudeHome)
   lib.gitProject(alpha)
   lib.gitProject(beta)
   lib.enableProviders(userData)
@@ -64,9 +68,8 @@ const check = (name, ok, extra = '') => {
     }
   }
   const type = async (proj, id, text) => {
-    await inv('pty:write', lib.ptyKey(proj, id), text)
-    await lib.sleep(300)
-    await inv('pty:write', lib.ptyKey(proj, id), '\r')
+    // Typed again if a wake of Hive's disturbed it (lib.typeLine, #1560).
+    await lib.typeLine(inv, lib.ptyKey(proj, id), claudeHome, null, text, { live: () => live(proj, id) })
   }
   const agentsOf = async (proj) => ((await inv('workspace:refresh')).projects.find((p) => p.path.toLowerCase() === proj.toLowerCase())?.agents ?? []).map((a) => a.name)
   const branches = (proj) => lib.git(proj, ['branch', '--format=%(refname:short)']).split(/\r?\n/).filter(Boolean)

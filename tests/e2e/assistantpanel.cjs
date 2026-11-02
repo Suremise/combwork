@@ -4,7 +4,7 @@
 // watch's cards as the app's card chips (their column's colour) that open the card, with the watch's end, and Hive's own
 // approval cards (stopping a busy agent) as "Waiting for your approval" in the attention colour until answered. At the
 // line's end, once it has done something, "Done by the Assistant (n)" opens the list under it (closed at first): the last
-// 3 (rows of one height, a setting's with Revert too), Show all scrolling every one inside the same height (nothing
+// 3 of its newest message's changes (#1283: rows of one height, each with Undo), Show all scrolling every one inside the same height (nothing
 // moves), Show fewer back at the top; closing it (Enter on the link too) gives the terminal the room (it refits); open
 // or closed is remembered for the workspace, across a restart. A busy agent's mark in the workspace section says it
 // works. Screenshots in both themes, wide and narrow. The Assistant runs the fake Claude Code (fake-claude/). Dev build,
@@ -28,6 +28,8 @@ const check = (name, ok, extra = '') => {
 ;(async () => {
   for (const d of [userData, ws, claudeHome]) fs.rmSync(d, { recursive: true, force: true })
   fs.mkdirSync(claudeHome, { recursive: true })
+  // Every read of the agents' input recorded, for typeLine (#1560).
+  lib.logFakeInput(claudeHome)
   lib.gitProject(path.join(ws, 'alpha'))
   fs.writeFileSync(path.join(claudeHome, 'fake-trusted.json'), JSON.stringify([ws.toLowerCase(), path.join(ws, 'alpha').toLowerCase()]))
   lib.enableProviders(userData)
@@ -35,7 +37,7 @@ const check = (name, ok, extra = '') => {
   const cfg = JSON.parse(fs.readFileSync(cfgFile, 'utf8'))
   cfg.settings.providers['claude-code'].executablePath = path.join(__dirname, 'fake-claude', 'fake-claude.cmd')
   cfg.settings.general = { ...cfg.settings.general, confirmOnQuit: 'never' }
-  // Setting changes (with Revert) among what it does.
+  // Setting changes among what it does.
   cfg.settings.assistant = { ...cfg.settings.assistant, changeSettings: true }
   fs.writeFileSync(cfgFile, JSON.stringify(cfg, null, 2))
   const env = lib.hiveEnv({ HIVE_USER_DATA: userData, HIVE_API_PORT: lib.port(47920), CLAUDE_CONFIG_DIR: claudeHome })
@@ -151,7 +153,7 @@ const check = (name, ok, extra = '') => {
   check('…and its turn ends by itself after the question', await ends(asking))
 
   // --- What it did: under the footer, the last 3, Show all scrolls inside the same height.
-  // Newest first they are: a card, two setting changes (with Revert, a taller button), then three cards.
+  // Newest first they are: a card, two setting changes, then three cards, each with Undo (#1283), under their message.
   const task = (t) => `hive hive_create_task {"project":"alpha","title":"${t}"}`
   check('it makes six changes in one turn', await say([task('First thing'), task('Second thing'), task('Third thing'), 'skill tune-settings', 'hive hive_update_setting {"id":"sessions.transcriptWarnMB","value":50}', 'hive hive_update_setting {"id":"sessions.transcriptWarnMB","value":60}', task('Sixth thing')].join(' then ')))
   const section = panel().locator('.assistant-actions')
@@ -166,9 +168,9 @@ const check = (name, ok, extra = '') => {
   check('…between the status line and the workspace, above the terminal', order.status >= 0 && order.status < order.actions && order.actions < order.workspace && order.workspace < order.terminal && !order.inOverview, JSON.stringify(order))
   const rows = section.locator('.assistant-action')
   const texts = async () => (await rows.allInnerTexts()).map((t) => t.replace(/\s+/g, ' '))
-  check('…the last 3, newest first: a card and two settings with Revert', (await rows.count()) === 3 && (await texts())[0].includes('Sixth thing') && (await section.locator('.assistant-revert').count()) === 2, JSON.stringify(await texts()))
+  check('…the last 3, newest first: a card and two settings, each with Undo', (await rows.count()) === 3 && (await texts())[0].includes('Sixth thing') && (await section.locator('.assistant-undo').count()) === 3, JSON.stringify(await texts()))
   const heights = await rows.evaluateAll((els) => els.map((el) => Math.round(el.getBoundingClientRect().height * 10) / 10))
-  check('…every row the same height, with or without Revert', new Set(heights).size === 1, JSON.stringify(heights))
+  check('…every row the same height, with its Undo button', new Set(heights).size === 1, JSON.stringify(heights))
   const list = section.locator('.show-all-list')
   const folded3 = (await list.boundingBox()).height
   const term3 = await box('.assistant-terminal')
@@ -186,14 +188,15 @@ const check = (name, ok, extra = '') => {
   check('…the list and the terminal the same size as before', Math.abs(fewer.list - folded3) <= 1 && Math.abs(fewer.term - term3.height) <= 1, `${JSON.stringify(fewer)} vs ${folded3}, ${term3.height}`)
   const inside = await list.evaluate((el) => {
     const b = el.getBoundingClientRect()
-    return [...el.querySelectorAll('.assistant-revert')].every((r) => {
+    return [...el.querySelectorAll('.assistant-undo')].every((r) => {
       const x = r.getBoundingClientRect()
       return x.top >= b.top - 0.5 && x.bottom <= b.bottom + 0.5
     })
   })
-  check('…each Revert whole inside the list, not cut off', inside)
-  await section.locator('.assistant-revert').first().click()
-  check('…and Revert works', !!(await lib.until(async () => (await section.locator('.assistant-action', { hasText: 'You reverted' }).count()) >= 1, 5000)))
+  check('…each Undo whole inside the list, not cut off', inside)
+  // Undo on the newer setting change (the second row): the value it replaced comes back, the row struck through.
+  await rows.nth(1).locator('.assistant-undo').click()
+  check('…and Undo works', !!(await lib.until(async () => (await section.locator('.assistant-action.undone').count()) === 1 && (await inv('settings:get')).sessions.transcriptWarnMB === 50, HUNG_MS)), JSON.stringify(await texts()))
 
   // --- Closing it: the link closes the list, and the terminal gets the room (refitted, not clipped).
   const head = link
@@ -250,13 +253,15 @@ const check = (name, ok, extra = '') => {
 
   // --- A card watch: its cards as chips that open the card, and until when.
   check('it watches two cards', await say('hive hive_wait_for_tasks {"cards":[1,2],"wake":true,"column":"review","limitMinutes":90}'))
-  check('watching: “Status: Waiting for #1 #2 → Review (watch until …)” (chips side by side)', !!(await lib.until(async () => /^Status: Waiting for #1 #2 → Review \(watch until \d{1,2}:\d{2}( [AP]M)?\)$/.test(await statusText()) && (await tone()) === 'calm', 15000)), await statusText())
+  // Its cards by key (#1221).
+  const [L1, L2] = [await lib.cardLabel(inv, 1), await lib.cardLabel(inv, 2)]
+  check('watching: “Status: Waiting for #1 #2 → Review (watch until …)” (chips side by side)', !!(await lib.until(async () => new RegExp(`^Status: Waiting for ${L1} ${L2} → Review \\(watch until \\d{1,2}:\\d{2}( [AP]M)?\\)$`).test(await statusText()) && (await tone()) === 'calm', 15000)), await statusText())
   const chips = status().locator('.card-chip')
   check('…each card the app’s card chip', (await chips.count()) === 2 && (await chips.first().locator('.codicon').count()) === 1)
   const tint = await chips.first().evaluate((el) => ({ colored: el.classList.contains('colored'), column: el.dataset.column, col: el.style.getPropertyValue('--col') }))
   check('…tinted with its column’s colour', tint.colored && tint.column === 'todo' && !!tint.col, JSON.stringify(tint))
-  await status().locator('.card-chip', { hasText: '#2' }).click()
-  const dialog = page.locator('.dialog', { hasText: '#2' })
+  await status().locator('.card-chip', { hasText: L2 }).click()
+  const dialog = lib.cardDialog(page, await lib.cardLabel(inv, 2))
   check('…that opens its card', !!(await lib.until(async () => (await dialog.count()) === 1, 5000)))
   await page.keyboard.press('Escape')
   await lib.until(async () => (await page.locator('.dialog').count()) === 0, HUNG_MS)
@@ -276,7 +281,7 @@ const check = (name, ok, extra = '') => {
   }, HUNG_MS)
   check('narrow: the status line is cut short with “…”', !!narrowed && cut.ellipsis === 'ellipsis', JSON.stringify(cut))
   await status().locator('.assistant-status-text').hover()
-  check('…its tooltip has the whole line', !!(await lib.until(async () => /Status: Waiting for #1, #2 → Review \(watch until/.test((await page.locator('.tip:visible').allInnerTexts()).join(' ')), HUNG_MS)))
+  check('…its tooltip has the whole line', !!(await lib.until(async () => (await page.locator('.tip:visible').allInnerTexts()).join(' ').includes(`Status: Waiting for ${L1}, ${L2} → Review (watch until`), HUNG_MS)))
   await page.mouse.move(0, 0)
   await head.click()
   await lib.until(async () => (await rows.count()) === 3, HUNG_MS)

@@ -59,6 +59,10 @@ const check = (name, ok, extra = '') => {
   check('by default the panel is on the right, after the main area', rightOfMain(l, 'panel'), JSON.stringify(l))
   check('…and the tip corner keeps left of it', !!(await lib.until(async () => parseInt((await layout()).corner) > l.panel.width, HUNG_MS)), (await layout()).corner)
 
+  // The header's fold button (#1330): its chevron points to the edge the panel folds to.
+  const foldIcon = () => page.locator('.assistant-header .assistant-panel-fold .codicon').getAttribute('class')
+  check('on the right, its fold button points right', /codicon-chevron-right/.test(await foldIcon()), await foldIcon())
+
   // --- The palette: "Move Assistant Panel to the Left".
   let items = await palette('move assistant')
   check('the palette offers "Move Assistant Panel to the Left"', items.some((t) => t.includes('Move Assistant Panel to the Left')), JSON.stringify(items))
@@ -67,6 +71,7 @@ const check = (name, ok, extra = '') => {
   l = await layout()
   check('moved: the panel is between the project list and the main area', leftOfMain(l, 'panel'), JSON.stringify(l))
   check('…saved as a setting', (await side()) === 'left')
+  check('on the left, its fold button points left', !!(await lib.until(async () => /codicon-chevron-left/.test(await foldIcon()), HUNG_MS)), await foldIcon())
   // The corner is measured on the next frame after the layout changes: wait for it rather than read it at once.
   const corner = await lib.until(async () => ((await layout()).corner === '14px' ? '14px' : null), HUNG_MS)
   check('…and the tip corner is back at the window edge', corner === '14px', (await layout()).corner)
@@ -92,14 +97,18 @@ const check = (name, ok, extra = '') => {
   await inv('settings:update', { appearance: { theme: 'dark' } })
 
   // Folded: its strip stays on the left, its arrow pointing right (to open it).
-  // Hidden from the header's ⋯ (#979: the header's own Hide button went into it).
+  // Folded from the header's ⋯ (its Fold the Assistant panel item, #1330's one word for it), then from its button.
   await page.locator('.assistant-header button[aria-label="More"]').click()
-  await page.locator('.menu .menu-item', { hasText: 'Hide the Assistant' }).click()
+  await page.locator('.menu .menu-item', { hasText: 'Fold the Assistant panel' }).click()
   await lib.until(async () => !!(await layout()).rail, 5000)
   l = await layout()
   check('hidden, its strip is on the left too', leftOfMain(l, 'rail'), JSON.stringify(l))
   check("…with the arrow pointing into the window", (await page.locator('.assistant-rail .codicon-chevron-right').count()) === 1)
   await page.screenshot({ path: path.join(lib.WORK, 'assistantside-rail-left.png') })
+  await page.locator('.assistant-rail').click()
+  await lib.until(async () => !!(await layout()).panel, 5000)
+  await page.locator('.assistant-header .assistant-panel-fold').click()
+  check('on the left, its fold button folds it to the left strip', !!(await lib.until(async () => leftOfMain(await layout(), 'rail'), HUNG_MS)), JSON.stringify(await layout()))
   await page.locator('.assistant-rail').click()
   await lib.until(async () => !!(await layout()).panel, 5000)
 

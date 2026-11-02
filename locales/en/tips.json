@@ -1,4 +1,20 @@
 {
+  "tips.activityTab.text": {
+    "defaultMessage": "The Activity tab has a tab per running agent: its card, its turn and tool call, its background tasks, subagents and processes. It opens as a snapshot; Play follows it live. An agent's ⋯ menu opens it on that agent.",
+    "description": "A tip. Names of Hive's menus, views, settings and commands: keep them as Hive shows them."
+  },
+  "tips.activityTab.title": {
+    "defaultMessage": "See what each agent is running",
+    "description": "A tip's title."
+  },
+  "tips.activityWorkspace.text": {
+    "defaultMessage": "Activity, in the activity bar, shows every project's running agents together, their tabs grouped by project. A card in progress opens it on the agents working on that card, and a run or a lane in the Progress panel on its agents (Show in Activity).",
+    "description": "A tip. Names of Hive's menus, views, settings and commands: keep them as Hive shows them."
+  },
+  "tips.activityWorkspace.title": {
+    "defaultMessage": "Everything running, in one place",
+    "description": "A tip's title."
+  },
   "tips.advancedSettings.text": {
     "defaultMessage": "After a coding agent's update, Hive no longer sees its trust question or its sign-in errors? Settings → Advanced has the text and fields Hive looks for, and its timeouts: change one, with the default beside it, or edit advanced.json.",
     "description": "A tip. Names of Hive's menus, views, settings and commands: keep them as Hive shows them."
@@ -14,6 +30,22 @@
   "tips.agentConsole.title": {
     "defaultMessage": "Let agents see what their CLI sends",
     "description": "A tip's title."
+  },
+  "tips.agentHooks.text": {
+    "defaultMessage": "Hooks… in an agent's ⋯ menu lists the hooks its session has, yours too, and the last hooks Hive received: what Hive replied, and whether it applied or ignored each one and why.",
+    "description": "A tip. ⋯ is the button on an agent's pane header: keep it. Names of Hive's menus, views, settings and commands: keep them as Hive shows them."
+  },
+  "tips.agentHooks.title": {
+    "defaultMessage": "See why an agent's hooks went quiet",
+    "description": "A tip's title. Hooks are the commands a coding agent runs at its events (a session's start, a tool call, a turn's end)."
+  },
+  "tips.agentInSlot.text": {
+    "defaultMessage": "Beside an agent's name on its pane: in slot-b while it builds a card in a slot (click it for Branches & remotes), carried: hb2 in the slot kept for it, home: hr4 for a reviewer's retired home. The project's hover lists them in a Slot column.",
+    "description": "A tip. A slot is a working folder (a worktree) Hive lends to a card or a lane; in slot-b, carried: hb2 and home: hr4 are examples of agents.place.short, as Hive shows them. Names of Hive's menus, views, settings and commands: keep them as Hive shows them. Glossary: slot."
+  },
+  "tips.agentInSlot.title": {
+    "defaultMessage": "See where each agent works",
+    "description": "A tip's title (#1442)."
   },
   "tips.agentLayouts.text": {
     "defaultMessage": "Each agent has its own pane: choose a layout at the right of the session toolbar, and drag a pane by its header to rearrange them. File locks stop two agents editing the same file.",
@@ -45,6 +77,22 @@
   },
   "tips.agentStates.title": {
     "defaultMessage": "Read your agents at a glance",
+    "description": "A tip's title."
+  },
+  "tips.agentWorkflowRole.text": {
+    "defaultMessage": "Each agent's Role in the workflow, in Agent Settings, says whether it builds cards, reviews them, or either. Start Lane offers builders and reviewers by it.",
+    "description": "A tip. Names of Hive's menus, views, settings and commands: keep them as Hive shows them. Glossary: workflow role."
+  },
+  "tips.agentWorkflowRole.title": {
+    "defaultMessage": "Builders and reviewers",
+    "description": "A tip's title. Glossary: builder, reviewer."
+  },
+  "tips.allKeysToCli.text": {
+    "defaultMessage": "In an agent's pane, Hive's shortcuts take their keys. Turn on Settings → Advanced → All keys go to the CLI to send every key to the CLI instead, but the command palette's (Show All Commands), so every command is still in reach.",
+    "description": "A tip. Names of Hive's menus, views, settings and commands: keep them as Hive shows them."
+  },
+  "tips.allKeysToCli.title": {
+    "defaultMessage": "Give every key to the agent's CLI",
     "description": "A tip's title."
   },
   "tips.alwaysOnTop.text": {
@@ -79,9 +127,17 @@
     "defaultMessage": "Ask the Hive Assistant",
     "description": "A tip's title."
   },
+  "tips.assistantAgentRequests.text": {
+    "defaultMessage": "An agent that needs something only the Assistant or you can do on a card, such as parking a card On Hold on your answer, asks the Assistant directly instead of leaving a comment. The request wakes it, and it acts only within its Control and what you decided.",
+    "description": "A tip. Names of Hive's menus, views, settings and commands (On Hold, a board column; Control, a setting): keep them as Hive shows them."
+  },
+  "tips.assistantAgentRequests.title": {
+    "defaultMessage": "Agents can ask the Assistant",
+    "description": "A tip's title."
+  },
   "tips.assistantBatch.text": {
-    "defaultMessage": "The Assistant can move or label up to {cards, plural, one {# card} other {# cards}} in one step, each card still listed on its own. The step counts as one of its {changes, plural, one {# change} other {# changes}} for a message, so it never stops part-way through them.",
-    "description": "A tip. Names of Hive's menus, views, settings and commands: keep them as Hive shows them. {cards} is how many cards one step can change (100), {changes} how many changes the Assistant may make for one message (30)."
+    "defaultMessage": "The Assistant can move or label up to {cards, plural, one {# card} other {# cards}} in one step, each card still listed on its own.",
+    "description": "A tip. Names of Hive's menus, views, settings and commands: keep them as Hive shows them. {cards} is how many cards one step can change (100)."
   },
   "tips.assistantBatch.title": {
     "defaultMessage": "Many cards in one step",
@@ -94,6 +150,14 @@
   "tips.assistantCompact.title": {
     "defaultMessage": "When the Assistant suggests compacting",
     "description": "A tip's title."
+  },
+  "tips.assistantConnection.text": {
+    "defaultMessage": "Assistant Settings → Connection picks the setup it runs on, for this workspace: keep it on your agents' model and effort, since a lighter one makes it careless. A server account such as DeepSeek works too, with caveats the guide lists.",
+    "description": "A tip (HI-2108). Names of Hive's menus, views, settings and commands: keep them as Hive shows them. DeepSeek is a product's name."
+  },
+  "tips.assistantConnection.title": {
+    "defaultMessage": "Choose what the Assistant runs on",
+    "description": "A tip's title (HI-2108): the Assistant's connection (the setup of model, effort and mode it runs on)."
   },
   "tips.assistantControl.text": {
     "defaultMessage": "Settings → Assistant → Control decides what it may do: only advise, or also add, start and brief agents and start cards when you ask.",
@@ -143,12 +207,28 @@
     "defaultMessage": "A new conversation for each lane",
     "description": "A tip's title."
   },
+  "tips.assistantMcp.textAdded": {
+    "defaultMessage": "The Assistant gets a workspace MCP server only once you add it for it, as for a project: + in MCP Servers in its view on the activity bar, or tick Hive Assistant in Add to… in the MCP view. A server with your own notes can reach it and no project.",
+    "description": "A tip (HI-1472, HI-2059). Names of Hive's menus, views, settings and commands: keep them as Hive shows them (Hive Assistant is a box to tick; + is a button)."
+  },
+  "tips.assistantMcp.title": {
+    "defaultMessage": "MCP servers for the Assistant only",
+    "description": "A tip's title. MCP is a protocol's name: keep it."
+  },
   "tips.assistantMessages.text": {
     "defaultMessage": "The Assistant can't give a waiting or working agent a new task, but it can leave it a message, such as your answer: delivered as soon as the agent can take it. Its pane shows it as unread (✉) until then; click that to cancel it.",
     "description": "A tip. Names of Hive's menus, views, settings and commands: keep them as Hive shows them."
   },
   "tips.assistantMessages.title": {
     "defaultMessage": "The Assistant can reach a busy agent",
+    "description": "A tip's title."
+  },
+  "tips.assistantNoticeOpens.text": {
+    "defaultMessage": "A notification from the Assistant or an agent about one agent or one card opens it when you click it: the agent's pane, or the card. Older ones are in the Notifications panel, and open from there too.",
+    "description": "A tip. Names of Hive's menus, views, settings and commands: keep them as Hive shows them."
+  },
+  "tips.assistantNoticeOpens.title": {
+    "defaultMessage": "Click a notification to go to it",
     "description": "A tip's title."
   },
   "tips.assistantReplies.text": {
@@ -191,6 +271,14 @@
     "defaultMessage": "The Assistant runs your team",
     "description": "A tip's title."
   },
+  "tips.assistantTemplates.text": {
+    "defaultMessage": "Ask the Assistant to load a template into a project, naming any agent you like: it shows what would change first, applies the template's workflow, and Undo puts the old agents back.",
+    "description": "A tip. Names of Hive's menus, views, settings and commands: keep them as Hive shows them."
+  },
+  "tips.assistantTemplates.title": {
+    "defaultMessage": "Have the Assistant set up a team",
+    "description": "A tip's title."
+  },
   "tips.assistantToldWaiting.text": {
     "defaultMessage": "While the Assistant watches the lanes, an agent showing a permission prompt or asking you something wakes it, and it tells you which agent, its card and what it asks. It never answers for you. Its watch can follow a release card outside the lanes too.",
     "description": "A tip. Names of Hive's menus, views, settings and commands: keep them as Hive shows them."
@@ -198,6 +286,14 @@
   "tips.assistantToldWaiting.title": {
     "defaultMessage": "The Assistant tells you when an agent needs you",
     "description": "A tip's title."
+  },
+  "tips.assistantUndo.text": {
+    "defaultMessage": "Done by the Assistant lists its changes by your message. Undo on a change puts it back, and Undo on a message puts back all of them; whatever you or an agent changed since is kept.",
+    "description": "A tip. Names of Hive's menus, views, settings and commands: keep them as Hive shows them. Glossary: undo, changed since."
+  },
+  "tips.assistantUndo.title": {
+    "defaultMessage": "Undo the Assistant's changes",
+    "description": "A tip's title (glossary: undo)."
   },
   "tips.assistantWaits.text": {
     "defaultMessage": "Ask the Assistant to let you know when an agent finishes a build or a test run: it waits without checking in, and Hive wakes it when the agent finishes, needs you or stops.",
@@ -215,6 +311,22 @@
     "defaultMessage": "Attach any file to a prompt",
     "description": "A tip's title."
   },
+  "tips.attachmentsTabs.text": {
+    "defaultMessage": "The Attachments tab has Pane attachments and Card attachments. Show in Attachments, beside a card's attachments, opens Card attachments at that card; Show Session's Attachments, in an agent's ⋯ menu, opens Pane attachments at its session.",
+    "description": "A tip (HI-1841). Names of Hive's menus, views, settings and commands: keep them as Hive shows them."
+  },
+  "tips.attachmentsTabs.title": {
+    "defaultMessage": "Jump to a card's or a session's files",
+    "description": "A tip's title (HI-1841)."
+  },
+  "tips.autoModeSetup.text": {
+    "defaultMessage": "In auto mode, Claude Code may offer to teach auto mode about your environment. Hive never answers it: the agent shows Needs input, and nothing is typed into it, until you do. Settings → Advanced → Claude Code can turn the offer off.",
+    "description": "A tip. Names of Hive's menus, views, settings and commands: keep them as Hive shows them. Claude Code is a product name, and auto mode its permission mode."
+  },
+  "tips.autoModeSetup.title": {
+    "defaultMessage": "Claude Code's offer waits for you",
+    "description": "A tip's title. Claude Code is a product name: keep it in English."
+  },
   "tips.backupRetention.text": {
     "defaultMessage": "Hive compresses its transcript backups once a session ends, and Storage shows what they hold. To let old ones go, set Settings → Sessions → Keep transcript backups: only copies of sessions the CLI still has go to the Recycle Bin.",
     "description": "A tip. Names of Hive's menus, views, settings and commands: keep them as Hive shows them."
@@ -224,15 +336,15 @@
     "description": "A tip's title."
   },
   "tips.banners.text": {
-    "defaultMessage": "While you use Hive, an agent finishing or needing you is a banner in the window, not a Windows notification over the Assistant. Settings → Notifications chooses where it shows, for which workspaces, and for how long.",
-    "description": "A tip. Names of Hive's menus, views, settings and commands: keep them as Hive shows them."
+    "defaultMessage": "Each thing is told once: a pop-up while you use Hive, a Windows notification while it is in the background, and either way it is kept under the bell, with its buttons while they apply. Settings → Notifications chooses where pop-ups go.",
+    "description": "A tip. The bell is the Notifications panel's button at the bottom of the activity bar. Names of Hive's menus, views, settings and commands: keep them as Hive shows them."
   },
   "tips.banners.title": {
-    "defaultMessage": "Notices in Hive, not over it",
-    "description": "A tip's title."
+    "defaultMessage": "Every notification is under the bell",
+    "description": "A tip's title (HI-2320: the bell is the Notifications panel)."
   },
   "tips.board.text": {
-    "defaultMessage": "Cards in On Hold, Todo, Doing, Review, Passed and Done, each for a project. Start… gives a card to an agent with the card as its prompt. {key}",
+    "defaultMessage": "Cards in On Hold, Todo, Active, Review, Approved and Done, each for a project. Start… gives a card to an agent with the card as its prompt. {key}",
     "description": "A tip. {key} is a shortcut (its keys, or the command's name when it has none). Names of Hive's menus, views, settings and commands: keep them as Hive shows them."
   },
   "tips.board.title": {
@@ -256,19 +368,19 @@
     "description": "A tip's title."
   },
   "tips.boardDoing.text": {
-    "defaultMessage": "Drag a card into Doing and Hive asks: nobody yet, an agent without starting anything, or an agent that starts on it now.",
+    "defaultMessage": "Drag a card into Active and Hive asks: nobody yet, an agent without starting anything, or an agent that starts on it now.",
     "description": "A tip. Names of Hive's menus, views, settings and commands: keep them as Hive shows them."
   },
   "tips.boardDoing.title": {
-    "defaultMessage": "Choose who works on a card in Doing",
+    "defaultMessage": "Choose who works on a card in Active",
     "description": "A tip's title."
   },
   "tips.boardDone.text": {
-    "defaultMessage": "A reviewer moves a card that passes its review to Passed; Done means merged, and an agent moves its cards there after merging its work. Say \"merged, move #65 to done\" and it does; the card's history shows who moved it.",
+    "defaultMessage": "A reviewer moves a card that passes its review to Approved; Done means merged, and an agent moves its cards there after merging its work. Say \"merged, move #65 to done\" and it does; the card's history shows who moved it.",
     "description": "A tip. Names of Hive's menus, views, settings and commands: keep them as Hive shows them."
   },
   "tips.boardDone.title": {
-    "defaultMessage": "Passed, then Done once merged",
+    "defaultMessage": "Approved, then Done once merged",
     "description": "A tip's title."
   },
   "tips.boardExport.text": {
@@ -304,7 +416,7 @@
     "description": "A tip's title."
   },
   "tips.boardReview.text": {
-    "defaultMessage": "Say \"review #87\" to another agent: the card stays in Review with the agent that did the work, shows who is reviewing it, and gets the verdict as a comment. When it passes, the reviewer moves it to Passed.",
+    "defaultMessage": "Say \"review #87\" to another agent: the card stays in Review with the agent that did the work, shows who is reviewing it, and gets the verdict as a comment. When it passes, the reviewer moves it to Approved.",
     "description": "A tip. Names of Hive's menus, views, settings and commands: keep them as Hive shows them."
   },
   "tips.boardReview.title": {
@@ -319,12 +431,68 @@
     "defaultMessage": "Cards made by an older Hive",
     "description": "A tip's title."
   },
+  "tips.boardStages.text": {
+    "defaultMessage": "The board’s columns are the stages your workflow options make: Merging sits under Approved while Hive merges, and a stage nobody uses is hidden. Ask the Assistant to rename one, such as “call Active Building in web”: a name changes no rule.",
+    "description": "A tip (glossary 2.2: stage). Active is a board column: use its name as the board shows it. The quoted request is what the user would ask the Assistant: translate it."
+  },
+  "tips.boardStages.title": {
+    "defaultMessage": "The board shows your workflow’s stages",
+    "description": "A tip's title (glossary 2.2: stage; 2.1: workflow)."
+  },
+  "tips.boardUpgrade.text": {
+    "defaultMessage": "Hive keeps the 0.9 board it upgraded to 1.0. Help → Restore the 0.9 Board Backup… puts it back, after keeping a copy of the board as it is, so a 0.9 Hive can change it again.",
+    "description": "A tip. Names of Hive's menus, views, settings and commands: keep them as Hive shows them."
+  },
+  "tips.boardUpgrade.title": {
+    "defaultMessage": "Back to 0.9 after the upgrade",
+    "description": "A tip's title."
+  },
+  "tips.branchCards.text": {
+    "defaultMessage": "In Version Control → Branches & remotes, a branch a card works on shows the card and its stage, and in Review the revision under review. Click the card to open it.",
+    "description": "A tip. Names of Hive's menus, views, settings and commands: keep them as Hive shows them (glossary 2.1: Version Control; 2.2: stage)."
+  },
+  "tips.branchCards.title": {
+    "defaultMessage": "See which card a branch is for",
+    "description": "A tip's title."
+  },
+  "tips.branchCleanup.text": {
+    "defaultMessage": "Version Control → Branches & remotes groups the branches as In use, Merged and Not merged. Clean Up Merged Branches… deletes the merged ones nothing uses, and offers the merged ones on your remotes apart, never ticked for you.",
+    "description": "A tip. Names of Hive's menus, views, settings and commands: keep them as Hive shows them."
+  },
+  "tips.branchCleanup.title": {
+    "defaultMessage": "Clean up merged branches",
+    "description": "A tip's title."
+  },
+  "tips.cardAttachments.text": {
+    "defaultMessage": "Paste or drop files into a card's description or comment: they are kept with the card when you save or post, shown in it, and listed for the agent that starts it. The pin on a pane's attachment chip copies a file to the agent's card.",
+    "description": "A tip (HI-1700). Names of Hive's menus, views, settings and commands: keep them as Hive shows them."
+  },
+  "tips.cardAttachments.title": {
+    "defaultMessage": "Keep a screenshot with its card",
+    "description": "A tip's title (HI-1700)."
+  },
+  "tips.cardAttachmentsCleanup.text": {
+    "defaultMessage": "Files kept with a card go to the Recycle Bin 30 days after it is archived. Choose 3, 7 or 90 days, or Never, in Project Settings → Storage, where Clean Up Now… removes what is due at once. Open and Done cards keep theirs.",
+    "description": "A tip (HI-1842). Names of Hive's menus, views, settings and commands: keep them as Hive shows them."
+  },
+  "tips.cardAttachmentsCleanup.title": {
+    "defaultMessage": "Archived cards' screenshots clean up after themselves",
+    "description": "A tip's title (HI-1842)."
+  },
   "tips.cardCost.text": {
     "defaultMessage": "A card's panel says what its agents used while they held it, \"{example}\", with the builder's and reviewer's parts and tokens on hover. Performance lists every card's cost, and a lane's hover in the Progress panel its overhead.",
     "description": "A tip. Names of Hive's menus, views, settings and commands: keep them as Hive shows them. {example} is a card's cost line as the board shows it (\"cost: ≈ $1.84 · 2 rounds\")."
   },
   "tips.cardCost.title": {
     "defaultMessage": "What a card cost",
+    "description": "A tip's title."
+  },
+  "tips.cardCostRounds.text": {
+    "defaultMessage": "A card's Work section ends with its cost by round: the builder's and reviewer's parts in each round, adding up to the card's cost. See whether extra rounds or one long read drove it.",
+    "description": "A tip. Names of Hive's menus, views, settings and commands: keep them as Hive shows them (Work is a section of the card dialog)."
+  },
+  "tips.cardCostRounds.title": {
+    "defaultMessage": "What each review round cost",
     "description": "A tip's title."
   },
   "tips.cardDecisions.text": {
@@ -375,6 +543,54 @@
     "defaultMessage": "Reports start with the gist",
     "description": "A tip's title."
   },
+  "tips.cardWork.text": {
+    "defaultMessage": "Open a card: its Work section lists each revision submitted for review, with its round, files, verdicts and checks, and how it was merged. On the board, a card shows its revision and last verdict.",
+    "description": "A tip. Names of Hive's menus, views, settings and commands (Work): keep them as Hive shows them. Glossary: work, revision, verdict, check."
+  },
+  "tips.cardWork.title": {
+    "defaultMessage": "See what a card’s work went through",
+    "description": "A tip's title. Glossary: work (a card's Work section)."
+  },
+  "tips.chooseConnections.text": {
+    "defaultMessage": "Project Settings → Agents → Choose Connections… picks a connection for each role of the project's agents (or one for all, or per agent), changing nothing else. Loading a template offers the same choice.",
+    "description": "A tip (HI-2109). A connection is a named setup on an account (model, effort, mode). Names of Hive's menus, views, settings and commands: keep them as Hive shows them."
+  },
+  "tips.chooseConnections.title": {
+    "defaultMessage": "High effort for every builder, in one go",
+    "description": "A tip's title (HI-2109). Glossary: builder, effort."
+  },
+  "tips.claudeStatusLine.text": {
+    "defaultMessage": "Hive's status line feeds an agent's footer and shows nothing in the pane. Turn off Settings → Advanced → Hive's status line in place of yours to see the one in your Claude Code settings again: Hive still reads the status.",
+    "description": "A tip. Names of Hive's menus, views, settings and commands: keep them as Hive shows them."
+  },
+  "tips.claudeStatusLine.title": {
+    "defaultMessage": "Keep your own Claude Code status line",
+    "description": "A tip's title. The status line is the line Claude Code shows under its input."
+  },
+  "tips.cliOverrides.text": {
+    "defaultMessage": "Hive changes a little of how each CLI behaves in its sessions, such as Copilot not updating itself or Codex's terminal title. Each change can be turned off in Settings → Advanced, under its CLI, which says what Hive can no longer do without it.",
+    "description": "A tip. Names of Hive's menus, views, settings and commands: keep them as Hive shows them."
+  },
+  "tips.cliOverrides.title": {
+    "defaultMessage": "Keep a CLI as it is outside Hive",
+    "description": "A tip's title."
+  },
+  "tips.cliOwnMode.text": {
+    "defaultMessage": "Choose The CLI's own setting as an agent's or a project's permission mode and Hive passes none: the CLI starts in the mode its own config sets. The badge says CLI's own, and switching a running session restarts it.",
+    "description": "A tip. Names of Hive's menus, views, settings and commands: keep them as Hive shows them."
+  },
+  "tips.cliOwnMode.title": {
+    "defaultMessage": "Let the CLI's own config choose the mode",
+    "description": "A tip's title."
+  },
+  "tips.closeCommands.text": {
+    "defaultMessage": "Settings → Workspace → When this workspace closes, run: Hive runs your command once it has closed the workspace and finished writing its files, and shows it running until it ends.",
+    "description": "A tip. Names of Hive's menus, views, settings and commands: keep them as Hive shows them."
+  },
+  "tips.closeCommands.title": {
+    "defaultMessage": "Run a backup as a workspace closes",
+    "description": "A tip's title."
+  },
   "tips.closeWindow.text": {
     "defaultMessage": "With several windows open, File → Close Window ({key}) closes just this one, as its X does. Exit Hive (all windows) closes every window and stops all their agents.",
     "description": "A tip. {key} is a shortcut (its keys, or the command's name when it has none). Names of Hive's menus, views, settings and commands: keep them as Hive shows them."
@@ -382,6 +598,22 @@
   "tips.closeWindow.title": {
     "defaultMessage": "Close one window, or all of them",
     "description": "A tip's title."
+  },
+  "tips.codexSandboxConnections.text": {
+    "defaultMessage": "Codex connections keep asking for Administrator permission? Each one's admin sandbox setup resets the others'. Settings → Advanced → Codex → Connections: use Codex's non-admin sandbox runs them all without it, at the cost of separate sandbox accounts.",
+    "description": "A tip. Names of Hive's menus, views, settings and commands: keep them as Hive shows them (Connections: use Codex's non-admin sandbox is an advanced setting's title). Codex is a product's name."
+  },
+  "tips.codexSandboxConnections.title": {
+    "defaultMessage": "Several Codex connections, no admin prompts",
+    "description": "A tip's title. Codex is a product's name."
+  },
+  "tips.codexScriptCalls.text": {
+    "defaultMessage": "Codex in code mode runs its tools from a script. In the Sessions tab, a Script line says how many calls it made and which; open it to read each call with its own result.",
+    "description": "A tip (HI-2240). Codex is a product name; Script is the transcript's name for it, kept as Hive shows it. Names of Hive's menus, views, settings and commands: keep them as Hive shows them."
+  },
+  "tips.codexScriptCalls.title": {
+    "defaultMessage": "See what a Codex script did",
+    "description": "A tip's title (HI-2240). Codex is a product name; a script is the code Codex runs to call its tools."
   },
   "tips.commandName": {
     "defaultMessage": "“{command}”",
@@ -411,6 +643,54 @@
     "defaultMessage": "Read a compaction where it happened",
     "description": "A tip's title."
   },
+  "tips.compareBranches.text": {
+    "defaultMessage": "Version Control → Changes compares any two local branches without checking anything out: pick one under Branches to see the commits each has that the other hasn't, the files it changes, and each file's diff.",
+    "description": "A tip. Names of Hive's menus, views, settings and commands: keep them as Hive shows them."
+  },
+  "tips.compareBranches.title": {
+    "defaultMessage": "Compare two branches, such as 1.0.0 with main",
+    "description": "A tip's title."
+  },
+  "tips.conflictHunks.text": {
+    "defaultMessage": "When the merge queue sends a card back for a conflict, its Work section lists the files: click one to see its conflicts, the target's side and the card's under their names, as the queue's test merge had them.",
+    "description": "A tip. Names of Hive's menus, views, settings and commands: keep them as Hive shows them."
+  },
+  "tips.conflictHunks.title": {
+    "defaultMessage": "See a returned card's conflicts",
+    "description": "A tip's title."
+  },
+  "tips.connectionOrder.text": {
+    "defaultMessage": "Drag accounts into your order in Settings → Accounts & Connections: a new agent gets the first connection of the first account that's on in the workspace. Running agents keep theirs.",
+    "description": "A tip (HI-2107). Names of Hive's menus, views, settings and commands: keep them as Hive shows them."
+  },
+  "tips.connectionOrder.title": {
+    "defaultMessage": "Put your accounts in order",
+    "description": "A tip's title (HI-2107): the one order of accounts, for every coding agent CLI."
+  },
+  "tips.connectionSetups.text": {
+    "defaultMessage": "Add Connection under an account in Settings → Accounts & Connections makes another setup on the same sign-in, say \"Claude · High\" beside \"Claude · Medium\". Agents choose a connection, so one edit changes every agent on it.",
+    "description": "A tip (HI-2107). Names of Hive's menus, views, settings and commands: keep them as Hive shows them (Add Connection is a button). \"Claude · High\" and \"Claude · Medium\" are example names of connections."
+  },
+  "tips.connectionSetups.title": {
+    "defaultMessage": "Several setups on one sign-in",
+    "description": "A tip's title (HI-2107): connections, several on one account."
+  },
+  "tips.connectionTrust.text": {
+    "defaultMessage": "A new connection's Set Up asks Claude Code once, in the workspace folder, to trust every project in it. Codex agents never ask: each trusts its own folder for that launch (Settings → Advanced → Codex).",
+    "description": "A tip (HI-1871): how a new connection's coding agent CLIs come to trust the workspace's folders. Names of Hive's menus, views, settings and commands: keep them as Hive shows them (Set Up is a button)."
+  },
+  "tips.connectionTrust.title": {
+    "defaultMessage": "Trust a workspace in one answer",
+    "description": "A tip's title."
+  },
+  "tips.connections.text": {
+    "defaultMessage": "Settings → Accounts & Connections keeps several Claude Code and Codex sign-ins, or a server such as Ollama on this PC. Each workspace chooses which accounts are on, and each agent runs on the connection it chose: pick another in Agent Settings.",
+    "description": "A tip (HI-2107). Names of Hive's menus, views, settings and commands: keep them as Hive shows them. Ollama is a product's name."
+  },
+  "tips.connections.title": {
+    "defaultMessage": "Run agents on different sign-ins",
+    "description": "A tip's title."
+  },
   "tips.consoleRecording.text": {
     "defaultMessage": "In the developer console, Record writes what an agent's CLI sends Hive to a file, redacted unless you tick text for that recording, and Copy Diagnostics can attach it to a bug report.",
     "description": "A tip. Names of Hive's menus, views, settings and commands: keep them as Hive shows them."
@@ -428,7 +708,7 @@
     "description": "A tip's title."
   },
   "tips.copilot.text": {
-    "defaultMessage": "Agents can use the GitHub Copilot CLI, Copilot Free included. Agent Setup installs it and says who it is signed in as: its own login or the GitHub CLI’s.",
+    "defaultMessage": "Agents can use the GitHub Copilot CLI, Copilot Free included. Provider Setup installs it and says who it is signed in as: its own login or the GitHub CLI’s.",
     "description": "A tip. Names of Hive's menus, views, settings and commands: keep them as Hive shows them."
   },
   "tips.copilot.title": {
@@ -451,6 +731,22 @@
     "defaultMessage": "Found a bug? Copy Diagnostics",
     "description": "A tip's title."
   },
+  "tips.ctrlCvToCli.text": {
+    "defaultMessage": "In an agent's pane Ctrl+C copies a selection and Ctrl+V pastes. Turn on Settings → Advanced → Ctrl+C and Ctrl+V go to the CLI to send both keys to the CLI instead, as in any other terminal; right-click still copies and pastes.",
+    "description": "A tip. Ctrl+C and Ctrl+V name keys: use the key names your language uses. Names of Hive's menus, views, settings and commands: keep them as Hive shows them."
+  },
+  "tips.ctrlCvToCli.title": {
+    "defaultMessage": "Give Ctrl+C and Ctrl+V to the agent's CLI",
+    "description": "A tip's title. Ctrl+C and Ctrl+V name keys: use the key names your language uses."
+  },
+  "tips.customCommands.text": {
+    "defaultMessage": "Name a command once in Settings → Commands and run it from the command palette (Run Command), or pick it for when a workspace opens or closes: a local server or a database your agents need, say. As a workspace opens, its agents start once they are done.",
+    "description": "A tip (HI-1954). Names of Hive's menus, views, settings and commands (Settings → Commands, Run Command): keep them as Hive shows them."
+  },
+  "tips.customCommands.title": {
+    "defaultMessage": "Your own commands, one click away",
+    "description": "A tip's title (HI-1954)."
+  },
   "tips.dateFormat.text": {
     "defaultMessage": "Hive shows dates as {date} and times as {time}. Settings → General → Date format and Time format change them everywhere, sessions named by when they started too.",
     "description": "A tip. Names of Hive's menus, views, settings and commands: keep them as Hive shows them. {date} and {time} are an example date and time (4 October 2026, 14:05) in the formats chosen now."
@@ -459,13 +755,13 @@
     "defaultMessage": "Dates your way",
     "description": "A tip's title."
   },
-  "tips.defaultProvider.text": {
-    "defaultMessage": "Default provider is Automatic unless you choose one: new agents use the first coding agent that is turned on and installed, so Codex or GitHub Copilot alone works without Claude Code. Choose one in Settings → Providers to always use it.",
-    "description": "A tip. Names of Hive's menus, views, settings and commands: keep them as Hive shows them."
+  "tips.designCheck.text": {
+    "defaultMessage": "Ask a card loop’s builder for a design first: it posts it on the card, Hive wakes the reviewer to check it, and the answer wakes the builder. With no answer within the Design check wait (Version Control → Workflow → Card loops), it goes ahead as posted.",
+    "description": "A tip (#1382). Names of Hive's menus, views, settings and commands: keep them as Hive shows them (Design check wait, Version Control, Workflow, Card loops)."
   },
-  "tips.defaultProvider.title": {
-    "defaultMessage": "New agents use what you have installed",
-    "description": "A tip's title."
+  "tips.designCheck.title": {
+    "defaultMessage": "Have a design checked before the build",
+    "description": "A tip's title (#1382). A design: the plan a builder posts on its card before building."
   },
   "tips.developerConsole.text": {
     "defaultMessage": "Turn on Settings → Advanced → Show developer features, then Help → Developer Console opens a window of its own: pick an agent and see each hook and status line beside what Hive made of it, redacted. Filter, search and pause as it runs.",
@@ -507,24 +803,88 @@
     "defaultMessage": "Catch rare events by themselves",
     "description": "A tip's title."
   },
+  "tips.focusedTests.text": {
+    "defaultMessage": "With Hive merging, Version Control → Workflow can run each card’s focused tests on the merged result: your project’s command chooses the tests a change needs when the card is submitted, and the merge queue runs them before it merges.",
+    "description": "A tip. Names of Hive's menus, views, settings and commands: keep them as Hive shows them. Glossary: merge queue."
+  },
+  "tips.focusedTests.title": {
+    "defaultMessage": "Each card’s own tests before it merges",
+    "description": "A tip's title: the workflow option that has Hive's merge queue run the tests a card's change needs on the merged result (G20)."
+  },
+  "tips.followUpCheck.text": {
+    "defaultMessage": "When you ask for a change to a card in Review or Approved for its reviewer to check, its builder posts the change as a follow-up: Hive wakes the reviewer, and the answer wakes the builder. One left unanswered for 15 minutes shows its card as stalled.",
+    "description": "A tip (#1467). Review and Approved are board columns. Names of Hive's menus, views, settings and commands: keep them as Hive shows them."
+  },
+  "tips.followUpCheck.title": {
+    "defaultMessage": "Have a follow-up checked without a new round",
+    "description": "A tip's title (#1467). A follow-up: a change asked of a card's reviewed work, such as a screenshot's, for its reviewer to check."
+  },
+  "tips.forYou.text": {
+    "defaultMessage": "A card with a For you chip waits for you: an approval, a decision or a question. The Task Board icon counts them, and For you on the board shows only those. Open the card to approve, decline or answer: the agent waiting on it hears at once.",
+    "description": "A tip. Names of Hive's menus, views, settings and commands: keep them as Hive shows them. Glossary: For you, approve."
+  },
+  "tips.forYou.title": {
+    "defaultMessage": "Answer what waits for you",
+    "description": "A tip's title (glossary: For you)."
+  },
+  "tips.forYouActions.text": {
+    "defaultMessage": "When an agent's question is about something only you can do on its card, it can offer it as a button under the question: Move to Done, Make It No Code or Unblock, with its suggested reason, which you can change. One click does it and answers the agent.",
+    "description": "A tip (#1630). Done is a board column. Names of Hive's menus, views, settings and commands: keep them as Hive shows them. Glossary: For you, no-code card."
+  },
+  "tips.forYouActions.title": {
+    "defaultMessage": "Answer with one click",
+    "description": "A tip's title (#1630)."
+  },
+  "tips.forYouApproveNote.text": {
+    "defaultMessage": "Approve takes an optional note. On an agent's question it's recorded as your decision on the card, so the agent works to it and its reviewer checks it; on Hive's own requests it's your comment. Left empty, Approve is one click.",
+    "description": "A tip (HI-2286). Names of Hive's menus, views, settings and commands: keep them as Hive shows them. Glossary: approve, decision, For you."
+  },
+  "tips.forYouApproveNote.title": {
+    "defaultMessage": "Approve, but change something",
+    "description": "A tip's title (HI-2286): approving a request while asking for a change."
+  },
+  "tips.generalistRole.text": {
+    "defaultMessage": "Give an agent the Generalist role in the workflow (Agent Settings) and it does whatever you ask in its pane: it is never put in a lane or asked to review. A card it takes still follows the project’s workflow.",
+    "description": "A tip. Names of Hive's menus, views, settings and commands: keep them as Hive shows them. Generalist is a role's name (Glossary: generalist)."
+  },
+  "tips.generalistRole.title": {
+    "defaultMessage": "An agent for whatever you ask",
+    "description": "A tip's title."
+  },
   "tips.gitCheck.text": {
-    "defaultMessage": "Help → Agent Setup… shows the git Hive found and its version. Worktree agents, merging and the Git tab need Git for Windows 2.38 or later.",
+    "defaultMessage": "Help → Provider Setup… shows the git Hive found and its version. Worktree agents, merging and the Version Control tab’s Git sections need Git for Windows 2.38 or later.",
     "description": "A tip. Names of Hive's menus, views, settings and commands: keep them as Hive shows them."
   },
   "tips.gitCheck.title": {
     "defaultMessage": "Is git ready for worktrees?",
     "description": "A tip's title."
   },
+  "tips.gitHistory.text": {
+    "defaultMessage": "Version Control → History opens on the branch your work merges into. Pick another in its heading, yours or a remote’s, and page back through older commits under the list.",
+    "description": "A tip. Names of Hive's menus, views, settings and commands: keep them as Hive shows them."
+  },
+  "tips.gitHistory.title": {
+    "defaultMessage": "See the history of any branch",
+    "description": "A tip's title."
+  },
   "tips.gitInit.text": {
-    "defaultMessage": "A project without git? Its Git tab's Initialise repository… makes it one on main, keeps .hive out, adds a starter .gitignore if you like and makes the first commit, so agents can work in worktrees at once.",
+    "defaultMessage": "A project without git? Its Version Control tab's Initialise repository… makes it one on main, keeps .hive out, adds a starter .gitignore if you like and makes the first commit, so agents can work in worktrees at once.",
     "description": "A tip. Names of Hive's menus, views, settings and commands: keep them as Hive shows them."
   },
   "tips.gitInit.title": {
     "defaultMessage": "Make a project a git repository in one click",
     "description": "A tip's title."
   },
+  "tips.gitRemotes.text": {
+    "defaultMessage": "Version Control → Branches & remotes: Push to… sends this branch, or every branch and tag, to any remote without changing what the branch tracks. A remote can be renamed or removed there, and a branch's Track… chooses what Pull and Push use.",
+    "description": "A tip. Names of Hive's menus, views, settings and commands: keep them as Hive shows them."
+  },
+  "tips.gitRemotes.title": {
+    "defaultMessage": "Push to a backup remote",
+    "description": "A tip's title."
+  },
   "tips.gitView.text": {
-    "defaultMessage": "The Git tab shows its branch, remotes, history and tags, and lets you switch or create a branch, fetch, pull, push, tag and set its commit identity. The status bar shows \"{example}\": click it to get there.",
+    "defaultMessage": "In a Git project, the Version Control tab shows its branch, remotes, history and tags, and lets you switch or create a branch, fetch, pull, push, tag and set its commit identity. The status bar shows \"{example}\": click it to get there.",
     "description": "A tip. Names of Hive's menus, views, settings and commands: keep them as Hive shows them. {example} is the status bar's git item as Hive shows it (\"main · origin · ↑2 ↓0\": the branch, its remote, and how many commits it is ahead and behind)."
   },
   "tips.gitView.title": {
@@ -587,6 +947,14 @@
     "defaultMessage": "A project's .hive stays on this computer",
     "description": "A tip's title."
   },
+  "tips.hiveMerges.text": {
+    "defaultMessage": "In Version Control → Workflow, choose Pair, or set Who merges to Hive merges: Hive’s merge queue merges each approved card once its checks pass on the merged result, so red work never reaches the target branch.",
+    "description": "A tip. Names of Hive's menus, views, settings and commands: keep them as Hive shows them (glossary 2.1: merge queue)."
+  },
+  "tips.hiveMerges.title": {
+    "defaultMessage": "Let Hive merge approved cards",
+    "description": "A tip's title."
+  },
   "tips.hiveSkills.text": {
     "defaultMessage": "Agents and the Assistant get Hive's own skills: work-on-card, review-agent-work, handover and more. Hive keeps them up to date; ones you edit stay yours.",
     "description": "A tip. Names of Hive's menus, views, settings and commands: keep them as Hive shows them."
@@ -594,6 +962,22 @@
   "tips.hiveSkills.title": {
     "defaultMessage": "Skills for working with Hive",
     "description": "A tip's title."
+  },
+  "tips.hooksMissing.text": {
+    "defaultMessage": "If a CLI update or a policy stops an agent’s hooks reaching Hive, its pane says Status unknown instead of a status that may be wrong, nothing is typed into it and its lane pauses. The banner over its pane says why when Hive can tell.",
+    "description": "A tip. Hooks: the calls an agent's coding agent makes to Hive as it works. Names of Hive's menus, views, settings and commands: keep them as Hive shows them."
+  },
+  "tips.hooksMissing.title": {
+    "defaultMessage": "When an agent’s hooks stop arriving",
+    "description": "A tip's title. Hooks: the calls an agent's coding agent makes to Hive as it works."
+  },
+  "tips.howDoYouWork.text": {
+    "defaultMessage": "A new project’s Version Control tab asks “How do you work?”: Solo, Pair or Team, the one that fits its agents suggested. Choose sets it up in one click; Not Now keeps your defaults.",
+    "description": "A tip. Names of Hive's menus, views, settings and commands: keep them as Hive shows them (glossary 2.1: Version Control, preset). The quoted question is the step's heading: use it as Hive shows it."
+  },
+  "tips.howDoYouWork.title": {
+    "defaultMessage": "Start a new project with a preset",
+    "description": "A tip's title (glossary 2.1: preset)."
   },
   "tips.imagesTab.text": {
     "defaultMessage": "The Attachments tab keeps each screenshot and file pasted or dropped into the project's sessions, grouped by session, with previews and a filter by kind, ready to insert again.",
@@ -611,12 +995,28 @@
     "defaultMessage": "Make Hive read better in your language",
     "description": "A tip's title."
   },
+  "tips.inboxCarryingOn.text": {
+    "defaultMessage": "Hive tells a working agent of new messages at a tool's end, keeps it going to read them before it stops, and wakes it when idle. Each has a switch in Settings → Advanced, and a project can set its own; with wakes off, the pane's Deliver Now types the line.",
+    "description": "A tip. Names of Hive's menus, views, settings and commands: keep them as Hive shows them."
+  },
+  "tips.inboxCarryingOn.title": {
+    "defaultMessage": "Choose how agents hear of their inbox",
+    "description": "A tip's title."
+  },
   "tips.inboxNotices.text": {
     "defaultMessage": "A message the Assistant leaves a working agent reaches it at its next tool call, or before its turn ends, as a short notice from Hive: nothing is typed over its work. The agent reads it from its inbox and acks it; its pane shows it as unread (✉) until it does.",
     "description": "A tip. Names of Hive's menus, views, settings and commands: keep them as Hive shows them."
   },
   "tips.inboxNotices.title": {
     "defaultMessage": "Messages reach a busy agent between steps",
+    "description": "A tip's title."
+  },
+  "tips.isolatedChecks.text": {
+    "defaultMessage": "In a shared folder, another agent's edit during a check makes it not count. hive-progress --check typecheck --isolated runs it in a copy of its own at the card's revision, which nothing else writes. Stop in the Progress panel ends it and all it started.",
+    "description": "A tip. hive-progress --check typecheck --isolated is a command: keep it as it is. Names of Hive's menus, views, settings and commands: keep them as Hive shows them."
+  },
+  "tips.isolatedChecks.title": {
+    "defaultMessage": "A check nobody else can spoil",
     "description": "A tip's title."
   },
   "tips.keepAwake.text": {
@@ -627,12 +1027,92 @@
     "defaultMessage": "Leave agents working, the PC stays awake",
     "description": "A tip's title."
   },
+  "tips.laneApplyNow.text": {
+    "defaultMessage": "In Start Lane for a lane's builder, Apply now changes the order at once: the card being worked goes back to Todo with its work kept on its branch, and the builder is told.",
+    "description": "A tip (HI-1995). Start Lane and Apply now are a dialog and its checkbox; Todo is a board column. Names of Hive's menus, views, settings and commands: keep them as Hive shows them."
+  },
+  "tips.laneApplyNow.title": {
+    "defaultMessage": "Reorder a running lane now",
+    "description": "A tip's title (HI-1995). A lane is Hive's record of a card loop (a builder and a reviewer taking cards in turn)."
+  },
+  "tips.laneBranchSquash.text": {
+    "defaultMessage": "After an agent's card is squash-merged, Hive brings its branch up to date before its next card, so each review shows only that card's work. What it can't do safely it asks under For you; Settings → Advanced makes it ask every time.",
+    "description": "A tip. Names of Hive's menus, views, settings and commands: keep them as Hive shows them. For you is the board's list of what waits for the user."
+  },
+  "tips.laneBranchSquash.title": {
+    "defaultMessage": "An agent's branch kept up to date between cards",
+    "description": "A tip's title. The branch is the one an agent builds on in its own worktree."
+  },
+  "tips.laneGates.text": {
+    "defaultMessage": "In the Progress panel, a lane says why it waits in its header, and a red notch on a card’s segment means its last request was refused: hover it for why and what next.",
+    "description": "A tip. Names of Hive's menus, views, settings and commands: keep them as Hive shows them. Glossary: lane, refused."
+  },
+  "tips.laneGates.title": {
+    "defaultMessage": "See why a lane isn’t moving",
+    "description": "A tip's title. A lane is Hive's record of a card loop (glossary 2.5: lane)."
+  },
+  "tips.laneNext.text": {
+    "defaultMessage": "With workflow rules on, once a lane's card is Done Hive gives the next one to its builder as soon as the builder's turn is over, so the lane goes on without a prompt from you or the Assistant.",
+    "description": "A tip (HI-1990). Names of Hive's menus, views, settings and commands: keep them as Hive shows them."
+  },
+  "tips.laneNext.title": {
+    "defaultMessage": "Hive starts a lane's next card",
+    "description": "A tip's title (HI-1990). A lane is Hive's record of a card loop (a builder and a reviewer taking cards in turn)."
+  },
+  "tips.laneNotices.text": {
+    "defaultMessage": "Hive notifies you when a lane's review fails, a card is blocked or stalls, or every card has passed so its merge is due, one notice per lane. Settings → Notifications decides where they appear.",
+    "description": "A tip. Names of Hive's menus, views, settings and commands: keep them as Hive shows them."
+  },
+  "tips.laneNotices.title": {
+    "defaultMessage": "Hear how a lane goes, without the Assistant",
+    "description": "A tip's title. A lane is Hive's record of a card loop (a builder and a reviewer taking cards in turn)."
+  },
+  "tips.laneSlots.text": {
+    "defaultMessage": "In the Progress panel, a lane names its slot after its agents (· slot-b): point at it for the branch being built there and whether the slot is ready, or click it for Branches & remotes.",
+    "description": "A tip. A slot is a working folder Hive lends to a lane (glossary 2.5: slot). Branches & remotes is a section of the Version Control tab: keep its name as Hive shows it."
+  },
+  "tips.laneSlots.title": {
+    "defaultMessage": "See where a lane builds",
+    "description": "A tip's title. A lane is Hive's record of a card loop (glossary 2.5: lane)."
+  },
+  "tips.laneStart.text": {
+    "defaultMessage": "Right-click the Todo column and choose Start Lane with These Cards…: pick the builder and the reviewer, put the cards in order, and both start with a brief. End or abandon a lane from its row in the Progress panel.",
+    "description": "A tip. Names of Hive's menus, views, settings and commands: keep them as Hive shows them. Glossary: lane."
+  },
+  "tips.laneStart.title": {
+    "defaultMessage": "Start a lane yourself",
+    "description": "A tip's title. A lane: a builder and a reviewer agent working through cards in turn (glossary 2.5: lane)."
+  },
+  "tips.lanesLegend.text": {
+    "defaultMessage": "Hover over the Lanes bar in the Progress panel for its legend: each colour is a category, with the stages in it. A lane marked old rules keeps the workflow options it started with until it ends.",
+    "description": "A tip. Names of Hive's menus, views, settings and commands: keep them as Hive shows them. Glossary: lane, stage, category, workflow options."
+  },
+  "tips.lanesLegend.title": {
+    "defaultMessage": "What a lane’s colours mean",
+    "description": "A tip's title. A lane is Hive's record of a card loop (glossary 2.5: lane)."
+  },
   "tips.language.text": {
     "defaultMessage": "Hive follows Windows' display language when it has it. Settings → General → Language picks another; languages translated by AI are marked, and improvements are welcome. Agents are still spoken to in English.",
     "description": "A tip. Names of Hive's menus, views, settings and commands: keep them as Hive shows them."
   },
   "tips.language.title": {
     "defaultMessage": "Hive in your language",
+    "description": "A tip's title."
+  },
+  "tips.leftRunning.text": {
+    "defaultMessage": "A process an agent's command started that keeps running after its shell has gone shows in Activity as Left running, with its CPU time and End It. Past ten minutes, a notice says so once, and the agent is told too.",
+    "description": "A tip (HI-2111). Names of Hive's menus, views, settings and commands: keep them as Hive shows them (Left running is a row's label; End It a button)."
+  },
+  "tips.leftRunning.title": {
+    "defaultMessage": "Spot what a command left running",
+    "description": "A tip's title (HI-2111)."
+  },
+  "tips.leftoverBranches.text": {
+    "defaultMessage": "Version Control → Changes lists leftover branches: a superseded or archived card’s, an agent’s from before slots. Compare one with your target first, then Delete… it; one with commits of its own lists them before it goes.",
+    "description": "A tip. Names of Hive's menus, views, settings and commands: keep them as Hive shows them."
+  },
+  "tips.leftoverBranches.title": {
+    "defaultMessage": "Clean up branches nothing uses",
     "description": "A tip's title."
   },
   "tips.leftoverProcesses.text": {
@@ -652,7 +1132,7 @@
     "description": "A tip's title."
   },
   "tips.loopDefaults.text": {
-    "defaultMessage": "Settings → Workspace → Card loop rounds and Card loop wait set what loops use when you don't say ({rounds, plural, one {# round} other {# rounds}} and {hours, plural, one {# hour} other {# hours}} to start with); a project can have its own. Saying \"rounds: 3\" when you start one still wins.",
+    "defaultMessage": "Rounds and Wait under Card loops in Settings → Version Control set what loops use when you don't say ({rounds, plural, one {# round} other {# rounds}} and {hours, plural, one {# hour} other {# hours}} to start with); a workspace and a project can set their own. Saying \"rounds: 3\" when you start one still wins.",
     "description": "A tip. Names of Hive's menus, views, settings and commands: keep them as Hive shows them. {rounds} and {hours} are the defaults (10 and 6). \"rounds: 3\" is what the user types to an agent: keep it in English."
   },
   "tips.loopDefaults.title": {
@@ -668,16 +1148,40 @@
     "description": "A tip's title."
   },
   "tips.loopWakes.text": {
-    "defaultMessage": "When a card arrives in Review, Hive wakes its reviewer, and on the verdict its builder, even if one forgot to wait. To drive reviews by hand, turn it off in the project's Settings → Card loops.",
+    "defaultMessage": "When a card arrives in Review, Hive wakes its reviewer, and on the verdict its builder, even if one forgot to wait. To drive reviews by hand, turn off Wake reviewers and builders in the project's Version Control → Workflow → Card loops.",
     "description": "A tip. Names of Hive's menus, views, settings and commands: keep them as Hive shows them."
   },
   "tips.loopWakes.title": {
     "defaultMessage": "Loops keep going on their own",
     "description": "A tip's title."
   },
-  "tips.mcpFromFile.text": {
-    "defaultMessage": "Got a server as a .json definition or a .zip of its folder? Add MCP Server from File in the MCP view shows what it runs and adds it turned off: switch it on there to choose its projects.",
-    "description": "A tip. Add MCP Server from File and the MCP view are names in Hive: keep them as Hive shows them."
+  "tips.mainProcessStalls.text": {
+    "defaultMessage": "Typing lagged a moment? Performance → Main process stalls lists the times Hive's main process was busy since it started: how long, whether it was working or waiting, and what was under way.",
+    "description": "A tip. Names of Hive's menus, views, settings and commands: keep them as Hive shows them (Main process stalls is a section of the Performance view)."
+  },
+  "tips.mainProcessStalls.title": {
+    "defaultMessage": "See why Hive felt slow",
+    "description": "A tip's title."
+  },
+  "tips.maxAgents.text": {
+    "defaultMessage": "Maximum agents in Version Control → Workflow is how many agents a project has, so nobody brings in agents you didn’t plan for, the Assistant included. Each preset sets its team: Solo one agent, Pair a builder and a reviewer. Raise it there to add more.",
+    "description": "A tip. Names of Hive's menus, views, settings and commands: keep them as Hive shows them. Maximum agents is a workflow option (HI-2001); Solo and Pair are presets."
+  },
+  "tips.maxAgents.title": {
+    "defaultMessage": "Your team size",
+    "description": "A tip's title (HI-2001): the workflow option Maximum agents, how many agents a project has."
+  },
+  "tips.mcpCatalogue.text": {
+    "defaultMessage": "The MCP view's Catalogue lists servers you can install, Hive's own first. Each download is checked against its catalogue and shows what it runs; updates are offered, never automatic. Add a company's catalogue in Settings → MCP Catalogues.",
+    "description": "A tip (HI-545). The MCP view, Catalogue and Settings → MCP Catalogues are names in Hive: keep them as Hive shows them."
+  },
+  "tips.mcpCatalogue.title": {
+    "defaultMessage": "Install a server from a catalogue",
+    "description": "A tip's title (HI-545): the MCP view's Catalogue."
+  },
+  "tips.mcpFromFile.textAdded": {
+    "defaultMessage": "Got a server as a .json definition or a .zip of its folder? Add MCP Server from File in the MCP view shows what it runs and adds it to the workspace: then add it to the projects that need it, with Add to… or in their MCP tab.",
+    "description": "A tip (HI-2059). Add MCP Server from File, the MCP view, Add to… and the MCP tab are names in Hive: keep them as Hive shows them."
   },
   "tips.mcpFromFile.title": {
     "defaultMessage": "Add an MCP server from a file",
@@ -691,13 +1195,21 @@
     "defaultMessage": "MCP servers for some agents only",
     "description": "A tip's title."
   },
-  "tips.mcpPerProject.text": {
-    "defaultMessage": "A workspace MCP server runs in a project only when it's on in the workspace (its switch in the MCP view, which asks for the projects) and on in that project's MCP tab. Its tools stay out of the other projects' agents' context.",
-    "description": "A tip. The MCP tab and the MCP view are names in Hive: keep them as Hive shows them."
+  "tips.mcpPerProject.textAdded": {
+    "defaultMessage": "A workspace MCP server runs only where it is added: Add Server… in a project's MCP tab picks one, showing what it runs. Its tools stay out of the other projects' agents' context, and the tab lists only what that project uses.",
+    "description": "A tip (HI-2059). The MCP tab and Add Server… are names in Hive: keep them as Hive shows them."
   },
   "tips.mcpPerProject.title": {
     "defaultMessage": "MCP servers only where they are needed",
     "description": "A tip's title."
+  },
+  "tips.mcpSearch.text": {
+    "defaultMessage": "The MCP view and Add Server… search your servers by name, description and tags (a definition's \"tags\" list), and show those added somewhere or nowhere.",
+    "description": "A tip (HI-2059). The MCP view and Add Server… are names in Hive: keep them as Hive shows them; \"tags\" is a field of a server’s JSON definition: keep it."
+  },
+  "tips.mcpSearch.title": {
+    "defaultMessage": "Find a server in a long list",
+    "description": "A tip's title (HI-2059): searching the workspace's MCP servers."
   },
   "tips.memorySnapshot.text": {
     "defaultMessage": "Turn on Settings → Advanced → Save a memory snapshot if Hive is about to run out of memory, to find out what filled it. Snapshots can be gigabytes, hold what Hive had in memory (card text, transcripts, possibly tokens) and stay on this PC.",
@@ -707,6 +1219,62 @@
     "defaultMessage": "Hive closed running out of memory?",
     "description": "A tip's title."
   },
+  "tips.mergeBranch.text": {
+    "defaultMessage": "⑂ beside a branch in Version Control → Branches & remotes merges it into the branch you pick, one merge at a time. A card's branch that isn't Done asks first, and the card is marked merged outside the rules.",
+    "description": "A tip. Names of Hive's menus, views, settings and commands: keep them as Hive shows them. Glossary: outside the rules."
+  },
+  "tips.mergeBranch.title": {
+    "defaultMessage": "Merge a branch by hand",
+    "description": "A tip's title (#1450): merging any branch outside cards."
+  },
+  "tips.mergeMessage.text": {
+    "defaultMessage": "With Hive merging, Version Control → Workflow sets the merge’s commit message: Hive’s names the card, the branch’s own keeps card keys out of your history. With Squash, each card then lands as one commit with its builder’s message.",
+    "description": "A tip. Names of Hive's menus, views, settings and commands: keep them as Hive shows them. Squash is a merge style's name: use the word Hive shows for it."
+  },
+  "tips.mergeMessage.title": {
+    "defaultMessage": "Merges with your own commit messages",
+    "description": "A tip's title (G19): the workflow option that sets the message of the commit Hive's merge queue makes."
+  },
+  "tips.mergePush.text": {
+    "defaultMessage": "With Hive merging, Version Control → Workflow can push the target branch after each merge, never forced. If the remote refuses it, the queue pauses and says why: pull and resume, or turn it off and resume.",
+    "description": "A tip. Names of Hive's menus, views, settings and commands: keep them as Hive shows them. Glossary: merge queue."
+  },
+  "tips.mergePush.title": {
+    "defaultMessage": "Push each merge to your remote",
+    "description": "A tip's title (G18): the workflow option that has Hive's merge queue push the target branch after each merge."
+  },
+  "tips.mergeQueueFolder.text": {
+    "defaultMessage": "When the merge queue merges into a branch checked out in a folder (main in the project folder), it updates the folder too, but pauses rather than touch a file you are changing. Settings → Advanced can have it ask you under For you first.",
+    "description": "A tip. Names of Hive's menus, views, settings and commands: keep them as Hive shows them. For you is the board's list of what waits for the user."
+  },
+  "tips.mergeQueueFolder.title": {
+    "defaultMessage": "Merging into the folder you work in",
+    "description": "A tip's title: the merge queue merging into a branch (main) that is checked out in the project folder."
+  },
+  "tips.mergeQueuePanel.text": {
+    "defaultMessage": "The Progress panel's Merges tab shows each merge queue: the card it is testing and how long its checks usually take, the cards waiting, and a card it returned until you've seen it. Pause queue and Resume queue are there too.",
+    "description": "A tip. Names of Hive's menus, views, settings and commands: keep them as Hive shows them. Glossary 2.5: merge queue, Pause queue / Resume queue; 2.4: returned."
+  },
+  "tips.mergeQueuePanel.title": {
+    "defaultMessage": "Watch the merge queue",
+    "description": "A tip's title (glossary 2.5: merge queue)."
+  },
+  "tips.mergeQueueRecent.text": {
+    "defaultMessage": "Under each merge queue in the Progress panel's Merges tab, Recent merges lists its latest merges, returns and pauses, with why, when and how long each took. Click one to open its card.",
+    "description": "A tip. Names of Hive's menus, views, settings and commands: keep them as Hive shows them. Glossary 2.5: merge queue; 2.4: returned."
+  },
+  "tips.mergeQueueRecent.title": {
+    "defaultMessage": "See what the merge queue did lately",
+    "description": "A tip's title (glossary 2.5: merge queue)."
+  },
+  "tips.mergeRebase.text": {
+    "defaultMessage": "With Hive merging, set Merge style to Rebase and fast-forward in Version Control → Workflow: the merge queue rebases each card onto the target, tests exactly that, and moves the target forward to it.",
+    "description": "A tip. Names of Hive's menus, views, settings and commands, and the option's value: keep them as Hive shows them. Glossary: merge queue."
+  },
+  "tips.mergeRebase.title": {
+    "defaultMessage": "A linear history, with no merge commits",
+    "description": "A tip's title (G6): the merge style Rebase and fast-forward."
+  },
   "tips.mergeSlot.text": {
     "defaultMessage": "When several agents finish at once, each claims the project's merge slot before it merges main in, checks and merges, so nobody's checks have to run twice. Who holds it and who waits shows in the Overview and the Progress panel.",
     "description": "A tip. Names of Hive's menus, views, settings and commands: keep them as Hive shows them."
@@ -714,6 +1282,14 @@
   "tips.mergeSlot.title": {
     "defaultMessage": "Agents take turns to merge",
     "description": "A tip's title."
+  },
+  "tips.mergeStrict.text": {
+    "defaultMessage": "With Hive merging, Version Control → Workflow can have work up to date with its target before it merges: the merge queue updates a card in its own folder, never on the builder’s branch, and the review still counts if it’s the same change.",
+    "description": "A tip. Names of Hive's menus, views, settings and commands: keep them as Hive shows them. Glossary: merge queue, builder, review."
+  },
+  "tips.mergeStrict.title": {
+    "defaultMessage": "Work up to date before it merges",
+    "description": "A tip's title: the workflow option that has Hive's merge queue bring a card's work up to date with its target branch first (G8, strict)."
   },
   "tips.messageReceipts.text": {
     "defaultMessage": "Every message the Assistant leaves an agent has an id and is kept, even across a restart: it is received once the agent reads its inbox, and acked once the agent acted on it. One not acked within {minutes, plural, one {# minute} other {# minutes}} shows as overdue (✉) in its pane.",
@@ -740,12 +1316,20 @@
     "description": "A tip's title."
   },
   "tips.moreAgents.text": {
-    "defaultMessage": "Need more than {usual, plural, one {# agent} other {# agents}} in a project? Raise Agents per project in Settings → Advanced, up to {most, number}, for every workspace or just this one. Above {usual, number} it shows what they cost on your computer: the memory your running agents take, and how much is free.",
-    "description": "A tip. Names of Hive's menus, views, settings and commands: keep them as Hive shows them. {usual} is how many agents a project can have by default (12), {most} the most it can be raised to (24)."
+    "defaultMessage": "Need more than {usual, plural, one {# agent} other {# agents}} in a project? Raise Maximum agents in Version Control → Workflow, up to {most, number}, then add them. Above {usual, number} it shows what they cost: the memory your running agents take, and how much is free.",
+    "description": "A tip. Names of Hive's menus, views, settings and commands: keep them as Hive shows them. {usual} is how many agents a project has by default (12), {most} the most it can have (24). Maximum agents is a workflow option (HI-2001)."
   },
   "tips.moreAgents.title": {
     "defaultMessage": "More than {usual, plural, one {# agent} other {# agents}}",
     "description": "A tip's title. {usual} is how many agents a project can have by default (12)."
+  },
+  "tips.moveAnyway.text": {
+    "defaultMessage": "Dragging a card past a rule of its project (to Done before its review, say) asks first and names the rules it skips. Move Anyway records an override on the card, with your reason: an open lock on its tile says who, which rules and why.",
+    "description": "A tip. Names of Hive's menus, views, settings and commands: keep them as Hive shows them. Glossary: rule, override, Move anyway."
+  },
+  "tips.moveAnyway.title": {
+    "defaultMessage": "Move a card past its rules, with a reason",
+    "description": "A tip's title (glossary: rule)."
   },
   "tips.myPrices.text": {
     "defaultMessage": "Claude Code's cost is its own figure, from its price table. On other rates (a discount, another tier)? Set Session costs to My prices, and Hive prices every session from your table instead.",
@@ -763,6 +1347,14 @@
     "defaultMessage": "Jot down a card",
     "description": "A tip's title."
   },
+  "tips.noCodeCards.text": {
+    "defaultMessage": "A decision, a write-up or a trial has nothing to commit: tick No code in the New Card dialog. Its work is submitted with a summary and goes to Done with nothing to merge.",
+    "description": "A tip. Names of Hive's menus, views, settings and commands: keep them as Hive shows them. Glossary: no-code card."
+  },
+  "tips.noCodeCards.title": {
+    "defaultMessage": "Cards with no code",
+    "description": "A tip's title (glossary: no-code card)."
+  },
   "tips.off.message": {
     "defaultMessage": "Help → Tips… still has them, and Settings → General turns them back on.",
     "description": "More in the notice after the tips were turned off. Help → Tips… and Settings → General are names in Hive: keep them as Hive shows them."
@@ -770,6 +1362,14 @@
   "tips.off.title": {
     "defaultMessage": "Tips are off",
     "description": "A notice after \"Don't show tips\" on the tip card."
+  },
+  "tips.outageResume.text": {
+    "defaultMessage": "Turn on Settings → Advanced → Resume agents after a connection drops, and an agent stopped by a router restart or a Wi-Fi blip waits for the connection, then reruns what was cut off by itself. Never for a usage limit or an expired sign-in.",
+    "description": "A tip. Names of Hive's menus, views, settings and commands: keep them as Hive shows them."
+  },
+  "tips.outageResume.title": {
+    "defaultMessage": "Agents can carry on after a connection drops",
+    "description": "A tip's title."
   },
   "tips.overview.text": {
     "defaultMessage": "The Workspace Overview shows what every project used, what runs now and the board, by day. {key}",
@@ -811,12 +1411,36 @@
     "defaultMessage": "Paste a screenshot into a session",
     "description": "A tip's title."
   },
+  "tips.pathsLeftOut.text": {
+    "defaultMessage": "Without version control, a card's work is only the files its paths list. When you drag one to Review and other files changed since it started, Hive lists them first: include them in its work, or leave them out.",
+    "description": "A tip. A card's paths: the files and folders its work covers, in a project with no version control. Review is the board column."
+  },
+  "tips.pathsLeftOut.title": {
+    "defaultMessage": "No version control? Check what a card covers",
+    "description": "A tip's title: in a project without version control, a card's work is the files its paths list."
+  },
+  "tips.pauseTeam.text": {
+    "defaultMessage": "Pause the Team, in the Progress panel's Lanes, stops lanes starting cards and agents being woken, tells each agent to park, and lists what still runs until it's safe to install: then Install Now.",
+    "description": "A tip (HI-2081). Pause the Team, the Progress panel, Lanes and Install Now are names in Hive: keep them as Hive shows them."
+  },
+  "tips.pauseTeam.title": {
+    "defaultMessage": "Pause the team before an update",
+    "description": "A tip's title (HI-2081). 'The team' is every agent of the workspace."
+  },
   "tips.perfCompare.text": {
     "defaultMessage": "Performance → Compare: keep the current view before a change and again after it, and see whether Hive’s traffic fell while the work still got done.",
     "description": "A tip. Names of Hive's menus, views, settings and commands: keep them as Hive shows them."
   },
   "tips.perfCompare.title": {
     "defaultMessage": "Before and after a change",
+    "description": "A tip's title."
+  },
+  "tips.perfCompareAgents.text": {
+    "defaultMessage": "Comparing two scenario benchmarks? Open a scenario in Performance → Compare: its measures show the session under test first, then the other agents (a lane’s builder and reviewer) and all of them together, with each agent’s hive calls.",
+    "description": "A tip (HI-2186). Names of Hive's menus, views, settings and commands: keep them as Hive shows them. Keep hive (Hive's tools). Glossary: builder, reviewer."
+  },
+  "tips.perfCompareAgents.title": {
+    "defaultMessage": "Which agent a change came from",
     "description": "A tip's title."
   },
   "tips.performance.text": {
@@ -833,6 +1457,22 @@
   },
   "tips.permissionMode.title": {
     "defaultMessage": "Switch permission mode",
+    "description": "A tip's title."
+  },
+  "tips.progressCard.text": {
+    "defaultMessage": "A run in the Progress panel shows the card and the revision it ran on under the agent, such as #1061 · a3f2c1d: click the card to open it, or the revision to copy it.",
+    "description": "A tip. Names of Hive's menus, views, settings and commands: keep them as Hive shows them. #1061 is a card's number and a3f2c1d a commit's short id: keep them as they are."
+  },
+  "tips.progressCard.title": {
+    "defaultMessage": "Which card was that run for?",
+    "description": "A tip's title."
+  },
+  "tips.progressCheck.text": {
+    "defaultMessage": "A run for a card is recorded as a check of the card's revision. Its details in the Progress panel say Counts as check, or why not: it wasn't started as the check, the folder had uncommitted changes, or files changed while it ran.",
+    "description": "A tip. Names of Hive's menus, views, settings and commands: keep them as Hive shows them. \"Counts as check\" is how a run's details say it counts: keep it as the details do."
+  },
+  "tips.progressCheck.title": {
+    "defaultMessage": "Did that run count as a check?",
     "description": "A tip's title."
   },
   "tips.progressCommand.text": {
@@ -860,8 +1500,8 @@
     "description": "A tip's title."
   },
   "tips.progressHistory.text": {
-    "defaultMessage": "Recent in the Progress panel shows the last {recent, plural, one {# run} other {# runs}}; Show all scrolls through the last {kept, plural, one {# run} other {# runs}}, even after Hive restarts. The project filter applies to them all.",
-    "description": "A tip. Names of Hive's menus, views, settings and commands: keep them as Hive shows them. {recent} is how many runs Recent shows (10), {kept} how many Show all keeps (200)."
+    "defaultMessage": "The Runs tab of the Progress panel keeps the last {kept, plural, one {# run} other {# runs}}, even after Hive restarts: by day, a run and its retries in one line. Find them by their words, or show only failures, a lane’s or an agent’s.",
+    "description": "A tip. Names of Hive's menus, views, settings and commands: keep them as Hive shows them (Runs: the Progress panel's tab of runs). {kept} is how many runs Hive keeps (200)."
   },
   "tips.progressHistory.title": {
     "defaultMessage": "What ran this morning?",
@@ -899,6 +1539,14 @@
     "defaultMessage": "How long until the tests finish?",
     "description": "A tip's title."
   },
+  "tips.progressTabs.text": {
+    "defaultMessage": "The Progress panel has four tabs: Pulse for what is going on now, then Merges, Runs and Lanes. A red number on Runs counts the runs that failed with nothing passing since; Pulse has a line for them too.",
+    "description": "A tip. Names of Hive's menus, views, settings and commands: keep them as Hive shows them (the tabs: Pulse, Merges, Runs, Lanes)."
+  },
+  "tips.progressTabs.title": {
+    "defaultMessage": "Pulse, Merges, Runs, Lanes",
+    "description": "A tip's title: the Progress panel's tabs, named as the panel shows them."
+  },
   "tips.projectCards.text": {
     "defaultMessage": "A project's Overview starts with its cards: how many are in each column, stalled or blocked. Click a number to open its Tasks tab.",
     "description": "A tip. Names of Hive's menus, views, settings and commands: keep them as Hive shows them."
@@ -906,6 +1554,14 @@
   "tips.projectCards.title": {
     "defaultMessage": "A project's cards at a glance",
     "description": "A tip's title."
+  },
+  "tips.projectKeys.text": {
+    "defaultMessage": "Each project has a key of 2 to 4 letters that names its cards: AM-12. Search the board or the command palette for AM-12, or AM- for all of that project’s cards; an old #12 still works. Change a key in Project Settings.",
+    "description": "A tip. AM-12 and AM- are examples of a card's name and a project's key: keep them as they are. Names of Hive's menus, views, settings and commands (Project Settings): keep them as Hive shows them."
+  },
+  "tips.projectKeys.title": {
+    "defaultMessage": "Cards are named by their project’s key",
+    "description": "A tip's title. A key is 2–4 letters, such as AM, that a project's cards are named by (AM-12)."
   },
   "tips.projectTabs.text": {
     "defaultMessage": "When space is short, a project's tabs shrink to icons, and the tab you're on keeps its name while it fits. Hover a tab for its name and shortcut.",
@@ -922,6 +1578,14 @@
   "tips.projectTabsKeys.title": {
     "defaultMessage": "Alt and a number for each tab",
     "description": "A tip's title."
+  },
+  "tips.projectTabsSettings.text": {
+    "defaultMessage": "The last item of More ▾, at the end of a project's tabs, is Project Settings…, with its shortcut (Alt+0 unless you change it).",
+    "description": "A tip (HI-1840). Names of Hive's menus, views, settings and commands: keep them as Hive shows them. More ▾ is the button's name with its arrow; Project Settings… is the menu item's name, with its …."
+  },
+  "tips.projectTabsSettings.title": {
+    "defaultMessage": "Project Settings from More ▾",
+    "description": "A tip's title (HI-1840). More ▾ is the button's name with its arrow."
   },
   "tips.quitWhenDone.text": {
     "defaultMessage": "Quitting while an agent works offers Quit when agents finish: Hive hides and quits by itself once they're done. Conversations are always kept.",
@@ -947,6 +1611,14 @@
     "defaultMessage": "Remove every agent at once",
     "description": "A tip's title."
   },
+  "tips.resumeAfterUpdate.text": {
+    "defaultMessage": "Installing a new version tells the agents that were working or in a card loop, and when Hive starts again it resumes them in their conversations, one at a time, each told its card, round and lane. After you quit, the next start offers to resume them instead.",
+    "description": "A tip. Names of Hive's menus, views, settings and commands: keep them as Hive shows them."
+  },
+  "tips.resumeAfterUpdate.title": {
+    "defaultMessage": "Updates leave your agents where they were",
+    "description": "A tip's title."
+  },
   "tips.resumeAll.text": {
     "defaultMessage": "After a restart, Resume All Agents in the project header resumes every stopped agent's last session in one go.",
     "description": "A tip. Names of Hive's menus, views, settings and commands: keep them as Hive shows them."
@@ -954,6 +1626,38 @@
   "tips.resumeAll.title": {
     "defaultMessage": "Resume all agents at once",
     "description": "A tip's title."
+  },
+  "tips.retryWait.text": {
+    "defaultMessage": "When a Codex, Claude Code or Copilot agent's requests are refused, often by a rate limit, it waits and tries again while its screen says only Working. Hive reads the wait from the agent's own records, and its status says so.",
+    "description": "A tip (HI-1972, HI-1973). Codex, Claude Code and Copilot are product names; Working is what their screens show."
+  },
+  "tips.retryWait.title": {
+    "defaultMessage": "See when an agent is rate-limited",
+    "description": "A tip's title (HI-1972, HI-1973): when an agent's coding agent has its model requests refused as too many."
+  },
+  "tips.reviewCopies.text": {
+    "defaultMessage": "A reviewer reviews in a review copy: a folder at exactly the submitted revision, which nothing else writes, so the builder can carry on meanwhile. Its checks there count for that submission. Settings → Advanced turns it off.",
+    "description": "A tip. A review copy: a folder Hive keeps at exactly the revision under review. Names of Hive's menus, views, settings and commands: keep them as Hive shows them."
+  },
+  "tips.reviewCopies.title": {
+    "defaultMessage": "Reviewers test exactly what was submitted",
+    "description": "A tip's title."
+  },
+  "tips.reviewSkip.text": {
+    "defaultMessage": "Building an installer or a quick trial needs no reviewer? Tick Skip review in the New Card dialog: submitting the card finishes it, and a code card still goes on to its merge, with its merge checks.",
+    "description": "A tip (#1625). Names of Hive's menus, views, settings and commands: keep them as Hive shows them (Skip review is the New Card dialog's tick box)."
+  },
+  "tips.reviewSkip.title": {
+    "defaultMessage": "Cards that don't need a review",
+    "description": "A tip's title (#1625): a card can skip its review."
+  },
+  "tips.reviewerPool.text": {
+    "defaultMessage": "With the workflow option Reviewers set to A shared pool, Start Lane offers the reviewer pool: each card submitted goes to the next free reviewer, oldest first, never to its own builder.",
+    "description": "A tip. Reviewers and A shared pool are a workflow option and its value; Start Lane is a dialog: keep them as Hive shows them. Glossary: reviewer pool, builder."
+  },
+  "tips.reviewerPool.title": {
+    "defaultMessage": "Share reviewers between lanes",
+    "description": "A tip's title. A lane is Hive's record of a card loop (glossary 2.5: lane)."
   },
   "tips.safeguardStops.text": {
     "defaultMessage": "A shield beside an agent's status means its CLI's safety classifier stopped a response: hover it for when, the model, and the agent's last tool calls before it. Orange means its model changed since, or it waits on you.",
@@ -1051,6 +1755,62 @@
     "defaultMessage": "An agent silent with its state unknown",
     "description": "A tip's title."
   },
+  "tips.skillFiles.text": {
+    "defaultMessage": "Agents read a skill's SKILL.md whenever they use it, and a file it links only when they need that part. A skill's page shows each of its files in a tab, to read and edit; a link to one opens its tab.",
+    "description": "A tip. Names of Hive's menus, views, settings and commands: keep them as Hive shows them. SKILL.md is a file name: keep it in English."
+  },
+  "tips.skillFiles.title": {
+    "defaultMessage": "A skill can link files beside its SKILL.md",
+    "description": "A tip's title. SKILL.md is a file name: keep it in English."
+  },
+  "tips.skillsDelivered.text": {
+    "defaultMessage": "The switch beside each Hive skill, in the Skills view or a project's Skills tab, says whether agents get it (Delivered to agents). Copies Hive puts in a folder for Codex and Copilot are removed once no agent works there, as Settings → Advanced says.",
+    "description": "A tip. Names of Hive's menus, views, settings and commands: keep them as Hive shows them. Codex and Copilot are CLIs' names."
+  },
+  "tips.skillsDelivered.title": {
+    "defaultMessage": "Choose which skills agents get",
+    "description": "A tip's title."
+  },
+  "tips.slotHeld.text": {
+    "defaultMessage": "When Hive can't tell that everything an agent's session started in a slot has ended, it keeps the slot for it rather than guess. Release Slot… in the agent's ⋯ menu shows what Hive knows, ends what it lists if you want, and frees the slot.",
+    "description": "A tip. A slot: a folder Hive lends to a card or a lane. Release Slot… is a menu item: keep it as Hive shows it; ⋯ is the agent's menu button."
+  },
+  "tips.slotHeld.title": {
+    "defaultMessage": "Free a slot held after Hive closed",
+    "description": "A tip's title (#1506). A slot: a folder Hive lends to a card or a lane."
+  },
+  "tips.slotOptions.text": {
+    "defaultMessage": "Version Control → Workflow → Slots and copies holds the script run in a new slot, the files copied into it and the slots in use, and how many review copies the project keeps. They save as you change them.",
+    "description": "A tip. A slot: a folder Hive lends to a card or a lane; a review copy: a folder at exactly the revision a reviewer reviews. Names of Hive's menus, views, settings and commands: keep them as Hive shows them."
+  },
+  "tips.slotOptions.title": {
+    "defaultMessage": "Set up slots in Version Control",
+    "description": "A tip's title. A slot: a folder Hive lends to a card or a lane."
+  },
+  "tips.slotResume.text": {
+    "defaultMessage": "A builder's conversation stays in its card's slot. Once the card ends, Resume All leaves it so the slot stays free for new work; its own Resume takes the slot back while nothing else has used it.",
+    "description": "A tip. A slot is a worktree Hive lends to a card. Names of Hive's menus, views, settings and commands: keep them as Hive shows them."
+  },
+  "tips.slotResume.title": {
+    "defaultMessage": "A conversation resumes where it was made",
+    "description": "A tip's title (#1434)."
+  },
+  "tips.slots.text": {
+    "defaultMessage": "With Where cards are built set to Each card in its own folder, starting a card lends its builder a slot, a ready worktree, and makes the card's branch there. A lane keeps its slot from card to card; with every slot in use, it waits for one.",
+    "description": "A tip. A slot is a working folder (a worktree) Hive lends to a card or a lane. Names of Hive's menus, views, settings and commands (Where cards are built is a workflow option, Each card in its own folder its value; glossary 2.6, G11): keep them as Hive shows them."
+  },
+  "tips.slots.title": {
+    "defaultMessage": "Each card on a branch of its own",
+    "description": "A tip's title. A slot is a working folder (a worktree) Hive lends to a card or a lane."
+  },
+  "tips.slotsAdopted.text": {
+    "defaultMessage": "Since the upgrade, each builder's own worktree is a slot kept for it until its next card or lane takes it over. Release Slot… in the agent's ⋯ menu gives one up; once free, Hive renames its folder to a slot name, taking its conversations with it.",
+    "description": "A tip. A slot is a working folder (a worktree) Hive lends to a card or a lane. Release Slot… is a menu item: keep it as Hive shows it; ⋯ is the agent's menu button."
+  },
+  "tips.slotsAdopted.title": {
+    "defaultMessage": "Your agents' worktrees are slots now",
+    "description": "A tip's title, after upgrading from Hive 0.9. A slot is a working folder (a worktree) Hive lends to a card or a lane."
+  },
   "tips.sortTables.text": {
     "defaultMessage": "Click a column's header in Hive's tables (shortcuts, Performance, Storage, the Overviews) to sort by it, again for the other way. Hive remembers each table's sort and rows per page.",
     "description": "A tip. Names of Hive's menus, views, settings and commands: keep them as Hive shows them."
@@ -1067,6 +1827,14 @@
     "defaultMessage": "A message about a round goes stale, not late",
     "description": "A tip's title."
   },
+  "tips.startFreshIdle.text": {
+    "defaultMessage": "Long conversations cost more. Start Fresh (Idle Agents) in the project header's Agents menu gives every idle agent a new one in one step, and Hive suggests it when a project's work has finished.",
+    "description": "A tip. Names of Hive's menus, views, settings and commands: keep them as Hive shows them."
+  },
+  "tips.startFreshIdle.title": {
+    "defaultMessage": "Start idle agents fresh when work is done",
+    "description": "A tip's title (#1437)."
+  },
   "tips.startNewAll.text": {
     "defaultMessage": "Start New in the project header's Agents menu gives every agent a new session after one question; Archive and Start New archives their old ones first. Their conversations stay in the Sessions tab.",
     "description": "A tip. Names of Hive's menus, views, settings and commands: keep them as Hive shows them."
@@ -1074,6 +1842,14 @@
   "tips.startNewAll.title": {
     "defaultMessage": "Fresh sessions for every agent",
     "description": "A tip's title."
+  },
+  "tips.stoppedPane.text": {
+    "defaultMessage": "When an agent's session ends, its pane is dimmed and its bar says when and why (stopped by you, its lane ended, its CLI exited…). Its last output stays readable, and Resume or New Session there starts it again.",
+    "description": "A tip (HI-1881). Names of Hive's menus, views, settings and commands: keep them as Hive shows them."
+  },
+  "tips.stoppedPane.title": {
+    "defaultMessage": "A stopped agent looks stopped",
+    "description": "A tip's title (HI-1881)."
   },
   "tips.storageCleanup.text": {
     "defaultMessage": "Project Settings → Storage shows how much space a project's backups, archive, attachments and worktrees take. Clean Up… moves old attachments and backups to the Recycle Bin, and shows you exactly what goes first.",
@@ -1099,6 +1875,22 @@
     "defaultMessage": "Glance at the taskbar",
     "description": "A tip's title."
   },
+  "tips.teamPreset.text": {
+    "defaultMessage": "Team, in Version Control → Workflow, is Pair with stricter checks: the unit tests pass before review and on the merged result, dependencies are installed from scratch before every merge, and cards labelled ui or release wait for your OK.",
+    "description": "A tip. Names of Hive's menus, views, settings and commands: keep them as Hive shows them (glossary 2.1: Team, Pair)."
+  },
+  "tips.teamPreset.title": {
+    "defaultMessage": "Several builders? Try the Team preset",
+    "description": "A tip's title (glossary 2.1: Team, preset)."
+  },
+  "tips.teamTemplates.text": {
+    "defaultMessage": "The Templates view’s Hive group has ready-made teams: Solo, Pair, Pair: one provider, Team 3×3, Team 6×6 and Team 6 + pool, with builders and reviewers paired. Loading one offers to switch the project to the preset it suits.",
+    "description": "A tip. Names of Hive's menus, views, settings and commands, and of Hive's own templates: keep them as Hive shows them. Glossary: builder, reviewer, preset."
+  },
+  "tips.teamTemplates.title": {
+    "defaultMessage": "Start from one of Hive’s templates",
+    "description": "A tip's title. Glossary: template."
+  },
   "tips.templateNames.text": {
     "defaultMessage": "Agent names are unique across the workspace. Loading a template from another project, give its agents new names in the list beside the template's own: Load template waits until none is taken.",
     "description": "A tip. Names of Hive's menus, views, settings and commands: keep them as Hive shows them."
@@ -1107,16 +1899,16 @@
     "defaultMessage": "Name a template's agents as you load it",
     "description": "A tip's title."
   },
-  "tips.templateWorktrees.text": {
-    "defaultMessage": "Loading a template puts an agent back in the clean worktree of its name, its branch left as it is, instead of making a new one. Old worktrees that are merged and clean can go too: tick the box in the Load dialog.",
+  "tips.templateWorkflow.text": {
+    "defaultMessage": "Save Template… can keep the project's workflow too: its rules, never its branch or commands. Loading it shows what changes, then opens Version Control → Workflow filled in, to save there.",
     "description": "A tip. Names of Hive's menus, views, settings and commands: keep them as Hive shows them."
   },
-  "tips.templateWorktrees.title": {
-    "defaultMessage": "Templates reuse worktrees",
+  "tips.templateWorkflow.title": {
+    "defaultMessage": "Keep your workflow in a template",
     "description": "A tip's title."
   },
   "tips.testedClis.text": {
-    "defaultMessage": "Claude Code, Codex and Copilot update on their own. Agent Setup shows the version this Hive release was tested with next to the one you have, and says when yours is newer or older.",
+    "defaultMessage": "Claude Code, Codex and Copilot update on their own. Provider Setup shows the version this Hive release was tested with next to the one you have, and says when yours is newer or older.",
     "description": "A tip. Names of Hive's menus, views, settings and commands: keep them as Hive shows them."
   },
   "tips.testedClis.title": {
@@ -1130,6 +1922,14 @@
   "tips.tileStrip.title": {
     "defaultMessage": "Each agent's card, beside its name",
     "description": "A tip's title."
+  },
+  "tips.tileStripOrder.text": {
+    "defaultMessage": "In an agent's focus view (Tiles), drag an agent up or down the strip on the left, or press Alt+Up or Alt+Down on it. The tiles and the panes follow the same order.",
+    "description": "A tip. Names of Hive's menus, views, settings and commands (Tiles): keep them as Hive shows them."
+  },
+  "tips.tileStripOrder.title": {
+    "defaultMessage": "Reorder agents from the focus view",
+    "description": "A tip's title (#1053)."
   },
   "tips.tilesView.text": {
     "defaultMessage": "Tiles shows each agent as a small tile: its state, status, card, progress and latest reply, twelve to a page. Click one to open its pane large beside the others; Esc goes back. Settings → Sessions → Tile order can put the agents waiting for you first.",
@@ -1208,7 +2008,7 @@
     "description": "A tip's title."
   },
   "tips.unmerged.text": {
-    "defaultMessage": "The agent's tab shows how many commits aren't merged yet, Merge… in its ⋯ menu says what is left, and Git → Changes shows everything the agent changed since it branched.",
+    "defaultMessage": "The agent's tab shows how many commits aren't merged yet, Merge… in its ⋯ menu says what is left, and Version Control → Changes shows everything the agent changed since it branched.",
     "description": "A tip. Names of Hive's menus, views, settings and commands: keep them as Hive shows them."
   },
   "tips.unmerged.title": {
@@ -1216,12 +2016,44 @@
     "description": "A tip's title."
   },
   "tips.unusedWorktrees.text": {
-    "defaultMessage": "Removed an agent but kept its worktree? Git → Changes opens on the worktrees no agent uses, saying who made each: open one to see its work and merge it, remove the merged ones with their branches, or give one back to an agent.",
+    "defaultMessage": "Removed an agent but kept its worktree? Version Control → Changes opens on the worktrees no agent uses, saying who made each: open one to see its work and merge it, or remove the merged ones with their branches.",
     "description": "A tip. Names of Hive's menus, views, settings and commands: keep them as Hive shows them."
   },
   "tips.unusedWorktrees.title": {
     "defaultMessage": "Tidy kept worktrees",
     "description": "A tip's title."
+  },
+  "tips.updateFromTarget.text": {
+    "defaultMessage": "Version Control → Branches & remotes: a branch behind the target has Update. Merge the target in or rebase onto it, where the branch is checked out; a conflict is undone at once, naming its files.",
+    "description": "A tip. Names of Hive's menus, views, settings and commands: keep them as Hive shows them."
+  },
+  "tips.updateFromTarget.title": {
+    "defaultMessage": "Bring a branch up to date with its target",
+    "description": "A tip's title."
+  },
+  "tips.usageMoves.text": {
+    "defaultMessage": "On an account in Settings → Accounts & Connections, tick When it reaches 98% of its weekly limit, move its agents to another account: they move once their turn is over and carry on there.",
+    "description": "A tip (HI-2195). Names of Hive's menus, views, settings and commands: keep them as Hive shows them; the rule is quoted as the setting shows it."
+  },
+  "tips.usageMoves.title": {
+    "defaultMessage": "Move agents before a plan runs out",
+    "description": "A tip's title (HI-2195): an account's agents move to another account when its plan's usage reaches a share."
+  },
+  "tips.versionControlSwitch.text": {
+    "defaultMessage": "Click None or Git atop a project’s Version Control tab to switch it from its next card; cards in flight keep the old rules. Each keeps its own workflow options, and when the folder changes (git init, say), Hive offers the switch there.",
+    "description": "A tip. Names of Hive's menus, views, settings and commands: keep them as Hive shows them (glossary 2.1: None, Git, Version Control, old rules, workflow). Keep git init as it is (a command)."
+  },
+  "tips.versionControlSwitch.title": {
+    "defaultMessage": "Switch between None and Git",
+    "description": "A tip's title (glossary 2.1: None, Git)."
+  },
+  "tips.versionControlTab.text": {
+    "defaultMessage": "A project’s Version Control tab says what Hive found in its folder, and starts with Workflow: who reviews, which checks pass first and who merges. Its header names the preset, and a click on it opens them.",
+    "description": "A tip. Names of Hive's menus, views, settings and commands: keep them as Hive shows them (glossary 2.1: Version Control, Workflow, preset)."
+  },
+  "tips.versionControlTab.title": {
+    "defaultMessage": "One tab for version control and workflow",
+    "description": "A tip's title (glossary 2.1: version control, workflow)."
   },
   "tips.viewerTokens.text": {
     "defaultMessage": "An app that shows what your agents are doing, such as Apiary, needs only a viewer token: Settings → Agent API → Viewer tokens makes one that can read everything and change nothing, and revokes it again.",
@@ -1231,6 +2063,30 @@
     "defaultMessage": "Let another app watch Hive",
     "description": "A tip's title."
   },
+  "tips.workflowDefaults.text": {
+    "defaultMessage": "Settings → Version Control sets the options every project starts from: Hive defaults, for every workspace, and the open workspace’s over them. A project’s own options still win, and saving lists the projects that inherit the change.",
+    "description": "A tip. Names of Hive's menus, views, settings and commands: keep them as Hive shows them (glossary 2.1: workflow)."
+  },
+  "tips.workflowDefaults.title": {
+    "defaultMessage": "Set a workflow once for every project",
+    "description": "A tip's title (glossary 2.1: workflow)."
+  },
+  "tips.workflowOptions.text": {
+    "defaultMessage": "Version Control → Workflow sets who reviews a card’s work, which checks pass first and who merges it. Pick a preset, or set each option: a change applies from the next card that starts.",
+    "description": "A tip. Names of Hive's menus, views, settings and commands: keep them as Hive shows them."
+  },
+  "tips.workflowOptions.title": {
+    "defaultMessage": "Choose how cards get to Done",
+    "description": "A tip's title (glossary 2.1: workflow)."
+  },
+  "tips.workflowPresetsWhy.text": {
+    "defaultMessage": "In Version Control → Workflow, click Solo, Pair or Team: it lists each option it sets and why, and marks what it would change. Nothing changes until you use it and save.",
+    "description": "A tip. Names of Hive's menus, views, settings and commands: keep them as Hive shows them (glossary 2.1: Solo, Pair, Team)."
+  },
+  "tips.workflowPresetsWhy.title": {
+    "defaultMessage": "See what a preset does before you use it",
+    "description": "A tip's title (glossary 2.1: preset)."
+  },
   "tips.workspaceMoved.text": {
     "defaultMessage": "Moved the workspace folder, say to another drive? Open it from its new place and choose Repair… in the banner: agents' worktrees, their sessions, and Claude Code's conversations and memory follow it.",
     "description": "A tip. Names of Hive's menus, views, settings and commands: keep them as Hive shows them."
@@ -1239,20 +2095,20 @@
     "defaultMessage": "Move a workspace without losing its agents",
     "description": "A tip's title."
   },
-  "tips.worktreeReuse.text": {
-    "defaultMessage": "Adding an agent with a new worktree named like one you kept (B4, and B4's worktree is unused)? If it's merged and clean, Hive gives the agent that folder, brought up to main: its node_modules are already there.",
+  "tips.workspaceMovedDefender.text": {
+    "defaultMessage": "If Hive had Defender skip the workspace's folders, Repair… after a move offers to move those exclusions to the new folders, with one administrator prompt, so none is left on a folder that's gone. Exclusions you made yourself stay as they are.",
     "description": "A tip. Names of Hive's menus, views, settings and commands: keep them as Hive shows them."
   },
-  "tips.worktreeReuse.title": {
-    "defaultMessage": "A kept worktree is used again",
+  "tips.workspaceMovedDefender.title": {
+    "defaultMessage": "Defender exclusions follow a moved workspace",
     "description": "A tip's title."
   },
-  "tips.worktrees.text": {
-    "defaultMessage": "In Add Agent…, choose New worktree: the agent works on its own branch, and Merge… brings its work back when you're happy with it.",
-    "description": "A tip. Names of Hive's menus, views, settings and commands: keep them as Hive shows them."
+  "tips.workspaceNotes.text": {
+    "defaultMessage": "Workspace notes, pinned first in Shared Notes, is for what's true of this machine, like a full path. Every agent gets it when it starts, in any folder, so it needn't go in a committed AGENTS.md. A section headed with a project's name is that project's alone.",
+    "description": "A tip. Names of Hive's menus, views, settings and commands: keep them as Hive shows them. Workspace notes is a shared note's name and AGENTS.md a file name: keep both in English."
   },
-  "tips.worktrees.title": {
-    "defaultMessage": "Give an agent its own worktree",
+  "tips.workspaceNotes.title": {
+    "defaultMessage": "Notes about this machine for every agent",
     "description": "A tip's title."
   }
 }

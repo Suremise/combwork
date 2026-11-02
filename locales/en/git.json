@@ -1,11 +1,71 @@
 {
+  "git.branch.delete": {
+    "defaultMessage": "Delete Branch",
+    "description": "The button of the confirmation before deleting a branch."
+  },
+  "git.branch.deleteMergedMessage": {
+    "defaultMessage": "Every commit of it is in {target}: nothing is lost.",
+    "description": "The confirmation before deleting a branch merged into the target branch {target}."
+  },
+  "git.branch.deleteMergedTitle": {
+    "defaultMessage": "Delete {branch}?",
+    "description": "Title of the confirmation before deleting a branch merged into the target."
+  },
+  "git.branch.deleteMore": {
+    "defaultMessage": "…and {n, plural, one {# more} other {# more}}",
+    "description": "The last line of the commits listed before deleting an unmerged branch: how many more there are than shown."
+  },
+  "git.branch.deleteTip": {
+    "defaultMessage": "Delete {branch}…",
+    "description": "Tooltip on a branch's Delete button in Version Control → Branches & remotes (it asks first, showing any commits it would drop)."
+  },
+  "git.branch.deleteUnmergedMessage": {
+    "defaultMessage": "{n, plural, one {This commit isn't in {target}. Deleting {branch} drops it, and Hive can't bring it back:} other {These commits aren't in {target}. Deleting {branch} drops them, and Hive can't bring them back:}}",
+    "description": "The confirmation before deleting a branch ({branch}) with {n} commits that aren't in the target {target}; the commits are listed under it."
+  },
+  "git.branch.deleteUnmergedTitle": {
+    "defaultMessage": "{n, plural, one {Delete {branch} and the commit only it has?} other {Delete {branch} and the # commits only it has?}}",
+    "description": "Title of the confirmation before deleting a branch with {n} commits that aren't in the target."
+  },
+  "git.branch.dropsFailed": {
+    "defaultMessage": "Couldn't read the commits {branch} would drop",
+    "description": "An error notification's title: reading an unmerged branch's commits before deleting it failed."
+  },
   "git.branches.branch": {
     "defaultMessage": "Branch",
     "description": "Heading in Git → Branches & remotes: the branch checked out in the project folder."
   },
+  "git.branches.cardOpen": {
+    "defaultMessage": "{card}: {stage}. Open the card",
+    "description": "Tooltip and accessible name of a card's key beside the branch it works on (Version Control → Branches & remotes): the card ({card}: its key, such as AL-12) and its stage ({stage}: the board's name for it, glossary 2.2); a click opens the card."
+  },
   "git.branches.checkedOut": {
     "defaultMessage": "{where, select, agent {Checked out in {agent}'s worktree: a branch is in one folder at a time.} other {Checked out in another worktree: a branch is in one folder at a time.}}",
     "description": "Why a branch's Switch is disabled (its tooltip). {agent} is the agent whose worktree has it."
+  },
+  "git.branches.cleanUp": {
+    "defaultMessage": "Clean Up Merged Branches…",
+    "description": "A button over the list of branches in Version Control → Branches & remotes: lists the branches merged into the target that nothing uses, to delete the ones you tick (it asks first). Keep the …: it opens a dialog."
+  },
+  "git.branches.cleanUpTip": {
+    "defaultMessage": "{n, plural, =0 {No branch is merged into {target} and unused.} one {# branch here or on a remote is merged into {target} and unused: pick which to delete.} other {# branches here or on a remote are merged into {target} and unused: pick which to delete.}}",
+    "description": "Tooltip of Clean Up Merged Branches… ({n}: how many it offers, local and remote; {target}: the branch the project merges into)."
+  },
+  "git.branches.copyRevision": {
+    "defaultMessage": "Copy revision {revision}",
+    "description": "Tooltip of the button beside a branch's revision under review: copies the whole commit id. {revision} is its short form (a3f2c1d)."
+  },
+  "git.branches.earlierCards": {
+    "defaultMessage": "{n, plural, one {+# earlier card} other {+# earlier cards}}",
+    "description": "Beside a branch's card (Version Control → Branches & remotes): how many earlier cards worked on the same branch ({n}); its tooltip lists them."
+  },
+  "git.branches.group": {
+    "defaultMessage": "{group, select, inUse {In use} merged {Merged into {target}} other {Not merged into {target}}}",
+    "description": "A heading inside Version Control → Branches & remotes' list of branches: the branches in use (the target, the default branch, the project folder's, a slot's or worktree's, an open card's), those merged into the target branch {target} that nothing uses, and those with commits not in it. Keep the select keys."
+  },
+  "git.branches.groupTip": {
+    "defaultMessage": "{group, select, inUse {The branch work merges into, the default branch, the project folder's, and those a slot, a worktree or an open card uses.} merged {Every commit of these is in {target}, and nothing uses them: Clean Up Merged Branches deletes them.} other {These have commits that aren't in {target}. Delete one only after checking the commits it drops.}}",
+    "description": "Tooltip of a group heading in the list of branches (#1642). {target} is the branch the project merges into. Keep the select keys."
   },
   "git.branches.heading": {
     "defaultMessage": "Branches",
@@ -15,9 +75,21 @@
     "defaultMessage": "the branches and remotes",
     "description": "What could not be read in Git → Branches & remotes: shown in \"Could not load {what}: {error}\" and \"Could not refresh {what}; last updated …\"."
   },
+  "git.branches.merge": {
+    "defaultMessage": "Merge {branch} into another branch…",
+    "description": "A branch row's button in Git → Branches & remotes (#1450): opens the Merge dialog on that branch."
+  },
+  "git.branches.merged": {
+    "defaultMessage": "{has, select, yes {merged: {revision}} other {merged}}",
+    "description": "Beside a branch's card that is Done (Version Control → Branches & remotes), lower case: its work was merged, with the commit that merged it ({revision}: a short commit id) when it is known (has yes). Keep the select keys."
+  },
   "git.branches.noCommits": {
     "defaultMessage": "No commits yet, and agents' worktrees need one.",
     "description": "Banner in Git → Branches & remotes of a repository with no commit."
+  },
+  "git.branches.notInTarget": {
+    "defaultMessage": "{n, plural, one {# commit not in {target}} other {# commits not in {target}}}",
+    "description": "On a branch of the Not merged group in Version Control → Branches & remotes: how many of its commits aren't in the target branch {target}."
   },
   "git.branches.reload": {
     "defaultMessage": "Read git again (doesn't fetch)",
@@ -26,6 +98,10 @@
   "git.branches.remote": {
     "defaultMessage": "Remote branches ({count, number})",
     "description": "Button in Git → Branches & remotes that shows or hides the remote branches with no local one."
+  },
+  "git.branches.revisionCopied": {
+    "defaultMessage": "Copied",
+    "description": "Shown for a moment after copying a revision beside a branch (Version Control → Branches & remotes)."
   },
   "git.branches.stateBanner": {
     "defaultMessage": "Git is {state, select, merge {merging} rebase {rebasing} cherrypick {cherry-picking} revert {reverting} other {bisecting}} in the project folder. Finish or abort it in a terminal (or ask an agent to): Hive doesn't.",
@@ -42,6 +118,10 @@
   "git.branches.tracksNothing": {
     "defaultMessage": "tracks no remote branch: Push sets one",
     "description": "Beside the branch checked out. Push is the button of that name."
+  },
+  "git.branches.underReview": {
+    "defaultMessage": "under review: {revision}",
+    "description": "Beside a branch's card in Review (Version Control → Branches & remotes), lower case: the revision submitted for review ({revision}: a short commit id, a3f2c1d)."
   },
   "git.busy.agent": {
     "defaultMessage": "{agent} {status, select, starting {is starting} working {is working} waiting {is waiting for your answer} background {is waiting on background tasks it started} watching {is waiting for cards to change (a card watch)} other {stopped in the middle of a task when its sign-in expired}} in the project folder: {action, select, switch {switch branches} create {create and switch to a branch} other {pull}} once it has finished.",
@@ -62,6 +142,46 @@
   "git.cancel": {
     "defaultMessage": "Cancel",
     "description": "Button: closes the Git tab's dialog or form without doing anything."
+  },
+  "git.cleanUp.delete": {
+    "defaultMessage": "Delete Ticked",
+    "description": "The button of the Clean Up Merged Branches dialog: deletes the branches ticked."
+  },
+  "git.cleanUp.deleting": {
+    "defaultMessage": "Deleting…",
+    "description": "The Clean Up Merged Branches or Delete branch dialog's button while branches are being deleted."
+  },
+  "git.cleanUp.failed": {
+    "defaultMessage": "Couldn't delete the branches",
+    "description": "An error notification's title: deleting branches in Version Control → Branches & remotes failed."
+  },
+  "git.cleanUp.local": {
+    "defaultMessage": "In this repository ({n, number})",
+    "description": "A heading in the Clean Up Merged Branches dialog: the local branches it offers ({n}), each with a tick box, ticked to start with."
+  },
+  "git.cleanUp.message": {
+    "defaultMessage": "Every commit of these is already in {target}, and no slot, worktree or open card uses them. Tick the ones to delete.",
+    "description": "The Clean Up Merged Branches dialog: what it lists. {target} is the branch the project merges into."
+  },
+  "git.cleanUp.none": {
+    "defaultMessage": "None",
+    "description": "In the Clean Up Merged Branches dialog, under a heading with nothing to offer."
+  },
+  "git.cleanUp.remote": {
+    "defaultMessage": "On {remotes} ({n, number})",
+    "description": "A heading in the Clean Up Merged Branches dialog: the branches it offers on the remote(s) {remotes} (a list of names), {n} of them, none ticked to start with."
+  },
+  "git.cleanUp.remoteWarn": {
+    "defaultMessage": "Ticking these deletes them on the remote, for everyone who uses it, and Hive can't undo that. None is ticked for you.",
+    "description": "A warning in the Clean Up Merged Branches dialog over the remote branches it offers: deleting them is outward-facing (git push --delete)."
+  },
+  "git.cleanUp.title": {
+    "defaultMessage": "Clean up merged branches",
+    "description": "Title of the Clean Up Merged Branches dialog (Version Control → Branches & remotes)."
+  },
+  "git.cleanUp.withLocal": {
+    "defaultMessage": "its local branch is ticked above",
+    "description": "Beside a remote branch in the Clean Up Merged Branches dialog: the local branch of the same name is ticked to be deleted, so this one is suggested too (it still needs its own tick)."
   },
   "git.fetch.at": {
     "defaultMessage": "As of the last fetch, {when}. Hive never fetches by itself.",
@@ -95,25 +215,41 @@
     "defaultMessage": "no commits yet",
     "description": "What the project folder has checked out in a repository with no commit yet. Lower case: also in the status bar."
   },
+  "git.history.branch": {
+    "defaultMessage": "Branch to show",
+    "description": "The name, for screen readers, of Git → History's branch picker (in its heading)."
+  },
   "git.history.heading": {
     "defaultMessage": "History",
     "description": "Heading of Git → History, before the branch is known."
   },
   "git.history.headingOf": {
     "defaultMessage": "History <faint>of {head}</faint>",
-    "description": "Heading of Git → History. {head} is the branch checked out (or \"detached at abc1234\"). <faint> is the part shown dimmed."
+    "description": "Heading of Git → History. {head} is the branch shown, a drop-down to choose another (or \"detached at abc1234\"). <faint> is the part shown dimmed."
   },
   "git.history.loadTarget": {
     "defaultMessage": "the history",
     "description": "What could not be read in Git → History: shown in \"Could not load {what}: {error}\" and \"Could not refresh {what}; last updated …\"."
   },
+  "git.history.local": {
+    "defaultMessage": "Branches",
+    "description": "A group in Git → History's branch picker: the repository's own branches."
+  },
   "git.history.noCommits": {
     "defaultMessage": "No commits yet.",
     "description": "Git → History when the repository has no commit."
   },
+  "git.history.option": {
+    "defaultMessage": "{kind, select, target {{branch} · target} folder {{branch} · project folder} other {{branch}}}",
+    "description": "A branch in Git → History's branch picker: the branch the project's work merges into (target), the one the project folder has checked out, or another. Keep the select keys."
+  },
   "git.history.reload": {
     "defaultMessage": "Read the history again",
     "description": "Tooltip on the refresh button in Git → History."
+  },
+  "git.history.remote": {
+    "defaultMessage": "Remote branches",
+    "description": "A group in Git → History's branch picker: the remotes' branches (origin/x)."
   },
   "git.hiveVcs.checking": {
     "defaultMessage": "Checking…",
@@ -464,12 +600,12 @@
     "description": "Title of the form that creates a branch."
   },
   "git.parentRepo": {
-    "defaultMessage": "This project is inside the git repository in {folder}, so the Git view only shows it: Hive changes only a project's own repository.",
-    "description": "Banner in the Git tab of a project whose folder is inside another repository (a workspace kept in git). {folder} is that repository's folder."
+    "defaultMessage": "This project is inside the git repository in {folder}, so the Version Control tab only shows it: Hive changes only a project's own repository.",
+    "description": "Banner in the Version Control tab of a project whose folder is inside another repository (a workspace kept in git). {folder} is that repository's folder."
   },
   "git.problem.agentSetup": {
-    "defaultMessage": "Agent Setup",
-    "description": "Button: opens Agent Setup, which checks git and says how to fix it."
+    "defaultMessage": "Provider Setup",
+    "description": "Button: opens Provider Setup, which checks git and says how to fix it."
   },
   "git.problem.cantRead": {
     "defaultMessage": "{problem}, so Hive can't read this repository.",
@@ -547,6 +683,106 @@
     "defaultMessage": "Push {branch}",
     "description": "Title of the dialog that pushes a branch that tracks no remote branch yet."
   },
+  "git.pushTo.about": {
+    "defaultMessage": "{onBranch, select, yes {Pushes to the remote you choose, without changing what {branch} tracks: Push still goes where it went. Never forced: a branch the remote has newer commits on is refused, and named.} other {Pushes to the remote you choose, without changing what any branch tracks. Never forced: a branch the remote has newer commits on is refused, and named.}}",
+    "description": "The Push to form. {branch} is the branch checked out ({onBranch} is no when HEAD is detached). Push is the button of that name."
+  },
+  "git.pushTo.all": {
+    "defaultMessage": "All branches and tags",
+    "description": "A choice of the Push to form's drop-down: every local branch, then every tag."
+  },
+  "git.pushTo.button": {
+    "defaultMessage": "Push to…",
+    "description": "Button beside Push in Git → Branches & remotes: opens the Push to form (any remote, this branch or everything)."
+  },
+  "git.pushTo.thisBranch": {
+    "defaultMessage": "This branch ({branch})",
+    "description": "A choice of the Push to form's drop-down. {branch} is the branch checked out."
+  },
+  "git.pushTo.tip": {
+    "defaultMessage": "Push to any remote, {branch} or every branch and tag, without changing what {branch} tracks",
+    "description": "Tooltip on Push to…. {branch} is the branch checked out."
+  },
+  "git.pushTo.title": {
+    "defaultMessage": "Push to a remote",
+    "description": "Title of the Push to form."
+  },
+  "git.pushTo.what": {
+    "defaultMessage": "Push",
+    "description": "Label of the Push to form's drop-down: what to push (this branch, or every branch and tag)."
+  },
+  "git.queue.cancelled": {
+    "defaultMessage": "Taken out ({reason, select, removed {Remove from queue} stale {its pass no longer counts} hold {On Hold} decision {a decision} integratedOutside {merged outside Hive} other {cancelled}})",
+    "description": "Tooltip of an outcome in the Git tab's merge queue history: the card's entry was taken out of the queue, and why. Keep the select keys."
+  },
+  "git.queue.cancelledShort": {
+    "defaultMessage": "Taken out",
+    "description": "An outcome in the Git tab's merge queue history (one short word or two: why is its tooltip): the card's entry was taken out of the queue."
+  },
+  "git.queue.card": {
+    "defaultMessage": "Card",
+    "description": "A column heading of the Git tab's merge queue history: the card."
+  },
+  "git.queue.history": {
+    "defaultMessage": "History of {target}",
+    "description": "A heading in the Git tab's Merge queue section: the latest outcomes of the queue for the branch {target} follow."
+  },
+  "git.queue.merged": {
+    "defaultMessage": "Merged as {result}",
+    "description": "Tooltip of an outcome in the Git tab's merge queue history: the card was merged; the target's new commit follows ({result}: a short commit id)."
+  },
+  "git.queue.mergedShort": {
+    "defaultMessage": "Merged",
+    "description": "An outcome in the Git tab's merge queue history (one short word or two: the full outcome is its tooltip): the card was merged."
+  },
+  "git.queue.noHistory": {
+    "defaultMessage": "Nothing merged or returned yet.",
+    "description": "The Git tab's Merge queue section, under a queue's history heading, when it has none yet."
+  },
+  "git.queue.none": {
+    "defaultMessage": "No merge queue. When the project's workflow has Hive merge its cards (Version Control → Workflow: Who merges), each target branch's queue shows here, with its history.",
+    "description": "The Version Control tab's Merge queue section when the project has no queue. Version Control → Workflow and Who merges are Hive's names: keep them as Hive shows them. Glossary 2.5: merge queue."
+  },
+  "git.queue.open": {
+    "defaultMessage": "Open {card}",
+    "description": "Accessible name of a row of the Git tab's merge queue history: opens the card ({card}: its key)."
+  },
+  "git.queue.outcome": {
+    "defaultMessage": "Outcome",
+    "description": "A column heading of the Git tab's merge queue history: merged (with the result), returned (with why) or taken out."
+  },
+  "git.queue.reading": {
+    "defaultMessage": "Reading the merge queues…",
+    "description": "The Version Control tab's Merge queue section while the project's queues are read. Glossary 2.5: merge queue."
+  },
+  "git.queue.region": {
+    "defaultMessage": "Merge queues",
+    "description": "Accessible name of the Git tab's Merge queue section: the project's merge queues, a part per target branch. Glossary 2.5: merge queue."
+  },
+  "git.queue.result": {
+    "defaultMessage": "Merge commit",
+    "description": "A column heading of the Git tab's merge queue history: for a merged card, the target's new commit (a short commit id)."
+  },
+  "git.queue.returned": {
+    "defaultMessage": "Returned: {why}",
+    "description": "Tooltip of an outcome in the Git tab's merge queue history: the queue returned the card to its builder, and why ({why}: conflict in tasks.ts, checks failed: unit…). Glossary 2.4: returned."
+  },
+  "git.queue.returnedShort": {
+    "defaultMessage": "Returned",
+    "description": "An outcome in the Git tab's merge queue history (one short word or two: why is its tooltip): the queue returned the card to its builder. Glossary 2.4: returned."
+  },
+  "git.queue.revision": {
+    "defaultMessage": "Revision",
+    "description": "A column heading of the Git tab's merge queue history: the card's revision the entry was for (a short commit id). Glossary: revision."
+  },
+  "git.queue.title": {
+    "defaultMessage": "Title",
+    "description": "A column heading of the Git tab's merge queue history: the card's title."
+  },
+  "git.queue.when": {
+    "defaultMessage": "When",
+    "description": "A column heading of the Git tab's merge queue history: how long ago it happened."
+  },
   "git.reading": {
     "defaultMessage": "Reading git…",
     "description": "A Git tab section while it reads git for the first time."
@@ -562,6 +798,58 @@
   "git.remote.changeTitle": {
     "defaultMessage": "Change {remote}'s URL",
     "description": "Title of the form that changes a remote's URL, and the tooltip of its button. {remote} is its name, such as origin."
+  },
+  "git.remote.removeButton": {
+    "defaultMessage": "Remove",
+    "description": "The button of the confirmation before removing a remote."
+  },
+  "git.remote.removeDetail": {
+    "defaultMessage": "Nothing on {remote} itself changes: its branches stay there, and you can add it again.",
+    "description": "The confirmation before removing a remote, under its list."
+  },
+  "git.remote.removeFailed": {
+    "defaultMessage": "Couldn't remove {remote}",
+    "description": "Title of an error notification."
+  },
+  "git.remote.removeMessage": {
+    "defaultMessage": "{n, plural, =0 {Hive forgets {remote} and its remote branches here. No branch tracks it.} one {Hive forgets {remote} and its remote branches here, and this branch stops tracking it:} other {Hive forgets {remote} and its remote branches here, and these # branches stop tracking it:}}",
+    "description": "The confirmation before removing the remote {remote}; the branches that track it ({n}) follow, one per line."
+  },
+  "git.remote.removeTip": {
+    "defaultMessage": "Remove {remote}…",
+    "description": "Tooltip on a remote's remove button. {remote} is its name."
+  },
+  "git.remote.removeTitle": {
+    "defaultMessage": "Remove the remote {remote}?",
+    "description": "Title of the confirmation before removing a remote."
+  },
+  "git.remote.removing": {
+    "defaultMessage": "Removing…",
+    "description": "The Remove button while it runs."
+  },
+  "git.remote.renameButton": {
+    "defaultMessage": "Rename",
+    "description": "The button of the dialog that renames a remote."
+  },
+  "git.remote.renameFailed": {
+    "defaultMessage": "Couldn't rename {remote}",
+    "description": "Title of an error notification."
+  },
+  "git.remote.renameMessage": {
+    "defaultMessage": "Branches tracking it follow the new name. Nothing changes on the remote itself.",
+    "description": "The dialog that renames a remote."
+  },
+  "git.remote.renameTip": {
+    "defaultMessage": "Rename {remote}…",
+    "description": "Tooltip on a remote's rename button. {remote} is its name, such as origin."
+  },
+  "git.remote.renameTitle": {
+    "defaultMessage": "Rename {remote}",
+    "description": "Title of the dialog that renames a remote. {remote} is its name now."
+  },
+  "git.remote.taken": {
+    "defaultMessage": "There is a remote called {remote} already",
+    "description": "Under the rename dialog's box: another remote has that name."
   },
   "git.remotes.add": {
     "defaultMessage": "Add remote…",
@@ -603,6 +891,22 @@
     "defaultMessage": "URL",
     "description": "Field of the Add a remote form."
   },
+  "git.repoLock.busy": {
+    "defaultMessage": "Another Hive is merging into this repository ({profile}). Nothing was changed: try again once it has finished.",
+    "description": "An error: a merge or another change to a repository didn't start, because another Hive (its profile folder's name, {profile}) still held the repository's merge lock after Hive had waited for it."
+  },
+  "git.repoLock.noGitDir": {
+    "defaultMessage": "Hive couldn't find the git folder of {folder}, so nothing was changed: {why}",
+    "description": "An error: a merge or another change to a repository didn't start, because git couldn't name the repository's git folder (where Hive's merge lock lives). {why} is git's message."
+  },
+  "git.repoLock.waiting": {
+    "defaultMessage": "Another Hive is merging into this repository ({profile})",
+    "description": "A notification's title: this Hive waits to merge into (or change) a repository because another Hive (its profile folder's name, {profile}, e.g. Hive-Dev) holds the repository's merge lock."
+  },
+  "git.repoLock.waitingFor": {
+    "defaultMessage": "Hive waits for it to finish, up to {seconds, number} s.",
+    "description": "The notification's text under \"Another Hive is merging into this repository\": how long this Hive waits for the other one, in seconds."
+  },
   "git.retry": {
     "defaultMessage": "Retry",
     "description": "Button: reads git again."
@@ -619,6 +923,14 @@
     "defaultMessage": "History",
     "description": "The Git tab's section with the last commits and the tags."
   },
+  "git.section.queue": {
+    "defaultMessage": "Merge queue",
+    "description": "The Git tab's section with the project's merge queues (#1357): each target's queue now, its history, Pause and Resume. Glossary 2.5: merge queue."
+  },
+  "git.section.workflow": {
+    "defaultMessage": "Workflow",
+    "description": "The Version Control tab's section with the project's workflow options (glossary 2.1: workflow)."
+  },
   "git.setup.howTo": {
     "defaultMessage": "To use them, make it a repository: Initialise makes it one on a branch called main, keeps its .hive out of git, and commits its files, so agents can work in worktrees at once. Then add a remote under Branches & remotes to push it.",
     "description": "The Git tab of a project that isn't a git repository. Initialise and Branches & remotes are a button and a section: keep them as they are named there. Keep main (the branch name)."
@@ -632,8 +944,8 @@
     "description": "Heading on the Git tab of a project that isn't a git repository. {project} is its name."
   },
   "git.setup.withoutGit": {
-    "defaultMessage": "Without git, agents work in the project folder, and Hive has no worktrees, merging or Git view for it.",
-    "description": "The Git tab of a project that isn't a git repository."
+    "defaultMessage": "Without a repository, agents work in the project folder, and Hive has no worktrees or merging for it.",
+    "description": "The Version Control tab of a Git project whose folder isn't a git repository."
   },
   "git.state": {
     "defaultMessage": "{state, select, merge {merging} rebase {rebasing} cherrypick {cherry-picking} revert {reverting} other {bisecting}}",
@@ -678,10 +990,6 @@
   "git.switch.title": {
     "defaultMessage": "Switch {project} to {branch}?",
     "description": "Title of the confirmation before switching the project folder's branch."
-  },
-  "git.tab.sections": {
-    "defaultMessage": "Git",
-    "description": "Accessible name of the Git tab's row of sections (Changes, History, Branches & remotes)."
   },
   "git.tags.about": {
     "defaultMessage": "{onBranch, select, yes {Tags the commit the project folder has checked out ({branch}). With a message, it's an annotated tag.} other {Tags the commit the project folder has checked out. With a message, it's an annotated tag.}}",
@@ -744,8 +1052,8 @@
     "description": "Title of the Create tag form before the commit is known."
   },
   "git.tip.click": {
-    "defaultMessage": "Click for Git → Branches & remotes.",
-    "description": "Last line of the status bar's git tooltip. Git → Branches & remotes is the tab and its section: keep them as they are named there."
+    "defaultMessage": "Click for Version Control → Branches & remotes.",
+    "description": "Last line of the status bar's git tooltip. Version Control → Branches & remotes is the tab and its section: keep them as they are named there."
   },
   "git.tip.detached": {
     "defaultMessage": "HEAD is detached at {commit}",
@@ -788,12 +1096,12 @@
     "description": "The status bar's git tooltip. {upstream} is the remote branch, such as origin/main; the counts are as of the last fetch."
   },
   "git.tool.fixMissing": {
-    "defaultMessage": "Install Git for Windows ({min} or later), or add the folder holding git.exe to your PATH, then Check again in Agent Setup (no need to restart Hive).",
-    "description": "How to fix git missing. {min} is a git version; Check again is a button in Agent Setup."
+    "defaultMessage": "Install Git for Windows ({min} or later), or add the folder holding git.exe to your PATH, then Check again in Provider Setup (no need to restart Hive).",
+    "description": "How to fix git missing. {min} is a git version; Check again is a button in Provider Setup."
   },
   "git.tool.fixOld": {
-    "defaultMessage": "Update Git for Windows to {min} or later, then Check again in Agent Setup.",
-    "description": "How to fix a git that is too old. {min} is a git version; Check again is a button in Agent Setup."
+    "defaultMessage": "Update Git for Windows to {min} or later, then Check again in Provider Setup.",
+    "description": "How to fix a git that is too old. {min} is a git version; Check again is a button in Provider Setup."
   },
   "git.tool.missing": {
     "defaultMessage": "Git isn't installed (or isn't on Hive's PATH)",
@@ -801,15 +1109,135 @@
   },
   "git.tool.oldLoses": {
     "defaultMessage": "{lost, select, recent {With Git {version}: merging can't check for conflicts before it starts (the merge still stops at one); squash-merged branches still count as unmerged, so Remove All and loading a template keep their worktrees; the merge-ready skill can't check a branch for conflicts.} older {With Git {version}: merging can't check for conflicts before it starts (the merge still stops at one); squash-merged branches still count as unmerged, so Remove All and loading a template keep their worktrees; the merge-ready skill can't check a branch for conflicts; moving a workspace can't repair its worktrees.} other {With Git {version}: merging can't check for conflicts before it starts (the merge still stops at one); squash-merged branches still count as unmerged, so Remove All and loading a template keep their worktrees; the merge-ready skill can't check a branch for conflicts; Remove All and loading a template keep the branches of the worktrees they remove; moving a workspace can't repair its worktrees.}}",
-    "description": "Agent Setup: what does not work with an older git that still runs. {version} is its version; {lost} says how old it is (the older, the more is listed). Remove All and merge-ready are names in Hive."
+    "description": "Provider Setup: what does not work with an older git that still runs. {version} is its version; {lost} says how old it is (the older, the more is listed). Remove All and merge-ready are names in Hive."
   },
   "git.tool.tooOld": {
     "defaultMessage": "Git {version} is too old for Hive (it needs {min} or later)",
     "description": "Said wherever git is needed when the installed git is too old to run. {version} and {min} are git versions. No full stop: some places add more after it."
   },
   "git.tool.tooOldToRun": {
-    "defaultMessage": "Hive's git commands fail with Git {version}: worktrees, merging, the Git tab and the unmerged counts don't work.",
-    "description": "Agent Setup, for a git too old for any of Hive's git commands. {version} is its version."
+    "defaultMessage": "Hive's git commands fail with Git {version}: worktrees, merging, the Version Control tab's Git sections and the unmerged counts don't work.",
+    "description": "Provider Setup, for a git too old for any of Hive's git commands. {version} is its version."
+  },
+  "git.track.about": {
+    "defaultMessage": "{tracks, select, yes {{branch} tracks {upstream} now. Pull and Push use the remote branch it tracks; other remotes stay as they are, and Push to… still pushes there.} other {{branch} tracks no remote branch now. Pull and Push use the remote branch it tracks; other remotes stay as they are, and Push to… still pushes there.}}",
+    "description": "The Track form. {branch} is the local branch; {upstream} the remote branch it tracks now ({tracks} is no when none). Pull, Push and Push to… are buttons: keep their names."
+  },
+  "git.track.button": {
+    "defaultMessage": "Track",
+    "description": "The Track form's button."
+  },
+  "git.track.pushFirst": {
+    "defaultMessage": "{remote} has no {branch} yet, as of the last fetch: Track pushes {local} there first (never forced).",
+    "description": "Under the Track form when the chosen remote branch isn't known to exist. {remote} the remote, {branch} the branch name there, {local} the local branch."
+  },
+  "git.track.remoteBranch": {
+    "defaultMessage": "Remote branch",
+    "description": "Field of the Track form: the branch's name on the remote."
+  },
+  "git.track.tip": {
+    "defaultMessage": "Track…: choose the remote branch {branch} pulls from and pushes to",
+    "description": "Tooltip on a branch's Track… button. {branch} is the local branch."
+  },
+  "git.track.title": {
+    "defaultMessage": "What {branch} tracks",
+    "description": "Title of the Track form. {branch} is the local branch."
+  },
+  "git.untrack.button": {
+    "defaultMessage": "Stop tracking",
+    "description": "The button of the confirmation before a branch stops tracking its remote branch."
+  },
+  "git.untrack.failed": {
+    "defaultMessage": "Couldn't stop {branch} tracking {upstream}",
+    "description": "Title of an error notification."
+  },
+  "git.untrack.message": {
+    "defaultMessage": "{branch} no longer tracks a remote branch: Pull has nothing to pull from, and Push asks where to push it. Nothing changes on the remote.",
+    "description": "The confirmation before a branch stops tracking its remote branch. Pull and Push are buttons: keep their names."
+  },
+  "git.untrack.tip": {
+    "defaultMessage": "Stop tracking {upstream}…",
+    "description": "Tooltip on a branch's stop-tracking button. {upstream} is the remote branch it tracks."
+  },
+  "git.untrack.title": {
+    "defaultMessage": "Stop {branch} tracking {upstream}?",
+    "description": "Title of the confirmation before a branch stops tracking its remote branch."
+  },
+  "git.update.agents": {
+    "defaultMessage": "{agents} {n, plural, one {works} other {work}} there: {n, plural, one {its} other {their}} next turn starts from the updated branch.",
+    "description": "The Update from <target> dialog: agents ({agents}: their names, joined) work in the folder the update runs in, none in a turn now; what they do next starts from the updated branch."
+  },
+  "git.update.approval": {
+    "defaultMessage": "{approval, select, carries {{card} has passed review: its pass carries over when the update is the same change, as a clean merge or rebase is.} other {{card} has passed review: once updated, it goes back for review (the project keeps a pass only for the exact commit).}}",
+    "description": "The Update from <target> dialog, for a card that passed review ({card}: its key): whether the pass survives the update (carries: the project's \"A pass survives a clean rebase\" is on; other: the card is reviewed again). Select: translate each."
+  },
+  "git.update.behind": {
+    "defaultMessage": "{n, plural, one {# commit of {target} it hasn't} other {# commits of {target} it hasn't}}",
+    "description": "On a branch in Version Control → Branches & remotes (HI-1180): how many commits of the target branch {target} the branch doesn't have yet (Update from {target} brings them in)."
+  },
+  "git.update.busy": {
+    "defaultMessage": "Updating…",
+    "description": "The Update from <target> dialog's button while the branch is being updated."
+  },
+  "git.update.card": {
+    "defaultMessage": "It is {card}'s work.",
+    "description": "The Update from <target> dialog: the branch is the line of a card ({card}: its key, such as HI-12) that isn't Done."
+  },
+  "git.update.confirm": {
+    "defaultMessage": "Update",
+    "description": "The Update from <target> dialog's button: updates the branch."
+  },
+  "git.update.counts": {
+    "defaultMessage": "{target} has {behind, plural, one {# commit} other {# commits}} {branch} hasn't; {branch} has {ahead, plural, one {# commit} other {# commits}} of its own.",
+    "description": "The Update from <target> dialog's first sentence: how many commits of the target {target} the branch {branch} lacks ({behind}), and how many it has that the target hasn't ({ahead})."
+  },
+  "git.update.forward": {
+    "defaultMessage": "Fast-forward to {target}",
+    "description": "The one choice in the Update from <target> dialog for a branch with no commits of its own (HI-1180): it is moved forward to the target branch {target}."
+  },
+  "git.update.forwardNote": {
+    "defaultMessage": "{branch} has no commits of its own, so it simply moves forward to {target}: no merge commit, nothing rewritten.",
+    "description": "What Fast-forward does, under the choice in the Update from <target> dialog: the branch {branch} has nothing the target {target} lacks, so it moves to the target."
+  },
+  "git.update.how": {
+    "defaultMessage": "How",
+    "description": "A label in the Update from <target> dialog: the choice of Merge or Rebase."
+  },
+  "git.update.merge": {
+    "defaultMessage": "Merge {target} in",
+    "description": "An option in the Update from <target> dialog (the default): merge the target branch {target} into the branch, as one merge commit."
+  },
+  "git.update.mergeNote": {
+    "defaultMessage": "One merge commit joins {target}'s commits to {branch}'s, which stay as they are.",
+    "description": "What Merge does, under the choice in the Update from <target> dialog: one merge commit; the branch {branch} keeps its own commits as they are."
+  },
+  "git.update.planFailed": {
+    "defaultMessage": "Couldn't read what updating {branch} would do",
+    "description": "An error notification's title (HI-1180): reading what Update from <target> would do to the branch {branch} failed."
+  },
+  "git.update.rebase": {
+    "defaultMessage": "Rebase onto {target}",
+    "description": "An option in the Update from <target> dialog: replay the branch's own commits on top of the target branch {target}."
+  },
+  "git.update.rebaseNote": {
+    "defaultMessage": "{branch}'s {n, plural, one {commit is} other {# commits are}} replayed on top of {target}, as new commits.{pushed, select, yes { What was pushed of {branch} then differs from it, and Hive never forces a push.} other {}}",
+    "description": "What Rebase does, under the choice in the Update from <target> dialog: the branch's {n} commits are rewritten on top of {target}; with pushed yes, it tracks a remote branch, which then no longer matches (pushing it would need a force, which Hive never does)."
+  },
+  "git.update.tip": {
+    "defaultMessage": "Update {branch} from {target}…",
+    "description": "Tooltip on a branch's Update button in Version Control → Branches & remotes (HI-1180): merges the target {target} into the branch {branch}, or rebases it onto {target} (a dialog asks which first)."
+  },
+  "git.update.title": {
+    "defaultMessage": "Update {branch} from {target}",
+    "description": "Title of the Update from <target> dialog (HI-1180): bring the branch {branch} up to date with the target branch {target}."
+  },
+  "git.update.undone": {
+    "defaultMessage": "A conflict is undone at once, leaving {branch} as it was.",
+    "description": "The Update from <target> dialog: if git stops at a conflict, Hive aborts the merge or rebase, so the branch {branch} is never left half updated."
+  },
+  "git.update.where": {
+    "defaultMessage": "{where, select, project {It runs in the project folder, where {branch} is checked out.} slot {It runs in {slot}, the slot {branch} is checked out in.} worktree {It runs in {folder}, where {branch} is checked out.} other {{branch} is checked out nowhere: Hive updates it in a temporary folder, removed after.}}",
+    "description": "The Update from <target> dialog: where the update runs (select: translate each): the project folder, a slot ({slot}: its name, such as slot-a), another worktree ({folder}: its path), or a temporary folder Hive makes when the branch isn't checked out anywhere."
   },
   "git.upstream.gone": {
     "defaultMessage": "upstream gone",
@@ -843,6 +1271,266 @@
     "defaultMessage": "Type the whole URL: its password or token is hidden here",
     "description": "Under a remote's URL box when it still has ••• for a hidden password."
   },
+  "git.vc.choice": {
+    "defaultMessage": "Version control",
+    "description": "Accessible name of the None · Git choice atop the Version Control tab (glossary 2.1: version control)."
+  },
+  "git.vc.fact.gone": {
+    "defaultMessage": "The Git repository is gone from this folder. Until it’s back, what needs Git can’t be read.",
+    "description": "Atop the Version Control tab of a Git project whose .git was removed or moved."
+  },
+  "git.vc.fact.none": {
+    "defaultMessage": "This folder has no version control.",
+    "description": "Atop the Version Control tab, when the project folder has no repository."
+  },
+  "git.vc.fact.other": {
+    "defaultMessage": "{vcs} found: not supported yet, so this project uses None.",
+    "description": "Atop the Version Control tab: another version control was found in the folder. {vcs} is its name (Mercurial, Jujutsu). None: glossary 2.1."
+  },
+  "git.vc.fact.otherGit": {
+    "defaultMessage": "{vcs} found in this folder: not supported yet.",
+    "description": "Atop the Version Control tab of a project still using Git, where another version control was found ({vcs}: Mercurial, Jujutsu). The offer under it says what to do."
+  },
+  "git.vc.fact.repo": {
+    "defaultMessage": "This folder is a Git repository at {root}.",
+    "description": "Atop the Version Control tab: what Hive found in the project folder. {root} is the repository root (glossary 2.1: repository root)."
+  },
+  "git.vc.fact.subfolder": {
+    "defaultMessage": "This folder is inside a Git repository at {root}: branch and merge actions affect that whole repository.",
+    "description": "Atop the Version Control tab, when the project is a subfolder of a larger repository. {root} is that repository’s root."
+  },
+  "git.vc.git": {
+    "defaultMessage": "Git",
+    "description": "A version control system’s name, in the choice atop the Version Control tab (glossary 2.1: keep)."
+  },
+  "git.vc.initHint": {
+    "defaultMessage": "Initialise repository… makes this folder a Git repository on a branch called main, keeps its .hive out of git and commits its files.",
+    "description": "Under the header of the Version Control tab of a project whose folder has no repository, beside the button. Initialise repository… is the button’s name: keep it as translated there. Keep main (the branch name)."
+  },
+  "git.vc.initOwnHint": {
+    "defaultMessage": "Initialise its own repository… makes this folder a Git repository of its own on a branch called main, keeps its .hive out of git and commits its files.",
+    "description": "Git’s page in the Version Control tab of a project inside another repository, under its buttons. Initialise its own repository… is the button’s name: keep it as translated there. Keep main (the branch name)."
+  },
+  "git.vc.insideRepo": {
+    "defaultMessage": "This folder is inside the Git repository at {root}: use that one, or give this folder its own.",
+    "description": "Git’s page in the Version Control tab of a project inside another repository, chosen before it has its own: above the buttons Use that repository… and Initialise its own repository…. {root} is the outer repository’s folder."
+  },
+  "git.vc.noCommitYet": {
+    "defaultMessage": "This folder's Git repository has no first commit yet.",
+    "description": "Git’s page in the Version Control tab, when Initialise repository… made the repository but stopped before its first commit: above the Make first commit… button."
+  },
+  "git.vc.none": {
+    "defaultMessage": "None",
+    "description": "The version control of a project without any, in the choice atop the Version Control tab and in \"Workflow: None · Solo\" (glossary 2.1: None)."
+  },
+  "git.vc.notRepoYet": {
+    "defaultMessage": "This folder isn't a Git repository yet.",
+    "description": "Git’s page in the Version Control tab of a project whose folder has no repository, chosen before it has one: above the Initialise repository… button."
+  },
+  "git.vc.offer.gitFound": {
+    "defaultMessage": "Git found at {root}: switch to Git?",
+    "description": "An offer atop the Version Control tab of a project without version control, after someone ran git init: {root} is the repository root. Hive never switches by itself."
+  },
+  "git.vc.offer.notNow": {
+    "defaultMessage": "Not Now",
+    "description": "A button of the offer to switch version control (atop the Version Control tab): hides the offer until Hive starts again."
+  },
+  "git.vc.offer.otherFound": {
+    "defaultMessage": "{vcs} found: not supported yet, so this project can only use None.",
+    "description": "An offer atop the Version Control tab of a Git project where another version control ({vcs}: Mercurial, Jujutsu) is found now. None: glossary 2.1."
+  },
+  "git.vc.offer.repositoryGone": {
+    "defaultMessage": "The Git repository is gone. Git’s rules hold until you switch, because what they check can’t be read.",
+    "description": "An offer atop the Version Control tab of a Git project whose .git folder was removed or moved: its cards are refused until the user switches to None or the repository is back."
+  },
+  "git.vc.offer.switchGit": {
+    "defaultMessage": "Switch…",
+    "description": "A button of the offer to switch a project to Git (atop the Version Control tab): shows what changes, then asks. The … says it asks first: keep it."
+  },
+  "git.vc.offer.switchNone": {
+    "defaultMessage": "Switch to None…",
+    "description": "A button of the offer to switch a project to None, no version control (atop the Version Control tab): shows what changes, then asks. The … says it asks first: keep it. None: glossary 2.1."
+  },
+  "git.vc.previewTip": {
+    "defaultMessage": "Git needs this folder to be a repository: Initialise repository… makes it one. Nothing changes until you do.",
+    "description": "Tooltip of Git in the None · Git choice atop the Version Control tab of a project whose folder has no repository of its own: clicking it shows Git’s page, which only offers Initialise repository… (keep it as translated on that button)."
+  },
+  "git.vc.sections": {
+    "defaultMessage": "Version Control",
+    "description": "Accessible name of the Version Control tab's row of sections (Workflow, Changes, History…). Glossary 2.1: Version Control (the tab)."
+  },
+  "git.vc.step.cantSave": {
+    "defaultMessage": "This preset can’t be saved for the project:",
+    "description": "Before the reasons a preset can’t be saved (it contradicts the workspace’s options, say), in the \"How do you work?\" step."
+  },
+  "git.vc.step.choose": {
+    "defaultMessage": "Choose {preset}",
+    "description": "The step’s main button: saves the preset shown ({preset}: Solo, Pair, Team) as the project’s workflow options, after a confirmation."
+  },
+  "git.vc.step.confirmTitle": {
+    "defaultMessage": "Use {preset} for {project}?",
+    "description": "Title of the confirmation after Choose in the \"How do you work?\" step. {preset} is Solo, Pair or Team; {project} the project’s name."
+  },
+  "git.vc.step.customise": {
+    "defaultMessage": "Customise…",
+    "description": "A button of the \"How do you work?\" step: opens the Workflow section with the preset shown filled in, not saved. The … says more follows: keep it."
+  },
+  "git.vc.step.details": {
+    "defaultMessage": "What {preset} sets",
+    "description": "A link in the \"How do you work?\" step: shows each option the preset shown ({preset}: Solo, Pair, Team) sets, and why."
+  },
+  "git.vc.step.hideDetails": {
+    "defaultMessage": "Hide what {preset} sets",
+    "description": "The link in the \"How do you work?\" step once the preset’s options are shown: hides them again. {preset} is Solo, Pair or Team."
+  },
+  "git.vc.step.intro": {
+    "defaultMessage": "A preset sets up this project’s workflow in one click: who reviews the work, which checks pass first and who merges. Nothing changes until you choose.",
+    "description": "Under \"How do you work?\": what choosing a preset does (glossary 2.1: preset, workflow)."
+  },
+  "git.vc.step.introNone": {
+    "defaultMessage": "A preset sets up this project’s workflow in one click: who reviews the work and which checks pass first. Nothing changes until you choose.",
+    "description": "Under \"How do you work?\" for a project without version control (None): what choosing a preset does. None has no merging, so unlike the Git intro it names no merges (glossary 2.1: preset, workflow)."
+  },
+  "git.vc.step.keeps": {
+    "defaultMessage": "{n, plural, one {The card in flight keeps the rules it started with; the options apply from the next card.} other {The # cards in flight keep the rules they started with; the options apply from the next card.}}",
+    "description": "The confirmation after Choose in the \"How do you work?\" step, when cards have started (glossary: old rules)."
+  },
+  "git.vc.step.notNow": {
+    "defaultMessage": "Not Now",
+    "description": "A button of the \"How do you work?\" step: no preset; the options stay inherited and the step isn’t offered again for this version control."
+  },
+  "git.vc.step.nothing": {
+    "defaultMessage": "Nothing is in flight yet: its options apply from the first card that starts.",
+    "description": "The confirmation after Choose in the \"How do you work?\" step, when no card has started and no lane runs."
+  },
+  "git.vc.step.presets": {
+    "defaultMessage": "Presets",
+    "description": "Accessible name of the row of presets (Solo, Pair, Team) in the \"How do you work?\" step."
+  },
+  "git.vc.step.saved": {
+    "defaultMessage": "{project} uses {preset}",
+    "description": "A notice after a preset was chosen in the \"How do you work?\" step."
+  },
+  "git.vc.step.suggested": {
+    "defaultMessage": "Suggested",
+    "description": "A tag on the preset Hive suggests for the project, in the \"How do you work?\" step."
+  },
+  "git.vc.step.title": {
+    "defaultMessage": "How do you work?",
+    "description": "The heading of the step that offers a new project a preset (Solo, Pair, Team), atop its Version Control tab."
+  },
+  "git.vc.step.use": {
+    "defaultMessage": "Use {preset}",
+    "description": "The confirm button after Choose in the \"How do you work?\" step. {preset} is Solo, Pair or Team."
+  },
+  "git.vc.step.why": {
+    "defaultMessage": "{why, select, solo {Suggested for one agent or none.} pair {Suggested for a builder and a reviewer.} other {Suggested for more agents than a builder and a reviewer.}}",
+    "description": "Why Hive suggests the marked preset, from the project’s agents, in the \"How do you work?\" step. Keep the select keys."
+  },
+  "git.vc.stepNotice.choose": {
+    "defaultMessage": "Choose…",
+    "description": "A button of the notice for projects added without a workflow: opens the first one’s Version Control tab at \"How do you work?\". The … says more follows: keep it."
+  },
+  "git.vc.stepNotice.notNow": {
+    "defaultMessage": "Not Now",
+    "description": "A button of the notice for projects added without a workflow: answers \"How do you work?\" with Not now for each (their options stay inherited), so it isn’t shown again."
+  },
+  "git.vc.stepNotice.text": {
+    "defaultMessage": "{n, plural, one {{projects} was added: how do you work?} other {{projects} were added: how do you work?}} A preset sets up a workflow in one click.",
+    "description": "A notice for projects Hive found in the workspace (or the Assistant added) that have no workflow yet: it offers the \"How do you work?\" step (glossary 2.1: preset, workflow). {projects} is a list of project names; {n} how many."
+  },
+  "git.vc.switch.changed": {
+    "defaultMessage": "Changed meanwhile: this project uses {platform} now. Look again before switching.",
+    "description": "Why a switch of version control was refused: someone else switched it since the tab was shown. {platform} is None or Git."
+  },
+  "git.vc.switch.confirm": {
+    "defaultMessage": "Switch",
+    "description": "The confirm button of the warning before switching a project’s version control."
+  },
+  "git.vc.switch.done": {
+    "defaultMessage": "{project} uses {platform} from its next card",
+    "description": "A notice after switching a project’s version control. {project} is its name, {platform} None or Git."
+  },
+  "git.vc.switch.fresh": {
+    "defaultMessage": "It has no {to} options of its own yet: they come from the workspace’s and Hive’s defaults until you choose some. {from}’s are kept for a switch back.",
+    "description": "In the warning before switching version control, when the project never used the other one: it starts with no options of its own (inherited). {to} and {from} are None or Git."
+  },
+  "git.vc.switch.gitFolder": {
+    "defaultMessage": "This folder is still a Git repository, but with None Hive records no commits or merges for its cards.",
+    "description": "In the warning before switching a project to None (no version control) while its folder is a Git repository. None: glossary 2.1."
+  },
+  "git.vc.switch.inFlight": {
+    "defaultMessage": "{n, plural, one {This card in flight finishes under {from}’s rules (old rules):} other {These cards in flight finish under {from}’s rules (old rules):}}",
+    "description": "In the warning before switching version control, above the cards already started (glossary: old rules). {from} is None or Git. Unlike other option changes, a switch can’t be applied to them."
+  },
+  "git.vc.switch.lane": {
+    "defaultMessage": "Lane “{name}” (builder {builder})",
+    "description": "A running lane in the warning before switching version control. {builder} is the agent building its cards, {name} the lane’s name. A noun before the name (glossary §1 rule 4)."
+  },
+  "git.vc.switch.laneUnnamed": {
+    "defaultMessage": "Lane (builder {builder})",
+    "description": "A running lane with no name in the warning before switching version control. {builder} is the agent building its cards. A noun before the name (glossary §1 rule 4)."
+  },
+  "git.vc.switch.lanes": {
+    "defaultMessage": "{n, plural, one {This running lane keeps {from}’s rules until it ends:} other {These running lanes keep {from}’s rules until they end:}}",
+    "description": "In the warning before switching version control, above the lanes running now (glossary: lane, old rules). {from} is None or Git."
+  },
+  "git.vc.switch.noGit": {
+    "defaultMessage": "No Git repository here: Initialise repository… first.",
+    "description": "Why a project can’t be switched to Git (the Version Control tab’s choice, a refusal): its folder has no Git repository. Initialise repository… is a button’s name: keep it as translated there."
+  },
+  "git.vc.switch.notSwitched": {
+    "defaultMessage": "{project} is a Git repository now, but it wasn't switched to Git: {error}",
+    "description": "A notice after Initialise repository… chosen from Git’s page made the repository but switching the project to Git failed. {project} is its name, {error} why (already translated)."
+  },
+  "git.vc.switch.nothing": {
+    "defaultMessage": "Nothing is in flight: every card works under {to} from now.",
+    "description": "In the warning before switching version control when no card has started and no lane runs. {to} is None or Git."
+  },
+  "git.vc.switch.otherFound": {
+    "defaultMessage": "{vcs} found: not supported yet, so this project can only use None.",
+    "description": "Why a project can’t be switched to Git: another version control ({vcs}: Mercurial, Jujutsu) was found in its folder. None: glossary 2.1."
+  },
+  "git.vc.switch.queue": {
+    "defaultMessage": "Their merge queue carries on, and stays in this tab and the Progress panel until it’s clear.",
+    "description": "In the warning before switching from Git to None, under the Git cards in flight: their merge queue goes on until it is empty."
+  },
+  "git.vc.switch.restored": {
+    "defaultMessage": "The {to} options it had before come back as they were; {from}’s are kept for a switch back.",
+    "description": "In the warning before switching version control, when the project used the other one before: its options for it are restored. {to} and {from} are None or Git."
+  },
+  "git.vc.switch.title": {
+    "defaultMessage": "Switch {project} to {platform}?",
+    "description": "Title of the warning before switching a project’s version control. {project} is its name, {platform} None or Git."
+  },
+  "git.vc.switch.what": {
+    "defaultMessage": "From its next card, {project} uses {to} and {to}’s own workflow options. Cards already started keep {from}’s rules.",
+    "description": "The warning before switching a project’s version control: what changes. {to} and {from} are None or Git."
+  },
+  "git.vc.switchTip": {
+    "defaultMessage": "Switch this project to {platform}, from its next card. Hive shows what changes first.",
+    "description": "Tooltip of the version control not in use, in the None · Git choice atop the Version Control tab: clicking it asks before switching. {platform} is None or Git."
+  },
+  "git.vc.templateNotApplied": {
+    "defaultMessage": "{project} still uses None, so the Git workflow of {template} wasn’t applied. Switch the project to Git, then load the template again.",
+    "description": "A notice (HI-1910): the repository was made from Git’s page for a template ({template}) whose workflow needs Git, but the project ({project}) wasn’t switched to Git (refused, or the warning cancelled). None and Git as Hive names them."
+  },
+  "git.vc.templatePending": {
+    "defaultMessage": "For the template {template}: once the repository is made and this project uses Git, its Load dialog opens again.",
+    "description": "Git’s page in the Version Control tab (HI-1910), opened from the Load template dialog because the template’s workflow needs Git. {template} is its name."
+  },
+  "git.vc.useParent": {
+    "defaultMessage": "Use that repository…",
+    "description": "Button on Git’s page in the Version Control tab of a project inside another repository: switches the project to Git on that repository, after the warning (the … says it asks first: keep it)."
+  },
+  "git.vc.workflow": {
+    "defaultMessage": "Workflow: {platform} · {state, select, preset {{preset}} custom {Custom (from {preset})} other {no preset chosen}}",
+    "description": "A link atop the Version Control tab: the project’s workflow, its version control ({platform}: None or Git) and its preset ({preset}: Solo, Pair, Team); Custom when the options were changed after it. Opens the Workflow section. Glossary 2.1: workflow, preset, Custom."
+  },
+  "git.vc.workflowTip": {
+    "defaultMessage": "Show the workflow options",
+    "description": "Tooltip of the \"Workflow: Git · Team\" link atop the Version Control tab."
+  },
   "git.worktree.agent": {
     "defaultMessage": "{agent}'s worktree",
     "description": "A worktree that belongs to an agent. {agent} is the agent's name."
@@ -850,6 +1538,10 @@
   "git.worktree.badge": {
     "defaultMessage": "worktree",
     "description": "Badge on a branch checked out in a worktree that isn't an agent's."
+  },
+  "git.worktree.slotLease": {
+    "defaultMessage": "{kind, select, card {{slot}: {agent} on {card}} lane {{slot}: {agent}, lane {lane}} carried {{slot}: carried, agent {agent}} other {{slot}: not lent}}",
+    "description": "A slot's row in Git → Branches & remotes, Worktrees (#1450): its name and its lease: lent to an agent ({agent}) for a card ({card}: its key) or a lane ({lane}: its name), carried for an agent (its old worktree, adopted), or not lent. carried: a noun before the name (glossary §1 rule 4)."
   },
   "git.worktree.unused": {
     "defaultMessage": "Unused worktree",
@@ -859,9 +1551,33 @@
     "defaultMessage": "Changes",
     "description": "Button on a worktree's row: shows its changes in Git → Changes."
   },
+  "git.worktrees.copiesHeading": {
+    "defaultMessage": "Review copies (Hive’s)",
+    "description": "A heading in Git → Branches & remotes, followed by how many: the worktrees Hive keeps for reviews (review copies: clean checkouts at the revision a reviewer checks). Hive's own, not the user's."
+  },
+  "git.worktrees.copiesHint": {
+    "defaultMessage": "Clean checkouts Hive keeps for reviewers, each at the revision being checked. Hive manages them: there is nothing to remove here.",
+    "description": "Under the Review copies (Hive's) heading in Git → Branches & remotes."
+  },
+  "git.worktrees.copyRow": {
+    "defaultMessage": "{use, select, review {{copy}: {agent} reviewing {card} at {revision}} check {{copy}: {agent} checking {card} at {revision}} other {{copy}: idle in the pool}}",
+    "description": "A review copy's row in Git → Branches & remotes: its name ({copy}, such as copy-1, keep it as it is) and who uses it: a reviewer ({agent}) reviewing a card ({card}: its key) at a revision ({revision}: a short commit id), an agent running a check on it, or no one (idle in Hive's pool of copies). Keep the select keys."
+  },
   "git.worktrees.heading": {
     "defaultMessage": "Worktrees",
     "description": "Heading in Git → Branches & remotes, followed by how many there are."
+  },
+  "git.worktrees.queueHeading": {
+    "defaultMessage": "Merge queue (Hive’s)",
+    "description": "A heading in Git → Branches & remotes, followed by how many: the folder Hive's merge queue tests merges in (glossary: merge queue). Hive's own, not the user's."
+  },
+  "git.worktrees.queueHint": {
+    "defaultMessage": "Where Hive’s merge queue tests a card’s merge before it goes in. Hive manages it: there is nothing to remove here.",
+    "description": "Under the Merge queue (Hive's) heading in Git → Branches & remotes."
+  },
+  "git.worktrees.queueRow": {
+    "defaultMessage": "The merge queue’s folder",
+    "description": "The merge queue's folder's row in Git → Branches & remotes (glossary: merge queue)."
   },
   "git.worktrees.readOnly": {
     "defaultMessage": "Read-only here: an agent's work comes into the project folder through Merge.",

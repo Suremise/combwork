@@ -72,6 +72,17 @@ describe('test tooling starts nothing through the shell (#599)', () => {
     // ShellExecute starts a program with the default error mode, under which a startup failure shows Windows' dialog and
     // waits for someone to click OK. child_process (and node-pty) start it directly, with the parent's mode.
     const shellLaunch = [/Start-Process/i, /Invoke-Item/i, /\bshell\.open(Path|External)\s*\(/, /['"]\/c['"],\s*['"]start['"]/i, /cmd(\.exe)?\s+\/c\s+start\b/i, /\bstart\s+""/i]
+    // Lines that name the rule without starting anything: the focused tests' picker lists what this test scans (HI-1367);
+    // the Sandbox checks run a command inside Windows Sandbox (its guest, not this machine), and their tests quote the
+    // errors PowerShell wrote there (HI-2298).
+    const allowed: Record<string, string[]> = {
+      'tests/sandbox/checks.cjs': ["await s.run(1, '1. open Installed apps', 'start \"\" ms-settings:appsfeatures', { timeoutSec: 30 })"],
+      'tests/sandboxChecks.test.ts': [
+        "const BLOCKED_ERR = 'Start-Process : This command cannot be run due to the error: An Applic \\r\\nation Control policy has blocked this file.\\r\\nAt C:\\\\tools\\\\hive-tests\\\\sandbox\\\\inside\\\\install.ps1:17 char:6'",
+        "const { r, json } = runChecks('install-fails', [{ match: 'install\\\\.ps1', exit: 1, stderr: 'Start-Process : The system cannot find the file specified.' }], ['--only', 'fresh'])"
+      ],
+      'tests/e2e/affected.mjs': ["{ test: 'tests/windowsExits.test.ts', paths: ['tests/', 'scripts/'], lines: ['start-process', 'invoke-item', 'shell\\\\.open(path|external)', '\\\\bstart\\\\b'] },"]
+    }
     const files = execFileSync('git', ['ls-files', '-co', '--exclude-standard', 'tests', 'scripts'], { cwd: root, encoding: 'utf8' })
       .split(/\r?\n/)
       .filter((f) => /\.(c|m)?[jt]s$/.test(f) && !f.startsWith('tests/fixtures/') && f !== 'tests/windowsExits.test.ts')
@@ -80,8 +91,10 @@ describe('test tooling starts nothing through the shell (#599)', () => {
       readFileSync(join(root, f), 'utf8')
         .split(/\r?\n/)
         // Code, not the comments that explain the rule.
-        .flatMap((l, i) => (!/^\s*(\/\/|\*|\/\*)/.test(l) && shellLaunch.some((re) => re.test(l)) ? [`${f}:${i + 1}`] : []))
+        .flatMap((l, i) => (!/^\s*(\/\/|\*|\/\*)/.test(l) && shellLaunch.some((re) => re.test(l)) && !allowed[f]?.includes(l.trim()) ? [`${f}:${i + 1}`] : []))
     )
     expect(found).toEqual([])
+    // Each allowance is still there: one that isn't goes from the list.
+    for (const [f, lines] of Object.entries(allowed)) expect(readFileSync(join(root, f), 'utf8').split(/\r?\n/).map((l) => l.trim()), f).toEqual(expect.arrayContaining(lines))
   })
 })

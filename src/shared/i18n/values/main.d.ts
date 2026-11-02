@@ -1,6 +1,22 @@
 // Generated from locales/en/main.json: do not edit. Each message's placeholders and their types, for tr(): a
 // global script, so its interface merges with every other area's (shared/i18n/msg.ts).
 interface HiveMessageValues {
+  'main.accounts.badTarget': { target: string | number; cli: string | number }
+  'main.accounts.checkHeld': { name: string | number; cli: string | number }
+  'main.accounts.folderNotUsable': { name: string | number }
+  'main.accounts.inUse': { name: string | number }
+  'main.accounts.keyRemoveFailed': { name: string | number }
+  'main.accounts.leftover': { name: string | number }
+  'main.accounts.makeFailed': { error: string | number }
+  'main.accounts.noHome': { cli: string | number; folder: string | number }
+  'main.accounts.noName': undefined
+  'main.accounts.noProvider': { cli: string | number }
+  'main.accounts.notFound': undefined
+  'main.accounts.nothingToKeep': { name: string | number }
+  'main.accounts.removeFailed': { name: string | number; error: string | number }
+  'main.accounts.running': { name: string | number }
+  'main.accounts.setUpCancelled': { name: string | number }
+  'main.accounts.usageMove.bad': undefined
   'main.antivirus.allExcluded': undefined
   'main.antivirus.changed': undefined
   'main.antivirus.closed': undefined
@@ -14,11 +30,34 @@ interface HiveMessageValues {
   'main.antivirus.tooLong': undefined
   'main.antivirus.unreadable': undefined
   'main.antivirus.windowsOnly': undefined
+  'main.assistantQuestion.answered': undefined
   'main.board.damagedBody': { files: string | number; folder: string | number }
   'main.board.damagedTitle': { n: number }
   'main.board.foundBody': { folder: string | number }
   'main.board.foundTitle': { n: number }
   'main.board.review': undefined
+  'main.branchMerge.cardWork': { branch: string | number; card: string | number }
+  'main.branchMerge.notBranch': { branch: string | number }
+  'main.branchMerge.same': { branch: string | number }
+  'main.connections.badMode': { cli: string | number; mode: string | number }
+  'main.connections.beingRemoved': { name: string | number }
+  'main.connections.choice.missing': { agent: string | number }
+  'main.connections.choice.off': { name: string | number; agent: string | number }
+  'main.connections.choice.otherCli': { name: string | number; agent: string | number }
+  'main.connections.inUse': { name: string | number; users: string | number }
+  'main.connections.launch.changedAgain': { agent: string | number }
+  'main.connections.launch.changing': { name: string | number; agent: string | number }
+  'main.connections.launch.deleted': { agent: string | number }
+  'main.connections.launch.noKey': { name: string | number; agent: string | number }
+  'main.connections.launch.none': { cli: string | number; agent: string | number }
+  'main.connections.launch.offNoDefault': { agent: string | number; name: string | number; cli: string | number }
+  'main.connections.launch.otherProvider': { agent: string | number; cli: string | number }
+  'main.connections.launch.signedOut': { name: string | number; agent: string | number }
+  'main.connections.moveFailed': { project: string | number }
+  'main.connections.nameTaken': { account: string | number; name: string | number }
+  'main.connections.noName': undefined
+  'main.connections.notFound': undefined
+  'main.connections.userIn': { agent: string | number; project: string | number }
   'main.console.noWorkspace': undefined
   'main.console.title': { workspace: string | number }
   'main.corrupt.damaged': { file: string | number }
@@ -30,6 +69,10 @@ interface HiveMessageValues {
   'main.finished.inProject': { n: number; project: string | number }
   'main.finished.many': { n: number }
   'main.finished.project': { project: string | number; n: string | number }
+  'main.freshStart.action': undefined
+  'main.freshStart.body': { project: string | number }
+  'main.freshStart.notFound': { agent: string | number }
+  'main.freshStart.title': undefined
   'main.gitInit.already': undefined
   'main.gitInit.done': { steps: string | number }
   'main.gitInit.failed.commit': undefined
@@ -67,13 +110,26 @@ interface HiveMessageValues {
   'main.installDir.whatFolder': undefined
   'main.installDir.whyFile': undefined
   'main.installDir.whyFolder': undefined
+  'main.keys.maskingFull': undefined
+  'main.keys.maskingUnreadable': undefined
+  'main.keys.unsafe': undefined
   'main.leftovers.end': undefined
   'main.leftovers.keep': undefined
   'main.leftovers.leave': undefined
+  'main.leftovers.offerChanged': undefined
+  'main.leftovers.offerEnded': { n: number }
+  'main.leftovers.offerEndedSome': { n: number; more: number }
+  'main.leftovers.offerGone': undefined
+  'main.leftovers.offerIncomplete': undefined
+  'main.leftovers.offerKept': undefined
+  'main.leftovers.offerNotEnded': { n: number }
+  'main.leftovers.offerUnchecked': undefined
   'main.leftovers.quitDetail': { n: number }
   'main.leftovers.quitMessage': { n: number }
   'main.leftovers.restoredBody': { n: number; processes: string | number }
   'main.leftovers.restoredTitle': { n: number; agent: string | number }
+  'main.mergeSlot.expiredBody': { agent: string | number; branch: string | number }
+  'main.mergeSlot.expiredTitle': { agent: string | number }
   'main.mergeSlot.leftBody': { branch: string | number; hasCards: string; cards: string | number; folder: string | number }
   'main.mergeSlot.leftBodyGone': { branch: string | number; hasCards: string; cards: string | number; project: string | number; folder: string | number }
   'main.mergeSlot.leftTitle': { agent: string | number }
@@ -83,10 +139,33 @@ interface HiveMessageValues {
   'main.move.already': undefined
   'main.move.alsoMoved': { n: number; things: string | number; from: string | number; to: string | number }
   'main.move.assistant': undefined
+  'main.move.branchBoth': undefined
+  'main.move.branchFailed': { host: string | number; from: string | number; agent: string | number; to: string | number; why: string | number }
+  'main.move.branchGone': { host: string | number; from: string | number; agent: string | number }
+  'main.move.branchQueued': undefined
+  'main.move.branchRenamed': { host: string | number; from: string | number; agent: string | number; to: string | number }
+  'main.move.branchRenamedRemote': { host: string | number; from: string | number; agent: string | number; to: string | number; remote: string | number }
+  'main.move.branchTaken': { host: string | number; from: string | number; agent: string | number; to: string | number }
+  'main.move.branchUnrecorded': { host: string | number; agent: string | number; to: string | number; why: string | number }
   'main.move.cards': { n: number; from: string | number; to: string | number }
+  'main.move.cardsNotMoved': { host: string | number; agent: string | number; path: string | number; why: string | number }
+  'main.move.closeRunsFailed': { why: string | number }
   'main.move.copied': { n: number; owner: string; host: string | number; provider: string | number; agent: string | number; of: string | number }
   'main.move.copyFailed': { n: number; owner: string; host: string | number; provider: string | number; folder: string | number; files: string | number; agent: string | number; of: string | number }
   'main.move.copyKept': { n: number; owner: string; host: string | number; provider: string | number; folder: string | number; files: string | number; agent: string | number; of: string | number }
+  'main.move.defenderFailed': { why: string | number }
+  'main.move.folder.busy': undefined
+  'main.move.folder.failed': { host: string | number; what: string | number; path: string | number; why: string | number }
+  'main.move.folder.forgotten': { host: string | number; what: string | number; path: string | number }
+  'main.move.folder.homeMissing': { host: string | number; what: string | number; path: string | number }
+  'main.move.folder.later': { host: string | number; what: string | number; path: string | number }
+  'main.move.folder.movedTo': { host: string | number; what: string | number; path: string | number }
+  'main.move.folder.original': { host: string | number; what: string | number; path: string | number; project: string | number }
+  'main.move.folder.recreateFailed': { host: string | number; what: string | number; why: string | number }
+  'main.move.folder.recreated': { host: string | number; what: string | number; branch: string | number; path: string | number }
+  'main.move.folder.released': { host: string | number; what: string | number }
+  'main.move.folder.relinked': { host: string | number; what: string | number; path: string | number }
+  'main.move.folder.slotMissing': { hasBranch: string; host: string | number; what: string | number; path: string | number; branch: string | number }
   'main.move.gitFailed': { command: string | number }
   'main.move.lanes': { n: number }
   'main.move.madeNew': { host: string | number; agent: string | number; branch: string | number; path: string | number }
@@ -103,6 +182,34 @@ interface HiveMessageValues {
   'main.move.recreateFailed': { host: string | number; agent: string | number; why: string | number }
   'main.move.recreated': { host: string | number; agent: string | number; branch: string | number; path: string | number }
   'main.move.relinked': { host: string | number; agent: string | number; path: string | number }
+  'main.move.result.agentWorktree': { agent: string | number }
+  'main.move.result.cards': { n: number }
+  'main.move.result.copied': { n: number }
+  'main.move.result.copyFailed': { n: number }
+  'main.move.result.copyKept': { n: number }
+  'main.move.result.failed': { why: string | number }
+  'main.move.result.folderMissing': { kind: string; gone: string }
+  'main.move.result.forgotten': undefined
+  'main.move.result.given': { to: string | number; what: string | number }
+  'main.move.result.gone': undefined
+  'main.move.result.later': undefined
+  'main.move.result.linked': undefined
+  'main.move.result.missing': { gone: string }
+  'main.move.result.notGiven': { to: string | number; why: string | number }
+  'main.move.result.notRepaired': { hasWhy: string; why: string | number }
+  'main.move.result.original': undefined
+  'main.move.result.pruneBlocked': { n: number; worktrees: string | number }
+  'main.move.result.recent': undefined
+  'main.move.result.recreateFailed': { made: string; why: string | number }
+  'main.move.result.recreated': { made: string }
+  'main.move.result.released': undefined
+  'main.move.result.renameFailed': { why: string | number }
+  'main.move.result.renamed': { remote: string }
+  'main.move.result.sessions': { n: number }
+  'main.move.result.taken': undefined
+  'main.move.result.unlinked': undefined
+  'main.move.result.unrecorded': { why: string | number }
+  'main.move.result.working': { projects: string | number }
   'main.move.running': { agents: string | number }
   'main.move.savedFailed': { from: string | number; to: string | number; why: string | number }
   'main.move.sessions': { n: number; host: string | number }
@@ -111,19 +218,60 @@ interface HiveMessageValues {
   'main.move.watches': { n: number }
   'main.move.workingMoved': { projects: string | number }
   'main.move.workingRenamed': { n: number; projects: string | number }
+  'main.notify.answered': undefined
+  'main.notify.sessionEnded': undefined
+  'main.outage.gaveUpBody': { n: number }
+  'main.outage.gaveUpTitle': { agent: string | number }
+  'main.outage.progressTitle': { agent: string | number }
+  'main.outage.progressWaiting': undefined
+  'main.outage.resumedSummary': { dropped: string | number; back: string | number }
+  'main.outage.timedOutBody': { minutes: number }
+  'main.outage.timedOutTitle': { agent: string | number }
+  'main.outcome.allowed': undefined
+  'main.outcome.conversationEnded': undefined
+  'main.outcome.conversationMoved': undefined
+  'main.outcome.modesChanged': undefined
+  'main.outcome.modesNextSession': undefined
+  'main.outcome.modesNothing': undefined
+  'main.outcome.namesDiffer': undefined
+  'main.outcome.noLongerAsked': undefined
+  'main.outcome.noLongerHeld': undefined
+  'main.outcome.notResumed': undefined
+  'main.outcome.offerReplaced': undefined
+  'main.outcome.openHereAgain': undefined
+  'main.outcome.released': undefined
+  'main.outcome.resuming': undefined
+  'main.outcome.runsAnother': undefined
+  'main.outcome.stoppedAndResumed': undefined
+  'main.outcome.updateInstalling': undefined
+  'main.outcome.updateNotReady': undefined
   'main.plan.close': undefined
   'main.plan.pause': undefined
   'main.plan.resetsAt': { time: string | number }
   'main.plan.resetsOn': { when: string | number }
   'main.plan.used': { share: number; provider: string | number; window: string; hours: number; label: string | number }
+  'main.plan.usedOn': { share: number; window: string; hours: number; label: string | number; connection: string | number }
   'main.quit.closed': undefined
   'main.quit.closedBody': { n: number }
   'main.quit.dialogTitle': undefined
   'main.removal.ahead': { n: number }
   'main.removal.already': { project: string | number }
   'main.removal.cardsKept': { why: string | number }
+  'main.removal.deleteBlocked': { folders: string | number }
   'main.removal.dirty': { n: number }
+  'main.removal.folder.copyBusy': undefined
+  'main.removal.folder.copyHeld': { by: string | number }
+  'main.removal.folder.copyLeased': undefined
+  'main.removal.folder.deleting': undefined
+  'main.removal.folder.heldNow': undefined
+  'main.removal.folder.home': undefined
+  'main.removal.folder.notForgotten': { why: string | number }
+  'main.removal.folder.notHeld': { n: number }
+  'main.removal.folder.notHives': undefined
+  'main.removal.folder.notTrashed': { path: string | number; why: string | number }
+  'main.removal.folder.outsideDelete': undefined
   'main.removal.folderGone': { folder: string | number }
+  'main.removal.folderKept': { what: string | number; path: string | number; why: string | number }
   'main.removal.handoverKept': { note: string | number; why: string | number }
   'main.removal.heldTree': { agent: string | number; work: string | number }
   'main.removal.leftAlone': { worktree: string | number }
@@ -140,6 +288,34 @@ interface HiveMessageValues {
   'main.removal.why.notListed': undefined
   'main.removal.why.otherProject': undefined
   'main.removal.wontRemove': { worktrees: string | number }
+  'main.restart.dismiss': undefined
+  'main.restart.notResumedLine': { agent: string | number; project: string | number; why: string | number }
+  'main.restart.offerQuit': { names: string | number }
+  'main.restart.offerTitle': { n: number }
+  'main.restart.offerUpdate': { names: string | number }
+  'main.restart.reportResume': { n: number }
+  'main.restart.reportUpdate': { n: number }
+  'main.restart.resume': undefined
+  'main.restart.resumedLine': { names: string | number }
+  'main.restart.why.expired': undefined
+  'main.restart.why.held': undefined
+  'main.restart.why.movedOn': undefined
+  'main.restart.why.notReady': undefined
+  'main.restart.why.notStopped': undefined
+  'main.restart.why.removed': undefined
+  'main.restart.why.running': undefined
+  'main.restart.why.stopped': undefined
+  'main.server.key.chars': undefined
+  'main.server.key.inField': { field: string }
+  'main.server.key.length': { min: number; max: number }
+  'main.server.notServer': undefined
+  'main.server.setUp.noKey': { name: string | number }
+  'main.server.unsupported': { cli: string | number }
+  'main.server.url.extra': undefined
+  'main.server.url.invalid': undefined
+  'main.server.url.remoteHttp': undefined
+  'main.server.url.scheme': undefined
+  'main.server.url.userinfo': undefined
   'main.storage.claimed': undefined
   'main.storage.noLonger': { path: string | number }
   'main.storage.purgeChanged': undefined
@@ -156,6 +332,7 @@ interface HiveMessageValues {
   'main.tray.active': undefined
   'main.tray.cancelQuit': undefined
   'main.tray.counts': { working: string | number; needYou: number }
+  'main.tray.finished': undefined
   'main.tray.more': { n: number }
   'main.tray.needYou': undefined
   'main.tray.noProjects': undefined
@@ -182,6 +359,8 @@ interface HiveMessageValues {
   'main.unexpectedClose.agents': { n: number; projects: string | number }
   'main.unexpectedClose.dump': undefined
   'main.unexpectedClose.failed': { n: number; agents: string | number }
+  'main.unexpectedClose.held': { n: number; agents: string | number }
+  'main.unexpectedClose.heldTitle': { n: number }
   'main.unexpectedClose.merge': { agent: string | number; branch: string | number; folder: string | number }
   'main.unexpectedClose.mergeCards': { agent: string | number; branch: string | number; cards: string | number; folder: string | number }
   'main.unexpectedClose.notChecked': { u: number; ids: string | number }
@@ -224,25 +403,52 @@ interface HiveMessageValues {
   'main.unused.read.head': undefined
   'main.unused.read.status': undefined
   'main.unused.refused': { why: string | number }
+  'main.unused.slot.archiveFailed': { error: string | number }
+  'main.unused.slot.busy': undefined
+  'main.unused.slot.cantCheck': { detail: string | number }
+  'main.unused.slot.dirty': { files: number }
+  'main.unused.slot.editedSkillCopy': { copies: number; names: string | number }
+  'main.unused.slot.gitRefused': { detail: string | number }
+  'main.unused.slot.inFlight': { card: string | number }
+  'main.unused.slot.leased': { agent: string | number }
+  'main.unused.slot.process': undefined
+  'main.unused.slot.session': { detail: string | number }
+  'main.unused.slot.unmerged': { target: string | number }
   'main.unused.stale': { n: number }
   'main.unused.tooBig': { n: number }
   'main.unused.tooMany': { n: number }
   'main.unused.why.contains': undefined
   'main.unused.why.detached': undefined
   'main.unused.why.notListed': undefined
+  'main.unused.why.notUnused': undefined
   'main.unused.why.otherProject': undefined
   'main.unused.why.owned': undefined
+  'main.unused.why.queueBusy': undefined
+  'main.unused.why.session': undefined
+  'main.unused.why.slotGuarded': undefined
+  'main.unused.why.slotInUse': undefined
   'main.update.checksum': undefined
   'main.update.devBuild': undefined
   'main.update.noRelease': undefined
+  'main.update.notInstalled': { app: string | number; version: string | number }
+  'main.update.notInstalledNotNewer': undefined
+  'main.update.notInstalledUnreadable': undefined
   'main.update.offline': undefined
+  'main.update.openReleasePage': undefined
   'main.update.ready': { app: string | number; version: string | number }
   'main.update.readyAuto': undefined
   'main.update.readyManual': undefined
   'main.update.restart': undefined
+  'main.update.sameVersion': { app: string | number; version: string | number }
+  'main.update.sameVersionBody': { version: string | number; hasCommit: string; commit: string | number }
+  'main.update.testCopy': undefined
   'main.update.updated': { app: string | number; version: string | number }
   'main.update.updatedBody': undefined
   'main.update.whatsNew': undefined
+  'main.usageMove.blockedBody': { reason: string; to: string | number; share: number; window: string; workspace: string | number; agents: string | number }
+  'main.usageMove.blockedTitle': { from: string | number; to: string | number }
+  'main.usageMove.movedBody': { from: string | number; share: number; window: string; agents: string | number; to: string | number }
+  'main.usageMove.movedTitle': { count: number; from: string | number; to: string | number }
   'main.window.openLogs': undefined
   'main.window.quit': undefined
   'main.window.reload': undefined

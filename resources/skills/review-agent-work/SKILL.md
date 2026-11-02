@@ -11,16 +11,11 @@ You are the reviewer: find what's wrong, don't fix it. Leave the code, the branc
 
 ## 1. Find exactly what to review
 
-- **A card** (#n): read it with `hive_read_task`. Its description says what was meant, and its comments say what was done and where. Start the review on the board: `hive_update_task` with `review: "start"`. The card stays in Review with the agent that did the work. You are recorded as its reviewer, separately. In a card loop, review the commit its builder names: work sent uncommitted gets a request for a commit, not a verdict (card-loop, Reviewer).
-- **A worktree branch**: `git worktree list`, then `git diff <base>...<branch>` and `git log <base>..<branch>`.
-- **Commits**: `git show` for the range named.
-- **Uncommitted changes**: `git status`, `git diff` and `git diff --staged` in that folder.
-
-`hive_project_status` shows each agent's folder and branch when you're told an agent's name rather than a branch. Note the exact commit or state you reviewed, so the verdict refers to it. Ask the user if what to review is unclear.
+- **A card** (AM-12): read it with `hive_read_task`. Start with `hive_start_review`: its reply names what to review (a revision with its base and files, or a no-code card's summary; `submission` names an earlier one), and the review copy holding that revision when the project has them. Review there, never in the builder's slot or folder. Your session and its shell stay in your own folder, so run every command with the review copy as its working directory: change into it first (`cd`, `Set-Location`) or give the command its working directory; one that doesn't runs your folder's code, not the submission, and leaves its output there. Where the project's rules forbid it, Hive refuses a review of work you built, saying so. What start review names is what you review, and what your verdict is recorded against: if the builder's summary names another commit, ask the builder (`hive_request_builder`) rather than review that one.
 
 ## 2. Know the intent
 
-Check the change against what was asked: the card, the user's request, a handover (`hive_read_latest_handover`) or a plan in the shared notes. A clean change can still do the wrong thing. A convention your brief or the card names (screenshots the user OKs before a visible change merges, say) is part of the intent: check the work has it. A card's **decisions** (listed first by `hive_read_task`) are what the user decided, and win over its description: check the work against every one, and work that doesn't follow one is a blocking finding.
+Check the change against what was asked: the card, the user's request, a handover (`hive_read_latest_handover`) or a plan in the shared notes. A convention your brief or the card names (screenshots the user OKs before a visible change merges, say) is part of the intent: check the work has it. Where the project's options ask for the user's OK, Hive asks them itself. A card's **decisions** (listed first) are what the user decided, and win over its description: check the work against every one, and work that doesn't follow one is a blocking finding.
 
 ## 3. Review
 
@@ -29,14 +24,10 @@ Read the whole change, and the code around it where needed. In order of importan
 1. **Bugs**: wrong logic, missed edge cases (empty, missing, very large, concurrent), broken error handling, leaks.
 2. **Missed requirements**: asked for but not done, or done differently.
 3. **Risk**: security (injection, secrets, unsafe paths, access checks), data loss, breaking formats or APIs, performance traps.
-4. **Tests**: new behaviour without tests, or tests that don't test it. A new or changed test that sleeps and then checks, reads state once just after an action, depends on another test's leftovers, or raises a timeout with no stated reason is a blocking finding: it fails on a loaded or slower machine. The project's test notes may say more.
+4. **Tests**: new behaviour without tests, or tests that don't test it. A new or changed test that sleeps and then checks, reads state once just after an action, depends on another test's leftovers, or raises a timeout with no stated reason is a blocking finding: it fails on a loaded or slower machine.
 5. **Clarity**: only where it will cause real trouble later.
 
-Run the checks that matter (tests, typecheck, a repro of a suspected bug) without committing or changing files; scratch files (probe scripts, screenshots, test profiles) go in your own scratchpad or temp folder, never in the project or a shared test folder. Note what you ran.
-
-**Screenshots cost far more to read than text.** When a check writes a text report of what its screenshots show, or its log says what each one is (the project's test notes say which), read that first. Then open only the images it flags and those of the screens the change touches, never a whole set: the rest are for people to browse.
-
-**Don't repeat the builder's run.** When the builder posted a run record (which checks ran on exactly which code, with results and logs), check the record instead of repeating it: it is for the code you are reviewing (its fingerprint or commit), recent, the checks the change needs ran, and every failure in it is explained. Then run only the quick checks (typecheck, lint), the tests the change affects (not the whole suite: the project's notes may give a command that picks them), and your own probes of the riskiest parts: they find what a repeated run doesn't. Run a whole suite or set again only when there's no record, it is for other or older code, something in it looks wrong (a flaky check, a pass that doesn't fit the change), or the change is to shared test infrastructure (the test runner, helpers or config), and say in your verdict which and why. The project's notes may say how to check a record. **Proof you can't open** (a cited log or run folder that isn't there, repeated runs cited with no path) isn't a failed round on that alone: ask on the card for the path, as for a missing commit in a card loop (card-loop), and judge the proof once it's there; the project's notes may say where proof is kept.
+**Don't repeat the builder's run**: check its run record (the summary's, and the runs Hive recorded as the card's checks of that revision): for this code, recent, the checks the change needs, every failure explained. Rerun only what the project's notes ask of a reviewer (else typecheck, lint and the tests the change affects), plus your own probes of the riskiest parts, in the review copy (§1), changing nothing. Note what you ran.
 
 ## 4. Report
 
@@ -50,17 +41,10 @@ Findings, most serious first. For each:
 
 Say how sure you are when you aren't certain. Then give the verdict, with what you checked and what you didn't, so the user knows how far to trust it.
 
-## 5. Verdict on the board
+## Reference files
 
-For a card, end your review with `hive_update_task`:
+Read one only when it applies. Each is in this skill's own folder, beside this SKILL.md, not your working folder:
 
-- `review: "passed"` or `"failed"`, with the report as `comment`. Its **first line is the verdict in one line**: "Round 1: PASSED" (with the gist), or "Round 1: FAILED: 2 findings: <their titles>". The findings and the evidence follow below it.
-- **Passed**: move it to `passed` in the same change (`column: "passed"`): reviewed, waiting to be merged. Not to `done`, which means merged.
-- **Failed**: it stays in Review. Leave its fixes to whoever the user asks to make them.
-- **A question only the user can answer** (scope, a choice the card doesn't settle) comes before a verdict: set `blocked` on the card (`hive_update_task`) to the question and `hive_notify` the user; a comment alone reaches no one, and the card stays in Review. Hive tells you of the decision they record: clear `blocked` (empty) and finish the review.
-
-If the card leaves Review while you review it (taken back to Doing for more work), your review is over. Leave the card where it is: don't move it back to Review or on to Passed, start another review or give a verdict: tell the user what you found, so the newer work is reviewed when it's ready. Only if your own session ended mid-review, with the card still in Review, start the review again.
-
-## Reviewing again
-
-When the card comes back after fixes, review what changed since your last verdict: the new commits, the comments after yours, and any decision recorded since (a reply flags a new one). Re-run a check only when what it covers has changed, and confirm each earlier finding is fixed or still open.
+- [other-targets.md](other-targets.md): not a card, a card with no workflow, a pool's card, work sent uncommitted.
+- [checks.md](checks.md): screenshots to look at, a whole suite to run again, or proof you can't open.
+- [verdict.md](verdict.md): giving the verdict on a card, or reviewing work again.

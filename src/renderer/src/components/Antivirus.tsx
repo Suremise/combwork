@@ -3,6 +3,8 @@ import { DEV_DRIVE_URL, KIND_LABEL, type AntivirusStatus, type AvAction, type Av
 import { formatDateTime } from '@shared/dates'
 import { call, errorMessage } from '../api'
 import { confirm, get, pushToast, set, setActivity, useStore } from '../store'
+import { awayFromProject } from '../agentPlace'
+import { resolveLocal } from '../entryConditions'
 import { cx, timeAgo } from '../util'
 import { Icon, LoadFailed } from './ui'
 import { fmt, msg, tr, tRich, type Msg } from '@shared/i18n'
@@ -14,7 +16,8 @@ import { fmt, msg, tr, tRich, type Msg } from '@shared/i18n'
  * when it matters. Answers for a workspace the window no longer shows are dropped.
  */
 
-const STATE: Record<AvPath['state'], { label: Msg; tone: string; tip: Msg }> = {
+/** How a folder's scanning is worded and coloured, here and in Repair's Defender rows (#1302). */
+export const AV_STATE: Record<AvPath['state'], { label: Msg; tone: string; tip: Msg }> = {
   excluded: { label: msg({ id: 'workspace.antivirus.stateExcluded', defaultMessage: 'Excluded', description: "A folder's scanning in Settings → Workspace's antivirus table: Defender skips it." }), tone: 'good-text', tip: msg({ id: 'workspace.antivirus.stateExcludedTip', defaultMessage: 'Defender doesn’t scan it.', description: 'Tooltip on Excluded.' }) },
   'not-excluded': { label: msg({ id: 'workspace.antivirus.stateScanned', defaultMessage: 'Scanned', description: "A folder's scanning: Defender scans it." }), tone: 'warn-text', tip: msg({ id: 'workspace.antivirus.stateScannedTip', defaultMessage: 'Defender scans every file Hive’s work creates or opens here.', description: 'Tooltip on Scanned.' }) },
   unknown: { label: msg({ id: 'workspace.antivirus.stateUnknown', defaultMessage: 'Unknown', description: "A folder's scanning: Defender hides its exclusions without administrator rights." }), tone: 'faint', tip: msg({ id: 'workspace.antivirus.stateUnknownTip', defaultMessage: 'Defender shows its exclusions only to administrators: Check with administrator rights to see them.', description: 'Tooltip on Unknown. Check with administrator rights is a button below.' }) },
@@ -60,6 +63,8 @@ const M = {
   checked: msg({ id: 'workspace.antivirus.checkedAt', defaultMessage: 'Checked {when}', description: 'When the antivirus status was checked ({when}: "4 minutes ago").' }),
   checkAgain: msg({ id: 'workspace.antivirus.checkAgain', defaultMessage: 'Check Again', description: "Settings → Workspace's antivirus: a button." }),
   checkAdmin: msg({ id: 'workspace.antivirus.checkAdmin', defaultMessage: 'Check with Administrator Rights…', description: "Settings → Workspace's antivirus: a button (Windows asks for administrator rights)." }),
+  goneTitle: msg({ id: 'workspace.antivirus.goneTitle', defaultMessage: 'Hive’s exclusions of folders that are gone', description: "Settings → Workspace's antivirus: a heading over a list of exclusions Hive added for folders that no longer exist (moved or deleted)." }),
+  goneHint: msg({ id: 'workspace.antivirus.goneHint', defaultMessage: '{n, plural, one {Hive excluded this folder, which no longer exists (moved or deleted). Remove Hive’s Exclusions… takes it away too.} other {Hive excluded these folders, which no longer exist (moved or deleted). Remove Hive’s Exclusions… takes them away too.}}', description: "Settings → Workspace's antivirus, under the heading for exclusions of folders that are gone. {n}: how many. Remove Hive’s Exclusions… is the button below: use its name as shown." }),
   removeHive: msg({ id: 'workspace.antivirus.removeHive', defaultMessage: 'Remove Hive’s Exclusions…', description: "Settings → Workspace's antivirus: a button." }),
   addExclusions: msg({ id: 'workspace.antivirus.addExclusions', defaultMessage: 'Add Exclusions…', description: "Settings → Workspace's antivirus: a button." }),
   aboutDevDrive: msg({ id: 'workspace.antivirus.aboutDevDrive', defaultMessage: 'About Dev Drive', description: "Settings → Workspace's antivirus: opens Microsoft's Dev Drive documentation." }),
@@ -71,8 +76,13 @@ const M = {
   reminder: msg({ id: 'workspace.antivirus.reminder', defaultMessage: 'A reminder: Microsoft Defender still scans every file Hive’s work creates or opens ({why}). Excluding the workspace’s folders, or a Dev Drive, can make builds, tests and git much faster. Hive reminds you at most once a day; Don’t Ask Again stops it for this workspace.', description: 'The suggestion, as a reminder ({why}: why now). Don’t Ask Again is its button.' }),
   suggestion: msg({ id: 'workspace.antivirus.suggestion', defaultMessage: 'Microsoft Defender scans every file Hive’s work creates or opens ({why}). Excluding the workspace’s folders, or a Dev Drive, can make builds, tests and git much faster.', description: 'The suggestion ({why}: why now).' }),
   review: msg({ id: 'workspace.antivirus.review', defaultMessage: 'Review…', description: "The suggestion's button: opens the antivirus status." }),
+  excludedNow: msg({ id: 'workspace.antivirus.excludedNow', defaultMessage: 'Excluded now: Defender no longer scans these folders', description: "What the suggestion to exclude the workspace from Defender's scanning says once every folder it named is excluded (HI-2320), in place of its buttons." }),
+  wontAsk: msg({ id: 'workspace.antivirus.wontAsk', defaultMessage: 'Hive won’t suggest it again for this workspace', description: "What the suggestion to exclude the workspace from Defender's scanning says after Don't Ask Again (HI-2320), in place of its buttons." }),
   dontAsk: msg({ id: 'workspace.antivirus.dontAsk', defaultMessage: 'Don’t Ask Again', description: "The suggestion's button: no more suggestions for this workspace." })
 }
+
+/** Where the states come from, as the panel says it; Repair's Defender rows say it the same way (#1302). */
+export const AV_SOURCE = { live: M.live, adminCheck: M.adminCheck }
 
 const antivirusLink = (c: React.ReactNode[]): React.ReactNode => <a onClick={showAntivirus}>{c}</a>
 
@@ -94,10 +104,21 @@ function scanLine(s: AntivirusStatus): string {
   }
 }
 
+/**
+ * The suggestion to exclude the workspace (HI-2320): once a status read here shows no folder Defender scans (excluded
+ * from the dialog, or by hand), its Review… and Don't Ask Again no longer apply, and it says so.
+ */
+function useSuggestionSettled(status: AntivirusStatus | null): void {
+  useEffect(() => {
+    if (status?.scan === 'defender' && status.paths.length && status.paths.every((p) => p.state === 'excluded')) resolveLocal('antivirus', tr(M.excludedNow))
+  }, [status])
+}
+
 /** Settings → Workspace: the status, each folder's, and the actions. */
 export function AntivirusPanel() {
   const workspace = useStore((s) => s.workspace?.path ?? null)
   const [status, setStatus] = useState<AntivirusStatus | null>(null)
+  useSuggestionSettled(status)
   const [error, setError] = useState<string | null>(null)
   const [checking, setChecking] = useState(false)
   const [result, setResult] = useState<AvChangeResult | null>(null)
@@ -161,7 +182,7 @@ export function AntivirusPanel() {
   const defender = status.scan === 'defender'
   const offerable = status.paths.filter((p) => !p.unsafe)
   const toAdd = offerable.filter((p) => p.state !== 'excluded')
-  const hiveAdded = offerable.some((p) => p.addedByHive)
+  const hiveAdded = offerable.some((p) => p.addedByHive) || !!status.gone?.length
   return (
     <div className="antivirus">
       <p className={cx('antivirus-scan', status.slowed && 'warn-text')}>
@@ -185,8 +206,8 @@ export function AntivirusPanel() {
                     {p.unsafe && <div className="warn-text small">{tr(M.notOffered, { why: p.unsafe })}</div>}
                   </td>
                   <td className="nowrap">
-                    <span className={STATE[p.state].tone} title={tr(STATE[p.state].tip)}>
-                      {tr(STATE[p.state].label)}
+                    <span className={AV_STATE[p.state].tone} title={tr(AV_STATE[p.state].tip)}>
+                      {tr(AV_STATE[p.state].label)}
                     </span>
                   </td>
                   <td className="nowrap faint" title={tr(DEV_DRIVE[p.devDrive].tip)}>
@@ -196,6 +217,35 @@ export function AntivirusPanel() {
               ))}
             </tbody>
           </table>
+        </div>
+      )}
+      {defender && !!status.gone?.length && (
+        <div className="antivirus-gone">
+          <h4>{tr(M.goneTitle)}</h4>
+          <p className="hint">{tr(M.goneHint, { n: status.gone.length })}</p>
+          <div className="table-wrap">
+            <table className="table antivirus-folders">
+              <thead>
+                <tr>
+                  <th>{tr(M.folder)}</th>
+                  <th>{tr(M.scanning)}</th>
+                </tr>
+              </thead>
+              <tbody>
+                {status.gone.map((g) => (
+                  <tr key={g.path}>
+                    <td className="mono small">{g.path}</td>
+                    <td className="nowrap">
+                      {/* Muted, never the good colour: a leftover exclusion isn't good news (the Assistant's call). */}
+                      <span className="faint" title={tr(AV_STATE[g.state].tip)}>
+                        {tr(AV_STATE[g.state].label)}
+                      </span>
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
         </div>
       )}
       {defender && (
@@ -245,6 +295,7 @@ export function showAntivirus(): void {
 export function AntivirusLine() {
   const workspace = useStore((s) => s.workspace?.path ?? null)
   const [status, setStatus] = useState<AntivirusStatus | null>(null)
+  useSuggestionSettled(status)
   useEffect(() => {
     let live = true
     setStatus(null)
@@ -281,8 +332,9 @@ const RECHECK_MS = 60 * 60_000
 export function useAntivirusOffer(): void {
   const workspace = useStore((s) => s.workspace?.path ?? null)
   const agents = useStore((s) => hostsOf(s).reduce((n, p) => n + p.agents.filter((a) => a.live && !a.live.settingUp).length, 0))
-  // The workspace's worktree agents, as a count: a new one may have made the worktrees folder.
-  const worktrees = useStore((s) => hostsOf(s).reduce((n, p) => n + p.agents.filter((a) => a.worktree).length, 0))
+  // The workspace's agents working outside their project folders (slots, worktrees: #1442), as a count: a new one may
+  // have made the worktrees folder.
+  const worktrees = useStore((s) => hostsOf(s).reduce((n, p) => n + p.agents.filter((a) => awayFromProject(a)).length, 0))
   // When the latest long command finished (0: none): each new one is a reason to ask.
   const slowRun = useStore((s) => s.progressRuns.reduce((t, r) => (r.finishedAt !== null && r.finishedAt - r.startedAt >= SLOW_RUN_MS ? Math.max(t, r.finishedAt) : t), 0))
   const reason = agents >= 2 ? 'agents' : slowRun ? 'slow' : null
@@ -312,6 +364,16 @@ export function useAntivirusOffer(): void {
       clearTimeout(timer)
     }
   }, [key, workspace, reason])
+}
+
+/** Don't Ask Again (HI-2320: the suggestion then says so, in place of its buttons). */
+export async function dismissAntivirusOffer(): Promise<void> {
+  try {
+    await call('antivirus:dismiss')
+    resolveLocal('antivirus', tr(M.wontAsk))
+  } catch {
+    // The suggestion stays, with its buttons, to try again.
+  }
 }
 
 function showOffer(count: number, reason: 'agents' | 'slow'): void {

@@ -54,13 +54,18 @@ describe('trash (src/main/trash.ts)', () => {
     expect(callers.map((f) => relative(root, f))).toEqual([])
   })
 
-  it('picks the test trash folder only in an unpackaged test copy', () => {
+  it('picks the test trash folder only in a test copy: unpackaged, or packaged and quiet (#1599)', () => {
     expect(testTrashDir({ HIVE_TEST_TRASH_DIR: 'C:\\t\\trash', HIVE_USER_DATA: 'C:\\p' }, false)).toBe('C:\\t\\trash')
     expect(testTrashDir({ HIVE_USER_DATA: 'C:\\p' }, false)).toBe(join('C:\\p', 'test-trash'))
     // npm run dev: no test profile, the Recycle Bin.
     expect(testTrashDir({}, false)).toBeNull()
-    // The installed app: always the Recycle Bin, whatever its environment says.
+    // The installed app (never quiet): always the Recycle Bin, whatever else its environment says.
     expect(testTrashDir({ HIVE_TEST_TRASH_DIR: 'C:\\t\\trash', HIVE_USER_DATA: 'C:\\p' }, true)).toBeNull()
+    expect(testTrashDir({ HIVE_TEST_TRASH_DIR: 'C:\\t\\trash', HIVE_USER_DATA: 'C:\\p', HIVE_TEST_QUIET: '0' }, true)).toBeNull()
+    // A packaged copy a test started (HIVE_TEST_QUIET=1, lib.hiveEnv): its suite's trash folder, or its profile's.
+    expect(testTrashDir({ HIVE_TEST_TRASH_DIR: 'C:\\t\\trash', HIVE_USER_DATA: 'C:\\p', HIVE_TEST_QUIET: '1' }, true)).toBe('C:\\t\\trash')
+    expect(testTrashDir({ HIVE_USER_DATA: 'C:\\p', HIVE_TEST_QUIET: '1' }, true)).toBe(join('C:\\p', 'test-trash'))
+    expect(testTrashDir({ HIVE_TEST_QUIET: '1' }, true)).toBeNull()
   })
 
   it('in a test copy, moves files and folders into its trash folder and notes each one', async () => {

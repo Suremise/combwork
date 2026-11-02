@@ -50,12 +50,12 @@ const GERMAN: Record<string, string> = {
   'agents.claude.safeguardHelp': 'Im Terminal: /feedback meldet einen Fehlalarm, /model wechselt zurück.',
   'board.busy.reviewing': '{agent} prüft sie',
   'tasks.by.you': 'Du',
-  'tasks.error.unknownTask': 'Unbekannte Aufgabe #{n}',
+  'tasks.error.unknownTask': 'Unbekannte Aufgabe {card}',
   'tasks.error.needsTitle': 'Eine Aufgabe braucht einen Titel.',
   'tasks.error.tooLong': '{what, select, title {Der Titel ist zu lang (höchstens {max, number} Zeichen).} other {Zu lang.}}',
   'tasks.error.onlyUserDone': 'Nur der Benutzer legt Karten in Erledigt an.',
-  'tasks.error.beforeArchived': '#{before} ist archiviert.',
-  'tasks.error.orderElsewhere': '#{n} ist in {other, select, doing {In Arbeit} other {{other}}}, nicht in {column, select, todo {Zu tun} other {{column}}}.',
+  'tasks.error.beforeArchived': '{before} ist archiviert.',
+  'tasks.error.orderElsewhere': '{card} ist in {other, select, doing {In Arbeit} other {{other}}}, nicht in {column, select, todo {Zu tun} other {{column}}}.',
   'tasks.error.reviewAgentsOnly': 'Nur ein Agent des Projekts prüft die Karte.',
   'tasks.start.noteTooLong': 'Die Notiz ist zu lang (höchstens {max, number} Zeichen).',
   'tasks.skipped.movedColumn': 'nach {column, select, doing {In Arbeit} other {{column}}} verschoben'
@@ -84,6 +84,9 @@ afterEach(() => {
   setLanguage('en', {})
 })
 
+/** A refusal HI-1952 gave a kind: its English matched no statusFor pattern, so it answered 500 until then. */
+const NOW_REFUSED = (english: string): boolean => /^(blockedBy must be a list|#\d+ is in Todo\. A card is reviewed in Review|You aren't reviewing #\d+ now)/.test(english)
+
 /** What a call threw. */
 async function caught(p: Promise<unknown>): Promise<Error> {
   try {
@@ -97,8 +100,8 @@ async function caught(p: Promise<unknown>): Promise<Error> {
 /** A stored line as the window shows it: its message in the window's language (what Board.tsx does). */
 const shown = (s: StoredText | undefined): string | null => (s ? storedLineText(s, (m, values) => tr(m, values), providerMessage) : null)
 
-/** A stored line's English (what main stores in `what`). */
-const englishOf = (s: StoredText): string | null => storedLineText(s, (m, values) => englishText(values ? withValues(m, values) : m), providerMessage)
+/** A stored line's English (what main stores in `what`): agents' column names (#1458). */
+const englishOf = (s: StoredText): string | null => storedLineText(s, tasks.agentEnglish, providerMessage)
 
 describe('the tasks area', () => {
   it('every message is of the tasks area, with a note for translators, and the two files have no text left to convert', () => {
@@ -185,6 +188,9 @@ describe("a card's history: English as stored, its line as data for the window",
       [storedText(HISTORY.movedBottom, { column: 'done' }), 'Moved to the bottom of Done'],
       [storedText(HISTORY.movedBefore, { column: 'doing', before: 1234 }), 'Moved to Doing, before #1234'],
       [storedText(HISTORY.movedBeforeIn, { column: 'todo', before: 7 }), 'Moved before #7 in Todo'],
+      // Since HI-1661 the card before it is stored by its key; a number above is a line from before, shown as it was.
+      [storedText(HISTORY.movedBefore, { column: 'doing', before: 'HI-12' }), 'Moved to Doing, before HI-12'],
+      [storedText(HISTORY.movedBeforeIn, { column: 'todo', before: 'AM-3' }), 'Moved before AM-3 in Todo'],
       [storedText(HISTORY.returned, { round: 3 }), 'Returned for review, round 3'],
       [storedText(HISTORY.toProject, { project: 'beta' }), 'Moved to beta'],
       [storedText(HISTORY.toWorkspace), 'Moved to the workspace'],
@@ -214,6 +220,33 @@ describe("a card's history: English as stored, its line as data for the window",
     for (const n of [1, 2, 3, 4, 11, 12, 13, 21, 22, 23, 101, 111, 112, 499]) expect(en(storedText(HISTORY.placed, { place: n, column: 'review' }))).toBe(`Placed ${ordinal(n)} in Review`)
   })
 
+  it('the window says Active and Approved where agents read Doing and Passed (#1458)', async () => {
+    const c = await run(() => tasks.createTask({ title: 'Staged', project: 'alpha', column: 'passed' }, user))
+    const other = await run(() => tasks.createTask({ title: 'Other', project: 'alpha', column: 'doing' }, user))
+    // Nobody on it, by the user's reason (HI-2062: the Assistant's move into Doing with nobody on it needs one).
+    await run(() => tasks.updateTask(c.number, { column: 'doing', before: other.number, override: { reason: 'Nobody yet' } }, assistant))
+    await run(() => tasks.updateTask(c.number, { position: 'bottom' }, assistant))
+    await run(() => tasks.updateTask(c.number, { position: 'top' }, assistant))
+    await run(() => tasks.updateTask(c.number, { column: 'passed' }, user))
+    const history = (await run(() => tasks.getTask(c.number))).history
+    const lines = ['Created in Passed', 'Moved to Doing, before #' + other.number, 'Moved to the bottom of Doing', 'Moved to the top of Doing', 'Moved to Passed']
+    expect(history.map((h) => h.what)).toEqual(lines)
+    expect(history.map((h) => entryForAgents(h).what)).toEqual(lines)
+    expect(history.map((h) => shown(h.whatText))).toEqual(['Created in Approved', 'Moved to Active, before #' + other.number, 'Moved to the bottom of Active', 'Moved to the top of Active', 'Moved to Approved'])
+    // Every column in both: agents' names are TASK_COLUMNS' labels, the window's its column names.
+    for (const [column, agents, window] of [['hold', 'On Hold', 'On Hold'], ['todo', 'Todo', 'Todo'], ['doing', 'Doing', 'Active'], ['review', 'Review', 'Review'], ['passed', 'Passed', 'Approved'], ['done', 'Done', 'Done']] as const) {
+      for (const m of [HISTORY.created, HISTORY.moved, HISTORY.movedTop, HISTORY.movedBottom]) {
+        const s = storedText(m, { column })
+        expect(englishOf(s)).toBe(englishText(withValues(m, { column: agents })))
+        expect(shown(s)).toBe(englishText(withValues(m, { column: window })))
+      }
+      expect(englishOf(storedText(HISTORY.placed, { place: 3, column }))).toBe(`Placed 3rd in ${agents}`)
+      expect(shown(storedText(HISTORY.placed, { place: 3, column }))).toBe(`Placed 3rd in ${window}`)
+      expect(englishOf(storedText(HISTORY.movedBeforeIn, { before: 4, column }))).toBe(`Moved before #4 in ${agents}`)
+      expect(shown(storedText(HISTORY.movedBeforeIn, { before: 4, column }))).toBe(`Moved before #4 in ${window}`)
+    }
+  })
+
   it('a review ended by Hive, and a project rename repaired, are data too', async () => {
     const c = await run(() => tasks.createTask({ title: 'Reviewed', project: 'alpha', column: 'review' }, user))
     await run(() => tasks.updateTask(c.number, { review: 'start' }, agent))
@@ -238,14 +271,14 @@ describe("the board's refusals: English for agents as before, the window's langu
       [await caught(run(() => tasks.updateTask(todo.number, { blocked: 'x'.repeat(1001) }, user))), 'The blocked reason is too long (at most 1,000 characters).', 400, 'Zu lang.'],
       [await caught(run(() => tasks.createTask({ title: 'x', column: 'nope' as never }, user))), 'Unknown column "nope": hold, todo, doing, review, passed or done.', 400, null],
       [await caught(run(() => tasks.createTask({ title: 'x', column: 'done' }, assistant))), 'Only the user puts cards in Done.', 403, 'Nur der Benutzer legt Karten in Erledigt an.'],
-      [await caught(run(() => tasks.createTask({ title: 'x', column: 'hold' }, agent))), 'Only the user or the Assistant puts cards On Hold: ask the user to park it.', 403, null],
+      [await caught(run(() => tasks.createTask({ title: 'x', column: 'hold' }, agent))), 'Only the user or the Assistant puts cards On Hold. Add it to Todo; where the user has decided to park it, ask the Assistant (hive_ask_assistant), otherwise ask the user.', 403, null],
       [await caught(run(() => tasks.createTask({ title: 'x', project: 'beta' }, agent))), 'You can add cards only to your project (alpha).', 403, null],
       [await caught(run(() => tasks.createTask({ title: 'x', project: 'gamma' }, user))), 'Unknown project "gamma"', 404, null],
       [await caught(run(() => tasks.createTask({ title: 'x', agent: 'a1' }, user))), 'Choose a project before giving the task to an agent.', 400, 'Choose a project before giving the card to an agent.'],
       [await caught(run(() => tasks.createTask({ title: 'x', project: 'alpha', agent: 'zed' }, user))), 'Unknown agent "zed" in alpha', 404, null],
       [await caught(run(() => tasks.updateTask(todo.number, { labels: 'a' as never }, user))), 'labels must be a list', 400, null],
       [await caught(run(() => tasks.updateTask(todo.number, { labels: Array.from({ length: 13 }, (_, i) => `l${i}`) }, user))), 'A card can have up to 12 labels.', 400, null],
-      [await caught(run(() => tasks.updateTask(todo.number, { blockedBy: 3 as never }, user))), 'blockedBy must be a list of card numbers', 500, null],
+      [await caught(run(() => tasks.updateTask(todo.number, { blockedBy: 3 as never }, user))), 'blockedBy must be a list of card numbers', 400, null],
       [await caught(run(() => tasks.updateTask(todo.number, { links: [todo.number] }, user))), "links: a card can't refer to itself", 400, null],
       [await caught(run(() => tasks.updateTask(todo.number, { links: ['x'] as never }, user))), 'links: "NaN" is not a card number', 400, null],
       [await caught(run(() => tasks.updateTask(todo.number, { blockedBy: [999] }, user))), 'blockedBy: there is no card #999', 400, null],
@@ -262,8 +295,8 @@ describe("the board's refusals: English for agents as before, the window's langu
       [await caught(run(() => tasks.updateTask(archived.number, { title: 'x' }, assistant))), `#${archived.number} is archived. Only the user can bring it back.`, 403, null],
       [await caught(run(() => tasks.commentTask(todo.number, ' ', user))), 'The comment is empty.', 400, null],
       [await caught(run(() => tasks.updateTask(todo.number, { review: 'start' }, user))), "Only an agent of the card's project reviews it, through its own hive tools.", 403, 'Nur ein Agent des Projekts prüft die Karte.'],
-      [await caught(run(() => tasks.updateTask(todo.number, { review: 'start' }, agent))), `#${todo.number} is in Todo. A card is reviewed in Review; if it needs more work, that is work on it (move it to doing).`, 500, null],
-      [await caught(run(() => tasks.updateTask(todo.number, { review: 'passed' }, agent))), `You aren't reviewing #${todo.number} now: its review ended (the card moved, or your session ended) or never started. Start one with review "start" if it is in Review.`, 500, null],
+      [await caught(run(() => tasks.updateTask(todo.number, { review: 'start' }, agent))), `#${todo.number} is in Todo. A card is reviewed in Review; if it needs more work, that is work on it (move it to doing).`, 400, null],
+      [await caught(run(() => tasks.updateTask(todo.number, { review: 'passed' }, agent))), `You aren't reviewing #${todo.number} now: its review ended (the card moved, or your session ended) or never started. Start one with review "start" if it is in Review.`, 400, null],
       [await caught(run(() => tasks.editDecision(todo.number, 'x', 'y', assistant))), "Only the user changes or removes a card's decisions.", 403, null],
       [await caught(run(() => tasks.archiveBatch([todo.number], { label: '', column: null, project: null, query: '', includeBusy: false }, assistant))), 'Only the user archives cards.', 403, null],
       [await caught(Promise.resolve().then(() => tasks.batchNumbers([]))),'cards: list the card numbers to change.', 400, null],
@@ -275,7 +308,8 @@ describe("the board's refusals: English for agents as before, the window's langu
       expect(apiErrorReply(e).body.error).toBe(english)
       expect(apiErrorReply(e).status, english).toBe(status)
       // A permission refusal was always 403 by its class; any other, by its English: the same status as before either way.
-      if (!(e instanceof tasks.TaskPermissionError)) expect(apiErrorReply(new Error(english)).status, `${english}: the status its English always gave`).toBe(status)
+      // Except the refusals HI-1952 gave a kind, which answered 500 (no pattern matched their English): now 400.
+      if (!(e instanceof tasks.TaskPermissionError) && !NOW_REFUSED(english)) expect(apiErrorReply(new Error(english)).status, `${english}: the status its English always gave`).toBe(status)
       // The window (IPC's conversion): in its language, or English where this test has no translation.
       expect((windowError(e) as Error).message).toBe(german ?? english)
       expect(shownError(e)).toBe(german ?? english)
@@ -283,13 +317,18 @@ describe("the board's refusals: English for agents as before, the window's langu
   })
 
   it('the window says card where agents and the Agent API keep the words they always read (#910)', async () => {
+    // A busy Start answered 500 by its English (no statusFor pattern for it) until HI-1952 gave it a kind: 409.
     // The status: what it always was (a busy Start's from its English: servers.ts statusFor).
     const cases: [Error, string, string, number, string?][] = [
+      // A refusal naming a column (#1458; Start's "was moved to … meanwhile"): the window says Active and Approved,
+      // agents Doing and Passed.
+      [tasks.columnError(HISTORY.moved, { column: 'doing' }, { kind: 'conflict' }), 'Moved to Doing', 'Moved to Active', 409],
+      [tasks.columnError(HISTORY.movedBefore, { column: 'passed', before: 'HI-3' }), 'Moved to Passed, before HI-3', 'Moved to Approved, before HI-3', apiErrorReply(new Error('Moved to Passed, before HI-3')).status],
       [await caught(run(() => tasks.getTask(99))), 'Unknown task #99', 'Unknown card #99', 404, 'Unbekannte Aufgabe #99'],
       [await caught(run(() => tasks.createTask({ title: ' ' }, user))), 'A task needs a title.', 'A card needs a title.', 400, 'Eine Aufgabe braucht einen Titel.'],
       [await caught(run(() => tasks.createTask({ title: 'x', agent: 'a1' }, user))), 'Choose a project before giving the task to an agent.', 'Choose a project before giving the card to an agent.', 400],
-      [agentBusyError('B1', 'working'), "B1 is working. Start the task once it's idle, or give it to another agent.", "B1 is working. Start the card once it's idle, or give it to another agent.", apiErrorReply(new Error("B1 is working. Start the task once it's idle, or give it to another agent.")).status],
-      [agentBusyError('B1', 'watching'), "B1 is waiting on cards (a card watch): it takes no other work until it is woken, or the watch is cancelled (Cancel in its header). Start the task once it's idle, or give it to another agent.", "B1 is waiting on cards (a card watch): it takes no other work until it is woken, or the watch is cancelled (Cancel in its header). Start the card once it's idle, or give it to another agent.", apiErrorReply(new Error("B1 is waiting on cards (a card watch): it takes no other work until it is woken, or the watch is cancelled (Cancel in its header). Start the task once it's idle, or give it to another agent.")).status]
+      [agentBusyError('B1', 'working'), "B1 is working. Start the task once it's idle, or give it to another agent.", "B1 is working. Start the card once it's idle, or give it to another agent.", 409],
+      [agentBusyError('B1', 'watching'), "B1 is waiting on cards (a card watch): it takes no other work until it is woken, or the watch is cancelled (Cancel in its header). Start the task once it's idle, or give it to another agent.", "B1 is waiting on cards (a card watch): it takes no other work until it is woken, or the watch is cancelled (Cancel in its header). Start the card once it's idle, or give it to another agent.", 409]
     ]
     for (const lang of ['en', 'de'] as const) {
       setLanguage(lang, lang === 'de' ? GERMAN : {})
@@ -310,7 +349,7 @@ describe("the board's refusals: English for agents as before, the window's langu
     await run(() => tasks.updateTask(c.number, { agent: 'a1' }, user))
     const e = await caught(run(() => tasks.updateTask(c.number, { column: 'review' }, { kind: 'agent', name: 'Agent 2 (alpha)', self: { project: 'alpha', agentId: 'a2' }, scope: 'alpha' })))
     expect(e).toBeInstanceOf(tasks.TaskConflictError)
-    expect(e.message).toBe(`#${c.number} is in Doing with Agent 1, who is working on it: newer work is in progress, so it can't be moved to Review by another agent. Leave it where it is; Agent 1 moves it to Review when done, and the user can move it.`)
+    expect(e.message).toBe(`#${c.number} is in Active with agent Agent 1, who is working on it: newer work is in progress, so another agent can't move it to Review. Leave it where it is; agent Agent 1 moves it to Review when done, and the user can move it.`)
     expect(apiErrorReply(e).status).toBe(409)
   })
 
@@ -321,7 +360,7 @@ describe("the board's refusals: English for agents as before, the window's langu
     expect(r.skipped).toEqual([{ number: c.number, why: 'nach In Arbeit verschoben' }])
     setLanguage('en', {})
     const again = await run(() => tasks.archiveBatch([c.number], { label: 'All in Todo', column: 'todo', project: null, query: '', includeBusy: false }, user))
-    expect(again.skipped).toEqual([{ number: c.number, why: 'moved to Doing' }])
+    expect(again.skipped).toEqual([{ number: c.number, why: 'moved to Active' }])
     // Archived with its batch: the line is German in the window; the batch's name is kept as it was named (the card
     // dialog words Archive All's own names with archiveBatchText, as the archive's picker does).
     const done = await run(() => tasks.archiveBatch([c.number], { label: 'All in Doing', column: 'doing', project: null, query: '', includeBusy: false }, user))

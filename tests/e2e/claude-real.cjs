@@ -10,6 +10,8 @@
 // Each wait on the CLI is a lib.cliStep: a usage limit, sign-in or network failure there makes the suite a SKIP.
 // Dev build, throwaway profile and workspace; the real Claude Code in a home of the suite's own with a made-up API key
 // (lib.ownClaudeHome, #368: never the user's ~/.claude). No prompt is sent, so it needs no sign-in.
+// Dev build only (#1580): it starts this checkout's Electron itself, and Reviewer is a 0.9 worktree agent
+// (agents:testLegacy, refused by a packaged build), for a real session in a worktree.
 const lib = require('./lib.cjs')
 const { _electron } = require('playwright-core')
 const fs = require('fs')
@@ -51,7 +53,7 @@ const check = (name, ok, extra = '') => {
   const launchLine = (key) => fs.readFileSync(path.join(userData, 'logs', 'hive.log'), 'utf8').split('\n').filter((l) => / spawn \W?session:/.test(l) && l.toLowerCase().includes(key)).pop() ?? ''
 
   // --- A session in a worktree.
-  const reviewer = await inv('agents:add', proj, { location: 'new-worktree', name: 'Reviewer' })
+  const reviewer = await inv('agents:testLegacy', proj, { location: 'new-worktree', name: 'Reviewer' })
   const wtPath = reviewer.worktree?.path ?? ''
   await inv('session:start', proj, { agentId: reviewer.id })
   await lib.cliStep('a session starts in the worktree', { session: lib.ptyKey(proj, reviewer.id) }, async () => {
@@ -74,7 +76,8 @@ const check = (name, ok, extra = '') => {
     await lib.acceptClaudeTrust(inv, proj, agent.id, 30000)
     check('Claude Code starts in the project', !!(await ready(proj, agent.id)), (await live(proj, agent.id))?.status)
   })
-  await inv('project:updateConfig', proj, { providers: { 'claude-code': { effort: 'low' } } })
+  // The agent's own effort (a project's isn't read for a CLI with connections, HI-1774).
+  await lib.setLaunch(inv, proj, agent.id, { effort: 'low' })
   await inv('workspace:refresh')
   const restart = page.getByRole('button', { name: 'Restart session' })
   check('a new effort offers Restart session', !!(await lib.until(async () => (await restart.count()) > 0, 10000)))
@@ -118,7 +121,8 @@ const check = (name, ok, extra = '') => {
   await stop(proj, agent.id)
 
   // --- The Assistant with Haiku: launched asking for Auto; what Claude Code runs it in, and what Hive shows and says.
-  await inv('settings:update', { assistant: { providers: { 'claude-code': { model: 'haiku' } } } })
+  // Its model is its connection's (HI-2108; Settings → Assistant's old one is only read by the migration): HI-2145.
+  await lib.setLaunch(inv, home, 'assistant', { model: 'haiku' })
   await inv('session:start', home, { agentId: 'assistant' })
   await lib.cliStep('the Assistant starts', { session: lib.ptyKey(home, 'assistant') }, async () => {
     await lib.acceptClaudeTrust(inv, home, 'assistant', 30000)
@@ -137,7 +141,7 @@ const check = (name, ok, extra = '') => {
   })
   // The warning matches what this Claude Code says: there exactly when Auto isn't offered (a guess when it doesn't say).
   const [caveatRight, caveat] = await lib.haikuAutoCaveat(page, m?.autoOffered)
-  check("Settings → Assistant warns about Auto with Haiku exactly when Claude Code says it isn't offered", caveatRight, caveat)
+  check("the connection dialog warns about Auto with Haiku exactly when Claude Code says it isn't offered", caveatRight, caveat)
   await stop(home, 'assistant')
 
   await app.close()

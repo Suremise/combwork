@@ -1,12 +1,19 @@
-import { closeSync, constants, existsSync, mkdirSync, openSync, readFileSync, readSync, realpathSync, renameSync, rmSync, statSync, writeFileSync, writeSync, type Dirent, type Stats } from 'original-fs'
+import { closeSync, constants, existsSync, mkdirSync, openSync, readFileSync, readSync, renameSync, rmSync, statSync, writeFileSync, writeSync, type Dirent, type Stats } from 'original-fs'
 import { copyFile, link, lstat, mkdir, open, opendir, readFile, readlink, rename, writeFile, stat, symlink, cp, rm, utimes } from 'original-fs/promises'
-import { dirname, isAbsolute, relative, resolve, sep } from 'path'
+import { basename, dirname, isAbsolute, relative, resolve, sep } from 'path'
 import { createHash } from 'crypto'
 import { readdir } from 'original-fs/promises'
 import { join } from 'path'
 import { msg } from '../shared/i18n'
 import { withValues } from '../shared/advanced'
 import { HiveError } from './hiveError'
+import { createLogger, userText } from './logger'
+import { timedStep } from './stallWork'
+import { placeKey, realPath, relativeInside } from './places'
+
+export { placeKey, placeMatcher, realPath, relativeInside, samePlace } from './places'
+
+const log = createLogger('files')
 
 export async function readJson<T>(path: string, fallback: T): Promise<T> {
   try {
@@ -18,8 +25,9 @@ export async function readJson<T>(path: string, fallback: T): Promise<T> {
 
 // ---------------------------------------------------------------------------
 // Kept files: Hive's own settings and records (config.json, workspace.json, project.json, sessions.json).
-// Each save also writes <file>.bak, the last good version. A file that can't be read as JSON is set aside
-// as <file>.corrupt-<time> and the .bak restored, so one bad file never turns into lost settings or records.
+// Each save also writes <file>.bak, the last good version. A file that can't be read as JSON (once it has stopped
+// changing: below) is set aside as <file>.corrupt-<time> and the .bak restored, so one bad file never turns into
+// lost settings or records.
 // ---------------------------------------------------------------------------
 
 type CorruptReport = (file: string, aside: string, restored: boolean) => void
@@ -51,7 +59,139 @@ function recoverText(path: string, bak: string | null): { value: unknown; restor
   return { value: null, restored: false, aside }
 }
 
-export async function readKeptJson<T>(path: string, fallback: T): Promise<T> {
+// A file that doesn't parse may be mid-save by something outside Hive: an editor or `fs.writeFileSync` saving in
+// place truncates it, then writes (#1598). Before calling it damaged, it is read again after short pauses (about
+// 1 s in all, only when it doesn't parse) until it parses, or two reads in a row see the same text, size and mtime
+// and that mtime is at least DAMAGED_AGE_MS old. A writer stalled mid-save on a busy machine leaves a half-written
+// file unchanged for longer than a pause, so a file changed more recently is still counted as a save in progress
+// (#1601). A file still changing, or changed too recently, when the pauses run out is left as it is (unsettled):
+// that read gets the .bak's value (or the fallback), and the next read looks again. The pauses nominally add up to
+// under half DAMAGED_AGE_MS, so a file changed just before it is read ends unsettled, unless the read itself is held
+// up for over a second (timers and disk reads have no upper bound on a loaded machine): then it is judged by its age.
+const SETTLE_PAUSES = [25, 50, 100, 150, 250, 400]
+const SETTLE_MS = SETTLE_PAUSES.reduce((a, b) => a + b, 0)
+/** How long a kept file that doesn't parse must have been unchanged before it can count as damaged. */
+export const DAMAGED_AGE_MS = 2000
+
+/** One read of a kept file: its text and what its stat said (null: missing or locked). */
+export type KeptSample = { text: string; size: number; mtimeMs: number } | null
+
+/** What reading a kept file that didn't parse came to: its value once it did, damaged, still changing (or changed too recently), or missing. */
+export type KeptSettled = { value: unknown } | 'damaged' | 'unsettled' | 'missing'
+
+const parses = (text: string): { value: unknown } | null => {
+  try {
+    return { value: JSON.parse(text) }
+  } catch {
+    return null
+  }
+}
+
+/** Whether a read that didn't parse is still worth reading again, given the read before it. */
+function stillSaving(prev: KeptSample, cur: KeptSample): boolean {
+  if (!cur || !prev) return true
+  if (Date.now() - cur.mtimeMs < DAMAGED_AGE_MS) return true
+  return prev.size !== cur.size || prev.mtimeMs !== cur.mtimeMs || prev.text !== cur.text
+}
+
+/** The rule above, as steps: given the first read, yields each pause, is given the read after it, and returns the outcome. */
+export function* keptSettleSteps(first: KeptSample): Generator<number, KeptSettled, KeptSample> {
+  let prev = first
+  const ok = prev && parses(prev.text)
+  if (ok) return ok
+  for (const ms of SETTLE_PAUSES) {
+    const cur = yield ms
+    const got = cur && parses(cur.text)
+    if (got) return got
+    if (!stillSaving(prev, cur)) return 'damaged'
+    prev = cur
+  }
+  return prev ? 'unsettled' : 'missing'
+}
+
+async function sample(path: string): Promise<KeptSample> {
+  try {
+    const s = await stat(path)
+    return { text: await readFile(path, 'utf8'), size: s.size, mtimeMs: s.mtimeMs }
+  } catch {
+    return null
+  }
+}
+
+function sampleSync(path: string): KeptSample {
+  try {
+    const s = statSync(path)
+    return { text: readFileSync(path, 'utf8'), size: s.size, mtimeMs: s.mtimeMs }
+  } catch {
+    return null
+  }
+}
+
+async function settle(path: string): Promise<KeptSettled> {
+  const steps = keptSettleSteps(await sample(path))
+  for (let step = steps.next(); ; ) {
+    if (step.done) return step.value
+    const ms = step.value
+    await new Promise((r) => setTimeout(r, ms))
+    step = steps.next(await sample(path))
+  }
+}
+
+/** The same, synchronously: blocks the thread for at most SETTLE_MS, and only for a file that doesn't parse. */
+function settleSync(path: string): KeptSettled {
+  const pause = new Int32Array(new SharedArrayBuffer(4))
+  const steps = keptSettleSteps(sampleSync(path))
+  for (let step = steps.next(); ; ) {
+    if (step.done) return step.value
+    Atomics.wait(pause, 0, 0, step.value)
+    step = steps.next(sampleSync(path))
+  }
+}
+
+/** A file still changing after the pauses, or changed too recently to call damaged: its .bak's value for this read, the file left as it is. */
+function unsettled<T>(path: string, bak: string | null, fallback: T): T {
+  log.warn(`${userText(path)} doesn't parse and had changed within ${DAMAGED_AGE_MS} ms (or was still changing after ${SETTLE_MS} ms): its last good copy is used for now, the file left as it is`)
+  const ok = bak === null ? null : parses(bak)
+  return ok ? (ok.value as T) : fallback
+}
+
+/**
+ * A kept file still being saved by something else, read for a change (#1600): its value can't be known yet, so the change
+ * isn't made. `retryWhileSaving` runs the change again a few times first.
+ */
+export class KeptFileBusy extends HiveError {
+  constructor(path: string) {
+    super(withValues(msg({ id: 'service.fsutil.keptBusy', defaultMessage: '{file} is being saved by something else: nothing was changed. Try again in a moment.', description: "An error: one of Hive's settings or records files ({file}: its path) was still being written by another program (an editor, a script), so Hive's change to it wasn't made." }), { file: path }), { kind: 'conflict' })
+  }
+}
+
+/** How a read for a change treats a file still changing after the pauses: as today (the .bak's value), or `throw` (KeptFileBusy). */
+export type KeptReadOptions = { unsettled?: 'bak' | 'throw' }
+
+/** How many times in all `retryWhileSaving` runs a change (each read waits out the pauses first, about 1 s). */
+export const KEPT_TRIES = 3
+
+/**
+ * Runs a read-modify-write of a kept file (read with `unsettled: 'throw'`) again while the file is still being saved by
+ * something else, KEPT_TRIES times in all: still busy, its KeptFileBusy is thrown, nothing written. `fn` must take its
+ * lock and read the file again each time.
+ */
+export async function retryWhileSaving<T>(fn: () => Promise<T>): Promise<T> {
+  for (let n = 1; ; n++) {
+    try {
+      return await fn()
+    } catch (e) {
+      if (!(e instanceof KeptFileBusy) || n >= KEPT_TRIES) throw e
+    }
+  }
+}
+
+/**
+ * A kept file's value. Read for a change written back (read-modify-write), pass `{ unsettled: 'throw' }`: a file still
+ * being saved by something else throws KeptFileBusy rather than giving the .bak's value, which written back would undo
+ * that save once it finishes (#1600).
+ */
+export async function readKeptJson<T>(path: string, fallback: T, opts: KeptReadOptions = {}): Promise<T> {
   let text: string
   try {
     text = await readFile(path, 'utf8')
@@ -62,7 +202,15 @@ export async function readKeptJson<T>(path: string, fallback: T): Promise<T> {
   try {
     return JSON.parse(text) as T
   } catch {
+    const settled = await settle(path)
+    if (settled === 'missing') return fallback
+    if (typeof settled === 'object') return settled.value as T
+    if (settled === 'unsettled' && opts.unsettled === 'throw') {
+      log.warn(`${userText(path)} doesn't parse and had changed within ${DAMAGED_AGE_MS} ms (or was still changing after ${SETTLE_MS} ms): a change to it waits for it`)
+      throw new KeptFileBusy(path)
+    }
     const bak = await readFile(`${path}.bak`, 'utf8').catch(() => null)
+    if (settled === 'unsettled') return unsettled(path, bak, fallback)
     const r = recoverText(path, bak)!
     if (r.restored) await writeTextAtomic(path, bak!).catch(() => undefined)
     reportCorrupt(path, r.aside, r.restored)
@@ -70,8 +218,69 @@ export async function readKeptJson<T>(path: string, fallback: T): Promise<T> {
   }
 }
 
+/**
+ * Kept files read by their stat (readKeptJsonByStat): path (lower-cased) → the stat it was read at and what it gave, the
+ * least recently read first.
+ */
+const keptByStat = new Map<string, { mtimeMs: number; size: number; ino: number; derive: (v: never) => unknown; derived: unknown }>()
+/** The most files kept by their stat (HR1's round 1): one more lets go of the least recently read. */
+export const KEPT_BY_STAT_MAX = 64
+
+/** Forgets what readKeptJsonByStat kept of a file: Hive is writing it. */
+const forgetKeptStat = (path: string): boolean => keptByStat.delete(path.toLowerCase())
+
+/**
+ * A file modified this close to a read is never kept by its stat: Windows' file times can be as coarse as the clock's
+ * 15.6 ms tick, so two writes of the same size in a row can share one (git's "racy" files, the same way).
+ */
+const KEPT_RACY_MS = 2000
+
+/**
+ * readKeptJson for a file read often and changed seldom (HI-1814: project.json, read several times by each check's
+ * resolve), with what `derive` makes of its value: one stat each read, and read and derived again only when the file's
+ * modified time, size or identity changed, else a copy of what it gave (a caller may change what it is given). The
+ * stat is taken before the read, so a change during it is a different stat next time, never kept as current; a file
+ * modified within KEPT_RACY_MS of the read is read in full each time until it has been left alone that long. Only a
+ * read that parsed is kept; anything else goes through readKeptJson, its recovery included, each time, as before.
+ */
+export async function readKeptJsonByStat<T, D>(path: string, fallback: T, derive: (value: T) => D, opts: KeptReadOptions = {}): Promise<D> {
+  const key = path.toLowerCase()
+  const asked = Date.now()
+  const st = await stat(path).catch(() => null)
+  const kept = keptByStat.get(key)
+  keptByStat.delete(key)
+  if (st && kept && kept.derive === derive && kept.mtimeMs === st.mtimeMs && kept.size === st.size && kept.ino === st.ino) {
+    // Read again: the most recently read now.
+    keptByStat.set(key, kept)
+    return structuredClone(kept.derived) as D
+  }
+  if (!st) return derive(await readKeptJson(path, fallback, opts))
+  const text = await readFile(path, 'utf8').catch(() => null)
+  let value: T
+  try {
+    if (text === null) throw new Error('unreadable')
+    value = JSON.parse(text) as T
+  } catch {
+    return derive(await readKeptJson(path, fallback, opts))
+  }
+  const derived = derive(value)
+  if (st.mtimeMs < asked - KEPT_RACY_MS) {
+    keptByStat.set(key, { mtimeMs: st.mtimeMs, size: st.size, ino: st.ino, derive, derived: structuredClone(derived) })
+    for (const k of keptByStat.keys()) {
+      if (keptByStat.size <= KEPT_BY_STAT_MAX) break
+      keptByStat.delete(k)
+    }
+  }
+  return derived
+}
+
 /** The same, for reads at startup that must be synchronous (config.json). */
 export function readKeptJsonSync<T>(path: string, fallback: T): T {
+  // Marked (HI-1692): read at start, and settled with pauses when it doesn't parse.
+  return timedStep(`kept file read ${basename(path)}`, () => readKeptJsonSyncNow(path, fallback))
+}
+
+function readKeptJsonSyncNow<T>(path: string, fallback: T): T {
   let text: string
   try {
     text = readFileSync(path, 'utf8')
@@ -81,12 +290,16 @@ export function readKeptJsonSync<T>(path: string, fallback: T): T {
   try {
     return JSON.parse(text) as T
   } catch {
+    const settled = settleSync(path)
+    if (settled === 'missing') return fallback
+    if (typeof settled === 'object') return settled.value as T
     let bak: string | null = null
     try {
       bak = readFileSync(`${path}.bak`, 'utf8')
     } catch {
       // No copy yet.
     }
+    if (settled === 'unsettled') return unsettled(path, bak, fallback)
     const r = recoverText(path, bak)!
     if (r.restored) {
       try {
@@ -97,55 +310,6 @@ export function readKeptJsonSync<T>(path: string, fallback: T): T {
     }
     reportCorrupt(path, r.aside, r.restored)
     return r.restored ? (r.value as T) : fallback
-  }
-}
-
-/**
- * The real location of a path, following symlinks and junctions (for a path that doesn't exist yet, its
- * nearest existing folder's real location plus the rest).
- */
-export function realPath(p: string): string {
-  let head = resolve(p)
-  const rest: string[] = []
-  for (;;) {
-    try {
-      return rest.length ? join(realpathSync.native(head), ...rest.reverse()) : realpathSync.native(head)
-    } catch {
-      const up = dirname(head)
-      if (up === head) return resolve(p)
-      rest.push(head.slice(up.length).replace(/^[\\/]/, ''))
-      head = up
-    }
-  }
-}
-
-/**
- * A path's key for telling whether two paths are the same place: its real location (`realPath`), lower-cased. Git lists
- * worktrees by their real, long names, so a path Hive was given or saved as an 8.3 short name (C:\Users\RUNNER~1\…),
- * through a junction or a symlink only matches git's by this (#389). One that can't be resolved keys as written.
- */
-export const placeKey = (p: string): string => realPath(p).toLowerCase()
-
-/** Whether two paths are the same place (`placeKey`). */
-export const samePlace = (a: string, b: string): boolean => placeKey(a) === placeKey(b)
-
-/**
- * A test for whether a path is the place `folder` is, for matching the cwd a CLI recorded with Hive's spelling of a
- * folder (#493): the same spelling, or else the same real location (`placeKey`), each other spelling resolved once.
- */
-export function placeMatcher(folder: string): (p: string) => boolean {
-  const spelt = resolve(folder).toLowerCase()
-  let key: string | undefined
-  const seen = new Map<string, boolean>()
-  return (p) => {
-    const s = resolve(p).toLowerCase()
-    if (s === spelt) return true
-    let same = seen.get(s)
-    if (same === undefined) {
-      same = placeKey(p) === (key ??= placeKey(folder))
-      seen.set(s, same)
-    }
-    return same
   }
 }
 
@@ -164,16 +328,6 @@ export function containsPlace(outer: string, inner: string): boolean {
 export function placeRelative(from: string, to: string): string {
   return relativeInside(from, to) ?? relative(from, to)
 }
-
-/** `to` relative to `from` when it is inside it (or is it: ''), by spelling or else by real locations (`placeRelative`); else null. */
-export function relativeInside(from: string, to: string): string | null {
-  const rel = relative(from, to)
-  if (!leavesFolder(rel)) return rel
-  const real = relative(realPath(from), realPath(to))
-  return leavesFolder(real) ? null : real
-}
-
-const leavesFolder = (rel: string): boolean => rel === '..' || rel.startsWith('..' + sep) || isAbsolute(rel)
 
 /**
  * Whether a path is inside an .asar archive (`…\app.asar\icon.png`). Such a path isn't a file on disk, and Electron's
@@ -226,14 +380,17 @@ const backedUp = new Set<string>()
 
 /**
  * Saves a kept file and its .bak copy. `compact`: JSON without spaces; `bakOncePerRun`: the .bak only at the first save
- * of the run (#1111: config.json, saved often, then costs one write a save, not two).
+ * of the run (#1111: config.json, saved often, then costs one write a save, not two). `existing`: its folder isn't made,
+ * so a file whose folder went (moved or deleted) fails with ENOENT rather than bringing the folder back (HI-1817).
  */
-export async function writeKeptJson(path: string, data: unknown, opts: { compact?: boolean; bakOncePerRun?: boolean } = {}): Promise<void> {
+export async function writeKeptJson(path: string, data: unknown, opts: { compact?: boolean; bakOncePerRun?: boolean; existing?: boolean } = {}): Promise<void> {
   const text = (opts.compact ? JSON.stringify(data) : JSON.stringify(data, null, 2)) + '\n'
-  await writeTextAtomic(path, text)
+  const write = { mkdir: !opts.existing }
+  forgetKeptStat(path)
+  await writeTextAtomic(path, text, write).finally(() => forgetKeptStat(path))
   const k = path.toLowerCase()
   if (opts.bakOncePerRun && backedUp.has(k)) return
-  await writeTextAtomic(`${path}.bak`, text).then(
+  await writeTextAtomic(`${path}.bak`, text, write).then(
     () => void backedUp.add(k),
     () => undefined
   )
@@ -249,10 +406,11 @@ let tmpCounter = 0
 /**
  * Each write has its own temp file, so two writes to one file at the same time can't mix their
  * contents; the last rename wins with a complete file. Windows briefly refuses a rename while
- * another process (or another rename) holds the target, so that is retried.
+ * another process (or another rename) holds the target, so that is retried. `mkdir: false` writes only into a folder
+ * that is there (ENOENT otherwise).
  */
-export async function writeTextAtomic(path: string, text: string): Promise<void> {
-  await mkdir(dirname(path), { recursive: true })
+export async function writeTextAtomic(path: string, text: string, opts: { mkdir?: boolean } = {}): Promise<void> {
+  if (opts.mkdir !== false) await mkdir(dirname(path), { recursive: true })
   const tmp = `${path}.${process.pid}-${++tmpCounter}.tmp`
   // A write that fails, while the temp file is written (a full disk) or renamed (retries given up, EPERM included),
   // removes it, so failed saves leave nothing behind (#1016). A crash part way still can: sweepLeftovers removes those.
@@ -272,6 +430,7 @@ export async function writeTextAtomic(path: string, text: string): Promise<void>
  * away meanwhile (a closed workspace) never renames late. `renameOnce` is the single rename (tests replace it).
  */
 export async function renameRetrying(from: string, to: string, tries = 20, guard?: () => void, renameOnce: (a: string, b: string) => Promise<void> = rename): Promise<void> {
+  const started = Date.now()
   for (let attempt = 0; ; attempt++) {
     guard?.()
     try {
@@ -279,10 +438,59 @@ export async function renameRetrying(from: string, to: string, tries = 20, guard
       return
     } catch (e) {
       const code = (e as NodeJS.ErrnoException).code
-      if (attempt >= tries || !(code === 'EPERM' || code === 'EACCES' || code === 'EBUSY')) throw e
+      const held = code === 'EPERM' || code === 'EACCES' || code === 'EBUSY'
+      if (held && attempt >= tries) renameGaveUp(to, code, attempt + 1, Date.now() - started)
+      if (attempt >= tries || !held) throw e
       await new Promise((r) => setTimeout(r, 15 + attempt * 10))
     }
   }
+}
+
+/**
+ * Who has a file open (fileHolders.ts), for a rename that gave up: `holders` is set by main's entry (none in workers and
+ * unit tests). Each lookup starts a process, so at most `max` run at once, one per file, each given up after `timeoutMs`.
+ */
+export const renameDiagnostics: { holders: ((path: string) => Promise<string[]>) | null; max: number; timeoutMs: number } = { holders: null, max: 2, timeoutMs: 30_000 }
+
+// The files whose holders are being looked up (lower-cased paths).
+const lookingUp = new Set<string>()
+
+/** How many holder lookups are under way (tests). */
+export const holderLookupsRunning = (): number => lookingUp.size
+
+/**
+ * A replace that kept failing because the file was held (HI-1749: a view switch's "EPERM … rename" reached the window and
+ * nothing of it hive.log): said with the file, the code and how long it was tried, then which processes have it open, as
+ * far as Windows can say (it may have let go by then). A lookup already under way for the file says it for this one too;
+ * with `max` under way, none is started (never queued: failures while Hive's I/O struggles mustn't pile up processes).
+ */
+function renameGaveUp(to: string, code: string, tries: number, ms: number): void {
+  log.warn(`replacing ${userText(to)} failed with ${code} after ${tries} tries over ${ms} ms: another process had it open`)
+  const holders = renameDiagnostics.holders
+  const key = to.toLowerCase()
+  if (!holders || lookingUp.has(key)) return
+  if (lookingUp.size >= renameDiagnostics.max) {
+    log.warn(`not looking up what had ${userText(to)} open: ${lookingUp.size} lookups already under way`)
+    return
+  }
+  lookingUp.add(key)
+  let timer: NodeJS.Timeout | undefined
+  const timedOut = new Promise<null>((res) => {
+    timer = setTimeout(() => res(null), renameDiagnostics.timeoutMs)
+    timer.unref?.()
+  })
+  void Promise.race([holders(to), timedOut])
+    .then(
+      (found) => {
+        if (found === null) log.warn(`could not tell what had ${userText(to)} open: the lookup took over ${renameDiagnostics.timeoutMs} ms`)
+        else log.warn(`${userText(to)} was open in ${found.length ? found.map((h) => userText(h)).join(', ') : 'no process Windows could name (it may have let go)'}`)
+      },
+      () => undefined
+    )
+    .finally(() => {
+      clearTimeout(timer)
+      lookingUp.delete(key)
+    })
 }
 
 /**
@@ -1114,9 +1322,17 @@ export function claudeFileAllowed(path: string, write: boolean, home: string): b
   const parts = rel.split(/[\\/]/)
   if (!/\.md$/i.test(rel)) return false
   if (parts.length === 1) return parts[0].toLowerCase() === 'claude.md'
-  if (parts[0] === 'projects') return parts.length === 4 && parts[2] === 'memory'
+  if (parts[0] === 'projects') return claudeAutoMemory(path, home)
   if (parts[0] === 'skills' || parts[0] === 'plugins') return !write && parts[parts.length - 1].toLowerCase() === 'skill.md'
   return false
+}
+
+/** Whether a path is one of a project's auto memory files in Claude Code's config folder: `projects/<project>/memory/<name>.md`. */
+export function claudeAutoMemory(path: string, home: string): boolean {
+  const rel = relative(resolve(home), resolve(path))
+  if (!rel || rel.startsWith('..') || isAbsolute(rel) || !/\.md$/i.test(rel)) return false
+  const parts = rel.split(/[\\/]/)
+  return parts.length === 4 && parts[0] === 'projects' && parts[2] === 'memory'
 }
 
 /** Windows' "in use" errors: another program has the file open without sharing it. */

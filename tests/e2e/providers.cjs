@@ -1,4 +1,4 @@
-// Visual check of the provider screens on a fresh profile: banner, Settings → Providers, Agent Setup, Add Agent.
+// Visual check of the provider screens on a fresh profile: banner, Settings → Providers, Provider Setup, Add Agent.
 const lib = require('./lib.cjs')
 const { _electron } = require('playwright-core')
 const fs = require('fs')
@@ -20,7 +20,7 @@ const check = (name, ok, extra = '') => results.push(`${ok ? 'PASS' : 'FAIL'} ${
   await lib.fitWindow(app, page, { width: 1400, height: 850 })
   await lib.appReady(page)
   const inv = (ch, ...a) => page.evaluate(([c, x]) => window.hive.invoke(c, ...x), [ch, a])
-  check('no setup dialog on a fresh install', (await page.locator('.dialog', { hasText: 'Agent Setup' }).count()) === 0)
+  check('no setup dialog on a fresh install', (await page.locator('.dialog', { hasText: 'Provider Setup' }).count()) === 0)
   check('welcome offers choosing agents', (await page.locator('.welcome-link', { hasText: 'Choose your coding agents' }).count()) === 1)
   await lib.openWorkspace(inv, page, ws)
   const banner = page.locator('.providers-banner')
@@ -45,21 +45,21 @@ const check = (name, ok, extra = '') => results.push(`${ok ? 'PASS' : 'FAIL'} ${
   check('Claude page has its settings', (await page.locator('.setting', { hasText: 'Enable the Bypass permissions option' }).count()) === 1)
   await inv('settings:update', { providers: { 'claude-code': { defaultModel: 'sonnet' } } })
   await sleep(300)
-  // Agent Setup
+  // Provider Setup
   await page.evaluate(() => window.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape' })))
   await page.locator('.activitybar .activity, .activity-bar .activity').first().click().catch(() => undefined)
   await sleep(300)
   await page.evaluate(() => (window).__hiveRun?.('help.agentSetup'))
-  // Open Agent Setup through the command palette.
+  // Open Provider Setup through the command palette.
   await page.keyboard.press('Control+Shift+P')
   await sleep(300)
-  await page.keyboard.type('Agent Setup')
+  await page.keyboard.type('Provider Setup')
   await sleep(300)
   await page.keyboard.press('Enter')
-  await lib.until(async () => (await page.locator('.dialog', { hasText: 'Agent Setup' }).count()) === 1, 10000)
-  const setup = page.locator('.dialog', { hasText: 'Agent Setup' })
-  check('Agent Setup opens', (await setup.count()) === 1)
-  check('Agent Setup shows Claude Code', /Claude Code \d/.test(await setup.innerText().catch(() => '')))
+  await lib.until(async () => (await page.locator('.dialog', { hasText: 'Provider Setup' }).count()) === 1, 10000)
+  const setup = page.locator('.dialog', { hasText: 'Provider Setup' })
+  check('Provider Setup opens', (await setup.count()) === 1)
+  check('Provider Setup shows Claude Code', /Claude Code \d/.test(await setup.innerText().catch(() => '')))
   await page.screenshot({ path: path.join(scratch, 'pv-4-setup.png') })
   await page.keyboard.press('Escape')
   await sleep(300)
@@ -73,7 +73,7 @@ const check = (name, ok, extra = '') => results.push(`${ok ? 'PASS' : 'FAIL'} ${
   await page.keyboard.press('Enter')
   await lib.until(async () => (await page.locator('.dialog', { hasText: 'Add an agent' }).count()) === 1, 10000)
   const add = page.locator('.dialog', { hasText: 'Add an agent' })
-  check('Add Agent has a coding agent choice', (await add.locator('.provider-choice .choice').count()) >= 1)
+  check('Add Agent has a connection choice, no coding agent choice (HI-2108)', (await add.locator('#add-agent-connection').count()) === 1 && (await add.locator('.provider-choice').count()) === 0)
   await page.screenshot({ path: path.join(scratch, 'pv-5-add-agent.png') })
   await page.keyboard.press('Escape')
   const cfg = JSON.parse(fs.readFileSync(path.join(userData, 'config.json'), 'utf8'))

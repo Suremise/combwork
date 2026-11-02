@@ -13,7 +13,9 @@ const fs = require('fs')
 const path = require('path')
 const { execFileSync } = require('child_process')
 const lib = require('../e2e/lib.cjs')
+const { processes, leftoverIdentities } = require('../e2e/folderProcesses.cjs')
 const { measuresOf, metricsTotals } = require('./benchmark.cjs')
+const { readWhole, withScriptCalls } = require('./codexScripts.cjs')
 
 /**
  * The Claude Code home the model trials use: a test home signed in once by hand (never the user's own ~/.claude, and
@@ -29,7 +31,7 @@ const PROVIDERS = {
   fake: { provider: 'claude-code', fake: true, executable: path.join(lib.ROOT, 'tests', 'e2e', 'fake-claude', 'fake-claude.cmd'), mode: 'bypassPermissions' },
   // The fake Codex, in a throwaway home of its own (never the signed-in test home).
   'fake-codex': { provider: 'codex', fake: true, executable: path.join(lib.ROOT, 'tests', 'e2e', 'fake-codex', 'fake-codex.cmd'), mode: 'full-access' },
-  // Accept edits, with the hive tools, commands and skills allowed on the command line (the project's extra arguments):
+  // Accept edits, with the hive tools, commands and skills allowed on the command line (its connection's extra arguments):
   // it never asks, and needs no bypass mode (which Claude Code asks to accept once). One value after `=`: the option
   // takes a list, and as separate words it also took the first task Hive passes last, so an agent started on a card sat
   // idle (#498).
@@ -44,10 +46,82 @@ const sleep = lib.sleep
 // The longest the harness waits for something it is waiting on (a file, a session, a report): a bound for a hung run,
 // never how long the step should take.
 const HUNG_MS = 30000
+/** The most of a trial's final reply its results keep (HI-2230): whole for any usual reply, bounded for a runaway one. */
+const REPLY_KEPT = 6000
 const plain = (text) => String(text).replace(/\x1b\[[0-9;?]*[ -/]*[@-~]/g, ' ').replace(/\x1b\][^\x07]*\x07/g, ' ').replace(/\s+/g, ' ')
 const escape = (s) => s.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')
 /** Tools that write or edit files: what they're given is never evidence of a read. */
 const WRITERS = /^(Write|Edit|MultiEdit|NotebookEdit|apply_patch)$/i
+
+/**
+ * Where a token was seen (HI-2259): `known` the tokens, each `{ kind, token }` (the Agent API's workspace, agent and
+ * assistant ones, and a launch's hook token: HI-2262),
+ * and `seen` what the session printed or said (`tools` and `scripts`, each `{ name, result }`; `replies`, text). Each
+ * sighting `{ kind, in: 'tool' | 'script' | 'reply', at, name?, excerpt }`: `at` its place in that list, `excerpt` up to
+ * 80 characters before it and 40 after, every known token in it as `<kind token>`, never the token, and any other run
+ * of 32 hex or more (a token it doesn't know) as `<hex>`.
+ */
+function tokenSightings(known, { tools = [], scripts = [], replies = [] }) {
+  const mask = (s) => known.reduce((x, t) => x.split(t.token).join(`<${t.kind} token>`), s)
+  const out = []
+  const look = (where, list, textOf) =>
+    list.forEach((item, at) => {
+      const text = String(textOf(item) ?? '')
+      for (const t of known) {
+        if (!text.includes(t.token)) continue
+        // Masked whole first, then cut: a cut through another token would leave a part of it.
+        const label = `<${t.kind} token>`
+        const sentinel = '\u0000'
+        // Any other secret beside it (the hook token, 48 hex, HR2's HI-2259 round 1) is masked too: a run of 32 hex or
+        // more, as Hive's tokens are, never ids (a run id is 24, a session id has dashes).
+        const whole = mask(text.replace(t.token, sentinel)).replace(/[0-9a-fA-F]{32,}/g, '<hex>')
+        const i = whole.indexOf(sentinel)
+        const excerpt = (whole.slice(Math.max(0, i - 80), i) + label + whole.slice(i + 1, i + 1 + 40)).replace(/\s+/g, ' ').trim()
+        out.push({ kind: t.kind, in: where, at, ...(typeof item === 'object' && item?.name ? { name: item.name } : {}), excerpt })
+      }
+    })
+  look('tool', tools, (x) => x.result)
+  look('script', scripts, (x) => x.result)
+  look('reply', replies, (x) => x)
+  return out
+}
+
+/**
+ * Every token a scenario's Hive issued, for scoring and masking (HI-2262, HR1's rounds 1 and 2): the workspace's
+ * (`apiToken`), then each line of its issuance record (`file`, HIVE_TEST_TOKEN_LOG: Hive appends each hook, agent and
+ * Assistant token as it makes it, before any session can hold it), so a token whose launch ended and whose files went
+ * long before the scoring is known. The record is evidence the result needs: missing, unreadable or with a line that
+ * isn't `{ kind, token }` it throws, and the scenario fails rather than scoring with tokens left out.
+ */
+function knownTokens(file, apiToken) {
+  let text
+  try {
+    text = fs.readFileSync(file, 'utf8')
+  } catch (e) {
+    throw new Error(`the token record (HIVE_TEST_TOKEN_LOG) can't be read (${e?.code ?? 'error'}): the leak check can't be scored`, { cause: e })
+  }
+  const issued = text.split(/\r?\n/).filter((l) => l.trim()).map((line, i) => {
+    let t = null
+    try {
+      t = JSON.parse(line)
+    } catch {
+      // not JSON: said below
+    }
+    if (!t || !['hook', 'agent', 'assistant'].includes(t.kind) || typeof t.token !== 'string' || !/^[0-9a-f]{32,}$/.test(t.token)) throw new Error(`the token record (HIVE_TEST_TOKEN_LOG) has a malformed line ${i + 1}: the leak check can't be scored`)
+    return { kind: t.kind, token: t.token }
+  })
+  if (typeof apiToken !== 'string' || apiToken.length < 16) throw new Error("no workspace token: the leak check can't be scored")
+  return [{ kind: 'workspace', token: apiToken }, ...issued.filter((t, i) => t.token !== apiToken && issued.findIndex((u) => u.token === t.token) === i)]
+}
+
+/** Text with every token in `tokens` as `<token>`: what a result keeps of what the session printed or said. */
+const maskTokens = (tokens, v) => tokens.reduce((x, t) => x.split(t).join('<token>'), String(v))
+
+/** What a result keeps of `observed`: each tool call's input and result 400 characters, the final reply bounded, every token in `tokens` masked. */
+function retainedObserved(observed, tokens) {
+  const short = (v) => maskTokens(tokens, v).slice(0, 400)
+  return { ...observed, tools: observed.tools.map((t) => ({ ...t, input: short(t.input), result: short(t.result) })), replies: undefined, settings: undefined, ...keptReply(maskTokens(tokens, observed.finalReply ?? '')) }
+}
 
 /**
  * What a session's transcript shows: every tool call (name, summary, input, result, error), the Hive skills it read,
@@ -57,8 +131,9 @@ const WRITERS = /^(Write|Edit|MultiEdit|NotebookEdit|apply_patch)$/i
  * (a Codex code-mode script's exec_command result carries the file as `"output":"---\r\nname: x\r\n…"`), so the result
  * is also matched with escaped line breaks and quotes turned back into real ones.
  */
-function observeTranscript(items, skillNames) {
-  const tools = items.filter((x) => x.kind === 'tool').map((x) => ({ name: x.tool.name, summary: x.tool.summary, input: String(x.tool.input ?? ''), isError: x.tool.isError, result: String(x.tool.result ?? '') }))
+function observeTranscript(items, skillNames, skillRefs = new Map()) {
+  // `cwd`: the folder a command ran in, where its CLI recorded it apart from the command (a Codex Shell's, HI-2264).
+  const tools = items.filter((x) => x.kind === 'tool').map((x) => ({ name: x.tool.name, summary: x.tool.summary, input: String(x.tool.input ?? ''), isError: x.tool.isError, result: String(x.tool.result ?? ''), ...(x.tool.cwd ? { cwd: String(x.tool.cwd) } : {}) }))
   const unescaped = (text) => text.replace(/\\+r\\+n|\\+[rn]/g, '\n').replace(/\\+"/g, '"')
   const skillsRead = []
   for (const t of tools) {
@@ -71,12 +146,52 @@ function observeTranscript(items, skillNames) {
       if (viaTool || viaRead) skillsRead.push(n)
     }
   }
+  // A skill's reference files read (HI-2011: SKILL.md as a contents page): only a read that worked, of that one file,
+  // whose result holds the file's own first line (its heading). A writer, a failed call, a listing, a search, or a
+  // command that mentions the path but shows something else never counts; nor does reading SKILL.md (skillsRead).
+  const skillRefsRead = []
+  const LISTING = /\b(ls|dir|Get-ChildItem|gci|grep|rg|Select-String|findstr|find|tree|Glob|Grep)\b/i
+  for (const t of tools) {
+    if (t.isError || WRITERS.test(t.name) || /^(Glob|Grep|LS)$/i.test(t.name)) continue
+    const shell = !/^(Read|view|read_file)$/i.test(t.name)
+    if (shell && (LISTING.test(t.input) || !/\b(cat|type|Get-Content|gc)\b/i.test(t.input))) continue
+    for (const [n, files] of skillRefs) {
+      for (const [file, head] of files) {
+        const ref = `${n}/${file}`
+        if (skillRefsRead.includes(ref)) continue
+        const at = new RegExp(`skills[\\\\/]+(hive-)?${escape(n)}[\\\\/]+${escape(file)}`, 'gi')
+        // One file a call: a command naming two of the skill's files is no evidence of either.
+        const named = [...t.input.matchAll(new RegExp(`skills[\\\\/]+(?:hive-)?${escape(n)}[\\\\/]+[\\w.-]+\\.md`, 'gi'))].length
+        if ((t.input.match(at) ?? []).length && named === 1 && (t.result.includes(head) || unescaped(t.result).includes(head))) skillRefsRead.push(ref)
+      }
+    }
+  }
   // Names of hive tools in the transcript: a direct call (mcp__hive__x, hive.x, Hive's "hive · x"), or one written in a
-  // Codex script (tools.mcp__hive__x(...)), which may or may not have run.
+  // Codex script (tools.mcp__hive__x(...)), which may or may not have run: a script whose calls were read from its
+  // rollout (HI-2235) is a `script` item, its calls tools of their own.
   const hiveName = (name) => /(?:^|[_.\s])(hive_[a-z]+(?:_[a-z]+)*)$/.exec(name)?.[1]
-  const hiveMentions = tools.flatMap((t) => (hiveName(t.name) ? [hiveName(t.name)] : [...t.input.matchAll(/\btools\.(?:mcp__hive__)?(hive_[a-z]+(?:_[a-z]+)*)\s*\(/g)].map((m) => m[1])))
+  const scripts = items.filter((x) => x.kind === 'script').map((x) => ({ name: x.tool.name, input: String(x.tool.input ?? '') }))
+  const hiveMentions = [...tools, ...scripts].flatMap((t) => (hiveName(t.name) ? [hiveName(t.name)] : [...t.input.matchAll(/\btools\.(?:mcp__hive__)?(hive_[a-z]+(?:_[a-z]+)*)\s*\(/g)].map((m) => m[1])))
   const replies = items.filter((x) => x.kind === 'assistant').map((x) => x.text)
-  return { tools, skillsRead, hiveMentions, finalReply: replies.at(-1) ?? '', replies }
+  return { tools, skillsRead, skillRefsRead, hiveMentions, finalReply: replies.at(-1) ?? '', replies }
+}
+
+/**
+ * Each skill's reference files (HI-2011) and their first lines, by skill: what a read of one is known by.
+ */
+function skillRefsOf(dir, names) {
+  const out = new Map()
+  for (const n of names) {
+    const folder = path.join(dir, n)
+    const files = new Map()
+    for (const f of fs.existsSync(folder) ? fs.readdirSync(folder) : []) {
+      if (f === 'SKILL.md' || !f.endsWith('.md')) continue
+      const head = fs.readFileSync(path.join(folder, f), 'utf8').split(/\r?\n/)[0].trim()
+      if (head) files.set(f, head)
+    }
+    if (files.size) out.set(n, files)
+  }
+  return out
 }
 
 /**
@@ -89,8 +204,20 @@ function allCallsReported(logged, metrics) {
   return !!metrics && metricsTotals(metrics).toolCalls >= logged.filter((c) => !c.direct).length
 }
 
-/** The calls the hive MCP servers ran, from their test log: [{ tool, role, project, agent, ok, error, args }]. */
+/**
+ * The calls the hive MCP servers ran, from their test log: [{ tool, role, project, agent, ok, error, args, mode, chars,
+ * bytes }]. Its other lines (HI-2186: `kind: 'list'`, a server's tool list) are left out: readMcpLists has those.
+ */
 function readMcpLog(file) {
+  return readJsonLines(file).filter((l) => l.kind === undefined)
+}
+
+/** The tool lists the hive MCP servers sent (HI-2186), one a server: [{ at, role, project, agent, tools, bytes, chars }]. */
+function readMcpLists(file) {
+  return readJsonLines(file).filter((l) => l.kind === 'list')
+}
+
+function readJsonLines(file) {
   if (!fs.existsSync(file)) return []
   return fs.readFileSync(file, 'utf8').split('\n').filter(Boolean).map((l) => JSON.parse(l))
 }
@@ -123,6 +250,51 @@ function sourceFingerprint(root = lib.ROOT) {
 function trialEnvironment({ status = null, replies = [], screen = '' } = {}) {
   if (status === 'signin') return 'not signed in: Hive shows the session waiting for a sign-in'
   return lib.environmentProblem([...replies, screen].join('\n'))
+}
+
+/**
+ * Why a prompt the CLI never took was refused by the environment, or null (#1321): what it drew once the prompt was
+ * typed (Claude Code's "Not logged in · Run /login" can show only then), not counting what the prompt itself names, or,
+ * when its screen says nothing, its own sign-in status (`auth`: Claude Code's `auth status --json`, or null).
+ */
+function promptRefused({ prompt = '', screen = '', auth = null } = {}) {
+  const named = new Set(lib.environmentProblems(prompt).map((x) => x.why.split(':')[0]))
+  const drawn = lib.environmentProblems(screen).find((x) => !named.has(x.why.split(':')[0]))
+  if (drawn) return drawn.why
+  if (auth?.loggedIn === false) return "not signed in: its auth status says it isn't logged in"
+  return null
+}
+
+/**
+ * How the session under test's trust question is answered in a run after its launch's (HI-2225: Hive's relaunch in a slot,
+ * which can come before the harness's prompt has even been taken): 'enter' (Copilot's, Codex's: Yes first), 'claude'
+ * (Claude Code's menu, starting on "No, exit": lib.acceptClaudeTrust), or null. Never in the launch's own run (answered as
+ * it started; its question may still be in the buffer), nor twice in a run.
+ */
+function relaunchTrust({ status, runId, launchRun, answered, screen = '', provider }) {
+  if (status !== 'waiting' || !runId || runId === launchRun || answered.has(runId)) return null
+  if (/Do you trust the files in this folder/i.test(screen)) return 'enter'
+  if (/trust this folder/i.test(screen)) return provider === 'codex' ? 'enter' : 'claude'
+  return null
+}
+
+/**
+ * The final reply as a trial's results keep it (HI-2230: checks judge it, and one cut at 400 characters couldn't be
+ * audited): whole up to REPLY_KEPT characters, with its whole length when longer (a trial's results are about 40 KB;
+ * a reply about 1 KB). `text` is already masked of tokens.
+ */
+function keptReply(text) {
+  const reply = String(text ?? '')
+  return { finalReply: reply.slice(0, REPLY_KEPT), ...(reply.length > REPLY_KEPT ? { finalReplyLength: reply.length } : {}) }
+}
+
+/**
+ * A prompt the CLI never took, nor refused for the environment (HI-1168): nothing of the model's ran, so the trial is a
+ * setup error (no checks, incomplete in the benchmark), never its checks failed as the model's. Null once it was taken.
+ */
+function promptNotTaken({ taken = false, screen = '' } = {}) {
+  if (taken) return null
+  return `setup: the prompt was never taken; its screen ends: ${JSON.stringify(lib.plainText(screen).trim().slice(-300))}`
 }
 
 /** The lines of Hive's log (a test profile's), or none. */
@@ -206,9 +378,38 @@ function environmentAdvice(why, providerKey) {
 }
 
 /**
+ * Claude Code's memory of the folders in and under `root` (HI-2260): its auto-memory is kept in its home, in
+ * `projects/<the folder's path, each character but a letter or digit a dash>/memory`, so a later trial in the same
+ * folder (each trial of a scenario has the same one) would start from what an earlier one remembered. Removes those
+ * `memory` folders only, never a transcript. The name can't tell a dash from a path separator, so a sibling named as
+ * `root` and a dash (the same scenario's evidence folder `<id>-2`, run.mjs) is forgotten too, which is as wanted;
+ * `<id>2` or any other name isn't. Returns the folders removed.
+ */
+function forgetClaudeMemory(home, root) {
+  const name = path.resolve(root).replace(/[^A-Za-z0-9]/g, '-').toLowerCase()
+  const projects = path.join(home, 'projects')
+  let entries = []
+  try {
+    entries = fs.readdirSync(projects, { withFileTypes: true })
+  } catch {
+    return []
+  }
+  const removed = []
+  for (const e of entries) {
+    const n = e.name.toLowerCase()
+    if (!e.isDirectory() || (n !== name && !n.startsWith(`${name}-`))) continue
+    const memory = path.join(projects, e.name, 'memory')
+    if (!fs.existsSync(memory)) continue
+    fs.rmSync(memory, { recursive: true, force: true, maxRetries: 3 })
+    removed.push(memory)
+  }
+  return removed
+}
+
+/**
  * Runs `sc` with `providerKey` (fake, claude-code or codex). `opts`: { model, effort, timeoutMs, port, keep, workRoot,
  * signedOut (a fake only: it acts out an expired sign-in, for checking the environment skip; 'launch': one that stops it
- * at launch) }.
+ * at launch; 'late': one shown only once the prompt is sent, #1321) }.
  * Returns { scenario, provider, model, cliVersion, guidance, observed, checks, usage, seconds, error }.
  */
 async function runScenario(sc, providerKey, opts = {}) {
@@ -224,6 +425,8 @@ async function runScenario(sc, providerKey, opts = {}) {
   const fakeHome = path.join(root, 'claude-home')
   const fakeCodexHome = path.join(root, 'codex-home')
   const mcpLog = path.join(root, 'mcp-calls.jsonl')
+  // Every token its Hive issues (HIVE_TEST_TOKEN_LOG, HI-2262): in the scenario's own folder, gone with it.
+  const tokenLog = path.join(root, 'tokens.jsonl')
   // Each change to the merge slots, with its time (HIVE_TEST_MERGE_SLOT_LOG, #374): who held one and who waited, when.
   const slotLog = path.join(root, 'merge-slots.jsonl')
   // Each state view Hive gave the Assistant at a session start (#1032), as Hive's development builds record them.
@@ -239,6 +442,9 @@ async function runScenario(sc, providerKey, opts = {}) {
       return { scenario: sc.id, title: sc.title, provider: providerKey, model: opts.model ?? '(default)', role: sc.role ?? 'agent', checks: [], observed: null, usage: null, measures: null, seconds: 0, error: `its folder ${root} is still in use from an earlier run (${e.code ?? e.message}): something left running holds it` }
     }
   }
+  // What the real Claude Code remembered in an earlier trial in these folders (its auto-memory, kept in its test home by
+  // folder path, the same path each trial of a scenario) is forgotten, so no trial starts from another's (HI-2260).
+  if (providerKey === 'claude-code') forgetClaudeMemory(CLAUDE_TEST_HOME, root)
   fs.mkdirSync(fakeHome, { recursive: true })
   if (providerKey === 'fake-codex') {
     fs.mkdirSync(fakeCodexHome, { recursive: true })
@@ -247,12 +453,14 @@ async function runScenario(sc, providerKey, opts = {}) {
   // The fakes follow Hive's notices as a model does (#650): told of something in their inbox, they read it and ack it.
   fs.writeFileSync(path.join(fakeHome, 'fake-follow-notices.txt'), '')
   if (providerKey === 'fake-codex') fs.writeFileSync(path.join(fakeCodexHome, 'fake-follow-notices.txt'), '')
+  // In code mode, as real Codex works (HI-2235): its calls come from scripts, read back from its rollout.
+  if (providerKey === 'fake-codex') fs.writeFileSync(path.join(fakeCodexHome, 'fake-code-mode.txt'), '')
   lib.gitProject(alpha, { 'README.md': '# alpha\n\nA small project for Hive scenarios.\n', 'math.js': 'module.exports = {}\n', ...sc.files })
   for (const other of sc.projects ?? []) lib.gitProject(path.join(ws, other), { 'README.md': `# ${other}\n` })
   // The fake trusts these folders; the real Claude Code asks (answered below); Codex reads its test home's trust list.
   fs.writeFileSync(path.join(fakeHome, 'fake-trusted.json'), JSON.stringify([alpha.toLowerCase(), ws.toLowerCase()]))
   // A fake that acts out an expired sign-in: each prompt's turn ends with "Login expired · Please run /login".
-  if (opts.signedOut && p.fake) fs.writeFileSync(path.join(fakeHome, 'fake-signin.json'), JSON.stringify({ expired: true, ...(opts.signedOut === 'launch' ? { atLaunch: true } : {}) }))
+  if (opts.signedOut && p.fake) fs.writeFileSync(path.join(fakeHome, 'fake-signin.json'), JSON.stringify({ expired: true, ...(opts.signedOut === 'launch' ? { atLaunch: true } : opts.signedOut === 'late' ? { late: true } : {}) }))
   if (providerKey === 'codex') {
     lib.trustForCodex(alpha)
     lib.trustForCodex(ws)
@@ -287,13 +495,14 @@ async function runScenario(sc, providerKey, opts = {}) {
   // The stand-in model for fake-copilot, on a port of its own: closed when the run ends, or at once if Copilot's
   // environment or the launch fails before the run begins (#464), and that failure is the one thrown.
   const standIn = p.standIn ? await startFakeCopilotApi({ log: modelLog }) : null
-  let app, inv, env
+  let app, inv, env, page
   try {
     // Each CLI's home is a test one: the fake's per run, the real Claude Code's and Codex's signed-in test homes.
     env = {
       HIVE_API_PORT: String(port),
       HIVE_TEST_TIPS: 'off',
       HIVE_TEST_MCP_LOG: mcpLog,
+      HIVE_TEST_TOKEN_LOG: tokenLog,
       HIVE_TEST_MERGE_SLOT_LOG: slotLog,
       HIVE_TEST_START_VIEW_LOG: startViewLog,
       CLAUDE_CONFIG_DIR: providerKey === 'claude-code' ? CLAUDE_TEST_HOME : fakeHome,
@@ -301,9 +510,11 @@ async function runScenario(sc, providerKey, opts = {}) {
       // The real Codex runs its commands in Windows PowerShell, not the Store's PowerShell 7 (#584, lib.cjs).
       ...(providerKey === 'codex' ? { PATH: lib.pathWithoutStoreAliases() } : {}),
       // Copilot in the run's own home, its profile folder faked and the GitHub CLI's login hidden (fake-copilot-api.cjs).
-      ...(standIn ? copilotTestEnv(standIn, root) : {})
+      ...(standIn ? copilotTestEnv(standIn, root, { above: root }) : {})
     }
-    ;({ app, inv } = await lib.launch({ userData, env }))
+    // Its token record starts empty: a scenario's Hive appends to it (missing at the end, the run is invalid).
+    fs.writeFileSync(tokenLog, '')
+    ;({ app, inv, page } = await lib.launch({ userData, env }))
   } catch (e) {
     await standIn?.close().catch(() => undefined)
     throw e
@@ -341,10 +552,11 @@ async function runScenario(sc, providerKey, opts = {}) {
     if (first.status === 401) throw new Error(`the Agent API on port ${port} refused this test Hive's token: another Hive is listening on that port`)
     result.guidance = { atStart: first.body?.guidance ?? null, delivered: null }
 
-    if (p.extraArgs) await inv('project:updateConfig', alpha, { providers: { [p.provider]: { extraArgs: p.extraArgs } } })
-    // The project's agents: the one under test (Coder), and another that did earlier work (Implementer, never started).
-    const coder = await lib.addAgent(inv, alpha, { name: 'Coder', provider: p.provider, model: opts.model ?? '', effort: opts.effort ?? '', permissionMode: p.mode })
-    const implementer = await lib.addAgent(inv, alpha, { name: 'Implementer', provider: p.provider, model: opts.model ?? '', effort: opts.effort ?? '', permissionMode: p.mode })
+    // The project's agents: the one under test (Coder), and another that did earlier work (Implementer, never started),
+    // on a connection with the scenario's extra arguments (HI-2122: a connection's, not the project's).
+    const launch = { provider: p.provider, model: opts.model ?? '', effort: opts.effort ?? '', permissionMode: p.mode, extraArgs: p.extraArgs ?? '' }
+    const coder = await lib.addAgent(inv, alpha, { name: 'Coder', ...launch })
+    const implementer = await lib.addAgent(inv, alpha, { name: 'Implementer', ...launch })
     const ctx = {
       api,
       inv,
@@ -362,7 +574,13 @@ async function runScenario(sc, providerKey, opts = {}) {
         const r = await api('POST', '/v1/tasks', { title: c.title, description: c.description ?? '', project: c.project ?? 'alpha', labels: c.labels ?? [], ...(c.context ? { context: c.context } : {}), ...(c.agent ? { agent: ctx.agents[c.agent].id } : {}) })
         if (r.status !== 200) throw new Error(`card ${key}: ${r.text}`)
         for (const text of c.comments ?? []) await api('POST', `/v1/tasks/${r.body.number}/comments`, { text })
-        if (c.column && c.column !== 'todo') await inv('tasks:update', r.body.number, { column: c.column, ...(c.agent ? { agent: ctx.agents[c.agent].id } : {}) })
+        if (c.column && c.column !== 'todo') {
+          await inv('tasks:update', r.body.number, { column: c.column, ...(c.agent ? { agent: ctx.agents[c.agent].id } : {}) })
+          // Under a project's rules a move can stop part way (#1537: a submission with nothing committed stays in Doing):
+          // the scenario never runs on a card that isn't where its setup put it.
+          const now = (await api('GET', `/v1/tasks/${r.body.number}`)).body?.column
+          if (now !== c.column) throw new Error(`setup: card ${key} is in ${now}, not ${c.column}: under the project's rules, move it as the user does (a real submission)`)
+        }
         ctx.cards[key] = r.body.number
         return r.body.number
       },
@@ -388,6 +606,16 @@ async function runScenario(sc, providerKey, opts = {}) {
         const reply = await res.json().catch(() => null)
         if (res.status !== 200) throw new Error(`${key}'s merge slot ${action}: ${res.status} ${JSON.stringify(reply)}`)
         return reply
+      },
+      /**
+       * A call of the Agent API as another of alpha's running agents ('implementer', started with startAgent), with its own
+       * token (#1382: a builder's design posted for the subject to check): { status, body }.
+       */
+      as: async (key, method, route, body) => {
+        const file = path.join(userData, 'agent-api', `${require('crypto').createHash('sha256').update(`${alpha.toLowerCase()}#${ctx.agents[key].id}`).digest('hex').slice(0, 16)}.json`)
+        const token = JSON.parse(fs.readFileSync(file, 'utf8')).token
+        const res = await fetch(`http://127.0.0.1:${port}${route}`, { method, headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' }, ...(body ? { body: JSON.stringify(body) } : {}) })
+        return { status: res.status, body: await res.json().catch(() => null) }
       },
       /** alpha's merge slot now, as a script reads it. */
       slotNow: async () => (await api('GET', '/v1/projects/alpha/merge-slot')).body,
@@ -460,17 +688,50 @@ async function runScenario(sc, providerKey, opts = {}) {
     const live = async () => (await inv('session:live')).find((s) => s.projectPath.toLowerCase() === host.toLowerCase() && s.agentId === agentId)
     // Hive's performance metrics before the launch (the run's own workspace: everything in it is this run's).
     const metricsFrom = new Date(started - 2 * 3600_000).toISOString()
-    const snapshot = async () => {
+    // Each snapshot's request, from just before it was sent to just after its answer (HI-2186): a hive call is in the
+    // measured window when its report reached Hive after the first and before the last (benchmark.cjs splitOf).
+    const snapshots = { before: null, after: null }
+    const snapshot = async (side) => {
       const t = Date.now()
+      const start = new Date().toISOString()
       const r = await api('GET', `/v1/metrics?scope=workspace&from=${encodeURIComponent(metricsFrom)}`)
       result.metricsOverheadMs += Date.now() - t
-      return r.status === 200 ? r.body : null
+      if (r.status !== 200) return null
+      snapshots[side] = { start, end: new Date().toISOString() }
+      return r.body
     }
-    const metricsBefore = await snapshot()
+    const metricsBefore = await snapshot('before')
     // A change made inside the measured window (a skill edited after the snapshot, before the launch), for scenarios
     // that compare the skill service's work on unchanged and changed revisions.
     if (sc.beforeLaunch) await sc.beforeLaunch(ctx)
-    await inv('session:start', host, { agentId })
+    // Hive's log as the session under test starts: its hive tools connecting is counted from here.
+    const launchMark = lib.hiveLogLines(userData).length
+    // A subject Hive starts itself (HI-2046: a reviewer given a card that reached Review outside a lane): its launch is
+    // the session under test, and Hive's line its prompt.
+    const byHive = !!sc.startedByHive
+    // A prompt given at launch (HI-2225), on the CLI's command line: the session's first input, before anything setup left
+    // for it (Hive types nothing into a launch whose CLI hasn't taken its task yet, #712, and a wake waits for the turn
+    // after), so a wake can't come first and do the prompt's work without it. Never with beforePrompt, which waits for
+    // that wake's turn.
+    const atLaunch = !byHive && !!sc.promptAtLaunch
+    if (atLaunch && sc.beforePrompt) throw new Error(`${sc.id}: promptAtLaunch and beforePrompt don't go together`)
+    const launchPrompt = !atLaunch ? null : p.fake ? (typeof sc.fake === 'function' ? sc.fake(ctx) : sc.fake) : typeof sc.prompt === 'function' ? sc.prompt(ctx) : sc.prompt
+    // The run the session under test launched as (HI-2225), known before any prompt can have Hive relaunch it (a card
+    // given in a slot): its trust is answered as it starts (below); a later run's is answered while its turn is waited for.
+    let launchRun = null
+    if (!byHive) {
+      // Refused as already running or starting (HI-2215): Hive started it itself after setup (a lane's card, a review),
+      // which a scenario says with startedByHive; never taken as Hive's start here, whose line would then race the prompt.
+      const refused = await inv('session:start', host, { agentId, ...(atLaunch ? { prompt: launchPrompt } : {}) }).then((st) => ((launchRun = st?.runId ?? null), null), (e) => e)
+      if (refused && /already running or starting/i.test(String(refused.message))) {
+        result.error = `setup: Hive started the session under test itself (${String(refused.message).replace(/^.*Error: /, '')}): mark the scenario startedByHive, or have its setup leave it unstarted`
+        return result
+      }
+      if (refused) throw refused
+    } else if (!(await lib.until(async () => !!(launchRun = (await live())?.runId ?? null), 90000))) {
+      result.error = "Hive didn't start the session under test"
+      return result
+    }
     const key = lib.ptyKey(host, agentId)
     /** The session under test's conversation as Hive reads it (its transcript's items), or [] before it has one. */
     const conversation = async () => {
@@ -524,6 +785,8 @@ async function runScenario(sc, providerKey, opts = {}) {
     while (Date.now() < readyBy) {
       const s = await live()
       if (s?.status === 'ready' || s?.status === 'finished') break
+      // Hive's line already at work: a model's turn on it is the trial. The prompt given at launch, the same.
+      if (((byHive && !p.fake) || atLaunch) && ['working', 'background'].includes(s?.status)) break
       const screen = plain(await inv('pty:buffer', key).catch(() => ''))
       if (screen) lastScreen = screen
       // Exited before its session started (an OAuth session it couldn't refresh, #577): no prompt can reach it.
@@ -552,9 +815,37 @@ async function runScenario(sc, providerKey, opts = {}) {
     // What the session under test was given at its launch (after setup): Hive's guidance and each skill as delivered.
     const subject = sc.role === 'assistant' ? (await inv('workspace:refresh')).assistant : (await inv('workspace:refresh')).projects.find((x) => x.name === 'alpha')
     result.guidance.delivered = subject?.agents.find((a) => a.id === agentId)?.live?.launched ?? null
+    // What setup left the session under test rings its doorbell once it's idle, as the prompt is typed (#1613: on Copilot
+    // the prompt was lost to the doorbell's turn). A scenario's beforePrompt waits for that turn, so the prompt comes after.
+    ctx.subjectStatus = async () => (await live())?.status ?? 'stopped'
+    // Every status the session under test reports, in order, as Hive emits it (HI-2022): a state the loop below would
+    // look at between its looks (each a few calls and a second apart; a short watch ends in between) is still seen.
+    // Each with the watch it had then (HI-2086): the watch a turn ended with, even once a wake has ended it since.
+    await page.evaluate((who) => {
+      window.__subjectStatuses = []
+      window.hive.onEvent((e) => {
+        if (e.type === 'session-status' && e.state?.agentId === who.agentId && String(e.state.projectPath).toLowerCase() === who.host.toLowerCase()) window.__subjectStatuses.push({ status: e.state.status, watch: e.state.watch ?? null })
+      })
+    }, { host, agentId })
+    /** The statuses the session under test has reported since its prompt was sent, in order (`watching` included). */
+    ctx.statusesSeen = () => page.evaluate(() => (window.__subjectStatuses ?? []).map((x) => x.status))
+    /** The same from the `from`th on, each with its watch. */
+    ctx.statesSeen = (from = 0) => page.evaluate((n) => (window.__subjectStatuses ?? []).slice(n), from)
+    if (sc.beforePrompt && !endedAtLaunch) await sc.beforePrompt(ctx)
     const prompt = typeof sc.prompt === 'function' ? sc.prompt(ctx) : sc.prompt
     const fakePrompt = typeof sc.fake === 'function' ? sc.fake(ctx) : sc.fake
-    const text = p.fake ? fakePrompt : prompt
+    // Started by Hive: its line, once the conversation has it. A model works on it, typed nothing more; a fake (which
+    // does nothing on a line it has no script for) is typed its steps once that turn is over.
+    let hiveLine = null
+    if (byHive && !endedAtLaunch) {
+      const lineOf = async () => (await conversation()).find((x) => x.kind === 'user' && String(x.text ?? '').startsWith('[Hive]'))?.text ?? null
+      await lib.until(async () => !!(hiveLine = await lineOf()) && (!p.fake || ['ready', 'finished'].includes((await live())?.status)), 60000)
+      if (!hiveLine) {
+        result.error = "Hive's line never reached the session under test"
+        return result
+      }
+    }
+    const text = launchPrompt ?? (p.fake ? fakePrompt : (hiveLine ?? prompt))
     // The prompt is sent, then checked: a CLI still drawing its first screen can drop an Enter (sent again) or the
     // whole line (typed again).
     const submitted = async () => {
@@ -563,13 +854,33 @@ async function runScenario(sc, providerKey, opts = {}) {
       const items = s?.sessionId ? ((await inv('transcript:read', host, s.sessionId).catch(() => null))?.items ?? []) : []
       return items.some((x) => x.kind === 'user' && x.text.includes(text.slice(0, 40)))
     }
-    if (!endedAtLaunch) await lib.sendPrompt(inv, key, text, { submitted, waitMs: 20000 })
+    let notTaken = null
+    // Where the prompt's states begin (HI-2086): a watch a turn before it left (a setup wake's, beforePrompt) isn't the
+    // prompt's. A model started by Hive's line has no prompt typed: its turn is the line's, all of them; a prompt given at
+    // launch was the first input, so the same.
+    const statesFrom = (hiveLine && !p.fake) || atLaunch ? 0 : ((await page.evaluate(() => (window.__subjectStatuses ?? []).length).catch(() => 0)) ?? 0)
+    if (!endedAtLaunch && !(hiveLine && !p.fake) && !atLaunch) {
+      turnBefore.set(text, (await live())?.turn?.id ?? null)
+      const mark = String((await inv('pty:buffer', key).catch(() => '')) ?? '').length
+      // Real Claude Code: its first prompt waits for its hive tools, as Hive's own first line does (HI-1148).
+      const ready = p.provider === 'claude-code' ? () => lib.hiveToolsConnected(userData, agentId, launchMark) : null
+      if (!(await lib.sendPrompt(inv, key, text, { submitted, ready, waitMs: 20000 }))) {
+        // Never taken: a sign-in or a limit the CLI shows only once something is typed is the environment (#1321).
+        const drawn = String((await inv('pty:buffer', key).catch(() => '')) ?? '').slice(mark)
+        const refused = promptRefused({ prompt: text, screen: drawn, auth: p.provider === 'claude-code' ? claudeAuthStatus(path.join(userData, 'logs', 'hive.log'), agentId, env) : null })
+        if (refused) return skipFor(refused)
+        notTaken = promptNotTaken({ taken: await submitted(), screen: drawn })
+      }
+    }
     const sentAt = Date.now()
+    // Later runs of the session under test whose trust question was answered (below).
+    const subjectTrusted = new Set()
 
     // Wait for the turn to end: working (or background) first, then finished/ready for a few seconds. `during` sees the
-    // board while it works, for scenarios that change things under it.
-    // A session that ended at launch has no turn to wait for.
-    const limit = endedAtLaunch ? Date.now() : Date.now() + (opts.timeoutMs ?? 300000)
+    // board while it works, for scenarios that change things under it. A quick turn can start and end between two looks
+    // (each look is several calls, slow under load: #1311), so the prompt answered counts as the work seen too.
+    // A session that ended at launch, or whose prompt was never taken, has no turn to wait for.
+    const limit = endedAtLaunch || notTaken ? Date.now() : Date.now() + (opts.timeoutMs ?? 300000)
     let sawWork = false
     let quietSince = 0
     const trustAnswered = new Set()
@@ -585,9 +896,19 @@ async function runScenario(sc, providerKey, opts = {}) {
       if (['working', 'background', 'starting'].includes(status)) {
         sawWork = true
         quietSince = 0
-      } else if (sawWork || Date.now() - sentAt > 60000) {
+      } else if (sawWork || (sawWork = await ctx.answered(text)) || Date.now() - sentAt > 60000) {
         quietSince ||= Date.now()
         if (Date.now() - quietSince > (status === 'waiting' ? 3000 : 6000)) break
+      }
+      // The session under test asking to trust a folder again (HI-2225): Hive gave it its card in a slot, a new run there
+      // (preset-pair-lane), whose question (waiting) ended the trial 3 s later, unanswered. Until it is answered the run is
+      // still starting.
+      // (The screen read only while it waits.)
+      const trust = status === 'waiting' ? relaunchTrust({ status, runId: s.runId, launchRun, answered: subjectTrusted, screen: plain(await inv('pty:buffer', key).catch(() => '')).slice(-2000), provider: p.provider }) : null
+      if (trust === 'enter') await inv('pty:write', key, '\r')
+      if (trust === 'enter' || (trust === 'claude' && (await lib.acceptClaudeTrust(inv, host, agentId, 10000)))) {
+        subjectTrusted.add(s.runId)
+        quietSince = 0
       }
       if (sc.during) await sc.during(ctx, status)
       // Other agents of the project started during the run (the Assistant dispatching one) ask to trust its folder, once
@@ -615,50 +936,73 @@ async function runScenario(sc, providerKey, opts = {}) {
     }
     const s = await live()
     if (endedAtLaunch) result.error = endedAtLaunch.error
+    else if (notTaken) result.error = notTaken
     else if (!s || Date.now() >= limit) result.error = s ? 'timed out' : 'the session ended'
     // The bridges report their calls to Hive a batch at a time (every 2 s, or as their CLI closes input): read the
     // metrics once they count every call the bridges logged (allCallsReported). Not all within the bound (a report
     // dropped): the last read, shown as partial.
-    let metricsAfter = await snapshot()
+    let metricsAfter = await snapshot('after')
     let allReported = !metricsBefore || !metricsAfter || allCallsReported(readMcpLog(mcpLog), metricsAfter)
     if (!allReported)
       allReported = !!(await lib.until(async () => {
-        metricsAfter = (await snapshot()) ?? metricsAfter
+        metricsAfter = (await snapshot('after')) ?? metricsAfter
         return allCallsReported(readMcpLog(mcpLog), metricsAfter)
       }, HUNG_MS))
     const sessionId = s?.sessionId ?? (await inv('workspace:refresh')).projects.find((x) => x.name === 'alpha')?.agents.find((a) => a.id === coder.id)?.lastSessionId
     // The session under test, for checks of what it was launched with (Codex's rollout carries its instructions, #520).
     ctx.session = { id: sessionId ?? null, codexHome: env.CODEX_HOME }
     const transcript = sessionId ? await inv('transcript:read', host, sessionId).catch(() => null) : null
-    // Tool calls the parser shortened for display are read in full (for the token check and read evidence).
-    const items = transcript?.items ?? []
-    for (const it of items) {
-      if (it.kind === 'tool' && (it.tool.inputLength || it.tool.resultLength)) it.tool = (await inv('transcript:tool', host, sessionId, it.id).catch(() => null)) ?? it.tool
-    }
-    const observed = observeTranscript(items, skillNames)
+    // Tool calls the parser shortened for display are read in full (for the token check and read evidence), a Codex
+    // script's calls too (HI-2246).
+    const items = await readWhole(transcript?.items ?? [], (itemId) => inv('transcript:tool', host, sessionId, itemId))
+    // Codex in code mode (HI-2235): each script's calls as Hive's parser gives them (HI-2240, HI-2246), in the script's
+    // place. A script whose calls aren't known is no tool: what it ran is unobservable (codeMode.unknown).
+    const code = p.provider === 'codex' ? withScriptCalls(items) : { items, scripts: 0, calls: 0, unknown: 0 }
+    const observed = observeTranscript(code.items, skillNames, skillRefsOf(ctx.skillsDir, skillNames))
+    observed.codeMode = { scripts: code.scripts, calls: code.calls, unknown: code.unknown }
     observed.status = s?.status ?? 'stopped'
+    // Every status it reported during the turn, in order (HI-2022): `watching` seen even when it came and went between looks.
+    observed.statuses = await ctx.statusesSeen().catch(() => [])
     // The watch it ended its turn with (#402): the live one, not every watch it started (a new one replaces the last).
     observed.watch = s?.watch ?? null
+    // The watch of the last turn it ended watching since its prompt (HI-2086), as it reported it then: a wake may have
+    // ended that watch before the run looked (the snapshot above), and the turn the wake started, a fake's inbox read,
+    // ended with none. Null if it never ended a turn watching. With no states seen, the snapshot's.
+    const states = await ctx.statesSeen(statesFrom).catch(() => [])
+    observed.turnWatch = states.length ? (states.findLast((x) => x.status === 'watching')?.watch ?? null) : observed.status === 'watching' ? observed.watch : null
     // What Hive woke it with (#402), in order: a line it typed in, or (#650: its doorbell) what the session's next
-    // hive_inbox call read, the inbox's own items after the doorbell.
-    observed.wakeLines = items.flatMap((x, i) => {
+    // hive_inbox call read, the inbox's own items after the doorbell. Codex calls hive tools from its code tool (Script):
+    // its read is the hive_inbox call the script made (HI-2235); with the script's calls unknown, the doorbell's line.
+    observed.wakeLines = code.items.flatMap((x, i) => {
       const line = String(x.kind === 'user' ? (x.text ?? '') : '').trim()
       if (!line.startsWith('[Hive]')) return []
       if (!line.startsWith('[Hive] New in your inbox: ')) return [line.slice(0, 1000)]
-      const read = items.slice(i + 1).find((y) => y.kind === 'tool' && /hive_inbox/.test(y.tool.name))
+      const read = code.items.slice(i + 1).find((y) => y.kind === 'tool' && /hive_inbox/.test(y.tool.name))
       return [String(read?.tool.result ?? line).trim().slice(0, 1000)]
     })
     observed.guidance = result.guidance
     // What the hive servers ran: the subject's own calls, and everyone's (an agent the Assistant started).
     observed.allHiveCalls = readMcpLog(mcpLog)
+    observed.mcpLists = readMcpLists(mcpLog)
+    observed.mcpReports = readJsonLines(mcpLog).filter((l) => l.kind === 'reported')
     observed.hiveCalls = observed.allHiveCalls.filter((c) => (sc.role === 'assistant' ? c.role === 'assistant' : c.agent === coder.id))
     // Each change to the merge slots (JSON lines, as the MCP log): { at, slots: [{ project, branch, holder, waiting }] }.
     observed.slotLog = readMcpLog(slotLog)
     // Any Agent API token (the workspace's, or an agent's for this launch) in what the session printed or said.
-    const tokensIn = (dir) => (fs.existsSync(dir) ? fs.readdirSync(dir).map((f) => JSON.parse(fs.readFileSync(path.join(dir, f), 'utf8')).token) : [])
-    const tokens = [apiToken, ...tokensIn(path.join(userData, 'agent-api')), ...tokensIn(path.join(userData, 'assistant-api'))].filter((t) => typeof t === 'string' && t.length >= 16)
-    observed.tokenLeak = tokens.some((t) => observed.tools.some((x) => x.result.includes(t)) || observed.replies.some((r) => r.includes(t)))
+    // Every one this Hive issued (its record, knownTokens), each launch's hook token among them (HI-2262, Darren's
+    // decision: HIVE_HOOK_TOKEN stays in the session's environment, so a listing of it would print that), those of
+    // launches long ended too.
+    const known = knownTokens(tokenLog, apiToken)
+    const tokens = known.map((t) => t.token)
+    // A script's own output too (what it printed), beside its calls'.
+    const scripts = code.items.filter((x) => x.kind === 'script').map((x) => ({ name: x.tool.name, result: String(x.tool.result ?? '') }))
+    // Where each was seen, masked (HI-2259: the results keep 400 characters of a result, so a leak further on was found
+    // but not where).
+    observed.tokenSeen = tokenSightings(known, { tools: observed.tools, scripts, replies: observed.replies })
+    observed.tokenLeak = observed.tokenSeen.length > 0
     observed.cards = Object.fromEntries(await Promise.all(Object.entries(ctx.cards).map(async ([k, n]) => [k, (await api('GET', `/v1/tasks/${n}`)).body])))
+    // Each card's workflow facts (1.0: Moved, Override, Refused…), for scenarios about what a move recorded (#1319).
+    observed.facts = Object.fromEntries(await Promise.all(Object.entries(ctx.cards).map(async ([k, n]) => [k, (await inv('tasks:facts', n).catch(() => null)) ?? []])))
     observed.allCards = (await api('GET', '/v1/tasks')).body ?? []
     // The lanes as the run left them (#402): running and lately ended.
     observed.lanes = (await api('GET', '/v1/lanes')).body ?? []
@@ -671,7 +1015,6 @@ async function runScenario(sc, providerKey, opts = {}) {
     observed.settings = await inv('settings:get')
     result.usage = sessionId ? await inv('session:usage', host, sessionId).catch(() => null) : null
     // A fake acts a scenario out with scripted board moves: checks only a model's own work can meet are skipped there.
-    result.measures = metricsBefore && metricsAfter ? measuresOf(metricsBefore, metricsAfter, observed, result.usage) : null
     result.metricsRecording = metricsAfter?.recording ?? null
     // How complete the measurement was: both reads, recording on, nothing dropped or evicted in between.
     const partial = []
@@ -682,6 +1025,11 @@ async function runScenario(sc, providerKey, opts = {}) {
     if (dropped) partial.push(`${dropped} measurements dropped`)
     if (metricsAfter?.coverage?.evictedThrough) partial.push('history removed for space')
     result.coverage = { recording: metricsAfter?.recording ?? null, dropped, partial }
+    // The subject apart from the other agents (HI-2186): who is who by the fixture's roster (the project's agents, by
+    // their fixture names) and the run's lanes.
+    const roster = (((await api('GET', '/v1/projects/alpha')).body?.agents ?? []) || []).map((a) => ({ id: a.id, name: a.name, workflowRole: a.workflowRole ?? null }))
+    const parts = { kind: sc.role === 'assistant' ? 'assistant' : 'agent', agentId, snapshots, complete: partial.length === 0, roster, lanes: observed.lanes }
+    result.measures = metricsBefore && metricsAfter ? measuresOf(metricsBefore, metricsAfter, observed, result.usage, parts) : null
     // Every scenario starts a new session (session:start with no resumeId): its usage is the scenario's own.
     result.resumed = false
     observed.measures = result.measures
@@ -696,14 +1044,16 @@ async function runScenario(sc, providerKey, opts = {}) {
       await lib.until(async () => !(await live()), HUNG_MS)
       observed.leftovers = ((await inv('session:leftovers', true)) ?? []).filter((l) => l.projectPath.toLowerCase() === host.toLowerCase() && l.agentId === agentId)
     }
-    result.checks = (sc.expect?.(observed, ctx) ?? []).map(([name, ok, detail]) =>
+    result.checks = (notTaken ? [] : (sc.expect?.(observed, ctx) ?? [])).map(([name, ok, detail]) =>
       p.fake && (typeof sc.fakeSkips === 'function' ? sc.fakeSkips(providerKey) : (sc.fakeSkips ?? [])).includes(name) ? { name, ok: null, skipped: 'fake provider' } : { name, ok: !!ok, ...(ok ? {} : { detail: String(detail ?? '').slice(0, 300) }) }
     )
+    // What a scenario records without checking it (#1611: whether the skill that owns the workflow was read, when the
+    // behaviour is what's checked): in the results and the benchmark, never a pass or a failure.
+    if (sc.observe) result.observations = sc.observe(observed, ctx).map(([name, value, detail]) => ({ name, value: !!value, ...(detail === undefined ? {} : { detail: String(detail).slice(0, 300) }) }))
     // Kept short in the results (whole tool calls can be large, and must not carry a token).
-    const short = (v) => tokens.reduce((x, t) => x.split(t).join('<token>'), String(v)).slice(0, 400)
-    result.observed = { ...observed, tools: observed.tools.map((t) => ({ ...t, input: short(t.input), result: short(t.result) })), replies: undefined, settings: undefined, finalReply: short(observed.finalReply) }
+    result.observed = retainedObserved(observed, tokens)
     // What each of the project's agents showed at the end, for a check that failed on an agent's work (#498).
-    if (sc.waitForAgents) result.observed.panes = Object.fromEntries(await Promise.all(Object.entries(ctx.agents).map(async ([k, a]) => [k, tokens.reduce((x, t) => x.split(t).join('<token>'), plain(await inv('pty:buffer', lib.ptyKey(alpha, a.id)).catch(() => ''))).slice(-1200)])))
+    if (sc.waitForAgents) result.observed.panes = Object.fromEntries(await Promise.all(Object.entries(ctx.agents).map(async ([k, a]) => [k, maskTokens(tokens, plain(await inv('pty:buffer', lib.ptyKey(alpha, a.id)).catch(() => ''))).slice(-1200)])))
   } catch (e) {
     result.error = String(e?.stack ?? e)
   } finally {
@@ -712,11 +1062,21 @@ async function runScenario(sc, providerKey, opts = {}) {
     for (const x of await inv('session:live').catch(() => [])) await inv('session:stop', x.projectPath, x.agentId).catch(() => undefined)
     // Closed once every session has stopped (a CLI still writing its transcript as Hive closes leaves it half-written).
     await lib.until(async () => !(await inv('session:live').catch(() => [])).some((x) => !['stopped', 'error'].includes(x.status)), HUNG_MS)
+    // What the agents left running, as their launches' jobs hold it (HI-2217): a command whose parent has exited and that
+    // names no scenario folder is in neither the tree nor a command line. Asked once their leftovers are settled.
+    const left = await inv('session:leftovers', true).catch(() => [])
+    if (left?.some((l) => l.processes?.length)) {
+      try {
+        tree.push(...leftoverIdentities(processes(), left))
+      } catch {
+        // No process list: the tree and the folder's own still go.
+      }
+    }
     await app.close().catch(() => undefined)
     await standIn?.close()
     // A command an agent started can outlive its session (#542): stop it, so it doesn't hold the folder.
     const leftOver = lib.stopProcessesIn(root, started, tree)
-    if (leftOver) result.leftOver = `${leftOver} process(es) the scenario's Hive started, or still running from its folder, were stopped`
+    if (leftOver) result.leftOver = `${leftOver} process(es) the scenario's Hive or its agents started, or still running from its folder, were stopped`
     result.seconds = Math.round((Date.now() - started) / 1000)
     // Unless a card cites it now, or the board can't be read (evidence.cjs reads it afresh): then it stays, said in the result.
     const kept = opts.keep ? null : opts.evidence?.protects(root)
@@ -733,4 +1093,4 @@ async function runScenario(sc, providerKey, opts = {}) {
   return result
 }
 
-module.exports = { runScenario, observeTranscript, readMcpLog, allCallsReported, sourceFingerprint, metricsTotals, measuresOf, trialEnvironment, cliNotices, launchEnded, startFailureIn, claudeAuthStatus, parseAuthStatus, environmentAdvice, PROVIDERS, CLAUDE_TEST_HOME, claudeSignedIn }
+module.exports = { runScenario, forgetClaudeMemory, observeTranscript, tokenSightings, knownTokens, maskTokens, retainedObserved, skillRefsOf, readMcpLog, allCallsReported, sourceFingerprint, metricsTotals, measuresOf, trialEnvironment, promptRefused, promptNotTaken, relaunchTrust, keptReply, REPLY_KEPT, cliNotices, launchEnded, startFailureIn, claudeAuthStatus, parseAuthStatus, environmentAdvice, PROVIDERS, CLAUDE_TEST_HOME, claudeSignedIn }

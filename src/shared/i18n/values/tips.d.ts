@@ -1,10 +1,18 @@
 // Generated from locales/en/tips.json: do not edit. Each message's placeholders and their types, for tr(): a
 // global script, so its interface merges with every other area's (shared/i18n/msg.ts).
 interface HiveMessageValues {
+  'tips.activityTab.text': undefined
+  'tips.activityTab.title': undefined
+  'tips.activityWorkspace.text': undefined
+  'tips.activityWorkspace.title': undefined
   'tips.advancedSettings.text': undefined
   'tips.advancedSettings.title': undefined
   'tips.agentConsole.text': undefined
   'tips.agentConsole.title': undefined
+  'tips.agentHooks.text': undefined
+  'tips.agentHooks.title': undefined
+  'tips.agentInSlot.text': undefined
+  'tips.agentInSlot.title': undefined
   'tips.agentLayouts.text': undefined
   'tips.agentLayouts.title': undefined
   'tips.agentMenu.text': { key: string | number }
@@ -13,6 +21,10 @@ interface HiveMessageValues {
   'tips.agentSettings.title': undefined
   'tips.agentStates.text': undefined
   'tips.agentStates.title': undefined
+  'tips.agentWorkflowRole.text': undefined
+  'tips.agentWorkflowRole.title': undefined
+  'tips.allKeysToCli.text': undefined
+  'tips.allKeysToCli.title': undefined
   'tips.alwaysOnTop.text': undefined
   'tips.alwaysOnTop.title': undefined
   'tips.antivirus.text': undefined
@@ -21,10 +33,14 @@ interface HiveMessageValues {
   'tips.archiveNew.title': undefined
   'tips.assistant.text': { key: string | number }
   'tips.assistant.title': undefined
-  'tips.assistantBatch.text': { cards: number; changes: number }
+  'tips.assistantAgentRequests.text': undefined
+  'tips.assistantAgentRequests.title': undefined
+  'tips.assistantBatch.text': { cards: number }
   'tips.assistantBatch.title': undefined
   'tips.assistantCompact.text': { tokens: number }
   'tips.assistantCompact.title': undefined
+  'tips.assistantConnection.text': undefined
+  'tips.assistantConnection.title': undefined
   'tips.assistantControl.text': undefined
   'tips.assistantControl.title': undefined
   'tips.assistantImages.text': undefined
@@ -37,8 +53,12 @@ interface HiveMessageValues {
   'tips.assistantLaneWatch.title': undefined
   'tips.assistantLanes.text': undefined
   'tips.assistantLanes.title': undefined
+  'tips.assistantMcp.textAdded': undefined
+  'tips.assistantMcp.title': undefined
   'tips.assistantMessages.text': undefined
   'tips.assistantMessages.title': undefined
+  'tips.assistantNoticeOpens.text': undefined
+  'tips.assistantNoticeOpens.title': undefined
   'tips.assistantReplies.text': undefined
   'tips.assistantReplies.title': undefined
   'tips.assistantSettings.text': undefined
@@ -49,12 +69,20 @@ interface HiveMessageValues {
   'tips.assistantStatus.title': undefined
   'tips.assistantTeam.text': undefined
   'tips.assistantTeam.title': undefined
+  'tips.assistantTemplates.text': undefined
+  'tips.assistantTemplates.title': undefined
   'tips.assistantToldWaiting.text': undefined
   'tips.assistantToldWaiting.title': undefined
+  'tips.assistantUndo.text': undefined
+  'tips.assistantUndo.title': undefined
   'tips.assistantWaits.text': undefined
   'tips.assistantWaits.title': undefined
   'tips.attachFiles.text': undefined
   'tips.attachFiles.title': undefined
+  'tips.attachmentsTabs.text': undefined
+  'tips.attachmentsTabs.title': undefined
+  'tips.autoModeSetup.text': undefined
+  'tips.autoModeSetup.title': undefined
   'tips.backupRetention.text': undefined
   'tips.backupRetention.title': undefined
   'tips.banners.text': undefined
@@ -81,8 +109,22 @@ interface HiveMessageValues {
   'tips.boardReview.title': undefined
   'tips.boardSetAside.text': undefined
   'tips.boardSetAside.title': undefined
+  'tips.boardStages.text': undefined
+  'tips.boardStages.title': undefined
+  'tips.boardUpgrade.text': undefined
+  'tips.boardUpgrade.title': undefined
+  'tips.branchCards.text': undefined
+  'tips.branchCards.title': undefined
+  'tips.branchCleanup.text': undefined
+  'tips.branchCleanup.title': undefined
+  'tips.cardAttachments.text': undefined
+  'tips.cardAttachments.title': undefined
+  'tips.cardAttachmentsCleanup.text': undefined
+  'tips.cardAttachmentsCleanup.title': undefined
   'tips.cardCost.text': { example: string | number }
   'tips.cardCost.title': undefined
+  'tips.cardCostRounds.text': undefined
+  'tips.cardCostRounds.title': undefined
   'tips.cardDecisions.text': undefined
   'tips.cardDecisions.title': undefined
   'tips.cardLinks.text': undefined
@@ -95,8 +137,24 @@ interface HiveMessageValues {
   'tips.cardReadFirst.title': undefined
   'tips.cardSummaries.text': undefined
   'tips.cardSummaries.title': undefined
+  'tips.cardWork.text': undefined
+  'tips.cardWork.title': undefined
+  'tips.chooseConnections.text': undefined
+  'tips.chooseConnections.title': undefined
+  'tips.claudeStatusLine.text': undefined
+  'tips.claudeStatusLine.title': undefined
+  'tips.cliOverrides.text': undefined
+  'tips.cliOverrides.title': undefined
+  'tips.cliOwnMode.text': undefined
+  'tips.cliOwnMode.title': undefined
+  'tips.closeCommands.text': undefined
+  'tips.closeCommands.title': undefined
   'tips.closeWindow.text': { key: string | number }
   'tips.closeWindow.title': undefined
+  'tips.codexSandboxConnections.text': undefined
+  'tips.codexSandboxConnections.title': undefined
+  'tips.codexScriptCalls.text': undefined
+  'tips.codexScriptCalls.title': undefined
   'tips.commandName': { command: string | number }
   'tips.compactFocus.text': { key: string | number }
   'tips.compactFocus.title': undefined
@@ -104,6 +162,18 @@ interface HiveMessageValues {
   'tips.compactSidebar.title': undefined
   'tips.compactionHistory.text': undefined
   'tips.compactionHistory.title': undefined
+  'tips.compareBranches.text': undefined
+  'tips.compareBranches.title': undefined
+  'tips.conflictHunks.text': undefined
+  'tips.conflictHunks.title': undefined
+  'tips.connectionOrder.text': undefined
+  'tips.connectionOrder.title': undefined
+  'tips.connectionSetups.text': undefined
+  'tips.connectionSetups.title': undefined
+  'tips.connectionTrust.text': undefined
+  'tips.connectionTrust.title': undefined
+  'tips.connections.text': undefined
+  'tips.connections.title': undefined
   'tips.consoleRecording.text': undefined
   'tips.consoleRecording.title': undefined
   'tips.consoleText.text': undefined
@@ -114,10 +184,14 @@ interface HiveMessageValues {
   'tips.copilotModes.title': undefined
   'tips.copyDiagnostics.text': undefined
   'tips.copyDiagnostics.title': undefined
+  'tips.ctrlCvToCli.text': undefined
+  'tips.ctrlCvToCli.title': undefined
+  'tips.customCommands.text': undefined
+  'tips.customCommands.title': undefined
   'tips.dateFormat.text': { date: string | number; time: string | number }
   'tips.dateFormat.title': undefined
-  'tips.defaultProvider.text': undefined
-  'tips.defaultProvider.title': undefined
+  'tips.designCheck.text': undefined
+  'tips.designCheck.title': undefined
   'tips.developerConsole.text': undefined
   'tips.developerConsole.title': undefined
   'tips.editTemplates.text': undefined
@@ -128,10 +202,26 @@ interface HiveMessageValues {
   'tips.filesTab.title': undefined
   'tips.flightRecorder.text': undefined
   'tips.flightRecorder.title': undefined
+  'tips.focusedTests.text': undefined
+  'tips.focusedTests.title': undefined
+  'tips.followUpCheck.text': undefined
+  'tips.followUpCheck.title': undefined
+  'tips.forYou.text': undefined
+  'tips.forYou.title': undefined
+  'tips.forYouActions.text': undefined
+  'tips.forYouActions.title': undefined
+  'tips.forYouApproveNote.text': undefined
+  'tips.forYouApproveNote.title': undefined
+  'tips.generalistRole.text': undefined
+  'tips.generalistRole.title': undefined
   'tips.gitCheck.text': undefined
   'tips.gitCheck.title': undefined
+  'tips.gitHistory.text': undefined
+  'tips.gitHistory.title': undefined
   'tips.gitInit.text': undefined
   'tips.gitInit.title': undefined
+  'tips.gitRemotes.text': undefined
+  'tips.gitRemotes.title': undefined
   'tips.gitView.text': { example: string | number }
   'tips.gitView.title': undefined
   'tips.gotoProject.text': { key: string | number }
@@ -148,18 +238,48 @@ interface HiveMessageValues {
   'tips.hardwareAcceleration.title': undefined
   'tips.hiveFolder.text': undefined
   'tips.hiveFolder.title': undefined
+  'tips.hiveMerges.text': undefined
+  'tips.hiveMerges.title': undefined
   'tips.hiveSkills.text': undefined
   'tips.hiveSkills.title': undefined
+  'tips.hooksMissing.text': undefined
+  'tips.hooksMissing.title': undefined
+  'tips.howDoYouWork.text': undefined
+  'tips.howDoYouWork.title': undefined
   'tips.imagesTab.text': undefined
   'tips.imagesTab.title': undefined
   'tips.improveTranslation.text': undefined
   'tips.improveTranslation.title': undefined
+  'tips.inboxCarryingOn.text': undefined
+  'tips.inboxCarryingOn.title': undefined
   'tips.inboxNotices.text': undefined
   'tips.inboxNotices.title': undefined
+  'tips.isolatedChecks.text': undefined
+  'tips.isolatedChecks.title': undefined
   'tips.keepAwake.text': undefined
   'tips.keepAwake.title': undefined
+  'tips.laneApplyNow.text': undefined
+  'tips.laneApplyNow.title': undefined
+  'tips.laneBranchSquash.text': undefined
+  'tips.laneBranchSquash.title': undefined
+  'tips.laneGates.text': undefined
+  'tips.laneGates.title': undefined
+  'tips.laneNext.text': undefined
+  'tips.laneNext.title': undefined
+  'tips.laneNotices.text': undefined
+  'tips.laneNotices.title': undefined
+  'tips.laneSlots.text': undefined
+  'tips.laneSlots.title': undefined
+  'tips.laneStart.text': undefined
+  'tips.laneStart.title': undefined
+  'tips.lanesLegend.text': undefined
+  'tips.lanesLegend.title': undefined
   'tips.language.text': undefined
   'tips.language.title': undefined
+  'tips.leftRunning.text': undefined
+  'tips.leftRunning.title': undefined
+  'tips.leftoverBranches.text': undefined
+  'tips.leftoverBranches.title': undefined
   'tips.leftoverProcesses.text': undefined
   'tips.leftoverProcesses.title': undefined
   'tips.licenceAudit.text': undefined
@@ -170,16 +290,40 @@ interface HiveMessageValues {
   'tips.loopLanes.title': undefined
   'tips.loopWakes.text': undefined
   'tips.loopWakes.title': undefined
-  'tips.mcpFromFile.text': undefined
+  'tips.mainProcessStalls.text': undefined
+  'tips.mainProcessStalls.title': undefined
+  'tips.maxAgents.text': undefined
+  'tips.maxAgents.title': undefined
+  'tips.mcpCatalogue.text': undefined
+  'tips.mcpCatalogue.title': undefined
+  'tips.mcpFromFile.textAdded': undefined
   'tips.mcpFromFile.title': undefined
   'tips.mcpPerAgent.text': undefined
   'tips.mcpPerAgent.title': undefined
-  'tips.mcpPerProject.text': undefined
+  'tips.mcpPerProject.textAdded': undefined
   'tips.mcpPerProject.title': undefined
+  'tips.mcpSearch.text': undefined
+  'tips.mcpSearch.title': undefined
   'tips.memorySnapshot.text': undefined
   'tips.memorySnapshot.title': undefined
+  'tips.mergeBranch.text': undefined
+  'tips.mergeBranch.title': undefined
+  'tips.mergeMessage.text': undefined
+  'tips.mergeMessage.title': undefined
+  'tips.mergePush.text': undefined
+  'tips.mergePush.title': undefined
+  'tips.mergeQueueFolder.text': undefined
+  'tips.mergeQueueFolder.title': undefined
+  'tips.mergeQueuePanel.text': undefined
+  'tips.mergeQueuePanel.title': undefined
+  'tips.mergeQueueRecent.text': undefined
+  'tips.mergeQueueRecent.title': undefined
+  'tips.mergeRebase.text': undefined
+  'tips.mergeRebase.title': undefined
   'tips.mergeSlot.text': undefined
   'tips.mergeSlot.title': undefined
+  'tips.mergeStrict.text': undefined
+  'tips.mergeStrict.title': undefined
   'tips.messageReceipts.text': { minutes: number }
   'tips.messageReceipts.title': undefined
   'tips.modelFallbacks.text': undefined
@@ -188,12 +332,18 @@ interface HiveMessageValues {
   'tips.modes.title': undefined
   'tips.moreAgents.text': { usual: number; most: number }
   'tips.moreAgents.title': { usual: number }
+  'tips.moveAnyway.text': undefined
+  'tips.moveAnyway.title': undefined
   'tips.myPrices.text': undefined
   'tips.myPrices.title': undefined
   'tips.newCard.text': { key: string | number }
   'tips.newCard.title': undefined
+  'tips.noCodeCards.text': undefined
+  'tips.noCodeCards.title': undefined
   'tips.off.message': undefined
   'tips.off.title': undefined
+  'tips.outageResume.text': undefined
+  'tips.outageResume.title': undefined
   'tips.overview.text': { key: string | number }
   'tips.overview.title': undefined
   'tips.ownShortcuts.text': undefined
@@ -204,19 +354,29 @@ interface HiveMessageValues {
   'tips.paneCells.title': undefined
   'tips.pasteScreenshot.text': undefined
   'tips.pasteScreenshot.title': undefined
+  'tips.pathsLeftOut.text': undefined
+  'tips.pathsLeftOut.title': undefined
+  'tips.pauseTeam.text': undefined
+  'tips.pauseTeam.title': undefined
   'tips.perfCompare.text': undefined
   'tips.perfCompare.title': undefined
+  'tips.perfCompareAgents.text': undefined
+  'tips.perfCompareAgents.title': undefined
   'tips.performance.text': undefined
   'tips.performance.title': undefined
   'tips.permissionMode.text': { key: string | number }
   'tips.permissionMode.title': undefined
+  'tips.progressCard.text': undefined
+  'tips.progressCard.title': undefined
+  'tips.progressCheck.text': undefined
+  'tips.progressCheck.title': undefined
   'tips.progressCommand.text': undefined
   'tips.progressCommand.title': undefined
   'tips.progressDetails.text': undefined
   'tips.progressDetails.title': undefined
   'tips.progressFilter.text': undefined
   'tips.progressFilter.title': undefined
-  'tips.progressHistory.text': { recent: number; kept: number }
+  'tips.progressHistory.text': { kept: number }
   'tips.progressHistory.title': undefined
   'tips.progressLanes.text': undefined
   'tips.progressLanes.title': undefined
@@ -226,20 +386,36 @@ interface HiveMessageValues {
   'tips.progressLanesOrder.title': undefined
   'tips.progressPanel.text': { key: string | number }
   'tips.progressPanel.title': undefined
+  'tips.progressTabs.text': undefined
+  'tips.progressTabs.title': undefined
   'tips.projectCards.text': undefined
   'tips.projectCards.title': undefined
+  'tips.projectKeys.text': undefined
+  'tips.projectKeys.title': undefined
   'tips.projectTabs.text': undefined
   'tips.projectTabs.title': undefined
   'tips.projectTabsKeys.text': undefined
   'tips.projectTabsKeys.title': undefined
+  'tips.projectTabsSettings.text': undefined
+  'tips.projectTabsSettings.title': undefined
   'tips.quitWhenDone.text': undefined
   'tips.quitWhenDone.title': undefined
   'tips.recentWorkspaces.text': undefined
   'tips.recentWorkspaces.title': undefined
   'tips.removeAll.text': undefined
   'tips.removeAll.title': undefined
+  'tips.resumeAfterUpdate.text': undefined
+  'tips.resumeAfterUpdate.title': undefined
   'tips.resumeAll.text': undefined
   'tips.resumeAll.title': undefined
+  'tips.retryWait.text': undefined
+  'tips.retryWait.title': undefined
+  'tips.reviewCopies.text': undefined
+  'tips.reviewCopies.title': undefined
+  'tips.reviewSkip.text': undefined
+  'tips.reviewSkip.title': undefined
+  'tips.reviewerPool.text': undefined
+  'tips.reviewerPool.title': undefined
   'tips.safeguardStops.text': undefined
   'tips.safeguardStops.title': undefined
   'tips.saveTemplate.text': undefined
@@ -264,26 +440,50 @@ interface HiveMessageValues {
   'tips.signInExpired.title': undefined
   'tips.silentUnknown.text': undefined
   'tips.silentUnknown.title': undefined
+  'tips.skillFiles.text': undefined
+  'tips.skillFiles.title': undefined
+  'tips.skillsDelivered.text': undefined
+  'tips.skillsDelivered.title': undefined
+  'tips.slotHeld.text': undefined
+  'tips.slotHeld.title': undefined
+  'tips.slotOptions.text': undefined
+  'tips.slotOptions.title': undefined
+  'tips.slotResume.text': undefined
+  'tips.slotResume.title': undefined
+  'tips.slots.text': undefined
+  'tips.slots.title': undefined
+  'tips.slotsAdopted.text': undefined
+  'tips.slotsAdopted.title': undefined
   'tips.sortTables.text': undefined
   'tips.sortTables.title': undefined
   'tips.staleMessages.text': undefined
   'tips.staleMessages.title': undefined
+  'tips.startFreshIdle.text': undefined
+  'tips.startFreshIdle.title': undefined
   'tips.startNewAll.text': undefined
   'tips.startNewAll.title': undefined
+  'tips.stoppedPane.text': undefined
+  'tips.stoppedPane.title': undefined
   'tips.storageCleanup.text': undefined
   'tips.storageCleanup.title': undefined
   'tips.storagePurge.text': undefined
   'tips.storagePurge.title': undefined
   'tips.taskbarBadge.text': undefined
   'tips.taskbarBadge.title': undefined
+  'tips.teamPreset.text': undefined
+  'tips.teamPreset.title': undefined
+  'tips.teamTemplates.text': undefined
+  'tips.teamTemplates.title': undefined
   'tips.templateNames.text': undefined
   'tips.templateNames.title': undefined
-  'tips.templateWorktrees.text': undefined
-  'tips.templateWorktrees.title': undefined
+  'tips.templateWorkflow.text': undefined
+  'tips.templateWorkflow.title': undefined
   'tips.testedClis.text': undefined
   'tips.testedClis.title': undefined
   'tips.tileStrip.text': undefined
   'tips.tileStrip.title': undefined
+  'tips.tileStripOrder.text': undefined
+  'tips.tileStripOrder.title': undefined
   'tips.tilesView.text': undefined
   'tips.tilesView.title': undefined
   'tips.triageReport.text': undefined
@@ -307,12 +507,26 @@ interface HiveMessageValues {
   'tips.unmerged.title': undefined
   'tips.unusedWorktrees.text': undefined
   'tips.unusedWorktrees.title': undefined
+  'tips.updateFromTarget.text': undefined
+  'tips.updateFromTarget.title': undefined
+  'tips.usageMoves.text': undefined
+  'tips.usageMoves.title': undefined
+  'tips.versionControlSwitch.text': undefined
+  'tips.versionControlSwitch.title': undefined
+  'tips.versionControlTab.text': undefined
+  'tips.versionControlTab.title': undefined
   'tips.viewerTokens.text': undefined
   'tips.viewerTokens.title': undefined
+  'tips.workflowDefaults.text': undefined
+  'tips.workflowDefaults.title': undefined
+  'tips.workflowOptions.text': undefined
+  'tips.workflowOptions.title': undefined
+  'tips.workflowPresetsWhy.text': undefined
+  'tips.workflowPresetsWhy.title': undefined
   'tips.workspaceMoved.text': undefined
   'tips.workspaceMoved.title': undefined
-  'tips.worktreeReuse.text': undefined
-  'tips.worktreeReuse.title': undefined
-  'tips.worktrees.text': undefined
-  'tips.worktrees.title': undefined
+  'tips.workspaceMovedDefender.text': undefined
+  'tips.workspaceMovedDefender.title': undefined
+  'tips.workspaceNotes.text': undefined
+  'tips.workspaceNotes.title': undefined
 }

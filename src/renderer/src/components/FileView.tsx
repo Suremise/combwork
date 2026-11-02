@@ -40,6 +40,7 @@ const M = {
   saveTip: msg({ id: 'files.view.saveTip', defaultMessage: 'Save (Ctrl+S)', description: 'Tooltip on the Save button. Keep Ctrl+S as it is.' }),
   binary: msg({ id: 'files.view.binary', defaultMessage: 'This is a binary file.', description: 'Shown in place of a file Hive cannot show as text.' }),
   tooLarge: msg({ id: 'files.view.tooLarge', defaultMessage: 'This file is too large to open here ({size}).', description: 'Shown in place of a file too large for the editor. {size} is its size, such as "12.4 MB".' }),
+  notUtf8: msg({ id: 'files.view.notUtf8', defaultMessage: "This file isn't UTF-8 text, so Hive can't edit it without changing its characters.", description: 'Shown in place of a text file in another encoding (such as Windows-1252), which the editor would corrupt on save. UTF-8 is the encoding\'s name: keep it as it is.' }),
   openInApp: msg({ id: 'files.view.openInApp', defaultMessage: 'Open it in its default app instead.', description: 'Under "This is a binary file." or "This file is too large to open here", above an Open button.' }),
   changedBanner: msg({ id: 'files.view.changedBanner', defaultMessage: '{name} has changed on disk since you opened it.', description: 'Banner over an open file with unsaved edits that changed on disk. Followed by Reload and Overwrite with Mine. {name} is the file name.' }),
   overwrite: msg({ id: 'files.view.overwrite', defaultMessage: 'Overwrite with mine', description: 'Button in the "changed on disk" banner: saves your version over the file on disk.' }),
@@ -471,13 +472,13 @@ export function FileView({
   }
   if (!content) return <>{header}</>
 
-  if (content.kind === 'too-large' || (content.kind === 'binary' && (!pv || pv.needsText))) {
+  if (content.kind === 'too-large' || content.kind === 'not-utf8' || (content.kind === 'binary' && (!pv || pv.needsText))) {
     return (
       <>
         {header}
         <div className="empty-state">
           <Icon name={content.kind === 'binary' ? 'file-binary' : 'file'} />
-          {content.kind === 'binary' ? tr(M.binary) : tr(M.tooLarge, { size: formatBytes(content.size) })}
+          {content.kind === 'binary' ? tr(M.binary) : content.kind === 'not-utf8' ? tr(M.notUtf8) : tr(M.tooLarge, { size: formatBytes(content.size) })}
           <p className="hint">{tr(M.openInApp)}</p>
           <button className="btn subtle" onClick={() => void actions.attempt(tr(FILES_TEXT.openFailed), () => call('files:open', project.path, rel))}>
             <Icon name="link-external" /> {tr(FILES_TEXT.open)}
@@ -508,7 +509,7 @@ export function FileView({
           <button className="btn small" onClick={() => void reloadFromDisk()}>
             {tr(M.reload)}
           </button>
-          <button className="btn small" style={{ marginLeft: 0 }} onClick={() => void save(true)}>
+          <button className="btn small" onClick={() => void save(true)}>
             {tr(M.overwrite)}
           </button>
         </div>

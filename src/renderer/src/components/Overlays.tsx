@@ -2,26 +2,29 @@ import { useEffect, useMemo, useRef, useState } from 'react'
 import iconUrl from '../assets/icon.svg'
 import { call, errorMessage } from '../api'
 import { commandCategory, commandKeybinding, commandLabel, commands, runCommand } from '../commands'
-import { closeDialog, dismissToast, findProject, NO_PROJECTS, notify, set, setActivity, useLanguage, useProviderWarnings, useStore } from '../store'
+import { closeDialog, findProject, NO_PROJECTS, notify, set, setActivity, useLanguage, useStore } from '../store'
 import { cacheState, useLiveUsage } from '../usage'
 import { actClass, cx, formatKeybinding, formatTokens, timeAgo } from '../util'
+import { EntryActions, EntryText, entryIcon } from './Popups'
+import { kindOf } from '@shared/notify'
 import { TerminalView } from './TerminalView'
 import { UpdateStatusRow } from './Updates'
 import { discardDrafts, saveAllDrafts, unsavedFiles } from './FileView'
-import type { ProviderId, ProviderTask, QuitChoice, QuitSession, SessionStatus, TestedCli } from '@shared/types'
-import { PROVIDERS, enabledProviders, installSourceText, isProviderEnabled, providerDescriptor } from '@shared/providers'
+import type { CustomCommand, ProviderId, ProviderTask, QuitChoice, QuitSession, SessionStatus, TestedCli } from '@shared/types'
+import { PROVIDERS, enabledProviders, installSourceText, isProviderEnabled, providerDescriptor, shownText } from '@shared/providers'
 import { distinguishingParents } from '@shared/folderLabels'
 import { GIT_DOWNLOAD, GIT_MIN, gitFixText, gitOldText, gitProblemText } from '@shared/gitTool'
 import { testedNote, testedSummary } from '@shared/testedClis'
 import { APP_NAME } from '@shared/appName'
 import { fmt, msg, tr, tRich, type Msg } from '@shared/i18n'
 import { formatDateTime } from '@shared/dates'
+import { cardLabel } from '@shared/projectKeys'
+import { cardMatches } from '@shared/tasks'
 import type { ConsoleRecordingInfo } from '@shared/devConsole'
 import { ProviderIcon } from './ProviderIcon'
+import { ConnectionSetupLine, useProviderWarnings } from './ConnectionChoice'
 import { AgentsDetail, CARD_COLUMN, PROJECT_COLUMN, STATE_COLUMN, type AgentColumn, type AgentTableGroup, type AgentTableRow } from './AgentsTable'
-import { BusyButton, Icon, IconButton, LoadFailed, Modal, SearchInput, STATUS_TEXT, useBackdrop, useBusy } from './ui'
-
-const LEVEL_ICON = { info: 'info', success: 'pass', warning: 'warning', error: 'error' } as const
+import { BusyButton, CodeText, CopyableCode, Icon, IconButton, LoadFailed, Modal, SearchInput, STATUS_TEXT, useBackdrop, useBusy } from './ui'
 
 // A message's tags (tRich), drawn the same everywhere: <b> bold, <muted> and <faint> greyed, a link.
 const bold = (chunks: React.ReactNode[]): React.ReactNode => <strong key="b">{chunks}</strong>
@@ -49,8 +52,16 @@ export function Dialogs() {
   const [value, setValue] = useState('')
   const [error, setError] = useState<string | null>(null)
   const [checked, setChecked] = useState(false)
+  const [checked2, setChecked2] = useState(false)
+  const [checked3, setChecked3] = useState(false)
   const [picked, setPicked] = useState('')
+  // The prompt's second box (a new project's key) and whether the user has typed in it.
+  const [second, setSecond] = useState('')
+  const [secondOwn, setSecondOwn] = useState(false)
   const inputRef = useRef<HTMLInputElement>(null)
+  // The dialog shown now, for a callback started for one that may have closed since.
+  const shownDialog = useRef(dialog)
+  shownDialog.current = dialog
   const action = useBusy()
   const { setError: setActionError } = action
 
@@ -59,9 +70,25 @@ export function Dialogs() {
     if (dialog?.kind === 'confirm') setChecked(dialog.check?.initial ?? false)
     if (dialog?.kind === 'prompt') {
       setValue(dialog.initial ?? '')
+      setSecond(dialog.second?.follow(dialog.initial ?? '') ?? '')
+      setSecondOwn(false)
       setChecked(dialog.check?.initial ?? false)
+      setChecked2(dialog.check2?.initial ?? false)
+      setChecked3(dialog.check3?.initial ?? false)
       setError(null)
-      setTimeout(() => inputRef.current?.select(), 30)
+      // Its box takes the focus as it opens, from wherever it was (a search box or a terminal behind the dialog too),
+      // unless the user has already gone into one of this dialog's own boxes (#1221: run late, on a busy machine, the
+      // select took what was being typed into the key box into the name box). Not once this prompt has closed.
+      const opened = dialog
+      setTimeout(() => {
+        const box = inputRef.current
+        if (shownDialog.current !== opened || !box?.isConnected) return
+        const active = document.activeElement
+        const own = box.closest('.dialog')
+        if (own && active !== box && own.contains(active) && (active instanceof HTMLInputElement || active instanceof HTMLTextAreaElement)) return
+        if (active === box && box.value !== (opened.initial ?? '')) return
+        box.select()
+      }, 30)
     }
     if ((dialog?.kind === 'choice' || dialog?.kind === 'prompt') && dialog.select) setPicked(dialog.select.initial)
   }, [dialog, setActionError])
@@ -74,7 +101,10 @@ export function Dialogs() {
       dialog.resolve(result === true)
     } else if (dialog.kind === 'prompt') {
       dialog.check?.set(checked)
+      dialog.check2?.set(checked2)
+      dialog.check3?.set(checked3)
       if (typeof result === 'string') dialog.select?.set(picked)
+      if (typeof result === 'string') dialog.second?.set(second)
       dialog.resolve(typeof result === 'string' ? result : null)
     }
   }
@@ -104,6 +134,7 @@ export function Dialogs() {
         }
       >
         <div>{dialog.message}</div>
+        {dialog.list && dialog.list.length > 0 && <DialogList items={dialog.list} />}
         {dialog.detail && <div className="detail">{dialog.detail}</div>}
         {dialog.select && <DialogSelect select={dialog.select} picked={picked} setPicked={setPicked} />}
       </Modal>
@@ -144,7 +175,7 @@ export function Dialogs() {
         }
       >
         <div>{dialog.message}</div>
-        {dialog.list && dialog.list.length > 0 && <DialogList items={dialog.list} />}
+        {dialog.list && dialog.list.length > 0 && <DialogList items={dialog.list} copy={!dialog.listOnly} mono={dialog.listMono} />}
         {dialog.content ? <div className={cx('detail rich' /* i18n-ignore: class names */, dialog.scrollDetail && 'scroll')}>{dialog.content}</div> : dialog.detail && <div className={cx('detail', dialog.scrollDetail && 'scroll')}>{dialog.detail}</div>}
         {dialog.check && (
           <label className="flex dialog-check">
@@ -155,9 +186,11 @@ export function Dialogs() {
     )
   }
 
+  const secondError = dialog.second ? dialog.second.validate(second) : null
   const submit = (): void => {
     const err = dialog.validate?.(value) ?? null
     if (err) return setError(err)
+    if (secondError) return
     close(value)
   }
   return (
@@ -169,17 +202,19 @@ export function Dialogs() {
           <button className="btn subtle" onClick={() => close(null)}>
             {tr(msg({ id: 'shell.dialog.cancel', defaultMessage: 'Cancel', description: "A dialog's button that closes it without doing anything." }))}
           </button>
-          <button className="btn primary" onClick={submit}>
+          <button className="btn primary" onClick={submit} disabled={!!secondError}>
             {dialog.confirmLabel ?? tr(msg({ id: 'shell.dialog.ok', defaultMessage: 'OK', description: "A dialog's button that agrees, when the dialog gives it no other name." }))}
           </button>
         </>
       }
     >
       {dialog.message && <p style={{ marginTop: 0 }} className="muted">{dialog.message}</p>}
-      {dialog.list && dialog.list.length > 0 && <DialogList items={dialog.list} />}
+      {dialog.list && dialog.list.length > 0 && <DialogList items={dialog.list} copy={!dialog.listOnly} />}
       {dialog.detail && <div className="detail" style={{ marginBottom: 10 }}>{dialog.detail}</div>}
+      {dialog.fieldLabel && <label className="dialog-field-label" htmlFor="dialog-prompt-field">{dialog.fieldLabel}</label>}
       <input
         ref={inputRef}
+        id="dialog-prompt-field"
         className={cx('input', error && 'invalid')}
         style={{ width: '100%' }}
         value={value}
@@ -187,14 +222,43 @@ export function Dialogs() {
         onChange={(e) => {
           setValue(e.target.value)
           setError(null)
+          if (dialog.second && !secondOwn) setSecond(dialog.second.follow(e.target.value))
         }}
         onKeyDown={(e) => e.key === 'Enter' && submit()}
       />
       {error && <div className="field-error">{error}</div>}
+      {dialog.second && (
+        <label className="dialog-select">
+          {dialog.second.label}
+          <input
+            className={cx('input', secondError && 'invalid')}
+            value={second}
+            aria-label={dialog.second.label}
+            aria-invalid={!!secondError}
+            spellCheck={false}
+            onChange={(e) => {
+              setSecond(e.target.value.toUpperCase())
+              setSecondOwn(true)
+            }}
+            onKeyDown={(e) => e.key === 'Enter' && submit()}
+          />
+        </label>
+      )}
+      {dialog.second && (secondError ? <div className="field-error">{secondError}</div> : dialog.second.hint?.(second) && <div className="field-hint">{dialog.second.hint(second)}</div>)}
       {dialog.select && <DialogSelect select={dialog.select} picked={picked} setPicked={setPicked} />}
       {dialog.check && (
         <label className="flex" style={{ marginTop: 10 }}>
           <input type="checkbox" checked={checked} onChange={(e) => setChecked(e.target.checked)} /> {dialog.check.label}
+        </label>
+      )}
+      {dialog.check2 && (
+        <label className="flex" style={{ marginTop: 6 }} data-check2>
+          <input type="checkbox" checked={checked2} onChange={(e) => setChecked2(e.target.checked)} /> {dialog.check2.label}
+        </label>
+      )}
+      {dialog.check3 && (
+        <label className="flex" style={{ marginTop: 6 }} data-check3>
+          <input type="checkbox" checked={checked3} onChange={(e) => setChecked3(e.target.checked)} /> {dialog.check3.label}
         </label>
       )}
     </Modal>
@@ -218,16 +282,16 @@ function DialogSelect({ select, picked, setPicked }: { select: { label: string; 
 }
 
 /** A confirm's list (paths): one per line, a long one wrapping inside itself, and a Copy button for them all (#347). */
-export function DialogList({ items }: { items: readonly string[] }) {
+export function DialogList({ items, copy = true, mono = false }: { items: readonly string[]; copy?: boolean; mono?: boolean }) {
   const [copied, setCopied] = useState(false)
   return (
-    <div className="dialog-list">
+    <div className={cx('dialog-list', !copy && 'plain', mono && 'mono')}>
       <ul>
-        {items.map((item) => (
-          <li key={item}>{item}</li>
+        {items.map((item, i) => (
+          <li key={`${i}:${item}`}>{item}</li>
         ))}
       </ul>
-      <IconButton
+      {copy && <IconButton
         icon={copied ? 'check' : 'copy'}
         title={items.length === 1 ? tr(msg({ id: 'shell.dialog.copy', defaultMessage: 'Copy', description: 'Button beside a list in a dialog: copies it.' })) : tr(msg({ id: 'shell.dialog.copyAll', defaultMessage: 'Copy all', description: 'Button beside a list of several in a dialog: copies them all.' }))}
         onClick={() => {
@@ -235,10 +299,13 @@ export function DialogList({ items }: { items: readonly string[] }) {
           setCopied(true)
           setTimeout(() => setCopied(false), 1200)
         }}
-      />
+      />}
     </div>
   )
 }
+
+/** What the palette takes for a card's name (#1221): a key with or without its number (AM-12, AM-), or #1061. */
+const CARD_QUERY = /^(#\d{1,9}|[A-Za-z]{2,4}-\d{0,9})$/
 
 function score(text: string, q: string): number {
   if (!q) return 1
@@ -254,10 +321,19 @@ function score(text: string, q: string): number {
   return 10
 }
 
+/** No commands: a stable value for the store's selectors (a fresh [] would render forever). */
+const NO_COMMANDS: CustomCommand[] = []
+
 export function CommandPalette() {
   const open = useStore((s) => s.paletteOpen)
   const mode = useStore((s) => s.paletteMode)
   const projects = useStore((s) => s.workspace?.projects ?? NO_PROJECTS)
+  const tasks = useStore((s) => s.tasks)
+  const keys = useStore((s) => s.projectKeys)
+  const moved = useStore((s) => s.movedCardNames)
+  // The user's commands (HI-1954): each one runs by hand from here, as from Settings.
+  const hiveCommands = useStore((s) => s.settings?.commands?.list ?? NO_COMMANDS)
+  const wsCommands = useStore((s) => s.workspace?.config.commands?.list ?? NO_COMMANDS)
   // Toggles' states as one string, so their rows' checkmarks follow live changes (pinning the window
   // while the palette is open) without rebuilding the item list; a string keeps the selector stable.
   useStore(() => commands.map((c) => (c.checked ? (c.checked() ? '1' : '0') : '')).join(''))
@@ -287,14 +363,38 @@ export function CommandPalette() {
       icon: 'folder',
       checked: undefined as (() => boolean) | undefined
     }))
-    return [...projectItems, ...cmdItems]
-      .map((i) => ({ ...i, s: score(i.label, q) }))
+    // Cards by name (#1221): typed as a card reference (AM-12, am-12, AM- for all of that project's, #1061), the cards it
+    // finds come first, those on the board before archived ones; choosing one opens it.
+    const ref = mode !== 'projects' && CARD_QUERY.test(q.trim())
+    const cardItems = ref
+      ? [...tasks.filter((c) => !c.archived), ...tasks.filter((c) => c.archived)]
+          .filter((c) => cardMatches(c, q, keys, moved))
+          .map((c) => ({
+            id: `card:${c.number}`,
+            command: undefined as string | undefined,
+            label: tr(msg({ id: 'shell.palette.openCard', defaultMessage: 'Open Card: {card} {title}', description: 'A card in the command palette, found by its name: choosing it opens the card. {card} is its name (its key, such as AM-12, or #12 for a card with none), {title} its title (the user’s own words).' }), { card: cardLabel(c), title: c.title }),
+            keybinding: undefined as string | undefined,
+            run: () => set({ taskOpen: c.number }),
+            icon: 'project',
+            checked: undefined as (() => boolean) | undefined
+          }))
+      : []
+    const runItems = mode === 'projects' ? [] : [...wsCommands.map((c) => ({ c, scope: 'workspace' as const })), ...hiveCommands.map((c) => ({ c, scope: 'hive' as const }))].map(({ c, scope }) => ({
+      id: `run:${scope}:${c.id}`,
+      command: undefined as string | undefined,
+      label: tr(msg({ id: 'shell.palette.runCommand', defaultMessage: 'Run Command: {name}', description: "One of the user's own commands in the command palette (Settings → Commands, HI-1954): choosing it runs it now. {name} is the command's name." }), { name: c.name }),
+      keybinding: undefined as string | undefined,
+      run: () => void call('commands:run', { scope, id: c.id }).catch((e) => notify('error', errorMessage(e))),
+      icon: 'play',
+      checked: undefined as (() => boolean) | undefined
+    }))
+    return [...cardItems.map((i) => ({ ...i, s: 1000 })), ...[...projectItems, ...cmdItems, ...runItems].map((i) => ({ ...i, s: score(i.label, q) }))]
       .filter((i) => i.s > 0)
       .sort((a, b) => b.s - a.s)
       .slice(0, 60)
     // `open`: commands' availability (when()) is read again each time the palette opens; `shownLanguage`: their labels.
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [q, projects, open, mode, shownLanguage])
+  }, [q, projects, open, mode, shownLanguage, tasks, keys, moved, hiveCommands, wsCommands])
 
   useEffect(() => {
     listRef.current?.querySelector('.active')?.scrollIntoView({ block: 'nearest' })
@@ -347,40 +447,6 @@ export function CommandPalette() {
   )
 }
 
-export function Toasts() {
-  const toasts = useStore((s) => s.toasts)
-  return (
-    <div className="toasts">
-      {toasts.map((t) => (
-        <div key={t.id} className={cx('toast', t.level)}>
-          <Icon name={LEVEL_ICON[t.level]} className="lead" />
-          <div className="toast-text">
-            <div className="toast-title">{t.title}</div>
-            {t.message && <div className="toast-msg">{t.message}</div>}
-            {!!t.actions?.length && (
-              <div className="toast-actions">
-                {t.actions.map((a) => (
-                  <button
-                    key={a.label}
-                    className="btn small primary"
-                    onClick={() => {
-                      dismissToast(t.id)
-                      runCommand(a.command, ...(a.args ?? []))
-                    }}
-                  >
-                    {a.label}
-                  </button>
-                ))}
-              </div>
-            )}
-          </div>
-          <IconButton icon="close" title={tr(msg({ id: 'shell.toast.dismiss', defaultMessage: 'Dismiss', description: 'Button on a notice in the corner: closes it.' }))} onClick={() => dismissToast(t.id)} />
-        </div>
-      ))}
-    </div>
-  )
-}
-
 /** The window is dimmed (its native buttons too) while this is shown. */
 function Backdrop(): null {
   useBackdrop()
@@ -390,13 +456,25 @@ function Backdrop(): null {
 export function NotificationCenter() {
   const open = useStore((s) => s.showNotifications)
   const items = useStore((s) => s.notifications)
+  // Escape closes it (HI-2376), after anything else had its turn: not one a handler took (a shortcut being recorded,
+  // a pop-up with the focus), nor while a dialog is open, nor from a field, a terminal or an editor, which use Escape.
+  useEffect(() => {
+    if (!open) return
+    const key = (e: KeyboardEvent): void => {
+      if (e.key !== 'Escape' || e.defaultPrevented || document.querySelector('[aria-modal="true"]')) return
+      if ((e.target as HTMLElement | null)?.closest?.('input, textarea, select, [contenteditable=""], [contenteditable="true"]')) return
+      set({ showNotifications: false })
+    }
+    window.addEventListener('keydown', key)
+    return () => window.removeEventListener('keydown', key)
+  }, [open])
   if (!open) return null
   return (
     <div className="notif-panel">
       <div className="pane-header">
         {tr(msg({ id: 'shell.notifications.title', defaultMessage: 'Notifications', description: 'The heading of the notifications panel (the bell in the status bar).' }))}
         <div className="actions">
-          <IconButton icon="clear-all" title={tr(msg({ id: 'shell.notifications.clearAll', defaultMessage: 'Clear all', description: 'Button of the notifications panel: removes every notification.' }))} onClick={() => set({ notifications: [] })} />
+          <IconButton icon="clear-all" title={tr(msg({ id: 'shell.notifications.clearAll', defaultMessage: 'Clear all', description: 'Button of the notifications panel: removes every notification.' }))} onClick={() => set({ notifications: [], toasts: [] })} />
           <IconButton icon="close" title={tr(msg({ id: 'shell.close', defaultMessage: 'Close', description: 'Closes a panel or a dialog.' }))} onClick={() => set({ showNotifications: false })} />
         </div>
       </div>
@@ -407,14 +485,14 @@ export function NotificationCenter() {
             {tr(msg({ id: 'shell.notifications.none', defaultMessage: 'No notifications', description: 'The notifications panel when it is empty.' }))}
           </div>
         )}
+        {/* Every entry this window was given (HI-2320), with its buttons while they still apply, or what happened. */}
         {items.map((t) => (
-          <div key={t.id} className="notif-item">
-            <Icon name={LEVEL_ICON[t.level]} className={cx('lead')} />
-            <div className="toast-text">
-              <div className="toast-title">{t.title}</div>
-              {t.message && <div className="toast-msg">{t.message}</div>}
+          <div key={t.id} className={cx('notif-item', t.level, `kind-${kindOf(t)}`, t.resolved && 'resolved')} data-entry={t.id} data-kind={kindOf(t)}>
+            <Icon name={entryIcon(t)} className={cx('lead')} />
+            <EntryText t={t} onOpen={() => set({ showNotifications: false })}>
+              <EntryActions t={t} onNavigate={() => set({ showNotifications: false })} />
               <div className="time">{timeAgo(t.timestamp)}</div>
-            </div>
+            </EntryText>
           </div>
         ))}
       </div>
@@ -653,22 +731,16 @@ export function ShortcutsDialog() {
 }
 
 /**
- * After Agent Setup's install found the CLI (#472). Installers say to restart the terminal; Hive looked again on the
+ * After Provider Setup's install found the CLI (#472). Installers say to restart the terminal; Hive looked again on the
  * PATH a new process gets, so neither it nor new agents need a restart. Running agents keep the PATH they started with.
  */
 function installedText(name: string): string {
-  return tr(msg({ id: 'shell.setup.installed', defaultMessage: "{provider} is installed and Hive has found it: agents you start now can use it, without restarting Hive (the installer's advice to restart your terminal is for terminals already open). Agents already running get the new PATH when they restart.", description: "Agent Setup, after an install found the coding agent's CLI. {provider} is its name; PATH is a Windows setting: keep it." }), { provider: name })
+  return tr(msg({ id: 'shell.setup.installed', defaultMessage: "{provider} is installed and Hive has found it: agents you start now can use it, without restarting Hive (the installer's advice to restart your terminal is for terminals already open). Agents already running get the new PATH when they restart.", description: "Provider Setup, after an install found the coding agent's CLI. {provider} is its name; PATH is a Windows setting: keep it." }), { provider: name })
 }
 
 /** An install that ended without Hive finding the CLI. */
 function installNotFoundText(name: string): string {
-  return tr(msg({ id: 'shell.setup.notFound', defaultMessage: "The install ended, but Hive can't find {provider}. If the installer reported an error, it's shown below; if it says it worked, Check again, or set {provider}'s path in Settings → {provider}.", description: "Agent Setup, after an install ended without Hive finding the CLI. {provider} is its name; Check again is the dialog's button." }), { provider: name })
-}
-
-/** Text with `code` and **bold** spans, as provider notes are written. */
-function CodeText({ text }: { text: string }) {
-  const code = (s: string, k: number) => s.split('`').map((part, i) => (i % 2 ? <code key={`${k}.${i}`}>{part}</code> : <span key={`${k}.${i}`}>{part}</span>))
-  return <>{text.split('**').map((part, k) => (k % 2 ? <strong key={k}>{code(part, k)}</strong> : code(part, k)))}</>
+  return tr(msg({ id: 'shell.setup.notFound', defaultMessage: "The install ended, but Hive can't find {provider}. If the installer reported an error, it's shown below; if it says it worked, Check again, or set {provider}'s path in Settings → {provider}.", description: "Provider Setup, after an install ended without Hive finding the CLI. {provider} is its name; Check again is the dialog's button." }), { provider: name })
 }
 
 /**
@@ -687,7 +759,7 @@ function GitSetupRow() {
     return (
       <div className="setup-status setup-git">
         <Icon name="loading" spin />
-        <div>{tr(msg({ id: 'shell.setup.lookingForGit', defaultMessage: 'Looking for Git…', description: 'Agent Setup while Hive looks for git.' }))}</div>
+        <div>{tr(msg({ id: 'shell.setup.lookingForGit', defaultMessage: 'Looking for Git…', description: 'Provider Setup while Hive looks for git.' }))}</div>
       </div>
     )
   }
@@ -697,20 +769,20 @@ function GitSetupRow() {
         <Icon name="pass-filled" />
         <div className="grow">
           <div>
-            {tRich(msg({ id: 'shell.setup.gitOk', defaultMessage: '<b>Git {version}</b> <muted>— for worktrees, merging and the Git tab</muted>', description: 'Agent Setup: the git Hive found. {version} is its version; <b> is bold, <muted> greyed. Git is a name: keep it.' }), { version: git.version ?? '', b: bold, muted })}
+            {tRich(msg({ id: 'shell.setup.gitOk', defaultMessage: '<b>Git {version}</b> <muted>— for worktrees, merging and the Version Control tab</muted>', description: 'Provider Setup: the git Hive found. {version} is its version; <b> is bold, <muted> greyed. Git is a name: keep it.' }), { version: git.version ?? '', b: bold, muted })}
           </div>
           {git.path && <div className="muted mono" style={{ fontSize: 11 }}>{git.path}</div>}
         </div>
       </div>
     )
   }
-  const title = git.state === 'missing' ? tr(msg({ id: 'shell.setup.gitMissing', defaultMessage: 'Git not found', description: 'Agent Setup when Hive finds no git. Git is a name: keep it.' })) : git.state === 'old' ? tr(msg({ id: 'shell.setup.gitOld', defaultMessage: 'Git {version} is older than {min}', description: 'Agent Setup when the git found is too old. {version} and {min} are version numbers.' }), { version: git.version ?? '', min: GIT_MIN }) : tr(msg({ id: 'shell.setup.gitUnknown', defaultMessage: "Couldn't check Git", description: "Agent Setup when Hive couldn't run git to check it." }))
+  const title = git.state === 'missing' ? tr(msg({ id: 'shell.setup.gitMissing', defaultMessage: 'Git not found', description: 'Provider Setup when Hive finds no git. Git is a name: keep it.' })) : git.state === 'old' ? tr(msg({ id: 'shell.setup.gitOld', defaultMessage: 'Git {version} is older than {min}', description: 'Provider Setup when the git found is too old. {version} and {min} are version numbers.' }), { version: git.version ?? '', min: GIT_MIN }) : tr(msg({ id: 'shell.setup.gitUnknown', defaultMessage: "Couldn't check Git", description: "Provider Setup when Hive couldn't run git to check it." }))
   const detail =
     git.state === 'old' && !problem
-      ? tr(msg({ id: 'shell.setup.gitOldDetail', defaultMessage: '{why} Update Git for Windows to {min} or later, then Check again.', description: "Agent Setup, under a too old git. {why} says why (in English for now); Git for Windows is a product's name; Check again is the dialog's button." }), { why: gitOldText(git.version!), min: GIT_MIN })
+      ? tr(msg({ id: 'shell.setup.gitOldDetail', defaultMessage: '{why} Update Git for Windows to {min} or later, then Check again.', description: "Provider Setup, under a too old git. {why} says why (in English for now); Git for Windows is a product's name; Check again is the dialog's button." }), { why: gitOldText(git.version!), min: GIT_MIN })
       : git.state === 'unknown'
-        ? tr(msg({ id: 'shell.setup.gitUnknownDetail', defaultMessage: '{error}. Hive needs Git {min} or later for worktrees, merging and the Git tab.', description: "Agent Setup when git couldn't be checked. {error} is the error, as given." }), { error: git.error ?? '', min: GIT_MIN })
-        : tr(msg({ id: 'shell.setup.gitProblemDetail', defaultMessage: "{problem}: worktree agents, merging, the Git tab and the unmerged counts don't work. {fix}", description: 'Agent Setup under a git problem. {problem} and {fix} say what is wrong and what to do (in English for now).' }), { problem: problem ?? '', fix: gitFixText(git) })
+        ? tr(msg({ id: 'shell.setup.gitUnknownDetail', defaultMessage: '{error}. Hive needs Git {min} or later for worktrees, merging and the Version Control tab.', description: "Provider Setup when git couldn't be checked. {error} is the error, as given." }), { error: git.error ?? '', min: GIT_MIN })
+        : tr(msg({ id: 'shell.setup.gitProblemDetail', defaultMessage: "{problem}: worktree agents, merging, the Version Control tab's Git sections and the unmerged counts don't work. {fix}", description: 'Provider Setup under a git problem. {problem} and {fix} say what is wrong and what to do (in English for now).' }), { problem: problem ?? '', fix: gitFixText(git) })
   return (
     <div className="setup-status setup-git" data-git={git.state}>
       <Icon name="warning" />
@@ -731,7 +803,7 @@ function GitSetupRow() {
 function TestedLine({ tested, installed }: { tested: TestedCli; installed: string | null }) {
   const note = testedNote(tested)
   return (
-    <div className="setup-tested" data-tested={tested.installed} title={tested.testedAt ? tr(msg({ id: 'shell.setup.testedAt', defaultMessage: "Hive's tests ran against {version} on {date}", description: "Tooltip of Agent Setup's tested-version line. {version} is the CLI's version; {date} when Hive's tests ran." }), { version: tested.version, date: tested.testedAt }) : undefined}>
+    <div className="setup-tested" data-tested={tested.installed} title={tested.testedAt ? tr(msg({ id: 'shell.setup.testedAt', defaultMessage: "Hive's tests ran against {version} on {date}", description: "Tooltip of Provider Setup's tested-version line. {version} is the CLI's version; {date} when Hive's tests ran." }), { version: tested.version, date: tested.testedAt }) : undefined}>
       <span className="muted">{testedSummary(tested, installed)}</span>
       {tested.installed === 'same' && <Icon name="check" className="setup-tested-ok" />}
       {note && <div className="hint">{note}</div>}
@@ -766,7 +838,7 @@ export function AgentSetupDialog() {
       setFinished(null)
       setRunning(true)
     } catch (e) {
-      notify('error', tr(msg({ id: 'shell.setup.startFailed', defaultMessage: 'Could not start', description: "An error's title: Agent Setup couldn't start an install, an update or a sign-in." })), errorMessage(e))
+      notify('error', tr(msg({ id: 'shell.setup.startFailed', defaultMessage: 'Could not start', description: "An error's title: Provider Setup couldn't start an install, an update or a sign-in." })), errorMessage(e))
     }
   }
   const recheck = async (): Promise<typeof providers | null> => {
@@ -797,11 +869,11 @@ export function AgentSetupDialog() {
     // Installers say to restart the terminal (#472): Hive looked again on the PATH a new process gets, so it needn't.
     const what: Record<ProviderTask, string> = {
       install: installedText(p.name),
-      update: tr(msg({ id: 'shell.setup.updated', defaultMessage: '{provider} is up to date.', description: "Agent Setup after an update. {provider} is the coding agent's name." }), { provider: p.name }),
-      login: tr(msg({ id: 'shell.setup.signedIn', defaultMessage: '{provider} is signed in.', description: "Agent Setup after signing in. {provider} is the coding agent's name." }), { provider: p.name }),
-      setup: tr(msg({ id: 'shell.setup.setUp', defaultMessage: '{provider} is set up.', description: "Agent Setup after a setup step. {provider} is the coding agent's name." }), { provider: p.name })
+      update: tr(msg({ id: 'shell.setup.updated', defaultMessage: '{provider} is up to date.', description: "Provider Setup after an update. {provider} is the coding agent's name." }), { provider: p.name }),
+      login: tr(msg({ id: 'shell.setup.signedIn', defaultMessage: '{provider} is signed in.', description: "Provider Setup after signing in. {provider} is the coding agent's name." }), { provider: p.name }),
+      setup: tr(msg({ id: 'shell.setup.setUp', defaultMessage: '{provider} is set up.', description: "Provider Setup after a setup step. {provider} is the coding agent's name." }), { provider: p.name })
     }
-    setFinished({ ok: true, text: tr(msg({ id: 'shell.setup.done', defaultMessage: '{what} You can close this window.', description: 'Agent Setup after a task did its job. {what} says what happened.' }), { what: what[kind] }) })
+    setFinished({ ok: true, text: tr(msg({ id: 'shell.setup.done', defaultMessage: '{what} You can close this window.', description: 'Provider Setup after a task did its job. {what} says what happened.' }), { what: what[kind] }) })
     setTask(null)
   }
   const close = (): void => {
@@ -814,18 +886,18 @@ export function AgentSetupDialog() {
 
   return (
     <Modal
-      title={tr(msg({ id: 'shell.setup.title', defaultMessage: 'Agent Setup', description: 'The title of Help → Agent Setup.' }))}
+      title={tr(msg({ id: 'shell.setup.title', defaultMessage: 'Provider Setup', description: 'The title of Help → Provider Setup.' }))}
       icon="hubot"
       wide
       onClose={close}
       footer={
         <>
           <button className="btn subtle" onClick={() => void call('app:openExternal', p.setupUrl)}>
-            <Icon name="link-external" /> {tr(msg({ id: 'shell.setup.docs', defaultMessage: '{provider} docs', description: "Agent Setup's button: opens the coding agent's own documentation. {provider} is its name." }), { provider: p.name })}
+            <Icon name="link-external" /> {tr(msg({ id: 'shell.setup.docs', defaultMessage: '{provider} docs', description: "Provider Setup's button: opens the coding agent's own documentation. {provider} is its name." }), { provider: p.name })}
           </button>
           <div className="grow" />
           <button className="btn subtle" onClick={() => void recheck()} disabled={busy || running}>
-            <Icon name={busy ? 'loading' : 'refresh'} spin={busy} /> {tr(msg({ id: 'shell.setup.checkAgain', defaultMessage: 'Check again', description: "Agent Setup's button: looks for the CLI, git and updates again." }))}
+            <Icon name={busy ? 'loading' : 'refresh'} spin={busy} /> {tr(msg({ id: 'shell.setup.checkAgain', defaultMessage: 'Check again', description: "Provider Setup's button: looks for the CLI, git and updates again." }))}
           </button>
           <button className="btn primary" onClick={close}>
             {running ? tr(msg({ id: 'shell.dialog.cancel', defaultMessage: 'Cancel', description: "A dialog's button that closes it without doing anything." })) : tr(msg({ id: 'shell.close', defaultMessage: 'Close', description: 'Closes a panel or a dialog.' }))}
@@ -837,7 +909,7 @@ export function AgentSetupDialog() {
         <div className="setup-tabs">
           {PROVIDERS.map((x) => (
             <button key={x.id} className={cx('setup-tab', tab === x.id && 'selected')} disabled={running} onClick={() => { setTab(x.id); setFinished(null) }}>
-              <ProviderIcon provider={x.id} /> {isProviderEnabled(settings, x.id) ? x.name : <span>{tRich(msg({ id: 'shell.setup.tabOff', defaultMessage: '{provider}<faint> (off)</faint>', description: 'A tab of Agent Setup for a provider that is turned off. {provider} is its name; <faint> is greyed.' }), { provider: x.name, faint })}</span>}
+              <ProviderIcon provider={x.id} /> {isProviderEnabled(settings, x.id) ? x.name : <span>{tRich(msg({ id: 'shell.setup.tabOff', defaultMessage: '{provider}<faint> (off)</faint>', description: 'A tab of Provider Setup for a provider that is turned off. {provider} is its name; <faint> is greyed.' }), { provider: x.name, faint })}</span>}
             </button>
           ))}
         </div>
@@ -846,17 +918,18 @@ export function AgentSetupDialog() {
         <div className="banner info" style={{ borderRadius: 6, marginBottom: 10 }}>
           <Icon name="info" />
           <span>
-            {tRich(msg({ id: 'shell.setup.off', defaultMessage: "{provider} is turned off, so Hive doesn't run it. <on>Turn it on</on>", description: 'Agent Setup for a provider that is turned off. {provider} is its name; <on> is a link that turns it on.' }), {
+            {tRich(msg({ id: 'shell.setup.off', defaultMessage: "{provider} is turned off, so Hive doesn't run it. <on>Turn it on</on>", description: 'Provider Setup for a provider that is turned off. {provider} is its name; <on> is a link that turns it on.' }), {
               provider: p.name,
               on: linkTo('on', () => void call('settings:update', { providers: { [tab]: { enabled: true } } }).then((ns) => set({ settings: ns })))
             })}
           </span>
         </div>
       )}
+      {on && <ConnectionSetupLine cli={tab} onOpen={close} />}
       {!info || info.checking ? (
         <div className="setup-status">
           <Icon name="loading" spin />
-          <div>{tr(msg({ id: 'shell.setup.looking', defaultMessage: 'Looking for {provider}…', description: 'Agent Setup while Hive looks for a CLI. {provider} is its name.' }), { provider: p.name })}</div>
+          <div>{tr(msg({ id: 'shell.setup.looking', defaultMessage: 'Looking for {provider}…', description: 'Provider Setup while Hive looks for a CLI. {provider} is its name.' }), { provider: p.name })}</div>
         </div>
       ) : info.found ? (
         <>
@@ -864,7 +937,7 @@ export function AgentSetupDialog() {
           <Icon name="pass-filled" className="" />
           <div className="grow">
             <div>
-              {tRich(msg({ id: 'shell.setup.found', defaultMessage: '<b>{provider} {version}</b> <muted>— found via {source}</muted>', description: 'Agent Setup: the CLI Hive found. {provider} is its name, {version} its version, {source} where it was found (PATH, an install folder); <b> is bold, <muted> greyed.' }), { provider: p.name, version: info.version ?? '', source: installSourceText(info.source, tr), b: bold, muted })}
+              {tRich(msg({ id: 'shell.setup.found', defaultMessage: '<b>{provider} {version}</b> <muted>— found via {source}</muted>', description: 'Provider Setup: the CLI Hive found. {provider} is its name, {version} its version, {source} where it was found (PATH, an install folder); <b> is bold, <muted> greyed.' }), { provider: p.name, version: info.version ?? '', source: installSourceText(info.source, tr), b: bold, muted })}
             </div>
             <div className="setup-path muted mono" title={info.path ?? undefined}>
               {info.path}
@@ -873,7 +946,7 @@ export function AgentSetupDialog() {
             <div className="setup-badges">
               {info.loggedIn === true && (
                 <span className="badge success" data-signin={info.authMethod ?? ''}>
-                  <Icon name="account" /> {tr(msg({ id: 'shell.setup.signedInAs', defaultMessage: '{account, select, none {Signed in} other {Signed in as {account}}}{method, select, none {} other { ({method})}}', description: 'A badge in Agent Setup: the CLI is signed in. {account} is the account, {method} how it signed in (none: not known).' }), { account: info.account || 'none', method: info.authMethod || 'none' })}
+                  <Icon name="account" /> {tr(msg({ id: 'shell.setup.signedInAs', defaultMessage: '{account, select, none {Signed in} other {Signed in as {account}}}{method, select, none {} other { ({method})}}', description: 'A badge in Provider Setup: the CLI is signed in. {account} is the account, {method} how it signed in (none: not known).' }), { account: info.account || 'none', method: info.authMethod || 'none' })}
                 </span>
               )}
               {issues.map((r) => (
@@ -881,7 +954,7 @@ export function AgentSetupDialog() {
                   {r.message}
                 </span>
               ))}
-              {!info.updateAvailable && info.latestVersion && <span className="badge">{tr(msg({ id: 'shell.setup.upToDate', defaultMessage: 'Up to date', description: 'A badge in Agent Setup: the CLI is the newest version.' }))}</span>}
+              {!info.updateAvailable && info.latestVersion && <span className="badge">{tr(msg({ id: 'shell.setup.upToDate', defaultMessage: 'Up to date', description: 'A badge in Provider Setup: the CLI is the newest version.' }))}</span>}
             </div>
             {!!info.notes?.length && (
               <div className="setup-notes">
@@ -920,29 +993,29 @@ export function AgentSetupDialog() {
           <div className="setup-status">
             <Icon name="warning" />
             <div className="grow">
-              <strong>{tr(msg({ id: 'shell.setup.notInstalled', defaultMessage: '{provider} is not installed', description: "Agent Setup when a CLI isn't installed. {provider} is its name." }), { provider: p.name })}</strong>
-              <div className="muted">{tr(msg({ id: 'shell.setup.notInstalledDetail', defaultMessage: "Hive runs the standalone {provider} command-line tool in each project. It isn't bundled with Hive — install it with {company}'s official installer.", description: 'Agent Setup, under "<provider> is not installed". {provider} is the coding agent\'s name, {company} its maker\'s.' }), { provider: p.name, company: p.company })}</div>
+              <strong>{tr(msg({ id: 'shell.setup.notInstalled', defaultMessage: '{provider} is not installed', description: "Provider Setup when a CLI isn't installed. {provider} is its name." }), { provider: p.name })}</strong>
+              <div className="muted">{tr(msg({ id: 'shell.setup.notInstalledDetail', defaultMessage: "Hive runs the standalone {provider} command-line tool in each project. It isn't bundled with Hive — install it with {company}'s official installer.", description: 'Provider Setup, under "<provider> is not installed". {provider} is the coding agent\'s name, {company} its maker\'s.' }), { provider: p.name, company: p.company })}</div>
             </div>
             <button className="btn primary" disabled={running} onClick={() => void start('install')}>
-              <Icon name="cloud-download" /> {tr(msg({ id: 'shell.setup.install', defaultMessage: 'Install {provider}', description: "Agent Setup's button: installs the CLI. {provider} is its name." }), { provider: p.name })}
+              <Icon name="cloud-download" /> {tr(msg({ id: 'shell.setup.install', defaultMessage: 'Install {provider}', description: "Provider Setup's button: installs the CLI. {provider} is its name." }), { provider: p.name })}
             </button>
           </div>
           {info.editorExtensionOnly && p.extensionNote && (
             <div className="banner info" style={{ borderRadius: 6, marginBottom: 10 }}>
               <Icon name="info" />
-              <span>{p.extensionNote}</span>
+              <span>{shownText(p.extensionNote, p.text?.extensionNote, tr)}</span>
             </div>
           )}
           {p.installNote && (
-            <p className="hint">
-              <CodeText text={p.installNote} />
+            <p className="hint" data-install-note>
+              <CodeText text={shownText(p.installNote, p.text?.installNote, tr)} />
             </p>
           )}
         </>
       )}
       {!!info?.rejected?.length && (
         <p className="hint setup-wrap">
-          <Icon name="info" /> {tRich(msg({ id: 'shell.setup.rejected', defaultMessage: '{n, plural, one {Ignored a copy} other {Ignored copies}} bundled with an editor extension ({path}). Hive only uses the standalone CLI.', description: "Agent Setup when it found a CLI only inside an editor's extension. {n} is how many; {path} is where (one of them)." }), { n: info.rejected.length, path: <code key="path">{info.rejected[0]}</code> })}
+          <Icon name="info" /> {tRich(msg({ id: 'shell.setup.rejected', defaultMessage: '{n, plural, one {Ignored a copy} other {Ignored copies}} bundled with an editor extension ({path}). Hive only uses the standalone CLI.', description: "Provider Setup when it found a CLI only inside an editor's extension. {n} is how many; {path} is where (one of them)." }), { n: info.rejected.length, path: <CopyableCode key="path" code={info.rejected[0]} /> })}
         </p>
       )}
       <GitSetupRow />
@@ -1151,7 +1224,7 @@ export function QuitPendingBanner() {
       <button className="btn small" onClick={() => void call('app:cancelPendingQuit')}>
         {tr(msg({ id: 'shell.dialog.cancel', defaultMessage: 'Cancel', description: "A dialog's button that closes it without doing anything." }))}
       </button>
-      <button className="btn small primary" style={{ marginLeft: 0 }} onClick={() => void call('app:quit')}>
+      <button className="btn small primary" onClick={() => void call('app:quit')}>
         {tr(msg({ id: 'shell.quitPending.now', defaultMessage: 'Quit now', description: "The banner's button: quits without waiting." }))}
       </button>
     </div>
@@ -1171,21 +1244,31 @@ export function ProvidersBanner() {
   const on = enabledProviders(settings)
   if (!on.length) {
     return (
-      <div className="banner warn providers-banner">
-        <Icon name="hubot" /> {tr(msg({ id: 'shell.providers.noneOn', defaultMessage: 'No coding agents are turned on. Choose the ones you use (Claude Code, …) to run sessions.', description: 'A banner when no provider is turned on.' }))}
-        <button className="btn small primary" onClick={() => runCommand('settings.providers')}>
-          {tr(msg({ id: 'shell.providers.choose', defaultMessage: 'Choose providers', description: "The banner's button: opens Settings → Providers." }))}
-        </button>
+      <div className="banner warn wrap-banner providers-banner">
+        <span className="wrap-banner-text">
+          <Icon name="hubot" />
+          <span className="grow">{tr(msg({ id: 'shell.providers.noneOn', defaultMessage: 'No coding agents are turned on. Choose the ones you use (Claude Code, …) to run sessions.', description: 'A banner when no provider is turned on.' }))}</span>
+        </span>
+        <span className="wrap-banner-actions">
+          <button className="btn small primary" onClick={() => runCommand('settings.providers')}>
+            {tr(msg({ id: 'shell.providers.choose', defaultMessage: 'Choose providers', description: "The banner's button: opens Settings → Providers." }))}
+          </button>
+        </span>
       </div>
     )
   }
   if (warn.noneInstalled) {
     return (
-      <div className="banner warn providers-banner" data-none-installed="">
-        <Icon name="hubot" /> {tr(msg({ id: 'shell.providers.noneInstalled', defaultMessage: '{several, select, yes {No coding agent CLI is installed. Install one of those you turned on to run agents.} other {No coding agent CLI is installed. Install {provider} to run agents.}}', description: "A banner when no turned-on provider's CLI is installed. {provider} is the one turned on, when only one is." }), { several: on.length > 1 ? 'yes' : 'no', provider: on[0].name })}
-        <button className="btn small primary" onClick={() => set({ setupOpen: on[0].id })}>
-          {tr(msg({ id: 'shell.providers.setup', defaultMessage: 'Agent Setup', description: "The banner's button: opens Agent Setup." }))}
-        </button>
+      <div className="banner warn wrap-banner providers-banner" data-none-installed="">
+        <span className="wrap-banner-text">
+          <Icon name="hubot" />
+          <span className="grow">{tr(msg({ id: 'shell.providers.noneInstalled', defaultMessage: '{several, select, yes {No coding agent CLI is installed. Install one of those you turned on to run agents.} other {No coding agent CLI is installed. Install {provider} to run agents.}}', description: "A banner when no turned-on provider's CLI is installed. {provider} is the one turned on, when only one is." }), { several: on.length > 1 ? 'yes' : 'no', provider: on[0].name })}</span>
+        </span>
+        <span className="wrap-banner-actions">
+          <button className="btn small primary" onClick={() => set({ setupOpen: on[0].id })}>
+            {tr(msg({ id: 'shell.providers.setup', defaultMessage: 'Provider Setup', description: "The banner's button: opens Provider Setup." }))}
+          </button>
+        </span>
       </div>
     )
   }
@@ -1198,11 +1281,16 @@ export function ProvidersBanner() {
   return (
     <>
       {issues.map(({ p, r }) => (
-        <div key={`${p.id}:${r.id}`} className={cx('banner providers-banner' /* i18n-ignore: class names */, r.level === 'error' ? 'warn' : 'info')}>
-          <ProviderIcon provider={p.id} /> {r.message}
-          <button className="btn small primary" onClick={() => set({ setupOpen: p.id })}>
-            {r.action?.label ?? tr(msg({ id: 'shell.providers.setUp', defaultMessage: 'Set up', description: "A provider's banner's button when Hive names no other action: opens Agent Setup." }))}
-          </button>
+        <div key={`${p.id}:${r.id}`} className={cx('banner wrap-banner providers-banner' /* i18n-ignore: class names */, r.level === 'error' ? 'warn' : 'info')}>
+          <span className="wrap-banner-text">
+            <ProviderIcon provider={p.id} />
+            <span className="grow">{r.message}</span>
+          </span>
+          <span className="wrap-banner-actions">
+            <button className="btn small primary" onClick={() => set({ setupOpen: p.id })}>
+              {r.action?.label ?? tr(msg({ id: 'shell.providers.setUp', defaultMessage: 'Set up', description: "A provider's banner's button when Hive names no other action: opens Provider Setup." }))}
+            </button>
+          </span>
         </div>
       ))}
     </>

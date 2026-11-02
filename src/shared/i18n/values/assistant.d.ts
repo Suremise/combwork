@@ -1,9 +1,39 @@
 // Generated from locales/en/assistant.json: do not edit. Each message's placeholders and their types, for tr(): a
 // global script, so its interface merges with every other area's (shared/i18n/msg.ts).
 interface HiveMessageValues {
+  'assistant.banner.connectionSetup': { cli: string | number }
+  'assistant.chooseConnections.agent': undefined
+  'assistant.chooseConnections.next': undefined
+  'assistant.chooseConnections.now': undefined
+  'assistant.chooseConnections.otherCli': { agent: string | number }
+  'assistant.chooseConnections.role': undefined
+  'assistant.chooseConnections.running': undefined
+  'assistant.hiveTemplates.pair': undefined
+  'assistant.hiveTemplates.pairOne': undefined
+  'assistant.hiveTemplates.pairOneText': undefined
+  'assistant.hiveTemplates.pairText': undefined
+  'assistant.hiveTemplates.solo': undefined
+  'assistant.hiveTemplates.soloText': undefined
+  'assistant.hiveTemplates.team3': undefined
+  'assistant.hiveTemplates.team3Text': undefined
+  'assistant.hiveTemplates.team6': undefined
+  'assistant.hiveTemplates.team6Pool': undefined
+  'assistant.hiveTemplates.team6PoolText': undefined
+  'assistant.hiveTemplates.team6Text': undefined
   'assistant.journal.allKinds': undefined
   'assistant.journal.allProjects': undefined
   'assistant.journal.allSources': undefined
+  'assistant.journal.build.built': { version: string | number; kind: string | number; commit: string | number; branch: string | number }
+  'assistant.journal.build.builtAt': { when: string | number }
+  'assistant.journal.build.builtDetached': { version: string | number; kind: string | number; commit: string | number }
+  'assistant.journal.build.installer': { path: string | number }
+  'assistant.journal.build.kind.baseline': undefined
+  'assistant.journal.build.kind.beta': undefined
+  'assistant.journal.build.kind.rc': undefined
+  'assistant.journal.build.kind.release': undefined
+  'assistant.journal.build.uploaded': { version: string | number; kind: string | number; commit: string | number; branch: string | number }
+  'assistant.journal.build.uploadedDetached': { version: string | number; kind: string | number; commit: string | number }
+  'assistant.journal.build.uploadedNote': undefined
   'assistant.journal.cancel': undefined
   'assistant.journal.clearFilters': undefined
   'assistant.journal.close': undefined
@@ -85,9 +115,11 @@ interface HiveMessageValues {
   'assistant.journal.workspaceOnly': undefined
   'assistant.journal.yesterday': undefined
   'assistant.loadNames.blocked': undefined
+  'assistant.loadNames.filledNote': { count: number; names: string | number; projects: string | number }
+  'assistant.loadNames.overMax': { count: number; max: number }
   'assistant.loadNames.sameTwice': undefined
+  'assistant.loadNames.savesMax': { now: number; next: number }
   'assistant.loadNames.taken': { project: string | number; name: string | number }
-  'assistant.loadNames.takenNote': { projects: string | number; count: number; names: string | number }
   'assistant.mcpSecret.argument': { start: string | number }
   'assistant.mcpSecret.named': { where: string; key: string | number; ref: string | number }
   'assistant.modes.create': undefined
@@ -138,20 +170,28 @@ interface HiveMessageValues {
   'assistant.panel.attentionOpen': { dismiss: string; name: string | number }
   'assistant.panel.cancel': undefined
   'assistant.panel.chooseMode': undefined
+  'assistant.panel.cliOwnConnection': undefined
   'assistant.panel.codingAgent': undefined
   'assistant.panel.compactLater': undefined
   'assistant.panel.compactMenu': undefined
   'assistant.panel.compactRecommended': undefined
   'assistant.panel.compacting': undefined
+  'assistant.panel.connectionRestart': undefined
   'assistant.panel.conversations': undefined
   'assistant.panel.counts': { running: string | number; projects: number }
   'assistant.panel.default': undefined
   'assistant.panel.defaultMode': { name: string | number }
+  'assistant.panel.deliverFailed': undefined
+  'assistant.panel.deliverNow': undefined
   'assistant.panel.doneBy': undefined
   'assistant.panel.ended': undefined
+  'assistant.panel.fold': undefined
+  'assistant.panel.foldTip': { hasKey: string; key: string | number }
   'assistant.panel.forWorkspace': undefined
-  'assistant.panel.hide': undefined
   'assistant.panel.inactive': { count: number }
+  'assistant.panel.inboxLine': { id: string | number; from: string | number; text: string | number }
+  'assistant.panel.inboxTip': { n: number }
+  'assistant.panel.inboxTipNoWakes': { n: number }
   'assistant.panel.listFailed': undefined
   'assistant.panel.manageModes': undefined
   'assistant.panel.markLabel': { name: string | number; state: string | number; running: string; hasDetail: string; detail: string | number }
@@ -174,13 +214,17 @@ interface HiveMessageValues {
   'assistant.panel.noConversations': undefined
   'assistant.panel.noEdits': undefined
   'assistant.panel.noProjects': undefined
+  'assistant.panel.noWakesHint': undefined
   'assistant.panel.noneRunning': undefined
+  'assistant.panel.notDelivered': undefined
+  'assistant.panel.notDeliveredDetail': undefined
   'assistant.panel.notDone': { error: string | number }
   'assistant.panel.nothingToCompact': undefined
   'assistant.panel.openCard': { known: string; number: string | number; column: string | number }
   'assistant.panel.openNow': undefined
   'assistant.panel.progress': { hasStep: string; run: string | number; step: string | number }
   'assistant.panel.provider': { provider: string | number }
+  'assistant.panel.providerOn': { provider: string | number; connection: string | number }
   'assistant.panel.railLabel': undefined
   'assistant.panel.restart': undefined
   'assistant.panel.restartButton': undefined
@@ -195,10 +239,6 @@ interface HiveMessageValues {
   'assistant.panel.resumeMenu': undefined
   'assistant.panel.resumeOne': undefined
   'assistant.panel.resumeTip': { name: string | number; when: string | number }
-  'assistant.panel.revert': undefined
-  'assistant.panel.revertFailed': undefined
-  'assistant.panel.revertLabel': { setting: string | number; value: string | number }
-  'assistant.panel.reverted': undefined
   'assistant.panel.reviewing': { number: string | number; title: string | number }
   'assistant.panel.running': { count: string | number }
   'assistant.panel.save': undefined
@@ -223,6 +263,7 @@ interface HiveMessageValues {
   'assistant.panel.theAssistant': undefined
   'assistant.panel.title': undefined
   'assistant.panel.transcriptAdvice': undefined
+  'assistant.panel.unreadCount': { n: number }
   'assistant.panel.watches': { name: string | number }
   'assistant.panel.workingOn': { number: string | number; title: string | number }
   'assistant.panel.workspace': undefined
@@ -256,8 +297,11 @@ interface HiveMessageValues {
   'assistant.sidebar.loading': undefined
   'assistant.sidebar.markNotWorking': undefined
   'assistant.sidebar.markWorking': undefined
+  'assistant.sidebar.mcpCatalogue': undefined
+  'assistant.sidebar.mcpInstalled': undefined
+  'assistant.sidebar.mcpNoMatch': undefined
   'assistant.sidebar.mcpServers': undefined
-  'assistant.sidebar.mcpTip': undefined
+  'assistant.sidebar.mcpTipAdded': undefined
   'assistant.sidebar.needYou': { count: number }
   'assistant.sidebar.newFolder': undefined
   'assistant.sidebar.newFolderButton': undefined
@@ -326,6 +370,8 @@ interface HiveMessageValues {
   'assistant.sidebar.workingOnTip': undefined
   'assistant.sidebar.workspace': { name: string | number }
   'assistant.sidebar.workspaceGroup': undefined
+  'assistant.sidebar.workspaceNotes': undefined
+  'assistant.sidebar.workspaceNotesTip': undefined
   'assistant.skills.add': undefined
   'assistant.skills.addFailed': undefined
   'assistant.skills.alsoFor': { provider: string | number }
@@ -353,10 +399,18 @@ interface HiveMessageValues {
   'assistant.skills.deleteTitle': undefined
   'assistant.skills.deletedBadge': undefined
   'assistant.skills.deletedHere': undefined
+  'assistant.skills.delivered.failed': { name: string | number }
+  'assistant.skills.delivered.offInWorkspace': undefined
+  'assistant.skills.delivered.switch': { name: string | number }
+  'assistant.skills.delivered.tipProject': undefined
+  'assistant.skills.delivered.tipWorkspace': undefined
   'assistant.skills.editInWorkspace': undefined
   'assistant.skills.editTip': undefined
   'assistant.skills.fileMessage': { file: string | number; where: string | number }
   'assistant.skills.fileTitle': undefined
+  'assistant.skills.files': { skill: string | number }
+  'assistant.skills.filesMore': { count: number }
+  'assistant.skills.filesTip': undefined
   'assistant.skills.levelHive': undefined
   'assistant.skills.levelLocal': undefined
   'assistant.skills.levelPlugin': undefined
@@ -380,6 +434,7 @@ interface HiveMessageValues {
   'assistant.skills.shipped.boardHygiene': undefined
   'assistant.skills.shipped.cardLoop': undefined
   'assistant.skills.shipped.coordinateAgents': undefined
+  'assistant.skills.shipped.generalist': undefined
   'assistant.skills.shipped.handover': undefined
   'assistant.skills.shipped.journal': undefined
   'assistant.skills.shipped.licenceAudit': undefined
@@ -421,61 +476,66 @@ interface HiveMessageValues {
   'assistant.status.watch': { watch: string | number; until: string }
   'assistant.status.working': undefined
   'assistant.template.agentNoName': { n: string | number }
-  'assistant.template.badContext': { name: string | number }
   'assistant.template.badMcp': { name: string | number }
   'assistant.template.badName': { max: string | number }
-  'assistant.template.badProvider': { name: string | number; given: string; provider: string | number }
-  'assistant.template.badSetting': { name: string | number; setting: string }
-  'assistant.template.longRole': { name: string | number; max: string | number }
+  'assistant.template.badPairs': undefined
+  'assistant.template.badRole': { name: string | number }
+  'assistant.template.badToken': { name: string | number; token: string | number }
+  'assistant.template.from09': undefined
+  'assistant.template.longNote': { name: string | number; max: number }
   'assistant.template.newer': undefined
   'assistant.template.noAgents': undefined
   'assistant.template.noVersion': undefined
   'assistant.template.notTemplate': undefined
   'assistant.template.sameName': { name: string | number }
   'assistant.template.tooMany': { count: string | number; max: string | number }
-  'assistant.template.tooManyHere': { count: string | number; limit: string | number }
+  'assistant.templateConnections.all': undefined
+  'assistant.templateConnections.heading': undefined
+  'assistant.templateConnections.keep': undefined
+  'assistant.templateConnections.keepOwn': { name: string | number }
+  'assistant.templateConnections.label': { who: string | number }
+  'assistant.templateConnections.none': undefined
+  'assistant.templateConnections.notOffered': undefined
+  'assistant.templateConnections.perAgent': undefined
+  'assistant.templateConnections.roleChoice': undefined
+  'assistant.templateConnections.roleRow': { role: string }
+  'assistant.templateConnections.same': undefined
+  'assistant.templateConnections.suggests': { cli: string | number }
   'assistant.templateLoad.afterLoad': { removed: string }
-  'assistant.templateLoad.branchKeptTitle': { count: number }
+  'assistant.templateLoad.cliDefaults': { cli: string | number }
+  'assistant.templateLoad.connectionLine': { name: string | number; values: string | number }
   'assistant.templateLoad.createdHeading': undefined
-  'assistant.templateLoad.createdLine': { name: string | number; hasRole: string; role: string | number; replaces: string; provider: string | number; settings: string | number }
-  'assistant.templateLoad.folderOnly': { branch: string | number; hasWhy: string; why: string | number }
-  'assistant.templateLoad.isDefault': { setting: string | number }
-  'assistant.templateLoad.keptLine': { branch: string | number; hasWhy: string; why: string | number }
-  'assistant.templateLoad.keptTitle': { count: number }
-  'assistant.templateLoad.newLine': { branch: string | number; base: string | number; path: string | number; hasNote: string; note: string | number }
-  'assistant.templateLoad.newWhy': { why: string | number }
+  'assistant.templateLoad.createdOn': { name: string | number; hasRole: string; role: string | number; replaces: string; connection: string | number }
+  'assistant.templateLoad.noConnection': undefined
   'assistant.templateLoad.oldKept': { branch: string | number; hasWhy: string; why: string | number }
-  'assistant.templateLoad.oldRemovable': { branch: string | number; known: string; into: string | number }
-  'assistant.templateLoad.oldReused': { branch: string | number; name: string | number }
-  'assistant.templateLoad.ownLine': undefined
+  'assistant.templateLoad.pairedWith': { name: string | number }
   'assistant.templateLoad.removedHeading': undefined
   'assistant.templateLoad.removedLine': { name: string | number; hasNote: string; note: string | number; replaced: string }
-  'assistant.templateLoad.removedWith': { count: number; branches: string | number }
-  'assistant.templateLoad.reuseLine': { branch: string | number; path: string | number }
-  'assistant.templateLoad.setup': { command: string | number }
-  'assistant.templateLoad.wholeDetail': { branches: string | number; count: number }
-  'assistant.templateLoad.wholeTitle': { count: number }
+  'assistant.templateLoad.roleLine': { role: string | number; paired: string; name: string | number }
   'assistant.templatePlan.agent': undefined
-  'assistant.templatePlan.codingAgent': undefined
-  'assistant.templatePlan.created': undefined
-  'assistant.templatePlan.default': undefined
-  'assistant.templatePlan.effort': undefined
-  'assistant.templatePlan.folder': undefined
+  'assistant.templatePlan.connection': undefined
   'assistant.templatePlan.fromTip': undefined
-  'assistant.templatePlan.mode': undefined
-  'assistant.templatePlan.model': undefined
   'assistant.templatePlan.nameLabel': { n: string | number }
-  'assistant.templatePlan.newBadge': undefined
-  'assistant.templatePlan.newTip': { path: string | number; base: string | number }
   'assistant.templatePlan.noteSentence': { note: string | number }
-  'assistant.templatePlan.ownOn': { branch: string | number }
-  'assistant.templatePlan.ownWorktree': undefined
-  'assistant.templatePlan.removed': undefined
-  'assistant.templatePlan.replaced': undefined
-  'assistant.templatePlan.reuseTip': { path: string | number }
-  'assistant.templatePlan.reuses': { branch: string | number }
-  'assistant.templatePlan.where': undefined
-  'assistant.templatePlan.withNote': { thing: string | number; note: string | number }
+  'assistant.templatePlan.role': undefined
+  'assistant.templatePlan.state': undefined
+  'assistant.templatePlan.stateNew': undefined
+  'assistant.templatePlan.stateNewTip': undefined
+  'assistant.templatePlan.stateRemoved': undefined
+  'assistant.templatePlan.stateRemovedTip': undefined
+  'assistant.templatePlan.stateReplaced': undefined
+  'assistant.templatePlan.stateReplacedTip': undefined
+  'assistant.templateWorkflow.alsoGit': undefined
+  'assistant.templateWorkflow.apply': undefined
+  'assistant.templateWorkflow.change': { option: string | number; now: string | number; next: string | number }
+  'assistant.templateWorkflow.changes': { n: number; platform: string | number }
+  'assistant.templateWorkflow.dropped': { count: number; platforms: string | number }
+  'assistant.templateWorkflow.head': undefined
+  'assistant.templateWorkflow.identityOff': undefined
+  'assistant.templateWorkflow.needsGit': undefined
+  'assistant.templateWorkflow.noCommand': { count: number; checks: string | number }
+  'assistant.templateWorkflow.noSection': { platform: string | number }
+  'assistant.templateWorkflow.setUpGit': undefined
   'assistant.templates.aProject': undefined
   'assistant.templates.addAgent': undefined
   'assistant.templates.addProjectFirst': undefined
@@ -496,16 +556,10 @@ interface HiveMessageValues {
   'assistant.templates.close': undefined
   'assistant.templates.colActions': undefined
   'assistant.templates.colAgent': undefined
-  'assistant.templates.colCodingAgent': undefined
-  'assistant.templates.colEffort': undefined
-  'assistant.templates.colMode': undefined
-  'assistant.templates.colModel': undefined
   'assistant.templates.colRole': undefined
-  'assistant.templates.colWorksIn': undefined
-  'assistant.templates.context200k': undefined
+  'assistant.templates.colSuggests': undefined
   'assistant.templates.continue': undefined
   'assistant.templates.copyAgent': { name: string | number }
-  'assistant.templates.default': undefined
   'assistant.templates.delete': undefined
   'assistant.templates.deleteMessage': { scope: string; project: string | number }
   'assistant.templates.deleteTip': undefined
@@ -535,8 +589,10 @@ interface HiveMessageValues {
   'assistant.templates.exportFailed': undefined
   'assistant.templates.exported': undefined
   'assistant.templates.exportedDetail': undefined
-  'assistant.templates.fullTip': { limit: string | number }
+  'assistant.templates.fullTip': { limit: number }
   'assistant.templates.gone': undefined
+  'assistant.templates.hive': undefined
+  'assistant.templates.hiveSummary': { count: number; layout: string | number }
   'assistant.templates.import': undefined
   'assistant.templates.importButton': undefined
   'assistant.templates.importFailed': undefined
@@ -567,16 +623,17 @@ interface HiveMessageValues {
   'assistant.templates.newAgentName': undefined
   'assistant.templates.noLongerEdited': undefined
   'assistant.templates.noProjects': undefined
+  'assistant.templates.noSuggestion': undefined
   'assistant.templates.noWorkspace': undefined
   'assistant.templates.noWorkspaceTemplates': undefined
+  'assistant.templates.noneHive': undefined
   'assistant.templates.noneOfItsOwn': undefined
   'assistant.templates.noneYet': undefined
   'assistant.templates.notSaved': undefined
-  'assistant.templates.ownWorktree': undefined
+  'assistant.templates.pairedWith': { name: string | number }
   'assistant.templates.panelHint': undefined
   'assistant.templates.problem': { problem: string | number }
   'assistant.templates.project': undefined
-  'assistant.templates.projectFolder': undefined
   'assistant.templates.refresh': undefined
   'assistant.templates.refreshTarget': undefined
   'assistant.templates.removeAgent': { name: string | number }
@@ -585,7 +642,6 @@ interface HiveMessageValues {
   'assistant.templates.renameFailed': undefined
   'assistant.templates.renameTitle': { name: string | number }
   'assistant.templates.replace': undefined
-  'assistant.templates.review': undefined
   'assistant.templates.rowDesc': { count: number; layout: string | number }
   'assistant.templates.saveTemplate': undefined
   'assistant.templates.saved': undefined
@@ -595,6 +651,8 @@ interface HiveMessageValues {
   'assistant.templates.selectOneHere': undefined
   'assistant.templates.showOf': undefined
   'assistant.templates.stale': { name: string | number }
+  'assistant.templates.suggests': { preset: string | number; pool: string }
+  'assistant.templates.suggestsTip': undefined
   'assistant.templates.summary': { count: number; layout: string | number; hasSaved: string; when: string | number; scope: string; project: string | number }
   'assistant.templates.tabHint': undefined
   'assistant.templates.thisProject': undefined
@@ -606,7 +664,83 @@ interface HiveMessageValues {
   'assistant.templates.unknownProvider': { provider: string | number }
   'assistant.templates.unsavedTip': undefined
   'assistant.templates.where': { name: string | number; scope: string; project: string | number }
+  'assistant.templates.workflowAbsent': undefined
+  'assistant.templates.workflowAllOff': undefined
+  'assistant.templates.workflowEditHint': undefined
+  'assistant.templates.workflowFill': undefined
+  'assistant.templates.workflowFillChoose': undefined
+  'assistant.templates.workflowHead': undefined
+  'assistant.templates.workflowNone': { platform: string | number }
+  'assistant.templates.workflowPlatforms': undefined
+  'assistant.templates.workflowPreset': { preset: string; name: string | number }
+  'assistant.templates.workflowRemove': undefined
   'assistant.templates.workspace': undefined
+  'assistant.undo.askFinal': { n: number }
+  'assistant.undo.askMessage': undefined
+  'assistant.undo.askTitle': { n: number }
+  'assistant.undo.card': { card: string | number; fields: string | number }
+  'assistant.undo.changed': { fields: string | number }
+  'assistant.undo.dismiss': undefined
+  'assistant.undo.ended': undefined
+  'assistant.undo.error': { error: string | number }
+  'assistant.undo.failed': undefined
+  'assistant.undo.field': { field: string }
+  'assistant.undo.final': undefined
+  'assistant.undo.gone': undefined
+  'assistant.undo.kept': undefined
+  'assistant.undo.made': { card: string | number }
+  'assistant.undo.message': { time: string | number; n: number }
+  'assistant.undo.messageNone': { time: string | number }
+  'assistant.undo.partly': undefined
+  'assistant.undo.resultAlready': { n: number }
+  'assistant.undo.resultFinal': { n: number }
+  'assistant.undo.resultKept': { n: number }
+  'assistant.undo.resultLine': { change: string | number; why: string | number }
+  'assistant.undo.resultUndone': { n: number }
+  'assistant.undo.undo': undefined
+  'assistant.undo.undoChange': { change: string | number }
+  'assistant.undo.undoMessage': { time: string | number }
+  'assistant.undo.undoneAt': { when: string | number }
+  'assistant.undo.why.agentAdded': undefined
+  'assistant.undo.why.agentStopped': undefined
+  'assistant.undo.why.ask': undefined
+  'assistant.undo.why.cannot': undefined
+  'assistant.undo.why.cardPlace': undefined
+  'assistant.undo.why.cardsOrder': undefined
+  'assistant.undo.why.comment': undefined
+  'assistant.undo.why.connectionChanged': undefined
+  'assistant.undo.why.connectionMade': undefined
+  'assistant.undo.why.context': undefined
+  'assistant.undo.why.decision': undefined
+  'assistant.undo.why.declarePaths': undefined
+  'assistant.undo.why.freshRetried': undefined
+  'assistant.undo.why.handOver': undefined
+  'assistant.undo.why.laneEnded': undefined
+  'assistant.undo.why.laneReorderNow': undefined
+  'assistant.undo.why.message': undefined
+  'assistant.undo.why.nothing': undefined
+  'assistant.undo.why.projectClosed': undefined
+  'assistant.undo.why.projectMade': undefined
+  'assistant.undo.why.projectOpened': undefined
+  'assistant.undo.why.prompt': undefined
+  'assistant.undo.why.putBack': undefined
+  'assistant.undo.why.queuePaused': undefined
+  'assistant.undo.why.queueResumed': undefined
+  'assistant.undo.why.removedFromQueue': undefined
+  'assistant.undo.why.reportMerge': undefined
+  'assistant.undo.why.request': undefined
+  'assistant.undo.why.retriedMerge': undefined
+  'assistant.undo.why.slotReleased': undefined
+  'assistant.undo.why.start': undefined
+  'assistant.undo.why.startReview': undefined
+  'assistant.undo.why.submit': undefined
+  'assistant.undo.why.teamPaused': undefined
+  'assistant.undo.why.teamResumed': undefined
+  'assistant.undo.why.templateCards': undefined
+  'assistant.undo.why.verdict': undefined
+  'assistant.undo.why.withdrawn': undefined
+  'assistant.undo.working': undefined
+  'assistant.view.addMcp': undefined
   'assistant.view.allAttachments': undefined
   'assistant.view.allConversations': undefined
   'assistant.view.attachments': undefined
@@ -614,13 +748,17 @@ interface HiveMessageValues {
   'assistant.view.digests': undefined
   'assistant.view.journal': undefined
   'assistant.view.journalTip': undefined
+  'assistant.view.mcp': undefined
+  'assistant.view.mcpTip': undefined
   'assistant.view.modes': undefined
   'assistant.view.newMode': undefined
+  'assistant.view.noMcp': undefined
   'assistant.view.noWorkspace': undefined
   'assistant.view.noWorkspaceMain': undefined
   'assistant.view.openFolder': undefined
   'assistant.view.period': undefined
   'assistant.view.refresh': undefined
+  'assistant.view.removeMcp': { name: string | number }
   'assistant.view.showPanel': undefined
   'assistant.view.statConversations': undefined
   'assistant.view.statCost': undefined

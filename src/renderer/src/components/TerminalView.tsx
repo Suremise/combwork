@@ -6,18 +6,21 @@ import { WebglAddon } from '@xterm/addon-webgl'
 import '@xterm/xterm/css/xterm.css'
 import { attempt } from '../actions'
 import { call } from '../api'
-import { useRightClickToCli } from '../advanced'
+import { useAdvancedValue, useRightClickToCli } from '../advanced'
 import { deferredFocus } from '../deferredFocus'
 import { isAppShortcut } from '../commands'
 import { cardLinkProvider } from '../cardLinks'
 import { fileLinkProvider } from '../fileLinks'
-import { useStore } from '../store'
+import { confirm, useStore } from '../store'
 import { offerTip } from '../tips'
 import type { ProviderId } from '@shared/types'
-import { osc52, OSC52_INPUT_MS, type Osc52Refusal } from '@shared/osc52'
+import { ALL_KEYS_TO_CLI, CTRL_CV_TO_CLI, OSC52_POLICY } from '@shared/advanced'
+import { clipboardPreview, osc52, osc52Decision, OSC52_INPUT_MS, type Osc52Refusal } from '@shared/osc52'
+import { copyPasteKey } from '@shared/terminalInput'
 import { carriesFiles, cx, HIVE_FILES_MIME, quotePath } from '../util'
 import { addChips, attachFiles, clearChips } from '../attach'
 import { AttachmentChips } from './AttachmentChips'
+import { deferHiddenSelectionRedraws } from '../hiddenTerminalRedraws'
 import { msg, tr } from '@shared/i18n'
 
 type Listener = (data: string) => void
@@ -56,6 +59,24 @@ function disposeWebgl(webgl: WebglAddon, canvases: HTMLCanvasElement[]): void {
   for (const c of canvases) c.getContext('webgl2')?.getExtension('WEBGL_lose_context')?.loseContext()
 }
 
+/**
+ * Gives a hidden terminal's WebGL renderer back with the terminal taken out of the page, until it is shown again
+ * (HI-1828: putBack). xterm draws with a new DOM renderer then: every row at once, and again later (its idle-time
+ * resize, its selection's next frame), measuring each character's width as it goes. In the page each measure laid the
+ * whole window out again: a page switch's four released terminals took 0.5–1 s, and in a view hidden by display: none
+ * (every width 0, never kept) seconds. Out of the page nothing is laid out; the widths it measures there are 0, which
+ * xterm never keeps, so they are measured again in the page when it is shown (without WebGL).
+ */
+function disposeWebglOffPage(term: Terminal, webgl: WebglAddon, canvases: HTMLCanvasElement[]): void {
+  term.element?.remove()
+  disposeWebgl(webgl, canvases)
+}
+
+/** Puts a terminal taken out of the page (disposeWebglOffPage) back in its mount. */
+function putBack(term: Terminal, mount: HTMLElement | null): void {
+  if (term.element && mount && !term.element.isConnected) mount.appendChild(term.element)
+}
+
 /** How many terminals hold a WebGL context (for tests). */
 ;(window as unknown as { __hiveWebglCount?: () => number }).__hiveWebglCount = () => webglHolders.size
 
@@ -82,6 +103,33 @@ function countAtlasMerges(): boolean {
     if (col >= 0) return { x: box.left + ((col + 0.5) * box.width) / term.cols, y: box.top + ((row + 0.5) * box.height) / term.rows }
   }
   return null
+}
+
+/**
+ * The text a terminal shows on a background colour of its program's (not the default), each run as a string, for tests:
+ * a program drawing its own selection (Copilot, #1299) shows it this way, and a user copies what they see highlighted.
+ */
+;(window as unknown as { __hiveTerminalHighlighted?: (key: string) => string[] | null }).__hiveTerminalHighlighted = (key) => {
+  const term = terminals.get(key)
+  if (!term) return null
+  const buf = term.buffer.active
+  const cell = buf.getNullCell()
+  const runs: string[] = []
+  for (let row = 0; row < term.rows; row++) {
+    const line = buf.getLine(buf.viewportY + row)
+    let run = ''
+    for (let col = 0; col <= term.cols; col++) {
+      const lit = col < term.cols && !!line?.getCell(col, cell) && !cell.isBgDefault()
+      if (lit) {
+        // The second half of a wide character has no text of its own.
+        if (cell.getWidth() > 0) run += cell.getChars() || ' '
+      } else if (run) {
+        runs.push(run)
+        run = ''
+      }
+    }
+  }
+  return runs
 }
 
 /** A terminal's size and scroll, for tests: scrolled to the bottom when viewportY is baseY; `mouse`, the mouse tracking its program turned on. */
@@ -134,6 +182,22 @@ function countAtlasMerges(): boolean {
   return new Promise((resolve) => (term ? term.write(data, () => resolve(true)) : resolve(false)))
 }
 
+/**
+ * Mouse reports a terminal would send its program (xterm's SGR or X10 encodings), held back while a test holds them,
+ * for tests (#1167): a right-click passed to a real CLI can be seen without the CLI acting on it (its paste would read
+ * the machine's clipboard). `__hiveHoldMouseReports(key, true)` starts holding; `false` stops and returns what was held.
+ * Development and test builds only (null in a packaged one).
+ */
+const heldMouseReports = new Map<string, string[]>()
+const MOUSE_REPORT = /^\x1b\[(?:<\d+;\d+;\d+[Mm]|M[\s\S]{3})+$/
+;(window as unknown as { __hiveHoldMouseReports?: (key: string, hold: boolean) => string[] | null }).__hiveHoldMouseReports = (key, hold) => {
+  if (useStore.getState().appInfo?.isPackaged !== false) return null
+  const held = heldMouseReports.get(key) ?? []
+  if (hold) heldMouseReports.set(key, held)
+  else heldMouseReports.delete(key)
+  return held
+}
+
 /** Scrolls a terminal by some lines without any input, as xterm's own late scroll syncs do, for tests. */
 ;(window as unknown as { __hiveTerminalScrollLines?: (key: string, lines: number) => void }).__hiveTerminalScrollLines = (key, lines) => terminals.get(key)?.scrollLines(lines)
 
@@ -176,6 +240,25 @@ const HOLD_BOTTOM_MS = 1000
 const USER_SCROLL_MS = 500
 /** A terminal logs each kind of refused OSC 52 request at most this often: a program may repeat one. */
 const OSC52_LOG_MS = 60_000
+
+
+/**
+ * Asks the user whether a CLI's clipboard write goes on the clipboard (#1292, Settings → Advanced: Ask each time),
+ * showing what it would put there: in the dialog's monospace box (as Move Anyway's rules), cut after a few lines.
+ */
+function askClipboardWrite(text: string): Promise<boolean> {
+  const { lines, more } = clipboardPreview(text)
+  return confirm({
+    title: tr(msg({ id: 'panes.terminal.osc52.askTitle', defaultMessage: 'Copy to the clipboard?', description: "Title of the question when an agent's CLI asks to put text on the clipboard (OSC 52) and Settings → Advanced says to ask first." })),
+    message: tr(msg({ id: 'panes.terminal.osc52.askMessage', defaultMessage: "The agent's CLI asks to put {n, plural, one {# character} other {# characters}} on the clipboard:", description: "The question when an agent's CLI asks to put text on the clipboard; the text follows it. {n} is how many characters." }), { n: text.length }),
+    list: lines.map((l) => l || ' '),
+    listOnly: true,
+    listMono: true,
+    detail: more > 0 ? tr(msg({ id: 'panes.terminal.osc52.askMore', defaultMessage: '…and {n, plural, one {# more character} other {# more characters}}', description: "Under the text an agent's CLI asks to put on the clipboard, when the question shows only its start. {n} is how many characters it leaves out." }), { n: more }) : undefined,
+    confirmLabel: tr(msg({ id: 'panes.terminal.osc52.askCopy', defaultMessage: 'Copy', description: "Button of the question when an agent's CLI asks to put text on the clipboard: puts it there." })),
+    cancelLabel: tr(msg({ id: 'panes.terminal.osc52.askDont', defaultMessage: "Don't Copy", description: "Button of the question when an agent's CLI asks to put text on the clipboard: leaves the clipboard as it is." }))
+  })
+}
 
 /**
  * Fits a terminal to its pane and tells its process the size: the only place that does (#247). Never while the
@@ -275,8 +358,11 @@ export function TerminalView({
   agentId,
   provider,
   style,
-  onFocus
+  onFocus,
+  dimmed
 }: {
+  /** Its agent is stopped (HI-1881): shown dimmed, still scrolled, selected and copied as ever. */
+  dimmed?: boolean
   ptyKey: string
   visible: boolean
   onExit?: (code: number) => void
@@ -312,6 +398,17 @@ export function TerminalView({
   const rightClickToCli = useRightClickToCli(provider)
   const rightClickToCliRef = useRef(rightClickToCli)
   rightClickToCliRef.current = rightClickToCli
+  // Settings → Advanced can give Ctrl+C and Ctrl+V to an agent's CLI instead (#1286).
+  const ctrlCVToCli = useAdvancedValue<boolean>(CTRL_CV_TO_CLI) && !!provider
+  const ctrlCVToCliRef = useRef(ctrlCVToCli)
+  ctrlCVToCliRef.current = ctrlCVToCli
+  // Every key to an agent's CLI but the palette's, and what its clipboard writes get (#1292, Settings → Advanced).
+  const allKeysToCli = useAdvancedValue<boolean>(ALL_KEYS_TO_CLI) && !!provider
+  const allKeysToCliRef = useRef(allKeysToCli)
+  allKeysToCliRef.current = allKeysToCli
+  const osc52Policy = useAdvancedValue<string>(OSC52_POLICY)
+  const osc52PolicyRef = useRef(osc52Policy)
+  osc52PolicyRef.current = osc52Policy
   // The key handler is set once per terminal; these keep it pointed at the current agent.
   const pathRef = useRef(projectPath)
   pathRef.current = projectPath
@@ -354,20 +451,24 @@ export function TerminalView({
     // its padding as usable space, so the padding lives on the host and the terminal mounts in an
     // unpadded child — otherwise the last row/column can spill over the status bar or off the edge.
     term.open(mount.current!)
+    // A hidden pane's selection is drawn once it is shown, not on each line its CLI prints meanwhile (HI-1827).
+    deferHiddenSelectionRedraws(term)
     termRef.current = term
     terminals.set(ptyKey, term)
     fits.set(ptyKey, fit)
 
     term.attachCustomKeyEventHandler((e) => {
       if (e.type !== 'keydown') return true
-      const mod = e.ctrlKey || e.metaKey
-      // Copy with Ctrl+C only when there is a selection; otherwise Ctrl+C interrupts the agent.
-      if (mod && !e.altKey && (e.key === 'c' || e.key === 'C') && term.hasSelection()) {
+      // Copy with Ctrl+C only when there is a selection; otherwise Ctrl+C interrupts the agent. Settings → Advanced can
+      // give both keys to the CLI, as xterm sends them (#1286).
+      const action = copyPasteKey(e, ctrlCVToCliRef.current, term.hasSelection())
+      if (action === 'cli') return true
+      if (action === 'copy') {
         void navigator.clipboard.writeText(term.getSelection())
         term.clearSelection()
         return false
       }
-      if (mod && !e.altKey && (e.key === 'v' || e.key === 'V')) {
+      if (action === 'paste') {
         void navigator.clipboard.readText().then(async (t) => {
           if (t) term.paste(t)
           else if (pathRef.current) {
@@ -385,7 +486,7 @@ export function TerminalView({
         e.preventDefault()
         return false
       }
-      return !isAppShortcut(e, providerRef.current)
+      return !isAppShortcut(e, providerRef.current, allKeysToCliRef.current)
     })
     // Removed with the terminal: the host element can outlive it (a new ptyKey in the same view).
     const listeners = new AbortController()
@@ -437,11 +538,23 @@ export function TerminalView({
       refusalLogged.set(reason, Date.now())
       void call('pty:clipboardRefused', ptyKey, reason).catch(() => undefined)
     }
+    // Ask each time (#1292): one question at a time, a write meanwhile refused, never queued behind it.
+    let asking = false
     const disposeOsc52 = term.parser.registerOscHandler(52, (data) => {
       const inUse = Date.now() - inputAt < OSC52_INPUT_MS && document.hasFocus() && !!host.current?.contains(document.activeElement)
-      const r = osc52(data, inUse)
-      if (r.kind === 'write') void navigator.clipboard.writeText(r.text).catch(() => undefined)
-      else refuse(r.reason)
+      const d = osc52Decision(osc52(data, inUse), osc52PolicyRef.current)
+      if ('write' in d) void navigator.clipboard.writeText(d.write).catch(() => undefined)
+      else if ('refuse' in d) refuse(d.refuse)
+      else if (asking) refuse('declined')
+      else {
+        asking = true
+        void askClipboardWrite(d.ask)
+          .then((ok) => (ok ? navigator.clipboard.writeText(d.ask) : refuse('declined')))
+          .catch(() => undefined)
+          .finally(() => {
+            asking = false
+          })
+      }
       return true
     })
 
@@ -470,6 +583,11 @@ export function TerminalView({
     const disposeInput = term.onData((d) => {
       // Enter sends the prompt, and with it what was attached: its chips go.
       if (d === '\r') clearChips(ptyKey)
+      const held = heldMouseReports.get(ptyKey)
+      if (held && MOUSE_REPORT.test(d)) {
+        held.push(d)
+        return
+      }
       void call('pty:write', ptyKey, d)
     })
     // IPC keeps event order, so anything received before the buffer reply is already in the buffer.
@@ -487,7 +605,8 @@ export function TerminalView({
     })
     // Until the window fits it, the terminal is its process's size, not xterm's 80 × 24: the process draws at its own
     // size, and output drawn into a smaller terminal (a CLI's first screens, or all of it while hidden) lands in the
-    // wrong places, which its redraw at the fit doesn't always clear (#486).
+    // wrong places, which its redraw at the fit doesn't always clear (#486). Asked as the view is made, which is often
+    // before its process is spawned: then the size that process starts at (HI-2250).
     let fitted = false
     void call('pty:size', ptyKey).then((size) => {
       if (size && !fitted && !signal.aborted && (size.cols !== term.cols || size.rows !== term.rows)) term.resize(size.cols, size.rows)
@@ -588,7 +707,7 @@ export function TerminalView({
 
   // WebGL renderer (as in VS Code): faster, and needed for rescaleOverlappingGlyphs. Only visible
   // terminals take a context, within WEBGL_BUDGET (see above); hidden ones keep it for 30 seconds so
-  // switching back is instant, then fall back to the DOM renderer.
+  // switching back is instant, then fall back to the DOM renderer, out of the page (disposeWebglOffPage).
   useEffect(() => {
     const term = termRef.current
     if (!term) return
@@ -596,12 +715,14 @@ export function TerminalView({
       if (dropWebgl.current) clearTimeout(dropWebgl.current)
       dropWebgl.current = null
       webglHolders.delete(ptyKey)
-      if (webglRef.current) disposeWebgl(webglRef.current, webglCanvases.current)
+      if (webglRef.current && visibleRef.current) disposeWebgl(webglRef.current, webglCanvases.current)
+      else if (webglRef.current) disposeWebglOffPage(term, webglRef.current, webglCanvases.current)
       webglRef.current = null
     }
     if (visible) {
       if (dropWebgl.current) clearTimeout(dropWebgl.current)
       dropWebgl.current = null
+      putBack(term, mount.current)
       if (!webglRef.current && !noWebgl) {
         makeRoomForWebgl(ptyKey)
         try {
@@ -625,7 +746,9 @@ export function TerminalView({
             })
           })
           webgl.onContextLoss(() => {
-            webgl.dispose()
+            // Lost while hidden (Chromium dropped it), it is given back as a release is (disposeWebglOffPage).
+            if (visibleRef.current) webgl.dispose()
+            else disposeWebglOffPage(term, webgl, [])
             if (webglRef.current === webgl) {
               webglRef.current = null
               webglHolders.delete(ptyKey)
@@ -662,14 +785,16 @@ export function TerminalView({
 
   return (
     <div
-      className={cx('terminal-host', !visible && 'hidden')}
+      className={cx('terminal-host', !visible && 'hidden', dimmed && 'dimmed')}
       data-pty={ptyKey}
       data-right-click={rightClickToCli ? 'cli' : 'hive'}
+      data-ctrl-cv={ctrlCVToCli ? 'cli' : 'hive'}
+      data-all-keys={allKeysToCli ? 'cli' : 'hive'}
       style={{ ['--terminal-bg' as string]: terminalTheme().background, ...style }}
       ref={host}
     >
       <div className="terminal-mount" ref={mount} />
-      {projectPath && <AttachmentChips ptyKey={ptyKey} provider={provider} />}
+      {projectPath && <AttachmentChips ptyKey={ptyKey} provider={provider} projectPath={projectPath} agentId={agentId ?? null} />}
     </div>
   )
 }

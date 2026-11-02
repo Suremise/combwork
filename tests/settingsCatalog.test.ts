@@ -22,6 +22,8 @@ const NOT_SETTINGS = new Set(['keybindings'])
 const PROVIDER_INTERNAL = new Set(['pricesRemoved'])
 /** Project config fields that aren't Project Settings rows: kept by Hive, or changed elsewhere (agents, layout, MCP, skills). */
 const PROJECT_INTERNAL = new Set(['version', 'agents', 'layout', 'layouts', 'mcp', 'skills', 'keybindings', 'templates'])
+/** A CLI's launch settings: on connections since HI-2107 (decision F), kept in Hive's settings only as migration input. */
+const LAUNCH_FIELDS = ['defaultModel', 'defaultEffort', 'defaultPermissionMode', 'extraArgs', 'use200kContext']
 
 describe('the settings catalog', () => {
   it("calls the Assistant's working mode a mode, never a persona, wherever the user or an agent reads it (#375)", () => {
@@ -57,28 +59,36 @@ describe('the settings catalog', () => {
     const missing: string[] = []
     for (const [section, value] of Object.entries(DEFAULT_SETTINGS)) {
       if (NOT_SETTINGS.has(section)) continue
+      // Gone with HI-2107 (decision A: the one order of accounts); kept only as migration input.
       if (section === 'defaultProvider') {
-        if (!ids.has('providers.defaultProvider')) missing.push(section)
+        expect(ids.has('providers.defaultProvider')).toBe(false)
+        continue
+      }
+      // The user's commands (HI-1954): read as their lists and points (general.commands, general.onQuit), not field by field.
+      if (section === 'commands') {
+        for (const id of ['general.commands', 'general.onQuit']) if (!ids.has(id)) missing.push(id)
+        continue
+      }
+      // The MCP catalogues (HI-545): one row, ours and the user's sources together.
+      if (section === 'mcpCatalogs') {
+        if (!ids.has('mcpCatalogs.sources')) missing.push('mcpCatalogs.sources')
         continue
       }
       if (section === 'providers') {
         for (const p of PROVIDERS) {
           // A setting the provider's capabilities don't give it has no row (Codex has no 200K switch, nor a cost source: it reports no cost).
-          const lacks = new Set([...(p.capabilities.contextLimit ? [] : ['use200kContext']), ...(p.capabilities.backgroundSessions ? [] : ['allowBackgroundSessions']), ...(p.capabilities.reportsCost ? [] : ['costSource'])])
+          // How a CLI launches is on connections (HI-2107, decision F): its old model, effort, mode, arguments and context
+          // are kept only as migration input, with no rows.
+          const lacks = new Set([...(p.capabilities.backgroundSessions ? [] : ['allowBackgroundSessions']), ...(p.capabilities.reportsCost ? [] : ['costSource']), ...LAUNCH_FIELDS])
+          for (const k of LAUNCH_FIELDS) expect(ids.has(`${p.id}.${k}`), `${p.id}.${k}`).toBe(false)
           for (const key of Object.keys(defaultProviderSettings(p))) if (!PROVIDER_INTERNAL.has(key) && !lacks.has(key) && !ids.has(`${p.id}.${key}`)) missing.push(`${p.id}.${key}`)
         }
         continue
       }
       for (const key of Object.keys(value as object)) {
-        // The Assistant's per-provider settings are one row a provider ("With Claude Code").
-        if (section === 'assistant' && key === 'providers') {
-          for (const p of PROVIDERS) {
-            if (!ids.has(`assistant.provider:${p.id}`)) missing.push(`assistant.provider:${p.id}`)
-            // And each of its fields, an entry of its own (read and explained; the Assistant can't change them).
-            for (const k of Object.keys(DEFAULT_SETTINGS.assistant.providers[p.id] ?? {})) if ((k !== 'use200kContext' || p.capabilities.contextLimit) && !ids.has(`assistant.${p.id}.${k}`)) missing.push(`assistant.${p.id}.${k}`)
-          }
-          continue
-        }
+        // The Assistant's provider and per-provider values are the accounts migration's input only (HI-2108): its
+        // connection, chosen in its dialog, holds them.
+        if (section === 'assistant' && (key === 'providers' || key === 'provider')) continue
         if (!ids.has(`${section}.${key}`)) missing.push(`${section}.${key}`)
       }
     }
@@ -86,21 +96,24 @@ describe('the settings catalog', () => {
   })
 
   it("describes every field of a project's settings", () => {
-    const missing = Object.keys(DEFAULT_PROJECT_CONFIG).filter((k) => !PROJECT_INTERNAL.has(k) && k !== 'providers' && !ids.has(`project.${k}`))
-    for (const p of PROVIDERS) for (const k of ['model', 'effort', 'permissionMode', 'extraArgs', ...(p.capabilities.contextLimit ? ['use200kContext'] : [])]) if (!ids.has(`project.${p.id}.${k}`)) missing.push(`project.${p.id}.${k}`)
+    // A project's copied files from before 1.0 (worktreeCopy) are read and set as project.slotCopy (HI-1765).
+    const rowOf: Record<string, string> = { worktreeCopy: 'slotCopy' }
+    // A project's provider pages and default provider went with HI-2107 (decisions A and F): kept only as migration input.
+    const missing = Object.keys(DEFAULT_PROJECT_CONFIG).filter((k) => !PROJECT_INTERNAL.has(k) && k !== 'providers' && k !== 'defaultProvider' && !ids.has(`project.${rowOf[k] ?? k}`))
+    expect(ids.has('project.defaultProvider')).toBe(false)
+    expect([...ids].filter((id) => PROVIDERS.some((p) => id.startsWith(`project.${p.id}.`)))).toEqual([])
+    expect(PROJECT_SETTINGS_SECTIONS.filter((x) => x.id.startsWith('provider:'))).toEqual([])
     expect(missing).toEqual([])
   })
 
   it('reads each value from where it is kept, with its default', () => {
-    const s = mergeDefaults(structuredClone(DEFAULT_SETTINGS), { sessions: { compactSuggestTokens: 150000 }, providers: { 'claude-code': { extraArgs: '--verbose' } }, defaultProvider: 'codex' }) as AppSettings
+    const s = mergeDefaults(structuredClone(DEFAULT_SETTINGS), { sessions: { compactSuggestTokens: 150000 }, providers: { 'claude-code': { executablePath: 'claude2.exe' } } }) as AppSettings
     expect(settingValue(entry('sessions.compactSuggestTokens'), s)).toBe(150000)
     expect(settingDefault(entry('sessions.compactSuggestTokens'))).toBe(200000)
-    expect(settingValue(entry('claude-code.extraArgs'), s)).toBe('--verbose')
-    expect(settingValue(entry('providers.defaultProvider'), s)).toBe('codex')
+    expect(settingValue(entry('claude-code.executablePath'), s)).toBe('claude2.exe')
     expect(settingValue(entry('assistant.compactSuggestTokens'), s)).toBe(500000)
     const cfg = { ...structuredClone(DEFAULT_PROJECT_CONFIG), compactSuggestTokens: 50000 }
     expect(settingValue(entry('project.compactSuggestTokens'), s, cfg)).toBe(50000)
-    expect(settingValue(entry('project.claude-code.model'), s, cfg)).toBe('inherit')
     expect(settingDefault(entry('project.transcriptWarnMB'))).toBeNull()
   })
 
@@ -118,8 +131,12 @@ describe('the settings catalog', () => {
     expect(v('notifications.chimeSound', 'bell')).toEqual({ value: 'bell' })
     expect(v('project.transcriptWarnMB', null)).toEqual({ value: null })
     expect(v('project.chime', 'inherit')).toEqual({ value: 'inherit' })
-    expect(v('project.claude-code.model', '')).toEqual({ value: 'inherit' })
-    expect(v('agents.worktreeCopy', 'a\nb')).toHaveProperty('error')
+    // The copied files (HI-1765), at each level and a project's: patterns over lines, "" its none, null inherits; other text one line.
+    expect(v('workflow.git.slotCopy', 'a\nb')).toEqual({ value: 'a\nb' })
+    expect(v('workspace.workflow.git.slotCopy', '')).toEqual({ value: '' })
+    expect(v('project.slotCopy', null)).toEqual({ value: null })
+    expect(v('workspace.workflow.git.slotCopy', 'inherit')).toEqual({ value: null })
+    expect(v('project.worktreeSetup', 'a\nb')).toHaveProperty('error')
     // Not values: a button, a table.
     expect(v('advanced.reset', true)).toHaveProperty('error')
     expect(v('board.colors', {})).toHaveProperty('error')
@@ -127,26 +144,39 @@ describe('the settings catalog', () => {
 
   it('makes the change through the same patches as Settings and Project Settings', () => {
     expect(settingPatch(entry('sessions.transcriptWarnMB'), 50)).toEqual({ settings: { sessions: { transcriptWarnMB: 50 } } })
-    expect(settingPatch(entry('codex.defaultModel'), 'gpt-5')).toEqual({ settings: { providers: { codex: { defaultModel: 'gpt-5' } } } })
-    expect(settingPatch(entry('providers.defaultProvider'), 'codex')).toEqual({ settings: { defaultProvider: 'codex' } })
-    const p = settingPatch(entry('project.claude-code.effort'), 'high')
-    expect('project' in p && p.project(structuredClone(DEFAULT_PROJECT_CONFIG)).providers?.['claude-code']).toMatchObject({ effort: 'high', model: 'inherit' })
+    expect(settingPatch(entry('copilot.checkUpdatesOnLaunch'), false)).toEqual({ settings: { providers: { copilot: { checkUpdatesOnLaunch: false } } } })
+    const p = settingPatch(entry('project.compactSuggestTokens'), 50000)
+    expect('project' in p && p.project(structuredClone(DEFAULT_PROJECT_CONFIG))).toEqual({ compactSuggestTokens: 50000 })
   })
 
   it("marks what the Assistant can't change: permissions, what runs, the Agent API, its own settings", () => {
     const ro = (id: string) => !!entry(id).sensitive
-    for (const id of ['agentApi.enabled', 'agentApi.port', 'agentApi.allowSessionInput', 'agentApi.provideHiveMcp', 'assistant.control', 'assistant.typingPause', 'claude-code.defaultPermissionMode', 'claude-code.enableDangerousMode', 'claude-code.executablePath', 'codex.extraArgs', 'project.claude-code.permissionMode', 'project.codex.extraArgs', 'project.worktreeSetup', 'claude-code.allowBackgroundSessions']) expect(ro(id), id).toBe(true)
-    for (const id of ['general.progressPanel', 'sessions.transcriptWarnMB', 'agents.fileLocks', 'claude-code.defaultModel', 'project.compactSuggestTokens', 'assistant.panelSide', 'assistant.compactSuggestTokens']) expect(ro(id), id).toBe(false)
+    for (const id of ['agentApi.enabled', 'agentApi.port', 'agentApi.allowSessionInput', 'agentApi.provideHiveMcp', 'assistant.control', 'assistant.typingPause', 'claude-code.enableDangerousMode', 'claude-code.executablePath', 'codex.executablePath', 'project.worktreeSetup', 'claude-code.allowBackgroundSessions']) expect(ro(id), id).toBe(true)
+    for (const id of ['general.progressPanel', 'sessions.transcriptWarnMB', 'workflow.git.fileLocks', 'copilot.checkUpdatesOnLaunch', 'project.compactSuggestTokens', 'assistant.panelSide', 'assistant.compactSuggestTokens']) expect(ro(id), id).toBe(false)
     expect(entry('assistant.control').readOnly).toMatch(/only the user can change it, in Settings → Assistant → Control/)
   })
 
+  it("keeps the user's commands to the user (HI-1368, HI-1954): sensitive, and the tools read their names but never set them", () => {
+    for (const id of ['general.commands', 'general.onQuit', 'workspace.commands', 'workspace.onOpen', 'workspace.onClose']) {
+      expect(entry(id).sensitive, id).toBe(true)
+      expect(entry(id).readOnly, id).toMatch(/Its commands run on this machine by themselves or by hand: the user saves them, the Assistant may only propose/)
+      expect(settingKind(entry(id)), id).toBeNull()
+      expect(entry(id).docs, id).toBe(id.endsWith('commands') ? 'commands' : 'close-commands')
+      expect(settingDefault(entry(id)), id).toEqual([])
+    }
+    const settings = { ...DEFAULT_SETTINGS, commands: { list: [{ id: 'c-0000000a', name: 'Backup', command: 'backup.cmd' }], onQuit: { run: [{ scope: 'hive' as const, id: 'c-0000000a' }], onUpdate: true } } }
+    expect(settingValue(entry('general.commands'), settings)).toEqual(['Backup'])
+    expect(settingValue(entry('general.onQuit'), settings)).toEqual(['Backup'])
+    const ws = { commands: { list: [{ id: 'c-0000000b', name: 'Serve', command: 'serve' }], onOpen: { run: [{ scope: 'workspace' as const, id: 'c-0000000b' }, { scope: 'hive' as const, id: 'c-0000000a' }, { scope: 'hive' as const, id: 'c-0000000c' }] }, onClose: { run: [] } } }
+    expect(settingValue(entry('workspace.onOpen'), settings, null, ws)).toEqual(['Serve', 'Backup', '(deleted)'])
+    expect(settingValue(entry('workspace.onClose'), settings, null, {})).toEqual([])
+  })
+
   it('keeps buttons, statuses and lists of things out of the values the tools set; keybindings are read-only', () => {
-    for (const id of ['advanced.reset', 'agentApi.token', 'workspace.hiddenProjects', 'claude-code.status', 'project.reset', 'assistant.provider:claude-code']) expect(entry(id).action, id).toBe(true)
+    for (const id of ['advanced.reset', 'agentApi.token', 'workspace.hiddenProjects', 'claude-code.status', 'project.reset']) expect(entry(id).action, id).toBe(true)
     expect(settingKind(entry('keybindings.editor'))).toBeNull()
     expect(entry('keybindings.editor').readOnly).toMatch(/Shortcuts are read-only to the Assistant for now/)
     for (const id of ['claude-code.prices', 'codex.modelFallback', 'claude-code.effortFallback', 'board.colors']) expect(settingKind(entry(id)), id).toBe('table')
-    expect(settingKind(entry('claude-code.defaultModel'))).toBe('text')
-    expect(settingKind(entry('claude-code.defaultEffort'))).toBe('effort')
   })
 
   it("checks tables: column colours, prices, fallback lists (null puts back Hive's)", () => {
@@ -203,44 +233,21 @@ describe('the settings catalog', () => {
     expect(texts.newText.endsWith('…')).toBe(true)
   })
 
-  it('takes only the effort levels the picker offers (or the default)', () => {
-    const levels = [
-      { value: 'low', label: 'Low' },
-      { value: 'high', label: 'High' }
-    ]
-    const ctx = { efforts: () => levels }
-    expect((checkSettingValue(entry('claude-code.defaultEffort'), 'bananas', ctx) as { error: string }).error).toMatch(/one of: low, high/)
-    expect(checkSettingValue(entry('claude-code.defaultEffort'), 'High', ctx)).toEqual({ value: 'high' })
-    expect(checkSettingValue(entry('claude-code.defaultEffort'), '', ctx)).toEqual({ value: '' })
-    expect(checkSettingValue(entry('project.codex.effort'), 'inherit', ctx)).toEqual({ value: 'inherit' })
-    expect(checkSettingValue(entry('project.codex.effort'), 'medium', ctx)).toHaveProperty('error')
-    // With no levels known, only the default.
-    expect(checkSettingValue(entry('codex.defaultEffort'), 'high')).toHaveProperty('error')
-  })
-
-  it("reads the Assistant's own launch settings, a field each, and keeps them the user's", () => {
-    const s = mergeDefaults(structuredClone(DEFAULT_SETTINGS), { assistant: { providers: { 'claude-code': { model: 'opus', effort: 'high', extraArgs: '--verbose' } } } }) as AppSettings
-    expect(settingValue(entry('assistant.claude-code.model'), s)).toBe('opus')
-    expect(settingValue(entry('assistant.claude-code.effort'), s)).toBe('high')
-    expect(settingValue(entry('assistant.codex.model'), s)).toBe('')
-    expect(settingDefault(entry('assistant.claude-code.model'))).toBe('')
-    expect(settingPath(entry('assistant.claude-code.extraArgs'))).toBe('Settings → Assistant → With Claude Code → Extra arguments')
-    for (const k of ['model', 'effort', 'permissionMode', 'extraArgs']) expect(entry(`assistant.codex.${k}`).sensitive, k).toBe(true)
-    expect(entry('assistant.claude-code.model').restart).toBe('assistant')
-    expect(settingPatch(entry('assistant.claude-code.model'), 'haiku')).toEqual({ settings: { assistant: { providers: { 'claude-code': { model: 'haiku' } } } } })
+  it("has no Assistant provider, connection or per-provider values: its connection holds them (HI-2108)", () => {
+    for (const id of ['assistant.provider', 'assistant.connection', 'assistant.provider:claude-code', 'assistant.claude-code.model', 'assistant.codex.effort']) expect(settingEntry(id), id).toBeUndefined()
   })
 
   it('says where each one is', () => {
     expect(settingPath(entry('sessions.compactSuggestTokens'))).toBe('Settings → Sessions → Suggest compacting above')
-    expect(settingPath(entry('claude-code.defaultModel'))).toBe('Settings → Claude Code → Default model')
-    expect(settingPath(entry('project.codex.model'))).toBe('Project Settings → Codex → Model')
+    expect(settingPath(entry('copilot.executablePath'))).toBe('Settings → GitHub Copilot → CLI path')
+    expect(settingPath(entry('accounts.list'))).toBe('Settings → Accounts & Connections → Accounts & Connections')
   })
 
   it('is what Settings and Project Settings draw: a custom row has its control there, and every row comes from here', () => {
     const view = readFileSync(join(__dirname, '../src/renderer/src/views/SettingsView.tsx'), 'utf8')
     const drawn = new Set([...view.matchAll(/^\s+'([\w.:-]+)': (?:\(\)|\(\{)/gm)].map((m) => m[1]))
-    // The Assistant's row for each provider ("With Claude Code") is drawn from one template.
-    if (view.includes('[`assistant.provider:${p.id}`, () => <AssistantProviderDefaults')) for (const p of PROVIDERS) drawn.add(`assistant.provider:${p.id}`)
+    // Version Control's two levels are its tabs (HI-1837), each a WorkflowLevelForm.
+    if (view.includes('<WorkflowLevelForm level="global"') && view.includes('<WorkflowLevelForm level="workspace"')) drawn.add('workflow.defaults').add('workflow.workspaceDefaults')
     const custom = APP_SETTINGS_CATALOG.filter((e) => e.type === 'custom' && !e.provider && !e.hidden).map((e) => e.id)
     expect(custom.filter((id) => !drawn.has(id))).toEqual([])
     expect([...drawn].filter((id) => !ids.has(id))).toEqual([])
@@ -251,7 +258,7 @@ describe('the settings catalog', () => {
     expect(rows).not.toMatch(/^\s+(title|desc|tip): ['"]/m)
     for (const m of rows.matchAll(/rowText\((?:'([\w.]+)'|`project\.\$\{id\}\.(\w+)`)\)/g)) {
       if (m[1]) expect(ids.has(m[1]), m[1]).toBe(true)
-      else for (const p of PROVIDERS) if (m[2] !== 'use200kContext' || p.capabilities.contextLimit) expect(ids.has(`project.${p.id}.${m[2]}`), `project.${p.id}.${m[2]}`).toBe(true)
+      else for (const p of PROVIDERS) if ((m[2] !== 'use200kContext' || p.capabilities.contextLimit) && !(p.capabilities.connections && ['model', 'effort', 'use200kContext'].includes(m[2]))) expect(ids.has(`project.${p.id}.${m[2]}`), `project.${p.id}.${m[2]}`).toBe(true)
     }
     expect(PROJECT_SETTINGS_CATALOG.length).toBeGreaterThan(10)
   })
@@ -261,8 +268,8 @@ describe("a provider's danger opt-in (#461)", () => {
   it("names the mode it unlocks: Copilot's is Autopilot alone (#490: Allow all needs no opt-in)", () => {
     const e = entry('copilot.enableDangerousMode')
     expect(e.title).toBe('Enable the Autopilot option')
-    expect(e.desc).toBe('Allow projects and agents to choose "Autopilot", where the agent runs every action without asking.')
-    expect(e.tip).toBe('Autopilot is never a global default. When turned off, projects and agents using it return to Inherit.')
+    expect(e.desc).toBe('Allow connections to choose "Autopilot", where the agent runs every action without asking.')
+    expect(e.tip).toBe("Only a connection chooses Autopilot. When turned off, a connection that chose it launches in the CLI's own default mode and says so.")
     expect(e.confirmOn?.title).toBe('Enable the Autopilot option?')
   })
 
@@ -272,20 +279,16 @@ describe("a provider's danger opt-in (#461)", () => {
     const ticked = mergeDefaults(structuredClone(DEFAULT_SETTINGS), { providers: { copilot: { enableDangerousMode: true } } } as unknown as Partial<AppSettings>)
     expect(modeAllowed('copilot', 'allow-all', off)).toBe(true)
     expect(modeAllowed('copilot', 'autopilot', off)).toBe(false)
-    expect(offeredModes('copilot', off).map((m) => m.value)).toEqual(['ask', 'accept-edits', 'plan', 'allow-all'])
+    expect(offeredModes('copilot', off).map((m) => m.value)).toEqual(['ask', 'accept-edits', 'plan', 'allow-all', 'cli-own'])
     expect(modeAllowed('copilot', 'autopilot', ticked)).toBe(true)
-    expect(offeredModes('copilot', ticked).map((m) => m.value)).toEqual(['ask', 'accept-edits', 'plan', 'autopilot', 'allow-all'])
-    // Allow all can be Copilot's default mode, as any mode outside the opt-in can; Autopilot can't.
-    const choices = (entry('copilot.defaultPermissionMode').options ?? []).map((o) => o.value)
-    expect(choices).toContain('allow-all')
-    expect(choices).not.toContain('autopilot')
+    expect(offeredModes('copilot', ticked).map((m) => m.value)).toEqual(['ask', 'accept-edits', 'plan', 'autopilot', 'allow-all', 'cli-own'])
   })
 
   it('reads as before for a provider with one (Claude Code, Codex)', () => {
     const c = entry('claude-code.enableDangerousMode')
     expect(c.title).toBe('Enable the Bypass permissions option')
-    expect(c.desc).toBe('Allow projects and agents to choose "Bypass permissions", where the agent runs every action without asking.')
-    expect(c.tip).toBe('Bypass permissions is never a global default. When turned off, projects and agents using it return to Inherit.')
+    expect(c.desc).toBe('Allow connections to choose "Bypass permissions", where the agent runs every action without asking.')
+    expect(c.tip).toBe("Only a connection chooses Bypass permissions. When turned off, a connection that chose it launches in the CLI's own default mode and says so.")
     expect(c.confirmOn?.title).toBe('Enable the Bypass permissions option?')
     expect(entry('codex.enableDangerousMode').title).toBe('Enable the Full access option')
   })

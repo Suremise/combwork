@@ -2,12 +2,13 @@
 // under os.tmpdir() itself, whose path is the 8.3 short form on GitHub's runner (C:\Users\RUNNER~1\…). A test that wants
 // another name for a folder makes one on purpose (tests/pathAliases.ts): checked here on this machine.
 import { spawnSync } from 'child_process'
-import { existsSync, mkdirSync, mkdtempSync, readdirSync, readFileSync, realpathSync, rmSync, writeFileSync } from 'fs'
+import { existsSync, mkdirSync, mkdtempSync, readdirSync, readFileSync, realpathSync, rmSync, utimesSync, writeFileSync } from 'fs'
+import { createRequire } from 'module'
 import { tmpdir } from 'os'
 import { basename, dirname, join, relative, sep } from 'path'
 import { afterAll, describe, expect, it } from 'vitest'
 import { junction, shortPath } from './pathAliases'
-import { endRunTemp, removeTempDirs, tempArea, tempDir, tempRoot } from './tempDir'
+import { endRunTemp, pruneRunTemps, removeTempDirs, tempArea, tempDir, tempRoot } from './tempDir'
 
 const here = __dirname
 const made: string[] = []
@@ -34,13 +35,16 @@ function code(d: string): string[] {
  */
 const ALLOWED: Record<string, string[]> = {
   // The hive-test root is %LOCALAPPDATA%\hive-test, in the temp folder only where LOCALAPPDATA is unset.
-  'e2e/runContext.cjs': ['const LOCAL = process.env.LOCALAPPDATA || os.tmpdir()'],
+  // and the temp folder's variables a child gets from the run (the run's own folder, HI-2102).
+  'e2e/runContext.cjs': ['const LOCAL = process.env.LOCALAPPDATA || os.tmpdir()', "'PATH', 'PATHEXT', 'SYSTEMROOT', 'SYSTEMDRIVE', 'WINDIR', 'COMSPEC', 'TEMP', 'TMP', 'TMPDIR', 'OS',"],
   'e2e/build.mjs': ["import { tmpdir } from 'os'", "export const BUILD_LOCKS = join(process.env.LOCALAPPDATA || tmpdir(), 'hive-test', 'build-locks')"],
   'progressReport.mts': ["import { tmpdir } from 'node:os'", "const timings = (): string => process.env.HIVE_TEST_PROGRESS_TIMINGS || join(process.env.LOCALAPPDATA || tmpdir(), 'hive-test', 'progress-timings.json')"],
   // npm run e2e -- --clear-dir: a folder the user names may be in the temp folder (one nothing here made).
+  // The focused tests' picker's check (HI-1367) reads a binding naming the temp folder as not the repository's.
+  'focusedPick.test.ts': ['if (bound.has(name) || !exprs.every((e) => !/tempDir|tmpdir|mkdtemp/.test(e) && names(e))) continue'],
   'e2e/evidence.cjs': ['function clearDir(target, { board = {}, temp = os.tmpdir(), testRoot = runContext.TEST_ROOT, homes = [runContext.CODEX_HOME, runContext.CLAUDE_TEST_HOME] } = {}) {']
 }
-const OWN = ['tempDir.ts', 'tempDir.test.ts']
+const OWN = ['tempDir.ts', 'runTemp.mts', 'tempDir.test.ts']
 
 /** Where these files name the temp folder themselves (os.tmpdir, TEMP or TMP), other than ALLOWED: `file:line` each. */
 function rawTempUses(files: { name: string; text: string }[]): string[] {
@@ -194,6 +198,96 @@ describe("the run's own temp folder goes when the run ends (#995)", () => {
     const notARun = dir('hive-not-a-run-')
     as(notARun, String(process.pid), () => expect(endRunTemp()).toMatch(/^not a run's folder/))
     expect(existsSync(notARun)).toBe(true)
+  })
+})
+
+describe("a stopped run's temp folder goes at a later run's start, and every runner has one (HI-2102)", () => {
+  const DAY = 24 * 60 * 60_000
+  const now = Date.now()
+  const at = (area: string, name: string, ageMs: number): string => {
+    const d = join(area, name)
+    mkdirSync(join(d, 'playwright-artifacts-x'), { recursive: true })
+    utimesSync(d, new Date(now - ageMs), new Date(now - ageMs))
+    return d
+  }
+
+  // The board's rules as the runners give them (tests/e2e/evidence.cjs), over cards given here (their text as the board
+  // gives it: pathText).
+  const { evidence, pathText } = createRequire(__filename)('./e2e/evidence.cjs')
+  const nobody = evidence({ cards: [] })
+
+  it("removes runs' folders older than a day whose run has ended, and nothing else", () => {
+    const area = dir('hive-run-area-')
+    const ended = at(area, 'run-4001-abcdef', DAY + 60_000)
+    const live = at(area, 'run-4002-abcdef', 2 * DAY)
+    const recent = at(area, 'run-4003-abcdef', DAY - 60_000)
+    const beforePids = at(area, 'run-Xy12Zq', 2 * DAY)
+    const other = at(area, 'hive-gitrepo-abcdef', 2 * DAY)
+    const removed = pruneRunTemps((p) => nobody.protects(p), { now, area, isAlive: (pid) => pid === 4002 })
+    expect(removed.sort()).toEqual([beforePids, ended].sort())
+    expect([ended, live, recent, beforePids, other].map((d) => existsSync(d))).toEqual([false, true, true, false, true])
+  })
+
+  it('keeps an old run whose files an open card cites, and removes an uncited one beside it', () => {
+    const area = dir('hive-run-area-')
+    const cited = at(area, 'run-4011-abcdef', 2 * DAY)
+    writeFileSync(join(cited, 'failure.txt'), 'x')
+    utimesSync(cited, new Date(now - 2 * DAY), new Date(now - 2 * DAY))
+    const uncited = at(area, 'run-4012-abcdef', 2 * DAY)
+    const ev = evidence({ cards: [{ number: 2102, text: pathText(`The failure is in ${join(cited, 'failure.txt')}`) }] })
+    expect(ev.protects(cited)).toBe('cited by #2102')
+    expect(pruneRunTemps((p) => ev.protects(p), { now, area, isAlive: () => false })).toEqual([uncited])
+    expect(existsSync(join(cited, 'failure.txt'))).toBe(true)
+    expect(existsSync(uncited)).toBe(false)
+  })
+
+  it("removes nothing while the board can't be read, or with no board found", () => {
+    const area = dir('hive-run-area-')
+    const old = at(area, 'run-4021-abcdef', 2 * DAY)
+    for (const ev of [evidence({ tasksDir: join(area, 'no-such-board') }), evidence({})]) {
+      expect(ev.ok).toBe(false)
+      expect(pruneRunTemps((p) => ev.protects(p), { now, area, isAlive: () => false })).toEqual([])
+    }
+    expect(existsSync(old)).toBe(true)
+  })
+
+  it('asks the board just before each removal: a card citing a run after the listing keeps it', () => {
+    const area = dir('hive-run-area-')
+    const run = at(area, 'run-4031-abcdef', 2 * DAY)
+    const cards: { number: number; text: string }[] = []
+    const ev = evidence({ cards })
+    // Its owner is looked up after the listing, before the removal: a card cites the run meanwhile.
+    const isAlive = (): boolean => {
+      cards.push({ number: 2103, text: pathText(`See ${run}`) })
+      return false
+    }
+    expect(pruneRunTemps((p) => ev.protects(p), { now, area, isAlive })).toEqual([])
+    expect(existsSync(run)).toBe(true)
+  })
+
+  it('gives nothing for an area that is not there', () => {
+    expect(pruneRunTemps((p) => nobody.protects(p), { now, area: join(dir('hive-run-area-'), 'none') })).toEqual([])
+  })
+
+  it("the run's folder is the temp folder of what it starts (TEMP, TMP, TMPDIR), in the e2e and scenario runners too", () => {
+    if (process.env.LOCALAPPDATA) expect([process.env.TEMP, process.env.TMP, process.env.TMPDIR]).toEqual([tempRoot(), tempRoot(), tempRoot()])
+    expect(basename(tempRoot())).toMatch(/^run-\d+-/)
+    // The runners make theirs before they start anything, and remove it as they exit; their children get it (ALLOW).
+    for (const runner of ['e2e/run.mjs', 'scenarios/run.mjs']) {
+      const text = readFileSync(join(here, runner), 'utf8')
+      expect(text, runner).toMatch(/^import \{ endRunTemp, startRunTemp \} from '\.\.\/runTemp\.mts'$/m)
+      // With the board's rules, once the runner has found the board readable (it doesn't start otherwise).
+      const start = text.search(/startRunTemp\((\(p\) => evidence\.protects\(p\)|spare)\)/)
+      expect(start, runner).toBeGreaterThan(text.indexOf('if (!evidence.ok)'))
+      expect(start, runner).toBeLessThan(text.search(/\bspawn(Sync)?\(|require\('\.\/harness\.cjs'\)/))
+      expect(text, runner).toMatch(/process\.on\('exit'[^]*?endRunTemp\(\)/)
+    }
+    // Playwright takes the temp folder as it loads (its playwright-artifacts-* folders): the scenario harness runs it in
+    // the runner's process, so the runner's folder comes before lib.cjs loads it; the e2e runner runs it only in suites.
+    const scenarios = readFileSync(join(here, 'scenarios/run.mjs'), 'utf8')
+    expect(scenarios.indexOf('startRunTemp(spare)')).toBeLessThan(scenarios.indexOf("require('../e2e/lib.cjs')"))
+    expect(readFileSync(join(here, 'e2e/run.mjs'), 'utf8')).not.toMatch(/_electron|\blib\.launch\(/)
+    expect(createRequire(__filename)('./e2e/runContext.cjs').ALLOW).toEqual(expect.arrayContaining(['TEMP', 'TMP', 'TMPDIR']))
   })
 })
 

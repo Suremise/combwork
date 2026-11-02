@@ -3,6 +3,7 @@ import { createRequire } from 'module'
 import { load } from 'js-yaml'
 import { describe, expect, it } from 'vitest'
 import { APP_NAME, DEV_APP_NAME, appName, profileFolder } from '../src/shared/appName'
+import { RELEASES_REPO } from '../src/shared/defaults'
 
 // #443: the app is displayed as "Hive Desktop", and nothing users have stored moves. These pin the names Windows and
 // the installer use, so a change to productName or electron-builder can't move the profile or install folder.
@@ -27,6 +28,7 @@ describe('the app name (#443)', () => {
     expect(builder.win.executableName).toBe('Hive')
     expect(builder.nsis.artifactName).toBe('Hive-Setup-${version}.${ext}')
     expect(builder.publish).toMatchObject({ owner: 'Suremise', repo: 'hive-desktop' })
+    expect(builder.publish).toMatchObject(RELEASES_REPO) // the updater's feed (HI-2311)
     // electron-updater's download cache (%LOCALAPPDATA%\hive-updater) is named after package.json's name.
     expect(pkg.name).toBe('hive')
   })

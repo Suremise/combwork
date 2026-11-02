@@ -3,6 +3,9 @@
 // no agent tool or Agent API route for any of it.
 import { msg, tr, type Msg } from './i18n'
 import { listOf, shownText, withValues, type Text } from './advanced'
+import type { PlatformId } from './platform/descriptors'
+import { queueShown } from './progressQueue'
+import type { QueueView } from './workflow/queue'
 
 /** A merge, rebase or other operation git has in progress in the folder. */
 export type GitRepoState = 'merge' | 'rebase' | 'cherry-pick' | 'revert' | 'bisect'
@@ -61,12 +64,106 @@ export interface GitBranchRow {
   /** Its last commit's time (ms). */
   date: number
   subject: string
+  /** The remote its upstream is on (#1385: Remove remote names the branches tracking it), or null: none, or a local branch. */
+  upstreamRemote?: string | null
+  /** Its commit, whole: what a deletion is checked against (#1642). */
+  sha?: string
+  /** Its commits not in the project's target (#1642): 0 merged into it, null not counted (no target, or too many to count). */
+  toTarget?: number | null
+  /** The target's commits it hasn't (HI-1180: Update from <target> while it has its own work too); null not counted. */
+  fromTarget?: number | null
 }
+
+/**
+ * What Update from <target> would do to a branch (HI-1180), as its dialog says it: where it runs, whose card's line it is,
+ * who works there, whether a pass carries over, and why it can't run now.
+ */
+export interface BranchUpdatePlan {
+  branch: string
+  target: string
+  /** The target's commits the branch hasn't, and its own commits the target hasn't. */
+  behind: number
+  ahead: number
+  /** Where it runs: the folder the branch is checked out in; a temporary one Hive makes when it is checked out nowhere. */
+  where: 'project' | 'slot' | 'worktree' | 'temporary'
+  folder: string | null
+  slot: string | null
+  /** The card whose line it is, while that card isn't Done. */
+  card: { key: string; stage: string } | null
+  /** Agents working in that folder, none of them in a turn (one in a turn blocks it), each with its status. */
+  agents: { name: string; status: string | null }[]
+  /** A passed card's pass: kept when the update is the same change ("A pass survives a clean rebase"), else reviewed again. */
+  approval: 'carries' | 'reviewAgain' | null
+  /** It tracks a remote branch: a rebase rewrites commits pushed there. */
+  pushed: boolean
+  /** Why it can't run now, in the window's language; null when it can. */
+  blocked: string | null
+}
+
+/** How Update from <target> brings a branch up to date (HI-1180). */
+export type BranchUpdateHow = 'merge' | 'rebase'
+
+/** A remote branch as Branches & remotes groups it (#1642). */
+export interface GitRemoteBranchRow {
+  /** As git names it: nas/hive/hb1. */
+  name: string
+  remote: string
+  /** On the remote: hive/hb1. */
+  branch: string
+  sha: string
+  date: number
+  /** As GitBranchRow's. */
+  toTarget: number | null
+  /** The remote's own default branch (its HEAD), never offered for deletion. */
+  remoteHead: boolean
+}
+
+/** What a deletion of branches (#1642) is given for each: its name and the commit the user saw it at. */
+export interface BranchAt {
+  name: string
+  sha: string
+}
+
+/** The commits deleting an unmerged branch drops (#1642): the newest few, and how many in all. */
+export interface BranchDrops {
+  target: string
+  total: number
+  commits: { short: string; subject: string; date: number }[]
+}
+
+/** What a push did to one ref (#1385), from `git push --porcelain`. */
+export interface PushedRef {
+  /** The branch or tag as the remote has it (refs/heads/ and refs/tags/ left off). */
+  name: string
+  kind: 'branch' | 'tag' | 'other'
+  result: 'pushed' | 'upToDate' | 'refused'
+}
+
+/**
+ * `git push --porcelain`'s lines, one per ref (`<flag>\t<from>:<to>\t<summary>`): `=` up to date, `!` refused (rejected
+ * by the remote, or not a fast-forward: Hive never forces), anything else pushed. Other lines (To …, Done) are skipped.
+ */
+export function parsePushPorcelain(out: string): PushedRef[] {
+  const refs: PushedRef[] = []
+  for (const line of out.split(/\r?\n/)) {
+    const m = /^([ +\-*!=])\t[^\t]*:([^\t]+)\t/.exec(line)
+    if (!m) continue
+    const to = m[2]
+    const kind = to.startsWith('refs/heads/') ? 'branch' : to.startsWith('refs/tags/') ? 'tag' : 'other'
+    refs.push({ name: to.replace(/^refs\/(heads|tags)\//, ''), kind, result: m[1] === '=' ? 'upToDate' : m[1] === '!' ? 'refused' : 'pushed' })
+  }
+  return refs
+}
+
+/** What Push to… pushes (#1385): the branch checked out, or every branch and tag. */
+export type PushScope = 'branch' | 'all'
 
 export interface GitWorktreeRow {
   path: string
   branch: string | null
   head: string | null
+  /** One of Hive's own (HI-1710): a review copy, or the merge queue's folder. Never an unused worktree, never removed here. */
+  hive?: 'copy' | 'queue'
 }
 
 export interface GitIdentityPart {
@@ -91,6 +188,12 @@ export interface GitRepoInfo {
   /** The repository's other worktrees (agents' and unused ones): shown, never changed here. */
   worktrees: GitWorktreeRow[]
   identity: GitIdentity
+  /** The branch the project's work merges into (its workflow's target, else the default branch) when it exists (#1642). */
+  target?: string | null
+  /** The repository's default branch (main or master, else the folder's). */
+  defaultBranch?: string | null
+  /** The remote branches with their state (#1642), as remoteBranches. */
+  remoteRows?: GitRemoteBranchRow[]
 }
 
 export interface GitCommitRow {
@@ -117,23 +220,119 @@ export interface GitTagRow {
 }
 
 export interface GitHistory {
-  /** The project folder's last commits, newest first (HISTORY_COMMITS). */
+  /** A page of the branch's commits, newest first (HISTORY_COMMITS a page). */
   commits: GitCommitRow[]
+  /** The branch shown, named whole (refs/heads/x, refs/remotes/origin/x), null for a detached HEAD (#1643). */
+  ref: string | null
+  /** What it shows unless another is chosen, named whole: the project's target when it is a branch here, else the folder's. */
+  defaultRef: string | null
+  /** The project's target when it is a branch here. */
+  target: string | null
+  /** The branches it can show, by name: local, and remote ones. */
+  branches: string[]
+  remoteBranches: string[]
+  /** Which page, of how many, of how many commits in all. */
+  page: number
+  pages: number
+  total: number
   /** Newest first, at most HISTORY_TAGS. */
   tags: GitTagRow[]
   /** Tags not listed. */
   moreTags: number
 }
 
+/**
+ * Every local branch as the Changes tab's leftover branches read them (HI-1823): uncut, each with its worktree and its
+ * commits not in the target (0: merged, as git said; null: not counted or unknown, never taken for merged).
+ */
+export interface LeftoverInfo {
+  isRepo: boolean
+  branches: GitBranchRow[]
+  target: string | null
+  defaultBranch: string | null
+  /** Branches whose commits not in the target aren't known (past the ones counted, or a read that failed). */
+  uncounted: number
+}
+
+/** A local branch the Changes tab can compare (HI-1824), and the folder it is checked out in, if any. */
+export interface CompareBranch {
+  name: string
+  folder: string | null
+}
+
+/** What the Changes tab can compare (HI-1824): the local branches, the main line, and the project's integration line. */
+export interface CompareLines {
+  isRepo: boolean
+  /** Git can't run (#346): nothing else is known. */
+  gitProblem?: string
+  /** By name. */
+  branches: CompareBranch[]
+  /** The repository's default branch, when it is a local branch. */
+  main: string | null
+  /** The project's target (G7) when it is a local branch other than main: the comparison shown by default. */
+  integration: string | null
+  /** The project's slots whose folder has a branch checked out, by name (free ones and blocked cards' included). */
+  slots: CompareSlot[]
+}
+
+/** A slot as the Changes tab's picker lists it (HI-1824): its branch, and its lease's card and agent when it is lent. */
+export interface CompareSlot {
+  name: string
+  folder: string
+  branch: string
+  card: number | null
+  agent: string | null
+  /** The branch its lines merge into, when the pool knows it. */
+  target: string | null
+}
+
+/** A file `head` changes since it left `base`, as git's name-status letter. */
+export interface CompareFile {
+  path: string
+  status: string
+}
+
+/** Two branches compared (HI-1824): read-only, nothing checked out. */
+export interface GitComparison {
+  base: string
+  head: string
+  /**
+   * The commits compared: each branch's tip as this comparison read it. A file's diff is asked for these (never the
+   * branches' tips then), so it belongs to the counts and files shown even if a branch has moved since.
+   */
+  baseCommit: string
+  headCommit: string
+  /** Where head left base; null when they share no history (the files are then base's tip against head's). */
+  mergeBase: string | null
+  /** Head's commits base hasn't, and base's head hasn't. */
+  ahead: number
+  behind: number
+  /** A page of each side's commits, newest first (COMPARE_COMMITS a page). */
+  aheadCommits: GitCommitRow[]
+  behindCommits: GitCommitRow[]
+  page: number
+  pages: number
+  /** The files head changes since it left base, by path, at most COMPARE_FILES; `filesTotal` counts them all. */
+  files: CompareFile[]
+  filesTotal: number
+}
+
+/** The Changes tab's comparison: commits a page, and files listed at most (HI-1824). */
+export const COMPARE_COMMITS = 50
+export const COMPARE_FILES = 5000
+
+/** Git → History's commits a page (#1643). */
 export const HISTORY_COMMITS = 20
 export const HISTORY_TAGS = 50
 /** Branches listed (local and remote, each); the rest are counted. */
 export const BRANCHES_SHOWN = 200
 
 const M = {
+  workflow: msg({ id: 'git.section.workflow', defaultMessage: 'Workflow', description: "The Version Control tab's section with the project's workflow options (glossary 2.1: workflow)." }),
   changes: msg({ id: 'git.section.changes', defaultMessage: 'Changes', description: "The Git tab's section with the uncommitted changes." }),
   history: msg({ id: 'git.section.history', defaultMessage: 'History', description: "The Git tab's section with the last commits and the tags." }),
   branches: msg({ id: 'git.section.branches', defaultMessage: 'Branches & remotes', description: "The Git tab's section with the branch, branches, remotes, worktrees and commit identity." }),
+  queue: msg({ id: 'git.section.queue', defaultMessage: 'Merge queue', description: "The Git tab's section with the project's merge queues (#1357): each target's queue now, its history, Pause and Resume. Glossary 2.5: merge queue." }),
   agentBusy: msg({
     id: 'git.busy.agent',
     defaultMessage:
@@ -148,7 +347,7 @@ const M = {
   noCommitsYet: msg({ id: 'git.head.noCommits', defaultMessage: 'no commits yet', description: "What the project folder has checked out in a repository with no commit yet. Lower case: also in the status bar." }),
   aheadBehind: msg({ id: 'git.status.aheadBehind', defaultMessage: '↑{ahead, number} ↓{behind, number}', description: 'Status bar and Git → Branches & remotes: how many commits a branch is ahead of the remote branch it tracks (↑, to push) and behind it (↓, to pull), "↑2 ↓0". Keep the arrows and the order.' }),
   upstreamGone: msg({ id: 'git.upstream.gone', defaultMessage: 'upstream gone', description: 'In place of the ahead/behind counts: the remote branch a branch tracked was deleted on the remote.' }),
-  parentRepo: msg({ id: 'git.parentRepo', defaultMessage: "This project is inside the git repository in {folder}, so the Git view only shows it: Hive changes only a project's own repository.", description: "Banner in the Git tab of a project whose folder is inside another repository (a workspace kept in git). {folder} is that repository's folder." }),
+  parentRepo: msg({ id: 'git.parentRepo', defaultMessage: "This project is inside the git repository in {folder}, so the Version Control tab only shows it: Hive changes only a project's own repository.", description: "Banner in the Version Control tab of a project whose folder is inside another repository (a workspace kept in git). {folder} is that repository's folder." }),
   noUpstream: msg({ id: 'git.status.noUpstream', defaultMessage: 'no upstream', description: 'Status bar, after the branch: it tracks no remote branch ("main · no upstream").' }),
   tipOn: msg({ id: 'git.tip.on', defaultMessage: 'On {branch}', description: "First line of the status bar's git tooltip: the branch checked out." }),
   tipDetached: msg({ id: 'git.tip.detached', defaultMessage: 'HEAD is detached at {commit}', description: "First line of the status bar's git tooltip. {commit} is a short commit hash." }),
@@ -160,7 +359,7 @@ const M = {
   tipNoRemotes: msg({ id: 'git.tip.noRemotes', defaultMessage: 'No remotes.', description: "The status bar's git tooltip: the repository has no remote." }),
   tipFetched: msg({ id: 'git.tip.fetched', defaultMessage: 'As of the last fetch, {when}. Hive never fetches by itself.', description: 'The status bar\'s git tooltip. {when} is how long ago, such as "5m ago".' }),
   tipNeverFetched: msg({ id: 'git.tip.neverFetched', defaultMessage: 'Never fetched: Hive never fetches by itself.', description: "The status bar's git tooltip, when the repository was never fetched." }),
-  tipClick: msg({ id: 'git.tip.click', defaultMessage: 'Click for Git → Branches & remotes.', description: "Last line of the status bar's git tooltip. Git → Branches & remotes is the tab and its section: keep them as they are named there." }),
+  tipClick: msg({ id: 'git.tip.click', defaultMessage: 'Click for Version Control → Branches & remotes.', description: "Last line of the status bar's git tooltip. Version Control → Branches & remotes is the tab and its section: keep them as they are named there." }),
   identityMissing: msg({ id: 'git.identity.missing', defaultMessage: 'Git has no {missing, select, both {user.name or user.email} name {user.name} other {user.email}} for this repository, so commits fail. Set them here (or in your global git config).', description: 'Warning in Git → Branches & remotes → Commit identity. user.name and user.email are git settings: keep them.' }),
   identityPublic: msg({ id: 'git.identity.public', defaultMessage: "Commits pushed to GitHub show {email} to anyone who reads them. GitHub's no-reply address (…@users.noreply.github.com, in GitHub's email settings) keeps your address private.", description: 'Warning in Git → Branches & remotes → Commit identity. {email} is the address commits are made as.' }),
   enterName: msg({ id: 'git.validate.enterName', defaultMessage: 'Enter a name', description: "Under a form's name box (a remote, a branch, a tag) while it is empty." }),
@@ -172,13 +371,38 @@ const M = {
   notEmail: msg({ id: 'git.validate.notEmail', defaultMessage: "That isn't an email address", description: 'Under a commit identity form.' })
 }
 
-/** The Git tab's sections. */
-export const GIT_SECTIONS: readonly { id: 'changes' | 'history' | 'branches'; label: Msg; icon: string }[] = [
+/** The Version Control tab's sections (#1416, SPEC §16.6): Workflow, then the platform's own. */
+export const VC_SECTIONS: readonly { id: 'workflow' | 'changes' | 'history' | 'branches' | 'queue'; label: Msg; icon: string }[] = [
+  { id: 'workflow', label: M.workflow, icon: 'git-pull-request' },
   { id: 'changes', label: M.changes, icon: 'git-compare' },
   { id: 'history', label: M.history, icon: 'history' },
-  { id: 'branches', label: M.branches, icon: 'git-branch' }
+  { id: 'branches', label: M.branches, icon: 'git-branch' },
+  { id: 'queue', label: M.queue, icon: 'git-merge' }
 ]
-export type GitSection = (typeof GIT_SECTIONS)[number]['id']
+export type VcSection = (typeof VC_SECTIONS)[number]['id']
+
+/** Each platform's own sections, after Workflow: None has none of its own. */
+const PLATFORM_SECTIONS: Record<PlatformId, readonly VcSection[]> = {
+  git: ['changes', 'history', 'branches', 'queue'],
+  none: []
+}
+
+/**
+ * The sections the tab shows (#1416): Workflow, then the platform's own; and Merge queue while an old Git ruleset's queue
+ * is still there (#1356's rule from the project's queues' actual state, `queueShown`), whatever the platform is now,
+ * until that state is clear.
+ */
+export function vcSections(platform: PlatformId, queues: readonly QueueView[], now: number): VcSection[] {
+  const own = PLATFORM_SECTIONS[platform]
+  const queue = queues.some((v) => queueShown(v, now))
+  return ['workflow', ...own, ...(queue && !own.includes('queue') ? (['queue'] as const) : [])]
+}
+
+/** The section a project opens at when none is kept (or the kept one isn't shown): Changes for Git, else Workflow. */
+export function vcSectionShown(kept: VcSection | undefined, shown: readonly VcSection[]): VcSection {
+  if (kept && shown.includes(kept)) return kept
+  return shown.includes('changes') ? 'changes' : 'workflow'
+}
 
 /** The actions refused while an agent works in the project folder or holds its merge slot. */
 export type GitFolderAction = 'switch' | 'create' | 'pull'
@@ -402,6 +626,6 @@ export function identityProblemData(name: string, email: string): Text | null {
 /** identityProblemData in the language shown (a dialog's check). */
 export const identityProblem = (name: string, email: string): string | null => inLanguage(identityProblemData(name, email))
 
-/** The user guide's heading for this view. */
-// i18n-ignore: a user guide heading, found by its English text
-export const GIT_VIEW_GUIDE = 'Git view'
+/** The id of the user guide's heading for this view. */
+// i18n-ignore: a user guide heading's id (#1535)
+export const GIT_VIEW_GUIDE = 'version-control-tab'

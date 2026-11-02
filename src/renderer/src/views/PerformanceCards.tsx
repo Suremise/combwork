@@ -8,7 +8,7 @@ import { call } from '../api'
 import { InfoTip, LoadFailed, Tooltip } from '../components/ui'
 import { CellLines, DataTable, type DataColumn } from '../components/DataTable'
 import { COST_NOTE_TEXT } from '../components/CardCost'
-import { set, useLanguage } from '../store'
+import { cardLabelOf, get, set, useLanguage } from '../store'
 import { useScopedLoad } from '../scopedLoad'
 import { formatDateTime } from '@shared/dates'
 
@@ -29,9 +29,9 @@ const M = {
   cost: msg({ id: 'performance.cards.cost', defaultMessage: 'Cost', description: "Column header of the Performance page's Cards table: the card's whole cost." }),
   lastHeld: msg({ id: 'performance.cards.lastHeld', defaultMessage: 'Last held', description: "Column header of the Performance page's Cards table: when an agent last held the card (a date and time)." }),
   heading: msg({ id: 'performance.cards.heading', defaultMessage: 'Cards', description: "Heading of the Performance page's table of what each card cost." }),
-  tip: msg({ id: 'performance.cards.tip', defaultMessage: "Each card its agents held in the last {range, select, 24h {24 hours} 7d {7 days} other {30 days}}: what its builder used while it was in Doing and its reviewer from the review's start to its verdict, as the providers reported it (each card's whole cost, as Provider usage counts whole sessions). ≈ is Hive's estimate; Unknown is what isn't known, never {zero}. Tokens on hover. What a lane's agents used holding no card is its overhead, on the lane's hover in the Progress panel.", description: 'Info tip beside the Cards heading of the Performance page. Doing is a board column, Provider usage a section of the page and Progress a panel: keep them as Hive names them. Keep ≈, and use the same word for Unknown as the costs do. {zero} is no cost, as costs show it ("$0.00"). {range} (24h, 7d or 30d) is a key: don\'t translate the keys, only the texts.' }),
+  tip: msg({ id: 'performance.cards.tip', defaultMessage: "Each card its agents held in the last {range, select, 24h {24 hours} 7d {7 days} other {30 days}}: what its builder used while it was in Active and its reviewer from the review's start to its verdict, as the providers reported it (each card's whole cost, as Provider usage counts whole sessions). ≈ is Hive's estimate; Unknown is what isn't known, never {zero}. Tokens on hover. What a lane's agents used holding no card is its overhead, on the lane's hover in the Progress panel.", description: 'Info tip beside the Cards heading of the Performance page. Active is a board column, Provider usage a section of the page and Progress a panel: keep them as Hive names them. Keep ≈, and use the same word for Unknown as the costs do. {zero} is no cost, as costs show it ("$0.00"). {range} (24h, 7d or 30d) is a key: don\'t translate the keys, only the texts.' }),
   loadTarget: msg({ id: 'performance.cards.loadTarget', defaultMessage: 'the cost of cards', description: 'What could not be read on the Performance page: shown in "Could not load {what}: {error}".' }),
-  open: msg({ id: 'performance.cards.open', defaultMessage: 'Open #{number}', description: "Name, for screen readers, of a row of the Performance page's Cards table: opens that card. {number} is the card's number (keep the #)." }),
+  open: msg({ id: 'performance.cards.open', defaultMessage: 'Open {number}', description: "Name, for screen readers, of a row of the Performance page's Cards table: opens that card. {number} is the card’s name: its key, such as AM-12, or #12 for a card with none (keep the #)." }),
   empty: msg({ id: 'performance.cards.empty', defaultMessage: 'No card was held in the last {range, select, 24h {24 hours} 7d {7 days} other {30 days}}.', description: "The Performance page's Cards table when it has no rows. {range} (24h, 7d or 30d) is a key: don't translate the keys, only the texts." })
 }
 
@@ -67,11 +67,11 @@ const cardColumns = (withProject: boolean): DataColumn<CardCost>[] => [
     header: tr(M.card),
     cell: (c) => (
       <span className="perf-card-title">
-        #{c.number} {c.title}
+        {cardLabelOf(get(), c.number)} {c.title}
       </span>
     ),
     sortValue: (c) => c.number,
-    filter: { kind: 'text', value: (c) => `#${c.number} ${c.title}` }
+    filter: { kind: 'text', value: (c) => `${cardLabelOf(get(), c.number)} ${c.title}` }
   },
   ...(withProject ? [{ key: 'project', header: tr(M.project), cell: (c: CardCost) => c.project || '—', sortValue: (c: CardCost) => c.project.toLowerCase(), filter: { kind: 'choice' as const, value: (c: CardCost) => c.project } }] : []),
   { key: 'column', header: tr(M.column), cell: (c) => columnName(c.column, tr), sortValue: (c) => c.column, filter: { kind: 'choice', value: (c) => c.column }, choiceLabel: (v) => columnName(v as CardCost['column'], tr) },
@@ -109,7 +109,7 @@ export function CardsTable({ workspacePath, project, from, to, range, refreshAt 
           rowKey={(c) => String(c.number)}
           defaultSort={{ key: 'cost', desc: true }}
           onRowClick={(c) => set({ taskOpen: c.number })}
-          rowLabel={(c) => tr(M.open, { number: c.number })}
+          rowLabel={(c) => tr(M.open, { number: cardLabelOf(get(), c.number) })}
           empty={tr(M.empty, { range })}
         />
       )}

@@ -1,7 +1,19 @@
 {
+  "errors.assistantUndo.gone": {
+    "defaultMessage": "That change of the Assistant's is no longer kept: changes are kept for 7 days.",
+    "description": "An error: the user asked to undo a change the Hive Assistant made, but it is older than 7 days (or was never kept), so it can't be undone any more."
+  },
+  "errors.assistantUndo.which": {
+    "defaultMessage": "Choose one change of the Assistant's to undo, or one message's changes.",
+    "description": "An error: the window asked to undo the Hive Assistant's changes without saying which: one change, or all the changes made for one of the user's messages."
+  },
   "errors.changes.notFile": {
     "defaultMessage": "{file} isn't a file of {folder}.",
     "description": "Changes tab: opening a file outside the folder it shows. {file} is the file, {folder} the folder."
+  },
+  "errors.commands.otherWorkspace": {
+    "defaultMessage": "This window shows another workspace now, so the commands you changed weren't saved.",
+    "description": "An error: the user changed a workspace's commands in Settings (HI-1954), and the window switched to another workspace before the change was saved, so Hive didn't save it into the wrong one."
   },
   "errors.console.hidden": {
     "defaultMessage": "The developer console is hidden: turn on Settings → Advanced → Show developer features.",
@@ -115,6 +127,10 @@
     "defaultMessage": "Not an image",
     "description": "Copy image: the file isn't an image Hive can read."
   },
+  "errors.lane.builderRequired": {
+    "defaultMessage": "A lane's builder is required",
+    "description": "Starting a lane (a card loop) without saying which agent builds it (a programming error, rarely seen)."
+  },
   "errors.lane.required": {
     "defaultMessage": "Which lane to end is required",
     "description": "Ending a card loop without saying which (a programming error, rarely seen)."
@@ -134,6 +150,10 @@
   "errors.log.notText": {
     "defaultMessage": "Hive opens only text logs and reports, not {file}: use Show in folder.",
     "description": "Progress panel: a run's log isn't a text file, so Hive won't open it. {file} is its file name. \"Show in folder\" is the menu item beside it."
+  },
+  "errors.merge.queueMerges": {
+    "defaultMessage": "Hive merges {card} through the merge queue. Merge it there, or choose Merge anyway in the Merge dialog.",
+    "description": "Refusal of a Merge of an agent's branch whose card Hive's merge queue merges (the dialog's state was out of date). {card} is the card's key. Merge anyway is a button: keep it as Hive shows it. Glossary 2.5: merge queue."
   },
   "errors.mergeSlot.holdRequired": {
     "defaultMessage": "Which hold to release is required",

@@ -51,6 +51,8 @@ async function start() {
 ;(async () => {
   for (const d of [userData, ws, claudeHome]) fs.rmSync(d, { recursive: true, force: true })
   fs.mkdirSync(claudeHome, { recursive: true })
+  // Every read of the agents' input recorded, for typeLine (#1560).
+  lib.logFakeInput(claudeHome)
   lib.gitProject(alpha)
   lib.enableProviders(userData)
   const cfgFile = path.join(userData, 'config.json')
@@ -71,9 +73,8 @@ async function start() {
   const wakes = () => wakeLog().map((w) => w.text)
   const bells = () => wakeLog().map((w) => w.doorbell ?? '')
   const say = async (id, text) => {
-    await inv('pty:write', lib.ptyKey(alpha, id), text)
-    await lib.sleep(300)
-    await inv('pty:write', lib.ptyKey(alpha, id), '\r')
+    // Typed again if a wake of Hive's disturbed it (lib.typeLine, #1560).
+    await lib.typeLine(inv, lib.ptyKey(alpha, id), claudeHome, null, text, { live: () => live(alpha, id) })
   }
   const idle = async (id) => ['ready', 'finished'].includes((await live(alpha, id))?.status)
   /** What the agent's hive tool calls got back (its transcript's tool results), for the inbox's replies. */
@@ -134,7 +135,7 @@ async function start() {
   // A message left now is told at once; had m1 been offered after it was received, its doorbell would name it too.
   const second = tool('hive_message_agent', { project: 'alpha', agent: 'Builder', text: 'Then take #2.' })
   check('a message for the idle builder is told at once', !second.isError && second.text === 'Told Builder now (m2): it reads it with hive_inbox.', second.text)
-  check('…its doorbell names it by id, never its text (#650)', !!(await until(() => bells().includes('[Hive] New in your inbox: 1 message (m2). Call hive_inbox to read it.'), HUNG_MS)), JSON.stringify(bells()))
+  check('…its doorbell names it by id, never its text (#650)', !!(await until(() => bells().includes('[Hive] New in your inbox: 1 message (m2). Call hive_inbox to read it, act on it, then ack it.'), HUNG_MS)), JSON.stringify(bells()))
   check('…and the builder reads it in its inbox', !!(await until(() => wakes().includes('Then take #2.'), HUNG_MS)), JSON.stringify(wakes()))
   check('…the message it had fetched is never offered again', !wakes().some((t) => t.includes('Rebase on main')) && !bells().some((t) => /\bm1\b/.test(t)), JSON.stringify(wakeLog()))
   check('…offered (its doorbell typed), and received once it read it', !!(await until(async () => wakes().length > 0 && delivery('m2')?.state === 'received' && (await idle(builder.id)), HUNG_MS)) && delivery('m2')?.receivedVia === 'inbox' && !!delivery('m2')?.offered, JSON.stringify(delivery('m2')))

@@ -5,6 +5,16 @@
   --mono: var(--font-mono);
 }
 
+/* The spacing scale (#1306): padding, gaps and the space between sections come from these, not from whatever margin an
+   element happens to bring. */
+:root {
+  --space-1: 4px;
+  --space-2: 8px;
+  --space-3: 12px;
+  --space-4: 16px;
+  --space-6: 24px;
+}
+
 /* ==========================================================================
    Hive — theme tokens. Honey orange replaces VS Code blue as the accent.
    ========================================================================== */
@@ -227,6 +237,39 @@ pre,
   font-family: 'Cascadia Code', 'Cascadia Mono', Consolas, 'Courier New', monospace;
 }
 
+/* A command or path with its Copy button (#1204, CopyableCode): the code may wrap, the button stays beside its end. */
+.copy-code {
+  overflow-wrap: anywhere;
+}
+.copy-code-btn {
+  display: inline-flex;
+  align-items: center;
+  vertical-align: middle;
+  margin-left: 3px;
+  padding: 1px 3px;
+  border: 0;
+  border-radius: 4px;
+  background: transparent;
+  color: var(--fg-muted);
+  cursor: pointer;
+  font-size: 12px;
+}
+.copy-code-btn:hover {
+  background: var(--bg-hover);
+  color: var(--fg-strong);
+}
+.copy-code-btn:focus-visible {
+  outline: 1px solid var(--accent);
+}
+.copy-code-btn .codicon {
+  font-size: 13px;
+}
+.copy-code-done {
+  margin-left: 4px;
+  color: var(--success);
+  font-size: 11px;
+}
+
 kbd {
   display: inline-block;
   padding: 1px 6px;
@@ -285,7 +328,8 @@ kbd {
 
 .main-area {
   flex: 1;
-  min-width: 0;
+  /* The work keeps its room while it can (HI-1737): layoutRoom.ts sets the least width the window leaves it. */
+  min-width: var(--main-min, 0px);
   display: flex;
   flex-direction: column;
   background: var(--bg);
@@ -373,9 +417,15 @@ kbd {
   color: var(--accent-ink);
 }
 
+/* Its natural width wherever it opens (#1329): a fixed box with only `left` set is as wide as the room between its left
+   edge and the window's right (shrink-to-fit), so one opened near that edge wrapped its descriptions into a narrow
+   column, and ContextMenu, measuring it there, moved it left by that narrow width. Narrower only in a window narrower
+   than the menu, where it wraps (.menu-text). */
 .menu {
   position: fixed;
   z-index: 1000;
+  width: max-content;
+  max-width: calc(100vw - 16px);
   min-width: 240px;
   background: var(--bg-elevated);
   border: 1px solid var(--border);
@@ -445,11 +495,23 @@ kbd {
 /* ---------- Activity bar ---------- */
 .activitybar {
   width: 48px;
+  /* Never narrowed for the room (HI-2180): squeezed, the sidebar and its resizer lay over its buttons (the Projects list
+     expanded in a narrow window, or the moment before it folds to its rail). The sidebar and panels give way instead. */
+  flex-shrink: 0;
   background: var(--bg-activity);
   display: flex;
   flex-direction: column;
   align-items: center;
   border-right: 1px solid var(--border-subtle);
+  /* Never past the status bar (HI-1957): a short window (thirteen buttons since HI-1664 need 624 px) shortens them,
+     then scrolls them (the wheel; no scroll bar in 48 px). */
+  min-height: 0;
+  overflow-y: auto;
+  scrollbar-width: none;
+}
+.activitybar > .tip-wrap {
+  flex: 0 1 48px;
+  min-height: 32px;
 }
 .activity-btn {
   width: 48px;
@@ -462,6 +524,9 @@ kbd {
   cursor: pointer;
   border: none;
   background: none;
+}
+.activitybar > .tip-wrap > .activity-btn {
+  height: auto;
 }
 .activity-btn .codicon {
   font-size: 24px;
@@ -557,7 +622,10 @@ kbd {
   border-right: 1px solid var(--border-subtle);
   display: flex;
   flex-direction: column;
-  min-width: 200px;
+  /* Narrowed for the work only once the side panels have given way (their shrink far outweighs this one), down to its
+     least width (HI-1737); a drag still keeps it 200 px or more. */
+  flex-shrink: 1;
+  min-width: 160px;
   max-width: 600px;
   position: relative;
 }
@@ -609,7 +677,7 @@ kbd {
   display: flex;
   align-items: center;
   gap: 4px;
-  padding: 4px 8px 4px 6px;
+  padding: var(--space-1) var(--space-2) var(--space-1) 6px;
   font-size: 11px;
   font-weight: 700;
   text-transform: uppercase;
@@ -617,6 +685,35 @@ kbd {
   color: var(--fg);
   cursor: pointer;
   border-top: 1px solid var(--border-subtle);
+}
+/* A section owns the space before the next one (#1306): the same gap above each header that follows content, whatever
+   that content ends with (a hint's margin, a link row, a list); stacked headers (folded sections) stay together. */
+:not(.section-header):has(+ .section-header) {
+  margin-bottom: 0;
+}
+.pane-empty:has(+ .section-header) {
+  padding-bottom: 0;
+}
+/* The same between sections each wrapped in an element of its own, its header first (the Memory tab's groups): the
+   gap above a group's header after another group, and a group's last item bringing no space of its own (whether or not
+   a group follows: nothing nested in :has(), which Chromium refuses, and a last group's end has nothing after it). A
+   panel's scrolling body that starts with a section isn't a group: what ends it (Skills' hint) keeps its space. */
+:has(> .section-header:first-child) + :has(> .section-header:first-child) > .section-header:first-child {
+  margin-top: var(--space-3);
+}
+:not(.pane-body):has(> .section-header:first-child) > :last-child:not(.section-header) {
+  margin-bottom: 0;
+}
+:not(.pane-body):has(> .section-header:first-child) > .pane-empty:last-child {
+  padding-bottom: 0;
+}
+:not(.section-header) + .section-header {
+  margin-top: var(--space-3);
+}
+/* A heading inside a list (Performance's Projects, the Board's Stalled), with no fold chevron: its text on the rows'
+   left edge, not left of it. */
+.section-header:not(:has(> .codicon:first-child)) {
+  padding-left: var(--space-4);
 }
 .section-header .section-actions {
   margin-left: auto;
@@ -636,7 +733,7 @@ kbd {
   overflow-x: hidden;
 }
 .pane-empty {
-  padding: 16px 20px;
+  padding: var(--space-4) 20px;
   color: var(--fg-muted);
   line-height: 1.6;
 }
@@ -652,7 +749,7 @@ kbd {
   align-items: center;
   gap: 6px;
   height: 26px;
-  padding: 0 8px 0 16px;
+  padding: 0 var(--space-2) 0 var(--space-4);
   cursor: pointer;
   color: var(--fg);
   position: relative;
@@ -720,6 +817,12 @@ kbd {
 }
 .row:hover .row-actions {
   display: flex;
+}
+/* A Hive skill's Delivered to agents switch (#1431): always shown, after the hover actions. */
+.skill-row .skill-delivered {
+  display: flex;
+  align-self: center;
+  margin-left: 6px;
 }
 .row.tall {
   height: auto;
@@ -890,6 +993,15 @@ kbd {
   font-weight: 600;
   color: var(--fg-strong);
 }
+/* A 3- or 4-letter key (#1221) fits the tile without widening the rail. */
+.rail-initials-3 {
+  font-size: 10.5px;
+  letter-spacing: -0.2px;
+}
+.rail-initials-4 {
+  font-size: 9px;
+  letter-spacing: -0.4px;
+}
 .rail-project .dot {
   position: absolute;
   right: -2px;
@@ -918,15 +1030,15 @@ kbd {
 .rail-tip .agents-table {
   margin-top: 6px;
 }
-.table.agents-table {
+.table.item-table {
   width: auto;
   font-size: 12px;
 }
-.table.agents-table th {
+.table.item-table th {
   padding: 2px 8px 3px;
   font-size: 10.5px;
 }
-.table.agents-table td {
+.table.item-table td {
   padding: 3px 8px;
   white-space: nowrap;
 }
@@ -935,14 +1047,14 @@ kbd {
   padding-top: 1px;
   padding-bottom: 1px;
 }
-.table.agents-table th:first-child,
-.table.agents-table td:first-child {
+.table.item-table th:first-child,
+.table.item-table td:first-child {
   padding-left: 0;
 }
-.table.agents-table tr:hover td {
+.table.item-table tr:hover td {
   background: none;
 }
-.table.agents-table tbody tr:last-child td {
+.table.item-table tbody tr:last-child td {
   border-bottom: none;
 }
 .agents-table-name {
@@ -979,12 +1091,26 @@ kbd {
 .agents-table.cols-5 .agents-table-card > span {
   max-width: min(260px, calc(var(--agents-room) * 0.28));
 }
+/* Six (#1442: the hover's Slot beside Role and Waiting for). */
+.agents-table.cols-6 .agents-table-cut > span {
+  max-width: min(170px, calc(var(--agents-room) * 0.15));
+}
+.agents-table.cols-6 .agents-table-name > span {
+  max-width: min(130px, calc(var(--agents-room) * 0.12));
+}
+.agents-table.cols-6 .agents-table-card > span {
+  max-width: min(230px, calc(var(--agents-room) * 0.24));
+}
+/* An agent's role in the workflow (#1430): a word ("Reviewer"), so a small share. */
+.agents-table-role > span {
+  max-width: min(110px, calc(var(--agents-room) * 0.12));
+}
 /* What stopping an agent interrupts (#572), in the warning colour as the quit dialog's badges are. */
 .agents-table td.agents-table-warn {
   color: var(--warning);
 }
-/* A heading row: the quit dialog's agents under their workspace (#572). */
-.agents-table tr.agents-table-group td {
+/* A heading row: the quit dialog's agents under their workspace (#572), a list dialog's group (#1317). */
+.item-table tr.item-table-group td {
   padding: 8px 0 2px;
   border-bottom: none;
   color: var(--fg-muted);
@@ -1013,6 +1139,66 @@ kbd {
 .agents-detail-note {
   margin-top: 8px;
   color: var(--fg-muted);
+}
+/* A list dialog's table (#1317, ItemTable): the agents tables' look (the rules above, .item-table), a dialog's width,
+   each column's share fixed by its first row's cells, so a long cell is cut with an ellipsis rather than widening the
+   table; each row's actions at its right edge, aligned down the table. */
+.dialog .table.item-table.fill {
+  width: 100%;
+  table-layout: fixed;
+}
+.item-table.fill td {
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.table.item-table .item-table-actions {
+  width: 1%;
+  padding-right: 0;
+  text-align: right;
+  white-space: nowrap;
+}
+.item-table.fill .item-table-actions {
+  width: var(--item-actions, 64px);
+}
+.item-table-actions .icon-btn + .icon-btn {
+  margin-left: 2px;
+}
+/* A path as the part that matters (#1317, ShortPath): one line, cut with an ellipsis; the full path in its tooltip. */
+.short-path {
+  display: inline-block;
+  max-width: 100%;
+  vertical-align: bottom;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.item-table td > .tip-wrap:has(> .short-path),
+.item-table td > span[aria-hidden] > .tip-wrap:has(> .short-path) {
+  display: block;
+  max-width: 100%;
+}
+.item-table td .short-path {
+  display: block;
+}
+/* Cut in the middle (#1447): the head shrinks with an ellipsis, the last name stays whole (and is cut only if it alone
+   doesn't fit). */
+.short-path-text.short-path-split {
+  display: flex;
+  min-width: 0;
+}
+.short-path-head {
+  flex: 0 1 auto;
+  min-width: 1.5em;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.short-path-tail {
+  flex: 0 0 auto;
+  max-width: 100%;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 /* Text for screen readers only (a table's plain-text form, #572). */
 .visually-hidden {
@@ -1061,6 +1247,8 @@ kbd {
 .state-mark.stalled { width: 8px; height: 8px; margin: 0.5px; background: var(--state-stalled); border-radius: 1px; }
 .state-mark.working { background: var(--state-working); border-radius: 50%; animation: pulse 1.2s ease-in-out infinite; }
 .state-mark.idle { border: 2px solid var(--state-idle); border-radius: 50%; }
+/* A stopped agent's own mark (HI-1881): still idle, its ring grey as its status's dot. */
+.state-mark.idle.stopped { border-color: var(--fg-faint); }
 @media (prefers-reduced-motion: reduce) {
   .state-mark.working { animation: none; }
 }
@@ -1134,6 +1322,8 @@ kbd {
 }
 
 /* ---------- Buttons & controls ---------- */
+/* A plain button has an edge of its own (#1304): its fill alone vanished on a hovered row (--bg-hover is within a
+   shade of --bg-elevated in dark) and on a white page in light. Filled buttons (primary, danger) keep no edge. */
 .btn {
   display: inline-flex;
   align-items: center;
@@ -1141,7 +1331,7 @@ kbd {
   height: 28px;
   padding: 0 12px;
   border-radius: 4px;
-  border: 1px solid transparent;
+  border: 1px solid var(--border);
   background: var(--bg-elevated);
   color: var(--fg);
   font: inherit;
@@ -1158,6 +1348,7 @@ kbd {
 }
 .btn.primary {
   background: var(--accent-fill);
+  border-color: transparent;
   color: var(--accent-fg);
   font-weight: 600;
 }
@@ -1167,6 +1358,7 @@ kbd {
 }
 .btn.danger {
   background: var(--error);
+  border-color: transparent;
   color: #fff;
 }
 .btn.subtle {
@@ -1485,6 +1677,161 @@ textarea.input {
   font-size: 11px;
   margin-left: -2px;
 }
+/*
+ * A view's own tabs (HI-1837, components/Tabs.tsx): the project tabs' look, underlined in the accent, so a row that
+ * switches pages never reads as a segmented control picking a value (None · Git) beside it. Never wider than its row; in
+ * a short one (`fold`) the tabs not selected fold to their icons, and shorter still the row scrolls.
+ */
+.hive-tabs-row {
+  position: relative;
+  display: flex;
+  min-inline-size: 0;
+  max-inline-size: 100%;
+  align-self: stretch;
+}
+.hive-tabs {
+  display: flex;
+  align-items: stretch;
+  max-inline-size: 100%;
+  overflow-x: auto;
+  scrollbar-width: thin;
+}
+.hive-tabs > .tip-wrap {
+  flex-shrink: 0;
+}
+.hive-tab {
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  flex-shrink: 0;
+  min-block-size: 30px;
+  padding: 0 10px;
+  border: 0;
+  background: transparent;
+  color: var(--fg-muted);
+  font: inherit;
+  font-size: 12px;
+  white-space: nowrap;
+  cursor: pointer;
+}
+.hive-tab:hover {
+  color: var(--fg-strong);
+}
+.hive-tab.active {
+  color: var(--fg-strong);
+}
+.hive-tab.active::after {
+  content: '';
+  position: absolute;
+  inset-inline: 4px;
+  inset-block-end: 0;
+  block-size: 2px;
+  background: var(--accent);
+}
+.hive-tab:focus-visible {
+  outline: 1px solid var(--accent);
+  outline-offset: -3px;
+}
+.hive-tab .codicon {
+  font-size: 13px;
+  color: inherit;
+}
+.hive-tab-count {
+  padding: 0 5px;
+  border-radius: 8px;
+  font-size: 11px;
+  background: var(--bg-active);
+  color: var(--fg);
+}
+.hive-tab-unsaved {
+  display: block;
+  inline-size: 6px;
+  block-size: 6px;
+  border-radius: 50%;
+  background: var(--accent);
+}
+.hive-tab.icon-only {
+  padding: 0 8px;
+}
+.hive-tab.icon-only .hive-tab-label {
+  position: absolute;
+  inline-size: 1px;
+  block-size: 1px;
+  overflow: hidden;
+  clip-path: inset(50%);
+  white-space: nowrap;
+}
+/* A tab's own icon (Hive's mark, a CLI's), the codicons' size; a dimmed tab (a CLI turned off, HI-1839) stays legible. */
+.hive-tab-icon {
+  display: inline-flex;
+}
+.hive-tab-icon > :is(.provider-icon, .tab-hex) {
+  inline-size: 13px;
+  block-size: 13px;
+}
+.hive-tab.muted:not(:hover) {
+  color: var(--fg-faint);
+}
+.hive-tab.muted .hive-tab-icon {
+  opacity: 0.6;
+}
+.hive-tab.muted.active:not(:hover) .hive-tab-label {
+  color: var(--fg-muted);
+}
+/* A short mark after a tab's name ("off"). */
+.hive-tab-tag {
+  padding: 0 5px;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  font-size: 10px;
+  line-height: 14px;
+  color: var(--fg-muted);
+}
+/* The tabs with every name, measured to choose between names and icons (Tabs' `fold`). */
+.hive-tabs-measure {
+  position: absolute;
+  inset-block-start: 0;
+  inset-inline-start: 0;
+  inline-size: max-content;
+  /* Every name's width, never capped by the row it measures for (which folding changes: it flickered). */
+  max-inline-size: none;
+  overflow: visible;
+  visibility: hidden;
+  pointer-events: none;
+}
+.hive-tabs-measure .hive-tab::after {
+  content: attr(data-label);
+}
+/* A tab's page not selected stays mounted (its draft kept) but never shows, whatever its own display. */
+[role='tabpanel'][hidden] {
+  display: none !important;
+}
+/* The tabs' line runs under the whole row, the selected tab's underline on it. */
+.workflow-defaults-tabs > .hive-tabs-row,
+.kb-editor > .hive-tabs-row,
+.advanced-list > .hive-tabs-row,
+.images-page > .hive-tabs-row {
+  border-block-end: 1px solid var(--border-subtle);
+  margin-block-end: 4px;
+}
+/* Keyboard Shortcuts' many categories (HI-1838) wrap onto another line rather than scroll with the last cut off. */
+.hive-tabs.kb-tabs {
+  flex-wrap: wrap;
+  overflow-x: visible;
+}
+/* "From Hive defaults", "From the workspace": a link to that tab of Settings → Version Control (HI-1837). */
+.workflow-origin-link {
+  padding: 0;
+  border: 0;
+  background: none;
+  color: var(--info);
+  font: inherit;
+  cursor: pointer;
+}
+.workflow-origin-link:hover {
+  text-decoration: underline;
+}
 
 /* ---------- Project header ---------- */
 .project-header {
@@ -1600,6 +1947,56 @@ textarea.input {
 .banner .btn {
   margin-left: auto;
 }
+/* Only a banner's first button pushes right; the rest sit beside it, one group (HI-2148). */
+.banner .btn + .btn {
+  margin-left: 0;
+}
+/* A notice banner (HI-1717: the presets notice and the providers banners): its icon and text, then its buttons, which go
+   under the text, together, once the text would have less than about 240 px beside them; where even they don't fit the
+   banner they stack, and a label wider than the banner wraps inside its button, so each stays whole and clickable at any
+   width. */
+.banner.wrap-banner {
+  flex-wrap: wrap;
+  row-gap: 6px;
+  container-type: inline-size;
+}
+.wrap-banner-text {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex: 1 1 266px;
+  min-width: 0;
+}
+.wrap-banner-text > .grow {
+  min-width: 0;
+}
+.wrap-banner-actions {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+  gap: 6px 8px;
+  min-width: 0;
+  max-width: 100%;
+  margin-left: auto;
+}
+.banner .wrap-banner-actions .btn {
+  margin-left: 0;
+  max-width: 100%;
+  height: auto;
+  min-height: 24px;
+  padding-block: 3px;
+  white-space: normal;
+  /* Between words; anywhere only as the last resort, a word wider than the button. (`hyphens: auto` would break it
+     with a hyphen, but Electron has no hyphenation dictionaries, so it does nothing: HI-1717.) */
+  overflow-wrap: anywhere;
+}
+/* In a narrow banner the buttons take less padding, so a long word of their label fits whole (French beside the
+   Assistant's panel: "fournisseurs" broke as "fournisseur" / "s"). */
+@container (max-width: 200px) {
+  .banner .wrap-banner-actions .btn {
+    padding-inline: 4px;
+  }
+}
 .moved-banner .grow {
   min-width: 0;
 }
@@ -1628,6 +2025,13 @@ textarea.input {
 }
 .journal-settings input[type='number'] {
   width: 80px;
+}
+/* Its numbers are NumberFields (HI-2345), inline in their sentence: the box keeps its width, a message under it. */
+.journal-settings .number-field {
+  width: auto;
+}
+.journal-settings .number-field-row .input {
+  flex: none;
 }
 .journal-settings .btn {
   align-self: flex-start;
@@ -1991,6 +2395,91 @@ textarea.input {
 .move-repair .mono {
   overflow-wrap: anywhere;
 }
+/* Repair's plan as a table (#1305, the project hover's agent table's look: ItemTable): What · Was · Now · Will do,
+   each row's choices at its right edge; the dialog as wide as is comfortable, so paths show their part that differs. */
+.dialog.wide:has(.repair-plan) {
+  width: min(1180px, calc(100vw - 48px));
+}
+/* The actions' column: an expander's room, or the missing worktrees' three choices when any row has them. */
+.table.item-table.repair-plan {
+  margin: 8px 0 10px;
+  --item-actions: 36px;
+}
+.table.item-table.repair-plan.has-choices {
+  --item-actions: 312px;
+}
+.repair-plan th:nth-child(1) {
+  width: 24%;
+}
+.repair-plan th:nth-child(2),
+.repair-plan th:nth-child(3) {
+  width: 18%;
+}
+.repair-plan td {
+  white-space: nowrap;
+}
+.repair-plan td > span[aria-hidden] {
+  display: block;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.repair-plan td:first-child .short-path {
+  font-weight: 600;
+  color: var(--fg-strong);
+}
+.repair-plan tr.repair-sub td:first-child .short-path {
+  padding-left: 14px;
+  font-weight: normal;
+  color: var(--fg);
+}
+.repair-plan tr.faint td {
+  color: var(--fg-muted);
+}
+.repair-plan tr.item-table-group td {
+  padding-top: 10px;
+}
+.repair-plan tbody tr.item-table-group:first-child td {
+  padding-top: 2px;
+}
+/* A folded row's expander, before its name (a coding agent's folders, #1305): the name beside it, both on one line. */
+.repair-plan .repair-expand {
+  width: 18px;
+  height: 18px;
+  margin: 0 2px 0 -4px;
+  vertical-align: top;
+}
+.repair-plan tr.repair-folded td:first-child .short-path {
+  display: inline-block;
+  max-width: calc(100% - 20px);
+  line-height: 18px;
+  vertical-align: top;
+}
+.repair-plan tr.repair-sub td:first-child .short-path {
+  padding-left: 18px;
+}
+/* Repair's report (#1313): a result wraps, so a problem's reason is read whole; its icon in the outcome's colour. */
+.repair-report td:nth-child(4),
+.repair-report td:nth-child(4) .short-path {
+  white-space: normal;
+}
+.repair-report tr.repair-done td:nth-child(4) .codicon {
+  color: var(--success);
+}
+.repair-report tr.repair-skipped td:nth-child(4) .codicon {
+  color: var(--fg-muted);
+}
+.repair-choice {
+  height: 22px;
+  padding: 0 6px;
+  gap: 4px;
+}
+.repair-choice + .repair-choice,
+.item-table-actions .tip-wrap + .tip-wrap {
+  margin-left: 4px;
+}
+.repair-choice .codicon {
+  font-size: 13px;
+}
 .move-repair ul.move-report {
   list-style: none;
   padding-left: 0;
@@ -2054,6 +2543,14 @@ textarea.input {
 .terminal-host.hidden {
   visibility: hidden;
   pointer-events: none;
+  /* Off screen too (HI-1828): xterm draws a terminal only while its screen intersects the window (an
+     IntersectionObserver), and visibility alone doesn't change that, so hidden terminals were drawn with every write. */
+  transform: translateX(-200vw);
+}
+/* A stopped agent's terminal (HI-1881): dimmed to show it isn't at work; its text still scrolls, selects and copies. */
+.terminal-host.dimmed .terminal-mount {
+  opacity: 0.5;
+  filter: saturate(0.4);
 }
 .terminal-mount {
   width: 100%;
@@ -2076,8 +2573,9 @@ textarea.input {
   overflow: auto;
   container-type: inline-size;
 }
-/* Very little room: the title and the buttons; the explanation and the mark go (#227). Warnings stay. */
-@container (max-width: 280px) {
+/* Very little room: the title and the buttons; the explanation and the mark go (#227). Warnings stay. Under 280 px, not
+   at it: 280 is the work's least width beside the side panels (HI-1737, MAIN_MIN), where the card shows in full (HI-1857). */
+@container (width < 280px) {
   .session-empty-card {
     padding: 12px 8px;
   }
@@ -2099,6 +2597,27 @@ textarea.input {
 .session-ended > .codicon {
   font-size: 16px;
   color: var(--fg-muted);
+}
+/* A stopped agent's bar (HI-1881): over its dimmed terminal, plainly a stop, with when and why. */
+.session-ended.stopped {
+  border-inline-start: 3px solid var(--fg-faint);
+  background: var(--bg-elevated, var(--bg-sidebar));
+  box-shadow: 0 -2px 8px rgba(0, 0, 0, 0.18);
+}
+.session-ended.stopped > .grow {
+  color: var(--fg-strong);
+  font-weight: 600;
+}
+/* Its header's status: a grey dot before "Stopped · 20:46". */
+.pane-status.stopped::before {
+  content: '';
+  display: inline-block;
+  inline-size: 7px;
+  block-size: 7px;
+  margin-inline-end: 5px;
+  border-radius: 50%;
+  background: var(--fg-faint);
+  vertical-align: middle;
 }
 .session-empty-card {
   text-align: center;
@@ -2210,7 +2729,7 @@ h2.section:first-child {
 }
 p.hint {
   color: var(--fg-muted);
-  margin: 4px 0 12px;
+  margin: var(--space-1) 0 var(--space-3);
   line-height: 1.6;
 }
 
@@ -2324,9 +2843,125 @@ p.hint {
 .toggle-item.disabled .ti-name {
   color: var(--fg-muted);
 }
-/* A project's switch for an MCP server the workspace has off (#1093): its choice is kept but waits on the workspace. */
-.toggle-item[data-gated] .switch {
-  opacity: 0.45;
+/* A project's MCP tab (HI-2059): its heading with Add Server… beside it. */
+.mcp-section-head {
+  align-items: center;
+}
+/* The MCP view's and the Add server picker's search and filter (HI-2059). */
+.mcp-search {
+  display: flex;
+  gap: 6px;
+  align-items: center;
+  padding: 6px 10px;
+}
+.mcp-search .search-box {
+  flex: 1;
+  min-width: 0;
+}
+.mcp-picker .mcp-search {
+  padding: 0 0 8px;
+}
+/* The sidebar's (HI-2088): the search and the filter each on a row of its own, so the placeholder shows whole. */
+.mcp-search.stacked {
+  flex-wrap: wrap;
+}
+.mcp-search.stacked .search-box,
+.mcp-search.stacked .select {
+  flex: 1 1 100%;
+  min-width: 0;
+}
+.mcp-picker-list {
+  max-height: 260px;
+  overflow-y: auto;
+  border: 1px solid var(--border-subtle);
+  border-radius: 6px;
+}
+.mcp-picker-row {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 8px 12px;
+  cursor: pointer;
+  border-bottom: 1px solid var(--border-subtle);
+}
+.mcp-picker-row:last-child {
+  border-bottom: none;
+}
+.mcp-picker-row:hover {
+  background: var(--bg-hover, var(--accent-soft));
+}
+.mcp-picker-row.selected {
+  background: var(--accent-soft);
+}
+.mcp-picker-row .ti-text {
+  flex: 1;
+  min-width: 0;
+}
+.mcp-picker-row .ti-name {
+  font-weight: 600;
+  color: var(--fg-strong);
+  display: flex;
+  gap: 6px;
+  align-items: center;
+  flex-wrap: wrap;
+}
+.mcp-picker-row .ti-desc {
+  color: var(--fg-muted);
+  font-size: 12px;
+}
+.mcp-picker-runs {
+  margin-top: 10px;
+  min-height: 64px;
+}
+.mcp-picker-runs ul {
+  margin: 4px 0 0;
+  padding-left: 18px;
+  word-break: break-all;
+}
+.badge.mcp-tag {
+  font-weight: 400;
+}
+/* The MCP view's Installed | Catalogue tabs and the Catalogue (HI-545). */
+.mcp-tabs {
+  padding: 6px 10px 0;
+}
+.mcp-catalog-filters .select {
+  flex: 1;
+  min-width: 0;
+}
+.mcp-catalog-note,
+.mcp-catalog-error {
+  font-size: 12px;
+}
+.mcp-catalog-error {
+  color: var(--danger, var(--fg-muted));
+}
+.mcp-catalog-more {
+  margin: 4px 10px 8px;
+}
+.mcp-catalog-checks {
+  list-style: none;
+  padding: 0;
+  margin: 0 0 12px;
+}
+.mcp-catalog-checks li {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 2px 0;
+}
+.mcp-catalog-checks li[data-check='ok'] .codicon {
+  color: var(--success, var(--accent-ink));
+}
+.mcp-catalog-checks li[data-check='no'] .codicon {
+  color: var(--danger, var(--fg-muted));
+}
+.mcp-catalog-add {
+  margin-top: 8px;
+}
+.mcp-catalog-add .input {
+  flex: 1;
+  min-width: 0;
 }
 
 /* ---------- Split views (changes, memory, notes) ---------- */
@@ -2348,6 +2983,49 @@ p.hint {
   min-width: 0;
   display: flex;
   flex-direction: column;
+}
+/* A skill's page (HI-2011): its files' tabs, then the file in the editor below them. */
+.skill-detail {
+  flex: 1;
+  min-width: 0;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+}
+.skill-detail > .split-main {
+  min-height: 0;
+}
+.skill-files {
+  display: flex;
+  align-items: center;
+  gap: 2px;
+  padding: 4px 10px 0 14px;
+  border-bottom: 1px solid var(--border-subtle);
+  flex-shrink: 0;
+  overflow-x: auto;
+  font-size: 12px;
+}
+.skill-files .faint {
+  margin-left: 8px;
+  white-space: nowrap;
+}
+.skill-file-tab {
+  padding: 4px 10px;
+  border: 1px solid transparent;
+  border-bottom: none;
+  border-radius: 4px 4px 0 0;
+  background: none;
+  color: var(--fg-muted);
+  white-space: nowrap;
+  cursor: pointer;
+}
+.skill-file-tab:hover {
+  color: var(--fg-strong);
+}
+.skill-file-tab.active {
+  color: var(--fg-strong);
+  background: var(--bg-active);
+  border-color: var(--border-subtle);
 }
 /* The Changes tab's split (#906). Its list gives up width first, down to 200px, so the detail keeps the 320px a drag of
    the divider leaves it; short of room for both, the list sits above the detail (at most 40% of the height, its files
@@ -2387,19 +3065,9 @@ p.hint {
   .changes-split > .split > .split-main {
     min-height: 0;
   }
-  /* The unused worktrees' heading and rows wrap rather than run out of the pane: its buttons go under the title, a
-     row's buttons under its text, and a long path breaks anywhere. */
-  .changes-split #unused-worktrees,
-  .changes-split .unused-wt,
-  .changes-split .unused-wt > .flex {
+  /* The unused worktrees' heading wraps rather than run out of the pane: its buttons go under the title. */
+  .changes-split #unused-worktrees {
     flex-wrap: wrap;
-  }
-  .changes-split .unused-wt .mono {
-    overflow-wrap: anywhere;
-  }
-  .changes-split .unused-wt > .grow {
-    flex: 1 1 160px;
-    min-width: 0;
   }
 }
 @container templates-split (max-width: 399px) {
@@ -2556,6 +3224,106 @@ p.hint {
 .markdown li { margin: 3px 0; }
 
 /* ---------- Overlays: dialogs, palette, toasts ---------- */
+/* A workspace opening (HI-1694): over every other dialog (an upgrade's question is busy beneath it). */
+.overlay.workspace-opening {
+  z-index: 2100;
+}
+.workspace-opening-step {
+  margin: 0 0 8px;
+}
+/* A close command running or failed (HI-1368): over everything, the window's own dialogs too; nothing behind takes input. */
+.overlay.close-command {
+  z-index: 2200;
+}
+.close-command-card {
+  width: 560px;
+}
+.close-command-error {
+  color: var(--error);
+}
+.close-command-text {
+  font-family: var(--font-mono);
+  font-size: 12px;
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+  color: var(--fg-strong);
+  margin-bottom: 6px;
+}
+/* The command itself (HI-2031): at most two lines, cut with an ellipsis; the whole line is its tooltip. */
+.close-command-line {
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+  min-width: 0;
+  line-height: 1.5;
+}
+.tip.close-command-tip {
+  max-width: 520px;
+  font-family: var(--font-mono);
+  overflow-wrap: anywhere;
+}
+.close-command-output {
+  margin: 8px 0 0;
+  padding: 6px 8px;
+  border: 1px solid var(--border-subtle);
+  border-radius: 4px;
+  background: var(--bg-input);
+  color: var(--fg);
+  font-family: var(--font-mono);
+  font-size: 12px;
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+  max-height: 12em;
+  overflow-y: auto;
+}
+.close-command-note {
+  margin: 8px 0 0;
+}
+/* A list of the user's commands (HI-1954): each step's state, the one running or failed with its command and output. */
+.close-command-steps {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+.close-command-step-line {
+  gap: 8px;
+  align-items: center;
+}
+.close-command-step[data-state='waiting'] .close-command-step-line,
+.close-command-step[data-state='skipped'] .close-command-step-line {
+  color: var(--fg-muted);
+}
+.close-command-step .close-command-text,
+.close-command-step .close-command-output {
+  margin-left: 24px;
+}
+.close-command-warn {
+  color: var(--warning);
+}
+/* Settings → When this workspace closes, run / When Hive quits, run (HI-1368). */
+.close-command-settings {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  margin-top: 8px;
+}
+.close-command-settings .flex {
+  gap: 6px;
+}
+.close-command-input {
+  font-family: var(--font-mono);
+  width: 100%;
+}
+.close-command-preview {
+  font-family: var(--font-mono);
+  font-size: 12px;
+  color: var(--fg-muted);
+  overflow-wrap: anywhere;
+}
 .overlay {
   position: fixed;
   inset: 0;
@@ -2637,26 +3405,33 @@ p.hint {
   overflow-wrap: normal;
   color: var(--fg);
 }
-.template-plan h4 {
-  margin: 8px 0 2px;
-  font-size: 11px;
-  font-weight: 600;
-  text-transform: uppercase;
-  letter-spacing: 0.04em;
-  color: var(--fg-muted);
+/* What happens to each agent (#1315: one table, no Removed list): its badge; what becomes of an old agent's worktree
+   across a removed row's empty settings, or on a line under a replaced one's row (no rule between the two). A removed
+   agent's row is muted. */
+.template-plan-table td.template-plan-state {
+  white-space: nowrap;
 }
-.template-plan-removed {
-  margin: 0 0 4px;
-  padding-left: 18px;
+.template-plan-old {
+  font-size: 11.5px;
+}
+.template-plan-table tr.template-plan-has-old td {
+  border-bottom: none;
+}
+.template-plan-table tr.template-plan-old-row td {
+  padding-top: 0;
+}
+.template-plan-removed-row .template-plan-name {
+  color: var(--fg-muted);
+  font-weight: normal;
 }
 .template-plan-table td {
-  padding: 4px 8px;
+  padding: 4px 6px;
   vertical-align: top;
 }
 /* A long heading ("Coding agent" in Spanish) wraps between its words when the dialog is short of room, rather than
    push Where out of it (#886). */
 .template-plan-table th {
-  padding: 4px 8px;
+  padding: 4px 6px;
   white-space: normal;
   vertical-align: bottom;
 }
@@ -2672,6 +3447,65 @@ p.hint {
   color: var(--fg-strong);
   margin-right: 6px;
 }
+/* An agent's connection in the plan (HI-2109): its CLI's icon and name, what it runs under it. */
+.template-connection-name {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  white-space: nowrap;
+}
+.template-plan-values {
+  font-size: 11.5px;
+}
+/* The Connections section (HI-2109): Same for all, then a row per role (or per agent, unfolded), each a choice and the
+   CLI its role suggests. */
+.template-connections {
+  margin-top: 10px;
+}
+.template-connections-form .template-connections-same {
+  grid-column: 1;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  white-space: nowrap;
+}
+.template-connections-same input {
+  margin: 0;
+}
+.template-connections-row {
+  gap: 8px;
+  min-width: 0;
+}
+.template-connections-row .connection-choice {
+  flex: 1;
+  min-width: 0;
+  max-width: 28em;
+}
+.template-connections-suggests {
+  white-space: nowrap;
+}
+.template-connections-agents {
+  margin-top: 8px;
+}
+.template-connections-agents > summary {
+  cursor: pointer;
+  margin-bottom: 6px;
+}
+/* The notice of moved settings above Settings → Accounts & Connections' list (HI-1770). */
+.connections-notice {
+  align-items: flex-start;
+}
+.connections-notice ul {
+  margin: 4px 0;
+  padding-left: 20px;
+}
+/* An agent's connection in its rows (HI-1769): one line, its ⟳ kept with it. */
+.agent-connection {
+  white-space: nowrap;
+}
+.running-line .running-connection {
+  flex: none;
+}
 .template-plan-provider {
   display: inline-flex;
   align-items: center;
@@ -2681,6 +3515,13 @@ p.hint {
 .template-plan-provider .provider-icon {
   width: 12px;
   height: 12px;
+}
+/* The agent an agent is paired with (#1436): a name like HI-R1 kept whole. A setting's name too (#1440): "Opus 5.5" and
+   its "(default)" each whole, wrapping only between them (two lines at most, never three). */
+.template-plan-role [data-paired-with],
+.template-plan-setting,
+.template-plan-default {
+  white-space: nowrap;
 }
 .template-plan-default {
   font-size: 11px;
@@ -2698,12 +3539,63 @@ p.hint {
   vertical-align: middle;
 }
 .template-plan-name-input {
-  width: 140px;
+  width: 120px;
   font-weight: 600;
+}
+/* The dialog naming a template's agents (#1440): wider, so every column shows in German and Polish without scrolling
+   sideways (narrower windows still cap it). */
+.dialog.wide:has(.template-plan-name-input) {
+  width: 880px;
 }
 .template-plan-note {
   margin: 8px 0 0;
   color: var(--fg-muted);
+}
+.template-plan-note.warn {
+  color: var(--warning);
+}
+/* A template's workflow (HI-1910): in the Load template dialog, under its agents; in the Templates view, under its agents too. */
+.template-workflow {
+  margin-top: 14px;
+  padding-top: 10px;
+  border-top: 1px solid var(--border-subtle);
+}
+.template-workflow-h {
+  margin: 0 0 6px;
+  font-size: 13px;
+}
+.template-workflow-apply {
+  gap: 6px;
+}
+.template-workflow-git {
+  margin-top: 8px;
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 6px 10px;
+}
+.template-workflow-list {
+  margin: 6px 0 0;
+  padding-inline-start: 18px;
+}
+.template-workflow-list li {
+  padding-block: 2px;
+}
+.template-workflow-view {
+  margin-top: 16px;
+}
+.template-workflow-panel {
+  padding-top: 8px;
+}
+.template-workflow-panel > p {
+  margin: 0 0 4px;
+}
+.template-workflow-edit {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-top: 8px;
 }
 /* A confirm's list (the folders an antivirus change covers, #347): one item per line, a long path wrapping inside itself. */
 .dialog-body .dialog-list {
@@ -2736,6 +3628,22 @@ p.hint {
 .dialog-list li + li {
   margin-top: 2px;
 }
+/* A list to read, not to copy (the rules a move skips, #1275): in the dialog's own type. */
+.dialog-list.plain ul {
+  font-family: inherit;
+  font-size: inherit;
+}
+/* Text as it was written (a CLI's clipboard text, #1292): monospace again, its spacing and long lines kept. */
+.dialog-list.plain.mono ul {
+  font-family: 'Cascadia Mono', Consolas, monospace;
+  font-size: 12px;
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+}
+.dialog-field-label {
+  display: block;
+  margin-block-end: 4px;
+}
 .dialog-footer {
   display: flex;
   justify-content: flex-end;
@@ -2764,9 +3672,18 @@ p.hint {
   border: 1px solid color-mix(in srgb, var(--error) 35%, transparent);
   white-space: pre-line;
   user-select: text;
+  /* A long one (Push to…'s every branch by name, #1385) scrolls in its own box, the buttons staying in view. */
+  max-height: 40vh;
+  overflow: auto;
 }
 .field-error {
   color: var(--error);
+  font-size: 12px;
+  margin-top: 6px;
+}
+/* What a field means, under it (a new project's key, #1221): where an error would be. */
+.field-hint {
+  color: var(--fg-muted);
   font-size: 12px;
   margin-top: 6px;
 }
@@ -2838,123 +3755,60 @@ p.hint {
   margin-left: auto;
 }
 
-.toasts {
+.popups {
   position: fixed;
-  /* Above the tip card, when one shows; both keep clear of the Assistant's panel and of a bar's buttons (CornerPlacement). */
-  right: var(--corner-right, 14px);
-  bottom: calc(36px + var(--corner-lift, 0px) + var(--tip-space, 0px));
+  /* Hive's one place for pop-ups (HI-2320): notifications and the tip, where Settings → Notifications puts them. Clear
+     of the title bar, the activity bar and the status bar; bottom right keeps clear of the Assistant's panel and of a
+     bar's buttons (CornerPlacement). Above the page, below menus and dialogs' own layers. */
   z-index: 2500;
   display: flex;
   flex-direction: column;
   gap: 8px;
   width: 380px;
-  max-width: calc(100vw - 28px);
-}
-/* In-app banners (#157): where a Windows notification would have gone while you use Hive. Clear of the title bar,
-   the activity bar and the status bar; above the page, below menus and dialogs' own layers. */
-.notice-banners {
-  position: fixed;
-  z-index: 2400;
-  display: flex;
-  flex-direction: column;
-  gap: 8px;
-  width: 380px;
   max-width: calc(100vw - 80px);
-  /* Never past the window (title bar above, status bar below): more than fit scroll, so every banner can be reached. */
+  /* Never past the window: more than fit scroll, so every pop-up can be reached. */
   max-height: calc(100vh - 44px - 36px);
   overflow-x: hidden;
   overflow-y: auto;
-  /* Room for the banners' shadows inside the scrolling box. */
+  /* Room for the pop-ups' shadows inside the scrolling box. */
   padding: 2px 6px 6px;
   margin: -2px -6px -6px;
   pointer-events: none;
 }
 /* Expanded ("+N more"): the stack itself takes the pointer, so its scrollbar can be dragged. */
-.notice-banners.expanded {
+.popups.expanded {
   pointer-events: auto;
 }
-.notice-banners.at-top-left,
-.notice-banners.at-top-center,
-.notice-banners.at-top-right {
+.popups > * {
+  flex-shrink: 0;
+  pointer-events: auto;
+}
+.popups.at-top-left,
+.popups.at-top-center,
+.popups.at-top-right {
   top: 44px;
 }
-.notice-banners.at-bottom-left,
-.notice-banners.at-bottom-center,
-.notice-banners.at-bottom-right {
+.popups.at-bottom-left,
+.popups.at-bottom-center {
   bottom: 36px;
 }
-.notice-banners.at-top-left,
-.notice-banners.at-bottom-left {
+.popups.at-bottom-right {
+  bottom: calc(36px + var(--corner-lift, 0px));
+}
+.popups.at-top-left,
+.popups.at-bottom-left {
   left: 60px;
 }
-.notice-banners.at-top-right,
-.notice-banners.at-bottom-right {
+.popups.at-top-right,
+.popups.at-bottom-right {
   right: var(--corner-right, 14px);
 }
-.notice-banners.at-top-center,
-.notice-banners.at-bottom-center {
+.popups.at-top-center,
+.popups.at-bottom-center {
   left: 50%;
   transform: translateX(-50%);
 }
-.notice-banner {
-  flex-shrink: 0;
-  pointer-events: auto;
-  background: var(--bg-elevated);
-  border: 1px solid var(--border);
-  border-left: 3px solid var(--info);
-  border-radius: 6px;
-  box-shadow: var(--shadow);
-  padding: 10px 8px 10px 12px;
-  display: flex;
-  gap: 10px;
-  cursor: pointer;
-  animation: slideIn 0.18s ease-out;
-}
-.notice-banner:hover {
-  border-color: var(--border-strong, var(--border));
-}
-.notice-banner.finished { border-left-color: var(--success); }
-.notice-banner.waiting { border-left-color: var(--warning); }
-.notice-banner .lead { margin-top: 1px; color: var(--info); }
-.notice-banner.finished .lead { color: var(--success); }
-.notice-banner.waiting .lead { color: var(--warning); }
-.notice-text {
-  flex: 1;
-  min-width: 0;
-}
-.notice-open {
-  /* A button for the keyboard that looks like the banner's text. */
-  display: block;
-  padding: 0;
-  border: 0;
-  background: none;
-  color: inherit;
-  font: inherit;
-  text-align: left;
-  cursor: pointer;
-}
-.notice-open:focus-visible {
-  outline-offset: 2px;
-  border-radius: 3px;
-}
-.notice-title {
-  font-weight: 600;
-  color: var(--fg-strong);
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
-.notice-body {
-  color: var(--fg-muted);
-  font-size: 12px;
-  margin-top: 2px;
-  display: -webkit-box;
-  -webkit-line-clamp: 2;
-  -webkit-box-orient: vertical;
-  overflow: hidden;
-  word-break: break-word;
-}
-.notice-close {
+.popup-close {
   align-self: flex-start;
 }
 .notice-more {
@@ -2992,6 +3846,30 @@ p.hint {
 .toast.success .lead { color: var(--success); }
 .toast.warning .lead { color: var(--warning); }
 .toast.error .lead { color: var(--error); }
+/* Kind by style, not by place (HI-2320): one that needs you has the accent; a tip is the quietest. */
+.toast.kind-needsYou { border-left-color: var(--accent); }
+.toast.kind-needsYou .lead { color: var(--accent-ink); }
+.toast.kind-tip {
+  border-left-color: var(--border-strong, var(--border));
+  font-size: 12px;
+}
+.toast.kind-tip .lead { color: var(--accent-ink); }
+.toast.stepped-aside {
+  visibility: hidden;
+}
+/* What happened, once an entry's action is done or no longer applies: in place of its buttons. */
+.entry-outcome {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  margin-top: 6px;
+  color: var(--fg-muted);
+  font-size: 12px;
+}
+.notif-item.warning .lead { color: var(--warning); }
+.notif-item.error .lead { color: var(--error); }
+.notif-item.success .lead { color: var(--success); }
+.notif-item.kind-needsYou .lead { color: var(--accent-ink); }
 .toast-text {
   flex: 1;
   min-width: 0;
@@ -3007,11 +3885,25 @@ p.hint {
   margin-top: 2px;
   word-break: break-word;
   white-space: pre-line;
+  /* A long message (Push to…'s every branch by name, #1385) scrolls rather than run off the screen. */
+  max-height: 40vh;
+  overflow: auto;
 }
+/* Two long actions wrap onto a second row rather than run past the notice's edge (#1574: "Start Fresh with a Handover"
+   in fr, es, pl and pt-BR); in a narrow window a label longer than the notice wraps inside its button. */
 .toast-actions {
   display: flex;
+  flex-wrap: wrap;
   gap: 6px;
   margin-top: 8px;
+}
+.toast-actions .btn {
+  max-width: 100%;
+  height: auto;
+  min-height: 24px;
+  padding-block: 2px;
+  white-space: normal;
+  text-align: start;
 }
 @keyframes slideIn {
   from { transform: translateY(8px); opacity: 0; }
@@ -3045,6 +3937,40 @@ p.hint {
   color: var(--fg-faint);
   font-size: 11px;
   margin-top: 2px;
+}
+/* A notice that opens what it is about (HI-1961): its text is a button, with a chevron, the pointer and a hover. */
+.toast-open {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  width: calc(100% + 8px);
+  margin: -4px;
+  padding: 4px;
+  border: 0;
+  border-radius: 4px;
+  background: none;
+  color: inherit;
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+}
+.toast-open:hover {
+  /* Over the toast's own background in either theme (--bg-hover is darker than a dark toast). */
+  background: color-mix(in srgb, var(--fg) 10%, transparent);
+}
+.toast-open-text {
+  flex: 1;
+  min-width: 0;
+}
+.toast-open-chevron {
+  flex: none;
+  color: var(--fg-muted);
+}
+.toast-open:hover .toast-open-chevron {
+  color: var(--fg-strong);
+}
+.toast-open:focus-visible {
+  outline-offset: 2px;
 }
 
 /* ---------- Welcome ---------- */
@@ -3206,10 +4132,17 @@ p.hint {
   display: flex;
   gap: 12px;
   align-items: center;
+  min-width: 0;
 }
+/* The search box gives way in a narrow window; Modified only stays whole (HI-2164). */
 .settings-top .search-box {
   flex: 1;
+  min-width: 0;
   max-width: 560px;
+}
+.settings-top > label {
+  flex-shrink: 0;
+  white-space: nowrap;
 }
 .settings-top .input {
   height: 30px;
@@ -3302,10 +4235,10 @@ p.hint {
 .setting {
   display: flex;
   flex-wrap: wrap;
-  gap: 8px 24px;
+  gap: var(--space-2) var(--space-6);
   align-items: flex-start;
-  padding: 12px 12px;
-  margin: 0 -12px;
+  padding: var(--space-3);
+  margin: 0 calc(-1 * var(--space-3));
   border-radius: 6px;
   max-width: 900px;
 }
@@ -3508,6 +4441,47 @@ p.hint {
   overflow-wrap: anywhere;
   user-select: text;
 }
+/* An agent's Hooks dialog (HI-982): its two tables in the dialog's own scroll, a long command cut to two lines. */
+.hooks-head {
+  align-items: flex-start;
+  gap: 8px;
+}
+.hooks-body {
+  user-select: text;
+}
+.hooks-heading {
+  margin: 14px 0 2px;
+  font-size: 12px;
+  font-weight: 600;
+}
+.hooks-note,
+.hooks-stale {
+  display: flex;
+  gap: 6px;
+  align-items: baseline;
+  margin: 4px 0;
+}
+.hooks-stale {
+  color: var(--warning, inherit);
+}
+.hooks-table td {
+  vertical-align: top;
+}
+.hooks-command code {
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+  overflow-wrap: anywhere;
+  font-size: 11px;
+}
+.hooks-why {
+  max-width: 340px;
+  overflow-wrap: anywhere;
+}
+.hooks-count {
+  font-weight: 600;
+}
 .about-table td:first-child {
   text-align: right;
   color: var(--fg-faint);
@@ -3606,19 +4580,144 @@ h2.section#unused-worktrees {
 .unused-worktrees-line a {
   cursor: pointer;
 }
-.unused-wt {
-  display: flex;
-  align-items: center;
-  gap: 12px;
-  padding: 10px 12px;
-  border: 1px solid var(--border-subtle);
-  border-radius: 8px;
-  background: var(--bg-sidebar);
-  margin-bottom: 8px;
+
+/* Unused worktrees as a table (#1314, ItemTable): a line a worktree, Branch · State · Folder · Last commit · Size, its
+   actions at the right edge, aligned down the table; a cell too long is cut with an ellipsis (the full text on hover).
+   Sized by the list's own width: under 1000px each row is two lines (branch, state and actions; under them folder, last
+   commit and size, muted), under 520px it stacks, its actions on a line of their own. */
+.unused-worktrees {
+  container: unused-list / inline-size;
 }
-.unused-wt > .codicon {
-  font-size: 18px;
+.table.item-table.unused-wt-table {
+  width: 100%;
+  table-layout: fixed;
+  margin-top: 4px;
+  --item-actions: 128px;
+}
+.table.item-table.unused-wt-table.has-work {
+  --item-actions: 290px;
+}
+.unused-wt-table th:nth-child(1) {
+  width: 18%;
+}
+.unused-wt-table th:nth-child(3) {
+  width: 9%;
+}
+.unused-wt-table th:nth-child(4) {
+  width: 20%;
+}
+.unused-wt-table th:nth-child(5) {
+  width: 64px;
+}
+.table.item-table.unused-wt-table .item-table-actions {
+  width: var(--item-actions);
+}
+.unused-wt-table td {
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.unused-wt-table td > span {
+  display: block;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.unused-wt-branch .codicon {
+  margin-right: 2px;
   color: var(--fg-muted);
+  vertical-align: text-bottom;
+}
+/* The state and who made it, badges in a row: never cut (the Assistant's OK on #1314); a badge that doesn't fit beside
+   the other goes under it, and one wider than its cell wraps inside itself. */
+.unused-wt-table td > span.unused-wt-badges {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 3px 4px;
+  overflow: visible;
+}
+.unused-wt-badges .badge {
+  max-width: 100%;
+  white-space: normal;
+  overflow-wrap: anywhere;
+}
+.unused-wt-table .item-table-actions .btn + .btn,
+.unused-wt-table .item-table-actions .btn + .tip-wrap,
+.unused-wt-table .item-table-actions .tip-wrap + .btn {
+  margin-left: 4px;
+}
+@container unused-list (max-width: 999px) {
+  .unused-wt-table,
+  .unused-wt-table tbody {
+    display: block;
+  }
+  .unused-wt-table thead {
+    display: none;
+  }
+  .table.item-table.unused-wt-table tr.unused-wt {
+    display: grid;
+    grid-template-columns: minmax(0, 32%) minmax(0, 1fr) auto;
+    grid-template-areas: 'branch state actions' 'folder last size';
+    align-items: center;
+    column-gap: 12px;
+    row-gap: 1px;
+    padding: 5px 0;
+    border-bottom: 1px solid var(--border-subtle);
+  }
+  .table.item-table.unused-wt-table tr.unused-wt:last-child {
+    border-bottom: none;
+  }
+  .table.item-table.unused-wt-table tr.unused-wt td {
+    padding: 0;
+    border: none;
+    width: auto;
+    min-width: 0;
+  }
+  .unused-wt-table tr.unused-wt td:nth-child(1) {
+    grid-area: branch;
+  }
+  .unused-wt-table tr.unused-wt td:nth-child(2) {
+    grid-area: state;
+  }
+  .unused-wt-table tr.unused-wt td:nth-child(3) {
+    grid-area: folder;
+    font-size: 11.5px;
+  }
+  .unused-wt-table tr.unused-wt td:nth-child(4) {
+    grid-area: last;
+    font-size: 11.5px;
+  }
+  .unused-wt-table tr.unused-wt td:nth-child(5) {
+    grid-area: size;
+    justify-self: end;
+    font-size: 11.5px;
+  }
+  .unused-wt-table tr.unused-wt td.item-table-actions {
+    grid-area: actions;
+  }
+}
+@container unused-list (max-width: 519px) {
+  .table.item-table.unused-wt-table tr.unused-wt {
+    grid-template-columns: minmax(0, 1fr) auto;
+    grid-template-areas: 'branch branch' 'state state' 'folder size' 'last last' 'actions actions';
+    row-gap: 3px;
+  }
+  /* Its buttons wrap rather than run out of the pane, from the right. */
+  .table.item-table.unused-wt-table tr.unused-wt td.item-table-actions {
+    display: flex;
+    flex-wrap: wrap;
+    justify-content: flex-end;
+    gap: 4px;
+    padding-top: 2px;
+    white-space: normal;
+  }
+  .unused-wt-table tr.unused-wt .item-table-actions .btn + .btn,
+  .unused-wt-table tr.unused-wt .item-table-actions .btn + .tip-wrap,
+  .unused-wt-table tr.unused-wt .item-table-actions .tip-wrap + .btn {
+    margin-left: 0;
+  }
+}
+/* Remove all merged's confirmation (#1314): Branch · Folder. */
+.unused-merged-table th:nth-child(1) {
+  width: 65%;
 }
 /* What a page of changes shows, at the top of its right side (#476); the list being checked again over it. */
 .changes-page-head {
@@ -3677,6 +4776,239 @@ h2.section#unused-worktrees {
 .setup-detail .hint {
   margin: 0 0 6px;
   line-height: 1.45;
+}
+/* Settings → Accounts (HI-980) */
+.accounts-provider {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 8px;
+}
+.account-row {
+  align-self: stretch;
+  display: flex;
+  gap: 12px;
+  align-items: flex-start;
+  justify-content: space-between;
+  flex-wrap: wrap;
+  padding: 8px 10px;
+  border: 1px solid var(--border);
+  border-radius: 6px;
+}
+.account-main {
+  flex: 1 1 360px;
+  min-width: 220px;
+}
+.account-name {
+  font-weight: 600;
+  display: flex;
+  gap: 8px;
+  align-items: center;
+  flex-wrap: wrap;
+}
+/* Each row's CLI (HI-1870): one list for every CLI, so each says its own. */
+.account-cli {
+  display: inline-flex;
+  gap: 4px;
+  align-items: center;
+  font-weight: normal;
+  font-size: 12px;
+}
+.account-setup-note {
+  margin: 2px 0 0;
+  font-size: 12px;
+}
+.account-setup-state {
+  display: inline-flex;
+  gap: 4px;
+  align-items: center;
+}
+.account-setup-state.needed .codicon {
+  color: var(--warning);
+}
+.account-setup-state.done .codicon {
+  color: var(--success);
+}
+.account-state {
+  display: flex;
+  gap: 4px;
+  align-items: center;
+  margin-top: 2px;
+}
+.account-state.state-signedIn .codicon {
+  color: var(--success);
+}
+.account-state.state-changed .codicon,
+.account-state.state-missing .codicon,
+.account-warning .codicon {
+  color: var(--warning);
+}
+.account-warning {
+  display: flex;
+  gap: 4px;
+  align-items: center;
+  margin-top: 4px;
+}
+/* An account's usage move (HI-2195): one sentence with its controls in it, wrapping on a narrow window. */
+.usage-move {
+  margin-top: 6px;
+}
+.usage-move-line {
+  display: flex;
+  gap: 6px;
+  align-items: baseline;
+}
+/* The sentence flows as text, its controls in it (translations put them in their own order). */
+.usage-move-line > span {
+  line-height: 30px;
+}
+.usage-move-line > span > .input,
+.usage-move-line > span > .select {
+  display: inline-block;
+  width: auto;
+  margin: 0 3px;
+  vertical-align: middle;
+}
+.usage-move-line > span > .usage-move-percent {
+  width: 4.5em;
+}
+.usage-move-note {
+  margin: 2px 0 0 22px;
+  font-size: 12px;
+}
+/* On the right of the account's own line (HI-2107): what it needs now, On here and its ⋯, in the same place on every row. */
+.account-actions {
+  display: flex;
+  gap: 6px;
+  align-items: center;
+  flex-wrap: wrap;
+  margin-left: auto;
+}
+.account-on-here {
+  display: inline-flex;
+  gap: 6px;
+  align-items: center;
+  font-size: 12px;
+}
+/* An account and its connections (HI-2107): the account's line, its connections indented under it. */
+.account-block {
+  align-self: stretch;
+  border: 1px solid var(--border);
+  border-radius: 6px;
+}
+.account-block > .account-row {
+  border: 0;
+  border-bottom: 1px solid var(--border);
+  border-radius: 6px 6px 0 0;
+}
+.connection-list {
+  container: connection-list / inline-size;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  padding: 4px 10px 6px 38px;
+}
+/* Each row is its own grid: a users column sized apart from its text keeps the split the same in every row, so the
+   columns line up (HI-2158). It fills to 150px before the fr columns grow, and gives way to 80px in a narrow pane. */
+.connection-row {
+  display: grid;
+  grid-template-columns: minmax(120px, 1.2fr) minmax(160px, 2fr) minmax(80px, 150px) auto;
+  gap: 10px;
+  align-items: center;
+  min-height: 26px;
+}
+/* A list narrower than those minimums (Settings beside the sidebar in a small window, HI-2163): the summary goes under
+   the name, the users column stays 80px, none sized by its text, so the rows stay inside the card and lined up. A
+   narrow window has its own layout (below). */
+@media (min-width: 701px) {
+  @container connection-list (max-width: 439px) {
+    .connection-row {
+      grid-template-columns: minmax(0, 1fr) 80px auto;
+      grid-template-areas: 'name users more' 'summary summary more';
+      row-gap: 0;
+      padding: 2px 0;
+    }
+    .connection-row > .connection-name {
+      grid-area: name;
+    }
+    .connection-row > .connection-summary {
+      grid-area: summary;
+    }
+    .connection-row > .connection-users {
+      grid-area: users;
+    }
+    .connection-row > :last-child {
+      grid-area: more;
+    }
+  }
+}
+.connection-row:hover {
+  background: var(--bg-hover);
+}
+.connection-name {
+  font-weight: 600;
+  display: inline-flex;
+  flex-wrap: wrap;
+  gap: 0 6px;
+  align-items: center;
+  overflow-wrap: anywhere;
+}
+/* Its First badge goes under a long name rather than breaking (HI-2163). */
+.connection-base {
+  white-space: nowrap;
+  font-weight: normal;
+  font-size: 11px;
+  padding: 0 6px;
+  border-radius: 8px;
+  border: 1px solid var(--border);
+  color: var(--fg-muted);
+}
+.connection-summary,
+.connection-users {
+  font-size: 12px;
+  overflow-wrap: anywhere;
+}
+.connection-users {
+  text-align: right;
+}
+.connection-warning .codicon {
+  color: var(--warning);
+  margin-left: 4px;
+}
+.connection-add {
+  align-self: flex-start;
+  margin-top: 2px;
+}
+@media (max-width: 700px) {
+  .connection-row {
+    grid-template-columns: 1fr auto;
+  }
+  .connection-users {
+    text-align: left;
+  }
+}
+/* Its handle: drag in the one order of accounts, or Alt+Up/Down. */
+.account-handle {
+  align-self: center;
+  background: none;
+  border: 0;
+  padding: 2px;
+  color: var(--fg-faint);
+  cursor: grab;
+}
+.account-handle:hover,
+.account-handle:focus-visible {
+  color: var(--fg);
+}
+.account-row.dragging {
+  opacity: 0.5;
+}
+.account-row.drop-target {
+  border-color: var(--accent);
+}
+.account-signin {
+  align-self: stretch;
+  margin-top: 10px;
 }
 .task-terminal {
   height: 280px;
@@ -3893,6 +5225,31 @@ h2.section#unused-worktrees {
 }
 .image-group {
   margin: 18px 0 8px;
+}
+/* A link's target in the Attachments tab (HI-1841: a card's or a session's files), outlined a moment. */
+.image-group.jumped {
+  outline: 2px solid var(--accent);
+  outline-offset: 4px;
+  border-radius: 4px;
+}
+.attachment-tab-empty {
+  padding-block: 32px;
+}
+/* Show in Attachments, beside the card dialog's Attachments heading (HI-1841). */
+.card-attachments-show {
+  margin-inline-start: auto;
+  padding: 0;
+  border: 0;
+  background: none;
+  color: var(--info);
+  font: inherit;
+  font-size: 12px;
+  text-transform: none;
+  letter-spacing: normal;
+  cursor: pointer;
+}
+.card-attachments-show:hover {
+  text-decoration: underline;
 }
 .image-group-head {
   display: flex;
@@ -4424,9 +5781,6 @@ h2.section#unused-worktrees {
   border-bottom: 1px solid var(--border);
   gap: 8px;
 }
-.banner.providers-banner .btn {
-  margin-left: auto;
-}
 
 .status-hex {
   width: 14px;
@@ -4544,7 +5898,7 @@ h2.section#unused-worktrees {
 .btn.quiet:is(.act-stop, .act-remove, .act-start, .act-archive-start, .act-resume) {
   color: var(--fg);
   background: var(--bg-elevated);
-  border-color: transparent;
+  border-color: var(--border);
 }
 .btn.quiet:is(.act-stop, .act-remove, .act-start, .act-archive-start, .act-resume):not(:disabled) .codicon {
   color: var(--act-fg);
@@ -4613,19 +5967,30 @@ h2.section#unused-worktrees {
 .split-list.sessions-list {
   width: 320px;
 }
-/* While searching: how many sessions and matches, after the Archived box. */
+/* While searching: how many sessions and matches, after the Archived box; the note while the CLIs' own sessions are read
+   (HI-1681). Each goes under the box when it doesn't fit beside it, and wraps within the list when it doesn't fit there
+   either (a long count in another language, the note), never past its edge (HI-1941); its spinner kept at its first line. */
 .sessions-scope {
   display: flex;
-  align-items: center;
+  align-items: flex-start;
   gap: 4px;
   margin-left: auto;
-  white-space: nowrap;
+  min-width: 0;
+  overflow-wrap: anywhere;
 }
+.sessions-scope > .codicon {
+  flex-shrink: 0;
+  margin-top: 1px;
+}
+/* What doesn't fit beside the Archived box goes under it, never past the list's edge, at any width it is resized to. */
 .sessions-filters {
   display: flex;
-  gap: 12px;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 4px 12px;
   padding: 0 10px 6px 14px;
   font-size: 12px;
+  min-width: 0;
 }
 .session-row {
   position: relative;
@@ -4928,6 +6293,13 @@ h2.section#unused-worktrees {
 .tx-fold-body {
   padding: 4px 10px 10px 30px;
 }
+/* A Codex script's calls (HI-2240), each folded, above the script's own code and output. */
+.tx-calls {
+  margin: 2px 0 8px -6px;
+}
+.tx-calls .tx-fold.open {
+  background: var(--bg);
+}
 .tx-thinking .tx-fold-body .tx-pre {
   font-family: inherit;
   font-style: italic;
@@ -5182,6 +6554,8 @@ body.pane-resizing .monaco-editor {
   position: absolute;
   inset: 32px 0 0 0;
   overflow: auto;
+  /* Its columns, which a page's size is measured from (HI-1951), never change with a scroll bar coming and going. */
+  scrollbar-gutter: stable;
 }
 .tile-grid {
   display: grid;
@@ -5432,6 +6806,35 @@ body.pane-resizing .monaco-editor {
 .tile-strip-row {
   position: relative;
   flex: none;
+}
+/* A row moves (#1053): dragged by its button; where it would go shows as a line in the gap between rows, the accent's,
+   as the lanes' and tabs' drops are. */
+.tile-strip-row.movable > .tile-strip-item {
+  cursor: grab;
+}
+.tile-strip-row.movable > .tile-strip-item:active {
+  cursor: grabbing;
+}
+.tile-strip-row.dragging {
+  opacity: 0.45;
+}
+.tile-strip-row.drop-before::before,
+.tile-strip-row.drop-after::after {
+  content: '';
+  position: absolute;
+  left: 2px;
+  right: 2px;
+  height: 3px;
+  border-radius: 2px;
+  background: var(--accent);
+  pointer-events: none;
+  z-index: 1;
+}
+.tile-strip-row.drop-before::before {
+  top: -2.5px;
+}
+.tile-strip-row.drop-after::after {
+  bottom: -2.5px;
 }
 .tile-strip-back,
 .tile-strip-item {
@@ -5827,6 +7230,35 @@ body.pane-resizing .monaco-editor {
 .pane-header-bar > .tip-wrap:has(> .agent-name) {
   min-width: 24px;
 }
+/* Where it works (#1442): "in slot-b" (a link to Branches & remotes), "carried: hb2", "home: hr4". */
+.agent-place {
+  white-space: nowrap;
+  font-size: 12px;
+}
+/* Short of room (#1568), it gives way after the status and before the name, shortened with an ellipsis (its tooltip
+   says where it works). */
+.pane-header-bar > .tip-wrap:has(> .agent-place) {
+  min-width: 0;
+  overflow: hidden;
+  flex-shrink: 100;
+}
+.pane-header-bar .agent-place {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+button.agent-place {
+  background: none;
+  border: none;
+  padding: 0;
+  color: var(--info);
+  cursor: pointer;
+  font: inherit;
+  font-size: 12px;
+}
+button.agent-place:hover {
+  text-decoration: underline;
+}
 /* The status gives way entirely before the name does (its shrink far outweighs the name's), and the review and
    safeguard shields with it. */
 .pane-header-bar > .tip-wrap:has(> .pane-status),
@@ -6013,6 +7445,13 @@ body.pane-resizing .monaco-editor {
 .pane-placeholder p {
   margin: 0 0 4px;
 }
+/* A folder or branch it names (#1552): marked as code, as in Markdown, so "hb2" reads as a name whatever its letters. */
+.pane-placeholder code {
+  background: var(--bg-elevated);
+  padding: 1px 5px;
+  border-radius: 4px;
+  font-size: 0.9em;
+}
 .pane-placeholder .btns {
   display: flex;
   gap: 8px;
@@ -6081,6 +7520,47 @@ body.pane-resizing .monaco-editor {
 .root-select {
   height: 24px;
   font-size: 12px;
+}
+/* The Changes tab's comparison (HI-1824): the two branches, a swap between them, and Files / Commits. */
+.compare-sides {
+  display: flex;
+  align-items: flex-end;
+  gap: 4px;
+  padding: 0 10px 8px 14px;
+}
+.compare-side {
+  display: flex;
+  flex-direction: column;
+  flex: 1;
+  min-width: 0;
+  font-size: 11px;
+  gap: 2px;
+}
+.compare-view {
+  margin: 0 10px 8px 14px;
+}
+/* The Changes tab's leftover branches (HI-1823). */
+.leftovers-pane {
+  overflow: auto;
+}
+.leftovers {
+  padding: 0 16px 16px;
+}
+.leftover-branch .leftover-ahead {
+  flex-shrink: 0;
+}
+.compare-files-hint {
+  padding: 0 10px 6px 14px;
+  font-size: 11px;
+}
+.compare-more {
+  margin: 6px 14px;
+}
+.compare-commits {
+  flex: 1;
+  min-height: 0;
+  overflow: auto;
+  padding: 0 16px 16px;
 }
 .agent-form {
   display: grid;
@@ -6157,14 +7637,28 @@ body.pane-resizing .monaco-editor {
 .assistant-action.failed .codicon {
   color: var(--fg-muted);
 }
-.assistant-action .assistant-revert {
+.assistant-action .assistant-undo,
+.assistant-change-head .assistant-undo-group {
   flex: none;
   height: 20px;
   padding: 0 6px;
   font-size: 11px;
 }
-.assistant-action .assistant-revert .codicon {
+.assistant-action .assistant-undo .codicon,
+.assistant-change-head .assistant-undo-group .codicon {
   color: inherit;
+}
+/* A change undone (#1283): struck through, with when; one that can't be undone, or kept, muted. */
+.assistant-action.undone .assistant-action-text {
+  text-decoration: line-through;
+  color: var(--fg-muted);
+}
+.assistant-action:is(.undone, .final, [data-status='kept'], [data-status='partly']) .codicon {
+  color: var(--fg-muted);
+}
+.assistant-change-status {
+  flex: none;
+  font-size: 11px;
 }
 .assistant-action-text {
   flex: 1;
@@ -6318,18 +7812,36 @@ body.pane-resizing .monaco-editor {
 .antivirus-folders td:first-child .mono {
   margin-left: 4px;
 }
+/* Hive's exclusions of folders that are gone (#1389): a heading and a table of their own under the workspace's. */
+.antivirus-gone h4 {
+  margin: var(--space-3) 0 var(--space-1);
+  font-size: inherit;
+}
+.antivirus-gone td.mono {
+  overflow-wrap: anywhere;
+}
 .perf-antivirus a {
   cursor: pointer;
 }
+/* Too narrow for the note and every button on one line, the buttons wrap onto the next, right-aligned; the note
+   ("Checked just now") keeps its words whole (#1306: it was squeezed into a cut column at the left edge). */
+/* Remove archived cards' attachments (HI-1842): its choice and Clean Up Now… on one line. */
+.card-cleanup-setting {
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--space-2);
+}
 .storage-actions {
   display: flex;
+  flex-wrap: wrap;
   align-items: center;
   justify-content: flex-end;
-  gap: 8px;
-  margin-top: 8px;
+  gap: var(--space-2);
+  margin-top: var(--space-2);
 }
 .storage-actions > :first-child {
   margin-right: auto;
+  flex-shrink: 0;
 }
 .storage-assistant {
   margin-top: 12px;
@@ -6454,6 +7966,23 @@ body.pane-resizing .monaco-editor {
   gap: 6px;
   margin-top: 8px;
 }
+.workflow-role-choice {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(130px, 1fr));
+  gap: 6px;
+}
+/* The role cards side by side where each has room for its sentence (Add Agent); in a narrower dialog (Agent Settings)
+   they stack, a card a row, rather than squeeze the sentence to a word or two a line (#1587: Polish, German). The
+   margin is the container's: one inside it wouldn't collapse with the heading's. */
+.workflow-role {
+  container: workflow-role / inline-size;
+  margin-block-start: 8px;
+}
+@container workflow-role (max-width: 519px) {
+  .workflow-role-choice {
+    grid-template-columns: 1fr;
+  }
+}
 .provider-choice .choice {
   align-items: center;
 }
@@ -6469,7 +7998,331 @@ body.pane-resizing .monaco-editor {
   justify-content: space-between;
   gap: 8px 12px;
 }
-/* The usage history's import under way (#1106): a spinner beside its note. */
+/* The Activity tab (#1254, HI-1743): a tab per running agent, its current work as a list, its details beside it. */
+.activity-tab {
+  display: flex;
+  height: 100%;
+  min-height: 0;
+}
+.activity-main {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+}
+.activity-head {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 8px 14px;
+  border-bottom: 1px solid var(--border-subtle);
+  flex-wrap: wrap;
+}
+.activity-head .actions {
+  margin-left: auto;
+  display: flex;
+  gap: 2px;
+}
+/* The list (HI-1743): a header line, then each agent's groups of rows, top to bottom; nothing off to the side. */
+.activity-list {
+  flex: 1;
+  min-height: 0;
+  overflow: auto;
+  padding: 10px 14px 16px;
+}
+.activity-card-head {
+  display: flex;
+  align-items: baseline;
+  gap: 6px;
+  min-width: 0;
+  margin-bottom: 6px;
+  font-size: 13px;
+}
+.activity-card-key {
+  font-weight: 600;
+  font-variant-numeric: tabular-nums;
+}
+/* One line (HI-1884): the key and the column never wrap or shrink; only the title gives way, cut with "…". */
+.activity-card-key,
+.activity-card-column {
+  flex: none;
+  white-space: nowrap;
+}
+.activity-card-title {
+  color: var(--fg-strong);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  min-width: 0;
+}
+.activity-part + .activity-part {
+  margin-top: 14px;
+  padding-top: 10px;
+  border-top: 1px solid var(--border-subtle);
+}
+.activity-part-head {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 12px;
+  margin-bottom: 2px;
+}
+.activity-group {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin: 10px 0 4px;
+  font-size: 11px;
+  font-weight: 600;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: var(--fg-muted);
+}
+.activity-own {
+  margin-left: auto;
+  font-size: 11px;
+  font-weight: normal;
+  letter-spacing: normal;
+  text-transform: none;
+}
+.activity-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  max-width: 900px;
+  padding: 4px 8px;
+  border-left: 3px solid var(--border);
+  border-radius: 4px;
+  cursor: pointer;
+}
+.activity-row + .activity-row {
+  margin-top: 2px;
+}
+.activity-row:hover {
+  background: var(--bg-hover);
+}
+.activity-row.selected,
+.activity-row:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: -1px;
+}
+.activity-row-plain {
+  cursor: default;
+}
+.activity-row-plain:hover {
+  background: transparent;
+}
+.activity-row.act-working {
+  border-left-color: var(--accent);
+}
+.activity-row.act-waiting {
+  border-left-color: var(--state-waiting, var(--warning));
+}
+/* Left running by the agent's command, its shell gone (HI-2111). */
+.activity-row.act-orphan {
+  border-left-color: var(--warning);
+}
+.activity-row.act-orphan > .codicon {
+  color: var(--warning);
+}
+.activity-row.act-failed {
+  border-left-color: var(--error);
+}
+.activity-row.act-done {
+  border-left-color: var(--success);
+  opacity: 0.72;
+}
+/* Live, what ended fades out where it was, then leaves (HI-1743: FADE_MS). */
+.activity-row.act-gone {
+  border-left-style: dashed;
+  animation: activity-fade 1.5s ease-in forwards;
+}
+@keyframes activity-fade {
+  from { opacity: 0.6; }
+  to { opacity: 0; }
+}
+@media (prefers-reduced-motion: reduce) {
+  .activity-row.act-gone { animation: none; opacity: 0.45; }
+}
+.activity-row-text {
+  min-width: 0;
+  flex: 0 1 auto;
+  line-height: 1.25;
+}
+.activity-row-title {
+  font-size: 12px;
+  color: var(--fg-strong);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.activity-row-sub {
+  font-size: 11px;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+/* A tab per agent (HI-1743), scrolling sideways when they don't fit, as the Progress panel's tabs. */
+.activity-tabs {
+  display: flex;
+  gap: 2px;
+  padding: 0 14px;
+  border-bottom: 1px solid var(--border-subtle);
+  overflow-x: auto;
+  overflow-y: hidden;
+  scrollbar-width: thin;
+}
+.activity-agent-tab {
+  flex: none;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 6px 10px;
+  border: 0;
+  border-bottom: 2px solid transparent;
+  background: transparent;
+  color: var(--fg-muted);
+  font: inherit;
+  font-size: 12px;
+  cursor: pointer;
+  white-space: nowrap;
+}
+.activity-agent-tab:hover {
+  color: var(--fg);
+  background: var(--bg-hover);
+}
+.activity-agent-tab.active {
+  color: var(--fg-strong);
+  border-bottom-color: var(--accent);
+}
+.activity-agent-tab:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: -2px;
+}
+.activity-agent-tab-card {
+  font-variant-numeric: tabular-nums;
+}
+/* Activity's workspace level (HI-1664): the agent tabs grouped by project, each group after its name. */
+.activity-tab-group {
+  flex: none;
+  display: inline-flex;
+  align-items: center;
+  gap: 2px;
+}
+.activity-tab-group + .activity-tab-group {
+  margin-left: 8px;
+  padding-left: 10px;
+  border-left: 1px solid var(--border-subtle);
+}
+.activity-tab-group-name {
+  font-size: 11px;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  padding-right: 4px;
+  white-space: nowrap;
+}
+.activity-for-card {
+  display: inline-flex;
+  align-items: center;
+  gap: 2px;
+}
+.activity-pick.on,
+.activity-live.on {
+  color: var(--accent);
+  border-color: var(--accent);
+}
+.activity-hide {
+  font-size: 12px;
+}
+.activity-pill {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  color: var(--accent-ink);
+  background: var(--accent-soft);
+  border-color: var(--accent);
+}
+/* Just after what it marks, not off at the row's far end. */
+.activity-pulse {
+  flex: none;
+  margin-left: 2px;
+}
+.activity-details {
+  flex: none;
+  width: 360px;
+  max-width: 45%;
+  border-left: 1px solid var(--border-subtle);
+  background: var(--bg-sidebar);
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
+}
+.activity-details-head {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 8px 10px 8px 14px;
+  border-bottom: 1px solid var(--border-subtle);
+}
+.activity-details-head .actions {
+  margin-left: auto;
+}
+.activity-details-title {
+  font-weight: 600;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.activity-details-body {
+  padding: 10px 14px;
+  overflow: auto;
+}
+.activity-facts {
+  margin: 0 0 8px;
+  display: grid;
+  gap: 4px;
+}
+.activity-facts > div {
+  display: flex;
+  gap: 8px;
+}
+.activity-facts dt {
+  color: var(--fg-muted);
+  min-width: 110px;
+}
+.activity-facts dd {
+  margin: 0;
+  overflow-wrap: anywhere;
+}
+.activity-pre {
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+  font-size: 11px;
+  max-height: 260px;
+  overflow: auto;
+  background: var(--bg);
+  border: 1px solid var(--border-subtle);
+  border-radius: 4px;
+  padding: 6px 8px;
+  margin: 4px 0 10px;
+}
+.activity-buttons {
+  display: flex;
+  gap: 6px;
+  flex-wrap: wrap;
+}
+
+/* The usage history's import under way (#1106), a bulk action on sessions (#1659): a spinner beside its note. */
+.sessions-bulk-progress {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+.sessions-list .sessions-bulk-progress {
+  margin: 0;
+  padding: 0 10px 6px 14px;
+}
 .overview-importing {
   display: flex;
   align-items: center;
@@ -6570,6 +8423,17 @@ body.pane-resizing .monaco-editor {
 .overview-plan {
   margin: 4px 0 6px;
 }
+/* A connection's plan limits (HI-1756): its name (and sign-in), then its cards. */
+.plan-connection-limits + .plan-connection-limits {
+  margin-top: 12px;
+}
+.plan-connection-name {
+  margin: 8px 0 2px;
+}
+/* The status bar's connection name before its limits. */
+.status-item .plan-connection {
+  font-weight: 600;
+}
 .running-list {
   display: flex;
   flex-direction: column;
@@ -6586,6 +8450,104 @@ body.pane-resizing .monaco-editor {
 }
 .running-row .small {
   font-size: 12px;
+}
+/* A running agent's first line (HI-1679): its name, its status and its card's chip on one line at any width. As the
+   row narrows, the chip's title gives way first (down to the key), then the status (with "…"), then the project before
+   the agent's name; the agent's name and the card's key stay whole. In a narrow Overview the context column narrows with
+   the line, so the line keeps room for them. */
+.running-row > .grow {
+  flex: 1 1 260px;
+  min-width: 0;
+}
+.running-row > .tip-wrap:has(> .running-ctx) {
+  flex: 0 1 180px;
+  min-width: 0;
+}
+.running-row .running-ctx {
+  flex: 1 1 auto;
+  width: auto;
+  min-width: 0;
+}
+.running-row .running-ctx > .small {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+/* Shrink factors far apart give each part its turn: what a part with a far smaller factor would give up meanwhile
+   rounds to nothing, so it shows no "…" until the parts before it are as small as they go. */
+.running-line {
+  display: flex;
+  align-items: center;
+  min-width: 0;
+}
+/* Spaced by margins, not a gap: the project and the agent's name are two items that read as one. */
+.running-line > .tip-wrap {
+  margin-left: 6px;
+}
+/* The name's parts are the line's own: its project shrinks to nothing first, its agent's name (no box of its own) never. */
+.running-line > strong {
+  display: contents;
+  white-space: nowrap;
+}
+.running-project {
+  flex: 0 1 auto;
+  min-width: 0;
+  overflow: hidden;
+  white-space: pre;
+}
+.running-line > .tip-wrap:has(> .running-status) {
+  flex: 0 100000 auto;
+  min-width: 0;
+}
+.running-status {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.running-line > .tip-wrap:has(> .card-chip) {
+  flex: 0 10000000000 auto;
+}
+/* Several cards (WatchedCardChips): a chip each, keys only, giving way as one chip does; when they don't fit, how many
+   ("2 cards"), whole. The unseen copy measures what the chips need. */
+.running-line > .running-cards {
+  position: relative;
+  display: inline-flex;
+  gap: 4px;
+  flex: 0 10000000000 auto;
+  min-width: 0;
+  margin-left: 6px;
+  overflow: hidden;
+}
+.running-line > .running-cards.counted {
+  min-width: max-content;
+}
+.running-cards-measure {
+  position: absolute;
+  top: 0;
+  left: 0;
+  display: inline-flex;
+  gap: 4px;
+  visibility: hidden;
+  white-space: nowrap;
+}
+.running-cards-count {
+  cursor: default;
+  white-space: nowrap;
+}
+/* The chip as a grid here: the title's column (the third) is as wide as the title when there is room and nothing at
+   the least, so the chip shrinks down to its icon and key, never past them. Its key stays whole by the base rule
+   (HI-2000); the grid is what lets the chip itself give way to the row. */
+.running-line .card-chip {
+  flex: 0 1 auto;
+  display: inline-grid;
+  grid-auto-flow: column;
+  grid-auto-columns: auto auto minmax(0, max-content) auto;
+  min-width: auto;
+  max-width: 100%;
+}
+.running-line .card-chip .codicon {
+  white-space: nowrap;
 }
 .running-ctx {
   width: 180px;
@@ -6761,14 +8723,14 @@ body.pane-resizing .monaco-editor {
   text-overflow: ellipsis;
   white-space: nowrap;
 }
-/* A description wraps onto a second line before it is cut (#886: the permission modes'). */
+/* A description wraps onto more lines before it is cut (#886: the permission modes'; #1126: three, as German's and Polish's mode descriptions run a little past two). */
 .menu-detail {
   font-size: 11px;
   color: var(--fg-muted);
   white-space: normal;
   display: -webkit-box;
   -webkit-box-orient: vertical;
-  -webkit-line-clamp: 2;
+  -webkit-line-clamp: 3;
 }
 .menu-item.muted .menu-label,
 .menu-item.muted > .codicon {
@@ -6852,10 +8814,14 @@ body.pane-resizing .monaco-editor {
 }
 .card-chip .codicon {
   font-size: 12px;
+  flex-shrink: 0;
 }
+/* Its key stays whole on one line: only the title gives way (HI-2000: "HI-" over "1985" in a Journal entry's Links). */
 .card-chip-number {
   font-variant-numeric: tabular-nums;
   font-weight: 600;
+  white-space: nowrap;
+  flex-shrink: 0;
 }
 .card-chip-title {
   overflow: hidden;
@@ -6865,6 +8831,8 @@ body.pane-resizing .monaco-editor {
 }
 .card-chip-more {
   color: var(--fg-muted);
+  white-space: nowrap;
+  flex-shrink: 0;
 }
 /* In a pane header, the strip and the Assistant's overview the chip is its icon and number (+n), the titles on hover
    (#311): it keeps its size, and the agent's status gives way first. */
@@ -7051,6 +9019,10 @@ button.mode-badge.badge:hover {
 .kb-table td.kb-label {
   overflow-wrap: break-word;
 }
+/* A table cell's own min-width doesn't hold it, so the id under the name does: German's long compounds ("Benachrichtigungseinstellungen") otherwise broke mid-word in a column 100 px wide (#1126). */
+.kb-table td.kb-label .kb-id {
+  min-inline-size: 11rem;
+}
 /* A narrow pane can be narrower than the table (it then scrolls sideways): the row's buttons stay in view at its right
    edge (#887). */
 .kb-table :is(th, td).kb-actions {
@@ -7063,6 +9035,26 @@ button.mode-badge.badge:hover {
 }
 .kb-table tr.recording td.kb-actions {
   background: linear-gradient(var(--accent-soft), var(--accent-soft)), var(--bg);
+}
+/* The editor's row isn't highlighted as a whole on hover: its sticky actions, on the page's background, would show as a
+   block of another colour (HI-1838's screenshot review). Its own rows still are. */
+.setting.wide:has(.kb-editor):hover {
+  background: none;
+}
+/*
+ * A narrow editor (HI-1838): the command takes less room, so it and its Shortcut stay in view beside the sticky actions;
+ * Category, after them, is what the table scrolls sideways to.
+ */
+.kb-editor {
+  container-type: inline-size;
+}
+@container (max-width: 620px) {
+  .kb-label {
+    min-width: 7em;
+  }
+  .kb-table td.kb-label .kb-id {
+    min-inline-size: 7rem;
+  }
 }
 .kb-id {
   font-size: 11px;
@@ -7112,8 +9104,10 @@ button.mode-badge.badge:hover {
   position: relative;
   display: flex;
   flex-direction: column;
-  flex-shrink: 0;
-  min-width: 300px;
+  /* Gives way first when the window is short of room for the work (HI-1737), down to its least width: 240 px, or less
+     (to 190) once everything else has given way (layoutRoom.ts sets it). */
+  flex-shrink: 1000;
+  min-width: var(--assistant-min, 240px);
   max-width: 70vw;
   background: var(--bg-sidebar);
   border-left: 1px solid var(--border-subtle);
@@ -7178,6 +9172,9 @@ button.mode-badge.badge:hover {
   font: inherit;
   font-size: 11px;
   cursor: pointer;
+  /* Squeezed past its icon and caret (the panel narrowed for the work, HI-1737): cut inside the pill, never drawn over
+     Start beside it. */
+  overflow: hidden;
 }
 .assistant-mode:hover {
   color: var(--fg);
@@ -7427,7 +9424,54 @@ body.pane-resizing-v .monaco-editor {
   border-bottom: 1px solid var(--border-subtle);
   padding-bottom: 2px;
 }
-/* Every row the same height, a setting's with its Revert button too, so the list's 3 rows are its height unfolded. */
+/* The user's messages (#1283): a heading each, the newest open; a long list scrolls inside, the panel's other parts kept. */
+.assistant-actions {
+  max-block-size: 45vh;
+  overflow-y: auto;
+}
+.assistant-change-head {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding-inline-end: 12px;
+}
+.assistant-change-toggle {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  padding-block: 3px;
+  padding-inline: 8px 0;
+  border: 0;
+  background: none;
+  color: var(--fg);
+  font: inherit;
+  font-size: 12px;
+  font-weight: 600;
+  text-align: start;
+  cursor: pointer;
+}
+.assistant-change-toggle:hover .assistant-action-text {
+  text-decoration: underline;
+}
+.assistant-undo-result {
+  margin-block: 2px 4px;
+  margin-inline: 12px;
+  padding-block: 4px;
+  padding-inline: 8px;
+  border-inline-start: 2px solid var(--border);
+  font-size: 12px;
+}
+.assistant-undo-result > .flex {
+  justify-content: space-between;
+}
+.assistant-undo-result ul {
+  margin-block: 2px;
+  padding-inline-start: 16px;
+  color: var(--fg-muted);
+}
+/* Every row the same height, with its Undo button or without, so the list's 3 rows are its height unfolded. */
 .assistant-actions .assistant-action {
   box-sizing: border-box;
   height: 24px;
@@ -7442,7 +9486,10 @@ body.pane-resizing-v .monaco-editor {
   display: flex;
   flex-direction: column;
   align-items: center;
-  justify-content: center;
+  /* Centred while it fits; in a short panel it starts at the top and scrolls, never spilling over the
+     workspace above or the footer below (HI-2198). */
+  justify-content: safe center;
+  overflow-y: auto;
   gap: 6px;
   padding: 20px;
   text-align: center;
@@ -7645,9 +9692,6 @@ body.pane-resizing-v .monaco-editor {
 .assistant-empty {
   padding: 6px 0;
 }
-.assistant-defaults {
-  width: 100%;
-}
 .titlebar-btn {
   position: relative;
   width: 30px;
@@ -7704,16 +9748,35 @@ body.pane-resizing-v .monaco-editor {
   font-weight: 600;
   color: var(--fg-strong);
 }
+/* In a narrow window the row wraps (HI-1725): the search box gives way to its least width first, then whatever doesn't
+   fit goes whole to a second line, New Card and ⋯ still at its end. */
 .board-toolbar {
   display: flex;
+  flex-wrap: wrap;
   align-items: center;
-  gap: 12px;
+  gap: 8px 12px;
+}
+/* The checkboxes keep their one line; the workflow link (#1420) is cut with "…" (its hover has it whole) only where even
+   a line of its own is too narrow for it. */
+.board-toolbar > label {
+  white-space: nowrap;
+}
+.board-toolbar .tip-wrap:has(> .board-workflow) {
+  min-width: 0;
+  display: flex;
+}
+.board-workflow {
+  min-width: 0;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
 }
 .board-search {
   display: flex;
   align-items: center;
   gap: 6px;
-  width: 300px;
+  flex: 0 1 300px;
+  min-width: 160px;
   max-width: 40%;
 }
 .board-search .search-box {
@@ -7727,6 +9790,9 @@ body.pane-resizing-v .monaco-editor {
   display: flex;
   gap: 10px;
   overflow-x: auto;
+  /* The view's 10 px gap above it is inside it, so a group's heading on its line there (below) is in its scroll box. */
+  margin-top: -10px;
+  padding-top: 10px;
 }
 .board-column {
   flex: 1 1 0;
@@ -7745,6 +9811,88 @@ body.pane-resizing-v .monaco-editor {
 .board-column.collapsed {
   flex: 0 0 34px;
   min-width: 34px;
+}
+/* A category with several stages (#1420: Approved with Merging): one heading over its stages' columns, which share its
+   width as the board's columns do; its flex-grow is how many of them are open (inline). Its basis is the room inside it that isn't its open
+   columns' shares: the gaps between its stages (10 px each), a folded stage's 34 px strip, and each open column's
+   borders (2 px: a column's least size, which every column outside a category has as its own basis). So each open
+   column gets the same share of the board as the others (#1490: Approved and Merging were 5 px narrower, and Approved's
+   ⋯ wrapped). */
+.board-category {
+  flex: 1 1 calc((var(--stages, 1) - 1) * 10px + var(--folded, 0) * 34px + (var(--stages, 1) - var(--folded, 0)) * 2px);
+  /* As wide as its columns' least widths: they never spill over the next category. Summed from them (the gaps, a
+     folded stage's 34 px, an open one's 120 px), not min-content: a collapsed card's one-line title would set that,
+     squeezing every other column to its least (#1619). */
+  min-width: calc((var(--stages, 1) - 1) * 10px + var(--folded, 0) * 34px + (var(--stages, 1) - var(--folded, 0)) * 120px);
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
+  position: relative;
+}
+.board-category.collapsed {
+  flex: 0 0 auto;
+}
+/* Its heading is a line over its columns in the 10 px gap above them, its name on the line as a fieldset's legend
+   (HI-1682, Darren's decision): it takes no row of its own, so every column's top is the same with a group or without
+   one. The name, on the view's background, may reach a pixel into the columns' tops. */
+.board-category-head {
+  position: absolute;
+  top: -10px;
+  left: 0;
+  right: 0;
+  height: 10px;
+  display: flex;
+  align-items: center;
+  padding: 0 8px;
+  pointer-events: none;
+}
+/* Folded to its strips, its name has their width only. */
+.board-category.collapsed .board-category-head {
+  padding: 0 2px;
+}
+.board-category-head::before {
+  content: '';
+  position: absolute;
+  top: 4px;
+  left: 0;
+  right: 0;
+  border-top: 2px solid var(--border-subtle);
+}
+.board-category-head > span {
+  position: relative;
+  min-width: 0;
+  padding: 0 4px;
+  background: var(--bg);
+  font-size: 10px;
+  line-height: 12px;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  color: var(--fg-muted);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.board.colored .board-category-head > span {
+  color: color-mix(in srgb, var(--col) var(--board-label), var(--fg-strong));
+}
+.board.colored .board-category-head::before {
+  border-top-color: var(--col);
+}
+.board-category-columns {
+  flex: 1;
+  display: flex;
+  gap: 10px;
+  min-height: 0;
+}
+/* A category's stages share its room: a little narrower at least, so seven columns fit where six did. */
+.board-category-columns > .board-column:not(.collapsed) {
+  min-width: 120px;
+}
+/* Seven columns where six were: each a little narrower at least, so they still fit where six did. Open ones only: it
+   outranks `.board-column.collapsed`, so a folded column kept 140 px (HI-1724). */
+.board.grouped > .board-column:not(.collapsed) {
+  min-width: 140px;
 }
 .board-column-strip {
   flex: 1;
@@ -7798,7 +9946,7 @@ body.pane-resizing-v .monaco-editor {
 }
 .board-column-header {
   display: flex;
-  align-items: center;
+  align-items: flex-start;
   gap: 6px;
   padding: 8px 4px;
   font-size: 12px;
@@ -7865,28 +10013,49 @@ body.pane-resizing-v .monaco-editor {
   background: var(--bg-input, transparent);
   cursor: pointer;
 }
-/* A long column name is cut with "…" (its tooltip gives it in full), keeping the count, + and ⋯ in the column (#886). */
+/* A column's name stays readable (#886; the Assistant's #1420 OK: seven columns at a normal width): never cut within a
+   word. While it fits, the header is one row; in a narrow column the name keeps the first row beside the fold button,
+   wrapping between words, and the count, + and ⋯ move to a second row; a word too long for the column ends in "…".
+   Its tooltip gives it in full as well. */
+.board-column-header {
+  flex-wrap: wrap;
+  row-gap: 2px;
+  /* Its width is the column's, so its name can be held to it (cqw below). */
+  container-type: inline-size;
+}
 .board-column-header > .tip-wrap:has(> .board-column-label) {
-  min-width: 0;
+  flex: 1 1 auto;
+  min-width: min-content;
   display: flex;
 }
+/* Never wider than the header beside the fold button: a name with a word longer than that (a stage's own name can be
+   24 letters, HR2's #1420 round 4; "Zatwierdzone" and "Fusionando" with every stage shown, HI-2160) ends that word
+   with "…" rather than painting over the next column or breaking within it. Its tooltip gives the name in full. */
 .board-column-header .board-column-label {
-  min-width: 0;
+  max-width: calc(100cqw - 30px);
   overflow: hidden;
   text-overflow: ellipsis;
-  white-space: nowrap;
+  line-height: 16px;
+}
+/* The count, + and ⋯ are one item (#1490): on the name's row while they fit, else together on a row of their own,
+   "count … ⋯", with ⋯ at the inline end. */
+.board-column-header .board-column-tools {
+  flex: 1 0 auto;
+  display: flex;
+  align-items: flex-start;
+  gap: 6px;
 }
 .board-column-header .count {
   font-weight: 400;
   color: var(--fg-faint);
-  margin-left: -2px;
-}
-/* The spacer takes no gap of its own, the buttons are a little narrower, the count sits 2 px closer and the right
+  margin-inline-start: -2px;
+}/* The spacer takes no gap of its own, the buttons are a little narrower, the count sits 2 px closer and the right
    padding matches the left (the icons move 2–4 px): that room goes to the column's name, so "Wstrzymane", "À faire" and "A fazer" stay whole beside
    + and ⋯ (#886). */
 .board-column-header .grow {
+  flex: 1;
   min-width: 0;
-  margin-left: -6px;
+  margin-inline-start: -6px;
 }
 .board-column-header .icon-btn {
   width: 20px;
@@ -7989,17 +10158,43 @@ body.pane-resizing-v .monaco-editor {
 /* A folded card: one line with its number, title (cut short), markers and agent. */
 .task-card.folded {
   padding: 4px 9px;
+  container: folded-card / inline-size;
+}
+.task-card-top .task-number,
+.task-card-line .task-number {
+  flex: none;
+  max-width: 100%;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+/* Its markers keep their size (#1634): with no room beside the title they go onto another line, never past the card's
+   edge or over each other. The title keeps a few letters, so its tooltip can be reached. */
+.task-card-line > .tip-wrap:has(> .task-for-you) {
+  flex: none;
+}
+/* In a narrow column (#1634) its For you chip is its bell alone (its words and the requests in its tooltip and
+   accessible name), and the title has a line of its own under the number and markers. */
+@container folded-card (max-width: 219px) {
+  .task-card-line .task-for-you .task-chip-label {
+    display: none;
+  }
+  .task-card-line > .tip-wrap:has(> .task-title) {
+    order: 1;
+    flex-basis: 100%;
+  }
 }
 .task-card-line {
   display: flex;
+  flex-wrap: wrap;
   align-items: center;
-  gap: 6px;
+  gap: 2px 6px;
   min-width: 0;
   font-size: 12px;
 }
 .task-card-line > .tip-wrap:has(> .task-title) {
-  flex: 1;
-  min-width: 0;
+  flex: 1 1 0;
+  min-width: min(4em, 100%);
 }
 .task-card-line .task-title {
   flex: 1;
@@ -8058,6 +10253,283 @@ body.pane-resizing-v .monaco-editor {
   gap: 6px;
   font-size: 11px;
 }
+/* A board card's work badges (#1224): one quiet line, an icon with each (colour never alone). */
+.task-work {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 6px;
+  font-size: 11px;
+  color: var(--fg-muted);
+}
+.task-work-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 2px;
+}
+.task-work-badge code {
+  font-size: 11px;
+}
+.task-work-badge.pass .codicon {
+  color: var(--success);
+}
+.task-work-badge.fail .codicon,
+.task-work-badge.warn .codicon {
+  color: var(--warning);
+}
+.task-work-badge.old {
+  opacity: 0.6;
+}
+/* A card's kind (#1277): No code, a quiet outlined pill with a note icon; a proposal (not confirmed) dashed, with a "?". */
+.task-for-you-row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px;
+}
+.task-kind {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding-block: 1px;
+  padding-inline: 7px;
+  border-radius: 8px;
+  border: 1px solid var(--border);
+  color: var(--fg-muted, var(--fg));
+  font-size: 11px;
+  white-space: nowrap;
+}
+/* A card's chips never run past its edge in a narrow column (#1634): each shrinks to the card, its label cut with "…"
+   and its icon kept; the whole in its tooltip. */
+.task-for-you-row > .tip-wrap,
+.task-card-top > .tip-wrap:has(> .task-project) {
+  min-width: 0;
+  max-width: 100%;
+}
+.task-kind,
+.task-for-you {
+  min-width: 0;
+  max-width: 100%;
+}
+.task-kind > .codicon,
+.task-for-you > .codicon {
+  flex: none;
+}
+.task-chip-label {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.task-kind.proposed {
+  border-style: dashed;
+}
+/* Review: Skip (#1625): the New Card dialog's tick box and its note, side by side. */
+.review-skip-new {
+  gap: 8px;
+  flex-wrap: wrap;
+}
+.review-skip-new .input {
+  flex: 1;
+  min-width: 160px;
+}
+.kind-field {
+  gap: 6px;
+}
+.kind-field .btn {
+  margin-inline-start: 6px;
+}
+.kind-proposal {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 6px;
+}
+.kind-proposal-actions {
+  display: inline-flex;
+  gap: 6px;
+  margin-inline-start: auto;
+}
+/* For you (#1276): a card waits for the user. A pill with a bell and the request's kind, in the accent colour. */
+.task-for-you-row {
+  margin-block-start: 4px;
+}
+.task-for-you {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding-block: 1px;
+  padding-inline: 7px;
+  border-radius: 8px;
+  border: 1px solid var(--accent);
+  background: var(--accent-soft);
+  color: var(--accent-ink, var(--fg));
+  font-size: 11px;
+  font-weight: 600;
+  white-space: nowrap;
+}
+/* Its tooltip (#1635): each request's asker in bold over the start of what it asks, then where to answer. */
+.for-you-tip {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+.for-you-tip-asks {
+  font-weight: 600;
+}
+.task-card.folded .task-for-you {
+  margin-inline-start: 4px;
+}
+.for-you-section {
+  border: 1px solid var(--accent);
+  border-radius: 6px;
+  background: var(--accent-soft);
+  padding-block: 8px;
+  padding-inline: 10px;
+  margin-block-end: 10px;
+}
+.for-you-section .task-section-h {
+  margin-block-start: 0;
+}
+/* For you's resolved list (HI-1932): requests a decision of the user's answered, quieter than those still open. */
+.for-you-resolved {
+  margin-block-start: 8px;
+  font-size: 12px;
+}
+.for-you-request + .for-you-resolved {
+  border-top: 1px solid var(--border-subtle);
+  padding-block-start: 8px;
+}
+.for-you-resolved-h {
+  font-size: 11px;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+}
+.for-you-resolved-row {
+  margin-block-start: 6px;
+  min-width: 0;
+}
+.for-you-resolved-q {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.for-you-resolved-by {
+  overflow-wrap: anywhere;
+}
+.for-you-resolved-when::before {
+  content: '· ';
+}
+.for-you-request + .for-you-request {
+  margin-block-start: 10px;
+  padding-block-start: 10px;
+  border-block-start: 1px solid var(--border-subtle);
+}
+.for-you-kind {
+  font-weight: 600;
+  margin-inline-end: 4px;
+}
+/* A request's text (#1637): Markdown as card comments show it, folded to about ten lines until Show all. */
+.for-you-question.folded {
+  max-block-size: 14em;
+  overflow: hidden;
+}
+.for-you-question.faded {
+  mask-image: linear-gradient(to bottom, #000 75%, transparent);
+}
+.for-you-question .markdown > :first-child {
+  margin-block-start: 0;
+}
+.for-you-question .markdown > :last-child {
+  margin-block-end: 0;
+}
+.for-you-more {
+  margin-block: 2px 4px;
+}
+.for-you-asked {
+  font-size: 11px;
+  margin-block: 2px 6px;
+}
+.for-you-checklist ul {
+  margin-block: 2px 6px;
+  padding-inline-start: 18px;
+}
+.for-you-reply {
+  width: 100%;
+  margin-block-end: 6px;
+  resize: vertical;
+}
+.for-you-actions {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 6px;
+}
+/* The optional note beside Approve (HI-2286): the row's spare width, its hint readable. */
+.for-you-approve-note {
+  flex: 1 1 18em;
+  min-width: 12em;
+}
+/* The actions an agent's question offers (#1630), as one grid (HI-1689): the buttons share a column as wide as the
+   widest label, so every reason box starts and ends at the same place. Narrow, each button is over its box. */
+.for-you-offers-box {
+  container-type: inline-size;
+  margin-block-end: 8px;
+}
+.for-you-offers {
+  display: grid;
+  grid-template-columns: max-content minmax(0, 1fr);
+  gap: 6px;
+}
+/* An action: its button, then the reason it is done with, a row of the grid (a subgrid, so it keeps a box). */
+.for-you-offer {
+  display: grid;
+  grid-column: 1 / -1;
+  grid-template-columns: subgrid;
+  align-items: center;
+  min-inline-size: 0;
+}
+.for-you-offer > .tip-wrap {
+  display: flex;
+  align-self: stretch;
+}
+.for-you-offer > .tip-wrap > .btn {
+  flex: 1;
+  justify-content: center;
+}
+.for-you-offer .input {
+  align-self: stretch;
+  min-inline-size: 0;
+}
+/* Narrower than the widest label (German's, 179 px) and a reason box of about 155 px: a button over its box, the actions
+   further apart than a button and its box. */
+@container (max-width: 340px) {
+  .for-you-offers {
+    grid-template-columns: minmax(0, 1fr);
+    row-gap: 10px;
+  }
+  .for-you-offer {
+    row-gap: 4px;
+  }
+}
+.for-you-rounds input {
+  inline-size: 64px;
+  margin-inline-start: 6px;
+}
+/* The merge queue's question before an upgraded project's first merge (HI-1697): a label over each choice, then Save. */
+.for-you-merge-choice {
+  display: grid;
+  gap: 8px;
+}
+.for-you-merge-choice > label {
+  flex-direction: column;
+  align-items: stretch;
+  gap: 4px;
+}
+/* A move past the card's rules (#1275): its own icon (an open lock) and colour, beside the other marks. */
+.task-work-badge.override .codicon {
+  color: var(--info);
+}
 .task-label {
   background: var(--bg-active);
   border-radius: 8px;
@@ -8097,9 +10569,19 @@ textarea.input.task-blocked-input {
   text-overflow: ellipsis;
   white-space: nowrap;
 }
-/* Its status stays on one line beside the name, which gives way first. */
-.task-agent > .faint {
+/* Its status stays on one line beside the name, which gives way first; in a narrow column the status is cut with "…"
+   too (#1634), the whole in the line's tooltip. */
+.task-agent > .dot {
   flex: none;
+}
+.task-agent > .task-agent-name {
+  flex-shrink: 1000;
+  min-width: 2ch;
+}
+.task-agent > .faint {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
   white-space: nowrap;
 }
 .task-drop {
@@ -8217,6 +10699,33 @@ textarea.input.task-blocked-input {
 .task-form {
   margin-bottom: 4px;
 }
+/*
+ * A card on a read-only board (#1230): its fields look read-only (no fill, faded), and the footer's buttons it
+ * can't use look off, as faded as Delete (a disabled subtle or gold button otherwise still reads as one to click).
+ */
+.task-title-input:read-only,
+.task-form .input:read-only,
+.task-form .select:disabled,
+.task-description-input:read-only,
+.task-decision-new .input:disabled,
+.task-comment-new .input:disabled {
+  background: transparent;
+  border-color: var(--border-subtle);
+  opacity: 0.5;
+  cursor: default;
+}
+/* No arrow: nothing to pick. */
+.task-form .select:disabled {
+  appearance: none;
+}
+.dialog-footer .btn.ro-off:disabled {
+  opacity: 0.3;
+}
+.dialog-footer .btn.primary.ro-off:disabled {
+  background: transparent;
+  border-color: var(--border);
+  color: var(--fg-muted);
+}
 /* The card dialog's Read first (#818): its references, one a line, then each as a link to its section. */
 .task-context {
   display: flex;
@@ -8296,6 +10805,379 @@ textarea.input.task-blocked-input {
   min-height: 140px;
   resize: vertical;
 }
+/* The card dialog's Work section (#1224). */
+.card-work {
+  font-size: 12px;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+.card-work-note {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  color: var(--warning);
+}
+.card-work-facts {
+  display: grid;
+  grid-template-columns: max-content 1fr;
+  gap: 4px 12px;
+  margin: 0;
+}
+.card-work-facts > div {
+  display: contents;
+}
+.card-work-facts dt {
+  color: var(--fg-muted);
+}
+.card-work-facts dd {
+  margin: 0;
+  overflow-wrap: anywhere;
+}
+.card-work-marks,
+.card-work-results,
+.card-work-files {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+}
+.card-work-marks li {
+  color: var(--warning);
+}
+.card-work-sub {
+  color: var(--fg-muted);
+  margin-block-start: 4px;
+}
+/* A card's cost by round and role (HI-1906): amounts right-aligned in their columns, the totals set apart. */
+.card-work-costs {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+.card-work-costs table {
+  border-collapse: collapse;
+  width: max-content;
+  max-width: 100%;
+}
+.card-work-costs th,
+.card-work-costs td {
+  padding: 2px 10px;
+  text-align: end;
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+}
+.card-work-costs th:first-child {
+  padding-inline-start: 0;
+  text-align: start;
+}
+.card-work-costs thead th {
+  color: var(--fg-muted);
+  font-weight: normal;
+  border-bottom: 1px solid var(--border-subtle);
+}
+.card-work-costs tbody th {
+  font-weight: normal;
+}
+.card-work-costs tfoot th,
+.card-work-costs tfoot td,
+.card-work-costs td[data-role='total'] {
+  font-weight: 600;
+}
+.card-work-costs tfoot th,
+.card-work-costs tfoot td {
+  border-top: 1px solid var(--border-subtle);
+}
+.card-work-rev {
+  border: 1px solid var(--border-subtle);
+  border-radius: 6px;
+  padding: 6px 8px;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+.card-work-rev-head {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+}
+.card-work-dot::before {
+  content: '·';
+  margin-inline-end: 8px;
+}
+.card-work-rev-head > .card-work-dot:first-child::before {
+  content: none;
+}
+.card-work-unread {
+  color: var(--warning);
+}
+.card-work-rev-id {
+  background: none;
+  border: none;
+  padding: 0;
+  cursor: pointer;
+  color: var(--info);
+}
+.card-work-results li.pass .codicon {
+  color: var(--success);
+}
+.card-work-results li.fail .codicon {
+  color: var(--warning);
+}
+.card-work-results li.old {
+  opacity: 0.65;
+}
+.card-work-files {
+  padding-inline-start: 18px;
+}
+/* The card's Work section, its merge queue part (#1357): where the entry stands, a return with its output, the queue's
+   pause, an advance stopped part way with its files and commands to copy. Each state has its icon and words. */
+.card-work-queue {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  border: 1px solid var(--border-subtle);
+  border-left: 3px solid var(--merge);
+  border-radius: 6px;
+  padding: 6px 8px;
+}
+.card-work-queue .card-work-sub {
+  margin-block-start: 0;
+}
+.card-work-queue-line {
+  display: flex;
+  align-items: flex-start;
+  gap: 6px;
+  overflow-wrap: anywhere;
+}
+.card-work-queue-line > span {
+  flex: 1 1 auto;
+  min-width: 0;
+}
+.card-work-queue-line > .codicon {
+  flex-shrink: 0;
+}
+.card-work-queue-line > .codicon-error {
+  color: var(--error);
+}
+.card-work-queue-line > .codicon-warning,
+.card-work-queue-paused .codicon-debug-pause {
+  color: var(--warning);
+}
+.card-work-queue-log {
+  margin: 0;
+  padding: 6px;
+  max-height: 220px;
+  overflow: auto;
+  font-size: 11px;
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+  border: 1px solid var(--border);
+  border-radius: 4px;
+  background: var(--bg);
+}
+.card-work-queue-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px;
+}
+/* A returned card's conflicts (HI-1181): each file unfolds its hunks, read-only; context lines muted, each side under its
+   name (the target, the card, a diff3 base), lines left out said apart from the text. */
+.card-work-conflicts > li > .link {
+  display: inline-flex;
+  align-items: center;
+  gap: 2px;
+}
+.card-work-hunk {
+  margin-block: 4px;
+}
+.card-work-hunk-text .hunk-context {
+  color: var(--fg-faint);
+}
+.card-work-hunk-text .hunk-side {
+  display: block;
+  border-inline-start: 2px solid var(--merge);
+  padding-inline-start: 6px;
+  margin-block: 2px;
+}
+.card-work-hunk-text .hunk-side-name {
+  font-weight: 600;
+  color: var(--fg-muted);
+}
+.card-work-hunk-text .hunk-cut {
+  font-style: italic;
+  color: var(--fg-faint);
+}
+.card-work-queue-why {
+  white-space: pre-line;
+  overflow-wrap: anywhere;
+}
+.card-work-queue-paused,
+.card-work-queue-stuck,
+.card-work-queue-returned,
+.card-work-queue-advance {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 4px;
+}
+.card-work-queue-note {
+  width: min(100%, 28em);
+}
+.card-work-queue-files [data-side] code,
+.card-work-queue-stuck .card-work-files code {
+  overflow-wrap: anywhere;
+}
+.card-work-queue-command {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  width: 100%;
+}
+.card-work-queue-command-row {
+  display: flex;
+  align-items: flex-start;
+  gap: 6px;
+}
+.card-work-queue-command-row > code {
+  flex: 1 1 auto;
+  min-width: 0;
+  padding: 4px 6px;
+  border-radius: 4px;
+  background: var(--bg);
+  border: 1px solid var(--border);
+  font-size: 11px;
+  overflow-wrap: anywhere;
+}
+.for-you-show-work {
+  margin-top: 4px;
+}
+/* The Git tab's Merge queue section (#1357): each target's queue card, then its history. */
+.git-queue {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+  padding: 12px;
+  overflow-y: auto;
+  min-height: 0;
+}
+.git-queue-target {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  max-width: 900px;
+}
+.git-queue-history-h {
+  font-weight: 600;
+}
+/* Its history (#1641): a data table as the archived cards' one, a line a row. The title takes the room left and is
+   ellipsised (its tooltip has it whole); the other columns never wrap, and a table narrower than them scrolls sideways
+   in its .table-wrap. */
+.git-queue-table {
+  container-type: inline-size;
+}
+/* A long history scrolls in its own box under headings and filters that stay in view (sticky needs the scrolling box
+   to be the table's own: .table-wrap already scrolls sideways). */
+.git-queue-table .table-wrap {
+  max-height: max(240px, 55vh);
+  overflow: auto;
+}
+/* Separate borders: a sticky thead in a collapsed table lets the rows show between its own (Chromium). */
+.git-queue-table .table {
+  border-collapse: separate;
+  border-spacing: 0;
+}
+.git-queue-table thead {
+  position: sticky;
+  top: 0;
+  z-index: 1;
+  background: var(--bg);
+}
+.git-queue-table thead th {
+  background: var(--bg);
+}
+.git-queue-table thead tr:last-child th {
+  box-shadow: inset 0 -1px 0 var(--border);
+}
+.git-queue-table td {
+  white-space: nowrap;
+}
+.git-queue-table td.git-queue-title-cell {
+  width: 100%;
+  max-width: 0;
+  min-width: 80px;
+}
+/* Narrow (the window at its narrowest): the merge commit is left to the outcome's tooltip, so When stays in view. */
+@container (max-width: 620px) {
+  .git-queue-table .git-queue-result {
+    display: none;
+  }
+}
+.git-queue-title {
+  display: block;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  color: var(--fg-strong);
+}
+.git-queue-outcome[data-outcome='merged'] .codicon {
+  color: var(--success);
+}
+.git-queue-outcome[data-outcome='returned'] .codicon {
+  color: var(--error);
+}
+/* The Merge dialog for merges outside cards (#1450): the branch and its target side by side, each as wide as it can be. */
+.branch-merge-pick {
+  display: flex;
+  gap: 12px;
+  flex-wrap: wrap;
+  margin-bottom: 10px;
+}
+.branch-merge-pick > label {
+  flex: 1 1 220px;
+  min-width: 0;
+}
+.branch-merge-pick .select {
+  width: 100%;
+}
+.branch-merge-card {
+  margin-bottom: 8px;
+}
+.branch-merge-card .link {
+  background: none;
+  border: none;
+  padding: 0;
+  color: var(--info);
+  cursor: pointer;
+  font: inherit;
+  text-decoration: underline;
+}
+/* The Merge dialog on a branch whose card Hive merges (#1357). */
+.merge-queue-note {
+  margin-bottom: 8px;
+}
+/* Its Merge, held while Hive merges the card: plainly off, its reason on hover (the disabled button passes the hover to
+   its tooltip). */
+.btn.merge-held:disabled {
+  pointer-events: none;
+}
+.card-work-files .link {
+  background: none;
+  border: none;
+  padding: 0;
+  color: var(--info);
+  cursor: pointer;
+  text-align: start;
+  overflow-wrap: anywhere;
+}
+.card-work-file-status {
+  display: inline-block;
+  min-inline-size: 1.4em;
+  color: var(--fg-muted);
+  font-family: var(--font-mono, monospace);
+}
 .task-description {
   border: 1px solid var(--border-subtle);
   border-radius: 6px;
@@ -8321,6 +11203,101 @@ textarea.input.task-blocked-input {
   min-height: 56px;
   resize: vertical;
 }
+/* Card attachments (HI-1700): an image in a card's text shown as a thumbnail under the text it follows (a click opens it);
+   a link to one removed. */
+.task-description .markdown img,
+.task-comment .markdown img {
+  display: block;
+  max-width: min(240px, 100%);
+  max-height: 240px;
+  margin: 4px 0;
+  border: 1px solid var(--border-subtle);
+  border-radius: 4px;
+  cursor: pointer;
+}
+.attachment-gone {
+  display: inline-block;
+  padding: 0 6px;
+  border-radius: 9px;
+  font-size: 12px;
+  color: var(--fg-muted);
+  background: var(--bg-active);
+}
+/* Files pasted or dropped into a box, not saved yet: a chip each, under the box. */
+.attach-drafts {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 6px;
+  align-self: stretch;
+  margin-top: 4px;
+}
+.attach-draft {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  max-width: 220px;
+  padding: 2px 2px 2px 4px;
+  border: 1px dashed var(--border);
+  border-radius: 6px;
+  font-size: 12px;
+}
+.attach-draft img {
+  width: 24px;
+  height: 24px;
+  object-fit: cover;
+  border-radius: 3px;
+}
+.attach-draft-name {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+/* The card's attachments: a row each, its thumbnail or icon, its name and size, and its actions. */
+.card-attachments {
+  margin-top: 8px;
+}
+.card-attachment-list {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+.card-attachment {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 4px 6px;
+  border: 1px solid var(--border-subtle);
+  border-radius: 6px;
+}
+.card-attachment.missing {
+  border-style: dashed;
+}
+.card-attachment-thumb {
+  width: 40px;
+  height: 40px;
+  object-fit: cover;
+  border-radius: 4px;
+  flex: none;
+}
+.card-attachment-icon {
+  width: 40px;
+  text-align: center;
+  font-size: 20px;
+  flex: none;
+}
+.card-attachment-text {
+  display: flex;
+  flex-direction: column;
+  flex: 1;
+  min-width: 0;
+}
+.card-attachment-name {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
 /* A card's decisions (#357), pinned above its comments: compact, an accent rule like a quote, "new since start" marked. */
 .task-decisions {
   margin-bottom: 4px;
@@ -8330,10 +11307,16 @@ textarea.input.task-blocked-input {
   padding: 2px 0 2px 10px;
   margin-bottom: 6px;
 }
+/* A decision's words, as Markdown (#1637), the way card comments show them. */
 .task-decision-text {
-  white-space: pre-wrap;
   overflow-wrap: anywhere;
   color: var(--fg-strong);
+}
+.task-decision-text > :first-child {
+  margin-block-start: 0;
+}
+.task-decision-text > :last-child {
+  margin-block-end: 0;
 }
 .task-decision-by {
   display: flex;
@@ -8391,14 +11374,31 @@ textarea.input.task-blocked-input {
   gap: 4px;
   max-width: 420px;
 }
-/* Remove Project: what each choice touches. */
-.removal-list {
-  margin: 0 0 10px;
-  padding-left: 20px;
-  font-size: 13px;
+/* Remove Project: what each choice touches (#1316), an item table: a thing (its count, or the folder by its name) and
+   what happens to it, both wrapping rather than being cut (only the folder's name is cut, its full path on hover); an
+   agent's worktree indented under the worktrees' row. */
+.table.item-table.removal-list {
+  margin: 2px 0 10px;
+  font-size: 12.5px;
 }
-.removal-list ul {
-  padding-left: 18px;
+.removal-list th:first-child {
+  width: 42%;
+}
+/* A long name or branch breaks inside itself rather than being cut (the shared table's ellipsis is for the folder's
+   short name only). */
+.item-table.fill.removal-list td {
+  white-space: normal;
+  overflow-wrap: anywhere;
+  text-overflow: clip;
+}
+/* "Folder" and its name on one line (the shared table makes a path's tooltip a block of its own). */
+.item-table.removal-list td > .tip-wrap:has(> .short-path) {
+  display: inline-block;
+  max-width: calc(100% - 60px);
+  vertical-align: bottom;
+}
+.removal-list tr.removal-sub td:first-child {
+  padding-left: 16px;
 }
 .warn-text {
   color: var(--warning);
@@ -8542,6 +11542,27 @@ textarea.input.task-blocked-input {
   height: 24px;
   font-size: 12px;
 }
+/* Quick filters above the table (HI-1878: the shortcuts editor): each named by its heading, wrapping in a narrow view. */
+.table-filter-bar {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 6px 16px;
+  margin-bottom: 8px;
+}
+.table-filter-item {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 12px;
+}
+.table-filter-item .select,
+.table-filter-item .input {
+  height: 24px;
+  font-size: 12px;
+  field-sizing: content;
+  min-width: fit-content;
+}
 /* The archived cards' and shortcuts' filters never cut their choice short under a narrow heading (#886, #890: "All" is
    longer in most languages). */
 :is(.archived-cards, .kb-table) .table tr.table-filters .select {
@@ -8661,25 +11682,7 @@ textarea.input.task-blocked-input {
   color: var(--warning);
 }
 
-/* The tip card: bottom right above the status bar, under the toasts; it steps aside over a focused terminal. */
-.tip-card {
-  position: fixed;
-  right: var(--corner-right, 14px);
-  bottom: calc(36px + var(--corner-lift, 0px));
-  z-index: 2400;
-  width: 320px;
-  max-width: calc(100vw - var(--corner-right, 14px) - 14px);
-  background: var(--bg-elevated);
-  border: 1px solid var(--border);
-  border-left: 3px solid var(--accent);
-  border-radius: 6px;
-  box-shadow: var(--shadow);
-  padding: 8px 12px 10px;
-  font-size: 12px;
-}
-.tip-card.stepped-aside {
-  visibility: hidden;
-}
+/* The tip: a pop-up of the quieter style (HI-2320, .toast.kind-tip); its parts, and Help → Tips…'s. */
 .tip-head {
   display: flex;
   align-items: center;
@@ -8795,6 +11798,17 @@ textarea.input.task-blocked-input {
 }
 .inbox-row:hover {
   background: var(--bg-hover);
+}
+/* A card counted once (HI-1931): its row, then its requests and the agents stopped on it, indented under it. */
+.inbox-row.inbox-under {
+  padding-top: 4px;
+  padding-bottom: 4px;
+  padding-inline-start: 38px;
+}
+.inbox-group + .inbox-row,
+.inbox-row + .inbox-group,
+.inbox-group + .inbox-group {
+  border-top: 1px solid var(--border-subtle);
 }
 .inbox-text {
   flex: 1;
@@ -8953,6 +11967,15 @@ textarea.input.task-blocked-input {
   font-size: 12px;
   font-weight: normal;
 }
+/* A stall's Step and During it (HI-1135): a line per work, its fixed name then its length. */
+.perf-stall-work {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+.perf-stall-item code {
+  font-size: 12px;
+}
 /* A filter and the sections it changes, framed together, so what it doesn't change isn't under it (#270): Who around
    the cards, chart and tables; Provider, inside it, around launches and the providers' usage. */
 .perf-group {
@@ -8998,6 +12021,14 @@ textarea.input.task-blocked-input {
 }
 .perf-detail-body p {
   margin: 0 0 6px;
+}
+/* A measure's other parts under the subject's row (HI-2186): the other agents' and all agents' together, indented. */
+.perf-detail-body tr.perf-part td:first-child {
+  padding-left: 22px;
+  color: var(--fg-faint);
+}
+.perf-detail-body .perf-agents {
+  margin-top: 6px;
 }
 .perf-kept {
   margin: 16px 0;
@@ -9075,7 +12106,9 @@ textarea.input.task-blocked-input {
   position: relative;
   display: flex;
   flex-direction: column;
-  flex-shrink: 0;
+  /* Gives way after the Assistant's panel and before the sidebar (HI-1737: their shrinks far apart), down to its least
+     width. */
+  flex-shrink: 10;
   min-width: 240px;
   max-width: 50vw;
   background: var(--bg-sidebar);
@@ -9219,6 +12252,40 @@ button.progress-run-show:focus-visible {
 .progress-title {
   margin: 4px 0 6px;
 }
+/* What a run ran for (#1220), under its agent: the card opens it, the revision copies it. */
+.progress-run-for {
+  margin-top: 2px;
+  font-size: 0.92em;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+/* A failed check that blocks its card's Review (#1279). */
+.progress-run-blocks {
+  margin-top: 2px;
+  color: var(--error);
+  font-size: 0.92em;
+  overflow-wrap: anywhere;
+}
+.progress-run-card,
+.progress-run-revision {
+  padding: 0;
+  border: 0;
+  background: none;
+  color: inherit;
+  font: inherit;
+  cursor: pointer;
+}
+.progress-run-card:hover,
+.progress-run-revision:hover {
+  color: var(--accent);
+  text-decoration: underline;
+}
+.progress-run-card:focus-visible,
+.progress-run-revision:focus-visible {
+  outline: 1px solid var(--accent);
+  outline-offset: 1px;
+}
 .progress-ok {
   color: var(--success);
 }
@@ -9322,19 +12389,314 @@ button.progress-run-show:focus-visible {
 .show-all-fold .codicon {
   font-size: 14px;
 }
-.progress-panel .show-all-fold {
-  padding: 4px 12px;
-}
-.progress-recent-list.all {
-  border-top: 1px solid var(--border-subtle);
-  border-bottom: 1px solid var(--border-subtle);
-}
 .progress-section {
   margin: 10px 12px 4px;
   font-size: 11px;
   text-transform: uppercase;
   letter-spacing: 0.06em;
   color: var(--fg-muted);
+}
+/* The panel's tabs (#1309): a segmented control in its header, a word and an icon each; below about 360 px (a container
+   query on the panel, not the window) the words go and the icons stay, each with its name in its tooltip. */
+.progress-panel {
+  container-type: inline-size;
+  container-name: progress;
+}
+.progress-title-text {
+  flex-shrink: 1;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.progress-tabs {
+  margin-inline-start: var(--space-1);
+  font-weight: normal;
+}
+.progress-tabs .progress-tab {
+  position: relative;
+  padding: 0 var(--space-1);
+}
+.progress-tabs .progress-tab:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: -2px;
+}
+.progress-tab-badge {
+  min-width: 14px;
+  padding: 0 3px;
+  border-radius: 7px;
+  background: var(--bg-hover);
+  color: var(--fg);
+  font-size: 10px;
+  line-height: 14px;
+  text-align: center;
+  font-variant-numeric: tabular-nums;
+}
+.progress-tab-badge.failed {
+  background: var(--error);
+  color: #ffffff;
+}
+@container progress (max-width: 359px) {
+  .progress-tab-label,
+  .progress-title-text {
+    display: none;
+  }
+}
+/* A tab's content: the rest of the panel's height. Pulse's runs take the room above its lanes, which sit at the
+   bottom of the panel and grow upwards (#484, as before #1309: HI-1673); Runs scrolls under its filters; Lanes shows
+   every lane from the top. */
+.progress-tab-body {
+  flex: 1 1 0;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+}
+/* The lanes take priority (HI-1673): on a short panel the runs give way, down to nothing, and scroll behind them. */
+.progress-tab-pulse > .progress-body {
+  min-height: 0;
+}
+/* The lanes keep the whole lanes they show (#1620): the runs give way and scroll. Shrinking with them squeezed the list
+   to part of a lane behind a scroll bar; how many fit, leaving the runs RUNS_KEEP_PX, is LanesSection's to measure. */
+.progress-tab-pulse > .progress-lanes {
+  flex-shrink: 0;
+}
+.progress-tab-merges {
+  overflow-y: auto;
+}
+.progress-lanes.full {
+  flex: 1 1 0;
+  min-height: 0;
+  border-top: 0;
+}
+.progress-lanes.full .progress-lanes-list {
+  flex: 1 1 0;
+  padding-top: var(--space-2);
+}
+/* HI-1926: the Lanes tab's lanes stacked from the bottom, growing upwards to the top, then scrolling (no row limit). */
+.progress-lanes.full .progress-lanes-list {
+  display: flex;
+  flex-direction: column;
+}
+.progress-lanes.full .progress-lanes-list > :first-child {
+  margin-top: auto;
+}
+.progress-lanes.full .progress-lane {
+  flex-shrink: 0;
+}
+.progress-lane-expand {
+  flex-shrink: 0;
+  margin: -2px 0 -2px -4px;
+}
+.progress-lane-waited {
+  flex-shrink: 0;
+  font-variant-numeric: tabular-nums;
+}
+.progress-lane-waited.long {
+  color: var(--warning);
+  font-weight: 600;
+  opacity: 1;
+}
+/* A lane's queued list change (HI-2151), under its bar in the Lanes tab: wrapped, so a narrow panel shows all of it. */
+.progress-lane-queued {
+  display: flex;
+  align-items: flex-start;
+  gap: 4px;
+  min-width: 0;
+  margin-top: 3px;
+  font-size: 12px;
+  line-height: 16px;
+}
+.progress-lane-queued > .codicon {
+  flex-shrink: 0;
+  line-height: 16px;
+}
+.progress-lane-queued-text {
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
+/* A lane's cards in order (HI-1926): a line each, its state's icon, key, title, round, time and a Done card's commit. */
+.progress-lane-queue {
+  list-style: none;
+  margin: 4px 0 0;
+  padding: 4px 0 0;
+  border-top: 1px solid var(--border-subtle);
+  font-size: 12px;
+}
+.progress-lane-queue-row {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  min-width: 0;
+  padding: 1px 0;
+}
+.progress-lane-queue-icon,
+.progress-lane-queue-key,
+.progress-lane-queue-round,
+.progress-lane-queue-time,
+.progress-lane-queue-commit {
+  flex-shrink: 0;
+}
+.progress-lane-queue-title {
+  flex: 1 1 auto;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.progress-lane-queue-time,
+.progress-lane-queue-commit {
+  font-variant-numeric: tabular-nums;
+}
+.progress-lane-queue-row.done > .progress-lane-queue-icon {
+  color: var(--success);
+}
+.progress-lane-queue-row.doing > .progress-lane-queue-icon {
+  color: var(--accent);
+}
+.progress-lane-queue-row.waiting > .progress-lane-queue-icon {
+  color: var(--warning);
+}
+.progress-lane-queue-row.gone,
+.progress-lane-queue-row.unrecorded {
+  opacity: 0.7;
+}
+/* Needs attention (#1309): failures nothing has passed since, one line that opens them in Runs. */
+.progress-attention {
+  display: flex;
+  align-items: center;
+  gap: var(--space-1);
+  width: calc(100% - var(--space-4));
+  margin: var(--space-1) var(--space-2);
+  padding: var(--space-1) var(--space-2);
+  border: 1px solid color-mix(in srgb, var(--error) 45%, var(--border));
+  border-radius: 4px;
+  background: color-mix(in srgb, var(--error) 10%, var(--bg));
+  color: var(--fg);
+  font: inherit;
+  text-align: start;
+  cursor: pointer;
+}
+/* Above the runs (HI-1923): never shrunk away as the runs and the lanes take the room. */
+.progress-tab-pulse > .progress-attention {
+  flex-shrink: 0;
+}
+.progress-attention > span {
+  flex: 1 1 auto;
+}
+.progress-attention > .codicon-error {
+  color: var(--error);
+}
+.progress-attention:hover {
+  background: color-mix(in srgb, var(--error) 18%, var(--bg));
+}
+/* The Runs tab's filters: words to find on a line of their own, then the choices, wrapping in a narrow panel. */
+.progress-runs-filters {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-1);
+  padding: var(--space-2) var(--space-2) var(--space-1);
+  border-bottom: 1px solid var(--border-subtle);
+  flex-shrink: 0;
+}
+.progress-runs-filters > .search-box,
+.progress-runs-search {
+  width: 100%;
+}
+.progress-runs-choices {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--space-1);
+}
+.progress-runs-choices .select {
+  flex: 1 1 8em;
+  min-width: 0;
+}
+.progress-runs-failed.active {
+  background: color-mix(in srgb, var(--error) 18%, var(--bg));
+  color: var(--fg);
+}
+.progress-runs-failed .codicon {
+  color: var(--error);
+}
+/* A day's runs by card (HI-1701): a heading per card (Other last), its runs under it, a line each. */
+.progress-card-head {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  min-width: 0;
+  padding: 2px 8px 2px 4px;
+  font-size: 12px;
+  cursor: pointer;
+}
+.progress-card-head > .codicon,
+.progress-card-key,
+.progress-card-summary,
+.progress-card-when {
+  flex-shrink: 0;
+}
+.progress-card-key {
+  padding: 0;
+  border: 0;
+  background: none;
+  color: inherit;
+  font: inherit;
+  font-weight: 600;
+}
+button.progress-card-key {
+  cursor: pointer;
+}
+button.progress-card-key:hover {
+  color: var(--accent);
+  text-decoration: underline;
+}
+/* The title gives way first, then the summary keeps its words. */
+.progress-card-title {
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.progress-card-runs.passed > .progress-card-head > .progress-card-icon {
+  color: var(--success);
+}
+.progress-card-runs.failed > .progress-card-head > .progress-card-icon,
+.progress-card-runs.failed .progress-card-summary {
+  color: var(--error);
+}
+.progress-card-runs.retried > .progress-card-head > .progress-card-icon,
+.progress-card-runs.stale > .progress-card-head > .progress-card-icon {
+  color: var(--warning);
+}
+.progress-card-runs.stopped > .progress-card-head > .progress-card-icon {
+  color: var(--fg-muted);
+}
+.progress-card-items {
+  margin-inline-start: 18px;
+  border-inline-start: 1px solid var(--border-subtle);
+}
+/* A run and its retries the same day, or the merge queue's checks of a card, one line (#1309, HI-1701): it opens to each run. */
+.progress-group-head {
+  width: 100%;
+  border: 0;
+  background: none;
+  font: inherit;
+  text-align: start;
+  cursor: pointer;
+}
+/* As wide and tall as a run's chevron button, so every line is the same height. */
+.progress-group-chevron {
+  flex-shrink: 0;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 24px;
+  height: 24px;
+}
+.progress-group-runs {
+  margin-inline-start: var(--space-4);
+  border-inline-start: 1px solid var(--border-subtle);
 }
 .progress-recent {
   display: flex;
@@ -9355,14 +12717,42 @@ button.progress-run-show:focus-visible {
   padding-right: 4px;
 }
 /* The line (its tooltip's), then the chevron after the time (#251): the title gives way first. */
-.progress-recent > .tip-wrap:first-child {
+.progress-recent > .tip-wrap:first-child,
+.progress-recent-line {
+  display: flex;
   flex: 1;
   min-width: 0;
   align-items: center;
   gap: 6px;
 }
-.progress-recent-took {
+.progress-recent-took,
+.progress-recent-at {
   flex-shrink: 0;
+}
+.progress-recent-at {
+  font-variant-numeric: tabular-nums;
+}
+/* Runs (HI-1925): what runs now on top, scrolling in what the dock leaves, down to nothing; the finished runs docked at
+   the bottom behind the lanes' edge, scrolling in their own height. */
+.progress-tab-runs > .progress-runs-body {
+  min-height: 0;
+}
+.progress-runs-dock {
+  position: relative;
+  flex: none;
+  display: flex;
+  flex-direction: column;
+  border-top: 1px solid var(--border-subtle);
+}
+.progress-runs-dock-list {
+  box-sizing: border-box;
+  overflow-y: auto;
+  overflow-x: hidden;
+  padding: 4px 0;
+}
+.progress-runs-none {
+  padding: 3px 12px;
+  font-size: 12px;
 }
 .progress-recent:hover,
 .progress-recent-item.open > .progress-recent {
@@ -9453,16 +12843,30 @@ button.progress-run-show:focus-visible {
   text-overflow: ellipsis;
   white-space: nowrap;
 }
-.progress-recent.passed > .tip-wrap > .codicon {
+/* Who ran it, then what (HI-1701): its name keeps its width. */
+.progress-recent-who {
+  flex-shrink: 0;
+  max-width: 45%;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  color: var(--fg-muted);
+}
+.progress-recent.passed > .tip-wrap > .codicon,
+.progress-recent.passed > .progress-recent-line > .codicon {
   color: var(--success);
 }
-.progress-recent.failed > .tip-wrap > .codicon {
+.progress-recent.failed > .tip-wrap > .codicon,
+.progress-recent.failed > .progress-recent-line > .codicon {
   color: var(--error);
 }
-.progress-recent.stale > .tip-wrap > .codicon {
+.progress-recent.stale > .tip-wrap > .codicon,
+.progress-recent.stale > .progress-recent-line > .codicon,
+.progress-recent.retried > .progress-recent-line > .codicon {
   color: var(--warning);
 }
-.progress-recent.stopped > .tip-wrap > .codicon {
+.progress-recent.stopped > .tip-wrap > .codicon,
+.progress-recent.stopped > .progress-recent-line > .codicon {
   color: var(--fg-muted);
 }
 .progress-rail {
@@ -9622,6 +13026,251 @@ button.progress-run-show:focus-visible {
 .progress-merge-time.late {
   color: var(--warning);
 }
+/* The Merges tab (#1356): the merge queues' cards and the merge slot's side by side, the whole tab's height. */
+.progress-merge.full {
+  max-height: none;
+  padding-bottom: 8px;
+}
+/* A merge queue's card (#1356): what it tests, what waits, a merge just made, a return until seen, a pause. Each state
+   has its icon and words; colour is never the only cue. */
+.progress-queue-card.paused {
+  border-color: var(--warning);
+}
+.progress-queue-line,
+.progress-queue-row,
+.progress-queue-paused,
+.progress-queue-merged {
+  display: flex;
+  align-items: flex-start;
+  gap: 6px;
+  margin-top: 4px;
+  font-size: 12px;
+  min-width: 0;
+}
+.progress-queue-line > .codicon,
+.progress-queue-row > .codicon,
+.progress-queue-paused > .codicon,
+.progress-queue-merged > .codicon {
+  flex-shrink: 0;
+  margin-top: 1px;
+}
+.progress-queue-icon {
+  color: var(--merge-ink);
+}
+.progress-queue-text {
+  min-width: 0;
+  white-space: pre-line;
+  overflow-wrap: anywhere;
+}
+.progress-queue-paused {
+  flex-wrap: wrap;
+}
+.progress-queue-paused > .codicon {
+  color: var(--warning);
+}
+.progress-queue-paused .progress-queue-text {
+  flex: 1 1 160px;
+}
+.progress-queue-merged > .codicon {
+  color: var(--success);
+}
+.progress-queue-row > .codicon-error {
+  color: var(--error);
+}
+.progress-queue-list {
+  margin: 2px 0 0;
+  padding: 0 0 0 18px;
+  font-size: 12px;
+}
+.progress-queue-list > li {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  min-width: 0;
+  margin-top: 2px;
+}
+/* A queued card's key stays whole ("BI-1" broke after its hyphen in a narrow panel, #1126); the title gives way. */
+.progress-queue-list > li > .progress-run-card {
+  flex-shrink: 0;
+  white-space: nowrap;
+}
+/* The queue's name keeps room for a few words, and Resume/Pause wraps onto a row of its own rather than squeeze it to a
+   few letters (#1126: "Warteschlange fortsetzen" left "billi…"), as a notice's actions do (#1574). */
+.progress-queue-card > .progress-merge-top {
+  flex-wrap: wrap;
+  row-gap: 4px;
+}
+.progress-queue-card > .progress-merge-top > .progress-merge-who {
+  flex: 1 1 9em;
+  /* Its project, name and target wrap rather than lose the queue's name ("Kolejka scalania · integration") to "…". */
+  white-space: normal;
+}
+.progress-queue-card > .progress-merge-top > :is(.btn, .tip-wrap) {
+  margin-inline-start: auto;
+}
+.progress-queue-title {
+  flex: 1 1 auto;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.progress-queue-remove {
+  flex-shrink: 0;
+}
+.progress-queue-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px;
+  margin: 4px 0 0 18px;
+}
+.progress-queue-log {
+  margin: 4px 0 0 18px;
+  padding: 6px;
+  max-height: 160px;
+  overflow: auto;
+  font-size: 11px;
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+  border: 1px solid var(--border);
+  border-radius: 4px;
+  background: var(--bg);
+}
+.progress-queue-link {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  margin-top: 6px;
+  padding: 0;
+  border: 0;
+  background: none;
+  color: var(--merge-ink);
+  font: inherit;
+  font-size: 12px;
+  cursor: pointer;
+}
+.progress-queue-link:hover {
+  text-decoration: underline;
+}
+/* A queue's Recent merges (HI-1924), under its card: a row an outcome or a pause, newest first, each opening its card.
+   Its icon and words say the outcome; colour is never the only cue. */
+.progress-queue-with-history + .progress-queue-with-history,
+.progress-queue-with-history + .progress-merge-card,
+.progress-merge-card + .progress-queue-with-history {
+  margin-top: 10px;
+}
+.progress-queue-history {
+  margin: 6px 0 0;
+  padding: 0 6px 0 10px;
+  min-width: 0;
+}
+.progress-queue-history-h {
+  font-size: 11px;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  color: var(--fg-muted);
+}
+.progress-queue-history-list {
+  margin: 2px 0 0;
+  padding: 0;
+  list-style: none;
+  font-size: 12px;
+}
+.progress-queue-history-row {
+  padding: 4px 4px 4px 0;
+  border-bottom: 1px solid var(--border);
+  min-width: 0;
+}
+.progress-queue-history-row.opens {
+  cursor: pointer;
+}
+.progress-queue-history-row.opens:hover {
+  background: var(--bg-hover);
+}
+.progress-queue-history-top {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  min-width: 0;
+}
+.progress-queue-history-top > .codicon {
+  flex-shrink: 0;
+}
+.progress-queue-history-row[data-outcome='merged'] .progress-queue-history-top > .codicon {
+  color: var(--success);
+}
+.progress-queue-history-row[data-outcome='returned'] .progress-queue-history-top > .codicon {
+  color: var(--error);
+}
+.progress-queue-history-row.pause .progress-queue-history-top > .codicon {
+  color: var(--warning);
+}
+.progress-queue-history-top > .progress-run-card {
+  flex-shrink: 0;
+  white-space: nowrap;
+}
+.progress-queue-history-row.pause .progress-queue-outcome {
+  flex: 1 1 auto;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.progress-queue-when {
+  flex-shrink: 0;
+  margin-inline-start: auto;
+  white-space: nowrap;
+  font-variant-numeric: tabular-nums;
+}
+.progress-queue-history-detail {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  column-gap: 8px;
+  row-gap: 2px;
+  margin: 2px 0 0 22px;
+  min-width: 0;
+}
+.progress-queue-history-detail > .progress-queue-outcome {
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
+/* Pulse's line per merge queue testing or paused (#1356): a click shows the Merges tab. */
+.progress-queue-lines {
+  padding: 6px 8px 0;
+}
+.progress-queue-pulse {
+  display: flex;
+  align-items: center;
+  gap: var(--space-1);
+  width: 100%;
+  padding: var(--space-1) var(--space-2);
+  border: 1px solid color-mix(in srgb, var(--merge) 45%, var(--border));
+  border-radius: 4px;
+  background: color-mix(in srgb, var(--merge) 9%, var(--bg));
+  color: var(--fg);
+  font: inherit;
+  font-size: 12px;
+  text-align: start;
+  cursor: pointer;
+}
+.progress-queue-pulse + .progress-queue-pulse {
+  margin-top: 4px;
+}
+.progress-queue-pulse > span {
+  flex: 1 1 auto;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.progress-queue-pulse.paused {
+  border-color: var(--warning);
+}
+.progress-queue-pulse.paused > .codicon:first-child {
+  color: var(--warning);
+}
 .progress-divider {
   flex-shrink: 0;
   height: 1px;
@@ -9692,7 +13341,8 @@ button.progress-run-show:focus-visible {
   outline: 1px solid var(--accent);
   outline-offset: -1px;
 }
-.progress-lanes-count {
+.progress-lanes-count,
+.progress-section-count {
   margin-left: 2px;
   padding: 0 5px;
   border-radius: 7px;
@@ -9700,6 +13350,161 @@ button.progress-run-show:focus-visible {
   font-size: 10px;
   line-height: 14px;
   letter-spacing: 0;
+}
+/* Start lane… (#1280): the Lanes tab's button, and the dialog's cards in order, each with its moves. */
+/* Its buttons wrap inside the panel, a long one's label too, never spilling over what is left of it (HI-2164: French). */
+.progress-lanes-actions {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+  row-gap: var(--space-1);
+  min-width: 0;
+  padding: var(--space-2) var(--space-2) 0;
+}
+.progress-lanes-actions .btn {
+  max-width: 100%;
+  height: auto;
+  min-height: 24px;
+  white-space: normal;
+  text-align: start;
+}
+/* The paused team's band (HI-2081): what still runs, or All parked with Install Now. */
+.team-pause-band {
+  margin: var(--space-2) var(--space-2) 0;
+  padding: var(--space-2);
+  border: 1px solid var(--warning);
+  border-radius: 6px;
+  background: var(--accent-soft);
+}
+.team-pause-band.parked {
+  border-color: var(--success);
+}
+.team-pause-head {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  flex-wrap: wrap;
+}
+.team-pause-title {
+  flex: 1;
+  min-width: 0;
+  font-weight: 600;
+}
+.team-pause-ws {
+  margin-top: var(--space-2);
+  color: var(--fg-muted);
+  font-size: 0.92em;
+}
+.team-pause-ws.other {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+}
+.team-pause-ws.other > span {
+  flex: 1;
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
+.team-pause-items {
+  margin: var(--space-1) 0 0;
+  padding: 0;
+  list-style: none;
+}
+.team-pause-items li {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  padding: 2px 0;
+  overflow-wrap: anywhere;
+}
+.team-pause-items li > span {
+  flex: 1;
+  min-width: 0;
+}
+.team-pause-items li.unknown > span {
+  color: var(--fg-muted);
+  font-style: italic;
+}
+.progress-lanes-actions .progress-lanes-team {
+  margin-left: var(--space-1);
+}
+.progress-empty .progress-lanes-start {
+  margin-top: var(--space-2);
+}
+.lane-start-cards {
+  counter-reset: lane-card;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  border: 1px solid var(--border-subtle);
+  border-radius: 4px;
+  max-height: 220px;
+  overflow-y: auto;
+}
+.lane-start-cards > li {
+  display: flex;
+  align-items: center;
+  gap: var(--space-1);
+  padding: 2px var(--space-2);
+  counter-increment: lane-card;
+}
+.lane-start-cards > li + li {
+  border-top: 1px solid var(--border-subtle);
+}
+.lane-start-cards > li:not(.lane-start-none)::before {
+  content: counter(lane-card) '.';
+  min-width: 1.5em;
+  color: var(--fg-muted);
+  font-variant-numeric: tabular-nums;
+}
+.lane-start-key {
+  flex-shrink: 0;
+  font-weight: 600;
+}
+.lane-start-card-title {
+  flex: 1 1 auto;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.lane-start-none {
+  padding: var(--space-2);
+}
+.lane-start-add {
+  margin-top: var(--space-1);
+}
+.lane-start-note {
+  resize: vertical;
+}
+.lane-start-busy {
+  margin-bottom: 0;
+  color: var(--warning);
+}
+/* The latest run of a lane's current card (#1309): its colour and its shape, after the card's name. */
+.lane-run-dot {
+  flex-shrink: 0;
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: var(--fg-muted);
+}
+.lane-run-dot.running {
+  background: none;
+  box-shadow: inset 0 0 0 2px var(--info);
+}
+.lane-run-dot.passed {
+  background: var(--success);
+}
+.lane-run-dot.failed {
+  border-radius: 1px;
+  background:
+    linear-gradient(45deg, transparent 40%, var(--error) 40% 60%, transparent 60%),
+    linear-gradient(-45deg, transparent 40%, var(--error) 40% 60%, transparent 60%);
+}
+.lane-run-dot.other {
+  height: 3px;
+  border-radius: 1px;
 }
 .progress-lanes-list {
   flex: 0 1 auto;
@@ -9751,7 +13556,6 @@ button.progress-run-show:focus-visible {
 }
 .progress-lane.ended .lane-seg,
 .progress-lane.abandoned .lane-seg {
-  animation: none;
   filter: saturate(0.45);
 }
 .progress-lane-top {
@@ -9765,8 +13569,12 @@ button.progress-run-show:focus-visible {
 .progress-lane > .tip-wrap > .progress-lane-top {
   flex: 1;
 }
+/* The pair gives way too, after the project and the reason (#1126): long agent names beside a slot and a longer state
+   ("festgefahren") pushed the card and the count past the row's end in a narrow panel. It keeps a few letters; its
+   hover names the lane whole. */
 .progress-lane-pair {
-  flex-shrink: 0;
+  flex-shrink: 0.2;
+  min-width: 4em;
   max-width: 55%;
   overflow: hidden;
   text-overflow: ellipsis;
@@ -9791,6 +13599,153 @@ button.progress-run-show:focus-visible {
 }
 .progress-lane-state.abandoned {
   color: var(--error);
+}
+/* Why it waits (#1279): in the header, in the room the lane's name had, cut short with its whole text in its title. */
+.progress-lane-why {
+  flex: 1 1 auto;
+  min-width: 0;
+  overflow: hidden;
+  color: var(--fg-muted);
+  text-align: end;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.progress-lane-why.paused {
+  color: var(--warning);
+}
+/* Why it waits as a link to what it waits for (#1446): the same look, underlined on hover. */
+button.progress-lane-why {
+  padding: 0;
+  border: 0;
+  background: none;
+  font: inherit;
+  cursor: pointer;
+}
+button.progress-lane-why:hover {
+  text-decoration: underline;
+}
+button.progress-lane-why:focus-visible,
+.progress-lane-slot:focus-visible {
+  outline: 1px solid var(--accent);
+  outline-offset: 1px;
+}
+/* A lane's slot after its pair (#1446): "· slot-b", a link to Branches & remotes. */
+.progress-lane-slot {
+  flex: 0 0 auto;
+  padding: 0;
+  border: 0;
+  background: none;
+  font: inherit;
+  font-size: 11px;
+  white-space: nowrap;
+  cursor: pointer;
+}
+.progress-lane-slot:hover {
+  color: var(--info);
+  text-decoration: underline;
+}
+/* A lane's slot and pool reviewers in its hover (#1446), above its cost. */
+.lane-slot-tip,
+.lane-pool-tip {
+  margin-bottom: 6px;
+}
+/* The lanes waiting for your answer, after the Lanes bar's count. */
+.progress-lanes-you {
+  margin-inline-start: 6px;
+  color: var(--warning);
+  font-size: 11px;
+}
+/* A lane's project after its pair (#1421): a link to its Version Control tab's Workflow section, cut short before the rest. */
+.progress-lane-project {
+  flex: 0 1 auto;
+  min-width: 0;
+  max-width: 30%;
+  padding: 0;
+  border: 0;
+  background: none;
+  font: inherit;
+  font-size: 11px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  cursor: pointer;
+}
+.progress-lane-project:hover {
+  color: var(--info);
+  text-decoration: underline;
+}
+.progress-lane-project:focus-visible {
+  outline: 1px solid var(--accent);
+  outline-offset: 1px;
+}
+/* A lane under old rules (#1421): a quiet dashed tag, its tooltip saying what it means. */
+.progress-lane-state.old-rules {
+  padding: 0 4px;
+  border: 1px dashed var(--border-strong, var(--border));
+  border-radius: 3px;
+  color: var(--fg-muted);
+  font-size: 10px;
+  line-height: 14px;
+}
+/* Its tooltip's wrap keeps the tag whole beside a long "why it waits". */
+.progress-lane-top > .tip-wrap:has(> .progress-lane-state) {
+  flex-shrink: 0;
+}
+/* Retry an agent's new conversation (HI-2034): the reason's own place, kept whole (short: "⟳ Retry B1"); the project's name gives way. */
+button.progress-lane-retry {
+  flex: none;
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+}
+.progress-lane-state.old-rules:focus-visible {
+  outline: 1px solid var(--accent);
+  outline-offset: 1px;
+}
+/* The lanes' legend (#1421): a row per category, its segment's swatch, its name and the stages in it. */
+.lanes-legend-title {
+  margin-bottom: 4px;
+  font-weight: 600;
+}
+.lanes-legend-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-top: 3px;
+}
+.lanes-legend-swatch.lane-seg {
+  flex: 0 0 22px;
+  cursor: default;
+}
+.lanes-legend-name {
+  flex-shrink: 0;
+}
+.lanes-legend-stages {
+  min-width: 0;
+}
+.lanes-legend-more {
+  margin-top: 6px;
+  font-size: 11px;
+}
+.progress-lanes-actions .progress-lanes-legend {
+  margin-inline-end: auto;
+}
+/* A category's stages in a segment's hover and the legend (#1421): a thin divider between them, never a colour; the card's own in bold. */
+.lane-stage-divider {
+  display: inline-block;
+  width: 1px;
+  height: 0.9em;
+  margin: 0 6px;
+  vertical-align: -0.1em;
+  background: var(--border);
+}
+.lane-seg-stages {
+  margin-top: 2px;
+  color: var(--fg-muted);
+}
+.lane-seg-stage.own {
+  color: var(--fg-strong);
+  font-weight: 600;
 }
 
 /* The lane's bar: one segment per card, equal widths; each state has its own colour AND pattern (colour-blind safe):
@@ -9828,16 +13783,37 @@ button.progress-run-show:focus-visible {
   outline: 2px solid var(--accent);
   outline-offset: 1px;
 }
-.lane-seg.doing {
-  box-shadow: none;
+.lane-seg.doing,
+.lane-seg.doing::before {
   background: repeating-linear-gradient(-45deg, var(--info) 0 4px, color-mix(in srgb, var(--info) 55%, var(--bg)) 4px 8px);
   background-size: 11.3px 12px;
+}
+.lane-seg.doing {
+  box-shadow: none;
+  overflow: hidden;
+}
+/* The stripes move by a transform of a copy one stripe wider, which the compositor does alone: moving the background
+   itself repainted the panel on every frame while a lane worked (#1629). */
+.lane-seg.doing::before {
+  content: '';
+  position: absolute;
+  inset-block: 0;
+  left: -11.3px;
+  width: calc(100% + 11.3px);
+  pointer-events: none;
   animation: lane-stripes 1s linear infinite;
 }
 @keyframes lane-stripes {
   to {
-    background-position: 11.3px 0;
+    transform: translateX(11.3px);
   }
+}
+/* Still: a legend's or a branch's swatch, and an ended or abandoned lane (after the animation, which they override). */
+.lanes-legend-swatch.lane-seg::before,
+.git-branch-card-swatch.lane-seg::before,
+.progress-lane.ended .lane-seg::before,
+.progress-lane.abandoned .lane-seg::before {
+  animation: none;
 }
 .lane-seg.review {
   background: color-mix(in srgb, var(--warning) 22%, var(--bg));
@@ -9875,10 +13851,65 @@ button.progress-run-show:focus-visible {
   border-radius: 0 0 2px 2px;
   background: var(--error);
 }
+/* Its facts' marks (#1279), each its own shape as well as colour: a refused request's red notch in the end corner (it
+   clears with the card's next move), a move past its rules' ringed dot in the start corner, a stale pass's amber dashed
+   top and bottom edges over a paler fill until it is submitted again. */
+.lane-seg-mark {
+  position: absolute;
+  pointer-events: none;
+}
+.lane-seg-mark.refused {
+  inset-block-start: 0;
+  inset-inline-end: 0;
+  width: 8px;
+  height: 8px;
+  background: var(--error);
+  clip-path: polygon(0 0, 100% 0, 100% 100%);
+}
+.lane-seg-mark.refused:dir(rtl) {
+  clip-path: polygon(0 0, 100% 0, 0 100%);
+}
+.lane-seg-mark.override {
+  inset-block-start: 3px;
+  inset-inline-start: 3px;
+  width: 5px;
+  height: 5px;
+  border-radius: 50%;
+  background: var(--fg-strong);
+  box-shadow: 0 0 0 1px var(--bg);
+}
+/* In flight under old rules (#1421): a hollow square in the bottom end corner. */
+.lane-seg-mark.old-rules {
+  inset-block-end: 2px;
+  inset-inline-end: 2px;
+  width: 5px;
+  height: 5px;
+  border: 1.5px solid var(--fg-strong);
+  background: var(--bg);
+}
+/* Over a folded "✓ n" segment's fill too (HR6's #1279 round 2: .finished, later, set its whole background). */
+.lane-seg.stale,
+.lane-seg.finished.stale {
+  background:
+    repeating-linear-gradient(90deg, var(--warning) 0 4px, transparent 4px 7px) top / 100% 3px no-repeat,
+    repeating-linear-gradient(90deg, var(--warning) 0 4px, transparent 4px 7px) bottom / 100% 3px no-repeat,
+    color-mix(in srgb, var(--success) 60%, var(--bg));
+}
 /* A segment's hover with what its marks mean (#706): a line each under the card's. */
 .lane-seg-note {
   margin-top: 2px;
   color: var(--fg);
+}
+/* What its facts say (#1225): a line each, then that a click opens the card for the rest. */
+.lane-seg-work {
+  margin-top: 2px;
+}
+.lane-seg-tip > div:first-child + .lane-seg-work {
+  margin-top: 4px;
+}
+.lane-seg-more {
+  margin-top: 4px;
+  font-size: 11px;
 }
 .lane-seg.finished,
 .lane-seg.more {
@@ -9898,7 +13929,7 @@ button.progress-run-show:focus-visible {
   color: var(--fg-muted);
 }
 @media (prefers-reduced-motion: reduce) {
-  .lane-seg.doing {
+  .lane-seg.doing::before {
     animation: none;
   }
 }
@@ -9968,16 +13999,216 @@ button.progress-run-show:focus-visible {
   display: flex;
   align-items: center;
   gap: 12px;
-  padding: 6px 14px;
+  /* The sections' tabs (HI-1837) sit on the line under them. */
+  padding: 0 14px;
+  position: relative;
   border-bottom: 1px solid var(--border-subtle);
   flex-shrink: 0;
   min-width: 0;
+}
+/* The Version Control tab's header (#1416): None · Git, what Hive finds in the folder, and "Workflow: Git · Team". */
+/*
+ * None · Git, the fact line and the workflow link: one row, the fact line taking the room left and wrapping inside it,
+ * so the link stays top right on every page; in a narrow tab the fact line has a row of its own under them.
+ */
+.vc-view {
+  container-type: inline-size;
+}
+.vc-head {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr) auto;
+  grid-template-areas: 'choice fact link';
+  align-items: center;
+  gap: 6px 12px;
+  padding: 8px 14px 6px;
+  flex-shrink: 0;
+  min-width: 0;
+}
+.vc-choice {
+  grid-area: choice;
+}
+@container (max-width: 560px) {
+  .vc-head {
+    grid-template-columns: auto minmax(0, 1fr);
+    grid-template-areas: 'choice link' 'fact fact';
+  }
+}
+.vc-choice .vc-choice-off {
+  opacity: 0.55;
+  cursor: default;
+}
+.vc-choice .vc-choice-off:hover {
+  background: transparent;
+  color: var(--fg-muted);
+}
+.vc-fact {
+  grid-area: fact;
+  font-size: 12px;
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
+.vc-fact.caution {
+  color: var(--warning);
+}
+/* The link's tooltip wrapper is the grid's item. */
+.vc-head > .tip-wrap {
+  grid-area: link;
+  justify-self: end;
+  display: flex;
+  min-width: 0;
+  max-width: 100%;
+}
+.vc-workflow {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  font-size: 12px;
+  max-width: 100%;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  background: none;
+  border: none;
+  padding: 0;
+  color: var(--info);
+  cursor: pointer;
+}
+.vc-workflow:hover {
+  text-decoration: underline;
+}
+.vc-init {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 6px 10px;
+  padding: 0 14px 8px;
+  flex-shrink: 0;
+}
+.vc-init .hint {
+  margin: 0;
+}
+/* Git's page before the folder has a repository (HI-1905): its line, its buttons, the hint, a failure, one under another. */
+.vc-init[data-vc-git-preview] {
+  flex-direction: column;
+  align-items: flex-start;
+  padding-top: 6px;
+}
+.vc-init-line {
+  margin: 0;
+}
+.vc-init-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+/* The switch Hive offers when it detects another version control (#1419): its sentence, then Switch… and Not Now. */
+.vc-offer {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 6px 10px;
+  margin: 0 14px 8px;
+  flex-shrink: 0;
+  min-width: 0;
+}
+.vc-offer-text {
+  flex: 1 1 260px;
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
+.vc-offer-actions {
+  display: flex;
+  gap: 6px;
+  flex-shrink: 0;
+}
+.vc-switch .caution {
+  color: var(--warning);
+}
+/* "How do you work?" (#1423): the presets as choices, the one shown previewed, then Choose, Customise… and Not Now. */
+.vc-step {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  margin: 0 14px 10px;
+  padding: 12px 14px;
+  border: 1px solid var(--border-subtle);
+  border-radius: 8px;
+  background: var(--bg-elevated, var(--bg));
+  flex-shrink: 0;
+  min-width: 0;
+  max-height: 45vh;
+  overflow-y: auto;
+}
+.vc-step-head h3 {
+  margin: 0 0 2px;
+  font-size: 14px;
+}
+.vc-step-presets {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(170px, 1fr));
+  gap: 8px;
+}
+.vc-step-preset {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 4px;
+  padding: 8px 10px;
+  text-align: left;
+  border: 1px solid var(--border-subtle);
+  border-radius: 6px;
+  background: transparent;
+  color: inherit;
+  cursor: pointer;
+  min-width: 0;
+}
+.vc-step-preset:hover {
+  border-color: var(--border);
+}
+.vc-step-preset.active {
+  border-color: var(--accent);
+  box-shadow: inset 0 0 0 1px var(--accent);
+}
+.vc-step-name {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-weight: 600;
+}
+.vc-step-tag {
+  font-size: 11px;
+  font-weight: normal;
+  padding: 0 6px;
+  border-radius: 8px;
+  background: var(--accent);
+  color: var(--accent-fg, #fff);
+}
+.vc-step-why {
+  margin: 0;
+}
+.vc-step-actions {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 6px;
+}
+.vc-step-details {
+  margin-left: auto;
+  font-size: 12px;
+  background: none;
+  border: none;
+  padding: 0;
+  color: var(--info);
+  cursor: pointer;
 }
 .git-head-status {
   font-size: 12px;
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
+  min-width: 0;
+}
+.git-head > .tip-wrap:has(> .git-head-status) {
   min-width: 0;
 }
 .git-body {
@@ -10019,6 +14250,39 @@ button.progress-run-show:focus-visible {
 .git-row.current {
   background: var(--accent-soft);
 }
+/* A group of the branches (#1642): In use, Merged, Not merged, a small heading row in the list. */
+.git-row.git-group-h {
+  min-height: 24px;
+  padding-block: 3px;
+  font-size: 11px;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  color: var(--fg-muted);
+  background: var(--bg-sidebar);
+}
+/* Clean Up Merged Branches' choice: the local branches, then the remote ones under their warning. */
+.git-cleanup {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  max-height: 50vh;
+  overflow-y: auto;
+}
+.git-cleanup-h {
+  font-weight: 600;
+  margin-top: 4px;
+}
+.git-cleanup-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+}
+.git-cleanup-list .dialog-check {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
 .git-hash {
   font-family: var(--font-mono, monospace);
   font-size: 12px;
@@ -10049,6 +14313,109 @@ button.progress-run-show:focus-visible {
 }
 .git-ref {
   flex-shrink: 0;
+}
+/* A branch's card (#1424): its key (a link), its stage with its category's swatch, under review or merged. */
+.git-branch-card {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  flex-shrink: 0;
+  font-size: 12px;
+  white-space: nowrap;
+}
+.git-branch-card-key {
+  padding: 0;
+  border: 0;
+  background: none;
+  color: var(--info);
+  font: inherit;
+  font-weight: 600;
+  cursor: pointer;
+}
+.git-branch-card-key:hover {
+  text-decoration: underline;
+}
+.git-branch-card-key:focus-visible {
+  outline: 1px solid var(--accent);
+  outline-offset: 1px;
+}
+.git-branch-card-stage {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+}
+.git-branch-card-swatch.lane-seg {
+  flex: 0 0 14px;
+  width: 14px;
+  height: 10px;
+  cursor: default;
+}
+.git-branch-card-review {
+  display: inline-flex;
+  align-items: center;
+  gap: 2px;
+}
+/* A branch row's Track… and Stop tracking (#1385): kept whole at its end, before Switch. */
+.git-row-actions {
+  display: inline-flex;
+  flex-shrink: 0;
+}
+/*
+ * A branch row (HI-1897): its name, then what it is and where it stands with its last commit (the part that gives way),
+ * then its time and actions, which never shrink and sit in the same place on every row. The name keeps a reasonable
+ * width and is cut with "…" only once the middle has given way; the middle's parts are cut with "…" in turn, its last
+ * commit first.
+ */
+/* Its whole name while the middle can give way (the middle takes only the room left: flex-basis 0); a very long name
+   at most 45% of the row, so the middle keeps a share; and short of room, no minimum of its own, so the time and the
+   actions always fit (HR5's HI-1897 round 1: a remote's Track and Stop tracking widened them past a fixed minimum). */
+.git-row.git-branch > .git-name {
+  flex: 0 1 auto;
+  min-inline-size: 0;
+  max-inline-size: 45%;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.git-branch-info {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex: 1 1 0;
+  min-inline-size: 0;
+  overflow: hidden;
+  white-space: nowrap;
+}
+.git-branch-info > * {
+  flex: 0 1 auto;
+  min-inline-size: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.git-branch-info > .git-subject {
+  flex: 1 1 0;
+}
+.git-row-tail {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  flex: none;
+  margin-inline-start: auto;
+}
+.git-row-tail > .git-meta {
+  min-inline-size: 7em;
+  text-align: end;
+}
+/* An action a row doesn't have: its place kept, so the others line up (an icon button's size). */
+.git-act-slot {
+  display: inline-block;
+  inline-size: 24px;
+  block-size: 1px;
+}
+.git-switch-slot {
+  visibility: hidden;
+}
+.git-form-note {
+  margin-top: 8px;
 }
 .git-ref.git-tag {
   background: rgba(245, 196, 81, 0.16);
@@ -10172,4 +14539,243 @@ button.progress-run-show:focus-visible {
 :lang(ja) .settings-nav .row .label,
 :lang(zh) .settings-nav .row .label {
   white-space: normal;
+}
+
+/* Project Settings → Workflow (#1278): P4's plain options form, its rows the settings' own. */
+.workflow-form {
+  display: flex;
+  flex-direction: column;
+  width: 100%;
+}
+.workflow-form > .setting {
+  margin-inline: 0;
+}
+/* The form's own rows highlight as they are hovered, not the whole section's row around them. */
+.setting.wide:has(.workflow-form):hover {
+  background: none;
+}
+.workflow-form .workflow-note {
+  margin-block-end: 8px;
+}
+.workflow-form .workflow-origin {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+.workflow-form .workflow-platform {
+  color: var(--fg-strong);
+}
+.workflow-form .workflow-readonly .link {
+  padding: 0;
+  border: 0;
+  background: none;
+  color: var(--accent);
+  font: inherit;
+  cursor: pointer;
+}
+.workflow-form .workflow-readonly .link:hover,
+.workflow-form .workflow-readonly .link:focus-visible {
+  text-decoration: underline;
+}
+.workflow-form .workflow-unavailable {
+  font-style: italic;
+}
+.workflow-stack {
+  display: flex;
+  flex-direction: column;
+  align-items: stretch;
+  gap: 6px;
+  width: 100%;
+}
+.workflow-checks .btn.small {
+  align-self: flex-start;
+}
+.workflow-check {
+  display: flex;
+  gap: 6px;
+  align-items: center;
+}
+.workflow-check .input {
+  min-width: 0;
+}
+.workflow-check .input:first-child {
+  flex: 0 0 35%;
+}
+.workflow-problems {
+  color: var(--error);
+  margin-block: 8px;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+.workflow-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-block-start: 12px;
+}
+.workflow-actions .workflow-spacer {
+  flex: 1;
+}
+.workflow-save ul {
+  margin-block: 4px 8px;
+  padding-inline-start: 20px;
+}
+.workflow-save .workflow-card {
+  display: block;
+  padding-block: 2px;
+}
+.workflow-paste {
+  width: 100%;
+  box-sizing: border-box;
+}
+/* The Workflow section's groups (#1418): a heading each, the rows under it. */
+.workflow-group {
+  display: flex;
+  flex-direction: column;
+  margin-block-end: 14px;
+}
+.workflow-group > .setting {
+  margin-inline: 0;
+}
+.workflow-group-h {
+  display: flex;
+  align-items: baseline;
+  flex-wrap: wrap;
+  gap: 4px 10px;
+  margin: 0 0 4px;
+  padding-block-end: 4px;
+  border-block-end: 1px solid var(--border-subtle);
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--fg-strong);
+}
+
+/* The Slots and copies group's slots list (#1445): name, state, what it's lent to. */
+.workflow-slots-table {
+  border-collapse: collapse;
+  margin: 4px 0 8px;
+}
+.workflow-slots-table td {
+  padding: 2px 16px 2px 0;
+  vertical-align: top;
+}
+.workflow-preset-now {
+  font-weight: 400;
+  font-size: 12px;
+  color: var(--fg-muted);
+}
+.workflow-choices {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(180px, 1fr));
+  gap: 8px;
+  margin-block: 8px;
+}
+.workflow-choice {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 4px;
+  padding: 8px 10px;
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  background: var(--bg-elevated, transparent);
+  color: var(--fg);
+  font: inherit;
+  text-align: start;
+  cursor: pointer;
+}
+.workflow-choice:hover {
+  background: var(--bg-hover);
+}
+.workflow-choice.current {
+  border-color: var(--accent);
+}
+.workflow-choice.open {
+  background: var(--accent-soft);
+}
+.workflow-choice-name {
+  font-weight: 600;
+}
+.workflow-choice-summary {
+  font-size: 12px;
+  color: var(--fg-muted);
+}
+.workflow-preview {
+  padding: 10px 12px;
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  margin-block-end: 8px;
+}
+.workflow-preview-h {
+  font-weight: 600;
+}
+.workflow-preview-list {
+  margin-block: 6px;
+  padding-inline-start: 18px;
+}
+.workflow-preview-list li {
+  padding-block: 2px;
+}
+/* An option the preset would change: a bar at the start, its bullet kept so the list stays aligned (the Assistant's OK). */
+.workflow-preview-list li.changes {
+  position: relative;
+}
+.workflow-preview-list li.changes::before {
+  content: '';
+  position: absolute;
+  inset-block: 2px;
+  inset-inline-start: -20px;
+  width: 3px;
+  border-radius: 2px;
+  background: var(--accent);
+}
+.workflow-preview-actions {
+  display: flex;
+  gap: 8px;
+}
+.workflow-contradiction {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  color: var(--error);
+  font-size: 12px;
+}
+.workflow-option.contradicted {
+  border-inline-start: 3px solid var(--error);
+  padding-inline-start: 8px;
+}
+.workflow-never-off {
+  padding: 8px 12px;
+  margin-block: 4px 8px;
+  border: 1px solid var(--border-subtle);
+  border-radius: 6px;
+  font-size: 12px;
+}
+.workflow-never-off ul {
+  margin-block: 4px 0;
+  padding-inline-start: 18px;
+}
+/* A level's workflow defaults (#1422): None · Git, then the editor. */
+.workflow-level {
+  display: flex;
+  flex-direction: column;
+  width: 100%;
+}
+.workflow-level-head {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 6px 12px;
+  margin-block-end: 10px;
+}
+.workflow-heirs ul {
+  margin-block: 4px 8px;
+  padding-inline-start: 20px;
+}
+.workflow-stages {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  width: 100%;
 }

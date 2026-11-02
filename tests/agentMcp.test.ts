@@ -14,6 +14,10 @@ import { tempDir } from './tempDir'
 
 const base = tempDir('hive-agentmcp-')
 ;(electron.app as unknown as { getPath: () => string }).getPath = () => join(base, 'profile')
+// A test copy on its CLI test home (tests/cliHomes.ts), as an e2e run is: its agents start with no connection (the
+// seam, HI-1755; connections are on for everyone since HI-1774).
+process.env.HIVE_USER_DATA = join(base, 'profile')
+process.env.HIVE_TEST_CLI_HOME_CONNECTION = '1'
 afterAll(() => rmSync(base, { recursive: true, force: true }))
 // Never the user's own CLI homes: the Codex and Copilot adapters read their config to turn the user's servers off.
 process.env.CODEX_HOME = join(base, 'codex-home')
@@ -89,10 +93,12 @@ describe('a launch', () => {
       expect(await of('a-only')).toEqual(['sandbox'])
       expect(await of('a-none')).toEqual([])
       expect((await sessions.effective(proj, agents[0] as never)).mcpServers.hive?.command).not.toBe('impostor')
-      // The choice changes the launch's signature, so a running agent is told to restart.
+      // The choice changes the launch's signature, so a running agent is told to restart: two saved agents that differ
+      // only in it (a resolution reads the agent as saved, HI-1770, so an unsaved variant can't stand in for one).
       const sig = async (a: object) => sessions.signature(await sessions.effective(proj, a as never))
-      expect(await sig(agents[0])).not.toBe(await sig({ ...agents[0], mcpServers: ['notes'] }))
-      // The Assistant gets Hive's own tools, not the projects' servers, whatever it is given.
+      expect(await sig(agents[0])).not.toBe(await sig(agents[1]))
+      // The Assistant gets Hive's own tools, not the projects' servers, whatever it is given: its own choices are
+      // tests/assistantMcp.test.ts's (HI-1472), none until switched on.
       expect(Object.keys((await sessions.effective(w.assistantHome, { id: 'assistant', name: 'Assistant', mcpServers: ['notes'] } as never)).mcpServers).filter((n) => n !== 'hive')).toEqual([])
 
       // Each provider's launch config has the tester's server and not the builder's other one.

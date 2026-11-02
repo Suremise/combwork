@@ -9,10 +9,12 @@
 // title, and Stop Them ends its whole tree; the Agent API says whether the launch it was started in still runs (a test
 // run waiting for a slot asks it). Fake Claude Code; dev build, throwaway profile and workspace, quiet.
 const lib = require('./lib.cjs')
-const { processes, descendantsIn, endExactly, childrenFirst } = require('./folderProcesses.cjs')
+const { processes, descendantsIn, endAsCrash } = require('./folderProcesses.cjs')
 const { _electron } = require('playwright-core')
-const { spawn } = require('child_process')
+const { spawn, execFileSync } = require('child_process')
+const { baseEnv } = require('./runContext.cjs')
 const fs = require('fs')
+const net = require('net')
 const path = require('path')
 // The longest a wait here waits for what it waits on: a bound for a hung run, never how long it should take (#570).
 const HUNG_MS = 20000
@@ -84,10 +86,29 @@ async function endFromOutside(app, outlives) {
   let top = byPid.get(outlives)
   for (let up = top && byPid.get(top.parent); up && up.started <= top.started && /hive-progress/i.test(up.commandLine); up = byPid.get(up.parent)) top = up
   const kept = new Set(top ? [top.pid, ...descendantsIn(list, top.pid).map((d) => d.pid)] : [])
-  const tree = root ? [{ pid: root.pid, started: root.started }, ...descendantsIn(list, root.pid)].filter((p) => !kept.has(p.pid)) : []
-  const ended = tree.length ? endExactly(childrenFirst(list, tree)) : 0
+  const ended = root && !kept.has(root.pid) ? endAsCrash(list, { pid: root.pid, started: root.started }, descendantsIn(list, root.pid).filter((p) => !kept.has(p.pid))) : 0
   const exited = await Promise.race([gone, new Promise((r) => setTimeout(() => r(false), HUNG_MS))])
   return ended > 0 && exited
+}
+
+/** Whether nothing listens on the Agent API port (on 127.0.0.1, where Hive listens), told as lanes.mjs portFree tells it. */
+const apiPortFree = () =>
+  new Promise((resolve) => {
+    const srv = net.createServer()
+    srv.once('error', () => resolve(false))
+    srv.listen(API_PORT, '127.0.0.1', () => srv.close(() => resolve(true)))
+  })
+
+/** What listens on the Agent API port (netstat), each owner by pid and command line: for a port that is never freed. */
+const portHolders = () => {
+  try {
+    const out = execFileSync('netstat', ['-ano', '-p', 'TCP'], { encoding: 'utf8', env: baseEnv(), windowsHide: true })
+    const pids = new Set(out.split(/\r?\n/).filter((l) => l.includes(`127.0.0.1:${API_PORT} `) && /LISTENING/.test(l)).map((l) => Number(l.trim().split(/\s+/).pop())))
+    const list = processes()
+    return JSON.stringify([...pids].map((pid) => list.find((p) => p.pid === pid) ?? { pid, gone: true }))
+  } catch (e) {
+    return String(e)
+  }
 }
 
 /** The notice's text in the window, once it is shown. */
@@ -111,6 +132,8 @@ const notice = (page) => page.evaluate(() => [...document.querySelectorAll('.toa
   stranger.unref()
 
   let current = null
+  // The suite's own hold on the Agent API port, while the second copy starts (HI-2196).
+  let held = null
   try {
     // --- 1. An agent whose command leaves a node running; the copy ended from outside while the agent runs.
     let node
@@ -168,7 +191,23 @@ const notice = (page) => page.evaluate(() => [...document.querySelectorAll('.toa
 
     // --- 2. The next start: the notice says it still runs, with Stop Them; nothing stops on its own.
     {
-      current = await start()
+      // The ended copy's Agent API socket is gone before the next copy listens on its port (HI-2193: once in 28 runs it
+      // wasn't yet, and the next copy's API failed to start). If something keeps it, the check names what.
+      check("the ended copy's Agent API port is free again", !!(await lib.until(apiPortFree, HUNG_MS)), portHolders())
+      // HI-2196: held as the next copy starts (as the copy just ended may still hold it), the port is tried again after
+      // the unexpected close, and the API listens once it is freed.
+      const logFile = path.join(userData, 'logs', 'hive.log')
+      const logFrom = fs.existsSync(logFile) ? fs.statSync(logFile).size : 0
+      const newLog = () => (fs.existsSync(logFile) ? fs.readFileSync(logFile, 'utf8').slice(logFrom) : '')
+      held = net.createServer()
+      await new Promise((r, j) => (held.once('error', j), held.listen(API_PORT, '127.0.0.1', r)))
+      const starting = start()
+      starting.catch(() => undefined)
+      check('after the unexpected close, the next copy tries its port again while it is in use', !!(await lib.until(() => newLog().includes(`port ${API_PORT} is in use after an unexpected close`), START_MS)), newLog().split('\n').filter((l) => /\[servers\]/.test(l)).join(' | '))
+      await new Promise((r) => held.close(r))
+      held = null
+      current = await starting
+      check('…and its Agent API listens once the port is free', !!(await lib.until(() => new RegExp(`Agent API listening on 127\\.0\\.0\\.1:${API_PORT} after \\d+ tries`).test(newLog()), HUNG_MS)), newLog().split('\n').filter((l) => /\[servers\]/.test(l)).join(' | '))
       const { page, inv } = current
       const text = await lib.until(() => notice(page), START_MS)
       // The node, and the hive-progress run as one item named by its title (cmd, hive-progress and its node).
@@ -195,6 +234,7 @@ const notice = (page) => page.evaluate(() => [...document.querySelectorAll('.toa
   } catch (e) {
     check('no unexpected error', false, e?.stack ?? String(e))
   } finally {
+    if (held) held.close()
     if (current) await current.app.close().catch(() => undefined)
     // Anything left of a copy this suite started, by its own pid and start time only, and the processes naming the
     // suite's folder (the node, the stranger), each ended as the process it was.

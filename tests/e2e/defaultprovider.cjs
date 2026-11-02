@@ -1,12 +1,13 @@
 // The default provider follows what's installed (#474).
 // 1. A Codex-only install (Codex turned on, the fake Codex its CLI; Claude Code and Copilot off) on a fresh profile: the
-//    default is Automatic, the empty project says nothing about Claude Code, Settings names Automatic's pick, and New
-//    Session adds its first agent, a Codex one, and starts it in one click. A default the user chose that can't run
-//    (Claude Code, turned off; Settings' or the project's) is named in the empty project, and Add Agent keeps it chosen,
-//    says why it can't add, and adds nothing until another provider is chosen.
+//    default is Automatic, the empty project says nothing about Claude Code, and New
+//    Session adds its first agent, a Codex one, and starts it in one click. A 0.9 config's chosen default (Claude Code,
+//    turned off) is read by nothing (decision A, HI-2132): the empty project doesn't name it, and Add Agent offers
+//    connections, with no provider to keep chosen.
 // 2. Claude Code turned on but not installed (hidden: a PATH without it, and a home and AppData of the suite's own, as
-//    the Copilot stand-in does), Codex installed: nothing warns about Claude Code (no banner, no Agent Setup opening, a
+//    the Copilot stand-in does), Codex installed: nothing warns about Claude Code (no banner, no Provider Setup opening, a
 //    plain status bar item) until an agent uses it.
+// Settings → Providers' Default provider and the providers' order went with HI-2107 (decision A: the one order of accounts).
 // Throwaway profiles, workspace and CODEX_HOME; quiet. No real CLI is installed or signed in.
 const lib = require('./lib.cjs')
 const fs = require('fs')
@@ -53,15 +54,6 @@ const check = (name, ok, extra = '') => {
     await shot(`codex-only-${theme}`)
   }
 
-  // Settings → Providers names what Automatic picks.
-  await page.keyboard.press('Control+,')
-  await lib.sleep(300)
-  await page.locator('.settings-nav .row', { hasText: 'Providers' }).first().click()
-  const picker = page.locator('.setting', { hasText: 'Default provider' }).locator('select').first()
-  const shown = await lib.until(async () => ((await picker.count()) ? picker.evaluate((el) => el.selectedOptions[0]?.textContent ?? '') : null), 10000)
-  check('Settings → Providers → Default provider says "Automatic (Codex)"', shown === 'Automatic (Codex)', String(shown))
-  await shot('settings')
-  await page.keyboard.press('Escape')
   await page.getByText('alpha', { exact: true }).first().click()
   await lib.until(async () => (await card.count()) === 1, 10000)
 
@@ -76,46 +68,28 @@ const check = (name, ok, extra = '') => {
   await lib.until(async () => !(await live()), 10000)
   await inv('project:updateConfig', alpha, { agents: [] })
 
-  // A default chosen in Settings that can't run is named.
+  // A 0.9 config's chosen default (Claude Code, turned off) is read by nothing since decision A (HI-2132): the empty
+  // project still names Codex and warns of nothing.
   await inv('settings:update', { defaultProvider: 'claude-code' })
-  const named = await lib.until(async () => {
-    const w = card.locator('[data-provider-warning]')
-    return (await w.count()) === 1 ? w.innerText() : null
-  }, 10000)
-  check('a chosen default that is turned off is named', /Claude Code is turned off/.test(named ?? ''), String(named))
+  check('a 0.9 chosen default is not named', !!(await lib.until(async () => (await card.locator('[data-provider-warning]').count()) === 0 && (await card.innerText()).includes('adds a Codex agent'), 10000)), await card.innerText())
   await shot('chosen-off')
 
-  // Add Agent keeps that choice, says why it can't add, and adds once another provider is chosen.
+  // Add Agent has no provider to choose (HI-2108, decision A): it offers connections, and Settings' old default doesn't
+  // keep Claude Code chosen there; adding stays possible.
   const dialog = page.locator('.dialog', { hasText: 'Add an agent to alpha' })
   const addButton = () => dialog.getByRole('button', { name: 'Add Agent', exact: true })
-  const addAgentDialog = async (label, whose) => {
-    await card.locator('button', { hasText: 'Add Agent' }).first().click()
-    const open = await lib.until(async () => (await dialog.count()) === 1, 10000)
-    const checked = await dialog.locator('.provider-choice .choice.selected strong').innerText().catch(() => '')
-    const note = await dialog.locator('[data-provider-off]').innerText().catch(() => '')
-    check(`${label}: Add Agent keeps Claude Code chosen`, !!open && checked === 'Claude Code', checked)
-    check(`${label}: …says it's turned off and is ${whose} default`, note.includes('Claude Code is turned off') && note.includes(`${whose} default provider`), note)
-    check(`${label}: …and can't add it`, await addButton().isDisabled(), 'Add Agent is enabled')
-    await shot(`add-${label.replace(/[^a-z]+/gi, '-').toLowerCase()}`)
-  }
-  await addAgentDialog('Settings default', 'your')
-  await dialog.locator('.provider-choice .choice', { hasText: 'Codex' }).click()
-  check('…choosing Codex instead allows Add', !(await addButton().isDisabled()) && (await dialog.locator('[data-provider-off]').count()) === 0)
+  await card.locator('button', { hasText: 'Add Agent' }).first().click()
+  check('Add Agent opens', !!(await lib.until(async () => (await dialog.count()) === 1, 10000)))
+  check('…with a connection to choose and no coding agent choice', (await dialog.locator('#add-agent-connection').count()) === 1 && (await dialog.locator('.provider-choice').count()) === 0 && (await dialog.locator('[data-provider-off]').count()) === 0)
+  check('…and can add', !(await addButton().isDisabled()))
+  await shot('add-agent')
   await page.keyboard.press('Escape')
   await lib.until(async () => (await dialog.count()) === 0, 5000)
   await inv('settings:update', { defaultProvider: 'auto' })
-  // Automatic clears the warning first: the one the project's default brings must be a new one, not the last one still
-  // shown (an Add Agent opened before the window has the project's default would start on Codex).
-  await lib.until(async () => (await card.locator('[data-provider-warning]').count()) === 0, 10000)
-  await inv('project:updateConfig', alpha, { defaultProvider: 'claude-code' })
-  await lib.until(async () => (await card.locator('[data-provider-warning]').count()) === 1, 10000)
-  check("a project's own default that is off is named too", /Claude Code is turned off/.test(await card.locator('[data-provider-warning]').innerText().catch(() => '')))
-  await addAgentDialog('project default', "this project's")
-  await page.keyboard.press('Escape')
-  await lib.until(async () => (await dialog.count()) === 0, 5000)
   check('nothing was added meanwhile', (await agents()).length === 0, JSON.stringify(await agents()))
-  await inv('project:updateConfig', alpha, { defaultProvider: 'inherit' })
-  check('…and back on Automatic, no warning', !!(await lib.until(async () => (await card.locator('[data-provider-warning]').count()) === 0, 10000)))
+  // A project has no default provider of its own any more (HI-2106, decision A): one sent is not kept.
+  await inv('project:updateConfig', alpha, { defaultProvider: 'claude-code' })
+  check("…a project's own default isn't kept, and Automatic warns of nothing", !JSON.parse(fs.readFileSync(path.join(alpha, '.hive', 'project.json'), 'utf8')).defaultProvider && !!(await lib.until(async () => (await card.locator('[data-provider-warning]').count()) === 0, 10000)))
   await app.close()
 
   // --- 2. Claude Code turned on but not installed, Codex installed.
@@ -142,11 +116,11 @@ const check = (name, ok, extra = '') => {
   await lib.openWorkspace(two.inv, two.page, ws)
   await two.page.getByText('alpha', { exact: true }).first().click()
   await lib.until(async () => (await two.page.locator('.session-empty-card').count()) === 1, 10000)
-  // Hive has looked for the CLIs (launch waited for it): Agent Setup would open at once if it were going to.
+  // Hive has looked for the CLIs (launch waited for it): Provider Setup would open at once if it were going to.
   await lib.sleep(1000) // on purpose: nothing should appear
   const banners = await two.page.locator('.providers-banner').allInnerTexts()
   check('no banner about Claude Code', !banners.some((b) => b.includes('Claude Code')), JSON.stringify(banners))
-  check('Agent Setup did not open by itself', (await two.page.locator('.dialog', { hasText: 'Agent Setup' }).count()) === 0)
+  check('Provider Setup did not open by itself', (await two.page.locator('.dialog', { hasText: 'Provider Setup' }).count()) === 0)
   check('the status bar shows Claude Code plainly, not as a warning', (await two.page.locator('[data-unused-provider="claude-code"]').count()) === 1 && (await two.page.locator('.statusbar .status-item.warn', { hasText: 'Claude Code' }).count()) === 0)
   check('the empty project names Codex, with no warning', (await two.page.locator('.session-empty-card').innerText()).includes('adds a Codex agent') && (await two.page.locator('[data-provider-warning]').count()) === 0)
   await two.page.screenshot({ path: path.join(lib.WORK, 'defprov-claude-unused.png') })
@@ -157,6 +131,7 @@ const check = (name, ok, extra = '') => {
   check('once an agent uses Claude Code, its banner shows', !!used, JSON.stringify(await two.page.locator('.providers-banner').allInnerTexts()))
   await two.page.screenshot({ path: path.join(lib.WORK, 'defprov-claude-used.png') })
   await two.app.close()
+
   console.log(failed ? `${failed} check(s) failed` : 'all checks passed')
   process.exit(failed ? 1 : 0)
 })().catch((e) => {

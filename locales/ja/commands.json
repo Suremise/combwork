@@ -1,0 +1,6 @@
+{
+  "commands.migrated.close": "閉じるときのコマンド",
+  "commands.migrated.quit": "終了時のコマンド",
+  "commands.run.gone": "そのコマンドはもうありません。",
+  "commands.run.testCopy": "これはHiveのテスト用コピーです。コマンドは実行しません。"
+}

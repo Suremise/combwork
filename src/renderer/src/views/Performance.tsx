@@ -3,9 +3,9 @@ import type { ProjectInfo } from '@shared/types'
 import { fmt, msg, tr, tRich, type Msg } from '@shared/i18n'
 import { providerDescriptor, providerName } from '@shared/providers'
 import { LATENCY_BOUNDS_MS, percentile, type GuidanceSeries, type MetricsReport, type MetricsScope, type ProviderUsageSummary, type SafeguardCount, type TrendPoint } from '@shared/metrics'
-import { DEFAULT_PERF_FILTERS, PERF_RANGES, WORKSPACE_OWN, byRoute, byTool, isEmpty, latencyOrder, pageQuery, providersIn, select, totals, type PerfFilters, type PerfRange, type PerfRole, type PerfSelection, type RouteRow, type ToolRow } from '@shared/metricsView'
+import { DEFAULT_PERF_FILTERS, PERF_RANGES, WORKSPACE_OWN, byRoute, byTool, isEmpty, latencyOrder, pageQuery, providersIn, select, toolListRows, totals, type PerfFilters, type PerfRange, type PerfRole, type PerfSelection, type RouteRow, type ToolListRow, type ToolRow } from '@shared/metricsView'
 import { compareScopeKey, compareScopeOf } from '@shared/benchmark'
-import { moneyLabel } from '@shared/usageTotals'
+import { FREE_LOCAL, moneyLabel } from '@shared/usageTotals'
 import { formatDateTime, formatDayLabel, formatWeekdayTime } from '@shared/dates'
 import { shownText } from '@shared/advanced'
 import { call } from '../api'
@@ -13,11 +13,13 @@ import { Icon, IconButton, InfoTip, LoadFailed, StaleNote, Tooltip } from '../co
 import { CellLines, DataTable, type DataColumn } from '../components/DataTable'
 import { notify, set, setActivity, useLanguage, useStore } from '../store'
 import { useScopedLoad } from '../scopedLoad'
+import { useShallow } from 'zustand/react/shallow'
 import { cx, formatBytes, formatTokens, timeAgo } from '../util'
 import { ComparePanel } from './PerformanceCompare'
 import { AntivirusLine } from '../components/Antivirus'
 import { Card } from './WorkspaceOverview'
 import { CardsTable } from './PerformanceCards'
+import { StallsTable } from './PerformanceStalls'
 
 /**
  * Performance: what Hive's own parts cost (shared/metrics.ts, recorded by main/metrics.ts), for the whole workspace (the
@@ -71,7 +73,7 @@ const M = {
   requests: msg({ id: 'performance.card.requests', defaultMessage: 'API requests', description: "Title of a Performance card: how many Agent API requests Hive answered." }),
   requestsSub: msg({ id: 'performance.card.requestsSub', defaultMessage: '{failed} failed · {cancelled} cancelled', description: "Under the API requests card's number. {failed} and {cancelled} are percentages (\"2%\") or — when there were none." }),
   requestsSubRate: msg({ id: 'performance.card.requestsSubRate', defaultMessage: '{rate, number} an hour recorded · {failed} failed · {cancelled} cancelled', description: "Under the API requests card's number. {rate} is requests per hour while Hive was recording; {failed} and {cancelled} are percentages (\"2%\")." }),
-  requestsTip: msg({ id: 'performance.card.requestsTip', defaultMessage: 'Agent API requests (agents’ tools, the Assistant, scripts). An hour: over the time Hive was recording, not the whole range. Failed: refused, client or server errors. Cancelled: the client went away before the reply.', description: 'Tooltip of the API requests card. An hour, Failed and Cancelled are words of the card: keep them as there.' }),
+  requestsTip: msg({ id: 'performance.card.requestsTip', defaultMessage: 'Agent API requests (agents’ tools, the Assistant, scripts). An hour: over the time Hive was recording, not the whole range. Failed: refused, client or server errors. Cancelled: the client went away before the reply. Waits (an isolated check waiting for a check copy) are counted but never failed.', description: 'Tooltip of the API requests card. An hour, Failed and Cancelled are words of the card, Waits a column of the Agent API table: keep them as there.' }),
   latency: msg({ id: 'performance.card.latency', defaultMessage: 'Latency', description: 'Title of a Performance card: how long Agent API requests took.' }),
   p50: msg({ id: 'performance.card.p50', defaultMessage: 'p50 {latency}', description: 'The median request time, on the Latency card. {latency} is a time such as "≤ 25 ms". Keep p50.' }),
   p95: msg({ id: 'performance.card.p95', defaultMessage: 'p95 {latency}', description: 'The 95th percentile of request time, on the Latency card. {latency} is a time such as "≤ 250 ms". Keep p95.' }),
@@ -108,6 +110,8 @@ const M = {
   trendNotRecorded: msg({ id: 'performance.trend.notRecorded', defaultMessage: 'not recorded (Hive closed, recording off, or before a reset)', description: 'Tooltip of a bar of the requests chart, after its hour or day and a colon: Hive recorded nothing then. Lower case.' }),
   trendDetail: msg({ id: 'performance.trend.detail', defaultMessage: '{requests, plural, one {# request} other {# requests}}{failed, plural, =0 {} other {, # failed{cancelled, plural, =0 {} other { ({cancelled, number} cancelled)}}}} · {toolCalls, plural, one {# tool call} other {# tool calls}} ({chars, number} characters) · {launches, plural, one {# launch} other {# launches}}{partial, select, yes { · recorded for {duration} of it} other {}}', description: 'Tooltip of a bar of the requests chart, after its hour or day and a colon: what happened then. {duration} is how long Hive recorded in it ("40 min"), shown when {partial} is yes. Lower case.' }),
   succeeded: msg({ id: 'performance.trend.succeeded', defaultMessage: 'Succeeded', description: "Legend of the requests chart: the bars' colour for requests that succeeded." }),
+  trendWaits: msg({ id: 'performance.trend.waits', defaultMessage: '{waits, plural, one {# wait} other {# waits}} for a check copy, not failures', description: 'A second line in the tooltip of a bar of the requests chart, shown when there were any: replies telling an isolated check to ask again because no check copy was free. Lower case.' }),
+  waitsLegend: msg({ id: 'performance.trend.waitsLegend', defaultMessage: 'Waits', description: "Legend of the requests chart: the bars' colour for replies that told a check to wait (no check copy free), which aren't failures." }),
   failed: msg({ id: 'performance.trend.failed', defaultMessage: 'Failed', description: "Legend of the requests chart: the bars' colour for requests that failed." }),
   notRecorded: msg({ id: 'performance.trend.notRecordedLegend', defaultMessage: 'Not recorded', description: 'Legend of the requests chart: the hatched bars, when Hive recorded nothing.' }),
   assistant: msg({ id: 'performance.who.assistant', defaultMessage: 'Assistant', description: "In a Performance table's Who column: the Hive Assistant's sessions." }),
@@ -126,6 +130,7 @@ const M = {
   route: msg({ id: 'performance.routes.route', defaultMessage: 'Route', description: "Column header of the Agent API table: the request's method and route (such as GET /api/tasks)." }),
   requestsHeader: msg({ id: 'performance.col.requests', defaultMessage: 'Requests', description: 'Column header of a Performance table: how many requests.' }),
   failedHeader: msg({ id: 'performance.routes.failed', defaultMessage: 'Failed', description: 'Column header of the Agent API table: requests that failed.' }),
+  waitsHeader: msg({ id: 'performance.routes.waits', defaultMessage: 'Waits', description: 'Column header of the Agent API table: replies that told the caller to ask again (an isolated check waiting for a check copy), not failures.' }),
   cancelled: msg({ id: 'performance.routes.cancelled', defaultMessage: 'Cancelled', description: 'Column header of the Agent API table: requests the client gave up on.' }),
   sent: msg({ id: 'performance.routes.sent', defaultMessage: 'Sent', description: 'Column header of the Agent API table: the size of the replies Hive sent.' }),
   received: msg({ id: 'performance.routes.received', defaultMessage: 'Received', description: 'Column header of the Agent API table: the size of the requests Hive received.' }),
@@ -137,8 +142,18 @@ const M = {
   allProviders: msg({ id: 'performance.provider.all', defaultMessage: 'All providers', description: "The Performance page's provider filter's choice of no filter." }),
   providerNote: msg({ id: 'performance.provider.note', defaultMessage: 'Launches and the providers’ usage: the only parts recorded per provider.', description: "Beside the Performance page's Provider filter: what it changes." }),
   providerNothing: msg({ id: 'performance.provider.nothing', defaultMessage: 'Nothing from {provider} in the last {range, select, 24h {24 hours} 7d {7 days} other {30 days}}{filtered, select, yes { for this filter} other {}}.', description: "The Performance page's provider box when the provider chosen has nothing. {provider} is its name (Claude Code, Codex, Copilot); {filtered} is yes when the Who filter is set; {range} (24h, 7d or 30d) is a key: don't translate the keys, only the texts." }),
-  toolList: msg({ id: 'performance.toolList', defaultMessage: 'The hive tools’ list, as each session got it: {list}.', description: 'A line on the Performance page. {list} is one or two items such as "agents 23 tools, 4 KB a start", separated by semicolons.' }),
-  toolListItem: msg({ id: 'performance.toolList.item', defaultMessage: '{role, select, assistant {Assistant} other {agents}} {tools, plural, one {# tool} other {# tools}}, {size} a start', description: "An item of \"The hive tools' list, as each session got it: …\": whose sessions, how many tools they got, and its size per start (\"4 KB\"). {role} is a key (assistant or agent): don't translate the keys, only the texts." }),
+  toolListHeading: msg({ id: 'performance.toolList.heading', defaultMessage: 'Hive tool list', description: "Heading of the Performance page's table of the hive tools' list each session was given (HI-2063). Keep hive (the tools' name)." }),
+  toolListTip: msg({ id: 'performance.toolList.tip', defaultMessage: 'The hive tools’ names, descriptions and schemas as each session’s CLI got them, once a start, on average, for every provider (not recorded per provider). Characters are the list’s JSON; Descriptions and Parameters are the tools’ descriptions and their parameters’ descriptions in it; Schemas is the rest: names, types, keys, punctuation and escapes. A dash: not measured (sessions from before Hive measured it).', description: "Tooltip of the Hive tool list table on the Performance page (HI-2063). Descriptions, Parameters and Schemas are its columns: name them as there. Keep hive (the tools' name)." }),
+  toolListEmpty: msg({ id: 'performance.toolList.empty', defaultMessage: 'No tool lists.', description: 'The Hive tool list table when it has no rows.' }),
+  toolListStarts: msg({ id: 'performance.toolList.starts', defaultMessage: 'Starts', description: 'Column header of the Hive tool list table: how many session starts were given the list.' }),
+  toolListTools: msg({ id: 'performance.toolList.tools', defaultMessage: 'Tools', description: 'Column header of the Hive tool list table: how many tools a start was given, on average.' }),
+  toolListChars: msg({ id: 'performance.toolList.chars', defaultMessage: 'Characters', description: "Column header of the Hive tool list table: the list's characters a start, on average." }),
+  toolListDescriptions: msg({ id: 'performance.toolList.descriptions', defaultMessage: 'Descriptions', description: "Column header of the Hive tool list table: the characters of the tools' descriptions a start, on average." }),
+  toolListParams: msg({ id: 'performance.toolList.params', defaultMessage: 'Parameters', description: "Column header of the Hive tool list table: the characters of the tools' parameters' descriptions a start, on average." }),
+  toolListSchemas: msg({ id: 'performance.toolList.schemas', defaultMessage: 'Schemas', description: "Column header of the Hive tool list table: the rest of the list's characters a start (names, types, keys, punctuation), on average." }),
+  toolListBytes: msg({ id: 'performance.toolList.bytes', defaultMessage: 'Bytes', description: "Column header of the Hive tool list table: the list's size in UTF-8 bytes a start, on average." }),
+  workflow: msg({ id: 'performance.guidance.workflow', defaultMessage: 'Workflow role', description: 'Column header of the Guidance at launch table (HI-2049): the side of the workflow the launched agents took. Glossary: workflow role.' }),
+  workflowSide: msg({ id: 'performance.guidance.workflowSide', defaultMessage: '{side, select, builder {Builder} reviewer {Reviewer} either {Either} none {None} other {Not recorded}}', description: "A cell of the Guidance at launch table's Workflow role column (HI-2049): builder, reviewer, either (builds or reviews), none (a generalist, the Assistant), or not recorded (launches from before Hive recorded it). Glossary: builder, reviewer, either." }),
   launches: msg({ id: 'performance.guidance.launches', defaultMessage: 'Launches', description: 'Column header of the Guidance at launch table: how many sessions were launched.' }),
   core: msg({ id: 'performance.guidance.core', defaultMessage: 'Core', description: "Column header of the Guidance at launch table: Hive's session contract's size per launch." }),
   projectBytes: msg({ id: 'performance.guidance.project', defaultMessage: 'Project', description: 'Column header of the Guidance at launch table: the size of what Hive adds for the project, per launch.' }),
@@ -170,6 +185,7 @@ const M = {
   notDetected: msg({ id: 'performance.usage.notDetected', defaultMessage: 'not detected', description: "A cell of the Safeguard stops column for a provider whose transcripts don't record them. Lower case." }),
   cost: msg({ id: 'performance.usage.cost', defaultMessage: 'Cost', description: 'Column header of the Provider usage table: what the usage cost.' }),
   costUnknown: msg({ id: 'performance.usage.costUnknown', defaultMessage: '+ {n, number} unknown', description: 'Under a cost: how many sessions\' cost is unknown. Lower case.' }),
+  costFree: msg({ id: 'performance.usage.costFree', defaultMessage: '{n, plural, one {+ # free (local)} other {+ # free (local)}}', description: "Under a cost: how many sessions ran only on a model server on this PC (Ollama, for example), so cost nothing (HI-1772). Lower case." }),
   unknown: msg({ id: 'performance.unknown', defaultMessage: 'unknown', description: 'A cell of a Performance table whose value no session reported (a token count, a model). Lower case.' }),
   agent: msg({ id: 'performance.safeguards.agent', defaultMessage: 'Agent', description: 'Column header of the Safeguard stops table: the agent (and its project).' }),
   model: msg({ id: 'performance.safeguards.model', defaultMessage: 'Model', description: 'Column header of the Safeguard stops table: the model the agent was on.' }),
@@ -212,33 +228,38 @@ const ROLE_LABEL: Record<PerfRole, Msg> = {
   viewer: msg({ id: 'performance.role.viewer', defaultMessage: 'Viewer apps', description: "A choice of the Performance page's Who filter: viewer apps' work." })
 }
 
+const NO_NAMES: string[] = []
+
 /** The activity bar's Performance view: the workspace, with the sidebar's (or the page's) project filter. */
 export function PerformanceView() {
-  const workspace = useStore((s) => s.workspace)
+  // Its path and project names (HI-1806): the workspace's every change (an agent's state) would render the page again.
+  const workspacePath = useStore((s) => s.workspace?.path)
+  const projects = useStore(useShallow((s) => s.workspace?.projects.map((p) => p.name) ?? NO_NAMES))
   const filters = useStore((s) => s.perfWorkspace)
   const activity = useStore((s) => s.activity)
   const setFilters = useCallback((f: Partial<PerfFilters>) => set((s) => ({ perfWorkspace: { ...s.perfWorkspace, ...f } })), [])
-  if (!workspace) return <div className="empty-state">{tr(M.noWorkspace)}</div>
+  if (!workspacePath) return <div className="empty-state">{tr(M.noWorkspace)}</div>
   // A project filter that isn't one of this workspace's projects (from before a switch): all of it.
-  const projects = workspace.projects.map((p) => p.name)
   const project = filters.project && filters.project !== WORKSPACE_OWN && !projects.some((n) => n.toLowerCase() === filters.project.toLowerCase()) ? '' : filters.project
   const scope: MetricsScope = project && project !== WORKSPACE_OWN ? { kind: 'project', project } : { kind: 'workspace' }
-  return <PerformancePage key={workspace.path} workspacePath={workspace.path} scope={scope} filters={{ ...filters, project }} setFilters={setFilters} projects={projects} active={activity === 'performance'} />
+  return <PerformancePage key={workspacePath} workspacePath={workspacePath} scope={scope} filters={{ ...filters, project }} setFilters={setFilters} projects={projects} active={activity === 'performance'} />
 }
 
 /** A project's Performance tab: fixed to that project (no workspace or other-project choice). */
 export function PerformanceTab({ project }: { project: ProjectInfo }) {
-  const workspace = useStore((s) => s.workspace)
+  const workspacePath = useStore((s) => s.workspace?.path)
   const filters = useStore((s) => s.perfProjects[project.path] ?? DEFAULT_PERF_FILTERS)
   const shown = useStore((s) => s.activity === 'projects' && s.selectedProject === project.path)
   const setFilters = useCallback((f: Partial<PerfFilters>) => set((s) => ({ perfProjects: { ...s.perfProjects, [project.path]: { ...(s.perfProjects[project.path] ?? DEFAULT_PERF_FILTERS), ...f, project: '' } } })), [project.path])
-  if (!workspace) return null
-  return <PerformancePage key={`${workspace.path}|${project.path}`} workspacePath={workspace.path} scope={{ kind: 'project', project: project.name }} filters={{ ...filters, project: '' }} setFilters={setFilters} active={shown} />
+  if (!workspacePath) return null
+  return <PerformancePage key={`${workspacePath}|${project.path}`} workspacePath={workspacePath} scope={{ kind: 'project', project: project.name }} filters={{ ...filters, project: '' }} setFilters={setFilters} active={shown} />
 }
 
 /** The Performance view's sidebar: what to look at (the whole workspace, its own work, or one project). */
 export function PerformancePanel() {
-  const workspace = useStore((s) => s.workspace)
+  // Whether one is open, and its project names (HI-1806): not the agents' states.
+  const workspace = useStore((s) => !!s.workspace)
+  const names = useStore(useShallow((s) => s.workspace?.projects.map((p) => p.name) ?? NO_NAMES))
   const project = useStore((s) => s.perfWorkspace.project)
   const pick = (p: string): void => set((s) => ({ perfWorkspace: { ...s.perfWorkspace, project: p } }))
   const row = (value: string, icon: string, label: string, tip: string) => (
@@ -261,7 +282,7 @@ export function PerformancePanel() {
             {row('', 'root-folder', tr(M.whole), tr(M.wholeTip))}
             {row(WORKSPACE_OWN, 'hubot', tr(M.own), tr(M.ownTip))}
             <div className="section-header">{tr(M.projects)}</div>
-            {workspace.projects.map((p) => row(p.name, 'folder', p.name, tr(M.projectTip, { project: p.name })))}
+            {names.map((name) => row(name, 'folder', name, tr(M.projectTip, { project: name })))}
           </>
         )}
       </div>
@@ -468,7 +489,7 @@ function PerformancePage({ workspacePath, scope, filters, setFilters, projects, 
                   <ByProvider report={report} sel={sel} range={range.value} provider={filters.provider} setProvider={(provider) => setFilters({ provider })} />
                 )}
                 {/* Hive's tool list isn't per provider: outside the provider's group. */}
-                <ToolList sel={all} />
+                <ToolListTable sel={all} />
               </>
             )}
             </section>
@@ -484,6 +505,8 @@ function PerformancePage({ workspacePath, scope, filters, setFilters, projects, 
               />
             )}
             {!isTab && report.skills && <SkillService report={report} filtered={filters.role !== 'all'} />}
+            {/* Hive's own main process (HI-1135): app-wide, since it started, so the workspace's page only. */}
+            {!isTab && <StallsTable refreshAt={loaded.at} />}
             {!isTab && report.app && <AppWide report={report} />}
             <details className="perf-limits">
               <summary>{tr(M.limits)}</summary>
@@ -575,12 +598,14 @@ function Trend({ points, step }: { points: TrendPoint[]; step: 'hour' | 'day' })
                       ? tr(M.trendNotRecorded)
                       : tr(M.trendDetail, { requests: p.requests, failed: p.failed, cancelled: p.cancelled, toolCalls: p.toolCalls, chars: p.toolChars, launches: p.launches, partial: p.observedMs < slotMs - 60_000 ? 'yes' : 'no', duration: duration(p.observedMs) })
                 })}
+                {p.waits > 0 && <div>{tr(M.trendWaits, { waits: p.waits })}</div>}
               </div>
             }
           >
             <div className={cx('daily-col', !p.observedMs && !p.requests && 'unobserved', p.observedMs > 0 && p.observedMs < slotMs - 60_000 && 'partial')}>
               <div className="stack-bar" style={{ height: `${p.requests ? Math.max(3, (p.requests / max) * 100) : 0}%` }}>
-                {p.requests - p.failed > 0 && <div className="stack-part" style={{ flexGrow: p.requests - p.failed, background: 'var(--series-1)' }} />}
+                {p.requests - p.failed - p.waits > 0 && <div className="stack-part" style={{ flexGrow: p.requests - p.failed - p.waits, background: 'var(--series-1)' }} />}
+                {p.waits > 0 && <div className="stack-part" style={{ flexGrow: p.waits, background: 'var(--fg-faint)' }} />}
                 {p.failed > 0 && <div className="stack-part" style={{ flexGrow: p.failed, background: 'var(--error)' }} />}
               </div>
             </div>
@@ -595,6 +620,11 @@ function Trend({ points, step }: { points: TrendPoint[]; step: 'hour' | 'day' })
         <span>
           <span className="swatch" style={{ background: 'var(--series-1)' }} /> {tr(M.succeeded)}
         </span>
+        {points.some((p) => p.waits > 0) && (
+          <span>
+            <span className="swatch" style={{ background: 'var(--fg-faint)' }} /> {tr(M.waitsLegend)}
+          </span>
+        )}
         <span>
           <span className="swatch" style={{ background: 'var(--error)' }} /> {tr(M.failed)}
         </span>
@@ -653,6 +683,7 @@ const routeColumns = (): DataColumn<RouteRow>[] => [
   { key: 'requests', header: tr(M.requestsHeader), num: true, descFirst: true, cell: (r) => num(r.requests), sortValue: (r) => r.requests },
   { key: 'failed', header: tr(M.failedHeader), num: true, descFirst: true, cell: (r) => (failedOnly(r) ? `${num(failedOnly(r))} (${pct(failedOnly(r), r.requests)})` : '—'), sortValue: failedOnly },
   { key: 'cancelled', header: tr(M.cancelled), num: true, descFirst: true, cell: (r) => (r.cancelled ? `${num(r.cancelled)} (${pct(r.cancelled, r.requests)})` : '—'), sortValue: (r) => r.cancelled },
+  { key: 'waits', header: tr(M.waitsHeader), num: true, descFirst: true, cell: (r) => (r.waits ? num(r.waits) : '—'), sortValue: (r) => r.waits },
   { key: 'p50', header: tr(M.p50Header), num: true, descFirst: true, cell: (r) => ms(r.p50, r.requests), sortValue: (r) => latencyOrder(r.p50, r.requests) },
   { key: 'p95', header: tr(M.p95Header), num: true, descFirst: true, cell: (r) => ms(r.p95, r.requests), sortValue: (r) => latencyOrder(r.p95, r.requests) },
   { key: 'sent', header: tr(M.sent), num: true, descFirst: true, cell: (r) => formatBytes(r.responseBytes), sortValue: (r) => r.responseBytes },
@@ -711,12 +742,37 @@ function ByProvider({ report, sel, range, provider, setProvider }: { report: Met
   )
 }
 
-/** The hive tools' list as each session got it: every provider's (not recorded per provider). */
-function ToolList({ sel }: { sel: PerfSelection }) {
-  if (!sel.catalog.length) return null
-  // The items are separated by semicolons (each has a comma of its own).
-  const list = sel.catalog.map((c) => tr(M.toolListItem, { role: c.role === 'assistant' ? 'assistant' : 'agent', tools: Math.round(c.starts ? c.tools / c.starts : 0), size: formatBytes(c.starts ? c.toolsBytes / c.starts : 0) })).join('; ')
-  return <p className="hint">{tr(M.toolList, { list })}</p>
+/** A count of characters a start, or — where none was measured (unknown, not zero). */
+const charsCell = (v: number | null): string => (v === null ? '—' : fmt.number(Math.round(v)))
+const charsColumn = (key: string, header: string, value: (r: ToolListRow) => number | null): DataColumn<ToolListRow> => ({ key, header, num: true, descFirst: true, cell: (r) => charsCell(value(r)), sortValue: value })
+/** The Hive tool list table's columns, in the window's language (made again when it changes). */
+const toolListColumns = (): DataColumn<ToolListRow>[] => [
+  { key: 'role', header: tr(M.who), className: 'nowrap', cell: (r) => roleName(r.role), sortValue: (r) => roleName(r.role) },
+  { key: 'workflow', header: tr(M.workflow), className: 'nowrap', cell: (r) => tr(M.workflowSide, { side: r.workflow }), sortValue: (r) => tr(M.workflowSide, { side: r.workflow }) },
+  { key: 'starts', header: tr(M.toolListStarts), num: true, descFirst: true, cell: (r) => num(r.starts), sortValue: (r) => r.starts },
+  { key: 'tools', header: tr(M.toolListTools), num: true, descFirst: true, cell: (r) => fmt.figure(r.tools, r.tools % 1 ? 1 : 0), sortValue: (r) => r.tools },
+  charsColumn('chars', tr(M.toolListChars), (r) => r.chars),
+  charsColumn('descriptions', tr(M.toolListDescriptions), (r) => r.descriptionChars),
+  charsColumn('params', tr(M.toolListParams), (r) => r.paramChars),
+  charsColumn('schemas', tr(M.toolListSchemas), (r) => r.schemaChars),
+  { key: 'bytes', header: tr(M.toolListBytes), num: true, descFirst: true, cell: (r) => formatBytes(r.bytes), sortValue: (r) => r.bytes }
+]
+
+/** The hive tools' list as each session got it, a start (HI-2063): every provider's (not recorded per provider). */
+function ToolListTable({ sel }: { sel: PerfSelection }) {
+  const language = useLanguage()
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  const columns = useMemo(() => toolListColumns(), [language])
+  const rows = useMemo(() => toolListRows(sel.catalog), [sel.catalog])
+  if (!rows.length) return null
+  return (
+    <>
+      <h2 className="section">
+        {tr(M.toolListHeading)} <InfoTip text={tr(M.toolListTip)} />
+      </h2>
+      <DataTable id="perf-tool-list" rows={rows} columns={columns} rowKey={(r) => `${r.role} ${r.workflow}`} empty={tr(M.toolListEmpty)} />
+    </>
+  )
 }
 
 const perLaunch = (n: number, launches: number): number | null => (launches && n ? n / launches : null)
@@ -735,6 +791,7 @@ const perLaunchColumn = (key: string, header: string, bytes: (g: GuidanceSeries)
 const guidanceColumns = (): DataColumn<GuidanceSeries>[] => [
   { key: 'provider', header: tr(M.provider), className: 'nowrap', cell: (g) => providerName(g.provider), sortValue: (g) => providerName(g.provider) },
   { key: 'role', header: tr(M.who), className: 'nowrap', cell: (g) => roleName(g.role), sortValue: (g) => roleName(g.role) },
+  { key: 'workflow', header: tr(M.workflow), className: 'nowrap', cell: (g) => tr(M.workflowSide, { side: g.workflow ?? 'unknown' }), sortValue: (g) => tr(M.workflowSide, { side: g.workflow ?? 'unknown' }) },
   { key: 'launches', header: tr(M.launches), num: true, descFirst: true, cell: (g) => num(g.launches), sortValue: (g) => g.launches },
   perLaunchColumn('core', tr(M.core), (g) => g.guidanceBytes),
   perLaunchColumn('project', tr(M.projectBytes), (g) => g.customBytes),
@@ -818,11 +875,14 @@ const providerColumns = (): DataColumn<ProviderUsageSummary>[] => [
     num: true,
     descFirst: true,
     cell: (p) =>
-      p.costUnknown === p.sessions ? (
+      // Only sessions on servers on this PC (HI-1772): free (local).
+      p.costFree && p.costFree === p.sessions ? (
+        tr(FREE_LOCAL)
+      ) : p.costUnknown === p.sessions ? (
         tr(M.unknown)
       ) : (
         // "≈ $25.87" as one unbreakable value; the unknown sessions under it (#241).
-        <CellLines main={`${p.costEstimated ? '≈ ' : ''}${moneyLabel(p.costUsd)}`} sub={p.costUnknown ? tr(M.costUnknown, { n: p.costUnknown }) : ''} subWarn />
+        <CellLines main={`${p.costEstimated ? '≈ ' : ''}${moneyLabel(p.costUsd)}`} sub={[p.costUnknown ? tr(M.costUnknown, { n: p.costUnknown }) : '', p.costFree ? tr(M.costFree, { n: p.costFree }) : ''].filter(Boolean).join(' · ')} subWarn={!!p.costUnknown} />
       ),
     sortValue: (p) => (p.costUnknown === p.sessions ? null : p.costUsd)
   }
@@ -863,7 +923,7 @@ function GuidanceTable({ sel, unmeasured }: { sel: PerfSelection; unmeasured: nu
         {tr(M.guidanceHeading)}{' '}
         <InfoTip text={tr(M.guidanceTableTip)} />
       </h2>
-      <DataTable id="perf-guidance" rows={sel.guidance} columns={columns} rowKey={(g) => `${g.provider} ${g.role}`} empty={tr(M.guidanceEmpty)} />
+      <DataTable id="perf-guidance" rows={sel.guidance} columns={columns} rowKey={(g, i) => `${g.provider} ${g.role} ${g.workflow} ${i}`} empty={tr(M.guidanceEmpty)} />
       {unmeasured > 0 && <p className="hint">{tr(M.unmeasuredSkills)}</p>}
     </>
   )

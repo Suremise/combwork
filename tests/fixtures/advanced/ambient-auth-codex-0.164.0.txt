@@ -1,0 +1,5 @@
+codex login status -c cli_auth_credentials_store="file", in a new empty CODEX_HOME, an allowlisted environment and one made-up variable (not a key) each time:
+OPENAI_API_KEY alone: "Not logged in" (exit 1)
+CODEX_API_KEY alone: "Not logged in" (exit 1)
+CODEX_ACCESS_TOKEN alone: "Error checking login status: invalid agent identity JWT format" (exit 1)
+none of them: "Not logged in" (exit 1)

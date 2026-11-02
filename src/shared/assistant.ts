@@ -1,5 +1,6 @@
 import type { AppSettings, ProjectConfig, ProjectProviderConfig, ProviderId } from './types'
 import { DEFAULT_SETTINGS, projectAgents } from './defaults'
+import { isCliOwnMode } from './cliOwnMode'
 import { PROVIDERS } from './providers'
 
 /**
@@ -42,16 +43,18 @@ export const ASSISTANT_TRUSTED_TOOLS = [
 /**
  * The Assistant's config as its sessions see it: Settings → Assistant stands in for "the project's" settings
  * (provider, model, effort, mode, arguments), an unset mode is the provider's assistantMode, and the home
- * always has exactly its one agent, keeping the workspace's overrides from the file.
+ * always has exactly its one agent, keeping the workspace's overrides from the file. The CLI's own setting is never the
+ * Assistant's mode (#1284: Control relies on knowing it): one set by hand or through the Agent API is its assistantMode.
  */
 export function assistantProjectConfig(cfg: ProjectConfig, settings: Pick<AppSettings, 'assistant'>): ProjectConfig {
   const a = settings.assistant
   const providers = {} as Record<ProviderId, ProjectProviderConfig>
   for (const p of PROVIDERS) {
     const s = a?.providers?.[p.id]
-    providers[p.id] = { model: s?.model || 'inherit', effort: s?.effort || 'inherit', permissionMode: s?.permissionMode || p.assistantMode, extraArgs: s?.extraArgs ?? '', use200kContext: s?.use200kContext || 'inherit' }
+    providers[p.id] = { model: s?.model || 'inherit', effort: s?.effort || 'inherit', permissionMode: s?.permissionMode && !isCliOwnMode(s.permissionMode) ? s.permissionMode : p.assistantMode, extraArgs: s?.extraArgs ?? '', use200kContext: s?.use200kContext || 'inherit' }
   }
-  const own = projectAgents(cfg).find((x) => x.id === ASSISTANT_AGENT_ID)
+  const found = projectAgents(cfg).find((x) => x.id === ASSISTANT_AGENT_ID)
+  const own = found && isCliOwnMode(found.permissionMode) ? { ...found, permissionMode: undefined } : found
   return {
     ...cfg,
     defaultProvider: a?.provider || 'inherit',

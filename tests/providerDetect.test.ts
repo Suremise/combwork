@@ -75,17 +75,21 @@ describe('detection before Automatic decides (#506)', () => {
     await expect(providerService.settle('codex')).rejects.toThrow(/still looking for Codex/)
   })
 
-  it("doesn't wait for a provider turned off, or when a default was chosen", async () => {
+  it("doesn't wait for a provider turned off; a default provider chosen before 1.0 no longer skips the wait (decision A)", async () => {
     config.update((c) => {
       c.settings.providers.copilot = { ...c.settings.providers.copilot, enabled: false }
     })
     hear('claude-code', false)
     hear('codex', true)
     expect(await providerService.detected()).toBe(true)
+    expect((await prepareAgent(join(base, 'p'), DEFAULT_PROJECT_CONFIG, { location: 'project' }, 'Codex', [])).def.provider).toBe('codex')
+    // HI-2121: a 0.9 config's chosen default is read by no new agent: Claude Code being looked for again is waited for.
     config.update((c) => {
       c.settings.defaultProvider = 'codex'
     })
     hear('claude-code', null)
-    expect((await prepareAgent(join(base, 'p'), DEFAULT_PROJECT_CONFIG, { location: 'project' }, 'Codex', [])).def.provider).toBe('codex')
+    await expect(prepareAgent(join(base, 'p'), DEFAULT_PROJECT_CONFIG, { location: 'project' }, 'Chosen', [])).rejects.toThrow(/still looking/)
+    // One naming its CLI waits only for that CLI.
+    expect((await prepareAgent(join(base, 'p'), DEFAULT_PROJECT_CONFIG, { location: 'project', provider: 'codex' }, 'Named', [])).def.provider).toBe('codex')
   })
 })

@@ -1,4 +1,4 @@
-// A project's tab strip at every width: its eight tabs and More ▾ (#1043) labelled while they fit (Settings opens from the header's ⋯, #974); icons with the active tab's label when
+// A project's tab strip at every width: its nine tabs and More ▾ (#1043) labelled while they fit (Settings opens from the header's ⋯, #974); icons with the active tab's label when
 // they don't (switching back only with a little room to spare, so it doesn't flicker); icons only, scrolling with the
 // active tab in view, when even that doesn't fit. No tab is ever cut off unless the strip scrolls, at the window's
 // minimum width too; icon-only tabs keep their name (tooltip and accessible label) and order, and dragging files over
@@ -19,7 +19,7 @@ const claudeHome = path.join(lib.WORK, 'tabstrip-claude-home')
 const alpha = path.join(ws, 'alpha')
 const beta = path.join(ws, 'beta')
 // The strip's tabs, then More ▾ (#1043), which shows the name of the tab of its menu that is open.
-const LABELS = ['Session', 'Overview', 'Performance', 'Tasks', 'Sessions', 'Files', 'Attachments', 'Git', 'More']
+const LABELS = ['Session', 'Overview', 'Performance', 'Tasks', 'Sessions', 'Files', 'Attachments', 'Version Control', 'Activity', 'More']
 const MORE = ['Memory', 'Skills', 'Templates', 'MCP']
 const SPARE = 12
 let failed = 0
@@ -129,9 +129,9 @@ const check = (name, ok, extra = '') => {
   const perf = await expectFit('Performance active', 'icons')
   check('Performance has the label now', perf.active === 'Performance', perf.active)
   await shot('tabstrip-2-icons-dark.png')
-  await page.locator('.tabs .tab', { hasText: 'Git' }).hover()
+  await page.locator('.tabs .tab', { hasText: 'Version Control' }).hover()
   const tip = page.locator('.tip')
-  check('an icon-only tab\'s tooltip names it', !!(await lib.until(async () => ((await tip.textContent().catch(() => '')) ?? '').startsWith('Git'), HUNG_MS)), await tip.textContent().catch(() => ''))
+  check('an icon-only tab\'s tooltip names it', !!(await lib.until(async () => ((await tip.textContent().catch(() => '')) ?? '').startsWith('Version Control'), HUNG_MS)), await tip.textContent().catch(() => ''))
   await page.mouse.move(5, 500)
   await inv('settings:update', { appearance: { theme: 'light' } })
   await lib.sleep(300)
@@ -143,14 +143,18 @@ const check = (name, ok, extra = '') => {
   await widthTo(iconsNeed + 20)
   await expectFit(`${iconsNeed + 20}px: room for the icons but not Performance's label`, 'all-icons')
   await lib.openMoreTab(page, 'MCP')
-  await widthTo(Math.round(iconsNeed * 0.6))
+  // Short of the icons: the strip itself is held narrower, as docked panels would make it. A narrower page no longer gets
+  // it there: the work keeps its least width (HI-1737), so with nine tabs the page overflows instead (HI-1844).
+  const cap = await page.addStyleTag({ content: `.tabs { max-width: ${iconsNeed - 40}px; }` })
+  check('strip held short of the icons', !!(await lib.until(async () => (await inspect()).width === iconsNeed - 40, HUNG_MS)), `${(await inspect()).width}px, the icons need ${iconsNeed}px`)
   const narrow = await expectFit('too narrow even for the icons, MCP (in More ▾, the last) active', 'all-icons')
   check('More ▾ is last and in view, showing MCP', (await inspect()).active === 'MCP' && (await page.locator('.tabs .tab').last().evaluate((t) => t.classList.contains('tab-more'))))
-  check('the strip scrolls', narrow.scrolls)
+  check('the strip scrolls', narrow.scrolls, `${narrow.width}px wide, the icons need ${iconsNeed}px`)
   await page.locator('.tabs .tab', { hasText: 'Session' }).first().evaluate((t) => t.click())
   await expectFit('Session active (clicked off screen)', 'all-icons')
   check('Session is scrolled into view', (await inspect()).active === 'Session' && !(await inspect()).bad.length)
   await shot('tabstrip-4-scrolls.png')
+  await cap.evaluate((s) => s.remove())
 
   // --- Wider again: labels back.
   viewport = 1700

@@ -1,21 +1,38 @@
-import { useEffect, useMemo, useRef, useState } from 'react'
+import { useEffect, useId, useMemo, useRef, useState } from 'react'
 import { keybindingProblem, resolveKeybinding } from '@shared/defaults'
 import { fmt, msg, tr, tRich } from '@shared/i18n'
 import type { KeybindingOverrides, ProjectInfo } from '@shared/types'
 import * as actions from '../actions'
 import { call } from '../api'
-import { commandCategory, commands, eventToKey, isProjectScoped, terminalReserved, type Command } from '../commands'
-import { confirm, notify, set, useStore } from '../store'
+import { CATEGORY_TEXT, commandCategory, commands, eventToKey, isProjectScoped, terminalReserved, type Command, type CommandCategory } from '../commands'
+import { chooseTab, confirm, notify, set, useRememberedTab, useStore } from '../store'
 import { formatKeybinding } from '../util'
 import { otherUsers, shortcutUsers } from '../keyConflicts'
 import { DottedId, Icon, IconButton, SearchInput, Tooltip } from './ui'
 import { DataTable, type DataColumn } from './DataTable'
+import { TabPanel, Tabs } from './Tabs'
 
 /** Waits this long after the first combination for a second one, which makes a chord ("Ctrl+K Ctrl+S"). */
 const CHORD_WAIT = 1200
 
 /** Stable empty overrides, so the memos below don't recompute on every render. */
 const NO_KEYS: KeybindingOverrides = {}
+
+/** The editor's first tab (HI-1838): every command, with the Category column. */
+const ALL = 'all'
+type KeysTab = CommandCategory | typeof ALL
+
+const T = {
+  tabs: msg({ id: 'settings.keys.tabs', defaultMessage: 'Command categories', description: "Accessible name of the keyboard shortcuts editor's tabs: All, then one per command category (Project, Session…)." }),
+  all: msg({ id: 'settings.keys.all', defaultMessage: 'All', description: "The keyboard shortcuts editor's first tab: every command, of every category. Short." }),
+  commandIn: msg({ id: 'settings.keys.commandIn', defaultMessage: '{category}: {command}', description: 'A command named with its category, where it may be on another tab of the shortcuts editor (Also used by…, Shortcut already in use): "Session: Compact Conversation". Keep the order natural for the language.' })
+}
+
+/** A command's name with its category, in the language shown, by its id: a clash may be on another tab. */
+const commandIn = (id: string): string => {
+  const c = commands.find((x) => x.id === id)
+  return c ? tr(T.commandIn, { category: commandCategory(c), command: c.label }) : id
+}
 
 export function Kbd({ keys }: { keys: string | undefined }) {
   if (!keys) return <span className="faint">—</span>
@@ -91,6 +108,10 @@ export function KeybindingsEditor({ project }: { project?: ProjectInfo }) {
   const settings = useStore((s) => s.settings)
   const [query, setQuery] = useState('')
   const [recording, setRecording] = useState<string | null>(null)
+  // A tab clicked while searching narrows that search, with the query it was made for; it isn't remembered (HR5's
+  // HI-1838 design check). A changed query drops it (HI-1885, as Advanced's HI-1839).
+  const [clicked, setClicked] = useState<{ query: string; tab: KeysTab } | null>(null)
+  const idBase = useId()
   const global: KeybindingOverrides = settings?.keybindings ?? NO_KEYS
   const local: KeybindingOverrides = project?.config.keybindings ?? NO_KEYS
 
@@ -120,7 +141,21 @@ export function KeybindingsEditor({ project }: { project?: ProjectInfo }) {
   )
 
   const q = query.trim().toLowerCase()
-  const shown = rows.filter((r) => !q || `${commandCategory(r.c)} ${r.c.label} ${r.c.id} ${r.key ? formatKeybinding(r.key) : ''}`.toLowerCase().includes(q))
+  const matching = rows.filter((r) => !q || `${commandCategory(r.c)} ${r.c.label} ${r.c.id} ${r.key ? formatKeybinding(r.key) : ''}`.toLowerCase().includes(q))
+  // All, then each category the editor offers, in the order the commands have them (HI-1838).
+  const categories = useMemo(() => [...new Set(rows.map((r) => r.c.category))], [rows])
+  const tabIds = useMemo((): KeysTab[] => [ALL, ...categories], [categories])
+  const remembered = useRememberedTab<KeysTab>(project ? 'shortcuts.project' : 'shortcuts', tabIds, ALL)
+  // Searching shows All (or the tab clicked during this very query); cleared, the tab remembered before it is back.
+  useEffect(() => {
+    setClicked((c) => (c && c.query !== q ? null : c))
+  }, [q])
+  const searchTab = q && clicked?.query === q && tabIds.includes(clicked.tab) ? clicked.tab : null
+  const tab: KeysTab = q ? (searchTab ?? ALL) : remembered
+  const chooseKeysTab = (id: KeysTab): void => (q ? setClicked({ query: q, tab: id }) : chooseTab(project ? 'shortcuts.project' : 'shortcuts', id))
+  // Each tab's count: its commands, or while searching its matches.
+  const count = (id: KeysTab): number => (id === ALL ? matching.length : matching.filter((r) => r.c.category === id).length)
+  const shown = tab === ALL ? matching : matching.filter((r) => r.c.category === tab)
 
   const save = async (id: string, key: string | null | undefined): Promise<void> => {
     if (project) {
@@ -139,7 +174,7 @@ export function KeybindingsEditor({ project }: { project?: ProjectInfo }) {
     setRecording(null)
     const problem = keybindingProblem(key)
     if (problem) return notify('warning', tr(msg({ id: 'settings.keys.cantUse', defaultMessage: "{keys} can't be used", description: "Title of a warning when a recorded shortcut can't be used. {keys} is the shortcut (Ctrl+K)." }), { keys: formatKeybinding(key) }), problem)
-    const others = otherUsers(conflicts, key, id).map(commandName)
+    const others = otherUsers(conflicts, key, id).map(commandIn)
     if (
       others.length &&
       !(await confirm({
@@ -171,7 +206,8 @@ export function KeybindingsEditor({ project }: { project?: ProjectInfo }) {
     } else set({ settings: await call('settings:reset', 'keybindings') })
   }
 
-  const columns = keyColumns({ project, recording, setRecording, record: (id, k) => void record(id, k), save: (id, k) => void save(id, k), conflicts })
+  // Inside a category's tab its Category column would say the same on every row: All alone has it.
+  const columns = keyColumns({ project, recording, setRecording, record: (id, k) => void record(id, k), save: (id, k) => void save(id, k), conflicts }).filter((c) => tab === ALL || c.key !== 'category')
 
   return (
     <div className="kb-editor">
@@ -183,26 +219,29 @@ export function KeybindingsEditor({ project }: { project?: ProjectInfo }) {
         </button>
       </div>
       {project && <p className="faint kb-note">{tr(msg({ id: 'settings.keys.projectNote', defaultMessage: 'Changes here apply while {project} is selected, over the global shortcuts. Other commands are set in Settings → Keyboard Shortcuts.', description: "Above a project's shortcuts (Project Settings → Keyboard Shortcuts). {project} is its name." }), { project: project.name })}</p>}
-      {/* Every command on one page (a settings page scrolls): sorting and the Category and Source filters, no paging. */}
-      <DataTable
-        id={project ? 'shortcuts-project' : 'shortcuts'}
-        className="kb-table"
-        rows={shown}
-        columns={columns}
-        rowKey={(r) => r.c.id}
-        pageSizes={ALL_ROWS}
-        defaultPageSize={ALL_ROWS[0]}
-        rowClassName={(r) => recording === r.c.id && 'recording'}
-        empty={tr(msg({ id: 'settings.keys.noMatch', defaultMessage: 'No commands match.', description: 'The keyboard shortcuts editor when its search finds nothing.' }))}
-      />
+      <Tabs<KeysTab> idBase={idBase} className="kb-tabs" label={tr(T.tabs)} value={tab} onChange={chooseKeysTab} items={tabIds.map((id) => ({ id, label: id === ALL ? tr(T.all) : tr(CATEGORY_TEXT[id]), count: count(id) }))} />
+      {/* A tab's commands on one page (a settings page scrolls): sorting and the Set filter, no paging. */}
+      <TabPanel idBase={idBase} id={tab} selected>
+        <DataTable
+          id={project ? 'shortcuts-project' : 'shortcuts'}
+          className="kb-table"
+          rows={shown}
+          columns={columns}
+          rowKey={(r) => r.c.id}
+          pageSizes={ALL_ROWS}
+          defaultPageSize={ALL_ROWS[0]}
+          rowClassName={(r) => recording === r.c.id && 'recording'}
+          // Its filtered columns come last, after what a narrow editor keeps in view: above it, they are never scrolled away (HI-1878).
+          filtersAbove
+          empty={tr(msg({ id: 'settings.keys.noMatch', defaultMessage: 'No commands match.', description: 'The keyboard shortcuts editor when its search finds nothing.' }))}
+        />
+      </TabPanel>
     </div>
   )
 }
 
 const ALL_ROWS = [1000]
 
-/** A command's name in the language shown, by its id. */
-const commandName = (id: string): string => commands.find((c) => c.id === id)?.label ?? id
 
 /** Where a shortcut comes from, as the Set column shows it ('' for a default one). */
 function sourceLabel(r: Row): string {
@@ -232,7 +271,7 @@ interface KeyEditing {
   conflicts: Map<string, string[]>
 }
 
-/** The editor's columns: the command, its category, its shortcut (recorded in place), where it comes from, and its actions. */
+/** The editor's columns: the command, its shortcut (recorded in place), its category, where it comes from, and its actions. */
 function keyColumns({ project, recording, setRecording, record, save, conflicts }: KeyEditing): DataColumn<Row>[] {
   return [
     {
@@ -249,14 +288,13 @@ function keyColumns({ project, recording, setRecording, record, save, conflicts 
       ),
       sortValue: (r) => r.c.label
     },
-    { key: 'category', header: tr(msg({ id: 'settings.keys.column.category', defaultMessage: 'Category', description: "A column of the keyboard shortcuts editor: the command's category (Project, Session…)." })), className: 'kb-category faint', cell: (r) => commandCategory(r.c), sortValue: (r) => commandCategory(r.c), filter: { kind: 'choice', value: (r) => commandCategory(r.c) } }, // i18n-ignore: class names
     {
       key: 'key',
       header: tr(msg({ id: 'settings.keys.column.shortcut', defaultMessage: 'Shortcut', description: 'A column of the keyboard shortcuts editor: the keys.' })),
       className: 'kb-key',
       cell: (r) => {
         if (recording === r.c.id) return <Recorder onDone={(k) => record(r.c.id, k)} onCancel={() => setRecording(null)} />
-        const clash = otherUsers(conflicts, r.key, r.c.id).map(commandName)
+        const clash = otherUsers(conflicts, r.key, r.c.id).map(commandIn)
         const terminal = r.key && terminalReserved().has(r.key.toUpperCase())
         return (
           <span className="kb-key-value" onDoubleClick={() => setRecording(r.c.id)}>
@@ -277,6 +315,9 @@ function keyColumns({ project, recording, setRecording, record, save, conflicts 
       // Commands without a shortcut sort last.
       sortValue: (r) => (r.key ? formatKeybinding(r.key) : null)
     },
+    // After the shortcut (HI-1838): in a narrow editor the command and its shortcut stay in view, and Category is what
+    // the table scrolls to. No filter of its own: the tabs above choose the category (the Assistant's HI-1878 review).
+    { key: 'category', header: tr(msg({ id: 'settings.keys.column.category', defaultMessage: 'Category', description: "A column of the keyboard shortcuts editor: the command's category (Project, Session…)." })), className: 'kb-category faint', cell: (r) => commandCategory(r.c), sortValue: (r) => commandCategory(r.c) }, // i18n-ignore: class names
     {
       key: 'source',
       header: tr(msg({ id: 'settings.keys.column.set', defaultMessage: 'Set', description: 'A column of the keyboard shortcuts editor: where the shortcut comes from (changed, removed, this project…). Keep it short.' })),

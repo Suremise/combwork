@@ -3,6 +3,8 @@
 // a project's Tasks tab, archiving; and Project → Remove Project… (Hide, restored from Settings → Workspace, and
 // Delete). Dev build, throwaway profile, workspace and CLAUDE_CONFIG_DIR. Delete sends a small test folder to the
 // Recycle Bin.
+// Dev build only (#1580): it starts this checkout's Electron itself, and delta's long-named agent is a 0.9 worktree
+// agent (agents:testLegacy, refused by a packaged build), for Remove Project's table of names and branches (#1316).
 const lib = require('./lib.cjs')
 const { _electron } = require('playwright-core')
 const fs = require('fs')
@@ -27,7 +29,9 @@ const check = (name, ok, extra = '') => {
   lib.gitProject(alpha)
   // Trusted already: an agent started from the board has no terminal on screen, so its trust question wraps narrowly.
   fs.writeFileSync(path.join(claudeHome, 'fake-trusted.json'), JSON.stringify([alpha.toLowerCase()]))
-  for (const p of ['beta', 'delta', 'gamma']) fs.mkdirSync(path.join(ws, p), { recursive: true })
+  for (const p of ['beta', 'gamma']) fs.mkdirSync(path.join(ws, p), { recursive: true })
+  // delta is a repository: Remove Project lists an agent's worktree of it (#1316).
+  lib.gitProject(path.join(ws, 'delta'))
   fs.writeFileSync(path.join(ws, 'gamma', 'notes.txt'), 'delete me')
   lib.enableProviders(userData)
   const cfgFile = path.join(userData, 'config.json')
@@ -44,6 +48,9 @@ const check = (name, ok, extra = '') => {
   await lib.appReady(page)
   const inv = (ch, ...a) => page.evaluate(([c, x]) => window.hive.invoke(c, ...x), [ch, a])
   await lib.openWorkspace(inv, page, ws)
+  // The board's own moves, as before 1.0's rules (#1275): its project has every rule off, where Review isn't a stage, so
+  // with the rules enforced the board refuses it (boardgates covers that); turned off, every column is a plain move.
+  await inv('advanced:set', 'hive.workflow.enforce', false)
   const until = async (fn, ms = 20000) => {
     const t = Date.now()
     let v
@@ -74,6 +81,7 @@ const check = (name, ok, extra = '') => {
 
   // The Board view, and a card added there.
   await page.getByRole('button', { name: 'Task Board' }).click()
+  // With the rules not enforced every category shows (#1420), as before 1.0.
   check('the Board shows six columns', !!(await until(async () => (await page.locator('.board-column').count()) === 6, 5000)))
   const dialog = page.locator('.dialog', { hasText: 'New Card' })
   await page.getByRole('button', { name: 'New Card', exact: true }).click()
@@ -124,7 +132,8 @@ const check = (name, ok, extra = '') => {
   const review = await api('PATCH', '/v1/tasks/2', { column: 'review', comment: 'Docs drafted.' })
   check('an agent moves it to Review with a comment', review.status === 200 && review.body.column === 'review' && review.body.comments.length === 1, JSON.stringify(review.body))
   const badge = page.locator('.activity-btn[aria-label="Task Board"] .activity-badge')
-  check('the activity bar counts cards waiting for review', !!(await until(async () => (await badge.count()) === 1 && (await badge.innerText()) === '1', 5000)))
+  // Its count is of cards waiting for you (#1276: For you), not Review's (the board sidebar's Waiting for review has those).
+  check("the activity bar doesn't count cards waiting for review", (await badge.count()) === 0)
   const start = await api('POST', '/v1/tasks/1/start', {})
   check('only the Assistant starts cards through the API', start.status === 403, JSON.stringify(start))
 
@@ -149,7 +158,7 @@ const check = (name, ok, extra = '') => {
 
   // Dragging a card to another column. Each drag starts once the board draws the card where the step before left it
   // (#682: under load the board was still redrawing after the deletions above, and both drags missed). A drop shows at
-  // once (the card moved, or the Move to Doing dialog: no call first), so one not shown within the hung-run bound
+  // once (the card moved, or the Move to Active dialog: no call first), so one not shown within the hung-run bound
   // missed: logged with what the board showed (a screenshot too), and dragged again, at most 3 times.
   const drawnIn = (label, n) => column(label).locator(`.task-card[data-task="${n}"]`)
   const dragged = async (what, n, label, landed) => {
@@ -169,11 +178,11 @@ const check = (name, ok, extra = '') => {
   check('…and the board draws only #1 again', !!(await until(async () => (redraws++, (await tile(rA).count()) + (await tile(rB).count()) === 0 && (await drawnIn('Todo', 1).count()) === 1), HUNG_MS)))
   if (redraws > 1) console.log(`  (the board drew the deletions ${Date.now() - deleted} ms after they were made)`)
   check('a card drags to another column', await dragged('to Review', 1, 'Review', async () => (await card(1))?.column === 'review'), (await card(1))?.column)
-  // Into Doing, it asks who works on it first (doingmove has the rest).
+  // Into Active, it asks who works on it first (doingmove has the rest).
   check('…and the board draws it in Review', !!(await until(async () => (await drawnIn('Review', 1).count()) === 1, HUNG_MS)))
-  const toDoing = page.locator('.dialog', { hasText: 'Move #1 to Doing' })
-  check('dragging into Doing asks who works on it', await dragged('into Doing', 1, 'Doing', async () => (await toDoing.count()) === 1))
-  await toDoing.getByRole('button', { name: 'Move to Doing' }).click()
+  const toDoing = page.locator('.dialog', { hasText: `Move ${await lib.cardLabel(inv, 1)} to Active` })
+  check('dragging into Active asks who works on it', await dragged('into Active', 1, 'Active', async () => (await toDoing.count()) === 1))
+  await toDoing.getByRole('button', { name: 'Move to Active' }).click()
   check('and moves it when confirmed', !!(await until(async () => (await card(1))?.column === 'doing', HUNG_MS)), (await card(1))?.column)
   await inv('tasks:update', 1, { column: 'todo' })
 
@@ -181,7 +190,7 @@ const check = (name, ok, extra = '') => {
   const c3 = (await api('POST', '/v1/tasks', { title: 'Old title', project: 'beta' })).body.number
   await until(async () => (await tile(c3).count()) === 1, 5000)
   await tile(c3).click()
-  const edit = page.locator('.dialog', { hasText: `#${c3}` })
+  const edit = lib.cardDialog(page, await lib.cardLabel(inv, c3))
   await edit.waitFor({ timeout: 5000 })
   await api('PATCH', `/v1/tasks/${c3}`, { column: 'review' })
   await lib.sleep(500)
@@ -196,13 +205,17 @@ const check = (name, ok, extra = '') => {
 
   // Start #1 on a new agent: it gets the card as its prompt, and the card goes to Doing.
   await tile(1).click()
-  const open = page.locator('.dialog', { hasText: '#1' })
+  const open = lib.cardDialog(page, await lib.cardLabel(inv, 1))
   await open.waitFor({ timeout: 5000 })
   await page.screenshot({ path: path.join(lib.WORK, 'board-card.png') })
   await open.getByRole('button', { name: 'Start…' }).click()
   await page.screenshot({ path: path.join(lib.WORK, 'board-start.png') })
-  const startDialog = page.locator('.dialog', { hasText: 'Start #1' })
+  const startDialog = page.locator('.dialog', { hasText: `Start ${await lib.cardLabel(inv, 1)}` })
   await startDialog.locator('label.choice', { hasText: 'A new agent' }).first().click()
+  // A new agent's connection, not a provider (HI-2121, decision A): the connection picker, no provider choice.
+  const picker = await until(async () => (await startDialog.locator('#start-agent-connection').count()) === 1, 5000)
+  check("Start's new agent chooses a connection, not a provider", picker && (await startDialog.getByText('Provider', { exact: true }).count()) === 0)
+  await page.screenshot({ path: path.join(lib.WORK, 'board-start-new-agent.png') })
   await startDialog.getByRole('button', { name: 'Start' }).click()
   const project = async () => (await inv('workspace:get')).projects.find((p) => p.name === 'alpha')
   const agent = await until(async () => (await project())?.agents[0], HUNG_MS)
@@ -214,7 +227,7 @@ const check = (name, ok, extra = '') => {
   check('the card is in Doing, given to the agent', c1b.column === 'doing' && c1b.agent === agent.id, JSON.stringify({ column: c1b.column, agent: c1b.agent }))
   const tr = fs.readdirSync(path.join(claudeHome, 'projects'), { recursive: true }).filter((f) => String(f).endsWith('.jsonl'))
   const text = tr.map((f) => fs.readFileSync(path.join(claudeHome, 'projects', String(f)), 'utf8')).join('\n')
-  check('the agent got the card as its prompt', /Work on task #1 from the Hive task board: Add a greeting/.test(text) && text.includes('hello()'))
+  check('the agent got the card as its prompt, named by key alone (#1219, HI-1661)', /Work on task [A-Z]{2,4}-1 from the Hive task board: Add a greeting/.test(text) && text.includes('hello()'), text.slice(0, 200))
   check('its tile shows the agent finished', !!(await until(async () => ((await tile(1).getAttribute('class')) ?? '').includes('finished') && /Finished/.test(await tile(1).innerText()), 8000)), await tile(1).innerText())
   await page.screenshot({ path: path.join(lib.WORK, 'board.png') })
 
@@ -234,7 +247,7 @@ const check = (name, ok, extra = '') => {
   const startItem = page.locator('.menu .menu-item', { hasText: 'Start…' })
   check('Start… is on for a Done card', (await startItem.count()) === 1 && !(await startItem.evaluate((e) => e.classList.contains('disabled') || e.hasAttribute('disabled') || e.getAttribute('aria-disabled') === 'true')))
   await startItem.click()
-  const again = page.locator('.dialog', { hasText: 'Start #1' })
+  const again = page.locator('.dialog', { hasText: `Start ${await lib.cardLabel(inv, 1)}` })
   await again.waitFor({ timeout: 5000 })
   await again.getByRole('button', { name: 'Start' }).click()
   const reran = !!(await until(async () => (await live())?.status === 'finished', 30000))
@@ -256,7 +269,7 @@ const check = (name, ok, extra = '') => {
   const edge = (n) => tile(n).evaluate((e) => getComputedStyle(e).borderLeftColor)
   check('cards are tinted by their column', !!(await until(async () => (await tile(extra[0].number).count()) === 1 && new Set([await bg(1), await bg(2), await bg(extra[0].number), await bg(extra[1].number)]).size === 4, 5000)), JSON.stringify([await bg(1), await bg(2)]))
   const heading = (name) => column(name).locator('.board-column-label').evaluate((e) => getComputedStyle(e).color)
-  check('column headings have their own colours', new Set([await heading('Todo'), await heading('Doing'), await heading('Review'), await heading('Done')]).size === 4)
+  check('column headings have their own colours', new Set([await heading('Todo'), await heading('Active'), await heading('Review'), await heading('Done')]).size === 4)
   const doingBg = await bg(1)
   // Each card's #number against its own background (WCAG contrast; tints come back as color(srgb …), 0–1 or 0–255).
   const numberContrast = () =>
@@ -394,11 +407,13 @@ const check = (name, ok, extra = '') => {
   check("the project's Tasks tab shows its cards", !!(await until(async () => (await page.locator('.board-view.in-tab .task-card').count()) === 2, 5000)))
 
   // Removing the agent asks about its open card; Move them back puts it in Todo with nobody.
+  // Project Settings opens on General; the agents are listed under Agents (HI-1765).
   await lib.openProjectSettings(page)
+  await page.locator('.tab-body .settings-nav .row').filter({ has: page.locator('.label', { hasText: /^Agents$/ }) }).click()
   await page.getByRole('button', { name: 'Remove agent…' }).first().click()
   await page.locator('.dialog .btn', { hasText: 'Remove' }).click()
   const ask = page.locator('.dialog', { hasText: 'open card' })
-  check('Remove Agent asks about its open cards', !!(await until(async () => (await ask.count()) === 1 && /#1 Add a greeting/.test(await ask.innerText()), 5000)))
+  check('Remove Agent asks about its open cards', !!(await until(async () => (await ask.count()) === 1 && (await ask.innerText()).includes(`${await lib.cardLabel(inv, 1)} Add a greeting`), 5000)))
   await page.screenshot({ path: path.join(lib.WORK, 'board-remove-agent.png') })
   await ask.getByRole('button', { name: /Move (it|them) back/ }).click()
   const back = await until(async () => {
@@ -428,7 +443,33 @@ const check = (name, ok, extra = '') => {
     return d
   }
   await inv('tasks:create', { title: 'Delta work', project: 'delta' })
+  // An agent with a long name on its own worktree (#1316): Remove Project's table shows its name and branch whole.
+  const longName = 'ABCDEFGHIJKLMNOPQRSTUVWXYZABCDEF'
+  await inv('agents:testLegacy', path.join(ws, 'delta'), { location: 'new-worktree', name: longName })
+  const longBranch = JSON.parse(fs.readFileSync(path.join(ws, 'delta', '.hive', 'project.json'), 'utf8')).agents.find((a) => a.name === longName)?.worktree?.branch
   let d = await removeVia('delta', 'Hide')
+  // What it touches is a table (#1316): a thing and what happens to it, for the choice made; the folder by its name, its
+  // full path behind it (on hover, and copied whole). Each choice shown in both themes, then back to Hide.
+  const touched = () => d.locator('.removal-list tbody tr').evaluateAll((rows) => rows.map((r) => [...r.children].map((c) => c.textContent.replace(/\s+/g, ' ').trim())))
+  const folderRow = async () => (await touched()).find((cells) => cells[0].startsWith('Folder')) ?? []
+  check('What it touches is a table, What · What happens, the folder by name', (await d.locator('.removal-list thead th').allInnerTexts()).slice(0, 2).join('|') === 'WHAT|WHAT HAPPENS' && (await d.locator('.removal-list .short-path[data-path]').getAttribute('data-path')).toLowerCase() === path.join(ws, 'delta').toLowerCase() && (await d.locator('.removal-list .short-path-text').innerText()) === 'delta', JSON.stringify(await touched()))
+  const themed = async (theme) => {
+    await inv('settings:update', { appearance: { theme } })
+    if (!(await until(() => themeIs(theme), HUNG_MS))) throw new Error(`the window didn't show the ${theme} theme`)
+  }
+  // Every cell's content fits it: a long name or branch wraps inside itself, never cut (only the folder's short name is).
+  const cellsFit = () => d.locator('.removal-list tbody td').evaluateAll((tds) => tds.length > 0 && tds.every((td) => td.scrollWidth <= td.clientWidth + 1))
+  for (const [choice, happens] of [['Hide', 'stays, hidden from Hive'], ['Remove from Hive', 'stays where it is'], ['Delete', 'to the Recycle Bin']]) {
+    await d.locator('label.choice').filter({ has: page.getByText(choice, { exact: true }) }).click()
+    check(`…${choice}: the folder ${happens}`, !!(await until(async () => (await folderRow())[1] === happens, HUNG_MS)), JSON.stringify(await touched()))
+    check(`…${choice}: the long agent's worktree whole, its name and branch, every cell fitting`, !!longBranch && (await touched()).some((cells) => cells[0] === `${longName} (${longBranch})`) && !!(await until(cellsFit, HUNG_MS)), JSON.stringify({ longBranch, rows: await touched() }))
+    for (const theme of ['dark', 'light']) {
+      await themed(theme)
+      await page.screenshot({ path: path.join(lib.WORK, `board-remove-${choice.toLowerCase().replace(/ /g, '-')}-${theme}.png`) })
+    }
+    await themed('dark')
+  }
+  await d.locator('label.choice').filter({ has: page.getByText('Hide', { exact: true }) }).click()
   await d.locator('.dialog-footer .btn', { hasText: 'Hide' }).click()
   const names = async () => (await inv('workspace:get')).projects.map((p) => p.name)
   check('Hide takes the project out of Hive', !!(await until(async () => !(await names()).includes('delta'), 8000)))

@@ -1,0 +1,31 @@
+{
+  "what": "Claude Code 2.1.312 when its API can't be reached (HI-1612): a new empty CLAUDE_CONFIG_DIR, a made-up API key, `claude -p \"say ok\"` with a StopFailure hook that saved its input. ANTHROPIC_BASE_URL was a closed port on 127.0.0.1 (refused) or a host under .invalid (notFound). Each retried for about 3 minutes (174 s and 185 s), then its StopFailure hook got this and it exited with 1, printing the message. Nothing reached a real model. Ids and folders replaced.",
+  "refused": {
+    "seconds": 174,
+    "printed": "API Error: Connection refused — a firewall or proxy may be blocking it (ECONNREFUSED)",
+    "hook": {
+      "session_id": "00000000-0000-0000-0000-000000000000",
+      "transcript_path": "C:\\work\\cfg\\projects\\C--work-alpha\\00000000-0000-0000-0000-000000000000.jsonl",
+      "cwd": "C:\\work\\alpha",
+      "prompt_id": "00000000-0000-0000-0000-000000000001",
+      "effort": { "level": "medium" },
+      "hook_event_name": "StopFailure",
+      "error": "server_error",
+      "last_assistant_message": "API Error: Connection refused — a firewall or proxy may be blocking it (ECONNREFUSED)"
+    }
+  },
+  "notFound": {
+    "seconds": 185,
+    "printed": "API Error: Can't reach the API server — check your internet or DNS (ENOTFOUND)",
+    "hook": {
+      "session_id": "00000000-0000-0000-0000-000000000002",
+      "transcript_path": "C:\\work\\cfg\\projects\\C--work-alpha\\00000000-0000-0000-0000-000000000002.jsonl",
+      "cwd": "C:\\work\\alpha",
+      "prompt_id": "00000000-0000-0000-0000-000000000003",
+      "effort": { "level": "medium" },
+      "hook_event_name": "StopFailure",
+      "error": "server_error",
+      "last_assistant_message": "API Error: Can't reach the API server — check your internet or DNS (ENOTFOUND)"
+    }
+  }
+}

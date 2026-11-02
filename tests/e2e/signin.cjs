@@ -79,12 +79,12 @@ const until = async (fn, ms = 10000) => {
   await lib.sleep(4500) // A fixed wait on purpose: it waits out the gathering window (agents refused together are told in one notification) to show only one arrives.
   const told = signInNotes()
   check('one notification for the three', told.length === 1, JSON.stringify(told))
-  check('it counts them and says how to sign in', told[0]?.title === '3 agents need you to sign in to Claude Code' && /\/login/.test(told[0]?.body ?? '') && /Agent Setup/.test(told[0]?.body ?? ''), JSON.stringify(told[0]))
+  check('it counts them and says how to sign in', told[0]?.title === '3 agents need you to sign in to Claude Code' && /\/login/.test(told[0]?.body ?? '') && /Provider Setup/.test(told[0]?.body ?? ''), JSON.stringify(told[0]))
   const info = await until(async () => {
     const i = (await inv('provider:info'))['claude-code']
     return i && !i.checking && i.loggedIn === false ? i : null
   }, 15000)
-  check('Agent Setup shows Claude Code signed out', !!info && (info.readiness ?? []).some((r) => r.id === 'signed-out'), JSON.stringify(info?.readiness))
+  check('Provider Setup shows Claude Code signed out', !!info && (info.readiness ?? []).some((r) => r.id === 'signed-out'), JSON.stringify(info?.readiness))
   // Each pane's mark: waiting for you, a diamond (#973; the agent strip's sign-in dots went with it, #975).
   const marks = await until(async () => ((await page.locator('.pane-header-bar .state-mark.waiting').count()) >= 3 ? true : null), 5000)
   check('the panes mark the three as waiting for you', !!marks, String(await page.locator('.pane-header-bar .state-mark.waiting').count()))
@@ -112,7 +112,7 @@ const until = async (fn, ms = 10000) => {
     const i = (await inv('provider:info'))['claude-code']
     return i && !i.checking && i.loggedIn === true ? i : null
   }, 15000)
-  check('Agent Setup shows it signed in again', !!back && !(back.readiness ?? []).some((r) => r.id === 'signed-out'), JSON.stringify(back?.readiness))
+  check('Provider Setup shows it signed in again', !!back && !(back.readiness ?? []).some((r) => r.id === 'signed-out'), JSON.stringify(back?.readiness))
   const resume = page.locator('.project-header button.act-resume', { hasText: 'Resume (2)' })
   check('Resume (n) counts the two still stopped', (await until(async () => ((await resume.count()) === 1 ? true : null), 5000)) === true)
   await page.screenshot({ path: path.join(shots, 'signin-2-signed-in-again.png') })

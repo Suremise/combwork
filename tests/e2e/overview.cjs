@@ -139,13 +139,35 @@ const becomes = async (fn) => !!(await lib.until(fn, HUNG_MS))
   // A row opens its compaction in the Sessions tab, at its divider with the summary open; from the keyboard too.
   check('rows are buttons for the keyboard, saying what they open', (await rows.first().getAttribute('tabindex')) === '0' && /^Open the auto compaction of .* in the transcript$/.test((await rows.first().getAttribute('aria-label')) ?? ''), await rows.first().getAttribute('aria-label'))
   await rows.first().focus()
+  const focused = await page.evaluate(() => document.activeElement?.getAttribute('aria-label') ?? document.activeElement?.tagName ?? null)
   await page.keyboard.press('Enter')
   const divider = page.locator('.tx-compaction.open')
-  check('Enter on the row opens the Sessions tab at that compaction, its summary open', !!(await lib.until(async () => (await page.locator('.tab.active', { hasText: 'Sessions' }).count()) === 1 && (await divider.count()) === 1, 10000)) && /Summary of part 0/.test(await divider.innerText().catch(() => '')), await divider.innerText().catch(() => ''))
+  // What there was to see if it didn't: what had the focus at Enter, the compactions main gives, and the dividers drawn.
+  const opened = async () => JSON.stringify({ focused, ids: await inv('transcript:compactions', proj, A).catch((e) => String(e)), dividers: await page.locator('.tx-compaction').count(), open: await divider.count(), summary: await divider.innerText().catch(() => '') })
+  check('Enter on the row opens the Sessions tab at that compaction, its summary open', !!(await lib.until(async () => (await page.locator('.tab.active', { hasText: 'Sessions' }).count()) === 1 && (await divider.count()) === 1, 10000)) && /Summary of part 0/.test(await divider.innerText().catch(() => '')), await opened())
   check('…in view', await divider.evaluate((el) => { const r = el.getBoundingClientRect(); return r.top >= 0 && r.bottom <= window.innerHeight }))
   await page.screenshot({ path: path.join(shots, '1c-transcript.png') })
   await page.locator('.tab', { hasText: 'Overview' }).click()
   await head.waitFor({ timeout: 10000 })
+  // The transcript opens at its end, then the jump moves it (#1323): with the compaction's place arriving just after that
+  // first scroll (a slow renderer, the answer held a few ms), its scroll event pinned the view to the end again and the
+  // compaction was scrolled away. Held for a spread of delays (the window moves with the machine's speed).
+  const cpu = await page.context().newCDPSession(page)
+  await cpu.send('Emulation.setCPUThrottlingRate', { rate: 4 })
+  const placedAt = []
+  for (let ms = 6; ms <= 50; ms += 4) {
+    await app.evaluate((_e, v) => { process.env.HIVE_TEST_SLOW_IPC = v }, `transcript:compactions=${ms}`)
+    await rows.first().focus()
+    await page.keyboard.press('Enter')
+    const inView = async () => (await divider.count()) === 1 && (await divider.evaluate((el) => { const r = el.getBoundingClientRect(); return r.top >= 0 && r.bottom <= window.innerHeight }))
+    placedAt.push({ ms, ok: !!(await lib.until(inView, HUNG_MS)), scroll: await page.evaluate(() => { const el = document.querySelector('.transcript'); return el && { top: Math.round(el.scrollTop), end: el.scrollHeight - el.clientHeight } }) })
+    await page.locator('.tab', { hasText: 'Overview' }).click()
+    await head.waitFor({ timeout: 10000 })
+  }
+  await app.evaluate(() => { delete process.env.HIVE_TEST_SLOW_IPC })
+  await cpu.send('Emulation.setCPUThrottlingRate', { rate: 1 })
+  await cpu.detach().catch(() => undefined)
+  check('…also when its place arrives just after the transcript opened at its end', placedAt.every((p) => p.ok), JSON.stringify(placedAt))
 
   await picker.selectOption(beta.id)
   check("picking another agent shows its session", await becomes(async () => /Beta work/.test(await head.textContent())), await head.textContent())

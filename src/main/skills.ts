@@ -3,8 +3,9 @@ import { mkdir, readFile, rm, writeFile } from 'original-fs/promises'
 import { existsSync, type Dirent } from 'original-fs'
 import { unzipSync } from 'fflate'
 import yaml from 'js-yaml'
-import type { ProviderId, SkillAudience, SkillInfo, SkillTarget } from '../shared/types'
+import type { ProviderId, SkillAudience, SkillInfo, SkillTarget, WorkspaceConfig } from '../shared/types'
 import { allProviders, provider } from './providers'
+import { connectionHomes } from './accounts'
 import { bundledDir, bundledIds, bundledStatus, restoreBundled } from './bundled'
 import { copyDir, COPY_MARKER, isDir, isFile, readDirBounded } from './fsutil'
 import { englishText, withValues, type Text, type TextValues } from '../shared/advanced'
@@ -12,7 +13,7 @@ import { msg, type Msg } from '../shared/i18n'
 import { hiveError } from './hiveError'
 import { createLogger } from './logger'
 import { headerOf, SKILL_HEAD_MAX } from './revisions'
-import { workspace } from './workspace'
+import { workspace, workspaceOf } from './workspace'
 import { trash } from './trash'
 
 const log = createLogger('skills')
@@ -173,14 +174,46 @@ async function findSkills(root: string, level: SkillInfo['level'], maxDepth: num
   return out
 }
 
-let machineCache: { at: number; skills: SkillInfo[] } | null = null
+/**
+ * Machine skills read lately, by the homes they were read from (HI-1755: each workspace's connections' own). Entries
+ * last 30 seconds and at most MACHINE_CACHE_MAX are kept, the least recently used going first (HI-1782): a set of
+ * homes no longer asked for (a connection turned off, a workspace closed) is let go rather than kept until Hive quits.
+ */
+const machineCache = new Map<string, { at: number; skills: SkillInfo[] }>()
+const MACHINE_CACHE_MS = 30_000
+const MACHINE_CACHE_MAX = 8
 
-/** Skills each provider's CLI loads from the user's profile and its installed plugins. */
-async function machineSkills(): Promise<SkillInfo[]> {
-  if (machineCache && Date.now() - machineCache.at < 30_000) return machineCache.skills
+function pruneMachineCache(now: number): void {
+  for (const [key, entry] of machineCache) if (now - entry.at >= MACHINE_CACHE_MS) machineCache.delete(key)
+  // A Map iterates in insertion order and a hit is put back last, so the first keys are the least recently used.
+  for (const key of machineCache.keys()) {
+    if (machineCache.size <= MACHINE_CACHE_MAX) break
+    machineCache.delete(key)
+  }
+}
+
+/** How many sets of homes the machine-skill cache holds (for tests). */
+export function machineSkillCacheSize(): number {
+  return machineCache.size
+}
+
+/**
+ * Skills each provider's CLI loads from the user's profile and its installed plugins: for a CLI with connections, those
+ * of the connections on in the asking workspace (`cfg`; HI-1755), never another workspace's; else the CLI's own home.
+ */
+async function machineSkills(cfg: WorkspaceConfig | null): Promise<SkillInfo[]> {
+  const homes: [ReturnType<typeof provider>, string | undefined][] = allProviders().flatMap((x) => connectionHomes(x.id, cfg)?.map((h): [typeof x, string | undefined] => [x, h.home]) ?? [[x, undefined]])
+  const key = JSON.stringify(homes.map(([p, h]) => [p.id, h ?? '']))
+  pruneMachineCache(Date.now())
+  const cached = machineCache.get(key)
+  if (cached) {
+    machineCache.delete(key)
+    machineCache.set(key, cached)
+    return cached.skills
+  }
   const all: SkillInfo[] = []
-  for (const p of allProviders()) {
-    const roots = p.skillRoots()
+  for (const [p, home] of homes) {
+    const roots = p.skillRoots(home)
     const skills: SkillInfo[] = []
     for (const dir of roots.machine) skills.push(...(await findSkills(dir, 'machine', 4)))
     const pluginSkills = roots.plugins ? await findSkills(roots.plugins, 'plugin', 7) : []
@@ -200,7 +233,9 @@ async function machineSkills(): Promise<SkillInfo[]> {
       all.push({ ...s, provider: p.id })
     }
   }
-  machineCache = { at: Date.now(), skills: all }
+  machineCache.delete(key)
+  machineCache.set(key, { at: Date.now(), skills: all })
+  pruneMachineCache(Date.now())
   return all
 }
 
@@ -281,6 +316,18 @@ export async function skillFiles(dir: string, lim = SKILL_FILES_LIMITS): Promise
   return { files, truncated }
 }
 
+/**
+ * A skill's files for its page (HI-2011: SKILL.md and the reference files it links), only for a skill the Skills view
+ * or the project's skills tab lists (the workspace's Hive skills, or `projectPath`'s): any other folder is refused, so
+ * the window can't list a folder that isn't a skill it shows. Bounded as skillFiles is, saying when it stopped short.
+ */
+export async function listedSkillFiles(dir: string, projectPath?: string): Promise<{ files: string[]; truncated: boolean }> {
+  const want = resolve(String(dir)).toLowerCase()
+  const listed = [...(await hiveSkills(true)), ...(projectPath ? await listSkills(projectPath) : [])]
+  if (!listed.some((s) => resolve(s.path).toLowerCase() === want)) throw hiveError(msg({ id: 'content.skill.notListed', defaultMessage: "That folder isn't a skill Hive lists.", description: "An error listing a skill's files for its page: the folder asked for isn't one of the skills Hive shows (the workspace's skills or a project's)." }), undefined, { kind: 'forbidden' })
+  return skillFiles(dir)
+}
+
 /** The folder a provider's project skills are created in (e.g. <project>/.claude/skills): the first it loads them from. */
 function localDir(projectPath: string, id: ProviderId): string {
   const rel = provider(id).skillRoots().local[0]
@@ -312,13 +359,15 @@ export async function localSkills(projectPath: string): Promise<SkillInfo[]> {
 
 /** Every skill: the workspace's Hive skills, each provider's user and plugin skills, and the project's local skills if given. */
 export async function listSkills(projectPath?: string): Promise<SkillInfo[]> {
-  const out = [...(await hiveSkills()), ...(await machineSkills())]
+  // The asking workspace's: the project's, else the current work's (HI-1755: its connections' skills only).
+  const ws = projectPath ? workspaceOf(projectPath) : workspace
+  const out = [...(await hiveSkills()), ...(await machineSkills(ws.path ? ws.config : null))]
   if (projectPath) out.push(...(await localSkills(projectPath)))
   return out
 }
 
 export function invalidateSkillCache(): void {
-  machineCache = null
+  machineCache.clear()
 }
 
 export function validSkillName(name: string): boolean {

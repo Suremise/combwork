@@ -33,6 +33,8 @@ const check = (name, ok, extra = '') => {
 ;(async () => {
   for (const d of [userData, ws, claudeHome]) fs.rmSync(d, { recursive: true, force: true })
   fs.mkdirSync(claudeHome, { recursive: true })
+  // Every read of the agents' input recorded, for typeLine (#1560).
+  lib.logFakeInput(claudeHome)
   lib.gitProject(alpha)
   lib.enableProviders(userData)
   const cfgFile = path.join(userData, 'config.json')
@@ -62,12 +64,12 @@ const check = (name, ok, extra = '') => {
     const f = path.join(claudeHome, 'fake-wakes.jsonl')
     return (fs.existsSync(f) ? fs.readFileSync(f, 'utf8').trim().split('\n').filter(Boolean).map((l) => JSON.parse(l)) : []).filter((w) => w.agent === agent)
   }
-  const wakes = (agent) => wakeLog(agent).map((w) => w.text)
-  const bells = (agent) => wakeLog(agent).map((w) => w.doorbell ?? '')
+  // As their checks read them: cards by number (named by key too, #1219: checked once below).
+  const wakes = (agent) => wakeLog(agent).map((w) => lib.unkey(w.text))
+  const bells = (agent) => wakeLog(agent).map((w) => lib.unkey(w.doorbell ?? ''))
   const say = async (id, text) => {
-    await inv('pty:write', lib.ptyKey(alpha, id), text)
-    await lib.sleep(300)
-    await inv('pty:write', lib.ptyKey(alpha, id), '\r')
+    // Typed again if a wake of Hive's disturbed it (lib.typeLine, #1560).
+    await lib.typeLine(inv, lib.ptyKey(alpha, id), claudeHome, null, text, { live: () => live(alpha, id) })
   }
   const idle = async (id) => ['ready', 'finished'].includes((await live(alpha, id))?.status)
 
@@ -105,7 +107,7 @@ const check = (name, ok, extra = '') => {
   const sent = tool('hive_message_agent', { project: 'alpha', agent: 'Reviewer', text: `Darren answered #${c1}: review it when it returns.` })
   check('a message to a watching agent is told at once, with its id', !sent.isError && sent.text === 'Told Reviewer now (m1): it reads it with hive_inbox; its watch carries on.', sent.text)
   // Its doorbell (#650): the id, never the text, and that its watch carries on; it reads the message with hive_inbox.
-  check('…its doorbell names it and says its watch carries on', !!(await until(async () => bells('Reviewer').some((t) => t.startsWith(`[Hive] New in your inbox: 1 message (m1). Call hive_inbox to read it. (Your watch is still on, waiting for #${c1} → Review:`)), 15000)), JSON.stringify(bells('Reviewer')))
+  check('…its doorbell names it and says its watch carries on', !!(await until(async () => bells('Reviewer').some((t) => t.startsWith(`[Hive] New in your inbox: 1 message (m1). Call hive_inbox to read it, act on it, then ack it. (Your watch is still on, waiting for #${c1} → Review:`)), 15000)), JSON.stringify(bells('Reviewer')))
   check('…and the reviewer reads it in its inbox', wakes('Reviewer').includes(`Darren answered #${c1}: review it when it returns.`) && !bells('Reviewer').some((t) => t.includes('Darren answered')), JSON.stringify(wakes('Reviewer')))
   check('…and is watching the card again after it', !!(await until(async () => (await live(alpha, reviewer.id))?.status === 'watching' && (await live(alpha, reviewer.id))?.watch?.cards?.[0] === c1, 15000)))
   await inv('tasks:update', c1, { column: 'review' })
@@ -117,7 +119,7 @@ const check = (name, ok, extra = '') => {
   const queued = tool('hive_message_agent', { project: 'alpha', agent: 'Builder', text: `Add #${c1}'s follow-up to your lane after it.` })
   // Its id: the project's next (the reviewer's wake was a delivery too, #649).
   const mid = /^Queued for Builder \((m\d+), working\)/.exec(queued.text)?.[1] ?? '?'
-  check('a message to a working agent is queued', !queued.isError && queued.text === `Queued for Builder (${mid}, working): Hive tells it at its next tool call or turn's end, or once it is idle; 1 waiting. hive_agent_activity says when it is received and acked.`, queued.text)
+  check('a message to a working agent is queued', !queued.isError && queued.text === `Queued for Builder (${mid}, working): Hive tells it at its next tool call, at its turn's end or once it is idle; 1 waiting. hive_agent_activity says when it is received and acked.`, queued.text)
   // Its pane's ⋯ (#977): a badge, "1 unread" in its name's description, and an entry whose menu lists the messages.
   const pane = page.locator('.pane-header-bar', { hasText: 'Builder' }).locator('.pane-more')
   const unread = async () => /unread/.test((await pane.getAttribute('aria-description').catch(() => null)) ?? '')
@@ -130,13 +132,28 @@ const check = (name, ok, extra = '') => {
   const waiting = activity('Builder')
   check('its activity lists the message waiting', waiting.inbox?.unread === 1 && waiting.inbox.deliveries.at(-1)?.id === mid && waiting.inbox.deliveries.at(-1)?.from === 'the Assistant' && waiting.inbox.deliveries.at(-1)?.state === 'queued', JSON.stringify(waiting))
   check('…not typed while it works', !wakes('Builder').length)
-  check('once idle, its doorbell is typed, and the builder reads it', !!(await until(async () => wakes('Builder').some((t) => t === `Add #${c1}'s follow-up to your lane after it.`), 30000)) && bells('Builder').includes(`[Hive] New in your inbox: 1 message (${mid}). Call hive_inbox to read it.`), JSON.stringify(wakeLog('Builder')))
+  check('once idle, its doorbell is typed, and the builder reads it', !!(await until(async () => wakes('Builder').some((t) => t === `Add #${c1}'s follow-up to your lane after it.`), 30000)) && bells('Builder').includes(`[Hive] New in your inbox: 1 message (${mid}). Call hive_inbox to read it, act on it, then ack it.`), JSON.stringify(wakeLog('Builder')))
   // Read (#650: the only receipt): received through the inbox, and no longer unread in the pane; still the builder's to ack.
   check('…received as it reads it, and no longer unread in its pane', !!(await until(async () => lastDelivery('Builder')?.state === 'received' && lastDelivery('Builder')?.receivedVia === 'inbox' && !(await unread()), 15000)), JSON.stringify(lastDelivery('Builder')))
   const done = activity('Builder')
   check('…and its activity says when it was offered and received', done.inbox?.unread === 0 && !!done.inbox.deliveries.at(-1)?.offered && !!done.inbox.deliveries.at(-1)?.received, JSON.stringify(done))
   await until(() => idle(builder.id), 15000)
-  await say(builder.id, `hive hive_inbox {"ack":["${mid}"]}`)
+  // While it acts on that one, a second comes (#1531): one call acks the first and reads the second (ack with read),
+  // which is received, not acked.
+  await say(builder.id, `waitfile agentmessage-ack-go then hive hive_inbox {"ack":["${mid}"],"read":true}`)
+  await until(async () => (await live(alpha, builder.id))?.status === 'working', 10000)
+  const second = tool('hive_message_agent', { project: 'alpha', agent: 'Builder', text: 'And note it in the README.' })
+  const mid2 = /\((m\d+), working\)/.exec(second.text)?.[1] ?? '?'
+  fs.writeFileSync(path.join(claudeHome, 'agentmessage-ack-go'), '')
+  const state = (id) => (activity('Builder').inbox?.deliveries ?? []).find((d) => d.id === id)
+  check('the builder acks the first and reads the second in one call (ack with read): the first acked, the second received only', !!(await until(async () => state(mid)?.state === 'acked' && state(mid2)?.state === 'received' && state(mid2)?.receivedVia === 'inbox', 15000)), JSON.stringify([state(mid), state(mid2)]))
+  await until(() => idle(builder.id), 15000)
+  // The reply it got, from its transcript: the ack line, then the read with the second, to ack once acted on.
+  const s = await live(alpha, builder.id)
+  const items = s?.sessionId ? ((await inv('transcript:read', alpha, s.sessionId).catch(() => null))?.items ?? []) : []
+  const reply = items.filter((x) => x.kind === 'tool' && x.tool.name === 'hive · hive_inbox').at(-1)?.tool.result ?? ''
+  check('…its reply: the ack line, then the second, received', reply === `Acked ${mid}.\n1 new:\n${mid2} · the Assistant: And note it in the README.\nAck each with hive_inbox (ack: its ids) once you have acted on it.`, reply)
+  await say(builder.id, `hive hive_inbox {"ack":["${mid2}"]}`)
   check('the builder acks it (hive_inbox): acked', !!(await until(async () => lastDelivery('Builder')?.state === 'acked' && !(await unread()), 15000)), JSON.stringify(lastDelivery('Builder')))
 
   // --- 3. Cancelled by the user from the pane: never typed.
@@ -157,19 +174,31 @@ const check = (name, ok, extra = '') => {
   // --- 3b. Tied to a card round (#652): refused for a card out of Doing and Review; once the card passes, stale, never told.
   const c3 = (await inv('tasks:create', { title: 'Round-tied', project: 'alpha', agent: builder.id, column: 'todo' })).number
   const early = tool('hive_message_agent', { project: 'alpha', agent: 'Builder', text: 'Too early.', card: c3 })
-  check('a message tied to a card not in Doing or Review is refused', early.isError && early.text.includes(`#${c3} left Doing and Review: a message tied to its round needs it in Doing or Review`), early.text)
+  check('a message tied to a card not in Doing or Review is refused', early.isError && lib.unkey(early.text).includes(`#${c3} left Doing and Review: a message tied to its round needs it in Doing or Review`), early.text)
   await inv('tasks:update', c3, { column: 'doing' })
-  await say(builder.id, 'work 6')
+  // Busy until the card has passed (holduntil), so each message below is queued, never told.
+  await say(builder.id, 'holduntil agentmessage-round-go')
   await until(async () => (await live(alpha, builder.id))?.status === 'working', 10000)
   const tied = tool('hive_message_agent', { project: 'alpha', agent: 'Builder', text: 'Round 1: also cover the empty case.', card: c3 })
-  const tiedId = /\((m\d+), for #\d+ round 1, working\)/.exec(tied.text)?.[1]
-  check('a message tied to its round is queued, saying the round', !tied.isError && !!tiedId && tied.text.startsWith(`Queued for Builder (${tiedId}, for #${c3} round 1, working)`), tied.text)
+  const tiedId = /\((m\d+), for #\d+ round 1, working\)/.exec(lib.unkey(tied.text))?.[1]
+  check('a message tied to its round is queued, saying the round', !tied.isError && !!tiedId && lib.unkey(tied.text).startsWith(`Queued for Builder (${tiedId}, for #${c3} round 1, working)`), tied.text)
+  // Its reply names the card by key and number however it was given (#1219): its number, its key, or a key it had.
+  const key3 = (await inv('tasks:list')).find((c) => c.number === c3)?.key
+  const byNumber = `${key3}`
+  check('…naming the card by key and number when given its number (#1219)', tied.text.includes(`, for ${byNumber} round 1, working)`), tied.text)
+  const byKey = tool('hive_message_agent', { project: 'alpha', agent: 'Builder', text: 'Round 1: by key.', card: key3.toLowerCase() })
+  check('…and when given its key, in any case', !byKey.isError && byKey.text.includes(`, for ${byNumber} round 1, working)`), byKey.text)
+  const renamed = await inv('project:setKey', alpha, 'ALX')
+  const byAlias = tool('hive_message_agent', { project: 'alpha', agent: 'Builder', text: 'Round 1: by its old key.', card: key3 })
+  check('…and when given the key its project had: by the key it has now', renamed === 'ALX' && !byAlias.isError && byAlias.text.includes(`, for ALX-${key3.split('-')[1]} round 1, working)`), byAlias.text)
   await inv('tasks:update', c3, { column: 'passed' })
-  check('…the card passes before it is read: stale, saying why', !!(await until(() => lastDelivery('Builder')?.id === tiedId && lastDelivery('Builder')?.state === 'stale' && lastDelivery('Builder')?.detail === `#${c3} passed review`, 15000)), JSON.stringify(lastDelivery('Builder')))
+  const tiedDelivery = () => activity('Builder').inbox?.deliveries?.find((d) => d.id === tiedId) ?? null
+  check('…the card passes before it is read: stale, saying why', !!(await until(() => tiedDelivery()?.state === 'stale' && lib.unkey(tiedDelivery()?.detail) === `#${c3} passed review`, 15000)), JSON.stringify(tiedDelivery()))
   check('…and no longer unread in its pane', !!(await until(async () => !(await unread()), 10000)))
+  fs.writeFileSync(path.join(claudeHome, 'agentmessage-round-go'), '')
   await until(() => idle(builder.id), 20000)
   // Stale is an end: nothing can offer it after, so no doorbell names it and the builder never reads it.
-  check('…never told or read', !bells('Builder').some((t) => t.includes(`${tiedId})`) || t.includes(`${tiedId},`)) && !wakes('Builder').some((t) => t.includes('Round 1: also cover the empty case.')), JSON.stringify(wakeLog('Builder')))
+  check('…never told or read', !bells('Builder').some((t) => t.includes(`${tiedId})`) || t.includes(`${tiedId},`)) && !wakes('Builder').some((t) => t.includes('Round 1: also cover the empty case.') || t.includes('Round 1: by')), JSON.stringify(wakeLog('Builder')))
 
   // --- 4. A message queued for a busy reviewer whose card watch fires meanwhile: both in one line, the message first.
   const c2 = (await inv('tasks:create', { title: 'Revised scope', project: 'alpha', agent: builder.id, column: 'doing' })).number
@@ -182,6 +211,7 @@ const check = (name, ok, extra = '') => {
   check('a message for it is queued', tool('hive_message_agent', { project: 'alpha', agent: 'Reviewer', text: 'Use the revised review scope.' }).text.startsWith('Queued for Reviewer (m'))
   await inv('tasks:update', c2, { column: 'review' })
   check('its watch wake and the message ring together, read in one go, the message first', !!(await until(async () => wakes('Reviewer').length > before4, 30000)) && /^\[Hive\] New in your inbox: 1 message and 1 card event \(#\d+\) \(m\d+, m\d+\)\./.test(bells('Reviewer')[before4]) && /^Use the revised review scope\. \[Hive\] #\d+ \(Builder's card\) is in Review/.test(wakes('Reviewer')[before4]), JSON.stringify(wakeLog('Reviewer').slice(before4)))
+  check('its wakes name cards by key alone (#1219, HI-1661)', wakeLog('Reviewer').some((w) => lib.KEYED.test(w.text ?? '')), JSON.stringify(wakeLog('Reviewer').slice(-1)))
   await until(() => idle(reviewer.id), 15000)
   check('…and only once, received as it read it', wakes('Reviewer').filter((t) => t.includes('Use the revised review scope.')).length === 1 && !!(await until(() => activity('Reviewer').inbox?.deliveries?.filter((d) => d.text.startsWith('Use the revised review scope.')).every((d) => d.state === 'received'), 10000)), JSON.stringify(wakes('Reviewer').slice(before4)))
 
@@ -219,6 +249,20 @@ const check = (name, ok, extra = '') => {
   check('with Control turned down, the waiting message is refused when the builder is idle', !!(await until(async () => lastDelivery('Builder')?.state === 'refused', 30000)), JSON.stringify(lastDelivery('Builder')))
   check('…and never typed', !wakes('Builder').some((t) => t.includes('This needs Control agents.')), JSON.stringify(wakes('Builder')))
   await inv('settings:update', { assistant: { control: 'projects' } })
+
+  // --- 7. The project's own carrying-on switches off (#1497): the queued reply names only the ways left on, else that it
+  // waits in its inbox.
+  await until(() => idle(builder.id), 15000)
+  await inv('project:updateConfig', alpha, { inboxCheckpoints: 'off', inboxIdleWakes: 'off' })
+  await say(builder.id, 'work 6')
+  await until(async () => (await live(alpha, builder.id))?.status === 'working', 10000)
+  const turnEnd = tool('hive_message_agent', { project: 'alpha', agent: 'Builder', text: 'Told at its turn’s end only.' })
+  check("with the project's checkpoints and idle wakes off, the queued reply names only its turn's end", !turnEnd.isError && /\): Hive tells it at its turn's end; \d+ waiting\./.test(turnEnd.text), turnEnd.text)
+  await inv('project:updateConfig', alpha, { inboxStopContinuation: 'off' })
+  const none = tool('hive_message_agent', { project: 'alpha', agent: 'Builder', text: 'Nothing tells it of this one.' })
+  check('…all three off: it waits in its inbox, the user can Deliver Now', !none.isError && none.text.includes('): it waits in its inbox until it reads it with hive_inbox (the user can Deliver Now);'), none.text)
+  check('…and the messages are cancelled', /^Cancelled 2 messages waiting for Builder\.$/.test(tool('hive_message_agent', { project: 'alpha', agent: 'Builder', cancel: true }).text))
+  await inv('project:updateConfig', alpha, { inboxCheckpoints: 'inherit', inboxStopContinuation: 'inherit', inboxIdleWakes: 'inherit' })
 
   await inv('session:stop', alpha)
   await inv('session:stop', home)

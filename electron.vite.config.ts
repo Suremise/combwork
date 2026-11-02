@@ -42,8 +42,24 @@ export default defineConfig({
           index: resolve(__dirname, 'src/main/index.ts'),
           'hive-mcp': resolve(__dirname, 'src/main/mcp/hive-mcp.ts'),
           'hive-progress': resolve(__dirname, 'src/main/progressReporters/hive-progress.ts'),
+          // The close commands' runner (HI-1368), run as Node outside the asar.
+          'hive-close-runner': resolve(__dirname, 'src/main/closeCommand/hive-close-runner.ts'),
           // The usage history's worker thread (#1106).
-          'usage-worker': resolve(__dirname, 'src/main/usageWorker.ts')
+          'usage-worker': resolve(__dirname, 'src/main/usageWorker.ts'),
+          // The repository lock's worker thread (HI-1680).
+          'repo-lock-worker': resolve(__dirname, 'src/main/repoLockWorker.ts'),
+          // A None project's whole-project read (HI-2340).
+          'none-baseline-worker': resolve(__dirname, 'src/main/noneBaselineWorker.ts'),
+          // Git's worker thread, which starts its processes (HI-1783).
+          'git-worker': resolve(__dirname, 'src/main/gitWorker.ts'),
+          // The stall watchdog's thread (HI-1692).
+          'stall-watchdog': resolve(__dirname, 'src/main/stallWatchdog.ts'),
+          // The log's writer thread (HI-1730).
+          'log-writer': resolve(__dirname, 'src/main/logWriter.ts'),
+          // The WAL checkpoints' worker thread (HI-1691).
+          'wal-checkpoint-worker': resolve(__dirname, 'src/main/walCheckpointWorker.ts'),
+          // Codex's log's worker thread (HI-1972).
+          'codex-log-worker': resolve(__dirname, 'src/main/codexLogWorker.ts')
         }
       }
     }

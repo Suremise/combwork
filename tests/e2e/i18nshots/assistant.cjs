@@ -181,7 +181,8 @@ async function notes(ctx) {
   await ctx.inv('notes:create', 'plans', true)
   await ctx.inv('notes:create', 'plans/next.md', false)
   await ctx.command('view.notes')
-  const row = ctx.page.locator('.sidebar .pane-body .row').first()
+  // The plans folder's row, by its path: Workspace notes is pinned first (#1433) and has no menu.
+  const row = ctx.page.locator('.sidebar .pane-body .row[data-note="plans"]')
   await (await shown(ctx, row, 'the notes')).click({ button: 'right' })
   await menuShown(ctx)
   return windowShot()
@@ -250,14 +251,24 @@ async function retryTemplates(ctx) {
   await failing(ctx, '')
   // Two templates to show: the project's agents saved for the workspace and for the project itself.
   for (const scope of ['workspace', 'project']) await ctx.inv('templates:save', ctx.project, scope, 'Pair', true)
+  // The user's name for them, though "Pair" is also a message (a workflow preset's): not English left.
+  ctx.authored('Pair', '.template-row, .template-detail-title')
   await ctx.page.locator('.sidebar .load-failed button').first().click()
   await shown(ctx, ctx.page.locator('.sidebar .template-row'), 'the templates')
 }
 
-/** The Templates view, a template selected: what it holds. */
+/** The Templates view, one of Hive's own selected (#1436): Team 3×3, its roles and pairs, read-only. */
+async function hiveTemplates(ctx) {
+  await showView(ctx, 'view.templates', '.sidebar .template-row')
+  await (await shown(ctx, ctx.page.locator('.sidebar .template-row[data-scope="hive"]'), "Hive's templates")).nth(3).click()
+  await shown(ctx, ctx.page.locator('.template-detail[data-scope="hive"] .template-agents'), "one of Hive's templates")
+  return windowShot()
+}
+
+/** The Templates view, a template selected: what it holds (the workspace's: Hive's own are listed first). */
 async function templates(ctx) {
   await showView(ctx, 'view.templates', '.sidebar .template-row')
-  await (await shown(ctx, ctx.page.locator('.sidebar .template-row'), 'the templates')).first().click()
+  await (await shown(ctx, ctx.page.locator('.sidebar .template-row[data-scope="workspace"]'), 'the templates')).first().click()
   await shown(ctx, ctx.page.locator('.template-detail .template-agents'), 'the template')
   return windowShot()
 }
@@ -325,6 +336,7 @@ module.exports = {
     { name: 'project-menu', open: projectMenu, close: closeMenu },
     { name: 'projects-rail', open: projectsRail, close: expandRail },
     { name: 'templates-failed', open: templatesFailed, close: retryTemplates },
+    { name: 'templates-hive', open: hiveTemplates },
     { name: 'templates', open: templates },
     { name: 'template-editor', open: templateEditor, close: closeEditor },
     { name: 'template-load', open: templateLoad, close: cancelDialog },

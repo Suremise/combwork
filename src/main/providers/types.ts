@@ -1,12 +1,20 @@
-import type { AgentInstallInfo, AutoCompactSetting, CatalogModel, EffortLevel, McpServerDef, MemorySource, PathDataCopy, PermissionMode, PlanUsage, ProviderId, ProviderUpdateRetry, ReadinessIssue, SessionUsage, SubSession, TranscriptImageRef, TranscriptItem } from '../../shared/types'
+import type { AgentInstallInfo, AutoCompactSetting, BackgroundTaskType, CatalogModel, EffortLevel, McpServerDef, MemorySource, PathDataCopy, PermissionMode, PlanUsage, ProviderId, ProviderUpdateRetry, ReadinessIssue, RetryWait, SessionUsage, SubSession, TranscriptImageRef, TranscriptItem } from '../../shared/types'
 import type { ProviderDescriptor } from '../../shared/providers'
 import type { StartHint } from '../../shared/startFailure'
 import type { SafeguardEvent } from '../../shared/safeguards'
 import type { Text } from '../../shared/advanced'
+import type { TypedNewline } from '../../shared/terminalInput'
+import type { HookListing } from '../../shared/hooks'
 
 export interface LaunchSkill {
   name: string
   sourcePath: string
+  /**
+   * The source's content hash as the launch's settings read it (HI-2268: revisions.ts's, hashed again only when its
+   * files' sizes or times changed), so agents launched in a row hash an unchanged skill once. Absent (or empty: it
+   * couldn't be read then), the adapter hashes the source itself.
+   */
+  revision?: string
 }
 
 /**
@@ -18,6 +26,16 @@ export interface SkillDelivery {
   revision: string | null
   problem?: string
   lasting?: true
+}
+
+/** A launch's hooks for its Hooks dialog (HI-982: ProviderAdapter.launchHooks). */
+export interface LaunchHooks {
+  /** As established at launch. */
+  listing: HookListing
+  /** Listed again for the dialog (the CLI's own listing asked now, or its files compared with the launch's); absent: `listing`. */
+  now?(): Promise<HookListing>
+  /** Hive's own hook for each event (its form: http, command), by the event's name: what a hook it received came through. */
+  receivers: Readonly<Record<string, string>>
 }
 
 export interface LaunchContext {
@@ -60,21 +78,94 @@ export interface LaunchContext {
   guidance: string
   /** More instructions for this launch, over the provider's own (the Hive Assistant's role and mode). */
   instructions?: string
+  /**
+   * The Workspace notes note as this launch delivers it (#1433: its part for the project, bounded, under its header), on
+   * every provider after Hive's guidance and the launch's instructions; empty or missing: none (switched off, no note).
+   */
+  notes?: string
+  /**
+   * A resume of a conversation Hive gave instructions of its own at an earlier launch, by any agent (SessionRecord.promptAdded,
+   * #1433): its prompt is rendered fresh, so instructions given then and not now leave it.
+   */
+  promptAddedBefore?: boolean
+  /**
+   * The provider's override switches (#1167) as read once for this launch (overridesNow), so prepareLaunch and
+   * buildCommand agree when one changes meanwhile; read with launchOverrides. Missing: each read as it is now.
+   */
+  overrides?: Readonly<Record<string, boolean>>
   /** Tools of the hive MCP server this launch may use without asking, for providers that can pre-approve tools. */
   trustedHiveTools?: string[]
   /** The first task, given on the command line so the CLI starts on it (e.g. from the Hive Assistant). */
   initialPrompt?: string
   env: Record<string, string>
+  /** The connection's folder this launch runs on (HI-1757: its homeEnv's value in `env`), absent when it runs on the CLI's own home. */
+  connectionHome?: string
   /** The user lets sessions move into the CLI's own background service (see capabilities.backgroundSessions). */
   allowBackgroundSessions: boolean
   /** A 200K context window instead of the model's 1M one (capabilities.contextLimit). */
   use200kContext: boolean
+  /**
+   * Hive's record of the skill copies it made in folders (#1431, skillCopies.ts), for CLIs that read copies in the folder
+   * (syncAgentsSkills). Missing: nothing is recorded, and no copy is removed but by its marker and content (tests).
+   */
+  copies?: SkillCopyBook
+  /**
+   * Whether another session of Hive's (not this launch's) runs or is starting in `cwd` (#1431): it may be reading Hive's
+   * skill copies there, so the copies of skills this launch no longer gets stay while one does.
+   */
+  othersHere?: () => boolean
+  /**
+   * Folders outside `cwd` the session may read and write (#1439, capabilities.extraDirs): a reviewer's grant of its
+   * project's review copies, one fixed folder. Given on the command line, never in the CLI's config; none when missing.
+   */
+  extraDirs?: string[]
+}
+
+/** One skill copy Hive recorded making in a folder (#1431): its revision is the copy's contentHash, its marker left out. */
+export interface SkillCopyRecord {
+  skill: string
+  project: string
+  revision: string
+}
+
+/**
+ * Hive's record of its skill copies (#1431, the `skill_copies` table): what it made in a folder, at which revision. A
+ * failure to read or write it never stops a launch: unrecorded copies are only kept, never removed.
+ */
+export interface SkillCopyBook {
+  /** The folder's recorded copies, by skill name in lower case. */
+  of(folder: string): Promise<Map<string, SkillCopyRecord>>
+  record(folder: string, project: string, skill: string, revision: string): Promise<void>
+  forget(folder: string, skill: string): Promise<void>
 }
 
 export interface UpdateRetry {
   command: CommandSpec
   notice: ProviderUpdateRetry
 }
+
+/** A home folder's sign-in, as its CLI reports it (HI-980): `ok: false` when it couldn't be told, `error` in English. */
+export type ConnectionStatus = { ok: true; loggedIn: boolean; email?: string; orgId?: string; plan?: string | null } | { ok: false; error: string }
+
+/**
+ * A workspace folder a connection's CLI must trust (HI-1870), as the CLIs look trust up (probed with Claude Code 2.1.311
+ * and Codex 0.164.0): `root` is the real path of a Git project's main repository root (the parent of its common git
+ * folder, which covers the project, its slots and copies, all worktrees of it), or of a project without Git; null when
+ * Hive couldn't resolve it. `short`: Hive launches it by an 8.3 path, which Claude Code doesn't expand.
+ */
+export interface TrustTarget {
+  root: string | null
+  git: boolean
+  short: boolean
+  /** The project's own folder, real path (a linked worktree's own, when the project is one): Codex looks it up first. */
+  folder?: string | null
+}
+
+/**
+ * A CLI's trust of one target (HI-1871): trusted, not (asked at its root), unknown (null), or not and asked at another
+ * folder (`at`: Codex's own entry for the project's folder, which it looks up before the main root, says no).
+ */
+export type TrustReading = boolean | null | { at: string }
 
 export interface CommandSpec {
   file: string
@@ -112,6 +203,9 @@ export interface ExternalSession {
   id: string
   transcriptPath: string
   modified: string
+  /** The transcript's size and time, from the stat that found it (HI-1681): the list needn't stat it again. */
+  bytes?: number
+  mtimeMs?: number
   /** A session the CLI started for another one (from the transcript's first line). */
   sub?: SubSession
 }
@@ -151,6 +245,12 @@ export type HookEvent =
   | { kind: 'stop'; lastMessage: string | null; failed?: true }
   /** The turn ended because the CLI's sign-in was refused (expired, revoked, an invalid key): `message` is the CLI's. */
   | { kind: 'signIn'; message: string | null }
+  /**
+   * The CLI's model request failed and it tries again by itself (HI-1973: Copilot's recoverable ErrorOccurred): the turn
+   * goes on. `status`: the HTTP status that refused it (429: rate-limited), when the CLI names one; `network`: the
+   * service couldn't be reached at all.
+   */
+  | { kind: 'retry'; status: number | null; network: boolean }
   | { kind: 'interrupt' }
   /**
    * The CLI says it is idle at its prompt, waiting for input, with nothing running (Claude Code's idle_prompt
@@ -205,6 +305,15 @@ export interface LiveDetails {
   /** When the CLI recorded that turn's end (ISO), when it says: one from before this launch (a resumed log) is history. */
   signInAt?: string
   /**
+   * A turn ended on an error that isn't a refused sign-in, as the CLI recorded it (#1632, Codex's rollout: its Stop hook
+   * says nothing of it): the CLI's message ('' for none), and when (ISO). A turn after it clears it; one from before
+   * this launch is history.
+   */
+  turnFailed?: string
+  turnFailedAt?: string
+  /** The turn it names (its id as the CLI's hooks name turns), when the record names one. */
+  turnFailedTurn?: string
+  /**
    * When a turn last ended on an interrupt the CLI sends no hook for (Copilot's `abort`, also when a person cancels its
    * permission dialog), as recorded (ISO): handled as an interrupt hook. One from before this launch is history.
    */
@@ -227,12 +336,25 @@ export interface LiveDetails {
   stopsAnswered?: string[]
 }
 
+export type { BackgroundTaskType } from '../../shared/types'
+
 /**
- * A background task an agent started (a command left running, a Monitor) or that ended, from its transcript.
- * `at` is when the line was written (ms); a task with `expiresAt` ends then if nothing says so sooner.
+ * A background task an agent started (a command left running, a Monitor, a subagent) or that ended, from its transcript.
+ * `at` is when the line was written (ms); a task with `expiresAt` ends then if nothing says so sooner. A start may say
+ * what it is (`type`; left out, a command) and its CLI's description of it (a subagent's: user text). `resumed`: a
+ * task that ended starts again under its id (a subagent given a message after it finished).
  */
 /** `stopped`: an end the agent made itself (Claude Code's TaskStop, #640): its CLI isn't told, so no turn follows. */
-export type BackgroundTaskEvent = { kind: 'start'; id: string; at: number; expiresAt?: number } | { kind: 'end'; id: string; at: number; stopped?: true }
+export type BackgroundTaskEvent = { kind: 'start'; id: string; at: number; expiresAt?: number; type?: BackgroundTaskType; description?: string; resumed?: true } | { kind: 'end'; id: string; at: number; stopped?: true }
+
+/** A turn as the transcript identifies it (#1371): its id, when its prompt was written (Unix ms), whether the model took it up. */
+export interface TranscriptTurn {
+  id: string
+  at: number
+  worked: boolean
+  /** With no turn ids in its hooks: its prompt's text as compared with a prompt hook's (hooksHealth's promptKey). */
+  prompt?: string
+}
 
 /** Where an image's data sits in a transcript: the line's byte range and the path to it inside the entry. */
 export interface ImageLocation {
@@ -290,16 +412,64 @@ export interface ProviderAdapter {
   /** A known update failure's explanation and explicit retry, if this installer supports one. */
   updateRetry?(executable: string, exitCode: number): UpdateRetry | null
   loginCommand(executable: string): CommandSpec
+  /**
+   * Who a home folder is signed in as (HI-980: an account's folder, given in `env` under the descriptor's
+   * `capabilities.connections.homeEnv`), from the CLI's own status: never a token. `ok: false` when it couldn't be told
+   * (a timeout, output it couldn't read), which isn't signed out.
+   */
+  accountStatus?(executable: string, env: NodeJS.ProcessEnv): Promise<ConnectionStatus>
+  /**
+   * Whether a connection's folder (`home`) has had the CLI's one-time first-run setup that Set Up answers (HI-1870), as
+   * the CLI's own files there say, read only; null when it can't be told. Absent: the CLI has none to tell.
+   */
+  connectionSetUp?(home: string): Promise<boolean | null>
+  /** The arguments the CLI takes in a connection's Set Up on its folder (`home`), as its launches there do (HI-1893). Absent: none. */
+  connectionSetUpArgs?(home: string): string[]
+  /**
+   * Whether the CLI on a connection's folder (`home`) trusts each of a workspace's folders (HI-1870), as its own files
+   * there say, read only: true, false (not trusted, or no record), or null when it can't be told (a file it can't
+   * read, a folder Hive couldn't resolve). Absent: the CLI keeps no trust to tell.
+   */
+  connectionTrusts?(home: string, targets: readonly TrustTarget[]): Promise<TrustReading[]>
+  /** Where a shared folder of an account (capabilities.connections.shared) links to: that folder of the CLI's own home. */
+  accountSharedTarget?(name: string): string
+  /** Whether a file in an account's folder is one that changes when the CLI signs in or out there: watched, never read. */
+  accountLoginFile?(name: string): boolean
+  /**
+   * The key Hive presses for a line break in a prompt it types (HI-1327), for the CLI at `version`: one of the
+   * descriptor's `typedNewlines`, as Settings → Advanced chooses it; null: a space (as before). Absent: always a space.
+   */
+  typedNewline?(version: string | null): TypedNewline | null
+  /** A connection's sign-in, when it differs from loginCommand (HI-1757: Codex keeps the login in the connection's folder). */
+  accountLoginCommand?(executable: string): CommandSpec
+  /**
+   * Environment variables the CLI reads as a login (HI-1757: Codex's CODEX_ACCESS_TOKEN), left out wherever it runs on a
+   * connection (its sign-in, its checks, its sessions: withoutAccountEnv), so they can't stand in for the connection's own.
+   */
+  accountEnvDrop?(): readonly string[]
+  /** The same by a pattern on the variable's name (HI-1772: Claude Code reads whole families: ANTHROPIC_*, CLAUDE_CODE_USE_*). */
+  accountEnvDropPattern?(): RegExp
+  /**
+   * Whether a connection's folder (its home) is held by the CLI's own check of it, not yet confirmed ended (HI-1757:
+   * Codex's app server): its sign-in and removal are refused meanwhile, as while a launch holds it.
+   */
+  accountHeld?(home: string): boolean
   /** A one-time setup task (Codex's Windows sandbox), when the provider has one. */
   setupCommand?(executable: string): CommandSpec
   /** The CLI's own home (its sign-in and config) as Hive's sessions get it: what a test copy notes beside the CLI (#368). */
   configHome?(): string
   /** What still keeps agents from running, given what locate() found. */
   readiness(info: AgentInstallInfo): ReadinessIssue[]
+  /**
+   * Advanced settings (ids) that change what locate() finds (#1281: the environment its sign-in is checked in): a change
+   * of one checks the CLI again, so the account shown is the one its sessions get.
+   */
+  readonly locateSettings?: readonly string[]
   /** Extra lines for Help → Copy Diagnostics (Codex: its Windows sandbox), with no paths or names in them. */
   diagnostics?(): string[]
   /** The CLI's own default model from its settings, if set. */
-  configuredDefaultModel(): string | null
+  /** The CLI's own default model from its settings; `home`: a connection's home (HI-1755) rather than the CLI's own. */
+  configuredDefaultModel(home?: string): string | null
   /** Whether a model seen in a transcript is this provider's (to learn the CLI's default). */
   ownsModel(model: string): boolean
   /** Environment variables to remove from sessions: a parent session's identity when Hive runs inside one. */
@@ -320,9 +490,10 @@ export interface ProviderAdapter {
   normalizeHook(body: Record<string, any>): NormalizedHook
   /**
    * For CLIs whose terminal title says when a person must act (Codex's "Action Required"): a test of a title, for
-   * this version of the CLI. Null (or absent) when its title doesn't say: its hooks then tell Hive (see hookStatus).
+   * this version of the CLI, and the launch (its override switches: a title Hive didn't set isn't read). Null (or
+   * absent) when its title doesn't say: its hooks then tell Hive (see hookStatus).
    */
-  titleAttention?(version: string | null): ((title: string) => boolean) | null
+  titleAttention?(version: string | null, ctx?: Pick<LaunchContext, 'overrides'>): ((title: string) => boolean) | null
   lockReply(decision: LockDecision): Record<string, unknown>
   /**
    * The reply that puts Hive's fixed notice text before the model at this hook (#650: the CLI's own event name, as the
@@ -354,6 +525,15 @@ export interface ProviderAdapter {
    * it doesn't show for sure. Null (or absent) for versions it wasn't checked with.
    */
   turnScreen?(version: string | null): ((screen: string) => 'idle' | 'working' | null) | null
+  /**
+   * Whether the CLI is waiting to retry its model request (HI-1972: rate-limited, its connection lost), from its own
+   * records: its newest such wait in conversation `sessionId` recorded since `since` (ms), or null (none, or Hive can't
+   * tell). `env` is the launch's environment (where its CLI keeps its records), `transcriptPath` its transcript where
+   * known. Read off main's thread and bounded in time; never changes anything of the CLI's. Absent: Hive can't tell.
+   */
+  retryWait?(q: { sessionId: string; env: NodeJS.ProcessEnv; transcriptPath?: string; since: number }): Promise<RetryWait | null>
+  /** How long a running turn goes without a hook before retryWait is asked (ms); absent: 20 s. */
+  retryLookAfterMs?(): number
   /** Claude Code's status-line JSON. */
   statusLine?(body: Record<string, any>): LiveDetails
   /**
@@ -361,6 +541,17 @@ export interface ProviderAdapter {
    * changed), for the model it runs as (`models`: the id it resolves to, then the choice). Absent: Hive doesn't know.
    */
   autoCompact?(ctx: LaunchContext, cmd: CommandSpec, models: string[]): AutoCompactSetting
+  /**
+   * Where the CLI's settings files turn its hooks off for a launch (#1336: why its hooks don't reach Hive), read now and
+   * never changed: the settings' name in the window's language, or null when none does (or Hive can't tell).
+   */
+  hooksOffIn?(ctx: LaunchContext): string | null
+  /**
+   * The launch's hooks for its Hooks dialog (HI-982), once its command is built: Hive's own as passed for it, and the CLI's
+   * others as far as this provider can establish them. Read-only, never changing a hook or a CLI's config. Absent: the
+   * dialog lists none.
+   */
+  launchHooks?(ctx: LaunchContext, cmd: CommandSpec): LaunchHooks
   /**
    * Details from lines appended to the session's transcript (Codex: model, preset, Plan mode, plan limits). `memo` is
    * the launch's own, kept between reads (and emptied when the reading starts again), for what a later line completes.
@@ -378,10 +569,36 @@ export interface ProviderAdapter {
    */
   safeguards?(appended: string, memo: Record<string, unknown>): SafeguardEvent[]
   /**
+   * Turns the session's transcript identifies in lines appended to it (whole lines; #1371, hooks health): each by the
+   * id its hooks carry for it (`turnsJoin: 'id'`), or by the transcript's own id when its hooks carry none (`'time'`),
+   * with when its prompt was written and whether the model took it up. Only turns a person's (or Hive's) prompt began,
+   * never a sub-agent's, a compaction or a local command. `memo` is kept between reads of one file (emptied when the
+   * reading starts again); a turn whose prompt wasn't read (before the reading began, or in a gap) isn't returned.
+   */
+  transcriptTurns?(appended: string, memo: Record<string, unknown>): TranscriptTurn[]
+  /** How transcriptTurns' ids meet its hooks: the same id ('id'), or only by when its hooks came ('time'). */
+  turnsJoin?: 'id' | 'time'
+  /**
    * Whether an ask is the CLI's prompt about a safeguard stop (Claude Code asks whether to switch models), from the ask
    * and the terminal's screen as it shows it.
    */
   safeguardAsk?(ask: Ask, screen: string): boolean
+  /**
+   * The question a CLI puts on its screen by itself while idle, sending no hook (HI-1959: Claude Code's offer to teach
+   * auto mode about the environment), from the screen as shown; null when none shows. The agent waits for the user
+   * while it does, and nothing is typed into it: the question takes the keys, and Enter answers it.
+   */
+  idleQuestion?(screen: string): string | null
+  /**
+   * What the CLI's ordinary input holds, from the screen with dim cells blanked (TerminalScreen.textWithoutDim: a hint in
+   * an empty input is dim): '' when empty, null when no ordinary input is drawn (a dialog, a redraw, a blank screen).
+   */
+  promptText?(screen: string): string | null
+  /**
+   * What promptText reads, as drawn: its rows and their spacing kept (HI-1979: a Ctrl+U that deletes an empty row, a
+   * line break's, changes this and not promptText's words). Null where promptText is.
+   */
+  promptBox?(screen: string): string | null
   /**
    * The installed CLI's models and what each can do (#125), when it can say (null: couldn't, or an unexpected reply).
    * Asking may start the CLI briefly, but never a session, a prompt or a sign-in. env: the sessions' environment.
@@ -426,9 +643,16 @@ export interface ProviderAdapter {
   transcriptPath(folder: string, sessionId: string, recorded?: string): Promise<string | null>
   /** Where to put a transcript restored from Hive's backup so the CLI can resume it; null if it can't be restored. */
   restorePath(folder: string, sessionId: string, recorded?: string): string | null
-  listSessions(folder: string): Promise<ExternalSession[]>
-  /** Whether a transcript (one of the CLI's, or Hive's copy of it) is a sub-session, from its first line; cached by mtime. */
-  subSessionOf(path: string, sessionId: string): Promise<SubSession | null>
+  /**
+   * The CLI's sessions run in a folder. `skip`: ids the caller has already (Hive's own sessions), left out before their
+   * files are looked at (HI-1681): a session list asks for every folder its sessions ran in, mostly Hive's own.
+   */
+  listSessions(folder: string, skip?: (id: string) => boolean): Promise<ExternalSession[]>
+  /**
+   * Whether a transcript (one of the CLI's, or Hive's copy of it) is a sub-session, from its first line; cached by mtime.
+   * `mtimeMs`: the file's, from a stat the caller has (HI-1681), so it isn't stat'd again.
+   */
+  subSessionOf(path: string, sessionId: string, mtimeMs?: number): Promise<SubSession | null>
   /**
    * What the CLI keeps by a folder's path rather than in it (Claude Code: ~/.claude/projects/<path as name>/, its
    * transcripts and auto memory), for a folder that moved (#146). With apply, copied to the new path's name: never moved
@@ -442,9 +666,17 @@ export interface ProviderAdapter {
   /**
    * How Hive ends the CLI as a person would, for CLIs that write what Hive reads only as they exit (Copilot's token
    * totals, #465): the keys it types, one every gapMs, before killing the CLI if it is still running after graceMs.
-   * Without it, Stop kills the process.
+   * Without it, Stop kills the process. `armed` (HI-2272): what its screen shows once a first key at its prompt has
+   * armed the next to exit. With it, Stop types the first key on conditions rather than at a fixed beat (exitKeys.ts):
+   * a turn under way is cancelled first and its end waited for, and the key that exits is typed once this shows.
    */
-  readonly exitKeys?: { keys: string[]; gapMs: number; graceMs: number }
+  readonly exitKeys?: { keys: string[]; gapMs: number; graceMs: number; armed?: RegExp }
+  /**
+   * The command a person types to end the CLI (Claude Code's /exit, Codex's /quit), which Hive types, then Enter, at a
+   * lane's end once its builder's turn is over (HI-1706, sessions.quit), killing it if it is still running after graceMs.
+   * Only that end uses it: Stop and restarts don't. A CLI without one is ended there by its exitKeys, or killed.
+   */
+  readonly quitLine?: { line: string; graceMs: number }
   parseUsage(text: string, sessionId: string): SessionUsage
   /** Reads a transcript's usage a piece at a time (whole lines), for transcripts that keep growing. */
   usageParser(sessionId: string): UsageParser
@@ -460,10 +692,13 @@ export interface ProviderAdapter {
   exportSubtitle(sessionId: string, project: string): string
 
   // Project files
-  memorySources(projectPath: string): Promise<MemorySource[]>
+  /** `homes`: the connections' homes on in the project's workspace (HI-1755), whose user memory replaces the CLI's own home's. */
+  memorySources(projectPath: string, homes?: readonly { id: string; name: string; home: string }[]): Promise<MemorySource[]>
   /** Files in the CLI's own folder Hive may show and edit (instructions, memory); false for anything else. */
-  fileAllowed(path: string, write: boolean): boolean
-  skillRoots(): SkillRoots
+  /** `homes`: the connections' homes (HI-1755) to allow in place of the CLI's own home. */
+  fileAllowed(path: string, write: boolean, homes?: readonly string[]): boolean
+  /** `home`: a connection's home (HI-1755) rather than the CLI's own. */
+  skillRoots(home?: string): SkillRoots
   /** MCP servers a project defines in the CLI's own config, which Hive leaves off until copied to the workspace. */
   projectMcpServers(projectPath: string): Promise<Record<string, McpServerDef>>
 

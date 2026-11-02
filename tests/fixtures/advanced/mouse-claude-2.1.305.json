@@ -1,0 +1,12 @@
+{
+  "about": "Claude Code's start in its own home (onboarding done, a made-up API key approved), in a 120x40 pty, through the folder trust question (answered Yes) up to its prompt, no prompt sent: the private modes it set or reset (DECSET/DECRST, in order), and the mouse tracking among them (#1167). Nothing more was set in 5 s at its prompt.",
+  "cli": "Claude Code",
+  "version": "2.1.305",
+  "runs": [
+    {
+      "args": "none",
+      "mouseTracking": "none",
+      "privateModes": "?9001h ?1004h ?25l ?25h ?25l ?2004h ?2031h ?1004h ?2031l ?2004l ?2004h ?2031h ?1004h"
+    }
+  ]
+}

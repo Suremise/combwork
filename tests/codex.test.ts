@@ -1,7 +1,8 @@
 import { readFileSync as readText } from 'fs'
 import { join as joinPath } from 'path'
-import { describe, expect, it } from 'vitest'
+import { describe, expect, it, vi } from 'vitest'
 import { codexMcpServer, hookHash, toToml } from '../src/main/providers/codex/adapter'
+import { scriptCall } from '../src/main/providers/codex/scriptCalls'
 import { CodexConversationParser, parseRollout, patchPaths, presetFromSettings, rolloutDetails, rolloutPlanUsage } from '../src/main/providers/codex/rollout'
 import { codexModelLabel } from '../src/shared/codex'
 import { tempDir } from './tempDir'
@@ -94,6 +95,117 @@ describe('Codex: when a person must act', () => {
       const title = setup.args.findIndex((a) => a.startsWith('tui.terminal_title='))
       expect(setup.args[title]).toMatch(/"activity".*"project-name"/)
       expect(setup.args[title - 1]).toBe('-c')
+    } finally {
+      if (before === undefined) delete process.env.CODEX_HOME
+      else process.env.CODEX_HOME = before
+      rmSync(home, { recursive: true, force: true })
+    }
+  })
+
+  it("says a connection's folder is set up (HI-1870) when its launches run in a Windows sandbox: its own, or this PC's passed on", async () => {
+    const { mkdirSync, rmSync, statSync, utimesSync, writeFileSync } = await import('fs')
+    const pc = tempDir('hive-codex-pc-')
+    const conn = tempDir('hive-codex-conn-')
+    const before = process.env.CODEX_HOME
+    process.env.CODEX_HOME = pc
+    try {
+      const { codex, launchConnectionArgs } = await import('../src/main/providers/codex/adapter')
+      const sandboxed = (): boolean => launchConnectionArgs({ connectionHome: conn }).some((a) => a.startsWith('windows.sandbox='))
+      if (process.platform !== 'win32') return void expect(await codex.connectionSetUp(conn)).toBe(true)
+      // Neither: Codex asks for its sandbox setup there.
+      expect(await codex.connectionSetUp(conn)).toBe(false)
+      // This PC's, which its launches are given. Each write of it given the same modification time, as two writes in one
+      // tick of the clock have (HI-2051): each is read all the same, of another size or the same.
+      const pcConfig = (text: string): void => {
+        writeFileSync(joinPath(pc, 'config.toml'), text)
+        utimesSync(joinPath(pc, 'config.toml'), 1_800_000_000, 1_800_000_000)
+        expect(statSync(joinPath(pc, 'config.toml')).mtimeMs).toBe(1_800_000_000_000)
+      }
+      const passedOn = (): string | undefined => launchConnectionArgs({ connectionHome: conn }).find((a) => a.startsWith('windows.sandbox='))
+      pcConfig('[windows]\nsandbox = "elevated"\n')
+      expect(sandboxed()).toBe(true)
+      expect(await codex.connectionSetUp(conn)).toBe(true)
+      // Another of the same size.
+      pcConfig('[windows]\nsandbox = "readonly"\n')
+      expect(passedOn()).toBe('windows.sandbox="readonly"')
+      // One the launches wouldn't pass on isn't counted.
+      pcConfig('[windows]\nsandbox = "not a kind"\n')
+      expect(sandboxed()).toBe(false)
+      expect(await codex.connectionSetUp(conn)).toBe(false)
+      // Its own, as its Set Up writes it.
+      mkdirSync(conn, { recursive: true })
+      writeFileSync(joinPath(conn, 'config.toml'), '[windows]\nsandbox = "unelevated"\n')
+      expect(await codex.connectionSetUp(conn)).toBe(true)
+    } finally {
+      if (before === undefined) delete process.env.CODEX_HOME
+      else process.env.CODEX_HOME = before
+      rmSync(pc, { recursive: true, force: true })
+      rmSync(conn, { recursive: true, force: true })
+    }
+  })
+
+  it("reads a connection's trust of a workspace's folders as Codex 0.164.0 looked it up (HI-1870), with Hive's per-launch trust off", async () => {
+    const { mkdirSync, rmSync, writeFileSync } = await import('fs')
+    const { codex } = await import('../src/main/providers/codex/adapter')
+    const { advanced } = await import('../src/main/advanced')
+    const real = advanced.get.bind(advanced)
+    const off = vi.spyOn(advanced, 'get').mockImplementation(((id: string) => (id === 'codex.trust.perLaunch' ? false : real(id))) as typeof advanced.get)
+    const home = tempDir('hive-codex-trust-')
+    try {
+      const t = (root: string | null, git = true) => ({ root, git, short: false })
+      const targets = [t('C:\\work\\alpha'), t('c:\\WORK\\Alpha'), t('C:\\work\\beta'), t('C:\\work\\notes', false), t(null)]
+      // No config.toml yet: nothing trusted (a folder without Git needs none: Codex asks only in a repository).
+      expect(await codex.connectionTrusts(home, targets)).toEqual([false, false, false, true, null])
+      mkdirSync(home, { recursive: true })
+      writeFileSync(joinPath(home, 'config.toml'), "[projects.'C:\\work\\alpha']\ntrust_level = \"trusted\"\n\n[projects.'C:\\work\\beta']\ntrust_level = \"untrusted\"\n")
+      expect(await codex.connectionTrusts(home, targets)).toEqual([true, true, false, true, null])
+      // A worktree project W of main repository R (HR3, HI-1871 round 1): Codex looks W's own entry up first.
+      const w = (folder: string) => ({ root: 'C:\\work\\alpha', git: true, short: false, folder })
+      writeFileSync(joinPath(home, 'config.toml'), "[projects.'C:\\work\\alpha']\ntrust_level = \"trusted\"\n\n[projects.'C:\\work\\alpha-wt']\ntrust_level = \"untrusted\"\n")
+      // R trusted, W's own entry untrusted: not trusted, and asked at W, not R.
+      expect(await codex.connectionTrusts(home, [w('C:\\work\\alpha-wt')])).toEqual([{ at: 'C:\\work\\alpha-wt' }])
+      // No entry for W: R's decides.
+      expect(await codex.connectionTrusts(home, [w('C:\\work\\alpha-wt2')])).toEqual([true])
+      // W's own entry trusted, R not: trusted.
+      writeFileSync(joinPath(home, 'config.toml'), "[projects.'c:\\WORK\\alpha-wt']\ntrust_level = \"trusted\"\n")
+      expect(await codex.connectionTrusts(home, [w('C:\\work\\alpha-wt')])).toEqual([true])
+      // One it can't read: unknown, never untrusted.
+      writeFileSync(joinPath(home, 'config.toml'), "[projects.'C:\\work\\alpha'\ntrust_level = \n")
+      expect(await codex.connectionTrusts(home, targets)).toEqual([null, null, null, null, null])
+    } finally {
+      off.mockRestore()
+      rmSync(home, { recursive: true, force: true })
+    }
+  })
+
+  it("trusts each launch's own folder when Hive's per-launch trust is on (HI-1871, Darren: on by default): its -c, and nothing pending", async () => {
+    const { rmSync } = await import('fs')
+    const { codex } = await import('../src/main/providers/codex/adapter')
+    const { advanced } = await import('../src/main/advanced')
+    const home = tempDir('hive-codex-perlaunch-')
+    const before = process.env.CODEX_HOME
+    process.env.CODEX_HOME = home
+    try {
+      const ctx = {
+        projectPath: home, agentId: 'a-1', executable: 'C:\\bin\\codex.exe', cwd: 'C:\\work\\HIVE.worktrees\\alpha\\slot-a', workspacePath: home, runId: 'r', sessionId: '',
+        resume: false, name: '', skills: [], mcpServers: {}, model: null, effort: null, permissionMode: null, extraArgs: [], hookUrl: 'http://127.0.0.1:1/hook?run=r', hookAuthFile: 'C:/hive/hook-auth/r.txt', privateDir: 'C:/hive/launches/r', guidance: '', env: {}, allowBackgroundSessions: false, use200kContext: false
+      }
+      expect(advanced.get<boolean>('codex.trust.perLaunch')).toBe(true)
+      const { args } = codex.buildCommand(ctx.executable, ctx)
+      const i = args.findIndex((a) => a.startsWith('projects='))
+      // The inline table (a dotted -c key would split the path at "HIVE.worktrees"), its folder alone.
+      expect(args[i - 1]).toBe('-c')
+      expect(args[i]).toBe('projects={"C:\\\\work\\\\HIVE.worktrees\\\\alpha\\\\slot-a"={trust_level="trusted"}}')
+      expect(await codex.connectionTrusts(home, [{ root: 'C:\\work\\alpha', git: true, short: false }, { root: null, git: true, short: false }])).toEqual([true, true])
+      // Off: no -c of it, and trust read from the connection's own file.
+      const real = advanced.get.bind(advanced)
+      const off = vi.spyOn(advanced, 'get').mockImplementation(((id: string) => (id === 'codex.trust.perLaunch' ? false : real(id))) as typeof advanced.get)
+      try {
+        expect(codex.buildCommand(ctx.executable, ctx).args.some((a) => a.startsWith('projects='))).toBe(false)
+        expect(await codex.connectionTrusts(home, [{ root: 'C:\\work\\alpha', git: true, short: false }])).toEqual([false])
+      } finally {
+        off.mockRestore()
+      }
     } finally {
       if (before === undefined) delete process.env.CODEX_HOME
       else process.env.CODEX_HOME = before
@@ -222,6 +334,114 @@ describe('Codex rollouts', () => {
     const restricted = (write: boolean) => ({ type: 'managed', file_system: { type: 'restricted', entries: [{ access: 'read' }, ...(write ? [{ access: 'write' }] : [])] } })
     expect(presetFromSettings({ approval_policy: 'on-request', approvals_reviewer: 'user', permission_profile: restricted(false) })).toBe('read-only')
     expect(presetFromSettings({ approval_policy: 'on-request', approvals_reviewer: 'user', permission_profile: restricted(true) })).toBe('ask')
+  })
+})
+
+describe("a Codex code-mode script's calls (HI-2240)", () => {
+  // Recorded from Codex 0.166.0 in the Codex test home (a probe MCP server, `echo hello`, a file made): one script ran a
+  // command and applied a patch, the next called the MCP tool. Cut down to the turn's calls, messages and outputs (no
+  // session_meta, instructions or token records), its folder replaced with C:\work\alpha.
+  const fixture = () => require('fs').readFileSync(require('path').join(__dirname, 'fixtures', 'codex-0.166.0-code-mode.jsonl'), 'utf8') as string
+  const parsed = (text: string) => {
+    const p = new CodexConversationParser('C:\\work\\alpha')
+    p.feed(Buffer.from(text))
+    return p.items.flatMap((i) => (i.kind === 'tool' ? [i.tool] : []))
+  }
+
+  it('gives each script the calls Codex recorded, named and shown as the same calls made directly', () => {
+    const [first, second] = parsed(fixture())
+    // The first script patched a file and ran a command: a Script (not the Edit of its patch), with both calls.
+    expect(first).toMatchObject({ name: 'Script', isError: false })
+    expect(first.input).toContain('tools.exec_command')
+    expect(first.calls).toEqual([
+      expect.objectContaining({ name: 'Shell', input: 'echo hello', summary: 'echo hello', result: 'hello\r\n', isError: false }),
+      expect.objectContaining({ name: 'Edit', summary: 'notes.txt', input: '*** Begin Patch\n*** Add File: notes.txt\n+one\n*** End Patch', isError: false })
+    ])
+    expect(second.calls).toEqual([expect.objectContaining({ name: 'probe · echo', summary: 'hi', input: JSON.stringify({ text: 'hi' }, null, 2), result: 'echo: hi', isError: false })])
+  })
+
+  it('a script that only applies a patch stays its Edit, with that one call; a direct call recorded as an item is not repeated', () => {
+    const exec = (id: string, input: string) => line({ type: 'response_item', payload: { type: 'custom_tool_call', name: 'exec', call_id: id, input } })
+    const done = (item: Record<string, unknown>) => line({ type: 'event_msg', payload: { type: 'item_completed', item } })
+    const patch = '*** Begin Patch\\n*** Add File: C:\\\\work\\\\alpha\\\\a.txt\\n+x\\n*** End Patch'
+    const text = [
+      exec('s1', `text(await tools.apply_patch("${patch}"))`),
+      done({ type: 'FileChange', id: 'exec-1', changes: { 'C:\\work\\alpha\\a.txt': { type: 'add', content: 'x\n' } }, status: 'completed' }),
+      line({ type: 'response_item', payload: { type: 'function_call', name: 'exec_command', call_id: 'direct', arguments: '{"cmd":"ls"}' } }),
+      done({ type: 'CommandExecution', id: 'direct', command: ['pwsh', '-Command', 'ls'], status: 'completed', exit_code: 0, aggregated_output: '' }),
+      // A failed MCP call, and one that isn't a call at all.
+      exec('s2', 'text(await tools.mcp__hive__hive_read_task({number: 1}))'),
+      done({ type: 'McpToolCall', id: 'exec-2', server: 'hive', tool: 'hive_read_task', arguments: { number: 1 }, status: 'failed', error: { message: 'No such card' } }),
+      done({ type: 'AgentMessage', id: 'm1', content: [] }),
+      // Recorded with no start time, while a script runs (none of these has ended): that script's.
+      done({ type: 'CommandExecution', id: 'exec-3', command: ['pwsh', '-Command', 'npm test'], status: 'failed', exit_code: 1, aggregated_output: 'failed' })
+    ].join('\n') + '\n'
+    const [edit, direct, script] = parsed(text)
+    expect(edit).toMatchObject({ name: 'Edit', summary: 'a.txt', calls: [expect.objectContaining({ name: 'Edit', summary: 'a.txt' })] })
+    expect(direct).toMatchObject({ name: 'Shell' })
+    expect(direct.calls).toBeUndefined()
+    expect(script.calls).toEqual([expect.objectContaining({ name: 'hive · hive_read_task', result: 'No such card', isError: true }), expect.objectContaining({ name: 'Shell', input: 'npm test', isError: true })])
+  })
+
+  it("hive_agent_activity's recent tools are the calls a script made, in order; any other tool is itself", async () => {
+    const { callsMade } = await import('../src/shared/activity')
+    expect(parsed(fixture()).flatMap(callsMade).map((t) => [t.name, t.summary])).toEqual([['Shell', 'echo hello'], ['Edit', 'notes.txt'], ['probe · echo', 'hi']])
+    const plain = { toolUseId: 'x', name: 'Shell', summary: 'ls', input: 'ls', result: '', isError: false, images: [] }
+    expect(callsMade(plain)).toEqual([plain])
+    expect(callsMade({ ...plain, name: 'Script', calls: [] })).toEqual([{ ...plain, name: 'Script', calls: [] }])
+  })
+
+  it("a command left running is the script's that started it, ending in a later script or turn (HR1's round 1)", () => {
+    // Recorded by Codex 0.166.0 in a scenario run (the Codex test home): script call_da8eb… starts `npm test` through
+    // hive-progress (started_at 15:59:51.791) and returns while it runs; it ends at 16:00:59, during call_a4ddc….
+    const real = parsed(require('fs').readFileSync(require('path').join(__dirname, 'fixtures', 'codex-0.166.0-delayed-command.jsonl'), 'utf8'))
+    const byId = (id: string) => real.find((t) => t.toolUseId === id)!
+    const delayed = 'exec-c26e1c16-34dd-4b62-88cc-5917b9fbe5f0'
+    expect(byId('call_da8eb3602bf54aecafa0eaac8888c3d6').calls?.map((c) => c.toolUseId)).toEqual([delayed])
+    expect(byId('call_a4ddc8c7c6f845ce86c5f635d67d63bf').calls?.map((c) => c.toolUseId)).toEqual(['exec-05089406-c6ce-414c-a22c-34b2bf160930'])
+    // Every call is in exactly one script.
+    const ids = real.flatMap((t) => t.calls ?? []).map((c) => c.toolUseId)
+    expect(new Set(ids).size).toBe(ids.length)
+
+    // The same across a turn's end, and a call whose script isn't known is in none (never the latest by default).
+    const at = (ms: number) => new Date(Date.UTC(2026, 9, 31, 12, 0, 0) + ms).toISOString()
+    const rec = (ms: number, payload: Record<string, unknown>, type = 'response_item') => line({ timestamp: at(ms), type, payload })
+    const exec = (ms: number, id: string) => rec(ms, { type: 'custom_tool_call', name: 'exec', call_id: id, input: `text(${id})` })
+    const out = (ms: number, id: string) => rec(ms, { type: 'custom_tool_call_output', call_id: id, output: 'Script completed' })
+    const cmd = (ms: number, startedMs: number | null, id: string) => rec(ms, { type: 'item_completed', item: { type: 'CommandExecution', id, command: ['pwsh', '-Command', id], status: 'completed', exit_code: 0, aggregated_output: '' }, ...(startedMs !== null ? { started_at_ms: Date.parse(at(startedMs)) } : {}) }, 'event_msg')
+    const text = [
+      exec(0, 'a'), out(1000, 'a'),
+      rec(2000, { type: 'task_complete' }, 'event_msg'), rec(3000, { type: 'task_started' }, 'event_msg'),
+      exec(4000, 'b'),
+      cmd(4500, 500, 'started-in-a'),
+      cmd(4600, 4200, 'started-in-b'),
+      cmd(4700, 1500, 'started-between'),
+      out(5000, 'b'),
+      cmd(6000, null, 'no-start-no-script')
+    ].join('\n') + '\n'
+    const [a, b] = parsed(text)
+    expect(a.calls?.map((c) => c.toolUseId)).toEqual(['started-in-a'])
+    expect(b.calls?.map((c) => c.toolUseId)).toEqual(['started-in-b'])
+  })
+
+  it("keeps a command's exit code (0 or not); one still running has none and no result", () => {
+    const cmd = (item: Record<string, unknown>) => scriptCall({ type: 'CommandExecution', id: 'x', command: ['pwsh', '-Command', 'my-checker'], aggregated_output: 'Check failed', ...item }, null)
+    expect(cmd({ status: 'failed', exit_code: 37 })).toMatchObject({ name: 'Shell', input: 'my-checker', result: 'Check failed', isError: true, exitCode: 37 })
+    expect(cmd({ status: 'completed', exit_code: 0, aggregated_output: 'ok' })).toMatchObject({ result: 'ok', isError: false, exitCode: 0 })
+    const running = cmd({ status: 'in_progress' })
+    expect(running).toMatchObject({ result: null, isError: false })
+    expect(running).not.toHaveProperty('exitCode')
+    // The fixture's `echo hello` ended with 0.
+    expect(parsed(fixture())[0].calls?.[0].exitCode).toBe(0)
+  })
+
+  it('0.159 records them too; a script whose calls none records has none', () => {
+    const old = parsed(require('fs').readFileSync(require('path').join(__dirname, 'fixtures', 'codex-0.159.jsonl'), 'utf8'))
+    // Its second script made no calls: known to have made none (an empty list, HI-2246), not unknown.
+    expect(old.filter((t) => t.calls).map((t) => t.calls!.map((c) => c.name))).toEqual([['Shell'], [], ['Edit']])
+    const [script] = parsed(line({ type: 'response_item', payload: { type: 'custom_tool_call', name: 'exec', call_id: 's', input: 'text(1)' } }) + '\n')
+    expect(script.name).toBe('Script')
+    expect(script.calls).toBeUndefined()
   })
 })
 

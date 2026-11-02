@@ -432,6 +432,25 @@ describe('progress runs', () => {
     expect(s.list(WS).find((r) => r.id === sc.id)!.state).toBe('running')
   })
 
+  it("a keep-alive (an empty report: hive-progress's command still writing output, HI-1993) keeps it running, and its deadline", () => {
+    const s = store()
+    const loop = s.start(alfie, { title: 'stress loop' })
+    const timed = s.start(betty, { title: 'timed', estimateMs: 20 * 60_000 })
+    for (let i = 0; i < 15; i++) {
+      now += 60_000
+      s.update(alfie, loop.id, {})
+      s.update(betty, timed.id, {})
+      s.sweep()
+    }
+    expect(s.list(WS).find((r) => r.id === loop.id)).toMatchObject({ state: 'running', staleReason: null })
+    // What is left of an estimate is as it was: a keep-alive moves no deadline.
+    expect(timeLeft(s.list(WS).find((r) => r.id === timed.id)!, now)).toBe(5 * 60_000)
+    // Silent past the limit, it goes stale as before.
+    now += 10 * 60_000 + 1000
+    s.sweep()
+    expect(s.list(WS).find((r) => r.id === loop.id)).toMatchObject({ state: 'stale', staleReason: 'quiet' })
+  })
+
   it('waiting (#549): no time left while it waits, never stale meanwhile; what was left comes back from when it stops waiting', () => {
     const s = store()
     // Waiting from the start, with an estimate: it is held, not counted down.
@@ -872,6 +891,9 @@ describe('progress rules', () => {
     expect(activeFilter(all, { project: 'c:\\ws\\beta', agent: 'x' })).toEqual({ project: 'c:\\ws\\beta' })
     // Every run in one project: nothing to choose between, so no filter.
     expect(activeFilter([a1, a2], { project: 'c:\\ws\\alpha', agent: 'x' })).toBe(SHOW_ALL)
+    // …unless offered anyway (HI-2165: All projects hides a queue): the one project is a choice.
+    expect(activeFilter([], { project: 'c:\\ws\\beta' }, ['C:\\ws\\beta'], true)).toEqual({ project: 'c:\\ws\\beta' })
+    expect(activeFilter([], { project: 'c:\\ws\\beta' }, ['C:\\ws\\beta'])).toBe(SHOW_ALL)
     expect(activeFilter(all, undefined)).toBe(SHOW_ALL)
   })
 
@@ -1121,5 +1143,43 @@ describe('progress history (#352): Recent kept across restarts', () => {
     expect(long).toMatchObject({ provider: null, workspacePath: WS, seenAt: 2, estimateMs: null })
     expect(runs[2]).toMatchObject({ agentId: null, projectPath: null })
     expect(keptRuns({ runs: Array.from({ length: RECENT_KEPT + 50 }, (_, i) => ({ ...good, id: `r${i}` })) }, WS).length).toBe(RECENT_KEPT)
+  })
+})
+
+describe("Hive's set-up runs in review copies (HI-1710)", () => {
+  const hive = (extra: Partial<Extract<ProgressCaller, { source: 'hive' }>> = {}): ProgressCaller => ({ source: 'hive', workspacePath: WS, projectPath: alfie.projectPath, ...extra })
+
+  it("are credited to the agent whose lease held the copy, in that copy, else to one 'Hive (review copies)'", () => {
+    const s = store()
+    const held = s.start(hive({ copy: 'copy-1', reviewer: { agentId: 'r-6', agentName: 'HR6' } }), { title: 'npm ci' })
+    expect(held).toMatchObject({ source: 'hive', agentId: 'r-6', agentName: 'HR6', copy: 'copy-1' })
+    expect(held.defaultName).toBeUndefined()
+    expect(runAgentName(held, tr)).toBe('HR6')
+    expect(runDetailsText(held, 'alpha', now)).toContain('copy-1')
+    const idle = [s.start(hive({ copy: 'copy-1' }), { title: 'npm ci' }), s.start(hive({ copy: 'copy-2' }), { title: 'npm ci' })]
+    expect(idle.map((r) => [r.agentId, r.agentName, r.defaultName, r.copy])).toEqual([[null, 'Hive (review copies)', 'copy', 'copy-1'], [null, 'Hive (review copies)', 'copy', 'copy-2']])
+    expect(idle.map((r) => runAgentName(r, tr))).toEqual(['Hive (review copies)', 'Hive (review copies)'])
+    // A slot's run never takes a reviewer.
+    expect(s.start(hive({ slot: 'slot-b', reviewer: { agentId: 'r-6', agentName: 'HR6' } }), { title: 'npm ci' })).toMatchObject({ agentId: null, agentName: 'Hive (slot slot-b)', defaultName: 'slot' })
+    // The reviewer's run is still Hive's: the agent can't change or end it.
+    const r6: ProgressCaller = { ...alfie, agentId: 'r-6', agentName: 'HR6' }
+    expect(status(() => s.update(r6, held.id, { step: 1 }))).not.toBeNull()
+    expect(status(() => s.update(hive(), held.id, { step: 1 }))).toBeNull()
+  })
+
+  it('keep their reviewer across a save; older "Hive (copy copy-1)" runs fold into "Hive (review copies)"', () => {
+    const ended = { state: 'passed', startedAt: 1, finishedAt: 2, source: 'hive', projectPath: alfie.projectPath }
+    const records = [
+      { ...ended, id: 'c1', title: 'npm ci', copy: 'copy-1', agentId: 'r-6', agentName: 'HR6' },
+      { ...ended, id: 'c2', title: 'npm ci', copy: 'copy-1', agentName: 'Hive (copy copy-1)', defaultName: 'copy' },
+      // An id on a run of the pool's (an edited file) doesn't make it an agent's.
+      { ...ended, id: 'c3', title: 'npm ci', copy: 'copy-2', agentId: 'r-6', agentName: 'Hive (review copies)', defaultName: 'copy' },
+      { ...ended, id: 'c4', title: 'npm ci', slot: 'slot-b', agentId: 'r-6', agentName: 'HR6' }
+    ]
+    const marks = (runs: ProgressRun[]): unknown[][] => runs.map((r) => [r.id, r.agentId, r.agentName, r.defaultName ?? null])
+    const want = [['c1', 'r-6', 'HR6', null], ['c2', null, 'Hive (review copies)', 'copy'], ['c3', null, 'Hive (review copies)', 'copy'], ['c4', null, 'Hive (slot slot-b)', 'slot']]
+    const once = keptRuns({ runs: records }, WS)
+    expect(marks(once)).toEqual(want)
+    expect(marks(keptRuns(JSON.parse(JSON.stringify({ runs: once })), WS))).toEqual(want)
   })
 })

@@ -39,6 +39,11 @@ const thisRun = () => {
   const at = text.lastIndexOf('] Hive ')
   return at < 0 ? '' : text.slice(text.lastIndexOf('\n', at) + 1)
 }
+/**
+ * This run's warnings and errors: why a start didn't reopen its workspace, say (HI-2179: an open that failed showed
+ * only later, as a workspace with no Assistant).
+ */
+const why = () => thisRun().split('\n').filter((l) => /\[(WARN|ERROR)\]/.test(l)).slice(0, 12).join('\n')
 const pad = (n) => String(n).padStart(2, '0')
 /** The time as the notice shows it (24-hour, the default), in this machine's time zone. */
 const shownTime = (iso) => {
@@ -113,7 +118,7 @@ const liveAgent = async (inv, agentId) => (await inv('session:live')).find((l) =
       check('the agent runs, in a conversation', !!sessionId)
       check('…and the marker lists it, in its project and conversation', !!(await lib.until(() => marker()?.agents?.some((a) => a.agentId === agent.id && a.project === 'alpha' && a.sessionId === sessionId), HUNG_MS)), JSON.stringify(marker()?.agents))
       // The window's workspace is remembered as it opens (config.json), so the next start opens it again.
-      await lib.until(() => JSON.parse(fs.readFileSync(cfgFile, 'utf8')).windows?.some((w) => w.workspace?.toLowerCase() === ws.toLowerCase()), HUNG_MS)
+      check('…and the window remembers its workspace, to reopen it', !!(await lib.until(() => JSON.parse(fs.readFileSync(cfgFile, 'utf8')).windows?.some((w) => w.workspace?.toLowerCase() === ws.toLowerCase()), HUNG_MS)))
       check('the copy is ended from outside', await endFromOutside(app))
       current = null
     }
@@ -132,7 +137,7 @@ const liveAgent = async (inv, agentId) => (await inv('session:live')).find((l) =
       fs.rmSync(release, { force: true })
       current = await start({ HIVE_TEST_HOLD_MERGE_RECOVERY: release })
       const { page, inv } = current
-      check('with the recovery held, the notice waits for it (the window is up)', !!(await lib.until(() => /The notice waits for \d+ startup step/.test(thisRun()) && /Merge slot recovery held/.test(thisRun()), HUNG_MS)))
+      check('with the recovery held, the notice waits for it (the window is up)', !!(await lib.until(() => /The notice waits for \d+ startup step/.test(thisRun()) && /Merge slot recovery held/.test(thisRun()), HUNG_MS)), why())
       check('…and is not shown meanwhile',(await notice(page)) === '')
       fs.writeFileSync(release, '')
       const text = await lib.until(() => notice(page), HUNG_MS)
@@ -142,7 +147,7 @@ const liveAgent = async (inv, agentId) => (await inv('session:live')).find((l) =
       check('…and the merge left half done, with the folder it was in', text.includes(`Steady was merging main (#7): check ${proj} for a merge left half done (git status there)`), text)
       await page.screenshot({ path: path.join(lib.WORK, 'unexpectedclose-notice.png') })
       check('…told in that notice, not one of its own', (await page.evaluate(() => [...document.querySelectorAll('.toast')].filter((t) => t.innerText.includes('was merging when Hive closed')).length)) === 0)
-      const home = (await inv('workspace:refresh')).assistant?.path
+      const home = (await inv('workspace:refresh'))?.assistant?.path
       const told = () => {
         try {
           return require('./storeDocs.cjs').deliveriesOf(home).find((r) => r.agentId === 'assistant' && r.from?.kind === 'hive' && /Hive closed unexpectedly: last seen/.test(r.body))
@@ -190,7 +195,7 @@ const liveAgent = async (inv, agentId) => (await inv('session:live')).find((l) =
       current = await start()
       const { page, inv } = current
       const text = await lib.until(() => notice(page), START_MS)
-      check('with the setting on, the notice says the agent was resumed', /One agent was running in alpha\. One was resumed, as Settings → Sessions says\./.test(text), text)
+      check('with the setting on, the notice says the agent was resumed', /One agent was running in alpha\. One was resumed, as Settings → Sessions says\./.test(text), `${text}\n${why()}`)
       check('…without Resume All', !/Resume All/.test(text), text)
       check('…and the agent runs, in its conversation', !!(await lib.until(async () => (await liveAgent(inv, agent.id))?.sessionId === sessionId, START_MS)))
       await page.screenshot({ path: path.join(lib.WORK, 'unexpectedclose-resumed.png') })

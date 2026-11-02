@@ -1,4 +1,5 @@
 import { EFFORT_TEXT, OLDER_VERSIONS } from './claude'
+import { withCliOwn } from './cliOwnMode'
 import { msg } from './i18n/msg'
 import type { ModeOption, ModelGroup, ProviderDescriptor } from './providers'
 
@@ -58,7 +59,9 @@ export const CODEX_MODE_FLAGS: Record<string, string[]> = {
   ask: ['-s', 'workspace-write', '-a', 'on-request'],
   // It brings its own workspace-write sandbox; Codex refuses --sandbox alongside it.
   'approve-for-me': ['--approve-for-me'],
-  'full-access': ['-s', 'danger-full-access', '-a', 'never']
+  'full-access': ['-s', 'danger-full-access', '-a', 'never'],
+  // The CLI's own setting (#1284): no sandbox or approval flag, so Codex's own config decides.
+  'cli-own': []
 }
 
 /** "gpt-6-luna" → "GPT-6 Luna", "gpt-5.6-terra" → "GPT-5.6 Terra"; anything else as it is. */
@@ -95,7 +98,7 @@ export const CODEX_DESCRIPTOR: ProviderDescriptor = {
   icon: 'codex',
   setupUrl: 'https://developers.openai.com/codex/cli',
   pricingUrl: 'https://openai.com/api/pricing/',
-  permissionModes: CODEX_PERMISSION_MODES,
+  permissionModes: withCliOwn(CODEX_PERMISSION_MODES),
   defaultPermissionMode: 'approve-for-me',
   assistantMode: 'approve-for-me',
   effortLevels: [
@@ -130,7 +133,22 @@ export const CODEX_DESCRIPTOR: ProviderDescriptor = {
     // Its paste-burst detection drops an Enter that a busy Codex reads with the line, bracketed or not; Enter once the line
     // is drawn sends it (#600, checked with 0.163). disable_paste_burst would too, but loses a user's multi-line paste.
     bracketedPaste: false,
-    enterOnceDrawn: true
+    enterOnceDrawn: true,
+    // Its editor's insert_newline keys (0.164.0's default keymap: ctrl+j, ctrl+m, enter, shift+enter, alt+enter; plain
+    // Enter sends): Alt+Enter and Ctrl+J, as Windows' console delivers them (HI-1327). Off until tried on real Codex.
+    typedNewlines: ['alt-enter', 'ctrl-j'],
+    // --add-dir, added to the writable roots of its own config (0.163.0: tests/fixtures/advanced/writable-roots-codex-0.163.0.json).
+    extraDirs: true,
+    // Each connection a CODEX_HOME of its own (HI-1757), its rollouts shared with the others through sessions\ and
+    // archived_sessions\ (resume reads the rollout alone); its memory, thread names and prompt history stay its own.
+    // Its sign-in names an email and plan, no organisation.
+    connections: {
+      homeEnv: 'CODEX_HOME',
+      shared: ['sessions', 'archived_sessions'],
+      userHome: '.codex',
+      orgs: false,
+      setUp: msg({ id: 'providers.codex.connections.setUp', defaultMessage: "Set Up runs Codex on this connection so you can choose its Windows sandbox, which its commands run in, and trust this workspace's folders. Answer in the terminal; Windows may ask for Administrator permission.", description: "Settings → Accounts & Connections, above a Codex connection's Set Up terminal and on one that still needs it: what Set Up is for. Set Up names a button." })
+    }
   },
   // Ctrl+T opens Codex's transcript view; Ctrl+G its external editor.
   reservedKeys: ['MOD+T', 'MOD+G'],
@@ -139,12 +157,12 @@ export const CODEX_DESCRIPTOR: ProviderDescriptor = {
     'The installer runs `irm https://chatgpt.com/codex/install.ps1 | iex` in PowerShell and installs to `%LOCALAPPDATA%\\Programs\\OpenAI\\Codex`. After installing, sign in with your ChatGPT account (Plus, Pro, Business or Enterprise) or an API key, then set up its Windows sandbox once. If the CLI is installed somewhere else, set its path in Settings → Codex.', // i18n-ignore: English, as main's notices use it (text has the window's)
   extensionNote:
     "You have the Codex extension for VS Code (or a similar editor). Hive doesn't use it — the extension's built-in copy moves with every extension update. Install the CLI; your extension keeps working as before.", // i18n-ignore: English, as main's notices use it (text has the window's)
-  signInHelp: 'Sign in again in Help → Agent Setup → Codex → Sign in (or run codex login in a terminal).', // i18n-ignore: English for main's notices (text has the window's)
+  signInHelp: 'Sign in again in Help → Provider Setup → Codex → Sign in (or run codex login in a terminal).', // i18n-ignore: English for main's notices (text has the window's)
   safeguardHelp: 'Codex sends a request it flags to another model, or stops the turn. For security work, OpenAI’s Trusted Access for Cyber program lifts that.', // i18n-ignore: English, the same as its message (text has it: a card comment stores the message, #866)
   text: {
-    installNote: msg({ id: 'agents.codex.installNote', defaultMessage: 'The installer runs `irm https://chatgpt.com/codex/install.ps1 | iex` in PowerShell and installs to `%LOCALAPPDATA%\\Programs\\OpenAI\\Codex`. After installing, sign in with your ChatGPT account (Plus, Pro, Business or Enterprise) or an API key, then set up its Windows sandbox once. If the CLI is installed somewhere else, set its path in Settings → Codex.', description: "Agent Setup → Codex: how its installer works. Keep the command and the path in backticks exactly as they are, and the plan names (Plus, Pro, Business, Enterprise); Settings → Codex is a place in Hive's settings." }),
-    extensionNote: msg({ id: 'agents.codex.extensionNote', defaultMessage: "You have the Codex extension for VS Code (or a similar editor). Hive doesn't use it — the extension's built-in copy moves with every extension update. Install the CLI; your extension keeps working as before.", description: 'Agent Setup → Codex, when only an editor extension was found: why Hive needs the standalone CLI.' }),
-    signInHelp: msg({ id: 'agents.codex.signInHelp', defaultMessage: 'Sign in again in Help → Agent Setup → Codex → Sign in (or run codex login in a terminal).', description: "How to sign in to Codex again after its sign-in expired (an agent's pane, a notification). Help → Agent Setup → Codex → Sign in is a menu path in Hive; codex login is a command: keep it." }),
+    installNote: msg({ id: 'agents.codex.installNote', defaultMessage: 'The installer runs `irm https://chatgpt.com/codex/install.ps1 | iex` in PowerShell and installs to `%LOCALAPPDATA%\\Programs\\OpenAI\\Codex`. After installing, sign in with your ChatGPT account (Plus, Pro, Business or Enterprise) or an API key, then set up its Windows sandbox once. If the CLI is installed somewhere else, set its path in Settings → Codex.', description: "Provider Setup → Codex: how its installer works. Keep the command and the path in backticks exactly as they are, and the plan names (Plus, Pro, Business, Enterprise); Settings → Codex is a place in Hive's settings." }),
+    extensionNote: msg({ id: 'agents.codex.extensionNote', defaultMessage: "You have the Codex extension for VS Code (or a similar editor). Hive doesn't use it — the extension's built-in copy moves with every extension update. Install the CLI; your extension keeps working as before.", description: 'Provider Setup → Codex, when only an editor extension was found: why Hive needs the standalone CLI.' }),
+    signInHelp: msg({ id: 'agents.codex.signInHelp', defaultMessage: 'Sign in again in Help → Provider Setup → Codex → Sign in (or run codex login in a terminal).', description: "How to sign in to Codex again after its sign-in expired (an agent's pane, a notification). Help → Provider Setup → Codex → Sign in is a menu path in Hive; codex login is a command: keep it." }),
     safeguardHelp: msg({ id: 'agents.codex.safeguardHelp', defaultMessage: 'Codex sends a request it flags to another model, or stops the turn. For security work, OpenAI’s Trusted Access for Cyber program lifts that.', description: "What happens after Codex's safety check flags a request (an agent's safeguard note). Trusted Access for Cyber is the name of OpenAI's program: keep it." }),
     modelPlaceholder: msg({ id: 'agents.codex.modelPlaceholder', defaultMessage: 'Model ID, e.g. gpt-6-sol', description: 'Placeholder of the custom model ID box (Codex). Keep the model ID exactly as it is.' })
   },

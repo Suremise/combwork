@@ -45,9 +45,11 @@ const check = (name, ok, extra = '') => {
   cfg.settings.general = { ...cfg.settings.general, confirmOnQuit: 'never' }
   cfg.settings.notifications = { ...cfg.settings.notifications, desktopNotifications: false }
   fs.writeFileSync(cfgFile, JSON.stringify(cfg, null, 2))
+  // HI-1973: the developer console with its text, so the error hooks of a rate-limited turn can be kept as Copilot sent them.
+  fs.writeFileSync(path.join(userData, 'advanced.json'), JSON.stringify({ format: 1, values: { 'hive.showDeveloperFeatures': true, 'hive.console.showText': true } }))
 
   const api = await startFakeCopilotApi({ log: apiLog })
-  const env = lib.hiveEnv({ HIVE_USER_DATA: userData, HIVE_API_PORT: lib.port(47823), ...copilotTestEnv(api, copilotDir) })
+  const env = lib.hiveEnv({ HIVE_USER_DATA: userData, HIVE_API_PORT: lib.port(47823), ...copilotTestEnv(api, copilotDir, { above: lib.WORK }) })
   // Path-only access to each sibling, as Copilot saves it in its (test) home when a path is allowed: never write access.
   const locations = Object.fromEntries([[proj, sibling], [proj2, sibling2]].map(([p, s]) => [p, { allowed_directories: [s], tool_approvals: [] }]))
   fs.writeFileSync(path.join(copilotHome, 'permissions-config.json'), JSON.stringify({ locations }, null, 2))
@@ -62,7 +64,7 @@ const check = (name, ok, extra = '') => {
     check('Copilot found', !!info?.found, JSON.stringify(info && { found: info.found, path: info.path }))
     console.log(`Copilot CLI ${info?.version ?? '?'} (${info?.source ?? '?'}), offline against the stand-in at ${api.url}`)
     await lib.openWorkspace(inv, page, ws)
-    const a = await inv('agents:add', proj, { name: 'Cop A', provider: 'copilot', location: 'project', permissionMode: 'ask' })
+    const a = await lib.addAgent(inv, proj, { name: 'Cop A', provider: 'copilot', location: 'project', permissionMode: 'ask' })
     const b = await inv('agents:add', proj, { name: 'Cop B', provider: 'copilot', location: 'project' })
     check('agents added with provider copilot', a.provider === 'copilot' && b.provider === 'copilot')
     const live = async (id) => (await inv('session:live')).find((l) => l.agentId === id)
@@ -248,19 +250,20 @@ const check = (name, ok, extra = '') => {
     check('p.txt not edited again', !fs.readFileSync(path.join(proj2, 'p.txt'), 'utf8').includes('again'))
 
     // Copilot's danger opt-in unlocks Autopilot alone (#490: entering Autopilot approves everything for the session);
-    // Allow all needs no opt-in. Turning the opt-in off moves projects and agents in Autopilot back to Inherit, and
-    // leaves Allow all where it is (#461, #490).
-    const cfg2 = () => JSON.parse(fs.readFileSync(path.join(proj2, '.hive', 'project.json'), 'utf8'))
-    const modes2 = () => { const c2 = cfg2(); return { project: c2.providers?.copilot?.permissionMode ?? 'inherit', agent: (c2.agents ?? []).find((x) => x.id === c.id)?.permissionMode ?? 'inherit' } }
+    // Allow all needs no opt-in. Since HI-2106 a mode is its agent's connection's; turned off, the opt-in changes no
+    // connection: one in Autopilot launches in Copilot's default meanwhile.
+    const modeOfC = () => {
+      const saved = JSON.parse(fs.readFileSync(path.join(userData, 'config.json'), 'utf8'))
+      const conn = JSON.parse(fs.readFileSync(path.join(proj2, '.hive', 'project.json'), 'utf8')).agents?.find((x) => x.id === c.id)?.connection
+      return saved.connections?.find((x) => x.id === conn)?.permissionMode ?? 'default'
+    }
     await inv('settings:update', { providers: { copilot: { enableDangerousMode: true } } })
-    await inv('project:updateProvider', proj2, 'copilot', { permissionMode: 'autopilot' })
-    await inv('agents:update', proj2, c.id, { permissionMode: 'allow-all' })
-    check('paren(1) in Autopilot and C in Allow all, once allowed', JSON.stringify(modes2()) === JSON.stringify({ project: 'autopilot', agent: 'allow-all' }), JSON.stringify(modes2()))
+    await lib.setProjectLaunch(inv, proj2, 'copilot', { permissionMode: 'autopilot' })
+    check("paren(1)'s Autopilot, once allowed, is C's connection's", modeOfC() === 'autopilot', modeOfC())
+    await lib.setLaunch(inv, proj2, c.id, { permissionMode: 'allow-all' })
+    check('…then C in Allow all', modeOfC() === 'allow-all', modeOfC())
     await inv('settings:update', { providers: { copilot: { enableDangerousMode: false } } })
-    const reverted = await lib.until(() => modes2().project === 'inherit', 15000, 300)
-    check('turning the opt-in off moves Autopilot back to Inherit', !!reverted, JSON.stringify(modes2()))
-    check('…and says so', !!(await lib.until(async () => (await page.getByText('Autopilot turned off').count()) > 0, 10000, 300)))
-    check('…and leaves C in Allow all, which needs no opt-in', modes2().agent === 'allow-all', JSON.stringify(modes2()))
+    check('turning the opt-in off leaves C in Allow all, which needs no opt-in', modeOfC() === 'allow-all', modeOfC())
     // With the opt-in off, A's mode menu offers Allow all and not Autopilot, and main allows the one and refuses the other.
     await page.locator('.mode-badge', { hasText: 'Ask' }).first().click()
     const menuText = await lib.until(async () => { const t = await page.locator('.menu .menu-item').allInnerTexts(); return t.length ? t.join(' | ') : null }, 5000, 200)
@@ -303,8 +306,9 @@ const check = (name, ok, extra = '') => {
     check('the command never ran', !fs.existsSync(path.join(proj, 'made-by-copilot.txt')))
 
     // Esc on the prompt for a file outside its folder (a read asks for the path, "Path permission needed"; in Ask a
-    // write asks to write it): Copilot records the refusal and ends the turn with neither a hook nor an abort, and Hive
-    // reads the end from its events (#475).
+    // write asks to write it): Copilot records the refusal and ends the turn with no Stop hook, and Hive reads the end
+    // from its events (#475). Up to 1.0.98 nothing followed the turn's end; from 1.0.104 an abort (user_initiated) does,
+    // which Hive reads as the user's interrupt (HI-1945): either way the agent is ready.
     const aEvents = path.join(copilotHome, 'session-state', sa.sessionId, 'events.jsonl')
     const aLog = () => fs.readFileSync(aEvents, 'utf8').split('\n').flatMap((l) => { try { return [JSON.parse(l)] } catch { return [] } })
     const refused = (e) => e.type === 'permission.completed' && e.data?.result?.kind === 'denied-interactively-by-user'
@@ -320,7 +324,10 @@ const check = (name, ok, extra = '') => {
         const at = evs.map((e, k) => (refused(e) ? k : -1)).filter((k) => k >= 0)[before] ?? -1
         return at >= 0 && evs.slice(at).some((e) => e.type === 'assistant.turn_end') ? evs.slice(at) : null
       }, 20000, 300)
-      check(`A: Copilot records the refusal of ${what} and the turn's end, with no abort or Stop`, !!after && !after.some((e) => e.type === 'abort' || (e.type === 'hook.start' && e.data?.hookType === 'agentStop')), JSON.stringify(after?.map((e) => e.type)))
+      // An abort, if any, only after the turn's end, and the user's.
+      const aborts = (after ?? []).flatMap((e, k) => (e.type === 'abort' ? [{ e, k }] : []))
+      const endAt = (after ?? []).findIndex((e) => e.type === 'assistant.turn_end')
+      check(`A: Copilot records the refusal of ${what} and the turn's end, with no Stop (an abort only after it)`, !!after && !after.some((e) => e.type === 'hook.start' && e.data?.hookType === 'agentStop') && aborts.every(({ e, k }) => k > endAt && e.data?.reason === 'user_initiated'), JSON.stringify(after?.map((e) => e.type)))
       check(`A: refusing ${what} with Esc leaves it ready, not waiting`, !!(await reach(a.id, ['ready'], 20000)), await status(a.id))
     }
     const outside = path.join(ws, 'outside-a.txt')
@@ -370,6 +377,29 @@ const check = (name, ok, extra = '') => {
     const projFiles = fs.readdirSync(proj, { recursive: true }).map(String).filter((f) => !f.startsWith('.git' + path.sep) && f !== '.git')
     check('no hooks.json or MCP config in the project', !projFiles.some((f) => /hooks\.json|mcp\.json/i.test(f)), projFiles.filter((f) => /json/i.test(f)).join(', '))
     check('no requests went anywhere but the stand-in (offline), and some did', api.requests > 0)
+
+    // HI-1973: its model refusing every request with a 429 (the stand-in's "ratelimited"). Copilot tries again (an error
+    // hook each try, recoverable): its pane says it is rate-limited and which try, not Working…; then it gives up with a
+    // rate_limit session error, which ends its turn failed with its words. The hooks are kept as Copilot sent them.
+    const sources = await lib.until(async () => { const l = await inv('console:sources'); return l.some((x) => x.agentId === a.id) ? l : null }, 20000, 300)
+    const source = sources?.find((x) => x.agentId === a.id)?.id
+    if (source) await inv('console:subscribe', [source])
+    const seqBefore = source ? Math.max(0, ...(await inv('console:snapshot', source, 0)).map((e) => e.seq)) : 0
+    check('A: a rate-limited prompt makes it working', (await send(a.id, 'ratelimited', ['working'])) > 0, await status(a.id))
+    const aHeader = page.locator('.pane-header-bar', { hasText: 'Cop A' })
+    const retryText = () => aHeader.locator('.pane-status.retrying').innerText().catch(() => '')
+    const retrying = await lib.until(async () => { const l = await live(a.id); return l?.retryWait?.status === 429 ? l : null }, 30000, 150)
+    check("A: Copilot's tries are its wait to retry, rate-limited (429), with no retry time or total it doesn't say", !!retrying && retrying.retryWait.retryAt === null && retrying.retryWait.max === null && retrying.status === 'working', JSON.stringify(retrying?.retryWait))
+    const shownRetry = await lib.until(async () => /^Rate-limited \(429\) · retrying… \(try \d+\)$/.test((await retryText()).trim()), 30000, 150)
+    check('A: its pane says it is rate-limited and which try, not Working…', !!shownRetry, await retryText())
+    await page.screenshot({ path: path.join(lib.WORK, 'copilot-4-ratelimited.png') })
+    const gaveUp = await lib.until(async () => { const l = await live(a.id); return l?.status === 'finished' && l.failedTurn ? l : null }, 60000, 300)
+    check("A: once Copilot gives up (rate_limit, 429), its turn ends failed with its words, the wait gone", !!gaveUp && /429/.test(gaveUp.failedTurn.message) && !gaveUp.retryWait, JSON.stringify(gaveUp && { failedTurn: gaveUp.failedTurn, retryWait: gaveUp.retryWait }))
+    if (source) {
+      const hooks = (await inv('console:snapshot', source, seqBefore)).filter((e) => e.kind === 'hook' && e.name === 'ErrorOccurred').map((e) => e.raw)
+      fs.writeFileSync(path.join(lib.WORK, 'copilot-ratelimit-hooks.json'), JSON.stringify(hooks, null, 2))
+      check('A: its error hooks, recoverable, kept for the record', hooks.length > 0 && hooks.every((h) => h?.recoverable === true), `${hooks.length} hook(s)`)
+    }
 
     // B stopped from Hive in the middle of a turn: the turn is cancelled and Copilot still exits by itself, with its totals.
     await send(b.id, 'work 20 then say Never said.', ['working'])

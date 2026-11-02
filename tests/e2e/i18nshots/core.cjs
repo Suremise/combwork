@@ -33,12 +33,12 @@ async function banner(ctx) {
   const typed = []
   for (const p of prompts) typed.push(await p.type('hello'))
   for (const [i, p] of prompts.entries()) if (!(await p.over(typed[i]))) throw new Error(`${agents[i].name}'s turn did not end`)
-  return shown(ctx, ctx.page.locator('.notice-banners').filter({ has: ctx.page.locator('.notice-banner') }).first(), 'a banner')
+  return shown(ctx, ctx.page.locator('.popups').filter({ has: ctx.page.locator('.popup.kind-finished') }).first(), 'a pop-up')
 }
 
 async function closeBanner(ctx) {
   const { page, lib, inv, agents, project } = ctx
-  const close = page.locator('.notice-banners .notice-close')
+  const close = page.locator('.popups .popup-close')
   if (!(await lib.until(async () => (await close.count()) === 0 || (await close.first().click({ timeout: 2000 }).then(() => false, () => false)), ctx.hungMs))) throw new Error("the banners didn't close")
   await ctx.setFocus(false)
   for (const a of agents) await inv('session:stop', project, a.id)
@@ -83,15 +83,18 @@ async function openCards(ctx) {
   await ctx.command('project.tab.session')
   await lib.showAgent(page, 'Four')
   await shown(ctx, lib.paneHeader(page, 'Four').locator(`[data-task="${cards[0].number}"]`).first(), "Four's card on its pane header")
+  // The agents are listed in Project Settings' Agents section (its people icon), not the section it opens on.
   await ctx.command('project.tab.settings')
+  await (await shown(ctx, page.locator('.settings-nav .row', { has: page.locator('.codicon-organization') }), 'the Agents section')).first().click()
   const remove = await shown(ctx, page.locator(`[data-agent="${four.id}"] [data-action="remove-agent"]`).first(), "Four's remove button")
   await remove.click()
   // First "Remove Four?": its action button is the solid (or danger, or primary) one, whatever its words.
   const confirm = await shown(ctx, page.locator('.dialog').last().locator('button.solid, button.danger, button.primary').last(), 'the remove dialog')
   await confirm.click()
-  // Then the open cards, listed by number.
+  // Then the open cards, listed by their label: the project's key where it has one ("AL-1"), else the number (#1318).
+  const label = cards[0].key || `#${cards[0].number}`
   const ask = page.locator('.dialog').last()
-  if (!(await lib.until(async () => (await ask.innerText().catch(() => '')).includes(`#${cards[0].number}`), ctx.hungMs))) throw new Error(`the open-cards dialog did not show (dialogs: ${JSON.stringify(await page.locator('.dialog').count())})`)
+  if (!(await lib.until(async () => (await ask.innerText().catch(() => '')).includes(label), ctx.hungMs))) throw new Error(`the open-cards dialog did not show ${label} (dialogs: ${await page.locator('.dialog').count()}; the last says: ${JSON.stringify((await ask.innerText().catch(() => '')).slice(0, 160))})`)
   return ask
 }
 

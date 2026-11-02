@@ -64,7 +64,7 @@ describe('the largest supported catalog', () => {
       const cold = await measure(`${entries} skills, cold`, () => scan(w, modePaths))
       expect(cold.files).toBeGreaterThanOrEqual(entries)
       expect(nothing(await measure(`${entries} skills, warm`, () => scan(w, modePaths)))).toEqual({ files: 0, bytes: 0, metaBytes: 0 })
-      expect(nothing(await measure(`${entries} skills, warm again`, () => scan(w, modePaths)))).toEqual({ files: 0, bytes: 0, metaBytes: 0 })
+      // Ten at once are two scans in turn (coalesced: the first, then one shared by the rest), each after a warm one (#1394).
       expect(nothing(await measure(`${entries} skills, 10 at once`, () => Promise.all(Array.from({ length: 10 }, () => scan(w, modePaths)))))).toEqual({ files: 0, bytes: 0, metaBytes: 0 })
       await disposeWorkspaceService(w)
     }, 180_000)

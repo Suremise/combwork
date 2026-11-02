@@ -2,7 +2,8 @@
 // but the allowlist. With the variables an agent's shell or an outer hive-progress sets put into this suite's own
 // environment (NO_COLOR, HIVE_PROGRESS_WRAPPED, an Agent API token…), checked: under the runner, the suite itself got
 // nothing else; a test Hive's main process (whose environment its agents' shells get), a child that is part of Hive,
-// and the hive-progress wrapper (#202: it reports, not taking itself for nested) see none of them; and a test Hive
+// and the hive-progress wrapper (#202: it reports, not taking itself for nested) see none of them; a test Hive's git
+// reads the suite's global config, with the test identity (#1466); and a test Hive
 // started with any environment but lib.hiveEnv's is refused.
 const lib = require('./lib.cjs')
 const ctx = require('./runContext.cjs')
@@ -36,6 +37,7 @@ const LEAKS = {
   CLAUDE_CONFIG_DIR: 'C:\\leaked\\claude',
   COPILOT_HOME: 'C:\\leaked\\copilot',
   GH_CONFIG_DIR: 'C:\\leaked\\gh',
+  GIT_CONFIG_GLOBAL: 'C:\\leaked\\gitconfig',
   ANTHROPIC_API_KEY: 'leaked-key',
   NODE_OPTIONS: '--max-old-space-size=4096',
   PROMPT: 'leaked$G',
@@ -63,7 +65,7 @@ const leaked = (env) => Object.entries(env).filter(([k, v]) => LEAKS[k.toUpperCa
     check("a test Hive gets none of the suite's environment", !leaked(env).length, leaked(env).join(', '))
     // CHROME_CRASHPAD_PIPE_NAME: Hive's own crash handler, which Electron sets in main for its processes (#985); what Hive
     // starts doesn't get it (ptyHost's childEnv).
-    const allowed = new Set(upper([...ctx.ALLOW, 'HIVE_USER_DATA', 'HIVE_TEST_QUIET', 'HIVE_TEST_TIPS', 'HIVE_LANG', 'HIVE_TEST_TRASH_DIR', ...Object.keys(ctx.cliHomes()), 'HIVE_API_PORT', ...ctx.CARRIED, 'CHROME_CRASHPAD_PIPE_NAME']))
+    const allowed = new Set(upper([...ctx.ALLOW, 'HIVE_USER_DATA', 'HIVE_TEST_QUIET', 'HIVE_TEST_TIPS', 'HIVE_TEST_CLI_HOME_CONNECTION', 'HIVE_LANG', 'HIVE_TEST_TRASH_DIR', ...Object.keys(ctx.cliHomes()), 'GIT_CONFIG_GLOBAL', 'GIT_CONFIG_NOSYSTEM', 'HIVE_API_PORT', ...ctx.CARRIED, 'CHROME_CRASHPAD_PIPE_NAME']))
     // PROMPT: cmd.exe's default ($P$G), which Playwright's start of Electron on Windows sets; not the suite's.
     const extra = upper(Object.keys(env)).filter((k) => !allowed.has(k) && !(k === 'PROMPT' && env[Object.keys(env).find((x) => x.toUpperCase() === 'PROMPT')] === '$P$G'))
     check('…only the allowlist and its run context', !extra.length, extra.join(', '))
@@ -72,6 +74,15 @@ const leaked = (env) => Object.entries(env).filter(([k, v]) => LEAKS[k.toUpperCa
     const homes = ctx.cliHomes()
     const given = Object.fromEntries(Object.keys(homes).map((k) => [k, env[k]]))
     check("…and the CLI homes (Claude Code's, Codex's, Copilot's, the GitHub CLI's config), empty folders of the suite's, not the user's (#382, #452)", Object.entries(homes).every(([k, v]) => env[k] === v && !ctx.isUserCliHome(env[k])), JSON.stringify(given))
+    // Its git (#1466): the suite's global config, with the test identity and line endings, never the user's ~/.gitconfig,
+    // and no system config: all its git reads is that file (`git config --list --show-scope`: global alone).
+    const globalGit = await app.evaluate(() => {
+      const { execFileSync } = process.mainModule.require('child_process')
+      // In its profile, outside any repository, so no repository's config is listed.
+      const read = (...a) => execFileSync('git', ['config', ...a], { cwd: process.env.HIVE_USER_DATA, encoding: 'utf8' }).trim()
+      return { name: read('--global', 'user.name'), email: read('--global', 'user.email'), autocrlf: read('core.autocrlf'), scopes: [...new Set(read('--list', '--show-scope').split(/\r?\n/).map((l) => l.split('\t')[0]))] }
+    })
+    check("…and its git's config, the suite's with the test identity and autocrlf false, no system or user config (#1466)", env.GIT_CONFIG_GLOBAL === ctx.gitConfig() && env.GIT_CONFIG_NOSYSTEM === '1' && globalGit.autocrlf === 'false' && globalGit.scopes.join() === 'global' && globalGit.email === ctx.TEST_GIT_IDENTITY.email && globalGit.name === ctx.TEST_GIT_IDENTITY.name, JSON.stringify({ GIT_CONFIG_GLOBAL: env.GIT_CONFIG_GLOBAL, ...globalGit }))
   } finally {
     await app.close().catch(() => undefined)
   }
@@ -111,7 +122,7 @@ const leaked = (env) => Object.entries(env).filter(([k, v]) => LEAKS[k.toUpperCa
   })
   await new Promise((r) => srv.listen(0, '127.0.0.1', r))
   const wrapped = await new Promise((resolve) => {
-    const env = lib.childEnv({ ELECTRON_RUN_AS_NODE: '1', HIVE_PROGRESS_DATA: data, HIVE_API_URL: `http://127.0.0.1:${srv.address().port}`, HIVE_API_TOKEN: 'agent-token' })
+    const env = lib.childEnv({ ELECTRON_RUN_AS_NODE: '1', HIVE_PROGRESS_DATA: data, HIVE_API_URL: `http://127.0.0.1:${srv.address().port}`, HIVE_API_TOKEN_FILE: lib.tokenFile('agent-token') })
     const p = spawn(lib.ELECTRON, [path.join(lib.ROOT, 'out', 'main', 'hive-progress.js'), '--', 'node', '-e', "console.log('##hive-progress step=1 total=1 name=one')"], { env, cwd: lib.WORK })
     let out = ''
     p.stdout.on('data', (d) => (out += d))

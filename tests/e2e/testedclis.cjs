@@ -1,4 +1,4 @@
-// Tested CLI versions (#365): Agent Setup shows the version this Hive release was tested with next to the installed one,
+// Tested CLI versions (#365): Provider Setup shows the version this Hive release was tested with next to the installed one,
 // with a tick when they match and a calm note when the installed one is newer or older; nothing when the release names
 // none; Copy Diagnostics and provider:info carry it. The fake Claude Code (it reports 2.1.999) against a manifest of the
 // suite's own (HIVE_TEST_TESTED_CLIS, unpackaged builds only), rewritten between checks and read again on Check again.
@@ -52,14 +52,14 @@ const testedWith = (version) => fs.writeFileSync(manifest, JSON.stringify(versio
     await theme('dark')
   }
 
-  // --- Agent Setup, through the command palette.
+  // --- Provider Setup, through the command palette.
   await page.keyboard.press('Control+Shift+P')
   await lib.sleep(300)
-  await page.keyboard.type('Agent Setup')
+  await page.keyboard.type('Provider Setup')
   await lib.sleep(300)
   await page.keyboard.press('Enter')
-  const setup = page.locator('.dialog', { hasText: 'Agent Setup' })
-  check('Agent Setup opens', !!(await lib.until(async () => (await setup.count()) === 1, 10000)))
+  const setup = page.locator('.dialog', { hasText: 'Provider Setup' })
+  check('Provider Setup opens', !!(await lib.until(async () => (await setup.count()) === 1, 10000)))
   const line = setup.locator('.setup-tested')
   const shows = async (kind) => !!(await lib.until(async () => (await setup.locator(`.setup-tested[data-tested="${kind}"]`).count()) === 1, 10000))
   check('the same version: "Tested with 2.1.999 · installed 2.1.999" and a tick', (await shows('same')) && (await line.innerText()).trim() === 'Tested with 2.1.999 · installed 2.1.999' && (await line.locator('.setup-tested-ok').count()) === 1, await line.innerText().catch(() => ''))

@@ -61,6 +61,20 @@ export function suggestAgentName(name: string, project: string, taken: readonly 
   }
 }
 
+/**
+ * A free name for a template's agent in a project (#1440): another project's key in it swapped for this one's (AM-B1 in
+ * a project keyed AP: AP-B1), else `suggestAgentName`'s. `taken`: every name it mustn't be (the workspace's agents and
+ * the names already chosen for the template's others).
+ */
+export function suggestTemplateAgentName(name: string, project: string, projectKey: string | null | undefined, taken: readonly string[]): string {
+  const m = /^([A-Za-z]{2,4})-(.+)$/.exec(name.trim())
+  if (projectKey && m && m[1].toUpperCase() !== projectKey.toUpperCase()) {
+    const swapped = `${projectKey.toUpperCase()}-${m[2]}`
+    if (!taken.some((t) => sameAgentName(t, swapped))) return swapped
+  }
+  return suggestAgentName(name, project, taken)
+}
+
 /** "There is already an agent called "B1" in amberlight…": the refusal, with a free name to use instead. */
 export function nameTakenMessage(name: string, owner: NamedAgent, suggestion: string, tr?: Tr): string {
   if (tr) return tr(msg({ id: 'agents.name.taken', defaultMessage: 'There is already an agent called "{agent}" in {project}. Agent names are unique across the workspace: try "{suggestion}".', description: "Why an agent name can't be used: another agent ({agent}, in {project}) has it. {suggestion} is a free name to use instead." }), { agent: owner.name, project: owner.project, suggestion })

@@ -1,16 +1,22 @@
-import { execFile } from 'child_process'
-import { resolve, sep } from 'path'
-import { lstat, readFile, readlink } from 'original-fs/promises'
-import { existsSync } from 'original-fs'
+import { AsyncLocalStorage } from 'async_hooks'
+import { join, resolve, sep } from 'path'
+import { SHARE_ENV, Worker } from 'worker_threads'
+import { lstat, readFile, readlink, realpath, stat } from 'original-fs/promises'
 import { insideReal } from './fsutil'
-import { gitProblem, gitTool, noteGitMissing, noteGitRan } from './gitTool'
+import { gitExe, gitExeGone, gitProblem, gitTool, noteGitMissing, noteGitRan, PATH_GIT, type GitExe } from './gitTool'
 import type { GitDiff, GitStatus } from '../shared/types'
 import { gitProblemData } from '../shared/gitTool'
 import { withValues } from '../shared/advanced'
 import { msg, tr } from '../shared/i18n'
 import { hiveError } from './hiveError'
+import { createLogger, userText } from './logger'
+import { runGit, type GitOutcome, type GitReply, type GitRequest, type RefsRequest } from './gitWorker'
+import { bundledScriptExists, workerHere, workerStarted } from './workerThreads'
+import { readRepoRefs, type RepoRefs } from './platform/repoRefs'
 
-const MAX_DIFF_BYTES = 2 * 1024 * 1024
+const log = createLogger('git')
+
+export const MAX_DIFF_BYTES = 2 * 1024 * 1024
 
 export interface GitResult {
   out: string
@@ -18,10 +24,19 @@ export interface GitResult {
   buf: Buffer
   /** Standard error, for messages to show when a command fails. */
   err: string
-  /** The exit code; -1 when git couldn't be started (`missing`), so no caller takes it for git's own "no" (exit 1). */
+  /**
+   * The exit code; -1 when git didn't run to an exit code of its own (not started: `missing`, or `notRun`), so no caller
+   * takes it for git's own "no" (exit 1: a config key not set, HEAD detached, not an ancestor).
+   */
   code: number
   /** Git couldn't be started: not installed, or not on Hive's PATH (#346). Never an answer about the repository. */
   missing?: boolean
+  /**
+   * HI-2019: git didn't run to an exit of its own for another reason, as Node or Hive's worker said it (`EAGAIN`, a
+   * busy machine; `ERR_GIT_WORKER`, the worker ended; the output bound; ended by a signal): a failure to try again, never
+   * git's answer, and never git missing.
+   */
+  notRun?: string
   /** Stopped at its `timeout` (GitRunOptions). */
   timedOut?: boolean
 }
@@ -39,28 +54,286 @@ export const GIT_PREFIX = ['--no-optional-locks', '-c', 'diff.autoRefreshIndex=f
 export interface GitRunOptions {
   env?: NodeJS.ProcessEnv
   timeout?: number
+  /** HI-2137: gitTool's own check of git: this git rather than gitExe()'s, and what it does is not noted as git's state. */
+  exe?: string
 }
 
-/** A seam for unit tests: told of each git command as it starts (#732 counts a template plan's and load's). */
-export const gitTestHooks: { started?: (cwd: string, args: readonly string[]) => void } = {}
+/**
+ * A seam for unit tests: told of each git command as it starts on git's worker thread (#732 counts a template plan's
+ * and load's), and as it ends there (HI-2322: worktree changes never overlap), not of one a route runs (HI-2078).
+ */
+export const gitTestHooks: { started?: (cwd: string, args: readonly string[]) => void; ended?: (cwd: string, args: readonly string[]) => void } = {}
+
+/** HI-2078: where a scope's git runs instead of the worker: the request as the worker gets it, its outcome as execFile's. */
+export type GitRoute = (m: Omit<GitRequest, 'id'>) => Promise<GitOutcome>
+
+/** A route's scope: its route, while what it wraps runs (active), and not after. */
+type RouteScope = { route: GitRoute; active: boolean }
+const routes = new AsyncLocalStorage<RouteScope | null>()
+
+/**
+ * HI-2078: runs `fn` with every git() it makes run by `route` (the merge queue's run: its lease's git host, in its job),
+ * until `fn` settles. Work started inside it and still going after (a timer, a listener) runs git on the worker again,
+ * as a completed step's answers go (gitStep). Inside, `route` answers for itself: it never falls back to the worker.
+ */
+export async function withGitRoute<T>(route: GitRoute, fn: () => Promise<T>): Promise<T> {
+  const scope: RouteScope = { route, active: true }
+  try {
+    return await routes.run(scope, fn)
+  } finally {
+    scope.active = false
+  }
+}
+
+/** HI-2078: runs `fn` outside any route (a runner's own release and clean-up, whoever started it). */
+export function withoutGitRoute<T>(fn: () => T): T {
+  return routes.run(null, fn)
+}
+
+/** HI-2189: a route runs git here now (another process, with its own environment), not the worker. */
+export function gitRouted(): boolean {
+  return !!routes.getStore()?.active
+}
 
 export function git(cwd: string, args: string[], maxBuffer = 16 * 1024 * 1024, input?: string, opts: GitRunOptions = {}): Promise<GitResult> {
-  gitTestHooks.started?.(cwd, args)
-  return new Promise((res) => {
-    const child = execFile('git', [...GIT_PREFIX, ...args], { cwd, windowsHide: true, maxBuffer, encoding: 'buffer', ...(opts.env ? { env: opts.env } : {}), ...(opts.timeout ? { timeout: opts.timeout } : {}) }, (err, stdout, stderr) => {
-      const buf = (stdout as unknown as Buffer) ?? Buffer.alloc(0)
-      const errCode = (err as { code?: unknown } | null)?.code
-      // Git didn't start. Node says ENOENT for a missing working folder too: that one is a failure, not a missing git.
-      const missing = (errCode === 'ENOENT' || errCode === 'EACCES' || errCode === 'EPERM' || errCode === 'UNKNOWN') && existsSync(cwd)
-      const code = err ? (typeof errCode === 'number' ? errCode : missing ? -1 : 1) : 0
-      if (missing) noteGitMissing()
-      // Git ran (whatever it answered): not one that didn't start for another reason (no working folder, output too big).
-      else if (!err || typeof errCode === 'number') noteGitRan()
-      res({ out: buf.toString('utf8'), ok: !err, buf, err: ((stderr as unknown as Buffer) ?? Buffer.alloc(0)).toString('utf8').trim(), code, ...(missing ? { missing } : {}), ...((err as { killed?: boolean } | null)?.killed && opts.timeout ? { timedOut: true } : {}) })
+  // HI-2137: the git Hive starts (Git for Windows' real git rather than its launcher, where it found one).
+  const run = (a: string[] = args): Promise<GitResult> => gitAs(opts.exe !== undefined ? { exe: opts.exe } : gitExe(), cwd, a, maxBuffer, input, opts)
+  return changesWorktrees(args) ? worktreeQueueKey(cwd).then((repo) => oneWorktreeChange(repo, () => worktreeChange(cwd, args, run))) : run()
+}
+
+/** HI-2349: how many times a worktree change runs again after meeting another's half-made entry, and how long it waits for that entry. */
+export const worktreeRetry = { times: 3, waitMs: 2000, stepMs: 20 }
+
+/**
+ * HI-2349: the half-made worktree entry git failed on (as git wrote its path), from a worktree command's stderr. Git
+ * reads every entry first (add, remove, move, lock, unlock) and dies on one whose `commondir` another git has created
+ * but not yet written ("fatal: failed to read .git/worktrees/copy-1/commondir: No error"), before it changes anything.
+ */
+export function halfMadeEntry(err: string): string | null {
+  return /^fatal: failed to read (.+?[\\/]worktrees[\\/][^\\/]+[\\/][^\\/:]+): /m.exec(err)?.[1] ?? null
+}
+
+/**
+ * HI-2349: a worktree change, run again when it failed on another git's half-made entry once that entry is written (or
+ * gone), at most worktreeRetry.times. oneWorktreeChange keeps this process's own changes apart (HI-2322); this covers
+ * the gits it can't queue: another Hive on the same repository, an agent's or the user's own `git worktree add`. An
+ * entry still unwritten after the wait (one a crashed git left) isn't waited for again: git's failure is the answer.
+ */
+async function worktreeChange(cwd: string, args: string[], run: (a: string[]) => Promise<GitResult>): Promise<GitResult> {
+  let a = args
+  for (let tries = 0; ; tries++) {
+    const r = await run(a)
+    const entry = r.ok || tries >= worktreeRetry.times ? null : halfMadeEntry(r.err)
+    if (!entry || !(await entryWritten(resolve(cwd, entry)))) return r
+    log.info(`git worktree ${args[1]} met another git's half-made worktree entry (${userText(entry)}): once more, now it's written`)
+    a = await afterHalfMade(a, run)
+  }
+}
+
+/** Waits for a file another git is writing to have something in it, or to be gone: false when it stays empty throughout. */
+async function entryWritten(file: string): Promise<boolean> {
+  const until = Date.now() + worktreeRetry.waitMs
+  for (;;) {
+    const size = await stat(file).then((s) => s.size, (e: NodeJS.ErrnoException) => (e.code === 'ENOENT' ? -1 : 0))
+    if (size !== 0) return true
+    if (Date.now() >= until) return false
+    await new Promise((r) => setTimeout(r, worktreeRetry.stepMs))
+  }
+}
+
+/**
+ * The command to run again. A `worktree add -b <branch> <folder> [<base>]` that failed had made its branch already (git
+ * refuses an existing one before that), and that branch stays: the next try checks it out (`add <folder> <branch>`)
+ * rather than failing on it. Anything else runs again as it was.
+ */
+async function afterHalfMade(args: string[], run: (a: string[]) => Promise<GitResult>): Promise<string[]> {
+  const b = args.indexOf('-b')
+  if (args[1] !== 'add' || b < 0 || !args[b + 1]) return args
+  const branch = args[b + 1]
+  if (!(await run(['rev-parse', '--verify', '--quiet', `refs/heads/${branch}`])).ok) return args
+  const rest = args.slice(2).filter((_, i) => i + 2 !== b && i + 2 !== b + 1)
+  const flags = rest.filter((x) => x.startsWith('-'))
+  const folder = rest.find((x) => !x.startsWith('-'))
+  return folder ? ['worktree', 'add', ...flags, folder, branch] : args
+}
+
+/**
+ * HI-2322: the repository a folder's worktree changes belong to, as oneWorktreeChange's queue knows it: its common git
+ * dir (`.git/worktrees` lives there), the same for a checkout and each of its linked worktrees, with links, junctions
+ * and drive aliases resolved. Read from the `.git` files where they say (as platform/git.ts's commonDirSync), else asked
+ * of git, else the folder itself.
+ */
+export async function worktreeQueueKey(cwd: string): Promise<string> {
+  const common = (await commonDirOf(cwd)) ?? resolve(cwd)
+  return resolve(await realpath(common).catch(() => common)).toLowerCase()
+}
+
+async function commonDirOf(folder: string): Promise<string | null> {
+  // GIT_DIR or GIT_COMMON_DIR in the environment chooses another repository than `.git` names: git says which.
+  if (!process.env.GIT_DIR && !process.env.GIT_COMMON_DIR) {
+    const dot = join(folder, '.git')
+    const own = await stat(dot).then(
+      async (s) => (s.isDirectory() ? resolve(dot) : ((m) => (m ? resolve(folder, m[1].trim()) : null))(/^gitdir: (.+)$/m.exec(await readFile(dot, 'utf8')))),
+      () => null
+    )
+    if (own) return readFile(join(own, 'commondir'), 'utf8').then((c) => resolve(own, c.trim()), () => own)
+  }
+  const r = await gitAs(gitExe(), folder, ['rev-parse', '--path-format=absolute', '--git-common-dir'], 64 * 1024, undefined, {})
+  return r.ok && r.out.trim() ? r.out.trim() : null
+}
+
+/** A command that changes the repository's list of worktrees (add, remove, prune, move, repair, lock...), not `list`. */
+export const changesWorktrees = (args: readonly string[]): boolean => args[0] === 'worktree' && args[1] !== undefined && args[1] !== 'list'
+
+/** The changes to each repository's worktrees under way, by the repository (its last one's end). */
+const worktreeChanges = new Map<string, Promise<unknown>>()
+
+/**
+ * HI-2322: one change to a repository's worktrees at a time in this process. Git reads every worktree's entry
+ * (.git/worktrees/<name>) as it adds one, and fails on one another add has made but not yet written ("fatal: failed to
+ * read .git/worktrees/copy-1/commondir"), so two review copies, slots or worktrees made at once could fail. Keyed by
+ * the repository (`repo`: git() passes worktreeQueueKey's, so a checkout and its linked worktrees share one queue).
+ * Each waits for the one before it, whatever that one's outcome; the entry goes once its last change has ended.
+ */
+export function oneWorktreeChange<T>(repo: string, fn: () => Promise<T>): Promise<T> {
+  const key = resolve(repo).toLowerCase()
+  const run = (worktreeChanges.get(key) ?? Promise.resolve()).then(fn, fn)
+  const tail = run.catch(() => undefined)
+  worktreeChanges.set(key, tail)
+  void tail.then(() => worktreeChanges.get(key) === tail && worktreeChanges.delete(key))
+  return run
+}
+
+/**
+ * The line of git's stderr that says why it failed: its first `fatal:` or `error:` line, else its first line. Not
+ * simply the first: `git worktree add` says "Preparing worktree…" before its error (HI-2322).
+ */
+export function gitErrorLine(err: string): string {
+  const lines = err.trim().split(/\r?\n/)
+  return lines.find((l) => /^(fatal|error):/.test(l)) ?? lines[0] ?? ''
+}
+
+/** For tests: how many repositories have a worktree change under way or waiting. */
+export const worktreeChangesPending = (): number => worktreeChanges.size
+
+/** git() with the git it starts (`use`). */
+async function gitAs(use: GitExe, cwd: string, args: string[], maxBuffer: number, input: string | undefined, opts: GitRunOptions): Promise<GitResult> {
+  const m = { cwd, args: [...GIT_PREFIX, ...args], maxBuffer, ...(use.exe !== 'git' ? { exe: use.exe } : {}), ...(use.launcherEnv ? { launcherEnv: use.launcherEnv } : {}), ...(input !== undefined ? { input } : {}), ...(opts.env ? { env: opts.env } : {}), ...(opts.timeout ? { timeout: opts.timeout } : {}) }
+  const scope = routes.getStore()
+  // HI-2078: a route's scope runs it there; else it starts off main's thread (HI-1783): gitWorker.ts runs it as this
+  // always did. Either way its outcome is read here.
+  if (!scope?.active) gitTestHooks.started?.(cwd, args)
+  const o = scope?.active ? await scope.route(m) : await thread.run(m)
+  if (!scope?.active) gitTestHooks.ended?.(cwd, args)
+  if (o.held) log.warn(`git ${args[0]}'s output stayed open after it exited, held by another process (HI-1854): taken as read`)
+  const buf = Buffer.from(o.stdout.buffer, o.stdout.byteOffset, o.stdout.byteLength)
+  const err = o.error
+  const errCode = err?.code
+  // Git didn't start. Node says ENOENT for a missing working folder too: that one is a failure, not a missing git.
+  const missing = (errCode === 'ENOENT' || errCode === 'EACCES' || errCode === 'EPERM' || errCode === 'UNKNOWN') && o.cwdExists
+  // HI-2019: anything but git's own exit code (a start that failed, the worker ended, the output bound, a signal) is -1,
+  // never 1, which callers read as git's "no"; what happened is kept (`notRun`), and said when git itself said nothing.
+  const ranToExit = !err || typeof errCode === 'number'
+  const notRun = !ranToExit && !missing ? String(errCode ?? err?.signal ?? 'error') : undefined
+  const code = err ? (typeof errCode === 'number' ? errCode : -1) : 0
+  if (opts.exe === undefined) {
+    // HI-2137: the real git Hive found couldn't start (uninstalled, moved): it never ran, so once more with PATH's,
+    // whether or not another command found it gone first.
+    if (missing && use.exe !== PATH_GIT.exe) {
+      gitExeGone(use.exe)
+      return gitAs(PATH_GIT, cwd, args, maxBuffer, input, opts)
+    }
+    if (missing) noteGitMissing()
+    // Git ran (whatever it answered): not one that didn't start for another reason (no working folder, output too big).
+    else if (ranToExit) noteGitRan()
+  }
+  const stderr = Buffer.from(o.stderr.buffer, o.stderr.byteOffset, o.stderr.byteLength).toString('utf8').trim()
+  const said = stderr || (notRun ? `git ${args[0]} didn't run to an exit (${notRun})` : '') // i18n-ignore: git's side of an error, in English as git's messages are
+  return { out: buf.toString('utf8'), ok: !err, buf, err: said, code, ...(missing ? { missing } : {}), ...(notRun ? { notRun } : {}), ...(err?.killed && opts.timeout ? { timedOut: true } : {}) }
+}
+
+/**
+ * Where git's commands run (HI-1783): its worker thread (gitWorker.ts, a build entry beside main's script), started with
+ * the first; in this thread where there is no built script (unit tests), as before. A command under way when the worker
+ * ends is answered as one that couldn't start (its outcome unknown: never taken for git's answer); the next starts it again.
+ */
+class GitThread {
+  private worker: Worker | null = null
+  /** Each call under way: its answer, or null when the worker ended first. */
+  private calls = new Map<number, (r: GitReply | null) => void>()
+  private next = 0
+  /** Why the worker last ended. */
+  private lost = ''
+
+  run(m: Omit<GitRequest, 'id'>): Promise<GitOutcome> {
+    const w = this.ensure()
+    if (!w) return runGit(m)
+    const id = ++this.next
+    return new Promise((done) => {
+      this.calls.set(id, (r) => done(r && 'outcome' in r ? r.outcome : lostOutcome(this.lost)))
+      w.postMessage({ ...m, id } satisfies GitRequest)
     })
-    // What the command reads (update-ref --stdin's transaction).
-    if (input !== undefined) child.stdin?.end(input)
-  })
+  }
+
+  /**
+   * A repository's refs and working folders, read in the worker (HI-1814: observe.ts's read walked every ref file on
+   * main); here where there is none, and here again when it ended first (a read has no side effects).
+   */
+  refs(common: string, max: number): Promise<RepoRefs> {
+    const w = this.ensure()
+    if (!w) return Promise.resolve(readRepoRefs(common, max))
+    const id = ++this.next
+    return new Promise((done) => {
+      this.calls.set(id, (r) => done(r && 'refs' in r ? r.refs : readRepoRefs(common, max)))
+      w.postMessage({ id, kind: 'refs', common, max } satisfies RefsRequest)
+    })
+  }
+
+  private ensure(): Worker | null {
+    if (this.worker) return this.worker
+    const script = gitWorkerScript()
+    if (!bundledScriptExists(script)) {
+      workerHere('git', "its script isn't there") // i18n-ignore: Copy Diagnostics' report, in English
+      return null
+    }
+    const w = new Worker(script, { env: SHARE_ENV })
+    this.worker = w
+    workerStarted('git', w) // i18n-ignore: a worker's name, for Copy Diagnostics' report (English)
+    w.on('message', (r: GitReply) => {
+      const c = this.calls.get(r.id)
+      this.calls.delete(r.id)
+      c?.(r)
+    })
+    const gone = (why: string): void => {
+      if (this.worker !== w) return
+      this.worker = null
+      log.warn(`git's worker ended (${why}); it starts again with the next command`)
+      this.lost = why
+      for (const c of this.calls.values()) c(null)
+      this.calls.clear()
+    }
+    w.on('error', (e: Error) => gone(e.message))
+    w.on('exit', (code) => gone(`exit code ${code}`)) // i18n-ignore: for the log
+    w.unref()
+    return w
+  }
+}
+
+/** A command's outcome when git's worker ended while it was under way: one that couldn't start (never git's answer). */
+const lostOutcome = (why: string): GitOutcome => ({ stdout: new Uint8Array(), stderr: Buffer.from(`Hive's git worker ended (${why})`), error: { code: 'ERR_GIT_WORKER', killed: false, signal: null }, cwdExists: true }) // i18n-ignore: git's error text, for the log and the caller's message
+
+/** The observer's read of a repository's refs (observe.ts), off main's thread: see GitThread.refs. */
+export const readRefsOffMain = (common: string, max: number): Promise<RepoRefs> => thread.refs(common, max)
+
+/** The worker's script, beside main's (inside the asar, as the others' are); a test's build of it (`useGitWorker`). */
+let gitScriptForTests: string | null = null
+const gitWorkerScript = (): string => gitScriptForTests ?? join(__dirname, 'git-worker.js')
+let thread = new GitThread()
+
+/** Tests: git's worker from this script (a build of gitWorker.ts), or null for the default; a new thread. */
+export function useGitWorker(file: string | null): void {
+  gitScriptForTests = file
+  thread = new GitThread()
 }
 
 /** Git couldn't read the index for a moment (another git command, a user's `git add`, is rewriting it): worth trying again (#222). */
@@ -82,11 +355,15 @@ export async function gitReading(cwd: string, args: string[]): Promise<GitResult
 const M = {
   failed: msg({ id: 'service.git.failed', defaultMessage: '{command} failed: {why}', description: "An error in the Changes tab: a git command ({command}, as it is: \"git status\") failed; {why} is git's own first line, or why git can't run." }),
   exitCode: msg({ id: 'service.git.exitCode', defaultMessage: 'exit code {code}', description: 'Why a git command failed when git said nothing: the number it exited with.' }),
-  outside: msg({ id: 'service.git.outside', defaultMessage: 'Path is outside the project', description: "An error showing a file's changes: its path leads out of the project." })
+  outside: msg({ id: 'service.git.outside', defaultMessage: 'Path is outside the project', description: "An error showing a file's changes: its path leads out of the project." }),
+  tooLarge: msg({ id: 'service.git.tooLarge', defaultMessage: 'File is too large to diff ({kb, number} KB).', description: "Shown in place of a file's changes in the Changes tab: the file is too large ({kb} KB) to compare." })
 }
 
+/** Shown in place of a file's diff when it is over MAX_DIFF_BYTES. */
+export const tooLargeDiff = (path: string, bytes: number): GitDiff => ({ path, original: '', modified: tr(M.tooLarge, { kb: Math.round(bytes / 1024) }), binary: true })
+
 /** Why a git command failed, for an error the window shows: git missing, else git's own first line. `command` is the git command, as it is. */
-function failure(command: string, r: GitResult): Error {
+export function failure(command: string, r: GitResult): Error {
   return hiveError(M.failed, { command, why: gitProblemData(gitTool()) ?? (r.err.split(/\r?\n/)[0] || withValues(M.exitCode, { code: r.code })) })
 }
 
@@ -176,7 +453,7 @@ async function workingStatus(projectPath: string): Promise<{ status: GitStatus; 
   return { status, inWorktree }
 }
 
-function isBinary(buf: Buffer): boolean {
+export function isBinary(buf: Buffer): boolean {
   const n = Math.min(buf.length, 8000)
   for (let i = 0; i < n; i++) if (buf[i] === 0) return true
   return false
@@ -196,7 +473,7 @@ export async function gitDiff(projectPath: string, file: string, base?: string):
     else {
       // Nor a file reached through a linked folder that leads outside.
       if (!insideReal(abs, [projectPath])) throw Object.assign(hiveError(M.outside), { outside: true })
-      if (s.size > MAX_DIFF_BYTES) return { path: file, original: '', modified: tr(msg({ id: 'service.git.tooLarge', defaultMessage: 'File is too large to diff ({kb, number} KB).', description: "Shown in place of a file's changes in the Changes tab: the file is too large ({kb} KB) to compare." }), { kb: Math.round(s.size / 1024) }), binary: true }
+      if (s.size > MAX_DIFF_BYTES) return tooLargeDiff(file, s.size)
       modified = await readFile(abs)
     }
   } catch (e) {

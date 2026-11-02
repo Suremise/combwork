@@ -17,6 +17,16 @@ ran:
 - **Hive tool calls** come from the hive MCP server itself. In development builds it logs each call it ran, with
   whether it worked, to the file named by `HIVE_TEST_MCP_LOG`. Tool names in a transcript, or in a Codex script that
   may never have run, are kept apart as *mentions* and are never counted as calls.
+- **Codex's calls in code mode** (HI-2235, HI-2246): Codex runs its tools from a script (its `exec` tool), which Hive's
+  transcript shows as one tool, `Script`. Codex's rollout records each call a script made as it ends (MCP calls, commands,
+  file changes, images viewed) with its arguments and result, and Hive's parser gives each script those calls (`calls`,
+  HI-2240), in the script it started in. The harness reads them from the transcript (a script with a call cut short for
+  display read whole, `transcript:tool`) and puts them in the script's place, named as Hive names the same call made
+  directly (`hive · <tool>`, `Shell`, `Edit`, `view_image`): the checks read what Codex called and got back, as for the
+  other CLIs, and a call written in a script that never ran isn't one (`codexScripts.cjs`). A script whose calls aren't
+  known (its Codex records none: no `calls`) is no evidence
+  of any: neither its code nor what it printed counts, and the run notes it as unobservable (`NOTE unobservable`,
+  `observed.codeMode.unknown`). The fake Codex works in code mode in the scenarios too (`fake-code-mode.txt` in its home).
 - **The merge slot** comes from Hive's own record: development builds write each change to the slots (who holds one,
   told so or not, and who waits in line) and each claim or release as Hive resolved it (the branch, and what it did:
   held or in line; released, left the line or nothing), with its time, to the file named by `HIVE_TEST_MERGE_SLOT_LOG`.
@@ -46,6 +56,10 @@ The checks are positive and negative:
 - **Card decisions** (#357): a decision the user records while the agent works on the card is flagged in its next board reply, and the agent reads the card again before moving it to Review; a reviewer fails work that ignores one of the card's decisions, also when woken for round 2 with a decision recorded since round 1 (its first reply flags it, and it reads the card in full before its verdict). An agent that asks the user and ends its turn is told of the decision recorded for it (#401), also when it asked about a card in Todo, which it takes first (#438).
 - **Merging when the base moved** after the checks (another branch merged meanwhile): the agent merges the base into
   its branch again and reruns the checks on that combination before merging (the fakes do it with real git commands).
+  The merge scenarios' checks (`check.js`) record each run in the project's `check-runs.txt` wherever it runs (HI-2233):
+  in the project, a worktree, a clone or a plain scratch copy of the files, with the tree it checked and the folder, so a
+  run in a scratch copy counts for what it checked; a check acted out another way (its test copied into `node -e`) is no
+  run. merge-checks-fail's fakes run them in a plain copy.
 - **Handovers**: the latest handover's next step, or the named one's, is done, and the other isn't. A wrap-up writes a
   handover without re-running tests.
 - **Notes**: a lasting rule goes to a shared note, while progress goes on the card.
@@ -70,25 +84,66 @@ The checks are positive and negative:
   waiting reviewer is woken. A builder woken by one card passing while the other failed at the same moment acts on the
   failed one too. A builder starting a loop registers its lane (the cards in order, its reviewer, rounds and wait) before
   its first card's review; a reviewer joins its builder's lane by name, starting none of its own (#483).
-  A builder at the lane's end whose commit needs the user's OK (a hook refuses it until they allow it) blocks the last
-  card and tells the user, bypasses nothing, and once allowed clears the block, commits and moves the cards to Done (#869).
+  A builder at the lane's end whose commit needs the user's OK (a hook refuses it until they allow it) asks the user on
+  the card (`hive_cannot_within_rules`, under For you), bypasses nothing, and once allowed commits and moves the cards to
+  Done (#869, HI-2222).
   A reviewer whose card its builder blocks while it waits (to ask the user) keeps watching it rather than moving on, and
   reviews it when Hive wakes it once the card is unblocked and back in Review (#481).
   A reviewer woken by Hive's own loop wake, with no watch of its own, reviews the card and waits for the next (#405).
   A builder told no rounds or wait gets the workspace's Card loop settings for its lane and its wait; one told its own keeps them (#412).
-  The Assistant at Look and advise lists the running lanes when asked, and changes none (#500).
+  The Assistant at Look and advise lists the running lanes when asked, and changes none (#500). A builder whose card's decision needs what only the Assistant may do (park another card, move its own to Done) asks it with `hive_ask_assistant`, not in a comment, and doesn't ask the user again (HI-1866).
+- **The intents and their gates** (1.0): an agent starts, puts back, submits, reviews and gives verdicts with the intent
+  tools (`hive_start_card`, `hive_submit`, `hive_start_review`, `hive_verdict`…). **work-on-card** runs in a project
+  whose work an agent reviews and requires them: started, committed, submitted, stopping in Review. Most other
+  scenarios' projects have every rule off (a new project's options before a preset). There a submission goes past
+  Review, since nothing reviews the work, so a builder's check takes either: the card in Review, or past it by the
+  agent's own submission, and never finished by a move of its own (`handedOn`). A reviewer's check takes where its
+  verdict leaves the card (`verdictLeft`): a fail back with its builder in Doing, a pass in Passed, or Done where nothing
+  comes after review. The `old-move-*` scenarios test Hive translating the old moves.
+- **The fakes act as the shipped guidance does** (#1536): their scripts use the intents (`fakeStart`, `fakeSubmit`,
+  `fakeStartReview`, `fakeVerdict`, `hive_report_merge`), so a passing fake run shows the checks take what a model
+  following the skills does. A fixture whose card a failed verdict would have sent back is in Doing, and one whose
+  loop has a reviewer runs in a reviewed project. The old moves left in the fakes, each for a reason:
+  - **old-move-submit** and **old-move-review**: they test the translation.
+  - **done-card-more-work**: `hive_update_task` with `column: "doing"` is what work-on-card says for a card back from
+    Passed or Done.
+  - **assistant-override-***, **assistant-bulk-move**: the Assistant moves cards with `hive_update_task(s)` and an
+    override reason.
+  - **prioritise**: an order within Todo, not a move between stages.
+- **A gate's refusal and its next step** (#1536):
+  - **intent-submit-refused**: a submission of uncommitted work is refused, saying in git's words that nothing is
+    committed (HI-1618: submitting for review never commits). Asked only to submit, not to do the card, the builder asks
+    the user before committing, as the refusal's next step says (HI-2257: an agent doing the card commits, one asked
+    only to submit asks first), committing nothing, overriding nothing and moving nothing by hand; the card stays in
+    Doing.
+  - **intent-submit-commit**: asked to commit and submit for review, the builder does both with no question.
+  - **review-interrupted**: a review started with the intent loses its card to its builder, so the verdict is refused.
+    The reviewer doesn't retry it and moves nothing.
+- **Under the presets** (#1536), saved as the Workflow section saves them: a solo user's card goes from start to Done
+  under Solo (started, committed, submitted: committed is done, with no review), and a pair's builder registers its
+  lane and starts its card in the slot Hive lends it under Pair, submitting from there.
 - **With `work-on-card` deleted**, the board rules still hold, and **an edited skill** is the one followed.
 - **The Assistant**:
   - at Look and advise, changes nothing;
   - at Control agents, starts a card (which worked), waits for it, and the card gets done;
   - with full control, plans as cards without starting them.
-  - in Coordinator mode with a team (#402): reads run-lanes, briefs each builder and reviewer with the card-loop skill,
-    their cards and partner, and ends its turn with one live watch on every lane's last card (scored on the watch it
+  - in Coordinator mode with a team (#402): reads run-lanes, starts each lane with `hive_lane start` (its builder,
+    reviewer and cards, the builder's card-loop brief in `brief`; HI-2222), its reviewer briefed by Hive's start of it or
+    a prompt, and ends its turn with one live watch on every lane's last card (scored on the watch it
     ends with, which replaces any before it, and on any move of those cards); woken by a failed review or an agent's
     question, it reads the card, sweeps the board, watches every lane again (not only the card that woke it) and leaves
     the fix (or the answer) to the loop (or the user); moves a card between running lanes; places a follow-up in the lane
     that owns its files; and follows two lanes through Hive's real wakes as each ends, re-watching what is left, until
     both have ended (the fake Claude Code acts out the Assistant's wakes from its `fake-wakes-Assistant.txt`);
+  - in Coordinator mode, the defaults Hive's setup decides (#1346 items 2–4, #1527), asking the user none of them: a
+    builder and reviewer pair's one card runs as a lane; a card reaching Review outside a lane gets its idle reviewer
+    started; a running lane is watched with `lanes` and none of its cards; a second failed review in a ten-round lane is
+    left to the loop; a lane whose cards have all passed, its builder merging them, is left to merge (it never asks
+    whether to merge, and merges, moves or ends nothing itself); and a no-code card that passed (its lane ended) is
+    neither moved nor its lane ended again;
+  - in Coordinator mode, looking before asking (#1346 items 1 and 5, #1528): a card whose deploy details are in a doc
+    it names is looked up and started without asking the user; asked whether a card should wait for another lane, it
+    reads the board and the lanes first and changes nothing;
   - in every mode (#325, #402): cards it plans are complete (80+ characters each), an open design question reaches the
     user, and one card on one agent loads no run-lanes and starts no lane.
 
@@ -111,11 +166,20 @@ runner's build stamp, `tests/e2e/build.mjs`) and rebuilds it if not, so a run or
 Hive's test copies run quiet (`src/main/testQuiet.ts`): no window on screen, no focus taken, no notifications.
 After each scenario, once Hive has closed, the harness stops what of it still runs (a command an agent started can
 outlive its session: #542): what the scenario's Hive started (its process tree, taken before it closes, each by pid and
-start time), and what names the scenario's folder on its command line (the folder itself, never a sibling whose name
+start time), what Hive lists as its agents' leftovers once their sessions have stopped (their launches' jobs hold what
+they started, so a command whose parent has exited and that names no folder is among them: HI-2217), and what names the scenario's folder on its command line (the folder itself, never a sibling whose name
 starts the same) and started after the scenario did (`tests/e2e/folderProcesses.cjs`; the result's `leftOver` says how
 many). A folder it still can't remove is kept and named in the result (`kept`) rather than ending the run. Setup helpers
 that start an agent for the fixture (a builder working, an agent idle) fail the scenario (`setup: …`, with the
 environment problem when the screen shows one) when it doesn't get there, rather than run on a fixture it didn't get.
+So does a setup's move of a card as the user moves it (`userMove`): its reply is checked, and the card must be seen in
+the column (in Review, with a new submission) before the scenario goes on (#1583). So does the scenario's own prompt
+never taken (HI-1168): typed as Hive types (`lib.sendPrompt`, on real Claude Code once its hive tools connected) and
+not taken nor refused for the environment, the trial is `setup: the prompt was never taken`, with no checks (incomplete
+in the benchmark), never every check failed as the model's. Setups change the project's workflow
+options through Hive (`workflow:setOptions`, under the project's lock), never by writing `project.json` beside it (a
+write that lost the agents just added, #1588), and make an agent's watch with its own token (`POST /v1/tasks/wait`), as
+its hive tool does, so a model trial gets the same fixture as a fake (#1545).
 
 - **The fakes** (`fake`, the default, `fake-codex` and `fake-copilot`) act each scenario out with their scripted commands (`skill NAME`, `boardmove`,
   `boardreview`, `boardcomment`). It checks the harness itself and the board rules Hive enforces, at no cost. Checks
@@ -149,6 +213,10 @@ environment problem when the screen shows one) when it doesn't get there, rather
     authenticate: OAuth session expired and could not be refreshed", exit 1) is matched by its last screen, the reason
     Hive logs, or, for Claude Code, its own `auth status --json` in the test home; anything else ends the trial at once
     as `ERROR the session ended at launch: …`, not after the trial's limits (#577). `--signed-out=launch` acts it out.
+    A prompt the CLI never takes is checked again (#1321): what it drew once the prompt was typed (Claude Code can show
+    "Not logged in · Run /login" only then; not what the prompt itself names) or, for Claude Code, its `auth status
+    --json` saying it isn't logged in skips the trial for the environment, rather than running the checks on an untouched
+    board. `--signed-out=late` acts it out.
   - Each scenario is one session of the chosen model, 6 minutes at most. `--budget` (USD, API-equivalent, above 0,
     default 2) stops the run once the scenarios so far cost that much. A trial that reports no cost makes the spend
     unknown, so no further trial starts unless `--allow-unknown-cost` is given; the summary then says the total is
@@ -166,9 +234,17 @@ environment problem when the screen shows one) when it doesn't get there, rather
   `--repeat`, is a heavy run: it waits for one of the machine's test slots, as heavy e2e runs do, saying who holds them
   (`--no-wait` fails at once instead; tests/e2e/README.md, "Heavy runs queue").
 - **Results** go to `%LOCALAPPDATA%\hive-test\scenarios\results\<time>-<provider>`: `results.json` (each scenario's
-  checks, skills read, executed hive calls and mentions, versions, guidance and source, usage) and `summary.md` (a
-  table). `BASELINE.md` here records the latest baseline. Run the trials again after changing Hive's guidance, a skill
-  or a tool's description, and compare.
+  checks, skills read, executed hive calls and mentions, the final reply whole up to 6,000 characters, so a check that
+  judged it can be audited (HI-2230; `finalReplyLength` when longer), versions, guidance and source, usage) and `summary.md` (a
+  table). `results.json` is written as each trial ends (`meta.incomplete` says how many of how many until the run
+  has ended), so a run cut short keeps what it had. A run holds its folder while it runs (`runner.json`, its process):
+  no other run's start prunes it, however many start meanwhile (HI-2234), and should the folder go all the same, the
+  run makes it again with everything it had written, says so, and carries on. `BASELINE.md` here records the latest baseline. Run the trials
+  again after changing Hive's guidance, a skill or a tool's description, and compare.
+- **Progress** (#1457): run in a Hive agent's session, a run shows in that Hive's Progress panel with a step per trial,
+  named with the results so far (`review-card · 11 ok, 1 failed`), and an estimate from the trials timed before (by
+  provider); under `hive-progress` it gives the wrapper's row those steps. `--no-progress` or `HIVE_PROGRESS=0` turns
+  it off.
 
 Bump `FIXTURES_VERSION` in `scenarios.cjs` when a scenario's setup or checks change.
 
@@ -186,10 +262,33 @@ the turn (`GET /v1/metrics` of the run's own workspace), and the difference is t
 - **The provider's usage** of the session (a new one, so its total is the scenario's), compared only when every sample on
   both sides reported it. A fake's tokens mean nothing; a cost is compared only when both sides have one.
 
+**The subject apart from the other agents** (HI-2186): a scenario's measures are every agent's in its workspace together
+(the session under test, a lane's builder and reviewer, agents it or Hive started), and each sample also has them for
+the subject (`measures.subject`: the Assistant, or the agent the scenario tests) and the others (`measures.others`), each
+measured on its own, and each agent's hive calls in the measured window (`measures.agents`, by its fixture name):
+- The Assistant as subject: Hive's metrics by caller role (the Assistant's, project agents'), every measure, only when
+  the coverage is whole (else `split: 'partial'` and neither part).
+- An agent as subject: its tool calls, replies and tool lists from the hive servers' test log (`HIVE_TEST_MCP_LOG`: each
+  call with its reply's size, and a `kind: 'list'` line per server's tool list); its API and launch measures are unknown
+  (Hive's metrics don't say which agent a request or launch was).
+- Which calls the window holds is told call by call, not by counting: each call and list line has an id, and the
+  server logs a `kind: 'reported'` line with the ids each metrics report carried, when it was sent and when Hive had
+  taken it. The harness times each metrics snapshot's request; a call is the window's when its report was sent after
+  the first snapshot's answer and taken before the last was asked for. A report that overlapped a snapshot, a call with
+  no report on record, or a log without ids (before HI-2186) leaves the log's parts and rows out (`split: 'partial'`);
+  so does a window whose counts still differ from the metrics' (Hive's own start-view record left out).
+
+**The fakes count per hive call.** The fake Claude Code and fake Codex (not fake-copilot: the real Copilot CLI) start a hive MCP server for every hive call (and
+each lists the tools), where a real CLI starts one a session: with them, tool-list starts and API requests count calls,
+not sessions. HI-2181 read a lane scenario's doubled tool-list starts as twice the fetches per session; it was the lane's
+agents making more calls.
+
 Compare two runs in Hive: **Performance → Compare → Import…** each `benchmark.json` (in the Performance view, with the
 whole workspace selected: a benchmark is its test workspace's, never a project's or the own work's). Each sample keeps
 every check (passed, failed, skipped), the measurement's coverage, and the guidance and skill revisions the session was
-given. Scenarios are judged **correctness first**, check by check:
+given, and its **observations**: what a scenario records without checking it (`observe`, #1611: whether the skill that
+owns a workflow was read, where the behaviour is what's checked), in `results.json` and the sample, never a pass or a
+failure. Scenarios are judged **correctness first**, check by check:
 - *Smaller, still correct*: less Hive context; every check that passed still passes and still runs; no more calls,
   failures (failed calls, tool errors, API failures, cancellations) or retries.
 - *Smaller but failing*: less context but a check passed or ran less often. A cut that breaks a workflow isn't an
@@ -218,7 +317,9 @@ spread to judge a change by: use `--repeat N` for model trials.
 - **Baselines**: `--save-baseline NAME` copies the run's `benchmark.json` to `scenarios/baselines/NAME.json`: the new
   one is read first and swapped in atomically, and an existing baseline of that name is archived as
   `NAME.<its time>.json` (`-2`, `-3`… if that name is taken), never overwritten; the 5 newest archives are kept. Each run
-  gets a results folder of its own; the newest 30 are kept. Nothing is invented for a run that wasn't recorded.
+  gets a results folder of its own; the newest 30 fake runs (`fake`, `fake-codex`, `fake-copilot`) and, counted apart,
+  the newest 30 model trials are kept (HI-2236: fake runs never push a paid trial's results out), besides those a card
+  cites and those a run still writes into. Nothing is invented for a run that wasn't recorded.
 - `tests/fixtures/benchmarks` holds a baseline from a real fake run, an intentional reduction of it and the same
   reduction that broke `card-detail`. `tests/benchmark.test.ts` checks that the first is "smaller, still correct" and the
   second "smaller but failing".

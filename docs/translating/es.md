@@ -19,8 +19,8 @@ Hive's English is plain and direct: short sentences, everyday words, *you* for t
 Translate the meaning, not the words, and keep the result as short and plain.
 
 - **Neutral international Spanish:** words understood from Mexico to Spain. No *vosotros* and no *vos*: the plural
-  "you" is *ustedes*. Prefer *archivo* (not *fichero*), *agregar* (not *añadir*), *equipo* or *PC* (not *ordenador*
-  or *computadora*), *costo* (not *coste*), *hacer clic*, *pegar*, *usar*.
+  "you" is *ustedes*. Prefer *archivo* (not *fichero*), *agregar* (not *añadir*), *PC* (not *equipo*, *ordenador*
+  or *computadora*: see Terms), *costo* (not *coste*), *hacer clic*, *pegar*, *usar*.
 - **Addressing the reader:** the informal *tú* (*Elige un proyecto*, *tus agentes*), as Spanish software usually does.
   Never *usted*. *Tú* is written in lower case.
 - **Tone:** friendly and direct, never casual. Prefer active sentences: *Hive guarda la sesión*, not *La sesión es
@@ -38,10 +38,11 @@ Translate the meaning, not the words, and keep the result as short and plain.
   the glossary's kept names keep theirs.
 - **A trailing `…`** (the command asks something before it acts) stays, with no space before it: *Quitar agente…*.
   Always the single character …, never three dots.
-- **Column headings:** *En espera*, *Pendiente*, *En curso*, *Revisión*, *Aprobado*, *Hecho*. In running text name the
-  column (*en la columna Revisión*, *pasa a Hecho*) so a sentence never reads *en En curso*.
+- **Column headings** (the 1.0 stages, glossary-1.0 §2.2): *En espera*, *Pendiente*, *En curso* (Active, was Doing),
+  *Revisión*, *Aprobado* (Approved, was Passed), with *Fusionando* (Merging) inside Aprobado, and *Hecho*. In running
+  text name the column (*en la columna Revisión*, *pasa a Hecho*) so a sentence never reads *en En curso*.
 - **Where things are:** paths through menus and settings keep Hive's arrows, with each name as Hive shows it in Spanish:
-  *Configuración → Proveedores*, *Ayuda → Configuración de agentes*.
+  *Configuración → Proveedores*, *Ayuda → Configuración de proveedores*.
 
 ## Grammar
 
@@ -86,12 +87,35 @@ English, it says so.
 | persona (now: working mode) | modo (modo de trabajo) | The Assistant's personas became *modes*; the old *persona* is *personaje*. |
 | task board / board | tablero de tareas / tablero | The *Tasks* tab is *Tareas*. |
 | card | tarjeta | Never *tarea* in running text. |
-| On Hold / Todo / Doing / Review / Passed / Done | En espera / Pendiente / En curso / Revisión / Aprobado / Hecho | *Hecho* means merged; *Aprobado*, passed review but not merged. |
+| On Hold / Todo / Active / Review / Approved / Merging / Done | En espera / Pendiente / En curso / Revisión / Aprobado / Fusionando / Hecho | Stages and categories (1.0: Active was Doing, Approved was Passed). *Hecho* means merged (or accepted); *Aprobado*, passed review but not merged. *Stage*: *etapa*; *category*: *categoría*. |
 | decision | decisión | |
 | blocked / stalled | bloqueada / estancada | Of a card. |
-| builder / reviewer | autor / revisor | The builder is who does the card's work (not who created it: *creada por*). |
-| card loop / lane / round | ciclo de tarjetas / carril / ronda | A review's *verdict* is *veredicto*. |
-| merge slot | turno de fusión | |
+| builder / reviewer / either | autor / revisor / ambos | The builder is who does the card's work (not who created it: *creada por*). Never *constructor*. |
+| card loop / lane / round | ciclo de tarjetas / carril / ronda | Never *bucle*. *Start lane…*: *Iniciar carril…*. |
+| verdict / pass / fail | veredicto / superada / no superada | A reviewer's pass is *superada* (*supera la revisión*, *la revisión superada*), never *aprobada*: *aprobación* is only your OK. |
+| approval / Approve | aprobación / Aprobar | Your OK on a card (G10, For you). |
+| For you (Decide / Test / Approve / Sign in) | Para ti (Decidir / Probar / Aprobar / Iniciar sesión) | |
+| revision | versión | An exact state of the work (a commit, a hash). Never *revisión*, which is Review. A *release* is a *lanzamiento*. |
+| change / same change / carries over / stale | cambio / el mismo cambio / se mantiene / caducada | *Stale* of a pass: *caducada*. |
+| check / checks before review / merge checks | comprobación / comprobaciones antes de la revisión / comprobaciones de fusión | |
+| review copy | copia de revisión | *Check copy*: *copia de comprobación*. |
+| merge queue / test merge | cola de fusión / fusión de prueba | *Pause queue* / *Resume queue*: *Pausar la cola* / *Reanudar la cola*. |
+| merge slot | turno de fusión | Only the agents' own merges; Hive's merges are the *cola de fusión*. |
+| slot / pool / ready | slot / grupo / listo | *Slot* is kept, masculine (*el slot*). |
+| Version Control (the tab) / version control | Control de versiones / control de versiones | |
+| workflow / workflow options | flujo de trabajo / opciones del flujo de trabajo | |
+| preset (Solo, Pair, Team, Custom) | ajuste predefinido (Individual, Pareja, Equipo, Personalizado) | |
+| computer / PC / this machine | PC | Masculine: *el PC*, *este PC*, *tu PC*, *reinicia el PC*. Never *equipo*, which is the team (the Team preset, *Pausar el equipo*), nor *ordenador* or *computadora*. |
+| team | equipo | Only the agents' team or the Team preset, never the computer. |
+| None (no version control) | Ninguno | |
+| rule / old rules | regla / reglas anteriores | |
+| refused / override / Move anyway | rechazado / excepción / Mover de todos modos | |
+| returned (to its builder) | devuelta | Of a card. |
+| no-code card / before 1.0 / outside Hive | tarjeta sin código / anterior a 1.0 / fuera de Hive | |
+| target branch / up to date / repository root | rama de destino / al día / raíz del repositorio | |
+| work (a card's Work section) / deliverables | trabajo / entregables | |
+| project key | clave del proyecto | |
+| in flight (a card) | en marcha | Not *en curso*, which is the column. |
 | inbox / message / wake | bandeja de entrada / mensaje / despertar | *Wake* as a verb is *despertar* (*Hive despierta al revisor*); as a noun, *aviso* (*un aviso del ciclo*). |
 | handover / shared notes | traspaso / notas compartidas | |
 | skill / template | habilidad / plantilla | A skill's own name (`work-on-card`) is kept. |

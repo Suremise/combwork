@@ -10,6 +10,9 @@ import type { GitResult } from '../src/main/git'
 import { tempDir } from './tempDir'
 // The longest a wait here waits for what it waits on: a bound for a hung run, never how long it should take (#570).
 const HUNG_MS = 10000
+/** The stress test's listings and adds, each at least (#1480), and its bound past its time for a hung run. */
+const ENOUGH = 30
+const STRESS_HUNG_MS = 120000
 
 /** check-ignore results to give instead of running it, in order; empty: run it. */
 const failNext: Partial<GitResult>[] = []
@@ -121,12 +124,14 @@ describe('Files tab: a failed git check-ignore (#222)', () => {
     expect(await dimmed()).toEqual(['dist'])
     realFailures = 0
     const running = { on: true }
+    let adds = 0
     // The user's (or an agent's) git add rewriting the index, three at once; their own clashes don't matter here.
     const writer = async () => {
       while (running.on) {
         const t = new Date(Date.now() - Math.floor(Math.random() * 1e7))
         utimesSync(join(proj, 'src', 'a.ts'), t, t)
         await new Promise((res) => execFile('git', ['add', 'src/a.ts'], { cwd: proj, windowsHide: true }, res))
+        adds++
       }
     }
     const undimmed: number[] = []
@@ -137,10 +142,18 @@ describe('Files tab: a failed git check-ignore (#222)', () => {
         listings++
       }
     }
-    setTimeout(() => (running.on = false), Number(process.env.HIVE_STRESS_MS) || 4000)
-    await Promise.all([writer(), writer(), writer(), reader(), reader(), reader()])
-    console.log(`#222 stress: ${listings} listings, ${realFailures} check-ignore failures absorbed`)
-    expect(listings).toBeGreaterThan(20)
+    // At least the stress's time (HIVE_STRESS_MS, 4 s), and on until enough listings ran beside enough adds, however
+    // long load makes that (#1480: a fixed 4 s did 13 listings in a loaded full run, failing a count, not the behaviour).
+    const loops = [writer(), writer(), writer(), reader(), reader(), reader()]
+    const began = Date.now()
+    const atLeastMs = Number(process.env.HIVE_STRESS_MS) || 4000
+    try {
+      await vi.waitFor(() => expect({ listings: listings >= ENOUGH, adds: adds >= ENOUGH, time: Date.now() - began >= atLeastMs }).toEqual({ listings: true, adds: true, time: true }), { timeout: atLeastMs + STRESS_HUNG_MS, interval: 50 })
+    } finally {
+      running.on = false
+      await Promise.all(loops)
+    }
+    console.log(`#222 stress: ${listings} listings, ${adds} adds in ${Date.now() - began} ms, ${realFailures} check-ignore failures absorbed`)
     // Once under four unit suites at once (#560), never since: if it comes back, what git answered says whether it's git
     // or Hive (#222's handling).
     expect(undimmed, `listings showing dist undimmed; git's answers without it: ${JSON.stringify(unnamed.slice(0, 5))}`).toEqual([])

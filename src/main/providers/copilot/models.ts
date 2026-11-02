@@ -8,7 +8,7 @@ import { removePath } from '../../fsutil'
 import { createLogger } from '../../logger'
 import { toSpawnable } from '../common'
 import type { CatalogRead } from '../types'
-import { copilotEnv, copilotHome } from './home'
+import { copilotEnv, copilotHome, noAutoUpdateArgs } from './home'
 
 const log = createLogger('copilot')
 
@@ -42,6 +42,9 @@ export function parseCopilotModels(result: unknown): CatalogRead | null {
   return current ? { models, defaultModel: current } : { models }
 }
 
+/** Copilot's arguments for reading its models: an ACP server, not updating itself unless that switch is off (#1167). */
+export const catalogArgs = (): string[] => ['--acp', ...noAutoUpdateArgs()]
+
 /**
  * Asks the installed Copilot for the account's models: starts it as an ACP server (no prompt, no sign-in, no cost), opens
  * a session in a folder of Hive's, and reads session/new's reply. That session leaves a folder in Copilot's session
@@ -53,7 +56,7 @@ export function readCopilotModels(executable: string, env: Record<string, string
   mkdirSync(dir, { recursive: true })
   const childEnv = copilotEnv(env)
   return new Promise((resolve) => {
-    const s = toSpawnable(executable, ['--acp', '--no-auto-update'])
+    const s = toSpawnable(executable, catalogArgs())
     const p = spawn(s.file, s.args, { cwd: dir, env: childEnv, windowsHide: true, stdio: ['pipe', 'pipe', 'ignore'] })
     let buf = ''
     let sessionId: string | null = null

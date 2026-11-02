@@ -88,7 +88,7 @@ describe('the project area', () => {
 
 describe('data kept at module level follows the language', () => {
   it("the tabs' labels are messages, shown when drawn", () => {
-    expect(PROJECT_TABS.map((t) => tr(t.label))).toEqual(['Session', 'Overview', 'Performance', 'Tasks', 'Sessions', 'Files', 'Attachments', 'Git', 'Memory', 'Skills', 'Templates', 'MCP', 'Settings'])
+    expect(PROJECT_TABS.map((t) => tr(t.label))).toEqual(['Session', 'Overview', 'Performance', 'Tasks', 'Sessions', 'Files', 'Attachments', 'Version Control', 'Activity', 'Memory', 'Skills', 'Templates', 'MCP', 'Settings'])
     setLanguage(PSEUDO_LANGUAGE, {})
     expect(tr(PROJECT_TABS[0].label)).toMatch(/^\[Šéššíöñ/)
   })
@@ -180,6 +180,5 @@ describe('the sentences once built by hand read as before, in English', () => {
     expect(tr(m('project.apply.new'), { live: 'yes' })).toBe('Changes apply to new sessions — restart the running session to apply them.')
     expect(tr(m('project.skills.assistantOnly'), { count: 1 })).toBe("1 Hive skill is for the Hive Assistant only, so it isn't listed: this project's agents don't get it.")
     expect(tr(m('project.settings.inherit'), { value: 'on' })).toBe('Inherit (on)')
-    expect(tr(m('project.settings.now'), { desc: 'Locks files.', current: 'Off.' })).toBe('Locks files. Now: Off.')
   })
 })

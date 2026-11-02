@@ -6,7 +6,7 @@ import { PSEUDO_LANGUAGE } from '../../src/shared/i18n/languages'
 import { otherUsers, shortcutUsers } from '../../src/renderer/src/keyConflicts'
 
 // #795: the `shell` area: commands (their names, categories and hover tips), the title bar's menus, the command palette,
-// dialog chrome, the quit, Compact and Agent Setup dialogs, About, Diagnostics and shortcuts. The renderer's modules
+// dialog chrome, the quit, Compact and Provider Setup dialogs, About, Diagnostics and shortcuts. The renderer's modules
 // load React views, so this checks commands.ts's source and the area's messages as extracted.
 
 const ROOT = resolve(__dirname, '../..')
@@ -123,14 +123,14 @@ describe('round 1 of review (#795)', () => {
     expect(otherUsers(users, 'MOD+SHIFT+P', 'project.goto')).toEqual(['palette.show'])
     expect(otherUsers(users, 'Mod+Shift+J', 'view.board')).toEqual([])
     expect(otherUsers(users, undefined, 'help.docs')).toEqual([])
-    // The editor keeps no labels: it names the commands when it shows a clash.
+    // The editor keeps no labels: it names the commands (with their categories, HI-1838) when it shows a clash.
     const editor = readFileSync(join(ROOT, 'src/renderer/src/components/Keybindings.tsx'), 'utf8')
-    expect(editor).toContain('otherUsers(conflicts, r.key, r.c.id).map(commandName)')
+    expect(editor).toContain('otherUsers(conflicts, r.key, r.c.id).map(commandIn)')
     expect(editor).not.toMatch(/filter\(\(l\) => l !== /)
   })
 
   it('the palette is made again when the language changes', () => {
-    expect(readFileSync(join(ROOT, 'src/renderer/src/components/Overlays.tsx'), 'utf8')).toContain('}, [q, projects, open, mode, shownLanguage])')
+    expect(readFileSync(join(ROOT, 'src/renderer/src/components/Overlays.tsx'), 'utf8')).toContain('}, [q, projects, open, mode, shownLanguage, tasks, keys, moved, hiveCommands, wsCommands])')
   })
 
   it("an agent's background tasks are whole sentences with the count, which a language words by the count", () => {

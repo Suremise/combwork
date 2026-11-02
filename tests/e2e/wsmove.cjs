@@ -11,6 +11,8 @@
 // listed, never overwritten. Then the common case: a workspace moved without its worktrees
 // folder, whose worktree stays put and is linked to the moved project. Dev build, throwaway profile, folders and fake
 // Claude home; quiet.
+// Dev build only (#1580): it starts this checkout's Electron itself, and its agents are 0.9 worktree agents
+// (agents:testLegacy, refused by a packaged build): moving their worktrees with the workspace is what it tests.
 const lib = require('./lib.cjs')
 const { _electron } = require('playwright-core')
 const { execFileSync } = require('child_process')
@@ -42,8 +44,7 @@ const check = (name, ok, extra = '') => {
   if (!ok) failed++
   console.log(`${ok ? 'PASS' : 'FAIL'} ${name}${ok || !extra ? '' : ` (${extra})`}`)
 }
-const { baseEnv } = require('./runContext.cjs')
-const gitOut = (cwd, args) => execFileSync('git', args, { cwd, env: baseEnv(), encoding: 'utf8' })
+const gitOut = (cwd, args) => execFileSync('git', args, { cwd, env: lib.gitEnv(), encoding: 'utf8' })
 const readJson = (f) => JSON.parse(fs.readFileSync(f, 'utf8'))
 /**
  * Makes a host's session records unwritable, or writable again (#1061: rows of its workspace's database, where a
@@ -56,7 +57,8 @@ const sessionsWritable = (host, writable) => {
     for (const op of ['INSERT', 'UPDATE', 'DELETE']) {
       const name = `test_sessions_readonly_${op.toLowerCase()}`
       const row = op === 'INSERT' ? 'NEW' : 'OLD'
-      db.exec(writable ? `DROP TRIGGER IF EXISTS ${name}` : `CREATE TRIGGER ${name} BEFORE ${op} ON store_rows WHEN ${row}.store = 'sessions' AND ${row}.scope = '${scope.replace(/'/g, "''")}' BEGIN SELECT RAISE(ABORT, 'attempt to write a readonly database (test)'); END`)
+      // The sessions table since 1.0 (#1211).
+      db.exec(writable ? `DROP TRIGGER IF EXISTS ${name}` : `CREATE TRIGGER ${name} BEFORE ${op} ON sessions WHEN ${row}.host = '${scope.replace(/'/g, "''")}' BEGIN SELECT RAISE(ABORT, 'attempt to write a readonly database (test)'); END`)
     }
   } finally {
     db.close()
@@ -101,10 +103,10 @@ async function launch() {
   {
     const { app, page, inv } = await launch()
     await lib.openWorkspace(inv, page, ws1)
-    const builder = await inv('agents:add', alpha1, { location: 'new-worktree', name: 'Builder' })
-    await inv('agents:add', alpha1, { location: 'new-worktree', name: 'Second' })
+    const builder = await inv('agents:testLegacy', alpha1, { location: 'new-worktree', name: 'Builder' })
+    await inv('agents:testLegacy', alpha1, { location: 'new-worktree', name: 'Second' })
     // Third has work on its branch: the worktree recreated after the move must have it.
-    const third = await inv('agents:add', alpha1, { location: 'new-worktree', name: 'Third' })
+    const third = await inv('agents:testLegacy', alpha1, { location: 'new-worktree', name: 'Third' })
     fs.writeFileSync(path.join(third.worktree.path, 'third.txt'), 'third\n')
     gitOut(third.worktree.path, ['-c', 'user.email=t@t', '-c', 'user.name=t', 'add', 'third.txt'])
     gitOut(third.worktree.path, ['-c', 'user.email=t@t', '-c', 'user.name=t', 'commit', '-qm', 'third work'])
@@ -181,10 +183,13 @@ async function launch() {
     // Repair from the dialog, Third recreated: everything but the worktree it couldn't find, and the copy that fails.
     await page.locator('.moved-banner button', { hasText: 'Repair…' }).click()
     const text = async () => (await dialog.innerText().catch(() => '')).replace(/\s+/g, ' ')
-    check('the dialog shows what Repair will do', !!(await lib.until(async () => /Builder.s worktree: now at/.test(await text()) && /wasn.t found/.test(await text()) && /Point 1 session/.test(await text()) && /Copy \d+ files? of Claude Code/.test(await text()), 10000)), await text())
-    const thirdLine = dialog.locator('li', { hasText: 'Third' })
-    await thirdLine.locator('button', { hasText: 'Recreate worktree' }).click()
-    check('…Recreate worktree: the plan says it is made again on its branch', !!(await lib.until(async () => /Recreate Third.s worktree on its branch hive\/ws\/alpha\/third/.test(await text()), 10000)), await text())
+    // A table (#1305): each row read as one sentence (its first cell's, for screen readers): What · Was · Now · Will do.
+    check('the dialog shows what Repair will do', !!(await lib.until(async () => /Builder.s worktree: was [^;]*, now [^;]*; will git worktree repair/.test(await text()) && /Second.s worktree: was [^;]*; will recreate, locate or remove its link/.test(await text()) && /Sessions: was [^;]*, now [^;]*; will point 1 session/.test(await text()) && /Claude Code.s conversations and memory: was 2 folders; will copy \d+ files?; the old ones stay/.test(await text()), 10000)), await text())
+    check('…as a table, What · Was · Now · Will do', (await dialog.locator('.repair-plan thead th').allInnerTexts()).slice(0, 4).join('|') === 'WHAT|WAS|NOW|WILL DO', JSON.stringify(await dialog.locator('.repair-plan thead th').allInnerTexts()))
+    check('…the paths as their part that differs, the full path on hover', (await dialog.locator('.repair-plan tr', { hasText: 'Builder’s worktree' }).or(dialog.locator('.repair-plan tr', { hasText: "Builder's worktree" })).locator('.short-path[data-path]').first().getAttribute('data-path')).toLowerCase() === wt1.toLowerCase())
+    const thirdLine = dialog.locator('.repair-plan tr', { hasText: "Third's worktree" })
+    await thirdLine.getByRole('button', { name: 'Recreate worktree' }).click()
+    check('…Recreate worktree: the plan says it is made again on its branch', !!(await lib.until(async () => /Third.s worktree: was [^;]*; will recreate on hive\/ws\/alpha\/third/.test(await text()), 10000)), await text())
     await page.screenshot({ path: path.join(lib.WORK, 'wsmove-2-plan.png') })
     await dialog.locator('button', { hasText: /^Repair$/ }).click()
     check('…then what it did, with problems: the copy that failed, and the worktree still to locate', !!(await lib.until(async () => /with problems/.test(await text()) && /for Builder.s worktree couldn.t be copied/.test(await text()) && /Second.s worktree wasn.t found/.test(await text()), 20000)), await text())
@@ -192,6 +197,18 @@ async function launch() {
     check('…Recreate refused while Second (missing too) still needs its git link', /Third.s worktree couldn.t be recreated: Recreating runs git worktree prune, which would also drop git.s link to .*second/.test(await text()), await text())
     check('…and Second’s link is still there', gitOut(alpha2, ['worktree', 'list', '--porcelain']).toLowerCase().includes(second1.toLowerCase().replace(/\\/g, '/')) || gitOut(alpha2, ['worktree', 'list', '--porcelain']).toLowerCase().includes(second1.toLowerCase()))
     await page.screenshot({ path: path.join(lib.WORK, 'wsmove-3-report.png') })
+    // The report as a table (#1313): What · Was · Now · Result, problems first, each row's full line on hover.
+    check('…the report as a table, What · Was · Now · Result', (await dialog.locator('.repair-report thead th').allInnerTexts()).slice(0, 4).join('|') === 'WHAT|WAS|NOW|RESULT', JSON.stringify(await dialog.locator('.repair-report thead th').allInnerTexts()))
+    const outcomes = await dialog.locator('.repair-report tbody tr:not(.item-table-group)').evaluateAll((rows) => rows.map((r) => ['failed', 'skipped', 'done'].find((o) => r.classList.contains(`repair-${o}`))))
+    check('…problems first, then what is left to choose, then what was done', outcomes.length > 3 && outcomes.join(',') === [...outcomes].sort((a, b) => ['failed', 'skipped', 'done'].indexOf(a) - ['failed', 'skipped', 'done'].indexOf(b)).join(','), JSON.stringify(outcomes))
+    // Third's result names the worktree in the way by its agent, no path (the row's tooltip has git's full sentence).
+    const thirdResult = (await dialog.locator('.repair-report tr', { hasText: "Third's worktree" }).first().locator('td').nth(3).innerText()).replace(/\s+/g, ' ').trim()
+    check('…Third’s result: Second’s worktree in the way, by name, no path', /another worktree is missing too \(Second's worktree\)/.test(thirdResult) && !/[A-Z]:\\/.test(thirdResult), thirdResult)
+    await inv('settings:update', { appearance: { theme: 'light' } })
+    await lib.until(() => page.evaluate(() => document.documentElement.dataset.theme === 'light'), 10000)
+    await page.screenshot({ path: path.join(lib.WORK, 'wsmove-3-report-light.png') })
+    await inv('settings:update', { appearance: { theme: 'dark' } })
+    await lib.until(() => page.evaluate(() => document.documentElement.dataset.theme === 'dark'), 10000)
     await dialog.locator('button', { hasText: 'Close' }).click()
     check('the banner stays while something is left', (await banner.count()) === 1)
     const pending = readJson(path.join(alpha2, '.hive', 'project.json')).pendingCopies ?? []
@@ -315,7 +332,7 @@ async function launch() {
     lib.gitProject(betaB1)
     let r = await launch()
     await lib.openWorkspace(r.inv, r.page, wsB1)
-    await r.inv('agents:add', betaB1, { location: 'new-worktree', name: 'Stay' })
+    await r.inv('agents:testLegacy', betaB1, { location: 'new-worktree', name: 'Stay' })
     await lib.until(() => readJson(path.join(betaB1, '.hive', 'project.json')).lastPath, 10000)
     await r.app.close()
     fs.mkdirSync(path.dirname(wsB2), { recursive: true })
@@ -324,7 +341,9 @@ async function launch() {
     await lib.openWorkspace(r.inv, r.page, wsB2)
     check('worktrees left behind: the banner shows', !!(await lib.until(async () => (await r.page.locator('.moved-banner').count()) === 1, 15000)))
     const plan = await r.inv('workspace:movePlan')
-    const stay = plan?.hosts.find((h) => h.name === 'beta')?.worktrees.find((w) => w.agentName === 'Stay')
+    // Stay's worktree is still git's at its place, so the slots' migration adopted it at this opening (#1441): Repair plans
+    // it as its carried slot (#1447), linked where it is, as it planned the agent's worktree before.
+    const stay = plan?.hosts.find((h) => h.name === 'beta')?.worktrees.find((w) => w.agentName === 'Stay' || (w.of?.kind === 'slot' && w.of.agent === 'Stay'))
     check('…the worktree stayed where it was, to be linked to the moved project', stay?.how === 'stayed' && same(stay.to, wtB), JSON.stringify(stay))
     const report = await r.inv('workspace:moveRepair')
     check('…Repair finishes', report.complete && report.failed.length === 0, JSON.stringify(report))

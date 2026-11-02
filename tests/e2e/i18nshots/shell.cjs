@@ -1,6 +1,6 @@
 // Screenshot cases for the `shell` area (#795): the title bar's menus (each open), the title bar at the narrowest
 // window (#1038), the command palette, the
-// notifications panel, Help → About, Copy Diagnostics, Keyboard Shortcuts and Agent Setup, the Compact dialog and the
+// notifications panel, Help → About, Copy Diagnostics, Keyboard Shortcuts and Provider Setup, the Compact dialog and the
 // quit dialog, reached for the i18nshots route (tests/e2e/i18nshots.cjs has the case format) with locale-independent
 // means only: IPC, command ids and structural hooks (data-menu, data-command, classes), never English text.
 
@@ -169,7 +169,7 @@ module.exports = {
     dialogScreen('about', 'help.about', 'Help → About'),
     dialogScreen('diagnostics', 'help.diagnostics', 'Copy Diagnostics'),
     dialogScreen('shortcuts', 'help.shortcuts', 'Keyboard Shortcuts'),
-    dialogScreen('agent-setup', 'help.agentSetup', 'Agent Setup'),
+    dialogScreen('agent-setup', 'help.agentSetup', 'Provider Setup'),
     { name: 'compact', open: compact, close: (ctx) => escapeFrom(ctx, '.dialog', 'the Compact dialog') },
     { name: 'quit', open: quit, close: closeQuit }
   ]

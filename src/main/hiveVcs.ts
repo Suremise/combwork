@@ -133,7 +133,11 @@ export async function ensureHiveExcluded(projectPath: string): Promise<{ exclude
   try {
     text = await readFile(f, 'utf8')
   } catch {
-    await mkdir(join(gd, 'info'), { recursive: true })
+    // Only inside the git folder that is there (HI-2045): a project that is its own repository, deleted meanwhile,
+    // fails with ENOENT rather than coming back as `.git\info`.
+    await mkdir(join(gd, 'info')).catch((e: NodeJS.ErrnoException) => {
+      if (e.code !== 'EEXIST') throw e
+    })
   }
   const added = !hasExcludeLine(text, line)
   if (added) {

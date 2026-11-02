@@ -1,0 +1,15 @@
+{
+  "what": "Claude Code 2.1.311 on a server that refuses its key (HI-1772): a new empty CLAUDE_CONFIG_DIR, ANTHROPIC_BASE_URL a local stub answering every request 401 authentication_error, ANTHROPIC_AUTH_TOKEN a dummy. One prompt; it retried 10 times (11 requests, about 3 minutes), then its StopFailure hook got this. Ids and folders replaced.",
+  "requests": 11,
+  "screen": "API error · Retrying in 1s · attempt 1/10 · 401 invalid x-api-key … attempt 10/10 … Not logged in · Please run /login",
+  "hook": {
+    "session_id": "00000000-0000-0000-0000-000000000000",
+    "transcript_path": "C:\\work\\cfg\\projects\\C--work-alpha\\00000000-0000-0000-0000-000000000000.jsonl",
+    "cwd": "C:\\work\\alpha",
+    "prompt_id": "00000000-0000-0000-0000-000000000001",
+    "effort": { "level": "medium" },
+    "hook_event_name": "StopFailure",
+    "error": "authentication_failed",
+    "last_assistant_message": "Not logged in · Please run /login"
+  }
+}

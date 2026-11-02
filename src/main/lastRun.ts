@@ -5,18 +5,21 @@ import { rm, writeFile } from 'original-fs/promises'
 import { join } from 'path'
 import { ASSISTANT_AGENT_ID } from '../shared/assistant'
 import { fmt, msg, tr } from '../shared/i18n'
-import { HEARTBEAT_MS, RUN_MARKER, parseRunMarker, LeftoverStops, resumeFailedLine, unexpectedCloseText, type LaunchProcesses, type LeftMerge, type ResumeReport, type RunMarker, type RunningAgent } from '../shared/unexpectedClose'
+import { HEARTBEAT_MS, RUN_MARKER, parseRunMarker, LeftoverStops, resumeFailedLine, resumeHeldLine, unexpectedCloseText, type LaunchProcesses, type LeftMerge, type ResumeReport, type RunMarker, type RunningAgent } from '../shared/unexpectedClose'
 import type { ToastAction } from '../shared/types'
 import { endProcessesExactly, endTreesExactly, onLaunchProcessJoined, runningProcesses, stillRunningOf } from './agentProcesses'
 import { assistantHome } from './assistantControl'
 import { config } from './config'
-import { createDelivery } from './deliveries'
+import { leaveDelivery } from './deliveries'
 import { journalFactAt } from './journalService'
-import { emit, onHiveEvent, toast } from './events'
+import { onHiveEvent, toast } from './events'
+import { dropOfferActions, resolveOffer } from './notify'
 import { crashDumps, type CrashDump } from './exitLog'
+import { renameRetrying } from './fsutil'
 import { hiveError } from './hiveError'
 import { createLogger, userText } from './logger'
 import { sessions } from './sessions'
+import { adoptInstalledRun, ownsResume } from './restartResume'
 import { inWorkspace, openWorkspaces, workspaceOf } from './workspace'
 
 /**
@@ -95,7 +98,11 @@ export function checkLastRun(file = markerFile()): UnexpectedClose | null {
   const since = m ? Date.parse(m.startedAt) : NaN
   const dump = crashDumps().find((d) => Number.isNaN(since) || d.at >= since) ?? null
   found = { lastSeen: m?.lastSeen ?? at, startedAt: m?.startedAt ?? null, agents: m?.agents ?? [], workspaces: m?.workspaces ?? [], dump, merges: [], processes: m?.processes ?? [] }
-  toResume = found.agents
+  // Ended by an installer that couldn't ask it to close first (HI-1707): a newer version starting now. Its agents are an
+  // install's, resumed by the restart queue as the switch says, not left to this notice.
+  if (m && m.hive && m.hive !== app.getVersion() && found.agents.length) adoptInstalledRun(found.agents, m.hive, found.lastSeen)
+  // The agents a restart's record has (restartResume.ts owns their resume): not resumed from here too.
+  toResume = found.agents.filter((a) => !ownsResume(a.projectPath, a.agentId))
   log.warn(`The last run of Hive ended without quitting: last seen ${found.lastSeen}${m ? ` (Hive ${m.hive}, started ${m.startedAt})` : ' (its marker could not be read)'}; ${found.agents.length} agent(s) were running${found.agents.length ? `: ${found.agents.map((a) => `${userText(a.agentName)} in ${userText(a.project)}`).join(', ')}` : ''}${dump ? `; a crash dump from ${new Date(dump.at).toISOString()}` : '; no crash dump'}`) // i18n-ignore: a line of hive.log
   return found
 }
@@ -149,22 +156,33 @@ function writeMarker(): void {
     })
 }
 
+/** A marker write stopped because the run ended meanwhile (writeMarkerFile's guard). */
+class NotWanted extends Error {}
+
 /**
  * Writes a marker whole beside its file, without holding the main process up (#1111: it was written synchronously on
- * every status change), then renames it into place, so a reader never sees half of one. `wanted` is asked just before
- * the rename, with nothing awaited between: a marker removed meanwhile (Hive quitting) is never put back. True if written.
+ * every status change), then renames it into place, so a reader never sees half of one. The rename is tried again while
+ * the marker is held for a moment (HI-2201: a reader or a virus scanner had it open, the write that had a hive-progress
+ * run's processes failed with EPERM, and the marker missed them until the next heartbeat). `wanted` is asked just before
+ * each rename, with nothing awaited between: a marker removed meanwhile (Hive quitting) is never put back. So each try is
+ * synchronous, in the guard's turn (HR2's round 1: an asynchronous rename, started after the guard, could finish after
+ * endRunMarker's removal and put the marker back); only the waits between tries are not. True if written.
+ * `renameOnce` is the single rename (tests replace it).
  */
-export async function writeMarkerFile(file: string, marker: RunMarker, wanted: () => boolean): Promise<boolean> {
+export async function writeMarkerFile(file: string, marker: RunMarker, wanted: () => boolean, renameOnce: (from: string, to: string) => Promise<void> = async (from, to) => renameSync(from, to)): Promise<boolean> {
   const tmp = `${file}.tmp`
   try {
     await writeFile(tmp, `${JSON.stringify(marker)}\n`)
-    if (!wanted()) {
-      await rm(tmp, { force: true })
-      return false
+    const guard = (): void => {
+      if (!wanted()) throw new NotWanted()
     }
-    renameSync(tmp, file)
+    await renameRetrying(tmp, file, 20, guard, renameOnce)
     return true
   } catch (e) {
+    if (e instanceof NotWanted) {
+      await rm(tmp, { force: true }).catch(() => undefined)
+      return false
+    }
     log.warn("Couldn't write the running marker", e)
     await rm(tmp, { force: true }).catch(() => undefined)
     return false
@@ -234,11 +252,18 @@ export function addLeftMerge(m: LeftMerge): boolean {
 
 /** Resumes the agents that were running, one at a time; one already running again, or with no conversation, is left. */
 async function resumeAgents(agents: readonly RunningAgent[]): Promise<ResumeReport> {
-  const out: ResumeReport = { resumed: [], failed: [] }
+  const out: ResumeReport = { resumed: [], failed: [], held: [] }
   for (const a of agents) {
     if (sessions.liveFor(a.projectPath, a.agentId) || !a.sessionId) continue
+    // Only where it may resume now (#1434): one whose slot is free or holds other work is left, and listed.
+    const hold = await inWorkspace(workspaceOf(a.projectPath), () => sessions.resumeHoldFor(a.projectPath, a.agentId, a.sessionId!)).catch(() => null)
+    if (hold) {
+      out.held!.push({ name: a.agentName, hold })
+      log.info(`Left ${userText(a.agentName)} in ${userText(a.project)} to resume by hand after the unexpected close (${hold.is})`)
+      continue
+    }
     try {
-      await inWorkspace(workspaceOf(a.projectPath), () => sessions.start(a.projectPath, { agentId: a.agentId, resumeId: a.sessionId, ...(a.sessionName ? { name: a.sessionName } : {}) }))
+      await inWorkspace(workspaceOf(a.projectPath), () => sessions.start(a.projectPath, { agentId: a.agentId, resumeId: a.sessionId, auto: true, ...(a.sessionName ? { name: a.sessionName } : {}) }))
       out.resumed.push(a.agentName)
       log.info(`Resumed ${userText(a.agentName)} in ${userText(a.project)} after the unexpected close`)
     } catch (e) {
@@ -249,20 +274,43 @@ async function resumeAgents(agents: readonly RunningAgent[]): Promise<ResumeRepo
   return out
 }
 
+/** The unexpected close's notice (HI-2320), and which of its buttons still have something to do. */
+let closeOffer: string | null = null
+let resumeOpen = false
+let stopOpen = false
+
+/**
+ * One of the notice's actions is done (HI-2320, HR2's round 1): its button goes and the notice says what it did, in
+ * place of another notice; with nothing left to do, the notice is resolved with it.
+ */
+function settled(part: 'resume' | 'stop', level: 'success' | 'error' | 'info', text: string): void {
+  if (part === 'resume') resumeOpen = false
+  else stopOpen = false
+  if (closeOffer && !resumeOpen && !stopOpen && resolveOffer(closeOffer, text)) {
+    closeOffer = null
+    return
+  }
+  if (closeOffer && dropOfferActions(closeOffer, [part === 'resume' ? 'session.resumeAfterClose' : 'session.stopLeftAfterClose'], text)) return
+  toast(level, text)
+}
+
 /** The notice's Resume All: the agents the notice listed, resumed once; the result told. */
 export async function resumeAfterClose(): Promise<ResumeReport> {
   const agents = toResume
   toResume = []
   const r = await resumeAgents(agents)
-  if (r.failed.length) toast('error', tr(msg({ id: 'main.unexpectedClose.resumeFailedTitle', defaultMessage: "Some agents couldn't resume", description: "A notice's title: resuming the agents that were running when Hive closed unexpectedly failed for some." })), resumeFailedLine(r))
-  else toast('success', tr(msg({ id: 'main.unexpectedClose.resumedTitle', defaultMessage: '{n, plural, =0 {Nothing to resume} one {Resumed one agent} other {Resumed # agents}}', description: "A notice's title: the agents that were running when Hive closed unexpectedly were resumed ({n} of them; 0: all were running again or had no conversation)." }), { n: r.resumed.length }))
+  if (r.held?.length) toast('info', tr(msg({ id: 'main.unexpectedClose.heldTitle', defaultMessage: '{n, plural, one {One agent left stopped} other {# agents left stopped}}', description: "A notice's title after resuming the agents that were running when Hive closed unexpectedly (#1434): {n} were left stopped, their conversations' slots free (only their own Resume takes one) or holding other work." }), { n: r.held.length }), resumeHeldLine(r.held))
+  if (r.failed.length) {
+    // Said in the notice whose Resume All it was (the button gone: its agents were each tried once).
+    settled('resume', 'error', `${tr(msg({ id: 'main.unexpectedClose.resumeFailedTitle', defaultMessage: "Some agents couldn't resume", description: "A notice's title: resuming the agents that were running when Hive closed unexpectedly failed for some." }))}: ${resumeFailedLine(r)}`)
+  } else settled('resume', 'success', tr(msg({ id: 'main.unexpectedClose.resumedTitle', defaultMessage: '{n, plural, =0 {Nothing to resume} one {Resumed one agent} other {Resumed # agents}}', description: "A notice's title: the agents that were running when Hive closed unexpectedly were resumed ({n} of them; 0: all were running again or had no conversation)." }), { n: r.resumed.length }))
   return r
 }
 
 /** The line the Assistant finds in its inbox (agent-facing: English). */
 function assistantLine(c: UnexpectedClose, r: ResumeReport | null, still: number): string {
   const agents = c.agents.map((a) => `${a.agentName} (${a.project})`).join(', ') // i18n-ignore: the Assistant's inbox (agent-facing, English)
-  const resumed = r ? `Hive resumed ${r.resumed.length} of them (the user's setting)${r.failed.length ? `; ${r.failed.length} couldn't resume` : ''}.` : 'Nothing was resumed: the user decides.' // i18n-ignore: the Assistant's inbox (agent-facing, English)
+  const resumed = r ? `Hive resumed ${r.resumed.length} of them (the user's setting)${r.failed.length ? `; ${r.failed.length} couldn't resume` : ''}${r.held?.length ? `; ${r.held.length} left stopped (their slots are free, to resume by hand, or hold other work)` : ''}.` : 'Nothing was resumed: the user decides.' // i18n-ignore: the Assistant's inbox (agent-facing, English)
   const left = still ? ` ${still} process(es) the agents started are still running; the user can stop them from Hive's notice.` : '' // i18n-ignore: the Assistant's inbox (agent-facing, English)
   return `Hive closed unexpectedly: last seen ${c.lastSeen}. ${c.agents.length ? `${c.agents.length} agent(s) were running: ${agents}. ${resumed}` : 'No agents were running.'}${left} Check for card loops and lanes that stalled and tell the user; don't restart or stop anything yourself.` // i18n-ignore: the Assistant's inbox (agent-facing, English)
 }
@@ -276,7 +324,8 @@ async function tellAssistants(c: UnexpectedClose, r: ResumeReport | null, still:
     await journalFactAt(ws, { summary: `Hive closed unexpectedly (last seen ${c.lastSeen}); ${c.agents.filter((a) => a.workspace.toLowerCase() === ws).length} agent(s) of this workspace were running`, importance: 2, tags: ['incident', 'unexpected-close'] }) // i18n-ignore: a journal fact (the Assistant's, English)
     // A session host's own config is in its .hive folder: none, the workspace has no Assistant to tell.
     if (!existsSync(join(home, '.hive', 'project.json'))) continue
-    await createDelivery(home, { agentId: ASSISTANT_AGENT_ID, kind: 'control', from: HIVE, body: assistantLine(c, r, still) }).catch((e) => log.warn('telling the Assistant Hive closed unexpectedly', e))
+    // Its workspace may be open in no window now (#1395): left on a lease, for its next open, not admitted for this.
+    await leaveDelivery(home, { agentId: ASSISTANT_AGENT_ID, kind: 'control', from: HIVE, body: assistantLine(c, r, still) }).catch((e) => log.warn('telling the Assistant Hive closed unexpectedly', e))
   }
 }
 
@@ -293,7 +342,8 @@ export async function tellUnexpectedClose(): Promise<void> {
   // can be resumed in them. However long they take: the notice waits for them, not for a time.
   await startupDone()
   const auto = config.settings.sessions.resumeAfterUnexpectedClose === true
-  const r = auto && c.agents.length ? await resumeAgents(c.agents) : null
+  const mine = c.agents.filter((a) => !ownsResume(a.projectPath, a.agentId))
+  const r = auto && mine.length ? await resumeAgents(mine) : null
   if (r) toResume = []
   // What the agents had started that still runs as the same processes (#987): listed, never stopped unasked.
   const kept = c.processes.flatMap((l) => l.processes)
@@ -302,12 +352,17 @@ export async function tellUnexpectedClose(): Promise<void> {
   if (kept.length) log.info(`Of ${kept.length} process(es) the agents had started, ${leftRunning.length} still run${leftRunning.length ? `: ${userText(leftRunning.map((p) => p.label).join('; '))}` : ''}`) // i18n-ignore: a line of hive.log
   told = true
   const actions: ToastAction[] = []
-  if (!r && c.agents.length) actions.push({ label: tr(msg({ id: 'main.unexpectedClose.resumeAll', defaultMessage: 'Resume All', description: 'A button in the notice that Hive closed unexpectedly: resumes the agents that were running.' })), command: 'session.resumeAfterClose' })
+  if (!r && mine.length) actions.push({ label: tr(msg({ id: 'main.unexpectedClose.resumeAll', defaultMessage: 'Resume All', description: 'A button in the notice that Hive closed unexpectedly: resumes the agents that were running.' })), command: 'session.resumeAfterClose' })
   if (leftRunning.length) actions.push({ label: tr(msg({ id: 'main.unexpectedClose.stopThem', defaultMessage: 'Stop Them', description: 'A button in the notice that Hive closed unexpectedly: ends the processes the agents had started that are still running (only those, checked to be the same processes).' })), command: 'session.stopLeftAfterClose' })
   actions.push({ label: tr(msg({ id: 'main.unexpectedClose.overview', defaultMessage: 'Show Overview', description: "A button in the notice that Hive closed unexpectedly: shows the Workspace Overview, with every project's agents." })), command: 'view.overview' })
   // It stays up for two minutes (a notice with buttons goes after 15 s), and in the Notifications panel after.
   const title = tr(msg({ id: 'main.unexpectedClose.title', defaultMessage: 'Hive closed unexpectedly', description: "The notice's title at start when the last run of Hive ended without quitting (killed, a crash, the power)." }))
-  emit({ type: 'toast', toast: { id: randomUUID(), level: 'warning', title, message: unexpectedCloseText({ ...c, dump: !!c.dump, stillRunning: leftRunning, kept }, r), actions, timestamp: new Date().toISOString(), timeoutMs: 120_000 } })
+  // Its offer (HI-2320): live while Resume All or Stop Them still has something to do; the last one's result is what it
+  // says then, in place of its buttons.
+  closeOffer = `lastrun:${randomUUID()}`
+  resumeOpen = !r && mine.length > 0
+  stopOpen = leftRunning.length > 0
+  toast('warning', title, unexpectedCloseText({ ...c, dump: !!c.dump, stillRunning: leftRunning, kept }, r), actions, undefined, undefined, { offer: closeOffer, timeoutMs: 120_000 })
   await tellAssistants(c, r, leftRunning.length)
 }
 
@@ -331,7 +386,7 @@ export async function stopLeftAfterClose(): Promise<number> {
   if (n && u) throw hiveError(msg({ id: 'main.unexpectedClose.notStoppedNorChecked', defaultMessage: "{n, plural, one {# process is still running: Windows didn't let Hive end it; Stop Them in the notice tries again.} other {# processes are still running: Windows didn't let Hive end them; Stop Them in the notice tries again.}} {u, plural, one {Another, started by a test run, may still be running: Windows let Hive neither end nor check it, so Hive can't find it again. Look for process ID {ids} in Task Manager's Details.} other {# others, started by a test run, may still be running: Windows let Hive neither end nor check them, so Hive can't find them again. Look for process IDs {ids} in Task Manager's Details.}}", description: "Stopping the processes the agents had started before Hive closed unexpectedly failed for some. {n} is how many still run, which Stop Them (the notice's button) tries again; {u} is how many more, started by a test run, Windows let Hive neither end nor check, so Hive can't tell them from other processes any more: {ids} lists their process IDs (\"4242, 4250\"), to look for in Task Manager's Details tab." }), { n, u, ids })
   if (n) throw hiveError(msg({ id: 'main.unexpectedClose.notStopped', defaultMessage: "{n, plural, one {# process is still running: Windows didn't let Hive end it.} other {# processes are still running: Windows didn't let Hive end them.}} Stop Them in the notice tries again.", description: "Stopping the processes the agents had started before Hive closed unexpectedly failed for some. {n} is how many still run; Stop Them is the notice's button." }), { n })
   if (u) throw hiveError(msg({ id: 'main.unexpectedClose.notChecked', defaultMessage: "{u, plural, one {A process started by a test run may still be running: Windows let Hive neither end nor check it, so Hive can't find it again. Look for process ID {ids} in Task Manager's Details.} other {# processes started by a test run may still be running: Windows let Hive neither end nor check them, so Hive can't find them again. Look for process IDs {ids} in Task Manager's Details.}}", description: "Stop Them (in the notice that Hive closed unexpectedly) ended what it could, but {u} processes a test run had started may still run: Windows let Hive neither end nor check them, and with what started them ended Hive can't tell them from other processes any more, so pressing Stop Them again won't reach them. {ids} lists their process IDs (\"4242, 4250\"), to look for in Task Manager's Details tab." }), { u, ids })
-  toast('success', tr(msg({ id: 'main.unexpectedClose.stopped', defaultMessage: '{n, plural, one {Stopped one process} other {Stopped # processes}}', description: "A notice's title: the processes the agents had started before Hive closed unexpectedly were ended ({n} of them)." }), { n: stopped }))
+  settled('stop', 'success', tr(msg({ id: 'main.unexpectedClose.stopped', defaultMessage: '{n, plural, one {Stopped one process} other {Stopped # processes}}', description: "A notice's title: the processes the agents had started before Hive closed unexpectedly were ended ({n} of them)." }), { n: stopped }))
   return stopped
 }
 

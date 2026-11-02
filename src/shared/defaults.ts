@@ -1,5 +1,7 @@
 import type { AgentBranchStatus, AgentDef, AppConfig, AppSettings, CompactionEvent, KeybindingOverrides, FileLockMode, PageLayout, PlanLimit, PlanUsage, ProjectConfig, ProjectProviderConfig, ProviderId, ProviderSettings, SessionLayout, SessionRecord, SessionStatus, SessionView, WorkspaceConfig } from './types'
 import { CLAUDE_CODE } from './claude'
+import { MIGRATED_QUIT, migrateHiveCommands } from './commands'
+import { AGENT_LIMIT_DEFAULT, AGENT_LIMIT_MAX } from './agentLimits'
 import { DEFAULT_COLUMN_COLORS } from './tasks'
 import { formatDateTime } from './dates'
 import { formatGigabytes, formatSize } from './units'
@@ -7,6 +9,9 @@ import { AUTO_PROVIDER, DEFAULT_PROVIDER, PROVIDERS, defaultProviderSettings, is
 import { chosenName, effortName, modelIdName, resolvedModel, runsAsName, type ModelInfo } from './models'
 import { msg, tr as trNow, type Msg } from './i18n'
 import type { Tr } from './tasks'
+import { samePath } from './movePaths'
+import { legacyWorktree } from './agentFolders'
+import { migrateGlobalFileLocks, migrateProjectPreferences } from './workflow/preferences'
 
 export const HIVE_DIR = '.hive'
 
@@ -28,6 +33,8 @@ export const RETIRED_PERSONAS: Record<string, string> = { overseer: 'coordinator
 
 export const DEFAULT_SETTINGS: AppSettings = {
   keybindings: {},
+  commands: { list: [], onQuit: { run: [] } },
+  mcpCatalogs: { oursOn: true, sources: [] },
   updates: {
     checkAutomatically: true,
     downloadAutomatically: true,
@@ -59,8 +66,10 @@ export const DEFAULT_SETTINGS: AppSettings = {
     terminalCursorBlink: true
   },
   providers: Object.fromEntries(PROVIDERS.map((p) => [p.id, defaultProviderSettings(p)])),
-  // Automatic (#474): the first provider turned on and installed.
+  // Automatic (#474): the first provider turned on and installed, in the order below.
   defaultProvider: AUTO_PROVIDER,
+  providerOrder: [],
+  // Hive's own order: no screen sets it since decision A (HI-2113); a 0.9 order is still read.
   notifications: {
     chimeEnabled: true,
     chimeSound: 'chime',
@@ -68,13 +77,13 @@ export const DEFAULT_SETTINGS: AppSettings = {
     desktopNotifications: true,
     notifyOnFinished: true,
     notifyOnWaiting: true,
-    whileFocused: 'inApp',
     bannerScope: 'all',
-    bannerPosition: 'top-center',
+    bannerPosition: 'bottom-right',
     bannerSeconds: 6,
     waitingBannerStays: true,
     taskbarCount: true,
-    flashOnWaiting: true
+    flashOnWaiting: true,
+    suggestFreshStart: true
   },
   sessions: {
     backupTranscripts: true,
@@ -112,9 +121,6 @@ export const DEFAULT_SETTINGS: AppSettings = {
     providers: Object.fromEntries(PROVIDERS.map((p) => [p.id, { model: '', effort: '', permissionMode: '', extraArgs: '', use200kContext: '' }]))
   },
   agents: {
-    fileLocks: 'block',
-    worktreeCopy: '.env*',
-    mergeStyle: 'merge',
     backgroundTaskMinutes: 60,
     leftoverProcesses: 'ask'
   },
@@ -129,7 +135,7 @@ export const DEFAULT_SETTINGS: AppSettings = {
 }
 
 export const DEFAULT_APP_CONFIG: AppConfig = {
-  version: 8,
+  version: 9,
   settings: DEFAULT_SETTINGS,
   recentWorkspaces: [],
   lastWorkspace: null,
@@ -150,49 +156,60 @@ export const DEFAULT_PROJECT_CONFIG: ProjectConfig = {
   version: 2,
   mcp: { disabled: [], enabled: [] },
   chime: 'inherit',
+  suggestFreshStart: 'inherit',
+  inboxCheckpoints: 'inherit',
+  inboxStopContinuation: 'inherit',
+  inboxIdleWakes: 'inherit',
   defaultProvider: 'inherit',
   providers: {},
   compactSuggestTokens: null,
   transcriptWarnMB: null,
+  cardAttachmentCleanup: '30',
   agents: [],
   layout: 'auto',
-  fileLocks: 'inherit',
   worktreeCopy: null,
-  worktreeSetup: '',
-  loopWakes: true,
-  loopRounds: null,
-  loopWaitHours: null
+  worktreeSetup: ''
 }
 
 /** The transcript viewer loads this many items at a time (the latest first, earlier ones as you scroll up). */
 export const TRANSCRIPT_WINDOW = 200
 
+export { AGENT_LIMIT_DEFAULT, AGENT_LIMIT_MAX }
 /**
- * How many agents a project can have (#562): Settings → Advanced → Agents per project (`hive.agents.perProject`, a
- * workspace can set its own), this by default and at most AGENT_LIMIT_MAX. Read it with `agentLimit()` (main, per project)
- * or `useAgentLimit()` (renderer), never a constant.
+ * Why the user can't add another agent (HI-2058: Maximum agents binds the user too): the project's workflow allows `max`
+ * (its Maximum agents), and where to raise it; at AGENT_LIMIT_MAX, the most any project can have.
  */
-export const AGENT_LIMIT_DEFAULT = 12
-/** The most the setting allows (Darren, 11 Oct: four pages of six; more than that should be another project). Templates hold at most this many. */
-export const AGENT_LIMIT_MAX = 24
-/** Why another agent can't be added: the project has `limit` already. */
-export const agentLimitText = (limit: number, tr?: Tr): string =>
-  tr
-    ? tr(msg({ id: 'agents.limit.reached', defaultMessage: 'A project can have up to {limit} agents (Settings → Advanced → Agents per project).', description: "Why another agent can't be added to a project. {limit} is a number; \"Settings → Advanced → Agents per project\" is where the setting is: use its translated names." }), { limit })
-    : `A project can have up to ${limit} agents (Settings → Advanced → Agents per project).` // i18n-ignore: English for main's error (the window passes tr)
+export const agentLimitText = (tr?: Tr, max: number = AGENT_LIMIT_MAX): string => {
+  if (max >= AGENT_LIMIT_MAX)
+    return tr
+      ? tr(msg({ id: 'agents.limit.most', defaultMessage: 'A project can have up to {most, number} agents.', description: "Why another agent can't be added to a project: it has as many as Hive allows ({most}, 24)." }), { most: AGENT_LIMIT_MAX })
+      : `A project can have up to ${AGENT_LIMIT_MAX} agents.` // i18n-ignore: English for main's error (the window passes tr)
+  return tr
+    ? tr(msg({ id: 'agents.limit.workflow', defaultMessage: 'This project’s workflow allows {max, plural, one {# agent} other {# agents}}: raise Maximum agents in Version Control → Workflow.', description: "Why another agent can't be added to a project (HI-2058): its workflow option Maximum agents allows {max} and it has that many. Maximum agents, Version Control and Workflow are names in the window: as translated there." }), { max })
+    : `This project's workflow sets Maximum agents to ${max}: raise it in Version Control → Workflow.` // i18n-ignore: English for main's error (the window passes tr)
+}
+/** The link beside agentLimitText at a project's Maximum agents (HI-2058): opens Version Control → Workflow. */
+export const OPEN_WORKFLOW_OPTIONS = msg({ id: 'agents.limit.openWorkflow', defaultMessage: 'Open Workflow Options', description: "A button or link beside why another agent can't be added (HI-2058: the project is at its Maximum agents): opens the project's Version Control tab at Workflow, where Maximum agents is set." })
+/**
+ * Why the Assistant or the Agent API can't add another agent (HI-2001): the project's workflow allows `max` (Maximum
+ * agents), and where the user raises it. Only agents read it, so it stays English.
+ */
+export const agentMaxText = (max: number): string =>
+  `This project's workflow sets Maximum agents to ${max}, the user's team size, and the project has that many. Ask the user to raise Maximum agents in Version Control → Workflow.` // i18n-ignore: English for the Assistant and the Agent API (agents read it)
 /** Memory as the agents note says it: MB, or GB from 1 GB. */
 const memoryText = (n: number): string => (n >= 1024 ** 3 ? formatGigabytes(n) : formatSize(n))
 
 /**
- * Settings → Advanced's note once Agents per project goes over the default (Darren, 11 Oct): what more agents cost, in
+ * The note under Maximum agents (Version Control → Workflow, HI-2001; before, Settings → Advanced's Agents per project)
+ * once it goes over the default (Darren, 11 Oct): what more agents cost, in
  * the machine's own figures (the memory running agents take now, measured; the computer's), and the plans' limits.
  */
 export function manyAgentsNote(m: { running: { agents: number; bytes: number } | null; total: number; free: number }): string {
   const machine = { limit: AGENT_LIMIT_DEFAULT, total: memoryText(m.total), free: memoryText(m.free) }
   if (m.running && m.running.agents > 0) {
-    return trNow(msg({ id: 'agents.limit.manyMeasured', defaultMessage: "More than {limit} agents: each runs its own copy of its CLI. {running, plural, one {Your # running agent takes} other {Your # running agents take}} {used} now (about {each} each); this computer has {total} of memory, {free} free. They all share your plans' usage limits, so they reach them sooner.", description: "Settings → Advanced, under Agents per project once it is over the default ({limit}): what more agents cost. {running} agents run now and take {used} of memory ({each} each); {total} and {free} are the computer's memory (\"16.0 GB\")." }), { ...machine, running: m.running.agents, used: memoryText(m.running.bytes), each: memoryText(m.running.bytes / m.running.agents) })
+    return trNow(msg({ id: 'agents.limit.manyMeasured', defaultMessage: "More than {limit} agents: each runs its own copy of its CLI. {running, plural, one {Your # running agent takes} other {Your # running agents take}} {used} now (about {each} each); this computer has {total} of memory, {free} free. They all share your plans' usage limits, so they reach them sooner.", description: "Version Control → Workflow, under Maximum agents once it is over the default ({limit}): what more agents cost. {running} agents run now and take {used} of memory ({each} each); {total} and {free} are the computer's memory (\"16.0 GB\")." }), { ...machine, running: m.running.agents, used: memoryText(m.running.bytes), each: memoryText(m.running.bytes / m.running.agents) })
   }
-  return trNow(msg({ id: 'agents.limit.many', defaultMessage: "More than {limit} agents: each runs its own copy of its CLI, roughly 200–500 MB of memory each; this computer has {total} of memory, {free} free. They all share your plans' usage limits, so they reach them sooner.", description: "Settings → Advanced, under Agents per project once it is over the default ({limit}): what more agents cost. {total} and {free} are the computer's memory (\"16.0 GB\")." }), machine)
+  return trNow(msg({ id: 'agents.limit.many', defaultMessage: "More than {limit} agents: each runs its own copy of its CLI, roughly 200–500 MB of memory each; this computer has {total} of memory, {free} free. They all share your plans' usage limits, so they reach them sooner.", description: "Version Control → Workflow, under Maximum agents once it is over the default ({limit}): what more agents cost. {total} and {free} are the computer's memory (\"16.0 GB\")." }), machine)
 }
 /** An agent's role (#126) is at most this long. */
 export const ROLE_MAX = 60
@@ -427,8 +444,8 @@ export function isCompacting(live: { status: SessionStatus; statusMessage?: stri
 }
 
 /**
- * Why a worktree agent's work can't be merged now, or null. A merge commits the worktree's uncommitted files first,
- * so not while the agent is in the middle of a task (working, asking you something, waiting on background tasks or on cards).
+ * Why a worktree agent's work can't be merged now, or null. A merge takes its branch as committed (#1347), so not while
+ * the agent may still be committing to it, in the middle of a task (working, asking you something, waiting on background tasks or on cards).
  */
 export function mergeBlocked(name: string, status: SessionStatus | null | undefined, tr?: Tr): string | null {
   const why = status === 'starting' ? 'working' : status
@@ -450,10 +467,11 @@ export function mergeBlocked(name: string, status: SessionStatus | null | undefi
 
 /**
  * Whether stopping an agent at the Assistant's request asks the user first: when it is in the middle of something
- * (starting, working, asking, waiting on background tasks, or on cards in a card loop).
+ * (starting, working, asking, waiting on background tasks). One only watching cards or agents is idle (HI-1994): no
+ * turn runs and its conversation is kept, so it is stopped without asking, as an idle one is.
  */
 export const stopAsksUser = (status: SessionStatus | null | undefined): boolean =>
-  status === 'starting' || status === 'working' || status === 'waiting' || status === 'background' || status === 'watching'
+  status === 'starting' || status === 'working' || status === 'waiting' || status === 'background'
 
 /** Folder-safe slug for branch and worktree names: "Agent 2" → "agent-2". */
 export function slugify(name: string): string {
@@ -489,6 +507,26 @@ export function agentModelShown(provider: ProviderId, chosen: string | undefined
   const fromCli = !own && !globalModel
   const picked = choice && (!fromCli || resolvedModel(info, choice) !== choice) ? chosenName(provider, choice, info) : null
   return { label: own ? name : trNow(msg({ id: 'agents.model.inherited', defaultMessage: '{model} (default)', description: "An agent's model when the agent didn't choose it (it comes from the project or Settings): {model} is its name (\"Opus 5.5\")." }), { model: name }), chosenAs: picked && picked !== name ? picked : null }
+}
+
+/**
+ * What a pane's footer resolves its model and effort from (HI-1996): a running session's own launch (`launchedWith`:
+ * the model and effort it was given, after the connection's defaults and HI-1770's dropped effort), never the settings
+ * as they are now; a new session's, the agent's, project's and Settings' choices. The CLI's reports come first either way.
+ * `modelGlobal` is a model the agent didn't choose itself (shown "(default)"); empty, with no model, its CLI's default.
+ */
+export function footerChoices(
+  a: { model?: string; effort?: string },
+  project: { model?: string; effort?: string },
+  global: { defaultModel?: string; defaultEffort?: string },
+  live: { launchedWith?: { model: string | null; effort: string | null; own?: true } } | null | undefined
+): { model: string | undefined; modelGlobal: string; effort: string | undefined; effortGlobal: string | undefined } {
+  const launched = live?.launchedWith
+  if (launched) {
+    const own = !!launched.model && !!launched.own
+    return { model: own ? launched.model! : undefined, modelGlobal: own ? '' : (launched.model ?? ''), effort: launched.effort ?? undefined, effortGlobal: undefined }
+  }
+  return { model: a.model || project.model, modelGlobal: global.defaultModel ?? '', effort: a.effort ?? project.effort, effortGlobal: global.defaultEffort }
 }
 
 /** agentModelShown's label for new sessions (no running model). */
@@ -538,6 +576,9 @@ const V1_LIMITS: Record<string, Pick<PlanLimit, 'id' | 'label' | 'windowMinutes'
 const OLD_ASSISTANT_DEFAULTS: Record<string, { model?: string; effort: string }> = { 'claude-code': { model: 'sonnet', effort: 'low' }, codex: { effort: 'low' } }
 
 export function migrateConfig(cfg: AppConfig, raw?: Record<string, any>): AppConfig {
+  // HI-1954: Hive's commands cleaned, and HI-1368's When Hive quits, run adopted as one of them (once; written next save).
+  cfg.settings.commands = migrateHiveCommands({ commands: raw?.settings?.commands, onQuit: raw?.settings?.general?.onQuit }, trNow(MIGRATED_QUIT))
+  delete cfg.settings.general.onQuit
   const g = cfg.settings.general
   const q = g.confirmOnQuit as unknown
   // 0.1 stored on/off; "on" asked whenever sessions ran, which maps to asking when an agent is working.
@@ -582,20 +623,13 @@ export function migrateConfig(cfg: AppConfig, raw?: Record<string, any>): AppCon
       if (a.effort === old.effort) a.effort = ''
     }
   }
-  if (raw && (raw.version ?? 1) < 4 && cfg.settings.agents.mergeStyle === 'squash') {
-    // Squash was the default until 0.3 (saved into every config): merging keeps a long-lived agent's commits, so
-    // its next merge brings only what is new. Anyone who wants Squash chooses it again.
-    cfg.settings.agents.mergeStyle = 'merge'
-  }
+  migrateAgentsWorktreeSettings(cfg)
+  // HI-1766: Settings → Agents → File locks is Hive's workflow default.
+  migrateGlobalFileLocks(cfg.settings)
   if (raw && (raw.version ?? 1) < 5 && cfg.settings.sessions.transcriptWarnMB === 50) {
     // 50 MB was the default up to 0.3.x (saved into every config); long transcripts slow things well before that.
     // Anyone who wants 50 sets it again.
     cfg.settings.sessions.transcriptWarnMB = 20
-  }
-  if (raw && (raw.version ?? 1) < 6) {
-    // Up to 0.3.x, "Only when Hive is in the background" (onlyWhenUnfocused) decided whether a Windows notification
-    // showed while you used Hive. Now notices show in Hive instead, and everyone starts there, whatever it was.
-    cfg.settings.notifications.whileFocused = 'inApp'
   }
   migratePersonaNames(cfg, raw)
   if (raw && (raw.version ?? 1) < 7) {
@@ -610,10 +644,28 @@ export function migrateConfig(cfg: AppConfig, raw?: Record<string, any>): AppCon
     // Copilot default was chosen, and stays.
     cfg.settings.defaultProvider = AUTO_PROVIDER
   }
-  delete (cfg.settings.notifications as unknown as Record<string, unknown>).onlyWhenUnfocused
-  cfg.version = 8
+  const notifications = cfg.settings.notifications as unknown as Record<string, unknown>
+  if (raw && (raw.version ?? 1) < 9) {
+    // HI-2320: one notification system. *While Hive is focused* went: Windows notifications only with no Hive window
+    // focused. Show nothing (version 6 on; before it, "Only when Hive is in the background" moved everyone to Show in
+    // Hive) becomes *Only in the bell* for agents' pop-ups, which keeps the Windows notifications in the background;
+    // a Windows notification while focused becomes a pop-up. The banners' old default place, top centre, moves to the
+    // pop-ups' corner, bottom right (Darren, 2 Nov); any other place chosen is kept.
+    const was = (raw.version ?? 1) < 6 ? 'inApp' : notifications.whileFocused
+    if (was === 'nothing') notifications.bannerScope = 'none'
+    if (notifications.bannerPosition === 'top-center') notifications.bannerPosition = 'bottom-right'
+  }
+  delete notifications.whileFocused
+  delete notifications.onlyWhenUnfocused
+  cfg.version = 9
   // Settings for providers this version doesn't know are kept (a newer Hive wrote them), but never used.
   if (!isDefaultProviderValue(cfg.settings.defaultProvider)) cfg.settings.defaultProvider = AUTO_PROVIDER
+  // 0.9's providers' order (HI-1965): no list follows it since HI-2139, but the migration reads it (what Automatic
+  // picked), so it is kept as it was saved: a list of ids, each once; ids this Hive doesn't know are kept (a newer Hive's).
+  const order: unknown = cfg.settings.providerOrder
+  cfg.settings.providerOrder = Array.isArray(order) ? [...new Set(order.filter((x): x is ProviderId => typeof x === 'string' && x.length > 0 && x.length <= 64))] : []
+  // Its revision went with the window's moves (HI-2113).
+  delete (cfg.settings as unknown as Record<string, unknown>).providerOrderRevision
   return cfg
 }
 
@@ -639,6 +691,24 @@ export function withLegacySettings(cfg: AppConfig): AppConfig & { settings: AppS
       }
     }
   }
+}
+
+/** Hive's own default for the git-ignored files copied into each new slot and review copy (HI-1765). */
+export const SLOT_COPY_DEFAULT = '.env*'
+
+/**
+ * Until 1.0's HI-1765, Settings → Agents & Worktrees had "Copy into new worktrees" (`agents.worktreeCopy`) and "Default
+ * merge style" (`agents.mergeStyle`). The copy is now Hive's slot default (`slotDefaults.copy`, a workflow default for
+ * Git): a value saved there moves over, unless the new one is already set or it is the old default (saved into every
+ * config, so nobody chose it: the built-in default stands). The merge style went: the merge dialogs follow each
+ * project's own. Both old keys are dropped on every load, so they can't come back.
+ */
+function migrateAgentsWorktreeSettings(cfg: AppConfig): void {
+  const agents = cfg.settings.agents as AppSettings['agents'] & { worktreeCopy?: unknown; mergeStyle?: unknown }
+  const old = agents.worktreeCopy
+  if (typeof old === 'string' && old !== SLOT_COPY_DEFAULT && cfg.settings.slotDefaults?.copy === undefined) cfg.settings.slotDefaults = { ...cfg.settings.slotDefaults, copy: old }
+  delete agents.worktreeCopy
+  delete agents.mergeStyle
 }
 
 /**
@@ -672,7 +742,8 @@ function migratePersonaNames(cfg: AppConfig, raw: Record<string, any> | undefine
 export function migrateProjectConfig(raw: Record<string, any>): Record<string, any> {
   if (!raw || typeof raw !== 'object' || Array.isArray(raw)) return raw
   let out = withoutSkillSwitches(raw)
-  if (out.providers === undefined) {
+  // Since the accounts migration (HI-2106) a project has no provider settings: never made again from 0.1's fields.
+  if (out.providers === undefined && !out.migrations?.accounts1) {
     // 0.1's model, effort, mode and arguments were Claude Code's.
     const legacy: Partial<ProjectProviderConfig> = {}
     for (const k of ['model', 'effort', 'permissionMode', 'extraArgs'] as const) if (out[k] !== undefined) legacy[k] = out[k]
@@ -706,7 +777,8 @@ export function migrateProjectConfig(raw: Record<string, any>): Record<string, a
     // Until 0.9.3 the Hive Assistant's mode was its persona (#1084).
     out = { ...out, agents: out.agents.map((a: unknown) => (a && typeof a === 'object' && 'persona' in a ? withMode(a as Record<string, unknown>) : a)) }
   }
-  return out
+  // HI-1766: Card loops and File locks are the project's workflow options.
+  return migrateProjectPreferences(out)
 }
 
 /** A record from before 0.9.3 (an agent, a session) with its `persona` as its `mode` (#1084). */
@@ -715,8 +787,16 @@ export function withMode<T extends Record<string, unknown>>(rec: T): T {
   return (typeof persona === 'string' && rest.mode === undefined ? { ...rest, mode: persona } : rest) as unknown as T
 }
 
-/** project.json as written: Claude Code's project settings are also kept in 0.1.x's flat fields. */
+/**
+ * project.json as written: Claude Code's project settings are also kept in 0.1.x's flat fields. Once the accounts
+ * migration removed the project's launch settings (HI-2106: its agents' connections hold them), neither they nor its
+ * default provider are written again.
+ */
 export function withLegacyProjectFields(cfg: ProjectConfig): ProjectConfig & Partial<ProjectProviderConfig> {
+  if (cfg.migrations?.accounts1) {
+    const { providers: _p, defaultProvider: _d, model: _m, effort: _e, permissionMode: _pm, extraArgs: _x, ...rest } = cfg as ProjectConfig & Partial<ProjectProviderConfig>
+    return rest as ProjectConfig
+  }
   const c = cfg.providers?.[CLAUDE_CODE]
   return c ? { ...cfg, model: c.model, effort: c.effort, permissionMode: c.permissionMode, extraArgs: c.extraArgs } : cfg
 }
@@ -758,30 +838,33 @@ export function effortLabel(provider: string, live: string | undefined, chosen: 
 }
 
 /** Whether a session record ran in the folder an agent works in (its worktree, or the project folder). */
-export function sessionInAgentFolder(projectPath: string, a: Pick<AgentDef, 'worktree'>, rec: Pick<SessionRecord, 'cwd'>): boolean {
-  const folder = (a.worktree?.path ?? projectPath).toLowerCase()
+export function sessionInAgentFolder(projectPath: string, a: object, rec: Pick<SessionRecord, 'cwd'>): boolean {
+  const folder = (legacyWorktree(a)?.path ?? projectPath).toLowerCase()
   return (rec.cwd ?? projectPath).toLowerCase() === folder
 }
 
 /**
  * The session an agent's Resume opens: its last session, else the latest one it ran, else the latest
  * one no current agent owns (its agent was removed, e.g. by the 0.2 upgrade). Archived sessions,
- * sessions from another folder and sessions open in another agent are skipped. Callers pass only
- * records of the agent's provider.
+ * sessions from another folder and sessions open in another agent are skipped; the agent's own in the
+ * project's slots (`slotFolders`, #1434) count, wherever they are (whether they may resume there is
+ * agentFolders' hold). Callers pass only records of the agent's provider.
  */
 export function resumeRecord<R extends Pick<SessionRecord, 'id' | 'archived' | 'lastActiveAt'> & Partial<Pick<SessionRecord, 'cwd' | 'agentId' | 'sub'>>>(
   projectPath: string,
-  a: Pick<AgentDef, 'id' | 'worktree' | 'lastSessionId'>,
+  a: Pick<AgentDef, 'id' | 'lastSessionId'>,
   records: R[],
   open: Set<string>,
-  agentIds: Set<string> = new Set([a.id])
+  agentIds: Set<string> = new Set([a.id]),
+  slotFolders: readonly string[] = []
 ): R | null {
+  const inSlot = (r: R): boolean => !!r.cwd && r.agentId === a.id && slotFolders.some((f) => samePath(f, r.cwd!))
   const usable = records
-    .filter((r) => !r.archived && !r.sub && !open.has(r.id) && sessionInAgentFolder(projectPath, a, r))
+    .filter((r) => !r.archived && !r.sub && !open.has(r.id) && (sessionInAgentFolder(projectPath, a, r) || inSlot(r)))
     .sort((x, y) => (y.lastActiveAt ?? '').localeCompare(x.lastActiveAt ?? ''))
   return (
     usable.find((r) => r.id === a.lastSessionId) ??
-    usable.find((r) => !!a.worktree || r.agentId === a.id) ??
+    usable.find((r) => !!legacyWorktree(a) || r.agentId === a.id) ??
     usable.find((r) => !r.agentId || !agentIds.has(r.agentId)) ??
     null
   )
@@ -868,6 +951,8 @@ export function unmergedWork(st: AgentBranchStatus | null | undefined, tr?: Tr):
 
 /** Where Hive's releases (and its update feed) are published. */
 export const RELEASES_URL = 'https://github.com/Suremise/hive-desktop/releases'
+/** The same repository, for the updater's feed (HI-2311): electron-builder.yml's publish block names it too (a test checks). */
+export const RELEASES_REPO = { owner: 'Suremise', repo: 'hive-desktop' } as const // i18n-ignore: a GitHub repository's owner and name
 
 // ---------------------------------------------------------------------------
 // Keyboard shortcuts

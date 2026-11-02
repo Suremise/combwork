@@ -1,31 +1,38 @@
 import { Children, useEffect, useRef, useState } from 'react'
 import { ASSISTANT_AGENT_ID, DEFAULT_MODE, NEW_MODE_DESCRIPTION, assistantModeId } from '@shared/assistant'
 import { assistantStatusLine } from '@shared/assistantStatus'
+import { SHIPPED_MODE_DESCRIPTIONS, SHIPPED_MODE_NAMES } from '@shared/modeDescriptions'
 import { AGENT_STATE_LABEL, agentState, boardExtras, type AgentState } from '@shared/agentState'
 import { compactThreshold, isCompacting } from '@shared/defaults'
-import { formatDateTime, formatTime } from '@shared/dates'
+import { formatTime } from '@shared/dates'
 import { agentOpenRun, runWords } from '@shared/progress'
 import { columnName } from '@shared/tasks'
-import { agentProvider, providerDescriptor } from '@shared/providers'
-import type { AgentInfo, AgentPatch, AssistantAction, EffortLevel, PermissionMode, ModeInfo, ProgressRun, ProjectInfo, ProviderId } from '@shared/types'
+import { agentProvider, modeOption, providerDescriptor } from '@shared/providers'
+import type { AgentInfo, AgentPatch, Connection, ModeInfo, ProgressRun, ProjectInfo, ProviderId } from '@shared/types'
+import { withSnapshot } from '@shared/assistantChangeList'
 import * as actions from '../actions'
 import { call } from '../api'
 import { commandKeybinding } from '../commands'
-import { agentProviderOf, confirm, get, notify, NO_PROJECTS, projectKey, revealAgent, runOnce, set, setActivity, setAssistantOpen, showAssistantView, showView, useDateStyle, useStore, assistantOnLeft, setAssistantSide } from '../store'
+import { legacyOf, placeText, placeTip } from '../agentPlace'
+import { cliReadyOf, ConnectionChoice, connectionCellText, connectionCli, firstUsableConnection, NoConnectionBanner, useConnections } from './ConnectionChoice'
+import { connectionOf } from '@shared/connectionLabel'
+import { agentProviderOf, cardLabelOf, confirm, get, notify, NO_PROJECTS, projectKey, revealAgent, runOnce, set, setActivity, setLoaded, setAssistantOpen, showAssistantView, showView, useDateStyle, useStarting, useStore, startingKey, startingLabel, assistantOnLeft, setAssistantSide } from '../store'
+import { cardLabel } from '@shared/projectKeys'
+import { loadAssistantChanges } from '../assistantUndo'
 import { useInbox } from '../inbox'
+import { useInboxSwitch } from '../advanced'
 import { useLiveUsage } from '../usage'
 import { cx, formatKeybinding, sessionLabel, timeAgo } from '../util'
-import { Overrides, ProviderChoice, contextChoice, contextValue, type ContextChoice } from './AgentDialogs'
+import { stoppedLine, useStoppedEnd } from '../stopped'
 import { PaneFooter, RESUME_TINT } from './AgentPanes'
+import { AssistantChanges, useDoneCount } from './AssistantChanges'
 import { AssistantMark } from './AssistantMark'
 import { TaskChip, useAgentCards, useAgentReviews } from './CardChip'
-import { confirmDangerousMode } from './PermissionMode'
 import { PaneResizer, usePaneSize } from './Resizer'
 import { StateMark } from './StateMark'
-import { ShowAllList } from './ShowAllList'
 import { TerminalView } from './TerminalView'
 import { Icon, IconButton, Modal, ReviewMark, statusText, Tooltip, useContextMenu, type MenuEntry } from './ui'
-import { fmt, msg, tr, tRich, type Msg } from '@shared/i18n'
+import { fmt, msg, tr, tRich } from '@shared/i18n'
 
 /**
  * The Hive Assistant's side panel: the workspace's overseer. Its header (mode, controls) and status line, what is
@@ -38,6 +45,16 @@ const AGENT = ASSISTANT_AGENT_ID
 const SESSION_NAMES = 'Assistant'
 
 const M = {
+  // Its inbox in ⋯ (#1432), as an agent's pane shows it.
+  unreadCount: msg({ id: 'assistant.panel.unreadCount', defaultMessage: '{n, plural, one {# unread} other {# unread}}', description: "Read out with the Assistant's ⋯ button: how many items in its inbox it hasn't fetched or acked yet. Keep it short." }),
+  inboxTip: msg({ id: 'assistant.panel.inboxTip', defaultMessage: "{n, plural, one {An item} other {# items}} in the Assistant's inbox that it hasn't fetched or acked yet: offered as its next line once it is idle, or read with hive_inbox.", description: "The heading of the Assistant's ⋯ menu's list of what it hasn't read in its inbox ({n}: how many). hive_inbox is a tool's name: keep it." }),
+  inboxTipNoWakes: msg({ id: 'assistant.panel.inboxTipNoWakes', defaultMessage: "{n, plural, one {An item} other {# items}} in the Assistant's inbox that it hasn't fetched or acked yet", description: "The heading of the Assistant's ⋯ menu's list of what it hasn't read in its inbox, when the setting Wake an idle agent (Settings → Advanced) is off (a hint line under it says so; {n}: how many)." }),
+  noWakesHint: msg({ id: 'assistant.panel.noWakesHint', defaultMessage: 'Wake an idle agent is off, so nothing is typed by itself. Deliver Now types the line once.', description: "A hint line under the heading of the Assistant's ⋯ menu's list of its unread inbox, when the setting Wake an idle agent (Settings → Advanced) is off. Wake an idle agent names a setting and Deliver Now a menu item below: use their names as Hive shows them." }),
+  inboxLine: msg({ id: 'assistant.panel.inboxLine', defaultMessage: '{id} · {from}: {text}', description: "An item of the Assistant's inbox in its ⋯ menu: its id, who it is from ({from}) and the start of its text ({text}). No preposition before the name (glossary §1 rule 4)." }),
+  deliverNow: msg({ id: 'assistant.panel.deliverNow', defaultMessage: 'Deliver Now', description: "Menu item in the Assistant's ⋯ menu, shown while the setting Wake an idle agent is off: types the line telling it of what waits in its inbox into its terminal, once." }),
+  deliverFailed: msg({ id: 'assistant.panel.deliverFailed', defaultMessage: "Could not deliver the Assistant's inbox", description: "An error's title: typing the line that tells the Assistant of what waits in its inbox (Deliver Now) failed." }),
+  notDelivered: msg({ id: 'assistant.panel.notDelivered', defaultMessage: "The Assistant wasn't told now", description: "A notice's title: Deliver Now couldn't type the line into the Assistant's terminal now." }),
+  notDeliveredDetail: msg({ id: 'assistant.panel.notDeliveredDetail', defaultMessage: "It isn't idle, or you are typing in its terminal. What waits stays in its inbox: try again once it's idle.", description: 'The detail of the notice that Deliver Now could not type the line into the Assistant now.' }),
   resumeLater: msg({ id: 'assistant.panel.resumeLater', defaultMessage: "You can resume the current conversation later from the Assistant's ⋯ menu.", description: "Under a confirmation that restarts the Assistant. ⋯ is the panel's More button." }),
   restartButton: msg({ id: 'assistant.panel.restartButton', defaultMessage: 'Restart the Assistant', description: "A confirmation's button: stops the Assistant and starts a new conversation." }),
   stopFailed: msg({ id: 'assistant.panel.stopFailed', defaultMessage: 'Could not stop the Assistant', description: "An error notice: the Assistant's session couldn't be stopped; the reason follows." }),
@@ -89,9 +106,11 @@ const M = {
   settingsMenu: msg({ id: 'assistant.panel.settingsMenu', defaultMessage: 'Assistant Settings…', description: "An item of the Assistant panel's More (⋯) menu: opens the Assistant Settings dialog." }),
   moveRight: msg({ id: 'assistant.panel.moveRight', defaultMessage: 'Move Panel to the Right', description: "An item of the Assistant panel's More (⋯) menu: moves the panel to the window's right side." }),
   moveLeft: msg({ id: 'assistant.panel.moveLeft', defaultMessage: 'Move Panel to the Left', description: "An item of the Assistant panel's More (⋯) menu: moves the panel to the window's left side." }),
-  hide: msg({ id: 'assistant.panel.hide', defaultMessage: 'Hide the Assistant', description: "An item of the Assistant panel's More (⋯) menu: hides the panel; the Assistant keeps running." }),
+  fold: msg({ id: 'assistant.panel.fold', defaultMessage: 'Fold the Assistant panel', description: "An item of the Assistant panel's More (⋯) menu, and its header's button: folds the panel to a strip at the window's edge; the Assistant keeps running. Fold as the Progress panel's button says it." }),
+  foldTip: msg({ id: 'assistant.panel.foldTip', defaultMessage: '{hasKey, select, yes {Fold the Assistant panel ({key})} other {Fold the Assistant panel}}', description: 'Tooltip of the button in the Assistant panel\'s header that folds it to a strip at the window\'s edge, with its shortcut ({key}: "Ctrl+Alt+I").' }),
   nameTip: msg({ id: 'assistant.panel.nameTip', defaultMessage: 'Assistant · {provider}', description: "Tooltip of the Assistant's name on its panel's header: its coding agent ({provider}: \"Claude Code\"). Assistant as the panel's title says it." }),
   provider: msg({ id: 'assistant.panel.provider', defaultMessage: 'Coding agent: {provider}', description: "A line of an agent's tooltip in the Assistant's workspace section ({provider}: \"Claude Code\")." }),
+  providerOn: msg({ id: 'assistant.panel.providerOn', defaultMessage: 'Coding agent: {provider} · {connection}', description: "A line of an agent's tooltip in the Assistant's workspace section, with Connections on (HI-1769): its CLI ({provider}: \"Claude Code\") and the connection it runs on or would start on ({connection}: \"Max 1\", with ⟳ when it runs on another than the one chosen, or why none can run it)." }),
   noneRunning: msg({ id: 'assistant.panel.noneRunning', defaultMessage: 'no agents running', description: "The Assistant's workspace section: a project none of whose agents run. Lower case." }),
   names: msg({ id: 'assistant.panel.names', defaultMessage: 'Show agent names', description: "The Assistant's workspace section: a toggle button that shows each agent's name beside its state mark, for screen readers." }),
   namesTip: msg({ id: 'assistant.panel.namesTip', defaultMessage: "{shown, select, yes {Show only the agents' state marks (names on hover)} other {Show the agents' names beside their state marks}}", description: "Tooltip of the toggle in the Assistant's workspace section: what clicking it does." }),
@@ -102,33 +121,30 @@ const M = {
   startTip: msg({ id: 'assistant.panel.startTip', defaultMessage: 'Start the Assistant', description: "Tooltip on the Assistant's Start button." }),
   more: msg({ id: 'assistant.panel.more', defaultMessage: 'More', description: "The Assistant panel's ⋯ button, which opens its More menu." }),
   status: msg({ id: 'assistant.panel.status', defaultMessage: 'Status: {text}', description: "The Assistant's status line under its header ({text}: \"Working\", \"Waiting for #12 → Review\")." }),
-  openCard: msg({ id: 'assistant.panel.openCard', defaultMessage: '{known, select, yes {Open card #{number}, in {column}} other {Open card #{number}}}', description: 'A card chip in the Assistant\'s status line, for screen readers ({column}: "Review").' }),
-  revertFailed: msg({ id: 'assistant.panel.revertFailed', defaultMessage: 'Could not revert the setting', description: "An error notice: a setting the Assistant changed couldn't be put back; the reason follows." }),
-  notDone: msg({ id: 'assistant.panel.notDone', defaultMessage: 'Not done: {error}', description: "Tooltip on something the Assistant was refused, after when: why ({error}, from Hive's Agent API, in English)." }),
-  reverted: msg({ id: 'assistant.panel.reverted', defaultMessage: 'reverted', description: 'Beside a setting the Assistant changed that was put back.' }),
-  revertLabel: msg({ id: 'assistant.panel.revertLabel', defaultMessage: 'Revert {setting} to {value}', description: 'The Revert button, for screen readers ({setting}: the setting\'s path; {value}: its old value).' }),
-  revert: msg({ id: 'assistant.panel.revert', defaultMessage: 'Revert', description: 'A button beside a setting the Assistant changed: puts the old value back.' }),
+  openCard: msg({ id: 'assistant.panel.openCard', defaultMessage: '{known, select, yes {Open card {number}, in {column}} other {Open card {number}}}', description: 'A card chip in the Assistant\'s status line, for screen readers ({number}: the card\'s name, its key, such as AM-12, or #12 for a card with none; {column}: "Review").' }),
   doneBy: msg({ id: 'assistant.panel.doneBy', defaultMessage: 'Done by the Assistant', description: "The heading of the list of what the Assistant did (a count follows)." }),
   markLabel: msg({ id: 'assistant.panel.markLabel', defaultMessage: '{name}: {state}{running, select, yes {{hasDetail, select, yes { · {detail}} other {}}} other { · not running}}', description: "An agent's state mark in the Assistant's workspace section: its name for screen readers and the first line of its tooltip. {state}: the state its mark draws (Working, Idle, Waiting for you, Stalled); {detail}: what it is doing, when that says more (\"e2e: 12 suites 4/12\"); \"not running\" while its session isn't. Lower case after the dot." }),
-  workingOn: msg({ id: 'assistant.panel.workingOn', defaultMessage: 'Working on #{number} {title}', description: "An agent's tooltip in the Assistant's overview: a card it works on." }),
-  reviewing: msg({ id: 'assistant.panel.reviewing', defaultMessage: 'Reviewing #{number} {title}', description: "An agent's tooltip in the Assistant's overview: a card it reviews." }),
+  workingOn: msg({ id: 'assistant.panel.workingOn', defaultMessage: 'Working on {number} {title}', description: "An agent's tooltip in the Assistant's overview: a card it works on ({number}: its name, its key, such as AM-12, or #12 for a card with none; {title}: its title)." }),
+  reviewing: msg({ id: 'assistant.panel.reviewing', defaultMessage: 'Reviewing {number} {title}', description: "An agent's tooltip in the Assistant's overview: a card it reviews ({number}: its name, its key, such as AM-12, or #12 for a card with none; {title}: its title)." }),
   progress: msg({ id: 'assistant.panel.progress', defaultMessage: '{hasStep, select, yes {Progress: {run} ({step})} other {Progress: {run}}}', description: "An agent's tooltip in the Assistant's overview: its test run ({run}: \"e2e: 12 suites 4/12\"; {step}: what it is on)." }),
-  worktree: msg({ id: 'assistant.panel.worktree', defaultMessage: 'Worktree on {branch}', description: "An agent's tooltip in the Assistant's overview: its worktree's branch." }),
+  ownWorktree: msg({ id: 'assistant.panel.worktree', defaultMessage: 'Worktree on {branch}', description: "An agent's tooltip in the Assistant's overview: its worktree's branch." }),
   noAgents: msg({ id: 'assistant.panel.noAgents', defaultMessage: 'no agents', description: "The Assistant's overview: a project with no agents. Lower case." }),
   running: msg({ id: 'assistant.panel.running', defaultMessage: '{count} running', description: "The Assistant's overview: how many of a folded project's agents run. Lower case." }),
   workspace: msg({ id: 'assistant.panel.workspace', defaultMessage: 'Workspace', description: "The heading of the Assistant's overview of the workspace." }),
   counts: msg({ id: 'assistant.panel.counts', defaultMessage: '{running} running · {projects, plural, one {# project} other {# projects}}', description: "Beside Workspace in the Assistant's overview." }),
-  attention: msg({ id: 'assistant.panel.attention', defaultMessage: '{kind, select, waiting {is waiting for you} question {has a question for you} safeguard {changed models after a safeguard stop} other {has finished}}', description: "The Assistant's overview: what an agent that needs you is doing, after its project and name. Lower case: it follows them." }),
+  attention: msg({ id: 'assistant.panel.attention', defaultMessage: "{kind, select, waiting {is waiting for you} signin {needs you to sign in} question {has a question for you} error {was stopped by an error} failed {couldn't start} safeguard {changed models after a safeguard stop} other {has finished}}", description: "The Assistant's overview: what an agent that needs you is doing, after its project and name. Lower case: it follows them." }),
   attentionOpen: msg({ id: 'assistant.panel.attentionOpen', defaultMessage: '{dismiss, select, yes {Click to open {name} and dismiss} other {Click to open {name}}}', description: "Tooltip of a row in the Assistant's overview for an agent that needs you ({name}: the agent, or its project when it has one agent). \"and dismiss\" when going there also removes the row (it has finished)." }),
   attentionDismiss: msg({ id: 'assistant.panel.attentionDismiss', defaultMessage: 'Dismiss: {name} {kind, select, safeguard {changed models after a safeguard stop} other {has finished}}', description: "The × on a row in the Assistant's overview for an agent that has finished (its tooltip and name for screen readers): removes the row without going to the agent. {name}: the agent, or its project when it has one agent." }),
   noProjects: msg({ id: 'assistant.panel.noProjects', defaultMessage: 'No projects in this workspace yet.', description: "The Assistant's overview with no projects." }),
   inactive: msg({ id: 'assistant.panel.inactive', defaultMessage: '{count, plural, one {# inactive project} other {# inactive projects}}', description: "The Assistant's overview: a row that shows the inactive projects folded into it." }),
   restartQuestion: msg({ id: 'assistant.panel.restartQuestion', defaultMessage: 'Restart the Assistant?', description: "Confirmation before the Assistant's coding agent is changed." }),
+  connectionRestart: msg({ id: 'assistant.panel.connectionRestart', defaultMessage: 'The Assistant restarts on the connection chosen and resumes this conversation.', description: "Confirmation before a running Assistant moves to another connection of the same coding agent CLI (HI-2108): it restarts in it and carries on the conversation." }),
+  cliOwnConnection: msg({ id: 'assistant.panel.cliOwnConnection', defaultMessage: "its mode is the CLI's own setting, and the Assistant needs to know its mode", description: "Why a connection is greyed out in Assistant Settings' choice of connection (HI-2108): its permission mode is \"The CLI's own setting\" (Hive passes none), and the Assistant's Control relies on knowing its mode. A clause, lower case." }),
   switching: msg({ id: 'assistant.panel.switching', defaultMessage: "Switching to {to} stops this conversation ({from} conversations can't move to another provider) and starts a new one.", description: "Confirmation before the Assistant's coding agent is changed ({to}, {from}: Claude Code, Codex…)." }),
   tellFailed: msg({ id: 'assistant.panel.tellFailed', defaultMessage: 'Could not tell the Assistant its mode', description: "An error notice: the running Assistant couldn't be told its new mode; the reason follows." }),
   cancel: msg({ id: 'assistant.panel.cancel', defaultMessage: 'Cancel', description: "The Assistant Settings dialog's button that closes it without saving." }),
   save: msg({ id: 'assistant.panel.save', defaultMessage: 'Save', description: "The Assistant Settings dialog's button that saves the choices." }),
-  forWorkspace: msg({ id: 'assistant.panel.forWorkspace', defaultMessage: 'For this workspace. Anything left at <i>Default</i> follows <link>Settings → Assistant</link>.', description: 'Assistant Settings, at the top. <i> is italic (the choice Default); <link> opens Settings → Assistant.' }),
+  forWorkspace: msg({ id: 'assistant.panel.forWorkspace', defaultMessage: 'For this workspace. Its connection holds its model, effort and permission mode; a mode left at <i>Default</i> follows <link>Settings → Assistant</link>.', description: 'Assistant Settings, at the top (HI-2108). <i> is italic (the choice Default of the Mode list); <link> opens Settings → Assistant.' }),
   mode: msg({ id: 'assistant.panel.mode', defaultMessage: 'Mode', description: "Assistant Settings: the mode's label." }),
   defaultMode: msg({ id: 'assistant.panel.defaultMode', defaultMessage: 'Default ({name})', description: "Assistant Settings: the mode that follows Settings → Assistant ({name}: that mode)." }),
   codingAgent: msg({ id: 'assistant.panel.codingAgent', defaultMessage: 'Coding agent', description: 'Assistant Settings: a heading (Claude Code, Codex…).' }),
@@ -152,36 +168,17 @@ const settingsLink = (c: React.ReactNode[]): React.ReactNode => (
 )
 
 /**
- * The names of the modes Hive ships (resources/modes), as the window shows them (#806). Display only: the files keep
- * their names, and what the Assistant reads is the file.
- */
-const SHIPPED_NAMES: Record<string, Msg> = {
-  coordinator: msg({ id: 'assistant.modes.shipped.coordinator', defaultMessage: 'Coordinator', description: "The name of a mode of the Hive Assistant that ships with Hive: it runs the work across the agents. Shown in its menus and the Assistant view; keep it short." }),
-  planner: msg({ id: 'assistant.modes.shipped.planner', defaultMessage: 'Planner', description: "The name of a mode of the Hive Assistant that ships with Hive: it shapes work before anyone starts it. Shown in its menus and the Assistant view; keep it short." }),
-  'qa-triager': msg({ id: 'assistant.modes.shipped.qaTriager', defaultMessage: 'QA triager', description: "The name of a mode of the Hive Assistant that ships with Hive: it turns a bug report into a card with evidence. Shown in its menus and the Assistant view; keep it short." }),
-  'release-manager': msg({ id: 'assistant.modes.shipped.releaseManager', defaultMessage: 'Release manager', description: "The name of a mode of the Hive Assistant that ships with Hive: it takes a release through its checklist. Shown in its menus and the Assistant view; keep it short." })
-}
-
-/**
- * A mode's name in the window: one Hive ships, in the window's language while its file still has Hive's name for it;
- * any other (the user's own, or one they renamed) as its file has it.
+ * A mode's name in the window: one Hive ships (SHIPPED_MODE_NAMES, #806), in the window's language while its file still
+ * has Hive's name for it; any other (the user's own, or one they renamed) as its file has it.
  */
 export function modeName(p: Pick<ModeInfo, 'id' | 'name' | 'bundled'>): string {
-  const shipped = p.bundled ? SHIPPED_NAMES[p.id] : undefined
+  const shipped = p.bundled ? SHIPPED_MODE_NAMES[p.id] : undefined
   return shipped && p.name === shipped.defaultMessage ? tr(shipped) : p.name
-}
-
-/** What the modes Hive ships are for (their files' description), as the window shows them (#885). Display only, as their names. */
-const SHIPPED_DESCRIPTIONS: Record<string, Msg> = {
-  coordinator: msg({ id: 'assistant.modes.shippedDescription.coordinator', defaultMessage: 'Runs the work across the agents: state first, short status tables, lane prompts from settled cards, decisions only when they are real.', description: "What a mode of the Hive Assistant that ships with Hive (Coordinator) is for, in a line: under its name in the mode menu and the Assistant view." }),
-  planner: msg({ id: 'assistant.modes.shippedDescription.planner', defaultMessage: 'Shapes work before anyone starts it: the open questions with a recommendation each, options, lanes split by files, complete cards.', description: "What a mode of the Hive Assistant that ships with Hive (Planner) is for, in a line: under its name in the mode menu and the Assistant view." }),
-  'qa-triager': msg({ id: 'assistant.modes.shippedDescription.qaTriager', defaultMessage: 'Turns a bug report into a card with evidence: reproduce or read the code to find the likely cause, propose a fix, place it in the right lane.', description: "What a mode of the Hive Assistant that ships with Hive (QA triager) is for, in a line: under its name in the mode menu and the Assistant view." }),
-  'release-manager': msg({ id: 'assistant.modes.shippedDescription.releaseManager', defaultMessage: 'Takes a release through its checklist: notes, licences, packaged checks; the version, tags and publishing only when asked.', description: "What a mode of the Hive Assistant that ships with Hive (Release manager) is for, in a line: under its name in the mode menu and the Assistant view." })
 }
 
 /** What a mode is for, in the window: as modeName, one Hive ships in the window's language while its file still has Hive's words. */
 export function modeDescription(p: Pick<ModeInfo, 'id' | 'description' | 'bundled'>): string {
-  const shipped = p.bundled ? SHIPPED_DESCRIPTIONS[p.id] : undefined
+  const shipped = p.bundled ? SHIPPED_MODE_DESCRIPTIONS[p.id] : undefined
   if (shipped && p.description === shipped.defaultMessage) return tr(shipped)
   // A new mode's description until the user writes one (#889).
   if (p.description === NEW_MODE_DESCRIPTION) return tr(msg({ id: 'assistant.modes.newDescription', defaultMessage: 'What this mode is for, in one line.', description: "A new mode of the Hive Assistant's description, until the user writes one in its file: under its name in the mode menu and the Assistant view." }))
@@ -209,7 +206,7 @@ export function useModes(): ModeInfo[] {
 }
 
 /** Changes the Assistant's settings for this workspace; a change that needs a new conversation restarts it after asking. */
-async function changeAssistant(patch: Omit<AgentPatch, 'name'>, restart: { title: string; message: string } | null): Promise<boolean> {
+async function changeAssistant(patch: Omit<AgentPatch, 'name'>, restart: { title: string; message: string; resume?: boolean } | null): Promise<boolean> {
   const a = get().workspace?.assistant
   const agent = a?.agents[0]
   if (!a || !agent) return false
@@ -222,7 +219,7 @@ async function changeAssistant(patch: Omit<AgentPatch, 'name'>, restart: { title
   }
   const done = await actions.attempt(tr(M.saveFailed), () => call('agents:update', a.path, AGENT, patch))
   await actions.refreshWorkspace()
-  if (done && wasLive) await actions.newSession(a.path, AGENT)
+  if (done && wasLive) await (restart!.resume ? actions.resumeLast(a.path, AGENT) : actions.newSession(a.path, AGENT))
   return !!done
 }
 
@@ -275,6 +272,11 @@ export function AssistantPanel() {
   const left = useStore(assistantOnLeft)
   const a = useStore((s) => s.workspace?.assistant ?? null)
   const epochs = useStore((s) => s.sessionEpoch)
+  // Its terminal dimmed while it is stopped (HI-1881): not while it starts again, nor after a failed start.
+  const notStopped = useStore((s) => {
+    const host = s.workspace?.assistant?.path
+    return !host || !!s.starting[startingKey(host, AGENT)] || !!s.startFailures[projectKey(host, AGENT)]
+  })
   const flash = useStore((s) => (a && s.paneFlash?.key === projectKey(a.path, AGENT) ? s.paneFlash.at : 0))
   const width = usePaneSize('assistant', 430)
   // The overview's share of the height once dragged; until then it takes what it needs (up to a third).
@@ -287,7 +289,10 @@ export function AssistantPanel() {
     if (!ws) return
     // Another workspace opened before this loaded: its own load is on the way.
     let current = true
-    void Promise.all([call('assistant:actions'), call('assistant:questions')]).then(([assistantActions, assistantQuestions]) => current && set({ assistantActions, assistantQuestions }))
+    // Those told by events meanwhile are kept, never twice (HI-1863).
+    void Promise.all([call('assistant:actions'), call('assistant:questions')]).then(([snapshot, assistantQuestions]) => current && setLoaded((s) => ({ assistantActions: withSnapshot(s.assistantActions, snapshot), assistantQuestions })))
+    // Its changes kept for undo (#1283), by message.
+    void loadAssistantChanges()
     return () => {
       current = false
     }
@@ -326,6 +331,7 @@ export function AssistantPanel() {
       <PaneResizer paneKey="assistant" edge={left ? 'right' : 'left'} min={300} max={900} keep={380} />
       <AssistantHeader project={a} a={agent} />
       <AssistantStatus a={agent} />
+      {!agent.live && <AssistantConnectionBanner a={agent} />}
       <AssistantQuestions />
       <AssistantActions />
       <div className="assistant-body" ref={body}>
@@ -352,8 +358,9 @@ export function AssistantPanel() {
               visible
               projectPath={a.path}
               agentId={AGENT}
-              provider={agentProviderOf(a, agent)}
+              provider={agentProviderOf(agent)}
               autoFocus={!!agent.live}
+              dimmed={!agent.live && !notStopped}
             />
           )}
           {!agent.live && <AssistantIdle project={a} a={agent} ended={hasTerminal} />}
@@ -372,6 +379,18 @@ export function AssistantPanel() {
       </div>
     </div>
   )
+}
+
+/**
+ * Asks for an account where the Assistant can't start without one (HI-1774; HI-2108): neither its connection nor its CLI's
+ * first usable one can run it here. Not for a test copy on its CLI test home.
+ */
+function AssistantConnectionBanner({ a }: { a: AgentInfo }) {
+  const provider = agentProviderOf(a)
+  const view = useConnections()
+  const shown = connectionOf(a.connection, provider, undefined, view)
+  if (!shown || shown.desired.ok || !view || view.testHome.includes(provider)) return null
+  return <NoConnectionBanner cli={provider} where="assistant" />
 }
 
 /** The hidden panel: a strip down the right edge; click it to show the panel. Its mark (#399) shows what the Assistant is doing. */
@@ -416,19 +435,25 @@ function AssistantIdle({ project, a, ended }: { project: ProjectInfo; a: AgentIn
   const modeId = assistantModeId(a, settings)
   const mode = modes.find((p) => p.id === modeId)
   const picker = useConversationPicker()
+  // From the click until the Assistant runs (#1177).
+  const starting = useStarting(project.path, AGENT)
+  // Why and when it stopped (HI-1881), on its ended bar.
+  const end = useStoppedEnd(project.path, a)
+  const resuming = starting?.kind === 'resume'
+  const startingNew = starting?.kind === 'start'
   const resume = a.resume ? (
-    <button className={cx(/* i18n-ignore: class names */ 'btn small', RESUME_TINT)} onClick={() => void actions.resumeLast(project.path, AGENT)} title={tr(M.resumeTip, { name: sessionLabel(a.resume, SESSION_NAMES), when: timeAgo(a.resume.lastActiveAt) })}>
-      <Icon name="debug-continue" /> {tr(M.resume)}
+    <button className={cx(/* i18n-ignore: class names */ 'btn small', RESUME_TINT)} disabled={!!starting} aria-busy={resuming || undefined} onClick={() => void actions.resumeLast(project.path, AGENT)} title={tr(M.resumeTip, { name: sessionLabel(a.resume, SESSION_NAMES), when: timeAgo(a.resume.lastActiveAt) })}>
+      <Icon name={resuming ? 'loading' : 'debug-continue'} spin={resuming} /> {resuming ? startingLabel(starting) : tr(M.resume)}
     </button>
   ) : null
   if (ended) {
     return (
-      <div className="session-ended compact assistant-ended">
-        <Icon name="debug-disconnect" />
-        <span className="grow">{tr(M.ended)}</span>
+      <div className={cx('session-ended', 'compact', 'assistant-ended', !starting && 'stopped')} data-stopped={end?.why ?? (starting ? undefined : '')}>
+        <Icon name={starting ? 'loading' : 'debug-disconnect'} spin={!!starting} />
+        <span className="grow">{starting ? startingLabel(starting) : end ? stoppedLine(end) : tr(M.ended)}</span>
         {resume}
-        <button className="btn act-start solid small" onClick={() => void actions.newSession(project.path, AGENT)}>
-          <Icon name="add" /> {tr(M.new)}
+        <button className="btn act-start solid small" disabled={!!starting} aria-busy={startingNew || undefined} onClick={() => void actions.newSession(project.path, AGENT)}>
+          <Icon name={startingNew ? 'loading' : 'add'} spin={startingNew} /> {startingNew ? startingLabel(starting) : tr(M.new)}
         </button>
       </div>
     )
@@ -441,11 +466,11 @@ function AssistantIdle({ project, a, ended }: { project: ProjectInfo; a: AgentIn
       </p>
       <p className="faint">{tr(M.noEdits)}</p>
       <div className="btns">
-        <button className="btn act-start solid" onClick={() => void actions.newSession(project.path, AGENT)}>
-          <Icon name="play" /> {tr(M.start)}
+        <button className="btn act-start solid" disabled={!!starting} aria-busy={startingNew || undefined} onClick={() => void actions.newSession(project.path, AGENT)}>
+          <Icon name={startingNew ? 'loading' : 'play'} spin={startingNew} /> {startingNew ? startingLabel(starting) : tr(M.start)}
         </button>
         {resume}
-        <button className="btn subtle small" onClick={(e) => picker.openBelow(e.currentTarget, project)}>
+        <button className="btn subtle small" disabled={!!starting} onClick={(e) => picker.openBelow(e.currentTarget, project)}>
           <Icon name="history" /> {tr(M.conversations)}
         </button>
       </div>
@@ -495,7 +520,9 @@ function AssistantHeader({ project, a }: { project: ProjectInfo; a: AgentInfo })
   const menu = useContextMenu()
   const picker = useConversationPicker()
   const usage = useLiveUsage(project, AGENT)
+  const starting = useStarting(project.path, AGENT)
   const live = a.live
+  const wakes = useInboxSwitch('idleWakes', null)
   const idle = live && (live.status === 'ready' || live.status === 'finished')
   const empty = !usage || usage.userMessages === 0 || (usage.contextTokens ?? 0) === 0
   // Highlighted past Settings → Assistant's threshold (overlaid on its host's config), as an agent's past its project's.
@@ -532,11 +559,29 @@ function AssistantHeader({ project, a }: { project: ProjectInfo; a: AgentInfo })
   const compacting = isCompacting(live)
   // Compact…'s detail in ⋯, as an agent's: why it is unavailable, or that it is recommended.
   const compactDetail = compacting ? tr(M.compacting) : !idle ? tr(M.compactLater) : empty ? tr(M.nothingToCompact) : suggested ? tr(M.compactRecommended) : undefined
+  // Its inbox (#1432 round 1): what it hasn't read, as an agent's pane shows it; with Settings' idle wakes off (it has
+  // no project of its own), nothing waiting is typed by itself, and Deliver Now types its line once.
+  const unread = live?.inbox?.unread ?? []
+  const waiting = unread.filter((m) => m.state === 'queued' || m.state === 'uncertain').length
+  const deliver = (): void =>
+    void actions.attempt(tr(M.deliverFailed), async () => {
+      if (!(await call('session:deliverNow', project.path, AGENT))) notify('info', tr(M.notDelivered), tr(M.notDeliveredDetail))
+    })
+  const inboxEntries: MenuEntry[] = unread.length
+    ? [
+        { header: true, label: tr(wakes ? M.inboxTip : M.inboxTipNoWakes, { n: unread.length }) },
+        ...(wakes ? [] : [{ label: tr(M.noWakesHint), disabled: true }]),
+        ...unread.map((m) => ({ label: tr(M.inboxLine, { id: m.id, from: m.from, text: m.text }), disabled: true })),
+        ...(waiting && !wakes && live ? [{ label: tr(M.deliverNow), icon: 'send', onClick: deliver } as MenuEntry] : []),
+        { separator: true }
+      ]
+    : []
   /** Stop's place: an icon with a tooltip, in its action's colour, as on an agent's pane. */
-  const btn = (icon: string, label: string, onClick: () => void, tone: string, tip: string) => (
-    <Tooltip content={tip}>
-      <button type="button" className={cx(/* i18n-ignore: class names */ 'btn small pane-btn icon-only', tone)} aria-label={label} onClick={onClick}>
-        <Icon name={icon} />
+  // A start or resume under way shows on its button, which takes no clicks (#1177).
+  const btn = (icon: string, label: string, onClick: () => void, tone: string, tip: string, busy?: boolean) => (
+    <Tooltip content={busy && starting ? startingLabel(starting) : tip}>
+      <button type="button" className={cx(/* i18n-ignore: class names */ 'btn small pane-btn icon-only', tone)} disabled={busy} aria-busy={busy || undefined} aria-label={busy && starting ? startingLabel(starting) : label} onClick={onClick}>
+        <Icon name={busy ? 'loading' : icon} spin={busy} />
       </button>
     </Tooltip>
   )
@@ -549,11 +594,12 @@ function AssistantHeader({ project, a }: { project: ProjectInfo; a: AgentInfo })
       x,
       y,
       [
+        ...inboxEntries,
         // Compact… as on an agent's ⋯: once the Assistant has finished, recommended past the threshold.
         ...(live ? [{ label: tr(M.compactMenu), icon: compacting ? 'loading' : 'fold', detail: compactDetail, disabled: !idle || empty || compacting, onClick: compact } as MenuEntry] : []),
         // Stop's place has Resume while there is a conversation to go back to: a new one is here.
-        live || a.resume ? { label: tr(M.newConversation), icon: 'add', action: 'start', onClick: start } : { label: tr(M.startMenu), icon: 'play', action: 'start', onClick: start },
-        ...(live ? [] : [{ label: tr(M.resumeMenu), icon: 'debug-continue', action: 'resume', disabled: !a.resume, onClick: resume } as MenuEntry]),
+        live || a.resume ? { label: tr(M.newConversation), icon: 'add', action: 'start', disabled: !!starting, onClick: start } : { label: tr(M.startMenu), icon: 'play', action: 'start', disabled: !!starting, onClick: start },
+        ...(live ? [] : [{ label: tr(M.resumeMenu), icon: 'debug-continue', action: 'resume', disabled: !a.resume || !!starting, onClick: resume } as MenuEntry]),
         { label: tr(M.resumeConversation), icon: 'history', action: 'resume', onClick: () => void picker.openAt(project, x, y) },
         { label: tr(M.allConversations), icon: 'comment-discussion', onClick: () => showAssistantView('conversations') },
         { separator: true },
@@ -561,13 +607,13 @@ function AssistantHeader({ project, a }: { project: ProjectInfo; a: AgentInfo })
         { label: tr(M.manageModes), icon: 'person', onClick: () => showAssistantView('modes') },
         { separator: true },
         { label: tr(left ? M.moveRight : M.moveLeft), icon: left ? 'layout-sidebar-right' : 'layout-sidebar-left', onClick: () => void setAssistantSide(left ? 'right' : 'left') },
-        { label: tr(M.hide), icon: left ? 'layout-sidebar-left-off' : 'layout-sidebar-right-off', keybinding: kb ? formatKeybinding(kb) : undefined, onClick: () => setAssistantOpen(false) }
+        { label: tr(M.fold), icon: left ? 'layout-sidebar-left-off' : 'layout-sidebar-right-off', keybinding: kb ? formatKeybinding(kb) : undefined, onClick: () => setAssistantOpen(false) }
       ],
       keyboard
     )
   }
   const kb = commandKeybinding('assistant.toggle')
-  const provider = providerDescriptor(agentProviderOf(project, a)).name
+  const provider = providerDescriptor(agentProviderOf(a)).name
   const state = agentState(live)
   return (
     <div className="assistant-header">
@@ -588,13 +634,16 @@ function AssistantHeader({ project, a }: { project: ProjectInfo; a: AgentInfo })
       {live
         ? btn('stop-circle', tr(M.stop), stop, 'act-stop', tr(M.stopTip))
         : a.resume
-          ? btn('debug-continue', tr(M.resume), resume, 'act-resume', resumeTip)
-          : btn('play', tr(M.startMenu), start, 'act-start', tr(M.startTip))}
+          ? btn('debug-continue', tr(M.resume), resume, 'act-resume', resumeTip, !!starting)
+          : btn('play', tr(M.startMenu), start, 'act-start', tr(M.startTip), !!starting)}
       <Tooltip content={tr(M.more)}>
-        <button ref={more} type="button" className="icon-btn pane-more" aria-label={tr(M.more)} aria-haspopup="menu" onClick={(e) => openMore(e.detail === 0)}>
+        <button ref={more} type="button" className="icon-btn pane-more" aria-label={tr(M.more)} aria-description={unread.length ? tr(M.unreadCount, { n: unread.length }) : undefined} aria-haspopup="menu" onClick={(e) => openMore(e.detail === 0)}>
           <Icon name="ellipsis" />
+          {unread.length > 0 && <span className="pane-more-badge" />}
         </button>
       </Tooltip>
+      {/* Fold, as the Progress panel's header has it (#1330): its chevron points to the edge the panel folds to. */}
+      <IconButton icon={left ? 'chevron-left' : 'chevron-right'} className="assistant-panel-fold" title={tr(M.foldTip, { hasKey: kb ? 'yes' : 'no', key: kb ? formatKeybinding(kb) : '' })} onClick={() => setAssistantOpen(false)} />
       {menu.element}
       {picker.element}
     </div>
@@ -644,11 +693,11 @@ function AssistantStatus({ a }: { a: AgentInfo }) {
   // Hive's own questions its actions wait on (the cards under this line): the user is wanted first.
   const approvals = useStore((s) => s.assistantQuestions)
   const tasks = useStore((s) => s.tasks)
-  const done = useStore((s) => s.assistantActions.length)
+  const done = useDoneCount()
   const ws = useStore((s) => s.workspace?.path ?? '')
   const open = useStore((s) => s.panes[doneOpenKey(ws)] === 1)
   const line = assistantStatusLine(live, (iso) => formatTime(iso), approvals.map((q) => q.title))
-  const whole = tr(M.status, { text: `${line.text}${line.cards.map((n) => `#${n}`).join(', ')}${line.after}` })
+  const whole = tr(M.status, { text: `${line.text}${line.cards.map((n) => cardLabelOf({ tasks }, n)).join(', ')}${line.after}` })
   const toggle = (): void => {
     const key = doneOpenKey(ws)
     set((s) => ({ panes: { ...s.panes, [key]: open ? 0 : 1 } }))
@@ -666,7 +715,7 @@ function AssistantStatus({ a }: { a: AgentInfo }) {
                   {line.text}
                   {line.cards.map((n) => {
                     const card = tasks.find((c) => c.number === n && !c.archived) ?? null
-                    return <TaskChip key={n} number={n} column={card?.column ?? null} short label={tr(M.openCard, { number: n, known: card ? 'yes' : 'no', column: card ? columnName(card.column, tr) : '' })} />
+                    return <TaskChip key={n} number={n} column={card?.column ?? null} short label={tr(M.openCard, { number: cardLabelOf({ tasks }, n), known: card ? 'yes' : 'no', column: card ? columnName(card.column, tr) : '' })} />
                   })}
                   {line.after}
                 </>
@@ -691,47 +740,9 @@ function AssistantStatus({ a }: { a: AgentInfo }) {
  * open (#979): the last 3, Show all scrolls every one inside the same height.
  */
 function AssistantActions() {
-  const list = useStore((s) => s.assistantActions)
-  const reverting = useStore((s) => s.running)
   const ws = useStore((s) => s.workspace?.path ?? '')
   const open = useStore((s) => s.panes[doneOpenKey(ws)] === 1)
-  useDateStyle()
-  if (!list.length || !open) return null
-  const newest = [...list].reverse()
-  const reverted = new Set(list.map((a) => a.revertOf).filter(Boolean))
-  // A setting it changed (#186): Revert puts the old value back, through the same checks.
-  const revert = (x: AssistantAction): void => void runOnce(`revert:${x.id}`, () => actions.attempt(tr(M.revertFailed), () => call('assistant:revertSetting', x.id)))
-  const row = (x: AssistantAction) => (
-    <Tooltip block content={[formatDateTime(x.at), ...(x.error ? [tr(M.notDone, { error: x.error })] : []), ...(x.setting ? [`${x.setting.path}: ${x.setting.oldText} → ${x.setting.newText}`] : [])].join('\n')}>
-      <div className={cx('assistant-action', !x.ok && 'failed')}>
-        <Icon name={x.ok ? 'check' : 'circle-slash'} />
-        <span className="assistant-action-text">{x.text}</span>
-        {x.setting &&
-          x.ok &&
-          (reverted.has(x.id) ? (
-            <span className="faint">{tr(M.reverted)}</span>
-          ) : (
-            <button
-              className="btn small subtle assistant-revert"
-              disabled={!!reverting[`revert:${x.id}`]}
-              aria-label={tr(M.revertLabel, { setting: x.setting.path, value: x.setting.oldText })}
-              onClick={(e) => {
-                e.stopPropagation()
-                revert(x)
-              }}
-            >
-              <Icon name="discard" /> {tr(M.revert)}
-            </button>
-          ))}
-        <span className="faint">{timeAgo(x.at)}</span>
-      </div>
-    </Tooltip>
-  )
-  return (
-    <div className="assistant-actions" id="assistant-done-list">
-      <ShowAllList items={newest} few={3} keyOf={(x) => x.id} renderItem={row} label={tr(M.doneBy)} className="assistant-actions-list" />
-    </div>
-  )
+  return open ? <AssistantChanges /> : null
 }
 
 /**
@@ -753,17 +764,22 @@ function OverviewAgent({ project: p, a, state, names, onGo }: { project: Project
   const doing = useAgentCards(p, a.id)
   const reviewing = useAgentReviews(p, a.id)
   const run = useStore((s) => agentOpenRun(s.progressRuns, p.path, a.id))
+  const connections = useConnections()
   const activity = activityOf(a.live, run)
   // The state its mark draws first (the board's too: a stalled or blocked card), then what it is doing when that says more.
   const stateText = tr(AGENT_STATE_LABEL[state])
   const detail = activity && !activity.toLowerCase().startsWith(stateText.toLowerCase()) ? activity : ''
+  // Its CLI, and the connection it runs on or would start on (HI-1769).
+  const cli = providerDescriptor(agentProviderOf(a)).name
+  const connection = connectionCellText(a.connection, agentProviderOf(a), a.live?.launchedConnection, connections)
   const first = tr(M.markLabel, { name: a.name, state: stateText, running: a.live ? 'yes' : 'no', hasDetail: detail ? 'yes' : 'no', detail })
   const rest = [
-    tr(M.provider, { provider: providerDescriptor(agentProviderOf(p, a)).name }),
-    ...doing.map((c) => tr(M.workingOn, { number: c.number, title: c.title })),
-    ...reviewing.map((c) => tr(M.reviewing, { number: c.number, title: c.title })),
+    connection ? tr(M.providerOn, { provider: cli, connection }) : tr(M.provider, { provider: cli }),
+    ...doing.map((c) => tr(M.workingOn, { number: cardLabel(c), title: c.title })),
+    ...reviewing.map((c) => tr(M.reviewing, { number: cardLabel(c), title: c.title })),
     ...(run ? [tr(M.progress, { run: runWords(run), hasStep: run.stepName ? 'yes' : 'no', step: run.stepName ?? '' })] : []),
-    ...(a.worktree ? [tr(M.worktree, { branch: a.worktree.branch })] : [])
+    // Where it works (#1442): its 0.9 worktree's branch, else its slot, carried slot or home.
+    ...(legacyOf(a) ? [tr(M.ownWorktree, { branch: legacyOf(a)!.branch })] : placeText(a.place) ? [placeTip(a.place)] : [])
   ]
   // The whole of it on keyboard focus too, and for screen readers: the name and state as its label, the rest as its description.
   return (
@@ -830,9 +846,10 @@ function WorkspaceOverview() {
     showView('projects')
     if (id) revealAgent(p, id)
   }
-  // The inbox's agents that need you, oldest first (the Assistant itself isn't listed in its own panel).
-  const needYou = useInbox().needYou
-  const attention = needYou.flatMap((i) => {
+  // The inbox's agents that need you, oldest first, then (#1632: not a need, kept apart) those finished since you last
+  // looked (the Assistant itself isn't listed in its own panel).
+  const box = useInbox()
+  const attention = [...box.needYou, ...box.finished].flatMap((i) => {
     const p = projects.find((x) => x.path === i.projectPath)
     const a = p?.agents.find((x) => x.id === i.agentId)
     return p && a ? [{ i, p, a }] : []
@@ -890,63 +907,53 @@ function WorkspaceOverview() {
 // Assistant Settings: this workspace's choices, over Settings → Assistant
 // ---------------------------------------------------------------------------
 
+/**
+ * Assistant Settings (HI-2108; HI-2105's design): this workspace's Assistant's connection (which holds its model, effort,
+ * context and mode; its CLI follows from it) and its mode (Coordinator…). A connection in the CLI's own mode is greyed
+ * out, saying why: the Assistant's Control relies on knowing its mode (#1284).
+ */
 export function AssistantSettingsDialog() {
   const openFlag = useStore((s) => s.assistantSettingsOpen)
   const a = useStore((s) => s.workspace?.assistant ?? null)
   const settings = useStore((s) => s.settings)
   const modes = useModes()
+  const view = useConnections()
   const agent = a?.agents[0] ?? null
-  const current: ProviderId = a && agent ? (agent.live?.provider ?? agentProvider(agent, a.config, settings)) : ''
-  const [provider, setProvider] = useState<ProviderId>(current)
+  const current: ProviderId = a && agent ? (agent.live?.provider ?? agentProvider(agent, settings)) : ''
   const [mode, setMode] = useState('')
-  const [model, setModel] = useState('')
-  const [effort, setEffort] = useState('')
-  const [permission, setPermission] = useState('')
-  const [context, setContext] = useState<ContextChoice>('')
+  const [connection, setConnection] = useState('')
   useEffect(() => {
-    setProvider(current)
     setMode(agent?.mode ?? '')
-    setModel(agent?.model ?? '')
-    setEffort(agent?.effort ?? '')
-    setPermission(agent?.permissionMode ?? '')
-    setContext(contextChoice(agent?.use200kContext))
+    setConnection(agent?.connection ?? '')
     // Reset each time the dialog opens.
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [openFlag])
+  // None chosen yet (a new workspace's): the first usable in the order of accounts, as a new agent's (decision A).
+  const providers = useStore((s) => s.providers)
+  const first = firstUsableConnection(view, settings, cliReadyOf(providers))
+  useEffect(() => {
+    if (openFlag && !connection && first) setConnection(first)
+  }, [openFlag, connection, first])
   if (!openFlag || !a || !agent) return null
   const close = (): void => set({ assistantSettingsOpen: false })
-  const chooseProvider = (v: ProviderId): void => {
-    setProvider(v)
-    if (v !== provider) {
-      setModel('')
-      setEffort('')
-      setPermission('')
-      setContext('')
-    }
-  }
   const defaultMode = modes.find((p) => p.id === (settings?.assistant.mode || DEFAULT_MODE))
+  const cliOf = (id: string): ProviderId => connectionCli(view, id) ?? current
+  const cliOwn = (c: Pick<Connection, 'permissionMode'>, cli: ProviderId): boolean => !!c.permissionMode && !!modeOption(cli, c.permissionMode)?.cliOwn
   const save = async (): Promise<void> => {
-    const providerChanged = provider !== current
+    const cli = connection ? cliOf(connection) : current
+    const connectionChanged = !!connection && connection !== agent.connection
     const modeChanged = assistantModeId({ mode }, settings) !== assistantModeId(agent, settings)
-    if (permission && permission !== agent.permissionMode && !(await confirmDangerousMode(provider, permission, tr(M.theAssistant)))) return
     const ok = await changeAssistant(
-      {
-        ...(providerChanged ? { provider } : {}),
-        mode: mode || undefined,
-        model: model || undefined,
-        effort: (effort || undefined) as EffortLevel | undefined,
-        permissionMode: (permission || undefined) as PermissionMode | undefined,
-        use200kContext: contextValue(context)
-      },
-      providerChanged
-        ? {
-            title: tr(M.restartQuestion),
-            message: tr(M.switching, { to: providerDescriptor(provider).name, from: providerDescriptor(current).name })
-          }
+      { mode: mode || undefined, ...(connectionChanged ? { connection } : {}) },
+      // Another connection is a restart (its model, mode or CLI), a running Assistant resuming in it; another CLI starts fresh.
+      connectionChanged
+        ? cli !== current
+          ? { title: tr(M.restartQuestion), message: tr(M.switching, { to: providerDescriptor(cli).name, from: providerDescriptor(current).name }) }
+          : { title: tr(M.restartQuestion), message: tr(M.connectionRestart), resume: true }
         : null
     )
     // A new mode needs no restart: the running Assistant is told it (#259).
-    if (ok && modeChanged && !providerChanged && agent.live) await actions.attempt(tr(M.tellFailed), () => call('assistant:switchMode', assistantModeId({ mode }, settings), false))
+    if (ok && modeChanged && !connectionChanged && agent.live) await actions.attempt(tr(M.tellFailed), () => call('assistant:switchMode', assistantModeId({ mode }, settings), false))
     if (ok) close()
   }
   return (
@@ -974,6 +981,7 @@ export function AssistantSettingsDialog() {
         )}
       </p>
       <div className="agent-form">
+        <ConnectionChoice id="assistant-connection" value={connection} onChange={setConnection} unavailable={(c) => (cliOwn(c, cliOf(c.id)) ? tr(M.cliOwnConnection) : null)} />
         <label>{tr(M.mode)}</label>
         <select className="select" value={mode} onChange={(e) => setMode(e.target.value)}>
           <option value="">{tr(M.defaultMode, { name: (defaultMode && modeName(defaultMode)) ?? settings?.assistant.mode ?? 'Overseer' /* i18n-ignore: the default mode's name, as Hive ships it */ })}</option>
@@ -987,10 +995,6 @@ export function AssistantSettingsDialog() {
             ))}
         </select>
       </div>
-      <h3 className="agent-dialog-h">{tr(M.codingAgent)}</h3>
-      <ProviderChoice value={provider} current={current} onChange={chooseProvider} />
-      <h3 className="agent-dialog-h">{tr(M.settings)}</h3>
-      <Overrides project={a} provider={provider} model={model} effort={effort} permission={permission} context={context} onModel={setModel} onEffort={setEffort} onPermission={setPermission} onContext={setContext} inherit={tr(M.default)} inheritIsDefault />
       {agent.live && <div className="detail">{tr(M.appliesNext)}</div>}
     </Modal>
   )

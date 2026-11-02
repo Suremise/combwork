@@ -30,6 +30,9 @@ w('icon.svg', '<svg xmlns="http://www.w3.org/2000/svg" width="120" height="120">
 w('img/pic.png', png)
 w('code.ts', 'export const answer = 42\n')
 w('blob.bin', Buffer.from([0, 1, 2, 3, 0, 255, 0, 10]))
+// Windows-1252 "café\r\n" (HI-2331): not UTF-8, so never opened for editing (a save would write U+FFFD over E9).
+const latin1 = Buffer.from([0x63, 0x61, 0x66, 0xe9, 0x0d, 0x0a])
+w('latin1.txt', latin1)
 
 const sleep = (ms) => new Promise((r) => setTimeout(r, ms))
 const results = []
@@ -106,6 +109,28 @@ const HUNG_MS = 10000
   check('csv: table with quoted fields', (await pane.locator('.csv-preview tbody tr').count()) === 2 && (await pane.locator('.csv-preview tbody tr').nth(0).innerText()).includes('red, crunchy') && (await pane.locator('.csv-preview tbody tr').nth(1).innerText()).includes('say "hi"'))
   await page.screenshot({ path: path.join(shots, '3-csv.png') })
   check('draft: unsaved file keeps its dot in the tree', (await row('code.ts').locator('.dirty-dot').count()) === 1)
+  // What Monaco did around the hover below, logged only if it fails (HI-2214): the editor's own events from its
+  // creation, its target under the pointer and the hover's steps. Through the renderer's own Monaco module, no app hook.
+  const monacoChunk = fs.readdirSync(path.join(lib.ROOT, 'out', 'renderer', 'assets')).find((n) => /^monaco-.*\.js$/.test(n))
+  await page.evaluate(async (chunk) => {
+    try {
+      const mod = await import(new URL(`./assets/${chunk}`, location.href).href)
+      const t0 = performance.now()
+      const trace = (window.__hoverTrace = { mod, log: [] })
+      trace.L = (...a) => trace.log.push(`${Math.round(performance.now() - t0)} ${a.map((x) => (typeof x === 'string' ? x : JSON.stringify(x))).join(' ')}`)
+      trace.created = mod.e.onDidCreateEditor((ed) => {
+        const id = `ed${ed.getId().split(':').pop()}`
+        trace.L(id, 'created')
+        ed.onDidChangeModel(() => trace.L(id, 'model', ed.getModel()?.getLineCount()))
+        ed.onDidLayoutChange((l) => trace.L(id, 'layout', l.width, l.height))
+        ed.onDidScrollChange((e) => (e.scrollTopChanged || e.scrollLeftChanged) && trace.L(id, 'scroll', e.scrollTop, e.scrollLeft))
+        ed.onDidChangeModelContent(() => trace.L(id, 'content'))
+        ed.onDidDispose(() => trace.L(id, 'disposed'))
+      })
+    } catch (e) {
+      window.__hoverTrace = { log: [`no trace: ${e.message}`] }
+    }
+  }, monacoChunk)
   await row('code.ts').click()
   await lib.until(async () => (await pane.locator('.monaco .view-lines').innerText().catch(() => '')).replace(/\u00a0/g, ' ').includes('draft = true'), 10000)
   check('draft: edits restored when coming back', (await pane.locator('.monaco .view-lines').innerText()).replace(/ /g, ' ').includes('draft = true'))
@@ -126,8 +151,72 @@ const HUNG_MS = 10000
     }
     return null
   })
+  await page.evaluate((at) => {
+    const trace = window.__hoverTrace
+    if (!trace?.mod) return
+    const { mod, L } = trace
+    L('test: moving to', at)
+    const ed = mod.e.getEditors().find((e) => e.getDomNode()?.isConnected && e.getModel()?.getValue().includes('draft = true'))
+    if (!ed) return L('no editor with the draft', mod.e.getEditors().length)
+    const target = (t) => t && { type: t.type, pos: t.position, word: t.position && ed.getModel().getWordAtPosition(t.position)?.word }
+    L(`ed${ed.getId().split(':').pop()} target at the pointer`, at && target(ed.getTargetAtClientPoint(at.x, at.y)))
+    ed.onMouseMove((e) => L('mousemove', target(e.target)))
+    ed.onMouseLeave(() => L('mouseleave'))
+    ed.onMouseDown(() => L('mousedown'))
+    ed.onKeyDown((e) => L('keydown', e.code))
+    // The hover's steps, by Monaco 0.57's names (one renamed in an update just isn't logged).
+    const wrap = (o, name, tag = name) => {
+      const f = o?.[name]
+      if (typeof f === 'function') o[name] = function (...a) { const r = f.apply(this, a); L(tag, typeof r === 'boolean' ? r : ''); return r }
+    }
+    const c = ed.getContribution('editor.contrib.contentHover')
+    L('hover controller', !!c)
+    for (const m of ['hideContentHover', '_cancelScheduler']) wrap(c, m)
+    const make = c?._getOrCreateContentWidget
+    if (typeof make === 'function') {
+      c._getOrCreateContentWidget = function () {
+        const widget = make.apply(this)
+        if (!widget.__traced) {
+          widget.__traced = true
+          for (const m of ['showsOrWillShow', '_setCurrentResult', '_showHover', '_hideHover']) wrap(widget, m, `widget ${m}`)
+        }
+        return widget
+      }
+    }
+    trace.provider = mod.l.registerHoverProvider('typescript', { provideHover: (m, p) => { L('providers asked', p); return null } })
+  }, word)
   if (word) await page.mouse.move(word.x, word.y)
-  check("hover: Monaco's Markdown hover renders (its sanitiser)", !!(await lib.until(async () => /answer/.test(await hoverText()), HUNG_MS)))
+  const hoverShown = !!(await lib.until(async () => /answer/.test(await hoverText()), HUNG_MS))
+  check("hover: Monaco's Markdown hover renders (its sanitiser)", hoverShown)
+  const hoverTrace = await page.evaluate(() => { const t = window.__hoverTrace; t?.provider?.dispose(); t?.created?.dispose(); return t?.log ?? ['no trace'] })
+  if (!hoverShown) {
+    // HI-2214 evidence: where the pointer was, what is under it now, and Monaco's hover widgets.
+    const state = await page.evaluate((at) => {
+      const now = (() => {
+        const lines = document.querySelector('.monaco .view-lines')
+        if (!lines) return null
+        const walk = document.createTreeWalker(lines, NodeFilter.SHOW_TEXT)
+        for (let n = walk.nextNode(); n; n = walk.nextNode()) {
+          const i = n.textContent.indexOf('answer')
+          if (i < 0) continue
+          const r = document.createRange()
+          r.setStart(n, i)
+          r.setEnd(n, i + 6)
+          const b = r.getBoundingClientRect()
+          return { x: b.left + b.width / 2, y: b.top + b.height / 2 }
+        }
+        return null
+      })()
+      const under = at ? document.elementFromPoint(at.x, at.y) : null
+      const chain = []
+      for (let e = under; e && chain.length < 6; e = e.parentElement) chain.push(`${e.tagName.toLowerCase()}.${[...e.classList].join('.')}`)
+      const hovers = [...document.querySelectorAll('.monaco-hover')].map((h) => ({ cls: h.className, text: h.innerText.slice(0, 120), shown: getComputedStyle(h).display !== 'none' }))
+      return { at, now, under: chain, hovers, editors: document.querySelectorAll('.monaco').length, lines: document.querySelector('.monaco .view-lines')?.innerText.slice(0, 120) }
+    }, word)
+    results.push(`INFO hover evidence (HI-2214): ${JSON.stringify(state)}`)
+    results.push(`INFO hover trace (HI-2214): ${hoverTrace.join(' | ')}`)
+    await page.screenshot({ path: path.join(shots, '3b-hover-failed.png') })
+  }
   await page.mouse.move(5, 5)
 
   // Conflict: file changes on disk while edited.
@@ -209,6 +298,10 @@ const HUNG_MS = 10000
   await page.screenshot({ path: path.join(shots, '5-pdf.png') })
   await row('blob.bin').click()
   check('binary: not opened as text', !!(await lib.until(async () => (await pane.innerText()).includes('binary file'), HUNG_MS)))
+  await row('latin1.txt').click()
+  check('not UTF-8: refused with Open in Default App, no editor', !!(await lib.until(async () => (await pane.innerText()).includes("isn't UTF-8 text") && (await pane.locator('.monaco-editor').count()) === 0, HUNG_MS)))
+  check('not UTF-8: the file is untouched', fs.readFileSync(path.join(proj, 'latin1.txt')).equals(latin1))
+  await page.screenshot({ path: path.join(shots, '5c-not-utf8.png') })
 
   // Light theme, markdown.
   await inv('settings:update', { appearance: { theme: 'light' } })

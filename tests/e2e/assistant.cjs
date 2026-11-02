@@ -1,5 +1,5 @@
 // The Hive Assistant: its home and modes (#259) in a workspace, the side panel (remembered per workspace), switching
-// mode, Assistant Settings over Settings → Assistant, the Modes view, and one launch (no prompt is sent)
+// mode, Assistant Settings (its connection and mode, HI-2108; dark and light screenshots), the Modes view, and one launch (no prompt is sent)
 // that runs in the workspace folder, in Auto mode, named "Assistant" in the quit dialog. The Assistant runs the fake
 // Claude Code (fake-claude/, #195); that the real Claude Code takes its launch (and falls back from Auto with Haiku) is
 // claude-real's. Dev build, throwaway profile and workspaces.
@@ -42,7 +42,9 @@ const becomes = async (fn) => !!(await lib.until(fn, HUNG_MS))
   check('the Assistant has its home and one agent', info.assistant?.path.toLowerCase() === home.toLowerCase() && info.assistant.agents.length === 1)
   check('its home is not listed as a project', info.projects.map((p) => p.name).sort().join(',') === 'api,web')
   check("its sessions are kept out of git", fs.readFileSync(path.join(home, '.gitignore'), 'utf8').includes('*'))
-  check('Hive\'s four modes are in the workspace', fs.readdirSync(path.join(ws, '.hive', 'modes')).sort().join(',') === 'coordinator.md,planner.md,qa-triager.md,release-manager.md')
+  // Brought in after the open (HI-1705): wait for them.
+  const modes = () => (fs.existsSync(path.join(ws, '.hive', 'modes')) ? fs.readdirSync(path.join(ws, '.hive', 'modes')).sort().join(',') : '')
+  check('Hive\'s four modes are in the workspace', await becomes(() => modes() === 'coordinator.md,planner.md,qa-triager.md,release-manager.md'), modes())
   check("it defaults to the agents' model and effort, and Auto mode", JSON.stringify(info.assistant.config.providers['claude-code']) === JSON.stringify({ model: 'inherit', effort: 'inherit', permissionMode: 'auto', extraArgs: '', use200kContext: 'inherit' }), JSON.stringify(info.assistant.config.providers['claude-code']))
 
   // The panel: hidden at first, Ctrl+Alt+I shows it, and each workspace remembers it.
@@ -66,9 +68,9 @@ const becomes = async (fn) => !!(await lib.until(fn, HUNG_MS))
   await lib.until(async () => (await panelWidth()) === 300, HUNG_MS)
   const inside = await page.evaluate(() => {
     const right = document.querySelector('.assistant-panel').getBoundingClientRect().right
-    return ['button[aria-label="Start"]', 'button[aria-label="More"]'].map((sel) => document.querySelector(`.assistant-header ${sel}`)?.getBoundingClientRect().right ?? Infinity).every((r) => r <= right + 0.5)
+    return ['button[aria-label="Start"]', 'button[aria-label="More"]', '.assistant-panel-fold'].map((sel) => document.querySelector(`.assistant-header ${sel}`)?.getBoundingClientRect().right ?? Infinity).every((r) => r <= right + 0.5)
   })
-  check('at its narrowest the header keeps Start and ⋯, inside the panel', inside)
+  check('at its narrowest the header keeps Start, ⋯ and Fold, inside the panel', inside)
   await page.locator('.assistant-header button[aria-label="More"]').click()
   check('…and ⋯ has Start too', await becomes(async () => (await page.locator('.menu-item', { hasText: /^Start$/ }).count()) === 1))
   await page.keyboard.press('Escape')
@@ -94,28 +96,35 @@ const becomes = async (fn) => !!(await lib.until(fn, HUNG_MS))
   // The header follows once the workspace is refreshed, which can be after the file is saved.
   check('the header shows it', !!(await lib.until(async () => (await page.locator('.assistant-mode').innerText()).includes('Planner'), 10000)))
 
-  // Assistant Settings: this workspace's effort, over the default.
-  // Saved by the time agents:update returns; the footer follows when the workspace's change reaches the window.
-  await inv('agents:update', home, 'assistant', { effort: 'medium' })
-  check('Assistant Settings saves an override', agentFile().effort === 'medium')
-  check('the footer shows it', await becomes(async () => (await page.locator('.assistant-footer').innerText()).includes('Medium')))
-  // Settings → Assistant: a new default model reaches the Assistant.
-  await inv('settings:update', { assistant: { providers: { 'claude-code': { model: 'haiku' } } } })
-  await lib.until(async () => (await inv('workspace:get')).assistant.config.providers['claude-code'].model === 'haiku', 10000)
-  check('Settings → Assistant changes its default model', (await inv('workspace:get')).assistant.config.providers['claude-code'].model === 'haiku')
-  check('renaming the Assistant is ignored', (await inv('agents:update', home, 'assistant', { name: 'Bob' })).name === 'Assistant')
-  // Haiku in Auto: the fake answers with Claude Code 2.1.289's models, where Haiku has no Auto (#129), so Assistant Settings
-  // and Settings → Assistant say it runs in Manual (claude-real checks that the real one does).
+  // Assistant Settings (HI-2108): this workspace's connection and mode, nothing else. Two connections on its account (the
+  // connection dialog's saves): Sonnet with Medium effort, and one in the CLI's own mode, which the Assistant can't take.
+  const saved = async () => (await inv('connections:list')).connectionRows
+  const account = await lib.until(async () => (await saved()).find((c) => c.id === agentFile().connection)?.account ?? (await saved())[0]?.account, HUNG_MS)
+  const light = await inv('connection:add', account, { name: 'Light', model: 'sonnet', effort: 'medium' })
+  const cliOwn = await inv('connection:add', account, { name: 'Its own mode', permissionMode: 'cli-own' })
   await page.locator('.assistant-header button[aria-label="More"]').click()
   await page.locator('.menu-item', { hasText: 'Assistant Settings…' }).click()
-  check('Assistant Settings warns about Auto with Haiku', await becomes(async () => (await page.locator('.dialog .mode-caveat', { hasText: "doesn't offer Auto with Haiku 4.5: it runs in Manual" }).count()) === 1))
-  await page.keyboard.press('Escape')
-  await lib.until(async () => (await page.locator('.dialog').count()) === 0, HUNG_MS)
+  const settingsDialog = page.locator('.dialog', { hasText: 'Assistant Settings' })
+  const choice = settingsDialog.locator('#assistant-connection')
+  check('Assistant Settings has a connection and a mode, no coding agent, model or effort', await becomes(async () => (await choice.count()) === 1) && (await settingsDialog.locator('.provider-choice').count()) === 0 && (await settingsDialog.getByText('Effort', { exact: true }).count()) === 0)
+  check("…a connection in the CLI's own mode greyed out, saying why", await becomes(async () => (await choice.locator(`option[value="${cliOwn.id}"]`).count()) === 1) && (await choice.locator(`option[value="${cliOwn.id}"]`).isDisabled()) && /the Assistant needs to know its mode/.test(await choice.locator(`option[value="${cliOwn.id}"]`).innerText()))
+  await choice.selectOption(light.id)
+  check('…the one chosen summed up under it', await becomes(async () => /Sonnet.*Medium/.test(await settingsDialog.locator('[data-connection-summary]').innerText().catch(() => ''))), await settingsDialog.locator('[data-connection-summary]').innerText().catch(() => ''))
+  for (const theme of ['dark', 'light']) {
+    await inv('settings:update', { appearance: { theme } })
+    await lib.until(async () => (await page.evaluate(() => document.documentElement.dataset.theme)) === theme, HUNG_MS)
+    await settingsDialog.screenshot({ path: path.join(lib.WORK, `assistant-settings-${theme}.png`) })
+  }
+  await inv('settings:update', { appearance: { theme: 'dark' } })
+  await settingsDialog.locator('.btn.primary', { hasText: 'Save' }).click()
+  check('Save gives the Assistant that connection, for this workspace', await becomes(() => agentFile().connection === light.id), JSON.stringify(agentFile()))
+  check('the footer shows its effort', await becomes(async () => (await page.locator('.assistant-footer').innerText()).includes('Medium')))
+  check('renaming the Assistant is ignored', (await inv('agents:update', home, 'assistant', { name: 'Bob' })).name === 'Assistant')
+  // Settings → Assistant has no provider, connection or per-provider values any more: its connection holds them.
   await page.keyboard.press('Control+,')
   await page.locator('.settings-nav .row', { hasText: 'Assistant' }).first().click()
-  check('so does Settings → Assistant', await becomes(async () => (await page.locator('.mode-caveat', { hasText: "doesn't offer Auto with Haiku 4.5: it runs in Manual" }).count()) === 1))
+  check('Settings → Assistant has no provider, connection or "With Claude Code"', await becomes(async () => (await page.locator('.setting', { hasText: 'Highlight Compact over' }).count()) >= 1) && (await page.locator('.setting', { hasText: /^Provider|With Claude Code|Connection \(this workspace\)/ }).count()) === 0)
   await page.keyboard.press('Control+Shift+E')
-  await lib.sleep(300)
 
   // The Modes view: create, delete and restore.
   await inv('modes:create', 'Night Watch')
@@ -151,11 +160,29 @@ const becomes = async (fn) => !!(await lib.until(fn, HUNG_MS))
   // The key is marked as the user's own text in the log (userText), so the line is found by its parts.
   const launch = log.split('\n').filter((l) => / spawn \W?session:/.test(l) && l.toLowerCase().includes('assistant#assistant')).pop() ?? ''
   check('it launches in Auto', launch.includes('"--permission-mode","auto"'))
-  check('…with the model set in Settings → Assistant', launch.includes('"--model","haiku"'))
+  check('…with the model its connection sets', launch.includes('"--model","sonnet"'))
   check("its mode is appended to Claude Code's system prompt", launch.includes('--append-system-prompt-file'))
   check("Hive's reading tools are allowed", launch.includes('mcp__hive__hive_list_projects') && !launch.includes('mcp__hive__hive_write_shared_note'))
   check('Planner\'s instructions are in the launch', fs.readFileSync(path.join(home, '.hive', 'launch-assistant', 'instructions.md'), 'utf8').includes('# Your mode: Planner'))
   check('it is not a project agent', (await inv('workspace:get')).projects.every((p) => p.agents.every((a) => a.id !== 'assistant')))
+  // The header's fold button (#1330), as the Progress panel's: its tooltip names the shortcut (a rebinding too), and
+  // folding the panel leaves the Assistant running.
+  const fold = page.locator('.assistant-header .assistant-panel-fold')
+  check('the header has a fold button, with its shortcut', (await fold.getAttribute('aria-label')) === 'Fold the Assistant panel (Ctrl+Alt+I)', await fold.getAttribute('aria-label'))
+  await inv('settings:setKeybinding', 'assistant.toggle', 'Mod+Alt+J')
+  check('…the shortcut as rebound', await becomes(async () => (await fold.getAttribute('aria-label')) === 'Fold the Assistant panel (Ctrl+Alt+J)'), await fold.getAttribute('aria-label'))
+  // null removes the shortcut (the tooltip names none); undefined resets it to Hive's (setKeybinding).
+  await inv('settings:setKeybinding', 'assistant.toggle', null)
+  check('…none once it is removed', await becomes(async () => (await fold.getAttribute('aria-label')) === 'Fold the Assistant panel'), await fold.getAttribute('aria-label'))
+  await inv('settings:setKeybinding', 'assistant.toggle', undefined)
+  check('…and Ctrl+Alt+I again once it is reset', await becomes(async () => (await fold.getAttribute('aria-label')) === 'Fold the Assistant panel (Ctrl+Alt+I)'), await fold.getAttribute('aria-label'))
+  const runBefore = (await inv('session:live')).find((s) => s.agentId === 'assistant')?.runId
+  await fold.click()
+  check('clicking it folds the panel to its strip', await becomes(async () => (await page.locator('.assistant-panel').count()) === 0 && (await page.locator('.assistant-rail').count()) === 1))
+  const after = (await inv('session:live')).find((s) => s.agentId === 'assistant')
+  check('…and the Assistant keeps running', !!runBefore && after?.status === 'ready' && after.runId === runBefore, JSON.stringify({ runBefore, status: after?.status, runId: after?.runId }))
+  await page.locator('.assistant-rail').click()
+  await becomes(async () => (await page.locator('.assistant-panel').count()) === 1)
   // Its conversation is in the Assistant view's browser, and reads like any session.
   await page.locator('.assistant-panel .assistant-header button[aria-label="More"]').click()
   await page.locator('.menu-item', { hasText: 'All Conversations…' }).click()

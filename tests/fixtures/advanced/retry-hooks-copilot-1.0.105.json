@@ -1,0 +1,77 @@
+{
+  "what": "GitHub Copilot CLI 1.0.105 launched by Hive (its launch plugin), offline BYOK (COPILOT_OFFLINE, a dummy key) against a local stand-in answering every chat request with 429 and an OpenAI-style rate-limit body (HI-1973, the copilot e2e suite's ratelimited): the ErrorOccurred hook of each try, as Hive received it (its developer console, text shown). Every one recoverable, error_context model_call; its message is the API's error body, with no HTTP status. Stacks left out, ids and folders replaced.",
+  "hooks": [
+    {
+      "hook_event_name": "ErrorOccurred",
+      "session_id": "00000000-0000-4000-8000-000000000000",
+      "timestamp": "2026-10-28T16:56:17.453Z",
+      "cwd": "C:\\work\\alpha",
+      "error": {
+        "message": "{\"message\":\"Rate limit reached for requests\",\"type\":\"requests\",\"code\":\"rate_limit_exceeded\"}",
+        "name": "Error"
+      },
+      "error_context": "model_call",
+      "recoverable": true
+    },
+    {
+      "hook_event_name": "ErrorOccurred",
+      "session_id": "00000000-0000-4000-8000-000000000000",
+      "timestamp": "2026-10-28T16:56:18.566Z",
+      "cwd": "C:\\work\\alpha",
+      "error": {
+        "message": "{\"message\":\"Rate limit reached for requests\",\"type\":\"requests\",\"code\":\"rate_limit_exceeded\"}",
+        "name": "Error"
+      },
+      "error_context": "model_call",
+      "recoverable": true
+    },
+    {
+      "hook_event_name": "ErrorOccurred",
+      "session_id": "00000000-0000-4000-8000-000000000000",
+      "timestamp": "2026-10-28T16:56:19.594Z",
+      "cwd": "C:\\work\\alpha",
+      "error": {
+        "message": "{\"message\":\"Rate limit reached for requests\",\"type\":\"requests\",\"code\":\"rate_limit_exceeded\"}",
+        "name": "Error"
+      },
+      "error_context": "model_call",
+      "recoverable": true
+    },
+    {
+      "hook_event_name": "ErrorOccurred",
+      "session_id": "00000000-0000-4000-8000-000000000000",
+      "timestamp": "2026-10-28T16:56:20.801Z",
+      "cwd": "C:\\work\\alpha",
+      "error": {
+        "message": "{\"message\":\"Rate limit reached for requests\",\"type\":\"requests\",\"code\":\"rate_limit_exceeded\"}",
+        "name": "Error"
+      },
+      "error_context": "model_call",
+      "recoverable": true
+    },
+    {
+      "hook_event_name": "ErrorOccurred",
+      "session_id": "00000000-0000-4000-8000-000000000000",
+      "timestamp": "2026-10-28T16:56:22.028Z",
+      "cwd": "C:\\work\\alpha",
+      "error": {
+        "message": "{\"message\":\"Rate limit reached for requests\",\"type\":\"requests\",\"code\":\"rate_limit_exceeded\"}",
+        "name": "Error"
+      },
+      "error_context": "model_call",
+      "recoverable": true
+    },
+    {
+      "hook_event_name": "ErrorOccurred",
+      "session_id": "00000000-0000-4000-8000-000000000000",
+      "timestamp": "2026-10-28T16:56:23.194Z",
+      "cwd": "C:\\work\\alpha",
+      "error": {
+        "message": "{\"message\":\"Rate limit reached for requests\",\"type\":\"requests\",\"code\":\"rate_limit_exceeded\"}",
+        "name": "Error"
+      },
+      "error_context": "model_call",
+      "recoverable": true
+    }
+  ]
+}

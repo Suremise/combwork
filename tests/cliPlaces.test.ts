@@ -9,7 +9,7 @@ import { afterEach, describe, expect, it } from 'vitest'
 import { junction, shortPath } from './pathAliases'
 import { tempDir } from './tempDir'
 
-const { ClaudeCodeAdapter, claudeSpelling } = await import('../src/main/providers/claude/adapter')
+const { ClaudeCodeAdapter, MAY_BE_SHORT, claudeSpelling } = await import('../src/main/providers/claude/adapter')
 const { CodexAdapter } = await import('../src/main/providers/codex/adapter')
 const { listCopilotSessions } = await import('../src/main/providers/copilot/events')
 const { encodeProjectPath } = await import('../src/main/providers/claude/usage')
@@ -92,6 +92,28 @@ describe("Claude Code's transcript folder (#493)", () => {
     // Its first prompt adds a line with the cwd: that changes the file, not the folder.
     appendFileSync(file, JSON.stringify({ type: 'user', cwd: p.short, sessionId: ID }) + '\n')
     expect((await claude.listSessions(p.real)).map((s) => s.id)).toEqual([ID])
+  })
+
+  it('looks for 8.3 names only in folders whose names may hold one (HI-1681)', () => {
+    // `~n` after at most six characters of a name, its own `-`s included; the encoded drive and separators are `-` too.
+    for (const n of ['C--Users-RUNNER-1-AppData', 'C--x-REALFO-1', 'C--hive-test-BUILD--1', 'C--a-PROGRA-1-b', 'D--x-HIVE-T-12']) expect(MAY_BE_SHORT.test(n), n).toBe(true)
+    for (const n of ['C--other-project-123', 'C--Users-Darren-AppData', 'D--Development-worktrees-review7']) expect(MAY_BE_SHORT.test(n), n).toBe(false)
+  })
+
+  it("finds a folder's first session once Claude Code makes its folder, on the same adapter (#1649)", async () => {
+    const p = place()
+    process.env.CLAUDE_CONFIG_DIR = join(p.base, 'claude-home')
+    const projects = join(process.env.CLAUDE_CONFIG_DIR, 'projects')
+    mkdirSync(join(projects, encodeProjectPath(join(p.base, 'Other'))), { recursive: true })
+    const claude = new ClaudeCodeAdapter()
+    // Looked up before it has any: the projects folder's names are kept while it is unchanged.
+    expect(await claude.transcriptPath(p.real, ID)).toBeNull()
+    expect(await claude.transcriptPath(p.real, ID)).toBeNull()
+    const dir = join(projects, encodeProjectPath(p.real))
+    mkdirSync(dir)
+    writeFileSync(join(dir, `${ID}.jsonl`), '{"type":"user"}\n')
+    expect(await claude.transcriptPath(p.real, ID)).toBe(join(dir, `${ID}.jsonl`))
+    expect((await claude.listSessions(p.via)).map((s) => s.id)).toEqual([ID])
   })
 
   it("copies a moved folder's data from every folder it is kept under, the first one winning", async () => {

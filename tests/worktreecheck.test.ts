@@ -59,11 +59,11 @@ describe('worktreeCheck', () => {
     const { project: p, tree } = await makeProject()
     const merged = await tree('merged')
     commit(merged.path, 'm.txt')
-    expect(await mergeWorktree(p, merged, { squash: false, message: 'merge' })).toEqual({ ok: true })
+    expect(await mergeWorktree(p, merged, { squash: false, message: 'merge' })).toMatchObject({ ok: true })
     expect((await worktreeCheck(p, merged)).removable).toBe(true)
     const squashed = await tree('squashed')
     commit(squashed.path, 's.txt')
-    expect(await mergeWorktree(p, squashed, { squash: true, message: 'squash' })).toEqual({ ok: true })
+    expect(await mergeWorktree(p, squashed, { squash: true, message: 'squash' })).toMatchObject({ ok: true })
     expect((await worktreeCheck(p, squashed)).removable).toBe(true)
   })
 
@@ -152,7 +152,7 @@ describe('removeCheckedWorktree', () => {
     const { project: p, tree } = await makeProject()
     const wt = await tree('shown')
     commit(wt.path, 's.txt')
-    expect(await mergeWorktree(p, wt, { squash: false, message: 'merge' })).toEqual({ ok: true })
+    expect(await mergeWorktree(p, wt, { squash: false, message: 'merge' })).toMatchObject({ ok: true })
     const check = await worktreeCheck(p, wt)
     expect(check.removable).toBe(true)
     // The user was shown another branch.
@@ -170,7 +170,7 @@ describe('removeCheckedWorktree', () => {
     const { project: p, tree } = await makeProject()
     const wt = await tree('race')
     commit(wt.path, 'unique-work.txt')
-    expect(await mergeWorktree(p, wt, { squash: false, message: 'merge' })).toEqual({ ok: true })
+    expect(await mergeWorktree(p, wt, { squash: false, message: 'merge' })).toMatchObject({ ok: true })
     const check = await worktreeCheck(p, wt)
     expect(check).toMatchObject({ removable: true, into: 'main' })
     // Between the worktree's removal and the branch's: main reset to before the merge, so the commit is unmerged again.

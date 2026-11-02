@@ -1,5 +1,5 @@
-// Templates view and tab, export and import (#127): the Templates view on the activity bar (next to Skills) lists the
-// workspace's templates and each project's, with a filter; selecting one shows its agents and layout; Rename…,
+// Templates view and tab, export and import (#127): the Templates view on the activity bar (next to Skills) lists Hive's
+// own (#1436), the workspace's templates and each project's, with a filter; selecting one shows its agents and layout; Rename…,
 // Duplicate… (into another project), Load into Project… (the project chosen, then loading's own confirmation),
 // Export… to a test folder (nothing personal in the file), Import… of that file (where to keep it; a name clash offers
 // Keep Both), an invalid file refused with the reason, and Delete. A project's Templates tab lists its own and the
@@ -15,6 +15,11 @@ const { _electron } = require('playwright-core')
 const fs = require('fs')
 const os = require('os')
 const path = require('path')
+// Only its agents (HI-1910): its workflow, ticked by default, would open Version Control → Workflow after the load.
+const agentsOnly = async (d) => {
+  const box = d.locator('[data-workflow-apply]')
+  if (await box.count()) await box.uncheck()
+}
 // The longest a wait here waits for what it waits on: a bound for a hung run, never how long it should take (#570).
 const HUNG_MS = 10000
 
@@ -52,13 +57,16 @@ const check = (name, ok, extra = '') => {
   const inv = (ch, ...a) => page.evaluate(([c, x]) => window.hive.invoke(c, ...x), [ch, a])
   await lib.openWorkspace(inv, page, ws)
   await lib.waitForProvider(inv)
-  const projectCfg = (p) => JSON.parse(fs.readFileSync(path.join(p, '.hive', 'project.json'), 'utf8'))
+  const projectCfg = (p) => lib.projectConfig(userData, p) // with this user's view over it (HI-1749)
   const dialog = page.locator('.dialog').last()
   const shot = (name) => page.screenshot({ path: path.join(lib.WORK, `templateshare-${name}.png`) })
   const sidebar = page.locator('.sidebar')
   // The view's main area (a project's Templates tab has a .tab-body of its own).
   const detail = page.locator('.main-area > .tab-body .template-detail')
-  const rowNames = async (where) => (await where.locator('.template-row .label').allInnerTexts()).map((t) => t.split('\n')[0].trim())
+  // The templates kept in the workspace and its projects (Hive's own, #1436, aside), and one of them by name.
+  const rowNames = async (where) => (await where.locator('.template-row:not([data-scope="hive"]) .label').allInnerTexts()).map((t) => t.split('\n')[0].trim())
+  const userRow = (where, name) => where.locator(`.template-row:not([data-scope="hive"])[aria-label="${name}"]`)
+  const HIVE_NAMES = ['Solo', 'Pair', 'Pair: one provider', 'Team 3×3', 'Team 6×6', 'Team 6 + pool']
   // (Their headers are upper-case by CSS.)
   const groups = async () => (await sidebar.locator('.template-group .skill-group').allInnerTexts()).map((t) => t.replace(/\s+/g, ' ').trim().toLowerCase())
   const templatesOf = (dir) => (fs.existsSync(dir) ? fs.readdirSync(dir).filter((f) => f.endsWith('.json')) : [])
@@ -82,14 +90,15 @@ const check = (name, ok, extra = '') => {
   const bar = await page.locator('.activitybar .activity-btn').evaluateAll((els) => els.map((e) => e.getAttribute('aria-label')))
   check('the Templates icon is next to Skills on the activity bar', bar.indexOf('Templates') === bar.indexOf('Skills') + 1, JSON.stringify(bar))
   await page.locator('.activitybar [aria-label="Templates"]').click()
-  check('the view lists the workspace\'s templates, then each project\'s under its name', !!(await lib.until(async () => JSON.stringify(await groups()) === '["workspace 1","alpha 1"]', 5000)) && JSON.stringify(await rowNames(sidebar)) === '["Pair","Solo"]', JSON.stringify([await groups(), await rowNames(sidebar)]))
+  check("the view lists Hive's own, the workspace's templates, then each project's under its name", !!(await lib.until(async () => JSON.stringify(await groups()) === '["hive 6","workspace 1","alpha 1"]', 5000)) && JSON.stringify(await rowNames(sidebar)) === '["Pair","Solo"]' && JSON.stringify(await sidebar.locator('.template-row[data-scope="hive"]').evaluateAll((l) => l.map((x) => x.getAttribute('aria-label')))) === JSON.stringify(HIVE_NAMES), JSON.stringify([await groups(), await rowNames(sidebar)]))
   await sidebar.locator('select[aria-label="Show templates of"]').selectOption({ label: 'alpha' })
   check('the filter shows one project\'s', !!(await lib.until(async () => JSON.stringify(await rowNames(sidebar)) === '["Solo"]', HUNG_MS)))
   await sidebar.locator('select[aria-label="Show templates of"]').selectOption({ label: 'All templates' })
-  await sidebar.locator('.template-row[aria-label="Pair"]').click()
+  await userRow(sidebar, 'Pair').click()
   await detail.waitFor({ timeout: 5000 })
   const table = (await detail.locator('table tbody tr').allInnerTexts()).map((r) => r.split('\t').map((c) => c.trim()))
-  check('selecting one shows its agents (role, model, where they work) and layout', table.length === 2 && table[0][0] === 'Builder' && table[0][1] === 'builder' && table[0][3] === 'opus' && table[0][6] === 'The project folder' && /2 agents, two columns layout/i.test(await detail.innerText()), JSON.stringify(table))
+  // HI-2109: the CLI each suggests; no model, effort or mode (a template keeps none).
+  check('selecting one shows its agents (role in the workflow with its note, the CLI it suggests) and layout; nothing of worktrees or models', table.length === 2 && table[0][0] === 'Builder' && /^Builder\s+builder$/.test(table[0][1]) && table[1][1] === 'Reviewer' && table[0][2] === 'Claude Code' && table[0].length === 3 && !/opus/i.test(table.flat().join()) && !/worktree|project folder/i.test((await detail.innerText()).replace(await detail.locator('[data-template-workflow-view]').innerText().catch(() => ''), '')) && /2 agents, two columns layout/i.test(await detail.innerText()), JSON.stringify(table))
   await shot('1-view')
 
   // Rename: in place, the file kept.
@@ -102,25 +111,26 @@ const check = (name, ok, extra = '') => {
   await detail.getByRole('button', { name: 'Duplicate…' }).click()
   await dialog.locator('select').selectOption({ label: 'beta (this project only)' })
   await dialog.getByRole('button', { name: 'Duplicate', exact: true }).click()
-  check('Duplicate… copies it into another project', !!(await lib.until(async () => templatesOf(own(beta)).length === 1, 5000)) && !!(await lib.until(async () => JSON.stringify(await groups()) === '["workspace 1","alpha 1","beta 1"]', 5000)), JSON.stringify(await groups()))
+  check('Duplicate… copies it into another project', !!(await lib.until(async () => templatesOf(own(beta)).length === 1, 5000)) && !!(await lib.until(async () => JSON.stringify(await groups()) === '["hive 6","workspace 1","alpha 1","beta 1"]', 5000)), JSON.stringify(await groups()))
 
   // Load into Project…: the project chosen, then the list of who goes and who comes.
-  await sidebar.locator('.template-row[aria-label="Team"]').first().click()
+  await userRow(sidebar, 'Team').first().click()
   await detail.getByRole('button', { name: 'Load into Project…' }).click()
   await dialog.locator('select').selectOption({ label: 'beta' })
   await dialog.getByRole('button', { name: 'Continue' }).click()
   const confirmLoad = page.locator('.dialog', { hasText: 'Load "Team"?' })
   await confirmLoad.waitFor({ timeout: 5000 })
-  check("…then loading's confirmation, for the chosen project", (await confirmLoad.locator('.template-plan-removed li').evaluateAll((l) => l.map((x) => x.dataset.agent))).join() === 'Old')
-  // Its names are alpha's agents' (#702): marked, Load template greyed out until they are changed.
+  check("…then loading's confirmation, for the chosen project", (await confirmLoad.locator('.template-plan-table tbody tr[data-state="removed"]').evaluateAll((l) => l.map((x) => x.dataset.agent))).join() === 'Old')
+  // Its names are alpha's agents' (#702): free ones filled in (#1440), so Load template is ready; chosen here instead.
   const nameBoxes = (d) => d.locator('.template-plan-name-input')
   const loadOf = (d) => d.getByRole('button', { name: 'Load template' })
-  check("…alpha's names marked, Load template greyed out", (await confirmLoad.locator('.template-plan-table .field-error').count()) === 2 && (await loadOf(confirmLoad).isDisabled()))
+  check("…alpha's names: free ones filled in, none marked, Load template ready", JSON.stringify(await nameBoxes(confirmLoad).evaluateAll((l) => l.map((x) => x.value))) === '["Builder (beta)","Reviewer (beta)"]' && (await confirmLoad.locator('.template-plan-table .field-error').count()) === 0 && (await loadOf(confirmLoad).isEnabled()), JSON.stringify(await nameBoxes(confirmLoad).evaluateAll((l) => l.map((x) => x.value))))
   await nameBoxes(confirmLoad).nth(0).fill('BBuilder')
   await nameBoxes(confirmLoad).nth(1).fill('BReviewer')
   await lib.until(() => loadOf(confirmLoad).isEnabled(), 5000)
+  await agentsOnly(confirmLoad)
   await loadOf(confirmLoad).click()
-  check('Load into Project… replaces that project\'s agents and layout', !!(await lib.until(async () => JSON.stringify(projectCfg(beta).agents.map((a) => a.name)) === '["BBuilder","BReviewer"]', 10000)) && projectCfg(beta).layout === 'columns2', JSON.stringify(projectCfg(beta).agents.map((a) => a.name)))
+  check('Load into Project… replaces that project\'s agents and layout', !!(await lib.until(async () => JSON.stringify(projectCfg(beta).agents.map((a) => a.name)) === '["BBuilder","BReviewer"]' && projectCfg(beta).layout === 'columns2', 10000)), JSON.stringify(projectCfg(beta).agents.map((a) => a.name)))
 
   // Export to a test folder: what the template holds, nothing personal.
   const exported = path.join(exports_, 'Team.hive-template.json')
@@ -129,7 +139,7 @@ const check = (name, ok, extra = '') => {
   check('Export… writes the template file', !!(await lib.until(async () => fs.existsSync(exported), 5000)) && !!(await toast(/Template exported/)))
   const text = fs.readFileSync(exported, 'utf8')
   const json = JSON.parse(text)
-  check('the exported file holds the template and nothing personal (no paths, ids, sessions, user names)', JSON.stringify(Object.keys(json).sort()) === '["agents","layout","name","savedAt","version"]' && !/templateshare|Users|"id"|lastSessionId/i.test(text) && !text.toLowerCase().includes(os.userInfo().username.toLowerCase()), text.slice(0, 200))
+  check('the exported file holds the template and nothing personal (no paths, ids, sessions, user names; its workflow the rules only, HI-1910)', JSON.stringify(Object.keys(json).sort()) === '["agents","layout","name","savedAt","version","workflow"]' && !/"target"|"commands"|"email"/.test(JSON.stringify(json.workflow)) && !/templateshare|Users|"id"|lastSessionId/i.test(text) && !text.toLowerCase().includes(os.userInfo().username.toLowerCase()), text.slice(0, 200))
 
   // Import it into alpha: where to keep it asked; again, a clash: Keep Both.
   const importInto = async (label) => {
@@ -160,7 +170,7 @@ const check = (name, ok, extra = '') => {
   check('an invalid file is refused, saying why', !!(await toast(/Could not import the template[\s\S]*newer version of Hive/)) && (await page.locator('.dialog').count()) === 0 && templatesOf(wsTemplates).length + templatesOf(own(alpha)).length + templatesOf(own(beta)).length === before)
 
   // Delete Team (2).
-  await sidebar.locator('.template-row[aria-label="Team (2)"]').click()
+  await userRow(sidebar, 'Team (2)').click()
   await detail.locator('[aria-label="Delete template"]').click()
   await page.locator('.dialog', { hasText: 'Delete "Team (2)"?' }).getByRole('button', { name: 'Delete' }).click()
   check('Delete removes it (to the Recycle Bin)', !!(await lib.until(async () => templatesOf(own(alpha)).length === 2, 5000)) && !!(await lib.until(async () => !(JSON.stringify(await rowNames(sidebar))).includes('Team (2)'), 5000)))
@@ -173,13 +183,14 @@ const check = (name, ok, extra = '') => {
   await tab.waitFor({ timeout: 5000 })
   // Each row's name and the badge saying where it is kept.
   const tabRows = async () => tab.locator('.template-row .label').evaluateAll((els) => els.map((el) => `${el.firstChild.textContent.trim()}: ${el.querySelector('.badge')?.textContent.trim() ?? ''}`))
-  check("the project's tab lists its own and the workspace's, each with its scope", !!(await lib.until(async () => JSON.stringify(await tabRows()) === '["Solo: alpha","Team: alpha","Team: Workspace"]', 5000)), JSON.stringify(await tabRows()))
-  await tab.locator('.template-row[aria-label="Solo"]').click()
+  check("the project's tab lists its own, the workspace's and Hive's, each with its scope", !!(await lib.until(async () => JSON.stringify(await tabRows()) === JSON.stringify(['Solo: alpha', 'Team: alpha', 'Team: Workspace', ...HIVE_NAMES.map((n) => `${n}: Hive`)]), 5000)), JSON.stringify(await tabRows()))
+  await userRow(tab, 'Solo').click()
   const tabDetail = page.locator('.split-main .template-detail')
   const ids = JSON.stringify(projectCfg(alpha).agents.map((a) => a.id))
   await tabDetail.getByRole('button', { name: 'Load into This Project…' }).click()
   const confirmTab = page.locator('.dialog', { hasText: 'Load "Solo"?' })
   await confirmTab.waitFor({ timeout: 5000 })
+  await agentsOnly(confirmTab)
   await confirmTab.getByRole('button', { name: 'Load template' }).click()
   check("Load into This Project… loads into the tab's project (new agents, as the template has them)", !!(await lib.until(async () => JSON.stringify(projectCfg(alpha).agents.map((a) => a.id)) !== ids, 10000)) && JSON.stringify(projectCfg(alpha).agents.map((a) => a.name)) === '["Builder","Reviewer"]')
 
@@ -204,7 +215,7 @@ const check = (name, ok, extra = '') => {
     }
   }
   await page.locator('.activitybar [aria-label="Templates"]').click()
-  await sidebar.locator('.template-row[aria-label="Solo"]').click()
+  await userRow(sidebar, 'Solo').click()
   for (const theme of ['dark', 'light']) {
     await inv('settings:update', { appearance: { theme } })
     await lib.sleep(400)
@@ -214,10 +225,10 @@ const check = (name, ok, extra = '') => {
   await inv('settings:update', { appearance: { theme: 'dark' } })
 
   // --- #271: Edit… a template in the view: its name, description and layout; Reviewer changed in the Agent Settings
-  // dialog (a role, its own worktree), Tester added (a name taken refused), moved up, Builder removed; saved, then loaded
-  // into beta: exactly those agents, in that order, with that layout. Both themes.
+  // dialog (a note, and Either as its role in the workflow, #1436), Tester added (a name taken refused), moved up,
+  // Builder removed; saved, then loaded into beta: exactly those agents, in that order, with that layout. Both themes.
   await lib.fitWindow(app, page, { width: 1700, height: 900 })
-  await sidebar.locator('.template-row[aria-label="Team"]').first().click()
+  await userRow(sidebar, 'Team').first().click()
   await detail.getByRole('button', { name: 'Edit…' }).click()
   const editor = page.locator('.main-area > .tab-body .template-editor')
   await editor.waitFor({ timeout: 5000 })
@@ -228,9 +239,9 @@ const check = (name, ok, extra = '') => {
   await editor.locator('[aria-label="Edit Reviewer…"]').click()
   const agentDialog = page.locator('.dialog', { hasText: 'Reviewer settings (template)' })
   await agentDialog.waitFor({ timeout: 5000 })
-  check('…each agent in the Agent Settings dialog (template mode: where it works is a choice)', (await agentDialog.locator('[role="radiogroup"][aria-label="Works in"]').count()) === 1 && (await agentDialog.locator('.provider-choice').count()) === 1)
+  check('…each agent in the Agent Settings dialog (template mode: its role in the workflow and note; nothing of where it works)', (await agentDialog.getByRole('radiogroup', { name: 'Role in the workflow' }).count()) === 1 && (await agentDialog.locator('[aria-label="Works in"]').count()) === 0 && (await agentDialog.locator('.provider-choice').count()) === 1)
   await agentDialog.locator('#agent-role').fill('checker')
-  await agentDialog.getByRole('radio', { name: 'Its own worktree' }).click()
+  await agentDialog.locator('.workflow-role-choice [data-workflow-role="either"]').click()
   await shot('edit-agent-dialog')
   await agentDialog.getByRole('button', { name: 'Save' }).click()
   await lib.until(async () => (await agentDialog.count()) === 0, HUNG_MS)
@@ -259,7 +270,7 @@ const check = (name, ok, extra = '') => {
     // (Its agents' Saves saved it already, #510: Save Template's own save is the one without Builder.)
     return j.name === 'Team edited' && !j.agents.some((x) => x.name === 'Builder') ? j : null
   }, 5000)
-  check('Save Template writes it where it is kept: name, description, layout and the agents in order', !!savedTeam && savedTeam.description === 'Builds, then reviews.' && savedTeam.layout === 'columns3' && JSON.stringify(savedTeam.agents.map((a) => [a.name, a.role ?? '', a.worktree])) === '[["Tester","",false],["Reviewer","checker",true]]', JSON.stringify(savedTeam))
+  check('Save Template writes it where it is kept: name, description, layout and the agents in order', !!savedTeam && savedTeam.description === 'Builds, then reviews.' && savedTeam.layout === 'columns3' && JSON.stringify(savedTeam.agents.map((a) => [a.name, a.role, a.note ?? '', 'worktree' in a])) === '[["Tester","builder","",false],["Reviewer","either","checker",false]]', JSON.stringify(savedTeam))
   check('…and the view shows it again, with its description', !!(await lib.until(async () => (await detail.count()) === 1 && /Builds, then reviews\./.test(await detail.innerText()), 5000)))
   await detail.getByRole('button', { name: 'Load into Project…' }).click()
   await dialog.locator('select').selectOption({ label: 'beta' })
@@ -269,8 +280,9 @@ const check = (name, ok, extra = '') => {
   // (Reviewer is alpha's agent's name: changed. Tester is free.)
   await nameBoxes(loadEdited).nth(1).fill('BReviewer')
   await lib.until(() => loadOf(loadEdited).isEnabled(), 5000)
+  await agentsOnly(loadEdited)
   await loadOf(loadEdited).click()
-  check('loaded into beta: exactly those agents, in order, with that layout', !!(await lib.until(async () => JSON.stringify(projectCfg(beta).agents.map((a) => [a.name, a.role ?? '', !!a.worktree])) === '[["Tester","",false],["BReviewer","checker",true]]', 15000)) && projectCfg(beta).layout === 'columns3', JSON.stringify(projectCfg(beta).agents))
+  check('loaded into beta: exactly those agents, in order, with that layout', !!(await lib.until(async () => JSON.stringify(projectCfg(beta).agents.map((a) => [a.name, a.workflowRole, a.role ?? '', !!a.worktree])) === '[["Tester","builder","",false],["BReviewer","either","checker",false]]' && projectCfg(beta).layout === 'columns3', 15000)), JSON.stringify(projectCfg(beta).agents))
   // A save made while the editor is open is never overwritten (#271): the draft (a new name) is open; "Team edited" is
   // changed on disk (a description) and the editor's own list refreshes (another template saved, from the palette).
   // The editor says so; Save is refused, keeping both the draft and the change; Discard and Reload shows the change.
@@ -302,7 +314,7 @@ const check = (name, ok, extra = '') => {
   // --- #510: an agent's Save in the editor saves the template too (Save means save), and the editor stays open. Its
   // changes not saved yet (a new name) survive leaving it for another template: the list marks it, and it opens again
   // with them. Cancel then discards them. Both themes.
-  await sidebar.locator('.template-row[aria-label="Team edited"]').first().click()
+  await userRow(sidebar, 'Team edited').first().click()
   await detail.getByRole('button', { name: 'Edit…' }).click()
   await editor.waitFor({ timeout: 5000 })
   await editor.locator('[aria-label="Edit Tester…"]').click()
@@ -311,7 +323,7 @@ const check = (name, ok, extra = '') => {
   check("the agent's dialog says its Save saves it in the template", /Save saves it in the template/.test(await testerDialog.innerText()), await testerDialog.innerText())
   await testerDialog.locator('#agent-role').fill('qa')
   await testerDialog.getByRole('button', { name: 'Save' }).click()
-  const roleOf = () => JSON.parse(fs.readFileSync(teamFile, 'utf8')).agents.find((a) => a.name === 'Tester')?.role
+  const roleOf = () => JSON.parse(fs.readFileSync(teamFile, 'utf8')).agents.find((a) => a.name === 'Tester')?.note
   check("an agent's Save saves the template, with no Save Template", !!(await lib.until(() => roleOf() === 'qa', 5000)), String(roleOf()))
   // (The file is written a moment before the editor has the reply.)
   check('…the editor stays open, with nothing left unsaved', !!(await lib.until(async () => (await editor.count()) === 1 && (await editor.locator('.template-unsaved-note').count()) === 0 && (await editor.getByRole('button', { name: 'Save Template' }).isDisabled()), 5000)))
@@ -324,8 +336,8 @@ const check = (name, ok, extra = '') => {
   // A change not saved, then another template: nothing lost.
   await editor.locator('#template-name').fill('Team pending')
   check('a change not saved is marked in the editor', (await editor.locator('.template-unsaved-note').count()) === 1)
-  await sidebar.locator('.template-row[aria-label="Bump"]').first().click()
-  const teamRow = sidebar.locator('.template-row[aria-label="Team edited"]').first()
+  await userRow(sidebar, 'Bump').first().click()
+  const teamRow = userRow(sidebar, 'Team edited').first()
   check('…another template: the list marks this one "Not saved"', !!(await lib.until(async () => (await teamRow.locator('.template-unsaved').count()) === 1, 5000)))
   for (const theme of ['dark', 'light']) {
     await inv('settings:update', { appearance: { theme } })
@@ -366,7 +378,7 @@ const check = (name, ok, extra = '') => {
   await shot('saving')
   check('…then it is saved and the editor closes', !!(await lib.until(async () => (await editor.count()) === 0 && teamNow().name === 'Team slow', 8000)), JSON.stringify(teamNow().name))
   // An agent's Save while its template save is slow: no other Save can start until it is done, and each one saved is.
-  const slowRow = sidebar.locator('.template-row[aria-label="Team slow"]').first()
+  const slowRow = userRow(sidebar, 'Team slow').first()
   await slowRow.click()
   await detail.getByRole('button', { name: 'Edit…' }).click()
   await editor.waitFor({ timeout: 5000 })
@@ -381,11 +393,11 @@ const check = (name, ok, extra = '') => {
   await slow('templates:update=2501*1')
   await saveTester('first-save')
   const duringAgentSave = await disabledNow()
-  check("an agent's Save saving slowly: no other agent can be edited meanwhile", duringAgentSave.edit && duringAgentSave.add && duringAgentSave.name && teamNow().agents.find((a) => a.name === 'Tester')?.role !== 'first-save', JSON.stringify(duringAgentSave))
-  check('…then it is saved', !!(await lib.until(() => teamNow().agents.find((a) => a.name === 'Tester')?.role === 'first-save', 8000)))
+  check("an agent's Save saving slowly: no other agent can be edited meanwhile", duringAgentSave.edit && duringAgentSave.add && duringAgentSave.name && teamNow().agents.find((a) => a.name === 'Tester')?.note !== 'first-save', JSON.stringify(duringAgentSave))
+  check('…then it is saved', !!(await lib.until(() => teamNow().agents.find((a) => a.name === 'Tester')?.note === 'first-save', 8000)))
   await lib.until(async () => !(await editor.locator('[aria-label="Edit Tester…"]').isDisabled()), HUNG_MS)
   await saveTester('second-save')
-  check('…and the next agent Save is saved too, with nothing left unsaved', !!(await lib.until(async () => teamNow().agents.find((a) => a.name === 'Tester')?.role === 'second-save' && (await editor.locator('.template-unsaved-note').count()) === 0, 5000)))
+  check('…and the next agent Save is saved too, with nothing left unsaved', !!(await lib.until(async () => teamNow().agents.find((a) => a.name === 'Tester')?.note === 'second-save' && (await editor.locator('.template-unsaved-note').count()) === 0, 5000)))
   // A draft not saved: Reload Window asks first (and Cancel keeps it), quitting asks too, and Save and quit saves it.
   await editor.locator('#template-name').fill('Team at quit')
   await page.evaluate(() => document.activeElement?.blur())

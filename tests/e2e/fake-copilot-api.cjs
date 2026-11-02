@@ -9,10 +9,13 @@
 //   edit PATH OLD NEW          Copilot's edit tool (PATH relative to the session's folder)
 //   write PATH TEXT…           its create tool
 //   view PATH                  its view tool (reads a file)
+//   skillref NAME FILE         its view tool on a skill's reference file, by the link in the SKILL.md it read (HI-2011)
 //   shell COMMAND…             its powershell tool
 //   question                   its ask_user tool (a question for the person)
 //   say TEXT…                  the turn's last reply (default: "Done.")
 //   checkpoint                 a view of README.md: a tool call after which Hive's notice may come (#650)
+//   ratelimited                every request refused with a 429 (a request-rate limit, HI-1973): Copilot tries again
+//                              5 times, its error hook each time, then gives up (a rate_limit session error)
 // Hive's notices (#650: "[Hive] New in your inbox…" added to a tool's result, "[Hive] Before you finish…" as the prompt
 // its Stop carried the turn on with) and its doorbell (the prompt "[Hive] New in your inbox…") are followed as a model does:
 // hive_inbox, then hive_inbox with ack for its ids; new work read so (a task, a handover) is then the prompt's steps.
@@ -55,6 +58,7 @@ function actionsOf(prompt) {
     const step = raw.trim()
     let m
     for (const s of step.matchAll(/\bskill\s+([a-z0-9][\w-]*)/gi)) out.push({ tool: 'skill', args: { skill: s[1] } })
+    for (const s of step.matchAll(/\bskillref\s+([a-z0-9][\w-]*)\s+([\w.-]+\.md)/gi)) out.push({ tool: 'view', args: { path: `.agents/skills/hive-${s[1]}/${s[2]}` }, ref: { skill: s[1], file: s[2] } })
     if ((m = /\bboardmove\s+(\d+)\s+(\w+)/i.exec(step))) out.push({ tool: 'hive_update_task', args: { number: Number(m[1]), column: m[2].toLowerCase() } })
     if ((m = /\bboardreview\s+(\d+)\s+(\w+)(?:\s+(hold|todo|doing|review|passed|done)\b)?/i.exec(step))) out.push({ tool: 'hive_update_task', args: { number: Number(m[1]), review: m[2].toLowerCase(), ...(m[3] ? { column: m[3].toLowerCase(), comment: 'Fake review: passed.' } : {}) } })
     if ((m = /\bboardcomment\s+(\d+)/i.exec(step))) out.push({ tool: 'hive_update_task', args: { number: Number(m[1]), comment: 'Fake: done, see the files.' } })
@@ -141,7 +145,11 @@ function decide(body) {
     if (a.say) continue
     if (n === done) {
       const name = offered(body.tools, a.tool)
-      return name ? { ...out, wait, tool: name, args: a.args } : { ...out, wait, text: `Fake Copilot: Copilot offers no tool ${a.tool}.` }
+      // A reference file: its link in SKILL.md as Copilot gave it (its skill tool says "loaded", and the skill comes as
+      // context of its own), else a path that isn't there.
+      const linked = !a.ref || msgs.some((m) => textOf(m).includes(`](${a.ref.file})`) || textOf(m).includes(`](./${a.ref.file})`))
+      const args = linked ? a.args : { path: `.agents/skills/hive-${a.ref.skill}/no-link-to-${a.ref.file}` }
+      return name ? { ...out, wait, tool: name, args } : { ...out, wait, text: `Fake Copilot: Copilot offers no tool ${a.tool}.` }
     }
     n++
   }
@@ -174,9 +182,10 @@ function stream(res, model, id, d) {
 
 /**
  * Starts the stand-in on 127.0.0.1 (`port` 0: any free port). Resolves { port, url (…/v1, for COPILOT_PROVIDER_BASE_URL),
- * requests (how many chat requests it answered), close() }.
+ * requests (how many chat requests it answered), close() }. `systems`: every request's system prompt in full in the log,
+ * not only the first's (several sessions' instructions, #1433).
  */
-function startFakeCopilotApi({ port = 0, log = null } = {}) {
+function startFakeCopilotApi({ port = 0, log = null, systems = false } = {}) {
   let n = 0
   const server = http.createServer((req, res) => {
     let raw = ''
@@ -198,11 +207,17 @@ function startFakeCopilotApi({ port = 0, log = null } = {}) {
       }
       const id = `fake${++n}`
       const d = decide(body)
+      // "ratelimited" (HI-1973): refused as too many requests, as an OpenAI-style API says it.
+      if (/\bratelimited\b/i.test(d.prompt ?? '')) {
+        if (log) fs.appendFileSync(log, `${JSON.stringify({ at: new Date().toISOString(), id, prompt: d.prompt, step: 'ratelimited', status: 429 })}\n`)
+        res.writeHead(429, { 'content-type': 'application/json', 'retry-after': '1' })
+        return res.end(JSON.stringify({ error: { message: 'Rate limit reached for requests', type: 'requests', code: 'rate_limit_exceeded' } }))
+      }
       if (log) {
         const system = (body.messages ?? []).find((m) => m.role === 'system')
-        // The system prompt (about 27 KB) in full only with the first request; its length with each.
+        // The system prompt (about 27 KB) in full only with the first request (each, with `systems`); its length with each.
         const sys = textOf(system)
-        fs.appendFileSync(log, `${JSON.stringify({ at: new Date().toISOString(), id, prompt: d.prompt, step: d.step, reply: d.tool ? { tool: d.tool, args: d.args } : { text: d.text }, tools: (body.tools ?? []).map((t) => t.function?.name ?? t.name), systemLength: sys.length, ...(n === 1 ? { system: sys } : {}) })}\n`)
+        fs.appendFileSync(log, `${JSON.stringify({ at: new Date().toISOString(), id, prompt: d.prompt, step: d.step, reply: d.tool ? { tool: d.tool, args: d.args } : { text: d.text }, tools: (body.tools ?? []).map((t) => t.function?.name ?? t.name), systemLength: sys.length, ...(n === 1 || systems ? { system: sys } : {}) })}\n`)
       }
       if (d.wait) await sleep(d.wait)
       if (body.stream) return stream(res, body.model, id, d)
@@ -240,10 +255,15 @@ function offlineEnv(api) {
  * its own COPILOT_HOME, a fake profile folder (Copilot also reads ~/.agents and the like), and the GitHub CLI's login
  * hidden (an empty GH_CONFIG_DIR, gh off PATH: with no stored login Copilot signs in with `gh auth token`). Never the
  * user's ~/.copilot, and no token variable (hiveEnv's allowlist passes none).
+ * `above`, the profile folder, is a folder above every folder this Copilot works in (its workspace, projects,
+ * worktrees, the Assistant's home): outside a git repository Copilot takes skills from every folder above its working
+ * folder up to its profile folder, so one under the user's profile (hive-test is) would otherwise reach the user's own
+ * ~\.claude\skills (#1308, tests/e2e/README.md).
  */
-function copilotTestEnv(api, dir) {
+function copilotTestEnv(api, dir, { above } = {}) {
+  if (!above) throw new Error('copilotTestEnv: give `above`, a folder above every folder Copilot works in (#1308)')
   const home = path.join(dir, 'copilot-home')
-  const profile = path.join(dir, 'copilot-userprofile')
+  const profile = above
   const gh = path.join(dir, 'copilot-gh')
   for (const d of [home, profile, gh]) fs.mkdirSync(d, { recursive: true })
   const PATH = pathWithoutGh(process.env.PATH || '')

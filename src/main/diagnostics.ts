@@ -1,4 +1,5 @@
 import { app, screen } from 'electron'
+import { legacyWorktree } from './agentFolders'
 import { existsSync } from 'original-fs'
 import { open, readdir } from 'original-fs/promises'
 import { homedir, release, version as osVersion } from 'os'
@@ -24,6 +25,9 @@ import { gpuDiagnostics, gpuThisRun } from './gpu'
 import { crashDumpLines, crashDumps, crashDumpsDir } from './exitLog'
 import { lastRunDiagnostics } from './lastRun'
 import { memoryDiagnostics } from './memory'
+import { workerThreadLines } from './workerThreads'
+import { queryMetrics } from './metrics'
+import { toolListRows, type ToolListRow } from '../shared/metricsView'
 
 /** How much of Hive's log a report carries. */
 const LOG_LINES = 50
@@ -55,6 +59,36 @@ async function earlierWork(): Promise<{ folders: string[]; names: string[] }> {
     for (const e of entries) if (e.isDirectory() && !e.name.startsWith('.')) names.push(e.name)
   }
   return { folders, names }
+}
+
+/**
+ * A workspace's hive tool list a start in the last 24 hours (HI-2063), per role and workflow role, as one line: counts
+ * only, never a name. A size Hive didn't measure (a bridge from before it did) is said, never shown as zero.
+ */
+export function toolListLine(label: string, rows: ToolListRow[]): string {
+  const n = (v: number): string => Math.round(v).toLocaleString('en')
+  // i18n-ignore: Copy Diagnostics' report: a bug report for the maintainer, in English (the design keeps diagnostics content English)
+  if (!rows.length) return `- ${label} hive tool list (24 h): none recorded`
+  const row = (r: ToolListRow): string => {
+    const parts = r.descriptionChars === null || r.paramChars === null || r.schemaChars === null ? 'parts not measured' : `descriptions ${n(r.descriptionChars)}, parameters ${n(r.paramChars)}, schemas ${n(r.schemaChars)}` // i18n-ignore: Copy Diagnostics' report: a bug report for the maintainer, in English (the design keeps diagnostics content English)
+    const chars = r.chars === null ? 'characters not measured' : `${n(r.chars)} chars a start (${parts})` // i18n-ignore: Copy Diagnostics' report: a bug report for the maintainer, in English (the design keeps diagnostics content English)
+    return `${r.role === 'assistant' ? 'assistant' : 'agents'} · ${r.workflow}: ${n(r.tools)} tools, ${chars}, ${n(r.bytes)} bytes, ${r.starts} start${r.starts === 1 ? '' : 's'}` // i18n-ignore: Copy Diagnostics' report: a bug report for the maintainer, in English (the design keeps diagnostics content English)
+  }
+  return `- ${label} hive tool list (24 h): ${rows.map(row).join('; ')}` // i18n-ignore: Copy Diagnostics' report: a bug report for the maintainer, in English (the design keeps diagnostics content English)
+}
+
+/** The tool list lines of each open workspace (its metrics' last 24 hours; one that can't be read says so). */
+function toolListLines(windows: ReturnType<typeof hiveWindows>): string[] {
+  // Numbered as the skills' lines number them: the windows with a workspace open.
+  return windows.filter((w) => !!w.ws.path).map((w, i) => {
+    const label = `Workspace ${i + 1}` // i18n-ignore: Copy Diagnostics' report: a bug report for the maintainer, in English (the design keeps diagnostics content English)
+    try {
+      const r = queryMetrics(w.ws, { scope: { kind: 'workspace' } })
+      return toolListLine(label, toolListRows([...Object.values(r.projects), ...(r.workspace ? [r.workspace] : [])].flatMap((p) => p.catalog)))
+    } catch {
+      return `- ${label} hive tool list (24 h): couldn't be read` // i18n-ignore: Copy Diagnostics' report: a bug report for the maintainer, in English (the design keeps diagnostics content English)
+    }
+  })
 }
 
 const yesNo = (v: boolean | null | undefined): string => (v === true ? 'yes' : v === false ? 'no' : 'unknown')
@@ -118,23 +152,24 @@ export async function diagnostics(opts: { recording?: boolean } = {}): Promise<s
     '### Counts',
     '',
     `- Windows: ${windows.length}; projects: ${projects.filter((p) => p.active).length} active of ${projects.length}`,
-    `- Agents: ${agents.length}, ${agents.filter((a) => a.live).length} running, ${agents.filter((a) => a.worktree).length} in worktrees`,
+    `- Agents: ${agents.length}, ${agents.filter((a) => a.live).length} running, ${agents.filter((a) => a.live?.slot).length} in slots`,
     `- Hive Assistant: ${assistants.some((a) => a.agents.some((x) => x.live)) ? 'running' : 'not running'}`,
     '',
     '### Guidance',
     '',
     `- Revision ${GUIDANCE_REVISION}${older ? `; ${older} running agent${older === 1 ? '' : 's'} launched with an older one` : ''}`,
     ...skillLines,
+    ...toolListLines(windows),
     '',
     '### Settings',
     '',
-    `- File locks: ${s.agents.fileLocks}; merge style: ${s.agents.mergeStyle}; background task limit: ${s.agents.backgroundTaskMinutes} min; leftover processes: ${s.agents.leftoverProcesses}`,
+    `- Background task limit: ${s.agents.backgroundTaskMinutes} min; leftover processes: ${s.agents.leftoverProcesses}`,
     `- Agents' processes: ${process.platform !== 'win32' ? 'not tracked (Windows only)' : trackingProblem() ? `not tracked: ${trackingProblem()}` : 'tracked'}${trackingLost() ? `; earlier, ${trackingLost()}` : ''}`,
     `- Confirm before quitting: ${s.general.confirmOnQuit}; close to tray: ${s.general.closeToTray ? 'on' : 'off'}; minimise to tray: ${s.general.minimizeToTray ? 'on' : 'off'}; keep the PC awake: ${s.general.keepAwake}`,
     `- Transcript backups: ${s.sessions.backupTranscripts ? 'on' : 'off'}; cache TTL: ${s.sessions.cacheTtl}; Overview refresh: ${s.sessions.overviewRefresh}`,
     `- Agent API: ${s.agentApi.enabled ? 'on' : 'off'}; built-in hive MCP server: ${s.agentApi.provideHiveMcp ? 'on' : 'off'}; session input: ${s.agentApi.allowSessionInput ? 'allowed' : 'off'}`,
     `- Assistant control: ${typeof s.assistant.control === 'string' ? s.assistant.control : 'custom'}`,
-    `- Notifications: ${s.notifications.desktopNotifications ? 'on' : 'off'}; while Hive is focused: ${{ inApp: 'in Hive', nothing: 'nothing', windows: 'Windows notifications' }[s.notifications.whileFocused]}${s.notifications.whileFocused === 'inApp' ? ` (banners for ${{ all: 'all workspaces', workspace: 'this workspace', project: 'this project' }[s.notifications.bannerScope]}, ${s.notifications.bannerPosition}, ${s.notifications.bannerSeconds} s; waiting banners ${s.notifications.waitingBannerStays ? 'stay' : 'close too'})` : ''}; chime ${s.notifications.chimeEnabled ? 'on' : 'off'}`, // i18n-ignore: Copy Diagnostics' report: a bug report for the maintainer, in English (the design keeps diagnostics content English)
+    `- Notifications: ${s.notifications.desktopNotifications ? 'on' : 'off'}; pop-ups about agents for ${{ all: 'all workspaces', workspace: 'this workspace', project: 'this project', none: 'none (bell only)' }[s.notifications.bannerScope]}; pop-ups ${s.notifications.bannerPosition}, ${s.notifications.bannerSeconds} s; waiting pop-ups ${s.notifications.waitingBannerStays ? 'stay' : 'close too'}; chime ${s.notifications.chimeEnabled ? 'on' : 'off'}`, // i18n-ignore: Copy Diagnostics' report: a bug report for the maintainer, in English (the design keeps diagnostics content English)
     `- Theme: ${s.appearance.theme}`,
     // Overrides of Hive's defaults (#367): how many and which, by Hive's names; never their values.
     ...advanced.diagnostics(windows.map((w) => (w.ws.path ? (w.ws.config.advanced ?? null) : null))),
@@ -149,7 +184,12 @@ export async function diagnostics(opts: { recording?: boolean } = {}): Promise<s
     // The main process's memory (#1005): now, and the last lines logged, which the log's tail may not reach.
     '### Memory',
     '',
-    ...memoryDiagnostics(app.getPath('userData'))
+    ...memoryDiagnostics(app.getPath('userData')),
+    '',
+    // How each worker thread runs (HI-1880): an installed Hive ran their work on main's thread, unseen.
+    '### Worker threads',
+    '',
+    ...workerThreadLines()
   ].join('\n')
 
   // The log goes back further than what is open now: earlier workspaces and their projects are taken out too.
@@ -158,11 +198,12 @@ export async function diagnostics(opts: { recording?: boolean } = {}): Promise<s
   const ctx: RedactContext = {
     home: homedir(),
     app: app.isPackaged ? undefined : app.getAppPath(),
-    folders: [...workspaces.map((w) => w.path), ...agents.flatMap((a) => (a.worktree ? [a.worktree.path] : [])), ...earlier.folders],
+    // Where agents work (#1451): their running sessions' folders (a slot, a retired home), and a 0.9 worktree not migrated yet.
+    folders: [...workspaces.map((w) => w.path), ...agents.flatMap((a) => [...(a.live?.cwd ? [a.live.cwd] : []), ...(legacyWorktree(a) ? [legacyWorktree(a)!.path] : [])]), ...earlier.folders],
     names: [
       ...workspaces.map((w) => ({ name: w.name, as: '<workspace>' })),
       ...projects.map((p) => ({ name: p.name, as: '<project>' })),
-      ...agents.flatMap((a) => [{ name: a.name, as: '<agent>' }, { name: a.id, as: '<agent>' }, ...(a.worktree ? [{ name: a.worktree.branch, as: '<branch>' }] : [])]),
+      ...agents.flatMap((a) => [{ name: a.name, as: '<agent>' }, { name: a.id, as: '<agent>' }, ...(legacyWorktree(a) ? [{ name: legacyWorktree(a)!.branch, as: '<branch>' }] : [])]),
       ...earlier.names.map((name) => ({ name, as: '<name>' }))
     ]
   }

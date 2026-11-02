@@ -218,6 +218,105 @@ describe('the turn ledger', () => {
     // An end with no start seen opens nothing (above: a compaction end under an id never seen is stale).
   })
 
+  describe('a turn under the id of a compaction the CLI began itself (HI-1916: Codex 0.164, HR5 on 27 Oct)', () => {
+    /** An agent whose CLI began a compaction itself under k1 while no turn ran, and (`over`) finished it. */
+    const compacted = (over: boolean): Agent => {
+      const a = feed(feed(agent(), { kind: 'prompt' }, ids('t1')), { kind: 'stop', lastMessage: null }, ids('t1'))
+      feed(a, { kind: 'compactStart', trigger: 'auto' }, ids('k1'))
+      if (over) feed(a, { kind: 'compactEnd' }, ids('k1'))
+      return a
+    }
+
+    it('its prompt begins that turn, after the compaction or while it is still under way; its news then follows as any turn', () => {
+      for (const over of [true, false]) {
+        const a = compacted(over)
+        feed(a, { kind: 'prompt' }, ids('k1'))
+        expect([a.status, a.ledger.compaction, a.ledger.active?.id, a.ledger.active?.state], `over ${over}`).toEqual(['working', null, 'k1', 'running'])
+        feed(a, { kind: 'toolStart' }, ids('k1', { call: 'c1' }))
+        expect(openCalls(a.ledger)).toBe(1)
+        feed(a, { kind: 'toolEnd' }, ids('k1', { call: 'c1' }))
+        feed(a, { kind: 'stop', lastMessage: null }, ids('k1'))
+        expect([a.status, a.ledger.active?.state, a.stale], `over ${over}`).toEqual(['finished', 'over', []])
+      }
+    })
+
+    it("a turn's news under the id before that prompt stays stale", () => {
+      const a = compacted(true)
+      feed(a, { kind: 'toolStart' }, ids('k1', { call: 'c1' }))
+      feed(a, { kind: 'ask', ask: { kind: 'permission', blocking: true, message: 'May I?' } }, ids('k1'))
+      expect([a.status, a.ledger.active?.id, a.ledger.active?.state]).toEqual(['ready', 't1', 'over'])
+      expect(a.stale).toEqual(["a tool start under a compaction's id", "a question under a compaction's id"])
+    })
+
+    it('a second prompt while it runs is a prompt in the running turn; one after its Stop opens nothing again', () => {
+      const a = compacted(true)
+      feed(a, { kind: 'prompt' }, ids('k1'))
+      expect(admit(a.ledger, { kind: 'prompt' }, ids('k1'), { now: a.ledger.seq })).toMatchObject({ verdict: 'apply', note: 'a prompt in the running turn' })
+      feed(a, { kind: 'stop', lastMessage: null }, ids('k1'))
+      feed(a, { kind: 'prompt' }, ids('k1'))
+      expect([a.status, a.ledger.active?.state, a.stale]).toEqual(['finished', 'over', ['a prompt of a turn that is over']])
+    })
+
+    it("the compaction's own late end or SessionStart under the id is old news: the running turn stays working", () => {
+      for (const over of [true, false]) {
+        const a = compacted(over)
+        feed(a, { kind: 'prompt' }, ids('k1'))
+        feed(a, { kind: 'toolStart' }, ids('k1', { call: 'c1' }))
+        feed(a, { kind: 'compactEnd' }, ids('k1'))
+        feed(a, { kind: 'start', source: 'compact' }, ids('k1'))
+        feed(a, { kind: 'compactEnd' }, ids('k1'))
+        expect([a.status, a.statusMessage, a.ledger.active?.state, openCalls(a.ledger)], `over ${over}`).toEqual(['working', undefined, 'running', 1])
+        expect(a.stale, `over ${over}`).toEqual(['a compaction end of the compaction its turn took the id of', 'a session start of the compaction its turn took the id of', 'a compaction end of the compaction its turn took the id of'])
+        // The launch's SessionEnd still ends it.
+        feed(a, { kind: 'end' }, ids('k1'))
+        expect(a.status).toBe('stopped')
+      }
+    })
+
+    it("a compaction of the turn's own later on (HR6's round 1: a long turn fills its context again) is handled as any turn's: working throughout, seen as compacting", () => {
+      const a = compacted(true)
+      feed(a, { kind: 'prompt' }, ids('k1'))
+      feed(a, { kind: 'toolStart' }, ids('k1', { call: 'c1' }))
+      feed(a, { kind: 'toolEnd' }, ids('k1', { call: 'c1' }))
+      // Its PreCompact: admitted, and the status rules see a compaction mid-turn (autoCompact: the runtime's compacting).
+      const start = admit(a.ledger, { kind: 'compactStart', trigger: 'auto' }, ids('k1'), { now: a.ledger.seq })
+      expect(start).toEqual({ verdict: 'apply', event: { kind: 'compactStart', trigger: 'auto' } })
+      const step = hookStep((start as { event: HookEvent }).event, input(a))
+      expect([step.next, step.actions]).toEqual([null, ['autoCompact']])
+      applyStep(a, step)
+      // Its SessionStart and PostCompact: admitted too, as a mid-turn compaction's (the turn stays working).
+      feed(a, { kind: 'start', source: 'compact' }, ids('k1'))
+      feed(a, { kind: 'compactEnd' }, ids('k1'))
+      feed(a, { kind: 'toolStart' }, ids('k1', { call: 'c2' }))
+      expect([a.status, a.statusMessage, a.ledger.active?.state, openCalls(a.ledger), a.stale]).toEqual(['working', undefined, 'running', 1, []])
+      feed(a, { kind: 'toolEnd' }, ids('k1', { call: 'c2' }))
+      feed(a, { kind: 'stop', lastMessage: null }, ids('k1'))
+      expect(a.status).toBe('finished')
+    })
+
+    it("an older compaction's id after a newer turn began is old news", () => {
+      const a = compacted(true)
+      feed(a, { kind: 'prompt' }, ids('t2'))
+      for (const [ev, i] of everyKind('k1')) feed(a, ev, i)
+      expect([a.status, a.ledger.active?.id, a.ledger.active?.state]).toEqual(['working', 't2', 'running'])
+      expect(a.stale.every((w) => w.endsWith('of an earlier turn'))).toBe(true)
+    })
+
+    it("Codex 0.164.0's recorded sequence (HR5's hooks.log): heard as a turn, its question asked, then finished", async () => {
+      const { codex } = await import('../src/main/providers/codex/adapter')
+      const hooks = fixture('turns-codex-0.164.0-compaction-turn.json')
+      const a = feed(feed(agent(), { kind: 'prompt' }, ids('t0')), { kind: 'stop', lastMessage: null }, ids('t0'))
+      const asked = hooks.findIndex((b) => b.hook_event_name === 'PermissionRequest')
+      send(codex, a, hooks.slice(0, asked))
+      expect([a.status, a.ledger.active?.id, openCalls(a.ledger)]).toEqual(['working', hooks[0].turn_id, 1])
+      send(codex, a, hooks.slice(asked, asked + 1))
+      expect(a.status).toBe('waiting')
+      send(codex, a, hooks.slice(asked + 1))
+      expect([a.status, a.ledger.active?.state]).toEqual(['finished', 'over'])
+      expect(a.stale).toEqual([])
+    })
+  })
+
   it("a background task's wake (Darren, 12 Oct): its prompt opens it; should that hook be lost, only a tool call the launch never saw does, only while the CLI woke", () => {
     const woke = (a: Agent, ev: HookEvent, i: HookIds, yes: boolean): Agent => {
       const took = admit(a.ledger, ev, i, { woke: yes, now: a.ledger.seq })

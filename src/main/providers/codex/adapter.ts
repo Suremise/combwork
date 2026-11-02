@@ -1,47 +1,66 @@
 import { createHash } from 'crypto'
 import { msg, tr } from '../../../shared/i18n'
 import { spawn } from 'child_process'
+import { codexCheckHeld, ownedAppServerRequest, type CheckAnswer } from '../../codexChecks'
 import { homedir, tmpdir } from 'os'
 import { basename, join, resolve } from 'path'
-import { readdir, stat } from 'original-fs/promises'
+import { readdir, readFile, stat } from 'original-fs/promises'
 import { existsSync, mkdirSync, readFileSync, statSync } from 'original-fs'
 import { parse as parseToml } from 'smol-toml'
-import type { AgentInstallInfo, McpServerDef, MemorySource, PermissionMode, ReadinessIssue, SubSession } from '../../../shared/types'
+import type { AgentInstallInfo, McpServerDef, MemorySource, PermissionMode, ReadinessIssue, RetryWait, SubSession } from '../../../shared/types'
 import { assertSessionId, isSessionId } from '../../../shared/defaults'
 import type { StartHint } from '../../../shared/startFailure'
 import { CODEX, CODEX_DESCRIPTOR, CODEX_MODE_FLAGS, CODEX_PERMISSION_MODES } from '../../../shared/codex'
 import { providerSettings } from '../../../shared/providers'
+import type { TypedNewline } from '../../../shared/terminalInput'
+import { HIVE_TOOLS } from '../../../shared/assistantTools'
 import { config } from '../../config'
-import { placeMatcher } from '../../fsutil'
+import { isFile, placeMatcher } from '../../fsutil'
 import { createLogger, userText } from '../../logger'
+import { hiveError } from '../../hiveError'
+import { plainHttpsJson } from '../../plainHttpsJson'
 import { findSecretWarnings } from '../../mcpSecrets'
-import { AGENTS_SKILLS, EDITOR_EXTENSION_PATH, EDITOR_ROOTS, agentsSkillCopyPath, compareVersions, hookForwardCommand, exportSubtitleText, hookIds, installText, notInstalledIssue, readFirstLine, run, signedOutIssue, syncAgentsSkills, taskArgs, toSpawnable, updateIssue, userMemoryLabel } from '../common'
+import { AGENTS_SKILLS, EDITOR_EXTENSION_PATH, EDITOR_ROOTS, agentsSkillCopyPath, compareVersions, connectionMemoryLabel, hookForwardCommand, exportSubtitleText, hookIds, installText, keepBounded, notInstalledIssue, readFirstLine, run, signedOutIssue, syncAgentsSkills, taskArgs, toSpawnable, updateIssue, userMemoryLabel } from '../common'
 import { storePwshFirst, storePwshIssue } from './storePwsh'
-import type { BackgroundTaskEvent, CatalogRead, CommandSpec, ExternalSession, KeySteps, LaunchContext, LiveDetails, LockDecision, NormalizedHook, ProviderAdapter, SkillDelivery, SkillRoots, UsageParser } from '../types'
+import type { BackgroundTaskEvent, CatalogRead, CommandSpec, ConnectionStatus, TrustReading, TrustTarget, ExternalSession, KeySteps, LaunchContext, LaunchHooks, LiveDetails, LockDecision, NormalizedHook, ProviderAdapter, SkillDelivery, SkillRoots, TranscriptTurn, UsageParser } from '../types'
 import { codexBackgroundMemo, codexBackgroundTasks, type CodexBackgroundMemo } from './background'
 import { codexSafeguards } from './safeguards'
+import { codexTranscriptTurns } from './turns'
+import { codexRetryWait } from './retryLog'
 import type { SafeguardEvent } from '../../../shared/safeguards'
 import { CodexConversationParser, CodexUsageParser, codexImageData, parseRollout, patchPaths, rolloutDetails, rolloutSubSession } from './rollout'
 import { parseCodexModels } from './models'
+import { atMost } from '../../../shared/atMost'
 import { permissionsMenuLabel, permissionsMenuNumber } from './permissionsMenu'
 import { strayCodexWarning } from './strayFolder'
 import { advanced } from '../../advanced'
+import { launchOverrides } from '../../advancedValues'
+import { codexListedHooks } from '../../hookListing'
+import type { HookListing, HookRow } from '../../../shared/hooks'
+import { withoutHiveAuth } from '../../../shared/hooks'
 
 const log = createLogger('codex')
+/** Rollouts stat'd at once while listing a folder's sessions (HI-1681). */
+const LIST_AT_ONCE = 8
+/** A rollout's session, from its session_meta. */
+type RolloutSession = { id: string; cwd: string; path: string; sub: SubSession | null }
 
 export function codexHome(): string {
   return process.env.CODEX_HOME || join(homedir(), '.codex')
 }
 
-/** A TOML file as an object; empty when missing or unreadable. Cached by modification time. */
-const tomlCache = new Map<string, { mtime: number; data: Record<string, any> }>()
+/**
+ * A TOML file as an object; empty when missing or unreadable. Read each time and parsed again only when its text
+ * changed: two writes in one tick of the clock share a modification time, and can share a size (HI-2051).
+ */
+const tomlCache = new Map<string, { text: string; data: Record<string, any> }>()
 function readToml(path: string): Record<string, any> {
   try {
-    const m = statSync(path).mtimeMs
+    const text = readFileSync(path, 'utf8')
     const c = tomlCache.get(path)
-    if (c && c.mtime === m) return c.data
-    const data = parseToml(readFileSync(path, 'utf8')) as Record<string, any>
-    tomlCache.set(path, { mtime: m, data })
+    if (c && c.text === text) return c.data
+    const data = parseToml(text) as Record<string, any>
+    tomlCache.set(path, { text, data })
     return data
   } catch {
     return {}
@@ -49,12 +68,14 @@ function readToml(path: string): Record<string, any> {
 }
 
 const userConfig = (): Record<string, any> => readToml(join(codexHome(), 'config.toml'))
+/** A home's config.toml: a connection's (HI-1757), or Codex's own. */
+const configOf = (home?: string): Record<string, any> => (home ? readToml(join(home, 'config.toml')) : userConfig())
 
-/** Agent Setup's explanation of the two choices Codex's sandbox setup offers, for someone working in Hive. */
+/** Provider Setup's explanation of the two choices Codex's sandbox setup offers, for someone working in Hive. */
 const SANDBOX_CHOICE = [
-  msg({ id: 'providers.codex.sandbox.setUp', defaultMessage: "**Set up** opens Codex's sandbox setup, which offers two choices. With either, Codex agents in **Ask for approval** or **Approve for me** can edit files in their own folder (the project, or the agent's worktree) and run commands there without asking, and ask before going online or writing anywhere else. Hive's own features (status, file locks, handovers, shared notes) work the same with both.", description: "Agent Setup, under Codex's sandbox setup (Windows): what Set up does. **…** marks bold text: keep the marks. Set up is the button; Ask for approval and Approve for me are Codex's permission modes as Hive names them: use their names as shown." }),
-  msg({ id: 'providers.codex.sandbox.default', defaultMessage: '**Set up default sandbox** (recommended): commands run under two local Windows accounts Codex creates for them (`CodexSandboxOffline` and `CodexSandboxOnline`), with a firewall rule that keeps them offline unless you allow it. It isolates commands best. Windows asks for Administrator permission once.', description: "Agent Setup, under Codex's sandbox setup (Windows): its first choice. **Set up default sandbox** is the choice as Codex names it (in English); `…` marks account names: keep them." }),
-  msg({ id: 'providers.codex.sandbox.nonAdmin', defaultMessage: '**Use non-admin sandbox**: needs no Administrator permission. Commands run under your own account with restricted rights. It protects your files and blocks internet access in most cases, but Codex warns it carries more risk if the agent is tricked by instructions hidden in a file or web page it reads (prompt injection). You can upgrade to the default sandbox from here later.', description: "Agent Setup, under Codex's sandbox setup (Windows): its second choice. **Use non-admin sandbox** is the choice as Codex names it (in English)." })
+  msg({ id: 'providers.codex.sandbox.setUp', defaultMessage: "**Set up** opens Codex's sandbox setup, which offers two choices. With either, Codex agents in **Ask for approval** or **Approve for me** can edit files in their own folder (the project, or the agent's worktree) and run commands there without asking, and ask before going online or writing anywhere else. Hive's own features (status, file locks, handovers, shared notes) work the same with both.", description: "Provider Setup, under Codex's sandbox setup (Windows): what Set up does. **…** marks bold text: keep the marks. Set up is the button; Ask for approval and Approve for me are Codex's permission modes as Hive names them: use their names as shown." }),
+  msg({ id: 'providers.codex.sandbox.default', defaultMessage: '**Set up default sandbox** (recommended): commands run under two local Windows accounts Codex creates for them (`CodexSandboxOffline` and `CodexSandboxOnline`), with a firewall rule that keeps them offline unless you allow it. It isolates commands best. Windows asks for Administrator permission once.', description: "Provider Setup, under Codex's sandbox setup (Windows): its first choice. **Set up default sandbox** is the choice as Codex names it (in English); `…` marks account names: keep them." }),
+  msg({ id: 'providers.codex.sandbox.nonAdmin', defaultMessage: '**Use non-admin sandbox**: needs no Administrator permission. Commands run under your own account with restricted rights. It protects your files and blocks internet access in most cases, but Codex warns it carries more risk if the agent is tricked by instructions hidden in a file or web page it reads (prompt injection). You can upgrade to the default sandbox from here later.', description: "Provider Setup, under Codex's sandbox setup (Windows): its second choice. **Use non-admin sandbox** is the choice as Codex names it (in English)." })
 ]
 
 /** A value as TOML, for -c overrides: strings, numbers, booleans, arrays and inline tables. */
@@ -185,6 +206,22 @@ export function hookHash(label: string, matcher: string | undefined, command: st
   return 'sha256:' + createHash('sha256').update(JSON.stringify(sortDeep(id))).digest('hex')
 }
 
+/**
+ * The config overrides of a launch's arguments (`-c k=v`, `--config k=v`), for asking its app server what the launch has
+ * (HI-982): only those, since its other arguments (-s, -a, resume) aren't the app server's; without the developer
+ * instructions and MCP servers, which say nothing of hooks.
+ */
+export function hookQueryArgs(args: readonly string[]): string[] {
+  const out: string[] = []
+  for (let i = 0; i < args.length; i++) {
+    const a = args[i]
+    const v = a === '-c' || a === '--config' ? args[++i] : a.startsWith('--config=') ? a.slice('--config='.length) : null
+    if (typeof v !== 'string' || /^(developer_instructions\s*=|mcp_servers[.=])/.test(v)) continue
+    out.push('-c', v)
+  }
+  return out
+}
+
 /** -c overrides for Hive's hooks, with the trust records that let them run without a review prompt. */
 function hookOverrides(url: string, authFile: string, hashes?: Record<string, string>): string[] {
   const command = hookCommand(url, authFile)
@@ -202,53 +239,179 @@ function hookOverrides(url: string, authFile: string, hashes?: Record<string, st
 }
 
 /** Asks Codex (its app server) for the keys and hashes of the given hooks. */
-async function hooksFromCodex(executable: string, hookArgs: string[], cwd: string): Promise<Record<string, string> | null> {
+async function hooksFromCodex(executable: string, hookArgs: string[], cwd: string, env?: NodeJS.ProcessEnv): Promise<Record<string, string> | null> {
+  const result = await askAppServer(executable, hookArgs, cwd, advanced.get<string>('codex.hooks.listMethod'), { cwds: [cwd] }, env, advanced.number('codex.hooks.listSeconds') * 1000)
+  const out: Record<string, string> = {}
+  for (const entry of result?.data ?? []) for (const h of entry.hooks ?? []) if (h.key && h.currentHash) out[h.key] = h.currentHash
+  return Object.keys(out).length ? out : null
+}
+
+/** Whether a file in a Codex home may be opened in Hive: its AGENTS.md (editable) and its skills' SKILL.md (read-only). */
+function codexFileAllowed(path: string, write: boolean, homeDir: string): boolean {
+  const home = resolve(homeDir).toLowerCase()
+  const abs = resolve(path).toLowerCase()
+  if (!abs.startsWith(home + '\\') && !abs.startsWith(home + '/')) return false
+  const rel = abs.slice(home.length + 1).replace(/\\/g, '/')
+  if (rel === 'agents.md') return true
+  return !write && rel.startsWith('skills/') && basename(rel) === 'skill.md'
+}
+
+/** The fields of Codex's sign-in answer Hive reads (Settings → Advanced, codex.accounts.*). */
+export interface CodexAccountFields {
+  account: string
+  email: string
+  plan: string
+}
+
+/**
+ * Who a CODEX_HOME is signed in as, from its app server's account answer (HI-1757: `account/read`; the type, email and
+ * plan, never a token or the account's id): signed out when its account is null. `ok: false` when there was no answer
+ * or Hive can't read it, which isn't signed out.
+ */
+export function codexAccountStatus(answer: { ok: true; result: any } | { ok: false; error: string }, f: CodexAccountFields): ConnectionStatus {
+  if (!answer.ok) return { ok: false, error: answer.error }
+  const r = answer.result
+  if (!r || typeof r !== 'object' || !(f.account in r)) return { ok: false, error: `its answer had no "${f.account}"` } // i18n-ignore: for the log
+  const a = r[f.account]
+  if (a === null) return { ok: true, loggedIn: false }
+  if (typeof a !== 'object') return { ok: false, error: `its "${f.account}" was not an object` } // i18n-ignore: for the log
+  const str = (k: string): string | undefined => (typeof a[k] === 'string' && a[k] ? (a[k] as string) : undefined)
+  return { ok: true, loggedIn: true, email: str(f.email), plan: str(f.plan) ?? null }
+}
+
+/** Settings → Advanced's key for a typed prompt's line breaks (HI-1327). */
+const NEWLINE_KEY = 'codex.prompt.newlineKey'
+/**
+ * The Codex versions its default typed newline (Alt+Enter) was tried on, in real Codex (HI-1327: the real-tier suite
+ * codex-newline, Alt+Enter and Ctrl+J each arriving as written in one prompt; 28 Oct 2026). Add a version once the
+ * suite passes on it.
+ */
+export const NEWLINE_TRIED: readonly string[] = ['0.164.0']
+
+/** The store Codex keeps a connection's login in (HI-1757): its own folder, whatever Codex's default store is. */
+export const CONNECTION_STORE = ['-c', 'cli_auth_credentials_store="file"']
+
+/**
+ * The overrides every Codex a launch on a connection runs takes (HI-1757): the session and its preflights alike (its
+ * hook check, its prompt render), each also in the launch's own environment. None on Codex's own home.
+ */
+export function launchConnectionArgs(ctx: Pick<LaunchContext, 'connectionHome'>): string[] {
+  if (!ctx.connectionHome) return []
+  return [...CONNECTION_STORE, ...connectionSandboxArgs(ctx.connectionHome)]
+}
+
+/**
+ * The Windows sandbox a connection's Codex runs in, passed with -c and never written: none when its own config.toml
+ * names one (it keeps its own); Codex's non-admin one when Advanced turns it on for connections (HI-1893); else this
+ * PC's, from ~/.codex's config. None off Windows.
+ */
+function connectionSandboxArgs(home: string): string[] {
+  if (process.platform !== 'win32' || configOf(home).windows?.sandbox) return []
+  const mode = advanced.get<boolean>('codex.accounts.unelevatedSandbox') ? 'unelevated' : userConfig().windows?.sandbox
+  return typeof mode === 'string' && /^[\w-]{1,24}$/.test(mode) ? ['-c', `windows.sandbox=${toToml(mode)}`] : []
+}
+
+/**
+ * The developer_instructions Codex itself would give a session started with `args` (the agent's Extra arguments) in
+ * `cwd` (#1285, the Assistant's design on it): Hive parses no profile and ranks no layer, Codex does. Its offline prompt
+ * inspector (`debug prompt-input`, no model call or sign-in) renders the session's prompt twice, as it is and with
+ * developer_instructions cleared (`-c developer_instructions=""`, which overrides every layer, profile and project
+ * alike): what the first's developer message has in front of the second's is the value, and the same renders mean none
+ * (missing, empty or blank). Its app server can't do this: it can't select a profile (0.163.0). Null when Codex couldn't
+ * render it or the two renders differ otherwise: Hive then gives its guidance alone, as before #1285.
+ */
+async function developerInstructionsFromCodex(executable: string, cwd: string, args: readonly string[], env?: NodeJS.ProcessEnv): Promise<string | null> {
+  const [as, cleared] = await Promise.all([promptDeveloper(executable, cwd, [...args], env), promptDeveloper(executable, cwd, [...args, '-c', 'developer_instructions=""'], env)])
+  return developerInstructionsOf(as, cleared)
+}
+
+/**
+ * The developer_instructions in a session's rendered prompt (`as`, its developer messages' texts), given the same prompt
+ * with them cleared (`cleared`): one text more, the rest the same and in the same order, is the value (in front in
+ * 0.163.0; first in the second developer message, after Codex's own base instructions, in 0.164.0); the same texts, none
+ * (''). Null for anything else (a render missing, or renders Hive can't tell apart).
+ */
+export function developerInstructionsOf(as: readonly string[] | null, cleared: readonly string[] | null): string | null {
+  if (!as || !cleared) return null
+  const same = (a: readonly string[], b: readonly string[]): boolean => a.length === b.length && a.every((t, i) => t === b[i])
+  if (same(as, cleared)) return ''
+  if (as.length !== cleared.length + 1) return null
+  const k = as.findIndex((t, i) => t !== cleared[i])
+  return same([...as.slice(0, k), ...as.slice(k + 1)], cleared) ? as[k].trim() : null
+}
+
+/** The texts of the developer message in Codex's rendering of a session's prompt (`codex <args> debug prompt-input`), or null. */
+function promptDeveloper(executable: string, cwd: string, args: string[], env?: NodeJS.ProcessEnv): Promise<string[] | null> {
   return new Promise((resolveP) => {
-    const s = toSpawnable(executable, ['app-server', ...hookArgs])
-    const p = spawn(s.file, s.args, { cwd, windowsHide: true, stdio: ['pipe', 'pipe', 'ignore'] })
-    let buf = ''
-    const done = (v: Record<string, string> | null): void => {
+    const s = toSpawnable(executable, [...args, 'debug', 'prompt-input'])
+    const p = spawn(s.file, s.args, { cwd, windowsHide: true, stdio: ['ignore', 'pipe', 'ignore'], ...(env ? { env } : {}) })
+    let out = ''
+    const timer = setTimeout(() => (p.kill(), resolveP(null)), advanced.number('codex.promptInput.timeoutSeconds') * 1000)
+    p.stdout.on('data', (d) => (out += d))
+    p.on('error', () => (clearTimeout(timer), resolveP(null)))
+    p.on('close', (code) => {
       clearTimeout(timer)
-      p.kill()
-      resolveP(v)
-    }
-    const timer = setTimeout(() => done(null), 20000)
-    const send = (m: unknown): void => void p.stdin.write(JSON.stringify(m) + '\n')
-    p.on('error', () => done(null))
-    p.stdout.on('data', (d) => {
-      buf += d
-      let i
-      while ((i = buf.indexOf('\n')) >= 0) {
-        const line = buf.slice(0, i)
-        buf = buf.slice(i + 1)
-        let m: any
-        try {
-          m = JSON.parse(line)
-        } catch {
-          continue
-        }
-        if (m.id === 1) {
-          send({ method: 'initialized' })
-          send({ id: 2, method: 'hooks/list', params: { cwds: [cwd] } })
-        } else if (m.id === 2) {
-          const out: Record<string, string> = {}
-          for (const entry of m.result?.data ?? []) for (const h of entry.hooks ?? []) if (h.key && h.currentHash) out[h.key] = h.currentHash
-          done(Object.keys(out).length ? out : null)
-        }
+      if (code !== 0) return resolveP(null)
+      try {
+        resolveP(developerTexts(JSON.parse(out)))
+      } catch {
+        resolveP(null)
       }
     })
-    send({ id: 1, method: 'initialize', params: { clientInfo: { name: 'hive', version: '1' } } })
   })
 }
 
 /**
- * Only Hive's own server's tools run without Codex asking (#1166), as with Claude Code and Copilot; every other server's
- * follow Codex's approval policy for the agent's mode. ("hive" is reserved: no workspace server has that name.)
+ * The texts of the developer messages in Codex's rendered prompt items (`debug prompt-input`'s JSON), in order: every
+ * item with the developer role that is a message. 0.164.0 renders its tools first as an item with the developer role too
+ * (`additional_tools`, no content), then its base instructions as a developer message of their own, and the
+ * developer_instructions in the next: read from the first developer item alone, every session's read as none, so Hive's
+ * guidance would have replaced the user's (#1514's real tier, codexownhooks).
  */
-const approval = (name: string): Record<string, unknown> => (name === 'hive' ? { default_tools_approval_mode: 'approve' } : {})
+export function developerTexts(items: unknown): string[] | null {
+  if (!Array.isArray(items)) return null
+  const devs = (items as { type?: unknown; role?: unknown; content?: unknown }[]).filter((x) => x?.role === 'developer' && (x.type === undefined || x.type === 'message') && Array.isArray(x.content))
+  return devs.flatMap((dev) => (dev.content as { text?: unknown }[]).map((c) => (typeof c?.text === 'string' ? c.text : '')))
+}
+
+/** One request to Codex's app server (started for it, in `cwd`, with `args`): its result, or null on an error or after 20 s. */
+function askAppServer(executable: string, args: string[], cwd: string, method: string, params: unknown, env?: NodeJS.ProcessEnv, timeoutMs = 20000): Promise<any> {
+  return appServerAnswer(executable, args, cwd, method, params, env, timeoutMs).then((a) => (a.ok ? a.result : null))
+}
+
+/**
+ * One request's answer from Codex's app server: its result, its error (`ok: false`, `error` its message), or none
+ * (`error` says why). Run through Hive's process ownership (codexChecks.ts, HI-1757): owned before it runs and confirmed
+ * gone before the answer is given; an end not confirmed is a failed answer, its connection held until it is.
+ */
+function appServerAnswer(executable: string, args: string[], cwd: string, method: string, params: unknown, env: NodeJS.ProcessEnv | undefined, timeoutMs: number): Promise<CheckAnswer> {
+  const s = toSpawnable(executable, ['app-server', ...args])
+  return ownedAppServerRequest({ command: s.file, args: s.args, cwd, env: env ?? process.env, method, params, timeoutMs })
+}
+
+/**
+ * Only Hive's own server's tools run without Codex asking (#1166), as with Claude Code and Copilot; every other server's
+ * follow Codex's approval policy for the agent's mode. ("hive" is reserved: no workspace server has that name.) The
+ * Assistant's only the ones its Control settings let it use without asking (`trusted`, #1174: Codex 0.163 takes a
+ * per-tool `tools.<tool>.approval_mode`); none with the switch off (#1281). Hive's server is always on (`enabled`): a
+ * native server named hive merges into Hive's table key by key, and could turn it off.
+ */
+function hiveTable(name: string, hive: HiveServerOptions): Record<string, unknown> {
+  if (name !== 'hive') return {}
+  if (!hive.preApprove) return { enabled: true }
+  if (hive.trusted) return { enabled: true, tools: Object.fromEntries(hive.trusted.map((t) => [t, { approval_mode: 'approve' }])) }
+  return { enabled: true, default_tools_approval_mode: 'approve' }
+}
+
+/** How Hive's own server is given to this launch: its tools pre-approved (all, or the Assistant's `trusted`), or not. */
+export interface HiveServerOptions {
+  preApprove: boolean
+  trusted?: readonly string[]
+}
 
 /** An MCP server definition (Claude Code's JSON format) as a Codex mcp_servers table; null if it can't be passed safely. */
-export function codexMcpServer(name: string, def: McpServerDef): { table: Record<string, unknown> | null; warning?: string } {
+export function codexMcpServer(name: string, def: McpServerDef, hive: HiveServerOptions = { preApprove: true }): { table: Record<string, unknown> | null; warning?: string } {
+  const approval = (n: string): Record<string, unknown> => hiveTable(n, hive)
   const ref = (v: unknown): string | null => {
     const m = typeof v === 'string' ? /^\$\{([A-Za-z_][A-Za-z0-9_]*)\}$|^\$([A-Za-z_][A-Za-z0-9_]*)$/.exec(v.trim()) : null
     return m ? (m[1] ?? m[2]) : null
@@ -287,6 +450,68 @@ export function codexMcpServer(name: string, def: McpServerDef): { table: Record
   if (Object.keys(env).length) table.env = env
   if (passThrough.length) table.env_vars = passThrough
   return { table }
+}
+
+/** A native hive server's keys for an HTTP server, which can't be taken out of Hive's stdio one (Codex refuses the mix). */
+const HTTP_KEYS = ['url', 'bearer_token_env_var', 'http_headers', 'env_http_headers', 'http_headers_helper', 'auth', 'oauth', 'oauth_resource', 'scopes', 'experimental_environment']
+
+/** Why a Codex agent can't start beside a native HTTP server named hive (outrankNativeHive). */
+const NATIVE_HIVE = msg({
+  id: 'providers.codex.nativeHive',
+  defaultMessage: 'Your Codex config has an MCP server named hive, reached over HTTP ({file}). Codex merges it into Hive’s own hive server, and can’t start with both. Rename yours there to start Codex agents.',
+  description: "Why a Codex agent didn't start: the user's own Codex config has an MCP server named hive. {file} is that config file's path. hive is the name of Hive's MCP server: keep it."
+})
+
+/**
+ * Hive's own hive server over a native one of that name (the user's own [mcp_servers.hive] in these config files, #1281):
+ * Codex merges Hive's `-c mcp_servers.hive={…}` into it key by key (0.163.0, probed: a whole table, an empty value or
+ * another transport can't take a key out), so Hive's table gives every key the native one sets Hive's value, and Hive's
+ * server wins whatever the isolation switch says:
+ * - its tools: all of them shown (`enabled_tools`, `disabled_tools`; `enabled` is always set, hiveTable);
+ * - their approval: the server default and each native per-tool mode as this launch approves them (`approved`: every
+ *   tool, the Assistant's trusted ones, or none), "auto" (Codex's own policy) for the rest;
+ * - how it starts: the session's folder for its `cwd`, Hive's startup timeout (`codex.mcp.startupTimeoutSeconds`, Codex's
+ *   own default), not `required`, and the native
+ *   `env` and `env_vars` emptied (an environment variable Hive doesn't set is set empty: Codex can't remove one).
+ * An HTTP one (`url` and its kin, HTTP_KEYS) can't be taken out of a stdio server: the launch is refused with what to do
+ * (NATIVE_HIVE; Codex itself would refuse to start).
+ */
+export function outrankNativeHive(files: string[], table: Record<string, unknown>, approved: 'all' | readonly string[], cwd: string): Record<string, unknown> {
+  const out: Record<string, unknown> = {}
+  const mode = (tool: string): string => (approved === 'all' || approved.includes(tool) ? 'approve' : 'auto')
+  for (const file of files) {
+    const servers = readToml(file).mcp_servers
+    const native = servers && typeof servers === 'object' ? (servers as Record<string, unknown>).hive : undefined
+    if (!native || typeof native !== 'object') continue
+    const n = native as Record<string, unknown>
+    const http = Object.keys(n).filter((k) => HTTP_KEYS.includes(k))
+    if (http.length) {
+      log.warn(`Codex has an HTTP MCP server named hive in ${userText(file)} (${http.join(', ')}): Codex agents can't start beside Hive's own.`)
+      throw hiveError(NATIVE_HIVE, { file })
+    }
+    if ('enabled_tools' in n) out.enabled_tools = [...HIVE_TOOLS]
+    if ('disabled_tools' in n) out.disabled_tools = []
+    if ('default_tools_approval_mode' in n && !('default_tools_approval_mode' in table)) out.default_tools_approval_mode = approved === 'all' ? 'approve' : 'auto'
+    const tools = n.tools && typeof n.tools === 'object' ? Object.keys(n.tools as Record<string, unknown>) : []
+    if (tools.length) {
+      const own = (table.tools ?? {}) as Record<string, unknown>
+      const merged = { ...((out.tools ?? {}) as Record<string, unknown>) }
+      for (const t of tools) if (!(t in own)) merged[t] = { approval_mode: mode(t) }
+      out.tools = { ...own, ...merged }
+    }
+    if ('cwd' in n && !('cwd' in table)) out.cwd = cwd
+    // Settings → Advanced (default Codex's own documented 10 s), over the native one's.
+    const startup = advanced.number('codex.mcp.startupTimeoutSeconds')
+    if ('startup_timeout_sec' in n) out.startup_timeout_sec = startup
+    if ('startup_timeout_ms' in n) out.startup_timeout_ms = startup * 1000
+    if ('required' in n) out.required = false
+    const env = n.env && typeof n.env === 'object' ? Object.keys(n.env as Record<string, unknown>) : []
+    const ownEnv = (table.env ?? {}) as Record<string, string>
+    if (env.some((k) => !(k in ownEnv))) out.env = { ...((out.env ?? {}) as Record<string, string>), ...Object.fromEntries(env.filter((k) => !(k in ownEnv)).map((k) => [k, ''])), ...ownEnv }
+    if ('env_vars' in n && !('env_vars' in table)) out.env_vars = []
+    log.warn(`Codex has an MCP server named hive in ${userText(file)}: Hive's own hive server is used instead, its keys over those of the same name (${Object.keys(n).join(', ')}).`)
+  }
+  return out
 }
 
 /** Codex's MCP servers in one config file ([mcp_servers.<name>]), as Hive's definitions. */
@@ -328,17 +553,21 @@ export class CodexAdapter implements ProviderAdapter {
   get startupQuestion(): RegExp {
     return advanced.pattern('codex.trust.prompt')
   }
+  // Ended as a person ends it at a lane's end (HI-1706): /quit, which 0.164.0 took and exited 0 on in 1.4 s.
+  get quitLine(): { line: string; graceMs: number } {
+    return { line: advanced.get<string>('codex.exit.command'), graceMs: advanced.number('codex.exit.graceSeconds') * 1000 }
+  }
   readonly planToggleKey = '\x1b[Z'
   busyScreen(screen: string): boolean {
     return codexHoldsInput(screen)
   }
 
   startHint(text: string): StartHint | null {
-    if (/\bmodel\b/i.test(text) && /not found|invalid|unknown|not supported|does not exist/i.test(text)) return { hint: tr(msg({ id: 'providers.codex.hint.model', defaultMessage: "Codex doesn't know this model: choose another in Agent Settings.", description: "Why Codex didn't start, in the agent's pane, with a button that goes where it says. Agent Settings, Agent Setup and Settings → … are Hive's names: use them as shown." })), fix: 'agent-settings' }
+    if (/\bmodel\b/i.test(text) && /not found|invalid|unknown|not supported|does not exist/i.test(text)) return { hint: tr(msg({ id: 'providers.codex.hint.model', defaultMessage: "Codex doesn't know this model: choose another in Agent Settings.", description: "Why Codex didn't start, in the agent's pane, with a button that goes where it says. Agent Settings, Provider Setup and Settings → … are Hive's names: use them as shown." })), fix: 'agent-settings' }
     // Hive's -c overrides and the user's own config.toml.
-    if (/error loading config|config\.toml|error parsing -c|invalid value for|unknown variant|unexpected argument|unrecognized|for more information, try '--help'/i.test(text)) return { hint: tr(msg({ id: 'providers.codex.hint.settings', defaultMessage: 'Codex refused its settings: check Extra arguments in Agent Settings and Settings → Codex, and your config.toml.', description: "Why Codex didn't start, in the agent's pane, with a button that goes where it says. Agent Settings, Agent Setup and Settings → … are Hive's names: use them as shown." })), fix: 'agent-settings' }
-    if (/not logged in|codex login|please (sign|log) in|unauthorized|401/i.test(text)) return { hint: tr(msg({ id: 'providers.codex.hint.signIn', defaultMessage: "Codex isn't signed in: sign in in Agent Setup, then start it again.", description: "Why Codex didn't start, in the agent's pane, with a button that goes where it says. Agent Settings, Agent Setup and Settings → … are Hive's names: use them as shown." })), fix: 'agent-setup' }
-    if (/is not recognized|ENOENT|cannot find|sandbox/i.test(text)) return { hint: tr(msg({ id: 'providers.codex.hint.broken', defaultMessage: 'Codex looks broken or not set up: check it in Agent Setup.', description: "Why Codex didn't start, in the agent's pane, with a button that goes where it says. Agent Settings, Agent Setup and Settings → … are Hive's names: use them as shown." })), fix: 'agent-setup' }
+    if (/error loading config|config\.toml|error parsing -c|invalid value for|unknown variant|unexpected argument|unrecognized|for more information, try '--help'/i.test(text)) return { hint: tr(msg({ id: 'providers.codex.hint.settings', defaultMessage: 'Codex refused its settings: check Extra arguments in Agent Settings and Settings → Codex, and your config.toml.', description: "Why Codex didn't start, in the agent's pane, with a button that goes where it says. Agent Settings, Provider Setup and Settings → … are Hive's names: use them as shown." })), fix: 'agent-settings' }
+    if (/not logged in|codex login|please (sign|log) in|unauthorized|401/i.test(text)) return { hint: tr(msg({ id: 'providers.codex.hint.signIn', defaultMessage: "Codex isn't signed in: sign in in Provider Setup, then start it again.", description: "Why Codex didn't start, in the agent's pane, with a button that goes where it says. Agent Settings, Provider Setup and Settings → … are Hive's names: use them as shown." })), fix: 'agent-setup' }
+    if (/is not recognized|ENOENT|cannot find|sandbox/i.test(text)) return { hint: tr(msg({ id: 'providers.codex.hint.broken', defaultMessage: 'Codex looks broken or not set up: check it in Provider Setup.', description: "Why Codex didn't start, in the agent's pane, with a button that goes where it says. Agent Settings, Provider Setup and Settings → … are Hive's names: use them as shown." })), fix: 'agent-setup' }
     return null
   }
   /** Codex versions whose hook hashes Hive has checked against Codex itself: true = Hive's own hash matches. */
@@ -407,6 +636,17 @@ export class CodexAdapter implements ProviderAdapter {
     return info
   }
 
+  /**
+   * The key for a line break in a prompt Hive types (HI-1327): Settings → Advanced's choice, if Codex takes it as one.
+   * Automatic (the default): Alt+Enter on a Codex version it was tried on (NEWLINE_TRIED: the real-tier suite
+   * codex-newline), a space on another or one not known, as before. A key chosen goes to any version.
+   */
+  typedNewline(version: string | null): TypedNewline | null {
+    const chosen = advanced.get<string>(NEWLINE_KEY)
+    const key = chosen === 'auto' ? (version && NEWLINE_TRIED.includes(version) ? 'alt-enter' : null) : chosen
+    return this.descriptor.capabilities.typedNewlines?.find((k) => k === key) ?? null
+  }
+
   /** Codex's Windows sandbox is set up once (windows.sandbox in its config); without it every command needs approval. */
   sandboxReady(): boolean {
     return !!this.sandboxKind()
@@ -439,17 +679,17 @@ export class CodexAdapter implements ProviderAdapter {
       out.push({
         id: 'sandbox',
         level: 'warning',
-        message: installText(msg({ id: 'providers.codex.sandbox.needed', defaultMessage: 'Codex needs a one-time setup of its Windows sandbox; until then it asks before every command.', description: "Agent Setup and Settings → Providers: Codex's Windows sandbox isn't set up yet." })),
-        action: { label: installText(msg({ id: 'providers.codex.sandbox.setUpAction', defaultMessage: 'Set up', description: "Agent Setup's button: opens Codex's sandbox setup in a terminal." })), task: 'setup' },
+        message: installText(msg({ id: 'providers.codex.sandbox.needed', defaultMessage: 'Codex needs a one-time setup of its Windows sandbox; until then it asks before every command.', description: "Provider Setup and Settings → Providers: Codex's Windows sandbox isn't set up yet." })),
+        action: { label: installText(msg({ id: 'providers.codex.sandbox.setUpAction', defaultMessage: 'Set up', description: "Provider Setup's button: opens Codex's sandbox setup in a terminal." })), task: 'setup' },
         detail: SANDBOX_CHOICE.map(installText)
       })
     else if (sandbox === 'unelevated') {
       out.push({
         id: 'sandbox-upgrade',
         level: 'info',
-        message: installText(msg({ id: 'providers.codex.sandbox.nonAdminUsed', defaultMessage: 'Codex uses its non-admin sandbox.', description: 'Agent Setup and Settings → Providers: Codex runs commands in its non-admin sandbox (Windows), which can be upgraded.' })),
-        action: { label: installText(msg({ id: 'providers.codex.sandbox.upgradeAction', defaultMessage: 'Upgrade', description: "Agent Setup's button: switches Codex to its default sandbox." })), task: 'setup' },
-        detail: [installText(msg({ id: 'providers.codex.sandbox.upgrade', defaultMessage: '**Upgrade** switches Codex to its default sandbox, which runs commands under separate Windows accounts instead of your own. Windows asks for Administrator permission once. Codex agents that are running keep their sandbox until they restart.', description: "Agent Setup, under Codex's sandbox setup (Windows): what Upgrade does. **…** marks bold text: keep the marks." }))]
+        message: installText(msg({ id: 'providers.codex.sandbox.nonAdminUsed', defaultMessage: 'Codex uses its non-admin sandbox.', description: 'Provider Setup and Settings → Providers: Codex runs commands in its non-admin sandbox (Windows), which can be upgraded.' })),
+        action: { label: installText(msg({ id: 'providers.codex.sandbox.upgradeAction', defaultMessage: 'Upgrade', description: "Provider Setup's button: switches Codex to its default sandbox." })), task: 'setup' },
+        detail: [installText(msg({ id: 'providers.codex.sandbox.upgrade', defaultMessage: '**Upgrade** switches Codex to its default sandbox, which runs commands under separate Windows accounts instead of your own. Windows asks for Administrator permission once. Codex agents that are running keep their sandbox until they restart.', description: "Provider Setup, under Codex's sandbox setup (Windows): what Upgrade does. **…** marks bold text: keep the marks." }))]
       })
     }
     // The Store's PowerShell 7 first on PATH, with the sandbox on: its commands fail while one is open (#585). Like the
@@ -461,12 +701,8 @@ export class CodexAdapter implements ProviderAdapter {
 
   async latestVersion(): Promise<string | null> {
     try {
-      const ctrl = new AbortController()
-      const t = setTimeout(() => ctrl.abort(), 6000)
-      const res = await fetch('https://api.github.com/repos/openai/codex/releases/latest', { signal: ctrl.signal, headers: { Accept: 'application/vnd.github+json' } })
-      clearTimeout(t)
-      if (!res.ok) return null
-      const tag = ((await res.json()) as { tag_name?: string }).tag_name ?? ''
+      const reply = await plainHttpsJson('https://api.github.com/repos/openai/codex/releases/latest', { timeoutMs: 6000, headers: { Accept: 'application/vnd.github+json' } })
+      const tag = (reply as { tag_name?: string }).tag_name ?? ''
       return /(\d+\.\d+\.\d+)/.exec(tag)?.[1] ?? null
     } catch {
       return null
@@ -490,6 +726,78 @@ export class CodexAdapter implements ProviderAdapter {
 
   loginCommand(executable: string): CommandSpec {
     return { ...toSpawnable(executable, ['login']) }
+  }
+
+  /** A connection's sign-in (HI-1757): Codex's own login, kept in the connection's folder. */
+  accountLoginCommand(executable: string): CommandSpec {
+    return { ...toSpawnable(executable, ['login', ...CONNECTION_STORE]) }
+  }
+
+  /** Who a connection's CODEX_HOME (in `env`) is signed in as: its app server's account answer, never a token. */
+  async accountStatus(executable: string, env: NodeJS.ProcessEnv): Promise<ConnectionStatus> {
+    const answer = await appServerAnswer(executable, launchConnectionArgs({ connectionHome: env.CODEX_HOME }), homedir(), advanced.get<string>('codex.accounts.readMethod'), {}, env, advanced.number('codex.accounts.statusSeconds') * 1000)
+    return codexAccountStatus(answer, { account: advanced.get<string>('codex.accounts.accountField'), email: advanced.get<string>('codex.accounts.emailField'), plan: advanced.get<string>('codex.accounts.planField') })
+  }
+
+  /**
+   * Its Windows sandbox set up for the folder (HI-1870), as its launches have it: the folder's own `windows.sandbox`,
+   * or else the one launches pass on (launchConnectionArgs: this PC's, or the non-admin one). Nothing to set up off Windows.
+   */
+  async connectionSetUp(home: string): Promise<boolean | null> {
+    if (process.platform !== 'win32') return true
+    const own = configOf(home).windows?.sandbox
+    return (typeof own === 'string' && !!own) || connectionSandboxArgs(home).length > 0
+  }
+
+  /** Its Set Up runs Codex as the connection's launches do (HI-1893): its login store and its sandbox. */
+  connectionSetUpArgs(home: string): string[] {
+    return launchConnectionArgs({ connectionHome: home })
+  }
+
+  /**
+   * Its trust of each folder in the folder's config.toml (HI-1870), as Codex 0.164.0 looks it up: a `[projects.'<path>']`
+   * with `trust_level = "trusted"` for the main repository root's real path, in any letter case (8.3 paths it expands).
+   * It asks only in a Git repository, so a folder without Git needs none. Its own file only: launches pass no trust.
+   */
+  async connectionTrusts(home: string, targets: readonly TrustTarget[]): Promise<TrustReading[]> {
+    // Each launch trusts its own folder (HI-1871: the Advanced switch, on by default): none of Hive's folders asks.
+    if (advanced.get<boolean>('codex.trust.perLaunch')) return targets.map(() => true)
+    let projects: Record<string, unknown>
+    try {
+      const t = parseToml(await readFile(join(home, 'config.toml'), 'utf8')) as Record<string, unknown>
+      projects = t.projects && typeof t.projects === 'object' ? (t.projects as Record<string, unknown>) : {}
+    } catch (e) {
+      if ((e as NodeJS.ErrnoException).code !== 'ENOENT') return targets.map(() => null)
+      projects = {}
+    }
+    const norm = (p: string): string => p.replace(/\//g, '\\').replace(/\\+$/, '').toLowerCase()
+    // Each entry's trust level, by its path as Codex compares it (get_active_project: the cwd's entry, then the main
+    // root's; source pinned at 6aaac69).
+    const levels = new Map(Object.entries(projects).map(([k, v]) => [norm(k), (v as Record<string, unknown> | null)?.trust_level]))
+    return targets.map((t): TrustReading => {
+      if (!t.git) return true
+      // The project's own folder's entry first (a worktree project's own, say): it decides, and is where to ask.
+      if (t.folder && levels.has(norm(t.folder))) return levels.get(norm(t.folder)) === 'trusted' ? true : { at: t.folder }
+      return t.root ? levels.get(norm(t.root)) === 'trusted' : null
+    })
+  }
+
+  accountSharedTarget(name: string): string {
+    return join(codexHome(), name)
+  }
+
+  accountLoginFile(name: string): boolean {
+    return advanced.pattern('codex.accounts.loginFiles').test(name)
+  }
+
+  /** What Codex reads as a login from its environment (HI-1757: CODEX_ACCESS_TOKEN): left out on a connection. */
+  accountEnvDrop(): readonly string[] {
+    return advanced.get<string[]>('codex.accounts.dropEnv')
+  }
+
+  /** Whether a connection's folder is held by a check of Codex not yet confirmed ended (codexChecks.ts). */
+  accountHeld(home: string): boolean {
+    return codexCheckHeld(home)
   }
 
   /**
@@ -522,8 +830,9 @@ export class CodexAdapter implements ProviderAdapter {
     return r.code === 0 ? parseCodexModels(r.stdout) : null
   }
 
-  configuredDefaultModel(): string | null {
-    const m = userConfig().model
+  /** "model" in Codex's own config.toml (~/.codex's, or a connection's: HI-1757). */
+  configuredDefaultModel(home?: string): string | null {
+    const m = configOf(home).model
     return typeof m === 'string' && m.trim() ? m.trim() : null
   }
 
@@ -552,18 +861,71 @@ export class CodexAdapter implements ProviderAdapter {
   async prepareLaunch(ctx: LaunchContext): Promise<Record<string, SkillDelivery>> {
     const delivered = await syncAgentsSkills(ctx, this.descriptor.name)
     await this.checkHookHashes(ctx)
+    // The developer_instructions Codex would give this session, for Hive's guidance to follow (#1285): asked at each
+    // launch Hive adds some to, with its own arguments, folder and environment (no cache: only Codex knows what they
+    // depend on). Unreadable, buildCommand never puts anything in their place (developerOverride).
+    if ([ctx.guidance, ctx.instructions, ctx.notes].some((t) => t && t.trim())) {
+      const theirs = await developerInstructionsFromCodex(ctx.executable, ctx.cwd, [...launchConnectionArgs(ctx), ...ctx.extraArgs], ctx.env)
+      if (theirs === null) log.warn("Codex couldn't render the session's prompt to say which developer_instructions apply; Hive leaves them as they are")
+      keepBounded(this.developerByRun, ctx.runId, theirs)
+    }
     return delivered
+  }
+
+  /**
+   * What Codex said each launch's developer_instructions are (prepareLaunch): the text, or null when it couldn't say;
+   * taken by buildCommand. A launch stopped before its command is built leaves its entry, so only the latest few are kept.
+   */
+  private developerByRun = new Map<string, string | null>()
+
+  /** Launches whose developer_instructions Codex couldn't say (buildCommand), for their notice (launchNotice). */
+  private developerUnread = new Map<string, 'agent' | 'assistant'>()
+
+  /**
+   * The launch's developer_instructions, or null for none of Hive's (#1285, #966 row 13; the Assistant's decisions on
+   * it): Hive's guidance and the Assistant's role after those Codex gives the session (prepareLaunch), never in their
+   * place, then the Workspace notes note (#1433). Codex unable to say: an agent's left as they are, with no guidance or
+   * notes of Hive's, and the Assistant's role alone with its notes (without it there is no Assistant), each told once
+   * (launchNotice). Hive never writes Codex's config.
+   */
+  private developerOverride(ctx: LaunchContext): string | null {
+    const guidance = ctx.guidance?.trim() ?? ''
+    const role = ctx.instructions?.trim() ?? ''
+    const notes = ctx.notes?.trim() ?? ''
+    const theirs = this.developerByRun.get(ctx.runId)
+    this.developerByRun.delete(ctx.runId)
+    if (!guidance && !role && !notes) return null
+    if (typeof theirs === 'string') return [theirs, guidance, role, notes].filter(Boolean).join('\n\n')
+    keepBounded(this.developerUnread, ctx.runId, role ? 'assistant' : 'agent')
+    return role ? [role, notes].filter(Boolean).join('\n\n') : null
+  }
+
+  launchNotice(ctx: LaunchContext): { title: string; message: string } | null {
+    const unread = this.developerUnread.get(ctx.runId)
+    this.developerUnread.delete(ctx.runId)
+    if (unread === 'assistant')
+      return {
+        title: tr(msg({ id: 'providers.codex.developerUnread.assistantTitle', defaultMessage: 'The Assistant started with its role only', description: "A notice as the Hive Assistant starts on Codex: Hive couldn't tell which of the user's own Codex instructions apply, so it gives the Assistant only its role." })),
+        message: tr(msg({ id: 'providers.codex.developerUnread.assistantMessage', defaultMessage: "Codex couldn't say which developer_instructions this session gets, so Hive gives the Assistant its role alone this time, without them or Hive's guidance. Restart the Assistant to try again.", description: 'The notice that the Hive Assistant on Codex got only its role. developer_instructions is a Codex setting: keep it.' }))
+      }
+    if (unread === 'agent')
+      return {
+        title: tr(msg({ id: 'providers.codex.developerUnread.agentTitle', defaultMessage: "Hive's guidance is missing for this agent", description: "A notice as a Codex agent starts: Hive couldn't tell which of the user's own Codex instructions apply, so it added none of its guidance." })),
+        message: tr(msg({ id: 'providers.codex.developerUnread.agentMessage', defaultMessage: "Codex couldn't say which developer_instructions this session gets, so Hive leaves yours as they are and adds none of its guidance this time: the agent has Hive's tools without it. Restart the agent to try again.", description: "The notice that a Codex agent started without Hive's guidance. developer_instructions is a Codex setting: keep it." }))
+      }
+    return null
   }
 
   /** Which hook hashes to trust for this launch (hashesByRun): Hive's own, unless this Codex version hashes differently. */
   private async checkHookHashes(ctx: LaunchContext): Promise<void> {
-    const version = (await run(ctx.executable, ['--version'], 10000)).stdout.match(/(\d+\.\d+\.\d+[\w.-]*)/)?.[1] ?? 'unknown'
+    // In the launch's own environment, with its connection's overrides (HI-1757 round 1): its CODEX_HOME, never Hive's.
+    const version = (await run(ctx.executable, ['--version'], 10000, ctx.env)).stdout.match(/(\d+\.\d+\.\d+[\w.-]*)/)?.[1] ?? 'unknown'
     // Hooks only (without the trust records), to ask Codex what it calls and hashes them.
-    const hooksOnly = hookOverrides(ctx.hookUrl, ctx.hookAuthFile).slice(0, -2)
+    const hooksOnly = [...launchConnectionArgs(ctx), ...hookOverrides(ctx.hookUrl, ctx.hookAuthFile).slice(0, -2)]
     const known = this.hashCheck.get(version)
     if (known === true) return
     if (this.unreachable.has(version)) return
-    const theirs = await hooksFromCodex(ctx.executable, hooksOnly, ctx.cwd)
+    const theirs = await hooksFromCodex(ctx.executable, hooksOnly, ctx.cwd, ctx.env)
     // Codex couldn't be asked: Hive's own hashes are the best guess. Don't wait for it again this run.
     if (!theirs) {
       this.unreachable.add(version)
@@ -591,30 +953,88 @@ export class CodexAdapter implements ProviderAdapter {
     args.push('--no-daemon')
     args.push(...hookOverrides(ctx.hookUrl, ctx.hookAuthFile, this.hashesByRun.get(ctx.runId)))
     this.hashesByRun.delete(ctx.runId)
-    args.push('-c', `tui.terminal_title=${toToml(titleItems())}`)
+    // Switched off (#1167), the user's own [tui].terminal_title applies, and titleAttention reads nothing from it.
+    if (launchOverrides(ctx.overrides, CODEX, 'terminalTitle')) args.push('-c', `tui.terminal_title=${toToml(titleItems())}`)
     if (ctx.model) args.push('-m', ctx.model)
     if (ctx.effort) args.push('-c', `model_reasoning_effort=${toToml(ctx.effort)}`)
     args.push(...(CODEX_MODE_FLAGS[ctx.permissionMode ?? ''] ?? CODEX_MODE_FLAGS[CODEX_DESCRIPTOR.defaultPermissionMode]))
-    const developer = [ctx.guidance, ctx.instructions].filter((t) => t && t.trim()).join('\n\n')
-    if (developer) args.push('-c', `developer_instructions=${toToml(developer)}`)
-    // Only the workspace's MCP servers: the user's own (and a project's own) are turned off, as for Claude Code.
+    // Folders it may also write in (#1439: a reviewer's review copies). --add-dir adds them to the writable roots of the
+    // user's own config; a -c sandbox_workspace_write.writable_roots would replace those (0.163.0: the fixture
+    // writable-roots-codex-0.163.0.json in tests/fixtures/advanced).
+    for (const d of ctx.extraDirs ?? []) args.push('--add-dir', d)
+    // On a connection (HI-1757): its login kept in its own folder, and the Windows sandbox this PC has (set up once, in
+    // ~/.codex's config: its accounts are the machine's), unless the connection's own config names one.
+    args.push(...launchConnectionArgs(ctx))
+    // Its own folder trusted for this launch (HI-1871, Darren 27 Oct: on by default, an Advanced off switch): Codex
+    // looks its cwd up first, so it never asks in Hive's folders. The table merges into the home's own for this launch
+    // (config overrides.rs, merge.rs at 6aaac69) and nothing is written.
+    if (advanced.get<boolean>('codex.trust.perLaunch')) args.push('-c', `projects=${toToml({ [ctx.cwd]: { trust_level: 'trusted' } })}`)
+    const files = [join(ctx.connectionHome ?? codexHome(), 'config.toml'), join(ctx.cwd, '.codex', 'config.toml')]
+    const developer = this.developerOverride(ctx)
+    const hive = { preApprove: launchOverrides(ctx.overrides, CODEX, 'preApproveHiveTools'), trusted: ctx.trustedHiveTools }
     for (const [name, def] of Object.entries(ctx.mcpServers)) {
-      const { table, warning } = codexMcpServer(name, def)
+      const { table, warning } = codexMcpServer(name, def, hive)
       if (warning) log.warn(warning)
-      if (table) args.push('-c', `mcp_servers.${name}=${toToml(table)}`)
+      if (!table) continue
+      if (name === 'hive') Object.assign(table, outrankNativeHive(files, table, hive.preApprove ? (hive.trusted ?? 'all') : [], ctx.cwd))
+      args.push('-c', `mcp_servers.${name}=${toToml(table)}`)
     }
-    const own = new Set(Object.keys(ctx.mcpServers))
-    const theirs = new Set([...Object.keys(mcpServersIn(join(codexHome(), 'config.toml'))), ...Object.keys(mcpServersIn(join(ctx.cwd, '.codex', 'config.toml')))])
-    for (const name of theirs) {
-      if (own.has(name)) continue
-      if (/^[A-Za-z0-9_-]+$/.test(name)) args.push('-c', `mcp_servers.${name}.enabled=false`)
-      else log.warn(`Codex MCP server ${userText(name)} can't be turned off for Hive sessions (its name needs quoting).`)
+    // Only the workspace's MCP servers: the user's own (and a project's own) are turned off, as for Claude Code; with the
+    // switch off (#1281), they load beside Hive's (one of the workspace's name still merges into the workspace's).
+    if (launchOverrides(ctx.overrides, CODEX, 'mcpIsolation')) {
+      const own = new Set(Object.keys(ctx.mcpServers))
+      const theirs = new Set(files.flatMap((f) => Object.keys(mcpServersIn(f))))
+      for (const name of theirs) {
+        if (own.has(name)) continue
+        if (/^[A-Za-z0-9_-]+$/.test(name)) args.push('-c', `mcp_servers.${name}.enabled=false`)
+        else log.warn(`Codex MCP server ${userText(name)} can't be turned off for Hive sessions (its name needs quoting).`)
+      }
     }
     args.push(...ctx.extraArgs)
+    // After the user's own arguments, so it is the one Codex keeps: their own -c developer_instructions is already in it.
+    if (developer !== null) args.push('-c', `developer_instructions=${toToml(developer)}`)
+    // Its config overrides, for asking Codex which hooks the launch has (HI-982: launchHooks).
+    keepBounded(this.configByRun, ctx.runId, hookQueryArgs(args))
     // Codex takes a first prompt as its last argument (after "resume <id>" too) and starts on it.
     if (ctx.initialPrompt) args.push(...taskArgs(executable, ctx.initialPrompt))
     const s = toSpawnable(executable, args)
     return { file: s.file, args: s.args, env: ctx.env }
+  }
+
+  /** Each launch's config overrides as buildCommand gave them (HI-982), until launchHooks takes them. */
+  private configByRun = new Map<string, string[]>()
+
+  /**
+   * The launch's hooks (HI-982): Hive's as passed (the -c hooks.<event> of hookOverrides), and every hook Codex itself
+   * lists for the launch, asked when the dialog opens (its app server's hooks/list, in the launch's environment and
+   * folder, with the launch's config overrides only: never its other arguments), each with Codex's trust. Hive's are
+   * those of the session flags running exactly Hive's command, with Codex's trust; Codex unable to say, they are as
+   * passed and the rest unknown.
+   */
+  launchHooks(ctx: LaunchContext): LaunchHooks {
+    const overrides = this.configByRun.get(ctx.runId) ?? []
+    this.configByRun.delete(ctx.runId)
+    const command = hookCommand(ctx.hookUrl, ctx.hookAuthFile)
+    const secrets = [ctx.hookAuthFile, ctx.env.HIVE_HOOK_TOKEN ?? '']
+    const hive: HookRow[] = HOOKS.map((h) => ({ event: h.event, source: 'hive', type: 'command', command: withoutHiveAuth(command, secrets), ...(h.matcher ? { matcher: h.matcher } : {}), status: 'passed', observed: true }))
+    const listing: HookListing = { basis: 'cli', rows: hive, notes: [] }
+    return {
+      listing,
+      receivers: Object.fromEntries(HOOKS.map((h) => [h.event, 'command'])),
+      now: async () => {
+        const answer = await appServerAnswer(ctx.executable, overrides, ctx.cwd, advanced.get<string>('codex.hooks.listMethod'), { cwds: [ctx.cwd] }, ctx.env, advanced.number('codex.hooks.listSeconds') * 1000)
+        if (!answer.ok) return { ...listing, notes: [{ kind: 'cliUnknown', why: answer.error.slice(0, 300) }] }
+        const all = ((answer.result as { data?: { hooks?: unknown[] }[] } | null)?.data ?? []).flatMap((e) => (Array.isArray(e?.hooks) ? e.hooks : []))
+        const got = codexListedHooks(all as never[], { command, flagsFile: SESSION_FLAGS }, secrets)
+        // Hive's as passed while Codex trusts them; else as Codex has them, or unknown where it doesn't list them (a later
+        // -c of the user's own for that event replaced Hive's).
+        const rows = hive.map((r): HookRow => {
+          const trust = got.hiveTrust.get(r.event) ?? 'unknown'
+          return { ...r, status: trust === 'trusted' ? 'passed' : trust }
+        })
+        return { basis: 'cli', rows: [...rows, ...got.rows], notes: got.more ? [{ kind: 'more', source: 'other', count: got.more }] : [] }
+      }
+    }
   }
 
   // -------------------------------------------------------------------------
@@ -718,13 +1138,22 @@ export class CodexAdapter implements ProviderAdapter {
     return codexTurnScreen
   }
 
+  /** Codex waiting to retry its model request (HI-1972): its log database's newest record of it (retryLog.ts). */
+  retryWait(q: { sessionId: string; env: NodeJS.ProcessEnv; since: number }): Promise<RetryWait | null> {
+    return codexRetryWait(q)
+  }
+
+  retryLookAfterMs(): number {
+    return advanced.number('codex.retry.checkAfterSeconds') * 1000
+  }
+
   /**
    * Codex titles its terminal "[ ! ] Action Required | <project>" (blinking with "[ . ]") exactly while a person
    * must act (an approval prompt, a question), and not while its auto-reviewer decides. Older versions than the one
-   * Hive was tested with go by the hooks.
+   * Hive was tested with go by the hooks, as do sessions whose title Hive leaves to the user's config (#1167).
    */
-  titleAttention(version: string | null): ((title: string) => boolean) | null {
-    if (!version || compareVersions(version, ACTION_REQUIRED_SINCE) < 0) return null
+  titleAttention(version: string | null, ctx?: Pick<LaunchContext, 'overrides'>): ((title: string) => boolean) | null {
+    if (!version || compareVersions(version, ACTION_REQUIRED_SINCE) < 0 || !launchOverrides(ctx?.overrides, CODEX, 'terminalTitle')) return null
     return (title) => /^\[ [!.] \] Action Required\b/.test(title)
   }
 
@@ -739,6 +1168,13 @@ export class CodexAdapter implements ProviderAdapter {
   safeguards(appended: string, memo: Record<string, unknown>): SafeguardEvent[] {
     return codexSafeguards(appended, memo)
   }
+
+  /** Turns by turn_id (as its hooks carry it), #1371. */
+  transcriptTurns(appended: string, memo: Record<string, unknown>): TranscriptTurn[] {
+    return codexTranscriptTurns(appended, memo)
+  }
+
+  readonly turnsJoin = 'id'
 
   /**
    * Codex's /permissions menu numbers its presets, and typing a number picks one (arrow keys wrap around, so counting
@@ -833,9 +1269,10 @@ export class CodexAdapter implements ProviderAdapter {
 
   async transcriptPath(_folder: string, sessionId: string, recorded?: string): Promise<string | null> {
     assertSessionId(sessionId)
-    if (recorded && existsSync(recorded)) return recorded
+    // Checked off main's thread: a session list asks for each of a project's hundreds of sessions (#1649).
+    if (recorded && (await isFile(recorded))) return recorded
     const cached = this.paths.get(sessionId)
-    if (cached && existsSync(cached)) return cached
+    if (cached && (await isFile(cached))) return cached
     if (Date.now() - (this.misses.get(sessionId) ?? 0) < 60_000) return null
     for (const p of await this.rollouts()) {
       const id = idFromFile(p)
@@ -855,21 +1292,45 @@ export class CodexAdapter implements ProviderAdapter {
     return recorded ?? null
   }
 
-  async listSessions(folder: string): Promise<ExternalSession[]> {
+  /** The rollouts' sessions (each one's session_meta), read once per rollout list: see rolloutSessions(). */
+  private rolloutSessionList: { list: Promise<string[]>; sessions: Promise<RolloutSession[]> } | null = null
+
+  /**
+   * Every rollout's session, read once per rollout list (#1646): a session list asks for each folder a project's
+   * sessions ran in (its slots and worktrees), and looking at every rollout once per folder took a second on 1,100
+   * rollouts and eight folders. A rollout's session_meta (its first line) never changes once written, so one read before
+   * isn't looked at again (HI-1681): only a new rollout is opened, and none is stat'd here.
+   */
+  private rolloutSessions(): Promise<RolloutSession[]> {
+    const list = this.rollouts()
+    if (this.rolloutSessionList?.list === list) return this.rolloutSessionList.sessions
+    const sessions = (async () => {
+      const out: RolloutSession[] = []
+      for (const p of await list) {
+        const m = this.metas.get(p) ?? (await this.meta(p))
+        if (m && isSessionId(m.id)) out.push({ id: m.id, cwd: m.cwd, path: p, sub: m.sub })
+      }
+      return out
+    })()
+    this.rolloutSessionList = { list, sessions }
+    return sessions
+  }
+
+  async listSessions(folder: string, skip?: (id: string) => boolean): Promise<ExternalSession[]> {
     // Codex records the cwd as it was given; Hive may spell the folder another way now (a junction, an 8.3 name, #493).
     const here = placeMatcher(folder)
-    const out: ExternalSession[] = []
-    for (const p of await this.rollouts()) {
-      const m = await this.meta(p)
-      if (!m || !isSessionId(m.id) || !here(m.cwd)) continue
-      const s = await stat(p).catch(() => null)
-      if (s && s.size > 0) out.push({ id: m.id, transcriptPath: p, modified: s.mtime.toISOString(), ...(m.sub ? { sub: m.sub } : {}) })
-    }
-    return out
+    const mine = (await this.rolloutSessions()).filter((s) => here(s.cwd) && !skip?.(s.id))
+    // Only the folder's sessions the caller doesn't have are stat'd (HI-1681), a few at once.
+    const found = await atMost(LIST_AT_ONCE, mine, async (s): Promise<ExternalSession | null> => {
+      const st = await stat(s.path).catch(() => null)
+      return st && st.size > 0 ? { id: s.id, transcriptPath: s.path, modified: st.mtime.toISOString(), bytes: st.size, mtimeMs: st.mtimeMs, ...(s.sub ? { sub: s.sub } : {}) } : null
+    })
+    return found.filter((x): x is ExternalSession => !!x)
   }
 
   async subSessionOf(path: string): Promise<SubSession | null> {
-    return (await this.meta(path))?.sub ?? null
+    // Its session_meta never changes once written (HI-1681): one read before is the answer.
+    return (this.metas.get(path) ?? (await this.meta(path)))?.sub ?? null
   }
 
   /** Session names from Codex's session_index.jsonl ({id, thread_name}). */
@@ -923,28 +1384,24 @@ export class CodexAdapter implements ProviderAdapter {
   // Project files
   // -------------------------------------------------------------------------
 
-  async memorySources(projectPath: string): Promise<MemorySource[]> {
+  async memorySources(projectPath: string, homes?: readonly { id: string; name: string; home: string }[]): Promise<MemorySource[]> {
     const p = this.id
-    const sources: MemorySource[] = [
-      { provider: p, id: 'project', label: 'AGENTS.md', path: join(projectPath, 'AGENTS.md'), kind: 'claude-md', exists: false }, // i18n-ignore: a file's name
-      { provider: p, id: 'user', label: userMemoryLabel('AGENTS.md'), path: join(codexHome(), 'AGENTS.md'), kind: 'claude-md', exists: false }
-    ]
+    // The user's own file: each connection's on in the workspace (HI-1757: each is its own home), else ~/.codex's.
+    const users: MemorySource[] = homes
+      ? homes.map((h) => ({ provider: p, id: `user:${h.id}`, label: connectionMemoryLabel('AGENTS.md', h.name), path: join(h.home, 'AGENTS.md'), kind: 'claude-md', exists: false })) // i18n-ignore: a file's name
+      : [{ provider: p, id: 'user', label: userMemoryLabel('AGENTS.md'), path: join(codexHome(), 'AGENTS.md'), kind: 'claude-md', exists: false }] // i18n-ignore: a file's name
+    const sources: MemorySource[] = [{ provider: p, id: 'project', label: 'AGENTS.md', path: join(projectPath, 'AGENTS.md'), kind: 'claude-md', exists: false }, ...users] // i18n-ignore: a file's name
     for (const s of sources) s.exists = existsSync(s.path)
     return sources
   }
 
-  /** In Codex's folder, only the user AGENTS.md (editable) and skills (read-only). Never credentials or config. */
-  fileAllowed(path: string, write: boolean): boolean {
-    const home = resolve(codexHome()).toLowerCase()
-    const abs = resolve(path).toLowerCase()
-    if (!abs.startsWith(home + '\\') && !abs.startsWith(home + '/')) return false
-    const rel = abs.slice(home.length + 1).replace(/\\/g, '/')
-    if (rel === 'agents.md') return true
-    return !write && rel.startsWith('skills/') && basename(rel) === 'skill.md'
+  /** In Codex's folder (or a connection's), only the user AGENTS.md (editable) and skills (read-only). Never credentials or config. */
+  fileAllowed(path: string, write: boolean, homes?: readonly string[]): boolean {
+    return (homes ?? [codexHome()]).some((h) => codexFileAllowed(path, write, h))
   }
 
-  skillRoots(): SkillRoots {
-    return { machine: [join(codexHome(), 'skills')], plugins: null, local: [AGENTS_SKILLS], hiveCopyPrefix: 'hive-' }
+  skillRoots(home = codexHome()): SkillRoots {
+    return { machine: [join(home, 'skills')], plugins: null, local: [AGENTS_SKILLS], hiveCopyPrefix: 'hive-' }
   }
 
   async projectMcpServers(projectPath: string): Promise<Record<string, McpServerDef>> {

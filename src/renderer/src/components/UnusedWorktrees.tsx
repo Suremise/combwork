@@ -2,14 +2,16 @@ import { useCallback, useEffect, useRef, useState } from 'react'
 import type { ProjectInfo, UnusedWorktree, UnusedWorktreePreview, UnusedWorktreeRemoval, UnusedWorktrees } from '@shared/types'
 import { formatSize } from '@shared/units'
 import { RecentCache } from '@shared/recentCache'
-import { CHANGES_ABOUT, UNUSED_WORKTREES_GUIDE, holdsWork, lostByRemoving, originLabel, unusedState, unusedSummary, unusedWorkNotice } from '@shared/unusedWorktrees'
+import { CHANGES_ABOUT, UNUSED_WORKTREES_GUIDE, holdsWork, isSlotRow, kindLabel, lostByRemoving, originLabel, unusedName, unusedState, unusedSummary, unusedWorkNotice } from '@shared/unusedWorktrees'
 import { call, errorMessage } from '../api'
-import { confirm, giveWorktreeToAgent, notify, showUnusedWorktrees, useStore } from '../store'
+import { confirm, notify, showUnusedWorktrees, useStore } from '../store'
 import { openGuideAt } from '../tips'
 import { cx, timeAgo } from '../util'
 import { BusyButton, Icon, InfoTip } from './ui'
+import { ItemTable, ShortPath, type ItemRow } from './ItemTable'
 import { useStorageRequests } from './Storage'
 import { msg, tr } from '@shared/i18n'
+import { agentFolder } from '../agentPlace'
 
 const M = {
   loading: msg({ id: 'workspace.unusedList.loading', defaultMessage: 'Loading…', description: "The Changes tab's Unused worktrees while git lists them." }),
@@ -38,13 +40,16 @@ const M = {
   measuring: msg({ id: 'workspace.unusedList.measuring', defaultMessage: 'measuring…', description: "An unused worktree's size while Storage measures it. Lower case." }),
   openTip: msg({ id: 'workspace.unusedList.openTip', defaultMessage: "{work, select, yes {Show {branch}'s changes, and merge them} other {Show {branch}'s changes}}", description: "Tooltip on an unused worktree's Open." }),
   open: msg({ id: 'workspace.unusedList.open', defaultMessage: 'Open', description: "An unused worktree's button: shows its changes." }),
-  give: msg({ id: 'workspace.unusedList.give', defaultMessage: 'Give to an agent…', description: "An unused worktree's button: an agent works in it again." }),
   checking: msg({ id: 'workspace.unusedList.checking', defaultMessage: 'Checking…', description: 'Remove anyway while it checks the worktree.' }),
   removeAnywayButton: msg({ id: 'workspace.unusedList.removeAnywayButton', defaultMessage: 'Remove anyway…', description: "An unused worktree's button when it holds work." }),
   heading: msg({ id: 'workspace.unusedList.heading', defaultMessage: 'Unused worktrees', description: "The Changes tab's Unused worktrees page: its heading (a count follows)." }),
-  headingTip: msg({ id: 'workspace.unusedList.headingTip', defaultMessage: 'Worktrees no agent of this project uses right now, e.g. from another template (loading that template gives them back to its agents).', description: 'Tooltip on Unused worktrees.' }),
   learnMore: msg({ id: 'workspace.unusedList.learnMore', defaultMessage: 'Learn more', description: 'Unused worktrees: opens the user guide there.' }),
   review: msg({ id: 'workspace.unusedList.review', defaultMessage: 'Review', description: "The Changes tab's notice on unused worktrees holding work: shows them." }),
+  colBranch: msg({ id: 'workspace.unusedList.colBranch', defaultMessage: 'Branch', description: "Unused worktrees' table (#1314), a column heading: the worktree's branch." }),
+  colState: msg({ id: 'workspace.unusedList.colState', defaultMessage: 'State', description: "Unused worktrees' table, a column heading: merged and clean, or the work it holds, and who made it." }),
+  colFolder: msg({ id: 'workspace.unusedList.colFolder', defaultMessage: 'Folder', description: "Unused worktrees' table, a column heading: the worktree's folder (its name; the full path on hover)." }),
+  colLast: msg({ id: 'workspace.unusedList.colLast', defaultMessage: 'Last commit', description: "Unused worktrees' table, a column heading: its branch's last commit, when and its subject." }),
+  colSize: msg({ id: 'workspace.unusedList.colSize', defaultMessage: 'Size', description: "Unused worktrees' table, a column heading: the folder's size on disk." }),
   reviewInChanges: msg({ id: 'workspace.unusedList.reviewInChanges', defaultMessage: 'Review in Changes', description: "The Overview's line on unused worktrees: shows them in the Git tab's Changes." })
 }
 
@@ -69,8 +74,9 @@ export function useUnusedWorktrees(project: ProjectInfo): { data: UnusedWorktree
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
   const loads = useRef(0)
-  // The agents' worktrees: one removed (its worktree kept) or given to an agent changes the list.
-  const trees = project.agents.map((a) => a.worktree?.path ?? '').join('|')
+  // The folders the agents work in (#1452: their place, a 0.9 worktree or a slot): one an agent leaves (removed, its
+  // worktree kept, or a lease ended) changes the list.
+  const trees = project.agents.map((a) => agentFolder(a)).join('|')
   const version = useStore((s) => s.unusedVersion[project.path] ?? 0)
   const reload = useCallback(() => {
     const n = ++loads.current
@@ -108,8 +114,8 @@ export function useUnusedWorktrees(project: ProjectInfo): { data: UnusedWorktree
 
 /**
  * The Changes tab's "Unused worktrees (n)" (#353, moved there from the Overview by #400): worktrees no agent works in,
- * each merged and clean (Remove, with its branch) or holding work (what is at stake, Give to an agent…, Remove
- * anyway…), with their last commit and size, and Open to see its changes (and merge them) like an agent's worktree.
+ * each merged and clean (Remove, with its branch) or holding work (what is at stake, Remove anyway…), with their last
+ * commit and size, and Open to see its changes (and merge them) like an agent's worktree.
  * Removing is the user's: the Assistant can only see them.
  */
 export function UnusedWorktreesSection({ project, data, reload, onOpen }: { project: ProjectInfo; data: UnusedWorktrees | null; reload: () => void; onOpen: (path: string) => void }) {
@@ -145,7 +151,7 @@ export function UnusedWorktreesSection({ project, data, reload, onOpen }: { proj
     setBusy(w.path)
     try {
       const r = await call('worktrees:removeUnused', project.path, w.path, { expectInto: w.check.into })
-      if (!r.deleted) notify('warning', tr(M.keptTitle, { name: w.branch ?? w.path }), r.reason)
+      if (!r.deleted) notify('warning', tr(M.keptTitle, { name: w.slot ?? w.branch ?? w.path }), r.reason)
       else if (r.branchKept) notify('warning', tr(M.branchKept, { path: w.path }), r.reason)
     } catch (e) {
       notify('error', tr(M.removeFailed), errorMessage(e))
@@ -160,13 +166,13 @@ export function UnusedWorktreesSection({ project, data, reload, onOpen }: { proj
     const ok = await confirm({
       title: tr(M.removeMergedTitle, { count: merged.length }),
       message: tr(M.removeMergedMessage, { into }),
-      list: merged.map((w) => `${w.branch} — ${w.path}`),
+      content: <ItemTable first={M.colBranch} columns={[{ label: M.colFolder }]} rows={merged.map((w) => ({ key: w.path, item: <strong title={w.branch ?? undefined}>{unusedName(w)}</strong>, text: unusedName(w), cells: [{ content: <ShortPath path={w.path} />, text: w.path }] }))} className="fill unused-merged-table" />,
       confirmLabel: tr(M.remove),
       busyLabel: tr(M.removing),
       run: async () => {
         for (const w of merged) {
           const r = await call('worktrees:removeUnused', project.path, w.path, { expectInto: w.check.into }).catch((e: unknown) => ({ deleted: false, reason: errorMessage(e) }))
-          if (!r.deleted) kept.push(`${w.branch}: ${r.reason ?? tr(M.keptReason)}`)
+          if (!r.deleted) kept.push(`${unusedName(w)}: ${r.reason ?? tr(M.keptReason)}`)
         }
       }
     })
@@ -219,7 +225,7 @@ export function UnusedWorktreesSection({ project, data, reload, onOpen }: { proj
         break
       }
       if (!r.lookAgain) {
-        notify('warning', tr(M.keptTitle, { name: w.branch ?? w.path }), r.reason)
+        notify('warning', tr(M.keptTitle, { name: w.slot ?? w.branch ?? w.path }), r.reason)
         break
       }
       // Looking again is what follows: the question says why the first try removed nothing (#848: main's reason is just that).
@@ -238,54 +244,73 @@ export function UnusedWorktreesSection({ project, data, reload, onOpen }: { proj
           </button>
         )}
       </UnusedHeading>
-      {list.map((w) => {
-        const size = sizes?.[w.path.toLowerCase()]
-        return (
-          <div key={w.path} className="unused-wt" data-path={w.path}>
-            <Icon name="git-branch" />
-            <div className="grow">
-              <div>
-                <strong>{w.branch ?? tr(M.detached)}</strong>{' '}
-                <span className={cx('badge', w.check.removable ? 'success' : holdsWork(w) ? 'warn' : '')}>{unusedState(w)}</span>{' '}
-                {w.origin && (
-                  <span className={cx('badge', w.origin.madeBy === 'other' && 'accent')} data-origin={w.origin.madeBy}>
-                    {originLabel(w)}
+      <ItemTable
+        first={M.colBranch}
+        columns={[{ label: M.colState }, { label: M.colFolder }, { label: M.colLast }, { label: M.colSize }]}
+        rows={list.map((w): ItemRow => {
+          const size = sizes?.[w.path.toLowerCase()]
+          const last = w.lastCommit ? tr(msg({ id: 'workspace.unusedList.lastCommit', defaultMessage: '{when}: {subject}', description: "An unused worktree's last commit: when it was made ({when}: \"2 days ago\") and its subject line. Your language's punctuation goes around the colon." }), { when: timeAgo(w.lastCommit.at), subject: w.lastCommit.subject }) : ''
+          const sized = size === undefined ? (sizes ? '' : tr(M.measuring)) : formatSize(size)
+          return {
+            key: w.path,
+            className: 'unused-wt',
+            data: { path: w.path, ...(w.kind ? { kind: w.kind } : {}), ...(w.slot ? { slot: w.slot } : {}) },
+            item: (
+              <span className="unused-wt-branch">
+                <Icon name={isSlotRow(w) ? 'repo' : 'git-branch'} /> <strong title={w.branch ?? undefined}>{unusedName(w)}</strong>
+              </span>
+            ),
+            text: unusedName(w),
+            cells: [
+              {
+                content: (
+                  <span className="unused-wt-badges">
+                    <span className={cx('badge', w.check.removable ? 'success' : holdsWork(w) ? 'warn' : '')} title={w.check.reason && isSlotRow(w) ? `${unusedState(w)} (${w.check.reason})` : unusedState(w)}>
+                      {unusedState(w)}
+                    </span>
+                    {w.kind ? (
+                      <span className="badge accent" data-unused-kind={w.kind} title={kindLabel(w)}>
+                        {kindLabel(w)}
+                      </span>
+                    ) : w.origin && (
+                      <span className={cx('badge', w.origin.madeBy === 'other' && 'accent')} data-origin={w.origin.madeBy} title={originLabel(w)}>
+                        {originLabel(w)}
+                      </span>
+                    )}
                   </span>
-                )}
-              </div>
-              <div className="muted mono" style={{ fontSize: 11 }}>
-                {w.path}
-              </div>
-              <div className="faint" style={{ fontSize: 12 }}>
-                {[w.lastCommit ? tr(msg({ id: 'workspace.unusedList.lastCommit', defaultMessage: '{when}: {subject}', description: "An unused worktree's last commit: when it was made ({when}: \"2 days ago\") and its subject line. Your language's punctuation goes around the colon." }), { when: timeAgo(w.lastCommit.at), subject: w.lastCommit.subject }) : '', size === undefined ? (sizes ? '' : tr(M.measuring)) : formatSize(size)].filter(Boolean).join(' · ')}
-              </div>
-            </div>
-            <div className="flex">
-              {w.branch && (
-                <button className="btn small subtle" title={tr(M.openTip, { branch: w.branch, work: holdsWork(w) ? 'yes' : 'no' })} onClick={() => onOpen(w.path)}>
-                  {tr(M.open)}
-                </button>
-              )}
-              {w.check.removable ? (
-                <BusyButton className="btn small" busy={busy === w.path} busyLabel={tr(M.removing)} disabled={!!busy} onClick={() => void removeOne(w)}>
-                  {tr(M.remove)}
-                </BusyButton>
-              ) : (
-                <>
-                  <button className="btn small" onClick={() => giveWorktreeToAgent(project.path, w.path)}>
-                    {tr(M.give)}
+                ),
+                text: [unusedState(w), kindLabel(w) || originLabel(w)].filter(Boolean).join(' · ')
+              },
+              { content: <ShortPath path={w.path} className="muted" />, text: w.path },
+              { content: <span className="faint" title={last || undefined}>{last}</span>, text: last, className: 'unused-wt-last' },
+              { content: <span className="faint">{sized}</span>, text: sized, className: 'unused-wt-size' }
+            ],
+            actions: (
+              <>
+                {(w.branch || isSlotRow(w)) && (
+                  <button className="btn small subtle" title={tr(M.openTip, { branch: unusedName(w), work: holdsWork(w) && w.branch ? 'yes' : 'no' })} onClick={() => onOpen(w.path)}>
+                    {tr(M.open)}
                   </button>
-                  {lostByRemoving(w) && (
+                )}
+                {w.check.removable ? (
+                  <BusyButton className="btn small" busy={busy === w.path} busyLabel={tr(M.removing)} disabled={!!busy} onClick={() => void removeOne(w)}>
+                    {tr(M.remove)}
+                  </BusyButton>
+                ) : isSlotRow(w) ? null : (
+                  // Its work is kept by Open (its changes, merged through the Merge dialog) or let go by Remove anyway…;
+                  // no agent is given a worktree in 1.0 (#1555: slots are lent per card or lane, #1451).
+                  lostByRemoving(w) && (
                     <BusyButton className="btn small danger-text" busy={busy === w.path} busyLabel={tr(M.checking)} disabled={!!busy} onClick={() => void removeAnyway(w)}>
                       {tr(M.removeAnywayButton)}
                     </BusyButton>
-                  )}
-                </>
-              )}
-            </div>
-          </div>
-        )
-      })}
+                  )
+                )}
+              </>
+            )
+          }
+        })}
+        className={cx(/* i18n-ignore: class names */ 'unused-wt-table', list.some((w) => !w.check.removable && !isSlotRow(w) && lostByRemoving(w)) && 'has-work')}
+      />
     </div>
   )
 }
@@ -299,7 +324,7 @@ export function UnusedHeading({ project, count, into, children }: { project: Pro
     <>
       <h2 className="section" id="unused-worktrees">
         <span className="unused-title">{tr(M.heading)}</span> {count !== undefined && <span className="badge">{count}</span>}
-        <InfoTip text={tr(M.headingTip)} />
+        <InfoTip text={CHANGES_ABOUT.unusedTip(into ?? null)} />
         <div className="grow" />
         {children}
         <button className="btn small subtle" onClick={() => openGuideAt(UNUSED_WORKTREES_GUIDE)}>
@@ -307,7 +332,7 @@ export function UnusedHeading({ project, count, into, children }: { project: Pro
         </button>
       </h2>
       <p className="hint changes-about" data-about="unused">
-        {CHANGES_ABOUT.unused(project.name, into ?? null)}
+        {CHANGES_ABOUT.unused(project.name)}
       </p>
     </>
   )

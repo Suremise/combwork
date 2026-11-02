@@ -1,4 +1,68 @@
 {
+  "main.accounts.badTarget": {
+    "defaultMessage": "Hive won't link a connection to {target}: it isn't one of {cli}'s own folders.",
+    "description": "An error adding a connection: the folder a connection's shared folder would link to ({target}, a path) isn't in the coding agent CLI's ({cli}) own folder."
+  },
+  "main.accounts.checkHeld": {
+    "defaultMessage": "{name} is being checked: Hive is still making sure {cli}'s check of it has ended. Try again in a moment.",
+    "description": "An error signing in or removing a connection ({name}, its name in Settings → Accounts & Connections): the coding agent CLI's ({cli}: \"Codex\") check of who it is signed in as hasn't been confirmed ended yet, so the connection is held."
+  },
+  "main.accounts.folderNotUsable": {
+    "defaultMessage": "{name}'s folder isn't the one Hive made (it is missing, or was moved or replaced), so nothing was started on it. Remove the connection and add it again.",
+    "description": "An error signing a connection in or starting on it ({name}, its name): its folder is missing or isn't the one Hive made."
+  },
+  "main.accounts.inUse": {
+    "defaultMessage": "{name} is in use: stop the agents on it and close its sign-in, then remove it.",
+    "description": "An error removing a connection ({name}, its name in Settings → Accounts & Connections): agents run on it, or its sign-in terminal is open."
+  },
+  "main.accounts.keyRemoveFailed": {
+    "defaultMessage": "{name} wasn't removed: its key couldn't be deleted. Nothing was changed; Remove tries again.",
+    "description": "An error removing a server connection ({name}, its name in Settings → Accounts & Connections): its stored API key couldn't be deleted, so the connection was left as it was."
+  },
+  "main.accounts.leftover": {
+    "defaultMessage": "{name} is half removed: remove it again first.",
+    "description": "An error signing a connection in ({name}): an earlier removal stopped partway, so it can't be used."
+  },
+  "main.accounts.makeFailed": {
+    "defaultMessage": "Couldn't make the connection's folder: {error}",
+    "description": "An error adding a connection: its folder or link couldn't be made. {error} is the reason, in English."
+  },
+  "main.accounts.noHome": {
+    "defaultMessage": "{cli}'s folder ({folder}) isn't there yet: run {cli} once, then add the connection.",
+    "description": "An error adding a connection: the coding agent CLI's ({cli}) own folder ({folder}, a path) doesn't exist on this PC."
+  },
+  "main.accounts.noName": {
+    "defaultMessage": "Give the connection a name.",
+    "description": "An error adding or renaming a connection in Settings → Accounts & Connections: its name is empty."
+  },
+  "main.accounts.noProvider": {
+    "defaultMessage": "{cli} can't have sign-in connections in Hive yet.",
+    "description": "An error: connections were asked for a coding agent CLI ({cli}: \"Codex\") that Hive keeps no connections for."
+  },
+  "main.accounts.notFound": {
+    "defaultMessage": "There is no such connection.",
+    "description": "An error: a connection named by its id is not in Settings → Accounts & Connections (removed meanwhile)."
+  },
+  "main.accounts.nothingToKeep": {
+    "defaultMessage": "{name} isn't signed in as anyone Hive could check, so there's no login to keep.",
+    "description": "An error: Keep the new login was asked for a connection ({name}) whose latest check didn't find it signed in."
+  },
+  "main.accounts.removeFailed": {
+    "defaultMessage": "{name} wasn't removed: {error}. Nothing outside its folder was touched; Remove tries again.",
+    "description": "An error removing a connection ({name}): its folder couldn't all be deleted. {error} is the reason, in English."
+  },
+  "main.accounts.running": {
+    "defaultMessage": "{name} has agents running on it: stop them, then remove it.",
+    "description": "An error removing a connection ({name}, its name in Settings → Accounts & Connections): agents run on it, or one is starting."
+  },
+  "main.accounts.setUpCancelled": {
+    "defaultMessage": "{name}'s Set Up didn't open: the connection was removed or its workspace closed while Hive checked its folders.",
+    "description": "An error opening a connection's Set Up (Settings → Accounts & Connections, HI-1870; {name}, its name): Hive was checking which of the workspace's folders its coding agent CLI trusts when the connection was removed or the workspace closed, so nothing was started."
+  },
+  "main.accounts.usageMove.bad": {
+    "defaultMessage": "Choose a share from 1% to 100%, a limit, and another account of the same CLI to move its agents to.",
+    "description": "An error setting an account's usage move in Settings → Accounts & Connections (HI-2195): the share, the limit or the account to move to isn't one it can be."
+  },
   "main.antivirus.allExcluded": {
     "defaultMessage": "Every folder Hive may offer is already excluded.",
     "description": "An error in Settings → Workspace → Antivirus scanning: nothing to add."
@@ -51,6 +115,10 @@
     "defaultMessage": "Only Windows has Defender exclusions.",
     "description": "An error in Settings → Workspace → Antivirus scanning on another system."
   },
+  "main.assistantQuestion.answered": {
+    "defaultMessage": "Answered",
+    "description": "What the notification of a question from the Hive Assistant says once it is answered or no longer waits (HI-2320), in place of its buttons. Keep it short."
+  },
   "main.board.damagedBody": {
     "defaultMessage": "{files} stayed out of the board. They are kept in {folder}.",
     "description": "The notice about card files Hive couldn't read as it moved the board into its database: {files} lists them, {folder} is where they are kept."
@@ -70,6 +138,94 @@
   "main.board.review": {
     "defaultMessage": "Review…",
     "description": "A button on the notice about cards an older Hive saved: opens a dialog listing them, to add each to the board or discard it."
+  },
+  "main.branchMerge.cardWork": {
+    "defaultMessage": "{branch} is {card}'s work: merge it through its card, or confirm merging it here.",
+    "description": "An error merging from the Merge dialog: the branch ({branch}) is the line of a card ({card}: its key) that isn't Done, and the merge wasn't confirmed for that card (the dialog asks first)."
+  },
+  "main.branchMerge.notBranch": {
+    "defaultMessage": "{branch} is not a local branch of the project.",
+    "description": "An error merging from the Merge dialog (#1450): the branch picked ({branch}) isn't one of the repository's local branches (deleted meanwhile, say)."
+  },
+  "main.branchMerge.same": {
+    "defaultMessage": "{branch} can't be merged into itself.",
+    "description": "An error merging from the Merge dialog: the branch picked and the target are the same ({branch})."
+  },
+  "main.connections.badMode": {
+    "defaultMessage": "{cli} has no permission mode {mode}.",
+    "description": "An error saving a connection (HI-2107): the permission mode asked for ({mode}, as given) is not one of the coding agent CLI's ({cli}: \"Codex\")."
+  },
+  "main.connections.beingRemoved": {
+    "defaultMessage": "{name} is being removed already.",
+    "description": "An error removing a connection (HI-2107): a removal of it ({name}, its name) is already under way."
+  },
+  "main.connections.choice.missing": {
+    "defaultMessage": "The connection chosen for {agent} no longer exists. Choose another, or the workspace's default.",
+    "description": "An error saving an agent's settings (or adding one): the connection chosen for it ({agent}, its name) was removed. A connection is how a coding agent CLI signs in or reaches its model (Settings → Accounts & Connections)."
+  },
+  "main.connections.choice.off": {
+    "defaultMessage": "{name} isn't on in this workspace. Turn it on in Settings → Accounts & Connections, or choose another for {agent}.",
+    "description": "An error saving an agent's settings (or adding one): the connection chosen ({name}) is off in this workspace, so it can't be the agent's ({agent}, its name). Settings → Accounts & Connections names a section."
+  },
+  "main.connections.choice.otherCli": {
+    "defaultMessage": "{name} is for another CLI than {agent}'s. Choose one of its own.",
+    "description": "An error saving an agent's settings (or adding one): the connection chosen ({name}) belongs to another coding agent CLI than the agent's ({agent}, its name)."
+  },
+  "main.connections.inUse": {
+    "defaultMessage": "Still in use, so {name} was kept: {users}. Choose another connection for them first, then remove it.",
+    "description": "An error removing a connection (Settings → Accounts & Connections, HI-2107): agents or the Assistant use it ({users}: their names, listed, each with its project)."
+  },
+  "main.connections.launch.changedAgain": {
+    "defaultMessage": "{agent}'s connection was changed again while it was starting. Start it again.",
+    "description": "Starting an agent ({agent}, its name) failed: the connection chosen for it was changed while it was starting, and again while Hive started it once more on the new choice. A connection is how a coding agent CLI signs in or reaches its model (Settings → Accounts & Connections)."
+  },
+  "main.connections.launch.changing": {
+    "defaultMessage": "{name}'s login kept changing while Hive checked it. Try starting {agent} again in a moment.",
+    "description": "Starting an agent ({agent}) is refused: its connection's ({name}) login changed again and again while Hive checked who it is signed in as."
+  },
+  "main.connections.launch.deleted": {
+    "defaultMessage": "The connection chosen for {agent} no longer exists. Choose another in its Agent Settings.",
+    "description": "Starting an agent ({agent}) is refused: the connection chosen for it was removed. Agent Settings names a dialog."
+  },
+  "main.connections.launch.noKey": {
+    "defaultMessage": "{name} has no key. Add one in Settings → Accounts & Connections, then start {agent}.",
+    "description": "Starting an agent ({agent}) is refused: its server account ({name}) reaches a server that needs an API key, and none is saved for it. Settings → Accounts & Connections names a section."
+  },
+  "main.connections.launch.none": {
+    "defaultMessage": "No {cli} account is on in this workspace. Add one in Settings → Accounts & Connections and sign it in, then start {agent} again.",
+    "description": "Starting an agent ({agent}, its name) is refused: its workspace has no account on for its coding agent CLI ({cli}: \"Claude Code\"). Settings → Accounts & Connections names a section."
+  },
+  "main.connections.launch.offNoDefault": {
+    "defaultMessage": "{agent}'s account, {name}, is off in this workspace, and no other {cli} account is on. Turn one on in Settings → Accounts & Connections.",
+    "description": "Starting an agent ({agent}) is refused: the connection chosen for it ({name}) is off in this workspace and there's no default to use instead. {cli} is the coding agent CLI."
+  },
+  "main.connections.launch.otherProvider": {
+    "defaultMessage": "The connection chosen for {agent} is for another CLI. Pick a {cli} connection in its Agent Settings.",
+    "description": "Starting an agent ({agent}) is refused: the connection chosen for it belongs to another coding agent CLI. {cli} is the agent's CLI (\"Claude Code\")."
+  },
+  "main.connections.launch.signedOut": {
+    "defaultMessage": "{name} is signed out. Sign it in again in Settings → Accounts & Connections, then start {agent}.",
+    "description": "Starting an agent ({agent}) is refused: its account ({name}) isn't signed in."
+  },
+  "main.connections.moveFailed": {
+    "defaultMessage": "Hive couldn't move {project}'s model settings to its agents",
+    "description": "A notice's title (HI-1770): moving a project's own model, effort and context settings onto its agents (connections now hold the defaults) failed; it is tried again at the next start. {project} is the project's name."
+  },
+  "main.connections.nameTaken": {
+    "defaultMessage": "{account} already has a connection named {name}. Choose another name.",
+    "description": "An error saving a connection (Settings → Accounts & Connections, HI-2107): another connection on the same account ({account}, its name) has this name ({name})."
+  },
+  "main.connections.noName": {
+    "defaultMessage": "Give the connection a name.",
+    "description": "An error saving a connection (Settings → Accounts & Connections, HI-2107): its name is empty."
+  },
+  "main.connections.notFound": {
+    "defaultMessage": "There is no such connection.",
+    "description": "An error (HI-2107): a connection named by its id is not in Settings → Accounts & Connections (removed meanwhile)."
+  },
+  "main.connections.userIn": {
+    "defaultMessage": "{agent} ({project})",
+    "description": "One user of a connection in the error refusing its removal (HI-2107): an agent ({agent}) and its project ({project})."
   },
   "main.console.noWorkspace": {
     "defaultMessage": "Open a workspace first: the developer console shows a workspace's agents and Hive's work there.",
@@ -114,6 +270,22 @@
   "main.finished.project": {
     "defaultMessage": "{project} ({n})",
     "description": "A project in the notification for agents that finished together, with how many of its agents finished."
+  },
+  "main.freshStart.action": {
+    "defaultMessage": "Start Fresh (Idle Agents)",
+    "description": "The button of the notification that a project's work has finished (#1437): opens Start Fresh (Idle Agents) for the project, which asks first."
+  },
+  "main.freshStart.body": {
+    "defaultMessage": "{project}'s work has finished: its idle agents can start new conversations. The old ones are kept.",
+    "description": "The body of the notification that a project's work has finished (#1437), above its button Start Fresh (Idle Agents). {project} is the project's name. The old conversations stay in the Sessions tab."
+  },
+  "main.freshStart.notFound": {
+    "defaultMessage": "No agent {agent} in this project.",
+    "description": "Start Fresh for one agent is refused: the agent named ({agent}, its id) is not in the project."
+  },
+  "main.freshStart.title": {
+    "defaultMessage": "A good moment to start fresh",
+    "description": "A notification's title (#1437): a project's work has finished (its lane ended, or its card is done, and no agent is busy), so its agents could start fresh conversations, which costs less than carrying on long ones."
   },
   "main.gitInit.already": {
     "defaultMessage": "This folder is a git repository already.",
@@ -168,8 +340,8 @@
     "description": "What to do when git has no name or email to commit as (main.gitInit.failed.identity). Make first commit is a button: use its name as shown."
   },
   "main.gitInit.fix.ignored": {
-    "defaultMessage": "fix that, then choose Make first commit on the Git tab",
-    "description": "What to do after .hive was found not ignored by git (main.gitInit.failed.ignored). Make first commit is a button on the Git tab: use its name as shown."
+    "defaultMessage": "fix that, then choose Make first commit in the Version Control tab",
+    "description": "What to do after .hive was found not ignored by git (main.gitInit.failed.ignored). Make first commit is a button in the Version Control tab (glossary 2.1): use its name as shown."
   },
   "main.gitInit.fix.staged": {
     "defaultMessage": "check the .gitignore for a rule that brings .hive back",
@@ -184,8 +356,8 @@
     "description": "Why a folder was not made a git repository: no email address to commit as is set, and the user entered none."
   },
   "main.gitInit.noGit": {
-    "defaultMessage": "{problem}: Agent Setup says how to fix it.",
-    "description": "Why a folder can't be made a git repository (the Initialise Git Repository dialog): git is missing or broken. {problem} says what's wrong. Agent Setup is a view's name."
+    "defaultMessage": "{problem}: Provider Setup says how to fix it.",
+    "description": "Why a folder can't be made a git repository (the Initialise Git Repository dialog): git is missing or broken. {problem} says what's wrong. Provider Setup is a view's name."
   },
   "main.gitInit.noName": {
     "defaultMessage": "Git has no name to make the first commit as: enter one.",
@@ -263,6 +435,18 @@
     "defaultMessage": "Its permissions have an entry for an app package but none for ALL APPLICATION PACKAGES, which Hive's sandboxed windows need, and Hive couldn't add one. Run this command in PowerShell (as an administrator if you don't own the folder), then start Hive again:",
     "description": "The message when Hive can't start from its install folder, its last paragraph (a command follows). ALL APPLICATION PACKAGES is a Windows name and PowerShell a program: keep them."
   },
+  "main.keys.maskingFull": {
+    "defaultMessage": "Hive can't keep masking for another key: it already keeps the most it can. The key wasn't saved.",
+    "description": "An error saving a server connection's API key: Hive keeps a fingerprint of every key ever saved (to hide it in logs and exports) and has reached its limit."
+  },
+  "main.keys.maskingUnreadable": {
+    "defaultMessage": "Hive can't check this for API keys: its masking data can't be read. See Settings → Accounts & Connections.",
+    "description": "An error: an export, Copy Diagnostics or a recording was refused because the data Hive uses to hide server connections' API keys can't be read. Settings → Accounts & Connections names a section, where it can be reset."
+  },
+  "main.keys.unsafe": {
+    "defaultMessage": "Hive can't store a key safely on this system, so it wasn't saved.",
+    "description": "An error saving a server connection's API key (Settings → Accounts & Connections): Windows' protection for stored secrets isn't available, and Hive won't keep a key in plain text."
+  },
   "main.leftovers.end": {
     "defaultMessage": "End Them",
     "description": "Button: ends the processes the agents left running."
@@ -274,6 +458,38 @@
   "main.leftovers.leave": {
     "defaultMessage": "Leave Running",
     "description": "Button: leaves the processes the agents left running."
+  },
+  "main.leftovers.offerChanged": {
+    "defaultMessage": "They changed since this notice: see them in the ⋯ menu on the agent's pane",
+    "description": "What the notice of processes an agent left running says once what runs is no longer exactly what it listed (HI-2320): its End Them would end processes it didn't show, so its buttons go. The ⋯ menu on the agent's pane lists them with End and Keep."
+  },
+  "main.leftovers.offerEnded": {
+    "defaultMessage": "{n, plural, one {Ended # process} other {Ended # processes}}",
+    "description": "What the notice of processes an agent left running says once End Them ended them (HI-2320), in place of its buttons. {n} is how many."
+  },
+  "main.leftovers.offerEndedSome": {
+    "defaultMessage": "{n, plural, one {Ended the # process listed} other {Ended the # processes listed}}; {more, plural, one {# started since still runs: see the ⋯ menu on the agent's pane} other {# started since still run: see the ⋯ menu on the agent's pane}}",
+    "description": "What the notice of processes an agent left running says after End Them ended exactly the ones it listed while others started since still run (HI-2320), in place of its buttons. {n} and {more} are how many. The ⋯ menu on the agent's pane lists them with End and Keep."
+  },
+  "main.leftovers.offerGone": {
+    "defaultMessage": "They have ended",
+    "description": "What the notice of processes an agent left running says once they ended by themselves, or were ended or kept elsewhere (HI-2320), in place of its buttons."
+  },
+  "main.leftovers.offerIncomplete": {
+    "defaultMessage": "Hive couldn't list them all, so it can't end exactly these: see the ⋯ menu on the agent's pane",
+    "description": "What the notice of processes an agent left running says when End Them is pressed but the notice couldn't list every process (more than it shows, or one without a start time), so Hive won't end them from it (HI-2320). The ⋯ menu on the agent's pane lists them with End and Keep."
+  },
+  "main.leftovers.offerKept": {
+    "defaultMessage": "Kept running",
+    "description": "What the notice of processes an agent left running says once Keep Running was chosen (HI-2320), in place of its buttons."
+  },
+  "main.leftovers.offerNotEnded": {
+    "defaultMessage": "{n, plural, one {Windows didn't let Hive end the process listed. Try again.} other {Windows didn't let Hive end all # processes listed. Try again.}}",
+    "description": "An error after End Them on the notice of processes an agent left running: some of the processes it listed still run (HI-2320). {n} is how many it listed."
+  },
+  "main.leftovers.offerUnchecked": {
+    "defaultMessage": "Hive couldn't check what runs now, so it ended nothing. Try again.",
+    "description": "An error after End Them or Keep Running on the notice of processes an agent left running: Hive couldn't read what the agent's processes are now, so it did nothing (HI-2320)."
   },
   "main.leftovers.quitDetail": {
     "defaultMessage": "{n, plural, one {The agents started it, and it may hold project folders or ports. End it as Hive quits, or leave it running?} other {The agents started them, and they may hold project folders or ports. End them as Hive quits, or leave them running?}}",
@@ -290,6 +506,14 @@
   "main.leftovers.restoredTitle": {
     "defaultMessage": "{n, plural, one {{agent} left # process running} other {{agent} left # processes running}}",
     "description": "A notice at start: processes an agent started before Hive last closed still run. {agent} is the agent (or project) name; {n} how many."
+  },
+  "main.mergeSlot.expiredBody": {
+    "defaultMessage": "{agent} held the merge slot for {branch} longer than its limit without reporting progress, so it went to the next in line. Check whether its merge finished.",
+    "description": "The notice that an agent's merge slot expired. {agent} is the agent, {branch} the branch it was merging into."
+  },
+  "main.mergeSlot.expiredTitle": {
+    "defaultMessage": "{agent}'s merge slot expired",
+    "description": "A notice's title: an agent ({agent}) held the merge slot longer than its limit without reporting progress, so Hive gave it to the next agent in line."
   },
   "main.mergeSlot.leftBody": {
     "defaultMessage": "It held the merge slot for {branch}{hasCards, select, yes { ({cards})} other {}}. Check {folder} for a merge left half done (git status there) before the next merge.",
@@ -327,9 +551,49 @@
     "defaultMessage": "Hive Assistant",
     "description": "The Hive Assistant's name, where Repair (after a workspace moved) lists what it repairs and the agents still running."
   },
+  "main.move.branchBoth": {
+    "defaultMessage": "both names are branches",
+    "description": "Why Repair couldn't rename an agent's branch (in main.move.branchFailed's {why}): a branch with the new name appeared meanwhile."
+  },
+  "main.move.branchFailed": {
+    "defaultMessage": "{host}: branch {from} of agent {agent} couldn't be renamed to {to} ({why}).",
+    "description": "A line of Repair's report, after a workspace or project moved to another folder. {host} is the project; {agent} an agent; {from} and {to} are branch names; {why} is git's or the system's message. A noun before the name (glossary §1 rule 4)."
+  },
+  "main.move.branchGone": {
+    "defaultMessage": "{host}: branch {from} of agent {agent} is gone, so it isn't renamed.",
+    "description": "A line of Repair's report, after a workspace or project moved to another folder: an agent's branch to rename no longer exists. {host} is the project; {agent} an agent; {from} a branch name. A noun before the name (glossary §1 rule 4)."
+  },
+  "main.move.branchQueued": {
+    "defaultMessage": "a queued step still uses it; Repair renames it next time",
+    "description": "Why Repair couldn't rename an agent's branch yet (in main.move.branchFailed's {why}): one of the board's queued steps (preparing a card's folder) names the branch."
+  },
+  "main.move.branchRenamed": {
+    "defaultMessage": "{host}: branch {from} of agent {agent} is now {to}.",
+    "description": "A line of Repair's report, after a workspace or project moved to another folder: an agent's branch named after the old place was renamed, with Hive's record of it. {host} is the project; {agent} an agent; {from} and {to} are branch names. A noun before the name (glossary §1 rule 4)."
+  },
+  "main.move.branchRenamedRemote": {
+    "defaultMessage": "{host}: branch {from} of agent {agent} is now {to}; it still tracks {from} on remote {remote}, so push it under the new name when you're ready.",
+    "description": "A line of Repair's report, after a workspace or project moved to another folder: an agent's branch named after the old place was renamed, and it tracks a remote, which keeps the old name. {host} is the project; {agent} an agent; {from} and {to} are branch names; {remote} the remote (origin). A noun before each name (glossary §1 rule 4)."
+  },
+  "main.move.branchTaken": {
+    "defaultMessage": "{host}: branch {from} of agent {agent} keeps its name: {to} is already a branch.",
+    "description": "A line of Repair's report, after a workspace or project moved to another folder: an agent's branch named after the old place isn't renamed, because a branch with its new name exists. {host} is the project; {agent} an agent; {from} and {to} are branch names. A noun before the name (glossary §1 rule 4)."
+  },
+  "main.move.branchUnrecorded": {
+    "defaultMessage": "{host}: the branch of agent {agent} is now {to}, but Hive couldn't record it yet ({why}). Repair finishes it.",
+    "description": "A line of Repair's report, after a workspace or project moved to another folder: git renamed an agent's branch, and Hive's record of it (or of the cards on it) couldn't be written; the next Repair finishes it. {host} is the project; {agent} an agent; {to} the branch's new name; {why} the system's message. A noun before the name (glossary §1 rule 4)."
+  },
   "main.move.cards": {
     "defaultMessage": "{n, plural, one {# card of {from} now belongs to {to}, with its agents.} other {# cards of {from} now belong to {to}, with their agents.}}",
     "description": "A line of Repair's report, after a workspace or project moved to another folder (the moved-workspace banner): what was left under a project's old name went to the project. {from} is the old name, {to} the project. {n} is how many cards."
+  },
+  "main.move.cardsNotMoved": {
+    "defaultMessage": "{host}: the cards {agent} works on couldn't be told its worktree is now at {path} ({why}). Repair tries again.",
+    "description": "A line of Repair's report, after a workspace or project moved to another folder: the board's record of the cards worked on in an agent's worktree couldn't be updated to its new place. {host} is the project; {agent} an agent; {path} the worktree's new folder; {why} the system's message."
+  },
+  "main.move.closeRunsFailed": {
+    "defaultMessage": "Hive's records of the workspace's close command couldn't all follow it from the old folder ({why}). Hive tries again.",
+    "description": "A line of Repair's report, after a workspace moved to another folder: the output Hive keeps of the workspace's close command couldn't all be moved from the old folder's records. {why} is the system's message."
   },
   "main.move.copied": {
     "defaultMessage": "{n, plural, one {{owner, select, project {{host}: copied {n, number} file of {provider}'s conversations and memory for the project to its folder for the new path (the old folder is kept).} assistant {{host}: copied {n, number} file of {provider}'s conversations and memory for the Assistant to its folder for the new path (the old folder is kept).} worktree {{host}: copied {n, number} file of {provider}'s conversations and memory for {agent}'s worktree to its folder for the new path (the old folder is kept).} other {{host}: copied {n, number} file of {provider}'s conversations and memory for {of} to its folder for the new path (the old folder is kept).}}} other {{owner, select, project {{host}: copied {n, number} files of {provider}'s conversations and memory for the project to its folder for the new path (the old folder is kept).} assistant {{host}: copied {n, number} files of {provider}'s conversations and memory for the Assistant to its folder for the new path (the old folder is kept).} worktree {{host}: copied {n, number} files of {provider}'s conversations and memory for {agent}'s worktree to its folder for the new path (the old folder is kept).} other {{host}: copied {n, number} files of {provider}'s conversations and memory for {of} to its folder for the new path (the old folder is kept).}}}}",
@@ -342,6 +606,58 @@
   "main.move.copyKept": {
     "defaultMessage": "{n, plural, one {{owner, select, project {{host}: {n, number} file of {provider}'s for the project already in {folder} with other content, not overwritten: {files}.} assistant {{host}: {n, number} file of {provider}'s for the Assistant already in {folder} with other content, not overwritten: {files}.} worktree {{host}: {n, number} file of {provider}'s for {agent}'s worktree already in {folder} with other content, not overwritten: {files}.} other {{host}: {n, number} file of {provider}'s for {of} already in {folder} with other content, not overwritten: {files}.}}} other {{owner, select, project {{host}: {n, number} files of {provider}'s for the project already in {folder} with other content, not overwritten: {files}.} assistant {{host}: {n, number} files of {provider}'s for the Assistant already in {folder} with other content, not overwritten: {files}.} worktree {{host}: {n, number} files of {provider}'s for {agent}'s worktree already in {folder} with other content, not overwritten: {files}.} other {{host}: {n, number} files of {provider}'s for {of} already in {folder} with other content, not overwritten: {files}.}}}}",
     "description": "A line of Repair's report, after a workspace or project moved to another folder (the moved-workspace banner). {host} is the project (or the Assistant) it is about; {n} is how many files; {provider} is the coding agent (Claude Code); {owner} whose folder the files are for: the project, the Assistant, an agent's worktree ({agent} is the agent), or other (a name kept from an older record, {of}); {folder} is where they would go; {files} lists them."
+  },
+  "main.move.defenderFailed": {
+    "defaultMessage": "Hive's Defender exclusions couldn't be moved to the new folders ({why}).",
+    "description": "A line of Repair's report, after a workspace moved to another folder: moving Hive's Microsoft Defender exclusions from the old folders to the new ones failed. {why} is the system's message."
+  },
+  "main.move.folder.busy": {
+    "defaultMessage": "Hive is using it now",
+    "description": "Why Repair couldn't update its record of a slot or copy (in main.move.folder.failed's {why}): one of Hive's own steps (setting it up, removing it) holds it now. A clause."
+  },
+  "main.move.folder.failed": {
+    "defaultMessage": "{host}: {what} at {path} couldn't be recorded ({why}). Repair tries again.",
+    "description": "A line of Repair's report, after a workspace or project moved: one of the project's slots, copies or old reviewer folders ({what}: its name) was found at {path}, but Hive's record of it couldn't be updated ({why}). {host} is the project."
+  },
+  "main.move.folder.forgotten": {
+    "defaultMessage": "{host}: {what} is no longer kept (it was at {path}); its conversations can't be resumed there.",
+    "description": "A line of Repair's report: an old reviewer folder ({what}) that wasn't found is forgotten, as the user chose; the conversations that ran there can be read, not resumed there. {host} is the project, {path} where it was."
+  },
+  "main.move.folder.homeMissing": {
+    "defaultMessage": "{host}: {what} wasn't found (it was at {path}). Locate it, or forget it.",
+    "description": "A line of Repair's report: an old reviewer folder ({what}), where its conversations resume, wasn't found; Repair waits for the user's choice. {host} is the project, {path} where it was."
+  },
+  "main.move.folder.later": {
+    "defaultMessage": "{host}: {what} wasn't found; it's made again at {path} when it is next used.",
+    "description": "A line of Repair's report: a free slot or a review copy ({what}: its name) whose folder wasn't found; Hive makes it again at {path} the next time it lends it. {host} is the project."
+  },
+  "main.move.folder.movedTo": {
+    "defaultMessage": "{host}: {what} is now at {path}.",
+    "description": "A line of Repair's report, after a workspace or project moved: one of the project's slots, copies or old reviewer folders ({what}: its name) is now at {path}. {host} is the project."
+  },
+  "main.move.folder.original": {
+    "defaultMessage": "{host}: {what} at {path} stays linked to the project at {project}, which is still there.",
+    "description": "A line of Repair's report: one of the project's slots, copies or old reviewer folders ({what}) stays with the project folder it was made from ({project}), which is still there (a copy was moved). {host} is the project, {path} the folder."
+  },
+  "main.move.folder.recreateFailed": {
+    "defaultMessage": "{host}: {what} couldn't be made again: {why}",
+    "description": "A line of Repair's report: a lent slot whose folder was gone couldn't be made again ({why}: the reason, often in English from git). {what} is its name, {host} the project."
+  },
+  "main.move.folder.recreated": {
+    "defaultMessage": "{host}: {what} was made again on {branch}, at {path}.",
+    "description": "A line of Repair's report: a slot lent to an agent, whose folder was gone, was made again on its branch ({branch}) at {path}; the agent keeps it. {what} is its name, {host} the project."
+  },
+  "main.move.folder.released": {
+    "defaultMessage": "{host}: {what} was released; it's made again where it belongs when it is next lent.",
+    "description": "A line of Repair's report: a lent slot whose folder was gone was released (its agent no longer has it); Hive makes it again at its next use. {what} is its name, {host} the project."
+  },
+  "main.move.folder.relinked": {
+    "defaultMessage": "{host}: {what} at {path} is linked to the project again.",
+    "description": "A line of Repair's report, after a workspace or project moved: one of the project's slots, review copies or old reviewer folders ({what}: its name, such as \"slot-b (HI-B1, AM-12)\") is linked to the project again. {host} is the project, {path} the folder."
+  },
+  "main.move.folder.slotMissing": {
+    "defaultMessage": "{hasBranch, select, yes {{host}: {what} wasn't found (it was at {path}). Recreate it on {branch}, locate it, or release it.} other {{host}: {what} wasn't found (it was at {path}), and its branch is gone too. Locate it, or release it.}}",
+    "description": "A line of Repair's report: a lent slot ({what}: its name) wasn't found; Repair waits for the user's choice: make it again on its branch ({branch}), pick its folder, or release it. {host} is the project, {path} where it was."
   },
   "main.move.gitFailed": {
     "defaultMessage": "{command} failed",
@@ -407,6 +723,118 @@
     "defaultMessage": "{host}: {agent}'s worktree at {path} is linked to the project again.",
     "description": "A line of Repair's report, after a workspace or project moved to another folder (the moved-workspace banner). {host} is the project (or the Assistant) it is about; {agent} an agent. {path} is the worktree."
   },
+  "main.move.result.agentWorktree": {
+    "defaultMessage": "{agent}'s worktree",
+    "description": "Repair's report: an agent's worktree ({agent}: its name), in a list of worktrees in the way (main.move.result.pruneBlocked's {worktrees})."
+  },
+  "main.move.result.cards": {
+    "defaultMessage": "{n, plural, one {# card, with its agents} other {# cards, with their agents}}",
+    "description": "Repair's report: cards that went to a project, in a list (main.move.result.given's {what}). {n} is how many."
+  },
+  "main.move.result.copied": {
+    "defaultMessage": "{n, plural, one {# file copied} other {# files copied}}",
+    "description": "Repair's report, the Result column: a coding agent's conversation and memory files copied to the new folder ({n}: how many)."
+  },
+  "main.move.result.copyFailed": {
+    "defaultMessage": "{n, plural, one {# file couldn't be copied} other {# files couldn't be copied}}",
+    "description": "Repair's report, the Result column: a coding agent's files that couldn't be copied (the row's tooltip lists them); Repair tries them again."
+  },
+  "main.move.result.copyKept": {
+    "defaultMessage": "{n, plural, one {# file already there with other content, kept} other {# files already there with other content, kept}}",
+    "description": "Repair's report, the Result column: a coding agent's files already in the new folder with other content, never overwritten (the row's tooltip lists them)."
+  },
+  "main.move.result.failed": {
+    "defaultMessage": "couldn't be updated: {why}",
+    "description": "Repair's report, the Result column: a step failed ({why}: the system's message); the next Repair tries again."
+  },
+  "main.move.result.folderMissing": {
+    "defaultMessage": "{kind, select, home {not found: locate or forget it} other {{gone, select, yes {not found, its branch gone too: locate or release it} other {not found: recreate, locate or release it}}}}",
+    "description": "Repair's report, the Result column: a lent slot or an old reviewer folder ({kind}: slot or home) wasn't found; Repair waits for the user's choice (#1447)."
+  },
+  "main.move.result.forgotten": {
+    "defaultMessage": "no longer kept",
+    "description": "Repair's report, the Result column: an old reviewer folder that wasn't found is forgotten (#1447)."
+  },
+  "main.move.result.given": {
+    "defaultMessage": "given to {to}: {what}",
+    "description": "Repair's report, the Result column of a board row: what was saved under a project's old name went to the project ({to}); {what} lists it (\"9 cards, 1 lane\")."
+  },
+  "main.move.result.gone": {
+    "defaultMessage": "gone, so it isn't renamed",
+    "description": "Repair's report, the Result column: an agent's branch to rename no longer exists."
+  },
+  "main.move.result.later": {
+    "defaultMessage": "made again here when next used",
+    "description": "Repair's report, the Result column: a free slot or review copy wasn't found, and is made again at its new place when next used (#1447)."
+  },
+  "main.move.result.linked": {
+    "defaultMessage": "linked again",
+    "description": "Repair's report, the Result column: an agent's worktree is linked to the moved project again (git worktree repair)."
+  },
+  "main.move.result.missing": {
+    "defaultMessage": "{gone, select, yes {not found, its branch gone too: create, locate or remove its link} other {not found: recreate, locate or remove its link}}",
+    "description": "Repair's report, the Result column: an agent's worktree wasn't found; Repair waits for the user's choice (Repair's buttons)."
+  },
+  "main.move.result.notGiven": {
+    "defaultMessage": "couldn't all be given to {to}: {why}",
+    "description": "Repair's report, the Result column: what was saved under an old name couldn't all go to its project ({to}: the project, or none known; {why}: the system's message). Repair tries again."
+  },
+  "main.move.result.notRepaired": {
+    "defaultMessage": "couldn't be repaired{hasWhy, select, yes {: {why}} other {}}",
+    "description": "Repair's report, the Result column: an agent's worktree couldn't be linked again; {why} is git's message."
+  },
+  "main.move.result.original": {
+    "defaultMessage": "stays linked to the project at its old folder",
+    "description": "Repair's report, the Result column: a worktree stays with the project folder it was made from, which is still there (a copy was moved)."
+  },
+  "main.move.result.pruneBlocked": {
+    "defaultMessage": "couldn't be recreated while {n, plural, one {another worktree is missing too ({worktrees}): locate, recreate or remove it first} other {# other worktrees are missing too ({worktrees}): locate, recreate or remove them first}}",
+    "description": "Repair's report, the Result column: a missing worktree can't be made again yet, because git's clean-up would also forget other missing worktrees. {worktrees} lists them (an agent's worktree, main.move.result.agentWorktree, or a folder's name); {n}: how many. The row's tooltip says it in full."
+  },
+  "main.move.result.recent": {
+    "defaultMessage": "lists the new folder",
+    "description": "Repair's report, the Result column of Open Recent: the new folder replaces the old one."
+  },
+  "main.move.result.recreateFailed": {
+    "defaultMessage": "{made, select, new {couldn't be made new: {why}} other {couldn't be recreated: {why}}}",
+    "description": "Repair's report, the Result column: an agent's worktree couldn't be made again ({why}: the reason)."
+  },
+  "main.move.result.recreated": {
+    "defaultMessage": "{made, select, new {made new (its branch was gone)} other {recreated on its branch}}",
+    "description": "Repair's report, the Result column: an agent's worktree made again on its branch, or new when its branch was gone. The branch's name is in the agent's branch row (Repair may rename it in the same run)."
+  },
+  "main.move.result.released": {
+    "defaultMessage": "released; made again when next lent",
+    "description": "Repair's report, the Result column: a lent slot whose folder was gone was released, and is made again at its next use (#1447)."
+  },
+  "main.move.result.renameFailed": {
+    "defaultMessage": "couldn't be renamed: {why}",
+    "description": "Repair's report, the Result column: an agent's branch couldn't be renamed ({why}: git's or the system's message)."
+  },
+  "main.move.result.renamed": {
+    "defaultMessage": "{remote, select, none {renamed} other {renamed; it still tracks {remote}'s old name}}",
+    "description": "Repair's report, the Result column: an agent's branch was renamed; {remote} is the remote it tracks (origin), which keeps the old name, or none."
+  },
+  "main.move.result.sessions": {
+    "defaultMessage": "{n, plural, one {# session points here now} other {# sessions point here now}}",
+    "description": "Repair's report, the Result column: session records pointed to the new folder ({n}: how many)."
+  },
+  "main.move.result.taken": {
+    "defaultMessage": "kept: the new name is a branch already",
+    "description": "Repair's report, the Result column: an agent's branch isn't renamed, because a branch with the new name exists."
+  },
+  "main.move.result.unlinked": {
+    "defaultMessage": "link removed; its folder was left as it was",
+    "description": "Repair's report, the Result column: the agent no longer has a worktree; the folder, if any, is untouched."
+  },
+  "main.move.result.unrecorded": {
+    "defaultMessage": "renamed, but not recorded yet ({why}): Repair finishes it",
+    "description": "Repair's report, the Result column: git renamed an agent's branch, but Hive couldn't record it yet ({why}: the system's message)."
+  },
+  "main.move.result.working": {
+    "defaultMessage": "marked again: {projects}",
+    "description": "Repair's report, the Result column of Working on: the projects ({projects}) are marked Working on again."
+  },
   "main.move.running": {
     "defaultMessage": "Stop the running agents first: {agents}.",
     "description": "Why Repair (after a workspace moved) can't start: agents are running. {agents} lists them (project · agent)."
@@ -439,6 +867,114 @@
     "defaultMessage": "{n, plural, one {Working on: {projects}, as before its rename.} other {Working on: {projects}, as before their rename.}}",
     "description": "A line of Repair's report, after a workspace or project moved to another folder (the moved-workspace banner): renamed projects stay Working on. Working on is how the sidebar marks projects: use its name as shown. {projects} lists them; {n} is how many."
   },
+  "main.notify.answered": {
+    "defaultMessage": "Answered",
+    "description": "What a notification that an agent waited for you (or asked you something) says once it no longer does (HI-2320): answered, or it moved on. Shown under its title, in the pop-up and the bell's list. Keep it short."
+  },
+  "main.notify.sessionEnded": {
+    "defaultMessage": "Its session ended",
+    "description": "What a notification that an agent waited for you says once its session has ended (HI-2320), so it no longer waits. Shown under its title, in the pop-up and the bell's list. Keep it short."
+  },
+  "main.outage.gaveUpBody": {
+    "defaultMessage": "{n, plural, one {It was resumed once in the past hour} other {It was resumed # times in the past hour}} and stopped again, so Hive won't resume it again by itself. This PC's network may not have recovered: try renewing its network adapter's addresses (ipconfig /renew), flushing DNS (ipconfig /flushdns) or restarting the PC, then resume it.",
+    "description": "The notice that Hive stopped resuming an agent whose connection kept dropping. {n} is how many times it was resumed in the past hour. ipconfig /renew and ipconfig /flushdns are Windows commands: keep them."
+  },
+  "main.outage.gaveUpTitle": {
+    "defaultMessage": "{agent}'s connection keeps dropping",
+    "description": "A notice's title: an agent's connection dropped again after Hive had resumed it several times in an hour, so Hive stopped resuming it. {agent} is the agent's name."
+  },
+  "main.outage.progressTitle": {
+    "defaultMessage": "{agent}: waiting for the connection",
+    "description": "A Progress panel run's title while Hive waits for an agent's connection to come back, to resume it. {agent} is the agent's name."
+  },
+  "main.outage.progressWaiting": {
+    "defaultMessage": "the connection to come back",
+    "description": "What a Progress panel run waits for, after \"Waiting for\": the connection of an agent whose turn a dropped connection ended."
+  },
+  "main.outage.resumedSummary": {
+    "defaultMessage": "Resumed: the connection dropped at {dropped} and came back at {back}.",
+    "description": "A Progress panel run's summary: Hive resumed an agent once its connection came back. {dropped} and {back} are times of day."
+  },
+  "main.outage.timedOutBody": {
+    "defaultMessage": "Hive waited {minutes, plural, one {# minute} other {# minutes}} and stopped waiting. If other apps can reach the internet, this PC's network may not have recovered: try renewing its network adapter's addresses (ipconfig /renew), flushing DNS (ipconfig /flushdns) or restarting the PC, then resume it.",
+    "description": "The notice that Hive stopped waiting for an agent's connection. {minutes} is how long it waited. ipconfig /renew and ipconfig /flushdns are Windows commands: keep them."
+  },
+  "main.outage.timedOutTitle": {
+    "defaultMessage": "{agent}'s connection didn't come back",
+    "description": "A notice's title: Hive waited for an agent's connection to come back, to resume it, and gave up. {agent} is the agent's name."
+  },
+  "main.outcome.allowed": {
+    "defaultMessage": "Allowed",
+    "description": "What the notice that an agent wants to edit a file another agent is editing says after Allow (HI-2320), in place of its button. Keep it short."
+  },
+  "main.outcome.conversationEnded": {
+    "defaultMessage": "Its conversation ended",
+    "description": "What a notification about an agent's conversation (a long conversation's Hand Over to…) says once that conversation's session has ended (HI-2320), in place of its button."
+  },
+  "main.outcome.conversationMoved": {
+    "defaultMessage": "It has a new conversation now",
+    "description": "What the long-conversation notification says once the agent has moved to a new conversation (handed over, or the CLI started one; HI-2320), in place of its Hand Over to… button."
+  },
+  "main.outcome.modesChanged": {
+    "defaultMessage": "Settings changed since: nothing switched",
+    "description": "What the notice that the permission mode changed says once the setting changed again since it was shown, so its Switch Now no longer names the mode the settings say (HI-2320), in place of its button."
+  },
+  "main.outcome.modesNextSession": {
+    "defaultMessage": "Their sessions ended: the new mode applies from the next",
+    "description": "What the notice that the permission mode changed says once none of the agents it named still runs that session (HI-2320), in place of its Switch Now button."
+  },
+  "main.outcome.modesNothing": {
+    "defaultMessage": "Nothing to switch: every running agent is in its mode",
+    "description": "What the notice that the permission mode changed says after Switch Now found nothing to switch (HI-2320), in place of its button."
+  },
+  "main.outcome.namesDiffer": {
+    "defaultMessage": "The names differ now",
+    "description": "What the notice that agents share a name says once they no longer do (HI-2320), in place of its Rename… button."
+  },
+  "main.outcome.noLongerAsked": {
+    "defaultMessage": "No longer asked",
+    "description": "What the notice that an agent wants to edit a locked file says once the agent no longer asks (its turn ended, or it was allowed elsewhere; HI-2320), in place of its Allow button."
+  },
+  "main.outcome.noLongerHeld": {
+    "defaultMessage": "No longer held",
+    "description": "What the notice that a slot is held by Windows' idle Sandbox broker says once nothing holds it (HI-2320), in place of its Release Slot… button."
+  },
+  "main.outcome.notResumed": {
+    "defaultMessage": "Not resumed",
+    "description": "What the notice offering to resume the agents that were working before Hive restarted says after Don't Resume (HI-2320), in place of its buttons."
+  },
+  "main.outcome.offerReplaced": {
+    "defaultMessage": "Replaced by a newer offer",
+    "description": "What the notice offering to resume the agents that were working before Hive restarted says once a newer such notice replaces it, listing every agent offered (another workspace got ready later; HI-2356), in place of its buttons."
+  },
+  "main.outcome.openHereAgain": {
+    "defaultMessage": "The conversation is open here again",
+    "description": "What the notice that a conversation runs as a background job says once it is open in Hive again (HI-2320), in place of its Stop It and Resume button."
+  },
+  "main.outcome.released": {
+    "defaultMessage": "Released",
+    "description": "What the notice that a slot is held by Windows' idle Sandbox broker says once the slot is released (HI-2320), in place of its Release Slot… button. Keep it short."
+  },
+  "main.outcome.resuming": {
+    "defaultMessage": "Resuming, one at a time",
+    "description": "What the notice offering to resume the agents that were working before Hive restarted says after Resume, in place of its buttons, until it says how the resumes went (HI-2356)."
+  },
+  "main.outcome.runsAnother": {
+    "defaultMessage": "It runs another conversation here now",
+    "description": "What the notice that a conversation runs as a background job says once the agent runs another conversation in Hive (HI-2320), in place of its Stop It and Resume button."
+  },
+  "main.outcome.stoppedAndResumed": {
+    "defaultMessage": "Stopped and resumed here",
+    "description": "What the notice that a conversation runs as a background job says after Stop It and Resume (HI-2320), in place of its button."
+  },
+  "main.outcome.updateInstalling": {
+    "defaultMessage": "Installing: Hive restarts",
+    "description": "What the notice that a Hive update is ready says after Restart and Update (HI-2320), in place of its button, as Hive restarts to install it."
+  },
+  "main.outcome.updateNotReady": {
+    "defaultMessage": "No longer ready to install",
+    "description": "What the notice that a Hive update is ready says once that update is no longer the one ready (HI-2320), in place of its Restart and Update button."
+  },
   "main.plan.close": {
     "defaultMessage": "You are getting close to the limit.",
     "description": "A plan-usage notice, below 95% used."
@@ -458,6 +994,10 @@
   "main.plan.used": {
     "defaultMessage": "{share, number, ::percent} of your {provider} {window, select, hours {{hours, plural, one {#-hour limit} other {#-hour limit}}} weekly {weekly limit} other {{label} limit}} used",
     "description": "A notice: how much of a plan's usage limit is used ({share}: \"85%\"). {provider} is the coding agent. The limit is a rolling window of {hours} hours (the 5-hour one), the weekly one, or another the provider names itself ({label}, in English as the provider says it)."
+  },
+  "main.plan.usedOn": {
+    "defaultMessage": "{share, number, ::percent} of the {window, select, hours {{hours, plural, one {#-hour limit} other {#-hour limit}}} weekly {weekly limit} other {{label} limit}} used on {connection}",
+    "description": "A notice (HI-1756): how much of a plan's usage limit is used ({share}: \"85%\") on one connection, a sign-in the user named ({connection}: \"Max 1\"). The limit is a rolling window of {hours} hours (the 5-hour one), the weekly one, or another the provider names itself ({label}, in English as the provider says it)."
   },
   "main.quit.closed": {
     "defaultMessage": "Hive has closed",
@@ -483,13 +1023,65 @@
     "defaultMessage": "Its cards couldn't all be deleted: {why}",
     "description": "A warning after Delete: some of the project's cards stayed. {why} is the system's message."
   },
+  "main.removal.deleteBlocked": {
+    "defaultMessage": "Delete can't go ahead: {folders}. Nothing was deleted.",
+    "description": "Why Delete refused (#1447): the project's slots or old folders that stop it ({folders}: each one's name and why, a list). Nothing was changed."
+  },
   "main.removal.dirty": {
     "defaultMessage": "{n, plural, one {# uncommitted file} other {# uncommitted files}}",
     "description": "Work in an agent's worktree that stops Remove from Hive: its files not committed. {n} is how many."
   },
+  "main.removal.folder.copyBusy": {
+    "defaultMessage": "Hive is setting it up or removing it now",
+    "description": "Remove Project (#1447): a review copy is kept because one of Hive's steps holds it. A clause."
+  },
+  "main.removal.folder.copyHeld": {
+    "defaultMessage": "it is in use ({by})",
+    "description": "Remove Project (#1447): a review copy is kept because something runs in it ({by}: what, in English). A clause."
+  },
+  "main.removal.folder.copyLeased": {
+    "defaultMessage": "a review uses it now",
+    "description": "Remove Project (#1447): a review copy is kept because a review or check uses it. A clause."
+  },
+  "main.removal.folder.deleting": {
+    "defaultMessage": "another Delete of this project holds its slots",
+    "description": "Why Delete can't go ahead (#1447): another Hive window or process is deleting the same project now. A clause."
+  },
+  "main.removal.folder.heldNow": {
+    "defaultMessage": "one of Hive's steps or a session took it up meanwhile",
+    "description": "Why Delete can't go ahead (#1447): between the dialog's check and Delete's start, one of the project's slots or copies was taken up (set up, renamed, a session started in it, a review copy leased), or a new one made. A clause."
+  },
+  "main.removal.folder.home": {
+    "defaultMessage": "left as it is: its conversations resume there",
+    "description": "Remove Project (#1447): an old reviewer folder (a reviewer's own worktree from before 1.0) stays where it is. A clause."
+  },
+  "main.removal.folder.notForgotten": {
+    "defaultMessage": "Hive's record of the project's slots couldn't all be cleared: {why}",
+    "description": "A warning after Delete (#1447): the project's slot or copy records stayed in Hive's database ({why}: the system's message)."
+  },
+  "main.removal.folder.notHeld": {
+    "defaultMessage": "{n, plural, one {# slot or copy was} other {# slots or copies were}} taken up by another step, and left",
+    "description": "A warning's reason after Delete (#1447): records of the project's slots or copies Delete didn't hold, so it didn't delete them. Follows main.removal.folder.notForgotten's colon."
+  },
+  "main.removal.folder.notHives": {
+    "defaultMessage": "left as it is: it isn't in Hive's worktrees folder for the project",
+    "description": "Remove Project (#1447): a slot whose folder Hive didn't make (outside <workspace>.worktrees/<project>) stays. A clause."
+  },
+  "main.removal.folder.notTrashed": {
+    "defaultMessage": "{path} couldn't be moved to the Recycle Bin: {why}",
+    "description": "A warning after Delete (#1447): one of the project's slots, copies or old folders ({path}) couldn't go to the Recycle Bin ({why}: the system's message)."
+  },
+  "main.removal.folder.outsideDelete": {
+    "defaultMessage": "it isn't in Hive's worktrees folder for the project, and would be left without its repository: release its slot and move or remove it first",
+    "description": "Why Delete can't go ahead (#1447): a slot outside <workspace>.worktrees/<project> (one Hive didn't make) would keep its files but lose the repository Delete sends to the Recycle Bin. Release its slot is a command in the agent's menu (Release Slot…). A clause."
+  },
   "main.removal.folderGone": {
     "defaultMessage": "The folder {folder} is no longer in the workspace. Put it back, or forget it.",
     "description": "An error restoring a project whose folder has gone. Forget is the button that stops listing it."
+  },
+  "main.removal.folderKept": {
+    "defaultMessage": "Left in place: {what} at {path} ({why}).",
+    "description": "A warning after Remove from Hive or Delete (#1447): a slot, review copy or old reviewer folder ({what}: its name) that was kept, at {path}, and why ({why}: a clause)."
   },
   "main.removal.handoverKept": {
     "defaultMessage": "{note} stayed in the shared notes (a copy is packed in the folder): {why}",
@@ -555,6 +1147,118 @@
     "defaultMessage": "Hive won't remove {worktrees}. Fix or remove that agent first.",
     "description": "Why Remove from Hive refused: agents' worktrees it won't remove. {worktrees} lists them, joined with “or” (main.removal.refusedTree)."
   },
+  "main.restart.dismiss": {
+    "defaultMessage": "Don't Resume",
+    "description": "A button in the notice offering to resume the agents that were working when Hive closed: resumes none, and the offer is not made again (the notice's × only closes it)."
+  },
+  "main.restart.notResumedLine": {
+    "defaultMessage": "Not resumed: {agent} ({project}): {why}.",
+    "description": "A line of the notice after Hive resumed agents when it started again: one it did not resume, and why."
+  },
+  "main.restart.offerQuit": {
+    "defaultMessage": "Hive was quit while they were working or in a card loop: {names}. Resume starts each again in its conversation, one at a time.",
+    "description": "The notice offering to resume agents after an ordinary quit. {names} lists them, each with its project."
+  },
+  "main.restart.offerTitle": {
+    "defaultMessage": "{n, plural, one {Resume the agent that was working?} other {Resume the # agents that were working?}}",
+    "description": "A notice at start: Hive was quit (or restarted for an update with resuming turned off) while agents worked. {n} is how many; Resume starts them again in their conversations."
+  },
+  "main.restart.offerUpdate": {
+    "defaultMessage": "Hive restarted for an update while they were working or in a card loop: {names}. Resume starts each again in its conversation, one at a time.",
+    "description": "The notice offering to resume agents after an update, with Settings → Advanced → Resume agents after an update turned off. {names} lists them, each with its project."
+  },
+  "main.restart.reportResume": {
+    "defaultMessage": "{n, plural, one {Resumed one agent} other {Resumed # agents}}",
+    "description": "A notice's title: the agents that were working when Hive was quit were resumed, as the user asked. {n} is how many."
+  },
+  "main.restart.reportUpdate": {
+    "defaultMessage": "{n, plural, one {Resumed one agent after the update} other {Resumed # agents after the update}}",
+    "description": "A notice's title: Hive restarted for an update and resumed the agents that were working. {n} is how many resumed."
+  },
+  "main.restart.resume": {
+    "defaultMessage": "Resume",
+    "description": "A button in the notice offering to resume the agents that were working when Hive closed."
+  },
+  "main.restart.resumedLine": {
+    "defaultMessage": "Resumed: {names}.",
+    "description": "A line of the notice after Hive resumed agents when it started again. {names} lists them, each with its project."
+  },
+  "main.restart.why.expired": {
+    "defaultMessage": "it waited more than a day",
+    "description": "Why an agent was not resumed after Hive restarted: the restart was over a day ago."
+  },
+  "main.restart.why.held": {
+    "defaultMessage": "its working folder is held for other work (resume it by hand)",
+    "description": "Why an agent was not resumed after Hive restarted: the slot (working folder) its conversation ran in is free or holds other work, so only the user's own Resume may take it."
+  },
+  "main.restart.why.movedOn": {
+    "defaultMessage": "it has a newer conversation",
+    "description": "Why an agent was not resumed after Hive restarted: it was started in another conversation since."
+  },
+  "main.restart.why.notReady": {
+    "defaultMessage": "it didn't get ready in time, so it was stopped",
+    "description": "Why an agent was not resumed after Hive restarted: its CLI did not become ready within the time allowed (Settings → Advanced), so Hive stopped it."
+  },
+  "main.restart.why.notStopped": {
+    "defaultMessage": "it didn't get ready in time and hasn't stopped yet; the others resume once it has",
+    "description": "Why an agent was not resumed after Hive restarted: its CLI did not become ready in time, and it did not end when Hive stopped it; Hive starts no other agent until it has ended."
+  },
+  "main.restart.why.removed": {
+    "defaultMessage": "it was removed",
+    "description": "Why an agent was not resumed after Hive restarted: the agent has been removed from its project."
+  },
+  "main.restart.why.running": {
+    "defaultMessage": "it is running already",
+    "description": "Why an agent was not resumed after Hive restarted: it is running already."
+  },
+  "main.restart.why.stopped": {
+    "defaultMessage": "it was stopped while it started",
+    "description": "Why an agent was not resumed after Hive restarted: its launch ended (the user stopped it, or its CLI exited) before it was ready."
+  },
+  "main.server.key.chars": {
+    "defaultMessage": "A key has no spaces or special characters outside plain ASCII. Check what was pasted.",
+    "description": "An error saving a server connection's API key (Settings → Accounts & Connections): it has spaces, line breaks or non-ASCII characters. The key itself is never shown."
+  },
+  "main.server.key.inField": {
+    "defaultMessage": "The key appears in the {field, select, name {name} url {base URL} other {model list}}: take it out of there first. Nothing was saved.",
+    "description": "An error saving a server connection's API key: the key was also typed into another field ({field}: its name, its base URL or its models), where it would be kept unencrypted."
+  },
+  "main.server.key.length": {
+    "defaultMessage": "A key is between {min, number} and {max, number} characters long. Check what was pasted.",
+    "description": "An error saving a server connection's API key: it is too short or too long. {min} and {max} are numbers. The key itself is never shown."
+  },
+  "main.server.notServer": {
+    "defaultMessage": "That connection doesn't get its model from a server.",
+    "description": "An error: an action for a server connection (its key, its models, its Set Up) was asked for a connection signed in through its CLI instead."
+  },
+  "main.server.setUp.noKey": {
+    "defaultMessage": "{name} has no key yet. Add its key first, then set it up.",
+    "description": "An error opening Set Up for a server connection ({name}, its name in Settings → Accounts & Connections): its server needs an API key and none is saved."
+  },
+  "main.server.unsupported": {
+    "defaultMessage": "{cli} can't get its model from a server in Hive.",
+    "description": "An error adding a server connection for a coding agent CLI ({cli}: \"Codex\") that Hive has no server connections for."
+  },
+  "main.server.url.extra": {
+    "defaultMessage": "The URL can't have a query (?…) or a fragment (#…): give the key in its own field.",
+    "description": "An error saving a server connection's base URL: it has a query string or a fragment, which Hive won't keep (a key could be in it)."
+  },
+  "main.server.url.invalid": {
+    "defaultMessage": "That isn't a URL Hive can use: write it in full, such as https://api.example.com.",
+    "description": "An error saving a server connection's base URL (Settings → Accounts & Connections): it can't be read as a URL."
+  },
+  "main.server.url.remoteHttp": {
+    "defaultMessage": "A server on another computer needs https://. Plain http:// is only for a server on this PC (localhost).",
+    "description": "An error saving a server connection's base URL: it uses http:// to a server that isn't on this computer, which would send the key unencrypted."
+  },
+  "main.server.url.scheme": {
+    "defaultMessage": "The URL must start with https:// (or http:// for a server on this PC).",
+    "description": "An error saving a server connection's base URL: it isn't http or https."
+  },
+  "main.server.url.userinfo": {
+    "defaultMessage": "The URL can't hold a user name or password: give the key in its own field.",
+    "description": "An error saving a server connection's base URL: it has user:password@ in it, which Hive won't keep."
+  },
   "main.storage.claimed": {
     "defaultMessage": "The folder belongs to a session again.",
     "description": "Why Clean Up (Settings → Storage) skipped a session's attachments folder: it had no session, and has one now."
@@ -618,6 +1322,10 @@
   "main.tray.counts": {
     "defaultMessage": "{working} working, {needYou, plural, one {# needs you} other {# need you}}",
     "description": "A line of the tray icon's tooltip: how many agents are working and how many need you."
+  },
+  "main.tray.finished": {
+    "defaultMessage": "Finished",
+    "description": "A section of the tray menu: agents that finished their turn since you last looked (nothing waits for you there)."
   },
   "main.tray.more": {
     "defaultMessage": "{n, plural, one {and # more} other {and # more}}",
@@ -722,6 +1430,14 @@
   "main.unexpectedClose.failed": {
     "defaultMessage": "{n, plural, one {One couldn't resume: {agents}.} other {# couldn't resume: {agents}.}}",
     "description": "In the notice that Hive closed unexpectedly, or the report of resuming its agents: the agents that failed to resume ({agents}: their names with why)."
+  },
+  "main.unexpectedClose.held": {
+    "defaultMessage": "{n, plural, one {One was left stopped: {agents}.} other {# were left stopped: {agents}.}}",
+    "description": "In the notice that Hive closed unexpectedly (#1434): agents whose conversations can't resume now where they ran (their slot is free, or holds other work), left for the user ({agents}: their names, each with why in a few words)."
+  },
+  "main.unexpectedClose.heldTitle": {
+    "defaultMessage": "{n, plural, one {One agent left stopped} other {# agents left stopped}}",
+    "description": "A notice's title after resuming the agents that were running when Hive closed unexpectedly (#1434): {n} were left stopped, their conversations' slots free (only their own Resume takes one) or holding other work."
   },
   "main.unexpectedClose.merge": {
     "defaultMessage": "{agent} was merging {branch}: check {folder} for a merge left half done (git status there) before the next merge.",
@@ -891,6 +1607,50 @@
     "defaultMessage": "Hive doesn't remove it: {why}.",
     "description": "An error asking to Remove anyway one of the Overview's unused worktrees (Remove, Remove anyway, Merge). {why} says why (main.unused.why.*)."
   },
+  "main.unused.slot.archiveFailed": {
+    "defaultMessage": "its archive command failed ({error})",
+    "description": "Why Hive didn't remove a slot listed in Unused worktrees: the project's archive command, run first, failed ({error}: why, in English). A clause."
+  },
+  "main.unused.slot.busy": {
+    "defaultMessage": "Hive is setting it up or removing it now",
+    "description": "Why Hive won't remove a slot listed in Unused worktrees: another operation of Hive's has it. A clause."
+  },
+  "main.unused.slot.cantCheck": {
+    "defaultMessage": "Hive couldn't check it ({detail})",
+    "description": "Why Hive won't remove a slot listed in Unused worktrees: git couldn't say what it holds ({detail}: why, in English). A clause."
+  },
+  "main.unused.slot.dirty": {
+    "defaultMessage": "{files, plural, one {# file in it isn't committed} other {# files in it aren't committed}}",
+    "description": "Why Hive won't remove a slot listed in Unused worktrees: it has uncommitted or untracked files ({files}: how many). A clause."
+  },
+  "main.unused.slot.editedSkillCopy": {
+    "defaultMessage": "{copies, plural, one {its skill folder {names} isn't an unchanged copy of Hive's} other {its skill folders {names} aren't unchanged copies of Hive's}}",
+    "description": "Why Hive didn't remove a slot listed in Unused worktrees (#1500): Hive removed its own skill copies from the slot's .agents/skills, but a folder named hive-… is left there (changed since Hive copied it, or the user's own), so the slot is kept. {names}: the folders' names, e.g. hive-merge-ready; {copies}: how many. A clause."
+  },
+  "main.unused.slot.gitRefused": {
+    "defaultMessage": "git didn't remove it ({detail})",
+    "description": "Why Hive didn't remove a slot listed in Unused worktrees: git worktree remove refused ({detail}: git's message). A clause."
+  },
+  "main.unused.slot.inFlight": {
+    "defaultMessage": "card {card}, which it held, is still being merged",
+    "description": "Why Hive won't remove a slot listed in Unused worktrees: the merge queue still merges a card ({card}: its key, such as HI-12) that worked in it. A clause."
+  },
+  "main.unused.slot.leased": {
+    "defaultMessage": "it is lent to agent {agent}",
+    "description": "Why Hive won't remove a slot listed in Unused worktrees (#1450): it is lent to the agent {agent} now. A clause. A noun before the name (glossary §1 rule 4)."
+  },
+  "main.unused.slot.process": {
+    "defaultMessage": "a process still has it open",
+    "description": "Why Hive won't remove a slot listed in Unused worktrees: a program still uses its folder. A clause."
+  },
+  "main.unused.slot.session": {
+    "defaultMessage": "a session runs in it ({detail})",
+    "description": "Why Hive won't remove a slot listed in Unused worktrees: an agent's session runs in it ({detail}: the agent and its state). A clause."
+  },
+  "main.unused.slot.unmerged": {
+    "defaultMessage": "it has commits that aren't on {target}",
+    "description": "Why Hive won't remove a slot listed in Unused worktrees: its commit isn't contained in its target branch ({target}). A clause."
+  },
   "main.unused.stale": {
     "defaultMessage": "{n, plural, one {what it holds was checked more than # minute ago} other {what it holds was checked more than # minutes ago}}",
     "description": "Why Remove anyway did nothing to one of the Overview's unused worktrees (Remove, Remove anyway, Merge): the confirmation was too old. {n} is how many minutes it lasts. A clause; the window then looks again and asks again, saying this."
@@ -915,6 +1675,10 @@
     "defaultMessage": "git doesn't list it as one of the project's worktrees",
     "description": "Why Hive won't remove or merge one of the Overview's unused worktrees (Remove, Remove anyway, Merge): a clause."
   },
+  "main.unused.why.notUnused": {
+    "defaultMessage": "it isn't one of the project's unused worktrees now (an agent's conversation, a review copy or the merge queue may use it)",
+    "description": "Why Hive won't remove or merge a folder from Unused worktrees (#1450): it isn't listed any more, as a conversation can resume there, it is one of Hive's copies, or the merge queue holds it. A clause."
+  },
   "main.unused.why.otherProject": {
     "defaultMessage": "it is another project of the workspace",
     "description": "Why Hive won't remove or merge one of the Overview's unused worktrees (Remove, Remove anyway, Merge): a clause."
@@ -922,6 +1686,22 @@
   "main.unused.why.owned": {
     "defaultMessage": "an agent works in it now",
     "description": "Why Hive won't remove or merge one of the Overview's unused worktrees (Remove, Remove anyway, Merge): a clause."
+  },
+  "main.unused.why.queueBusy": {
+    "defaultMessage": "the merge queue is using it",
+    "description": "Why Hive won't remove a folder from Unused worktrees (#1644): it is the merge queue's working folder, and the queue is merging in it or starting to (it may have started since the list was read). A clause. Glossary: merge queue."
+  },
+  "main.unused.why.session": {
+    "defaultMessage": "a session runs in it",
+    "description": "Why Hive won't remove a folder from Unused worktrees (#1450): an agent's session runs in it now. A clause."
+  },
+  "main.unused.why.slotGuarded": {
+    "defaultMessage": "it is a slot, which Hive removes only when it is clean and its work is merged",
+    "description": "Why Hive won't remove a slot anyway from Unused worktrees (#1450): slots go only through the guarded clean-up. A clause."
+  },
+  "main.unused.why.slotInUse": {
+    "defaultMessage": "it is a slot in use",
+    "description": "Why Hive won't remove a slot from Unused worktrees (#1450): it is lent, protected or busy now (it changed since it was listed). A clause."
   },
   "main.update.checksum": {
     "defaultMessage": "The downloaded update did not match its checksum and was discarded.",
@@ -935,9 +1715,25 @@
     "defaultMessage": "No release of Hive has been published yet.",
     "description": "Why checking for updates found none."
   },
+  "main.update.notInstalled": {
+    "defaultMessage": "{app} {version} wasn't installed",
+    "description": "A notice: the user chose Restart and Update, and Hive didn't install the downloaded update. {app} is Hive's name."
+  },
+  "main.update.notInstalledNotNewer": {
+    "defaultMessage": "The copy installed on this computer is the same version or newer (a local build, say).",
+    "description": "Why Hive did not install a downloaded update: what is installed is not older than it."
+  },
+  "main.update.notInstalledUnreadable": {
+    "defaultMessage": "Hive couldn't read the copy installed on this computer, so it didn't replace it. Try again once any other Hive installer has finished.",
+    "description": "Why Hive did not install a downloaded update: it could not read the installed copy (another installer may be replacing it)."
+  },
   "main.update.offline": {
     "defaultMessage": "Couldn't reach GitHub to check for updates. Check your internet connection.",
     "description": "Why checking for updates failed. GitHub is a name."
+  },
+  "main.update.openReleasePage": {
+    "defaultMessage": "Open Release Page",
+    "description": "The notice's button: opens that release's page on GitHub in the browser (it doesn't install anything)."
   },
   "main.update.ready": {
     "defaultMessage": "{app} {version} is ready",
@@ -955,6 +1751,18 @@
     "defaultMessage": "Restart and Update",
     "description": "The notice's button: restarts Hive and installs the update."
   },
+  "main.update.sameVersion": {
+    "defaultMessage": "A published {app} {version} is available",
+    "description": "A notice: the user runs a local build (one they built themselves) of a version, and a published release of the same version exists. {app} is Hive's name."
+  },
+  "main.update.sameVersionBody": {
+    "defaultMessage": "You're running a local build of {version}{hasCommit, select, yes { ({commit})} other {}}. Hive doesn't install a release of the same version over it.",
+    "description": "The notice that a published release has the same version as the user's local build. {commit} is the commit it was built from."
+  },
+  "main.update.testCopy": {
+    "defaultMessage": "A test copy of Hive doesn't check for updates.",
+    "description": "Settings → Updates in a copy of Hive started by its tests, which never checks for updates."
+  },
   "main.update.updated": {
     "defaultMessage": "{app} updated to {version}",
     "description": "A notice after Hive was updated. {app} is its name, {version} the new version."
@@ -966,6 +1774,22 @@
   "main.update.whatsNew": {
     "defaultMessage": "What's New",
     "description": "The notice's button: opens the release notes."
+  },
+  "main.usageMove.blockedBody": {
+    "defaultMessage": "{reason, select, missing {That account is gone, or isn't for the same CLI: choose another in Settings → Accounts & Connections.} signedOut {{to} is signed out: sign it in, and they move then.} noConnections {{to} has no connections: add one, and they move then.} full {{to} has also used {share, number, ::percent} of its {window, select, weekly {weekly limit} other {5-hour limit}}, so they stay where they are.} off {{to} isn't on in {workspace}: turn it on in Settings → Accounts & Connections, and they move then.} other {Their connection couldn't be saved: {agents}. Hive stops trying until the limit resets.}}",
+    "description": "Why an account's agents can't move to another (HI-2195), under the title saying so. {to} is the account they should move to, {workspace} a workspace's name, {share} a share of a usage limit (\"98%\"), {agents} agents' names joined into a list. The limit is the weekly one or the 5-hour one. Settings → Accounts & Connections names a section."
+  },
+  "main.usageMove.blockedTitle": {
+    "defaultMessage": "Hive can't move {from}'s agents to {to}",
+    "description": "A notice's title (HI-2195): an account ({from}) reached the share of its usage limit its rule sets, but its agents can't move to the account the rule names ({to}); the text says why."
+  },
+  "main.usageMove.movedBody": {
+    "defaultMessage": "{from} has used {share, number, ::percent} of its {window, select, weekly {weekly limit} other {5-hour limit}}. {agents}: each moves to the matching connection on {to} and resumes its conversation there, a working agent once its turn ends. Hive doesn't move them back: to move one back, choose its connection in Agent Settings.",
+    "description": "A notice's text (HI-2195), under the title saying agents move from one account to another. {from} and {to} are accounts' names, {share} how much of the limit is used (\"98%\"), {agents} the agents' names joined into a list. The limit is the weekly one or the 5-hour one. Agent Settings names a dialog."
+  },
+  "main.usageMove.movedTitle": {
+    "defaultMessage": "{count, plural, one {# agent moves} other {# agents move}} from {from} to {to}",
+    "description": "A notice's title (HI-2195): an account ({from}, the user's name for it in Settings → Accounts & Connections) reached the share of its plan's usage limit its rule sets, so Hive moves its agents to another account ({to})."
   },
   "main.window.openLogs": {
     "defaultMessage": "Open Logs",

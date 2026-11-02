@@ -26,6 +26,8 @@ const check = (name, ok, extra = '') => {
   for (const d of [userData, ws, claudeHome]) fs.rmSync(d, { recursive: true, force: true })
   fs.rmSync(notifyLog, { force: true })
   fs.mkdirSync(claudeHome, { recursive: true })
+  // Every read of the agents' input recorded, for typeLine (#1560).
+  lib.logFakeInput(claudeHome)
   lib.gitProject(alpha)
   fs.writeFileSync(path.join(claudeHome, 'fake-trusted.json'), JSON.stringify([alpha.toLowerCase()]))
   lib.enableProviders(userData)
@@ -61,11 +63,11 @@ const check = (name, ok, extra = '') => {
     const f = path.join(userData, 'logs', 'hive.log')
     return fs.existsSync(f) ? fs.readFileSync(f, 'utf8') : ''
   }
-  const notices = () => (fs.existsSync(notifyLog) ? fs.readFileSync(notifyLog, 'utf8').trim().split('\n').filter(Boolean).map((l) => JSON.parse(l)) : [])
+  // The Windows notifications the user got: each tell() also logs an `entry` line (HI-2320), not a second notice (HI-2369).
+  const notices = () => (fs.existsSync(notifyLog) ? fs.readFileSync(notifyLog, 'utf8').trim().split('\n').filter(Boolean).map((l) => JSON.parse(l)) : []).filter((e) => e.kind === 'notification')
   const say = async (id, text) => {
-    await inv('pty:write', lib.ptyKey(alpha, id), text)
-    await lib.sleep(300)
-    await inv('pty:write', lib.ptyKey(alpha, id), '\r')
+    // Typed again if a wake of Hive's disturbed it (lib.typeLine, #1560).
+    await lib.typeLine(inv, lib.ptyKey(alpha, id), claudeHome, null, text, { live: () => live(id) })
   }
   const idle = async (id) => ['ready', 'finished'].includes((await live(id))?.status)
   /** Hive's window for a typed wake to be taken, from now on (HIVE_TEST_WAKE_TAKE_MS, read at each wake). */
@@ -74,6 +76,9 @@ const check = (name, ok, extra = '') => {
   await page.getByText('alpha', { exact: true }).first().click()
   const agent = await lib.addAgent(inv, alpha, { name: 'Watcher' })
   const card = (await inv('tasks:create', { title: 'Watched', project: 'alpha' })).number
+  // Wakes name a card by its key with the number the tools take (#1219): its own key, from the board.
+  const named = `${(await inv('tasks:list')).find((c) => c.number === card).key}`
+  check('the card has a key of its project', /^[A-Z]{2,4}-\d+$/.test(named), named)
   await inv('session:start', alpha, { agentId: agent.id })
   check('the agent starts', !!(await until(() => idle(agent.id), HUNG_MS)))
   const watch = async () => {
@@ -97,7 +102,7 @@ const check = (name, ok, extra = '') => {
   check('it watches again', !!(await watch()))
   await inv('tasks:comment', card, 'Second change')
   const marked = await until(async () => (await live(agent.id))?.untakenLine, HUNG_MS)
-  check('not taken after Enter again: the agent is marked', !!marked && /^\[Hive\] New in your inbox: 1 card event \(#\d+\) \(m\d+\)\./.test(marked.text), JSON.stringify(marked))
+  check('not taken after Enter again: the agent is marked', !!marked && marked.text.startsWith(`[Hive] New in your inbox: 1 card event (${named}) (m`) && /^\[Hive\] New in your inbox: 1 card event \(.+\) \(m\d+\)\./.test(marked.text), JSON.stringify(marked))
   // Hive's two Enters were pressed before it marked the agent, but the CLI may not have read them yet (#664, under load).
   const drops = () => fs.readFileSync(path.join(claudeHome, 'fake-drop-enters-Watcher.txt'), 'utf8').trim()
   check('Hive pressed Enter twice, never a third time (the CLI dropped both)', !!(await until(async () => drops() === '0', HUNG_MS)) && wakes().length === 1, JSON.stringify({ left: drops(), wakes: wakes().length }))

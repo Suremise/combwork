@@ -1,6 +1,6 @@
 // The Hive Assistant changes Hive's settings (#186). With Settings → Assistant → Control → Change settings on, its
 // hive_update_setting changes a setting as Settings would: Settings shows the new value (modified), its panel lists the
-// change with old → new and a Revert button, and Revert puts the old value back (listed too, the change marked reverted).
+// change with old → new and an Undo button (#1283), and Undo puts the old value back (the change struck through, undone).
 // A project's setting changes in Project Settings. Its own Control and other sensitive settings are refused and listed as
 // not done; with Change settings turned off while it runs, a change is refused at once. Change settings is a switch
 // under Control, off by default. The Assistant runs the fake Claude Code (fake-claude/), whose "hive TOOL {json}" calls a
@@ -100,7 +100,7 @@ const check = (name, ok, extra = '') => {
   await panel.locator('.assistant-header').getByRole('button', { name: 'Start', exact: true }).click()
   check('the Assistant runs', !!(await lib.until(async () => (await live())?.status === 'ready', 20000)))
 
-  // --- A change: Settings shows it, the panel lists it with Revert.
+  // --- A change: Settings shows it, the panel lists it with Undo.
   check('it changes a setting', await say('skill tune-settings then hive hive_update_setting {"id":"sessions.transcriptWarnMB","value":50}'))
   check('…which is now 50 MB', (await settings()).sessions.transcriptWarnMB === 50, String((await settings()).sessions.transcriptWarnMB))
   // The list opens from "Done by the Assistant (n)" at the watch line's end (#979: closed until then).
@@ -111,8 +111,8 @@ const check = (name, ok, extra = '') => {
   const changed =/Changed Settings → Sessions → Warn when a transcript is over: 20 → 50/
   const changedText = await showsText('the change', action, changed)
   check('its panel lists the change, old → new', changed.test(changedText), changedText)
-  const revert = action.getByRole('button', { name: /^Revert Settings → Sessions → Warn when a transcript is over to 20/ })
-  check('…with a Revert button', !!(await shows('its Revert', async () => (await revert.count()) === 1)))
+  const revert = action.getByRole('button', { name: /^Undo: Changed Settings → Sessions → Warn when a transcript is over: 20 → 50/ })
+  check('…with an Undo button', !!(await shows('its Undo', async () => (await revert.count()) === 1)))
   await page.keyboard.press('Control+,')
   await page.locator('.settings-nav .row', { hasText: 'Sessions' }).first().click()
   const warn = page.locator('.setting', { has: page.locator('.s-title', { hasText: 'Warn when a transcript is over' }) })
@@ -125,11 +125,11 @@ const check = (name, ok, extra = '') => {
   }
   await inv('settings:update', { appearance: { theme: 'dark' } })
 
-  // --- Revert: back to 20, listed, and the change marked reverted.
+  // --- Undo: back to 20, and the change struck through.
   await revert.click()
-  check('Revert puts it back to 20 MB', !!(await lib.until(async () => (await settings()).sessions.transcriptWarnMB === 20, HUNG_MS)))
+  check('Undo puts it back to 20 MB', !!(await lib.until(async () => (await settings()).sessions.transcriptWarnMB === 20, HUNG_MS)))
   check('…which Settings shows', !!(await lib.until(async () => (await warn.locator('input[type=number]').inputValue()) === '20', HUNG_MS)))
-  check('…and the panel lists, the change marked reverted', !!(await lib.until(async () => (await panel.locator('.assistant-action', { hasText: 'You reverted Settings → Sessions → Warn when a transcript is over: 50 → 20' }).count()) === 1 && (await action.locator('text=reverted').count()) === 1, HUNG_MS)))
+  check('…and the panel strikes the change through, undone', !!(await lib.until(async () => (await panel.locator('.assistant-action.undone', { hasText: 'Warn when a transcript is over: 20 → 50' }).count()) === 1 && (await revert.count()) === 0, HUNG_MS)))
   await page.screenshot({ path: path.join(lib.WORK, 'assistantsettings-reverted.png') })
 
   // --- A project's setting: Project Settings has it.
@@ -158,16 +158,18 @@ const check = (name, ok, extra = '') => {
   const release = () => app.evaluate(() => global.__hiveTestGate.release())
   // A change queued for the project's lock (#423): withFileLock (fsutil.ts) queues a call behind the one holding a file's
   // lock by setting the file's key (its path in lower case) in its map of locks, in the same step as the call. While the
-  // user's write holds project.json, a set of that key is a change queued behind it: past all its checks before the lock.
-  // Counted from Map.prototype.set in Hive's main process only while a race waits for it, then put back. Were the lock
-  // kept some other way, no set would come and the check fails, rather than passing without the race.
+  // user's write holds project.json, a set of that key to the queue's promise is a change queued behind it: past all its
+  // checks before the lock. Only a promise counts: other maps use the same key (HI-1850: project.json's kept reads,
+  // HI-1814, set it on every read, and the lock's call count beside it). Counted from Map.prototype.set in Hive's main
+  // process only while a race waits for it, then put back. Were the lock kept some other way, no set would come and the
+  // check fails, rather than passing without the race.
   const watchLockQueue = () =>
     app.evaluate((_, lockKey) => {
       const set = (global.__hiveTestMapSet ??= Map.prototype.set)
       global.__hiveTestQueued = 0
       // eslint-disable-next-line eslint/no-extend-native -- in the test copy only, and put back once the race is queued
       Map.prototype.set = function (k, v) {
-        if (k === lockKey) global.__hiveTestQueued++
+        if (k === lockKey && typeof v?.then === 'function') global.__hiveTestQueued++
         return set.call(this, k, v)
       }
     }, projectFile.toLowerCase())
@@ -246,8 +248,8 @@ const check = (name, ok, extra = '') => {
   const colourChange = /Column colours: doing: #[0-9a-f]{6} → doing: #ff0000/
   const coloursText = await showsText('the colour change', colours, colourChange)
   check('…listed as the colour it changed, not the table\'s size', colourChange.test(coloursText), coloursText)
-  await colours.getByRole('button', { name: /^Revert / }).click()
-  check('…and Revert puts the colours back', !!(await lib.until(async () => (await settings()).board.colors.doing !== '#ff0000', HUNG_MS)))
+  await colours.getByRole('button', { name: /^Undo: / }).click()
+  check('…and Undo puts the colours back', !!(await lib.until(async () => (await settings()).board.colors.doing !== '#ff0000', HUNG_MS)))
 
   // --- A fallback list: a label-only change is listed by that entry, old and new (#317).
   await inv('settings:setProviderFallback', 'claude-code', 'models', [{ value: 'opus', label: 'Opus' }, { value: 'sonnet', label: 'Sonnet' }])
@@ -257,7 +259,7 @@ const check = (name, ok, extra = '') => {
   const renamedText = await showsText('the renamed model', renamed, relabel)
   check('…listed as the label that changed', relabel.test(renamedText), renamedText)
 
-  // --- A provider's prices: null puts back Hive's, a shipped model removed from the table too (#315); Revert removes it again.
+  // --- A provider's prices: null puts back Hive's, a shipped model removed from the table too (#315); Undo removes it again.
   const removedNow = async () => JSON.stringify((await settings()).providers['claude-code'].pricesRemoved ?? [])
   await inv('settings:setProviderPrices', 'claude-code', {}, ['claude-opus-4-8'])
   check('it resets the API prices', await say('hive hive_update_setting {"id":"claude-code.prices","value":null}'))
@@ -266,8 +268,8 @@ const check = (name, ok, extra = '') => {
   const putBack = /claude-opus-4-8: removed → claude-opus-4-8: Hive's price/
   const resetText = await showsText('the prices reset', reset, putBack)
   check('…listed as the model put back', putBack.test(resetText), resetText)
-  await reset.getByRole('button', { name: /^Revert / }).click()
-  check('…and Revert removes it again', !!(await lib.until(async () => (await removedNow()) === '["claude-opus-4-8"]', HUNG_MS)), await removedNow())
+  await reset.getByRole('button', { name: /^Undo: / }).click()
+  check('…and Undo removes it again', !!(await lib.until(async () => (await removedNow()) === '["claude-opus-4-8"]', HUNG_MS)), await removedNow())
 
   // --- Refused: its own Control, and what Hive runs.
   check('it tries to raise its own Control', await say('hive hive_update_setting {"id":"assistant.control","value":"look"}'))

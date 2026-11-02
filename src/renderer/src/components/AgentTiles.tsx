@@ -1,15 +1,17 @@
 import { useCallback, useEffect, useMemo, useRef, useState, type KeyboardEvent as ReactKeyboardEvent, type ReactNode } from 'react'
 import type { AgentState } from '@shared/agentState'
-import { agentDoingCards, agentReviewCards, columnName } from '@shared/tasks'
+import { stoppedLabel, useStoppedEnd } from '../stopped'
+import { agentDoingCards, agentReviewCards } from '@shared/tasks'
 import { cardsText } from '@shared/agentTable'
 import { compactThreshold, pageEndIndex, transcriptWarnLimit } from '@shared/defaults'
+import { droppedLaneOrder } from '@shared/laneBar'
 import { fractionDone, runStatusLine } from '@shared/progress'
 import { providerName } from '@shared/providers'
-import { isUrgent, TILES_PER_PAGE, tilePageCount, tilePageOf, tilesOnPage, urgentByPage } from '@shared/tiles'
+import { isUrgent, tilePageCount, tilePageOf, tilesOnPage, tilesThatFit, urgentByPage } from '@shared/tiles'
 import { fmt, msg, tr } from '@shared/i18n'
 import type { AgentInfo, ProjectInfo, ProgressRun } from '@shared/types'
 import { formatSize } from '@shared/units'
-import { agentProviderOf, closeTile, openTile, projectKey, showTilePage, tileAgents, tileFocusOf, tilePage, useLanguage, useStore } from '../store'
+import { agentProviderOf, clearTileReturn, closeTile, openTile, projectKey, setTilesFit, showTilePage, tileAgents, tileFocusOf, tilePage, tileReturnOf, tilesPageSize, useLanguage, useStore } from '../store'
 import * as actions from '../actions'
 import { commandKeybinding, keyIsBound } from '../commands'
 import { deferredFocus } from '../deferredFocus'
@@ -20,6 +22,7 @@ import { RowCardChip, useRowCards } from './CardChip'
 import { PaneResizer, usePaneSize } from './Resizer'
 import { StateMark } from './StateMark'
 import { Icon, statusText, Tooltip, useClipped, useContextMenu } from './ui'
+import { cardsWait } from './watchLine'
 
 /**
  * The Session tab's Tiles view (#976; #975's toggle switches to it): a tile per agent, 12 to a page, in the order Settings
@@ -63,7 +66,7 @@ function moveTile(project: ProjectInfo, id: string, delta: -1 | 1): void {
   if (to < 0 || to >= project.agents.length) return
   refocusTile = { id, may: deferredFocus(() => document.querySelector(tileSelector(id))) }
   actions.nudgeAgent(delta, project.path, id)
-  showTilePage(project, tilePageOf(to))
+  showTilePage(project, tilePageOf(to, tilesPageSize(project)))
 }
 
 const tileSelector = (id: string): string => `.agent-tile[data-agent="${CSS.escape(id)}"]`
@@ -91,11 +94,13 @@ const back = (project: ProjectInfo): void => focusTileAfter(closeTile(project))
 
 const NOT_RUNNING = msg({ id: 'panes.tiles.notRunning', defaultMessage: 'Not running', description: "An agent's status on its tile (the Tiles view) and in the focus view's strip: its session isn't running." })
 
-/** An agent's status in words: its session's, why its launch failed, or that it isn't running. */
+/** An agent's status in words: its session's, why its launch failed, when it stopped (HI-1881), or that it isn't running. */
 function useStatus(project: ProjectInfo, a: AgentInfo): string {
   const failure = useStore((s) => (a.live ? undefined : s.startFailures[projectKey(project.path, a.id)]))
+  const end = useStoppedEnd(project.path, a)
   if (a.live) return statusText(a.live)
   if (failure) return tr(FAILED_TO_START, { why: failure.reason.split('\n')[0] })
+  if (end) return stoppedLabel(end)
   return tr(NOT_RUNNING)
 }
 
@@ -109,8 +114,10 @@ function agentRun(runs: readonly ProgressRun[], project: ProjectInfo, a: AgentIn
 function TileGrid({ project }: { project: ProjectInfo }) {
   const tiles = useTiles(project)
   const page = useStore((s) => tilePage(project, s))
-  const shown = tilesOnPage(tiles, page)
-  const pages = tilePageCount(tiles.length)
+  const perPage = useStore((s) => tilesPageSize(project, s))
+  const shown = tilesOnPage(tiles, page, perPage)
+  const pages = tilePageCount(tiles.length, perPage)
+  const area = useRef<HTMLDivElement>(null)
   const grid = useRef<HTMLDivElement>(null)
   const movable = useMovable(project)
   const menu = useContextMenu()
@@ -126,8 +133,38 @@ function TileGrid({ project }: { project: ProjectInfo }) {
     })
   }, [movable, project])
   // The tile that holds the grid's one tab stop: the last one the keyboard was on, while it is on this page.
-  const [current, setCurrent] = useState<string | null>(null)
+  // Back from the focus view, the agent it showed (HI-1951, HR1's round 1), whatever the first tile of its page.
+  const [current, setCurrent] = useState<string | null>(() => tileReturnOf(project))
   const stop = shown.some((t) => t.a.id === current) ? current : (shown[0]?.a.id ?? null)
+  // How many tiles fit the area (HI-1951): measured as it resizes (and as its tiles are first drawn), the page keeping the
+  // agent the focus view just went back from (the window may have been resized while it was open), else the tile the
+  // keyboard is on, else the tab stop. Columns are the grid's tracks; rows, its height over a tile's.
+  const keep = useRef<{ project: ProjectInfo; tile: string | null }>({ project, tile: stop })
+  keep.current = { project, tile: stop }
+  const hasAgents = project.agents.length > 0
+  useEffect(() => {
+    const box = area.current
+    const g = grid.current
+    if (!box || !g) return
+    const measure = (): void => {
+      const css = getComputedStyle(g)
+      const columns = css.gridTemplateColumns.split(' ').filter((x) => x && x !== 'none').length
+      const pad = (parseFloat(css.paddingTop) || 0) + (parseFloat(css.paddingBottom) || 0)
+      const tileHeight = g.querySelector<HTMLElement>('.agent-tile')?.offsetHeight ?? 0
+      const fit = tilesThatFit({ columns, height: box.clientHeight - pad, tileHeight, gap: parseFloat(css.rowGap) || 0 })
+      if (fit === null) return
+      const p = keep.current.project
+      const returning = tileReturnOf(p)
+      const at = (document.activeElement as HTMLElement | null)?.closest<HTMLElement>('.agent-tile')?.dataset.agent
+      setTilesFit(p, fit, returning ?? (at && g.contains(document.activeElement) ? at : keep.current.tile))
+      if (returning) clearTileReturn(p)
+    }
+    const seen = new ResizeObserver(measure)
+    seen.observe(box)
+    seen.observe(g)
+    measure()
+    return () => seen.disconnect()
+  }, [hasAgents])
   if (!project.agents.length)
     return (
       <div className="agent-tiles empty-state">
@@ -151,7 +188,7 @@ function TileGrid({ project }: { project: ProjectInfo }) {
     els[Math.max(0, Math.min(els.length - 1, to))]?.focus()
   }
   return (
-    <div className="agent-tiles">
+    <div ref={area} className="agent-tiles">
       <div
         ref={grid}
         className="tile-grid"
@@ -187,6 +224,8 @@ function Tile({ project, a, state, tabStop, movable, onFocus, onMenu }: { projec
   const settings = useStore((s) => s.settings)
   const flash = useStore((s) => s.paneFlash)
   const status = useStatus(project, a)
+  // Stopped (HI-1881): its own mark grey, as its pane's header has it.
+  const stoppedEnd = useStoppedEnd(project.path, a)
   const usage = useLiveUsage(project, a.id)
   const now = useNow()
   const live = a.live
@@ -251,9 +290,9 @@ function Tile({ project, a, state, tabStop, movable, onFocus, onMenu }: { projec
         </span>
       )}
       <span className="tile-head">
-        <StateMark state={state} />
+        <StateMark state={state} className={stoppedEnd ? 'stopped' : undefined} label={stoppedEnd ? stoppedLabel(stoppedEnd) : undefined} />
         <span className="tile-name">{a.name}</span>
-        <span className="tile-provider">{providerName(agentProviderOf(project, a))}</span>
+        <span className="tile-provider">{providerName(agentProviderOf(a))}</span>
       </span>
       {/* Every row keeps its place, shown or not (#1145): a tile is always the same height, so tiles don't move. */}
       <TileText className="tile-status">{status}</TileText>
@@ -368,15 +407,86 @@ export function useTileStripWidth(): number {
   return room === null ? chosen : Math.min(chosen, room)
 }
 
+/** A strip row moved from the keyboard (#1053): it takes the keyboard back once drawn again, as a moved tile does. */
+let refocusRow: { id: string; may: () => boolean } | null = null
+
+const stripRowSelector = (id: string): string => `.tile-strip-item[data-agent="${CSS.escape(id)}"]`
+
+const ROW_MOVED = msg({ id: 'panes.tiles.rowMoved', defaultMessage: '{agent}: {place, number} of {count, number}', description: "Said to screen readers when an agent is moved in the focus view's strip from the keyboard (Alt+Up, Alt+Down or its menu): its place in the project's order now ({place}) of how many agents ({count})." })
+const ROW_EDGE = msg({ id: 'panes.tiles.rowEdge', defaultMessage: '{where, select, first {{agent} is already first} other {{agent} is already last}}', description: "Said to screen readers when an agent is moved in the focus view's strip with Alt+Up or Alt+Down but is already first or last in the project's order." })
+
 /**
  * The focus view's strip (#976): Back to Tiles, then every agent in tile order (its mark, name, card and status), the one
  * shown marked; choosing another shows it. Esc, outside the terminal (where it is the CLI's), goes back to the grid. Its
  * right edge resizes it (#1021); ProjectView puts the agent's pane beside it.
+ * In the panes' order (#1053, as the tiles, #993), a row is dragged to another place in the list, a line showing where it
+ * goes; Alt+Up and Alt+Down, its menu and Move Agent Left/Right move it from the keyboard. The agent shown stays shown.
  */
 function TileStrip({ project, focus }: { project: ProjectInfo; focus: string }) {
   const tiles = useTiles(project)
   const width = useTileStripWidth()
   const key = commandKeybinding('session.backToTiles')
+  const movable = useMovable(project)
+  const menu = useContextMenu()
+  const list = useRef<HTMLElement>(null)
+  const [dragging, setDragging] = useState<string | null>(null)
+  // Where the dragged row would go: before this agent's row, after the last (null), or nowhere (undefined).
+  const [dropBefore, setDropBefore] = useState<string | null | undefined>(undefined)
+  const [said, setSaid] = useState('')
+  const ids = tiles.map((t) => t.a.id)
+  /** Moves an agent one place up or down the list (the project's order), saying where it went. */
+  const nudge = (id: string, delta: -1 | 1, keyboard: boolean): void => {
+    const a = project.agents.find((x) => x.id === id)
+    const i = ids.indexOf(id)
+    if (!a || i < 0) return
+    if (i + delta < 0 || i + delta >= ids.length) return setSaid(tr(ROW_EDGE, { agent: a.name, where: delta < 0 ? 'first' : 'last' }))
+    if (keyboard) refocusRow = { id, may: deferredFocus(() => document.querySelector(stripRowSelector(id))) }
+    void actions.moveAgent(project.path, id, i + delta, false)
+    setSaid(tr(ROW_MOVED, { agent: a.name, place: i + delta + 1, count: ids.length }))
+  }
+  const nudgeNow = useRef(nudge)
+  nudgeNow.current = nudge
+  // Move Agent Left/Right (whatever its keys) with the keyboard on a row moves that row's agent, as on a tile (#993).
+  useEffect(() => {
+    if (!movable) return
+    return actions.onTileNudge((delta) => {
+      const el = document.activeElement
+      const id = list.current?.contains(el) ? (el as HTMLElement).closest<HTMLElement>('.tile-strip-item')?.dataset.agent : undefined
+      if (!id) return false
+      nudgeNow.current(id, delta, true)
+      return true
+    })
+  }, [movable])
+  /** Where the dragged row would go with the pointer at height `y`: before the first row whose middle is below it. */
+  const place = (y: number): void => {
+    if (!dragging) return
+    const rows = [...(list.current?.querySelectorAll<HTMLElement>('.tile-strip-row') ?? [])]
+    const row = rows.find((r) => y < r.getBoundingClientRect().top + r.getBoundingClientRect().height / 2)
+    const before = row?.dataset.agent ?? null
+    setDropBefore(droppedLaneOrder(ids, dragging, before) ? before : undefined)
+  }
+  const endDrag = (): void => {
+    setDragging(null)
+    setDropBefore(undefined)
+  }
+  const drop = (): void => {
+    const next = dragging && dropBefore !== undefined ? droppedLaneOrder(ids, dragging, dropBefore) : null
+    if (dragging && next) void actions.moveAgent(project.path, dragging, next.indexOf(dragging), false)
+    endDrag()
+  }
+  const rowMenu = (a: AgentInfo, x: number, y: number, keyboard: boolean): void => {
+    const i = ids.indexOf(a.id)
+    const kb = (k: string): string => formatKeybinding(k)
+    menu.openAt(
+      x,
+      y,
+      [
+        { label: tr(msg({ id: 'panes.tiles.moveUp', defaultMessage: 'Move Up', description: "Menu item (an agent's row in the focus view's strip, the Tiles view): moves the agent one place up the list, the project's order." })), icon: 'arrow-up', disabled: i <= 0, keybinding: kb('Alt+ArrowUp'), onClick: () => nudge(a.id, -1, keyboard) }, // i18n-ignore: a shortcut's keys
+        { label: tr(msg({ id: 'panes.tiles.moveDown', defaultMessage: 'Move Down', description: "Menu item (an agent's row in the focus view's strip, the Tiles view): moves the agent one place down the list, the project's order." })), icon: 'arrow-down', disabled: i >= ids.length - 1, keybinding: kb('Alt+ArrowDown'), onClick: () => nudge(a.id, 1, keyboard) } // i18n-ignore: a shortcut's keys
+      ],
+      keyboard
+    )
+  }
   useEffect(() => {
     const onKey = (e: KeyboardEvent): void => {
       if (e.key !== 'Escape' || e.defaultPrevented || e.ctrlKey || e.altKey || e.shiftKey || e.metaKey) return
@@ -389,7 +499,15 @@ function TileStrip({ project, focus }: { project: ProjectInfo; focus: string }) 
     document.addEventListener('keydown', onKey)
     return () => document.removeEventListener('keydown', onKey)
   }, [project])
-  const onKeyDown = (e: ReactKeyboardEvent<HTMLDivElement>): void => {
+  const onKeyDown = (e: ReactKeyboardEvent<HTMLElement>): void => {
+    if (e.ctrlKey || e.metaKey || e.shiftKey) return
+    const row = (document.activeElement as HTMLElement | null)?.closest<HTMLElement>('.tile-strip-item')?.dataset.agent
+    // Alt+Up and Alt+Down on a row move its agent (#1053), as the Progress panel's lanes move.
+    if (e.altKey) {
+      if (!movable || !row || (e.key !== 'ArrowUp' && e.key !== 'ArrowDown')) return
+      e.preventDefault()
+      return nudge(row, e.key === 'ArrowUp' ? -1 : 1, true)
+    }
     // Between the rows' buttons (their card chips are Tab's).
     const els = [...e.currentTarget.querySelectorAll<HTMLElement>('button')]
     const at = els.indexOf(document.activeElement as HTMLElement)
@@ -402,39 +520,128 @@ function TileStrip({ project, focus }: { project: ProjectInfo; focus: string }) 
   if (!width) return null
   return (
     <div className="tile-strip" style={{ width }}>
-      <nav className="tile-strip-list" aria-label={tr(msg({ id: 'panes.tiles.stripLabel', defaultMessage: "The project's agents", description: "Accessible name of the focus view's strip of agents (the Tiles view, one agent's pane large)." }))} onKeyDown={onKeyDown}>
+      <nav
+        ref={list}
+        className="tile-strip-list"
+        aria-label={tr(msg({ id: 'panes.tiles.stripLabel', defaultMessage: "The project's agents", description: "Accessible name of the focus view's strip of agents (the Tiles view, one agent's pane large)." }))}
+        onKeyDown={onKeyDown}
+        // Anywhere in the list, between rows and above or below them too: the line goes where the pointer's height says.
+        onDragOver={(e) => {
+          if (!dragging) return
+          e.preventDefault()
+          e.dataTransfer.dropEffect = 'move'
+          place(e.clientY)
+        }}
+        onDrop={(e) => {
+          if (!dragging) return
+          e.preventDefault()
+          drop()
+        }}
+      >
         <Tooltip content={tr(msg({ id: 'panes.tiles.backTip', defaultMessage: 'Back to the tiles (Esc outside the terminal{key, select, none {} other {, or {key}}})', description: "Tooltip of the focus view's Back to Tiles button: the keys that do it too ({key}: \"Ctrl+Alt+Escape\"; none: leave that branch empty)." }), { key: key ? formatKeybinding(key) : 'none' })}>
           <button type="button" className="tile-strip-back" onClick={() => back(project)}>
             <Icon name="arrow-left" /> {tr(msg({ id: 'panes.tiles.back', defaultMessage: 'Tiles', description: "The focus view's button back to the grid of tiles. Use the Panes | Tiles toggle's word." }))}
           </button>
         </Tooltip>
-        {tiles.map(({ a, state }) => (
-          <StripItem key={a.id} project={project} a={a} state={state} active={a.id === focus} />
+        {tiles.map(({ a, state }, i) => (
+          <StripItem
+            key={a.id}
+            project={project}
+            a={a}
+            state={state}
+            active={a.id === focus}
+            drag={
+              movable
+                ? {
+                    dragging: dragging === a.id,
+                    dropBefore: !!dragging && dropBefore === a.id,
+                    dropAfter: !!dragging && dropBefore === null && i === tiles.length - 1,
+                    onDragStart: (e) => {
+                      e.dataTransfer.effectAllowed = 'move'
+                      e.dataTransfer.setData(STRIP_DRAG, a.id)
+                      e.dataTransfer.setData('text/plain', a.name)
+                      // After the browser has taken its drag image.
+                      setTimeout(() => setDragging(a.id), 0)
+                    },
+                    onDragEnd: endDrag,
+                    onMenu: (x, y, keyboard) => rowMenu(a, x, y, keyboard)
+                  }
+                : undefined
+            }
+          />
         ))}
       </nav>
+      {/* What the last move from the keyboard said, for screen readers only. */}
+      <div className="visually-hidden" role="status">
+        {said}
+      </div>
+      {menu.element}
       <PaneResizer paneKey={TILE_STRIP.key} min={TILE_STRIP.min} max={TILE_STRIP.max} keep={360} />
     </div>
   )
 }
 
+/** A strip row dragged (#1053): the strip's own, so the panes and page buttons don't take it. */
+const STRIP_DRAG = 'application/x-hive-strip-agent'
+
+/** What a movable row of the strip needs (#1053): its drag state and handlers, and its menu. */
+interface StripDrag {
+  dragging: boolean
+  dropBefore: boolean
+  dropAfter: boolean
+  onDragStart: (e: React.DragEvent) => void
+  onDragEnd: () => void
+  onMenu: (x: number, y: number, keyboard: boolean) => void
+}
+
 /**
  * An agent's row in the strip: a button (its mark, name and status) and its card's chip (#1021) at the name line's right,
  * beside the button rather than in it (a chip is a button of its own). An unseen copy of the chip holds its room on the
- * name's line, so a long name ends in an ellipsis before it and the chips line up down the strip.
+ * name's line, so a long name ends in an ellipsis before it and the chips line up down the strip. `drag`: it can be moved
+ * (#1053), dragged by its button.
  */
-function StripItem({ project, a, state, active }: { project: ProjectInfo; a: AgentInfo; state: AgentState; active: boolean }) {
+function StripItem({ project, a, state, active, drag }: { project: ProjectInfo; a: AgentInfo; state: AgentState; active: boolean; drag?: StripDrag }) {
+  const ref = useRef<HTMLButtonElement>(null)
+  // Moved from the keyboard: the keyboard back on it, unless the user chose another place since.
+  useEffect(() => {
+    if (refocusRow?.id !== a.id) return
+    if (!refocusRow.may()) refocusRow = null
+    else if (document.activeElement !== ref.current) ref.current?.focus()
+  })
   const status = useStatus(project, a)
+  // Stopped (HI-1881): its own mark grey, as its pane's header has it.
+  const stoppedEnd = useStoppedEnd(project.path, a)
   const cards = useRowCards(project, a.id)
   const [nameRef, clipped] = useClipped<HTMLSpanElement>()
   const shown = cards[0]?.card.number
-  const watch = a.live?.status === 'watching' ? a.live.watch : undefined
-  // Waiting on its own card only (#1021): the chip says which, so the status doesn't repeat its number.
-  const short = watch && status === watch.label && shown !== undefined && !watch.agents?.length && !watch.lanes?.length && watch.cards.length === 1 && watch.cards[0] === shown
-  const line = short ? (watch.column ? tr(msg({ id: 'panes.tiles.waitingInto', defaultMessage: 'Waiting → {column}', description: "An agent's status in the focus view's strip while it waits for its card (named by the chip beside it) to move into a board column ({column})." }), { column: columnName(watch.column, tr) }) : tr(msg({ id: 'panes.tiles.waitingCard', defaultMessage: 'Waiting for its card', description: "An agent's status in the focus view's strip while it waits for its card (named by the chip beside it) to change." }))) : status
+  // Waiting on its own card only (#1021): the chip says which, so the status doesn't repeat its name.
+  const wait = a.live ? cardsWait(a.live, status) : null
+  const line = wait && wait.cards.length === 1 && wait.cards[0] === shown ? wait.line : status
   return (
-    <div className="tile-strip-row">
-      <button type="button" className={cx('tile-strip-item', state, isUrgent(state) && 'urgent', active && 'active')} data-agent={a.id} aria-current={active || undefined} onClick={() => openTile(project, a.id)}>
-        <StateMark state={state} />
+    <div className={cx('tile-strip-row', drag && 'movable', drag?.dragging && 'dragging', drag?.dropBefore && 'drop-before', drag?.dropAfter && 'drop-after')} data-agent={a.id}>
+      <button
+        ref={ref}
+        type="button"
+        className={cx('tile-strip-item', state, isUrgent(state) && 'urgent', active && 'active')}
+        data-agent={a.id}
+        aria-current={active || undefined}
+        onClick={() => openTile(project, a.id)}
+        {...(drag
+          ? {
+              draggable: true,
+              onDragStart: drag.onDragStart,
+              onDragEnd: drag.onDragEnd,
+              onContextMenu: (e: React.MouseEvent<HTMLButtonElement>) => {
+                e.preventDefault()
+                // From the keyboard (the menu key, Shift+F10): below the row's name, on its first entry.
+                const keyboard = e.button !== 2
+                const r = e.currentTarget.getBoundingClientRect()
+                drag.onMenu(keyboard ? r.left + 8 : e.clientX, keyboard ? r.top + 24 : e.clientY, keyboard)
+              }
+            }
+          : {})}
+      >
+        <StateMark state={state} className={stoppedEnd ? 'stopped' : undefined} label={stoppedEnd ? stoppedLabel(stoppedEnd) : undefined} />
         {/* Its name in full on hover when it is cut short. */}
         <Tooltip content={clipped ? a.name : null} block>
           <span ref={nameRef} className="tile-strip-name">
@@ -466,7 +673,8 @@ export function TilePager({ project }: { project: ProjectInfo }) {
   const tiles = useTiles(project)
   const page = useStore((s) => tilePage(project, s))
   const focus = useStore((s) => tileFocusOf(project, s))
-  const pages = tilePageCount(tiles.length)
+  const perPage = useStore((s) => tilesPageSize(project, s))
+  const pages = tilePageCount(tiles.length, perPage)
   const movable = useMovable(project)
   const dragging = useAgentDrag(project)
   const [dropPage, setDropPage] = useState<number | null>(null)
@@ -478,14 +686,14 @@ export function TilePager({ project }: { project: ProjectInfo }) {
     hover.current = null
   }, [dragging])
   if (pages < 2) return null
-  const urgent = urgentByPage(tiles.map((t) => t.state))
+  const urgent = urgentByPage(tiles.map((t) => t.state), perPage)
   const pageKb = commandKeybinding('agent.nextPage')
   return (
     <div className="segmented page-switch tile-pages">
       {Array.from({ length: pages }, (_, i) => {
         const counted = i !== page && urgent[i] > 0
         // A tile dropped here goes to this page's last place (#993): not a target where it already is.
-        const end = pageEndIndex(project.agents.length, i, TILES_PER_PAGE)
+        const end = pageEndIndex(project.agents.length, i, perPage)
         const moves = movable && !!dragging && end !== project.agents.findIndex((a) => a.id === dragging)
         return (
           <Tooltip

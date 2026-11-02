@@ -45,7 +45,7 @@ async function closeAdvancedFileError(ctx) {
 const BIG = 'too-big-to-diff.bin'
 
 /** git in the project, with an identity of its own (never the machine's config). */
-const git = (ctx, ...a) => execFileSync('git', ['-c', 'user.email=t@t', '-c', 'user.name=t', '-c', 'core.autocrlf=false', ...a], { cwd: ctx.project, env: ctx.lib.baseEnv(), stdio: 'pipe', encoding: 'utf8' })
+const git = (ctx, ...a) => execFileSync('git', ['-c', 'user.email=t@t', '-c', 'user.name=t', '-c', 'core.autocrlf=false', ...a], { cwd: ctx.project, env: ctx.lib.gitEnv(), stdio: 'pipe', encoding: 'utf8' })
 
 /** A file over the Changes tab's 2 MB, uncommitted: in place of its changes, the tab says it is too large to compare. */
 async function diffTooLarge(ctx) {
@@ -57,21 +57,35 @@ async function diffTooLarge(ctx) {
   fs.writeFileSync(path.join(ctx.project, BIG), Buffer.alloc(3 * 1024 * 1024, 120))
   await ctx.command('project.tab.changes')
   await (await shown(ctx, page.locator('.git-sections [data-section="changes"]'), "the Git tab's sections")).click()
-  // The project folder's own changes (the picker's last entry), when there is a picker.
+  // The project folder's own changes (the picker's entry valued "", its last), when there is a picker: by its value, not
+  // its place, as the groups above it (comparisons, unused worktrees) can still be loading (HI-2159: an index counted
+  // before they came picked the unused worktrees). Picked again in the wait below until it holds.
   const picker = page.locator('select.changes-picker')
-  if (await picker.count()) await picker.first().selectOption({ index: (await picker.first().locator('option').count()) - 1 })
+  const folderPicked = async () => {
+    if (!(await picker.count())) return true
+    if ((await picker.first().inputValue().catch(() => null)) === '') return true
+    await picker.first().selectOption({ value: '' }, { timeout: 2000 }).catch(() => undefined)
+    return false
+  }
+  await folderPicked()
   const rows = page.locator('.split-list .pane-body .row')
   const shownFile = page.locator('.split-main .editor-toolbar .path strong').first()
-  // Each row in turn until the diff shown is the big file's (its name, which is the file's own in every language).
+  // Its own row, by the file's path (data-path, never its text: HI-1935), once the list has it: never each row in turn,
+  // which ran out of time behind the files earlier screens left changed (HI-1914). Clicked again until its diff is the one shown.
+  const own = page.locator(`.split-list .pane-body .row[data-path$="${BIG}"]`).first()
+  const started = Date.now()
   const opened = await ctx.lib.until(async () => {
-    const n = await rows.count()
-    for (let i = 0; i < n; i++) {
-      await rows.nth(i).click({ timeout: 2000 }).catch(() => undefined)
-      if (await ctx.lib.until(async () => ((await shownFile.textContent({ timeout: 500 }).catch(() => null)) ?? '').endsWith(BIG), 1500)) return true
-    }
-    return false
+    if (!(await folderPicked()) || !(await own.count())) return false
+    await own.click({ timeout: 2000 }).catch(() => undefined)
+    return ((await shownFile.textContent({ timeout: 500 }).catch(() => null)) ?? '').endsWith(BIG)
   }, ctx.hungMs)
-  if (!opened) throw new Error('the big file did not show in the Changes tab')
+  // How long finding its diff took, for comparing runs (HI-1914).
+  console.log(`${ctx.lang}: diff-too-large: its diff ${opened ? 'shown' : 'not shown'} after ${Date.now() - started} ms, ${await rows.count()} rows`)
+  if (!opened) {
+    // What the tab showed instead: its rows, the file shown, and the picker's choice.
+    const seen = { rows: await rows.allTextContents().catch(() => []), shown: await shownFile.textContent({ timeout: 500 }).catch(() => null), picker: (await picker.count()) ? await picker.first().inputValue().catch(() => null) : null }
+    throw new Error(`the big file did not show in the Changes tab: ${JSON.stringify(seen).slice(0, 600)}`)
+  }
   await shown(ctx, page.locator('.split-main .editor-host .empty-state'), 'the note in place of its changes')
   return page.locator('.split').first()
 }

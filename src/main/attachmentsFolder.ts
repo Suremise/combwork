@@ -3,7 +3,7 @@
 // folder, its session folders or any folder above them.
 import { lstat, mkdir, readdir, readFile, rename, rmdir } from 'original-fs/promises'
 import { extname, join, relative, sep } from 'path'
-import { ATTACHMENTS_DIR, OLD_ATTACHMENTS_DIR, movedAttachmentPath } from '../shared/attachments'
+import { ATTACHMENTS_DIR, OLD_ATTACHMENTS_DIR, isSessionFolder, movedAttachmentPath } from '../shared/attachments'
 import { HIVE_DIR } from '../shared/defaults'
 import { insideReal, writeJsonAtomic } from './fsutil'
 import { msg } from '../shared/i18n'
@@ -71,6 +71,20 @@ export async function ownAttachmentsFolder(host: string, sessionFolder?: string)
   return chain[chain.length - 1]
 }
 
+/**
+ * An attachment's name in its folder: the time it came, then the file's own name (a clipboard image has none), so they
+ * list in the order they came and an agent sees what each is. Characters Windows refuses, and control characters,
+ * become "_"; a long name keeps its end (the extension).
+ */
+export function attachmentName(name: string | null, at = new Date()): string {
+  const pad = (n: number): string => String(n).padStart(2, '0')
+  const stamp = `${at.getFullYear()}-${pad(at.getMonth() + 1)}-${pad(at.getDate())}_${pad(at.getHours())}-${pad(at.getMinutes())}-${pad(at.getSeconds())}`
+  const own = name ? name.replace(/[<>:"/\\|?*\x00-\x1f]/g, '_').replace(/[. ]+$/, '').slice(-100) : ''
+  const ext = own ? extname(own) : '.png'
+  const base = own ? `${stamp}_${own.slice(0, own.length - ext.length)}` : stamp
+  return `${base}${ext}`
+}
+
 /** A name free in a folder: taken means anything there, a link (even a broken one) included. */
 export async function freeName(dir: string, name: string, suffix: (i: number) => string): Promise<string> {
   const ext = extname(name)
@@ -110,7 +124,7 @@ async function moveOldFolder(host: string): Promise<void> {
   for (const d of await readdir(old)) {
     const from = join(old, d)
     const to = join(dest, d)
-    if (!SESSION_FOLDER.test(d) || !(await isOwnFolder(host, from))) {
+    if (!SESSION_FOLDER.test(d) || !isSessionFolder(d) || !(await isOwnFolder(host, from))) {
       left++
       continue
     }

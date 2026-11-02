@@ -127,7 +127,7 @@ describe.runIf(process.platform === 'win32')('refreshPathBeforeStart', () => {
   })
 })
 
-// #1103: Claude Code's native installer can leave ~\.local\bin off every PATH (the registry's too), so Agent Setup
+// #1103: Claude Code's native installer can leave ~\.local\bin off every PATH (the registry's too), so Provider Setup
 // found the CLI where it installs it while the sessions and terminals Hive starts couldn't run it by name.
 describe("a found CLI's folder on the PATH of what Hive starts (#1103)", () => {
   const sep = process.platform === 'win32' ? ';' : ':'

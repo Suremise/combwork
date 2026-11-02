@@ -2,6 +2,7 @@ import { Children, useEffect, useRef, useState } from 'react'
 import type { McpServerInfo, SkillInfo } from '@shared/types'
 import { enabledProviders } from '@shared/providers'
 import { APP_NAME } from '@shared/appName'
+import { guideTarget } from '@shared/userGuide'
 import iconUrl from '../assets/icon.svg'
 import guideMd from '@docs/USER_GUIDE.md?raw'
 import apiMd from '@docs/AGENT_API.md?raw'
@@ -13,15 +14,18 @@ import { call, errorMessage } from '../api'
 import { clearEditorDraft, editorDraft, onEditorDrafts, setEditorDraft } from '../editorDrafts'
 import { runCommand, commandKeybinding } from '../commands'
 import { DocEditor } from '../components/DocEditor'
+import { workspaceNotesNotice, workspaceNotesTemplate, workspaceNotesTitle } from '../components/WorkspaceNotes'
+import { workspaceNotesPath } from '@shared/workspaceNotes'
 import { CodeEditor } from '../components/Editors'
 import { PaneResizer, usePaneSize } from '../components/Resizer'
-import { Icon, IconButton, LoadFailed, Markdown, StaleNote, Switch, useContextMenu } from '../components/ui'
+import { Icon, IconButton, LoadFailed, Markdown, StaleNote, useContextMenu } from '../components/ui'
 import { useScopedLoad } from '../scopedLoad'
 import { SkillDetail } from '../components/Skills'
 import { confirm, NO_PROJECTS, notify, set, useStore } from '../store'
 import { basename, cx, formatKeybinding, recentNote, recentTip } from '../util'
 import { tr, tRich, type Msg } from '@shared/i18n'
 import { msg } from '@shared/i18n/msg'
+import { McpCatalogDetail } from '../components/McpCatalog'
 
 const M = {
   tagline: msg({ id: 'workspace.welcome.tagline', defaultMessage: 'Run AI coding agents across your projects, side by side.', description: "The welcome page (no workspace open), under Hive's name." }),
@@ -52,7 +56,7 @@ const M = {
   deleteNote: msg({ id: 'workspace.notes.delete', defaultMessage: 'Delete note', description: "A button over an open shared note." }),
   skillLoadTarget: msg({ id: 'workspace.skillView.loadTarget', defaultMessage: 'the skill', description: 'What could not be loaded: shown in "Could not load {what}: {error}", with Retry.' }),
   skillRefreshTarget: msg({ id: 'workspace.skillView.refreshTarget', defaultMessage: 'the skill', description: 'What could not be refreshed while the skill stays open: shown in "Could not refresh {what}; last updated …", with Retry.' }),
-  selectSkill: msg({ id: 'workspace.skillView.select', defaultMessage: 'Select a Hive skill to view or edit it. The agents in every project of this workspace get these skills, except those marked for the Hive Assistant.', description: 'The Skills view with no skill selected.' }),
+  selectSkill: msg({ id: 'workspace.skillView.select', defaultMessage: 'Select a Hive skill to view or edit it. The agents in every project of this workspace get these skills, except those marked for the Hive Assistant and those switched off beside them (Delivered to agents).', description: 'The Skills view with no skill selected.' }),
   skillGone: msg({ id: 'workspace.skillView.gone', defaultMessage: 'The skill <b>{name}</b> no longer exists in this workspace. It may have been deleted or renamed.', description: 'The Skills view, for a skill deleted or renamed since it was chosen. <b> is bold.' }),
   ok: msg({ id: 'workspace.skillView.ok', defaultMessage: 'OK', description: 'The Skills view, under a skill that no longer exists: closes it.' }),
   mcpFormat: msg({ id: 'workspace.mcpView.format', defaultMessage: "**Format** — one server per file, in Claude Code's .mcp.json format (Hive converts it for other providers) plus an optional `description`:", description: "An MCP server's view, beside its editor (Markdown: keep ** and the backticks). An example follows." }),
@@ -236,6 +240,14 @@ export function NotesView() {
       </div>
     )
   }
+  // Workspace notes (#1433): titled, started from a template, and saying as you type who gets it and whether it is cut.
+  if (selected.toLowerCase() === workspaceNotesPath(workspace.path).toLowerCase()) {
+    return (
+      <div className="split">
+        <DocEditor key={selected} path={selected} title={workspaceNotesTitle()} createIfMissing={workspaceNotesTemplate()} notice={workspaceNotesNotice} toolbarExtra={<IconButton icon="trash" title={tr(M.deleteNote)} onClick={() => void actions.deleteNote(selected, basename(selected), false)} />} />
+      </div>
+    )
+  }
   return (
     <div className="split">
       <DocEditor key={selected} path={selected} toolbarExtra={<IconButton icon="trash" title={tr(M.deleteNote)} onClick={() => void actions.deleteNote(selected, basename(selected), false)} />} />
@@ -323,6 +335,9 @@ export function McpView() {
   const selected = useStore((s) => s.selectedMcp)
   // One editor per server (and workspace): a load or save still running for one can't land in another's.
   const ws = useStore((s) => s.workspace?.path ?? '')
+  // The Catalogue tab (HI-545) shows the catalogue server chosen in it.
+  const tab = useStore((s) => s.mcpTab)
+  if (tab === 'catalogue') return <McpCatalogDetail />
   return <McpServerView key={`${ws}|${selected ?? ''}`} selected={selected} />
 }
 
@@ -440,7 +455,7 @@ function McpServerView({ selected }: { selected: string | null }) {
       setInfo(r)
     }
   }
-  const remove = (): Promise<boolean> => actions.deleteMcpServer(selected)
+  const remove = (): Promise<boolean> => actions.deleteMcpServer(info ?? { name: selected, def: null, projects: [], assistant: false })
 
   return (
     <div className="split">
@@ -454,15 +469,9 @@ function McpServerView({ selected }: { selected: string | null }) {
           {info && (
             <>
               {!info.error && <span className="faint mcp-where">{actions.mcpWhereText(info, projects)}</span>}
-              <label className="flex muted" style={{ fontSize: 12 }}>
-                <Switch
-                  small
-                  checked={info.globallyEnabled}
-                  disabled={!!info.error}
-                  onChange={(v) => void actions.setMcpServerEnabled(info, v)}
-                />
-                {tr(msg({ id: 'mcp.view.allProjects', defaultMessage: 'Workspace', description: "Beside the switch in an MCP server's view that turns it on or off in the workspace (on: it runs in the projects that have it on)." }))}
-              </label>
+              <button className="btn small" data-action="mcp-places" disabled={!!info.error} onClick={() => void actions.chooseMcpPlaces(info).then(() => call('mcp:list')).then((l) => setInfo((was) => l.find((m) => m.name === selected) ?? was))}>
+                <Icon name="add" /> {tr(msg({ id: 'mcp.view.addTo', defaultMessage: 'Add to…', description: "A button in an MCP server's view (HI-2059): chooses the projects, and the Hive Assistant, it is added to." }))}
+              </button>
             </>
           )}
           <IconButton icon="trash" title={tr(M.deleteServer)} onClick={() => void remove()} />
@@ -540,13 +549,16 @@ export function DocsView() {
   const doc = DOCS.find((d) => d.id === page) ?? DOCS[0]
   const api = useStore((s) => s.api)
   const source = api?.url ? doc.source().replace(/http:\/\/127\.0\.0\.1:47821/g, api.url) : doc.source()
-  // Opened at a heading (a tip's Learn more): scroll to it once the page has rendered, and mark it briefly.
+  // Opened at a heading by its id (a tip's Learn more, #1535): scroll to it once the page has rendered, and mark it briefly.
   const anchor = useStore((s) => s.docsAnchor)
   const pageRef = useRef<HTMLDivElement>(null)
   useEffect(() => {
     if (!anchor) return
     const t = setTimeout(() => {
-      const h = [...(pageRef.current?.querySelectorAll('h1, h2, h3, h4') ?? [])].find((x) => x.textContent?.trim() === anchor)
+      // Resolved as card references and hive_read_section resolve a heading: an id none or several carry goes nowhere.
+      const slug = guideTarget(source, anchor)
+      if (!slug) console.warn(`Docs: no single heading has the id "${anchor}"`) // i18n-ignore: a developer's console line
+      const h = slug ? [...(pageRef.current?.querySelectorAll('h1, h2, h3, h4, h5, h6') ?? [])].find((x) => x.id === slug) : undefined
       if (h) {
         h.scrollIntoView({ block: 'start' })
         h.classList.add('docs-target')
@@ -555,7 +567,7 @@ export function DocsView() {
       set({ docsAnchor: null })
     }, 50)
     return () => clearTimeout(t)
-  }, [anchor, doc.id])
+  }, [anchor, doc.id, source])
   return (
     <div className="split">
       <div className="split-list" style={{ width: listWidth }}>

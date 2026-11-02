@@ -65,7 +65,7 @@ export async function initCheck(projectPath: string): Promise<GitInitCheck> {
   // Refused: its English for the log and the error initRepo throws (#881), its text for the window.
   const refuse = (text: Text): GitInitCheck => ({ ...base, refused: englishText(text), refusedText: text })
   const problem = gitProblemData(gitTool())
-  if (problem) return refuse(withValues(msg({ id: 'main.gitInit.noGit', defaultMessage: '{problem}: Agent Setup says how to fix it.', description: "Why a folder can't be made a git repository (the Initialise Git Repository dialog): git is missing or broken. {problem} says what's wrong. Agent Setup is a view's name." }), { problem }))
+  if (problem) return refuse(withValues(msg({ id: 'main.gitInit.noGit', defaultMessage: '{problem}: Provider Setup says how to fix it.', description: "Why a folder can't be made a git repository (the Initialise Git Repository dialog): git is missing or broken. {problem} says what's wrong. Provider Setup is a view's name." }), { problem }))
   // Looked for at every level whatever git is there: a colocated Jujutsu repository has .git beside .jj.
   const other = otherVcsOf(projectPath)
   if (other) return refuse(withValues(msg({ id: 'main.gitInit.otherVcs', defaultMessage: '{vcs} keeps this folder (in {root}): Hive makes a git repository only where no other version control system is.', description: "Why a folder can't be made a git repository: another version control system (Jujutsu, Mercurial…), {vcs}, keeps it. {root} is the folder it keeps." }), { vcs: other.name, root: other.root }))
@@ -129,7 +129,7 @@ export async function initRepo(projectPath: string, opts: GitInitOptions): Promi
     if (!ex?.excluded)
       throw stop(
         msg({ id: 'main.gitInit.failed.ignored', defaultMessage: "git still doesn't ignore .hive here (a rule in a .gitignore may bring it back), so nothing was committed", description: 'What failed in making a git repository, a clause (main.gitInit.stoppedAfter). .hive and .gitignore are names.' }),
-        msg({ id: 'main.gitInit.fix.ignored', defaultMessage: 'fix that, then choose Make first commit on the Git tab', description: 'What to do after .hive was found not ignored by git (main.gitInit.failed.ignored). Make first commit is a button on the Git tab: use its name as shown.' })
+        msg({ id: 'main.gitInit.fix.ignored', defaultMessage: 'fix that, then choose Make first commit in the Version Control tab', description: 'What to do after .hive was found not ignored by git (main.gitInit.failed.ignored). Make first commit is a button in the Version Control tab (glossary 2.1): use its name as shown.' })
       )
     await excludeCopies(projectPath).catch((e) => log.warn('excluding skill copies after git init', e))
 

@@ -1,9 +1,9 @@
 // The Microsoft Store's PowerShell 7 and Codex's sandbox (#585, Darren's decision: options 1 and 3). With Codex's Windows
-// sandbox set up and the Store's pwsh first on PATH, Agent Setup warns, names the symptom and suggests the installer's
+// sandbox set up and the Store's pwsh first on PATH, Provider Setup warns, names the symptom and suggests the installer's
 // PowerShell 7; Hive never changes the shell. Detection: the first pwsh.exe on PATH, by the Store's app execution alias
 // folder or its package folder. (On a machine with the Store's pwsh the alias is a reparse point only lstat can see:
 // checked against the real one, where there is one.)
-import { mkdirSync, writeFileSync } from 'fs'
+import { mkdirSync, readFileSync, writeFileSync } from 'fs'
 import { join, delimiter } from 'path'
 import { lstatSync } from 'original-fs'
 import { afterEach, describe, expect, it } from 'vitest'
@@ -54,12 +54,30 @@ describe('the Store PowerShell first on PATH (#585)', () => {
     if (process.platform === 'win32' && link) expect(storePwshFirst(real, process.env.LOCALAPPDATA, 'win32')).toBe(true)
   })
 
-  it('warns in Agent Setup: the symptom and the fix, no button (Hive never changes the shell)', () => {
+  it('warns in Provider Setup: a short label, then the problem, the symptom and the fix, no button (Hive never changes the shell)', () => {
     const issue = storePwshIssue()
-    expect(issue).toMatchObject({ id: 'store-pwsh', level: 'warning' })
+    expect(issue).toMatchObject({ id: 'store-pwsh', level: 'warning', message: 'PowerShell 7 from the Microsoft Store is installed' })
+    // The label is a badge and the window's banner (#1404): the explanation is the detail's first paragraph.
+    expect(issue.detail![0]).toMatch(/^Codex agents' commands can fail while a PowerShell 7 from the Microsoft Store is open/)
     expect(issue.action).toBeUndefined()
     expect(issue.detail!.join('\n')).toMatch(/CreateProcessAsUserW failed: 5/)
-    expect(issue.detail!.join('\n')).toMatch(/winget install --id Microsoft\.PowerShell --source winget/)
+    expect(issue.detail!.join('\n')).toMatch(/winget install --id Microsoft\.PowerShell --source winget --installer-type wix/)
+  })
+
+  // #1512: winget takes the Store's PowerShell for the same app ("already installed", nothing installed) until it is gone.
+  it('the fix in the order that works, in English and every translation: uninstall the Store one, install, then restart', () => {
+    const order = (text: string, lang: string): void => {
+      const uninstall = text.indexOf('Remove-AppxPackage')
+      const install = text.indexOf('winget install --id Microsoft.PowerShell --source winget --installer-type wix')
+      expect(uninstall, `${lang}: the uninstall command`).toBeGreaterThan(0)
+      expect(install, `${lang}: the install command after it`).toBeGreaterThan(uninstall)
+      expect(text.indexOf('Hive', install), `${lang}: Hive restarted after the install`).toBeGreaterThan(install)
+    }
+    order(storePwshIssue().detail!.at(-1)!, 'en')
+    for (const lang of ['de', 'es', 'fr', 'ja', 'pl', 'pt-BR', 'zh-CN']) {
+      const catalogue = JSON.parse(readFileSync(join(__dirname, '..', 'locales', lang, 'providers.json'), 'utf8')) as Record<string, string>
+      order(catalogue['providers.codex.storePwsh.fix'], lang)
+    }
   })
 })
 

@@ -101,6 +101,15 @@ describe("a board's fold, saved as a change (#170)", () => {
     expect(Object.keys(saved)).toEqual(['c:\\ws\\a'])
   })
 
+  it('keeps Merging collapsed, in board order after Approved, and expands it again (#1662)', () => {
+    let saved = applyBoardFold({}, 'ws', { columns: { ids: ['merging'], collapsed: true } })
+    expect(saved.ws).toEqual({ columns: ['merging'] })
+    saved = applyBoardFold(saved, 'ws', { columns: { ids: ['done', 'passed', 'hold'], collapsed: true } })
+    expect(saved.ws.columns).toEqual(['hold', 'passed', 'merging', 'done'])
+    saved = applyBoardFold(saved, 'ws', { columns: { ids: ['merging'], collapsed: false } })
+    expect(saved.ws.columns).toEqual(['hold', 'passed', 'done'])
+  })
+
   it('drops folds of cards no longer on the board, ignores what is not a column or card, and keeps the newest workspaces', () => {
     const saved = applyBoardFold({ ws: { columns: ['hold'], cards: [1, 2, 3] } }, 'ws', { cards: { numbers: [4, -1, 2.5, 'x' as never], folded: true }, columns: { ids: ['merged' as never, 'passed'], collapsed: true }, known: [2, 4] })
     expect(saved.ws).toEqual({ columns: ['hold', 'passed'], cards: [2, 4] })
@@ -163,7 +172,7 @@ describe('who moves cards to On Hold and Passed', () => {
 
   it('only the user and the Assistant (and the workspace token) park a card: a project agent is refused, moving or creating it there', async () => {
     const c = await run(() => tasks.createTask({ title: 'Park me', project: 'alpha' }, user))
-    await expect(run(() => tasks.updateTask(c.number, { column: 'hold' }, coder))).rejects.toThrow(/Only the user or the Assistant puts cards On Hold: ask the user to park #\d+/)
+    await expect(run(() => tasks.updateTask(c.number, { column: 'hold' }, coder))).rejects.toThrow(/Only the user or the Assistant puts cards On Hold\. Where the user has decided to park #\d+, ask the Assistant \(hive_ask_assistant\); otherwise ask the user\./)
     await expect(run(() => tasks.updateTask(c.number, { column: 'hold' }, coder))).rejects.toBeInstanceOf(tasks.TaskPermissionError)
     await expect(run(() => tasks.createTask({ title: 'Parked', project: 'alpha', column: 'hold' }, coder))).rejects.toBeInstanceOf(tasks.TaskPermissionError)
     expect((await run(() => tasks.getTask(c.number))).column).toBe('todo')
@@ -195,17 +204,22 @@ describe('who moves cards to On Hold and Passed', () => {
     expect(history(merged).at(-1)).toBe('Coder (alpha): Moved to Done')
   })
 
-  it("a failed verdict can't move the card on: it stays in Review for its fixes", async () => {
+  it("a failed verdict can't move the card anywhere but back to Doing, its builder's (HI-1946)", async () => {
     const c = await run(() => tasks.createTask({ title: 'Not yet', project: 'alpha', agent: 'c1', column: 'review' }, user))
     await run(() => tasks.updateTask(c.number, { review: 'start' }, reviewer))
-    for (const column of ['passed', 'done'] as const) await expect(run(() => tasks.updateTask(c.number, { review: 'failed', column }, reviewer))).rejects.toThrow(/A failed review leaves #\d+ in Review/)
+    const was = await run(() => tasks.getTask(c.number))
+    // Refused before anything is written: no verdict, no move, no hold.
+    for (const column of ['passed', 'done', 'review', 'todo'] as const) await expect(run(() => tasks.updateTask(c.number, { review: 'failed', column }, reviewer))).rejects.toThrow(/A failed review sends #\d+ back to Doing, to its builder/)
     const still = await run(() => tasks.getTask(c.number))
-    expect([still.column, still.review?.agent]).toEqual(['review', 'r1'])
+    expect([still.column, still.review?.agent, still.history.length, still.held?.length]).toEqual(['review', 'r1', was.history.length, was.held?.length])
+    // To Doing named, or no column: the same verdict.
+    const failed = await run(() => tasks.updateTask(c.number, { review: 'failed', column: 'doing' }, reviewer))
+    expect([failed.column, failed.agent, failed.review]).toEqual(['doing', 'c1', undefined])
   })
 
   it("another agent's card in Doing can't be moved on to Passed by a project agent", async () => {
     const c = await run(() => tasks.createTask({ title: 'In progress', project: 'alpha', agent: 'c1', column: 'doing' }, user))
-    await expect(run(() => tasks.updateTask(c.number, { column: 'passed' }, reviewer))).rejects.toThrow(/can't be moved to Passed by another agent/)
+    await expect(run(() => tasks.updateTask(c.number, { column: 'passed' }, reviewer))).rejects.toThrow(/another agent can't move it to Approved/)
   })
 
   it('an unknown column lists the six', async () => {

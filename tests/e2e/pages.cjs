@@ -1,9 +1,10 @@
 // Agent pages (#134): one layout for the project, and a page holds as many agents as the layout has panes, so pages
 // = agents ÷ panes. Automatic until chosen (up to a 3×2 grid, then pages of six). 4 agents in three columns are two
 // pages (the 4th alone on page 2); 6 in a grid of four are two; one at a time has no page buttons; switching the layout
-// changes the pages at once; the last page's spare panes are empty; up to twelve agents, and up to 24 with this
-// workspace's Agents per project raised (#562): pages, the most page buttons, the agents table, a template of 24 round
-// trip, a lower limit refusing a template and more agents but removing none.
+// changes the pages at once; the last page's spare panes are empty; the workflow's Maximum agents of twelve binds the
+// user too (HI-2058), and raised to 24 (#562, HI-2001), up to 24 agents: pages, the most page buttons, the agents table, a
+// template of 24 round trip (its plan saying how far over twelve, its load without its workflow refused there), and a
+// twenty-fifth refused.
 // Dev build, throwaway profile and workspace; no sessions are started.
 const lib = require('./lib.cjs')
 const { _electron } = require('playwright-core')
@@ -62,7 +63,7 @@ const check = (name, ok, extra = '') => {
   await choose('Three columns')
   check('four agents in three columns: two page buttons, at once', (await buttons()) === 2, String(await buttons()))
   check('page 1 shows agents 1–3', (await shown()) === 'Agent 1,Agent 2,Agent 3', await shown())
-  check('the summary chip counts the four agents (#975)', (await page.locator('.session-toolbar .summary-chip').innerText()).trim() === '4 idle', await page.locator('.session-toolbar .summary-chip').innerText())
+  check('the summary chip counts the four agents (#975), none running: stopped, as the header counts them (HI-1908)', (await page.locator('.session-toolbar .summary-chip').innerText()).trim() === '4 stopped', await page.locator('.session-toolbar .summary-chip').innerText())
   await go(2)
   check('page 2 has the fourth agent, its spare panes empty', (await shown()) === 'Agent 4' && (await panes()) === 3, `${await shown()} / ${await panes()}`)
   check('saved as the project layout', (await cfg()).layout === 'columns3', JSON.stringify(await cfg()))
@@ -112,14 +113,12 @@ const check = (name, ok, extra = '') => {
   await lib.until(async () => (await active()) === '1', 5000)
   check("choosing an agent on page 1 in the summary chip's list goes there", (await active()) === '1')
 
-  // Twelve is the most.
+  // Twelve, the workflow's Maximum agents by default: raised below to go past it (HI-2001, HI-2058).
   await add(4)
   const n = (await inv('workspace:refresh')).projects[0].agents.length
   check('twelve agents', n === 12, String(n))
   await go(2)
   check('page 2 is a full 3×2 grid too', (await shown()).split(',').length === 6)
-  const refused = await inv('agents:add', proj, { location: 'project', provider: 'claude-code' }).then(() => '', (e) => String(e.message ?? e))
-  check('a thirteenth is refused', /up to 12 agents/.test(refused), refused)
   await page.screenshot({ path: path.join(lib.WORK, 'pages-3-twelve.png') })
 
   // Removing the focused agent on page 2 stays on page 2 (the next agent takes focus) until page 2 empties.
@@ -143,8 +142,8 @@ const check = (name, ok, extra = '') => {
   await remove('Agent 7')
   check('removing the only agent on page 2 goes to page 1', (await page.locator('.page-switch').count()) === 0 && (await panes()) >= 1)
 
-  // --- More than twelve (#562): Settings → Advanced → Agents per project, this workspace's own value, up to 24.
-  const setLimit = (v) => inv('advanced:set', 'hive.agents.perProject', v, 'workspace')
+  // --- More than twelve (#562, HI-2001): the workflow's Maximum agents binds the user too (HI-2058); raised, up to 24.
+  const setLimit = (v) => lib.setMaxAgents(inv, v, 'workspace')
   const agentsNow = async () => (await inv('workspace:refresh')).projects[0].agents
   const refusal = () => inv('agents:add', proj, { location: 'project', provider: 'claude-code' }).then(() => '', (e) => String(e.message ?? e))
   // + Add ▾'s Configure Agent and Add… (#975), greyed out at the limit.
@@ -157,15 +156,16 @@ const check = (name, ok, extra = '') => {
     return greyed
   }
   await add(12 - (await agentsNow()).length)
+  check("at Maximum agents (twelve), + Add ▾'s Configure Agent and Add… is greyed out: it binds the user too", !!(await lib.until(addGreyed, HUNG_MS)))
   const at12 = await refusal()
-  check('back at twelve: a thirteenth is refused, naming the setting', /up to 12 agents \(Settings → Advanced → Agents per project\)/.test(at12), at12)
-  check("…and + Add ▾'s Configure Agent and Add… is greyed out", !!(await lib.until(addGreyed, HUNG_MS)))
+  check('…and a thirteenth is refused, saying where Maximum agents is raised', at12.endsWith('This project’s workflow allows 12 agents: raise Maximum agents in Version Control → Workflow.'), at12)
   await setLimit(24)
-  check('this workspace allows 24: it is back', !!(await lib.until(async () => !(await addGreyed()), HUNG_MS)))
+  check("raised to 24: + Add ▾'s Configure Agent and Add… isn't greyed out", !!(await lib.until(async () => !(await addGreyed()), HUNG_MS)))
   await add(12)
   check('twenty-four agents', (await agentsNow()).length === 24, String((await agentsNow()).length))
   const at24 = await refusal()
-  check('a twenty-fifth is refused', /up to 24 agents/.test(at24), at24)
+  check('a twenty-fifth is refused', at24.endsWith('A project can have up to 24 agents.'), at24)
+  check("…and + Add ▾'s Configure Agent and Add… is greyed out", !!(await lib.until(addGreyed, HUNG_MS)))
   await choose('Grid of six')
   check('24 in the grid of six: four pages', (await buttons()) === 4, String(await buttons()))
   await go(4)
@@ -225,22 +225,21 @@ const check = (name, ok, extra = '') => {
   check('a template of 24 is saved', saved?.saved?.agents?.length === 24, JSON.stringify(saved).slice(0, 200))
   for (const a of (await agentsNow()).slice(3)) await inv('agents:remove', proj, a.id, { deleteWorktree: false })
   check('down to three agents', (await agentsNow()).length === 3)
-  await setLimit(12)
-  const low = await inv('templates:plan', proj, 'project', saved.saved.file)
-  check("this workspace back to 12: the template's plan is blocked, saying why", low.blocked.some((b) => /It has 24 agents, and this project can have up to 12/.test(b)), JSON.stringify(low.blocked))
-  const lowLoad = await inv('templates:load', proj, 'project', saved.saved.file, low.remove.map((a) => a.id)).then(() => '', (e) => String(e.message ?? e))
-  check('…and loading it is refused, nothing changed', /up to 12/.test(lowLoad) && (await agentsNow()).length === 3, lowLoad)
-  await setLimit(24)
-  const plan = await inv('templates:plan', proj, 'project', saved.saved.file)
-  check('at 24, its plan has 24 agents and nothing blocking', plan.create.length === 24 && plan.blocked.length === 0, JSON.stringify(plan.blocked))
-  const loaded = await inv('templates:load', proj, 'project', saved.saved.file, plan.remove.map((a) => a.id))
-  check('loaded: 24 agents again', loaded.created.length === 24 && (await agentsNow()).length === 24, `${loaded.created.length} / ${(await agentsNow()).length}`)
-  // Lowered with 24 agents: they all stay; none can be added.
   await setLimit(null)
-  check('the workspace value cleared (back to 12): the 24 agents stay', (await agentsNow()).length === 24)
+  const plan = await inv('templates:plan', proj, 'project', saved.saved.file)
+  check("at Maximum agents twelve, the user's plan has 24 agents and nothing blocking, saying how far over", plan.create.length === 24 && plan.blocked.length === 0 && JSON.stringify(plan.maxAgents) === '{"now":12,"needs":24}', JSON.stringify([plan.blocked, plan.maxAgents]))
+  await setLimit(24)
+  const fits = await inv('templates:plan', proj, 'project', saved.saved.file)
+  check('this workspace allows 24: nothing over', fits.maxAgents === null, JSON.stringify(fits.maxAgents))
+  await setLimit(null)
+  // Its workflow not applied (HI-2058): more agents than Maximum agents can't be loaded, and nothing changes.
+  const over = await inv('templates:load', proj, 'project', saved.saved.file, plan.remove.map((a) => a.id)).then(() => '', (e) => String(e.message ?? e))
+  check('at twelve, its load without its workflow is refused, nothing changed', /It has 24 agents, and this project’s workflow allows 12 agents: raise Maximum agents in Version Control → Workflow first, or load it with its workflow\. Nothing was changed\./.test(over) && (await agentsNow()).length === 3, `${over} / ${(await agentsNow()).length}`)
+  await setLimit(24)
+  const loaded = await inv('templates:load', proj, 'project', saved.saved.file, plan.remove.map((a) => a.id))
+  check('at 24, loaded: 24 agents again', loaded.created.length === 24 && (await agentsNow()).length === 24, `${loaded.created.length} / ${(await agentsNow()).length}`)
   const after = await refusal()
-  check('…and none can be added', /up to 12 agents/.test(after), after)
-  check("…+ Add ▾'s Configure Agent and Add… greyed out", !!(await lib.until(addGreyed, HUNG_MS)))
+  check('…and a twenty-fifth is refused', after.endsWith('A project can have up to 24 agents.'), after)
 
   await app.close()
   process.exit(failed ? 1 : 0)

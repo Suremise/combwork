@@ -2,7 +2,8 @@
 // with worktrees opens on Unused worktrees: first the picker says Hive is looking and the page shows a spinner and a
 // message (listing is slowed, HIVE_TEST_SLOW_IPC), then the list, each labelled with who made it ("was B4": the Hive
 // agent whose session last ran there; "not made by Hive": a `git worktree add` of its own). The picker lists the unused
-// worktrees, then those in use, then the project folder, last. Coming back shows the last list at once while it is
+// worktrees, then the folders agents work in (#1569: Coder's 0.9 worktree, the slot kept for it once the project has
+// opened), then the project folder, last. Coming back shows the last list at once while it is
 // checked again, and Refresh looks again; a Refresh that fails keeps the list, says so, and Retry recovers
 // (HIVE_TEST_FAIL_IPC). A project with no agent whose only worktree is unused shows the spinner while it is first looked
 // at, never its folder as if it had none; if that first look fails, it says so with Retry (still not its folder), and
@@ -87,7 +88,7 @@ function inUse(project, name) {
   const about = page.locator('.changes-about')
   const openChanges = async (name) => {
     await page.getByText(name, { exact: true }).first().click()
-    await page.locator('.tab', { hasText: 'Git' }).click()
+    await page.locator('.tab', { hasText: 'Version Control' }).click()
   }
   const slow = (v) => app.evaluate((_, x) => {
     process.env.HIVE_TEST_SLOW_IPC = x
@@ -119,9 +120,13 @@ function inUse(project, name) {
   const row = (p) => section.locator(`.unused-wt[data-path="${p.replace(/\\/g, '\\\\')}"]`)
   check('…B4\'s labelled "was B4" (its session ran there)', (await row(b4).locator('[data-origin="hive"]').innerText().catch(() => '')) === 'was B4', await row(b4).innerText().catch(() => ''))
   check('…the other "not made by Hive"', (await row(other).locator('[data-origin="other"]').innerText().catch(() => '')) === 'not made by Hive', await row(other).innerText().catch(() => ''))
-  const values = await picker.locator('option').evaluateAll((os) => os.map((o) => o.value))
-  const labels = await picker.locator('option').allInnerTexts()
-  check('the picker: Unused worktrees first, then each unused one, then those in use, then the project folder last', values[0] === 'unused' && values[values.length - 1] === '' && values.indexOf(coder.id) > values.findIndex((v) => v.startsWith('unused:')) && values.filter((v) => v.startsWith('unused:')).length === 2, JSON.stringify(labels))
+  // The branch comparisons (HI-1824) come first, in a group of their own: these checks are of the folders after them.
+  const all = await picker.locator('option').evaluateAll((os) => os.map((o) => ({ value: o.value, label: o.textContent ?? '' })))
+  const folders = all.filter((o) => !(o.value.startsWith('compare:') || o.value === 'leftovers'))
+  const values = folders.map((o) => o.value)
+  const labels = folders.map((o) => o.label)
+  check('the picker: Branches first, then Unused worktrees, then each unused one, then those in use, then the project folder last', all[0].value.startsWith('compare:') && all.findIndex((o) => !(o.value.startsWith('compare:') || o.value === 'leftovers')) === all.length - folders.length, JSON.stringify(all.map((o) => o.value)))
+  check('…its folders: Unused worktrees first, then each unused one, then those in use, then the project folder last', values[0] === 'unused' && values[values.length - 1] === '' && values.indexOf(coder.id) > values.findIndex((v) => v.startsWith('unused:')) && values.filter((v) => v.startsWith('unused:')).length === 2, JSON.stringify(labels))
   check('…each unused one says who made it', labels.some((l) => l.startsWith('hive/b4 · was B4')) && labels.some((l) => l.startsWith('experiment · not made by Hive')), JSON.stringify(labels))
   check('…and Unused worktrees counts them', labels[0] === 'Unused worktrees (2)', labels[0])
   await shots('populated')
@@ -129,7 +134,7 @@ function inUse(project, name) {
   // --- Back again: the last list at once, checked again in the background.
   await page.locator('.tab', { hasText: 'Overview' }).click()
   await lib.sleep(300)
-  await page.locator('.tab', { hasText: 'Git' }).click()
+  await page.locator('.tab', { hasText: 'Version Control' }).click()
   const refreshing = page.locator('[data-unused-refreshing]')
   check('coming back shows the last list at once, while it checks them again', !!(await lib.until(async () => (await rows.count()) === 2 && (await refreshing.count()) === 1, HUNG_MS)) && (await loadingPage.count()) === 0, await page.locator('.split-main').innerText().catch(() => ''))
   await shots('refreshing')
@@ -151,8 +156,12 @@ function inUse(project, name) {
   await failing('')
 
   // --- The other pages say what they show.
+  // Coder's 0.9 worktree became the slot kept for it as the project opened (#1441): listed as where it works (#1569).
+  check('…the folder Coder works in, as in use: the slot kept for it, with its branch', labels.includes('Coder · carried: coder · hive/coder'), JSON.stringify(labels))
   await picker.selectOption(coder.id)
-  check("an agent's worktree: what it shows", !!(await lib.until(async () => (await about.getAttribute('data-about')) === 'agent', 8000)) && (await about.innerText()).includes("Coder's worktree"), await about.innerText().catch(() => ''))
+  check("an agent's folder: what it shows", !!(await lib.until(async () => (await about.getAttribute('data-about')) === 'agent', 8000)) && (await about.innerText()).includes('Coder works in coder, the slot kept for it: everything on its branch since it left master.'), await about.innerText().catch(() => ''))
+  check('…its branch since it left its base, and Merge hive/coder…', !!(await lib.until(async () => (await page.locator('.split-list').innerText()).includes('hive/coder since it left master') && (await page.locator('.split-list [aria-label="Merge hive/coder…"]').count()) === 1, 8000)), await page.locator('.split-list').innerText().catch(() => ''))
+  await shots('agent-slot')
   await picker.selectOption(`unused:${b4}`)
   check('an unused one: what it shows', !!(await lib.until(async () => (await about.getAttribute('data-about')) === 'unused-one', 8000)) && (await about.innerText()).includes('hive/b4'), await about.innerText().catch(() => ''))
   await picker.selectOption('')
@@ -167,7 +176,7 @@ function inUse(project, name) {
     shell.openPath = async (p) => (globalThis.__opened.push(p), '')
   })
   const opened = () => app.evaluate(() => globalThis.__opened.at(-1) ?? null)
-  for (const [label, value, folder] of [["Coder's worktree", coder.id, coder.worktree.path], ['B4’s unused worktree', `unused:${b4}`, b4], ['the unused worktree outside the workspace', `unused:${other}`, other], ['the project folder', '', repo]]) {
+  for (const [label, value, folder] of [["Coder's slot", coder.id, coder.worktree.path], ['B4’s unused worktree', `unused:${b4}`, b4], ['the unused worktree outside the workspace', `unused:${other}`, other], ['the project folder', '', repo]]) {
     const name = `only-${(value || 'project').replace(/[^\w]+/g, '-').slice(-24)}.txt`
     fs.writeFileSync(path.join(folder, name), 'only here\n')
     await picker.selectOption(value)

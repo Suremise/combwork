@@ -52,7 +52,7 @@ const check = (name, ok, extra = '') => {
   await until(async () => (await tile(todo[29]).count()) === 1, HUNG_MS)
   const scroll = (label) => body(label).evaluate((el) => ({ top: el.scrollTop, max: el.scrollHeight - el.clientHeight }))
   const scrollTo = (label, top) => body(label).evaluate((el, t) => (el.scrollTop = t === 'end' ? el.scrollHeight : t), top)
-  check('the columns are taller than the window', (await scroll('Todo')).max > 400 && (await scroll('Doing')).max > 400, JSON.stringify(await scroll('Todo')))
+  check('the columns are taller than the window', (await scroll('Todo')).max > 400 && (await scroll('Active')).max > 400, JSON.stringify(await scroll('Todo')))
 
   /** Presses on a card and moves a little, so the drag starts. */
   const pick = async (n) => {
@@ -121,56 +121,56 @@ const check = (name, ok, extra = '') => {
   await release()
   check('dropped at the very bottom', !!(await until(async () => (await saved('todo')).at(-1) === first, 5000)), (await saved('todo')).slice(-3).join(','))
 
-  // --- Into another long column scrolled elsewhere: Doing scrolls to its top, and the card lands first.
+  // --- Into another long column scrolled elsewhere: Active scrolls to its top, and the card lands first.
   await scrollTo('Todo', 0)
-  await scrollTo('Doing', 300)
+  await scrollTo('Active', 300)
   await lib.sleep(200)
   const moved = (await saved('todo'))[0]
   await pick(moved)
-  const doingBox = await body('Doing').boundingBox()
+  const doingBox = await body('Active').boundingBox()
   await holdAt(doingBox.x + doingBox.width / 2, doingBox.y + 200)
   // Scrolled by something other than the board's own edge scrolling (Chromium scrolls a column near its edge during
   // a drag too, #256), with the pointer still: the marker follows the card now under it, the sixth.
-  const sixth = await body('Doing').evaluate((el, [n, y]) => {
+  const sixth = await body('Active').evaluate((el, [n, y]) => {
     const r = el.querySelector(`.task-card[data-task="${n}"]`).getBoundingClientRect()
     el.scrollTop += r.top + r.height / 4 - y
     return el.scrollTop
   }, [doing[5], held.y])
-  check('scrolled under a still pointer, the marker follows', sixth > 50 && !!(await until(async () => (await marker('Doing')) === doing[5], HUNG_MS)), `${sixth}: ${await marker('Doing')}`)
+  check('scrolled under a still pointer, the marker follows', sixth > 50 && !!(await until(async () => (await marker('Active')) === doing[5], HUNG_MS)), `${sixth}: ${await marker('Active')}`)
   await holdAt(doingBox.x + doingBox.width / 2, doingBox.y + 6)
-  check('over Doing, Doing scrolls to its top', !!(await until(async () => (await scroll('Doing')).top === 0, 8000)))
+  check('over Active, Active scrolls to its top', !!(await until(async () => (await scroll('Active')).top === 0, 8000)))
   check("Todo doesn't scroll meanwhile", (await scroll('Todo')).top === 0)
-  check('the marker is before Doing\'s first card', !!(await until(async () => (await marker('Doing')) === doing[0], HUNG_MS)), String(await marker('Doing')))
+  check('the marker is before Active\'s first card', !!(await until(async () => (await marker('Active')) === doing[0], HUNG_MS)), String(await marker('Active')))
   await release()
-  // Into Doing from another column asks who works on it (Move to Doing): the card has no agent, so Nobody yet.
-  const ask = page.locator('.dialog', { hasText: `Move #${moved} to Doing` })
+  // Into Active from another column asks who works on it (Move to Active): the card has no agent, so Nobody yet.
+  const ask = page.locator('.dialog', { hasText: `Move ${await lib.cardLabel(inv, moved)} to Active` })
   await ask.waitFor({ timeout: 5000 })
   await ask.locator('.dialog-footer .btn.primary').click()
   check('it lands first in Doing, where the marker was', !!(await until(async () => (await saved('doing'))[0] === moved, 5000)), (await saved('doing')).slice(0, 3).join(','))
 
   // --- Leaving the board stops the scrolling; afterwards the column scrolls as usual.
-  await scrollTo('Doing', 'end')
+  await scrollTo('Active', 'end')
   await lib.sleep(200)
   await pick(doing[29])
   await holdAt(doingBox.x + doingBox.width / 2, doingBox.y + 6)
-  await until(async () => (await scroll('Doing')).top < (await scroll('Doing')).max - 100, 5000)
+  await until(async () => (await scroll('Active')).top < (await scroll('Active')).max - 100, 5000)
   // Out of the board, over the page header.
   await holdAt(doingBox.x + doingBox.width / 2, 20)
   await lib.sleep(200)
-  const a1 = (await scroll('Doing')).top
+  const a1 = (await scroll('Active')).top
   await lib.sleep(500)
-  const a2 = (await scroll('Doing')).top
+  const a2 = (await scroll('Active')).top
   check('leaving the board stops the scrolling', a1 === a2 && a1 > 0, `${a1} → ${a2}`)
   await release()
   await lib.sleep(300)
-  const b1 = (await scroll('Doing')).top
+  const b1 = (await scroll('Active')).top
   await lib.sleep(500)
-  check('dropping outside stops it too', (await scroll('Doing')).top === b1)
+  check('dropping outside stops it too', (await scroll('Active')).top === b1)
   check('the card stayed where it was', (await saved('doing')).at(-1) === doing[29])
-  const box = await body('Doing').boundingBox()
+  const box = await body('Active').boundingBox()
   await page.mouse.move(box.x + box.width / 2, box.y + box.height / 2)
   await page.mouse.wheel(0, -400)
-  check('the column scrolls normally afterwards', !!(await until(async () => (await scroll('Doing')).top < b1, HUNG_MS)))
+  check('the column scrolls normally afterwards', !!(await until(async () => (await scroll('Active')).top < b1, HUNG_MS)))
 
   // --- A click still opens a card.
   await tile(todo[5]).click()

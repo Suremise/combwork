@@ -5,6 +5,7 @@
  * provider reported. Hive estimates no tokens. Nothing here holds a prompt, a body, a token, a URL or a path.
  */
 import type { Text } from './advanced'
+import type { LaunchWorkflow } from './workflow/roles'
 
 /** Latency histogram bounds (ms, inclusive upper bounds); a last bucket counts everything above the highest. */
 export const LATENCY_BOUNDS_MS = [1, 2, 5, 10, 20, 50, 100, 200, 500, 1000, 2000, 5000, 10000] as const
@@ -18,7 +19,11 @@ export interface Timed {
   histogram: number[]
 }
 
-export type MetricOutcome = 'ok' | 'client-error' | 'denied' | 'server-error' | 'cancelled'
+/**
+ * How a request ended. `waiting` (HI-1831): a reply that says to ask again (an isolated check's resolve while no check
+ * copy is free): an expected wait, not a failure. Before HI-1831 those were recorded as `client-error`.
+ */
+export type MetricOutcome = 'ok' | 'client-error' | 'denied' | 'server-error' | 'cancelled' | 'waiting'
 
 /** Agent API requests, by route template, method, caller role and outcome. */
 export interface ApiSeries extends Timed {
@@ -47,6 +52,8 @@ export interface McpSeries extends Timed {
 export interface GuidanceSeries {
   provider: string
   role: 'agent' | 'assistant'
+  /** The launch's side of the workflow (HI-2049); `unknown`: recorded before Hive counted it. */
+  workflow: LaunchWorkflow | 'unknown'
   launches: number
   /**
    * Each part of what Hive tells the session at launch, counted once a launch whichever way the provider gets it (the
@@ -87,9 +94,27 @@ export interface GuidanceSeries {
  */
 export interface CatalogSeries {
   role: 'agent' | 'assistant'
+  /** The side of the workflow of the launch whose bridge sent it (HI-2049); `unknown`: recorded before Hive counted it. */
+  workflow: LaunchWorkflow | 'unknown'
   starts: number
   tools: number
   toolsBytes: number
+  /**
+   * The same list's characters (its JSON's UTF-16 code units), and of how many of the starts: a bridge from before
+   * HI-2049 sent bytes only, so its starts are in `starts` and not here.
+   */
+  toolsChars: number
+  charStarts: number
+  /**
+   * Its parts (HI-2063), of the starts that reported them (`partStarts`, a bridge from before HI-2063 reported none):
+   * those starts' characters in all (`partToolsChars`), the tools' descriptions and the parameters' descriptions, each
+   * as the JSON has them. The rest of those characters is the schemas and the list's structure (names, types, keys,
+   * punctuation, escapes): `partToolsChars - descriptionChars - paramChars`.
+   */
+  partStarts: number
+  partToolsChars: number
+  descriptionChars: number
+  paramChars: number
 }
 
 /** The skill service (revisions.ts): scans, what they read and what the inventory saved. */
@@ -155,6 +180,8 @@ export interface ProviderUsageSummary {
   costEstimated: number
   /** Sessions whose cost isn't known (no price for the model, or no usage reported). */
   costUnknown: number
+  /** Sessions run only on servers on this PC (HI-1772): free, $0 known (in neither costEstimated nor costUnknown). */
+  costFree?: number
   /**
    * Context is a snapshot (each session's last request), not a sum: of the sessions that reported one, how many, their
    * average and largest, and the largest context window reported (null: none was).
@@ -178,6 +205,8 @@ export interface TrendPoint {
   /** Requests that didn't succeed (client or server error, refused, cancelled); `cancelled` of them, by the client. */
   failed: number
   cancelled: number
+  /** Replies that said to ask again (HI-1831), not among `failed`. */
+  waits: number
   requestBytes: number
   responseBytes: number
   toolCalls: number

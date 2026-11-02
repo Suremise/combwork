@@ -3,6 +3,7 @@
 import { mkdirSync, writeFileSync } from 'fs'
 import { join } from 'path'
 import { afterAll, beforeAll, beforeEach, describe, expect, it, vi } from 'vitest'
+import { claudeInput } from './claudeInputStandIn'
 import * as electron from 'electron'
 import { tempDir } from './tempDir'
 
@@ -58,15 +59,22 @@ function withFacts<T extends { status: string }>(state: T): T {
   return state
 }
 
+
 /** A running agent, idle, as SessionManager keeps one (no process). */
 function idle(agentId: string): { status: string } {
   const state = withFacts({ provider: 'claude', runId: `run-${agentId}`, projectPath: p, agentId, cwd: p, sessionId: '', status: 'ready', startedAt: '', launchSignature: '', unseen: false })
-  s.live.set(`${p.toLowerCase()}#${agentId}`, { state, adapter: claudeCode, transcriptMtime: '', defaultModel: false, modeTail: '', launchMode: null, configuredMode: null })
+  // Its input box (claudeInputStandIn, fed what is typed: HI-1979, Hive types into it only once a key of its own shows
+  // it empty), bracketed paste off.
+  const input = claudeInput({ paste: false })
+  input.from(() => pty.typed)
+  s.live.set(`${p.toLowerCase()}#${agentId}`, { state, adapter: claudeCode, screen: input.screen, transcriptMtime: '', defaultModel: false, modeTail: '', launchMode: null, configuredMode: null })
   return state
 }
 // Its doorbell (#650: the task's id, never its text, which the agent reads with hive_inbox).
 const prompted = (): boolean => pty.typed.join('').includes('New in your inbox: 1 task')
 const submitted = (): boolean => pty.typed.includes('\r')
+// A write of Backspaces only: how Hive takes back a line it stopped in Claude Code (HI-1974).
+const backspaces = (d: string): boolean => /^\x7f+$/.test(d)
 
 describe('a Start typed into a running agent', () => {
   beforeAll(async () => {
@@ -101,7 +109,8 @@ describe('a Start typed into a running agent', () => {
   it('the agent starts work while the input is being cleared: nothing is typed, the card goes back to Review', async () => {
     const st = idle('d1')
     pty.onWrite = (d) => {
-      if (d === '\x15') st.status = 'working'
+      // As the clear begins (HI-1979: an empty box's is the letter Hive shows and takes back).
+      if (d === '\x15' || d === 'x') st.status = 'working'
     }
     const { error, card } = await startWith('d1', user)
     expect(error).toMatch(/is working/)
@@ -118,7 +127,16 @@ describe('a Start typed into a running agent', () => {
     const { error, card } = await startWith('d2', user)
     expect(error).toMatch(/is working/)
     expect(submitted()).toBe(false)
-    expect(pty.typed.at(-1)).toBe('\x15')
+    // Claude Code's Ctrl+U deletes only one wrapped row, so what Hive typed is taken back with a Backspace for each
+    // character, eight to a write (HI-1974): never fewer than it typed, and nothing else after them.
+    // The empty input shown so first (HI-1979): the letter Hive types and takes back.
+    expect(pty.typed.slice(0, 2)).toEqual(['x', '\x7f'])
+    const back = pty.typed.findIndex((d, i) => i >= 2 && backspaces(d))
+    const typedText = pty.typed.slice(2, back).join('')
+    expect(typedText).toContain('New in your inbox')
+    expect(pty.typed.slice(back).every((d) => backspaces(d) && d.length <= 8)).toBe(true)
+    expect(pty.typed.slice(back).join('').length).toBeGreaterThanOrEqual([...typedText].length)
+    expect(pty.typed.includes('\x15')).toBe(false)
     expect([card.column, card.agent]).toEqual(['review', 'd2'])
   })
 
@@ -126,8 +144,8 @@ describe('a Start typed into a running agent', () => {
     idle('d3')
     // 50 ms after the last piece of the prompt went in (pieces go every 10 ms): in the wait before Enter.
     let timer: ReturnType<typeof setTimeout> | undefined
-    pty.onWrite = (d) => {
-      if (d === '\x15') return
+    pty.onWrite = () => {
+      if (!pty.typed.slice(2).length) return
       clearTimeout(timer)
       timer = setTimeout(() => sessions.noteUserInput(s.key(p, 'd3'), 'x'), 50)
     }
@@ -136,7 +154,8 @@ describe('a Start typed into a running agent', () => {
     expect(prompted()).toBe(true)
     expect(submitted()).toBe(false)
     // Nothing cleared after the prompt began: the user's text stays where they typed it.
-    expect(pty.typed.lastIndexOf('\x15')).toBe(0)
+    expect(pty.typed.slice(0, 2)).toEqual(['x', '\x7f'])
+    expect(pty.typed.slice(2).some((d) => d.includes('\x15') || d.includes('\x7f'))).toBe(false)
     expect([card.column, card.agent]).toEqual(['review', 'd3'])
   })
 

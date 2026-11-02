@@ -1,29 +1,42 @@
 import { DEFAULT_PERF_FILTERS, type PerfFilters } from '@shared/metricsView'
 import { create } from 'zustand'
-import { useMemo, type ReactNode } from 'react'
+import type { ReactNode } from 'react'
 import type { Period } from '@shared/usageTotals'
+import type { McpCatalogRow } from '@shared/types'
 import type { StartFailure } from '@shared/startFailure'
+import { cardLabel, setCardNaming } from '@shared/projectKeys'
 import type { AdvancedState } from '@shared/advanced'
+import type { StageId } from '@shared/workflow/facts'
 import type { AgentLeftovers } from '@shared/agentProcesses'
 import { EMPTY_TIPS_STATE, type TipsState } from '@shared/tips'
+import { BELL_MAX, keepPopups, staysUntilHandled } from '@shared/notify'
 import { agentPtyKey, agentsPerPage, layoutFitting, layoutPanes, mostUrgent, projectLayout, projectSessionView } from '@shared/defaults'
 import { cellPage, cellPageCount, pageCells, pageIds, placedCells, type PaneCells } from '@shared/paneCells'
 import { projectAgentStates, type AgentState } from '@shared/agentState'
-import { tileOrder, tilePageOf, tilePageShown, tilesOnPage } from '@shared/tiles'
-import { agentProvider, providersInUse, providerWarnings, setInstalledCheck } from '@shared/providers'
+import { tileOrder, tilePageOf, tilePageShown, tilesOnPage, tilesPerPage } from '@shared/tiles'
+import { agentProvider, setInstalledCheck } from '@shared/providers'
 import { setDateStyle } from '@shared/dates'
-import { language as shownLanguage, onLanguageChange } from '@shared/i18n'
+import { language as shownLanguage, msg, onLanguageChange, tr } from '@shared/i18n'
 import { chooseFocus, deferredFocus } from './deferredFocus'
 import type { ProjectTab } from '@shared/projectTabs'
-import type { GitSection } from '@shared/gitRepo'
+import type { VcSection } from '@shared/gitRepo'
 import type { ProgressFilter } from '@shared/progress'
-import type { TemplateAgent, TemplateRef } from '@shared/templates'
+import type { TemplateAgent, TemplateEntry, TemplateRef } from '@shared/templates'
 import type { GitTool } from '@shared/gitTool'
-import type { AgentBranchStatus, AssistantPanelSide, BoardFold, PageLayout, QuitScope, SessionLayout, TaskCard, TaskColumn, UpdateState, WorkspaceUsage, RecentWorkspace } from '@shared/types'
+import type { RunsFilter } from '@shared/progressTabs'
+import { loadActivityView, saveActivityView, type ActivityView } from './activityView'
+import { currentCard, type ActivityCardAgent } from '@shared/activity'
+import { boardReader } from './boardReads'
+import type { AgentBranchStatus, AgentStart, AssistantPanelSide, BoardFold, BoardState, PageLayout, ProjectStages, QuitScope, SessionBulkProgress, SessionLayout, TaskCard, TaskColumn, UpdateState, WorkflowForm, WorkspaceUsage, RecentWorkspace } from '@shared/types'
+import type { PresetId } from '@shared/workflow/options'
+import type { TemplateWorkflow, TemplateWorkflows } from '@shared/workflow/templateOptions'
+import type { PlatformId } from '@shared/platform/descriptors'
 import type {
   AgentApiInfo,
   AgentInfo,
   AssistantAction,
+  AssistantChangeGroup,
+  AssistantUndoResult,
   AssistantQuestion,
   ProgressRun,
   MergeSlotInfo,
@@ -37,12 +50,20 @@ import type {
   ProjectInfo,
   QuitSession,
   ToastMessage,
-  Notice,
+  OpenProgress,
+  CloseCommandRun,
   WorkspaceInfo
 } from '@shared/types'
+import type { QueueView } from '@shared/workflow/queue'
+import type { KeptReturn } from '@shared/progressQueue'
 import type { SessionAction } from './util'
+import { storeUpdated } from './pageMarks'
+import { keepSame } from '@shared/keepSame'
+import { withAction } from '@shared/assistantChangeList'
+import { sessionEndBook, type EndsChange, type SessionEnd } from '@shared/sessionEnd'
+import { rememberTab, shownTab } from '@shared/tabs'
 
-export type Activity = 'projects' | 'overview' | 'performance' | 'board' | 'notes' | 'skills' | 'templates' | 'mcp' | 'assistant' | 'docs' | 'settings'
+export type Activity = 'projects' | 'overview' | 'activity' | 'performance' | 'board' | 'notes' | 'skills' | 'templates' | 'mcp' | 'assistant' | 'docs' | 'settings'
 export type { ProjectTab } from '@shared/projectTabs'
 
 /**
@@ -51,7 +72,8 @@ export type { ProjectTab } from '@shared/projectTabs'
  * Templates tab; none in the Templates view), and where the answer goes (the agent as saved, or null: cancelled).
  */
 /** A template being edited (#510): its revision and content as saved (what a save expects there), and the draft. */
-export type TemplateDraft = { name: string; description: string; layout: PageLayout; agents: TemplateAgent[] }
+/** A template being edited: `pairs` by the agents' places (#1440), so they follow a move, a removal or a renumbering. */
+export type TemplateDraft = { name: string; description: string; layout: PageLayout; agents: TemplateAgent[]; pairs?: { builder: number; reviewer: number }[]; workflow?: TemplateWorkflows }
 export interface TemplateEdit {
   /** The template (where it is kept). */
   ref: TemplateRef
@@ -80,6 +102,9 @@ export interface TemplateAgentRequest {
  */
 export interface ArchiveAllRequest {
   column: TaskColumn | null
+  /** A stage column's (#1420: Approved beside Merging): only cards in that stage, named as the column is (`name`). */
+  stage?: StageId
+  name?: string
   project: string | null
   scope: string | null
   query: string
@@ -91,6 +116,10 @@ export interface ConfirmRequest {
   message: string
   /** Items (paths) under the message, one per line, with a Copy button (#347): never lines joined into message. */
   list?: readonly string[]
+  /** The list is to read, not to copy (a CLI's clipboard text Hive asks about, #1292): no Copy button. */
+  listOnly?: boolean
+  /** The list is text as it was written (a CLI's clipboard text, #1292): monospace, its spacing kept, even with listOnly. */
+  listMono?: boolean
   detail?: string
   /** A long detail scrolls in its own box, the dialog's buttons staying in view (a template's agents, #268). */
   scrollDetail?: boolean
@@ -121,12 +150,25 @@ export interface PromptRequest {
   validate?: (value: string) => string | null
   /** Items under the message, one per line, with a Copy button (what an MCP server runs, #550). */
   list?: readonly string[]
+  /** The list is to read, not to copy (the rules a move skips, #1275): no Copy button. */
+  listOnly?: boolean
   /** Under the list: what else to know (warnings). */
   detail?: string
+  /** The field's label, above it (and its accessible name): "Reason (optional)". */
+  fieldLabel?: string
   /** A tick box under the field; `set` gets the user's choice before the dialog resolves. */
   check?: { label: string; initial: boolean; set: (checked: boolean) => void }
+  /** A second tick box under the first (Save Template's "Use the project key in names", #1440), alike. */
+  check2?: { label: string; initial: boolean; set: (checked: boolean) => void }
+  /** A third (Save Template's "Include this project's workflow", HI-1910), alike. */
+  check3?: { label: string; initial: boolean; set: (checked: boolean) => void }
   /** A drop-down under the field (where to turn a new MCP server on, #713); `set` gets the pick before the dialog resolves with a value. */
   select?: { label: string; options: { label: string; value: string }[]; initial: string; set: (value: string) => void }
+  /**
+   * A second box under the field (a new project's key, #1221): it follows the field (`follow`) until the user types in
+   * it, is checked as it changes (`validate`: why it can't be, or null), and `set` gets it before the dialog resolves.
+   */
+  second?: { label: string; hint?: (second: string) => string; follow: (value: string) => string; validate: (second: string) => string | null; set: (second: string) => void }
   resolve: (value: string | null) => void
 }
 
@@ -135,6 +177,8 @@ export interface ChoiceRequest {
   kind: 'choice'
   title: string
   message: string
+  /** Items (paths) under the message, one per line, with a Copy button (what a card's paths leave out, HI-2352). */
+  list?: readonly string[]
   detail?: string
   danger?: boolean
   /** Buttons left to right; the last is the default. A session action's button takes its colour (#344). */
@@ -165,19 +209,29 @@ interface State {
   settings: AppSettings | null
   /** Settings → Advanced (#367): advanced.json's overrides, this window's workspace's own values and the installed CLIs. */
   advanced: AdvancedState | null
+  /** Moves on each time main says Hive's accounts changed (HI-980): Settings → Accounts reads them again. */
+  connectionsChanged: number
   workspace: WorkspaceInfo | null
   /** The recent workspaces as this window sees them (#144). */
   recent: RecentWorkspace[]
+  /** This window's workspace opening, its step now (HI-1694), or null. */
+  openProgress: OpenProgress | null
+  /** This window's close command (HI-1368) while it runs or after it failed: CloseCommandPanel; null: none. */
+  closeCommand: CloseCommandRun | null
   /** Each provider's installed CLI (install state, version, sign-in, readiness). */
   providers: Record<ProviderId, AgentInstallInfo>
   /** Whether git itself runs (#346); null until asked. */
   gitTool: GitTool | null
   /** Subscription limits each provider last reported (account-wide), by provider. */
   planUsage: Record<ProviderId, PlanUsage>
+  /** Subscription limits each connection's sessions last reported (that login's own, HI-1756), by connection id. */
+  connectionPlanUsage: Record<string, PlanUsage>
   /** Worktree agents' unmerged work, by projectKey (null: git couldn't check it). */
   branchStatus: Record<string, AgentBranchStatus | null>
   /** Agents whose CLI exited before its session started, by projectKey: why, until the next launch or ✕. */
   startFailures: Record<string, StartFailure>
+  /** Each agent's last ended run, why and when (HI-1881), by projectKey: what its stopped pane says; presentation only. */
+  sessionEnds: Record<string, SessionEnd>
   /** What agents' stopped launches left running, by projectKey (#507): until ended, kept, or they end. */
   leftovers: Record<string, AgentLeftovers>
   /** What the tips know (saved in the profile), the tip in the card, and whether Help → Tips… is open. */
@@ -195,9 +249,26 @@ interface State {
   sidebarWidth: number
   /** Projects sidebar collapsed to a rail of status dots. */
   sidebarCompact: boolean
+  /**
+   * The Projects sidebar folded to its rail for now (HI-1737): the window too narrow for it beside the side panels and
+   * the work (layoutRoom.ts). Never saved; `sidebarUnfolded`: the user's Expand Sidebar meanwhile, until there's room.
+   */
+  sidebarFolded: boolean
+  sidebarUnfolded: boolean
+  /**
+   * The Progress panel folded to its strip for now (HI-1737, the Assistant's rule): the work short of its least width
+   * even with the sidebar given way. Never saved (the panel stays open in what is kept); `progressUnfolded`: the user
+   * opened it meanwhile, until there's room.
+   */
+  progressFolded: boolean
+  progressUnfolded: boolean
   /** Set to select a session in its project's Sessions tab. */
   /** Open the Sessions tab on a session, and in it at its nth compaction (from 0, oldest first) when given. */
   sessionsJump: { project: string; id: string; nonce: number; compaction?: number } | null
+  /** A link into a project's Attachments tab (HI-1841): its tab, at a card's or a session's files; cleared once shown. */
+  attachmentsJump: AttachmentsJump | null
+  /** The Activity tab's view per project (#1254, HI-1677): its range, agents' and cards' filters, Hide finished, paused by hand. */
+  activityFilters: Record<string, ActivityView>
   /** A file to show in a project's Files tab (a terminal's file link): whose folder (`root`, a worktree agent's id or ''), the file and the line. */
   filesJump: { project: string; root: string; rel: string; line?: number; col?: number; nonce: number } | null
   /** Resizable pane sizes, saved with the window layout. */
@@ -215,6 +286,8 @@ interface State {
   progressFilter: Record<string, ProgressFilter>
   /** Each workspace's running lanes in the user's order (#568; saved in ui), lane ids by workspace path in lower case. */
   laneOrder: Record<string, string[]>
+  /** The tab each remembered row of tabs last showed (HI-1837; saved in ui), by the row's key. */
+  tabs: Record<string, string>
   selectedProject: string | null
   projectTabs: Record<string, ProjectTab>
   selectedNote: string | null
@@ -225,6 +298,12 @@ interface State {
   /** A Hive skill to open for editing (not preview) when the Skills view shows it: from a project's Edit in workspace. */
   skillEdit: string | null
   selectedMcp: string | null
+  /** The MCP view's tab (HI-545): the installed servers, or the catalogues' servers to install. */
+  mcpTab: 'installed' | 'catalogue'
+  /** The catalogue server open in the MCP view (HI-545), as its list last had it. */
+  mcpPick: McpCatalogRow | null
+  /** Bumped to read the catalogues again (the view's ↻, an install or update). */
+  mcpCatalogVersion: number
   /** The mode open in the Modes view (its file). */
   selectedMode: string | null
   /** What the Assistant view's main area shows: its conversations or the selected mode. */
@@ -239,6 +318,14 @@ interface State {
   progressRuns: ProgressRun[]
   /** This window's workspace's merge slots (#350): those held or waited for. */
   mergeSlots: MergeSlotInfo[]
+  /** This window's workspace's merge queues (#1356), every project's, as `queue:list` gives them (queueSource.ts). */
+  queues: QueueView[]
+  /** The returns this window showed and marked seen, kept until their own 10 s are up (#1356 round 6: queueSource.ts). */
+  queueKept: KeptReturn[]
+  /** Bumped on each `queue-changed` (#1357): the card's Work section and the Git tab's Merge queue section read again. */
+  queueVersion: number
+  /** Bumped on each `workflow-changed` (#1417): views that show a project's stages (`workflow:stages`) read them again. */
+  workflowVersion: number
   /** This window's workspace's lanes (#483), for the Progress panel (#484): running ones and those ended lately. */
   lanes: LaneInfo[]
   /** A pane (an agent's, or the Assistant's panel) briefly highlighted because something asked to show it: its pty key. */
@@ -255,21 +342,28 @@ interface State {
   /** What the Hive Assistant did in this window's workspace (oldest first), and what it is asking the user. */
   assistantActions: AssistantAction[]
   assistantQuestions: AssistantQuestion[]
+  /** The Assistant's changes kept for undo, by the user's message (#1283), and what each undo in this window did. */
+  assistantChanges: AssistantChangeGroup[]
+  assistantUndone: Record<string, AssistantUndoResult>
   /** Agents the Assistant added that the user hasn't looked at yet, by project path (their page's button shows a dot). */
   newAgents: Record<string, string[]>
   modesVersion: number
   docsPage: string
-  /** A heading of the shown doc to scroll to (Learn more on a tip), cleared once there. */
+  /** The id of a heading of the shown doc to scroll to (Learn more on a tip, #1535), cleared once there. */
   docsAnchor: string | null
   settingsSection: string
   settingsQuery: string
   /** Settings' Modified only (Settings → Advanced's list follows it too, #367). */
   settingsModifiedOnly: boolean
 
+  /** Pop-ups showing in this window (components/Popups.tsx, HI-2320), the newest first. */
   toasts: ToastMessage[]
-  /** In-app banners showing in this window (components/NoticeBanners.tsx), the newest first. */
-  notices: Notice[]
+  /** The bell's list (the Notifications panel): every entry this window was given, the newest first. */
   notifications: ToastMessage[]
+  /** Entries whose button runs now (HI-2320): its spinner, by entry id and the button's label. */
+  entryBusy: Record<string, string>
+  /** Finishes main still collects to tell together (HI-2320: a tip waits while any do). */
+  finishesPending: number
   unread: number
   showNotifications: boolean
   /** The status bar's attention inbox popover. */
@@ -287,7 +381,7 @@ interface State {
   /** Hive's own update state, and whether its dialog is open. */
   update: UpdateState | null
   updateOpen: boolean
-  /** The Agent Setup dialog, open at a provider (or at the first one). */
+  /** The Provider Setup dialog, open at a provider (or at the first one). */
   setupOpen: ProviderId | true | false
   /** Repair… for a moved workspace (#146), and the move whose banner was hidden (until Hive restarts). */
   moveRepairOpen: boolean
@@ -310,12 +404,14 @@ interface State {
   windowCount: number
   /** Working agents keeping the PC awake (0: none). */
   keepAwake: number
+  /** Bulk actions under way on hosts' sessions, by host path lower-cased (#1659): none, no entry. */
+  sessionBulk: Record<string, SessionBulkProgress[]>
   /** The agent whose Compact dialog is open. */
   compactFor: AgentRef | null
+  /** The agent whose Hooks dialog is open (HI-982). */
+  hooksFor: AgentRef | null
   /** Project whose Add Agent dialog is open. */
   addAgentFor: string | null
-  /** Add Agent opened on an existing worktree, chosen (#353's Give to an agent…). */
-  addAgentPreset: { project: string; worktreePath: string } | null
   /** Agent whose settings dialog (name, model, effort, permission mode) is open. */
   agentSettingsFor: AgentRef | null
   /** The Agent Settings dialog for a template's agent (#271): open while set; it answers the template editor. */
@@ -328,6 +424,8 @@ interface State {
   templateEdits: Record<string, TemplateEdit>
   /** Worktree agent whose Merge dialog is open. */
   mergeFor: AgentRef | null
+  /** The Merge dialog for merges outside cards (#1450): its project, and the branch it opened on (else the first). */
+  branchMergeFor: { project: string; branch?: string } | null
   /** The project whose Initialise repository dialog is open (#701): kept while the Git tab changes under it. */
   gitInitFor: string | null
   /** The agent whose work "Hand Over to…" hands to another agent. */
@@ -345,20 +443,43 @@ interface State {
   paneSaid: { text: string; n: number } | null
   /** Actions without a dialog that are running (runOnce): their buttons show a spinner and ignore clicks. */
   running: Record<string, true>
+  /** Agents whose session is starting or resuming ("<path>#<agent>", startingKey), from the click until it runs or fails: their buttons show it (#1177). */
+  starting: Record<string, Starting>
   /** Per project and agent page ("<path>#<page>"): the agent last focused there, focused again on going back. */
   pageFocus: Record<string, string>
   /** Per project, in the Tiles view (#976): the agent its focus view shows (none: the grid of tiles). */
   tileFocus: Record<string, string>
   /** Per project: the page of tiles the Tiles view shows (from 0). */
   tilePage: Record<string, number>
+  /** Per project: how many tiles fit its Tiles view's area, as last measured (HI-1951); none: TILES_PER_PAGE. */
+  tilesFit: Record<string, number>
+  /**
+   * Per project: the agent the focus view just went back from (HI-1951, HR1's round 1), until the grid drawn again has
+   * measured its page: the window may have been resized meanwhile, so its page is worked out again with it in view.
+   */
+  tileReturn: Record<string, string>
   /**
    * Per project: whose folder the Changes and Files tabs show (a worktree agent's id; anything else = the project
    * folder). Changes also takes an unused worktree (#400): `unused:<its folder>`, or `unused` for the list of them all.
    */
   changesRoot: Record<string, string>
-  /** Per project: the Git tab's section shown (#607; Changes when none). */
-  gitSection: Record<string, GitSection>
-  /** Per project: bumped after a Git action in this window, so the Git tab and the status bar read git again. */
+  /** Per project: the Version Control tab's section shown (#607, #1416; none: Changes for Git, Workflow for None). */
+  vcSection: Record<string, VcSection>
+  /**
+   * "How do you work?"'s Customise… (#1423): the Workflow section opens with this preset filled in, not saved. A loaded
+   * template's workflow (HI-1910): its section for `platform`, laid over the project's options as the form reads them.
+   */
+  workflowPrefill: { path: string; preset: PresetId | null; template?: { name: string; platform: PlatformId; section: TemplateWorkflow; savedMax?: number } } | null
+  /**
+   * A template waiting for its project's Git (HI-1910): its Load dialog's Set up Git… opened Version Control on Git's
+   * page; once Initialise repository… has made the repository and the project is Git, its Load dialog opens again.
+   */
+  templatePending: { path: string; entry: Pick<TemplateEntry, 'scope' | 'file' | 'name'>; from?: string } | null
+  /** Version Control opens on Git's page for this project (HI-1905's view, before its repository: HI-1910's Set up Git…). */
+  vcGitPreview: string | null
+  /** Projects added from this window (Add Project, New Project): their Version Control tab shows the step, so no notice (#1423). */
+  presetStepShown: string[]
+  /** Per project: bumped after a Git action in this window, so the Version Control tab and the status bar read git again. */
   gitVersion: Record<string, number>
   /** Per project: bumped when its unused worktrees change outside the list (a merge of one, #400): the list reloads. */
   unusedVersion: Record<string, number>
@@ -366,6 +487,23 @@ interface State {
 
   /** The workspace's task board (archived cards too), and the board view's filters. */
   tasks: TaskCard[]
+  /**
+   * Bumped by each read of the board (HI-1859): a change that writes only a card's facts (an agent's refusal) leaves
+   * `tasks` the same object (keepSame, HI-1806), so what is made from the facts (the work badges, a card's work) reads
+   * again on this.
+   */
+  boardReads: number
+  /** Whether the board is read-only and why, and its kept 0.9 copy (#1207): read with the board. */
+  boardState: BoardState | null
+  /**
+   * Every project's stages for the board's columns (`board:stages`, HI-1682), by path in lower case: read with the
+   * board when what they were read for (`for`, boardStagesFor) has changed, so its columns come with its cards.
+   */
+  boardStages: { for: string; byPath: Record<string, ProjectStages | null>; forms: Record<string, WorkflowForm> } | null
+  /** Each project's key and its old keys (#1221), read with the board (a key change is a board change). */
+  projectKeys: ProjectKeys[]
+  /** The names moved cards keep in the projects they left (`HI-1` → card), read with the board too (#1221). */
+  movedCardNames: Record<string, number>
   /**
    * The Performance view's filters (activity bar: the workspace, a project filter) and each project's Performance tab's
    * (fixed to that project), kept while you move around.
@@ -382,10 +520,16 @@ interface State {
   boardProject: string | null
   boardQuery: string
   boardArchived: boolean
+  /** The Task Board shows only the cards something waits on the user for (#1276). */
+  boardForYou: boolean
   /** The card open in the card dialog, or a new card (with the project it's for). */
   taskOpen: number | { project: string } | null
   /** The card whose Start dialog is open. */
   taskStartFor: number | null
+  /** Start lane… (#1280): open for a project (its path; null: the first with agents), with these cards chosen first. */
+  laneStartFor: { project: string | null; cards: number[] } | null
+  /** The Progress panel's Runs tab asked for with this filter (#1446: what a lane waits for); the panel takes it and clears it. */
+  runsShow: RunsFilter | null
   /** The Archive All dialog (#351): a column's (or the whole board's, column null) cards as the board shows them. */
   boardArchiveAll: ArchiveAllRequest | null
   /** A card being moved to Doing: the Move to Doing dialog asks who has it. */
@@ -409,13 +553,18 @@ interface State {
 export const useStore = create<State>(() => ({
   settings: null,
   advanced: null,
+  connectionsChanged: 0,
   workspace: null,
   recent: [],
+  openProgress: null,
+  closeCommand: null,
   providers: {},
   gitTool: null,
   planUsage: {},
+  connectionPlanUsage: {},
   branchStatus: {},
   startFailures: {},
+  sessionEnds: {},
   leftovers: {},
   tips: EMPTY_TIPS_STATE,
   tipShown: null,
@@ -429,7 +578,13 @@ export const useStore = create<State>(() => ({
   sidebarVisible: true,
   sidebarWidth: 280,
   sidebarCompact: false,
+  sidebarFolded: false,
+  sidebarUnfolded: false,
+  progressFolded: false,
+  progressUnfolded: false,
   sessionsJump: null,
+  attachmentsJump: null,
+  activityFilters: {},
   filesJump: null,
   panes: {},
   skillsProvider: {},
@@ -440,6 +595,7 @@ export const useStore = create<State>(() => ({
   boardFold: {},
   progressFilter: {},
   laneOrder: {},
+  tabs: {},
   selectedProject: null,
   projectTabs: {},
   selectedNote: null,
@@ -448,12 +604,19 @@ export const useStore = create<State>(() => ({
   templateFilter: 'all',
   skillEdit: null,
   selectedMcp: null,
+  mcpTab: 'installed',
+  mcpPick: null,
+  mcpCatalogVersion: 0,
   selectedMode: null,
   assistantSection: 'conversations',
   journalVersion: 0,
   assistantOpen: false,
   progressRuns: [],
   mergeSlots: [],
+  queues: [],
+  queueKept: [],
+  queueVersion: 0,
+  workflowVersion: 0,
   lanes: [],
   paneFlash: null,
   paneColumns: null,
@@ -461,6 +624,8 @@ export const useStore = create<State>(() => ({
   assistantSettingsOpen: false,
   assistantActions: [],
   assistantQuestions: [],
+  assistantChanges: [],
+  assistantUndone: {},
   newAgents: {},
   modesVersion: 0,
   docsPage: 'guide',
@@ -470,8 +635,9 @@ export const useStore = create<State>(() => ({
   settingsModifiedOnly: false,
 
   toasts: [],
-  notices: [],
   notifications: [],
+  entryBusy: {},
+  finishesPending: 0,
   unread: 0,
   showNotifications: false,
   inboxOpen: false,
@@ -496,13 +662,15 @@ export const useStore = create<State>(() => ({
   quitPending: null,
   windowCount: 1,
   keepAwake: 0,
+  sessionBulk: {},
   compactFor: null,
+  hooksFor: null,
   addAgentFor: null,
-  addAgentPreset: null,
   agentSettingsFor: null,
   templateAgentFor: null,
   templateEdits: {},
   mergeFor: null,
+  branchMergeFor: null,
   gitInitFor: null,
   handOverFor: null,
   overviewJump: null,
@@ -511,16 +679,28 @@ export const useStore = create<State>(() => ({
   agentDrag: null,
   paneSaid: null,
   running: {},
+  starting: {},
   pageFocus: {},
   tileFocus: {},
   tilePage: {},
+  tilesFit: {},
+  tileReturn: {},
   changesRoot: {},
-  gitSection: {},
+  vcSection: {},
+  workflowPrefill: null,
+  templatePending: null,
+  vcGitPreview: null,
+  presetStepShown: [],
   gitVersion: {},
   unusedVersion: {},
   filesRoot: {},
 
   tasks: [],
+  boardReads: 0,
+  boardState: null,
+  boardStages: null,
+  projectKeys: [],
+  movedCardNames: {},
   perfWorkspace: DEFAULT_PERF_FILTERS,
   perfProjects: {},
   overviewPeriod: 'week',
@@ -530,8 +710,11 @@ export const useStore = create<State>(() => ({
   boardProject: null,
   boardQuery: '',
   boardArchived: false,
+  boardForYou: false,
   taskOpen: null,
   taskStartFor: null,
+  laneStartFor: null,
+  runsShow: null,
   boardArchiveAll: null,
   taskDoing: null,
   removeProjectFor: null,
@@ -552,7 +735,54 @@ setInstalledCheck((id) => {
   return !i ? null : i.found ? true : i.checking ? null : false
 })
 
-export const set = useStore.setState
+/** The store's parts set kept the same where they are equal (keepSame). */
+const KEPT_SAME = ['workspace', 'tasks', 'boardState', 'projectKeys', 'movedCardNames'] as const satisfies readonly (keyof State)[]
+
+/** How long agents' states wait to be shown together (HI-1806): a dozen agents send dozens a second. */
+const LIVE_BATCH_MS = 250
+/** Agents' states not shown yet (applyLiveState), by projectKey, the newest of each. */
+const pendingLive = new Map<string, LiveSessionState>()
+/**
+ * Changes to show with them (HI-1862): an agent's bookkeeping (its terminal's epoch, a run's end, its usage changed, its
+ * start over), in the order made, so a dozen agents starting at once render the window a few times, not ~12 each.
+ */
+const pendingWith: ((s: State) => Partial<State>)[] = []
+let liveTimer: ReturnType<typeof setTimeout> | null = null
+/**
+ * The parts set with setLoaded (HI-1938): a direct set of one shows the changes waiting first, so an older answer
+ * waiting never replaces what was set after it.
+ */
+const LOADED = new Set<string>(['lanes', 'laneOrder', 'mergeSlots', 'assistantActions', 'assistantQuestions', 'assistantChanges', 'queues', 'queueKept', 'advanced', 'recent', 'openProgress', 'skillsVersion', 'modesVersion'] satisfies (keyof State)[])
+
+/** Sets the store, noting which of its parts changed (HI-1775): a long task's line in hive.log names the updates made in it. */
+export const set: typeof useStore.setState = ((partial: Parameters<typeof useStore.setState>[0], replace?: boolean) => {
+  let before = useStore.getState()
+  let update = typeof partial === 'function' ? partial(before) : partial
+  // A workspace set (main's newer report, a change made here): the agents' states waiting are older, so shown first;
+  // likewise the loaded parts waiting (setLoaded) before a direct set of one.
+  if ((pendingLive.size || pendingWith.length) && update && ('workspace' in update || Object.keys(update).some((k) => LOADED.has(k)))) {
+    flushLiveStates()
+    before = useStore.getState()
+    if (typeof partial === 'function') update = partial(before)
+  }
+  if (replace || !update) useStore.setState(update as never, replace as never)
+  else {
+    // Parts main sends again whole (HI-1806: a workspace with one agent's state changed, the board after each change):
+    // the parts unchanged stay the objects the window has, so only what shows a changed one renders again, and a part
+    // the same throughout changes nothing.
+    const rest: Partial<State> = { ...update }
+    for (const k of KEPT_SAME) {
+      if (!(k in rest) || !rest[k] || !before[k]) continue
+      const kept = keepSame(before[k], rest[k])
+      if (kept === before[k]) delete rest[k]
+      else (rest as Record<string, unknown>)[k] = kept
+    }
+    if (Object.keys(rest).length) useStore.setState(rest as never)
+  }
+  const after = useStore.getState()
+  // The parts it changed (an update by a function too): what re-renders their readers.
+  if (after !== before) storeUpdated(Object.keys(after).filter((k) => after[k as keyof State] !== before[k as keyof State]))
+}) as typeof useStore.setState
 export const get = useStore.getState
 
 // A change of language (Settings → General → Language) renders the window again in it (#767).
@@ -628,24 +858,9 @@ export function useFocusedAgent(p: ProjectInfo | null | undefined): AgentInfo | 
   return p.agents.find((a) => a.id === id) ?? p.agents[0] ?? null
 }
 
-/**
- * Which providers' problems this window shows (#474): none of those turned on installed, or else those turned on that
- * new agents or this workspace's agents (the Assistant's too) use. Recomputed when settings, what's installed or the
- * workspace change.
- */
-export function useProviderWarnings(): ReturnType<typeof providerWarnings> {
-  const settings = useStore((s) => s.settings)
-  const providers = useStore((s) => s.providers)
-  const workspace = useStore((s) => s.workspace)
-  return useMemo(() => {
-    const hosts = [...(workspace?.projects ?? []), ...(workspace?.assistant ? [workspace.assistant] : [])]
-    return providerWarnings(settings, (id) => providers[id], providersInUse(settings, hosts))
-  }, [settings, providers, workspace])
-}
-
-/** The provider an agent runs (its own, else the project's default, else the global default). */
-export function agentProviderOf(p: ProjectInfo | null | undefined, a: Pick<AgentInfo, 'provider' | 'live'> | null | undefined): ProviderId {
-  return a?.live?.provider || agentProvider(a, p?.config, get().settings)
+/** The provider an agent runs: the one its session runs, else its own (agentProvider). */
+export function agentProviderOf(a: Pick<AgentInfo, 'provider' | 'live'> | null | undefined): ProviderId {
+  return a?.live?.provider || agentProvider(a, get().settings)
 }
 
 /** The combined state shown by a project's single status dot: its most urgent agent. */
@@ -710,7 +925,7 @@ export function agentsOnScreen(s: State = get()): Map<string, string[]> {
   // The Tiles view (#976): the agent its focus view shows, else the page of tiles.
   if (p && (s.projectTabs[p.path] ?? 'session') === 'session' && projectSessionView(p.config, s.settings) === 'tiles') {
     const focus = tileFocusOf(p, s)
-    out.set(p.path, focus ? [focus] : tilesOnPage(tileAgents(p, s), tilePage(p, s)).map((t) => t.a.id))
+    out.set(p.path, focus ? [focus] : tilesOnPage(tileAgents(p, s), tilePage(p, s), tilesPageSize(p, s)).map((t) => t.a.id))
   } else if (p && (s.projectTabs[p.path] ?? 'session') === 'session') {
     const focused = s.focusedAgent[p.path]
     const shown = paneAssignment(p, focused && p.agents.some((a) => a.id === focused) ? focused : (p.agents[0]?.id ?? null))
@@ -737,12 +952,33 @@ export function tileAgents(p: Pick<ProjectInfo, 'path' | 'name' | 'agents'>, s: 
   return tileOrder(states, s.settings?.sessions.tileOrder ?? 'panes').map((i) => ({ a: p.agents[i], state: states[i] }))
 }
 
-/** The page of tiles a project's Tiles view shows. */
-export const tilePage = (p: Pick<ProjectInfo, 'path' | 'agents'>, s: Pick<State, 'tilePage'> = get()): number => tilePageShown(s.tilePage[p.path] ?? 0, p.agents.length)
+/** How many tiles a page of a project's Tiles view holds: as many as fit its area (HI-1951), TILES_PER_PAGE until measured. */
+export const tilesPageSize = (p: Pick<ProjectInfo, 'path'>, s: Pick<State, 'tilesFit'> = get()): number => tilesPerPage(s.tilesFit[p.path])
 
-/** Shows a page of a project's tiles. */
+/** The page of tiles a project's Tiles view shows. */
+export const tilePage = (p: Pick<ProjectInfo, 'path' | 'agents'>, s: Pick<State, 'tilePage' | 'tilesFit'> = get()): number => tilePageShown(s.tilePage[p.path] ?? 0, p.agents.length, tilesPageSize(p, s))
+
+/**
+ * Shows a page of a project's tiles: the user's (or a command's) choice, so a return from the focus view still waiting for
+ * the grid's measure (`tileReturn`) no longer decides the page (HR1's HI-1951 round 2).
+ */
 export function showTilePage(p: Pick<ProjectInfo, 'path' | 'agents'>, page: number): void {
-  set((s) => ({ tilePage: { ...s.tilePage, [p.path]: tilePageShown(page, p.agents.length) } }))
+  set((s) => {
+    const { [p.path]: _, ...tileReturn } = s.tileReturn
+    return { tilePage: { ...s.tilePage, [p.path]: tilePageShown(page, p.agents.length, tilesPageSize(p, s)) }, tileReturn }
+  })
+}
+
+/**
+ * How many tiles fit a project's Tiles view now (HI-1951, measured as its area resizes): the page holds that many, and
+ * the page shown becomes the one with `keep` on it (the tile the keyboard is on, else the first shown), so it stays in view.
+ */
+export function setTilesFit(p: Pick<ProjectInfo, 'path' | 'name' | 'agents'>, fit: number, keep: string | null): void {
+  set((s) => {
+    if (s.tilesFit[p.path] === fit) return {}
+    const at = keep ? tileAgents(p, s).findIndex((t) => t.a.id === keep) : -1
+    return { tilesFit: { ...s.tilesFit, [p.path]: fit }, ...(at >= 0 ? { tilePage: { ...s.tilePage, [p.path]: tilePageOf(at, tilesPerPage(fit)) } } : {}) }
+  })
 }
 
 /** The agent a project's focus view shows (#976), while it is one of its agents; null: the grid of tiles. */
@@ -763,9 +999,24 @@ export function closeTile(p: ProjectInfo): string | null {
   set((s) => {
     const { [p.path]: _, ...rest } = s.tileFocus
     const at = id ? tileAgents(p, s).findIndex((t) => t.a.id === id) : -1
-    return { tileFocus: rest, ...(at >= 0 ? { tilePage: { ...s.tilePage, [p.path]: tilePageOf(at) } } : {}) }
+    return { tileFocus: rest, ...(at >= 0 ? { tilePage: { ...s.tilePage, [p.path]: tilePageOf(at, tilesPageSize(p, s)) }, tileReturn: { ...s.tileReturn, [p.path]: id! } } : {}) }
   })
   return id
+}
+
+/** The agent a project's focus view went back from, while its grid hasn't measured its page since (null: none). */
+export function tileReturnOf(p: Pick<ProjectInfo, 'path' | 'agents'>, s: Pick<State, 'tileReturn'> = get()): string | null {
+  const id = s.tileReturn[p.path]
+  return id && p.agents.some((a) => a.id === id) ? id : null
+}
+
+/** The grid has measured with the returning agent in view: its page is the grid's own again. */
+export function clearTileReturn(p: Pick<ProjectInfo, 'path'>): void {
+  if (!get().tileReturn[p.path]) return
+  set((s) => {
+    const { [p.path]: _, ...rest } = s.tileReturn
+    return { tileReturn: rest }
+  })
 }
 
 /**
@@ -821,9 +1072,15 @@ export async function setAssistantSide(side: AssistantPanelSide): Promise<void> 
 
 const progressOpenKey = (ws: string): string => `progress-open:${ws.toLowerCase()}`
 
-/** Whether this window's workspace's Progress panel is open (else it is folded to its strip). */
+/** Whether this window's workspace's Progress panel shows open (else it is folded to its strip, by the user or for the room). */
 export function useProgressOpen(): boolean {
-  return useStore((s) => !!s.workspace && s.panes[progressOpenKey(s.workspace.path)] === 1)
+  return useStore((s) => !!s.workspace && s.panes[progressOpenKey(s.workspace.path)] === 1 && !(s.progressFolded && !s.progressUnfolded))
+}
+
+/** Whether the user left the Progress panel open (what is kept), folded for the room or not (HI-1737's layoutRoom). */
+export function progressWanted(): boolean {
+  const ws = get().workspace?.path
+  return !!ws && get().panes[progressOpenKey(ws)] === 1
 }
 
 /** The Progress panel's filter as chosen for this window's workspace (#251), if any. */
@@ -843,18 +1100,43 @@ export function setProgressFilter(f: ProgressFilter): void {
   void window.hive.invoke('ui:set', { progressFilter: kept }).catch(() => undefined)
 }
 
+/** The tab a remembered row of tabs shows (HI-1837): the one last chosen while it is offered, else `fallback`. */
+export function useRememberedTab<T extends string>(key: string, ids: readonly T[], fallback: T): T {
+  const wanted = useStore((s) => s.tabs[key])
+  return shownTab(ids, wanted, fallback)
+}
+
+/** Chooses a remembered row's tab (a click, or a link to it), kept across restarts (at most 100 rows, the oldest go). */
+export function chooseTab(key: string, id: string): void {
+  const kept = rememberTab(get().tabs, key, id)
+  set({ tabs: kept })
+  void window.hive.invoke('ui:set', { tabs: kept }).catch(() => undefined)
+}
+
+/** Settings → Version Control's tabs (HI-1837): Hive defaults and the open workspace's, by their rows' ids. */
+export const WORKFLOW_DEFAULTS_TABS = 'settings.workflow'
+export const WORKFLOW_DEFAULTS_TAB = { global: 'workflow.defaults', workspace: 'workflow.workspaceDefaults' } as const
+
+/** Opens Settings → Version Control on a level's tab (a "From Hive defaults" or "From the workspace" origin's link). */
+export function showWorkflowDefaults(level: keyof typeof WORKFLOW_DEFAULTS_TAB): void {
+  chooseTab(WORKFLOW_DEFAULTS_TABS, WORKFLOW_DEFAULTS_TAB[level])
+  set({ settingsSection: 'workflow', settingsQuery: '', settingsModifiedOnly: false })
+  setActivity('settings')
+}
+
 /** Shows or folds the Progress panel, remembered per workspace. */
 export function setProgressOpen(open: boolean): void {
   const ws = get().workspace?.path
   if (!ws) return
-  set((s) => ({ panes: { ...s.panes, [progressOpenKey(ws)]: open ? 1 : 0 } }))
+  // Folded for the room (HI-1737): opening it shows it anyway, until there's room; folding it is the user's again.
+  set((s) => ({ panes: { ...s.panes, [progressOpenKey(ws)]: open ? 1 : 0 }, progressUnfolded: open && s.progressFolded }))
   void window.hive.invoke('ui:setPane', progressOpenKey(ws), open ? 1 : 0)
 }
 
 /** Whether the Progress panel is open now (for commands). */
 export function progressIsOpen(): boolean {
-  const ws = get().workspace?.path
-  return !!ws && get().panes[progressOpenKey(ws)] === 1
+  const s = get()
+  return progressWanted() && !(s.progressFolded && !s.progressUnfolded)
 }
 
 /** Whether a workspace's Assistant panel was left open. */
@@ -868,6 +1150,7 @@ export function selectedProjectInfo() {
 }
 
 export function setActivity(a: Activity): void {
+  navigations++
   set((s) => ({
     activity: a,
     lastSideActivity: a === 'docs' || a === 'settings' ? s.lastSideActivity : a,
@@ -876,9 +1159,11 @@ export function setActivity(a: Activity): void {
 }
 
 /** Collapses the Projects sidebar to a rail of status dots, or expands it again. Either way the Projects list is shown. */
-export function toggleCompactSidebar(compact = !get().sidebarCompact): void {
+export function toggleCompactSidebar(compact = !(get().sidebarCompact || (get().sidebarFolded && !get().sidebarUnfolded))): void {
   set((s) => ({
     sidebarCompact: compact,
+    // Folded for the room (HI-1737): Expand shows the list anyway, until there's room again; Collapse folds it back.
+    sidebarUnfolded: s.sidebarFolded && !compact,
     sidebarVisible: true,
     lastSideActivity: 'projects',
     activity: s.activity === 'docs' || s.activity === 'settings' ? s.activity : 'projects'
@@ -892,11 +1177,108 @@ export function openProjectSettings(path: string, section: string): void {
   setProjectTab(path, 'settings')
 }
 
+/** Where a link into the Attachments tab goes (HI-1841): Card attachments at a card, or Pane attachments at a session. */
+export type AttachmentsJump = { project: string; nonce: number } & ({ tab: 'card'; card: number } | { tab: 'pane'; session: string })
+
+/** Opens a project's Attachments tab on Card attachments at a card, or Pane attachments at a session (HI-1841). */
+export function showAttachments(path: string, at: { card: number } | { session: string }): void {
+  set({ selectedProject: path, attachmentsJump: { project: path, nonce: Date.now(), ...('card' in at ? { tab: 'card' as const, card: at.card } : { tab: 'pane' as const, session: at.session }) } })
+  showView('projects')
+  setProjectTab(path, 'images')
+}
+
 /** Opens the Sessions tab on one session; with `compaction`, at that compaction's divider (its nth, from 0). */
 export function openInSessionsTab(path: string, id: string, compaction?: number): void {
   set({ sessionsJump: { project: path, id, nonce: Date.now(), ...(compaction !== undefined ? { compaction } : {}) } })
   setProjectTab(path, 'sessions')
 }
+
+/**
+ * Opens a project's Activity tab (#1254), frozen (HI-1743): filtered to an agent, its tab shown; or to a card, on the tab
+ * of the agent working on it (`agentId`); null: as it was left. Hide finished and the zoom stay as they were.
+ */
+export function openActivity(path: string, filter: { agentId?: string; card?: number } | null): void {
+  set((s) => {
+    const was = s.activityFilters[path] ?? loadActivityView(path)
+    const opened = Date.now()
+    const view: ActivityView = filter ? { ...was, agents: filter.agentId && filter.card === undefined ? [filter.agentId] : [], cards: filter.card !== undefined ? [filter.card] : [], ...(filter.agentId ? { tab: filter.agentId } : {}), opened } : { ...was, opened }
+    saveActivityView(path, view)
+    return { activityFilters: { ...s.activityFilters, [path]: view }, selectedProject: path }
+  })
+  showView('projects')
+  setProjectTab(path, 'activity')
+}
+
+/**
+ * Whether a card has an Activity to open (HI-1743, HI-1664): in progress (Doing or Review), a project's or the
+ * workspace's own. Who works on it now is found as it opens.
+ */
+export const cardHasActivity = (c: Pick<TaskCard, 'column' | 'archived'>): boolean => !c.archived && (c.column === 'doing' || c.column === 'review')
+
+/** The key of an agent of a session host on Activity's workspace level (HI-1664): its host's path and its id, as the panes'. */
+export const activityAgentKey = (path: string, agentId: string): string => projectKey(path, agentId)
+
+/** Where Activity's workspace level keeps its view (HI-1664): the workspace's own, never a project's or another workspace's. */
+export const workspaceActivityKey = (workspacePath: string): string => `workspace:${workspacePath.toLowerCase()}`
+
+/**
+ * Opens Activity's workspace level (HI-1664), frozen: filtered to these agents (keys of activityAgentKey), the first's
+ * tab shown, for a card (`card`: said so, and its agents found again as agents start and stop); null: as it was left.
+ */
+export function openWorkspaceActivity(filter: { agents: string[]; card?: number } | null): void {
+  const ws = get().workspace?.path
+  if (!ws) return
+  const k = workspaceActivityKey(ws)
+  set((s) => {
+    const was = s.activityFilters[k] ?? loadActivityView(k)
+    const opened = Date.now()
+    const { forCard: _forCard, ...rest } = was
+    const view: ActivityView = filter ? { ...rest, agents: filter.agents, cards: [], ...(filter.card !== undefined ? { forCard: filter.card } : {}), ...(filter.agents[0] ? { tab: filter.agents[0] } : {}), opened } : { ...was, opened }
+    saveActivityView(k, view)
+    return { activityFilters: { ...s.activityFilters, [k]: view } }
+  })
+  showView('activity')
+}
+
+/**
+ * The agents working on a card now (HI-1664): its builder and its reviewer while each runs with this card as its current
+ * one (a builder gone on to its next card isn't: HR6's round 1, HR5's HI-1664 round 1), and every agent whose running
+ * session worked on it, a workspace card's too (main finds them by the cards' index, only now). Keys of
+ * activityAgentKey, each once.
+ */
+export async function cardActivityAgents(c: TaskCard): Promise<string[]> {
+  const s = get()
+  const p = c.project ? s.workspace?.projects.find((x) => x.name.toLowerCase() === c.project.toLowerCase()) : undefined
+  const asActivity = (t: TaskCard) => ({ number: t.number, label: '', title: t.title, column: t.column, builder: t.agent, reviewer: t.review?.agent ?? null })
+  const cards = p ? s.tasks.filter((t) => !t.archived && t.project.toLowerCase() === c.project.toLowerCase()).map(asActivity) : []
+  // On it now: running, with this card as its current one.
+  const onIt = (id: string | null): id is string => !!p && !!id && !!p.agents.find((a) => a.id === id)?.live && currentCard(id, cards)?.number === c.number
+  const out = p ? [c.agent, c.review?.agent ?? null].filter(onIt).map((id) => activityAgentKey(p.path, id)) : []
+  const found = (await window.hive.invoke('activity:cardAgents', c.number).catch(() => [])) as ActivityCardAgent[]
+  // A project card's agents found by their session only while it is still their current card: a builder's session runs
+  // on into its next card (a card loop), its record keeping this one. A workspace card's agents have no current card.
+  for (const a of found) if (!p || a.path.toLowerCase() !== p.path.toLowerCase() || onIt(a.agentId)) out.push(activityAgentKey(a.path, a.agentId))
+  return [...new Set(out)]
+}
+
+/**
+ * Opens a card's Activity (HI-1743, HI-1664): the workspace level, frozen, on the agents working on it now. Found first:
+ * if the window went elsewhere meanwhile (another view, another workspace, another opening: HR5's HI-1664 round 1), it
+ * isn't opened.
+ */
+export async function openCardActivity(c: TaskCard): Promise<void> {
+  if (!cardHasActivity(c)) return
+  const mine = ++navigations
+  const ws = get().workspace?.path
+  const agents = await cardActivityAgents(c)
+  cardOpenings.settled++
+  if (mine !== navigations || !ws || get().workspace?.path !== ws) return void cardOpenings.dropped++
+  openWorkspaceActivity({ agents, card: c.number })
+}
+
+/** A card's Activity openings settled, and those dropped as the window went elsewhere: a test copy's window reads them. */
+const cardOpenings = { settled: 0, dropped: 0 }
+;(window as unknown as { __hiveCardActivity?: typeof cardOpenings }).__hiveCardActivity = cardOpenings
 
 /** Shows an agent's pane on the Session tab and focuses it. */
 export function revealAgent(p: ProjectInfo, agentId: string): void {
@@ -935,8 +1317,12 @@ export function flashPane(key: string): void {
 
 /** Shows a sidebar view without toggling it (setActivity hides the sidebar when that view is already shown). */
 export function showView(a: Exclude<Activity, 'docs' | 'settings'>): void {
+  navigations++
   set({ activity: a, lastSideActivity: a, sidebarVisible: true })
 }
+
+/** Each view shown, counted: a card's Activity found after the window went elsewhere isn't opened (openCardActivity). */
+let navigations = 0
 
 /** Shows the Hive Assistant view (activity bar) on its conversations, its modes, its attachments ('images') or its journal. */
 export function showAssistantView(section: 'conversations' | 'modes' | 'images' | 'journal' | 'digests'): void {
@@ -948,12 +1334,22 @@ export function setProjectTab(path: string, tab: ProjectTab): void {
   set((s) => ({ projectTabs: { ...s.projectTabs, [path]: tab } }))
 }
 
-/** Opens a project's Git tab at a section (#607): the status bar's item, and whose changes to review (Changes). */
-export function showGit(path: string, section: GitSection): void {
-  set((s) => ({ projectTabs: { ...s.projectTabs, [path]: 'changes' }, gitSection: { ...s.gitSection, [path]: section } }))
+/**
+ * Opens a project's Version Control tab at a section (#607, #1416): the status bar's item, whose changes to review
+ * (Changes), the merge queue's links (Merge queue) and the presets notice (Workflow).
+ */
+export function showVersionControl(path: string, section: VcSection): void {
+  set((s) => ({ projectTabs: { ...s.projectTabs, [path]: 'changes' }, vcSection: { ...s.vcSection, [path]: section } }))
 }
 
-/** After a Git action: the project's Git tab and status bar item read git again. */
+/** Selects the project and shows its Version Control tab at a section, from anywhere (Project Settings, the presets notice). */
+export function openVersionControl(path: string, section: VcSection): void {
+  set({ selectedProject: path })
+  showView('projects')
+  showVersionControl(path, section)
+}
+
+/** After a Git action: the project's Version Control tab and status bar item read git again. */
 export function bumpGit(path: string): void {
   set((s) => ({ gitVersion: { ...s.gitVersion, [path]: (s.gitVersion[path] ?? 0) + 1 } }))
 }
@@ -964,7 +1360,7 @@ export const unusedRoot = (worktreePath: string): string => `${UNUSED_ROOT}:${wo
 
 /** Opens a project's Changes tab at its unused worktrees (#353, #400: they live in Changes). */
 export function showUnusedWorktrees(path: string): void {
-  set((s) => ({ projectTabs: { ...s.projectTabs, [path]: 'changes' }, gitSection: { ...s.gitSection, [path]: 'changes' }, changesRoot: { ...s.changesRoot, [path]: UNUSED_ROOT } }))
+  set((s) => ({ projectTabs: { ...s.projectTabs, [path]: 'changes' }, vcSection: { ...s.vcSection, [path]: 'changes' }, changesRoot: { ...s.changesRoot, [path]: UNUSED_ROOT } }))
 }
 
 /** The project's unused worktrees changed outside their list (#400): it reloads. */
@@ -972,52 +1368,225 @@ export function bumpUnused(path: string): void {
   set((s) => ({ unusedVersion: { ...s.unusedVersion, [path]: (s.unusedVersion[path] ?? 0) + 1 } }))
 }
 
-/** Opens Add Agent on one of the project's worktrees (#353). */
-export function giveWorktreeToAgent(path: string, worktreePath: string): void {
-  set({ addAgentPreset: { project: path, worktreePath }, addAgentFor: path })
-}
-
 /** Opens a project's Overview at one agent's session (picked there, and scrolled to). */
 export function showInOverview(path: string, agentId: string, target: 'history' | 'session' = 'history'): void {
   set((s) => ({ projectTabs: { ...s.projectTabs, [path]: 'overview' }, overviewJump: { project: path, agentId, at: Date.now(), target } }))
 }
 
+/**
+ * Each project's name by its path in lower case: with useShallow, what reads only the names stays still while the
+ * projects' agents change state (HI-1806).
+ */
+export function projectNames(projects: readonly ProjectInfo[] | undefined): Record<string, string> {
+  return Object.fromEntries((projects ?? []).map((p) => [p.path.toLowerCase(), p.name]))
+}
+
+/**
+ * Shows an agent's new state (a session-status event): at once, then those that come within LIVE_BATCH_MS of it
+ * together at its end, in one update of the store (HI-1806), so a dozen agents changing state render the window a few
+ * times a second, not dozens, and one change on its own shows without waiting.
+ */
 export function applyLiveState(state: LiveSessionState): void {
+  // A launch's state: any end kept for an older run no longer applies (HI-1881).
+  if (state.status !== 'stopped') noteRun(state.projectPath, state.agentId, state.runId)
+  pendingLive.set(projectKey(state.projectPath, state.agentId), state)
+  showSoon()
+}
+
+/**
+ * Sets the store with the agents' states (HI-1862): at once when none came lately, else at the end of their batch, in
+ * the same update. For an agent's bookkeeping that comes in bursts with its states (many agents started or ended at
+ * once); `withNext` waits for the state that follows it at once (an agent's new terminal shown with its start).
+ */
+export function setWithLive(change: (s: State) => Partial<State>, withNext = false): void {
+  pendingWith.push(change)
+  if (!withNext) showSoon()
+}
+
+/**
+ * Sets a part of the workspace main sent (a load's answer, an event's): in the same batch as the agents' states (HI-1938),
+ * at once when none came lately, else at the batch's end. Opening a workspace loads a dozen parts, each answering on its
+ * own: shown together, not one render each. Only for the parts in LOADED (a direct set of one shows the batch first).
+ */
+export function setLoaded(change: Partial<State> | ((s: State) => Partial<State>)): void {
+  setWithLive(typeof change === 'function' ? change : () => change)
+}
+
+/** Shows what waits now, unless a batch is under way: then at its end. */
+function showSoon(): void {
+  if (liveTimer) return
+  flushLiveStates()
+  liveTimer = setTimeout(liveWindowEnds, LIVE_BATCH_MS)
+}
+
+/** The batch's time is up: the states that came meanwhile are shown, and the next ones wait a while again. */
+function liveWindowEnds(): void {
+  liveTimer = null
+  if (!pendingLive.size && !pendingWith.length) return
+  flushLiveStates()
+  liveTimer = setTimeout(liveWindowEnds, LIVE_BATCH_MS)
+}
+
+/** The run each agent's window last saw start (HI-1881), by projectKey: an exit of any other run is an older one's. */
+const endBook = sessionEndBook()
+
+/** A change to the ends kept, as a store update: none when they stay the same. */
+const endsUpdate =
+  (change: EndsChange) =>
+  (s: State): Partial<State> => {
+    const ends = change(s.sessionEnds)
+    return ends === s.sessionEnds ? {} : { sessionEnds: ends }
+  }
+
+/**
+ * Notes the run an agent's live state is of (its latest launch): an end of another run, kept or still to be shown, no
+ * longer applies. With the state that brought it (applyLiveState, next): one update for both.
+ */
+export function noteRun(projectPath: string, agentId: string, runId: string): void {
+  const change = endBook.run(projectKey(projectPath, agentId), runId)
+  if (change) setWithLive(endsUpdate(change), true)
+}
+
+/** Keeps an ended run's why and when (HI-1881), unless it is an older run's than the latest the window saw start, then or when it is shown. */
+export function noteEnd(projectPath: string, agentId: string, end: SessionEnd): void {
+  const change = endBook.end(projectKey(projectPath, agentId), end)
+  if (change) setWithLive(endsUpdate(change))
+}
+
+/** Drops the ends of agents no longer in the window's workspace (their agent, project or workspace gone). */
+export function pruneEnds(keep: (key: string) => boolean): void {
+  const ends = get().sessionEnds
+  const gone = Object.keys(ends).filter((k) => !keep(k))
+  if (!gone.length) return
+  for (const k of gone) endBook.forget(k)
+  set((s) => ({ sessionEnds: Object.fromEntries(Object.entries(s.sessionEnds).filter(([k]) => keep(k))) }))
+}
+
+// Ends of agents gone from the workspace (removed, or their project or workspace) are dropped as it changes.
+useStore.subscribe((s, prev) => {
+  if (s.workspace === prev.workspace || !Object.keys(s.sessionEnds).length) return
+  const ws = s.workspace
+  const keys = new Set<string>()
+  for (const p of [...(ws?.projects ?? []), ...(ws?.assistant ? [ws.assistant] : [])]) for (const a of p.agents) keys.add(projectKey(p.path, a.id))
+  pruneEnds((k) => keys.has(k))
+})
+
+/** An agent's state as last told, shown yet or not. */
+export function liveStateOf(projectPath: string, agentId: string): LiveSessionState | null | undefined {
+  const pending = pendingLive.get(projectKey(projectPath, agentId))
+  if (pending) return pending.status === 'stopped' ? null : pending
+  return findProject(get(), projectPath)?.agents.find((a) => a.id === agentId)?.live
+}
+
+/**
+ * Shows the agents' states waiting (applyLiveState) now, and the changes made with them (setWithLive) first, in one
+ * update; also before the workspace is set, which they are older than.
+ */
+export function flushLiveStates(): void {
+  if (!pendingLive.size && !pendingWith.length) return
+  const states = [...pendingLive.values()]
+  const changes = pendingWith.splice(0)
+  pendingLive.clear()
   set((s) => {
-    if (!s.workspace) return {}
-    const agentId = state.agentId
-    const live = state.status === 'stopped' ? null : state
-    const projects = s.workspace.projects.map((p) => {
-      if (p.path.toLowerCase() !== state.projectPath.toLowerCase()) return p
-      const known = p.agents.some((a) => a.id === agentId)
-      const agents = known
-        ? p.agents.map((a) => (a.id === agentId ? { ...a, live, restartNeeded: live ? a.restartNeeded : false } : a))
-        : live
-          ? [...p.agents, { id: agentId, name: state.agentName ?? 'Agent', live, restartNeeded: false, resume: null }] // i18n-ignore: a stand-in agent name until the project's own list arrives
-          : p.agents
-      const primary = agents.find((a) => a.live)
-      return { ...p, agents, live: primary?.live ?? null, restartNeeded: primary?.restartNeeded ?? false, active: live ? true : p.active }
-    })
-    // The Hive Assistant's one agent.
-    const a = s.workspace.assistant
-    const assistant =
-      a && a.path.toLowerCase() === state.projectPath.toLowerCase()
-        ? { ...a, live, agents: a.agents.map((x) => (x.id === agentId ? { ...x, live, restartNeeded: live ? x.restartNeeded : false } : x)) }
-        : a
-    return { workspace: { ...s.workspace, projects, assistant } }
+    let now: State = s
+    let out: Partial<State> = {}
+    for (const change of changes) {
+      const part = change(now)
+      now = { ...now, ...part }
+      out = { ...out, ...part }
+    }
+    return states.length && now.workspace ? { ...out, workspace: states.reduce(withLiveState, now.workspace) } : out
   })
 }
 
-export function pushToast(t: ToastMessage): void {
+/**
+ * An action of the Assistant's told by an event (HI-1863): shown with the agents' states, once by id (a snapshot of the
+ * panel's loaded meanwhile may have it), and only in the workspace it was told in.
+ */
+export function noteAssistantAction(action: AssistantAction): void {
+  const ws = get().workspace?.path ?? null
+  setWithLive((s) => {
+    if ((s.workspace?.path ?? null) !== ws) return {}
+    const actions = withAction(s.assistantActions, action)
+    return actions === s.assistantActions ? {} : { assistantActions: actions }
+  })
+}
+
+/**
+ * Shows the workspace main reported (workspace-changed), dropping warnings about projects no longer in it. Another
+ * workspace's: the previous one's Assistant actions go in the same update, after those still waiting were shown (set's
+ * flush), so none of them reaches this one's panel (HR3's HI-1863 round 2).
+ */
+export function showWorkspace(ws: WorkspaceInfo | null, other: boolean): void {
   set((s) => ({
-    // A quiet one is for the Notifications panel only (told as a banner, a Windows notification, or not at all).
-    toasts: t.quiet ? s.toasts : [...s.toasts.filter((x) => x.id !== t.id), t].slice(-5),
-    notifications: [t, ...s.notifications].slice(0, 100),
-    unread: s.showNotifications ? s.unread : s.unread + 1
+    workspace: ws,
+    ...(other ? { assistantActions: [] } : {}),
+    toasts: s.toasts.filter((t) => !t.id.startsWith('mcp-') || !!ws?.projects.some((p) => t.id === `mcp-${p.path}`))
   }))
-  if (t.quiet) return
-  const timeout = t.timeoutMs ?? (t.level === 'error' ? 12000 : t.actions?.length ? 15000 : 6000)
-  setTimeout(() => dismissToast(t.id), timeout)
+}
+
+/** A project's usage changed (a session's tokens, its end): what shows it reads it again, with the agents' states. */
+export function bumpUsage(path: string): void {
+  setWithLive((s) => ({ usageVersion: { ...s.usageVersion, [path]: (s.usageVersion[path] ?? 0) + 1 } }))
+}
+
+function withLiveState(workspace: WorkspaceInfo, state: LiveSessionState): WorkspaceInfo {
+  const agentId = state.agentId
+  const live = state.status === 'stopped' ? null : state
+  const projects = workspace.projects.map((p) => {
+    if (p.path.toLowerCase() !== state.projectPath.toLowerCase()) return p
+    const known = p.agents.some((a) => a.id === agentId)
+    const agents = known
+      ? p.agents.map((a) => (a.id === agentId ? { ...a, live, restartNeeded: live ? a.restartNeeded : false } : a))
+      : live
+        ? [...p.agents, { id: agentId, name: state.agentName ?? 'Agent', live, restartNeeded: false, resume: null, place: { folder: state.cwd, is: 'project' as const, name: null, branch: null } }] // i18n-ignore: a stand-in agent name until the project's own list arrives
+        : p.agents
+    const primary = agents.find((a) => a.live)
+    return { ...p, agents, live: primary?.live ?? null, restartNeeded: primary?.restartNeeded ?? false, active: live ? true : p.active }
+  })
+  // The Hive Assistant's one agent.
+  const a = workspace.assistant
+  const assistant =
+    a && a.path.toLowerCase() === state.projectPath.toLowerCase()
+      ? { ...a, live, agents: a.agents.map((x) => (x.id === agentId ? { ...x, live, restartNeeded: live ? x.restartNeeded : false } : x)) }
+      : a
+  return { ...workspace, projects, assistant }
+}
+
+/**
+ * An entry for this window (HI-2320): main's tell() or this window's notify() decided it is ours. A pop-up unless quiet
+ * (told as a Windows notification, or left out of pop-ups by the scope); in the bell either way. The same id replaces
+ * the one before it (a project's newer platform notice, #1419). A pop-up's time is the pop-up's own
+ * (components/Popups.tsx: paused while hovered, focused or the window is in the background). A tip showing gives way.
+ */
+export function pushToast(t: ToastMessage): void {
+  const waitingStays = get().settings?.notifications.waitingBannerStays ?? true
+  set((s) => ({
+    toasts: t.quiet ? s.toasts.filter((x) => x.id !== t.id) : keepPopups([t, ...s.toasts.filter((x) => x.id !== t.id)], (x) => staysUntilHandled(x, waitingStays)),
+    notifications: [t, ...s.notifications.filter((x) => x.id !== t.id)].slice(0, BELL_MAX),
+    unread: s.showNotifications ? s.unread : s.unread + 1,
+    ...(t.quiet || !s.tipShown ? {} : { tipShown: null })
+  }))
+}
+
+/** Entries whose action was done or no longer applies: their buttons go, and they say what happened (HI-2320). */
+export function resolveToasts(ids: readonly string[], outcome: string): void {
+  const hit = (t: ToastMessage): boolean => ids.includes(t.id) && !t.resolved
+  set((s) => {
+    if (!s.toasts.some(hit) && !s.notifications.some(hit)) return {}
+    const done = (t: ToastMessage): ToastMessage => (hit(t) ? { ...t, resolved: outcome } : t)
+    return { toasts: s.toasts.map(done), notifications: s.notifications.map(done) }
+  })
+}
+
+/** One of these entries' buttons done, its others still live (HI-2320): those commands' buttons go, and the note says what happened. */
+export function updateToasts(ids: readonly string[], drop: readonly string[], note: string): void {
+  const hit = (t: ToastMessage): boolean => ids.includes(t.id) && !t.resolved
+  set((s) => {
+    if (!s.toasts.some(hit) && !s.notifications.some(hit)) return {}
+    const upd = (t: ToastMessage): ToastMessage => (hit(t) ? { ...t, actions: t.actions?.filter((a) => !drop.includes(a.command)), note } : t)
+    return { toasts: s.toasts.map(upd), notifications: s.notifications.map(upd) }
+  })
 }
 
 export function dismissToast(id: string): void {
@@ -1042,6 +1611,80 @@ export async function runOnce<T>(key: string, fn: () => Promise<T>): Promise<T |
     })
   }
 }
+/** A start or resume under way for an agent (#1177): which, and the session it resumes. */
+export interface Starting {
+  kind: 'start' | 'resume'
+  sessionId?: string
+  /** Started without its worktree's setup (Start Without Setup). */
+  skipSetup?: boolean
+}
+
+/** What a start is held under while an agent is added for it (a project without agents, a session no agent can run). */
+export const ADDING_AGENT = ':adding'
+
+const STARTING = msg({ id: 'panes.session.starting', defaultMessage: '{kind, select, resume {Resuming…} other {Starting…}}', description: "A start (other) or Resume (resume) button's label while the agent's session starts, from the click until it runs (it shows a spinner and takes no clicks). Keep it short." })
+
+/** The label a start or resume button shows while its agent starts (#1177). */
+export function startingLabel(st: Starting): string {
+  return tr(STARTING, { kind: st.kind })
+}
+
+export function startingKey(path: string, agentId: string): string {
+  return `${path.toLowerCase()}#${agentId}`
+}
+
+/**
+ * Runs an agent's start or resume, marked as starting until it ends (the call that starts it answers once the
+ * session runs, or fails), so every button that starts it shows that it's working and ignores clicks: a second
+ * start of an agent already starting is ignored.
+ */
+export async function whileStarting<T>(path: string, agentId: string, what: Starting, fn: () => Promise<T>): Promise<T | undefined> {
+  const key = startingKey(path, agentId)
+  if (get().starting[key]) return undefined
+  set((s) => ({ starting: { ...s.starting, [key]: what } }))
+  try {
+    return await fn()
+  } finally {
+    // Its start over: shown with the agents' states (a dozen started at once end together, HI-1862). A start clicked
+    // meanwhile is still ignored, as while it was under way.
+    setWithLive((s) => {
+      const { [key]: _, ...rest } = s.starting
+      return { starting: rest }
+    })
+  }
+}
+
+/** The agent's start or resume under way (none for no agent). */
+export function useStarting(path: string, agentId: string | null): Starting | null {
+  return useStore((s) => (agentId ? (s.starting[startingKey(path, agentId)] ?? null) : null))
+}
+
+/** The resume of this session under way, by whichever of the project's agents (the Sessions tab's buttons). */
+export function useSessionStarting(path: string, sessionId: string | null): Starting | null {
+  return useStore((s) => {
+    if (!sessionId) return null
+    const prefix = `${path.toLowerCase()}#`
+    for (const k in s.starting) if (k.startsWith(prefix) && s.starting[k].sessionId === sessionId) return s.starting[k]
+    return null
+  })
+}
+
+/** Any start or resume under way in the project (an agent's, or one adding its agent): for its buttons that name no agent. */
+export function useProjectStarting(path: string): Starting | null {
+  return useStore((s) => startingIn(s.starting, path))
+}
+
+function startingIn(starting: Record<string, Starting>, path: string): Starting | null {
+  const prefix = `${path.toLowerCase()}#`
+  for (const k in starting) if (k.startsWith(prefix)) return starting[k]
+  return null
+}
+
+/** Any start or resume under way in the project: for its menu items that name no agent. */
+export function projectStarting(path: string): Starting | null {
+  return startingIn(get().starting, path)
+}
+
 export function notify(level: ToastMessage['level'], title: string, message?: string, actions?: ToastMessage['actions']): void {
   pushToast({ id: `local-${++toastSeq}-${Date.now()}`, level, title, message, actions, timestamp: new Date().toISOString() })
 }
@@ -1057,6 +1700,15 @@ function openDialog(d: DialogRequest): void {
 /** Closes the dialog shown (its caller resolves it) and shows the next one waiting, if any. */
 export function closeDialog(): void {
   set({ dialog: dialogQueue.shift() ?? null, dialogBlocked: null })
+}
+
+/** Closes the dialog shown as its Cancel would (from what it shows: HI-1910's Set up Git…), its caller told so. */
+export function cancelDialog(): void {
+  const d = get().dialog
+  if (!d) return
+  closeDialog()
+  if (d.kind === 'confirm') d.resolve(false)
+  else if (d.kind === 'prompt' || d.kind === 'choice') d.resolve(null)
 }
 
 export function confirm(opts: Omit<ConfirmRequest, 'kind' | 'resolve'>): Promise<boolean> {
@@ -1121,18 +1773,128 @@ export function loadTasks(): Promise<void> {
 async function readTasks(): Promise<void> {
   const ws = get().workspace?.path
   const mine = ++tasksLoad
-  if (!ws) return set({ tasks: [] })
+  if (!ws) {
+    boardReads.clear()
+    return set({ tasks: [], boardState: null, boardStages: null, projectKeys: [], movedCardNames: {} })
+  }
   try {
-    const tasks = await window.hive.invoke('tasks:list', fullArchive > 0)
-    if (mine === tasksLoad && get().workspace?.path === ws) set({ tasks })
+    // The stages too when a workflow was written or the projects changed since they were read (HI-1682); a failed read
+    // of them leaves each project's columns as its cards' stages give them.
+    const stagesFor = boardStagesFor(get())
+    const readStages = get().boardStages?.for !== stagesFor
+    // What changed since this window's copy of the board (HI-1715), or the whole board while the archived cards are wanted in full.
+    const board = boardReads.begin(ws, fullArchive > 0)
+    // With them, each project's workflow line for the toolbar's link (#1420): it came after the board's first paint, and
+    // a toolbar it made wrap moved every column down under the pointer (HI-1852).
+    const forms = readStages ? workflowForms() : null
+    const [cards, boardState, projectKeys, movedCardNames, stages, formsRead] = await Promise.all([board.request, window.hive.invoke('board:state'), window.hive.invoke('project:keys'), window.hive.invoke('project:movedCardNames'), readStages ? window.hive.invoke('board:stages').catch(() => ({})) : null, forms])
+    if (mine !== tasksLoad) return
+    const tasks = board.take(cards, { ws: get().workspace?.path ?? null, whole: fullArchive > 0 })
+    if (tasks === 'again') return void loadTasks()
+    if (tasks) set({ tasks, boardReads: get().boardReads + 1, boardState, projectKeys, movedCardNames, ...(stages ? { boardStages: { for: stagesFor, byPath: stages, forms: formsRead ?? {} } } : {}) })
   } catch {
     // The workspace closed meanwhile.
   }
 }
 
+/** The window's board reads, with the board as main last sent it (HI-1715). */
+const boardReads = boardReader({ list: () => window.hive.invoke('tasks:list', true), changes: (since) => window.hive.invoke('tasks:changes', since) })
+
+/**
+ * What the board's stages are read for: the workspace, its projects and their version control, and the workflows
+ * written since the window opened (`workflow-changed`). Stages read for another are read again with the board.
+ */
+/** Each project with version control's workflow form, by path in lower case; one that can't be read is left out. */
+async function workflowForms(): Promise<Record<string, WorkflowForm>> {
+  const projects = (get().workspace?.projects ?? []).filter((p) => p.platform)
+  const read = await Promise.all(projects.map((p) => window.hive.invoke('workflow:form', p.path).then((f) => [p.path.toLowerCase(), f] as const, () => null)))
+  return Object.fromEntries(read.filter((x) => !!x))
+}
+
+export const boardStagesFor =(s: Pick<State, 'workspace' | 'workflowVersion'>): string => `${s.workspace?.path ?? ''}|${s.workflowVersion}|${(s.workspace?.projects ?? []).map((p) => `${p.path}:${p.platform?.id ?? ''}`).join('|')}`
+
+/** A project's key and its old keys, as the board has them (#1221). */
+export type ProjectKeys = { projectPath: string; key: string; aliases: string[] }
+
+/** A project's key (null before it has one). */
+export const projectKeyOf = (s: Pick<State, 'projectKeys'>, projectPath: string | null | undefined): string | null => (projectPath ? (s.projectKeys.find((k) => k.projectPath.toLowerCase() === projectPath.toLowerCase())?.key ?? null) : null)
+
+/**
+ * A card named by its number as the window names it (#1221): its key when the board has the card, else `#12`. For a
+ * card in hand, cardLabel(card).
+ */
+export const cardLabelOf = (s: Pick<State, 'tasks'>, n: number): string => {
+  const c = s.tasks.find((t) => t.number === n)
+  return c ? cardLabel(c) : `#${n}`
+}
+
+// Shared code the window runs names a card by its number with cardRef: by the board's key here too (HI-1661 round 1).
+setCardNaming(() => (n) => cardLabelOf(get(), n))
+
 /** Stable empty list for selectors — a fresh [] on every call makes zustand re-render forever. */
 export const NO_PROJECTS: ProjectInfo[] = []
 export const NO_IDS: string[] = []
+
+/**
+ * Agents' start changes told by main (HI-1977), by project path and agent (`agentKey`), with their count (`seq`): kept
+ * until a read of the project as new as the change replaces them. A read made before a change can arrive after it (HR6's
+ * round 1: the projects are read in turn, and the change told at once); the change stands over that older read.
+ */
+const startsTold = new Map<string, { seq: number; start: AgentStart | null }>()
+const agentKey = (path: string, agentId: string): string => `${path.toLowerCase()}|${agentId}`
+
+/**
+ * An agent's start changed (HI-1977): its AgentInfo's `start`, set at once (not with the agents' batched states), so the
+ * card's move it comes before never shows without it.
+ */
+export function agentStartChanged(path: string, agentId: string, start: AgentStart | null, seq: number): void {
+  const key = agentKey(findProject(get(), path)?.path ?? path, agentId)
+  if ((startsTold.get(key)?.seq ?? -1) >= seq) return
+  startsTold.set(key, { seq, start })
+  const ws = get().workspace
+  if (ws) set({ workspace: withStartsTold(ws) })
+}
+
+/**
+ * The workspace with each start change told after its agent was read (startsTold, newer than its `startSeq`); a change
+ * the read already has is forgotten. The same workspace when nothing changes.
+ */
+export function withStartsTold(ws: WorkspaceInfo): WorkspaceInfo {
+  if (!startsTold.size) return ws
+  let changed = false
+  const projects = ws.projects.map((p) => {
+    let mine = false
+    const agents = p.agents.map((a) => {
+      const key = agentKey(p.path, a.id)
+      const told = startsTold.get(key)
+      if (!told) return a
+      if (told.seq <= (a.startSeq ?? -1)) {
+        startsTold.delete(key)
+        return a
+      }
+      if (JSON.stringify(a.start ?? null) === JSON.stringify(told.start)) return a
+      mine = true
+      return withStart(a, told.start)
+    })
+    if (!mine) return p
+    changed = true
+    return { ...p, agents }
+  })
+  return changed ? { ...ws, projects } : ws
+}
+
+function withStart(a: AgentInfo, start: AgentStart | null): AgentInfo {
+  if (start) return { ...a, start }
+  const { start: _, ...rest } = a
+  return rest
+}
+
+// However the workspace is set (an event's refresh, an action's answer), a start change told since its read stands.
+useStore.subscribe((s, prev) => {
+  if (!s.workspace || s.workspace === prev.workspace) return
+  const ws = withStartsTold(s.workspace)
+  if (ws !== s.workspace) useStore.setState({ workspace: ws })
+})
 
 /**
  * The Assistant added an agent. The user's view doesn't move: on the project they're looking at, its page's

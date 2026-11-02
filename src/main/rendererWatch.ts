@@ -2,7 +2,8 @@ import { msg, tr } from '../shared/i18n'
 import { dialog, type MessageBoxOptions, type RenderProcessGoneDetails } from 'electron'
 import { randomUUID } from 'crypto'
 import { emitTo } from './events'
-import { createLogger } from './logger'
+import { createLogger, userText } from './logger'
+import { taskText, whereText, type LongTask, type WindowWhere } from '../shared/windowHealth'
 import type { HiveWindow } from './windows'
 import { APP_NAME } from '../shared/appName'
 
@@ -23,6 +24,70 @@ export function reloadedMessage(unsaved: number): string {
   return unsaved
     ? tr(msg({ id: 'main.window.reloadedLost', defaultMessage: '{n, plural, one {Your agents kept running. Unsaved changes to one file were lost.} other {Your agents kept running. Unsaved changes to # files were lost.}}', description: "The notice after Hive's window crashed and was reloaded, when files had unsaved edits. {n} is how many." }), { n: unsaved })
     : tr(msg({ id: 'main.window.reloaded', defaultMessage: 'Your agents kept running.', description: "The notice after Hive's window crashed and was reloaded." }))
+}
+
+/** What hive.log needs of a window's page to say why it froze (HI-1775): where it is, its last input, its last long tasks. */
+interface Health {
+  where: WindowWhere | null
+  /** Its last input (a key, a click, a move): epoch ms. */
+  inputAt: number
+  /** Its long tasks lately, newest last. */
+  recent: LongTask[]
+  /** When a long-task line was last written, and the tasks held back since (rate-limited). */
+  loggedAt: number
+  heldBack: number
+  /** When it stopped responding (Electron's `unresponsive`), while it hasn't responded since. */
+  hungAt: number | null
+}
+const health = new WeakMap<HiveWindow, Health>()
+const healthOf = (entry: HiveWindow): Health => {
+  let h = health.get(entry)
+  if (!h) health.set(entry, (h = { where: null, inputAt: 0, recent: [], loggedAt: 0, heldBack: 0, hungAt: null }))
+  return h
+}
+/** At most one long-task line per window in this long: the rest are counted in the next. */
+const LONG_TASK_LOG_MS = 10_000
+/** How many of its last long tasks a hang's line names. */
+const RECENT_TASKS = 5
+
+/** The page says where it is now. */
+export function noteWhere(entry: HiveWindow, where: WindowWhere | null): void {
+  if (where) healthOf(entry).where = where
+}
+
+/** The page's long tasks just ended: logged as one line (its longest, how many, where), at most every LONG_TASK_LOG_MS. */
+export function noteLongTasks(entry: HiveWindow, tasks: LongTask[], where: WindowWhere | null, now = Date.now()): void {
+  if (!tasks.length) return
+  const h = healthOf(entry)
+  if (where) h.where = where
+  h.recent = [...h.recent, ...tasks].slice(-RECENT_TASKS)
+  if (now - h.loggedAt < LONG_TASK_LOG_MS) {
+    h.heldBack += tasks.length
+    return
+  }
+  const longest = tasks.reduce((a, b) => (b.ms > a.ms ? b : a))
+  const total = tasks.reduce((t, x) => t + x.ms, 0)
+  const more = h.heldBack ? `; ${h.heldBack} more since the last line, not logged` : '' // i18n-ignore: hive.log, in English
+  // Where the longest ran (its own place: the window may have moved on since), and each other place the burst's tasks ran.
+  const at = longest.where ?? where ?? h.where
+  const places = new Set(tasks.map((t) => whereText(t.where ?? null, userText)).filter((w) => w !== whereText(at, userText) && w !== 'where unknown'))
+  const elsewhere = places.size ? `; others in ${[...places].join(' | ')}` : '' // i18n-ignore: hive.log, in English
+  log.warn(`The window's page was busy for ${Math.round(longest.ms)} ms (${whereText(at, userText)}); ${tasks.length} long task(s), ${Math.round(total)} ms in all; the longest: ${taskText(longest)}${elsewhere}${more}`)
+  h.loggedAt = now
+  h.heldBack = 0
+}
+
+/** What a hang's lines say of the window: where it was, its last input, its last long tasks. */
+function hangContext(h: Health, now: number): string {
+  const input = h.inputAt ? `its last input ${((now - h.inputAt) / 1000).toFixed(1)} s before` : 'no input seen' // i18n-ignore: hive.log, in English
+  // Each where it ran, when that isn't where the window is now.
+  const here = whereText(h.where, userText)
+  const placed = (t: LongTask): string => {
+    const there = whereText(t.where ?? null, userText)
+    return there !== here && there !== 'where unknown' ? `${taskText(t)} in ${there}` : taskText(t) // i18n-ignore: hive.log, in English
+  }
+  const tasks = h.recent.length ? `its last long tasks: ${h.recent.map(placed).join(', ')}` : 'no long task reported' // i18n-ignore: hive.log, in English
+  return `${whereText(h.where, userText)}; ${input}; ${tasks}`
 }
 
 const stillRunning = (): string => tr(msg({ id: 'main.window.stillRunning', defaultMessage: 'Your agents are still running: reloading the window reconnects to them.', description: "Hive's question when its window stopped or isn't responding." }))
@@ -101,12 +166,23 @@ export function watchRenderer(entry: HiveWindow, opts: { quitting: () => boolean
     hangPrompt = null
   }
 
+  // Its last input, for a hang's line (each event only noted: no work here).
+  const h = healthOf(entry)
+  win.webContents.on('input-event', () => {
+    h.inputAt = Date.now()
+  })
+
   win.on('unresponsive', () => {
+    // The episode's start, logged as it begins (once): a hang that recovers before the prompt has both ends in the log
+    // too (HR1's HI-1775 round 1). The prompt still waits HANG_MS.
+    if (h.hungAt === null && !win.isDestroyed() && !opts.quitting()) {
+      h.hungAt = Date.now()
+      log.warn(`The window's page isn't responding (${hangContext(h, h.hungAt)})`)
+    }
     if (hangTimer || hangPrompt || win.isDestroyed()) return
     hangTimer = setTimeout(() => {
       hangTimer = null
       if (win.isDestroyed() || opts.quitting()) return
-      log.warn("The window's page isn't responding")
       const prompt = new AbortController()
       hangPrompt = prompt
       void ask(
@@ -135,6 +211,12 @@ export function watchRenderer(entry: HiveWindow, opts: { quitting: () => boolean
     }, HANG_MS)
   })
 
-  // It recovered: no need to ask any more.
-  win.on('responsive', () => clearHang())
+  // It recovered: no need to ask any more, and how long it was out goes in the log.
+  win.on('responsive', () => {
+    clearHang()
+    if (h.hungAt === null) return
+    const now = Date.now()
+    log.warn(`The window's page responds again, ${((now - h.hungAt) / 1000).toFixed(1)} s after it stopped responding (${hangContext(h, now)})`)
+    h.hungAt = null
+  })
 }

@@ -6,12 +6,14 @@ import { call } from '../api'
 import { clearEditorDraftsUnder } from '../editorDrafts'
 import { DocEditor } from './DocEditor'
 import { AssistantMark } from './AssistantMark'
-import { Icon, IconButton, Tooltip } from './ui'
+import { Icon, IconButton, Switch, Tooltip } from './ui'
 import { confirm, notify, prompt, set, showView, useStore } from '../store'
 import { cx } from '../util'
 import { msg, tr, tRich, type Msg } from '@shared/i18n'
 import { shownText } from '@shared/advanced'
 import { shippedSkillDescription } from '@shared/skillDescriptions'
+import { skillOff } from '@shared/skillDelivery'
+import { skillLinkTarget } from '@shared/skillLinks'
 
 /**
  * Skills in Hive: the workspace's Hive skills (given to project agents, the Assistant or both, as each one's
@@ -51,6 +53,9 @@ export const SKILL_LEVEL_TIP: Record<SkillLevel, string> = {
 }
 
 const M = {
+  files: msg({ id: 'assistant.skills.files', defaultMessage: 'Files of {skill}', description: "Accessible name of the row of tabs above a skill's page, one tab per file of the skill ({skill}: the skill's name): its SKILL.md and the reference files it links." }),
+  filesTip: msg({ id: 'assistant.skills.filesTip', defaultMessage: "SKILL.md is what an agent reads when it uses the skill. The other files are read only when SKILL.md's link to them is needed.", description: "Tooltip on the tabs of a skill's files: an agent reads SKILL.md whenever it uses the skill, and each reference file only when it follows SKILL.md's link to it." }),
+  filesMore: msg({ id: 'assistant.skills.filesMore', defaultMessage: 'Only the first {count, number} files are shown.', description: "Shown after a skill's file tabs when the skill's folder has more files than Hive lists ({count}: how many are shown)." }),
   warning: msg({ id: 'assistant.skills.warning', defaultMessage: '<b>Warning:</b> Editing these skills may change agent behaviour in Hive', description: 'A banner over the Hive skills and a Hive skill being edited. <b> is bold.' }),
   notGivenTip: msg({ id: 'assistant.skills.notGivenTip', defaultMessage: "Nobody gets this skill until its header is fixed: {problem}. A skill's header starts and ends with a --- line; for who gets it, put audience: agents, assistant or all under metadata:.", description: "Tooltip on Not given: a Hive skill whose header (SKILL.md's front matter) can't be read. {problem} says what is wrong. Keep ---, audience:, agents, assistant, all and metadata: as they are." }),
   notGiven: msg({ id: 'assistant.skills.notGiven', defaultMessage: 'Not given', description: "A badge on a Hive skill nobody gets, because its header can't be read." }),
@@ -261,7 +266,7 @@ export function skillDescription(s: SkillInfo): string {
 }
 
 /** One skill in a list: icon, name, description and its actions. */
-export function SkillRow({ skill, selected, onSelect, actionsFor }: { skill: SkillInfo; selected: boolean; onSelect: () => void; actionsFor?: React.ReactNode }) {
+export function SkillRow({ skill, selected, onSelect, actionsFor, delivered }: { skill: SkillInfo; selected: boolean; onSelect: () => void; actionsFor?: React.ReactNode; delivered?: React.ReactNode }) {
   const missing = skill.bundled === 'missing'
   return (
     <div className={cx(/* i18n-ignore: class names */ 'row tall skill-row', selected && 'selected', missing && 'missing')} onClick={onSelect}>
@@ -286,7 +291,38 @@ export function SkillRow({ skill, selected, onSelect, actionsFor }: { skill: Ski
           {actionsFor}
         </div>
       )}
+      {delivered && (
+        <div className="skill-delivered" onClick={(e) => e.stopPropagation()}>
+          {delivered}
+        </div>
+      )}
     </div>
+  )
+}
+
+const DELIVERY = {
+  on: msg({ id: 'assistant.skills.delivered.switch', defaultMessage: '{name} delivered to agents', description: "A Hive skill's switch in the Skills view and a project's Skills tab (Delivered to agents), for screen readers: whether agents are given the skill. {name} is the skill." }),
+  tipWorkspace: msg({ id: 'assistant.skills.delivered.tipWorkspace', defaultMessage: "Delivered to agents: on, every project's agents get this skill from their next session; off, none of them do, and Hive removes its copies at their next launch.", description: "Tooltip on a Hive skill's switch in the workspace's Skills view." }),
+  tipProject: msg({ id: 'assistant.skills.delivered.tipProject', defaultMessage: "Delivered to agents: on, this project's agents get this skill from their next session; off, they don't, and Hive removes its copies at their next launch.", description: "Tooltip on a Hive skill's switch in a project's Skills tab." }),
+  offInWorkspace: msg({ id: 'assistant.skills.delivered.offInWorkspace', defaultMessage: "Off in the workspace's Skills view, so no project's agents get it. Turn it on there first.", description: "Tooltip on a Hive skill's switch in a project's Skills tab, shown off and disabled: the skill is switched off for the whole workspace." }),
+  failed: msg({ id: 'assistant.skills.delivered.failed', defaultMessage: "Couldn't change whether agents get {name}", description: 'A notice: switching a skill on or off for agents (Delivered to agents) failed. {name} is the skill.' })
+}
+
+/**
+ * A Hive skill's Delivered to agents switch (#1431): in the workspace (no `projectPath`), or in one project, where a skill
+ * the workspace has off shows off and can't be turned on.
+ */
+export function DeliveredSwitch({ skill, projectPath }: { skill: SkillInfo; projectPath?: string }) {
+  const ws = useStore((s) => s.workspace?.config.skillDelivery)
+  const project = useStore((s) => (projectPath ? s.workspace?.projects.find((p) => p.path === projectPath)?.config.skillDelivery : undefined))
+  const offHere = skillOff(skill.name, { skillDelivery: ws })
+  const on = !skillOff(skill.name, { skillDelivery: ws }, { skillDelivery: project })
+  const blocked = !!projectPath && offHere
+  const change = (v: boolean): void => void actions.attempt(tr(DELIVERY.failed, { name: skill.name }), () => call('skills:setDelivered', projectPath ?? null, skill.name, v))
+  return (
+    <Tooltip content={blocked ? tr(DELIVERY.offInWorkspace) : tr(projectPath ? DELIVERY.tipProject : DELIVERY.tipWorkspace)}>
+      <Switch small checked={on} disabled={blocked || !!skill.problem || skill.bundled === 'missing'} label={tr(DELIVERY.on, { name: skill.name })} onChange={change} />
+    </Tooltip>
   )
 }
 
@@ -294,7 +330,7 @@ export function SkillRow({ skill, selected, onSelect, actionsFor }: { skill: Ski
  * A skill's SKILL.md, previewed, with what can be done to it. `where` is 'workspace' (the Skills view, where
  * Hive skills are edited) or 'project' (where Hive skills are view only and local skills are edited).
  */
-export function SkillDetail({ skill, where: place, onDeleted, onRestored }: { skill: SkillInfo; where: 'workspace' | 'project'; onDeleted?: () => void; onRestored?: (s: SkillInfo) => void }) {
+export function SkillDetail({ skill, where: place, projectPath, onDeleted, onRestored }: { skill: SkillInfo; where: 'workspace' | 'project'; projectPath?: string; onDeleted?: () => void; onRestored?: (s: SkillInfo) => void }) {
   const workspace = useStore((s) => s.workspace)
   const editRequest = useStore((s) => s.skillEdit)
   const missing = skill.bundled === 'missing'
@@ -305,65 +341,102 @@ export function SkillDetail({ skill, where: place, onDeleted, onRestored }: { sk
   useEffect(() => {
     if (forMe) set({ skillEdit: null })
   }, [forMe])
+  // Its files (HI-2011): SKILL.md, then the reference files it links, each in a tab; read again when skills change
+  // (a Restore or Revert puts back the whole folder).
+  const skillsVersion = useStore((s) => s.skillsVersion)
+  const [files, setFiles] = useState<{ files: string[]; truncated: boolean }>({ files: ['SKILL.md'], truncated: false })
+  const [file, setFile] = useState('SKILL.md')
+  useEffect(() => {
+    let live = true
+    void call('skills:files', skill.path, place === 'project' ? projectPath : undefined)
+      .then((r) => live && setFiles({ files: ['SKILL.md', ...r.files.filter((f) => f !== 'SKILL.md')], truncated: r.truncated }))
+      .catch(() => live && setFiles({ files: ['SKILL.md'], truncated: false }))
+    return () => {
+      live = false
+    }
+  }, [skill.path, skill.bundled, place, projectPath, skillsVersion])
+  const shown = files.files.includes(file) ? file : 'SKILL.md'
+  // A link in its Markdown to another of its files opens that file's tab; any other link as usual.
+  const onLink = (href: string): boolean => {
+    const to = skillLinkTarget(href, files.files)
+    if (!to) return false
+    setFile(to)
+    return true
+  }
 
   return (
-    <DocEditor
-      key={`${skill.path}:${skill.bundled ?? ''}`}
-      path={`${skill.path}\\SKILL.md`}
-      title={skill.name}
-      readOnly={!editable || !workspace}
-      defaultPreview={!editing}
-      editingNote={skill.level === 'hive' && place === 'workspace' ? <HiveSkillsWarning /> : undefined}
-      toolbarExtra={
-        <>
-          <Tooltip content={SKILL_LEVEL_TIP[skill.level]}>
-            <span className={cx('badge', skill.level === 'hive' ? 'accent' : '')}>
-              {tr(LEVEL_LABEL[skill.level])}
-              {skill.provider && skill.level !== 'hive' ? ` · ${providerDescriptor(skill.provider).name}` : ''}
-              {skill.plugin ? ` · ${skill.plugin}` : ''}
-            </span>
-          </Tooltip>
-          {skill.level === 'hive' && (skill.problem ? <ProblemBadge problem={skillProblem(skill) ?? ''} /> : <AudienceBadge audience={skill.audience} />)}
-          {missing && (
-            <>
-              <span className="badge warn">{tr(M.deletedHere)}</span>
-              <button className="btn small primary" onClick={() => void restoreBundled(skill).then((s) => s && onRestored?.(s))}>
-                <Icon name="history" /> {tr(M.restore)}
+    <div className="skill-detail">
+      {(files.files.length > 1 || files.truncated) && (
+        <Tooltip content={tr(M.filesTip)}>
+          <div className="skill-files" role="tablist" aria-label={tr(M.files, { skill: skill.name })}>
+            {files.files.map((f) => (
+              <button key={f} role="tab" aria-selected={f === shown} className={cx('skill-file-tab', f === shown && 'active')} onClick={() => setFile(f)}>
+                {f}
               </button>
-            </>
-          )}
-          {skill.bundled === 'changed' && place === 'workspace' && (
-            <>
-              {skill.updateAvailable && (
-                <Tooltip content={tr(M.updateTip)}>
-                  <span className="badge accent">{tr(M.updateAvailable)}</span>
+            ))}
+            {files.truncated && <span className="faint">{tr(M.filesMore, { count: files.files.length })}</span>}
+          </div>
+        </Tooltip>
+      )}
+      <DocEditor
+        key={`${skill.path}:${skill.bundled ?? ''}:${shown}`}
+        path={`${skill.path}\\${shown.replace(/\//g, '\\')}`}
+        title={shown === 'SKILL.md' ? skill.name : `${skill.name} · ${shown}`}
+        onLink={onLink}
+        readOnly={!editable || !workspace}
+        defaultPreview={!editing}
+        editingNote={skill.level === 'hive' && place === 'workspace' ? <HiveSkillsWarning /> : undefined}
+        toolbarExtra={
+          <>
+            <Tooltip content={SKILL_LEVEL_TIP[skill.level]}>
+              <span className={cx('badge', skill.level === 'hive' ? 'accent' : '')}>
+                {tr(LEVEL_LABEL[skill.level])}
+                {skill.provider && skill.level !== 'hive' ? ` · ${providerDescriptor(skill.provider).name}` : ''}
+                {skill.plugin ? ` · ${skill.plugin}` : ''}
+              </span>
+            </Tooltip>
+            {skill.level === 'hive' && (skill.problem ? <ProblemBadge problem={skillProblem(skill) ?? ''} /> : <AudienceBadge audience={skill.audience} />)}
+            {missing && (
+              <>
+                <span className="badge warn">{tr(M.deletedHere)}</span>
+                <button className="btn small primary" onClick={() => void restoreBundled(skill).then((s) => s && onRestored?.(s))}>
+                  <Icon name="history" /> {tr(M.restore)}
+                </button>
+              </>
+            )}
+            {skill.bundled === 'changed' && place === 'workspace' && (
+              <>
+                {skill.updateAvailable && (
+                  <Tooltip content={tr(M.updateTip)}>
+                    <span className="badge accent">{tr(M.updateAvailable)}</span>
+                  </Tooltip>
+                )}
+                <Tooltip content={tr(M.revertTip)}>
+                  <button className="btn small subtle" onClick={() => void restoreBundled(skill).then((s) => s && onRestored?.(s))}>
+                    <Icon name="discard" /> {tr(M.revertButton)}
+                  </button>
                 </Tooltip>
-              )}
-              <Tooltip content={tr(M.revertTip)}>
-                <button className="btn small subtle" onClick={() => void restoreBundled(skill).then((s) => s && onRestored?.(s))}>
-                  <Icon name="discard" /> {tr(M.revertButton)}
+              </>
+            )}
+            {skill.level === 'hive' && place === 'project' && (
+              <Tooltip content={tr(M.editTip)}>
+                <button className="btn small subtle" onClick={() => editInWorkspace(skill)}>
+                  <Icon name="go-to-file" /> {tr(M.edit)}
                 </button>
               </Tooltip>
-            </>
-          )}
-          {skill.level === 'hive' && place === 'project' && (
-            <Tooltip content={tr(M.editTip)}>
-              <button className="btn small subtle" onClick={() => editInWorkspace(skill)}>
-                <Icon name="go-to-file" /> {tr(M.edit)}
-              </button>
-            </Tooltip>
-          )}
-          {skill.level !== 'hive' && workspace && (
-            <Tooltip content={tr(M.copyTip)}>
-              <button className="btn small subtle" onClick={() => void copyToWorkspace(skill)}>
-                <Icon name="cloud-upload" /> {tr(M.copy)}
-              </button>
-            </Tooltip>
-          )}
-          {editable && <IconButton icon="trash" title={tr(M.deleteTip)} onClick={() => void deleteSkill(skill).then((ok) => ok && onDeleted?.())} />}
-        </>
-      }
-    />
+            )}
+            {skill.level !== 'hive' && workspace && (
+              <Tooltip content={tr(M.copyTip)}>
+                <button className="btn small subtle" onClick={() => void copyToWorkspace(skill)}>
+                  <Icon name="cloud-upload" /> {tr(M.copy)}
+                </button>
+              </Tooltip>
+            )}
+            {editable && <IconButton icon="trash" title={tr(M.deleteTip)} onClick={() => void deleteSkill(skill).then((ok) => ok && onDeleted?.())} />}
+          </>
+        }
+      />
+    </div>
   )
 }
 

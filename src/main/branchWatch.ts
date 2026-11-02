@@ -1,15 +1,23 @@
+import { basename } from 'path'
 import type { AgentBranchStatus, HiveEvent, ProjectInfo } from '../shared/types'
+import { leasedLine, legacyWorktree, slotsMigrated } from './agentFolders'
+import { boardRead } from './boardStore'
 import { emit, onHiveEvent } from './events'
 import { createLogger, userText } from './logger'
 import { openWorkspaces, workspaceFor } from './workspace'
 import * as wt from './worktrees'
 import { gitProblem } from './gitTool'
+import { workTargetOf } from './gitRepo'
+import * as G from './platform/git'
+import { isUnknown } from './platform/types'
 
 const log = createLogger('branches')
 
 /**
- * What each worktree agent has not merged (commits ahead of the project folder's branch, uncommitted files),
- * for the Merge… button and the agent's tab. Git is asked when an agent's turn ends or it stops, when a window
+ * What each agent's line has not merged (commits ahead of the branch it merges into, uncommitted files), for the
+ * Merge… button and the agent's tab. An agent's line (#1451) is its open lease's in that slot (a card's or a lane's,
+ * else its carried one's: the card last started there, a carried slot's own branch), else its 0.9 worktree's while the
+ * project isn't migrated; an agent with none isn't watched. Git is asked when an agent's turn ends or it stops, when a window
  * gets focus, when an agent is added, after a merge or the Merge dialog's own check, and every minute for
  * agents that still have something to merge. Each change is sent as a `branch-status` event.
  */
@@ -32,12 +40,62 @@ function projectsOf(ws = openWorkspaces()): ProjectInfo[] {
   return ws.flatMap((w) => w.info()?.projects ?? [])
 }
 
-function findAgent(projectPath: string, agentId: string): { project: ProjectInfo; worktree: NonNullable<ProjectInfo['agents'][number]['worktree']> } | null {
+/** An agent's watched line: its project, its folder and branch, and for a slot's line the branch it merges into. */
+export interface Watched {
+  project: ProjectInfo
+  /** The agent whose line it is. */
+  agentId?: string
+  worktree: wt.WorktreeRef
+  slot?: true
+  target?: string
+}
+
+/**
+ * The line an agent's status is about (#1451): its open lease's (dispatch, else carried) in that slot, counted against
+ * its target (its card's, else the slot's: #1627); else its 0.9 worktree. Null: none to watch.
+ */
+function findAgent(projectPath: string, agentId: string): Watched | null {
   const p = projectPath.toLowerCase()
   const ws = workspaceFor(projectPath)
   const project = projectsOf(ws ? [ws] : undefined).find((x) => x.path.toLowerCase() === p)
-  const worktree = project?.agents.find((a) => a.id === agentId)?.worktree
-  return project && worktree ? { project, worktree } : null
+  const agent = project?.agents.find((a) => a.id === agentId)
+  if (!ws || !project || !agent) return null
+  const legacy = legacyWorktree(agent)
+  let leased: { folder: string; target: string | null; line: string | null; carried: boolean } | null = null
+  try {
+    const slotProject = project.config?.id ?? basename(project.path)
+    leased = boardRead(ws, (db) => leasedLine(db, slotProject, agentId))
+  } catch {
+    // A board still 0.9's: no slots.
+  }
+  if (leased) {
+    const branch = leased.line ?? (leased.carried ? (legacy?.branch ?? null) : null)
+    return branch ? { project, agentId, worktree: { path: leased.folder, branch, base: leased.target ?? legacy?.base ?? '' }, slot: true, ...(leased.target ? { target: leased.target } : {}) } : null
+  }
+  return legacy ? { project, agentId, worktree: legacy } : null
+}
+
+/**
+ * A line's unmerged work. A slot's is counted against its target, else the project's default branch (#1627: never the
+ * branch the project folder has checked out, which needn't be where the line merges), and isn't asked about until its
+ * branch is made (a card's line is made as it starts there, after its lease names it): null then, quietly. A 0.9
+ * worktree's is counted against the project folder's branch, which its Merge… merges into.
+ */
+export async function lineStatus(found: Watched): Promise<AgentBranchStatus | null> {
+  const { project, worktree } = found
+  // A branch that isn't there has nothing to merge, and isn't an error to log (HI-1698: an agent's 0.9 branch gone with
+  // its worktree, a card's line deleted after its merge, each checked on every refresh): null, quietly.
+  if ((await G.lineHead(project.path, worktree.branch)) === null) return null
+  if (!found.slot) {
+    // An agent whose 0.9 worktree the slots took over (#1441) works in its slot's lines: that branch is no longer its own.
+    if (found.agentId && (await slotsMigrated(project.path, found.agentId))) return null
+    return wt.branchStatus(project.path, worktree)
+  }
+  // Its card's target, else the project's (HI-1698: 1.0.0 while that is where work merges, not main), else its default branch.
+  const own = found.target ?? (await workTargetOf(project.path))
+  const fallback = own ? null : await G.defaultBranch(project.path)
+  const target = own ?? (fallback && !isUnknown(fallback) ? fallback : undefined)
+  return wt.branchStatus(project.path, target ? { ...worktree, base: worktree.base || target } : worktree, undefined, target)
 }
 
 /** Records a status (from a check here or the Merge dialog's) and tells the window when it changed. */
@@ -59,13 +117,13 @@ export function check(projectPath: string, agentId: string): Promise<void> {
     forget(key)
     return Promise.resolve()
   }
-  const p = wt
-    .branchStatus(found.project.path, found.worktree)
+  const p = lineStatus(found)
     .then(
       (st) => record(found.project.path, agentId, st),
-      (e) => {
-        // Git that can't run fails every check, every minute: Agent Setup and the status bar say so once (#346).
-        if (!gitProblem()) log.warn(`Couldn't check ${userText(found.worktree.branch)}`, e)
+      async (e) => {
+        // Git that can't run fails every check, every minute: Provider Setup and the status bar say so once (#346). A branch
+        // deleted while it was checked (a card's line, just merged) isn't worth a warning either (HI-1698).
+        if (!gitProblem() && (await G.lineHead(found.project.path, found.worktree.branch).catch(() => null)) !== null) log.warn(`Couldn't check ${userText(found.worktree.branch)}`, e)
         record(found.project.path, agentId, null)
       }
     )
@@ -87,18 +145,18 @@ function soon(projectPath: string, agentId: string, ms = 1500): void {
   )
 }
 
-/** Every worktree agent of a project: a merge changes the branch they are all compared with. */
+/** Every agent of a project with a line (`findAgent`): a merge changes the branch they are all compared with. */
 export function checkProject(projectPath: string): Promise<void> {
   const p = projectPath.toLowerCase()
   const project = projectsOf().find((x) => x.path.toLowerCase() === p)
-  return Promise.all((project?.agents ?? []).filter((a) => a.worktree).map((a) => check(project!.path, a.id))).then(() => undefined)
+  return Promise.all((project?.agents ?? []).filter((a) => findAgent(project!.path, a.id)).map((a) => check(project!.path, a.id))).then(() => undefined)
 }
 
 function checkAll(onlyNew = false): void {
   const live = new Set<string>()
   for (const project of projectsOf()) {
     for (const a of project.agents) {
-      if (!a.worktree) continue
+      if (!findAgent(project.path, a.id)) continue
       const key = keyOf(project.path, a.id)
       live.add(key)
       if (!onlyNew || !known.has(key)) void check(project.path, a.id)

@@ -4,7 +4,8 @@
 import { readdirSync, readFileSync, rmSync } from 'fs'
 import { join } from 'path'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
-import { keepOffScreen, offScreenOrigin, presentWindow, showOsNotification, testNotifyLog, testQuiet } from '../src/main/testQuiet'
+import { keepOffScreen, offScreenOrigin, presentWindow, showOsNotification, takesTestSeams, testNotifyLog, testQuiet } from '../src/main/testQuiet'
+import { testTipsOff } from '../src/main/config'
 import { tempDir, tempRoot } from './tempDir'
 
 // Two screens side by side: one at the origin, one to its left.
@@ -40,6 +41,39 @@ describe('quiet test copies', () => {
     expect(testQuiet()).toBe(true)
     process.env.HIVE_TEST_QUIET = '0'
     expect(testQuiet()).toBe(false)
+  })
+
+  it('a packaged build is quiet only with HIVE_TEST_QUIET=1, never for its test profile alone (#1253)', async () => {
+    const { app } = await import('electron')
+    const packaged = app as { isPackaged: boolean }
+    packaged.isPackaged = true
+    try {
+      process.env.HIVE_USER_DATA = join(tempRoot(), 'hive-quiet-profile')
+      delete process.env.HIVE_TEST_QUIET
+      expect(testQuiet()).toBe(false)
+      process.env.HIVE_TEST_QUIET = '0'
+      expect(testQuiet()).toBe(false)
+      // The packaged suites' copies: hiveEnv sets it.
+      process.env.HIVE_TEST_QUIET = '1'
+      expect(testQuiet()).toBe(true)
+    } finally {
+      packaged.isPackaged = false
+    }
+  })
+
+  it("takes the every-copy test seams (tips off, the notify log, the trash folder) unpackaged or quiet, never as the installed app (#1599)", () => {
+    // Unpackaged: always, as before.
+    expect(takesTestSeams({}, false)).toBe(true)
+    expect(testTipsOff({ HIVE_TEST_TIPS: 'off' }, false)).toBe(true)
+    expect(testTipsOff({}, false)).toBe(false)
+    // Packaged: only a copy a test started quiet.
+    expect(takesTestSeams({ HIVE_TEST_QUIET: '1' }, true)).toBe(true)
+    expect(testTipsOff({ HIVE_TEST_TIPS: 'off', HIVE_TEST_QUIET: '1' }, true)).toBe(true)
+    // The installed app is never quiet: unchanged, whatever else its environment says.
+    for (const env of [{}, { HIVE_TEST_QUIET: '0' }, { HIVE_USER_DATA: 'C:\\p' }]) {
+      expect(takesTestSeams(env, true)).toBe(false)
+      expect(testTipsOff({ ...env, HIVE_TEST_TIPS: 'off' }, true)).toBe(false)
+    }
   })
 
   it('every e2e suite and scenario starts Hive with a test profile, and none turns quiet off', () => {

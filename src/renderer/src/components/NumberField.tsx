@@ -5,7 +5,8 @@ import { parseNumberDraft } from '@shared/numberInput'
  * A number setting's box, saved on blur or Enter (once). A blank box keeps the saved value, or inherits where
  * `inherit` is given; text that isn't a number in range shows a message under the box and saves nothing. Where
  * 0 turns the feature off, `off` adds a checkbox for it: ticking saves 0, unticking brings back the last other
- * value (or `off.restore`).
+ * value (or `off.restore`). `live` (a form staging its draft, HI-2058): each value in range is passed on as it is typed
+ * or stepped, so the form sees the change before the box loses focus; a blank or invalid box still waits for blur.
  */
 export function NumberField({
   value,
@@ -15,6 +16,9 @@ export function NumberField({
   off,
   inherit,
   label,
+  unit,
+  live,
+  disabled,
   onCommit
 }: {
   value: number | null
@@ -25,6 +29,11 @@ export function NumberField({
   /** Placeholder for an empty box, which saves null (inherit). Without it, a blank box keeps the saved value. */
   inherit?: string
   label?: string
+  /** The number's unit, shown after the box ("s"). */
+  unit?: string
+  live?: boolean
+  /** The box and its Off checkbox can't be changed (a save in progress, a setting that doesn't apply now). */
+  disabled?: boolean
   onCommit: (value: number | null) => Promise<unknown> | void
 }) {
   const shown = (v: number | null): string => (v === null ? '' : String(v))
@@ -94,12 +103,16 @@ export function NumberField({
           min={min}
           max={max}
           step={step ?? 1}
-          disabled={isOff}
+          disabled={isOff || disabled}
           value={isOff ? '' : draft}
           placeholder={isOff ? off.label : inherit}
           onChange={(e) => {
             setDraft(e.target.value)
             setError(null)
+            if (!live) return
+            const r = parseNumberDraft(e.target.value, { min, max }, { badInput: e.target.validity.badInput, off: !!off })
+            // Passed on as it is, with no reset: the box keeps what is typed (the form's draft only stages it).
+            if (r.kind === 'value' && r.value !== current.current) void Promise.resolve(onCommit(r.value)).catch(() => undefined)
           }}
           onBlur={commit}
           onKeyDown={(e) => {
@@ -110,9 +123,10 @@ export function NumberField({
             }
           }}
         />
+        {unit && <span className="muted number-field-unit">{unit}</span>}
         {off && (
           <label className="flex muted number-field-off">
-            <input type="checkbox" className="checkbox" checked={isOff} onChange={(e) => save(e.target.checked ? 0 : (lastOn.current ?? off.restore))} /> {off.label}
+            <input type="checkbox" className="checkbox" checked={isOff} disabled={disabled} onChange={(e) => save(e.target.checked ? 0 : (lastOn.current ?? off.restore))} /> {off.label}
           </label>
         )}
       </div>

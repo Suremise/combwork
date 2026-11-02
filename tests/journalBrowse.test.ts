@@ -7,6 +7,7 @@ import { join } from 'path'
 import { DatabaseSync } from 'node:sqlite'
 import { afterAll, afterEach, beforeAll, describe, expect, it } from 'vitest'
 import { tempDir } from './tempDir'
+import { admitted } from './admitted'
 import { DEFAULT_JOURNAL, type JournalSettings } from '../src/shared/journal'
 
 const base = tempDir('hive-journal-browse-')
@@ -14,13 +15,18 @@ const j = await import('../src/main/journal')
 
 let n = 0
 const homes: string[] = []
+/** An Assistant's home in a workspace a window holds (#1395: its journal is kept open only then). */
+const dismissals: (() => void)[] = []
 const home = (): string => {
-  const h = join(base, `home-${++n}`)
+  const ws = join(base, `ws-${++n}`)
+  const h = join(ws, '.hive', 'assistant')
   homes.push(h)
+  dismissals.push(admitted(ws))
   return h
 }
 afterEach(() => {
   for (const h of homes.splice(0)) j.closeJournal(h)
+  for (const d of dismissals.splice(0)) d()
 })
 afterAll(() => j.closeAllJournals())
 

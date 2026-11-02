@@ -49,6 +49,8 @@ function mcp(config, msgs) {
 ;(async () => {
   for (const d of [userData, ws, claudeHome]) fs.rmSync(d, { recursive: true, force: true })
   fs.mkdirSync(claudeHome, { recursive: true })
+  // Every read of the agents' input recorded, for typeLine (#1560).
+  lib.logFakeInput(claudeHome)
   lib.gitProject(alpha)
   fs.writeFileSync(path.join(claudeHome, 'fake-trusted.json'), JSON.stringify([alpha.toLowerCase()]))
   lib.enableProviders(userData)
@@ -86,9 +88,8 @@ function mcp(config, msgs) {
     }
     await until(async () => ['ready', 'finished'].includes((await live(id))?.status), HUNG_MS)
     const before = calls().length
-    await inv('pty:write', lib.ptyKey(alpha, id), text)
-    await lib.sleep(300)
-    await inv('pty:write', lib.ptyKey(alpha, id), '\r')
+    // Typed again if a wake of Hive's disturbed it (lib.typeLine, #1560).
+    await lib.typeLine(inv, lib.ptyKey(alpha, id), claudeHome, null, text, { live: () => live(id) })
     await until(async () => calls().length > before && (await live(id))?.status === 'finished', HUNG_MS)
     return calls().at(-1)
   }
@@ -123,7 +124,7 @@ function mcp(config, msgs) {
   await page.locator('.tab', { hasText: 'Session' }).first().click()
   // On each agent's pane header (#975: its strip tab had it).
   const chip = (name) => lib.paneHeader(page, name).locator('.card-chip')
-  check("the reviewer's pane header shows the card, with an eye", !!(await until(async () => (await chip('Reviewer').getAttribute('data-review').catch(() => null)) === 'true', 5000)) && (await chip('Reviewer').innerText()).includes(`#${n}`))
+  check("the reviewer's pane header shows the card, with an eye", !!(await until(async () => (await chip('Reviewer').getAttribute('data-review').catch(() => null)) === 'true', 5000)) && (await chip('Reviewer').innerText()).includes(await lib.cardLabel(inv, n)))
   check("the coder's doesn't (it isn't working on it)", (await chip('Coder').count()) === 0)
 
   // --- A second reviewer is refused, naming the first.
@@ -140,11 +141,13 @@ function mcp(config, msgs) {
   check("its session ending stops the review, and says so in the card's history", !!r2 && r2.history.some((h) => h.what === 'Review by Reviewer stopped: its session ended'), JSON.stringify(r2?.history?.slice(-2)))
   check('the card is still in Review with its agent', r2 && r2.column === 'review' && r2.agent === coder.id)
 
-  // --- A review with a verdict: failed leaves it in Review; passed with Done moves it there.
+  // --- A review with a verdict: failed sends it back to Doing with its agent (HI-1946); passed with Done moves it there.
   await say(reviewer.id, `boardreview ${n} start`)
   const verdict = await say(reviewer.id, `boardreview ${n} failed`)
   const r3 = await card(n)
-  check('a failed verdict ends the review, the card staying in Review', verdict?.status === 200 && !r3.review && r3.column === 'review' && r3.agent === coder.id && r3.history.at(-1).what === 'Review failed', JSON.stringify(r3.history.slice(-1)))
+  check('a failed verdict ends the review, the card back in Doing with its agent', verdict?.status === 200 && !r3.review && r3.column === 'doing' && r3.agent === coder.id && JSON.stringify(r3.history.slice(-2).map((h) => h.what)) === '["Review failed","Moved to Doing"]', JSON.stringify(r3.history.slice(-2)))
+  // Its fixes done, the user moves it to Review again (its next round), to be reviewed again.
+  await inv('tasks:update', n, { column: 'review' })
   await say(reviewer.id, `boardreview ${n} start`)
   const passed = await say(reviewer.id, `boardreview ${n} passed done`)
   const r4 = await card(n)
@@ -165,12 +168,14 @@ function mcp(config, msgs) {
     { jsonrpc: '2.0', id: 2, method: 'tools/list', params: {} }
   ]).then((r) => [r.find((x) => x.id === 1), r.find((x) => x.id === 2)])
   const instructions = init?.result?.instructions ?? ''
-  check("the agents' instructions tell reviewing from working on a card, and name the skill", /asked to review or check one, use review-agent-work/.test(instructions) && /Reviewing a card is not working on it/.test(instructions), instructions.slice(0, 400))
+  check("the agents' instructions tell reviewing from working on a card, and name the skill", /asked to review or check one, use review-agent-work/.test(instructions) && /\bhive_start_review then hive_verdict\b/.test(instructions), instructions.slice(0, 400))
   const update = list?.result?.tools?.find((t) => t.name === 'hive_update_task')
-  check('hive_update_task describes reviewing, and takes review', /reviewing isn't working on it/.test(update?.description ?? '') && JSON.stringify(update?.inputSchema?.properties?.review?.enum) === '["start","passed","failed"]', JSON.stringify(update?.inputSchema?.properties?.review))
+  check('hive_update_task describes reviewing, and takes review', /reviewing isn't working on it/.test(update?.inputSchema?.properties?.review?.description ?? '') && JSON.stringify(update?.inputSchema?.properties?.review?.enum) === '["start","passed","failed"]', JSON.stringify(update?.inputSchema?.properties?.review))
   // The reviewer's launch carries the review skill (its own copy, in its launch plugin).
   const skillFile = path.join(alpha, '.hive', `launch-${reviewer.id}`, 'plugin', 'skills', 'review-agent-work', 'SKILL.md')
-  check("the reviewer's launch has the review-agent-work skill", fs.existsSync(skillFile) && /review: "start"/.test(fs.readFileSync(skillFile, 'utf8')))
+  // HI-2011: the review mechanics are in its reference file beside SKILL.md, copied with it.
+  const otherTargets = path.join(path.dirname(skillFile), 'other-targets.md')
+  check("the reviewer's launch has the review-agent-work skill", fs.existsSync(skillFile) && fs.existsSync(otherTargets) && /review: "start"/.test(fs.readFileSync(otherTargets, 'utf8')))
   check('…but not the Assistant\'s coordinate-agents', !fs.existsSync(path.join(alpha, '.hive', `launch-${reviewer.id}`, 'plugin', 'skills', 'coordinate-agents')))
 
   await app.close()

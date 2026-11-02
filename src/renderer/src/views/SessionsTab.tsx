@@ -5,23 +5,25 @@ import { useAgentLimit } from '../advanced'
 import { formatDateTime } from '@shared/dates'
 import { isProviderEnabled, providerDescriptor, providerName } from '@shared/providers'
 import { buildSessionTree, countText, countsIn, pathTo, sessionKey, sessionsIn, type TreeNode } from '@shared/sessionTree'
-import { removedAgentNote, resumeBlock, type ResumeContext } from '@shared/sessionResume'
+import { holdText, removedAgentNote, resumeBlock, type ResumeContext } from '@shared/sessionResume'
 import { ProviderIcon } from '../components/ProviderIcon'
 import * as actions from '../actions'
 import { call, errorMessage } from '../api'
 import { PaneResizer, usePaneSize } from '../components/Resizer'
 import { Icon, IconButton, InfoTip, LoadFailed, Markdown, Modal, SearchInput, StaleNote, Tooltip, useContextMenu, type MenuEntry } from '../components/ui'
-import { agentProviderOf, confirm, focusedAgentId, notify, openInSessionsTab, prompt, revealAgent, set, setAssistantOpen, useDateStyle, useLanguage, useStore } from '../store'
+import { agentProviderOf, confirm, focusedAgentId, get, notify, openInSessionsTab, prompt, revealAgent, set, setAssistantOpen, useDateStyle, useLanguage, useSessionStarting, useStarting, useStore, startingKey, startingLabel } from '../store'
+import { cardLabel } from '@shared/projectKeys'
 import { cx, formatDuration, formatKeybinding, formatTokens, sessionLabel, timeAgo } from '../util'
 import { useSessions } from './ProjectTabs'
 import { useScopedLoad } from '../scopedLoad'
 import { sessionOrigin, type SessionOrigin } from '@shared/sessionOrigin'
+import { legacyOf, placeText } from '../agentPlace'
 import { MAX_TREE_PREFS } from '@shared/uiPrefs'
 import { shownText } from '@shared/advanced'
 import { rememberProjectPref } from '../projectPrefs'
 import { fmt, msg, tr, type Msg } from '@shared/i18n'
 import type { CleanupPlan, CleanupSkip } from '@shared/sessionCleanup'
-import { SessionCleanup } from './SessionCleanup'
+import { BulkProgressNote, SessionCleanup } from './SessionCleanup'
 import { PurgeDialog } from '../components/Purge'
 
 /**
@@ -59,8 +61,8 @@ function cleanupSkipText(reason: CleanupSkip): string {
 type Kind = 'session' | 'conversation'
 
 export function SessionsTab({ project, assistant = false }: { project: ProjectInfo; assistant?: boolean }) {
-  const { items, reload, error: listError, loadedAt } = useSessions(project)
-  const limit = useAgentLimit()
+  const { items, othersLoading, reload, error: listError, loadedAt } = useSessions(project)
+  const limit = useAgentLimit(project)
   const listWidth = usePaneSize('sessions', 320)
   const [showArchived, setShowArchived] = useState(false)
   const [cleaningUp, setCleaningUp] = useState(false)
@@ -97,7 +99,7 @@ export function SessionsTab({ project, assistant = false }: { project: ProjectIn
   const isLive = (id: string): boolean => liveById.has(id)
   const many = project.agents.length > 1
   // Where each session ran and whose it was, as it recorded (the Assistant's conversations have one place to run).
-  const origin = (s: SessionListItem): SessionOrigin | null => (assistant ? null : sessionOrigin(project.path, project.agents, s))
+  const origin = (s: SessionListItem): SessionOrigin | null => (assistant ? null : sessionOrigin(project.path, project.agents, s, project.folders))
   const sessionName = (s: SessionListItem): string => sessionLabel(s, project.name, tr)
   const menu = useContextMenu()
   const resumeMenu = useContextMenu()
@@ -134,7 +136,7 @@ export function SessionsTab({ project, assistant = false }: { project: ProjectIn
   // Branches start folded except the focused agent's (the Assistant's: its provider's); what the user opens or folds is
   // remembered for the project.
   const focused = assistant ? null : focusedAgentId(project)
-  const focusedProvider = assistant ? agentProviderOf(project, project.agents[0]) : focused ? agentProviderOf(project, project.agents.find((a) => a.id === focused)) : null
+  const focusedProvider = assistant ? agentProviderOf(project.agents[0]) : focused ? agentProviderOf(project.agents.find((a) => a.id === focused)) : null
   const defaultOpen = (n: TreeNode): boolean =>
     n.kind === 'provider' ? n.provider === focusedProvider && (assistant || n.children.some((c) => c.kind === 'agent' && c.agentId === focused)) : n.kind === 'agent' ? !!focused && n.agentId === focused : false
   const isOpen = (n: TreeNode): boolean => !!q || revealed.has(n.key) || (explicit[n.key] ?? defaultOpen(n))
@@ -182,6 +184,9 @@ export function SessionsTab({ project, assistant = false }: { project: ProjectIn
   }, [jumpTo, project.path])
 
   const selected = items?.find((i) => i.id === selectedId) ?? null
+  // From the click until it runs (#1177); the agent that would resume it busy starting something else holds it too.
+  const resuming = useSessionStarting(project.path, selected?.id ?? null)
+  const targetStarting = !!useStarting(project.path, selected ? actions.resumeTarget(project, selected) : null)
 
   // Start on the running session, or the most recent conversation (not while an action has closed the view: moving).
   const moving = useRef(false)
@@ -310,7 +315,8 @@ export function SessionsTab({ project, assistant = false }: { project: ProjectIn
       providerInstalled: install && !install.checking ? install.found : null,
       runners: actions.agentsForSession(project, s),
       canAddAgent: !assistant && (!s.cwd || s.cwd.toLowerCase() === project.path.toLowerCase()) && project.agents.length < limit,
-      assistant
+      assistant,
+      projectPath: project.path
     }
   }
   const whyNot = (s: SessionListItem): string | null => resumeBlock(s, resumeCtx(s))
@@ -323,7 +329,12 @@ export function SessionsTab({ project, assistant = false }: { project: ProjectIn
     if (live) {
       const holder = project.agents.find((a) => a.live?.sessionId === s.id)
       if (holder) entries.push({ label: assistant ? tr(msg({ id: 'sessions.menu.showAssistant', defaultMessage: 'Show the Assistant', description: "Menu item on the Hive Assistant's running conversation: opens its panel." })) : tr(msg({ id: 'sessions.menu.showAgent', defaultMessage: 'Show {agent}', description: "Menu item on a running session: shows the agent running it ({agent}: its name)." }), { agent: holder.name }), icon: 'terminal', onClick: () => (assistant ? setAssistantOpen(true) : revealAgent(project, holder.id)) })
-    } else if (!s.archived) entries.push({ label: tr(RESUME), icon: 'debug-continue', action: 'resume', disabled: !!block, detail: block ?? undefined, onClick: () => void actions.resumeSession(project.path, s) })
+    } else if (!s.archived) {
+      // Its agent starting already (#1177).
+      const target = actions.resumeTarget(project, s)
+      const busy = target ? get().starting[startingKey(project.path, target)] : undefined
+      entries.push({ label: tr(RESUME), icon: 'debug-continue', action: 'resume', disabled: !!block || !!busy, detail: block ?? (busy ? startingLabel(busy) : undefined), onClick: () => void actions.resumeSession(project.path, s) })
+    }
     if (s.source === 'external' && !s.sub) entries.push({ label: tr(ADOPT), icon: 'add', onClick: () => void actions.attempt(tr(ADOPT_FAILED), () => call('session:adopt', project.path, s.id)).then(reload) })
     if (s.source === 'hive') entries.push({ label: tr(msg({ id: 'sessions.menu.rename', defaultMessage: 'Rename…', description: 'Menu item on a session: renames it.' })), icon: 'tag', keybinding: 'F2', onClick: () => void rename(s) })
     entries.push({ separator: true })
@@ -468,6 +479,11 @@ export function SessionsTab({ project, assistant = false }: { project: ProjectIn
           <label className="flex muted">
             <input type="checkbox" className="checkbox" checked={showArchived} onChange={(e) => setShowArchived(e.target.checked)} /> {tr(msg({ id: 'sessions.filter.archived', defaultMessage: 'Archived', description: 'A checkbox above the Sessions list: shows archived sessions too.' }))}
           </label>
+          {othersLoading && !assistant && (
+            <span className="sessions-scope faint" data-loading="others">
+              <Icon name="loading" spin /> {tr(msg({ id: 'sessions.list.othersLoading', defaultMessage: 'Looking for sessions started outside Hive…', description: "Above the Sessions list while it shows Hive's own sessions and is still reading the sessions the CLIs keep for the project's folders (started in a terminal or an editor)." }))}
+            </span>
+          )}
           {q && (
             <span className="sessions-scope faint">
               {searchError ? null : !results ? (
@@ -482,10 +498,11 @@ export function SessionsTab({ project, assistant = false }: { project: ProjectIn
             </span>
           )}
         </div>
+        <BulkProgressNote projectPath={project.path} kind={kind} />
         {listError && <StaleNote what={theList} error={listError} at={loadedAt} onRetry={reload} />}
         {q && searchError && <LoadFailed inline what={tr(msg({ id: 'sessions.search.what', defaultMessage: 'the search results', description: "What could not be loaded, in \"Could not load …\": the Sessions tab's search. Lower case." }))} error={searchError} onRetry={() => setSearchTry((n) => n + 1)} />}
         <div className="pane-body file-tree sessions-tree" tabIndex={0} ref={treeRef} onKeyDown={onKeyDown}>
-          {items.length === 0 && <div className="pane-empty">{tr(NONE_YET, { kind })}</div>}
+          {items.length === 0 && !othersLoading && <div className="pane-empty">{tr(NONE_YET, { kind })}</div>}
           {items.length > 0 && rows.length === 0 && !q && <div className="pane-empty">{tr(msg({ id: 'sessions.list.noneHere', defaultMessage: '{kind, select, conversation {No conversations here: tick Archived to see archived ones.} other {No sessions here: tick Archived to see archived ones.}}', description: "The Sessions list when every session is archived (the Hive Assistant's: conversations). Archived is the checkbox above it: use its translation." }), { kind })}</div>}
           {rows.map((r) => {
             if (r.kind === 'hit') {
@@ -583,27 +600,37 @@ export function SessionsTab({ project, assistant = false }: { project: ProjectIn
                 })()}
                 {!selected.archived && !isLive(selected.id) && (() => {
                   const block = whyNot(selected)
-                  // Can't be resumed: the buttons stay, disabled, and say why.
+                  // Can't be resumed: the buttons stay, disabled, and say why. One whose slot holds other work now (#1434) can
+                  // start its agent afresh from a handover instead (its transcript is the one shown here).
                   if (block) {
+                    const fresh = !!selected.hold && !!selected.agentId && project.agents.some((a) => a.id === selected.agentId)
                     return (
-                      <Tooltip content={block}>
-                        <span className="resume-blocked">
-                          <button className="btn small act-resume" disabled>
-                            <Icon name="debug-continue" /> {tr(RESUME)}
+                      <>
+                        <Tooltip content={block}>
+                          <span className="resume-blocked">
+                            <button className="btn small act-resume" disabled>
+                              <Icon name="debug-continue" /> {tr(RESUME)}
+                            </button>
+                          </span>
+                        </Tooltip>
+                        {fresh && (
+                          <button className="btn small" data-action="start-fresh-handover" onClick={() => set({ handOverFor: { project: project.path, agentId: selected.agentId! } })}>
+                            <Icon name="arrow-swap" /> {tr(msg({ id: 'sessions.resume.startFresh', defaultMessage: 'Start Fresh with a Handover', description: "Button over a session's transcript that can't resume where it ran (#1434: its slot holds other work): opens Hand Over to… for its agent, which starts a new conversation from a handover." }))}
                           </button>
-                        </span>
-                      </Tooltip>
+                        )}
+                      </>
                     )
                   }
                   const agents = actions.agentsForSession(project, selected)
                   const target = actions.resumeTarget(project, selected)
                   const targetAgent = agents.find((a) => a.id === target) ?? null
                   const targetName = targetAgent?.name
-                  const note = removedAgentNote(selected, project.agents, targetAgent)
+                  // Its slot free and as it left it (#1434): this Resume takes it again, as Resume All doesn't.
+                  const note = (selected.hold?.is === 'byHand' ? shownText(holdText(selected.hold, targetName ?? selected.agentName ?? '')) : null) ?? removedAgentNote(selected, project.agents, targetAgent)
                   if (agents.length < 2) {
                     const button = (
-                      <button className="btn small act-resume" onClick={() => void actions.resumeSession(project.path, selected)}>
-                        <Icon name="debug-continue" /> {tr(RESUME)}
+                      <button className="btn small act-resume" disabled={!!resuming || targetStarting} aria-busy={!!resuming || undefined} onClick={() => void actions.resumeSession(project.path, selected)}>
+                        <Icon name={resuming ? 'loading' : 'debug-continue'} spin={!!resuming} /> {resuming ? startingLabel(resuming) : tr(RESUME)}
                       </button>
                     )
                     return note ? <Tooltip content={note}>{button}</Tooltip> : button
@@ -611,13 +638,14 @@ export function SessionsTab({ project, assistant = false }: { project: ProjectIn
                   return (
                     <span className="split-btn">
                       <Tooltip content={note ?? (targetName ? tr(RESUME_IN, { agent: targetName }) : tr(msg({ id: 'sessions.resume.addsTip', defaultMessage: 'Resume (adds an agent if none can run it)', description: "Tooltip of Resume when no agent can run the session: Resume adds one." })))}>
-                        <button className="btn small act-resume" onClick={() => void actions.resumeSession(project.path, selected)}>
-                          <Icon name="debug-continue" /> {targetName ? tr(RESUME_IN, { agent: targetName }) : tr(RESUME)}
+                        <button className="btn small act-resume" disabled={!!resuming || targetStarting} aria-busy={!!resuming || undefined} onClick={() => void actions.resumeSession(project.path, selected)}>
+                          <Icon name={resuming ? 'loading' : 'debug-continue'} spin={!!resuming} /> {resuming ? startingLabel(resuming) : targetName ? tr(RESUME_IN, { agent: targetName }) : tr(RESUME)}
                         </button>
                       </Tooltip>
                       <Tooltip content={tr(RESUME_ELSEWHERE)}>
                         <button
                           className="btn small act-resume split-caret"
+                          disabled={!!resuming || targetStarting}
                           aria-label={tr(RESUME_ELSEWHERE)}
                           onClick={(e) => {
                             const r = e.currentTarget.getBoundingClientRect()
@@ -626,7 +654,9 @@ export function SessionsTab({ project, assistant = false }: { project: ProjectIn
                               ...agents.map((a) => ({
                                 label: a.name,
                                 icon: a.id === target ? 'debug-continue' : 'person',
-                                detail: tr(msg({ id: 'sessions.resume.agentDetail', defaultMessage: '{where, select, worktree {worktree · {branch}} other {project folder}}{running, select, yes { · running, its current session stops first} other {}}', description: 'Under an agent in the Resume in menu: where it works (a worktree and its branch, or the project folder; lower case), and, when it runs, that its current session stops first.' }), { where: a.worktree ? 'worktree' : 'folder', branch: a.worktree?.branch ?? '', running: a.live ? 'yes' : 'no' }),
+                                // Starting already (#1177).
+                                disabled: !!get().starting[startingKey(project.path, a.id)],
+                                detail: tr(msg({ id: 'sessions.resume.agentDetail', defaultMessage: '{where, select, worktree {worktree · {branch}} place {{place}} other {project folder}}{running, select, yes { · running, its current session stops first} other {}}', description: 'Under an agent in the Resume in menu: where it works (its worktree from before 1.0 and its branch; a slot, carried slot or home ({place}: agents.place.short, such as "in slot-b"); or the project folder; lower case), and, when it runs, that its current session stops first.' }), { where: legacyOf(a) ? 'worktree' : placeText(a.place) ? 'place' : 'folder', branch: legacyOf(a)?.branch ?? '', place: placeText(a.place) ?? '', running: a.live ? 'yes' : 'no' }),
                                 onClick: () => void actions.resumeSession(project.path, selected, a.id)
                               }))
                             ])
@@ -950,6 +980,15 @@ function TranscriptView({ project, session, origin, live, jump, query, viewId, m
   const loadingEarlier = useRef(false)
   /** Whether the view follows the end of the transcript. */
   const pinned = useRef(jump === null)
+  /**
+   * A jump placed the view (a search hit, a compaction): only the user's own scrolling follows the end again, not the
+   * scroll events of Hive's own scrolls (#1323: the opening scroll to the end, its event arriving after the jump, pinned
+   * the view again and the jump was scrolled away).
+   */
+  const placed = useRef(false)
+  const unplace = (): void => {
+    placed.current = false
+  }
   const followDefault = useStore((s) => s.settings?.sessions.followTranscripts ?? false)
   useDateStyle()
   // A running session is followed only when switched on (Follow), else it updates with Refresh.
@@ -1030,6 +1069,7 @@ function TranscriptView({ project, session, origin, live, jump, query, viewId, m
     }
     // Runs for a new jump, or once its items have loaded — not on every transcript update (it would scroll back).
     pinned.current = false
+    placed.current = true
     setExpanded((s) => new Set(s).add(jump.itemId))
     let frames = 0
     const go = (): void => {
@@ -1139,9 +1179,12 @@ function TranscriptView({ project, session, origin, live, jump, query, viewId, m
         ref={scroller}
         onScroll={(e) => {
           const el = e.currentTarget
-          pinned.current = el.scrollHeight - el.scrollTop - el.clientHeight < 60
+          if (!placed.current) pinned.current = el.scrollHeight - el.scrollTop - el.clientHeight < 60
           if (el.scrollTop < 200) void loadEarlier()
         }}
+        onWheel={unplace}
+        onPointerDown={unplace}
+        onKeyDown={unplace}
       >
         {error ? (
           <div className="empty-state">{/no transcript/i.test(error) ? tr(NOTHING_SAID) : error}</div>
@@ -1247,9 +1290,9 @@ function Reply({ items, project, sessionId, assistant, isOpen, toggle, onImage }
   )
 }
 
-function Collapsible({ id, open, toggle, icon, label, detail, badge, className, children }: { id: number; open: boolean; toggle: (id: number) => void; icon: string; label: React.ReactNode; detail?: string; badge?: React.ReactNode; className?: string; children: React.ReactNode }) {
+function Collapsible({ id, open, toggle, icon, label, detail, badge, className, anchored = true, children }: { id: number; open: boolean; toggle: (id: number) => void; icon: string; label: React.ReactNode; detail?: string; badge?: React.ReactNode; className?: string; anchored?: boolean; children: React.ReactNode }) {
   return (
-    <div className={cx('tx-fold', open && 'open', className)} id={`tx-${id}`}>
+    <div className={cx('tx-fold', open && 'open', className)} id={anchored ? `tx-${id}` : undefined}>
       <div className="tx-fold-head" onClick={() => toggle(id)}>
         <Icon name={open ? 'chevron-down' : 'chevron-right'} />
         <Icon name={icon} />
@@ -1262,23 +1305,72 @@ function Collapsible({ id, open, toggle, icon, label, detail, badge, className, 
   )
 }
 
-const TOOL_ICON: Record<string, string> = { Bash: 'terminal', PowerShell: 'terminal', Read: 'go-to-file', Edit: 'edit', MultiEdit: 'edit', Write: 'edit', Glob: 'search', Grep: 'search', Agent: 'hubot', Task: 'hubot', WebFetch: 'globe', WebSearch: 'globe' }
+const TOOL_ICON: Record<string, string> = { Bash: 'terminal', PowerShell: 'terminal', Shell: 'terminal', Script: 'code', view_image: 'file-media', Read: 'go-to-file', Edit: 'edit', MultiEdit: 'edit', Write: 'edit', Glob: 'search', Grep: 'search', Agent: 'hubot', Task: 'hubot', WebFetch: 'globe', WebSearch: 'globe' }
 
-function ToolCall({ id, tool, open, toggle, project, sessionId, onImage }: { id: number; tool: TranscriptTool; open: boolean; toggle: (id: number) => void; project: ProjectInfo; sessionId: string; onImage: (img: TranscriptImageRef) => void }) {
+const NO_CALLS_OPEN: ReadonlySet<number> = new Set()
+
+/** A command's exit code, as a badge says it (HI-2240: a Codex script's command). */
+const exitCodeText = (code: number): string => tr(msg({ id: 'sessions.tool.exitCode', defaultMessage: 'exit code {code}', description: "A badge on a command a Codex script ran, in a transcript (HI-2240): the exit code it ended with ({code}: a number such as 0 or 1, shown as it is). Lower case; keep it short." }), { code: String(code) })
+
+/** What kind of call a Codex script's call is, as its line counts it (HI-2240): an MCP server's (by server), or Hive's name for it. */
+const callKind = (c: TranscriptTool): string => (c.name.includes(' · ') ? `mcp:${c.name.split(' · ')[0]}` : c.name === 'Shell' ? 'command' : c.name === 'Edit' ? 'edit' : c.name === 'view_image' ? 'image' : 'other')
+
+/**
+ * A Codex script's calls in a line (HI-2240, Darren's decision): how many of each kind, in the order they first came
+ * ("3 hive calls, 1 command, 2 edits"), and how many failed.
+ */
+function callsSummary(calls: TranscriptTool[]): string {
+  const counts = new Map<string, number>()
+  for (const c of calls) counts.set(callKind(c), (counts.get(callKind(c)) ?? 0) + 1)
+  const parts = [...counts].map(([kind, n]) =>
+    kind.startsWith('mcp:')
+      ? tr(msg({ id: 'sessions.tool.scriptMcpCalls', defaultMessage: '{n, plural, one {# {server} call} other {# {server} calls}}', description: "Part of a folded Codex script's line in a transcript (HI-2240), in a list such as \"3 hive calls, 1 command, 2 edits\": how many calls the script made to one MCP server's tools ({server}: the server's name, such as hive, not translated)." }), { n, server: kind.slice(4) })
+      : tr(msg({ id: 'sessions.tool.scriptKindCalls', defaultMessage: '{kind, select, command {{n, plural, one {# command} other {# commands}}} edit {{n, plural, one {# edit} other {# edits}}} image {{n, plural, one {# image view} other {# image views}}} other {{n, plural, one {# other call} other {# other calls}}}}', description: "Part of a folded Codex script's line in a transcript (HI-2240), in a list such as \"3 hive calls, 1 command, 2 edits\": how many calls of one kind the script made. {kind}: shell commands it ran, file edits it made, images it looked at, or (other) any other tool calls." }), { n, kind })
+  )
+  const failed = calls.filter((c) => c.isError).length
+  if (failed) parts.push(tr(msg({ id: 'sessions.tool.scriptFailedCalls', defaultMessage: '{n, plural, one {# failed} other {# failed}}', description: "The last part of a folded Codex script's line in a transcript (HI-2240), after \"3 hive calls, 1 command\": how many of the script's calls failed." }), { n: failed }))
+  return fmt.list(parts, 'unit')
+}
+
+/**
+ * A tool call in a transcript, folded. A Codex code-mode script shows the calls it made (HI-2240): folded, how many and
+ * which; open, each call folded in turn with its own icon and result, then the script's code and what it printed.
+ * `nested`: a script's call, the `index`th of the tool `id` (its whole text is loaded from it).
+ */
+function ToolCall({ id, tool, open, toggle, project, sessionId, onImage, nested }: { id: number; tool: TranscriptTool; open: boolean; toggle: (id: number) => void; project: ProjectInfo; sessionId: string; onImage: (img: TranscriptImageRef) => void; nested?: { parent: number; index: number } }) {
   const [full, setFull] = useState<TranscriptTool | null>(null)
+  const [openCalls, setOpenCalls] = useState<ReadonlySet<number>>(NO_CALLS_OPEN)
+  const toggleCall = useCallback((i: number) => setOpenCalls((was) => {
+    const next = new Set(was)
+    if (!next.delete(i)) next.add(i)
+    return next
+  }), [])
   const t = full ?? tool
+  const calls = t.calls ?? []
   const truncated = !full && (tool.inputLength !== undefined || tool.resultLength !== undefined)
+  const load = async (): Promise<TranscriptTool | null> => {
+    const whole = await call('transcript:tool', project.path, sessionId, nested ? nested.parent : id)
+    return nested ? (whole.calls?.[nested.index] ?? null) : whole
+  }
   return (
     <Collapsible
       id={id}
       open={open}
       toggle={toggle}
+      anchored={!nested}
       icon={TOOL_ICON[tool.name] ?? (tool.name.includes(' · ') ? 'plug' : 'tools')}
       label={tool.name}
-      detail={tool.summary}
-      badge={tool.isError ? <span className="badge error">{tr(msg({ id: 'sessions.tool.errorBadge', defaultMessage: 'error', description: 'A badge on a tool call in a transcript that failed. Lower case; keep it short.' }))}</span> : tool.result === null ? <span className="badge">{tr(msg({ id: 'sessions.tool.noResult', defaultMessage: 'no result', description: 'A badge on a tool call in a transcript that has no result (yet). Lower case; keep it short.' }))}</span> : null}
+      detail={tool.calls?.length ? callsSummary(tool.calls) : tool.summary}
+      badge={tool.exitCode !== undefined && tool.exitCode !== 0 ? <span className="badge error">{exitCodeText(tool.exitCode)}</span> : tool.isError ? <span className="badge error">{tr(msg({ id: 'sessions.tool.errorBadge', defaultMessage: 'error', description: 'A badge on a tool call in a transcript that failed. Lower case; keep it short.' }))}</span> : tool.result === null ? <span className="badge">{tr(msg({ id: 'sessions.tool.noResult', defaultMessage: 'no result', description: 'A badge on a tool call in a transcript that has no result (yet). Lower case; keep it short.' }))}</span> : null}
       className="tx-tool"
     >
+      {calls.length > 0 && (
+        <div className="tx-calls">
+          {calls.map((c, i) => (
+            <ToolCall key={i} id={i} tool={c} open={openCalls.has(i)} toggle={toggleCall} project={project} sessionId={sessionId} onImage={onImage} nested={{ parent: nested?.parent ?? id, index: i }} />
+          ))}
+        </div>
+      )}
       <div className="tx-io-label">
         {tr(msg({ id: 'sessions.tool.input', defaultMessage: 'Input', description: "Label above a tool call's input in a transcript." }))} <CopyButton text={t.input} title={tr(msg({ id: 'sessions.tool.copyInput', defaultMessage: 'Copy Input', description: "Tooltip: copies a tool call's input." }))} />
       </div>
@@ -1287,12 +1379,13 @@ function ToolCall({ id, tool, open, toggle, project, sessionId, onImage }: { id:
         <>
           <div className="tx-io-label">
             {t.isError ? tr(msg({ id: 'sessions.tool.error', defaultMessage: 'Error', description: "Label above a failed tool call's result in a transcript." })) : tr(msg({ id: 'sessions.tool.result', defaultMessage: 'Result', description: "Label above a tool call's result in a transcript." }))} <CopyButton text={t.result} title={tr(msg({ id: 'sessions.tool.copyResult', defaultMessage: 'Copy Result', description: "Tooltip: copies a tool call's result." }))} />
+            {t.exitCode !== undefined && <span className={cx('badge', t.exitCode !== 0 && 'error')}>{exitCodeText(t.exitCode)}</span>}
           </div>
           <div className={cx('tx-pre', 'tx-result', t.isError && 'error')}>{t.result || <span className="faint">{tr(msg({ id: 'sessions.tool.empty', defaultMessage: '(empty)', description: "A tool call's result when it is empty." }))}</span>}</div>
         </>
       )}
       {truncated && (
-        <button className="btn small subtle" style={{ marginTop: 6 }} onClick={() => void actions.attempt(tr(msg({ id: 'sessions.tool.loadFailed', defaultMessage: 'Could not load the tool call', description: "An error's title: loading a long tool call in full failed." })), () => call('transcript:tool', project.path, sessionId, id)).then((f) => f && setFull(f))}>
+        <button className="btn small subtle" style={{ marginTop: 6 }} onClick={() => void actions.attempt(tr(msg({ id: 'sessions.tool.loadFailed', defaultMessage: 'Could not load the tool call', description: "An error's title: loading a long tool call in full failed." })), load).then((f) => f && setFull(f))}>
           {tr(msg({ id: 'sessions.tool.showAll', defaultMessage: 'Show all ({n, plural, one {# character} other {# characters}})', description: 'Button under a long tool call cut short in a transcript: shows it all ({n}: its length in characters).' }), { n: (tool.inputLength ?? 0) + (tool.resultLength ?? 0) })}
         </button>
       )}
@@ -1478,7 +1571,7 @@ function CardsLine({ icon, label, cards }: { icon: string; label: string; cards:
       <Icon name={icon} /> {label}{' '}
       {cards.map((c, i) => {
         const card = tasks.find((t) => t.number === c.number)
-        const text = `#${c.number} ${card?.title ?? c.title}`
+        const text = `${card ? cardLabel(card) : `#${c.number}`} ${card?.title ?? c.title}`
         return (
           <span key={c.number}>
             {i > 0 && ', '}

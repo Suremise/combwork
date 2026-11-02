@@ -5,14 +5,18 @@ import type { ReadinessIssue } from '../../../shared/types'
 import { installText } from '../common'
 
 const M = {
-  warning: msg({ id: 'providers.codex.storePwsh.warning', defaultMessage: "Codex agents' commands can fail while a PowerShell 7 from the Microsoft Store is open: Codex's Windows sandbox can't start that PowerShell while another copy of it runs.", description: "Agent Setup and Settings → Providers (#585): a warning that Codex's commands fail (Windows) while the Microsoft Store's PowerShell 7, the one found first, is running anywhere, e.g. in a terminal. Codex is the coding agent's name." }),
-  symptom: msg({ id: 'providers.codex.storePwsh.symptom', defaultMessage: 'The symptom: a Codex command fails at once with `CreateProcessAsUserW failed: 5` (access denied), and works again once every PowerShell 7 window and command is closed.', description: "Agent Setup (#585), under the warning about the Microsoft Store's PowerShell 7: how the problem shows. `…` marks the error as Codex prints it: keep it as it is." }),
-  fix: msg({ id: 'providers.codex.storePwsh.fix', defaultMessage: 'To avoid it, install PowerShell 7 from its installer instead of the Store (`winget install --id Microsoft.PowerShell --source winget`) and uninstall the Store one, then restart Hive and its Codex agents. Hive leaves your shell as it is.', description: "Agent Setup (#585), under the warning about the Microsoft Store's PowerShell 7: what to do. `…` marks a command to type: keep it as it is." })
+  label: msg({ id: 'providers.codex.storePwsh.label', defaultMessage: 'PowerShell 7 from the Microsoft Store is installed', description: "Provider Setup and Settings → Providers (#585, #1404): the short label of the warning about the Microsoft Store's PowerShell 7 (a badge and the banner atop the window); the explanation follows under it." }),
+  warning: msg({ id: 'providers.codex.storePwsh.warning', defaultMessage: "Codex agents' commands can fail while a PowerShell 7 from the Microsoft Store is open: Codex's Windows sandbox can't start that PowerShell while another copy of it runs.", description: "Provider Setup and Settings → Providers (#585): a warning that Codex's commands fail (Windows) while the Microsoft Store's PowerShell 7, the one found first, is running anywhere, e.g. in a terminal. Codex is the coding agent's name." }),
+  symptom: msg({ id: 'providers.codex.storePwsh.symptom', defaultMessage: 'The symptom: a Codex command fails at once with `CreateProcessAsUserW failed: 5` (access denied), and works again once every PowerShell 7 window and command is closed.', description: "Provider Setup (#585), under the warning about the Microsoft Store's PowerShell 7: how the problem shows. `…` marks the error as Codex prints it: keep it as it is." }),
+  fix: msg({ id: 'providers.codex.storePwsh.fix', defaultMessage: "To avoid it, replace the Store's PowerShell 7 with the installer's, in this order. First uninstall the Store one (Settings → Apps → Installed apps → PowerShell → Uninstall, or `Get-AppxPackage Microsoft.PowerShell | Remove-AppxPackage`): while it is there, winget takes it for the same app and installs nothing. Then install PowerShell 7 (`winget install --id Microsoft.PowerShell --source winget --installer-type wix`). Then restart Hive and its Codex agents: they keep their old PATH until they restart. Hive leaves your shell as it is.", description: "Provider Setup (#585, #1512), under the warning about the Microsoft Store's PowerShell 7: what to do, in an order that must stay (uninstall the Store copy first, then install, then restart). `…` marks a command to type: keep it as it is. Settings → Apps → Installed apps is Windows 11's settings page: use Windows' own names for it in your language." })
 }
 
-/** Agent Setup's warning about the Store's PowerShell 7 (#585, Darren's decision: warn and name the symptom, never change the shell). */
+/**
+ * Provider Setup's warning about the Store's PowerShell 7 (#585, Darren's decision: warn and name the symptom, never change the
+ * shell): a short label (its badge, the window's banner), what goes wrong, the symptom and the fix under it (#1404).
+ */
 export function storePwshIssue(): ReadinessIssue {
-  return { id: 'store-pwsh', level: 'warning', message: installText(M.warning), detail: [installText(M.symptom), installText(M.fix)] }
+  return { id: 'store-pwsh', level: 'warning', message: installText(M.label), detail: [installText(M.warning), installText(M.symptom), installText(M.fix)] }
 }
 
 /**

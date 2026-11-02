@@ -3,6 +3,7 @@ import type { HiveEvent, QuitChoice, QuitScope, QuitSession } from '../shared/ty
 import { setEventRouter } from './events'
 import { samePlace } from './fsutil'
 import { forgetWindowViews } from './transcriptReads'
+import { forgetOwner } from './notify'
 import { contextWorkspace, setWorkspaceFallback, workspaceFor, type WorkspaceService } from './workspace'
 
 /**
@@ -43,6 +44,8 @@ export function unregisterWindow(e: HiveWindow): void {
     if (v !== e) continue
     entries.delete(k)
     forgetWindowViews(k)
+    // The offers of entries only it held went with it (HI-2320).
+    forgetOwner(k)
   }
   e.ws.window = null
 }
@@ -92,7 +95,9 @@ function forEvent(e: HiveEvent): BrowserWindow[] {
     case 'assistant-activity':
     case 'assistant-questions':
     case 'agent-added':
+    case 'agent-start':
     case 'branch-status':
+    case 'session-bulk':
       return wins([windowForPath(e.projectPath)])
     case 'agent-leftovers':
       return wins([windowForPath(e.leftovers.projectPath)])
@@ -126,7 +131,7 @@ function forEvent(e: HiveEvent): BrowserWindow[] {
 }
 
 function forPty(key: string): BrowserWindow[] {
-  // session:<project path>#<agent id>: the window showing that project. Other terminals (Agent Setup's
+  // session:<project path>#<agent id>: the window showing that project. Other terminals (Provider Setup's
   // tasks) go to every window; only the one that started the task shows it.
   const m = /^session:(.+)#[^#]+$/.exec(key)
   return m ? wins([windowForPath(m[1])]) : wins(hiveWindows())

@@ -5,12 +5,22 @@ import { spawn, spawnSync, type ChildProcess } from 'node:child_process'
 import { createHash } from 'node:crypto'
 import { existsSync, statSync } from 'node:fs'
 import { delimiter, extname, isAbsolute, join } from 'node:path'
-import { estimateFor, ProgressRun, progressTarget, recordTiming, type Fetch } from './report.mts'
+import { assignIsolated, estimateFor, ProgressRun, progressTarget, recordTiming, resolveRun, type Fetch, type FinishOutcome, type ProgressStart, type RunLink, type Unreachable } from './report.mts'
+import { startLauncher } from '../workflow/launcher'
 
-export const USAGE = `Usage: hive-progress [--title <title>] -- <command> [args...]
+export const USAGE = `Usage: hive-progress [--title <title>] [--card <card>] [--revision <commit>] -- <command> [args...]
+       hive-progress --check <name> [--isolated] [--title <title>] [--card <card>] [--revision <commit>]
 
 Runs the command, passing its output through and returning its exit code, and shows it in Hive's Progress panel
-with the time it usually takes. A line the command prints like
+with the time it usually takes, and the card and revision it ran for.
+  --card <card>       the card it runs for ("#1061", quoted); without it, the card you are working on (yours in Doing)
+  --revision <commit> the commit it runs on: it must be what is checked out here, or nothing runs; without it,
+                      what is checked out when it starts
+  --check <name>      runs the project's command for that check (the project's options name it), not one of yours;
+                      focused:<test> (a card's focused test) runs your command after -- as that test's check
+  --isolated          with --check: runs it in a check copy of its own at the card's revision, which nothing else
+                      writes, so another agent's edits here can't spoil it (waits for a copy when none is free)
+A line the command prints like
   ##hive-progress step=4 total=12 name=carddialog
 says step 4 of 12 (carddialog) is starting, and isn't shown. The first total given is the run's: give it within the
 first 2 seconds for a bar with steps from the start, or later for one from then on.
@@ -20,22 +30,45 @@ against the usual time; "##hive-progress wait=" says it waits no more. A command
 stopped, and one whose hive-progress is killed as ended without a report. Outside Hive it just runs the command.
 HIVE_PROGRESS=0 turns reporting off.`
 
-export type WrapperArgs = { title?: string; command: string[] } | { help: true } | { error: string }
+/** What the options say: a title, and what the run is for (#1220): its card, its revision, the check it runs. */
+export interface WrapperOptions {
+  title?: string
+  card?: string
+  revision?: string
+  check?: string
+  /** Run the check in a check copy (#1435). */
+  isolated?: true
+}
+
+/** The command to run (empty with --check: the project's command for it runs), or help, or what's wrong. */
+export type WrapperArgs = (WrapperOptions & { command: string[] }) | { help: true } | { error: string }
+
+const VALUED = /^--(title|card|revision|check)(?:=([\s\S]*))?$/
 
 export function parseArgs(argv: string[]): WrapperArgs {
-  let title: string | undefined
+  const opts: WrapperOptions = {}
+  const done = (command: string[], afterDashes: boolean): WrapperArgs => {
+    // A focused test's check (HI-1367, `focused:<test>`) runs a command of your own; any other check, the project's.
+    if (opts.check !== undefined && opts.check.startsWith('focused:')) return command.length ? { ...opts, command } : { error: `--check ${opts.check} runs the command you give after -- for that test.` }
+    if (opts.check !== undefined) return command.length ? { error: `--check runs the project's command for ${opts.check || 'the check'}: give no command of your own.` } : { ...opts, command }
+    if (opts.isolated) return { error: '--isolated runs a check in a copy of its own: use it with --check <name>.' }
+    if (command.length) return { ...opts, command }
+    return { error: afterDashes ? 'No command after --.' : 'No command given.' }
+  }
   for (let i = 0; i < argv.length; i++) {
     const a = argv[i]
-    if (a === '--') return argv.length > i + 1 ? { title, command: argv.slice(i + 1) } : { error: 'No command after --.' }
+    if (a === '--') return done(argv.slice(i + 1), true)
     if (a === '--help' || a === '-h') return { help: true }
-    if (a === '--title') {
-      if (i + 1 >= argv.length) return { error: '--title needs a value.' }
-      title = argv[++i]
-    } else if (a.startsWith('--title=')) title = a.slice(8)
+    const v = VALUED.exec(a)
+    if (v) {
+      const name = v[1] as 'title' | 'card' | 'revision' | 'check'
+      if (v[2] === undefined && i + 1 >= argv.length) return { error: name === 'card' ? '--card needs a value: the card\'s key, as in --card HI-12 (an old --card "#1061" needs its quotes: a shell takes an unquoted # for the start of a comment).' : `--${name} needs a value.` }
+      opts[name] = v[2] ?? argv[++i]
+    } else if (a === '--isolated') opts.isolated = true
     else if (a.startsWith('-')) return { error: `Unknown option ${a}.` }
-    else return { title, command: argv.slice(i) }
+    else return done(argv.slice(i), false)
   }
-  return { error: 'No command given.' }
+  return done([], false)
 }
 
 const STEP_PREFIX = '##hive-progress'
@@ -180,6 +213,37 @@ export function spawnSpec(command: string[], env: Record<string, string | undefi
   return { file: env.ComSpec ?? env.COMSPEC ?? 'cmd.exe', args: ['/d', '/s', '/c', `"${line}"`], verbatim: true }
 }
 
+/** A revision as git takes one, never an option: a commit id, a branch or tag, HEAD~1 (as Hive checks it). */
+const REVISION = /^[\w./@^~{}-]{1,100}$/
+
+/**
+ * Why `revision` isn't what's checked out in `cwd`, or null when it is: checked with git itself when Hive can't check it,
+ * in the same words as Hive's refusal. A folder git can't read refuses too: a revision that can't be checked isn't taken.
+ */
+export function revisionProblem(cwd: string, revision: string, env: Record<string, string | undefined>): string | null {
+  const named = revision.trim()
+  if (!named || named.startsWith('-') || !REVISION.test(named)) return 'revision is a commit (its id, or a name git knows)'
+  const parse = (rev: string): string | null => {
+    try {
+      const r = spawnSync('git', ['rev-parse', '--verify', '--quiet', rev], { cwd, env, encoding: 'utf8', windowsHide: true, timeout: 10_000 })
+      return r.status === 0 ? String(r.stdout).trim() || null : null
+    } catch {
+      return null
+    }
+  }
+  const head = parse('HEAD')
+  if (!head) return `Nothing is checked out in ${cwd} to compare ${named} with (or git can't read it): leave --revision out`
+  const id = parse(`${named}^{commit}`)
+  if (!id) return `${named} isn't a commit in ${cwd}`
+  return id === head ? null : `${named} isn't what's checked out here (${head.slice(0, 7)} is): check it out first, or leave --revision out`
+}
+
+/** How to start a check's configured command (a command line, as the project's options give it): through the shell. */
+export function shellSpec(command: string, env: Record<string, string | undefined>, platform = process.platform): { file: string; args: string[]; verbatim: boolean } {
+  if (platform !== 'win32') return { file: '/bin/sh', args: ['-c', command], verbatim: false }
+  return { file: env.ComSpec ?? env.COMSPEC ?? 'cmd.exe', args: ['/d', '/s', '/c', `"${command}"`], verbatim: true }
+}
+
 /** The command line as shown: arguments with spaces or quotes quoted. */
 export function commandLabel(command: string[]): string {
   return command.map((a) => (/^[\w@%+=:,./\\-]+$/.test(a) ? a : `"${a.replace(/"/g, '\\"')}"`)).join(' ')
@@ -196,15 +260,91 @@ export interface WrapperIo {
   stdout: { write(b: Buffer | string): unknown }
   stderr: { write(b: Buffer | string): unknown }
   stdin?: 'inherit' | 'ignore'
+  /** For tests: how often at most output tells Hive the run still goes (default KEEPALIVE_MS). */
+  keepAliveMs?: number
   /** For tests: the API calls (report.mts's fetch) and the update interval. */
   fetch?: Fetch
   minIntervalMs?: number
+  /**
+   * How long it waits for Hive to say what the run is for, and for its start to be taken (default: Hive's setting, which
+   * it hands sessions as HIVE_PROGRESS_REPLY_SECONDS; `replyTimeoutMs`).
+   */
+  resolveTimeoutMs?: number
+  /** How long it waits before asking Hive again, once, when a check's ask or finish got no reply (default 1 s, HI-1892). */
+  retryMs?: number
+  /** How long a check's finish waits for Hive's reply (default CHECK_FINISH_WAIT_MS); tests shorten it. */
+  checkFinishWaitMs?: number
   /** How long the run waits for a step line with the total before it is reported without (default 2 s). */
   startWaitMs?: number
   /** Whether hive-progress runs in Hive's executable as Node (default: whether it does); tests set it. */
   viaElectron?: boolean
   /** The stop signals it listens for (default STOP_SIGNALS); tests pass none, or their own. */
   signals?: NodeJS.Signals[]
+  /** How often an isolated check waiting for a check copy asks again at first (default ISOLATED_POLL_MS). */
+  isolatedPollMs?: number
+}
+
+/**
+ * How long hive-progress waits for Hive's reply (HI-1892: a fixed 5 s gave up on a Hive whose main was slow): Settings →
+ * Advanced, "hive-progress: Hive's reply time" (hive.progress.replySeconds), handed to sessions as
+ * HIVE_PROGRESS_REPLY_SECONDS; without it, 15 s. Kept within 1 s to 2 minutes whatever is set, so a hung Hive never holds
+ * a command for long.
+ */
+export const REPLY_DEFAULT_S = 15
+export const REPLY_MAX_S = 120
+export function replyTimeoutMs(env: Record<string, string | undefined>): number {
+  const s = Number(env.HIVE_PROGRESS_REPLY_SECONDS)
+  return Math.round(Math.min(REPLY_MAX_S, Math.max(1, Number.isFinite(s) && s > 0 ? s : REPLY_DEFAULT_S)) * 1000)
+}
+/** How long it waits before asking again, once (a check's ask or finish that got no reply). */
+const RETRY_MS = 1000
+
+/**
+ * Why Hive gave no answer to a run that needed one, and that nothing was run (HI-1892). `what`: what the answer was for
+ * ("to look up the command for lint"). Slow: Hive is there but busy (try again; the setting gives it longer); refused:
+ * nothing listens at its address, or this process may not reach it (a sandbox that blocks local network access, as
+ * Claude Code's Bash sandbox does); anything else, with what happened.
+ */
+export function unansweredLine(u: Unreachable, what: string, waitedMs: number, url: string, asked: number): string {
+  if (u.why === 'slow') return `Hive is slow to answer: no reply ${what} in ${Math.round(waitedMs / 1000)} s${asked > 1 ? `, asked ${asked} times` : ''}, so nothing was run. Try again; Settings → Advanced → "hive-progress: Hive's reply time" gives it longer.`
+  if (u.why === 'refused') return `Hive couldn't be reached ${what} (connection ${u.detail === 'ECONNREFUSED' ? 'refused' : `not allowed: ${u.detail}`} at ${url}), so nothing was run. Is Hive running? A sandbox that blocks local network access (Claude Code's Bash sandbox does) stops it too: run the command outside the sandbox.`
+  return `Hive couldn't be reached ${what} (${u.detail}), so nothing was run.`
+}
+
+/**
+ * What hive-progress says when a check's result may not have been recorded (HI-1892), or null when it was: Hive never
+ * took the run's start, gave no reply to its finish (asked twice), or took a finish sent again after the first had
+ * arrived (how it counted not said).
+ */
+export function unrecordedLine(outcome: FinishOutcome | null, check: string): string | null {
+  if (outcome === 'noStart') return `Hive didn't take this run's report (no reply in time), so check ${check} wasn't recorded: run it again.`
+  if (outcome === 'noReply') return `Hive didn't confirm it recorded check ${check} (no reply to its result, asked twice): if submitting says it hasn't passed, run it again.`
+  if (outcome === 'refused') return `Hive refused this run's result, so check ${check} may not be recorded: run it again.`
+  if (outcome === 'endedBefore') return `Hive recorded check ${check}, but its reply was lost, so how it counted isn't known.`
+  return null
+}
+
+/** How often an isolated check waiting for a check copy asks Hive again (#1435), for the wait's first minute. */
+const ISOLATED_POLL_MS = 2000
+/** After that each ask comes half as long again later, up to this (HI-1831: an hour's wait was 1,800 asks). */
+const ISOLATED_POLL_PROMPT_MS = 60_000
+const ISOLATED_POLL_MAX_MS = 10_000
+
+/**
+ * How long an isolated check that has waited `waitedMs` waits before asking again, after waiting `lastMs` last time:
+ * `firstMs` while the wait is short, so a copy freed soon is taken at once, then backing off to ISOLATED_POLL_MAX_MS.
+ */
+export function isolatedPollDelay(waitedMs: number, lastMs: number, firstMs = ISOLATED_POLL_MS): number {
+  if (waitedMs < ISOLATED_POLL_PROMPT_MS) return firstMs
+  return Math.max(firstMs, Math.min(ISOLATED_POLL_MAX_MS, Math.round(lastMs * 1.5)))
+}
+
+/** How often at most a command's output tells Hive its run still goes (HI-1993): well within a quiet run's grace (STALE_GRACE_MS). */
+export const KEEPALIVE_MS = 60_000
+
+/** Whether output at `now` tells Hive the run still goes: once `every` ms have passed since it last did (or since its start or last step). */
+export function keepAliveDue(lastAlive: number, now: number, every = KEEPALIVE_MS): boolean {
+  return now - lastAlive >= every
 }
 
 /**
@@ -224,9 +364,11 @@ class WrappedRun {
   private waiting = ''
   private waitStart = 0
   private waitedBefore = 0
+  /** When it last told Hive the command still goes (output), ms. */
+  private lastAlive = 0
   constructor(
-    private readonly start: () => { title: string; command: string; titleFromCommand: boolean; estimateMs?: number; started: number },
-    private readonly opts: { fetch?: Fetch; minIntervalMs?: number; target: NonNullable<ReturnType<typeof progressTarget>> },
+    private readonly start: () => { title: string; command: string; titleFromCommand: boolean; estimateMs?: number; started: number; link: Partial<ProgressStart> },
+    private readonly opts: { fetch?: Fetch; minIntervalMs?: number; target: NonNullable<ReturnType<typeof progressTarget>>; startTimeoutMs?: number; keepAliveMs?: number },
     waitMs: number
   ) {
     this.timer = setTimeout(() => this.begin(), waitMs)
@@ -237,8 +379,19 @@ class WrappedRun {
     if (this.timer) clearTimeout(this.timer)
     this.timer = null
     const s = this.start()
+    this.lastAlive = Date.now()
     const left = s.estimateMs === undefined ? undefined : Math.max(0, s.estimateMs - (Date.now() - s.started))
-    this.run = new ProgressRun(this.opts.target, { title: s.title, command: s.command, titleFromCommand: s.titleFromCommand, total: this.total, step: this.step, stepName: this.name, estimateMs: left, ...(this.waiting ? { waiting: this.waiting } : {}) }, { fetch: this.opts.fetch, minIntervalMs: this.opts.minIntervalMs })
+    this.run = new ProgressRun(this.opts.target, { ...s.link, title: s.title, command: s.command, titleFromCommand: s.titleFromCommand, total: this.total, step: this.step, stepName: this.name, estimateMs: left, ...(this.waiting ? { waiting: this.waiting } : {}) }, { fetch: this.opts.fetch, minIntervalMs: this.opts.minIntervalMs, startTimeoutMs: this.opts.startTimeoutMs })
+  }
+
+  /**
+   * The command wrote output (HI-1993): the run is told it still goes, at most every KEEPALIVE_MS, so a long command with
+   * no step lines (a stress loop) isn't taken for one that stopped reporting. One silent for long still is.
+   */
+  output(now = Date.now()): void {
+    if (!this.run || !keepAliveDue(this.lastAlive, now, this.opts.keepAliveMs)) return
+    this.lastAlive = now
+    this.run.update({})
   }
 
   /** How long the command has waited in all (its wait lines), so far. */
@@ -269,13 +422,50 @@ class WrappedRun {
     }
     const late = this.total === undefined && u.total !== undefined && u.total > 0 ? u.total : undefined
     if (late !== undefined) this.total = late
+    this.lastAlive = Date.now()
     this.run.update({ ...(late !== undefined ? { total: late, step: this.step ?? 0 } : {}), ...(u.step !== undefined ? { step: this.step } : {}), ...(u.name !== undefined ? { stepName: u.name } : {}) })
   }
 
-  async finish(ok: boolean, summary: string | undefined, exitCode: number, stopped = false): Promise<void> {
+  /** Hive's answer to the finish (null: none in `waitMs`); `retry`: sent once more after that many ms when it got no reply. */
+  finish(ok: boolean, summary: string | undefined, exitCode: number, stopped = false, waitMs?: number, retry?: number): Promise<unknown> {
     this.begin()
-    await this.run!.finish(ok, summary, undefined, { exitCode, ...(this.log ? { logPath: this.log } : {}), ...(stopped ? { stopped: true } : {}) })
+    return this.run!.finish(ok, summary, waitMs, { exitCode, ...(this.log ? { logPath: this.log } : {}), ...(stopped ? { stopped: true } : {}) }, retry)
   }
+
+  /** How the finish went, once it has resolved. */
+  finishedAs(): FinishOutcome | null {
+    return this.run?.finishedAs() ?? null
+  }
+}
+
+/** How long a check's finish waits for Hive to say how it counted (Hive answers within 8 s: servers.ts CHECK_REPLY_MS). */
+const CHECK_FINISH_WAIT_MS = 9000
+
+/** What's done about each reason a check run didn't count (#1654): what happened, then what to do. */
+const UNCOUNTED: Record<string, (more: { name: string; changes: string; isolate: boolean }) => string> = {
+  notCheck: (m) => `Hive didn't see the check's configured command run. Run it again with hive-progress --check ${m.name}`,
+  notContained: () => "what is checked out here doesn't contain the card's revision. Run it in the card's own folder, at its revision",
+  dirty: (m) => `the folder had uncommitted changes${m.changes}. Commit or remove them, then run it again`,
+  moved: () => 'something else was checked out by the time it ended. Run it again',
+  changed: (m) => `files changed in the folder while it ran${m.changes}. Run it again with nothing else writing in the folder${m.isolate ? ', or with --isolated (a check copy of its own)' : ''}`,
+  revisionChanged: () => "the card's declared files changed while it ran. Run it again"
+}
+
+/** Names for what a write log records that isn't a file. */
+const MARKS: Record<string, string> = { ':reflog': 'a commit or checkout', ':edit': "an agent's edit" }
+
+/**
+ * The line hive-progress prints when Hive says a check's run didn't count (#1654), or null (it counted, or Hive didn't
+ * say): why, and what to do, so an agent isn't left running the same command again for a submit that keeps refusing.
+ */
+export function uncountedLine(answer: unknown, isolated: boolean): string | null {
+  const c = answer && typeof answer === 'object' ? (answer as { check?: unknown }).check : null
+  if (!c || typeof c !== 'object') return null
+  const { name, counted, whyNot, changes, platform } = c as Record<string, unknown>
+  if (counted !== false || typeof name !== 'string' || typeof whyNot !== 'string' || !UNCOUNTED[whyNot]) return null
+  const listed = Array.isArray(changes) ? changes.filter((x): x is string => typeof x === 'string').map((x) => MARKS[x] ?? x) : []
+  const why = UNCOUNTED[whyNot]({ name, changes: listed.length ? ` (${listed.join(', ')})` : '', isolate: !isolated && platform === 'git' })
+  return `not counted as check ${name}: ${why}.`
 }
 
 /**
@@ -406,7 +596,56 @@ export async function runWrapped(argv: string[], io: WrapperIo): Promise<number>
     return 2
   }
   const target = progressTarget(io.env)
-  const spec = spawnSpec(parsed.command, io.env, io.cwd)
+  const replyMs = io.resolveTimeoutMs ?? replyTimeoutMs(io.env)
+  // A check's command is the project's (#1220), which only Hive knows.
+  if (parsed.check !== undefined && !target) {
+    io.stderr.write(`hive-progress: --check runs the project's command for ${parsed.check}, which only Hive knows: run it in a session Hive started, with reporting on.\n`)
+    return 2
+  }
+  // What the run is for, checked before anything runs: a revision that isn't checked out, an unknown card or a check
+  // with no command is refused here. An older Hive, or one that doesn't answer, just doesn't link it.
+  let link: RunLink | null = null
+  if (target) {
+    const ask = { folder: io.cwd, ...(parsed.card !== undefined ? { card: parsed.card } : {}), ...(parsed.revision !== undefined ? { revision: parsed.revision } : {}), ...(parsed.check !== undefined ? { check: parsed.check } : {}), ...(parsed.isolated ? { isolated: true as const } : {}) }
+    // A check needs the answer (its command is Hive's): asked once more if it got none (HI-1892), but never an isolated
+    // check's first ask, which may lend a copy Hive is still setting up (it is asked again with its ticket below).
+    const retry = parsed.check !== undefined && !parsed.isolated ? (io.retryMs ?? RETRY_MS) : undefined
+    let r = await resolveRun(target, ask, { fetch: io.fetch, timeoutMs: replyMs, retry })
+    // No check copy free (#1435): said once, then asked again until one is (Ctrl+C stops waiting).
+    // Asked at once at first, less often after a minute (isolatedPollDelay).
+    let said = ''
+    const waitFrom = Date.now()
+    let delay = 0
+    while ('wait' in r) {
+      if (r.wait !== said) io.stderr.write(`hive-progress: waiting for ${(said = r.wait)}\n`)
+      delay = isolatedPollDelay(Date.now() - waitFrom, delay, io.isolatedPollMs)
+      await new Promise((res) => setTimeout(res, delay))
+      // Asked again with its ticket: the copy Hive is setting up for this run (none: a new ask).
+      r = await resolveRun(target, { ...ask, ...(r.ticket ? { ticket: r.ticket } : {}) }, { fetch: io.fetch, timeoutMs: replyMs })
+    }
+    if ('refused' in r) {
+      io.stderr.write(`hive-progress: ${r.refused}\n`)
+      return 2
+    }
+    if ('link' in r) link = r.link
+    else if (parsed.isolated || parsed.check !== undefined) {
+      const what = parsed.isolated ? 'to lend a check copy' : `to look up the command for ${parsed.check}`
+      io.stderr.write(`hive-progress: ${unansweredLine(r, what, replyMs, target.url, retry !== undefined && r.why !== 'refused' ? 2 : 1)}\n`)
+      return 2
+    }
+  }
+  // A revision named is checked whether or not Hive can (reporting off, outside Hive, Hive unreachable): here, with git.
+  if (!link && parsed.revision !== undefined) {
+    const wrong = revisionProblem(io.cwd, parsed.revision, io.env)
+    if (wrong) {
+      io.stderr.write(`hive-progress: ${wrong}\n`)
+      return 2
+    }
+  }
+  // A focused test's check (HI-1367) has no configured command: the one given after `--` runs.
+  const checkCommand = link?.check?.command || undefined
+  const command = checkCommand !== undefined ? [checkCommand] : parsed.command
+  const spec = checkCommand !== undefined ? shellSpec(checkCommand, io.env) : spawnSpec(parsed.command, io.env, io.cwd)
   const env = commandEnv(io.env, io.viaElectron ?? !!process.versions.electron)
   const started = Date.now()
   // Not reporting: the command runs as if hive-progress weren't there (its own console, no filtering).
@@ -414,12 +653,17 @@ export async function runWrapped(argv: string[], io: WrapperIo): Promise<number>
   // Its run is this one: a reporter inside it (Hive's test runners, another hive-progress) prints step lines instead
   // of reporting a second row (report.mts).
   env.HIVE_PROGRESS_WRAPPED = '1'
-  const label = commandLabel(parsed.command)
+  const label = checkCommand ?? commandLabel(parsed.command)
   const timings = io.env.HIVE_PROGRESS_DATA ? join(io.env.HIVE_PROGRESS_DATA, 'timings.json') : null
-  const key = timingKey(io.cwd, parsed.command)
+  const key = timingKey(io.cwd, command)
+  // A check is titled by its name (not its command line) unless given a title.
+  const title = parsed.title?.trim() || link?.check?.name
+  const linked: Partial<ProgressStart> = link
+    ? { ...(link.link ? { link: link.link } : {}), card: link.card, ...(link.revision ? { revision: link.revision } : {}), ...(link.check ? { check: link.check.name } : {}), ...(link.folder ? { folder: link.folder } : {}) }
+    : {}
   const report = new WrappedRun(
-    () => ({ title: parsed.title?.trim() || label, command: label, titleFromCommand: !parsed.title?.trim(), estimateMs: timings ? estimateFor(timings, key) : undefined, started }),
-    { target, fetch: io.fetch, minIntervalMs: io.minIntervalMs },
+    () => ({ title: title || label, command: label, titleFromCommand: !title, estimateMs: timings ? estimateFor(timings, key) : undefined, started, link: linked }),
+    { target, fetch: io.fetch, minIntervalMs: io.minIntervalMs, startTimeoutMs: replyMs, keepAliveMs: io.keepAliveMs },
     io.startWaitMs ?? 2000
   )
   let signalled = false
@@ -445,7 +689,9 @@ export async function runWrapped(argv: string[], io: WrapperIo): Promise<number>
     }
   })
   const ended = { signal: null as NodeJS.Signals | null }
-  const code = await run(spec, env, io, (u) => report.onStep(u), (c) => (child = c), ended, forced)
+  // An isolated check (#1435): in its copy, its launcher put in the copy's job before the command exists.
+  const isolated = link?.isolated && link.folder ? { folder: link.folder, assign: (a: { pid: number; after: number; before: number }) => assignIsolated(target, { lease: link!.isolated!.lease, ...a }, { fetch: io.fetch }) } : undefined
+  const code = await run(spec, env, io, (u) => report.onStep(u), (c) => (child = c), ended, forced, isolated, () => report.output())
   for (const s of signals) process.off(s, onSignal)
   // Told to stop, it is stopped however it then ended (a server shutting down cleanly exits 0); a command that ended by
   // an interrupt of its own is stopped too. Its exit code is passed on as it was.
@@ -453,7 +699,11 @@ export async function runWrapped(argv: string[], io: WrapperIo): Promise<number>
   const passed = code === 0 && !stopped
   // The time it usually takes: from runs that passed only, leaving out the time it waited (a queue, a lock).
   if (passed && timings) recordTiming(timings, key, Math.max(0, Date.now() - started - report.waitedMs()))
-  await report.finish(passed, passed ? undefined : stopped ? 'interrupted' : `exit code ${code}`, code, stopped)
+  // A check's result is what a submit needs: its finish is sent once more if it got no reply (HI-1892).
+  const answer = await report.finish(passed, passed ? undefined : stopped ? 'interrupted' : `exit code ${code}`, code, stopped, link?.check ? (io.checkFinishWaitMs ?? CHECK_FINISH_WAIT_MS) : undefined, link?.check ? (io.retryMs ?? RETRY_MS) : undefined)
+  // A check that didn't count says why (#1654), or that it may not be recorded; its exit code is the command's all the same.
+  const uncounted = link?.check ? (uncountedLine(answer, !!link.isolated) ?? unrecordedLine(report.finishedAs(), link.check.name)) : null
+  if (uncounted) io.stderr.write(`hive-progress: ${uncounted}\n`)
   return code
 }
 
@@ -464,21 +714,45 @@ function run(
   onStep: ((u: StepLine) => void) | null,
   onChild?: (c: ChildProcess) => void,
   ended?: { signal: NodeJS.Signals | null },
-  forced?: { at: number }
+  forced?: { at: number },
+  isolated?: { folder: string; assign: (a: { pid: number; after: number; before: number }) => Promise<true | string> },
+  onOutput?: () => void
 ): Promise<number> {
   return new Promise((resolve) => {
     let child: ChildProcess
     try {
-      child = spawn(spec.file, spec.args, {
-        cwd: io.cwd,
-        env,
-        stdio: [io.stdin ?? 'inherit', onStep ? 'pipe' : 'inherit', onStep ? 'pipe' : 'inherit'],
-        windowsVerbatimArguments: spec.verbatim,
-        // The wrapper runs as Electron (a GUI program) with no console of its own, so the command gets a new one: shown,
-        // it is a terminal window popping up (Windows Terminal, when it is the default). Hidden, the output still comes
-        // through, and windows the command opens itself still show (only cmd's own window is hidden).
-        windowsHide: true
-      })
+      if (isolated) {
+        // Its launcher, waiting: put in the copy's job by Hive, then told to run the command (its output is the command's).
+        const l = startLauncher({ command: spec.file, args: spec.args, verbatim: spec.verbatim }, { cwd: isolated.folder, env: env as NodeJS.ProcessEnv })
+        child = l.child
+        const giveUp = (why: string): void => {
+          io.stderr.write(`hive-progress: ${why}\n`)
+          child.stdin?.end()
+          if (child.exitCode === null) child.kill()
+        }
+        child.stdin?.on('error', () => undefined)
+        if (!child.pid) giveUp("the check's launcher didn't start")
+        else
+          void isolated.assign({ pid: child.pid, after: l.after, before: l.before }).then(
+            (ok) => {
+              if (ok !== true) return giveUp(`the check wasn't run: ${ok}`)
+              child.stdin!.write('go\n')
+              child.stdin!.end()
+            },
+            (e: Error) => giveUp(`the check wasn't run: ${e.message}`)
+          )
+      } else {
+        child = spawn(spec.file, spec.args, {
+          cwd: io.cwd,
+          env,
+          stdio: [io.stdin ?? 'inherit', onStep ? 'pipe' : 'inherit', onStep ? 'pipe' : 'inherit'],
+          windowsVerbatimArguments: spec.verbatim,
+          // The wrapper runs as Electron (a GUI program) with no console of its own, so the command gets a new one: shown,
+          // it is a terminal window popping up (Windows Terminal, when it is the default). Hidden, the output still comes
+          // through, and windows the command opens itself still show (only cmd's own window is hidden).
+          windowsHide: true
+        })
+      }
     } catch (e) {
       io.stderr.write(`hive-progress: ${(e as Error).message}\n`)
       return resolve(127)
@@ -490,7 +764,10 @@ function run(
         [child.stdout, io.stdout],
         [child.stderr, io.stderr]
       ] as const) {
-        const f = new StepFilter((b) => to.write(b), onStep)
+        const f = new StepFilter((b) => {
+          to.write(b)
+          onOutput?.()
+        }, onStep)
         filters.push(f)
         stream?.on('data', (d: Buffer) => f.push(d))
       }

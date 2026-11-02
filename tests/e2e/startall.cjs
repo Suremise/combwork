@@ -27,6 +27,8 @@ const check = (name, ok, extra = '') => {
 ;(async () => {
   for (const d of [userData, ws, claudeHome]) fs.rmSync(d, { recursive: true, force: true })
   fs.mkdirSync(claudeHome, { recursive: true })
+  // Every read of the agents' input recorded, for typeLine (#1560).
+  lib.logFakeInput(claudeHome)
   lib.gitProject(alpha)
   lib.enableProviders(userData)
   const cfgFile = path.join(userData, 'config.json')
@@ -52,9 +54,8 @@ const check = (name, ok, extra = '') => {
     return v
   }
   const type = async (id, text) => {
-    await inv('pty:write', lib.ptyKey(alpha, id), text)
-    await lib.sleep(300)
-    await inv('pty:write', lib.ptyKey(alpha, id), '\r')
+    // Typed again if a wake of Hive's disturbed it (lib.typeLine, #1560).
+    await lib.typeLine(inv, lib.ptyKey(alpha, id), claudeHome, null, text, { live: () => live(id) })
   }
   // Starts an agent (trusting its folder) and has one exchange, so it has a conversation.
   const run = async (id) => {
@@ -114,10 +115,11 @@ const check = (name, ok, extra = '') => {
   }, 5000)), JSON.stringify(await look('button.act-stop')))
   await page.mouse.move(0, 0)
   check('no Explorer or Terminal button in the header', (await header.locator('button', { hasText: /Explorer|Terminal/ }).count()) === 0)
-  // Agents ▾: the batch actions with their counts, Remove All last after a line; each in its action's colour (#344).
-  check('Agents ▾ has Start New (3), Archive and Start New (3) and Remove All (3)…', JSON.stringify(await lib.agentsMenu(page)) === JSON.stringify(['Start New (3)', 'Archive and Start New (3)', 'Remove All (3)…']))
+  // Agents ▾: the batch actions with their counts, Start Fresh (Idle Agents)… after Start New (#1437), Remove All last
+  // after a line; each in its action's colour (#344).
+  check('Agents ▾ has Start New (3), Start Fresh (Idle Agents)…, Archive and Start New (3) and Remove All (3)…', JSON.stringify(await lib.agentsMenu(page)) === JSON.stringify(['Start New (3)', 'Start Fresh (Idle Agents)…', 'Archive and Start New (3)', 'Remove All (3)…']), JSON.stringify(await lib.agentsMenu(page)))
   const acts = () => page.locator('.menu .menu-item').evaluateAll((items) => items.map((m) => [...m.classList].find((c) => c.startsWith('act-')) ?? 'none'))
-  check("each entry wears its action's colour", JSON.stringify(await acts()) === JSON.stringify(['act-start', 'act-archive-start', 'act-remove']), JSON.stringify(await acts()))
+  check("each entry wears its action's colour", JSON.stringify(await acts()) === JSON.stringify(['act-start', 'act-start', 'act-archive-start', 'act-remove']), JSON.stringify(await acts()))
   check('…with a line before Remove All', !!(await page.locator('.menu > *').evaluateAll((els) => els.at(-2)?.classList.contains('menu-sep'))))
   for (const theme of ['dark', 'light']) {
     await inv('settings:update', { appearance: { theme } })
@@ -146,7 +148,7 @@ const check = (name, ok, extra = '') => {
   }, HUNG_MS)
   check('Enter on Agents ▾: the focus is in the menu, on Start New (3) as its active descendant, the button expanded', !!opened, JSON.stringify(await focusState()))
   await page.keyboard.press('ArrowDown')
-  check('↓: the active descendant is Archive and Start New (3)', !!(await lib.until(async () => (await focusState()).chosen === 'Archive and Start New (3)', HUNG_MS)), JSON.stringify(await focusState()))
+  check('↓: the active descendant is Start Fresh (Idle Agents)…', !!(await lib.until(async () => (await focusState()).chosen === 'Start Fresh (Idle Agents)…', HUNG_MS)), JSON.stringify(await focusState()))
   await page.keyboard.press('Escape')
   check('Escape: the menu closes, the focus back on Agents ▾, no longer expanded', !!(await lib.until(async () => {
     const f = await focusState()
@@ -223,7 +225,7 @@ const check = (name, ok, extra = '') => {
   check('…the status its most urgent count only, the rest in its tooltip', !(await statusText()).includes('·') && (await statusText()).length > 0, await statusText())
   const items265 = await menuNames()
   const folded = RUN.filter((n) => !at265.some((x) => x.name === n))
-  check("…⋯ starts with Active, then what of Resume and Stop left the row, then Agents ▾'s actions", JSON.stringify(items265.slice(0, 4 + folded.length)) === JSON.stringify(['Active', ...folded, 'Start New (3)', 'Archive and Start New (3)', 'Remove All (3)…']), JSON.stringify({ items265, row: at265.map((x) => x.name) }))
+  check("…⋯ starts with Active, then what of Resume and Stop left the row, then Agents ▾'s actions", JSON.stringify(items265.slice(0, 5 + folded.length)) === JSON.stringify(['Active', ...folded, 'Start New (3)', 'Start Fresh (Idle Agents)…', 'Archive and Start New (3)', 'Remove All (3)…']), JSON.stringify({ items265, row: at265.map((x) => x.name) }))
   await page.screenshot({ path: path.join(lib.WORK, 'startall-header-265.png'), clip: { x: 0, y: 0, width: 900, height: 120 } })
   await toggleProgress()
   // The Assistant's panel open too (a main area of about a hundred pixels): only ⋯ is left beside the name.
@@ -234,7 +236,7 @@ const check = (name, ok, extra = '') => {
   }, 5000)) || (await actionsAt())
   check('900 px with the Assistant open (a squeezed main area): one row, only ⋯ beside the name, reachable', cramped.length === 1 && cramped[0].name === 'More actions' && allReachable(cramped) && (await oneRow()), JSON.stringify(cramped))
   const crampedItems = await menuNames()
-  check("…⋯ starts with Active, Resume and Stop, then Agents ▾'s actions", JSON.stringify(crampedItems.slice(0, 6)) === JSON.stringify(['Active', "Resume Stopped's last session", 'Stop all 2 running agents', 'Start New (3)', 'Archive and Start New (3)', 'Remove All (3)…']), JSON.stringify(crampedItems))
+  check("…⋯ starts with Active, Resume and Stop, then Agents ▾'s actions", JSON.stringify(crampedItems.slice(0, 7)) === JSON.stringify(['Active', "Resume Stopped's last session", 'Stop all 2 running agents', 'Start New (3)', 'Start Fresh (Idle Agents)…', 'Archive and Start New (3)', 'Remove All (3)…']), JSON.stringify(crampedItems))
   await page.screenshot({ path: path.join(lib.WORK, 'startall-header-cramped.png') })
   await page.evaluate(() => document.activeElement?.blur())
   await page.keyboard.press('Control+Alt+I')
@@ -257,7 +259,7 @@ const check = (name, ok, extra = '') => {
   }
   const project = await menuItems('Project')
   const tabs = project.filter((t) => t.startsWith('Go to '))
-  check('the Project menu lists the 12 tabs in the strip order, and Project Settings', JSON.stringify(tabs) === JSON.stringify(['Session', 'Overview', 'Performance', 'Tasks', 'Sessions', 'Files', 'Attachments', 'Git', 'Memory', 'Skills', 'Templates', 'MCP', 'Project Settings'].map((t) => `Go to ${t}`)), JSON.stringify(tabs))
+  check('the Project menu lists the 13 tabs in the strip order, and Project Settings', JSON.stringify(tabs) === JSON.stringify(['Session', 'Overview', 'Performance', 'Tasks', 'Sessions', 'Files', 'Attachments', 'Version Control', 'Activity', 'Memory', 'Skills', 'Templates', 'MCP', 'Project Settings'].map((t) => `Go to ${t}`)), JSON.stringify(tabs))
   check('and Explorer and Terminal', project.some((t) => /Explorer/.test(t)) && project.some((t) => /Terminal/.test(t)), JSON.stringify(project))
   const session = await menuItems('Session')
   check('the Session menu has Start New (3)… and Archive and Start New (3)…', session.includes('Start New (3)…') && session.includes('Archive and Start New (3)…') && session.includes('Archive Session and Start New…'), JSON.stringify(session))
@@ -277,7 +279,7 @@ const check = (name, ok, extra = '') => {
 
   // --- The session toolbar beside them (#975: the agent strip went): its summary chip counts every agent, idle ones too.
   const chipText = () => page.locator('.session-toolbar .summary-chip-text').innerText().catch(() => '')
-  check("the summary chip: 1 working · 2 idle", !!(await until(async () => (await chipText()) === '1 working · 2 idle', HUNG_MS)), await chipText())
+  check("the summary chip: 1 working · 1 idle · 1 stopped, as the header (HI-1908)", !!(await until(async () => (await chipText()) === '1 working · 1 idle · 1 stopped', HUNG_MS)), await chipText())
   for (const theme of ['dark', 'light']) {
     await inv('settings:update', { appearance: { theme } })
     await until(async () => (await page.evaluate(() => document.documentElement.dataset.theme)) === theme, HUNG_MS)
@@ -305,14 +307,16 @@ const check = (name, ok, extra = '') => {
   // --- Stop (2): the running agents as a table, Agent · State · Card, its card named; Cancel changes nothing.
   const card = (await inv('tasks:create', { title: 'Batch tables', project: 'alpha', column: 'doing', agent: w.id })).number
   // Once the window's board has it: the Worker's pane header shows the card.
-  await until(async () => (await lib.paneHeader(page, 'Worker').innerText().catch(() => '')).includes(`#${card}`), HUNG_MS)
+  await until(async () => (await lib.paneHeader(page, 'Worker').innerText().catch(() => '')).includes(await lib.cardLabel(inv, card)), HUNG_MS)
   // Idle reviews another card (started with its own token, as its CLI would): its row says "reviewing #n …".
   const reviewed = (await inv('tasks:create', { title: 'Review table', project: 'alpha', column: 'review', agent: s.id })).number
+  // The cards by key, as the window names them (#1221).
+  const [cardName, reviewedName] = [await lib.cardLabel(inv, card), await lib.cardLabel(inv, reviewed)]
   const launches = () => fs.readFileSync(path.join(claudeHome, 'fake-launches.jsonl'), 'utf8').trim().split('\n').map((l) => JSON.parse(l))
-  const idleToken = launches().filter((l) => l.sessionId === before.i).at(-1)?.env?.HIVE_API_TOKEN
+  const idleToken = launches().filter((l) => l.sessionId === before.i).at(-1)?.token
   const startReview = await fetch(`http://127.0.0.1:${PORT}/v1/tasks/${reviewed}`, { method: 'PATCH', headers: { Authorization: `Bearer ${idleToken}`, 'Content-Type': 'application/json' }, body: JSON.stringify({ review: 'start' }) })
   check('Idle starts reviewing a card', !!idleToken && startReview.status === 200, `${!!idleToken} ${startReview.status}`)
-  await until(async () => (await lib.paneHeader(page, 'Idle').innerText().catch(() => '')).includes(`#${reviewed}`), HUNG_MS)
+  await until(async () => (await lib.paneHeader(page, 'Idle').innerText().catch(() => '')).includes(reviewedName), HUNG_MS)
   // What a screen reader gets: the accessibility tree's text (the table is hidden from it, so a cell is never said twice).
   const cdp = await page.context().newCDPSession(page)
   const axTexts = async () => (await cdp.send('Accessibility.getFullAXTree')).nodes.filter((n) => !n.ignored).map((n) => n.name?.value ?? '')
@@ -321,9 +325,9 @@ const check = (name, ok, extra = '') => {
   await stopDialog.waitFor({ timeout: 5000 })
   const stopTable = await tableOf(stopDialog)
   check('Stop all lists the running agents as a table: Agent, State, Card', JSON.stringify(stopTable.heads) === JSON.stringify(['Agent', 'State', 'Card']) && JSON.stringify(Object.keys(stopTable.rows).sort()) === JSON.stringify(['Idle', 'Worker']), JSON.stringify(stopTable))
-  check("…the Worker's card in its row, and the one Idle reviews in its", stopTable.rows.Worker?.[2]?.text === `#${card} Batch tables` && /Working/.test(stopTable.rows.Worker?.[1]?.text ?? '') && stopTable.rows.Idle?.[2]?.text === `reviewing #${reviewed} Review table`, JSON.stringify(stopTable.rows))
+  check("…the Worker's card in its row, and the one Idle reviews in its", stopTable.rows.Worker?.[2]?.text === `${cardName} Batch tables` && /Working/.test(stopTable.rows.Worker?.[1]?.text ?? '') && stopTable.rows.Idle?.[2]?.text === `reviewing ${reviewedName} Review table`, JSON.stringify(stopTable.rows))
   const stopAx = await axTexts()
-  check('…a screen reader gets each card too, the reviewed one as such', stopAx.some((t) => t.includes(`• Worker — Working`) && t.includes(`card #${card} Batch tables`)) && stopAx.some((t) => t.includes(`• Idle — `) && t.includes(`card reviewing #${reviewed} Review table`)), JSON.stringify(stopAx.filter((t) => t.includes('•'))))
+  check('…a screen reader gets each card too, the reviewed one as such', stopAx.some((t) => t.includes(`• Worker — Working`) && t.includes(`card ${cardName} Batch tables`)) && stopAx.some((t) => t.includes(`• Idle — `) && t.includes(`card reviewing ${reviewedName} Review table`)), JSON.stringify(stopAx.filter((t) => t.includes('•'))))
   // The table itself is out of the accessibility tree, so no cell of it is said twice.
   const tableIgnored = async () => {
     const { root } = await cdp.send('DOM.getDocument', { depth: 0 })
@@ -331,7 +335,7 @@ const check = (name, ok, extra = '') => {
     const { nodes } = await cdp.send('Accessibility.getPartialAXTree', { nodeId, fetchRelatives: false })
     return nodes.length > 0 && nodes.every((n) => n.ignored)
   }
-  check('…and the table itself is ignored by screen readers, so nothing is said twice', (await tableIgnored()) && !stopAx.includes(`#${card} Batch tables`), JSON.stringify(stopAx.filter((t) => /Batch tables/.test(t))))
+  check('…and the table itself is ignored by screen readers, so nothing is said twice', (await tableIgnored()) && !stopAx.includes(`${cardName} Batch tables`), JSON.stringify(stopAx.filter((t) => /Batch tables/.test(t))))
   check('…the table hidden from screen readers, its plain lines for them instead, and the note under it', stopTable.hidden && /• Worker — Working/.test(await plainLines(stopDialog)) && /conversations are kept/.test(await stopDialog.locator('.agents-detail-note').innerText()))
   await bothThemes('startall-stop-confirm')
   await stopDialog.getByRole('button', { name: 'Cancel' }).click()
@@ -346,7 +350,7 @@ const check = (name, ok, extra = '') => {
   check('it lists every agent, flagging the working one', /Worker — Working.*\(will be interrupted\)/.test(text) && /Idle — /.test(text) && /Stopped — Not running · A new session/.test(text), text)
   const newTable = await tableOf(dialog)
   const newAx = await axTexts()
-  check('…a screen reader gets each agent with its card and what happens to it', newAx.some((t) => t.includes(`• Worker — Working`) && t.includes(`card #${card} Batch tables`) && t.includes('Stopped (will be interrupted), then a new session')) && newAx.some((t) => t.includes(`card reviewing #${reviewed} Review table`)), JSON.stringify(newAx.filter((t) => t.includes('•'))))
+  check('…a screen reader gets each agent with its card and what happens to it', newAx.some((t) => t.includes(`• Worker — Working`) && t.includes(`card ${cardName} Batch tables`) && t.includes('Stopped (will be interrupted), then a new session')) && newAx.some((t) => t.includes(`card reviewing ${reviewedName} Review table`)), JSON.stringify(newAx.filter((t) => t.includes('•'))))
   check('…as a table: Agent, State, Card, What happens', JSON.stringify(newTable.heads) === JSON.stringify(['Agent', 'State', 'Card', 'What happens']) && Object.keys(newTable.rows).length === 3, JSON.stringify(newTable))
   check('…the working one stopped first, in the warning colour; the stopped one only starts', newTable.rows.Worker?.[3]?.text === 'Stopped (will be interrupted), then a new session' && newTable.rows.Worker[3].warn && newTable.rows.Stopped?.[3]?.text === 'A new session' && !newTable.rows.Stopped[3].warn && newTable.rows.Stopped?.[1]?.text === 'Not running', JSON.stringify(newTable.rows))
   await bothThemes('startall-confirm')
@@ -374,6 +378,8 @@ const check = (name, ok, extra = '') => {
   const current = Object.fromEntries(await Promise.all([w, i, s].map(async (a) => [a.id, (await live(a.id)).sessionId])))
   await type(w.id, 'work 120')
   await until(async () => (await live(w.id))?.status === 'working', HUNG_MS)
+  // The dialog lists the window's agent states, which follow main's within a batch (HI-1806): once its chip says so (HI-1845).
+  await until(async () => /^1 working\b/.test(await chipText()), HUNG_MS)
   const archiveDialog = page.locator('.dialog', { hasText: 'Archive and start new for all agents?' })
   await lib.agentsMenuRun(page, 'Archive and Start New (3)')
   await archiveDialog.waitFor({ timeout: 5000 })

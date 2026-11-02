@@ -36,7 +36,10 @@ const PATTERN_LETTERS = 6
  * and the language's translations (id → text). A text is left out when the language also shows it as it is (a message
  * it doesn't translate, or translates to the same words, or another message's translation), since seeing it is then no
  * sign of a miss. Messages with plain placeholders ("{agent} (removed)") become patterns; plurals, selects and markup don't.
- * Returns { exact: [text], patterns: [{ id, source }] } (source: a RegExp's, whole text).
+ * Returns { exact: [text], patterns: [{ id, source }], authored: [] } (source: a RegExp's, whole text). authored: what
+ * the route itself wrote into Hive as a user would (a template's name, a card's blocked reason, HI-1915), each
+ * { text, within } (within: a selector for where Hive shows it), added as cases write it: English there is the user's,
+ * even where it equals a message ("Pair") or fits a placeholder message's pattern ("Waiting for {what}").
  */
 function englishLeft(english, translations) {
   const shown = new Set(Object.values(translations).map((t) => norm(t)))
@@ -53,10 +56,14 @@ function englishLeft(english, translations) {
     // Plain placeholders only: {name}, with no ICU format (plural, select, number) and no markup or quoting.
     if (/[<'#]/.test(e) || /\{[^}]*,/.test(e)) continue
     const parts = norm(e).split(/\{\w+\}/)
-    if (parts.join('').replace(/[^\p{L}]/gu, '').length < PATTERN_LETTERS) continue
+    const literal = parts.join('')
+    if (literal.replace(/[^\p{L}]/gu, '').length < PATTERN_LETTERS) continue
+    // A placeholder and one bare word ("{provider} version") matches any phrase ending in that word, translated or not
+    // ("Notes de version", HI-1590): only a pattern with two words, or marks around its words ("{agent} (removed)").
+    if ((literal.match(/\p{L}+/gu) ?? []).length < 2 && !/[^\p{L}\s]/u.test(literal)) continue
     patterns.push({ id, source: `^${parts.map(escapeRegex).join('.+?')}$` })
   }
-  return { exact: [...exact].sort(), patterns }
+  return { exact: [...exact].sort(), patterns, authored: [] }
 }
 
 const norm = (s) => String(s).replace(/\s+/g, ' ').trim()
@@ -253,14 +260,16 @@ function inspectLayout([root, english]) {
     // A block of text in a narrow column.
     if (lines >= SQUEEZED_LINES && box.right - box.left < SQUEEZED_WIDTH && text.trim().length / lines < SQUEEZED_CHARS) add('squeezed', el, text, { detail: `${lines} lines of about ${Math.round(text.trim().length / lines)} characters, ${Math.round(box.right - box.left)} px wide` })
     // A word broken across lines (only where the text wraps at all). Paths, addresses and ids (a run of text with \ / @
-    // _ . or : inside) may break anywhere, and a hyphenated word at its hyphen.
+    // _ . or : inside) may break anywhere, and a hyphenated word at its hyphen. Chinese and Japanese have no spaces
+    // between words, so a line may break between any two of their characters (HI-1590): a word is a run of other
+    // letters (a Latin word inside Japanese text is still one), never of Han, Hiragana, Katakana or full-width forms.
     if (lines > 1) {
       for (const n of el.childNodes) {
         if (n.nodeType !== 3) continue
         const tokens = /\S+/g
         for (let tok; (tok = tokens.exec(n.nodeValue)); ) {
           if (/[\\/@_.:]/.test(tok[0].replace(/[.,:;!?)\]"'’”]+$/, '')) || /\p{Ll}\p{Lu}/u.test(tok[0])) continue
-          const re = /[\p{L}\p{N}'’]{4,}/gu
+          const re = /(?:(?![\p{Script=Han}\p{Script=Hiragana}\p{Script=Katakana}\p{Script=Bopomofo}\u3000-\u303f\u30fc\uff00-\uffef])[\p{L}\p{N}'’]){4,}/gu
           for (let m; (m = re.exec(tok[0])); ) {
             const r = document.createRange()
             r.setStart(n, tok.index + m.index)
@@ -311,6 +320,10 @@ function inspectLayout([root, english]) {
     const patterns = english.patterns.map((p) => ({ id: p.id, re: new RegExp(p.source, 'u') }))
     // Whitespace as englishLeft() reads it (in the page: nothing from outside reaches it).
     const squash = (s) => s.replace(/\s+/g, ' ').trim()
+    // The user's own words where Hive shows them (englishLeft's authored): only that text, only there, so the same
+    // words elsewhere (a message Hive left in English) are still reported.
+    const authored = (english.authored ?? []).map((a) => ({ text: squash(a.text), within: a.within }))
+    const own = (el, c) => authored.some((a) => a.text === c && !!el.closest(a.within))
     for (const t of texts) {
       // Not a document Hive renders (a skill, a mode, a note: their words are their author's, not messages).
       if (t.el.closest('.markdown')) continue
@@ -319,6 +332,7 @@ function inspectLayout([root, english]) {
       const pieces = ownText(t.el).map(squash).filter((p) => /\s|\p{Lu}/u.test(p))
       const candidates = [...new Set([squash(t.el.textContent ?? ''), ...pieces])].filter(Boolean)
       for (const c of candidates) {
+        if (own(t.el, c)) continue
         const p = exact.has(c) ? null : patterns.find((x) => x.re.test(c))
         if (exact.has(c) || p) {
           add('english', t.el, c, p ? { detail: p.id } : {})

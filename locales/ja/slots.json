@@ -1,0 +1,12 @@
+{
+  "slots.idleBroker.body": "{names}は、すでに閉じたHiveでエージェント{agent}の最後のセッションが残した、Windowsのアイドル状態のサンドボックスブローカーです。サンドボックスは実行されていないため、スロットは安全に解放できます。「スロットを解放…」でほかの作業に使えるようになり、ブローカーは実行されたままです。",
+  "slots.idleBroker.release": "スロットを解放…",
+  "slots.idleBroker.title": "{slot}は{names}が保持しています",
+  "slots.release.changed": "{slot}はその間に変わりました。書き込んでいるのは表示されたセッションではなくなっています。もう一度確認してください。",
+  "slots.release.live": "{slot}に書き込んでいるセッションはこのHiveでまだ実行中です。先にエージェントを停止するか、残したプロセスを終了または保持してください。",
+  "slots.release.notEnded": "一覧のプロセスの一部がまだ実行中です。WindowsがHiveによる終了を許可しなかったため、{slot}は解放されませんでした。もう一度試すか、終了せずに解放してください。",
+  "slots.release.otherHive": "{slot}は、まだ実行中の別のHive（プロセス{pid}）が保持しています。そちらで解放するか、先にそのHiveを終了してください。",
+  "slots.setting.bad": "そのようなスロット設定はHiveにありません。",
+  "slots.setting.badSize": "レビュー用とチェック用のコピーの数は{min, number}から{max, number}までの整数で指定してください。",
+  "slots.setting.badText": "スロットのスクリプトやファイルの一覧は、{max, number}文字以内のテキストで指定してください。"
+}

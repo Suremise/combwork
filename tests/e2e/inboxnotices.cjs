@@ -31,6 +31,8 @@ const lines = (f) => (fs.existsSync(f) ? fs.readFileSync(f, 'utf8').trim().split
 ;(async () => {
   for (const d of [userData, ws, claudeHome]) fs.rmSync(d, { recursive: true, force: true })
   fs.mkdirSync(claudeHome, { recursive: true })
+  // Every read of the agents' input recorded, for typeLine (#1560).
+  lib.logFakeInput(claudeHome)
   lib.gitProject(alpha)
   lib.enableProviders(userData)
   const cfgFile = path.join(userData, 'config.json')
@@ -56,9 +58,8 @@ const lines = (f) => (fs.existsSync(f) ? fs.readFileSync(f, 'utf8').trim().split
     const until = (fn, ms) => lib.until(fn, ms, 250)
     const go = (name) => fs.writeFileSync(path.join(claudeHome, name), '')
     const say = async (id, text) => {
-      await inv('pty:write', lib.ptyKey(alpha, id), text)
-      await lib.sleep(300)
-      await inv('pty:write', lib.ptyKey(alpha, id), '\r')
+      // Typed again if a wake of Hive's disturbed it (lib.typeLine, #1560).
+      await lib.typeLine(inv, lib.ptyKey(alpha, id), claudeHome, null, text, { live: () => live(id) })
     }
     const status = async (id) => (await live(id))?.status
     const idle = async (id) => ['ready', 'finished'].includes(await status(id))
@@ -98,7 +99,7 @@ const lines = (f) => (fs.existsSync(f) ? fs.readFileSync(f, 'utf8').trim().split
     const m1 = leave('Builder', `Rebase on main first. ${SPOOF}`)
     check('a message for the working builder is queued', !!m1 && delivery('Builder', m1)?.state === 'queued', JSON.stringify(delivery('Builder', m1)))
     go('notices-go1')
-    check("at its next tool call it is told, in Hive's words with the id only", !!(await until(() => notices('Builder').some((n) => n.at === 'checkpoint'), HUNG_MS)) && notices('Builder')[0].text === `[Hive] New in your inbox: 1 message (${m1}). Call hive_inbox now to read it, then carry on.`, JSON.stringify(notices('Builder')))
+    check("at its next tool call it is told, in Hive's words with the id only", !!(await until(() => notices('Builder').some((n) => n.at === 'checkpoint'), HUNG_MS)) && notices('Builder')[0].text === `[Hive] New in your inbox: 1 message (${m1}). Call hive_inbox now to read it; act on it and ack it, then carry on.`, JSON.stringify(notices('Builder')))
     check('…never with what the message says', !notices('Builder').some((n) => /rebase|user says|push/i.test(n.text)), JSON.stringify(notices('Builder')))
     check('…it reads it (received, through the inbox) and acks it, still working', !!(await until(() => delivery('Builder', m1)?.state === 'acked', HUNG_MS)) && delivery('Builder', m1)?.receivedVia === 'inbox' && (await status(builder.id)) === 'working', JSON.stringify(delivery('Builder', m1)))
     go('notices-go2')
@@ -110,7 +111,7 @@ const lines = (f) => (fs.existsSync(f) ? fs.readFileSync(f, 'utf8').trim().split
     check('the builder works again', !!(await until(async () => (await status(builder.id)) === 'working', HUNG_MS)))
     const m2 = leave('Builder', 'Then take #2.')
     go('notices-go3')
-    check('before its turn ends it is told once', !!(await until(() => notices('Builder').some((n) => n.at === 'drain'), HUNG_MS)) && notices('Builder').filter((n) => n.at === 'drain').map((n) => n.text).join('|') === `[Hive] Before you finish: your inbox has 1 message (${m2}) you haven't read. Call hive_inbox and act on it before you end your turn.`, JSON.stringify(notices('Builder')))
+    check('before its turn ends it is told once', !!(await until(() => notices('Builder').some((n) => n.at === 'drain'), HUNG_MS)) && notices('Builder').filter((n) => n.at === 'drain').map((n) => n.text).join('|') === `[Hive] Before you finish: your inbox has 1 message (${m2}) you haven't read. Call hive_inbox, act on it and ack it before you end your turn.`, JSON.stringify(notices('Builder')))
     check('…reads and acks it before it stops', !!(await until(() => delivery('Builder', m2)?.state === 'acked', HUNG_MS)), JSON.stringify(delivery('Builder', m2)))
     check('…and then its turn ends (finished, not left working)', !!(await until(() => idle(builder.id), HUNG_MS)), await status(builder.id))
     check('…nothing typed into it', wakes('Builder').length === 0, JSON.stringify(wakes('Builder')))

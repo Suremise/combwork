@@ -1,4 +1,20 @@
 {
+  "files.attach.cardArchived": {
+    "defaultMessage": "Archived",
+    "description": "A badge on a card in the Attachments tab's Cards section (HI-1700): the card is archived (its files are kept)."
+  },
+  "files.attach.cardsKept": {
+    "defaultMessage": "Kept with the card until it is deleted: Clean Up and Purge don't remove them.",
+    "description": "Under the Cards heading of a project's Attachments tab (HI-1700)."
+  },
+  "files.attach.openCard": {
+    "defaultMessage": "Open {card}",
+    "description": "Hover of a card's name in the Attachments tab's Cards section (HI-1700): opens the card. {card} is its key."
+  },
+  "files.attach.toCard": {
+    "defaultMessage": "Attach to a card",
+    "description": "A session attachment's menu entry in the Attachments tab (HI-1700): opens a menu of the project's cards, to copy the file to one."
+  },
   "files.attachments.all": {
     "defaultMessage": "All",
     "description": "Attachments filter: every kind. Followed by a count."
@@ -10,6 +26,18 @@
   "files.attachments.archivedBadge": {
     "defaultMessage": "archived",
     "description": "Badge beside an archived session's name in the Attachments tab."
+  },
+  "files.attachments.cardEmpty": {
+    "defaultMessage": "No files kept with this project's cards yet. Paste or drop files into a card's description or a comment.",
+    "description": "Card attachments (a tab of a project's Attachments tab, HI-1841) with no files."
+  },
+  "files.attachments.cardFailed": {
+    "defaultMessage": "The cards' attachments couldn't be read.",
+    "description": "Card attachments (a tab of a project's Attachments tab, HI-1841) when reading them failed."
+  },
+  "files.attachments.cardTab": {
+    "defaultMessage": "Card attachments",
+    "description": "A tab of a project's Attachments tab (HI-1841): the files kept with the project's cards, by card."
   },
   "files.attachments.copyImage": {
     "defaultMessage": "Copy Image",
@@ -32,8 +60,8 @@
     "description": "The confirmation before deleting an attachment. {name} is its file name."
   },
   "files.attachments.desc": {
-    "defaultMessage": "Files pasted or dropped into this project's agents' sessions, by session.",
-    "description": "Under a project's Attachments heading."
+    "defaultMessage": "Files kept with this project's cards, and files pasted or dropped into its agents' sessions.",
+    "description": "Under a project's Attachments heading (HI-1700: cards' files, then sessions')."
   },
   "files.attachments.descAssistant": {
     "defaultMessage": "Files pasted or dropped into the Assistant, by conversation.",
@@ -119,6 +147,14 @@
     "defaultMessage": "{host, select, assistant {Open this conversation's transcript} other {Open this session's transcript}}",
     "description": "Tooltip on a session's name in the Attachments tab. {host} is assistant for the Hive Assistant's conversations."
   },
+  "files.attachments.paneEmpty": {
+    "defaultMessage": "Nothing pasted or dropped into a pane yet.",
+    "description": "Pane attachments (a tab of a project's Attachments tab, HI-1841) with no files."
+  },
+  "files.attachments.paneTab": {
+    "defaultMessage": "Pane attachments",
+    "description": "A tab of a project's Attachments tab (HI-1841): the files pasted or dropped into its agents' panes (sessions), by conversation."
+  },
   "files.attachments.refreshTarget": {
     "defaultMessage": "the attachments",
     "description": "What could not be refreshed while the attachments shown stay on screen: shown in \"Could not refresh {what}; last updated …\", with Retry."
@@ -131,6 +167,14 @@
     "defaultMessage": "Running",
     "description": "Badge beside a session's name in the Attachments tab: it is running now."
   },
+  "files.attachments.sessionsKept": {
+    "defaultMessage": "Kept with their session: Clean Up and Purge can remove them with it.",
+    "description": "Atop a project's Attachments tab's Pane attachments (HI-1700, HI-1841): the files pasted or dropped into sessions."
+  },
+  "files.attachments.tabs": {
+    "defaultMessage": "Attachments",
+    "description": "Accessible name of a project's Attachments tab's two tabs (HI-1841): Pane attachments and Card attachments."
+  },
   "files.attachments.title": {
     "defaultMessage": "Attachments",
     "description": "Heading of the Attachments tab."
@@ -138,6 +182,10 @@
   "files.attachments.total": {
     "defaultMessage": "{host, select, assistant {{total, number} in {groups, plural, one {# conversation} other {# conversations}}} other {{total, number} in {groups, plural, one {# session} other {# sessions}}}}",
     "description": "Beside the Attachments heading: how many attachments, in how many sessions (conversations for the Hive Assistant)."
+  },
+  "files.attachments.totalWithCards": {
+    "defaultMessage": "{total, plural, one {# file} other {# files}} · {cards, number} on cards, {sessions, number} in {groups, plural, one {# session} other {# sessions}}",
+    "description": "Beside a project's Attachments heading when its cards keep files too (HI-1700): how many files in all, how many on cards, and how many in how many sessions."
   },
   "files.attachments.unnamed": {
     "defaultMessage": "{host, select, assistant {Conversation {id}} other {Session {id}}}",
@@ -351,6 +399,10 @@
     "defaultMessage": "Insert into Session",
     "description": "Button or menu item: attaches the file to the agent's running session."
   },
+  "files.links.title": {
+    "defaultMessage": "Open in Files · Ctrl+click",
+    "description": "The hover of a file path in a terminal (an agent's output): Ctrl+click opens the file in the project's Files tab. Files is the tab's name: use it as the tab is named."
+  },
   "files.loading": {
     "defaultMessage": "Loading…",
     "description": "Shown while the attachments (or one of them) load."
@@ -419,13 +471,17 @@
     "defaultMessage": "Reveal in File Explorer",
     "description": "Button or menu item: shows the file or folder in Windows File Explorer."
   },
+  "files.root.place": {
+    "defaultMessage": "{agent} · {place}",
+    "description": "The Files tab's folder picker: the folder an agent works in. {agent} is the agent's name, {place} where (agents.place.short: \"in slot-b\", \"carried: hb2\", \"home: hr4\")."
+  },
   "files.root.projectFolder": {
     "defaultMessage": "Project folder",
     "description": "The Files tab's folder picker: the project's own folder."
   },
   "files.root.tip": {
-    "defaultMessage": "Show the project folder, or the worktree a worktree agent works in",
-    "description": "Tooltip on the Files tab's folder picker, shown when agents work in worktrees."
+    "defaultMessage": "Show the project folder, or the folder an agent works in: its slot or worktree",
+    "description": "Tooltip on the Files tab's folder picker, shown when agents work outside the project folder (in slots, Hive's worktrees lent to cards, or their own worktrees from before 1.0)."
   },
   "files.root.worktree": {
     "defaultMessage": "{agent}'s worktree · {branch}",
@@ -503,6 +559,10 @@
     "defaultMessage": "Image",
     "description": "A file view's mode button: an image file (or SVG) shown as a picture."
   },
+  "files.view.notUtf8": {
+    "defaultMessage": "This file isn't UTF-8 text, so Hive can't edit it without changing its characters.",
+    "description": "Shown in place of a text file in another encoding (such as Windows-1252), which the editor would corrupt on save. UTF-8 is the encoding's name: keep it as it is."
+  },
   "files.view.openInApp": {
     "defaultMessage": "Open it in its default app instead.",
     "description": "Under \"This is a binary file.\" or \"This file is too large to open here\", above an Open button."
@@ -552,12 +612,16 @@
     "description": "Tooltip on the attachment viewer's left arrow. Keep the arrow."
   },
   "files.viewer.noPreview": {
-    "defaultMessage": "No preview for this kind of file. Reveal it, or insert it into a session.",
-    "description": "The attachment viewer for a file it cannot show. Reveal and Insert into Session are its buttons."
+    "defaultMessage": "No preview for this kind of file. Show it in its folder, or insert it into a session.",
+    "description": "The attachment viewer for a file it cannot show. Show in Folder and Insert into Session are its buttons (the second only while an agent runs)."
   },
   "files.viewer.older": {
     "defaultMessage": "Older (→)",
     "description": "Tooltip on the attachment viewer's right arrow. Keep the arrow."
+  },
+  "files.viewer.openInApp": {
+    "defaultMessage": "Open in Its App",
+    "description": "A button in the attachment viewer (HI-1958), for an image or a PDF only: opens it in the program Windows opens that kind of file with (its photo viewer, its PDF reader), for zooming, printing and the like. Other kinds of file are never opened (nothing attached is ever run): they get Show in Folder instead."
   },
   "files.viewer.position": {
     "defaultMessage": "{index, number} of {count, number}",
@@ -566,6 +630,10 @@
   "files.viewer.readFailed": {
     "defaultMessage": "Couldn't read it: {error}",
     "description": "The attachment viewer when the file can't be read. {error} is why (from Windows, may be English)."
+  },
+  "files.viewer.removeFromCard": {
+    "defaultMessage": "Remove from Card",
+    "description": "A button in the attachment viewer for a card's attachment (HI-1958): takes the file off its card (to the Recycle Bin), after asking. A session's attachment has Delete there instead."
   },
   "files.viewer.tooLarge": {
     "defaultMessage": "Too large to preview here. Reveal it to open it in another program.",

@@ -77,6 +77,22 @@ describe('Codex: a refused sign-in', () => {
     expect(rolloutDetails([refused, turn('task_started')].join('\n')).signIn).toBeUndefined()
     expect(rolloutDetails([refused, turn('task_started'), turn('task_complete')].join('\n')).signIn).toBeUndefined()
   })
+
+  it("a turn that ended on another error is a failed turn (#1632), not a sign-in nor a safeguard's stop; a turn after it carries on", () => {
+    const line = (at: string, type: string, payload: Record<string, unknown> = {}) => JSON.stringify({ timestamp: at, type: 'event_msg', payload: { type, ...payload } })
+    const lost = line('2026-10-25T21:40:00.000Z', 'task_complete', { turn_id: 't1', error: { message: 'stream disconnected before completion', codex_error_info: { http_connection_failed: { http_status_code: null } } } })
+    const d = rolloutDetails([line('2026-10-25T21:39:00.000Z', 'task_started'), lost].join('\n'))
+    // The turn it names, as Codex's hooks name turns: the failure is that turn's only.
+    expect([d.turnFailed, d.turnFailedAt, d.turnFailedTurn, d.signIn]).toEqual(['stream disconnected before completion', '2026-10-25T21:40:00.000Z', 't1', undefined])
+    // No words: failed all the same (the window then says so in its own words).
+    expect(rolloutDetails(line('2026-10-25T21:40:00.000Z', 'task_complete', { error: { codex_error_info: 'internal_server_error' } })).turnFailed).toBe('')
+    // A refused sign-in is that, and a usage policy's stop a safeguard's (#606), told as themselves.
+    expect(rolloutDetails(line('t', 'task_complete', { error: { message: 'unexpected status 401 Unauthorized', codex_error_info: 'unauthorized' } })).turnFailed).toBeUndefined()
+    expect(rolloutDetails(line('t', 'task_complete', { error: { message: 'flagged', codex_error_info: 'cyber_policy' } })).turnFailed).toBeUndefined()
+    // A turn that ends well, or a next turn started, is the agent carrying on.
+    expect(rolloutDetails(line('t', 'task_complete', { last_agent_message: 'Done.' })).turnFailed).toBeUndefined()
+    expect(rolloutDetails([lost, line('2026-10-25T21:41:00.000Z', 'task_started')].join('\n')).turnFailed).toBeUndefined()
+  })
 })
 
 describe('status rules: needs sign-in', () => {
@@ -129,6 +145,6 @@ describe('Resume (n) and agents a refused sign-in stopped', () => {
     const done: string[] = []
     const r = await resumeAll(agents, async (a) => void done.push(`${stalledOnSignIn(a.live) ? 'carry on' : 'resume'} ${a.name}`))
     expect(done).toEqual(['carry on Stuck', 'carry on Again', 'resume Stopped'])
-    expect(r).toEqual({ resumed: ['Stuck', 'Again', 'Stopped'], running: ['Busy', 'Moved'], nothing: ['Nothing'], failed: [] })
+    expect(r).toEqual({ resumed: ['Stuck', 'Again', 'Stopped'], running: ['Busy', 'Moved'], nothing: ['Nothing'], held: [], failed: [] })
   })
 })

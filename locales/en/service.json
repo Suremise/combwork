@@ -35,6 +35,14 @@
     "defaultMessage": "No advanced setting \"{id}\".",
     "description": "An error changing an advanced setting: Hive has none with the id {id}."
   },
+  "service.answerRelay.title": {
+    "defaultMessage": "{card}: nobody else has your answer",
+    "description": "A notification's title (a banner, a Windows notification): the user answered an agent's question on card {card} (its key, such as HI-12), and the Hive Assistant, which could act on it, couldn't be told."
+  },
+  "service.assistantAsk.title": {
+    "defaultMessage": "{card}: the Hive Assistant didn't get an agent's request",
+    "description": "A notification's title (a banner, a Windows notification), HI-1866: an agent asked the Hive Assistant for something on card {card} (its key, such as HI-12), and the request couldn't reach the Assistant."
+  },
   "service.attachments.badFolder": {
     "defaultMessage": "Not a session folder name.",
     "description": "An error: a name given for a session's attachments folder isn't one Hive makes (a session id)."
@@ -139,6 +147,42 @@
     "defaultMessage": "That comparison file doesn’t match its scope: remove it and import it again.",
     "description": "An error on the Performance page: a kept comparison's file is of another scope than its entry in the list says."
   },
+  "service.cardAttach.moveFailed": {
+    "defaultMessage": "The card's attachments couldn't be copied to {project}, so it wasn't moved: {why}",
+    "description": "An error moving a card to another project (HI-1700): its attached files couldn't be copied there; the card stays where it was. {project} is the project's name, {why} the reason."
+  },
+  "service.cardAttach.moved": {
+    "defaultMessage": "The card moved to another project meanwhile: attach again.",
+    "description": "An error attaching files to a card (HI-1700): the card moved to another project while they were copied; nothing was attached."
+  },
+  "service.cardAttach.noAttachment": {
+    "defaultMessage": "The card has no such attachment.",
+    "description": "An error removing a card attachment (HI-1700) that is gone."
+  },
+  "service.cardAttach.noCard": {
+    "defaultMessage": "No such card.",
+    "description": "An error attaching a file to a card (HI-1700): the card is gone."
+  },
+  "service.cardAttach.noProject": {
+    "defaultMessage": "{project} is not a project of the workspace. Nothing was attached.",
+    "description": "An error attaching files to a card (HI-1700): the project named for it is not one of the workspace’s (a path, or a name no project has); nothing was copied."
+  },
+  "service.cardAttach.refused": {
+    "defaultMessage": "{path} is not a file that can be attached here: give the path of a file of your own project (its folder, its slots) or of the temp folder. Nothing was attached.",
+    "description": "An error attaching a file to a card by its path (HI-1700): it is missing, a folder or a link, or in a place the caller may not attach from (another project, Hive’s own folders). Nothing was attached."
+  },
+  "service.cardAttach.tooLarge": {
+    "defaultMessage": "{name} is larger than {max}, the most a card keeps in one file (Settings → Advanced → Card attachments: largest file). Nothing was attached.",
+    "description": "An error attaching files to a card (HI-1700): one is larger than the limit ({max}: a size such as 25 MB); none of them was attached."
+  },
+  "service.cardAttach.tooMuch": {
+    "defaultMessage": "At most {files, number} files and {total} can be attached at once. Nothing was attached.",
+    "description": "An error attaching files to a card (HI-1700): more files, or more bytes in all ({total}: a size such as 100 MB), than one change takes; none was attached."
+  },
+  "service.cardCleanup.stale": {
+    "defaultMessage": "This list is out of date: nothing was removed. Open Clean Up Now again.",
+    "description": "An error of Clean Up Now (Project Settings → Storage, HI-1842): the list of archived cards' files it showed expired, was used already, or belongs to a workspace closed since; nothing was removed."
+  },
   "service.files.badName": {
     "defaultMessage": "\"{name}\" is not a valid name",
     "description": "An error making or renaming a file or folder: {name} is empty, . or .., or has a character Windows can't have in a name."
@@ -187,6 +231,10 @@
     "defaultMessage": "Path leads outside the project (through a link)",
     "description": "An error in the Files tab: a file's path goes through a link (a symbolic link or junction) to somewhere outside the project."
   },
+  "service.fsutil.keptBusy": {
+    "defaultMessage": "{file} is being saved by something else: nothing was changed. Try again in a moment.",
+    "description": "An error: one of Hive's settings or records files ({file}: its path) was still being written by another program (an editor, a script), so Hive's change to it wasn't made."
+  },
   "service.fsutil.notCopied": {
     "defaultMessage": "{name} could not be copied",
     "description": "An error putting back one of Hive's skills or modes: its copy couldn't be made ({name}: its folder or file name); nothing was replaced."
@@ -207,6 +255,10 @@
     "defaultMessage": "File is too large to diff ({kb, number} KB).",
     "description": "Shown in place of a file's changes in the Changes tab: the file is too large ({kb} KB) to compare."
   },
+  "service.gitCompare.noBranch": {
+    "defaultMessage": "There's no branch {branch} here any more.",
+    "description": "An error comparing two branches in the Changes tab: the branch {branch} was deleted or renamed since the list was read."
+  },
   "service.gitRepo.addFailed": {
     "defaultMessage": "Couldn't add {remote}: {why}",
     "description": "An error adding the remote {remote} in the Git view; {why} is git's own words."
@@ -222,6 +274,14 @@
   "service.gitRepo.badName": {
     "defaultMessage": "{kind, select, tag {{hasName, select, yes {{name} isn't a valid tag name.} other {That isn't a valid tag name.}}} other {{hasName, select, yes {{name} isn't a valid branch name.} other {That isn't a valid branch name.}}}}",
     "description": "An error creating a branch or a tag ({kind}): its name {name} is one git refuses. {hasName} is no when no name was given (then it says That)."
+  },
+  "service.gitRepo.branchKept": {
+    "defaultMessage": "{why, select, target {{branch} is the branch work merges into: kept.} default {{branch} is the default branch: kept.} current {{branch} is checked out in the project folder: kept.} worktree {{branch} is checked out in a worktree or slot: kept.} card {An open card works on {branch}: kept.} remoteHead {{branch} is the remote's default branch: kept.} moved {{branch} has moved since you were shown it: kept. Look at it again.} unmerged {{branch} has commits that aren't in {target}: kept.} gone {There's no branch {branch}.} other {{branch} isn't a valid branch name.}}",
+    "description": "Why a branch wasn't deleted (Clean Up Merged Branches, Delete branch…, in Version Control → Branches & remotes). {branch} is its name, {target} the branch the project's work merges into. Keep the select keys."
+  },
+  "service.gitRepo.branchesDeleted": {
+    "defaultMessage": "{n, plural, one {Deleted {branches}.} other {Deleted # branches: {branches}.}}",
+    "description": "After deleting branches in Version Control → Branches & remotes: {branches} lists them ({n})."
   },
   "service.gitRepo.chooseRemote": {
     "defaultMessage": "Choose the remote to push to.",
@@ -242,6 +302,10 @@
   "service.gitRepo.createdSwitched": {
     "defaultMessage": "Created {name} and switched to it.",
     "description": "After creating a branch in the Git view: the project folder is on the new branch {name}."
+  },
+  "service.gitRepo.deleteBranchFailed": {
+    "defaultMessage": "Couldn't delete {branch}: {why}",
+    "description": "An error deleting the branch {branch} in Version Control → Branches & remotes; {why} is git's own words."
   },
   "service.gitRepo.detachedPull": {
     "defaultMessage": "HEAD is detached: switch to a branch to pull.",
@@ -289,7 +353,7 @@
   },
   "service.gitRepo.noBranch": {
     "defaultMessage": "There's no branch {branch}.",
-    "description": "An error switching branch in the Git view: the repository has no branch called {branch}."
+    "description": "An error in the Git view (switching branch, choosing what a branch tracks): the repository has no branch called {branch}."
   },
   "service.gitRepo.noCommits": {
     "defaultMessage": "The repository has no commits yet: commit something first.",
@@ -307,9 +371,17 @@
     "defaultMessage": "This repository has no remotes to fetch from: add one first.",
     "description": "An error fetching in the Git view: the repository has no remote."
   },
+  "service.gitRepo.noTarget": {
+    "defaultMessage": "There's no branch {target} here to check the branches against.",
+    "description": "An error deleting branches in Version Control → Branches & remotes: the branch the project's work merges into ({target}; the default branch when none is set) isn't in the repository, so Hive can't tell which branches are merged."
+  },
   "service.gitRepo.noUpstream": {
     "defaultMessage": "{branch} tracks no remote branch: push it first, or switch to one that does.",
     "description": "An error pulling in the Git view: the branch {branch} follows no remote branch."
+  },
+  "service.gitRepo.notOnRemote": {
+    "defaultMessage": "{remote} has no {branch} (as of the last fetch): push it there first, or fetch.",
+    "description": "An error choosing what a branch tracks in the Git view: the remote {remote} has no branch {branch} that Hive knows of."
   },
   "service.gitRepo.notRepo": {
     "defaultMessage": "{folder} isn't a git repository.",
@@ -331,17 +403,69 @@
     "defaultMessage": "Pulled {n, plural, one {# commit} other {# commits}} from {upstream}.",
     "description": "After pulling in the Git view: {n} commits came from the remote branch {upstream}."
   },
+  "service.gitRepo.pushAllRefused": {
+    "defaultMessage": "{remote} refused {n, plural, one {# branch or tag} other {# branches and tags}} (Hive never forces a push): it has commits they haven't, so pull or merge them first. What happened to each:",
+    "description": "An error after Push to… with all branches and tags in the Git view: the first line, the remote {remote} refused {n} of them; a line for each outcome follows (service.gitRepo.pushOutcome)."
+  },
   "service.gitRepo.pushFailed": {
     "defaultMessage": "Couldn't push to {to}: {why}",
     "description": "An error pushing to the remote branch {to} in the Git view; {why} is git's own words."
+  },
+  "service.gitRepo.pushOutcome": {
+    "defaultMessage": "{result, select, pushed {Pushed: {refs}.} upToDate {Already up to date: {refs}.} refused {Refused: {refs}.} other {Tags pushed: {refs}.}}",
+    "description": "A line after Push to… with all branches and tags in the Git view: the branches pushed, already up to date, refused (branches or tags), or the tags pushed. {refs} lists them all by name."
+  },
+  "service.gitRepo.pushUpToDate": {
+    "defaultMessage": "{to} already has {branch}: nothing to push.",
+    "description": "After Push to… in the Git view: the remote branch {to} already had every commit of the branch {branch}."
   },
   "service.gitRepo.pushed": {
     "defaultMessage": "Pushed {branch} to {to}.",
     "description": "After pushing in the Git view: the branch {branch} went to the remote branch {to}."
   },
+  "service.gitRepo.pushedAll": {
+    "defaultMessage": "Pushed every branch and tag to {remote}:",
+    "description": "After Push to… with all branches and tags in the Git view: the first line, what went to the remote {remote}; a line for each outcome follows (service.gitRepo.pushOutcome)."
+  },
   "service.gitRepo.rejected": {
     "defaultMessage": "{to} has commits {branch} hasn't, so the push was refused (Hive never forces a push). Pull first, or merge them in a terminal.",
     "description": "An error pushing the branch {branch} in the Git view: the remote branch {to} has commits it hasn't, so the remote refused."
+  },
+  "service.gitRepo.remoteBranchesDeleted": {
+    "defaultMessage": "{n, plural, one {Deleted {branches} on {remote}.} other {Deleted # branches on {remote}: {branches}.}}",
+    "description": "After deleting branches on the remote {remote} (Clean Up Merged Branches): {branches} lists them ({n})."
+  },
+  "service.gitRepo.remoteDeleteRefused": {
+    "defaultMessage": "{remote} refused to delete {branches}: it has commits there you haven't fetched, or it doesn't allow deleting them.",
+    "description": "After deleting branches on the remote {remote}: it refused those listed in {branches} (Hive deletes a remote branch only at the commit you were shown)."
+  },
+  "service.gitRepo.remoteRemoved": {
+    "defaultMessage": "{n, plural, =0 {Removed {remote}.} one {Removed {remote}: {branches} no longer tracks a remote branch.} other {Removed {remote}: {branches} no longer track a remote branch.}}",
+    "description": "After removing the remote {remote} in the Git view. {branches} lists the local branches that tracked it ({n} of them)."
+  },
+  "service.gitRepo.remoteRenamed": {
+    "defaultMessage": "{n, plural, =0 {Renamed {from} to {to}.} one {Renamed {from} to {to}: {branches} tracks it by its new name.} other {Renamed {from} to {to}: {branches} track it by its new name.}}",
+    "description": "After renaming a remote in the Git view from {from} to {to}. {branches} lists the local branches tracking it ({n} of them), which follow the rename."
+  },
+  "service.gitRepo.remoteSameName": {
+    "defaultMessage": "{remote} keeps its name.",
+    "description": "After Rename in the Git view, when the remote {remote} was given its own name."
+  },
+  "service.gitRepo.remoteTaken": {
+    "defaultMessage": "There is a remote called {remote} already.",
+    "description": "An error renaming a remote in the Git view: another remote has that name ({remote})."
+  },
+  "service.gitRepo.remoteTrackingChanged": {
+    "defaultMessage": "The branches tracking {remote} changed since you were asked, so nothing was removed: look at them again.",
+    "description": "An error removing a remote in the Git view: the local branches tracking it are not the ones the confirmation listed (one started or stopped tracking it meanwhile)."
+  },
+  "service.gitRepo.removeRemoteFailed": {
+    "defaultMessage": "Couldn't remove {remote}: {why}",
+    "description": "An error removing the remote {remote} in the Git view; {why} is git's own words."
+  },
+  "service.gitRepo.renameRemoteFailed": {
+    "defaultMessage": "Couldn't rename {remote}: {why}",
+    "description": "An error renaming the remote {remote} in the Git view; {why} is git's own words."
   },
   "service.gitRepo.setFailed": {
     "defaultMessage": "Couldn't set {key}: {why}",
@@ -371,9 +495,89 @@
     "defaultMessage": "Tagged {commit} {name} and pushed it to {remote}.",
     "description": "After tagging in the Git view: the commit {commit} has the tag {name}, which went to the remote {remote} too."
   },
+  "service.gitRepo.trackedNothing": {
+    "defaultMessage": "{branch} tracks no remote branch already.",
+    "description": "After Stop tracking in the Git view, when the branch {branch} tracked nothing."
+  },
+  "service.gitRepo.tracking": {
+    "defaultMessage": "{pushed, select, yes {Pushed {branch} to {upstream}, and it tracks it now.} other {{branch} tracks {upstream} now.}}",
+    "description": "After Track… in the Git view: the branch {branch} follows the remote branch {upstream} (pushed there first when {pushed} is yes)."
+  },
+  "service.gitRepo.untracked": {
+    "defaultMessage": "{branch} no longer tracks {upstream}.",
+    "description": "After Stop tracking in the Git view: the branch {branch} no longer follows the remote branch {upstream}."
+  },
   "service.gitRepo.upToDate": {
     "defaultMessage": "{branch} is up to date with {upstream}.",
     "description": "After pulling in the Git view: the branch {branch} has every commit of the remote branch {upstream} already."
+  },
+  "service.gitRepo.update.agentBusy": {
+    "defaultMessage": "{agent} {status, select, starting {is starting} working {is working} waiting {is waiting for your answer} background {is waiting on background tasks it started} watching {is waiting for cards to change (a card watch)} other {stopped in the middle of a task when its sign-in expired}} in {folder}: update {branch} once it has finished.",
+    "description": "Why updating a branch from its target is refused now: an agent works in the folder the branch is checked out in ({folder}: a slot's name, such as slot-a, or a folder's name or path). {agent} is the agent's name; {status} what it is doing (select: translate each); {branch} the branch."
+  },
+  "service.gitRepo.update.conflict": {
+    "defaultMessage": "{how, select, rebase {Rebasing} other {Merging}} {branch} with {target} stopped at a conflict in {files}, so it was undone: {branch} is as it was. Update it by hand, or ask its builder to.",
+    "description": "An error updating a branch from its target: git stopped at a conflict, and Hive aborted it, leaving the branch and its folder as they were. {how}: merge or rebase (select: translate each); {branch} the branch, {target} the target; {files} the files in conflict, joined (src/a.ts and src/b.ts)."
+  },
+  "service.gitRepo.update.dirty": {
+    "defaultMessage": "{folder} has uncommitted changes: commit them, or set them aside, before updating {branch}.",
+    "description": "Why updating a branch from its target is refused: the folder it is checked out in ({folder}: a slot's name, a folder's name or a path) has changes not committed. {branch} is the branch."
+  },
+  "service.gitRepo.update.failed": {
+    "defaultMessage": "Couldn't update {branch} from {target}, so it is as it was: {why}",
+    "description": "An error updating a branch from its target that isn't a conflict (a hook refused the commit, signing failed…); Hive undid what git started. {why} is git's own words."
+  },
+  "service.gitRepo.update.forwarded": {
+    "defaultMessage": "Fast-forwarded {branch} to {target} ({commit}).",
+    "description": "After Update from <target> on a branch with no commits of its own (HI-1180): it was moved forward to the target {target}; {commit} is its new head (a short id: keep it as it is)."
+  },
+  "service.gitRepo.update.isTarget": {
+    "defaultMessage": "{branch} is the target itself.",
+    "description": "An error updating a branch from its target: the branch picked ({branch}) is the target."
+  },
+  "service.gitRepo.update.merged": {
+    "defaultMessage": "Merged {target} into {branch} ({commit}).",
+    "description": "After Update from <target> with Merge (HI-1180): the target {target} was merged into the branch {branch}, as the commit {commit} (a short id: keep it as it is)."
+  },
+  "service.gitRepo.update.midOperation": {
+    "defaultMessage": "Git is in the middle of a {state} in {folder}: finish or abort it first.",
+    "description": "Why updating a branch from its target is refused: a git operation ({state}: merge, rebase…, as git names it) is under way in the folder the branch is checked out in ({folder}: a slot's name, a folder's name or a path)."
+  },
+  "service.gitRepo.update.missed": {
+    "defaultMessage": "{branch} was changed, but it still lacks commits of {target}: check it in History before going on.",
+    "description": "An error after Update from <target> (HI-1180): git said it succeeded, but the branch {branch} still doesn't contain the target {target}'s head."
+  },
+  "service.gitRepo.update.moved": {
+    "defaultMessage": "{branch} changed while it was being updated, so nothing was changed: try again.",
+    "description": "An error updating a branch from its target: the branch moved to another commit meanwhile (a commit, a push), so Hive left it as it is."
+  },
+  "service.gitRepo.update.noTarget": {
+    "defaultMessage": "The project has no target branch here, so there is nothing to update {branch} from.",
+    "description": "An error updating a branch from its target (Version Control → Branches, HI-1180): the project's workflow target (or the repository's default branch) doesn't exist in this repository. {branch} is the branch."
+  },
+  "service.gitRepo.update.notUndone": {
+    "defaultMessage": "Updating {branch} from {target} stopped, and Hive couldn't undo it: {folder} is {state, select, none {left changed} merge {still in the middle of a merge} rebase {still in the middle of a rebase} other {still in the middle of a git operation}}. Finish or abort it there yourself (git status says how), then check {branch}. Git said: {why}",
+    "description": "An error updating a branch from its target (HI-1180): git stopped, and Hive's own abort failed, so the folder ({folder}: a slot's name, a folder's name or a path) is left as git left it ({state}: none, merge, rebase or another operation; select: translate each). {why} is git's own words."
+  },
+  "service.gitRepo.update.notUndoneTemporary": {
+    "defaultMessage": "Updating {branch} from {target} stopped, and Hive couldn't undo it in its temporary folder {folder}, kept as git left it: {branch} itself is as it was. Remove that folder in Unused worktrees once you have looked. Git said: {why}",
+    "description": "An error updating a branch from its target (HI-1180) that was checked out nowhere: git stopped in the temporary folder Hive made ({folder}: its path), and Hive's abort failed, so the folder is kept; the branch itself wasn't moved. {state} is unused here. {why} is git's own words."
+  },
+  "service.gitRepo.update.queued": {
+    "defaultMessage": "{card} is in the merge queue, which brings it up to date itself: take it out of the queue first to update {branch} here.",
+    "description": "Why updating a branch from its target is refused: the branch is the line of a card ({card}: its key, such as HI-12) that Hive's merge queue is merging now. {branch} is the branch."
+  },
+  "service.gitRepo.update.rebased": {
+    "defaultMessage": "Rebased {branch}'s {n, plural, one {# commit} other {# commits}} onto {target} ({commit}).",
+    "description": "After Update from <target> with Rebase (HI-1180): the branch {branch} has its {n} commits replayed onto the target {target}; {commit} is its new head (a short id: keep it as it is)."
+  },
+  "service.gitRepo.update.temporaryLeft": {
+    "defaultMessage": "Hive couldn't remove its temporary folder {folder}: remove it in Unused worktrees.",
+    "description": "A second line after Update from <target> on a branch checked out nowhere (HI-1180): the temporary folder Hive made for it ({folder}: its path) could not be removed."
+  },
+  "service.gitRepo.update.upToDate": {
+    "defaultMessage": "{branch} already has everything in {target}.",
+    "description": "After Update from <target> (HI-1180): the branch {branch} already contains every commit of the target {target}; nothing was done."
   },
   "service.gitRepo.upstreamGone": {
     "defaultMessage": "{upstream} is gone from the remote.",
@@ -411,13 +615,109 @@
     "defaultMessage": "git rm --cached failed: {why}",
     "description": "An error untracking the project's .hive folder from git: the git command (git rm --cached: keep it) failed; {why} is git's own first line, or why git can't run."
   },
+  "service.intent.noWorkflow": {
+    "defaultMessage": "{card} has no workflow: it is a card about the workspace, or its project has no version control chosen yet. Move it on the board instead.",
+    "description": "An error: an intent (a card's start, submission, verdict…) was asked for a card that has no workflow, because it belongs to no project or its project's version control (Git or None) isn't chosen yet. {card} is the card's key (HI-12)."
+  },
+  "service.intent.queueNotAgents": {
+    "defaultMessage": "Only the user, or the Hive Assistant within Settings → Assistant → Control, takes a card out of the merge queue or retries its merge.",
+    "description": "An error: an agent or a script asked to remove a card from the merge queue or retry its merge, which only the user and the Hive Assistant (within its Control setting, a setting name: use it as Hive shows it) can do."
+  },
+  "service.keys.closed": {
+    "defaultMessage": "The workspace was closed, or the window opened another, before the key was changed: nothing changed.",
+    "description": "An error changing a project's key: its workspace closed (or the window switched to another workspace) while the change waited; nothing was changed."
+  },
+  "service.keys.form": {
+    "defaultMessage": "A project key is 2 to 4 letters, A to Z.",
+    "description": "An error changing a project's key (Project Settings): the key typed isn't 2–4 letters A–Z."
+  },
+  "service.keys.notice": {
+    "defaultMessage": "Cards are named by their project’s key: {keys}. Change a key in Project Settings; the old one keeps working.",
+    "description": "A quiet notice once after the upgrade to Hive 1.0. {keys}: the projects' keys, joined (HI, AM and WE)."
+  },
+  "service.keys.noticeTitle": {
+    "defaultMessage": "Projects have keys now",
+    "description": "A quiet notice's title, once after the upgrade to Hive 1.0: each project now has a short key (letters such as HI or AM) its cards are named by (HI-12)."
+  },
+  "service.keys.prefix": {
+    "defaultMessage": "{key} and another project’s key {other} begin alike: no key can be the start of another.",
+    "description": "An error changing a project's key: {key} and another project's key {other} (both letters such as AM and AMB) would be one the start of the other, which isn't allowed."
+  },
+  "service.keys.taken": {
+    "defaultMessage": "{key} is another project’s key, or was: a key stays with its project for good.",
+    "description": "An error changing a project's key: {key} (letters such as AM) belongs to another project now or did before (its old keys stay its aliases)."
+  },
+  "service.keys.unknownProject": {
+    "defaultMessage": "That project has no id yet, so it can’t have a key: open it in Hive first.",
+    "description": "An error changing a project's key: the project hasn't been given Hive's id (it hasn't been opened yet)."
+  },
+  "service.laneStart.busy": {
+    "defaultMessage": "{status, select, working {Agent {agent} is working.} starting {Agent {agent} is starting.} waiting {Agent {agent} is waiting for your answer.} background {Agent {agent} is waiting on background tasks it started.} signin {Agent {agent} needs you to sign in again.} other {Agent {agent} is waiting on cards (a card watch).}} Start the lane once it's idle, or choose another agent.",
+    "description": "An error starting a lane from the window: the agent {agent} can't start in a new conversation now, because of what it is doing ({status}; keep the select keys). The window offers to wait until it's idle. Each {status} a whole sentence with a noun before the name (HI-1585: glossary §1 rules 3 and 4)."
+  },
+  "service.laneStart.done": {
+    "defaultMessage": "{card} is Done already.",
+    "description": "An error starting a lane from the window: a card chosen ({card}, its key) is already Done."
+  },
+  "service.laneStart.needsReviewer": {
+    "defaultMessage": "{project}'s rules have a reviewer agent review each card: choose a reviewer.",
+    "description": "An error starting a lane from the window: the project's workflow options have a reviewer agent review the work, and no reviewer was chosen."
+  },
+  "service.laneStart.noCards": {
+    "defaultMessage": "Choose the cards for the lane.",
+    "description": "An error starting a lane (a builder and a reviewer working through cards in turn) from the window: no card was chosen."
+  },
+  "service.laneStart.notTheProjects": {
+    "defaultMessage": "{card} isn't one of {project}'s cards, or it is archived.",
+    "description": "An error starting a lane from the window: a card chosen ({card}, its key) isn't this project's ({project}), or is archived."
+  },
+  "service.laneStart.poolEmpty": {
+    "defaultMessage": "None of {project}'s agents besides the builder reviews, so the pool has nobody to review the cards.",
+    "description": "An error starting a lane from the window with the reviewer pool chosen: no agent of the project other than the builder has a role that reviews (Reviewer or Either)."
+  },
+  "service.laneStart.poolNotOffered": {
+    "defaultMessage": "{project}'s rules have one reviewer per lane: choose a reviewer, or set Reviewers to a shared pool.",
+    "description": "An error starting a lane from the window with the reviewer pool chosen: the project's workflow options (G17, “Reviewers”, a value “A shared pool”) don't have a pool, or workflow rules are off."
+  },
+  "service.laneStart.sameAgent": {
+    "defaultMessage": "The builder can't be its own reviewer.",
+    "description": "An error starting a lane from the window: the same agent was chosen as builder and reviewer."
+  },
+  "service.laneStart.starting": {
+    "defaultMessage": "The lane of agent {agent} is being started already.",
+    "description": "An error starting a lane from the window: one with the same builder ({agent}) is being started right now. A noun before the name (glossary §1 rule 4)."
+  },
+  "service.laneStart.unknownAgent": {
+    "defaultMessage": "{agent} isn't one of {project}'s agents.",
+    "description": "An error starting a lane from the window: the builder or reviewer chosen ({agent}) isn't an agent of the project ({project})."
+  },
+  "service.laneStarts.freshBlockedBody": {
+    "defaultMessage": "{why, select, timeout {It wasn’t free within {minutes, plural, one {# minute} other {# minutes}}.} uncertain {Hive closed while starting it, so it may not have started.} other {{reason}}} Retry it from the lane’s row in the Progress panel, or end the lane. Its cards wait until then.",
+    "description": "A notification's text (HI-2034), under \"{agent}'s new conversation didn't start\". why (select): the agent wasn't free (in a turn) within the wait, {minutes} minutes (Settings → Advanced); Hive closed while it was starting it; or (other) its start failed, {reason} saying why (a sentence, may be in English). Translate each."
+  },
+  "service.laneStarts.freshBlockedTitle": {
+    "defaultMessage": "{agent}’s new conversation didn’t start",
+    "description": "A notification's title (HI-2034): a lane's agent ({agent}, its name) is owed a new conversation for the lane, and Hive has stopped trying to start it."
+  },
   "service.lanes.noWorkspace": {
     "defaultMessage": "No workspace is open",
     "description": "An error changing a workspace's lanes (card loops) while no workspace is open in the window."
   },
+  "service.lanes.teamPaused": {
+    "defaultMessage": "The team is paused (before an update): resume the team first, then start the lane.",
+    "description": "An error starting a lane (a card loop) while the user or the Hive Assistant has paused the whole team before an update (HI-2081): nothing of a lane starts until the team resumes (Resume the Team, in the Progress panel's Lanes)."
+  },
   "service.lanes.unknown": {
     "defaultMessage": "Unknown lane {id}",
     "description": "An error: there is no lane (a card loop) with the id {id}, perhaps removed meanwhile."
+  },
+  "service.mcp.addedDropped": {
+    "defaultMessage": "Each project and the Hive Assistant lists the servers that ran there. {n, plural, one {# choice kept for a server that was off in the workspace was} other {# choices kept for servers that were off in the workspace were}} dropped: add a server in a project’s MCP tab where you need it.",
+    "description": "A quiet notice once after the upgrade that made MCP servers added to projects and the Hive Assistant: nothing that ran changed; {n} choices remembered for servers the workspace had switched off were not carried over. \"MCP tab\" as Hive names it."
+  },
+  "service.mcp.addedTitle": {
+    "defaultMessage": "MCP servers are now added where they run",
+    "description": "A quiet notice's title, once after the upgrade that made a workspace's MCP servers added to projects and the Hive Assistant, in place of switches."
   },
   "service.metrics.badProvider": {
     "defaultMessage": "provider must be a provider id",
@@ -481,7 +781,11 @@
   },
   "service.providers.retryUnavailable": {
     "defaultMessage": "This update retry is no longer available. Check again, then try Update.",
-    "description": "Agent Setup error when a user tries to retry an update whose failure is no longer current. Check again and Update are buttons."
+    "description": "Provider Setup error when a user tries to retry an update whose failure is no longer current. Check again and Update are buttons."
+  },
+  "service.providers.signInConnections": {
+    "defaultMessage": "{cli} signs in per account: sign in from Settings → Accounts & Connections.",
+    "description": "An error: Provider Setup was asked to sign a coding agent CLI ({cli}: \"Claude Code\") in, but its logins are accounts (Settings → Accounts & Connections names a section)."
   },
   "service.providers.stillLooking": {
     "defaultMessage": "Hive is still looking for {cli}. Try again in a moment.",
@@ -515,6 +819,26 @@
     "defaultMessage": "{task} exited with code {code}",
     "description": "A notification: a coding agent CLI's task ({task}: \"Codex install\") ended with the exit code {code}."
   },
+  "service.slots.notPrepared": {
+    "defaultMessage": "Hive couldn't get {slot} ready for {card}: {why}",
+    "description": "A notice: a card was started in a slot (a worktree Hive lends to a card or a lane), and Hive couldn't check out the card's branch there or install its dependencies. {slot} is the slot's name (slot-b), {card} the card's key, {why} git's or the setup's reason, in English."
+  },
+  "service.slots.resumeFailed": {
+    "defaultMessage": "Hive couldn't resume {agent}'s conversation in {slot} for {card} (three tries): {why}. Resume {agent} from Sessions, or start it fresh, and Hive gives it {card}.",
+    "description": "A notice (HI-1746): a card was started for an agent (its builder) in a slot, and Hive's resumes of the agent's last conversation there failed three times, so it stopped trying. Once the user resumes the agent, or starts it, Hive hands it the card. {card} is the card's key, {agent} the agent's name, {slot} the slot's name (slot-b), {why} the last failure's reason, in English."
+  },
+  "service.slots.resumeHeld": {
+    "defaultMessage": "Hive can't give {card} to {agent} yet: {agent}'s conversation in {slot} can't resume now ({why}). Hive gives it {card} once it can.",
+    "description": "A notice (HI-1746): a card was started for an agent (its builder) in a slot, and Hive hasn't handed the card to it yet; the agent's last conversation, in that slot, can't be resumed now, and Hive never starts a new conversation instead. {card} is the card's key, {agent} the agent's name, {slot} the slot's name (slot-b), {why} the reason, in English."
+  },
+  "service.templates.v09": {
+    "defaultMessage": "1.0 templates don’t pin agents to worktrees, so the Hive templates take their place. A copy of {n, plural, one {the template} other {the # templates}} is kept with the 0.9 board backup.",
+    "description": "A quiet notice once after the upgrade to Hive 1.0: the {n} agent templates saved in 0.9 aren't used; a copy of each was put in the folder of the board's 0.9 backup. \"The Hive templates\" are Hive's own templates (the Templates view's Hive group)."
+  },
+  "service.templates.v09Title": {
+    "defaultMessage": "Your 0.9 agent templates aren’t used in 1.0",
+    "description": "A quiet notice's title, once after the upgrade to Hive 1.0: the agent templates saved in 0.9 aren't listed or loaded any more (a copy is kept)."
+  },
   "service.transcripts.busy": {
     "defaultMessage": "This session is being archived or deleted. Try again in a moment.",
     "description": "An error opening a session's conversation in the Sessions tab while it is being archived or deleted."
@@ -539,6 +863,58 @@
     "defaultMessage": "This session has no transcript yet.",
     "description": "An error in the Sessions tab: the session's CLI hasn't written its conversation's file yet."
   },
+  "service.workflow.changedMeanwhile": {
+    "defaultMessage": "The workflow options changed meanwhile (in another window, or by the Hive Assistant), so nothing was saved. The section shows them as they are now.",
+    "description": "Why saving the Workflow section of the Version Control tab was refused: the options changed after the section was read. It reloads them."
+  },
+  "service.workflow.closed": {
+    "defaultMessage": "The workspace this card belongs to has closed",
+    "description": "An error: a change to a card was asked for in a workspace that has since closed, or whose window opened another workspace."
+  },
+  "service.workflow.inheritor": {
+    "defaultMessage": "Project {project} inherits these options, and the change would make its options contradict each other:",
+    "description": "Why saving workflow defaults (Settings → Workflow defaults or Settings → Workspace) was refused: a project that inherits them would have contradictory options. The reason follows on its own line. {project} is its name."
+  },
+  "service.workflowNotice.blocked": {
+    "defaultMessage": "{card} is blocked: {reason}",
+    "description": "A line of a lane's notification: a card (its key, e.g. HI-12) was marked blocked, with the reason given ({reason}, the user's or an agent's own words)."
+  },
+  "service.workflowNotice.blockedNoReason": {
+    "defaultMessage": "{card} is blocked",
+    "description": "A line of a lane's notification: a card (its key, e.g. HI-12) was marked blocked."
+  },
+  "service.workflowNotice.failed": {
+    "defaultMessage": "{card} failed review",
+    "description": "A line of a lane's notification: its reviewer gave a card (its key, e.g. HI-12) a failing verdict, so it goes back to its builder."
+  },
+  "service.workflowNotice.forYou": {
+    "defaultMessage": "{card} needs you",
+    "description": "A notification's title: a card (its key, e.g. HI-12) waits for the user (an approval, a decision, a question an agent asked). Its body says what."
+  },
+  "service.workflowNotice.lane": {
+    "defaultMessage": "Lane {lane}",
+    "description": "A notification's title: something happened in a lane (Hive's record of a card loop, a builder and a reviewer taking cards in turn). {lane} is its label, e.g. “B1 / R1 (greetings)”. Its body lists what happened."
+  },
+  "service.workflowNotice.mergeDue": {
+    "defaultMessage": "Every card passed review: its merge is due",
+    "description": "A line of a lane's notification: all of the lane's cards passed review, so its work is ready to be merged."
+  },
+  "service.workflowNotice.mergeStalled": {
+    "defaultMessage": "Its merge has stalled",
+    "description": "A line of a lane's notification: every card passed review, but nobody has started merging the work for a while (its builder is idle or stopped)."
+  },
+  "service.workflowNotice.merging": {
+    "defaultMessage": "{card} is being merged: the lane waits for it",
+    "description": "A line of a lane's notification: the lane takes one card at a time, and its card (its key, e.g. HI-12) is in the merge queue, so the next card can't start."
+  },
+  "service.workflowNotice.notMerged": {
+    "defaultMessage": "{card} passed review: the lane waits for it to be merged",
+    "description": "A line of a lane's notification: the lane takes one card at a time, and its card (its key, e.g. HI-12) passed review but isn't merged yet, so the next card can't start."
+  },
+  "service.workflowNotice.stalled": {
+    "defaultMessage": "{card} has stalled",
+    "description": "A line of a lane's notification: a card (its key, e.g. HI-12) has stalled: nothing has happened on it for a long time, or its agent stopped."
+  },
   "service.workspace.advancedNotHere": {
     "defaultMessage": "{setting} can't be set for a workspace.",
     "description": "An error: the advanced setting {setting} (its title, or its id) has no value of its own for a workspace, only for Hive."
@@ -555,6 +931,10 @@
     "defaultMessage": "The workspace was closed",
     "description": "An error: the workspace was closed (or the window opened another) while the action was under way."
   },
+  "service.workspace.connectionGone": {
+    "defaultMessage": "The connection chosen for {agent} was removed, or is being removed. Choose another.",
+    "description": "An error saving an agent (HI-2107): the connection chosen for it ({agent}, the agent's name) was removed from Settings → Accounts & Connections meanwhile."
+  },
   "service.workspace.folderExists": {
     "defaultMessage": "A folder named \"{name}\" already exists",
     "description": "An error making a project: the workspace already has a folder called {name}."
@@ -566,14 +946,6 @@
   "service.workspace.insideOpen": {
     "defaultMessage": "{folder} is inside the workspace {workspace}, which is open in another window. Close that workspace first, or open this folder's projects from there.",
     "description": "An error opening a workspace: the folder {folder} is inside {workspace}, the workspace of another Hive window (a workspace inside another would share its projects)."
-  },
-  "service.workspace.loopRounds": {
-    "defaultMessage": "Card loop rounds take a whole number from 1 to {max}.",
-    "description": "An error in Settings → Workspace: a card loop's rounds (how many reviews a card gets before the user is asked) must be a whole number from 1 to {max}."
-  },
-  "service.workspace.loopWait": {
-    "defaultMessage": "Card loop wait takes a whole number of hours from 1 to {max}.",
-    "description": "An error in Settings → Workspace: a card loop's wait (hours with no change before the user is told) must be a whole number from 1 to {max}."
   },
   "service.workspace.nameIn": {
     "defaultMessage": "{name} is in {projects}",
@@ -603,6 +975,38 @@
     "defaultMessage": "{folder} is already open in another window.",
     "description": "An error opening a workspace: the folder {folder} is the workspace of another Hive window."
   },
+  "service.workspace.platformGitFound": {
+    "defaultMessage": "{project} is a Git repository now. Hive goes on treating it as a project without version control until you switch it in its Version Control tab.",
+    "description": "A notice: someone ran git init in a project Hive treats as having no version control. Hive does not switch it by itself: the Version Control tab offers the switch (glossary 2.1: Version Control)."
+  },
+  "service.workspace.platformInvalid": {
+    "defaultMessage": "{project}'s project.json names a version control Hive doesn't know (platform: {value}). Until it says \"git\" or \"none\", Hive uses what it finds in the folder.",
+    "description": "A notice: the platform setting in the project {project}'s .hive/project.json is {value}, which is not one Hive has (only \"git\" and \"none\" are: keep them as they are, they are setting values)."
+  },
+  "service.workspace.platformInvalidTitle": {
+    "defaultMessage": "Unknown version control setting in {project}",
+    "description": "A notice's title: the project {project}'s settings file names a version control Hive doesn't have."
+  },
+  "service.workspace.platformOpen": {
+    "defaultMessage": "Open Version Control",
+    "description": "A button on the notice that a project's version control changed: shows the project's Version Control tab, where Hive offers the switch (glossary 2.1)."
+  },
+  "service.workspace.platformOtherFound": {
+    "defaultMessage": "{vcs} was found in {project}. Hive doesn't support it yet, and goes on treating the project as a Git project until you switch it to None in its Version Control tab.",
+    "description": "A notice: another version control system ({vcs}: Mercurial, Jujutsu…) was found in a project Hive treats as a Git project. Hive does not switch it by itself: the Version Control tab offers the switch to None (glossary 2.1)."
+  },
+  "service.workspace.platformRepositoryGone": {
+    "defaultMessage": "{project}'s Git repository is gone. Git's rules hold, so its cards can't move on until the repository is back or you switch the project to None in its Version Control tab.",
+    "description": "A notice: the .git folder of a project Hive treats as a Git project was removed or moved. Hive doesn't switch it by itself: the Version Control tab offers the switch to None (glossary 2.1)."
+  },
+  "service.workspace.platformSettled": {
+    "defaultMessage": "Settled: nothing to change now",
+    "description": "What the notice that a project's version control changed says once it no longer applies (HI-2320): the project was switched, or its folder is back as it was. Shown in place of its button."
+  },
+  "service.workspace.platformTitle": {
+    "defaultMessage": "Version control changed in {project}",
+    "description": "A notice's title: the version control found in the project {project}'s folder is no longer the one Hive recorded for it."
+  },
   "service.workspace.renameAgent": {
     "defaultMessage": "Rename {project}'s {agent}…",
     "description": "The notice's button: opens the settings of the agent {agent} of the project {project}, to rename it."
@@ -610,6 +1014,14 @@
   "service.workspace.sharedNames": {
     "defaultMessage": "Agent names are unique across the workspace now, so each agent can be told apart. {shared}: they keep working, but rename one of each, e.g. {project}'s {agent} to {suggestion}.",
     "description": "A notice: agents of several projects share names from before names were unique. {shared} says which (\"R1 is in alpha and beta\"); {suggestion} is a free name for the agent {agent} of the project {project}."
+  },
+  "service.workspace.stillClosing": {
+    "defaultMessage": "{name} is still closing: wait for it to finish, then try again.",
+    "description": "An error opening, making or closing a workspace while this window is still closing its workspace {name}."
+  },
+  "service.workspace.stillOpening": {
+    "defaultMessage": "{name} is still opening: wait for it to finish, then try again.",
+    "description": "An error opening, making or closing a workspace while this window is still opening its workspace {name} (bringing its skills up to date, or upgrading it to Hive 1.0)."
   },
   "service.workspace.twoCalled": {
     "defaultMessage": "Two agents are called {name}",

@@ -35,7 +35,8 @@ Translate the meaning, not the words, and keep the result as short and plain.
 - **Capitalisation:** sentence case everywhere: only the first word and names take a capital („Dodaj nowego agenta”,
   „Ustawienia agenta”). Don't copy the English Title Case. Names stay as they are (Hive, Claude Code, Hive Assistant).
 - **A trailing `…`** stays, with no space before it: „Usuń agenta…”.
-- **Column headings:** Wstrzymane, Do zrobienia, W toku, Recenzja, Zatwierdzone, Gotowe.
+- **Column headings:** Wstrzymane, Do zrobienia, Aktywne, Recenzja, Zatwierdzone, Gotowe (and the stage Scalanie inside
+  Zatwierdzone). Before 1.0 the Active column was „W toku”; it is „Aktywne” now (a Polish user's feedback, #1104).
 
 ## Grammar
 
@@ -92,13 +93,33 @@ The words Polish uses for Hive's terms ([glossary.md](glossary.md)). Use them ev
 | persona | persona | *persony*. |
 | task board / board | tablica zadań / tablica | The *Tasks* tab is the „Zadania” tab („zakładka Zadania”). |
 | card | karta | Feminine: „karta jest zablokowana”, „karta utknęła”. Never „zadanie” for a card in running text. |
-| On Hold / Todo / Doing / Review / Passed / Done | Wstrzymane / Do zrobienia / W toku / Recenzja / Zatwierdzone / Gotowe | *Gotowe* means merged; *Zatwierdzone* means it passed its review but isn't merged. Agents' tool text keeps the English ids. |
+| On Hold / Todo / Active / Review / Approved / Done | Wstrzymane / Do zrobienia / Aktywne / Recenzja / Zatwierdzone / Gotowe | The board's categories and default stages (1.0; *Active* was *Doing*, „W toku”, and *Approved* was *Passed*). *Gotowe* means merged (or accepted); *Zatwierdzone* means it passed its review but isn't merged. Name a column in a sentence with a noun in front: „do kolumny Aktywne”, „na etapie Zatwierdzone”. Agents' tool text keeps the English ids (`doing`, `passed`). |
+| Merging (a stage in Approved) | Scalanie | |
+| category / stage | kategoria / etap | „na etapie {stage}”. |
 | decision | decyzja | |
 | blocked / stalled | zablokowana / utknęła (zastój) | Said of a card: „zablokowana karta”, „karta utknęła”. |
-| builder / reviewer | wykonawca / recenzent | |
+| builder / reviewer / either (workflow role) | wykonawca / recenzent / dowolna | |
 | review (the act) | recenzja | „przekaż do recenzji”, „recenzja nie przeszła”. |
-| card loop / lane / round | pętla kart / tor / runda | |
-| merge slot | kolejka scalania | „zajmij kolejkę scalania”. |
+| card loop / lane / round | pętla kart / tor / runda | *Start lane…*: „Uruchom tor…”. |
+| merge queue / test merge | kolejka scalania / scalanie próbne | *kolejka scalania* was the old *merge slot*'s word; from 1.0 it names the merge queue. *Pause queue / Resume queue*: „Wstrzymaj kolejkę / Wznów kolejkę”. |
+| merge slot (one agent merge at a time into a branch, where agents merge) | blokada scalania | Feminine: „blokada jest wolna”, „zwolnij ją”. Never *kolejka scalania*, which is the merge queue (Darren, HI-1928). |
+| slot / pool / ready (a slot) | slot (*slotu, sloty, slotów*) / pula / gotowy | „w slocie {slot}”, „pula recenzentów”. |
+| version control (the Version Control tab) | kontrola wersji (zakładka Kontrola wersji) | Its choice *None*: „Brak” („opcja Brak”). |
+| workflow / workflow options | przepływ pracy / opcje przepływu pracy | |
+| preset (Solo, Pair, Team, Custom) | ustawienie wstępne (Solo, Para, Zespół, Własne) | „ustawienie Para”. |
+| rule / old rules | reguła / stare reguły | |
+| target branch / up to date | gałąź docelowa / aktualna | „aktualna względem {target}”. |
+| revision / change / same change | rewizja / zmiana / ta sama zmiana | |
+| check / checks before review / merge checks | sprawdzenie / sprawdzenia przed recenzją / sprawdzenia przed scaleniem | A check *passed / failed*: „udane / nieudane”. |
+| pass / fail (a verdict) | zaliczona / niezaliczona (zaliczenie) | Said of the review: „recenzja zaliczona”. A reviewer's pass is never an approval (*zgoda*). *carries over*: „pozostaje ważne”; *stale*: „nieaktualne”. |
+| approval / Approve | zgoda / Zatwierdź | Your OK on a card: „Twoja zgoda przed scaleniem”. |
+| For you (Decide, Test, Approve, Sign in) | Dla Ciebie (Zdecyduj, Przetestuj, Zatwierdź, Zaloguj się) | „w sekcji Dla Ciebie”. |
+| review copy | kopia do recenzji | |
+| refused / returned (a card) | odrzucono / zwrócona | „Karta {card} zwrócona wykonawcy {builder}”. |
+| override / Move anyway | wyjątek / Przenieś mimo to | |
+| no-code card / before 1.0 / outside Hive | karta bez kodu / sprzed 1.0 / poza Hive | |
+| work (a card's Work section) | praca (sekcja Praca) | |
+| deliverables | rezultaty | |
 | inbox / message / wake | skrzynka odbiorcza / wiadomość / wybudzenie (wybudzić) | |
 | handover / shared notes | przekazanie (notatka przekazania) / notatki wspólne | |
 | skill / template | umiejętność / szablon | A skill's own name (`work-on-card`) stays as it is. |
@@ -115,7 +136,7 @@ The words Polish uses for Hive's terms ([glossary.md](glossary.md)). Use them ev
 | terminal | terminal | |
 | conversation / transcript | rozmowa / transkrypcja | |
 | Hive (inflected) | Hive | Not inflected: „w Hive”, „okno Hive”, „ustawienia Hive”. |
-| uncommitted (changes, files) | bez commita | „# pliki bez commita”, „zmiany bez commita”. Never „niezatwierdzone”, which reads as the Passed column. |
+| uncommitted (changes, files) | bez commita | „# pliki bez commita”, „zmiany bez commita”. Never „niezatwierdzone”, which reads as the Approved column; and to commit is „zrób commit”, never „zatwierdź”, which is Approve. |
 | staged / unstage | w indeksie / usuń z indeksu | |
 | fetch / pull / push | pobierz / ściągnij / wypchnij | |
 | check out (a branch) | wybierz (gałąź wybrana w folderze projektu) | |
@@ -133,7 +154,7 @@ The words Polish uses for Hive's terms ([glossary.md](glossary.md)). Use them ev
 | Storage (a project's) | Miejsce na dysku | Clean Up…: Wyczyść…. |
 | Repair (a moved workspace) | Naprawa (button: Napraw…) | |
 | Recycle Bin / File Explorer | Kosz / Eksplorator plików | |
-| Agent Setup | Konfiguracja agentów | |
+| Provider Setup | Konfiguracja dostawców | |
 | Mark idle | Oznacz jako bezczynny | |
 | layouts | Pojedynczo, Dwie kolumny, Trzy kolumny, Siatka 2×2, Siatka 3×2 | |
 | the Assistant's modes | Koordynator, Planista, Triażysta QA, Menedżer wydań | |
@@ -159,6 +180,6 @@ fine here, but the same shape also fits verbs that would agree with a gender.
 - `npm run i18n:check` passes, and `npm run i18n:coverage` shows what is still missing or outdated.
 - Look at the screenshots: `npm run e2e -- --lang pl --build`, in both themes, for text that is cut off or wraps
   badly. Polish runs long in buttons, the status bar and the board's column headings: there the shortest natural word
-  was chosen („Recenzja”, „W toku”).
+  was chosen („Recenzja”, „Aktywne”).
 - A reviewer should look first at the plurals (all four forms), past-tense verbs next to names, and the status bar's
   limit tooltip (GitHub issue #1).

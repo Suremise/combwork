@@ -7,6 +7,7 @@ import { randomBytes } from 'crypto'
 import { DatabaseSync } from 'node:sqlite'
 import { afterAll, afterEach, beforeAll, describe, expect, it } from 'vitest'
 import { tempDir } from './tempDir'
+import { admitted } from './admitted'
 import { DEFAULT_JOURNAL, isoWeek, journalSettings, weekStart, type JournalSettings } from '../src/shared/journal'
 
 const base = tempDir('hive-journal-')
@@ -14,13 +15,18 @@ const j = await import('../src/main/journal')
 
 let n = 0
 const homes: string[] = []
+/** An Assistant's home in a workspace a window holds (#1395: its journal is kept open only then). */
+const dismissals: (() => void)[] = []
 const home = (): string => {
-  const h = join(base, `home-${++n}`)
+  const ws = join(base, `ws-${++n}`)
+  const h = join(ws, '.hive', 'assistant')
   homes.push(h)
+  dismissals.push(admitted(ws))
   return h
 }
 afterEach(() => {
   for (const h of homes.splice(0)) j.closeJournal(h)
+  for (const d of dismissals.splice(0)) d()
 })
 afterAll(() => j.closeAllJournals())
 
@@ -199,23 +205,31 @@ describe('retention and the size cap', () => {
   it('past the cap, the oldest everyday entries go first until it fits; important ones never; space goes back to the file', () => {
     const h = home()
     const settings = { ...all, capMB: null }
-    // Details that don't compress, so the file grows: about 8 MB of everyday entries and one important.
-    const noise = (): string => randomBytes(60_000).toString('base64')
+    // Details that don't compress, so the file grows: about 1.7 MB with their index, of everyday entries and one
+    // important; past a 1 MB cap about half go (#1324: a tenth of the 16 MB it once wrote, which took 6 s a run).
+    const MB = 1024 * 1024
+    const noise = (): string => randomBytes(6_000).toString('base64')
     const keep = write(h, { summary: 'Keep me', importance: 3, detail: noise() }, settings)
     const ids: number[] = []
     for (let i = 1; i <= 100; i++) ids.push(write(h, { summary: `Everyday ${i}`, detail: noise() }, settings))
-    expect(j.journalSize(h)!.bytes).toBeGreaterThan(5 * 1024 * 1024)
-    const gone = j.pruneJournal(h, { ...settings, capMB: 5 })
+    expect(j.journalSize(h)!.bytes).toBeGreaterThan(1.5 * MB)
+    const gone = j.pruneJournal(h, { ...settings, capMB: 1 })
     expect(gone).toBeGreaterThan(0)
-    expect(j.journalSize(h)!.bytes).toBeLessThanOrEqual(5 * 1024 * 1024)
-    const left = new Set(j.recall(h, { limit: 50 }).map((r) => r.id))
-    expect(left.has(keep)).toBe(true)
-    // The oldest went: every one left is newer than every one gone.
-    const goneIds = ids.filter((x) => !left.has(x))
-    expect(Math.max(...goneIds)).toBeLessThan(Math.min(...ids.filter((x) => left.has(x))))
+    expect(j.journalSize(h)!.bytes).toBeLessThanOrEqual(MB)
+    expect(j.readEntry(h, keep)).not.toBeNull()
+    // The oldest went: every one left is newer than every one gone, and some are left.
+    const left = ids.filter((x) => j.readEntry(h, x) !== null)
+    const goneIds = ids.filter((x) => !left.includes(x))
+    expect(left.length).toBeGreaterThan(0)
+    expect(goneIds).toHaveLength(gone)
+    expect(Math.max(...goneIds)).toBeLessThan(Math.min(...left))
     // Freed pages are given back (incremental auto-vacuum): the file isn't kept at its biggest.
     j.closeJournal(h)
-    expect(statSync(j.journalFile(h)).size).toBeLessThan(6 * 1024 * 1024)
+    // What was left beside it, if it isn't (#1324: once 16 MB in a loaded full run): a WAL still there is a checkpoint
+    // that didn't finish at the close, none is a vacuum that gave nothing back.
+    const file = j.journalFile(h)
+    const beside = ['-wal', '-shm'].map((x) => `${x}: ${existsSync(file + x) ? statSync(file + x).size : 'none'}`).join(', ')
+    expect(statSync(file).size, beside).toBeLessThan(1.2 * MB)
   })
 })
 

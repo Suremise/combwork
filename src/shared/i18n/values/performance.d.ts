@@ -40,9 +40,16 @@ interface HiveMessageValues {
   'performance.compare.about.export': { from: string | number; to: string | number; filters: string | number }
   'performance.compare.about.exportPart': { from: string | number; to: string | number; filters: string | number; part: string | number }
   'performance.compare.about.scenarios': { real: string; provider: string | number; model: string | number; effort: string | number; mode: string | number; fixtures: string | number; scenarios: number; repeats: number; head: string | number; spent: string | number; unpriced: number }
+  'performance.compare.agent.assistant': undefined
+  'performance.compare.agent.overflow': { n: number }
+  'performance.compare.agent.unattributed': undefined
+  'performance.compare.agentCalls': { agent: string | number; role: string; base: string | number; run: string | number }
   'performance.compare.baseline': undefined
+  'performance.compare.callsByAgent': { agents: string | number }
   'performance.compare.cantCompare': undefined
+  'performance.compare.col.allAgentsTip': undefined
   'performance.compare.col.calls': undefined
+  'performance.compare.col.callsTip': undefined
   'performance.compare.col.change': undefined
   'performance.compare.col.checks': undefined
   'performance.compare.col.checksTip': undefined
@@ -125,6 +132,7 @@ interface HiveMessageValues {
   'performance.compare.measure.exportResponseBytes': undefined
   'performance.compare.measure.exportToolCalls': undefined
   'performance.compare.measure.exportToolChars': undefined
+  'performance.compare.measure.exportToolListPerLaunch': undefined
   'performance.compare.measure.guidanceBytes': undefined
   'performance.compare.measure.guidanceChars': undefined
   'performance.compare.measure.hiveCallErrors': undefined
@@ -148,6 +156,7 @@ interface HiveMessageValues {
   'performance.compare.measure.toolDetailCalls': undefined
   'performance.compare.measure.toolErrors': undefined
   'performance.compare.measure.toolListBytes': undefined
+  'performance.compare.measure.toolListChars': undefined
   'performance.compare.measureTip.apiCancelled': undefined
   'performance.compare.measureTip.apiFailed': undefined
   'performance.compare.measureTip.apiMs': undefined
@@ -160,6 +169,7 @@ interface HiveMessageValues {
   'performance.compare.measureTip.exportGuidancePerLaunch': undefined
   'performance.compare.measureTip.exportRequests': undefined
   'performance.compare.measureTip.exportToolChars': undefined
+  'performance.compare.measureTip.exportToolListPerLaunch': undefined
   'performance.compare.measureTip.guidanceBytes': undefined
   'performance.compare.measureTip.guidanceChars': undefined
   'performance.compare.measureTip.hiveCallErrors': undefined
@@ -183,13 +193,16 @@ interface HiveMessageValues {
   'performance.compare.measureTip.toolDetailCalls': undefined
   'performance.compare.measureTip.toolErrors': undefined
   'performance.compare.measureTip.toolListBytes': undefined
+  'performance.compare.measureTip.toolListChars': undefined
   'performance.compare.noScenarios': undefined
   'performance.compare.notComparable': { reasons: string | number }
   'performance.compare.note.cliVersions': { base: string | number; run: string | number }
   'performance.compare.note.estimates': undefined
+  'performance.compare.note.fakePerCall': undefined
   'performance.compare.note.fakeUsage': undefined
   'performance.compare.note.leftOut': { n: number; why: string | number }
   'performance.compare.note.measuredPartly': { n: number }
+  'performance.compare.note.noSplit': { side: string }
   'performance.compare.note.notJudged': undefined
   'performance.compare.note.oneSample': undefined
   'performance.compare.note.partial': { side: string; what: string | number }
@@ -199,6 +212,7 @@ interface HiveMessageValues {
   'performance.compare.note.sameGuidance': undefined
   'performance.compare.note.skillRevisions': undefined
   'performance.compare.note.skillRevisionsOf': { names: string | number }
+  'performance.compare.note.splitPartial': undefined
   'performance.compare.note.stale': { n: number }
   'performance.compare.note.usageNotEvery': undefined
   'performance.compare.note.withinSpread': undefined
@@ -237,7 +251,9 @@ interface HiveMessageValues {
   'performance.compare.sample.tooManyChecks': undefined
   'performance.compare.samples': { title: string | number; base: number; run: number }
   'performance.compare.scopeName': { kind: string; project: string | number }
+  'performance.compare.sideMeasure': { measure: string | number; side: string }
   'performance.compare.sizesHint': undefined
+  'performance.compare.splitMeasure': { measure: string | number; part: string; assistant: string }
   'performance.compare.status.better': undefined
   'performance.compare.status.betterTip': undefined
   'performance.compare.status.failing': undefined
@@ -297,6 +313,8 @@ interface HiveMessageValues {
   'performance.guidance.skills': undefined
   'performance.guidance.tip': undefined
   'performance.guidance.unmeasured': undefined
+  'performance.guidance.workflow': undefined
+  'performance.guidance.workflowSide': { side: string }
   'performance.heading': undefined
   'performance.intro.project': undefined
   'performance.intro.workspace': undefined
@@ -336,6 +354,7 @@ interface HiveMessageValues {
   'performance.routes.route': undefined
   'performance.routes.sent': undefined
   'performance.routes.tip': undefined
+  'performance.routes.waits': undefined
   'performance.safeguards.agent': undefined
   'performance.safeguards.empty': undefined
   'performance.safeguards.heading': undefined
@@ -362,8 +381,35 @@ interface HiveMessageValues {
   'performance.skills.tooBig': undefined
   'performance.skills.tooBigSub': undefined
   'performance.skills.unfiltered': undefined
-  'performance.toolList': { list: string | number }
-  'performance.toolList.item': { role: string; tools: number; size: string | number }
+  'performance.stalls.count': { total: number; listed: string; kept: number }
+  'performance.stalls.cpu': undefined
+  'performance.stalls.cpuUnknown': undefined
+  'performance.stalls.during': undefined
+  'performance.stalls.empty': undefined
+  'performance.stalls.heading': undefined
+  'performance.stalls.length': undefined
+  'performance.stalls.loadTarget': undefined
+  'performance.stalls.more': { n: number }
+  'performance.stalls.ms': { ms: number }
+  'performance.stalls.none': undefined
+  'performance.stalls.repeated': { n: number; length: string | number }
+  'performance.stalls.running': { length: string | number }
+  'performance.stalls.seconds': { s: string | number }
+  'performance.stalls.since': undefined
+  'performance.stalls.step': undefined
+  'performance.stalls.tip': { kept: number }
+  'performance.stalls.waiting': undefined
+  'performance.stalls.when': undefined
+  'performance.toolList.bytes': undefined
+  'performance.toolList.chars': undefined
+  'performance.toolList.descriptions': undefined
+  'performance.toolList.empty': undefined
+  'performance.toolList.heading': undefined
+  'performance.toolList.params': undefined
+  'performance.toolList.schemas': undefined
+  'performance.toolList.starts': undefined
+  'performance.toolList.tip': undefined
+  'performance.toolList.tools': undefined
   'performance.tools.calls': undefined
   'performance.tools.chars': undefined
   'performance.tools.detail': undefined
@@ -381,6 +427,8 @@ interface HiveMessageValues {
   'performance.trend.notRecordedLegend': undefined
   'performance.trend.slot': { when: string | number; detail: string | number }
   'performance.trend.succeeded': undefined
+  'performance.trend.waits': { waits: number }
+  'performance.trend.waitsLegend': undefined
   'performance.unknown': undefined
   'performance.updated': { when: string | number }
   'performance.usage.allUnreadable': undefined
@@ -392,6 +440,7 @@ interface HiveMessageValues {
   'performance.usage.contextMax': { max: string | number; hasWindow: string; window: string | number }
   'performance.usage.contextTip': { sessions: number; avg: string | number; max: string | number; hasWindow: string; window: string | number }
   'performance.usage.cost': undefined
+  'performance.usage.costFree': { n: number }
   'performance.usage.costUnknown': { n: number }
   'performance.usage.empty': undefined
   'performance.usage.heading': undefined

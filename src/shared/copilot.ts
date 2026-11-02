@@ -3,6 +3,7 @@ import type { PermissionMode } from './types'
 import type { ModeOption, ModelGroup, ProviderDescriptor } from './providers'
 import { codexModelLabel } from './codex'
 import { EFFORT_TEXT, OLDER_VERSIONS } from './claude'
+import { withCliOwn } from './cliOwnMode'
 import { msg } from './i18n/msg'
 
 /**
@@ -107,6 +108,7 @@ export function copilotModeFlags(mode: PermissionMode, folder: string): string[]
       return ['--autopilot']
     case 'allow-all':
       return ['--allow-all']
+    // Ask, and the CLI's own setting (#1284): no flag, so Copilot's own config decides.
     default:
       return []
   }
@@ -198,7 +200,7 @@ export const COPILOT_DESCRIPTOR: ProviderDescriptor = {
   icon: 'copilot',
   setupUrl: 'https://docs.github.com/copilot/how-tos/copilot-cli',
   pricingUrl: 'https://docs.github.com/copilot/reference/ai-models/supported-models',
-  permissionModes: COPILOT_PERMISSION_MODES,
+  permissionModes: withCliOwn(COPILOT_PERMISSION_MODES),
   // Ask, with edits in the agent's folder approved (#468).
   defaultPermissionMode: 'accept-edits',
   // Reads are approved by Copilot itself, and Hive's own tools are pre-approved (the Assistant's: trustedHiveTools).
@@ -235,10 +237,14 @@ export const COPILOT_DESCRIPTOR: ProviderDescriptor = {
     backgroundWakes: false,
     // Its interface fills the screen: drawn while its terminal changed size, it can stay at the old width (#486).
     startupSizeRefresh: true,
+    // A model call it gave up on ends the turn with a session.error and no Stop (1.0.105, HI-1960).
+    failureEndsTurn: true,
     // A line typed in pieces that a busy Copilot reads with its Enter in one go isn't sent by that Enter; pasted, it is,
     // as text (#600, checked with 1.0.98).
     bracketedPaste: true,
-    enterOnceDrawn: false
+    enterOnceDrawn: false,
+    // --add-dir (1.0.100).
+    extraDirs: true
   },
   reservedKeys: [],
   instructionsFile: 'AGENTS.md',
@@ -246,13 +252,13 @@ export const COPILOT_DESCRIPTOR: ProviderDescriptor = {
     'Install the GitHub Copilot CLI with WinGet (`winget install GitHub.Copilot`) or npm (`npm install -g @github/copilot`), then sign in once with `copilot login` in a terminal (or with the GitHub CLI, which Copilot also uses). Copilot Free runs the Auto model only; choosing a model needs a paid plan. If the CLI is installed somewhere else, set its path in Settings → GitHub Copilot.', // i18n-ignore: English, as main's notices use it (text has the window's)
   extensionNote:
     "You have GitHub Copilot in VS Code (or a similar editor). Hive doesn't use the editor's copy — it moves with every extension update. Install the Copilot CLI; your extension keeps working as before.", // i18n-ignore: English, as main's notices use it (text has the window's)
-  signInHelp: 'Sign in again: run copilot login in a terminal (Help → Agent Setup → GitHub Copilot shows how).', // i18n-ignore: English for main's notices (text has the window's)
+  signInHelp: 'Sign in again: run copilot login in a terminal (Help → Provider Setup → GitHub Copilot shows how).', // i18n-ignore: English for main's notices (text has the window's)
   // Its session events have no record of a safety classifier stopping a response or rerouting it (checked with 1.0.x, #606).
   safeguardHelp: null,
   text: {
-    installNote: msg({ id: 'agents.copilot.installNote', defaultMessage: 'Install the GitHub Copilot CLI with WinGet (`winget install GitHub.Copilot`) or npm (`npm install -g @github/copilot`), then sign in once with `copilot login` in a terminal (or with the GitHub CLI, which Copilot also uses). Copilot Free runs the Auto model only; choosing a model needs a paid plan. If the CLI is installed somewhere else, set its path in Settings → GitHub Copilot.', description: "Agent Setup → GitHub Copilot: how to install it. Keep the commands in backticks exactly as they are; Copilot Free is a plan's name and Auto a model's; Settings → GitHub Copilot is a place in Hive's settings." }),
-    extensionNote: msg({ id: 'agents.copilot.extensionNote', defaultMessage: "You have GitHub Copilot in VS Code (or a similar editor). Hive doesn't use the editor's copy — it moves with every extension update. Install the Copilot CLI; your extension keeps working as before.", description: 'Agent Setup → GitHub Copilot, when only an editor extension was found: why Hive needs the standalone CLI.' }),
-    signInHelp: msg({ id: 'agents.copilot.signInHelp', defaultMessage: 'Sign in again: run copilot login in a terminal (Help → Agent Setup → GitHub Copilot shows how).', description: "How to sign in to GitHub Copilot again after its sign-in expired (an agent's pane, a notification). copilot login is a command: keep it; Help → Agent Setup → GitHub Copilot is a menu path in Hive." }),
+    installNote: msg({ id: 'agents.copilot.installNote', defaultMessage: 'Install the GitHub Copilot CLI with WinGet (`winget install GitHub.Copilot`) or npm (`npm install -g @github/copilot`), then sign in once with `copilot login` in a terminal (or with the GitHub CLI, which Copilot also uses). Copilot Free runs the Auto model only; choosing a model needs a paid plan. If the CLI is installed somewhere else, set its path in Settings → GitHub Copilot.', description: "Provider Setup → GitHub Copilot: how to install it. Keep the commands in backticks exactly as they are; Copilot Free is a plan's name and Auto a model's; Settings → GitHub Copilot is a place in Hive's settings." }),
+    extensionNote: msg({ id: 'agents.copilot.extensionNote', defaultMessage: "You have GitHub Copilot in VS Code (or a similar editor). Hive doesn't use the editor's copy — it moves with every extension update. Install the Copilot CLI; your extension keeps working as before.", description: 'Provider Setup → GitHub Copilot, when only an editor extension was found: why Hive needs the standalone CLI.' }),
+    signInHelp: msg({ id: 'agents.copilot.signInHelp', defaultMessage: 'Sign in again: run copilot login in a terminal (Help → Provider Setup → GitHub Copilot shows how).', description: "How to sign in to GitHub Copilot again after its sign-in expired (an agent's pane, a notification). copilot login is a command: keep it; Help → Provider Setup → GitHub Copilot is a menu path in Hive." }),
     safeguardHelp: null,
     modelPlaceholder: msg({ id: 'agents.copilot.modelPlaceholder', defaultMessage: 'Model ID, e.g. claude-sonnet-5.5 or auto', description: 'Placeholder of the custom model ID box (GitHub Copilot). Keep the model IDs exactly as they are.' })
   },

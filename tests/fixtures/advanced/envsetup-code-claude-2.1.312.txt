@@ -1,0 +1,23 @@
+Claude Code 2.1.312's own code for its offer to teach auto mode about the environment (HI-1959): excerpts of the
+JavaScript bundled in claude.exe, minified names as they are. Not a screen: what decides when the offer shows, and the
+setting that turns it off. Neither was seen on a screen (the test home's probe of 28 Oct 2026 didn't show the offer).
+
+The offer's first dialog (its title, its body, its choices; Esc is "later"):
+
+  Ge=r(we,{title:"Teach auto mode about your environment?",onCancel:It,children:[Pt,eo]})
+  Pt=e(n,{children:"Auto mode works better when it knows your environment. Takes about a minute."})
+  Dt=[{label:"Yes",value:"accept"},{label:"Not now",value:"later"},{label:"Don't show again",value:"dismiss"}]
+
+When it shows: auto mode, eligible, the offer on, no auto mode environment set, 5 starts and 5 auto mode denials, not
+dismissed, and not put off ("Not now") in the last 7 days (604800000 ms):
+
+  var RNt=604800000,PNt=5,LQ=5;function gO(){if(!lce())return!1;if((sI()?.environment?.length??0)>0)return!1;let h=ue();if(h.numStartups<PNt)return!1;if((h.autoModeEnvSetup?.denials??0)<LQ)return!1;if(ANt())return!1;let x=h.autoModeEnvSetup;if(x?.dismissed)return!1;if(x?.dismissedAt&&Date.now()-x.dismissedAt<RNt)return!1;return!0}
+  function eHe(h){return Nlr()===!0&&h.toolPermissionContext.mode==="auto"&&!h.viewingAgentTaskId&&!gc()&&!Mn()&&!i.CLAUDE_BRIDGE_REATTACH_SESSION&&gO()}
+
+The offer on: a server flag (envOnboarding), unless the settings turn the auto-mode-setup skill off:
+
+  function t6e(){return e6e()&&by()?.envOnboarding===!0}function lce(){return t6e()&&ft().skillOverrides?.["auto-mode-setup"]!=="off"}
+
+The /auto-mode-setup command stays (its own isEnabled doesn't read skillOverrides):
+
+  var o6e={type:"local",name:"auto-mode-setup",supportsNonInteractive:!0,description:"Teach auto mode about your environment, plus optional rule tweaks",isEnabled:()=>e6e()&&be()}

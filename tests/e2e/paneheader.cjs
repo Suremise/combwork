@@ -9,6 +9,8 @@
 // whole compaction, Compact… is unavailable meanwhile and a second one is refused; it ends when it finishes, fails or is
 // cancelled. The agents run the fake Claude Code (fake-claude/). Dev build, throwaway profile, workspace and
 // CLAUDE_CONFIG_DIR.
+// Dev build only (#1580): it starts this checkout's Electron itself, and its long-named agent and Three are 0.9
+// worktree agents (agents:testLegacy, refused by a packaged build), for the header's branch.
 const lib = require('./lib.cjs')
 const { _electron } = require('playwright-core')
 const fs = require('fs')
@@ -45,13 +47,15 @@ function commits(wt, n) {
     const text = `${i}\n`
     s += `commit refs/heads/${branch}\ncommitter t <t@t> ${1700000000 + i} +0000\ndata ${msg.length}\n${msg}\n${i === 0 ? `from ${head}\n` : ''}M 644 inline n.txt\ndata ${text.length}\n${text}\n`
   }
-  execFileSync('git', ['fast-import', '--quiet'], { cwd: wt, input: s })
+  execFileSync('git', ['fast-import', '--quiet'], { cwd: wt, input: s, env: lib.gitEnv() })
   git(wt, 'reset', '-q', '--hard', 'HEAD')
 }
 
 ;(async () => {
   for (const d of [userData, ws, ws + '.worktrees', claudeHome]) fs.rmSync(d, { recursive: true, force: true })
   fs.mkdirSync(claudeHome, { recursive: true })
+  // Every read of the agents' input recorded, for typeLine (#1560).
+  lib.logFakeInput(claudeHome)
   lib.gitProject(alpha)
   lib.gitProject(beta)
   lib.enableProviders(userData)
@@ -111,13 +115,21 @@ function commits(wt, n) {
     const has = await h.evaluate((el) => ({ provider: !!el.querySelector('.provider-icon, [class*="provider-"]'), branch: !!el.querySelector('.agent-branch'), compact: !!el.querySelector('[aria-label="Compact"]'), merge: !!el.querySelector('[aria-label="Merge…"]'), more: !!el.querySelector('.pane-more') }))
     check(`${a.name}: the header has ⋯, and no provider icon, worktree mark, Compact or Merge…`, has.more && !has.provider && !has.branch && !has.compact && !has.merge, JSON.stringify(has))
   }
-  // Its state mark (#973) comes first: both agents are idle (a ring), named by their state for screen readers.
+  // Its state mark (#973) comes first: both agents are idle (a ring), named by their state for screen readers. The turn's
+  // end is main's (session:live); the window's mark follows once its status event is in, read until it is (HI-2194:
+  // under load, read at once, it still said Working).
   for (const a of [long, other]) {
-    const mark = await header(a).evaluate((el) => {
-      const m = el.querySelector('.state-mark')
-      return m ? { first: el.firstElementChild?.contains(m), idle: m.classList.contains('idle'), name: m.getAttribute('aria-label') } : null
-    })
-    check(`${a.name}: the header starts with its state mark, a ring while idle`, !!mark && mark.first && mark.idle && mark.name === 'Idle', JSON.stringify(mark))
+    const read = () =>
+      header(a).evaluate((el) => {
+        const m = el.querySelector('.state-mark')
+        return m ? { first: el.firstElementChild?.contains(m), idle: m.classList.contains('idle'), name: m.getAttribute('aria-label') } : null
+      })
+    const ok = (m) => !!m && m.first && m.idle && m.name === 'Idle'
+    let mark = null
+    const first = await read()
+    const t = Date.now()
+    check(`${a.name}: the header starts with its state mark, a ring while idle`, !!(await until(async () => ok((mark = await read())))), JSON.stringify(mark))
+    if (!ok(first)) console.log(`  (${a.name}'s mark read ${JSON.stringify(first)} at first, idle ${Date.now() - t} ms later)`)
   }
   await header(long).locator('.agent-name').hover()
   check("the name's tooltip says the agent and its provider (#975: with what its strip tab said)", !!(await until(async () => (await tips()).some((t) => t.startsWith(`${long.name} (Claude Code): `)), HUNG_MS)), JSON.stringify(await tips()))
@@ -329,7 +341,7 @@ function commits(wt, n) {
         // Narrower: the name never shrinks while the status still has room to give.
         if (prev && r.name < prev.name - 0.5) check(`${label}${role} at ${w}px: the name shortens only once the status has given way`, r.status <= 1 || prev.status <= 1, JSON.stringify({ prev, r }))
         prev = r
-        if (w !== 900 && w !== 240) continue
+        if (![900, 420, 320, 240].includes(w)) continue
         await shot(`${prefix}-${role}-${w}.png`)
         await theme('light')
         await fits(`${label}light theme, ${role} pane at ${w}px`)

@@ -1,6 +1,7 @@
 // Card numbers in a terminal are links (#440): Ctrl+click on "#n" in an agent's or the Assistant's output opens card
 // n, archived ones too; hovering shows its title and column. A number that isn't a card on the board, hex and a URL's
-// fragment aren't linked, and a plain click doesn't open anything. The agent and the Assistant run the fake Claude
+// fragment aren't linked, and a plain click doesn't open anything. A card's key (AM-12, #1221) is linked too, and an old
+// key still is after the project's key changes; hovers name the card by its key. The agent and the Assistant run the fake Claude
 // Code (fake-claude/), which prints each prompt back. Screenshots of the hover in both themes. Dev build, throwaway
 // profile, workspace and CLAUDE_CONFIG_DIR; a quiet test copy.
 const lib = require('./lib.cjs')
@@ -23,6 +24,8 @@ const check = (name, ok, extra = '') => {
 ;(async () => {
   for (const d of [userData, ws, claudeHome]) fs.rmSync(d, { recursive: true, force: true })
   fs.mkdirSync(claudeHome, { recursive: true })
+  // Every read of the agents' input recorded, for typeLine (#1560).
+  lib.logFakeInput(claudeHome)
   fs.mkdirSync(alpha, { recursive: true })
   lib.gitProject(alpha, { 'README.md': '# Alpha\n' })
   lib.enableProviders(userData)
@@ -97,7 +100,9 @@ const check = (name, ok, extra = '') => {
   const key = lib.ptyKey(alpha, agent.id)
   const A = `#${live1.number}`
   const G = `#${gone.number}`
-  await say(alpha, agent.id, `card (${A}) and ${G}, not #9999 or #fff or https://x.test/a${A}`)
+  // Its key (#1221): linked too, and still after the project's key changes.
+  const K = live1.key
+  await say(alpha, agent.id, `card (${A}) and ${G}, not #9999 or #fff or https://x.test/a${A}; by key ${K}.`)
   check('the card numbers are printed', !!(await until(() => textAt(key, '#9999'), 10000)))
 
   // --- Not linked: an unknown number, hex, a URL's fragment.
@@ -108,7 +113,7 @@ const check = (name, ok, extra = '') => {
 
   // --- A card's number: underlined, its title and column on hover; a plain click does nothing; Ctrl+click opens it.
   const h1 = await hover(key, `${A})`)
-  check('a card number is linked, its title and column on hover', !!h1 && h1.title === `${A} Attention inbox · Review · Ctrl+click to open`, h1?.title)
+  check('a card number is linked, its title and column on hover', !!h1 && h1.title === `${K} Attention inbox · Review · Ctrl+click to open`, h1?.title)
   await page.mouse.click(h1.at.x + 4, h1.at.y)
   await lib.sleep(600)
   check("a plain click doesn't open it", (await dialog.count()) === 0)
@@ -118,16 +123,35 @@ const check = (name, ok, extra = '') => {
 
   // --- An archived card is linked too, and opens.
   const h2 = await hover(key, `${G},`)
-  check('an archived card is linked, saying so', !!h2 && h2.title === `${G} Old idea · Archived (from Todo) · Ctrl+click to open`, h2?.title)
+  check('an archived card is linked, saying so', !!h2 && h2.title === `${gone.key} Old idea · Archived (from Todo) · Ctrl+click to open`, h2?.title)
   await ctrlClick({ x: h2.at.x + 4, y: h2.at.y })
   check('Ctrl+click opens the archived card', !!(await until(async () => (await dialog.count()) === 1 && ((await dialogTitle()) === 'Old idea' || /Old idea/.test(await dialog.innerText().catch(() => ''))), 5000)), await dialogTitle())
+  await closeDialog()
+
+  // --- A card's key (#1221): linked, its title on hover, Ctrl+click opens it; after the project's key changes, the old
+  // key printed before still is.
+  check('the card has a key', /^[A-Z]{2,4}-\d+$/.test(K ?? ''), K)
+  const hk = await hover(key, `${K}.`)
+  check("a card's key is linked, its title and column on hover", !!hk && hk.title === `${K} Attention inbox · Review · Ctrl+click to open`, hk?.title)
+  await ctrlClick({ x: hk.at.x + 4, y: hk.at.y })
+  check('Ctrl+click on the key opens the card', !!(await until(async () => (await dialog.count()) === 1 && (await dialogTitle()) === 'Attention inbox', 5000)), await dialogTitle())
+  await closeDialog()
+  const newKey = await inv('project:setKey', alpha, 'ALX')
+  const renamed = `ALX-${K.split('-')[1]}`
+  const hOld = await until(async () => {
+    const h = await hover(key, `${K}.`)
+    return h && h.title.startsWith(`${renamed} Attention inbox`) && h
+  }, HUNG_MS)
+  check('after a key change, the old key printed before is still linked, the hover naming the card by its new key', newKey === 'ALX' && !!hOld, (await hover(key, `${K}.`))?.title)
+  await ctrlClick({ x: hOld.at.x + 4, y: hOld.at.y })
+  check('…and Ctrl+click on it opens the card', !!(await until(async () => (await dialog.count()) === 1 && (await dialogTitle()) === 'Attention inbox', 5000)), await dialogTitle())
   await closeDialog()
 
   // --- The hover follows the board: a card moved since the line was printed shows its column now.
   await inv('tasks:update', live1.number, { column: 'passed' })
   const h3 = await until(async () => {
     const h = await hover(key, `${A})`)
-    return h && /· Passed ·/.test(h.title) && h
+    return h && /· Approved ·/.test(h.title) && h
   }, 5000)
   check('the hover shows the card as it is now', !!h3, (await hover(key, `${A})`))?.title)
 
@@ -153,7 +177,7 @@ const check = (name, ok, extra = '') => {
   await say(home, 'assistant', `${G} is archived; ${A} passed`)
   check("the Assistant's line is printed", !!(await until(() => textAt(akey, `${A} passed`), 10000)))
   const h4 = await hover(akey, `${A} passed`)
-  check("a card number in the Assistant's output is linked", !!h4 && h4.title.startsWith(`${A} Attention inbox · Passed`), h4?.title)
+  check("a card number in the Assistant's output is linked", !!h4 && h4.title.startsWith(`${renamed} Attention inbox · Approved`), h4?.title)
   await ctrlClick({ x: h4.at.x + 4, y: h4.at.y })
   check("Ctrl+click in the Assistant's panel opens the card", !!(await until(async () => (await dialog.count()) === 1 && (await dialogTitle()) === 'Attention inbox', 5000)), await dialogTitle())
   await page.screenshot({ path: path.join(lib.WORK, 'cardlinks-assistant-opened.png') })

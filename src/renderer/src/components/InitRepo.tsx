@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import type { ProjectInfo } from '@shared/types'
 import { GITIGNORE_CHOICES, initAbout, initProblem, type GitInitCheck, type GitignoreChoice } from '@shared/gitInit'
 import { msg, tr } from '@shared/i18n'
@@ -50,13 +50,21 @@ export function InitRepoButton({ project, label, small }: { project: ProjectInfo
   )
 }
 
-/** The project's Initialise dialog while it is open: in the Git tab, which stays as the page under it changes. */
-export function InitRepoHost({ project }: { project: ProjectInfo }) {
-  const open = useStore((s) => s.gitInitFor === project.path)
-  return open ? <InitRepoDialog project={project} onClose={() => set({ gitInitFor: null })} /> : null
+/** What the page under the dialog hears of it (HI-1905's Git preview): the repository made with its first commit, or why not. */
+export interface InitRepoEvents {
+  /** Called after the dialog has closed on success, with the project it initialised. */
+  onInitialised?: (project: ProjectInfo) => void
+  /** Called with each failure the dialog shows. */
+  onFailed?: (error: string) => void
 }
 
-function InitRepoDialog({ project, onClose }: { project: ProjectInfo; onClose: () => void }) {
+/** The project's Initialise dialog while it is open: in the Git tab, which stays as the page under it changes. */
+export function InitRepoHost({ project, ...events }: { project: ProjectInfo } & InitRepoEvents) {
+  const open = useStore((s) => s.gitInitFor === project.path)
+  return open ? <InitRepoDialog project={project} onClose={() => set({ gitInitFor: null })} {...events} /> : null
+}
+
+function InitRepoDialog({ project, onClose, onInitialised, onFailed }: { project: ProjectInfo; onClose: () => void } & InitRepoEvents) {
   const [check, setCheck] = useState<GitInitCheck | null>(null)
   const [loadError, setLoadError] = useState<string | null>(null)
   const [gitignore, setGitignore] = useState<GitignoreChoice>('minimal')
@@ -64,6 +72,11 @@ function InitRepoDialog({ project, onClose }: { project: ProjectInfo; onClose: (
   const [email, setEmail] = useState('')
   const [nested, setNested] = useState(false)
   const { busy, error, run } = useBusy()
+  const failed = useRef(onFailed)
+  failed.current = onFailed
+  useEffect(() => {
+    if (error) failed.current?.(error)
+  }, [error])
   useEffect(() => {
     let live = true
     call('git:initCheck', project.path).then(
@@ -88,6 +101,7 @@ function InitRepoDialog({ project, onClose }: { project: ProjectInfo; onClose: (
     }
     notify('success', r.value)
     onClose()
+    onInitialised?.(project)
   }
   const asks = check && !check.refused
   return (

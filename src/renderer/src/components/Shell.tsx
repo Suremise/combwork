@@ -1,8 +1,10 @@
-import type { PlanLimit, TaskCard, WorkspaceInfo } from '@shared/types'
+import type { PlanLimit, PlanUsage, ProviderId, TaskCard, WorkspaceInfo } from '@shared/types'
 import { useNow } from '../usage'
 import { runCommand } from '../commands'
-import { setActivity, set, useProviderWarnings, useStore, type Activity } from '../store'
-import { enabledProviders, installSourceText } from '@shared/providers'
+import { setActivity, set, setProgressOpen, useStore, type Activity } from '../store'
+import { useTeamPaused } from './TeamPause'
+import { useTeamPause } from '../teamPause'
+import { enabledProviders, installSourceText, providerDescriptor } from '@shared/providers'
 import { ProviderIcon } from './ProviderIcon'
 import { cx, formatKeybinding, resetsIn, timeAgo } from '../util'
 import { commandKeybinding } from '../commands'
@@ -14,15 +16,20 @@ import { InboxStatusItem } from './Inbox'
 import { keepAwakeText } from '@shared/keepAwake'
 import { GIT_MIN, gitFixText, gitProblemText } from '@shared/gitTool'
 import { useInbox } from '../inbox'
+import { useForYou } from '../forYou'
 import { GitStatusBarItem } from '../views/GitTab'
 import { AGENT_LIMIT_MAX } from '@shared/defaults'
 import { AgentRowsTable, CARD_COLUMN, PROJECT_COLUMN, STATE_COLUMN, WAITING_COLUMN, agentRow, tableText, type AgentTableData, type AgentTableRow } from './AgentsTable'
 import { limitWindow } from '../views/ProjectTabs'
+import { useConnections, useProviderWarnings } from './ConnectionChoice'
+import { connectionsApply, planUsageItems } from '@shared/accounts'
+import { useConnectionsInUse } from '../connectionUsage'
 import { fmt, msg, tr, type Msg } from '@shared/i18n'
 
 const M = {
   projects: msg({ id: 'workspace.activity.projects', defaultMessage: 'Projects', description: 'The activity bar (left edge): the Projects view.' }),
   overview: msg({ id: 'workspace.activity.overview', defaultMessage: 'Workspace Overview', description: 'The activity bar (left edge): the Workspace Overview.' }),
+  activity: msg({ id: 'workspace.activity.activity', defaultMessage: 'Activity', description: "The activity bar (left edge): the Activity view (what every project's agents run now, HI-1664)." }),
   performance: msg({ id: 'workspace.activity.performance', defaultMessage: 'Performance', description: "The activity bar (left edge): the Performance view (how agents' turns perform)." }),
   board: msg({ id: 'workspace.activity.board', defaultMessage: 'Task Board', description: 'The activity bar (left edge): the task board.' }),
   notes: msg({ id: 'workspace.activity.notes', defaultMessage: 'Shared Notes', description: 'The activity bar (left edge): the workspace\'s shared notes.' }),
@@ -35,6 +42,7 @@ const M = {
   withKey: msg({ id: 'workspace.activity.withKey', defaultMessage: '{label} ({key})', description: 'Tooltip on an activity bar button: its name and its shortcut ({key}: "Ctrl+Shift+E").' }),
   notifications: msg({ id: 'workspace.activity.notifications', defaultMessage: 'Notifications', description: 'The activity bar: the button that shows the notifications.' }),
   notificationsTip: msg({ id: 'workspace.activity.notificationsTip', defaultMessage: '{unread, plural, =0 {Notifications} other {Notifications (# unread)}}', description: 'Tooltip on the notifications button.' }),
+  forYouBadge: msg({ id: 'workspace.activity.forYou', defaultMessage: '{n, plural, one {# card waits for you} other {# cards wait for you}}', description: "Accessible name and tooltip line of the count on the activity bar's Task Board icon: how many cards wait for the user (an approval, a decision, a question: For you). Glossary: For you." }),
   unread: msg({ id: 'workspace.activity.unread', defaultMessage: '{count, plural, other {# unread}}', description: 'The notifications button, for screen readers: how many notifications are unread.' }),
   more: msg({ id: 'workspace.statusBar.more', defaultMessage: 'and {count} more', description: "Under the running agents' table in the status bar's tooltip: agents not listed." }),
   openWorkspace: msg({ id: 'workspace.statusBar.openWorkspace', defaultMessage: 'Open a workspace', description: 'The status bar with no workspace open: opens one.' }),
@@ -46,6 +54,7 @@ const M = {
   api: msg({ id: 'workspace.statusBar.api', defaultMessage: 'API', description: "The status bar's item for Hive's Agent API. Keep it short." }),
   awakeTip: msg({ id: 'workspace.statusBar.awakeTip', defaultMessage: "Windows won't sleep until the agents finish (the screen may still turn off). Settings → General → Keep the PC awake while agents work.", description: "Tooltip on the status bar's keep-awake note. Keep the setting's path as Settings shows it." }),
   shortLimit: msg({ id: 'workspace.statusBar.shortLimit', defaultMessage: '{window, select, fiveHour {5h} weekly {Week} other {{label}}}', description: "The status bar's plan limits, before each one's percent: the 5-hour window, the weekly one, or the provider's own name for another. Keep it very short." }),
+  connectionLine: msg({ id: 'workspace.statusBar.connectionLine', defaultMessage: '{name} ({provider}{hasPlan, select, yes {, {plan} plan} other {}})', description: "The first line of a connection's plan limits tooltip in the status bar (HI-1756): the connection's name the user gave it ({name}: \"Max 1\"), its coding agent ({provider}: Claude Code) and its plan's name ({plan}: max, pro…)." }),
   planLine: msg({ id: 'workspace.statusBar.planLine', defaultMessage: '{provider}{hasPlan, select, yes { ({plan} plan)} other {}}', description: "The first line of the status bar's plan limits tooltip (GitHub issue #1): the coding agent ({provider}: Claude Code) and its plan's name ({plan}: max, pro…)." }),
   limitLine: msg({ id: 'workspace.statusBar.limitLine', defaultMessage: '{window, select, fiveHour {5-hour limit} weekly {Weekly limit} other {{label} limit}}: {used, number, ::percent} used{hasReset, select, yes {, resets {when}} other {}}', description: 'A line of the status bar\'s plan limits tooltip (GitHub issue #1): a rolling usage window, how much of it is used, and when it resets ({when}: "in 2 h 5 min", or a weekday and time).' }),
   reportedBy: msg({ id: 'workspace.statusBar.reportedBy', defaultMessage: 'Reported by {agent}, {when}', description: 'Under a line of the status bar\'s plan limits tooltip (#383): which agent\'s session reported the figure of the limit above ({agent}: its name) and when ({when}: "4 minutes ago").' }),
@@ -65,6 +74,7 @@ const ASSISTANT_ICON = 'hive-assistant'
 const ACTIVITIES: { id: Activity; icon: string; label: Msg; command: string }[] = [
   { id: 'projects', icon: 'files', label: M.projects, command: 'view.projects' },
   { id: 'overview', icon: 'dashboard', label: M.overview, command: 'view.overview' },
+  { id: 'activity', icon: 'type-hierarchy', label: M.activity, command: 'view.activity' },
   { id: 'performance', icon: 'pulse', label: M.performance, command: 'view.performance' },
   { id: 'board', icon: 'project', label: M.board, command: 'view.board' },
   { id: 'notes', icon: 'notebook', label: M.notes, command: 'view.notes' },
@@ -81,17 +91,23 @@ export function ActivityBar() {
   const unread = useStore((s) => s.unread)
   // Agents that need you (the inbox's count).
   const attention = useInbox().needYou.length
-  // Cards waiting for the user to look at them.
-  const review = useStore((s) => s.tasks.filter((c) => !c.archived && c.column === 'review').length)
+  // Cards waiting for the user (#1276, For you: an approval, a decision, a question); Review's count stays in the board
+  // sidebar's Waiting for review.
+  const forYou = new Set(useForYou().summary.items.map((i) => i.card)).size
 
-  const button = (id: Activity, icon: string, labelMsg: Msg, command: string, badge?: number) => {
+  const button = (id: Activity, icon: string, labelMsg: Msg, command: string, badge?: number, badgeLabel?: string) => {
     const kb = commandKeybinding(command)
     const label = tr(labelMsg)
+    const said = badge && badgeLabel ? `${label} · ${badgeLabel}` : label
     return (
-      <Tooltip key={id} content={kb ? tr(M.withKey, { label, key: formatKeybinding(kb) }) : label}>
-        <button className={cx('activity-btn', activity === id && (sidebarVisible || id === 'docs' || id === 'settings') && 'active')} onClick={() => setActivity(id)} aria-label={label}>
+      <Tooltip key={id} content={kb ? tr(M.withKey, { label: said, key: formatKeybinding(kb) }) : said}>
+        <button className={cx('activity-btn', activity === id && (sidebarVisible || id === 'docs' || id === 'settings') && 'active')} onClick={() => setActivity(id)} aria-label={label} aria-description={badge && badgeLabel ? badgeLabel : undefined}>
           {icon === ASSISTANT_ICON ? <AssistantMark className="activity-mark" /> : <Icon name={icon} />}
-          {!!badge && <span className="activity-badge">{badge}</span>}
+          {!!badge && (
+            <span className="activity-badge" aria-label={badgeLabel} data-badge={id}>
+              {badge}
+            </span>
+          )}
         </button>
       </Tooltip>
     )
@@ -99,7 +115,7 @@ export function ActivityBar() {
 
   return (
     <div className="activitybar">
-      {ACTIVITIES.map((a) => button(a.id, a.icon, a.label, a.command, a.id === 'projects' ? attention : a.id === 'board' ? review : undefined))}
+      {ACTIVITIES.map((a) => button(a.id, a.icon, a.label, a.command, a.id === 'projects' ? attention : a.id === 'board' ? forYou : undefined, a.id === 'board' ? tr(M.forYouBadge, { n: forYou }) : undefined))}
       <div className="activity-spacer" />
       <Tooltip content={tr(M.notificationsTip, { unread })}>
         <button
@@ -188,6 +204,7 @@ export function StatusBar() {
         </div>
       </Tooltip>
       <InboxStatusItem />
+      <TeamPausedStatusItem />
       <div className="status-spacer" />
       <KeepAwakeStatusItem />
       {/* App-wide items only: each agent's model, effort, mode and context are in its pane's footer. */}
@@ -204,6 +221,27 @@ export function StatusBar() {
       <UpdateStatusItem />
     </div>
   )
+}
+
+/** While the team is paused (HI-2081): a quiet item that opens the Progress panel, where its Lanes say what still runs. */
+function TeamPausedStatusItem() {
+  const paused = useTeamPaused()
+  const parked = useTeamPause((s) => !!s.state?.allParked)
+  if (!paused) return null
+  const text = parked ? tr(TEAM_STATUS.parked) : tr(TEAM_STATUS.paused)
+  return (
+    <Tooltip content={tr(TEAM_STATUS.tip)}>
+      <div className="status-item team-paused" role="button" tabIndex={0} aria-label={text} onClick={() => setProgressOpen(true)} onKeyDown={(e) => (e.key === 'Enter' || e.key === ' ') && setProgressOpen(true)}>
+        <Icon name="debug-pause" /> {text}
+      </div>
+    </Tooltip>
+  )
+}
+
+const TEAM_STATUS = {
+  paused: msg({ id: 'shell.status.teamPaused', defaultMessage: 'Team paused', description: "A status bar item while the team is paused before an update (HI-2081): Hive starts no lane card and wakes no agent until it resumes. Click: opens the Progress panel." }),
+  parked: msg({ id: 'shell.status.teamParked', defaultMessage: 'Team parked', description: 'The status bar item (HI-2081) once the paused team has parked: nothing runs, so an update can be installed.' }),
+  tip: msg({ id: 'shell.status.teamPausedTip', defaultMessage: "The team is paused: no lane starts a card and no agent is woken until you resume it. The Progress panel's Lanes says what still runs.", description: 'Tooltip of the status bar item while the team is paused (HI-2081).' })
 }
 
 /** While working agents keep the PC from sleeping (Settings → General). */
@@ -230,40 +268,64 @@ function shortLimit(l: PlanLimit): string {
 /**
  * Each enabled provider's plan limits, as Hive keeps them from its sessions' reports (the highest in each reset period,
  * #383): one item per provider. A limit whose reset has passed with no new report is left out, not shown as it was.
+ * A CLI with accounts (HI-1756; HI-2107) shows one item per account a session of this window's workspace runs on, by its
+ * name now, all of them in the one order of accounts across every CLI (HI-2119), each that login's own limits; its
+ * CLI-wide item (sessions not on one) goes. CLIs without accounts here follow, each with its CLI-wide item.
  */
 function PlanUsageStatus() {
   const all = useStore((s) => s.planUsage)
+  const byConnection = useStore((s) => s.connectionPlanUsage)
   const settings = useStore((s) => s.settings)
+  const view = useConnections()
+  const inUse = useConnectionsInUse()
   const now = useNow(60000)
+  const byConnections = new Set((view?.providers ?? []).filter((p) => connectionsApply(view, p)))
+  // Accounts in the one order, each by its name now (renamed since its session launched: the new one), then CLI-wide items.
+  const items = planUsageItems(enabledProviders(settings).map((p) => p.id), byConnections, inUse, view?.order ?? [], (id) => view?.connections.find((a) => a.id === id)?.name)
   return (
     <>
-      {enabledProviders(settings).map((p) => {
-        const kept = all[p.id]
-        const limits = (kept?.limits ?? []).filter((l) => !l.resetsAt || Date.parse(l.resetsAt) > now)
-        if (!kept || !limits.length) return null
-        const usage = { ...kept, limits }
-        const worst = Math.max(...usage.limits.map((l) => l.usedPercent))
-        // GitHub issue #1: every part in the window's language (the window's name, the percent, when it resets, how long ago).
-        const lines = usage.limits.flatMap((l) => [
-          tr(M.limitLine, { window: limitWindow(l), label: l.label, used: Math.round(l.usedPercent) / 100, hasReset: l.resetsAt ? 'yes' : 'no', when: l.resetsAt ? resetsIn(l.resetsAt) : '' }),
-          ...(l.reportedBy && l.reportedAt ? [tr(M.reportedBy, { agent: l.reportedBy, when: timeAgo(l.reportedAt) })] : [])
-        ])
-        const tip = [tr(M.planLine, { provider: p.name, hasPlan: usage.plan ? 'yes' : 'no', plan: usage.plan ?? '' }), ...lines, tr(M.asOf, { when: timeAgo(usage.updatedAt) })].join('\n')
-        return (
-          <Tooltip key={p.id} content={<span style={{ whiteSpace: 'pre-line' }}>{tip}</span>}>
-            <div className={cx('status-item', worst >= 95 ? 'warn' : worst >= 80 && 'caution')} data-plan={p.id} onClick={() => runCommand('project.tab.overview')}>
-              <ProviderIcon provider={p.id} mono />
-              {usage.limits.map((l, i) => (
-                <span key={l.id}>
-                  {i > 0 && <span className="status-sep">·</span>}
-                  {shortLimit(l)} {fmt.percent(l.usedPercent / 100)}
-                </span>
-              ))}
-            </div>
-          </Tooltip>
+      {items.map((it) => {
+        const p = providerDescriptor(it.provider)
+        return it.kind === 'account' ? (
+          <PlanItem key={it.id} provider={p.id} kept={byConnection[it.id]} now={now} label={it.name} first={tr(M.connectionLine, { name: it.name, provider: p.name, hasPlan: byConnection[it.id]?.plan ? 'yes' : 'no', plan: byConnection[it.id]?.plan ?? '' })} data={{ 'data-plan': p.id, 'data-plan-connection': it.id }} />
+        ) : (
+          <PlanItem key={p.id} provider={p.id} kept={all[p.id]} now={now} first={tr(M.planLine, { provider: p.name, hasPlan: all[p.id]?.plan ? 'yes' : 'no', plan: all[p.id]?.plan ?? '' })} data={{ 'data-plan': p.id }} />
         )
       })}
     </>
+  )
+}
+
+/** One item of the status bar's plan limits: a CLI's, or (`label`, its name) a connection's. Nothing while none is current. */
+function PlanItem({ provider, kept, now, label, first, data }: { provider: ProviderId; kept: PlanUsage | undefined; now: number; label?: string; first: string; data: Record<string, string> }) {
+  const limits = (kept?.limits ?? []).filter((l) => !l.resetsAt || Date.parse(l.resetsAt) > now)
+  if (!kept || !limits.length) return null
+  const usage = { ...kept, limits }
+  const worst = Math.max(...usage.limits.map((l) => l.usedPercent))
+  // GitHub issue #1: every part in the window's language (the window's name, the percent, when it resets, how long ago).
+  const lines = usage.limits.flatMap((l) => [
+    tr(M.limitLine, { window: limitWindow(l), label: l.label, used: Math.round(l.usedPercent) / 100, hasReset: l.resetsAt ? 'yes' : 'no', when: l.resetsAt ? resetsIn(l.resetsAt) : '' }),
+    ...(l.reportedBy && l.reportedAt ? [tr(M.reportedBy, { agent: l.reportedBy, when: timeAgo(l.reportedAt) })] : [])
+  ])
+  const tip = [first, ...lines, tr(M.asOf, { when: timeAgo(usage.updatedAt) })].join('\n')
+  return (
+    <Tooltip content={<span style={{ whiteSpace: 'pre-line' }}>{tip}</span>}>
+      <div className={cx('status-item', worst >= 95 ? 'warn' : worst >= 80 && 'caution')} {...data} onClick={() => runCommand('project.tab.overview')}>
+        <ProviderIcon provider={provider} mono />
+        {label !== undefined && (
+          <span className="plan-connection">
+            {label}
+            <span className="status-sep">·</span>
+          </span>
+        )}
+        {usage.limits.map((l, i) => (
+          <span key={l.id}>
+            {i > 0 && <span className="status-sep">·</span>}
+            {shortLimit(l)} {fmt.percent(l.usedPercent / 100)}
+          </span>
+        ))}
+      </div>
+    </Tooltip>
   )
 }
 

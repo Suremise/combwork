@@ -96,8 +96,8 @@
     "description": "Title of the confirmation before attaching large files to an agent's prompt."
   },
   "actions.batch.providerMissing": {
-    "defaultMessage": "{cli} isn't installed (Agent Setup).",
-    "description": "Why an agent couldn't start or resume in a batch: its CLI ({cli}) isn't installed. Agent Setup is a Help window: use its translated name."
+    "defaultMessage": "{cli} isn't installed (Provider Setup).",
+    "description": "Why an agent couldn't start or resume in a batch: its CLI ({cli}) isn't installed. Provider Setup is a Help window: use its translated name."
   },
   "actions.batch.providerOff": {
     "defaultMessage": "{cli} is turned off in Settings → Providers.",
@@ -108,8 +108,8 @@
     "description": "A removed agent's open cards, cut short: the first five ({cards}: \"#3 Title, #4 Title\") and how many more ({n})."
   },
   "actions.cards.detail": {
-    "defaultMessage": "{cards, plural, one {Move it back: nobody has it, and if it is in Doing it goes to Todo, ready to start on another agent. Leave it: it keeps showing {agent, select, none {its agent} other {{agent}}} (removed), and in Doing shows as stalled.} other {Move them back: nobody has them, and those in Doing go to Todo, ready to start on another agent. Leave them: they keep showing {agent, select, none {their agent} other {{agent}}} (removed), and those in Doing show as stalled.}}",
-    "description": "Under the question about a removed agent's open cards: what Move back and Leave do. Doing and Todo are board columns; {agent} is the agent's name (none when several agents are removed)."
+    "defaultMessage": "{cards, plural, one {Move it back: nobody has it, and if it is in Active it goes to Todo, ready to start on another agent. Leave it: it keeps showing {agent, select, none {its agent} other {{agent}}} (removed), and in Active shows as stalled.} other {Move them back: nobody has them, and those in Active go to Todo, ready to start on another agent. Leave them: they keep showing {agent, select, none {their agent} other {{agent}}} (removed), and those in Active show as stalled.}}",
+    "description": "Under the question about a removed agent's open cards: what Move back and Leave do. Active and Todo are board columns; {agent} is the agent's name (none when several agents are removed)."
   },
   "actions.cards.leave": {
     "defaultMessage": "{cards, plural, one {Leave it} other {Leave them}}",
@@ -117,11 +117,55 @@
   },
   "actions.cards.release": {
     "defaultMessage": "{cards, plural, one {Move it back} other {Move them back}}",
-    "description": "Button: takes a removed agent's open cards back (nobody has them; Doing ones go to Todo)."
+    "description": "Button: takes a removed agent's open cards back (nobody has them; Active ones go to Todo)."
   },
   "actions.cards.title": {
     "defaultMessage": "{agents, plural, one {{agent} has} other {The # agents have}} {cards, plural, one {# open card} other {# open cards}}",
     "description": "Title of the question about the open cards of an agent being removed ({agent}: its name), or of {agents} agents (Remove All)."
+  },
+  "actions.chooseConnections.busy": {
+    "defaultMessage": "Applying…",
+    "description": "The Choose Connections dialog's button while it works (HI-2109)."
+  },
+  "actions.chooseConnections.confirm": {
+    "defaultMessage": "Apply",
+    "description": "The Choose Connections dialog's button (HI-2109): gives the agents the connections chosen."
+  },
+  "actions.chooseConnections.failed": {
+    "defaultMessage": "Could not change the connections",
+    "description": "An error's title (HI-2109): Choose Connections failed to read or change the agents' connections."
+  },
+  "actions.chooseConnections.later": {
+    "defaultMessage": "Later",
+    "description": "Button (HI-2109): leaves the running agents on their old connections until they restart."
+  },
+  "actions.chooseConnections.message": {
+    "defaultMessage": "Only their connections change: no agent is replaced, and their conversations stay.",
+    "description": "The Choose Connections dialog (HI-2109), under its title: it changes nothing but the agents' connections."
+  },
+  "actions.chooseConnections.restartMessage": {
+    "defaultMessage": "{agents} {count, plural, one {runs on its old connection until it restarts.} other {run on their old connections until they restart.}}",
+    "description": "That question (HI-2109): the running agents ({agents}, a list; {count} of them) keep their old connection until they restart."
+  },
+  "actions.chooseConnections.restartTitle": {
+    "defaultMessage": "Switch the running agents?",
+    "description": "Title of the question after Choose Connections (HI-2109) changed the connection of agents that are running."
+  },
+  "actions.chooseConnections.skipped": {
+    "defaultMessage": "{count, plural, one {# agent kept its connection} other {# agents kept their connections}}",
+    "description": "A warning's title after Choose Connections (HI-2109): some agents ({count}) couldn't be changed."
+  },
+  "actions.chooseConnections.skippedWhy": {
+    "defaultMessage": "{agent}: {why, select, running {it runs, and that connection is another coding agent’s: stop it first} other {it was removed meanwhile}}.",
+    "description": "Under that warning (HI-2109), one line per agent ({agent}): why its connection didn't change."
+  },
+  "actions.chooseConnections.switch": {
+    "defaultMessage": "Switch Them When Their Turn Is Over",
+    "description": "Button (HI-2109): each running agent ends once its turn is over and carries on, on the connection chosen now."
+  },
+  "actions.chooseConnections.title": {
+    "defaultMessage": "Choose connections for {project}",
+    "description": "Title of the Choose Connections dialog (HI-2109): chooses the connections (named setups on accounts: model, effort, mode) of a project's ({project}) agents, by role or one by one."
   },
   "actions.delete.busy": {
     "defaultMessage": "Deleting…",
@@ -215,6 +259,10 @@
     "defaultMessage": "Could not copy MCP servers",
     "description": "An error's title: copying a project's MCP servers to the workspace failed."
   },
+  "actions.mcp.deleteAdded": {
+    "defaultMessage": "{where}: deleting it removes it there too.",
+    "description": "The question before deleting a workspace MCP server (HI-2059), when it is added somewhere: {where} says where, such as \"Added in hive and for the Hive Assistant\"."
+  },
   "actions.mcp.deleteMessage": {
     "defaultMessage": "Move {name}.json to the Recycle Bin, with its folder if it was added from a .zip? Projects will no longer be able to use it.",
     "description": "The question before deleting a workspace MCP server: its file ({name}.json) goes to the Recycle Bin (Windows' name for it)."
@@ -226,6 +274,10 @@
   "actions.mcp.listFailed": {
     "defaultMessage": "Could not list the servers",
     "description": "An error's title: reading the workspace's MCP servers failed."
+  },
+  "actions.mcp.listFailedPicker": {
+    "defaultMessage": "Could not list the servers",
+    "description": "An error's title: reading the workspace's MCP servers for the Add server picker failed."
   },
   "actions.mcp.namePlaceholder": {
     "defaultMessage": "server-name",
@@ -251,9 +303,9 @@
     "defaultMessage": "Replace {name}?",
     "description": "Title of the question when the workspace already has an MCP server of that name ({name})."
   },
-  "actions.mcp.updateFailed": {
+  "actions.mcp.updateFailedAdded": {
     "defaultMessage": "Could not update the server",
-    "description": "An error's title: turning an MCP server on or off in the workspace failed."
+    "description": "An error's title: adding an MCP server to a project or the Hive Assistant, or removing it, failed."
   },
   "actions.pane.edge": {
     "defaultMessage": "{agent} can't move further {dir, select, left {left} right {right} up {up} other {down}}",
@@ -295,6 +347,14 @@
     "defaultMessage": "{n, plural, one {Stop session and deactivate?} other {Stop agents and deactivate?}}",
     "description": "Title of the question before marking a project inactive while {n} of its agents run."
   },
+  "actions.project.key": {
+    "defaultMessage": "Key",
+    "description": "The New Project dialog: the label of the project's key box (2–4 letters, such as AM, that its cards are named by: AM-12)."
+  },
+  "actions.project.keyHint": {
+    "defaultMessage": "Its cards are named {first}, {second} and so on. You can change the key later in Project Settings.",
+    "description": "Under the key box of the New Project dialog. {first} and {second} are the first two card names with the key typed, such as AM-1 and AM-2."
+  },
   "actions.project.nameChars": {
     "defaultMessage": "Names cannot contain {chars}",
     "description": "Why a new project's name can't be used: it has a character Windows doesn't allow in a folder name ({chars}: the characters)."
@@ -323,10 +383,6 @@
     "defaultMessage": "Open a workspace first",
     "description": "A warning: a project can't be created without an open workspace."
   },
-  "actions.project.saveFailed": {
-    "defaultMessage": "Could not save project settings",
-    "description": "An error's title: saving a project's settings failed."
-  },
   "actions.project.stopAndDeactivate": {
     "defaultMessage": "Stop and deactivate",
     "description": "Button: stops the project's agents and marks it inactive."
@@ -352,8 +408,8 @@
     "description": "A notification's button: opens Settings → Providers. Keep it short."
   },
   "actions.providers.agentSetup": {
-    "defaultMessage": "Agent Setup",
-    "description": "A notification's button: opens Agent Setup (a Help window). Keep it short."
+    "defaultMessage": "Provider Setup",
+    "description": "A notification's button: opens Provider Setup (a Help window). Keep it short."
   },
   "actions.providers.checkFailed": {
     "defaultMessage": "Could not check the providers",
@@ -372,8 +428,8 @@
     "description": "A warning's title: a coding agent CLI ({cli}: \"Codex\") isn't installed."
   },
   "actions.providers.notInstalledMessage": {
-    "defaultMessage": "Open Help → Agent Setup to install it.",
-    "description": "Under the warning that a CLI isn't installed. Help → Agent Setup is a menu command: use its translated names."
+    "defaultMessage": "Open Help → Provider Setup to install it.",
+    "description": "Under the warning that a CLI isn't installed. Help → Provider Setup is a menu command: use its translated names."
   },
   "actions.providers.upToDate": {
     "defaultMessage": "{cli} is up to date",
@@ -381,7 +437,7 @@
   },
   "actions.providers.update": {
     "defaultMessage": "Update",
-    "description": "A notification's button: opens Agent Setup to update the CLI. Keep it short."
+    "description": "A notification's button: opens Provider Setup to update the CLI. Keep it short."
   },
   "actions.providers.updateTitle": {
     "defaultMessage": "{cli} {version} is available",
@@ -471,6 +527,70 @@
     "defaultMessage": "Remove from Recent",
     "description": "Button: forgets the recent workspace whose folder is gone."
   },
+  "actions.releaseHeld.confirm": {
+    "defaultMessage": "Release",
+    "description": "Button: releases the slot."
+  },
+  "actions.releaseHeld.detailIdleBroker": {
+    "defaultMessage": "Released, the broker is left running: it is Windows’ own, and closes by itself.",
+    "description": "Release Slot… (HI-2309), under the question about a slot held only by Windows' idle Sandbox broker: releasing doesn't end it unless the box below is ticked."
+  },
+  "actions.releaseHeld.detailListed": {
+    "defaultMessage": "{n, plural, one {Hive lists # process its session left running.} other {Hive lists # processes its session left running.}} Released while they run, they may still write in the slot as other work uses it.",
+    "description": "Release Slot…: under the list of processes the agent's session left running ({n}: how many)."
+  },
+  "actions.releaseHeld.detailUnknown": {
+    "defaultMessage": "Hive doesn't know which of the processes its session started still run. Release it once you know nothing of it still writes in the slot.",
+    "description": "Release Slot…: Hive lists no processes the agent's session left running, so it can't say whether any still run."
+  },
+  "actions.releaseHeld.endFirst": {
+    "defaultMessage": "End these processes first",
+    "description": "Release Slot…: a tick box, on by default: Hive ends the listed processes before releasing the slot."
+  },
+  "actions.releaseHeld.messageGone": {
+    "defaultMessage": "{slot} is held by a session of agent {agent} (run {run}) in a Hive that is no longer running (process {pid}). Hive can't tell whether what it started still runs: until you release it, nothing else uses the slot.",
+    "description": "Release Slot…: why the slot ({slot}) is held. The agent ({agent}) ran there in a copy of Hive that quit or closed unexpectedly; {run} is the session's run id (a code such as 3f9a1c…), {pid} that Hive's process id: they tell one launch from another. A noun before the name (glossary §1 rule 4)."
+  },
+  "actions.releaseHeld.messageIdleBroker": {
+    "defaultMessage": "{slot} is held by {names}, Windows' idle Sandbox broker, left by {agent}'s last session there (run {run}). No Sandbox is running, so releasing it is safe.",
+    "description": "Release Slot… (HI-2309): the slot ({slot}) is held only by Windows' own idle Windows Sandbox broker ({names}: its process names, such as WindowsSandboxServer), which the agent's ({agent}) last session left; no Sandbox runs, so nothing can write in the slot through it. {run} is the session's run id (a code such as 3f9a1c…)."
+  },
+  "actions.releaseHeld.messageSelf": {
+    "defaultMessage": "{agent}'s last session in {slot} (run {run}) has ended in this Hive (process {pid}, running), but Hive doesn't know that everything it started there has: until you release it, nothing else uses the slot.",
+    "description": "Release Slot…: why the slot ({slot}) is held. The session of the agent ({agent}) ended in this Hive; its processes were kept running or Hive could not follow them. {run} is the session's run id (a code such as 3f9a1c…), {pid} this Hive's process id: they tell one launch from another."
+  },
+  "actions.releaseHeld.process": {
+    "defaultMessage": "{label} (process {pid})",
+    "description": "Release Slot…: one process the agent's session left running, as listed: what it runs ({label}, such as node serve.js) and its process id ({pid})."
+  },
+  "actions.releaseHeld.readFailed": {
+    "defaultMessage": "Could not read the slot's writer",
+    "description": "An error's title: Hive couldn't read who holds a slot, before Release Slot…'s question."
+  },
+  "actions.releaseHeld.title": {
+    "defaultMessage": "Release {agent}'s slot {slot}?",
+    "description": "Title of the question before releasing a slot ({slot}, such as slot-b) that an agent's ({agent}) last session there still holds: it has ended, but Hive doesn't know that everything it started has."
+  },
+  "actions.releaseSlot.confirm": {
+    "defaultMessage": "Release",
+    "description": "Button: releases the agent's slot."
+  },
+  "actions.releaseSlot.detail": {
+    "defaultMessage": "{agent}'s conversations there can be resumed while nothing else uses the slot.",
+    "description": "Under the question before releasing an agent's ({agent}) slot."
+  },
+  "actions.releaseSlot.failed": {
+    "defaultMessage": "Could not release the slot",
+    "description": "An error's title: releasing an agent's slot failed."
+  },
+  "actions.releaseSlot.message": {
+    "defaultMessage": "{slot} stops being kept for {agent}. Its folder and branch stay; Hive lends it to new work once it is clean, and may rename its folder to a slot name.",
+    "description": "The question before releasing an agent's ({agent}) slot ({slot}): what happens to it after."
+  },
+  "actions.releaseSlot.title": {
+    "defaultMessage": "Release {agent}'s slot {slot}?",
+    "description": "Title of the question before releasing an agent's ({agent}) slot ({slot}, such as hb2): its own worktree from before 1.0, kept for it as a slot since the upgrade."
+  },
   "actions.remove.confirm": {
     "defaultMessage": "Remove",
     "description": "Button: removes the agent."
@@ -504,8 +624,8 @@
     "description": "Button: removes the agent and keeps its worktree and branch."
   },
   "actions.remove.keptMessage": {
-    "defaultMessage": "{branch} in {path}. Git → Changes lists the project's unused worktrees, merged or not.",
-    "description": "Under the notification that a removed agent's worktree was kept: its branch ({branch}) and folder ({path}). Git → Changes is a project tab: use its translated names."
+    "defaultMessage": "{branch} in {path}. Version Control → Changes lists the project's unused worktrees, merged or not.",
+    "description": "Under the notification that a removed agent's worktree was kept: its branch ({branch}) and folder ({path}). Version Control → Changes is a project tab: use its translated names."
   },
   "actions.remove.keptTitle": {
     "defaultMessage": "{agent}'s worktree is kept",
@@ -524,8 +644,8 @@
     "description": "Title of the question before removing an agent ({agent})."
   },
   "actions.remove.worktreeDetail": {
-    "defaultMessage": "Keep the worktree and branch to merge or reuse them later (Add Agent → Existing worktree), or delete both. Its sessions stay in the Sessions tab either way.",
-    "description": "Under the question before removing a worktree agent. Add Agent → Existing worktree is where: use the translated names."
+    "defaultMessage": "Keep the worktree and branch to merge them later, or delete both. Its sessions stay in the Sessions tab either way.",
+    "description": "Under the question before removing an agent that works in its own worktree from before 1.0."
   },
   "actions.remove.worktreeMessage": {
     "defaultMessage": "{agent} works in its own worktree on branch {branch}.",
@@ -627,6 +747,10 @@
     "defaultMessage": "It ran in a worktree no agent uses any more ({folder}). Add an agent for that worktree (Add Agent → existing worktree) to resume it.",
     "description": "Why a session can't be resumed: no agent works in the worktree folder it ran in ({folder}). Add Agent → existing worktree is where: use the translated names."
   },
+  "actions.resume.heldTitle": {
+    "defaultMessage": "Can't resume here now",
+    "description": "A warning's title (#1434): the conversation can't resume in the slot it ran in (the message says why: its slot holds other work, changed, or its agent builds elsewhere)."
+  },
   "actions.resume.noneMessage": {
     "defaultMessage": "{agent, select, none {There is no session to resume.} other {{agent} has no session to resume.}} Start a new one instead.",
     "description": "Under the notification that there is no session to resume: the agent ({agent}; none in a project with one agent)."
@@ -634,6 +758,14 @@
   "actions.resume.noneTitle": {
     "defaultMessage": "No previous session",
     "description": "A notification's title: there is no session to resume."
+  },
+  "actions.resume.readTranscript": {
+    "defaultMessage": "Read Transcript",
+    "description": "A button in the warning that a conversation can't resume where it ran (#1434): opens it in the Sessions tab."
+  },
+  "actions.resume.startFresh": {
+    "defaultMessage": "Start Fresh with a Handover",
+    "description": "A button in the warning that a conversation can't resume where it ran (#1434): opens Hand Over to… for its agent, which starts a new conversation from a handover."
   },
   "actions.resumeAll.coldLine": {
     "defaultMessage": "• {agent} — about {tokens} tokens",
@@ -646,6 +778,14 @@
   "actions.resumeAll.failed": {
     "defaultMessage": "{all, select, yes {{tried, plural, one {Could not resume the agent} other {Could not resume the agents}}} other {{failed} of {tried} agents could not resume}}",
     "description": "An error's title after Resume All: none of the {tried} agents resumed (yes), or {failed} of them didn't."
+  },
+  "actions.resumeAll.heldLine": {
+    "defaultMessage": "• {agent}: {why}",
+    "description": "A line of Resume All's report of the agents it left (#1434): the agent ({agent}) and why, in plain words ({why}: \"its slot is free. Resume it by hand to take it\", \"its slot now holds AM-14's work\", \"after AM-14\")."
+  },
+  "actions.resumeAll.heldTitle": {
+    "defaultMessage": "{n, plural, one {Resume All left one agent} other {Resume All left # agents}}",
+    "description": "A notification's title after Resume All (#1434): it left {n} agents stopped, whose conversations can't resume now where they ran (a slot that is free, so only their own Resume takes it, or holds other work); the lines below say why."
   },
   "actions.resumeAll.message": {
     "defaultMessage": "The prompt cache has expired for {who, select, all {all of them} other {{cold, plural, one {one agent} other {# agents}}}}. Resuming re-caches on the first message:",
@@ -662,6 +802,10 @@
   "actions.resumeAll.resumed": {
     "defaultMessage": "Resumed: {agents}",
     "description": "Resume All's report: the agents that did resume ({agents}: their names, listed)."
+  },
+  "actions.resumeAll.show": {
+    "defaultMessage": "Show {agent}",
+    "description": "A button in Resume All's report of the agents it left (#1434): opens the Sessions tab on that agent's ({agent}) conversation, where it can be resumed by hand, read, or started fresh with a handover."
   },
   "actions.resumeAll.title": {
     "defaultMessage": "{n, plural, one {Resume the agent?} other {Resume all agents?}}",
@@ -682,6 +826,38 @@
   "actions.sessionView.failed": {
     "defaultMessage": "Could not change the view",
     "description": "An error's title: switching a project's Session tab between Panes and Tiles failed."
+  },
+  "actions.slot.goneDetail": {
+    "defaultMessage": "If the workspace moved, Repair… in its banner can also locate the folder.",
+    "description": "Under the question when a slot's folder is missing: Repair… is a button in the workspace's banner."
+  },
+  "actions.slot.goneMessage": {
+    "defaultMessage": "{agent}'s slot {slot} is missing its folder ({path}). Its branch {branch} is still in the repository: make the slot again on it, with its commits, and start?",
+    "description": "The question when a slot's ({slot}) folder ({path}) is missing; the agent ({agent}) holds it, and its branch ({branch}) is still there."
+  },
+  "actions.slot.goneNoBranch": {
+    "defaultMessage": "{agent}'s slot {slot} is missing its folder ({path}), and its branch is gone too. Release the slot? Hive makes it again the next time it lends it.",
+    "description": "The question when a slot's ({slot}) folder ({path}) and its branch are missing; the agent ({agent}) holds it."
+  },
+  "actions.slot.goneTitle": {
+    "defaultMessage": "The slot is gone",
+    "description": "Title of the question when the folder of a slot an agent holds (a working folder Hive lends it for a card or lane) is missing."
+  },
+  "actions.slot.recreate": {
+    "defaultMessage": "Recreate and Start",
+    "description": "Button: makes the slot again on its branch and starts the agent."
+  },
+  "actions.slot.recreateFailed": {
+    "defaultMessage": "Could not make the slot again",
+    "description": "An error's title: making a slot whose folder was gone again failed."
+  },
+  "actions.slot.release": {
+    "defaultMessage": "Release the Slot",
+    "description": "Button: the agent gives up the slot whose folder is gone; Hive makes the slot again the next time it lends it."
+  },
+  "actions.slot.releaseFailed": {
+    "defaultMessage": "Could not release the slot",
+    "description": "An error's title: releasing a slot whose folder is gone failed."
   },
   "actions.startAll.archiveMessage": {
     "defaultMessage": "{n, plural, one {{agent}'s session is archived in {project}, and each starts a fresh one:} other {The sessions of these # agents are archived in {project}, and each starts a fresh one:}}",
@@ -722,6 +898,62 @@
   "actions.startAll.title": {
     "defaultMessage": "{kind, select, archive {{n, plural, one {Archive and start new?} other {Archive and start new for all agents?}}} other {{n, plural, one {Start a new session?} other {Start new sessions for all agents?}}}}",
     "description": "Title of the question before Start New (All) or Archive and Start New (All) (archive) for {n} agents."
+  },
+  "actions.startFresh.confirm": {
+    "defaultMessage": "Start Fresh",
+    "description": "Start Fresh (Idle Agents)' button (#1437)."
+  },
+  "actions.startFresh.line": {
+    "defaultMessage": "• {agent}: {why}",
+    "description": "A line of Start Fresh (Idle Agents)' question (#1437): an agent ({agent}) and what happens to it ({why}: \"idle: starts fresh\", \"working: left as it is\")."
+  },
+  "actions.startFresh.message": {
+    "defaultMessage": "Idle agents in {project} start new conversations; their old ones stay in the Sessions tab. The others are left as they are:",
+    "description": "Start Fresh (Idle Agents)' question (#1437), above the list of the project's ({project}) agents and what happens to each."
+  },
+  "actions.startFresh.noneTitle": {
+    "defaultMessage": "No idle agent to start fresh",
+    "description": "A notification's title (#1437): Start Fresh (Idle Agents) found no idle running agent."
+  },
+  "actions.startFresh.reportTitle": {
+    "defaultMessage": "{n, plural, one {Started one agent fresh} other {Started # agents fresh}}",
+    "description": "A notification's title after Start Fresh (Idle Agents) (#1437): {n} agents got new conversations; the lines say which didn't, and why."
+  },
+  "actions.startFresh.title": {
+    "defaultMessage": "{n, plural, one {Start the idle agent fresh?} other {Start # idle agents fresh?}}",
+    "description": "Title of Start Fresh (Idle Agents)' question (#1437): {n} idle agents get new conversations."
+  },
+  "actions.startFresh.why.background": {
+    "defaultMessage": "background tasks running: left as it is",
+    "description": "Start Fresh (Idle Agents)' list (#1437): this agent has background tasks running, so it keeps its conversation."
+  },
+  "actions.startFresh.why.fresh": {
+    "defaultMessage": "idle: starts fresh",
+    "description": "Start Fresh (Idle Agents)' list (#1437): this agent is idle and gets a new conversation."
+  },
+  "actions.startFresh.why.lease": {
+    "defaultMessage": "{card, select, none {its lane is still in flight} other {{card} is still in flight}}: left as it is",
+    "description": "Start Fresh (Idle Agents)' list (#1437): this agent holds a slot for a card ({card}: \"AM-12\") or a lane (none) whose work isn't finished, so it keeps its conversation."
+  },
+  "actions.startFresh.why.pending": {
+    "defaultMessage": "a prompt not taken yet: left as it is",
+    "description": "Start Fresh (Idle Agents)' list (#1437): Hive typed a prompt this agent's CLI hasn't taken yet, so it keeps its conversation."
+  },
+  "actions.startFresh.why.stopped": {
+    "defaultMessage": "stopped: left stopped",
+    "description": "Start Fresh (Idle Agents)' list (#1437): this agent isn't running, and stays stopped."
+  },
+  "actions.startFresh.why.waiting": {
+    "defaultMessage": "waiting for you: left as it is",
+    "description": "Start Fresh (Idle Agents)' list (#1437): this agent is asking the user something, so it keeps its conversation."
+  },
+  "actions.startFresh.why.watching": {
+    "defaultMessage": "watching cards: left as it is",
+    "description": "Start Fresh (Idle Agents)' list (#1437): this agent waits on a card watch, so it keeps its conversation."
+  },
+  "actions.startFresh.why.working": {
+    "defaultMessage": "working: left as it is",
+    "description": "Start Fresh (Idle Agents)' list (#1437): this agent is in a turn (or starting), so it keeps its conversation."
   },
   "actions.stop.confirm": {
     "defaultMessage": "Stop",
@@ -783,6 +1015,22 @@
     "defaultMessage": "Could not add the agent",
     "description": "An error's title: adding an agent from a template failed."
   },
+  "actions.template.addConfirm": {
+    "defaultMessage": "Add Agent",
+    "description": "The dialog adding one agent of a template: its button."
+  },
+  "actions.template.addName": {
+    "defaultMessage": "Its name",
+    "description": "The dialog adding one agent of a template: the label of its name box."
+  },
+  "actions.template.addSuggests": {
+    "defaultMessage": "{role}{hasCli, select, yes { · suggests {cli}} other {}}",
+    "description": "The dialog adding one agent of a template (HI-2109): what it is: its role in the workflow ({role}: Builder, Reviewer, Either) and the coding agent CLI the template suggests ({cli}), which picks the connection it starts on. Lower case after the dot."
+  },
+  "actions.template.addTitle": {
+    "defaultMessage": "Add an agent from a template",
+    "description": "Title of the dialog that adds one agent of a template to the project (#1440)."
+  },
   "actions.template.blockedMessage": {
     "defaultMessage": "It can't be loaded into {project, select, none {this project} other {{project}}} yet:",
     "description": "Above the reasons a template can't be loaded into a project ({project}; none when unknown)."
@@ -794,6 +1042,10 @@
   "actions.template.everyProject": {
     "defaultMessage": "For every project in the workspace (else for this project only)",
     "description": "A tick box in the Save as Template dialog: the template is the workspace's (ticked) or this project's."
+  },
+  "actions.template.includeWorkflow": {
+    "defaultMessage": "Include this project's workflow (its rules for {platform}: review, checks by name, merging, stages; never its target branch, check commands or identity's name)",
+    "description": "A tick box in the Save as Template dialog (HI-1910), ticked by default: the template keeps the project's workflow options for its version control ({platform}: None or Git, as Hive names them), the rules only. Glossary: workflow, check, target branch, identity."
   },
   "actions.template.load": {
     "defaultMessage": "Load template",
@@ -839,25 +1091,9 @@
     "defaultMessage": "OK",
     "description": "Button: closes the message that a template can't be loaded yet."
   },
-  "actions.template.openSetup": {
-    "defaultMessage": "Open Agent Setup",
-    "description": "Button: opens Agent Setup (a Help window) to install a missing CLI."
-  },
-  "actions.template.providerOff": {
-    "defaultMessage": "A provider it needs is turned off",
-    "description": "A warning's title: a template needs a CLI that is turned off."
-  },
-  "actions.template.providerOffMessage": {
-    "defaultMessage": "Turn it on in Settings → Providers, then load the template again.",
-    "description": "Under the warning that a template needs a CLI that is turned off. Settings → Providers is where: use its translated names."
-  },
   "actions.template.readFailed": {
     "defaultMessage": "Could not read the template",
     "description": "An error's title: reading a template failed."
-  },
-  "actions.template.removeOld": {
-    "defaultMessage": "{n, plural, one {Also remove the old worktree and its branch} other {Also remove # old worktrees and their branches}} (merged into {into, select, none {the main branch} other {{into}}} and clean): {branches}",
-    "description": "A tick box when loading a template: also delete the replaced agents' {n} worktrees and branches that are merged into a branch ({into}; none when it isn't known) and have no changes. {branches} lists them."
   },
   "actions.template.replace": {
     "defaultMessage": "Replace",
@@ -875,14 +1111,6 @@
     "defaultMessage": "Replace the template?",
     "description": "Title of the question when a template of that name exists."
   },
-  "actions.template.reusedMessage": {
-    "defaultMessage": "{branch} in {path}: it was clean, and its branch is left as it is.",
-    "description": "Under the notification that an agent works in its old worktree again: its branch ({branch}) and folder ({path})."
-  },
-  "actions.template.reusedTitle": {
-    "defaultMessage": "{agent} works in its worktree again",
-    "description": "A notification's title: an agent added from a template ({agent}) works in the clean worktree it had before."
-  },
   "actions.template.save": {
     "defaultMessage": "Save",
     "description": "Button: saves the template."
@@ -891,9 +1119,9 @@
     "defaultMessage": "Could not save the template",
     "description": "An error's title: saving a template failed."
   },
-  "actions.template.saveMessage": {
-    "defaultMessage": "A template keeps the project's {n, plural, one {agent} other {# agents}} (settings and roles) and its layout, to load into any project later. Sessions and worktrees aren't saved.",
-    "description": "The Save as Template dialog: what a template keeps of the project's {n} agents."
+  "actions.template.saveMessage2": {
+    "defaultMessage": "A template keeps the project's {n, plural, one {agent} other {# agents}} (settings, roles and notes), its layout and, ticked below, its workflow, to load into any project later. Sessions and worktrees aren't saved.",
+    "description": "The Save as Template dialog: what a template keeps of the project's {n} agents (HI-1910: its workflow options, when the box below is ticked). Glossary: workflow."
   },
   "actions.template.saveTitle": {
     "defaultMessage": "Save as template",
@@ -906,6 +1134,30 @@
   "actions.template.savedMessage": {
     "defaultMessage": "\"{name}\" ({n, plural, one {# agent} other {# agents}}), for {scope, select, workspace {the workspace} other {this project}}.",
     "description": "Under the notification that a template ({name}) of {n} agents was saved for the workspace (workspace) or this project (other)."
+  },
+  "actions.template.switchPreset": {
+    "defaultMessage": "Also switch this project to {preset}… (opens Version Control → Workflow with it chosen, to save there)",
+    "description": "A tick box when loading a template that suggests a preset ({preset}: Solo, Pair or Team, as the presets are named): after loading, the project's Version Control tab opens at Workflow with that preset chosen but not saved. Glossary: preset."
+  },
+  "actions.template.usePatterns": {
+    "defaultMessage": "Use the project key in names ({example} becomes {pattern}, named from the key of the project it is loaded into)",
+    "description": "A tick box in the Save as Template dialog (#1440): agent names that start with this project's key ({example}, e.g. HI-B1) are saved as a pattern ({pattern}: {key}-B{n}), so a project loading the template names them with its own key. Keep {key} and {n} as they are."
+  },
+  "actions.template.workflowChanged": {
+    "defaultMessage": "The template \"{template}\" changed while it loaded, so its workflow wasn’t filled in. Load it again to see its workflow as it is now.",
+    "description": "A warning after loading a template (HI-1910): its workflow section changed between the Load dialog's preview and the load ({template}: its name), so the Workflow form isn't filled in with it."
+  },
+  "actions.template.workflowKept": {
+    "defaultMessage": "{count, plural, one {The workflow for {platforms} it had is kept.} other {The workflows for {platforms} it had are kept.}}",
+    "description": "Under the notification that a template was saved over one of the same name (HI-1910): the workflow sections it had for {platforms} (None, Git: a list) are kept, {count} of them."
+  },
+  "actions.template.workflowNone": {
+    "defaultMessage": "It holds no workflow.",
+    "description": "Under the notification that a template was saved (HI-1910): saved without the project's workflow, and it had none."
+  },
+  "actions.template.workflowSaved": {
+    "defaultMessage": "It holds this project's workflow for {platform}.",
+    "description": "Under the notification that a template was saved (HI-1910): it holds the project's workflow options for its version control ({platform}: None or Git, as Hive names them)."
   },
   "actions.unsaved.changedMessage": {
     "defaultMessage": "Save them, then {action, select, switch {switch workspace} close {close the workspace} other {reload the window}} again.",

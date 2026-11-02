@@ -24,15 +24,22 @@ interface HiveMessageValues {
   'providers.autoCompact.unsureScope': { scope: string | number; unsure: string | number }
   'providers.autoCompact.why.notFile': undefined
   'providers.autoCompact.why.tooBig': undefined
+  'providers.claude.connections.setUp': undefined
   'providers.claude.hint.args': undefined
   'providers.claude.hint.broken': undefined
   'providers.claude.hint.model': undefined
   'providers.claude.hint.signIn': undefined
   'providers.cmdTooLong': { file: string | number; max: number; length: number }
+  'providers.codex.connections.setUp': undefined
+  'providers.codex.developerUnread.agentMessage': undefined
+  'providers.codex.developerUnread.agentTitle': undefined
+  'providers.codex.developerUnread.assistantMessage': undefined
+  'providers.codex.developerUnread.assistantTitle': undefined
   'providers.codex.hint.broken': undefined
   'providers.codex.hint.model': undefined
   'providers.codex.hint.settings': undefined
   'providers.codex.hint.signIn': undefined
+  'providers.codex.nativeHive': { file: string | number }
   'providers.codex.sandbox.default': undefined
   'providers.codex.sandbox.needed': undefined
   'providers.codex.sandbox.nonAdmin': undefined
@@ -42,6 +49,7 @@ interface HiveMessageValues {
   'providers.codex.sandbox.upgrade': undefined
   'providers.codex.sandbox.upgradeAction': undefined
   'providers.codex.storePwsh.fix': undefined
+  'providers.codex.storePwsh.label': undefined
   'providers.codex.storePwsh.symptom': undefined
   'providers.codex.storePwsh.warning': undefined
   'providers.codex.stray.message': { folder: string | number; files: string | number }
@@ -71,6 +79,7 @@ interface HiveMessageValues {
   'providers.export.summary': undefined
   'providers.export.thinking': undefined
   'providers.export.you': undefined
+  'providers.memory.connection': { file: string | number; name: string | number }
   'providers.memory.user': { file: string | number }
   'providers.readiness.notInstalled': { provider: string | number }
   'providers.readiness.signedOut': { provider: string | number }

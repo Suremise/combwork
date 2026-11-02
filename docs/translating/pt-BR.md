@@ -33,9 +33,10 @@ Translate the meaning, not the words, and keep the result as short and plain.
 - **Capitalisation:** sentence case in titles, buttons, headings and menus: only the first word and names take a
   capital („Configurações do projeto“, not „Configurações do Projeto“). Don't copy the English Title Case.
 - **A trailing `…`** (the command asks something before it acts) stays, without a space: „Remover agente…“.
-- **Column headings:** Em espera (On Hold), A fazer (Todo), Fazendo (Doing), Revisão (Review), Aprovado (Passed),
-  Concluído (Done). *Concluído* means merged; *Aprovado* passed its review and waits to be merged. They are short on
-  purpose: the board shows them in capitals in a narrow header.
+- **Column headings** (the stages, glossary-1.0 §2.2): Em espera (On Hold), A fazer (Todo), Fazendo (Active, was
+  Doing), Revisão (Review), Aprovado (Approved, was Passed), Em merge (Merging, inside Approved), Concluído (Done).
+  *Concluído* means merged (or accepted, without version control); *Aprovado* passed its review (or got your OK) and
+  waits to be merged. They are short on purpose: the board shows them in capitals in a narrow header.
 - **Error titles** („Could not add an agent“): „Não foi possível adicionar um agente“, or a short noun phrase where
   space is tight, „Falha ao adicionar“.
 - **Shortcuts** keep the key names Brazilian keyboards print (ABNT2): Ctrl, Shift, Alt, Del, as written.
@@ -78,7 +79,8 @@ Translate the meaning, not the words, and keep the result as short and plain.
 
 ## Terms
 
-The words Brazilian Portuguese uses for Hive's terms ([glossary.md](glossary.md)). Use them every time. Where a term
+The words Brazilian Portuguese uses for Hive's terms ([glossary.md](glossary.md), and for the 1.0 workflow terms
+[glossary-1.0.md](../../locales/glossary-1.0.md)). Use them every time. Where a term
 is kept in English, it is as Brazilian developers say it.
 
 | English | Português (Brasil) | Notes |
@@ -92,12 +94,28 @@ is kept in English, it is as Brazilian developers say it.
 | persona | persona | |
 | task board / board | quadro de tarefas / quadro | |
 | card | cartão (o), cartões | Never *tarefa* for a card; *tarefas* only in *quadro de tarefas* and the *Tasks* tab („Tarefas“). |
-| On Hold / Todo / Doing / Review / Passed / Done | Em espera / A fazer / Fazendo / Revisão / Aprovado / Concluído | In running text: „em Revisão“, „mover para Aprovado“; *park* a card: „pôr em espera“. |
+| On Hold / Todo / Active / Review / Approved / Merging / Done | Em espera / A fazer / Fazendo / Revisão / Aprovado / Em merge / Concluído | The stages (1.0; *Active* was *Doing*, *Approved* was *Passed*). In running text: „em Revisão“, „mover para Aprovado“; *park* a card: „pôr em espera“. |
+| category / stage | categoria / etapa | A stage is a board column; each sits in one of the six categories. |
 | decision | decisão | |
 | blocked / stalled | bloqueado / travado | |
 | builder / reviewer | executor / revisor | Roles of agents in a card loop. |
-| card loop / lane / round | ciclo de cartões / raia / rodada | *Raia* as in a kanban swimlane. |
-| merge slot | vez de merge | One merge at a time: „a vez de merge“, „liberar a vez“. |
+| card loop / lane / round | ciclo de cartões / raia / rodada | *Raia* as in a kanban swimlane. Never *loop de cartões*. *Start lane…*: „Iniciar raia…“. |
+| merge slot | vez de merge | One merge at a time when an agent merges: „a vez de merge“, „liberar a vez“. |
+| merge queue / test merge / Pause queue / Resume queue | fila de merge / merge de teste / Pausar a fila / Retomar a fila | Hive's queue of approved cards (1.0). |
+| slot / pool / ready (a slot) | slot (o) / grupo / pronto | A slot is a worktree Hive lends to a card or lane; *pool* of slots or of reviewers: „o grupo de revisores“. |
+| version control / Version Control (the tab) / None | controle de versão / Controle de versão / Nenhum | |
+| workflow / workflow options / rule / old rules | fluxo de trabalho / opções do fluxo de trabalho / regra / regras antigas | |
+| preset (Solo, Pair, Team, Custom) | predefinição (Solo, Dupla, Equipe, Personalizado) | |
+| target branch / up to date / repository root | branch de destino / atualizado / raiz do repositório | |
+| revision | versão | Never *revisão*, which is Review. |
+| change / same change / carries over / stale | alteração / a mesma alteração / continua valendo / desatualizada | *stale* agrees with *revisão bem-sucedida*. |
+| check / checks before review / merge checks | verificação / verificações antes da revisão / verificações de merge | A check *passes* („passou“) or *fails* („falhou“). |
+| verdict / pass / fail | veredito / bem-sucedida / reprovada | A reviewer's pass is „revisão bem-sucedida“, „passou na revisão“: never *aprovação* or *aprovado*, which are your OK and the Approved stage. |
+| review copy | cópia de revisão | |
+| approval / Approve / For you | aprovação / Aprovar / Para você | Your OK only. For you asks: Decidir / Testar / Aprovar / Entrar. |
+| refused / override / Move anyway / returned | recusado / exceção / Mover mesmo assim / devolvido | |
+| no-code card / before 1.0 / outside Hive / Work (a card's section) | cartão sem código / anterior à 1.0 / fora do Hive / Trabalho | |
+| deliverables | entregáveis | |
 | inbox / message / wake | caixa de entrada / mensagem / acordar | „O Hive acorda o agente.“ |
 | handover / shared notes | passagem de trabalho (passagem) / notas compartilhadas | |
 | skill / template | skill / modelo | The skill's own name stays (`work-on-card`). |
@@ -113,20 +131,21 @@ is kept in English, it is as Brazilian developers say it.
 | compact, compaction | compactar, compactação | The button: „Compactar“. |
 | an agent's turn | turno | Not *rodada*, which is a card loop's round. |
 | Inherit (a setting's choice) | Herdado | „Herdado (Configurações: Planejar)“. |
-| Working on (a project) | Ativo | Not *Fazendo*, which is the Doing column. |
+| Working on (a project) | Ativo | Not *Fazendo*, which is the Active column. |
 | idle | ocioso | „Marcar como ocioso“. |
 | memory (a CLI's memory files) | memória | |
 | background tasks | tarefas em segundo plano | They aren't cards. |
 | backup | backup | |
 | staged | preparado | As VS Code says („alterações preparadas“). |
 | watch (a card watch) | observação, observação de cartão | |
-| Agent Setup | Configuração de agentes | |
+| Provider Setup | Configuração de provedores | |
 | the shipped modes (Coordinator, Planner, QA triager, Release manager) | Coordenador, Planejador, Triagem de QA, Gerente de release | As `assistant.modes.shipped.*` shows them. |
 | view (the Skills view, the MCP view) | visualização | „na visualização Skills“; the View menu is „Exibir“. |
 | Start… (a card) | Iniciar… | *Start New* is „Começar de novo“. |
 | setup command (a worktree's) | comando de preparação | Not *configuração*, which is Settings. |
 | exclude from git (.git/info/exclude) | ignorar no git | Not *excluir*, which is Delete. |
-| role (an agent's) | função | |
+| role (an agent's) | função | An agent's own role, in its words. |
+| role in the workflow (builder, reviewer, either, generalist) | papel | „Papel no fluxo de trabalho” (Darren, HI-1928). |
 | hand over (to) | passar o trabalho (para) | The command *Hand Over to…*: „Passar para…“. |
 | Reset / Reset to defaults | Redefinir / Restaurar padrões | |
 | chime | som | |

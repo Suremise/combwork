@@ -10,13 +10,13 @@
 //
 // What goes:
 // - In an idle e2e lane (no runner holds its claim: lanes.mjs; the clean-up claims it while it works, so no runner starts
-//   in it meanwhile): every suite folder no run claims (a failed suite's is claimed by its run's logs until KEEP_RUNS
-//   prunes them: #285), and anything left from before suites had folders of their own, whatever their age. In an idle
+//   in it meanwhile): every suite folder no run claims (a failed suite's is claimed by its run's logs until they are
+//   pruned: logs.mjs, #285), and anything left from before suites had folders of their own, whatever their age. In an idle
 //   scenario lane: numbered copies (`<scenario>-2`…) whatever their age, the rest (what --keep left) by age.
 // - In the e2e work folder: anything but `lanes` and `logs` older than the age (suites run on their own, probes).
 // - Anything else in hive-test older than the age (one-off folders and files: reviewers' and builders' probes).
 //   `scratch\<agent>-<date>` is the place for probes that must be under hive-test: its folders go by the same age.
-// - In `tmp` (the unit tests' temp folders: tests/tempDir.ts, #992): anything older than a day (TMP_DAYS; --days less
+// - In `tmp` (the test runs' temp folders: tests/runTemp.mts, #992, HI-2102): anything older than a day (TMP_DAYS; --days less
 //   than that goes by --days). Each test removes its own; this is for what a stopped run left.
 // - In the Codex test home (#404, codexPlan), under its lease (codexHomeLock.mjs; nothing while a run holds it): rollouts
 //   older than the age, package copies Codex no longer runs, and unfinished downloads in its cache older than the age.
@@ -46,7 +46,7 @@ const { claimedByRuns, evidenceFor, linkOnPath, safeList, sizeOf, removeTree } =
 
 /** Leftovers older than this many days go (--days). */
 export const PRUNE_DAYS = 3
-/** The unit tests' temp folders (`tmp`, tests/tempDir.ts) go after a day: no run lasts that long (#992). */
+/** The test runs' temp folders (`tmp`, tests/runTemp.mts) go after a day: no run lasts that long (#992). */
 export const TMP_DAYS = 1
 const DAY = 24 * 60 * 60_000
 
@@ -60,7 +60,7 @@ export const KEPT = {
   'build-locks': "the worktrees' build locks",
   concurrency: "the concurrency checker's folders (it removes its own)",
   'progress-timings.json': "the Progress panel's suite timings",
-  'config.json': "the machine's test settings (heavySlots, slots.mjs CONFIG_FILE, #589)"
+  'config.json': "the machine's test settings (heavySlots, sideSlots, modelTrials, smallRun: slots.mjs CONFIG_FILE, #589, HI-2070)"
 }
 
 /**
@@ -95,8 +95,9 @@ export async function holdLane(dir, k, { owner = process.pid, alive = processAli
 
 /** When something was last changed: it, or anything directly in it (a profile's mtime alone misses new files deeper). */
 export function lastChanged(p) {
-  let t = lstatSync(p).mtimeMs
-  if (lstatSync(p).isDirectory())
+  const st = lstatSync(p)
+  let t = st.mtimeMs
+  if (st.isDirectory())
     for (const name of safeList(p))
       try {
         t = Math.max(t, lstatSync(join(p, name)).mtimeMs)
@@ -137,7 +138,7 @@ export function plan({ root, days = PRUNE_DAYS, now = Date.now(), held = () => f
     else out.push({ ...item, remove: false, why: `newer than ${maxDays} day${maxDays === 1 ? '' : 's'}` })
   }
   // An e2e lane holds the folders of suites running now (only in a lane a runner holds) and of failed suites, which
-  // their run's logs claim (evidence.cjs recordKept) until KEEP_RUNS prunes them. Anything else in an idle lane is left
+  // their run's logs claim (evidence.cjs recordKept) until those are pruned (logs.mjs). Anything else in an idle lane is left
   // over, whatever its age (#285). A scenario lane holds what --keep left, by age, but not numbered copies (`-2`…),
   // which only pile up.
   const lane = (dir, k, kind) => {
@@ -205,8 +206,25 @@ export function codexPlan({ root, home = join(root, 'codex'), days = PRUNE_DAYS,
     out.push({ path, rel: rel(path), area: 'codex', age: age(path), remove: !kept, why: kept ?? why, check })
   }
   // Rollouts: whether everything under a folder is a rollout older than the age (an empty folder is, once old itself).
-  const stale = (p) => (isDir(p) ? list(p).every((n) => stale(join(p, n))) && (list(p).length > 0 || age(p) >= maxAge) : !!stat(p)?.isFile() && /^rollout-.*\.jsonl$/.test(basename(p)) && age(p) >= maxAge)
-  const staleStill = (p) => () => (stale(p) ? null : 'it changed since the plan')
+  // With memo, each path is looked at once in the plan (HI-2365: sessions() asked again at every depth); an item's
+  // check() looks afresh, just before it goes.
+  const staleBy = (memo) => {
+    const stale = (p) => {
+      if (memo?.has(p)) return memo.get(p)
+      const st = stat(p)
+      let r
+      if (st?.isDirectory()) {
+        const names = safeList(p)
+        r = names.every((n) => stale(join(p, n))) && (names.length > 0 || Math.max(0, now - st.mtimeMs) >= maxAge)
+      } else r = !!st?.isFile() && /^rollout-.*\.jsonl$/.test(basename(p)) && Math.max(0, now - st.mtimeMs) >= maxAge
+      memo?.set(p, r)
+      return r
+    }
+    return stale
+  }
+  const stale = staleBy(new Map())
+  const staleNow = staleBy(null)
+  const staleStill = (p) => () => (staleNow(p) ? null : 'it changed since the plan')
   const sessions = (dir, depth) => {
     for (const name of list(dir)) {
       const p = join(dir, name)
@@ -410,7 +428,7 @@ export function areaSizes(root = runContext.TEST_ROOT) {
   rows.push(['e2e (suites run on their own, probes)', safeList(e2e).filter((n) => n !== 'lanes' && n !== 'logs').reduce((t, n) => t + sizeOf(join(e2e, n)), 0)])
   for (const name of Object.keys(KEPT)) add(name, join(root, name))
   add('scratch', join(root, 'scratch'))
-  add('tmp (unit tests)', join(root, 'tmp'))
+  add('tmp (test runs)', join(root, 'tmp'))
   rows.push(['other (one-off)', safeList(root).filter((n) => !(n in KEPT) && !['e2e', 'scratch', 'tmp'].includes(n)).reduce((t, n) => t + sizeOf(join(root, n)), 0)])
   return rows
 }

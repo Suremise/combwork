@@ -54,3 +54,28 @@ describe('card links: card numbers in terminal output (#440)', () => {
     expect(linked('no hash here', [1])).toEqual([])
   })
 })
+
+describe('card links: card keys in terminal output (#1221)', () => {
+  // The board: HI-12 is #40, AM-3 is #7; an old key HX of hive finds HI's cards.
+  const keys: Record<string, number> = { 'HI-12': 40, 'AM-3': 7, 'HX-12': 40 }
+  const keyed = (text: string) => findCardRefs(text, (n) => n === 40, (k) => keys[k] ?? null).map((m) => [text.slice(m.start, m.end), m.number])
+
+  it('a key alone, in punctuation, and beside its number, in order', () => {
+    expect(keyed('HI-12')).toEqual([['HI-12', 40]])
+    expect(keyed('done (AM-3), then HI-12.')).toEqual([
+      ['AM-3', 7],
+      ['HI-12', 40]
+    ])
+    expect(keyed('HI-12 (#40) passed review')).toEqual([
+      ['HI-12', 40],
+      ['#40', 40]
+    ])
+    expect(keyed('an old key: HX-12')).toEqual([['HX-12', 40]])
+  })
+
+  it('only keys the board has a card for, in capitals, not inside a word, path, version or URL', () => {
+    expect(keyed('ZZ-1 UTF-8 re-12 hi-12 Hi-12')).toEqual([])
+    expect(keyed('XHI-12 a/HI-12 HI-12.5 HI-12x HI-012 v.HI-12')).toEqual([])
+    expect(keyed('https://x/y/HI-12 then HI-12')).toEqual([['HI-12', 40]])
+  })
+})

@@ -74,7 +74,8 @@ const check = (name, ok, extra = '') => {
   check("the Assistant's hive tools use its token and role", mcp?.env.HIVE_API_TOKEN_FILE === tokenFile && mcp.env.HIVE_ROLE === 'assistant' && mcp.env.HIVE_ASSISTANT_CONTROL === 'projects', JSON.stringify(mcp?.env))
   // Its skills: the workspace's skills for the Assistant (coordinate-agents and the shared ones), none for agents only.
   const assistantSkills = fs.readdirSync(path.join(home, '.hive', 'launch-assistant', 'plugin', 'skills')).sort()
-  check('the Assistant gets the skills for it', ['coordinate-agents', 'handover', 'pick-up', 'split-work', 'workspace-note'].every((n) => assistantSkills.includes(n)) && !['work-on-card', 'review-agent-work', 'merge-ready', 'use-hive-api'].some((n) => assistantSkills.includes(n)), assistantSkills.join(','))
+  // use-hive-api is for both (HI-2012): its tools.md, the hive tools' detail, is copied with it.
+  check('the Assistant gets the skills for it', ['coordinate-agents', 'handover', 'pick-up', 'split-work', 'workspace-note', 'use-hive-api'].every((n) => assistantSkills.includes(n)) && fs.existsSync(path.join(home, '.hive', 'launch-assistant', 'plugin', 'skills', 'use-hive-api', 'tools.md')) && !['work-on-card', 'review-agent-work', 'merge-ready'].some((n) => assistantSkills.includes(n)), assistantSkills.join(','))
   // Its instructions: its control level and boundaries, the skill that says how, then the mode.
   const told = fs.readFileSync(path.join(home, '.hive', 'launch-assistant', 'instructions.md'), 'utf8')
   check('its instructions give its control level and point to coordinate-agents, before the mode', /Control agents and create projects/.test(told) && told.indexOf('coordinate-agents skill') > 0 && told.indexOf('coordinate-agents skill') < told.indexOf('# Your mode'), told.slice(0, 300))
@@ -194,6 +195,14 @@ const check = (name, ok, extra = '') => {
   const qs = await inv('assistant:questions')
   await inv('assistant:answer', qs[0]?.id, true)
   check('and a yes stops it', (await stopping2).status === 200 && !!(await until(async () => !(await live(alpha, fixer)), HUNG_MS)))
+  // HI-1994: an agent only watching a card (its turn over, a card watch running) is idle: stopped with no question.
+  const watched = (await api('POST', '/v1/tasks', { title: 'Watched card', project: 'alpha' })).body?.number
+  await api('POST', '/v1/projects/alpha/agents/Fixer/start', {})
+  await until(async () => (await live(alpha, fixer))?.status === 'ready', HUNG_MS)
+  await api('POST', '/v1/projects/alpha/agents/Fixer/prompt', { text: `hive hive_wait_for_tasks ${JSON.stringify({ cards: [`#${watched}`], column: 'done', wake: true })}` })
+  check('Fixer watches a card', !!(await until(async () => (await live(alpha, fixer))?.status === 'watching', HUNG_MS)), (await live(alpha, fixer))?.status)
+  const quiet = await api('POST', '/v1/projects/alpha/agents/Fixer/stop', { reason: 'testing' })
+  check('stopping an agent that only watches asks nothing: it stops at once', quiet.status === 200 && quiet.body?.wasRunning === true && (await inv('assistant:questions')).length === 0 && !!(await until(async () => !(await live(alpha, fixer)), HUNG_MS)), JSON.stringify(quiet.body))
   const stoppedFresh = await api('POST', '/v1/projects/alpha/agents/Fixer/prompt', { text: 'work 1', newConversation: true })
   check('a stopped agent gets no new conversation: start it instead', stoppedFresh.status === 409 && /isn't running/.test(stoppedFresh.body?.error) && !(await live(alpha, fixer)), JSON.stringify(stoppedFresh.body))
 
@@ -269,7 +278,11 @@ const check = (name, ok, extra = '') => {
   check('the Assistant moves it to Done', moved.status === 200 && moved.body?.column === 'done', JSON.stringify(moved.body))
   check('without asking the user', (await page.locator('.assistant-question').count()) === 0)
   check('its history says the Assistant did it', moved.body?.history?.at(-1)?.by === 'Assistant' && moved.body.history.at(-1).what === 'Moved to Done', JSON.stringify(moved.body?.history?.at(-1)))
-  check('the board changes are listed', (await inv('assistant:actions')).some((x) => x.ok && x.text.startsWith(`Started #${cardNo} on a new agent, Writer`)))
+
+  // The list names cards by key alone (#1219, HI-1661): each card's own key, from the board.
+  const named = async (n) => `${(await inv('tasks:list')).find((c) => c.number === n)?.key}`
+  const cardName = await named(cardNo)
+  check('the board changes are listed, the card by its key', /^[A-Z]{2,4}-\d+$/.test(cardName) && (await inv('assistant:actions')).some((x) => x.ok && x.text.startsWith(`Started ${cardName} on a new agent, Writer`)), cardName)
   // Putting cards in order: listed in Done by the Assistant; the order of Done is the user's, refused without asking.
   const o1 = (await api('POST', '/v1/tasks', { title: 'Order one', project: 'alpha' })).body.number
   const o2 = (await api('POST', '/v1/tasks', { title: 'Order two', project: 'alpha' })).body.number
@@ -279,31 +292,63 @@ const check = (name, ok, extra = '') => {
   const top = await api('PATCH', `/v1/tasks/${o1}`, { position: 'top' })
   check('and one card to the top', top.status === 200 && (await api('GET', '/v1/tasks?column=todo')).body[0]?.number === o1, JSON.stringify(top.body))
   const listed = (await inv('assistant:actions')).map((x) => x.ok && x.text)
-  check('both are listed in Done by the Assistant', listed.includes(`Put #${o2}, #${o1} at the top of Todo`) && listed.some((t) => t && t.startsWith(`#${o1} `) && t.endsWith('moved it to the top of Todo')), JSON.stringify(listed.slice(-3)))
+  const [o1Name, o2Name] = [await named(o1), await named(o2)]
+  check('both are listed in Done by the Assistant, by key', listed.includes(`Put ${o2Name}, ${o1Name} at the top of Todo`) && listed.some((t) => t && t.startsWith(`${o1Name} `) && t.endsWith('moved it to the top of Todo')), JSON.stringify({ o1Name, o2Name, listed: listed.slice(-3) }))
   const doneTop = await api('PATCH', `/v1/tasks/${cardNo}`, { position: 'top' })
   check("the Assistant can't put Done in order, and the user isn't asked", doneTop.status === 403 && (await page.locator('.assistant-question').count()) === 0, JSON.stringify(doneTop))
-  // A lane the Assistant starts unwatched (#402; its changes count towards the limit below): the reply nudges it to watch the lanes; with a lane watch on them all (#531), it doesn't.
+  // A lane the Assistant starts unwatched (#402): the reply nudges it to watch the lanes; with a lane watch on them all (#531), it doesn't.
+  const builderId = (await inv('workspace:get')).projects.find((x) => x.name === 'alpha').agents.find((a) => a.name === 'Builder')?.id
+  const wasLive = await live(alpha, builderId)
   const unwatched = await api('POST', '/v1/lanes', { project: 'alpha', builder: 'Builder', cards: [o1, o2] })
   check('a lane started with no watch following it: the reply says to watch the lanes', unwatched.status === 200 && /No watch of yours follows this lane/.test(unwatched.body?.note ?? ''), JSON.stringify(unwatched.body))
+  // HI-2232 (Darren's decision (a)): Builder, idle outside slots, is given the lane in a new conversation, as Start Lane… gives it;
+  // not free at its launch, it is owed one (HI-2034). Here it isn't free: the user pressed Enter in its terminal above, and the
+  // suite's typing pause (600 s, enterEndsPause off) still holds, so its run is left for now and the reply says Hive gives it the
+  // lane once it is free, not to prompt it (HI-2029, HR1: a prompt would race Hive's start). The reply comes once the lane's launch
+  // is over, so a new conversation given now would show by now.
+  const nowLive = await live(alpha, builderId)
+  check("…its builder, idle but not free (the user typed there), is owed the lane's new conversation, and the reply says not to prompt it (HI-2232, HI-2034)", wasLive?.status === 'finished' && !!wasLive.sessionId && nowLive?.sessionId === wasLive.sessionId && nowLive?.runId === wasLive.runId && /Builder wasn't free: Hive gives it the lane in a new conversation once it is, so don't prompt it\./.test(unwatched.body?.note ?? ''), JSON.stringify({ note: unwatched.body?.note, status: wasLive?.status, before: wasLive?.sessionId, after: nowLive?.sessionId }))
   const watching = await api('POST', '/v1/tasks/wait', { lanes: ['all'], wake: true })
   const rewatched = await api('POST', '/v1/lanes', { project: 'alpha', builder: 'Builder', cards: [o1, o2] })
   check('…and with one, no nudge', watching.status === 200 && rewatched.status === 200 && !/No watch of yours/.test(rewatched.body?.note ?? ''), JSON.stringify({ watching: watching.body, rewatched: rewatched.body }))
   await api('POST', '/v1/tasks/wait', { cancel: true })
+  // HR2's HI-1900 round 1: its running lane updated while Builder is stopped starts Builder on it (never left active, stuck).
+  await inv('session:stop', alpha, builderId)
+  check('Builder stopped', !!(await until(async () => !(await live(alpha, builderId)), HUNG_MS)))
+  const updated = await api('POST', '/v1/lanes', { project: 'alpha', builder: 'Builder', cards: [o2, o1] })
+  check("…its lane updated meanwhile starts Builder on it, and the reply says so", updated.status === 200 && updated.body?.did === 'updated' && /Builder wasn't running: started it on the lane\./.test(updated.body?.note ?? '') && !!(await until(async () => !!(await live(alpha, builderId)), HUNG_MS)), JSON.stringify(updated.body?.note))
   await api('POST', `/v1/lanes/${encodeURIComponent(rewatched.body?.lane?.id ?? unwatched.body?.lane?.id)}/end`, { abandoned: true })
 
-  // At most 30 changes for one message.
-  let status = 200
-  let n = 0
-  while (status === 200 && n < 40) {
-    status = (await api('POST', '/v1/projects/alpha/activate')).status
-    n++
-  }
-  check('at most 30 changes for one message', status === 429, `${status} after ${n}`)
-  // A batch is one change, however many cards (#488): none is left, so it changes none of its cards and says none fit.
-  const batch = await api('POST', '/v1/tasks/batch', { numbers: [o1, o2], column: 'doing' })
-  const columns = [(await api('GET', `/v1/tasks/${o1}`)).body.column, (await api('GET', `/v1/tasks/${o2}`)).body.column]
-  check('a batch over the limit changes none of its cards and says how many fit', batch.status === 429 && batch.body?.fits === 0 && columns.every((c) => c === 'todo'), JSON.stringify({ status: batch.status, body: batch.body, columns }))
-  check('and lists the batch as refused, not as changes', (await inv('assistant:actions')).some((x) => !x.ok && x.text === 'Change 2 cards on the board'))
+  // No limit on its changes for one message (#1170; it stopped at 30): 40 more changes, then a batch, all apply.
+  const statuses = []
+  for (let n = 0; n < 40; n++) statuses.push((await api('POST', '/v1/projects/alpha/activate')).status)
+  check('more than 30 changes for one message all apply', statuses.every((s) => s === 200), JSON.stringify(statuses))
+  const batch = await api('POST', '/v1/tasks/batch', { numbers: [o1, o2], addLabels: ['many'] })
+  const labelled = [(await api('GET', `/v1/tasks/${o1}`)).body.labels, (await api('GET', `/v1/tasks/${o2}`)).body.labels]
+  check('…and a batch after them changes its cards', batch.status === 200 && labelled.every((l) => l?.includes('many')), JSON.stringify({ status: batch.status, body: batch.body, labelled }))
+
+  // Undo (#1282): the user's next message starts a new group of the Assistant's changes. Its own
+  // change, listed by that message and undone with its tool: what it changed comes back, and the undo is listed in Done
+  // by the Assistant. An id that isn't one of its own changes is refused.
+  const before = (await api('GET', '/v1/assistant/changes')).body?.[0]?.group
+  const sinceBefore = (await live(home, 'assistant'))?.statusSince
+  await inv('pty:write', lib.ptyKey(home, 'assistant'), 'hello')
+  await inv('pty:write', lib.ptyKey(home, 'assistant'), '\r')
+  await until(async () => (async (s) => !!s && ['finished', 'ready'].includes(s.status) && s.statusSince !== sinceBefore)(await live(home, 'assistant')), HUNG_MS)
+  await api('PATCH', `/v1/tasks/${cardNo}`, { labels: ['undo-me'] })
+  const kept = (await api('GET', '/v1/assistant/changes')).body
+  const relabel = kept?.flatMap((g) => g.changes).find((c) => c.card === cardNo && c.fields.includes('labels'))
+  check('its change is kept for undo, by its message, with the field it set', !!relabel && kept[0]?.group !== before && kept[0].changes.includes(relabel), JSON.stringify(kept).slice(0, 400))
+  const undoTool = (args) => JSON.parse(execFileSync(process.execPath, [path.join(lib.ROOT, 'out', 'main', 'hive-mcp.js')], { input: JSON.stringify({ jsonrpc: '2.0', id: 1, method: 'tools/call', params: { name: 'hive_undo', arguments: args } }) + '\n', env: lib.childEnv({ ...mcp.env, HIVE_API_URL: API }), timeout: 15000 }).toString().split('\n')[0]).result
+  const undoneReply = undoTool({ change: relabel?.id })
+  check('hive_undo undoes it: the label it set is gone', !undoneReply?.isError && (undoneReply?.content?.[0]?.text ?? '').startsWith('Undid 1 of 1 change in full.') && (await api('GET', `/v1/tasks/${cardNo}`)).body?.labels?.length === 0, JSON.stringify(undoneReply).slice(0, 300))
+  check('…listed in Done by the Assistant', (await inv('assistant:actions')).some((x) => x.ok && x.kind === 'undo' && x.card === cardNo), JSON.stringify((await inv('assistant:actions')).slice(-2)))
+  check('…and in the window\'s list as undone', (await inv('assistant:changes')).flatMap((g) => g.changes).some((c) => c.id === relabel?.id && !!c.undoneAt))
+  check('an id that is not one of its changes is refused', (await api('POST', '/v1/assistant/undo', { change: 'not-a-change' })).status === 404)
+  // A change undo can't take back is still listed, with why (#1282 round 3): withdrawn messages aren't sent again.
+  const cancelled = await api('POST', '/v1/projects/alpha/agents/Builder/message', { cancel: true })
+  const finals = ((await api('GET', '/v1/assistant/changes')).body?.[0]?.changes ?? []).filter((c) => c.final)
+  check("a change it can't undo is listed with why", cancelled.status === 200 && finals.some((c) => /withdrew/.test(c.final)), JSON.stringify({ status: cancelled.status, finals }))
 
   // The tools its hive MCP server offers follow the control level; project agents never get them.
   const tools = (envExtra) => {
@@ -320,6 +365,86 @@ const check = (name, ok, extra = '') => {
   // Its lane tool says only list works there (#500); trusted at every level (sessions' trustedHiveTools, unit-tested).
   const laneTool = (envExtra) => JSON.parse(execFileSync(process.execPath, [path.join(lib.ROOT, 'out', 'main', 'hive-mcp.js')], { input: JSON.stringify({ jsonrpc: '2.0', id: 1, method: 'tools/list' }) + '\n', env: lib.childEnv({ HIVE_API_URL: API, ...envExtra }), timeout: 10000 }).toString().split('\n')[0]).result.tools.find((t) => t.name === 'hive_lane')
   check('Look and advise: hive_lane says only list works', /only list works/.test(laneTool({ HIVE_ROLE: 'assistant', HIVE_ASSISTANT_CONTROL: 'look' })?.description ?? '') && !/only list works/.test(laneTool({ HIVE_ROLE: 'assistant', HIVE_ASSISTANT_CONTROL: 'agents' })?.description ?? ''))
+
+  // --- HI-2328: an agent change waiting behind project.json's lock is checked again with its write. The user's own write is
+  // held just before its file is replaced (as in assistantsettings), the Assistant's change queues behind it, Control is
+  // lowered or the Assistant's session ends, and once the lock is free the old change changes nothing.
+  const projectFile = path.join(alpha, '.hive', 'project.json')
+  const holdNextWrite = () =>
+    app.evaluate((_, target) => {
+      const f = process.mainModule.require('original-fs/promises')
+      const original = global.__hiveTestRename ?? (global.__hiveTestRename = f.rename)
+      global.__hiveTestGate = { entered: false }
+      f.rename = async (...args) => {
+        if (!global.__hiveTestGate.entered && String(args[1]).toLowerCase() === target.toLowerCase()) {
+          global.__hiveTestGate.entered = true
+          await new Promise((resolve) => (global.__hiveTestGate.release = resolve))
+          f.rename = original
+        }
+        return original(...args)
+      }
+    }, projectFile)
+  const held = () => lib.until(() => app.evaluate(() => global.__hiveTestGate.entered), HUNG_MS)
+  const release = () => app.evaluate(() => global.__hiveTestGate.release())
+  // A change queued for the lock: withFileLock (fsutil.ts) sets the file's key (its path in lower case) to the queue's
+  // promise in the same step as the call, so a promise set to that key while the user's write holds it is a change queued
+  // behind it, past its checks before the lock (assistantsettings says more). Counted only while it waits, then put back.
+  const watchLockQueue = () =>
+    app.evaluate((_, lockKey) => {
+      const set = (global.__hiveTestMapSet ??= Map.prototype.set)
+      global.__hiveTestQueued = 0
+      // eslint-disable-next-line eslint/no-extend-native -- in the test copy only, and put back once the change is queued
+      Map.prototype.set = function (k, v) {
+        if (k === lockKey && typeof v?.then === 'function') global.__hiveTestQueued++
+        return set.call(this, k, v)
+      }
+    }, projectFile.toLowerCase())
+  const queuedForLock = async () => {
+    const queued = !!(await lib.until(() => app.evaluate(() => global.__hiveTestQueued > 0), 30000))
+    await app.evaluate(() => {
+      // eslint-disable-next-line eslint/no-extend-native -- putting Map's own set back
+      Map.prototype.set = global.__hiveTestMapSet
+    })
+    return queued
+  }
+  // Started in the page and left there: the write is held on purpose.
+  const userWrite = (value) =>
+    page.evaluate(([p, v]) => {
+      window.__userWrite = window.hive.invoke('project:updateConfig', p, { compactSuggestTokens: v }).then(() => 'saved', (e) => e.message)
+    }, [alpha, value])
+  const alphaAgents = async () => (await inv('workspace:get')).projects.find((x) => x.name === 'alpha').agents.map((a) => a.name)
+  const lastRefusal = async () => (await inv('assistant:actions')).filter((a) => !a.ok).at(-1)
+
+  // Control lowered while its rename of Checker waits: refused under the lock, Checker keeps its name.
+  await holdNextWrite()
+  await userWrite(300001)
+  check("HI-2328: the user's write holds alpha's project.json", !!(await held()))
+  await watchLockQueue()
+  const renaming = api('PATCH', '/v1/projects/alpha/agents/Checker', { name: 'Renamed' })
+  check("…the Assistant's rename of Checker waits behind it", await queuedForLock())
+  await inv('settings:update', { assistant: { control: 'look' } })
+  await release()
+  const renamed = await renaming
+  check('…Control lowered meanwhile: refused when its turn comes', renamed.status === 403 && /turned Settings → Assistant → Control down before this change was made/.test(renamed.body?.error ?? ''), JSON.stringify(renamed))
+  check('…and Checker keeps its name', (await alphaAgents()).includes('Checker') && !(await alphaAgents()).includes('Renamed'), JSON.stringify(await alphaAgents()))
+  check("…the user's write is saved", (await page.evaluate(() => window.__userWrite)) === 'saved')
+  check('…listed as not done', (await lastRefusal())?.kind === 'update-agent', JSON.stringify(await lastRefusal()))
+  await inv('settings:update', { assistant: { control: 'agents' } })
+
+  // The Assistant stopped while its added agent waits: its session's change adds nothing (the Assistant isn't used after this).
+  await holdNextWrite()
+  await userWrite(300002)
+  check("the user's write holds it again", !!(await held()))
+  await watchLockQueue()
+  const adding = api('POST', '/v1/projects/alpha/agents', { name: 'Late' })
+  check("…the Assistant's new agent waits behind it", await queuedForLock())
+  await inv('session:stop', home, 'assistant')
+  check('…the Assistant stopped meanwhile', !!(await until(async () => !(await live(home, 'assistant')), HUNG_MS)))
+  await release()
+  const late = await adding
+  check('…its session ended: refused when its turn comes', late.status === 409 && /session that asked for this ended before the change was made/.test(late.body?.error ?? ''), JSON.stringify(late))
+  check('…and no agent Late is added', !(await alphaAgents()).includes('Late'), JSON.stringify(await alphaAgents()))
+  check("…the user's write is saved too", (await page.evaluate(() => window.__userWrite)) === 'saved')
 
   // Let the agents finish before closing.
   await until(async () => !(await inv('session:live')).some((s) => s.status === 'working' || s.status === 'starting'), 30000)

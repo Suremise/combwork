@@ -1,5 +1,5 @@
 // #1103, the case seen on Darren's PC in the 0.9.2 release: Claude Code installed by its native installer in
-// ~\.local\bin, a folder on no PATH (Hive's, the registry's). Agent Setup found it where it installs it, but a shell Hive
+// ~\.local\bin, a folder on no PATH (Hive's, the registry's). Provider Setup found it where it installs it, but a shell Hive
 // started couldn't run `claude`. Once Hive's refresh finds it, its folder is on the PATH of what Hive starts (its child
 // environment), so a shell finds the same CLI by name; Hive's own PATH, which it finds the CLIs on, is unchanged. The registry is a stand-in (HIVE_TEST_REGISTRY_PATH: none), the
 // home a temp folder, and the CLI's answers stubbed: nothing of the machine's own is read or changed.
@@ -31,7 +31,7 @@ afterAll(() => {
 })
 
 describe("a standalone CLI found off PATH, on Hive's PATH for what it starts (#1103)", () => {
-  it.runIf(process.platform === 'win32')('a shell Hive starts finds `claude` where Agent Setup found it', async () => {
+  it.runIf(process.platform === 'win32')('a shell Hive starts finds `claude` where Provider Setup found it', async () => {
     // Hive's PATH: Windows' own folders only (no ~\.local\bin), and no registry folders to add.
     const key = Object.keys(process.env).find((k) => k.toUpperCase() === 'PATH') ?? 'PATH'
     const system32 = join(process.env.SystemRoot ?? 'C:\\Windows', 'System32')

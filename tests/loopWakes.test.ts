@@ -1,10 +1,16 @@
 import { mkdirSync, readFileSync, rmSync, writeFileSync } from 'fs'
 import { join } from 'path'
-import { afterAll, describe, expect, it, vi } from 'vitest'
+import { afterAll, afterEach, describe, expect, it, vi } from 'vitest'
 import * as electron from 'electron'
-import { cardChange, loopWakeLine, readCondition, wakeAbout, type WatchCondition } from '../src/shared/watch'
+import { cardChange, laneNextWords, loopWakeLine, readCondition, wakeAbout, type WatchCondition } from '../src/shared/watch'
+import { laneStartDue } from '../src/shared/lanes'
+import type { LaneCard } from '../src/shared/types'
 import { tempDir } from './tempDir'
 import { follow } from './followDoorbell'
+
+/** The merge queue's returns as queueReturnOf finds them (HI-1721), by card: none unless a test sets one. */
+const { returns, resubmits } = vi.hoisted(() => ({ returns: new Map<number, { at: string; text: string; builder: string | null }>(), resubmits: new Map<number, string>() }))
+vi.mock('../src/main/queueReturn', () => ({ queueReturnOf: async (_ws: unknown, _p: string, n: number) => returns.get(n) ?? null, returnIn: () => null, resubmittedOf: async (_ws: unknown, _p: string, n: number) => resubmits.get(n) ?? null, resubmittedIn: () => null, staleApprovalOf: async () => null, staleIn: () => null }))
 
 describe('loop wake lines (#405)', () => {
   const card = { number: 12, title: 'T', description: '', project: 'alpha', agent: 'b1', agentName: 'B1', column: 'review' as const, order: 1, labels: [], blocked: null, blockedBy: [], links: [], comments: [{ at: '2026-10-10T00:00:00.000Z', by: 'R1 (alpha)', text: 'Round 1: FAILED. 1. No delay.' }], history: [{ at: '2026-10-10T00:00:00.000Z', by: 'R1 (alpha)', what: 'Review failed' }], archived: false, createdAt: '2026-10-10T00:00:00.000Z', createdBy: 'You', updatedAt: '2026-10-10T00:00:00.000Z' }
@@ -16,6 +22,28 @@ describe('loop wake lines (#405)', () => {
     expect(loopWakeLine({ ...cardChange(12, card, ['verdict']), about: wakeAbout(card, ['verdict'], 'b1') }, 'verdict')).toBe(
       '[Hive] #12 is in Review: R1 (alpha) failed it; latest comment by R1 (alpha): "Round 1: FAILED. 1. No delay.". This is your card in its loop: carry on (hive_read_task with latestComment for the comment in full).'
     )
+  })
+})
+
+describe("a lane's next card, after a Done one (HI-1990)", () => {
+  const lc = (number: number, column: LaneCard['column'], more: Partial<LaneCard> = {}): LaneCard => ({ number, title: `Card ${number}`, column, blocked: null, round: 1, reviewing: false, ...more })
+  it('is due for Hive to start as the first open card, in Todo, not blocked, in an active lane (its first card too, HI-2029)', () => {
+    expect(laneStartDue({ state: 'active', cards: [lc(1, 'done'), lc(2, 'todo')] })?.number).toBe(2)
+    // Another lane's card before it doesn't hold it up; one Done before that does count.
+    expect(laneStartDue({ state: 'active', cards: [lc(1, 'done'), lc(3, 'doing', { elsewhere: 'x' }), lc(2, 'todo')] })?.number).toBe(2)
+    // Its first card too (HI-2029).
+    expect(laneStartDue({ state: 'active', cards: [lc(1, 'todo'), lc(2, 'todo')] })?.number).toBe(1)
+    expect(laneStartDue({ state: 'active', cards: [lc(1, 'passed'), lc(2, 'todo')] })).toBeNull()
+    expect(laneStartDue({ state: 'active', cards: [lc(1, 'done'), lc(2, 'todo', { blocked: 'Which icon?' })] })).toBeNull()
+    expect(laneStartDue({ state: 'active', cards: [lc(1, 'done'), lc(2, 'doing')] })).toBeNull()
+    expect(laneStartDue({ state: 'paused', cards: [lc(1, 'done'), lc(2, 'todo')] })).toBeNull()
+    expect(laneStartDue({ state: 'active', cards: [lc(1, 'done')] })).toBeNull()
+  })
+  it("words what comes next in the builder's Done wake", () => {
+    expect(laneNextWords({ card: 7, title: 'Show progress', is: 'started' })).toBe(`Your lane's next card, #7 ("Show progress"), is under way: carry on with it`)
+    expect(laneNextWords({ card: 7, title: 'x'.repeat(80), is: 'waits' })).toBe(`Your lane's next card is #7 ("${'x'.repeat(59)}…"): hive_lane next says when it can start`)
+    expect(laneNextWords('last')).toBe("That was your lane's last card: the lane ends by itself, so end your turn unless you have other work")
+    expect(laneNextWords('paused')).toBe('Your lane is paused: hive_lane next says why')
   })
 })
 
@@ -32,6 +60,14 @@ describe('loop wakes (main/loopWakes.ts, #405)', async () => {
   const watches = await import('../src/main/watches')
   watches.testHooks.settleMs = 0
   const lanes = await import('../src/main/lanes')
+
+  /** Workflow rules off for one test (#1270: Hive owns the lane while they are on), on again after it. */
+  const { advanced } = await import('../src/main/advanced')
+  const { ENFORCE } = await import('../src/main/workflow/service')
+  const rulesOff = (): Promise<unknown> => advanced.set(ENFORCE, false)
+  afterEach(async () => {
+    await advanced.set(ENFORCE, true)
+  })
   const loopWakes = await import('../src/main/loopWakes')
   loopWakes.initLoopWakes()
   const { sessions } = await import('../src/main/sessions')
@@ -111,18 +147,18 @@ describe('loop wakes (main/loopWakes.ts, #405)', async () => {
     await typedUntil(st, 1)
     expect(st.typed).toEqual([{ agent: 'r1', text: `[Hive] #${c} (B1's card) is in Review. You review this card in its loop: carry on with it (hive_read_task with latestComment for the comment in full).` }])
     await vi.waitFor(async () => expect(await history(w, c)).toContain('Hive: Woke R1 (alpha) to review it (a loop wake)'), HANG)
-    // Failed: the builder is woken with the verdict.
+    // Failed: the builder is woken with the verdict, the card back in Doing (HI-1946).
     st.status.set('r1', 'working')
     await inWorkspace(w, () => tasks.updateTask(c, { review: 'start' }, r1))
     await inWorkspace(w, () => tasks.updateTask(c, { review: 'failed' }, r1, { comment: 'Round 1: FAILED. 1. No delay.' }))
     await typedUntil(st, 2)
-    expect(st.typed.at(-1)).toEqual({ agent: 'b1', text: `[Hive] #${c} is in Review: R1 (alpha) failed it; latest comment by R1 (alpha): "Round 1: FAILED. 1. No delay.". This is your card in its loop: carry on (hive_read_task with latestComment for the comment in full).` })
+    expect(st.typed.at(-1)).toEqual({ agent: 'b1', text: `[Hive] #${c} is in Doing: R1 (alpha) failed it; latest comment by R1 (alpha): "Round 1: FAILED. 1. No delay.". This is your card in its loop: carry on (hive_read_task with latestComment for the comment in full).` })
     await vi.waitFor(async () => expect(await history(w, c)).toContain('Hive: Woke B1 (alpha) with its verdict (a loop wake)'), HANG)
-    // Returned for round 2 by the builder: the reviewer again; passed: the builder again.
+    // Round 2 submitted by the builder: the reviewer again; passed: the builder again.
     st.status.set('r1', 'ready')
     await inWorkspace(w, () => tasks.updateTask(c, { column: 'review' }, b1))
     await typedUntil(st, 3)
-    expect(st.typed.at(-1)).toEqual({ agent: 'r1', text: `[Hive] #${c} (B1's card) was returned for review (round 2); latest comment by R1 (alpha): "Round 1: FAILED. 1. No delay.". You review this card in its loop: carry on with it (hive_read_task with latestComment for the comment in full).` })
+    expect(st.typed.at(-1)).toEqual({ agent: 'r1', text: `[Hive] #${c} (B1's card) is in Review; latest comment by R1 (alpha): "Round 1: FAILED. 1. No delay.". You review this card in its loop: carry on with it (hive_read_task with latestComment for the comment in full).` })
     st.status.set('b1', 'ready')
     await inWorkspace(w, () => tasks.updateTask(c, { review: 'start' }, r1))
     await inWorkspace(w, () => tasks.updateTask(c, { review: 'passed', column: 'passed' }, r1, { comment: 'Round 2: PASSED.' }))
@@ -250,7 +286,7 @@ describe('loop wakes (main/loopWakes.ts, #405)', async () => {
       await typedUntil(st, 3)
       await settled()
       expect(st.typed).toHaveLength(3)
-      expect(st.typed[2]).toMatchObject({ agent: 'r1', text: expect.stringMatching(/was returned for review \(round 2\)/) })
+      expect(st.typed[2]).toMatchObject({ agent: 'r1', text: expect.stringMatching(/\(B1's card\) is in Review/) })
       expect(loopWakes.pendingLoopWakes()).toEqual([])
     } finally {
       vi.useRealTimers()
@@ -261,6 +297,8 @@ describe('loop wakes (main/loopWakes.ts, #405)', async () => {
   })
 
   it("goes to whoever reviews it when it is typed: the lane's reviewer changed or taken off while it waited (round 1 finding 1)", async () => {
+    // A list changed (or a lane ended) at once, as with workflow rules off: with them on, a change waits for the card boundary (#1270, tests/laneOwnership.test.ts).
+    await rulesOff()
     await loopWakes.clearLoopWakes()
     const { w, alpha } = await open()
     const st = fake(alpha)
@@ -370,6 +408,41 @@ describe('loop wakes (main/loopWakes.ts, #405)', async () => {
     await disposeWorkspaceService(w)
   })
 
+  it("HI-2023: the failed verdict's loop wake says it failed however slowly the verdict's lines are written (the flake under load)", async () => {
+    await loopWakes.clearLoopWakes()
+    const { w, alpha } = await open()
+    const st = fake(alpha)
+    const c = await newCard(w)
+    await lanes.startLane(w, { project: 'alpha', builder: 'b1', reviewer: 'r1', cards: [c], by: 'B1 (alpha)' })
+    await inWorkspace(w, () => tasks.updateTask(c, { column: 'review' }, b1))
+    await typedUntil(st, 1)
+    st.status.set('b1', 'watching')
+    await watches.registerWatch(w, alpha, 'b1', readCondition({ cards: [c], column: 'passed' }) as WatchCondition)
+    await inWorkspace(w, () => tasks.updateTask(c, { review: 'start' }, r1))
+    // A loaded machine between the verdict's lines: the clock moves on by a millisecond at each read (HI-2016's cause).
+    const RealDate = Date
+    let tick = 0
+    ;(globalThis as { Date: DateConstructor }).Date = class extends RealDate {
+      constructor(...args: unknown[]) {
+        if (args.length) super(...(args as [number]))
+        else super(RealDate.now() + tick++)
+      }
+      static now(): number {
+        return RealDate.now() + tick++
+      }
+    } as DateConstructor
+    try {
+      await inWorkspace(w, () => tasks.updateTask(c, { review: 'failed' }, r1, { comment: 'Round 1: FAILED.' }))
+    } finally {
+      ;(globalThis as { Date: DateConstructor }).Date = RealDate
+    }
+    await watches.evaluateWatches(w)
+    await typedUntil(st, 2)
+    expect(st.typed[1].agent).toBe('b1')
+    expect(st.typed[1].text).toMatch(new RegExp(`^\\[Hive\\] #${c} is in Doing: R1 \\(alpha\\) failed it; .*This is your card in its loop`))
+    await disposeWorkspaceService(w)
+  })
+
   it('a waiting arrival is dropped once that round is reviewed: a review started and failed before the reviewer was idle (round 2 finding)', async () => {
     await loopWakes.clearLoopWakes()
     const { w, alpha } = await open()
@@ -386,16 +459,16 @@ describe('loop wakes (main/loopWakes.ts, #405)', async () => {
     await typedUntil(st, 1)
     await drained()
     expect(st.typed.map((t) => t.agent)).toEqual(['b1'])
-    // The builder returns it: that new round wakes the reviewer.
+    // The builder submits it again (HI-1946: from Doing): that new round wakes the reviewer.
     st.status.set('b1', 'ready')
     await inWorkspace(w, () => tasks.updateTask(c, { column: 'review' }, b1))
     await typedUntil(st, 2)
     expect(st.typed.map((t) => t.agent)).toEqual(['b1', 'r1'])
-    expect(st.typed[1].text).toMatch(/was returned for review \(round 2\)/)
+    expect(st.typed[1].text).toMatch(/\(B1's card\) is in Review/)
     await disposeWorkspaceService(w)
   })
 
-  it('is off for a project that turned it off (Project Settings → Card loops)', async () => {
+  it('is off for a project that turned it off before HI-1766, with no workflow options: its old key is read as its own', async () => {
     await loopWakes.clearLoopWakes()
     const { w, alpha } = await open({ loopWakes: false })
     const st = fake(alpha)
@@ -407,5 +480,723 @@ describe('loop wakes (main/loopWakes.ts, #405)', async () => {
     expect(st.typed).toEqual([])
     expect(JSON.parse(readFileSync(join(alpha, '.hive', 'project.json'), 'utf8')).loopWakes).toBe(false)
     await disposeWorkspaceService(w)
+  })
+
+  it("follows the workflow option (HI-1766): the workspace's default off reaches its projects, a project's own on wins", async () => {
+    await loopWakes.clearLoopWakes()
+    const { w, alpha } = await open({ workflow: { platform: 'none', preset: null, options: {} } })
+    await w.saveWorkspaceConfigWith(() => ({ workflow: { none: { loopWakes: false }, git: { loopWakes: false } } }))
+    expect(await loopWakes.wakesOn(w, alpha)).toBe(false)
+    const st = fake(alpha)
+    const c = await newCard(w)
+    await lanes.startLane(w, { project: 'alpha', builder: 'b1', reviewer: 'r1', cards: [c], by: 'B1 (alpha)' })
+    await inWorkspace(w, () => tasks.updateTask(c, { column: 'review' }, b1))
+    await settled()
+    expect(loopWakes.pendingLoopWakes()).toEqual([])
+    expect(st.typed).toEqual([])
+    await w.mutateProjectConfig(alpha, (cfg) => ({ workflow: { ...cfg.workflow!, options: { ...cfg.workflow!.options, loopWakes: true } } }))
+    expect(await loopWakes.wakesOn(w, alpha)).toBe(true)
+    await disposeWorkspaceService(w)
+  })
+
+  it("a lane reviewer's comment on a card it hasn't started reviewing is its request: the builder is woken with it (#1410)", async () => {
+    await loopWakes.clearLoopWakes()
+    const { w, alpha } = await open()
+    const st = fake(alpha)
+    const first = (await inWorkspace(w, () => tasks.createTask({ title: 'First', project: 'alpha' }, user))).number
+    const c = await newCard(w)
+    await lanes.startLane(w, { project: 'alpha', builder: 'b1', reviewer: 'r1', cards: [first, c], by: 'B1 (alpha)' })
+    await inWorkspace(w, () => tasks.updateTask(c, { column: 'review' }, b1))
+    await typedUntil(st, 1)
+    st.status.set('b1', 'ready')
+    // HR2's comment on 22 Oct: keeping the lane's order, it waits for the earlier card.
+    await inWorkspace(w, () => tasks.updateTask(c, {}, r1, { comment: `Keeping the lane order: #${first} first.` }))
+    await typedUntil(st, 2)
+    expect(st.typed.at(-1)?.agent).toBe('b1')
+    expect(st.typed.at(-1)?.text).toContain(`The reviewer asks: "Keeping the lane order: #${first} first."`)
+    expect(await history(w, c)).toContain(`R1 (alpha): Asked the builder: "Keeping the lane order: #${first} first."`)
+    // Once its review has started, a comment is only a comment (its requests are hive_request_builder's); nor is another agent's.
+    await inWorkspace(w, () => tasks.updateTask(c, { review: 'start' }, r1))
+    await inWorkspace(w, () => tasks.updateTask(c, {}, r1, { comment: 'Reading the diff.' }))
+    await inWorkspace(w, () => tasks.updateTask(c, {}, agent('o1', 'O1'), { comment: 'Looks related to #12.' }))
+    await settled()
+    expect(st.typed).toHaveLength(2)
+    expect((await history(w, c)).filter((h) => h.includes('Asked the builder'))).toHaveLength(1)
+    await disposeWorkspaceService(w)
+  })
+
+  /** A card of alpha's lane (b1 builds, r1 reviews) started by its builder's intent, under a workflow (#1382: steps are intents). */
+  const WORKFLOW = { workflow: { platform: 'none', preset: null, options: { review: 'agent', noSelfReview: true } } }
+  const startedInLane = async (w: Awaited<ReturnType<typeof open>>['w']) => {
+    const c = (await inWorkspace(w, () => tasks.createTask({ title: 'Design first', project: 'alpha' }, user))).number
+    await lanes.startLane(w, { project: 'alpha', builder: 'b1', reviewer: 'r1', cards: [c], by: 'B1 (alpha)' })
+    await inWorkspace(w, () => runCardIntent({ n: c, plain: false }, b1, { kind: 'start' }))
+    return c
+  }
+  const { runCardIntent } = await import('../src/main/cardIntents')
+
+  it("a builder's design wakes its reviewer though its watch counts only arrivals in Review; the answer wakes the builder (#1382)", async () => {
+    await loopWakes.clearLoopWakes()
+    const { w, alpha } = await open(WORKFLOW)
+    const st = fake(alpha)
+    const c = await startedInLane(w)
+    // HR5 on #1305: waiting for the card to arrive in Review, and nothing else.
+    st.status.set('r1', 'watching')
+    await watches.registerWatch(w, alpha, 'r1', readCondition({ cards: [c], column: 'review' }) as WatchCondition)
+    const id = String((await inWorkspace(w, () => runCardIntent({ n: c, plain: false }, b1, { kind: 'loopStep', step: 'design', text: 'Design: a step the reviewer is woken for.' }))).done.data?.design)
+    await typedUntil(st, 1)
+    expect(st.typed[0].agent).toBe('r1')
+    // It names the design, which the answer names.
+    expect(st.typed[0].text).toContain(`The builder: "design ${id} posted for your check (answer with its id): Design: a step the reviewer is woken for."`)
+    expect(st.typed[0].text).toContain("check it and answer with hive_loop_step (ok, or gaps saying what's missing, and its id)")
+    st.status.set('b1', 'ready')
+    await inWorkspace(w, () => runCardIntent({ n: c, plain: false }, r1, { kind: 'loopStep', step: 'ok', text: 'Holds: build it.', design: id }))
+    await typedUntil(st, 2)
+    expect(st.typed[1]).toMatchObject({ agent: 'b1' })
+    expect(st.typed[1].text).toContain(`The reviewer: "design ${id} is OK: Holds: build it."`)
+    await vi.waitFor(async () => expect(await history(w, c)).toEqual(expect.arrayContaining(['Hive: Woke R1 (alpha) with a card loop step (a loop wake)', 'Hive: Woke B1 (alpha) with a card loop step (a loop wake)'])), HANG)
+    await disposeWorkspaceService(w)
+  })
+
+  it("leaves a step to a watch that counts it: the builder's watch for its verdict tells it the reviewer's answer, one line (#1382)", async () => {
+    await loopWakes.clearLoopWakes()
+    const { w, alpha } = await open(WORKFLOW)
+    const st = fake(alpha)
+    const c = await startedInLane(w)
+    const id = String((await inWorkspace(w, () => runCardIntent({ n: c, plain: false }, b1, { kind: 'loopStep', step: 'design', text: 'Plan' }))).done.data?.design)
+    await typedUntil(st, 1)
+    st.status.set('b1', 'watching')
+    await watches.registerWatch(w, alpha, 'b1', readCondition({ cards: [c], changes: ['verdict', 'column', 'comment'], column: 'passed' }) as WatchCondition)
+    watches.testHooks.settleMs = undefined
+    try {
+      await inWorkspace(w, () => runCardIntent({ n: c, plain: false }, r1, { kind: 'loopStep', step: 'gaps', text: 'What bounds the wait?', design: id }))
+      await watches.evaluateWatches(w)
+      await vi.waitFor(() => expect(st.typed).toHaveLength(2), HANG)
+    } finally {
+      watches.testHooks.settleMs = 0
+    }
+    await drained()
+    await settled()
+    expect(st.typed).toHaveLength(2)
+    expect(st.typed[1].agent).toBe('b1')
+    expect(st.typed[1].text).toMatch(/a card loop step: read its latest comment.*Your card watch has ended/)
+    await disposeWorkspaceService(w)
+  })
+
+  it("a reviewer whose own comment watch tells it of a design learns its id from that line and answers it (#1382, HR4's round 2 finding 1)", async () => {
+    await loopWakes.clearLoopWakes()
+    const { w, alpha } = await open(WORKFLOW)
+    const st = fake(alpha)
+    const c = await startedInLane(w)
+    st.status.set('r1', 'watching')
+    await watches.registerWatch(w, alpha, 'r1', readCondition({ cards: [c], changes: ['comment'] }) as WatchCondition)
+    watches.testHooks.settleMs = undefined
+    try {
+      await inWorkspace(w, () => runCardIntent({ n: c, plain: false }, b1, { kind: 'loopStep', step: 'design', text: 'Design: the id rides in the first line.' }))
+      await watches.evaluateWatches(w)
+      await vi.waitFor(() => expect(st.typed).toHaveLength(1), HANG)
+    } finally {
+      watches.testHooks.settleMs = 0
+    }
+    await drained()
+    await settled()
+    // One line, its watch's: the loop wake stands aside, and the line's latest comment names the design.
+    expect(st.typed).toHaveLength(1)
+    expect(st.typed[0].text).toMatch(/Your card watch has ended/)
+    const learned = /Design (\S+\/s\d+), for the reviewer's check/.exec(st.typed[0].text)?.[1]
+    expect(learned).toBeTruthy()
+    // So does the card's latest comment, as hive_read_task with latestComment gives it.
+    expect((await inWorkspace(w, () => tasks.getTask(c, w))).comments.at(-1)?.text.split('\n')[0]).toContain(learned!)
+    // The reviewer answers with what it learned: taken.
+    await inWorkspace(w, () => runCardIntent({ n: c, plain: false }, r1, { kind: 'loopStep', step: 'ok', text: 'Holds.', design: learned }))
+    expect((await history(w, c)).at(-1)).toBe('R1 (alpha): Checked the design: OK: "Holds."')
+    await disposeWorkspaceService(w)
+  })
+
+  it("going ahead unchecked tells the reviewer, with nothing to answer (#1382, HR4's round 1 finding 5)", async () => {
+    await loopWakes.clearLoopWakes()
+    vi.useFakeTimers({ toFake: ['Date'] })
+    try {
+      const { w, alpha } = await open(WORKFLOW)
+      const st = fake(alpha)
+      const c = await startedInLane(w)
+      const id = String((await inWorkspace(w, () => runCardIntent({ n: c, plain: false }, b1, { kind: 'loopStep', step: 'design', text: 'Plan' }))).done.data?.design)
+      await typedUntil(st, 1)
+      st.status.set('r1', 'ready')
+      vi.setSystemTime(Date.now() + 31 * 60_000)
+      await inWorkspace(w, () => runCardIntent({ n: c, plain: false }, b1, { kind: 'loopStep', step: 'proceed', text: 'No answer: building as posted.', design: id }))
+      await typedUntil(st, 2)
+      expect(st.typed[1].agent).toBe('r1')
+      expect(st.typed[1].text).toContain(`The builder: "no check of design ${id} came in time: the builder goes ahead with it as posted: No answer: building as posted."`)
+      expect(st.typed[1].text).toContain('Nothing to answer: carry on with your loop')
+      expect(st.typed[1].text).not.toContain('answer with hive_loop_step')
+      await disposeWorkspaceService(w)
+    } finally {
+      vi.useRealTimers()
+    }
+  })
+
+  /**
+   * A pool lane's card (HI-2310) started by b1, its first design posted and given by the pool to r1 (the pool's own
+   * write, as reviewerPool.ts makes it: its pass isn't running here). Before any submission: the design's answer closes
+   * it, and the card has no reviewer until the pool gives out its build (HI-2325).
+   */
+  const POOL = { agents: [{ id: 'b1', name: 'B1', workflowRole: 'builder' }, { id: 'r1', name: 'R1', workflowRole: 'reviewer' }, { id: 'o1', name: 'O1', workflowRole: 'builder' }], workflow: { platform: 'none', preset: null, options: { review: 'agent', noSelfReview: true, reviewerMode: 'pool' } } }
+  const designedInPool = async (w: Awaited<ReturnType<typeof open>>['w'], alpha: string) => {
+    const c = (await inWorkspace(w, () => tasks.createTask({ title: 'Pool design', project: 'alpha' }, user))).number
+    await lanes.startLane(w, { project: 'alpha', builder: 'b1', reviewer: null, pool: true, cards: [c], by: 'B1 (alpha)' })
+    await inWorkspace(w, () => runCardIntent({ n: c, plain: false }, b1, { kind: 'start' }))
+    const id = String((await inWorkspace(w, () => runCardIntent({ n: c, plain: false }, b1, { kind: 'loopStep', step: 'design', text: 'Plan' }))).done.data?.design)
+    const wf = (await workflowFor(w, alpha))!
+    const rec = wf.store.card(c)
+    const submission = wf.store.facts(c).findLast((f) => f.kind === 'LoopStep')!.seq
+    await wf.write(rec, null, 'hive', (x) => void x.fact('ReviewerAssigned', { reviewer: 'r1', submission, design: true }))
+    expect((await loopReviewerOf(w, await inWorkspace(w, () => tasks.getTask(c, w))))?.id).toBe('r1')
+    return { c, id }
+  }
+  const { workflowFor } = await import('../src/main/workflow/service')
+  const { loopReviewerOf } = await import('../src/main/loopReviewer')
+
+  it.each(['ok', 'gaps'] as const)("a pool design's %s answer before any submission wakes its builder, with no watch (HI-2325)", async (step) => {
+    await loopWakes.clearLoopWakes()
+    const { w, alpha } = await open(POOL)
+    const st = fake(alpha)
+    const { c, id } = await designedInPool(w, alpha)
+    await settled()
+    // The pool tells its design's reviewer itself: no loop wake.
+    expect(st.typed).toEqual([])
+    await inWorkspace(w, () => runCardIntent({ n: c, plain: false }, r1, { kind: 'loopStep', step, text: 'Answered.', design: id }))
+    // Closed by its answer: the card has no reviewer until its build is given out, and none is made the owner meanwhile.
+    expect(await loopReviewerOf(w, await inWorkspace(w, () => tasks.getTask(c, w)))).toBeNull()
+    await typedUntil(st, 1)
+    expect(st.typed[0].agent).toBe('b1')
+    expect(st.typed[0].text).toContain(`design ${id}`)
+    await vi.waitFor(async () => expect(await history(w, c)).toContain('Hive: Woke B1 (alpha) with a card loop step (a loop wake)'), HANG)
+    await disposeWorkspaceService(w)
+  })
+
+  it("a pool design's builder going ahead unchecked tells the reviewer the pool gave it, with no watch (HI-2325)", async () => {
+    await loopWakes.clearLoopWakes()
+    vi.useFakeTimers({ toFake: ['Date'] })
+    try {
+      const { w, alpha } = await open(POOL)
+      const st = fake(alpha)
+      const { c, id } = await designedInPool(w, alpha)
+      vi.setSystemTime(Date.now() + 31 * 60_000)
+      await inWorkspace(w, () => runCardIntent({ n: c, plain: false }, b1, { kind: 'loopStep', step: 'proceed', text: 'No answer: building as posted.', design: id }))
+      await typedUntil(st, 1)
+      expect(st.typed[0].agent).toBe('r1')
+      expect(st.typed[0].text).toContain(`no check of design ${id} came in time`)
+      await disposeWorkspaceService(w)
+    } finally {
+      vi.useRealTimers()
+    }
+  })
+
+  it('a design to check is dropped once nothing waits: posted again, the newer one is told, not the older (#1382)', async () => {
+    await loopWakes.clearLoopWakes()
+    const { w, alpha } = await open(WORKFLOW)
+    const st = fake(alpha)
+    const c = await startedInLane(w)
+    // The reviewer is busy: its wakes wait.
+    st.status.set('r1', 'working')
+    await inWorkspace(w, () => runCardIntent({ n: c, plain: false }, b1, { kind: 'loopStep', step: 'design', text: 'Design v1' }))
+    const v2 = String((await inWorkspace(w, () => runCardIntent({ n: c, plain: false }, b1, { kind: 'loopStep', step: 'design', text: 'Design v2' }))).done.data?.design)
+    await settled()
+    st.status.set('r1', 'ready')
+    await typedUntil(st, 1)
+    await drained()
+    expect(st.typed[0].text).toContain(`design ${v2} posted for your check`)
+    expect(st.typed[0].text).not.toContain('Design v1')
+    // Answered by the user meanwhile: a waiting design wake has nothing left to ask.
+    st.status.set('r1', 'working')
+    const v3 = String((await inWorkspace(w, () => runCardIntent({ n: c, plain: false }, b1, { kind: 'loopStep', step: 'design', text: 'Design v3' }))).done.data?.design)
+    await inWorkspace(w, () => runCardIntent({ n: c, plain: false }, user, { kind: 'loopStep', step: 'ok', text: 'Fine by me', design: v3 }))
+    await settled()
+    st.status.set('r1', 'ready')
+    await drained()
+    expect(st.typed.filter((t) => t.agent === 'r1')).toHaveLength(1)
+    await disposeWorkspaceService(w)
+  })
+
+  it("a follow-up of a card in Passed wakes its reviewer though its watch counts only Review; the answer wakes the builder (#1467)", async () => {
+    await loopWakes.clearLoopWakes()
+    // A workflow whose passed work waits in Passed (for the user's OK too), as a card waiting to be merged does.
+    const { w, alpha } = await open({ workflow: { ...WORKFLOW.workflow, options: { review: 'agentThenYou', noSelfReview: true } } })
+    const st = fake(alpha)
+    const c = await startedInLane(w)
+    const intent = (who: typeof b1, i: Parameters<typeof runCardIntent>[2]) => inWorkspace(w, () => runCardIntent({ n: c, plain: false }, who, i))
+    await intent(b1, { kind: 'submit', summary: 'Ready', paths: ['a.txt'] })
+    await intent(r1, { kind: 'startReview' })
+    await intent(r1, { kind: 'verdict', pass: true, comment: 'Round 1: PASSED.' })
+    await drained()
+    await settled()
+    const k = st.typed.length
+    // HR3 on #1419: the screenshot OK asked for changes for it to check, and it waited for the card's move into Review.
+    st.status.set('r1', 'watching')
+    await watches.registerWatch(w, alpha, 'r1', readCondition({ cards: [c], column: 'review' }) as WatchCondition)
+    const id = String((await intent(b1, { kind: 'loopStep', step: 'followUp', text: 'Fixes ready: the dark theme.' })).done.data?.design)
+    await typedUntil(st, k + 1)
+    expect(st.typed[k].agent).toBe('r1')
+    expect(st.typed[k].text).toContain(`The builder: "follow-up ${id} ready for your check (answer with its id): Fixes ready: the dark theme."`)
+    expect(st.typed[k].text).toContain("check it and answer with hive_loop_step (ok, or gaps saying what's missing, and its id)")
+    st.status.set('b1', 'ready')
+    await intent(r1, { kind: 'loopStep', step: 'ok', text: 'Both themes fine.', design: id })
+    await typedUntil(st, k + 2)
+    expect(st.typed[k + 1]).toMatchObject({ agent: 'b1' })
+    expect(st.typed[k + 1].text).toContain(`The reviewer: "follow-up ${id} is OK: Both themes fine."`)
+    expect(await history(w, c)).toContain('R1 (alpha): Checked the follow-up: OK: "Both themes fine."')
+    await disposeWorkspaceService(w)
+  })
+
+  it("a follow-up's wake and stall outlast its card's change of place in Passed (HR4's round 1 finding on #1467)", async () => {
+    await loopWakes.clearLoopWakes()
+    const { w, alpha } = await open({ workflow: { ...WORKFLOW.workflow, options: { review: 'agentThenYou', noSelfReview: true } } })
+    const st = fake(alpha)
+    const c = await startedInLane(w)
+    const intent = (who: typeof b1, i: Parameters<typeof runCardIntent>[2]) => inWorkspace(w, () => runCardIntent({ n: c, plain: false }, who, i))
+    await intent(b1, { kind: 'submit', summary: 'Ready', paths: ['a.txt'] })
+    await intent(r1, { kind: 'startReview' })
+    await intent(r1, { kind: 'verdict', pass: true, comment: 'Round 1: PASSED.' })
+    // Another card waiting in Passed, below it.
+    await inWorkspace(w, () => tasks.createTask({ title: 'Also passed', project: 'alpha', column: 'passed' }, user))
+    await drained()
+    await settled()
+    const k = st.typed.length
+    // The reviewer is busy when the follow-up comes; the builder then puts its card below the other one.
+    st.status.set('r1', 'working')
+    const posted = await intent(b1, { kind: 'loopStep', step: 'followUp', text: 'Fixes ready.' })
+    await inWorkspace(w, () => tasks.updateTask(c, { position: 'bottom' }, b1))
+    const now = await inWorkspace(w, () => tasks.getTask(c, w))
+    expect(now.column).toBe('passed')
+    expect(now.history.at(-1)?.what).toBe('Moved to the bottom of Passed')
+    // Still waiting: so is its stall, aged from the follow-up, with the builder only watching it.
+    const { loopStepWaitReason } = await import('../src/shared/tasks')
+    const hb = { name: 'B1', project: 'alpha', agentId: 'b1', cards: [c], status: 'watching' }
+    const at = Date.parse(now.history.findLast((h) => h.what.startsWith('Posted a follow-up'))!.at)
+    expect(loopStepWaitReason(now, [hb], 30 * 60_000, at + 16 * 60_000)).toMatch(/posted a follow-up .* has waited 16 min:/)
+    // And its wake is still due: the reviewer, once free, is told.
+    st.status.set('r1', 'ready')
+    await typedUntil(st, k + 1)
+    expect(st.typed[k].agent).toBe('r1')
+    expect(st.typed[k].text).toContain(`follow-up ${String(posted.done.data?.design)} ready for your check`)
+    await disposeWorkspaceService(w)
+  })
+
+  it("a reviewer waiting for a failed card's next round (fresh) hears a follow-up from its own watch, one line (#1467)", async () => {
+    await loopWakes.clearLoopWakes()
+    const { w, alpha } = await open({ workflow: { ...WORKFLOW.workflow, options: { review: 'agentThenYou', noSelfReview: true } } })
+    const st = fake(alpha)
+    const c = await startedInLane(w)
+    const intent = (who: typeof b1, i: Parameters<typeof runCardIntent>[2]) => inWorkspace(w, () => runCardIntent({ n: c, plain: false }, who, i))
+    await intent(b1, { kind: 'submit', summary: 'Ready', paths: ['a.txt'] })
+    await intent(r1, { kind: 'startReview' })
+    await intent(r1, { kind: 'verdict', pass: true, comment: 'Round 1: PASSED.' })
+    await drained()
+    await settled()
+    const k = st.typed.length
+    st.status.set('r1', 'watching')
+    await watches.registerWatch(w, alpha, 'r1', readCondition({ cards: [c], column: 'review', fresh: true }) as WatchCondition)
+    watches.testHooks.settleMs = undefined
+    try {
+      await intent(b1, { kind: 'loopStep', step: 'followUp', text: 'Fixes ready.' })
+      await watches.evaluateWatches(w)
+      await vi.waitFor(() => expect(st.typed).toHaveLength(k + 1), HANG)
+    } finally {
+      watches.testHooks.settleMs = 0
+    }
+    await drained()
+    await settled()
+    // Its watch's line, naming the follow-up in the latest comment; the loop wake stands aside.
+    expect(st.typed).toHaveLength(k + 1)
+    expect(st.typed[k].agent).toBe('r1')
+    expect(st.typed[k].text).toMatch(/Follow-up \S+\/s\d+, for the reviewer's check.*Your card watch has ended/)
+    await disposeWorkspaceService(w)
+  })
+
+  it("a step wakes no one while the project's loop wakes are off (#1382)", async () => {
+    await loopWakes.clearLoopWakes()
+    const { w, alpha } = await open({ ...WORKFLOW, loopWakes: false })
+    const st = fake(alpha)
+    const c = await startedInLane(w)
+    await inWorkspace(w, () => runCardIntent({ n: c, plain: false }, b1, { kind: 'loopStep', step: 'design', text: 'Plan' }))
+    await settled()
+    expect(loopWakes.pendingLoopWakes()).toEqual([])
+    expect(st.typed).toEqual([])
+    await disposeWorkspaceService(w)
+  })
+
+  // HI-1687: the Stop hook named a loop wake (m4790) that hive_inbox wouldn't give, nor ack: the read made it again, then
+  // found the board changed (any card's change) by its hand-out, and kept it unread. Now a notice names only what a read
+  // would give (deliveries.countable, which makes nothing again), and a read's hand-out asks only whether this wake's own
+  // card, lanes and project changed: another card's change doesn't keep it from being read, a change of its own does.
+  describe('a card the merge queue returned (HI-1721)', async () => {
+    const deliveries = await import('../src/main/deliveries')
+    /** A wake as wakeFromAction makes the queue's return: a note, anchored at the card's latest entry (the return writes none). */
+    const queueReturnWake = async (w: Awaited<ReturnType<typeof open>>['w'], alpha: string, c: number, text: string) => {
+      const card = await inWorkspace(w, () => tasks.getTask(c, w))
+      const since = card.history.at(-1)!
+      await deliveries.createDelivery(alpha, { agentId: 'b1', agentName: 'B1 (alpha)', kind: 'card-event', from: { kind: 'hive', name: 'Hive' }, card: c, body: `[Hive] #${c}: ${text}`, source: 'loop', ref: `#${c}`, replace: true, meta: { n: c, kind: 'note', agentName: 'B1 (alpha)', sinceAt: since.at, sinceId: since.id ?? '', text } })
+    }
+
+    it("HI-1694's sequence: the builder's watch told it the pass; the return comes, and a watch for Done begins before it reads it: the return is still given, and the builder told of the conflict", async () => {
+      await loopWakes.clearLoopWakes()
+      const { w, alpha } = await open()
+      const st = fake(alpha)
+      const c = await newCard(w)
+      await lanes.startLane(w, { project: 'alpha', builder: 'b1', reviewer: 'r1', cards: [c], by: 'B1 (alpha)' })
+      await inWorkspace(w, () => tasks.updateTask(c, { column: 'review' }, b1))
+      await typedUntil(st, 1)
+      // B1 watches for its verdict; R1 passes it: the watch's line tells B1 the card is in Passed (its told boundary).
+      st.status.set('b1', 'watching')
+      await watches.registerWatch(w, alpha, 'b1', { cards: [c], changes: ['verdict', 'column', 'comment'], column: 'passed' })
+      st.status.set('r1', 'working')
+      await inWorkspace(w, () => tasks.updateTask(c, { review: 'start' }, r1))
+      await inWorkspace(w, () => tasks.updateTask(c, { review: 'passed', column: 'passed' }, r1, { comment: 'Round 1: PASSED.' }))
+      await watches.evaluateWatches(w)
+      await vi.waitFor(() => expect(st.typed.filter((t) => t.agent === 'b1').map((t) => t.text).join('\n')).toMatch(/is in Passed/), HANG)
+      await settled()
+      const before = st.typed.length
+      // The queue returns it with a conflict (a wake anchored at the entry B1's watch has read), and B1, still acting on
+      // the pass, starts a watch for Done before it reads that.
+      const conflict = `#${c} came back from the merge queue: a conflict with main in src/a.ts. Merge main into your worktree, resolve the conflict, commit and submit again (hive_submit).`
+      st.status.set('b1', 'watching')
+      await queueReturnWake(w, alpha, c, conflict)
+      await watches.registerWatch(w, alpha, 'b1', { cards: [c], changes: ['column'], column: 'done' })
+      await typedUntil(st, before + 1)
+      expect(st.typed.at(-1)).toMatchObject({ agent: 'b1', text: expect.stringContaining('came back from the merge queue: a conflict with main in src/a.ts') })
+      await disposeWorkspaceService(w)
+    })
+
+    it('a watch begun on its own returned card for another column tells the builder of the return at once, from the card as it is; not one for Doing, nor another agent\'s card', async () => {
+      await loopWakes.clearLoopWakes()
+      const { w, alpha } = await open()
+      const st = fake(alpha)
+      const c = await newCard(w)
+      await lanes.startLane(w, { project: 'alpha', builder: 'b1', reviewer: 'r1', cards: [c], by: 'B1 (alpha)' })
+      const text = `#${c} came back from the merge queue: a conflict with main in src/b.ts. Merge main into your worktree, resolve the conflict, commit and submit again (hive_submit).`
+      returns.set(c, { at: new Date().toISOString(), text, builder: 'b1' })
+      try {
+        // For Doing (where it already waits): nothing more; R1 watching it: not R1's card to fix.
+        st.status.set('r1', 'watching')
+        await watches.registerWatch(w, alpha, 'r1', { cards: [c], changes: ['column'], column: 'done' })
+        st.status.set('b1', 'watching')
+        await watches.registerWatch(w, alpha, 'b1', { cards: [c], changes: ['column'], column: 'doing' })
+        await settled()
+        expect(st.typed).toEqual([])
+        // For Done: told of the return now.
+        await watches.registerWatch(w, alpha, 'b1', { cards: [c], changes: ['column'], column: 'done' })
+        await typedUntil(st, 1)
+        expect(st.typed[0]).toMatchObject({ agent: 'b1', text: expect.stringContaining('came back from the merge queue: a conflict with main in src/b.ts') })
+      } finally {
+        returns.delete(c)
+      }
+      await disposeWorkspaceService(w)
+    })
+
+    it("HI-2122's sequence (HI-2143): the reviewer's watch on any move, begun before its pass; returned and submitted again, the card wakes the reviewer once, led by the return", async () => {
+      await loopWakes.clearLoopWakes()
+      await rulesOff()
+      const { w, alpha } = await open()
+      const st = fake(alpha)
+      const c = await newCard(w)
+      await lanes.startLane(w, { project: 'alpha', builder: 'b1', reviewer: 'r1', cards: [c], by: 'B1 (alpha)' })
+      await inWorkspace(w, () => tasks.updateTask(c, { column: 'review' }, b1))
+      await typedUntil(st, 1)
+      // R1 reviews, starts its watch on any move of the card (HR2's: changes column, no column), then passes it.
+      st.status.set('r1', 'working')
+      await inWorkspace(w, () => tasks.updateTask(c, { review: 'start' }, r1))
+      await watches.registerWatch(w, alpha, 'r1', { cards: [c], changes: ['column'] })
+      await inWorkspace(w, () => tasks.updateTask(c, { review: 'passed', column: 'passed' }, r1, { comment: 'Round 1: PASSED.' }))
+      st.status.set('r1', 'watching')
+      // The queue returns it to Doing in its approver's name, as it does.
+      await inWorkspace(w, () => tasks.updateTask(c, { column: 'doing' }, r1))
+      await watches.evaluateWatches(w)
+      await settled()
+      const before = st.typed.filter((t) => t.agent === 'r1').length
+      const text = `#${c} is back in Review after the merge queue returned it (a conflict with main in src/a.ts (1 conflict, line 4)); B1 resolved it and submitted it again: review the resolution`
+      resubmits.set(c, text)
+      try {
+        // B1 resolves it and submits again: R1, back to waiting on it, is woken once, led by the return.
+        await inWorkspace(w, () => tasks.updateTask(c, { column: 'review' }, b1))
+        await watches.evaluateWatches(w)
+        await vi.waitFor(async () => {
+          await loopWakes.tryLoopWakes()
+          expect(st.typed.filter((t) => t.agent === 'r1')).toHaveLength(before + 1)
+        }, HANG)
+        await settled()
+        const toR1 = st.typed.filter((t) => t.agent === 'r1')
+        expect(toR1).toHaveLength(before + 1)
+        expect(toR1.at(-1)!.text).toContain(`[Hive] ${text}`)
+        expect(toR1.at(-1)!.text).not.toContain('Round 1: PASSED')
+      } finally {
+        resubmits.delete(c)
+      }
+      await disposeWorkspaceService(w)
+    })
+
+    it("the user's answer stays due until the agent reads it, though it acted on the card meanwhile (HI-1694's m4917)", async () => {
+      await loopWakes.clearLoopWakes()
+      const { w, alpha } = await open()
+      const st = fake(alpha)
+      const c = await newCard(w)
+      await lanes.startLane(w, { project: 'alpha', builder: 'b1', reviewer: 'r1', cards: [c], by: 'B1 (alpha)' })
+      const card = await inWorkspace(w, () => tasks.getTask(c, w))
+      const since = card.history.at(-1)!
+      st.status.set('b1', 'working')
+      await deliveries.createDelivery(alpha, { agentId: 'b1', agentName: 'B1 (alpha)', kind: 'answer', from: { kind: 'user', name: 'the user' }, card: c, body: 'Defender excludes Tools.', source: 'loop', ref: `#${c}/answer`, meta: { n: c, kind: 'answer', agentName: 'B1 (alpha)', sinceAt: since.at, sinceId: since.id ?? '', text: 'Defender excludes Tools.', to: 'b1' } })
+      // B1 submits its next round before it reads the answer.
+      await inWorkspace(w, () => tasks.updateTask(c, { column: 'review' }, b1))
+      st.status.set('b1', 'ready')
+      await vi.waitFor(async () => {
+        await loopWakes.tryLoopWakes()
+        expect(st.typed.filter((t) => t.agent === 'b1').map((t) => t.text).join('\n')).toContain('Defender excludes Tools.')
+      }, HANG)
+      await disposeWorkspaceService(w)
+    })
+  })
+
+  describe('what the notices name, hive_inbox gives (HI-1687)', async () => {
+    const deliveries = await import('../src/main/deliveries')
+    const { noticeFor } = await import('../src/main/inboxNotices')
+    const liveOf = (alpha: string, agentId: string) => ({ projectPath: alpha, agentId, sessionId: null }) as never
+    const idsIn = (text: string | null): string[] => [...(text ?? '').matchAll(/\bm\d+\b/g)].map((m) => m[0])
+    const given = (read: { items: { ids: string[] }[] }): string[] => read.items.flatMap((i) => i.ids)
+    const loopOf = async (alpha: string, agentId: string) => (await deliveries.deliveriesOf(alpha, agentId)).filter((r) => r.source === 'loop')
+    /** The builder working while its card passes: its verdict's wake waits in its inbox, made once by a read that gave it nothing. */
+    const passedWhileWorking = async () => {
+      await loopWakes.clearLoopWakes()
+      await rulesOff()
+      const { w, alpha } = await open()
+      const st = fake(alpha)
+      const c = await newCard(w)
+      const later = await newCard(w)
+      const unrelated = await newCard(w)
+      const lane = (await lanes.startLane(w, { project: 'alpha', builder: 'b1', reviewer: 'r1', cards: [c, later], by: 'B1 (alpha)' })).lane
+      st.status.set('b1', 'working')
+      st.status.set('r1', 'working')
+      st.status.set('o1', 'working')
+      await inWorkspace(w, () => tasks.updateTask(c, { column: 'review' }, b1))
+      await inWorkspace(w, () => tasks.updateTask(c, { review: 'start' }, r1))
+      await inWorkspace(w, () => tasks.updateTask(c, { review: 'passed', column: 'passed' }, r1, { comment: 'Round 1: PASSED.' }))
+      await vi.waitFor(async () => expect((await loopOf(alpha, 'b1')).filter((r) => r.state === 'queued')).toHaveLength(1), HANG)
+      const [wake] = await loopOf(alpha, 'b1')
+      return { w, alpha, st, c, later, unrelated, lane, wake }
+    }
+    afterEach(() => {
+      deliveries.setBeforePlanForTests(null)
+      loopWakes.loopWakeTestHooks.afterKey = null
+    })
+
+    it('another card changes while hive_inbox reads it: it is given and acked, and the Stop hook named nothing a read would not give', async () => {
+      const { w, alpha, unrelated, wake } = await passedWhileWorking()
+      const named = idsIn(await noticeFor(liveOf(alpha, 'b1'), 'drain'))
+      let changed = false
+      deliveries.setBeforePlanForTests(async () => {
+        if (changed) return
+        changed = true
+        await inWorkspace(w, () => tasks.updateTask(unrelated, {}, user, { comment: 'Another lane at work.' }))
+      })
+      const read = await deliveries.readInbox(alpha, 'b1')
+      expect(changed).toBe(true)
+      expect(given(read)).toEqual([wake.id])
+      expect(named.every((id) => given(read).includes(id))).toBe(true)
+      expect((await deliveries.ackDeliveries(alpha, 'b1', [wake.id])).acked).toEqual([wake.id])
+      await settled()
+      await disposeWorkspaceService(w)
+    })
+
+    it('once made, the Stop hook names it, and a read made again after its own card changed gives it', async () => {
+      const { w, alpha, c, wake } = await passedWhileWorking()
+      // Made by a read held back once (the card itself changed between its making and its hand-out): named now.
+      let changed = false
+      deliveries.setBeforePlanForTests(async () => {
+        if (changed) return
+        changed = true
+        await inWorkspace(w, () => tasks.updateTask(c, {}, user, { comment: 'A note on the card itself.' }))
+      })
+      const read = await deliveries.readInbox(alpha, 'b1')
+      expect(changed).toBe(true)
+      // Its own card changed: made again (the next attempt), then given.
+      expect(given(read)).toEqual([wake.id])
+      await settled()
+      await disposeWorkspaceService(w)
+    })
+
+    it("the lane's reviewer changes after a reviewer's wake is made and before its hand-out: the old reviewer gets nothing", async () => {
+      await loopWakes.clearLoopWakes()
+      await rulesOff()
+      const { w, alpha } = await open()
+      const st = fake(alpha)
+      const c = await newCard(w)
+      await lanes.startLane(w, { project: 'alpha', builder: 'b1', reviewer: 'r1', cards: [c], by: 'B1 (alpha)' })
+      st.status.set('r1', 'working')
+      st.status.set('o1', 'working')
+      await inWorkspace(w, () => tasks.updateTask(c, { column: 'review' }, b1))
+      await vi.waitFor(async () => expect((await loopOf(alpha, 'r1')).filter((r) => r.state === 'queued')).toHaveLength(1), HANG)
+      let changed = false
+      deliveries.setBeforePlanForTests(async () => {
+        if (changed) return
+        changed = true
+        await lanes.startLane(w, { project: 'alpha', builder: 'b1', reviewer: 'o1', cards: [c], by: 'B1 (alpha)' })
+      })
+      expect(given(await deliveries.readInbox(alpha, 'r1'))).toEqual([])
+      expect(changed).toBe(true)
+      expect((await loopOf(alpha, 'r1')).map((r) => `${r.state}: ${r.detail}`)).toEqual(["cancelled: it is another agent's wake now"])
+      expect(idsIn(await noticeFor(liveOf(alpha, 'r1'), 'drain'))).toEqual([])
+      await settled()
+      await disposeWorkspaceService(w)
+    })
+
+    it('the card changes while its wake is made again (before the read reaches the hand-out): that version is not given; the next one is', async () => {
+      const { w, alpha, c, wake } = await passedWhileWorking()
+      let changed = false
+      loopWakes.loopWakeTestHooks.afterKey = async () => {
+        if (changed) return
+        changed = true
+        await inWorkspace(w, () => tasks.updateTask(c, {}, user, { comment: 'Changed while it was made.' }))
+      }
+      const read = await deliveries.readInbox(alpha, 'b1')
+      expect(changed).toBe(true)
+      expect(given(read)).toEqual([wake.id])
+      // The version given is the one made after the change, not the one made across it.
+      expect((await deliveries.deliveriesOf(alpha, 'b1')).find((r) => r.id === wake.id)?.meta?.v).not.toBe(undefined)
+      await settled()
+      await disposeWorkspaceService(w)
+    })
+
+    it("a Done card's step whose lane ends before its hand-out is dropped as no longer due, and never named", async () => {
+      await loopWakes.clearLoopWakes()
+      await rulesOff()
+      const { w, alpha } = await open()
+      const st = fake(alpha)
+      const c = await newCard(w)
+      const lane = (await lanes.startLane(w, { project: 'alpha', builder: 'b1', reviewer: 'r1', cards: [c], by: 'B1 (alpha)' })).lane
+      st.status.set('b1', 'working')
+      st.status.set('r1', 'working')
+      await inWorkspace(w, () => tasks.updateTask(c, { column: 'review' }, b1))
+      await inWorkspace(w, () => tasks.updateTask(c, { review: 'start' }, r1))
+      await inWorkspace(w, () => tasks.updateTask(c, { review: 'passed', column: 'done' }, r1, { comment: 'Round 1: PASSED.' }))
+      await vi.waitFor(async () => expect((await loopOf(alpha, 'b1')).filter((r) => r.state === 'queued')).toHaveLength(1), HANG)
+      let ended = false
+      deliveries.setBeforePlanForTests(async () => {
+        if (ended) return
+        ended = true
+        await lanes.endLane(w, lane.id, {})
+      })
+      expect(given(await deliveries.readInbox(alpha, 'b1'))).toEqual([])
+      expect(ended).toBe(true)
+      expect((await loopOf(alpha, 'b1')).map((r) => `${r.state}: ${r.detail}`)).toEqual(['cancelled: no longer due'])
+      expect(idsIn(await noticeFor(liveOf(alpha, 'b1'), 'drain'))).toEqual([])
+      await settled()
+      await disposeWorkspaceService(w)
+    })
+
+    it('counting changes nothing: no version made, no wake for the new recipient, and a read in progress still gives it', async () => {
+      const { w, alpha, c, later, wake } = await passedWhileWorking()
+      // The lane's reviewer changes (a builder's wake stays the builder's), and the notices count, again and again.
+      await lanes.startLane(w, { project: 'alpha', builder: 'b1', reviewer: 'o1', cards: [c, later], by: 'B1 (alpha)' })
+      const snapshot = async () => JSON.stringify(await Promise.all(['b1', 'r1', 'o1'].map(async (a) => (await deliveries.deliveriesOf(alpha, a)).map((r) => [r.id, r.state, r.meta?.v ?? null]))))
+      const before = await snapshot()
+      let counted = 0
+      deliveries.setBeforePlanForTests(async () => {
+        // While the read waits at its hand-out: the notices count for both agents.
+        for (let i = 0; i < 3; i++) for (const a of ['b1', 'o1']) await noticeFor(liveOf(alpha, a), i % 2 ? 'checkpoint' : 'drain')
+        counted++
+      })
+      for (let i = 0; i < 3; i++) for (const a of ['b1', 'o1']) await noticeFor(liveOf(alpha, a), 'drain')
+      expect(await snapshot()).toBe(before)
+      const read = await deliveries.readInbox(alpha, 'b1')
+      expect(counted).toBeGreaterThan(0)
+      expect(given(read)).toEqual([wake.id])
+      await settled()
+      await disposeWorkspaceService(w)
+    })
+  })
+
+  it("a builder's comment after its reviewer's in the round is its reply: the reviewer is woken with it (HI-2302)", async () => {
+    await loopWakes.clearLoopWakes()
+    const { w, alpha } = await open()
+    const st = fake(alpha)
+    const c = await newCard(w)
+    await lanes.startLane(w, { project: 'alpha', builder: 'b1', reviewer: 'r1', cards: [c], by: 'B1 (alpha)' })
+    await inWorkspace(w, () => tasks.updateTask(c, { column: 'review' }, b1))
+    await typedUntil(st, 1)
+    expect(st.typed[0].agent).toBe('r1')
+    st.status.set('r1', 'ready')
+    // A builder's comment before its reviewer said anything this round is only a comment.
+    await inWorkspace(w, () => tasks.updateTask(c, {}, b1, { comment: 'The run record is in the summary.' }))
+    // PE-39: the reviewer, reviewing, asks for the logs; the builder answers.
+    await inWorkspace(w, () => tasks.updateTask(c, { review: 'start' }, r1))
+    await inWorkspace(w, () => tasks.updateTask(c, {}, r1, { comment: 'Please attach the e2e logs.' }))
+    await inWorkspace(w, () => tasks.updateTask(c, {}, b1, { comment: 'Logs attached: run-12.' }))
+    await typedUntil(st, 2)
+    expect(st.typed[1].agent).toBe('r1')
+    expect(st.typed[1].text).toContain('The builder replies: "Logs attached: run-12."')
+    expect(st.typed[1].text).toContain('You review this card in its loop: carry on with your review')
+    const h = await history(w, c)
+    expect(h.filter((x) => x.includes('Replied to the reviewer'))).toEqual(['B1 (alpha): Replied to the reviewer: "Logs attached: run-12."'])
+    await vi.waitFor(async () => expect(await history(w, c)).toContain('Hive: Woke R1 (alpha) with a card loop step (a loop wake)'), HANG)
+    // Another agent's comment is no reply, nor the reviewer's own.
+    await inWorkspace(w, () => tasks.updateTask(c, {}, agent('o1', 'O1'), { comment: 'Looks related to #12.' }))
+    await inWorkspace(w, () => tasks.updateTask(c, {}, r1, { comment: 'Thanks, reading them.' }))
+    await settled()
+    expect(st.typed).toHaveLength(2)
+    expect((await history(w, c)).filter((x) => x.includes('Replied to the reviewer'))).toHaveLength(1)
+    await disposeWorkspaceService(w)
+  })
+
+  it("a builder's reply is only a comment while the project's loop wakes are off (HI-2302)", async () => {
+    await loopWakes.clearLoopWakes()
+    const { w, alpha } = await open({ loopWakes: false })
+    const st = fake(alpha)
+    const c = await newCard(w)
+    await lanes.startLane(w, { project: 'alpha', builder: 'b1', reviewer: 'r1', cards: [c], by: 'B1 (alpha)' })
+    await inWorkspace(w, () => tasks.updateTask(c, { column: 'review' }, b1))
+    await inWorkspace(w, () => tasks.updateTask(c, { review: 'start' }, r1))
+    await inWorkspace(w, () => tasks.updateTask(c, {}, r1, { comment: 'Please attach the e2e logs.' }))
+    await inWorkspace(w, () => tasks.updateTask(c, {}, b1, { comment: 'Logs attached.' }))
+    await settled()
+    expect(st.typed).toEqual([])
+    expect((await history(w, c)).some((h) => h.includes('Replied to the reviewer'))).toBe(false)
+    await disposeWorkspaceService(w)
+  })
+
+  it("a lane reviewer's comment is only a comment while the project's loop wakes are off (#1410)", async () => {
+    await loopWakes.clearLoopWakes()
+    const { w, alpha } = await open({ loopWakes: false })
+    const st = fake(alpha)
+    const c = await newCard(w)
+    await lanes.startLane(w, { project: 'alpha', builder: 'b1', reviewer: 'r1', cards: [c], by: 'B1 (alpha)' })
+    await inWorkspace(w, () => tasks.updateTask(c, { column: 'review' }, b1))
+    await inWorkspace(w, () => tasks.updateTask(c, {}, r1, { comment: 'Waiting for the earlier card.' }))
+    await settled()
+    expect(st.typed).toEqual([])
+    expect((await history(w, c)).some((h) => h.includes('Asked the builder'))).toBe(false)
+    await disposeWorkspaceService(w)
+  })
+
+  it("a builder's Done wake in its lane names the lane's next card: Hive starts it with the rules on, the builder with them off (HI-1990)", async () => {
+    await loopWakes.clearLoopWakes()
+    const { w, alpha } = await open()
+    const st = fake(alpha)
+    const c = await newCard(w)
+    const next = (await inWorkspace(w, () => tasks.createTask({ title: 'Show progress', project: 'alpha', agent: 'b1' }, user))).number
+    await lanes.startLane(w, { project: 'alpha', builder: 'b1', reviewer: 'r1', cards: [c, next], by: 'B1 (alpha)' })
+    await inWorkspace(w, () => tasks.updateTask(c, { column: 'done' }, user))
+    await typedUntil(st, 1)
+    expect(st.typed).toEqual([{ agent: 'b1', text: `[Hive] #${c} is in Done. Your lane's next card is #${next} ("Show progress"): Hive starts it for you once your turn ends, so end your turn now (hive_read_task with latestComment for the comment in full).` }])
+    await disposeWorkspaceService(w)
+    // With the rules off the lane is the builder's to carry on: it starts the next card itself, whatever its card's prompt said.
+    await rulesOff()
+    const off = await open()
+    const st2 = fake(off.alpha)
+    const c2 = await newCard(off.w)
+    const next2 = (await inWorkspace(off.w, () => tasks.createTask({ title: 'Show progress', project: 'alpha', agent: 'b1' }, user))).number
+    await lanes.startLane(off.w, { project: 'alpha', builder: 'b1', reviewer: 'r1', cards: [c2, next2], by: 'B1 (alpha)' })
+    await inWorkspace(off.w, () => tasks.updateTask(c2, { column: 'done' }, user))
+    await typedUntil(st2, 1)
+    expect(st2.typed[0].text).toBe(`[Hive] #${c2} is in Done. Your lane's next card is #${next2} ("Show progress"): start it now (hive_lane next, then hive_start_card); this card's own prompt doesn't narrow the lane (hive_read_task with latestComment for the comment in full).`)
+    await disposeWorkspaceService(off.w)
   })
 })

@@ -44,7 +44,7 @@ const launch = async () => {
 
   let { app, page, inv } = await launch()
   await lib.openWorkspace(inv, page, ws)
-  const projectJson = () => JSON.parse(fs.readFileSync(path.join(alpha, '.hive', 'project.json'), 'utf8'))
+  const projectJson = () => lib.projectConfig(userData, alpha) // with this user's view over it (HI-1749)
   /** A layout's saved cells by agent name ("." for an empty cell), joined: "One . . Two". */
   const savedCells = (layout) => {
     const c = projectJson()
@@ -132,6 +132,52 @@ const launch = async () => {
   // --- Two dragged onto One's pane: they swap.
   await drag(lib.paneHeader(page, 'Two').locator('.agent-name'), () => pane('One'))
   check('a pane dropped on another swaps them', !!(await lib.until(async () => savedCells('grid6') === '. One . . . Two' && (await shownCells()) === '. One . . . Two', HUNG_MS)), `${savedCells('grid6')} / ${await shownCells()}`)
+
+  // --- A pane moved while its save is held (#1229): a refresh meanwhile reads the cells from before, and its report
+  // reaches the window (seen by a listener after the window's own, then drawn); the panes stay where they were moved.
+  await app.evaluate(() => void (process.env.HIVE_TEST_SLOW_IPC = 'agents:place=20000*1'))
+  await lib.showAgent(page, 'Two')
+  await page.evaluate(() => document.activeElement?.blur())
+  await page.keyboard.press('Control+Alt+Shift+ArrowLeft')
+  check('Move Agent Left on Two, its save held: shown at once, not saved yet', !!(await lib.until(async () => (await shownCells()) === '. One . . Two .', HUNG_MS)) && savedCells('grid6') === '. One . . . Two', `${savedCells('grid6')} / ${await shownCells()}`)
+  await page.evaluate(() => {
+    window.__olderCells = null
+    window.hive.onEvent((e) => {
+      const p = e.type === 'workspace-changed' && window.__olderCells === null ? e.workspace?.projects.find((x) => x.name === 'alpha') : null
+      if (p) window.__olderCells = (p.config.placement?.grid6 ?? []).map((id) => p.agents.find((a) => a.id === id)?.name ?? '.').join(' ')
+    })
+  })
+  await inv('workspace:refresh')
+  const older = await lib.until(() => page.evaluate(() => window.__olderCells), HUNG_MS)
+  await page.evaluate(() => new Promise((r) => requestAnimationFrame(() => requestAnimationFrame(r))))
+  check('…a refresh meanwhile reports the cells from before the move', older === '. One . . . Two', String(older))
+  check('…and the panes stay where they were moved', (await shownCells()) === '. One . . Two .', await shownCells())
+  await app.evaluate(() => void (process.env.HIVE_TEST_SLOW_IPC = ''))
+  // Bound: the save's hold left over, plus a hung run's.
+  check('…saved once its save goes on, still shown', !!(await lib.until(async () => savedCells('grid6') === '. One . . Two' && (await shownCells()) === '. One . . Two .', 20000 + HUNG_MS)), `${savedCells('grid6')} / ${await shownCells()}`)
+  await page.evaluate(() => document.activeElement?.blur())
+  await page.keyboard.press('Control+Alt+Shift+ArrowRight')
+  check('…and Move Agent Right puts it back', !!(await lib.until(async () => savedCells('grid6') === '. One . . . Two' && (await shownCells()) === '. One . . . Two', HUNG_MS)), `${savedCells('grid6')} / ${await shownCells()}`)
+
+  // --- Two moves of a pane, the later refused while the earlier's save is held (#1229 round 3): the panes show the
+  // earlier's cells, and once it is saved, what was saved, with no other refresh needed.
+  await app.evaluate(() => void (process.env.HIVE_TEST_SLOW_IPC = 'agents:place=20000*1'))
+  await page.evaluate(() => document.activeElement?.blur())
+  await page.keyboard.press('Control+Alt+Shift+ArrowLeft')
+  check('Move Agent Left on Two, its save held', !!(await lib.until(async () => (await shownCells()) === '. One . . Two .', HUNG_MS)) && savedCells('grid6') === '. One . . . Two', `${savedCells('grid6')} / ${await shownCells()}`)
+  // The next save fails at once (the held one has taken its delay already, and takes no failure once this one has).
+  await app.evaluate(() => void (process.env.HIVE_TEST_FAIL_IPC = 'agents:place*1'))
+  await page.evaluate(() => document.activeElement?.blur())
+  await page.keyboard.press('Control+Alt+Shift+ArrowLeft')
+  const refused = page.locator('.toast', { hasText: 'Could not move the agent' })
+  check("…Move Agent Left again, refused: the panes show the first move's cells, not the refused one's", !!(await lib.until(async () => (await refused.count()) > 0 && (await shownCells()) === '. One . . Two .', HUNG_MS)), `${await refused.count()} toasts / ${await shownCells()}`)
+  await app.evaluate(() => void (process.env.HIVE_TEST_SLOW_IPC = process.env.HIVE_TEST_FAIL_IPC = ''))
+  // Bound: the save's hold left over, plus a hung run's.
+  check('…once the first is saved, the panes show what was saved', !!(await lib.until(async () => savedCells('grid6') === '. One . . Two' && (await shownCells()) === '. One . . Two .', 20000 + HUNG_MS)), `${savedCells('grid6')} / ${await shownCells()}`)
+  await page.locator('.toast .icon-btn[aria-label="Dismiss"], .toast button[title="Dismiss"]').first().click().catch(() => undefined)
+  await page.evaluate(() => document.activeElement?.blur())
+  await page.keyboard.press('Control+Alt+Shift+ArrowRight')
+  check('…and Move Agent Right puts it back again', !!(await lib.until(async () => savedCells('grid6') === '. One . . . Two' && (await shownCells()) === '. One . . . Two', HUNG_MS)), `${savedCells('grid6')} / ${await shownCells()}`)
   for (const t of ['dark', 'light']) {
     await theme(t)
     await page.screenshot({ path: path.join(lib.WORK, `placement-1-grid-${t}.png`) })

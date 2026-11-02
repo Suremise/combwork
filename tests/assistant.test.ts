@@ -4,7 +4,7 @@ import { join } from 'path'
 import { describe, expect, it } from 'vitest'
 import { ASSISTANT_AGENT_ID, DEFAULT_MODE, RETIRED_PERSONAS, assistantModeId, assistantProjectConfig, modeMessage, modeSummary, newModeText, parseMode, modeId } from '../src/shared/assistant'
 import { DEFAULT_APP_CONFIG, DEFAULT_PROJECT_CONFIG, DEFAULT_SETTINGS, compactThreshold, mergeDefaults } from '../src/shared/defaults'
-import { agentLaunchSettings } from '../src/shared/providers'
+import { legacyLaunchSettings as agentLaunchSettings } from '../src/shared/connectionDefaults'
 import type { AppSettings, ProjectConfig } from '../src/shared/types'
 import { assistantTools, controlAllows } from '../src/shared/assistantTools'
 import { assistantStatusLine } from '../src/shared/assistantStatus'
@@ -106,7 +106,8 @@ describe('modes', () => {
       const lines = (p.summary ?? '').split('\n').filter(Boolean)
       expect(lines.length, f).toBeGreaterThanOrEqual(3)
       expect(lines.length, f).toBeLessThanOrEqual(5)
-      expect(p.body, f).toMatch(/## Put first[\s\S]+## How you work[\s\S]+## What you hand back/)
+      // How you work only where a mode has habits its skills don't own (HI-2010: Coordinator's are run-lanes' and coordinate-agents').
+      expect(p.body, f).toMatch(/## Put first[\s\S]+(## How you work[\s\S]+)?## What you hand back/)
       // How to use Hive's tools and what the Assistant may do are Hive's (its rules and skills), not a mode's.
       expect(`${p.body}\n${p.summary}`, f).not.toMatch(/hive_\w+|as Hive allows|you may|you can (add|start|stop)|permission/i)
     }
@@ -151,6 +152,9 @@ describe('control', () => {
     for (const level of ['look', 'agents', 'projects'] as const) expect(controlRules(level)).toMatch(/Settings → Assistant → Control/)
     expect(controlRules('look')).toMatch(/Look and advise/)
     expect(controlRules('look')).toMatch(/Never edit or create files[^.]*change the task board[^.]*start, stop or prompt agents, even if asked/)
+    // With Change settings on, the ban leaves the settings line its say (HI-2227: Codex took the ban for settings too).
+    expect(controlRules('look')).not.toMatch(/changing a Hive setting/)
+    expect(controlRules('look', true)).toMatch(/handovers is fine when the user asks, and so is changing a Hive setting, as the next line says\.\n- Hive's settings: change one \(hive_update_setting\)/)
     expect(controlRules('agents')).not.toMatch(/create projects/)
     expect(controlRules('projects')).toMatch(/create projects when the user asks/)
     for (const level of ['agents', 'projects'] as const) {
@@ -159,7 +163,8 @@ describe('control', () => {
       expect(rules).toMatch(/never edit or create project files/)
       expect(rules).toMatch(/Never interrupt a working agent, answer a question an agent is asking the user/)
       expect(rules).toMatch(/worktree only if the user asked/)
-      expect(rules).toMatch(/30 changes per message/)
+      // No count of changes per message (#1170): undo, not a cap, protects the board.
+      expect(rules).not.toMatch(/changes per message/)
       // How to work within them is the coordinate-agents skill's.
       expect(rules).toMatch(/coordinate-agents skill/)
     }

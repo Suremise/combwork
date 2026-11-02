@@ -111,6 +111,25 @@ const check = (name, ok, extra = '') => {
   check('then it takes a task again', given.status === 200, JSON.stringify(given.body))
   await api('POST', '/v1/agents/wait', { agents: [{ project: 'alpha', agent: 'Tester' }], timeoutSeconds: 30 })
 
+  // #1584: two subagents run in the background (the Agent tool's async_launched) keep it in the background, not
+  // finished, through the first one's end (its notification's turn) until the second ends.
+  const subs = await api('POST', '/v1/projects/alpha/agents/Tester/prompt', { text: 'subagent 6 subagent 14' })
+  const two = await until(async () => {
+    const s = await live(alpha, id)
+    return s?.status === 'background' && s.backgroundTasks === 2 && s
+  }, HUNG_MS)
+  check('its turn ends with two subagents running: background, two tasks (#1584)', subs.status === 200 && !!two, JSON.stringify(await live(alpha, id)))
+  // Its turn for the first one's end has replied and is over (the count drops when the end is read, before that turn).
+  const one = await until(async () => {
+    const s = await live(alpha, id)
+    const reply = (await api('GET', '/v1/projects/alpha/agents/Tester/activity')).body?.latestReply ?? ''
+    return s?.backgroundTasks === 1 && s.status === 'background' && /subagent Review part 1 has finished/.test(reply) && s
+  }, HUNG_MS)
+  check("the first one's end leaves it in the background, the other running", !!one, JSON.stringify(await live(alpha, id)))
+  const subsDone = await api('POST', '/v1/agents/wait', { agents: [{ project: 'alpha', agent: 'Tester' }], timeoutSeconds: 60 })
+  const last = subsDone.body?.agents?.[0]
+  check('it finishes once the last subagent has ended', subsDone.body?.timedOut === false && last?.status === 'finished' && last.backgroundTasks === 0, JSON.stringify(subsDone.body))
+
   // #712: a launch's task is on its CLI's command line, taken only after SessionStart. Held there (the fake keeps it
   // until fake-launch-go), the agent is ready but hasn't begun its task: a wait doesn't take that for idle.
   fs.writeFileSync(path.join(claudeHome, 'fake-launch-hold-Tester'), '')

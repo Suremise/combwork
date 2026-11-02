@@ -10,6 +10,7 @@ const lib = require('./lib.cjs')
 const { _electron } = require('playwright-core')
 const fs = require('fs')
 const path = require('path')
+const zlib = require('zlib')
 const { sessionsOf, putSessions } = require('./storeDocs.cjs')
 // The longest a wait here waits for what it waits on: a bound for a hung run, never how long it should take (#570).
 const HUNG_MS = 10000
@@ -74,7 +75,7 @@ const stamp = (d, name) => `${d.getFullYear()}-${two(d.getMonth() + 1)}-${two(d.
   await page.locator('.activity-btn[aria-label="Hive Assistant"]').click()
   await lib.until(async () => (await page.locator('.assistant-summary').count()) > 0, 10000)
   const sections = (await page.locator('.sidebar .section-header').allTextContents()).map((t) => t.replace(/\d+$/, '').trim())
-  check('sections in order: Modes, Conversations, Journal (#1033), Attachments', JSON.stringify(sections) === JSON.stringify(['Modes', 'Conversations', 'Journal', 'Attachments']), JSON.stringify(sections))
+  check('sections in order: Modes, MCP Servers (HI-2059), Conversations, Journal (#1033), Attachments', JSON.stringify(sections) === JSON.stringify(['Modes', 'MCP Servers', 'Conversations', 'Journal', 'Attachments']), JSON.stringify(sections))
 
   // --- New Mode…: Enter in its prompt (a real key press: keydown, keypress, keyup) never opens it again (#355).
   const newMode = async (name) => {
@@ -116,6 +117,7 @@ const stamp = (d, name) => `${d.getFullYear()}-${two(d.getMonth() + 1)}-${two(d.
   const group = page.locator('.image-group', { hasText: 'Planning the week' })
   await lib.until(async () => (await group.locator('.thumb').count()) === 4, 10000)
   check("the pasted files show, under their conversation's name", (await group.locator('.thumb').count()) === 4)
+  check('…with no tabs: the Assistant has pane attachments alone (HI-1841)', (await page.locator('.images-page .attachment-tabs').count()) === 0 && (await page.locator('.images-page [role="tabpanel"]').count()) === 0)
   check('the toolbar counts them by conversation', /4 in 1 conversation\b/.test(await page.locator('.images-toolbar').innerText()), await page.locator('.images-toolbar').innerText())
   const desc = await page.locator('.images-desc').innerText().catch(() => '')
   check('a line says what the view holds', desc === 'Files pasted or dropped into the Assistant, by conversation.', desc)
@@ -160,7 +162,23 @@ const stamp = (d, name) => `${d.getFullYear()}-${two(d.getMonth() + 1)}-${two(d.
   await lib.until(async () => (await page.locator('.images-page').count()) === 0, 8000)
   check('the group goes, and the view says there are none', /No attachments yet/.test(await page.locator('.empty-state').first().innerText().catch(() => '')))
   check('its images are gone from its home', !fs.existsSync(imgDir) || fs.readdirSync(imgDir).length === 0)
-  check('the conversation itself stays', fs.existsSync(path.join(home, '.hive', 'sessions', `${conv}.jsonl`)))
+  // Hive's copy of its transcript, whole: plain, or compressed by the backups' housekeeping (#1110), which may run
+  // meanwhile (#1298). The .gz is in place before the plain file goes, so reading the plain one first misses neither.
+  const backup = path.join(home, '.hive', 'sessions', `${conv}.jsonl`)
+  const kept = (() => {
+    try {
+      return fs.readFileSync(backup, 'utf8')
+    } catch {
+      try {
+        return zlib.gunzipSync(fs.readFileSync(backup + '.gz')).toString('utf8')
+      } catch {
+        return null
+      }
+    }
+  })()
+  check('the conversation itself stays, its transcript whole', kept === transcript.map((l) => JSON.stringify(l)).join('\n') + '\n', kept === null ? 'no copy' : 'changed')
+  check('nothing of it but its attachments went to the Recycle Bin', lib.trashed(conv).every((e) => e.from.toLowerCase().includes(`${path.sep}attachments${path.sep}`)), JSON.stringify(lib.trashed(conv).map((e) => e.from)))
+  check('its record stays', sessionsOf(home).sessions.some((s) => s.id === conv))
   await page.screenshot({ path: path.join(lib.WORK, 'assistantimages-2-empty.png') })
 
   await app.close()

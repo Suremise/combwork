@@ -2,7 +2,7 @@
 // workspace's), and with it lists, reads, comments on, moves, creates and orders only its project's cards, whatever
 // the request says about who is calling; other projects' cards answer as if they didn't exist, and a linked one
 // shows as a number. Nor can it read another project's agents' conversations (activity, sessions), where a card
-// started on an agent is its prompt, or type into them. The workspace token (scripts) still sees all of it. The agent is the fake Claude Code;
+// started on an agent is its prompt, or type into, hand over, start or stop them (HI-2327). The workspace token (scripts) still sees all of it. The agent is the fake Claude Code;
 // the calls are made with its token as its hive tools would. Dev build, throwaway profile, workspace and
 // CLAUDE_CONFIG_DIR.
 const lib = require('./lib.cjs')
@@ -88,7 +88,7 @@ const until = async (fn, ms = 10000) => {
   const agentToken = JSON.parse(fs.readFileSync(mcpEnv.HIVE_API_TOKEN_FILE, 'utf8')).token
   const workspaceToken = JSON.parse(fs.readFileSync(path.join(userData, 'agent-api.json'), 'utf8')).token
   check('the agent has a token of its own', !!agentToken && agentToken !== workspaceToken)
-  check("its environment has its token, not the workspace's", launch.env.HIVE_API_TOKEN === agentToken && launch.env.HIVE_API_TOKEN_FILE === mcpEnv.HIVE_API_TOKEN_FILE, JSON.stringify(launch.env))
+  check("its environment names its token's file, not the token (HI-2262)", launch.token === agentToken && !('HIVE_API_TOKEN' in launch.env) && launch.env.HIVE_API_TOKEN_FILE === mcpEnv.HIVE_API_TOKEN_FILE, JSON.stringify(launch.env))
   const call = async (token, method, p, body) => {
     const res = await fetch(`http://127.0.0.1:${PORT}${p}`, { method, headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' }, ...(body ? { body: JSON.stringify(body) } : {}) })
     return { status: res.status, body: await res.json().catch(() => null) }
@@ -112,6 +112,16 @@ const until = async (fn, ms = 10000) => {
   check('a project change takes the card from its agent, and says so', m.status === 200 && m.body.agent === null && m.body.history.slice(-1)[0].what === 'Taken from Alfie of alpha', JSON.stringify(m.body?.history?.slice(-2)))
   await inv('tasks:delete', moved)
   check('the workspace token still lists every card', r.status === 200 && r.body.length === 5, String(r.body?.length))
+  // ?q= (#1237): the board's search, through its index for words, in the caller's scope.
+  const titles = (x) => (x.status === 200 ? x.body.map((c) => c.title).sort() : x)
+  r = await call(workspaceToken, 'GET', '/v1/tasks?q=bet')
+  check('?q= finds cards by their words (the project, through the index)', JSON.stringify(titles(r)) === '["B1","B2"]', JSON.stringify(titles(r)))
+  r = await as('GET', '/v1/tasks?q=bet')
+  check("an agent's ?q= finds nothing of another project's", JSON.stringify(titles(r)) === '[]', JSON.stringify(titles(r)))
+  r = await as('GET', '/v1/tasks?q=ALP')
+  check("…and its own project's cards, case aside", JSON.stringify(titles(r)) === '["A1","A2"]', JSON.stringify(titles(r)))
+  r = await call(workspaceToken, 'GET', `/v1/tasks?q=%23${n.W}`)
+  check('?q= takes a card number too', JSON.stringify(titles(r)) === '["W"]', JSON.stringify(titles(r)))
 
   // --- Another project's card, or the workspace's: as if it didn't exist, whatever the request claims.
   for (const [what, x] of [['beta', n.B1], ['workspace', n.W]]) {
@@ -221,7 +231,25 @@ const until = async (fn, ms = 10000) => {
   check('…and its own sessions', r.status === 200 && Array.isArray(r.body), JSON.stringify(r).slice(0, 200))
   r = await as('POST', '/v1/agents/wait', { agents: [{ project: 'beta', agent: other.id }], timeoutSeconds: 1 })
   check("another project's agents' status is still open to it", r.status === 200 && !JSON.stringify(r.body).includes('PRIVATE'), JSON.stringify(r).slice(0, 300))
+  // Nor hand it over, stop it or start it (HI-2327): a hand-over prompts the agent, as typing into it does.
+  const betaRun = (await betaLive())?.runId
+  r = await as('POST', '/v1/projects/beta/handover', { from: other.id, to: other.id, handover: true })
+  check("…nor hand beta's agent over", r.status === 403 && /your own project/.test(r.body?.error ?? ''), JSON.stringify(r))
+  r = await as('POST', `/v1/projects/beta/stop?agent=${encodeURIComponent(other.id)}`)
+  check("…nor stop it", r.status === 403, JSON.stringify(r))
+  check('…and it runs on as it was, given nothing', (await betaLive())?.runId === betaRun && (await betaLive())?.status === 'finished', JSON.stringify(await betaLive()))
   await inv('session:stop', beta, other.id).catch(() => undefined)
+  await until(async () => !(await betaLive()), 10000)
+  r = await as('POST', '/v1/projects/beta/sessions', { agent: other.id })
+  check("…nor start it", r.status === 403 && !(await betaLive()), JSON.stringify(r))
+  // Nor turn beta off or on (HI-2330): with no session running there, a deactivate would otherwise go through.
+  const betaActive = async () => (await call(workspaceToken, 'GET', '/v1/projects/beta')).body?.active
+  r = await as('POST', '/v1/projects/beta/deactivate')
+  check("…nor deactivate beta", r.status === 403 && /your own project/.test(r.body?.error ?? '') && (await betaActive()) === true, JSON.stringify(r))
+  r = await as('POST', '/v1/projects/beta/activate')
+  check('…nor activate it', r.status === 403 && (await betaActive()) === true, JSON.stringify(r))
+  r = await as('POST', '/v1/projects/alpha/activate')
+  check('its own project it may activate', r.status === 200 && r.body?.active === true, JSON.stringify(r).slice(0, 300))
   // Something of alpha's own, so its stream has something to show.
   await inv('pty:write', lib.ptyKey(alpha, agent.id), 'hello')
   await lib.sleep(100)
@@ -262,6 +290,14 @@ const until = async (fn, ms = 10000) => {
   r = await call(workspaceToken, 'PATCH', `/v1/tasks/${busy}`, { column: 'done' })
   check('the workspace token can move it', r.status === 200 && r.body.column === 'done', JSON.stringify(r.body?.column ?? r))
   await inv('tasks:delete', busy)
+
+  // --- Its own project's agents it may still start and stop (HI-2327 confines only another project's).
+  const almaLive = async () => (await inv('session:live')).find((s) => s.agentId === alma.id)
+  r = await as('POST', '/v1/projects/alpha/sessions', { agent: alma.id })
+  check("it starts its own project's agent", r.status === 200 && r.body?.agentId === alma.id && !!(await almaLive()), JSON.stringify(r).slice(0, 300))
+  await until(async () => ['ready', 'finished'].includes((await almaLive())?.status), 20000)
+  r = await as('POST', `/v1/projects/alpha/stop?agent=${encodeURIComponent(alma.id)}`)
+  check('…and stops it', r.status === 200 && !!(await until(async () => !(await almaLive()), 10000)), JSON.stringify(r))
 
   // --- Once the agent stops, its token stops working.
   await inv('session:stop', alpha, agent.id).catch(() => undefined)

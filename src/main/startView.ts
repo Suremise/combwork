@@ -1,8 +1,10 @@
 import { basename } from 'path'
+import { ASSISTANT_START_VIEW } from '../shared/advanced'
 import { inScope, type JournalKind } from '../shared/journal'
 import { utf8Bytes } from '../shared/metrics'
 import { startView, type ViewCard, type ViewEntry } from '../shared/startView'
 import type { LiveSessionState, TaskCard } from '../shared/types'
+import { advanced } from './advanced'
 import { digestDue, hasJournal, recall, type RecallRow } from './journal'
 import { journalSettingsOf } from './journalService'
 import { listLanes } from './lanes'
@@ -27,9 +29,12 @@ const DAY = 86_400_000
 const cardOf = (c: TaskCard): ViewCard => ({ number: c.number, title: c.title, column: c.column, project: c.project || '(workspace)', agent: c.agentName ?? c.agent, reviewer: c.review?.agentName ?? null, blocked: c.blocked, labels: c.labels, updatedAt: c.updatedAt })
 const entryOf = (r: RecallRow): ViewEntry => ({ id: r.id, at: r.at, kind: r.kind, project: r.project, summary: r.summary, importance: r.importance })
 
-/** The view for a workspace's Assistant; null while its journal is off (or there is no workspace). */
+/**
+ * The view for a workspace's Assistant; null while its journal is off, Settings → Advanced turns the view off (#1286), or
+ * there is no workspace.
+ */
 export async function assistantStartView(ws: WorkspaceService, live: LiveSessionState[], source: string | null, now = new Date()): Promise<string | null> {
-  if (!ws.path) return null
+  if (!ws.path || !advanced.get<boolean>(ASSISTANT_START_VIEW)) return null
   const started = Date.now()
   const settings = journalSettingsOf(ws)
   if (!settings.enabled) return null

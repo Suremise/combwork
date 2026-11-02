@@ -123,7 +123,7 @@ const oldCard = (n, proj, agent) =>
   await page.locator('.moved-banner button', { hasText: 'Repair…' }).click()
   const dialog = page.locator('.dialog', { has: page.locator('.move-repair') })
   await dialog.waitFor({ timeout: 10000 })
-  check('the plan gives the cards saved under old-site to site', !!(await lib.until(async () => /Give the 2 cards saved under old-site \(#1, #2\) to site/.test(await dialog.innerText()), 10000)), await dialog.innerText())
+  check('the plan gives the cards saved under old-site to site', !!(await lib.until(async () => /Board: old-site; will give 2 cards \(#1, #2\) to site/.test(await dialog.innerText()), 10000)), await dialog.innerText())
   await shots(page, 'repair-plan')
   await dialog.getByRole('button', { name: 'Repair', exact: true }).click()
   check('Repair says what it did', !!(await lib.until(async () => /2 cards of old-site now belong to site/.test(await dialog.innerText()), 15000)), await dialog.innerText())
@@ -141,7 +141,8 @@ const oldCard = (n, proj, agent) =>
   await page.locator('.board-toolbar label', { hasText: 'Archived (' }).click()
   const table = page.locator('.archived-cards')
   await table.waitFor({ timeout: 10000 })
-  const rowOf = (n) => table.locator('tbody tr', { has: page.locator('.task-number', { hasText: new RegExp(`^#${n}$`) }) })
+  // A row by its card's number (its cell shows the card's key, #1221).
+  const rowOf = (n) => table.locator('tbody tr', { has: page.locator(`.task-number[data-task="${n}"]`) })
   check('Archived shows the renamed project’s card under its new name, with its agent', !!(await lib.until(async () => {
     const t = await rowOf(old.number).innerText().catch(() => '')
     return /gamma/.test(t) && /Builder/.test(t) && !/removed/.test(t)

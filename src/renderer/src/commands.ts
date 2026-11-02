@@ -1,21 +1,27 @@
 import { PROJECT_KEYBINDING_CATEGORIES, SESSION_LAYOUTS, projectSessionView, resolveKeybinding } from '@shared/defaults'
 import { PROVIDERS, providerDescriptor } from '@shared/providers'
 import { batchCounts, type BatchCounts } from '@shared/startAll'
-import type { ProjectInfo, ProviderId, SessionLayout } from '@shared/types'
+import { appTakesTerminalKey } from '@shared/terminalInput'
+import type { ProjectInfo, ProviderId, SessionLayout, ToastTarget } from '@shared/types'
 import { tilePageCount } from '@shared/tiles'
 import { APP_NAME } from '@shared/appName'
 import { msg, tr, type Msg, type Values } from '@shared/i18n'
 import { call } from './api'
 import { EXPORT_BOARD, exportBoard, unarchiveBatch } from './boardBatches'
+import { restoreBoard09 } from './components/BoardUpgrade'
 import { checkForUpdates, openReleaseNotes } from './components/Updates'
 import { openModeMenu } from './components/PermissionMode'
 import * as actions from './actions'
 import { noteCommandUsed } from './tips'
+import { showNoticeTarget } from './noticeTarget'
 import { requestStripMenu, type StripMenu } from './stripMenus'
-import { showAntivirus } from './components/Antivirus'
+import { dismissAntivirusOffer, showAntivirus } from './components/Antivirus'
 import { focusTileAfter } from './components/AgentTiles'
-import { agentPage, assistantOnLeft, closeTile, showTilePage, tileFocusOf, tilePage, focusedAgentId, get, isAssistantPath, setAssistantSide, notify, openProjectSettings, revealAgent, set, setActivity, setAssistantOpen, setProgressOpen, progressIsOpen, showAssistantView, showView, showUnusedWorktrees, setProjectTab, showAgent, showPage, panePageCount, shownLayout, toggleCompactSidebar, type ProjectTab } from './store'
+import type { VcSection } from '@shared/gitRepo'
+import { agentPage, assistantOnLeft, closeTile, showTilePage, tileFocusOf, tilePage, tilesPageSize, focusedAgentId, get, isAssistantPath, setAssistantSide, notify, openInSessionsTab, openProjectSettings, openVersionControl, revealAgent, set, setActivity, setAssistantOpen, setProgressOpen, progressIsOpen, showAssistantView, showView, showUnusedWorktrees, setProjectTab, showAgent, showPage, panePageCount, shownLayout, toggleCompactSidebar, type ProjectTab } from './store'
 import { STRIP_TABS } from '@shared/projectTabs'
+import { workspacePaused } from './teamPause'
+import { pauseTheTeam, resumeTheTeam } from './components/TeamPause'
 
 /** A command's category: an id (CATEGORY_TEXT names it), as Settings → Keyboard Shortcuts groups and filters them. */
 export type CommandCategory = 'view' | 'file' | 'project' | 'session' | 'help' | 'preferences' | 'assistant' | 'developer' | 'tasks' | 'notes' | 'mcp'
@@ -45,7 +51,8 @@ export interface CommandDef {
   /** The default shortcut. Users change it in Settings → Keyboard Shortcuts (projects for Project and Session commands). */
   keybinding?: string
   run: (...args: any[]) => unknown
-  when?: () => boolean
+  /** Whether it can run now; given the arguments it runs with (a notice's button names its project, #1437). */
+  when?: (...args: unknown[]) => boolean
   /** Needs arguments (e.g. a path), so it can't have a shortcut or appear in the palette. */
   internal?: boolean
   /** A toggle: shown with a checkmark in the menus and the palette while it is on. */
@@ -132,7 +139,7 @@ const tilesShown = (p: ProjectInfo): boolean => projectSessionView(p.config, get
 const pageCount = (): number => {
   const p = selected()
   if (!p) return 1
-  return tilesShown(p) ? tilePageCount(p.agents.length) : panePageCount(p)
+  return tilesShown(p) ? tilePageCount(p.agents.length, tilesPageSize(p)) : panePageCount(p)
 }
 
 /** Whether the selected project's agents move: two or more (in order), or one in panes side by side (to another cell, #762). */
@@ -207,11 +214,12 @@ const COMMAND_DEFS: CommandDef[] = [
   { id: 'project.goto', name: msg({ id: 'shell.command.project.goto', defaultMessage: 'Go to Project…', description: 'A command (the menus, the command palette, Settings → Keyboard Shortcuts), in the View category. The … says it opens a dialog first: keep it.' }), category: 'view', keybinding: 'Mod+P', when: hasWorkspace, run: () => set({ paletteOpen: true, paletteMode: 'projects' }) }, // i18n-ignore: a shortcut's keys
   { id: 'settings.open', name: msg({ id: 'shell.command.settings.open', defaultMessage: 'Open Settings', description: 'A command (the menus, the command palette, Settings → Keyboard Shortcuts), in the Preferences category.' }), category: 'preferences', keybinding: 'Mod+,', run: () => setActivity('settings') }, // i18n-ignore: a shortcut's keys
   { id: 'settings.providers', name: msg({ id: 'shell.command.settings.providers', defaultMessage: 'Choose Coding Agents (Providers)', description: 'A command (the menus, the command palette, Settings → Keyboard Shortcuts), in the Preferences category.' }), category: 'preferences', run: () => { set({ settingsSection: 'providers', settingsQuery: '' }); setActivity('settings') } },
+  { id: 'settings.accounts', name: msg({ id: 'shell.command.settings.accounts', defaultMessage: 'Accounts & Connections', description: 'A command (the menus, the command palette, Settings → Keyboard Shortcuts), in the Preferences category (HI-2107): opens Settings → Accounts & Connections.' }), category: 'preferences', run: () => { set({ settingsSection: 'accounts', settingsQuery: '' }); setActivity('settings') } },
   { id: 'settings.keybindings', name: msg({ id: 'shell.command.settings.keybindings', defaultMessage: 'Customise Keyboard Shortcuts', description: 'A command (the menus, the command palette, Settings → Keyboard Shortcuts), in the Preferences category.' }), category: 'preferences', run: () => { set({ settingsSection: 'keybindings', settingsQuery: '' }); setActivity('settings') } },
   { id: 'settings.advanced', name: msg({ id: 'shell.command.settings.advanced', defaultMessage: 'Advanced Settings', description: 'A command (the menus, the command palette, Settings → Keyboard Shortcuts), in the Preferences category.' }), category: 'preferences', run: () => { set({ settingsSection: 'advanced', settingsQuery: '' }); setActivity('settings') } },
   { id: 'settings.notifications', name: msg({ id: 'shell.command.settings.notifications', defaultMessage: 'Notification Settings', description: 'A command (the menus, the command palette, Settings → Keyboard Shortcuts), in the Preferences category.' }), category: 'preferences', run: () => { set({ settingsSection: 'notifications', settingsQuery: '' }); setActivity('settings') } },
   { id: 'antivirus.show', name: msg({ id: 'shell.command.antivirus.show', defaultMessage: 'Antivirus Scanning of the Workspace', description: 'A command (the menus, the command palette, Settings → Keyboard Shortcuts), in the Preferences category.' }), category: 'preferences', run: () => showAntivirus() },
-  { id: 'antivirus.dismiss', name: msg({ id: 'shell.command.antivirus.dismiss', defaultMessage: 'Don’t Suggest Antivirus Exclusions Again', description: "A command (the menus, the command palette, Settings → Keyboard Shortcuts), in the Preferences category. It isn't in the menus or the palette: notifications and buttons run it by its name." }), category: 'preferences', internal: true, run: () => void call('antivirus:dismiss') },
+  { id: 'antivirus.dismiss', name: msg({ id: 'shell.command.antivirus.dismiss', defaultMessage: 'Don’t Suggest Antivirus Exclusions Again', description: "A command (the menus, the command palette, Settings → Keyboard Shortcuts), in the Preferences category. It isn't in the menus or the palette: notifications and buttons run it by its name." }), category: 'preferences', internal: true, run: () => dismissAntivirusOffer() },
   { id: 'window.new', name: msg({ id: 'shell.command.window.new', defaultMessage: 'New Window', description: 'A command (the menus, the command palette, Settings → Keyboard Shortcuts), in the File category.' }), category: 'file', keybinding: 'Mod+K Mod+N', run: () => call('window:new') }, // i18n-ignore: a shortcut's keys
   { id: 'workspace.open', name: msg({ id: 'shell.command.workspace.open', defaultMessage: 'Open Workspace…', description: 'A command (the menus, the command palette, Settings → Keyboard Shortcuts), in the File category. The … says it opens a dialog first: keep it.' }), category: 'file', keybinding: 'Mod+K Mod+O', run: (path?: string) => actions.openWorkspace(path) }, // i18n-ignore: a shortcut's keys
   { id: 'workspace.create', name: msg({ id: 'shell.command.workspace.create', defaultMessage: 'New Workspace…', description: 'A command (the menus, the command palette, Settings → Keyboard Shortcuts), in the File category. The … says it opens a dialog first: keep it.' }), category: 'file', run: () => actions.createWorkspace() },
@@ -241,7 +249,9 @@ const COMMAND_DEFS: CommandDef[] = [
   { id: 'project.tab.sessions', name: msg({ id: 'shell.command.project.tab.sessions', defaultMessage: 'Go to Sessions', description: 'A command (the menus, the command palette, Settings → Keyboard Shortcuts), in the Project category.' }), category: 'project', keybinding: 'Alt+5', when: hasProject, run: tab('sessions') },
   { id: 'project.tab.files', name: msg({ id: 'shell.command.project.tab.files', defaultMessage: 'Go to Files', description: 'A command (the menus, the command palette, Settings → Keyboard Shortcuts), in the Project category.' }), category: 'project', keybinding: 'Alt+6', when: hasProject, run: tab('files') },
   { id: 'project.tab.images', name: msg({ id: 'shell.command.project.tab.images', defaultMessage: 'Go to Attachments', description: 'A command (the menus, the command palette, Settings → Keyboard Shortcuts), in the Project category.' }), category: 'project', keybinding: 'Alt+7', when: hasProject, run: tab('images') },
-  { id: 'project.tab.changes', name: msg({ id: 'shell.command.project.tab.changes', defaultMessage: 'Go to Git', description: 'A command (the menus, the command palette, Settings → Keyboard Shortcuts), in the Project category.' }), category: 'project', keybinding: 'Alt+8', when: hasProject, run: tab('changes') },
+  { id: 'project.tab.changes', name: msg({ id: 'shell.command.project.tab.changes', defaultMessage: 'Go to Version Control', description: 'A command (the menus, the command palette, Settings → Keyboard Shortcuts), in the Project category: shows the Version Control tab (glossary 2.1).' }), category: 'project', keybinding: 'Alt+8', when: hasProject, run: tab('changes') },
+  { id: 'project.tab.activity', name: msg({ id: 'shell.command.project.tab.activity', defaultMessage: 'Go to Activity', description: "A command (the menus, the command palette, Settings → Keyboard Shortcuts), in the Project category: shows the Activity tab, the project's live work as a tree." }), category: 'project', keybinding: 'Alt+9', when: hasProject, run: tab('activity') },
+  { id: 'project.openVersionControl', name: msg({ id: 'shell.command.project.openVersionControl', defaultMessage: 'Open Version Control', description: "A command, in the Project category: shows a project's Version Control tab (glossary 2.1). It isn't in the menus or the palette: notifications run it by its name (Hive found another version control in a project's folder)." }), category: 'project', internal: true, run: (path?: string, section?: VcSection) => typeof path === 'string' && openVersionControl(path, section ?? get().vcSection[path] ?? 'workflow') },
   { id: 'project.tab.memory', name: msg({ id: 'shell.command.project.tab.memory', defaultMessage: 'Go to Memory', description: 'A command (the menus, the command palette, Settings → Keyboard Shortcuts), in the Project category.' }), category: 'project', when: hasProject, run: tab('memory') },
   { id: 'project.tab.skills', name: msg({ id: 'shell.command.project.tab.skills', defaultMessage: 'Go to Skills', description: 'A command (the menus, the command palette, Settings → Keyboard Shortcuts), in the Project category.' }), category: 'project', when: hasProject, run: tab('skills') },
   { id: 'project.tab.templates', name: msg({ id: 'shell.command.project.tab.templates', defaultMessage: 'Go to Templates', description: 'A command (the menus, the command palette, Settings → Keyboard Shortcuts), in the Project category.' }), category: 'project', when: hasProject, run: tab('templates') },
@@ -288,13 +298,23 @@ const COMMAND_DEFS: CommandDef[] = [
     }
   },
   {
+    id: 'session.showTranscript',
+    name: msg({ id: 'shell.command.session.showTranscript', defaultMessage: "Read a Session's Transcript", description: "A command (the menus, the command palette, Settings → Keyboard Shortcuts), in the Session category. It isn't in the menus or the palette: notifications and buttons run it by its name. It opens the Sessions tab on one session (#1434)." }),
+    category: 'session',
+    // A refused Resume's notice (#1434), which passes the project and the session.
+    internal: true,
+    run: (projectPath?: unknown, sessionId?: unknown) => {
+      if (typeof projectPath === 'string' && typeof sessionId === 'string') openInSessionsTab(projectPath, sessionId)
+    }
+  },
+  {
     id: 'session.handOverLongConversation',
     name: msg({ id: 'shell.command.session.handOverLongConversation', defaultMessage: 'Hand Over a Long Conversation', description: "A command (the menus, the command palette, Settings → Keyboard Shortcuts), in the Session category. It isn't in the menus or the palette: notifications and buttons run it by its name. It opens Hand Over to… if the agent is idle and on no card loop's card." }),
     category: 'session',
     // The long-conversation notice's Hand Over to…, which passes the agent: checked again when it is clicked.
     internal: true,
-    run: (projectPath?: unknown, agentId?: unknown) => {
-      if (typeof projectPath === 'string' && typeof agentId === 'string') void actions.handOverLongConversation(projectPath, agentId)
+    run: (projectPath?: unknown, agentId?: unknown, sessionId?: unknown) => {
+      if (typeof projectPath === 'string' && typeof agentId === 'string') return actions.handOverLongConversation(projectPath, agentId, typeof sessionId === 'string' ? sessionId : undefined)
     }
   },
   {
@@ -303,9 +323,9 @@ const COMMAND_DEFS: CommandDef[] = [
     category: 'session',
     // Only from the notification, which passes the agent and file.
     internal: true,
-    run: (projectPath?: unknown, agentId?: unknown, path?: unknown) => {
+    run: (projectPath?: unknown, agentId?: unknown, path?: unknown, offer?: unknown) => {
       if (typeof projectPath === 'string' && typeof agentId === 'string' && typeof path === 'string')
-        void actions.attempt(tr(msg({ id: 'shell.error.allowEdit', defaultMessage: 'Could not allow the edit', description: "An error's title: allowing an agent's edit of a locked file failed." })), () => call('session:allowLockedEdit', projectPath, agentId, path))
+        return actions.attempt(tr(msg({ id: 'shell.error.allowEdit', defaultMessage: 'Could not allow the edit', description: "An error's title: allowing an agent's edit of a locked file failed." })), () => call('session:allowLockedEdit', projectPath, agentId, path, typeof offer === 'string' ? offer : undefined))
     }
   },
   {
@@ -314,9 +334,11 @@ const COMMAND_DEFS: CommandDef[] = [
     category: 'session',
     // Only from the notification and the pane header, which pass the agent and what to do.
     internal: true,
-    run: (projectPath?: unknown, agentId?: unknown, how?: unknown) => {
-      if (typeof projectPath === 'string' && typeof agentId === 'string' && (how === 'end' || how === 'keep'))
-        void actions.attempt(how === 'end' ? tr(msg({ id: 'shell.error.endProcesses', defaultMessage: 'Could not end the processes', description: "An error's title: ending the processes an agent left running failed." })) : tr(msg({ id: 'shell.error.keepProcesses', defaultMessage: 'Could not keep the processes', description: "An error's title: keeping the processes an agent left running failed." })), () => call('session:settleLeftovers', projectPath, agentId, how))
+    // From a notice, its offer (HI-2320): only what it listed, checked again by main, which says what happened.
+    run: (projectPath?: unknown, agentId?: unknown, how?: unknown, offer?: unknown) => {
+      if (typeof projectPath !== 'string' || typeof agentId !== 'string' || (how !== 'end' && how !== 'keep')) return
+      const title = how === 'end' ? tr(msg({ id: 'shell.error.endProcesses', defaultMessage: 'Could not end the processes', description: "An error's title: ending the processes an agent left running failed." })) : tr(msg({ id: 'shell.error.keepProcesses', defaultMessage: 'Could not keep the processes', description: "An error's title: keeping the processes an agent left running failed." }))
+      return actions.attempt(title, async () => void (typeof offer === 'string' ? await call('session:settleOffer', projectPath, offer, how) : await call('session:settleLeftovers', projectPath, agentId, how))).then(() => undefined)
     }
   },
   {
@@ -325,9 +347,9 @@ const COMMAND_DEFS: CommandDef[] = [
     category: 'session',
     // Only from the notification, which names the job and the conversation.
     internal: true,
-    run: (projectPath?: unknown, agentId?: unknown, jobId?: unknown, sessionId?: unknown) => {
+    run: (projectPath?: unknown, agentId?: unknown, jobId?: unknown, sessionId?: unknown, offer?: unknown) => {
       if (typeof projectPath === 'string' && typeof agentId === 'string' && typeof jobId === 'string' && typeof sessionId === 'string')
-        void actions.attempt(tr(msg({ id: 'shell.error.stopBackground', defaultMessage: 'Could not stop the background session', description: "An error's title: stopping an agent's background session failed." })), () => call('session:stopBackgroundAndResume', projectPath, agentId, jobId, sessionId))
+        return actions.attempt(tr(msg({ id: 'shell.error.stopBackground', defaultMessage: 'Could not stop the background session', description: "An error's title: stopping an agent's background session failed." })), () => call('session:stopBackgroundAndResume', projectPath, agentId, jobId, sessionId, typeof offer === 'string' ? offer : undefined))
     }
   },
   {
@@ -336,7 +358,7 @@ const COMMAND_DEFS: CommandDef[] = [
     category: 'session',
     // Only from the notice that Hive closed unexpectedly (#984), which lists them.
     internal: true,
-    run: () => void actions.attempt(tr(msg({ id: 'shell.error.resumeAfterClose', defaultMessage: 'Could not resume the agents', description: "An error's title: resuming the agents that were running when Hive closed unexpectedly failed." })), () => call('app:resumeAfterClose'))
+    run: () => actions.attempt(tr(msg({ id: 'shell.error.resumeAfterClose', defaultMessage: 'Could not resume the agents', description: "An error's title: resuming the agents that were running when Hive closed unexpectedly failed." })), () => call('app:resumeAfterClose'))
   },
   {
     id: 'session.stopLeftAfterClose',
@@ -344,15 +366,33 @@ const COMMAND_DEFS: CommandDef[] = [
     category: 'session',
     // Only from the notice that Hive closed unexpectedly (#987), which lists them.
     internal: true,
-    run: () => void actions.attempt(tr(msg({ id: 'shell.error.stopLeftAfterClose', defaultMessage: 'Could not stop the processes', description: "An error's title: ending the processes the agents had started before Hive closed unexpectedly failed." })), () => call('app:stopLeftAfterClose'))
+    run: () => actions.attempt(tr(msg({ id: 'shell.error.stopLeftAfterClose', defaultMessage: 'Could not stop the processes', description: "An error's title: ending the processes the agents had started before Hive closed unexpectedly failed." })), () => call('app:stopLeftAfterClose'))
+  },
+  {
+    id: 'session.resumeRestart',
+    name: msg({ id: 'shell.command.session.resumeRestart', defaultMessage: 'Resume the Agents Working When Hive Closed', description: "A command (the menus, the command palette, Settings → Keyboard Shortcuts), in the Session category: resumes the agents that were working when Hive was last quit or restarted. It isn't in the menus or the palette: notifications and buttons run it by its name." }),
+    category: 'session',
+    // Only from the notice offering it (HI-1707), which lists them.
+    internal: true,
+    run: () => actions.attempt(tr(msg({ id: 'shell.error.resumeRestart', defaultMessage: 'Could not resume the agents', description: "An error's title: resuming the agents that were working when Hive was last quit or restarted failed." })), () => call('app:resumeRestart'))
+  },
+  {
+    id: 'session.dismissRestart',
+    name: msg({ id: 'shell.command.session.dismissRestart', defaultMessage: "Don't Resume the Agents Working When Hive Closed", description: "A command (the menus, the command palette, Settings → Keyboard Shortcuts), in the Session category: declines the offer to resume the agents that were working when Hive was last quit or restarted. It isn't in the menus or the palette: notifications and buttons run it by its name." }),
+    category: 'session',
+    // Only from the notice offering it (HI-1707).
+    internal: true,
+    run: () => call('app:dismissRestart').catch(() => undefined)
   },
   {
     id: 'session.applyPermissionModes',
     name: msg({ id: 'shell.command.session.applyPermissionModes', defaultMessage: 'Switch Running Agents to Their Permission Mode Settings', description: 'A command (the menus, the command palette, Settings → Keyboard Shortcuts), in the Session category.' }),
     category: 'session',
-    run: async () => {
-      const r = await actions.attempt(tr(msg({ id: 'shell.error.switchModes', defaultMessage: 'Could not switch permission modes', description: "An error's title: switching running agents to their permission mode settings failed." })), () => call('session:applyModes'))
-      if (!r) return
+    // From its notice, the notice's offer (HI-2320): what happened goes into that notice.
+    run: async (offer?: unknown) => {
+      const fromNotice = typeof offer === 'string' ? offer : undefined
+      const r = await actions.attempt(tr(msg({ id: 'shell.error.switchModes', defaultMessage: 'Could not switch permission modes', description: "An error's title: switching running agents to their permission mode settings failed." })), () => call('session:applyModes', fromNotice))
+      if (!r || fromNotice) return
       if (r.switched.length) notify('success', tr(msg({ id: 'shell.modes.switched', defaultMessage: 'Permission mode switched', description: 'A notice after running agents were switched to their permission mode settings; the agents are listed under it.' })), r.switched.join('\n'))
       if (r.skipped.length) notify('warning', r.switched.length ? tr(msg({ id: 'shell.modes.someSkipped', defaultMessage: 'Some agents were not switched', description: 'A notice after switching permission modes: the agents listed under it were not switched.' })) : tr(msg({ id: 'shell.modes.noneSwitched', defaultMessage: 'Permission mode not switched', description: 'A notice after switching permission modes: none could be switched; why is listed under it.' })), r.skipped.join('\n'))
       if (!r.switched.length && !r.skipped.length) notify('info', tr(msg({ id: 'shell.modes.nothing', defaultMessage: 'Nothing to switch', description: 'A notice: every running agent already has its permission mode.' })), tr(msg({ id: 'shell.modes.nothingDetail', defaultMessage: 'Every running agent is already in the mode its settings ask for.', description: 'More in the notice that there was nothing to switch.' })))
@@ -371,6 +411,17 @@ const COMMAND_DEFS: CommandDef[] = [
       const p = path ? get().workspace?.projects.find((x) => x.path === path) : selected()
       const id = agentId ?? (p ? focusedAgentId(p) : null)
       if (p && id && p.agents.some((a) => a.id === id)) set({ agentSettingsFor: { project: p.path, agentId: id } })
+    }
+  },
+  {
+    id: 'agent.hooks',
+    name: msg({ id: 'shell.command.agent.hooks', defaultMessage: 'Agent Hooks…', description: "A command (the menus, the command palette, Settings → Keyboard Shortcuts), in the Session category: opens the focused agent's Hooks dialog (the hooks its session has, and what Hive received). The … says it opens a dialog first: keep it." }),
+    category: 'session',
+    when: () => !!selected()?.agents.length,
+    run: (path?: string, agentId?: string) => {
+      const p = path ? get().workspace?.projects.find((x) => x.path === path) : selected()
+      const id = agentId ?? (p ? focusedAgentId(p) : null)
+      if (p && id && p.agents.some((a) => a.id === id)) set({ hooksFor: { project: p.path, agentId: id } })
     }
   },
   {
@@ -436,6 +487,18 @@ const COMMAND_DEFS: CommandDef[] = [
   },
   { id: 'session.archive', name: msg({ id: 'shell.command.session.archive', defaultMessage: 'Archive Session and Start New…', description: 'A command (the menus, the command palette, Settings → Keyboard Shortcuts), in the Session category. The … says it opens a dialog first: keep it.' }), category: 'session', when: hasProject, run: () => actions.archiveCurrent() },
   // Every agent of the project at once, after one confirmation (#216); the menus and the palette say how many (#275).
+  {
+    id: 'session.startFreshIdle',
+    name: msg({ id: 'shell.command.session.startFreshIdle', defaultMessage: 'Start Fresh (Idle Agents)…', description: "A command (the menus, the command palette, Settings → Keyboard Shortcuts), in the Session category (#1437): gives each idle running agent of the project a new conversation, after one question. The … says it opens a dialog first: keep it." }),
+    category: 'session',
+    // The nudge's button passes its project (in this window: main sends it to the window that has it), whatever is
+    // selected; otherwise the selected one, with an agent running.
+    when: (projectPath?: unknown) => (typeof projectPath === 'string' ? !!get().workspace?.projects.some((p) => p.path.toLowerCase() === projectPath.toLowerCase()) : hasProject() && !!selected()?.agents.some((a) => a.live)),
+    run: (projectPath?: unknown) => {
+      const path = typeof projectPath === 'string' ? projectPath : selected()?.path
+      if (path) return actions.startFreshIdle(path)
+    }
+  },
   { id: 'session.startNewAll', name: msg({ id: 'shell.command.session.startNewAll', defaultMessage: 'Start New (All)…', description: 'A command (the menus, the command palette, Settings → Keyboard Shortcuts), in the Session category. The … says it opens a dialog first: keep it.' }), category: 'session', when: () => hasProject() && !!selected()?.agents.length, liveLabel: () => batchLabel(msg({ id: 'shell.command.session.startNewAllLive', defaultMessage: '{several, select, yes {Start New ({n})…} other {Start New…}}', description: 'The command that gives every agent of the project a new session, as the menus and the palette show it: with several agents, how many it acts on ({n}). The … says it asks first: keep it.' }), 'startNew'), run: () => void actions.startNewAll(get().selectedProject!) },
   // The project's agents and layout as a template (#126); loading one and adding one of its agents open the agent strip's menus (#286).
   { id: 'template.save', name: msg({ id: 'shell.command.template.save', defaultMessage: 'Save Agents as Template…', description: 'A command (the menus, the command palette, Settings → Keyboard Shortcuts), in the Session category. The … says it opens a dialog first: keep it.' }), category: 'session', when: () => hasProject() && !!selected()?.agents.length, run: () => void actions.saveTemplate(get().selectedProject!) },
@@ -453,6 +516,7 @@ const COMMAND_DEFS: CommandDef[] = [
   },
   { id: 'view.projects', name: msg({ id: 'shell.command.view.projects', defaultMessage: 'Show Projects', description: 'A command (the menus, the command palette, Settings → Keyboard Shortcuts), in the View category.' }), category: 'view', keybinding: 'Mod+Shift+E', run: () => setActivity('projects') }, // i18n-ignore: a shortcut's keys
   { id: 'view.overview', name: msg({ id: 'shell.command.view.overview', defaultMessage: 'Show Workspace Overview', description: 'A command (the menus, the command palette, Settings → Keyboard Shortcuts), in the View category.' }), category: 'view', keybinding: 'Mod+Shift+O', run: () => setActivity('overview') }, // i18n-ignore: a shortcut's keys
+  { id: 'view.activity', name: msg({ id: 'shell.command.view.activity', defaultMessage: 'Show Activity', description: "A command (the menus, the command palette, Settings → Keyboard Shortcuts), in the View category: Activity's workspace level, what every project's agents run now." }), category: 'view', run: () => setActivity('activity') },
   { id: 'view.performance', name: msg({ id: 'shell.command.view.performance', defaultMessage: 'Show Performance', description: 'A command (the menus, the command palette, Settings → Keyboard Shortcuts), in the View category.' }), category: 'view', run: () => setActivity('performance') },
   { id: 'view.board', name: msg({ id: 'shell.command.view.board', defaultMessage: 'Show Task Board', description: 'A command (the menus, the command palette, Settings → Keyboard Shortcuts), in the View category.' }), category: 'view', keybinding: 'Mod+Shift+J', run: () => setActivity('board') }, // i18n-ignore: a shortcut's keys
   {
@@ -488,7 +552,7 @@ const COMMAND_DEFS: CommandDef[] = [
     category: 'tasks',
     // The Undo of an Archived n cards toast (#351): its batch back where it was.
     internal: true,
-    run: (id: string) => void unarchiveBatch(id)
+    run: (id: string, workspacePath?: unknown) => unarchiveBatch(id, typeof workspacePath === 'string' ? workspacePath : undefined).then(() => undefined)
   },
   {
     id: 'agent.show',
@@ -503,6 +567,26 @@ const COMMAND_DEFS: CommandDef[] = [
       actions.selectProject(p.path)
       showAgent(p, agentId)
       setProjectTab(p.path, 'session')
+    }
+  },
+  {
+    id: 'slot.releaseHeld',
+    name: msg({ id: 'shell.command.slot.releaseHeld', defaultMessage: 'Release a Held Slot', description: "A command (the menus, the command palette, Settings → Keyboard Shortcuts), in the Session category. It isn't in the menus or the palette: a notice's button runs it by its name (HI-2309), asking first whether to release a slot that Windows' idle Sandbox broker holds." }),
+    category: 'session',
+    // The notice that a slot is held only by an idle broker (HI-2309): Release Slot…'s question for it.
+    internal: true,
+    run: (path?: unknown, slot?: unknown) => {
+      if (typeof path === 'string' && typeof slot === 'string') return actions.releaseHeldSlot(path, slot)
+    }
+  },
+  {
+    id: 'notice.openTarget',
+    name: msg({ id: 'shell.command.notice.openTarget', defaultMessage: 'Open What a Notification Is About', description: "A command (the menus, the command palette, Settings → Keyboard Shortcuts), in the Session category. It isn't in the menus or the palette: a click on a notification runs it by its name, to show the agent's pane or the card it names." }),
+    category: 'session',
+    // A notice's target (HI-1961), in the window that has its project: notice:action brings it here.
+    internal: true,
+    run: (target?: unknown) => {
+      if (target && typeof target === 'object') showNoticeTarget(target as ToastTarget)
     }
   },
   {
@@ -546,7 +630,7 @@ const COMMAND_DEFS: CommandDef[] = [
     run: () => setProgressOpen(!progressIsOpen())
   },
   // The answer to a question the Assistant waits on (its card in the panel, or a notification).
-  { id: 'assistant.answer', name: msg({ id: 'shell.command.assistant.answer', defaultMessage: 'Answer the Hive Assistant', description: "A command (the menus, the command palette, Settings → Keyboard Shortcuts), in the Assistant category. It isn't in the menus or the palette: notifications and buttons run it by its name." }), category: 'assistant', internal: true, run: (id: string, yes: boolean) => void call('assistant:answer', id, yes) },
+  { id: 'assistant.answer', name: msg({ id: 'shell.command.assistant.answer', defaultMessage: 'Answer the Hive Assistant', description: "A command (the menus, the command palette, Settings → Keyboard Shortcuts), in the Assistant category. It isn't in the menus or the palette: notifications and buttons run it by its name." }), category: 'assistant', internal: true, run: (id: string, yes: boolean) => call('assistant:answer', id, yes).catch(() => undefined) },
   {
     id: 'assistant.start',
     name: msg({ id: 'shell.command.assistant.start', defaultMessage: 'Start the Hive Assistant', description: 'A command (the menus, the command palette, Settings → Keyboard Shortcuts), in the Assistant category.' }),
@@ -560,7 +644,7 @@ const COMMAND_DEFS: CommandDef[] = [
   },
   { id: 'view.toggleSidebar', name: msg({ id: 'shell.command.view.toggleSidebar', defaultMessage: 'Toggle Sidebar', description: 'A command (the menus, the command palette, Settings → Keyboard Shortcuts), in the View category.' }), category: 'view', keybinding: 'Mod+B', run: () => set((s) => ({ sidebarVisible: !s.sidebarVisible })) }, // i18n-ignore: a shortcut's keys
   { id: 'view.compactSidebar', name: msg({ id: 'shell.command.view.compactSidebar', defaultMessage: 'Toggle Compact Sidebar', description: 'A command (the menus, the command palette, Settings → Keyboard Shortcuts), in the View category.' }), category: 'view', keybinding: 'Mod+Alt+B', run: () => toggleCompactSidebar() }, // i18n-ignore: a shortcut's keys
-  { id: 'view.notifications', name: msg({ id: 'shell.command.view.notifications', defaultMessage: 'Show Notifications', description: 'A command (the menus, the command palette, Settings → Keyboard Shortcuts), in the View category.' }), category: 'view', keybinding: 'Mod+Alt+U', run: () => set({ showNotifications: true, unread: 0 }) }, // i18n-ignore: a shortcut's keys
+  { id: 'view.notifications', name: msg({ id: 'shell.command.view.notifications', defaultMessage: 'Show Notifications', description: 'A command (the menus, the command palette, Settings → Keyboard Shortcuts), in the View category.' }), category: 'view', keybinding: 'Mod+Alt+U', run: () => set((s) => ({ showNotifications: !s.showNotifications, unread: 0 })) }, // i18n-ignore: a shortcut's keys
   { id: 'view.zoomIn', name: msg({ id: 'shell.command.view.zoomIn', defaultMessage: 'Zoom In', description: 'A command (the menus, the command palette, Settings → Keyboard Shortcuts), in the View category.' }), category: 'view', keybinding: 'Mod+=', run: () => call('window:zoom', 'in') }, // i18n-ignore: a shortcut's keys
   { id: 'view.zoomOut', name: msg({ id: 'shell.command.view.zoomOut', defaultMessage: 'Zoom Out', description: 'A command (the menus, the command palette, Settings → Keyboard Shortcuts), in the View category.' }), category: 'view', keybinding: 'Mod+-', run: () => call('window:zoom', 'out') }, // i18n-ignore: a shortcut's keys
   { id: 'view.zoomReset', name: msg({ id: 'shell.command.view.zoomReset', defaultMessage: 'Reset Zoom', description: 'A command (the menus, the command palette, Settings → Keyboard Shortcuts), in the View category.' }), category: 'view', keybinding: 'Mod+0', run: () => call('window:zoom', 'reset') }, // i18n-ignore: a shortcut's keys
@@ -572,7 +656,7 @@ const COMMAND_DEFS: CommandDef[] = [
   { id: 'view.reload', name: msg({ id: 'shell.command.view.reload', defaultMessage: 'Reload Window', description: 'A command (the menus, the command palette, Settings → Keyboard Shortcuts), in the Developer category.' }), category: 'developer', run: () => void actions.saveUnsavedFirst('reload the window' /* i18n-ignore: actions.ts slots the phrase into its sentence (E5b) */).then((ok) => ok && location.reload()) },
   { id: 'notes.open', name: msg({ id: 'shell.command.notes.open', defaultMessage: 'Open Shared Note', description: "A command (the menus, the command palette, Settings → Keyboard Shortcuts), in the Notes category. It isn't in the menus or the palette: notifications and buttons run it by its name." }), category: 'notes', internal: true, run: (path: string) => { showView('notes'); set({ selectedNote: path }) } },
   { id: 'mcp.import', name: msg({ id: 'shell.command.mcp.import', defaultMessage: 'Copy Project MCP Servers to Workspace', description: "A command (the menus, the command palette, Settings → Keyboard Shortcuts), in the MCP category. It isn't in the menus or the palette: notifications and buttons run it by its name." }), category: 'mcp', internal: true, run: (path: string, names: string[]) => actions.importProjectMcp(path, names) },
-  { id: 'help.agentSetup', name: msg({ id: 'shell.command.help.agentSetup', defaultMessage: 'Agent Setup…', description: 'A command (the menus, the command palette, Settings → Keyboard Shortcuts), in the Help category. The … says it opens a dialog first: keep it.' }), category: 'help', run: (provider?: unknown) => set({ setupOpen: typeof provider === 'string' ? provider : true }) },
+  { id: 'help.agentSetup', name: msg({ id: 'shell.command.help.agentSetup', defaultMessage: 'Provider Setup…', description: 'A command (the menus, the command palette, Settings → Keyboard Shortcuts), in the Help category. The … says it opens a dialog first: keep it.' }), category: 'help', run: (provider?: unknown) => set({ setupOpen: typeof provider === 'string' ? provider : true }) },
   { id: 'help.checkProviders', name: msg({ id: 'shell.command.help.checkProviders', defaultMessage: 'Check Coding Agents for Updates', description: 'A command (the menus, the command palette, Settings → Keyboard Shortcuts), in the Help category.' }), category: 'help', run: () => actions.refreshProviders() },
   { id: 'help.docs', name: msg({ id: 'shell.command.help.docs', defaultMessage: 'Documentation', description: 'A command (the menus, the command palette, Settings → Keyboard Shortcuts), in the Help category.' }), category: 'help', keybinding: 'F1', run: () => { set({ docsPage: 'guide' }); setActivity('docs') } },
   { id: 'help.api', name: msg({ id: 'shell.command.help.api', defaultMessage: 'Agent API Reference', description: 'A command (the menus, the command palette, Settings → Keyboard Shortcuts), in the Help category.' }), category: 'help', run: () => { set({ docsPage: 'api' }); setActivity('docs') } },
@@ -588,11 +672,22 @@ const COMMAND_DEFS: CommandDef[] = [
     run: () => call('app:openExternal', TRANSLATING_URL)
   },
   { id: 'help.logs', name: msg({ id: 'shell.command.help.logs', defaultMessage: 'Open Logs Folder', description: 'A command (the menus, the command palette, Settings → Keyboard Shortcuts), in the Help category.' }), category: 'help', run: () => call('app:openLogs') },
+  {
+    id: 'help.restoreBoard09',
+    name: msg({ id: 'shell.command.help.restoreBoard09', defaultMessage: 'Restore the 0.9 Board Backup…', description: "A command (the Help menu, the command palette), in the Help category: puts back the copy of the workspace's board Hive kept when it upgraded the board to 1.0, for going back to Hive 0.9. The … says it asks first: keep it." }),
+    category: 'help',
+    when: () => hasWorkspace() && !!get().boardState?.backup09,
+    tip: () => tr(msg({ id: 'shell.tip.help.restoreBoard09', defaultMessage: 'Puts back the board as it was before its upgrade to 1.0, to go back to Hive 0.9', description: 'What a command does, on hover in the menus.' })),
+    run: () => void restoreBoard09()
+  },
   { id: 'help.diagnostics', name: msg({ id: 'shell.command.help.diagnostics', defaultMessage: 'Copy Diagnostics…', description: 'A command (the menus, the command palette, Settings → Keyboard Shortcuts), in the Help category. The … says it opens a dialog first: keep it.' }), category: 'help', run: () => set({ diagnosticsOpen: true }) },
   { id: 'help.about', name: msg({ id: 'shell.command.help.about', defaultMessage: 'About {app}', description: "A command (the Help menu, the command palette), in the Help category. {app} is Hive's name." }), nameValues: { app: APP_NAME }, category: 'help', run: () => set({ aboutOpen: true }) },
   { id: 'help.checkUpdates', name: msg({ id: 'shell.command.help.checkUpdates', defaultMessage: 'Check for Updates…', description: 'A command (the menus, the command palette, Settings → Keyboard Shortcuts), in the Help category. The … says it opens a dialog first: keep it.' }), category: 'help', run: () => checkForUpdates() },
   { id: 'update.show', name: msg({ id: 'shell.command.update.show', defaultMessage: 'Show Hive Update', description: 'A command (the menus, the command palette, Settings → Keyboard Shortcuts), in the Help category.' }), category: 'help', when: () => ['available', 'downloading', 'ready'].includes(get().update?.status ?? ''), run: () => set({ updateOpen: true }) },
-  { id: 'update.install', name: msg({ id: 'shell.command.update.install', defaultMessage: 'Restart and Update Hive', description: 'A command (the menus, the command palette, Settings → Keyboard Shortcuts), in the Help category.' }), category: 'help', when: () => get().update?.status === 'ready', run: () => call('update:install') },
+  { id: 'update.install', name: msg({ id: 'shell.command.update.install', defaultMessage: 'Restart and Update Hive', description: 'A command (the menus, the command palette, Settings → Keyboard Shortcuts), in the Help category.' }), category: 'help', when: () => get().update?.status === 'ready', run: (version?: unknown) => call('update:install', typeof version === 'string' ? version : undefined) },
+  // Pausing the team before an update (HI-2081): every open workspace's lanes, wakes and hand-outs held until it resumes.
+  { id: 'team.pause', name: msg({ id: 'shell.command.team.pause', defaultMessage: 'Pause the Team', description: "A command (the command palette, Settings → Keyboard Shortcuts), in the Help category (HI-2081): before an update, Hive starts no lane card, wakes no agent with card events and gives no reviews out in every open workspace, and tells each running agent to park (finish its turn, end its runs, commit). The Progress panel's Lanes shows what still runs." }), category: 'help', when: () => hasWorkspace() && !workspacePaused(get().workspace?.path), run: () => void pauseTheTeam() },
+  { id: 'team.resume', name: msg({ id: 'shell.command.team.resume', defaultMessage: 'Resume the Team', description: 'A command (the command palette, Settings → Keyboard Shortcuts), in the Help category (HI-2081): lifts the pause of every open workspace, so lanes start their cards and agents are woken again.' }), category: 'help', when: () => hasWorkspace() && workspacePaused(get().workspace?.path), run: () => void resumeTheTeam() },
   { id: 'update.releaseNotes', name: msg({ id: 'shell.command.update.releaseNotes', defaultMessage: "What's New in Hive", description: 'A command (the menus, the command palette, Settings → Keyboard Shortcuts), in the Help category.' }), category: 'help', run: (version?: unknown) => openReleaseNotes(typeof version === 'string' ? version : get().appInfo?.version) },
   // As the window's X: with several open, it closes this one (stopping its workspace's agents); the last one goes to the tray or quits.
   { id: 'window.close', name: msg({ id: 'shell.command.window.close', defaultMessage: 'Close Window', description: 'A command (the menus, the command palette, Settings → Keyboard Shortcuts), in the File category.' }), category: 'file', keybinding: 'Mod+Shift+W', tip: () => (severalWindows() ? tr(msg({ id: 'shell.tip.window.closeSeveral', defaultMessage: "Close this window and stop its workspace's agents", description: 'What a command does, on hover in the menus. With several windows open.' })) : get().settings?.general.closeToTray ? tr(msg({ id: 'shell.tip.window.closeToTray', defaultMessage: 'Close the window; Hive keeps running in the tray', description: 'What a command does, on hover in the menus. With one window, and Close to tray on.' })) : tr(msg({ id: 'shell.tip.window.closeQuit', defaultMessage: 'Close the window and quit Hive', description: 'What a command does, on hover in the menus. With one window, and Close to tray off.' }))), run: () => call('window:close') }, // i18n-ignore: a shortcut's keys
@@ -613,10 +708,26 @@ export const commands: Command[] = COMMAND_DEFS.map((d) => Object.defineProperty
 export function runCommand(id: string, ...args: unknown[]): void {
   const c = commands.find((x) => x.id === id)
   if (!c || c.hidden?.()) return
-  if (c.when && !c.when()) return
+  if (c.when && !c.when(...args)) return
   // Tips skip what the user already does.
   noteCommandUsed(id)
   void Promise.resolve(c.run(...args)).catch((e) => console.error(e))
+}
+
+/**
+ * Runs a command and waits for what it does (HI-2320: a notification's button shows its spinner until then). Resolves
+ * once it has settled; a command that fails reports it itself (actions.attempt), so this never rejects.
+ */
+export async function runCommandAsync(id: string, ...args: unknown[]): Promise<void> {
+  const c = commands.find((x) => x.id === id)
+  if (!c || c.hidden?.()) return
+  if (c.when && !c.when(...args)) return
+  noteCommandUsed(id)
+  try {
+    await c.run(...args)
+  } catch (e) {
+    console.error(e)
+  }
 }
 
 /** Whether a project may override this command's shortcut. */
@@ -718,11 +829,17 @@ export function terminalReserved(provider?: ProviderId): Set<string> {
 }
 
 /** Keys the terminal must pass through to Hive instead of the agent. Chords are not started from the terminal. */
-export function isAppShortcut(e: KeyboardEvent, provider?: ProviderId): boolean {
+export function isAppShortcut(e: KeyboardEvent, provider?: ProviderId, allKeysToCli = false): boolean {
   if (e.type !== 'keydown') return false
   const key = eventToKey(e)
   if (!key) return false
-  const norm = key.toUpperCase()
-  if (terminalReserved(provider).has(norm)) return false
-  return bound().some((b) => b.key === norm)
+  // Every key to the CLI (#1292, Settings → Advanced) but the command palette's, so every command stays in reach. A
+  // two-step palette shortcut: its first key starts the window's chord (matchKeybinding), its second completes it; any
+  // other key goes to the CLI, and the chord its first key began is over.
+  const takes = appTakesTerminalKey(key, { allKeysToCli, palette: commandKeybinding('palette.show'), reserved: terminalReserved(provider), bound: bound().map((b) => b.key), pending: chordPrefix })
+  if (allKeysToCli && !takes && chordPrefix) {
+    chordPrefix = null
+    window.clearTimeout(chordTimer)
+  }
+  return takes
 }

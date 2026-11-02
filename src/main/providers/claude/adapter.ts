@@ -1,39 +1,60 @@
 import { homedir } from 'os'
 import { msg, tr } from '../../../shared/i18n'
 import { join, basename } from 'path'
-import { mkdir, open, readdir, stat, writeFile } from 'original-fs/promises'
+import { mkdir, open, readdir, readFile, stat, writeFile } from 'original-fs/promises'
 import { existsSync, readFileSync, realpathSync } from 'original-fs'
-import type { AgentInstallInfo, AutoCompactSetting, McpServerDef, MemorySource, PathDataCopy, PlanLimit, PlanUsage, ReadinessIssue, SubSession } from '../../../shared/types'
+import type { AgentInstallInfo, AutoCompactSetting, McpServerDef, MemorySource, PathDataCopy, PlanLimit, PlanUsage, ReadinessIssue, RetryWait, SubSession } from '../../../shared/types'
 import { HIVE_DIR, assertSessionId, isSessionId } from '../../../shared/defaults'
+import { isCliOwnMode } from '../../../shared/cliOwnMode'
 import { CLAUDE_CODE, CLAUDE_DESCRIPTOR, CLAUDE_FOOTER_MODES, baseModel, canSwitchLive, footerMode, hookMode } from '../../../shared/claude'
 import { providerSettings } from '../../../shared/providers'
 import { samePath } from '../../../shared/movePaths'
 import { config } from '../../config'
-import { claudeFileAllowed, contentHash, ContentTooLarge, copyMissing, copySkillTree, sourceProblem, tooBigToDeliver, isDir, linksNotCopied, placeMatcher, readJson, realPath, removePath, writeJsonAtomic, type PlannedCopies } from '../../fsutil'
+import { claudeAutoMemory, claudeFileAllowed, containsPlace, contentHash, ContentTooLarge, copyMissing, copySkillTree, sourceProblem, tooBigToDeliver, isDir, isFile, linksNotCopied, placeMatcher, readJson, realPath, removePath, writeJsonAtomic, type PlannedCopies } from '../../fsutil'
 import { createLogger, userText } from '../../logger'
-import { EDITOR_EXTENSION_PATH, EDITOR_ROOTS, compareVersions, hookForwardCommand, exportSubtitleText, hookIds, notInstalledIssue, readFirstLine, run, runsThroughCmd, signedOutIssue, taskArgs, toSpawnable, updateIssue, userMemoryLabel } from '../common'
+import { plainHttpsJson } from '../../plainHttpsJson'
+import { EDITOR_EXTENSION_PATH, EDITOR_ROOTS, compareVersions, connectionMemoryLabel, hookForwardCommand, exportSubtitleText, hookIds, keepBounded, notInstalledIssue, readFirstLine, run, runsThroughCmd, signedOutIssue, taskArgs, toSpawnable, updateIssue, userMemoryLabel } from '../common'
 import type { StartHint } from '../../../shared/startFailure'
-import type { Ask, BackgroundTaskEvent, CatalogRead, CommandSpec, ExternalSession, LaunchContext, LiveDetails, LockDecision, NormalizedHook, ProviderAdapter, SkillDelivery, SkillRoots } from '../types'
-import { autoCompactOf, settingsScopes } from './autoCompact'
-import { mergeLaunchSettings, userSettings, withoutSettingsArgs } from './launchSettings'
+import type { ConnectionStatus, TrustReading, TrustTarget, Ask, BackgroundTaskEvent, CatalogRead, CommandSpec, ExternalSession, LaunchContext, LaunchHooks, LiveDetails, LockDecision, NormalizedHook, ProviderAdapter, SkillDelivery, SkillRoots, TranscriptTurn } from '../types'
+import { autoCompactOf, effectiveEnv, settingsScopes } from './autoCompact'
+import { claudeScopeHooks, rowsOfHooksTable } from '../../hookListing'
+import type { HookListing } from '../../../shared/hooks'
+import { connectionsManaged } from '../../connectionSeam'
+import { hiveStatusLine, mergeLaunchSettings, ownStatusLine, userSettings, withoutSettingsArgs } from './launchSettings'
+import { MEMORY_ENV_OVERRIDES, connectionMemoryDir, memoryBase } from './memoryDir'
 import { claudeBackgroundTasks } from './background'
+import { claudeRetryWait } from './retry'
 import { claudeSafeguards } from './safeguards'
+import { claudeTranscriptTurns } from './turns'
 import type { SafeguardEvent } from '../../../shared/safeguards'
 import { ConversationParser, claudeImageData } from './conversation'
 import { readClaudeModels } from './models'
 import { ClaudeUsageParser, encodeProjectPath, parseTranscript, transcriptSubSession } from './usage'
+import { atMost } from '../../../shared/atMost'
+import { joined } from '../../../shared/coalesce'
 import { advanced } from '../../advanced'
+import { launchOverrides } from '../../advancedValues'
 
 const log = createLogger('claude-code')
 /** Transcripts whose sub-agent check is remembered (by path and mtime). */
 const SUB_CACHE = 2000
+/** Transcripts looked at at once while listing a folder's sessions (HI-1681), and skills copied at once for a launch (HI-1694): each waits on the disk, one after another was slow under load. */
+const LIST_AT_ONCE = 8
+/** A launch's preparation this slow is logged with where its time went (HI-1694). */
+const SLOW_PREPARE_MS = 500
 /**
  * How many of the screen's last written lines a safeguard prompt is looked for in: its dialog is drawn last, at the
  * bottom, its choices within about a dozen lines of the end (more when a narrow pane wraps their descriptions).
  */
 const SAFEGUARD_PROMPT_LINES = 24
-/** A ~/.claude/projects folder name that may hold an 8.3 short name: `~1` is encoded `-1`. */
-const MAY_BE_SHORT = /-\d+(-|$)/
+/** The skill whose override turns off Claude Code's offer to teach auto mode about the environment (2.1.312, HI-1959). */
+const AUTO_MODE_SETUP = 'auto-mode-setup' // i18n-ignore: Claude Code's skill name
+/**
+ * A ~/.claude/projects folder name that may hold an 8.3 short name: `~1` is encoded `-1`, after at most six characters
+ * of the name, its own `-`s included (`BUILD-~1` is `BUILD--1`). `project-12` can't be one (HI-1681): looking in every
+ * folder named like it took most of a cold session list.
+ */
+export const MAY_BE_SHORT = /(^|-).{1,6}-\d+(-|$)/
 /** How much of a transcript is read for the cwd it records (its first lines carry none). */
 const CWD_HEAD = 64 * 1024
 
@@ -72,6 +93,47 @@ export function claudeTurnScreen(screen: string): 'idle' | 'working' | null {
 
 export function claudeHome(): string {
   return process.env.CLAUDE_CONFIG_DIR || join(homedir(), '.claude')
+}
+
+/** The fields Hive reads from `claude auth status --json` (HI-980), as Settings → Advanced names them. */
+export interface AuthStatusFields {
+  loggedIn: string
+  email: string
+  orgId: string
+  plan: string
+}
+
+/**
+ * Who `claude auth status --json` says a folder is signed in as (HI-980), from its output (it exits 1 when signed out,
+ * with the same JSON): only the fields named, never anything else it prints. Not told (no JSON, no boolean signed-in
+ * field) is `ok: false`, never signed out.
+ */
+/**
+ * An account's status from `claude auth status --json`'s run (HI-980): only a check that ended by itself counts. Exit
+ * 0 with its answer, or exit 1 with signed-out JSON (how it says signed out); anything else (a timeout, another exit,
+ * exit 1 claiming signed in) is a failed check, whatever it printed.
+ */
+export function claudeAccountStatus(r: { stdout: string; code: number; ended?: true }, f: AuthStatusFields): ConnectionStatus {
+  if (r.ended) return { ok: false, error: `it didn't finish (exit ${r.code})` } // i18n-ignore: for the log
+  const s = parseClaudeAuthStatus(r.stdout, f)
+  if (r.code === 0) return s
+  if (r.code === 1 && s.ok && !s.loggedIn) return s
+  return { ok: false, error: s.ok ? `it exited ${r.code} saying ${s.loggedIn ? 'signed in' : 'signed out'}` : `${s.error} (exit ${r.code})` } // i18n-ignore: for the log
+}
+
+export function parseClaudeAuthStatus(stdout: string, f: AuthStatusFields): ConnectionStatus {
+  let j: unknown
+  try {
+    j = JSON.parse(stdout.trim())
+  } catch {
+    return { ok: false, error: 'its status was not JSON' } // i18n-ignore: for the log
+  }
+  if (!j || typeof j !== 'object') return { ok: false, error: 'its status was not an object' } // i18n-ignore: for the log
+  const o = j as Record<string, unknown>
+  const signedIn = o[f.loggedIn]
+  if (typeof signedIn !== 'boolean') return { ok: false, error: `its status had no "${f.loggedIn}"` } // i18n-ignore: for the log
+  const str = (k: string): string | undefined => (typeof o[k] === 'string' && o[k] ? (o[k] as string) : undefined)
+  return { ok: true, loggedIn: signedIn, email: str(f.email), orgId: str(f.orgId), plan: str(f.plan) ?? null }
 }
 
 /**
@@ -131,6 +193,11 @@ export function toIso(v: unknown): string | null {
   return null
 }
 
+/** What a launch appends to Claude Code's system prompt: the Assistant's role and mode, then the Workspace notes note (#1433). */
+export function appendedInstructions(ctx: LaunchContext): string {
+  return [ctx.instructions ?? '', ctx.notes ?? ''].map((t) => t.trim()).filter(Boolean).join('\n\n')
+}
+
 export class ClaudeCodeAdapter implements ProviderAdapter {
   readonly id = CLAUDE_CODE
   readonly descriptor = CLAUDE_DESCRIPTOR
@@ -141,6 +208,10 @@ export class ClaudeCodeAdapter implements ProviderAdapter {
   // advanced setting, so a changed question can be fixed without a release).
   get startupQuestion(): RegExp {
     return advanced.pattern('claude-code.trust.prompt')
+  }
+  // Ended as a person ends it at a lane's end (HI-1706): /exit, which 2.1.310 took and exited 0 on in 1.9 s.
+  get quitLine(): { line: string; graceMs: number } {
+    return { line: advanced.get<string>('claude-code.exit.command'), graceMs: advanced.number('claude-code.exit.graceSeconds') * 1000 }
   }
 
   private async candidates(): Promise<{ path: string; source: string }[]> {
@@ -205,7 +276,8 @@ export class ClaudeCodeAdapter implements ProviderAdapter {
       break
     }
     if (!info.found) info.editorExtensionOnly = await this.editorExtensionPresent()
-    if (info.path) {
+    // Its sign-in is its connections' (HI-1755): ~/.claude's own login is never checked.
+    if (info.path && !connectionsManaged(this.id)) {
       const auth = await run(info.path, ['auth', 'status', '--json'], 10000)
       try {
         const j = JSON.parse(auth.stdout)
@@ -233,12 +305,7 @@ export class ClaudeCodeAdapter implements ProviderAdapter {
 
   async latestVersion(): Promise<string | null> {
     try {
-      const ctrl = new AbortController()
-      const t = setTimeout(() => ctrl.abort(), 6000)
-      const res = await fetch('https://registry.npmjs.org/@anthropic-ai/claude-code/latest', { signal: ctrl.signal })
-      clearTimeout(t)
-      if (!res.ok) return null
-      return ((await res.json()) as { version?: string }).version ?? null
+      return ((await plainHttpsJson('https://registry.npmjs.org/@anthropic-ai/claude-code/latest', { timeoutMs: 6000 })) as { version?: string }).version ?? null
     } catch {
       return null
     }
@@ -266,10 +333,71 @@ export class ClaudeCodeAdapter implements ProviderAdapter {
     return { file: executable, args: ['auth', 'login'] }
   }
 
-  /** Claude Code's own default: "model" in ~/.claude/settings.json. */
-  configuredDefaultModel(): string | null {
+  async accountStatus(executable: string, env: NodeJS.ProcessEnv): Promise<ConnectionStatus> {
+    const r = await run(executable, ['auth', 'status', '--json'], advanced.number('claude-code.accounts.statusSeconds') * 1000, env)
+    const fields: AuthStatusFields = {
+      loggedIn: advanced.get<string>('claude-code.accounts.loggedInField'),
+      email: advanced.get<string>('claude-code.accounts.emailField'),
+      orgId: advanced.get<string>('claude-code.accounts.orgField'),
+      plan: advanced.get<string>('claude-code.accounts.planField')
+    }
+    return claudeAccountStatus(r, fields)
+  }
+
+  /** Its first-run screens answered in the folder (HI-1870): its `.claude.json`'s onboarding field; no file yet, not. */
+  async connectionSetUp(home: string): Promise<boolean | null> {
     try {
-      const m = JSON.parse(readFileSync(join(claudeHome(), 'settings.json'), 'utf8')).model
+      const j = JSON.parse(await readFile(join(home, '.claude.json'), 'utf8')) as Record<string, unknown>
+      return j[advanced.get<string>('claude-code.accounts.onboardedField')] === true
+    } catch (e) {
+      return (e as NodeJS.ErrnoException).code === 'ENOENT' ? false : null
+    }
+  }
+
+  /**
+   * Its trust of each folder in the folder's `.claude.json` (HI-1870), as Claude Code 2.1.311 looks it up: the real path
+   * or an ancestor's entry with the trust field, forward slashes, letter case as on disk (it asked with an entry in
+   * another case, and for an 8.3 path whatever the long one's entry said: unknown then).
+   */
+  async connectionTrusts(home: string, targets: readonly TrustTarget[]): Promise<TrustReading[]> {
+    let entries: Record<string, unknown>
+    try {
+      const j = JSON.parse(await readFile(join(home, '.claude.json'), 'utf8')) as { projects?: unknown }
+      entries = j.projects && typeof j.projects === 'object' ? (j.projects as Record<string, unknown>) : {}
+    } catch (e) {
+      if ((e as NodeJS.ErrnoException).code !== 'ENOENT') return targets.map(() => null)
+      entries = {}
+    }
+    const field = advanced.get<string>('claude-code.accounts.trustField')
+    const trusted = new Set(Object.entries(entries).filter(([, v]) => (v as Record<string, unknown> | null)?.[field] === true).map(([k]) => k.replace(/\\/g, '/')))
+    return targets.map((t) => {
+      if (!t.root || t.short) return null
+      for (let p = t.root.replace(/\\/g, '/').replace(/\/+$/, ''); ; ) {
+        if (trusted.has(p)) return true
+        const up = p.slice(0, p.lastIndexOf('/'))
+        if (!up || up === p || !up.includes(':')) return false
+        p = up
+      }
+    })
+  }
+
+  accountSharedTarget(name: string): string {
+    return join(claudeHome(), name)
+  }
+
+  accountLoginFile(name: string): boolean {
+    return advanced.pattern('claude-code.accounts.loginFiles').test(name)
+  }
+
+  /** What it reads as a login, a header, a server or a model in a connection's place (HI-1772): left out on a connection. */
+  accountEnvDropPattern(): RegExp {
+    return advanced.pattern('claude-code.accounts.dropEnv')
+  }
+
+  /** Claude Code's own default: "model" in its home's settings.json (~/.claude's, or a connection's: HI-1755). */
+  configuredDefaultModel(home = claudeHome()): string | null {
+    try {
+      const m = JSON.parse(readFileSync(join(home, 'settings.json'), 'utf8')).model
       if (typeof m === 'string' && m.trim()) return m.trim()
     } catch {
       // no settings file, or no model in it
@@ -300,11 +428,20 @@ export class ClaudeCodeAdapter implements ProviderAdapter {
   }
 
   async prepareLaunch(ctx: LaunchContext): Promise<Record<string, SkillDelivery>> {
+    const started = performance.now()
     // A --settings of the user's is read first: one Hive can't read stops the launch before anything changes (#330).
     const theirs = await userSettings(ctx.extraArgs, ctx.cwd)
     const dir = this.launchDir(ctx.projectPath, ctx.agentId)
-    await removePath(dir)
     const pluginDir = join(dir, 'plugin')
+    const skillsDir = join(pluginDir, 'skills')
+    // The last launch's skill copies are kept while each is still its source's content, so a launch copies only what
+    // changed (HI-1694: copying every skill again took 6 s on a drive a virus scanner watches); everything else in the
+    // folder is written again, and a skill no longer given goes.
+    const last = await readJson<{ hashes?: Record<string, string> } | null>(join(dir, 'sync.json'), null)
+    const wanted = new Set(ctx.skills.map((s) => s.name))
+    for (const [folder, keep] of [[dir, 'plugin'], [pluginDir, 'skills']] as const) for (const f of await readdir(folder).catch(() => [] as string[])) if (f !== keep) await removePath(join(folder, f))
+    for (const f of await readdir(skillsDir).catch(() => [] as string[])) if (!wanted.has(f)) await removePath(join(skillsDir, f))
+    const cleared = performance.now()
     await mkdir(join(pluginDir, '.claude-plugin'), { recursive: true })
     await writeJsonAtomic(join(pluginDir, '.claude-plugin', 'plugin.json'), {
       name: 'hive',
@@ -314,8 +451,10 @@ export class ClaudeCodeAdapter implements ProviderAdapter {
     const hashes: Record<string, string> = {}
     // Each agent's own copies: what it gets is what was copied here (its revision read back from the copy).
     const delivered: Record<string, SkillDelivery> = {}
-    for (const skill of ctx.skills) {
-      const dest = join(pluginDir, 'skills', skill.name)
+    let copied = 0
+    // A few skills at once: each waits on the disk.
+    await atMost(LIST_AT_ONCE, ctx.skills, async (skill) => {
+      const dest = join(skillsDir, skill.name)
       // A skill over the hashing limits isn't copied (the launch folder starts empty, so the session has no copy of it).
       // Checked on the source first, which reads no more than the limits, and on the copy, which may have grown since.
       // One skill's failure is its own: the launch folder started empty, so a skill not copied is one the session
@@ -324,11 +463,18 @@ export class ClaudeCodeAdapter implements ProviderAdapter {
         await removePath(dest).catch(() => undefined)
         delivered[skill.name] = e instanceof ContentTooLarge ? { revision: null, problem: tooBigToDeliver(e), lasting: true } : { revision: null, problem: sourceProblem(e, skill.sourcePath) }
       }
+      let source: string
       try {
-        hashes[`skill:${skill.name}`] = await contentHash(skill.sourcePath)
+        // The launch's settings' read of it where they had one (HI-2268: hashed again only when its files changed).
+        source = hashes[`skill:${skill.name}`] = skill.revision || (await contentHash(skill.sourcePath))
       } catch (e) {
         await fail(e)
-        continue
+        return
+      }
+      // The last launch's copy, still the source's content (read back, as a copy is): kept.
+      if (last?.hashes?.[`skill:${skill.name}`] === source && (await contentHash(dest).catch(() => null)) === source) {
+        delivered[skill.name] = { revision: source }
+        return
       }
       // Links stay links, to the same place, so the copy is the same content as the workspace's skill. A link it can't
       // make (Windows needs a privilege for a link to a file) is left out, with every other file of the skill copied.
@@ -337,14 +483,17 @@ export class ClaudeCodeAdapter implements ProviderAdapter {
       let skipped: string[]
       let revision: string
       try {
+        await removePath(dest)
         skipped = await copySkillTree(skill.sourcePath, dest)
         revision = await contentHash(dest)
+        copied++
       } catch (e) {
         await fail(e)
-        continue
+        return
       }
       delivered[skill.name] = skipped.length ? { revision, problem: linksNotCopied(skipped), lasting: true } : { revision }
-    }
+    })
+    const skillsDone = performance.now()
     // The MCP config and settings may hold secrets (servers' own env and headers, a user's --settings): they go in the
     // launch's private folder, outside the project (#345).
     await writeJsonAtomic(join(ctx.privateDir, 'mcp.json'), { mcpServers: ctx.mcpServers })
@@ -372,17 +521,47 @@ export class ClaudeCodeAdapter implements ProviderAdapter {
       else hooks[ev] = [ev === 'PostToolUse' ? { matcher: '*', hooks: [hook] } : { hooks: [hook] }]
     }
     // The status line forwards Claude Code's status JSON (model, effort, cost, plan limits) to Hive and
-    // prints nothing, so no line is added to the terminal.
-    const statusLine = { type: 'command', command: hookForwardCommand(`${ctx.hookUrl}&statusline`, ctx.hookAuthFile, timeout), padding: 0 }
+    // prints nothing, so no line is added to the terminal. Switched off (#1285), the user's own runs after it, given the
+    // same JSON, and shows its output: Hive still reads the status.
+    const scopes = settingsScopes(ctx.cwd, ctx.env.CLAUDE_CONFIG_DIR || claudeHome(), ctx.extraArgs)
+    const own = launchOverrides(ctx.overrides, CLAUDE_CODE, 'statusLine') ? null : ownStatusLine(scopes)
+    const statusLine = hiveStatusLine((echo) => hookForwardCommand(`${ctx.hookUrl}&statusline${echo ? '&echo' : ''}`, ctx.hookAuthFile, timeout), own)
+    // On a connection, its auto memory written without asking, as without one (HI-1899): the home's `projects` is a link,
+    // so Claude Code is given the memory folder by its resolved path. Not where something else names the folder.
+    const home = ctx.env.CLAUDE_CONFIG_DIR
+    // The launch's environment as Claude Code has it (its settings' env blocks too), and a settings file Hive can't read,
+    // may name one too, or another home: none then.
+    const field = advanced.get<string>('claude-code.memory.setting')
+    const env = effectiveEnv(ctx.env, scopes).env
+    const named = MEMORY_ENV_OVERRIDES.some((v) => env[v]) || (env.CLAUDE_CONFIG_DIR ?? '') !== (home ?? '') || scopes.some((s) => s.unsure !== undefined || (s.json && typeof s.json === 'object' && (s.json as Record<string, unknown>)[field] != null))
+    const memoryDir = home && !named && advanced.get<boolean>('claude-code.memory.realPath') ? await connectionMemoryDir(home, () => memoryBase(ctx.cwd)) : null
+    // What Hive passed, for the agent's Hooks dialog (HI-982: launchHooks).
+    keepBounded(this.hooksByRun, ctx.runId, hooks)
     // The user's --settings merged in: Hive passes only this file (#330).
-    await writeJsonAtomic(join(ctx.privateDir, 'settings.json'), mergeLaunchSettings({ hooks, statusLine }, theirs, { url: ctx.hookUrl, envVar: 'HIVE_HOOK_TOKEN' }))
+    const settings = mergeLaunchSettings({ hooks, statusLine }, theirs, { url: ctx.hookUrl, envVar: 'HIVE_HOOK_TOKEN' })
+    if (memoryDir) settings[field] = memoryDir
+    // Its offer to teach auto mode about the environment, turned off for this launch when the user said so (HI-1959,
+    // Settings → Advanced): the skill's override in Hive's settings file, never where their own --settings name it.
+    if (!advanced.get<boolean>('claude-code.autoModeSetup.offer')) {
+      const overrides = settings.skillOverrides && typeof settings.skillOverrides === 'object' ? (settings.skillOverrides as Record<string, unknown>) : {}
+      if (!(AUTO_MODE_SETUP in overrides)) settings.skillOverrides = { ...overrides, [AUTO_MODE_SETUP]: 'off' }
+    }
+    await writeJsonAtomic(join(ctx.privateDir, 'settings.json'), settings)
     await writeJsonAtomic(join(dir, 'sync.json'), { launchedAt: new Date().toISOString(), hashes })
-    // Instructions for this launch (the Hive Assistant's) are appended to Claude Code's system prompt from a file.
-    if (ctx.instructions) await writeFile(join(dir, 'instructions.md'), ctx.instructions)
+    // Instructions for this launch (the Hive Assistant's, and the Workspace notes note, #1433) are appended to Claude Code's
+    // system prompt from a file.
+    const appended = appendedInstructions(ctx)
+    if (appended) await writeFile(join(dir, 'instructions.md'), appended)
     await writeFile(
       join(dir, 'README.txt'),
       'This folder is generated by Hive each time a session starts. Edits here are overwritten.\n'
     )
+    // Where a slow launch's preparation went (HI-1694).
+    const ms = performance.now() - started
+    if (ms > SLOW_PREPARE_MS) {
+      const s = (a: number, b: number): string => `${Math.round(b - a)} ms`
+      log.info(`preparing ${userText(ctx.agentId)}'s launch took ${s(0, ms)}: clearing the last one's ${s(started, cleared)}, ${ctx.skills.length} skill(s) ${s(cleared, skillsDone)} (${copied} copied, ${ctx.skills.length - copied} kept), its settings ${s(skillsDone, started + ms)}`)
+    }
     return delivered
   }
 
@@ -392,18 +571,33 @@ export class ClaudeCodeAdapter implements ProviderAdapter {
     if (ctx.resume) args.push('--resume', ctx.sessionId)
     else args.push('--session-id', ctx.sessionId)
     if (ctx.name) args.push('--name', runsThroughCmd(executable) ? ctx.name.replace(/["%^&|<>!]/g, ' ').replace(/\s+/g, ' ').trim() : ctx.name)
-    args.push('--plugin-dir', join(dir, 'plugin'))
-    args.push('--mcp-config', join(ctx.privateDir, 'mcp.json'), '--strict-mcp-config')
+    const plugin = join(dir, 'plugin')
+    args.push('--plugin-dir', plugin)
+    // Folders it may also work in (#1439: a reviewer's review copies), within its permission mode. --add-dir takes several
+    // (2.1.309), so an option always follows it here, never the first prompt. Its launch plugin too, where that is outside
+    // its folder (HI-2274: a slot's or worktree's session, the plugin in the project's .hive): Claude Code asks before it
+    // reads a skill's reference file there (acceptEdits, 2.1.309), and a session nobody watches waits on that for good.
+    const added = [...(ctx.extraDirs ?? []), ...(containsPlace(ctx.cwd, plugin) ? [] : [plugin])]
+    for (const d of added) args.push('--add-dir', d)
+    // Only the workspace's servers; switched off (#1281), Claude Code's own load too, and the --mcp-config ones still win
+    // over its own of the same name, hive included (2.1.305: the user's and the project's are never started).
+    args.push('--mcp-config', join(ctx.privateDir, 'mcp.json'))
+    if (launchOverrides(ctx.overrides, CLAUDE_CODE, 'mcpIsolation')) args.push('--strict-mcp-config')
     args.push('--settings', join(ctx.privateDir, 'settings.json'))
-    if (ctx.instructions) args.push('--append-system-prompt-file', join(dir, 'instructions.md'))
-    // A resumed conversation gets this launch's instructions (the Assistant's current mode), not the ones it started with:
-    // a newer Claude Code would keep sending those. Not where the user's own arguments choose.
-    if (ctx.instructions && ctx.resume && ctx.cliVersion && compareVersions(ctx.cliVersion, PROMPT_SNAPSHOT_SINCE) >= 0 && !ctx.extraArgs.some((a) => /^--system-prompt-snapshot(=|$)/.test(a))) args.push('--system-prompt-snapshot', 'off')
-    if (ctx.trustedHiveTools?.length && ctx.mcpServers.hive) args.push('--allowedTools', ctx.trustedHiveTools.map((t) => `mcp__hive__${t}`).join(','))
+    const appended = !!appendedInstructions(ctx)
+    if (appended) args.push('--append-system-prompt-file', join(dir, 'instructions.md'))
+    // A resumed conversation gets this launch's instructions (the Assistant's current mode, the notes as they are now), not
+    // the ones it started with: a newer Claude Code would keep sending those. So does one Hive appended to at an earlier
+    // launch, by any agent, and appends nothing to now (the notes switched off or emptied, #1433: SessionRecord.promptAdded):
+    // it gets none. Not where the user's own arguments choose, nor with the switch off (#1167).
+    const refresh = appended || ctx.promptAddedBefore === true
+    if (refresh && ctx.resume && launchOverrides(ctx.overrides, CLAUDE_CODE, 'promptSnapshotOff') && ctx.cliVersion && compareVersions(ctx.cliVersion, PROMPT_SNAPSHOT_SINCE) >= 0 && !ctx.extraArgs.some((a) => /^--system-prompt-snapshot(=|$)/.test(a))) args.push('--system-prompt-snapshot', 'off')
+    if (ctx.trustedHiveTools?.length && ctx.mcpServers.hive && launchOverrides(ctx.overrides, CLAUDE_CODE, 'preApproveHiveTools')) args.push('--allowedTools', ctx.trustedHiveTools.map((t) => `mcp__hive__${t}`).join(','))
     // With 1M turned off, Claude Code rejects a "[1m]" model as unrecognised (2.1.287): run the base model.
     if (ctx.model) args.push('--model', ctx.use200kContext ? baseModel(ctx.model) : ctx.model)
     if (ctx.effort) args.push('--effort', ctx.effort)
-    if (ctx.permissionMode) args.push('--permission-mode', ctx.permissionMode)
+    // The CLI's own setting (#1284): no flag, so Claude Code's own settings (defaultMode) decide.
+    if (ctx.permissionMode && !isCliOwnMode(ctx.permissionMode)) args.push('--permission-mode', ctx.permissionMode)
     args.push(...withoutSettingsArgs(ctx.extraArgs))
     // Claude Code takes a first message as its last argument and starts on it.
     if (ctx.initialPrompt) args.push(...taskArgs(executable, ctx.initialPrompt))
@@ -422,13 +616,66 @@ export class ClaudeCodeAdapter implements ProviderAdapter {
     return autoCompactOf(ctx.extraArgs, env, settingsScopes(ctx.cwd, env.CLAUDE_CONFIG_DIR || claudeHome(), ctx.extraArgs), models)
   }
 
-  backgroundTasks(appended: string): BackgroundTaskEvent[] {
-    return claudeBackgroundTasks(appended)
+  /**
+   * The settings that turn Claude Code's hooks off (#1336): the first scope, highest first, that sets disableAllHooks,
+   * if it sets it on; or managed settings allowing only their own hooks (allowManagedHooksOnly), which Hive's aren't.
+   */
+  hooksOffIn(ctx: LaunchContext): string | null {
+    const scopes = settingsScopes(ctx.cwd, ctx.env.CLAUDE_CONFIG_DIR || claudeHome(), ctx.extraArgs)
+    const obj = (j: unknown): Record<string, unknown> | null => (j && typeof j === 'object' && !Array.isArray(j) ? (j as Record<string, unknown>) : null)
+    if (obj(scopes[0]?.json)?.allowManagedHooksOnly === true) return scopes[0].label
+    const deciding = scopes.find((s) => typeof obj(s.json)?.disableAllHooks === 'boolean')
+    return deciding && obj(deciding.json)!.disableAllHooks === true ? deciding.label : null
+  }
+
+  /** Hive's hooks as each launch's prepareLaunch built them (HI-982), until launchHooks takes them. */
+  private hooksByRun = new Map<string, Record<string, unknown[]>>()
+
+  /**
+   * The launch's hooks (HI-982): Hive's as passed (off where a setting turns hooks off: hooksOffIn), then each settings
+   * scope's as read now, at launch: configured, their loading unverified, since Claude Code doesn't say which it loaded.
+   * Listed again, the rows stay the launch's, with each file whose hooks changed since then said to have changed.
+   */
+  launchHooks(ctx: LaunchContext): LaunchHooks {
+    const passed = this.hooksByRun.get(ctx.runId) ?? {}
+    this.hooksByRun.delete(ctx.runId)
+    const secrets = [ctx.hookAuthFile, ctx.env.HIVE_HOOK_TOKEN ?? '']
+    const off = this.hooksOffIn(ctx)
+    const hive = rowsOfHooksTable(passed, { source: 'hive', status: off ? 'disabled' : 'passed', ...(off ? { why: off } : {}), observed: true }, secrets)
+    const read = (): ReturnType<typeof settingsScopes> => settingsScopes(ctx.cwd, ctx.env.CLAUDE_CONFIG_DIR || claudeHome(), ctx.extraArgs)
+    // What of a scope decides its hooks: their table and the switches that turn them off.
+    const print = (json: unknown): string => {
+      const o = json && typeof json === 'object' ? (json as Record<string, unknown>) : {}
+      return JSON.stringify([o.hooks ?? null, o.disableAllHooks ?? null, o.allowManagedHooksOnly ?? null])
+    }
+    const first = read()
+    const atLaunch = new Map(first.map((s) => [s.file ?? s.label, print(s.json)]))
+    const own = claudeScopeHooks(first, secrets)
+    const listing: HookListing = { basis: 'launch', rows: [...hive.rows, ...own.rows], notes: own.notes }
+    return {
+      listing,
+      receivers: Object.fromEntries(hive.rows.map((r) => [r.event, r.type])),
+      now: async () => {
+        const changed = read().filter((s) => s.file && atLaunch.get(s.file) !== print(s.json))
+        return { ...listing, notes: [...listing.notes, ...changed.map((s) => ({ kind: 'changed' as const, file: s.file! }))] }
+      }
+    }
+  }
+
+  backgroundTasks(appended: string, memo: Record<string, unknown>): BackgroundTaskEvent[] {
+    return claudeBackgroundTasks(appended, memo)
   }
 
   safeguards(appended: string, memo: Record<string, unknown>): SafeguardEvent[] {
     return claudeSafeguards(appended, memo)
   }
+
+  /** Turns by prompt id (prompt_id in its hooks), #1371. */
+  transcriptTurns(appended: string, memo: Record<string, unknown>): TranscriptTurn[] {
+    return claudeTranscriptTurns(appended, memo)
+  }
+
+  readonly turnsJoin = 'id'
 
   /**
    * Claude Code's prompt after a safeguard stop (whether to switch models, a question it puts through its permission
@@ -443,12 +690,49 @@ export class ClaudeCodeAdapter implements ProviderAdapter {
     return advanced.pattern('claude-code.safeguard.prompt').test(bottom)
   }
 
+  /**
+   * Claude Code's question by itself after a turn (HI-1959: 2.1.312's offer to teach auto mode about the environment),
+   * which sends no hook: the advanced setting claude-code.screen.idleQuestion (its title, a line of its own), in the lines
+   * written last. Its dialog replaces the input box (2.1.312's wizard), or is drawn under it and its footer (2.1.314, as
+   * recorded: the empty box stays above it, HI-2191). So with a box drawn only the title under the last one counts: above
+   * it, the same words are a prompt's or a reply's (HR3's round 1 of HI-1959), never the dialog.
+   */
+  idleQuestion(screen: string): string | null {
+    const box = this.lastBox(screen)
+    const under = box ? screen.slice(box.index! + box[0].length) : screen
+    const bottom = under.trimEnd().split('\n').slice(-SAFEGUARD_PROMPT_LINES).join('\n')
+    const asked = advanced.pattern('claude-code.screen.idleQuestion').exec(bottom)
+    return asked ? asked[0].trim() : null
+  }
+
+  /**
+   * What Claude Code's input box holds (HI-1959), from the screen with dim cells blanked: the last box the advanced
+   * setting claude-code.screen.input finds, its rows joined and whitespace squashed ('' when empty); null without one.
+   */
+  promptText(screen: string): string | null {
+    return this.promptBox(screen)?.replace(/\s+/g, ' ').trim() ?? null
+  }
+
+  /** promptText's box as drawn: the last one's first group, its rows kept (HI-1979). */
+  promptBox(screen: string): string | null {
+    const last = this.lastBox(screen)
+    return last ? (last[1] ?? '') : null
+  }
+
+  /** The last input box the advanced setting claude-code.screen.input finds on the screen, or null. */
+  private lastBox(screen: string): RegExpMatchArray | null {
+    const re = advanced.pattern('claude-code.screen.input')
+    let last: RegExpMatchArray | null = null
+    for (const m of screen.matchAll(new RegExp(re.source, re.flags.includes('g') ? re.flags : `${re.flags}g`))) last = m
+    return last
+  }
+
   startHint(text: string): StartHint | null {
-    if (/\bmodel\b/i.test(text) && /not found|invalid|unknown|not available|does not exist|isn't available/i.test(text)) return { hint: tr(msg({ id: 'providers.claude.hint.model', defaultMessage: "Claude Code doesn't know this model: choose another in Agent Settings.", description: "Why Claude Code didn't start, in the agent's pane, with a button that goes where it says. Agent Settings, Agent Setup and Settings → … are Hive's names: use them as shown." })), fix: 'agent-settings' }
+    if (/\bmodel\b/i.test(text) && /not found|invalid|unknown|not available|does not exist|isn't available/i.test(text)) return { hint: tr(msg({ id: 'providers.claude.hint.model', defaultMessage: "Claude Code doesn't know this model: choose another in Agent Settings.", description: "Why Claude Code didn't start, in the agent's pane, with a button that goes where it says. Agent Settings, Provider Setup and Settings → … are Hive's names: use them as shown." })), fix: 'agent-settings' }
     // Its argument parser: "error: unknown option '--x'", "error: option '--effort <level>' argument 'x' is invalid".
-    if (/unknown option|unknown command|error: option|too many arguments|missing required argument|is invalid\. Allowed choices/i.test(text)) return { hint: tr(msg({ id: 'providers.claude.hint.args', defaultMessage: 'Claude Code refused an argument: check Extra arguments in Agent Settings and Settings → Claude Code.', description: "Why Claude Code didn't start, in the agent's pane, with a button that goes where it says. Agent Settings, Agent Setup and Settings → … are Hive's names: use them as shown." })), fix: 'agent-settings' }
-    if (/not logged in|please (run )?\/?login|invalid api key|authentication|OAuth/i.test(text)) return { hint: tr(msg({ id: 'providers.claude.hint.signIn', defaultMessage: "Claude Code isn't signed in: start it again and sign in in its terminal.", description: "Why Claude Code didn't start, in the agent's pane, with a button that goes where it says. Agent Settings, Agent Setup and Settings → … are Hive's names: use them as shown." })), fix: 'terminal' }
-    if (/is not recognized|ENOENT|cannot find module|MODULE_NOT_FOUND/i.test(text)) return { hint: tr(msg({ id: 'providers.claude.hint.broken', defaultMessage: 'Claude Code looks broken or missing: reinstall or update it in Agent Setup.', description: "Why Claude Code didn't start, in the agent's pane, with a button that goes where it says. Agent Settings, Agent Setup and Settings → … are Hive's names: use them as shown." })), fix: 'agent-setup' }
+    if (/unknown option|unknown command|error: option|too many arguments|missing required argument|is invalid\. Allowed choices/i.test(text)) return { hint: tr(msg({ id: 'providers.claude.hint.args', defaultMessage: 'Claude Code refused an argument: check Extra arguments in Agent Settings and Settings → Claude Code.', description: "Why Claude Code didn't start, in the agent's pane, with a button that goes where it says. Agent Settings, Provider Setup and Settings → … are Hive's names: use them as shown." })), fix: 'agent-settings' }
+    if (/not logged in|please (run )?\/?login|invalid api key|authentication|OAuth/i.test(text)) return { hint: tr(msg({ id: 'providers.claude.hint.signIn', defaultMessage: "Claude Code isn't signed in: start it again and sign in in its terminal.", description: "Why Claude Code didn't start, in the agent's pane, with a button that goes where it says. Agent Settings, Provider Setup and Settings → … are Hive's names: use them as shown." })), fix: 'terminal' }
+    if (/is not recognized|ENOENT|cannot find module|MODULE_NOT_FOUND/i.test(text)) return { hint: tr(msg({ id: 'providers.claude.hint.broken', defaultMessage: 'Claude Code looks broken or missing: reinstall or update it in Provider Setup.', description: "Why Claude Code didn't start, in the agent's pane, with a button that goes where it says. Agent Settings, Provider Setup and Settings → … are Hive's names: use them as shown." })), fix: 'agent-setup' }
     return null
   }
 
@@ -561,6 +845,15 @@ export class ClaudeCodeAdapter implements ProviderAdapter {
   }
 
   /** What Claude Code's screen shows of its turn (claudeTurnScreen), for the versions it was checked with (#648). */
+  /** Claude Code waiting to retry its model request (HI-1973): its transcript's newest record of it (retry.ts). */
+  retryWait(q: { sessionId: string; env: NodeJS.ProcessEnv; transcriptPath?: string; since: number }): Promise<RetryWait | null> {
+    return claudeRetryWait(q.transcriptPath, q.since)
+  }
+
+  retryLookAfterMs(): number {
+    return advanced.number('claude-code.retry.checkAfterSeconds') * 1000
+  }
+
   turnScreen(version: string | null): ((screen: string) => 'idle' | 'working' | null) | null {
     if (!version || compareVersions(version, TURN_SCREEN_SINCE) < 0) return null
     return claudeTurnScreen
@@ -593,37 +886,66 @@ export class ClaudeCodeAdapter implements ProviderAdapter {
    * names the folder by Node's realpath of its cwd (`claudeSpelling`), so a session started through a junction is under
    * the real path's name; then Hive's spelling and the real, long path (one started by another name, or an older CLI's).
    * Last, those named by an 8.3 short spelling of the folder, which no other spelling of it gives: found by the cwd
-   * their transcripts record (`shortNamed`).
+   * their transcripts record (`shortNamed`). Kept per folder while the projects folder is unchanged and no folder that
+   * may be its 8.3 name is waiting for a cwd (HI-1681): a list looks up hundreds of sessions in a dozen folders, and each
+   * lookup took the folder's real path three times on main's thread and went through every name.
    */
+  private dirsOf = new Map<string, { names: string[]; dirs: string[] }>()
   private async transcriptDirs(folder: string): Promise<string[]> {
     const root = join(claudeHome(), 'projects')
-    let names: string[]
-    try {
-      names = await readdir(root)
-    } catch {
-      return []
-    }
+    const names = await this.projectFolders(root)
+    if (!names) return []
+    const key = `${root}|${folder}`.toLowerCase()
+    const kept = this.dirsOf.get(key)
+    if (kept?.names === names) return kept.dirs
     const byName = new Map(names.map((d) => [d.toLowerCase(), d]))
     const wanted = new Set([claudeSpelling(folder), folder, realPath(folder)].map((p) => encodeProjectPath(p).toLowerCase()))
     const exact = [...wanted].flatMap((w) => (byName.has(w) ? [join(root, byName.get(w)!)] : []))
-    return [...exact, ...(await this.shortNamed(root, names.filter((n) => !wanted.has(n.toLowerCase())), folder))]
+    const short = await this.shortNamed(root, names.filter((n) => !wanted.has(n.toLowerCase())), folder)
+    const dirs = [...exact, ...short.dirs]
+    this.dirsOf.delete(key)
+    if (short.settled) this.dirsOf.set(key, { names, dirs })
+    if (this.dirsOf.size > SUB_CACHE) this.dirsOf.delete(this.dirsOf.keys().next().value!)
+    return dirs
+  }
+
+  /**
+   * The folders of ~/.claude/projects, read again only when it changed (#1649): a session list looks up each session's
+   * transcript, and reading 500 folders' names for each of 400 sessions took most of a second. A folder's time changes
+   * when one is added, removed or renamed in it. Null when it can't be read. Lookups made while one checks share its
+   * check (HI-1681): a list looks a few sessions up at once.
+   */
+  private projectNames: { root: string; mtime: number; names: string[] } | null = null
+  private projectsCheck = joined<string[] | null>()
+  private projectFolders(root: string): Promise<string[] | null> {
+    return this.projectsCheck(root, () => this.readProjectFolders(root))
+  }
+
+  private async readProjectFolders(root: string): Promise<string[] | null> {
+    try {
+      const mtime = (await stat(root)).mtimeMs
+      if (this.projectNames?.root === root && this.projectNames.mtime === mtime) return this.projectNames.names
+      const names = await readdir(root)
+      this.projectNames = { root, mtime, names }
+      return names
+    } catch {
+      return null
+    }
   }
 
   /**
    * Of `names` (folders of ~/.claude/projects), those whose transcripts record an 8.3 short spelling of `folder` as their
    * cwd. Only names that may hold one (on the folder's drive, with an encoded `~n`) are looked in, and each one's cwd is
-   * read once while the folder is unchanged.
+   * read once while the folder is unchanged. `settled`: none of them is still without a cwd (one may record it later).
    */
-  private async shortNamed(root: string, names: string[], folder: string): Promise<string[]> {
+  private async shortNamed(root: string, names: string[], folder: string): Promise<{ dirs: string[]; settled: boolean }> {
     const drive = encodeProjectPath(realPath(folder)).slice(0, 3).toLowerCase()
     const here = placeMatcher(folder)
-    const out: string[] = []
-    for (const n of names) {
-      if (!n.toLowerCase().startsWith(drive) || !MAY_BE_SHORT.test(n)) continue
-      const cwd = await this.recordedCwd(join(root, n))
-      if (cwd?.includes('~') && here(cwd)) out.push(join(root, n))
-    }
-    return out
+    const candidates = names.filter((n) => n.toLowerCase().startsWith(drive) && MAY_BE_SHORT.test(n))
+    // A few at once: each is read once, the first time (HI-1681).
+    const cwds = await atMost(LIST_AT_ONCE, candidates, (n) => this.recordedCwd(join(root, n)))
+    const dirs = candidates.filter((n, i) => cwds[i]?.includes('~') && here(cwds[i]!)).map((n) => join(root, n))
+    return { dirs, settled: cwds.every((c) => !!c) }
   }
 
   /**
@@ -653,7 +975,7 @@ export class ClaudeCodeAdapter implements ProviderAdapter {
 
   async transcriptPath(folder: string, sessionId: string): Promise<string | null> {
     const file = `${assertSessionId(sessionId)}.jsonl`
-    for (const dir of await this.transcriptDirs(folder)) if (existsSync(join(dir, file))) return join(dir, file)
+    for (const dir of await this.transcriptDirs(folder)) if (await isFile(join(dir, file))) return join(dir, file)
     return null
   }
 
@@ -679,29 +1001,52 @@ export class ClaudeCodeAdapter implements ProviderAdapter {
     return out
   }
 
-  async listSessions(folder: string): Promise<ExternalSession[]> {
-    const out: ExternalSession[] = []
-    const seen = new Set<string>()
-    for (const dir of await this.transcriptDirs(folder)) for (const f of await readdir(dir).catch(() => [])) {
-      if (!f.endsWith('.jsonl') || !isSessionId(basename(f, '.jsonl'))) continue
-      const p = join(dir, f)
+  async listSessions(folder: string, skip?: (id: string) => boolean): Promise<ExternalSession[]> {
+    const files: { id: string; path: string }[] = []
+    for (const dir of await this.transcriptDirs(folder)) for (const f of await this.transcriptNames(dir)) {
+      const id = basename(f, '.jsonl')
+      if (f.endsWith('.jsonl') && isSessionId(id) && !skip?.(id)) files.push({ id, path: join(dir, f) })
+    }
+    const found = await atMost(LIST_AT_ONCE, files, async ({ id, path }): Promise<ExternalSession | null> => {
       try {
-        const s = await stat(p)
-        const id = basename(f, '.jsonl')
-        if (!s.isFile() || s.size === 0 || seen.has(id.toLowerCase())) continue
-        seen.add(id.toLowerCase())
-        const sub = await this.subSession(p, id, s.mtimeMs)
-        out.push({ id, transcriptPath: p, modified: s.mtime.toISOString(), ...(sub ? { sub } : {}) })
+        const s = await stat(path)
+        if (!s.isFile() || s.size === 0) return null
+        const sub = await this.subSession(path, id, s.mtimeMs)
+        return { id, transcriptPath: path, modified: s.mtime.toISOString(), bytes: s.size, mtimeMs: s.mtimeMs, ...(sub ? { sub } : {}) }
       } catch {
         // Removed between readdir and stat.
+        return null
       }
-    }
-    return out
+    })
+    // A session in two of the folders (#493): the first folder's, as they are listed.
+    const seen = new Set<string>()
+    return found.filter((x): x is ExternalSession => !!x && !seen.has(x.id.toLowerCase()) && !!seen.add(x.id.toLowerCase()))
   }
 
-  async subSessionOf(path: string, sessionId: string): Promise<SubSession | null> {
-    const s = await stat(path).catch(() => null)
-    return s ? this.subSession(path, sessionId, s.mtimeMs) : null
+  /**
+   * A transcript folder's names, read again only when the folder's time changed (HI-1681): it changes as a transcript
+   * is added, removed or renamed in it, not as one grows, so a session list reads each folder's names once per change.
+   */
+  private names = new Map<string, { mtime: number; names: string[] }>()
+  private async transcriptNames(dir: string): Promise<string[]> {
+    try {
+      const mtime = (await stat(dir)).mtimeMs
+      const c = this.names.get(dir)
+      if (c && c.mtime === mtime) return c.names
+      const names = await readdir(dir)
+      this.names.delete(dir)
+      this.names.set(dir, { mtime, names })
+      if (this.names.size > SUB_CACHE) this.names.delete(this.names.keys().next().value!)
+      return names
+    } catch {
+      this.names.delete(dir)
+      return []
+    }
+  }
+
+  async subSessionOf(path: string, sessionId: string, mtimeMs?: number): Promise<SubSession | null> {
+    const mtime = mtimeMs ?? (await stat(path).catch(() => null))?.mtimeMs
+    return mtime === undefined ? null : this.subSession(path, sessionId, mtime)
   }
 
   /** Each transcript's sub-agent check (its first line), by file and mtime; the oldest go past SUB_CACHE entries. */
@@ -738,13 +1083,17 @@ export class ClaudeCodeAdapter implements ProviderAdapter {
   // Project files
   // -------------------------------------------------------------------------
 
-  async memorySources(projectPath: string): Promise<MemorySource[]> {
+  async memorySources(projectPath: string, homes?: readonly { id: string; name: string; home: string }[]): Promise<MemorySource[]> {
     const p = this.id
+    // The user's own file: each connection's on in the workspace (HI-1755: each is its own home), else ~/.claude's.
+    const users: MemorySource[] = homes
+      ? homes.map((h) => ({ provider: p, id: `user:${h.id}`, label: connectionMemoryLabel('CLAUDE.md', h.name), path: join(h.home, 'CLAUDE.md'), kind: 'claude-md', exists: false })) // i18n-ignore: a file's name
+      : [{ provider: p, id: 'user', label: userMemoryLabel('CLAUDE.md'), path: join(claudeHome(), 'CLAUDE.md'), kind: 'claude-md', exists: false }] // i18n-ignore: a file's name
     const sources: MemorySource[] = [
       { provider: p, id: 'project', label: 'CLAUDE.md', path: join(projectPath, 'CLAUDE.md'), kind: 'claude-md', exists: false }, // i18n-ignore: a file's name
       { provider: p, id: 'project-dot', label: '.claude/CLAUDE.md', path: join(projectPath, '.claude', 'CLAUDE.md'), kind: 'claude-md', exists: false }, // i18n-ignore: a file's name
       { provider: p, id: 'local', label: 'CLAUDE.local.md', path: join(projectPath, 'CLAUDE.local.md'), kind: 'local-md', exists: false }, // i18n-ignore: a file's name
-      { provider: p, id: 'user', label: userMemoryLabel('CLAUDE.md'), path: join(claudeHome(), 'CLAUDE.md'), kind: 'claude-md', exists: false }
+      ...users
     ]
     for (const s of sources) s.exists = existsSync(s.path)
     const dir = await this.transcriptDir(projectPath)
@@ -758,12 +1107,14 @@ export class ClaudeCodeAdapter implements ProviderAdapter {
     return sources
   }
 
-  fileAllowed(path: string, write: boolean): boolean {
-    return claudeFileAllowed(path, write, claudeHome())
+  fileAllowed(path: string, write: boolean, homes?: readonly string[]): boolean {
+    // Auto memory is listed from the CLI's own projects folder (memorySources), which each connection's home links by a
+    // junction (HI-1755): its memory files by that path too, and nothing else of the CLI's home (HI-1999).
+    return (homes ?? [claudeHome()]).some((home) => claudeFileAllowed(path, write, home)) || (!!homes && claudeAutoMemory(path, claudeHome()))
   }
 
-  skillRoots(): SkillRoots {
-    return { machine: [join(claudeHome(), 'skills')], plugins: join(claudeHome(), 'plugins'), local: [join('.claude', 'skills')], hiveCopyPrefix: null }
+  skillRoots(home = claudeHome()): SkillRoots {
+    return { machine: [join(home, 'skills')], plugins: join(home, 'plugins'), local: [join('.claude', 'skills')], hiveCopyPrefix: null }
   }
 
   async projectMcpServers(projectPath: string): Promise<Record<string, McpServerDef>> {

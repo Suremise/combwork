@@ -15,7 +15,8 @@ import { DatabaseSync } from 'node:sqlite'
 const base = tempDir('hive-board-events-')
 ;(electron.app as unknown as { getPath: () => string }).getPath = () => join(base, 'profile')
 
-// Every read of the whole board that recording the running agents' cards makes, counted (the reads themselves unchanged).
+// Every read of the whole board that recording the running agents' cards makes, counted (the reads themselves unchanged):
+// the board's cards in full, or the live cards' heads (HI-1690).
 const boardReads = vi.hoisted(() => ({ n: 0 }))
 vi.mock('../src/main/tasks', async (importOriginal) => {
   const orig = await importOriginal<typeof import('../src/main/tasks')>()
@@ -24,6 +25,10 @@ vi.mock('../src/main/tasks', async (importOriginal) => {
     allTasks: (...a: Parameters<typeof orig.allTasks>) => {
       boardReads.n++
       return orig.allTasks(...a)
+    },
+    liveCardHeads: (...a: Parameters<typeof orig.liveCardHeads>) => {
+      boardReads.n++
+      return orig.liveCardHeads(...a)
     }
   }
 })
@@ -93,7 +98,7 @@ describe('board events (#1011)', () => {
 
   beforeAll(async () => {
     mkdirSync(join(alpha, '.hive'), { recursive: true })
-    writeFileSync(join(alpha, '.hive', 'project.json'), JSON.stringify({ version: 2, agents: [{ id: 'a1', name: 'Agent 1' }] }))
+    writeFileSync(join(alpha, '.hive', 'project.json'), JSON.stringify({ version: 2, agents: [{ id: 'a1', name: 'Agent 1' }, { id: 'a2', name: 'Agent 2' }] }))
     w = createWorkspaceService()
     await w.open(wsPath)
     off = onHiveEvent((e: HiveEvent) => {
@@ -182,16 +187,21 @@ describe('board events (#1011)', () => {
     expect((await run(() => tasks.getTask(cards[2]))).labels).toEqual(['after'])
   })
 
-  it("a loop's handoff is told once its change is saved, in a batch too, and sees the card as saved (#1017)", async () => {
+  it("a loop's handoff (its wake action, #1266) runs once its change is saved, in a batch too, and sees the card as saved (#1017)", async () => {
     const [x, y] = await doneCards(2)
     await run(() => tasks.updateTasks([x, y], { column: 'todo' }, user))
     const builder = { kind: 'agent', name: 'Agent 1 (alpha)', self: { project: 'alpha', agentId: 'a1' }, scope: 'alpha' } as const
     await run(() => tasks.updateTasks([x, y], { agent: 'a1' }, user))
+    // In a loop (a lane with a reviewer): a card with no reviewer has no handoffs.
+    await (await import('../src/main/lanes')).startLane(w, { project: 'alpha', builder: 'a1', reviewer: 'a2', cards: [x, y], by: 'Agent 1 (alpha)' })
     const handed: { n: number; column: string; seen: number }[] = []
-    tasks.onLoopEvent((e) => {
+    const { onAction, clearActionHandlers } = await import('../src/main/workflow/actionWorker')
+    onAction(
+      'wake',
       // Read as any reader outside the change reads it: the last commit.
-      void tasks.getTask(e.card.number, w).then((c) => handed.push({ n: c.number, column: c.column, seen: seen.length }))
-    })
+      (a) => void tasks.getTask(a.card, w).then((c) => handed.push({ n: c.number, column: c.column, seen: seen.length })),
+      'delivered'
+    )
     try {
       seen.length = 0
       await run(() => tasks.updateTasks([x, y], { column: 'review' }, builder))
@@ -202,7 +212,7 @@ describe('board events (#1011)', () => {
         [y, 'review', 1]
       ])
     } finally {
-      tasks.onLoopEvent(() => undefined)
+      clearActionHandlers()
     }
   })
 

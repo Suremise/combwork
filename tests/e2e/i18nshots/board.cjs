@@ -33,7 +33,7 @@ async function start(ctx, agents) {
 async function tokenOf(ctx, agent) {
   const [live] = await liveOf(ctx, [agent])
   const launches = fs.readFileSync(path.join(ctx.claudeHome, 'fake-launches.jsonl'), 'utf8').trim().split('\n').map((l) => JSON.parse(l))
-  const token = launches.filter((l) => l.sessionId === live?.sessionId).at(-1)?.env?.HIVE_API_TOKEN
+  const token = launches.filter((l) => l.sessionId === live?.sessionId).at(-1)?.token
   if (!token) throw new Error(`no API token for ${agent.name} (session ${live?.sessionId})`)
   return token
 }
@@ -47,8 +47,8 @@ async function apiAs(ctx, token, method, route, body) {
 }
 
 /**
- * The task board with a card in every column: one On Hold with its reason, one blocked, one in Doing whose agent isn't
- * running (stalled), one in Review, Passed and Done, and one archived for the archive's screen.
+ * The task board with a card in every column: one On Hold with its reason, one blocked, one in Active whose agent isn't
+ * running (stalled), one in Review, Approved and Done, and one archived for the archive's screen.
  */
 async function board(ctx) {
   const { page, inv, agents, project } = ctx
@@ -58,6 +58,8 @@ async function board(ctx) {
   const cards = (ctx.boardCards = {})
   cards.hold = await make('Parked idea', 'hold')
   await inv('tasks:update', cards.hold, { blocked: 'Waiting for the release' })
+  // The user's reason, though it fits a message's pattern ("Waiting for {what}"): not English left.
+  ctx.authored('Waiting for the release', '.task-blocked')
   cards.todo = await make('Next thing', 'todo')
   cards.blocked = await make('Needs a decision', 'todo')
   await inv('tasks:update', cards.blocked, { blocked: 'Which colour?' })
@@ -90,10 +92,13 @@ async function cardMenu(ctx) {
   return (await shown(ctx, page.locator('.menu[role="menu"]'), "the card's menu")).first()
 }
 
+/** The toolbar's Archived checkbox: the one that isn't For you's (#1276's filter, which comes first). */
+const archivedBox = (page) => page.locator('.board-view .board-toolbar label:not(.board-for-you-filter) input.checkbox').first()
+
 /** The archive: the board's archived cards (the toolbar's checkbox). */
 async function archive(ctx) {
   const { page } = ctx
-  const box = page.locator('.board-view .board-toolbar input.checkbox').first()
+  const box = archivedBox(page)
   await shown(ctx, box, "the board's archived checkbox")
   await box.check()
   await shown(ctx, page.locator('.board-view .archived-cards tbody tr'), 'the archived cards')
@@ -105,7 +110,7 @@ async function archive(ctx) {
 
 async function closeArchive(ctx) {
   await ctx.page.locator('.board-view .archive-batch select').first().selectOption({ index: 0 })
-  await ctx.page.locator('.board-view .board-toolbar input.checkbox').first().uncheck()
+  await archivedBox(ctx.page).uncheck()
 }
 
 /** The attention inbox: Two finishes a turn nobody has looked at (the window shows the board, not its pane). */
@@ -130,8 +135,20 @@ async function lanes(ctx) {
   await start(ctx, [one])
   const c = ctx.boardCards
   const name = project.split(/[\\/]/).pop()
+  // One, an idle builder outside slots, is given the lane in a new conversation (HI-2232), so a new launch and token. Quiet
+  // first (idle, nothing of Hive's being typed into it or waiting to be), or it would be left as it is mid-turn, or its
+  // new conversation owed until it is free (HI-2252).
+  const twoToken = await tokenOf(ctx, two)
+  const port = ctx.lib.port(47834)
+  if (!(await ctx.lib.until(async () => ctx.lib.agentQuiet(port, name, (await liveOf(ctx, [one]))[0], twoToken), ctx.hungMs))) throw new Error(`One wasn't quiet before its lane: ${JSON.stringify((await liveOf(ctx, [one]))[0])}`)
+  const [before] = await liveOf(ctx, [one])
   await ctx.api('POST', '/v1/lanes', { project: name, builder: one.name, reviewer: two.name, name: 'i18n lane', cards: [c.done, c.passed, c.review, c.doing, c.blocked, c.todo] })
-  ctx.tokens = { one: await tokenOf(ctx, one), two: await tokenOf(ctx, two) }
+  const renewed = async () => {
+    const [now] = await liveOf(ctx, [one])
+    return !!now && now.sessionId !== before?.sessionId && ['ready', 'finished'].includes(now.status) && !!(await tokenOf(ctx, one).catch(() => null))
+  }
+  if (!(await ctx.lib.until(renewed, ctx.hungMs))) throw new Error(`One didn't get its lane in a new conversation: ${JSON.stringify((await liveOf(ctx, [one]))[0])}`)
+  ctx.tokens = { one: await tokenOf(ctx, one), two: twoToken }
   await apiAs(ctx, ctx.tokens.one, 'POST', '/v1/progress', { title: 'Full test set', total: 146, step: 112, stepName: 'mergeslot', estimateMs: 600000 })
   await apiAs(ctx, ctx.tokens.one, 'POST', `/v1/projects/${name}/merge-slot/claim`, { branch: 'main', cards: [c.passed], timeoutSeconds: 0 })
   await apiAs(ctx, ctx.tokens.two, 'POST', `/v1/projects/${name}/merge-slot/claim`, { branch: 'main', cards: [c.review], timeoutSeconds: 0 })

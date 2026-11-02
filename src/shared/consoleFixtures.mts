@@ -294,17 +294,29 @@ export const DIAGNOSTIC_BYTES = 64 * 1024
 
 const utf8 = new TextEncoder()
 
-function mapStrings(v: unknown, fn: (s: string) => string): unknown {
-  if (typeof v === 'string') return fn(v)
-  if (Array.isArray(v)) return v.map((x) => mapStrings(x, fn))
-  if (v && typeof v === 'object') return Object.fromEntries(Object.entries(v).map(([k, x]) => [k, mapStrings(x, fn)]))
+/**
+ * The fields of an event's payload whose value is a path: those devConsole.ts's safe fields keep one in (a hook's tool
+ * input, its transcript and folder, a status line's folders, a CLI's file), at any depth.
+ */
+export const PATH_FIELDS: ReadonlySet<string> = new Set(['file_path', 'notebook_path', 'path', 'transcript_path', 'transcriptPath', 'cwd', 'current_dir', 'project_dir', 'file'])
+/** A value that starts as an absolute path does (a drive's, a share's, a home-relative one), in whatever field the capture kept it. */
+const PATH_START = /^\s*(?:[A-Za-z]:[\\/]|[\\/]{2}|~[\\/])/
+
+/**
+ * Every string through `fn`, but a path's whole value is `<path>` (HI-2332): by its field, or by how it starts. Never by
+ * finding where a path ends in it, which a name or a mask put in it by redaction made fail twice.
+ */
+function mapStrings(v: unknown, fn: (s: string) => string, inPath = false): unknown {
+  if (typeof v === 'string') return v && (inPath || PATH_START.test(v)) ? '<path>' : fn(v)
+  if (Array.isArray(v)) return v.map((x) => mapStrings(x, fn, inPath))
+  if (v && typeof v === 'object') return Object.fromEntries(Object.entries(v).map(([k, x]) => [k, mapStrings(x, fn, inPath || PATH_FIELDS.has(k))]))
   return v
 }
 
 /**
  * The part of a recording Copy Diagnostics attaches: a line about it and its newest events (within DIAGNOSTIC_LINES, and
- * DIAGNOSTIC_BYTES of UTF-8 with a line end each), every string passed through `redact` (paths, names, secrets). Null for
- * a recording with text, which is never attached.
+ * DIAGNOSTIC_BYTES of UTF-8 with a line end each), every string passed through `redact` (names, folders, secrets), and
+ * every path `<path>` whole, wherever it is (mapStrings). Null for a recording with text, which is never attached.
  */
 export function diagnosticRecording(text: string, redact: (s: string) => string): { summary: string; lines: string[] } | null {
   const r = parseRecording(text)

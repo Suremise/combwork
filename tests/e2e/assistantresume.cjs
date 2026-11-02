@@ -101,7 +101,7 @@ const mode = ({ name, word: w }) =>
     const before = (await items(id)).length
     const prompt = 'What is your codeword? Reply with the codeword only.'
     let question
-    const sent = await lib.sendPrompt(inv, key, prompt, { submitted: async () => {
+    const sent = await lib.sendPrompt(inv, key, prompt, { ready: () => lib.hiveToolsConnected(userData, 'assistant', launchMark), submitted: async () => {
       question = (await items(id)).find((i) => i.id >= before && i.kind === 'user' && i.text.trim() === prompt)
       return !!question
     } })
@@ -120,7 +120,9 @@ const mode = ({ name, word: w }) =>
     check('…the question’s own turn ends with its reply', !!ended, `question ${question.id}; ${JSON.stringify({ status: state?.status, since: state?.statusSince })}`)
     return reply
   }
-  const answers = (reply, m) => reply.includes(m.word) && Object.values(modes).every((o) => o === m || !reply.includes(o.word))
+  // Its answer is the first codeword in the reply (HI-1669: Haiku may go on to name its earlier one, "My earlier reply,
+  // ALPHA-…, was wrong."): a wrong first answer, or a codeword from an earlier run, still fails.
+  const answers = (reply, m) => /\b(?:ALPHA|BRAVO|CHARLIE)-[0-9A-F]{6}\b/.exec(reply)?.[0] === m.word
   // The mode menu in the Assistant panel's header.
   const panel = page.locator('.assistant-panel')
   const menu = async (label) => {
@@ -134,6 +136,9 @@ const mode = ({ name, word: w }) =>
   await page.evaluate(() => document.activeElement?.blur())
   await page.keyboard.press('Control+Alt+I')
   await lib.until(async () => (await panel.locator('.assistant-header').count()) === 1, 5000)
+  // Hive's log as each launch starts: ask() types its question once that launch's hive tools connected, as Hive types
+  // nothing before (#1148: a question typed into a just-started Claude Code wasn't taken).
+  let launchMark = lib.hiveLogLines(userData).length
   await inv('session:start', home, { agentId: 'assistant' })
   let session = ''
   await lib.cliStep('the Assistant starts in Alpha and gives its codeword', { session: key }, async () => {
@@ -153,6 +158,7 @@ const mode = ({ name, word: w }) =>
     const dialog = page.locator('.dialog', { hasText: `Restart in ${modes.bravo.name} mode?` })
     check('Restart in This Mode… asks first', !!(await lib.until(async () => (await dialog.count()) === 1, 5000)))
     const before = (await live())?.runId
+    launchMark = lib.hiveLogLines(userData).length
     await dialog.getByRole('button', { name: 'Restart', exact: true }).click()
     check('…and resumes the same conversation', !!(await lib.until(async () => { const l = await live(); return !!l && l.runId !== before && l.sessionId === session && ['ready', 'finished'].includes(l.status) }, 90000, 500)), (await live())?.sessionId)
     const reply = await ask(session)
@@ -165,6 +171,7 @@ const mode = ({ name, word: w }) =>
   // --- Switched while it is stopped, then resumed: told the mode once, and on Charlie's instructions.
   await menu(modes.charlie.name)
   check('switching while it is stopped saves the mode', !!(await lib.until(async () => JSON.parse(fs.readFileSync(path.join(home, '.hive', 'project.json'), 'utf8')).agents?.[0]?.mode === 'codeword-charlie', 5000)))
+  launchMark = lib.hiveLogLines(userData).length
   await inv('session:start', home, { resumeId: session, agentId: 'assistant' })
   await lib.cliStep('resumed after a switch while stopped', { session: key }, async () => {
     check('Claude Code resumes the conversation', !!(await idle()) && (await live())?.sessionId === session, (await live())?.sessionId)

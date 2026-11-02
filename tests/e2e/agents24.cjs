@@ -1,4 +1,4 @@
-// 24 agents at once (#562), on fake Claude Code agents: this workspace's Agents per project raised to 24, its 24 agents
+// 24 agents at once (#562), on fake Claude Code agents: this workspace's Maximum agents (HI-2001) raised to 24, its 24 agents
 // added and all started (a 25th refused); 23 of them each reporting a run through hive-progress, which the Progress
 // panel lists (the folded strip's bars and "+N" counting them all), while the 24th watches every working agent (more
 // than the 20 a watch took before), woken when they finish; Settings → Advanced's note on what more agents cost,
@@ -26,6 +26,8 @@ const check = (name, ok, extra = '') => {
 ;(async () => {
   for (const d of [userData, ws, claudeHome]) fs.rmSync(d, { recursive: true, force: true })
   fs.mkdirSync(claudeHome, { recursive: true })
+  // Every read of the agents' input recorded, for typeLine (#1560).
+  lib.logFakeInput(claudeHome)
   lib.gitProject(crowd)
   fs.writeFileSync(path.join(claudeHome, 'fake-trusted.json'), JSON.stringify([crowd.toLowerCase()]))
   // What each run is: it lasts until the release file exists (3 minutes at the most, in case).
@@ -63,15 +65,14 @@ const check = (name, ok, extra = '') => {
     }
     /** Types a prompt into an agent (as the user does), Enter included. */
     const say = async (id, text) => {
-      await inv('pty:write', lib.ptyKey(crowd, id), text)
-      await lib.sleep(300)
-      await inv('pty:write', lib.ptyKey(crowd, id), '\r')
+      // Typed again if a wake of Hive's disturbed it (lib.typeLine, #1560).
+      await lib.typeLine(inv, lib.ptyKey(crowd, id), claudeHome, null, text, { live: () => live(id) })
     }
     const openRuns = async () => (await inv('progress:list')).filter((r) => r.finishedAt === null && r.projectPath?.toLowerCase() === crowd.toLowerCase())
 
     // --- 24 agents: the workspace allows them, and all of them start.
     await page.getByText('crowd', { exact: true }).first().click()
-    await inv('advanced:set', 'hive.agents.perProject', N, 'workspace')
+    await lib.setMaxAgents(inv, N, 'workspace')
     const agents = []
     for (let i = 1; i <= N; i++) agents.push(await lib.addAgent(inv, crowd, { name: `W${i}` }))
     const refused = await inv('agents:add', crowd, { location: 'project', provider: 'claude-code' }).then(() => '', (e) => String(e.message ?? e))
@@ -105,13 +106,15 @@ const check = (name, ok, extra = '') => {
     const status = (await api('GET', '/v1/projects/crowd')).body?.agents?.find((a) => a.name === `W${N}`)
     check('…all 23 of them', status?.watching?.agents?.length === N - 1, JSON.stringify(status?.watching))
 
-    // --- Settings → Advanced: the note measures the running agents.
+    // --- Settings → Version Control → Workspace defaults (HI-2001): Maximum agents' note measures the running agents.
     await page.keyboard.press('Control+,')
-    await page.locator('.settings-nav .row', { hasText: 'Advanced' }).click()
-    const row = page.locator('.advanced-row[data-advanced="hive.agents.perProject"]')
+    await page.locator('.settings-nav .row', { hasText: 'Version Control' }).click()
+    await page.locator('.settings-group[data-section="workflow"] [role="tab"][data-setting-tab="workflow.workspaceDefaults"]').click()
+    // One form per version control (None, Git), the one shown has the note.
+    const row = page.locator('.workflow-option[data-option="maxAgents"]:visible').first()
     const note = row.locator('[data-note="many-agents"]')
     const noteText = async () => ((await note.count()) ? await note.innerText() : '')
-    check("Agents per project's note measures the 24 running agents, and this computer", !!(await until(async () => /Your 24 running agents take [\d.]+ [GM]B now \(about \d+ MB each\); this computer has [\d.]+ GB of memory/.test(await noteText()), HUNG_MS)), await noteText())
+    check("Maximum agents' note measures the 24 running agents, and this computer", !!(await until(async () => /Your 24 running agents take [\d.]+ [GM]B now \(about \d+ MB each\); this computer has [\d.]+ GB of memory/.test(await noteText()), HUNG_MS)), await noteText())
     await row.scrollIntoViewIfNeeded()
     await page.screenshot({ path: path.join(lib.WORK, 'agents24-3-note.png') })
     console.log(`  ${await noteText()}`)

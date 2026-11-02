@@ -1,0 +1,5 @@
+{
+  "tabs.unsaved": "Cambios sin guardar",
+  "tabs.unsavedNamed": "{tab} (cambios sin guardar)",
+  "tabs.withNote": "{tab} ({note})"
+}

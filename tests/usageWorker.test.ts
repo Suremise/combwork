@@ -1,12 +1,14 @@
 // The usage worker (#1106): records a session from its transcript, reads only what was added since (taking up its
 // parser's state), never makes a session's totals smaller, keeps a kept usage only for a session it doesn't have, and
 // leaves a session another writer recorded meanwhile as that writer wrote it.
-import { appendFileSync, readFileSync, writeFileSync } from 'fs'
+import { appendFileSync, readFileSync, rmSync, writeFileSync } from 'fs'
 import { spawn, type ChildProcess } from 'child_process'
-import { join } from 'path'
-import { describe, expect, it } from 'vitest'
+import { dirname, join } from 'path'
+import { Worker } from 'worker_threads'
+import { build } from 'esbuild'
+import { describe, expect, it, vi } from 'vitest'
 import { DatabaseSync } from 'node:sqlite'
-import { handleRequest, type IngestJob, type IngestResult } from '../src/main/usageWorker'
+import { handleRequest, logInProcess, openableWaits, openFiles, type IngestJob, type IngestResult, type WorkerReply, type WorkerRequest } from '../src/main/usageWorker'
 import { cursorOf, writeSession, type StoredSession } from '../src/main/usageDb'
 import { rowsPart, summaryOf, usageFromRows } from '../src/shared/usageLedger'
 import { priceUsage } from '../src/shared/usageDays'
@@ -15,12 +17,15 @@ import { DEFAULT_SETTINGS } from '../src/shared/defaults'
 import { estimateCost } from '../src/shared/prices'
 import type { AppSettings, ProviderId, SessionUsage } from '../src/shared/types'
 import { tempDir } from './tempDir'
+import { leftByAKill, refusedNow, whileMapped } from './mappedShm'
 
 const T0 = Date.parse('2026-10-12T10:00:00.000Z')
 const line = (i: number, output = 100): string => JSON.stringify({ type: 'assistant', requestId: `r${i}`, timestamp: new Date(T0 + i * 1000).toISOString(), message: { model: 'claude-opus-5-5', usage: { input_tokens: 10, cache_read_input_tokens: 0, cache_creation_input_tokens: 0, output_tokens: output } } }) + '\n'
 const prompt = (i: number): string => JSON.stringify({ type: 'user', timestamp: new Date(T0 + i * 1000).toISOString(), message: { role: 'user', content: `go ${i}` } }) + '\n'
 
 let id = 0
+// The longest a wait here waits for what it waits on: a bound for a hung run (tests/README.md).
+const HUNG_MS = 10_000
 
 /** Holds a file open the way an editor or a virus scanner can: no sharing, so it can't be read (as sessionInUse.test.ts does). */
 async function hold(file: string): Promise<ChildProcess> {
@@ -294,6 +299,25 @@ describe('the usage worker', () => {
     expect(rows.map((r) => [r.session, r.agentId, r.row.role, r.row.outputTokens])).toEqual([['abc', 'a1', 'review', 200]])
     await t.close()
   })
+
+  it("answers only the named sessions' timelines, of that scope alone (HI-1906: a card's)", async () => {
+    const t = await setup()
+    const other = join(t.transcript, '..', 'def.jsonl')
+    writeFileSync(t.transcript, prompt(0) + line(1) + line(2))
+    writeFileSync(other, prompt(0) + line(5))
+    await t.ingest()
+    await t.ingest({ session: 'def', path: other })
+    // The same session id in another scope (another host's session): never one of p1's.
+    await t.ingest({ scope: 'p2', path: other })
+    type Timeline = { scope: string; session: string; timeline: { rows: unknown[] } | null }
+    const timelines = async (scope: string, sessions?: string[]) => ((await call({ type: 'timelines', file: t.file, scope, ...(sessions ? { sessions } : {}) })) as Timeline[]).map((s) => [s.scope, s.session, s.timeline?.rows.length ?? 0]).sort()
+    expect(await timelines('p1')).toEqual([['p1', 'abc', 2], ['p1', 'def', 1]])
+    expect(await timelines('p1', ['abc'])).toEqual([['p1', 'abc', 2]])
+    expect(await timelines('p2', ['abc'])).toEqual([['p2', 'abc', 1]])
+    expect(await timelines('p1', ['abc', 'nope'])).toEqual([['p1', 'abc', 2]])
+    expect(await timelines('p1', [])).toEqual([])
+    await t.close()
+  })
 })
 
 // Reads for main (#1147): a running session's footer and context gauge, read here rather than in main's thread.
@@ -402,6 +426,293 @@ describe('the usage worker reading a transcript for main', () => {
       expect(context(got), provider).toEqual(context(want))
       expect(got.contextTokens, provider).toBeGreaterThan(0)
     }
+    await t.close()
+  })
+
+  it("a session that ran on a server connection (HI-1772): its CLI's Claude-priced cost report never counted, in the history or a read", async () => {
+    const t = await setup()
+    // A server's model (no price of Hive's), with the cost Claude Code reported for it priced as a Claude model.
+    const server = (i: number): string => JSON.stringify({ type: 'assistant', requestId: `r${i}`, timestamp: new Date(T0 + i * 1000).toISOString(), message: { model: 'deepseek-flash', usage: { input_tokens: 10, cache_read_input_tokens: 0, cache_creation_input_tokens: 0, output_tokens: 100 } } }) + '\n'
+    const report = JSON.stringify({ type: 'cost-state', timestamp: new Date(T0 + 3000).toISOString(), totalCostUSD: 4.2 }) + '\n'
+    writeFileSync(t.transcript, prompt(0) + server(1) + server(2) + report)
+    const settings = { providers: DEFAULT_SETTINGS.providers }
+    const cost = async () => { const st = (await t.stored())!; return usageFromRows(st.summary, st.rows, settings).costUsd }
+    // As a sign-in session: the report is its cost.
+    expect((await t.ingest()).status).toBe('written')
+    expect(await cost()).toBeCloseTo(4.2)
+    // The same session, now marked (its record's serverRan): the same file, unchanged, read again without the report.
+    const tokens = async () => (await t.stored())!.rows.reduce((n, r) => n + r.outputTokens, 0)
+    const days = async () => [...new Set((await t.stored())!.rows.map((r) => r.day))]
+    const daysBefore = await days()
+    expect((await t.ingest({ reportsIgnored: true })).status).toBe('written')
+    expect(await cost()).toBeNull()
+    expect(await tokens()).toBe(200)
+    expect(await days()).toEqual(daysBefore)
+    // A late job from before it was marked: never brings the report back; then nothing to do.
+    expect((await t.ingest({ reportsIgnored: false })).status).toBe('unchanged')
+    expect(await cost()).toBeNull()
+    // More of the file, read on from its saved parser: still without the report.
+    appendFileSync(t.transcript, server(4) + JSON.stringify({ type: 'cost-state', timestamp: new Date(T0 + 5000).toISOString(), totalCostUSD: 6.3 }) + '\n')
+    expect((await t.ingest()).status).toBe('written')
+    expect(await cost()).toBeNull()
+    expect(await tokens()).toBe(300)
+    // A read for its footer the same way; without the flag, the report.
+    const readFor = (reportsIgnored?: boolean) => call({ type: 'read', path: t.transcript, session: 'abc', provider: 'claude-code', seed: null, ...(reportsIgnored ? { reportsIgnored } : {}) }) as Promise<{ usage: SessionUsage }>
+    expect(priceUsage((await readFor(true)).usage, settings).costUsd).toBeNull()
+    expect(priceUsage((await readFor()).usage, settings).costUsd).toBeCloseTo(6.3)
+    // A session marked once its transcript is gone: its stored rows stripped of the report, counts kept.
+    const g = await setup()
+    writeFileSync(g.transcript, readFileSync(t.transcript, 'utf8'))
+    expect((await g.ingest()).status).toBe('written')
+    rmSync(g.transcript)
+    expect((await g.ingest({ reportsIgnored: true })).status).toBe('written')
+    const gs = (await g.stored())!
+    expect(usageFromRows(gs.summary, gs.rows, settings).costUsd).toBeNull()
+    expect(gs.rows.reduce((n, r) => n + r.outputTokens, 0)).toBe(300)
+    await g.close()
+    await t.close()
+  })
+
+  it('free (HI-1772, Darren 27 Oct): only on servers on this PC, a known $0 whatever prices are set; a run anywhere else ends it for good', async () => {
+    const t = await setup()
+    // A local model, priced by the user (a price local-only sessions never use), and Claude Code's report beside it.
+    const local = (i: number): string => JSON.stringify({ type: 'assistant', requestId: `r${i}`, timestamp: new Date(T0 + i * 1000).toISOString(), message: { model: 'qwen3:8b', usage: { input_tokens: 10, cache_read_input_tokens: 0, cache_creation_input_tokens: 0, output_tokens: 100 } } }) + '\n'
+    writeFileSync(t.transcript, prompt(0) + local(1) + JSON.stringify({ type: 'cost-state', timestamp: new Date(T0 + 2000).toISOString(), totalCostUSD: 3 }) + '\n')
+    const settings = { providers: { ...DEFAULT_SETTINGS.providers, 'claude-code': { ...DEFAULT_SETTINGS.providers['claude-code'], prices: { 'qwen3:8b': { input: 1000, cachedInput: 0, output: 1000 } } } } }
+    const usage = async () => {
+      const st = (await t.stored())!
+      return usageFromRows(st.summary, st.rows, settings)
+    }
+    // Local only: free, $0 known, its tokens counted.
+    expect((await t.ingest({ reportsIgnored: true, serverLocal: true })).status).toBe('written')
+    expect(await usage()).toMatchObject({ costUsd: 0, costFree: true, outputTokens: 100 })
+    // Unchanged, the same again.
+    expect((await t.ingest({ reportsIgnored: true, serverLocal: true })).status).toBe('unchanged')
+    // A run elsewhere (a remote server, a sign-in): not free from now on; the user's price for its model then applies.
+    expect((await t.ingest({ reportsIgnored: true, notLocal: true })).status).toBe('written')
+    const after = await usage()
+    expect(after.costFree).toBeUndefined()
+    expect(after.costUsd).toBeGreaterThan(0)
+    expect(after.outputTokens).toBe(100)
+    // A stale job from before (local alone) never makes it free again.
+    expect((await t.ingest({ reportsIgnored: true, serverLocal: true })).status).toBe('unchanged')
+    expect((await usage()).costFree).toBeUndefined()
+    // Remote first, then local: never free.
+    const r = await setup()
+    writeFileSync(r.transcript, readFileSync(t.transcript, 'utf8'))
+    expect((await r.ingest({ reportsIgnored: true, notLocal: true })).status).toBe('written')
+    expect((await r.ingest({ reportsIgnored: true, serverLocal: true })).status).toBe('unchanged')
+    const rs = (await r.stored())!
+    expect(usageFromRows(rs.summary, rs.rows, settings).costFree).toBeUndefined()
+    await r.close()
+    await t.close()
+  })
+
+  it('a locality fact on an unchanged file is kept (HI-1772 follow-up): history from before the flags, notLocal, then a stale local job, across a reopen', async () => {
+    const h = await setup()
+    const qwen = (i: number): string => JSON.stringify({ type: 'assistant', requestId: `r${i}`, timestamp: new Date(T0 + i * 1000).toISOString(), message: { model: 'qwen3:8b', usage: { input_tokens: 10, cache_read_input_tokens: 0, cache_creation_input_tokens: 0, output_tokens: 100 } } }) + '\n'
+    writeFileSync(h.transcript, prompt(0) + qwen(1))
+    const settings = { providers: { ...DEFAULT_SETTINGS.providers, 'claude-code': { ...DEFAULT_SETTINGS.providers['claude-code'], prices: { 'qwen3:8b': { input: 1000, cachedInput: 0, output: 1000 } } } } }
+    // Recorded with no locality at all (as a history from before this change).
+    expect((await h.ingest({ reportsIgnored: true })).status).toBe('written')
+    // The same file, unchanged: a run elsewhere is told; nothing to read, but the fact is kept.
+    expect((await h.ingest({ reportsIgnored: true, notLocal: true })).status).toBe('unchanged')
+    // A stale local-only job after it: the stored disqualifier stands.
+    expect((await h.ingest({ reportsIgnored: true, serverLocal: true })).status).toBe('unchanged')
+    const priced = async () => {
+      const st = (await h.stored())!
+      return usageFromRows(st.summary, st.rows, settings)
+    }
+    expect((await priced()).costFree).toBeUndefined()
+    expect((await priced()).costUsd).toBeGreaterThan(0)
+    // Reopened (the history's file closed and read again): the same.
+    await h.close()
+    expect((await h.ingest({ reportsIgnored: true, serverLocal: true })).status).toBe('unchanged')
+    expect((await priced()).costFree).toBeUndefined()
+    await h.close()
+  })
+
+  it("an Ollama cloud model (HI-1773, Darren 27 Oct): a conversation free while local only, then run on a connection with a cloud model: Hive's price for that id, never the CLI's report", async () => {
+    const t = await setup()
+    // Claude Code's own $5 for it, priced as a Claude model, beside the requests.
+    const cloud = (i: number): string => JSON.stringify({ type: 'assistant', requestId: `r${i}`, timestamp: new Date(T0 + i * 1000).toISOString(), message: { model: 'glm-4.6:cloud', usage: { input_tokens: 10, cache_read_input_tokens: 0, cache_creation_input_tokens: 0, output_tokens: 100 } } }) + '\n'
+    writeFileSync(t.transcript, prompt(0) + cloud(1) + JSON.stringify({ type: 'cost-state', timestamp: new Date(T0 + 2000).toISOString(), totalCostUSD: 5 }) + '\n')
+    const priced = { providers: { ...DEFAULT_SETTINGS.providers, 'claude-code': { ...DEFAULT_SETTINGS.providers['claude-code'], prices: { 'glm-4.6:cloud': { input: 1_000_000, cachedInput: 0, output: 1_000_000 } } } } }
+    const unpriced = { providers: DEFAULT_SETTINGS.providers }
+    const usage = async (settings: typeof unpriced) => {
+      const st = (await t.stored())!
+      return usageFromRows(st.summary, st.rows, settings)
+    }
+    // Its first runs on a connection that was local only: free.
+    expect((await t.ingest({ reportsIgnored: true, serverLocal: true })).status).toBe('written')
+    expect(await usage(priced)).toMatchObject({ costUsd: 0, costFree: true })
+    // Its connection gained a cloud model, so its next launch wasn't local (runsLocally): the same file, unchanged, its
+    // free rows read again as charges.
+    expect((await t.ingest({ reportsIgnored: true, notLocal: true })).status).toBe('written')
+    const after = await usage(priced)
+    expect(after.costFree).toBeUndefined()
+    // The user's price for glm-4.6:cloud (10 + 100 tokens at $1 each), not the $5 Claude Code reported.
+    expect(after.costUsd).toBeCloseTo(110)
+    expect(after.outputTokens).toBe(100)
+    // No price for it: unpriced, its tokens still counted.
+    expect(await usage(unpriced)).toMatchObject({ costUsd: null, outputTokens: 100 })
+    // A stale job from while it was local never makes it free again.
+    expect((await t.ingest({ reportsIgnored: true, serverLocal: true })).status).toBe('unchanged')
+    expect((await usage(priced)).costFree).toBeUndefined()
+    await t.close()
+  })
+})
+
+describe('the usage worker as main starts it (HI-1729)', () => {
+  it('loads in a worker thread, where Electron has no `app`, and answers a job (since HI-1684 its logger threw there and ended it on every start)', async () => {
+    const base = tempDir('hive-usage-worker-thread-')
+    // What `electron` is in a worker of Electron's main process: the npm package's export, a path, with no `app`.
+    const stub = join(base, 'electron-in-worker.cjs')
+    writeFileSync(stub, "module.exports = 'C:\\\\electron\\\\electron.exe'\n")
+    const script = join(base, 'usage-worker.cjs')
+    await build({ entryPoints: [join(__dirname, '..', 'src', 'main', 'usageWorker.ts')], outfile: script, bundle: true, platform: 'node', format: 'cjs', alias: { 'original-fs': 'fs', electron: stub }, logLevel: 'silent' })
+    const w = new Worker(script)
+    try {
+      const reply = await new Promise<WorkerReply>((resolve, reject) => {
+        w.on('message', (m: WorkerReply) => {
+          if ('id' in m) resolve(m)
+        })
+        w.once('error', reject)
+        w.once('exit', (code) => reject(new Error(`the usage worker ended (${code})`)))
+        w.postMessage({ id: 1, type: 'sessions', file: join(base, 'usage.db'), scopes: null } satisfies WorkerRequest)
+      })
+      expect(reply).toEqual({ id: 1, ok: true, value: [] })
+    } finally {
+      await w.terminate()
+    }
+  })
+})
+
+describe.runIf(process.platform === 'win32')('a usage history whose -shm another process still maps (HI-2200)', () => {
+  const logged: string[] = []
+  const capture = (m: WorkerReply): void => {
+    if ('log' in m) logged.push(m.text)
+  }
+
+  it('its requests wait for it to be let go, then the history opens with what it kept', async () => {
+    const t = await setup()
+    writeFileSync(t.transcript, prompt(0) + line(1, 100))
+    await t.ingest()
+    await t.close()
+    await leftByAKill(t.file)
+    logInProcess(capture)
+    try {
+      await whileMapped(dirname(t.file), `${t.file}-shm`, async (release) => {
+        expect(refusedNow(t.file)).toBe(1546)
+        const output = t.output()
+        await vi.waitFor(() => expect(logged.some((l) => l.includes("can't be opened yet"))).toBe(true), { timeout: HUNG_MS, interval: 20 })
+        release()
+        expect(await output).toBe(100)
+      })
+    } finally {
+      logInProcess(() => undefined)
+      logged.length = 0
+      await t.close()
+    }
+  })
+
+  // A resumed session's read takes its saved state up from the history (#1147): shown by a change before the offset,
+  // which only a read from the start sees (as "after a restart, takes the session's saved state up" does).
+  const pad = JSON.stringify({ type: 'user', timestamp: new Date(T0).toISOString(), message: { role: 'user', content: 'x'.repeat(10_000) } }) + '\n'
+  const changeRead = (file: string): void => writeFileSync(file, readFileSync(file, 'utf8').replace('"output_tokens":100}', '"output_tokens":900}'))
+  const seeded = async () => {
+    const t = await setup()
+    writeFileSync(t.transcript, prompt(0) + line(1) + pad + line(2))
+    await t.ingest({ keepState: 'now' })
+    await t.close()
+    await call({ type: 'forgetReads' })
+    changeRead(t.transcript)
+    appendFileSync(t.transcript, line(3))
+    await leftByAKill(t.file)
+    const read = (noWait?: boolean) => call({ type: 'read', path: t.transcript, session: 'abc', provider: 'claude-code', seed: { file: t.file, scope: 'p1' }, ...(noWait ? { noWait } : {}) }) as Promise<{ usage: SessionUsage } | null>
+    return { ...t, read }
+  }
+
+  it("a resumed session's read waits for its history too, then takes its saved state up", async () => {
+    const t = await seeded()
+    logInProcess(capture)
+    try {
+      await whileMapped(dirname(t.file), `${t.file}-shm`, async (release) => {
+        const reading = t.read()
+        await vi.waitFor(() => expect(logged.some((l) => l.includes("can't be opened yet"))).toBe(true), { timeout: HUNG_MS, interval: 20 })
+        release()
+        // 300: only what was added since its saved state was read (from the start, it would be 1100).
+        expect((await reading)!.usage.outputTokens).toBe(300)
+        expect(logged.some((l) => l.includes("couldn't look for a session's saved state"))).toBe(false)
+      })
+    } finally {
+      logInProcess(() => undefined)
+      logged.length = 0
+      await t.close()
+    }
+    expect(openableWaits()).toBe(0)
+  })
+
+  it("a start's read never waits for it: it gets nothing while the history can't be opened, and its state once it can", async () => {
+    const t = await seeded()
+    logInProcess(capture)
+    try {
+      await whileMapped(dirname(t.file), `${t.file}-shm`, async () => {
+        expect(await t.read(true)).toBeNull()
+        // Nothing waited, nothing is left waiting.
+        expect(logged.some((l) => l.includes("can't be opened yet"))).toBe(false)
+        expect(openableWaits()).toBe(0)
+      })
+      expect((await t.read(true))!.usage.outputTokens).toBe(300)
+    } finally {
+      logInProcess(() => undefined)
+      logged.length = 0
+      await t.close()
+    }
+  })
+
+  it("a close while a resumed session's read waits: the read goes on without the history, which isn't opened again", async () => {
+    const t = await seeded()
+    logInProcess(capture)
+    try {
+      await whileMapped(dirname(t.file), `${t.file}-shm`, async () => {
+        const reading = t.read()
+        await vi.waitFor(() => expect(logged.some((l) => l.includes("can't be opened yet"))).toBe(true), { timeout: HUNG_MS, interval: 20 })
+        await t.close()
+        // 1100 (900 + 100 + 100): read from the start, its saved state not taken up from a history that has gone.
+        expect((await reading)!.usage.outputTokens).toBe(1100)
+        expect(openFiles()).not.toContain(t.file.toLowerCase())
+        expect(openableWaits()).toBe(0)
+      })
+    } finally {
+      logInProcess(() => undefined)
+      logged.length = 0
+    }
+  })
+
+  it('a close while they wait ends the wait at once, and the requests that waited are refused', async () => {
+    const t = await setup()
+    writeFileSync(t.transcript, prompt(0) + line(1, 100))
+    await t.ingest()
+    await t.close()
+    await leftByAKill(t.file)
+    logInProcess(capture)
+    try {
+      await whileMapped(dirname(t.file), `${t.file}-shm`, async () => {
+        const waiting = t.stored().then(() => 'answered', (e: Error) => e.message)
+        await vi.waitFor(() => expect(logged.some((l) => l.includes("can't be opened yet"))).toBe(true), { timeout: HUNG_MS, interval: 20 })
+        await t.close()
+        // Still mapped: the wait ended for the close, not for the file.
+        expect(await waiting).toMatch(/closed while it waited/)
+        expect(refusedNow(t.file)).toBe(1546)
+        expect(openableWaits()).toBe(0)
+      })
+    } finally {
+      logInProcess(() => undefined)
+      logged.length = 0
+    }
+    // Let go: a request after the close opens it.
+    expect(await t.output()).toBe(100)
     await t.close()
   })
 })

@@ -1,15 +1,15 @@
 {
   "providers.action.install": {
     "defaultMessage": "Install",
-    "description": "Agent Setup's button: installs the coding agent's CLI in a terminal."
+    "description": "Provider Setup's button: installs the coding agent's CLI in a terminal."
   },
   "providers.action.signIn": {
     "defaultMessage": "Sign in",
-    "description": "Agent Setup's button: signs the coding agent's CLI in, in a terminal."
+    "description": "Provider Setup's button: signs the coding agent's CLI in, in a terminal."
   },
   "providers.action.update": {
     "defaultMessage": "Update",
-    "description": "Agent Setup's button: updates the coding agent's CLI in a terminal."
+    "description": "Provider Setup's button: updates the coding agent's CLI in a terminal."
   },
   "providers.autoCompact.autoIn": {
     "defaultMessage": "{key}: \"auto\" in {scope}",
@@ -91,85 +91,117 @@
     "defaultMessage": "it's over Claude Code's 2 MiB limit",
     "description": "Where Claude Code's auto-compaction setting comes from, in the context tooltip of an agent's footer: why Hive couldn't read a settings file (providers.autoCompact.unreadable). 2 MiB is the size limit: keep it."
   },
+  "providers.claude.connections.setUp": {
+    "defaultMessage": "Set Up runs Claude Code on this connection for its one-time first-run questions (its look, its notes) and to trust this workspace's folders. Answer them in the terminal.",
+    "description": "Settings → Accounts & Connections, above a Claude Code connection's Set Up terminal and on one that still needs it: what Set Up is for. Set Up names a button."
+  },
   "providers.claude.hint.args": {
     "defaultMessage": "Claude Code refused an argument: check Extra arguments in Agent Settings and Settings → Claude Code.",
-    "description": "Why Claude Code didn't start, in the agent's pane, with a button that goes where it says. Agent Settings, Agent Setup and Settings → … are Hive's names: use them as shown."
+    "description": "Why Claude Code didn't start, in the agent's pane, with a button that goes where it says. Agent Settings, Provider Setup and Settings → … are Hive's names: use them as shown."
   },
   "providers.claude.hint.broken": {
-    "defaultMessage": "Claude Code looks broken or missing: reinstall or update it in Agent Setup.",
-    "description": "Why Claude Code didn't start, in the agent's pane, with a button that goes where it says. Agent Settings, Agent Setup and Settings → … are Hive's names: use them as shown."
+    "defaultMessage": "Claude Code looks broken or missing: reinstall or update it in Provider Setup.",
+    "description": "Why Claude Code didn't start, in the agent's pane, with a button that goes where it says. Agent Settings, Provider Setup and Settings → … are Hive's names: use them as shown."
   },
   "providers.claude.hint.model": {
     "defaultMessage": "Claude Code doesn't know this model: choose another in Agent Settings.",
-    "description": "Why Claude Code didn't start, in the agent's pane, with a button that goes where it says. Agent Settings, Agent Setup and Settings → … are Hive's names: use them as shown."
+    "description": "Why Claude Code didn't start, in the agent's pane, with a button that goes where it says. Agent Settings, Provider Setup and Settings → … are Hive's names: use them as shown."
   },
   "providers.claude.hint.signIn": {
     "defaultMessage": "Claude Code isn't signed in: start it again and sign in in its terminal.",
-    "description": "Why Claude Code didn't start, in the agent's pane, with a button that goes where it says. Agent Settings, Agent Setup and Settings → … are Hive's names: use them as shown."
+    "description": "Why Claude Code didn't start, in the agent's pane, with a button that goes where it says. Agent Settings, Provider Setup and Settings → … are Hive's names: use them as shown."
   },
   "providers.cmdTooLong": {
     "defaultMessage": "{file} has to run through cmd.exe, which takes a command line of at most {max, number} characters, and this launch needs about {length, number}. Set the CLI's path in Settings to its .exe (or install the standalone CLI), which has no such limit.",
     "description": "Starting an agent is refused: its CLI is a .cmd or .bat launcher, and cmd.exe can't take a command line this long. {file} is the launcher's file name; {max} and {length} are numbers of characters. Keep cmd.exe and .exe as they are."
   },
+  "providers.codex.connections.setUp": {
+    "defaultMessage": "Set Up runs Codex on this connection so you can choose its Windows sandbox, which its commands run in, and trust this workspace's folders. Answer in the terminal; Windows may ask for Administrator permission.",
+    "description": "Settings → Accounts & Connections, above a Codex connection's Set Up terminal and on one that still needs it: what Set Up is for. Set Up names a button."
+  },
+  "providers.codex.developerUnread.agentMessage": {
+    "defaultMessage": "Codex couldn't say which developer_instructions this session gets, so Hive leaves yours as they are and adds none of its guidance this time: the agent has Hive's tools without it. Restart the agent to try again.",
+    "description": "The notice that a Codex agent started without Hive's guidance. developer_instructions is a Codex setting: keep it."
+  },
+  "providers.codex.developerUnread.agentTitle": {
+    "defaultMessage": "Hive's guidance is missing for this agent",
+    "description": "A notice as a Codex agent starts: Hive couldn't tell which of the user's own Codex instructions apply, so it added none of its guidance."
+  },
+  "providers.codex.developerUnread.assistantMessage": {
+    "defaultMessage": "Codex couldn't say which developer_instructions this session gets, so Hive gives the Assistant its role alone this time, without them or Hive's guidance. Restart the Assistant to try again.",
+    "description": "The notice that the Hive Assistant on Codex got only its role. developer_instructions is a Codex setting: keep it."
+  },
+  "providers.codex.developerUnread.assistantTitle": {
+    "defaultMessage": "The Assistant started with its role only",
+    "description": "A notice as the Hive Assistant starts on Codex: Hive couldn't tell which of the user's own Codex instructions apply, so it gives the Assistant only its role."
+  },
   "providers.codex.hint.broken": {
-    "defaultMessage": "Codex looks broken or not set up: check it in Agent Setup.",
-    "description": "Why Codex didn't start, in the agent's pane, with a button that goes where it says. Agent Settings, Agent Setup and Settings → … are Hive's names: use them as shown."
+    "defaultMessage": "Codex looks broken or not set up: check it in Provider Setup.",
+    "description": "Why Codex didn't start, in the agent's pane, with a button that goes where it says. Agent Settings, Provider Setup and Settings → … are Hive's names: use them as shown."
   },
   "providers.codex.hint.model": {
     "defaultMessage": "Codex doesn't know this model: choose another in Agent Settings.",
-    "description": "Why Codex didn't start, in the agent's pane, with a button that goes where it says. Agent Settings, Agent Setup and Settings → … are Hive's names: use them as shown."
+    "description": "Why Codex didn't start, in the agent's pane, with a button that goes where it says. Agent Settings, Provider Setup and Settings → … are Hive's names: use them as shown."
   },
   "providers.codex.hint.settings": {
     "defaultMessage": "Codex refused its settings: check Extra arguments in Agent Settings and Settings → Codex, and your config.toml.",
-    "description": "Why Codex didn't start, in the agent's pane, with a button that goes where it says. Agent Settings, Agent Setup and Settings → … are Hive's names: use them as shown."
+    "description": "Why Codex didn't start, in the agent's pane, with a button that goes where it says. Agent Settings, Provider Setup and Settings → … are Hive's names: use them as shown."
   },
   "providers.codex.hint.signIn": {
-    "defaultMessage": "Codex isn't signed in: sign in in Agent Setup, then start it again.",
-    "description": "Why Codex didn't start, in the agent's pane, with a button that goes where it says. Agent Settings, Agent Setup and Settings → … are Hive's names: use them as shown."
+    "defaultMessage": "Codex isn't signed in: sign in in Provider Setup, then start it again.",
+    "description": "Why Codex didn't start, in the agent's pane, with a button that goes where it says. Agent Settings, Provider Setup and Settings → … are Hive's names: use them as shown."
+  },
+  "providers.codex.nativeHive": {
+    "defaultMessage": "Your Codex config has an MCP server named hive, reached over HTTP ({file}). Codex merges it into Hive’s own hive server, and can’t start with both. Rename yours there to start Codex agents.",
+    "description": "Why a Codex agent didn't start: the user's own Codex config has an MCP server named hive. {file} is that config file's path. hive is the name of Hive's MCP server: keep it."
   },
   "providers.codex.sandbox.default": {
     "defaultMessage": "**Set up default sandbox** (recommended): commands run under two local Windows accounts Codex creates for them (`CodexSandboxOffline` and `CodexSandboxOnline`), with a firewall rule that keeps them offline unless you allow it. It isolates commands best. Windows asks for Administrator permission once.",
-    "description": "Agent Setup, under Codex's sandbox setup (Windows): its first choice. **Set up default sandbox** is the choice as Codex names it (in English); `…` marks account names: keep them."
+    "description": "Provider Setup, under Codex's sandbox setup (Windows): its first choice. **Set up default sandbox** is the choice as Codex names it (in English); `…` marks account names: keep them."
   },
   "providers.codex.sandbox.needed": {
     "defaultMessage": "Codex needs a one-time setup of its Windows sandbox; until then it asks before every command.",
-    "description": "Agent Setup and Settings → Providers: Codex's Windows sandbox isn't set up yet."
+    "description": "Provider Setup and Settings → Providers: Codex's Windows sandbox isn't set up yet."
   },
   "providers.codex.sandbox.nonAdmin": {
     "defaultMessage": "**Use non-admin sandbox**: needs no Administrator permission. Commands run under your own account with restricted rights. It protects your files and blocks internet access in most cases, but Codex warns it carries more risk if the agent is tricked by instructions hidden in a file or web page it reads (prompt injection). You can upgrade to the default sandbox from here later.",
-    "description": "Agent Setup, under Codex's sandbox setup (Windows): its second choice. **Use non-admin sandbox** is the choice as Codex names it (in English)."
+    "description": "Provider Setup, under Codex's sandbox setup (Windows): its second choice. **Use non-admin sandbox** is the choice as Codex names it (in English)."
   },
   "providers.codex.sandbox.nonAdminUsed": {
     "defaultMessage": "Codex uses its non-admin sandbox.",
-    "description": "Agent Setup and Settings → Providers: Codex runs commands in its non-admin sandbox (Windows), which can be upgraded."
+    "description": "Provider Setup and Settings → Providers: Codex runs commands in its non-admin sandbox (Windows), which can be upgraded."
   },
   "providers.codex.sandbox.setUp": {
     "defaultMessage": "**Set up** opens Codex's sandbox setup, which offers two choices. With either, Codex agents in **Ask for approval** or **Approve for me** can edit files in their own folder (the project, or the agent's worktree) and run commands there without asking, and ask before going online or writing anywhere else. Hive's own features (status, file locks, handovers, shared notes) work the same with both.",
-    "description": "Agent Setup, under Codex's sandbox setup (Windows): what Set up does. **…** marks bold text: keep the marks. Set up is the button; Ask for approval and Approve for me are Codex's permission modes as Hive names them: use their names as shown."
+    "description": "Provider Setup, under Codex's sandbox setup (Windows): what Set up does. **…** marks bold text: keep the marks. Set up is the button; Ask for approval and Approve for me are Codex's permission modes as Hive names them: use their names as shown."
   },
   "providers.codex.sandbox.setUpAction": {
     "defaultMessage": "Set up",
-    "description": "Agent Setup's button: opens Codex's sandbox setup in a terminal."
+    "description": "Provider Setup's button: opens Codex's sandbox setup in a terminal."
   },
   "providers.codex.sandbox.upgrade": {
     "defaultMessage": "**Upgrade** switches Codex to its default sandbox, which runs commands under separate Windows accounts instead of your own. Windows asks for Administrator permission once. Codex agents that are running keep their sandbox until they restart.",
-    "description": "Agent Setup, under Codex's sandbox setup (Windows): what Upgrade does. **…** marks bold text: keep the marks."
+    "description": "Provider Setup, under Codex's sandbox setup (Windows): what Upgrade does. **…** marks bold text: keep the marks."
   },
   "providers.codex.sandbox.upgradeAction": {
     "defaultMessage": "Upgrade",
-    "description": "Agent Setup's button: switches Codex to its default sandbox."
+    "description": "Provider Setup's button: switches Codex to its default sandbox."
   },
   "providers.codex.storePwsh.fix": {
-    "defaultMessage": "To avoid it, install PowerShell 7 from its installer instead of the Store (`winget install --id Microsoft.PowerShell --source winget`) and uninstall the Store one, then restart Hive and its Codex agents. Hive leaves your shell as it is.",
-    "description": "Agent Setup (#585), under the warning about the Microsoft Store's PowerShell 7: what to do. `…` marks a command to type: keep it as it is."
+    "defaultMessage": "To avoid it, replace the Store's PowerShell 7 with the installer's, in this order. First uninstall the Store one (Settings → Apps → Installed apps → PowerShell → Uninstall, or `Get-AppxPackage Microsoft.PowerShell | Remove-AppxPackage`): while it is there, winget takes it for the same app and installs nothing. Then install PowerShell 7 (`winget install --id Microsoft.PowerShell --source winget --installer-type wix`). Then restart Hive and its Codex agents: they keep their old PATH until they restart. Hive leaves your shell as it is.",
+    "description": "Provider Setup (#585, #1512), under the warning about the Microsoft Store's PowerShell 7: what to do, in an order that must stay (uninstall the Store copy first, then install, then restart). `…` marks a command to type: keep it as it is. Settings → Apps → Installed apps is Windows 11's settings page: use Windows' own names for it in your language."
+  },
+  "providers.codex.storePwsh.label": {
+    "defaultMessage": "PowerShell 7 from the Microsoft Store is installed",
+    "description": "Provider Setup and Settings → Providers (#585, #1404): the short label of the warning about the Microsoft Store's PowerShell 7 (a badge and the banner atop the window); the explanation follows under it."
   },
   "providers.codex.storePwsh.symptom": {
     "defaultMessage": "The symptom: a Codex command fails at once with `CreateProcessAsUserW failed: 5` (access denied), and works again once every PowerShell 7 window and command is closed.",
-    "description": "Agent Setup (#585), under the warning about the Microsoft Store's PowerShell 7: how the problem shows. `…` marks the error as Codex prints it: keep it as it is."
+    "description": "Provider Setup (#585), under the warning about the Microsoft Store's PowerShell 7: how the problem shows. `…` marks the error as Codex prints it: keep it as it is."
   },
   "providers.codex.storePwsh.warning": {
     "defaultMessage": "Codex agents' commands can fail while a PowerShell 7 from the Microsoft Store is open: Codex's Windows sandbox can't start that PowerShell while another copy of it runs.",
-    "description": "Agent Setup and Settings → Providers (#585): a warning that Codex's commands fail (Windows) while the Microsoft Store's PowerShell 7, the one found first, is running anywhere, e.g. in a terminal. Codex is the coding agent's name."
+    "description": "Provider Setup and Settings → Providers (#585): a warning that Codex's commands fail (Windows) while the Microsoft Store's PowerShell 7, the one found first, is running anywhere, e.g. in a terminal. Codex is the coding agent's name."
   },
   "providers.codex.stray.message": {
     "defaultMessage": "{folder} holds {files}, which isn't Codex configuration (config.toml, agents, rules) or a file it names. Codex treats the folder as its own, and stray files in it (an agent's scratch or logs) can make every Codex agent's commands fail (\"setup refresh had errors\"). Move those files out of it (scratch belongs outside the project); leave Codex's configuration where it is.",
@@ -185,23 +217,23 @@
   },
   "providers.copilot.hint.args": {
     "defaultMessage": "Copilot refused an argument: check Extra arguments in Agent Settings and Settings → GitHub Copilot.",
-    "description": "Why GitHub Copilot didn't start, in the agent's pane, with a button that goes where it says. Agent Settings, Agent Setup and Settings → … are Hive's names: use them as shown."
+    "description": "Why GitHub Copilot didn't start, in the agent's pane, with a button that goes where it says. Agent Settings, Provider Setup and Settings → … are Hive's names: use them as shown."
   },
   "providers.copilot.hint.broken": {
-    "defaultMessage": "Copilot looks broken or missing: check it in Agent Setup.",
-    "description": "Why GitHub Copilot didn't start, in the agent's pane, with a button that goes where it says. Agent Settings, Agent Setup and Settings → … are Hive's names: use them as shown."
+    "defaultMessage": "Copilot looks broken or missing: check it in Provider Setup.",
+    "description": "Why GitHub Copilot didn't start, in the agent's pane, with a button that goes where it says. Agent Settings, Provider Setup and Settings → … are Hive's names: use them as shown."
   },
   "providers.copilot.hint.mcp": {
     "defaultMessage": "Copilot couldn't read the MCP configuration Hive gave it: start it again.",
-    "description": "Why GitHub Copilot didn't start, in the agent's pane, with a button that goes where it says. Agent Settings, Agent Setup and Settings → … are Hive's names: use them as shown."
+    "description": "Why GitHub Copilot didn't start, in the agent's pane, with a button that goes where it says. Agent Settings, Provider Setup and Settings → … are Hive's names: use them as shown."
   },
   "providers.copilot.hint.model": {
     "defaultMessage": "Copilot doesn't offer this model to this account (Copilot Free runs Auto only): choose another in Agent Settings.",
-    "description": "Why GitHub Copilot didn't start, in the agent's pane, with a button that goes where it says. Agent Settings, Agent Setup and Settings → … are Hive's names: use them as shown."
+    "description": "Why GitHub Copilot didn't start, in the agent's pane, with a button that goes where it says. Agent Settings, Provider Setup and Settings → … are Hive's names: use them as shown."
   },
   "providers.copilot.hint.signIn": {
-    "defaultMessage": "Copilot isn't signed in: sign in as Agent Setup shows, then start it again.",
-    "description": "Why GitHub Copilot didn't start, in the agent's pane, with a button that goes where it says. Agent Settings, Agent Setup and Settings → … are Hive's names: use them as shown."
+    "defaultMessage": "Copilot isn't signed in: sign in as Provider Setup shows, then start it again.",
+    "description": "Why GitHub Copilot didn't start, in the agent's pane, with a button that goes where it says. Agent Settings, Provider Setup and Settings → … are Hive's names: use them as shown."
   },
   "providers.copilot.parens.message": {
     "defaultMessage": "Copilot can't approve edits in a folder whose path has parentheses, so this agent asks before each edit, as in Ask. Rename the folder to give it Accept edits.",
@@ -213,35 +245,35 @@
   },
   "providers.copilot.planNote": {
     "defaultMessage": "Copilot Free uses Auto only; choosing a model needs a paid plan.",
-    "description": "A note in Agent Setup under GitHub Copilot. Copilot Free is the plan's name; Auto is Copilot's model choice: keep both names."
+    "description": "A note in Provider Setup under GitHub Copilot. Copilot Free is the plan's name; Auto is Copilot's model choice: keep both names."
   },
   "providers.copilot.signIn.deviceCode": {
     "defaultMessage": "For a code to enter on GitHub instead, run `copilot login --device-code` in a terminal.",
-    "description": "Agent Setup, under GitHub Copilot's Sign in: another way to sign in. `…` marks a command: keep it."
+    "description": "Provider Setup, under GitHub Copilot's Sign in: another way to sign in. `…` marks a command: keep it."
   },
   "providers.copilot.signIn.gh": {
     "defaultMessage": "With no login of its own, Copilot uses the GitHub CLI’s (`gh auth login`).",
-    "description": "Agent Setup, under GitHub Copilot's Sign in: Copilot falls back to the GitHub CLI's sign-in. `…` marks a command: keep it."
+    "description": "Provider Setup, under GitHub Copilot's Sign in: Copilot falls back to the GitHub CLI's sign-in. `…` marks a command: keep it."
   },
   "providers.copilot.signIn.ignored": {
     "defaultMessage": "{n, plural, one {Copilot agents don’t get {variables} from Hive’s environment, so it doesn’t sign them in. For a token of Copilot’s own, set `COPILOT_GITHUB_TOKEN`.} other {Copilot agents don’t get {variables} from Hive’s environment, so they don’t sign them in. For a token of Copilot’s own, set `COPILOT_GITHUB_TOKEN`.}}",
-    "description": "Agent Setup, under GitHub Copilot's Sign in: environment variables with a GitHub token that Hive keeps from Copilot agents. {variables} lists them (joined with “or”), {n} is how many. `…` marks a variable name: keep it."
+    "description": "Provider Setup, under GitHub Copilot's Sign in: environment variables with a GitHub token that Hive keeps from Copilot agents. {variables} lists them (joined with “or”), {n} is how many. `…` marks a variable name: keep it."
   },
   "providers.copilot.signIn.runs": {
     "defaultMessage": "**Sign in** runs `copilot login` in a terminal: it opens GitHub in your browser to authorise Copilot. Hive never signs in for you.",
-    "description": "Agent Setup, under GitHub Copilot's Sign in: what it does. **…** marks bold text and `…` a command: keep the marks and the command."
+    "description": "Provider Setup, under GitHub Copilot's Sign in: what it does. **…** marks bold text and `…` a command: keep the marks and the command."
   },
   "providers.copilot.updateAnyway": {
     "defaultMessage": "Update anyway",
-    "description": "Agent Setup button: explicitly retry a failed WinGet Copilot update with --force, replacing the old package despite changed files."
+    "description": "Provider Setup button: explicitly retry a failed WinGet Copilot update with --force, replacing the old package despite changed files."
   },
   "providers.copilot.updateManual": {
     "defaultMessage": "Update {provider} the way you installed it, then choose Check again.",
-    "description": "Agent Setup, under a newer GitHub Copilot that Hive can't update itself. {provider} is its name. Check again is the button in Agent Setup."
+    "description": "Provider Setup, under a newer GitHub Copilot that Hive can't update itself. {provider} is its name. Check again is the button in Provider Setup."
   },
   "providers.copilot.updateModified": {
     "defaultMessage": "WinGet could not remove the old Copilot package. Its installed files may have changed since WinGet installed them, often because Copilot updated itself. Update anyway asks WinGet to replace them with --force. Stop Copilot agents first.",
-    "description": "Agent Setup after WinGet portable removal failed. The exit code can also mean other removal failures, so the cause is tentative. Update anyway is the adjacent button; keep WinGet, Copilot and --force unchanged."
+    "description": "Provider Setup after WinGet portable removal failed. The exit code can also mean other removal failures, so the cause is tentative. Update anyway is the adjacent button; keep WinGet, Copilot and --force unchanged."
   },
   "providers.export.compacted": {
     "defaultMessage": "**Conversation compacted** ({trigger}) · {before} → {after} tokens",
@@ -279,25 +311,29 @@
     "defaultMessage": "You",
     "description": "The Markdown export of a conversation (Sessions tab → Export): the heading over the user's messages."
   },
+  "providers.memory.connection": {
+    "defaultMessage": "{file} of connection {name} (its agents, all projects)",
+    "description": "In the Memory view: a connection's own instructions file (HI-1755), which the agents running on that connection read in every project. {file} is its name (CLAUDE.md), {name} the connection's name (\"Personal\")."
+  },
   "providers.memory.user": {
     "defaultMessage": "User {file} (all projects)",
     "description": "In the Memory view: the user's own instructions file, which every project's agents read. {file} is its name (CLAUDE.md)."
   },
   "providers.readiness.notInstalled": {
     "defaultMessage": "{provider} is not installed.",
-    "description": "Agent Setup and Settings → Providers: Hive didn't find the coding agent's CLI. {provider} is its name (Claude Code)."
+    "description": "Provider Setup and Settings → Providers: Hive didn't find the coding agent's CLI. {provider} is its name (Claude Code)."
   },
   "providers.readiness.signedOut": {
     "defaultMessage": "{provider} is not signed in.",
-    "description": "Agent Setup and Settings → Providers: the coding agent's CLI has no sign-in. {provider} is its name."
+    "description": "Provider Setup and Settings → Providers: the coding agent's CLI has no sign-in. {provider} is its name."
   },
   "providers.readiness.update": {
     "defaultMessage": "{provider} {version} is available.",
-    "description": "Agent Setup and Settings → Providers: a newer version of the coding agent is out. {provider} is its name, {version} the version."
+    "description": "Provider Setup and Settings → Providers: a newer version of the coding agent is out. {provider} is its name, {version} the version."
   },
   "providers.settings.hooksOff": {
-    "defaultMessage": "{source, select, inline {The --settings in Extra arguments} other {The settings file {file} (--settings in Extra arguments)}} turns off all hooks (disableAllHooks), which Hive needs for the agent's status, file locks and status line. Remove it in Agent Settings or Settings → Claude Code.",
-    "description": "Starting a Claude Code agent is refused: its settings turn Claude Code's hooks off. {source} is inline (settings written in the argument itself) or file; {file} is the file's path as the user wrote it. Keep --settings and the setting names as they are; \"Agent Settings\" and \"Settings → Claude Code\" are where to change it, as Hive shows them."
+    "defaultMessage": "{source, select, inline {The --settings in Extra arguments} other {The settings file {file} (--settings in Extra arguments)}} turns off all hooks (disableAllHooks). Hive's hooks are how it knows what the agent is doing (its status, file locks, what it is told) and they carry its status line, so Hive doesn't start an agent without them. Take disableAllHooks out of those settings, or remove the --settings from Extra arguments in Agent Settings or Settings → Claude Code.",
+    "description": "Starting a Claude Code agent is refused: its settings turn Claude Code's hooks off. {source} is inline (settings written in the argument itself) or file; {file} is the file's path as the user wrote it. Keep --settings, disableAllHooks and the setting names as they are; \"Agent Settings\" and \"Settings → Claude Code\" are where to change it, as Hive shows them."
   },
   "providers.settings.noFile": {
     "defaultMessage": "there is no such file",

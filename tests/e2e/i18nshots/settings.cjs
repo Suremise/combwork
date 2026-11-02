@@ -49,7 +49,7 @@ async function cancelDialog(ctx) {
 }
 
 /** Settings' sections, in their order (settingsCatalog.ts SETTINGS_SECTIONS), each photographed whole. */
-const SECTIONS = ['general', 'updates', 'appearance', 'providers', 'provider:claude-code', 'provider:codex', 'provider:copilot', 'notifications', 'sessions', 'assistant', 'workspace', 'board', 'agents', 'keybindings', 'agentApi', 'advanced']
+const SECTIONS = ['general', 'updates', 'appearance', 'providers', 'provider:claude-code', 'provider:codex', 'provider:copilot', 'accounts', 'notifications', 'sessions', 'assistant', 'workspace', 'board', 'workflow', 'agents', 'keybindings', 'mcpCatalogs', 'agentApi', 'advanced']
 const screenName = (id) => `section-${id.replace(/:/g, '-').replace(/[A-Z]/g, (c) => `-${c.toLowerCase()}`)}`
 
 const sectionScreens = SECTIONS.map((id) => ({
@@ -66,6 +66,13 @@ async function advancedFile(ctx) {
   return path.join((await ctx.inv('app:info')).userData, 'advanced.json')
 }
 
+/** Shows one of Advanced's tabs (HI-1839: Hive, then each CLI), by its group's id, whatever the language. */
+async function advancedTab(ctx, group) {
+  const tab = ctx.page.locator(`.advanced-tabs [role="tab"][data-tab="${group}"]`)
+  await tab.click()
+  if (!(await ctx.lib.until(async () => (await tab.getAttribute('aria-selected')) === 'true', ctx.hungMs))) throw new Error(`Advanced's ${group} tab wasn't shown`)
+}
+
 /**
  * Advanced's list with what it says about values: one that isn't valid (below its range), one that no longer finds
  * what the CLI was recorded showing, an id this Hive doesn't know, and each one's default beside it. Modified only.
@@ -74,7 +81,9 @@ async function advancedNotes(ctx) {
   const { page } = ctx
   fs.writeFileSync(await advancedFile(ctx), `${JSON.stringify({ format: 1, values: { 'hive.mcp.replySeconds': 5, 'codex.ready.placeholder': 'zzz nothing like it', 'hive.not.a.value': 1 }, madeFor: {} }, null, 2)}\n`)
   await openSection(ctx, 'advanced')
+  await advancedTab(ctx, 'hive')
   await shown(ctx, page.locator('.advanced-row.invalid[data-advanced="hive.mcp.replySeconds"]'), 'the value that is not valid')
+  await advancedTab(ctx, 'codex')
   await shown(ctx, page.locator('[data-advanced="codex.ready.placeholder"] .advanced-note.warn'), "the value that doesn't find the recorded text")
   const modifiedOnly = page.locator('.settings-top input.checkbox').first()
   if (!(await modifiedOnly.isChecked())) await modifiedOnly.click()
@@ -95,6 +104,7 @@ async function closeAdvancedNotes(ctx) {
 async function advancedTyped(ctx) {
   const { page } = ctx
   await openSection(ctx, 'advanced')
+  await advancedTab(ctx, 'codex')
   const row = await shown(ctx, page.locator('[data-advanced="codex.rateLimits.field"]'), "Codex's plan limits field")
   const box = row.locator('.advanced-control input.input').first()
   await box.fill('0bad')
@@ -107,6 +117,8 @@ async function advancedTyped(ctx) {
 async function closeAdvancedTyped(ctx) {
   const state = await ctx.inv('advanced:state')
   if (state?.values?.['codex.rateLimits.field'] !== undefined) throw new Error('the refused value was saved')
+  // The next screens find Advanced on Hive's tab again.
+  await advancedTab(ctx, 'hive')
   await openSection(ctx, 'general')
 }
 

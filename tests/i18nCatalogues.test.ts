@@ -202,8 +202,10 @@ describe('the blocking check of the translations (i18n:check)', () => {
   })
 
   it("a deliberately broken translation fails the command CI's npm test runs, and a missing one doesn't", () => {
+    // English and the one language it breaks (HI-2021): the check runs once per language, and every language's own pass
+    // is "Hive's translations pass" above. The whole tree, run four times, took over 20 s under a loaded machine.
     const root = tree({})
-    cpSync(join(ROOT, 'locales'), join(root, 'locales'), { recursive: true })
+    for (const code of ['en', 'pl']) cpSync(join(ROOT, 'locales', code), join(root, 'locales', code), { recursive: true })
     expect(script('i18nCheck.mjs', '--root', root).status).toBe(0)
     const file = join(root, 'locales/pl/language.json')
     const pl = JSON.parse(readFileSync(file, 'utf8')) as Record<string, string>

@@ -1,8 +1,11 @@
-// Advanced settings (#367): Settings → Advanced's list (grouped, the developer features switch first, a value not
+// Advanced settings (#367): Settings → Advanced's list (on tabs since HI-1839: Hive, then each CLI from the
+// descriptors with its icon, a CLI turned off dimmed but chosen, only a tab's own values in it, remembered; filters
+// counting per tab, landing on a tab with matches or a searched id's own, a click meanwhile not remembered, a tab with
+// none saying so; the developer features switch first, a value not
 // valid in advanced.json listed as such, an override made for another CLI version flagged with Keep), changing a value
 // (marked modified, its default beside it, written to advanced.json, Reset), a value refused, advanced.json edited by
 // hand (the list follows; a number written as text read as the number), the developer switch and advanced.json as one
-// value, a workspace's own value (workspace.json), Agents per project's note above 12 (#562), Settings' search and Modified only (Settings' and the list's), Copy
+// value, a workspace's own value (workspace.json) and its own switch inheriting Settings' (HI-2344), Agents per project gone (HI-2001), Settings' search and Modified only (Settings' and the list's), Copy
 // Diagnostics, and Reset all settings clearing advanced.json. The fake Claude Code (2.1.999) is the installed CLI; no
 // agent runs. Dev build, throwaway profile and workspace.
 const lib = require('./lib.cjs')
@@ -47,14 +50,50 @@ const readFile = () => JSON.parse(fs.readFileSync(file, 'utf8'))
     await page.locator('.settings-nav .row', { hasText: 'Advanced' }).click()
     const list = page.locator('.advanced-list')
     check('Settings → Advanced shows the list', !!(await lib.until(async () => (await list.count()) === 1, HUNG_MS)))
-    const groups = await list.locator('.advanced-group h3').allInnerTexts()
-    check('grouped: Hive, then each CLI', groups.join('|').toLowerCase() === 'hive|claude code|codex|github copilot', groups.join('|'))
+    // Tabs (HI-1839): Hive, then each CLI in the providers' order, named and iconed as Settings → Providers has them.
+    const tabs = () => list.locator('.advanced-tabs [role="tab"]').evaluateAll((els) => els.map((e) => ({ id: e.getAttribute('data-tab'), label: e.querySelector('.hive-tab-label').textContent.trim(), count: e.querySelector('.hive-tab-count') ? Number(e.querySelector('.hive-tab-count').textContent.replace(/\D/g, '')) : null, selected: e.getAttribute('aria-selected') === 'true', muted: e.hasAttribute('data-muted'), name: e.getAttribute('aria-label'), icon: e.querySelector('.hive-tab-icon .provider-icon, .hive-tab-icon .tab-hex')?.getAttribute('class') ?? null })))
+    const tab = (id) => list.locator(`.advanced-tabs [role="tab"][data-tab="${id}"]`)
+    const selectedTab = async () => (await tabs()).find((t) => t.selected)?.id ?? null
+    const configTab = () => JSON.parse(fs.readFileSync(path.join(userData, 'config.json'), 'utf8')).ui?.tabs?.['settings.advanced']
+    // The rows on screen: only the tab shown's, each of its group.
+    const visibleIds = () => list.locator('.advanced-row').evaluateAll((rows) => rows.filter((r) => r.checkVisibility()).map((r) => r.getAttribute('data-advanced')))
+    const t0 = await lib.until(async () => { const t = await tabs(); return t.length ? t : null }, HUNG_MS)
+    check('tabs: Hive, then each CLI in the providers’ order, Hive first chosen', JSON.stringify(t0?.map((t) => t.label)) === JSON.stringify(['Hive', 'Claude Code', 'Codex', 'GitHub Copilot']) && t0[0].selected, JSON.stringify(t0))
+    check('…each with its icon: Hive’s mark, then each CLI’s own', /tab-hex/.test(t0[0].icon ?? '') && t0.slice(1).every((t) => /provider-icon/.test(t.icon ?? '')), JSON.stringify(t0.map((t) => t.icon)))
+    check('…no counts while nothing filters', t0.every((t) => t.count === null))
+    const providers = (await inv('settings:get')).providers
+    const enabled = (id) => !!providers?.[id]?.enabled
+    check('a CLI turned off: its tab dimmed, its name saying so; one on: not', t0.slice(1).every((t) => t.muted === !enabled(t.id) && (!t.muted || /is turned off: these settings apply once you turn it on/.test(t.name ?? ''))), JSON.stringify([t0.map((t) => [t.id, t.muted, t.name]), providers]))
+    const prefix = { hive: 'hive.', 'claude-code': 'claude-code.', codex: 'codex.', copilot: 'copilot.' }
+    for (const t of t0) {
+      await tab(t.id).click()
+      check(`the ${t.label} tab shows only its own values`, !!(await lib.until(async () => { const v = await visibleIds(); return (await selectedTab()) === t.id && v.length > 5 && v.every((id) => id.startsWith(prefix[t.id])) }, HUNG_MS)), JSON.stringify((await visibleIds()).slice(0, 5)))
+    }
+    const muted = t0.find((t) => t.muted)
+    if (muted) {
+      await tab(muted.id).click()
+      check('a dimmed tab is chosen as any other, its values there', !!(await lib.until(async () => (await selectedTab()) === muted.id && (await visibleIds()).length > 0, HUNG_MS)))
+      // Visibly off (the Assistant's screenshot review): an "off" mark on the tab, and a line atop its values.
+      const offNote = list.locator(`[role="tabpanel"][data-group="${muted.id}"] [data-note="cli-off"]`)
+      check('…marked off on its tab, and its values headed by a line saying it is turned off', (await tab(muted.id).locator('.hive-tab-tag').innerText()).trim() === 'off' && (await offNote.isVisible()) && (await offNote.innerText()).includes(`${muted.label} is turned off: these settings apply once you turn it on`), await offNote.innerText().catch(() => ''))
+      check('…a CLI turned on has neither', (await list.locator('.advanced-tabs [role="tab"]:not([data-muted]) .hive-tab-tag').count()) === 0 && (await list.locator('[role="tabpanel"][data-note="cli-off"], [role="tabpanel"] [data-note="cli-off"]').count()) === t0.filter((t) => t.muted).length)
+      await list.locator('.advanced-tabs').scrollIntoViewIfNeeded()
+      for (const theme of ['dark', 'light']) {
+        await page.evaluate((th) => document.documentElement.setAttribute('data-theme', th), theme)
+        await page.mouse.move(5, 5)
+        await page.screenshot({ path: path.join(lib.WORK, `advanced-tabs-off-${theme}.png`) })
+      }
+      await page.evaluate(() => document.documentElement.setAttribute('data-theme', 'dark'))
+    }
+    await tab('hive').click()
+    await lib.until(async () => (await selectedTab()) === 'hive', HUNG_MS)
     const first = list.locator('.advanced-row').first()
     check('Show developer features is first, under its advanced.json name', (await first.getAttribute('data-advanced')) === 'hive.showDeveloperFeatures')
     const row = (id) => list.locator(`.advanced-row[data-advanced="${id}"]`)
     check('a value not valid in advanced.json is listed so, and the default used', /Not valid, so Hive uses the default/.test(await row('hive.mcp.replySeconds').innerText()) && (await row('hive.mcp.replySeconds').locator('input').inputValue()) === '300')
     check("an id this Hive doesn't know is named, not used", /hive\.someday, which this Hive doesn't know/.test(await list.innerText()))
     const trust = row('claude-code.trust.prompt')
+    await tab('claude-code').click()
     check('an override made for another Claude Code is flagged once the installed one is known', !!(await lib.until(async () => /Made for Claude Code 2\.1\.0; 2\.1\.999 is installed now/.test(await trust.innerText()), HUNG_MS)), await trust.innerText())
     check('…marked modified, with its default beside it', (await trust.locator('.modified').count()) === 1 && /Default: trust this folder/.test(await trust.innerText()))
     await page.screenshot({ path: path.join(lib.WORK, 'advanced-1-list.png') })
@@ -62,6 +101,7 @@ const readFile = () => JSON.parse(fs.readFileSync(file, 'utf8'))
     check('Keep records the installed version', !!(await lib.until(async () => readFile().madeFor['claude-code.trust.prompt']?.version === '2.1.999' && !/Made for/.test(await trust.innerText()), HUNG_MS)))
 
     // --- Changing one: modified, its default beside it, in advanced.json; Reset.
+    await tab('hive').click()
     const reply = row('hive.mcp.replySeconds')
     await reply.locator('input').fill('600')
     await reply.locator('input').press('Enter')
@@ -71,6 +111,7 @@ const readFile = () => JSON.parse(fs.readFileSync(file, 'utf8'))
     check('Reset takes it out of advanced.json', !!(await lib.until(async () => !('hive.mcp.replySeconds' in readFile().values) && (await reply.locator('.modified').count()) === 0, HUNG_MS)))
 
     // --- A value refused: the box says why, the file keeps what it had.
+    await tab('codex').click()
     const codexTrust = row('codex.trust.prompt').locator('input')
     await codexTrust.fill('trust (this')
     await codexTrust.press('Enter')
@@ -97,6 +138,7 @@ const readFile = () => JSON.parse(fs.readFileSync(file, 'utf8'))
     await lib.until(async () => !/isn't valid JSON/.test(await list.innerText()), HUNG_MS)
 
     // --- The developer switch and advanced.json are one value.
+    await tab('hive').click()
     const dev = row('hive.showDeveloperFeatures')
     await dev.getByRole('switch').click()
     check('turning on Show developer features writes it to advanced.json', !!(await lib.until(() => readFile().values['hive.showDeveloperFeatures'] === true, HUNG_MS)), JSON.stringify(readFile().values))
@@ -116,37 +158,94 @@ const readFile = () => JSON.parse(fs.readFileSync(file, 'utf8'))
     check('…and not in advanced.json', !('hive.progress.lanesShown' in readFile().values))
     const state = await inv('advanced:state')
     check('the window uses it', state.workspace?.['hive.progress.lanesShown'] === 2, JSON.stringify(state.workspace))
-    check("Settings' own value stays beside it", (await lanes.getByLabel('Hive: Progress panel: lanes shown', { exact: true }).inputValue()) === '4')
+    check("Settings' own value stays beside it", (await lanes.getByLabel('Hive: Progress panel: lanes shown', { exact: true }).inputValue()) === '6')
 
-    // --- Agents per project (#562): above 12, a note on what more agents cost, in this computer's figures.
-    const agentsRow = row('hive.agents.perProject')
-    const note = agentsRow.locator('[data-note="many-agents"]')
-    check('Agents per project: 12, and no note', (await agentsRow.getByLabel('Hive: Agents per project', { exact: true }).inputValue()) === '12' && (await note.count()) === 0)
-    const agentsOwn = agentsRow.getByLabel('Agents per project, this workspace', { exact: false })
-    await agentsOwn.fill('20')
-    await agentsOwn.press('Enter')
-    const noteText = async () => ((await note.count()) ? await note.innerText() : '')
-    check("this workspace at 20: a note on memory and the plans' limits, with this computer's figures", !!(await lib.until(async () => /this computer has \d+\.\d GB of memory, \d+(\.\d)? [GM]B free\. They all share your plans' usage limits/.test(await noteText()), HUNG_MS)), await noteText())
-    check('…in workspace.json, the limit Hive uses here', !!(await lib.until(async () => (await inv('advanced:state')).workspace?.['hive.agents.perProject'] === 20, HUNG_MS)))
-    await agentsRow.scrollIntoViewIfNeeded()
-    await page.screenshot({ path: path.join(lib.WORK, 'advanced-4-agents.png') })
-    await agentsOwn.fill('25')
-    await agentsOwn.press('Enter')
-    check('25 is refused: 24 at the most', !!(await lib.until(async () => /24/.test(await agentsRow.locator('.field-error').innerText().catch(() => '')), HUNG_MS)), await agentsRow.innerText())
-    await agentsOwn.fill('')
-    await agentsOwn.press('Enter')
-    check('emptied: Settings\' 12 again, and no note', !!(await lib.until(async () => (await inv('advanced:state')).workspace?.['hive.agents.perProject'] === undefined && (await note.count()) === 0, HUNG_MS)))
+    // --- A workspace's own switch (HI-2344): it inherits Settings' value and shows it, takes on and off, and goes back.
+    const resume = row('hive.restart.resumeAfterUpdate')
+    const resumeOwn = resume.getByLabel('Hive: Resume agents after an update, this workspace', { exact: true })
+    const wsOwn = () => (fs.existsSync(wsFile) ? JSON.parse(fs.readFileSync(wsFile, 'utf8')).advanced ?? {} : {})
+    const shownOwn = () => resumeOwn.evaluate((s) => s.options[s.selectedIndex].textContent)
+    check("a workspace's switch untouched inherits, showing Settings' value", (await resumeOwn.inputValue()) === '' && (await shownOwn()) === "on (Settings')" && !('hive.restart.resumeAfterUpdate' in wsOwn()), await shownOwn())
+    await resume.screenshot({ path: path.join(lib.WORK, 'advanced-ws-switch-inherited.png') })
+    await resumeOwn.selectOption({ label: 'off' })
+    check('…off goes in workspace.json as false', !!(await lib.until(() => wsOwn()['hive.restart.resumeAfterUpdate'] === false, HUNG_MS)), JSON.stringify(wsOwn()))
+    check('…and the window uses it', (await inv('advanced:state')).workspace?.['hive.restart.resumeAfterUpdate'] === false)
+    await resume.screenshot({ path: path.join(lib.WORK, 'advanced-ws-switch-off.png') })
+    await resumeOwn.selectOption({ label: 'on' })
+    check('…on as true', !!(await lib.until(() => wsOwn()['hive.restart.resumeAfterUpdate'] === true, HUNG_MS)), JSON.stringify(wsOwn()))
+    await resume.screenshot({ path: path.join(lib.WORK, 'advanced-ws-switch-on.png') })
+    await resumeOwn.selectOption({ index: 0 })
+    check('…and Settings\' choice takes it out of workspace.json', !!(await lib.until(() => !('hive.restart.resumeAfterUpdate' in wsOwn()), HUNG_MS)), JSON.stringify(wsOwn()))
+    check('…not in advanced.json either', !('hive.restart.resumeAfterUpdate' in readFile().values))
+    // Inheriting again, it follows a later change of Settings' value.
+    await resume.getByRole('switch').click()
+    check("…inheriting, it follows Settings' value changed afterwards", !!(await lib.until(async () => readFile().values['hive.restart.resumeAfterUpdate'] === false && (await shownOwn()) === "off (Settings')" && (await resumeOwn.inputValue()) === '', HUNG_MS)), await shownOwn())
+    check('…and stays out of workspace.json', !('hive.restart.resumeAfterUpdate' in wsOwn()))
+    await resume.getByRole('button', { name: /^Reset to default \(on\)/ }).click()
+    await lib.until(async () => !('hive.restart.resumeAfterUpdate' in readFile().values) && (await shownOwn()) === "on (Settings')", HUNG_MS)
 
-    // --- Settings' search finds them; Modified only lists the changed ones.
-    await page.getByRole('textbox', { name: 'Search settings' }).fill('trust question')
+    // Agents per project and its note moved to Version Control → Workflow (HI-2001): maxagents and agents24.
+    check('Agents per project is no longer listed', (await page.locator('.advanced-row[data-advanced="hive.agents.perProject"]').count()) === 0)
+
+    // --- Remembered (HI-1839): Codex chosen, Settings reopened on it.
+    await tab('codex').click()
+    check('a tab chosen is remembered in the settings', !!(await lib.until(() => configTab() === 'codex', HUNG_MS)), String(configTab()))
+    await page.keyboard.press('Escape')
+    await page.keyboard.press('Control+,')
+    await page.locator('.settings-nav .row', { hasText: 'Advanced' }).click()
+    check('…and Settings → Advanced opens on it again', !!(await lib.until(async () => (await selectedTab()) === 'codex', HUNG_MS)), String(await selectedTab()))
+
+    // --- Settings' search finds them, each tab counting its matches; Modified only lists the changed ones.
+    const search = page.getByRole('textbox', { name: 'Search settings' })
+    await search.fill('trust question')
     check("Settings' search finds the advanced values", !!(await lib.until(async () => (await list.locator('.advanced-row').count()) === 3, HUNG_MS)), String(await list.locator('.advanced-row').count()))
-    await page.screenshot({ path: path.join(lib.WORK, 'advanced-2-search.png') })
-    await page.getByRole('textbox', { name: 'Search settings' }).fill('')
+    const counted = async () => (await tabs()).reduce((n, t) => n + (t.count ?? 0), 0)
+    check('…each tab counting its matches, adding up to them, the remembered Codex shown (it has one)', !!(await lib.until(async () => (await counted()) === 3 && (await selectedTab()) === 'codex' && (await tabs()).find((t) => t.id === 'codex').count === (await visibleIds()).length, HUNG_MS)), JSON.stringify(await tabs()))
+    await list.locator('.advanced-tabs').scrollIntoViewIfNeeded()
+    for (const theme of ['dark', 'light']) {
+      await page.evaluate((th) => document.documentElement.setAttribute('data-theme', th), theme)
+      await page.mouse.move(5, 5)
+      await page.screenshot({ path: path.join(lib.WORK, `advanced-tabs-search-${theme}.png`) })
+    }
+    await page.evaluate(() => document.documentElement.setAttribute('data-theme', 'dark'))
+    // A value's own id opens its group's tab, whatever is remembered.
+    await search.fill('claude-code.trust.prompt')
+    check('a value’s id searched for opens its tab (Claude Code), the remembered Codex aside', !!(await lib.until(async () => (await selectedTab()) === 'claude-code' && JSON.stringify(await visibleIds()) === '["claude-code.trust.prompt"]', HUNG_MS)), JSON.stringify([await selectedTab(), await visibleIds()]))
+    // A tab with no matches is still chosen, saying so honestly; a click meanwhile isn't remembered.
+    await search.fill('trust question')
+    const none = (await tabs()).find((t) => t.count === 0)
+    await tab(none.id).click()
+    check(`…a tab without matches (${none.label}) is chosen, saying it has none`, !!(await lib.until(async () => (await selectedTab()) === none.id && (await visibleIds()).length === 0 && (await list.locator(`[role="tabpanel"][data-group="${none.id}"] .empty-state`).innerText().catch(() => '')) === `No settings of ${none.label} match.`, HUNG_MS)), JSON.stringify(await tabs()))
+    check('…and isn’t remembered', configTab() === 'codex', String(configTab()))
+    // That choice holds for its filter only (HR5's HI-1839 round 1): the list's own filter changed without clearing
+    // anything chooses again, as does a changed search for a value's id.
+    await list.getByLabel('Filter advanced settings').fill('codex')
+    check('…the list’s filter changed: a tab with matches again (Codex), not the one clicked', !!(await lib.until(async () => (await selectedTab()) === 'codex' && (await visibleIds()).length === 1, HUNG_MS)), JSON.stringify([await selectedTab(), await visibleIds()]))
+    await list.getByLabel('Filter advanced settings').fill('')
+    await tab(none.id).click()
+    await lib.until(async () => (await selectedTab()) === none.id, HUNG_MS)
+    await search.fill('claude-code.trust.prompt')
+    check('…the search changed to a value’s id: its tab, Claude Code, not the one clicked', !!(await lib.until(async () => (await selectedTab()) === 'claude-code' && JSON.stringify(await visibleIds()) === '["claude-code.trust.prompt"]', HUNG_MS)), JSON.stringify([await selectedTab(), await visibleIds()]))
+    await search.fill('trust question')
+    check('…and back to the first search: chosen again, not the old click', !!(await lib.until(async () => (await selectedTab()) === 'codex', HUNG_MS)), String(await selectedTab()))
+    await search.fill('')
+    check('cleared: the remembered tab, Codex, is back, no counts', !!(await lib.until(async () => (await selectedTab()) === 'codex' && (await tabs()).every((t) => t.count === null), HUNG_MS)), JSON.stringify(await tabs()))
+    // Settings' search, the list's own filter and both Modified only together; cleared, the remembered tab again.
+    await search.fill('trust')
+    await list.getByLabel('Filter advanced settings').fill('claude')
+    await page.locator('.settings-top').getByLabel('Modified only').check()
+    check('the search, the list’s filter and Modified only together: Claude Code’s changed trust question alone, on its tab', !!(await lib.until(async () => (await selectedTab()) === 'claude-code' && JSON.stringify(await visibleIds()) === '["claude-code.trust.prompt"]' && (await counted()) === 1, HUNG_MS)), JSON.stringify([await tabs(), await visibleIds()]))
+    await page.locator('.settings-top').getByLabel('Modified only').uncheck()
+    await search.fill('')
+    await page.locator('.settings-nav .row', { hasText: 'Advanced' }).click()
+    await list.getByLabel('Filter advanced settings').fill('')
+    check('…all cleared: the remembered Codex again', !!(await lib.until(async () => (await selectedTab()) === 'codex' && (await tabs()).every((t) => t.count === null), HUNG_MS)), JSON.stringify(await tabs()))
     const changedIds = 'hive.mcp.replySeconds,hive.progress.lanesShown,claude-code.trust.prompt,codex.trust.prompt,codex.hooks.timeoutSeconds'
     const ids = () => list.locator('.advanced-row').evaluateAll((rows) => rows.map((r) => r.getAttribute('data-advanced')).join())
     // Settings' own Modified only, at the top, filters the list too.
     await page.locator('.settings-top').getByLabel('Modified only').check()
     check("Settings' Modified only lists only the changed advanced values", !!(await lib.until(async () => (await ids()) === changedIds, HUNG_MS)), await ids())
+    check('…each tab counting its changed ones (Hive 2, Claude Code 1, Codex 2, GitHub Copilot 0)', !!(await lib.until(async () => JSON.stringify((await tabs()).map((t) => t.count)) === '[2,1,2,0]', HUNG_MS)), JSON.stringify(await tabs()))
     await page.locator('.settings-top').getByLabel('Modified only').uncheck()
     await page.locator('.settings-nav .row', { hasText: 'Advanced' }).click()
     await list.getByLabel('Modified only').check()

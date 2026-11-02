@@ -64,7 +64,7 @@ const TRAY_ITEMS = 10
 /** A window's inbox, with each agent's state as it is now (the workspace's cached info has it as of its last refresh). */
 function windowInbox(w: WorkspaceService, live: LiveSessionState[]): Inbox {
   const info = w.info()
-  if (!info) return { needYou: [], toReview: [] }
+  if (!info) return { needYou: [], finished: [], toReview: [] }
   const now = new Map(live.map((s) => [`${s.projectPath.toLowerCase()}#${s.agentId}`, s]))
   const fresh = (p: ProjectInfo): ProjectInfo => ({ ...p, agents: p.agents.map((a) => ({ ...a, live: now.get(`${p.path.toLowerCase()}#${a.id}`) ?? null })) })
   return inbox(info.projects.map(fresh), info.assistant ? fresh(info.assistant) : null, knownStatus)
@@ -138,12 +138,14 @@ export function createTray(getWindow: () => BrowserWindow | null, actions: TrayA
         { label: tr(msg({ id: 'main.tray.show', defaultMessage: 'Show Hive', description: "The tray menu: brings Hive's window up." })), click: () => { const w = getWindow(); if (w) showWindow(w) } },
         { type: 'separator' },
         ...inboxSection(tr(msg({ id: 'main.tray.needYou', defaultMessage: 'Need you', description: 'A section of the tray menu: agents waiting for you.' })), (b) => b.needYou),
+        // Finished since you last looked (#1632): apart from what needs you, and not counted with it.
+        ...inboxSection(tr(msg({ id: 'main.tray.finished', defaultMessage: 'Finished', description: 'A section of the tray menu: agents that finished their turn since you last looked (nothing waits for you there).' })), (b) => b.finished),
         ...inboxSection(tr(msg({ id: 'main.tray.toReview', defaultMessage: 'To review', description: "A section of the tray menu: agents' work to look at." })), (b) => b.toReview),
         { label: tr(msg({ id: 'main.tray.active', defaultMessage: 'Active projects', description: 'A section of the tray menu: the active projects.' })), enabled: false },
         ...projectItems,
         { type: 'separator' },
         { label: tr(msg({ id: 'main.tray.settings', defaultMessage: 'Settings', description: 'The tray menu: opens Settings.' })), click: () => { const w = getWindow(); if (w) { showWindow(w); emitTo(w, { type: 'menu-command', command: 'settings.open' }) } } },
-        ...(updateState().status === 'ready' ? [{ label: tr(msg({ id: 'main.tray.restartToUpdate', defaultMessage: 'Restart to Update ({version})', description: 'The tray menu when an update is downloaded. {version} is its version.' }), { version: updateState().version ?? '' }), click: restartAndInstall }] : []),
+        ...(updateState().status === 'ready' ? [{ label: tr(msg({ id: 'main.tray.restartToUpdate', defaultMessage: 'Restart to Update ({version})', description: 'The tray menu when an update is downloaded. {version} is its version.' }), { version: updateState().version ?? '' }), click: () => restartAndInstall() }] : []),
         ...(pendingQuit
           ? [
               { label: tr(msg({ id: 'main.tray.quitting', defaultMessage: '{n, plural, one {Quitting when the agent finishes} other {Quitting when # agents finish}}', description: 'The tray menu while Hive waits for working agents to finish before quitting.' }), { n: working }), enabled: false },

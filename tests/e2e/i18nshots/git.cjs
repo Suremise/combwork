@@ -33,7 +33,7 @@ const failing = (ctx, calls) => ctx.app.evaluate((_, c) => {
 }, calls)
 
 /** git in the project, with an identity of its own for the commits these cases make (never the machine's config). */
-const git = (ctx, ...a) => execFileSync('git', ['-c', 'user.email=t@t', '-c', 'user.name=t', '-c', 'core.autocrlf=false', ...a], { cwd: ctx.project, env: ctx.lib.baseEnv(), stdio: 'pipe', encoding: 'utf8' })
+const git = (ctx, ...a) => execFileSync('git', ['-c', 'user.email=t@t', '-c', 'user.name=t', '-c', 'core.autocrlf=false', ...a], { cwd: ctx.project, env: ctx.lib.gitEnv(), stdio: 'pipe', encoding: 'utf8' })
 
 const gitView = (ctx) => ctx.page.locator('.git-view').first()
 const section = async (ctx, id, hook, what) => {
@@ -59,7 +59,7 @@ function seedRepo(ctx) {
   git(ctx, 'tag', '-a', 'v1.0.0', '-m', 'First release')
   git(ctx, 'branch', 'feature/greeting')
   const origin = path.join(path.dirname(ctx.workspace), `${path.basename(ctx.workspace)}-origin.git`)
-  if (!fs.existsSync(origin)) execFileSync('git', ['init', '-q', '--bare', origin], { env: ctx.lib.baseEnv(), stdio: 'pipe' })
+  if (!fs.existsSync(origin)) execFileSync('git', ['init', '-q', '--bare', origin], { env: ctx.lib.gitEnv(), stdio: 'pipe' })
   git(ctx, 'remote', 'add', 'origin', origin)
   git(ctx, 'push', '-q', '-u', 'origin', 'HEAD')
   fs.writeFileSync(path.join(dir, 'CHANGES.md'), '# Changes\n\n- A greeting\n')
@@ -67,16 +67,20 @@ function seedRepo(ctx) {
   git(ctx, 'worktree', 'add', '-q', path.join(path.dirname(ctx.workspace), `${path.basename(ctx.workspace)}-wt`), '-b', 'spare')
 }
 
-/** The Git tab of a project that isn't a repository: its .git set aside while the screen shows. */
+/**
+ * The Git tab of a project that isn't a repository: its .git set aside while the screen shows. Its header says the
+ * repository is gone, with the offer (#1492: the tab's read has the workspace read again), never a mix.
+ */
 async function gitSetup(ctx) {
   seedRepo(ctx)
   fs.renameSync(path.join(ctx.project, '.git'), path.join(ctx.project, '.git-aside'))
   await ctx.command('project.tab.changes')
   await shown(ctx, ctx.page.locator('[data-git-setup]'), 'the Git tab without a repository')
+  await shown(ctx, ctx.page.locator('[data-vc-offer="repositoryGone"]'), 'the offer: the repository gone')
   return gitView(ctx)
 }
 
-/** Its Initialise dialog: what it will do, the starter .gitignore, and the identity git lacks here. */
+/** Its Initialise dialog: what it will do, the starter .gitignore, and who it will commit as (the test identity, #1466). */
 async function initDialog(ctx) {
   await ctx.page.locator('[data-git-setup] [data-git-init]').first().click()
   return shown(ctx, ctx.page.locator('.dialog', { has: ctx.page.locator('[data-git-init-form]') }).last(), 'the Initialise dialog')
@@ -89,6 +93,8 @@ async function closeInit(ctx) {
   // The tab reads git again when the window gets focus (as after using a terminal).
   await ctx.page.evaluate(() => window.dispatchEvent(new Event('focus')))
   await gone(ctx, ctx.page.locator('[data-git-setup]'), 'the Git tab without a repository')
+  // The workspace read again with it (#1492): settled before the next screen, whose reads it would otherwise start over.
+  await gone(ctx, ctx.page.locator('[data-vc-offer]'), 'the offer: the repository gone')
 }
 
 /** History when it couldn't be read: said in its place, with Retry. */

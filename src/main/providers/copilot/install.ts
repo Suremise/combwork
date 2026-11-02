@@ -8,12 +8,13 @@ import { COPILOT, COPILOT_DESCRIPTOR } from '../../../shared/copilot'
 import { providerSettings } from '../../../shared/providers'
 import { config } from '../../config'
 import { createLogger, userText } from '../../logger'
+import { plainHttpsJson } from '../../plainHttpsJson'
 import { listOf } from '../../../shared/advanced'
 import { EDITOR_EXTENSION_PATH, installText, notInstalledIssue, run, signedOutIssue, toSpawnable, updateIssue } from '../common'
 import type { CommandSpec, UpdateRetry } from '../types'
-import { COPILOT_ENV_STRIP, copilotEnv, copilotHome } from './home'
+import { COPILOT_ENV_STRIP, copilotEnv, copilotHome, stripsTokens } from './home'
 
-// The GitHub Copilot CLI's installation and sign-in, for Agent Setup (#452, from the #403 spike on CLI 1.0.93). The
+// The GitHub Copilot CLI's installation and sign-in, for Provider Setup (#452, from the #403 spike on CLI 1.0.93). The
 // adapter delegates locate, readiness and the install, update and sign-in tasks here.
 
 const log = createLogger('providers')
@@ -22,8 +23,8 @@ const NAME = COPILOT_DESCRIPTOR.name
 /** The WinGet package, which puts copilot.exe in WinGet's Links folder. */
 const WINGET_ID = 'GitHub.Copilot'
 const NPM_PACKAGE = '@github/copilot'
-/** The CLI can't say which plan an account has, so Agent Setup always says it. */
-export const COPILOT_PLAN_NOTE = msg({ id: 'providers.copilot.planNote', defaultMessage: 'Copilot Free uses Auto only; choosing a model needs a paid plan.', description: "A note in Agent Setup under GitHub Copilot. Copilot Free is the plan's name; Auto is Copilot's model choice: keep both names." })
+/** The CLI can't say which plan an account has, so Provider Setup always says it. */
+export const COPILOT_PLAN_NOTE = msg({ id: 'providers.copilot.planNote', defaultMessage: 'Copilot Free uses Auto only; choosing a model needs a paid plan.', description: "A note in Provider Setup under GitHub Copilot. Copilot Free is the plan's name; Auto is Copilot's model choice: keep both names." })
 
 /** How Copilot agents are signed in: a token in their environment, Copilot's own login, or the GitHub CLI's (gh). */
 export type CopilotSignInSource = 'token' | 'stored' | 'gh'
@@ -107,7 +108,7 @@ export function copilotCheckEnv(base: NodeJS.ProcessEnv = process.env): Record<s
 
 /** The token variables set in Hive's own environment that Copilot agents don't get (none are read). */
 export function ignoredTokens(base: NodeJS.ProcessEnv = process.env): string[] {
-  return COPILOT_ENV_STRIP.filter((k) => !!base[k]?.trim())
+  return stripsTokens() ? COPILOT_ENV_STRIP.filter((k) => !!base[k]?.trim()) : []
 }
 
 /** Where the CLI may be: the path set in Settings, PATH, WinGet's Links folder, npm's global folder. */
@@ -189,17 +190,17 @@ export function copilotReadiness(info: AgentInstallInfo, hiveEnv: NodeJS.Process
     const ignored = ignoredTokens(hiveEnv)
     out.push(
       signedOutIssue(NAME, [
-        msg({ id: 'providers.copilot.signIn.runs', defaultMessage: '**Sign in** runs `copilot login` in a terminal: it opens GitHub in your browser to authorise Copilot. Hive never signs in for you.', description: "Agent Setup, under GitHub Copilot's Sign in: what it does. **…** marks bold text and `…` a command: keep the marks and the command." }),
-        msg({ id: 'providers.copilot.signIn.deviceCode', defaultMessage: 'For a code to enter on GitHub instead, run `copilot login --device-code` in a terminal.', description: "Agent Setup, under GitHub Copilot's Sign in: another way to sign in. `…` marks a command: keep it." }),
-        msg({ id: 'providers.copilot.signIn.gh', defaultMessage: 'With no login of its own, Copilot uses the GitHub CLI’s (`gh auth login`).', description: "Agent Setup, under GitHub Copilot's Sign in: Copilot falls back to the GitHub CLI's sign-in. `…` marks a command: keep it." }),
-        ...(ignored.length ? [{ m: msg({ id: 'providers.copilot.signIn.ignored', defaultMessage: '{n, plural, one {Copilot agents don’t get {variables} from Hive’s environment, so it doesn’t sign them in. For a token of Copilot’s own, set `COPILOT_GITHUB_TOKEN`.} other {Copilot agents don’t get {variables} from Hive’s environment, so they don’t sign them in. For a token of Copilot’s own, set `COPILOT_GITHUB_TOKEN`.}}', description: "Agent Setup, under GitHub Copilot's Sign in: environment variables with a GitHub token that Hive keeps from Copilot agents. {variables} lists them (joined with “or”), {n} is how many. `…` marks a variable name: keep it." }), values: { variables: listOf(ignored.map((k) => `\`${k}\``), 'disjunction'), n: ignored.length } }] : [])
+        msg({ id: 'providers.copilot.signIn.runs', defaultMessage: '**Sign in** runs `copilot login` in a terminal: it opens GitHub in your browser to authorise Copilot. Hive never signs in for you.', description: "Provider Setup, under GitHub Copilot's Sign in: what it does. **…** marks bold text and `…` a command: keep the marks and the command." }),
+        msg({ id: 'providers.copilot.signIn.deviceCode', defaultMessage: 'For a code to enter on GitHub instead, run `copilot login --device-code` in a terminal.', description: "Provider Setup, under GitHub Copilot's Sign in: another way to sign in. `…` marks a command: keep it." }),
+        msg({ id: 'providers.copilot.signIn.gh', defaultMessage: 'With no login of its own, Copilot uses the GitHub CLI’s (`gh auth login`).', description: "Provider Setup, under GitHub Copilot's Sign in: Copilot falls back to the GitHub CLI's sign-in. `…` marks a command: keep it." }),
+        ...(ignored.length ? [{ m: msg({ id: 'providers.copilot.signIn.ignored', defaultMessage: '{n, plural, one {Copilot agents don’t get {variables} from Hive’s environment, so it doesn’t sign them in. For a token of Copilot’s own, set `COPILOT_GITHUB_TOKEN`.} other {Copilot agents don’t get {variables} from Hive’s environment, so they don’t sign them in. For a token of Copilot’s own, set `COPILOT_GITHUB_TOKEN`.}}', description: "Provider Setup, under GitHub Copilot's Sign in: environment variables with a GitHub token that Hive keeps from Copilot agents. {variables} lists them (joined with “or”), {n} is how many. `…` marks a variable name: keep it." }), values: { variables: listOf(ignored.map((k) => `\`${k}\``), 'disjunction'), n: ignored.length } }] : [])
       ])
     )
   }
   if (info.updateAvailable) {
     // Use the installer that owns this executable, keeping its package record consistent.
     const updatable = !!info.path && installKind(info.path) !== 'other'
-    out.push(updateIssue(NAME, info.latestVersion, updatable ? undefined : [{ m: msg({ id: 'providers.copilot.updateManual', defaultMessage: 'Update {provider} the way you installed it, then choose Check again.', description: "Agent Setup, under a newer GitHub Copilot that Hive can't update itself. {provider} is its name. Check again is the button in Agent Setup." }), values: { provider: NAME } }]))
+    out.push(updateIssue(NAME, info.latestVersion, updatable ? undefined : [{ m: msg({ id: 'providers.copilot.updateManual', defaultMessage: 'Update {provider} the way you installed it, then choose Check again.', description: "Provider Setup, under a newer GitHub Copilot that Hive can't update itself. {provider} is its name. Check again is the button in Provider Setup." }), values: { provider: NAME } }]))
   }
   return out
 }
@@ -207,12 +208,7 @@ export function copilotReadiness(info: AgentInstallInfo, hiveEnv: NodeJS.Process
 /** The newest release on npm (the WinGet package follows it). */
 export async function copilotLatestVersion(): Promise<string | null> {
   try {
-    const ctrl = new AbortController()
-    const t = setTimeout(() => ctrl.abort(), 6000)
-    const res = await fetch(`https://registry.npmjs.org/${NPM_PACKAGE}/latest`, { signal: ctrl.signal })
-    clearTimeout(t)
-    if (!res.ok) return null
-    return ((await res.json()) as { version?: string }).version ?? null
+    return ((await plainHttpsJson(`https://registry.npmjs.org/${NPM_PACKAGE}/latest`, { timeoutMs: 6000 })) as { version?: string }).version ?? null
   } catch {
     return null
   }
@@ -240,8 +236,8 @@ export function copilotUpdateRetry(executable: string, exitCode: number): Update
   return {
     command: { ...command, args: [...command.args, '--force'] },
     notice: {
-      message: installText(msg({ id: 'providers.copilot.updateModified', defaultMessage: 'WinGet could not remove the old Copilot package. Its installed files may have changed since WinGet installed them, often because Copilot updated itself. Update anyway asks WinGet to replace them with --force. Stop Copilot agents first.', description: 'Agent Setup after WinGet portable removal failed. The exit code can also mean other removal failures, so the cause is tentative. Update anyway is the adjacent button; keep WinGet, Copilot and --force unchanged.' })),
-      label: installText(msg({ id: 'providers.copilot.updateAnyway', defaultMessage: 'Update anyway', description: 'Agent Setup button: explicitly retry a failed WinGet Copilot update with --force, replacing the old package despite changed files.' }))
+      message: installText(msg({ id: 'providers.copilot.updateModified', defaultMessage: 'WinGet could not remove the old Copilot package. Its installed files may have changed since WinGet installed them, often because Copilot updated itself. Update anyway asks WinGet to replace them with --force. Stop Copilot agents first.', description: 'Provider Setup after WinGet portable removal failed. The exit code can also mean other removal failures, so the cause is tentative. Update anyway is the adjacent button; keep WinGet, Copilot and --force unchanged.' })),
+      label: installText(msg({ id: 'providers.copilot.updateAnyway', defaultMessage: 'Update anyway', description: 'Provider Setup button: explicitly retry a failed WinGet Copilot update with --force, replacing the old package despite changed files.' }))
     }
   }
 }
