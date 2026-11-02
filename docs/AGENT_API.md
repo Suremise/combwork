@@ -163,6 +163,8 @@ A workspace's Hive Assistant is listed in `liveSessions` with `"project": null` 
 
 `POST /v1/projects/{name}/deactivate` — mark it as not being worked on (fails with 409 while a session is running).
 
+A project agent may turn only its own project on or off: another project is `403` (Who sees what, below).
+
 ### Sessions
 
 `GET /v1/projects/{name}/sessions` — Hive and external sessions for the project, newest first, each with usage and a re-cache estimate. A session a CLI started for another one (a Codex guardian review) has `sub: { parentId, kind }`: it isn't a conversation, and resuming it is refused (`409`).
@@ -283,7 +285,7 @@ The changes below are the Assistant's only: other callers get `403`.
 | Call | Needs | What it does |
 |---|---|---|
 | `POST /v1/projects` `{ "name" }` | Control agents and create projects | Creates a project folder in the workspace and turns it on |
-| `POST /v1/projects/{name}/activate` | Control agents | Turns a project on (other callers: no restriction, as before) |
+| `POST /v1/projects/{name}/activate` | Control agents | Turns a project on (other callers: scripts with no restriction, a project agent only its own project: HI-2330) |
 | `POST /v1/projects/{name}/agents` | Control agents | Adds an agent: `name`, `connection` (Connections, below: its model, effort, context and mode, and its CLI; default the first usable), `workflowRole` (`builder`, `reviewer`, `either` or `generalist`), `mcpServers` (only these of the project's MCP servers, by name; `[]` none; leave it out for all of them); `provider`, `model`, `effort`, `mode` and `context200k` are refused (`400`, naming the connections to use); `start` starts it, and `prompt` starts it on that task, given on the CLI's command line. Up to the project's Maximum agents (a workflow option, the user's team size: HI-2001; `409` at it, saying where the user raises it; the user adds more in Hive's window). It starts in the project folder: a card or lane it builds is lent a slot. `worktree`, `existingWorktree`, `branch` and `base` are refused (`400`: "Agents aren't pinned to worktrees in 1.0: slots are lent per card or lane.", #1451), never ignored |
 | `PATCH /v1/projects/{name}/agents/{agent}` | Control agents | Changes `name`, `workflowRole`, `connection` (Connections, below; another CLI's only while it is stopped; `null` or `""`: its CLI's first usable one; left out it stays) or `mcpServers` (only these of the project's MCP servers, `[]` none, `["*"]` all of them again; the `hive` server can't be named: it is always given). `provider`, `model`, `effort`, `mode` and `context200k` are refused (`400`, naming the connections on its account) |
 | `POST /v1/projects/{name}/agents/{agent}/start` | Control agents | Starts a stopped agent: a new conversation, or `resume: true` (its last) or a session id; `prompt` as above |
@@ -395,6 +397,7 @@ The workspace's board: cards in six columns, `hold` (On Hold), `todo`, `doing`, 
 - A card of its own that waits for or links to another project's card shows that card as a number, listed in `elsewhere`; changing `blockedBy` or `links` keeps those.
 - `position` and a reorder place its cards among its project's cards in the column (the top or bottom of those); other projects' cards keep their places. The place a short reply gives (`3rd of 5`) counts its project's cards.
 - Another project's agents' conversations hold that project's cards (a card started on an agent is its prompt), so for another project, `GET /v1/projects/{name}/agents/{agent}/activity`, `GET /v1/projects/{name}/sessions`, and `POST /v1/projects/{name}/input`, and starting, stopping or handing over its agents (`POST /v1/projects/{name}/sessions`, `/stop`, `/handover`; HI-2327) are `403`, and the event stream (`/v1/events`) leaves out their session events. Their status (`/v1/projects`, `/v1/projects/{name}`, `/v1/agents/wait`) stays open; an agent watch's line leaves out what another project's agent said.
+- Turning another project on or off (`POST /v1/projects/{name}/activate`, `/deactivate`; HI-2330) is `403`: that is for its own agents, the Hive Assistant and the user. Its own project it may still turn on or off.
 
 An agent runs as the user, so it could read the workspace token from disk: this keeps agents to their own project's work rather than containing a hostile one.
 

@@ -242,6 +242,14 @@ const until = async (fn, ms = 10000) => {
   await until(async () => !(await betaLive()), 10000)
   r = await as('POST', '/v1/projects/beta/sessions', { agent: other.id })
   check("…nor start it", r.status === 403 && !(await betaLive()), JSON.stringify(r))
+  // Nor turn beta off or on (HI-2330): with no session running there, a deactivate would otherwise go through.
+  const betaActive = async () => (await call(workspaceToken, 'GET', '/v1/projects/beta')).body?.active
+  r = await as('POST', '/v1/projects/beta/deactivate')
+  check("…nor deactivate beta", r.status === 403 && /your own project/.test(r.body?.error ?? '') && (await betaActive()) === true, JSON.stringify(r))
+  r = await as('POST', '/v1/projects/beta/activate')
+  check('…nor activate it', r.status === 403 && (await betaActive()) === true, JSON.stringify(r))
+  r = await as('POST', '/v1/projects/alpha/activate')
+  check('its own project it may activate', r.status === 200 && r.body?.active === true, JSON.stringify(r).slice(0, 300))
   // Something of alpha's own, so its stream has something to show.
   await inv('pty:write', lib.ptyKey(alpha, agent.id), 'hello')
   await lib.sleep(100)
