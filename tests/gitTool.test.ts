@@ -186,6 +186,10 @@ describe('the git Hive starts', () => {
     // Git for Windows on ARM.
     const arm = layout('clangarm64')
     expect(realGitBehind(arm.launcher, arm.execPath)?.launcherEnv).toEqual({ pathFirst: [join(arm.root, 'clangarm64', 'bin'), join(arm.root, 'usr', 'bin')].join(delimiter), msystem: 'CLANGARM64' })
+    // HI-2400: Git for Windows 2.56's UCRT64 build.
+    const ucrt = layout('ucrt64')
+    const { run: askUcrt } = answers({ git: { '--exec-path': `${ucrt.execPath.replace(/\\/g, '/')}\n` }, [ucrt.real]: { '--version': SAID } })
+    expect(await realGit(SAID, ucrt.launcher, askUcrt)).toEqual({ exe: ucrt.real, launcherEnv: { pathFirst: [join(ucrt.root, 'ucrt64', 'bin'), join(ucrt.root, 'usr', 'bin')].join(delimiter), msystem: 'UCRT64' } })
   })
 
   it("the real git's environment is the launcher's (git-wrapper.c): its MSYSTEM, PLINK_PROTOCOL, HOME, and its folders and ~\\bin before PATH", () => {
@@ -263,7 +267,8 @@ describe('the git Hive starts', () => {
     Object.assign(env, { GIT_CONFIG_GLOBAL: '/dev/null', GIT_CONFIG_NOSYSTEM: '1', PATH: `${process.env.SystemRoot}\\System32;${process.env.SystemRoot}`, MSYSTEM: 'MSYS', HOMEDRIVE: roaming.slice(0, 2), HOMEPATH: roaming.slice(2), USERPROFILE: local })
     const said = (exe: string, e: NodeJS.ProcessEnv): string => execFileSync(exe, ['-c', 'alias.hiveenv=!echo "$MSYSTEM|$HOME|$PLINK_PROTOCOL|$PATH"', 'hiveenv'], { cwd: p, env: e, encoding: 'utf8', windowsHide: true })
     const through = said(launcher, env)
-    expect(through).toMatch(/^MINGW64\|/)
+    // The launcher's own MSYSTEM (MINGW64, or UCRT64 on Git for Windows 2.56's UCRT64 build, HI-2400), not the inherited one.
+    expect(through.startsWith(`${real.launcherEnv.msystem}|`)).toBe(true)
     expect(said(real.exe, withLauncherEnv(env, real.launcherEnv))).toBe(through)
   })
 
