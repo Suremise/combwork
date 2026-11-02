@@ -95,8 +95,9 @@ export async function holdLane(dir, k, { owner = process.pid, alive = processAli
 
 /** When something was last changed: it, or anything directly in it (a profile's mtime alone misses new files deeper). */
 export function lastChanged(p) {
-  let t = lstatSync(p).mtimeMs
-  if (lstatSync(p).isDirectory())
+  const st = lstatSync(p)
+  let t = st.mtimeMs
+  if (st.isDirectory())
     for (const name of safeList(p))
       try {
         t = Math.max(t, lstatSync(join(p, name)).mtimeMs)
@@ -205,8 +206,25 @@ export function codexPlan({ root, home = join(root, 'codex'), days = PRUNE_DAYS,
     out.push({ path, rel: rel(path), area: 'codex', age: age(path), remove: !kept, why: kept ?? why, check })
   }
   // Rollouts: whether everything under a folder is a rollout older than the age (an empty folder is, once old itself).
-  const stale = (p) => (isDir(p) ? list(p).every((n) => stale(join(p, n))) && (list(p).length > 0 || age(p) >= maxAge) : !!stat(p)?.isFile() && /^rollout-.*\.jsonl$/.test(basename(p)) && age(p) >= maxAge)
-  const staleStill = (p) => () => (stale(p) ? null : 'it changed since the plan')
+  // With memo, each path is looked at once in the plan (HI-2365: sessions() asked again at every depth); an item's
+  // check() looks afresh, just before it goes.
+  const staleBy = (memo) => {
+    const stale = (p) => {
+      if (memo?.has(p)) return memo.get(p)
+      const st = stat(p)
+      let r
+      if (st?.isDirectory()) {
+        const names = safeList(p)
+        r = names.every((n) => stale(join(p, n))) && (names.length > 0 || Math.max(0, now - st.mtimeMs) >= maxAge)
+      } else r = !!st?.isFile() && /^rollout-.*\.jsonl$/.test(basename(p)) && Math.max(0, now - st.mtimeMs) >= maxAge
+      memo?.set(p, r)
+      return r
+    }
+    return stale
+  }
+  const stale = staleBy(new Map())
+  const staleNow = staleBy(null)
+  const staleStill = (p) => () => (staleNow(p) ? null : 'it changed since the plan')
   const sessions = (dir, depth) => {
     for (const name of list(dir)) {
       const p = join(dir, name)

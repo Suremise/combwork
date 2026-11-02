@@ -75,10 +75,17 @@ function citedBy(rel, cards, children = [], label = 'hive-test') {
   const ancestors = []
   const area = label === 'temp' ? isTempArea : isArea
   for (let k = 1; k < own.length; k++) if (!area(own.slice(0, k).join('/'))) ancestors.push([label, ...own.slice(0, k)])
+  // Each tail ends with the path's last two parts, so a text without them (or, for a child, without `<last>/<child>`)
+  // can't mention one: looked for first, they spare scanning every card for every tail (HI-2365: the clean-up's plan
+  // spent seconds here). The answer is the same.
+  const last = parts.slice(-2).join('/')
+  const kids = children.map((c) => pathText(c))
   for (const { number, text } of cards) {
-    for (const t of tails(parts)) if (mentions(text, t)) return number
-    for (const c of children) for (const t of tails([...parts, pathText(c)])) if (mentions(text, t)) return number
-    for (const a of ancestors) for (const t of tails(a)) if (mentions(text, t, 'end')) return number
+    if (text.includes(parts.at(-1))) {
+      if (text.includes(last)) for (const t of tails(parts)) if (mentions(text, t)) return number
+      for (const c of kids) if (text.includes(`${parts.at(-1)}/${c}`)) for (const t of tails([...parts, c])) if (mentions(text, t)) return number
+    }
+    for (const a of ancestors) if (text.includes(a.slice(-2).join('/'))) for (const t of tails(a)) if (mentions(text, t, 'end')) return number
   }
   return null
 }
