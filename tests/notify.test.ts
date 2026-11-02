@@ -160,14 +160,18 @@ describe('tell(): one entry, one window', () => {
       requester: () => (request.getStore() as never) ?? null
     })
     focused = B
-    await request.run(B, async () => {
-      // The request runs on, and meanwhile the user moves to window A.
-      await new Promise((r) => setTimeout(r, 5))
-      focused = A
+    // B's request is held at a barrier while the user moves to window A from outside it, then released.
+    let release!: () => void
+    const held = new Promise<void>((r) => (release = r))
+    const running = request.run(B, async () => {
+      await held
       notify.tell({ kind: 'result', title: 'Copied to workspace' })
       notify.tell({ kind: 'warning', title: 'Platform changed' })
       notify.tell({ kind: 'needsYou', title: 'beta needs your input', projectPath: 'C:\\Work\\B\\beta' })
     })
+    focused = A
+    release()
+    await running
     expect(toasts(B).map((t) => t.title)).toEqual(['Copied to workspace', 'Platform changed'])
     expect(toasts(A).map((t) => t.title)).toEqual(['beta needs your input'])
     // No request: Hive's own message goes to the window in use.
