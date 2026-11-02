@@ -268,7 +268,14 @@ const beta = path.join(fx.ws, 'beta')
         if (await dontResume.count()) await dontResume.first().click().catch(() => undefined)
         return !fs.existsSync(restartRecord) && (await dontResume.count()) === 0
       })
-      check("ja: the offer to resume the lanes' agents answered Don't Resume, and gone", !!answered, String(fs.existsSync(restartRecord)))
+      // Its outcome then shows for the usual time, counted only while the window is focused (Popups.tsx), and a test
+      // window never is: closed with its × as the user would (HI-2370).
+      const outcome = page.locator('.toast.resolved .popup-close')
+      const closed = await waitHung(async () => {
+        if (await outcome.count()) await outcome.first().click().catch(() => undefined)
+        return (await outcome.count()) === 0
+      })
+      check("ja: the offer to resume the lanes' agents answered Don't Resume, and gone", !!answered && !!closed, String(fs.existsSync(restartRecord)))
     }
     await page.getByText('alpha', { exact: true }).first().click()
     const panelJa = page.locator('.progress-panel')
