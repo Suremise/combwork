@@ -862,6 +862,8 @@ export interface HiveRequests {
   'lanes:retryFresh': (laneId: string) => number
   /** Test copies only (HI-2034): a lane agent owed its new conversation, as a busy start leaves it, `minutesAgo` since. */
   'lanes:test': (op: { op: 'oweFresh'; lane: string; role: 'builder' | 'reviewer'; minutesAgo?: number }) => boolean
+  /** Test copies only (HI-2321): how many of an agent's card-loop grace checks have finished (`loopChecksOf`), so a test waits for its own. */
+  'loops:checks': (projectPath: string, agentId: string) => number
   /**
    * Start lane… (#1280): records a lane of a project's cards in order and starts its builder and reviewer, each in a
    * fresh conversation with the generated brief. Refused (nothing recorded) while either agent is busy.

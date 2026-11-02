@@ -102,6 +102,25 @@ describe("what a loop agent with no watch owes, while Hive's loop wakes reach it
     expect(owedCards(inReview, 'alpha', 'b1', [1], { ...reach, wakes: false })).toEqual([1])
     expect(owedCards(inReview, 'alpha', 'b1', [1], { wakes: true, reviewerOf: () => null })).toEqual([1])
   })
+
+  // HI-2321 (seen on HI-2320): HR1 checked design s10, the pool gave its revision s19 to HR2, and HR1 was flagged.
+  it("a pool card is owed only by its builder and the reviewer the pool has for it now: an earlier step's reviewer is out of its loop", () => {
+    const pool = () => true
+    const revision = [h('Moved to Doing'), h('Posted a design for the reviewer to check: "Plan"'), { ...h('Design has gaps: "More"'), by: 'HR1 (alpha)' }, h('Posted a design for the reviewer to check: "Plan, revised"')]
+    const toHr2 = { wakes: true, reviewerOf: () => 'r2', pool }
+    // The revision is HR2's to check: HR2 owes it, HR1 (who watched the card for s10) owes nothing.
+    expect(owedCards([own({ column: 'doing', history: revision })], 'alpha', 'r2', [1], toHr2)).toEqual([1])
+    expect(owedCards([own({ column: 'doing', history: revision })], 'alpha', 'r1', [1], toHr2)).toEqual([])
+    // Checked, or no reviewer given it yet: still nothing of HR1's, loop wakes or not; its builder's own move stays its.
+    expect(owedCards([own({ column: 'doing' })], 'alpha', 'r1', [1], { wakes: true, reviewerOf: () => null, pool })).toEqual([])
+    expect(owedCards([own({ column: 'review', history: [h('Moved to Review')] })], 'alpha', 'r1', [1], { ...toHr2, wakes: false })).toEqual([])
+    expect(owedCards([own({ column: 'doing' })], 'alpha', 'b1', [1], { wakes: true, reviewerOf: () => null, pool })).toEqual([1])
+    // The pool's reviewer now still owes its move: a card in Review it hasn't given a verdict on, a design given to it.
+    expect(owedCards([own({ column: 'review', history: [h('Moved to Review')] })], 'alpha', 'r2', [1], toHr2)).toEqual([1])
+    expect(owedCards([own({ column: 'review', history: [h('Moved to Review')] })], 'alpha', 'r2', [1], { ...toHr2, wakes: false })).toEqual([1])
+    // Outside the pool, a card's other watchers are flagged as before.
+    expect(owedCards([own({ column: 'doing', history: revision })], 'alpha', 'r1', [1], { ...toHr2, pool: () => false })).toEqual([1])
+  })
 })
 
 describe('a card in Review its watching reviewer has not started on (#521)', () => {

@@ -54,6 +54,7 @@ import { followNames } from './projectRename'
 import { slotBranch } from './mergeSlots'
 import { endLane, listLanes, stampLaneProjects } from './lanes'
 import { laneStartInfo, oweFreshForTest, retryFreshStart, startLaneFromWindow } from './laneStart'
+import { loopChecksOf } from './loopCheck'
 import { sweepWorkspaceLeftovers } from './leftovers'
 import { AfterOpen, assertNotOpening, claimWindow, openProgress, openStep, releaseWindow, windowClaim } from './openProgress'
 import { boardState, boardWaits, cardHeads, exportBoard, movedNames, onBoardUpgraded, projectKeys, restoreBoardBackup, upgradeBoard } from './boardStore'
@@ -1453,6 +1454,11 @@ export function registerIpc(getAppInfo: () => ReturnType<HiveRequests['app:info'
       if (app.isPackaged) throw new Error('lanes:test is for test copies') // i18n-ignore: a test channel, never shown
       if (op?.op !== 'oweFresh' || typeof op.lane !== 'string' || (op.role !== 'builder' && op.role !== 'reviewer')) throw new Error('lanes:test: { op: "oweFresh", lane, role, minutesAgo? }') // i18n-ignore: a test channel, never shown
       return oweFreshForTest(currentWorkspace(), op.lane, op.role, typeof op.minutesAgo === 'number' ? op.minutesAgo : 0)
+    },
+    'loops:checks': (p, agentId) => {
+      if (app.isPackaged) throw new Error('loops:checks is for test copies') // i18n-ignore: a test channel, never shown
+      if (typeof agentId !== 'string' || !agentId) throw new Error('loops:checks: (projectPath, agentId)') // i18n-ignore: a test channel, never shown
+      return loopChecksOf(workspace.assertProject(p), agentId)
     },
     'lanes:start': (p, req) => {
       const r = req && typeof req === 'object' ? req : ({} as LaneStartRequest)

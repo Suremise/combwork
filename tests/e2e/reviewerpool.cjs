@@ -9,6 +9,8 @@
 //    reviewers in turn, each in a review copy at the submitted revision, then Done.
 // 3. gamma (HI-2046, one reviewer per lane): a card started on its builder alone and submitted outside a lane goes to
 //    the project's stopped reviewer, started for it and told, with no Assistant step; its verdict makes it Done.
+// 4. delta (HI-2321): a pool lane's design checked by one reviewer and its revision by another: the first, out of the
+//    card's loop, isn't flagged as not watching when it ends with no watch; the card's reviewer now is.
 // Screenshots of Start Lane with the pool chosen and of the lane's row, in both themes; the builder's brief as text.
 // Dev build, throwaway profile, workspace and CLAUDE_CONFIG_DIR.
 const lib = require('./lib.cjs')
@@ -25,6 +27,7 @@ const shots = at('shots')
 const alpha = path.join(ws, 'alpha')
 const beta = path.join(ws, 'beta')
 const gamma = path.join(ws, 'gamma')
+const delta = path.join(ws, 'delta')
 const slotsRoot = path.join(`${ws}.worktrees`, 'alpha')
 const PORT = Number(lib.port(47805))
 const identity = { name: 'Hive Pool Test', email: 'pool@example.com' }
@@ -46,14 +49,14 @@ const commitIn = (dir, files, message, trailer) => {
 ;(async () => {
   for (const d of [userData, ws, `${ws}.worktrees`, shots]) fs.rmSync(d, { recursive: true, force: true })
   fs.mkdirSync(shots, { recursive: true })
-  for (const p of [alpha, beta, gamma]) {
+  for (const p of [alpha, beta, gamma, delta]) {
     lib.gitProject(p, { 'a.txt': 'a\n', '.gitignore': '.hive/\n' })
     lib.git(p, ['branch', '-M', 'main'])
     // The identity its commits use, in its git config: G12 reads it from git each time (HI-2266, HI-2283).
     lib.git(p, ['config', 'user.name', identity.name])
     lib.git(p, ['config', 'user.email', identity.email])
   }
-  const env = lib.fakeClaude(userData, home, [alpha, beta, gamma, ws, ...['slot-a', 'slot-b', 'slot-c', 'slot-d'].map((s) => path.join(slotsRoot, s))])
+  const env = lib.fakeClaude(userData, home, [alpha, beta, gamma, delta, ws, ...['slot-a', 'slot-b', 'slot-c', 'slot-d'].map((s) => path.join(slotsRoot, s))])
   const cfgFile = path.join(userData, 'config.json')
   const cfg = JSON.parse(fs.readFileSync(cfgFile, 'utf8'))
   cfg.settings.general = { ...cfg.settings.general, confirmOnQuit: 'never', showTips: false }
@@ -61,7 +64,7 @@ const commitIn = (dir, files, message, trailer) => {
   cfg.settings.agentApi = { ...cfg.settings.agentApi, enabled: true }
   fs.writeFileSync(cfgFile, JSON.stringify(cfg, null, 2))
 
-  const h = await lib.launch({ userData, env: { ...env, HIVE_API_PORT: String(PORT), HIVE_TEST_TIPS: 'off' } })
+  const h = await lib.launch({ userData, env: { ...env, HIVE_API_PORT: String(PORT), HIVE_TEST_TIPS: 'off', HIVE_TEST_LOOP_GRACE_MS: '2000' } })
   const { app, page, inv } = h
   try {
     page.on('pageerror', (e) => check('no page errors', false, e.message))
@@ -299,6 +302,65 @@ const commitIn = (dir, files, message, trailer) => {
     const kv = (await intent(tgr, k, 'start-review')).status === 200 && (await intent(tgr, k, 'verdict', { pass: true, comment: 'K: passed' })).status === 200
     check('GA-R1 reviews and passes K', kv)
     check('K is Done (committed), with no Assistant step', !!(await until(async () => (await card(k))?.column === 'done', HUNG_MS)) && !(await live(path.join(ws, '.hive', 'assistant'), 'assistant')), (await card(k))?.column)
+
+    // --- 4. delta (HI-2321, seen on HI-2320): a pool lane's design checked by one reviewer and its revision by another.
+    // DE-R1 checks the design (gaps) while watching the card, so the pool gives the revision to DE-R2, who passes it and
+    // is then given the review. DE-R1, out of the card's loop, ends with no watch: never flagged as not watching; DE-R2,
+    // its reviewer now, ending with no watch on the card in Review, is.
+    await inv('workflow:setOptions', delta, { preset: null, options: { review: 'agent', noSelfReview: true, finish: 'committed', folder: 'project', preChecks: [], identity, okBefore: { mode: 'never', labels: [] }, reviewerMode: 'pool' } })
+    const db1 = await lib.addAgent(inv, delta, { name: 'DE-B1', workflowRole: 'builder' })
+    const dr1 = await lib.addAgent(inv, delta, { name: 'DE-R1', workflowRole: 'reviewer' })
+    const dr2 = await lib.addAgent(inv, delta, { name: 'DE-R2', workflowRole: 'reviewer' })
+    const x = await create(delta, 'Pool X')
+    const keyX = (await card(x)).key
+    const ld = await inv('lanes:start', delta, { builder: db1.id, reviewer: null, pool: true, cards: [x] })
+    check("delta's lane starts on the pool", ld.lane.pool === true, JSON.stringify(ld))
+    const tdb = await tokenOf(delta, db1.id)
+    check('DE-B1 starts X', (await intent(tdb, x, 'start')).status === 200)
+    const stalledOf = async (n) => (await (await fetch(`http://127.0.0.1:${PORT}/v1/tasks/${n}`, { headers: { Authorization: `Bearer ${workspaceToken}` } })).json())?.stalled ?? null
+    const designs = async () => (await facts(x)).filter((f) => f.kind === 'ReviewerAssigned' && f.data.design).map((f) => f.data.reviewer)
+    const designId = async () => `${keyX}/s${(await facts(x)).findLast((f) => f.kind === 'LoopStep' && f.data.step === 'design').seq}`
+    const s10 = await intent(tdb, x, 'loop-step', { step: 'design', text: 'X: the plan' })
+    check('DE-B1 posts a design: the pool gives it to DE-R1', s10.status === 200 && !!(await until(async () => JSON.stringify(await designs()) === JSON.stringify([dr1.id]), HUNG_MS)), JSON.stringify({ s10: s10.body, given: await designs() }))
+    const tdr1 = await tokenOf(delta, dr1.id)
+    await idle(delta, dr1.id)
+    // DE-R1 watches X (a loop's watch: it is in X's loop), then answers with gaps, still watching, so it isn't free.
+    await lib.typeLine(inv, lib.ptyKey(delta, dr1.id), home, null, `hive hive_wait_for_tasks ${JSON.stringify({ cards: [`#${x}`], changes: ['comment'], wake: true })}`, { live: () => live(delta, dr1.id) })
+    check('DE-R1 watches X', !!(await until(async () => (await live(delta, dr1.id))?.status === 'watching', HUNG_MS)), JSON.stringify(await live(delta, dr1.id)))
+    check('DE-R1 answers with gaps', (await intent(tdr1, x, 'loop-step', { step: 'gaps', design: await designId(), text: 'X: more, please' })).status === 200)
+    const s19 = await intent(tdb, x, 'loop-step', { step: 'design', text: 'X: the plan, revised' })
+    check('DE-B1 posts its revision: DE-R1 is busy watching, so the pool gives it to DE-R2', s19.status === 200 && !!(await until(async () => JSON.stringify(await designs()) === JSON.stringify([dr1.id, dr2.id]), HUNG_MS)), JSON.stringify({ s19: s19.body, given: await designs() }))
+    const tdr2 = await tokenOf(delta, dr2.id)
+    await idle(delta, dr2.id)
+    check('DE-R2 passes the revision', (await intent(tdr2, x, 'loop-step', { step: 'ok', design: await designId(), text: 'X: good' })).status === 200)
+    // DE-R1 ends with no card watch, as HR1 did on HI-2320: once its own grace check has run (loops:checks, counted
+    // after its mark is made), it has no mark. Read again at each stage: it would flag DE-R1 for X in Doing, here.
+    const r1Clear = async (stage) => {
+      const before = await inv('loops:checks', delta, dr1.id)
+      await inv('watch:cancel', delta, dr1.id)
+      check(`DE-R1 is idle with no watch (${stage})`, !!(await until(async () => ['ready', 'finished'].includes((await live(delta, dr1.id))?.status) && !(await live(delta, dr1.id))?.watch, HUNG_MS)), JSON.stringify(await live(delta, dr1.id)))
+      check(`…its grace check runs (${stage})`, !!(await until(async () => (await inv('loops:checks', delta, dr1.id)) > before, HUNG_MS)), String(await inv('loops:checks', delta, dr1.id)))
+      check(`…and DE-R1, out of X's loop, isn't flagged as not watching it (${stage}; HI-2321)`, !(await live(delta, dr1.id))?.notWatching && !/DE-R1 isn't watching/.test(fs.readFileSync(path.join(userData, 'logs', 'hive.log'), 'utf8')), JSON.stringify(await live(delta, dr1.id)))
+    }
+    await r1Clear('X in Doing, its revision checked by DE-R2')
+    // Built and submitted: the review goes to DE-R2, the design's last answer (its preferred reviewer).
+    const revX = commitIn(delta, { 'x.txt': 'x\n' }, 'X done', keyX)
+    check('DE-B1 submits X', (await intent(tdb, x, 'submit', { summary: 'X: ready', revision: revX })).status === 200 && !!(await until(async () => (await card(x))?.column === 'review', HUNG_MS)))
+    check('X goes to DE-R2', !!(await until(async () => JSON.stringify(await assigned(x)) === JSON.stringify([dr1.id, dr2.id, dr2.id]), HUNG_MS)), JSON.stringify(await assigned(x)))
+    await idle(delta, dr2.id)
+    check('DE-R2 starts its review', (await intent(tdr2, x, 'start-review')).status === 200)
+    // DE-R2 watches X, then ends with no watch: X in Review is its move, so after the grace it is flagged.
+    await lib.typeLine(inv, lib.ptyKey(delta, dr2.id), home, null, `hive hive_wait_for_tasks ${JSON.stringify({ cards: [`#${x}`], changes: ['verdict'], wake: true })}`, { live: () => live(delta, dr2.id) })
+    check('DE-R2 watches X', !!(await until(async () => (await live(delta, dr2.id))?.status === 'watching', HUNG_MS)), JSON.stringify(await live(delta, dr2.id)))
+    await inv('watch:cancel', delta, dr2.id)
+    const r2Flag = await until(async () => JSON.stringify((await live(delta, dr2.id))?.notWatching) === JSON.stringify([x]), HUNG_MS)
+    check("DE-R2, X's reviewer now, ending with no watch is flagged as not watching X", !!r2Flag, JSON.stringify(await live(delta, dr2.id)))
+    // DE-R1 watches X again and ends with no watch, X in Review with DE-R2: its grace check runs and finds nothing of its.
+    await idle(delta, dr1.id)
+    await lib.typeLine(inv, lib.ptyKey(delta, dr1.id), home, null, `hive hive_wait_for_tasks ${JSON.stringify({ cards: [`#${x}`], changes: ['verdict'], wake: true })}`, { live: () => live(delta, dr1.id) })
+    check('DE-R1 watches X again', !!(await until(async () => (await live(delta, dr1.id))?.status === 'watching', HUNG_MS)), JSON.stringify(await live(delta, dr1.id)))
+    await r1Clear('X in Review with DE-R2')
+    check('…and X\'s stall names DE-R2, not DE-R1', (lib.unkey(await stalledOf(x)) ?? '').startsWith("DE-R2 isn't watching"), String(await stalledOf(x)))
   } catch (err) {
     check('no unexpected error', false, err.stack)
   } finally {
