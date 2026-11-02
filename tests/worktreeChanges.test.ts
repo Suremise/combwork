@@ -3,9 +3,10 @@
 // .git/worktrees/copy-1/commondir"), so two review copies made at once failed now and then (reviewCopies.test.ts, "two
 // reviews at once"). The queue's rules with changes held open by the test, then git() putting real worktree changes
 // in it; conditions, never time.
+import { realpathSync, symlinkSync } from 'fs'
 import { join } from 'path'
 import { afterEach, describe, expect, it } from 'vitest'
-import { changesWorktrees, git, gitErrorLine, gitTestHooks, oneWorktreeChange, worktreeChangesPending } from '../src/main/git'
+import { changesWorktrees, git, gitErrorLine, gitTestHooks, oneWorktreeChange, worktreeChangesPending, worktreeQueueKey } from '../src/main/git'
 import { tempDir } from './tempDir'
 import { commit, gitRepo, sh } from './workflow/harness'
 
@@ -26,7 +27,23 @@ const settled = (): Promise<void> => new Promise((r) => setImmediate(r))
 
 afterEach(() => {
   gitTestHooks.started = undefined
+  gitTestHooks.ended = undefined
 })
+
+/** Watches git's worktree changes from their git's start to its end: each one that started while another ran. */
+function overlapping(): string[] {
+  let running = 0
+  const overlaps: string[] = []
+  gitTestHooks.started = (_cwd, args) => {
+    if (!changesWorktrees(args)) return
+    if (running > 0) overlaps.push(args.join(' '))
+    running++
+  }
+  gitTestHooks.ended = (_cwd, args) => {
+    if (changesWorktrees(args)) running--
+  }
+  return overlaps
+}
 
 describe('one worktree change at a time per repository (HI-2322)', () => {
   it('the next change starts only once the one before it has ended, ended well or not', async () => {
@@ -84,19 +101,75 @@ describe('one worktree change at a time per repository (HI-2322)', () => {
     const repo = gitRepo(join(tempDir('worktree-changes-'), 'project'))
     const rev = commit(repo, { 'a.ts': 'export const a = 1\n' }, 'first')
     const copies = join(repo, '..', 'copies')
-    // A change is running from its git's start (the hook) until its call has ended; one starting while another runs overlaps.
-    let running = 0
-    const overlaps: string[] = []
-    gitTestHooks.started = (_cwd, args) => {
-      if (!changesWorktrees(args)) return
-      if (running > 0) overlaps.push(args.join(' '))
-      running++
-    }
-    const change = (args: string[]) => git(repo, args).finally(() => running--)
+    const overlaps = overlapping()
+    const change = (args: string[]) => git(repo, args)
     const made = await Promise.all([1, 2, 3, 4].flatMap((n) => [change(['worktree', 'prune']), change(['worktree', 'add', '--detach', join(copies, `copy-${n}`), rev])]))
     expect(overlaps).toEqual([])
     expect(made.map((r) => r.ok)).toEqual(Array(8).fill(true))
     expect(sh(repo, 'worktree', 'list', '--porcelain').match(/^worktree /gm)).toHaveLength(5)
+    expect(worktreeChangesPending()).toBe(0)
+  })
+})
+
+describe("the queue's repository: a checkout and its linked worktrees are one (HI-2322, HR1's round 1)", () => {
+  /** A repository, a linked worktree of it, a junction to it, and another repository. */
+  function repos(): { main: string; linked: string; alias: string; other: string } {
+    const dir = tempDir('worktree-repos-')
+    const main = gitRepo(join(dir, 'main'))
+    commit(main, { 'a.ts': 'export const a = 1\n' }, 'first')
+    const linked = join(dir, 'linked')
+    sh(main, 'worktree', 'add', '-q', '--detach', linked)
+    const alias = join(dir, 'alias')
+    symlinkSync(main, alias, 'junction')
+    const other = gitRepo(join(dir, 'other'))
+    return { main, linked, alias, other }
+  }
+
+  it("one key for the checkout, its linked worktree and a junction to it, as git's common dir; another repository's differs", async () => {
+    const r = repos()
+    const key = await worktreeQueueKey(r.main)
+    expect(key).toBe(realpathSync.native(sh(r.main, 'rev-parse', '--path-format=absolute', '--git-common-dir')).toLowerCase())
+    expect(await worktreeQueueKey(r.linked)).toBe(key)
+    expect(await worktreeQueueKey(r.alias)).toBe(key)
+    expect(await worktreeQueueKey(`${r.linked.toUpperCase()}\\`)).toBe(key)
+    expect(await worktreeQueueKey(r.other)).not.toBe(key)
+  })
+
+  it("a change held in the checkout holds the linked worktree's; another repository's runs alongside; the queue goes after a failure", async () => {
+    const r = repos()
+    const log: string[] = []
+    const inMain = held(log, 'main')
+    const inLinked = held(log, 'linked')
+    const inOther = held(log, 'other')
+    const pm = oneWorktreeChange(await worktreeQueueKey(r.main), inMain.fn)
+    const pl = oneWorktreeChange(await worktreeQueueKey(r.linked), inLinked.fn)
+    const po = oneWorktreeChange(await worktreeQueueKey(r.other), inOther.fn)
+    await settled()
+    expect([inMain.started(), inLinked.started(), inOther.started()]).toEqual([true, false, true])
+    inMain.fail()
+    await expect(pm).rejects.toThrow('main failed')
+    await settled()
+    expect(inLinked.started()).toBe(true)
+    inLinked.end()
+    inOther.end()
+    expect(await Promise.all([pl, po])).toEqual(['linked', 'other'])
+    await settled()
+    expect(worktreeChangesPending()).toBe(0)
+  })
+
+  it("git()'s worktree changes from the checkout and its linked worktree queue together, and are all made", async () => {
+    const r = repos()
+    const rev = sh(r.main, 'rev-parse', 'HEAD')
+    const overlaps = overlapping()
+    const change = (cwd: string, args: string[]) => git(cwd, args)
+    const copies = join(r.main, '..', 'copies')
+    const made = await Promise.all([1, 2, 3, 4].flatMap((n) => {
+      const from = n % 2 ? r.main : r.linked
+      return [change(from, ['worktree', 'prune']), change(from, ['worktree', 'add', '--detach', join(copies, `copy-${n}`), rev])]
+    }))
+    expect(overlaps).toEqual([])
+    expect(made.map((m) => m.ok)).toEqual(Array(8).fill(true))
+    expect(sh(r.main, 'worktree', 'list', '--porcelain').match(/^worktree /gm)).toHaveLength(6)
     expect(worktreeChangesPending()).toBe(0)
   })
 })
