@@ -4,7 +4,7 @@ import { existsSync } from 'original-fs'
 import { open, readdir } from 'original-fs/promises'
 import { homedir, release, version as osVersion } from 'os'
 import { basename, join } from 'path'
-import { redact, redactLog, type RedactContext } from '../shared/redact'
+import { redact, redactLog, redactValue, type RedactContext } from '../shared/redact'
 import { providerName } from '../shared/providers'
 import { testedComparison } from '../shared/testedClis'
 import type { AgentInstallInfo, ProviderId } from '../shared/types'
@@ -218,7 +218,8 @@ async function recordingSection(ctx: RedactContext): Promise<string> {
   const latest = await latestRecording()
   if (!latest) return '\n### Developer console recording\n\nNone.\n' // i18n-ignore: Copy Diagnostics' report: a bug report for the maintainer, in English (the design keeps diagnostics content English)
   if (latest.includeText) return '\n### Developer console recording\n\nThe newest recording includes prompt and reply text, so it is not attached.\n' // i18n-ignore: Copy Diagnostics' report: a bug report for the maintainer, in English (the design keeps diagnostics content English)
-  const part = diagnosticRecording(await readRecordingText(latest.file), (s) => redact(s, ctx))
+  // Paths outside the known folders go too, as in the log (HI-2332): hooks keep their tool input's file path.
+  const part = diagnosticRecording(await readRecordingText(latest.file), (s) => redactValue(s, ctx))
   if (!part) return ''
   return `\n### Developer console recording\n\n${part.summary}\n\n\`\`\`jsonl\n${part.lines.join('\n')}\n\`\`\`\n` // i18n-ignore: Copy Diagnostics' report: a bug report for the maintainer, in English (the design keeps diagnostics content English)
 }

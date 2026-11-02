@@ -2,6 +2,7 @@ import { describe, expect, it, vi } from 'vitest'
 import { join } from 'path'
 import { HOOK_FIELDS, HOOK_MADE_FIELDS, sessionSourceId, type ConsoleEvent } from '../src/shared/devConsole'
 import { DevConsole } from '../src/main/devConsole'
+import { redactValue, type RedactContext } from '../src/shared/redact'
 import { compareContract, diagnosticRecording, DIAGNOSTIC_BYTES, DIAGNOSTIC_LINES, newestRecordingsFirst, parseRecording, readingOf, recordingName, recordingToFixture, shapeOf, type ConsoleFixture, type RecordingHeader } from '../src/shared/consoleFixtures.mts'
 
 // Developer console recordings as files (#638): a recording written as the recorder writes it (header, events as a
@@ -177,6 +178,20 @@ describe('diagnosticRecording', () => {
     expect(part?.summary).toMatch(/^session source \(claude-code\), started 2026-10-12T09:00:00.000Z, Hive 0.7.0; 3 events, ended \(stopped\); CLIs: claude-code 2.1.296 \(tested with 2.1.296\); redacted; the newest 3$/)
     expect(part?.lines.join('\n')).not.toContain(alpha.replace(/\\/g, '\\\\'))
     expect(part?.lines.join('\n')).toContain('<folder>')
+  })
+
+  it("takes out a hook's file path outside every known folder, a drive's or a share's, spaces and all (HI-2332)", () => {
+    const ctx: RedactContext = { home: 'C:\\Users\\Example', folders: ['D:\\Work\\Demo'], names: [] }
+    const paths = ['E:/Clients/Cedar Research/acquisition.txt', 'E:\\Clients\\Cedar Research\\acquisition.txt', '\\\\fileserver\\Clients\\Cedar Research\\deal.docx']
+    const kept = { file_path: 'D:\\Work\\Demo\\src\\a.ts', notebook_path: 'C:\\Program Files\\Tool\\x.ipynb', path: 'C:\\Users\\Example\\.claude\\projects\\s.jsonl' }
+    const events = [...paths.map((p) => ({ file_path: p })), kept].map((input, i) => ({ type: 'event', seq: i + 1, at: '', kind: 'hook', name: 'PreToolUse', summary: 'Read', raw: { hook_event_name: 'PreToolUse', tool_input: input } }))
+    const part = diagnosticRecording([header(), ...events].map((l) => JSON.stringify(l)).join('\n'), (s) => redactValue(s, ctx))!
+    const text = part.lines.join('\n')
+    for (const word of ['Clients', 'Cedar', 'Research', 'acquisition', 'fileserver', 'deal.docx']) expect(text).not.toContain(word)
+    const inputs = part.lines.map((l) => JSON.parse(l).raw.tool_input)
+    expect(inputs.slice(0, 3)).toEqual([{ file_path: '<path>' }, { file_path: '<path>' }, { file_path: '<path>' }])
+    // Known folders keep their place holders, and Hive's and the CLIs' own folders stay: still valid JSON lines.
+    expect(inputs[3]).toEqual({ file_path: '<workspace>\\src\\a.ts', notebook_path: 'C:\\Program Files\\Tool\\x.ipynb', path: '~\\.claude\\projects\\s.jsonl' })
   })
 
   it('never takes a recording with text, and keeps to its count', async () => {

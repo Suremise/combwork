@@ -256,6 +256,27 @@ export function hideUserText(text: string): string {
 const PLAIN_FOLDER = /^(?:~[\\/](?:AppData|\.)|[A-Za-z]:[\\/](?:Program Files|Program Files \(x86\)|ProgramData|Windows)(?:[\\/]|$))/i
 /** An absolute path, up to a space or a character that can't be in one (from a path with spaces, the words after the first space stay). */
 const ABSOLUTE_PATH = /(?<![\w<>])(?:[A-Za-z]:[\\/](?:Program Files(?: \(x86\))?)?|~[\\/]|\\\\)[^\s"'<>|?*,;()[\]{}]*/gi
+/** A string that is one absolute path as a whole, spaces and all (a drive's, a home-relative or a UNC path). */
+const WHOLE_PATH = /^(?:[A-Za-z]:[\\/]|~[\\/]|\\\\)[^\n"<>|?*]*$/i
+
+/**
+ * The report's last step after redact() (HI-2332): any absolute path left that isn't one of Hive's or the CLIs' own
+ * (outside every known folder: another drive, a share) becomes <path>. Shared by the log and recordings.
+ */
+export function hidePaths(text: string): string {
+  return text.replace(ABSOLUTE_PATH, (p) => (PLAIN_FOLDER.test(p) ? p : '<path>'))
+}
+
+/**
+ * Redaction for one string value of a report's structured attachment (a console recording's event fields): redact(),
+ * then hidePaths(). A value that is a path as a whole goes whole, so the words after a space in it don't stay.
+ */
+export function redactValue(text: string, ctx: RedactContext): string {
+  const out = redact(text, ctx)
+  const whole = out.trim()
+  if (WHOLE_PATH.test(whole)) return PLAIN_FOLDER.test(whole) ? out : '<path>'
+  return hidePaths(out)
+}
 
 /** In the line Hive logs as it starts, once its log marks the user's own text. */
 export const MARKED_LOG = 'your text marked'
@@ -293,7 +314,7 @@ export function redactLog(text: string, ctx: RedactContext): string {
       // A line's time, level and [scope] stay as they are: a project called "sessions" mustn't take the scope with it.
       const head = /^\S+ \[[A-Z]+\] \[[\w-]+\] /.exec(line)?.[0] ?? ''
       if (!marked) return line.trim() ? `${head}${OLDER_LINE}` : line
-      const rest = redact(hideUserText(line.slice(head.length)), ctx).replace(ABSOLUTE_PATH, (p) => (PLAIN_FOLDER.test(p) ? p : '<path>'))
+      const rest = hidePaths(redact(hideUserText(line.slice(head.length)), ctx))
       carried = rest.endsWith('<redacted>') && continues(line)
       return head + rest
     })
