@@ -125,6 +125,32 @@ describe("a card from before 1.0 started by the board, in a project that builds 
     expect([now.column, now.agent]).toEqual(['todo', null])
   })
 
+  // HI-2395: a no-code card takes no slot (HI-2335), so its start, a direct one (the window's Start, with no reason, as
+  // the Assistant's hive_start_task) as a lane's, is never taken for one that got none: it starts where its agent is
+  // (here the project folder), the agent launched.
+  for (const [who, actor] of [["the window's Start", user], ['a lane', tasks.HIVE_LANE_START]] as const) {
+    it(`a no-code card started by ${who} takes no slot and starts, its agent launched where it is (HI-2395)`, async () => {
+      const w = await workspace()
+      const card = await inWorkspace(w, async () => (await tasks.createTask({ title: 'A decision to write up', project: 'p' }, user)).number)
+      await store.boardWrite(w, async () => void FactStore.forBoard(w, { project: 'p', key: 'p' }).updateCard(card, { kind: 'no-code' }))
+      const s = sessions as unknown as { start: (p: string, o: { agentId: string }) => Promise<unknown> }
+      const original = s.start
+      const launched: string[] = []
+      s.start = async (p, o) => void launched.push(`${p}|${o.agentId}`)
+      try {
+        await inWorkspace(w, () => startTask(card, { kind: 'agent', agentId: 'a1' }, actor))
+      } finally {
+        s.start = original
+      }
+      expect(lending.asked).toBe(0)
+      expect(launched).toEqual([`${join(w.path!, 'p')}|a1`])
+      expect(facts(w, card).find((f) => f.kind === 'Started')?.data).toMatchObject({ folder: 'project', builder: 'a1' })
+      expect(facts(w, card).find((f) => f.kind === 'Started')?.data).not.toHaveProperty('lease')
+      const now = await inWorkspace(w, () => tasks.getTask(card))
+      expect([now.column, now.agent]).toEqual(['doing', 'a1'])
+    })
+  }
+
   it("a Start of a card already Active with no slot (a start from before the fix) is refused, its builder never launched (HR2's round 1)", async () => {
     const w = await workspace()
     const card = await inWorkspace(w, async () => (await tasks.createTask({ title: 'Started with none', project: 'p' }, user)).number)
