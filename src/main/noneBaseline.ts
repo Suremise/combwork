@@ -211,8 +211,8 @@ class BaselineThread {
 
 /** The log's lines for a read that failed, or a worker that ended: its error is the file system's, which can name the
  * user's files, so it is the user's text (Copy Diagnostics leaves it out). */
-export const failedLine = (project: string, error: string): string => `reading ${userText(project)} whole failed: ${userText(error)}`
-export const endedLine = (why: string): string => `the None baseline's worker ended (${userText(why)}); a new one starts with the next read`
+export const failedLine = (project: string, error: string): string => `reading ${userText(project)} whole failed: ${userText(error)}` // i18n-ignore: a log line, in English
+export const endedLine = (why: string): string => `the None baseline's worker ended (${userText(why)}); a new one starts with the next read` // i18n-ignore: a log line, in English
 
 /** The worker's script, beside main's (inside the asar, as the others); a test's build of it (`useBaselineWorker`). */
 let scriptForTests: string | null = null
