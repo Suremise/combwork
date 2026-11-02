@@ -264,6 +264,25 @@ describe('Allow on an "Ask me" lock', () => {
     expect(askOf()?.[1]).not.toBe(old![1])
   })
 
+  it("a claim that expired is taken over by a third agent's edit: the ask about it goes, the agent is told to try again, its old Allow answers nothing, and the retry asks about the new claim", async () => {
+    const a = agents()
+    await a.claim()
+    expect(await a.edit()).not.toBeNull()
+    await a.hook('Stop')
+    const old = a.offer()!
+    // The holder stalls past the lock's time limit (15 min): its claim no longer holds anyone back.
+    const locks = (sessions as unknown as { locks: Map<string, { path: string; at: number }> }).locks
+    const held = [...locks.values()].find((v) => v.path.endsWith(a.file))!
+    held.at = Date.now() - 16 * 60_000
+    expect(await a.otherEdits()).toBeNull()
+    expect(a.offer()).toBeNull()
+    await vi.waitFor(async () => expect(await a.freed()).toBe(true), { timeout: HUNG_MS })
+    await a.allow(old)
+    a.editor.status = 'working'
+    expect(JSON.stringify(await a.edit())).toContain('Hive has asked the user')
+    expect(a.offer()).not.toBe(old)
+  })
+
   it('allowed while the blocked agent is in its turn, then the holder lets the file go and another claims it: the go-ahead only says try again, and the retry asks about the new holder', async () => {
     const a = agents()
     await a.claim()
