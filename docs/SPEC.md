@@ -4470,7 +4470,9 @@ repeating them (#533) [note §8].
   card in Review whose latest submission nobody reviews, with fewer passes than G1b asks, oldest submission first, goes
   to the first free agent: its role reviews (#1430's `reviewsWork`), no open dispatch lease (#1434: an either agent
   building in a slot is never taken, and is once its lease ends; a lease that can't be read counts as held), idle (not
-  in a turn, waiting, watching, with background tasks or runs), not reviewing another card of the project (given or
+  in a turn, waiting, with background tasks or runs, and able to take a line now, `readyFor`'s `idle`; a card watch
+  doesn't count, HI-2333: Hive's loop wakes reach a watching agent, and what it reviews or checks holds it already),
+  not reviewing another card of the project (given or
   started its latest submission with no verdict: any card in Review, in a running lane, an ended one or none), not the
   card's builder (`review.notAuthor`'s builders), and with G1b = 2 not one who has seen this submission: the second is
   given it once the first has passed. Recorded as `ReviewerAssigned { reviewer, submission }` in a write that checks
@@ -4481,7 +4483,7 @@ repeating them (#533) [note §8].
   whose role no longer reviews, or that took a dispatch lease meanwhile is released from it (`ReviewerReleased
   { reviewer, submission, why }`, in a write that finds it still given and not started) and the card given again; one
   busy, or whose lease can't be read, is told later. Then once per assignment (its delivery's identity is the card, the submission,
-  the agent and its `ReviewerAssigned`, so one released and given again is told again): typed into its conversation when it runs, else it is launched with it for review (#1434's purpose: the project folder, with #1439's grant to the
+  the agent and its `ReviewerAssigned`, so one released and given again is told again): typed into its conversation when it runs (as a wake, need `idle`: a reviewer at a card watch takes it and its watch carries on, HI-2333), else it is launched with it for review (#1434's purpose: the project folder, with #1439's grant to the
   review copies): *#12 (HI-B1's card) is in Review: you review it from the pool…*. Not given: told at a later pass.
   Hive's loop wakes leave a pool card's arrival in Review to the pool, and route its other handoffs (requests, steps,
   verdicts) by its current reviewer: the newest given or started on its latest submission (`loopReviewerOf`).

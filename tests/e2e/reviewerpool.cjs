@@ -9,8 +9,11 @@
 //    reviewers in turn, each in a review copy at the submitted revision, then Done.
 // 3. gamma (HI-2046, one reviewer per lane): a card started on its builder alone and submitted outside a lane goes to
 //    the project's stopped reviewer, started for it and told, with no Assistant step; its verdict makes it Done.
-// 4. delta (HI-2321): a pool lane's design checked by one reviewer and its revision by another: the first, out of the
-//    card's loop, isn't flagged as not watching when it ends with no watch; the card's reviewer now is.
+// 4. delta (HI-2321): a pool lane's design checked by one reviewer and its revision by another (the first reviewing
+//    another card meanwhile, which holds it; its watch doesn't, HI-2333): the first, out of the card's loop, isn't
+//    flagged as not watching when it ends with no watch; the card's reviewer now is.
+// 5. epsilon (HI-2333, the cli project's stall on rc.19): its one pooled reviewer, watching a card in its loop, is still
+//    free: given the card's revised design and then its submission, each told once and read.
 // Screenshots of Start Lane with the pool chosen and of the lane's row, in both themes; the builder's brief as text.
 // Dev build, throwaway profile, workspace and CLAUDE_CONFIG_DIR.
 const lib = require('./lib.cjs')
@@ -28,6 +31,7 @@ const alpha = path.join(ws, 'alpha')
 const beta = path.join(ws, 'beta')
 const gamma = path.join(ws, 'gamma')
 const delta = path.join(ws, 'delta')
+const epsilon = path.join(ws, 'epsilon')
 const slotsRoot = path.join(`${ws}.worktrees`, 'alpha')
 const PORT = Number(lib.port(47805))
 const identity = { name: 'Hive Pool Test', email: 'pool@example.com' }
@@ -49,14 +53,14 @@ const commitIn = (dir, files, message, trailer) => {
 ;(async () => {
   for (const d of [userData, ws, `${ws}.worktrees`, shots]) fs.rmSync(d, { recursive: true, force: true })
   fs.mkdirSync(shots, { recursive: true })
-  for (const p of [alpha, beta, gamma, delta]) {
+  for (const p of [alpha, beta, gamma, delta, epsilon]) {
     lib.gitProject(p, { 'a.txt': 'a\n', '.gitignore': '.hive/\n' })
     lib.git(p, ['branch', '-M', 'main'])
     // The identity its commits use, in its git config: G12 reads it from git each time (HI-2266, HI-2283).
     lib.git(p, ['config', 'user.name', identity.name])
     lib.git(p, ['config', 'user.email', identity.email])
   }
-  const env = lib.fakeClaude(userData, home, [alpha, beta, gamma, delta, ws, ...['slot-a', 'slot-b', 'slot-c', 'slot-d'].map((s) => path.join(slotsRoot, s))])
+  const env = lib.fakeClaude(userData, home, [alpha, beta, gamma, delta, epsilon, ws, ...['slot-a', 'slot-b', 'slot-c', 'slot-d'].map((s) => path.join(slotsRoot, s))])
   const cfgFile = path.join(userData, 'config.json')
   const cfg = JSON.parse(fs.readFileSync(cfgFile, 'utf8'))
   cfg.settings.general = { ...cfg.settings.general, confirmOnQuit: 'never', showTips: false }
@@ -112,6 +116,11 @@ const commitIn = (dir, files, message, trailer) => {
     const deliveries = async (project, agent) => {
       const v = await (await fetch(`http://127.0.0.1:${PORT}/v1/projects/${project}/agents/${encodeURIComponent(agent)}/deliveries?limit=10`, { headers: { Authorization: `Bearer ${workspaceToken}` } })).json()
       return (v.items ?? v.deliveries ?? []).map((d) => d.body ?? d.text ?? '')
+    }
+    /** An agent's deliveries in full (their text and state: `received` once it read it with hive_inbox). */
+    const deliveryRows = async (project, agent) => {
+      const v = await (await fetch(`http://127.0.0.1:${PORT}/v1/projects/${project}/agents/${encodeURIComponent(agent)}/deliveries?limit=20`, { headers: { Authorization: `Bearer ${workspaceToken}` } })).json()
+      return (v.items ?? v.deliveries ?? []).map((d) => ({ text: d.body ?? d.text ?? '', state: d.state }))
     }
     const card = async (n) => (await inv('tasks:list')).find((c) => c.number === n)
     const facts = (n) => inv('tasks:facts', n)
@@ -304,17 +313,21 @@ const commitIn = (dir, files, message, trailer) => {
     check('K is Done (committed), with no Assistant step', !!(await until(async () => (await card(k))?.column === 'done', HUNG_MS)) && !(await live(path.join(ws, '.hive', 'assistant'), 'assistant')), (await card(k))?.column)
 
     // --- 4. delta (HI-2321, seen on HI-2320): a pool lane's design checked by one reviewer and its revision by another.
-    // DE-R1 checks the design (gaps) while watching the card, so the pool gives the revision to DE-R2, who passes it and
-    // is then given the review. DE-R1, out of the card's loop, ends with no watch: never flagged as not watching; DE-R2,
-    // its reviewer now, ending with no watch on the card in Review, is.
+    // DE-R1 checks the design (gaps) while watching the card. Its watch doesn't hold it (HI-2333): DE-B2's card Y goes to
+    // it, and reviewing Y does, so the pool gives the revision to DE-R2, who passes it and is then given the review.
+    // DE-R1 passes Y, then, out of X's loop, ends with no watch: never flagged as not watching; DE-R2, its reviewer now,
+    // ending with no watch on the card in Review, is.
     await inv('workflow:setOptions', delta, { preset: null, options: { review: 'agent', noSelfReview: true, finish: 'committed', folder: 'project', preChecks: [], identity, okBefore: { mode: 'never', labels: [] }, reviewerMode: 'pool' } })
     const db1 = await lib.addAgent(inv, delta, { name: 'DE-B1', workflowRole: 'builder' })
     const dr1 = await lib.addAgent(inv, delta, { name: 'DE-R1', workflowRole: 'reviewer' })
     const dr2 = await lib.addAgent(inv, delta, { name: 'DE-R2', workflowRole: 'reviewer' })
+    const db2 = await lib.addAgent(inv, delta, { name: 'DE-B2', workflowRole: 'builder' })
     const x = await create(delta, 'Pool X')
+    const y = await create(delta, 'Pool Y')
     const keyX = (await card(x)).key
     const ld = await inv('lanes:start', delta, { builder: db1.id, reviewer: null, pool: true, cards: [x] })
-    check("delta's lane starts on the pool", ld.lane.pool === true, JSON.stringify(ld))
+    const ldy = await inv('lanes:start', delta, { builder: db2.id, reviewer: null, pool: true, cards: [y] })
+    check("delta's lanes start on the pool", ld.lane.pool === true && ldy.lane.pool === true, JSON.stringify([ld, ldy]))
     const tdb = await tokenOf(delta, db1.id)
     check('DE-B1 starts X', (await intent(tdb, x, 'start')).status === 200)
     const stalledOf = async (n) => (await (await fetch(`http://127.0.0.1:${PORT}/v1/tasks/${n}`, { headers: { Authorization: `Bearer ${workspaceToken}` } })).json())?.stalled ?? null
@@ -324,15 +337,24 @@ const commitIn = (dir, files, message, trailer) => {
     check('DE-B1 posts a design: the pool gives it to DE-R1', s10.status === 200 && !!(await until(async () => JSON.stringify(await designs()) === JSON.stringify([dr1.id]), HUNG_MS)), JSON.stringify({ s10: s10.body, given: await designs() }))
     const tdr1 = await tokenOf(delta, dr1.id)
     await idle(delta, dr1.id)
-    // DE-R1 watches X (a loop's watch: it is in X's loop), then answers with gaps, still watching, so it isn't free.
+    // DE-R1 watches X (a loop's watch: it is in X's loop), then answers with gaps, still watching.
     await lib.typeLine(inv, lib.ptyKey(delta, dr1.id), home, null, `hive hive_wait_for_tasks ${JSON.stringify({ cards: [`#${x}`], changes: ['comment'], wake: true })}`, { live: () => live(delta, dr1.id) })
     check('DE-R1 watches X', !!(await until(async () => (await live(delta, dr1.id))?.status === 'watching', HUNG_MS)), JSON.stringify(await live(delta, dr1.id)))
     check('DE-R1 answers with gaps', (await intent(tdr1, x, 'loop-step', { step: 'gaps', design: await designId(), text: 'X: more, please' })).status === 200)
+    // Its watch doesn't hold it (HI-2333): Y, submitted, goes to DE-R1 (running, so before the stopped DE-R2), which
+    // starts reviewing it: that holds it.
+    const tdb2 = await tokenOf(delta, db2.id)
+    check('DE-B2 starts Y', (await intent(tdb2, y, 'start')).status === 200)
+    const revY = commitIn(delta, { 'y.txt': 'y\n' }, 'Y done', (await card(y)).key)
+    check('DE-B2 submits Y', (await intent(tdb2, y, 'submit', { summary: 'Y: ready', revision: revY })).status === 200 && !!(await until(async () => (await card(y))?.column === 'review', HUNG_MS)))
+    check('Y goes to DE-R1, watching X (HI-2333)', !!(await until(async () => JSON.stringify(await assigned(y)) === JSON.stringify([dr1.id]), HUNG_MS)), JSON.stringify(await assigned(y)))
+    check('DE-R1 starts reviewing Y', (await intent(tdr1, y, 'start-review')).status === 200)
     const s19 = await intent(tdb, x, 'loop-step', { step: 'design', text: 'X: the plan, revised' })
-    check('DE-B1 posts its revision: DE-R1 is busy watching, so the pool gives it to DE-R2', s19.status === 200 && !!(await until(async () => JSON.stringify(await designs()) === JSON.stringify([dr1.id, dr2.id]), HUNG_MS)), JSON.stringify({ s19: s19.body, given: await designs() }))
+    check('DE-B1 posts its revision: DE-R1 is reviewing Y, so the pool gives it to DE-R2', s19.status === 200 && !!(await until(async () => JSON.stringify(await designs()) === JSON.stringify([dr1.id, dr2.id]), HUNG_MS)), JSON.stringify({ s19: s19.body, given: await designs() }))
     const tdr2 = await tokenOf(delta, dr2.id)
     await idle(delta, dr2.id)
     check('DE-R2 passes the revision', (await intent(tdr2, x, 'loop-step', { step: 'ok', design: await designId(), text: 'X: good' })).status === 200)
+    check('DE-R1 passes Y: Done', (await intent(tdr1, y, 'verdict', { pass: true, comment: 'Y: passed' })).status === 200 && !!(await until(async () => (await card(y))?.column === 'done', HUNG_MS)), (await card(y))?.column)
     // DE-R1 ends with no card watch, as HR1 did on HI-2320: once its own grace check has run (loops:checks, counted
     // after its mark is made), it has no mark. Read again at each stage: it would flag DE-R1 for X in Doing, here.
     const r1Clear = async (stage) => {
@@ -361,6 +383,56 @@ const commitIn = (dir, files, message, trailer) => {
     check('DE-R1 watches X again', !!(await until(async () => (await live(delta, dr1.id))?.status === 'watching', HUNG_MS)), JSON.stringify(await live(delta, dr1.id)))
     await r1Clear('X in Review with DE-R2')
     check('…and X\'s stall names DE-R2, not DE-R1', (lib.unkey(await stalledOf(x)) ?? '').startsWith("DE-R2 isn't watching"), String(await stalledOf(x)))
+
+    // --- 5. epsilon (HI-2333, the cli project's stall on rc.19): one pooled reviewer, EP-R1, watching Z in its loop. It
+    // is still free: Z's revised design and then Z's submission are given to it and typed at its prompt, each told once
+    // and read (`received`: it read it with hive_inbox), with no other line for them from the watch or a loop wake.
+    await inv('workflow:setOptions', epsilon, { preset: null, options: { review: 'agent', noSelfReview: true, finish: 'committed', folder: 'project', preChecks: [], identity, okBefore: { mode: 'never', labels: [] }, reviewerMode: 'pool' } })
+    const eb1 = await lib.addAgent(inv, epsilon, { name: 'EP-B1', workflowRole: 'builder' })
+    const er1 = await lib.addAgent(inv, epsilon, { name: 'EP-R1', workflowRole: 'reviewer' })
+    const z = await create(epsilon, 'Pool Z')
+    const keyZ = (await card(z)).key
+    const le = await inv('lanes:start', epsilon, { builder: eb1.id, reviewer: null, pool: true, cards: [z] })
+    check("epsilon's lane starts on the pool", le.lane.pool === true, JSON.stringify(le))
+    const teb = await tokenOf(epsilon, eb1.id)
+    check('EP-B1 starts Z', (await intent(teb, z, 'start')).status === 200)
+    const designsZ = async () => (await facts(z)).filter((f) => f.kind === 'ReviewerAssigned' && f.data.design).map((f) => f.data.reviewer)
+    const designZ = async () => `${keyZ}/s${(await facts(z)).findLast((f) => f.kind === 'LoopStep' && f.data.step === 'design').seq}`
+    /** EP-R1's lines that tell it of this (a design's id, or Z in Review from the pool): each, and whether it read them. */
+    const toldOf = async (what) => (await deliveryRows('epsilon', er1.name)).filter((d) => d.text.includes(what))
+    const readOnce = (what) => until(async () => {
+      const rows = await toldOf(what)
+      return rows.length === 1 && ['received', 'acked'].includes(rows[0].state)
+    }, HUNG_MS)
+    /** EP-R1 watches Z (a loop's watch), as card-loop's reviewer does: `watching` then. */
+    const watchZ = async (changes) => {
+      await idle(epsilon, er1.id)
+      await lib.typeLine(inv, lib.ptyKey(epsilon, er1.id), home, null, `hive hive_wait_for_tasks ${JSON.stringify({ cards: [`#${z}`], changes, wake: true })}`, { live: () => live(epsilon, er1.id) })
+      return until(async () => (await live(epsilon, er1.id))?.status === 'watching', HUNG_MS)
+    }
+    check('EP-B1 posts a design: the pool gives it to EP-R1', (await intent(teb, z, 'loop-step', { step: 'design', text: 'Z: the plan' })).status === 200 && !!(await until(async () => JSON.stringify(await designsZ()) === JSON.stringify([er1.id]), HUNG_MS)), JSON.stringify(await designsZ()))
+    const z1 = await designZ()
+    check('…started for it, told once, and it reads it', !!(await readOnce(z1)), JSON.stringify(await toldOf(z1)))
+    const ter = await tokenOf(epsilon, er1.id)
+    check('EP-R1 watches Z', !!(await watchZ(['comment'])), JSON.stringify(await live(epsilon, er1.id)))
+    check('EP-R1 answers with gaps, still watching', (await intent(ter, z, 'loop-step', { step: 'gaps', design: z1, text: 'Z: more, please' })).status === 200 && (await live(epsilon, er1.id))?.status === 'watching', JSON.stringify(await live(epsilon, er1.id)))
+    check('EP-B1 posts its revision: the pool gives it to EP-R1, watching (HI-2333)', (await intent(teb, z, 'loop-step', { step: 'design', text: 'Z: the plan, revised' })).status === 200 && !!(await until(async () => JSON.stringify(await designsZ()) === JSON.stringify([er1.id, er1.id]), HUNG_MS)), JSON.stringify(await designsZ()))
+    const z2 = await designZ()
+    check('…told of it once, typed at its prompt, and it reads it', !!(await readOnce(z2)), JSON.stringify(await toldOf(z2)))
+    check('EP-R1 passes the revision (CL-8 s23 was refused: nobody had been given it)', (await intent(ter, z, 'loop-step', { step: 'ok', design: z2, text: 'Z: good' })).status === 200)
+    // It watches Z again (for a verdict only: the submission's move and summary don't end it), and Z is submitted.
+    check('EP-R1 watches Z again', !!(await watchZ(['verdict'])), JSON.stringify(await live(epsilon, er1.id)))
+    const revZ = commitIn(epsilon, { 'z.txt': 'z\n' }, 'Z done', keyZ)
+    check('EP-B1 submits Z', (await intent(teb, z, 'submit', { summary: 'Z: ready', revision: revZ })).status === 200 && !!(await until(async () => (await card(z))?.column === 'review', HUNG_MS)))
+    check('Z goes to EP-R1, watching (HI-2333)', !!(await until(async () => JSON.stringify(await assigned(z)) === JSON.stringify([er1.id, er1.id, er1.id]), HUNG_MS)), JSON.stringify(await assigned(z)))
+    check('…told once that it reviews Z from the pool, and it reads it', !!(await readOnce(`${keyZ} (EP-B1's card) is in Review: you review it from the pool`)), JSON.stringify(await deliveryRows('epsilon', er1.name)))
+    check('…no other line tells it Z is in Review (its watch counts verdicts; a pool card has no loop wake for it)', (await deliveryRows('epsilon', er1.name)).filter((d) => d.text.includes(keyZ) && /is in Review/.test(d.text)).length === 1, JSON.stringify(await deliveryRows('epsilon', er1.name)))
+    // One try for each assignment (its design, its revision, its submission): a delivery refused and tried again at
+    // once, as watching once made it, would log a line for each try.
+    const tellings = (fs.readFileSync(path.join(userData, 'logs', 'hive.log'), 'utf8').match(new RegExp(`Telling \\S*EP-R1\\S* of #${z} `, 'g')) ?? []).length
+    check('…each of its three assignments told in one try (no pass looping on a refused line)', tellings === 3, String(tellings))
+    await idle(epsilon, er1.id)
+    check('EP-R1 reviews and passes Z: Done', (await intent(ter, z, 'start-review')).status === 200 && (await intent(ter, z, 'verdict', { pass: true, comment: 'Z: passed' })).status === 200 && !!(await until(async () => (await card(z))?.column === 'done', HUNG_MS)), (await card(z))?.column)
   } catch (err) {
     check('no unexpected error', false, err.stack)
   } finally {

@@ -24,6 +24,15 @@ const state = vi.hoisted(() => ({
   busy: new Set<string>(),
   /** Agents running (typed into); the rest are launched. */
   running: new Set<string>(),
+  /** A running agent's status, where not its turn's (`busy`: working, else ready): a watch, a sign-in… (HI-2333). */
+  status: new Map<string, string>(),
+  /** Running agents with background tasks, and agents with runs going (HI-2333). */
+  background: new Set<string>(),
+  runs: new Set<string>(),
+  /** Agents with a line typed or queued for them, at their prompt (`agentBusy`, HI-2333). */
+  pending: new Set<string>(),
+  /** Running agents whose hooks aren't arriving: `readyFor` refuses them a line (HI-2333). */
+  hooksMissing: new Set<string>(),
   deliveries: [] as { id: string; agentId: string; source?: string; ref?: string; state: string; body: string }[],
   /** The next deliveries: given, or not (its agent got busy: cancelled). */
   next: [] as ('given' | 'notGiven')[],
@@ -32,15 +41,15 @@ const state = vi.hoisted(() => ({
   beforeSpawn: null as null | (() => void | Promise<void>)
 }))
 
-vi.mock('../src/main/workflow/service', async (orig) => ({ ...(await orig<object>()), workflowEnforced: () => state.enforced, agentRunsGoing: () => [], workflowFor: async () => state.wf }))
-vi.mock('../src/main/workflow/lineUpdates', async (orig) => ({ ...(await orig<object>()), agentBusy: (_p: string, a: string) => state.busy.has(a) }))
+vi.mock('../src/main/workflow/service', async (orig) => ({ ...(await orig<object>()), workflowEnforced: () => state.enforced, agentRunsGoing: (_p: string, a: string) => (state.runs.has(a) ? [{}] : []), workflowFor: async () => state.wf }))
+vi.mock('../src/main/workflow/lineUpdates', async (orig) => ({ ...(await orig<object>()), agentBusy: (_p: string, a: string) => state.busy.has(a) || state.pending.has(a) }))
 vi.mock('../src/main/lanes', async (orig) => ({ ...(await orig<object>()), rawLanes: async () => state.lanes }))
 vi.mock('../src/main/projectKeys', async (orig) => ({ ...(await orig<object>()), withCardNames: (_ws: unknown, fn: () => string) => fn() }))
 vi.mock('../src/main/sessions', async (orig) => {
   const actual = await orig<typeof import('../src/main/sessions')>()
   const stub = {
-    liveFor: (_p: string, a: string) => (state.running.has(a) ? { status: 'ready', sessionId: `s-${a}`, cwd: '' } : null),
-    agentNow: (_p: string, a: string) => (state.running.has(a) ? { status: state.busy.has(a) ? 'working' : 'ready', pending: false, backgroundTasks: 0 } : null),
+    liveFor: (_p: string, a: string) => (state.running.has(a) ? { status: state.status.get(a) ?? (state.busy.has(a) ? 'working' : 'ready'), sessionId: `s-${a}`, cwd: '', ...(state.hooksMissing.has(a) ? { hooksMissing: true } : {}) } : null),
+    agentNow: (_p: string, a: string) => (state.running.has(a) ? { status: state.status.get(a) ?? (state.busy.has(a) ? 'working' : 'ready'), pending: false, backgroundTasks: state.background.has(a) ? 1 : 0 } : null),
     // As the real one: its `allowed` just before it spawns, after its own awaits (HI-2046).
     start: async (_p: string, o: { agentId: string; prompt?: string; purpose?: string; allowed?: () => void }) => {
       await state.beforeSpawn?.()
@@ -81,7 +90,7 @@ let env: Env | null = null
 afterEach(() => {
   env?.close()
   env = null
-  Object.assign(state, { enforced: true, wf: null, lanes: [], busy: new Set(), running: new Set(), deliveries: [], next: [], calls: [], beforeSpawn: null })
+  Object.assign(state, { enforced: true, wf: null, lanes: [], busy: new Set(), running: new Set(), status: new Map(), background: new Set(), runs: new Set(), pending: new Set(), hooksMissing: new Set(), deliveries: [], next: [], calls: [], beforeSpawn: null })
 })
 
 const E1 = agentActor('E1')
@@ -789,5 +798,114 @@ describe("a pool lane's design step (HI-2310): given out by the pool, its answer
     const b = e.wf.createCard({ title: 'No reviewer' })
     moved(await e.wf.start(b.key, B1))
     refusedBy(await e.wf.loopStep(b.key, B1, 'design', 'The plan', { waitMinutes: 30, reviewer: async () => null }), 'loop.noReviewer')
+  })
+})
+
+describe('a reviewer watching a card is free for the pool (HI-2333): only what it reviews, checks or runs holds it', { timeout: 60_000 }, () => {
+  /** One reviewer, R1, as in the cli project's pool that stalled. */
+  const ONE = AGENTS.filter((a) => a.id !== 'R2')
+  const reviewer = (e: Env, id: number) => async () => designReviewer(e.store.facts(id), () => true)
+  const poolDesign = async (e: Env, c: { id: number; key: string }) => {
+    const posted = await e.wf.loopStep(c.key, B1, 'design', 'The plan', { waitMinutes: 30, reviewer: reviewer(e, c.id) })
+    moved(posted)
+    return (posted as { data?: Record<string, unknown> }).data?.design as string
+  }
+  const pooled = (e: Env, title: string, builder = 'B1') => {
+    const c = e.wf.createCard({ title })
+    lane(e, `L-${c.id}`, [c.id], builder, null)
+    return c
+  }
+
+  it('a watching reviewer is given a submission and told once, typed at its prompt', async () => {
+    const e = (env = setup({ ...optionsFor(1, 'pool', 'project'), platform: 'git' }, { autoRun: false }))
+    state.wf = e.wf
+    state.running = new Set(['R1'])
+    state.status.set('R1', 'watching')
+    const a = pooled(e, 'Watched')
+    await submitted(e, a)
+    await pass(e, ONE)
+    await pass(e, ONE)
+    expect(assignedTo(e, a.id)).toEqual(['R1'])
+    expect(state.calls).toEqual(['typed to R1'])
+    expect(state.deliveries.map((d) => d.body)).toEqual([expect.stringMatching(/you review it from the pool/)])
+  })
+
+  it('a watching reviewer that answered a design with gaps is given its revision, and told of it once', async () => {
+    const e = (env = setup({ ...optionsFor(1, 'pool', 'project'), platform: 'git' }, { autoRun: false }))
+    state.wf = e.wf
+    state.running = new Set(['R1'])
+    const a = pooled(e, 'Designed')
+    moved(await e.wf.start(a.key, B1))
+    const first = await poolDesign(e, a)
+    await pass(e, ONE)
+    expect(assignedTo(e, a.id)).toEqual(['R1'])
+    // It watches the card (its loop's watch), then answers: still watching.
+    state.status.set('R1', 'watching')
+    moved(await e.wf.loopStep(a.key, R1, 'gaps', 'More, please', { waitMinutes: 30, design: first, reviewer: reviewer(e, a.id) }))
+    const second = await poolDesign(e, a)
+    await pass(e, ONE)
+    await pass(e, ONE)
+    expect(assignedTo(e, a.id)).toEqual(['R1', 'R1'])
+    expect(designReviewer(e.store.facts(a.id), () => true)).toBe('R1')
+    expect(state.calls).toEqual(['typed to R1', 'typed to R1'])
+    expect(state.deliveries.at(-1)?.body).toContain(second)
+    // Its answer to the revision is taken (CL-8's s23 was refused: nobody had been given it).
+    moved(await e.wf.loopStep(a.key, R1, 'ok', 'Fine', { waitMinutes: 30, design: second, reviewer: reviewer(e, a.id) }))
+  })
+
+  it("a watching reviewer given another card's submission or open design isn't given a second", async () => {
+    const e = (env = setup({ ...optionsFor(1, 'pool', 'project'), platform: 'git' }, { autoRun: false }))
+    state.wf = e.wf
+    state.running = new Set(['R1'])
+    state.status.set('R1', 'watching')
+    const [a, b] = [pooled(e, 'First'), pooled(e, 'Second', 'B2')]
+    await submitted(e, a)
+    await pass(e, ONE)
+    await submitted(e, b, B2)
+    await pass(e, ONE)
+    expect([assignedTo(e, a.id), assignedTo(e, b.id)]).toEqual([['R1'], []])
+    // Its verdict frees it: the second is its now.
+    moved(await e.wf.verdict(a.key, R1, { pass: true, comment: 'ok', startReview: true }))
+    await pass(e, ONE)
+    expect(assignedTo(e, b.id)).toEqual(['R1'])
+    moved(await e.wf.verdict(b.key, R1, { pass: true, comment: 'ok', startReview: true }))
+    // An open design given to it holds it too.
+    const d = pooled(e, 'Design')
+    moved(await e.wf.start(d.key, B1))
+    await poolDesign(e, d)
+    await pass(e, ONE)
+    expect(assignedTo(e, d.id)).toEqual(['R1'])
+    const c = pooled(e, 'Third', 'B2')
+    await submitted(e, c, B2)
+    await pass(e, ONE)
+    expect(assignedTo(e, c.id)).toEqual([])
+  })
+
+  it.each([
+    ['in a turn', () => state.status.set('R1', 'working')],
+    ['waiting for the user', () => state.status.set('R1', 'waiting')],
+    ['with background work its status says', () => state.status.set('R1', 'background')],
+    ['starting', () => state.status.set('R1', 'starting')],
+    ['at a sign-in', () => state.status.set('R1', 'signin')],
+    ['watching, with a line typed or queued for it', () => (state.status.set('R1', 'watching'), state.pending.add('R1'))],
+    ['watching, with background tasks', () => (state.status.set('R1', 'watching'), state.background.add('R1'))],
+    ['watching, with a run going', () => (state.status.set('R1', 'watching'), state.runs.add('R1'))],
+    // The delivery would refuse it a line (readyFor): never given, so no pass tries again at once (HI-2333's e2e loop).
+    ['watching, its hooks not arriving', () => (state.status.set('R1', 'watching'), state.hooksMissing.add('R1'))]
+  ])('a reviewer %s is still not free: given the card once that ends', async (_what, hold) => {
+    const e = (env = setup({ ...optionsFor(1, 'pool', 'project'), platform: 'git' }, { autoRun: false }))
+    state.wf = e.wf
+    state.running = new Set(['R1'])
+    hold()
+    const a = pooled(e, 'Held')
+    await submitted(e, a)
+    await pass(e, ONE)
+    expect(assignedTo(e, a.id)).toEqual([])
+    expect(state.calls).toEqual([])
+    Object.assign(state, { status: new Map([['R1', 'watching']]), pending: new Set(), background: new Set(), runs: new Set(), hooksMissing: new Set() })
+    await pass(e, ONE)
+    await pass(e, ONE)
+    expect(assignedTo(e, a.id)).toEqual(['R1'])
+    expect(state.calls).toEqual(['typed to R1'])
   })
 })
