@@ -74,15 +74,24 @@ function useTitleFit(bar: RefObject<HTMLDivElement | null>, menus: RefObject<HTM
       const right = a.offsetLeft - TITLE_GAP
       const room = right - left
       if (room < TITLE_MIN) return setStyle({ visibility: 'hidden' })
-      // scrollWidth is the whole title's width, however narrow it is shown.
-      const width = Math.min(t.scrollWidth, room)
+      // The whole title's width, however narrow it is shown, rounded up: scrollWidth rounds a fractional width
+      // (197.09 px) down, and the ellipsis then took its last letters with room to spare (HI-2319).
+      const range = document.createRange()
+      range.selectNodeContents(t)
+      const width = Math.min(Math.ceil(range.getBoundingClientRect().width), room)
       const centred = (b.clientWidth - width) / 2
       setStyle({ left: Math.min(Math.max(centred, left), right - width), maxWidth: width })
     }
     fit()
     const ro = new ResizeObserver(fit)
     for (const el of [b, m, a]) ro.observe(el)
-    return () => ro.disconnect()
+    // Measured again once the fonts have loaded, as a fallback font's width isn't the title's.
+    let gone = false
+    void document.fonts?.ready.then(() => !gone && fit())
+    return () => {
+      gone = true
+      ro.disconnect()
+    }
   }, [bar, menus, end, titleEl, title])
   return style
 }
