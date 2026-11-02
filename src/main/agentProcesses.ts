@@ -5,7 +5,7 @@ import { emit, toast } from './events'
 import { readJson, writeJsonAtomic } from './fsutil'
 import { createLogger, userText } from './logger'
 import { JobHost, MAX_LISTED, type HostFailure, type JobList } from './processSupervisor'
-import { brokersOnly } from './systemBrokers'
+import { brokersOnly, mayBeBroker } from './systemBrokers'
 import { hiveError } from './hiveError'
 import { processLabel, progressRunTitle, type AgentLeftovers, type AgentProcess } from '../shared/agentProcesses'
 import type { ActivityProcess } from '../shared/activity'
@@ -329,7 +329,8 @@ export function keeperStillBound(run: string, helper: string): boolean {
 }
 
 /** A keeper's state of a run, as the next Hive reads it (HI-2055). */
-export type KeeperState = { state: 'ended'; helper: string } | { state: 'live'; helper: string; members: AgentProcess[] }
+/** `more` (HI-2309, HR1's round 3): members its total counts beyond those it describes (none listed may be all of them). */
+export type KeeperState = { state: 'ended'; helper: string } | { state: 'live'; helper: string; members: AgentProcess[]; more: number }
 
 const KEEPER_FILE = /^keeper-([A-Za-z0-9_-]{1,64})\.json$/
 const MAX_KEEPER_BYTES = 64 * 1024
@@ -367,7 +368,7 @@ export async function keeperState(run: string, hive: string): Promise<KeeperStat
   }
   if (total < members.length) return null
   // A console window's host ends with the process it serves: counted (the job isn't empty), never listed (listJob's way).
-  return { state: 'live', helper, members: members.filter((p) => !/^(conhost|openconsole)(\.exe)?$/i.test(p.name)) }
+  return { state: 'live', helper, members: members.filter((p) => !/^(conhost|openconsole)(\.exe)?$/i.test(p.name)), more: total - members.length }
 }
 
 /** A run's writer settled (HI-2055): its keeper's state and its binding go. */
@@ -625,7 +626,7 @@ async function lookAt(runId: string, launch: Launch): Promise<AgentLeftovers | n
     list = await listJob(runId)
   }
   // Empty only when its whole membership is: members not described (more) are still members, left as leftovers.
-  if (!list || emptyJob(list) || (await onlyIdleBrokers(launch, list))) {
+  if (!list || (await nothingHolds(list.processes, list.more, launch.agentName))) {
     void host.request('forget', runId)
     settleRun(runId, list ? 'ended' : 'unknown')
     return null
@@ -662,11 +663,9 @@ export function orphanedCli(processes: readonly AgentProcess[], gate: number): A
   return out
 }
 
-async function listJob(runId: string, withCommands = false): Promise<{ processes: ActivityProcess[]; more: number; adopted: number; paths: ReadonlyMap<number, string> } | null> {
+async function listJob(runId: string, withCommands = false): Promise<{ processes: ActivityProcess[]; more: number; adopted: number } | null> {
   const r = (await host.request('list', runId)) as JobList | string | null
   if (!r || typeof r !== 'object' || !Array.isArray(r.processes)) return null
-  // Each listed process's executable (HI-2304: a system broker is known by it), never shown or kept.
-  const paths = new Map(r.processes.map((p) => [p.pid, testBrokerPath(p.cmd) ?? p.path ?? '']).filter((e): e is [number, string] => !!e[1]))
   const processes = r.processes
     // A console window's host belongs to a process of the job and ends with it: not one to list.
     .filter((p) => !/^(conhost|openconsole)\.exe$/i.test(p.name))
@@ -679,20 +678,47 @@ async function listJob(runId: string, withCommands = false): Promise<{ processes
     .sort((a, b) => a.pid - b.pid)
     .slice(0, MAX_LISTED)
   const hosts = r.processes.length - r.processes.filter((p) => !/^(conhost|openconsole)\.exe$/i.test(p.name)).length
-  return { processes, more: Math.max(0, r.total - hosts - processes.length), adopted: Number(r.adopted) || 0, paths }
+  return { processes, more: Math.max(0, r.total - hosts - processes.length), adopted: Number(r.adopted) || 0 }
 }
 
 /**
- * Whether what a launch's job still has is only Windows' own brokers, none of whose Sandboxes (or the like) runs now
- * (HI-2304, systemBrokers.ts): the launch then counts as ended, its writer released, and the brokers are let go, never
- * ended. Logged once, naming them. Anything else in it, a path not given, or a look at what runs that fails: false.
+ * The one rule for whether what a run still has running holds its slot (HI-2304, HI-2309: Darren's decision, one rule in
+ * one place, whichever path found the processes): nothing does, and neither do Windows' own brokers while none of what
+ * they serve runs (systemBrokers.ts). True when `processes` (all of them, `more` none beyond) is empty, or each still
+ * runs as the same process (id and start time) with a known broker's executable, none of their active processes
+ * running on the machine. Each executable is asked of the helper by identity, never taken from a name or a command
+ * line. Fails closed: a process without a start time, one gone meanwhile (the caller's next look decides), a path
+ * not read, anything else, or the helper not answering. Ends nothing. `who`: for the log, when brokers are set aside
+ * (null: not logged, for a look that doesn't settle anything).
  */
-async function onlyIdleBrokers(launch: Launch, list: { processes: readonly ActivityProcess[]; more: number; paths: ReadonlyMap<number, string> }): Promise<boolean> {
-  const withPaths = list.processes.map((p) => ({ ...p, path: list.paths.get(p.pid) }))
-  const brokers = await brokersOnly(withPaths, list.more, runningNamed).catch(() => null)
+export async function nothingHolds(processes: readonly AgentProcess[], more: number, who: string | null): Promise<boolean> {
+  if (more > 0) return false
+  if (!processes.length) return true
+  if (processes.some((p) => !p.created)) return false
+  // Named as no broker is (most leftovers): nothing to ask. The name only rules out; the path decides.
+  const test = testBrokers()
+  if (!processes.every((p) => mayBeBroker(p.name) || test?.has(p.pid))) return false
+  const paths = await pathsOf(processes)
+  if (!paths) return false
+  const found = processes.map((p) => ({ ...p, path: paths.get(identity(p)) }))
+  if (found.some((p) => p.path === undefined)) return false
+  const brokers = await brokersOnly(found, 0, runningNamed).catch(() => null)
   if (!brokers) return false
-  log.info(`${userText(launch.agentName)}'s run left only ${[...new Set(brokers.map((b) => b.broker.what))].join(', ')} running (${userText(brokers.map((b) => b.process.label).join('; '))}), with none of what it serves running: not its work, so its run counts as ended (the process is left running, no longer followed)`)
+  if (who !== null) log.info(`${userText(who)}'s run left only ${[...new Set(brokers.map((b) => b.broker.what))].join(', ')} running (${userText(brokers.map((b) => b.process.label).join('; '))}), with none of what it serves running: not its work, so it holds nothing (the process is left running)`)
   return true
+}
+
+/** The executables of processes still running as the same processes (HI-2309, the helper's "paths"): identity → path, "" unread. */
+async function pathsOf(processes: readonly AgentProcess[]): Promise<Map<string, string> | null> {
+  const r = await host.request('paths', identities([...processes]))
+  if (!r || typeof r !== 'object' || Array.isArray(r)) return null
+  const out = new Map<string, string>()
+  const test = testBrokers()
+  for (const [id, path] of Object.entries(r as Record<string, unknown>)) {
+    if (typeof path !== 'string') return null
+    out.set(id, test?.has(Number(id.split(':')[0])) ? TEST_BROKER_PATH() : path)
+  }
+  return out
 }
 
 /** Which of the executable names (lower case) run on the machine now, or null when it can't be told (HI-2304). */
@@ -700,27 +726,27 @@ async function runningNamed(names: readonly string[]): Promise<readonly string[]
   const r = await host.request('running', names.join(','))
   const now = Array.isArray(r) && r.every((x) => typeof x === 'string') ? (r as string[]) : null
   // A test copy's own names stand in only for a real answer (HR1's round 1): the request itself is always made.
-  const test = now ? testActive() : null
+  const test = now && testBrokers() ? testLines(process.env.HIVE_TEST_SYSTEM_BROKER_ACTIVE).map((l) => l.toLowerCase()) : null
   return test !== null ? names.filter((n) => test.includes(n)) : now
 }
 
 /**
- * Test copies (unpackaged): a process whose command line has HIVE_TEST_SYSTEM_BROKER in it is taken as Windows Sandbox's
- * broker (no test can put one in WindowsApps), and HIVE_TEST_SYSTEM_BROKER_ACTIVE (a file) holds the names running now,
- * one per line: while it is missing, none is.
+ * Test copies (unpackaged): HIVE_TEST_SYSTEM_BROKER is a file of process ids, one per line, each taken as Windows
+ * Sandbox's broker (no test can put one in WindowsApps), its path asked of the helper all the same; and
+ * HIVE_TEST_SYSTEM_BROKER_ACTIVE a file of the executable names running now, one per line (while it is missing, none).
  */
-function testBrokerPath(cmd: string | null | undefined): string | undefined {
-  const mark = app.isPackaged ? '' : (process.env.HIVE_TEST_SYSTEM_BROKER ?? '')
-  return mark && cmd?.includes(mark) ? join(process.env.ProgramW6432 || process.env.ProgramFiles || 'C:\\Program Files', 'WindowsApps', 'MicrosoftWindows.WindowsSandbox_0.0.0.0_x64__test', 'WindowsSandboxServer.exe') : undefined
-}
-function testActive(): string[] | null {
+function testBrokers(): Set<number> | null {
   if (app.isPackaged || !process.env.HIVE_TEST_SYSTEM_BROKER) return null
+  return new Set(testLines(process.env.HIVE_TEST_SYSTEM_BROKER).map(Number).filter((n) => n > 0))
+}
+const testLines = (file: string | undefined): string[] => {
   try {
-    return readFileSync(process.env.HIVE_TEST_SYSTEM_BROKER_ACTIVE ?? '', 'utf8').split(/\r?\n/).map((l) => l.trim().toLowerCase()).filter(Boolean)
+    return readFileSync(file ?? '', 'utf8').split(/\r?\n/).map((l) => l.trim()).filter(Boolean)
   } catch {
     return []
   }
 }
+const TEST_BROKER_PATH = (): string => join(process.env.ProgramW6432 || process.env.ProgramFiles || 'C:\\Program Files', 'WindowsApps', 'MicrosoftWindows.WindowsSandbox_0.0.0.0_x64__test', 'WindowsSandboxServer.exe')
 
 /** Keeps the newest launches' leftovers within the bounds, forgetting (not ending) the oldest. */
 function bound(launch: Launch): void {
@@ -743,10 +769,10 @@ function startPolling(): void {
 async function refresh(): Promise<void> {
   const changed = new Set<string>()
   for (const l of [...left.values()]) {
-    const list: { processes: AgentProcess[]; more: number; paths?: ReadonlyMap<number, string> } | null = l.restored ? await stillRunning(l.processes) : await listJob(l.runId)
+    const list = l.restored ? await stillRunning(l.processes) : await listJob(l.runId)
     if (!left.has(l.runId)) continue
-    // Only Windows' own brokers left, idle (HI-2304): ended as an empty job is (a restored launch has no paths: kept).
-    if (emptyJob(list) || (!l.restored && list?.paths && (await onlyIdleBrokers(l, { ...list, paths: list.paths })) && left.has(l.runId))) {
+    // Nothing left that holds its slot (HI-2309's one rule: none, or only idle brokers), restored from before too.
+    if (list && (await nothingHolds(list.processes, list.more, l.agentName)) && left.has(l.runId)) {
       left.delete(l.runId)
       if (!l.restored) void host.request('forget', l.runId)
       if (!l.restored) settleRun(l.runId, 'ended')
@@ -1186,6 +1212,14 @@ export async function recordEndedLaunches(): Promise<void> {
   const tracked = (run: string): boolean => host.instance === helper && (running.has(run) || looking.has(run) || confirming.has(run)) && !outcomes.has(run)
   // No helper as it begins: nothing can be seen empty.
   if (helper !== null) {
+    // Launches whose leftovers are listed (HI-2309): looked at once, not waited for, since what they left may run on
+    // for good. Only Windows' own idle brokers left counts as ended, as the leftovers' own look would have it.
+    for (const l of [...left.values()]) {
+      if (l.restored || outcomes.has(l.runId) || host.instance !== helper) continue
+      const list = await listJob(l.runId).catch(() => null)
+      if (host.instance !== helper || !left.has(l.runId) || outcomes.has(l.runId)) continue
+      if (list && (await nothingHolds(list.processes, list.more, l.agentName))) ended.push(l.runId)
+    }
     scan: while (pending.size) {
       for (const run of [...pending]) {
         if (!tracked(run)) {
@@ -1197,7 +1231,8 @@ export async function recordEndedLaunches(): Promise<void> {
         }
         const list = await listJob(run).catch(() => null)
         if (host.instance !== helper) break scan
-        if (!emptyJob(list) || !tracked(run)) continue
+        // HI-2309's one rule: nothing left that holds its slot (none, or only idle brokers).
+        if (!list || !(await nothingHolds(list.processes, list.more, (running.get(run) ?? looking.get(run))?.agentName ?? run)) || !tracked(run)) continue
         pending.delete(run)
         ended.push(run)
       }
@@ -1352,6 +1387,8 @@ async function restore(): Promise<AgentLeftovers[]> {
     const processes = l.processes.filter((p) => alive.has(identity(p))).map((p) => ({ pid: p.pid, name: String(p.name ?? ''), label: String(p.label ?? p.name ?? ''), created: String(p.created) }))
     const runId = l.runId.startsWith('restored:') ? l.runId : `restored:${l.runId}`
     if (!processes.length || left.has(runId)) continue
+    // HI-2309's one rule: what holds nothing (only Windows' own idle brokers) isn't the agent's to list.
+    if (await nothingHolds(processes, 0, l.agentName)) continue
     const launch = { runId, projectPath: l.projectPath, agentId: l.agentId, agentName: l.agentName }
     left.set(runId, { ...launch, processes, more: 0, since: l.since, restored: true })
     bound(launch)

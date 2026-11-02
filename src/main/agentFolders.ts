@@ -14,14 +14,17 @@ import { samePlace } from './fsutil'
 import { createLogger, userText } from './logger'
 import * as G from './platform/git'
 import { isUnknown } from './platform/types'
-import { endedEarlier, endProcessesExactly, forgetEarlierRun, forgetKeeperRun, keepRunEnded, keeperState, keeperStillBound, leftoversOfRun, onRunOutcome, runOutcome, runTookWriter, runWriterReleased, setHiveIdentity, settleLeftovers, stillRunningOf, type RunOutcome } from './agentProcesses'
+import { endedEarlier, endProcessesExactly, forgetEarlierRun, forgetKeeperRun, keepRunEnded, keeperState, nothingHolds, keeperStillBound, leftoversOfRun, onRunOutcome, runOutcome, runTookWriter, runWriterReleased, setHiveIdentity, settleLeftovers, stillRunningOf, type RunOutcome } from './agentProcesses'
 import { hiveError } from './hiveError'
-import { msg } from '../shared/i18n'
+import { fmt, msg, tr } from '../shared/i18n'
+import { toast } from './events'
+import { projectAgents } from '../shared/defaults'
 import { SlotStore, type SlotConn } from './slots'
 import { workspace, workspaceOf, type WorkspaceService } from './workspace'
 import { agentPlaces, launchPlace, legacyWorktree, resumeFolder, resumeHold, slotAt, type AgentPlace, type FolderAgent, type FolderFacts, type FolderLease, type FolderPurpose, type FolderSession, type FolderSlot, type ResumeHold } from '../shared/agentFolders'
 import { agentWorkflowRole } from '../shared/workflow/roles'
 import type { AgentDef, HeldWriter } from '../shared/types'
+import type { AgentProcess } from '../shared/agentProcesses'
 
 const log = createLogger('sessions')
 
@@ -481,13 +484,16 @@ export async function heldWriter(projectPath: string, slot: string): Promise<Hel
   const self = w.pid === me.pid && w.started === me.started
   const alive = self ? true : await writerHost.alive(w.pid, w.started)
   const left = runLeftovers(w.run)
+  const processes: HeldWriter['processes'] = left ? { list: left.processes, more: left.more, from: 'leftovers' } : !self && alive === false ? await restartList(projectPath, w) : null
   return {
     slot,
     agent: w.agent,
     run: w.run,
     hive: { pid: w.pid, self, alive },
     live: self && writerHost.live.has(w.run),
-    processes: left ? { list: left.processes, more: left.more, from: 'leftovers' } : !self && alive === false ? await restartList(projectPath, w) : null
+    processes,
+    // Only Windows' own idle brokers listed (HI-2309, the one rule): Release Slot… says releasing is safe.
+    ...(processes?.list.length && (await nothingHolds(processes.list, processes.more, null)) ? { idleBrokers: true } : {})
   }
 }
 
@@ -519,7 +525,7 @@ const runLeftovers = (run: string): ReturnType<typeof leftoversOfRun> => leftove
  * A list of its processes taken earlier (the last run's marker) never is: what they started since isn't in it (HR2's
  * round 1). Nothing kept, or its Hive still running or not known to have gone: it stays held for the user's Release Slot….
  */
-export async function goneWriterSettles(projectPath: string, w: { run: string; agent: string; pid: number; started: number }): Promise<GoneEvidence | false> {
+export async function goneWriterSettles(projectPath: string, w: { run: string; agent: string; pid: number; started: number }, slot?: string): Promise<GoneEvidence | false> {
   const me = await writerHost.self()
   if ((w.pid === me.pid && w.started === me.started) || (await writerHost.alive(w.pid, w.started)) !== false) return false
   if (await endedEarlier(w.run)) {
@@ -527,9 +533,39 @@ export async function goneWriterSettles(projectPath: string, w: { run: string; a
     return Object.freeze({ run: w.run, helper: null })
   }
   const kept = await keeperState(w.run, `${w.pid}:${w.started}`)
+  // Its keeper's "live" is a snapshot, never proof (HI-2309, Darren's decision: the keeper's fresh answer is HI-2313):
+  // held, and when what it lists is only Windows' own idle brokers, the user is told once that releasing it is safe.
+  if (kept?.state === 'live' && slot) await tellIdleBrokerHold(projectPath, slot, w, kept.members, kept.more)
   if (kept?.state !== 'ended') return false
   log.info(`The slot writer ${w.run} in ${userText(basename(projectPath))} settled: ${userText(w.agent)}'s ended run left nothing running (its Hive, process ${w.pid}, gone; seen by its helper ${kept.helper})`)
   return Object.freeze({ run: w.run, helper: kept.helper })
+}
+
+/** Runs whose held slot the user was told only an idle broker holds (HI-2309): once each, in this Hive's run. */
+const toldIdleBroker = new Set<string>()
+
+/**
+ * A gone Hive's writer held by its keeper's "live" processes that are all Windows' own idle brokers (HI-2309: the one
+ * rule, nothingHolds, on those still running): held all the same (fail closed; the keeper's "live" is a snapshot), and
+ * the user told once, naming them, that releasing it is safe, with Release Slot…. Nothing is ended.
+ */
+async function tellIdleBrokerHold(projectPath: string, slot: string, w: { run: string; agent: string }, members: readonly AgentProcess[], more: number): Promise<void> {
+  // A receipt that describes only some of its members (HR1's round 3): what it leaves out may write, so never "safe".
+  if (toldIdleBroker.has(w.run) || !members.length || more > 0) return
+  const running = await stillRunningOf(members)
+  if (!running?.length || !(await nothingHolds(running, 0, null))) return
+  toldIdleBroker.add(w.run)
+  const cfg = await workspaceOf(projectPath).projectConfig(projectPath).catch(() => null)
+  const agent = (cfg ? projectAgents(cfg) : []).find((a) => a.id === w.agent)?.name ?? w.agent
+  const names = fmt.list(running.map((p) => p.name.replace(/\.exe$/i, '')), 'unit')
+  log.info(`${userText(slot)} in ${userText(basename(projectPath))} stays held by ${userText(names)} (only Windows' own idle brokers), left by ${userText(agent)}'s run in a Hive that has gone: the user is told releasing it is safe`)
+  toast(
+    'info',
+    tr(msg({ id: 'slots.idleBroker.title', defaultMessage: '{slot} is held by {names}', description: "A notice's title (HI-2309): a slot (a worktree Hive lends to a card, {slot} such as slot-a) stays held after Hive restarted, only by Windows' own idle Windows Sandbox broker ({names}: its process names, such as WindowsSandboxServer)." }), { slot, names }),
+    tr(msg({ id: 'slots.idleBroker.body', defaultMessage: "{names} is Windows' idle Sandbox broker, left by {agent}'s last session in a Hive that has since closed. No Sandbox is running, so releasing the slot is safe: Release Slot… frees it for other work, and the broker is left running.", description: "The notice (HI-2309) that a slot stays held only by Windows' idle Windows Sandbox broker after Hive restarted: Hive doesn't release it by itself, and asks the user. {names}: the broker's process names (WindowsSandboxServer); {agent}: the agent whose session left it. Release Slot… is the button's name." }), { names, agent }),
+    [{ label: tr(msg({ id: 'slots.idleBroker.release', defaultMessage: 'Release Slot…', description: "The notice's button (HI-2309): opens the question that frees a slot held only by Windows' idle Sandbox broker." })), command: 'slot.releaseHeld', args: [projectPath, slot] }],
+    projectPath
+  )
 }
 
 /**
@@ -598,7 +634,8 @@ async function restartList(projectPath: string, w: { run: string; agent: string;
   const keeper = await keeperState(w.run, `${w.pid}:${w.started}`)
   if (keeper?.state === 'live') {
     const running = await stillRunningOf(keeper.members)
-    return running?.length ? { list: running, more: 0, from: 'restart' } : null
+    // Its members not described counted (HR1's round 3 on HI-2309): never listed as all there is.
+    return running?.length ? { list: running, more: keeper.more, from: 'restart' } : null
   }
   const { lastUnexpectedClose } = await import('./lastRun')
   const kept = (lastUnexpectedClose()?.processes ?? []).filter((l) => l.runId === w.run && l.agentId === w.agent && samePlace(l.projectPath, projectPath)).flatMap((l) => l.processes)

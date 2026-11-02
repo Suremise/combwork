@@ -442,9 +442,10 @@ $r | ConvertTo-Json -Compress
     expect(JSON.parse(String(out).trim().split(/\r?\n/).at(-1)!)).toEqual({ inOther: true, added: 'the process has exited', taken: true, followed: true, inJob: false, listed: true, ended: true })
   }, 120000)
 
-  // HI-2304: a job's listing gives each process's executable path (a system broker is known by it), and "running" says
-  // which executable names run on the machine (whether a Windows Sandbox does), from a whole snapshot.
-  it("lists each process's executable path, and which executable names run now (HI-2304)", async () => {
+  // HI-2309: "paths" gives each process's executable by id and start time (a system broker is known by it): one whose
+  // id names another process by now, or none, is left out. HI-2304: "running" says which executable names run on the
+  // machine (whether a Windows Sandbox does), from a whole snapshot.
+  it("gives processes' executables by identity, and which executable names run now (HI-2304, HI-2309)", async () => {
     const { HOST_SOURCE } = await import('../src/main/agentProcesses')
     const src = join(dir, 'host-running.cs')
     writeFileSync(src, HOST_SOURCE)
@@ -458,7 +459,9 @@ $s = [System.Diagnostics.ProcessStartInfo]::new($node, '-e "setTimeout(() => {},
 $a = [System.Diagnostics.Process]::Start($s)
 $r = [ordered]@{}
 $r.added = [HiveJobs]::Add('t', $a.Id)
-$r.listed = [HiveJobs]::Describe('t', 10)
+$c = [HiveJobs]::CreatedOf($a.Id)
+$r.id = "$($a.Id):$c"
+$r.paths = [HiveJobs]::Paths("$($a.Id):$c,$($a.Id):1,99999991:$c")
 $r.running = [HiveJobs]::Running('NODE.exe,hive-no-such-process-2304.exe')
 $r.ended = [HiveJobs]::Kill('t') -and $a.WaitForExit(10000)
 if (-not $a.HasExited) { Stop-Process -Id $a.Id -Force }
@@ -466,12 +469,13 @@ $r | ConvertTo-Json -Compress
 `
     )
     const out = execFileSync(join(process.env.SystemRoot ?? 'C:\\Windows', 'System32', 'WindowsPowerShell', 'v1.0', 'powershell.exe'), ['-NoProfile', '-NonInteractive', '-ExecutionPolicy', 'Bypass', '-File', probe, src, process.execPath], { windowsHide: true, timeout: 120000 })
-    const r = JSON.parse(String(out).trim().split(/\r?\n/).at(-1)!) as { added: string; listed: string; running: string; ended: boolean }
+    const r = JSON.parse(String(out).trim().split(/\r?\n/).at(-1)!) as { added: string; id: string; paths: string; running: string; ended: boolean }
     expect(r.added).toBe('ok')
     expect(r.ended).toBe(true)
-    const listed = JSON.parse(r.listed) as { processes: { name: string; path: string }[] }
-    // Its console host (conhost) is in the job too; main leaves it out of what it lists.
-    expect(listed.processes.find((p) => p.name.toLowerCase() === 'node.exe')?.path.toLowerCase()).toBe(process.execPath.toLowerCase())
+    // Only the process as it is: another start time on its id, or an id no process has, left out.
+    const paths = JSON.parse(r.paths) as Record<string, string>
+    expect(Object.keys(paths)).toEqual([r.id])
+    expect(paths[r.id].toLowerCase()).toBe(process.execPath.toLowerCase())
     expect(JSON.parse(r.running)).toEqual(['node.exe'])
   }, 120000)
 

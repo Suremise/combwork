@@ -4004,25 +4004,38 @@ Whether a conversation may resume there is its **hold** (none: it may):
     - This replaces recording each process as it starts (the card's first idea): a record can't hold what a process
       started after it through one that has since exited; the job's own holder sees it.
   - **Windows' own brokers don't hold a slot** (HI-2304: MB1's connection switch never resumed, its slot held by
-    `WindowsSandboxServer.exe`, which the windows-sandbox server's Sandbox had started and which outlived it). A
-    launch's job whose remaining processes are all known system brokers (`systemBrokers.ts`), none described beyond
-    them, counts as ended, so its writer is released, while none of what they serve runs on the whole machine. The
-    job is let go and the broker is never ended. The decision (a known list plus a confirmed "nothing it serves is
-    running"):
-    - A broker is known only by its executable's full path, which the helper's listing gives (WMI `ExecutablePath`),
-      directly in its package's folder in `%ProgramFiles%\WindowsApps`. Only Windows writes there, so an agent can't
-      put a look-alike there.
+    `WindowsSandboxServer.exe`, which the windows-sandbox server's Sandbox had started and which outlived it).
+    **One rule, in one place** (HI-2309, Darren's decision): `agentProcesses.nothingHolds(processes)`, true when nothing
+    is left, or when every process left is a known system broker (`systemBrokers.ts`) with none of what it serves
+    running on the whole machine. Every path that decides from what Hive sees now whether a run's processes have ended
+    uses it:
+    - the CLI's exit and each 10 s look at the leftovers (the run settles `ended`, so its writer is released);
+    - restored leftovers (#614): not listed at the start, and dropped by a later look;
+    - the quit's record (`recordEndedLaunches`, HI-1886), which now also looks once at launches whose leftovers are
+      listed;
+    - not a gone Hive's keeper (HI-2055; Darren's decision, 1 Nov ~23:25, after HR1's rounds 1 and 2): its `live`
+      receipt is a snapshot, never proof, since a writer may have joined after it while a later sweep or write of its
+      failed. Its slot stays held, and when the processes it lists that still run are only idle brokers by the rule, the
+      user is told once (a notice naming them, *slot-a is held by WindowsSandboxServer*: no Sandbox is running, so
+      releasing it is safe, with **Release Slot…**). Release Slot…'s question says the same (`HeldWriter.idleBrokers`)
+      and leaves "End these processes first" off. A receipt that describes only some of its members (its total above them)
+      is never called safe (`KeeperState.more`, HR1's round 3). The keeper's own `ended` is unchanged; its current answer is HI-2313,
+      after 1.0. Members are named without `.exe` (`ProcessName`), so the broker's name filter takes either form.
+    The broker is never ended, and a job it is the last of is let go. The decision (a known list plus a confirmed
+    "nothing it serves is running"):
+    - A broker is known only by its executable's full path, asked of the helper by id and start time (`paths`:
+      `QueryFullProcessImageNameW`), directly in its package's folder in `%ProgramFiles%\WindowsApps`. Only Windows
+      writes there, so an agent can't put a look-alike there. Its file name only rules others out, before anything is
+      asked.
     - It counts as the agent's while any of its `active` processes runs, because a Sandbox's mapped folders, which can
       be in the slot, can be written from inside it. The Sandbox's are `WindowsSandbox.exe`, `WindowsSandboxClient.exe`,
       `WindowsSandboxRemoteSession.exe` and `vmmemWindowsSandbox`, checked from one whole process snapshot (the
       helper's `running`).
-    - It fails closed: no path, a path elsewhere, another process beside it, or a snapshot not read whole, and the
-      slot stays held as before.
-    - It is checked at the CLI's exit and at each 10 s look at the leftovers.
+    - It fails closed: no start time, a process gone or whose path can't be read, a path elsewhere, another process
+      beside it, a member not described, or a snapshot not read whole, and the slot stays held as before.
     - Not a check of working folders or open handles: reading another process's handles needs rights that are often
       refused, and a Sandbox's writes come through Hyper-V's share, not through the broker's handles.
     - The list is code, not an Advanced setting, so a typo can't make a writer not one.
-    - A restored launch (no paths) and a gone Hive's keeper (HI-2055) still hold, for Release Slot….
   - **A held slot is waited on, not retried** (HI-2304: the lane resumed MB1 every ~20 s, each try spending 15 s and a
     cancelled delivery).
     - A placement whose builder isn't running first asks what holds its slot (`slotHeldWords`: a run of this Hive's,

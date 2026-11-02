@@ -1014,7 +1014,7 @@ export interface PoolDeps {
    * settled it (false: not settled), which only that attempt's clear carries: `still`, checked inside the clear's write,
    * throws when it no longer holds (a revoked helper); `cleared`, told once a refresh has cleared it, is given it too.
    */
-  writerGone?: { settles: (w: SlotWriter) => GoneSettled | Promise<GoneSettled>; cleared: (run: string, evidence: Exclude<GoneSettled, false>) => void; still?: (evidence: Exclude<GoneSettled, false>) => () => void }
+  writerGone?: { settles: (w: SlotWriter, slot: string) => GoneSettled | Promise<GoneSettled>; cleared: (run: string, evidence: Exclude<GoneSettled, false>) => void; still?: (evidence: Exclude<GoneSettled, false>) => () => void }
   /** Removes Hive's own unchanged skill copies from a folder (skillCopies.ts removeCopiesIn), before a slot goes (#1500). */
   removeSkillCopies?: (folder: string) => Promise<unknown>
   /** A rename's steps (#1441); none: slots aren't renamed. */
@@ -1472,7 +1472,7 @@ export class SlotPool {
   private async settleGone(s: Slot): Promise<boolean> {
     const w = s.writer
     if (!w || !this.deps.writerGone) return false
-    const evidence = await this.deps.writerGone.settles(w)
+    const evidence = await this.deps.writerGone.settles(w, s.name)
     if (!evidence) return false
     let clear: boolean
     try {

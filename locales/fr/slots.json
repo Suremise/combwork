@@ -1,4 +1,7 @@
 {
+  "slots.idleBroker.body": "{names} est le broker inactif du Bac à sable Windows, laissé par la dernière session de l’agent {agent} dans un Hive fermé depuis. Aucun Bac à sable ne tourne, donc libérer l’emplacement est sans risque : « Libérer l’emplacement… » le rend disponible pour d’autres travaux, et le broker continue de tourner.",
+  "slots.idleBroker.release": "Libérer l’emplacement…",
+  "slots.idleBroker.title": "L’emplacement {slot} est retenu par {names}",
   "slots.release.changed": "{slot} a changé entre-temps : ce qui y écrit n’est plus ce qui est affiché. Regarde à nouveau.",
   "slots.release.live": "Ce qui écrit dans {slot} tourne encore dans ce Hive : arrête d’abord l’agent, ou arrête ou garde ce qu’il a laissé tourner.",
   "slots.release.notEnded": "Certains des processus listés tournent encore : Windows n’a pas laissé Hive les arrêter, donc {slot} n’a pas été libéré. Réessaie, ou libère-le sans les arrêter.",

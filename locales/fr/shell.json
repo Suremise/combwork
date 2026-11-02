@@ -134,6 +134,7 @@
   "shell.command.settings.notifications": "Paramètres des notifications",
   "shell.command.settings.open": "Ouvrir les paramètres",
   "shell.command.settings.providers": "Choisir les agents de code (fournisseurs)",
+  "shell.command.slot.releaseHeld": "Libérer un emplacement retenu",
   "shell.command.task.new": "Nouvelle carte…",
   "shell.command.task.reviewSetAside": "Examiner les cartes créées par une ancienne version de Hive…",
   "shell.command.task.undoArchive": "Annuler l’archivage",

@@ -302,7 +302,11 @@ describe("a run's record for its slot writer (HI-1886)", () => {
       plantState('k-run', state('k-run'))
       expect(await next.keeperState('k-run', HIVE)).toEqual({ state: 'ended', helper: '4001:1' })
       plantState('k-run', state('k-run', { state: 'live', total: 2, members: [{ pid: 7001, created: '133000000000000000', name: 'node' }] }))
-      expect(await next.keeperState('k-run', HIVE)).toMatchObject({ state: 'live', helper: '4001:1', members: [{ pid: 7001, created: '133000000000000000', name: 'node' }] })
+      // Its total counts one member it doesn't describe (HI-2309, HR1's round 3): said, so nothing takes the list as all.
+      expect(await next.keeperState('k-run', HIVE)).toMatchObject({ state: 'live', helper: '4001:1', members: [{ pid: 7001, created: '133000000000000000', name: 'node' }], more: 1 })
+      // Console hosts it describes are counted, never listed: not "more".
+      plantState('k-run', state('k-run', { state: 'live', total: 2, members: [{ pid: 7001, created: '133000000000000000', name: 'node' }, { pid: 7002, created: '133000000000000000', name: 'conhost' }] }))
+      expect(await next.keeperState('k-run', HIVE)).toMatchObject({ state: 'live', members: [{ pid: 7001 }], more: 0 })
     })
 
     it.runIf(process.platform === 'win32')("none taken unless whole and its own: another helper, Hive or run, a version, an incomplete or non-empty \"ended\", a bad member, malformed or too large", async () => {

@@ -8,12 +8,12 @@ import { join } from 'path'
 import { afterEach, beforeAll, describe, expect, it, vi } from 'vitest'
 import { app } from 'electron'
 import { tempDir } from './tempDir'
-import { brokerOf, brokersOnly, inPackage } from '../src/main/systemBrokers'
+import { brokerOf, brokersOnly, inPackage, mayBeBroker } from '../src/main/systemBrokers'
 
 const ROOT = join(process.env.ProgramW6432 || process.env.ProgramFiles || 'C:\\Program Files', 'WindowsApps')
 const BROKER = join(ROOT, 'MicrosoftWindows.WindowsSandbox_0.5.3.0_x64__cw5n1h2txyewy', 'WindowsSandboxServer.exe')
 
-const host = vi.hoisted(() => ({ listing: new Map<string, unknown>(), running: [] as string[] | null, asked: [] as string[], killed: [] as string[], ended: [] as string[], forgotten: [] as string[] }))
+const host = vi.hoisted(() => ({ listing: new Map<string, unknown>(), paths: new Map<string, string>(), running: [] as string[] | null, asked: [] as string[], pathsAsked: 0, killed: [] as string[], ended: [] as string[], forgotten: [] as string[] }))
 vi.mock('../src/main/processSupervisor', () => ({
   MAX_LISTED: 100,
   HOST_SOURCE: '',
@@ -26,6 +26,12 @@ vi.mock('../src/main/processSupervisor', () => ({
     }
     async request(cmd: string, arg?: string) {
       if (cmd === 'list') return host.listing.has(arg!) ? host.listing.get(arg!) : null
+      // Each process's executable by id and start time (HI-2309): those the test gave a path, "" for one it gave "".
+      if (cmd === 'paths') {
+        host.pathsAsked++
+        return Object.fromEntries(arg!.split(',').filter((id) => host.paths.has(id)).map((id) => [id, host.paths.get(id)]))
+      }
+      if (cmd === 'identify') return arg!.split(',').filter((id) => host.paths.has(id))
       if (cmd === 'running') {
         host.asked.push(arg!)
         return host.running === null ? 'error: no snapshot' : arg!.split(',').filter((n) => host.running!.includes(n))
@@ -40,7 +46,12 @@ vi.mock('../src/main/processSupervisor', () => ({
 
 const { launchEnded, leftoversOf, runOutcome, trackLaunch } = await import('../src/main/agentProcesses')
 
-const proc = (pid: number, name: string, path: string | undefined) => ({ pid, name, cmd: name, created: '133000000000000000', ...(path !== undefined ? { path } : {}) })
+const CREATED = '133000000000000000'
+/** A process as the job lists it; with a path, it runs (the helper's "paths" gives it that path; "": unread). */
+const proc = (pid: number, name: string, path: string | undefined) => {
+  if (path !== undefined) host.paths.set(`${pid}:${CREATED}`, path)
+  return { pid, name, cmd: name, created: CREATED }
+}
 const broker = (pid = 79816) => proc(pid, 'WindowsSandboxServer.exe', BROKER)
 const list = (runId: string, processes: ReturnType<typeof proc>[], total = processes.length): void => void host.listing.set(runId, { total, adopted: processes.length, processes })
 async function exited(runId: string, agentId: string): Promise<void> {
@@ -77,6 +88,11 @@ describe("the broker is known by its executable's path in WindowsApps, never by 
     expect(brokerOf(join(ROOT, 'MicrosoftWindows.WindowsSandbox_0.5.3.0_x64__cw5n1h2txyewy', 'node.exe'))).toBeNull()
     expect(brokerOf(join(ROOT, 'MicrosoftWindows.WindowsSandbox_..', 'WindowsSandboxServer.exe'))).toBeNull()
     expect(brokerOf('')).toBeNull()
+    // Its name only rules others out, with or without ".exe" (a keeper names members without it, HR1 on HI-2309).
+    expect(mayBeBroker('WindowsSandboxServer')).toBe(true)
+    expect(mayBeBroker('WindowsSandboxServer.EXE')).toBe(true)
+    expect(mayBeBroker('node')).toBe(false)
+    expect(mayBeBroker('WindowsSandboxServer.exe.exe')).toBe(false)
     expect(brokerOf(undefined)).toBeNull()
   })
 
@@ -131,19 +147,21 @@ describe("a launch that leaves only the idle broker ends, and its broker isn't e
     expect(leftoversOf('C:\\p', 'mb3').processes.map((p) => p.name).sort()).toEqual(['WindowsSandboxServer.exe', 'node.exe'])
   })
 
-  it('a look-alike broker, one with no path given, one beside an undescribed member, or a look at what runs that fails: held', async () => {
+  it("a look-alike broker, one gone or whose path can't be read, one beside an undescribed member, or a look at what runs that fails: held", async () => {
     vi.useFakeTimers()
     host.running = []
     list('r-alike', [proc(6001, 'WindowsSandboxServer.exe', 'C:\\slots\\slot-a\\WindowsSandboxServer.exe')])
     await exited('r-alike', 'mb4')
     list('r-nopath', [proc(6002, 'WindowsSandboxServer.exe', undefined)])
     await exited('r-nopath', 'mb5')
+    list('r-unread', [proc(6005, 'WindowsSandboxServer.exe', '')])
+    await exited('r-unread', 'mb8')
     list('r-more', [broker(6003)], 2)
     await exited('r-more', 'mb6')
     host.running = null
     list('r-unsure', [broker(6004)])
     await exited('r-unsure', 'mb7')
     await poll()
-    for (const r of ['r-alike', 'r-nopath', 'r-more', 'r-unsure']) expect(runOutcome(r)).toBeNull()
+    for (const r of ['r-alike', 'r-nopath', 'r-unread', 'r-more', 'r-unsure']) expect(runOutcome(r)).toBeNull()
   })
 })
