@@ -285,7 +285,10 @@ const check = (name, ok, extra = '') => { if (ok) pass++; else fail++; console.l
   await page.locator('.settings-top input.input').first().click()
   await page.keyboard.press('Control+Alt+Y'); await lib.until(async () => (await page.locator('.notif-panel').count()) === 1, HUNG_MS)
   check('new shortcut works', await page.locator('.notif-panel').count() === 1)
-  await page.keyboard.press('Escape'); await sleep(200)
+  // Closed by its ×: Escape doesn't close the bell, and pop-ups give way to it while it is open (HI-2320), so the
+  // refusal below would go only to its list (HI-2373).
+  await page.locator('.notif-panel .icon-btn[aria-label="Close"]').click(); await lib.until(async () => (await page.locator('.notif-panel').count()) === 0, HUNG_MS)
+  check('bell closed', await page.locator('.notif-panel').count() === 0)
   // Chord
   await row.locator('.icon-btn[aria-label^="Change shortcut"]').click(); await sleep(200)
   // The chord's two presses a beat apart, as a person types them; then the wait for the saved chord.
@@ -295,7 +298,9 @@ const check = (name, ok, extra = '') => { if (ok) pass++; else fail++; console.l
   // Refused key
   await row.locator('.icon-btn[aria-label^="Change shortcut"]').click(); await sleep(200)
   await page.keyboard.press('Control+C'); await lib.until(async () => (await page.locator('.toast', { hasText: "can't be used" }).count()) >= 1, 10000)
-  check('Ctrl+C refused', (await page.locator('.toast', { hasText: "can't be used" }).count()) >= 1 && (await inv('settings:get')).keybindings['view.notifications'] === 'Mod+K Mod+J')
+  check('Ctrl+C refused: its pop-up shows', (await page.locator('.toast', { hasText: "can't be used" }).count()) >= 1)
+  s = await inv('settings:get')
+  check('Ctrl+C refused: the chord is kept', s.keybindings['view.notifications'] === 'Mod+K Mod+J', s.keybindings['view.notifications'])
   // Conflict asks
   await row.locator('.icon-btn[aria-label^="Change shortcut"]').click(); await sleep(200)
   await page.keyboard.press('Control+Shift+P'); await lib.until(async () => (await page.locator('.dialog', { hasText: 'Shortcut already in use' }).count()) === 1, 10000)
