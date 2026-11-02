@@ -50,15 +50,46 @@ const check = (name, ok, extra = '') => {
   console.log(`${ok ? 'PASS' : 'FAIL'} ${name}${ok || !extra ? '' : ` (${extra})`}`)
 }
 const same = (a, b) => !!a && !!b && path.resolve(a).toLowerCase() === path.resolve(b).toLowerCase()
-/** Ends a test Hive from outside, as a crash would (slotrelease's way): its main process first, then all it started but `spare`. */
+/**
+ * Ends a test Hive from outside, as a crash would (slotrelease's way): its main process first, then all it started but
+ * `spare`. True once its main process has exited and none of those it ended still runs as the same process (HI-2316).
+ */
 async function endFromOutside(app, spare = []) {
   const proc = app.process()
   const gone = new Promise((r) => (proc.exitCode !== null ? r(true) : proc.once('exit', () => r(true))))
   const id = lib.identify([proc.pid])[0]
   const list = processes()
   const top = id && list.find((p) => p.pid === id.pid && Math.abs(p.started - id.started) <= 1)
-  const ended = top ? endAsCrash(list, { pid: top.pid, started: top.started }, descendantsIn(list, top.pid).filter((p) => !spare.includes(p.pid))) : 0
-  return ended > 0 && !!(await lib.until(() => gone, HUNG_MS))
+  const rest = top ? descendantsIn(list, top.pid).filter((p) => !spare.includes(p.pid)) : []
+  const ended = top ? endAsCrash(list, { pid: top.pid, started: top.started }, rest) : 0
+  return ended > 0 && !!(await lib.until(() => gone, HUNG_MS)) && !!(await lib.until(() => lib.stillSame([{ pid: top.pid, started: top.started }, ...rest]).length === 0, HUNG_MS, 250))
+}
+/**
+ * A row of a gone Hive's hive.db, read once a read succeeds (HI-2316). Windows reports the ended Hive's exit a moment
+ * before its view of hive.db-shm is unmapped: a first connection then can't truncate that file and is refused ("disk
+ * I/O error", SQLITE_IOERR_TRUNCATE, 1546), with the keeper still running and holding nothing. So each refusal is
+ * noted, with how long after `since`, and the read is tried again until one succeeds. Returns { row, refused }: row
+ * null if none succeeded within the bound.
+ */
+async function readGoneHiveDb(file, sql, since) {
+  const refused = []
+  const row = await lib.until(() => {
+    let db
+    try {
+      db = new DatabaseSync(file)
+      return db.prepare(sql).get() ?? { none: true }
+    } catch (e) {
+      refused.push(`${Date.now() - since} ms: ${e.code ?? ''} ${e.errcode ?? ''} ${e.errstr ?? ''} ${e.message}`.trim())
+      return null
+    } finally {
+      try {
+        db?.close()
+      } catch {
+        // a connection that failed to open has nothing to close
+      }
+    }
+  }, HUNG_MS, 250)
+  return { row: row ?? null, refused }
 }
 const pids = (file) => (fs.existsSync(file) ? fs.readFileSync(file, 'utf8').trim().split('\n').filter(Boolean).map((l) => JSON.parse(l).pid) : [])
 
@@ -208,9 +239,9 @@ const pids = (file) => (fs.existsSync(file) ? fs.readFileSync(file, 'utf8').trim
       kept.push(...keeper)
       check(`${part}: …and Hive is ended from outside, the broker and its keeper left running`, await endFromOutside(h.app, [pid, helperPid]))
       h = null
-      const db = new DatabaseSync(path.join(ws, '.hive', 'hive.db'))
-      const row = db.prepare("SELECT writer_run AS run, writer_pid AS pid, writer_started AS started FROM slots WHERE name = 'slot-a'").get()
-      db.close()
+      const read = await readGoneHiveDb(path.join(ws, '.hive', 'hive.db'), "SELECT writer_run AS run, writer_pid AS pid, writer_started AS started FROM slots WHERE name = 'slot-a'", Date.now())
+      if (read.refused.length) console.log(`INFO ${part}: hive.db refused ${read.refused.length} read(s) before one succeeded, the keeper ${lib.stillSame(keeper).length ? 'running' : 'gone'}: ${read.refused.slice(0, 5).join(' | ')}`)
+      const row = read.row
       check(`${part}: …slot-a still names its run as writer`, row?.run === run, JSON.stringify(row))
       const receiptFile = path.join(userData, 'keeper', `keeper-${run}.json`)
       const receipt = () => {
