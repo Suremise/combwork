@@ -199,6 +199,7 @@ export const SUITES = [
   { name: 'mcpagents' },
   { name: 'mcpcatalog' },
   { name: 'mcpfile' },
+  { name: 'mergeburst' },
   { name: 'mergedialogslots' },
   { name: 'mergequeue' },
   { name: 'mergequeuecrash' },
