@@ -192,12 +192,15 @@ async function owedNow(loop: Loop): Promise<number[]> {
   const project = basename(loop.projectPath)
   const heads = await liveCardHeads(ws)
   let watched = loop.cards
-  // Another's card it waits on (HI-2381): not its loop, unless it is that card's loop reviewer.
-  const deps = dependencyWatches(heads, loop.agentId, watched, () => false)
+  // Another's card it waits on (HI-2381): not its loop, unless it is that card's loop reviewer. Its watched cards are read
+  // in full for their dependencies (heads have none) only when one of them is another agent's in Doing or Review.
+  const othersWork = heads.some((c) => watched.includes(c.number) && (c.column === 'doing' || c.column === 'review') && !!c.agent && c.agent !== loop.agentId)
+  const full = othersWork ? await allTasks(ws, { numbers: [...watched] }) : []
+  const deps = dependencyWatches(full, loop.agentId, watched, () => false)
   if (deps.length) {
     const reviewing = new Set<number>()
-    for (const c of heads) if (deps.includes(c.number) && (await loopReviewerOf(ws, c).catch(() => null))?.id === loop.agentId) reviewing.add(c.number)
-    const drop = new Set(dependencyWatches(heads, loop.agentId, watched, (n) => reviewing.has(n)))
+    for (const c of full) if (deps.includes(c.number) && (await loopReviewerOf(ws, c).catch(() => null))?.id === loop.agentId) reviewing.add(c.number)
+    const drop = new Set(dependencyWatches(full, loop.agentId, watched, (n) => reviewing.has(n)))
     watched = watched.filter((n) => !drop.has(n))
   }
   const inPlay = cardsInPlay(heads, project, loop.agentId, watched)
