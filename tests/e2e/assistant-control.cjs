@@ -366,6 +366,86 @@ const check = (name, ok, extra = '') => {
   const laneTool = (envExtra) => JSON.parse(execFileSync(process.execPath, [path.join(lib.ROOT, 'out', 'main', 'hive-mcp.js')], { input: JSON.stringify({ jsonrpc: '2.0', id: 1, method: 'tools/list' }) + '\n', env: lib.childEnv({ HIVE_API_URL: API, ...envExtra }), timeout: 10000 }).toString().split('\n')[0]).result.tools.find((t) => t.name === 'hive_lane')
   check('Look and advise: hive_lane says only list works', /only list works/.test(laneTool({ HIVE_ROLE: 'assistant', HIVE_ASSISTANT_CONTROL: 'look' })?.description ?? '') && !/only list works/.test(laneTool({ HIVE_ROLE: 'assistant', HIVE_ASSISTANT_CONTROL: 'agents' })?.description ?? ''))
 
+  // --- HI-2328: an agent change waiting behind project.json's lock is checked again with its write. The user's own write is
+  // held just before its file is replaced (as in assistantsettings), the Assistant's change queues behind it, Control is
+  // lowered or the Assistant's session ends, and once the lock is free the old change changes nothing.
+  const projectFile = path.join(alpha, '.hive', 'project.json')
+  const holdNextWrite = () =>
+    app.evaluate((_, target) => {
+      const f = process.mainModule.require('original-fs/promises')
+      const original = global.__hiveTestRename ?? (global.__hiveTestRename = f.rename)
+      global.__hiveTestGate = { entered: false }
+      f.rename = async (...args) => {
+        if (!global.__hiveTestGate.entered && String(args[1]).toLowerCase() === target.toLowerCase()) {
+          global.__hiveTestGate.entered = true
+          await new Promise((resolve) => (global.__hiveTestGate.release = resolve))
+          f.rename = original
+        }
+        return original(...args)
+      }
+    }, projectFile)
+  const held = () => lib.until(() => app.evaluate(() => global.__hiveTestGate.entered), HUNG_MS)
+  const release = () => app.evaluate(() => global.__hiveTestGate.release())
+  // A change queued for the lock: withFileLock (fsutil.ts) sets the file's key (its path in lower case) to the queue's
+  // promise in the same step as the call, so a promise set to that key while the user's write holds it is a change queued
+  // behind it, past its checks before the lock (assistantsettings says more). Counted only while it waits, then put back.
+  const watchLockQueue = () =>
+    app.evaluate((_, lockKey) => {
+      const set = (global.__hiveTestMapSet ??= Map.prototype.set)
+      global.__hiveTestQueued = 0
+      // eslint-disable-next-line eslint/no-extend-native -- in the test copy only, and put back once the change is queued
+      Map.prototype.set = function (k, v) {
+        if (k === lockKey && typeof v?.then === 'function') global.__hiveTestQueued++
+        return set.call(this, k, v)
+      }
+    }, projectFile.toLowerCase())
+  const queuedForLock = async () => {
+    const queued = !!(await lib.until(() => app.evaluate(() => global.__hiveTestQueued > 0), 30000))
+    await app.evaluate(() => {
+      // eslint-disable-next-line eslint/no-extend-native -- putting Map's own set back
+      Map.prototype.set = global.__hiveTestMapSet
+    })
+    return queued
+  }
+  // Started in the page and left there: the write is held on purpose.
+  const userWrite = (value) =>
+    page.evaluate(([p, v]) => {
+      window.__userWrite = window.hive.invoke('project:updateConfig', p, { compactSuggestTokens: v }).then(() => 'saved', (e) => e.message)
+    }, [alpha, value])
+  const alphaAgents = async () => (await inv('workspace:get')).projects.find((x) => x.name === 'alpha').agents.map((a) => a.name)
+  const lastRefusal = async () => (await inv('assistant:actions')).filter((a) => !a.ok).at(-1)
+
+  // Control lowered while its rename of Checker waits: refused under the lock, Checker keeps its name.
+  await holdNextWrite()
+  await userWrite(300001)
+  check("HI-2328: the user's write holds alpha's project.json", !!(await held()))
+  await watchLockQueue()
+  const renaming = api('PATCH', '/v1/projects/alpha/agents/Checker', { name: 'Renamed' })
+  check("…the Assistant's rename of Checker waits behind it", await queuedForLock())
+  await inv('settings:update', { assistant: { control: 'look' } })
+  await release()
+  const renamed = await renaming
+  check('…Control lowered meanwhile: refused when its turn comes', renamed.status === 403 && /turned Settings → Assistant → Control down before this change was made/.test(renamed.body?.error ?? ''), JSON.stringify(renamed))
+  check('…and Checker keeps its name', (await alphaAgents()).includes('Checker') && !(await alphaAgents()).includes('Renamed'), JSON.stringify(await alphaAgents()))
+  check("…the user's write is saved", (await page.evaluate(() => window.__userWrite)) === 'saved')
+  check('…listed as not done', (await lastRefusal())?.kind === 'update-agent', JSON.stringify(await lastRefusal()))
+  await inv('settings:update', { assistant: { control: 'agents' } })
+
+  // The Assistant stopped while its added agent waits: its session's change adds nothing (the Assistant isn't used after this).
+  await holdNextWrite()
+  await userWrite(300002)
+  check("the user's write holds it again", !!(await held()))
+  await watchLockQueue()
+  const adding = api('POST', '/v1/projects/alpha/agents', { name: 'Late' })
+  check("…the Assistant's new agent waits behind it", await queuedForLock())
+  await inv('session:stop', home, 'assistant')
+  check('…the Assistant stopped meanwhile', !!(await until(async () => !(await live(home, 'assistant')), HUNG_MS)))
+  await release()
+  const late = await adding
+  check('…its session ended: refused when its turn comes', late.status === 409 && /session that asked for this ended before the change was made/.test(late.body?.error ?? ''), JSON.stringify(late))
+  check('…and no agent Late is added', !(await alphaAgents()).includes('Late'), JSON.stringify(await alphaAgents()))
+  check("…the user's write is saved too", (await page.evaluate(() => window.__userWrite)) === 'saved')
+
   // Let the agents finish before closing.
   await until(async () => !(await inv('session:live')).some((s) => s.status === 'working' || s.status === 'starting'), 30000)
   await app.close()

@@ -311,7 +311,7 @@ The changes below are the Assistant's only: other callers get `403`.
 
 Changing the task board (`POST /v1/tasks`, `PATCH /v1/tasks/{n}`, comments) is open to other callers too; for the Assistant it needs Control agents and counts as a change.
 
-With **Look and advise** these return `403`. There is no limit on how many changes the Assistant makes for a message (#1170): the user can undo them (below). Every change, and every refusal, is listed in the Assistant's panel and in `hive.log`. There is no call to remove agents, discard worktrees, archive or delete cards, or remove projects. For the Assistant, `POST /v1/projects/{name}/sessions`, `/stop` and `/input` answer `400` (it uses the calls above), and `/deactivate` needs Control agents.
+With **Look and advise** these return `403`. Adding an agent, changing its settings, starting it and stopping it are checked again where the change is made (HI-2328): with the write to `project.json`, after any wait for its lock, and just before the agent's process starts or stops. If Control was turned down meanwhile, the call is `403`; if the Assistant's session that asked has ended, `409`; either way nothing changed. There is no limit on how many changes the Assistant makes for a message (#1170): the user can undo them (below). Every change, and every refusal, is listed in the Assistant's panel and in `hive.log`. There is no call to remove agents, discard worktrees, archive or delete cards, or remove projects. For the Assistant, `POST /v1/projects/{name}/sessions`, `/stop` and `/input` answer `400` (it uses the calls above), and `/deactivate` needs Control agents.
 
 ### Settings
 
