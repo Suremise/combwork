@@ -32,7 +32,10 @@ const busyLines = () => lines().filter((l) => l.includes('[main] The main proces
       for (const until = Date.now() + 1500; Date.now() < until; );
       powerMonitor.emit('resume')
     })
-    const slept = await lib.until(() => busyLines().slice(before).find((l) => /\[INFO\] \[main\] The main process was paused for \d+ ms while the PC slept: not counted as busy/.test(l)), HUNG_MS)
+    // This sleep's own line, its 1.5 s: an earlier stall (Hive's start, under load) still being decided when the suspend
+    // is told is taken for the sleep's too, and its line can come first (HI-2317).
+    const sleepLine = (l) => Number(/\[INFO\] \[main\] The main process was paused for (\d+) ms while the PC slept: not counted as busy/.exec(l)?.[1] ?? 0) >= 1450
+    const slept = await lib.until(() => busyLines().slice(before).find(sleepLine), HUNG_MS)
     check('a gap spanning sleep is an info line', !!slept, busyLines().slice(before).join(' | '))
     check('and not a warning', !busyLines().slice(before).some((l) => l.includes('[WARN]')), busyLines().slice(before).join(' | '))
 

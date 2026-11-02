@@ -88,7 +88,7 @@ describe('main process stalls (#1109)', () => {
     s.tick()
     s.w.power()
     s.stall(18_695, 3)
-    s.w.power()
+    s.w.power(true)
     s.settle()
     expect(s.warnings).toEqual([])
     expect(s.infos).toEqual(['The main process was paused for 18695 ms while the PC slept: not counted as busy'])
@@ -98,9 +98,25 @@ describe('main process stalls (#1109)', () => {
     const s = watcher()
     s.tick()
     s.stall(5087, 2)
-    s.w.power()
+    s.w.power(true)
     s.settle()
     expect(s.warnings).toEqual([])
+  })
+
+  it('warns for a busy stall soon after a resume, even when the tick before it fell before the resume (HI-2317)', () => {
+    const s = watcher()
+    s.tick()
+    s.w.power()
+    s.stall(1500, 3)
+    // The resume is told just after the late tick, and the next stall begins before the next tick: its `since` reaches
+    // back past the resume, to within the grace a suspend gets.
+    now += 50
+    s.w.power(true)
+    now += 100
+    s.stall(1500)
+    s.settle()
+    expect(s.infos).toEqual(['The main process was paused for 1500 ms while the PC slept: not counted as busy'])
+    expect(s.warnings).toEqual(['The main process was busy for 1500 ms (main thread CPU 1500 ms); nothing marked was under way (no IPC call, Agent API request or hook, nor a database or kept file step)'])
   })
 
   it('warns for a stall with no power event, naming the IPC call that blocked and the CPU time', () => {
@@ -511,6 +527,17 @@ describe('slow file calls, timed on the watchdog thread (HI-1702)', () => {
     f.slow(600)
     f.settle()
     expect(f.warnings[0]).toMatch(/^A file call took 600 ms to end/)
+  })
+
+  it('warns for a slow file call that began just after a resume: that sleep was over (HI-2317)', () => {
+    const f = files()
+    f.w.power()
+    now += 1500
+    f.w.power(true)
+    now += 100
+    f.slow(900)
+    f.settle()
+    expect(f.warnings[0]).toMatch(/^A file call took 900 ms to end/)
   })
 
   it('warns once a minute, counting the slow calls between', () => {
