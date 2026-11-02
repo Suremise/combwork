@@ -912,7 +912,7 @@
   "board.upgrade.notNow": "Agora não",
   "board.upgrade.upgrade": "Atualizar",
   "board.upgrade.upgrading": "Atualizando…",
-  "board.view.intro": "Planeje o trabalho em cartões, comece-os em agentes e veja onde cada um está. Os agentes põem o trabalho terminado em Revisão, e os revisores movem o que passa na revisão para Aprovado.",
+  "board.view.intro": "Planeje o trabalho em cartões, comece-os em agentes e veja onde cada um está no caminho até Concluído.",
   "board.view.noWorkspace": "Abra um espaço de trabalho para ver o quadro de tarefas.",
   "board.view.title": "Quadro de tarefas",
   "board.view.workspaceCards": "cartões do espaço de trabalho",

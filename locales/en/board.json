@@ -3652,8 +3652,8 @@
     "description": "The Upgrade button while the board is converted."
   },
   "board.view.intro": {
-    "defaultMessage": "Plan work as cards, start them on agents, and see where each one is. Agents put finished work in Review, and reviewers move what passes to Approved.",
-    "description": "Under the Task Board's title. Review and Approved are board columns."
+    "defaultMessage": "Plan work as cards, start them on agents, and see where each one is on its way to Done.",
+    "description": "Under the Task Board's title, whatever the workflow (HI-2341: some have no Review or Approved). Done is the board's last column, in every workflow."
   },
   "board.view.noWorkspace": {
     "defaultMessage": "Open a workspace to see its task board.",

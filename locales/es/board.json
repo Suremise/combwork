@@ -912,7 +912,7 @@
   "board.upgrade.notNow": "Ahora no",
   "board.upgrade.upgrade": "Actualizar",
   "board.upgrade.upgrading": "Actualizando…",
-  "board.view.intro": "Planifica el trabajo como tarjetas, inícialas en agentes y ve dónde está cada una. Los agentes ponen el trabajo terminado en Revisión, y los revisores pasan a Aprobado lo que supera la revisión.",
+  "board.view.intro": "Planifica el trabajo como tarjetas, inícialas en agentes y ve dónde está cada una en su camino a Hecho.",
   "board.view.noWorkspace": "Abre un espacio de trabajo para ver su tablero de tareas.",
   "board.view.title": "Tablero de tareas",
   "board.view.workspaceCards": "tarjetas del espacio de trabajo",
