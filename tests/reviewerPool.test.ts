@@ -96,9 +96,13 @@ const { resolveOptions } = await import('../src/main/workflow/rulesets')
 
 let env: Env | null = null
 afterEach(() => {
+  for (const life of lives) life.abort()
+  lives.clear()
   env?.close()
   env = null
   Object.assign(state, { enforced: true, wf: null, lanes: [], busy: new Set(), running: new Set(), status: new Map(), background: new Set(), runs: new Set(), pending: new Set(), hooksMissing: new Set(), deliveries: [], next: [], refuse: new Set(), onRefused: null, calls: [], beforeSpawn: null })
+  // Nothing armed by this test outlives it (HI-2360).
+  expect(poolTestHooks.retriesPending()).toBe(0)
 })
 
 const E1 = agentActor('E1')
@@ -112,7 +116,12 @@ const AGENTS: AgentDef[] = [
 ] as AgentDef[]
 
 /** The workspace the pass is given: its folder, its project's agents. */
-const wsOf = (e: Env, agents: AgentDef[] = AGENTS, life = new AbortController()) => ({ path: e.home, lifetime: life.signal, projectConfig: async () => ({ agents }) }) as never
+const wsOf = (e: Env, agents: AgentDef[] = AGENTS, life = new AbortController()) => (lives.add(life), { path: e.home, lifetime: life.signal, projectConfig: async () => ({ agents }) }) as never
+/**
+ * Every lifetime `wsOf` gave a pass, ended after its test (HI-2360): a retry a refused line armed (HI-2333) belongs to
+ * its workspace's lifetime, and one left armed would fire into a later test, whose runtime `workflowFor` hands it.
+ */
+const lives = new Set<AbortController>()
 
 /** A lane of the store, reviewed by the pool (its `extra`, as lanes.ts keeps it) or by its own reviewer; and the app's record of it. */
 function lane(e: Env, id: string, cards: number[], builder: string, reviewer: string | null): void {
