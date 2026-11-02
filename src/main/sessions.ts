@@ -5675,13 +5675,21 @@ class SessionManager {
       return l.adapter.lockReply({ kind: mode === 'ask' ? 'ask' : 'deny', reason })
     }
     let fresh = false
+    // Claims taken over from another holder (an allowed edit, or a holder whose claim had expired): theirs end here, as
+    // a release would end them (HI-2386, HR1's round 2), by holder.
+    const taken = new Map<string, Map<string, string>>()
     for (const abs of files) {
       const key = keys.get(abs)!
       const held = this.locks.get(key)
       if (!held || held.liveId !== id) fresh = true
+      if (held && held.liveId !== id) taken.set(held.liveId, (taken.get(held.liveId) ?? new Map<string, string>()).set(key, held.path))
       this.locks.set(key, { liveId: id, at: now, seq: ++this.lockSeq, path: abs })
     }
     if (fresh) this.publishLocks(id)
+    for (const [holder, ended] of taken) {
+      this.publishLocks(holder)
+      this.claimsEnded(holder, ended, id)
+    }
     decided('allowed')
     return this.editAccepted(id, files, null, keys)
   }
@@ -5711,20 +5719,22 @@ class SessionManager {
    * A holder's claims ended (`files`, lock keys → paths): what other agents were asked or allowed about them was about
    * this holder's claim (HI-2386). Their questions go, and their allowances (a later holder's claim needs its own); each
    * such agent is told the file is free to try again, when its turn has ended, unless an allowance was already typed
-   * (it is trying now). The next try claims the file, or asks the user about whoever claimed it meanwhile.
+   * (it is trying now). The next try claims the file, or asks the user about whoever claimed it meanwhile. `taker`: the
+   * agent whose edit took the claims over (its own edit settles its asks and go-aheads: editAccepted).
    */
-  private claimsEnded(holder: string, files: ReadonlyMap<string, string>): void {
+  private claimsEnded(holder: string, files: ReadonlyMap<string, string>, taker?: string): void {
     const told = new Set<string>()
+    const others = (key: string): boolean => !key.startsWith(`${holder}|`) && (taker === undefined || !key.startsWith(`${taker}|`))
     for (const [k, path] of files) {
       const ending = `|${k}`
       for (const key of [...this.lockAsked.keys()]) {
-        if (!key.endsWith(ending) || key.startsWith(`${holder}|`) || this.lockAskHolder.get(key) !== holder) continue
+        if (!key.endsWith(ending) || !others(key) || this.lockAskHolder.get(key) !== holder) continue
         this.closeAsk(key)
         this.lockGoAhead.set(key, { path, allowed: false })
         told.add(key.slice(0, -ending.length))
       }
       for (const key of [...this.lockAllowed.keys()]) {
-        if (!key.endsWith(ending) || key.startsWith(`${holder}|`)) continue
+        if (!key.endsWith(ending) || !others(key)) continue
         this.lockAllowed.delete(key)
         if (this.lockGoAhead.get(key)?.allowed) {
           this.lockGoAhead.set(key, { path, allowed: false })
