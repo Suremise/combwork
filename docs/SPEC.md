@@ -1495,6 +1495,9 @@ All Git calls go through the `git()` runner (`src/main/git.ts:47`); the two bypa
     belongs to no card (`how: unattributed`) and is listed in the Version Control tab for the user to assign or leave.
     Hive keeps the last head it attributed up to per folder line; the first look starts from the oldest `Started.base`
     of the folder's unfinished cards, so commits from before any card started are nobody's [P2].
+    New commits are attributed in batches of at most 100, each batch one transaction (its records, the cards' facts
+    and the folder's cursor) with the folder's cards checked once under its lock, and main's thread given back between
+    batches (HI-2379: a merge bringing 3,536 commits into the line, one transaction each, held it for 40 s).
     So A entering Review never hands A's commits to B: they were attributed when made, and a commit made while A and
     B are both unfinished needs a trailer.
   - **A card's change** is the ordered list of its attributed commits. With one card unfinished since its start, that

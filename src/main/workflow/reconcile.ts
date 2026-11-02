@@ -34,6 +34,8 @@ export interface ReconcileHooks {
 }
 
 const UNFINISHED = ['active', 'review', 'approved', 'merging']
+/** A shared folder's new commits attributed in one transaction at most (HI-2379): main's thread given back between. */
+export const ATTRIBUTE_BATCH = 100
 
 /** Cards working in the project folder that aren't finished (Active, Review, Approved). */
 function sharedFolderCards(wf: Workflow): CardRecord[] {
@@ -78,26 +80,46 @@ async function attributeOnce(wf: Workflow, hooks: ReconcileHooks): Promise<'done
   const list = await G.commits(project, `${from}..${head}`)
   if (isUnknown(list)) return 'done'
   await hooks.afterRead?.()
-  for (const c of list) {
+  const decided = list.map((c) => {
     const byTrailer = c.cards.map((k) => wf.store.cardByKey(k)).find((x): x is CardRecord => !!x)
     const card = byTrailer ?? (cards.length === 1 ? cards[0] : null)
-    const how = byTrailer ? 'trailer' : card ? 'onlyCard' : 'unattributed'
-    // The folder's record, the card's facts and the cursor in one transaction: a crash keeps all or none of them.
+    return { commit: c.commit, card, how: byTrailer ? 'trailer' : card ? 'onlyCard' : 'unattributed' }
+  })
+  // HI-2379: in batches, main's thread given back between them. A merge brings thousands of commits into the folder's
+  // line at once (the release merge, 3,536): one transaction each, every one checking the folder's cards and folding
+  // its card's whole log again, held main for 40 s. A batch checks and folds once, then follows what it appends.
+  for (let at = 0; at < decided.length; at += ATTRIBUTE_BATCH) {
+    if (at) await new Promise((r) => setImmediate(r))
+    const batch = decided.slice(at, at + ATTRIBUTE_BATCH)
+    // The folder's records, the cards' facts and the cursor in one transaction: a crash keeps all or none of them.
     const kept = await wf.locked(() =>
       wf.store.tx((tx) => {
         // The folder's cards as they are now, under the lock (HR4's #1217 round 1): one started, finished or in a new cycle
         // since they were read, and this attribution (immutable once written) waits: read again, from the cursor.
         const now = sharedFolderCards(wf)
         if (now.length !== cards.length || now.some((x) => cycles.get(x.id) !== wf.state(x).cycle)) return false
-        if (!tx.recordFolderCommit(project, c.commit, card?.id ?? null, how)) return true
-        if (card) {
-          const s = foldCard(tx.facts(card.id))
-          tx.appendObserved(card.id, { kind: 'CommitAttributed', actor: 'outside', source: 'observed', dedupe: `commit:${c.commit}`, data: { commit: c.commit, how: how as 'trailer' | 'onlyCard' } })
-          // A shared-folder card's revision is its newest commit: working revisions, never an integration.
-          const stage = tx.card(card.id).stage
-          if (UNFINISHED.includes(stage) || stage === 'todo') tx.appendObserved(card.id, { kind: 'HeadMoved', actor: 'outside', source: 'observed', dedupe: `prev:${s.lastHeadFact}`, data: { line, from: s.head, to: c.commit } })
+        // Each card's head as its facts say, read once in the batch and moved on by the HeadMoved facts it appends.
+        const heads = new Map<number, { lastHeadFact: number; head: string | null; moves: boolean }>()
+        for (const { commit, card, how } of batch) {
+          if (!tx.recordFolderCommit(project, commit, card?.id ?? null, how)) continue
+          if (card) {
+            let h = heads.get(card.id)
+            if (!h) {
+              const s = foldCard(tx.facts(card.id))
+              // A shared-folder card's revision is its newest commit: working revisions, never an integration.
+              const stage = tx.card(card.id).stage
+              heads.set(card.id, (h = { lastHeadFact: s.lastHeadFact, head: s.head, moves: UNFINISHED.includes(stage) || stage === 'todo' }))
+            }
+            tx.appendObserved(card.id, { kind: 'CommitAttributed', actor: 'outside', source: 'observed', dedupe: `commit:${commit}`, data: { commit, how: how as 'trailer' | 'onlyCard' } })
+            if (h.moves) {
+              const moved = tx.appendObserved(card.id, { kind: 'HeadMoved', actor: 'outside', source: 'observed', dedupe: `prev:${h.lastHeadFact}`, data: { line, from: h.head, to: commit } })
+              // Already observed (another Hive's): its log says where the head is now, read again at its next commit.
+              if (moved) Object.assign(h, { lastHeadFact: moved.seq, head: commit })
+              else heads.delete(card.id)
+            }
+          }
         }
-        tx.setMeta(seenKey, c.commit)
+        tx.setMeta(seenKey, batch[batch.length - 1].commit)
         return true
       })
     )

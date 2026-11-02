@@ -19,6 +19,7 @@ Hive 1.0 adds a workflow layer: your project's options decide how a card goes fr
 
 ### Fixed
 
+- **A big merge or checkout no longer freezes Hive's window.** With a card worked in the project folder itself (no slots), a merge bringing thousands of commits into the folder's branch held Hive for up to a minute while it noted each commit on the card (3,536 commits: 40 s). It now notes them in batches, and Hive stays responsive meanwhile (HI-2379).
 - **Quit when agents finish no longer loses edits made after reopening Hive.** Opened again during the wait, a file left with unsaved changes is asked about (save or discard) before Hive quits, when the last agent finishes or on Quit Now; Cancel keeps Hive running (HI-2336).
 
 ### One notification system
