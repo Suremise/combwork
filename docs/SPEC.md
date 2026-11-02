@@ -4484,7 +4484,7 @@ repeating them (#533) [note §8].
   { reviewer, submission, why }`, in a write that finds it still given and not started) and the card given again; one
   busy, or whose lease can't be read, is told later. Then once per assignment (its delivery's identity is the card, the submission,
   the agent and its `ReviewerAssigned`, so one released and given again is told again): typed into its conversation when it runs (as a wake, need `idle`: a reviewer at a card watch takes it and its watch carries on, HI-2333), else it is launched with it for review (#1434's purpose: the project folder, with #1439's grant to the
-  review copies): *#12 (HI-B1's card) is in Review: you review it from the pool…*. Not given: told at a later pass.
+  review copies): *#12 (HI-B1's card) is in Review: you review it from the pool…*. Not given: told at a later pass, never at once (HI-2333): one when the agent's state changes (an agent's status event asks a pass only when what its freedom reads has changed, never its inbox alone, so a refused line's own event doesn't), or the project's retry pass 5 s later (one at a time) for a refusal that changes nothing it reports (the user typing, its watch's wake going first).
   Hive's loop wakes leave a pool card's arrival in Review to the pool, and route its other handoffs (requests, steps,
   verdicts) by its current reviewer: the newest given or started on its latest submission (`loopReviewerOf`).
 - **None free**: the card waits, *waiting for a reviewer on HI-12* (the existing reason). A verdict frees its reviewer;

@@ -294,7 +294,27 @@ async function tell(ws: WorkspaceService, projectPath: string, wf: Workflow, slo
           sessions.start(projectPath, { agentId: agent.id, prompt: line, purpose: 'review', allowed })
         ).catch((e) => ({ record: notStarted(e) }))
       ).record
-  if (!r || NOT_GIVEN.has(r.state)) log.info(`#${c.card}'s pool delivery to ${userText(agent.name)} wasn't given (${r?.state ?? 'none made'}): told at the next pass`)
+  if (!r || NOT_GIVEN.has(r.state)) {
+    log.info(`#${c.card}'s pool delivery to ${userText(agent.name)} wasn't given (${r?.state ?? 'none made'}): told at the next pass`)
+    // Its next try (HI-2333): a pass when the agent's state changes, or this one shortly, for a refusal that changes
+    // nothing it reports (the user typing, a watch's wake going first, a race at the boundary). Never at once.
+    retrySoon(ws, projectPath)
+  }
+}
+
+/** How long a refused pool line waits for its retry pass (HI-2333); tests set it shorter. */
+export const poolTestHooks = { retryMs: 5000 }
+/** A project's pending retry pass, one at a time (by project path): never re-armed while it waits. */
+const retries = new Map<string, NodeJS.Timeout>()
+function retrySoon(ws: WorkspaceService, projectPath: string): void {
+  const key = projectPath.toLowerCase()
+  if (retries.has(key)) return
+  const t = setTimeout(() => {
+    retries.delete(key)
+    if (!ws.lifetime.aborted) void settleReviewerPool(ws, projectPath).catch((e) => log.warn('retrying the reviewer pool', e))
+  }, poolTestHooks.retryMs)
+  t.unref?.()
+  retries.set(key, t)
 }
 
 /** A pool's assignment given up (`ReviewerReleased`) while it is still the submission's and not started; the pass again. */
@@ -362,9 +382,16 @@ export function startReviewerPool(): void {
     }, 1000)
     soon.unref?.()
   }
+  // An agent's state as the pass reads it, by agent: a status event that changes none of it (a refused line's own, HI-2333) asks no pass.
+  const seen = new Map<string, string>()
   const offEvents = onHiveEvent((e) => {
     if (e.type === 'tasks-changed' || e.type === 'workspace-changed' || e.type === 'team-pause-changed') later()
-    else if (e.type === 'session-status' && freed(e.state)) {
+    else if (e.type === 'session-status') {
+      const key = `${e.state.projectPath.toLowerCase()}#${e.state.agentId}`
+      const now = poolStateKey(e.state, sessions.agentNow(e.state.projectPath, e.state.agentId))
+      if (seen.get(key) === now) return
+      seen.set(key, now)
+      if (!freed(e.state)) return
       const ws = workspaceFor(e.state.projectPath)
       if (ws && !ws.isAssistantHome(e.state.projectPath)) void settleReviewerPool(ws, e.state.projectPath)
     }
@@ -383,7 +410,18 @@ export function startReviewerPool(): void {
     offAdvanced()
     if (soon) clearTimeout(soon)
     clearInterval(hourly)
+    for (const t of retries.values()) clearTimeout(t)
+    retries.clear()
   }
+}
+
+/**
+ * What of an agent's state its freedom for the pool reads (HI-2333): its status, turn, watch, hooks, a question or a
+ * line not taken, input blocked, and its pending input and background tasks. Not its inbox: a delivery made or refused
+ * changes only that, and a pass for it would try a refused line again at once.
+ */
+export function poolStateKey(st: LiveSessionState, now: { pending?: boolean; backgroundTasks?: number } | null): string {
+  return JSON.stringify([st.status, st.turn?.state ?? null, !!st.watch, !!st.hooksMissing, !!st.question, !!st.untakenLine, !!st.inputBlocked, now?.pending ?? null, now?.backgroundTasks ?? null])
 }
 
 /** A status an agent may be free in (its turn ended, with a card watch or none, or it stopped). */

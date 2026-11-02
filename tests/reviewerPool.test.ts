@@ -82,7 +82,7 @@ vi.mock('../src/main/deliveries', async (orig) => {
   }
 })
 
-const { settleReviewerPool } = await import('../src/main/reviewerPool')
+const { settleReviewerPool, poolStateKey, poolTestHooks } = await import('../src/main/reviewerPool')
 const { poolReviewerOf } = await import('../src/main/loopReviewer')
 const { resolveOptions } = await import('../src/main/workflow/rulesets')
 
@@ -907,5 +907,40 @@ describe('a reviewer watching a card is free for the pool (HI-2333): only what i
     await pass(e, ONE)
     expect(assignedTo(e, a.id)).toEqual(['R1'])
     expect(state.calls).toEqual(['typed to R1'])
+  })
+
+  it("a line refused at the delivery's boundary is tried once more by a pass of its own, not at once, and given once", async () => {
+    const e = (env = setup({ ...optionsFor(1, 'pool', 'project'), platform: 'git' }, { autoRun: false }))
+    state.wf = e.wf
+    state.running = new Set(['R1'])
+    state.status.set('R1', 'watching')
+    // Refused once (a watch's wake going first, the user typing: nothing its state reports), then given.
+    state.next = ['notGiven']
+    const was = poolTestHooks.retryMs
+    poolTestHooks.retryMs = 0
+    try {
+      const a = pooled(e, 'Refused once')
+      await submitted(e, a)
+      await pass(e, ONE)
+      expect(assignedTo(e, a.id)).toEqual(['R1'])
+      // Its retry pass, which no event asked for, tells it again: given this time, and never a third.
+      await vi.waitFor(() => expect(state.deliveries.map((d) => d.state)).toEqual(['cancelled', 'offered']), { timeout: HUNG_MS })
+      await pass(e, ONE)
+      expect(state.calls).toEqual(['typed to R1', 'typed to R1'])
+    } finally {
+      poolTestHooks.retryMs = was
+    }
+  })
+
+  it("asks a pass for an agent's status event only when what its freedom reads has changed, never its inbox alone", () => {
+    const base = { status: 'watching', watch: { label: 'x' }, inbox: { unread: 0 } } as never
+    const key = (st: Record<string, unknown>, now: { pending?: boolean; backgroundTasks?: number } | null = { pending: false, backgroundTasks: 0 }) => poolStateKey({ ...(base as object), ...st } as never, now)
+    // A refused line's own event: only its inbox differs.
+    expect(key({ inbox: { unread: 1 } })).toBe(key({}))
+    expect(key({ status: 'finished', watch: undefined })).not.toBe(key({}))
+    expect(key({ watch: undefined })).not.toBe(key({}))
+    expect(key({ hooksMissing: { since: 't' } })).not.toBe(key({}))
+    expect(key({}, { pending: true, backgroundTasks: 0 })).not.toBe(key({}))
+    expect(key({}, { pending: false, backgroundTasks: 1 })).not.toBe(key({}))
   })
 })

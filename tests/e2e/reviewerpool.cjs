@@ -398,11 +398,15 @@ const commitIn = (dir, files, message, trailer) => {
     check('EP-B1 starts Z', (await intent(teb, z, 'start')).status === 200)
     const designsZ = async () => (await facts(z)).filter((f) => f.kind === 'ReviewerAssigned' && f.data.design).map((f) => f.data.reviewer)
     const designZ = async () => `${keyZ}/s${(await facts(z)).findLast((f) => f.kind === 'LoopStep' && f.data.step === 'design').seq}`
-    /** EP-R1's lines that tell it of this (a design's id, or Z in Review from the pool): each, and whether it read them. */
-    const toldOf = async (what) => (await deliveryRows('epsilon', er1.name)).filter((dv) => dv.text.includes(what))
+    /**
+     * The pool's lines to EP-R1 about this (a design's id, or Z in Review), each with whether it read it: not its watch's
+     * own wake, whose latest comment may quote the same id.
+     */
+    const toldOf = async (what) => (await deliveryRows('epsilon', er1.name)).filter((dv) => dv.text.includes(what) && dv.text.includes('from the pool'))
+    /** Given once and read: one line not refused (a refused try, the watch's wake going first, is cancelled), received. */
     const readOnce = (what) => until(async () => {
-      const rows = await toldOf(what)
-      return rows.length === 1 && ['received', 'acked'].includes(rows[0].state)
+      const given = (await toldOf(what)).filter((dv) => dv.state !== 'cancelled')
+      return given.length === 1 && ['received', 'acked'].includes(given[0].state)
     }, HUNG_MS)
     /** EP-R1 watches Z (a loop's watch), as card-loop's reviewer does: `watching` then. */
     const watchZ = async (changes) => {
@@ -426,11 +430,12 @@ const commitIn = (dir, files, message, trailer) => {
     check('EP-B1 submits Z', (await intent(teb, z, 'submit', { summary: 'Z: ready', revision: revZ })).status === 200 && !!(await until(async () => (await card(z))?.column === 'review', HUNG_MS)))
     check('Z goes to EP-R1, watching (HI-2333)', !!(await until(async () => JSON.stringify(await assigned(z)) === JSON.stringify([er1.id, er1.id, er1.id]), HUNG_MS)), JSON.stringify(await assigned(z)))
     check('…told once that it reviews Z from the pool, and it reads it', !!(await readOnce(`${keyZ} (EP-B1's card) is in Review: you review it from the pool`)), JSON.stringify(await deliveryRows('epsilon', er1.name)))
-    check('…no other line tells it Z is in Review (its watch counts verdicts; a pool card has no loop wake for it)', (await deliveryRows('epsilon', er1.name)).filter((dv) => dv.text.includes(keyZ) && /is in Review/.test(dv.text)).length === 1, JSON.stringify(await deliveryRows('epsilon', er1.name)))
-    // One try for each assignment (its design, its revision, its submission): a delivery refused and tried again at
-    // once, as watching once made it, would log a line for each try.
+    check('…no other line tells it Z is in Review (its watch counts verdicts; a pool card has no loop wake for it)', (await deliveryRows('epsilon', er1.name)).filter((dv) => dv.state !== 'cancelled' && dv.text.includes(keyZ) && /is in Review/.test(dv.text)).length === 1, JSON.stringify(await deliveryRows('epsilon', er1.name)))
+    // A try or two for each assignment (its design, its revision, its submission): its line refused while its own
+    // watch's wake goes first (the revision's comment ends EP-R1's watch) is tried again once its state changes or by
+    // the retry pass, never at once: refused lines retried at each status event logged ~20 tries for one (HI-2333).
     const tellings = (fs.readFileSync(path.join(userData, 'logs', 'hive.log'), 'utf8').match(new RegExp(`Telling \\S*EP-R1\\S* of #${z} `, 'g')) ?? []).length
-    check('…each of its three assignments told in one try (no pass looping on a refused line)', tellings === 3, String(tellings))
+    check('…its three assignments told in at most two tries each (no pass looping on a refused line)', tellings >= 3 && tellings <= 6, String(tellings))
     await idle(epsilon, er1.id)
     check('EP-R1 reviews and passes Z: Done', (await intent(ter, z, 'start-review')).status === 200 && (await intent(ter, z, 'verdict', { pass: true, comment: 'Z: passed' })).status === 200 && !!(await until(async () => (await card(z))?.column === 'done', HUNG_MS)), (await card(z))?.column)
   } catch (err) {
