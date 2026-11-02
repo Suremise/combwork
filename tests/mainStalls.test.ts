@@ -216,6 +216,21 @@ describe('main process stalls (#1109)', () => {
     expect(apiLabel(undefined, '(no route)')).toBe('api other (no route)')
   })
 
+  it('counts a block the loop delay recorded nothing of, from just after the last tick (HI-2317)', () => {
+    // Node's reset forgets its timer's last turn: a 700 ms block begun before the next turn isn't measured, and this
+    // timer is only 200 ms late.
+    const lines: string[] = []
+    let t = now
+    let recorded: number | null = 0
+    const w = stallWatcher({ now: () => t, longestDelayMs: () => recorded, cpuMs: () => null, defer: (fn) => fn(), warn: (l) => lines.push(l), info: () => undefined })
+    t += 500
+    w.tick()
+    recorded = null
+    t += 700
+    w.tick()
+    expect(lines).toEqual(['The main process was busy for 700 ms; nothing marked was under way (no IPC call, Agent API request or hook, nor a database or kept file step)'])
+  })
+
   it('says when nothing tracked was running, and leaves CPU out where it is unknown', () => {
     const lines: string[] = []
     let t = now

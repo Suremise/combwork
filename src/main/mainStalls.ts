@@ -146,8 +146,12 @@ export function resetStallsForTests(): void {
 
 export interface StallDeps {
   now(): number
-  /** The longest event loop delay since the last call, in ms (and starts measuring afresh). */
-  longestDelayMs(): number
+  /**
+   * The longest event loop delay since the last call, in ms (and starts measuring afresh), or null when it recorded none:
+   * its timer had no whole turn since, the loop held from about the last call on (HI-2317: Node's reset forgets its
+   * timer's last turn, so a block that begins before the next is never measured).
+   */
+  longestDelayMs(): number | null
   /** The main thread's CPU time so far in ms, or null where Node can't tell. */
   cpuMs(): number | null
   defer(fn: () => void, ms: number): void
@@ -178,7 +182,8 @@ export function stallWatcher(d: StallDeps, t = STALL_TIMING): { tick(): void; po
       const cpu = d.cpuMs()
       const cpuUsed = cpu !== null && cpuLast !== null ? cpu - cpuLast : null
       // The loop delay, or how late this timer itself is (whichever is longer: the histogram's timer may only fire next).
-      const delay = Math.max(d.longestDelayMs(), now - last - t.every)
+      // None recorded: the loop was held from about the last tick on, the whole time since.
+      const delay = Math.max(d.longestDelayMs() ?? now - last, now - last - t.every)
       const since = last
       last = now
       cpuLast = cpu
@@ -299,7 +304,7 @@ export function watchMainStalls(): void {
   const watch = stallWatcher({
     now: () => stallClock.mono(),
     longestDelayMs: () => {
-      const ms = delays.max / 1e6
+      const ms = delays.count ? delays.max / 1e6 : null
       delays.reset()
       return ms
     },
