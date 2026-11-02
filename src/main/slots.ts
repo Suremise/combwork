@@ -46,7 +46,7 @@ import { dirname, join } from 'path'
 import { BOARD_MIGRATIONS } from './boardStore'
 import { openDb } from './db'
 import { samePlace } from './fsutil'
-import { git } from './git'
+import { git, gitErrorLine } from './git'
 import { createLogger, userText } from './logger'
 import * as G from './platform/git'
 import { isUnknown } from './platform/types'
@@ -1666,7 +1666,7 @@ export class SlotPool {
         const at = target ? await G.lineHead(this.deps.project, target) : await G.head(this.deps.project)
         if (isUnknown(at) || !at) return await fail(`git couldn't read ${target ?? 'HEAD'}`)
         const r = await git(this.deps.project, ['worktree', 'add', '--detach', slot.folder, at])
-        if (!r.ok) return await fail(`git worktree add: ${r.err.trim().split(/\r?\n/)[0] || 'failed'}`)
+        if (!r.ok) return await fail(`git worktree add: ${gitErrorLine(r.err) || 'failed'}`)
         log.info(`Made slot ${userText(name)} at ${at.slice(0, 7)} in ${userText(slot.folder)}`)
         if (opts.copy.trim()) await copyIgnored(this.deps.project, slot.folder, opts.copy).catch((e) => log.warn(`Could not copy files into slot ${userText(name)}`, e))
       }

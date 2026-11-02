@@ -1,7 +1,7 @@
 import { AsyncLocalStorage } from 'async_hooks'
 import { join, resolve, sep } from 'path'
 import { SHARE_ENV, Worker } from 'worker_threads'
-import { lstat, readFile, readlink } from 'original-fs/promises'
+import { lstat, readFile, readlink, realpath, stat } from 'original-fs/promises'
 import { insideReal } from './fsutil'
 import { gitExe, gitExeGone, gitProblem, gitTool, noteGitMissing, noteGitRan, PATH_GIT, type GitExe } from './gitTool'
 import type { GitDiff, GitStatus } from '../shared/types'
@@ -60,9 +60,9 @@ export interface GitRunOptions {
 
 /**
  * A seam for unit tests: told of each git command as it starts on git's worker thread (#732 counts a template plan's
- * and load's), not of one a route runs (HI-2078).
+ * and load's), and as it ends there (HI-2322: worktree changes never overlap), not of one a route runs (HI-2078).
  */
-export const gitTestHooks: { started?: (cwd: string, args: readonly string[]) => void } = {}
+export const gitTestHooks: { started?: (cwd: string, args: readonly string[]) => void; ended?: (cwd: string, args: readonly string[]) => void } = {}
 
 /** HI-2078: where a scope's git runs instead of the worker: the request as the worker gets it, its outcome as execFile's. */
 export type GitRoute = (m: Omit<GitRequest, 'id'>) => Promise<GitOutcome>
@@ -97,8 +97,68 @@ export function gitRouted(): boolean {
 
 export function git(cwd: string, args: string[], maxBuffer = 16 * 1024 * 1024, input?: string, opts: GitRunOptions = {}): Promise<GitResult> {
   // HI-2137: the git Hive starts (Git for Windows' real git rather than its launcher, where it found one).
-  return gitAs(opts.exe !== undefined ? { exe: opts.exe } : gitExe(), cwd, args, maxBuffer, input, opts)
+  const run = (): Promise<GitResult> => gitAs(opts.exe !== undefined ? { exe: opts.exe } : gitExe(), cwd, args, maxBuffer, input, opts)
+  return changesWorktrees(args) ? worktreeQueueKey(cwd).then((repo) => oneWorktreeChange(repo, run)) : run()
 }
+
+/**
+ * HI-2322: the repository a folder's worktree changes belong to, as oneWorktreeChange's queue knows it: its common git
+ * dir (`.git/worktrees` lives there), the same for a checkout and each of its linked worktrees, with links, junctions
+ * and drive aliases resolved. Read from the `.git` files where they say (as platform/git.ts's commonDirSync), else asked
+ * of git, else the folder itself.
+ */
+export async function worktreeQueueKey(cwd: string): Promise<string> {
+  const common = (await commonDirOf(cwd)) ?? resolve(cwd)
+  return resolve(await realpath(common).catch(() => common)).toLowerCase()
+}
+
+async function commonDirOf(folder: string): Promise<string | null> {
+  // GIT_DIR or GIT_COMMON_DIR in the environment chooses another repository than `.git` names: git says which.
+  if (!process.env.GIT_DIR && !process.env.GIT_COMMON_DIR) {
+    const dot = join(folder, '.git')
+    const own = await stat(dot).then(
+      async (s) => (s.isDirectory() ? resolve(dot) : ((m) => (m ? resolve(folder, m[1].trim()) : null))(/^gitdir: (.+)$/m.exec(await readFile(dot, 'utf8')))),
+      () => null
+    )
+    if (own) return readFile(join(own, 'commondir'), 'utf8').then((c) => resolve(own, c.trim()), () => own)
+  }
+  const r = await gitAs(gitExe(), folder, ['rev-parse', '--path-format=absolute', '--git-common-dir'], 64 * 1024, undefined, {})
+  return r.ok && r.out.trim() ? r.out.trim() : null
+}
+
+/** A command that changes the repository's list of worktrees (add, remove, prune, move, repair, lock...), not `list`. */
+export const changesWorktrees = (args: readonly string[]): boolean => args[0] === 'worktree' && args[1] !== undefined && args[1] !== 'list'
+
+/** The changes to each repository's worktrees under way, by the repository (its last one's end). */
+const worktreeChanges = new Map<string, Promise<unknown>>()
+
+/**
+ * HI-2322: one change to a repository's worktrees at a time in this process. Git reads every worktree's entry
+ * (.git/worktrees/<name>) as it adds one, and fails on one another add has made but not yet written ("fatal: failed to
+ * read .git/worktrees/copy-1/commondir"), so two review copies, slots or worktrees made at once could fail. Keyed by
+ * the repository (`repo`: git() passes worktreeQueueKey's, so a checkout and its linked worktrees share one queue).
+ * Each waits for the one before it, whatever that one's outcome; the entry goes once its last change has ended.
+ */
+export function oneWorktreeChange<T>(repo: string, fn: () => Promise<T>): Promise<T> {
+  const key = resolve(repo).toLowerCase()
+  const run = (worktreeChanges.get(key) ?? Promise.resolve()).then(fn, fn)
+  const tail = run.catch(() => undefined)
+  worktreeChanges.set(key, tail)
+  void tail.then(() => worktreeChanges.get(key) === tail && worktreeChanges.delete(key))
+  return run
+}
+
+/**
+ * The line of git's stderr that says why it failed: its first `fatal:` or `error:` line, else its first line. Not
+ * simply the first: `git worktree add` says "Preparing worktree…" before its error (HI-2322).
+ */
+export function gitErrorLine(err: string): string {
+  const lines = err.trim().split(/\r?\n/)
+  return lines.find((l) => /^(fatal|error):/.test(l)) ?? lines[0] ?? ''
+}
+
+/** For tests: how many repositories have a worktree change under way or waiting. */
+export const worktreeChangesPending = (): number => worktreeChanges.size
 
 /** git() with the git it starts (`use`). */
 async function gitAs(use: GitExe, cwd: string, args: string[], maxBuffer: number, input: string | undefined, opts: GitRunOptions): Promise<GitResult> {
@@ -108,6 +168,7 @@ async function gitAs(use: GitExe, cwd: string, args: string[], maxBuffer: number
   // always did. Either way its outcome is read here.
   if (!scope?.active) gitTestHooks.started?.(cwd, args)
   const o = scope?.active ? await scope.route(m) : await thread.run(m)
+  if (!scope?.active) gitTestHooks.ended?.(cwd, args)
   if (o.held) log.warn(`git ${args[0]}'s output stayed open after it exited, held by another process (HI-1854): taken as read`)
   const buf = Buffer.from(o.stdout.buffer, o.stdout.byteOffset, o.stdout.byteLength)
   const err = o.error
