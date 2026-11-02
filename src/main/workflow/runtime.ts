@@ -28,6 +28,7 @@ import { LANE_MAX_ROUNDS } from '../../shared/lanes'
 import type { FinishInputs, LineNow, PlatformAdapter, Unsubmitted } from '../platform/adapter'
 import { GitPlatform } from '../platform/gitPlatform'
 import { NoneAdapter } from '../platform/none'
+import { readBaseline } from '../noneBaseline'
 import { NonePlatform } from '../platform/nonePlatform'
 import { isUnknown, unknown, type Maybe } from '../platform/types'
 import type { PlatformId } from '../../shared/platform/descriptors'
@@ -310,6 +311,8 @@ interface StartGathered {
   warnings: string[]
   /** A slot's lease lent for this start (#1438): given back if the start isn't written. */
   lent: string | null
+  /** None (HI-2340): the generation its whole-project read was made under; another at the write, it is gathered again. */
+  baselineGen?: number
 }
 
 /** A submission gathered outside the lock: the revision with its endpoints, keys and files, and its guards' inputs. */
@@ -859,6 +862,7 @@ export class Workflow {
       await this.cfg.hooks?.beforeWrite?.('start')
       if (await this.revalidate(card, from, g.o, g.before)) return this.regather(card, () => this.start(ref, actor, opts))
       let laneMoved = false
+      let baselineMoved = false
       const out = await this.writeWhole(card, g.r, actor, (w) => {
         const moved = this.stillAt(w, s, 'start')
         if (moved) return moved
@@ -867,8 +871,13 @@ export class Workflow {
         // Refused once it has moved it back to Todo: undone whole (writeWhole), nothing of the reopening kept (a lane's
         // boundary applied in it too: the next write applies it again).
         const undone = (g2: GuardRefusal): GuardRefusal => (reopening ? undo(g2) : g2)
+        // None (HI-2340): its baseline read under the folders left out as they are now, else gathered again (once).
         const changed = this.evidenceChanged(w, g.o, g.before)
         if (changed) return undone(changed)
+        if (g.baselineGen !== undefined && g.baselineGen !== this.none.generation) {
+          baselineMoved = true
+          return undone({ rule: 'evidence.changed', values: { card: card.key } } as GuardRefusal)
+        }
         // Decided where the start is written, from the lane as it is there (HR6's #1270 round 1, the Assistant's round 4
         // design): a queued list whose boundary has passed applies first (committed with its wake even if this start is
         // then refused: the boundary passed either way), then the start is checked against it.
@@ -891,7 +900,7 @@ export class Workflow {
         this.applyStart(w, g, w.written.some((f) => f.kind === 'Override') ? 'override' : actor === 'user' ? 'user' : 'intent')
         return null
       })
-      if (out && laneMoved && !this.regathering.has(card.id)) return this.regather(card, () => this.start(ref, actor, opts))
+      if (out && (laneMoved || baselineMoved) && !this.regathering.has(card.id)) return this.regather(card, () => this.start(ref, actor, opts))
       if (out) return (out.rule === 'move.notFromHere' ? forIt(this.state(this.store.card(card.id))) : null) ?? this.refuse(card, actor, 'start', out)
       const moved = this.ok(card, s.stage, 'active', { folder: this.folderOf(this.state(card)), line: g.data.line, base: g.data.base, target: g.data.target }, g.warnings)
       return g.data.lease && g.data.slot ? { ...moved, placed: true } : moved
@@ -913,7 +922,7 @@ export class Workflow {
     const before = await this.evidenceOf(card, s, o, builder)
     const plan = await this.platform(o).start(card, o, builder, dry)
     if (isUnknown(plan)) return { rule: 'platform.unknown', values: { card: card.key, what: plan.whatText ?? plan.what, rule: 'start' } }
-    const { existing, slotWait, fresh, ...planned } = plan
+    const { existing, slotWait, fresh, baselineGen, ...planned } = plan
     // A slot lent for this start (#1438) is given back if the start isn't written (refused, gathered again, undone).
     const lent = fresh && plan.lease ? plan.lease : null
     // Its target resolved again as it was planned (the builder worktree's base moved meanwhile): not what the evidence
@@ -929,7 +938,7 @@ export class Workflow {
     if (data.lease && data.slot) warnings.push(`You'll continue in ${data.slot}, on ${data.line}: Hive makes the line there from ${data.target}, then gives you ${card.key} there (a new conversation unless you already work there; your old one is kept). End your turn now.`) // i18n-ignore: agent-facing, the start's reply
     // Dependencies Done by facts, in this card's target (§16.7.4).
     const waitingFor = r.guards.start.includes('start.dependenciesIntegrated') ? await this.waitingFor(card, data.target, o) : []
-    return { r, o, data, existing: !!existing, ins: { agent: agentOf(actor), waitingFor, slotFree: !slotWait }, before, warnings, lent }
+    return { r, o, data, existing: !!existing, ins: { agent: agentOf(actor), waitingFor, slotFree: !slotWait }, before, warnings, lent, ...(baselineGen !== undefined ? { baselineGen } : {}) }
   }
 
   /**
@@ -1324,13 +1333,13 @@ export class Workflow {
 
     const g = await this.gatherSubmit(card, s, actor, args, undefined, false, op)
     // Nothing changed in its paths (None): what they leave out goes with the refusal (HI-2339), the likely why.
-    if (!('inputs' in g)) return this.withNotices(await this.refuse(card, actor, 'submit', g), g.rule === 'submit.unchanged' ? this.pathNotices({ ...card, paths: args.paths ?? card.paths ?? this.prefill(card) }, o, !!args.paths) : [])
+    if (!('inputs' in g)) return this.withNotices(await this.refuse(card, actor, 'submit', g), g.rule === 'submit.unchanged' ? await this.pathNotices({ ...card, paths: args.paths ?? card.paths ?? this.prefill(card) }, o, !!args.paths, op) : [])
     const ended: GuardRefusal = { rule: 'submit.focusedChosen', values: { card: card.key, revision: (g.revision ?? '').slice(0, 7), state: 'unknown', why: 'cancelled' } } // i18n-ignore: codes
     // Its operation ended while it gathered (G20: only where it picked): refused before anything.
     if (g.focusedOp?.aborted) return this.refuse(card, actor, 'submit', ended)
     // The same revision again: a new submission only with a note (§16.8.1).
     const waiting = (from === 'review' || from === 'approved' || awaitsAgentMerge(g.r, g.s)) && !g.s.stale
-    if (g.earlier && !waiting && !args.note && !args.drag) return this.withNotices(await this.refuse(card, actor, 'submit', { rule: 'submit.sameRevisionNote', values: { revision: g.revision!.slice(0, 7) } }), this.pathNotices(g.card, g.o, !!args.paths))
+    if (g.earlier && !waiting && !args.note && !args.drag) return this.withNotices(await this.refuse(card, actor, 'submit', { rule: 'submit.sameRevisionNote', values: { revision: g.revision!.slice(0, 7) } }), await this.pathNotices(g.card, g.o, !!args.paths, op))
 
     await this.cfg.hooks?.beforeWrite?.('submit')
     const again = await this.revalidate(g.card, g.s, g.o, g.before)
@@ -1428,7 +1437,7 @@ export class Workflow {
       if (!plan.ok) return plan.refusal
       ;({ revision, base, key, files, commits, paths } = plan)
       Object.assign(inputs, plan.inputs)
-      warnings.push(...plan.warnings, ...this.pathNotices(card, o, !!args.paths))
+      warnings.push(...plan.warnings, ...(await this.pathNotices(card, o, !!args.paths, op)))
       // The adapter may have reconciled (a shared folder's attribution): the card and its state as they are now.
       if (!predicted) {
         card = { ...this.store.card(card.id), ...(setPaths ? { paths: setPaths } : {}) }
@@ -2233,7 +2242,7 @@ export class Workflow {
       const gsub = ORDER.indexOf(to) > ORDER.indexOf('active') && s1.stage === 'active' ? await this.gatherSubmit(card, s1, by, opts.paths ? { paths: opts.paths } : {}, gs ? gs.r : r, !!gs) : null
       // The window's drag of a started None code card (HI-2352): what its paths leave out is asked first, read-only, so
       // the user includes it or leaves it (an unchanged revision too: a later round's new file may be all its change).
-      const leftOut = gsub && !gs && by === 'user' && opts.askPaths && !opts.dry && ('inputs' in gsub || gsub.rule === 'submit.unchanged') ? this.leftOutOf('inputs' in gsub ? gsub.card : card, r.options) : null
+      const leftOut = gsub && !gs && by === 'user' && opts.askPaths && !opts.dry && ('inputs' in gsub || gsub.rule === 'submit.unchanged') ? await this.leftOutOf('inputs' in gsub ? gsub.card : card, r.options) : null
       if (leftOut) return { ask: true, card: card.key, rules: [], leftOut }
       if (gsub && !('inputs' in gsub)) {
         // A submission refused for what no override makes true stops the drag there (§16.8.4), after its start. Its folder
@@ -2465,7 +2474,7 @@ export class Workflow {
     if (bad) return refusal('paths.excluded', { card: card0.key, ...bad }, null)
     const card = await this.locked(() => this.store.updateCard(card0.id, { paths }))
     const rev = this.none.revision(paths)
-    return { prefill: this.prefill(card), unclaimed: this.unclaimed(card), revision: isUnknown(rev) ? null : rev.revision }
+    return { prefill: this.prefill(card), unclaimed: await this.unclaimed(card), revision: isUnknown(rev) ? null : rev.revision }
   }
 
   /** The first declared path under `.hive`, `.git` or an excluded folder (#1511), with that folder; null when none is. */
@@ -2477,18 +2486,33 @@ export class Workflow {
     return null
   }
 
-  /** Deliverables changed since the card started that are in neither its paths nor its pre-fill: for it to add or leave. */
-  unclaimed(card: CardRecord): string[] {
-    const before = this.none.covering(this.state(card).started?.deliverables ?? {})
-    const all = this.none.deliverables()
-    if (isUnknown(all)) return []
-    const now = this.none.manifest(all)
-    if (isUnknown(now)) return []
-    // Covered as a revision covers them (HI-2339): a declared folder's files are the card's.
-    const mine = [...(card.paths ?? []), ...this.prefill(card)]
-    return NoneAdapter.diff(before, now)
-      .map((f) => f.path)
-      .filter((p) => !this.none.covers(mine, p))
+  /**
+   * Deliverables changed since the card started that are in neither its paths nor its pre-fill: for it to add or leave.
+   * Advisory, never written. The project is read whole off main's thread (HI-2340); after that read, the card is read
+   * again from the board, and the read compared with its baseline, paths (`paths`: a submit's given ones, not stored
+   * yet) and pre-fill as they are then, in the same start cycle as before it: a newer cycle (put back and started again
+   * meanwhile) or a read under folders left out that changed since, read once more, and then nothing rather than a
+   * misleading list. No-code cards keep no baseline: nothing.
+   */
+  async unclaimed(card0: CardRecord, o: { paths?: readonly string[]; signal?: AbortSignal } = {}): Promise<string[]> {
+    if (this.store.card(card0.id).kind === 'no-code') return []
+    for (let tries = 0; tries < 2; tries++) {
+      const cycle = this.state(this.store.card(card0.id)).cycle
+      const generation = this.none.generation
+      const now = await readBaseline(this.none, o.signal)
+      if (!now || isUnknown(now) || o.signal?.aborted) return []
+      const card = this.store.card(card0.id)
+      const s = this.state(card)
+      if (s.cycle !== cycle || card.kind === 'no-code') return []
+      if (this.none.generation !== generation) continue
+      const before = this.none.covering(s.started?.deliverables ?? {})
+      // Covered as a revision covers them (HI-2339): a declared folder's files are the card's.
+      const mine = [...(o.paths ?? card.paths ?? []), ...this.prefill(card)]
+      return NoneAdapter.diff(before, this.none.covering(now))
+        .map((f) => f.path)
+        .filter((p) => !this.none.covers(mine, p))
+    }
+    return []
   }
 
   /**
@@ -2496,13 +2520,13 @@ export class Workflow {
    * pre-fill's files the paths don't cover (paths set, none given), and the unclaimed changes. Never claimed: the
    * declared paths stay what the revision covers. Agent-facing English; empty elsewhere (Git, no-code).
    */
-  private pathNotices(card: CardRecord, o: WorkflowOptions, given: boolean): string[] {
+  private async pathNotices(card: CardRecord, o: WorkflowOptions, given: boolean, signal?: AbortSignal): Promise<string[]> {
     if (o.platform !== 'none' || card.kind !== 'code') return []
     const paths = card.paths ?? []
     const out: string[] = []
     const outside = given ? [] : this.prefill(card).filter((p) => !this.none.covers(paths, p))
     if (outside.length) out.push(`${card.key}'s paths leave out files it recorded as its agents' edits: ${outside.join(', ')}. Its revision covers only its paths: to include them, submit with paths listing every file of its work (or declare its paths); to leave them out, carry on.`) // i18n-ignore: agent-facing warning in the submit's reply
-    const unclaimed = this.unclaimed(card).filter((p) => !outside.includes(p))
+    const unclaimed = (await this.unclaimed(card, { paths, signal })).filter((p) => !outside.includes(p))
     if (unclaimed.length) out.push(`Changed in the project since ${card.key} started, in neither its paths nor what it recorded as its agents' edits: ${unclaimed.join(', ')}. Not part of its revision: to include any, submit with paths listing every file of its work; else leave them.`) // i18n-ignore: agent-facing warning in the submit's reply
     return out
   }
@@ -2511,12 +2535,12 @@ export class Workflow {
    * What a None code card's submission with its paths (else its pre-fill) leaves out, counted as pathNotices counts it
    * (HI-2352), for the window's drag to ask the user: null when nothing is, or it isn't a None code card.
    */
-  private leftOutOf(card: CardRecord, o: WorkflowOptions): { paths: string[]; files: string[] } | null {
+  private async leftOutOf(card: CardRecord, o: WorkflowOptions): Promise<{ paths: string[]; files: string[] } | null> {
     if (o.platform !== 'none' || card.kind !== 'code') return null
     const prefill = this.prefill(card)
     const paths = card.paths ?? prefill
     const outside = prefill.filter((p) => !this.none.covers(paths, p))
-    const files = [...outside, ...this.unclaimed({ ...card, paths }).filter((p) => !outside.includes(p))]
+    const files = [...outside, ...(await this.unclaimed(card, { paths })).filter((p) => !outside.includes(p))]
     return files.length ? { paths, files } : null
   }
 

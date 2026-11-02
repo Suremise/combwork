@@ -48,6 +48,8 @@ export default defineConfig({
           'usage-worker': resolve(__dirname, 'src/main/usageWorker.ts'),
           // The repository lock's worker thread (HI-1680).
           'repo-lock-worker': resolve(__dirname, 'src/main/repoLockWorker.ts'),
+          // A None project's whole-project read (HI-2340).
+          'none-baseline-worker': resolve(__dirname, 'src/main/noneBaselineWorker.ts'),
           // Git's worker thread, which starts its processes (HI-1783).
           'git-worker': resolve(__dirname, 'src/main/gitWorker.ts'),
           // The stall watchdog's thread (HI-1692).

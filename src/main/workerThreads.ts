@@ -20,8 +20,8 @@ export function bundledScriptExists(file: string): boolean {
 }
 
 /** Hive's worker threads, by the names Copy Diagnostics gives them. */
-export type WorkerName = 'usage history' | 'git' | 'repository lock' | 'WAL checkpoints' | 'stall watchdog' | 'log writer' | "Codex's log"
-const NAMES: WorkerName[] = ['usage history', 'git', 'repository lock', 'WAL checkpoints', 'stall watchdog', 'log writer', "Codex's log"] // i18n-ignore: a worker's name, for Copy Diagnostics' report (English)
+export type WorkerName = 'usage history' | 'git' | 'repository lock' | 'WAL checkpoints' | 'stall watchdog' | 'log writer' | "Codex's log" | 'None baseline'
+const NAMES: WorkerName[] = ['usage history', 'git', 'repository lock', 'WAL checkpoints', 'stall watchdog', 'log writer', "Codex's log", 'None baseline'] // i18n-ignore: a worker's name, for Copy Diagnostics' report (English)
 
 type WorkerState = { how: 'started'; running: () => boolean } | { how: 'here' | 'ended'; why: string }
 const states = new Map<WorkerName, WorkerState>()

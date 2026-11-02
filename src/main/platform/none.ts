@@ -45,11 +45,30 @@ export class NoneAdapter {
     if (JSON.stringify(excluded) === JSON.stringify(this.excluded)) return
     this.excluded = [...excluded]
     this.cache.clear()
+    this.generation++
   }
 
   /** Every cached hash goes (writes may have been missed: the watcher's record isn't complete), each path read again. */
   forget(): void {
     this.cache.clear()
+    this.generation++
+  }
+
+  /**
+   * HI-2340: what the deliverables are read under, counted up whenever that changes (the folders left out, or the
+   * watcher's record lost): a whole-project read made off main's thread (`noneBaseline`) under an earlier one is
+   * gathered again, never used.
+   */
+  generation = 0
+
+  /** The folders left out of the deliverables, as a read off main's thread is asked for them (HI-2340). */
+  get excludedNames(): readonly string[] {
+    return this.excluded
+  }
+
+  /** Whether names match whatever their case (Windows), as a read off main's thread is asked for them (HI-2340). */
+  get caseless(): boolean {
+    return this.anyCase
   }
 
   /** A watcher write event for a path: its cached hash goes, even if its size and time look unchanged. */

@@ -272,6 +272,9 @@ export const WORKFLOW_ENFORCE = 'hive.workflow.enforce'
 /** How long a returned copy waits to be quiet before it shows as still in use, in minutes (#1435): read by main's copiesApp. */
 export const COPIES_QUIET_WAIT = 'hive.copies.quietWaitMinutes'
 
+/** HI-2340: how long a None project's whole-project read (its worker's scan) may take before it is stopped. */
+export const NONE_BASELINE_SECONDS = 'hive.none.baselineSeconds'
+
 /** Ctrl+C and Ctrl+V in an agent's pane go to its CLI rather than Hive's copy and paste (#1286, #966 row 24): read by TerminalView. */
 export const CTRL_CV_TO_CLI = 'hive.terminal.ctrlCVToCli'
 
@@ -1115,6 +1118,22 @@ const SOURCES: readonly AdvancedSource[] = [
     min: 1,
     max: 1440,
     unit: 'min',
+    applies: 'now'
+  },
+  {
+    id: NONE_BASELINE_SECONDS,
+    group: 'hive',
+    title: msg({ id: 'settings.advanced.hive.none.baselineSeconds.title', defaultMessage: 'No version control: longest read of the project', description: "An advanced setting's title (Settings → Advanced), listed under Hive, followed by its value in seconds (\"120 s\"). In a project without version control, Hive reads every file of the project in the background when a card starts." }),
+    desc: msg({
+      id: 'settings.advanced.hive.none.baselineSeconds.desc',
+      defaultMessage: "In a project without version control, Hive reads the project's files in the background when a card starts, and when it is submitted, to find what changed outside the card's files. A read that takes longer than this is stopped: the card starts or is submitted without that list.",
+      description: 'What the advanced setting "No version control: longest read of the project" does (Settings → Advanced, under Hive).'
+    }),
+    kind: 'number',
+    default: 120,
+    min: 10,
+    max: 3600,
+    unit: 's',
     applies: 'now'
   },
   // Switches for what Hive does with the pane's keys and with what it types (#1286, #966 rows 24, 28, 29): Hive's own

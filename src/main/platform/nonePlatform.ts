@@ -12,6 +12,7 @@ import { snapshot } from '../workflow/checks'
 import type { Workflow } from '../workflow/runtime'
 import type { CheckBracket, FinishInputs, HeadMove, PlatformAdapter, RunRevision, StartPlan, SubmitPlan } from './adapter'
 import { NoneAdapter } from './none'
+import { readBaseline } from '../noneBaseline'
 import { observer, type Disposable, type ObserveEvent } from './observe'
 import { isUnknown, type Containment, type Maybe } from './types'
 
@@ -23,13 +24,19 @@ export class NonePlatform implements PlatformAdapter {
     readonly hashing: NoneAdapter
   ) {}
 
-  async start(card: CardRecord): Promise<Maybe<StartPlan>> {
+  async start(card: CardRecord, _o?: unknown, _builder?: string, dry = false): Promise<Maybe<StartPlan>> {
+    // A no-code card has no content revision (HI-2340): nothing of the project is read for it, its declared paths
+    // either (a kind changed later keeps them), and nothing reads its base, manifest or baseline.
+    if (card.kind === 'no-code') return { folder: 'project', line: null, base: null, target: null, manifest: {} }
     const rev = this.hashing.revision(card.paths ?? [])
     if (isUnknown(rev)) return rev
-    // Every deliverable's hash at the start, kept in Started: what unclaimed changes are found against.
-    const all = this.hashing.deliverables()
-    const deliverables = isUnknown(all) ? undefined : this.hashing.manifest(all)
-    return { folder: 'project', line: null, base: rev.revision, target: null, manifest: rev.manifest, ...(deliverables && !isUnknown(deliverables) ? { deliverables } : {}) }
+    if (dry) return { folder: 'project', line: null, base: rev.revision, target: null, manifest: rev.manifest }
+    // Every deliverable's hash at the start, kept in Started: what unclaimed changes are found against. Read whole off
+    // main's thread (HI-2340); the generation it was read under is checked again at the write. Unreadable, or no
+    // answer (its worker ended, the read too long): no baseline, as before.
+    const baselineGen = this.hashing.generation
+    const deliverables = await readBaseline(this.hashing)
+    return { folder: 'project', line: null, base: rev.revision, target: null, manifest: rev.manifest, baselineGen, ...(deliverables && !isUnknown(deliverables) ? { deliverables } : {}) }
   }
 
   async prime(): Promise<unknown> {
@@ -46,9 +53,14 @@ export class NonePlatform implements PlatformAdapter {
     return null
   }
 
-  /** The card's paths' hash now (the hash cache follows writes and file times, so an edit since shows). */
+  /**
+   * The card's paths' hash now (the hash cache follows writes and file times, so an edit since shows). A no-code card
+   * has no content to hash (HI-2340): its kind, as the board has it now, so a kind changed meanwhile is evidence changed.
+   */
   evidence(card: CardRecord): string | null {
-    const r = this.hashing.revision(this.wf.store.card(card.id).paths ?? [])
+    const now = this.wf.store.card(card.id)
+    if (now.kind === 'no-code') return 'no-code'
+    const r = this.hashing.revision(now.paths ?? [])
     return isUnknown(r) ? null : r.revision
   }
 
