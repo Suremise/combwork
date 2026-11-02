@@ -475,18 +475,14 @@ describe('following the project', () => {
     await run(() => workspace.ensureProject(p))
     await run(() => workspace.projectIds({ fresh: true }))
     await run(() => workspace.upsertSession(p, { id: 'stay-out' }))
-    // A place under its folder's scope (its id unreadable for a moment), where no export is marked.
-    const cfg = join(p, '.hive', 'project.json')
-    let place: SessionsPlace
-    renameSync(cfg, `${cfg}.aside`)
-    try {
-      await run(() => workspace.projectIds({ fresh: true }))
-      place = await run(() => (w as unknown as { sessionsPlace: (pp: string) => Promise<SessionsPlace> }).sessionsPlace(p))
-    } finally {
-      renameSync(`${cfg}.aside`, cfg)
-      await run(() => workspace.projectIds({ fresh: true }))
-    }
-    expect(place.scope).toBe('folder:held-read')
+    // A place under its folder's scope (its id unreadable for a moment), where no export is marked: the project's own,
+    // under the scope sessionsPlace gives a folder whose id it can't read (that fallback is "a removed project read under
+    // its folder's scope" above). Not by setting its project.json aside (HI-2361): the project is present, so a refresh
+    // meanwhile makes it a project.json of its own, with no id, which could land over the original as it came back (or
+    // hold it, refusing the rename): the project then had a new id, and its records read as none after Restore.
+    const own = await run(() => (w as unknown as { sessionsPlace: (pp: string) => Promise<SessionsPlace> }).sessionsPlace(p))
+    expect(own.scope).toBe(idOf(p))
+    const place: SessionsPlace = { ...own, scope: 'folder:held-read' }
     expect(place.removed!()).toBe(false)
     // Its file's read is held; the project is removed meanwhile, writing its records into that file.
     const file = join(p, '.hive', 'sessions.json')
