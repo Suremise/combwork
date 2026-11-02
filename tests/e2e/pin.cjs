@@ -10,6 +10,7 @@ const userData = path.join(lib.WORK, 'pin-profile')
 const wsA = path.join(lib.WORK, 'pin-ws-a')
 const wsB = path.join(lib.WORK, 'pin-ws-b')
 const PORT = lib.port(47926)
+const TITLED = ['website', 'cli', 'mobile-app']
 let failed = 0
 const check = (name, ok, extra = '') => {
   if (!ok) failed++
@@ -31,6 +32,8 @@ const both = async (page, on) => (await onTop(page)) === on && (await pinLit(pag
 ;(async () => {
   for (const d of [userData, wsA, wsB]) fs.rmSync(d, { recursive: true, force: true })
   for (const ws of [wsA, wsB]) fs.mkdirSync(path.join(ws, 'alpha'), { recursive: true })
+  // Titles whose text is a fractional width, each cut by a pixel's rounding before HI-2319.
+  for (const n of TITLED) fs.mkdirSync(path.join(wsA, n), { recursive: true })
   lib.enableProviders(userData, [])
   const cfgFile = path.join(userData, 'config.json')
   const cfg = JSON.parse(fs.readFileSync(cfgFile, 'utf8'))
@@ -65,6 +68,29 @@ const both = async (page, on) => (await onTop(page)) === on && (await pinLit(pag
 
   await lib.openWorkspace(inv1, p1, wsA)
   check('a workspace never pinned: off, the pin not lit', await both(p1, false))
+
+  // --- HI-2319: a title with room is shown in full, at 100% and at fractional zooms (its width is fractional).
+  const titleCut = () =>
+    p1.evaluate(() => {
+      const t = document.querySelector('.titlebar-title')
+      if (!t || !t.style.maxWidth) return null
+      const r = document.createRange()
+      r.selectNodeContents(t)
+      return { text: t.textContent, textW: r.getBoundingClientRect().width, boxW: t.getBoundingClientRect().width }
+    })
+  for (const zoom of [1, 1.1, 1.25]) {
+    await app.evaluate(({ BrowserWindow }, z) => BrowserWindow.getAllWindows()[0].webContents.setZoomFactor(z), zoom)
+    for (const n of TITLED) {
+      await p1.locator('.project-row', { hasText: n }).first().click()
+      let seen = null
+      const whole = await lib.until(async () => {
+        seen = await titleCut()
+        return !!seen && seen.text.startsWith(`${n} — `) && seen.textW <= seen.boxW + 0.01
+      }, 5000)
+      check(`at ${zoom * 100}% zoom, the title "${n} — …" has room and is shown in full`, !!whole, JSON.stringify(seen))
+    }
+  }
+  await app.evaluate(({ BrowserWindow }) => BrowserWindow.getAllWindows()[0].webContents.setZoomFactor(1))
 
   // --- The title bar's pin.
   await p1.locator('.titlebar-pin').click()
