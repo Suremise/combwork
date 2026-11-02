@@ -1548,7 +1548,9 @@ All Git calls go through the `git()` runner (`src/main/git.ts:47`); the two bypa
   the two refusals they explain, `submit.unchanged` and `submit.sameRevisionNote` (a refusal's `warnings`, in the Agent
   API's body and the hive tools' text). Nothing is claimed: to include them, the builder submits with `paths` listing
   every file of the work (or declares them). The paths cover a file when it is one of them or under one, as the file
-  system names them (`src` covers `src/x`, never `src-other/x`). Git cards and no-code cards are unchanged.
+  system names them (`src` covers `src/x`, never `src-other/x`). Git cards and no-code cards are unchanged. **Not
+  built yet:** the user's surface (the window shows no card's paths, and a user's submit names nothing of this; the
+  Version Control tab listing above): HI-2352, by Darren's choice (HI-2339/r12, 2 Nov: "B", the agent side first).
 - **Revision:** SHA-256 over the sorted list of (relative path, SHA-256 of content, or "deleted") of **the card's
   paths** (a folder means every deliverable file under it), together with the path list itself. It can be computed
   **at any time** from the card's current paths, not only at submit: a check run computes it when it starts and ends
