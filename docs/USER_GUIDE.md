@@ -1888,6 +1888,7 @@ Hive tells you each thing once, in one place, and keeps it under the bell.
 
 - **While you use Hive** (any Hive window focused), it shows a **pop-up** in that window: an agent finished or needs you, a lane or a card needs you, plan usage, and Hive's own messages (a warning, what an action did, an update ready). Every pop-up is also kept in the **Notifications** panel (the bell).
 - **With Hive in the background**, an agent finishing or needing you, a lane's or a card's news, and plan usage come as a **Windows notification** instead, and are kept under the bell too, without a pop-up. Hive's own messages wait as a pop-up in the window, which stays until you come back to it.
+- **With several Hive windows**, what an action you started says (it worked, or a warning about it) pops up in the window you started it from, even if you have moved to another by the time it finishes, so you find it under that window's bell. Everything else pops up in the window you are using.
 - Never both: what you see in Hive never comes as a Windows notification as well.
 
 When an agent finishes (for one waiting on background tasks, once they have ended) or needs input, Hive also plays a chime. Configure all of this in **Settings → Notifications**; each project can override the chime.
