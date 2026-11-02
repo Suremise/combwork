@@ -30,6 +30,9 @@ w('icon.svg', '<svg xmlns="http://www.w3.org/2000/svg" width="120" height="120">
 w('img/pic.png', png)
 w('code.ts', 'export const answer = 42\n')
 w('blob.bin', Buffer.from([0, 1, 2, 3, 0, 255, 0, 10]))
+// Windows-1252 "café\r\n" (HI-2331): not UTF-8, so never opened for editing (a save would write U+FFFD over E9).
+const latin1 = Buffer.from([0x63, 0x61, 0x66, 0xe9, 0x0d, 0x0a])
+w('latin1.txt', latin1)
 
 const sleep = (ms) => new Promise((r) => setTimeout(r, ms))
 const results = []
@@ -295,6 +298,10 @@ const HUNG_MS = 10000
   await page.screenshot({ path: path.join(shots, '5-pdf.png') })
   await row('blob.bin').click()
   check('binary: not opened as text', !!(await lib.until(async () => (await pane.innerText()).includes('binary file'), HUNG_MS)))
+  await row('latin1.txt').click()
+  check('not UTF-8: refused with Open in Default App, no editor', !!(await lib.until(async () => (await pane.innerText()).includes("isn't UTF-8 text") && (await pane.locator('.monaco-editor').count()) === 0, HUNG_MS)))
+  check('not UTF-8: the file is untouched', fs.readFileSync(path.join(proj, 'latin1.txt')).equals(latin1))
+  await page.screenshot({ path: path.join(shots, '5c-not-utf8.png') })
 
   // Light theme, markdown.
   await inv('settings:update', { appearance: { theme: 'light' } })

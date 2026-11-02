@@ -138,6 +138,7 @@
   "files.view.gone": "このファイルはディスク上にもうありません。保存すると再作成されます。",
   "files.view.htmlPreview": "HTMLプレビュー",
   "files.view.image": "画像",
+  "files.view.notUtf8": "このファイルはUTF-8のテキストではないため、Hiveでは文字を変えずに編集できません。",
   "files.view.openInApp": "代わりに既定のアプリで開いてください。",
   "files.view.overwrite": "自分のバージョンで上書き",
   "files.view.pdf": "PDF",

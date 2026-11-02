@@ -138,6 +138,7 @@
   "files.view.gone": "此文件已不在磁盘上。保存即可重新创建。",
   "files.view.htmlPreview": "HTML 预览",
   "files.view.image": "图片",
+  "files.view.notUtf8": "此文件不是 UTF-8 文本，Hive 无法在不改变其字符的情况下编辑它。",
   "files.view.openInApp": "可改用默认应用打开。",
   "files.view.overwrite": "用我的版本覆盖",
   "files.view.pdf": "PDF",

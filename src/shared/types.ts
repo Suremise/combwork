@@ -3440,7 +3440,8 @@ export interface FileEntry {
 
 /** A file opened in the Files tab editor. */
 export interface FileContent {
-  kind: 'text' | 'binary' | 'too-large'
+  /** not-utf8: text that isn't valid UTF-8, never offered for editing (saving would rewrite its bytes, HI-2331). */
+  kind: 'text' | 'binary' | 'too-large' | 'not-utf8'
   text: string
   size: number
   modified: string

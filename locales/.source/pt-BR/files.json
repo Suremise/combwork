@@ -138,6 +138,7 @@
   "files.view.gone": "This file no longer exists on disk. Save to recreate it.",
   "files.view.htmlPreview": "HTML preview",
   "files.view.image": "Image",
+  "files.view.notUtf8": "This file isn't UTF-8 text, so Hive can't edit it without changing its characters.",
   "files.view.openInApp": "Open it in its default app instead.",
   "files.view.overwrite": "Overwrite with mine",
   "files.view.pdf": "PDF",

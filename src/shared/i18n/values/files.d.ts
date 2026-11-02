@@ -140,6 +140,7 @@ interface HiveMessageValues {
   'files.view.gone': undefined
   'files.view.htmlPreview': undefined
   'files.view.image': undefined
+  'files.view.notUtf8': undefined
   'files.view.openInApp': undefined
   'files.view.overwrite': undefined
   'files.view.pdf': undefined

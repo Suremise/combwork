@@ -555,6 +555,10 @@
     "defaultMessage": "Image",
     "description": "A file view's mode button: an image file (or SVG) shown as a picture."
   },
+  "files.view.notUtf8": {
+    "defaultMessage": "This file isn't UTF-8 text, so Hive can't edit it without changing its characters.",
+    "description": "Shown in place of a text file in another encoding (such as Windows-1252), which the editor would corrupt on save. UTF-8 is the encoding's name: keep it as it is."
+  },
   "files.view.openInApp": {
     "defaultMessage": "Open it in its default app instead.",
     "description": "Under \"This is a binary file.\" or \"This file is too large to open here\", above an Open button."
