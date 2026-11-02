@@ -833,16 +833,24 @@ export function releasedLine(released: Released[]): string {
 /**
  * Where a timed-out watch's card is now, when it is in Review (HI-2295), read from the board as the limit passes: being
  * reviewed (`reviewer`: who), given by the reviewer pool to a reviewer that hasn't started (`assigned`), waiting for the
- * pool to give it to one (`pool`), or waiting for its reviewer (`review`).
+ * pool to give it to one (`pool`), or waiting for its reviewer (`review`). A dependency in progress (HI-2381): a card
+ * that waits on another agent's card in Doing or Review (`waits`, `on` those), and that card, in Doing with its builder
+ * (`working`, `reviewer` its builder): another's work going on is nothing to ask the user about either.
  */
 export interface ReviewWhere {
   number: number
-  state: 'reviewing' | 'assigned' | 'pool' | 'review'
+  state: 'reviewing' | 'assigned' | 'pool' | 'review' | 'waits' | 'working'
   reviewer?: string
+  on?: number[]
 }
+
+/** Where a card is that waits on, or is, another agent's card in progress (HI-2381), rather than one in Review. */
+const dependencyState = (w: ReviewWhere): boolean => w.state === 'waits' || w.state === 'working'
 
 function wherePart(w: ReviewWhere): string {
   const ref = cardRef(w.number)
+  if (w.state === 'waits') return `${ref} waits on ${cards(w.on ?? [])}`
+  if (w.state === 'working') return `${ref} is in Doing with ${shortName(w.reviewer ?? '')}`
   return w.state === 'reviewing'
     ? `${ref} is in Review, being reviewed by ${shortName(w.reviewer ?? '')}`
     : w.state === 'assigned'
@@ -855,21 +863,27 @@ function wherePart(w: ReviewWhere): string {
 /**
  * The line Hive types when a watch's overall limit passes with no change. Cards that left the watch meanwhile (#420) are
  * told first: drop them. A card in Review (HI-2295, `where`) is said to be there, by whom it is reviewed or that it waits for
- * a reviewer: a review on its way is nothing to tell the user, so only the other cards ask the agent to.
+ * a reviewer: a review on its way is nothing to tell the user, so only the other cards ask the agent to. Likewise a card
+ * waiting on another agent's card in progress, and that card (HI-2381): watched again quietly, the lane showing the wait.
  */
 export function limitLine(cond: WatchCondition, minutes: number, released: Released[] = [], where: ReviewWhere[] = []): string {
   const dur = minutes >= 60 ? `${Math.round((minutes / 60) * 10) / 10} h` : `${minutes} min`
   const gone = new Set(released.map((r) => r.number))
-  const inReview = where.filter((w) => cond.cards.includes(w.number) && !gone.has(w.number))
-  const reviewed = new Set(inReview.map((w) => w.number))
-  const rest = cond.cards.filter((n) => !gone.has(n) && !reviewed.has(n))
+  const placed = where.filter((w) => cond.cards.includes(w.number) && !gone.has(w.number))
+  const inReview = placed.filter((w) => !dependencyState(w))
+  const waiting = placed.filter(dependencyState)
+  const known = new Set(placed.map((w) => w.number))
+  const rest = cond.cards.filter((n) => !gone.has(n) && !known.has(n))
   const steps: string[] = []
   if (released.length) steps.push(`drop ${released.length === 1 ? 'the first' : 'those'} from your list`)
   if (inReview.length) steps.push(`watch ${cards(inReview.map((w) => w.number))} again for ${inReview.length === 1 ? 'its' : 'their'} verdict (in a card loop, Hive wakes you with it); don't tell the user about ${inReview.length === 1 ? 'it' : 'them'}`)
+  if (waiting.length) steps.push(`watch ${cards(waiting.map((w) => w.number))} again: another agent's work is going on; don't tell the user about ${waiting.length === 1 ? 'it' : 'them'}`)
   if (rest.length || !steps.length) steps.push(`${steps.length ? 'for the rest, ' : ''}tell the user (hive_notify) and ask what to do`)
   const todo = steps.join('; ')
   const ended = `No change on ${cards(cond.cards)} in ${dur}: your card watch has ended. `
-  const tailOf = (full: boolean): string => `${ended}${inReview.length ? `${full ? inReview.map(wherePart).join('; ') : `${cards(inReview.map((w) => w.number))} ${inReview.length === 1 ? 'is' : 'are'} in Review`}. ` : ''}${todo[0].toUpperCase()}${todo.slice(1)}.`
+  const short = (ws: ReviewWhere[], what: string, whats: string): string => `${cards(ws.map((w) => w.number))} ${ws.length === 1 ? what : whats}`
+  const shortParts = [...(inReview.length ? [short(inReview, 'is in Review', 'are in Review')] : []), ...(waiting.length ? [short(waiting, 'waits on work in progress', 'wait on work in progress')] : [])]
+  const tailOf = (full: boolean): string => `${ended}${placed.length ? `${full ? [...inReview, ...waiting].map(wherePart).join('; ') : shortParts.join('; ')}. ` : ''}${todo[0].toUpperCase()}${todo.slice(1)}.`
   for (const full of [true, false]) {
     const head = released.length ? `${released.map((r) => releasedPart(r, full)).join('; ')}. ` : ''
     const line = `[Hive] ${head}${tailOf(full)}`

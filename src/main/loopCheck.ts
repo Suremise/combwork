@@ -99,6 +99,19 @@ export function cardsInPlay(cards: readonly TaskCard[], project: string, agentId
     .sort((a, b) => a - b)
 }
 
+/**
+ * Of an agent's watched cards, those it watches only as another's work that a card of its own waits on (HI-2381): another
+ * agent builds the card, it isn't its reviewer (`reviews`), and another card it watches, not Done, depends on it
+ * (blockedBy). Not its loop: CB2, whose next card CL-10 waits on CL-8, watched CL-8 and, its watch over, flagged CL-8 as
+ * stalled while CL-8's own builder and reviewer were on it. A card's stall counts only its own builder and reviewer.
+ */
+export function dependencyWatches(cards: readonly TaskCard[], agentId: string, watched: readonly number[], reviews: (n: number) => boolean): number[] {
+  const blockers = new Set(cards.filter((c) => watched.includes(c.number) && !c.archived && c.column !== 'done').flatMap((c) => c.blockedBy ?? []))
+  return cards
+    .filter((c) => watched.includes(c.number) && blockers.has(c.number) && !!c.agent && c.agent !== agentId && c.review?.agent !== agentId && !reviews(c.number))
+    .map((c) => c.number)
+}
+
 /** What reaches an agent of its cards without a watch (HI-1693): whether Hive's loop wakes can, and each card's loop reviewer. */
 export interface LoopReach {
   /** The project's loop wakes are on and the agent can read its inbox (its hive tools): a loop wake reaches it. */
@@ -178,7 +191,16 @@ async function owedNow(loop: Loop): Promise<number[]> {
   const ws = workspaceOf(loop.projectPath)
   const project = basename(loop.projectPath)
   const heads = await liveCardHeads(ws)
-  const inPlay = cardsInPlay(heads, project, loop.agentId, loop.cards)
+  let watched = loop.cards
+  // Another's card it waits on (HI-2381): not its loop, unless it is that card's loop reviewer.
+  const deps = dependencyWatches(heads, loop.agentId, watched, () => false)
+  if (deps.length) {
+    const reviewing = new Set<number>()
+    for (const c of heads) if (deps.includes(c.number) && (await loopReviewerOf(ws, c).catch(() => null))?.id === loop.agentId) reviewing.add(c.number)
+    const drop = new Set(dependencyWatches(heads, loop.agentId, watched, (n) => reviewing.has(n)))
+    watched = watched.filter((n) => !drop.has(n))
+  }
+  const inPlay = cardsInPlay(heads, project, loop.agentId, watched)
   if (!inPlay.length) return []
   // Pool cards (HI-2321): only its builder and its reviewer now are in its loop, so their reviewer is read either way.
   const pooled = new Set(heads.filter((c) => inPlay.includes(c.number) && poolCard(ws, c)).map((c) => c.number))
@@ -189,14 +211,14 @@ async function owedNow(loop: Loop): Promise<number[]> {
   const wakes = agentReadsInbox(loop.projectPath, loop.agentId) && projectPreferences(ws, loop.projectPath, await ws.projectConfig(loop.projectPath).catch(() => null)).loopWakes
   if (!wakes) {
     for (const c of heads) if (pooled.has(c.number)) reviewers.set(c.number, (await loopReviewerOf(ws, c).catch(() => null))?.id ?? null)
-    return owedCards(heads, project, loop.agentId, loop.cards, { wakes, reviewerOf, pool: (n) => pooled.has(n) })
+    return owedCards(heads, project, loop.agentId, watched, { wakes, reviewerOf, pool: (n) => pooled.has(n) })
   }
   const cards = await allTasks(ws, { numbers: inPlay })
   for (const c of cards) reviewers.set(c.number, (await loopReviewerOf(ws, c).catch(() => null))?.id ?? null)
   // Its own questions for the user still open (HI-2080), from the board's For you as it is now.
   const open = forYouOfCards(ws, inPlay)
   const asked = (n: number): boolean => (open.get(n) ?? []).some((r) => r.asker === loop.agentId)
-  return owedCards(cards, project, loop.agentId, loop.cards, { wakes, reviewerOf, asked, pool: (n) => pooled.has(n) })
+  return owedCards(cards, project, loop.agentId, watched, { wakes, reviewerOf, asked, pool: (n) => pooled.has(n) })
 }
 
 /** Starts an idle agent's grace before its owed cards are flagged (once: a timer running, or a flag made, waits). */

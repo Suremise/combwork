@@ -214,6 +214,24 @@ const check = (name, ok, extra = '') => {
   await inv('tasks:answer', c3, (await question()).request, { outcome: 'answered', reply: 'Keep it.' })
   check('once the user answers, its card is the builder\'s move again: flagged after the grace', !!(await until(async () => ((await stalledOf(c3)) ?? '').startsWith("Builder isn't watching #"), 20000)), String(await stalledOf(c3)))
 
+  // --- 5. HI-2381: an agent whose next card waits on another's card in progress (CB2 watching CB1's CL-8, which its CL-10
+  // depends on). Its watch's limit says where they are and asks nothing of the user; ending its turn with no watch then
+  // stalls nothing: CL-8's stall is its own builder's and reviewer's.
+  const dep = (await inv('tasks:create', { title: 'Another builder works on it', project: 'alpha', agent: builder.id, column: 'doing' })).number
+  const next = (await inv('tasks:create', { title: 'Waits on it', project: 'alpha' })).number
+  await inv('tasks:update', next, { blockedBy: [dep] })
+  script('Reviewer', [])
+  const limitWakes = () => wakes('Reviewer').filter((w) => w.text.includes('your card watch has ended'))
+  const before = limitWakes().length
+  await say(reviewer.id, `hive hive_wait_for_tasks ${JSON.stringify({ cards: [`#${dep}`, `#${next}`], changes: ['column'], limitMinutes: 1, wake: true })}`)
+  check('the reviewer watches the card and the one waiting on it', !!(await until(async () => (await live(reviewer.id))?.status === 'watching', HUNG_MS)), await why(reviewer.id))
+  // The watch's limit is a minute: the wait is bounded at twice that.
+  check('its limit passes: woken, then idle with no watch', !!(await until(async () => limitWakes().length > before && ['ready', 'finished'].includes((await live(reviewer.id))?.status) && !(await live(reviewer.id))?.watch, 120000)), `${JSON.stringify(limitWakes().map((w) => w.text))} ${await why(reviewer.id)}`)
+  const limit = limitWakes().at(-1)?.text ?? ''
+  check("…the line says what waits on what, and not to tell the user", limit.includes(`#${next} waits on #${dep}`) && limit.includes(`#${dep} is in Doing with Builder`) && /don't tell the user about them\.$/.test(limit) && !/hive_notify/.test(limit), limit)
+  await lib.sleep(4500) // on purpose: longer than the grace, to see no flag comes
+  check("another's card it waits on is never stalled for it (HI-2381)", !(await stalledOf(dep)) && !((await live(reviewer.id))?.notWatching ?? []).includes(dep), JSON.stringify({ stalled: await stalledOf(dep), mark: (await live(reviewer.id))?.notWatching }))
+
   await inv('session:stop', alpha)
   await until(async () => (await inv('session:live')).length === 0, 15000)
   await app.close()
