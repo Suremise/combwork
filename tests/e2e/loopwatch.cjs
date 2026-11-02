@@ -259,6 +259,15 @@ const check = (name, ok, extra = '') => {
   // Its stall, if any, is its own builder's ("Other isn't running": never started here), never the Reviewer's.
   check("…and another's card with its own reviewer is never stalled for it", !/^Reviewer\b/.test((await stalledOf(solo)) ?? '') && !((await live(reviewer.id))?.notWatching ?? []).includes(solo), JSON.stringify({ stalled: await stalledOf(solo), mark: (await live(reviewer.id))?.notWatching }))
 
+  // --- 5c. HR1's round 2: the blocker alone with no reviewer known (section 5's, Builder's in Doing): only its builder and
+  // its reviewer owe it, so the watcher still isn't flagged (the Assistant's scope call: no exception for a missing reviewer).
+  const depBefore = await inv('loops:checks', alpha, reviewer.id)
+  await say(reviewer.id, wait(dep, { changes: ['comment'] }))
+  check('the reviewer watches the blocker alone', !!(await until(async () => (await live(reviewer.id))?.status === 'watching', HUNG_MS)), await why(reviewer.id))
+  await inv('watch:cancel', alpha, reviewer.id)
+  check('…ends with no watch, and its grace check runs', !!(await until(async () => (await inv('loops:checks', alpha, reviewer.id)) > depBefore, HUNG_MS)), String(await inv('loops:checks', alpha, reviewer.id)))
+  check('…and a card with no reviewer is never stalled for an agent that only watches it', !/^Reviewer\b/.test((await stalledOf(dep)) ?? '') && !((await live(reviewer.id))?.notWatching ?? []).includes(dep), JSON.stringify({ stalled: await stalledOf(dep), mark: (await live(reviewer.id))?.notWatching }))
+
   await inv('session:stop', alpha)
   await until(async () => (await inv('session:live')).length === 0, 15000)
   await app.close()

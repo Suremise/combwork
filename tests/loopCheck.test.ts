@@ -71,12 +71,13 @@ describe("another's card isn't the watcher's loop: a card's stall is its own bui
     // The review on it names its reviewer too (a pool card in Review, say).
     expect(othersCards([card(8, { column: 'review', agent: 'cb1', review: { agent: 'cr1' } as never })], 'cb2', [8], none)).toEqual([8])
   })
-  it('with no reviewer known, drops it only when a watched card not Done waits on it', () => {
+  it('with no reviewer known, drops it too: only its builder and reviewer owe it (the Assistant, after HR1 round 2)', () => {
+    // The blocker alone in a lane whose reviewer was removed (HR1's case), with or without its dependent card.
+    expect(othersCards(board, 'cb2', [8], none)).toEqual([8])
     expect(othersCards(board, 'cb2', [8, 10], none)).toEqual([8])
-    expect(othersCards([board[0], card(10, { column: 'done', blockedBy: [8] })], 'cb2', [8, 10], none)).toEqual([])
-    // Nothing watched waits on it: it may be waiting for this agent to review it, as before.
-    expect(othersCards(board, 'cb2', [12], none)).toEqual([])
-    expect(othersCards(board, 'cb2', [8], none)).toEqual([])
+    // A card nothing watched waits on, and one with no builder: the same.
+    expect(othersCards(board, 'cb2', [12], none)).toEqual([12])
+    expect(othersCards([card(9, { column: 'review' })], 'cb2', [9], none)).toEqual([9])
   })
   it('keeps its own builder and reviewer in the loop, and cards out of play', () => {
     expect(othersCards(board, 'cb1', [8, 10], cr1)).toEqual([])
