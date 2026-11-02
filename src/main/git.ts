@@ -9,7 +9,7 @@ import { gitProblemData } from '../shared/gitTool'
 import { withValues } from '../shared/advanced'
 import { msg, tr } from '../shared/i18n'
 import { hiveError } from './hiveError'
-import { createLogger } from './logger'
+import { createLogger, userText } from './logger'
 import { runGit, type GitOutcome, type GitReply, type GitRequest, type RefsRequest } from './gitWorker'
 import { bundledScriptExists, workerHere, workerStarted } from './workerThreads'
 import { readRepoRefs, type RepoRefs } from './platform/repoRefs'
@@ -97,8 +97,64 @@ export function gitRouted(): boolean {
 
 export function git(cwd: string, args: string[], maxBuffer = 16 * 1024 * 1024, input?: string, opts: GitRunOptions = {}): Promise<GitResult> {
   // HI-2137: the git Hive starts (Git for Windows' real git rather than its launcher, where it found one).
-  const run = (): Promise<GitResult> => gitAs(opts.exe !== undefined ? { exe: opts.exe } : gitExe(), cwd, args, maxBuffer, input, opts)
-  return changesWorktrees(args) ? worktreeQueueKey(cwd).then((repo) => oneWorktreeChange(repo, run)) : run()
+  const run = (a: string[] = args): Promise<GitResult> => gitAs(opts.exe !== undefined ? { exe: opts.exe } : gitExe(), cwd, a, maxBuffer, input, opts)
+  return changesWorktrees(args) ? worktreeQueueKey(cwd).then((repo) => oneWorktreeChange(repo, () => worktreeChange(cwd, args, run))) : run()
+}
+
+/** HI-2349: how many times a worktree change runs again after meeting another's half-made entry, and how long it waits for that entry. */
+export const worktreeRetry = { times: 3, waitMs: 2000, stepMs: 20 }
+
+/**
+ * HI-2349: the half-made worktree entry git failed on (as git wrote its path), from a worktree command's stderr. Git
+ * reads every entry first (add, remove, move, lock, unlock) and dies on one whose `commondir` another git has created
+ * but not yet written ("fatal: failed to read .git/worktrees/copy-1/commondir: No error"), before it changes anything.
+ */
+export function halfMadeEntry(err: string): string | null {
+  return /^fatal: failed to read (.+?[\\/]worktrees[\\/][^\\/]+[\\/][^\\/:]+): /m.exec(err)?.[1] ?? null
+}
+
+/**
+ * HI-2349: a worktree change, run again when it failed on another git's half-made entry once that entry is written (or
+ * gone), at most worktreeRetry.times. oneWorktreeChange keeps this process's own changes apart (HI-2322); this covers
+ * the gits it can't queue: another Hive on the same repository, an agent's or the user's own `git worktree add`. An
+ * entry still unwritten after the wait (one a crashed git left) isn't waited for again: git's failure is the answer.
+ */
+async function worktreeChange(cwd: string, args: string[], run: (a: string[]) => Promise<GitResult>): Promise<GitResult> {
+  let a = args
+  for (let tries = 0; ; tries++) {
+    const r = await run(a)
+    const entry = r.ok || tries >= worktreeRetry.times ? null : halfMadeEntry(r.err)
+    if (!entry || !(await entryWritten(resolve(cwd, entry)))) return r
+    log.info(`git worktree ${args[1]} met another git's half-made worktree entry (${userText(entry)}): once more, now it's written`)
+    a = await afterHalfMade(a, run)
+  }
+}
+
+/** Waits for a file another git is writing to have something in it, or to be gone: false when it stays empty throughout. */
+async function entryWritten(file: string): Promise<boolean> {
+  const until = Date.now() + worktreeRetry.waitMs
+  for (;;) {
+    const size = await stat(file).then((s) => s.size, (e: NodeJS.ErrnoException) => (e.code === 'ENOENT' ? -1 : 0))
+    if (size !== 0) return true
+    if (Date.now() >= until) return false
+    await new Promise((r) => setTimeout(r, worktreeRetry.stepMs))
+  }
+}
+
+/**
+ * The command to run again. A `worktree add -b <branch> <folder> [<base>]` that failed had made its branch already (git
+ * refuses an existing one before that), and that branch stays: the next try checks it out (`add <folder> <branch>`)
+ * rather than failing on it. Anything else runs again as it was.
+ */
+async function afterHalfMade(args: string[], run: (a: string[]) => Promise<GitResult>): Promise<string[]> {
+  const b = args.indexOf('-b')
+  if (args[1] !== 'add' || b < 0 || !args[b + 1]) return args
+  const branch = args[b + 1]
+  if (!(await run(['rev-parse', '--verify', '--quiet', `refs/heads/${branch}`])).ok) return args
+  const rest = args.slice(2).filter((_, i) => i + 2 !== b && i + 2 !== b + 1)
+  const flags = rest.filter((x) => x.startsWith('-'))
+  const folder = rest.find((x) => !x.startsWith('-'))
+  return folder ? ['worktree', 'add', ...flags, folder, branch] : args
 }
 
 /**
