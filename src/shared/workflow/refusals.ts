@@ -334,6 +334,8 @@ export interface Refusal {
   change?: string
   override: 'the user' | 'the user or the Assistant' | null
   values: RefusalValues
+  /** What else the agent should know, in English (HI-2339: the files a None submit's paths leave out). */
+  warnings?: string[]
 }
 
 /** How a refusal's sentences are formatted: in English for agents, or in the window's language (`refusalLines`). */
@@ -409,6 +411,11 @@ export function refusalLines(rule: RuleId, values: RefusalValues, f: RefusalForm
   const done = rule === 'move.notFromHere' && values.stage === 'done' && (values.move === 'start' || values.move === 'submit') ? DONE_NEXT : null
   const next = user?.next ?? side ?? done ?? (rule === 'move.notFromHere' && !values.moves ? NOTHING_FROM_HERE : rule === 'platform.unknown' && values.offer === 'repositoryGone' ? REPOSITORY_GONE_NEXT : (queued ?? t.next))
   return { message: f.one(user?.message ?? t.message, vals), next: f.one(next, vals), change: t.change ? f.one(t.change, vals) : null }
+}
+
+/** A workflow refusal as the Agent API gives it (SPEC §16.8.3): its rule, three English sentences, who can override, and its warnings (HI-2339). */
+export function refusalBody(x: Refusal): Record<string, unknown> {
+  return { refused: true, rule: x.rule, message: x.message, next: x.next, ...(x.change ? { change: x.change } : {}), override: x.override, ...(x.warnings?.length ? { warnings: x.warnings } : {}) }
 }
 
 /** Builds a refusal from its rule and values: three English sentences, each from its own message. */

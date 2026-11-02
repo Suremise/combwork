@@ -63,6 +63,25 @@ export class NoneAdapter {
     return n === '.hive' || n === '.git' || this.excluded.some((x) => fold(x) === n)
   }
 
+  /**
+   * Whether declared paths cover a file (HI-2339): it is one of them, or under one (a folder's files), as the file system
+   * names them (`/` or `\`, `./`, a trailing `/`; on Windows any case). A sibling sharing a prefix (`src-other` beside
+   * `src`) isn't under it. The project's root (`.`, `./`, `.\`: a valid declaration, which the manifest walks whole)
+   * covers every deliverable, as its revision does; an empty path covers nothing (never a valid declaration: `inside`).
+   */
+  covers(paths: readonly string[], file: string): boolean {
+    const norm = (p: string): string => {
+      const s = toPosix(p).replace(/\\/g, '/').split('/').filter((x) => x && x !== '.').join('/')
+      return this.anyCase ? s.toLowerCase() : s
+    }
+    const f = norm(file)
+    return paths.some((p) => {
+      const d = norm(p)
+      if (!d) return NoneAdapter.inside(p) && this.isDeliverable(file)
+      return f === d || f.startsWith(`${d}/`)
+    })
+  }
+
   /** A manifest without the paths a card's work never covers (#1511): a starting one recorded before, compared with now. */
   covering(m: Manifest): Manifest {
     return Object.fromEntries(Object.entries(m).filter(([p]) => this.excludedPart(p) === null))

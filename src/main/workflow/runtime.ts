@@ -1317,13 +1317,14 @@ export class Workflow {
     if (!(from === 'active' || ((from === 'approved' || from === 'review') && s.stale) || from === 'review')) return this.notFrom(card, actor, s, 'submit')
 
     const g = await this.gatherSubmit(card, s, actor, args, undefined, false, op)
-    if (!('inputs' in g)) return this.refuse(card, actor, 'submit', g)
+    // Nothing changed in its paths (None): what they leave out goes with the refusal (HI-2339), the likely why.
+    if (!('inputs' in g)) return this.withNotices(await this.refuse(card, actor, 'submit', g), g.rule === 'submit.unchanged' ? this.pathNotices({ ...card, paths: args.paths ?? card.paths ?? this.prefill(card) }, o, !!args.paths) : [])
     const ended: GuardRefusal = { rule: 'submit.focusedChosen', values: { card: card.key, revision: (g.revision ?? '').slice(0, 7), state: 'unknown', why: 'cancelled' } } // i18n-ignore: codes
     // Its operation ended while it gathered (G20: only where it picked): refused before anything.
     if (g.focusedOp?.aborted) return this.refuse(card, actor, 'submit', ended)
     // The same revision again: a new submission only with a note (§16.8.1).
     const waiting = (from === 'review' || from === 'approved' || awaitsAgentMerge(g.r, g.s)) && !g.s.stale
-    if (g.earlier && !waiting && !args.note && !args.drag) return this.refuse(card, actor, 'submit', { rule: 'submit.sameRevisionNote', values: { revision: g.revision!.slice(0, 7) } })
+    if (g.earlier && !waiting && !args.note && !args.drag) return this.withNotices(await this.refuse(card, actor, 'submit', { rule: 'submit.sameRevisionNote', values: { revision: g.revision!.slice(0, 7) } }), this.pathNotices(g.card, g.o, !!args.paths))
 
     await this.cfg.hooks?.beforeWrite?.('submit')
     const again = await this.revalidate(g.card, g.s, g.o, g.before)
@@ -1421,7 +1422,7 @@ export class Workflow {
       if (!plan.ok) return plan.refusal
       ;({ revision, base, key, files, commits, paths } = plan)
       Object.assign(inputs, plan.inputs)
-      warnings.push(...plan.warnings)
+      warnings.push(...plan.warnings, ...this.pathNotices(card, o, !!args.paths))
       // The adapter may have reconciled (a shared folder's attribution): the card and its state as they are now.
       if (!predicted) {
         card = { ...this.store.card(card.id), ...(setPaths ? { paths: setPaths } : {}) }
@@ -2472,10 +2473,32 @@ export class Workflow {
     if (isUnknown(all)) return []
     const now = this.none.manifest(all)
     if (isUnknown(now)) return []
-    const mine = new Set([...(card.paths ?? []), ...this.prefill(card)])
+    // Covered as a revision covers them (HI-2339): a declared folder's files are the card's.
+    const mine = [...(card.paths ?? []), ...this.prefill(card)]
     return NoneAdapter.diff(before, now)
       .map((f) => f.path)
-      .filter((p) => !mine.has(p))
+      .filter((p) => !this.none.covers(mine, p))
+  }
+
+  /**
+   * What a None code card's submission leaves out of its paths (HI-2339, §16.3.3), for its builder to add or leave: its
+   * pre-fill's files the paths don't cover (paths set, none given), and the unclaimed changes. Never claimed: the
+   * declared paths stay what the revision covers. Agent-facing English; empty elsewhere (Git, no-code).
+   */
+  private pathNotices(card: CardRecord, o: WorkflowOptions, given: boolean): string[] {
+    if (o.platform !== 'none' || card.kind !== 'code') return []
+    const paths = card.paths ?? []
+    const out: string[] = []
+    const outside = given ? [] : this.prefill(card).filter((p) => !this.none.covers(paths, p))
+    if (outside.length) out.push(`${card.key}'s paths leave out files it recorded as its agents' edits: ${outside.join(', ')}. Its revision covers only its paths: to include them, submit with paths listing every file of its work (or declare its paths); to leave them out, carry on.`) // i18n-ignore: agent-facing warning in the submit's reply
+    const unclaimed = this.unclaimed(card).filter((p) => !outside.includes(p))
+    if (unclaimed.length) out.push(`Changed in the project since ${card.key} started, in neither its paths nor what it recorded as its agents' edits: ${unclaimed.join(', ')}. Not part of its revision: to include any, submit with paths listing every file of its work; else leave them.`) // i18n-ignore: agent-facing warning in the submit's reply
+    return out
+  }
+
+  /** A refusal with what its card's paths leave out (HI-2339): its `warnings`, passed on to the agent's reply. */
+  private withNotices(r: Refusal, notices: string[]): Refusal {
+    return notices.length ? { ...r, warnings: notices } : r
   }
 
   // --- Lanes (§16.11).

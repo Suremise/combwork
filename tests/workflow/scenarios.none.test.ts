@@ -4,7 +4,9 @@ import { afterEach, describe, expect, it } from 'vitest'
 import { execFileSync } from 'child_process'
 import { rmSync, writeFileSync } from 'fs'
 import { join } from 'path'
-import { B1, B2, moved, put, R1, refusedBy, setup, type Env } from './harness'
+import { B1, B2, commit, moved, put, R1, refusedBy, setup, type Env } from './harness'
+import { refusalBody } from '../../src/shared/workflow/refusals'
+import { refusedText, type Refused } from '../../src/shared/toolReplies'
 import { preset } from '../../src/shared/workflow/options'
 import { reconcile } from '../../src/main/workflow/reconcile'
 import { runCheck } from '../../src/main/workflow/checks'
@@ -267,6 +269,154 @@ describe('workflow scenarios, None', () => {
     expect(offer('none', detect(n.project))).toBeNull()
     execFileSync('git', ['init', '-q', n.project])
     expect(offer('none', detect(n.project))).toEqual({ offer: 'git', why: 'gitFound' })
+  })
+})
+
+// HI-2339 (§16.3.3): a submission names what the card's declared paths leave out (its pre-fill beyond them, and the
+// unclaimed changes), for its builder to add or leave: never claimed, the declared paths stay what the revision covers.
+describe('None: what a submission leaves out of its paths is named (HI-2339)', () => {
+  const warningsOf = (r: unknown): string[] => (r as { warnings?: string[] }).warnings ?? []
+  const pairNone = () => (env = setup({ ...preset('none', 'pair'), preChecks: [] }, { files: { 'a.txt': 'a\n' } }))
+
+  it("a later round's new file, and a user's edit: the resubmission's refusal names both, through the Agent API and the hive tools; declared, accepted with the new file only", async () => {
+    const e = pairNone()
+    const card = e.wf.createCard({ title: 'Round two' })
+    moved(await e.wf.start(card.key, B1))
+    put(e.project, 'a.txt', 'a1\n')
+    e.wf.noteEdit(card, 'a.txt')
+    moved(await e.wf.submit(card.key, B1, { summary: 'round 1' }))
+    expect(e.wf.state(card).latest!.paths).toEqual(['a.txt'])
+    moved(await e.wf.startReview(card.key, R1))
+    moved(await e.wf.verdict(card.key, R1, { pass: false, comment: 'add b' }))
+    // Round 2: its agent adds b.txt (recorded in its pre-fill), and the user edits c.txt.
+    put(e.project, 'b.txt', 'b\n')
+    e.wf.noteEdit(card, 'b.txt')
+    put(e.project, 'c.txt', 'the user typed\n')
+    e.wf.noteWrite('c.txt', { agents: [], user: true })
+    const r = refusedBy(await e.wf.submit(card.key, B1, { summary: 'round 2' }), 'submit.sameRevisionNote')
+    expect(r.warnings).toHaveLength(2)
+    expect(r.warnings![0]).toMatch(/paths leave out files it recorded as its agents' edits: b\.txt\..*submit with paths listing every file/)
+    expect(r.warnings![1]).toMatch(/in neither its paths nor what it recorded as its agents' edits: c\.txt\./)
+    // Factual, not attributed: the unclaimed file isn't said to be the user's or anyone's.
+    expect(r.warnings![1]).not.toMatch(/user|editor|formatter|not by/)
+    // The Agent API's body and the hive tools' text carry them.
+    const body = refusalBody(r)
+    expect(body.warnings).toEqual(r.warnings)
+    const text = refusedText(body as unknown as Refused)
+    expect(text.split('\n').slice(-2)).toEqual(r.warnings!.map((w) => `Warning: ${w}`))
+    // The builder includes b.txt: accepted with it, c.txt still only named.
+    const ok = await e.wf.submit(card.key, B1, { summary: 'round 2', paths: ['a.txt', 'b.txt'] })
+    moved(ok)
+    expect(e.wf.state(card).latest!.paths).toEqual(['a.txt', 'b.txt'])
+    expect(warningsOf(ok).join('\n')).toMatch(/c\.txt/)
+    expect(warningsOf(ok).join('\n')).not.toMatch(/b\.txt/)
+  })
+
+  it('nothing changed in its paths: submit.unchanged names its pre-fill beyond them', async () => {
+    const e = pairNone()
+    const card = e.wf.createCard({ title: 'Unchanged', paths: ['a.txt'] })
+    moved(await e.wf.start(card.key, B1))
+    put(e.project, 'b.txt', 'b\n')
+    e.wf.noteEdit(card, 'b.txt')
+    const r = refusedBy(await e.wf.submit(card.key, B1, { summary: 'x' }), 'submit.unchanged')
+    expect(r.warnings).toEqual([expect.stringMatching(/leave out files it recorded as its agents' edits: b\.txt\./)])
+    expect(refusalBody(r).warnings).toEqual(r.warnings)
+  })
+
+  it("a first submission's overlapping write (two agents active) is named in its reply, not claimed", async () => {
+    const e = pairNone()
+    const card = e.wf.createCard({ title: 'Overlap' })
+    moved(await e.wf.start(card.key, B1))
+    put(e.project, 'a.txt', 'a1\n')
+    e.wf.noteEdit(card, 'a.txt')
+    put(e.project, 'fmt.txt', 'formatted\n')
+    e.wf.noteWrite('fmt.txt', { agents: ['B1', 'B2'], user: false })
+    const r = await e.wf.submit(card.key, B1, { summary: 'x' })
+    moved(r)
+    expect(e.wf.state(card).latest!.paths).toEqual(['a.txt'])
+    expect(warningsOf(r)).toEqual([expect.stringMatching(/in neither its paths nor what it recorded as its agents' edits: fmt\.txt\./)])
+  })
+
+  it("a declared folder covers its files, and not a sibling's sharing its name's start (src, src-other)", async () => {
+    const e = pairNone()
+    const card = e.wf.createCard({ title: 'Folder' })
+    moved(await e.wf.start(card.key, B1))
+    for (const f of ['src/x.txt', 'src/deep/y.txt', 'src-other/z.txt']) {
+      put(e.project, f, `${f}\n`)
+      e.wf.noteWrite(f, { agents: [], user: true })
+    }
+    for (const declared of [['src'], ['src/'], ['./src'], ['src\\']]) {
+      const d = await e.wf.declarePaths(card.key, B1, declared)
+      if (isRefusal(d)) throw new Error(d.message)
+      expect(d.unclaimed, declared[0]).toEqual(['src-other/z.txt'])
+    }
+    const r = await e.wf.submit(card.key, B1, { summary: 'x' })
+    moved(r)
+    expect(warningsOf(r)).toEqual([expect.stringMatching(/: src-other\/z\.txt\./)])
+  })
+
+  it("the project's root declared (., ./, .\\) covers every deliverable: nothing named; excluded folders stay out (HR1's round 1)", async () => {
+    const e = pairNone()
+    const card = e.wf.createCard({ title: 'Root' })
+    moved(await e.wf.start(card.key, B1))
+    put(e.project, 'src/a.txt', 'agent\n')
+    e.wf.noteEdit(card, 'src/a.txt')
+    put(e.project, 'lib/b.txt', 'user\n')
+    e.wf.noteWrite('lib/b.txt', { agents: [], user: true })
+    put(e.project, 'node_modules/x/index.js', 'installed\n')
+    e.wf.noteWrite('node_modules/x/index.js', { agents: [], user: true })
+    for (const root of ['.', './', '.\\']) {
+      const d = await e.wf.declarePaths(card.key, B1, [root])
+      if (isRefusal(d)) throw new Error(d.message)
+      expect(d.unclaimed, root).toEqual([])
+    }
+    // Its paths set (the root), none given: the pre-fill's src/a.txt is covered, so nothing is named.
+    const r = await e.wf.submit(card.key, B1, { summary: 'x' })
+    moved(r)
+    expect(warningsOf(r).join('\n')).not.toMatch(/leave out|neither its paths/)
+    const changed = e.wf.state(card).latest!.files.map((f) => f.path)
+    expect(changed).toEqual(expect.arrayContaining(['src/a.txt', 'lib/b.txt']))
+    expect(changed.some((f) => f.startsWith('node_modules/'))).toBe(false)
+    // An empty path is no declaration of the root: it covers nothing.
+    expect(e.wf.none.covers([''], 'src/a.txt')).toBe(false)
+    expect(e.wf.none.covers(['.'], 'node_modules/x/index.js')).toBe(false)
+  })
+
+  it('Solo with no version control: its submission (Done, no review) names what its paths leave out too', async () => {
+    const e = (env = setup({ ...preset('none', 'solo'), preChecks: [] }, { files: { 'a.txt': 'a\n' } }))
+    const card = e.wf.createCard({ title: 'Solo' })
+    moved(await e.wf.start(card.key, B1))
+    put(e.project, 'a.txt', 'a1\n')
+    e.wf.noteEdit(card, 'a.txt')
+    put(e.project, 'notes.txt', 'n\n')
+    e.wf.noteWrite('notes.txt', { agents: [], user: true })
+    const r = await e.wf.submit(card.key, B1, { summary: 'x' })
+    moved(r)
+    expect(e.wf.state(card).stage).toBe('done')
+    expect(warningsOf(r)).toEqual([expect.stringMatching(/: notes\.txt\./)])
+  })
+
+  it('a no-code card, and Git, name nothing of the kind', async () => {
+    const e = pairNone()
+    const nc = e.wf.createCard({ title: 'Decide', kind: 'no-code' })
+    moved(await e.wf.start(nc.key, B1))
+    put(e.project, 'other.txt', 'o\n')
+    e.wf.noteWrite('other.txt', { agents: [], user: true })
+    const r = await e.wf.submit(nc.key, B1, { summary: 'decided' })
+    moved(r)
+    expect(warningsOf(r).join('\n')).not.toMatch(/leave out|neither its paths/)
+    env!.close()
+    const g = (env = setup({ ...preset('git', 'pair'), preChecks: [], mergeChecks: [] }))
+    const card = g.wf.createCard({ title: 'Git' })
+    const s = await g.wf.start(card.key, B1)
+    moved(s)
+    const folder = String((s as { data?: Record<string, unknown> }).data?.folder)
+    commit(folder, { 'g.txt': 'g\n' }, 'g')
+    // An edit in the project folder, outside the card's: Git's change is its commits, nothing to name.
+    put(g.project, 'elsewhere.txt', 'e\n')
+    const gr = await g.wf.submit(card.key, B1, { summary: 'g' })
+    moved(gr)
+    expect(warningsOf(gr).join('\n')).not.toMatch(/leave out|neither its paths/)
   })
 })
 
