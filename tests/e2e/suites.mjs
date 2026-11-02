@@ -191,6 +191,7 @@ export const SUITES = [
   { name: 'legacyworktree' },
   { name: 'linecarried' },
   { name: 'loadfail' },
+  { name: 'lockask' },
   { name: 'longsession' },
   { name: 'loopwakes' },
   { name: 'loopwatch' },
