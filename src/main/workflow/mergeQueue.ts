@@ -355,6 +355,11 @@ export interface CommitChild {
   /** Its exit code; none while it ran (the stream ended, or was cut, first). */
   code?: number
   text: string
+  /**
+   * git's own text once it had exited, until the next child starts (HI-2399): where a newer git (Git for Windows 2.56) reprints the signer's
+   * text, which it captured (`error: gpg failed to sign the data:` and gpg's lines; ssh-keygen's as `error: …`).
+   */
+  after: string
 }
 
 /**
@@ -410,6 +415,8 @@ export function readCommitStream(err: string): CommitStream {
   const children: CommitChild[] = []
   const byId = new Map<number, CommitChild>()
   let open: CommitChild | null = null
+  // The child that exited last, while no other has started since: git's text then is also its `after`.
+  let last: CommitChild | null = null
   let top: string | null = null
   let own = ''
   let text = ''
@@ -417,7 +424,10 @@ export function readCommitStream(err: string): CommitStream {
     if (!t) return
     text += t
     if (open) open.text += t
-    else own += t
+    else {
+      own += t
+      if (last) last.after += t
+    }
   }
   // The top git's session starts with its `version` event (trace2's first) and has no parent's prefix; a git a hook runs
   // is `<parent>/<own>`. Only their records are events: any other record (a hook's own structured log, #1397) is text.
@@ -435,14 +445,18 @@ export function readCommitStream(err: string): CommitStream {
     if (ev.event === 'child_start') {
       const argv = ev.argv ?? []
       const signer = argv.includes('-bsau') || (argv.includes('-Y') && argv.includes('sign'))
-      const c: CommitChild = { kind: ev.child_class === 'hook' ? 'hook' : signer ? 'signer' : 'other', ...(ev.child_class === 'hook' ? { name: ev.hook_name ?? argv[0] ?? 'hook' } : {}), text: '' }
+      const c: CommitChild = { kind: ev.child_class === 'hook' ? 'hook' : signer ? 'signer' : 'other', ...(ev.child_class === 'hook' ? { name: ev.hook_name ?? argv[0] ?? 'hook' } : {}), text: '', after: '' }
       children.push(c)
       byId.set(ev.child_id, c)
       open = c
+      last = null
     } else if (ev.event === 'child_exit') {
       const c = byId.get(ev.child_id)
       if (c) c.code = ev.code
-      if (open === c) open = null
+      if (open === c) {
+        open = null
+        last = c ?? null
+      }
     }
   })
   return { traced: top !== null, children, open, git: own, text }
@@ -458,7 +472,9 @@ const joined = (...parts: (string | undefined)[]): string => parts.map((p) => p?
  *   nothing known in a repository that signs → `signingWaits`; else `needsYou`;
  * - a hook that exited non-zero → returned (`hook`) with its own text, then git's;
  * - the signer exiting non-zero → `signingWaits` when its own text says it needs a passphrase, a pinentry or a
- *   terminal, else `signing`, with its text and git's;
+ *   terminal, else `signing`, with its text and git's. Its own text is what it wrote while it ran (Git for Windows
+ *   2.45 lets it write to stderr) and git's text right after it exited, before any other child (HI-2399: 2.56 captures it and
+ *   reprints it then, `error: gpg failed to sign the data:` and gpg's lines); a hook's text is never either;
  * - anything else (an index lock, a broken repository) → `needsYou` with git's own lines, never a return.
  * With no trace (an old git), only git's own "Not committing merge" is a hook. A message never has an event in it.
  */
@@ -474,7 +490,7 @@ export function commitFailed(r: QueueGitResult, signs: boolean): { fail: 'hook';
   const hook = s.children.find((c) => c.kind === 'hook' && c.code !== undefined && c.code !== 0)
   if (hook) return { fail: 'hook', log: joined(hook.text, s.git, r.out) }
   const signer = s.children.find((c) => c.kind === 'signer' && c.code !== undefined && c.code !== 0)
-  if (signer) return { pause: SIGN_WAITS.test(signer.text) ? 'signingWaits' : 'signing', message: joined(signer.text, s.git) }
+  if (signer) return { pause: SIGN_WAITS.test(signer.text) || SIGN_WAITS.test(signer.after) ? 'signingWaits' : 'signing', message: joined(signer.text, s.git) }
   return { pause: 'needsYou', message: joined(r.out, s.git) }
 }
 
