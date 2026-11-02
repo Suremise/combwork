@@ -13,7 +13,7 @@ import { advanced } from './advanced'
 import { assistantHome } from './assistantControl'
 import { createDelivery, leaveDelivery, roundOf } from './deliveries'
 import { onHiveEvent, toast } from './events'
-import { resolveOffer } from './notify'
+import { dropOfferActions, resolveOffer } from './notify'
 import { OUTCOME } from './outcomes'
 import { placeKey, samePlace } from './fsutil'
 import { listLanes } from './lanes'
@@ -293,7 +293,7 @@ export async function startRestartRecovery(): Promise<void> {
     if (e.state === 'offered') offer.push(e)
   }
   await save()
-  if (offer.length) tellOffer(offer)
+  if (offer.length) tellOffer()
   // A team resuming (HI-2081): what waited for it is decided now.
   onHiveEvent((ev) => {
     if (ev.type === 'team-pause-changed' && !ev.pause) pump()
@@ -304,6 +304,10 @@ export async function startRestartRecovery(): Promise<void> {
 /** Once a start: the window's load can come more than once (a reload). */
 let recoveryStarted = false
 
+/** The offer's buttons' commands (the renderer's commands.ts). */
+const RESUME_COMMAND = 'session.resumeRestart'
+const DISMISS_COMMAND = 'session.dismissRestart'
+
 function enqueue(e: RestartEntry): void {
   const key = agentKey(e)
   setState(e, 'queued')
@@ -311,8 +315,15 @@ function enqueue(e: RestartEntry): void {
   queuedAt.set(key, Date.now())
 }
 
-/** The notice offering to resume the agents (an ordinary quit, or the switch off): Resume or Don't Resume (the notice's × only closes it). */
-function tellOffer(entries: readonly RestartEntry[]): void {
+/**
+ * The notice offering to resume the agents (an ordinary quit, or the switch off): Resume or Don't Resume (the notice's ×
+ * only closes it). One offer at a time (HI-2356): it lists every entry offered now, and a notice still open with its
+ * buttons is resolved as replaced, so no notice's buttons act on agents it didn't name (they act on every entry offered).
+ */
+function tellOffer(): void {
+  const entries = record?.entries.filter((e) => e.state === 'offered') ?? []
+  if (!entries.length) return
+  if (openOffer) resolveOffer(openOffer, tr(OUTCOME.offerReplaced))
   const n = entries.length
   const names = fmt.list(entries.map((e) => `${e.agentName} (${e.project})`))
   const quit = policy() === 'quit'
@@ -321,8 +332,8 @@ function tellOffer(entries: readonly RestartEntry[]): void {
     ? tr(msg({ id: 'main.restart.offerQuit', defaultMessage: 'Hive was quit while they were working or in a card loop: {names}. Resume starts each again in its conversation, one at a time.', description: 'The notice offering to resume agents after an ordinary quit. {names} lists them, each with its project.' }), { names })
     : tr(msg({ id: 'main.restart.offerUpdate', defaultMessage: 'Hive restarted for an update while they were working or in a card loop: {names}. Resume starts each again in its conversation, one at a time.', description: 'The notice offering to resume agents after an update, with Settings → Advanced → Resume agents after an update turned off. {names} lists them, each with its project.' }), { names })
   const actions: ToastAction[] = [
-    { label: tr(msg({ id: 'main.restart.resume', defaultMessage: 'Resume', description: 'A button in the notice offering to resume the agents that were working when Hive closed.' })), command: 'session.resumeRestart' },
-    { label: tr(msg({ id: 'main.restart.dismiss', defaultMessage: "Don't Resume", description: "A button in the notice offering to resume the agents that were working when Hive closed: resumes none, and the offer is not made again (the notice's × only closes it)." })), command: 'session.dismissRestart' }
+    { label: tr(msg({ id: 'main.restart.resume', defaultMessage: 'Resume', description: 'A button in the notice offering to resume the agents that were working when Hive closed.' })), command: RESUME_COMMAND },
+    { label: tr(msg({ id: 'main.restart.dismiss', defaultMessage: "Don't Resume", description: "A button in the notice offering to resume the agents that were working when Hive closed: resumes none, and the offer is not made again (the notice's × only closes it)." })), command: DISMISS_COMMAND }
   ]
   log.info(`Offered to resume ${n} agent(s): ${entries.map((e) => userText(e.agentName)).join(', ')}`)
   // Its offer (HI-2320): Resume's report, or Don't Resume, is what it says once taken.
@@ -330,13 +341,20 @@ function tellOffer(entries: readonly RestartEntry[]): void {
   toast('info', title, body, actions, undefined, undefined, { offer: openOffer, timeoutMs: 120_000 })
 }
 
-/** The offer to resume shown now (HI-2320), until Resume's report or Don't Resume says what happened in it. */
+/** The offer to resume shown now with its buttons (HI-2320), until Resume, Don't Resume or a newer offer. */
 let openOffer: string | null = null
+/** Offers whose Resume was taken (their buttons gone), each waiting for the report to say how it went. */
+const takenOffers: string[] = []
 
-/** The offer's Resume: its entries queued. How many. */
+/** The offer's Resume: its entries queued, and its notice's buttons gone until its report. How many. */
 export async function resumeOffered(): Promise<number> {
   const offered = record?.entries.filter((e) => e.state === 'offered') ?? []
   for (const e of offered) enqueue(e)
+  if (openOffer) {
+    dropOfferActions(openOffer, [RESUME_COMMAND, DISMISS_COMMAND], tr(OUTCOME.resuming))
+    takenOffers.push(openOffer)
+    openOffer = null
+  }
   await save()
   pump()
   return offered.length
@@ -437,7 +455,7 @@ function pump(): void {
         }
         if (offer.length) {
           await save()
-          tellOffer(offer)
+          tellOffer()
         }
         if (stuckRun && runLive(stuckRun)) return
         stuckRun = null
@@ -655,9 +673,11 @@ function report(): void {
   const title = update
     ? tr(msg({ id: 'main.restart.reportUpdate', defaultMessage: '{n, plural, one {Resumed one agent after the update} other {Resumed # agents after the update}}', description: "A notice's title: Hive restarted for an update and resumed the agents that were working. {n} is how many resumed." }), { n: resumed.length })
     : tr(msg({ id: 'main.restart.reportResume', defaultMessage: '{n, plural, one {Resumed one agent} other {Resumed # agents}}', description: "A notice's title: the agents that were working when Hive was quit were resumed, as the user asked. {n} is how many." }), { n: resumed.length })
-  // The offer's Resume: its notice says how it went, in place of its buttons (HI-2320); else a notice of its own.
-  if (!openOffer || !resolveOffer(openOffer, `${title}\n${lines.join('\n')}`)) toast(failed.length ? 'warning' : 'success', title, lines.join('\n'), undefined, undefined, undefined, { timeoutMs: 60_000 })
-  openOffer = null
+  // The offers whose Resume was taken: each notice says how it went, in place of its buttons (HI-2320); else a notice of
+  // its own. An offer still open (its buttons not used) stays open.
+  const text = `${title}\n${lines.join('\n')}`
+  const said = takenOffers.splice(0).filter((o) => resolveOffer(o, text)).length
+  if (!said) toast(failed.length ? 'warning' : 'success', title, lines.join('\n'), undefined, undefined, undefined, { timeoutMs: 60_000 })
   void tellAssistants([...resumed], [...failed, ...held, ...skipped])
   done.resumed = []
   done.failed = []

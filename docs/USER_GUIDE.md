@@ -2022,7 +2022,7 @@ If files have unsaved changes (in the Files tab, or a shared note, skill, instru
 
 Tick **Don't ask again** to stop the question about sessions, or change it any time in **Settings → General → Confirm before quitting** (*When an agent is working*, *Whenever sessions are running*, or *Never*).
 
-The next time Hive starts, it offers to resume the agents that were working, watching their cards or in a card loop when you quit: one notice, **Resume the 3 agents that were working?**, naming them. **Resume** starts each again in its conversation, one at a time, telling it Hive was quit and started again; **Don't Resume** leaves them stopped and doesn't ask again. Nothing resumes until you choose, and closing the notice (×) without choosing asks again at the next start.
+The next time Hive starts, it offers to resume the agents that were working, watching their cards or in a card loop when you quit: one notice, **Resume the 3 agents that were working?**, naming them. **Resume** starts each again in its conversation, one at a time, telling it Hive was quit and started again; **Don't Resume** leaves them stopped and doesn't ask again. Nothing resumes until you choose, and closing the notice (×) without choosing asks again at the next start. With several workspaces open, one that gets ready later replaces the notice with one naming every agent still offered (the earlier one says *Replaced by a newer offer*), so each choice applies to exactly the agents its notice names.
 
 ### Your commands <a id="commands"></a>
 

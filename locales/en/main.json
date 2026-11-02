@@ -943,6 +943,10 @@
     "defaultMessage": "Not resumed",
     "description": "What the notice offering to resume the agents that were working before Hive restarted says after Don't Resume (HI-2320), in place of its buttons."
   },
+  "main.outcome.offerReplaced": {
+    "defaultMessage": "Replaced by a newer offer",
+    "description": "What the notice offering to resume the agents that were working before Hive restarted says once a newer such notice replaces it, listing every agent offered (another workspace got ready later; HI-2356), in place of its buttons."
+  },
   "main.outcome.openHereAgain": {
     "defaultMessage": "The conversation is open here again",
     "description": "What the notice that a conversation runs as a background job says once it is open in Hive again (HI-2320), in place of its Stop It and Resume button."
@@ -950,6 +954,10 @@
   "main.outcome.released": {
     "defaultMessage": "Released",
     "description": "What the notice that a slot is held by Windows' idle Sandbox broker says once the slot is released (HI-2320), in place of its Release Slot… button. Keep it short."
+  },
+  "main.outcome.resuming": {
+    "defaultMessage": "Resuming, one at a time",
+    "description": "What the notice offering to resume the agents that were working before Hive restarted says after Resume, in place of its buttons, until it says how the resumes went (HI-2356)."
   },
   "main.outcome.runsAnother": {
     "defaultMessage": "It runs another conversation here now",

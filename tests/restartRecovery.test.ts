@@ -24,7 +24,13 @@ const h = vi.hoisted(() => ({
   /** The team of the workspace paused (HI-2081). */
   paused: false,
   advanced: { 'hive.restart.resumeAfterUpdate': true, 'hive.restart.resumeReadySeconds': 90 } as Record<string, unknown>,
-  run: 0
+  run: 0,
+  /** The notices told (HI-2356): each one's offer, its message and its buttons' commands. */
+  toasts: [] as { offer?: string; message?: string; commands: string[] }[],
+  /** The offers whose notices still have their buttons, and what each was resolved or had its buttons dropped with. */
+  openOffers: new Set<string>(),
+  resolved: [] as [string, string][],
+  dropped: [] as [string, string[], string][]
 }))
 
 vi.mock('../src/main/sessions', () => ({
@@ -62,6 +68,17 @@ vi.mock('../src/main/teamPause', () => ({ pausedFor: () => (h.paused ? { pauseId
 vi.mock('../src/main/tasks', () => ({ allTasks: () => h.tasks ?? Promise.resolve([]) }))
 vi.mock('../src/main/deliveries', () => ({ createDelivery: async () => null, leaveDelivery: async () => null, roundOf: () => 1 }))
 vi.mock('../src/main/assistantControl', () => ({ assistantHome: (ws: string) => join(ws, '.hive', 'assistant') }))
+// The notices' offers (HI-2320), as notify.ts keeps them: resolved once, its buttons dropped while it is open.
+vi.mock('../src/main/notify', () => ({
+  resolveOffer: (offer: string, outcome: string) => {
+    h.resolved.push([offer, outcome])
+    return h.openOffers.delete(offer)
+  },
+  dropOfferActions: (offer: string, commands: string[], note: string) => {
+    h.dropped.push([offer, commands, note])
+    return h.openOffers.has(offer)
+  }
+}))
 vi.mock('../src/main/advanced', () => ({ advanced: { get: (id: string, ws?: Record<string, unknown> | null) => (ws && id in ws ? ws[id] : h.advanced[id]) } }))
 
 /** A workspace as the queue reads it: its path, whether it has been read (info), its own Advanced values. */
@@ -93,6 +110,11 @@ async function startWith(entries: unknown[], o: { readyMs?: number; reason?: str
   writeFileSync(file, JSON.stringify({ version: 1, reason: o.reason ?? 'install', entries }))
   m.loadRestartRecord(file)
   m.initRestartRecovery()
+  events.setToastTeller((t) => {
+    h.toasts.push({ offer: t.offer, message: t.message, commands: (t.actions ?? []).map((a) => a.command) })
+    if (t.offer) h.openOffers.add(t.offer)
+    return { id: `toast-${h.toasts.length}` }
+  })
 }
 const saved = (): { reason: string; entries: { agentId: string; state: string; why?: string }[] } | null => {
   try {
@@ -140,7 +162,7 @@ function takesNote(agentId: string): void {
 
 beforeEach(() => {
   dir = tempDir('hive-restart-recovery-')
-  Object.assign(h, { lives: [], workspaces: [], hold: null, holdAsked: 0, starts: [], pending: [], tasks: null, stopEnds: true, paused: false, run: 0 })
+  Object.assign(h, { lives: [], workspaces: [], hold: null, holdAsked: 0, starts: [], pending: [], tasks: null, stopEnds: true, paused: false, run: 0, toasts: [], openOffers: new Set(), resolved: [], dropped: [] })
 })
 afterEach(() => {
   m?.stopRestartRecovery()
@@ -315,6 +337,71 @@ describe('the restart queue (HI-1707)', () => {
     await m.startRestartRecovery()
     await vi.waitFor(() => expect(h.starts).toEqual(['b1']), { timeout: HUNG_MS })
     expect(m.restartRecord()?.entries.find((e) => e.agentId === 'a1')?.state).toBe('offered')
+  })
+
+  // HI-2356: two workspaces ready at different times after a quit. One offer at a time: the later one replaces the earlier
+  // notice with one listing every agent offered, so no notice's buttons act on agents it didn't name.
+  describe('offers from two workspaces ready at different times (HI-2356)', () => {
+    const offerCommands = ['session.resumeRestart', 'session.dismissRestart']
+    async function twoWorkspaces() {
+      const a = workspace(join(dir, 'ws-a'), ['a1'])
+      const b = workspace(join(dir, 'ws-b'), ['b1'])
+      h.workspaces = [a, b]
+      await startWith([entry(a.path, 'a1'), entry(b.path, 'b1')], { reason: 'quit', readyMs: HUNG_MS })
+      m.workspaceRecovering(a.path, Promise.resolve())
+      let recoverB!: () => void
+      m.workspaceRecovering(b.path, new Promise<void>((r) => (recoverB = r)))
+      await m.startRestartRecovery()
+      // A is ready first: its one agent offered, in a notice of its own.
+      await vi.waitFor(() => expect(h.toasts).toHaveLength(1), { timeout: HUNG_MS })
+      expect(h.toasts[0].message).toContain('a1 (alpha)')
+      expect(h.toasts[0].message).not.toContain('b1')
+      expect(h.toasts[0].commands).toEqual(offerCommands)
+      return { recoverB, first: h.toasts[0].offer! }
+    }
+    const states = () => m.restartRecord()?.entries.map((e) => [e.agentId, e.state])
+
+    it("B's offer replaces A's: one notice lists both, A's resolves as replaced, and Don't Resume dismisses what that notice named", async () => {
+      const { recoverB, first } = await twoWorkspaces()
+      recoverB()
+      await vi.waitFor(() => expect(h.toasts).toHaveLength(2), { timeout: HUNG_MS })
+      const second = h.toasts[1]
+      expect(second.message).toContain('a1 (alpha)')
+      expect(second.message).toContain('b1 (alpha)')
+      expect(second.offer).not.toBe(first)
+      // A's notice resolved (its buttons gone): none of its buttons is left to act on B's agent.
+      expect(h.resolved).toEqual([[first, 'Replaced by a newer offer']])
+      expect([...h.openOffers]).toEqual([second.offer])
+      expect(await m.dismissOffered()).toBe(2)
+      expect(states()).toEqual([['a1', 'dismissed'], ['b1', 'dismissed']])
+      expect(h.resolved).toEqual([[first, 'Replaced by a newer offer'], [second.offer, 'Not resumed']])
+      expect(h.starts).toEqual([])
+    })
+
+    it("Resume on A's offer, then B's offer: A's notice keeps its report, not its buttons, and B's Don't Resume dismisses B's agent alone", async () => {
+      h.lives = []
+      const { recoverB, first } = await twoWorkspaces()
+      expect(await m.resumeOffered()).toBe(1)
+      // A's buttons are gone at once (it waits for its report): a later click on it can't act on B's agent.
+      expect(h.dropped).toEqual([[first, offerCommands, 'Resuming, one at a time']])
+      await vi.waitFor(() => expect(h.starts).toEqual(['a1']), { timeout: HUNG_MS })
+      // B gets ready while a1 resumes; the queue decides it once a1 is ready, telling B's offer before A's report.
+      recoverB()
+      takesNote('a1')
+      await vi.waitFor(() => expect(h.toasts).toHaveLength(2), { timeout: HUNG_MS })
+      const second = h.toasts[1]
+      expect(second.message).toContain('b1 (alpha)')
+      expect(second.message).not.toContain('a1')
+      expect(second.commands).toEqual(offerCommands)
+      // Taken, not replaced: A's notice says how its Resume went.
+      await vi.waitFor(() => expect(h.resolved.map(([o]) => o)).toEqual([first]), { timeout: HUNG_MS })
+      expect(h.resolved[0][1]).toContain('Resumed: a1 (alpha).')
+      expect([...h.openOffers]).toEqual([second.offer])
+      expect(await m.dismissOffered()).toBe(1)
+      expect(m.restartRecord()?.entries.find((e) => e.agentId === 'b1')?.state).toBe('dismissed')
+      expect(m.restartRecord()?.entries.find((e) => e.agentId === 'a1')?.state ?? 'gone').toMatch(/resumed|gone/)
+      expect(h.resolved).toEqual([[first, expect.stringContaining('Resumed: a1 (alpha).')], [second.offer, 'Not resumed']])
+    })
   })
 
   it("Hive closing while reading the agents' cards and lanes hangs: every running conversation is still recorded", async () => {
