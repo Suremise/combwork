@@ -99,7 +99,7 @@ const check = (name, ok, extra = '') => {
     check('Two (stopped) moves to Max 2’s Main', !!(await lib.until(async () => (await agentConnection('a-two')) === max2.main, HUNG_MS)), String(await agentConnection('a-two')))
     check('One (running) moves to Max 2’s Builder, the same name', !!(await lib.until(async () => (await agentConnection('a-one')) === max2.builder, HUNG_MS)), String(await agentConnection('a-one')))
     check('…and is resumed on Max 2 once its turn is over', !!(await lib.until(async () => (await live('a-one'))?.launchedConnection?.id === max2.id && (await live('a-one')).status === 'ready', HUNG_MS)), JSON.stringify((await live('a-one'))?.launchedConnection ?? null))
-    const notices = () => (fs.existsSync(notifyLog) ? fs.readFileSync(notifyLog, 'utf8').split(/\r?\n/).filter(Boolean).map((l) => JSON.parse(l)) : []).filter((e) => /move from Max 1 to Max 2/.test(e.title ?? ''))
+    const notices = () => (fs.existsSync(notifyLog) ? fs.readFileSync(notifyLog, 'utf8').split(/\r?\n/).filter(Boolean).map((l) => JSON.parse(l)) : []).filter((e) => e.kind === 'notification' && /move from Max 1 to Max 2/.test(e.title ?? '')) // each tell() also logs an `entry` line (HI-2320, HI-2369)
     const told = await lib.until(async () => (notices().length ? notices() : null), HUNG_MS)
     check('a notice says who moved and why: One and Two', !!told && told.length === 1 && /2 agents move from Max 1 to Max 2/.test(told[0].title) && /One and Two/.test(told[0].body ?? ''), JSON.stringify(told))
     // The workspace's Assistant runs on Max 1 too (its CLI's first account here), and is never moved: its connection is

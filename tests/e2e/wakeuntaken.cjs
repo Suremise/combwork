@@ -63,7 +63,8 @@ const check = (name, ok, extra = '') => {
     const f = path.join(userData, 'logs', 'hive.log')
     return fs.existsSync(f) ? fs.readFileSync(f, 'utf8') : ''
   }
-  const notices = () => (fs.existsSync(notifyLog) ? fs.readFileSync(notifyLog, 'utf8').trim().split('\n').filter(Boolean).map((l) => JSON.parse(l)) : [])
+  // The Windows notifications the user got: each tell() also logs an `entry` line (HI-2320), not a second notice (HI-2369).
+  const notices = () => (fs.existsSync(notifyLog) ? fs.readFileSync(notifyLog, 'utf8').trim().split('\n').filter(Boolean).map((l) => JSON.parse(l)) : []).filter((e) => e.kind === 'notification')
   const say = async (id, text) => {
     // Typed again if a wake of Hive's disturbed it (lib.typeLine, #1560).
     await lib.typeLine(inv, lib.ptyKey(alpha, id), claudeHome, null, text, { live: () => live(id) })
