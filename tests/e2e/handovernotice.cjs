@@ -93,21 +93,15 @@ const check = (name, ok, extra = '') => {
      * A lane started through the Agent API for an idle builder outside slots, which Hive gives it in a new conversation
      * whose first turn is the lane's brief (HI-2232). Quiet first (idle, nothing of Hive's being typed into it or waiting
      * to be), so it is renewed at once, never left as it is mid-turn nor owed; then `renewed` once its new conversation has
-     * had its brief's turn and is quiet again, before the suite types into it (HI-2251). Quiet alone isn't that turn over
-     * (HI-2350): Hive answers a hook before it handles it, so under load the brief's UserPromptSubmit can reach its status
-     * after the CLI has read its inbox, and the conversation looks ready, its input free and nothing waiting, while the
-     * brief runs: a line typed then is dropped (fake-dropped.jsonl). Its turn, over, is the brief done.
+     * had its brief's turn and is quiet again, before the suite types into it (HI-2251; quiet alone isn't that turn over:
+     * HI-2350, lib.laneBriefDone).
      */
     const quiet = async (a) => lib.agentQuiet(PORT, 'alpha', await live(a.id), workspaceToken)
     const laneOf = async (a, body) => {
       if (!(await lib.until(() => quiet(a), HUNG_MS, 200))) return { status: 0, body: `${a.name} wasn't quiet before its lane`, renewed: false, now: JSON.stringify(await live(a.id)) }
       const before = (await live(a.id))?.sessionId
       const r = await api(workspaceToken, 'POST', '/v1/lanes', body)
-      const briefDone = async () => {
-        const s = await live(a.id)
-        return !!s && s.sessionId !== before && s.turn?.state === 'over'
-      }
-      const renewed = !!(await lib.until(async () => (await briefDone()) && (await quiet(a)), HUNG_MS, 200))
+      const renewed = !!(await lib.until(async () => lib.laneBriefDone(PORT, 'alpha', await live(a.id), before, workspaceToken), HUNG_MS, 200))
       return { ...r, renewed, now: JSON.stringify(await live(a.id)) }
     }
     /**
