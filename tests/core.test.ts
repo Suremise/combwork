@@ -225,7 +225,7 @@ describe('providers migration', () => {
 
   it('a fresh install starts with every provider off', () => {
     expect(Object.values(DEFAULT_SETTINGS.providers).every((p) => !p.enabled)).toBe(true)
-    expect(DEFAULT_APP_CONFIG.version).toBe(8)
+    expect(DEFAULT_APP_CONFIG.version).toBe(9)
   })
   it('moves a default persona that went to its working mode, once (#259)', () => {
     // Saved before 0.9.3, as `persona` (#1084).
@@ -260,7 +260,7 @@ describe('providers migration', () => {
   })
   it('moves 0.1 Claude Code settings over and keeps Claude Code on', () => {
     const c = load(v1)
-    expect(c.version).toBe(8)
+    expect(c.version).toBe(9)
     // Automatic (#474), which picks Claude Code: it stays on.
     expect(c.settings.defaultProvider).toBe('auto')
     expect(c.settings.providers['claude-code']).toMatchObject({ enabled: true, executablePath: 'C:\\x\\claude.exe', defaultModel: 'opus', defaultEffort: 'high', defaultPermissionMode: 'acceptEdits', enableDangerousMode: true, extraArgs: '--verbose', checkUpdatesOnLaunch: false })
@@ -308,19 +308,30 @@ describe('providers migration', () => {
     // Once migrated, 50 is the user's choice.
     expect(warn(saved(5, 50))).toBe(50)
   })
-  it('moves everyone to Show in Hive once (Only when Hive is in the background goes), then keeps the choice', () => {
-    const notifications = (raw: Record<string, unknown>) => load(raw).settings.notifications
-    expect(DEFAULT_SETTINGS.notifications.whileFocused).toBe('inApp')
-    for (const onlyWhenUnfocused of [true, false]) {
-      for (const version of [5, 1]) {
-        const n = notifications({ version, settings: { notifications: { onlyWhenUnfocused } } })
-        expect(n.whileFocused, `${version} ${onlyWhenUnfocused}`).toBe('inApp')
-        expect('onlyWhenUnfocused' in n).toBe(false)
-      }
+  it("one notification system (HI-2320, config 9): While Hive is focused goes, Show nothing becomes Only in the bell, top centre moves to bottom right", () => {
+    const notifications = (raw: Record<string, unknown>) => load(raw).settings.notifications as unknown as Record<string, unknown>
+    expect(DEFAULT_SETTINGS.notifications.bannerPosition).toBe('bottom-right')
+    expect('whileFocused' in DEFAULT_SETTINGS.notifications).toBe(false)
+    // Each While Hive is focused × each scope: Show nothing becomes Only in the bell (background Windows notifications
+    // are kept by the routing table, tests/notify.test.ts); Show in Hive and Windows notification keep the scope.
+    for (const bannerScope of ['all', 'workspace', 'project'] as const) {
+      expect(notifications({ version: 8, settings: { notifications: { whileFocused: 'nothing', bannerScope } } }).bannerScope, bannerScope).toBe('none')
+      expect(notifications({ version: 8, settings: { notifications: { whileFocused: 'inApp', bannerScope } } }).bannerScope, bannerScope).toBe(bannerScope)
+      expect(notifications({ version: 8, settings: { notifications: { whileFocused: 'windows', bannerScope } } }).bannerScope, bannerScope).toBe(bannerScope)
     }
-    // Chosen since: kept.
-    expect(notifications({ version: 6, settings: { notifications: { whileFocused: 'windows' } } }).whileFocused).toBe('windows')
-    expect(notifications({ version: 6, settings: { notifications: { whileFocused: 'nothing' } } }).whileFocused).toBe('nothing')
+    for (const whileFocused of ['inApp', 'nothing', 'windows']) expect('whileFocused' in notifications({ version: 8, settings: { notifications: { whileFocused } } }), whileFocused).toBe(false)
+    // Before version 6 everyone was moved to Show in Hive: their old onlyWhenUnfocused says nothing now, and goes.
+    for (const onlyWhenUnfocused of [true, false]) {
+      const n = notifications({ version: 5, settings: { notifications: { onlyWhenUnfocused, bannerScope: 'project' } } })
+      expect(n.bannerScope).toBe('project')
+      expect('onlyWhenUnfocused' in n).toBe(false)
+    }
+    // The old default place moves to the pop-ups' corner; any other place chosen is kept.
+    expect(notifications({ version: 8, settings: { notifications: { bannerPosition: 'top-center' } } }).bannerPosition).toBe('bottom-right')
+    for (const bannerPosition of ['top-left', 'top-right', 'bottom-left', 'bottom-center', 'bottom-right']) expect(notifications({ version: 8, settings: { notifications: { bannerPosition } } }).bannerPosition, bannerPosition).toBe(bannerPosition)
+    // Once migrated, a choice is the user's: top centre chosen since stays.
+    expect(notifications({ version: 9, settings: { notifications: { bannerPosition: 'top-center' } } }).bannerPosition).toBe('top-center')
+    expect(notifications({ version: 9, settings: { notifications: { bannerScope: 'none' } } }).bannerScope).toBe('none')
   })
   it('writes the Claude Code settings where 0.1 reads them', async () => {
     const { withLegacySettings } = await import('../src/shared/defaults')

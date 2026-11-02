@@ -15,7 +15,7 @@ import * as actions from './actions'
 import { noteCommandUsed } from './tips'
 import { showNoticeTarget } from './noticeTarget'
 import { requestStripMenu, type StripMenu } from './stripMenus'
-import { showAntivirus } from './components/Antivirus'
+import { dismissAntivirusOffer, showAntivirus } from './components/Antivirus'
 import { focusTileAfter } from './components/AgentTiles'
 import type { VcSection } from '@shared/gitRepo'
 import { agentPage, assistantOnLeft, closeTile, showTilePage, tileFocusOf, tilePage, tilesPageSize, focusedAgentId, get, isAssistantPath, setAssistantSide, notify, openInSessionsTab, openProjectSettings, openVersionControl, revealAgent, set, setActivity, setAssistantOpen, setProgressOpen, progressIsOpen, showAssistantView, showView, showUnusedWorktrees, setProjectTab, showAgent, showPage, panePageCount, shownLayout, toggleCompactSidebar, type ProjectTab } from './store'
@@ -219,7 +219,7 @@ const COMMAND_DEFS: CommandDef[] = [
   { id: 'settings.advanced', name: msg({ id: 'shell.command.settings.advanced', defaultMessage: 'Advanced Settings', description: 'A command (the menus, the command palette, Settings → Keyboard Shortcuts), in the Preferences category.' }), category: 'preferences', run: () => { set({ settingsSection: 'advanced', settingsQuery: '' }); setActivity('settings') } },
   { id: 'settings.notifications', name: msg({ id: 'shell.command.settings.notifications', defaultMessage: 'Notification Settings', description: 'A command (the menus, the command palette, Settings → Keyboard Shortcuts), in the Preferences category.' }), category: 'preferences', run: () => { set({ settingsSection: 'notifications', settingsQuery: '' }); setActivity('settings') } },
   { id: 'antivirus.show', name: msg({ id: 'shell.command.antivirus.show', defaultMessage: 'Antivirus Scanning of the Workspace', description: 'A command (the menus, the command palette, Settings → Keyboard Shortcuts), in the Preferences category.' }), category: 'preferences', run: () => showAntivirus() },
-  { id: 'antivirus.dismiss', name: msg({ id: 'shell.command.antivirus.dismiss', defaultMessage: 'Don’t Suggest Antivirus Exclusions Again', description: "A command (the menus, the command palette, Settings → Keyboard Shortcuts), in the Preferences category. It isn't in the menus or the palette: notifications and buttons run it by its name." }), category: 'preferences', internal: true, run: () => void call('antivirus:dismiss') },
+  { id: 'antivirus.dismiss', name: msg({ id: 'shell.command.antivirus.dismiss', defaultMessage: 'Don’t Suggest Antivirus Exclusions Again', description: "A command (the menus, the command palette, Settings → Keyboard Shortcuts), in the Preferences category. It isn't in the menus or the palette: notifications and buttons run it by its name." }), category: 'preferences', internal: true, run: () => dismissAntivirusOffer() },
   { id: 'window.new', name: msg({ id: 'shell.command.window.new', defaultMessage: 'New Window', description: 'A command (the menus, the command palette, Settings → Keyboard Shortcuts), in the File category.' }), category: 'file', keybinding: 'Mod+K Mod+N', run: () => call('window:new') }, // i18n-ignore: a shortcut's keys
   { id: 'workspace.open', name: msg({ id: 'shell.command.workspace.open', defaultMessage: 'Open Workspace…', description: 'A command (the menus, the command palette, Settings → Keyboard Shortcuts), in the File category. The … says it opens a dialog first: keep it.' }), category: 'file', keybinding: 'Mod+K Mod+O', run: (path?: string) => actions.openWorkspace(path) }, // i18n-ignore: a shortcut's keys
   { id: 'workspace.create', name: msg({ id: 'shell.command.workspace.create', defaultMessage: 'New Workspace…', description: 'A command (the menus, the command palette, Settings → Keyboard Shortcuts), in the File category. The … says it opens a dialog first: keep it.' }), category: 'file', run: () => actions.createWorkspace() },
@@ -313,8 +313,8 @@ const COMMAND_DEFS: CommandDef[] = [
     category: 'session',
     // The long-conversation notice's Hand Over to…, which passes the agent: checked again when it is clicked.
     internal: true,
-    run: (projectPath?: unknown, agentId?: unknown) => {
-      if (typeof projectPath === 'string' && typeof agentId === 'string') void actions.handOverLongConversation(projectPath, agentId)
+    run: (projectPath?: unknown, agentId?: unknown, sessionId?: unknown) => {
+      if (typeof projectPath === 'string' && typeof agentId === 'string') return actions.handOverLongConversation(projectPath, agentId, typeof sessionId === 'string' ? sessionId : undefined)
     }
   },
   {
@@ -323,9 +323,9 @@ const COMMAND_DEFS: CommandDef[] = [
     category: 'session',
     // Only from the notification, which passes the agent and file.
     internal: true,
-    run: (projectPath?: unknown, agentId?: unknown, path?: unknown) => {
+    run: (projectPath?: unknown, agentId?: unknown, path?: unknown, offer?: unknown) => {
       if (typeof projectPath === 'string' && typeof agentId === 'string' && typeof path === 'string')
-        void actions.attempt(tr(msg({ id: 'shell.error.allowEdit', defaultMessage: 'Could not allow the edit', description: "An error's title: allowing an agent's edit of a locked file failed." })), () => call('session:allowLockedEdit', projectPath, agentId, path))
+        return actions.attempt(tr(msg({ id: 'shell.error.allowEdit', defaultMessage: 'Could not allow the edit', description: "An error's title: allowing an agent's edit of a locked file failed." })), () => call('session:allowLockedEdit', projectPath, agentId, path, typeof offer === 'string' ? offer : undefined))
     }
   },
   {
@@ -334,9 +334,11 @@ const COMMAND_DEFS: CommandDef[] = [
     category: 'session',
     // Only from the notification and the pane header, which pass the agent and what to do.
     internal: true,
-    run: (projectPath?: unknown, agentId?: unknown, how?: unknown) => {
-      if (typeof projectPath === 'string' && typeof agentId === 'string' && (how === 'end' || how === 'keep'))
-        void actions.attempt(how === 'end' ? tr(msg({ id: 'shell.error.endProcesses', defaultMessage: 'Could not end the processes', description: "An error's title: ending the processes an agent left running failed." })) : tr(msg({ id: 'shell.error.keepProcesses', defaultMessage: 'Could not keep the processes', description: "An error's title: keeping the processes an agent left running failed." })), () => call('session:settleLeftovers', projectPath, agentId, how))
+    // From a notice, its offer (HI-2320): only what it listed, checked again by main, which says what happened.
+    run: (projectPath?: unknown, agentId?: unknown, how?: unknown, offer?: unknown) => {
+      if (typeof projectPath !== 'string' || typeof agentId !== 'string' || (how !== 'end' && how !== 'keep')) return
+      const title = how === 'end' ? tr(msg({ id: 'shell.error.endProcesses', defaultMessage: 'Could not end the processes', description: "An error's title: ending the processes an agent left running failed." })) : tr(msg({ id: 'shell.error.keepProcesses', defaultMessage: 'Could not keep the processes', description: "An error's title: keeping the processes an agent left running failed." }))
+      return actions.attempt(title, async () => void (typeof offer === 'string' ? await call('session:settleOffer', projectPath, offer, how) : await call('session:settleLeftovers', projectPath, agentId, how))).then(() => undefined)
     }
   },
   {
@@ -345,9 +347,9 @@ const COMMAND_DEFS: CommandDef[] = [
     category: 'session',
     // Only from the notification, which names the job and the conversation.
     internal: true,
-    run: (projectPath?: unknown, agentId?: unknown, jobId?: unknown, sessionId?: unknown) => {
+    run: (projectPath?: unknown, agentId?: unknown, jobId?: unknown, sessionId?: unknown, offer?: unknown) => {
       if (typeof projectPath === 'string' && typeof agentId === 'string' && typeof jobId === 'string' && typeof sessionId === 'string')
-        void actions.attempt(tr(msg({ id: 'shell.error.stopBackground', defaultMessage: 'Could not stop the background session', description: "An error's title: stopping an agent's background session failed." })), () => call('session:stopBackgroundAndResume', projectPath, agentId, jobId, sessionId))
+        return actions.attempt(tr(msg({ id: 'shell.error.stopBackground', defaultMessage: 'Could not stop the background session', description: "An error's title: stopping an agent's background session failed." })), () => call('session:stopBackgroundAndResume', projectPath, agentId, jobId, sessionId, typeof offer === 'string' ? offer : undefined))
     }
   },
   {
@@ -356,7 +358,7 @@ const COMMAND_DEFS: CommandDef[] = [
     category: 'session',
     // Only from the notice that Hive closed unexpectedly (#984), which lists them.
     internal: true,
-    run: () => void actions.attempt(tr(msg({ id: 'shell.error.resumeAfterClose', defaultMessage: 'Could not resume the agents', description: "An error's title: resuming the agents that were running when Hive closed unexpectedly failed." })), () => call('app:resumeAfterClose'))
+    run: () => actions.attempt(tr(msg({ id: 'shell.error.resumeAfterClose', defaultMessage: 'Could not resume the agents', description: "An error's title: resuming the agents that were running when Hive closed unexpectedly failed." })), () => call('app:resumeAfterClose'))
   },
   {
     id: 'session.stopLeftAfterClose',
@@ -364,7 +366,7 @@ const COMMAND_DEFS: CommandDef[] = [
     category: 'session',
     // Only from the notice that Hive closed unexpectedly (#987), which lists them.
     internal: true,
-    run: () => void actions.attempt(tr(msg({ id: 'shell.error.stopLeftAfterClose', defaultMessage: 'Could not stop the processes', description: "An error's title: ending the processes the agents had started before Hive closed unexpectedly failed." })), () => call('app:stopLeftAfterClose'))
+    run: () => actions.attempt(tr(msg({ id: 'shell.error.stopLeftAfterClose', defaultMessage: 'Could not stop the processes', description: "An error's title: ending the processes the agents had started before Hive closed unexpectedly failed." })), () => call('app:stopLeftAfterClose'))
   },
   {
     id: 'session.resumeRestart',
@@ -372,7 +374,7 @@ const COMMAND_DEFS: CommandDef[] = [
     category: 'session',
     // Only from the notice offering it (HI-1707), which lists them.
     internal: true,
-    run: () => void actions.attempt(tr(msg({ id: 'shell.error.resumeRestart', defaultMessage: 'Could not resume the agents', description: "An error's title: resuming the agents that were working when Hive was last quit or restarted failed." })), () => call('app:resumeRestart'))
+    run: () => actions.attempt(tr(msg({ id: 'shell.error.resumeRestart', defaultMessage: 'Could not resume the agents', description: "An error's title: resuming the agents that were working when Hive was last quit or restarted failed." })), () => call('app:resumeRestart'))
   },
   {
     id: 'session.dismissRestart',
@@ -380,15 +382,17 @@ const COMMAND_DEFS: CommandDef[] = [
     category: 'session',
     // Only from the notice offering it (HI-1707).
     internal: true,
-    run: () => void call('app:dismissRestart')
+    run: () => call('app:dismissRestart').catch(() => undefined)
   },
   {
     id: 'session.applyPermissionModes',
     name: msg({ id: 'shell.command.session.applyPermissionModes', defaultMessage: 'Switch Running Agents to Their Permission Mode Settings', description: 'A command (the menus, the command palette, Settings → Keyboard Shortcuts), in the Session category.' }),
     category: 'session',
-    run: async () => {
-      const r = await actions.attempt(tr(msg({ id: 'shell.error.switchModes', defaultMessage: 'Could not switch permission modes', description: "An error's title: switching running agents to their permission mode settings failed." })), () => call('session:applyModes'))
-      if (!r) return
+    // From its notice, the notice's offer (HI-2320): what happened goes into that notice.
+    run: async (offer?: unknown) => {
+      const fromNotice = typeof offer === 'string' ? offer : undefined
+      const r = await actions.attempt(tr(msg({ id: 'shell.error.switchModes', defaultMessage: 'Could not switch permission modes', description: "An error's title: switching running agents to their permission mode settings failed." })), () => call('session:applyModes', fromNotice))
+      if (!r || fromNotice) return
       if (r.switched.length) notify('success', tr(msg({ id: 'shell.modes.switched', defaultMessage: 'Permission mode switched', description: 'A notice after running agents were switched to their permission mode settings; the agents are listed under it.' })), r.switched.join('\n'))
       if (r.skipped.length) notify('warning', r.switched.length ? tr(msg({ id: 'shell.modes.someSkipped', defaultMessage: 'Some agents were not switched', description: 'A notice after switching permission modes: the agents listed under it were not switched.' })) : tr(msg({ id: 'shell.modes.noneSwitched', defaultMessage: 'Permission mode not switched', description: 'A notice after switching permission modes: none could be switched; why is listed under it.' })), r.skipped.join('\n'))
       if (!r.switched.length && !r.skipped.length) notify('info', tr(msg({ id: 'shell.modes.nothing', defaultMessage: 'Nothing to switch', description: 'A notice: every running agent already has its permission mode.' })), tr(msg({ id: 'shell.modes.nothingDetail', defaultMessage: 'Every running agent is already in the mode its settings ask for.', description: 'More in the notice that there was nothing to switch.' })))
@@ -492,7 +496,7 @@ const COMMAND_DEFS: CommandDef[] = [
     when: (projectPath?: unknown) => (typeof projectPath === 'string' ? !!get().workspace?.projects.some((p) => p.path.toLowerCase() === projectPath.toLowerCase()) : hasProject() && !!selected()?.agents.some((a) => a.live)),
     run: (projectPath?: unknown) => {
       const path = typeof projectPath === 'string' ? projectPath : selected()?.path
-      if (path) void actions.startFreshIdle(path)
+      if (path) return actions.startFreshIdle(path)
     }
   },
   { id: 'session.startNewAll', name: msg({ id: 'shell.command.session.startNewAll', defaultMessage: 'Start New (All)…', description: 'A command (the menus, the command palette, Settings → Keyboard Shortcuts), in the Session category. The … says it opens a dialog first: keep it.' }), category: 'session', when: () => hasProject() && !!selected()?.agents.length, liveLabel: () => batchLabel(msg({ id: 'shell.command.session.startNewAllLive', defaultMessage: '{several, select, yes {Start New ({n})…} other {Start New…}}', description: 'The command that gives every agent of the project a new session, as the menus and the palette show it: with several agents, how many it acts on ({n}). The … says it asks first: keep it.' }), 'startNew'), run: () => void actions.startNewAll(get().selectedProject!) },
@@ -548,7 +552,7 @@ const COMMAND_DEFS: CommandDef[] = [
     category: 'tasks',
     // The Undo of an Archived n cards toast (#351): its batch back where it was.
     internal: true,
-    run: (id: string) => void unarchiveBatch(id)
+    run: (id: string, workspacePath?: unknown) => unarchiveBatch(id, typeof workspacePath === 'string' ? workspacePath : undefined).then(() => undefined)
   },
   {
     id: 'agent.show',
@@ -572,7 +576,7 @@ const COMMAND_DEFS: CommandDef[] = [
     // The notice that a slot is held only by an idle broker (HI-2309): Release Slot…'s question for it.
     internal: true,
     run: (path?: unknown, slot?: unknown) => {
-      if (typeof path === 'string' && typeof slot === 'string') void actions.releaseHeldSlot(path, slot)
+      if (typeof path === 'string' && typeof slot === 'string') return actions.releaseHeldSlot(path, slot)
     }
   },
   {
@@ -626,7 +630,7 @@ const COMMAND_DEFS: CommandDef[] = [
     run: () => setProgressOpen(!progressIsOpen())
   },
   // The answer to a question the Assistant waits on (its card in the panel, or a notification).
-  { id: 'assistant.answer', name: msg({ id: 'shell.command.assistant.answer', defaultMessage: 'Answer the Hive Assistant', description: "A command (the menus, the command palette, Settings → Keyboard Shortcuts), in the Assistant category. It isn't in the menus or the palette: notifications and buttons run it by its name." }), category: 'assistant', internal: true, run: (id: string, yes: boolean) => void call('assistant:answer', id, yes) },
+  { id: 'assistant.answer', name: msg({ id: 'shell.command.assistant.answer', defaultMessage: 'Answer the Hive Assistant', description: "A command (the menus, the command palette, Settings → Keyboard Shortcuts), in the Assistant category. It isn't in the menus or the palette: notifications and buttons run it by its name." }), category: 'assistant', internal: true, run: (id: string, yes: boolean) => call('assistant:answer', id, yes).catch(() => undefined) },
   {
     id: 'assistant.start',
     name: msg({ id: 'shell.command.assistant.start', defaultMessage: 'Start the Hive Assistant', description: 'A command (the menus, the command palette, Settings → Keyboard Shortcuts), in the Assistant category.' }),
@@ -680,7 +684,7 @@ const COMMAND_DEFS: CommandDef[] = [
   { id: 'help.about', name: msg({ id: 'shell.command.help.about', defaultMessage: 'About {app}', description: "A command (the Help menu, the command palette), in the Help category. {app} is Hive's name." }), nameValues: { app: APP_NAME }, category: 'help', run: () => set({ aboutOpen: true }) },
   { id: 'help.checkUpdates', name: msg({ id: 'shell.command.help.checkUpdates', defaultMessage: 'Check for Updates…', description: 'A command (the menus, the command palette, Settings → Keyboard Shortcuts), in the Help category. The … says it opens a dialog first: keep it.' }), category: 'help', run: () => checkForUpdates() },
   { id: 'update.show', name: msg({ id: 'shell.command.update.show', defaultMessage: 'Show Hive Update', description: 'A command (the menus, the command palette, Settings → Keyboard Shortcuts), in the Help category.' }), category: 'help', when: () => ['available', 'downloading', 'ready'].includes(get().update?.status ?? ''), run: () => set({ updateOpen: true }) },
-  { id: 'update.install', name: msg({ id: 'shell.command.update.install', defaultMessage: 'Restart and Update Hive', description: 'A command (the menus, the command palette, Settings → Keyboard Shortcuts), in the Help category.' }), category: 'help', when: () => get().update?.status === 'ready', run: () => call('update:install') },
+  { id: 'update.install', name: msg({ id: 'shell.command.update.install', defaultMessage: 'Restart and Update Hive', description: 'A command (the menus, the command palette, Settings → Keyboard Shortcuts), in the Help category.' }), category: 'help', when: () => get().update?.status === 'ready', run: (version?: unknown) => call('update:install', typeof version === 'string' ? version : undefined) },
   // Pausing the team before an update (HI-2081): every open workspace's lanes, wakes and hand-outs held until it resumes.
   { id: 'team.pause', name: msg({ id: 'shell.command.team.pause', defaultMessage: 'Pause the Team', description: "A command (the command palette, Settings → Keyboard Shortcuts), in the Help category (HI-2081): before an update, Hive starts no lane card, wakes no agent with card events and gives no reviews out in every open workspace, and tells each running agent to park (finish its turn, end its runs, commit). The Progress panel's Lanes shows what still runs." }), category: 'help', when: () => hasWorkspace() && !workspacePaused(get().workspace?.path), run: () => void pauseTheTeam() },
   { id: 'team.resume', name: msg({ id: 'shell.command.team.resume', defaultMessage: 'Resume the Team', description: 'A command (the command palette, Settings → Keyboard Shortcuts), in the Help category (HI-2081): lifts the pause of every open workspace, so lanes start their cards and agents are woken again.' }), category: 'help', when: () => hasWorkspace() && workspacePaused(get().workspace?.path), run: () => void resumeTheTeam() },
@@ -708,6 +712,22 @@ export function runCommand(id: string, ...args: unknown[]): void {
   // Tips skip what the user already does.
   noteCommandUsed(id)
   void Promise.resolve(c.run(...args)).catch((e) => console.error(e))
+}
+
+/**
+ * Runs a command and waits for what it does (HI-2320: a notification's button shows its spinner until then). Resolves
+ * once it has settled; a command that fails reports it itself (actions.attempt), so this never rejects.
+ */
+export async function runCommandAsync(id: string, ...args: unknown[]): Promise<void> {
+  const c = commands.find((x) => x.id === id)
+  if (!c || c.hidden?.()) return
+  if (c.when && !c.when(...args)) return
+  noteCommandUsed(id)
+  try {
+    await c.run(...args)
+  } catch (e) {
+    console.error(e)
+  }
 }
 
 /** Whether a project may override this command's shortcut. */

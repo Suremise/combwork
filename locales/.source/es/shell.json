@@ -218,6 +218,8 @@
   "shell.edit.redo": "Redo",
   "shell.edit.selectAll": "Select All",
   "shell.edit.undo": "Undo",
+  "shell.entry.mcpCopied": "In the workspace now",
+  "shell.entry.unfinished": "Didn't finish: try again",
   "shell.error.allowEdit": "Could not allow the edit",
   "shell.error.endProcesses": "Could not end the processes",
   "shell.error.keepProcesses": "Could not keep the processes",
@@ -261,6 +263,7 @@
   "shell.noticeTarget.agentGone": "{agent} isn't in {project} any more",
   "shell.noticeTarget.cardElsewhere": "{card} is on {workspace}'s board, which isn't open",
   "shell.noticeTarget.cardGone": "{card} isn't on the board any more",
+  "shell.noticeTarget.projectGone": "{project} isn't in this workspace any more",
   "shell.notifications.clearAll": "Clear all",
   "shell.notifications.none": "No notifications",
   "shell.notifications.title": "Notifications",
@@ -411,5 +414,6 @@
   "shell.titlebar.pinTip": "{on, select, yes {Always on Top (on)} other {Always on Top (off)}}",
   "shell.toast.dismiss": "Dismiss",
   "shell.toast.openAgent": "Open {agent}'s pane",
-  "shell.toast.openCard": "Open {card}"
+  "shell.toast.openCard": "Open {card}",
+  "shell.toast.openProject": "Show {project}"
 }

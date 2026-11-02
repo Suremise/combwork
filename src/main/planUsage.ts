@@ -1,15 +1,12 @@
 import { englishText } from '../shared/advanced'
 import { msg, tr } from '../shared/i18n'
-import { Notification } from 'electron'
 import { createHash } from 'crypto'
 import type { ConnectionPlanUsage, PlanLimit, PlanUsage, ProviderId } from '../shared/types'
 import { providerName } from '../shared/providers'
 import { formatTime, formatWeekdayTime } from '../shared/dates'
 import { config } from './config'
-import { emit, logNotice } from './events'
-import { notificationIcon } from './paths'
-import { showOsNotification } from './testQuiet'
-import { routeAppNotice } from './notices'
+import { emit } from './events'
+import { tell } from './notify'
 
 /**
  * Plan usage (a subscription's rolling limits, e.g. 5-hour and weekly) as each provider reports it:
@@ -18,8 +15,6 @@ import { routeAppNotice } from './notices'
  * last one in its rollout, maybe days old), so reports come out of order: mergePlanUsage keeps the truth (#383).
  */
 
-/** Kept so Windows can still activate them after they are shown. */
-const shown = new Set<Notification>()
 const WARN_LEVELS = [95, 80]
 
 /** Reset times can wobble by seconds between reports; a new period moves them by hours. */
@@ -153,21 +148,9 @@ export function reportPlanUsage(provider: ProviderId, report: PlanUsage, reporte
     if (level === null) continue
     config.update((cfg) => (cfg.planWarnings[key] = { resetsAt: l.resetsAt, level }))
     const { title, body, apiTitle } = planNotice(provider, l, level, connection?.name)
-    // Kept in the Notifications panel, and told as agent notices are (routeAppNotice): a banner in the window you are
-    // using, a Windows notification with Hive in the background, or nothing (notifications off, or Show nothing).
-    logNotice(level >= 95 ? 'error' : 'warning', title, body)
-    routeAppNotice(
-      title,
-      body,
-      () => {
-        if (!Notification.isSupported()) return
-        const n = new Notification({ title, body, icon: notificationIcon() })
-        shown.add(n)
-        n.on('close', () => shown.delete(n))
-        if (!showOsNotification(n, title, body)) shown.delete(n)
-      },
-      apiTitle
-    )
+    // Told once (HI-2320): a pop-up in the window you are using (kept in its bell), a Windows notification with Hive in
+    // the background (its bell row kept quietly), or nothing (notifications off).
+    tell({ kind: 'usage', level: level >= 95 ? 'error' : 'warning', title, message: body, apiTitle })
   }
 }
 

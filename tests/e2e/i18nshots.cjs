@@ -107,7 +107,7 @@ if (require.main === module) {
     const cfg = JSON.parse(fs.readFileSync(cfgFile, 'utf8'))
     cfg.settings.general = { ...cfg.settings.general, confirmOnQuit: 'never', showTips: false }
     // Banners for agents finishing while the window is focused (stubbed), and the Windows notifications it would show.
-    cfg.settings.notifications = { ...cfg.settings.notifications, chimeEnabled: false, desktopNotifications: true, notifyOnFinished: true, notifyOnWaiting: true, whileFocused: 'inApp', bannerSeconds: 60 }
+    cfg.settings.notifications = { ...cfg.settings.notifications, chimeEnabled: false, desktopNotifications: true, notifyOnFinished: true, notifyOnWaiting: true, bannerSeconds: 60 }
     // The Progress panel's runs come in through the Agent API, as a script's would.
     cfg.settings.agentApi = { ...cfg.settings.agentApi, enabled: true }
     fs.writeFileSync(cfgFile, JSON.stringify(cfg, null, 2))

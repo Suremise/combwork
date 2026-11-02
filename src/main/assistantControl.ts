@@ -2,13 +2,15 @@ import { randomBytes, randomUUID, timingSafeEqual } from 'crypto'
 import { app } from 'electron'
 import { dirname, join } from 'path'
 import { mkdir } from 'original-fs/promises'
-import { ASSISTANT_DIR } from '../shared/assistant'
+import { ASSISTANT_AGENT_ID, ASSISTANT_DIR, ASSISTANT_NAME } from '../shared/assistant'
 import { activityFields, publicReason, type ActivityTarget } from '../shared/assistantActivity'
 import { controlAllows } from '../shared/assistantTools'
 import { HIVE_DIR } from '../shared/defaults'
 import type { AssistantAction, AssistantControl, AssistantQuestion, AssistantSettingChange } from '../shared/types'
 import { config } from './config'
 import { emit } from './events'
+import { resolveOffer, tell } from './notify'
+import { msg, tr } from '../shared/i18n'
 import { hashText, writeJsonAtomic } from './fsutil'
 import { createLogger, userText } from './logger'
 import { recordTestToken } from './testQuiet'
@@ -186,6 +188,46 @@ export function currentTurn(workspacePath: string): AssistantTurn {
 
 function emitQuestions(workspacePath: string): void {
   emit({ type: 'assistant-questions', projectPath: assistantHome(workspacePath), questions: questions(workspacePath) })
+  // A question told as a notification (HI-2320) and no longer waiting (answered, its time up, its caller gone): its
+  // entry says so and loses Yes and No.
+  const pending = stateOf(workspacePath).pending
+  for (const id of [...toldQuestions]) {
+    if (pending.has(id) || ![...states.values()].every((s) => !s.pending.has(id))) continue
+    toldQuestions.delete(id)
+    resolveOffer(`aq:${id}`, tr(QUESTION_ANSWERED))
+  }
+}
+
+/** Questions told as a notification (HI-2320), by id: once each. */
+const toldQuestions = new Set<string>()
+const QUESTION_ANSWERED = msg({ id: 'main.assistantQuestion.answered', defaultMessage: 'Answered', description: "What the notification of a question from the Hive Assistant says once it is answered or no longer waits (HI-2320), in place of its buttons. Keep it short." })
+
+/**
+ * A question of the Assistant's, while its panel is hidden in the window that asks (HI-2320): told once as a
+ * notification that needs you, through the one routing table (a pop-up in the window in use, a Windows notification
+ * with Hive in the background, as the settings say), with Yes and No while it waits. The window decides that its panel
+ * is hidden; main tells it. Returns whether it was told now.
+ */
+export function tellQuestion(workspacePath: string, id: string): boolean {
+  const q = stateOf(workspacePath).pending.get(id)?.question
+  if (!q || toldQuestions.has(id)) return false
+  toldQuestions.add(id)
+  const home = assistantHome(workspacePath)
+  tell({
+    kind: 'needsYou',
+    level: 'warning',
+    title: q.title,
+    message: q.message,
+    projectPath: home,
+    agentId: ASSISTANT_AGENT_ID,
+    target: { kind: 'agent', projectPath: home, agentId: ASSISTANT_AGENT_ID, name: ASSISTANT_NAME, project: ASSISTANT_NAME },
+    actions: [
+      { label: q.yes, command: 'assistant.answer', args: [id, true] },
+      { label: q.no, command: 'assistant.answer', args: [id, false] }
+    ],
+    offer: `aq:${id}`
+  })
+  return true
 }
 
 export function questions(workspacePath: string): AssistantQuestion[] {

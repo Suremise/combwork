@@ -88,7 +88,7 @@ describe('the i18nshots route (#769)', () => {
 
   it('--affected runs it for its case files, the translations and the screens its core cases reach', () => {
     const pick = (f: string) => affectedSuites([f], names)
-    for (const f of ['tests/e2e/i18nshots.cjs', 'tests/e2e/i18nshots/core.cjs', 'tests/e2e/i18nshots/board.cjs', 'locales/pl/language.json', 'src/renderer/src/components/NoticeBanners.tsx', 'src/main/progress.ts']) expect(pick(f).suites, f).toContain('i18nshots')
+    for (const f of ['tests/e2e/i18nshots.cjs', 'tests/e2e/i18nshots/core.cjs', 'tests/e2e/i18nshots/board.cjs', 'locales/pl/language.json', 'src/renderer/src/components/Popups.tsx', 'src/main/progress.ts']) expect(pick(f).suites, f).toContain('i18nshots')
     // A translation alone needs nothing else: every other suite runs in English.
     expect(pick('locales/de/board.json')).toEqual({ suites: ['i18nshots'], why: ['locales/de/board.json: i18nshots'] })
     // The i18n tooling and each area's unit tests are npm test's (#768): no suite.

@@ -217,6 +217,8 @@
   "shell.edit.redo": "やり直し",
   "shell.edit.selectAll": "すべて選択",
   "shell.edit.undo": "元に戻す",
+  "shell.entry.mcpCopied": "ワークスペースに追加済み",
+  "shell.entry.unfinished": "完了しませんでした：もう一度お試しください",
   "shell.error.allowEdit": "編集を許可できませんでした",
   "shell.error.endProcesses": "プロセスを終了できませんでした",
   "shell.error.keepProcesses": "プロセスを維持できませんでした",
@@ -260,6 +262,7 @@
   "shell.noticeTarget.agentGone": "{agent}はもう{project}にいません",
   "shell.noticeTarget.cardElsewhere": "{card}は{workspace}のボードにありますが、そのワークスペースは開かれていません",
   "shell.noticeTarget.cardGone": "{card}はもうボードにありません",
+  "shell.noticeTarget.projectGone": "{project}はもうこのワークスペースにありません",
   "shell.notifications.clearAll": "すべてクリア",
   "shell.notifications.none": "通知はありません",
   "shell.notifications.title": "通知",
@@ -410,5 +413,6 @@
   "shell.titlebar.pinTip": "{on, select, yes {常に手前に表示（オン）} other {常に手前に表示（オフ）}}",
   "shell.toast.dismiss": "閉じる",
   "shell.toast.openAgent": "{agent}のペインを開く",
-  "shell.toast.openCard": "{card}を開く"
+  "shell.toast.openCard": "{card}を開く",
+  "shell.toast.openProject": "{project}を表示"
 }

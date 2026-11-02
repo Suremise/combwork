@@ -7,6 +7,8 @@ import type { UpdateState } from '../shared/types'
 import { APP_NAME } from '../shared/appName'
 import { config } from './config'
 import { emit, toast } from './events'
+import { resolveOffer, resolveOffers } from './notify'
+import { OUTCOME } from './outcomes'
 import { createLogger, userText } from './logger'
 import { exitBy } from './exitLog'
 import { testQuiet } from './testQuiet'
@@ -46,6 +48,9 @@ let manualCheck = false
 function set(patch: Partial<UpdateState>, replace = false): void {
   state = replace ? ({ current: app.getVersion(), local: localOf(running), ...patch } as UpdateState) : { ...state, ...patch }
   emit({ type: 'update-state', state })
+  // A Restart and Update offered for a version no longer the one ready loses its button (HI-2320).
+  const ready = state.status === 'ready' ? `update:${state.version}` : null
+  resolveOffers((o) => o.startsWith('update:') && o !== ready, tr(OUTCOME.notReady))
 }
 
 export function updateState(): UpdateState {
@@ -197,12 +202,17 @@ function mayInstall(): boolean {
 }
 
 /** Restart and Update: quit through the normal flow (which asks if agents are working), then install. */
-export function restartAndInstall(): void {
-  if (state.status !== 'ready') return
+export function restartAndInstall(version?: string): void {
+  // Checked again (HI-2320): only the version its notice offered, while it is the one ready.
+  if (state.status !== 'ready' || (version !== undefined && state.version !== version)) {
+    if (version !== undefined) resolveOffer(`update:${version}`, tr(OUTCOME.notReady))
+    return
+  }
   if (!mayInstall()) {
     toast('warning', tr(msg({ id: 'main.update.notInstalled', defaultMessage: "{app} {version} wasn't installed", description: "A notice: the user chose Restart and Update, and Hive didn't install the downloaded update. {app} is Hive's name." }), { app: APP_NAME, version: state.version ?? '' }), notInstalledText())
     return
   }
+  if (version !== undefined) resolveOffer(`update:${version}`, tr(OUTCOME.installing))
   restartForUpdate()
 }
 
@@ -289,7 +299,11 @@ export function initUpdater(opts: { restart: () => void }): void {
       'info',
       tr(msg({ id: 'main.update.ready', defaultMessage: '{app} {version} is ready', description: "A notice: an update was downloaded. {app} is Hive's name, {version} the new version." }), { app: APP_NAME, version: info.version }),
       auto ? tr(msg({ id: 'main.update.readyAuto', defaultMessage: 'It installs when you quit Hive, or restart now.', description: 'The notice that an update is ready, with updates installed automatically.' })) : tr(msg({ id: 'main.update.readyManual', defaultMessage: 'Restart Hive to install it.', description: 'The notice that an update is ready, with updates installed manually.' })),
-      [{ label: tr(msg({ id: 'main.update.restart', defaultMessage: 'Restart and Update', description: "The notice's button: restarts Hive and installs the update." })), command: 'update.install' }]
+      [{ label: tr(msg({ id: 'main.update.restart', defaultMessage: 'Restart and Update', description: "The notice's button: restarts Hive and installs the update." })), command: 'update.install', args: [info.version] }],
+      undefined,
+      undefined,
+      // Its offer (HI-2320): this version, while it is the one ready.
+      { offer: `update:${info.version}` }
     )
   })
 

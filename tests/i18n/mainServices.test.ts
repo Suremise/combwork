@@ -43,7 +43,8 @@ const { PSEUDO_LANGUAGE } = await import('../../src/shared/i18n/languages')
 const { config } = await import('../../src/main/config')
 const { planNotice, reportPlanUsage } = await import('../../src/main/planUsage')
 const { onHiveEvent } = await import('../../src/main/events')
-const { closedNotice, routeAppNotice, setFocusedHive } = await import('../../src/main/notices')
+const { closedNotice } = await import('../../src/main/notices')
+const { setNotifyHost, tell } = await import('../../src/main/notify')
 const { apiEventFor } = await import('../../src/main/apiEvents')
 const { finishedApiTitle, finishedNotice } = await import('../../src/shared/bursts')
 const { DEFAULT_SETTINGS } = await import('../../src/shared/defaults')
@@ -71,7 +72,7 @@ describe('notices: in the language shown, their Agent API title in English', () 
     vi.spyOn(config, 'update').mockImplementation((fn: (c: ReturnType<typeof config.get>) => void) => fn(config.get()))
     config.get().planWarnings = {}
     // Hive in the background: a Windows notification, told to the Agent API's stream.
-    setFocusedHive(() => null)
+    setNotifyHost({ focused: () => null, fallback: () => null, workspaceOf: () => null })
   })
   afterEach(() => {
     off()
@@ -105,7 +106,7 @@ describe('notices: in the language shown, their Agent API title in English', () 
   it('Hive closing', () => {
     setLanguage('de', GERMAN, 'de-DE')
     const c = closedNotice(2)
-    routeAppNotice(c.title, c.body, () => undefined, c.apiTitle)
+    tell({ kind: 'quit', title: c.title, message: c.body, apiTitle: c.apiTitle })
     expect(told()).toEqual([{ user: 'Hive wurde geschlossen', api: 'Hive has closed' }])
   })
 

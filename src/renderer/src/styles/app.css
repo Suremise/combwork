@@ -3748,131 +3748,60 @@ p.hint {
   margin-left: auto;
 }
 
-.toasts {
+.popups {
   position: fixed;
-  /* Above the tip card, when one shows; both keep clear of the Assistant's panel and of a bar's buttons (CornerPlacement). */
-  right: var(--corner-right, 14px);
-  bottom: calc(36px + var(--corner-lift, 0px) + var(--tip-space, 0px));
+  /* Hive's one place for pop-ups (HI-2320): notifications and the tip, where Settings → Notifications puts them. Clear
+     of the title bar, the activity bar and the status bar; bottom right keeps clear of the Assistant's panel and of a
+     bar's buttons (CornerPlacement). Above the page, below menus and dialogs' own layers. */
   z-index: 2500;
   display: flex;
   flex-direction: column;
   gap: 8px;
   width: 380px;
-  max-width: calc(100vw - 28px);
-}
-/* In-app banners (#157): where a Windows notification would have gone while you use Hive. Clear of the title bar,
-   the activity bar and the status bar; above the page, below menus and dialogs' own layers. */
-.notice-banners {
-  position: fixed;
-  z-index: 2400;
-  display: flex;
-  flex-direction: column;
-  gap: 8px;
-  width: 380px;
   max-width: calc(100vw - 80px);
-  /* Never past the window (title bar above, status bar below): more than fit scroll, so every banner can be reached. */
+  /* Never past the window: more than fit scroll, so every pop-up can be reached. */
   max-height: calc(100vh - 44px - 36px);
   overflow-x: hidden;
   overflow-y: auto;
-  /* Room for the banners' shadows inside the scrolling box. */
+  /* Room for the pop-ups' shadows inside the scrolling box. */
   padding: 2px 6px 6px;
   margin: -2px -6px -6px;
   pointer-events: none;
 }
 /* Expanded ("+N more"): the stack itself takes the pointer, so its scrollbar can be dragged. */
-.notice-banners.expanded {
+.popups.expanded {
   pointer-events: auto;
 }
-.notice-banners.at-top-left,
-.notice-banners.at-top-center,
-.notice-banners.at-top-right {
+.popups > * {
+  flex-shrink: 0;
+  pointer-events: auto;
+}
+.popups.at-top-left,
+.popups.at-top-center,
+.popups.at-top-right {
   top: 44px;
 }
-.notice-banners.at-bottom-left,
-.notice-banners.at-bottom-center,
-.notice-banners.at-bottom-right {
+.popups.at-bottom-left,
+.popups.at-bottom-center {
   bottom: 36px;
 }
-.notice-banners.at-top-left,
-.notice-banners.at-bottom-left {
+.popups.at-bottom-right {
+  bottom: calc(36px + var(--corner-lift, 0px));
+}
+.popups.at-top-left,
+.popups.at-bottom-left {
   left: 60px;
 }
-.notice-banners.at-top-right,
-.notice-banners.at-bottom-right {
+.popups.at-top-right,
+.popups.at-bottom-right {
   right: var(--corner-right, 14px);
 }
-.notice-banners.at-top-center,
-.notice-banners.at-bottom-center {
+.popups.at-top-center,
+.popups.at-bottom-center {
   left: 50%;
   transform: translateX(-50%);
 }
-.notice-banner {
-  flex-shrink: 0;
-  pointer-events: auto;
-  background: var(--bg-elevated);
-  border: 1px solid var(--border);
-  border-left: 3px solid var(--info);
-  border-radius: 6px;
-  box-shadow: var(--shadow);
-  padding: 10px 8px 10px 12px;
-  display: flex;
-  gap: 10px;
-  cursor: pointer;
-  animation: slideIn 0.18s ease-out;
-}
-.notice-banner:hover {
-  border-color: var(--border-strong, var(--border));
-}
-.notice-banner.finished { border-left-color: var(--success); }
-.notice-banner.waiting { border-left-color: var(--warning); }
-.notice-banner .lead { margin-top: 1px; color: var(--info); }
-.notice-banner.finished .lead { color: var(--success); }
-.notice-banner.waiting .lead { color: var(--warning); }
-.notice-main {
-  flex: 1;
-  min-width: 0;
-  display: flex;
-  flex-direction: column;
-  align-items: flex-start;
-  gap: 8px;
-}
-.notice-text {
-  align-self: stretch;
-  min-width: 0;
-}
-.notice-open {
-  /* A button for the keyboard that looks like the banner's text. */
-  display: block;
-  padding: 0;
-  border: 0;
-  background: none;
-  color: inherit;
-  font: inherit;
-  text-align: left;
-  cursor: pointer;
-}
-.notice-open:focus-visible {
-  outline-offset: 2px;
-  border-radius: 3px;
-}
-.notice-title {
-  font-weight: 600;
-  color: var(--fg-strong);
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
-.notice-body {
-  color: var(--fg-muted);
-  font-size: 12px;
-  margin-top: 2px;
-  display: -webkit-box;
-  -webkit-line-clamp: 2;
-  -webkit-box-orient: vertical;
-  overflow: hidden;
-  word-break: break-word;
-}
-.notice-close {
+.popup-close {
   align-self: flex-start;
 }
 .notice-more {
@@ -3910,6 +3839,30 @@ p.hint {
 .toast.success .lead { color: var(--success); }
 .toast.warning .lead { color: var(--warning); }
 .toast.error .lead { color: var(--error); }
+/* Kind by style, not by place (HI-2320): one that needs you has the accent; a tip is the quietest. */
+.toast.kind-needsYou { border-left-color: var(--accent); }
+.toast.kind-needsYou .lead { color: var(--accent-ink); }
+.toast.kind-tip {
+  border-left-color: var(--border-strong, var(--border));
+  font-size: 12px;
+}
+.toast.kind-tip .lead { color: var(--accent-ink); }
+.toast.stepped-aside {
+  visibility: hidden;
+}
+/* What happened, once an entry's action is done or no longer applies: in place of its buttons. */
+.entry-outcome {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  margin-top: 6px;
+  color: var(--fg-muted);
+  font-size: 12px;
+}
+.notif-item.warning .lead { color: var(--warning); }
+.notif-item.error .lead { color: var(--error); }
+.notif-item.success .lead { color: var(--success); }
+.notif-item.kind-needsYou .lead { color: var(--accent-ink); }
 .toast-text {
   flex: 1;
   min-width: 0;
@@ -11722,25 +11675,7 @@ textarea.input.task-blocked-input {
   color: var(--warning);
 }
 
-/* The tip card: bottom right above the status bar, under the toasts; it steps aside over a focused terminal. */
-.tip-card {
-  position: fixed;
-  right: var(--corner-right, 14px);
-  bottom: calc(36px + var(--corner-lift, 0px));
-  z-index: 2400;
-  width: 320px;
-  max-width: calc(100vw - var(--corner-right, 14px) - 14px);
-  background: var(--bg-elevated);
-  border: 1px solid var(--border);
-  border-left: 3px solid var(--accent);
-  border-radius: 6px;
-  box-shadow: var(--shadow);
-  padding: 8px 12px 10px;
-  font-size: 12px;
-}
-.tip-card.stepped-aside {
-  visibility: hidden;
-}
+/* The tip: a pop-up of the quieter style (HI-2320, .toast.kind-tip); its parts, and Help → Tips…'s. */
 .tip-head {
   display: flex;
   align-items: center;

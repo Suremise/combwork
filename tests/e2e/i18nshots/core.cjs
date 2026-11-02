@@ -33,12 +33,12 @@ async function banner(ctx) {
   const typed = []
   for (const p of prompts) typed.push(await p.type('hello'))
   for (const [i, p] of prompts.entries()) if (!(await p.over(typed[i]))) throw new Error(`${agents[i].name}'s turn did not end`)
-  return shown(ctx, ctx.page.locator('.notice-banners').filter({ has: ctx.page.locator('.notice-banner') }).first(), 'a banner')
+  return shown(ctx, ctx.page.locator('.popups').filter({ has: ctx.page.locator('.popup.kind-finished') }).first(), 'a pop-up')
 }
 
 async function closeBanner(ctx) {
   const { page, lib, inv, agents, project } = ctx
-  const close = page.locator('.notice-banners .notice-close')
+  const close = page.locator('.popups .popup-close')
   if (!(await lib.until(async () => (await close.count()) === 0 || (await close.first().click({ timeout: 2000 }).then(() => false, () => false)), ctx.hungMs))) throw new Error("the banners didn't close")
   await ctx.setFocus(false)
   for (const a of agents) await inv('session:stop', project, a.id)

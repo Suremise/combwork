@@ -183,6 +183,10 @@
     "defaultMessage": "Don’t Ask Again",
     "description": "The suggestion's button: no more suggestions for this workspace."
   },
+  "workspace.antivirus.excludedNow": {
+    "defaultMessage": "Excluded now: Defender no longer scans these folders",
+    "description": "What the suggestion to exclude the workspace from Defender's scanning says once every folder it named is excluded (HI-2320), in place of its buttons."
+  },
   "workspace.antivirus.folder": {
     "defaultMessage": "Folder",
     "description": "Settings → Workspace's antivirus table: a column."
@@ -407,25 +411,17 @@
     "defaultMessage": "a long command just ran",
     "description": "Why Hive suggests exclusions now. Lower case: it goes in brackets in the suggestion."
   },
-  "workspace.banners.dismiss": {
-    "defaultMessage": "Dismiss",
-    "description": "A notification banner's close button, for screen readers."
+  "workspace.antivirus.wontAsk": {
+    "defaultMessage": "Hive won’t suggest it again for this workspace",
+    "description": "What the suggestion to exclude the workspace from Defender's scanning says after Don't Ask Again (HI-2320), in place of its buttons."
   },
   "workspace.banners.more": {
     "defaultMessage": "+{count} more",
-    "description": "Under the notification banners when more arrived than fit: shows the rest. Keep it short."
+    "description": "Under the pop-ups when more arrived than fit: shows the rest. Keep it short."
   },
   "workspace.banners.region": {
     "defaultMessage": "Notifications",
-    "description": "The notification banners, for screen readers."
-  },
-  "workspace.banners.showProject": {
-    "defaultMessage": "Show the project",
-    "description": "Tooltip on a notification banner about a project: clicking it shows the project."
-  },
-  "workspace.banners.showProjectLabel": {
-    "defaultMessage": "Show the project: {title}",
-    "description": "A notification banner's text, for screen readers ({title}: the notification)."
+    "description": "The pop-ups (notifications and tips), for screen readers."
   },
   "workspace.changes.aboutAgent": {
     "defaultMessage": "{agent}'s worktree: everything on {branch} since it left {base}. Merge… brings it into {base}.",

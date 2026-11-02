@@ -217,6 +217,8 @@
   "shell.edit.redo": "Rétablir",
   "shell.edit.selectAll": "Tout sélectionner",
   "shell.edit.undo": "Annuler",
+  "shell.entry.mcpCopied": "Dans l’espace de travail maintenant",
+  "shell.entry.unfinished": "Pas terminé : réessaie",
   "shell.error.allowEdit": "Impossible d’autoriser la modification",
   "shell.error.endProcesses": "Impossible d’arrêter les processus",
   "shell.error.keepProcesses": "Impossible de garder les processus",
@@ -260,6 +262,7 @@
   "shell.noticeTarget.agentGone": "{agent} n’est plus dans {project}",
   "shell.noticeTarget.cardElsewhere": "{card} est sur le tableau de {workspace}, qui n’est pas ouvert",
   "shell.noticeTarget.cardGone": "{card} n’est plus sur le tableau",
+  "shell.noticeTarget.projectGone": "{project} n’est plus dans cet espace de travail",
   "shell.notifications.clearAll": "Tout effacer",
   "shell.notifications.none": "Aucune notification",
   "shell.notifications.title": "Notifications",
@@ -410,5 +413,6 @@
   "shell.titlebar.pinTip": "{on, select, yes {Toujours au premier plan (activé)} other {Toujours au premier plan (désactivé)}}",
   "shell.toast.dismiss": "Fermer",
   "shell.toast.openAgent": "Ouvrir le volet de {agent}",
-  "shell.toast.openCard": "Ouvrir {card}"
+  "shell.toast.openCard": "Ouvrir {card}",
+  "shell.toast.openProject": "Afficher {project}"
 }

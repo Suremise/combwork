@@ -58,11 +58,11 @@ const check = (name, ok, extra = '') => {
     const nudges = () => [...hiveLog().matchAll(/Suggested a fresh start in .*?\((.+?)\)/g)].map((m) => m[1])
     /** The decisions not to suggest one, by what ended and why. */
     const notNudged = () => [...hiveLog().matchAll(/No fresh-start suggestion in .*?\((.+?)\): (.+)/g)].map((m) => `${m[1]}: ${m[2].trim()}`)
-    const banner = page.locator('.notice-banner', { hasText: 'A good moment to start fresh' })
+    const banner = page.locator('.popups .popup', { hasText: 'A good moment to start fresh' })
     /** Closes the fresh-start banners shown (one at a time, each seen gone). */
     const closeBanners = async () => {
       for (let n = await banner.count(); n > 0; n = await banner.count()) {
-        await banner.first().locator('.notice-close').click()
+        await banner.first().locator('.popup-close').click()
         await until(async () => (await banner.count()) < n, HUNG_MS)
       }
     }
@@ -98,13 +98,13 @@ const check = (name, ok, extra = '') => {
     await inv('tasks:update', a, { column: 'done' })
     check('the lane ends with its card Done', !!(await until(async () => (await inv('lanes:list')).find((l) => l.id === lane.id)?.state === 'ended', HUNG_MS)))
     check('…one nudge: "A good moment to start fresh", for the lane', !!(await until(async () => (await banner.count()) === 1 && nudges().length === 1, HUNG_MS)) && nudges()[0] === `lane:${lane.id}`, JSON.stringify(nudges()))
-    check('…with Start Fresh (Idle Agents)', (await banner.locator('button.notice-action', { hasText: 'Start Fresh (Idle Agents)' }).count()) === 1)
+    check('…with Start Fresh (Idle Agents)', (await banner.locator('button.btn', { hasText: 'Start Fresh (Idle Agents)' }).count()) === 1)
     await themed('nudge', (file) => banner.screenshot({ path: file }))
 
     // --- 2. Its button: the question lists who will and won't; the idle two start fresh, the working and stopped are left.
     await say(busy.id, 'holduntil busy-go')
     check('Busy is working meanwhile', !!(await until(async () => (await live(busy.id))?.status === 'working', HUNG_MS)))
-    await banner.locator('button.notice-action', { hasText: 'Start Fresh (Idle Agents)' }).click()
+    await banner.locator('button.btn', { hasText: 'Start Fresh (Idle Agents)' }).click()
     const dialog = page.locator('.modal, [role="dialog"]').filter({ hasText: 'Start 2 idle agents fresh?' }).first()
     check('the question: Start 2 idle agents fresh?', !!(await until(async () => (await dialog.count()) === 1, HUNG_MS)))
     const text = await dialog.innerText()
@@ -168,7 +168,7 @@ const check = (name, ok, extra = '') => {
     const shown = (name) => page.locator('.sidebar .project-row.selected', { hasText: name })
     await page.locator('.sidebar .project-row', { hasText: 'beta' }).first().click()
     check('beta shown', !!(await until(async () => (await shown('beta').count()) === 1, HUNG_MS)))
-    await banner.locator('button.notice-action').click()
+    await banner.locator('button.btn').click()
     const alphaQuestion = page.locator('.modal, [role="dialog"]').filter({ hasText: /idle agents? fresh\?/ }).first()
     check("the button with beta shown: alpha's question, alpha shown", !!(await until(async () => (await alphaQuestion.count()) === 1 && /in alpha start/.test(await alphaQuestion.innerText()) && (await shown('alpha').count()) === 1, HUNG_MS)))
     await alphaQuestion.locator('button', { hasText: 'Cancel' }).click()

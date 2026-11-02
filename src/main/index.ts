@@ -19,7 +19,7 @@ import { initWorkflowNotices } from './workflowNotices'
 import { initDevConsole } from './devConsoleSources'
 import { flightRecorder } from './flightRecorder'
 import { initAssistantModes } from './assistantMode'
-import { app, BrowserWindow, dialog, Menu, nativeTheme, Notification, protocol, screen, session, shell } from 'electron'
+import { app, BrowserWindow, dialog, Menu, nativeTheme, protocol, screen, session, shell } from 'electron'
 import { execFile } from 'child_process'
 import { appendFileSync, createReadStream, existsSync } from 'original-fs'
 import { basename, join, resolve, sep } from 'path'
@@ -84,7 +84,7 @@ import { setQueueLive, setRunsGoing, workflowFor } from './workflow/service'
 import { isOpenRun } from '../shared/progress'
 import { createLogger, userText, logsDir } from './logger'
 import { killAll } from './ptyHost'
-import { allLeftovers, closeProcessTracking, leftoversSaved, leftoversSettled, recordEndedLaunches, restoreLeftovers, settleAllLeftovers, settleLeftovers, warmProcessTracking } from './agentProcesses'
+import { allLeftovers, closeProcessTracking, leftoversOffer, leftoversSaved, leftoversSettled, recordEndedLaunches, restoreLeftovers, settleAllLeftovers, settleLeftovers, warmProcessTracking } from './agentProcesses'
 import { leftoversSummary } from '../shared/agentProcesses'
 import { installShims } from './progressReporters/shims'
 import { insideArchive, onCorruptFile, renameDiagnostics } from './fsutil'
@@ -96,10 +96,11 @@ import { sessions } from './sessions'
 import { usageHistory } from './usageHistory'
 import { notificationIcon } from './paths'
 import { createTray, destroyTray, resourcesDir, setTrayPendingQuit, showWindow } from './tray'
-import { keepOffScreen, offScreenOrigin, showOsNotification, testQuiet } from './testQuiet'
+import { keepOffScreen, offScreenOrigin, testQuiet } from './testQuiet'
 import { COMMIT_WATCH_ARG } from '../shared/commitWatch'
 import { pinFollower } from './pin'
-import { closedNotice, focusedHive, routeAppNotice, setFocusedHive, startNoticeResolver } from './notices'
+import { closedNotice, startNoticeResolver } from './notices'
+import { setNotifyHost, tell } from './notify'
 import { initUpdater, installNow, installsOnQuit } from './updater'
 import { flushMetrics } from './metrics'
 import { watchMainStalls } from './mainStalls'
@@ -636,18 +637,11 @@ async function quitNow(tellUser: boolean): Promise<void> {
   saveWindows()
   quitting = true
   const stopped = sessions.liveCount()
-  // Quitting without a dialog (or after waiting): say where the sessions went, as other notices are told (a banner in
-  // the window you are using while it is still open, a Windows notification with Hive in the background, or nothing).
+  // Quitting without a dialog (or after waiting): say where the sessions went, as a Windows notification when no Hive
+  // window is focused (HI-2320: its windows are closing, so never a pop-up; nothing while you are looking at Hive).
   if (tellUser && stopped > 0) {
     const { title, body, apiTitle } = closedNotice(stopped)
-    routeAppNotice(
-      title,
-      body,
-      () => {
-        if (Notification.isSupported()) showOsNotification(new Notification({ title, icon: notificationIcon(), body, silent: true }), title, body)
-      },
-      apiTitle
-    )
+    tell({ kind: 'quit', title, message: body, apiTitle, onWindowsClick: () => undefined })
   }
   // The slots' passes (#1628): none starts as the sessions stop (no builder placed), and one running ends before the
   // boards close (will-quit); what it didn't get to is the next start's.
@@ -761,15 +755,19 @@ async function offerRestoredLeftovers(): Promise<void> {
   for (const l of await restoreLeftovers()) {
     if (config.settings.agents.leftoverProcesses === 'end' && (await settleLeftovers(l.projectPath, l.agentId, 'end').then(() => true, () => false))) continue
     const n = l.processes.length + l.more
+    // Its buttons act on exactly what it lists (HI-2320).
+    const offer = leftoversOffer(l.projectPath, l.agentId)
     toast(
       'warning',
       tr(msg({ id: 'main.leftovers.restoredTitle', defaultMessage: '{n, plural, one {{agent} left # process running} other {{agent} left # processes running}}', description: 'A notice at start: processes an agent started before Hive last closed still run. {agent} is the agent (or project) name; {n} how many.' }), { agent: l.agentName || basename(l.projectPath), n }),
       tr(msg({ id: 'main.leftovers.restoredBody', defaultMessage: "{n, plural, one {{processes}. It was started by the agent before Hive last closed, and may hold the project's folder or ports.} other {{processes}. They were started by the agent before Hive last closed, and may hold the project's folder or ports.}}", description: 'The notice at start about processes an agent left running. {processes} lists them ("node serve.js, 2 × tail -f capture.log"); {n} is how many.' }), { processes: leftoversSummary(l, undefined, { tr, list: fmt.list }), n }),
       [
-        { label: tr(msg({ id: 'main.leftovers.end', defaultMessage: 'End Them', description: 'Button: ends the processes the agents left running.' })), command: 'session.settleLeftovers', args: [l.projectPath, l.agentId, 'end'] },
-        { label: tr(msg({ id: 'main.leftovers.keep', defaultMessage: 'Keep Running', description: 'Button: leaves the processes an agent left running.' })), command: 'session.settleLeftovers', args: [l.projectPath, l.agentId, 'keep'] }
+        { label: tr(msg({ id: 'main.leftovers.end', defaultMessage: 'End Them', description: 'Button: ends the processes the agents left running.' })), command: 'session.settleLeftovers', args: [l.projectPath, l.agentId, 'end', offer] },
+        { label: tr(msg({ id: 'main.leftovers.keep', defaultMessage: 'Keep Running', description: 'Button: leaves the processes an agent left running.' })), command: 'session.settleLeftovers', args: [l.projectPath, l.agentId, 'keep', offer] }
       ],
-      l.projectPath
+      l.projectPath,
+      { kind: 'agent', projectPath: l.projectPath, agentId: l.agentId, name: l.agentName || basename(l.projectPath), project: basename(l.projectPath) },
+      { offer }
     )
   }
 }
@@ -1091,13 +1089,25 @@ app.whenReady().then(async () => {
   sessions.assistantInstructions = (projectPath, agent) => inWorkspace(workspaceOf(projectPath), () => assistantInstructions(assistantModeId(agent, config.settings), config.settings.assistant?.control ?? 'projects', config.settings.assistant?.changeSettings === true))
   // A project's notifications and focus checks use the window showing it.
   sessions.setWindowProvider((projectPath) => (projectPath ? windowForPath(projectPath)?.win : null) ?? lastFocused()?.win ?? null)
-  // The window the user is using, for in-app banners (#157): visible, not minimised, focused.
-  setFocusedHive(() => {
-    const e = hiveWindows().find((x) => !x.win.isDestroyed() && x.win.isVisible() && !x.win.isMinimized() && x.win.isFocused())
-    return e ? { win: e.win, workspacePath: e.ws.path, projectPath: e.showing } : null
+  // The one notification system's windows (HI-2320): the one the user is using (visible, not minimised, focused) owns
+  // what is told; with none, the one showing the entry's workspace (or a source path's), else the last focused.
+  setNotifyHost({
+    focused: () => {
+      const e = hiveWindows().find((x) => !x.win.isDestroyed() && x.win.isVisible() && !x.win.isMinimized() && x.win.isFocused())
+      return e ? { win: e.win, workspacePath: e.ws.path, projectPath: e.showing } : null
+    },
+    fallback: (projectPath, source) => (projectPath ? windowForPath(projectPath) : null)?.win ?? (source && /[\\/]/.test(source) ? windowForPath(source)?.win : null) ?? lastFocused()?.win ?? null,
+    workspaceOf: (projectPath) => workspaceOf(projectPath)?.path ?? null,
+    // A toast's source that is a project (its folder): the entry's link (HI-2320).
+    projectAt: (p) => {
+      try {
+        return workspaceOf(p)?.info()?.projects.find((x) => x.path.toLowerCase() === p.toLowerCase())?.path ?? null
+      } catch {
+        return null
+      }
+    }
   })
-  sessions.setFocusedWindowProvider(focusedHive)
-  // An agent no longer waiting for you: its waiting banner closes, in whichever window shows it.
+  // An agent no longer waiting for you: its entries say so, in whichever window owns them.
   startNoticeResolver()
   providerService.setLiveSessionCounter((p) => sessions.liveCount(p))
   // Agents stopped by a refused sign-in can carry on once the CLI is signed in again (#309).

@@ -1017,6 +1017,7 @@ interface HiveMessageValues {
   'settings.notifications.bannerPosition.title': undefined
   'settings.notifications.bannerScope.desc': undefined
   'settings.notifications.bannerScope.option.all': undefined
+  'settings.notifications.bannerScope.option.none': undefined
   'settings.notifications.bannerScope.option.project': undefined
   'settings.notifications.bannerScope.option.workspace': undefined
   'settings.notifications.bannerScope.tip': undefined
@@ -1054,12 +1055,6 @@ interface HiveMessageValues {
   'settings.notifications.waitingBannerStays.desc': undefined
   'settings.notifications.waitingBannerStays.tip': undefined
   'settings.notifications.waitingBannerStays.title': undefined
-  'settings.notifications.whileFocused.desc': undefined
-  'settings.notifications.whileFocused.option.inApp': undefined
-  'settings.notifications.whileFocused.option.nothing': undefined
-  'settings.notifications.whileFocused.option.windows': undefined
-  'settings.notifications.whileFocused.tip': undefined
-  'settings.notifications.whileFocused.title': undefined
   'settings.number.any': undefined
   'settings.number.atLeast': { min: number }
   'settings.number.atMost': { max: number }

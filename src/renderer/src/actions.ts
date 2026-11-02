@@ -45,8 +45,11 @@ import { cardLabel, normalKey, suggestKey } from '@shared/projectKeys'
  * over now (#1057; Hive checks, knowing the lanes and merge slots as they are: a notice can be old by then), else a notice
  * that it can when it has finished.
  */
-export async function handOverLongConversation(path: string, agentId: string): Promise<void> {
-  if (await call('session:mayHandOverNow', path, agentId).catch(() => false)) set({ handOverFor: { project: path, agentId } })
+export async function handOverLongConversation(path: string, agentId: string, sessionId?: string): Promise<void> {
+  // From its notice, for the conversation it was about (HI-2320): another now, the notice says so, and nothing opens.
+  const may = sessionId ? await call('session:handOverOffer', path, agentId, sessionId).catch(() => 'busy' as const) : (await call('session:mayHandOverNow', path, agentId).catch(() => false)) ? 'ok' : 'busy'
+  if (may === 'stale') return
+  if (may === 'ok') set({ handOverFor: { project: path, agentId } })
   else notify('info', tr(HAND_OVER_TEXT.notNow, { agent: findProject(get(), path)?.agents.find((a) => a.id === agentId)?.name ?? agentId }), tr(HAND_OVER_TEXT.notNowText))
 }
 

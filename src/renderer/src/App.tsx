@@ -6,9 +6,9 @@ import { useEffect, useRef, useState } from 'react'
 import type { HiveEvent } from '@shared/types'
 import { call } from './api'
 import { playChime } from './chime'
-import { matchKeybinding, runCommand } from './commands'
+import { matchKeybinding, runCommand, runCommandAsync } from './commands'
 import { HooksDialog } from './components/HooksDialog'
-import { AboutDialog, AgentSetupDialog, DiagnosticsDialog, CommandPalette, CompactDialog, Dialogs, NotificationCenter, ProvidersBanner, QuitDialog, QuitPendingBanner, ShortcutsDialog, Toasts } from './components/Overlays'
+import { AboutDialog, AgentSetupDialog, DiagnosticsDialog, CommandPalette, CompactDialog, Dialogs, NotificationCenter, ProvidersBanner, QuitDialog, QuitPendingBanner, ShortcutsDialog } from './components/Overlays'
 import { ConnectionsIntroBanner, useProviderWarnings } from './components/ConnectionChoice'
 import { AddAgentDialog, AgentSettingsDialog, HandOverDialog, MergeDialog, TemplateAgentDialog } from './components/AgentDialogs'
 import { BranchMergeDialog } from './components/BranchMerge'
@@ -28,8 +28,10 @@ import { Sidebar } from './components/Sidebar'
 import { TitleBar } from './components/TitleBar'
 import { enabledProviders } from '@shared/providers'
 import { tipsState } from '@shared/tips'
-import { CornerPlacement, TipCard, TipsDialog } from './components/Tips'
-import { applyTipsState, showTodaysTip } from './tips'
+import { CornerPlacement, TipsDialog } from './components/Tips'
+import { Popups } from './components/Popups'
+import { startEntryReconciler } from './entryConditions'
+import { applyTipsState, showTodaysTip, startTipWatch } from './tips'
 import { startupReplay } from './startupReplay'
 import { movesShown } from './pendingMoves'
 import { AssistantPanel, AssistantSettingsDialog } from './components/Assistant'
@@ -37,7 +39,7 @@ import { ProgressPanel, progressRunsChanged } from './components/Progress'
 import { queueBoardChanged, queueChangedEvent } from './queueSource'
 import { AssistantMain } from './components/AssistantView'
 import { reloadAssistantChanges } from './assistantUndo'
-import { agentOnScreen, applyLeftovers, applyLiveState, bumpUsage, noteAssistantAction, flushLiveStates, setLoaded, setWithLive, showWorkspace, liveStateOf, assistantOnLeft, assistantWasOpen, clearStartFailure, dismissToast, filesListeners, agentStartChanged, findProject, get, loadTasks, noteAgentAdded, noteEnd, notify, projectKey, pushToast, set, useLanguage, useStore } from './store'
+import { agentOnScreen, applyLeftovers, applyLiveState, bumpUsage, noteAssistantAction, flushLiveStates, setLoaded, setWithLive, showWorkspace, liveStateOf, assistantOnLeft, assistantWasOpen, clearStartFailure, filesListeners, agentStartChanged, findProject, get, loadTasks, noteAgentAdded, noteEnd, projectKey, pushToast, resolveToasts, set, updateToasts, useLanguage, useStore } from './store'
 import { DocsView, McpView, NotesView, SkillView, WelcomeView } from './views/OtherViews'
 import { TemplatesView } from './components/Templates'
 import { ProjectView } from './views/ProjectView'
@@ -47,7 +49,6 @@ import { markOnScreenSeen, onScreen } from './inbox'
 import { InboxPopover } from './components/Inbox'
 import { MoveRepairDialog, MovedBanner } from './components/MoveRepair'
 import { SetAsideDialog } from './components/SetAside'
-import { NoticeBanners, addNotice, resolveNotices } from './components/NoticeBanners'
 import { chimeAllowed } from '@shared/bursts'
 import { sessionEpochBook } from '@shared/sessionEpoch'
 import { loadAdvanced } from './advanced'
@@ -74,9 +75,12 @@ function noticeUnmanagedMcp(): void {
     pushToast({
       id: `mcp-${p.path}`,
       level: 'warning',
+      target: { kind: 'project', projectPath: p.path, project: p.name },
       title: tr(msg({ id: 'shell.mcp.notInWorkspace', defaultMessage: '{project}: MCP servers not in the workspace', description: "A notice: a project defines MCP servers of its own (in its .mcp.json) that the workspace doesn't have. {project} is its name." }), { project: p.name }),
       message: tr(msg({ id: 'shell.mcp.notInWorkspaceDetail', defaultMessage: "{n, plural, one {{servers} is defined in the project's .mcp.json and will stay disabled until copied to the workspace.} other {{servers} are defined in the project's .mcp.json and will stay disabled until copied to the workspace.}}", description: "More in the notice about a project's own MCP servers. {servers} lists their names; {n} is how many. .mcp.json is a file name: keep it." }), { n: p.unmanagedMcp.length, servers: fmt.list(p.unmanagedMcp) }),
       actions: [{ label: tr(msg({ id: 'shell.mcp.copyToWorkspace', defaultMessage: 'Copy to workspace', description: "The notice's button: copies the project's MCP servers to the workspace." })), command: 'mcp.import', args: [p.path, p.unmanagedMcp] }],
+      // Live while some of them still aren't in the workspace (HI-2320: entryConditions.ts).
+      condition: { kind: 'mcpMissing', projectPath: p.path, names: p.unmanagedMcp },
       timestamp: new Date().toISOString()
     })
   }
@@ -88,6 +92,8 @@ let lastChimeAt: number | null = null
 const epochBook = sessionEpochBook()
 let chimesPlayed = 0
 ;(window as unknown as { __hiveChimes?: () => number }).__hiveChimes = () => chimesPlayed
+// The bell's list as the tests read it (HI-2320): each entry, whether it was quiet (no pop-up), its buttons and what it says once resolved.
+;(window as unknown as { __hiveBell?: () => unknown[] }).__hiveBell = () => get().notifications.map((t) => ({ id: t.id, title: t.title, kind: t.kind ?? null, level: t.level, quiet: !!t.quiet, resolved: t.resolved ?? null, actions: t.actions?.map((x) => x.label) ?? [], target: t.target?.kind ?? null }))
 
 function handleEvent(e: HiveEvent): void {
   switch (e.type) {
@@ -157,6 +163,7 @@ function handleEvent(e: HiveEvent): void {
           level: 'error',
           title: name ? (p ? tr(msg({ id: 'shell.startFailed.named', defaultMessage: "{project} · {agent} couldn't start", description: "A notice when an agent's session failed to start, while its pane isn't on screen. {project} and {agent} are names." }), { project: p.name, agent: name }) : tr(msg({ id: 'shell.startFailed.agent', defaultMessage: "{agent} couldn't start", description: "A notice when an agent's session failed to start. {agent} is its name." }), { agent: name })) : tr(msg({ id: 'shell.startFailed.unnamed', defaultMessage: "An agent couldn't start", description: "A notice when a session failed to start and its agent isn't known." })),
           message: failure.hint ?? failure.reason,
+          ...(name ? { target: { kind: 'agent' as const, projectPath: path, agentId: e.agentId, name, project: p?.name ?? path } } : {}),
           actions: shown ? [{ label: tr(msg({ id: 'shell.startFailed.show', defaultMessage: 'Show', description: "The notice's button: shows the agent's pane." })), command: 'agent.show', args: [path, e.agentId] }] : undefined,
           timestamp: failure.at
         })
@@ -164,12 +171,8 @@ function handleEvent(e: HiveEvent): void {
     }
     case 'agent-leftovers': {
       const path = findProject(get(), e.leftovers.projectPath)?.path ?? e.leftovers.projectPath
+      // Its notice's End Them / Keep Running is main's offer (HI-2320): main resolves it as they end or change.
       applyLeftovers({ ...e.leftovers, projectPath: path })
-      // Nothing left (ended, kept, or ended by themselves): the offers to end them go too.
-      if (!e.leftovers.processes.length && !e.leftovers.more) {
-        const offer = (a: { command: string; args?: unknown[] }): boolean => a.command === 'session.settleLeftovers' && String(a.args?.[0]).toLowerCase() === e.leftovers.projectPath.toLowerCase() && a.args?.[1] === e.leftovers.agentId
-        set((s) => ({ toasts: s.toasts.filter((t) => !t.actions?.some(offer)) }))
-      }
       break
     }
     case 'usage-changed': {
@@ -179,8 +182,14 @@ function handleEvent(e: HiveEvent): void {
     case 'toast':
       pushToast(e.toast)
       break
-    case 'toast-gone':
-      dismissToast(e.id)
+    case 'toast-resolved':
+      resolveToasts(e.ids, e.outcome)
+      break
+    case 'toast-update':
+      updateToasts(e.ids, e.drop, e.note)
+      break
+    case 'notify-pending':
+      set({ finishesPending: e.finishes })
       break
     case 'chime': {
       // Agents finishing together chime once: at most one every 2 seconds.
@@ -222,7 +231,11 @@ function handleEvent(e: HiveEvent): void {
       set({ gitTool: e.git })
       break
     case 'menu-command':
-      runCommand(e.command, ...(e.args ?? []))
+      // An entry's button run here for another window (HI-2320): that window's spinner waits until it has finished.
+      if (e.reply) {
+        const reply = e.reply
+        void runCommandAsync(e.command, ...(e.args ?? [])).finally(() => void call('notice:actionDone', reply, null).catch(() => undefined))
+      } else runCommand(e.command, ...(e.args ?? []))
       break
     case 'quit-request':
       set({ quitRequest: e.sessions, quitUnsaved: e.unsaved, quitScope: e.scope ?? 'app' })
@@ -320,14 +333,11 @@ function handleEvent(e: HiveEvent): void {
       flushLiveStates()
       const before = get().assistantQuestions
       set({ assistantQuestions: e.questions })
-      // With the panel hidden, the question comes as a notification the user can answer.
+      // With the panel hidden, the question comes as a notification the user can answer: main tells it once, as the
+      // routing table says (HI-2320: a pop-up, or a Windows notification with Hive in the background), and its entry
+      // says Answered once the question no longer waits.
       if (!get().assistantOpen) {
-        for (const q of e.questions.filter((x) => !before.some((b) => b.id === x.id))) {
-          notify('warning', q.title, q.message, [
-            { label: q.yes, command: 'assistant.answer', args: [q.id, true] },
-            { label: q.no, command: 'assistant.answer', args: [q.id, false] }
-          ])
-        }
+        for (const q of e.questions.filter((x) => !before.some((b) => b.id === x.id))) void call('assistant:tellQuestion', q.id).catch(() => undefined)
       }
       break
     }
@@ -339,12 +349,6 @@ function handleEvent(e: HiveEvent): void {
       break
     case 'branch-status':
       set((st) => ({ branchStatus: { ...st.branchStatus, [projectKey(e.projectPath, e.agentId)]: e.status } }))
-      break
-    case 'notice':
-      addNotice(e.notice)
-      break
-    case 'notice-resolved':
-      resolveNotices(e.projectPath, e.agentId)
       break
     case 'window-state':
       // Focusing the window marks the agents on screen seen (markOnScreenSeen).
@@ -389,6 +393,16 @@ export function App() {
   const [bench, setBench] = useState<HTMLDivElement | null>(null)
   const sideView = activity === 'docs' || activity === 'settings' ? lastSide : activity
   useLayoutRoom(bench, sidebarVisible && !sidebarCompact && sideView === 'projects')
+
+  // Window-made notifications lose their buttons once their condition no longer holds (HI-2320); tips wait for a quiet moment.
+  useEffect(() => {
+    const offEntries = startEntryReconciler()
+    const offTips = startTipWatch()
+    return () => {
+      offEntries()
+      offTips()
+    }
+  }, [])
 
   useEffect(() => {
     // What another window changes while this one loads must outlive the older snapshot it loads (#295).
@@ -568,9 +582,7 @@ export function App() {
       </div>
       <StatusBar />
       <CornerPlacement />
-      <TipCard />
-      <Toasts />
-      <NoticeBanners />
+      <Popups />
       <NotificationCenter />
       <InboxPopover />
       <CommandPalette />

@@ -251,6 +251,7 @@ interface HiveMessageValues {
   'service.workspace.platformOpen': undefined
   'service.workspace.platformOtherFound': { vcs: string | number; project: string | number }
   'service.workspace.platformRepositoryGone': { project: string | number }
+  'service.workspace.platformSettled': undefined
   'service.workspace.platformTitle': { project: string | number }
   'service.workspace.renameAgent': { project: string | number; agent: string | number }
   'service.workspace.sharedNames': { shared: string | number; project: string | number; agent: string | number; suggestion: string | number }

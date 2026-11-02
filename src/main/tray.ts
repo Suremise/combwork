@@ -145,7 +145,7 @@ export function createTray(getWindow: () => BrowserWindow | null, actions: TrayA
         ...projectItems,
         { type: 'separator' },
         { label: tr(msg({ id: 'main.tray.settings', defaultMessage: 'Settings', description: 'The tray menu: opens Settings.' })), click: () => { const w = getWindow(); if (w) { showWindow(w); emitTo(w, { type: 'menu-command', command: 'settings.open' }) } } },
-        ...(updateState().status === 'ready' ? [{ label: tr(msg({ id: 'main.tray.restartToUpdate', defaultMessage: 'Restart to Update ({version})', description: 'The tray menu when an update is downloaded. {version} is its version.' }), { version: updateState().version ?? '' }), click: restartAndInstall }] : []),
+        ...(updateState().status === 'ready' ? [{ label: tr(msg({ id: 'main.tray.restartToUpdate', defaultMessage: 'Restart to Update ({version})', description: 'The tray menu when an update is downloaded. {version} is its version.' }), { version: updateState().version ?? '' }), click: () => restartAndInstall() }] : []),
         ...(pendingQuit
           ? [
               { label: tr(msg({ id: 'main.tray.quitting', defaultMessage: '{n, plural, one {Quitting when the agent finishes} other {Quitting when # agents finish}}', description: 'The tray menu while Hive waits for working agents to finish before quitting.' }), { n: working }), enabled: false },

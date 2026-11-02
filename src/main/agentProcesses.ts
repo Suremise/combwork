@@ -1,7 +1,8 @@
 import { join } from 'path'
 import { readFileSync } from 'original-fs'
 import { app } from 'electron'
-import { emit, toast } from './events'
+import { emit, onHiveEvent, toast } from './events'
+import { resolveOffer } from './notify'
 import { readJson, writeJsonAtomic } from './fsutil'
 import { createLogger, userText } from './logger'
 import { JobHost, MAX_LISTED, type HostFailure, type JobList } from './processSupervisor'
@@ -9,6 +10,7 @@ import { brokersOnly, mayBeBroker } from './systemBrokers'
 import { hiveError } from './hiveError'
 import { processLabel, progressRunTitle, type AgentLeftovers, type AgentProcess } from '../shared/agentProcesses'
 import type { ActivityProcess } from '../shared/activity'
+import type { HiveEvent } from '../shared/types'
 import { maskText } from '../shared/redact'
 import { englishText, shownText, withValues, type TextPart } from '../shared/advanced'
 import { msg, tr } from '../shared/i18n'
@@ -943,6 +945,166 @@ export async function settleLeftovers(projectPath: string, agentId: string, how:
     throw hiveError(msg({ id: 'session.leftovers.notEnded', defaultMessage: "{n, plural, one {# process is still running: Windows didn't let Hive end it. It stays listed in the ⋯ menu on the agent's pane, to try again or keep.} other {# processes are still running: Windows didn't let Hive end them. They stay listed in the ⋯ menu on the agent's pane, to try again or keep.}}", description: "Ending the processes an agent left running failed. {n} is how many are still running; the ⋯ menu on the agent's pane lists them with End and Keep." }), { n: failed })
   }
   return done
+}
+
+/**
+ * A notice's End Them / Keep Running (HI-2320, Darren: "End Them must confirm the exact processes (PID and start
+ * time), never just the PID"): the launches it lists, each with its processes by id and start time, as shown.
+ */
+interface ShownLaunch {
+  run: string
+  ids: string[]
+  more: number
+}
+/**
+ * A notice's offer: each launch as it showed it, and the processes themselves (pid and start time), frozen as shown
+ * (HR2's round 2): End Them ends exactly these, never what the kept list says after an await.
+ */
+const offersShown = new Map<string, { projectPath: string; agentId: string; agentName?: string; runs: (ShownLaunch & { frozen: readonly AgentProcess[] })[] }>()
+
+const shownOf = (l: { runId: string; processes: AgentProcess[]; more: number }): ShownLaunch => ({ run: l.runId, ids: l.processes.map((p) => `${p.pid}:${p.created ?? ''}`).sort(), more: l.more })
+
+/** Whether a launch still lists exactly what the notice showed: the same processes (id and start time) and as many more. */
+function stillAsShown(r: ShownLaunch): boolean {
+  const l = left.get(r.run)
+  if (!l) return false
+  const now = shownOf(l)
+  return now.more === r.more && now.ids.length === r.ids.length && now.ids.every((x, i) => x === r.ids[i])
+}
+
+const LO = {
+  ended: msg({ id: 'main.leftovers.offerEnded', defaultMessage: '{n, plural, one {Ended # process} other {Ended # processes}}', description: "What the notice of processes an agent left running says once End Them ended them (HI-2320), in place of its buttons. {n} is how many." }),
+  kept: msg({ id: 'main.leftovers.offerKept', defaultMessage: 'Kept running', description: "What the notice of processes an agent left running says once Keep Running was chosen (HI-2320), in place of its buttons." }),
+  endedSome: msg({ id: 'main.leftovers.offerEndedSome', defaultMessage: "{n, plural, one {Ended the # process listed} other {Ended the # processes listed}}; {more, plural, one {# started since still runs: see the ⋯ menu on the agent's pane} other {# started since still run: see the ⋯ menu on the agent's pane}}", description: "What the notice of processes an agent left running says after End Them ended exactly the ones it listed while others started since still run (HI-2320), in place of its buttons. {n} and {more} are how many. The ⋯ menu on the agent's pane lists them with End and Keep." }),
+  incomplete: msg({ id: 'main.leftovers.offerIncomplete', defaultMessage: "Hive couldn't list them all, so it can't end exactly these: see the ⋯ menu on the agent's pane", description: "What the notice of processes an agent left running says when End Them is pressed but the notice couldn't list every process (more than it shows, or one without a start time), so Hive won't end them from it (HI-2320). The ⋯ menu on the agent's pane lists them with End and Keep." }),
+  unchecked: msg({ id: 'main.leftovers.offerUnchecked', defaultMessage: "Hive couldn't check what runs now, so it ended nothing. Try again.", description: "An error after End Them or Keep Running on the notice of processes an agent left running: Hive couldn't read what the agent's processes are now, so it did nothing (HI-2320)." }),
+  notEnded: msg({ id: 'main.leftovers.offerNotEnded', defaultMessage: "{n, plural, one {Windows didn't let Hive end the process listed. Try again.} other {Windows didn't let Hive end all # processes listed. Try again.}}", description: "An error after End Them on the notice of processes an agent left running: some of the processes it listed still run (HI-2320). {n} is how many it listed." }),
+  gone: msg({ id: 'main.leftovers.offerGone', defaultMessage: 'They have ended', description: "What the notice of processes an agent left running says once they ended by themselves, or were ended or kept elsewhere (HI-2320), in place of its buttons." }),
+  changed: msg({ id: 'main.leftovers.offerChanged', defaultMessage: "They changed since this notice: see them in the ⋯ menu on the agent's pane", description: "What the notice of processes an agent left running says once what runs is no longer exactly what it listed (HI-2320): its End Them would end processes it didn't show, so its buttons go. The ⋯ menu on the agent's pane lists them with End and Keep." })
+}
+
+/**
+ * The offer of a notice about what an agent left running (HI-2320): its key names the launches it lists, and what each
+ * listed then is kept, so End Them acts only on exactly those processes (settleOffer) and a newer launch's notice is
+ * another offer.
+ */
+export function leftoversOffer(projectPath: string, agentId: string): string {
+  const k = agentKey(projectPath, agentId)
+  const mine = [...left.values()].filter((l) => agentKey(l.projectPath, l.agentId) === k)
+  const offer = `leftovers:${k}#${mine.map((l) => l.runId).join(',')}`
+  offersShown.set(offer, { projectPath, agentId, agentName: mine[0]?.agentName, runs: mine.map((l) => ({ ...shownOf(l), frozen: Object.freeze(l.processes.map((p) => Object.freeze({ ...p }))) })) })
+  watchLeftoverOffers()
+  return offer
+}
+
+/** Offers whose End Them or Keep Running runs now: their own outcome says what happened, not the reconciler (HR2's round 1). */
+const offersSettling = new Set<string>()
+
+/** A launch's processes as they are now (the job's, or a restored launch's still running by id and start time): null if Hive can't tell. */
+async function listedNow(l: { runId: string; processes: AgentProcess[]; restored?: boolean }): Promise<{ processes: AgentProcess[]; more: number } | null> {
+  return l.restored ? await stillRunning(l.processes) : await listJob(l.runId)
+}
+
+/**
+ * End Them or Keep Running, from a notice (HI-2320, Darren: "End Them must confirm the exact processes (PID and start
+ * time), never just the PID"; HR2's round 1). Checked first against what runs now, read again from the job (never the
+ * list kept since the last look): each launch the notice listed must still have exactly the processes it showed, by id
+ * and start time, and none beyond them. End Them then ends exactly those processes (each only while it is still that
+ * process), never the whole job, so a process started since the notice is never touched; what the launch has left
+ * after that stays listed (the agent's ⋯ menu). A notice that couldn't list them all (some beyond the list, one without
+ * a start time) can't be checked, and says so. Gone, it says they ended; changed, it says so and ends nothing. A failure
+ * to end keeps the offer and its buttons (to try again) and throws.
+ */
+export async function settleOffer(offer: string, how: 'end' | 'keep'): Promise<void> {
+  const o = offersShown.get(offer)
+  const done = (text: string): void => {
+    offersShown.delete(offer)
+    resolveOffer(offer, text)
+  }
+  if (!o || o.runs.every((r) => !left.has(r.run))) return done(tr(LO.gone))
+  if (offersSettling.has(offer)) return
+  offersSettling.add(offer)
+  try {
+    if (how === 'end' && o.runs.some((r) => r.more > 0 || r.ids.some((id) => id.endsWith(':')))) return done(tr(LO.incomplete))
+    // What runs now, from the job itself.
+    for (const r of o.runs) {
+      const l = left.get(r.run)
+      if (!l) return done(tr(LO.changed))
+      const now = await listedNow(l)
+      if (!now) throw hiveError(LO.unchecked, undefined, { kind: 'conflict' })
+      const seen = shownOf({ runId: r.run, processes: now.processes, more: now.more })
+      if (seen.more !== r.more || seen.ids.join(',') !== r.ids.join(',')) return done(tr(LO.changed))
+    }
+    if (how === 'keep') {
+      for (const r of o.runs) await settleLeftovers(o.projectPath, o.agentId, 'keep', r.run)
+      return done(tr(LO.kept))
+    }
+    // What the notice showed and the user authorised, frozen when it was made: never widened from the kept list, which a
+    // poll may have changed during the awaits above (HR2's round 2).
+    const shown = o.runs.flatMap((r) => r.frozen)
+    if (!(await endProcessesExactly(shown))) throw hiveError(LO.notEnded, { n: shown.length }, { kind: 'conflict' })
+    // Each launch looked at again: one now empty is settled as ended; one with something started since stays listed.
+    let left_ = 0
+    for (const r of o.runs) {
+      const l = left.get(r.run)
+      if (!l) continue
+      const now = await listedNow(l)
+      if (now && !now.processes.length && !now.more) {
+        left.delete(r.run)
+        if (!l.restored) {
+          void host.request('forget', r.run)
+          settleRun(r.run, 'ended')
+        }
+      } else if (now) {
+        left.set(r.run, { ...l, processes: now.processes, more: now.more })
+        left_ += now.processes.length + now.more
+      }
+    }
+    persist()
+    emit({ type: 'agent-leftovers', leftovers: leftoversOf(o.projectPath, o.agentId) })
+    log.info(`ended exactly the ${shown.length} process(es) a notice listed for ${userText(o.agentName ?? o.agentId)}${left_ ? `; ${left_} started since still run` : ''}`)
+    return done(left_ ? tr(LO.endedSome, { n: shown.length, more: left_ }) : tr(LO.ended, { n: shown.length }))
+  } finally {
+    offersSettling.delete(offer)
+  }
+}
+
+/** For tests (HI-2320's offers): what a launch left running, put as the poll would have listed it, and all of it cleared. */
+export const leftoverOffersForTests = {
+  put: (l: { runId: string; projectPath: string; agentId: string; agentName: string; processes: AgentProcess[]; more: number; restored?: boolean }): void => void left.set(l.runId, { ...l, since: new Date().toISOString() } as never),
+  drop: (run: string): void => void left.delete(run),
+  clear: (): void => {
+    left.clear()
+    offersShown.clear()
+  }
+}
+
+let watchingOffers = false
+
+/**
+ * As an agent's leftovers change (ended, kept, ended by themselves, or another process listed), a notice's offer that
+ * no longer shows exactly what runs loses its buttons (HI-2320). Watched from the first offer on.
+ */
+function watchLeftoverOffers(): void {
+  if (watchingOffers) return
+  watchingOffers = true
+  onHiveEvent(reconcileLeftoverOffers)
+}
+
+function reconcileLeftoverOffers(e: HiveEvent): void {
+  if (e.type !== 'agent-leftovers' || !offersShown.size) return
+  const k = agentKey(e.leftovers.projectPath, e.leftovers.agentId)
+  for (const [offer, o] of offersShown) {
+    // Its own End Them or Keep Running is under way: that says what happened.
+    if (agentKey(o.projectPath, o.agentId) !== k || offersSettling.has(offer)) continue
+    if (o.runs.every((r) => !left.has(r.run))) {
+      offersShown.delete(offer)
+      resolveOffer(offer, tr(LO.gone))
+    } else if (!o.runs.every(stillAsShown)) {
+      offersShown.delete(offer)
+      resolveOffer(offer, tr(LO.changed))
+    }
+  }
 }
 
 /** Ends or keeps every agent's leftovers (Hive quitting): those that can't be ended keep running. */

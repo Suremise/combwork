@@ -77,6 +77,7 @@
   "board.batch.leftOnBoard": "{n, plural, one {Eine Karte ist} other {# Karten sind}} auf dem Board geblieben: {why}.",
   "board.batch.noneBack": "{failed} konnten nicht zurückgeholt werden",
   "board.batch.nothingArchived": "Nichts archiviert",
+  "board.batch.otherWorkspace": "Dieses Archiv gehört zu einem anderen Arbeitsbereich: Mach es dort rückgängig, unter „Archiviert“",
   "board.batch.someBack": "{n, plural, one {# Karte} other {# Karten}} zurückgeholt; {failed} nicht",
   "board.batch.stayArchived": "Die Karten bleiben mit ihrem Stapel archiviert: „Diesen Stapel zurückholen“ unter „Archiviert“ versucht es erneut (die Datei einer Karte ist vielleicht in einem anderen Programm geöffnet).",
   "board.batch.undo": "Rückgängig",

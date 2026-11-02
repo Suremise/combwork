@@ -30,6 +30,7 @@ interface HiveMessageValues {
   'main.antivirus.tooLong': undefined
   'main.antivirus.unreadable': undefined
   'main.antivirus.windowsOnly': undefined
+  'main.assistantQuestion.answered': undefined
   'main.board.damagedBody': { files: string | number; folder: string | number }
   'main.board.damagedTitle': { n: number }
   'main.board.foundBody': { folder: string | number }
@@ -115,10 +116,20 @@ interface HiveMessageValues {
   'main.leftovers.end': undefined
   'main.leftovers.keep': undefined
   'main.leftovers.leave': undefined
+  'main.leftovers.offerChanged': undefined
+  'main.leftovers.offerEnded': { n: number }
+  'main.leftovers.offerEndedSome': { n: number; more: number }
+  'main.leftovers.offerGone': undefined
+  'main.leftovers.offerIncomplete': undefined
+  'main.leftovers.offerKept': undefined
+  'main.leftovers.offerNotEnded': { n: number }
+  'main.leftovers.offerUnchecked': undefined
   'main.leftovers.quitDetail': { n: number }
   'main.leftovers.quitMessage': { n: number }
   'main.leftovers.restoredBody': { n: number; processes: string | number }
   'main.leftovers.restoredTitle': { n: number; agent: string | number }
+  'main.mergeSlot.expiredBody': { agent: string | number; branch: string | number }
+  'main.mergeSlot.expiredTitle': { agent: string | number }
   'main.mergeSlot.leftBody': { branch: string | number; hasCards: string; cards: string | number; folder: string | number }
   'main.mergeSlot.leftBodyGone': { branch: string | number; hasCards: string; cards: string | number; project: string | number; folder: string | number }
   'main.mergeSlot.leftTitle': { agent: string | number }
@@ -207,6 +218,8 @@ interface HiveMessageValues {
   'main.move.watches': { n: number }
   'main.move.workingMoved': { projects: string | number }
   'main.move.workingRenamed': { n: number; projects: string | number }
+  'main.notify.answered': undefined
+  'main.notify.sessionEnded': undefined
   'main.outage.gaveUpBody': { n: number }
   'main.outage.gaveUpTitle': { agent: string | number }
   'main.outage.progressTitle': { agent: string | number }
@@ -214,6 +227,22 @@ interface HiveMessageValues {
   'main.outage.resumedSummary': { dropped: string | number; back: string | number }
   'main.outage.timedOutBody': { minutes: number }
   'main.outage.timedOutTitle': { agent: string | number }
+  'main.outcome.allowed': undefined
+  'main.outcome.conversationEnded': undefined
+  'main.outcome.conversationMoved': undefined
+  'main.outcome.modesChanged': undefined
+  'main.outcome.modesNextSession': undefined
+  'main.outcome.modesNothing': undefined
+  'main.outcome.namesDiffer': undefined
+  'main.outcome.noLongerAsked': undefined
+  'main.outcome.noLongerHeld': undefined
+  'main.outcome.notResumed': undefined
+  'main.outcome.openHereAgain': undefined
+  'main.outcome.released': undefined
+  'main.outcome.runsAnother': undefined
+  'main.outcome.stoppedAndResumed': undefined
+  'main.outcome.updateInstalling': undefined
+  'main.outcome.updateNotReady': undefined
   'main.plan.close': undefined
   'main.plan.pause': undefined
   'main.plan.resetsAt': { time: string | number }

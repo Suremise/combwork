@@ -3,6 +3,7 @@ import type { HiveEvent, QuitChoice, QuitScope, QuitSession } from '../shared/ty
 import { setEventRouter } from './events'
 import { samePlace } from './fsutil'
 import { forgetWindowViews } from './transcriptReads'
+import { forgetOwner } from './notify'
 import { contextWorkspace, setWorkspaceFallback, workspaceFor, type WorkspaceService } from './workspace'
 
 /**
@@ -43,6 +44,8 @@ export function unregisterWindow(e: HiveWindow): void {
     if (v !== e) continue
     entries.delete(k)
     forgetWindowViews(k)
+    // The offers of entries only it held went with it (HI-2320).
+    forgetOwner(k)
   }
   e.ws.window = null
 }

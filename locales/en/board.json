@@ -311,6 +311,10 @@
     "defaultMessage": "Nothing was archived",
     "description": "A notification's title: Archive All archived no card."
   },
+  "board.batch.otherWorkspace": {
+    "defaultMessage": "This archive is another workspace's: undo it there, from its Archived view",
+    "description": "What the notification after Archive All says when its Undo is pressed while the window shows another workspace (HI-2320): nothing was brought back. Archived is the archive's view: use its translation."
+  },
   "board.batch.someBack": {
     "defaultMessage": "Brought back {n, plural, one {# card} other {# cards}}; {failed} couldn't be",
     "description": "A notification's title: unarchiving a batch brought back {n} cards but not the ones listed ({failed}: \"#3, #4\")."

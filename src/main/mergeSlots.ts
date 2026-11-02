@@ -1,5 +1,12 @@
 import { CLAIM_WAIT_MAX_SECONDS, CLAIM_WAIT_SECONDS, holderText, holdingNote, waitingNote } from '../shared/mergeSlot'
 import type { MergeSlotInfo } from '../shared/types'
+import { msg, tr } from '../shared/i18n'
+
+/** The window's notice that a merge slot expired (HI-2320: in the language Hive shows). */
+const EXPIRED = {
+  title: msg({ id: 'main.mergeSlot.expiredTitle', defaultMessage: "{agent}'s merge slot expired", description: "A notice's title: an agent ({agent}) held the merge slot longer than its limit without reporting progress, so Hive gave it to the next agent in line." }),
+  body: msg({ id: 'main.mergeSlot.expiredBody', defaultMessage: '{agent} held the merge slot for {branch} longer than its limit without reporting progress, so it went to the next in line. Check whether its merge finished.', description: "The notice that an agent's merge slot expired. {agent} is the agent, {branch} the branch it was merging into." })
+}
 
 /**
  * The merge slot (#350): one merge at a time into a project's branch. An agent claims it right before its final merge
@@ -416,7 +423,7 @@ export class MergeSlots {
         } else {
           const why = h.unconfirmed ? `it was your turn, but you didn't claim it within ${Math.round(KEEP_PLACE_MS / 60000)} minutes` : `it expired after ${Math.round((now - h.since) / 60000)} minutes`
           this.setLost(who, s.branch, why)
-          if (!h.unconfirmed) this.deps.warn(s.projectPath, `${who.agentName}'s merge slot expired`, `${who.agentName} held the merge slot for ${s.branch} longer than its limit without reporting progress, so it went to the next in line. Check whether its merge finished.`)
+          if (!h.unconfirmed) this.deps.warn(s.projectPath, tr(EXPIRED.title, { agent: who.agentName }), tr(EXPIRED.body, { agent: who.agentName, branch: s.branch }))
           this.end(s)
           changed = true
         }

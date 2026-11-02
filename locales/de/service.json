@@ -249,6 +249,7 @@
   "service.workspace.platformOpen": "Versionsverwaltung öffnen",
   "service.workspace.platformOtherFound": "In {project} wurde {vcs} gefunden. Hive unterstützt das noch nicht und behandelt das Projekt weiter als Git-Projekt, bis du es in seinem Tab „Versionsverwaltung“ auf „Keine“ umstellst.",
   "service.workspace.platformRepositoryGone": "Das Git-Repository von {project} ist weg. Die Regeln von Git gelten weiter, daher kommen seine Karten nicht voran, bis das Repository wieder da ist oder du das Projekt in seinem Tab „Versionsverwaltung“ auf „Keine“ umstellst.",
+  "service.workspace.platformSettled": "Erledigt: Jetzt ist nichts zu ändern",
   "service.workspace.platformTitle": "Versionsverwaltung in {project} geändert",
   "service.workspace.renameAgent": "Agent {agent} von {project} umbenennen…",
   "service.workspace.sharedNames": "Agentennamen sind jetzt im ganzen Arbeitsbereich eindeutig, damit jeder Agent unterscheidbar ist. {shared}: Sie arbeiten weiter, aber benenne jeweils einen um, z. B. Agent {agent} von {project} in {suggestion}.",

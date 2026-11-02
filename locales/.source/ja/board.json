@@ -77,6 +77,7 @@
   "board.batch.leftOnBoard": "{n, plural, one {One card was} other {# cards were}} left on the board: {why}.",
   "board.batch.noneBack": "Couldn't bring back {failed}",
   "board.batch.nothingArchived": "Nothing was archived",
+  "board.batch.otherWorkspace": "This archive is another workspace's: undo it there, from its Archived view",
   "board.batch.someBack": "Brought back {n, plural, one {# card} other {# cards}}; {failed} couldn't be",
   "board.batch.stayArchived": "They stay archived with their batch: Unarchive this batch in Archived tries again (a card's file may be open in another program).",
   "board.batch.undo": "Undo",
