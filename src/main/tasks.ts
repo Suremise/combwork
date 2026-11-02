@@ -1215,8 +1215,20 @@ const englishSaid = (s: StoredText): string => {
  * A line in the card's history: its English (`what`), and as data (`whatText`, #846) for the window to show in its
  * language. Text from elsewhere (an agent-facing note, noteOnCard) is kept in English only.
  */
-/** Adds a line to a card's history, at `at` (a change's one time, HI-2016) or now. */
-function note(card: TaskCard, by: string, said: StoredText | string, at = new Date().toISOString()): void {
+/**
+ * The time of a change to a card (HI-2315): now, or a millisecond after the card's latest entry or change when now isn't
+ * later (two changes written back to back in one millisecond, or the clock set back). A card's changes so come in time
+ * order across its history and comments, which only times relate: a watch begun after the watcher's own comment
+ * (watch.ts ownCut) tells a reassignment just before that comment from one after it.
+ */
+function changeTime(card: TaskCard): string {
+  const now = Date.now()
+  const latest = Math.max(...[card.updatedAt, card.history.at(-1)?.at, card.comments.at(-1)?.at].map((t) => (t ? Date.parse(t) : NaN)).filter((t) => !Number.isNaN(t)), -Infinity)
+  return new Date(now > latest ? now : latest + 1).toISOString()
+}
+
+/** Adds a line to a card's history, at `at` (a change's one time, HI-2016, from changeTime) or as a change of its own. */
+function note(card: TaskCard, by: string, said: StoredText | string, at = changeTime(card)): void {
   card.history = [...card.history, entryOf(at, by, said)].slice(-MAX_HISTORY)
   card.updatedAt = at
 }
@@ -2361,9 +2373,9 @@ async function updateTaskAs(n: number, patch: TaskPatch, actor: TaskActor, opts:
     if (!said.length && !reordered && !reviewed && !comment) return card
     // One change, one time (HI-2016): its lines share it, so what reads them as one change (a failed verdict's own move
     // back to Doing, watch.ts wakeAbout) does so however slowly they are written.
-    const at = new Date().toISOString()
+    const at = changeTime(card)
     for (const s of said) note(card, by, s, at)
-    if (comment) addComment(card, by, comment)
+    if (comment) addComment(card, by, comment, undefined, undefined, at)
     // The last thing before the write, after every read above: a caller whose authority can change while those awaits run
     // (the Assistant's control and session) checks it here, so a revoked change saves nothing. Unlike `check`, it doesn't
     // see the card as it was before this change.
@@ -2671,9 +2683,8 @@ function commentText(comment: string): string {
   return t
 }
 
-/** Adds a comment; one Hive writes itself can carry its text as data (`hiveText`) beside its English. */
-function addComment(c: TaskCard, by: string, t: string, hiveText?: StoredText, id?: string): void {
-  const at = new Date().toISOString()
+/** Adds a comment, at `at` (its change's one time) or as a change of its own; one Hive writes itself can carry its text as data (`hiveText`) beside its English. */
+function addComment(c: TaskCard, by: string, t: string, hiveText?: StoredText, id?: string, at = changeTime(c)): void {
   c.comments = [...c.comments, { at, by, text: t, ...(hiveText ? { hiveText } : {}), id: id ?? entryId() }].slice(-MAX_COMMENTS)
   c.updatedAt = at
 }

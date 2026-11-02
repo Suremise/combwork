@@ -914,6 +914,20 @@ describe('watches (main/watches.ts)', async () => {
     await watches.registerWatch(w, alpha, 'a1', agentWatch(e.number))
     await evaluated(w)
     expect(st.typed).toHaveLength(3)
+    // HI-2315: the same, both in one millisecond (a loaded machine wrote them back to back): the card's later change is
+    // still told apart, so nothing fires.
+    st.status = 'watching'
+    const f = await inWorkspace(w, () => tasks.createTask({ title: 'D', project: 'alpha', agent: 'a2', column: 'review' }, user))
+    vi.useFakeTimers({ toFake: ['Date'], now: Date.now() })
+    try {
+      await inWorkspace(w, () => tasks.updateTask(f.number, { agent: null }, user))
+      await inWorkspace(w, () => tasks.commentTask(f.number, 'Noted.', asker))
+    } finally {
+      vi.useRealTimers()
+    }
+    await watches.registerWatch(w, alpha, 'a1', agentWatch(f.number))
+    await evaluated(w)
+    expect(st.typed).toHaveLength(3)
     await watches.cancelWatch(w, alpha, 'a1')
     Object.assign(sessions, { liveFor: live })
     await disposeWorkspaceService(w)

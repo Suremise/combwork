@@ -214,8 +214,10 @@ export function carriedOver(card: TaskCard, told: Baseline, self: string): CardM
  * HI-2302: a card's starting point for a watch from just after the watcher's (`self`, by its board name) own last change
  * to it, a comment or a history entry made after `after` (ISO: its launch, so a card it touched in an earlier run doesn't
  * fire a new watch with old news): what others did after that counts, as when PR1 asked PE-39's builder for logs, the
- * builder answered, and PR1's watch began a minute later from the card as it was then, the answer in it. Entries in the
- * same millisecond as that change, by others, stay new (a wake too many, never one missed). Null: no such change, or
+ * builder answered, and PR1's watch began a minute later from the card as it was then, the answer in it. A card's changes
+ * have times in their order (tasks.ts changeTime, HI-2315), so only the lines of one change share a time; where others'
+ * entries still share that change's millisecond (written before HI-2315), they stay new (a wake too many, never one
+ * missed). Null: no such change, or
  * one a wake had already told it of (`told`: that wake is the later point, carriedOver's).
  */
 export function ownCut(card: TaskCard, self: string, after: string, told?: Baseline): Baseline | null {
