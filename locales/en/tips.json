@@ -1411,6 +1411,14 @@
     "defaultMessage": "Paste a screenshot into a session",
     "description": "A tip's title."
   },
+  "tips.pathsLeftOut.text": {
+    "defaultMessage": "Without version control, a card's work is only the files its paths list. When you drag one to Review and other files changed since it started, Hive lists them first: include them in its work, or leave them out.",
+    "description": "A tip. A card's paths: the files and folders its work covers, in a project with no version control. Review is the board column."
+  },
+  "tips.pathsLeftOut.title": {
+    "defaultMessage": "No version control? Check what a card covers",
+    "description": "A tip's title: in a project without version control, a card's work is the files its paths list."
+  },
   "tips.pauseTeam.text": {
     "defaultMessage": "Pause the Team, in the Progress panel's Lanes, stops lanes starting cards and agents being woken, tells each agent to park, and lists what still runs until it's safe to install: then Install Now.",
     "description": "A tip (HI-2081). Pause the Team, the Progress panel, Lanes and Install Now are names in Hive: keep them as Hive shows them."

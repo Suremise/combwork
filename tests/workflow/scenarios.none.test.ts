@@ -420,5 +420,134 @@ describe('None: what a submission leaves out of its paths is named (HI-2339)', (
   })
 })
 
+// HI-2352 (§16.3.3): the user's drag that submits a None code card asks what its paths leave out first (read-only), and
+// submits with the paths the user chose (Include Them) or as it is (Leave Them Out).
+describe("None: the user's drag asks what a card's paths leave out (HI-2352)", () => {
+  type LeftOut = { ask: true; rules: string[]; leftOut?: { paths: string[]; files: string[] } }
+  const leftOutOf = (r: unknown): { paths: string[]; files: string[] } => {
+    expect(r).toMatchObject({ ask: true, rules: [] })
+    return (r as LeftOut).leftOut!
+  }
+  const none = (mode: 'pair' | 'solo' = 'pair', preChecks: string[] = []) => (env = setup({ ...preset('none', mode), preChecks }, { files: { 'a.txt': 'a\n', 'b.txt': 'b\n' } }))
+  /** A started card declaring a.txt, edited, with b.txt in its pre-fill and c.txt changed by the user. */
+  const started = async (e: Env) => {
+    const card = e.wf.createCard({ title: 'Drag', paths: ['a.txt'] })
+    moved(await e.wf.start(card.key, B1))
+    put(e.project, 'a.txt', 'a1\n')
+    put(e.project, 'b.txt', 'b1\n')
+    e.wf.noteEdit(card, 'b.txt')
+    put(e.project, 'c.txt', 'the user typed\n')
+    e.wf.noteWrite('c.txt', { agents: [], user: true })
+    return card
+  }
+
+  it('asks first, nothing written; Include Them submits with every file and keeps them as its paths', async () => {
+    const e = none()
+    const card = await started(e)
+    const facts = e.wf.store.facts(card.id).length
+    const left = leftOutOf(await e.wf.move(card.key, 'review', 'user', { askPaths: true }))
+    expect(left).toEqual({ paths: ['a.txt'], files: ['b.txt', 'c.txt'] })
+    // Read-only: no fact, its stage and paths as they were (Cancel leaves it so).
+    expect(e.wf.store.facts(card.id)).toHaveLength(facts)
+    expect(e.wf.state(card).stage).toBe('active')
+    expect(e.wf.store.card(card.id).paths).toEqual(['a.txt'])
+    moved(await e.wf.move(card.key, 'review', 'user', { paths: [...left.paths, ...left.files] }))
+    const s = e.wf.state(card)
+    expect(s.stage).toBe('review')
+    expect(s.latest!.paths).toEqual(['a.txt', 'b.txt', 'c.txt'])
+    expect(e.wf.store.card(card.id).paths).toEqual(['a.txt', 'b.txt', 'c.txt'])
+  })
+
+  it('Leave Them Out submits with its paths as they are', async () => {
+    const e = none()
+    const card = await started(e)
+    moved(await e.wf.move(card.key, 'review', 'user', {}))
+    expect(e.wf.state(card).latest!.paths).toEqual(['a.txt'])
+    expect(e.wf.store.card(card.id).paths).toEqual(['a.txt'])
+  })
+
+  it('the choice goes through the rules question: Include Them, then Move Anyway, submits with its paths', async () => {
+    const e = none('pair', ['typecheck'])
+    const card = await started(e)
+    const left = leftOutOf(await e.wf.move(card.key, 'review', 'user', { askPaths: true }))
+    const paths = [...left.paths, ...left.files]
+    // The rules question asked with the paths chosen; cancelling it writes nothing either.
+    const ask = await e.wf.move(card.key, 'review', 'user', { paths })
+    expect(ask).toMatchObject({ ask: true, rules: ['submit.checksPassed'] })
+    expect((ask as LeftOut).leftOut).toBeUndefined()
+    expect(e.wf.state(card).stage).toBe('active')
+    expect(e.wf.store.card(card.id).paths).toEqual(['a.txt'])
+    moved(await e.wf.move(card.key, 'review', 'user', { paths, confirm: true, reason: 'checked by hand' }))
+    expect(e.wf.state(card).latest!.paths).toEqual(['a.txt', 'b.txt', 'c.txt'])
+  })
+
+  it("its paths unchanged, a later file in its pre-fill: asked rather than refused, and Include Them submits it", async () => {
+    const e = none()
+    const card = e.wf.createCard({ title: 'Unchanged', paths: ['a.txt'] })
+    moved(await e.wf.start(card.key, B1))
+    put(e.project, 'b.txt', 'b1\n')
+    e.wf.noteEdit(card, 'b.txt')
+    const left = leftOutOf(await e.wf.move(card.key, 'review', 'user', { askPaths: true }))
+    expect(left).toEqual({ paths: ['a.txt'], files: ['b.txt'] })
+    moved(await e.wf.move(card.key, 'review', 'user', { paths: ['a.txt', 'b.txt'] }))
+    expect(e.wf.state(card).latest!.paths).toEqual(['a.txt', 'b.txt'])
+  })
+
+  it('no paths yet: its pre-fill is what it submits, only the unclaimed change is asked', async () => {
+    const e = none()
+    const card = e.wf.createCard({ title: 'Prefill' })
+    moved(await e.wf.start(card.key, B1))
+    put(e.project, 'a.txt', 'a1\n')
+    e.wf.noteEdit(card, 'a.txt')
+    put(e.project, 'c.txt', 'c\n')
+    e.wf.noteWrite('c.txt', { agents: [], user: true })
+    const left = leftOutOf(await e.wf.move(card.key, 'review', 'user', { askPaths: true }))
+    expect(left).toEqual({ paths: ['a.txt'], files: ['c.txt'] })
+    moved(await e.wf.move(card.key, 'review', 'user', { paths: ['a.txt', 'c.txt'] }))
+    expect(e.wf.state(card).latest!.paths).toEqual(['a.txt', 'c.txt'])
+  })
+
+  it("Solo: the user's drag to Done is a move, not a submission (§16.8.4), so it asks nothing", async () => {
+    const e = none('solo')
+    const card = await started(e)
+    moved(await e.wf.move(card.key, 'done', 'user', { askPaths: true }))
+    expect(e.wf.state(card).stage).toBe('done')
+    expect(e.wf.state(card).latest).toBeNull()
+  })
+
+  it('asks nothing when nothing is left out, for a no-code card, from Todo (start and submit in one drag), or without askPaths', async () => {
+    const e = none()
+    const covered = e.wf.createCard({ title: 'Covered', paths: ['a.txt'] })
+    moved(await e.wf.start(covered.key, B1))
+    put(e.project, 'a.txt', 'a1\n')
+    e.wf.noteEdit(covered, 'a.txt')
+    moved(await e.wf.move(covered.key, 'review', 'user', { askPaths: true }))
+    expect(e.wf.state(covered).stage).toBe('review')
+    // A change unclaimed by any card, from here on.
+    put(e.project, 'c.txt', 'c\n')
+    e.wf.noteWrite('c.txt', { agents: [], user: true })
+    const nc = e.wf.createCard({ title: 'Decide', kind: 'no-code' })
+    moved(await e.wf.start(nc.key, B2))
+    put(e.project, 'd.txt', 'd\n')
+    e.wf.noteWrite('d.txt', { agents: [], user: true })
+    moved(await e.wf.move(nc.key, 'review', 'user', { askPaths: true }))
+    // From Todo: its start in the same drag, so nothing changed since it started; never asked (refused as unchanged).
+    const todo = e.wf.createCard({ title: 'Todo', paths: ['a.txt'] })
+    const r = await e.wf.move(todo.key, 'review', 'user', { askPaths: true, builder: 'B1' })
+    expect((r as LeftOut).leftOut).toBeUndefined()
+  })
+
+  it('Git asks nothing', async () => {
+    const g = (env = setup({ ...preset('git', 'pair'), preChecks: [], mergeChecks: [] }))
+    const card = g.wf.createCard({ title: 'Git' })
+    const s = await g.wf.start(card.key, B1)
+    moved(s)
+    commit(String((s as { data?: Record<string, unknown> }).data?.folder), { 'g.txt': 'g\n' }, 'g')
+    put(g.project, 'elsewhere.txt', 'e\n')
+    moved(await g.wf.move(card.key, 'review', 'user', { askPaths: true }))
+    expect(g.wf.state(card).stage).toBe('review')
+  })
+})
+
 const agentC = 'agent:C1' as const
 const agentD = 'agent:D1' as const

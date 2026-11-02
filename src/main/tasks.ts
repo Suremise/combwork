@@ -1659,7 +1659,7 @@ export async function runIntent<R>(
  * its comment) saved with its first write, its place with the write that reaches the column asked for. The user's move
  * with `confirm` skips what it must and records an `Override`; the Assistant's needs `override.reason` for that.
  */
-async function moveThroughRules(g: Gate, n: number, patch: TaskPatch, actor: TaskActor, opts: Parameters<typeof updateTaskLocked>[3] = {}, confirm = true): Promise<MoveResult> {
+async function moveThroughRules(g: Gate, n: number, patch: TaskPatch, actor: TaskActor, opts: Parameters<typeof updateTaskLocked>[3] = {}, confirm = true, paths?: { paths?: string[]; askPaths?: boolean }): Promise<MoveResult> {
   const ws = workspace
   const target = patch.column!
   const { column: _column, before, position, override, ...rest } = patch
@@ -1668,7 +1668,7 @@ async function moveThroughRules(g: Gate, n: number, patch: TaskPatch, actor: Tas
     g.wf,
     n,
     actor,
-    (wf) => wf.move(n, g.to, g.by, { confirm, ...(reason ? { reason } : {}), ...(g.builder ? { builder: g.builder } : {}) }),
+    (wf) => wf.move(n, g.to, g.by, { confirm, ...(reason ? { reason } : {}), ...(g.builder ? { builder: g.builder } : {}), ...paths }),
     (w, first) => {
       const placed = STAGE_CATEGORY[w.current] === target ? { ...(before !== undefined ? { before } : {}), ...(position !== undefined ? { position } : {}) } : {}
       // A write that takes the card into Active (a start, or back from Review: HI-2062): whether its Override lets the card
@@ -1679,7 +1679,7 @@ async function moveThroughRules(g: Gate, n: number, patch: TaskPatch, actor: Tas
   )
   // A drag that went as far as it could (its start written, its submission refused for what no override makes true).
   if (isRefusal(reply)) return saved ? { moved: saved, stopped: reply } : { refused: reply }
-  if ('ask' in reply) return saved ? { moved: saved } : { ask: reply.rules }
+  if ('ask' in reply) return saved ? { moved: saved } : reply.leftOut ? { leftOut: reply.leftOut } : { ask: reply.rules }
   if (saved) return { moved: saved }
   // Nothing moved (the card was already there): the rest of the change, as any other.
   const others: TaskPatch = { ...rest, ...(before !== undefined ? { before } : {}), ...(position !== undefined ? { position } : {}) }
@@ -1696,7 +1696,8 @@ async function moveThrough(g: Gate, n: number, patch: TaskPatch, actor: TaskActo
   // Stopped part way: the user sees where the card is; the Assistant is told why it stopped there (its start kept).
   if ('moved' in r && r.stopped && actor.kind !== 'user') throw new WorkflowRefusedError(r.stopped)
   if ('ask' in r) throw new WorkflowRefusedError(refusalOf('move.needsOverride', { card: cardRef(n), stage: g.to, rules: r.ask.join(', ') }, 'the user')) // i18n-ignore: who can override, agent-facing (§16.8.3)
-  return r.moved
+  // Never `leftOut` here: only the window's tasks:move asks what a card's paths leave out (HI-2352).
+  return 'moved' in r ? r.moved : getTask(n, workspace)
 }
 
 /**
@@ -1730,8 +1731,10 @@ async function moveDecidedAgain(g: Gate, n: number, patch: TaskPatch, actor: Tas
 /**
  * The window's move (`tasks:move`, #1265): through the card's rules when they apply, asking first unless `confirm`
  * (the rules it would skip, nothing written), else a plain move. Never refused for a rule: the user overrides.
+ * `paths` (HI-2352): a None code card's submission asks first what its paths leave out (`leftOut`, nothing written);
+ * moved again with the paths to submit with (Include Them), or null (Leave Them Out), it doesn't ask.
  */
-export async function moveTask(n: number, column: TaskColumn, o: { before?: number | null; confirm?: boolean; reason?: string; agent?: string | null } = {}): Promise<MoveResult> {
+export async function moveTask(n: number, column: TaskColumn, o: { before?: number | null; confirm?: boolean; reason?: string; agent?: string | null; paths?: string[] | null } = {}): Promise<MoveResult> {
   const actor: TaskActor = { kind: 'user' }
   // `agent`: the Move to Doing dialog's choice (an agent, or nobody), given with the move.
   const patch: TaskPatch = { column, ...(o.before !== undefined ? { before: o.before } : {}), ...(o.agent !== undefined ? { agent: o.agent } : {}), ...(o.reason ? { override: { reason: o.reason } } : {}) }
@@ -1740,7 +1743,8 @@ export async function moveTask(n: number, column: TaskColumn, o: { before?: numb
     const { override: _o, ...plain } = patch
     return { moved: await updateTask(n, plain, actor) }
   }
-  return moveThroughRules(gate, n, patch, actor, {}, !!o.confirm)
+  const paths = Array.isArray(o.paths) && o.paths.length && o.paths.every((p) => typeof p === 'string' && p.length > 0) ? { paths: o.paths } : o.paths === undefined ? { askPaths: true } : {}
+  return moveThroughRules(gate, n, patch, actor, {}, !!o.confirm, paths)
 }
 
 /**
@@ -1955,10 +1959,10 @@ const ACTION_GONE = msg({ id: 'tasks.error.actionGone', defaultMessage: "{action
 async function doAskAction(n: number, kind: AskActionKind, reason: string | undefined): Promise<void> {
   const actor: TaskActor = { kind: 'user' }
   if (kind === 'done') {
-    const r = await moveTask(n, 'done', { confirm: true, ...(reason ? { reason } : {}) })
+    const r = await moveTask(n, 'done', { confirm: true, paths: null, ...(reason ? { reason } : {}) })
     if ('refused' in r) throw new WorkflowRefusedError(r.refused)
     if ('ask' in r) throw new WorkflowRefusedError(refusalOf('move.needsOverride', { card: cardRef(n), stage: 'done', rules: r.ask.join(', ') }, 'the user')) // i18n-ignore: who can override, agent-facing (§16.8.3)
-    if (r.stopped) throw new WorkflowRefusedError(r.stopped)
+    if ('moved' in r && r.stopped) throw new WorkflowRefusedError(r.stopped)
   } else if (kind === 'noCode') {
     await setKind(n, 'no-code', actor, { confirm: true, ...(reason ? { reason } : {}) })
   } else if (kind === 'skipReview') {

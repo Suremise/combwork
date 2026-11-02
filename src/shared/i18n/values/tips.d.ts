@@ -354,6 +354,8 @@ interface HiveMessageValues {
   'tips.paneCells.title': undefined
   'tips.pasteScreenshot.text': undefined
   'tips.pasteScreenshot.title': undefined
+  'tips.pathsLeftOut.text': undefined
+  'tips.pathsLeftOut.title': undefined
   'tips.pauseTeam.text': undefined
   'tips.pauseTeam.title': undefined
   'tips.perfCompare.text': undefined

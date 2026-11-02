@@ -135,7 +135,9 @@ describe('keeping files with a card (HI-1700)', () => {
     await inWorkspace(w, () => att.removeCardAttachment(w, c, a.id))
     expect(rows(w, c)).toEqual([])
     await expect.poll(() => trashed().some((t) => t.endsWith(a.file))).toBe(true)
-    expect(inside(join(root, 'p', '.hive', 'attachments', 'cards', '.trash'))).toEqual([])
+    // The removal's own folder goes after its file is in the Recycle Bin (finishTrash, after the commit): awaited, not
+    // looked at once (HI-2362: under load the look came between the two).
+    await expect.poll(() => inside(join(root, 'p', '.hive', 'attachments', 'cards', '.trash'))).toEqual([])
   })
 })
 

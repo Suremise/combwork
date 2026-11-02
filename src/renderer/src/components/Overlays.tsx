@@ -134,6 +134,7 @@ export function Dialogs() {
         }
       >
         <div>{dialog.message}</div>
+        {dialog.list && dialog.list.length > 0 && <DialogList items={dialog.list} />}
         {dialog.detail && <div className="detail">{dialog.detail}</div>}
         {dialog.select && <DialogSelect select={dialog.select} picked={picked} setPicked={setPicked} />}
       </Modal>

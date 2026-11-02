@@ -36,7 +36,9 @@ afterAll(async () => {
 
 describe.runIf(process.platform === 'win32')('the helper says which executables run (HI-2304)', () => {
   it('names with dots reach the helper: those running are named, the rest not', async () => {
-    const r = await host.request('running', 'node.exe,windowssandboxclient-hive-test-2304.exe,vmmemwindowssandbox')
+    // Only made-up names besides node.exe (HI-2347): a real one, such as vmmemWindowsSandbox, runs whenever anything on
+    // the shared machine has a Windows Sandbox up.
+    const r = await host.request('running', 'node.exe,windowssandboxclient-hive-test-2304.exe,vmmem-hive-test-2347')
     expect(r).toEqual(['node.exe'])
     expect(launches).toBe(1)
   }, HUNG_MS)

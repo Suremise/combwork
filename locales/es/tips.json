@@ -352,6 +352,8 @@
   "tips.paneCells.title": "Pon un agente en cualquier panel",
   "tips.pasteScreenshot.text": "Presiona Ctrl+V en la terminal de un agente con una imagen en el portapapeles, o suelta una imagen en ella: el agente la ve, y Hive guarda una copia.",
   "tips.pasteScreenshot.title": "Pega una captura en una sesión",
+  "tips.pathsLeftOut.text": "Sin control de versiones, el trabajo de una tarjeta son solo los archivos que indican sus rutas. Cuando arrastras una a Revisión y otros archivos cambiaron desde que empezó, Hive los enumera primero: inclúyelos en su trabajo o déjalos fuera.",
+  "tips.pathsLeftOut.title": "¿Sin control de versiones? Revisa qué abarca una tarjeta",
   "tips.pauseTeam.text": "Pausar el equipo, en Carriles del panel Progreso, evita que los carriles inicien tarjetas y que se despierte a los agentes, pide a cada agente que aparque y lista lo que sigue en marcha hasta que se pueda instalar: entonces, Instalar ahora.",
   "tips.pauseTeam.title": "Pausa el equipo antes de una actualización",
   "tips.perfCompare.text": "Rendimiento → Comparar: guarda la vista actual antes de un cambio y otra vez después, y comprueba si el tráfico de Hive bajó mientras el trabajo se seguía haciendo.",

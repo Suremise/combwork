@@ -177,6 +177,8 @@ export interface ChoiceRequest {
   kind: 'choice'
   title: string
   message: string
+  /** Items (paths) under the message, one per line, with a Copy button (what a card's paths leave out, HI-2352). */
+  list?: readonly string[]
   detail?: string
   danger?: boolean
   /** Buttons left to right; the last is the default. A session action's button takes its colour (#344). */

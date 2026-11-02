@@ -57,6 +57,12 @@ export interface Ask {
   ask: true
   card: string
   rules: string[]
+  /**
+   * The user's drag that submits a None code card whose paths leave files out (HI-2352): asked before the rules (none
+   * then), nothing written. `paths`: what it would submit with; `files`: what they leave out (its pre-fill beyond them,
+   * then the unclaimed changes, which may be another card's). Moved again with `paths` to include them, or without asking.
+   */
+  leftOut?: { paths: string[]; files: string[] }
 }
 
 export type Reply = Moved | Refusal
@@ -2124,7 +2130,7 @@ export class Workflow {
    * The user's drag (or menu): never refused. A move that skips rules asks first, then records an `Override`; a move
    * that skips nothing just moves (§16.7.1). The Assistant passes `override: { reason }` or is refused.
    */
-  async move(ref: unknown, to: StageId, by: 'user' | 'assistant', opts: { confirm?: boolean; reason?: string; builder?: string; dry?: boolean } = {}): Promise<Moved | Ask | Refusal> {
+  async move(ref: unknown, to: StageId, by: 'user' | 'assistant', opts: { confirm?: boolean; reason?: string; builder?: string; dry?: boolean; paths?: string[]; askPaths?: boolean } = {}): Promise<Moved | Ask | Refusal> {
     const card = this.resolve(ref)
     if (isRefusal(card)) return card
     const s = this.state(card)
@@ -2222,7 +2228,7 @@ export class Workflow {
    * checks the rules again: one not decided on undoes it, and asks again. `fromHold`: where the card goes first, in the
    * same write (back from On Hold to where it was; a Done card reopened, to Todo), the drag counted from there.
    */
-  private async dragForward(card: CardRecord, from: StageId, to: StageId, by: 'user' | 'assistant', opts: { confirm?: boolean; reason?: string; builder?: string; dry?: boolean }, fromHold?: StageId): Promise<Moved | Ask | Refusal> {
+  private async dragForward(card: CardRecord, from: StageId, to: StageId, by: 'user' | 'assistant', opts: { confirm?: boolean; reason?: string; builder?: string; dry?: boolean; paths?: string[]; askPaths?: boolean }, fromHold?: StageId): Promise<Moved | Ask | Refusal> {
     const asking = by === 'user' ? !opts.confirm || !!opts.dry : !opts.reason
     const s0 = this.state(card)
     // Back from On Hold: the drag counts from where the card was.
@@ -2233,14 +2239,19 @@ export class Workflow {
     if (gs && !('data' in gs)) return this.refuse(card, by, 'start', gs)
     try {
       const s1 = gs ? this.predicted(card, s, gs) : s
-      const gsub = ORDER.indexOf(to) > ORDER.indexOf('active') && s1.stage === 'active' ? await this.gatherSubmit(card, s1, by, {}, gs ? gs.r : r, !!gs) : null
+      const gsub = ORDER.indexOf(to) > ORDER.indexOf('active') && s1.stage === 'active' ? await this.gatherSubmit(card, s1, by, opts.paths ? { paths: opts.paths } : {}, gs ? gs.r : r, !!gs) : null
+      // The window's drag of a started None code card (HI-2352): what its paths leave out is asked first, read-only, so
+      // the user includes it or leaves it (an unchanged revision too: a later round's new file may be all its change).
+      const leftOut = gsub && !gs && by === 'user' && opts.askPaths && !opts.dry && ('inputs' in gsub || gsub.rule === 'submit.unchanged') ? await this.leftOutOf('inputs' in gsub ? gsub.card : card, r.options) : null
+      if (leftOut) return { ask: true, card: card.key, rules: [], leftOut }
       if (gsub && !('inputs' in gsub)) {
         // A submission refused for what no override makes true stops the drag there (§16.8.4), after its start. Its folder
         // may only exist once started (a slot of its own): the start alone, then the submission gathered again on it.
         if (!gs) return this.refuse(card, by, 'submit', gsub)
         if (opts.dry) return this.dragForward(card, from, 'active', by, opts, fromHold)
         const started = await this.dragForward(card, from, 'active', by, opts, fromHold)
-        return isRefusal(started) || 'ask' in started ? started : this.dragForward(card, from, to, by, opts)
+        // Its paths aren't asked after the start (HI-2352: nothing written may then ask; nothing is since it started).
+        return isRefusal(started) || 'ask' in started ? started : this.dragForward(card, from, to, by, { ...opts, askPaths: false })
       }
       // Where the card is once submitted (null: Finish decides, with no review), and what is left to the stage dragged to.
       const after: StageId | null = gsub ? (r.options.review === 'none' ? null : 'review') : s1.stage
@@ -2518,6 +2529,19 @@ export class Workflow {
     const unclaimed = (await this.unclaimed(card, { paths, signal })).filter((p) => !outside.includes(p))
     if (unclaimed.length) out.push(`Changed in the project since ${card.key} started, in neither its paths nor what it recorded as its agents' edits: ${unclaimed.join(', ')}. Not part of its revision: to include any, submit with paths listing every file of its work; else leave them.`) // i18n-ignore: agent-facing warning in the submit's reply
     return out
+  }
+
+  /**
+   * What a None code card's submission with its paths (else its pre-fill) leaves out, counted as pathNotices counts it
+   * (HI-2352), for the window's drag to ask the user: null when nothing is, or it isn't a None code card.
+   */
+  private async leftOutOf(card: CardRecord, o: WorkflowOptions): Promise<{ paths: string[]; files: string[] } | null> {
+    if (o.platform !== 'none' || card.kind !== 'code') return null
+    const prefill = this.prefill(card)
+    const paths = card.paths ?? prefill
+    const outside = prefill.filter((p) => !this.none.covers(paths, p))
+    const files = [...outside, ...(await this.unclaimed(card, { paths })).filter((p) => !outside.includes(p))]
+    return files.length ? { paths, files } : null
   }
 
   /** A refusal with what its card's paths leave out (HI-2339): its `warnings`, passed on to the agent's reply. */

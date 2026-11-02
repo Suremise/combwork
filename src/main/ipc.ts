@@ -209,6 +209,17 @@ const advancedState = (): AdvancedState => advanced.state(workspace.path ? (work
 
 /** The window an IPC call came from, for calls that keep something per window (the developer console's subscription). */
 const senderStore = new AsyncLocalStorage<WebContents>()
+
+/**
+ * The Hive window whose IPC request is being served now (HI-2355), or null outside one (a timer, a hook, the Agent API):
+ * a result or warning made for that request is told in that window (main/notify.ts), even if another has the focus by
+ * then. A console window's request is its own, not a Hive window's: none.
+ */
+export function requestingWindow(): BrowserWindow | null {
+  const wc = senderStore.getStore()
+  const w = wc ? windowOf(wc)?.win : null
+  return w && !w.isDestroyed() ? w : null
+}
 /**
  * Windows subscribed to the developer console, each with the workspace (lower case) it subscribed in: a subscription ends
  * when its window closes or leaves that workspace (#637), so no capture outlives the workspace it was for.
