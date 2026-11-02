@@ -109,8 +109,12 @@ export async function cardReviewer(ws: WorkspaceService, _projectPath: string, c
 async function targetOf(ws: WorkspaceService, projectPath: string, card: TaskCard, kind: LoopWakeKind, agent?: string): Promise<{ id: string; name: string } | null> {
   const agents = projectAgents(await ws.projectConfig(projectPath)).map((a) => ({ id: a.id, name: a.name }))
   // The user's answer reaches the agent waiting on it in or out of a loop (#1269); a loop's handoffs need a reviewer.
-  const reviewer = kind === 'answer' ? null : await reviewerOf(ws, card)
-  if (!reviewer && kind !== 'answer') return null
+  // A pool lane's design closed by its answer or its builder going ahead (HI-2325) leaves the card with no reviewer
+  // until the pool gives out its next submission, but the handoff is still the loop's: the answer to its builder, the
+  // notice to the reviewer the pool gave that design (`agent`, the runtime's, kept by its wake).
+  const poolStep = (kind === 'stepAnswer' || (kind === 'stepNotice' && !!agent)) && poolCard(ws, card)
+  const reviewer = kind === 'answer' || poolStep ? null : await reviewerOf(ws, card)
+  if (!reviewer && kind !== 'answer' && !poolStep) return null
   const target = kind === 'review' || toReviewer(kind) ? (agent ?? reviewer) : (agent ?? card.agent)
   if (!target || ((kind === 'review' || toReviewer(kind)) && target === card.agent)) return null
   const found = agents.find((a) => a.id === target)
@@ -124,7 +128,10 @@ interface Wake {
   agentName: string
   since: TaskHistoryEntry | null
   text?: string
-  /** The user's answer's: the agent waiting on it (the one that asked, else the builder), kept whoever the card's agent is now (#1626). */
+  /**
+   * The user's answer's: the agent waiting on it (the one that asked, else the builder), kept whoever the card's agent is
+   * now (#1626). A pool design's going ahead (HI-2325): the reviewer the pool gave that design, not whoever reviews next.
+   */
   to?: string
 }
 
@@ -208,13 +215,15 @@ async function wakeAboutFor(ws: WorkspaceService, projectPath: string, card: Tas
  * carries the id: made once).
  */
 async function enqueue(ws: WorkspaceService, projectPath: string, card: TaskCard, w: Pick<Wake, 'kind' | 'since' | 'text'>, to: { id: string; name: string }, action?: number): Promise<void> {
+  // Kept with the wake (HI-2325): a pool design's notice stays with that design's reviewer when it is made again.
+  const keepTo = w.kind === 'answer' || (w.kind === 'stepNotice' && poolCard(ws, card))
   if (covered(projectPath, to.id, card, w.kind)) return
   // Its line names cards by key, its workspace's (#1219).
   await withCardNames(ws, async () => {
     if (!ws.path || !ws.isProjectPath(projectPath)) return
     const kinds = kindsOf(w.kind)
     const answer = w.kind === 'answer'
-    const meta = { n: card.number, kind: w.kind, agentName: to.name, sinceAt: w.since?.at ?? '', sinceId: w.since?.id ?? '', ...textMeta(w.kind, w.text), ...(answer ? { to: to.id } : {}), ...(isReturnNote(w.kind, w.text) ? { queueReturn: true } : {}) }
+    const meta = { n: card.number, kind: w.kind, agentName: to.name, sinceAt: w.since?.at ?? '', sinceId: w.since?.id ?? '', ...textMeta(w.kind, w.text), ...(keepTo ? { to: to.id } : {}), ...(isReturnNote(w.kind, w.text) ? { queueReturn: true } : {}) }
     // The user's answer is an answer from them (#1626: acked, never coalesced into the card's events), each its own (a
     // later handoff of the card, or another answer, doesn't replace it); the rest, Hive's card events, the latest per card.
     const ref = answer ? `#${card.number}/answer${action ? `/${action}` : ''}` : `#${card.number}`
@@ -397,7 +406,8 @@ registerSource('loop', {
     if (!card || !stillDue({ ...p, agentId: r.agentId }, card, inRunningLane(ws, p.n)) || covered(host, r.agentId, card, p.kind) || told || !(await wakesOn(ws, host))) return { cancel: 'no longer due' }
     // Only to whose wake it is now: another reviewer given the lane meanwhile gets it instead (#405 round 1 finding).
     // The user's answer stays with the agent waiting on it (#1626), while it is one of the project's agents.
-    const to = await targetOf(ws, host, card, p.kind, p.kind === 'answer' ? p.to : undefined)
+    // A pool design's notice stays with that design's reviewer (HI-2325).
+    const to = await targetOf(ws, host, card, p.kind, p.kind === 'answer' || p.kind === 'stepNotice' ? p.to : undefined)
     if (to?.id !== r.agentId) {
       if (to) inBackground('a loop wake', enqueue(ws, host, card, p, to))
       return { cancel: 'it is another agent\'s wake now' }

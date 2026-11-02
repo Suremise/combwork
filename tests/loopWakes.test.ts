@@ -636,6 +636,63 @@ describe('loop wakes (main/loopWakes.ts, #405)', async () => {
     }
   })
 
+  /**
+   * A pool lane's card (HI-2310) started by b1, its first design posted and given by the pool to r1 (the pool's own
+   * write, as reviewerPool.ts makes it: its pass isn't running here). Before any submission: the design's answer closes
+   * it, and the card has no reviewer until the pool gives out its build (HI-2325).
+   */
+  const POOL = { agents: [{ id: 'b1', name: 'B1', workflowRole: 'builder' }, { id: 'r1', name: 'R1', workflowRole: 'reviewer' }, { id: 'o1', name: 'O1', workflowRole: 'builder' }], workflow: { platform: 'none', preset: null, options: { review: 'agent', noSelfReview: true, reviewerMode: 'pool' } } }
+  const designedInPool = async (w: Awaited<ReturnType<typeof open>>['w'], alpha: string) => {
+    const c = (await inWorkspace(w, () => tasks.createTask({ title: 'Pool design', project: 'alpha' }, user))).number
+    await lanes.startLane(w, { project: 'alpha', builder: 'b1', reviewer: null, pool: true, cards: [c], by: 'B1 (alpha)' })
+    await inWorkspace(w, () => runCardIntent({ n: c, plain: false }, b1, { kind: 'start' }))
+    const id = String((await inWorkspace(w, () => runCardIntent({ n: c, plain: false }, b1, { kind: 'loopStep', step: 'design', text: 'Plan' }))).done.data?.design)
+    const wf = (await workflowFor(w, alpha))!
+    const rec = wf.store.card(c)
+    const submission = wf.store.facts(c).findLast((f) => f.kind === 'LoopStep')!.seq
+    await wf.write(rec, null, 'hive', (x) => void x.fact('ReviewerAssigned', { reviewer: 'r1', submission, design: true }))
+    expect((await loopReviewerOf(w, await inWorkspace(w, () => tasks.getTask(c, w))))?.id).toBe('r1')
+    return { c, id }
+  }
+  const { workflowFor } = await import('../src/main/workflow/service')
+  const { loopReviewerOf } = await import('../src/main/loopReviewer')
+
+  it.each(['ok', 'gaps'] as const)("a pool design's %s answer before any submission wakes its builder, with no watch (HI-2325)", async (step) => {
+    await loopWakes.clearLoopWakes()
+    const { w, alpha } = await open(POOL)
+    const st = fake(alpha)
+    const { c, id } = await designedInPool(w, alpha)
+    await settled()
+    // The pool tells its design's reviewer itself: no loop wake.
+    expect(st.typed).toEqual([])
+    await inWorkspace(w, () => runCardIntent({ n: c, plain: false }, r1, { kind: 'loopStep', step, text: 'Answered.', design: id }))
+    // Closed by its answer: the card has no reviewer until its build is given out, and none is made the owner meanwhile.
+    expect(await loopReviewerOf(w, await inWorkspace(w, () => tasks.getTask(c, w)))).toBeNull()
+    await typedUntil(st, 1)
+    expect(st.typed[0].agent).toBe('b1')
+    expect(st.typed[0].text).toContain(`design ${id}`)
+    await vi.waitFor(async () => expect(await history(w, c)).toContain('Hive: Woke B1 (alpha) with a card loop step (a loop wake)'), HANG)
+    await disposeWorkspaceService(w)
+  })
+
+  it("a pool design's builder going ahead unchecked tells the reviewer the pool gave it, with no watch (HI-2325)", async () => {
+    await loopWakes.clearLoopWakes()
+    vi.useFakeTimers({ toFake: ['Date'] })
+    try {
+      const { w, alpha } = await open(POOL)
+      const st = fake(alpha)
+      const { c, id } = await designedInPool(w, alpha)
+      vi.setSystemTime(Date.now() + 31 * 60_000)
+      await inWorkspace(w, () => runCardIntent({ n: c, plain: false }, b1, { kind: 'loopStep', step: 'proceed', text: 'No answer: building as posted.', design: id }))
+      await typedUntil(st, 1)
+      expect(st.typed[0].agent).toBe('r1')
+      expect(st.typed[0].text).toContain(`no check of design ${id} came in time`)
+      await disposeWorkspaceService(w)
+    } finally {
+      vi.useRealTimers()
+    }
+  })
+
   it('a design to check is dropped once nothing waits: posted again, the newer one is told, not the older (#1382)', async () => {
     await loopWakes.clearLoopWakes()
     const { w, alpha } = await open(WORKFLOW)
