@@ -27,6 +27,8 @@ export interface NotifyHost {
   workspaceOf: (projectPath: string) => string | null
   /** A project's folder as its workspace has it, when `path` is one (a toast's source: its link), else null. */
   projectAt?: (path: string) => string | null
+  /** The Hive window whose IPC request is being served now, or null (HI-2355: ipc.ts requestingWindow). */
+  requester?: () => BrowserWindow | null
 }
 
 let host: NotifyHost = { focused: () => null, fallback: () => null, workspaceOf: () => null }
@@ -75,6 +77,9 @@ export interface Told {
 
 const DEFAULT_LEVEL: Record<NotifyKind, ToastLevel> = { needsYou: 'info', finished: 'success', work: 'info', usage: 'warning', warning: 'warning', result: 'info', transcript: 'warning', update: 'info', quit: 'info', tip: 'info' } // i18n-ignore: levels, not text
 
+/** The kinds that answer the request they were made in (HI-2355): Hive's own messages, told in the window that asked. */
+const ANSWERS_REQUESTS: ReadonlySet<NotifyKind> = new Set(['result', 'warning'])
+
 /** The Agent API's kind for an entry it hears of (#620: finished, waiting, or another notice). */
 const apiKind = (k: NotifyKind): Notice['kind'] => (k === 'needsYou' ? 'waiting' : k === 'finished' ? 'finished' : 'notice')
 
@@ -104,7 +109,11 @@ export function tell(spec: TellSpec): Told {
   const sourceProject = !projectPath && spec.source && /[\\/]/.test(spec.source) ? (host.projectAt?.(spec.source) ?? null) : null
   const linked = projectPath ?? sourceProject
   const target = spec.target ?? (linked ? { kind: 'project' as const, projectPath: linked, project: projectName(linked) } : undefined)
-  const owner = at?.win ?? host.fallback(projectPath, spec.source)
+  // Its owner (s19's rules): Hive's own result or warning answering a window's request goes to that window, even if
+  // another has the focus by then (HI-2355); otherwise the window in use; with none, its workspace's (or source's).
+  // Agents' kinds never follow a request: a request's context can carry into later callbacks (a session it started).
+  const requester = ANSWERS_REQUESTS.has(spec.kind) ? (host.requester?.() ?? null) : null
+  const owner = requester ?? at?.win ?? host.fallback(projectPath, spec.source)
   const entry: ToastMessage = {
     id,
     kind: spec.kind,

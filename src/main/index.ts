@@ -56,7 +56,7 @@ import { startHeapSnapshots, startMemoryLog } from './memory'
 import { recordLiveCardsSoon } from './cardSessions'
 import { closeAllBoards, onBoardNotice } from './boardStore'
 import { closeAllJournals } from './journal'
-import { registerIpc } from './ipc'
+import { registerIpc, requestingWindow } from './ipc'
 import { watchRenderer } from './rendererWatch'
 import { startPowerWatch } from './power'
 import { startTaskbarFlash } from './taskbar'
@@ -1130,6 +1130,8 @@ app.whenReady().then(async () => {
     },
     fallback: (projectPath, source) => (projectPath ? windowForPath(projectPath) : null)?.win ?? (source && /[\\/]/.test(source) ? windowForPath(source)?.win : null) ?? lastFocused()?.win ?? null,
     workspaceOf: (projectPath) => workspaceOf(projectPath)?.path ?? null,
+    // A result of a window's request is told in that window (HI-2355).
+    requester: requestingWindow,
     // A toast's source that is a project (its folder): the entry's link (HI-2320).
     projectAt: (p) => {
       try {

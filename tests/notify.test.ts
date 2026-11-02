@@ -149,6 +149,32 @@ describe('tell(): one entry, one window', () => {
   })
   const toasts = (w: { id: number }) => (sent.get(w.id) ?? []).flatMap((e) => (e.type === 'toast' ? [e.toast] : []))
 
+  it("HI-2355: a result of window B's request goes to B even if A has the focus by then; an agent's notice made in that request still goes to the focused A; outside a request, the focused window", async () => {
+    const { AsyncLocalStorage } = await import('async_hooks')
+    // As ipc.ts keeps the request's window (senderStore), read through the host.
+    const request = new AsyncLocalStorage<typeof B>()
+    notify.setNotifyHost({
+      focused: () => (focused ? { win: focused as never, workspacePath: null, projectPath: null } : null),
+      fallback: () => A as never,
+      workspaceOf: () => null,
+      requester: () => (request.getStore() as never) ?? null
+    })
+    focused = B
+    await request.run(B, async () => {
+      // The request runs on, and meanwhile the user moves to window A.
+      await new Promise((r) => setTimeout(r, 5))
+      focused = A
+      notify.tell({ kind: 'result', title: 'Copied to workspace' })
+      notify.tell({ kind: 'warning', title: 'Platform changed' })
+      notify.tell({ kind: 'needsYou', title: 'beta needs your input', projectPath: 'C:\\Work\\B\\beta' })
+    })
+    expect(toasts(B).map((t) => t.title)).toEqual(['Copied to workspace', 'Platform changed'])
+    expect(toasts(A).map((t) => t.title)).toEqual(['beta needs your input'])
+    // No request: Hive's own message goes to the window in use.
+    notify.tell({ kind: 'warning', title: 'Background warning' })
+    expect(toasts(A).map((t) => t.title)).toEqual(['beta needs your input', 'Background warning'])
+  })
+
   it("workspace B's warning while A is focused: it pops up in A, the window you are using, and nowhere else", () => {
     focused = A
     const t = notify.tell({ kind: 'warning', title: 'B left 2 processes running', projectPath: 'C:\\Work\\B\\beta' })
