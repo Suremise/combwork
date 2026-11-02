@@ -554,6 +554,11 @@ interface HiveMessageValues {
   'board.lanes.waitsLink': undefined
   'board.lanes.waitsPreparing': { slot: string | number }
   'board.lanes.waitsStart': { card: string | number; why: string; agent: string | number }
+  'board.leftOut.detail': { hasPaths: string; paths: string | number; card: string | number }
+  'board.leftOut.include': { n: number }
+  'board.leftOut.leave': { n: number }
+  'board.leftOut.message': { n: number; card: string | number }
+  'board.leftOut.title': { card: string | number }
   'board.links.archivedTitle': { card: string | number; title: string | number; column: string | number }
   'board.links.title': { card: string | number; title: string | number; column: string | number }
   'board.menu.delete': undefined

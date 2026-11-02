@@ -352,6 +352,8 @@
   "tips.paneCells.title": "把智能体放进任意窗格",
   "tips.pasteScreenshot.text": "剪贴板中有图片时，在智能体的终端中按 Ctrl+V，或把图片拖到终端上：智能体就能看到它，Hive 也会保存一份副本。",
   "tips.pasteScreenshot.title": "把截图粘贴到会话中",
+  "tips.pathsLeftOut.text": "没有版本控制时，卡片的工作只包括其路径列出的文件。当你把卡片拖到“评审”，而它开始后其他文件有改动时，Hive 会先列出它们：把它们加入卡片的工作，或不包含它们。",
+  "tips.pathsLeftOut.title": "没有版本控制？检查卡片包含哪些文件",
   "tips.pauseTeam.text": "“进度”面板“通道”中的“暂停团队”会让通道不再开始卡片、智能体不再被唤醒，告诉每个智能体停放，并列出仍在运行的内容，直到可以安全安装：然后点“立即安装”。",
   "tips.pauseTeam.title": "更新前暂停团队",
   "tips.perfCompare.text": "“性能”→“比较”：在更改前保存当前视图，更改后再保存一次，看看 Hive 的流量是否减少了，同时工作照样完成。",

@@ -235,6 +235,7 @@ export const SUITES = [
   { name: 'pageswitch' },
   { name: 'paneheader' },
   { name: 'panelroom' },
+  { name: 'pathsleftout' },
   { name: 'perfcompare' },
   { name: 'performance' },
   { name: 'perftable' },

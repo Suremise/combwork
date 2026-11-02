@@ -1384,9 +1384,10 @@ export interface TaskPatch {
 /**
  * What the window's move of a card came to (`tasks:move`, #1265): moved (the card as saved; `stopped`: it went only as
  * far as it could, the step after refused for what no override makes true, such as nothing to submit, §16.8.4), or a
- * question first (the rules the move would skip: nothing written; move again with `confirm`), or refused.
+ * question first (the rules the move would skip: nothing written; move again with `confirm`), or refused. `leftOut`
+ * (HI-2352): a None code card's submission, asked first what its paths leave out: move again with `paths`.
  */
-export type TaskMoveResult = { moved: TaskCard; stopped?: Refusal } | { ask: string[] } | { refused: Refusal }
+export type TaskMoveResult = { moved: TaskCard; stopped?: Refusal } | { ask: string[] } | { leftOut: { paths: string[]; files: string[] } } | { refused: Refusal }
 
 /** Which agent Start gives a card to; a new one runs on `connection` (its id: HI-2121), else the first usable here. */
 /** `worktree` (0.9's own worktree for a new agent) is refused since 1.0 (#1451); the window stops sending it (#1442). */

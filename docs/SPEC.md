@@ -1543,12 +1543,12 @@ All Git calls go through the `git()` runner (`src/main/git.ts:47`); the two bypa
   as given.
 - **A card's paths** are **declared, not guessed**: the card's list of files and folders its work covers, kept on the
   card from its start, which the builder sets at any time (the **declare paths** intent, §16.8.1, or `submit`'s
-  `paths`) and the user can edit on the card. Hive **pre-fills** it from what
+  `paths`), and the user when they submit it (below). Hive **pre-fills** it from what
   it saw: edits by the card's agents through Hive's hooks and file locks, and deliverable writes the watcher saw while
   that agent's turn ran and no other agent or the user was active in the folder. Everything else written in the
   deliverables since the card started (a formatter's output during overlapping turns, the user's editor, a
-  hooks-free session, §16.15) is listed at submit as **unclaimed changes**, for the builder to add or leave out, and
-  in the Version Control tab for the user. Hooks only make the pre-fill better; they are never needed for a
+  hooks-free session, §16.15) is listed at submit as **unclaimed changes**, for the builder (or the user who
+  submits it) to add or leave out. Hooks only make the pre-fill better; they are never needed for a
   correct revision. In a hooks-free session the list starts empty and the builder declares it.
   **Built (HI-2339)** for agents: the pre-fill sets the paths only while the card has none, so a code card's submit
   that gives no `paths` names, in its reply's warnings, its pre-fill beyond its paths (*its paths leave out files it
@@ -1557,9 +1557,18 @@ All Git calls go through the `git()` runner (`src/main/git.ts:47`); the two bypa
   the two refusals they explain, `submit.unchanged` and `submit.sameRevisionNote` (a refusal's `warnings`, in the Agent
   API's body and the hive tools' text). Nothing is claimed: to include them, the builder submits with `paths` listing
   every file of the work (or declares them). The paths cover a file when it is one of them or under one, as the file
-  system names them (`src` covers `src/x`, never `src-other/x`). Git cards and no-code cards are unchanged. **Not
-  built yet:** the user's surface (the window shows no card's paths, and a user's submit names nothing of this; the
-  Version Control tab listing above): HI-2352, by Darren's choice (HI-2339/r12, 2 Nov: "B", the agent side first).
+  system names them (`src` covers `src/x`, never `src-other/x`). Git cards and no-code cards are unchanged.
+  **Built (HI-2352)** for the user: their move that submits a started None code card (a drag or **Move to** from
+  Doing, or back from On Hold to Doing, to Review or past it: §16.8.4's submit step) first asks, when its paths
+  leave files out (counted as above: its paths, else its pre-fill; its pre-fill beyond them, then the unclaimed
+  changes), **Include files {card}'s paths leave out?**, listing every file, with **Include Them** (submitted with
+  `paths` = its paths and those files, kept as its paths), **Leave Them Out** (submitted as it is) and Cancel
+  (nothing written). The question is read-only (`tasks:move` replies `leftOut`; the runtime's `Ask` carries it with
+  no rules), comes before the rules a move would skip, and the choice goes with that question's confirm too. It
+  says a changed file may be another card's or the user's own. Nothing else asks: a drag from Todo (started in the
+  same move: nothing changed since), a move to Done (a move, not a submission: Solo's), the Assistant's moves and
+  agents' intents (their warnings, above). **Not built:** the window shows no card's paths, and has no editor for
+  them; the Version Control tab lists no unclaimed changes.
 - **Revision:** SHA-256 over the sorted list of (relative path, SHA-256 of content, or "deleted") of **the card's
   paths** (a folder means every deliverable file under it), together with the path list itself. It can be computed
   **at any time** from the card's current paths, not only at submit: a check run computes it when it starts and ends
