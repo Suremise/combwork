@@ -1638,7 +1638,7 @@ export function BoardView() {
           {tr(TASK_BOARD)}
           {project !== null && <span className="faint"> · {project || tr(msg({ id: 'board.view.workspaceCards', defaultMessage: 'workspace cards', description: "After the Task Board's title when the sidebar shows the cards of no project (about the whole workspace). Lower case." }))}</span>}
         </h1>
-        <span className="faint">{tr(msg({ id: 'board.view.intro', defaultMessage: 'Plan work as cards, start them on agents, and see where each one is. Agents put finished work in Review, and reviewers move what passes to Approved.', description: 'Under the Task Board\'s title. Review and Approved are board columns.' }))}</span>
+        <span className="faint">{tr(msg({ id: 'board.view.intro', defaultMessage: 'Plan work as cards, start them on agents, and see where each one is on its way to Done.', description: 'Under the Task Board\'s title, whatever the workflow (HI-2341: some have no Review or Approved). Done is the board\'s last column, in every workflow.' }))}</span>
       </div>
       <BoardToolbar project={project} query={query} setQuery={(q) => set({ boardQuery: q })} archived={archived} setArchived={(v) => set({ boardArchived: v })} forYouOnly={forYouOnly} setForYouOnly={(v) => set({ boardForYou: v })} />
       <Board project={project} query={query} archived={archived} forYouOnly={forYouOnly} />

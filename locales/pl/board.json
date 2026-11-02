@@ -912,7 +912,7 @@
   "board.upgrade.notNow": "Nie teraz",
   "board.upgrade.upgrade": "Uaktualnij",
   "board.upgrade.upgrading": "Uaktualnianie…",
-  "board.view.intro": "Planuj pracę jako karty, uruchamiaj je na agentach i sprawdzaj, gdzie jest każda z nich. Agenci przekazują skończoną pracę do Recenzji, a recenzenci przenoszą to, co przejdzie, do Zatwierdzonych.",
+  "board.view.intro": "Planuj pracę jako karty, uruchamiaj je na agentach i sprawdzaj, gdzie jest każda z nich w drodze do Gotowych.",
   "board.view.noWorkspace": "Otwórz obszar roboczy, aby zobaczyć jego tablicę zadań.",
   "board.view.title": "Tablica zadań",
   "board.view.workspaceCards": "karty obszaru roboczego",

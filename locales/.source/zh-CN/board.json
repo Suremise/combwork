@@ -914,7 +914,7 @@
   "board.upgrade.notNow": "Not Now",
   "board.upgrade.upgrade": "Upgrade",
   "board.upgrade.upgrading": "Upgrading…",
-  "board.view.intro": "Plan work as cards, start them on agents, and see where each one is. Agents put finished work in Review, and reviewers move what passes to Approved.",
+  "board.view.intro": "Plan work as cards, start them on agents, and see where each one is on its way to Done.",
   "board.view.noWorkspace": "Open a workspace to see its task board.",
   "board.view.title": "Task Board",
   "board.view.workspaceCards": "workspace cards",

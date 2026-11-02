@@ -912,7 +912,7 @@
   "board.upgrade.notNow": "Pas maintenant",
   "board.upgrade.upgrade": "Mettre à niveau",
   "board.upgrade.upgrading": "Mise à niveau…",
-  "board.view.intro": "Planifie le travail en cartes, confie-les à des agents et vois où en est chacune. Les agents placent le travail fini en Relecture, et les relecteurs déplacent ce qui est validé vers Validé.",
+  "board.view.intro": "Planifie le travail en cartes, confie-les à des agents et vois où en est chacune sur son chemin vers Terminé.",
   "board.view.noWorkspace": "Ouvre un espace de travail pour voir son tableau des tâches.",
   "board.view.title": "Tableau des tâches",
   "board.view.workspaceCards": "cartes de l’espace de travail",

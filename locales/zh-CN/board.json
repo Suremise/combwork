@@ -912,7 +912,7 @@
   "board.upgrade.notNow": "暂不",
   "board.upgrade.upgrade": "升级",
   "board.upgrade.upgrading": "正在升级…",
-  "board.view.intro": "把工作规划成卡片，交给智能体开始，并随时查看每张卡片的进展。智能体把完成的工作放到“评审”，评审者把通过的卡片移到“已批准”。",
+  "board.view.intro": "把工作规划成卡片，交给智能体开始，并随时查看每张卡片在走向“已完成”途中的进展。",
   "board.view.noWorkspace": "打开一个工作区以查看其任务看板。",
   "board.view.title": "任务看板",
   "board.view.workspaceCards": "工作区卡片",

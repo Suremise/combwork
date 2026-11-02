@@ -912,7 +912,7 @@
   "board.upgrade.notNow": "Nicht jetzt",
   "board.upgrade.upgrade": "Aktualisieren",
   "board.upgrade.upgrading": "Wird aktualisiert…",
-  "board.view.intro": "Plane Arbeit als Karten, starte sie mit Agenten und sieh, wo jede steht. Agenten legen fertige Arbeit in Review ab, und Reviewer verschieben, was besteht, nach Genehmigt.",
+  "board.view.intro": "Plane Arbeit als Karten, starte sie mit Agenten und sieh, wo jede auf ihrem Weg nach Erledigt steht.",
   "board.view.noWorkspace": "Öffne einen Arbeitsbereich, um sein Aufgabenboard zu sehen.",
   "board.view.title": "Aufgabenboard",
   "board.view.workspaceCards": "Karten des Arbeitsbereichs",

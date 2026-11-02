@@ -912,7 +912,7 @@
   "board.upgrade.notNow": "今はしない",
   "board.upgrade.upgrade": "アップグレード",
   "board.upgrade.upgrading": "アップグレード中…",
-  "board.view.intro": "作業をカードとして計画し、エージェントで開始して、各カードの状況を確認します。エージェントは終わった作業を「レビュー」に入れ、レビュアーは合格したものを「承認済み」に移動します。",
+  "board.view.intro": "作業をカードとして計画し、エージェントで開始して、「完了」までの各カードの状況を確認します。",
   "board.view.noWorkspace": "タスクボードを表示するには、ワークスペースを開いてください。",
   "board.view.title": "タスクボード",
   "board.view.workspaceCards": "ワークスペースのカード",
