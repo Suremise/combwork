@@ -276,6 +276,22 @@ function ValueBox({ def, value, label, placeholder, onCommit }: { def: AdvancedD
   const shown = (v: unknown): string => (v === null || v === undefined ? '' : Array.isArray(v) ? v.join(', ') : String(v))
   const [draft, setDraft] = useState(shown(value))
   useEffect(() => setDraft(shown(value)), [value])
+  // A workspace's own switch or choice (HI-2344): a select whose first option follows Settings' value (null, so no
+  // override), shown as that value, then each value; a bare switch couldn't show inheriting or go back to it.
+  if (placeholder !== undefined && (def.kind === 'boolean' || def.kind === 'choice')) {
+    const options = def.kind === 'boolean' ? [true, false] : (def.choices ?? []).map((c) => c.value)
+    const current = options.findIndex((o) => o === value)
+    return (
+      <select className="select" aria-label={label} value={current < 0 ? '' : String(current)} onChange={(e) => void onCommit(e.target.value === '' ? null : options[Number(e.target.value)]).catch(() => undefined)}>
+        <option value="">{placeholder}</option>
+        {options.map((o, i) => (
+          <option key={String(o)} value={String(i)}>
+            {advancedShown(def, o)}
+          </option>
+        ))}
+      </select>
+    )
+  }
   if (def.kind === 'boolean') return <Switch checked={value === true} label={label} onChange={(v) => void onCommit(v).catch(() => undefined)} />
   if (def.kind === 'choice')
     return (

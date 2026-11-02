@@ -5,7 +5,7 @@
 // valid in advanced.json listed as such, an override made for another CLI version flagged with Keep), changing a value
 // (marked modified, its default beside it, written to advanced.json, Reset), a value refused, advanced.json edited by
 // hand (the list follows; a number written as text read as the number), the developer switch and advanced.json as one
-// value, a workspace's own value (workspace.json), Agents per project gone (HI-2001), Settings' search and Modified only (Settings' and the list's), Copy
+// value, a workspace's own value (workspace.json) and its own switch inheriting Settings' (HI-2344), Agents per project gone (HI-2001), Settings' search and Modified only (Settings' and the list's), Copy
 // Diagnostics, and Reset all settings clearing advanced.json. The fake Claude Code (2.1.999) is the installed CLI; no
 // agent runs. Dev build, throwaway profile and workspace.
 const lib = require('./lib.cjs')
@@ -159,6 +159,30 @@ const readFile = () => JSON.parse(fs.readFileSync(file, 'utf8'))
     const state = await inv('advanced:state')
     check('the window uses it', state.workspace?.['hive.progress.lanesShown'] === 2, JSON.stringify(state.workspace))
     check("Settings' own value stays beside it", (await lanes.getByLabel('Hive: Progress panel: lanes shown', { exact: true }).inputValue()) === '6')
+
+    // --- A workspace's own switch (HI-2344): it inherits Settings' value and shows it, takes on and off, and goes back.
+    const resume = row('hive.restart.resumeAfterUpdate')
+    const resumeOwn = resume.getByLabel('Hive: Resume agents after an update, this workspace', { exact: true })
+    const wsOwn = () => (fs.existsSync(wsFile) ? JSON.parse(fs.readFileSync(wsFile, 'utf8')).advanced ?? {} : {})
+    const shownOwn = () => resumeOwn.evaluate((s) => s.options[s.selectedIndex].textContent)
+    check("a workspace's switch untouched inherits, showing Settings' value", (await resumeOwn.inputValue()) === '' && (await shownOwn()) === "on (Settings')" && !('hive.restart.resumeAfterUpdate' in wsOwn()), await shownOwn())
+    await resume.screenshot({ path: path.join(lib.WORK, 'advanced-ws-switch-inherited.png') })
+    await resumeOwn.selectOption({ label: 'off' })
+    check('…off goes in workspace.json as false', !!(await lib.until(() => wsOwn()['hive.restart.resumeAfterUpdate'] === false, HUNG_MS)), JSON.stringify(wsOwn()))
+    check('…and the window uses it', (await inv('advanced:state')).workspace?.['hive.restart.resumeAfterUpdate'] === false)
+    await resume.screenshot({ path: path.join(lib.WORK, 'advanced-ws-switch-off.png') })
+    await resumeOwn.selectOption({ label: 'on' })
+    check('…on as true', !!(await lib.until(() => wsOwn()['hive.restart.resumeAfterUpdate'] === true, HUNG_MS)), JSON.stringify(wsOwn()))
+    await resume.screenshot({ path: path.join(lib.WORK, 'advanced-ws-switch-on.png') })
+    await resumeOwn.selectOption({ index: 0 })
+    check('…and Settings\' choice takes it out of workspace.json', !!(await lib.until(() => !('hive.restart.resumeAfterUpdate' in wsOwn()), HUNG_MS)), JSON.stringify(wsOwn()))
+    check('…not in advanced.json either', !('hive.restart.resumeAfterUpdate' in readFile().values))
+    // Inheriting again, it follows a later change of Settings' value.
+    await resume.getByRole('switch').click()
+    check("…inheriting, it follows Settings' value changed afterwards", !!(await lib.until(async () => readFile().values['hive.restart.resumeAfterUpdate'] === false && (await shownOwn()) === "off (Settings')" && (await resumeOwn.inputValue()) === '', HUNG_MS)), await shownOwn())
+    check('…and stays out of workspace.json', !('hive.restart.resumeAfterUpdate' in wsOwn()))
+    await resume.getByRole('button', { name: /^Reset to default \(on\)/ }).click()
+    await lib.until(async () => !('hive.restart.resumeAfterUpdate' in readFile().values) && (await shownOwn()) === "on (Settings')", HUNG_MS)
 
     // Agents per project and its note moved to Version Control → Workflow (HI-2001): maxagents and agents24.
     check('Agents per project is no longer listed', (await page.locator('.advanced-row[data-advanced="hive.agents.perProject"]').count()) === 0)
