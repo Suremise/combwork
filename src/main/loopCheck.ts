@@ -7,7 +7,7 @@ import { agentReadsInbox } from './deliveries'
 import { onHiveEvent } from './events'
 import { coalesced } from './coalesce'
 import { createLogger, userText } from './logger'
-import { loopReviewerOf } from './loopReviewer'
+import { loopReviewerOf, poolCard } from './loopReviewer'
 import { sessions } from './sessions'
 import { allTasks, liveCardHeads } from './tasks'
 import { forYouOfCards } from './workflow/cardWork'
@@ -107,6 +107,17 @@ export interface LoopReach {
   reviewerOf: (n: number) => string | null
   /** Whether the card has an open For you request the agent asked (HI-2080): the user's answer is its loop wake. */
   asked?: (n: number) => boolean
+  /** Whether the card's lane is reviewed by the pool (poolCard; HI-2321): only its builder and its reviewer now are in its loop. */
+  pool?: (n: number) => boolean
+}
+
+/**
+ * A pool card's loop is its builder's and the reviewer the pool has for it now (`reviewerOf`, HI-2321): a reviewer the
+ * pool gave an earlier step or round to is out of it once the next goes to another (HI-2320: HR1 checked design s10, HR2
+ * its revision s19, and HR1 was flagged as not watching). Its own pool, whether a loop wake reaches it or not.
+ */
+function inPoolLoop(card: Pick<TaskCard, 'agent'>, agentId: string, reach: Pick<LoopReach, 'pool' | 'reviewerOf'>, n: number): boolean {
+  return !reach.pool?.(n) || card.agent === agentId || reach.reviewerOf(n) === agentId
 }
 
 /**
@@ -118,10 +129,11 @@ export interface LoopReach {
  * - a card with an open For you request it asked (`hive_ask_user`, `hive_cannot_within_rules`; HI-2080): the user's
  *   answer, whatever the card's column or reviewer. Once answered or closed, the card is owed as before.
  * The rest is its own move (a builder's card in Doing, a step its reviewer must answer, a card in Review its reviewer
- * hasn't given a verdict on), or one no loop wake tells (no reviewer, loop wakes off, no inbox).
+ * hasn't given a verdict on), or one no loop wake tells (no reviewer, loop wakes off, no inbox). A pool card is owed
+ * only by its builder and its reviewer now (inPoolLoop), loop wakes or not.
  */
 export function owedCards(cards: readonly TaskCard[], project: string, agentId: string, watched: readonly number[], reach: LoopReach): number[] {
-  const inPlay = cardsInPlay(cards, project, agentId, watched)
+  const inPlay = cardsInPlay(cards, project, agentId, watched).filter((n) => inPoolLoop(cards.find((x) => x.number === n)!, agentId, reach, n))
   if (!reach.wakes) return inPlay
   return inPlay.filter((n) => {
     const c = cards.find((x) => x.number === n)!
@@ -165,19 +177,26 @@ function requestOpen(card: Pick<TaskCard, 'history' | 'comments' | 'agentName' |
 async function owedNow(loop: Loop): Promise<number[]> {
   const ws = workspaceOf(loop.projectPath)
   const project = basename(loop.projectPath)
-  const inPlay = cardsInPlay(await liveCardHeads(ws), project, loop.agentId, loop.cards)
+  const heads = await liveCardHeads(ws)
+  const inPlay = cardsInPlay(heads, project, loop.agentId, loop.cards)
   if (!inPlay.length) return []
+  // Pool cards (HI-2321): only its builder and its reviewer now are in its loop, so their reviewer is read either way.
+  const pooled = new Set(heads.filter((c) => inPlay.includes(c.number) && poolCard(ws, c)).map((c) => c.number))
+  const reviewers = new Map<number, string | null>()
+  const reviewerOf = (n: number): string | null => reviewers.get(n) ?? null
   // The project's loop wakes (its workflow option, HI-1766: loopWakes.ts' wakesOn, read as it reads it), and an inbox
   // to receive them (deliveries are refused without one).
   const wakes = agentReadsInbox(loop.projectPath, loop.agentId) && projectPreferences(ws, loop.projectPath, await ws.projectConfig(loop.projectPath).catch(() => null)).loopWakes
-  if (!wakes) return inPlay
+  if (!wakes) {
+    for (const c of heads) if (pooled.has(c.number)) reviewers.set(c.number, (await loopReviewerOf(ws, c).catch(() => null))?.id ?? null)
+    return owedCards(heads, project, loop.agentId, loop.cards, { wakes, reviewerOf, pool: (n) => pooled.has(n) })
+  }
   const cards = await allTasks(ws, { numbers: inPlay })
-  const reviewers = new Map<number, string | null>()
   for (const c of cards) reviewers.set(c.number, (await loopReviewerOf(ws, c).catch(() => null))?.id ?? null)
   // Its own questions for the user still open (HI-2080), from the board's For you as it is now.
   const open = forYouOfCards(ws, inPlay)
   const asked = (n: number): boolean => (open.get(n) ?? []).some((r) => r.asker === loop.agentId)
-  return owedCards(cards, project, loop.agentId, loop.cards, { wakes, reviewerOf: (n) => reviewers.get(n) ?? null, asked })
+  return owedCards(cards, project, loop.agentId, loop.cards, { wakes, reviewerOf, asked, pool: (n) => pooled.has(n) })
 }
 
 /** Starts an idle agent's grace before its owed cards are flagged (once: a timer running, or a flag made, waits). */
