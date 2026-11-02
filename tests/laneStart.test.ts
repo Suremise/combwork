@@ -5,7 +5,7 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 
 type Live = { status: string; sessionId: string }
-const state = vi.hoisted(() => ({ live: new Map<string, Live>(), calls: [] as string[], afterRecord: null as null | (() => void), enforced: false, options: null as unknown, recorded: [] as unknown[], briefs: [] as string[], onStart: null as null | ((id: string) => void), lanes: [] as unknown[], lanesHeld: null as null | Promise<void>, lend: { slot: 'slot-c' } as { slot: string } | { waiting: string }, slotWaits: [] as string[], waits: [] as unknown[], onGetTask: null as null | (() => void), beforeLaunch: null as null | ((agentId: string) => void), whileStopping: null as null | ((agentId: string) => void), pending: new Set<string>(), owed: [] as unknown[] }))
+const state = vi.hoisted(() => ({ live: new Map<string, Live>(), calls: [] as string[], afterRecord: null as null | (() => void), enforced: false, options: null as unknown, recorded: [] as unknown[], briefs: [] as string[], onStart: null as null | ((id: string) => void), lanes: [] as unknown[], lanesHeld: null as null | Promise<void>, lend: { slot: 'slot-c' } as { slot: string } | { waiting: string }, slotWaits: [] as string[], waits: [] as unknown[], onGetTask: null as null | (() => void), beforeLaunch: null as null | ((agentId: string) => void), whileStopping: null as null | ((agentId: string) => void), pending: new Set<string>(), owed: [] as unknown[], noCode: [] as number[] }))
 
 vi.mock('../src/main/sessions', () => ({
   sessions: {
@@ -98,6 +98,8 @@ vi.mock('../src/main/tasks', () => ({
   }
 }))
 vi.mock('../src/main/workflow/service', () => ({ workflowEnforced: () => state.enforced }))
+// Each card's kind (HI-2338): `state.noCode`'s are no-code, the rest code.
+vi.mock('../src/main/workflow/cardWork', () => ({ openCardsNoCode: (_ws: unknown, ns: number[]) => ns.length > 0 && ns.every((n) => state.noCode.includes(n)) }))
 vi.mock('../src/main/workflow/rulesets', () => ({ resolvedOf: () => ({ options: state.options }) }))
 
 const { checkLanePool, launchFresh, launchRecordedLane, laneStartInfo, recordedLaneNote, resumeLaneBuilder, startLaneFromWindow, startWaitingLane } = await import('../src/main/laneStart')
@@ -128,6 +130,7 @@ beforeEach(() => {
   state.onGetTask = null
   state.beforeLaunch = null
   state.whileStopping = null
+  state.noCode = []
 })
 
 describe('Start Lane… with the reviewer pool (#1443)', () => {
@@ -348,6 +351,26 @@ describe('a lane the Assistant or a script starts over stopped agents (HI-1900)'
     expect(state.slotWaits).toEqual(['lane-9'])
     expect(state.waits).toEqual([expect.objectContaining({ stoppedOnly: true })])
     expect(recordedLaneNote(l)).toBe('No slot is free (every working slot is taken): the lane waits for one, and its stopped agents start once it is lent.')
+  })
+
+  it('in slots, its cards all no-code (HI-2338): no slot lent, both start where they are, the brief naming the project folder', async () => {
+    recorded()
+    inSlots()
+    state.noCode = [1, 2]
+    state.lend = { waiting: 'every working slot is taken' }
+    const l = await launchRecordedLane(ws, ALPHA, 'lane-9')
+    expect(state.calls).toEqual(['start b2', 'start r1'])
+    expect(state.slotWaits).toEqual([])
+    expect(state.briefs[0]).toContain('B2 works in the project folder')
+    expect(recordedLaneNote(l)).toBe("Started B2 and R1 with the lane's brief.")
+  })
+
+  it('in slots, one of its cards code (HI-2338): lent its slot first, as before', async () => {
+    recorded()
+    inSlots()
+    state.noCode = [1]
+    await launchRecordedLane(ws, ALPHA, 'lane-9')
+    expect(state.calls).toEqual(['lend lane-9', 'start b2', 'start r1'])
   })
 
   it('outside slots: both start in a fresh conversation with the brief', async () => {
@@ -593,5 +616,43 @@ describe("a running lane the Assistant or a script updates while its builder is 
     expect(state.calls).toEqual(['start b2'])
     expect(await resumeLaneBuilder(ALPHA, lane)).toBe('')
     expect(state.calls).toEqual(['start b2'])
+  })
+})
+
+describe('Start Lane… of only no-code cards, in slots (HI-2338)', () => {
+  const inSlots = (): void => {
+    state.enforced = true
+    state.options = { ...allOff('git'), review: 'agent', folder: 'slots' }
+  }
+
+  it('every slot lent: nothing is lent or waited for, both start where they are, the brief naming the project folder', async () => {
+    inSlots()
+    state.noCode = [1, 2]
+    state.lend = { waiting: 'every working slot is taken' }
+    const r = await startLaneFromWindow(ws, 'D:\\ws\\alpha', { builder: 'b2', reviewer: 'r1', cards: [1, 2] })
+    expect(state.calls).toEqual(['record', 'start b2', 'start r1'])
+    expect(r.waitingForSlot).toBeUndefined()
+    expect(r.slot).toBeUndefined()
+    expect(state.slotWaits).toEqual([])
+    expect(state.briefs[0]).toContain('B2 works in the project folder')
+  })
+
+  it('one code card among them: the lane is lent its slot before its agents start, or waits for one, as before', async () => {
+    inSlots()
+    state.noCode = [1]
+    expect((await startLaneFromWindow(ws, 'D:\\ws\\alpha', { builder: 'b2', reviewer: 'r1', cards: [1, 2] })).slot).toBe('slot-c')
+    expect(state.calls).toEqual(['record', 'lend lane-1', 'start b2', 'start r1'])
+    state.calls.length = 0
+    state.live.clear()
+    state.lend = { waiting: 'every working slot is taken' }
+    expect((await startLaneFromWindow(ws, 'D:\\ws\\alpha', { builder: 'b2', reviewer: 'r1', cards: [1, 2] })).waitingForSlot).toBe('every working slot is taken')
+    expect(state.calls).toEqual(['record', 'lend lane-1'])
+  })
+
+  it('outside slots, or Solo: no-code or not, nothing is lent', async () => {
+    state.enforced = true
+    state.options = { ...allOff('git'), review: 'agent', folder: 'project' }
+    await startLaneFromWindow(ws, 'D:\\ws\\alpha', { builder: 'b2', reviewer: 'r1', cards: [1, 2] })
+    expect(state.calls).toEqual(['record', 'start b2', 'start r1'])
   })
 })

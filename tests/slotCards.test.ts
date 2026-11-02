@@ -49,6 +49,8 @@ const state = vi.hoisted(() => ({
   waitingLooks: 0,
   /** The lanes waiting for a slot, as the pass reads them. */
   waiting: [] as unknown[],
+  /** Cards that are no-code: a waiting lane whose cards are all of them takes no slot (HI-2338, noCodeOnly). */
+  noCode: [] as number[],
   /** The pool's own, over the stand-in's (a lend held, say). */
   pool: {} as Record<string, unknown>,
   /** The slots' log, as `<level> <line>`. */
@@ -154,7 +156,8 @@ vi.mock('../src/main/lanes', async (orig) => ({
 }))
 vi.mock('../src/main/laneStart', async (orig) => ({
   ...(await orig<object>()),
-  startWaitingLane: async (_ws: unknown, _p: string, lane: string) => (state.calls.push(`start lane ${lane}`), true)
+  startWaitingLane: async (_ws: unknown, _p: string, lane: string, slot: string | null) => (state.calls.push(`start lane ${lane}${slot ? '' : ' with no slot'}`), true),
+  noCodeOnly: (_ws: unknown, cards?: number[]) => !!cards?.length && cards.every((c) => state.noCode.includes(c))
 }))
 vi.mock('../src/main/logger', async (orig) => {
   const actual = await orig<typeof import('../src/main/logger')>()
@@ -259,7 +262,7 @@ afterEach(() => {
   env?.close()
   env = null
   resetAgentStartsForTests()
-  Object.assign(state, { enforced: true, afterList: null, afterRemove: null, restoreFails: false, live: null, slot: '', deliveries: [], next: [], calls: [], wf: null, deleteOn: true, lanes: null, waitingLooks: 0, waiting: [], pool: {}, logged: [], conv: { is: 'none' }, starts: [], resuming: false, convFails: false, busy: null, quietAt: null, freeAfterLook: null, held: null, heldLooks: 0, freeAfterHeldLook: false })
+  Object.assign(state, { enforced: true, afterList: null, afterRemove: null, restoreFails: false, live: null, slot: '', deliveries: [], next: [], calls: [], wf: null, deleteOn: true, lanes: null, waitingLooks: 0, waiting: [], noCode: [], pool: {}, logged: [], conv: { is: 'none' }, starts: [], resuming: false, convFails: false, busy: null, quietAt: null, freeAfterLook: null, held: null, heldLooks: 0, freeAfterHeldLook: false })
 })
 
 /**
@@ -1482,6 +1485,47 @@ describe('Hive quitting (#1628)', { timeout: 60_000 }, () => {
     await pass
     expect(state.calls).toEqual([])
     expect(state.logged.filter((l) => l.startsWith('warn'))).toEqual([])
+  })
+
+  it('a lane waiting for a slot whose cards are all no-code by now (HI-2338): started with no slot, nothing lent, its wait cleared; one with a code card is lent one', async () => {
+    const e = (env = setup({ platform: 'git', review: 'none', finish: 'agentMerges', folder: 'slots', target: 'main' }, { autoRun: false }))
+    state.wf = e.wf
+    state.noCode = [7, 8]
+    state.waiting = [
+      { id: 'lane-1', project: 'project', builder: { id: 'b1', name: 'B1' }, cards: [7, 8], slotWait: { since: '2026-10-25T00:00:00.000Z' } },
+      { id: 'lane-2', project: 'project', builder: { id: 'b2', name: 'B2' }, cards: [8, 9], slotWait: { since: '2026-10-25T00:01:00.000Z' } }
+    ]
+    const lent: string[] = []
+    state.pool = {
+      leaseOf: () => null,
+      leasesOf: () => [],
+      lend: async (o: { lane: string }) => (lent.push(o.lane), { ok: true, lease: { id: 'l-9', slot: 'slot-a' }, slot: { name: 'slot-a' } })
+    }
+    const ws = { path: e.home, lifetime: { aborted: false }, info: () => ({ projects: [{ name: 'project', path: e.project }] }), projectConfig: async () => ({ agents: [] }) } as never
+    await settleSlotCards(ws, e.project)
+    expect(lent).toEqual(['lane-2'])
+    expect(state.calls).toEqual(['start lane lane-1 with no slot', 'lane lane-1 waits no more', 'start lane lane-2', 'lane lane-2 waits no more'])
+  })
+
+  it("every slot lent, a code lane waiting first (HR1 on HI-2338): a later no-code lane still starts with no slot, the code lanes keep waiting, and no later one is lent", async () => {
+    const e = (env = setup({ platform: 'git', review: 'none', finish: 'agentMerges', folder: 'slots', target: 'main' }, { autoRun: false }))
+    state.wf = e.wf
+    state.noCode = [8]
+    state.waiting = [
+      { id: 'lane-a', project: 'project', builder: { id: 'b1', name: 'B1' }, cards: [7, 8], slotWait: { since: '2026-10-25T00:00:00.000Z' } },
+      { id: 'lane-b', project: 'project', builder: { id: 'b2', name: 'B2' }, cards: [8], slotWait: { since: '2026-10-25T00:01:00.000Z' } },
+      { id: 'lane-c', project: 'project', builder: { id: 'b3', name: 'B3' }, cards: [9], slotWait: { since: '2026-10-25T00:02:00.000Z' } }
+    ]
+    const lends: string[] = []
+    state.pool = {
+      leaseOf: () => null,
+      leasesOf: () => [],
+      lend: async (o: { lane: string }) => (lends.push(o.lane), { ok: false, refusal: { why: 'noSlot' } })
+    }
+    const ws = { path: e.home, lifetime: { aborted: false }, info: () => ({ projects: [{ name: 'project', path: e.project }] }), projectConfig: async () => ({ agents: [] }) } as never
+    await settleSlotCards(ws, e.project)
+    expect(lends).toEqual(['lane-a'])
+    expect(state.calls).toEqual(['start lane lane-b with no slot', 'lane lane-b waits no more'])
   })
 
   it('a pass that never ends holds the quit only for its bound', async () => {

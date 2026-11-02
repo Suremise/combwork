@@ -262,6 +262,19 @@ export function cardKind(ws: WorkspaceService, n: number): { kind: CardKind; kin
   })
 }
 
+/**
+ * Whether the cards still to do among `numbers` (not Done, not archived) are all no-code, and there is one (HI-2338: a
+ * lane of only no-code cards takes no slot as it starts). One read; false on a board waiting for its 1.0 upgrade.
+ */
+export function openCardsNoCode(ws: WorkspaceService, numbers: readonly number[]): boolean {
+  if (!numbers.length) return false
+  return boardRead(ws, (db) => {
+    if (!hasFacts(db)) return false
+    const rows = db.prepare(`SELECT kind FROM cards WHERE number IN (${numbers.map(() => '?').join(', ')}) AND col <> 'done' AND archived = 0`).all(...numbers) as { kind: CardKind }[] // i18n-ignore: SQL
+    return rows.length > 0 && rows.every((r) => r.kind === 'no-code')
+  })
+}
+
 /** Whether a card skips review and an open proposal of it (#1625), from its facts; null on a board waiting for its 1.0 upgrade. */
 export function cardReviewSkip(ws: WorkspaceService, n: number): ReturnType<typeof reviewSkipOf> | null {
   return boardRead(ws, (db) => {

@@ -10,7 +10,9 @@
 //    line, merged, is deleted (LineDeleted on card 1);
 // 3. with one slot (Maximum agents: 1), a second lane waits ("waiting for a slot", paused) and starts in slot-a once
 //    the first ends, its builder there; the first's builder is stopped. HI-2335: meanwhile, slot-a lent, a generalist
-//    in the project folder starts a no-code card there, and its code card is still refused start.slotAvailable;
+//    in the project folder starts a no-code card there, and its code card is still refused start.slotAvailable.
+//    HI-2338: a third lane, of only no-code cards, starts at once with no slot (not waiting, nothing lent, its agents in
+//    the project folder), and its no-code card is Done there; its next card, made code, waits for a slot at its start;
 // 4. HI-2014 (Legible's LE-249): the second lane's card 3, committed and not merged, moved to Done by the user's override:
 //    slot-a leaves its line (detached at the target's head), the line kept; card 4, which depends on it, is told it
 //    starts without card 3's work, and starts as the lane's next card in slot-a.
@@ -114,6 +116,9 @@ const installs = () => (fs.existsSync(setupLog) ? fs.readFileSync(setupLog, 'utf
     const r2 = await lib.addAgent(inv, alpha, { name: 'R2', workflowRole: 'reviewer' })
     // HI-2335's generalist (step 3), never counted in the pool's size.
     const g1 = await lib.addAgent(inv, alpha, { name: 'G1', workflowRole: 'generalist' })
+    // HI-2338's lane of only no-code cards (step 3).
+    const b3 = await lib.addAgent(inv, alpha, { name: 'B3', workflowRole: 'builder' })
+    const r3 = await lib.addAgent(inv, alpha, { name: 'R3', workflowRole: 'reviewer' })
     // One slot for the project: its pool is its builders, at most its Maximum agents (HI-2001).
     await lib.setMaxAgents(inv, 1)
     const live = async (id) => (await inv('session:live')).find((s) => same(s.projectPath, alpha) && s.agentId === id) ?? null
@@ -154,6 +159,9 @@ const installs = () => (fs.existsSync(setupLog) ? fs.readFileSync(setupLog, 'utf
     const cN = (await inv('tasks:create', { title: 'Decide the names', project: 'alpha', kind: 'no-code' })).number
     const cG = (await inv('tasks:create', { title: 'Write it down', project: 'alpha', kind: 'no-code' })).number
     const cGc = (await inv('tasks:create', { title: 'Code meanwhile', project: 'alpha' })).number
+    // HI-2338: the third lane's cards, both no-code as it starts.
+    const cL1 = (await inv('tasks:create', { title: 'Name the release', project: 'alpha', kind: 'no-code' })).number
+    const cL2 = (await inv('tasks:create', { title: 'Later made code', project: 'alpha', kind: 'no-code' })).number
     const key = (await card(c1)).key.split('-')[0]
     const line = (n, slug) => `hive/${key}/${key}-${n}-${slug}`
 
@@ -262,6 +270,25 @@ const installs = () => (fs.existsSync(setupLog) ? fs.readFileSync(setupLog, 'utf
     const sGc = await intent(tg1, cGc, 'start')
     check('…while its code card still waits for a slot (start.slotAvailable)', sGc.status === 409 && sGc.body?.rule === 'start.slotAvailable' && (await card(cGc))?.column === 'todo', JSON.stringify(sGc.body))
     check('G1 puts its no-code card back: nothing of a slot to give back', (await intent(tg1, cG, 'put-back', { why: 'done looking' })).status === 200 && (await slotNow())?.lease?.lane === started.lane.id)
+    // HI-2338: every slot still lent, a lane of only no-code cards from the window starts at once, with no slot.
+    const third = await inv('lanes:start', alpha, { builder: b3.id, reviewer: r3.id, cards: [cL1, cL2] })
+    check('a lane of only no-code cards starts with every slot lent: not waiting, no slot, both agents started', !third.waitingForSlot && !third.slot && third.started.length === 2 && third.started.every((s) => s.how !== 'failed'), JSON.stringify(third))
+    const thirdNow = await lane(third.lane.id)
+    check("…its lane neither paused nor 'waiting for a slot', and names no slot", thirdNow?.state === 'active' && thirdNow?.status?.reason !== 'slot' && !thirdNow?.slot, JSON.stringify(thirdNow))
+    check('…B3 and R3 run in the project folder', !!(await until(async () => same((await live(b3.id))?.cwd, alpha) && same((await live(r3.id))?.cwd, alpha), HUNG_MS)), JSON.stringify([await live(b3.id), await live(r3.id)]))
+    check("…slot-a still the first lane's, no other lent", (await slotNow())?.lease?.lane === started.lane.id && (await slots()).filter((x) => x.lease).length === 1, JSON.stringify(await slots()))
+    const tb3 = await tokenOf(b3.id)
+    const tr3 = await tokenOf(r3.id)
+    // Its first card: B3's own start, or Hive's for the lane's next card (HI-1990) landing first.
+    check("the lane's no-code card starts where B3 is", (await until(async () => ((await card(cL1))?.column === 'doing' ? true : (await intent(tb3, cL1, 'start')).status === 200 || null), HUNG_MS)) === true && (await inv('tasks:facts', cL1)).findLast((f) => f.kind === 'Started')?.data?.folder === 'project', JSON.stringify(await inv('tasks:facts', cL1)))
+    // A code card comes up later in it: its next card made code (the user's change).
+    await inv('tasks:setKind', cL2, 'code', { confirm: true, reason: 'It needs a change after all' })
+    check('B3 submits it; R3 passes it: Done, nothing merged', (await intent(tb3, cL1, 'submit', { summary: 'Release: named' })).status === 200 && (await intent(tr3, cL1, 'start-review')).status === 200 && (await intent(tr3, cL1, 'verdict', { pass: true, comment: 'Release name: fine' })).status === 200 && !!(await until(async () => (await card(cL1))?.column === 'done', HUNG_MS)), JSON.stringify(await card(cL1)))
+    const sL2 = await intent(tb3, cL2, 'start')
+    check('…its next card, now code, is lent a slot at its start: none free, it waits (start.slotAvailable)', sL2.status === 409 && sL2.body?.rule === 'start.slotAvailable' && (await card(cL2))?.column === 'todo' && (await slotNow())?.lease?.lane === started.lane.id, JSON.stringify(sL2.body))
+    // Ended here, so slot-a goes to the second lane as the first ends.
+    await inv('lanes:end', third.lane.id, true)
+    check('the third lane is ended', !!(await until(async () => !!(await lane(third.lane.id))?.endedAt, HUNG_MS)))
     const rev2 = commitIn(slotA, { 'two.txt': 'two\n' }, 'Slot two')
     check('B1 submits card 2; R1 passes it', (await intent(tb1, c2, 'submit', { summary: 'Slot two: ready' })).status === 200 && (await intent(tr1, c2, 'start-review')).status === 200 && (await intent(tr1, c2, 'verdict', { pass: true, comment: 'Slot two: passed' })).status === 200)
     check('card 2 merged: the first lane ends', !!(await until(async () => (await card(c2))?.column === 'done' && !!(await lane(started.lane.id))?.endedAt, HUNG_MS)) && isIn(rev2, 'integration'))

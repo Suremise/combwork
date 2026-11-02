@@ -4198,10 +4198,18 @@ Whether a conversation may resume there is its **hold** (none: it may):
   *no folder of its own*: its agent stays where it runs (the project folder, or a lane's kept slot), and no line is made
   or prepared. Its lane's dispatch lease isn't taken or ended by it (a lane's lease ends with the lane), and putting it
   back has no lease to give back. Code cards are unchanged. Solo (F = project) and no version control never lend, so
-  they start as before. **Not covered:** a lane started from the window still waits for a slot when every one is lent,
-  even when all its cards are no-code (HI-2338); and a no-code card made code while Active (the user's or the
-  Assistant's override, §16.7.3) keeps its project-folder start until it is put back and started again, which lends it
-  a slot.
+  they start as before. **Not covered:** a no-code card made code while Active (the user's or the Assistant's override,
+  §16.7.3) keeps its project-folder start until it is put back and started again, which lends it a slot.
+- **A lane of only no-code cards takes no slot** [HI-2338; Darren, 2 Nov, "as recommended"]: a lane whose cards still to
+  do (not Done, not archived) are all no-code (`openCardsNoCode`, one board read, no await) is lent nothing as it starts,
+  from the window (`startLaneFromWindow`) or recorded by the Assistant or a script (`launchRecordedLane`): it records no
+  `slotWait`, and its agents start where they are (the project folder by default; the brief says so). A lane already
+  waiting for a slot whose cards are all no-code by now is started the same way by slotCards' waiting-lanes pass, its
+  wait cleared, nothing lent, even behind a code lane waiting before it: once no slot can be lent, the pass lends no
+  later lane one but still starts those that need none [HR1's round 1]. A code card coming up later in it (added, or made code) is lent the lane's slot as it
+  starts (`leaseForStart`), as a lane an agent registers is at its first card: none free, that start waits
+  (`start.slotAvailable`). A board with no kinds (waiting for its 1.0 upgrade) lends as before. Solo and no version
+  control are unchanged.
 - **The line** is `hive/<KEY>/<card key>-<slug>` (slug: the title folded to ASCII, lower case letters, digits and
   hyphens, at most 40), from the target's head; a line the card already has (started again after being put back) is
   checked out as it is, its base where it left the target. The spike's `.hive/slots` folders are its unit tests' only.
