@@ -1126,7 +1126,7 @@ const SOURCES: readonly AdvancedSource[] = [
     title: msg({ id: 'settings.advanced.hive.none.baselineSeconds.title', defaultMessage: 'No version control: longest read of the project', description: "An advanced setting's title (Settings → Advanced), listed under Hive, followed by its value in seconds (\"120 s\"). In a project without version control, Hive reads every file of the project in the background when a card starts." }),
     desc: msg({
       id: 'settings.advanced.hive.none.baselineSeconds.desc',
-      defaultMessage: "In a project without version control, Hive reads the project's files in the background when a card starts, and when it is submitted, to find what changed outside the card's files. A read that takes longer than this is stopped: the card starts or is submitted without that list.",
+      defaultMessage: "In a project without version control, Hive reads the project's files in the background when a card starts, when it is submitted, and when a check of it starts and ends, to find what changed outside the card's files. A read that takes longer than this is stopped: the card starts or is submitted without that list, and the check doesn't count.",
       description: 'What the advanced setting "No version control: longest read of the project" does (Settings → Advanced, under Hive).'
     }),
     kind: 'number',

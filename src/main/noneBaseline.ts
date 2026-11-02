@@ -6,7 +6,7 @@ import { advanced } from './advanced'
 import { createLogger, userText } from './logger'
 import type { NoneAdapter } from './platform/none'
 import type { Maybe } from './platform/types'
-import type { BaselineReply, BaselineRequest } from './noneBaselineWorker'
+import type { BaselineReply, BaselineRequest, PointAnswer } from './noneBaselineWorker'
 import { bundledScriptExists, workerHere, workerStarted } from './workerThreads'
 
 const log = createLogger('noneBaseline')
@@ -23,11 +23,13 @@ const log = createLogger('noneBaseline')
  * - each worker has its own calls: when it errs or ends, they are answered with nothing, and a message from a worker
  *   ended or replaced is never taken for another's.
  * Nothing (`null`) means no answer: the caller goes on as with an unreadable project (no baseline, no unclaimed list).
+ * A None check's point (HI-2358, `readPoint`) goes through the same queue, worker, bound and endings, never shared and
+ * never dropped by a generation: each is its own moment of its own check.
  */
 export type BaselineAnswer = Maybe<Manifest> | null
 
 interface Waiter {
-  resolve: (a: BaselineAnswer) => void
+  resolve: (a: never) => void
   signal?: AbortSignal
   onAbort?: () => void
 }
@@ -39,6 +41,8 @@ interface Read {
   generation: number
   excluded: readonly string[]
   caseless: boolean
+  /** A None check's point (HI-2358): its declared paths, and whether to take the stat snapshot. */
+  point?: { paths: readonly string[]; snapshot: boolean }
   waiters: Set<Waiter>
 }
 
@@ -75,12 +79,27 @@ class BaselineThread {
     const r: Read = shared ?? { id: ++this.next, key, project, generation, excluded: [...excluded], caseless: none.caseless, waiters: new Set() }
     if (!shared) this.queue.push(r)
     return new Promise((resolve) => {
-      const w: Waiter = { resolve, signal }
+      const w: Waiter = { resolve: resolve as (a: never) => void, signal }
       if (signal) {
         w.onAbort = () => this.leave(r, w)
         signal.addEventListener('abort', w.onAbort, { once: true })
       }
       r.waiters.add(w)
+      this.pump()
+    })
+  }
+
+  /**
+   * A None check's point, off main's thread (HI-2358): its declared paths' revision and, when `snapshot`, the stat
+   * snapshot of every deliverable, on a fresh adapter as `runChecks` read them. Its own read, never shared or dropped;
+   * nothing (null) when no answer came (the worker ended, or the read took too long).
+   */
+  readPoint(p: { project: string; excluded: readonly string[]; caseless: boolean; paths: readonly string[]; snapshot: boolean }): Promise<PointAnswer | null> {
+    const id = ++this.next
+    const r: Read = { id, key: `point:${id}`, project: p.project, generation: Number.POSITIVE_INFINITY, excluded: [...p.excluded], caseless: p.caseless, point: { paths: [...p.paths], snapshot: p.snapshot }, waiters: new Set() }
+    this.queue.push(r)
+    return new Promise((resolve) => {
+      r.waiters.add({ resolve: resolve as (a: never) => void })
       this.pump()
     })
   }
@@ -104,7 +123,7 @@ class BaselineThread {
 
   private leave(r: Read, w: Waiter): void {
     if (!r.waiters.delete(w)) return
-    w.resolve(null)
+    w.resolve(null as never)
     // Nobody waits for it: a read not sent yet isn't (one in flight ends by itself, its answer to nobody).
     if (!r.waiters.size) this.queue = this.queue.filter((q) => q !== r)
   }
@@ -114,10 +133,10 @@ class BaselineThread {
     this.answer(r, null)
   }
 
-  private answer(r: Read, a: BaselineAnswer): void {
+  private answer(r: Read, a: BaselineAnswer | PointAnswer): void {
     for (const w of r.waiters) {
       if (w.signal && w.onAbort) w.signal.removeEventListener('abort', w.onAbort)
-      w.resolve(a)
+      w.resolve(a as never)
     }
     r.waiters.clear()
   }
@@ -133,7 +152,8 @@ class BaselineThread {
       i.timer = setTimeout(() => this.timedOut(i, r, ms), ms)
       i.timer.unref?.()
     }
-    i.send({ id: r.id, type: 'scan', project: r.project, excluded: r.excluded, caseless: r.caseless })
+    const what = { id: r.id, project: r.project, excluded: r.excluded, caseless: r.caseless }
+    i.send(r.point ? { ...what, type: 'point', paths: r.point.paths, snapshot: r.point.snapshot } : { ...what, type: 'scan' })
   }
 
   private timedOut(i: Instance, r: Read, ms: number): void {
@@ -222,6 +242,9 @@ let thread = new BaselineThread()
 
 /** A None project's whole-project manifest, read off main's thread (HI-2340). */
 export const readBaseline = (none: NoneAdapter, signal?: AbortSignal): Promise<BaselineAnswer> => thread.read(none, signal)
+
+/** A None check's point, read off main's thread (HI-2358): `BaselineThread.readPoint`. */
+export const readCheckPoint = (p: Parameters<BaselineThread['readPoint']>[0]): Promise<PointAnswer | null> => thread.readPoint(p)
 
 /** Tests: the worker from this script (a build of noneBaselineWorker.ts), or null for the default; a new thread. */
 export function useBaselineWorker(file: string | null, o: { timeoutMs?: number } = {}): BaselineThread {

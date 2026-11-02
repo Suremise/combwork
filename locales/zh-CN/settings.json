@@ -416,7 +416,7 @@
   "settings.advanced.hive.mcpCatalog.probeSeconds.title": "MCP 目录：检查此电脑的要求",
   "settings.advanced.hive.merge.lockWaitSeconds.desc": "当这台电脑上的另一个 Hive 正在向同一个仓库合并时，合并或对仓库分支的其他更改（拉取、切换分支、移动智能体的分支）等待多长时间。超过这个时间后不做任何更改，Hive 会说明是哪个 Hive 占用着仓库：请在它完成后重试。Hive 绝不会从仍在运行的 Hive 手中夺走仓库。",
   "settings.advanced.hive.merge.lockWaitSeconds.title": "合并：等待另一个 Hive",
-  "settings.advanced.hive.none.baselineSeconds.desc": "在没有版本控制的项目中，卡片开始和提交时，Hive 会在后台读取项目的文件，以找出卡片文件之外发生的更改。读取超过此时长会被停止：卡片将在没有该列表的情况下开始或提交。",
+  "settings.advanced.hive.none.baselineSeconds.desc": "在没有版本控制的项目中，卡片开始时、提交时，以及其检查开始和结束时，Hive 会在后台读取项目的文件，以找出卡片文件之外发生的更改。读取超过此时长会被停止：卡片将在没有该列表的情况下开始或提交，检查也不计入。",
   "settings.advanced.hive.none.baselineSeconds.title": "无版本控制：读取项目的最长时间",
   "settings.advanced.hive.notes.deliverWorkspaceNotes.desc": "每个智能体和 Hive Assistant 在启动时都会在指令中获得共享笔记 Workspace notes，无论使用哪种 CLI、在哪个文件夹中工作：这些是关于这台机器、不应写进任何已提交文件的笔记。项目的智能体获得面向所有人的部分和自己项目的章节。关闭后，或笔记为空时，从每个智能体的下一次会话起不再添加任何内容。",
   "settings.advanced.hive.notes.deliverWorkspaceNotes.title": "向智能体提供 Workspace notes",

@@ -1569,8 +1569,14 @@ All Git calls go through the `git()` runner (`src/main/git.ts:47`); the two bypa
   their content, and its kind (the evidence, again at the write), its column (`stillAt`), and the folders left out (the
   adapter's generation: a start read under others is gathered again, once; an unclaimed list is read again, else
   none). **A no-code card reads nothing of the project**: no baseline, no hash of its declared paths (its base is
-  none, its evidence its kind), and its unclaimed list is empty. A check's snapshot (`runChecks`) still walks the
-  project on main: HI-2358.
+  none, its evidence its kind), and its unclaimed list is empty. **A check's points too** (HI-2358): a None check's
+  start and end (`runChecks`' `checkStart` and `checkEnd`) read its declared paths' revision on a fresh adapter (cold:
+  the whole project for a card declaring `.`) and, at the start and where the watcher's record isn't complete at the
+  end, the stat snapshot of every deliverable, in the same worker (`readCheckPoint`: never shared or dropped, the same
+  bound and endings), in the same order as before: the start's after `t0` and before the command, the end's after the
+  watcher's record. The snapshot's lines are one function (`snapshotLine`), so a snapshot taken in the worker compares
+  exactly with one taken on main. No answer, or a walk that couldn't be read, is null, never an empty snapshot: the
+  run doesn't count (`revisionChanged`, or `changed`).
 - **Revision:** SHA-256 over the sorted list of (relative path, SHA-256 of content, or "deleted") of **the card's
   paths** (a folder means every deliverable file under it), together with the path list itself. It can be computed
   **at any time** from the card's current paths, not only at submit: a check run computes it when it starts and ends
