@@ -790,8 +790,10 @@ route('GET', '/v1/projects/:name', async ({ params }) => {
   return { ...(await projectSummary(p)), ...(unused ? { unusedWorktrees: unused } : {}) }
 })
 
+// A project agent turns only its own project on or off (HI-2330: another project is its own agents', the Assistant's and the user's).
 route('POST', '/v1/projects/:name/activate', async ({ params }) => {
   const p = projectByName(params[0])
+  ownProjectOnly(p, 'Activating a project')
   if (assistantCaller()) {
     return assistantChange('agents', `activate the project ${basename(p)}`, { kind: 'activate-project', project: basename(p) }, async () => {
       workspace.setActive(p, true)
@@ -806,6 +808,7 @@ route('POST', '/v1/projects/:name/activate', async ({ params }) => {
 
 route('POST', '/v1/projects/:name/deactivate', async ({ params }) => {
   const p = projectByName(params[0])
+  ownProjectOnly(p, 'Deactivating a project')
   assistantMay('agents', `deactivate the project ${basename(p)}`, { kind: 'deactivate-project', project: basename(p) })
   if (sessions.liveFor(p)) throw new HttpError(409, 'Stop the running session before deactivating the project')
   workspace.setActive(p, false)
