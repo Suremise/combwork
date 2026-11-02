@@ -724,7 +724,14 @@ const until = (fn, ms = 10000) => lib.until(fn, ms, 150)
       if (await dontResume.count()) await dontResume.first().click().catch(() => undefined)
       return !fs.existsSync(restartRecord) && (await dontResume.count()) === 0
     }, 30000)
-    check("the offer to resume the lanes' agents answered Don't Resume, and gone", !!answered, String(fs.existsSync(restartRecord)))
+    // Its outcome then shows for the usual time, counted only while the window is focused (Popups.tsx), and a test
+    // window never is: closed with its × as the user would (HI-2370).
+    const outcome = page2.locator('.toast.resolved .popup-close')
+    const closed = await until(async () => {
+      if (await outcome.count()) await outcome.first().click().catch(() => undefined)
+      return (await outcome.count()) === 0
+    }, 10000)
+    check("the offer to resume the lanes' agents answered Don't Resume, and gone", !!answered && !!closed, String(fs.existsSync(restartRecord)))
   }
   if (!(await until(async () => (await page2.locator('.progress-panel').count()) === 1, 5000))) await page2.locator('.progress-rail').click()
   const edge2 = page2.locator('.progress-lanes-edge')
