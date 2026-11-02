@@ -355,6 +355,33 @@ describe('None: what a submission leaves out of its paths is named (HI-2339)', (
     expect(warningsOf(r)).toEqual([expect.stringMatching(/: src-other\/z\.txt\./)])
   })
 
+  it("the project's root declared (., ./, .\\) covers every deliverable: nothing named; excluded folders stay out (HR1's round 1)", async () => {
+    const e = pairNone()
+    const card = e.wf.createCard({ title: 'Root' })
+    moved(await e.wf.start(card.key, B1))
+    put(e.project, 'src/a.txt', 'agent\n')
+    e.wf.noteEdit(card, 'src/a.txt')
+    put(e.project, 'lib/b.txt', 'user\n')
+    e.wf.noteWrite('lib/b.txt', { agents: [], user: true })
+    put(e.project, 'node_modules/x/index.js', 'installed\n')
+    e.wf.noteWrite('node_modules/x/index.js', { agents: [], user: true })
+    for (const root of ['.', './', '.\\']) {
+      const d = await e.wf.declarePaths(card.key, B1, [root])
+      if (isRefusal(d)) throw new Error(d.message)
+      expect(d.unclaimed, root).toEqual([])
+    }
+    // Its paths set (the root), none given: the pre-fill's src/a.txt is covered, so nothing is named.
+    const r = await e.wf.submit(card.key, B1, { summary: 'x' })
+    moved(r)
+    expect(warningsOf(r).join('\n')).not.toMatch(/leave out|neither its paths/)
+    const files = e.wf.state(card).latest!.files.map((f) => f.path)
+    expect(files).toEqual(expect.arrayContaining(['src/a.txt', 'lib/b.txt']))
+    expect(files.some((f) => f.startsWith('node_modules/'))).toBe(false)
+    // An empty path is no declaration of the root: it covers nothing.
+    expect(e.wf.none.covers([''], 'src/a.txt')).toBe(false)
+    expect(e.wf.none.covers(['.'], 'node_modules/x/index.js')).toBe(false)
+  })
+
   it('Solo with no version control: its submission (Done, no review) names what its paths leave out too', async () => {
     const e = (env = setup({ ...preset('none', 'solo'), preChecks: [] }, { files: { 'a.txt': 'a\n' } }))
     const card = e.wf.createCard({ title: 'Solo' })

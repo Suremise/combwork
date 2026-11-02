@@ -66,7 +66,8 @@ export class NoneAdapter {
   /**
    * Whether declared paths cover a file (HI-2339): it is one of them, or under one (a folder's files), as the file system
    * names them (`/` or `\`, `./`, a trailing `/`; on Windows any case). A sibling sharing a prefix (`src-other` beside
-   * `src`) isn't under it.
+   * `src`) isn't under it. The project's root (`.`, `./`, `.\`: a valid declaration, which the manifest walks whole)
+   * covers every deliverable, as its revision does; an empty path covers nothing (never a valid declaration: `inside`).
    */
   covers(paths: readonly string[], file: string): boolean {
     const norm = (p: string): string => {
@@ -76,7 +77,8 @@ export class NoneAdapter {
     const f = norm(file)
     return paths.some((p) => {
       const d = norm(p)
-      return !!d && (f === d || f.startsWith(`${d}/`))
+      if (!d) return NoneAdapter.inside(p) && this.isDeliverable(file)
+      return f === d || f.startsWith(`${d}/`)
     })
   }
 
