@@ -237,8 +237,10 @@ interface HiveMessageValues {
   'main.outcome.noLongerAsked': undefined
   'main.outcome.noLongerHeld': undefined
   'main.outcome.notResumed': undefined
+  'main.outcome.offerReplaced': undefined
   'main.outcome.openHereAgain': undefined
   'main.outcome.released': undefined
+  'main.outcome.resuming': undefined
   'main.outcome.runsAnother': undefined
   'main.outcome.stoppedAndResumed': undefined
   'main.outcome.updateInstalling': undefined
