@@ -92,27 +92,44 @@ const check = (name, ok, extra = '') => {
     /**
      * A lane started through the Agent API for an idle builder outside slots, which Hive gives it in a new conversation
      * whose first turn is the lane's brief (HI-2232). Quiet first (idle, nothing of Hive's being typed into it or waiting
-     * to be), so it is renewed at once, never left as it is mid-turn nor owed; then `renewed` once its new conversation is
-     * quiet again, before the suite types into it (HI-2251).
+     * to be), so it is renewed at once, never left as it is mid-turn nor owed; then `renewed` once its new conversation has
+     * had its brief's turn and is quiet again, before the suite types into it (HI-2251). Quiet alone isn't that turn over
+     * (HI-2350): Hive answers a hook before it handles it, so under load the brief's UserPromptSubmit can reach its status
+     * after the CLI has read its inbox, and the conversation looks ready, its input free and nothing waiting, while the
+     * brief runs: a line typed then is dropped (fake-dropped.jsonl). Its turn, over, is the brief done.
      */
     const quiet = async (a) => lib.agentQuiet(PORT, 'alpha', await live(a.id), workspaceToken)
     const laneOf = async (a, body) => {
       if (!(await lib.until(() => quiet(a), HUNG_MS, 200))) return { status: 0, body: `${a.name} wasn't quiet before its lane`, renewed: false, now: JSON.stringify(await live(a.id)) }
       const before = (await live(a.id))?.sessionId
       const r = await api(workspaceToken, 'POST', '/v1/lanes', body)
-      const renewed = !!(await lib.until(async () => (await live(a.id))?.sessionId !== before && (await quiet(a)), HUNG_MS, 200))
+      const briefDone = async () => {
+        const s = await live(a.id)
+        return !!s && s.sessionId !== before && s.turn?.state === 'over'
+      }
+      const renewed = !!(await lib.until(async () => (await briefDone()) && (await quiet(a)), HUNG_MS, 200))
       return { ...r, renewed, now: JSON.stringify(await live(a.id)) }
     }
     /**
      * Crosses the limit while idle (HI-1670): the transcript grows during the fake's turn, and Hive's 5-second look could
      * make the notice then (working: no button). So the limit is off (Never) while it pads, and back at 1 MB once its turn
-     * is over: the next look makes the notice, the agent idle.
+     * is over: the next look makes the notice, the agent idle. Its own turn (a new one) over, with the transcript past
+     * 1 MB as Hive's look read it: the pad taken, not another turn's end (HI-2350).
      */
     const pad = async (a) => {
       await inv('settings:update', { sessions: { transcriptWarnMB: 0 } })
       try {
-        await say(a, 'pad 1200')
-        return await lib.until(async () => (await live(a.id))?.status === 'finished', HUNG_MS, 300)
+        const turnBefore = (await live(a.id))?.turn?.id
+        await lib.sendPrompt(inv, lib.ptyKey(alpha, a.id), 'pad 1200', {
+          submitted: async () => {
+            const s = await live(a.id)
+            return !!s?.turn?.id && s.turn.id !== turnBefore
+          }
+        })
+        return await lib.until(async () => {
+          const s = await live(a.id)
+          return s?.status === 'finished' && !!s.turn?.id && s.turn.id !== turnBefore && s.turn.state === 'over' && (s.transcriptBytes ?? 0) > 1024 * 1024
+        }, HUNG_MS, 300)
       } finally {
         await inv('settings:update', { sessions: { transcriptWarnMB: 1 } })
       }
