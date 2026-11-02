@@ -55,6 +55,9 @@ const tracker = vi.hoisted(() => ({
   bound: (_run: string, _helper: string): boolean => true,
   reading: () => undefined as void,
   keeperForgotten: [] as string[],
+  /** HI-2313: its keeper's answer now (keeperObservation; by default none), and the Hives it was asked for. */
+  observe: async (_run: string): Promise<{ helper: string; members: Proc[]; more: number } | null> => null,
+  observeAsked: [] as string[],
   /** HI-2309: what the one rule (nothingHolds) says holds nothing: here, processes named as Windows Sandbox's broker. */
   idle: (list: Proc[]) => list.length > 0 && list.every((p) => /^WindowsSandboxServer(\.exe)?$/i.test(p.name))
 }))
@@ -78,6 +81,10 @@ vi.mock('../src/main/agentProcesses', async (orig) => ({
     tracker.keeperAsked.push(hive)
     tracker.reading()
     return tracker.keeper.get(run) ?? null
+  },
+  keeperObservation: async (run: string, hive: string) => {
+    tracker.observeAsked.push(hive)
+    return tracker.observe(run)
   },
   keeperStillBound: (run: string, helper: string) => tracker.bound(run, helper),
   nothingHolds: async (list: Proc[], more: number) => !more && tracker.idle(list),
@@ -610,6 +617,8 @@ describe("a gone Hive's writer settled by itself after a restart (HI-1886)", () 
     tracker.bound = () => true
     tracker.reading = () => undefined
     tracker.keeperForgotten.length = 0
+    tracker.observe = async () => null
+    tracker.observeAsked.length = 0
   })
   const node = { pid: 5150, name: 'node.exe', label: 'node serve.js', created: '133900000000000000' }
   const claude = { pid: 6160, name: 'claude.exe', label: 'claude', created: '133900000000000001' }
@@ -743,6 +752,81 @@ describe("a gone Hive's writer settled by itself after a restart (HI-1886)", () 
       } finally {
         off()
       }
+    })
+
+    // HI-2313: its keeper's answer now, asked of it (a receipt is a snapshot); the one rule decides on that answer alone.
+    describe('its keeper asked for its run now (HI-2313)', () => {
+      const broker = { pid: 7101, name: 'WindowsSandboxServer', label: 'WindowsSandboxServer', created: '133900000000000002' }
+
+      it("HR1's round 2 repro: a complete broker-only receipt, then its keeper unsure (a failed sweep, a writer joined): held, told once, nothing ended", async () => {
+        hostOn(false)
+        await plant('r-repro', { ended: true })
+        tracker.keeper.set('r-repro', { state: 'live', helper, members: [broker], more: 0 })
+        // The keeper can't say now (unsure, no answer, a foreign one): keeperObservation's null.
+        tracker.observe = async () => null
+        await pool.settleGoneWriters()
+        expect(writer()?.run).toBe('r-repro')
+        expect(tracker.observeAsked).toEqual([hive()])
+        expect(tracker.keeperForgotten).toEqual([])
+        expect(tracker.endedExactly).toEqual([])
+        // Its answer lists a writer beside the broker: held.
+        tracker.observe = async () => ({ helper, members: [broker, node], more: 0 })
+        await pool.settleGoneWriters()
+        expect(writer()?.run).toBe('r-repro')
+        // Or counts one it doesn't describe: held.
+        tracker.observe = async () => ({ helper, members: [broker], more: 1 })
+        await pool.settleGoneWriters()
+        expect(writer()?.run).toBe('r-repro')
+        await store.clearWriterRun('r-repro')
+      })
+
+      it('a current broker-only answer frees it at the sweep and at its own start; so does a current empty one', async () => {
+        hostOn(false)
+        await plant('r-now-broker', { ended: true })
+        tracker.keeper.set('r-now-broker', { state: 'live', helper, members: [broker], more: 0 })
+        tracker.observe = async (run) => (run === 'r-now-broker' ? { helper, members: [broker], more: 0 } : null)
+        await pool.settleGoneWriters()
+        expect(writer()).toBeNull()
+        expect(tracker.keeperForgotten).toEqual(['r-now-broker'])
+        expect(tracker.endedExactly).toEqual([])
+        // Empty now (its last receipt still "live"), asked by the agent's own start: its slot back. (The one rule holds
+        // nothing for no processes: nothingHolds' first case.)
+        const idle = tracker.idle
+        tracker.idle = (list) => list.length === 0 || idle(list)
+        try {
+          await plant('r-now-empty')
+          tracker.keeper.set('r-now-empty', { state: 'live', helper, members: [node], more: 0 })
+          tracker.observe = async (run) => (run === 'r-now-empty' ? { helper, members: [], more: 0 } : null)
+          const state = await start()
+          expect(writer()?.run).toBe(state.runId)
+          expect(tracker.keeperForgotten).toEqual(['r-now-broker', 'r-now-empty'])
+        } finally {
+          tracker.idle = idle
+        }
+      })
+
+      it('revoked, or the slot’s writer changed, while its keeper was being asked: not cleared', async () => {
+        hostOn(false)
+        await plant('r-pending', { ended: true })
+        tracker.keeper.set('r-pending', { state: 'live', helper, members: [broker], more: 0 })
+        tracker.observe = async () => {
+          tracker.bound = () => false
+          return { helper, members: [broker], more: 0 }
+        }
+        await pool.settleGoneWriters()
+        expect(writer()?.run).toBe('r-pending')
+        expect(tracker.keeperForgotten).toEqual([])
+        // Bound again, but the slot's writer replaced while the answer was on its way: the clear names the old run only.
+        tracker.bound = () => true
+        tracker.observe = async () => {
+          await plant('r-other', { ended: true })
+          return { helper, members: [broker], more: 0 }
+        }
+        await pool.settleGoneWriters()
+        expect(writer()?.run).toBe('r-other')
+        expect(tracker.keeperForgotten).toEqual([])
+        await store.clearWriterRun('r-other')
+      })
     })
 
     it('"ended": its own agent\'s start (a restart\'s resume) takes the slot back', async () => {

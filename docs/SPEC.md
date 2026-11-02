@@ -4022,14 +4022,31 @@ Whether a conversation may resume there is its **hold** (none: it may):
     - restored leftovers (#614): not listed at the start, and dropped by a later look;
     - the quit's record (`recordEndedLaunches`, HI-1886), which now also looks once at launches whose leftovers are
       listed;
-    - not a gone Hive's keeper (HI-2055; Darren's decision, 1 Nov ~23:25, after HR1's rounds 1 and 2): its `live`
-      receipt is a snapshot, never proof, since a writer may have joined after it while a later sweep or write of its
-      failed. Its slot stays held, and when the processes it lists that still run are only idle brokers by the rule, the
-      user is told once (a notice naming them, *slot-a is held by WindowsSandboxServer*: no Sandbox is running, so
-      releasing it is safe, with **Release Slot…**). Release Slot…'s question says the same (`HeldWriter.idleBrokers`)
-      and leaves "End these processes first" off. A receipt that describes only some of its members (its total above them)
-      is never called safe (`KeeperState.more`, HR1's round 3). The keeper's own `ended` is unchanged; its current answer is HI-2313,
-      after 1.0. Members are named without `.exe` (`ProcessName`), so the broker's name filter takes either form.
+    - a gone Hive's keeper, only by its answer now (HI-2313). Its `live` receipt is a snapshot, never proof, since a
+      writer may have joined after it while a later sweep or write of its failed (HI-2309, HR1's rounds 1 and 2). So the
+      next Hive asks the keeper itself:
+      - The keeper, once its Hive is gone, serves a named pipe, `\\.\pipe\hive-keeper-<pid>-<created>`, named after
+        its identity, which the run's binding names. Only this user's processes can open it, never a remote client, and
+        only as its first instance (one taken already, it serves nothing).
+      - It takes one client at a time, each asking one line, `observe <run>`, and reading its answer within 2 s, then
+        let go.
+      - Its answer is observed for the asking, by the same observation its states use (`Look`): a sweep sure of
+        everything and the job's membership read whole. That gives `now` with `observed: complete` and its members
+        (none: empty now), or `unsure` (a sweep or read that wasn't sure, or its ancestry let go unsure), or `unknown`
+        for a job it doesn't hold. Nothing a client sends ends or changes anything.
+      - `keeperObservation` asks the helper the run is bound to (unrevoked), within 5 s, and takes the answer only when
+        it is whole and its own: version 1, its run, that helper, the writer's Hive, `now`, `complete`, every member by
+        id, start time and name, its total no less than those described (console hosts counted, not listed).
+      - Then the rule decides on that answer alone (`nothingHolds`: nothing, or only idle brokers, each still running as
+        the same process). Settled, the clear checks the binding again inside its write, as for `ended`.
+      - No answer, any doubt, an extra or undescribed member: held. Then, when the processes its receipt lists that
+        still run are only idle brokers by the rule, the user is told once (a notice naming them, *slot-a is held by
+        WindowsSandboxServer*: no Sandbox is running, so releasing it is safe, with **Release Slot…**). Release Slot…'s
+        question says the same (`HeldWriter.idleBrokers`) and leaves "End these processes first" off. A receipt that
+        describes only some of its members (its total above them) is never called safe (`KeeperState.more`, HR1's
+        round 3).
+      - The keeper's own `ended` is unchanged. Members are named without `.exe` (`ProcessName`), so the broker's name
+        filter takes either form.
     The broker is never ended, and a job it is the last of is let go. The decision (a known list plus a confirmed
     "nothing it serves is running"):
     - A broker is known only by its executable's full path, asked of the helper by id and start time (`paths`:

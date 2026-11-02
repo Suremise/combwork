@@ -7,8 +7,10 @@ import { spawn, type ChildProcess, type ChildProcessWithoutNullStreams } from 'c
 import { existsSync, mkdirSync, readFileSync, rmSync, writeFileSync } from 'fs'
 import { createRequire } from 'module'
 import { join } from 'path'
+import { connect, type Socket } from 'net'
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import { HOST_SOURCE, JobHost } from '../src/main/processSupervisor'
+import { keeperPipe } from '../src/main/agentProcesses'
 import { tempDir } from './tempDir'
 
 // Every child gets the run context's allowlisted environment (tests/e2e/runContext.cjs), never this shell's; the
@@ -284,6 +286,99 @@ describe.runIf(process.platform === 'win32')('the keeper (HI-2055)', () => {
       expect(await next.keeperState('boundary-run', '100:5')).toEqual({ state: 'ended', helper })
     }, 60_000)
   }
+
+  /**
+   * HI-2313: what a later Hive asks of the keeper over its pipe (one line, "observe <run>"), and its answer's one line;
+   * null when it can't be asked now (busy with another client, not there).
+   */
+  const ask = (self: string, line: string, opts: { hold?: boolean } = {}): Promise<{ answer: unknown; socket: Socket } | null> =>
+    new Promise((resolve) => {
+      const socket = connect({ path: keeperPipe(self) })
+      let got = ''
+      socket.setEncoding('utf8')
+      socket.on('connect', () => (opts.hold ? resolve({ answer: null, socket }) : socket.write(line)))
+      socket.on('data', (d: string) => {
+        got += d
+        const nl = got.indexOf('\n')
+        if (nl < 0) return
+        socket.end()
+        resolve({ answer: JSON.parse(got.slice(0, nl)), socket })
+      })
+      socket.on('error', () => resolve(null))
+    })
+  /** Asked until it answers (another client may hold it a moment). */
+  const answered = async (self: string, line: string): Promise<Record<string, unknown>> => {
+    let r: Awaited<ReturnType<typeof ask>> = null
+    await waitFor(async () => {
+      r = await ask(self, line)
+      expect(r).not.toBeNull()
+    })
+    return r!.answer as Record<string, unknown>
+  }
+  /** A member that starts a child (which joins its job) each time it reads a line, saying its id. */
+  function spawner(): ChildProcessWithoutNullStreams & { children: number[] } {
+    const code = "const { spawn } = require('child_process'); process.stdin.on('data', () => { const c = spawn(process.execPath, ['-e', 'setTimeout(() => {}, 120000)'], { stdio: 'ignore' }); console.log('child ' + c.pid) }); setTimeout(() => {}, 120000)"
+    const c = spawn(process.execPath, ['-e', code], { stdio: 'pipe', windowsHide: true, env: baseEnv() }) as ChildProcessWithoutNullStreams & { children: number[] }
+    c.children = []
+    c.stdout.setEncoding('utf8').on('data', (d: string) => {
+      for (const m of d.matchAll(/child (\d+)/g)) c.children.push(Number(m[1]))
+    })
+    started.push(c)
+    return c
+  }
+
+  it("asked over its pipe once it keeps (HI-2313): observed for the asking, never its last receipt; unsure while its sweeps fail with a writer joined since (HR1's round 2 repro)", async () => {
+    const k = keeper('observe')
+    const s = spawner()
+    await waitFor(() => expect(k.out.find((l) => l.startsWith('self '))).toBeTruthy())
+    const self = k.out.find((l) => l.startsWith('self '))!.slice(5)
+    const fail = join(dir, 'observe.fail')
+    k.say(`failsnap ${fail}`)
+    await waitFor(() => expect(k.out).toContain('failsnap set'))
+    k.say(`add j8 ${s.pid}`)
+    await waitFor(() => expect(k.out).toContain('added ok'))
+    // Not served before it keeps: its Hive is still there.
+    expect(await ask(self, 'observe j8\n')).toBeNull()
+    k.say('keep')
+    await waitFor(() => expect(k.state('j8')).toMatchObject({ state: 'live', members: expect.arrayContaining([expect.objectContaining({ pid: s.pid })]) }))
+    const { parseObservation } = await import('../src/main/agentProcesses')
+    const now = await answered(self, 'observe j8\n')
+    expect(now).toMatchObject({ v: 1, run: 'j8', helper: self, hive: '100:5', state: 'now', observed: 'complete', members: expect.arrayContaining([expect.objectContaining({ pid: s.pid, name: 'node' })]) })
+    // Its real answer is one the next Hive takes (parseObservation), its console host counted and not listed.
+    expect(parseObservation(JSON.stringify(now), 'j8', self, '100:5')).toMatchObject({ helper: self, more: 0, members: [expect.objectContaining({ pid: s.pid })] })
+    expect(parseObservation(JSON.stringify(now), 'j8', self, '100:6')).toBeNull()
+    expect(parseObservation(JSON.stringify(now), 'j8', '1:1', '100:5')).toBeNull()
+
+    // Its sweeps fail (a snapshot refused), then a writer joins: the receipt still says only the first member, and the
+    // keeper, asked now, is unsure.
+    writeFileSync(fail, '')
+    s.stdin.write('go\n')
+    await waitFor(() => expect(s.children).toHaveLength(1))
+    const unsure = await answered(self, 'observe j8\n')
+    expect(unsure).toMatchObject({ run: 'j8', helper: self, state: 'now', observed: 'unsure' })
+    expect(unsure).not.toHaveProperty('members')
+    expect(parseObservation(JSON.stringify(unsure), 'j8', self, '100:5')).toBeNull()
+    expect(((k.state('j8')?.members ?? []) as { pid: number }[]).map((m) => m.pid)).not.toContain(s.children[0])
+    // Sure again: both.
+    rmSync(fail)
+    await waitFor(async () => expect(await answered(self, 'observe j8\n')).toMatchObject({ observed: 'complete', members: expect.arrayContaining([expect.objectContaining({ pid: s.pid }), expect.objectContaining({ pid: s.children[0] })]) }))
+
+    // A run it doesn't hold, and a request it doesn't know: answered, never as a run's membership.
+    expect(await answered(self, 'observe nope\n')).toMatchObject({ run: 'nope', state: 'unknown' })
+    expect(await answered(self, 'list j8\n')).toBe('error: unknown request')
+    // A client that connects and says nothing is let go within its bound: the next one is answered.
+    const silent = await ask(self, '', { hold: true })
+    expect(silent).not.toBeNull()
+    expect(await answered(self, 'observe j8\n')).toMatchObject({ observed: 'complete' })
+    silent!.socket.destroy()
+
+    // Its member and the child it started end (the child by its identity: not the test's own): "ended", and it exits.
+    const child = identify(s.children)
+    s.kill()
+    endExactly(child)
+    await exited(k.proc)
+    expect(k.state('j8')).toMatchObject({ state: 'ended', total: 0 })
+  }, 90_000)
 
   it('not configured (no folder), or holding no job: it exits at the end of its input, writing nothing', async () => {
     const k = keeper('nothing')
