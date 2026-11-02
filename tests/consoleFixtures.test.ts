@@ -1,8 +1,8 @@
 import { describe, expect, it, vi } from 'vitest'
 import { join } from 'path'
-import { HOOK_FIELDS, HOOK_MADE_FIELDS, sessionSourceId, type ConsoleEvent } from '../src/shared/devConsole'
+import { HOOK_FIELDS, HOOK_MADE_FIELDS, makeEvent, sessionSourceId, type ConsoleEvent } from '../src/shared/devConsole'
 import { DevConsole } from '../src/main/devConsole'
-import { redactValue, type RedactContext } from '../src/shared/redact'
+import { redact, type RedactContext } from '../src/shared/redact'
 import { compareContract, diagnosticRecording, DIAGNOSTIC_BYTES, DIAGNOSTIC_LINES, newestRecordingsFirst, parseRecording, readingOf, recordingName, recordingToFixture, shapeOf, type ConsoleFixture, type RecordingHeader } from '../src/shared/consoleFixtures.mts'
 
 // Developer console recordings as files (#638): a recording written as the recorder writes it (header, events as a
@@ -177,35 +177,34 @@ describe('diagnosticRecording', () => {
     expect(part?.lines).toHaveLength(3)
     expect(part?.summary).toMatch(/^session source \(claude-code\), started 2026-10-12T09:00:00.000Z, Hive 0.7.0; 3 events, ended \(stopped\); CLIs: claude-code 2.1.296 \(tested with 2.1.296\); redacted; the newest 3$/)
     expect(part?.lines.join('\n')).not.toContain(alpha.replace(/\\/g, '\\\\'))
-    expect(part?.lines.join('\n')).toContain('<folder>')
+    // Its paths (cwd, transcript_path) go whole (HI-2332), before redact sees them.
+    expect(part?.lines.join('\n')).toContain('"cwd":"<path>"')
   })
 
-  it("takes out a hook's file path outside every known folder, a drive's or a share's, spaces and all (HI-2332)", () => {
-    const ctx: RedactContext = { home: 'C:\\Users\\Example', folders: ['D:\\Work\\Demo'], names: [] }
-    const paths = ['E:/Clients/Cedar Research/acquisition.txt', 'E:\\Clients\\Cedar Research\\acquisition.txt', '\\\\fileserver\\Clients\\Cedar Research\\deal.docx']
-    const kept = { file_path: 'D:\\Work\\Demo\\src\\a.ts', notebook_path: 'C:\\Program Files\\Tool\\x.ipynb', path: 'C:\\Users\\Example\\.claude\\projects\\s.jsonl' }
-    const events = [...paths.map((p) => ({ file_path: p })), kept].map((input, i) => ({ type: 'event', seq: i + 1, at: '', kind: 'hook', name: 'PreToolUse', summary: 'Read', raw: { hook_event_name: 'PreToolUse', tool_input: input } }))
-    const part = diagnosticRecording([header(), ...events].map((l) => JSON.stringify(l)).join('\n'), (s) => redactValue(s, ctx))!
+  it("replaces every path's whole value with <path>, as the capture recorded it, wherever it is (HI-2332)", () => {
+    // As Copy Diagnostics redacts: names, folders, secrets; a project named like a folder in the paths, as round 1 found.
+    const ctx: RedactContext = { home: 'C:\\Users\\Example', folders: ['D:\\Work\\Demo'], names: [{ name: 'Cedar', as: '<project>' }] }
+    const paths = [
+      'E:/Clients/Cedar Research/acquisition.txt', // another drive, spaces, a name in it
+      'E:\\Clients\\Cedar\\acquisition.txt',
+      '\\\\fileserver\\Clients\\Cedar Research\\deal.docx', // a share
+      'E:/Builds/0123456789abcdef0123456789abcdef/Cedar Research/acquisition.txt', // masked by the capture (round 2)
+      'C:\\Users\\Example\\Documents\\Cedar Research\\notes.txt', // home, outside the CLIs' folders
+      'D:\\Work\\Demo\\src\\a.ts' // a known folder: a path all the same
+    ]
+    // As the console captures a hook (sessions.ts): HOOK_FIELDS, no text. A path in a field kept for another reason (`source`) too.
+    const events = paths.map((p, i) => makeEvent(i + 1, '2026-11-02T10:00:00.000Z', A1, { kind: 'hook', name: 'PreToolUse', summary: 'PreToolUse', raw: { hook_event_name: 'PreToolUse', session_id: 's1', tool_name: 'Read', cwd: p, transcript_path: p, source: p, tool_input: { file_path: p, path: p, notebook_path: p, content: 'x' } }, safe: { raw: HOOK_FIELDS } }))
+    expect(events[3].raw).toMatchObject({ tool_input: { file_path: 'E:/Builds/<redacted>/Cedar Research/acquisition.txt' } })
+    const recording = [header(), ...events.map((e) => ({ type: 'event', ...e }))].map((l) => JSON.stringify(l)).join('\n')
+    const part = diagnosticRecording(recording, (s) => redact(s, ctx))!
+    expect(part.lines).toHaveLength(paths.length)
     const text = part.lines.join('\n')
-    for (const word of ['Clients', 'Cedar', 'Research', 'acquisition', 'fileserver', 'deal.docx']) expect(text).not.toContain(word)
-    const inputs = part.lines.map((l) => JSON.parse(l).raw.tool_input)
-    expect(inputs.slice(0, 3)).toEqual([{ file_path: '<path>' }, { file_path: '<path>' }, { file_path: '<path>' }])
-    // Known folders keep their place holders, and Hive's and the CLIs' own folders stay: still valid JSON lines.
-    expect(inputs[3]).toEqual({ file_path: '<workspace>\\src\\a.ts', notebook_path: 'C:\\Program Files\\Tool\\x.ipynb', path: '~\\.claude\\projects\\s.jsonl' })
-  })
-
-  it("takes the whole path out when a name in it is one Hive replaces too (HI-2332 round 2)", () => {
-    const ctx: RedactContext = { home: 'C:\\Users\\Example', folders: ['D:\\Work\\Demo'], names: [{ name: 'Cedar', as: '<project>' }, { name: 'acquisition', as: '<agent>' }] }
-    const paths = ['E:/Clients/Cedar Research/acquisition.txt', 'E:/Clients/Cedar/acquisition.txt', '\\\\Cedar\\Clients\\Research\\deal.docx', 'C:\\Users\\Example\\Documents\\Cedar\\notes.txt', 'Cedar']
-    const kept = { file_path: 'D:\\Work\\Demo\\Cedar\\a.ts', path: 'C:\\Users\\Example\\.claude\\projects\\Cedar\\s.jsonl' }
-    const events = [...paths.map((p) => ({ file_path: p })), kept].map((input, i) => ({ type: 'event', seq: i + 1, at: '', kind: 'hook', name: 'PreToolUse', summary: 'Read', raw: { tool_input: input } }))
-    const part = diagnosticRecording([header(), ...events].map((l) => JSON.stringify(l)).join('\n'), (s) => redactValue(s, ctx))!
-    for (const word of ['Clients', 'Cedar', 'Research', 'acquisition', 'Documents', 'notes', 'deal.docx']) expect(part.lines.join('\n')).not.toContain(word)
-    const inputs = part.lines.map((l) => JSON.parse(l).raw.tool_input)
-    expect(inputs.slice(0, 4)).toEqual(Array.from({ length: 4 }, () => ({ file_path: '<path>' })))
-    // A name alone is no path; in a known folder or the CLIs' own, the path stays with the name replaced.
-    expect(inputs[4]).toEqual({ file_path: '<project>' })
-    expect(inputs[5]).toEqual({ file_path: '<workspace>\\<project>\\a.ts', path: '~\\.claude\\projects\\<project>\\s.jsonl' })
+    for (const word of ['Clients', 'Cedar', 'Research', 'acquisition', 'Builds', 'fileserver', 'deal', 'Documents', 'notes', 'src', 'a.ts', '<project>', '<redacted>']) expect(text).not.toContain(word)
+    for (const line of part.lines) {
+      const raw = JSON.parse(line).raw
+      expect(raw).toEqual({ hook_event_name: 'PreToolUse', session_id: 's1', tool_name: 'Read', cwd: '<path>', transcript_path: '<path>', source: '<path>', tool_input: { file_path: '<path>', path: '<path>', notebook_path: '<path>', content: raw.tool_input.content } })
+      expect(raw.tool_input.content).not.toBe('<path>')
+    }
   })
 
   it('never takes a recording with text, and keeps to its count', async () => {

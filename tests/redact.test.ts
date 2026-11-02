@@ -214,14 +214,6 @@ describe('diagnostics redaction of the log', () => {
     expect(out).toContain('Removed worktree <path>')
   })
 
-  it('takes out the rest of a path after a name it replaced in it (HI-2332)', () => {
-    const named: RedactContext = { ...ctx, names: [{ name: 'Cedar', as: '<project>' }] }
-    const out = redactLog([`${T} [worktrees] Removed worktree E:/Clients/Cedar/acquisition.txt`, `${T} [x] Read \\\\Cedar\\share\\deal.docx done`].join('\n'), named)
-    expect(out).not.toMatch(/Clients|Cedar|<project>|acquisition|share|deal/)
-    expect(out).toContain('Removed worktree <path>')
-    expect(out).toContain('Read <path> done')
-  })
-
   it("keeps Hive's and the CLIs' own paths, and each line's [scope]", () => {
     const keep = [
       `${T} [main] at f (C:\\Users\\Jo Smith\\AppData\\Local\\Programs\\Hive\\resources\\app.asar\\out\\main\\index.js:12:3)`,
