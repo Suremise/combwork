@@ -312,7 +312,22 @@ export async function readText(projectPath: string, rel: string): Promise<FileCo
   const n = Math.min(buf.length, 8000)
   for (let i = 0; i < n; i++) if (buf[i] === 0) return { kind: 'binary', text: '', bom: false, ...meta }
   const bom = buf.length >= 3 && buf[0] === 0xef && buf[1] === 0xbb && buf[2] === 0xbf
-  return { kind: 'text', text: buf.toString('utf8', bom ? 3 : 0), bom, ...meta }
+  const text = decodeUtf8(buf.subarray(bom ? 3 : 0))
+  // Not UTF-8 (a Windows-1252 file, say): decoding it would put U+FFFD in place of its bytes, and saving would
+  // write those over them (HI-2331), so it isn't offered for editing.
+  if (text === null) return { kind: 'not-utf8', text: '', bom: false, ...meta }
+  return { kind: 'text', text, bom, ...meta }
+}
+
+const utf8Strict = new TextDecoder('utf-8', { fatal: true, ignoreBOM: true })
+
+/** The bytes as text, or null when they aren't valid UTF-8. */
+export function decodeUtf8(bytes: Uint8Array): string | null {
+  try {
+    return utf8Strict.decode(bytes)
+  } catch {
+    return null
+  }
 }
 
 export async function writeText(projectPath: string, rel: string, text: string, expectedModified: string | null, bom: boolean): Promise<{ modified: string; size: number }> {
