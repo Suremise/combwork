@@ -33,6 +33,12 @@ let offered: string | null = null
 
 let state: UpdateState = { status: 'idle', current: app.getVersion() }
 let timer: ReturnType<typeof setInterval> | null = null
+/** The first automatic check, 30 s after Hive starts: cancelled when automatic checks are turned off before it (HI-2324). */
+let firstCheck: ReturnType<typeof setTimeout> | null = null
+/** An automatic check (the first one, the 6-hourly one), which runs only while automatic checks are on (HI-2324). */
+const autoCheck = (): void => {
+  if (config.settings.updates.checkAutomatically) void check(false)
+}
 let restartForUpdate: () => void = () => undefined
 /** The check in progress was started by the user, so its result is shown even if nothing is found. */
 let manualCheck = false
@@ -84,7 +90,11 @@ function applySettings(): void {
   autoUpdater.allowDowngrade = false
   log.info(`Update settings: check ${s.checkAutomatically ? 'on' : 'off'}, download ${s.downloadAutomatically ? 'auto' : 'manual'}, install ${s.install}, pre-releases ${s.prerelease ? 'on' : 'off'}`)
   if (timer) clearInterval(timer)
-  timer = s.checkAutomatically && !enabledReason() ? setInterval(() => void check(false), CHECK_INTERVAL) : null
+  timer = s.checkAutomatically && !enabledReason() ? setInterval(autoCheck, CHECK_INTERVAL) : null
+  if (!s.checkAutomatically && firstCheck) {
+    clearTimeout(firstCheck)
+    firstCheck = null
+  }
 }
 
 function notesOf(info: UpdateInfo): string | undefined {
@@ -293,7 +303,12 @@ export function initUpdater(opts: { restart: () => void }): void {
   const reason = enabledReason()
   if (packagedTestCopy()) log.info('A test copy (HIVE_TEST_QUIET=1): no update checks, automatic or manual')
   if (reason) set({ status: 'disabled', error: reason }, true)
-  else if (config.settings.updates.checkAutomatically) setTimeout(() => void check(false), Number(process.env.HIVE_UPDATE_DELAY) || FIRST_CHECK_DELAY)
+  else if (config.settings.updates.checkAutomatically) {
+    firstCheck = setTimeout(() => {
+      firstCheck = null
+      autoCheck()
+    }, Number(process.env.HIVE_UPDATE_DELAY) || FIRST_CHECK_DELAY)
+  }
 
   noticeUpdated()
 }
