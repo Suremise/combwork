@@ -228,7 +228,7 @@ const check = (name, ok, extra = '') => {
   // The watch's limit is a minute: the wait is bounded at twice that.
   check('its limit passes: woken, then idle with no watch', !!(await until(async () => limitWakes().length > before && ['ready', 'finished'].includes((await live(reviewer.id))?.status) && !(await live(reviewer.id))?.watch, 120000)), `${JSON.stringify(limitWakes().map((w) => w.text))} ${await why(reviewer.id)}`)
   const limit = limitWakes().at(-1)?.text ?? ''
-  check("…the line says what waits on what, and not to tell the user", limit.includes(`#${next} waits on #${dep}`) && limit.includes(`#${dep} is in Doing with Builder`) && /don't tell the user about them\.$/.test(limit) && !/hive_notify/.test(limit), limit)
+  check("…the line says what waits on what, and not to tell the user", limit.includes(`#${next} waits on #${dep}`) && limit.includes(`#${dep} is in Doing with Builder`) && limit.endsWith("don't tell the user about them.") && !/hive_notify/.test(limit), limit)
   await lib.sleep(4500) // on purpose: longer than the grace, to see no flag comes
   check("another's card it waits on is never stalled for it (HI-2381)", !(await stalledOf(dep)) && !((await live(reviewer.id))?.notWatching ?? []).includes(dep), JSON.stringify({ stalled: await stalledOf(dep), mark: (await live(reviewer.id))?.notWatching }))
 
