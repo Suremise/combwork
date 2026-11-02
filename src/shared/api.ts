@@ -219,7 +219,8 @@ export interface HiveRequests {
   'update:check': () => UpdateState
   'update:download': () => void
   /** Restart and Update: quits (asking if agents are working), installs and restarts. */
-  'update:install': () => void
+  /** `version`: from the update's notice (HI-2320), installed only while it is the one ready. */
+  'update:install': (version?: string) => void
   'update:skip': (version: string) => void
   /** Pausing the team before an update (HI-2081): every open workspace's pause and what still runs, scanned now. */
   'team:state': () => import('./teamPause').TeamPauseState
@@ -552,6 +553,8 @@ export interface HiveRequests {
   'session:leftovers': (settled?: boolean) => AgentLeftovers[]
   /** Ends what the agent's stopped launches left running (only processes they started), or keeps it running and stops listing it. Returns how many. */
   'session:settleLeftovers': (projectPath: string, agentId: string, how: 'end' | 'keep') => number
+  /** A notice's End Them / Keep Running (HI-2320): only the processes it listed, by id and start time; its entry says what happened. */
+  'session:settleOffer': (projectPath: string, offer: string, how: 'end' | 'keep') => void
   /** Types a short "carry on" into a running agent whose turn a refused sign-in stopped (Resume (n), #309). */
   'session:carryOn': (projectPath: string, agentId: string) => void
   /** After a refused resume (Resume All): 'running' when the agent runs that conversation, or a start of it under way finished (its failure thrown); 'other' otherwise (HI-1746). */
@@ -620,7 +623,8 @@ export interface HiveRequests {
   /** Stops the agent and resumes the same conversation in the given mode. */
   'session:restartInMode': (projectPath: string, agentId: string, mode: PermissionMode) => void
   /** Switches running agents whose settings now say a different mode (after "Switch now"). */
-  'session:applyModes': () => { switched: string[]; skipped: string[] }
+  /** `offer`: from Switch Now's notice (HI-2320), which then says what happened. */
+  'session:applyModes': (offer?: string) => { switched: string[]; skipped: string[] }
   /** Saves the clipboard image into .hive/attachments/<sessionId> and gives its path; null if the clipboard has no image. */
   'session:pasteImage': (projectPath: string, agentId?: string) => string | null
   /** How each file would be attached to the agent's session (#387): copied or by path, its size and kind. Nothing changes. */

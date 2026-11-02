@@ -128,8 +128,8 @@ const check = (name, ok, extra = '') => {
     })
     await page.screenshot({ path: path.join(lib.WORK, 'lanenotices-1-before.png') })
     await inv('tasks:update', a, { blocked: 'Release notes first?' })
-    const banner = page.locator('.notice-banner', { hasText: 'Lane Builder / Reviewer (greetings)' })
-    check('with Hive focused, a lane notice is a banner in the window', !!(await until(async () => (await banner.count()) > 0, HUNG_MS)), JSON.stringify(await page.locator('.notice-banner').allInnerTexts()))
+    const banner = page.locator('.popups .popup', { hasText: 'Lane Builder / Reviewer (greetings)' })
+    check('with Hive focused, a lane notice is a pop-up in the window', !!(await until(async () => (await banner.count()) > 0, HUNG_MS)), JSON.stringify(await page.locator('.popups .popup').allInnerTexts()))
     check('…naming the card by its key and why it is blocked', (await banner.first().innerText()).includes(`${keyA} is blocked: Release notes first?`), await banner.first().innerText())
     await page.screenshot({ path: path.join(lib.WORK, 'lanenotices-2-banner.png') })
     await app.evaluate(({ BrowserWindow }) => {

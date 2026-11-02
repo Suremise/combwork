@@ -336,12 +336,12 @@
     "description": "A tip's title."
   },
   "tips.banners.text": {
-    "defaultMessage": "While you use Hive, an agent finishing or needing you is a banner in the window, not a Windows notification over the Assistant. Settings → Notifications chooses where it shows, for which workspaces, and for how long.",
-    "description": "A tip. Names of Hive's menus, views, settings and commands: keep them as Hive shows them."
+    "defaultMessage": "Each thing is told once: a pop-up while you use Hive, a Windows notification while it is in the background, and either way it is kept under the bell, with its buttons while they apply. Settings → Notifications chooses where pop-ups go.",
+    "description": "A tip. The bell is the Notifications panel's button at the bottom of the activity bar. Names of Hive's menus, views, settings and commands: keep them as Hive shows them."
   },
   "tips.banners.title": {
-    "defaultMessage": "Notices in Hive, not over it",
-    "description": "A tip's title."
+    "defaultMessage": "Every notification is under the bell",
+    "description": "A tip's title (HI-2320: the bell is the Notifications panel)."
   },
   "tips.board.text": {
     "defaultMessage": "Cards in On Hold, Todo, Active, Review, Approved and Done, each for a project. Start… gives a card to an agent with the card as its prompt. {key}",

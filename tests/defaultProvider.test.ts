@@ -165,7 +165,7 @@ describe('migration (config version 8)', () => {
 
   it('turns the old saved default, Claude Code, into Automatic', () => {
     const c = load({ version: 7, settings: { defaultProvider: 'claude-code' } })
-    expect(c.version).toBe(8)
+    expect(c.version).toBe(9)
     expect(c.settings.defaultProvider).toBe(AUTO_PROVIDER)
   })
 

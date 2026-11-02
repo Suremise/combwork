@@ -249,6 +249,7 @@
   "service.workspace.platformOpen": "打开版本控制",
   "service.workspace.platformOtherFound": "在 {project} 中发现了 {vcs}。Hive 尚不支持它，在你于其“版本控制”标签页中切换到“无”之前，仍将该项目视为 Git 项目。",
   "service.workspace.platformRepositoryGone": "{project} 的 Git 仓库不见了。Git 的规则仍然有效，因此在仓库恢复或你于其“版本控制”标签页中将项目切换到“无”之前，其卡片无法继续推进。",
+  "service.workspace.platformSettled": "已解决：现在无需更改",
   "service.workspace.platformTitle": "{project} 的版本控制已变化",
   "service.workspace.renameAgent": "重命名 {project} 的 {agent}…",
   "service.workspace.sharedNames": "智能体名称现在在整个工作区中唯一，以便区分每个智能体。{shared}：它们仍可正常工作，但请在每组同名智能体中重命名一个，例如将 {project} 的 {agent} 改为 {suggestion}。",

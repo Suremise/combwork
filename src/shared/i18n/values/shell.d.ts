@@ -219,6 +219,8 @@ interface HiveMessageValues {
   'shell.edit.redo': undefined
   'shell.edit.selectAll': undefined
   'shell.edit.undo': undefined
+  'shell.entry.mcpCopied': undefined
+  'shell.entry.questionAnswered': undefined
   'shell.error.allowEdit': undefined
   'shell.error.endProcesses': undefined
   'shell.error.keepProcesses': undefined
@@ -262,6 +264,7 @@ interface HiveMessageValues {
   'shell.noticeTarget.agentGone': { agent: string | number; project: string | number }
   'shell.noticeTarget.cardElsewhere': { card: string | number; workspace: string | number }
   'shell.noticeTarget.cardGone': { card: string | number }
+  'shell.noticeTarget.projectGone': { project: string | number }
   'shell.notifications.clearAll': undefined
   'shell.notifications.none': undefined
   'shell.notifications.title': undefined
@@ -413,4 +416,5 @@ interface HiveMessageValues {
   'shell.toast.dismiss': undefined
   'shell.toast.openAgent': { agent: string | number }
   'shell.toast.openCard': { card: string | number }
+  'shell.toast.openProject': { project: string | number }
 }

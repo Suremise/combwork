@@ -77,9 +77,8 @@ export const DEFAULT_SETTINGS: AppSettings = {
     desktopNotifications: true,
     notifyOnFinished: true,
     notifyOnWaiting: true,
-    whileFocused: 'inApp',
     bannerScope: 'all',
-    bannerPosition: 'top-center',
+    bannerPosition: 'bottom-right',
     bannerSeconds: 6,
     waitingBannerStays: true,
     taskbarCount: true,
@@ -136,7 +135,7 @@ export const DEFAULT_SETTINGS: AppSettings = {
 }
 
 export const DEFAULT_APP_CONFIG: AppConfig = {
-  version: 8,
+  version: 9,
   settings: DEFAULT_SETTINGS,
   recentWorkspaces: [],
   lastWorkspace: null,
@@ -632,11 +631,6 @@ export function migrateConfig(cfg: AppConfig, raw?: Record<string, any>): AppCon
     // Anyone who wants 50 sets it again.
     cfg.settings.sessions.transcriptWarnMB = 20
   }
-  if (raw && (raw.version ?? 1) < 6) {
-    // Up to 0.3.x, "Only when Hive is in the background" (onlyWhenUnfocused) decided whether a Windows notification
-    // showed while you used Hive. Now notices show in Hive instead, and everyone starts there, whatever it was.
-    cfg.settings.notifications.whileFocused = 'inApp'
-  }
   migratePersonaNames(cfg, raw)
   if (raw && (raw.version ?? 1) < 7) {
     // Up to 0.3.x Hive shipped character personas; working modes replaced them (#259): a default persona that went
@@ -650,8 +644,20 @@ export function migrateConfig(cfg: AppConfig, raw?: Record<string, any>): AppCon
     // Copilot default was chosen, and stays.
     cfg.settings.defaultProvider = AUTO_PROVIDER
   }
-  delete (cfg.settings.notifications as unknown as Record<string, unknown>).onlyWhenUnfocused
-  cfg.version = 8
+  const notifications = cfg.settings.notifications as unknown as Record<string, unknown>
+  if (raw && (raw.version ?? 1) < 9) {
+    // HI-2320: one notification system. *While Hive is focused* went: Windows notifications only with no Hive window
+    // focused. Show nothing (version 6 on; before it, "Only when Hive is in the background" moved everyone to Show in
+    // Hive) becomes *Only in the bell* for agents' pop-ups, which keeps the Windows notifications in the background;
+    // a Windows notification while focused becomes a pop-up. The banners' old default place, top centre, moves to the
+    // pop-ups' corner, bottom right (Darren, 2 Nov); any other place chosen is kept.
+    const was = (raw.version ?? 1) < 6 ? 'inApp' : notifications.whileFocused
+    if (was === 'nothing') notifications.bannerScope = 'none'
+    if (notifications.bannerPosition === 'top-center') notifications.bannerPosition = 'bottom-right'
+  }
+  delete notifications.whileFocused
+  delete notifications.onlyWhenUnfocused
+  cfg.version = 9
   // Settings for providers this version doesn't know are kept (a newer Hive wrote them), but never used.
   if (!isDefaultProviderValue(cfg.settings.defaultProvider)) cfg.settings.defaultProvider = AUTO_PROVIDER
   // 0.9's providers' order (HI-1965): no list follows it since HI-2139, but the migration reads it (what Automatic

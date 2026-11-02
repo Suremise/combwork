@@ -122,7 +122,7 @@ export const TIP_ENTRIES: Tip[] = [
   { id: 'attachments-tabs', group: 'Files', order: 281, title: msg({ id: 'tips.attachmentsTabs.title', defaultMessage: "Jump to a card's or a session's files", description: "A tip's title (HI-1841)." }), text: msg({ id: 'tips.attachmentsTabs.text', defaultMessage: "The Attachments tab has Pane attachments and Card attachments. Show in Attachments, beside a card's attachments, opens Card attachments at that card; Show Session's Attachments, in an agent's ⋯ menu, opens Pane attachments at its session.", description: "A tip (HI-1841). Names of Hive's menus, views, settings and commands: keep them as Hive shows them." }), docs: 'attachments', command: 'project.tab.images' }, // i18n-ignore: its words are messages; its group is a key of TIP_GROUPS (TIP_GROUP_TEXT names it), docs a user guide heading's id
   { id: 'auto-mode-setup', group: 'Agents', order: 99, title: msg({ id: 'tips.autoModeSetup.title', defaultMessage: "Claude Code's offer waits for you", description: "A tip's title. Claude Code is a product name: keep it in English." }), text: msg({ id: 'tips.autoModeSetup.text', defaultMessage: "In auto mode, Claude Code may offer to teach auto mode about your environment. Hive never answers it: the agent shows Needs input, and nothing is typed into it, until you do. Settings → Advanced → Claude Code can turn the offer off.", description: "A tip. Names of Hive's menus, views, settings and commands: keep them as Hive shows them. Claude Code is a product name, and auto mode its permission mode." }), docs: 'when-claude-code-asks-by-itself' }, // i18n-ignore: its words are messages; its group is a key of TIP_GROUPS (TIP_GROUP_TEXT names it), docs a user guide heading's id
   { id: 'backup-retention', group: 'Sessions', order: 51, title: msg({ id: 'tips.backupRetention.title', defaultMessage: 'Backups take less room, and can expire', description: "A tip's title." }), text: msg({ id: 'tips.backupRetention.text', defaultMessage: "Hive compresses its transcript backups once a session ends, and Storage shows what they hold. To let old ones go, set Settings → Sessions → Keep transcript backups: only copies of sessions the CLI still has go to the Recycle Bin.", description: "A tip. Names of Hive's menus, views, settings and commands: keep them as Hive shows them." }), docs: 'archiving-and-backups' }, // i18n-ignore: its words are messages; its group is a key of TIP_GROUPS (TIP_GROUP_TEXT names it), docs a user guide heading's id
-  { id: 'banners', group: 'Agents', order: 305, title: msg({ id: 'tips.banners.title', defaultMessage: 'Notices in Hive, not over it', description: "A tip's title." }), text: msg({ id: 'tips.banners.text', defaultMessage: 'While you use Hive, an agent finishing or needing you is a banner in the window, not a Windows notification over the Assistant. Settings → Notifications chooses where it shows, for which workspaces, and for how long.', description: "A tip. Names of Hive's menus, views, settings and commands: keep them as Hive shows them." }), docs: 'banners-in-hive', command: 'settings.notifications' }, // i18n-ignore: its words are messages; its group is a key of TIP_GROUPS (TIP_GROUP_TEXT names it), docs a user guide heading's id
+  { id: 'banners', group: 'Agents', order: 305, title: msg({ id: 'tips.banners.title', defaultMessage: 'Every notification is under the bell', description: "A tip's title (HI-2320: the bell is the Notifications panel)." }), text: msg({ id: 'tips.banners.text', defaultMessage: "Each thing is told once: a pop-up while you use Hive, a Windows notification while it is in the background, and either way it is kept under the bell, with its buttons while they apply. Settings → Notifications chooses where pop-ups go.", description: "A tip. The bell is the Notifications panel's button at the bottom of the activity bar. Names of Hive's menus, views, settings and commands: keep them as Hive shows them." }), docs: 'pop-ups-and-the-bell', command: 'settings.notifications' }, // i18n-ignore: its words are messages; its group is a key of TIP_GROUPS (TIP_GROUP_TEXT names it), docs a user guide heading's id
   { id: 'board', group: 'Board', order: 150, title: msg({ id: 'tips.board.title', defaultMessage: 'Plan work on the task board', description: "A tip's title." }), text: msg({ id: 'tips.board.text', defaultMessage: 'Cards in On Hold, Todo, Active, Review, Approved and Done, each for a project. Start… gives a card to an agent with the card as its prompt. {key}', description: "A tip. {key} is a shortcut (its keys, or the command's name when it has none). Names of Hive's menus, views, settings and commands: keep them as Hive shows them." }), key: 'view.board', docs: 'task-board', command: 'view.board' }, // i18n-ignore: its words are messages; its group is a key of TIP_GROUPS (TIP_GROUP_TEXT names it), docs a user guide heading's id
   { id: 'board-archive', group: 'Board', order: 185, title: msg({ id: 'tips.boardArchive.title', defaultMessage: 'Find an archived card', description: "A tip's title." }), text: msg({ id: 'tips.boardArchive.text', defaultMessage: 'Tick Archived on the board for a table of archived cards: sort and filter them by project, label or the column they came from, and Unarchive one or a whole selection.', description: "A tip. Names of Hive's menus, views, settings and commands: keep them as Hive shows them." }), docs: 'task-board', command: 'view.board', knownBy: [] }, // i18n-ignore: its words are messages; its group is a key of TIP_GROUPS (TIP_GROUP_TEXT names it), docs a user guide heading's id
   { id: 'board-archive-all', group: 'Board', order: 186, title: msg({ id: 'tips.boardArchiveAll.title', defaultMessage: 'Clear a column in one go', description: "A tip's title." }), text: msg({ id: 'tips.boardArchiveAll.text', defaultMessage: "A column's ⋯ has Archive All in Done (n)…, and the board's ⋯ has Archive All Cards… for every column. Cards agents are on are skipped unless you say, and Undo puts everything back where it was.", description: "A tip. Names of Hive's menus, views, settings and commands: keep them as Hive shows them." }), docs: 'task-board', command: 'view.board', knownBy: [] }, // i18n-ignore: its words are messages; its group is a key of TIP_GROUPS (TIP_GROUP_TEXT names it), docs a user guide heading's id
@@ -422,3 +422,42 @@ export function applyTipsChange(s: TipsState, change: TipsChange, tips: Tip[] = 
   if ('moment' in change) return s.moments.includes(change.moment) ? s : { ...s, moments: [...s.moments, change.moment] }
   return { ...s, shownOn: change.shownOn }
 }
+
+/** No key pressed in the window for this long: the user isn't typing (HI-2320). */
+export const TYPING_QUIET_MS = 10_000
+
+/** What says whether nothing else goes on in a window (HI-2320). */
+export interface QuietInputs {
+  /** The window is the one in use (visible, focused). */
+  focused: boolean
+  /** Pop-ups showing or queued in it, those behind "+N more" and those paused for the focus included. */
+  popups: number
+  /** Finishes main still collects to tell together. */
+  finishesPending: number
+  /** Agents in it waiting for the user (a prompt, a question, a sign-in). */
+  waiting: number
+  /** When a key was last pressed in it (ms), or null. */
+  lastKeyAt: number | null
+  now: number
+}
+
+/**
+ * Whether a tip may show now (HI-2320, Darren: "tips should be shown at a time that nothing else is going on only,
+ * otherwise they are ignored"): the window focused, no pop-up showing or queued, no finishes about to be told, no agent
+ * waiting for the user, and no key pressed for TYPING_QUIET_MS.
+ */
+export function quietNow(q: QuietInputs): boolean {
+  return q.focused && q.popups === 0 && q.finishesPending === 0 && q.waiting === 0 && (q.lastKeyAt === null || q.now - q.lastKeyAt >= TYPING_QUIET_MS)
+}
+
+/** A tip waiting for a quiet moment: the day's, or a moment's; dropped once its day is over. */
+export interface QueuedTip {
+  id: string
+  /** The local day it was queued on (YYYY-MM-DD). */
+  day: string
+  /** The moment it is for; none: the day's tip. */
+  moment?: TipMoment
+}
+
+/** Whether a queued tip may still show on `now`'s day (one that never found a quiet moment isn't shown another day). */
+export const queuedToday = (q: QueuedTip, now: Date): boolean => q.day === localDay(now)

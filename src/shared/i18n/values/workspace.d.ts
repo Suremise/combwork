@@ -103,11 +103,9 @@ interface HiveMessageValues {
   'workspace.antivirus.wholeShare': undefined
   'workspace.antivirus.whyAgents': undefined
   'workspace.antivirus.whySlow': undefined
-  'workspace.banners.dismiss': undefined
+  'workspace.antivirus.wontAsk': undefined
   'workspace.banners.more': { count: string | number }
   'workspace.banners.region': undefined
-  'workspace.banners.showProject': undefined
-  'workspace.banners.showProjectLabel': { title: string | number }
   'workspace.changes.aboutAgent': { agent: string | number; branch: string | number; base: string | number }
   'workspace.changes.aboutProject': undefined
   'workspace.changes.aboutSlot': { is: string; agent: string | number; name: string | number; known: string; base: string | number }

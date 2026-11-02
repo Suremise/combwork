@@ -26,7 +26,7 @@ const { connectionLoginChanged, forgetConnectionUsage, mergePlanUsage, nextWarni
 const { parseClaudePlanUsage } = await import('../src/main/providers/claude/adapter')
 const { rolloutPlanUsage } = await import('../src/main/providers/codex/rollout')
 const { onHiveEvent } = await import('../src/main/events')
-const { setFocusedHive } = await import('../src/main/notices')
+const { setNotifyHost } = await import('../src/main/notify')
 const { DEFAULT_SETTINGS } = await import('../src/shared/defaults')
 
 // Resets ahead of now, as a current reading's are (one past its reset is an old period's: #383).
@@ -70,56 +70,59 @@ describe('reportPlanUsage', () => {
   })
 })
 
-// A warning is kept in the Notifications panel and told as other notices are (#157): never an unconditional toast.
+// A warning is told once (HI-2320): a pop-up in the window you are using (kept in its bell), or a Windows notification
+// with Hive in the background (its bell row kept quietly), never both, never a second copy.
 describe('a plan usage warning', () => {
   const g = globalThis as { __osSupported?: boolean; __osShown?: string[] }
-  const seen: { type: string; toast?: { quiet?: boolean; title: string }; notice?: { title: string }; windows?: true }[] = []
+  const seen: { type: string; toast?: { quiet?: boolean; title: string; kind?: string }; notice?: { title: string }; windows?: true }[] = []
   let off: () => void
+  const win = { isDestroyed: () => false, webContents: { id: 7, send: () => undefined } }
+  let focused = false
   beforeEach(() => {
     g.__osSupported = true
     g.__osShown = []
     seen.length = 0
+    focused = false
     off = onHiveEvent((e) => void seen.push(e as never))
     vi.spyOn(config, 'update').mockImplementation((fn: (c: ReturnType<typeof config.get>) => void) => fn(config.get()))
     config.get().planWarnings = {}
+    setNotifyHost({ focused: () => (focused ? { win: win as never, workspacePath: 'C:\\Work\\A', projectPath: 'C:\\Work\\A\\alpha' } : null), fallback: () => win as never, workspaceOf: () => null })
   })
   afterEach(() => {
     off()
     vi.restoreAllMocks()
-    setFocusedHive(() => null)
+    setNotifyHost({ focused: () => null, fallback: () => null, workspaceOf: () => null })
     Object.assign(config.settings.notifications, DEFAULT_SETTINGS.notifications)
     g.__osSupported = false
   })
-  const win = { isDestroyed: () => false, webContents: { send: () => undefined } }
-  const focus = () => setFocusedHive(() => ({ win: win as never, workspacePath: 'C:\\Work\\A', projectPath: 'C:\\Work\\A\\alpha' }))
   const warn = () => {
     reportPlanUsage('claude-code', usage(96))
     const toasts = seen.filter((e) => e.type === 'toast').map((e) => e.toast!)
     return {
-      kept: toasts.length === 1 && toasts[0].quiet === true && /96% of your Claude Code 5-hour limit/.test(toasts[0].title),
-      visibleToasts: toasts.filter((t) => !t.quiet).length,
-      banners: seen.filter((e) => e.type === 'notice' && !e.windows).length,
+      // One entry, of the usage kind, in the window's bell either way.
+      entries: toasts.filter((t) => t.kind === 'usage' && /96% of your Claude Code 5-hour limit/.test(t.title)).length,
+      popups: toasts.filter((t) => !t.quiet).length,
       windows: g.__osShown!.length,
-      // A Windows notification is told to in-process listeners too (the Agent API's stream, #620), marked as such.
+      // The Agent API's stream hears of it, marked when it went to a Windows notification (#620).
       told: seen.filter((e) => e.type === 'notice' && e.windows).length
     }
   }
 
-  it('Hive in the background: a Windows notification, kept in the panel, no toast', () => {
-    expect(warn()).toEqual({ kept: true, visibleToasts: 0, banners: 0, windows: 1, told: 1 })
+  it('Hive in the background: a Windows notification, its row kept in the bell, no pop-up', () => {
+    expect(warn()).toEqual({ entries: 1, popups: 0, windows: 1, told: 1 })
   })
-  it('a Hive window focused: a banner in it, kept in the panel, no toast, no Windows notification', () => {
-    focus()
-    expect(warn()).toEqual({ kept: true, visibleToasts: 0, banners: 1, windows: 0, told: 0 })
+  it('a Hive window focused: a pop-up in it, no Windows notification', () => {
+    focused = true
+    expect(warn()).toEqual({ entries: 1, popups: 1, windows: 0, told: 0 })
   })
-  it('focused and Show nothing: only kept in the panel', () => {
-    focus()
-    config.settings.notifications.whileFocused = 'nothing'
-    expect(warn()).toEqual({ kept: true, visibleToasts: 0, banners: 0, windows: 0, told: 0 })
+  it('focused, pop-ups about agents only in the bell: plan usage is about no project, so it still pops up', () => {
+    focused = true
+    config.settings.notifications.bannerScope = 'none'
+    expect(warn()).toEqual({ entries: 1, popups: 1, windows: 0, told: 0 })
   })
-  it('notifications off: only kept in the panel, focused or not', () => {
+  it('notifications off: nothing at all, focused or not', () => {
     config.settings.notifications.desktopNotifications = false
-    expect(warn()).toEqual({ kept: true, visibleToasts: 0, banners: 0, windows: 0, told: 0 })
+    expect(warn()).toEqual({ entries: 0, popups: 0, windows: 0, told: 0 })
   })
 })
 
@@ -142,6 +145,8 @@ describe('plan usage per connection (HI-1756)', () => {
   beforeEach(() => {
     events.length = 0
     off = onHiveEvent((e) => void events.push(e as never))
+    // A window owns the warnings (HI-2320: told once, to one window), whose events the listeners hear.
+    setNotifyHost({ focused: () => null, fallback: () => ({ isDestroyed: () => false, webContents: { id: 8, send: () => undefined } }) as never, workspaceOf: () => null })
     vi.spyOn(config, 'update').mockImplementation((fn: (c: ReturnType<typeof config.get>) => void) => fn(config.get()))
     config.get().planWarnings = {}
     config.get().planUsage = {}

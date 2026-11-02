@@ -455,6 +455,22 @@
     "defaultMessage": "Leave Running",
     "description": "Button: leaves the processes the agents left running."
   },
+  "main.leftovers.offerChanged": {
+    "defaultMessage": "They changed since this notice: see them in the ⋯ menu on the agent's pane",
+    "description": "What the notice of processes an agent left running says once what runs is no longer exactly what it listed (HI-2320): its End Them would end processes it didn't show, so its buttons go. The ⋯ menu on the agent's pane lists them with End and Keep."
+  },
+  "main.leftovers.offerEnded": {
+    "defaultMessage": "{n, plural, one {Ended # process} other {Ended # processes}}",
+    "description": "What the notice of processes an agent left running says once End Them ended them (HI-2320), in place of its buttons. {n} is how many."
+  },
+  "main.leftovers.offerGone": {
+    "defaultMessage": "They have ended",
+    "description": "What the notice of processes an agent left running says once they ended by themselves, or were ended or kept elsewhere (HI-2320), in place of its buttons."
+  },
+  "main.leftovers.offerKept": {
+    "defaultMessage": "Kept running",
+    "description": "What the notice of processes an agent left running says once Keep Running was chosen (HI-2320), in place of its buttons."
+  },
   "main.leftovers.quitDetail": {
     "defaultMessage": "{n, plural, one {The agents started it, and it may hold project folders or ports. End it as Hive quits, or leave it running?} other {The agents started them, and they may hold project folders or ports. End them as Hive quits, or leave them running?}}",
     "description": "The question as Hive quits, under the list of the processes agents left running. {n} is how many."
@@ -470,6 +486,14 @@
   "main.leftovers.restoredTitle": {
     "defaultMessage": "{n, plural, one {{agent} left # process running} other {{agent} left # processes running}}",
     "description": "A notice at start: processes an agent started before Hive last closed still run. {agent} is the agent (or project) name; {n} how many."
+  },
+  "main.mergeSlot.expiredBody": {
+    "defaultMessage": "{agent} held the merge slot for {branch} longer than its limit without reporting progress, so it went to the next in line. Check whether its merge finished.",
+    "description": "The notice that an agent's merge slot expired. {agent} is the agent, {branch} the branch it was merging into."
+  },
+  "main.mergeSlot.expiredTitle": {
+    "defaultMessage": "{agent}'s merge slot expired",
+    "description": "A notice's title: an agent ({agent}) held the merge slot longer than its limit without reporting progress, so Hive gave it to the next agent in line."
   },
   "main.mergeSlot.leftBody": {
     "defaultMessage": "It held the merge slot for {branch}{hasCards, select, yes { ({cards})} other {}}. Check {folder} for a merge left half done (git status there) before the next merge.",
@@ -823,6 +847,14 @@
     "defaultMessage": "{n, plural, one {Working on: {projects}, as before its rename.} other {Working on: {projects}, as before their rename.}}",
     "description": "A line of Repair's report, after a workspace or project moved to another folder (the moved-workspace banner): renamed projects stay Working on. Working on is how the sidebar marks projects: use its name as shown. {projects} lists them; {n} is how many."
   },
+  "main.notify.answered": {
+    "defaultMessage": "Answered",
+    "description": "What a notification that an agent waited for you (or asked you something) says once it no longer does (HI-2320): answered, or it moved on. Shown under its title, in the pop-up and the bell's list. Keep it short."
+  },
+  "main.notify.sessionEnded": {
+    "defaultMessage": "Its session ended",
+    "description": "What a notification that an agent waited for you says once its session has ended (HI-2320), so it no longer waits. Shown under its title, in the pop-up and the bell's list. Keep it short."
+  },
   "main.outage.gaveUpBody": {
     "defaultMessage": "{n, plural, one {It was resumed once in the past hour} other {It was resumed # times in the past hour}} and stopped again, so Hive won't resume it again by itself. This PC's network may not have recovered: try renewing its network adapter's addresses (ipconfig /renew), flushing DNS (ipconfig /flushdns) or restarting the PC, then resume it.",
     "description": "The notice that Hive stopped resuming an agent whose connection kept dropping. {n} is how many times it was resumed in the past hour. ipconfig /renew and ipconfig /flushdns are Windows commands: keep them."
@@ -850,6 +882,62 @@
   "main.outage.timedOutTitle": {
     "defaultMessage": "{agent}'s connection didn't come back",
     "description": "A notice's title: Hive waited for an agent's connection to come back, to resume it, and gave up. {agent} is the agent's name."
+  },
+  "main.outcome.allowed": {
+    "defaultMessage": "Allowed",
+    "description": "What the notice that an agent wants to edit a file another agent is editing says after Allow (HI-2320), in place of its button. Keep it short."
+  },
+  "main.outcome.conversationEnded": {
+    "defaultMessage": "Its conversation ended",
+    "description": "What a notification about an agent's conversation (a long conversation's Hand Over to…) says once that conversation's session has ended (HI-2320), in place of its button."
+  },
+  "main.outcome.conversationMoved": {
+    "defaultMessage": "It has a new conversation now",
+    "description": "What the long-conversation notification says once the agent has moved to a new conversation (handed over, or the CLI started one; HI-2320), in place of its Hand Over to… button."
+  },
+  "main.outcome.modesNextSession": {
+    "defaultMessage": "Their sessions ended: the new mode applies from the next",
+    "description": "What the notice that the permission mode changed says once none of the agents it named still runs that session (HI-2320), in place of its Switch Now button."
+  },
+  "main.outcome.modesNothing": {
+    "defaultMessage": "Nothing to switch: every running agent is in its mode",
+    "description": "What the notice that the permission mode changed says after Switch Now found nothing to switch (HI-2320), in place of its button."
+  },
+  "main.outcome.namesDiffer": {
+    "defaultMessage": "The names differ now",
+    "description": "What the notice that agents share a name says once they no longer do (HI-2320), in place of its Rename… button."
+  },
+  "main.outcome.noLongerAsked": {
+    "defaultMessage": "No longer asked",
+    "description": "What the notice that an agent wants to edit a locked file says once the agent no longer asks (its turn ended, or it was allowed elsewhere; HI-2320), in place of its Allow button."
+  },
+  "main.outcome.noLongerHeld": {
+    "defaultMessage": "No longer held",
+    "description": "What the notice that a slot is held by Windows' idle Sandbox broker says once nothing holds it (HI-2320), in place of its Release Slot… button."
+  },
+  "main.outcome.notResumed": {
+    "defaultMessage": "Not resumed",
+    "description": "What the notice offering to resume the agents that were working before Hive restarted says after Don't Resume (HI-2320), in place of its buttons."
+  },
+  "main.outcome.openHereAgain": {
+    "defaultMessage": "The conversation is open here again",
+    "description": "What the notice that a conversation runs as a background job says once it is open in Hive again (HI-2320), in place of its Stop It and Resume button."
+  },
+  "main.outcome.released": {
+    "defaultMessage": "Released",
+    "description": "What the notice that a slot is held by Windows' idle Sandbox broker says once the slot is released (HI-2320), in place of its Release Slot… button. Keep it short."
+  },
+  "main.outcome.stoppedAndResumed": {
+    "defaultMessage": "Stopped and resumed here",
+    "description": "What the notice that a conversation runs as a background job says after Stop It and Resume (HI-2320), in place of its button."
+  },
+  "main.outcome.updateInstalling": {
+    "defaultMessage": "Installing: Hive restarts",
+    "description": "What the notice that a Hive update is ready says after Restart and Update (HI-2320), in place of its button, as Hive restarts to install it."
+  },
+  "main.outcome.updateNotReady": {
+    "defaultMessage": "No longer ready to install",
+    "description": "What the notice that a Hive update is ready says once that update is no longer the one ready (HI-2320), in place of its Restart and Update button."
   },
   "main.plan.close": {
     "defaultMessage": "You are getting close to the limit.",

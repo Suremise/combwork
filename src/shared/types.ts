@@ -78,13 +78,11 @@ export type PermissionMode = string
 /** A reasoning effort id from the agent's provider (e.g. "low", "high", "max"). */
 export type EffortLevel = string
 export type ChimeSound = 'chime' | 'bell' | 'soft' | 'pop'
-/** Settings → Notifications, *While Hive is focused*: Show in Hive, Show nothing, or a Windows notification. */
-export type WhileFocused = 'inApp' | 'nothing' | 'windows'
-/** Settings → Notifications, *Show banners for*. */
-export type BannerScope = 'all' | 'workspace' | 'project'
+/** Settings → Notifications, *Show pop-ups about agents for* (HI-2320: `none`, only in the bell). */
+export type BannerScope = 'all' | 'workspace' | 'project' | 'none'
 export type BannerPosition = 'top-left' | 'top-center' | 'top-right' | 'bottom-left' | 'bottom-center' | 'bottom-right'
 
-/** A notice shown as a banner in the focused window (#157): an agent finished or waiting, or another notice. */
+/** A notice the Agent API's event stream hears of (#620): an agent finished or waiting, or another notice (HI-2320: the window shows it as an entry). */
 export interface Notice {
   id: string
   kind: 'finished' | 'waiting' | 'notice'
@@ -222,14 +220,13 @@ export interface AppSettings {
     desktopNotifications: boolean
     notifyOnFinished: boolean
     notifyOnWaiting: boolean
-    /** While a Hive window is focused: a banner in it, nothing, or a Windows notification (shared/bursts.ts noticeRoute). */
-    whileFocused: WhileFocused
-    /** Which notices the focused window shows as banners: from every window, its workspace, or the project it shows. */
+    /** Which agents' notices the focused window pops up: from every window, its workspace, the project it shows, or none (only in the bell). */
     bannerScope: BannerScope
+    /** Where every pop-up goes (HI-2320). */
     bannerPosition: BannerPosition
-    /** How long a banner for a finished agent (or another notice) stays, in seconds; kept while the pointer is on it. */
+    /** How long a pop-up that closes by itself stays, in seconds; kept while the pointer or the focus is on it, or the window isn't focused. */
     bannerSeconds: number
-    /** Banners for an agent waiting for you stay until handled (clicked, dismissed or answered); off: they close like the others. */
+    /** Pop-ups for an agent waiting for you stay until handled (clicked, dismissed or answered); off: they close like the others. */
     waitingBannerStays: boolean
     /** A badge with the count of agents that need you on the window's taskbar button, and the count in its title. */
     taskbarCount: boolean
@@ -567,7 +564,7 @@ export interface WindowState {
 
 export interface AppConfig {
   /** 7 since working modes replaced the shipped personas (#259); 6 since notices show in Hive while it is focused; 3 since the Assistant uses the agents' model and effort (0.3.0); 2 since providers (0.2.0); 1 was Claude Code only. */
-  version: 8
+  version: 9
   settings: AppSettings
   recentWorkspaces: string[]
   /** The workspace of the window focused last (what 0.1 reopened); `windows` has every window. */
@@ -3518,6 +3515,19 @@ export interface ToastAction {
 export type ToastTarget =
   | { kind: 'agent'; projectPath: string; agentId: string; name: string; project: string }
   | { kind: 'card'; number: number; label: string; projectPath: string | null; workspacePath: string }
+  /** A project (HI-2320: every entry links to what it is about); `project` its name as shown then. */
+  | { kind: 'project'; projectPath: string; project: string }
+
+/** What an entry is about, which says where it goes and how it behaves (shared/notify.ts, HI-2320). */
+export type NotifyKind = 'needsYou' | 'finished' | 'work' | 'usage' | 'warning' | 'result' | 'transcript' | 'update' | 'quit' | 'tip'
+
+/**
+ * What keeps a window-made entry's buttons live (HI-2320), re-checked by the window as its state changes
+ * (renderer/entryConditions.ts): its buttons go, and the entry says what happened, once it no longer holds.
+ */
+export type EntryCondition =
+  | { kind: 'mcpMissing'; projectPath: string; names: string[] }
+  | { kind: 'assistantQuestion'; id: string }
 
 export type UpdateStatus = 'disabled' | 'idle' | 'checking' | 'available' | 'downloading' | 'ready' | 'up-to-date' | 'error'
 
@@ -3549,20 +3559,33 @@ export interface UpdateState {
   notInstalled?: 'unreadable' | 'notNewer'
 }
 
+/**
+ * One notification (HI-2320): shown as a pop-up in one window and kept in that window's bell, or kept in the bell only
+ * (`quiet`: told as a Windows notification, or left out of pop-ups by the scope).
+ */
 export interface ToastMessage {
   id: string
   level: ToastLevel
+  /** What it is about (shared/notify.ts); none: from its level (warning and error: warning, else result). */
+  kind?: NotifyKind
   title: string
   message?: string
+  /** Its buttons, shown while it is unresolved, in its pop-up and its bell row alike. */
   actions?: ToastAction[]
-  /** What a click on it opens (HI-1961). */
+  /** What a click on it opens (HI-1961; a project too, HI-2320). */
   target?: ToastTarget
   timestamp: string
   source?: string
-  /** Kept in the Notifications panel (the bell) only, not shown as a toast: a notice told another way, or not at all (#157). */
+  /** Kept in the Notifications panel (the bell) only, not shown as a pop-up. */
   quiet?: boolean
-  /** How long the toast stays (ms), when not the usual for its kind (an Undo's ~10 s, #351). */
+  /** How long the pop-up stays (ms), when not the usual for its kind (an Undo's ~10 s, #351). */
   timeoutMs?: number
+  /** The offer its buttons act on, main's (main/notify.ts): resolved by that offer alone, never by a newer one. */
+  offer?: string
+  /** A window-made entry's live condition, which the window re-checks (renderer/entryConditions.ts). */
+  condition?: EntryCondition
+  /** What happened, once its action is done or no longer applies: its buttons are gone and this is shown instead. */
+  resolved?: string
 }
 
 export interface AppInfo {
@@ -3652,7 +3675,10 @@ export type HiveEvent =
   | { type: 'agent-leftovers'; leftovers: AgentLeftovers }
   | { type: 'toast'; toast: ToastMessage }
   /** A notice no longer true (HI-1905: a project's platform notice once detection and the platform agree): every window drops it. */
-  | { type: 'toast-gone'; id: string }
+  /** Entries whose offer was taken or no longer applies (HI-2320): their buttons go and `outcome` says what happened. */
+  | { type: 'toast-resolved'; ids: string[]; outcome: string }
+  /** How many finishes wait to be told together (HI-2320: no tip while some do). */
+  | { type: 'notify-pending'; finishes: number }
   | { type: 'chime'; projectPath: string; silent?: boolean }
   | { type: 'settings-changed'; settings: AppSettings }
   /** Advanced settings (#367) changed: an override, advanced.json, a workspace's own or an installed CLI's version. */

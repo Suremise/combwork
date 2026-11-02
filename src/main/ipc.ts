@@ -95,7 +95,7 @@ import * as skills from './skills'
 import * as storage from './storage'
 import { applyCleanupPlan, cardCleanupPreview, queueCleanup } from './cardAttachmentCleanup'
 import { antivirusStatus, antivirusSuggestion, applyAntivirus, dismissAntivirus, moveDefenderPlan, prepareAntivirus } from './antivirus'
-import { agentsMemory, allLeftovers, endAgentProcess, leftoversSettled, settleLeftovers } from './agentProcesses'
+import { agentsMemory, allLeftovers, endAgentProcess, leftoversSettled, settleLeftovers, settleOffer } from './agentProcesses'
 import { cardWork, forYou, workBadges } from './workflow/cardWork'
 import { contextWorkspace, currentWorkspace, inWorkspace, workspace, workspaceFor, workspaceOf, WorkspaceService } from './workspace'
 import { ensureHiveExcluded, trackedHiveFiles, untrackHive, vcsOf } from './hiveVcs'
@@ -524,7 +524,7 @@ export function registerIpc(getAppInfo: () => ReturnType<HiveRequests['app:info'
     'update:state': () => updater.updateState(),
     'update:check': () => updater.check(true),
     'update:download': () => updater.download(),
-    'update:install': () => updater.restartAndInstall(),
+    'update:install': (version) => updater.restartAndInstall(typeof version === 'string' ? version : undefined),
     'update:skip': (version) => updater.skip(version),
     'team:state': () => teamPauseState(),
     'team:pause': async () => {
@@ -1093,11 +1093,17 @@ export function registerIpc(getAppInfo: () => ReturnType<HiveRequests['app:info'
       return allLeftovers((p) => workspaceFor(p) === ws)
     },
     'session:settleLeftovers': (p, agentId, how) => settleLeftovers(workspace.assertSessionHost(p), agentId, how === 'end' ? 'end' : 'keep'),
+    // A notice's End Them / Keep Running (HI-2320): only what it listed, by id and start time, checked again first.
+    'session:settleOffer': async (p, offer, how) => {
+      workspace.assertSessionHost(p)
+      if (typeof offer !== 'string' || !offer.startsWith('leftovers:')) throw new Error('not a leftovers offer') // i18n-ignore: a malformed call, never shown
+      await settleOffer(offer, how === 'end' ? 'end' : 'keep')
+    },
     'session:stopBackgroundAndResume': (p, agentId, jobId, sessionId) => sessions.stopBackgroundAndResume(p, agentId, jobId, sessionId),
     'session:handOver': (p, from, to, opts) => sessions.handOver(p, from, to, opts),
     'session:mayHandOverNow': (p, agentId) => mayHandOverNow(workspace.assertSessionHost(p), String(agentId)),
     'session:allowLockedEdit': (p, agentId, path) => sessions.allowLockedEdit(p, agentId, path),
-    'session:applyModes': () => sessions.applyModeSettings(),
+    'session:applyModes': (offer) => (typeof offer === 'string' && offer.startsWith('modes:') ? sessions.applyModeOffer(offer) : sessions.applyModeSettings()),
     'session:compact': (p, focus, agentId) => sessions.compact(p, focus, agentId),
     'session:pasteImage': (p, agentId) => sessions.pasteImage(p, agentId),
     'session:planAttach': (p, sources, agentId) => sessions.planAttach(p, sources, agentId),

@@ -101,6 +101,7 @@
   "workspace.antivirus.wholeShare": "a whole network share",
   "workspace.antivirus.whyAgents": "several agents are running",
   "workspace.antivirus.whySlow": "a long command just ran",
+  "workspace.antivirus.wontAsk": "Hive won’t suggest it again for this workspace",
   "workspace.banners.dismiss": "Dismiss",
   "workspace.banners.more": "+{count} more",
   "workspace.banners.region": "Notifications",

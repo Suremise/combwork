@@ -1,22 +1,10 @@
 /**
  * Agents finishing together: one chime at a time, and one notification for a burst of finishes instead of a
- * pop-up each. Waiting for input is never grouped or delayed (main/sessions.ts notify()).
+ * pop-up each. Waiting for input is never grouped or delayed (main/sessions.ts notify()). Where they go is shared/notify.ts'.
  */
 
 import { englishText } from './advanced'
 import { fmt, msg, tr, type Msg } from './i18n'
-import type { AppSettings } from './types'
-
-/** Where a notice goes: a banner in the focused Hive window, a Windows notification, or nowhere. */
-export type NoticeRoute = 'banner' | 'windows' | 'none'
-
-/** The Hive window you are using: the workspace it holds and the project it shows. */
-export interface FocusedHive {
-  workspacePath: string | null
-  projectPath: string | null
-}
-
-const samePath = (a: string | null, b: string | null): boolean => !!a && !!b && a.toLowerCase() === b.toLowerCase()
 
 /** At most one chime this often (per window). */
 export const CHIME_GAP_MS = 2000
@@ -24,56 +12,6 @@ export const CHIME_GAP_MS = 2000
 export const FINISH_GROUP_MS = 3000
 /** A steady stream of finishes is told at least this often. */
 export const FINISH_GROUP_MAX_MS = 10_000
-
-/**
- * Where a notice goes now (Settings → Notifications): decided when it happens and again when a group of finishes is
- * shown, since the settings or the focus may have changed while it was collected.
- * - Notifications off, or that kind off: nowhere.
- * - No Hive window focused: a Windows notification.
- * - A Hive window focused (`focused`): per *While Hive is focused*: a banner in that window (Show in Hive), nothing, or
- *   a Windows notification. A banner only for what *Show banners for* covers: every window's notices, the focused
- *   window's workspace's, or the project it shows; one it leaves out shows nothing at all. A notice about no project
- *   (plan usage) is for every scope.
- */
-export function noticeRoute(
-  n: Pick<AppSettings['notifications'], 'desktopNotifications' | 'notifyOnFinished' | 'notifyOnWaiting' | 'whileFocused' | 'bannerScope'>,
-  kind: 'finished' | 'waiting' | 'notice',
-  focused: FocusedHive | null,
-  from: { workspacePath: string | null; projectPath: string | null }
-): NoticeRoute {
-  return noticeRouteWhy(n, kind, focused, from).route
-}
-
-/** noticeRoute, with why in a few English words for the log (HI-2312: each notice told is traced there). */
-export function noticeRouteWhy(
-  n: Pick<AppSettings['notifications'], 'desktopNotifications' | 'notifyOnFinished' | 'notifyOnWaiting' | 'whileFocused' | 'bannerScope'>,
-  kind: 'finished' | 'waiting' | 'notice',
-  focused: FocusedHive | null,
-  from: { workspacePath: string | null; projectPath: string | null }
-): { route: NoticeRoute; why: string } {
-  if (!n.desktopNotifications) return { route: 'none', why: 'notifications off' } // i18n-ignore: the log's reason (English)
-  if (kind === 'finished' && !n.notifyOnFinished) return { route: 'none', why: 'finished notices off' } // i18n-ignore: the log's reason (English)
-  if (kind === 'waiting' && !n.notifyOnWaiting) return { route: 'none', why: 'waiting notices off' } // i18n-ignore: the log's reason (English)
-  if (!focused) return { route: 'windows', why: 'no Hive window focused' } // i18n-ignore: the log's reason (English)
-  if (n.whileFocused === 'nothing') return { route: 'none', why: 'Hive focused, set to show nothing' } // i18n-ignore: the log's reason (English)
-  if (n.whileFocused === 'windows') return { route: 'windows', why: 'Hive focused, set to Windows notifications' } // i18n-ignore: the log's reason (English)
-  if (!from.projectPath && !from.workspacePath) return { route: 'banner', why: 'about no project' } // i18n-ignore: the log's reason (English)
-  if (n.bannerScope === 'workspace' && !samePath(focused.workspacePath, from.workspacePath)) return { route: 'none', why: "banner scope: another workspace's" } // i18n-ignore: the log's reason (English)
-  if (n.bannerScope === 'project' && !samePath(focused.projectPath, from.projectPath)) return { route: 'none', why: "banner scope: another project's" } // i18n-ignore: the log's reason (English)
-  return { route: 'banner', why: `banner scope: ${n.bannerScope}` } // i18n-ignore: the log's reason (English)
-}
-
-/** How many banners show at once (more are behind "+N more"), and how many that close by themselves are kept. */
-export const MAX_BANNERS = 4
-
-/**
- * The banners a window keeps, newest first: every one that stays until handled (a waiting agent's, unless set to close
- * like the others), however many, and the newest MAX_BANNERS of the rest. A new notice never pushes out one waiting.
- */
-export function keepNotices<T>(newestFirst: readonly T[], staysUntilHandled: (n: T) => boolean, max = MAX_BANNERS): T[] {
-  let others = 0
-  return newestFirst.filter((n) => staysUntilHandled(n) || others++ < max)
-}
 
 export function chimeAllowed(lastAt: number | null, now: number): boolean {
   return lastAt === null || now - lastAt >= CHIME_GAP_MS
@@ -129,12 +67,15 @@ export class FinishBatcher {
 
   constructor(
     private readonly flush: (items: Finish[]) => void,
-    private readonly now: () => number = Date.now
+    private readonly now: () => number = Date.now,
+    /** How many wait to be told, each time it changes (HI-2320: a tip waits while any do). */
+    private readonly pending: (n: number) => void = () => undefined
   ) {}
 
   add(item: Finish): void {
     if (!this.items.length) this.firstAt = this.now()
     this.items.push(item)
+    this.pending(this.items.length)
     if (this.timer) clearTimeout(this.timer)
     const wait = Math.max(0, Math.min(FINISH_GROUP_MS, this.firstAt + FINISH_GROUP_MAX_MS - this.now()))
     this.timer = setTimeout(() => this.send(), wait)
@@ -145,6 +86,7 @@ export class FinishBatcher {
     const dropped = this.items.filter(match)
     if (!dropped.length) return dropped
     this.items = this.items.filter((i) => !match(i))
+    this.pending(this.items.length)
     if (!this.items.length && this.timer) {
       clearTimeout(this.timer)
       this.timer = null
@@ -156,6 +98,9 @@ export class FinishBatcher {
     this.timer = null
     const items = this.items
     this.items = []
-    if (items.length) this.flush(items)
+    if (items.length) {
+      this.pending(0)
+      this.flush(items)
+    }
   }
 }

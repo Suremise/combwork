@@ -1,4 +1,4 @@
-import { randomBytes, randomUUID } from 'crypto'
+import { randomBytes } from 'crypto'
 import { carryLegacyAgentFields, legacyWorktree, type LegacyAgentFields, type NamedFolder, type StoredAgent } from '../shared/agentFolders'
 import { basename, dirname, join, resolve, sep } from 'path'
 import { mkdir, readdir, readFile, stat, writeFile } from 'original-fs/promises'
@@ -22,7 +22,9 @@ import { HiveError, hiveError } from './hiveError'
 import type { AgentDef, AgentInfo, HiddenProject, HiveEvent, KeptUsage, LiveSessionState, ProjectConfig, ProjectInfo, RemovedData, SessionRecord, WorkspaceConfig, WorkspaceInfo, WorkspaceMoved } from '../shared/types'
 import { config } from './config'
 import { changesConfig, viewOf, withoutView } from '../shared/projectView'
-import { emit, emitTo } from './events'
+import { emit, emitTo, toast } from './events'
+import { resolveOffer, resolveOffers } from './notify'
+import { OUTCOME } from './outcomes'
 import { containsPlace, insideReal, isDir, placeKey, readJson, readKeptJson, readKeptJsonByStat, removePath, retryWhileSaving, samePlace, withFileLock, writeKeptJson, type KeptReadOptions } from './fsutil'
 import { admit, dismiss, setFenceReason } from './openingFence'
 import { AfterOpen } from './openProgress'
@@ -70,6 +72,7 @@ const M = {
   platformInvalidTitle: msg({ id: 'service.workspace.platformInvalidTitle', defaultMessage: 'Unknown version control setting in {project}', description: "A notice's title: the project {project}'s settings file names a version control Hive doesn't have." }),
   platformInvalid: msg({ id: 'service.workspace.platformInvalid', defaultMessage: "{project}'s project.json names a version control Hive doesn't know (platform: {value}). Until it says \"git\" or \"none\", Hive uses what it finds in the folder.", description: 'A notice: the platform setting in the project {project}\'s .hive/project.json is {value}, which is not one Hive has (only "git" and "none" are: keep them as they are, they are setting values).' }),
   otherFound: msg({ id: 'service.workspace.platformOtherFound', defaultMessage: "{vcs} was found in {project}. Hive doesn't support it yet, and goes on treating the project as a Git project until you switch it to None in its Version Control tab.", description: 'A notice: another version control system ({vcs}: Mercurial, Jujutsu…) was found in a project Hive treats as a Git project. Hive does not switch it by itself: the Version Control tab offers the switch to None (glossary 2.1).' }),
+  platformSettled: msg({ id: 'service.workspace.platformSettled', defaultMessage: 'Settled: nothing to change now', description: "What the notice that a project's version control changed says once it no longer applies (HI-2320): the project was switched, or its folder is back as it was. Shown in place of its button." }),
   openVc: msg({ id: 'service.workspace.platformOpen', defaultMessage: 'Open Version Control', description: "A button on the notice that a project's version control changed: shows the project's Version Control tab, where Hive offers the switch (glossary 2.1)." })
 }
 // What a closed workspace's refused open throws (#1381: made when refused, not kept per workspace).
@@ -1625,7 +1628,7 @@ export class WorkspaceService {
     // Nothing to say now (switched, or the folder back as it was): the notice said before goes (HI-1905: a project
     // switched to Git right after Initialise repository… kept "Hive goes on treating it as … None").
     if (!why) {
-      if (before) this.emit({ type: 'toast-gone', id: `platform:${key}` })
+      if (before) resolveOffer(`platform:${key}`, tr(M.platformSettled))
       return
     }
     if (p.invalid !== undefined) log.warn(`${userText(basename(projectPath))}'s project.json names no platform Hive has (${userText(p.invalid)}): it uses ${p.id}, as detected`)
@@ -1633,7 +1636,9 @@ export class WorkspaceService {
     // An offer has its button to the tab that makes it (#1419); an unknown setting is fixed in project.json.
     const actions = p.offer ? [{ label: tr(M.openVc), command: 'project.openVersionControl', args: [projectPath] }] : undefined
     // One notice per project: a newer detection replaces the one before it rather than stacking (#1419).
-    this.emit({ type: 'toast', toast: { id: `platform:${key}`, level: p.invalid !== undefined ? 'warning' : 'info', ...platformNotice(basename(projectPath), p), ...(actions ? { actions } : {}), source: projectPath, timestamp: new Date().toISOString() } })
+    // Its offer (HI-2320) is the project's platform notice: settled, it says so and loses its button.
+    const n = platformNotice(basename(projectPath), p)
+    toast(p.invalid !== undefined ? 'warning' : 'info', n.title, n.message, actions, projectPath, { kind: 'project', projectPath, project: basename(projectPath) }, { id: `platform:${key}`, offer: `platform:${key}` })
   }
 
   /** Whether project.json was written after this read of it began (#999). */
@@ -1711,6 +1716,8 @@ export class WorkspaceService {
     if (now.length) this.wsConfig.flaggedAgentNames = now
     else delete this.wsConfig.flaggedAgentNames
     void this.saveWorkspaceConfig().catch((e) => log.warn('remembering the shared agent names', e))
+    // No name shared any more: the notice's Rename… no longer applies (HI-2320).
+    if (!now.length) resolveOffers((o) => o === `names:${this.path?.toLowerCase()}`, tr(OUTCOME.namesDiffer))
     const fresh = dups.filter((d) => !before.includes(d.name.toLowerCase()))
     if (!fresh.length) return
     // The one to rename: the last project's, alphabetically, given its own project's prefix.
@@ -1721,7 +1728,7 @@ export class WorkspaceService {
     const message = tr(msg({ id: 'service.workspace.sharedNames', defaultMessage: "Agent names are unique across the workspace now, so each agent can be told apart. {shared}: they keep working, but rename one of each, e.g. {project}'s {agent} to {suggestion}.", description: "A notice: agents of several projects share names from before names were unique. {shared} says which (\"R1 is in alpha and beta\"); {suggestion} is a free name for the agent {agent} of the project {project}." }), { shared, project: first.project, agent: first.name, suggestion })
     const title = fresh.length === 1 ? tr(msg({ id: 'service.workspace.twoCalled', defaultMessage: 'Two agents are called {name}', description: "A notice's title: agents of two projects share the name {name}." }), { name: fresh[0].name }) : tr(msg({ id: 'service.workspace.namesShared', defaultMessage: 'Agents share names', description: "A notice's title: agents of several projects share names." }))
     const label = tr(msg({ id: 'service.workspace.renameAgent', defaultMessage: "Rename {project}'s {agent}…", description: "The notice's button: opens the settings of the agent {agent} of the project {project}, to rename it." }), { project: first.project, agent: first.name })
-    this.emit({ type: 'toast', toast: { id: randomUUID(), level: 'warning', title, message, actions: [{ label, command: 'agent.settings', args: [first.path, first.id] }], source: first.path, timestamp: new Date().toISOString() } })
+    toast('warning', title, message, [{ label, command: 'agent.settings', args: [first.path, first.id] }], first.path, { kind: 'agent', projectPath: first.path, agentId: first.id, name: first.name, project: first.project }, { offer: `names:${this.path?.toLowerCase()}` })
   }
 
   info(): WorkspaceInfo | null {

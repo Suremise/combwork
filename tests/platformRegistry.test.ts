@@ -157,11 +157,14 @@ describe('in ProjectInfo', () => {
     gitInit(p)
     await info(p)
     expect(notices(p)).toHaveLength(1)
-    const gone = () => events.flatMap((e) => (e.type === 'toast-gone' ? [e.id] : []))
+    // HI-2320: its entry is resolved (it says so, its button goes), not taken away.
+    const notice = notices(p)[0] as { id: string }
+    const gone = () => events.flatMap((e) => (e.type === 'toast-resolved' ? e.ids : []))
     expect(gone()).toEqual([])
     await inWorkspace(w, () => w.mutateProjectConfig(p, (c) => ({ ...c, platform: 'git' })))
     await info(p)
-    expect(gone()).toEqual([`platform:${p.toLowerCase()}`])
+    expect(gone()).toEqual([notice.id])
+    expect(notice.id).toBe(`platform:${p.toLowerCase()}`)
     // Said once: read again, nothing more.
     await info(p)
     expect(gone()).toHaveLength(1)

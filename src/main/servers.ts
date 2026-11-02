@@ -3898,7 +3898,7 @@ route('POST', '/v1/notify', async ({ body }) => {
   if (!body?.title) throw new HttpError(400, 'title is required')
   const target = await notifyTarget(body.target)
   toast(level, String(body.title).slice(0, 200), body.message ? String(body.message).slice(0, 2000) : undefined, undefined, body.source ? String(body.source) : 'agent', target)
-  return { ok: true, ...(target ? { opens: target.kind === 'agent' ? target.name : target.label } : {}) }
+  return { ok: true, ...(target ? { opens: target.kind === 'agent' ? target.name : target.kind === 'card' ? target.label : target.project } : {}) }
 })
 
 /**

@@ -12,7 +12,8 @@ import { assistantHome } from './assistantControl'
 import { config } from './config'
 import { leaveDelivery } from './deliveries'
 import { journalFactAt } from './journalService'
-import { emit, onHiveEvent, toast } from './events'
+import { onHiveEvent, toast } from './events'
+import { resolveOffer } from './notify'
 import { crashDumps, type CrashDump } from './exitLog'
 import { renameRetrying } from './fsutil'
 import { hiveError } from './hiveError'
@@ -273,14 +274,32 @@ async function resumeAgents(agents: readonly RunningAgent[]): Promise<ResumeRepo
   return out
 }
 
+/** The unexpected close's notice (HI-2320), and which of its buttons still have something to do. */
+let closeOffer: string | null = null
+let resumeOpen = false
+let stopOpen = false
+
+/** One of the notice's actions is done: with nothing left to do, its result is what the notice says (no notice of its own). */
+function settled(part: 'resume' | 'stop', level: 'success' | 'error' | 'info', text: string): void {
+  if (part === 'resume') resumeOpen = false
+  else stopOpen = false
+  if (closeOffer && !resumeOpen && !stopOpen && resolveOffer(closeOffer, text)) {
+    closeOffer = null
+    return
+  }
+  toast(level, text)
+}
+
 /** The notice's Resume All: the agents the notice listed, resumed once; the result told. */
 export async function resumeAfterClose(): Promise<ResumeReport> {
   const agents = toResume
   toResume = []
   const r = await resumeAgents(agents)
   if (r.held?.length) toast('info', tr(msg({ id: 'main.unexpectedClose.heldTitle', defaultMessage: '{n, plural, one {One agent left stopped} other {# agents left stopped}}', description: "A notice's title after resuming the agents that were running when Hive closed unexpectedly (#1434): {n} were left stopped, their conversations' slots free (only their own Resume takes one) or holding other work." }), { n: r.held.length }), resumeHeldLine(r.held))
-  if (r.failed.length) toast('error', tr(msg({ id: 'main.unexpectedClose.resumeFailedTitle', defaultMessage: "Some agents couldn't resume", description: "A notice's title: resuming the agents that were running when Hive closed unexpectedly failed for some." })), resumeFailedLine(r))
-  else toast('success', tr(msg({ id: 'main.unexpectedClose.resumedTitle', defaultMessage: '{n, plural, =0 {Nothing to resume} one {Resumed one agent} other {Resumed # agents}}', description: "A notice's title: the agents that were running when Hive closed unexpectedly were resumed ({n} of them; 0: all were running again or had no conversation)." }), { n: r.resumed.length }))
+  if (r.failed.length) {
+    resumeOpen = false
+    toast('error', tr(msg({ id: 'main.unexpectedClose.resumeFailedTitle', defaultMessage: "Some agents couldn't resume", description: "A notice's title: resuming the agents that were running when Hive closed unexpectedly failed for some." })), resumeFailedLine(r))
+  } else settled('resume', 'success', tr(msg({ id: 'main.unexpectedClose.resumedTitle', defaultMessage: '{n, plural, =0 {Nothing to resume} one {Resumed one agent} other {Resumed # agents}}', description: "A notice's title: the agents that were running when Hive closed unexpectedly were resumed ({n} of them; 0: all were running again or had no conversation)." }), { n: r.resumed.length }))
   return r
 }
 
@@ -334,7 +353,12 @@ export async function tellUnexpectedClose(): Promise<void> {
   actions.push({ label: tr(msg({ id: 'main.unexpectedClose.overview', defaultMessage: 'Show Overview', description: "A button in the notice that Hive closed unexpectedly: shows the Workspace Overview, with every project's agents." })), command: 'view.overview' })
   // It stays up for two minutes (a notice with buttons goes after 15 s), and in the Notifications panel after.
   const title = tr(msg({ id: 'main.unexpectedClose.title', defaultMessage: 'Hive closed unexpectedly', description: "The notice's title at start when the last run of Hive ended without quitting (killed, a crash, the power)." }))
-  emit({ type: 'toast', toast: { id: randomUUID(), level: 'warning', title, message: unexpectedCloseText({ ...c, dump: !!c.dump, stillRunning: leftRunning, kept }, r), actions, timestamp: new Date().toISOString(), timeoutMs: 120_000 } })
+  // Its offer (HI-2320): live while Resume All or Stop Them still has something to do; the last one's result is what it
+  // says then, in place of its buttons.
+  closeOffer = `lastrun:${randomUUID()}`
+  resumeOpen = !r && mine.length > 0
+  stopOpen = leftRunning.length > 0
+  toast('warning', title, unexpectedCloseText({ ...c, dump: !!c.dump, stillRunning: leftRunning, kept }, r), actions, undefined, undefined, { offer: closeOffer, timeoutMs: 120_000 })
   await tellAssistants(c, r, leftRunning.length)
 }
 
@@ -358,7 +382,7 @@ export async function stopLeftAfterClose(): Promise<number> {
   if (n && u) throw hiveError(msg({ id: 'main.unexpectedClose.notStoppedNorChecked', defaultMessage: "{n, plural, one {# process is still running: Windows didn't let Hive end it; Stop Them in the notice tries again.} other {# processes are still running: Windows didn't let Hive end them; Stop Them in the notice tries again.}} {u, plural, one {Another, started by a test run, may still be running: Windows let Hive neither end nor check it, so Hive can't find it again. Look for process ID {ids} in Task Manager's Details.} other {# others, started by a test run, may still be running: Windows let Hive neither end nor check them, so Hive can't find them again. Look for process IDs {ids} in Task Manager's Details.}}", description: "Stopping the processes the agents had started before Hive closed unexpectedly failed for some. {n} is how many still run, which Stop Them (the notice's button) tries again; {u} is how many more, started by a test run, Windows let Hive neither end nor check, so Hive can't tell them from other processes any more: {ids} lists their process IDs (\"4242, 4250\"), to look for in Task Manager's Details tab." }), { n, u, ids })
   if (n) throw hiveError(msg({ id: 'main.unexpectedClose.notStopped', defaultMessage: "{n, plural, one {# process is still running: Windows didn't let Hive end it.} other {# processes are still running: Windows didn't let Hive end them.}} Stop Them in the notice tries again.", description: "Stopping the processes the agents had started before Hive closed unexpectedly failed for some. {n} is how many still run; Stop Them is the notice's button." }), { n })
   if (u) throw hiveError(msg({ id: 'main.unexpectedClose.notChecked', defaultMessage: "{u, plural, one {A process started by a test run may still be running: Windows let Hive neither end nor check it, so Hive can't find it again. Look for process ID {ids} in Task Manager's Details.} other {# processes started by a test run may still be running: Windows let Hive neither end nor check them, so Hive can't find them again. Look for process IDs {ids} in Task Manager's Details.}}", description: "Stop Them (in the notice that Hive closed unexpectedly) ended what it could, but {u} processes a test run had started may still run: Windows let Hive neither end nor check them, and with what started them ended Hive can't tell them from other processes any more, so pressing Stop Them again won't reach them. {ids} lists their process IDs (\"4242, 4250\"), to look for in Task Manager's Details tab." }), { u, ids })
-  toast('success', tr(msg({ id: 'main.unexpectedClose.stopped', defaultMessage: '{n, plural, one {Stopped one process} other {Stopped # processes}}', description: "A notice's title: the processes the agents had started before Hive closed unexpectedly were ended ({n} of them)." }), { n: stopped }))
+  settled('stop', 'success', tr(msg({ id: 'main.unexpectedClose.stopped', defaultMessage: '{n, plural, one {Stopped one process} other {Stopped # processes}}', description: "A notice's title: the processes the agents had started before Hive closed unexpectedly were ended ({n} of them)." }), { n: stopped }))
   return stopped
 }
 

@@ -16,7 +16,7 @@ import { constants as fsConstants, existsSync, realpathSync } from 'original-fs'
 import { TYPED_NEWLINE_KEYS, typedText } from '../shared/terminalInput'
 import { failedStart, type StartFailure } from '../shared/startFailure'
 import { startBegins, startFailed } from './agentStarts'
-import { BrowserWindow, Notification, app, clipboard } from 'electron'
+import { BrowserWindow, app, clipboard } from 'electron'
 import { ASSISTANT_DIR, ASSISTANT_NAME } from '../shared/assistant'
 import { formatDateTime } from '../shared/dates'
 import { formatSize } from '../shared/units'
@@ -54,7 +54,8 @@ import type {
   Attached,
   AttachmentPlan,
   SessionListItem,
-  Notice,
+  NotifyKind,
+  ToastTarget,
   SessionRecord,
   SessionSkipReason,
   SubSession,
@@ -77,8 +78,8 @@ import type { Ask, BackgroundTaskType, ExternalSession, HookEvent, LaunchContext
 import { HOOK_FIRED_MAX, HOOK_SHORT_MAX, clip, type ActivityHookBlock, type HookFired, type SessionHooks } from '../shared/hooks'
 import { providerService } from './providerService'
 import { config } from './config'
-import { emit, emitTo, onHiveEvent, tellListeners, toast } from './events'
-import { presentWindow, showOsNotification, testNotifyLog, testQuiet } from './testQuiet'
+import { emit, emitTo, onHiveEvent, toast } from './events'
+import { presentWindow, testNotifyLog, testQuiet } from './testQuiet'
 import { hashText, heldOpen, insideReal, isInUse, placeRelative, removePath, samePlace, treeSignature, syncCopy, syncCopyLocked, syncCopyNow, trashAllOrNothing, withFileLock } from './fsutil'
 import { createLogger, hookJournal, userText } from './logger'
 import { COMPACTING_TEXT, HOOKS_MISSING_NOTE, addRetryWaited, retryWaitCurrent } from '../shared/runtime'
@@ -92,12 +93,15 @@ import type { DeliveryHooks, NewDelivery } from './deliveries'
 import { readyFor } from './readiness'
 import { HAND_OVER_TEXT, handOverNow } from '../shared/handOver'
 import { NOTICE_PREFIX } from '../shared/doorbell'
-import { FinishBatcher, finishedApiTitle, finishedNotice, noticeRouteWhy, type FocusedHive, type NoticeRoute } from '../shared/bursts'
+import { FinishBatcher, finishedApiTitle, finishedNotice } from '../shared/bursts'
+import { notifyRoute, type NotifyRoute } from '../shared/notify'
+import { askOffer, focusedHive, notifyPending, resolveOffer, resolveOffers, tell } from './notify'
+import { OUTCOME } from './outcomes'
 import type { SlotNote } from './mergeSlots'
 import { commentOnDoingCards, recordCards } from './cardSessions'
 import { listMcp, toLaunchDef } from './mcp'
 import { agentGetsMcp, assistantMcpAdded, serverOnIn } from '../shared/agentMcp'
-import { launchEnded, leftoversOf, noteUntracked, settleLeftovers, STOPPED_BEFORE_START, trackingProblemText, trackingReady, trackLaunch, type TrackResult } from './agentProcesses'
+import { launchEnded, leftoversOf, leftoversOffer, noteUntracked, settleLeftovers, STOPPED_BEFORE_START, trackingProblemText, trackingReady, trackLaunch, type TrackResult } from './agentProcesses'
 import type { GateWord } from './launchGate'
 import { leftoversSummary, processCount } from '../shared/agentProcesses'
 import { childEnv, hasPty, killPty, refreshPty, spawnPty, startSize, writePty } from './ptyHost'
@@ -112,7 +116,6 @@ import { workspaceNotesFor } from './workspaceNotes'
 import { skillOff } from '../shared/skillDelivery'
 import { samePath } from '../shared/movePaths'
 import { GUIDANCE_REVISION, launchParts, launchRecord } from './guidance'
-import { notificationIcon } from './paths'
 import { reportPlanUsage } from './planUsage'
 import { devConsole, sessionSourceId } from './devConsole'
 import { flightRecorder } from './flightRecorder'
@@ -905,7 +908,8 @@ export function shellCommand(command: string, platform: NodeJS.Platform = proces
   return platform === 'win32' ? { file: process.env.ComSpec || 'cmd.exe', args: `/d /s /c "${command}"` } : { file: '/bin/sh', args: ['-c', command] }
 }
 
-const shownNotifications = new Set<Notification>()
+/** A session's notice kinds as the one notification system's (HI-2320). */
+const NOTIFY_KIND = { finished: 'finished', waiting: 'needsYou', notice: 'work' } as const
 
 /** A new session's automatic name: "<project> · <date>", with the agent's name when the project has several. */
 function autoName(projectPath: string, agent: Pick<AgentDef, 'name'>, count: number): string {
@@ -1433,13 +1437,6 @@ class SessionManager {
 
   setWindowProvider(fn: (projectPath?: string) => BrowserWindow | null): void {
     this.getWindow = fn
-  }
-
-  /** The Hive window the user is using (visible, focused): where in-app banners go (#157). None while Hive is in the background. */
-  private focusedHive: () => (FocusedHive & { win: BrowserWindow }) | null = () => null
-
-  setFocusedWindowProvider(fn: () => (FocusedHive & { win: BrowserWindow }) | null): void {
-    this.focusedHive = fn
   }
 
   key(projectPath: string, agentId: string): string {
@@ -4201,8 +4198,29 @@ class SessionManager {
   }
 
   // A changed mode setting applies to new sessions; for running ones, Hive offers to switch them now.
-  private modeOffers = new Map<string, { label: string; mode: string }>()
+  private modeOffers = new Map<string, { id: string; label: string; mode: string }>()
   private modeOfferTimer: NodeJS.Timeout | null = null
+  /** Switch Now's offers (HI-2320) and the running agents each named: gone with the last of them. */
+  private modeOfferAgents = new Map<string, Set<string>>()
+  private modeOfferSeq = 0
+
+  /** An agent's session ended: a Switch Now offer left with none of its agents running no longer applies (HI-2320). */
+  private modeOfferGone(id: string): void {
+    for (const [offer, ids] of this.modeOfferAgents) {
+      if (!ids.delete(id) || ids.size) continue
+      this.modeOfferAgents.delete(offer)
+      resolveOffer(offer, tr(OUTCOME.modesNextSession))
+    }
+  }
+
+  /** Switch Now, from its notice (HI-2320): the switches, then what happened, in the notice; checked again by applyModeSettings. */
+  async applyModeOffer(offer: string): Promise<{ switched: string[]; skipped: string[] }> {
+    const r = await this.applyModeSettings()
+    this.modeOfferAgents.delete(offer)
+    const text = r.switched.length || r.skipped.length ? [...r.switched, ...r.skipped].join('\n') : tr(OUTCOME.modesNothing)
+    resolveOffer(offer, text)
+    return r
+  }
 
   private noticeModeSetting(l: LiveSession, mode: PermissionMode | null): void {
     if (!mode || l.configuredMode === undefined || mode === l.configuredMode || mode === l.offeredMode) return
@@ -4212,7 +4230,7 @@ class SessionManager {
       return
     }
     l.offeredMode = mode
-    this.modeOffers.set(liveId(l.state.projectPath, l.state.agentId), { label: this.label(l.state), mode: permissionLabel(l.state.provider, mode, tr) })
+    this.modeOffers.set(liveId(l.state.projectPath, l.state.agentId), { id: liveId(l.state.projectPath, l.state.agentId), label: this.label(l.state), mode: permissionLabel(l.state.provider, mode, tr) })
     if (this.modeOfferTimer) clearTimeout(this.modeOfferTimer)
     this.modeOfferTimer = setTimeout(() => {
       this.modeOfferTimer = null
@@ -4220,13 +4238,19 @@ class SessionManager {
       this.modeOffers.clear()
       if (!offers.length) return
       const modes = [...new Set(offers.map((o) => o.mode))]
+      // Its offer (HI-2320): live while one of the agents it names still runs this session.
+      const offer = `modes:${++this.modeOfferSeq}`
+      this.modeOfferAgents.set(offer, new Set(offers.map((o) => o.id)))
       toast(
         'info',
         tr(msg({ id: 'session.modeOffer.title', defaultMessage: 'Permission mode changed to {modes}', description: "A notice's title: the permission mode in Settings changed for running agents. {modes} is the new mode's name (several joined by \" / \")." }), { modes: modes.join(' / ') }),
         offers.length === 1
           ? tr(msg({ id: 'session.modeOffer.one', defaultMessage: 'Switch {agent} now? Otherwise the new mode applies from its next session.', description: 'The notice that the permission mode setting changed for a running agent. {agent} is the agent.' }), { agent: offers[0].label })
           : tr(msg({ id: 'session.modeOffer.many', defaultMessage: '{n, plural, other {Switch # running agents ({agents}) now? Otherwise the new mode applies from their next session.}}', description: 'The notice that the permission mode setting changed for running agents. {n} is how many (2 or more), {agents} lists them.' }), { n: offers.length, agents: offers.map((o) => o.label).join(', ') }),
-        [{ label: tr(msg({ id: 'session.modeOffer.switch', defaultMessage: 'Switch Now', description: "A notice's button: switches the running agents to the new permission mode now." })), command: 'session.applyPermissionModes' }]
+        [{ label: tr(msg({ id: 'session.modeOffer.switch', defaultMessage: 'Switch Now', description: "A notice's button: switches the running agents to the new permission mode now." })), command: 'session.applyPermissionModes', args: [offer] }],
+        undefined,
+        undefined,
+        { offer }
       )
     }, 400)
   }
@@ -4278,6 +4302,12 @@ class SessionManager {
   /** Stops the CLI's background job holding a conversation, then resumes the conversation in this agent. */
   async stopBackgroundAndResume(projectPath: string, agentId: string, jobId: string, sessionId: string): Promise<void> {
     projectPath = workspace.assertSessionHost(projectPath)
+    // Checked again (HI-2320): the conversation already open here again needs no stopping.
+    const offer = `bg:${liveId(projectPath, agentId)}#${jobId}#${sessionId}`
+    if (this.live.get(liveId(projectPath, agentId))?.state.sessionId === sessionId) {
+      resolveOffer(offer, tr(OUTCOME.openHereAgain))
+      return
+    }
     const { agent } = await this.agentDef(projectPath, agentId)
     const rec = (await workspace.sessionsFile(projectPath)).sessions.find((s) => s.id === sessionId)
     const adapter = providerAdapter((await this.resumeProvider(projectPath, sessionId, rec)) ?? agentProvider(agent, config.settings))
@@ -4287,6 +4317,7 @@ class SessionManager {
     // The job lets go of the conversation as it exits.
     await new Promise((r) => setTimeout(r, 1500))
     await this.start(projectPath, { agentId, resumeId: sessionId })
+    resolveOffer(offer, tr(OUTCOME.stoppedAndResumed))
   }
 
   /** Sessions that would be interrupted by quitting: an agent is working or waiting on a prompt. */
@@ -4296,6 +4327,9 @@ class SessionManager {
   }
 
   private async onExit(projectPath: string, agentId: string, runId: string, code: number, output = ''): Promise<void> {
+    // What notices offered about this run no longer applies (HI-2320): its conversation ended here.
+    resolveOffers((o) => o.startsWith(`transcript:${liveId(projectPath, agentId)}#`), tr(OUTCOME.conversationEnded))
+    this.modeOfferGone(liveId(projectPath, agentId))
     // When and how it ended, as it ended (HR5's HI-1881 round 1): not after the bookkeeping below, which can take a
     // while (the time would drift, and a quit begun meanwhile would relabel it).
     const exitAt = new Date().toISOString()
@@ -4315,7 +4349,9 @@ class SessionManager {
         tr(msg({ id: 'session.background.title', defaultMessage: '{agent}: the session is running in the background', description: "A notice's title: the coding agent runs this conversation as a background job, so Hive can't open it. {agent} is the agent." }), { agent: this.label(l.state) }),
         tr(msg({ id: 'session.background.body', defaultMessage: "{provider} moved this conversation into its background service (job {job}), so it can't be opened here until that job is stopped. The conversation is kept.", description: "The notice that a conversation runs as a background job. {provider} is the coding agent's name, {job} the job's id." }), { provider: l.adapter.descriptor.name, job }),
         [{ label: tr(msg({ id: 'session.background.stopAndResume', defaultMessage: 'Stop It and Resume', description: "A notice's button: stops the coding agent's background job, then resumes the conversation in the agent." })), command: 'session.stopBackgroundAndResume', args: [projectPath, agentId, job, sessionId] }],
-        projectPath
+        projectPath,
+        { kind: 'agent', projectPath, agentId, name: this.label(l.state), project: basename(projectPath) },
+        { offer: `bg:${id}#${job}#${sessionId}` }
       )
     }
     // Exited before its session started, and nobody stopped it: a failed start, whose reason the pane shows.
@@ -4433,6 +4469,8 @@ class SessionManager {
     const n = left.processes.length + left.more
     if (!n) return
     const summary = leftoversSummary(left, undefined, { tr, list: fmt.list })
+    // Its buttons act on exactly what it lists (HI-2320): a newer launch's leftovers are another offer.
+    const offer = leftoversOffer(left.projectPath, left.agentId)
     toast(
       'warning',
       tr(msg({ id: 'session.leftovers.title', defaultMessage: '{agent} left {processes} running', description: "A notice's title: an agent's processes still run after it stopped. {agent} is the agent; {processes} how many (\"2 processes\")." }), { agent: label, processes: processCount(n, tr) }),
@@ -4440,10 +4478,12 @@ class SessionManager {
         ? tr(msg({ id: 'session.leftovers.notEndedBody', defaultMessage: "{processes}. {n, plural, one {It was started by the agent and may hold the project's folder or ports. Hive couldn't end it by itself.} other {They were started by the agent and may hold the project's folder or ports. Hive couldn't end them by itself.}}", description: "The notice of processes an agent left running, which Hive tried to end and couldn't. {processes} lists them (\"node serve.js, 4 × tail -f …\"); {n} is how many." }), { processes: summary, n })
         : tr(msg({ id: 'session.leftovers.body', defaultMessage: "{processes}. {n, plural, one {It was started by the agent and may hold the project's folder or ports.} other {They were started by the agent and may hold the project's folder or ports.}}", description: "The notice of processes an agent left running. {processes} lists them (\"node serve.js, 4 × tail -f …\"); {n} is how many." }), { processes: summary, n }),
       [
-        { label: tr(msg({ id: 'session.leftovers.end', defaultMessage: 'End Them', description: "A notice's button: ends the processes the agent left running." })), command: 'session.settleLeftovers', args: [left.projectPath, left.agentId, 'end'] },
-        { label: tr(msg({ id: 'session.leftovers.keep', defaultMessage: 'Keep Running', description: "A notice's button: keeps the processes the agent left running, and stops listing them." })), command: 'session.settleLeftovers', args: [left.projectPath, left.agentId, 'keep'] }
+        { label: tr(msg({ id: 'session.leftovers.end', defaultMessage: 'End Them', description: "A notice's button: ends the processes the agent left running." })), command: 'session.settleLeftovers', args: [left.projectPath, left.agentId, 'end', offer] },
+        { label: tr(msg({ id: 'session.leftovers.keep', defaultMessage: 'Keep Running', description: "A notice's button: keeps the processes the agent left running, and stops listing them." })), command: 'session.settleLeftovers', args: [left.projectPath, left.agentId, 'keep', offer] }
       ],
-      left.projectPath
+      left.projectPath,
+      { kind: 'agent', projectPath: left.projectPath, agentId: left.agentId, name: label, project: basename(left.projectPath) },
+      { offer }
     )
   }
 
@@ -5106,8 +5146,8 @@ class SessionManager {
     void (assistant ? Promise.resolve(false) : this.handOverAllowed(st.projectPath, st.agentId).catch(() => false)).then((now) => {
       const values = { size: formatSize(bytes), limit: limitMB, when: assistant ? 'assistant' : now ? 'now' : 'other' }
       const actions: ToastAction[] | undefined = now ? [{ label: tr(msg({ id: 'session.long.handOver', defaultMessage: 'Hand Over to…', description: "A notice's button: hands the agent's work over to a new conversation (the Hand Over to… command)." })), command: 'session.handOverLongConversation', args: [st.projectPath, st.agentId] }] : undefined
-      toast('warning', tr(M.longConversation, { agent: label }), tr(HAND_OVER_TEXT.notice, values), actions, st.projectPath)
-      this.notify(st.projectPath, withValues(M.longConversation, { agent: label }), withValues(HAND_OVER_TEXT.notice, values), 'notice')
+      // Told once (HI-2320: a toast and a routed copy before), its Hand Over to… live while this conversation is.
+      tell({ kind: 'transcript', title: tr(M.longConversation, { agent: label }), message: tr(HAND_OVER_TEXT.notice, values), ...(actions ? { actions, offer: `transcript:${liveId(st.projectPath, st.agentId)}#${st.sessionId}` } : {}), projectPath: st.projectPath, agentId: st.agentId, target: { kind: 'agent', projectPath: st.projectPath, agentId: st.agentId, name: label, project: basename(st.projectPath) } })
     })
   }
 
@@ -5533,7 +5573,9 @@ class SessionManager {
             tr(msg({ id: 'session.lock.title', defaultMessage: '{agent} wants to edit {file}', description: "A notice's title: an agent wants to edit a file another agent is editing (Hive's file locks, Ask me). {agent} is the agent, {file} the file's path in the project." }), { agent: this.label(l.state), file: rel }),
             tr(msg({ id: 'session.lock.body', defaultMessage: '{holder} is editing it right now. Allow {agent} to edit it too?', description: "The notice that an agent wants to edit a file another agent is editing. {holder} is the agent editing it, {agent} the agent asking." }), { holder: holder.state.agentName ?? tr(msg({ id: 'session.lock.anotherAgent', defaultMessage: 'Another agent', description: "Stands for an agent whose name isn't known, at the start of a sentence (\"Another agent is editing it right now.\")." })), agent: l.state.agentName ?? tr(msg({ id: 'session.lock.theAgent', defaultMessage: 'the agent', description: "Stands for an agent whose name isn't known, in the middle of a sentence (\"Allow the agent to edit it too?\")." })) }),
             [{ label: tr(msg({ id: 'session.lock.allow', defaultMessage: 'Allow', description: "A notice's button: lets the agent edit the file another agent is editing." })), command: 'session.allowLockedEdit', args: [l.state.projectPath, l.state.agentId, abs] }],
-            l.state.projectPath
+            l.state.projectPath,
+            { kind: 'agent', projectPath: l.state.projectPath, agentId: l.state.agentId, name: this.label(l.state), project: basename(l.state.projectPath) },
+            { offer: `lock:${key}#${this.lockAsked.get(key)}` }
           )
         }
         // i18n-ignore: the lock's reply to the agent (agent-facing)
@@ -5579,6 +5621,13 @@ class SessionManager {
     const l = this.live.get(id)
     if (!l) return
     const key = `${id}|${lockKey(resolve(path))}`
+    // Checked again (HI-2320): only an ask still open is answered; its notice says what happened.
+    const asked = this.lockAsked.get(key)
+    if (asked === undefined || this.lockAllowed.has(key)) {
+      resolveOffers((o) => o.startsWith(`lock:${key}#`), tr(OUTCOME.noLongerAsked))
+      return
+    }
+    resolveOffer(`lock:${key}#${asked}`, tr(OUTCOME.allowed))
     // The user's answer ends the block it asked about (HI-982).
     if (l.hookBlock && `${id}|${l.hookBlock.key}` === key) l.hookBlock = undefined
     this.lockAllowed.set(key, ++this.lockSeq)
@@ -5616,7 +5665,12 @@ class SessionManager {
    */
   private releaseLocks(id: string, before = Infinity): void {
     for (const map of [this.lockAllowed, this.lockAsked]) {
-      for (const [k, seq] of map) if (k.startsWith(`${id}|`) && seq <= before) map.delete(k)
+      for (const [k, seq] of map) {
+        if (!k.startsWith(`${id}|`) || seq > before) continue
+        map.delete(k)
+        // An ask let go unanswered: its notice's Allow goes (HI-2320).
+        if (map === this.lockAsked) resolveOffer(`lock:${k}#${seq}`, tr(OUTCOME.noLongerAsked))
+      }
     }
     // A go-ahead waits for the turn's end, so only releasing everything (the session ended or moved) drops it.
     if (before === Infinity) this.dropGoAheads(id)
@@ -6462,6 +6516,8 @@ class SessionManager {
     // (#650: one started again meanwhile keeps its own locks, state and session to resume).
     if (!this.owns(l)) return
     log.info(`${userText(this.label(st))}: the CLI moved from session ${old} to ${sessionId}`)
+    // The old conversation's long-conversation notice no longer applies (HI-2320).
+    resolveOffers((o) => o.startsWith(`transcript:${liveId(st.projectPath, st.agentId)}#`), tr(OUTCOME.conversationMoved))
     try {
       const { agent, count } = await this.agentDef(st.projectPath, st.agentId)
       const existing = (await workspace.sessionsFile(st.projectPath)).sessions.find((s) => s.id === sessionId)
@@ -6506,9 +6562,11 @@ class SessionManager {
   }
 
   /**
-   * Tells the user (and for finished/waiting, the chime): a banner in the Hive window they are using, else a Windows
-   * notification (route()). A notice is a warning that needs no sound. Its title and body are formatted in the language
-   * Hive shows; the Agent API's stream gets the title in English (`apiTitle`, #796), and never the body.
+   * Tells the user (and for finished/waiting, the chime), through tell() (main/notify.ts, HI-2320): a pop-up in the
+   * window they are using (kept in its bell), else a Windows notification, as shared/notify.ts's table says. A waiting
+   * agent's entry is its ask's offer, resolved once the agent no longer asks; a notice ('work') needs no sound. Its title
+   * and body are formatted in the language Hive shows; the Agent API's stream gets the title in English (`apiTitle`,
+   * #796), and never the body.
    */
   private notify(projectPath: string, titleText: Text, bodyText: TextPart, kind: 'finished' | 'waiting' | 'notice', agentName?: string, agentId?: string, action?: { label: Text; command: string; args?: unknown[] }): void {
     const title = shownText(titleText)
@@ -6525,75 +6583,99 @@ class SessionManager {
         })
         .catch((e) => log.warn('chime: settings unavailable', e))
     }
-    const { route, why } = this.routeWhy(projectPath, kind)
-    if (route === 'none') {
-      // i18n-ignore: the log (English)
-      if (kind !== 'notice') log.info(`Notice ${kind} not told: ${why} (${userText(title)})`)
-      return
-    }
+    const notifyKind = NOTIFY_KIND[kind]
     // Finishes that come together are told in one notice ("3 agents finished in hive"); a question is told at once.
     if (kind === 'finished') {
+      const { route, why } = this.routeWhy(projectPath, notifyKind)
+      if (route === 'none') {
+        // i18n-ignore: the log (English)
+        log.info(`Notice finished not told: ${why} (${userText(title)})`)
+        return
+      }
       const assistant = workspace.isAssistantHome(projectPath)
       // i18n-ignore: a fallback name, never seen (every agent that finishes has its name)
       this.finishes.add({ projectPath, project: assistant ? ASSISTANT_NAME : basename(projectPath), agent: assistant ? ASSISTANT_NAME : (agentName ?? 'Agent'), ...(agentId ? { agentId } : {}), title, apiTitle, body })
       return
     }
-    this.deliver(projectPath, title, body, kind, agentId, apiTitle, action && { label: shownText(action.label), command: action.command, ...(action.args ? { args: action.args } : {}) })
+    this.deliver(projectPath, title, body, notifyKind, agentId, agentName, apiTitle, action && { label: shownText(action.label), command: action.command, ...(action.args ? { args: action.args } : {}) })
   }
 
   /**
    * A notice about a project's work that no one agent gives (#1266: a card's request for the user, a lane's events), told
-   * as every notice is (notify): a banner in the window the user is using or a Windows notification, as the settings say.
-   * `action`: a banner's button (#1437: Start Fresh (Idle Agents)), a command of the window's; a Windows notification
-   * shows the project.
+   * as every notice is (notify). `action`: its button (#1437: Start Fresh (Idle Agents)), a command of the window's,
+   * shown in its pop-up and bell row while `offer` is open; `kind`: needsYou for a card that needs you (HI-2320), else
+   * work. `target`: what a click opens (a card), else the project.
    */
-  notice(projectPath: string, title: Text, body: TextPart, action?: { label: Text; command: string; args?: unknown[] }): void {
-    this.notify(projectPath, title, body, 'notice', undefined, undefined, action)
+  notice(projectPath: string, title: Text, body: TextPart, action?: { label: Text; command: string; args?: unknown[] }, extra?: { kind?: 'needsYou' | 'work'; offer?: string; target?: ToastTarget }): void {
+    if (!extra?.kind && !extra?.offer && !extra?.target) return this.notify(projectPath, title, body, 'notice', undefined, undefined, action)
+    this.deliver(projectPath, shownText(title), shownText(body), extra.kind ?? 'work', undefined, undefined, englishText(title), action && { label: shownText(action.label), command: action.command, ...(action.args ? { args: action.args } : {}) }, extra)
   }
 
-  /** Where a notice about this project goes now: the settings, and the Hive window the user is using (noticeRoute). */
-  private route(projectPath: string, kind: 'finished' | 'waiting' | 'notice'): NoticeRoute {
-    return this.routeWhy(projectPath, kind).route
+  /** Where a notice about this project goes now: the settings, and the Hive window the user is using (notifyRoute), with why for the log. */
+  private routeWhy(projectPath: string, kind: NotifyKind): { route: NotifyRoute; why: string } {
+    return notifyRoute(config.settings.notifications, kind, focusedHive(), { workspacePath: workspaceOf(projectPath)?.path ?? null, projectPath })
   }
 
-  /** route(), with why for the log. */
-  private routeWhy(projectPath: string, kind: 'finished' | 'waiting' | 'notice'): { route: NoticeRoute; why: string } {
-    return noticeRouteWhy(config.settings.notifications, kind, this.focusedHive(), { workspacePath: workspaceOf(projectPath)?.path ?? null, projectPath })
+  /**
+   * Told by tell() as things are now (HI-2320). A waiting agent's is registered as its ask (askOffer), so the agent no
+   * longer asking resolves it; its link is the agent's pane, or the project. `apiTitle`: its title in English, when
+   * `title` is translated.
+   */
+  private deliver(projectPath: string, title: string, body: string, kind: NotifyKind, agentId?: string, agentName?: string, apiTitle?: string, action?: ToastAction, extra?: { offer?: string; target?: ToastTarget }): void {
+    const assistant = workspace.isAssistantHome(projectPath)
+    const target: ToastTarget | undefined = extra?.target ?? (agentId ? { kind: 'agent', projectPath, agentId, name: assistant ? ASSISTANT_NAME : (agentName ?? this.agentName(projectPath, agentId)), project: assistant ? ASSISTANT_NAME : basename(projectPath) } : undefined)
+    const offer = extra?.offer ?? (kind === 'needsYou' && agentId ? askOffer(projectPath, agentId) : undefined)
+    tell({
+      kind,
+      title,
+      message: body,
+      apiTitle,
+      projectPath,
+      ...(agentId ? { agentId } : {}),
+      ...(target ? { target } : {}),
+      ...(action ? { actions: [action] } : {}),
+      ...(offer ? { offer } : {}),
+      // A Windows notification's click shows what it is about, in the window that has its project.
+      onWindowsClick: () => {
+        const w = this.getWindow(projectPath)
+        if (!w) return
+        presentWindow(w)
+        if (target) emitTo(w, { type: 'menu-command', command: 'notice.openTarget', args: [target] })
+        else emitTo(w, { type: 'menu-command', command: 'project.focus', args: [projectPath] })
+      }
+    })
   }
 
-  /** A banner in the focused window, or a Windows notification, as route() says now; `apiTitle`: its title in English, when `title` is translated. */
-  private deliver(projectPath: string, title: string, body: string, kind: 'finished' | 'waiting' | 'notice', agentId?: string, apiTitle?: string, action?: Notice['action']): void {
-    const { route, why } = this.routeWhy(projectPath, kind)
-    const at = this.focusedHive()
-    // Each notice told, where and why (HI-2312), so a late or missing one can be traced from the log.
-    // i18n-ignore: the log (English)
-    log.info(`Notice ${kind} told: ${route === 'banner' && !at ? 'none (no window to show its banner)' : route} (${why}) (${userText(title)})`)
-    const notice: Notice = { id: randomUUID(), kind, title, ...(apiTitle && apiTitle !== title ? { apiTitle } : {}), body, projectPath, ...(agentId ? { agentId } : {}), ...(action ? { action } : {}) }
-    if (route === 'windows') {
-      // The Agent API's stream hears of every notice Hive tells, as a banner or a Windows notification (#620).
-      tellListeners({ type: 'notice', notice, windows: true })
-      return this.showNotification(projectPath, title, body)
-    }
-    if (route !== 'banner' || !at) return
-    emitTo(at.win, { type: 'notice', notice })
+  /** An agent's name as Hive shows it, for a notice's link (its id when it has gone). */
+  private agentName(projectPath: string, agentId: string): string {
+    return this.live.get(liveId(projectPath, agentId))?.state.agentName ?? agentId
   }
 
   /**
    * Finishes collected by `finishes`, in one notice: those that may still be told (notifications turned off
-   * meanwhile, or left out by the banner scope), counted and opened from what is left, as a banner or a Windows
-   * notification as things are when it is shown.
+   * meanwhile), counted and opened from what is left, as a pop-up or a Windows notification as things are when it is
+   * shown (HI-2320: the focus then picks its window).
    */
-  private readonly finishes = new FinishBatcher((all) => {
-    const items = all.filter((i) => {
-      const { route, why } = this.routeWhy(i.projectPath, 'finished')
-      // i18n-ignore: the log (English)
-      if (route === 'none') log.info(`Notice finished not told: ${why} (${userText(i.title)})`)
-      return route !== 'none'
-    })
-    if (!items.length) return
-    const { title, body } = finishedNotice(items)
-    this.deliver(items[0].projectPath, title, body, 'finished', undefined, finishedApiTitle(items))
-  })
+  private readonly finishes = new FinishBatcher(
+    (all) => {
+      const items = all.filter((i) => {
+        const { route, why } = this.routeWhy(i.projectPath, 'finished')
+        // i18n-ignore: the log (English)
+        if (route === 'none') log.info(`Notice finished not told: ${why} (${userText(i.title)})`)
+        return route !== 'none'
+      })
+      // Those the pop-up scope leaves out go to the bell as a group of their own, never inside another's pop-up (HI-2320).
+      const quiet = items.filter((i) => this.routeWhy(i.projectPath, 'finished').route === 'bell')
+      for (const group of [items.filter((i) => !quiet.includes(i)), quiet]) {
+        if (!group.length) continue
+        const { title, body } = finishedNotice(group)
+        const one = group.length === 1 ? group[0] : null
+        this.deliver(group[0].projectPath, title, body, 'finished', one?.agentId, one?.agent, finishedApiTitle(group))
+      }
+    },
+    Date.now,
+    (n) => notifyPending(n)
+  )
 
   /**
    * An agent started its next turn while its finish waited to be told (HI-2312: a Hive delivery typed at its turn's end,
@@ -6606,24 +6688,6 @@ class SessionManager {
       // i18n-ignore: the log (English)
       log.info(`Notice finished not told: ${userText(f.agent)} started its next turn first (${now}) (${userText(f.title)})`)
     }
-  }
-
-  /** A Windows notification; clicking it shows the project (the first one's, for finishes in several). */
-  private showNotification(projectPath: string, title: string, body: string): void {
-    if (!Notification.isSupported()) return
-    const note = new Notification({ title, body, silent: true, icon: notificationIcon() })
-    // Keep a reference: a garbage-collected Notification no longer delivers its click.
-    shownNotifications.add(note)
-    if (shownNotifications.size > 50) shownNotifications.delete(shownNotifications.values().next().value!)
-    note.on('click', () => {
-      shownNotifications.delete(note)
-      const w = this.getWindow(projectPath)
-      if (w) {
-        presentWindow(w)
-        emitTo(w, { type: 'menu-command', command: 'project.focus', args: [projectPath] })
-      }
-    })
-    if (!showOsNotification(note, title, body)) shownNotifications.delete(note)
   }
 
   /** The window showed these agents (all of the project's when none are named). */

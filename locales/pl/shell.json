@@ -217,6 +217,8 @@
   "shell.edit.redo": "Ponów",
   "shell.edit.selectAll": "Zaznacz wszystko",
   "shell.edit.undo": "Cofnij",
+  "shell.entry.mcpCopied": "Już w obszarze roboczym",
+  "shell.entry.questionAnswered": "Odpowiedziano",
   "shell.error.allowEdit": "Nie udało się zezwolić na edycję",
   "shell.error.endProcesses": "Nie udało się zakończyć procesów",
   "shell.error.keepProcesses": "Nie udało się zostawić procesów",
@@ -260,6 +262,7 @@
   "shell.noticeTarget.agentGone": "Agent {agent} nie jest już w projekcie {project}",
   "shell.noticeTarget.cardElsewhere": "Karta {card} jest na tablicy obszaru roboczego {workspace}, który nie jest otwarty",
   "shell.noticeTarget.cardGone": "Karty {card} nie ma już na tablicy",
+  "shell.noticeTarget.projectGone": "Projektu {project} nie ma już w tym obszarze roboczym",
   "shell.notifications.clearAll": "Wyczyść wszystko",
   "shell.notifications.none": "Brak powiadomień",
   "shell.notifications.title": "Powiadomienia",
@@ -410,5 +413,6 @@
   "shell.titlebar.pinTip": "{on, select, yes {Zawsze na wierzchu (wł.)} other {Zawsze na wierzchu (wył.)}}",
   "shell.toast.dismiss": "Odrzuć",
   "shell.toast.openAgent": "Otwórz panel agenta {agent}",
-  "shell.toast.openCard": "Otwórz kartę {card}"
+  "shell.toast.openCard": "Otwórz kartę {card}",
+  "shell.toast.openProject": "Pokaż projekt {project}"
 }

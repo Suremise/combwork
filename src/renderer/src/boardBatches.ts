@@ -2,6 +2,7 @@ import { msg, tr } from '@shared/i18n'
 import type { ArchiveResult } from '@shared/types'
 import { call, errorMessage } from './api'
 import { cardLabelOf, get, loadTasks, notify, pushToast } from './store'
+import { resolveLocal } from './entryConditions'
 
 /** "AM-3, AM-4, #5" (by key where they have one), or the first six and how many more. */
 function numbers(ns: number[]): string {
@@ -53,7 +54,11 @@ export async function unarchiveBatch(id: string): Promise<boolean> {
       )
       return false
     }
-    notify('success', tr(msg({ id: 'board.batch.broughtBack', defaultMessage: 'Brought back {n, plural, one {# card} other {# cards}}', description: "A notification's title: unarchiving a batch brought all its cards back to the board." }), { n: restored.length }))
+    const done = tr(msg({ id: 'board.batch.broughtBack', defaultMessage: 'Brought back {n, plural, one {# card} other {# cards}}', description: "A notification's title: unarchiving a batch brought all its cards back to the board." }), { n: restored.length })
+    // From its Archived n cards notice's Undo (HI-2320): that notice says so, in place of its button; else its own notice.
+    const entry = `archived-${id}`
+    if (get().notifications.some((t) => t.id === entry && !t.resolved)) resolveLocal(entry, done)
+    else notify('success', done)
     return true
   } catch (e) {
     notify('error', tr(msg({ id: 'board.batch.backFailed', defaultMessage: 'Could not bring the batch back', description: "An error's title: unarchiving a batch of cards failed." })), errorMessage(e))

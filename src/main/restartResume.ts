@@ -12,7 +12,9 @@ import type { RunningAgent } from '../shared/unexpectedClose'
 import { advanced } from './advanced'
 import { assistantHome } from './assistantControl'
 import { createDelivery, leaveDelivery, roundOf } from './deliveries'
-import { emit, onHiveEvent } from './events'
+import { onHiveEvent, toast } from './events'
+import { resolveOffer } from './notify'
+import { OUTCOME } from './outcomes'
 import { placeKey, samePlace } from './fsutil'
 import { listLanes } from './lanes'
 import { createLogger, userText } from './logger'
@@ -323,8 +325,13 @@ function tellOffer(entries: readonly RestartEntry[]): void {
     { label: tr(msg({ id: 'main.restart.dismiss', defaultMessage: "Don't Resume", description: "A button in the notice offering to resume the agents that were working when Hive closed: resumes none, and the offer is not made again (the notice's × only closes it)." })), command: 'session.dismissRestart' }
   ]
   log.info(`Offered to resume ${n} agent(s): ${entries.map((e) => userText(e.agentName)).join(', ')}`)
-  emit({ type: 'toast', toast: { id: randomUUID(), level: 'info', title, message: body, actions, timestamp: new Date().toISOString(), timeoutMs: 120_000 } })
+  // Its offer (HI-2320): Resume's report, or Don't Resume, is what it says once taken.
+  openOffer = `restart:${randomUUID()}`
+  toast('info', title, body, actions, undefined, undefined, { offer: openOffer, timeoutMs: 120_000 })
 }
+
+/** The offer to resume shown now (HI-2320), until Resume's report or Don't Resume says what happened in it. */
+let openOffer: string | null = null
 
 /** The offer's Resume: its entries queued. How many. */
 export async function resumeOffered(): Promise<number> {
@@ -340,6 +347,8 @@ export async function dismissOffered(): Promise<number> {
   const offered = record?.entries.filter((e) => e.state === 'offered') ?? []
   for (const e of offered) setState(e, 'dismissed')
   await save()
+  if (openOffer) resolveOffer(openOffer, tr(OUTCOME.notResumed))
+  openOffer = null
   return offered.length
 }
 
@@ -646,7 +655,9 @@ function report(): void {
   const title = update
     ? tr(msg({ id: 'main.restart.reportUpdate', defaultMessage: '{n, plural, one {Resumed one agent after the update} other {Resumed # agents after the update}}', description: "A notice's title: Hive restarted for an update and resumed the agents that were working. {n} is how many resumed." }), { n: resumed.length })
     : tr(msg({ id: 'main.restart.reportResume', defaultMessage: '{n, plural, one {Resumed one agent} other {Resumed # agents}}', description: "A notice's title: the agents that were working when Hive was quit were resumed, as the user asked. {n} is how many." }), { n: resumed.length })
-  emit({ type: 'toast', toast: { id: randomUUID(), level: failed.length ? 'warning' : 'success', title, message: lines.join('\n'), timestamp: new Date().toISOString(), timeoutMs: 60_000 } })
+  // The offer's Resume: its notice says how it went, in place of its buttons (HI-2320); else a notice of its own.
+  if (!openOffer || !resolveOffer(openOffer, `${title}\n${lines.join('\n')}`)) toast(failed.length ? 'warning' : 'success', title, lines.join('\n'), undefined, undefined, undefined, { timeoutMs: 60_000 })
+  openOffer = null
   void tellAssistants([...resumed], [...failed, ...held, ...skipped])
   done.resumed = []
   done.failed = []

@@ -10,6 +10,7 @@ const folderName = (p: string): string => p.split(/[\\/]/).filter(Boolean).pop()
 const M = {
   agentGone: msg({ id: 'shell.noticeTarget.agentGone', defaultMessage: "{agent} isn't in {project} any more", description: "A notice after clicking a notification about an agent (HI-1961): the agent it named ({agent}) has been removed from its project ({project}) since, so its pane can't be shown." }),
   cardElsewhere: msg({ id: 'shell.noticeTarget.cardElsewhere', defaultMessage: "{card} is on {workspace}'s board, which isn't open", description: "A notice after clicking a notification about a card (HI-1961): the card ({card}, its key, e.g. HI-12) is in another workspace ({workspace}, its folder's name), open in no Hive window now, so it can't be opened." }),
+  projectGone: msg({ id: 'shell.noticeTarget.projectGone', defaultMessage: "{project} isn't in this workspace any more", description: "A notice after clicking a notification about a project (HI-2320): the project it named ({project}) has been removed from the workspace since, so it can't be shown." }),
   cardGone: msg({ id: 'shell.noticeTarget.cardGone', defaultMessage: "{card} isn't on the board any more", description: "A notice after clicking a notification about a card (HI-1961): the card it named ({card}, its key, e.g. HI-12) has been deleted since, so it can't be opened." })
 }
 
@@ -39,6 +40,12 @@ export function showNoticeTarget(t: ToastTarget): void {
   }
   if (isAssistantPath(t.projectPath)) return setAssistantOpen(true)
   const p = findProject(get(), t.projectPath)
+  if (t.kind === 'project') {
+    // A project (HI-2320): shown, as a Windows notification's click shows it.
+    if (!p) return notify('info', tr(M.projectGone, { project: t.project }))
+    actions.selectProject(p.path)
+    return setProjectTab(p.path, 'session')
+  }
   if (!p || !p.agents.some((a) => a.id === t.agentId)) return notify('info', tr(M.agentGone, { agent: t.name, project: t.project }))
   actions.selectProject(p.path)
   showAgent(p, t.agentId)

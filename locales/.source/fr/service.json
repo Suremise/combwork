@@ -249,6 +249,7 @@
   "service.workspace.platformOpen": "Open Version Control",
   "service.workspace.platformOtherFound": "{vcs} was found in {project}. Hive doesn't support it yet, and goes on treating the project as a Git project until you switch it to None in its Version Control tab.",
   "service.workspace.platformRepositoryGone": "{project}'s Git repository is gone. Git's rules hold, so its cards can't move on until the repository is back or you switch the project to None in its Version Control tab.",
+  "service.workspace.platformSettled": "Settled: nothing to change now",
   "service.workspace.platformTitle": "Version control changed in {project}",
   "service.workspace.renameAgent": "Rename {project}'s {agent}…",
   "service.workspace.sharedNames": "Agent names are unique across the workspace now, so each agent can be told apart. {shared}: they keep working, but rename one of each, e.g. {project}'s {agent} to {suggestion}.",

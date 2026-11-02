@@ -217,6 +217,8 @@
   "shell.edit.redo": "重做",
   "shell.edit.selectAll": "全选",
   "shell.edit.undo": "撤销",
+  "shell.entry.mcpCopied": "现已在工作区中",
+  "shell.entry.questionAnswered": "已回答",
   "shell.error.allowEdit": "无法允许此编辑",
   "shell.error.endProcesses": "无法结束进程",
   "shell.error.keepProcesses": "无法保留进程",
@@ -260,6 +262,7 @@
   "shell.noticeTarget.agentGone": "{agent} 已不在 {project} 中",
   "shell.noticeTarget.cardElsewhere": "{card} 在 {workspace} 的看板上，该工作区未打开",
   "shell.noticeTarget.cardGone": "{card} 已不在看板上",
+  "shell.noticeTarget.projectGone": "{project} 已不在此工作区中",
   "shell.notifications.clearAll": "全部清除",
   "shell.notifications.none": "没有通知",
   "shell.notifications.title": "通知",
@@ -410,5 +413,6 @@
   "shell.titlebar.pinTip": "{on, select, yes {窗口置顶（开）} other {窗口置顶（关）}}",
   "shell.toast.dismiss": "关闭",
   "shell.toast.openAgent": "打开 {agent} 的窗格",
-  "shell.toast.openCard": "打开 {card}"
+  "shell.toast.openCard": "打开 {card}",
+  "shell.toast.openProject": "显示 {project}"
 }

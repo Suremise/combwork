@@ -4020,76 +4020,80 @@
     "description": "Settings when its search finds nothing."
   },
   "settings.notifications.bannerPosition.desc": {
-    "defaultMessage": "Where banners show in the window.",
-    "description": "What the setting \"Banner position\" does, under its title (Settings → Notifications)."
+    "defaultMessage": "Where notifications and tips pop up in the window.",
+    "description": "What the setting \"Pop-up position\" does, under its title (Settings → Notifications)."
   },
   "settings.notifications.bannerPosition.option.bottomCenter": {
     "defaultMessage": "Bottom centre",
-    "description": "A choice of the setting \"Banner position\" (Settings → Notifications)."
+    "description": "A choice of the setting \"Pop-up position\" (Settings → Notifications)."
   },
   "settings.notifications.bannerPosition.option.bottomLeft": {
     "defaultMessage": "Bottom left",
-    "description": "A choice of the setting \"Banner position\" (Settings → Notifications)."
+    "description": "A choice of the setting \"Pop-up position\" (Settings → Notifications)."
   },
   "settings.notifications.bannerPosition.option.bottomRight": {
     "defaultMessage": "Bottom right",
-    "description": "A choice of the setting \"Banner position\" (Settings → Notifications)."
+    "description": "A choice of the setting \"Pop-up position\" (Settings → Notifications)."
   },
   "settings.notifications.bannerPosition.option.topCenter": {
     "defaultMessage": "Top centre",
-    "description": "A choice of the setting \"Banner position\" (Settings → Notifications)."
+    "description": "A choice of the setting \"Pop-up position\" (Settings → Notifications)."
   },
   "settings.notifications.bannerPosition.option.topLeft": {
     "defaultMessage": "Top left",
-    "description": "A choice of the setting \"Banner position\" (Settings → Notifications)."
+    "description": "A choice of the setting \"Pop-up position\" (Settings → Notifications)."
   },
   "settings.notifications.bannerPosition.option.topRight": {
     "defaultMessage": "Top right",
-    "description": "A choice of the setting \"Banner position\" (Settings → Notifications)."
+    "description": "A choice of the setting \"Pop-up position\" (Settings → Notifications)."
   },
   "settings.notifications.bannerPosition.tip": {
-    "defaultMessage": "Several stack, the newest nearest the edge.",
-    "description": "The info tip of the setting \"Banner position\" (Settings → Notifications): more on what it does and when it applies."
+    "defaultMessage": "Several stack, the newest nearest the edge. Bottom right stays left of the Assistant's panel.",
+    "description": "The info tip of the setting \"Pop-up position\" (Settings → Notifications): more on what it does and when it applies."
   },
   "settings.notifications.bannerPosition.title": {
-    "defaultMessage": "Banner position",
-    "description": "A setting's title (Settings → Notifications)."
+    "defaultMessage": "Pop-up position",
+    "description": "A setting's title (Settings → Notifications, HI-2320)."
   },
   "settings.notifications.bannerScope.desc": {
-    "defaultMessage": "Which notices the window you are using shows as banners.",
-    "description": "What the setting \"Show banners for\" does, under its title (Settings → Notifications)."
+    "defaultMessage": "Which agents, lanes and cards the window you are using pops up a notification about.",
+    "description": "What the setting \"Show pop-ups about agents for\" does, under its title (Settings → Notifications)."
   },
   "settings.notifications.bannerScope.option.all": {
     "defaultMessage": "All workspaces",
-    "description": "A choice of the setting \"Show banners for\" (Settings → Notifications)."
+    "description": "A choice of the setting \"Show pop-ups about agents for\" (Settings → Notifications)."
+  },
+  "settings.notifications.bannerScope.option.none": {
+    "defaultMessage": "None (only in the bell)",
+    "description": "A choice of the setting \"Show pop-ups about agents for\" (Settings → Notifications, HI-2320): no pop-ups about agents; they are kept under the bell (the Notifications panel)."
   },
   "settings.notifications.bannerScope.option.project": {
     "defaultMessage": "This project",
-    "description": "A choice of the setting \"Show banners for\" (Settings → Notifications)."
+    "description": "A choice of the setting \"Show pop-ups about agents for\" (Settings → Notifications)."
   },
   "settings.notifications.bannerScope.option.workspace": {
     "defaultMessage": "This workspace",
-    "description": "A choice of the setting \"Show banners for\" (Settings → Notifications)."
+    "description": "A choice of the setting \"Show pop-ups about agents for\" (Settings → Notifications)."
   },
   "settings.notifications.bannerScope.tip": {
-    "defaultMessage": "Clicking a banner from another window brings that window up. A notice left out shows nothing, but still counts on its own window's taskbar button and in its inbox.",
-    "description": "The info tip of the setting \"Show banners for\" (Settings → Notifications): more on what it does and when it applies."
+    "defaultMessage": "One left out is kept under the bell without popping up. With Hive in the background, Windows notifications come whatever this says. Clicking one about another window's project brings that window up.",
+    "description": "The info tip of the setting \"Show pop-ups about agents for\" (Settings → Notifications): more on what it does and when it applies."
   },
   "settings.notifications.bannerScope.title": {
-    "defaultMessage": "Show banners for",
-    "description": "A setting's title (Settings → Notifications)."
+    "defaultMessage": "Show pop-ups about agents for",
+    "description": "A setting's title (Settings → Notifications, HI-2320)."
   },
   "settings.notifications.bannerSeconds.desc": {
-    "defaultMessage": "How long a banner for a finished agent, or another notice, stays.",
-    "description": "What the setting \"Finished banners close after (seconds)\" does, under its title (Settings → Notifications)."
+    "defaultMessage": "How long a pop-up stays, unless it waits for you.",
+    "description": "What the setting \"Pop-ups close after (seconds)\" does, under its title (Settings → Notifications)."
   },
   "settings.notifications.bannerSeconds.tip": {
-    "defaultMessage": "It stays while the pointer is on it.",
-    "description": "The info tip of the setting \"Finished banners close after (seconds)\" (Settings → Notifications): more on what it does and when it applies."
+    "defaultMessage": "One with buttons, or an error, stays at least 15 seconds. It stays while the pointer or the keyboard is on it, and while the window is in the background.",
+    "description": "The info tip of the setting \"Pop-ups close after (seconds)\" (Settings → Notifications): more on what it does and when it applies."
   },
   "settings.notifications.bannerSeconds.title": {
-    "defaultMessage": "Finished banners close after (seconds)",
-    "description": "A setting's title (Settings → Notifications)."
+    "defaultMessage": "Pop-ups close after (seconds)",
+    "description": "A setting's title (Settings → Notifications, HI-2320)."
   },
   "settings.notifications.chimeEnabled.desc": {
     "defaultMessage": "Play a sound when an agent finishes or needs your input.",
@@ -4128,11 +4132,11 @@
     "description": "A setting's title (Settings → Notifications)."
   },
   "settings.notifications.desktopNotifications.desc": {
-    "defaultMessage": "Tell you when an agent finishes or needs input: in Hive while you use it, else with a Windows notification.",
+    "defaultMessage": "Tell you when an agent finishes or needs input, about lanes and cards, and about plan usage: a pop-up in the window you are using, else a Windows notification.",
     "description": "What the setting \"Notifications\" does, under its title (Settings → Notifications)."
   },
   "settings.notifications.desktopNotifications.tip": {
-    "defaultMessage": "Clicking one shows its project. Off, nothing is shown either way; the chime and the taskbar have settings of their own.",
+    "defaultMessage": "Clicking one shows what it is about. Every one shown is kept under the bell. Off, nothing is shown either way; Hive's own messages still pop up, and the chime and the taskbar have settings of their own.",
     "description": "The info tip of the setting \"Notifications\" (Settings → Notifications): more on what it does and when it applies."
   },
   "settings.notifications.desktopNotifications.title": {
@@ -4201,39 +4205,15 @@
   },
   "settings.notifications.waitingBannerStays.desc": {
     "defaultMessage": "Until you click or dismiss it, or answer the agent. Off, they close like the others.",
-    "description": "What the setting \"Banners for an agent waiting for you stay until handled\" does, under its title (Settings → Notifications)."
+    "description": "What the setting \"Pop-ups for an agent waiting for you stay until handled\" does, under its title (Settings → Notifications)."
   },
   "settings.notifications.waitingBannerStays.tip": {
-    "defaultMessage": "Answering the agent anywhere (its terminal, another window) closes its banner.",
-    "description": "The info tip of the setting \"Banners for an agent waiting for you stay until handled\" (Settings → Notifications): more on what it does and when it applies."
+    "defaultMessage": "Answering the agent anywhere (its terminal, another window) closes its pop-up, and its entry under the bell says Answered.",
+    "description": "The info tip of the setting \"Pop-ups for an agent waiting for you stay until handled\" (Settings → Notifications): more on what it does and when it applies."
   },
   "settings.notifications.waitingBannerStays.title": {
-    "defaultMessage": "Banners for an agent waiting for you stay until handled",
-    "description": "A setting's title (Settings → Notifications)."
-  },
-  "settings.notifications.whileFocused.desc": {
-    "defaultMessage": "What to show while you are using a Hive window. With Hive in the background, a Windows notification.",
-    "description": "What the setting \"While Hive is focused\" does, under its title (Settings → Notifications)."
-  },
-  "settings.notifications.whileFocused.option.inApp": {
-    "defaultMessage": "Show in Hive",
-    "description": "A choice of the setting \"While Hive is focused\" (Settings → Notifications)."
-  },
-  "settings.notifications.whileFocused.option.nothing": {
-    "defaultMessage": "Show nothing",
-    "description": "A choice of the setting \"While Hive is focused\" (Settings → Notifications)."
-  },
-  "settings.notifications.whileFocused.option.windows": {
-    "defaultMessage": "Windows notification",
-    "description": "A choice of the setting \"While Hive is focused\" (Settings → Notifications)."
-  },
-  "settings.notifications.whileFocused.tip": {
-    "defaultMessage": "Show in Hive: a banner in the window you are using, where Windows notifications would cover the Assistant. The chime still plays either way.",
-    "description": "The info tip of the setting \"While Hive is focused\" (Settings → Notifications): more on what it does and when it applies."
-  },
-  "settings.notifications.whileFocused.title": {
-    "defaultMessage": "While Hive is focused",
-    "description": "A setting's title (Settings → Notifications)."
+    "defaultMessage": "Pop-ups for an agent waiting for you stay until handled",
+    "description": "A setting's title (Settings → Notifications, HI-2320)."
   },
   "settings.number.any": {
     "defaultMessage": "A number",

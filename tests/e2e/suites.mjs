@@ -209,6 +209,7 @@ export const SUITES = [
   { name: 'models' },
   { name: 'narrowmain' },
   { name: 'nocode' },
+  { name: 'notifyonce' },
   { name: 'notifytarget' },
   { name: 'numbers' },
   { name: 'onclose' },

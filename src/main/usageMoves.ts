@@ -1,6 +1,5 @@
 import { randomBytes } from 'crypto'
 import { basename } from 'path'
-import { Notification } from 'electron'
 import type { Account, AgentDef, PlanLimit, UsageMoveRecord, UsageMoveRule } from '../shared/types'
 import { USAGE_MOVES, englishText } from '../shared/advanced'
 import { accountOnIn, resolveAgentConnection } from '../shared/accounts'
@@ -13,13 +12,11 @@ import { accountById, allAccounts, allConnections, getConnection, onConnectionSi
 import { choiceCount, onManualChoice } from './agentChoice'
 import { coalesced } from './coalesce'
 import { config } from './config'
-import { logNotice, onHiveEvent } from './events'
+import { onHiveEvent } from './events'
 import { createLogger, userText } from './logger'
-import { routeAppNotice } from './notices'
-import { notificationIcon } from './paths'
+import { tell } from './notify'
 import { connectionLoginNow } from './planUsage'
 import { sessions } from './sessions'
-import { showOsNotification } from './testQuiet'
 import { inWorkspace, openWorkspaces, workspaceOf, type WorkspaceService } from './workspace'
 
 /**
@@ -105,21 +102,9 @@ const BLOCKED_BODY = msg({
   description: "Why an account's agents can't move to another (HI-2195), under the title saying so. {to} is the account they should move to, {workspace} a workspace's name, {share} a share of a usage limit (\"98%\"), {agents} agents' names joined into a list. The limit is the weekly one or the 5-hour one. Settings → Accounts & Connections names a section."
 })
 
-/** Shows a notice as plan usage's are (planUsage.ts): kept in Notifications, and told as an agent notice is. */
+/** Tells a notice as plan usage's are (planUsage.ts, HI-2320): once, a pop-up or a Windows notification. */
 function notify(level: 'warning' | 'error' | 'info', title: Msg, body: Msg, values: Record<string, string | number>): void {
-  const t = tr(title, values)
-  const b = tr(body, values)
-  logNotice(level, t, b)
-  routeAppNotice(
-    t,
-    b,
-    () => {
-      if (!Notification.isSupported()) return
-      const n = new Notification({ title: t, body: b, icon: notificationIcon() })
-      showOsNotification(n, t, b)
-    },
-    englishText({ m: title, values })
-  )
+  tell({ kind: 'usage', level, title: tr(title, values), message: tr(body, values), apiTitle: englishText({ m: title, values }) })
 }
 
 const windowOf = (l: Pick<PlanLimit, 'windowMinutes'>): 'weekly' | 'fiveHour' => limitKind(l) ?? 'fiveHour'

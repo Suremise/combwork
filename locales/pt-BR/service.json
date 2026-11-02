@@ -249,6 +249,7 @@
   "service.workspace.platformOpen": "Abrir Controle de versão",
   "service.workspace.platformOtherFound": "{vcs} foi encontrado em {project}. O Hive ainda não oferece suporte a ele e continua a tratar o projeto como um projeto Git até você mudá-lo para Nenhum na aba Controle de versão dele.",
   "service.workspace.platformRepositoryGone": "O repositório Git de {project} sumiu. As regras do Git continuam valendo, então os cartões dele não podem avançar até o repositório voltar ou você mudar o projeto para Nenhum na aba Controle de versão dele.",
+  "service.workspace.platformSettled": "Resolvido: nada a mudar agora",
   "service.workspace.platformTitle": "O controle de versão mudou em {project}",
   "service.workspace.renameAgent": "Renomear o agente {agent} do projeto {project}…",
   "service.workspace.sharedNames": "Os nomes de agente agora são únicos em todo o espaço de trabalho, para que cada agente possa ser identificado. {shared}: eles continuam funcionando, mas renomeie um de cada, por exemplo, o agente {agent} do projeto {project} para {suggestion}.",

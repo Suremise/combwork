@@ -249,6 +249,7 @@
   "service.workspace.platformOpen": "Ouvrir Gestion de versions",
   "service.workspace.platformOtherFound": "{vcs} a été trouvé dans {project}. Hive ne le prend pas encore en charge et continue de traiter le projet comme un projet Git jusqu’à ce que tu le passes à Aucune dans son onglet Gestion de versions.",
   "service.workspace.platformRepositoryGone": "Le dépôt Git du projet {project} a disparu. Les règles de Git s’appliquent toujours, donc ses cartes ne peuvent pas avancer tant que le dépôt n’est pas revenu ou que tu n’as pas passé le projet à Aucune dans son onglet Gestion de versions.",
+  "service.workspace.platformSettled": "Réglé : rien à changer maintenant",
   "service.workspace.platformTitle": "La gestion de versions a changé dans {project}",
   "service.workspace.renameAgent": "Renommer l’agent {agent} du projet {project}…",
   "service.workspace.sharedNames": "Les noms d’agents sont désormais uniques dans l’espace de travail, pour qu’on puisse distinguer chaque agent. {shared} : ils continuent de fonctionner, mais renomme l’un d’eux à chaque fois, par exemple l’agent {agent} du projet {project} en {suggestion}.",

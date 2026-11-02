@@ -217,6 +217,8 @@
   "shell.edit.redo": "Wiederholen",
   "shell.edit.selectAll": "Alles auswählen",
   "shell.edit.undo": "Rückgängig",
+  "shell.entry.mcpCopied": "Jetzt im Arbeitsbereich",
+  "shell.entry.questionAnswered": "Beantwortet",
   "shell.error.allowEdit": "Änderung konnte nicht erlaubt werden",
   "shell.error.endProcesses": "Prozesse konnten nicht beendet werden",
   "shell.error.keepProcesses": "Prozesse konnten nicht behalten werden",
@@ -260,6 +262,7 @@
   "shell.noticeTarget.agentGone": "{agent} ist nicht mehr in {project}",
   "shell.noticeTarget.cardElsewhere": "{card} ist auf dem Board von {workspace}, das nicht geöffnet ist",
   "shell.noticeTarget.cardGone": "{card} ist nicht mehr auf dem Board",
+  "shell.noticeTarget.projectGone": "{project} ist nicht mehr in diesem Arbeitsbereich",
   "shell.notifications.clearAll": "Alle löschen",
   "shell.notifications.none": "Keine Benachrichtigungen",
   "shell.notifications.title": "Benachrichtigungen",
@@ -410,5 +413,6 @@
   "shell.titlebar.pinTip": "{on, select, yes {Immer im Vordergrund (an)} other {Immer im Vordergrund (aus)}}",
   "shell.toast.dismiss": "Schließen",
   "shell.toast.openAgent": "Bereich von {agent} öffnen",
-  "shell.toast.openCard": "{card} öffnen"
+  "shell.toast.openCard": "{card} öffnen",
+  "shell.toast.openProject": "{project} zeigen"
 }

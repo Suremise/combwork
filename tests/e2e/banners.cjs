@@ -1,8 +1,9 @@
-// In-app banners (#157): while a Hive window is focused, an agent finishing or waiting is a banner in it, not a
-// Windows notification; a finished banner closes after its seconds (kept while hovered), a waiting one stays until the
-// agent moves on; clicking one shows its project; × dismisses; the position setting places them; Show nothing and
-// Windows notification; Show banners for This project; with Hive in the background, a Windows notification as before;
-// and a profile from before (onlyWhenUnfocused off) is moved to Show in Hive. The test copy runs quiet and records the
+// Pop-ups (#157, HI-2320: one pop-up system): while a Hive window is focused, an agent finishing or waiting is a pop-up
+// in it, kept in its bell, not a Windows notification; a finished one closes after its seconds (kept while hovered or
+// focused), a waiting one stays until the agent moves on; clicking one shows its agent; × and Escape dismiss; the
+// position setting places them (bottom right by default); Show pop-ups about agents for This project and None (only in
+// the bell); with Hive in the background, a Windows notification and a quiet bell row, never a pop-up; and a profile from
+// before (config 5) gets the 1.0 settings. The test copy runs quiet and records the
 // Windows notifications it would show (HIVE_TEST_NOTIFY_LOG); the window's focus is stubbed (Windows won't give a
 // background app the focus). Fake Claude Code; throwaway profile and workspace.
 const lib = require('./lib.cjs')
@@ -48,7 +49,7 @@ const check = (name, ok, extra = '') => {
   const inv = (ch, ...a) => page.evaluate(([c, x]) => window.hive.invoke(c, ...x), [ch, a])
 
   const n0 = (await inv('settings:get')).notifications
-  check('a profile from before is moved to Show in Hive, the old setting gone', n0.whileFocused === 'inApp' && !('onlyWhenUnfocused' in n0) && n0.bannerPosition === 'top-center' && n0.bannerSeconds === 6 && n0.waitingBannerStays === true, JSON.stringify(n0))
+  check('a profile from before gets the one notification system: no While Hive is focused, pop-ups bottom right', !('whileFocused' in n0) && !('onlyWhenUnfocused' in n0) && n0.bannerPosition === 'bottom-right' && n0.bannerScope === 'all' && n0.bannerSeconds === 6 && n0.waitingBannerStays === true, JSON.stringify(n0))
   // Shorter banners, so the suite doesn't wait 6 s for each.
   await inv('settings:update', { notifications: { bannerSeconds: 2 } })
 
@@ -73,23 +74,24 @@ const check = (name, ok, extra = '') => {
       w.emit(f ? 'focus' : 'blur')
     }, on)
   const osNotes = () => (fs.existsSync(notifyLog) ? fs.readFileSync(notifyLog, 'utf8').split('\n').filter(Boolean).map((l) => JSON.parse(l)) : []).filter((e) => e.kind === 'notification')
-  const banners = () => page.locator('.notice-banner')
+  const banners = () => page.locator('.popups .popup:not(.kind-tip)')
+  const bellTitles = () => page.evaluate(() => window.__hiveBell?.().map((t) => `${t.quiet ? 'quiet:' : ''}${t.title}`) ?? null)
   const bannerTitles = () => banners().allInnerTexts()
   const showProject = async (name) => {
     await page.locator('.project-row', { hasText: name }).first().click()
     await lib.until(async () => (await page.locator('.project-header h1').innerText().catch(() => '')).includes(name), 5000)
   }
 
-  // --- Focused: a finished agent is a banner at the top centre, not a Windows notification.
+  // --- Focused: a finished agent is a pop-up at the bottom right, not a Windows notification.
   await setFocus(true)
   await showProject('beta')
   await send(alpha, one, 'go work 1')
   await turnEnds(alpha, one)
-  check('a finished agent: a banner in the window', !!(await lib.until(async () => (await bannerTitles()).some((t) => /alpha finished/.test(t)), 10000)), JSON.stringify(await bannerTitles()))
-  check('…at the top centre', (await page.locator('.notice-banners.at-top-center').count()) === 1)
+  check('a finished agent: a pop-up in the window', !!(await lib.until(async () => (await bannerTitles()).some((t) => /alpha finished/.test(t)), 10000)), JSON.stringify(await bannerTitles()))
+  check('…at the bottom right', (await page.locator('.popups.at-bottom-right').count()) === 1)
   check('…and no Windows notification', osNotes().length === 0, JSON.stringify(osNotes()))
   await page.screenshot({ path: path.join(lib.WORK, 'banners-1-finished.png') })
-  check('a finished banner closes after its seconds', !!(await lib.until(async () => (await banners().count()) === 0, 6000)))
+  check('a finished pop-up closes after its seconds', !!(await lib.until(async () => (await banners().count()) === 0, 6000)))
 
   // --- Kept while hovered.
   await send(alpha, one, 'go work 1')
@@ -106,150 +108,158 @@ const check = (name, ok, extra = '') => {
   await turnEnds(alpha, one)
   await lib.until(async () => (await banners().count()) === 1, 10000)
   await banners().first().click()
-  check('clicking a banner shows its project, and closes it', !!(await lib.until(async () => (await page.locator('.project-header h1').innerText().catch(() => '')).includes('alpha'), 5000)) && (await banners().count()) === 0)
+  check('clicking a pop-up shows its agent\'s project, and closes it', !!(await lib.until(async () => (await page.locator('.project-header h1').innerText().catch(() => '')).includes('alpha'), 5000)) && (await banners().count()) === 0)
 
   // --- × dismisses without going to the project.
   await showProject('beta')
   await send(alpha, one, 'go work 1')
   await turnEnds(alpha, one)
   await lib.until(async () => (await banners().count()) === 1, 10000)
-  await banners().first().locator('.notice-close').click()
+  await banners().first().locator('.popup-close').click()
   check('× dismisses it, and stays on the project shown', (await banners().count()) === 0 && (await page.locator('.project-header h1').innerText()).includes('beta'))
 
-  // --- From the keyboard (#175): the project's button, Enter opens it; Tab to ×, Space dismisses. DOM focus only
-  // (element.focus() and keys sent to the page): the test window never takes the OS focus.
+  // --- From the keyboard (#175): the text is the agent's button, Enter opens it; Tab to ×, Space dismisses; Escape
+  // closes it. DOM focus only (element.focus() and keys sent to the page): the test window never takes the OS focus.
   await send(alpha, one, 'go work 1')
   await turnEnds(alpha, one)
   await lib.until(async () => (await banners().count()) === 1, 10000)
-  const openBtn = page.getByRole('button', { name: /^Show the project: .*alpha finished/ })
-  check('a banner has a button to show its project, named for it', (await openBtn.count()) === 1, JSON.stringify(await bannerTitles()))
-  check('…and keeps its live role', (await page.locator('.notice-banner[role="status"]').count()) === 1)
+  const openBtn = banners().first().locator('.toast-open')
+  check("a pop-up's text is a button that opens its agent, saying so", (await openBtn.count()) === 1 && /Open One's pane/.test((await openBtn.getAttribute('title')) ?? ''), JSON.stringify(await bannerTitles()))
+  check('…and keeps its live role', (await page.locator('.popups .popup[role="status"]').count()) === 1)
   // Reached by the keyboard (Shift+Tab from ×), so it shows the focus ring as Tab would.
-  await page.locator('.notice-close').focus()
+  await page.locator('.popup-close').focus()
   await page.keyboard.press('Shift+Tab')
-  check('…reached with the keyboard', await page.evaluate(() => document.activeElement?.classList.contains('notice-open') ?? false))
-  await page.screenshot({ path: path.join(lib.WORK, 'banners-2-keyboard.png'), clip: { x: 300, y: 0, width: 700, height: 160 }, animations: 'disabled' })
+  check('…reached with the keyboard', await page.evaluate(() => document.activeElement?.classList.contains('toast-open') ?? false))
+  await page.screenshot({ path: path.join(lib.WORK, 'banners-2-keyboard.png'), clip: { x: 500, y: 560, width: 800, height: 240 }, animations: 'disabled' })
   await lib.sleep(3500) // A fixed wait on purpose: longer than the banner's 2 s, to show it does NOT close while focused.
   check('…it stays open while it has the focus', (await banners().count()) === 1)
   await page.keyboard.press('Enter')
-  check('Enter on it shows the project, and closes it', !!(await lib.until(async () => (await page.locator('.project-header h1').innerText().catch(() => '')).includes('alpha'), 5000)) && (await banners().count()) === 0)
+  check('Enter on it shows the agent\'s project, and closes it', !!(await lib.until(async () => (await page.locator('.project-header h1').innerText().catch(() => '')).includes('alpha'), 5000)) && (await banners().count()) === 0)
   await showProject('beta')
   await send(alpha, one, 'go work 1')
   await turnEnds(alpha, one)
   await lib.until(async () => (await banners().count()) === 1, 10000)
-  await page.locator('.notice-open').focus()
+  await page.locator('.toast-open').focus()
   await page.keyboard.press('Tab')
-  check('Tab moves from it to ×', await page.evaluate(() => document.activeElement?.classList.contains('notice-close') ?? false))
+  check('Tab moves from it to ×', await page.evaluate(() => document.activeElement?.classList.contains('popup-close') ?? false))
   await page.keyboard.press('Space')
   check('…and Space there dismisses it, staying on the project shown', !!(await lib.until(async () => (await banners().count()) === 0, HUNG_MS)) && (await page.locator('.project-header h1').innerText()).includes('beta'))
   await send(alpha, one, 'go work 1')
   await turnEnds(alpha, one)
   await lib.until(async () => (await banners().count()) === 1, 10000)
-  await page.locator('.notice-open').focus()
-  await page.locator('.notice-open').evaluate((el) => el.blur())
-  check('a focused banner closes once the focus leaves it', !!(await lib.until(async () => (await banners().count()) === 0, 6000)))
+  await page.locator('.toast-open').focus()
+  await page.locator('.toast-open').evaluate((el) => el.blur())
+  check('a focused pop-up closes once the focus leaves it', !!(await lib.until(async () => (await banners().count()) === 0, 6000)))
+  await send(alpha, one, 'go work 1')
+  await turnEnds(alpha, one)
+  await lib.until(async () => (await banners().count()) === 1, 10000)
+  await page.locator('.toast-open').focus()
+  await page.keyboard.press('Escape')
+  check('Escape with the focus in it closes it', !!(await lib.until(async () => (await banners().count()) === 0, HUNG_MS)))
+  // Every one of them is kept in the bell (HI-2320), none of them quiet.
+  const kept = await bellTitles()
+  check('the bell kept every finish shown, as pop-ups (none quiet)', Array.isArray(kept) && kept.filter((t) => t.startsWith('alpha finished')).length >= 6 && !kept.some((t) => t.startsWith('quiet:')), JSON.stringify(kept))
 
   // --- Waiting: stays until the agent moves on (it finishes after 8 s here).
   await send(alpha, one, 'ask work 8')
-  check('an agent waiting for you: a banner', !!(await lib.until(async () => (await page.locator('.notice-banner.waiting').count()) === 1, 10000)), JSON.stringify(await bannerTitles()))
+  check('an agent waiting for you: a pop-up', !!(await lib.until(async () => (await page.locator('.popups .popup.kind-needsYou').count()) === 1, 10000)), JSON.stringify(await bannerTitles()))
   await lib.sleep(3500) // A fixed wait on purpose: longer than the 2 s a finished banner stays, to show a waiting one does NOT close.
-  check('…that stays while it waits', (await page.locator('.notice-banner.waiting').count()) === 1)
+  check('…that stays while it waits', (await page.locator('.popups .popup.kind-needsYou').count()) === 1)
   await turnEnds(alpha, one)
-  check('…and closes once it is no longer waiting', !!(await lib.until(async () => (await page.locator('.notice-banner.waiting').count()) === 0, 8000)))
+  check('…and closes once it is no longer waiting', !!(await lib.until(async () => (await page.locator('.popups .popup.kind-needsYou').count()) === 0, 8000)))
+  check('…its bell row says Answered', !!(await lib.until(() => page.evaluate(() => window.__hiveBell?.().some((t) => t.kind === 'needsYou' && t.resolved === 'Answered')), 5000)))
   check('no Windows notification for any of them', osNotes().length === 0, JSON.stringify(osNotes()))
   await lib.until(async () => (await banners().count()) === 0, 6000)
 
   // --- More than fit: five waiting for you are all kept ("+1 more" shows the fifth), and finished ones never push
   // a waiting one out. Sent to the window as main sends them.
   const sendEvent = (e) => app.evaluate(({ BrowserWindow }, ev) => BrowserWindow.getAllWindows()[0].webContents.send('hive:event', ev), e)
-  const waitingNotice = (i) => ({ type: 'notice', notice: { id: `w${i}`, kind: 'waiting', title: `Waiting ${i}`, body: 'Allow Bash?', projectPath: alpha, agentId: `agent-${i}` } })
+  const entry = (id, kind, title, message) => ({ type: 'toast', toast: { id, kind, level: kind === 'finished' ? 'success' : 'info', title, message, target: { kind: 'project', projectPath: alpha, project: 'alpha' }, timestamp: new Date().toISOString() } })
+  const waitingNotice = (i) => entry(`w${i}`, 'needsYou', `Waiting ${i}`, 'Allow Bash?')
+  const resolved = (ids) => sendEvent({ type: 'toast-resolved', ids, outcome: 'Answered' })
   for (let i = 1; i <= 5; i++) await sendEvent(waitingNotice(i))
-  check('five waiting: four show, and "+1 more"', !!(await lib.until(async () => (await page.locator('.notice-banner.waiting').count()) === 4 && /\+1 more/.test((await page.locator('.notice-more').textContent().catch(() => '')) ?? ''), 5000)), JSON.stringify(await bannerTitles()))
+  check('five waiting: four show, and "+1 more"', !!(await lib.until(async () => (await page.locator('.popups .popup.kind-needsYou').count()) === 4 && /\+1 more/.test((await page.locator('.notice-more').textContent().catch(() => '')) ?? ''), 5000)), JSON.stringify(await bannerTitles()))
   await page.locator('.notice-more').click()
-  check('…which shows the fifth: none was dropped', !!(await lib.until(async () => (await page.locator('.notice-banner.waiting').count()) === 5, 5000)) && (await bannerTitles()).some((t) => /Waiting 1\b/.test(t)), JSON.stringify(await bannerTitles()))
+  check('…which shows the fifth: none was dropped', !!(await lib.until(async () => (await page.locator('.popups .popup.kind-needsYou').count()) === 5, 5000)) && (await bannerTitles()).some((t) => /Waiting 1\b/.test(t)), JSON.stringify(await bannerTitles()))
   await page.screenshot({ path: path.join(lib.WORK, 'banners-3-five-waiting.png') })
-  for (let i = 1; i <= 4; i++) await sendEvent({ type: 'notice', notice: { id: `f${i}`, kind: 'finished', title: `Finished ${i}`, body: 'Done.', projectPath: alpha } })
+  for (let i = 1; i <= 4; i++) await sendEvent(entry(`f${i}`, 'finished', `Finished ${i}`, 'Done.'))
   await lib.sleep(500)
-  check('four finished after them: all five waiting are still there', (await page.evaluate(() => document.querySelectorAll('.notice-banner.waiting').length + Number((document.querySelector('.notice-more')?.textContent ?? '').replace(/\D/g, '') || 0))) >= 5)
-  await lib.until(async () => (await page.locator('.notice-banner.finished').count()) === 0, 8000)
-  for (let i = 1; i <= 5; i++) await sendEvent({ type: 'notice-resolved', projectPath: alpha, agentId: `agent-${i}` })
-  check('answered: each waiting banner goes', !!(await lib.until(async () => (await banners().count()) === 0 && (await page.locator('.notice-more').count()) === 0, 5000)), JSON.stringify(await bannerTitles()))
+  check('four finished after them: all five waiting are still there', (await page.evaluate(() => document.querySelectorAll('.popups .popup.kind-needsYou').length + Number((document.querySelector('.notice-more')?.textContent ?? '').replace(/\D/g, '') || 0))) >= 5)
+  await lib.until(async () => (await page.locator('.popups .popup.kind-finished').count()) === 0, 8000)
+  await resolved([1, 2, 3, 4, 5].map((i) => `w${i}`))
+  check('answered: each waiting pop-up closes like the others once it says so', !!(await lib.until(async () => (await banners().count()) === 0 && (await page.locator('.notice-more').count()) === 0, 8000)), JSON.stringify(await bannerTitles()))
   // Set to close like the others: the newest four are kept, and they close after their seconds.
   await inv('settings:update', { notifications: { waitingBannerStays: false } })
   for (let i = 6; i <= 10; i++) await sendEvent(waitingNotice(i))
-  check('waiting banners set to close: the newest four, and no "+more"', !!(await lib.until(async () => (await page.locator('.notice-banner.waiting').count()) === 4, 5000)) && (await page.locator('.notice-more').count()) === 0)
+  check('waiting pop-ups set to close: the newest four, and no "+more"', !!(await lib.until(async () => (await page.locator('.popups .popup.kind-needsYou').count()) === 4, 5000)) && (await page.locator('.notice-more').count()) === 0)
   check('…which close after their seconds', !!(await lib.until(async () => (await banners().count()) === 0, 8000)))
   await inv('settings:update', { notifications: { waitingBannerStays: true } })
 
   // --- More than fit in the window: the stack scrolls inside it, and the oldest can be reached and handled.
   const tall = async (position, from) => {
     await inv('settings:update', { notifications: { bannerPosition: position } })
-    for (let i = 0; i < 12; i++) await sendEvent({ type: 'notice', notice: { id: `t${from + i}`, kind: 'waiting', title: `Tall ${from + i}`, body: 'Allow Bash to run this command?\nnpm run e2e -- --all --build --record\nin the alpha project', projectPath: alpha, agentId: `tall-${from + i}` } })
+    for (let i = 0; i < 12; i++) await sendEvent(entry(`t${from + i}`, 'needsYou', `Tall ${from + i}`, 'Allow Bash to run this command?\nnpm run e2e -- --all --build --record\nin the alpha project'))
     await lib.until(async () => (await page.locator('.notice-more').count()) === 1, 5000)
     await page.locator('.notice-more').click()
-    await lib.until(async () => (await page.locator('.notice-banner.waiting').count()) === 12, 5000)
+    await lib.until(async () => (await page.locator('.popups .popup.kind-needsYou').count()) === 12, 5000)
     const box = await page.evaluate(() => {
-      const el = document.querySelector('.notice-banners')
+      const el = document.querySelector('.popups')
       const r = el.getBoundingClientRect()
       return { top: r.top, bottom: r.bottom, height: innerHeight, scrolls: el.scrollHeight > el.clientHeight, overflow: getComputedStyle(el).overflowY }
     })
     check(`${position}: twelve waiting, expanded, stay inside the window and scroll`, box.top >= 0 && box.bottom <= box.height && box.scrolls && box.overflow === 'auto', JSON.stringify(box))
     // The oldest: scrolled to and dismissed with a real click.
-    const oldest = page.locator('.notice-banner', { hasText: `Tall ${from}` })
-    await oldest.locator('.notice-close').click({ timeout: 5000 })
-    check(`${position}: the oldest can be reached and dismissed`, !!(await lib.until(async () => (await page.locator('.notice-banner', { hasText: `Tall ${from}` }).count()) === 0, 5000)))
+    const oldest = page.locator('.popups .popup', { hasText: `Tall ${from}` })
+    await oldest.locator('.popup-close').click({ timeout: 5000 })
+    check(`${position}: the oldest can be reached and dismissed`, !!(await lib.until(async () => (await page.locator('.popups .popup', { hasText: `Tall ${from}` }).count()) === 0, 5000)))
     // The next oldest: its project opened by clicking it.
     await showProject('beta')
-    await page.locator('.notice-banner', { hasText: `Tall ${from + 1}` }).locator('.notice-title').click({ timeout: 5000 })
+    await page.locator('.popups .popup', { hasText: `Tall ${from + 1}` }).locator('.toast-title').click({ timeout: 5000 })
     check(`${position}: …and another clicked to open its project`, !!(await lib.until(async () => (await page.locator('.project-header h1').innerText().catch(() => '')).includes('alpha'), 5000)))
     await page.screenshot({ path: path.join(lib.WORK, `banners-4-tall-${position}.png`) })
-    for (let i = 0; i < 12; i++) await sendEvent({ type: 'notice-resolved', projectPath: alpha, agentId: `tall-${from + i}` })
-    await lib.until(async () => (await banners().count()) === 0, 5000)
+    await resolved(Array.from({ length: 12 }, (_, i) => `t${from + i}`))
+    await lib.until(async () => (await banners().count()) === 0, 8000)
   }
   await tall('top-center', 100)
   await tall('bottom-right', 200)
-  await inv('settings:update', { notifications: { bannerPosition: 'top-center' } })
 
   // --- Position.
-  await inv('settings:update', { notifications: { bannerPosition: 'bottom-right' } })
+  await inv('settings:update', { notifications: { bannerPosition: 'top-center' } })
   await send(beta, two, 'go work 1')
   await turnEnds(beta, two)
-  check('the position setting places them (bottom right)', !!(await lib.until(async () => (await page.locator('.notice-banners.at-bottom-right .notice-banner').count()) === 1, 10000)))
-  await page.screenshot({ path: path.join(lib.WORK, 'banners-2-bottom-right.png') })
+  check('the position setting places them (top centre)', !!(await lib.until(async () => (await page.locator('.popups.at-top-center .popup').count()) === 1, 10000)))
+  await page.screenshot({ path: path.join(lib.WORK, 'banners-2-top-center.png') })
   await lib.until(async () => (await banners().count()) === 0, 6000)
-  await inv('settings:update', { notifications: { bannerPosition: 'top-center' } })
+  await inv('settings:update', { notifications: { bannerPosition: 'bottom-right' } })
 
-  // --- Show banners for This project: another project's finish shows nothing at all.
+  // --- Show pop-ups about agents for This project: another project's finish goes to the bell only.
   await inv('settings:update', { notifications: { bannerScope: 'project' } })
   await showProject('beta')
   await send(alpha, one, 'go work 1')
   await turnEnds(alpha, one)
   await lib.sleep(4500) // A fixed wait on purpose: the finish group (3 s) and a banner's time, to show nothing comes.
-  check('This project: another project\'s finish shows no banner, and no Windows notification', (await banners().count()) === 0 && osNotes().length === 0, JSON.stringify(osNotes()))
+  check('This project: another project\'s finish pops up nothing, no Windows notification, a quiet row in the bell', (await banners().count()) === 0 && osNotes().length === 0 && ((await bellTitles()) ?? []).some((t) => t.startsWith('quiet:alpha finished')), JSON.stringify(osNotes()))
   await send(beta, two, 'go work 1')
   await turnEnds(beta, two)
   check('…its own project\'s does', !!(await lib.until(async () => (await bannerTitles()).some((t) => /beta finished/.test(t)), 10000)))
   await lib.until(async () => (await banners().count()) === 0, 6000)
   await inv('settings:update', { notifications: { bannerScope: 'all' } })
 
-  // --- While Hive is focused: Windows notification, and Show nothing.
-  await inv('settings:update', { notifications: { whileFocused: 'windows' } })
-  await send(alpha, one, 'go work 1')
-  await turnEnds(alpha, one)
-  check('set to Windows notification: one while focused, no banner', !!(await lib.until(() => osNotes().some((n) => /alpha finished/.test(n.title)), 10000)) && (await banners().count()) === 0, JSON.stringify(osNotes()))
+  // --- None (only in the bell): focused, no pop-up and no Windows notification; in the background, Windows notifications
+  // as ever (the old Show nothing's meaning).
   const before = osNotes().length
-  await inv('settings:update', { notifications: { whileFocused: 'nothing' } })
+  await inv('settings:update', { notifications: { bannerScope: 'none' } })
   await send(alpha, one, 'go work 1')
   await turnEnds(alpha, one)
-  await lib.sleep(4500) // A fixed wait on purpose: the finish group (3 s), to show nothing comes.
-  check('Show nothing: no banner, no Windows notification', (await banners().count()) === 0 && osNotes().length === before)
-  await inv('settings:update', { notifications: { whileFocused: 'inApp' } })
+  await lib.sleep(4500) // A fixed wait on purpose: the finish group (3 s), to show nothing pops up.
+  check('None (only in the bell): no pop-up, no Windows notification while focused', (await banners().count()) === 0 && osNotes().length === before)
 
-  // --- Hive in the background: a Windows notification, as before.
+  // --- Hive in the background: a Windows notification and a quiet bell row, never a pop-up, whatever the scope.
   await setFocus(false)
   await send(alpha, one, 'go work 1')
   await turnEnds(alpha, one)
-  check('in the background: a Windows notification, no banner', !!(await lib.until(() => osNotes().length > before, 10000)) && (await banners().count()) === 0, JSON.stringify(osNotes()))
+  check('in the background: a Windows notification, no pop-up', !!(await lib.until(() => osNotes().length > before, 10000)) && (await banners().count()) === 0, JSON.stringify(osNotes()))
+  await inv('settings:update', { notifications: { bannerScope: 'all' } })
 
   for (const [p, a] of [[alpha, one], [beta, two]]) await inv('session:stop', p, a.id).catch(() => undefined)
   await lib.until(async () => (await inv('session:live')).length === 0, 15000)

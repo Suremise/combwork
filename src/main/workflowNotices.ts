@@ -26,7 +26,7 @@ import { openWorkspaces, type WorkspaceService } from './workspace'
  * What Hive tells the user of the work itself (#1266, SPEC §16.11.4), with or without the Assistant: a card's request for
  * the user (the runtime's `notify` action: For you, a "couldn't within the rules"), and what the Assistant's lane watch
  * reports of each running lane (a failed review, a card blocked or stalled, every card passed so the merge is due, the
- * merge stalled). Each is a notice, a banner in the window the user is using or a Windows notification, as the user's
+ * merge stalled). Each is a notice, a pop-up in the window the user is using or a Windows notification, as the user's
  * notification settings say (Settings → Notifications); a quiet test copy records it to HIVE_TEST_NOTIFY_LOG. A lane's
  * events found together are one notice, per lane. Like the loop's wakes, none for a project whose Project Settings →
  * Card loops → Wake reviewers and builders is off (`loopWakes`).
@@ -66,8 +66,10 @@ const TICK_MS = 30_000
 const SINCE = 'lane_notices_since'
 
 /** A notice about a project's work, as the user's notification settings say. */
-function tell(projectPath: string, title: Text, lines: TextPart[]): void {
-  sessions.notice(projectPath, title, lines.length === 1 ? lines[0] : { lines })
+function tell(projectPath: string, title: Text, lines: TextPart[], about?: { kind: 'needsYou' | 'work'; card: { number: number; label: string }; workspacePath: string }): void {
+  // Its link is its card (HI-2320); a card that needs you is told as an agent waiting for you is.
+  const extra = about ? { kind: about.kind, target: { kind: 'card' as const, number: about.card.number, label: about.card.label, projectPath, workspacePath: about.workspacePath } } : undefined
+  sessions.notice(projectPath, title, lines.length === 1 ? lines[0] : { lines }, undefined, extra)
 }
 
 /** A card's project folder and the card, while it is on the board and its project lets loops wake (and tell) anyone. */
@@ -92,7 +94,7 @@ async function notifyFromAction(a: ActionRow, ws: WorkspaceService, ctx: Paramet
   // the Agent API them whole; the card's For you shows them rendered.
   const body: TextPart[] = shown ? [{ shown, english: text || shown }] : text ? [{ shown: gist(text, NOTICE_GIST), english: text }] : []
   // Shown once its dispatch is counted under a lease that holds (uncertain until the action is marked).
-  await ctx.dispatch(() => tell(at.projectPath, withValues(M.forYou, { card: cardLabel(at.card) }), body))
+  await ctx.dispatch(() => tell(at.projectPath, withValues(M.forYou, { card: cardLabel(at.card) }), body, ws.path ? { kind: 'needsYou', card: { number: at.card.number, label: cardLabel(at.card) }, workspacePath: ws.path } : undefined))
 }
 
 /**
@@ -136,7 +138,8 @@ async function laneNoticeFromAction(a: ActionRow, ws: WorkspaceService, ctx: Par
     if (e.event === 'paused-merge' || (e.event as string) === 'paused') return withValues(e.detail === 'merging' ? M.merging : M.notMerged, { card })
     return M.mergeDue
   })
-  if (lines.length) await ctx.dispatch(() => tell(at.projectPath, withValues(M.lane, { lane: String(a.payload.lane ?? '') }), lines))
+  const workspacePath = ws.path
+  if (lines.length) await ctx.dispatch(() => tell(at.projectPath, withValues(M.lane, { lane: String(a.payload.lane ?? '') }), lines, { kind: 'work', card: { number: at.card.number, label: cardLabel(at.card) }, workspacePath }))
 }
 
 // --- What lane notices last told, with the board.

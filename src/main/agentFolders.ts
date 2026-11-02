@@ -18,6 +18,8 @@ import { endedEarlier, endProcessesExactly, forgetEarlierRun, forgetKeeperRun, k
 import { hiveError } from './hiveError'
 import { fmt, msg, tr } from '../shared/i18n'
 import { toast } from './events'
+import { resolveOffer } from './notify'
+import { OUTCOME } from './outcomes'
 import { projectAgents } from '../shared/defaults'
 import { SlotStore, type SlotConn } from './slots'
 import { workspace, workspaceOf, type WorkspaceService } from './workspace'
@@ -576,7 +578,10 @@ async function tellIdleBrokerHold(projectPath: string, slot: string, w: { run: s
     tr(msg({ id: 'slots.idleBroker.title', defaultMessage: '{slot} is held by {names}', description: "A notice's title (HI-2309): a slot (a worktree Hive lends to a card, {slot} such as slot-a) stays held after Hive restarted, only by Windows' own idle Windows Sandbox broker ({names}: its process names, such as WindowsSandboxServer)." }), { slot, names }),
     tr(msg({ id: 'slots.idleBroker.body', defaultMessage: "{names} is Windows' idle Sandbox broker, left by {agent}'s last session in a Hive that has since closed. No Sandbox is running, so releasing the slot is safe: Release Slot… frees it for other work, and the broker is left running.", description: "The notice (HI-2309) that a slot stays held only by Windows' idle Windows Sandbox broker after Hive restarted: Hive doesn't release it by itself, and asks the user. {names}: the broker's process names (WindowsSandboxServer); {agent}: the agent whose session left it. Release Slot… is the button's name." }), { names, agent }),
     [{ label: tr(msg({ id: 'slots.idleBroker.release', defaultMessage: 'Release Slot…', description: "The notice's button (HI-2309): opens the question that frees a slot held only by Windows' idle Sandbox broker." })), command: 'slot.releaseHeld', args: [projectPath, slot] }],
-    projectPath
+    projectPath,
+    { kind: 'project', projectPath, project: basename(projectPath) },
+    // Its offer (HI-2320): this writer's hold, gone once it is released, here or by any other way (writerCleared).
+    { offer: `slot:${w.run}` }
   )
 }
 
@@ -605,6 +610,8 @@ export function goneWriterStill(evidence: GoneEvidence): () => void {
  * (`writerOver`). Nothing reads its run's records again: its kept record, its keeper's binding and state go.
  */
 export function writerCleared(run: string): void {
+  // A notice offering to release it no longer applies (HI-2320); Release Slot… said Released first.
+  resolveOffer(`slot:${run}`, tr(OUTCOME.noLongerHeld))
   released.delete(run)
   runWriterReleased(run)
   forgetEarlierRun(run)
@@ -675,6 +682,7 @@ export async function releaseHeldWriter(projectPath: string, slot: string, run: 
   }
   const { ws, project } = await hostOf(projectPath)
   if (!(await new SlotStore(boardConn(ws), project).clearWriter(slot, run, o.guard))) throw changed()
+  resolveOffer(`slot:${run}`, tr(OUTCOME.released))
   writerCleared(run)
   log.info(`The slot writer ${run} on ${userText(slot)} released by the user (its Hive ${w.hive.self ? 'this one' : `process ${w.hive.pid}, gone`}${o.end && w.processes ? ', its listed processes ended first' : ''})`)
   await writerHost.drained(projectPath, slot)

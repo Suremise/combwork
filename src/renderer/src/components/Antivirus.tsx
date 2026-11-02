@@ -4,6 +4,7 @@ import { formatDateTime } from '@shared/dates'
 import { call, errorMessage } from '../api'
 import { confirm, get, pushToast, set, setActivity, useStore } from '../store'
 import { awayFromProject } from '../agentPlace'
+import { resolveLocal } from '../entryConditions'
 import { cx, timeAgo } from '../util'
 import { Icon, LoadFailed } from './ui'
 import { fmt, msg, tr, tRich, type Msg } from '@shared/i18n'
@@ -75,6 +76,7 @@ const M = {
   reminder: msg({ id: 'workspace.antivirus.reminder', defaultMessage: 'A reminder: Microsoft Defender still scans every file Hive’s work creates or opens ({why}). Excluding the workspace’s folders, or a Dev Drive, can make builds, tests and git much faster. Hive reminds you at most once a day; Don’t Ask Again stops it for this workspace.', description: 'The suggestion, as a reminder ({why}: why now). Don’t Ask Again is its button.' }),
   suggestion: msg({ id: 'workspace.antivirus.suggestion', defaultMessage: 'Microsoft Defender scans every file Hive’s work creates or opens ({why}). Excluding the workspace’s folders, or a Dev Drive, can make builds, tests and git much faster.', description: 'The suggestion ({why}: why now).' }),
   review: msg({ id: 'workspace.antivirus.review', defaultMessage: 'Review…', description: "The suggestion's button: opens the antivirus status." }),
+  wontAsk: msg({ id: 'workspace.antivirus.wontAsk', defaultMessage: 'Hive won’t suggest it again for this workspace', description: "What the suggestion to exclude the workspace from Defender's scanning says after Don't Ask Again (HI-2320), in place of its buttons." }),
   dontAsk: msg({ id: 'workspace.antivirus.dontAsk', defaultMessage: 'Don’t Ask Again', description: "The suggestion's button: no more suggestions for this workspace." })
 }
 
@@ -349,6 +351,16 @@ export function useAntivirusOffer(): void {
       clearTimeout(timer)
     }
   }, [key, workspace, reason])
+}
+
+/** Don't Ask Again (HI-2320: the suggestion then says so, in place of its buttons). */
+export async function dismissAntivirusOffer(): Promise<void> {
+  try {
+    await call('antivirus:dismiss')
+    resolveLocal('antivirus', tr(M.wontAsk))
+  } catch {
+    // The suggestion stays, with its buttons, to try again.
+  }
 }
 
 function showOffer(count: number, reason: 'agents' | 'slow'): void {

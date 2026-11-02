@@ -9,6 +9,7 @@ import type { AdvancedState } from '@shared/advanced'
 import type { StageId } from '@shared/workflow/facts'
 import type { AgentLeftovers } from '@shared/agentProcesses'
 import { EMPTY_TIPS_STATE, type TipsState } from '@shared/tips'
+import { BELL_MAX, keepPopups, staysUntilHandled } from '@shared/notify'
 import { agentPtyKey, agentsPerPage, layoutFitting, layoutPanes, mostUrgent, projectLayout, projectSessionView } from '@shared/defaults'
 import { cellPage, cellPageCount, pageCells, pageIds, placedCells, type PaneCells } from '@shared/paneCells'
 import { projectAgentStates, type AgentState } from '@shared/agentState'
@@ -49,7 +50,6 @@ import type {
   ProjectInfo,
   QuitSession,
   ToastMessage,
-  Notice,
   OpenProgress,
   CloseCommandRun,
   WorkspaceInfo
@@ -354,10 +354,14 @@ interface State {
   /** Settings' Modified only (Settings → Advanced's list follows it too, #367). */
   settingsModifiedOnly: boolean
 
+  /** Pop-ups showing in this window (components/Popups.tsx, HI-2320), the newest first. */
   toasts: ToastMessage[]
-  /** In-app banners showing in this window (components/NoticeBanners.tsx), the newest first. */
-  notices: Notice[]
+  /** The bell's list (the Notifications panel): every entry this window was given, the newest first. */
   notifications: ToastMessage[]
+  /** Entries whose button runs now (HI-2320): its spinner, by entry id and the button's label. */
+  entryBusy: Record<string, string>
+  /** Finishes main still collects to tell together (HI-2320: a tip waits while any do). */
+  finishesPending: number
   unread: number
   showNotifications: boolean
   /** The status bar's attention inbox popover. */
@@ -629,8 +633,9 @@ export const useStore = create<State>(() => ({
   settingsModifiedOnly: false,
 
   toasts: [],
-  notices: [],
   notifications: [],
+  entryBusy: {},
+  finishesPending: 0,
   unread: 0,
   showNotifications: false,
   inboxOpen: false,
@@ -1546,17 +1551,30 @@ function withLiveState(workspace: WorkspaceInfo, state: LiveSessionState): Works
   return { ...workspace, projects, assistant }
 }
 
+/**
+ * An entry for this window (HI-2320): main's tell() or this window's notify() decided it is ours. A pop-up unless quiet
+ * (told as a Windows notification, or left out of pop-ups by the scope); in the bell either way. The same id replaces
+ * the one before it (a project's newer platform notice, #1419). A pop-up's time is the pop-up's own
+ * (components/Popups.tsx: paused while hovered, focused or the window is in the background). A tip showing gives way.
+ */
 export function pushToast(t: ToastMessage): void {
+  const waitingStays = get().settings?.notifications.waitingBannerStays ?? true
   set((s) => ({
-    // A quiet one is for the Notifications panel only (told as a banner, a Windows notification, or not at all).
-    toasts: t.quiet ? s.toasts : [...s.toasts.filter((x) => x.id !== t.id), t].slice(-5),
-    notifications: [t, ...s.notifications].slice(0, 100),
-    unread: s.showNotifications ? s.unread : s.unread + 1
+    toasts: t.quiet ? s.toasts.filter((x) => x.id !== t.id) : keepPopups([t, ...s.toasts.filter((x) => x.id !== t.id)], (x) => staysUntilHandled(x, waitingStays)),
+    notifications: [t, ...s.notifications.filter((x) => x.id !== t.id)].slice(0, BELL_MAX),
+    unread: s.showNotifications ? s.unread : s.unread + 1,
+    ...(t.quiet || !s.tipShown ? {} : { tipShown: null })
   }))
-  if (t.quiet) return
-  const timeout = t.timeoutMs ?? (t.level === 'error' ? 12000 : t.actions?.length ? 15000 : 6000)
-  // This toast's own time: one that replaced it under the same id (a project's newer notice, #1419) keeps its own.
-  setTimeout(() => set((s) => ({ toasts: s.toasts.filter((x) => x !== t) })), timeout)
+}
+
+/** Entries whose action was done or no longer applies: their buttons go, and they say what happened (HI-2320). */
+export function resolveToasts(ids: readonly string[], outcome: string): void {
+  const hit = (t: ToastMessage): boolean => ids.includes(t.id) && !t.resolved
+  set((s) => {
+    if (!s.toasts.some(hit) && !s.notifications.some(hit)) return {}
+    const done = (t: ToastMessage): ToastMessage => (hit(t) ? { ...t, resolved: outcome } : t)
+    return { toasts: s.toasts.map(done), notifications: s.notifications.map(done) }
+  })
 }
 
 export function dismissToast(id: string): void {
