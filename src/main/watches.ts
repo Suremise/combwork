@@ -2805,7 +2805,8 @@ async function evaluate(ws: WorkspaceService): Promise<void> {
  * telling the agent to ask the user. From the board as it is: the card's review (being reviewed), else for a pool lane's
  * card its assigned reviewer or none yet (loopReviewerOf), else waiting for its reviewer. Not a card the watcher reviews
  * itself, nor one that left the watch. A dependency in progress (HI-2381): a watched card that waits (blockedBy) on another
- * agent's card in Doing or Review, and such a card in Doing when it is watched too (`waits`, `working`).
+ * agent's card in Doing or Review (`waits`), and another agent's card in Doing that a watched card waits on or whose
+ * reviewer is another agent (`working`).
  */
 async function reviewWhere(store: Store, rec: WatchRecord): Promise<ReviewWhere[]> {
   const gone = new Set((rec.released ?? []).map((r) => r.number))
@@ -2828,9 +2829,15 @@ async function reviewWhere(store: Store, rec: WatchRecord): Promise<ReviewWhere[
   for (const n of rec.cond.cards) {
     if (gone.has(n) || out.some((w) => w.number === n)) continue
     const card = await read(n)
-    if (blocking.has(n) && othersWork(card) && card.column === 'doing') {
-      out.push({ number: n, state: 'working', reviewer: card.agentName || card.agent! })
-      continue
+    // Another's card in Doing (HI-2381): one a watched card waits on, or one with a reviewer that isn't the watcher (its
+    // loop: its builder's and reviewer's). One with no reviewer yet may be waiting for the watcher to review it: as before.
+    // The reviewer's part is for a project agent's watch only: the Assistant's (no scope) watches others' cards as it likes.
+    if (othersWork(card) && card.column === 'doing') {
+      const reviewer = blocking.has(n) || rec.scope === null ? null : ((await loopReviewerOf(store.ws, card).catch(() => null))?.id ?? null)
+      if (blocking.has(n) || (reviewer && reviewer !== rec.agentId)) {
+        out.push({ number: n, state: 'working', reviewer: card.agentName || card.agent! })
+        continue
+      }
     }
     if (!card || card.archived || card.column !== 'review') continue
     if (card.review) {

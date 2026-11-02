@@ -223,14 +223,40 @@ const check = (name, ok, extra = '') => {
   script('Reviewer', [])
   const limitWakes = () => wakes('Reviewer').filter((w) => w.text.includes('your card watch has ended'))
   const before = limitWakes().length
+  // Its grace checks so far (loops:checks: counted once a check has decided its mark): the next is the one after its turn ends.
+  const checksBefore = await inv('loops:checks', alpha, reviewer.id)
   await say(reviewer.id, `hive hive_wait_for_tasks ${JSON.stringify({ cards: [`#${dep}`, `#${next}`], changes: ['column'], limitMinutes: 1, wake: true })}`)
   check('the reviewer watches the card and the one waiting on it', !!(await until(async () => (await live(reviewer.id))?.status === 'watching', HUNG_MS)), await why(reviewer.id))
   // The watch's limit is a minute: the wait is bounded at twice that.
   check('its limit passes: woken, then idle with no watch', !!(await until(async () => limitWakes().length > before && ['ready', 'finished'].includes((await live(reviewer.id))?.status) && !(await live(reviewer.id))?.watch, 120000)), `${JSON.stringify(limitWakes().map((w) => w.text))} ${await why(reviewer.id)}`)
   const limit = limitWakes().at(-1)?.text ?? ''
   check("…the line says what waits on what, and not to tell the user", limit.includes(`#${next} waits on #${dep}`) && limit.includes(`#${dep} is in Doing with Builder`) && limit.endsWith("don't tell the user about them.") && !/hive_notify/.test(limit), limit)
-  await lib.sleep(4500) // on purpose: longer than the grace, to see no flag comes
+  check('…its grace check runs', !!(await until(async () => (await inv('loops:checks', alpha, reviewer.id)) > checksBefore, HUNG_MS)), String(await inv('loops:checks', alpha, reviewer.id)))
   check("another's card it waits on is never stalled for it (HI-2381)", !(await stalledOf(dep)) && !((await live(reviewer.id))?.notWatching ?? []).includes(dep), JSON.stringify({ stalled: await stalledOf(dep), mark: (await live(reviewer.id))?.notWatching }))
+
+  // --- 5b. HI-2381 round 2: the blocker alone in the watch (its dependent card left out), with a reviewer of its own: still
+  // its builder's and reviewer's, never the watcher's. Other builds it (never started: the card names it), Builder reviewed
+  // it (a review started is its loop reviewer), and the Reviewer, which reviews neither, watches it and ends with none.
+  const other = await lib.addAgent(inv, alpha, { name: 'Other' })
+  const solo = (await inv('tasks:create', { title: "Another's, reviewed by another", project: 'alpha', agent: other.id, column: 'review' })).number
+  const launches = () => {
+    const f = path.join(claudeHome, 'fake-launches.jsonl')
+    const text = fs.existsSync(f) ? fs.readFileSync(f, 'utf8') : ''
+    return text.slice(0, text.lastIndexOf('\n') + 1).split(/\r?\n/).filter(Boolean).map((l) => JSON.parse(l))
+  }
+  const builderSession = (await live(builder.id))?.sessionId
+  const launch = launches().find((l) => l.sessionId === builderSession && l.opts['--mcp-config'])
+  const hiveServer = launch ? JSON.parse(fs.readFileSync(launch.opts['--mcp-config'], 'utf8')).mcpServers.hive : null
+  const builderToken = hiveServer ? JSON.parse(fs.readFileSync(hiveServer.env.HIVE_API_TOKEN_FILE, 'utf8')).token : null
+  const reviewing = builderToken ? await fetch(`http://127.0.0.1:${PORT}/v1/tasks/${encodeURIComponent(`#${solo}`)}/start-review`, { method: 'POST', headers: { Authorization: `Bearer ${builderToken}`, 'Content-Type': 'application/json' }, body: '{}' }) : null
+  check('Builder starts reviewing it', reviewing?.status === 200, String(reviewing?.status))
+  await inv('tasks:update', solo, { column: 'doing' })
+  const soloBefore = await inv('loops:checks', alpha, reviewer.id)
+  await say(reviewer.id, wait(solo, { changes: ['comment'] }))
+  check('the reviewer watches it alone', !!(await until(async () => (await live(reviewer.id))?.status === 'watching', HUNG_MS)), await why(reviewer.id))
+  await inv('watch:cancel', alpha, reviewer.id)
+  check('…ends with no watch, and its grace check runs', !!(await until(async () => (await inv('loops:checks', alpha, reviewer.id)) > soloBefore, HUNG_MS)), String(await inv('loops:checks', alpha, reviewer.id)))
+  check("…and another's card with its own reviewer is never stalled for it", !(await stalledOf(solo)) && !((await live(reviewer.id))?.notWatching ?? []).includes(solo), JSON.stringify({ stalled: await stalledOf(solo), mark: (await live(reviewer.id))?.notWatching }))
 
   await inv('session:stop', alpha)
   await until(async () => (await inv('session:live')).length === 0, 15000)

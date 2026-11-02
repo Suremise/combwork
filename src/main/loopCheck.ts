@@ -100,15 +100,21 @@ export function cardsInPlay(cards: readonly TaskCard[], project: string, agentId
 }
 
 /**
- * Of an agent's watched cards, those it watches only as another's work that a card of its own waits on (HI-2381): another
- * agent builds the card, it isn't its reviewer (`reviews`), and another card it watches, not Done, depends on it
- * (blockedBy). Not its loop: CB2, whose next card CL-10 waits on CL-8, watched CL-8 and, its watch over, flagged CL-8 as
- * stalled while CL-8's own builder and reviewer were on it. A card's stall counts only its own builder and reviewer.
+ * Of an agent's watched cards, those that are another's loop, not its own (HI-2381): a card's stall counts only its own
+ * builder and reviewer. CB2, whose next card CL-10 waits on CB1's CL-8, watched CL-8 and, its watch over, flagged CL-8 as
+ * stalled while CB1 and CR1 were on it. A watched card in Doing or Review that another agent builds is another's when its
+ * reviewer (the review on it, else `reviewerOf`: its loop reviewer) is another agent, or, with none known, when another
+ * card the agent watches, not Done, depends on it (blockedBy). A card with no reviewer yet that nothing watched waits on
+ * stays: the agent may be the reviewer waiting for it to arrive in Review.
  */
-export function dependencyWatches(cards: readonly TaskCard[], agentId: string, watched: readonly number[], reviews: (n: number) => boolean): number[] {
+export function othersCards(cards: readonly TaskCard[], agentId: string, watched: readonly number[], reviewerOf: (n: number) => string | null): number[] {
   const blockers = new Set(cards.filter((c) => watched.includes(c.number) && !c.archived && c.column !== 'done').flatMap((c) => c.blockedBy ?? []))
   return cards
-    .filter((c) => watched.includes(c.number) && blockers.has(c.number) && !!c.agent && c.agent !== agentId && c.review?.agent !== agentId && !reviews(c.number))
+    .filter((c) => {
+      if (!watched.includes(c.number) || c.archived || (c.column !== 'doing' && c.column !== 'review') || !c.agent || c.agent === agentId) return false
+      const reviewer = c.review?.agent ?? reviewerOf(c.number)
+      return reviewer ? reviewer !== agentId : blockers.has(c.number)
+    })
     .map((c) => c.number)
 }
 
@@ -192,15 +198,14 @@ async function owedNow(loop: Loop): Promise<number[]> {
   const project = basename(loop.projectPath)
   const heads = await liveCardHeads(ws)
   let watched = loop.cards
-  // Another's card it waits on (HI-2381): not its loop, unless it is that card's loop reviewer. Its watched cards are read
-  // in full for their dependencies (heads have none) only when one of them is another agent's in Doing or Review.
-  const othersWork = heads.some((c) => watched.includes(c.number) && (c.column === 'doing' || c.column === 'review') && !!c.agent && c.agent !== loop.agentId)
-  const full = othersWork ? await allTasks(ws, { numbers: [...watched] }) : []
-  const deps = dependencyWatches(full, loop.agentId, watched, () => false)
-  if (deps.length) {
-    const reviewing = new Set<number>()
-    for (const c of full) if (deps.includes(c.number) && (await loopReviewerOf(ws, c).catch(() => null))?.id === loop.agentId) reviewing.add(c.number)
-    const drop = new Set(dependencyWatches(full, loop.agentId, watched, (n) => reviewing.has(n)))
+  // Another's card (HI-2381): its stall is its own builder's and reviewer's. Read in full (their dependencies; heads have
+  // none) with their loop reviewers, only when one of its watched cards is another agent's in Doing or Review.
+  const others = heads.filter((c) => watched.includes(c.number) && (c.column === 'doing' || c.column === 'review') && !!c.agent && c.agent !== loop.agentId)
+  if (others.length) {
+    const full = await allTasks(ws, { numbers: [...watched] })
+    const loopReviewers = new Map<number, string | null>()
+    for (const c of full) if (others.some((o) => o.number === c.number)) loopReviewers.set(c.number, (await loopReviewerOf(ws, c).catch(() => null))?.id ?? null)
+    const drop = new Set(othersCards(full, loop.agentId, watched, (n) => loopReviewers.get(n) ?? null))
     watched = watched.filter((n) => !drop.has(n))
   }
   const inPlay = cardsInPlay(heads, project, loop.agentId, watched)
