@@ -297,13 +297,20 @@ export function pruneRunDirs(root, keep = KEEP_RUNS, protect = [], alive = proce
 
 /**
  * pruneRunDirs for the runner (#285): before each run folder goes, release(runDir) removes what the run kept outside it
- * (its failed suites' folders in a lane: evidence.cjs releaseKept), awaited, in lanes it may work in.
+ * (its failed suites' folders in a lane: evidence.cjs releaseKept), awaited, in lanes it may work in. listSpare, if
+ * given, is what the list of folders to go is made with (one look at the board for them all: evidence.cjs snapshot);
+ * spare is then asked again before each folder's release and after it, just before the folder goes, so a card citing
+ * one since the list, or while its release waited, keeps it (HI-2364: asking
+ * the board afresh for every run folder kept the runner busy for over a minute after its record).
  */
-export async function pruneRunDirsReleasing(root, keep = KEEP_RUNS, protect = [], alive = processAlive, spare = () => null, { release = async () => {}, ...options } = {}) {
-  const old = runDirsToPrune(root, keep, protect, alive, spare, options)
+export async function pruneRunDirsReleasing(root, keep = KEEP_RUNS, protect = [], alive = processAlive, spare = () => null, { release = async () => {}, listSpare = spare, ...options } = {}) {
+  const old = runDirsToPrune(root, keep, protect, alive, listSpare, options)
   const removed = []
   for (const name of old) {
+    if (listSpare !== spare && spare(join(root, name))) continue
     await release(join(root, name))
+    // And again after the release, which can wait for a lane: a card citing the run meanwhile still keeps its logs.
+    if (spare(join(root, name))) continue
     if (removeRunDir(root, name, options.onKept)) removed.push(name)
   }
   return removed

@@ -586,7 +586,10 @@ finishRunDirs(runs.map((r) => r.logDir))
 // last day are kept too, up to a size (#1595: HIVE_E2E_KEEP_HOURS, HIVE_E2E_KEEP_MB).
 const retention = logRetention()
 if (retention.bad.length) console.log(`\nIgnored ${retention.bad.join(', ')}: not a number of 0 or more (the default is used).`)
+// The runs to prune are listed with one look at the board, and each is looked at afresh just before it goes (HI-2364).
+const look = evidence.snapshot()
 await pruneRunDirsReleasing(logsRoot, undefined, runs.map((r) => r.logDir), undefined, (p) => evidence.protects(p), {
+  listSpare: (p) => look.protects(p),
   keepMs: retention.keepMs,
   maxBytes: retention.maxBytes,
   onOverCap: (names, bytes) =>
