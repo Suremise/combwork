@@ -19,6 +19,7 @@ Hive 1.0 adds a workflow layer: your project's options decide how a card goes fr
 
 ### Fixed
 
+- **A branch merged into the project folder's branch no longer lands on the folder's card.** With cards worked in the project folder itself (no slots), merging a branch into the folder's branch noted every commit it brought in on a card there: those naming a card on that card (often one long done), the rest on the folder's only unfinished card. Only the branch's own commits count now, the merge commit among them; the merged branch's commits stay with their own cards (HI-2382).
 - **A big merge or checkout no longer freezes Hive's window.** With a card worked in the project folder itself (no slots), a merge bringing thousands of commits into the folder's branch held Hive for up to a minute while it noted each commit on the card (3,536 commits: 40 s). It now notes them in batches, and Hive stays responsive meanwhile (HI-2379).
 - **Quit when agents finish no longer loses edits made after reopening Hive.** Opened again during the wait, a file left with unsaved changes is asked about (save or discard) before Hive quits, when the last agent finishes or on Quit Now; Cancel keeps Hive running (HI-2336).
 
