@@ -3,7 +3,7 @@
 // change before it is let go is seen: the card's paths, the folders left out (gathered again on the new ones), its kind,
 // its column, the board closed. A no-code card reads nothing of the project, its declared paths included.
 import { afterEach, describe, expect, it, vi } from 'vitest'
-import { B1, moved, put, refusedBy, setup, type Env } from './harness'
+import { B1, B2, moved, put, refusedBy, setup, type Env } from './harness'
 import { preset } from '../../src/shared/workflow/options'
 import { isRefusal } from '../../src/main/workflow/runtime'
 import { baselineThread } from '../../src/main/noneBaseline'
@@ -103,6 +103,33 @@ describe('a None start or submit waiting on its whole-project read (HI-2340)', (
     e.store.updateCard(card.id, { paths: ['a.txt', 'big'] })
     baselineThread().release()
     refusedBy(await p, 'evidence.changed')
+  })
+
+  it("a file edited while another card's read is under way: a later submit reads again and names it (HR3's round 1)", async () => {
+    const e = none()
+    put(e.project, 'outside.txt', 'o\n')
+    const a = e.wf.createCard({ title: 'A', paths: ['a.txt'] })
+    const b = e.wf.createCard({ title: 'B', paths: ['b.txt'] })
+    moved(await e.wf.start(a.key, B1))
+    moved(await e.wf.start(b.key, B2))
+    // A's declare reads the project (outside.txt as it was), its answer held.
+    const t = baselineThread()
+    const held = t.answersHeld
+    t.hold({ after: true })
+    const declared = e.wf.declarePaths(a.key, B1, ['a.txt'])
+    await until(() => t.answersHeld === held + 1)
+    // The user edits outside.txt; then B submits its own file.
+    put(e.project, 'outside.txt', 'edited by the user\n')
+    e.wf.noteWrite('outside.txt', { agents: [], user: true })
+    put(e.project, 'b.txt', 'B\n')
+    e.wf.noteEdit(b, 'b.txt')
+    const submitted = e.wf.submit(b.key, B2, { summary: 'b' })
+    await until(() => t.pending === 2)
+    t.release()
+    await declared
+    const r = await submitted
+    moved(r)
+    expect(((r as { warnings?: string[] }).warnings ?? []).join('\n')).toMatch(/neither its paths .*: outside\.txt\./)
   })
 
   it('a no-code card with declared paths reads nothing of the project: no hash, no whole-project read, held or not', async () => {

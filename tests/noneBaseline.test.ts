@@ -12,7 +12,8 @@ import { afterAll, beforeAll, describe, expect, it } from 'vitest'
 import { NoneAdapter } from '../src/main/platform/none'
 import { isUnknown, unknown } from '../src/main/platform/types'
 import { UNREADABLE } from '../src/shared/workflow/texts'
-import { readBaseline, useBaselineWorker, type BaselineThread } from '../src/main/noneBaseline'
+import { endedLine, failedLine, readBaseline, useBaselineWorker, type BaselineThread } from '../src/main/noneBaseline'
+import { MARKED_LOG, redactLog, type RedactContext } from '../src/shared/redact'
 import { scanProject } from '../src/main/noneBaselineWorker'
 import { tempDir } from './tempDir'
 
@@ -90,10 +91,11 @@ describe("a None project's whole-project read in its worker (HI-2340)", () => {
     expect(t.pending).toBe(0)
   })
 
-  it('reads asked alike share one; a caller that stops waiting leaves only itself; a read nobody waits for is not sent', async () => {
+  it('reads asked alike share one not sent yet; a caller that stops waiting leaves only itself; a read nobody waits for is not sent', async () => {
     const a = new NoneAdapter(project(5))
     const b = new NoneAdapter(project(5))
     t.hold()
+    // The first is sent (under way: never shared); the next two, asked alike, share the one queued behind it.
     const one = readBaseline(a)
     const two = readBaseline(a)
     const gone = new AbortController()
@@ -101,17 +103,46 @@ describe("a None project's whole-project read in its worker (HI-2340)", () => {
     // b's read waits behind a's (one at a time); its only caller stops waiting: it isn't sent.
     const left = new AbortController()
     const other = readBaseline(b, left.signal)
-    await until(() => t.pending === 2)
+    await until(() => t.pending === 3)
     gone.abort()
     left.abort()
     expect(await three).toBeNull()
     expect(await other).toBeNull()
-    await until(() => t.pending === 1)
+    // two still waits on the shared queued read: it stays.
+    await until(() => t.pending === 2)
     t.release()
     const [x, y] = await Promise.all([one, two])
     expect(x).not.toBeNull()
-    expect(x).toBe(y)
+    expect(y).toEqual(x)
     expect(t.pending).toBe(0)
+  })
+
+  it("a read already under way is never shared: a file it read, changed since, is read again for a later caller (HR3's round 1)", async () => {
+    const root = project(3)
+    const a = new NoneAdapter(root, ['node_modules'])
+    const file = join(root, 'assets', '0', '0.txt')
+    // The first read reads the files (the old content), its answer held.
+    t.hold({ after: true })
+    const held = t.answersHeld
+    const first = readBaseline(a)
+    await until(() => t.answersHeld === held + 1)
+    // The file changes, as the watcher would see it (an invalidation: the generation doesn't change).
+    writeFileSync(file, 'changed since the first read')
+    a.invalidate('assets/0/0.txt')
+    const later = readBaseline(a)
+    await until(() => t.pending === 2)
+    t.release()
+    const [x, y] = (await Promise.all([first, later])) as Record<string, string>[]
+    expect(x['assets/0/0.txt']).not.toBe(y['assets/0/0.txt'])
+    expect(y).toEqual(a.manifest(a.deliverables() as string[]))
+  })
+
+  it("a read's failure and a worker's end are logged as the user's text: Copy Diagnostics leaves the file's name out (HR3's round 1)", () => {
+    const T = '2026-11-02T12:00:00.000Z [WARN] [noneBaseline]'
+    const lines = [`${T} Hive 1.0.0 starting (${MARKED_LOG})`, `${T} ${failedLine('D:\\Work\\notes', "ENOENT: no such file or directory, open 'D:\\Work\\notes\\private-salary-review.txt'")}`, `${T} ${endedLine("EACCES: permission denied, scandir 'D:\\Work\\notes\\medical'")}`]
+    const out = redactLog(lines.join('\n'), { home: 'C:\\Users\\someone', folders: [], names: [] } satisfies RedactContext)
+    expect(out).not.toMatch(/private-salary-review|medical|Work\\notes/)
+    expect(out).toContain("the None baseline's worker ended")
   })
 
   it("a newer generation drops the project's reads not sent yet: they are answered with nothing", async () => {

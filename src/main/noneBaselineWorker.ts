@@ -12,9 +12,9 @@ import type { Manifest } from '../shared/workflow/facts'
  * Electron here (a worker can't load it).
  */
 
-export type BaselineRequest = { id: number; type: 'scan'; project: string; excluded: readonly string[]; caseless: boolean } | { type: 'hold' } | { type: 'release' }
+export type BaselineRequest = { id: number; type: 'scan'; project: string; excluded: readonly string[]; caseless: boolean } | { type: 'hold'; after?: boolean } | { type: 'release' }
 
-export type BaselineReply = { id: number; ok: true; value: Maybe<Manifest>; ms: number } | { id: number; ok: false; error: string }
+export type BaselineReply = { id: number; ok: true; value: Maybe<Manifest>; ms: number } | { id: number; ok: false; error: string } | { heldAnswer: number }
 
 /** Reads a project's deliverables and hashes them: the whole-project manifest, or what couldn't be read. */
 export function scanProject(project: string, excluded: readonly string[], caseless: boolean): Maybe<Manifest> {
@@ -24,28 +24,34 @@ export function scanProject(project: string, excluded: readonly string[], casele
 }
 
 /**
- * The worker's requests, one at a time. `hold` and `release` are its tests' barrier (a read held before it starts, so a
- * test can change the world while a start waits on it): nothing in Hive sends them.
+ * The worker's requests, one at a time. `hold` and `release` are its tests' barrier: a read held before it starts (so a
+ * test can change the world while a start waits on it), or with `after`, read and its answer held (so a test can change
+ * a file it has read): nothing in Hive sends them.
  */
 export function baselineHandler(post: (r: BaselineReply) => void): (m: BaselineRequest) => void {
-  let held = false
+  let held: 'before' | 'after' | null = null
   const waiting: Extract<BaselineRequest, { type: 'scan' }>[] = []
-  const run = (m: Extract<BaselineRequest, { type: 'scan' }>): void => {
+  const answers: BaselineReply[] = []
+  const read = (m: Extract<BaselineRequest, { type: 'scan' }>): BaselineReply => {
     const t = performance.now()
     try {
-      const value = scanProject(m.project, m.excluded, m.caseless)
-      post({ id: m.id, ok: true, value, ms: performance.now() - t })
+      return { id: m.id, ok: true, value: scanProject(m.project, m.excluded, m.caseless), ms: performance.now() - t }
     } catch (e) {
-      post({ id: m.id, ok: false, error: e instanceof Error ? e.message : String(e) })
+      return { id: m.id, ok: false, error: e instanceof Error ? e.message : String(e) }
     }
   }
   return (m) => {
-    if (m.type === 'hold') held = true
+    if (m.type === 'hold') held = m.after ? 'after' : 'before'
     else if (m.type === 'release') {
-      held = false
-      for (const w of waiting.splice(0)) run(w)
-    } else if (held) waiting.push(m)
-    else run(m)
+      held = null
+      for (const a of answers.splice(0)) post(a)
+      for (const w of waiting.splice(0)) post(read(w))
+    } else if (held === 'before') waiting.push(m)
+    else if (held === 'after') {
+      answers.push(read(m))
+      post({ heldAnswer: m.id })
+    }
+    else post(read(m))
   }
 }
 

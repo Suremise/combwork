@@ -14,8 +14,9 @@ const log = createLogger('noneBaseline')
 /**
  * A None project's whole-project read, off main's thread (HI-2340, `noneBaselineWorker.ts`): one worker for the process,
  * as the repository lock's, started with the first read and never keeping Hive open. Bounded:
- * - reads asked alike (the project, its folders left out, and the adapter's `generation`) share one: at most one read
- *   per project and generation waits, and a newer generation drops that project's reads not yet sent;
+ * - reads asked alike (the project, its folders left out, and the adapter's `generation`) share one not sent yet, never
+ *   one under way (it may have read a file before a write since): at most one read per project and generation waits
+ *   beside the one in flight, and a newer generation drops that project's reads not yet sent;
  * - one is sent at a time, in order; past the advanced setting's seconds the worker is ended, its read answered with
  *   nothing, and the next read starts a new one;
  * - a caller that stops waiting (its signal) leaves only itself; a read nobody waits for any more isn't sent;
@@ -68,7 +69,9 @@ class BaselineThread {
     const key = keyOf(project, generation, excluded)
     // A newer generation of the project: its reads not sent yet go, answered with nothing.
     for (const r of this.queue.filter((q) => q.project.toLowerCase() === project.toLowerCase() && q.generation < generation)) this.drop(r)
-    const shared = this.instance?.current?.key === key ? this.instance.current : this.queue.find((q) => q.key === key)
+    // Only a read not sent yet is shared (HR3's round 1): one under way may have read a file before a write the caller
+    // knows of (an invalidation doesn't change the generation), so a later caller gets a read of its own after it.
+    const shared = this.queue.find((q) => q.key === key)
     const r: Read = shared ?? { id: ++this.next, key, project, generation, excluded: [...excluded], caseless: none.caseless, waiters: new Set() }
     if (!shared) this.queue.push(r)
     return new Promise((resolve) => {
@@ -82,14 +85,17 @@ class BaselineThread {
     })
   }
 
-  /** Tests' barrier: reads wait in the worker until `release`. */
-  hold(): void {
-    this.transport().send({ type: 'hold' })
+  /** Tests' barrier: reads wait in the worker until `release` (`after`: read, their answers held). */
+  hold(o: { after?: boolean } = {}): void {
+    this.transport().send({ type: 'hold', ...(o.after ? { after: true } : {}) })
   }
 
   release(): void {
     this.transport().send({ type: 'release' })
   }
+
+  /** Tests: answers read and held by `hold({ after: true })`, as the worker has said. */
+  answersHeld = 0
 
   /** Reads waiting or in flight, for tests: none left behind. */
   get pending(): number {
@@ -146,11 +152,12 @@ class BaselineThread {
     const r = i.current
     i.current = null
     if (r) this.answer(r, null)
-    log.warn(`the None baseline's worker ended (${why}); a new one starts with the next read`)
+    log.warn(endedLine(why))
     if (this.queue.length) this.pump()
   }
 
   private reply(i: Instance, m: BaselineReply): void {
+    if ('heldAnswer' in m) return void this.answersHeld++
     // Only the worker now and its read now: a late message of one ended or replaced is never another's answer.
     if (this.instance !== i || !i.current || i.current.id !== m.id) return
     const r = i.current
@@ -161,7 +168,7 @@ class BaselineThread {
       if (m.ms > 1000) log.info(`read ${userText(r.project)} whole in ${Math.round(m.ms)} ms, off main's thread`)
       this.answer(r, m.value)
     } else {
-      log.warn(`reading ${userText(r.project)} whole failed: ${m.error}`)
+      log.warn(failedLine(r.project, m.error))
       this.answer(r, null)
     }
     this.pump()
@@ -201,6 +208,11 @@ class BaselineThread {
     return this.instance?.worker?.terminate()
   }
 }
+
+/** The log's lines for a read that failed, or a worker that ended: its error is the file system's, which can name the
+ * user's files, so it is the user's text (Copy Diagnostics leaves it out). */
+export const failedLine = (project: string, error: string): string => `reading ${userText(project)} whole failed: ${userText(error)}`
+export const endedLine = (why: string): string => `the None baseline's worker ended (${userText(why)}); a new one starts with the next read`
 
 /** The worker's script, beside main's (inside the asar, as the others); a test's build of it (`useBaselineWorker`). */
 let scriptForTests: string | null = null
