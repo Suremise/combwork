@@ -254,10 +254,15 @@ export function hideUserText(text: string): string {
 
 /** Folders whose paths name nothing of the user's: app data, the CLIs' dot folders, Windows and installed programs. */
 const PLAIN_FOLDER = /^(?:~[\\/](?:AppData|\.)|[A-Za-z]:[\\/](?:Program Files|Program Files \(x86\)|ProgramData|Windows)(?:[\\/]|$))/i
-/** An absolute path, up to a space or a character that can't be in one (from a path with spaces, the words after the first space stay). */
-const ABSOLUTE_PATH = /(?<![\w<>])(?:[A-Za-z]:[\\/](?:Program Files(?: \(x86\))?)?|~[\\/]|\\\\)[^\s"'<>|?*,;()[\]{}]*/gi
-/** A string that is one absolute path as a whole, spaces and all (a drive's, a home-relative or a UNC path). */
+/**
+ * An absolute path, up to a space or a character that can't be in one (from a path with spaces, the words after the first
+ * space stay). A placeholder redact() put in it (a name, `<project>`) doesn't end it, so the rest of the path goes too (HI-2332).
+ */
+const ABSOLUTE_PATH = /(?<![\w<>])(?:[A-Za-z]:[\\/](?:Program Files(?: \(x86\))?)?|~[\\/]|\\\\)(?:[^\s"'<>|?*,;()[\]{}]|<[a-z]+>)*/gi
+/** A string that is one absolute path as a whole, spaces and all (a drive's, a home-relative or a UNC path): read before redact(). */
 const WHOLE_PATH = /^(?:[A-Za-z]:[\\/]|~[\\/]|\\\\)[^\n"<>|?*]*$/i
+/** What redact() makes of a path in a known folder: Hive's own or a workspace's. */
+const KNOWN_ROOT = /^<(?:hive|workspace)>(?:[\\/]|$)/
 
 /**
  * The report's last step after redact() (HI-2332): any absolute path left that isn't one of Hive's or the CLIs' own
@@ -269,13 +274,14 @@ export function hidePaths(text: string): string {
 
 /**
  * Redaction for one string value of a report's structured attachment (a console recording's event fields): redact(),
- * then hidePaths(). A value that is a path as a whole goes whole, so the words after a space in it don't stay.
+ * then hidePaths(). A value that is a path as a whole (read from the value as it came, so a name redact() replaced in it
+ * doesn't hide that) goes whole, so the words after a space in it don't stay; in a known or plain folder it stays redacted.
  */
 export function redactValue(text: string, ctx: RedactContext): string {
   const out = redact(text, ctx)
-  const whole = out.trim()
-  if (WHOLE_PATH.test(whole)) return PLAIN_FOLDER.test(whole) ? out : '<path>'
-  return hidePaths(out)
+  if (!WHOLE_PATH.test(text.trim())) return hidePaths(out)
+  const kept = out.trim()
+  return KNOWN_ROOT.test(kept) || PLAIN_FOLDER.test(kept) ? out : '<path>'
 }
 
 /** In the line Hive logs as it starts, once its log marks the user's own text. */

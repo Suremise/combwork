@@ -194,6 +194,20 @@ describe('diagnosticRecording', () => {
     expect(inputs[3]).toEqual({ file_path: '<workspace>\\src\\a.ts', notebook_path: 'C:\\Program Files\\Tool\\x.ipynb', path: '~\\.claude\\projects\\s.jsonl' })
   })
 
+  it("takes the whole path out when a name in it is one Hive replaces too (HI-2332 round 2)", () => {
+    const ctx: RedactContext = { home: 'C:\\Users\\Example', folders: ['D:\\Work\\Demo'], names: [{ name: 'Cedar', as: '<project>' }, { name: 'acquisition', as: '<agent>' }] }
+    const paths = ['E:/Clients/Cedar Research/acquisition.txt', 'E:/Clients/Cedar/acquisition.txt', '\\\\Cedar\\Clients\\Research\\deal.docx', 'C:\\Users\\Example\\Documents\\Cedar\\notes.txt', 'Cedar']
+    const kept = { file_path: 'D:\\Work\\Demo\\Cedar\\a.ts', path: 'C:\\Users\\Example\\.claude\\projects\\Cedar\\s.jsonl' }
+    const events = [...paths.map((p) => ({ file_path: p })), kept].map((input, i) => ({ type: 'event', seq: i + 1, at: '', kind: 'hook', name: 'PreToolUse', summary: 'Read', raw: { tool_input: input } }))
+    const part = diagnosticRecording([header(), ...events].map((l) => JSON.stringify(l)).join('\n'), (s) => redactValue(s, ctx))!
+    for (const word of ['Clients', 'Cedar', 'Research', 'acquisition', 'Documents', 'notes', 'deal.docx']) expect(part.lines.join('\n')).not.toContain(word)
+    const inputs = part.lines.map((l) => JSON.parse(l).raw.tool_input)
+    expect(inputs.slice(0, 4)).toEqual(Array.from({ length: 4 }, () => ({ file_path: '<path>' })))
+    // A name alone is no path; in a known folder or the CLIs' own, the path stays with the name replaced.
+    expect(inputs[4]).toEqual({ file_path: '<project>' })
+    expect(inputs[5]).toEqual({ file_path: '<workspace>\\<project>\\a.ts', path: '~\\.claude\\projects\\<project>\\s.jsonl' })
+  })
+
   it('never takes a recording with text, and keeps to its count', async () => {
     expect(diagnosticRecording(await record(true), (s) => s)).toBeNull()
     const many = [header(), ...Array.from({ length: DIAGNOSTIC_LINES + 50 }, (_, i) => ({ type: 'event', seq: i + 1, at: '', kind: 'hook', name: 'Stop', summary: '' }))].map((l) => JSON.stringify(l)).join('\n')
