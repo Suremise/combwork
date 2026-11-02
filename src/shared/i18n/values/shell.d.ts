@@ -219,8 +219,8 @@ interface HiveMessageValues {
   'shell.edit.redo': undefined
   'shell.edit.selectAll': undefined
   'shell.edit.undo': undefined
-  'shell.entry.archiveChanged': undefined
   'shell.entry.mcpCopied': undefined
+  'shell.entry.unfinished': undefined
   'shell.error.allowEdit': undefined
   'shell.error.endProcesses': undefined
   'shell.error.keepProcesses': undefined

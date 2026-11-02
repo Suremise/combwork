@@ -230,8 +230,7 @@ interface HiveMessageValues {
   'main.outcome.allowed': undefined
   'main.outcome.conversationEnded': undefined
   'main.outcome.conversationMoved': undefined
-  'main.outcome.handOverLater': undefined
-  'main.outcome.modesAlready': undefined
+  'main.outcome.modesChanged': undefined
   'main.outcome.modesNextSession': undefined
   'main.outcome.modesNothing': undefined
   'main.outcome.namesDiffer': undefined

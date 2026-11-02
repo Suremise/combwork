@@ -956,7 +956,11 @@ interface ShownLaunch {
   ids: string[]
   more: number
 }
-const offersShown = new Map<string, { projectPath: string; agentId: string; agentName?: string; runs: ShownLaunch[] }>()
+/**
+ * A notice's offer: each launch as it showed it, and the processes themselves (pid and start time), frozen as shown
+ * (HR2's round 2): End Them ends exactly these, never what the kept list says after an await.
+ */
+const offersShown = new Map<string, { projectPath: string; agentId: string; agentName?: string; runs: (ShownLaunch & { frozen: readonly AgentProcess[] })[] }>()
 
 const shownOf = (l: { runId: string; processes: AgentProcess[]; more: number }): ShownLaunch => ({ run: l.runId, ids: l.processes.map((p) => `${p.pid}:${p.created ?? ''}`).sort(), more: l.more })
 
@@ -988,7 +992,7 @@ export function leftoversOffer(projectPath: string, agentId: string): string {
   const k = agentKey(projectPath, agentId)
   const mine = [...left.values()].filter((l) => agentKey(l.projectPath, l.agentId) === k)
   const offer = `leftovers:${k}#${mine.map((l) => l.runId).join(',')}`
-  offersShown.set(offer, { projectPath, agentId, agentName: mine[0]?.agentName, runs: mine.map(shownOf) })
+  offersShown.set(offer, { projectPath, agentId, agentName: mine[0]?.agentName, runs: mine.map((l) => ({ ...shownOf(l), frozen: Object.freeze(l.processes.map((p) => Object.freeze({ ...p }))) })) })
   watchLeftoverOffers()
   return offer
 }
@@ -1035,7 +1039,9 @@ export async function settleOffer(offer: string, how: 'end' | 'keep'): Promise<v
       for (const r of o.runs) await settleLeftovers(o.projectPath, o.agentId, 'keep', r.run)
       return done(tr(LO.kept))
     }
-    const shown = o.runs.flatMap((r) => left.get(r.run)?.processes ?? [])
+    // What the notice showed and the user authorised, frozen when it was made: never widened from the kept list, which a
+    // poll may have changed during the awaits above (HR2's round 2).
+    const shown = o.runs.flatMap((r) => r.frozen)
     if (!(await endProcessesExactly(shown))) throw hiveError(LO.notEnded, { n: shown.length }, { kind: 'conflict' })
     // Each launch looked at again: one now empty is settled as ended; one with something started since stays listed.
     let left_ = 0

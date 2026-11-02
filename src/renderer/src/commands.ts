@@ -552,7 +552,7 @@ const COMMAND_DEFS: CommandDef[] = [
     category: 'tasks',
     // The Undo of an Archived n cards toast (#351): its batch back where it was.
     internal: true,
-    run: (id: string) => unarchiveBatch(id).then(() => undefined)
+    run: (id: string, workspacePath?: unknown) => unarchiveBatch(id, typeof workspacePath === 'string' ? workspacePath : undefined).then(() => undefined)
   },
   {
     id: 'agent.show',

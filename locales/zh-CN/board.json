@@ -77,6 +77,7 @@
   "board.batch.leftOnBoard": "{n, plural, other {# 张卡片}}留在了看板上：{why}。",
   "board.batch.noneBack": "无法恢复 {failed}",
   "board.batch.nothingArchived": "未归档任何卡片",
+  "board.batch.otherWorkspace": "此归档属于另一个工作区：请在那里的“已归档”中撤销",
   "board.batch.someBack": "已恢复 {n, plural, other {# 张卡片}}；{failed} 无法恢复",
   "board.batch.stayArchived": "它们仍随所在批次保持归档：在“已归档”中点击“取消归档此批次”可重试（卡片的文件可能正被其他程序打开）。",
   "board.batch.undo": "撤销",

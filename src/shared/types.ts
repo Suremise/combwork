@@ -3527,8 +3527,6 @@ export type NotifyKind = 'needsYou' | 'finished' | 'work' | 'usage' | 'warning' 
  */
 export type EntryCondition =
   | { kind: 'mcpMissing'; projectPath: string; names: string[] }
-  /** An archive's Undo: the cards it archived, while all of them still are. */
-  | { kind: 'archiveBatch'; numbers: number[] }
 
 export type UpdateStatus = 'disabled' | 'idle' | 'checking' | 'available' | 'downloading' | 'ready' | 'up-to-date' | 'error'
 

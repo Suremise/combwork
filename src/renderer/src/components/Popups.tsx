@@ -5,7 +5,7 @@ import { msg, tr } from '@shared/i18n'
 import { runCommandAsync } from '../commands'
 import { openNoticeTarget } from '../noticeTarget'
 import { call } from '../api'
-import { dismissToast, isAssistantPath, set, useStore } from '../store'
+import { dismissToast, isAssistantPath, set, updateToasts, useStore } from '../store'
 import { cx } from '../util'
 import { TipPopup } from './Tips'
 import { Icon } from './ui'
@@ -23,6 +23,7 @@ const M = {
   dismiss: msg({ id: 'shell.toast.dismiss', defaultMessage: 'Dismiss', description: 'Button on a notice in the corner: closes it.' }),
   agent: msg({ id: 'shell.toast.openAgent', defaultMessage: "Open {agent}'s pane", description: "Tooltip on a notification an agent or the Assistant sent about an agent (HI-1961): clicking it shows that agent's pane (where its terminal is). {agent} is the agent's name." }),
   card: msg({ id: 'shell.toast.openCard', defaultMessage: 'Open {card}', description: 'Tooltip on a notification an agent or the Assistant sent about a card (HI-1961): clicking it opens the card ({card}, its key, e.g. HI-12).' }),
+  unfinished: msg({ id: 'shell.entry.unfinished', defaultMessage: "Didn't finish: try again", description: "What a notification says above its buttons when one of them, run in another Hive window, didn't say it had finished (that window reloaded, closed, or took too long; HI-2320). The buttons stay, to try again." }),
   project: msg({ id: 'shell.toast.openProject', defaultMessage: 'Show {project}', description: 'Tooltip on a notification about a project (HI-2320): clicking it shows the project ({project}, its name).' })
 }
 
@@ -48,7 +49,9 @@ export async function runEntryAction(t: ToastMessage, a: ToastAction): Promise<v
     // About a project (an agent's, or the project itself): it runs in the window that has it, with the project shown
     // (#1437, as the banners' buttons did), whichever window this is. What it did comes back as the entry's resolution.
     const where = t.target && t.target.kind !== 'card' && !isAssistantPath(t.target.projectPath) ? t.target.projectPath : null
-    if (where) await call('notice:action', where, a.command, a.args ?? []).catch(() => undefined)
+    // Run elsewhere and not finished there (its window didn't say in time, reloaded or went): never passed for done; its
+    // buttons stay, and the entry says so.
+    if (where) await call('notice:action', where, a.command, a.args ?? []).catch(() => updateToasts([t.id], [], tr(M.unfinished)))
     else await runCommandAsync(a.command, ...(a.args ?? []))
   } finally {
     set((s) => {

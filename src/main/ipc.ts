@@ -588,7 +588,7 @@ export function registerIpc(getAppInfo: () => ReturnType<HiveRequests['app:info'
       emitTo(target, { type: 'menu-command', command: 'project.focus', args: [projectPath] })
       return noticeActionIn(target, command, Array.isArray(args) ? args : [])
     },
-    'notice:actionDone': (reply, error) => noticeActionDone(String(reply), typeof error === 'string' ? error : null),
+    'notice:actionDone': (reply, error) => noticeActionDone(String(reply), typeof error === 'string' ? error : null, win().webContents.id),
     'notice:target': (target) => {
       // The window that has its project, or a workspace card's workspace; else this one, which says it's gone.
       const where = target?.projectPath ?? (target?.kind === 'card' ? target.workspacePath : null)

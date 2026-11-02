@@ -209,3 +209,67 @@ describe('tell(): one entry, one window', () => {
     expect(notify.offerOpen('update:1.0.0')).toBe(false)
   })
 })
+
+// HI-2320 (the Assistant's scope for round 3, HR2's round 2 finding 5): an entry's button run in another window waits
+// for that window to say it has finished, and only that window; bounded, and cancelled if it reloads, its renderer goes
+// or it closes, never passing for done.
+describe('a button run in another window (noticeActionIn)', () => {
+  const window = async (id: number) => {
+    const { EventEmitter } = await import('events')
+    const wc = Object.assign(new EventEmitter(), { id, sent: [] as unknown[], send: (_c: string, e: unknown) => void wc.sent.push(e) })
+    return { webContents: wc, isDestroyed: () => false }
+  }
+  const replyOf = (w: { webContents: { sent: unknown[] } }) => (w.webContents.sent.at(-1) as { reply: string }).reply
+
+  it('finishes when its own window replies; a reply from another window is ignored', async () => {
+    const notify = await import('../src/main/notify')
+    const target = await window(11)
+    const done = notify.noticeActionIn(target as never, 'session.allowLockedEdit', ['p'])
+    expect(target.webContents.sent.at(-1)).toMatchObject({ type: 'menu-command', command: 'session.allowLockedEdit' })
+    const reply = replyOf(target)
+    let settled = false
+    void done.then(() => (settled = true))
+    notify.noticeActionDone(reply, null, 22)
+    await Promise.resolve()
+    expect(settled).toBe(false)
+    notify.noticeActionDone(reply, null, 11)
+    await done
+    expect(notify.noticeActionsWaiting()).toBe(0)
+  })
+
+  it('the other window reloads, or its renderer goes, mid-run: the wait ends as unfinished and is let go', async () => {
+    const notify = await import('../src/main/notify')
+    for (const event of ['did-start-navigation', 'render-process-gone', 'destroyed']) {
+      const target = await window(12)
+      const done = notify.noticeActionIn(target as never, 'x', [])
+      target.webContents.emit(event)
+      await expect(done).rejects.toThrow(notify.NOTICE_ACTION_UNFINISHED)
+      expect(notify.noticeActionsWaiting()).toBe(0)
+      // A late reply after that changes nothing.
+      notify.noticeActionDone(replyOf(target), null, 12)
+    }
+  })
+
+  it('no reply in time: unfinished, never done', async () => {
+    vi.useFakeTimers()
+    try {
+      const notify = await import('../src/main/notify')
+      const target = await window(13)
+      const done = notify.noticeActionIn(target as never, 'x', [], 1000)
+      const failed = expect(done).rejects.toThrow(notify.NOTICE_ACTION_UNFINISHED)
+      await vi.advanceTimersByTimeAsync(1000)
+      await failed
+      expect(notify.noticeActionsWaiting()).toBe(0)
+    } finally {
+      vi.useRealTimers()
+    }
+  })
+
+  it('its window closing ends the wait as unfinished', async () => {
+    const notify = await import('../src/main/notify')
+    const target = await window(14)
+    const done = notify.noticeActionIn(target as never, 'x', [])
+    notify.forgetOwner(14)
+    await expect(done).rejects.toThrow(notify.NOTICE_ACTION_UNFINISHED)
+  })
+})

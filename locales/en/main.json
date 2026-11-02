@@ -915,13 +915,9 @@
     "defaultMessage": "It has a new conversation now",
     "description": "What the long-conversation notification says once the agent has moved to a new conversation (handed over, or the CLI started one; HI-2320), in place of its Hand Over to… button."
   },
-  "main.outcome.handOverLater": {
-    "defaultMessage": "Not now: Hand Over to… is in its ⋯ menu once it is free",
-    "description": "What the long-conversation notification says once the agent may no longer hand over from it (it works again, or is on a card loop's card; HI-2320), in place of its Hand Over to… button. Hand Over to… is a command; the ⋯ menu is on the agent's pane."
-  },
-  "main.outcome.modesAlready": {
-    "defaultMessage": "Switched: the agents are in their new mode",
-    "description": "What the notice that the permission mode changed says once every agent it named is in its new mode, switched there or by hand (HI-2320), in place of its Switch Now button."
+  "main.outcome.modesChanged": {
+    "defaultMessage": "Settings changed since: nothing switched",
+    "description": "What the notice that the permission mode changed says once the setting changed again since it was shown, so its Switch Now no longer names the mode the settings say (HI-2320), in place of its button."
   },
   "main.outcome.modesNextSession": {
     "defaultMessage": "Their sessions ended: the new mode applies from the next",

@@ -79,6 +79,7 @@ interface HiveMessageValues {
   'board.batch.leftOnBoard': { n: number; why: string | number }
   'board.batch.noneBack': { failed: string | number }
   'board.batch.nothingArchived': undefined
+  'board.batch.otherWorkspace': undefined
   'board.batch.someBack': { n: number; failed: string | number }
   'board.batch.stayArchived': undefined
   'board.batch.undo': undefined

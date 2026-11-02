@@ -30,11 +30,11 @@ export function reportArchived(r: ArchiveResult): void {
     level: 'success',
     title: tr(msg({ id: 'board.batch.archived', defaultMessage: 'Archived {n, plural, one {# card} other {# cards}}', description: "A notification's title after Archive All: how many cards it archived. It has an Undo button." }), { n: r.archived.length }),
     message: left,
-    actions: [{ label: tr(msg({ id: 'board.batch.undo', defaultMessage: 'Undo', description: 'Button on the notification after Archive All: brings the archived cards back.' })), command: 'task.undoArchive', args: [r.batch.id] }],
+    // Its Undo names its workspace (HI-2320): pressed while this window shows another, it is refused. What it did is
+    // its own result (unarchiveBatch), checked by main card by card; no live check meanwhile (the Assistant's scope).
+    actions: [{ label: tr(msg({ id: 'board.batch.undo', defaultMessage: 'Undo', description: 'Button on the notification after Archive All: brings the archived cards back.' })), command: 'task.undoArchive', args: [r.batch.id, get().workspace?.path ?? ''] }],
     timestamp: new Date().toISOString(),
-    timeoutMs: 10_000,
-    // Its Undo is live while every card it archived still is (HI-2320: entryConditions.ts).
-    condition: { kind: 'archiveBatch', numbers: r.archived }
+    timeoutMs: 10_000
   })
 }
 
@@ -42,7 +42,12 @@ export function reportArchived(r: ArchiveResult): void {
  * Brings a batch back (Undo, "Unarchive this batch") and says how it went: cards that couldn't come back stay archived
  * with the batch, which is kept so another try brings them. Returns whether every card came back.
  */
-export async function unarchiveBatch(id: string): Promise<boolean> {
+export async function unarchiveBatch(id: string, workspacePath?: string): Promise<boolean> {
+  // From its notice, for its own workspace only (HI-2320): another shown here now, nothing is done.
+  if (workspacePath && workspacePath.toLowerCase() !== (get().workspace?.path ?? '').toLowerCase()) {
+    resolveLocal(`archived-${id}`, tr(msg({ id: 'board.batch.otherWorkspace', defaultMessage: "This archive is another workspace's: undo it there, from its Archived view", description: "What the notification after Archive All says when its Undo is pressed while the window shows another workspace (HI-2320): nothing was brought back. Archived is the archive's view: use its translation." })))
+    return false
+  }
   try {
     const { restored, failed } = await call('tasks:unarchiveBatch', id)
     await loadTasks()

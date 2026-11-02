@@ -4206,10 +4206,13 @@ class SessionManager {
   }
 
   // A changed mode setting applies to new sessions; for running ones, Hive offers to switch them now.
-  private modeOffers = new Map<string, { id: string; label: string; mode: string }>()
+  private modeOffers = new Map<string, { id: string; label: string; mode: string; value: PermissionMode }>()
   private modeOfferTimer: NodeJS.Timeout | null = null
-  /** Switch Now's offers (HI-2320) and the running agents each named: gone with the last of them. */
-  private modeOfferAgents = new Map<string, Set<string>>()
+  /**
+   * Switch Now's offers (HI-2320): each running agent it named and the mode it offered that agent (HR2's round 2: its
+   * settings' generation). Gone with the last of them, or superseded by a newer offer for one of them.
+   */
+  private modeOfferAgents = new Map<string, Map<string, PermissionMode>>()
   private modeOfferSeq = 0
 
   /** An agent's session ended: a Switch Now offer left with none of its agents running no longer applies (HI-2320). */
@@ -4221,15 +4224,30 @@ class SessionManager {
     }
   }
 
-  /** Switch Now, from its notice (HI-2320): the switches, then what happened, in the notice; checked again by applyModeSettings. */
+  /**
+   * Switch Now, from its notice (HI-2320): only an offer still open, only the agents it named, and only into the mode it
+   * named for each (HR2's rounds 1 and 2). Settings changed since (another mode for one of them): nothing is switched,
+   * and the notice says so. Checked again at the switch itself (applyModeSettings).
+   */
   async applyModeOffer(offer: string): Promise<{ switched: string[]; skipped: string[] }> {
-    // Only an offer still open, and only the agents it named (HR2's round 1): an old notice switches no newer session.
-    const ids = this.modeOfferAgents.get(offer)
-    if (!ids) {
+    const offered = this.modeOfferAgents.get(offer)
+    if (!offered) {
       resolveOffer(offer, tr(OUTCOME.modesNothing))
       return { switched: [], skipped: [] }
     }
-    const r = await this.applyModeSettings(ids)
+    for (const [id, mode] of offered) {
+      const l = this.live.get(id)
+      if (!l) continue
+      const { agent } = await this.agentDef(l.state.projectPath, l.state.agentId).catch(() => ({ agent: null }))
+      const now = agent ? (await this.effective(l.state.projectPath, pinProvider(agent, l.state.provider))).permissionMode : null
+      if (now !== mode) {
+        this.modeOfferAgents.delete(offer)
+        resolveOffer(offer, tr(OUTCOME.modesChanged))
+        return { switched: [], skipped: [] }
+      }
+    }
+    if (!this.modeOfferAgents.has(offer)) return { switched: [], skipped: [] }
+    const r = await this.applyModeSettings(offered)
     this.modeOfferAgents.delete(offer)
     const text = r.switched.length || r.skipped.length ? [...r.switched, ...r.skipped].join('\n') : tr(OUTCOME.modesNothing)
     resolveOffer(offer, text)
@@ -4244,7 +4262,7 @@ class SessionManager {
       return
     }
     l.offeredMode = mode
-    this.modeOffers.set(liveId(l.state.projectPath, l.state.agentId), { id: liveId(l.state.projectPath, l.state.agentId), label: this.label(l.state), mode: permissionLabel(l.state.provider, mode, tr) })
+    this.modeOffers.set(liveId(l.state.projectPath, l.state.agentId), { id: liveId(l.state.projectPath, l.state.agentId), label: this.label(l.state), mode: permissionLabel(l.state.provider, mode, tr), value: mode })
     if (this.modeOfferTimer) clearTimeout(this.modeOfferTimer)
     this.modeOfferTimer = setTimeout(() => {
       this.modeOfferTimer = null
@@ -4252,9 +4270,15 @@ class SessionManager {
       this.modeOffers.clear()
       if (!offers.length) return
       const modes = [...new Set(offers.map((o) => o.mode))]
-      // Its offer (HI-2320): live while one of the agents it names still runs this session.
+      // Its offer (HI-2320): live while one of the agents it names still runs this session, each with the mode offered
+      // it. A newer offer for one of them supersedes an older one (HR2's round 2): the settings changed since.
+      for (const [older, ids] of [...this.modeOfferAgents]) {
+        if (!offers.some((o) => ids.has(o.id))) continue
+        this.modeOfferAgents.delete(older)
+        resolveOffer(older, tr(OUTCOME.modesChanged))
+      }
       const offer = `modes:${++this.modeOfferSeq}`
-      this.modeOfferAgents.set(offer, new Set(offers.map((o) => o.id)))
+      this.modeOfferAgents.set(offer, new Map(offers.map((o) => [o.id, o.value])))
       toast(
         'info',
         tr(msg({ id: 'session.modeOffer.title', defaultMessage: 'Permission mode changed to {modes}', description: "A notice's title: the permission mode in Settings changed for running agents. {modes} is the new mode's name (several joined by \" / \")." }), { modes: modes.join(' / ') }),
@@ -4275,7 +4299,7 @@ class SessionManager {
    * own question (Codex's Full Access warning, up to 10 minutes: #1024) doesn't hold up the others. Reported in the
    * agents' order once all have ended.
    */
-  async applyModeSettings(only?: ReadonlySet<string>): Promise<{ switched: string[]; skipped: string[] }> {
+  async applyModeSettings(only?: ReadonlyMap<string, PermissionMode>): Promise<{ switched: string[]; skipped: string[] }> {
     const todo: { l: LiveSession; mode: PermissionMode }[] = []
     for (const l of [...this.live.values()]) {
       const st = l.state
@@ -4286,6 +4310,8 @@ class SessionManager {
       if (!agent) continue
       const mode = (await this.effective(st.projectPath, pinProvider(agent, st.provider))).permissionMode
       if (!mode || mode === l.configuredMode) continue
+      // From a notice: only into the mode it named for this agent (the settings changed since: not this one).
+      if (only && only.get(liveId(st.projectPath, st.agentId)) !== mode) continue
       l.configuredMode = mode
       if (mode !== st.permissionMode) todo.push({ l, mode })
     }
@@ -4321,22 +4347,41 @@ class SessionManager {
     // conversation) is still open; and never while the agent runs, the conversation already open here again or another.
     const offer = `bg:${liveId(projectPath, agentId)}#${jobId}#${sessionId}`
     if (fromOffer !== undefined && (fromOffer !== offer || !offerOpen(offer))) return
-    const running = this.live.get(liveId(projectPath, agentId))
-    if (running) {
+    if (this.bgSettling.has(offer)) return
+    /**
+     * Whether it may still go on (HR2's round 2, checked again after each wait before stopping or starting anything): its
+     * notice's offer, when it came from one, still open; and the agent not running (its conversation open here again, or
+     * another), which resolves the notice instead.
+     */
+    const stillApplies = (): boolean => {
+      if (fromOffer !== undefined && !offerOpen(offer)) return false
+      const running = this.live.get(liveId(projectPath, agentId))
+      if (!running) return true
       resolveOffer(offer, tr(running.state.sessionId === sessionId ? OUTCOME.openHereAgain : OUTCOME.runsAnother))
-      return
+      return false
     }
-    const { agent } = await this.agentDef(projectPath, agentId)
-    const rec = (await workspace.sessionsFile(projectPath)).sessions.find((s) => s.id === sessionId)
-    const adapter = providerAdapter((await this.resumeProvider(projectPath, sessionId, rec)) ?? agentProvider(agent, config.settings))
-    const info = providerService.info(adapter.id)
-    if (!adapter.stopBackgroundJob || !info.path) throw hiveError(msg({ id: 'session.background.cantStop', defaultMessage: "{provider} can't stop background sessions.", description: "Stop It and Resume is refused: the coding agent can't stop its background service's job. {provider} is its name." }), { provider: adapter.descriptor.name }, { kind: 'invalid' })
-    await adapter.stopBackgroundJob(info.path, jobId)
-    // The job lets go of the conversation as it exits.
-    await new Promise((r) => setTimeout(r, 1500))
-    await this.start(projectPath, { agentId, resumeId: sessionId })
-    resolveOffer(offer, tr(OUTCOME.stoppedAndResumed))
+    if (!stillApplies()) return
+    this.bgSettling.add(offer)
+    try {
+      const { agent } = await this.agentDef(projectPath, agentId)
+      const rec = (await workspace.sessionsFile(projectPath)).sessions.find((s) => s.id === sessionId)
+      const adapter = providerAdapter((await this.resumeProvider(projectPath, sessionId, rec)) ?? agentProvider(agent, config.settings))
+      if (!stillApplies()) return
+      const info = providerService.info(adapter.id)
+      if (!adapter.stopBackgroundJob || !info.path) throw hiveError(msg({ id: 'session.background.cantStop', defaultMessage: "{provider} can't stop background sessions.", description: "Stop It and Resume is refused: the coding agent can't stop its background service's job. {provider} is its name." }), { provider: adapter.descriptor.name }, { kind: 'invalid' })
+      await adapter.stopBackgroundJob(info.path, jobId)
+      // The job lets go of the conversation as it exits.
+      await new Promise((r) => setTimeout(r, 1500))
+      if (!stillApplies()) return
+      await this.start(projectPath, { agentId, resumeId: sessionId })
+      resolveOffer(offer, tr(OUTCOME.stoppedAndResumed))
+    } finally {
+      this.bgSettling.delete(offer)
+    }
   }
+
+  /** Stop It and Resume offers whose own action runs now: its outcome says what happened, not the agent starting (HI-2320). */
+  private bgSettling = new Set<string>()
 
   /** Sessions that would be interrupted by quitting: an agent is working or waiting on a prompt. */
   busyStates(): LiveSessionState[] {
@@ -6679,35 +6724,17 @@ class SessionManager {
     return false
   }
 
-  /** Each agent's status and mode last looked at for its notices' offers (HI-2320), so a report that changed neither costs nothing. */
-  private offersLookedAt = new Map<string, string>()
-
   /**
-   * An agent's notices' buttons, checked again as its status or mode changes (HI-2320, HR2's round 1): Switch Now goes
-   * once each agent it named is in its new mode (switched here or by hand); Hand Over to… goes once the agent may no
-   * longer hand over (working again, on a card loop's card…), saying where to find it then.
+   * An agent running again (its conversation open here, or another): a Stop It and Resume offered for it no longer
+   * applies (HI-2320, the Assistant's scope for round 3: that session over, the entry resolves; no other live checks).
    */
   private recheckOffers(l: LiveSession): void {
     const st = l.state
+    if (st.status === 'starting' || st.status === 'stopped') return
     const id = liveId(st.projectPath, st.agentId)
-    const look = `${st.status}|${st.permissionMode ?? ''}|${st.sessionId ?? ''}`
-    if (this.offersLookedAt.get(id) === look) return
-    this.offersLookedAt.set(id, look)
-    if (l.offeredMode && st.permissionMode === l.offeredMode) {
-      for (const [offer, ids] of this.modeOfferAgents) {
-        if (!ids.delete(id) || ids.size) continue
-        this.modeOfferAgents.delete(offer)
-        resolveOffer(offer, tr(OUTCOME.modesAlready))
-      }
-    }
-    const offer = st.sessionId ? `transcript:${id}#${st.sessionId}` : null
-    if (offer && offerOpen(offer)) {
-      void this.handOverAllowed(st.projectPath, st.agentId)
-        .then((ok) => {
-          if (!ok && offerOpen(offer)) resolveOffer(offer, tr(OUTCOME.handOverLater))
-        })
-        .catch(() => undefined)
-    }
+    const mine = (o: string): boolean => o.startsWith(`bg:${id}#`) && !this.bgSettling.has(o)
+    resolveOffers((o) => mine(o) && !o.endsWith(`#${st.sessionId}`), tr(OUTCOME.runsAnother))
+    if (st.sessionId) resolveOffers((o) => mine(o) && o.endsWith(`#${st.sessionId}`), tr(OUTCOME.openHereAgain))
   }
 
   /** An agent's name as Hive shows it, for a notice's link (its id when it has gone). */

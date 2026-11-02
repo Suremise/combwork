@@ -13,6 +13,8 @@ const H = vi.hoisted(() => ({
   /** What the job host answers: its live list per run, and what ending exactly does. */
   live: new Map<string, { pid: number; name: string; created?: string }[]>(),
   endFails: false,
+  /** Runs as the click reads a launch's live list, before its answer (a poll landing in between). */
+  onList: null as null | ((run: string) => void),
   resolutions: [] as { offer: string; outcome: string }[],
   listeners: [] as ((e: unknown) => void)[],
   profile: ''
@@ -29,6 +31,7 @@ vi.mock('../src/main/processSupervisor', () => ({
       H.requests.push(args)
       const [cmd, job] = args
       if (cmd === 'list') {
+        H.onList?.(String(job))
         const processes = (H.live.get(String(job)) ?? []).map((p) => ({ ...p, cmd: `node ${p.pid}.js` }))
         return { processes, total: processes.length, adopted: 0 }
       }
@@ -76,6 +79,7 @@ describe("a notice's End Them / Keep Running (settleOffer)", () => {
     H.resolutions.length = 0
     H.live.clear()
     H.endFails = false
+    H.onList = null
   })
   afterEach(() => m.leftoverOffersForTests.clear())
   const leave = (run: string, processes: ReturnType<typeof proc>[], more = 0) => {
@@ -93,6 +97,23 @@ describe("a notice's End Them / Keep Running (settleOffer)", () => {
     expect(sent('endexact').map((r) => r[1])).toEqual(['42:1042,43:1043'])
     expect(H.resolutions).toEqual([{ offer, outcome: 'Ended 2 processes' }])
     expect(m.leftoversOf(P, 'a1').processes).toEqual([])
+  })
+
+  only('win32')('a poll landing during the click, after its check, widening the kept list: End Them still ends only what the notice showed, across several launches (HR2 round 2)', async () => {
+    leave('run1', [proc(42)])
+    leave('run2', [proc(60), proc(61)])
+    const offer = m.leftoversOffer(P, 'a1')
+    // The click reads run2's live list last: as it does, a poll puts a new process into each kept list. The live answers
+    // still match what the notice showed, so the check passes; the kept list now has more than the notice authorised.
+    H.onList = (run) => {
+      if (run !== 'run2') return
+      m.leftoverOffersForTests.put({ runId: 'run1', projectPath: P, agentId: 'a1', agentName: 'One', processes: [proc(42), proc(77)], more: 0 })
+      m.leftoverOffersForTests.put({ runId: 'run2', projectPath: P, agentId: 'a1', agentName: 'One', processes: [proc(60), proc(61), proc(88)], more: 0 })
+    }
+    await m.settleOffer(offer, 'end')
+    expect(sent('endexact').map((r) => r[1])).toEqual(['42:1042,60:1060,61:1061'])
+    expect(sent('kill')).toEqual([])
+    expect(H.resolutions[0]).toEqual({ offer, outcome: 'Ended 3 processes' })
   })
 
   only('win32')('a process started since the notice, in the live job but not yet in the kept list: nothing ended, it says they changed', async () => {

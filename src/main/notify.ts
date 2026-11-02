@@ -203,35 +203,55 @@ export function resolveOffers(match: (offer: string) => boolean, outcome: string
 /** A window closed: the offers only it held are let go (their entries went with it), and buttons it ran for others end. */
 export function forgetOwner(webContentsId: number): void {
   for (const [k, o] of offers) if (o.owner === webContentsId) offers.delete(k)
-  for (const [k, p] of runningActions) {
-    if (p.win !== webContentsId) continue
-    runningActions.delete(k)
-    p.done(null)
-  }
+  for (const p of [...runningActions.values()]) if (p.win === webContentsId) p.done(NOTICE_ACTION_UNFINISHED)
 }
 
 /** Entries' buttons run in another window (notice:action), until that window says they have finished. */
 const runningActions = new Map<string, { win: number; done: (error: string | null) => void }>()
 
+/** The longest an entry's button waits for the window that runs it (HI-2320, the Assistant's scope for round 3). */
+export const NOTICE_ACTION_MS = 30_000
+
+/** Why an entry's button run elsewhere didn't finish: its window didn't say so in time, reloaded, or went. */
+export const NOTICE_ACTION_UNFINISHED = 'unfinished'
+
 /**
  * Runs an entry's button in `win` (the window that has its project) and resolves once its command there has finished
- * (HI-2320, HR2's round 1: the button's spinner lasts that long, wherever it runs); rejects with its failure.
+ * (HI-2320: the button's spinner lasts that long, wherever it runs). Bounded (NOTICE_ACTION_MS), and cancelled if that
+ * window reloads or navigates, its renderer goes, or it closes: then it rejects with NOTICE_ACTION_UNFINISHED, never
+ * passing for done. Only that window's own reply finishes it (noticeActionDone checks the sender).
  */
-export function noticeActionIn(win: BrowserWindow, command: string, args: unknown[]): Promise<void> {
+export function noticeActionIn(win: BrowserWindow, command: string, args: unknown[], waitMs = NOTICE_ACTION_MS): Promise<void> {
   const reply = randomUUID()
+  const wc = win.webContents
   return new Promise<void>((resolve, reject) => {
-    runningActions.set(reply, { win: win.webContents.id, done: (error) => (error ? reject(new Error(error)) : resolve()) })
+    const timer = setTimeout(() => finish(NOTICE_ACTION_UNFINISHED), waitMs)
+    timer.unref?.()
+    const cancel = (): void => finish(NOTICE_ACTION_UNFINISHED)
+    const events = ['did-start-navigation', 'render-process-gone', 'destroyed'] as const
+    for (const e of events) wc.once(e as never, cancel)
+    const finish = (error: string | null): void => {
+      if (!runningActions.has(reply)) return
+      runningActions.delete(reply)
+      clearTimeout(timer)
+      for (const e of events) wc.removeListener(e as never, cancel)
+      if (error) reject(new Error(error))
+      else resolve()
+    }
+    runningActions.set(reply, { win: wc.id, done: finish })
     emitTo(win, { type: 'menu-command', command, args, reply })
   })
 }
 
-/** The window that ran an entry's button says it has finished. */
-export function noticeActionDone(reply: string, error: string | null): void {
+/** The window that ran an entry's button says it has finished: only the one it was sent to (`from`, its webContents id). */
+export function noticeActionDone(reply: string, error: string | null, from: number): void {
   const p = runningActions.get(reply)
-  if (!p) return
-  runningActions.delete(reply)
+  if (!p || p.win !== from) return
   p.done(error)
 }
+
+/** For tests: how many entries' buttons wait for another window. */
+export const noticeActionsWaiting = (): number => runningActions.size
 
 const askSeq = new Map<string, number>()
 const askKey = (projectPath: string, agentId: string): string => `ask:${projectPath.toLowerCase()}#${agentId}#`
