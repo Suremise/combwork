@@ -814,7 +814,7 @@ route('POST', '/v1/projects/:name/deactivate', async ({ params }) => {
 })
 
 /**
- * A project agent (by its own token) looks into and types into only its own project's agents: another project's
+ * A project agent (by its own token) looks into, types into, starts, stops and hands over only its own project's agents: another project's
  * conversations can hold that project's cards (a card started on an agent is its prompt), which are not its to see.
  * Status stays open to it (projects, project status, waiting for agents); the Assistant and scripts see everything.
  */
@@ -834,12 +834,14 @@ route('GET', '/v1/projects/:name/sessions', async ({ params }) => {
 route('POST', '/v1/projects/:name/sessions', async ({ params, body }) => {
   const p = projectByName(params[0])
   if (assistantCaller()) throw new HttpError(400, 'Use hive_start_agent (POST /v1/projects/{name}/agents/{agent}/start) to start agents.')
+  ownProjectOnly(p, 'Starting an agent')
   return sessions.start(p, { resumeId: body?.resumeId, name: body?.name, agentId: await agentParam(p, body?.agent) })
 })
 
 route('POST', '/v1/projects/:name/stop', async ({ params, query, body }) => {
   const p = projectByName(params[0])
   if (assistantCaller()) throw new HttpError(400, 'Use hive_stop_agent (POST /v1/projects/{name}/agents/{agent}/stop) to stop agents.')
+  ownProjectOnly(p, 'Stopping an agent')
   const agent = query.get('agent') ?? body?.agent
   // Its cause from the caller's token (HI-1881): an agent's; a script's or another caller's unknown, just "stopped".
   sessions.stop(p, agent ? await agentParam(p, agent) : undefined, agentCaller() ? 'agent' : undefined)
@@ -886,6 +888,8 @@ route('POST', '/v1/projects/:name/handover', async ({ params, body }) => {
   const own = assistantCaller()
   if (!own && !config.settings.agentApi.allowSessionInput) throw new HttpError(403, 'Session input is disabled. Enable it in Settings → Agent API.')
   const p = projectByName(params[0])
+  // A hand-over prompts its agent (HI-2327): another project's agents are not a project agent's to type into, as /input.
+  ownProjectOnly(p, 'Handing over an agent')
   const from = await agentParam(p, body?.from)
   if (typeof body?.to !== 'string' || !body.to) throw new HttpError(400, 'to is required')
   const to = await agentParam(p, body.to)
