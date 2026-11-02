@@ -846,13 +846,41 @@ describe("the runners' own deletions keep evidence too", () => {
       listSpare: (p: string) => (listed.push(basename(p)), null),
       release: async (d: string) => void released.push(basename(d))
     })
-    // Every run folder listed once; the board asked again only for the six that were to go.
+    // Every run folder listed once; the board asked again only for the six that were to go (before and after each release).
     expect(listed.sort()).toEqual(names)
-    expect(asked).toEqual(names.slice(0, 6))
+    expect([...new Set(asked)]).toEqual(names.slice(0, 6))
     // The run cited since the list stays, never released; the rest go.
     expect(gone).toEqual(names.slice(0, 6).filter((n) => n !== names[1]))
     expect(released).toEqual(gone)
     expect(readdirSync(logs).sort()).toEqual([names[1], names[6], names[7]])
+  })
+
+  it('…and a run a card cites while its release waits (for a lane) keeps its logs (HI-2364 review)', async () => {
+    const root = temp('hive-clean-release-')
+    const logs = join(root, 'e2e', 'logs')
+    const names = Array.from({ length: 4 }, (_, k) => `run-20261005-23000${k}`)
+    for (const n of names) tree(logs, { [`${n}/board.log`]: 0 })
+    let cards: Card[] = []
+    const spare = (p: string) => rules(root, cards).protects(p)
+    const released: string[] = []
+    const gone = await pruneRunDirsReleasing(logs, 2, [], () => false, spare, {
+      listSpare: () => null,
+      release: async (d: string) => {
+        released.push(basename(d))
+        // While the first run's release waits, a card cites it.
+        if (basename(d) === names[0]) cards = [card(2364, `hive-test\\e2e\\logs\\${names[0]}`)]
+      }
+    })
+    expect(released).toEqual(names.slice(0, 2))
+    expect(gone).toEqual([names[1]])
+    expect(existsSync(join(logs, names[0]))).toBe(true)
+    // The board unreadable while a release waits: nothing goes either.
+    const later = await pruneRunDirsReleasing(logs, 0, [], () => false, (p: string) => (cards === null ? rules(root, null).protects(p) : null), {
+      listSpare: () => null,
+      release: async () => void (cards = null as unknown as Card[])
+    })
+    expect(later).toEqual([])
+    expect(readdirSync(logs).sort()).toEqual([names[0], names[2], names[3]])
   })
 
   it('scenario results and older baselines a card cites stay', () => {
