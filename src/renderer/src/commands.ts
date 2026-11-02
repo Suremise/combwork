@@ -313,8 +313,8 @@ const COMMAND_DEFS: CommandDef[] = [
     category: 'session',
     // The long-conversation notice's Hand Over to…, which passes the agent: checked again when it is clicked.
     internal: true,
-    run: (projectPath?: unknown, agentId?: unknown) => {
-      if (typeof projectPath === 'string' && typeof agentId === 'string') return actions.handOverLongConversation(projectPath, agentId)
+    run: (projectPath?: unknown, agentId?: unknown, sessionId?: unknown) => {
+      if (typeof projectPath === 'string' && typeof agentId === 'string') return actions.handOverLongConversation(projectPath, agentId, typeof sessionId === 'string' ? sessionId : undefined)
     }
   },
   {
@@ -323,9 +323,9 @@ const COMMAND_DEFS: CommandDef[] = [
     category: 'session',
     // Only from the notification, which passes the agent and file.
     internal: true,
-    run: (projectPath?: unknown, agentId?: unknown, path?: unknown) => {
+    run: (projectPath?: unknown, agentId?: unknown, path?: unknown, offer?: unknown) => {
       if (typeof projectPath === 'string' && typeof agentId === 'string' && typeof path === 'string')
-        return actions.attempt(tr(msg({ id: 'shell.error.allowEdit', defaultMessage: 'Could not allow the edit', description: "An error's title: allowing an agent's edit of a locked file failed." })), () => call('session:allowLockedEdit', projectPath, agentId, path))
+        return actions.attempt(tr(msg({ id: 'shell.error.allowEdit', defaultMessage: 'Could not allow the edit', description: "An error's title: allowing an agent's edit of a locked file failed." })), () => call('session:allowLockedEdit', projectPath, agentId, path, typeof offer === 'string' ? offer : undefined))
     }
   },
   {
@@ -347,9 +347,9 @@ const COMMAND_DEFS: CommandDef[] = [
     category: 'session',
     // Only from the notification, which names the job and the conversation.
     internal: true,
-    run: (projectPath?: unknown, agentId?: unknown, jobId?: unknown, sessionId?: unknown) => {
+    run: (projectPath?: unknown, agentId?: unknown, jobId?: unknown, sessionId?: unknown, offer?: unknown) => {
       if (typeof projectPath === 'string' && typeof agentId === 'string' && typeof jobId === 'string' && typeof sessionId === 'string')
-        return actions.attempt(tr(msg({ id: 'shell.error.stopBackground', defaultMessage: 'Could not stop the background session', description: "An error's title: stopping an agent's background session failed." })), () => call('session:stopBackgroundAndResume', projectPath, agentId, jobId, sessionId))
+        return actions.attempt(tr(msg({ id: 'shell.error.stopBackground', defaultMessage: 'Could not stop the background session', description: "An error's title: stopping an agent's background session failed." })), () => call('session:stopBackgroundAndResume', projectPath, agentId, jobId, sessionId, typeof offer === 'string' ? offer : undefined))
     }
   },
   {

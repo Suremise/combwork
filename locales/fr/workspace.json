@@ -45,6 +45,7 @@
   "workspace.antivirus.devUntrusted": "oui, non approuvé",
   "workspace.antivirus.devUntrustedTip": "Un Dev Drive non approuvé : Defender l’analyse comme n’importe quel autre lecteur.",
   "workspace.antivirus.dontAsk": "Ne plus demander",
+  "workspace.antivirus.excludedNow": "Exclus maintenant : Defender n’analyse plus ces dossiers",
   "workspace.antivirus.folder": "Dossier",
   "workspace.antivirus.goneHint": "{n, plural, one {Hive a exclu ce dossier, qui n’existe plus (déplacé ou supprimé). « Retirer les exclusions de Hive… » le retire aussi.} many {Hive a exclu ces dossiers, qui n’existent plus (déplacés ou supprimés). « Retirer les exclusions de Hive… » les retire aussi.} other {Hive a exclu ces dossiers, qui n’existent plus (déplacés ou supprimés). « Retirer les exclusions de Hive… » les retire aussi.}}",
   "workspace.antivirus.goneTitle": "Exclusions de Hive pour des dossiers qui n’existent plus",

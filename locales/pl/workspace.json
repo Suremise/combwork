@@ -45,6 +45,7 @@
   "workspace.antivirus.devUntrusted": "tak, niezaufany",
   "workspace.antivirus.devUntrustedTip": "Niezaufany Dev Drive: Defender skanuje go jak każdy inny dysk.",
   "workspace.antivirus.dontAsk": "Nie pytaj ponownie",
+  "workspace.antivirus.excludedNow": "Wykluczono: Defender nie skanuje już tych folderów",
   "workspace.antivirus.folder": "Folder",
   "workspace.antivirus.goneHint": "{n, plural, one {Hive wykluczył ten folder, którego już nie ma (przeniesiony lub usunięty). „Usuń wykluczenia Hive…” usuwa także jego wykluczenie.} few {Hive wykluczył te foldery, których już nie ma (przeniesione lub usunięte). „Usuń wykluczenia Hive…” usuwa także ich wykluczenia.} many {Hive wykluczył te foldery, których już nie ma (przeniesione lub usunięte). „Usuń wykluczenia Hive…” usuwa także ich wykluczenia.} other {Hive wykluczył te foldery, których już nie ma (przeniesione lub usunięte). „Usuń wykluczenia Hive…” usuwa także ich wykluczenia.}}",
   "workspace.antivirus.goneTitle": "Wykluczenia Hive dla folderów, których już nie ma",

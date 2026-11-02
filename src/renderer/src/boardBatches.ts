@@ -32,7 +32,9 @@ export function reportArchived(r: ArchiveResult): void {
     message: left,
     actions: [{ label: tr(msg({ id: 'board.batch.undo', defaultMessage: 'Undo', description: 'Button on the notification after Archive All: brings the archived cards back.' })), command: 'task.undoArchive', args: [r.batch.id] }],
     timestamp: new Date().toISOString(),
-    timeoutMs: 10_000
+    timeoutMs: 10_000,
+    // Its Undo is live while every card it archived still is (HI-2320: entryConditions.ts).
+    condition: { kind: 'archiveBatch', numbers: r.archived }
   })
 }
 

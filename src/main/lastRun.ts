@@ -13,7 +13,7 @@ import { config } from './config'
 import { leaveDelivery } from './deliveries'
 import { journalFactAt } from './journalService'
 import { onHiveEvent, toast } from './events'
-import { resolveOffer } from './notify'
+import { dropOfferActions, resolveOffer } from './notify'
 import { crashDumps, type CrashDump } from './exitLog'
 import { renameRetrying } from './fsutil'
 import { hiveError } from './hiveError'
@@ -279,7 +279,10 @@ let closeOffer: string | null = null
 let resumeOpen = false
 let stopOpen = false
 
-/** One of the notice's actions is done: with nothing left to do, its result is what the notice says (no notice of its own). */
+/**
+ * One of the notice's actions is done (HI-2320, HR2's round 1): its button goes and the notice says what it did, in
+ * place of another notice; with nothing left to do, the notice is resolved with it.
+ */
 function settled(part: 'resume' | 'stop', level: 'success' | 'error' | 'info', text: string): void {
   if (part === 'resume') resumeOpen = false
   else stopOpen = false
@@ -287,6 +290,7 @@ function settled(part: 'resume' | 'stop', level: 'success' | 'error' | 'info', t
     closeOffer = null
     return
   }
+  if (closeOffer && dropOfferActions(closeOffer, [part === 'resume' ? 'session.resumeAfterClose' : 'session.stopLeftAfterClose'], text)) return
   toast(level, text)
 }
 
@@ -297,8 +301,8 @@ export async function resumeAfterClose(): Promise<ResumeReport> {
   const r = await resumeAgents(agents)
   if (r.held?.length) toast('info', tr(msg({ id: 'main.unexpectedClose.heldTitle', defaultMessage: '{n, plural, one {One agent left stopped} other {# agents left stopped}}', description: "A notice's title after resuming the agents that were running when Hive closed unexpectedly (#1434): {n} were left stopped, their conversations' slots free (only their own Resume takes one) or holding other work." }), { n: r.held.length }), resumeHeldLine(r.held))
   if (r.failed.length) {
-    resumeOpen = false
-    toast('error', tr(msg({ id: 'main.unexpectedClose.resumeFailedTitle', defaultMessage: "Some agents couldn't resume", description: "A notice's title: resuming the agents that were running when Hive closed unexpectedly failed for some." })), resumeFailedLine(r))
+    // Said in the notice whose Resume All it was (the button gone: its agents were each tried once).
+    settled('resume', 'error', `${tr(msg({ id: 'main.unexpectedClose.resumeFailedTitle', defaultMessage: "Some agents couldn't resume", description: "A notice's title: resuming the agents that were running when Hive closed unexpectedly failed for some." }))}: ${resumeFailedLine(r)}`)
   } else settled('resume', 'success', tr(msg({ id: 'main.unexpectedClose.resumedTitle', defaultMessage: '{n, plural, =0 {Nothing to resume} one {Resumed one agent} other {Resumed # agents}}', description: "A notice's title: the agents that were running when Hive closed unexpectedly were resumed ({n} of them; 0: all were running again or had no conversation)." }), { n: r.resumed.length }))
   return r
 }

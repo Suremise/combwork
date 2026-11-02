@@ -871,13 +871,13 @@
     "defaultMessage": "Undo",
     "description": "An item of the Edit menu."
   },
+  "shell.entry.archiveChanged": {
+    "defaultMessage": "Changed since: some of these cards are back on the board or gone",
+    "description": "What the notification after Archive All says once one of the cards it archived was brought back or deleted another way (HI-2320), in place of its Undo button."
+  },
   "shell.entry.mcpCopied": {
     "defaultMessage": "In the workspace now",
     "description": "What the notice about a project's own MCP servers says once they are all in the workspace (HI-2320), in place of its Copy to workspace button."
-  },
-  "shell.entry.questionAnswered": {
-    "defaultMessage": "Answered",
-    "description": "What the notification of a question from the Hive Assistant says once it is answered or withdrawn (HI-2320), in place of its buttons. Keep it short."
   },
   "shell.error.allowEdit": {
     "defaultMessage": "Could not allow the edit",

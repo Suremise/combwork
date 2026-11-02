@@ -30,6 +30,7 @@ interface HiveMessageValues {
   'main.antivirus.tooLong': undefined
   'main.antivirus.unreadable': undefined
   'main.antivirus.windowsOnly': undefined
+  'main.assistantQuestion.answered': undefined
   'main.board.damagedBody': { files: string | number; folder: string | number }
   'main.board.damagedTitle': { n: number }
   'main.board.foundBody': { folder: string | number }
@@ -117,8 +118,12 @@ interface HiveMessageValues {
   'main.leftovers.leave': undefined
   'main.leftovers.offerChanged': undefined
   'main.leftovers.offerEnded': { n: number }
+  'main.leftovers.offerEndedSome': { n: number; more: number }
   'main.leftovers.offerGone': undefined
+  'main.leftovers.offerIncomplete': undefined
   'main.leftovers.offerKept': undefined
+  'main.leftovers.offerNotEnded': { n: number }
+  'main.leftovers.offerUnchecked': undefined
   'main.leftovers.quitDetail': { n: number }
   'main.leftovers.quitMessage': { n: number }
   'main.leftovers.restoredBody': { n: number; processes: string | number }
@@ -225,6 +230,8 @@ interface HiveMessageValues {
   'main.outcome.allowed': undefined
   'main.outcome.conversationEnded': undefined
   'main.outcome.conversationMoved': undefined
+  'main.outcome.handOverLater': undefined
+  'main.outcome.modesAlready': undefined
   'main.outcome.modesNextSession': undefined
   'main.outcome.modesNothing': undefined
   'main.outcome.namesDiffer': undefined
@@ -233,6 +240,7 @@ interface HiveMessageValues {
   'main.outcome.notResumed': undefined
   'main.outcome.openHereAgain': undefined
   'main.outcome.released': undefined
+  'main.outcome.runsAnother': undefined
   'main.outcome.stoppedAndResumed': undefined
   'main.outcome.updateInstalling': undefined
   'main.outcome.updateNotReady': undefined

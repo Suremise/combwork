@@ -1097,7 +1097,15 @@ app.whenReady().then(async () => {
       return e ? { win: e.win, workspacePath: e.ws.path, projectPath: e.showing } : null
     },
     fallback: (projectPath, source) => (projectPath ? windowForPath(projectPath) : null)?.win ?? (source && /[\\/]/.test(source) ? windowForPath(source)?.win : null) ?? lastFocused()?.win ?? null,
-    workspaceOf: (projectPath) => workspaceOf(projectPath)?.path ?? null
+    workspaceOf: (projectPath) => workspaceOf(projectPath)?.path ?? null,
+    // A toast's source that is a project (its folder): the entry's link (HI-2320).
+    projectAt: (p) => {
+      try {
+        return workspaceOf(p)?.info()?.projects.find((x) => x.path.toLowerCase() === p.toLowerCase())?.path ?? null
+      } catch {
+        return null
+      }
+    }
   })
   // An agent no longer waiting for you: its entries say so, in whichever window owns them.
   startNoticeResolver()

@@ -3527,7 +3527,8 @@ export type NotifyKind = 'needsYou' | 'finished' | 'work' | 'usage' | 'warning' 
  */
 export type EntryCondition =
   | { kind: 'mcpMissing'; projectPath: string; names: string[] }
-  | { kind: 'assistantQuestion'; id: string }
+  /** An archive's Undo: the cards it archived, while all of them still are. */
+  | { kind: 'archiveBatch'; numbers: number[] }
 
 export type UpdateStatus = 'disabled' | 'idle' | 'checking' | 'available' | 'downloading' | 'ready' | 'up-to-date' | 'error'
 
@@ -3586,6 +3587,8 @@ export interface ToastMessage {
   condition?: EntryCondition
   /** What happened, once its action is done or no longer applies: its buttons are gone and this is shown instead. */
   resolved?: string
+  /** What one of its buttons did while others are still live (HI-2320), shown above them. */
+  note?: string
 }
 
 export interface AppInfo {
@@ -3677,6 +3680,8 @@ export type HiveEvent =
   /** A notice no longer true (HI-1905: a project's platform notice once detection and the platform agree): every window drops it. */
   /** Entries whose offer was taken or no longer applies (HI-2320): their buttons go and `outcome` says what happened. */
   | { type: 'toast-resolved'; ids: string[]; outcome: string }
+  /** One of an entry's buttons done or no longer applying, its others still live (HI-2320): those commands' buttons go, `note` says what happened. */
+  | { type: 'toast-update'; ids: string[]; drop: string[]; note: string }
   /** How many finishes wait to be told together (HI-2320: no tip while some do). */
   | { type: 'notify-pending'; finishes: number }
   | { type: 'chime'; projectPath: string; silent?: boolean }
@@ -3692,7 +3697,8 @@ export type HiveEvent =
   | { type: 'provider-install'; provider: ProviderId; info: AgentInstallInfo }
   /** Whether git runs changed (#346): every window's store follows. */
   | { type: 'git-tool'; git: GitTool }
-  | { type: 'menu-command'; command: string; args?: unknown[] }
+  /** `reply`: an entry's button run here for another window (HI-2320), which waits for notice:actionDone with it. */
+  | { type: 'menu-command'; command: string; args?: unknown[]; reply?: string }
   | { type: 'usage-changed'; projectPath: string; sessionId: string }
   /** A workspace's usage history: its one-time import of existing sessions under way, or done (#1106). */
   | { type: 'usage-history'; workspacePath: string; progress: UsageHistoryProgress }

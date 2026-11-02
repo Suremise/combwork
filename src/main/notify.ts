@@ -25,6 +25,8 @@ export interface NotifyHost {
   fallback: (projectPath: string | null, source?: string) => BrowserWindow | null
   /** The workspace a project belongs to, for the pop-up scope. */
   workspaceOf: (projectPath: string) => string | null
+  /** A project's folder as its workspace has it, when `path` is one (a toast's source: its link), else null. */
+  projectAt?: (path: string) => string | null
 }
 
 let host: NotifyHost = { focused: () => null, fallback: () => null, workspaceOf: () => null }
@@ -97,7 +99,11 @@ export function tell(spec: TellSpec): Told {
   // i18n-ignore: the log (English)
   if (spec.kind !== 'result' && spec.kind !== 'warning') log.info(`Notice ${spec.kind} told: ${route} (${why}) (${userText(spec.title)})`)
   if (route === 'none') return { id, route }
-  const target = spec.target ?? (projectPath ? { kind: 'project' as const, projectPath, project: projectName(projectPath) } : undefined)
+  // Its link (HI-2320: every entry about something opens it): as given, else its project, else the project its source
+  // names (main's toast() passes the project's folder as its source).
+  const sourceProject = !projectPath && spec.source && /[\\/]/.test(spec.source) ? (host.projectAt?.(spec.source) ?? null) : null
+  const linked = projectPath ?? sourceProject
+  const target = spec.target ?? (linked ? { kind: 'project' as const, projectPath: linked, project: projectName(linked) } : undefined)
   const owner = at?.win ?? host.fallback(projectPath, spec.source)
   const entry: ToastMessage = {
     id,
@@ -176,6 +182,17 @@ export function resolveOffer(offer: string, outcome: string): boolean {
   return true
 }
 
+/**
+ * One of an offer's buttons is done, or no longer applies, while its others still do (HI-2320: an entry with independent
+ * buttons): those commands' buttons go from its entries, and `note` says what happened. The offer stays open.
+ */
+export function dropOfferActions(offer: string, commands: string[], note: string): boolean {
+  const o = offers.get(offer)
+  if (!o) return false
+  emit({ type: 'toast-update', ids: [...o.ids], drop: commands, note })
+  return true
+}
+
 /** Resolves every open offer whose key `match` picks (e.g. all of an agent's asks once it no longer asks). */
 export function resolveOffers(match: (offer: string) => boolean, outcome: string): number {
   let n = 0
@@ -183,9 +200,37 @@ export function resolveOffers(match: (offer: string) => boolean, outcome: string
   return n
 }
 
-/** A window closed: the offers only it held are let go (their entries went with it). */
+/** A window closed: the offers only it held are let go (their entries went with it), and buttons it ran for others end. */
 export function forgetOwner(webContentsId: number): void {
   for (const [k, o] of offers) if (o.owner === webContentsId) offers.delete(k)
+  for (const [k, p] of runningActions) {
+    if (p.win !== webContentsId) continue
+    runningActions.delete(k)
+    p.done(null)
+  }
+}
+
+/** Entries' buttons run in another window (notice:action), until that window says they have finished. */
+const runningActions = new Map<string, { win: number; done: (error: string | null) => void }>()
+
+/**
+ * Runs an entry's button in `win` (the window that has its project) and resolves once its command there has finished
+ * (HI-2320, HR2's round 1: the button's spinner lasts that long, wherever it runs); rejects with its failure.
+ */
+export function noticeActionIn(win: BrowserWindow, command: string, args: unknown[]): Promise<void> {
+  const reply = randomUUID()
+  return new Promise<void>((resolve, reject) => {
+    runningActions.set(reply, { win: win.webContents.id, done: (error) => (error ? reject(new Error(error)) : resolve()) })
+    emitTo(win, { type: 'menu-command', command, args, reply })
+  })
+}
+
+/** The window that ran an entry's button says it has finished. */
+export function noticeActionDone(reply: string, error: string | null): void {
+  const p = runningActions.get(reply)
+  if (!p) return
+  runningActions.delete(reply)
+  p.done(error)
 }
 
 const askSeq = new Map<string, number>()

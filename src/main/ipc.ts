@@ -89,6 +89,7 @@ import * as branchWatch from './branchWatch'
 import { sessions } from './sessions'
 import { activityCardAgents, activityNowAll, launchesNow } from './activityWorkspace'
 import { usageHistory } from './usageHistory'
+import { noticeActionDone, noticeActionIn } from './notify'
 import { mayHandOverNow } from './handOverCheck'
 import { transcripts } from './transcripts'
 import * as skills from './skills'
@@ -580,12 +581,14 @@ export function registerIpc(getAppInfo: () => ReturnType<HiveRequests['app:info'
       if (projectPath) emitTo(target, { type: 'menu-command', command: 'project.focus', args: [projectPath] })
     },
     'notice:action': (projectPath, command, args) => {
-      // The window that has the project, which may not be the one the banner was in.
+      // The window that has the project, which may not be the one the entry is in; the button's spinner lasts until the
+      // command there has finished (HI-2320, HR2's round 1), its failure shown where the button was.
       const target = windowForPath(projectPath)?.win ?? win()
       presentWindow(target)
       emitTo(target, { type: 'menu-command', command: 'project.focus', args: [projectPath] })
-      emitTo(target, { type: 'menu-command', command, args: Array.isArray(args) ? args : [] })
+      return noticeActionIn(target, command, Array.isArray(args) ? args : [])
     },
+    'notice:actionDone': (reply, error) => noticeActionDone(String(reply), typeof error === 'string' ? error : null),
     'notice:target': (target) => {
       // The window that has its project, or a workspace card's workspace; else this one, which says it's gone.
       const where = target?.projectPath ?? (target?.kind === 'card' ? target.workspacePath : null)
@@ -1099,10 +1102,16 @@ export function registerIpc(getAppInfo: () => ReturnType<HiveRequests['app:info'
       if (typeof offer !== 'string' || !offer.startsWith('leftovers:')) throw new Error('not a leftovers offer') // i18n-ignore: a malformed call, never shown
       await settleOffer(offer, how === 'end' ? 'end' : 'keep')
     },
-    'session:stopBackgroundAndResume': (p, agentId, jobId, sessionId) => sessions.stopBackgroundAndResume(p, agentId, jobId, sessionId),
+    'session:stopBackgroundAndResume': (p, agentId, jobId, sessionId, offer) => sessions.stopBackgroundAndResume(p, agentId, jobId, sessionId, typeof offer === 'string' ? offer : undefined),
     'session:handOver': (p, from, to, opts) => sessions.handOver(p, from, to, opts),
     'session:mayHandOverNow': (p, agentId) => mayHandOverNow(workspace.assertSessionHost(p), String(agentId)),
-    'session:allowLockedEdit': (p, agentId, path) => sessions.allowLockedEdit(p, agentId, path),
+    // The long-conversation notice's Hand Over to… (HI-2320): only for the conversation it was about.
+    'session:handOverOffer': async (p, agentId, sessionId) => {
+      const host = workspace.assertSessionHost(p)
+      if (!sessions.handOverOfferCurrent(host, String(agentId), String(sessionId))) return 'stale'
+      return (await mayHandOverNow(host, String(agentId))) ? 'ok' : 'busy'
+    },
+    'session:allowLockedEdit': (p, agentId, path, offer) => sessions.allowLockedEdit(p, agentId, path, typeof offer === 'string' ? offer : undefined),
     'session:applyModes': (offer) => (typeof offer === 'string' && offer.startsWith('modes:') ? sessions.applyModeOffer(offer) : sessions.applyModeSettings()),
     'session:compact': (p, focus, agentId) => sessions.compact(p, focus, agentId),
     'session:pasteImage': (p, agentId) => sessions.pasteImage(p, agentId),
@@ -1422,6 +1431,8 @@ export function registerIpc(getAppInfo: () => ReturnType<HiveRequests['app:info'
     'assistant:actions': () => (workspace.path ? assistantControl.actions(workspace.path) : []),
     'assistant:questions': () => (workspace.path ? assistantControl.questions(workspace.path) : []),
     'assistant:answer': (id, yes) => assistantControl.answer(id, yes),
+    // Its question while its panel is hidden here (HI-2320): told once, as the routing table says.
+    'assistant:tellQuestion': (id) => (workspace.path && typeof id === 'string' ? assistantControl.tellQuestion(workspace.path, id) : false),
     'assistant:switchMode': (modeId, save) => switchMode(String(modeId), save !== false),
     'assistant:revertSetting': async (actionId) => {
       if (!workspace.path) throw hiveError(M.noWorkspace, undefined, { kind: 'conflict' })

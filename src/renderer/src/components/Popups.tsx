@@ -109,8 +109,15 @@ export function EntryActions({ t, onNavigate }: { t: ToastMessage; onNavigate?: 
         <Icon name="check" /> {t.resolved}
       </div>
     )
-  if (!t.actions?.length) return null
+  const note = t.note ? (
+    <div className="entry-outcome" role="status">
+      <Icon name="check" /> {t.note}
+    </div>
+  ) : null
+  if (!t.actions?.length) return note
   return (
+    <>
+    {note}
     <div className="toast-actions">
       {t.actions.map((a) => (
         <button
@@ -128,6 +135,7 @@ export function EntryActions({ t, onNavigate }: { t: ToastMessage; onNavigate?: 
         </button>
       ))}
     </div>
+    </>
   )
 }
 

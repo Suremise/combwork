@@ -45,6 +45,7 @@
   "workspace.antivirus.devUntrusted": "是，不受信任",
   "workspace.antivirus.devUntrustedTip": "不受信任的开发驱动器：Defender 会像扫描其他驱动器一样扫描它。",
   "workspace.antivirus.dontAsk": "不再询问",
+  "workspace.antivirus.excludedNow": "现已排除：Defender 不再扫描这些文件夹",
   "workspace.antivirus.folder": "文件夹",
   "workspace.antivirus.goneHint": "{n, plural, other {Hive 排除了这些已不存在的文件夹（已移动或删除）。“删除 Hive 添加的排除项…”也会将其删除。}}",
   "workspace.antivirus.goneTitle": "Hive 对已不存在的文件夹的排除项",

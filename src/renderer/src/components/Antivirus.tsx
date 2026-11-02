@@ -76,6 +76,7 @@ const M = {
   reminder: msg({ id: 'workspace.antivirus.reminder', defaultMessage: 'A reminder: Microsoft Defender still scans every file Hive’s work creates or opens ({why}). Excluding the workspace’s folders, or a Dev Drive, can make builds, tests and git much faster. Hive reminds you at most once a day; Don’t Ask Again stops it for this workspace.', description: 'The suggestion, as a reminder ({why}: why now). Don’t Ask Again is its button.' }),
   suggestion: msg({ id: 'workspace.antivirus.suggestion', defaultMessage: 'Microsoft Defender scans every file Hive’s work creates or opens ({why}). Excluding the workspace’s folders, or a Dev Drive, can make builds, tests and git much faster.', description: 'The suggestion ({why}: why now).' }),
   review: msg({ id: 'workspace.antivirus.review', defaultMessage: 'Review…', description: "The suggestion's button: opens the antivirus status." }),
+  excludedNow: msg({ id: 'workspace.antivirus.excludedNow', defaultMessage: 'Excluded now: Defender no longer scans these folders', description: "What the suggestion to exclude the workspace from Defender's scanning says once every folder it named is excluded (HI-2320), in place of its buttons." }),
   wontAsk: msg({ id: 'workspace.antivirus.wontAsk', defaultMessage: 'Hive won’t suggest it again for this workspace', description: "What the suggestion to exclude the workspace from Defender's scanning says after Don't Ask Again (HI-2320), in place of its buttons." }),
   dontAsk: msg({ id: 'workspace.antivirus.dontAsk', defaultMessage: 'Don’t Ask Again', description: "The suggestion's button: no more suggestions for this workspace." })
 }
@@ -103,10 +104,21 @@ function scanLine(s: AntivirusStatus): string {
   }
 }
 
+/**
+ * The suggestion to exclude the workspace (HI-2320): once a status read here shows no folder Defender scans (excluded
+ * from the dialog, or by hand), its Review… and Don't Ask Again no longer apply, and it says so.
+ */
+function useSuggestionSettled(status: AntivirusStatus | null): void {
+  useEffect(() => {
+    if (status?.scan === 'defender' && status.paths.length && status.paths.every((p) => p.state === 'excluded')) resolveLocal('antivirus', tr(M.excludedNow))
+  }, [status])
+}
+
 /** Settings → Workspace: the status, each folder's, and the actions. */
 export function AntivirusPanel() {
   const workspace = useStore((s) => s.workspace?.path ?? null)
   const [status, setStatus] = useState<AntivirusStatus | null>(null)
+  useSuggestionSettled(status)
   const [error, setError] = useState<string | null>(null)
   const [checking, setChecking] = useState(false)
   const [result, setResult] = useState<AvChangeResult | null>(null)
@@ -283,6 +295,7 @@ export function showAntivirus(): void {
 export function AntivirusLine() {
   const workspace = useStore((s) => s.workspace?.path ?? null)
   const [status, setStatus] = useState<AntivirusStatus | null>(null)
+  useSuggestionSettled(status)
   useEffect(() => {
     let live = true
     setStatus(null)

@@ -1577,6 +1577,16 @@ export function resolveToasts(ids: readonly string[], outcome: string): void {
   })
 }
 
+/** One of these entries' buttons done, its others still live (HI-2320): those commands' buttons go, and the note says what happened. */
+export function updateToasts(ids: readonly string[], drop: readonly string[], note: string): void {
+  const hit = (t: ToastMessage): boolean => ids.includes(t.id) && !t.resolved
+  set((s) => {
+    if (!s.toasts.some(hit) && !s.notifications.some(hit)) return {}
+    const upd = (t: ToastMessage): ToastMessage => (hit(t) ? { ...t, actions: t.actions?.filter((a) => !drop.includes(a.command)), note } : t)
+    return { toasts: s.toasts.map(upd), notifications: s.notifications.map(upd) }
+  })
+}
+
 export function dismissToast(id: string): void {
   set((s) => ({ toasts: s.toasts.filter((t) => t.id !== id) }))
 }

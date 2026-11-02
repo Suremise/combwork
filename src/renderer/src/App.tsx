@@ -6,7 +6,7 @@ import { useEffect, useRef, useState } from 'react'
 import type { HiveEvent } from '@shared/types'
 import { call } from './api'
 import { playChime } from './chime'
-import { matchKeybinding, runCommand } from './commands'
+import { matchKeybinding, runCommand, runCommandAsync } from './commands'
 import { HooksDialog } from './components/HooksDialog'
 import { AboutDialog, AgentSetupDialog, DiagnosticsDialog, CommandPalette, CompactDialog, Dialogs, NotificationCenter, ProvidersBanner, QuitDialog, QuitPendingBanner, ShortcutsDialog } from './components/Overlays'
 import { ConnectionsIntroBanner, useProviderWarnings } from './components/ConnectionChoice'
@@ -39,7 +39,7 @@ import { ProgressPanel, progressRunsChanged } from './components/Progress'
 import { queueBoardChanged, queueChangedEvent } from './queueSource'
 import { AssistantMain } from './components/AssistantView'
 import { reloadAssistantChanges } from './assistantUndo'
-import { agentOnScreen, applyLeftovers, applyLiveState, bumpUsage, noteAssistantAction, flushLiveStates, setLoaded, setWithLive, showWorkspace, liveStateOf, assistantOnLeft, assistantWasOpen, clearStartFailure, filesListeners, agentStartChanged, findProject, get, loadTasks, noteAgentAdded, noteEnd, projectKey, pushToast, resolveToasts, set, useLanguage, useStore } from './store'
+import { agentOnScreen, applyLeftovers, applyLiveState, bumpUsage, noteAssistantAction, flushLiveStates, setLoaded, setWithLive, showWorkspace, liveStateOf, assistantOnLeft, assistantWasOpen, clearStartFailure, filesListeners, agentStartChanged, findProject, get, loadTasks, noteAgentAdded, noteEnd, projectKey, pushToast, resolveToasts, set, updateToasts, useLanguage, useStore } from './store'
 import { DocsView, McpView, NotesView, SkillView, WelcomeView } from './views/OtherViews'
 import { TemplatesView } from './components/Templates'
 import { ProjectView } from './views/ProjectView'
@@ -75,6 +75,7 @@ function noticeUnmanagedMcp(): void {
     pushToast({
       id: `mcp-${p.path}`,
       level: 'warning',
+      target: { kind: 'project', projectPath: p.path, project: p.name },
       title: tr(msg({ id: 'shell.mcp.notInWorkspace', defaultMessage: '{project}: MCP servers not in the workspace', description: "A notice: a project defines MCP servers of its own (in its .mcp.json) that the workspace doesn't have. {project} is its name." }), { project: p.name }),
       message: tr(msg({ id: 'shell.mcp.notInWorkspaceDetail', defaultMessage: "{n, plural, one {{servers} is defined in the project's .mcp.json and will stay disabled until copied to the workspace.} other {{servers} are defined in the project's .mcp.json and will stay disabled until copied to the workspace.}}", description: "More in the notice about a project's own MCP servers. {servers} lists their names; {n} is how many. .mcp.json is a file name: keep it." }), { n: p.unmanagedMcp.length, servers: fmt.list(p.unmanagedMcp) }),
       actions: [{ label: tr(msg({ id: 'shell.mcp.copyToWorkspace', defaultMessage: 'Copy to workspace', description: "The notice's button: copies the project's MCP servers to the workspace." })), command: 'mcp.import', args: [p.path, p.unmanagedMcp] }],
@@ -162,6 +163,7 @@ function handleEvent(e: HiveEvent): void {
           level: 'error',
           title: name ? (p ? tr(msg({ id: 'shell.startFailed.named', defaultMessage: "{project} · {agent} couldn't start", description: "A notice when an agent's session failed to start, while its pane isn't on screen. {project} and {agent} are names." }), { project: p.name, agent: name }) : tr(msg({ id: 'shell.startFailed.agent', defaultMessage: "{agent} couldn't start", description: "A notice when an agent's session failed to start. {agent} is its name." }), { agent: name })) : tr(msg({ id: 'shell.startFailed.unnamed', defaultMessage: "An agent couldn't start", description: "A notice when a session failed to start and its agent isn't known." })),
           message: failure.hint ?? failure.reason,
+          ...(name ? { target: { kind: 'agent' as const, projectPath: path, agentId: e.agentId, name, project: p?.name ?? path } } : {}),
           actions: shown ? [{ label: tr(msg({ id: 'shell.startFailed.show', defaultMessage: 'Show', description: "The notice's button: shows the agent's pane." })), command: 'agent.show', args: [path, e.agentId] }] : undefined,
           timestamp: failure.at
         })
@@ -182,6 +184,9 @@ function handleEvent(e: HiveEvent): void {
       break
     case 'toast-resolved':
       resolveToasts(e.ids, e.outcome)
+      break
+    case 'toast-update':
+      updateToasts(e.ids, e.drop, e.note)
       break
     case 'notify-pending':
       set({ finishesPending: e.finishes })
@@ -226,7 +231,11 @@ function handleEvent(e: HiveEvent): void {
       set({ gitTool: e.git })
       break
     case 'menu-command':
-      runCommand(e.command, ...(e.args ?? []))
+      // An entry's button run here for another window (HI-2320): that window's spinner waits until it has finished.
+      if (e.reply) {
+        const reply = e.reply
+        void runCommandAsync(e.command, ...(e.args ?? [])).finally(() => void call('notice:actionDone', reply, null).catch(() => undefined))
+      } else runCommand(e.command, ...(e.args ?? []))
       break
     case 'quit-request':
       set({ quitRequest: e.sessions, quitUnsaved: e.unsaved, quitScope: e.scope ?? 'app' })
@@ -324,24 +333,11 @@ function handleEvent(e: HiveEvent): void {
       flushLiveStates()
       const before = get().assistantQuestions
       set({ assistantQuestions: e.questions })
-      // With the panel hidden, the question comes as a notification the user can answer: it needs you (HI-2320), and
-      // says Answered once the question is gone (entryConditions.ts).
+      // With the panel hidden, the question comes as a notification the user can answer: main tells it once, as the
+      // routing table says (HI-2320: a pop-up, or a Windows notification with Hive in the background), and its entry
+      // says Answered once the question no longer waits.
       if (!get().assistantOpen) {
-        for (const q of e.questions.filter((x) => !before.some((b) => b.id === x.id))) {
-          pushToast({
-            id: `assistant-question-${q.id}`,
-            kind: 'needsYou',
-            level: 'warning',
-            title: q.title,
-            message: q.message,
-            actions: [
-              { label: q.yes, command: 'assistant.answer', args: [q.id, true] },
-              { label: q.no, command: 'assistant.answer', args: [q.id, false] }
-            ],
-            condition: { kind: 'assistantQuestion', id: q.id },
-            timestamp: new Date().toISOString()
-          })
-        }
+        for (const q of e.questions.filter((x) => !before.some((b) => b.id === x.id))) void call('assistant:tellQuestion', q.id).catch(() => undefined)
       }
       break
     }

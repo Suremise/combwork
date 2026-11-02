@@ -115,6 +115,10 @@
     "defaultMessage": "Only Windows has Defender exclusions.",
     "description": "An error in Settings → Workspace → Antivirus scanning on another system."
   },
+  "main.assistantQuestion.answered": {
+    "defaultMessage": "Answered",
+    "description": "What the notification of a question from the Hive Assistant says once it is answered or no longer waits (HI-2320), in place of its buttons. Keep it short."
+  },
   "main.board.damagedBody": {
     "defaultMessage": "{files} stayed out of the board. They are kept in {folder}.",
     "description": "The notice about card files Hive couldn't read as it moved the board into its database: {files} lists them, {folder} is where they are kept."
@@ -463,13 +467,29 @@
     "defaultMessage": "{n, plural, one {Ended # process} other {Ended # processes}}",
     "description": "What the notice of processes an agent left running says once End Them ended them (HI-2320), in place of its buttons. {n} is how many."
   },
+  "main.leftovers.offerEndedSome": {
+    "defaultMessage": "{n, plural, one {Ended the # process listed} other {Ended the # processes listed}}; {more, plural, one {# started since still runs: see the ⋯ menu on the agent's pane} other {# started since still run: see the ⋯ menu on the agent's pane}}",
+    "description": "What the notice of processes an agent left running says after End Them ended exactly the ones it listed while others started since still run (HI-2320), in place of its buttons. {n} and {more} are how many. The ⋯ menu on the agent's pane lists them with End and Keep."
+  },
   "main.leftovers.offerGone": {
     "defaultMessage": "They have ended",
     "description": "What the notice of processes an agent left running says once they ended by themselves, or were ended or kept elsewhere (HI-2320), in place of its buttons."
   },
+  "main.leftovers.offerIncomplete": {
+    "defaultMessage": "Hive couldn't list them all, so it can't end exactly these: see the ⋯ menu on the agent's pane",
+    "description": "What the notice of processes an agent left running says when End Them is pressed but the notice couldn't list every process (more than it shows, or one without a start time), so Hive won't end them from it (HI-2320). The ⋯ menu on the agent's pane lists them with End and Keep."
+  },
   "main.leftovers.offerKept": {
     "defaultMessage": "Kept running",
     "description": "What the notice of processes an agent left running says once Keep Running was chosen (HI-2320), in place of its buttons."
+  },
+  "main.leftovers.offerNotEnded": {
+    "defaultMessage": "{n, plural, one {Windows didn't let Hive end the process listed. Try again.} other {Windows didn't let Hive end all # processes listed. Try again.}}",
+    "description": "An error after End Them on the notice of processes an agent left running: some of the processes it listed still run (HI-2320). {n} is how many it listed."
+  },
+  "main.leftovers.offerUnchecked": {
+    "defaultMessage": "Hive couldn't check what runs now, so it ended nothing. Try again.",
+    "description": "An error after End Them or Keep Running on the notice of processes an agent left running: Hive couldn't read what the agent's processes are now, so it did nothing (HI-2320)."
   },
   "main.leftovers.quitDetail": {
     "defaultMessage": "{n, plural, one {The agents started it, and it may hold project folders or ports. End it as Hive quits, or leave it running?} other {The agents started them, and they may hold project folders or ports. End them as Hive quits, or leave them running?}}",
@@ -895,6 +915,14 @@
     "defaultMessage": "It has a new conversation now",
     "description": "What the long-conversation notification says once the agent has moved to a new conversation (handed over, or the CLI started one; HI-2320), in place of its Hand Over to… button."
   },
+  "main.outcome.handOverLater": {
+    "defaultMessage": "Not now: Hand Over to… is in its ⋯ menu once it is free",
+    "description": "What the long-conversation notification says once the agent may no longer hand over from it (it works again, or is on a card loop's card; HI-2320), in place of its Hand Over to… button. Hand Over to… is a command; the ⋯ menu is on the agent's pane."
+  },
+  "main.outcome.modesAlready": {
+    "defaultMessage": "Switched: the agents are in their new mode",
+    "description": "What the notice that the permission mode changed says once every agent it named is in its new mode, switched there or by hand (HI-2320), in place of its Switch Now button."
+  },
   "main.outcome.modesNextSession": {
     "defaultMessage": "Their sessions ended: the new mode applies from the next",
     "description": "What the notice that the permission mode changed says once none of the agents it named still runs that session (HI-2320), in place of its Switch Now button."
@@ -926,6 +954,10 @@
   "main.outcome.released": {
     "defaultMessage": "Released",
     "description": "What the notice that a slot is held by Windows' idle Sandbox broker says once the slot is released (HI-2320), in place of its Release Slot… button. Keep it short."
+  },
+  "main.outcome.runsAnother": {
+    "defaultMessage": "It runs another conversation here now",
+    "description": "What the notice that a conversation runs as a background job says once the agent runs another conversation in Hive (HI-2320), in place of its Stop It and Resume button."
   },
   "main.outcome.stoppedAndResumed": {
     "defaultMessage": "Stopped and resumed here",

@@ -183,6 +183,10 @@
     "defaultMessage": "Don’t Ask Again",
     "description": "The suggestion's button: no more suggestions for this workspace."
   },
+  "workspace.antivirus.excludedNow": {
+    "defaultMessage": "Excluded now: Defender no longer scans these folders",
+    "description": "What the suggestion to exclude the workspace from Defender's scanning says once every folder it named is excluded (HI-2320), in place of its buttons."
+  },
   "workspace.antivirus.folder": {
     "defaultMessage": "Folder",
     "description": "Settings → Workspace's antivirus table: a column."

@@ -98,9 +98,13 @@ export class FinishBatcher {
     this.timer = null
     const items = this.items
     this.items = []
-    if (items.length) {
-      this.pending(0)
+    if (!items.length) return
+    // Told first, then no longer pending (HR2's round 1): a tip waiting for a quiet moment sees the pop-up before the
+    // gate opens, never a gap between them.
+    try {
       this.flush(items)
+    } finally {
+      this.pending(0)
     }
   }
 }

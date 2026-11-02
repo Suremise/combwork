@@ -95,7 +95,7 @@ import { HAND_OVER_TEXT, handOverNow } from '../shared/handOver'
 import { NOTICE_PREFIX } from '../shared/doorbell'
 import { FinishBatcher, finishedApiTitle, finishedNotice } from '../shared/bursts'
 import { notifyRoute, type NotifyRoute } from '../shared/notify'
-import { askOffer, focusedHive, notifyPending, resolveOffer, resolveOffers, tell } from './notify'
+import { askOffer, focusedHive, notifyPending, offerOpen, resolveOffer, resolveOffers, tell } from './notify'
 import { OUTCOME } from './outcomes'
 import type { SlotNote } from './mergeSlots'
 import { commentOnDoingCards, recordCards } from './cardSessions'
@@ -906,6 +906,12 @@ export function drawnLine(screen: Pick<TerminalScreen, 'text'>, line: string): (
  */
 export function shellCommand(command: string, platform: NodeJS.Platform = process.platform): { file: string; args: string[] | string } {
   return platform === 'win32' ? { file: process.env.ComSpec || 'cmd.exe', args: `/d /s /c "${command}"` } : { file: '/bin/sh', args: ['-c', command] }
+}
+
+/** A notice's link to an agent's pane (HI-2320: every entry links to what it is about); the Assistant's opens its panel. */
+function agentTarget(projectPath: string, agentId: string, name: string): ToastTarget {
+  const assistant = workspace.isAssistantHome(projectPath)
+  return { kind: 'agent', projectPath, agentId, name: assistant ? ASSISTANT_NAME : name, project: assistant ? ASSISTANT_NAME : basename(projectPath) }
 }
 
 /** A session's notice kinds as the one notification system's (HI-2320). */
@@ -2195,7 +2201,8 @@ class SessionManager {
           tr(msg({ id: 'session.setup.failedTitle', defaultMessage: '{project} · {agent}: setup failed', description: "A notice's title: the worktree setup command failed for an agent. {project} is the project, {agent} the agent." }), { project: basename(projectPath), agent: agent.name }),
           tr(msg({ id: 'session.setup.failed', defaultMessage: "The setup command exited with code {code}. Its output is in the agent's terminal. Fix it and start the agent again, or start it without setup.", description: "The notice that a worktree setup command failed. {code} is its exit code." }), { code: String(code) }),
           undefined,
-          projectPath
+          projectPath,
+          agentTarget(projectPath, agent.id, agent.name)
         )
       workspaceOf(projectPath).scheduleRefresh()
       return
@@ -2209,7 +2216,7 @@ class SessionManager {
       void this.afterLaunch(l.state.runId, this.label(l.state))
       this.forget(id)
       emit({ type: 'session-status', state: { ...l.state, status: 'stopped', runtime: { ...l.state.runtime!, lifecycle: 'stopped' } } })
-      toast('error', tr(msg({ id: 'session.start.couldNot', defaultMessage: 'Could not start {agent}', description: "A notice's title: an agent failed to start after its worktree setup. {agent} is the agent's name; the error follows." }), { agent: agent.name }), shownError(e), undefined, projectPath)
+      toast('error', tr(msg({ id: 'session.start.couldNot', defaultMessage: 'Could not start {agent}', description: "A notice's title: an agent failed to start after its worktree setup. {agent} is the agent's name; the error follows." }), { agent: agent.name }), shownError(e), undefined, projectPath, agentTarget(projectPath, agent.id, agent.name))
     }
   }
 
@@ -2309,7 +2316,7 @@ class SessionManager {
         }
       },
       waits: (e) => (e instanceof SlotHeld ? e.why : null),
-      told: (why) => toast('warning', tr(msg({ id: 'session.switch.waitsTitle', defaultMessage: "{agent}'s switch of connection waits for {slot}", description: "A notice's title (HI-2304): an agent was stopped to switch it to another connection (account), and Hive can't resume it yet because its slot (a worktree Hive lends it, \"slot-a\") is still held. {agent} is the agent's name." }), { agent: l.state.agentName ?? this.label(l.state), slot: heldSlot ?? '' }), tr(msg({ id: 'session.switch.waits', defaultMessage: '{why}. Hive resumes it once the slot is free.', description: "The notice that an agent's switch of connection waits (HI-2304): {why} says what holds its slot, in English (\"slot-a is held by WindowsSandboxServer, left running by MB1's last run\"), without its full stop." }), { why }), undefined, projectPath),
+      told: (why) => toast('warning', tr(msg({ id: 'session.switch.waitsTitle', defaultMessage: "{agent}'s switch of connection waits for {slot}", description: "A notice's title (HI-2304): an agent was stopped to switch it to another connection (account), and Hive can't resume it yet because its slot (a worktree Hive lends it, \"slot-a\") is still held. {agent} is the agent's name." }), { agent: l.state.agentName ?? this.label(l.state), slot: heldSlot ?? '' }), tr(msg({ id: 'session.switch.waits', defaultMessage: '{why}. Hive resumes it once the slot is free.', description: "The notice that an agent's switch of connection waits (HI-2304): {why} says what holds its slot, in English (\"slot-a is held by WindowsSandboxServer, left running by MB1's last run\"), without its full stop." }), { why }), undefined, projectPath, agentTarget(projectPath, l.state.agentId, l.state.agentName ?? this.label(l.state))),
       // A slot of its project freed (HI-2304): what its resume waits for, when it does.
       watch: (look) => {
         const offEvents = onHiveEvent((e) => {
@@ -2548,7 +2555,7 @@ class SessionManager {
     state.launchedConnection = conn ? { id: conn.id, name: conn.name, ...(conn.note ? { note: conn.note } : {}), ...(conn.login ? { login: conn.login } : {}), ...(conn.server ? { server: { models: conn.server.models, local: conn.server.local } } : {}) } : undefined
     if (conn?.server && state.sessionId) (l.serverSids ??= new Set()).add(state.sessionId)
     // Decision H (HI-2108): its connection is off here or gone, so it runs on its CLI's first usable one: said once a launch.
-    if (conn?.note === 'offFallback' || conn?.note === 'missing') toast('warning', tr(M.connectionFallbackTitle, { agent: this.label(state) }), tr(M.connectionFallback, { why: conn.note, wanted: getConnection(agent.connection)?.name ?? '', name: conn.name }), undefined, projectPath) // i18n-ignore: select keys, never shown
+    if (conn?.note === 'offFallback' || conn?.note === 'missing') toast('warning', tr(M.connectionFallbackTitle, { agent: this.label(state) }), tr(M.connectionFallback, { why: conn.note, wanted: getConnection(agent.connection)?.name ?? '', name: conn.name }), undefined, projectPath, agentTarget(projectPath, state.agentId, this.label(state))) // i18n-ignore: select keys, never shown
     if (!isProviderEnabled(config.settings, adapter.id)) throw hiveError(msg({ id: 'session.start.turnedOff', defaultMessage: '{provider} was turned off while {agent} was starting.', description: "Starting an agent failed: its coding agent was turned off in Settings meanwhile. {provider} is the coding agent's name, {agent} the agent's." }), { provider: adapter.descriptor.name, agent: agent.name }, { kind: 'conflict' })
     l.startAllowed?.()
     const cmd = adapter.buildCommand(info.path, ctx)
@@ -2557,7 +2564,7 @@ class SessionManager {
     const noticeKey = notice ? `${id}\n${ctx.cwd}\n${notice.title}` : ''
     if (notice && !this.launchNotices.has(noticeKey)) {
       this.launchNotices.add(noticeKey)
-      toast('warning', `${this.label(state)}: ${notice.title}`, notice.message, undefined, projectPath)
+      toast('warning', `${this.label(state)}: ${notice.title}`, notice.message, undefined, projectPath, agentTarget(projectPath, state.agentId, this.label(state)))
     }
     this.checkFolder(projectPath, ctx.cwd)
     // Where it compacts by itself (#242): for the model it runs as, the choice's (an alias resolved) or the CLI's default.
@@ -3465,7 +3472,7 @@ class SessionManager {
     // Once a conversation (a restart with the same hooks problem says it again only in its pane).
     if (!this.hooksTold.first(`${st.agentId}\n${st.sessionId || st.runId}`)) return
     // A toast, kept in Notifications.
-    toast('warning', tr(msg({ id: 'session.notice.hooksMissingTitle', defaultMessage: "Hive isn't hearing from {agent}'s hooks", description: "A notification's title: an agent's coding agent has stopped sending Hive its hooks (the calls that tell Hive what it is doing). {agent} is the agent." }), { agent: label }), tr(HOOKS_MISSING_NOTE, { provider: l.adapter.descriptor.name, why: why ?? 'other', where: offIn ?? '', after }), undefined, st.projectPath) // i18n-ignore: select keys, never shown
+    toast('warning', tr(msg({ id: 'session.notice.hooksMissingTitle', defaultMessage: "Hive isn't hearing from {agent}'s hooks", description: "A notification's title: an agent's coding agent has stopped sending Hive its hooks (the calls that tell Hive what it is doing). {agent} is the agent." }), { agent: label }), tr(HOOKS_MISSING_NOTE, { provider: l.adapter.descriptor.name, why: why ?? 'other', where: offIn ?? '', after }), undefined, st.projectPath, agentTarget(st.projectPath, st.agentId, label)) // i18n-ignore: select keys, never shown
   }
 
   /** Its hooks came again (#1336): its status is Hive's to tell again, and its lanes go on. */
@@ -4024,7 +4031,8 @@ class SessionManager {
           ? tr(msg({ id: 'session.handOver.self', defaultMessage: "It continues from it in a new conversation when it's done.", description: 'The notice that an agent writes a handover to itself (Hand Over to… the same agent).' }))
           : tr(msg({ id: 'session.handOver.other', defaultMessage: "{agent} continues from it when it's done.", description: "The notice that an agent writes a handover for another. {agent} is the other agent's name." }), { agent: to.name }),
         undefined,
-        projectPath
+        projectPath,
+        agentTarget(projectPath, from.id, from.name)
       )
       // A handover delivery (#649), given now or not at all.
       askedAt = Date.now()
@@ -4215,7 +4223,13 @@ class SessionManager {
 
   /** Switch Now, from its notice (HI-2320): the switches, then what happened, in the notice; checked again by applyModeSettings. */
   async applyModeOffer(offer: string): Promise<{ switched: string[]; skipped: string[] }> {
-    const r = await this.applyModeSettings()
+    // Only an offer still open, and only the agents it named (HR2's round 1): an old notice switches no newer session.
+    const ids = this.modeOfferAgents.get(offer)
+    if (!ids) {
+      resolveOffer(offer, tr(OUTCOME.modesNothing))
+      return { switched: [], skipped: [] }
+    }
+    const r = await this.applyModeSettings(ids)
     this.modeOfferAgents.delete(offer)
     const text = r.switched.length || r.skipped.length ? [...r.switched, ...r.skipped].join('\n') : tr(OUTCOME.modesNothing)
     resolveOffer(offer, text)
@@ -4261,10 +4275,11 @@ class SessionManager {
    * own question (Codex's Full Access warning, up to 10 minutes: #1024) doesn't hold up the others. Reported in the
    * agents' order once all have ended.
    */
-  async applyModeSettings(): Promise<{ switched: string[]; skipped: string[] }> {
+  async applyModeSettings(only?: ReadonlySet<string>): Promise<{ switched: string[]; skipped: string[] }> {
     const todo: { l: LiveSession; mode: PermissionMode }[] = []
     for (const l of [...this.live.values()]) {
       const st = l.state
+      if (only && !only.has(liveId(st.projectPath, st.agentId))) continue
       // Still launching: it starts in what the settings say now.
       if (st.settingUp || l.configuredMode === undefined) continue
       const { agent } = await this.agentDef(st.projectPath, st.agentId).catch(() => ({ agent: null }))
@@ -4300,12 +4315,15 @@ class SessionManager {
   }
 
   /** Stops the CLI's background job holding a conversation, then resumes the conversation in this agent. */
-  async stopBackgroundAndResume(projectPath: string, agentId: string, jobId: string, sessionId: string): Promise<void> {
+  async stopBackgroundAndResume(projectPath: string, agentId: string, jobId: string, sessionId: string, fromOffer?: string): Promise<void> {
     projectPath = workspace.assertSessionHost(projectPath)
-    // Checked again (HI-2320): the conversation already open here again needs no stopping.
+    // Checked again (HI-2320, HR2's round 1): from its notice, only while that notice's offer (this job, this
+    // conversation) is still open; and never while the agent runs, the conversation already open here again or another.
     const offer = `bg:${liveId(projectPath, agentId)}#${jobId}#${sessionId}`
-    if (this.live.get(liveId(projectPath, agentId))?.state.sessionId === sessionId) {
-      resolveOffer(offer, tr(OUTCOME.openHereAgain))
+    if (fromOffer !== undefined && (fromOffer !== offer || !offerOpen(offer))) return
+    const running = this.live.get(liveId(projectPath, agentId))
+    if (running) {
+      resolveOffer(offer, tr(running.state.sessionId === sessionId ? OUTCOME.openHereAgain : OUTCOME.runsAnother))
       return
     }
     const { agent } = await this.agentDef(projectPath, agentId)
@@ -4348,7 +4366,7 @@ class SessionManager {
         'warning',
         tr(msg({ id: 'session.background.title', defaultMessage: '{agent}: the session is running in the background', description: "A notice's title: the coding agent runs this conversation as a background job, so Hive can't open it. {agent} is the agent." }), { agent: this.label(l.state) }),
         tr(msg({ id: 'session.background.body', defaultMessage: "{provider} moved this conversation into its background service (job {job}), so it can't be opened here until that job is stopped. The conversation is kept.", description: "The notice that a conversation runs as a background job. {provider} is the coding agent's name, {job} the job's id." }), { provider: l.adapter.descriptor.name, job }),
-        [{ label: tr(msg({ id: 'session.background.stopAndResume', defaultMessage: 'Stop It and Resume', description: "A notice's button: stops the coding agent's background job, then resumes the conversation in the agent." })), command: 'session.stopBackgroundAndResume', args: [projectPath, agentId, job, sessionId] }],
+        [{ label: tr(msg({ id: 'session.background.stopAndResume', defaultMessage: 'Stop It and Resume', description: "A notice's button: stops the coding agent's background job, then resumes the conversation in the agent." })), command: 'session.stopBackgroundAndResume', args: [projectPath, agentId, job, sessionId, `bg:${id}#${job}#${sessionId}`] }],
         projectPath,
         { kind: 'agent', projectPath, agentId, name: this.label(l.state), project: basename(projectPath) },
         { offer: `bg:${id}#${job}#${sessionId}` }
@@ -5145,7 +5163,7 @@ class SessionManager {
     // clicked, and by the hand-over); else that it can when it has finished.
     void (assistant ? Promise.resolve(false) : this.handOverAllowed(st.projectPath, st.agentId).catch(() => false)).then((now) => {
       const values = { size: formatSize(bytes), limit: limitMB, when: assistant ? 'assistant' : now ? 'now' : 'other' }
-      const actions: ToastAction[] | undefined = now ? [{ label: tr(msg({ id: 'session.long.handOver', defaultMessage: 'Hand Over to…', description: "A notice's button: hands the agent's work over to a new conversation (the Hand Over to… command)." })), command: 'session.handOverLongConversation', args: [st.projectPath, st.agentId] }] : undefined
+      const actions: ToastAction[] | undefined = now ? [{ label: tr(msg({ id: 'session.long.handOver', defaultMessage: 'Hand Over to…', description: "A notice's button: hands the agent's work over to a new conversation (the Hand Over to… command)." })), command: 'session.handOverLongConversation', args: [st.projectPath, st.agentId, st.sessionId] }] : undefined
       // Told once (HI-2320: a toast and a routed copy before), its Hand Over to… live while this conversation is.
       tell({ kind: 'transcript', title: tr(M.longConversation, { agent: label }), message: tr(HAND_OVER_TEXT.notice, values), ...(actions ? { actions, offer: `transcript:${liveId(st.projectPath, st.agentId)}#${st.sessionId}` } : {}), projectPath: st.projectPath, agentId: st.agentId, target: { kind: 'agent', projectPath: st.projectPath, agentId: st.agentId, name: label, project: basename(st.projectPath) } })
     })
@@ -5189,6 +5207,7 @@ class SessionManager {
   private emitState(state: LiveSessionState): void {
     // Its input as Hive holds it now (#648): a line typed or given up since the last report.
     const l = state.projectPath ? this.live.get(liveId(state.projectPath, state.agentId)) : undefined
+    if (l?.state === state) this.recheckOffers(l)
     if (l?.state === state) this.fact(state, { composer: this.composerOf(l) })
     // A launch with its task on its command line: when it first became ready, before a watch shows that as watching (#721).
     if (l?.state === state && l.launchTask && l.launchReadyAt === undefined && (state.status === 'ready' || state.status === 'watching' || state.status === 'finished')) l.launchReadyAt = Date.now()
@@ -5572,7 +5591,7 @@ class SessionManager {
             'warning',
             tr(msg({ id: 'session.lock.title', defaultMessage: '{agent} wants to edit {file}', description: "A notice's title: an agent wants to edit a file another agent is editing (Hive's file locks, Ask me). {agent} is the agent, {file} the file's path in the project." }), { agent: this.label(l.state), file: rel }),
             tr(msg({ id: 'session.lock.body', defaultMessage: '{holder} is editing it right now. Allow {agent} to edit it too?', description: "The notice that an agent wants to edit a file another agent is editing. {holder} is the agent editing it, {agent} the agent asking." }), { holder: holder.state.agentName ?? tr(msg({ id: 'session.lock.anotherAgent', defaultMessage: 'Another agent', description: "Stands for an agent whose name isn't known, at the start of a sentence (\"Another agent is editing it right now.\")." })), agent: l.state.agentName ?? tr(msg({ id: 'session.lock.theAgent', defaultMessage: 'the agent', description: "Stands for an agent whose name isn't known, in the middle of a sentence (\"Allow the agent to edit it too?\")." })) }),
-            [{ label: tr(msg({ id: 'session.lock.allow', defaultMessage: 'Allow', description: "A notice's button: lets the agent edit the file another agent is editing." })), command: 'session.allowLockedEdit', args: [l.state.projectPath, l.state.agentId, abs] }],
+            [{ label: tr(msg({ id: 'session.lock.allow', defaultMessage: 'Allow', description: "A notice's button: lets the agent edit the file another agent is editing." })), command: 'session.allowLockedEdit', args: [l.state.projectPath, l.state.agentId, abs, `lock:${key}#${this.lockAsked.get(key)}`] }],
             l.state.projectPath,
             { kind: 'agent', projectPath: l.state.projectPath, agentId: l.state.agentId, name: this.label(l.state), project: basename(l.state.projectPath) },
             { offer: `lock:${key}#${this.lockAsked.get(key)}` }
@@ -5615,19 +5634,22 @@ class SessionManager {
    * now if it is idle, else when its turn ends (the toast shows while the blocked agent is still replying, and that
    * turn's end would otherwise drop the allowance with nothing typed).
    */
-  async allowLockedEdit(projectPath: string, agentId: string, path: string): Promise<void> {
+  async allowLockedEdit(projectPath: string, agentId: string, path: string, offer?: string): Promise<void> {
     projectPath = workspace.assertSessionHost(projectPath)
     const id = liveId(projectPath, agentId)
     const l = this.live.get(id)
     if (!l) return
     const key = `${id}|${lockKey(resolve(path))}`
-    // Checked again (HI-2320): only an ask still open is answered; its notice says what happened.
+    // Checked again (HI-2320, HR2's round 1): only the ask its notice offered (`offer`, its sequence), while it is still
+    // open, is answered; an older notice's Allow answers nothing newer, and says it no longer applies.
     const asked = this.lockAsked.get(key)
-    if (asked === undefined || this.lockAllowed.has(key)) {
-      resolveOffers((o) => o.startsWith(`lock:${key}#`), tr(OUTCOME.noLongerAsked))
+    const current = asked === undefined ? null : `lock:${key}#${asked}`
+    if (!current || this.lockAllowed.has(key) || (offer !== undefined && offer !== current)) {
+      if (offer !== undefined) resolveOffer(offer, tr(OUTCOME.noLongerAsked))
+      else resolveOffers((o) => o.startsWith(`lock:${key}#`), tr(OUTCOME.noLongerAsked))
       return
     }
-    resolveOffer(`lock:${key}#${asked}`, tr(OUTCOME.allowed))
+    resolveOffer(current, tr(OUTCOME.allowed))
     // The user's answer ends the block it asked about (HI-982).
     if (l.hookBlock && `${id}|${l.hookBlock.key}` === key) l.hookBlock = undefined
     this.lockAllowed.set(key, ++this.lockSeq)
@@ -6385,7 +6407,8 @@ class SessionManager {
             tr(msg({ id: 'session.autoCompact.title', defaultMessage: '{agent}: compacting conversation', description: "A notice's title: an agent's CLI compacts its conversation by itself. {agent} is the agent." }), { agent: label }),
             tr(msg({ id: 'session.autoCompact.body', defaultMessage: '{provider} is summarising the context to free up space.', description: "The notice that an agent's CLI compacts its conversation by itself. {provider} is the coding agent's name." }), { provider: l.adapter.descriptor.name }),
             undefined,
-            st.projectPath
+            st.projectPath,
+            agentTarget(st.projectPath, st.agentId, label)
           )
           break
         case 'autoCompactIdle':
@@ -6644,6 +6667,47 @@ class SessionManager {
         else emitTo(w, { type: 'menu-command', command: 'project.focus', args: [projectPath] })
       }
     })
+  }
+
+  /**
+   * Whether a long-conversation notice's Hand Over to… is for the agent's conversation now (HI-2320): not, its notice
+   * says the agent has a new conversation, and nothing is done.
+   */
+  handOverOfferCurrent(projectPath: string, agentId: string, sessionId: string): boolean {
+    if (this.live.get(liveId(projectPath, agentId))?.state.sessionId === sessionId) return true
+    resolveOffer(`transcript:${liveId(projectPath, agentId)}#${sessionId}`, tr(OUTCOME.conversationMoved))
+    return false
+  }
+
+  /** Each agent's status and mode last looked at for its notices' offers (HI-2320), so a report that changed neither costs nothing. */
+  private offersLookedAt = new Map<string, string>()
+
+  /**
+   * An agent's notices' buttons, checked again as its status or mode changes (HI-2320, HR2's round 1): Switch Now goes
+   * once each agent it named is in its new mode (switched here or by hand); Hand Over to… goes once the agent may no
+   * longer hand over (working again, on a card loop's card…), saying where to find it then.
+   */
+  private recheckOffers(l: LiveSession): void {
+    const st = l.state
+    const id = liveId(st.projectPath, st.agentId)
+    const look = `${st.status}|${st.permissionMode ?? ''}|${st.sessionId ?? ''}`
+    if (this.offersLookedAt.get(id) === look) return
+    this.offersLookedAt.set(id, look)
+    if (l.offeredMode && st.permissionMode === l.offeredMode) {
+      for (const [offer, ids] of this.modeOfferAgents) {
+        if (!ids.delete(id) || ids.size) continue
+        this.modeOfferAgents.delete(offer)
+        resolveOffer(offer, tr(OUTCOME.modesAlready))
+      }
+    }
+    const offer = st.sessionId ? `transcript:${id}#${st.sessionId}` : null
+    if (offer && offerOpen(offer)) {
+      void this.handOverAllowed(st.projectPath, st.agentId)
+        .then((ok) => {
+          if (!ok && offerOpen(offer)) resolveOffer(offer, tr(OUTCOME.handOverLater))
+        })
+        .catch(() => undefined)
+    }
   }
 
   /** An agent's name as Hive shows it, for a notice's link (its id when it has gone). */

@@ -265,7 +265,10 @@ export interface HiveRequests {
   /** A banner was clicked: brings up the window showing its project, and the project (as a Windows notification's click). */
   'notice:open': (projectPath: string | null) => void
   /** A banner's button (#1437): brings up the window that has its project, shows the project and runs the command there. */
+  /** An entry's button, run in the window that has its project (HI-2320: resolves once the command there has finished). */
   'notice:action': (projectPath: string, command: string, args: unknown[]) => void
+  /** The window that ran a notice:action's command says it has finished (`error`: its failure, shown where its button was). */
+  'notice:actionDone': (reply: string, error: string | null) => void
   /** A notice's target (HI-1961): brings up the window that has its project or workspace (else this one) and opens it there. */
   'notice:target': (target: ToastTarget) => void
 
@@ -547,7 +550,7 @@ export interface HiveRequests {
   /** agentId: without one, the project's only agent. skipSetup starts the agent even though the worktree's setup command hasn't succeeded. */
   'session:start': (projectPath: string, opts: { resumeId?: string; name?: string; agentId?: string; skipSetup?: boolean; auto?: boolean }) => LiveSessionState
   /** Stops the CLI's background job holding a conversation, then resumes it in the agent. */
-  'session:stopBackgroundAndResume': (projectPath: string, agentId: string, jobId: string, sessionId: string) => void
+  'session:stopBackgroundAndResume': (projectPath: string, agentId: string, jobId: string, sessionId: string, offer?: string) => void
   'session:stop': (projectPath: string, agentId?: string) => void
   /** What this window's agents left running when they stopped (#507); `settled`: once every launch that has exited has been looked at (#613). */
   'session:leftovers': (settled?: boolean) => AgentLeftovers[]
@@ -613,11 +616,14 @@ export interface HiveRequests {
   /** Switches a running agent's permission mode the way the CLI allows (Claude Code: Shift+Tab). ok false: not possible live (restart instead) or it didn't take. */
   'session:setMode': (projectPath: string, agentId: string, mode: PermissionMode) => { ok: boolean; restart?: boolean; message?: string }
   /** Lets an agent edit a file another agent holds ("Ask me" lock, for CLIs that can't ask themselves). */
-  'session:allowLockedEdit': (projectPath: string, agentId: string, path: string) => void
+  /** `offer`: from its notice (HI-2320), answering only the ask it offered. */
+  'session:allowLockedEdit': (projectPath: string, agentId: string, path: string, offer?: string) => void
   /** Continues one agent's work in another, of any provider: a handover from the source (optional), then the target picks it up. */
   'session:handOver': (projectPath: string, fromAgentId: string, toAgentId: string, opts: { handover: boolean }) => void
   /** Whether the agent may hand over to a new conversation of its own now (#1057): what a long conversation's Hand Over to… asks when clicked. */
   'session:mayHandOverNow': (projectPath: string, agentId: string) => boolean
+  /** The long-conversation notice's Hand Over to… (HI-2320): for its conversation only (stale: another now, the notice says so), else whether it may hand over now. */
+  'session:handOverOffer': (projectPath: string, agentId: string, sessionId: string) => 'ok' | 'busy' | 'stale'
   /** Turns Plan mode on or off in a running agent, for providers where it is a toggle (Codex). */
   'session:setPlanMode': (projectPath: string, agentId: string, on: boolean) => void
   /** Stops the agent and resumes the same conversation in the given mode. */
@@ -846,6 +852,8 @@ export interface HiveRequests {
   'assistant:actions': () => AssistantAction[]
   'assistant:questions': () => AssistantQuestion[]
   'assistant:answer': (id: string, yes: boolean) => void
+  /** A question of the Assistant's, its panel hidden in this window (HI-2320): told once as a notification that needs you; whether it was told now. */
+  'assistant:tellQuestion': (id: string) => boolean
   /** Revert on a setting the Assistant changed (its activity list): sets it back, and lists that too (#186). */
   'assistant:revertSetting': (actionId: string) => void
   /** The Assistant's changes kept for undo (#1282), by the user's message they came from, newest first (7 days). */

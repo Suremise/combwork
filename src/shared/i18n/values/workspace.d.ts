@@ -47,6 +47,7 @@ interface HiveMessageValues {
   'workspace.antivirus.devUntrusted': undefined
   'workspace.antivirus.devUntrustedTip': undefined
   'workspace.antivirus.dontAsk': undefined
+  'workspace.antivirus.excludedNow': undefined
   'workspace.antivirus.folder': undefined
   'workspace.antivirus.goneHint': { n: number }
   'workspace.antivirus.goneTitle': undefined
