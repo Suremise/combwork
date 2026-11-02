@@ -461,7 +461,7 @@ export function NotificationCenter() {
       <div className="pane-header">
         {tr(msg({ id: 'shell.notifications.title', defaultMessage: 'Notifications', description: 'The heading of the notifications panel (the bell in the status bar).' }))}
         <div className="actions">
-          <IconButton icon="clear-all" title={tr(msg({ id: 'shell.notifications.clearAll', defaultMessage: 'Clear all', description: 'Button of the notifications panel: removes every notification.' }))} onClick={() => set({ notifications: [] })} />
+          <IconButton icon="clear-all" title={tr(msg({ id: 'shell.notifications.clearAll', defaultMessage: 'Clear all', description: 'Button of the notifications panel: removes every notification.' }))} onClick={() => set({ notifications: [], toasts: [] })} />
           <IconButton icon="close" title={tr(msg({ id: 'shell.close', defaultMessage: 'Close', description: 'Closes a panel or a dialog.' }))} onClick={() => set({ showNotifications: false })} />
         </div>
       </div>
