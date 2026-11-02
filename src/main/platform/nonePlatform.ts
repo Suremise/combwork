@@ -12,7 +12,7 @@ import { snapshot } from '../workflow/checks'
 import type { Workflow } from '../workflow/runtime'
 import type { CheckBracket, FinishInputs, HeadMove, PlatformAdapter, RunRevision, StartPlan, SubmitPlan } from './adapter'
 import { NoneAdapter } from './none'
-import { readBaseline } from '../noneBaseline'
+import { readBaseline, readCheckPoint } from '../noneBaseline'
 import { observer, type Disposable, type ObserveEvent } from './observe'
 import { isUnknown, type Containment, type Maybe } from './types'
 
@@ -70,10 +70,15 @@ export class NonePlatform implements PlatformAdapter {
     return isUnknown(r) ? r : r.revision
   }
 
-  /** The card's paths' hash: what the run is for and what it is tested on (its content is its revision); a name is a hash as given. */
+  /**
+   * The card's paths' hash: what the run is for and what it is tested on (its content is its revision); a name is a hash
+   * as given. Read off main's thread (HI-2358, HR3's round 1): a progress run's link resolves it before its check starts,
+   * and for a card declaring `.` or a big folder it is the project read whole. A no-code card has none; no answer (its
+   * worker ended, or the read took too long) is none, as an unreadable one was.
+   */
   async runRevision(card: CardRecord, _s: CardState, _folder: string | null, named: string | null): Promise<RunRevision> {
-    const r = await this.revisionNow(card)
-    const revision = isUnknown(r) ? null : r
+    const p = card.kind === 'no-code' ? null : await readCheckPoint({ project: this.hashing.project, excluded: this.hashing.excludedNames, caseless: this.hashing.caseless, paths: card.paths ?? [], snapshot: false })
+    const revision = p?.revision ?? null
     return { revision, tested: revision, testedIs: 'content', ...(named !== null ? { named } : {}) }
   }
 

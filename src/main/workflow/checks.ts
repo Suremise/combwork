@@ -11,6 +11,7 @@ import { randomUUID } from 'crypto'
 import { stat } from 'original-fs/promises'
 import { join } from 'path'
 import { atMost } from '../../shared/atMost'
+import { snapshotLine } from '../platform/snapshotLine'
 import type { CardRecord } from './factStore'
 import type { FactData } from '../../shared/workflow/facts'
 import { refusal, type Refusal } from '../../shared/workflow/refusals'
@@ -39,7 +40,7 @@ const SNAPSHOT_STATS = 8
  * it; HI-1814: it was read in full on main to count its lines).
  */
 export async function snapshot(folder: string, files: string[], gitDir: string | null): Promise<string> {
-  const parts = await atMost(SNAPSHOT_STATS, files, (f) => stat(join(folder, f)).then((s) => `${f}:${s.size}:${s.mtimeMs}`, () => `${f}:gone`))
+  const parts = await atMost(SNAPSHOT_STATS, files, (f) => stat(join(folder, f)).then((s) => snapshotLine(f, s), () => snapshotLine(f, null)))
   if (gitDir) parts.push(`reflog:${await stat(join(gitDir, 'logs', 'HEAD')).then((s) => s.size, () => 0)}`)
   return parts.join('\n')
 }

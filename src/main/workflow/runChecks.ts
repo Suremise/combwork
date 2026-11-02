@@ -22,6 +22,7 @@ import type { WorkspaceService } from '../workspace'
 import { platformIdOf } from '../platform/registry'
 import * as G from '../platform/git'
 import { NoneAdapter } from '../platform/none'
+import { readCheckPoint } from '../noneBaseline'
 import { observer as appObserver, type FolderChanges } from '../platform/observe'
 import { isUnknown, type Maybe } from '../platform/types'
 import { blocks, snapshot } from './checks'
@@ -73,8 +74,11 @@ export interface CheckStart {
   t0: number
   /** Git: the folder's uncommitted changes. */
   dirty: Maybe<string[]> | null
-  /** The stat snapshot: what decides where the watcher's record of the run isn't complete. */
-  snapshot: string
+  /**
+   * The stat snapshot: what decides where the watcher's record of the run isn't complete. None: null where it couldn't
+   * be read (HI-2358: its walk unreadable, or no answer from its worker), which never matches another.
+   */
+  snapshot: string | null
   /** The card's revision: None, its paths' hash; Git, read from where the card works (`cardRevisionNow`). */
   revision: string | null
   /** Git: how the tested checkout must hold it: be it (its own line), or have it as an ancestor (a shared folder). */
@@ -102,6 +106,17 @@ function noneOf(r: CheckRunFor): NoneAdapter {
 }
 
 /**
+ * A None check's point, read off main's thread (HI-2358): its declared paths' revision on a fresh adapter (cold
+ * hashes: the whole project for a card declaring `.`) and, when `snapshot`, every deliverable's stat line. Nothing
+ * where no answer came: a null revision and snapshot, so the run doesn't count.
+ */
+async function nonePoint(r: CheckRunFor, paths: readonly string[], withSnapshot: boolean): Promise<{ revision: string | null; snapshot: string | null }> {
+  const none = noneOf(r)
+  const p = await readCheckPoint({ project: r.project, excluded: none.excludedNames, caseless: none.caseless, paths, snapshot: withSnapshot })
+  return { revision: p?.revision ?? null, snapshot: p?.snapshot ?? null }
+}
+
+/**
  * The card's revision on Git, read when the run starts, independently of what the run tested (HR5's #1222 round 1):
  * - a card on its own line (started in a folder of its own): its folder's head, which the tested checkout must be;
  * - a card in a shared folder (`project`): its newest attributed commit, else its base, which the checkout must contain;
@@ -122,9 +137,9 @@ export async function checkStart(r: CheckRunFor, log: WriteLog = appObserver, no
   await log.settled(r.folder)
   const t0 = now()
   if (r.platform === 'none') {
-    const none = noneOf(r)
-    const rev = none.revision(r.paths)
-    return { t0, dirty: null, snapshot: await snapshot(r.project, known(none.deliverables()), null), revision: isUnknown(rev) ? null : rev.revision, containment: 'equal', paths: [...r.paths] }
+    // Read before the command starts (its caller awaits this), after t0: a write while it is read counts against it.
+    const p = await nonePoint(r, r.paths, true)
+    return { t0, dirty: null, snapshot: p.snapshot, revision: p.revision, containment: 'equal', paths: [...r.paths] }
   }
   const t = await tracked(r.folder)
   const snap = await snapshot(r.folder, t.files, t.gitDir)
@@ -157,14 +172,15 @@ export async function checkEnd(r: CheckRunFor, start: CheckStart, end: { at: num
   if (r.platform === 'none') {
     const none = noneOf(r)
     const paths = end.endPaths ?? start.paths
-    const after = none.revision(paths)
+    // The watcher's record first; then the point, off main's thread (HI-2358), its snapshot only where that record isn't
+    // complete. Nothing read, or unreadable, never counts: a null revision or snapshot matches nothing.
     const seen = await log.changedBetween(r.folder, start.t0, end.at, (written) => written.filter((f) => none.isDeliverable(f)))
-    const snapB = isUnknown(seen) ? await snapshot(r.project, known(none.deliverables()), null) : null
-    const tested = isUnknown(after) ? '' : after.revision
+    const p = await nonePoint(r, paths, isUnknown(seen))
+    const tested = p.revision ?? ''
     const samePaths = JSON.stringify([...paths].sort()) === JSON.stringify([...start.paths].sort())
     if (!check.ran) whyNot = 'notCheck'
-    else if (start.revision === null || isUnknown(after) || !samePaths || start.revision !== after.revision) whyNot = 'revisionChanged'
-    else if (isUnknown(seen) ? start.snapshot !== snapB : seen.changed) whyNot = 'changed'
+    else if (start.revision === null || p.revision === null || !samePaths || start.revision !== p.revision) whyNot = 'revisionChanged'
+    else if (isUnknown(seen) ? start.snapshot === null || p.snapshot === null || start.snapshot !== p.snapshot : seen.changed) whyNot = 'changed'
     const changes = whyNot === 'changed' && !isUnknown(seen) ? kept(seen.paths) : []
     return { ...base, revision: start.revision ?? '', tested, counted: !whyNot, ...(whyNot ? { whyNot } : {}), ...(changes.length ? { changes } : {}) }
   }
