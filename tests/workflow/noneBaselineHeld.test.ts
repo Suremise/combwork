@@ -132,6 +132,34 @@ describe('a None start or submit waiting on its whole-project read (HI-2340)', (
     expect(((r as { warnings?: string[] }).warnings ?? []).join('\n')).toMatch(/neither its paths .*: outside\.txt\./)
   })
 
+  it("a progress run's link reads the card's revision off main's thread: no hash of its paths here, held until let go (HR3's HI-2358 round 1)", async () => {
+    const e = none()
+    const card = e.wf.createCard({ title: 'Whole', paths: ['.'] })
+    moved(await e.wf.start(card.key, B1))
+    const rec = e.store.card(card.id)
+    const hashes = [vi.spyOn(e.wf.none, 'revision'), vi.spyOn(e.wf.none, 'manifest'), vi.spyOn(e.wf.none, 'deliverables')]
+    const t = baselineThread()
+    t.hold()
+    let done = false
+    const linked = e.wf.platformOf(rec).runRevision(rec, e.wf.state(rec), null, null).then((x) => ((done = true), x))
+    await until(() => t.pending === 1)
+    expect(done).toBe(false)
+    t.release()
+    const r = await linked
+    for (const h of hashes) expect(h).not.toHaveBeenCalled()
+    for (const h of hashes) h.mockRestore()
+    const here = e.wf.none.revision(['.'])
+    expect(r).toMatchObject({ revision: 'revision' in here ? here.revision : null, testedIs: 'content' })
+    expect(r.tested).toBe(r.revision)
+    // A name is kept as given; a no-code card has no revision and reads nothing.
+    expect(await e.wf.platformOf(rec).runRevision(rec, e.wf.state(rec), null, 'abc')).toMatchObject({ named: 'abc' })
+    const nc = e.wf.createCard({ title: 'Decide', kind: 'no-code', paths: ['.'] })
+    const ncRec = e.store.card(nc.id)
+    t.hold()
+    expect(await e.wf.platformOf(ncRec).runRevision(ncRec, e.wf.state(ncRec), null, null)).toMatchObject({ revision: null, tested: null })
+    expect(t.pending).toBe(0)
+  })
+
   it('a no-code card with declared paths reads nothing of the project: no hash, no whole-project read, held or not', async () => {
     const e = none()
     const card = e.wf.createCard({ title: 'Decide', kind: 'no-code', paths: ['big', 'a.txt'] })

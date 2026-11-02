@@ -1576,7 +1576,8 @@ All Git calls go through the `git()` runner (`src/main/git.ts:47`); the two bypa
   bound and endings), in the same order as before: the start's after `t0` and before the command, the end's after the
   watcher's record. The snapshot's lines are one function (`snapshotLine`), so a snapshot taken in the worker compares
   exactly with one taken on main. No answer, or a walk that couldn't be read, is null, never an empty snapshot: the
-  run doesn't count (`revisionChanged`, or `changed`).
+  run doesn't count (`revisionChanged`, or `changed`). The run's link reads the card's revision first, before its
+  check starts (`cardRunRevision` → `NonePlatform.runRevision`): a revision-only point there too, never a hash on main.
 - **Revision:** SHA-256 over the sorted list of (relative path, SHA-256 of content, or "deleted") of **the card's
   paths** (a folder means every deliverable file under it), together with the path list itself. It can be computed
   **at any time** from the card's current paths, not only at submit: a check run computes it when it starts and ends

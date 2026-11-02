@@ -10,6 +10,8 @@ import { mkdirSync, rmSync, writeFileSync } from 'fs'
 import { build } from 'esbuild'
 import { afterAll, beforeAll, describe, expect, it } from 'vitest'
 import { NoneAdapter } from '../src/main/platform/none'
+import { NonePlatform } from '../src/main/platform/nonePlatform'
+import type { CardRecord } from '../src/main/workflow/factStore'
 import { isUnknown, unknown } from '../src/main/platform/types'
 import { UNREADABLE } from '../src/shared/workflow/texts'
 import { useBaselineWorker, type BaselineThread } from '../src/main/noneBaseline'
@@ -202,6 +204,25 @@ describe("a None check's points, off main's thread (HI-2358)", () => {
     })
     const inWorker = await gapDuring(() => checkStart(forNone(p, ['.']), logOf(null)))
     console.info(`HI-2358 benchmark, a check's start declaring the project, 5,000 x 1 KB: main's longest gap ${Math.round(onMain)} ms on main's thread, ${Math.round(inWorker)} ms with its point in the worker`)
+    // The whole start, as the app does it (HR3's round 1): the run's link reads the card's revision first
+    // (`NonePlatform.runRevision`, through `cardRunRevision`), then the check's start. Before: the workflow's own adapter
+    // (its cache warm from the card's start: the walk and stats left) on main, then the old start.
+    const adapter = new NoneAdapter(p, ['node_modules'])
+    adapter.revision(['.'])
+    const platform = new NonePlatform({} as never, adapter)
+    const card = { id: 7, key: 'AM-7', kind: 'code', paths: ['.'] } as unknown as CardRecord
+    const fullBefore = await gapDuring(async () => {
+      adapter.revision(['.'])
+      const a = new NoneAdapter(p, ['node_modules'])
+      a.revision(['.'])
+      await snapshot(p, a.deliverables() as string[], null)
+    })
+    const fullAfter = await gapDuring(async () => {
+      const linked = await platform.runRevision(card, {} as never, null, null)
+      expect(linked.revision).toMatch(/^[0-9a-f]{64}$/)
+      await checkStart(forNone(p, ['.']), logOf(null))
+    })
+    console.info(`HI-2358 benchmark, the whole start (its link's revision, then the check's start), 5,000 x 1 KB: main's longest gap ${Math.round(fullBefore)} ms before, ${Math.round(fullAfter)} ms after`)
     expect(inWorker).toBeGreaterThanOrEqual(0)
   }, 120_000)
 })
