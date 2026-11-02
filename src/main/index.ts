@@ -486,8 +486,8 @@ function ask(e: HiveWindow, req: { sessions: QuitSession[]; unsaved: string[]; s
 
 async function requestQuit(opts: { force?: boolean } = {}): Promise<void> {
   if (quitting) return
-  // Already waiting to quit: asking again means "now".
-  if (pendingQuit) return quitNow(true)
+  // Already waiting to quit: asking again means "now", after the final look at unsaved files (HI-2336).
+  if (pendingQuit) return finishPendingQuit()
   const asking = hiveWindows().find((e) => e.question)
   if (asking) {
     // A dialog is already open: just bring it forward.
@@ -627,8 +627,39 @@ function cancelPendingQuit(): void {
 function checkPendingQuit(): void {
   if (!pendingQuit) return
   const working = workingCount()
-  if (working === 0) void quitNow(true)
+  if (working === 0) void finishPendingQuit()
   else emit({ type: 'quit-pending', pending: true, working })
+}
+
+/** The pending quit's final look at unsaved files under way (HI-2336): repeated session events open its dialog once. */
+let finishingPendingQuit: Promise<void> | null = null
+
+/**
+ * A pending quit going ahead (the last agent finished, or Quit Now while it waits; HI-2336): a window reopened during
+ * the wait may hold edits made since the quit was asked for, so each window with unsaved files asks about them first,
+ * as quitting does (save or discard). Cancel there keeps Hive running (the pending quit is cancelled). Once at a time.
+ */
+function finishPendingQuit(): Promise<void> {
+  if (finishingPendingQuit) {
+    const asking = hiveWindows().find((e) => e.question)
+    if (asking) showWindow(asking.win)
+    return finishingPendingQuit
+  }
+  finishingPendingQuit = (async () => {
+    try {
+      for (const e of hiveWindows().filter((x) => x.unsaved.length > 0)) {
+        if (!pendingQuit || quitting) return
+        const choice = await ask(e, { sessions: [], unsaved: e.unsaved, scope: 'app' })
+        if (choice === 'cancel') return cancelPendingQuit()
+        // Close this window only: its files are dealt with; the quit still waits for the rest.
+        if (choice === 'window') return void closeWindowOnly(e, { unsaved: true })
+      }
+      if (pendingQuit && !quitting) await quitNow(true)
+    } finally {
+      finishingPendingQuit = null
+    }
+  })()
+  return finishingPendingQuit
 }
 
 async function quitNow(tellUser: boolean): Promise<void> {
@@ -1251,7 +1282,8 @@ app.whenReady().then(async () => {
   }
   createTray(() => lastFocused()?.win ?? null, {
     quit: () => void requestQuit(),
-    quitNow: () => void quitNow(true),
+    // While a quit waits, Quit Now still asks about files edited since (HI-2336).
+    quitNow: () => void (pendingQuit ? finishPendingQuit() : quitNow(true)),
     cancelPendingQuit
   })
   onHiveEvent((e) => {

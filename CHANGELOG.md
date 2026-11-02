@@ -17,6 +17,10 @@ Hive 1.0 adds a workflow layer: your project's options decide how a card goes fr
 - **Your 0.9 templates aren't used in 1.0.** They stay where they were, but aren't listed or loaded; the upgrade keeps a copy of each with the 0.9 board backup. Save your agents as a template again, or start from one of Hive's (below).
 - **Add a connection, and sign it in once.** Claude Code and Codex agents (and the Assistant) now run on connections Hive keeps, never on your terminal's own sign-in (`~/.claude`, `~/.codex`), which stays as it is. Until one is on in a workspace, its agents can't start: a notice, the project, the Assistant panel and Provider Setup each offer to add one. Every agent keeps exactly what it launched with: its model, effort, context, mode and extra arguments go into a connection on its sign-in (Connections, below). GitHub Copilot keeps its own sign-in.
 
+### Fixed
+
+- **Quit when agents finish no longer loses edits made after reopening Hive.** Opened again during the wait, a file left with unsaved changes is asked about (save or discard) before Hive quits, when the last agent finishes or on Quit Now; Cancel keeps Hive running (HI-2336).
+
 ### One notification system
 
 - **Each thing is told once, in one place.** While you use Hive, an agent finishing or needing you, a lane's or a card's news, plan usage and Hive's own messages are all one kind of **pop-up**, bottom right by default (left of the Assistant's panel), with one look, one stacking and one timing; with Hive in the background, the agents', lanes', cards' and plan usage's come as a Windows notification instead, never as both. A long conversation or a plan usage warning no longer shows twice (a corner toast and a banner, or a Windows notification). Hive's own messages wait in the window, their pop-up paused until you come back (HI-2320).
