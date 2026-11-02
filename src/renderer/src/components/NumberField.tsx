@@ -18,6 +18,7 @@ export function NumberField({
   label,
   unit,
   live,
+  disabled,
   onCommit
 }: {
   value: number | null
@@ -31,6 +32,8 @@ export function NumberField({
   /** The number's unit, shown after the box ("s"). */
   unit?: string
   live?: boolean
+  /** The box and its Off checkbox can't be changed (a save in progress, a setting that doesn't apply now). */
+  disabled?: boolean
   onCommit: (value: number | null) => Promise<unknown> | void
 }) {
   const shown = (v: number | null): string => (v === null ? '' : String(v))
@@ -100,7 +103,7 @@ export function NumberField({
           min={min}
           max={max}
           step={step ?? 1}
-          disabled={isOff}
+          disabled={isOff || disabled}
           value={isOff ? '' : draft}
           placeholder={isOff ? off.label : inherit}
           onChange={(e) => {
@@ -123,7 +126,7 @@ export function NumberField({
         {unit && <span className="muted number-field-unit">{unit}</span>}
         {off && (
           <label className="flex muted number-field-off">
-            <input type="checkbox" className="checkbox" checked={isOff} onChange={(e) => save(e.target.checked ? 0 : (lastOn.current ?? off.restore))} /> {off.label}
+            <input type="checkbox" className="checkbox" checked={isOff} disabled={disabled} onChange={(e) => save(e.target.checked ? 0 : (lastOn.current ?? off.restore))} /> {off.label}
           </label>
         )}
       </div>
