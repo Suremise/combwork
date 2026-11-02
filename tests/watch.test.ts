@@ -373,6 +373,9 @@ describe('what counts as a change', () => {
     expect(limitLine({ cards: [7], changes: [] }, 30, [], [{ number: 7, state: 'pool' }])).toMatch(/#7 is in Review, waiting for the reviewer pool to give it to a reviewer\. Watch #7 again/)
     expect(limitLine({ cards: [7], changes: [] }, 30, [], [{ number: 7, state: 'assigned', reviewer: 'CR2' }])).toMatch(/the reviewer pool gave it to CR2, who hasn't started yet\. Watch #7/)
     expect(limitLine({ cards: [7], changes: [] }, 30, [], [{ number: 7, state: 'review' }])).not.toMatch(/tell the user \(hive_notify\)/)
+    // HI-2381: a card waiting on another agent's card in progress, and that card, are watched again quietly.
+    expect(limitLine({ cards: [8, 10], changes: [] }, 30, [], [{ number: 10, state: 'waits', on: [8] }, { number: 8, state: 'working', reviewer: 'CB1 (cli)' }])).toBe("[Hive] No change on #8, #10 in 30 min: your card watch has ended. #10 waits on #8; #8 is in Doing with CB1 (cli). Watch #10, #8 again: another agent's work is going on; don't tell the user about them.")
+    expect(limitLine({ cards: [10, 11], changes: [] }, 30, [], [{ number: 10, state: 'waits', on: [8] }])).toMatch(/#10 waits on #8\. Watch #10 again: another agent's work is going on; don't tell the user about it; for the rest, tell the user \(hive_notify\) and ask what to do\.$/)
     // Mixed: the card in Review, and the rest told as before.
     expect(limitLine({ cards: [7, 8], changes: [] }, 30, [], [{ number: 7, state: 'pool' }])).toMatch(/don't tell the user about it; for the rest, tell the user \(hive_notify\) and ask what to do\.$/)
     // With a card that left the watch: dropped first, as before.

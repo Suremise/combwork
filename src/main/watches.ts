@@ -2804,14 +2804,41 @@ async function evaluate(ws: WorkspaceService): Promise<void> {
  * Where each of a timed-out card watch's cards is now, when it is in Review (HI-2295): its limit line says so instead of
  * telling the agent to ask the user. From the board as it is: the card's review (being reviewed), else for a pool lane's
  * card its assigned reviewer or none yet (loopReviewerOf), else waiting for its reviewer. Not a card the watcher reviews
- * itself, nor one that left the watch.
+ * itself, nor one that left the watch. A dependency in progress (HI-2381): a watched card that waits (blockedBy) on another
+ * agent's card in Doing or Review (`waits`), and another agent's card in Doing that a watched card waits on or, in a
+ * project agent's watch, that it isn't the loop reviewer of (`working`).
  */
 async function reviewWhere(store: Store, rec: WatchRecord): Promise<ReviewWhere[]> {
   const gone = new Set((rec.released ?? []).map((r) => r.number))
   const out: ReviewWhere[] = []
+  const reads: CardReads = new Map()
+  const read = (n: number): Promise<TaskCard | null> => cardIn(store, n, rec.scope, reads).catch(() => null)
+  // Another agent's card in progress: in Doing or Review with a builder that isn't the watcher.
+  const othersWork = (c: TaskCard | null): c is TaskCard => !!c && !c.archived && (c.column === 'doing' || c.column === 'review') && !!c.agent && c.agent !== rec.agentId
+  const blocking = new Set<number>()
   for (const n of rec.cond.cards) {
     if (gone.has(n)) continue
-    const card = await cardIn(store, n, rec.scope).catch(() => null)
+    const card = await read(n)
+    if (!card || card.archived || card.column === 'done' || !card.blockedBy?.length) continue
+    const on: number[] = []
+    for (const m of card.blockedBy) if (othersWork(await read(m))) on.push(m)
+    if (!on.length || card.column === 'review') continue
+    for (const m of on) blocking.add(m)
+    out.push({ number: n, state: 'waits', on })
+  }
+  for (const n of rec.cond.cards) {
+    if (gone.has(n) || out.some((w) => w.number === n)) continue
+    const card = await read(n)
+    // Another's card in Doing (HI-2381): one a watched card waits on, or, in a project agent's watch, one it isn't the loop
+    // reviewer of (the card's loop is its builder's and reviewer's, as its stall is). The Assistant's (no scope) watches
+    // others' cards as it likes: only the dependency counts for it.
+    if (othersWork(card) && card.column === 'doing') {
+      const reviewer = blocking.has(n) || rec.scope === null ? null : ((await loopReviewerOf(store.ws, card).catch(() => null))?.id ?? null)
+      if (blocking.has(n) || (rec.scope !== null && reviewer !== rec.agentId)) {
+        out.push({ number: n, state: 'working', reviewer: card.agentName || card.agent! })
+        continue
+      }
+    }
     if (!card || card.archived || card.column !== 'review') continue
     if (card.review) {
       if (rec.scope !== null && card.review.agent === rec.agentId) continue
