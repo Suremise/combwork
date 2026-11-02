@@ -104,7 +104,8 @@ export const GUARD_FNS: Record<GuardId, Guard> = {
     return w.length ? { rule: 'start.dependenciesIntegrated', values: { card: i.card.key, waitsFor: w[0] } } : null
   },
   'start.slotAvailable': (i) => {
-    if (i.slotFree === undefined) return null
+    // A no-code card takes no slot (HI-2335): this rule never holds it.
+    if (i.slotFree === undefined || i.card.kind === 'no-code') return null
     if (isUnknownAnswer(i.slotFree)) return unknownRefusal(i, 'start.slotAvailable', i.slotFree)
     return i.slotFree ? null : { rule: 'start.slotAvailable', values: { card: i.card.key } }
   },

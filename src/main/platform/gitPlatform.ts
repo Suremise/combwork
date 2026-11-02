@@ -96,6 +96,9 @@ export class GitPlatform implements PlatformAdapter {
       if (!base) return unknown(UNREADABLE.branchedOff, { a: line ?? own.path, b: target })
       return { folder: own.path, line, base, target, existing: true }
     }
+    // A no-code card takes no slot (HI-2335): it changes nothing, so it starts where its agent is (`project`: no folder
+    // of its own, its agent left where it runs, a lane's kept slot included), as with no slot here. Code cards go on.
+    if (o.folder === 'slots' && this.wf.cfg.slotFor && card.kind === 'no-code') return this.start(card, { ...o, folder: 'project' })
     if (o.folder === 'slots' && this.wf.cfg.slotFor) {
       // Slots (#1438, SPEC §16.10): the card's own line from the target's head, in the slot its builder is lent (its
       // lane's, kept for the lane, else the card's own). None free: it waits for one (refused `start.slotAvailable`;
@@ -144,7 +147,7 @@ export class GitPlatform implements PlatformAdapter {
   private async startTarget(card: CardRecord, o: WorkflowOptions, builder?: string): Promise<Maybe<string | null>> {
     const own = builder && this.wf.cfg.agentFolder ? await this.wf.cfg.agentFolder(builder) : null
     if (own) return card.target || o.target || own.base || G.defaultBranch(this.project)
-    if (o.folder === 'slots' && (this.slotsHere() || !this.wf.cfg.agentFolder)) return card.target || o.target || G.defaultBranch(this.project)
+    if (o.folder === 'slots' && !(card.kind === 'no-code' && this.wf.cfg.slotFor) && (this.slotsHere() || !this.wf.cfg.agentFolder)) return card.target || o.target || G.defaultBranch(this.project)
     if (o.finish !== 'committed' && (card.target || o.target)) return card.target || o.target
     return G.branch(this.project)
   }

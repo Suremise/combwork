@@ -1719,7 +1719,7 @@ that can't be written fails the change whole.
 
 | Kind | Data | Written when |
 |---|---|---|
-| `Started` | folder (slot lease or `project`), line, base revision, target, ruleset, builder agent, kind (code / no-code); None: manifest, and the deliverables' manifest (hashes) that its unclaimed changes are found against [P2] | The start intent or the user's Start passes its rules. |
+| `Started` | folder (slot lease or `project`; under slots a no-code card's is `project`, HI-2335: no folder of its own, its agent left where it runs), line, base revision, target, ruleset, builder agent, kind (code / no-code); None: manifest, and the deliverables' manifest (hashes) that its unclaimed changes are found against [P2] | The start intent or the user's Start passes its rules. |
 | `Adopted` (observed) | as `Started`, what could be read; followed by a `Moved` to the stage it was in (cause derived), since the stage is the last `Moved`'s [P2] | The upgrade, for a card in flight (§16.4.1). |
 | `Submitted` | **submission id** (its seq), revision (none for no-code), base, head, candidate key, files changed (#945), round, the decision generation the builder had received, same-revision (bool), summary comment id | The submit intent passes (§16.8.1). |
 | `CheckRan` | name, command, revision, result (passed/failed/stopped), run id, duration, by, counted (bool), why not counted | A run naming the card finishes (§16.13, P3) [#1119 c]. |
@@ -2060,7 +2060,7 @@ whose option is off isn't in the ruleset at all, so it can't refuse.
 |---|---|---|---|
 | `start.notBlocked` | The card isn't blocked. | — | G14 / N6 (with "Cards start only when…"); off in all-off, where a blocked card starts with a warning |
 | `start.dependenciesIntegrated` | Every `blockedBy` card is **Done by facts** (integrated or accepted), not just Approved. | containment | G14 / N6 |
-| `start.slotAvailable` | A slot can be lent (or the project folder is the card's folder). | isolation | G11 = slots |
+| `start.slotAvailable` | A slot can be lent (or the project folder is the card's folder). Never holds a no-code card, which takes no slot (HI-2335). | isolation | G11 = slots |
 | `submit.notDuplicate` | This revision (or, for no-code, this card) has no submission still waiting for review or approval, and no open queue entry. A revision that failed review may be submitted again unchanged, with a note (§16.8.1) [answering HR2's round 1 finding 7 and round 2 finding 1]. | revisions | Always (it can't refuse an ordinary move: it only stops a second copy of a submission already waiting) |
 | `requeue.allowed` | Re-entering the queue with an **unchanged** approved, unstale revision: its last entry ended with `IntegrationFailed` marked `transient` (or was cancelled by a hold or by the user), and fewer than **2** unchanged requeues **after transient failures** have followed the last new revision; a hold or the user's own cancel resets that count, so holding a card never strands it [HB3's round 3 finding 3]. A conflict, red checks or a failing hook need a new revision. At the limit the card gets For you (Decide: retry once more, take it over, or send it back) [HB3's round 2 finding E]. | integration | Hive merges |
 | `submit.ready` | The revision is ready (no stored conflicts; jj's snapshot taken) (§16.3.1). | revisions | Any rule that needs the card's change (as `submit.clean`); not in all-off rulesets |
@@ -4173,6 +4173,16 @@ Whether a conversation may resume there is its **hold** (none: it may):
   it works where the agent is. A lease lent for a start that isn't written (refused, undone) is given back; a window
   Start that only asks lends nothing. `Started` records the slot and lease; the start's reply tells an agent where it
   continues and to end its turn.
+- **A no-code card takes no slot** [HI-2335; Darren, 2 Nov: "we were able to create agents that worked in the project
+  folder rather than a worktree before"]: it changes nothing, so its start never asks `leaseForStart` and
+  `start.slotAvailable` never holds it. It starts as with no slot here: `Started.folder` is `project`, which for it means
+  *no folder of its own*: its agent stays where it runs (the project folder, or a lane's kept slot), and no line is made
+  or prepared. Its lane's dispatch lease isn't taken or ended by it (a lane's lease ends with the lane), and putting it
+  back has no lease to give back. Code cards are unchanged. Solo (F = project) and no version control never lend, so
+  they start as before. **Not covered:** a lane started from the window still waits for a slot when every one is lent,
+  even when all its cards are no-code (HI-2338); and a no-code card made code while Active (the user's or the
+  Assistant's override, §16.7.3) keeps its project-folder start until it is put back and started again, which lends it
+  a slot.
 - **The line** is `hive/<KEY>/<card key>-<slug>` (slug: the title folded to ASCII, lower case letters, digits and
   hyphens, at most 40), from the target's head; a line the card already has (started again after being put back) is
   checked out as it is, its base where it left the target. The spike's `.hive/slots` folders are its unit tests' only.
