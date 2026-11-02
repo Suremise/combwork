@@ -99,6 +99,7 @@
   "files.image.actualSize": "点击查看实际大小",
   "files.image.fit": "点击适应窗口",
   "files.insertIntoSession": "插入到会话",
+  "files.links.title": "在文件中打开 · Ctrl+单击",
   "files.loading": "正在加载…",
   "files.menu.copy": "复制",
   "files.menu.copyPath": "复制路径",

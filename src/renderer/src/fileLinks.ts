@@ -1,8 +1,12 @@
 import type { IBufferLine, ILink, ILinkProvider, Terminal } from '@xterm/xterm'
 import { findPaths, pathCandidates, resolveLink, type LinkRoot, type LinkTarget, type PathMatch } from '@shared/fileLinks'
+import { msg, tr } from '@shared/i18n'
 import { call } from './api'
 import { get, isAssistantPath, set, setProjectTab, showView } from './store'
 import { agentFolder, awayFromProject } from './agentPlace'
+
+/** The hover of a file path's link in a terminal. */
+const LINK_TITLE = msg({ id: 'files.links.title', defaultMessage: 'Open in Files · Ctrl+click', description: "The hover of a file path in a terminal (an agent's output): Ctrl+click opens the file in the project's Files tab. Files is the tab's name: use it as the tab is named." })
 
 /** The workspace's projects and the folders their agents work in (slots, homes, 0.9 worktrees: #1442), where file links may lead. */
 function linkRoots(): LinkRoot[] {
@@ -108,7 +112,8 @@ export function fileLinkProvider(term: Terminal, context: () => { projectPath?: 
             activate: (e) => {
               if (e.ctrlKey || e.metaKey) openFileLink(target, m.line, m.col)
             },
-            hover: () => host()?.setAttribute('title', 'Open in Files · Ctrl+click'),
+            // Translated as it shows, so a language changed since the terminal opened applies (HI-2346).
+            hover: () => host()?.setAttribute('title', tr(LINK_TITLE)),
             leave: () => host()?.removeAttribute('title')
           }))
         callback(links.length ? links : undefined)

@@ -99,6 +99,7 @@
   "files.image.actualSize": "クリックで実際のサイズ",
   "files.image.fit": "クリックで全体を表示",
   "files.insertIntoSession": "セッションに挿入",
+  "files.links.title": "ファイルで開く · Ctrl+クリック",
   "files.loading": "読み込み中…",
   "files.menu.copy": "コピー",
   "files.menu.copyPath": "パスをコピー",

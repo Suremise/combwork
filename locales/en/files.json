@@ -399,6 +399,10 @@
     "defaultMessage": "Insert into Session",
     "description": "Button or menu item: attaches the file to the agent's running session."
   },
+  "files.links.title": {
+    "defaultMessage": "Open in Files · Ctrl+click",
+    "description": "The hover of a file path in a terminal (an agent's output): Ctrl+click opens the file in the project's Files tab. Files is the tab's name: use it as the tab is named."
+  },
   "files.loading": {
     "defaultMessage": "Loading…",
     "description": "Shown while the attachments (or one of them) load."
