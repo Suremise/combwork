@@ -1,6 +1,6 @@
 // File paths in an agent's terminal are links: Ctrl+click opens the file in the Files tab at its line (in the
 // agent's worktree for a worktree agent, in another project for a path into it). Only files that exist are
-// linked, and a plain click doesn't open anything. The agents run the fake Claude Code (fake-claude/), which
+// linked, with a tooltip in the window's language as it shows (HI-2346), and a plain click doesn't open anything. The agents run the fake Claude Code (fake-claude/), which
 // prints each prompt back. Dev build, throwaway profile, workspace and CLAUDE_CONFIG_DIR.
 // Dev build only (#1580): it starts this checkout's Electron itself, and Two is a 0.9 worktree agent
 // (agents:testLegacy, refused by a packaged build), for links into a folder other than the project's.
@@ -106,6 +106,18 @@ const lines = (n, tag) => Array.from({ length: n }, (_, i) => `// ${tag} line ${
   await page.mouse.move(app1.x + 4, app1.y)
   check('an existing file is linked, with a tooltip', !!(await until(async () => (await linkTitle()) === 1, HUNG_MS)))
   await page.screenshot({ path: path.join(lib.WORK, 'filelinks-1-hover.png') })
+  // Its tooltip is a message, in the window's language as it shows (HI-2346): a language changed meanwhile, as main
+  // sends it, applies to the same terminal's next hover; then back to English.
+  const lang = (await inv('app:info')).language
+  const speak = (code, messages) => app.evaluate(({ BrowserWindow }, ev) => BrowserWindow.getAllWindows()[0].webContents.send('hive:event', ev), { type: 'language-changed', language: { ...lang, code, locale: code, messages } })
+  await speak('de', { 'files.links.title': 'In Dateien öffnen · Strg+Klick' })
+  await page.mouse.move(nope.x + 4, nope.y)
+  await until(async () => (await linkTitle()) === 0, HUNG_MS)
+  await page.mouse.move(app1.x + 4, app1.y)
+  check('…in the language chosen since the terminal opened', !!(await until(async () => (await page.locator('.terminal-host[title="In Dateien öffnen · Strg+Klick"]').count()) === 1, HUNG_MS)))
+  await speak(lang.code, lang.messages)
+  await page.mouse.move(nope.x + 4, nope.y)
+  await until(async () => (await page.locator('.terminal-host[title]').count()) === 0, HUNG_MS)
 
   // --- A plain click is just a click.
   await page.mouse.click(app1.x + 4, app1.y)

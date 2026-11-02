@@ -101,6 +101,7 @@ interface HiveMessageValues {
   'files.image.actualSize': undefined
   'files.image.fit': undefined
   'files.insertIntoSession': undefined
+  'files.links.title': undefined
   'files.loading': undefined
   'files.menu.copy': undefined
   'files.menu.copyPath': undefined

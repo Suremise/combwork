@@ -99,6 +99,7 @@
   "files.image.actualSize": "Clique pour la taille réelle",
   "files.image.fit": "Clique pour ajuster",
   "files.insertIntoSession": "Insérer dans la session",
+  "files.links.title": "Ouvrir dans Fichiers · Ctrl+clic",
   "files.loading": "Chargement…",
   "files.menu.copy": "Copier",
   "files.menu.copyPath": "Copier le chemin",
