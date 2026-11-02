@@ -315,7 +315,9 @@ describe('what a run is for (#1220): its card, revision and check, asked before 
 
   it("--check runs the project's configured command, titled by the check's name", async () => {
     const marker = join(dir, 'ran-check.txt')
-    const command = `"${node}" -e "require('fs').writeFileSync(process.argv[1], 'checked')" "${marker}"`
+    // Short on any machine (the marker named from the folder it runs in): a command over the API's 200 characters is clipped.
+    const command = `"${node}" -e "require('fs').writeFileSync('ran-check.txt', 'checked')"`
+    expect(command.length).toBeLessThan(200)
     resolveReply = { status: 200, body: { card: '#12', revision: id, testedCheckout: id, check: { name: 'typecheck', command }, folder: dir } }
     const r = await wrap(['--check', 'typecheck'], env(), 0)
     expect(r.code).toBe(0)
