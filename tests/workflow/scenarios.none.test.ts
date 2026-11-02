@@ -374,9 +374,9 @@ describe('None: what a submission leaves out of its paths is named (HI-2339)', (
     const r = await e.wf.submit(card.key, B1, { summary: 'x' })
     moved(r)
     expect(warningsOf(r).join('\n')).not.toMatch(/leave out|neither its paths/)
-    const files = e.wf.state(card).latest!.files.map((f) => f.path)
-    expect(files).toEqual(expect.arrayContaining(['src/a.txt', 'lib/b.txt']))
-    expect(files.some((f) => f.startsWith('node_modules/'))).toBe(false)
+    const changed = e.wf.state(card).latest!.files.map((f) => f.path)
+    expect(changed).toEqual(expect.arrayContaining(['src/a.txt', 'lib/b.txt']))
+    expect(changed.some((f) => f.startsWith('node_modules/'))).toBe(false)
     // An empty path is no declaration of the root: it covers nothing.
     expect(e.wf.none.covers([''], 'src/a.txt')).toBe(false)
     expect(e.wf.none.covers(['.'], 'node_modules/x/index.js')).toBe(false)
