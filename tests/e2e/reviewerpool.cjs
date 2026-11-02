@@ -333,9 +333,16 @@ const commitIn = (dir, files, message, trailer) => {
     const tdr2 = await tokenOf(delta, dr2.id)
     await idle(delta, dr2.id)
     check('DE-R2 passes the revision', (await intent(tdr2, x, 'loop-step', { step: 'ok', design: await designId(), text: 'X: good' })).status === 200)
-    // DE-R1 ends with no card watch, as HR1 did on HI-2320.
-    await inv('watch:cancel', delta, dr1.id)
-    check('DE-R1 is idle with no watch', !!(await until(async () => ['ready', 'finished'].includes((await live(delta, dr1.id))?.status) && !(await live(delta, dr1.id))?.watch, HUNG_MS)), JSON.stringify(await live(delta, dr1.id)))
+    // DE-R1 ends with no card watch, as HR1 did on HI-2320: once its own grace check has run (loops:checks, counted
+    // after its mark is made), it has no mark. Read again at each stage: it would flag DE-R1 for X in Doing, here.
+    const r1Clear = async (stage) => {
+      const before = await inv('loops:checks', delta, dr1.id)
+      await inv('watch:cancel', delta, dr1.id)
+      check(`DE-R1 is idle with no watch (${stage})`, !!(await until(async () => ['ready', 'finished'].includes((await live(delta, dr1.id))?.status) && !(await live(delta, dr1.id))?.watch, HUNG_MS)), JSON.stringify(await live(delta, dr1.id)))
+      check(`…its grace check runs (${stage})`, !!(await until(async () => (await inv('loops:checks', delta, dr1.id)) > before, HUNG_MS)), String(await inv('loops:checks', delta, dr1.id)))
+      check(`…and DE-R1, out of X's loop, isn't flagged as not watching it (${stage}; HI-2321)`, !(await live(delta, dr1.id))?.notWatching && !/DE-R1 isn't watching/.test(fs.readFileSync(path.join(userData, 'logs', 'hive.log'), 'utf8')), JSON.stringify(await live(delta, dr1.id)))
+    }
+    await r1Clear('X in Doing, its revision checked by DE-R2')
     // Built and submitted: the review goes to DE-R2, the design's last answer (its preferred reviewer).
     const revX = commitIn(delta, { 'x.txt': 'x\n' }, 'X done', keyX)
     check('DE-B1 submits X', (await intent(tdb, x, 'submit', { summary: 'X: ready', revision: revX })).status === 200 && !!(await until(async () => (await card(x))?.column === 'review', HUNG_MS)))
@@ -348,8 +355,11 @@ const commitIn = (dir, files, message, trailer) => {
     await inv('watch:cancel', delta, dr2.id)
     const r2Flag = await until(async () => JSON.stringify((await live(delta, dr2.id))?.notWatching) === JSON.stringify([x]), HUNG_MS)
     check("DE-R2, X's reviewer now, ending with no watch is flagged as not watching X", !!r2Flag, JSON.stringify(await live(delta, dr2.id)))
-    // DE-R1's grace began before DE-R2's (the same grace), and the board has changed since: it was checked, and owes nothing.
-    check('DE-R1, out of X\'s loop, never is (HI-2321)', !(await live(delta, dr1.id))?.notWatching && !/DE-R1 isn't watching/.test(fs.readFileSync(path.join(userData, 'logs', 'hive.log'), 'utf8')), JSON.stringify(await live(delta, dr1.id)))
+    // DE-R1 watches X again and ends with no watch, X in Review with DE-R2: its grace check runs and finds nothing of its.
+    await idle(delta, dr1.id)
+    await lib.typeLine(inv, lib.ptyKey(delta, dr1.id), home, null, `hive hive_wait_for_tasks ${JSON.stringify({ cards: [`#${x}`], changes: ['verdict'], wake: true })}`, { live: () => live(delta, dr1.id) })
+    check('DE-R1 watches X again', !!(await until(async () => (await live(delta, dr1.id))?.status === 'watching', HUNG_MS)), JSON.stringify(await live(delta, dr1.id)))
+    await r1Clear('X in Review with DE-R2')
     check('…and X\'s stall names DE-R2, not DE-R1', (lib.unkey(await stalledOf(x)) ?? '').startsWith("DE-R2 isn't watching"), String(await stalledOf(x)))
   } catch (err) {
     check('no unexpected error', false, err.stack)
