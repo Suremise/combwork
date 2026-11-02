@@ -37,8 +37,12 @@ export function gitExe(): GitExe {
   return started
 }
 
-/** Where Git for Windows keeps the real git, under its root: `git --exec-path` is `<root>/<this>/libexec/git-core`. */
-const MINGW = ['mingw64', 'clangarm64', 'mingw32']
+/**
+ * Where Git for Windows keeps the real git, under its root: `git --exec-path` is `<root>/<this>/libexec/git-core`. Its
+ * launcher puts `<root>\<this>\bin` first on PATH and sets MSYSTEM to this upper-cased (`ucrt64`: Git for Windows 2.56's
+ * UCRT64 build, HI-2400).
+ */
+const MINGW = ['mingw64', 'ucrt64', 'clangarm64', 'mingw32']
 /** Git for Windows' launcher: `<root>\cmd\git.exe`. */
 const LAUNCHER = /\\cmd\\git\.exe$/i
 
