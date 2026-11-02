@@ -329,7 +329,8 @@ export function keeperStillBound(run: string, helper: string): boolean {
 }
 
 /** A keeper's state of a run, as the next Hive reads it (HI-2055). */
-export type KeeperState = { state: 'ended'; helper: string } | { state: 'live'; helper: string; members: AgentProcess[] }
+/** `more` (HI-2309, HR1's round 3): members its total counts beyond those it describes (none listed may be all of them). */
+export type KeeperState = { state: 'ended'; helper: string } | { state: 'live'; helper: string; members: AgentProcess[]; more: number }
 
 const KEEPER_FILE = /^keeper-([A-Za-z0-9_-]{1,64})\.json$/
 const MAX_KEEPER_BYTES = 64 * 1024
@@ -367,7 +368,7 @@ export async function keeperState(run: string, hive: string): Promise<KeeperStat
   }
   if (total < members.length) return null
   // A console window's host ends with the process it serves: counted (the job isn't empty), never listed (listJob's way).
-  return { state: 'live', helper, members: members.filter((p) => !/^(conhost|openconsole)(\.exe)?$/i.test(p.name)) }
+  return { state: 'live', helper, members: members.filter((p) => !/^(conhost|openconsole)(\.exe)?$/i.test(p.name)), more: total - members.length }
 }
 
 /** A run's writer settled (HI-2055): its keeper's state and its binding go. */

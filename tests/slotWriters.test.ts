@@ -50,7 +50,7 @@ const tracker = vi.hoisted(() => ({
    * asked for, whether a helper is still bound (`bound`, by default yes), what is done while it is read (`reading`), and
    * the keepers' states forgotten once their writers were cleared.
    */
-  keeper: new Map<string, { state: 'ended'; helper: string } | { state: 'live'; helper: string; members: Proc[] }>(),
+  keeper: new Map<string, { state: 'ended'; helper: string } | { state: 'live'; helper: string; members: Proc[]; more: number }>(),
   keeperAsked: [] as string[],
   bound: (_run: string, _helper: string): boolean => true,
   reading: () => undefined as void,
@@ -80,7 +80,7 @@ vi.mock('../src/main/agentProcesses', async (orig) => ({
     return tracker.keeper.get(run) ?? null
   },
   keeperStillBound: (run: string, helper: string) => tracker.bound(run, helper),
-  nothingHolds: async (list: Proc[]) => tracker.idle(list),
+  nothingHolds: async (list: Proc[], more: number) => !more && tracker.idle(list),
   forgetKeeperRun: (run: string) => void tracker.keeperForgotten.push(run)
 }))
 vi.mock('../src/main/lastRun', async (orig) => ({ ...((await orig()) as object), lastUnexpectedClose: () => (tracker.restart.length ? { processes: tracker.restart } : null) }))
@@ -708,13 +708,24 @@ describe("a gone Hive's writer settled by itself after a restart (HI-1886)", () 
       try {
         const broker = { pid: 7101, name: 'WindowsSandboxServer', label: 'WindowsSandboxServer', created: '133900000000000002' }
         await plant('r-live-node', { ended: true })
-        tracker.keeper.set('r-live-node', { state: 'live', helper, members: [broker, node] })
+        tracker.keeper.set('r-live-node', { state: 'live', helper, members: [broker, node], more: 0 })
         await pool.settleGoneWriters()
         expect(writer()?.run).toBe('r-live-node')
         expect(toasts).toEqual([])
         await store.clearWriterRun('r-live-node')
+        // A receipt describing only the broker, but counting one member more (HR1's round 3: truncated, the one left out may
+        // write): held, and never said to be safe, neither by a notice nor in Release Slot….
+        await plant('r-live-cut')
+        tracker.keeper.set('r-live-cut', { state: 'live', helper, members: [broker], more: 1 })
+        await pool.settleGoneWriters()
+        expect(writer()?.run).toBe('r-live-cut')
+        expect(toasts).toEqual([])
+        const cut = await heldWriter(project, 'slot-a')
+        expect(cut).toMatchObject({ run: 'r-live-cut', processes: { from: 'restart', more: 1 } })
+        expect(cut).not.toHaveProperty('idleBrokers')
+        await store.clearWriterRun('r-live-cut')
         await plant('r-live-broker')
-        tracker.keeper.set('r-live-broker', { state: 'live', helper, members: [broker] })
+        tracker.keeper.set('r-live-broker', { state: 'live', helper, members: [broker], more: 0 })
         await pool.settleGoneWriters()
         await pool.settleGoneWriters()
         expect(writer()?.run).toBe('r-live-broker')
@@ -779,7 +790,7 @@ describe("a gone Hive's writer settled by itself after a restart (HI-1886)", () 
     it('"live": held, its members still running (checked again by id and start time) listed, nothing ended', async () => {
       hostOn(false)
       await plant('r-live', { ended: true })
-      tracker.keeper.set('r-live', { state: 'live', helper, members: [node, claude] })
+      tracker.keeper.set('r-live', { state: 'live', helper, members: [node, claude], more: 0 })
       tracker.stillRunning = (list) => list.filter((p) => p.pid === node.pid)
       await pool.settleGoneWriters()
       expect(writer()?.run).toBe('r-live')

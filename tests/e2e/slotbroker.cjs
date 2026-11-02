@@ -15,9 +15,16 @@
 //    broker listed); the "Sandbox" closes and Hive quits at once. The next Hive, on the same profile, finds slot-a free
 //    (its run kept as ended: the quit's look, or the leftovers' if it came first, both by the one rule), the broker not
 //    listed as B1's, and still running.
+// 5. (HI-2309, Darren's decision) Hive is ended from outside while B1 runs, its broker left running, as a crash would,
+//    and its keeper's "live" receipt listing only the broker is planted as a keeper that outlived it writes one: the
+//    next Hive keeps slot-a held (the keeper's "live" is no proof), says once in a notice that only the idle broker
+//    holds it and releasing is safe; its Release Slot… (from the notice's button) says so with "End these processes
+//    first" off. Screenshots of the notice and the question, light and dark. Released, the broker still runs.
 // Dev build, throwaway profile, workspace and CLAUDE_CONFIG_DIR.
 // Dev build only: slot-a is lent through slots:test, and the broker is a test seam's, both of which a packaged build refuses.
 const lib = require('./lib.cjs')
+const { processes, descendantsIn, endAsCrash } = require('./folderProcesses.cjs')
+const { DatabaseSync } = require('node:sqlite')
 const fs = require('fs')
 const path = require('path')
 // The longest a wait here waits for what it waits on: a bound for a hung run, never how long it should take (#570).
@@ -40,6 +47,16 @@ const check = (name, ok, extra = '') => {
   console.log(`${ok ? 'PASS' : 'FAIL'} ${name}${ok || !extra ? '' : ` (${extra})`}`)
 }
 const same = (a, b) => !!a && !!b && path.resolve(a).toLowerCase() === path.resolve(b).toLowerCase()
+/** Ends a test Hive from outside, as a crash would (slotrelease's way): its main process first, then all it started but `spare`. */
+async function endFromOutside(app, spare = []) {
+  const proc = app.process()
+  const gone = new Promise((r) => (proc.exitCode !== null ? r(true) : proc.once('exit', () => r(true))))
+  const id = lib.identify([proc.pid])[0]
+  const list = processes()
+  const top = id && list.find((p) => p.pid === id.pid && Math.abs(p.started - id.started) <= 1)
+  const ended = top ? endAsCrash(list, { pid: top.pid, started: top.started }, descendantsIn(list, top.pid).filter((p) => !spare.includes(p.pid))) : 0
+  return ended > 0 && !!(await lib.until(() => gone, HUNG_MS))
+}
 const pids = (file) => (fs.existsSync(file) ? fs.readFileSync(file, 'utf8').trim().split('\n').filter(Boolean).map((l) => JSON.parse(l).pid) : [])
 
 ;(async () => {
@@ -157,6 +174,56 @@ const pids = (file) => (fs.existsSync(file) ? fs.readFileSync(file, 'utf8').trim
     await inv('session:start', alpha, { agentId: b1.id })
     const s4 = await until(async () => ((await idle(b1.id)) ? live(b1.id) : null), HUNG_MS)
     check('B1 starts in slot-a', s4?.slot === 'slot-a', JSON.stringify(s4))
+
+    // --- 5. (HI-2309, Darren's decision) Hive closes unexpectedly while B1 runs, its broker left: its keeper outlives it
+    // (its "live" receipt lists only the broker), so the next Hive keeps slot-a held, tells the user once that releasing
+    // it is safe, and its Release Slot… says so, "End these processes first" off. Released, the broker still runs.
+    const before5 = pids(brokerFile)
+    await lib.sendPrompt(inv, key, 'hidden-linger', { submitted: async () => (await live(b1.id))?.status === 'working' || pids(brokerFile).length > before5.length })
+    const pid5 = await until(async () => ((await idle(b1.id)) ? pids(brokerFile).find((p) => !before5.includes(p)) : null), HUNG_MS)
+    kept.push(...lib.identify(pid5 ? [pid5] : []))
+    asBroker(pid5)
+    check('B1 leaves the broker again, still running in slot-a', !!pid5 && !!(await live(b1.id)))
+    // Its launch's processes as Hive's running marker lists them (id and start time, as the keeper names its members).
+    const markerFile = path.join(userData, 'running.json')
+    const marked = () => {
+      try {
+        return JSON.parse(fs.readFileSync(markerFile, 'utf8')).processes?.find((l) => l.runId === s4.runId)?.processes.find((p) => p.pid === pid5) ?? null
+      } catch {
+        return null
+      }
+    }
+    const member = await until(marked, HUNG_MS)
+    check('…the running marker lists it, with its start time', !!member?.created, JSON.stringify(member))
+    check('…and Hive is ended from outside, the broker left running', await endFromOutside(h.app, [pid5]))
+    h = null
+    // Its keeper's receipt, as one that outlived it writes it ("live", only the broker), planted by the test (the
+    // reviewer's allowance for HR1's round 3: whether a real keeper outlives a killed test Hive is a card of its own):
+    // its run's helper as the profile bound it, the gone Hive as the slot's writer names it.
+    const helper = JSON.parse(fs.readFileSync(path.join(userData, 'leftovers.json'), 'utf8')).helpers?.[s4.runId]
+    const db = new DatabaseSync(path.join(ws, '.hive', 'hive.db'))
+    const row = db.prepare("SELECT writer_run AS run, writer_pid AS pid, writer_started AS started FROM slots WHERE name = 'slot-a'").get()
+    db.close()
+    check('…slot-a still names its run as writer, bound to a helper', row?.run === s4.runId && typeof helper === 'string', JSON.stringify({ row, helper }))
+    fs.mkdirSync(path.join(userData, 'keeper'), { recursive: true })
+    fs.writeFileSync(path.join(userData, 'keeper', `keeper-${s4.runId}.json`), JSON.stringify({ v: 1, run: s4.runId, helper, hive: `${row?.pid}:${row?.started}`, state: 'live', observed: 'complete', total: 1, members: [{ pid: pid5, created: member?.created, name: 'node' }], at: 1 }))
+    await start()
+    const notice = h.page.locator('.toast', { hasText: 'slot-a is held by node' })
+    check('the next Hive keeps slot-a held, and says once that only the idle broker holds it and releasing is safe', !!(await until(async () => (await notice.count()) === 1, HUNG_MS)) && /Windows' idle Sandbox broker.*releasing the slot is safe/.test(await notice.innerText()) && !!(await slotA())?.writer, await h.page.locator('.toast').allInnerTexts().then((t) => t.join(' | ')))
+    await h.page.screenshot({ path: path.join(shots, 'slotbroker-notice.png') })
+    await notice.getByRole('button', { name: 'Release Slot…' }).click()
+    const dialog = h.page.locator('.dialog', { hasText: "Release B1's slot slot-a?" })
+    await dialog.waitFor({ timeout: HUNG_MS })
+    const said = await dialog.innerText()
+    check("its Release Slot… says the broker is Windows' idle one and releasing is safe", /held by node, Windows' idle Sandbox broker/.test(said) && /No Sandbox is running, so releasing it is safe/.test(said) && /the broker is left running/.test(said), said)
+    check('…"End these processes first" off', (await dialog.locator('input[type="checkbox"]').count()) === 1 && !(await dialog.locator('input[type="checkbox"]').isChecked()))
+    for (const theme of ['light', 'dark']) {
+      await h.page.evaluate((t) => document.documentElement.setAttribute('data-theme', t), theme)
+      await h.page.screenshot({ path: path.join(shots, `slotbroker-release-${theme}.png`) })
+    }
+    await dialog.getByRole('button', { name: 'Release', exact: true }).click()
+    await dialog.waitFor({ state: 'detached', timeout: HUNG_MS })
+    check('released: slot-a free, the broker still running', !!(await until(async () => !(await slotA())?.writer, HUNG_MS)) && lib.identify([pid5]).length === 1)
   } finally {
     await h?.app.close().catch(() => undefined)
     lib.endExactly(kept)

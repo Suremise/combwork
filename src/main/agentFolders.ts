@@ -535,7 +535,7 @@ export async function goneWriterSettles(projectPath: string, w: { run: string; a
   const kept = await keeperState(w.run, `${w.pid}:${w.started}`)
   // Its keeper's "live" is a snapshot, never proof (HI-2309, Darren's decision: the keeper's fresh answer is HI-2313):
   // held, and when what it lists is only Windows' own idle brokers, the user is told once that releasing it is safe.
-  if (kept?.state === 'live' && slot) await tellIdleBrokerHold(projectPath, slot, w, kept.members)
+  if (kept?.state === 'live' && slot) await tellIdleBrokerHold(projectPath, slot, w, kept.members, kept.more)
   if (kept?.state !== 'ended') return false
   log.info(`The slot writer ${w.run} in ${userText(basename(projectPath))} settled: ${userText(w.agent)}'s ended run left nothing running (its Hive, process ${w.pid}, gone; seen by its helper ${kept.helper})`)
   return Object.freeze({ run: w.run, helper: kept.helper })
@@ -549,8 +549,9 @@ const toldIdleBroker = new Set<string>()
  * rule, nothingHolds, on those still running): held all the same (fail closed; the keeper's "live" is a snapshot), and
  * the user told once, naming them, that releasing it is safe, with Release Slot…. Nothing is ended.
  */
-async function tellIdleBrokerHold(projectPath: string, slot: string, w: { run: string; agent: string }, members: readonly AgentProcess[]): Promise<void> {
-  if (toldIdleBroker.has(w.run) || !members.length) return
+async function tellIdleBrokerHold(projectPath: string, slot: string, w: { run: string; agent: string }, members: readonly AgentProcess[], more: number): Promise<void> {
+  // A receipt that describes only some of its members (HR1's round 3): what it leaves out may write, so never "safe".
+  if (toldIdleBroker.has(w.run) || !members.length || more > 0) return
   const running = await stillRunningOf(members)
   if (!running?.length || !(await nothingHolds(running, 0, null))) return
   toldIdleBroker.add(w.run)
@@ -633,7 +634,8 @@ async function restartList(projectPath: string, w: { run: string; agent: string;
   const keeper = await keeperState(w.run, `${w.pid}:${w.started}`)
   if (keeper?.state === 'live') {
     const running = await stillRunningOf(keeper.members)
-    return running?.length ? { list: running, more: 0, from: 'restart' } : null
+    // Its members not described counted (HR1's round 3 on HI-2309): never listed as all there is.
+    return running?.length ? { list: running, more: keeper.more, from: 'restart' } : null
   }
   const { lastUnexpectedClose } = await import('./lastRun')
   const kept = (lastUnexpectedClose()?.processes ?? []).filter((l) => l.runId === w.run && l.agentId === w.agent && samePlace(l.projectPath, projectPath)).flatMap((l) => l.processes)

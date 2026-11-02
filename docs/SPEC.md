@@ -4018,7 +4018,8 @@ Whether a conversation may resume there is its **hold** (none: it may):
       failed. Its slot stays held, and when the processes it lists that still run are only idle brokers by the rule, the
       user is told once (a notice naming them, *slot-a is held by WindowsSandboxServer*: no Sandbox is running, so
       releasing it is safe, with **Release Slot…**). Release Slot…'s question says the same (`HeldWriter.idleBrokers`)
-      and leaves "End these processes first" off. The keeper's own `ended` is unchanged; its current answer is HI-2313,
+      and leaves "End these processes first" off. A receipt that describes only some of its members (its total above them)
+      is never called safe (`KeeperState.more`, HR1's round 3). The keeper's own `ended` is unchanged; its current answer is HI-2313,
       after 1.0. Members are named without `.exe` (`ProcessName`), so the broker's name filter takes either form.
     The broker is never ended, and a job it is the last of is let go. The decision (a known list plus a confirmed
     "nothing it serves is running"):
