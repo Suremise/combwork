@@ -637,10 +637,23 @@ function lockKey(abs: string): string {
 }
 
 /** What Hive types to tell an agent it may make the locked edits the user allowed. */
-function goAheadPrompt(cwd: string, paths: string[]): string {
-  const files = paths.map((p) => placeRelative(cwd, p) || basename(p)).join(', ')
-  // i18n-ignore: typed to the agent (agent-facing text stays English)
-  return `The user allowed you to edit ${files} while the other agent works on ${paths.length > 1 ? 'them' : 'it'}. Go ahead with the ${paths.length > 1 ? 'edits' : 'edit'}.`
+/** A go-ahead waiting for an agent's turn to end: the user's Allow, or the claim it waited on having ended (HI-2386). */
+interface GoAhead {
+  path: string
+  allowed: boolean
+}
+
+function goAheadPrompt(cwd: string, goAheads: GoAhead[]): string {
+  const said: string[] = []
+  for (const allowed of [true, false]) {
+    const paths = goAheads.filter((g) => g.allowed === allowed).map((g) => g.path)
+    if (!paths.length) continue
+    const files = paths.map((p) => placeRelative(cwd, p) || basename(p)).join(', ')
+    const many = paths.length > 1
+    // i18n-ignore: typed to the agent (agent-facing text stays English)
+    said.push(allowed ? `The user allowed you to edit ${files} while the other agent works on ${many ? 'them' : 'it'}. Go ahead with the ${many ? 'edits' : 'edit'}.` : `The other agent has finished with ${files}, so Hive no longer asks the user about ${many ? 'them' : 'it'}. Try the ${many ? 'edits' : 'edit'} again.`)
+  }
+  return said.join(' ')
 }
 
 /** A lock is released when its agent's turn ends; this covers an agent that stalls without ending it. */
@@ -1167,8 +1180,13 @@ class SessionManager {
   /** "Allow" given for an agent and file (`<liveId>|<lock key>`), and questions already asked, with their lockSeq. */
   private lockAllowed = new Map<string, number>()
   private lockAsked = new Map<string, number>()
-  /** "Allow" given while the agent was still in its turn (`<liveId>|<lock key>` → the file's path): the go-ahead it gets when that turn ends. */
-  private lockGoAhead = new Map<string, string>()
+  /** Each open question's holder (its liveId): the claim it asked about, so another holder's is asked about anew (HI-2386). */
+  private lockAskHolder = new Map<string, string>()
+  /**
+   * The go-ahead an agent gets when its turn has ended (`<liveId>|<lock key>`): the file's path, and whether the user
+   * allowed it (`allowed`), or the claim it waited on ended unanswered and it may simply try again (HI-2386).
+   */
+  private lockGoAhead = new Map<string, GoAhead>()
   /**
    * The delivery service (#649, deliveries.ts sets it as it loads): the lines sessions give agents of their own (a lock's
    * go-ahead, the carry-on after a sign-in, a handover's steps) are deliveries it offers, as every way into an agent is.
@@ -5630,8 +5648,12 @@ class SessionManager {
         // The CLI can't show its own approval for this, so Hive asks the user and the agent waits.
         const key = `${id}|${keys.get(abs)!}`
         if (this.lockAllowed.has(key)) continue
+        // An open question about another holder's claim (that one ended, and this agent found the file claimed again
+        // before Hive told it so) answers nothing about this one: it goes, and the user is asked about this holder.
+        if (this.lockAsked.has(key) && this.lockAskHolder.get(key) !== held!.liveId) this.closeAsk(key)
         if (!this.lockAsked.has(key)) {
           this.lockAsked.set(key, ++this.lockSeq)
+          this.lockAskHolder.set(key, held!.liveId)
           toast(
             'warning',
             tr(msg({ id: 'session.lock.title', defaultMessage: '{agent} wants to edit {file}', description: "A notice's title: an agent wants to edit a file another agent is editing (Hive's file locks, Ask me). {agent} is the agent, {file} the file's path in the project." }), { agent: this.label(l.state), file: rel }),
@@ -5672,15 +5694,48 @@ class SessionManager {
     // None waiting (nearly always): no file's identity to resolve.
     if (this.lockGoAhead.size) for (const abs of files) this.lockGoAhead.delete(`${id}|${keys?.get(abs) ?? lockKey(abs)}`)
     // Nor an answer to an ask still open for them (HI-2386: kept past its turn's end): its notice's Allow goes.
-    if (this.lockAsked.size)
-      for (const abs of files) {
-        const key = `${id}|${keys?.get(abs) ?? lockKey(abs)}`
-        const seq = this.lockAsked.get(key)
-        if (seq === undefined) continue
-        this.lockAsked.delete(key)
-        resolveOffer(`lock:${key}#${seq}`, tr(OUTCOME.noLongerAsked))
-      }
+    if (this.lockAsked.size) for (const abs of files) this.closeAsk(`${id}|${keys?.get(abs) ?? lockKey(abs)}`)
     return reply
+  }
+
+  /** An "Ask me" question no longer open (answered, or no longer applying): its notice's Allow goes, saying so. */
+  private closeAsk(key: string): void {
+    const seq = this.lockAsked.get(key)
+    this.lockAskHolder.delete(key)
+    if (seq === undefined) return
+    this.lockAsked.delete(key)
+    resolveOffer(`lock:${key}#${seq}`, tr(OUTCOME.noLongerAsked))
+  }
+
+  /**
+   * A holder's claims ended (`files`, lock keys → paths): what other agents were asked or allowed about them was about
+   * this holder's claim (HI-2386). Their questions go, and their allowances (a later holder's claim needs its own); each
+   * such agent is told the file is free to try again, when its turn has ended, unless an allowance was already typed
+   * (it is trying now). The next try claims the file, or asks the user about whoever claimed it meanwhile.
+   */
+  private claimsEnded(holder: string, files: ReadonlyMap<string, string>): void {
+    const told = new Set<string>()
+    for (const [k, path] of files) {
+      const ending = `|${k}`
+      for (const key of [...this.lockAsked.keys()]) {
+        if (!key.endsWith(ending) || key.startsWith(`${holder}|`) || this.lockAskHolder.get(key) !== holder) continue
+        this.closeAsk(key)
+        this.lockGoAhead.set(key, { path, allowed: false })
+        told.add(key.slice(0, -ending.length))
+      }
+      for (const key of [...this.lockAllowed.keys()]) {
+        if (!key.endsWith(ending) || key.startsWith(`${holder}|`)) continue
+        this.lockAllowed.delete(key)
+        if (this.lockGoAhead.get(key)?.allowed) {
+          this.lockGoAhead.set(key, { path, allowed: false })
+          told.add(key.slice(0, -ending.length))
+        }
+      }
+    }
+    for (const id of told) {
+      const l = this.live.get(id)
+      if (l) this.sendGoAheads(id, l)
+    }
   }
 
   /**
@@ -5710,33 +5765,35 @@ class SessionManager {
     // Answered: no longer open (HI-2386: asks outlive the turn's end, so a later block asks again rather than waiting on
     // this one).
     this.lockAsked.delete(key)
+    this.lockAskHolder.delete(key)
     // The user's answer ends the block it asked about (HI-982).
     if (l.hookBlock && `${id}|${l.hookBlock.key}` === key) l.hookBlock = undefined
     this.lockAllowed.set(key, ++this.lockSeq)
-    this.lockGoAhead.set(key, path)
+    this.lockGoAhead.set(key, { path, allowed: true })
     this.sendGoAheads(id, l)
   }
 
   /**
-   * Gives the agent one go-ahead for its allowed files once its turn has ended: a delivery (#649: a control notice for
-   * this launch) the delivery service offers as any line of Hive's is, only while it is free and the user isn't writing
-   * in its terminal (Pause after you type), checked again until Enter, so the user's input is never added to or sent. The
-   * files are allowed again for the turn it starts. Not typed yet, it waits (the user's own prompt, or a wake, went
-   * first; the files stay allowed for it, and the next turn's end gives it again).
+   * Gives the agent one go-ahead for its allowed files (and those whose claim it waited on ended, HI-2386) once its turn
+   * has ended: a delivery (#649: a control notice for this launch) the delivery service offers as any line of Hive's is,
+   * only while it is free and the user isn't writing in its terminal (Pause after you type), checked again until Enter,
+   * so the user's input is never added to or sent. The allowed files are allowed again for the turn it starts. Not typed
+   * yet, it waits (the user's own prompt, or a wake, went first; the files stay allowed for it, and the next turn's end
+   * gives it again).
    */
   private sendGoAheads(id: string, l: LiveSession): void {
     const { projectPath, agentId, runId } = l.state
     const keys = [...this.lockGoAhead.keys()].filter((k) => k.startsWith(`${id}|`))
     if (!keys.length || (l.state.status !== 'ready' && l.state.status !== 'finished') || this.live.get(id) !== l) return
-    const paths = keys.map((k) => this.lockGoAhead.get(k)!)
-    for (const k of keys) this.lockAllowed.set(k, ++this.lockSeq)
+    const given = keys.map((k) => this.lockGoAhead.get(k)!)
+    keys.forEach((k, i) => given[i].allowed && this.lockAllowed.set(k, ++this.lockSeq))
     // This delivery's go-aheads, still wanted: an interrupt, the edit going ahead, or the session ending or moving
-    // (dropGoAheads, editAccepted) cancels it, even part-way.
-    const current = (): boolean => this.live.get(id) === l && keys.every((k, i) => this.lockGoAhead.get(k) === paths[i])
+    // (dropGoAheads, editAccepted) cancels it, even part-way; so does one changed since (claimsEnded).
+    const current = (): boolean => this.live.get(id) === l && keys.every((k, i) => this.lockGoAhead.get(k) === given[i])
     this.delivery()
-      .give(projectPath, { agentId, kind: 'control', from: HIVE_SENDER, body: goAheadPrompt(l.state.cwd, paths), source: 'go-ahead', ref: runId, replace: true, need: 'free', forRun: runId }, {
+      .give(projectPath, { agentId, kind: 'control', from: HIVE_SENDER, body: goAheadPrompt(l.state.cwd, given), source: 'go-ahead', ref: runId, replace: true, need: 'free', forRun: runId }, {
         holds: current,
-        received: () => keys.forEach((k, i) => this.lockGoAhead.get(k) === paths[i] && this.lockGoAhead.delete(k))
+        received: () => keys.forEach((k, i) => this.lockGoAhead.get(k) === given[i] && this.lockGoAhead.delete(k))
       })
       .catch((e: Error) => log.info(`${userText(this.label(l.state))}: go-ahead for a locked edit not given: ${e.message}`))
   }
@@ -5745,28 +5802,26 @@ class SessionManager {
    * Releases an agent's file locks, approvals and questions: all of them, or (`before`, a lockSeq) those from
    * before then, so a turn's end handled late keeps what the next turn has claimed since. A turn's end keeps the
    * questions (HI-2386): the agent blocked by one ends its turn within seconds to wait for the user's answer, and its
-   * notice's Allow stays open for that answer until the user gives it, the edit goes ahead (editAccepted), or the
-   * session ends or moves.
+   * notice's Allow stays open for that answer until the user gives it, the edit goes ahead (editAccepted), the claim
+   * it asked about ends (claimsEnded), or the session ends or moves.
    */
   private releaseLocks(id: string, before = Infinity): void {
-    for (const map of before === Infinity ? [this.lockAllowed, this.lockAsked] : [this.lockAllowed]) {
-      for (const [k, seq] of map) {
-        if (!k.startsWith(`${id}|`) || seq > before) continue
-        map.delete(k)
-        // An ask let go unanswered: its notice's Allow goes (HI-2320).
-        if (map === this.lockAsked) resolveOffer(`lock:${k}#${seq}`, tr(OUTCOME.noLongerAsked))
-      }
-    }
+    for (const [k, seq] of this.lockAllowed) if (k.startsWith(`${id}|`) && seq <= before) this.lockAllowed.delete(k)
+    // An ask let go unanswered (the session ended or moved): its notice's Allow goes (HI-2320).
+    if (before === Infinity) for (const k of [...this.lockAsked.keys()]) if (k.startsWith(`${id}|`)) this.closeAsk(k)
     // A go-ahead waits for the turn's end, so only releasing everything (the session ended or moved) drops it.
     if (before === Infinity) this.dropGoAheads(id)
-    let changed = false
+    const ended = new Map<string, string>()
     for (const [k, v] of this.locks) {
       if (v.liveId === id && v.seq <= before) {
         this.locks.delete(k)
-        changed = true
+        ended.set(k, v.path)
       }
     }
-    if (changed) this.publishLocks(id)
+    if (ended.size) {
+      this.publishLocks(id)
+      this.claimsEnded(id, ended)
+    }
   }
 
   private dropGoAheads(id: string): void {
