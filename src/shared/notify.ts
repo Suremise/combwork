@@ -75,9 +75,13 @@ export function staysUntilHandled(t: Pick<ToastMessage, 'kind' | 'level' | 'reso
   return kind === 'needsYou' && waitingStays && !t.resolved
 }
 
-/** How long a pop-up that closes by itself stays (ms): its own time, else the setting's, longer for an error or live buttons. */
+/**
+ * How long a pop-up that closes by itself stays (ms): its own time, else the setting's, longer for an error or live
+ * buttons. Its own time is for answering it: once resolved (its outcome shown), the setting's (HI-2370: Don't Resume's
+ * outcome stayed the offer's 2 minutes over the window).
+ */
 export function popupMs(t: Pick<ToastMessage, 'level' | 'actions' | 'timeoutMs' | 'resolved'>, seconds: number): number {
-  if (t.timeoutMs) return t.timeoutMs
+  if (t.timeoutMs && !t.resolved) return t.timeoutMs
   const base = Math.max(2, seconds) * 1000
   return t.level === 'error' || (!!t.actions?.length && !t.resolved) ? Math.max(base, LONG_POPUP_MS) : base
 }
