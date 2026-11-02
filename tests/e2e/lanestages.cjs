@@ -105,18 +105,32 @@ const beta = path.join(fx.ws, 'beta')
     // The page's tooltip (the page is another after the restart in Japanese).
     const tips = () => page.locator('.tip')
     const tipText = async () => ((await tips().first().innerText().catch(() => '')) ?? '').replace(/\s+/g, ' ')
-    /** Hovers `target` until its tooltip shows `want` (a tooltip shows after its delay). */
+    const order = () => panel.locator('.progress-lane').evaluateAll((els) => els.map((e) => e.getAttribute('data-lane')))
+    /**
+     * Hovers `target` until its own tooltip shows `want` (a tooltip shows after its delay). A row that moves after the
+     * pointer lands (a lane's row arriving above it: running lanes are newest first) leaves the pointer over another
+     * segment, whose tooltip is rightly that one's (HI-2377): then it hovers the target again where it is now.
+     */
     const hover = async (target, want) => {
-      await page.mouse.move(5, 5)
-      await waitHung(async () => (await tips().count()) === 0)
-      await target.hover()
-      return waitHung(async () => want(await tipText()))
+      let other = null
+      const shown = await waitHung(async () => {
+        await page.mouse.move(5, 5)
+        if (!(await lib.until(async () => (await tips().count()) === 0, 5000))) return false
+        await target.hover()
+        const t = await lib.until(async () => (await tips().count()) > 0 && (await tipText()), 5000)
+        if (t && want(t)) return true
+        if (t && other === null) other = { tip: t, rows: await order() }
+        return false
+      })
+      if (other) console.log(`INFO hovered again: the tooltip first read was another's (${JSON.stringify(other)})`)
+      return shown
     }
-    check('the lane shows in Pulse', !!(await waitHung(async () => (await row(l1).count()) === 1 && /Merging/.test(await label(m.n)))), await panel.innerText())
+    // Both lanes' rows shown before any hover, so neither moves the other's under the pointer (HI-2377).
+    check('the lane shows in Pulse', !!(await waitHung(async () => (await row(l1).count()) === 1 && (await row(l2).count()) === 1 && /Merging/.test(await label(m.n)))), await panel.innerText())
     const cls = async (n) => (await seg(n).getAttribute('class')) ?? ''
     check("segments in their category's colour: Merging and Approved green (passed), Review amber", (await cls(m.n)).includes('passed') && (await cls(a)).includes('passed') && (await cls(r)).includes('review'), JSON.stringify([await cls(m.n), await cls(a), await cls(r)]))
     check('accessible names say the stage: Merging, Approved, Review', /· Merging/.test(await label(m.n)) && /· Approved/.test(await label(a)) && /· Review/.test(await label(r)), JSON.stringify([await label(m.n), await label(a), await label(r)]))
-    check("the Merging segment's hover: Approved | Merging, the card's own (Merging) marked", !!(await hover(seg(m.n), (t) => t.includes('Merging') && t.includes('Approved'))) && (await page.locator('.tip .lane-seg-stage.own').innerText()) === 'Merging' && (await page.locator('.tip .lane-stage-divider').count()) === 1, await tipText())
+    check("the Merging segment's hover: Approved | Merging, the card's own (Merging) marked", !!(await hover(seg(m.n), (t) => t.includes('Merging card') && t.includes('Approved'))) && (await page.locator('.tip .lane-seg-stage.own').innerText()) === 'Merging' && (await page.locator('.tip .lane-stage-divider').count()) === 1, await tipText())
     check("the Approved segment's hover: the divider, Approved its own", !!(await hover(seg(a), (t) => t.includes('Approved card'))) && (await page.locator('.tip .lane-seg-stage.own').innerText()) === 'Approved' && (await page.locator('.tip .lane-seg-stages').count()) === 1, await tipText())
     check("the Review segment's hover: no divider (one stage in its category)", !!(await hover(seg(r), (t) => t.includes('Review card'))) && (await page.locator('.tip .lane-seg-stages').count()) === 0, await tipText())
     const shoot = async (name, show) => {
