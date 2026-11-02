@@ -2,11 +2,12 @@
 // worktree's entry as it adds one and fails on one another add has made but not yet written ("fatal: failed to read
 // .git/worktrees/copy-1/commondir"), so two review copies made at once failed now and then (reviewCopies.test.ts, "two
 // reviews at once"). The queue's rules with changes held open by the test, then git() putting real worktree changes
-// in it; conditions, never time.
-import { realpathSync, symlinkSync } from 'fs'
+// in it; conditions, never time. HI-2349: a git this process can't queue (another Hive, an agent's or the user's own)
+// leaves such an entry for a moment: git() runs the change again once it's written.
+import { existsSync, mkdirSync, realpathSync, rmSync, symlinkSync, writeFileSync } from 'fs'
 import { join } from 'path'
 import { afterEach, describe, expect, it } from 'vitest'
-import { changesWorktrees, git, gitErrorLine, gitTestHooks, oneWorktreeChange, worktreeChangesPending, worktreeQueueKey } from '../src/main/git'
+import { changesWorktrees, git, gitErrorLine, gitTestHooks, halfMadeEntry, oneWorktreeChange, worktreeChangesPending, worktreeQueueKey, worktreeRetry } from '../src/main/git'
 import { tempDir } from './tempDir'
 import { commit, gitRepo, sh } from './workflow/harness'
 
@@ -180,5 +181,104 @@ describe("git's reason for a failure (HI-2322)", () => {
     expect(gitErrorLine('error: pathspec x did not match\nhint: try y')).toBe('error: pathspec x did not match')
     expect(gitErrorLine('something went wrong\nsecond line')).toBe('something went wrong')
     expect(gitErrorLine('')).toBe('')
+  })
+})
+
+describe("another git's half-made entry: the change runs again once it's written (HI-2349)", () => {
+  const defaults = { ...worktreeRetry }
+  afterEach(() => Object.assign(worktreeRetry, defaults))
+
+  /** A repository with a half-made entry in it, as another git's `worktree add` leaves it for a moment: commondir created, empty. */
+  function withHalfEntry(): { repo: string; rev: string; entry: string; dir: string } {
+    const dir = tempDir('worktree-half-')
+    const repo = gitRepo(join(dir, 'project'))
+    const rev = commit(repo, { 'a.ts': 'export const a = 1\n' }, 'first')
+    const entry = join(repo, '.git', 'worktrees', 'other')
+    mkdirSync(entry, { recursive: true })
+    writeFileSync(join(entry, 'gitdir'), `${join(dir, 'other', '.git').replace(/\\/g, '/')}\n`)
+    writeFileSync(join(entry, 'locked'), 'initializing\n')
+    writeFileSync(join(entry, 'commondir'), '')
+    return { repo, rev, entry, dir }
+  }
+
+  /** The worktree commands git ran, and `then` run once after the first of them ends (the other git finishing its entry). */
+  function tries(then: () => void): string[][] {
+    const ran: string[][] = []
+    gitTestHooks.started = (_cwd, args) => changesWorktrees(args) && ran.push([...args])
+    gitTestHooks.ended = (_cwd, args) => changesWorktrees(args) && ran.length === 1 && then()
+    return ran
+  }
+
+  it("names the entry git failed on, as git wrote its path; nothing for any other failure", () => {
+    expect(halfMadeEntry('Preparing worktree (detached HEAD 2c30cd0)\nfatal: failed to read .git/worktrees/copy-1/commondir: No error\n')).toBe('.git/worktrees/copy-1/commondir')
+    expect(halfMadeEntry('fatal: failed to read D:/Work/My Repo/.git/worktrees/slot-a/commondir: No error')).toBe('D:/Work/My Repo/.git/worktrees/slot-a/commondir')
+    expect(halfMadeEntry("fatal: 'D:/x' is a missing but already registered worktree")).toBeNull()
+    expect(halfMadeEntry('fatal: failed to read object 2c30cd0: Invalid argument')).toBeNull()
+  })
+
+  it('it fails on the entry, so git() runs it again once the other git has written it, and the worktree is made', async () => {
+    const h = withHalfEntry()
+    expect(sh(h.repo, 'rev-parse', 'HEAD')).toBe(h.rev)
+    const ran = tries(() => writeFileSync(join(h.entry, 'commondir'), '../..\n'))
+    const folder = join(h.dir, 'copy-1')
+    const r = await git(h.repo, ['worktree', 'add', '--detach', folder, h.rev])
+    expect(r.ok, r.err).toBe(true)
+    expect(ran).toHaveLength(2)
+    expect(sh(folder, 'rev-parse', 'HEAD')).toBe(h.rev)
+  })
+
+  it("an add -b runs again as an add of the branch its first try made, and that branch is the worktree's, at its base", async () => {
+    const h = withHalfEntry()
+    const ran = tries(() => rmSync(h.entry, { recursive: true }))
+    const folder = join(h.dir, 'wt')
+    const r = await git(h.repo, ['worktree', 'add', '-b', 'hive/feature', folder, h.rev])
+    expect(r.ok, r.err).toBe(true)
+    expect(ran).toEqual([['worktree', 'add', '-b', 'hive/feature', folder, h.rev], ['worktree', 'add', folder, 'hive/feature']])
+    expect(sh(folder, 'symbolic-ref', 'HEAD')).toBe('refs/heads/hive/feature')
+    expect(sh(folder, 'rev-parse', 'HEAD')).toBe(h.rev)
+  })
+
+  it('a remove too: it changed nothing on its first try, and removes the worktree on its second', async () => {
+    const h = withHalfEntry()
+    const folder = join(h.dir, 'gone')
+    writeFileSync(join(h.entry, 'commondir'), '../..\n')
+    sh(h.repo, 'worktree', 'add', '-q', '--detach', folder)
+    writeFileSync(join(h.entry, 'commondir'), '')
+    const ran = tries(() => rmSync(h.entry, { recursive: true }))
+    const r = await git(h.repo, ['worktree', 'remove', folder])
+    expect(r.ok, r.err).toBe(true)
+    expect(ran).toHaveLength(2)
+    expect(existsSync(folder)).toBe(false)
+  })
+
+  it("an entry still empty after the wait (a crashed git's) isn't waited for again: git's failure is the answer", async () => {
+    const h = withHalfEntry()
+    worktreeRetry.waitMs = 50
+    const ran = tries(() => undefined)
+    const r = await git(h.repo, ['worktree', 'add', '--detach', join(h.dir, 'copy-1'), h.rev])
+    expect(r.ok).toBe(false)
+    expect(gitErrorLine(r.err)).toMatch(/^fatal: failed to read .*worktrees[\\/]other[\\/]commondir/)
+    expect(ran).toHaveLength(1)
+    expect(worktreeChangesPending()).toBe(0)
+  })
+
+  it('at most worktreeRetry.times more tries, however many half-made entries come', async () => {
+    const h = withHalfEntry()
+    worktreeRetry.times = 2
+    // Each try meets a new half-made entry, which the other git then writes.
+    const ran: string[][] = []
+    gitTestHooks.started = (_cwd, args) => changesWorktrees(args) && ran.push([...args])
+    gitTestHooks.ended = (_cwd, args) => {
+      if (!changesWorktrees(args)) return
+      writeFileSync(join(h.entry, 'commondir'), '../..\n')
+      const next = join(h.repo, '.git', 'worktrees', `other-${ran.length}`)
+      mkdirSync(next, { recursive: true })
+      writeFileSync(join(next, 'gitdir'), `${join(h.dir, `other-${ran.length}`, '.git').replace(/\\/g, '/')}\n`)
+      writeFileSync(join(next, 'commondir'), '')
+      h.entry = next
+    }
+    const r = await git(h.repo, ['worktree', 'add', '--detach', join(h.dir, 'copy-1'), h.rev])
+    expect(r.ok).toBe(false)
+    expect(ran).toHaveLength(3)
   })
 })
