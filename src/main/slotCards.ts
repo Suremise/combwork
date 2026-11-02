@@ -1631,6 +1631,15 @@ async function startWaitingLanes(ws: WorkspaceService, projectPath: string, pool
     if (stopped()) return
     let lease = pool.leaseOf({ lane: lane.id })
     if (!lease) {
+      // Its cards still to do all no-code by now (HI-2338): it takes no slot, and its agents start where they are.
+      const { noCodeOnly, startWaitingLane } = await import('./laneStart')
+      if (noCodeOnly(ws, lane.cards)) {
+        if (stopped() || teamPauseOf(ws)) return
+        const started = await startWaitingLane(ws, projectPath, lane.id, null, () => stopped() || !!teamPauseOf(ws)).catch((e) => (failedStep(`starting lane ${lane.id} with no slot`, e), false)) // i18n-ignore: a log line (failedStep logs it)
+        if (started && !stopped()) await setLaneSlotWait(ws, lane.id, null)
+        continue
+      }
+      if (stopped()) return
       // The builder's own slot first (#1441), checked against the default branch (the lane's target isn't known here).
       const own = await carriedToHand(ws, projectPath, pool, lane.builder.id, null)
       if (stopped()) return

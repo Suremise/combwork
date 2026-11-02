@@ -20,6 +20,7 @@ import type { WorkspaceService } from './workspace'
 import type { AgentDef, ProjectConfig } from '../shared/types'
 import { reviewerModeOf, type WorkflowOptions } from '../shared/workflow/options'
 import { teamPauseOf } from './teamPause'
+import { openCardsNoCode } from './workflow/cardWork'
 
 const log = createLogger('lanes')
 
@@ -97,7 +98,7 @@ export async function startLaneFromWindow(ws: WorkspaceService, projectPath: str
   starting.add(key)
   try {
     const recorded = await startLane(ws, { project, builder: builder.id, reviewer: reviewer?.id ?? null, ...(pool ? { pool: true } : {}), cards: cards.map((c) => c.number), name: req.name?.trim() || null, by: 'the user', ...(req.applyNow ? { applyNow: true } : {}) }) // i18n-ignore: who started it, as the lane records it (agents read it)
-    const where = await builderWhere(projectPath, builder, options)
+    const where = await builderWhere(projectPath, builder, options, noCodeOnly(ws, cards.map((c) => c.number)))
     if (where.inSlots) {
       // Its slot, lent before its agents start and kept for the whole lane (§16.10.2). None free: the lane is recorded
       // with its wait (kept with the lane, through a restart) and shows "waiting for a slot"; its agents start once a
@@ -120,11 +121,27 @@ export async function startLaneFromWindow(ws: WorkspaceService, projectPath: str
 
 /**
  * Where a lane's builder works (#1438): a slot of the lane's (G11 = slots, a builder whose 0.9 worktree isn't its
- * folder any more, #1434's legacyWorktree), else its 0.9 worktree or the project folder, as before.
+ * folder any more, #1434's legacyWorktree), else its 0.9 worktree or the project folder, as before. A lane of only
+ * no-code cards (`noCode`, HI-2338) is lent no slot as it starts: its agents start where they are.
  */
-async function builderWhere(projectPath: string, builder: AgentDef, options: WorkflowOptions | null): Promise<{ inSlots: boolean; legacy: { path: string; branch: string } | null }> {
+async function builderWhere(projectPath: string, builder: AgentDef, options: WorkflowOptions | null, noCode: boolean): Promise<{ inSlots: boolean; legacy: { path: string; branch: string } | null }> {
   const legacy = (await slotsMigrated(projectPath, builder.id)) ? null : legacyWorktree(builder)
-  return { inSlots: options?.folder === 'slots' && buildsWork(agentWorkflowRole(builder)) && !legacy, legacy: legacy ? { path: legacy.path, branch: legacy.branch } : null }
+  return { inSlots: options?.folder === 'slots' && buildsWork(agentWorkflowRole(builder)) && !legacy && !noCode, legacy: legacy ? { path: legacy.path, branch: legacy.branch } : null }
+}
+
+/**
+ * A lane whose cards still to do are all no-code (HI-2338, Darren's decision): none of them changes anything, so the
+ * lane takes no slot as it starts and its agents start where they are (the project folder by default). A code card
+ * coming up later in it (added, or made code) is lent the lane's slot as it starts (slotCards' leaseForStart), as a lane
+ * an agent registers is at its first card. False with no card to do, or on a board with no kinds (waiting for its 1.0
+ * upgrade): the lane is lent its slot as before. Read at once (no await), so it is decided where the slot always was.
+ */
+export function noCodeOnly(ws: WorkspaceService, cards: readonly number[]): boolean {
+  try {
+    return openCardsNoCode(ws, cards)
+  } catch {
+    return false
+  }
 }
 
 /**
@@ -343,7 +360,8 @@ export async function launchRecordedLane(ws: WorkspaceService, projectPath: stri
   const who = { builder: builder.name, firstCardByHive: workflowEnforced() }
   const platform = ws.info()?.projects.find((p) => p.path.toLowerCase() === projectPath.toLowerCase())?.platform?.id
   const options = workflowEnforced() && platform ? resolvedOf(ws, projectPath, platform, cfg).options : null
-  const where = await builderWhere(projectPath, builder, options)
+  // Its cards all no-code (HI-2338): no slot.
+  const where = await builderWhere(projectPath, builder, options, noCodeOnly(ws, lane.cards))
   // Running now: left out of this start whatever they do meanwhile (its slot is decided from it), and named to the caller.
   const left = [builder, reviewer].filter((a): a is AgentDef => !!a && !!sessions.liveFor(projectPath, a.id))
   // An idle builder outside slots (HI-2232, Darren's decision (a)): given the lane in a new conversation, as Start Lane…
@@ -413,14 +431,15 @@ export function recordedLaneNote(l: RecordedLaneLaunch | null): string {
 }
 
 /**
- * A lane started from the window that waited for a slot, now lent `slot` (#1438, slotCards' pass): its agents started,
+ * A lane started from the window that waited for a slot, now lent `slot` (#1438, slotCards' pass), or null for one whose
+ * cards still to do are all no-code by now (HI-2338: it takes none, its agents start where they are): its agents started,
  * each once, as Start Lane… would have, from the lane as it is now (its builder and reviewer, still the project's
  * agents and the builder still one; its cards; the rules now; the note it was started with). Whether they all started
  * (false: the lane keeps waiting to be started; not running any more: nothing is started, and it is done with).
  * `over` (Hive quitting, #1628), looked at after each await and at each agent's launch: from then on nothing is read
  * or started, and it is false, the lane left waiting (with its slot lent) for the next start's pass.
  */
-export async function startWaitingLane(ws: WorkspaceService, projectPath: string, laneId: string, slot: string, over: () => boolean = () => false): Promise<boolean> {
+export async function startWaitingLane(ws: WorkspaceService, projectPath: string, laneId: string, slot: string | null, over: () => boolean = () => false): Promise<boolean> {
   if (over()) return false
   const lane = (await rawLanes(ws)).find((l) => l.id === laneId)
   if (over()) return false
@@ -439,7 +458,7 @@ export async function startWaitingLane(ws: WorkspaceService, projectPath: string
   const brief = briefFor(lane.rounds, basename(projectPath), cards, builder, reviewer, pooled, options, { legacy: null }, slot, lane.slotWait?.note ?? '')
   const started = await launchAgents(ws, projectPath, laneId, builder, reviewer, brief, over, lane.slotWait?.stoppedOnly === true ? { left: new Set() } : undefined, undefined, lane.slotWait?.note ?? '')
   if (over()) return false
-  log.info(`Lane ${laneId} got ${userText(slot)}: ${started.map((s) => `${userText(s.name)} ${s.how}`).join(', ')}`)
+  log.info(`Lane ${laneId} got ${slot ? userText(slot) : 'no slot (only no-code cards)'}: ${started.map((s) => `${userText(s.name)} ${s.how}`).join(', ')}`)
   return started.every((s) => s.how !== 'failed')
 }
 
@@ -502,7 +521,7 @@ export async function launchFresh(ws: WorkspaceService, projectPath: string, lan
   const platform = ws.info()?.projects.find((p) => p.path.toLowerCase() === projectPath.toLowerCase())?.platform?.id
   const options = workflowEnforced() && platform ? resolvedOf(ws, projectPath, platform, cfg).options : null
   const pooled = lane.pool ? (poolOf(cfg, options)?.filter((a) => a.id !== builder.id).map((a) => a.name) ?? []) : null
-  const where = await builderWhere(projectPath, builder, options)
+  const where = await builderWhere(projectPath, builder, options, noCodeOnly(ws, lane.cards))
   const slot = (await listLanes(ws)).find((l) => l.id === laneId)?.slot ?? null
   // The note it was owed with (HR1 on HI-2034: the user's Start Lane note, kept through its wait, a restart and a retry).
   const brief = briefFor(lane.rounds, basename(projectPath), cards, builder, reviewer, pooled, options, where, slot, entry.note ?? lane.slotWait?.note ?? '')
