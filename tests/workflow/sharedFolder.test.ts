@@ -87,6 +87,41 @@ describe('workflow scenarios, several agents in one folder', () => {
     expect(e.wf.state(b).latest).toMatchObject({ revision: b1, commits: [b1] })
   })
 
+  it("HI-2382: a branch merged into the folder's line → its commits, with a trailer or without, stay off the folder's cards; the merge commit is attributed like any of the line's", async () => {
+    const e = (env = setup({ ...preset('git', 'pair'), finish: 'committed', folder: 'project', slotsUpToDate: false, preChecks: [], mergeChecks: [], target: '' }))
+    const [a, b, other] = ['A', 'B', 'Merged elsewhere'].map((t) => e.wf.createCard({ title: t }))
+    moved(await e.wf.start(a.key, B1))
+    // A branch of the line: one commit names another card, one names none.
+    sh(e.project, 'checkout', '-q', '-b', 'side')
+    const x1 = commit(e.project, { 'x1.txt': 'x\n' }, 'x1', { trailer: other.key })
+    const x2 = commit(e.project, { 'x2.txt': 'x\n' }, 'x2')
+    sh(e.project, 'checkout', '-q', 'main')
+    const own = commit(e.project, { 'a.txt': 'a\n' }, 'a', { trailer: a.key })
+    // The merge has no trailer: A, the folder's only unfinished card, made it.
+    sh(e.project, 'merge', '-q', '--no-ff', '-m', 'merge side', 'side')
+    const merge1 = sh(e.project, 'rev-parse', 'HEAD')
+    await attributeFolder(e.wf)
+    const rows = () => e.store.folderCommits(e.project).map((r) => ({ sha: r.sha, card: r.card, how: r.how }))
+    expect(rows()).toEqual([
+      { sha: own, card: a.id, how: 'trailer' },
+      { sha: merge1, card: a.id, how: 'onlyCard' }
+    ])
+    expect(e.kinds(other.id)).not.toContain('CommitAttributed')
+    // With two cards unfinished, a merge of another branch takes its trailer; its branch's commit is still nobody's here.
+    moved(await e.wf.start(b.key, B2))
+    sh(e.project, 'checkout', '-q', '-b', 'side2')
+    const y1 = commit(e.project, { 'y1.txt': 'y\n' }, 'y1')
+    sh(e.project, 'checkout', '-q', 'main')
+    sh(e.project, 'merge', '-q', '--no-ff', '-m', 'merge side2', '-m', `Hive-Card: ${b.key}`, 'side2')
+    const merge2 = sh(e.project, 'rev-parse', 'HEAD')
+    await attributeFolder(e.wf)
+    expect(rows().slice(2)).toEqual([{ sha: merge2, card: b.id, how: 'trailer' }])
+    for (const x of [x1, x2, y1]) expect(rows().some((r) => r.sha === x)).toBe(false)
+    // A's change is its own commit and the merge it made.
+    moved(await e.wf.submit(a.key, B1, { summary: 'A' }))
+    expect(e.wf.state(a).latest).toMatchObject({ revision: merge1, commits: [own, merge1] })
+  })
+
   it('S31: check runs: a file edited and restored, HEAD moved and back → uncounted with why; a wrong --revision refused at start', async () => {
     const e = (env = setup({ ...preset('git', 'pair'), preChecks: ['unit'], mergeChecks: [], commands: { unit: 'npm test' } }))
     const card = e.wf.createCard({ title: 'Checked' })
