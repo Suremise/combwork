@@ -5671,6 +5671,15 @@ class SessionManager {
   private editAccepted<T>(id: string, files: string[], reply: T, keys?: ReadonlyMap<string, string>): T {
     // None waiting (nearly always): no file's identity to resolve.
     if (this.lockGoAhead.size) for (const abs of files) this.lockGoAhead.delete(`${id}|${keys?.get(abs) ?? lockKey(abs)}`)
+    // Nor an answer to an ask still open for them (HI-2386: kept past its turn's end): its notice's Allow goes.
+    if (this.lockAsked.size)
+      for (const abs of files) {
+        const key = `${id}|${keys?.get(abs) ?? lockKey(abs)}`
+        const seq = this.lockAsked.get(key)
+        if (seq === undefined) continue
+        this.lockAsked.delete(key)
+        resolveOffer(`lock:${key}#${seq}`, tr(OUTCOME.noLongerAsked))
+      }
     return reply
   }
 
@@ -5690,11 +5699,17 @@ class SessionManager {
     const asked = this.lockAsked.get(key)
     const current = asked === undefined ? null : `lock:${key}#${asked}`
     if (!current || this.lockAllowed.has(key) || (offer !== undefined && offer !== current)) {
+      // i18n-ignore: the log (English)
+      log.info(`Lock: Allow for ${userText(this.label(l.state))} → ${userText(basename(path))} answered nothing (${!current ? 'no open ask' : this.lockAllowed.has(key) ? 'already allowed' : 'an older notice'})`)
       if (offer !== undefined) resolveOffer(offer, tr(OUTCOME.noLongerAsked))
       else resolveOffers((o) => o.startsWith(`lock:${key}#`), tr(OUTCOME.noLongerAsked))
       return
     }
     resolveOffer(current, tr(OUTCOME.allowed))
+    log.info(`Lock: ${userText(this.label(l.state))} allowed to edit ${userText(basename(path))} (${l.state.status})`)
+    // Answered: no longer open (HI-2386: asks outlive the turn's end, so a later block asks again rather than waiting on
+    // this one).
+    this.lockAsked.delete(key)
     // The user's answer ends the block it asked about (HI-982).
     if (l.hookBlock && `${id}|${l.hookBlock.key}` === key) l.hookBlock = undefined
     this.lockAllowed.set(key, ++this.lockSeq)
@@ -5728,10 +5743,13 @@ class SessionManager {
 
   /**
    * Releases an agent's file locks, approvals and questions: all of them, or (`before`, a lockSeq) those from
-   * before then, so a turn's end handled late keeps what the next turn has claimed since.
+   * before then, so a turn's end handled late keeps what the next turn has claimed since. A turn's end keeps the
+   * questions (HI-2386): the agent blocked by one ends its turn within seconds to wait for the user's answer, and its
+   * notice's Allow stays open for that answer until the user gives it, the edit goes ahead (editAccepted), or the
+   * session ends or moves.
    */
   private releaseLocks(id: string, before = Infinity): void {
-    for (const map of [this.lockAllowed, this.lockAsked]) {
+    for (const map of before === Infinity ? [this.lockAllowed, this.lockAsked] : [this.lockAllowed]) {
       for (const [k, seq] of map) {
         if (!k.startsWith(`${id}|`) || seq > before) continue
         map.delete(k)

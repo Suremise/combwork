@@ -933,7 +933,7 @@
   },
   "main.outcome.noLongerAsked": {
     "defaultMessage": "No longer asked",
-    "description": "What the notice that an agent wants to edit a locked file says once the agent no longer asks (its turn ended, or it was allowed elsewhere; HI-2320), in place of its Allow button."
+    "description": "What the notice that an agent wants to edit a locked file says once the agent no longer asks (its edit went ahead, its session ended, or it was allowed elsewhere; HI-2320, HI-2386), in place of its Allow button."
   },
   "main.outcome.noLongerHeld": {
     "defaultMessage": "No longer held",

@@ -152,13 +152,14 @@ const post = (url, token, body) =>
     }
     await page.screenshot({ path: path.join(scratch, 'cxe-3-lock-ask.png') })
     check('the locked edit is held back', !/from agent 1/.test(notes()), `${w?.status}`)
-    check('Hive asks with an Allow button', (await asking.getByRole('button', { name: 'Allow' }).count()) > 0)
+    // Exactly Allow (HI-2386): the entry's own text is a button too (it opens the agent), and says "Allow Codex to edit it too?".
+    check('Hive asks with an Allow button', (await asking.getByRole('button', { name: 'Allow', exact: true }).count()) > 0)
   })
   const notes0 = notes()
   // Allow as soon as Hive asks, as a user does: usually while Codex is still replying to the refusal, so Hive's
   // go-ahead waits for that turn's end (#201); after it, the go-ahead goes at once.
   console.log(`Allow clicked while agent 1 is ${(await live(a1.id))?.status}`)
-  await asking.getByRole('button', { name: 'Allow' }).first().click().catch(() => undefined)
+  await asking.getByRole('button', { name: 'Allow', exact: true }).first().click().catch(() => undefined)
   // The edit is Codex's retry. Waiting for the edit itself: a working-then-finished wait could see the blocked turn's end.
   await lib.cliStep('the edit after Allow', { session: key1 }, async () => {
     const edited = await lib.until(async () => /from agent 1/.test(notes()), 180000, 1000)

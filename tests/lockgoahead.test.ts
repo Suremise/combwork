@@ -154,6 +154,52 @@ describe('Allow on an "Ask me" lock', () => {
     await vi.waitFor(async () => expect(await a.goAhead()).toBe(true), { timeout: HUNG_MS })
   })
 
+  it('clicked after the blocked turn ended by its Stop (HI-2386): the ask outlived it, the go-ahead is typed, and the next turn may edit', async () => {
+    const a = agents()
+    await a.claim()
+    expect(await a.edit()).not.toBeNull()
+    // The agent stops to wait for the answer, as Codex does within seconds: its turn's end keeps the ask open.
+    await a.hook('Stop')
+    expect(a.editor.status).toBe('finished')
+    await a.allow()
+    await vi.waitFor(async () => expect(await a.goAhead()).toBe(true), { timeout: HUNG_MS })
+    a.editor.status = 'working'
+    expect(await a.edit()).toBeNull()
+  })
+
+  it('an ask answered after its turn ended is closed: a later block asks again (a new notice) rather than waiting on it', async () => {
+    const a = agents()
+    await a.claim()
+    expect(await a.edit()).not.toBeNull()
+    await a.hook('Stop')
+    await a.allow()
+    await vi.waitFor(async () => expect(await a.goAhead()).toBe(true), { timeout: HUNG_MS })
+    const asked = (sessions as unknown as { lockAsked: Map<string, number> }).lockAsked
+    const mine = () => [...asked.keys()].filter((k) => k.startsWith(`${p.toLowerCase()}#${a.editor.agentId}|`))
+    expect(mine()).toEqual([])
+    // The allowed edit goes ahead; the turn the go-ahead started ends, and the holder claims the file again: the next try
+    // asks again.
+    a.editor.status = 'working'
+    expect(await a.edit()).toBeNull()
+    await a.hook('Stop')
+    await a.claim()
+    a.editor.status = 'working'
+    expect(await a.edit()).not.toBeNull()
+    expect(mine().length).toBe(1)
+  })
+
+  it('an ask its turn left open, then the edit went ahead on its own (the holder finished): the ask is closed', async () => {
+    const a = agents()
+    await a.claim()
+    expect(await a.edit()).not.toBeNull()
+    await a.hook('Stop')
+    await a.holderHook('Stop')
+    a.editor.status = 'working'
+    expect(await a.edit()).toBeNull()
+    const asked = (sessions as unknown as { lockAsked: Map<string, number> }).lockAsked
+    expect([...asked.keys()].some((k) => k.startsWith(`${p.toLowerCase()}#${a.editor.agentId}|`))).toBe(false)
+  })
+
   it('clicked while the blocked agent is still in its turn: nothing is typed then; at its end, the go-ahead, and the edit is allowed', async () => {
     const a = agents()
     await a.claim()
