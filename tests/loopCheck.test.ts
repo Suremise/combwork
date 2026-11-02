@@ -1,7 +1,7 @@
 // An agent in a card loop that ends its turn with no card watch (#376): which of its cards are still in play, and what a
 // stalled card says. (The e2e loopwatch suite runs it on fake Claude Code agents: the grace, the flag, the notice.)
 import { describe, expect, it } from 'vitest'
-import { cardsInPlay, owedCards, unwatched } from '../src/main/loopCheck'
+import { cardsInPlay, othersCards, owedCards, unwatched } from '../src/main/loopCheck'
 import { providerDescriptor } from '../src/shared/providers'
 import { backgroundTaskMinutes, builderJobOf, laneOrderWait, laneOrderWaitReason, LOOP_STEP_STALL_GRACE_MS, loopStepWait, loopStepWaitReason, notWatchingAgent, pendingDesign, pendingStep, notWatchingReason, REVIEW_WAIT_STALL_MS, reviewVerdictWaitReason, reviewWaitReason } from '../src/shared/tasks'
 import type { TaskCard } from '../src/shared/types'
@@ -56,6 +56,38 @@ describe('cards in play for a loop agent (#376)', () => {
     expect(unwatched({ provider: 'codex', status: 'finished', backgroundTasks: 1 })).toBe(true)
     expect(unwatched({ provider: 'claude-code', status: 'watching', watch: { cards: [1], changes: ['column'], label: '', since: '', limitAt: '' } })).toBe(false)
     expect(unwatched(null)).toBe(false)
+  })
+})
+
+describe("another's card isn't the watcher's loop: a card's stall is its own builder's and reviewer's (HI-2381)", () => {
+  // CB2's next card 10 waits on CB1's card 8 (in Doing, CR1 reviewing its design); CB2 watched both.
+  const board = [card(8, { column: 'doing', agent: 'cb1' }), card(10, { column: 'todo', blockedBy: [8] }), card(12, { column: 'doing', agent: 'cb1' })]
+  const none = (): null => null
+  const cr1 = (n: number): string | null => (n === 8 ? 'cr1' : null)
+  it("drops another builder's card with another reviewer, whatever else the watch names", () => {
+    expect(othersCards(board, 'cb2', [8, 10], cr1)).toEqual([8])
+    // The blocker alone, or its dependent card taken out of the watch (HR1, round 1): still CB1's and CR1's.
+    expect(othersCards(board, 'cb2', [8], cr1)).toEqual([8])
+    // The review on it names its reviewer too (a pool card in Review, say).
+    expect(othersCards([card(8, { column: 'review', agent: 'cb1', review: { agent: 'cr1' } as never })], 'cb2', [8], none)).toEqual([8])
+  })
+  it('with no reviewer known, drops it too: only its builder and reviewer owe it (the Assistant, after HR1 round 2)', () => {
+    // The blocker alone in a lane whose reviewer was removed (HR1's case), with or without its dependent card.
+    expect(othersCards(board, 'cb2', [8], none)).toEqual([8])
+    expect(othersCards(board, 'cb2', [8, 10], none)).toEqual([8])
+    // A card nothing watched waits on, and one with no builder: the same.
+    expect(othersCards(board, 'cb2', [12], none)).toEqual([12])
+    expect(othersCards([card(9, { column: 'review' })], 'cb2', [9], none)).toEqual([9])
+  })
+  it('keeps its own builder and reviewer in the loop, and cards out of play', () => {
+    expect(othersCards(board, 'cb1', [8, 10], cr1)).toEqual([])
+    expect(othersCards(board, 'cr1', [8, 10], cr1)).toEqual([])
+    expect(othersCards([card(8, { column: 'review', agent: 'cb1', review: { agent: 'cr1' } as never }), card(10, { blockedBy: [8] })], 'cr1', [8, 10], none)).toEqual([])
+    expect(othersCards([card(8, { column: 'passed', agent: 'cb1' })], 'cb2', [8], cr1)).toEqual([])
+    // Not watched: not its to drop.
+    expect(othersCards(board, 'cb2', [10], cr1)).toEqual([])
+    // Without the drop, card 8 was owed by CB2, and stalled with its name on it.
+    expect(owedCards(board, 'alpha', 'cb2', [8, 10], { wakes: true, reviewerOf: () => 'cr1' })).toEqual([8])
   })
 })
 

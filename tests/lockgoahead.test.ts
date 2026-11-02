@@ -97,6 +97,10 @@ function agents() {
    * id; the agent reads what it says with hive_inbox).
    */
   const goAhead = async () => typed().join('').includes('New in your inbox: 1 notice') && typed().at(-1) === '\r' && (await deliveries.deliveriesOf(p, editor.agentId)).some((r) => r.state === 'offered' && r.body.includes(`allowed you to edit ${file}`))
+  /** Its go-ahead once the claim it waited on ended unanswered (HI-2386): try again, nothing allowed. */
+  const freed = async () => typed().at(-1) === '\r' && (await deliveries.deliveriesOf(p, editor.agentId)).some((r) => r.state === 'offered' && r.body.includes(`has finished with ${file}`) && !r.body.includes('allowed you'))
+  const asked = () => (sessions as unknown as { lockAsked: Map<string, number> }).lockAsked
+  const editorKey = `${p.toLowerCase()}#${editor.agentId}|`
   return {
     file,
     second,
@@ -110,7 +114,14 @@ function agents() {
     edit: (...files: string[]) => editBy(editor, ...(files.length ? files : [file])),
     hook: (event: string) => hookOf(editor, event),
     holderHook: (event: string) => hookOf(holder, event),
-    allow: () => run(() => sessions.allowLockedEdit(p, editor.agentId, join(p, file))),
+    allow: (offer?: string) => run(() => sessions.allowLockedEdit(p, editor.agentId, join(p, file), offer)),
+    /** The offer of editor's open ask (its notice's Allow), or null. */
+    offer: () => {
+      const k = [...asked().keys()].find((x) => x.startsWith(editorKey))
+      return k ? `lock:${k}#${asked().get(k)}` : null
+    },
+    /** other edits the file (claiming it once the holder has let it go). */
+    otherEdits: () => editBy(other, file),
     /** The user typing in editor's terminal. */
     userTypes: (text: string) => sessions.noteUserInput(s.key(p, editor.agentId), text),
     /**
@@ -123,7 +134,10 @@ function agents() {
       for (let i = 0; i < 3 && !(await goAhead()); i++) await deliveries.offerNow(p, editor.agentId)
     },
     typed,
-    goAhead
+    goAhead,
+    freed,
+    other,
+    editBy
   }
 }
 
@@ -152,6 +166,157 @@ describe('Allow on an "Ask me" lock', () => {
     a.editor.status = 'finished'
     await a.allow()
     await vi.waitFor(async () => expect(await a.goAhead()).toBe(true), { timeout: HUNG_MS })
+  })
+
+  it('clicked after the blocked turn ended by its Stop (HI-2386): the ask outlived it, the go-ahead is typed, and the next turn may edit', async () => {
+    const a = agents()
+    await a.claim()
+    expect(await a.edit()).not.toBeNull()
+    // The agent stops to wait for the answer, as Codex does within seconds: its turn's end keeps the ask open.
+    await a.hook('Stop')
+    expect(a.editor.status).toBe('finished')
+    await a.allow()
+    await vi.waitFor(async () => expect(await a.goAhead()).toBe(true), { timeout: HUNG_MS })
+    a.editor.status = 'working'
+    expect(await a.edit()).toBeNull()
+  })
+
+  it('an ask answered after its turn ended is closed: a later block asks again (a new notice) rather than waiting on it', async () => {
+    const a = agents()
+    await a.claim()
+    expect(await a.edit()).not.toBeNull()
+    await a.hook('Stop')
+    await a.allow()
+    await vi.waitFor(async () => expect(await a.goAhead()).toBe(true), { timeout: HUNG_MS })
+    const asked = (sessions as unknown as { lockAsked: Map<string, number> }).lockAsked
+    const mine = () => [...asked.keys()].filter((k) => k.startsWith(`${p.toLowerCase()}#${a.editor.agentId}|`))
+    expect(mine()).toEqual([])
+    // The allowed edit goes ahead; the turn the go-ahead started ends, and the holder claims the file again: the next try
+    // asks again.
+    a.editor.status = 'working'
+    expect(await a.edit()).toBeNull()
+    await a.hook('Stop')
+    await a.claim()
+    a.editor.status = 'working'
+    expect(await a.edit()).not.toBeNull()
+    expect(mine().length).toBe(1)
+  })
+
+  it('an ask its turn left open, then the edit went ahead on its own (the holder finished): the ask is closed', async () => {
+    const a = agents()
+    await a.claim()
+    expect(await a.edit()).not.toBeNull()
+    await a.hook('Stop')
+    await a.holderHook('Stop')
+    a.editor.status = 'working'
+    expect(await a.edit()).toBeNull()
+    const asked = (sessions as unknown as { lockAsked: Map<string, number> }).lockAsked
+    expect([...asked.keys()].some((k) => k.startsWith(`${p.toLowerCase()}#${a.editor.agentId}|`))).toBe(false)
+  })
+
+  it("the holder lets the file go before the user answers (HR1's round 1): the ask goes, the agent is told to try again, and the old notice's Allow lets nothing through a new holder's claim", async () => {
+    const a = agents()
+    await a.claim()
+    expect(await a.edit()).not.toBeNull()
+    await a.hook('Stop')
+    const old = a.offer()
+    expect(old).not.toBeNull()
+    // The holder finishes: its claim ends, and with it the question about it. The waiting agent is told it may try again.
+    await a.holderHook('Stop')
+    expect(a.offer()).toBeNull()
+    await vi.waitFor(async () => expect(await a.freed()).toBe(true), { timeout: HUNG_MS })
+    // A third agent claims the file before the retry. The old notice's Allow, pressed now, answers nothing.
+    expect(await a.otherEdits()).toBeNull()
+    await a.allow(old!)
+    await a.allow()
+    a.editor.status = 'working'
+    // The retry is refused for the new holder's claim, and asks the user about that one: a new question, its own notice.
+    const refused = JSON.stringify(await a.edit())
+    expect(refused).toContain('Hive has asked the user')
+    expect(a.offer()).not.toBeNull()
+    expect(a.offer()).not.toBe(old)
+  })
+
+  it("an allowed agent's edit takes the claim over (HR1's round 2): another agent's ask about the old holder goes, it is told to try again, and its old Allow lets nothing through the new holder's claim", async () => {
+    const a = agents()
+    await a.claim()
+    // B (editor) and C (other) both ask about the holder's claim; each ends its turn to wait.
+    expect(await a.edit()).not.toBeNull()
+    expect(await a.editBy(a.other, a.file)).not.toBeNull()
+    await a.hook('Stop')
+    await run(() => sessions.handleHook(a.other.runId, { hook_event_name: 'Stop', session_id: a.other.sessionId, cwd: p }))
+    const otherKey = `${p.toLowerCase()}#${a.other.agentId}|`
+    const askOf = () => [...(sessions as unknown as { lockAsked: Map<string, number> }).lockAsked].find(([k]) => k.startsWith(otherKey))
+    const old = askOf()
+    expect(old).toBeDefined()
+    // B is allowed and edits in the turn the go-ahead starts: the claim is B's now.
+    await a.allow()
+    await vi.waitFor(async () => expect(await a.goAhead()).toBe(true), { timeout: HUNG_MS })
+    a.editor.status = 'working'
+    expect(await a.edit()).toBeNull()
+    // C's question was about the old holder: it goes, and C is told the file is free to try again (allowing nothing).
+    expect(askOf()).toBeUndefined()
+    await vi.waitFor(async () => expect((await deliveries.deliveriesOf(p, a.other.agentId)).some((r) => r.body.includes(`has finished with ${a.file}`) && !r.body.includes('allowed you'))).toBe(true), { timeout: HUNG_MS })
+    // Its old notice's Allow answers nothing, and C's retry asks about B's claim: a new question.
+    await run(() => sessions.allowLockedEdit(p, a.other.agentId, join(p, a.file), `lock:${old![0]}#${old![1]}`))
+    a.other.status = 'working'
+    expect(JSON.stringify(await a.editBy(a.other, a.file))).toContain('Hive has asked the user')
+    expect(askOf()?.[1]).not.toBe(old![1])
+  })
+
+  it("A → B → C → B within running turns (HR1's round 3): B's Allow against A doesn't count against C's claim, and B's Allow for C's claim is answered", async () => {
+    const a = agents()
+    await a.claim()
+    const otherKey = `${p.toLowerCase()}#${a.other.agentId}|`
+    const askOf = () => [...(sessions as unknown as { lockAsked: Map<string, number> }).lockAsked].find(([k]) => k.startsWith(otherKey))
+    // B (editor) is allowed against A's claim and takes it over, in its turn.
+    expect(await a.edit()).not.toBeNull()
+    await a.allow()
+    expect(await a.edit()).toBeNull()
+    // C (other) asks about B's claim, is allowed, and takes it over, in its turn.
+    expect(await a.editBy(a.other, a.file)).not.toBeNull()
+    const c = askOf()!
+    await run(() => sessions.allowLockedEdit(p, a.other.agentId, join(p, a.file), `lock:${c[0]}#${c[1]}`))
+    expect(await a.editBy(a.other, a.file)).toBeNull()
+    // B, still in its turn, edits again: refused for C's claim, and asked about anew.
+    expect(JSON.stringify(await a.edit())).toContain('Hive has asked the user')
+    const fresh = a.offer()
+    expect(fresh).not.toBeNull()
+    // Its Allow is answered (not refused as "already allowed" by the Allow it had against A): its retry goes ahead.
+    await a.allow(fresh!)
+    expect(await a.edit()).toBeNull()
+  })
+
+  it("a claim that expired is taken over by a third agent's edit: the ask about it goes, the agent is told to try again, its old Allow answers nothing, and the retry asks about the new claim", async () => {
+    const a = agents()
+    await a.claim()
+    expect(await a.edit()).not.toBeNull()
+    await a.hook('Stop')
+    const old = a.offer()!
+    // The holder stalls past the lock's time limit (15 min): its claim no longer holds anyone back.
+    const locks = (sessions as unknown as { locks: Map<string, { path: string; at: number }> }).locks
+    const held = [...locks.values()].find((v) => v.path.endsWith(a.file))!
+    held.at = Date.now() - 16 * 60_000
+    expect(await a.otherEdits()).toBeNull()
+    expect(a.offer()).toBeNull()
+    await vi.waitFor(async () => expect(await a.freed()).toBe(true), { timeout: HUNG_MS })
+    await a.allow(old)
+    a.editor.status = 'working'
+    expect(JSON.stringify(await a.edit())).toContain('Hive has asked the user')
+    expect(a.offer()).not.toBe(old)
+  })
+
+  it('allowed while the blocked agent is in its turn, then the holder lets the file go and another claims it: the go-ahead only says try again, and the retry asks about the new holder', async () => {
+    const a = agents()
+    await a.claim()
+    expect(await a.edit()).not.toBeNull()
+    await a.allow()
+    await a.holderHook('Stop')
+    expect(await a.otherEdits()).toBeNull()
+    await a.hook('Stop')
+    await vi.waitFor(async () => expect(await a.freed()).toBe(true), { timeout: HUNG_MS })
+    a.editor.status = 'working'
+    expect(JSON.stringify(await a.edit())).toContain('Hive has asked the user')
   })
 
   it('clicked while the blocked agent is still in its turn: nothing is typed then; at its end, the go-ahead, and the edit is allowed', async () => {

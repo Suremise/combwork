@@ -88,11 +88,12 @@ const check = (name, ok, extra = '') => {
   /** Between steps: both agents' turns over, so nothing of a step's is still to come in the next (#667). */
   const settle = async (what) => check(`${what}: both agents' turns are over`, !!(await until(async () => (await idle(watcher.id)) && (await idle(worker.id)) && !(await live(watcher.id))?.watch, HUNG_MS)), JSON.stringify({ watcher: await live(watcher.id).then((s) => [s?.status, s?.watch?.label]), worker: (await live(worker.id))?.status }))
   /** The result of the agent's latest hive_wait_for_agents call, from its transcript. */
-  const lastWaitReply = async (id) => {
+  const waitReplies = async (id) => {
     const s = await live(id)
     const items = s?.sessionId ? ((await inv('transcript:read', alpha, s.sessionId).catch(() => null))?.items ?? []) : []
-    return items.filter((x) => x.kind === 'tool' && x.tool.name === 'hive · hive_wait_for_agents').at(-1)?.tool.result ?? null
+    return items.filter((x) => x.kind === 'tool' && x.tool.name === 'hive · hive_wait_for_agents').map((x) => x.tool.result ?? null)
   }
+  const lastWaitReply = async (id) => (await waitReplies(id)).at(-1) ?? null
   /** Whether an agent's turn has ended and it isn't watching. */
   const idle = async (id) => ['ready', 'finished'].includes((await live(id))?.status)
 
@@ -162,6 +163,14 @@ const check = (name, ok, extra = '') => {
   go('agentwatch-answered')
   await settle('waiting')
   check('…and no line when its turn then ended', wakes('Watcher').length === 2, JSON.stringify(wakes('Watcher').slice(2)))
+  // That end is still news to the watcher (its wake told only the wait): a watch now would fire at once with it, "working
+  // again now", typed into the next step if the watcher took a while to be given its next prompt (HI-2383). Watching
+  // again tells it at once, so the next step's watch starts after it.
+  const asked = (await waitReplies(watcher.id)).length
+  await say(watcher.id, watchOn('Worker'))
+  await until(async () => (await waitReplies(watcher.id)).length > asked && (await lastWaitReply(watcher.id)) !== null && (await idle(watcher.id)), HUNG_MS)
+  const caught = await lastWaitReply(watcher.id)
+  check('…and watching again, told it at once: idle, with its reply', (caught ?? '').startsWith('Already: Worker (alpha) is idle: "Done: askwhen agentwatch-permission') && !(await live(watcher.id))?.watch, caught)
 
   // --- Not while the watcher works: the line waits for its turn to end. Both turns are held until the test lets them
   // end (#667), so the worker finishes while the watcher works, however slow the machine.

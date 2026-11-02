@@ -21,7 +21,8 @@
 //   "boardmove", "boardreview", "boardcomment" and "hive TOOL {json}" (through the launch's real hive MCP server),
 //   "work N" and "shell: <command line>" (run in cmd with the session's environment, between its PreToolUse and
 //   PostToolUse; fake-shell.jsonl in CODEX_HOME records it, #1486). "planusage F W": its rollout's rate limits, F% of
-//   the 5-hour window and W% of the weekly one (HI-1882). Anything else: a short turn.
+//   the 5-hour window and W% of the weekly one (HI-1882). "patch FILE" (HI-2386): an apply_patch edit of FILE, which
+//   Hive's file lock may refuse (fake-edits.jsonl in CODEX_HOME records each try). Anything else: a short turn.
 //   The turn ledger's cases (#648): "latetool" (a command whose PostToolUse reaches Hive after the turn's Stop),
 //   "loststop" (no Stop reaches Hive; its rollout records the turn's end, task_complete) and "silent" (neither).
 //   "ratelimited" (HI-1972): a 429 recorded only in its log database (logs_2.sqlite), then no hook until
@@ -514,7 +515,21 @@ async function scripted(step) {
     const rateLimits = { primary: { used_percent: Number(plan[1]), window_minutes: 300, resets_at: resets }, secondary: { used_percent: Number(plan[2]), window_minutes: 10080, resets_at: resets }, plan_type: 'plus' }
     fs.appendFileSync(rollout, JSON.stringify({ timestamp: new Date().toISOString(), type: 'event_msg', payload: { type: 'token_count', info: null, rate_limits: rateLimits } }) + '\n')
   }
-  return any || !!(move || rev || comment || call || pause || check || sh || plan)
+  // "patch FILE" (HI-2386): an apply_patch edit appending a line to FILE (in its folder), which Codex asks Hive about first;
+  // refused (Hive's file lock), the file is left alone. Each try goes in fake-edits.jsonl: allowed or not, and why.
+  const edit = /\bpatch\s+([\w.-]+)/i.exec(step)
+  if (edit) {
+    const c = { tool_name: 'apply_patch', tool_use_id: `patch-${randomUUID()}`, tool_input: { command: `*** Begin Patch\n*** Update File: ${edit[1]}\n@@\n+edited\n*** End Patch` } }
+    const reply = await hook('PreToolUse', c)
+    const refused = reply?.hookSpecificOutput?.permissionDecision === 'deny' ? String(reply.hookSpecificOutput.permissionDecisionReason ?? '') : null
+    if (refused === null) {
+      fs.appendFileSync(path.join(process.cwd(), edit[1]), `edited by ${process.env.HIVE_AGENT || 'agent'}\n`)
+      await hook('PostToolUse', c)
+    }
+    const agent = String(process.env.HIVE_AGENT || 'agent').replace(/[^\w-]/g, '_')
+    if (process.env.CODEX_HOME) fs.appendFileSync(path.join(process.env.CODEX_HOME, 'fake-edits.jsonl'), JSON.stringify({ agent, file: edit[1], allowed: refused === null, reason: refused, at: new Date().toISOString() }) + '\n')
+  }
+  return any || !!(move || rev || comment || call || pause || check || sh || plan || edit)
 }
 
 /** A shell step's command, in cmd with the session's environment; the agent, command, exit code and output go to fake-shell.jsonl. */

@@ -618,6 +618,11 @@ interface FileLock {
   /** When it was claimed, in claim order (lockSeq): a turn's end releases only what was claimed before it. */
   seq: number
   path: string
+  /**
+   * The claim's id (HI-2386): the same while one holder keeps the file, a new one when another holder claims it. "Ask
+   * me" questions and the user's Allows are about one claim, and end with it (claimsEnded).
+   */
+  claim: number
 }
 
 /**
@@ -637,10 +642,24 @@ function lockKey(abs: string): string {
 }
 
 /** What Hive types to tell an agent it may make the locked edits the user allowed. */
-function goAheadPrompt(cwd: string, paths: string[]): string {
-  const files = paths.map((p) => placeRelative(cwd, p) || basename(p)).join(', ')
-  // i18n-ignore: typed to the agent (agent-facing text stays English)
-  return `The user allowed you to edit ${files} while the other agent works on ${paths.length > 1 ? 'them' : 'it'}. Go ahead with the ${paths.length > 1 ? 'edits' : 'edit'}.`
+/** A go-ahead waiting for an agent's turn to end: the user's Allow, or the claim it waited on having ended (HI-2386). */
+interface GoAhead {
+  path: string
+  /** The user's Allow, for this claim (FileLock.claim); without it, the claim ended and the agent may try again. */
+  allowed?: number
+}
+
+function goAheadPrompt(cwd: string, goAheads: GoAhead[]): string {
+  const said: string[] = []
+  for (const allowed of [true, false]) {
+    const paths = goAheads.filter((g) => (g.allowed !== undefined) === allowed).map((g) => g.path)
+    if (!paths.length) continue
+    const files = paths.map((p) => placeRelative(cwd, p) || basename(p)).join(', ')
+    const many = paths.length > 1
+    // i18n-ignore: typed to the agent (agent-facing text stays English)
+    said.push(allowed ? `The user allowed you to edit ${files} while the other agent works on ${many ? 'them' : 'it'}. Go ahead with the ${many ? 'edits' : 'edit'}.` : `The other agent has finished with ${files}, so Hive no longer asks the user about ${many ? 'them' : 'it'}. Try the ${many ? 'edits' : 'edit'} again.`)
+  }
+  return said.join(' ')
 }
 
 /** A lock is released when its agent's turn ends; this covers an agent that stalls without ending it. */
@@ -1167,8 +1186,19 @@ class SessionManager {
   /** "Allow" given for an agent and file (`<liveId>|<lock key>`), and questions already asked, with their lockSeq. */
   private lockAllowed = new Map<string, number>()
   private lockAsked = new Map<string, number>()
-  /** "Allow" given while the agent was still in its turn (`<liveId>|<lock key>` → the file's path): the go-ahead it gets when that turn ends. */
-  private lockGoAhead = new Map<string, string>()
+  /**
+   * The claim (FileLock.claim) each open question asked about, and each Allow was given against (HI-2386): neither
+   * applies to any other claim of the file.
+   */
+  private lockAskClaim = new Map<string, number>()
+  private lockAllowedClaim = new Map<string, number>()
+  /** Gives each claim its id (FileLock.claim). */
+  private claimSeq = 0
+  /**
+   * The go-ahead an agent gets when its turn has ended (`<liveId>|<lock key>`): the file's path, and the claim the user
+   * allowed it against (`allowed`), or none when the claim it waited on ended unanswered and it may try again (HI-2386).
+   */
+  private lockGoAhead = new Map<string, GoAhead>()
   /**
    * The delivery service (#649, deliveries.ts sets it as it loads): the lines sessions give agents of their own (a lock's
    * go-ahead, the carry-on after a sign-in, a handover's steps) are deliveries it offers, as every way into an agent is.
@@ -5629,9 +5659,15 @@ class SessionManager {
       if (mode === 'ask' && !l.adapter.descriptor.capabilities.lockAsk) {
         // The CLI can't show its own approval for this, so Hive asks the user and the agent waits.
         const key = `${id}|${keys.get(abs)!}`
-        if (this.lockAllowed.has(key)) continue
+        // Allowed against this claim (HI-2386: an Allow given against another claim of the file allows nothing here, and
+        // goes, so the user can be asked about this one).
+        if (this.lockAllowed.has(key) && this.lockAllowedClaim.get(key) === held!.claim) continue
+        this.dropAllowance(key)
+        // An open question about another claim answers nothing about this one: it goes, and the user is asked about this.
+        if (this.lockAsked.has(key) && this.lockAskClaim.get(key) !== held!.claim) this.closeAsk(key)
         if (!this.lockAsked.has(key)) {
           this.lockAsked.set(key, ++this.lockSeq)
+          this.lockAskClaim.set(key, held!.claim)
           toast(
             'warning',
             tr(msg({ id: 'session.lock.title', defaultMessage: '{agent} wants to edit {file}', description: "A notice's title: an agent wants to edit a file another agent is editing (Hive's file locks, Ask me). {agent} is the agent, {file} the file's path in the project." }), { agent: this.label(l.state), file: rel }),
@@ -5653,13 +5689,21 @@ class SessionManager {
       return l.adapter.lockReply({ kind: mode === 'ask' ? 'ask' : 'deny', reason })
     }
     let fresh = false
+    // Claims taken over from another holder (an allowed edit, or a holder whose claim had expired) end here, as a
+    // release ends them (HI-2386).
+    const replaced = new Map<string, FileLock>()
     for (const abs of files) {
       const key = keys.get(abs)!
-      const held = this.locks.get(key)
-      if (!held || held.liveId !== id) fresh = true
-      this.locks.set(key, { liveId: id, at: now, seq: ++this.lockSeq, path: abs })
+      const old = this.claimFile(key, id, abs, now)
+      if (old === 'kept') continue
+      fresh = true
+      if (old) replaced.set(key, old)
     }
     if (fresh) this.publishLocks(id)
+    if (replaced.size) {
+      for (const holder of new Set([...replaced.values()].map((v) => v.liveId))) this.publishLocks(holder)
+      this.claimsEnded(replaced, id)
+    }
     decided('allowed')
     return this.editAccepted(id, files, null, keys)
   }
@@ -5671,7 +5715,77 @@ class SessionManager {
   private editAccepted<T>(id: string, files: string[], reply: T, keys?: ReadonlyMap<string, string>): T {
     // None waiting (nearly always): no file's identity to resolve.
     if (this.lockGoAhead.size) for (const abs of files) this.lockGoAhead.delete(`${id}|${keys?.get(abs) ?? lockKey(abs)}`)
+    // Nor an answer to an ask still open for them (HI-2386: kept past its turn's end): its notice's Allow goes. Nor the
+    // Allows it was given for them: they were against claims its edit has ended (it holds the files now, or edits past a
+    // warning or with locks off), and a later claim of another agent's is asked about anew.
+    if (this.lockAsked.size || this.lockAllowed.size)
+      for (const abs of files) {
+        const key = `${id}|${keys?.get(abs) ?? lockKey(abs)}`
+        this.closeAsk(key)
+        this.dropAllowance(key)
+      }
     return reply
+  }
+
+  private dropAllowance(key: string): void {
+    this.lockAllowed.delete(key)
+    this.lockAllowedClaim.delete(key)
+  }
+
+  /** An "Ask me" question no longer open (answered, or no longer applying): its notice's Allow goes, saying so. */
+  private closeAsk(key: string): void {
+    const seq = this.lockAsked.get(key)
+    this.lockAskClaim.delete(key)
+    if (seq === undefined) return
+    this.lockAsked.delete(key)
+    resolveOffer(`lock:${key}#${seq}`, tr(OUTCOME.noLongerAsked))
+  }
+
+  /**
+   * The one way a file is claimed (HI-2386; releaseLocks the one way a claim is let go): `id` holds the file now. Its own
+   * claim kept goes on ('kept', the same claim id); a new one gets a new id. Returns the claim it replaced (another
+   * holder's: the caller ends it with claimsEnded), or undefined when the file was free.
+   */
+  private claimFile(key: string, id: string, path: string, now: number): FileLock | 'kept' | undefined {
+    const held = this.locks.get(key)
+    const kept = held?.liveId === id
+    this.locks.set(key, { liveId: id, at: now, seq: ++this.lockSeq, path, claim: kept ? held!.claim : ++this.claimSeq })
+    return kept ? 'kept' : held
+  }
+
+  /**
+   * Claims ended (`ended`, by lock key: released, or replaced by `taker`'s): what was asked or allowed about each was about
+   * that claim alone (HI-2386). Its questions go, and the Allows given against it (another claim needs its own); each
+   * agent waiting on it is told the file is free to try again, when its turn has ended, unless its Allow was already
+   * typed (it is trying now). The next try claims the file, or asks the user about the claim it then finds. `taker`'s own
+   * edit settles its asks and go-aheads (editAccepted).
+   */
+  private claimsEnded(ended: ReadonlyMap<string, FileLock>, taker?: string): void {
+    const told = new Set<string>()
+    const others = (key: string): boolean => taker === undefined || !key.startsWith(`${taker}|`)
+    for (const [k, lock] of ended) {
+      const ending = `|${k}`
+      for (const key of [...this.lockAsked.keys()]) {
+        if (!key.endsWith(ending) || !others(key) || this.lockAskClaim.get(key) !== lock.claim) continue
+        this.closeAsk(key)
+        this.lockGoAhead.set(key, { path: lock.path })
+        told.add(key.slice(0, -ending.length))
+      }
+      for (const key of [...this.lockAllowedClaim.keys()]) {
+        if (!key.endsWith(ending) || !others(key) || this.lockAllowedClaim.get(key) !== lock.claim) continue
+        this.lockAllowed.delete(key)
+        this.lockAllowedClaim.delete(key)
+      }
+      for (const [key, g] of [...this.lockGoAhead]) {
+        if (!key.endsWith(ending) || !others(key) || g.allowed !== lock.claim) continue
+        this.lockGoAhead.set(key, { path: g.path })
+        told.add(key.slice(0, -ending.length))
+      }
+    }
+    for (const id of told) {
+      const l = this.live.get(id)
+      if (l) this.sendGoAheads(id, l)
+    }
   }
 
   /**
@@ -5684,71 +5798,100 @@ class SessionManager {
     const id = liveId(projectPath, agentId)
     const l = this.live.get(id)
     if (!l) return
-    const key = `${id}|${lockKey(resolve(path))}`
+    const file = lockKey(resolve(path))
+    const key = `${id}|${file}`
     // Checked again (HI-2320, HR2's round 1): only the ask its notice offered (`offer`, its sequence), while it is still
-    // open, is answered; an older notice's Allow answers nothing newer, and says it no longer applies.
+    // open, is answered; an older notice's Allow answers nothing newer, and says it no longer applies. So does one whose
+    // claim isn't the file's claim now (HI-2386: let go or replaced, however that happened).
     const asked = this.lockAsked.get(key)
     const current = asked === undefined ? null : `lock:${key}#${asked}`
-    if (!current || this.lockAllowed.has(key) || (offer !== undefined && offer !== current)) {
+    const claim = this.lockAskClaim.get(key)
+    const stale = claim !== undefined && this.locks.get(file)?.claim !== claim
+    // Already allowed against this claim (HI-2386, HR1's round 3: one given against another claim doesn't count).
+    const allowed = this.lockAllowed.has(key) && (claim === undefined || this.lockAllowedClaim.get(key) === claim)
+    if (!current || allowed || (offer !== undefined && offer !== current) || stale) {
+      // i18n-ignore: the log (English)
+      log.info(`Lock: Allow for ${userText(this.label(l.state))} → ${userText(basename(path))} answered nothing (${!current ? 'no open ask' : allowed ? 'already allowed' : offer !== undefined && offer !== current ? 'an older notice' : 'its claim has ended'})`)
+      // A question about a claim that has ended is closed whichever notice was pressed.
+      if (stale) this.closeAsk(key)
       if (offer !== undefined) resolveOffer(offer, tr(OUTCOME.noLongerAsked))
       else resolveOffers((o) => o.startsWith(`lock:${key}#`), tr(OUTCOME.noLongerAsked))
       return
     }
     resolveOffer(current, tr(OUTCOME.allowed))
+    log.info(`Lock: ${userText(this.label(l.state))} allowed to edit ${userText(basename(path))} (${l.state.status})`)
+    // Answered: no longer open (HI-2386: asks outlive the turn's end, so a later block asks again rather than waiting on
+    // this one).
+    this.lockAsked.delete(key)
+    this.lockAskClaim.delete(key)
     // The user's answer ends the block it asked about (HI-982).
     if (l.hookBlock && `${id}|${l.hookBlock.key}` === key) l.hookBlock = undefined
+    // Against the claim it asked about only (HI-2386).
+    const against = claim ?? this.locks.get(file)?.claim ?? 0
     this.lockAllowed.set(key, ++this.lockSeq)
-    this.lockGoAhead.set(key, path)
+    this.lockAllowedClaim.set(key, against)
+    this.lockGoAhead.set(key, { path, allowed: against })
     this.sendGoAheads(id, l)
   }
 
   /**
-   * Gives the agent one go-ahead for its allowed files once its turn has ended: a delivery (#649: a control notice for
-   * this launch) the delivery service offers as any line of Hive's is, only while it is free and the user isn't writing
-   * in its terminal (Pause after you type), checked again until Enter, so the user's input is never added to or sent. The
-   * files are allowed again for the turn it starts. Not typed yet, it waits (the user's own prompt, or a wake, went
-   * first; the files stay allowed for it, and the next turn's end gives it again).
+   * Gives the agent one go-ahead for its allowed files (and those whose claim it waited on ended, HI-2386) once its turn
+   * has ended: a delivery (#649: a control notice for this launch) the delivery service offers as any line of Hive's is,
+   * only while it is free and the user isn't writing in its terminal (Pause after you type), checked again until Enter,
+   * so the user's input is never added to or sent. The allowed files are allowed again for the turn it starts. Not typed
+   * yet, it waits (the user's own prompt, or a wake, went first; the files stay allowed for it, and the next turn's end
+   * gives it again).
    */
   private sendGoAheads(id: string, l: LiveSession): void {
     const { projectPath, agentId, runId } = l.state
     const keys = [...this.lockGoAhead.keys()].filter((k) => k.startsWith(`${id}|`))
     if (!keys.length || (l.state.status !== 'ready' && l.state.status !== 'finished') || this.live.get(id) !== l) return
-    const paths = keys.map((k) => this.lockGoAhead.get(k)!)
-    for (const k of keys) this.lockAllowed.set(k, ++this.lockSeq)
+    const given = keys.map((k) => this.lockGoAhead.get(k)!)
+    keys.forEach((k, i) => {
+      const against = given[i].allowed
+      if (against === undefined) return
+      this.lockAllowed.set(k, ++this.lockSeq)
+      this.lockAllowedClaim.set(k, against)
+    })
     // This delivery's go-aheads, still wanted: an interrupt, the edit going ahead, or the session ending or moving
-    // (dropGoAheads, editAccepted) cancels it, even part-way.
-    const current = (): boolean => this.live.get(id) === l && keys.every((k, i) => this.lockGoAhead.get(k) === paths[i])
+    // (dropGoAheads, editAccepted) cancels it, even part-way; so does one changed since (claimsEnded).
+    const current = (): boolean => this.live.get(id) === l && keys.every((k, i) => this.lockGoAhead.get(k) === given[i])
     this.delivery()
-      .give(projectPath, { agentId, kind: 'control', from: HIVE_SENDER, body: goAheadPrompt(l.state.cwd, paths), source: 'go-ahead', ref: runId, replace: true, need: 'free', forRun: runId }, {
+      .give(projectPath, { agentId, kind: 'control', from: HIVE_SENDER, body: goAheadPrompt(l.state.cwd, given), source: 'go-ahead', ref: runId, replace: true, need: 'free', forRun: runId }, {
         holds: current,
-        received: () => keys.forEach((k, i) => this.lockGoAhead.get(k) === paths[i] && this.lockGoAhead.delete(k))
+        received: () => keys.forEach((k, i) => this.lockGoAhead.get(k) === given[i] && this.lockGoAhead.delete(k))
       })
       .catch((e: Error) => log.info(`${userText(this.label(l.state))}: go-ahead for a locked edit not given: ${e.message}`))
   }
 
   /**
    * Releases an agent's file locks, approvals and questions: all of them, or (`before`, a lockSeq) those from
-   * before then, so a turn's end handled late keeps what the next turn has claimed since.
+   * before then, so a turn's end handled late keeps what the next turn has claimed since. A turn's end keeps the
+   * questions (HI-2386): the agent blocked by one ends its turn within seconds to wait for the user's answer, and its
+   * notice's Allow stays open for that answer until the user gives it, the edit goes ahead (editAccepted), the claim
+   * it asked about ends (claimsEnded), or the session ends or moves.
    */
   private releaseLocks(id: string, before = Infinity): void {
-    for (const map of [this.lockAllowed, this.lockAsked]) {
-      for (const [k, seq] of map) {
-        if (!k.startsWith(`${id}|`) || seq > before) continue
-        map.delete(k)
-        // An ask let go unanswered: its notice's Allow goes (HI-2320).
-        if (map === this.lockAsked) resolveOffer(`lock:${k}#${seq}`, tr(OUTCOME.noLongerAsked))
+    for (const [k, seq] of this.lockAllowed)
+      if (k.startsWith(`${id}|`) && seq <= before) {
+        this.lockAllowed.delete(k)
+        this.lockAllowedClaim.delete(k)
       }
-    }
+    // An ask let go unanswered (the session ended or moved): its notice's Allow goes (HI-2320).
+    if (before === Infinity) for (const k of [...this.lockAsked.keys()]) if (k.startsWith(`${id}|`)) this.closeAsk(k)
     // A go-ahead waits for the turn's end, so only releasing everything (the session ended or moved) drops it.
     if (before === Infinity) this.dropGoAheads(id)
-    let changed = false
+    const ended = new Map<string, FileLock>()
     for (const [k, v] of this.locks) {
       if (v.liveId === id && v.seq <= before) {
         this.locks.delete(k)
-        changed = true
+        ended.set(k, v)
       }
     }
-    if (changed) this.publishLocks(id)
+    if (ended.size) {
+      this.publishLocks(id)
+      this.claimsEnded(ended)
+    }
   }
 
   private dropGoAheads(id: string): void {

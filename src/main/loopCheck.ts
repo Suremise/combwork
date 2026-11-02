@@ -99,6 +99,21 @@ export function cardsInPlay(cards: readonly TaskCard[], project: string, agentId
     .sort((a, b) => a - b)
 }
 
+/**
+ * Of an agent's watched cards, those that are another's loop, not its own (HI-2381): a card's stall counts only its own
+ * builder and reviewer. CB2, whose next card CL-10 waits on CB1's CL-8, watched CL-8 and, its watch over, flagged CL-8 as
+ * stalled while CB1 and CR1 were on it. A watched card in Doing or Review is owed only by its builder (its agent) and its
+ * current reviewer (the review on it, else `reviewerOf`: its loop reviewer); any other watcher's is dropped, with no
+ * exception for dependencies or a missing reviewer (the Assistant's scope call after HR1's round 2). What that gives up:
+ * a reviewer outside any lane, waiting for a card's first round with no review of it started yet, isn't its loop
+ * reviewer, so its watch on the card isn't owed either.
+ */
+export function othersCards(cards: readonly TaskCard[], agentId: string, watched: readonly number[], reviewerOf: (n: number) => string | null): number[] {
+  return cards
+    .filter((c) => watched.includes(c.number) && !c.archived && (c.column === 'doing' || c.column === 'review') && c.agent !== agentId && (c.review?.agent ?? reviewerOf(c.number)) !== agentId)
+    .map((c) => c.number)
+}
+
 /** What reaches an agent of its cards without a watch (HI-1693): whether Hive's loop wakes can, and each card's loop reviewer. */
 export interface LoopReach {
   /** The project's loop wakes are on and the agent can read its inbox (its hive tools): a loop wake reaches it. */
@@ -178,7 +193,18 @@ async function owedNow(loop: Loop): Promise<number[]> {
   const ws = workspaceOf(loop.projectPath)
   const project = basename(loop.projectPath)
   const heads = await liveCardHeads(ws)
-  const inPlay = cardsInPlay(heads, project, loop.agentId, loop.cards)
+  let watched = loop.cards
+  // Another's card (HI-2381): its stall is its own builder's and reviewer's. Those not its own are read in full (a loop
+  // reviewer from before 1.0 is in its history) for their loop reviewers, only when there are any.
+  const others = heads.filter((c) => watched.includes(c.number) && (c.column === 'doing' || c.column === 'review') && c.agent !== loop.agentId && c.review?.agent !== loop.agentId)
+  if (others.length) {
+    const full = await allTasks(ws, { numbers: others.map((c) => c.number) })
+    const loopReviewers = new Map<number, string | null>()
+    for (const c of full) loopReviewers.set(c.number, (await loopReviewerOf(ws, c).catch(() => null))?.id ?? null)
+    const drop = new Set(othersCards(full, loop.agentId, watched, (n) => loopReviewers.get(n) ?? null))
+    watched = watched.filter((n) => !drop.has(n))
+  }
+  const inPlay = cardsInPlay(heads, project, loop.agentId, watched)
   if (!inPlay.length) return []
   // Pool cards (HI-2321): only its builder and its reviewer now are in its loop, so their reviewer is read either way.
   const pooled = new Set(heads.filter((c) => inPlay.includes(c.number) && poolCard(ws, c)).map((c) => c.number))
@@ -189,14 +215,14 @@ async function owedNow(loop: Loop): Promise<number[]> {
   const wakes = agentReadsInbox(loop.projectPath, loop.agentId) && projectPreferences(ws, loop.projectPath, await ws.projectConfig(loop.projectPath).catch(() => null)).loopWakes
   if (!wakes) {
     for (const c of heads) if (pooled.has(c.number)) reviewers.set(c.number, (await loopReviewerOf(ws, c).catch(() => null))?.id ?? null)
-    return owedCards(heads, project, loop.agentId, loop.cards, { wakes, reviewerOf, pool: (n) => pooled.has(n) })
+    return owedCards(heads, project, loop.agentId, watched, { wakes, reviewerOf, pool: (n) => pooled.has(n) })
   }
   const cards = await allTasks(ws, { numbers: inPlay })
   for (const c of cards) reviewers.set(c.number, (await loopReviewerOf(ws, c).catch(() => null))?.id ?? null)
   // Its own questions for the user still open (HI-2080), from the board's For you as it is now.
   const open = forYouOfCards(ws, inPlay)
   const asked = (n: number): boolean => (open.get(n) ?? []).some((r) => r.asker === loop.agentId)
-  return owedCards(cards, project, loop.agentId, loop.cards, { wakes, reviewerOf, asked, pool: (n) => pooled.has(n) })
+  return owedCards(cards, project, loop.agentId, watched, { wakes, reviewerOf, asked, pool: (n) => pooled.has(n) })
 }
 
 /** Starts an idle agent's grace before its owed cards are flagged (once: a timer running, or a flag made, waits). */

@@ -114,13 +114,13 @@ module.exports = async function run(provider) {
     const screen = async (key) => ((await page.evaluate((k) => window.__hiveTerminalLines(k), key)) ?? []).join('\n')
     const paneCols = async (key) => (await page.evaluate((k) => window.__hiveTerminalState(k), key))?.cols
     /**
-     * The doorbells for a message on its screen (`delivery`: one of them), however its rows were wrapped: by its "(m4).
-     * Call hive_inbox", as a doorbell's first row can have other text drawn in it (Copilot's time, what Codex drew there
-     * at its width before).
+     * The doorbells on its screen, each by its id, however its rows were wrapped: by its "(m4). Call hive_inbox" with
+     * whitespace dropped, and up to a few non-letters between "Call" and "hive_inbox", as the CLI can draw in a doorbell's
+     * first row where it wraps (HI-2387: Copilot's time and its border, "(m4). Call   19:34 ┃" / "hive_inbox …").
      */
-    const copies = async (key, delivery) => (await screen(key)).replace(/\s+/g, '').split(`(${delivery}).Callhive_inbox`).length - 1
-    /** The deliveries whose doorbells its screen shows. */
-    const doorbellIds = async (key) => [...(await screen(key)).replace(/\s+/g, '').matchAll(/\((m\d+)\)\.Callhive_inbox/g)].map((x) => x[1])
+    const doorbellIds = async (key) => [...(await screen(key)).replace(/\s+/g, '').matchAll(/\((m\d+)\)\.Call[^A-Za-z]{0,16}hive_inbox/g)].map((x) => x[1])
+    /** How many doorbells its screen shows for a message (`delivery`: one of them). */
+    const copies = async (key, delivery) => (await doorbellIds(key)).filter((x) => x === delivery).length
     /** Hive has written the whole line into the agent: its Enter too (Woke), or, for Codex, waiting for it to be drawn. */
     const written = (from) => hiveLog().split('\n').slice(from).some((l) => (l.includes(id) && /\[watches\] Woke /.test(l)) || /the line Hive typed is in; Enter once it shows/.test(l))
 
@@ -205,7 +205,7 @@ module.exports = async function run(provider) {
       }, HUNG_MS, 500)
       check('put off: …the agent reads the message', read, JSON.stringify(r.body))
       // In its conversation once: a copy left behind would show this message's doorbell twice, glued to the one sent.
-      check('put off: …and the doorbell it was sent is alone', !!r.body?.id && (await copies(key, r.body.id)) === 1, await screen(key))
+      check('put off: …and the doorbell it was sent is alone', !!r.body?.id && !!(await lib.until(async () => (await copies(key, r.body.id)) === 1, HUNG_MS, 300)), await screen(key))
     })
   } finally {
     fs.rmSync(hold, { force: true })
