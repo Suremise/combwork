@@ -21,7 +21,7 @@ const os = require('os')
 const path = require('path')
 const { execFileSync } = require('child_process')
 const runContext = require('./runContext.cjs')
-const { readDocs } = require('./boardRows.cjs')
+const { readCitingDocs } = require('./boardRows.cjs')
 
 /** Areas: folders that hold evidence rather than being it (relative to hive-test). Naming one keeps nothing. */
 const AREAS = new Set(['', 'e2e', 'e2e/lanes', 'e2e/logs', 'e2e/logs/nested', 'scenarios', 'scenarios/lanes', 'scenarios/results', 'scenarios/baselines', 'scratch', 'tmp', 'codex', 'codex/sessions', 'codex/packages', 'codex/cache'])
@@ -116,7 +116,7 @@ function readDbCards(file) {
     const { DatabaseSync } = require('node:sqlite')
     db = new DatabaseSync(file, { readOnly: true, timeout: 5000 })
     const cards = []
-    for (const row of readDocs(db)) {
+    for (const row of readCitingDocs(db)) {
       const c = citing({ ...row.doc, number: row.number })
       if (c) cards.push(c)
     }
@@ -163,7 +163,7 @@ function readCards(tasksDir) {
 /**
  * What may be deleted under testRoot, by the board's cards: protects(p) gives why p must stay (`cited by #n`, or that
  * the board can't be read), or null. Built from a board (tasksDir: its database or folder; null: none found, so nothing may go) or from
- * cards given (tests). Every protects() reads the board afresh (about 25 ms), so a deletion is never authorised by
+ * cards given (tests). Every protects() reads the board afresh (a few ms: only the cards that may cite, HI-2364), so a deletion is never authorised by
  * an older look: a card that cites something a moment before it would go keeps it. snapshot() reads it once, for
  * listing many things (the clean-up's plan), never for deleting.
  */

@@ -3,7 +3,7 @@
 import { createRequire } from 'module'
 import { DatabaseSync } from 'node:sqlite'
 import { appendFileSync, cpSync, existsSync, lstatSync, mkdirSync, readdirSync, readFileSync, renameSync, rmSync, symlinkSync, utimesSync, writeFileSync } from 'fs'
-import { join, resolve } from 'path'
+import { basename, join, resolve } from 'path'
 import { afterAll, describe, expect, it } from 'vitest'
 // @ts-expect-error: plain .mjs modules without types
 import { clean, codexPlan, holdLane, plan } from './e2e/clean.mjs'
@@ -169,12 +169,15 @@ describe('what cards cite (they keep it)', () => {
     add(2, { column: 'done', description: 'hive-test\\e2e\\b.png' })
     add(3, { archived: true, description: 'hive-test\\e2e\\c.png' })
     add(4, { column: 'passed', comments: [{ at: '2026-10-20T00:00:00.000Z', by: 'You', text: 'e2e\\D.png' }] })
+    // Only the cards that may cite are read, and of their rows only the comments (HI-2364): a card's history cites nothing.
+    add(5, { column: 'review', history: [{ at: '2026-10-20T00:00:00.000Z', from: 'doing', to: 'review', note: 'hive-test\\e2e\\e.png' }] })
     db.close()
     const read = readCards(file)
     expect(read.ok).toBe(true)
-    expect(read.cards.map((c: Card) => c.number).sort()).toEqual([1, 4])
+    expect(read.cards.map((c: Card) => c.number).sort()).toEqual([1, 4, 5])
     expect(citedBy('e2e/d.png', read.cards)).toBe(4)
     expect(citedBy('e2e/a.png', read.cards)).toBe(1)
+    expect(citedBy('e2e/e.png', read.cards)).toBe(null)
   })
 
   it('finds the database before the stub folder an older Hive reads (#1017): a moved board never reads as empty', () => {
@@ -827,6 +830,29 @@ describe("the runners' own deletions keep evidence too", () => {
     expect(gone).toEqual(names.slice(1, 4))
     expect(readdirSync(logs).sort()).toEqual([names[0], names[4], names[5]])
     expect(pruneRunDirs(logs, 0, [], () => false, (p: string) => rules(root, null).protects(p))).toEqual([])
+  })
+
+  it("the runner's prune lists with one look at the board, and asks afresh only for each run about to go (HI-2364)", async () => {
+    const root = temp('hive-clean-look-')
+    const logs = join(root, 'e2e', 'logs')
+    const names = Array.from({ length: 8 }, (_, k) => `run-20261005-23000${k}`)
+    for (const n of names) tree(logs, { [`${n}/board.log`]: 0 })
+    // The list's look: no card cites anything. Since then, a card cites the second oldest run.
+    const listed: string[] = []
+    const asked: string[] = []
+    const fresh = rules(root, [card(2364, `hive-test\\e2e\\logs\\${names[1]} kept it alive`)])
+    const released: string[] = []
+    const gone = await pruneRunDirsReleasing(logs, 2, [], () => false, (p: string) => (asked.push(basename(p)), fresh.protects(p)), {
+      listSpare: (p: string) => (listed.push(basename(p)), null),
+      release: async (d: string) => void released.push(basename(d))
+    })
+    // Every run folder listed once; the board asked again only for the six that were to go.
+    expect(listed.sort()).toEqual(names)
+    expect(asked).toEqual(names.slice(0, 6))
+    // The run cited since the list stays, never released; the rest go.
+    expect(gone).toEqual(names.slice(0, 6).filter((n) => n !== names[1]))
+    expect(released).toEqual(gone)
+    expect(readdirSync(logs).sort()).toEqual([names[1], names[6], names[7]])
   })
 
   it('scenario results and older baselines a card cites stay', () => {

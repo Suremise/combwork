@@ -18,6 +18,18 @@ function readDocs(db, numbers) {
   return readCardRows(db, numbers ? { numbers } : {}).map((r) => ({ number: r.card.number, doc: composeCard(r) }))
 }
 
+/**
+ * The documents of the cards that may cite test output (evidence.cjs): those neither Done nor archived, with their
+ * comments as the only child rows (HI-2364: every card's every row took about 200 ms on a board of 2,400, read once for
+ * each run folder a prune looked at). The caller still judges each document; the condition only leaves out rows it
+ * would drop. A 0.9 board's documents are all read (its upgrade is due).
+ */
+function readCitingDocs(db) {
+  if (legacy(db)) return readDocs(db)
+  const { readCardRows, composeCard } = cardRows()
+  return readCardRows(db, { where: "archived = 0 AND col <> 'done'", parts: ['comments'] }).map((r) => ({ number: r.card.number, doc: composeCard(r) }))
+}
+
 /** Saves a card's document as another program would, in one transaction (a running Hive sees it within about a second). */
 function writeDoc(db, n, doc) {
   if (legacy(db)) {
@@ -36,4 +48,4 @@ function writeDoc(db, n, doc) {
   }
 }
 
-module.exports = { readDocs, writeDoc }
+module.exports = { readCitingDocs, readDocs, writeDoc }
