@@ -42,7 +42,7 @@ export interface JobHostOptions {
   onLost: (why: string) => void
   /** It couldn't start: nothing is tracked. */
   onFailed: (why: HostFailure) => void
-  /** Starts its PowerShell instead (tests: one that outlives its Hive). */
+  /** Starts its helper instead (tests), as given (its launcher's PowerShell and arguments, helperLaunch; or a test mode's). */
   launch?: (file: string, args: string[]) => ChildProcessWithoutNullStreams
   /** Test requests allowed (`follow`): unpackaged builds and unit tests only. */
   testRequests?: boolean
@@ -1093,10 +1093,12 @@ public static class HiveJobs {
  * The host's loop: one request per line ("<n> <command> <job> [pid]"), one reply per line ("<n> <JSON>"), all in the
  * C#; between them, a line "new" when a process has joined a job (Notices, #1134). No cmdlet but Add-Type, so PowerShell loads no other module (and writes no module cache, which goes into the
  * working folder when LOCALAPPDATA is unset). The C# comes first on its input, a line of base64 (HOST_INPUT): a command
- * line holds at most 32,767 characters, and -EncodedCommand doubles them and more.
+ * line holds at most 32,767 characters, and -EncodedCommand doubles them and more. Its first line is its own process id
+ * ("pid <n>"): it is started through a launcher (helperLaunch), so its owner's child is the launcher, not it.
  */
 const HOST_SCRIPT = `
 [Console]::OutputEncoding = [Text.Encoding]::UTF8
+[Console]::Out.WriteLine('pid ' + $PID)
 $ErrorActionPreference = 'Stop'
 Add-Type -ReferencedAssemblies System.Management -TypeDefinition ([Text.Encoding]::UTF8.GetString([Convert]::FromBase64String([Console]::In.ReadLine())))
 [HiveJobs]::Notices = [Console]::Out
@@ -1105,6 +1107,103 @@ while ($null -ne ($line = [Console]::In.ReadLine())) { [Console]::Out.WriteLine(
 [HiveJobs]::Keep()
 `
 const HOST_INPUT = Buffer.from(HOST_SOURCE, 'utf8').toString('base64') + '\n'
+
+/**
+ * The helper's launcher (HI-2314): starts the command line given with only its own standard handles (its pipes to
+ * Hive) to inherit, in a console of its own with no window, waits for it, and returns its exit code (-1: it couldn't
+ * start it, said on its error output).
+ */
+const LAUNCH_SOURCE = String.raw`
+using System;
+using System.Runtime.InteropServices;
+using System.Text;
+public static class HiveLaunch {
+  [StructLayout(LayoutKind.Sequential)] struct StartupInfoEx {
+    public int cb; public IntPtr reserved, desktop, title;
+    public int x, y, xSize, ySize, xChars, yChars, fill, flags;
+    public short show, reserved2Size; public IntPtr reserved2, stdIn, stdOut, stdErr;
+    public IntPtr attributes;
+  }
+  [StructLayout(LayoutKind.Sequential)] struct ProcessInfo { public IntPtr process, thread; public int pid, tid; }
+  [DllImport("kernel32.dll")] static extern IntPtr GetStdHandle(int which);
+  [DllImport("kernel32.dll", SetLastError=true)] static extern bool SetHandleInformation(IntPtr h, int mask, int flags);
+  [DllImport("kernel32.dll", SetLastError=true)] static extern bool InitializeProcThreadAttributeList(IntPtr list, int count, int flags, ref IntPtr size);
+  [DllImport("kernel32.dll", SetLastError=true)] static extern bool UpdateProcThreadAttribute(IntPtr list, int flags, IntPtr attribute, IntPtr value, IntPtr size, IntPtr previous, IntPtr returned);
+  [DllImport("kernel32.dll")] static extern void DeleteProcThreadAttributeList(IntPtr list);
+  [DllImport("kernel32.dll", SetLastError=true, CharSet=CharSet.Unicode)] static extern bool CreateProcessW(string app, StringBuilder line, IntPtr pa, IntPtr ta, bool inherit, int flags, IntPtr env, string dir, ref StartupInfoEx si, out ProcessInfo pi);
+  [DllImport("kernel32.dll")] static extern int WaitForSingleObject(IntPtr h, int ms);
+  [DllImport("kernel32.dll")] static extern bool GetExitCodeProcess(IntPtr h, out int code);
+  [DllImport("kernel32.dll")] static extern bool CloseHandle(IntPtr h);
+  public static int Run(string line) {
+    var std = new System.Collections.Generic.List<IntPtr>();
+    foreach (int which in new[] { -10, -11, -12 }) {
+      IntPtr h = GetStdHandle(which);
+      if (h == IntPtr.Zero || h == new IntPtr(-1) || std.Contains(h)) continue;
+      SetHandleInformation(h, 1, 1);
+      std.Add(h);
+    }
+    IntPtr size = IntPtr.Zero;
+    InitializeProcThreadAttributeList(IntPtr.Zero, 1, 0, ref size);
+    IntPtr attrs = Marshal.AllocHGlobal(size);
+    IntPtr handles = Marshal.AllocHGlobal(IntPtr.Size * Math.Max(1, std.Count));
+    try {
+      if (!InitializeProcThreadAttributeList(attrs, 1, 0, ref size)) return Fail("attribute list");
+      try {
+        for (int i = 0; i < std.Count; i++) Marshal.WriteIntPtr(handles, i * IntPtr.Size, std[i]);
+        // PROC_THREAD_ATTRIBUTE_HANDLE_LIST: these handles only, whatever else this process could hand down.
+        if (std.Count > 0 && !UpdateProcThreadAttribute(attrs, 0, new IntPtr(0x20002), handles, new IntPtr(IntPtr.Size * std.Count), IntPtr.Zero, IntPtr.Zero)) return Fail("handle list");
+        var si = new StartupInfoEx();
+        si.cb = Marshal.SizeOf(typeof(StartupInfoEx));
+        si.flags = 0x100;
+        si.stdIn = GetStdHandle(-10); si.stdOut = GetStdHandle(-11); si.stdErr = GetStdHandle(-12);
+        si.attributes = attrs;
+        ProcessInfo pi;
+        // EXTENDED_STARTUPINFO_PRESENT | CREATE_NO_WINDOW
+        if (!CreateProcessW(null, new StringBuilder(line), IntPtr.Zero, IntPtr.Zero, std.Count > 0, 0x80000 | 0x8000000, IntPtr.Zero, null, ref si, out pi)) return Fail("start");
+        CloseHandle(pi.thread);
+        WaitForSingleObject(pi.process, -1);
+        int code;
+        if (!GetExitCodeProcess(pi.process, out code)) code = -1;
+        CloseHandle(pi.process);
+        return code;
+      } finally { DeleteProcThreadAttributeList(attrs); }
+    } finally { Marshal.FreeHGlobal(attrs); Marshal.FreeHGlobal(handles); }
+  }
+  static int Fail(string what) {
+    Console.Error.WriteLine("the helper's launcher couldn't " + what + ": " + Marshal.GetLastWin32Error());
+    return -1;
+  }
+}
+`
+/** The longest command line CreateProcess takes. */
+const LINE_MAX = 32767
+const b64 = (s: string): string => Buffer.from(s, 'utf8').toString('base64')
+
+/**
+ * How the helper is started (HI-2314), so that it outlives its Hive as the keeper (HI-2055): through a launcher, a
+ * PowerShell of its own (LAUNCH_SOURCE). Node (libuv) puts each child it starts in one job that ends them all once Hive
+ * ends, a quit or a crash alike, and lets their own children leave it silently: the launcher is in that job and ends
+ * with Hive, the helper it starts is not. It hands the helper only its pipes to Hive: Electron's own standard handles
+ * can be inherited (a test's pipes to it, say), and a helper outliving Hive would hold them. It waits for the helper and
+ * exits with its exit code, so its owner's `exit` is the helper's, and holds its handle meanwhile, so the helper's id
+ * (its "pid" line) is its own while the launcher runs (endHelper). Not Node's `detached`, which leaves that job too:
+ * PowerShell 5.1 started without a console (DETACHED_PROCESS) exits at once, running nothing. Exported for the unit
+ * tests, which start it as Hive does and then end the Hive.
+ */
+export function helperLaunch(script = HOST_SCRIPT): { file: string; args: string[]; input: string } {
+  const line = `"${POWERSHELL}" ${psArgs(script).join(' ')}`
+  const launcher = `$ErrorActionPreference = 'Stop'
+Add-Type -TypeDefinition ([Text.Encoding]::UTF8.GetString([Convert]::FromBase64String('${b64(LAUNCH_SOURCE)}')))
+exit [HiveLaunch]::Run([Text.Encoding]::UTF8.GetString([Convert]::FromBase64String('${b64(line)}')))
+`
+  const args = psArgs(launcher)
+  if (line.length > LINE_MAX || [POWERSHELL, ...args].join(' ').length + 8 > LINE_MAX) throw new Error('the helper’s command line is too long') // i18n-ignore: a technical error, logged (it can't happen with the scripts as they are)
+  return { file: POWERSHELL, args, input: HOST_INPUT }
+}
+function psArgs(script: string): string[] {
+  return ['-NoProfile', '-NonInteractive', '-ExecutionPolicy', 'Bypass', '-EncodedCommand', Buffer.from(script, 'utf16le').toString('base64')] // i18n-ignore: PowerShell's arguments
+}
+
 /** Test copies' helper that is ready but never answers (HIVE_TEST_PROCESS_TRACKER=mute): it notes each request it reads. */
 const MUTE_SCRIPT = `
 $null = [Console]::In.ReadLine()
@@ -1136,8 +1235,9 @@ export class JobHost {
   /**
    * Every helper started that hasn't exited yet (one being replaced too), with whether it said it was ready; `gone` also
    * resolves once it says it is keeping its jobs past its Hive (HI-2055): closing waits for that, never for them to end.
+   * `pid`: the helper's own id once it has said it (its "pid" line), when it was started through its launcher (helperLaunch).
    */
-  private alive = new Map<ChildProcessWithoutNullStreams, { up: boolean; gone: Promise<void> }>()
+  private alive = new Map<ChildProcessWithoutNullStreams, { up: boolean; gone: Promise<void>; pid?: number }>()
 
   /** Told of each process a kill-on-close job couldn't journal and ended (onUnowned). */
   private unownedListeners = new Set<(job: string, pid: number) => void>()
@@ -1175,14 +1275,17 @@ export class JobHost {
     this.ready = new Promise<boolean>((resolve) => {
       let up = false
       let p: ChildProcessWithoutNullStreams
+      let direct = false
       try {
         // Test copies: HIVE_TEST_PROCESS_TRACKER=silent acts out a helper that starts but never says it is ready, =mute
         // one that is ready but never answers (each request it reads noted in HIVE_TEST_TRACKER_HEARD), until its input closes.
+        // The test modes' PowerShell is Hive's own child (no keeper: ended with Hive, the silent one included); the
+        // helper is started through its launcher, to outlive Hive (helperLaunch).
         const mode = this.opts.testMode()
-        const script = Buffer.from(mode === 'silent' ? '[System.Threading.Thread]::Sleep(-1)' : mode === 'mute' ? MUTE_SCRIPT : HOST_SCRIPT, 'utf16le').toString('base64')
+        direct = mode === 'silent' || mode === 'mute'
+        const { file, args } = direct ? { file: POWERSHELL, args: psArgs(mode === 'silent' ? '[System.Threading.Thread]::Sleep(-1)' : MUTE_SCRIPT) } : helperLaunch()
         // In the temp folder: nothing it might write lands in whatever folder Hive was started from.
-        const args = ['-NoProfile', '-NonInteractive', '-ExecutionPolicy', 'Bypass', '-EncodedCommand', script] // i18n-ignore: PowerShell's arguments
-        p = this.opts.launch ? this.opts.launch(POWERSHELL, args) : spawn(POWERSHELL, args, { windowsHide: true, stdio: 'pipe', cwd: tmpdir() })
+        p = this.opts.launch ? this.opts.launch(file, args) : spawn(file, args, { windowsHide: true, stdio: 'pipe', cwd: tmpdir() })
       } catch (e) {
         this.opts.log.warn('could not start the process job host: agents\u2019 leftover processes are not tracked', e)
         this.opts.onFailed({ kind: 'noPowerShell', error: (e as Error).message })
@@ -1192,12 +1295,14 @@ export class JobHost {
       this.proc = p
       this.helpers++
       let keeping = (): void => undefined
-      const state = {
+      const state: { up: boolean; gone: Promise<void>; pid?: number } = {
         up: false,
         gone: new Promise<void>((r) => {
           keeping = r
           p.once('exit', () => r())
-        })
+        }),
+        // Started directly (a test mode): its id is its child's.
+        ...(direct && p.pid !== undefined ? { pid: p.pid } : {})
       }
       // A helper that never started (no pid) has nothing to wait for.
       if (p.pid === undefined) state.gone = Promise.resolve()
@@ -1210,7 +1315,7 @@ export class JobHost {
         if (up || this.proc !== p) return
         this.proc = null
         this.ready = null
-        p.kill()
+        this.endHelper(p)
         this.opts.log.warn(`the process job host didn't start within ${Math.round(this.opts.waitMs() / 1000)} s: agents\u2019 leftover processes are not tracked`)
         this.opts.onFailed({ kind: 'slowHelper', seconds: Math.round(this.opts.waitMs() / 1000) })
         this.failed = true
@@ -1227,6 +1332,11 @@ export class JobHost {
         while ((i = buf.indexOf('\n')) >= 0) {
           const line = buf.slice(0, i).trim()
           buf = buf.slice(i + 1)
+          const own = !up && state.pid === undefined ? /^pid (\d+)$/.exec(line) : null
+          if (own) {
+            state.pid = Number(own[1])
+            continue
+          }
           if (!up && line === 'ready') {
             up = state.up = true
             clearTimeout(readyBy)
@@ -1309,7 +1419,7 @@ export class JobHost {
         if (!this.waiting.delete(n)) return
         resolve(null)
         this.opts.log.warn(`the process job host didn't answer within ${Math.round(this.opts.waitMs() / 1000)} s (${command}): closing it`)
-        if (this.proc === p) p.kill()
+        if (this.proc === p) this.endHelper(p)
       }, this.opts.waitMs())
     })
     // Numbers, and words (a path goes as base64url): nothing that could split a request.
@@ -1322,9 +1432,34 @@ export class JobHost {
     }
   }
 
-  /** The helper's process id while it runs (tests: to end it as a crash would). */
+  /**
+   * The helper's process id while it runs (tests: to end it as a crash would): its own, so null for the moment after it
+   * starts before it has said it (never its launcher's).
+   */
   get pid(): number | null {
-    return this.proc?.pid ?? null
+    return this.proc ? (this.alive.get(this.proc)?.pid ?? null) : null
+  }
+
+  /**
+   * Ends a helper (stuck, or not ready when closing): the helper by its own id while its launcher still runs (which holds its
+   * handle until it exits, so the id is still the helper's), then the launcher, and its input closed. One that hadn't said its id
+   * yet sees its input end: it exits once it reads it.
+   */
+  private endHelper(p: ChildProcessWithoutNullStreams): void {
+    const own = this.alive.get(p)?.pid
+    if (own !== undefined && own !== p.pid && p.exitCode === null && p.signalCode === null) {
+      try {
+        process.kill(own) // its handle is held: by its launcher, still running, so the id is still the helper's
+      } catch {
+        // Gone already.
+      }
+    }
+    p.kill()
+    try {
+      p.stdin.destroy()
+    } catch {
+      // Gone already.
+    }
   }
 
   /**
@@ -1353,7 +1488,7 @@ export class JobHost {
     // Requests on their way get no answer: said now, not once they time out (a refresh's next look would follow).
     for (const done of this.waiting.values()) done(null)
     this.waiting.clear()
-    for (const [q, { up }] of this.alive) if (!up) q.kill()
+    for (const [q, { up }] of this.alive) if (!up) this.endHelper(q)
     return Promise.all([...this.alive.values()].map((h) => h.gone)).then(() => undefined)
   }
 }

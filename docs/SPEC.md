@@ -3978,6 +3978,14 @@ Whether a conversation may resume there is its **hold** (none: it may):
     process's identity and a followed one's are let go only after one, a followed one whose state can't be read never,
     and past 4096 exits kept the jobs concerned can no longer be told complete), then lets it go; it exits once it holds none, and says `keeping` first, so a quit doesn't
     wait for it. It ends nothing. A quit whose agents kept nothing running leaves none behind.
+    - It is started through a launcher, a small PowerShell of its own (HI-2314): Node puts each process Hive starts in
+      one job that ends them all once Hive ends (a quit or a crash), and lets their own children leave it, so a helper
+      started directly died with its Hive and kept nothing. The launcher ends with Hive, the helper it starts stays. It
+      hands the helper only its pipes to Hive (a handle list), never what Electron itself could hand down (its own
+      standard handles, such as a test's pipes to it, which a helper outliving Hive would hold open). It waits for the
+      helper and exits with its code; the helper's first line names its own id, by which Hive ends it while the
+      launcher still runs (a stuck helper, one not ready as Hive quits). Not Node's `detached`: PowerShell 5.1 started
+      without a console runs nothing.
     - Each tracked run is bound to its helper (`leftovers.json`'s `helpers`, "pid:created") as it is given its job.
       Bindings are kept by need, never by age (HI-2303: kept to the newest 100, a busy day's launches pushed out the
       binding of a run still holding a slot's writer, so its keeper's `ended` freed nothing): each stays until settled,
