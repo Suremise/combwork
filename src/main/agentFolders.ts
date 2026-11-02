@@ -14,7 +14,7 @@ import { samePlace } from './fsutil'
 import { createLogger, userText } from './logger'
 import * as G from './platform/git'
 import { isUnknown } from './platform/types'
-import { endedEarlier, endProcessesExactly, forgetEarlierRun, forgetKeeperRun, keepRunEnded, keeperState, nothingHolds, keeperStillBound, leftoversOfRun, onRunOutcome, runOutcome, runTookWriter, runWriterReleased, setHiveIdentity, settleLeftovers, stillRunningOf, type RunOutcome } from './agentProcesses'
+import { endedEarlier, endProcessesExactly, forgetEarlierRun, forgetKeeperRun, keepRunEnded, keeperObservation, keeperState, nothingHolds, keeperStillBound, leftoversOfRun, onRunOutcome, runOutcome, runTookWriter, runWriterReleased, setHiveIdentity, settleLeftovers, stillRunningOf, type RunOutcome } from './agentProcesses'
 import { hiveError } from './hiveError'
 import { fmt, msg, tr } from '../shared/i18n'
 import { toast } from './events'
@@ -532,13 +532,25 @@ export async function goneWriterSettles(projectPath: string, w: { run: string; a
     log.info(`The slot writer ${w.run} in ${userText(basename(projectPath))} of a Hive that has gone (process ${w.pid}) settled: its processes were seen to end`)
     return Object.freeze({ run: w.run, helper: null })
   }
-  const kept = await keeperState(w.run, `${w.pid}:${w.started}`)
-  // Its keeper's "live" is a snapshot, never proof (HI-2309, Darren's decision: the keeper's fresh answer is HI-2313):
-  // held, and when what it lists is only Windows' own idle brokers, the user is told once that releasing it is safe.
+  const hive = `${w.pid}:${w.started}`
+  const kept = await keeperState(w.run, hive)
+  if (kept?.state === 'ended') {
+    log.info(`The slot writer ${w.run} in ${userText(basename(projectPath))} settled: ${userText(w.agent)}'s ended run left nothing running (its Hive, process ${w.pid}, gone; seen by its helper ${kept.helper})`)
+    return Object.freeze({ run: w.run, helper: kept.helper })
+  }
+  // Its keeper's "live" is a snapshot, never proof (HI-2309): its keeper is asked for the run now (HI-2313), and the one
+  // rule decides on that answer alone: nothing, or only Windows' own idle brokers. No answer, or any doubt: held.
+  const now = await keeperObservation(w.run, hive)
+  if (now && (await nothingHolds(now.members, now.more, w.agent))) {
+    // Revoked while it was asked: held (the clear checks the binding again inside its write).
+    if (!keeperStillBound(w.run, now.helper)) return false
+    log.info(`The slot writer ${w.run} in ${userText(basename(projectPath))} settled: ${userText(w.agent)}'s ended run has nothing running that holds it (its Hive, process ${w.pid}, gone; its helper ${now.helper} asked now)`)
+    return Object.freeze({ run: w.run, helper: now.helper })
+  }
+  // Held, and when what its last receipt lists is only Windows' own idle brokers, the user is told once that releasing
+  // it is safe.
   if (kept?.state === 'live' && slot) await tellIdleBrokerHold(projectPath, slot, w, kept.members, kept.more)
-  if (kept?.state !== 'ended') return false
-  log.info(`The slot writer ${w.run} in ${userText(basename(projectPath))} settled: ${userText(w.agent)}'s ended run left nothing running (its Hive, process ${w.pid}, gone; seen by its helper ${kept.helper})`)
-  return Object.freeze({ run: w.run, helper: kept.helper })
+  return false
 }
 
 /** Runs whose held slot the user was told only an idle broker holds (HI-2309): once each, in this Hive's run. */

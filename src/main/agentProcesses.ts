@@ -371,6 +371,81 @@ export async function keeperState(run: string, hive: string): Promise<KeeperStat
   return { state: 'live', helper, members: members.filter((p) => !/^(conhost|openconsole)(\.exe)?$/i.test(p.name)), more: total - members.length }
 }
 
+/** How long asking a gone Hive's keeper for its run now may take (HI-2313): a bound for one that doesn't answer. */
+const KEEPER_ASK_MS = 5000
+
+/** The pipe a keeper answers on while it keeps (HI-2313), named after its identity ("pid:created"). */
+export const keeperPipe = (helper: string): string => `\\\\.\\pipe\\hive-keeper-${helper.replace(':', '-')}`
+
+/** A keeper's answer of a run's job now (HI-2313): its members described (console hosts left out, counted), `more` beyond. */
+export type KeeperObservation = { helper: string; members: AgentProcess[]; more: number }
+
+/**
+ * A gone Hive's run as its keeper observes it now (HI-2313): asked of the helper its run is bound to (unrevoked), over its
+ * pipe, which it serves while it keeps; the keeper sweeps for the asking, never answering from a state written before.
+ * Null unless the answer is whole and its own: one line, version 1, this run, that helper, the writer's Hive (`hive`,
+ * "pid:started"), `now` and `observed: complete`, every member by id, start time and name, its total at least those
+ * described. Anything else (no binding, no pipe, no answer within KEEPER_ASK_MS, unsure, a job it doesn't hold): null,
+ * and its writer stays held. It ends nothing; what it says is decided by the one rule (nothingHolds).
+ */
+export async function keeperObservation(run: string, hive: string): Promise<KeeperObservation | null> {
+  if (process.platform !== 'win32' || !/^[A-Za-z0-9_-]{1,64}$/.test(run)) return null
+  await readRecords()
+  const helper = runHelpers.get(run)
+  if (!helper || !HELPER_ID.test(helper) || !keeperStillBound(run, helper)) return null
+  const line = await askKeeper(keeperPipe(helper), `observe ${run}\n`) // i18n-ignore: the keeper's request, a protocol word
+  return line === null ? null : parseObservation(line, run, helper, hive)
+}
+
+/** One line asked of a keeper's pipe, and its answer's one line; null when none came whole within KEEPER_ASK_MS. */
+async function askKeeper(pipe: string, ask: string): Promise<string | null> {
+  const { connect } = await import('net')
+  return new Promise((resolve) => {
+    let got = ''
+    let done = false
+    const finish = (line: string | null): void => {
+      if (done) return
+      done = true
+      clearTimeout(timer)
+      socket.destroy()
+      resolve(line)
+    }
+    const timer = setTimeout(() => finish(null), KEEPER_ASK_MS)
+    const socket = connect({ path: pipe })
+    socket.setEncoding('utf8')
+    socket.on('connect', () => socket.write(ask))
+    socket.on('data', (d: string) => {
+      got += d
+      const nl = got.indexOf('\n')
+      if (nl >= 0) finish(got.slice(0, nl))
+      else if (got.length > MAX_KEEPER_BYTES) finish(null)
+    })
+    socket.on('error', () => finish(null))
+    socket.on('close', () => finish(null))
+  })
+}
+
+/** A keeper's answer (HI-2313) taken only whole and its own (keeperObservation); exported for the unit tests. */
+export function parseObservation(line: string, run: string, helper: string, hive: string): KeeperObservation | null {
+  let s: Record<string, unknown>
+  try {
+    s = JSON.parse(line) as Record<string, unknown>
+  } catch {
+    return null
+  }
+  if (!s || typeof s !== 'object' || Array.isArray(s) || s.v !== 1 || s.run !== run || s.helper !== helper || s.hive !== hive || s.state !== 'now' || s.observed !== 'complete') return null
+  const total = s.total
+  if (typeof total !== 'number' || !Number.isSafeInteger(total) || total < 0 || !Array.isArray(s.members) || s.members.length > MAX_LISTED || total < s.members.length) return null
+  const members: AgentProcess[] = []
+  for (const m of s.members as unknown[]) {
+    const e = m as { pid?: unknown; created?: unknown; name?: unknown }
+    if (!e || typeof e !== 'object' || typeof e.pid !== 'number' || !Number.isSafeInteger(e.pid) || e.pid <= 0 || typeof e.created !== 'string' || !/^\d{1,20}$/.test(e.created) || e.created === '0' || typeof e.name !== 'string' || e.name.length > 260) return null
+    members.push({ pid: e.pid, name: e.name, label: processLabel(e.name, ''), created: e.created })
+  }
+  // A console window's host ends with the process it serves: counted, not listed (keeperState's way).
+  return { helper, members: members.filter((p) => !/^(conhost|openconsole)(\.exe)?$/i.test(p.name)), more: total - members.length }
+}
+
 /** A run's writer settled (HI-2055): its keeper's state and its binding go. */
 export function forgetKeeperRun(run: string): void {
   if (!/^[A-Za-z0-9_-]{1,64}$/.test(run)) return

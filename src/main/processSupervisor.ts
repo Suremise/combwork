@@ -768,16 +768,152 @@ public static class HiveJobs {
     }
     return members.ToArray();
   }
+  /**
+   * A job as it is now, observed as the keeper observes it (HI-2313: one policy for its states and its answers): false
+   * when it holds no such job (let go, or never its own). Its members only after a sweep that was sure of everything (a
+   * failed one could miss an escaped child) and its membership read whole, else null; lost: its ancestry was let go
+   * unsure, so it can never be told complete.
+   */
+  static bool Look(string id, out int[] members, out bool lost) {
+    lock (turn) {
+      members = null;
+      lost = false;
+      if (!jobs.ContainsKey(id)) return false;
+      uncertain = 0;
+      try { Sweep(); } catch { uncertain++; }
+      members = uncertain == 0 ? MembersChecked(id) : null;
+      lost = ancestryLost.Contains(id);
+      return true;
+    }
+  }
+  /** A job's state as JSON, its members (null: none said) by id, start time and name (never a command line). */
+  static string StateJson(string id, string state, string observed, int[] members) {
+    var b = new StringBuilder("{\"v\":1,\"run\":" + Q(id) + ",\"helper\":" + Q(keepSelf) + ",\"hive\":" + Q(keepHive) + ",\"state\":" + Q(state) + ",\"observed\":" + Q(observed));
+    if (members != null) {
+      b.Append(",\"total\":").Append(members.Length).Append(",\"members\":[");
+      for (int i = 0; i < members.Length && i < ${MAX_LISTED}; i++) {
+        string name = "";
+        try { using (var p = System.Diagnostics.Process.GetProcessById(members[i])) name = p.ProcessName; } catch { }
+        b.Append(i > 0 ? "," : "").Append("{\"pid\":").Append(members[i]).Append(",\"created\":\"").Append(CreatedOf(members[i])).Append("\",\"name\":").Append(Q(name)).Append("}");
+      }
+      b.Append("]");
+    }
+    return b.Append(",\"at\":").Append(DateTime.UtcNow.ToFileTimeUtc()).Append("}").ToString();
+  }
+  /**
+   * The answer to a later Hive asking for a run's job now (HI-2313): observed for the asking (Look), never a state written
+   * before. "now" with "complete" and its members (none: empty now); "now" with "unsure" when the observation wasn't sure
+   * or its ancestry was let go unsure; "unknown" for a job it doesn't hold. Ends and changes nothing.
+   */
+  public static string Observation(string id) {
+    if (keepSelf == null || !System.Text.RegularExpressions.Regex.IsMatch(id ?? "", "^[A-Za-z0-9_-]{1,64}$")) return Q("error: no such run");
+    int[] m;
+    bool lost;
+    if (!Look(id, out m, out lost)) return StateJson(id, "unknown", "none", null);
+    if (m == null || lost) return StateJson(id, "now", "unsure", null);
+    Array.Sort(m);
+    return StateJson(id, "now", "complete", m);
+  }
+  [StructLayout(LayoutKind.Sequential)] struct PipeSecurity { public int length; public IntPtr descriptor; public bool inherit; }
+  [DllImport("kernel32.dll", SetLastError=true, CharSet=CharSet.Unicode)] static extern IntPtr CreateNamedPipeW(string name, int openMode, int pipeMode, int instances, int outSize, int inSize, int timeout, ref PipeSecurity sa);
+  [DllImport("advapi32.dll", SetLastError=true, CharSet=CharSet.Unicode)] static extern bool ConvertStringSecurityDescriptorToSecurityDescriptorW(string sddl, int revision, out IntPtr sd, IntPtr size);
+  [DllImport("kernel32.dll", SetLastError=true)] static extern bool ConnectNamedPipe(IntPtr pipe, IntPtr ov);
+  [DllImport("kernel32.dll", SetLastError=true)] static extern bool DisconnectNamedPipe(IntPtr pipe);
+  [DllImport("kernel32.dll", SetLastError=true)] static extern bool ReadFile(IntPtr h, IntPtr buf, int n, IntPtr read, IntPtr ov);
+  [DllImport("kernel32.dll", SetLastError=true)] static extern bool WriteFile(IntPtr h, IntPtr buf, int n, IntPtr written, IntPtr ov);
+  [DllImport("kernel32.dll", SetLastError=true)] static extern bool GetOverlappedResult(IntPtr h, IntPtr ov, out int n, bool wait);
+  [DllImport("kernel32.dll")] static extern bool CancelIoEx(IntPtr h, IntPtr ov);
+  [DllImport("kernel32.dll", SetLastError=true)] static extern IntPtr CreateEventW(IntPtr sa, bool manual, bool initial, IntPtr name);
+  /** The pipe a keeper answers on, named after its identity (its binding names it). */
+  public static string PipeName() { return @"\\.\pipe\hive-keeper-" + (keepSelf ?? "").Replace(':', '-'); }
+  /** How long one asking may take, from connecting to the answer read (a client that stops is let go). */
+  const int ASK_MS = 2000;
+  /**
+   * One overlapped step on the pipe (0 connect, 1 read, 2 write), bounded by ms (-1: none): the bytes moved, or -1 when
+   * it failed or didn't finish in time (then cancelled, and waited for, so its buffer is free).
+   */
+  static int Step(IntPtr pipe, IntPtr ov, IntPtr ev, int kind, IntPtr buf, int n, int ms) {
+    int size = 2 * IntPtr.Size + 8;
+    for (int i = 0; i < size + IntPtr.Size; i++) Marshal.WriteByte(ov, i, 0);
+    Marshal.WriteIntPtr(ov, size, ev);
+    bool ok = kind == 0 ? ConnectNamedPipe(pipe, ov) : kind == 1 ? ReadFile(pipe, buf, n, IntPtr.Zero, ov) : WriteFile(pipe, buf, n, IntPtr.Zero, ov);
+    int err = ok ? 0 : Marshal.GetLastWin32Error();
+    // ERROR_PIPE_CONNECTED: a client connected before it was asked.
+    if (kind == 0 && err == 535) return 0;
+    if (!ok && err != 997) return -1;
+    int moved;
+    if (WaitForSingleObject(ev, ms < 0 ? 0xFFFFFFFF : (uint)Math.Max(0, ms)) != 0) {
+      CancelIoEx(pipe, ov);
+      GetOverlappedResult(pipe, ov, out moved, true);
+      return -1;
+    }
+    return GetOverlappedResult(pipe, ov, out moved, false) ? moved : -1;
+  }
+  static int Left(DateTime deadline) { return (int)Math.Max(0, (deadline - DateTime.UtcNow).TotalMilliseconds); }
+  /**
+   * Its pipe, while it keeps (HI-2313): one client at a time, each asking one line ("observe <run>", at most 256 bytes)
+   * and read its answer (Observation), all within ASK_MS from connecting, then let go. Only this user's processes, never
+   * a remote client, may open it, and only the first instance by its name: one taken already, nothing is served (a later
+   * Hive asking it fails closed). Nothing a client sends ends or changes anything.
+   */
+  static void Serve() {
+    IntPtr pipe = new IntPtr(-1), ev = IntPtr.Zero, ov = IntPtr.Zero, buf = IntPtr.Zero;
+    try {
+      IntPtr sd;
+      string sid = System.Security.Principal.WindowsIdentity.GetCurrent().User.Value;
+      if (!ConvertStringSecurityDescriptorToSecurityDescriptorW("D:P(A;;GA;;;" + sid + ")", 1, out sd, IntPtr.Zero)) return;
+      var sa = new PipeSecurity();
+      sa.length = Marshal.SizeOf(typeof(PipeSecurity));
+      sa.descriptor = sd;
+      // PIPE_ACCESS_DUPLEX | FILE_FLAG_FIRST_PIPE_INSTANCE | FILE_FLAG_OVERLAPPED; PIPE_TYPE_BYTE | PIPE_REJECT_REMOTE_CLIENTS.
+      pipe = CreateNamedPipeW(PipeName(), 0x3 | 0x80000 | 0x40000000, 0x8, 1, 65536, 4096, 0, ref sa);
+      if (pipe == new IntPtr(-1)) return;
+      ev = CreateEventW(IntPtr.Zero, true, false, IntPtr.Zero);
+      ov = Marshal.AllocHGlobal(2 * IntPtr.Size + 8 + IntPtr.Size);
+      buf = Marshal.AllocHGlobal(65536 + 512);
+      if (ev == IntPtr.Zero) return;
+      while (true) {
+        if (Step(pipe, ov, ev, 0, IntPtr.Zero, 0, -1) < 0) { DisconnectNamedPipe(pipe); continue; }
+        try { Converse(pipe, ov, ev, buf); } catch { }
+        DisconnectNamedPipe(pipe);
+      }
+    } catch { } finally {
+      if (pipe != new IntPtr(-1)) CloseHandle(pipe);
+      if (ev != IntPtr.Zero) CloseHandle(ev);
+      if (ov != IntPtr.Zero) Marshal.FreeHGlobal(ov);
+      if (buf != IntPtr.Zero) Marshal.FreeHGlobal(buf);
+    }
+  }
+  /** One client's asking, within ASK_MS: its line, the answer, then its end (so the answer is read before it is let go). */
+  static void Converse(IntPtr pipe, IntPtr ov, IntPtr ev, IntPtr buf) {
+    var deadline = DateTime.UtcNow.AddMilliseconds(ASK_MS);
+    int n = 0, nl = -1;
+    while (nl < 0 && n < 257) {
+      int got = Step(pipe, ov, ev, 1, buf + n, 257 - n, Left(deadline));
+      if (got <= 0) return;
+      for (int i = n; i < n + got; i++) if (Marshal.ReadByte(buf, i) == (byte)'\n') { nl = i; break; }
+      n += got;
+    }
+    if (nl < 0) return;
+    var line = new byte[nl];
+    Marshal.Copy(buf, line, 0, nl);
+    string asked = Encoding.ASCII.GetString(line).TrimEnd('\r');
+    string answer = asked.StartsWith("observe ") ? Observation(asked.Substring(8)) : Q("error: unknown request");
+    byte[] bytes = Encoding.UTF8.GetBytes(answer + "\n");
+    if (bytes.Length > 65536) bytes = Encoding.UTF8.GetBytes(Q("error: too long") + "\n");
+    Marshal.Copy(bytes, 0, buf, bytes.Length);
+    for (int sent = 0; sent < bytes.Length; ) {
+      int put = Step(pipe, ov, ev, 2, buf + sent, bytes.Length - sent, Left(deadline));
+      if (put <= 0) return;
+      sent += put;
+    }
+    // Its end (it read the answer), or the deadline.
+    while (Step(pipe, ov, ev, 1, buf, 512, Left(deadline)) > 0) { }
+  }
   /** A job's state written whole (a temp file, then replaced through to the disk): whether it was. */
   static bool WriteState(string id, string state, int[] members) {
     if (keepDir == null || !System.Text.RegularExpressions.Regex.IsMatch(id, "^[A-Za-z0-9_-]{1,64}$")) return false;
-    var b = new StringBuilder("{\"v\":1,\"run\":" + Q(id) + ",\"helper\":" + Q(keepSelf) + ",\"hive\":" + Q(keepHive) + ",\"state\":" + Q(state) + ",\"observed\":\"complete\",\"total\":" + members.Length + ",\"members\":[");
-    for (int i = 0; i < members.Length && i < ${MAX_LISTED}; i++) {
-      string name = "";
-      try { using (var p = System.Diagnostics.Process.GetProcessById(members[i])) name = p.ProcessName; } catch { }
-      b.Append(i > 0 ? "," : "").Append("{\"pid\":").Append(members[i]).Append(",\"created\":\"").Append(CreatedOf(members[i])).Append("\",\"name\":").Append(Q(name)).Append("}");
-    }
-    b.Append("],\"at\":").Append(DateTime.UtcNow.ToFileTimeUtc()).Append("}");
+    var b = new StringBuilder(StateJson(id, state, "complete", members));
     string path = System.IO.Path.Combine(keepDir, "keeper-" + id + ".json");
     string tmp = path + "." + System.Diagnostics.Process.GetCurrentProcess().Id + ".tmp";
     try {
@@ -808,20 +944,16 @@ public static class HiveJobs {
     if (mine.Count == 0) return;
     try { Console.Out.WriteLine("keeping"); Console.Out.Flush(); Console.Out.Close(); } catch { }
     Notices = null;
+    // Asked by a later Hive for its jobs as they are now (HI-2313).
+    new System.Threading.Thread(Serve) { IsBackground = true }.Start();
     var last = new Dictionary<string, string>();
     while (mine.Count > 0) {
       foreach (var id in new List<string>(mine)) {
         int[] m;
-        // Its membership only after a sweep that was sure of everything (a failed one could miss an escaped child).
-        lock (turn) {
-          uncertain = 0;
-          try { Sweep(); } catch { uncertain++; }
-          m = uncertain == 0 ? MembersChecked(id) : null;
-        }
+        bool lost;
+        if (!Look(id, out m, out lost)) { mine.Remove(id); continue; }
         if (m == null) continue;
         if (m.Length == 0) {
-          bool lost;
-          lock (turn) lost = ancestryLost.Contains(id);
           // Its ancestry let go unsure: never told complete, so no "ended" (its last "live" stays, and its slot held).
           if (!lost) for (int tries = 0; tries < 3 && !WriteState(id, "ended", m); tries++) System.Threading.Thread.Sleep(200);
           lock (turn) Forget(id);
