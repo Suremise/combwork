@@ -30,8 +30,26 @@ const h = vi.hoisted(() => ({
   /** The offers whose notices still have their buttons, and what each was resolved or had its buttons dropped with. */
   openOffers: new Set<string>(),
   resolved: [] as [string, string][],
-  dropped: [] as [string, string[], string][]
+  dropped: [] as [string, string[], string][],
+  /** The record's writes held here while set, and how many are held (HI-2356, HR1's round 1). */
+  saveHold: null as Promise<void> | null,
+  savesHeld: 0
 }))
+
+// The record's writes, held while a test says (a slow disk): what an await on save() lets happen meanwhile.
+vi.mock('original-fs/promises', async (original) => {
+  const actual = await original<typeof import('fs/promises')>()
+  return {
+    ...actual,
+    writeFile: async (...a: Parameters<typeof actual.writeFile>) => {
+      if (h.saveHold) {
+        h.savesHeld++
+        await h.saveHold
+      }
+      return actual.writeFile(...a)
+    }
+  }
+})
 
 vi.mock('../src/main/sessions', () => ({
   sessions: {
@@ -162,7 +180,7 @@ function takesNote(agentId: string): void {
 
 beforeEach(() => {
   dir = tempDir('hive-restart-recovery-')
-  Object.assign(h, { lives: [], workspaces: [], hold: null, holdAsked: 0, starts: [], pending: [], tasks: null, stopEnds: true, paused: false, run: 0, toasts: [], openOffers: new Set(), resolved: [], dropped: [] })
+  Object.assign(h, { lives: [], workspaces: [], hold: null, holdAsked: 0, starts: [], pending: [], tasks: null, stopEnds: true, paused: false, run: 0, toasts: [], openOffers: new Set(), resolved: [], dropped: [], saveHold: null, savesHeld: 0 })
 })
 afterEach(() => {
   m?.stopRestartRecovery()
@@ -376,6 +394,27 @@ describe('the restart queue (HI-1707)', () => {
       expect(states()).toEqual([['a1', 'dismissed'], ['b1', 'dismissed']])
       expect(h.resolved).toEqual([[first, 'Replaced by a newer offer'], [second.offer, 'Not resumed']])
       expect(h.starts).toEqual([])
+    })
+
+    // HR1's round 1: B offered, its record write held (a slow disk). A's notice must already be replaced: its buttons,
+    // which act on every offered entry, would otherwise act on B, which it never named.
+    it("B offered while the record's write is held: A's notice is already replaced, so nothing on it can act on B", async () => {
+      const { recoverB, first } = await twoWorkspaces()
+      let release!: () => void
+      h.saveHold = new Promise((r) => (release = r))
+      recoverB()
+      await vi.waitFor(() => expect(m.restartRecord()?.entries.find((e) => e.agentId === 'b1')?.state).toBe('offered'), { timeout: HUNG_MS })
+      await vi.waitFor(() => expect(h.savesHeld).toBeGreaterThan(0), { timeout: HUNG_MS })
+      // The write still held: A's notice has no buttons left, and the one with buttons names both.
+      expect(h.resolved).toEqual([[first, 'Replaced by a newer offer']])
+      expect(h.openOffers.has(first)).toBe(false)
+      expect(h.toasts).toHaveLength(2)
+      expect(h.toasts[1].message).toContain('a1 (alpha)')
+      expect(h.toasts[1].message).toContain('b1 (alpha)')
+      h.saveHold = null
+      release()
+      await m.restartRecordSaved()
+      expect(h.toasts).toHaveLength(2)
     })
 
     it("Resume on A's offer, then B's offer: A's notice keeps its report, not its buttons, and B's Don't Resume dismisses B's agent alone", async () => {

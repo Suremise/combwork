@@ -292,8 +292,9 @@ export async function startRestartRecovery(): Promise<void> {
     if (e.state === 'held') setState(e, 'offered')
     if (e.state === 'offered') offer.push(e)
   }
-  await save()
+  // Told before the write is awaited, as pump does (HI-2356): an offer the queue told already is replaced at once.
   if (offer.length) tellOffer()
+  await save()
   // A team resuming (HI-2081): what waited for it is decided now.
   onHiveEvent((ev) => {
     if (ev.type === 'team-pause-changed' && !ev.pause) pump()
@@ -453,9 +454,11 @@ function pump(): void {
             offer.push(e)
           }
         }
+        // Told in the same step as they became offered, before any await (HI-2356, HR1's round 1): an older notice's
+        // buttons, which act on every offered entry, never see one it didn't name.
         if (offer.length) {
-          await save()
           tellOffer()
+          await save()
         }
         if (stuckRun && runLive(stuckRun)) return
         stuckRun = null
