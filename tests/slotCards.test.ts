@@ -1507,6 +1507,27 @@ describe('Hive quitting (#1628)', { timeout: 60_000 }, () => {
     expect(state.calls).toEqual(['start lane lane-1 with no slot', 'lane lane-1 waits no more', 'start lane lane-2', 'lane lane-2 waits no more'])
   })
 
+  it("every slot lent, a code lane waiting first (HR1 on HI-2338): a later no-code lane still starts with no slot, the code lanes keep waiting, and no later one is lent", async () => {
+    const e = (env = setup({ platform: 'git', review: 'none', finish: 'agentMerges', folder: 'slots', target: 'main' }, { autoRun: false }))
+    state.wf = e.wf
+    state.noCode = [8]
+    state.waiting = [
+      { id: 'lane-a', project: 'project', builder: { id: 'b1', name: 'B1' }, cards: [7, 8], slotWait: { since: '2026-10-25T00:00:00.000Z' } },
+      { id: 'lane-b', project: 'project', builder: { id: 'b2', name: 'B2' }, cards: [8], slotWait: { since: '2026-10-25T00:01:00.000Z' } },
+      { id: 'lane-c', project: 'project', builder: { id: 'b3', name: 'B3' }, cards: [9], slotWait: { since: '2026-10-25T00:02:00.000Z' } }
+    ]
+    const lends: string[] = []
+    state.pool = {
+      leaseOf: () => null,
+      leasesOf: () => [],
+      lend: async (o: { lane: string }) => (lends.push(o.lane), { ok: false, refusal: { why: 'noSlot' } })
+    }
+    const ws = { path: e.home, lifetime: { aborted: false }, info: () => ({ projects: [{ name: 'project', path: e.project }] }), projectConfig: async () => ({ agents: [] }) } as never
+    await settleSlotCards(ws, e.project)
+    expect(lends).toEqual(['lane-a'])
+    expect(state.calls).toEqual(['start lane lane-b with no slot', 'lane lane-b waits no more'])
+  })
+
   it('a pass that never ends holds the quit only for its bound', async () => {
     const { go } = await heldPass()
     await quitSlotCards(10)

@@ -4195,7 +4195,8 @@ Whether a conversation may resume there is its **hold** (none: it may):
   from the window (`startLaneFromWindow`) or recorded by the Assistant or a script (`launchRecordedLane`): it records no
   `slotWait`, and its agents start where they are (the project folder by default; the brief says so). A lane already
   waiting for a slot whose cards are all no-code by now is started the same way by slotCards' waiting-lanes pass, its
-  wait cleared, nothing lent. A code card coming up later in it (added, or made code) is lent the lane's slot as it
+  wait cleared, nothing lent, even behind a code lane waiting before it: once no slot can be lent, the pass lends no
+  later lane one but still starts those that need none [HR1's round 1]. A code card coming up later in it (added, or made code) is lent the lane's slot as it
   starts (`leaseForStart`), as a lane an agent registers is at its first card: none free, that start waits
   (`start.slotAvailable`). A board with no kinds (waiting for its 1.0 upgrade) lends as before. Solo and no version
   control are unchanged.

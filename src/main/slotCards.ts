@@ -1621,12 +1621,16 @@ async function lendLaneSlot(ws: WorkspaceService, projectPath: string, lane: str
  * A project's lanes waiting for a slot (`slotWait`), in the order they began waiting: each lent one while one is free,
  * its agents (its builder and reviewer now) started once (laneStart's, by their brief's delivery identity), then its
  * wait cleared. Only with the rules on; a lane ended or abandoned meanwhile isn't running, so it is never started.
+ * Once none is free, no later lane is lent one, but a lane that needs none (only no-code cards, HI-2338) still starts.
  */
 async function startWaitingLanes(ws: WorkspaceService, projectPath: string, pool: SlotPool): Promise<void> {
   const name = ws.info()?.projects.find((p) => p.path.toLowerCase() === projectPath.toLowerCase())?.name
   const waiting = (await lanesWaitingForSlot(ws)).filter((l) => l.project.toLowerCase() === name?.toLowerCase()).sort((a, b) => a.slotWait!.since.localeCompare(b.slotWait!.since))
   // The rules off, or Hive quitting (#1628): looked at again after each await, nothing more lent or started.
   const stopped = (): boolean => !workflowEnforced() || ended(ws)
+  // No slot could be lent (HR1 on HI-2338): the lanes after it are visited only for those that need none, so an earlier
+  // code lane keeps its place for the next free slot.
+  let full = false
   for (const lane of waiting) {
     if (stopped()) return
     let lease = pool.leaseOf({ lane: lane.id })
@@ -1640,6 +1644,7 @@ async function startWaitingLanes(ws: WorkspaceService, projectPath: string, pool
         continue
       }
       if (stopped()) return
+      if (full) continue
       // The builder's own slot first (#1441), checked against the default branch (the lane's target isn't known here).
       const own = await carriedToHand(ws, projectPath, pool, lane.builder.id, null)
       if (stopped()) return
@@ -1655,7 +1660,10 @@ async function startWaitingLanes(ws: WorkspaceService, projectPath: string, pool
     if (stopped()) return
     if (!lease) {
       const r = await pool.lend({ lane: lane.id, agent: lane.builder.id }, { install: false })
-      if (!r.ok) return
+      if (!r.ok) {
+        full = true
+        continue
+      }
       lease = r.lease
       log.info(`Lent ${userText(r.slot.name)} to lane ${lane.id}, which waited for a slot (lease ${r.lease.id})`)
       // Its carried lease kept for a card it has left ends now that the lane holds its own (HI-1731).
