@@ -5659,8 +5659,10 @@ class SessionManager {
       if (mode === 'ask' && !l.adapter.descriptor.capabilities.lockAsk) {
         // The CLI can't show its own approval for this, so Hive asks the user and the agent waits.
         const key = `${id}|${keys.get(abs)!}`
-        // Allowed against this claim (HI-2386: an Allow given against another claim of the file allows nothing here).
+        // Allowed against this claim (HI-2386: an Allow given against another claim of the file allows nothing here, and
+        // goes, so the user can be asked about this one).
         if (this.lockAllowed.has(key) && this.lockAllowedClaim.get(key) === held!.claim) continue
+        this.dropAllowance(key)
         // An open question about another claim answers nothing about this one: it goes, and the user is asked about this.
         if (this.lockAsked.has(key) && this.lockAskClaim.get(key) !== held!.claim) this.closeAsk(key)
         if (!this.lockAsked.has(key)) {
@@ -5713,9 +5715,21 @@ class SessionManager {
   private editAccepted<T>(id: string, files: string[], reply: T, keys?: ReadonlyMap<string, string>): T {
     // None waiting (nearly always): no file's identity to resolve.
     if (this.lockGoAhead.size) for (const abs of files) this.lockGoAhead.delete(`${id}|${keys?.get(abs) ?? lockKey(abs)}`)
-    // Nor an answer to an ask still open for them (HI-2386: kept past its turn's end): its notice's Allow goes.
-    if (this.lockAsked.size) for (const abs of files) this.closeAsk(`${id}|${keys?.get(abs) ?? lockKey(abs)}`)
+    // Nor an answer to an ask still open for them (HI-2386: kept past its turn's end): its notice's Allow goes. Nor the
+    // Allows it was given for them: they were against claims its edit has ended (it holds the files now, or edits past a
+    // warning or with locks off), and a later claim of another agent's is asked about anew.
+    if (this.lockAsked.size || this.lockAllowed.size)
+      for (const abs of files) {
+        const key = `${id}|${keys?.get(abs) ?? lockKey(abs)}`
+        this.closeAsk(key)
+        this.dropAllowance(key)
+      }
     return reply
+  }
+
+  private dropAllowance(key: string): void {
+    this.lockAllowed.delete(key)
+    this.lockAllowedClaim.delete(key)
   }
 
   /** An "Ask me" question no longer open (answered, or no longer applying): its notice's Allow goes, saying so. */
@@ -5793,9 +5807,11 @@ class SessionManager {
     const current = asked === undefined ? null : `lock:${key}#${asked}`
     const claim = this.lockAskClaim.get(key)
     const stale = claim !== undefined && this.locks.get(file)?.claim !== claim
-    if (!current || this.lockAllowed.has(key) || (offer !== undefined && offer !== current) || stale) {
+    // Already allowed against this claim (HI-2386, HR1's round 3: one given against another claim doesn't count).
+    const allowed = this.lockAllowed.has(key) && (claim === undefined || this.lockAllowedClaim.get(key) === claim)
+    if (!current || allowed || (offer !== undefined && offer !== current) || stale) {
       // i18n-ignore: the log (English)
-      log.info(`Lock: Allow for ${userText(this.label(l.state))} → ${userText(basename(path))} answered nothing (${!current ? 'no open ask' : this.lockAllowed.has(key) ? 'already allowed' : offer !== undefined && offer !== current ? 'an older notice' : 'its claim has ended'})`)
+      log.info(`Lock: Allow for ${userText(this.label(l.state))} → ${userText(basename(path))} answered nothing (${!current ? 'no open ask' : allowed ? 'already allowed' : offer !== undefined && offer !== current ? 'an older notice' : 'its claim has ended'})`)
       // A question about a claim that has ended is closed whichever notice was pressed.
       if (stale) this.closeAsk(key)
       if (offer !== undefined) resolveOffer(offer, tr(OUTCOME.noLongerAsked))

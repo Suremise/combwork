@@ -264,6 +264,29 @@ describe('Allow on an "Ask me" lock', () => {
     expect(askOf()?.[1]).not.toBe(old![1])
   })
 
+  it("A → B → C → B within running turns (HR1's round 3): B's Allow against A doesn't count against C's claim, and B's Allow for C's claim is answered", async () => {
+    const a = agents()
+    await a.claim()
+    const otherKey = `${p.toLowerCase()}#${a.other.agentId}|`
+    const askOf = () => [...(sessions as unknown as { lockAsked: Map<string, number> }).lockAsked].find(([k]) => k.startsWith(otherKey))
+    // B (editor) is allowed against A's claim and takes it over, in its turn.
+    expect(await a.edit()).not.toBeNull()
+    await a.allow()
+    expect(await a.edit()).toBeNull()
+    // C (other) asks about B's claim, is allowed, and takes it over, in its turn.
+    expect(await a.editBy(a.other, a.file)).not.toBeNull()
+    const c = askOf()!
+    await run(() => sessions.allowLockedEdit(p, a.other.agentId, join(p, a.file), `lock:${c[0]}#${c[1]}`))
+    expect(await a.editBy(a.other, a.file)).toBeNull()
+    // B, still in its turn, edits again: refused for C's claim, and asked about anew.
+    expect(JSON.stringify(await a.edit())).toContain('Hive has asked the user')
+    const fresh = a.offer()
+    expect(fresh).not.toBeNull()
+    // Its Allow is answered (not refused as "already allowed" by the Allow it had against A): its retry goes ahead.
+    await a.allow(fresh!)
+    expect(await a.edit()).toBeNull()
+  })
+
   it("a claim that expired is taken over by a third agent's edit: the ask about it goes, the agent is told to try again, its old Allow answers nothing, and the retry asks about the new claim", async () => {
     const a = agents()
     await a.claim()
