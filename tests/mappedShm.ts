@@ -6,6 +6,7 @@ import { spawn, type ChildProcess } from 'child_process'
 import { join } from 'path'
 import { expect, vi } from 'vitest'
 import { DatabaseSync } from 'node:sqlite'
+import { powershellEnv } from './powershellEnv'
 
 // The longest a wait here waits for what it waits on: a bound for a hung run (tests/README.md).
 const HUNG_MS = 10_000
@@ -52,7 +53,7 @@ export async function whileMapped(dir: string, shm: string, body: (release: () =
     '$view.Dispose(); $mm.Dispose()'
   ].join('\r\n'))
   const release = (): void => writeFileSync(releaseFile, '')
-  const ps: ChildProcess = spawn('powershell.exe', ['-NoProfile', '-ExecutionPolicy', 'Bypass', '-File', ps1, '-File', shm, '-Release', releaseFile], { stdio: ['ignore', 'pipe', 'inherit'], windowsHide: true, env: { SystemRoot: process.env.SystemRoot, PATH: process.env.PATH } })
+  const ps: ChildProcess = spawn('powershell.exe', ['-NoProfile', '-ExecutionPolicy', 'Bypass', '-File', ps1, '-File', shm, '-Release', releaseFile], { stdio: ['ignore', 'pipe', 'inherit'], windowsHide: true, env: powershellEnv() })
   const exited = new Promise<void>((r) => (ps.exitCode !== null ? r() : ps.once('exit', () => r())))
   let out = ''
   ps.stdout!.on('data', (d) => (out += String(d)))

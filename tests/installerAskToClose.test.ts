@@ -5,14 +5,15 @@ import { spawn, spawnSync, type ChildProcess } from 'child_process'
 import { copyFileSync, existsSync, mkdirSync, readFileSync, writeFileSync } from 'fs'
 import { join } from 'path'
 import { afterAll, beforeAll, describe, expect, it } from 'vitest'
+import { powershellEnv } from './powershellEnv'
 import { tempDir } from './tempDir'
 
 const HUNG_MS = 30_000
 const SCRIPT = join(__dirname, '..', 'build', 'hiveAskToClose.ps1')
 const root = join(process.env.SystemRoot ?? 'C:\\Windows')
 const ps = join(root, 'System32', 'WindowsPowerShell', 'v1.0', 'powershell.exe')
-/** PowerShell's environment: what it needs to load Get-CimInstance, nothing of the test's shell. */
-const psEnv = { SystemRoot: root, windir: root, PSModulePath: join(root, 'System32', 'WindowsPowerShell', 'v1.0', 'Modules') }
+/** PowerShell's environment: what it has on any machine (its module-analysis cache too, HI-2401), nothing else of the test's shell. */
+const psEnv = powershellEnv()
 
 /** The stand-in Hive: watches the profile for a request, records it, and acknowledges and exits, acknowledges and stays, or neither. */
 const STAND_IN = `
