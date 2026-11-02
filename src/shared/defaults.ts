@@ -485,7 +485,7 @@ export function modelLabel(model: string, provider: string = DEFAULT_PROVIDER): 
 
 /** The model an agent runs, for display (#248): its name, and the choice it came from when that reads differently. */
 export interface ModelShown {
-  /** "Opus 5.5", "Opus 5.5 (default)" when inherited (Hive's default or the CLI's own), "Claude Code default" when unknown. */
+  /** "Opus 5.5", "Opus 5.5 (default)" when nothing chose it (the CLI's own), "Claude Code default" when unknown. */
   label: string
   /** The choice's own name when it isn't the model's ("Opus", an alias), else null. */
   chosenAs: string | null
@@ -495,7 +495,7 @@ export interface ModelShown {
  * The model an agent's sessions run, for display (#248): the running session's model when it reports one (`running`:
  * the status line's or the transcript's model id), else what the choice resolves to (an alias by the model the CLI says
  * it stands for), else the CLI's default model. Never guessed: what nothing resolves shows as the CLI or provider names
- * it. An own or project choice shows plainly; anything inherited is marked "(default)".
+ * it. A model chosen (its connection's) shows plainly; one the CLI picks is marked "(default)".
  */
 export function agentModelShown(provider: ProviderId, chosen: string | undefined, globalModel: string, info: ModelInfo, running?: string | null): ModelShown {
   const own = chosen && chosen !== 'inherit' ? chosen : ''
@@ -506,19 +506,18 @@ export function agentModelShown(provider: ProviderId, chosen: string | undefined
   // The CLI's default is named in the tooltip only when it is an alias ("chosen as Opus"): an id was nobody's choice.
   const fromCli = !own && !globalModel
   const picked = choice && (!fromCli || resolvedModel(info, choice) !== choice) ? chosenName(provider, choice, info) : null
-  return { label: own ? name : trNow(msg({ id: 'agents.model.inherited', defaultMessage: '{model} (default)', description: "An agent's model when the agent didn't choose it (it comes from the project or Settings): {model} is its name (\"Opus 5.5\")." }), { model: name }), chosenAs: picked && picked !== name ? picked : null }
+  return { label: own ? name : trNow(msg({ id: 'agents.model.inherited', defaultMessage: '{model} (default)', description: "An agent's model when nothing chose it, so its coding agent (CLI) runs its own default: {model} is its name (\"Opus 5.5\"). A model chosen on the agent's connection is shown without this." }), { model: name }), chosenAs: picked && picked !== name ? picked : null }
 }
 
 /**
  * What a pane's footer resolves its model and effort from (HI-1996): a running session's own launch (`launchedWith`:
- * the model and effort it was given, after the connection's defaults and HI-1770's dropped effort), never the settings
- * as they are now; a new session's, the agent's, project's and Settings' choices. The CLI's reports come first either way.
+ * the model and effort it was given, after HI-1770's dropped effort), never the settings as they are now; a new
+ * session's, the agent's as the window reads it (its connection's values, agentLaunchView): HI-2106 launches with no
+ * project or Settings layer, so none is shown (HI-2398). The CLI's reports come first either way.
  * `modelGlobal` is a model the agent didn't choose itself (shown "(default)"); empty, with no model, its CLI's default.
  */
 export function footerChoices(
   a: { model?: string; effort?: string },
-  project: { model?: string; effort?: string },
-  global: { defaultModel?: string; defaultEffort?: string },
   live: { launchedWith?: { model: string | null; effort: string | null; own?: true } } | null | undefined
 ): { model: string | undefined; modelGlobal: string; effort: string | undefined; effortGlobal: string | undefined } {
   const launched = live?.launchedWith
@@ -526,7 +525,15 @@ export function footerChoices(
     const own = !!launched.model && !!launched.own
     return { model: own ? launched.model! : undefined, modelGlobal: own ? '' : (launched.model ?? ''), effort: launched.effort ?? undefined, effortGlobal: undefined }
   }
-  return { model: a.model || project.model, modelGlobal: global.defaultModel ?? '', effort: a.effort ?? project.effort, effortGlobal: global.defaultEffort }
+  return { model: a.model, modelGlobal: '', effort: a.effort, effortGlobal: undefined }
+}
+
+/**
+ * A launch's record of the model and effort it was given (HI-1996, LiveSessionState.launchedWith): a model given is its
+ * connection's, chosen there (HI-2106 launches with no other layer), so its own; none, its CLI's default (HI-2398).
+ */
+export function launchedWithOf(model: string | null | undefined, effort: string | null | undefined): { model: string | null; effort: string | null; own?: true } {
+  return { model: model ?? null, effort: effort ?? null, ...(model && model !== 'inherit' ? { own: true as const } : {}) }
 }
 
 /** agentModelShown's label for new sessions (no running model). */

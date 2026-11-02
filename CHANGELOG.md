@@ -1,5 +1,11 @@
 # Release Notes
 
+## Unreleased
+
+### Fixes
+
+- **An agent's footer no longer marks its connection's model *(default)*.** A model chosen on the agent's connection showed as, say, *GPT-6 Astra (default)* once the agent was running, as if its CLI had picked it. It now shows plainly before and after the agent starts; *(default)* means only that the CLI runs its own default (HI-2398).
+
 ## 1.0.0 — 2026-11-02
 
 **Hive 1.0 runs your board by your project's rules.** Choose how a card goes from Todo to Done (who reviews it, which checks pass first, who merges it, where it is built) with the Solo, Pair or Team presets; agents tell Hive what they did, and Hive moves the card, asks you only what's yours to answer, and can merge approved work itself, each card in its own slot. Agents run on connections Hive keeps (several sign-ins side by side), one notification system tells each thing once, and the Activity view shows what every agent is doing now.
