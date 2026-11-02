@@ -357,7 +357,7 @@ const commitIn = (dir, files, message, trailer) => {
     // HI-2384: DE-R1's watch on X wakes it for these loop steps; read before r1Clear cancels that watch. Cancelled first,
     // the wake goes untold, and DE-R1's next watch of X counts them from its own last change (its gaps, HI-2302): it
     // fires at once, and DE-R1 ends with no watch where the suite waits for it watching.
-    const toldStep = await until(async () => (await deliveryRows('delta', dr1.name)).some((d) => d.text.startsWith(`[Hive] ${keyX} `) && d.text.includes('a card loop step') && ['received', 'acked'].includes(d.state)), HUNG_MS)
+    const toldStep = await until(async () => (await deliveryRows('delta', dr1.name)).some((w) => w.text.startsWith(`[Hive] ${keyX} `) && w.text.includes('a card loop step') && ['received', 'acked'].includes(w.state)), HUNG_MS)
     check("…DE-R1's watch on X tells it, and it reads the wake", !!toldStep, JSON.stringify(await deliveryRows('delta', dr1.name)))
     check('DE-R1 passes Y: Done', (await intent(tdr1, y, 'verdict', { pass: true, comment: 'Y: passed' })).status === 200 && !!(await until(async () => (await card(y))?.column === 'done', HUNG_MS)), (await card(y))?.column)
     // DE-R1 ends with no card watch, as HR1 did on HI-2320: once its own grace check has run (loops:checks, counted
