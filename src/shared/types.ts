@@ -1937,6 +1937,8 @@ export interface AddAgentOptions {
   mcpServers?: string[]
   /** The connection it runs on (HI-2108: its id), on in the workspace; absent: the first usable here (decision A). */
   connection?: string
+  /** Run with the write, under project.json's lock (HI-2328: the Assistant's guard): throwing adds nothing. Main only. */
+  check?: () => void
   /**
    * #456: new-worktree, work in the project's unused worktree on that branch instead when it is merged into the base and
    * clean, brought up to the base; existing-worktree, bring the one chosen up to the base when it is merged and clean.

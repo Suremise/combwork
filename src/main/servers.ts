@@ -1361,7 +1361,7 @@ const NOT_PINNED = "Agents aren't pinned to worktrees in 1.0: slots are lent per
 route('POST', '/v1/projects/:name/agents', async ({ params, body }) => {
   const p = projectByName(params[0])
   const project = basename(p)
-  return assistantChange('agents', `add an agent to ${project}`, { kind: 'add-agent', project }, async () => {
+  return assistantChange('agents', `add an agent to ${project}`, { kind: 'add-agent', project }, async (guard) => {
     const conn = connectionArg(body, p)
     const ws = workspaceOf(p)
     // Decision D (HI-2108): provider, model, effort, mode and context are a connection's now, refused naming those there.
@@ -1376,7 +1376,9 @@ route('POST', '/v1/projects/:name/agents', async ({ params, body }) => {
       ...(body?.workflowRole !== undefined ? { workflowRole: workflowRoleArg(body.workflowRole) } : {}),
       location: 'project',
       mcpServers: mcp.mcpServers ?? undefined,
-      ...(conn?.connection ? { connection: conn.connection } : {})
+      ...(conn?.connection ? { connection: conn.connection } : {}),
+      // Control and the Assistant's session checked again with the write, and just before its start (HI-2328).
+      check: guard
     })
     // The view stays where the user has it; the new agent is marked for them.
     emit({ type: 'agent-added', projectPath: p, agentId: def.id })
@@ -1387,7 +1389,7 @@ route('POST', '/v1/projects/:name/agents', async ({ params, body }) => {
     let launched: string | null = null
     if (body?.start || prompt) {
       try {
-        launched = (prompt ? await startOnTask(p, def.id, def.name, prompt, (line) => sessions.start(p, { agentId: def.id, prompt: line })) : await sessions.start(p, { agentId: def.id }))?.runId ?? null
+        launched = (prompt ? await startOnTask(p, def.id, def.name, prompt, (line) => sessions.start(p, { agentId: def.id, prompt: line, allowed: guard })) : await sessions.start(p, { agentId: def.id, allowed: guard }))?.runId ?? null
         started = ' and started it'
         didStart = true
       } catch (e) {
@@ -1406,7 +1408,7 @@ route('PATCH', '/v1/projects/:name/agents/:agent', async ({ params, body }) => {
   const p = projectByName(params[0])
   const agentId = await agentParam(p, params[1] && decodeURIComponent(params[1]))
   const a = await agentDefOf(p, agentId)
-  return assistantChange('agents', `change ${a.name}'s settings in ${basename(p)}`, { kind: 'update-agent', project: basename(p), agent: actAgent(a) }, async () => {
+  return assistantChange('agents', `change ${a.name}'s settings in ${basename(p)}`, { kind: 'update-agent', project: basename(p), agent: actAgent(a) }, async (guard) => {
     // What of its settings changed, for undo (#1282): as saved when the change was made, under the project's lock.
     let was: AgentDef | undefined
     const role = body?.workflowRole !== undefined ? { workflowRole: workflowRoleArg(body.workflowRole) } : {}
@@ -1414,7 +1416,13 @@ route('PATCH', '/v1/projects/:name/agents/:agent', async ({ params, body }) => {
     // Decision D (HI-2108): refused, naming the connections on its account.
     refuseOldFields(body, getConnection(a.connection)?.account)
     // Another CLI's connection is a change of CLI: only while it is stopped (updateAgent refuses it otherwise).
-    const def = await updateAgent(p, agentId, { ...(body?.name !== undefined ? { name: String(body.name) } : {}), ...agentMcpArg(body), ...(conn ? { connection: conn.connection } : {}), ...role }, { check: (current) => void (was = structuredClone(current)) })
+    const def = await updateAgent(p, agentId, { ...(body?.name !== undefined ? { name: String(body.name) } : {}), ...agentMcpArg(body), ...(conn ? { connection: conn.connection } : {}), ...role }, {
+      // Control and the Assistant's session checked again under the lock, with the write (HI-2328).
+      check: (current) => {
+        guard()
+        was = structuredClone(current)
+      }
+    })
     if (was) await noteAgent(requireWorkspace(), basename(p), was, def)
     const live = sessions.liveFor(p, agentId)
     return { done: `Changed ${def.name}'s settings in ${basename(p)}${live ? ' (it applies them when restarted)' : ''}`, act: { agent: actAgent(def) }, result: def }
@@ -1425,7 +1433,7 @@ route('POST', '/v1/projects/:name/agents/:agent/start', async ({ params, body })
   const p = projectByName(params[0])
   const agentId = await agentParam(p, decodeURIComponent(params[1]))
   const a = await agentDefOf(p, agentId)
-  return assistantChange('agents', `start ${a.name} in ${basename(p)}`, { kind: 'start-agent', project: basename(p), agent: actAgent(a) }, async () => {
+  return assistantChange('agents', `start ${a.name} in ${basename(p)}`, { kind: 'start-agent', project: basename(p), agent: actAgent(a) }, async (guard) => {
     if (sessions.liveFor(p, agentId)) throw new HttpError(409, `${a.name} is already running. Use hive_prompt_agent to give it work once it's idle.`)
     let resumeId: string | undefined
     if (typeof body?.resume === 'string' && body.resume) resumeId = body.resume
@@ -1434,7 +1442,7 @@ route('POST', '/v1/projects/:name/agents/:agent/start', async ({ params, body })
       if (!resumeId) throw new HttpError(409, `${a.name} has no conversation to resume. Start it without resume.`)
     }
     const prompt = typeof body?.prompt === 'string' ? body.prompt.trim() : ''
-    const st = prompt ? await startOnTask(p, agentId, a.name, prompt, (line) => sessions.start(p, { agentId, resumeId, prompt: line })) : await sessions.start(p, { agentId, resumeId })
+    const st = prompt ? await startOnTask(p, agentId, a.name, prompt, (line) => sessions.start(p, { agentId, resumeId, prompt: line, allowed: guard })) : await sessions.start(p, { agentId, resumeId, allowed: guard })
     return { done: `${resumeId ? 'Resumed' : 'Started'} ${a.name} in ${basename(p)}`, said: prompt ? ` on: ${clip(prompt.replace(/\s+/g, ' '), 80)}` : undefined, result: st, ...(st?.runId ? { started: { project: basename(p), agentId, run: st.runId } } : {}) }
   })
 })
@@ -1444,7 +1452,7 @@ route('POST', '/v1/projects/:name/agents/:agent/stop', async ({ params, body, si
   const agentId = await agentParam(p, decodeURIComponent(params[1]))
   const a = await agentDefOf(p, agentId)
   const ws = assistantCaller()
-  return assistantChange('agents', `stop ${a.name} in ${basename(p)}`, { kind: 'stop-agent', project: basename(p), agent: actAgent(a) }, async () => {
+  return assistantChange('agents', `stop ${a.name} in ${basename(p)}`, { kind: 'stop-agent', project: basename(p), agent: actAgent(a) }, async (guard) => {
     const st = sessions.liveFor(p, agentId)
     if (!st) return { done: `${a.name} in ${basename(p)} wasn't running`, result: { ok: true, wasRunning: false } }
     // Stopping an agent in the middle of something is the user's call; one only watching is idle (HI-1994).
@@ -1469,6 +1477,8 @@ route('POST', '/v1/projects/:name/agents/:agent/stop', async ({ params, body, si
       if (sessions.liveFor(p, agentId)?.runId !== st.runId) return { done: `${a.name} in ${basename(p)} had already stopped`, result: { ok: true, wasRunning: false } }
       if (!assistant.allows('agents')) throw new HttpError(403, `The user's settings (Settings → Assistant → Control: ${assistant.LEVEL_NAME[assistant.controlLevel()]}) no longer let you stop agents.`)
     }
+    // Control and the Assistant's session that asked, checked again just before the stop (HI-2328).
+    guard()
     // Its cause from the caller's token (HI-1881): the Assistant's, an agent's, or unknown (a script).
     sessions.stop(p, agentId, ws ? 'assistant' : agentCaller() ? 'agent' : undefined)
     return { done: `Stopped ${a.name} in ${basename(p)}`, result: { ok: true, wasRunning: true } }

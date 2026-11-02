@@ -200,6 +200,8 @@ export async function addAgent(projectPath: string, opts: AddAgentOptions, by: A
         if (list.some((a) => sameAgentName(a.name, name))) throw hiveError(msg({ id: 'worktrees.agent.nameTaken', defaultMessage: 'There is already an agent called "{name}".', description: 'An error: the project already has an agent with the name {name}.' }), { name }, { kind: 'conflict' })
         // Its connection as it is now (HI-1769): turned off or removed while it was being prepared, it isn't added.
         if (def.connection) assertConnectionHere(getConnection(def.connection)?.account ?? def.connection, def.provider!, projectPath, name)
+        // The caller's own last check, with the write (HI-2328: the Assistant's Control and session, after the waits above).
+        opts.check?.()
         // An automatic layout follows the agents, so the new one shows; with one chosen by hand, a full page sends it to the next (#134).
         return { agents: [...list, def] }
       })
