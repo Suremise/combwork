@@ -364,7 +364,10 @@ describe.runIf(process.platform === 'win32')('the keeper (HI-2055)', () => {
     await waitFor(async () => expect(await answered(self, 'observe j8\n')).toMatchObject({ observed: 'complete', members: expect.arrayContaining([expect.objectContaining({ pid: s.pid }), expect.objectContaining({ pid: s.children[0] })]) }))
 
     // A run it doesn't hold, and a request it doesn't know: answered, never as a run's membership.
-    expect(await answered(self, 'observe nope\n')).toMatchObject({ run: 'nope', state: 'unknown' })
+    const unknown = await answered(self, 'observe nope\n')
+    expect(unknown).toMatchObject({ run: 'nope', state: 'unknown' })
+    // Not empty: never taken (HR2 on the design).
+    expect(parseObservation(JSON.stringify(unknown), 'nope', self, '100:5')).toBeNull()
     expect(await answered(self, 'list j8\n')).toBe('error: unknown request')
     // A client that connects and says nothing is let go within its bound: the next one is answered.
     const silent = await ask(self, '', { hold: true })
