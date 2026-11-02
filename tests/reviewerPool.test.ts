@@ -932,6 +932,35 @@ describe('a reviewer watching a card is free for the pool (HI-2333): only what i
     }
   })
 
+  it('a retry armed by a workspace that has closed since does nothing; the workspace opened again gives the line', async () => {
+    const e = (env = setup({ ...optionsFor(1, 'pool', 'project'), platform: 'git' }, { autoRun: false }))
+    state.wf = e.wf
+    state.running = new Set(['R1'])
+    state.status.set('R1', 'watching')
+    state.next = ['notGiven']
+    const was = poolTestHooks.retryMs
+    poolTestHooks.retryMs = 50
+    try {
+      const a = pooled(e, 'Closed meanwhile')
+      await submitted(e, a)
+      const closing = wsOf(e, ONE) as { lifetime: { aborted: boolean } }
+      const fired = poolTestHooks.retriesFired
+      await settleReviewerPool(closing as never, e.project)
+      expect(state.deliveries.map((d) => d.state)).toEqual(['cancelled'])
+      // Closed before its retry fires: the retry does nothing.
+      closing.lifetime.aborted = true
+      await vi.waitFor(() => expect(poolTestHooks.retriesFired).toBe(fired + 1), { timeout: HUNG_MS })
+      expect(state.deliveries.map((d) => d.state)).toEqual(['cancelled'])
+      expect(state.calls).toEqual(['typed to R1'])
+      // Opened again (another service at the same path): its pass tells the assignment still owed, once.
+      await pass(e, ONE)
+      expect(state.deliveries.map((d) => d.state)).toEqual(['cancelled', 'offered'])
+      expect(assignedTo(e, a.id)).toEqual(['R1'])
+    } finally {
+      poolTestHooks.retryMs = was
+    }
+  })
+
   it("asks a pass for an agent's status event only when what its freedom reads has changed, never its inbox alone", () => {
     const base = { status: 'watching', watch: { label: 'x' }, inbox: { unread: 0 } } as never
     const key = (st: Record<string, unknown>, now: { pending?: boolean; backgroundTasks?: number } | null = { pending: false, backgroundTasks: 0 }) => poolStateKey({ ...(base as object), ...st } as never, now)

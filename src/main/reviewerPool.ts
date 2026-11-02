@@ -302,19 +302,28 @@ async function tell(ws: WorkspaceService, projectPath: string, wf: Workflow, slo
   }
 }
 
-/** How long a refused pool line waits for its retry pass (HI-2333); tests set it shorter. */
-export const poolTestHooks = { retryMs: 5000 }
-/** A project's pending retry pass, one at a time (by project path): never re-armed while it waits. */
-const retries = new Map<string, NodeJS.Timeout>()
+/** How long a refused pool line waits for its retry pass (HI-2333), and how many have fired; tests set it shorter. */
+export const poolTestHooks = { retryMs: 5000, retriesFired: 0 }
+/**
+ * A project's pending retry pass, one at a time, by the workspace that armed it (its service, not its path: one closed
+ * and opened again at the same path is another) and the project: never re-armed while it waits. Cleared when the pool
+ * stops; one whose workspace has closed does nothing when it fires, and the pass it runs checks everything again (the
+ * rules, the assignment still this agent's, its delivery not made already).
+ */
+const retries = new Map<WorkspaceService, Map<string, NodeJS.Timeout>>()
 function retrySoon(ws: WorkspaceService, projectPath: string): void {
   const key = projectPath.toLowerCase()
-  if (retries.has(key)) return
+  const mine = retries.get(ws) ?? new Map<string, NodeJS.Timeout>()
+  if (mine.has(key) || ws.lifetime.aborted) return
   const t = setTimeout(() => {
-    retries.delete(key)
+    poolTestHooks.retriesFired++
+    mine.delete(key)
+    if (!mine.size && retries.get(ws) === mine) retries.delete(ws)
     if (!ws.lifetime.aborted) void settleReviewerPool(ws, projectPath).catch((e) => log.warn('retrying the reviewer pool', e))
   }, poolTestHooks.retryMs)
   t.unref?.()
-  retries.set(key, t)
+  mine.set(key, t)
+  retries.set(ws, mine)
 }
 
 /** A pool's assignment given up (`ReviewerReleased`) while it is still the submission's and not started; the pass again. */
@@ -410,7 +419,7 @@ export function startReviewerPool(): void {
     offAdvanced()
     if (soon) clearTimeout(soon)
     clearInterval(hourly)
-    for (const t of retries.values()) clearTimeout(t)
+    for (const mine of retries.values()) for (const t of mine.values()) clearTimeout(t)
     retries.clear()
   }
 }
