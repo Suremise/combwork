@@ -9,6 +9,7 @@ import { lineName, slugOf, type SlotForStart } from '../../src/main/workflow/run
 import { tempDir } from '../tempDir'
 import { reconcile, slotPreparationOwed } from '../../src/main/workflow/reconcile'
 import type { FactData } from '../../src/shared/workflow/facts'
+import { GUARD_FNS, type GuardInputs } from '../../src/shared/workflow/guards'
 
 let env: Env | null = null
 afterEach(() => {
@@ -105,6 +106,67 @@ describe('cards on slots (#1438)', () => {
     expect(s.started).toMatchObject({ folder: 'project' })
     expect(s.started?.lease).toBeUndefined()
     expect(e.store.pendingActions().filter((a) => a.kind === 'prepareSlot')).toEqual([])
+  })
+
+  it('HI-2335: a no-code card takes no slot: with none free it starts where its agent is, the slot never asked for; a code card still waits', async () => {
+    const { e, asked, unused } = world(() => ({ wait: "no slot free: the pool's 1 slot is in use" }))
+    const decide = e.wf.createCard({ title: 'Decide', kind: 'no-code' })
+    const r = await e.wf.start(decide.key, B1)
+    moved(r)
+    const s = e.wf.state(decide)
+    expect(s.started).toMatchObject({ folder: 'project', cardKind: 'no-code', builder: 'B1' })
+    expect(s.started?.lease).toBeUndefined()
+    expect(s.started?.slot).toBeUndefined()
+    expect(e.wf.folderOf(s)).toBe(e.project)
+    expect(asked).toEqual([])
+    expect(unused).toEqual([])
+    expect(e.store.pendingActions().filter((a) => a.kind === 'prepareSlot')).toEqual([])
+    // Nothing tells it to move: it carries on where it runs.
+    expect(JSON.stringify((r as { warnings?: string[] }).warnings ?? [])).not.toMatch(/continue in|waits for a slot/)
+    // A code card is unchanged: it asks for a slot, and with none free it waits.
+    const fix = e.wf.createCard({ title: 'Fix' })
+    refusedBy(await e.wf.start(fix.key, B1), 'start.slotAvailable')
+    expect(asked.map((a) => a.card)).toEqual([fix.id])
+  })
+
+  it("HI-2335: a no-code card's evidence covers the target its slot-less start plans on (#1401)", async () => {
+    const { e } = world(() => ({ wait: 'none free' }))
+    // The project folder on another branch than the default: a slot's target and the project folder's differ.
+    sh(e.project, 'switch', '-q', '-c', 'dev')
+    // G7 empty: a slot's target is the default branch, the project folder's is its line.
+    const o = { ...e.options, target: '' }
+    const p = e.wf.platform(o)
+    const primedOf = async (card: ReturnType<typeof e.store.cardByKey> & object) => ((await p.prime(card, e.wf.state(card), o, 'B1')) as { target?: string | null })?.target
+    const noCode = e.store.cardByKey(e.wf.createCard({ title: 'No code', kind: 'no-code' }).key)!
+    const plan = (await p.start(noCode, o, 'B1', true)) as { target?: string; folder?: string }
+    expect([await primedOf(noCode), plan.target, plan.folder]).toEqual(['dev', 'dev', 'project'])
+    // A code card's still plans on a slot's target, the default branch.
+    const code = e.store.cardByKey(e.wf.createCard({ title: 'Code' }).key)!
+    expect(await primedOf(code)).toBe('main')
+  })
+
+  it('HI-2335: under Solo and with no version control a no-code card starts as before, in the project folder', async () => {
+    for (const platform of ['git', 'none'] as const) {
+      const e = (env = setup({ ...preset(platform, 'solo'), preChecks: [] }, { autoRun: false }))
+      const asked: number[] = []
+      e.wf.cfg.slotFor = async (card) => (asked.push(card.id), { wait: 'none free' })
+      for (const kind of ['no-code', 'code'] as const) {
+        const card = e.wf.createCard({ title: `${platform} ${kind}`, kind })
+        moved(await e.wf.start(card.key, B1))
+        expect(e.wf.state(card).started, `${platform} ${kind}`).toMatchObject({ folder: 'project', cardKind: kind })
+      }
+      expect(asked, platform).toEqual([])
+      env.close()
+      env = null
+    }
+  })
+
+  it('HI-2335: the slot rule never holds a no-code card; a code card with no slot free is held', () => {
+    const base = { ruleset: null, state: null } as unknown as Omit<GuardInputs, 'card' | 'slotFree'>
+    const of = (kind: 'code' | 'no-code', slotFree: boolean) => GUARD_FNS['start.slotAvailable']({ ...base, card: { key: 'AM-1', kind, labels: [], blocked: null }, slotFree } as GuardInputs)
+    expect(of('no-code', false)).toBeNull()
+    expect(of('code', false)).toMatchObject({ rule: 'start.slotAvailable' })
+    expect(of('code', true)).toBeNull()
   })
 
   it('a card started again keeps the line it has: its base where it left the target', async () => {
