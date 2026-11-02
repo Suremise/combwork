@@ -14,6 +14,8 @@ const st = vi.hoisted(() => ({
   found: { isUpdateAvailable: false } as Record<string, unknown>,
   installs: [] as [boolean, boolean][],
   feeds: [] as Record<string, unknown>[],
+  updates: { checkAutomatically: true, downloadAutomatically: true, install: 'auto', prerelease: false },
+  settingsChanged: [] as ((s: unknown, prev: unknown) => void)[],
   toasts: [] as { level: string; title: string; actions?: { label: string; command: string; args?: unknown[] }[] }[]
 }))
 vi.mock('electron-updater', () => ({
@@ -29,8 +31,10 @@ vi.mock('electron-updater', () => ({
 }))
 vi.mock('../src/main/config', () => ({
   config: {
-    settings: { updates: { checkAutomatically: true, downloadAutomatically: true, install: 'auto', prerelease: false } },
-    onSettingsChanged: () => undefined,
+    get settings() {
+      return { updates: st.updates }
+    },
+    onSettingsChanged: (fn: (s: unknown, prev: unknown) => void) => void st.settingsChanged.push(fn),
     get: () => ({ lastRunVersion: '0.0.0-test' }),
     update: () => undefined
   }
@@ -49,6 +53,8 @@ beforeEach(async () => {
   st.found = { isUpdateAvailable: false }
   st.installs = []
   st.feeds = []
+  st.updates = { checkAutomatically: true, downloadAutomatically: true, install: 'auto', prerelease: false }
+  st.settingsChanged = []
   st.toasts = []
   delete process.env.HIVE_UPDATE_DELAY
   ;((await import('electron')).app as { isPackaged: boolean }).isPackaged = true
@@ -71,6 +77,43 @@ describe('update checks', () => {
     expect(st.checks).toBe(1)
     await vi.advanceTimersByTimeAsync(6 * 60 * 60 * 1000)
     expect(st.checks).toBe(2)
+  })
+
+  it('automatic checks turned off before the first one: none runs; turned on again: one at once, then every 6 hours (HI-2324)', async () => {
+    delete process.env.HIVE_TEST_QUIET
+    const updater = await import('../src/main/updater')
+    updater.initUpdater({ restart: () => undefined })
+    const change = (checkAutomatically: boolean): void => {
+      const prev = { updates: st.updates }
+      st.updates = { ...st.updates, checkAutomatically }
+      for (const fn of st.settingsChanged) fn({ updates: st.updates }, prev)
+    }
+    await vi.advanceTimersByTimeAsync(10_000)
+    change(false)
+    await vi.advanceTimersByTimeAsync(6 * 60 * 60 * 1000 + 30_000)
+    expect(st.checks).toBe(0)
+    // A manual check still runs.
+    await updater.check(true)
+    expect(st.checks).toBe(1)
+    change(true)
+    await vi.advanceTimersByTimeAsync(0)
+    expect(st.checks).toBe(2)
+    await vi.advanceTimersByTimeAsync(6 * 60 * 60 * 1000)
+    expect(st.checks).toBe(3)
+  })
+
+  it('automatic checks turned off and on again before the first one: one check at once, not a second at 30 s (HI-2324)', async () => {
+    delete process.env.HIVE_TEST_QUIET
+    ;(await import('../src/main/updater')).initUpdater({ restart: () => undefined })
+    const change = (checkAutomatically: boolean): void => {
+      const prev = { updates: st.updates }
+      st.updates = { ...st.updates, checkAutomatically }
+      for (const fn of st.settingsChanged) fn({ updates: st.updates }, prev)
+    }
+    change(false)
+    change(true)
+    await vi.advanceTimersByTimeAsync(60_000)
+    expect(st.checks).toBe(1)
   })
 
   it("a packaged Hive reads GitHub's releases through Hive's provider (HI-2311); a development build sets no feed", async () => {
