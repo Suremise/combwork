@@ -44,7 +44,7 @@ async function launch(name) {
   const live = async () => (await inv('session:live')).find((s) => s.agentId === agent.id)
   await inv('session:start', alpha, { agentId: agent.id })
   const ready = await until(async () => (await live())?.status === 'ready', 20000)
-  return { app, page, inv, alpha, agent, live, ready }
+  return { app, page, inv, alpha, agent, live, ready, userData }
 }
 
 const until = async (fn, ms = 10000) => {
@@ -156,7 +156,8 @@ async function keepBusy(inv, alpha, agent, live, secs) {
   // --- HI-2336: Hive reopened during the wait, a file edited and left unsaved. Quit Now, and the agent finishing, ask about
   // it (save or discard) rather than quit and lose it; Cancel there keeps Hive running.
   {
-    const { app, page, inv, alpha, agent, live, ready } = await launch('reopen')
+    const { app, page, inv, alpha, agent, live, ready, userData } = await launch('reopen')
+    const reentries = () => (fs.existsSync(path.join(userData, 'logs', 'hive.log')) ? fs.readFileSync(path.join(userData, 'logs', 'hive.log'), 'utf8').split('\n').filter((l) => l.includes('final look at unsaved files is already asking')).length : 0)
     check('reopen: the agent starts', !!ready)
     const dialog = page.locator('.dialog', { hasText: 'Quit Hive?' })
     const waitToQuit = async (secs) => {
@@ -184,7 +185,11 @@ async function keepBusy(inv, alpha, agent, live, secs) {
     let closedAt = null
     void app.waitForEvent('close', { timeout: 0 }).then(() => (closedAt = Date.now()), () => undefined)
     check('the agent finishing asks about the file edited since, rather than quit', !!(await until(async () => (await dialog.count()) === 1 && /1 file has unsaved changes/.test(await dialog.innerText()), QUIT_HUNG_MS)) && !closedAt)
-    await lib.sleep(1500) // A fixed wait on purpose: repeated session events in this time must not open a second dialog, nor quit.
+    // A second request while it asks (Quit, which means "now" while a quit waits, as a session event's check does): Hive
+    // says it brought the open dialog forward rather than ask again; then still one dialog, and still running.
+    const before = reentries()
+    void page.evaluate(() => window.hive.invoke('app:quit')).catch(() => undefined)
+    check('a second request while it asks is taken by the dialog already open', !!(await until(() => reentries() > before, HUNG_MS)))
     check('…once, and still running', (await page.locator('.dialog', { hasText: 'Quit Hive?' }).count()) === 1 && !closedAt)
     await dialog.locator('button.primary, button.danger').last().click()
     check('Save and quit then quits', !!(await until(() => closedAt, QUIT_HUNG_MS)))

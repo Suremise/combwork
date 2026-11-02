@@ -643,6 +643,7 @@ function finishPendingQuit(): Promise<void> {
   if (finishingPendingQuit) {
     const asking = hiveWindows().find((e) => e.question)
     if (asking) showWindow(asking.win)
+    log.info('Pending quit: its final look at unsaved files is already asking; brought forward, not asked again')
     return finishingPendingQuit
   }
   finishingPendingQuit = (async () => {
