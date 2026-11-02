@@ -97,8 +97,43 @@ export function gitRouted(): boolean {
 
 export function git(cwd: string, args: string[], maxBuffer = 16 * 1024 * 1024, input?: string, opts: GitRunOptions = {}): Promise<GitResult> {
   // HI-2137: the git Hive starts (Git for Windows' real git rather than its launcher, where it found one).
-  return gitAs(opts.exe !== undefined ? { exe: opts.exe } : gitExe(), cwd, args, maxBuffer, input, opts)
+  const run = (): Promise<GitResult> => gitAs(opts.exe !== undefined ? { exe: opts.exe } : gitExe(), cwd, args, maxBuffer, input, opts)
+  return changesWorktrees(args) ? oneWorktreeChange(cwd, run) : run()
 }
+
+/** A command that changes the repository's list of worktrees (add, remove, prune, move, repair, lock...), not `list`. */
+export const changesWorktrees = (args: readonly string[]): boolean => args[0] === 'worktree' && args[1] !== undefined && args[1] !== 'list'
+
+/** The changes to each repository's worktrees under way, by the folder they run in (its last one's end). */
+const worktreeChanges = new Map<string, Promise<unknown>>()
+
+/**
+ * HI-2322: one change to a repository's worktrees at a time in this process. Git reads every worktree's entry
+ * (.git/worktrees/<name>) as it adds one, and fails on one another add has made but not yet written ("fatal: failed to
+ * read .git/worktrees/copy-1/commondir"), so two review copies, slots or worktrees made at once could fail. Keyed by
+ * the folder git runs in: every caller runs these in the project's folder. Each waits for the one before it, whatever
+ * that one's outcome; the entry goes once its last change has ended.
+ */
+export function oneWorktreeChange<T>(cwd: string, fn: () => Promise<T>): Promise<T> {
+  const key = resolve(cwd).toLowerCase()
+  const run = (worktreeChanges.get(key) ?? Promise.resolve()).then(fn, fn)
+  const tail = run.catch(() => undefined)
+  worktreeChanges.set(key, tail)
+  void tail.then(() => worktreeChanges.get(key) === tail && worktreeChanges.delete(key))
+  return run
+}
+
+/**
+ * The line of git's stderr that says why it failed: its first `fatal:` or `error:` line, else its first line. Not
+ * simply the first: `git worktree add` says "Preparing worktree…" before its error (HI-2322).
+ */
+export function gitErrorLine(err: string): string {
+  const lines = err.trim().split(/\r?\n/)
+  return lines.find((l) => /^(fatal|error):/.test(l)) ?? lines[0] ?? ''
+}
+
+/** For tests: how many repositories have a worktree change under way or waiting. */
+export const worktreeChangesPending = (): number => worktreeChanges.size
 
 /** git() with the git it starts (`use`). */
 async function gitAs(use: GitExe, cwd: string, args: string[], maxBuffer: number, input: string | undefined, opts: GitRunOptions): Promise<GitResult> {

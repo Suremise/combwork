@@ -30,7 +30,7 @@ import { existsSync } from 'original-fs'
 import { mkdir } from 'original-fs/promises'
 import { basename, join, resolve } from 'path'
 import { placeMatcher, samePlace } from './fsutil'
-import { git } from './git'
+import { git, gitErrorLine } from './git'
 import { createLogger, userText } from './logger'
 import { deletingIn, folderThere, IDLE_MS, lockHash, OpLost, quiet, releaseDeleteIn, type Holder, type OpHolder, type SlotConn, type SlotOptionsNow, type SlotRunner, type SlotRunEnd } from './slots'
 import { copyIgnored, listWorktrees } from './worktrees'
@@ -567,14 +567,14 @@ export class CopyPool {
         await mkdir(this.deps.dir, { recursive: true })
         await git(this.deps.project, ['worktree', 'prune'])
         const r = await git(this.deps.project, ['worktree', 'add', '--detach', copy.folder, lease.revision])
-        if (!r.ok) return await fail(`git worktree add: ${r.err.trim().split(/\r?\n/)[0] || 'failed'}`)
+        if (!r.ok) return await fail(`git worktree add: ${gitErrorLine(r.err) || 'failed'}`)
         if (opts.copy.trim()) await copyIgnored(this.deps.project, copy.folder, opts.copy).catch((e) => log.warn(`Could not copy files into ${userText(name)}`, e))
       } else {
         // The exact revision, and nothing else: tracked changes dropped, what isn't ignored removed (dependencies stay).
         const co = await git(copy.folder, ['checkout', '--detach', '--force', lease.revision])
-        if (!co.ok) return await fail(`git checkout: ${co.err.trim().split(/\r?\n/)[0] || 'failed'}`)
+        if (!co.ok) return await fail(`git checkout: ${gitErrorLine(co.err) || 'failed'}`)
         const cl = await git(copy.folder, ['clean', '-fd'])
-        if (!cl.ok) return await fail(`git clean: ${cl.err.trim().split(/\r?\n/)[0] || 'failed'}`)
+        if (!cl.ok) return await fail(`git clean: ${gitErrorLine(cl.err) || 'failed'}`)
       }
       const hash = await lockHash(copy.folder)
       const needed = made || (hash !== null && hash !== copy.installHash)

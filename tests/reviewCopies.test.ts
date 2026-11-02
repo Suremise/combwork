@@ -387,8 +387,9 @@ describe('waiting when none is free', () => {
     const rev = head(w.project)
     const R3 = { id: 'r-3', name: 'R3' }
     for (const [card, r] of [[12, R1], [13, R2], [14, R3]] as const) review(w, card, r.id, 1, rev)
+    // Both copies made at once: git's worktree changes in the repository one at a time (HI-2322, git.ts oneWorktreeChange).
     const [a, b] = await Promise.all([w.rc.start(12, R1), w.rc.start(13, R2)])
-    expect([a.is, b.is]).toEqual(['ready', 'ready'])
+    expect([a.is, b.is], JSON.stringify([a, b])).toEqual(['ready', 'ready'])
     expect(a.is === 'ready' && b.is === 'ready' && a.folder !== b.folder).toBe(true)
     expect((await w.rc.start(14, R3)).is).toBe('waiting')
   })
