@@ -1,4 +1,4 @@
-// HI-2379: a merge that brings thousands of commits into a project folder's line while a card works in that folder
+// HI-2379: a fast-forward that brings thousands of commits into a project folder's line while a card works in that folder
 // (Solo, no slots): Hive attributes each of them to the card (SPEC §16.3.2), and main's thread is never held long while
 // it does. The release merge into main brought 3,536 and held it for 40 s, each commit its own transaction folding the
 // card's whole log again (2,000 here held it 18 s); in batches, main's longest stall stays well under a second.
@@ -57,10 +57,11 @@ function fixture() {
         g.last = now
       }, 10).unref()
     })
-    git(['merge', '-q', '--no-ff', '-m', 'merge big', 'big'])
+    // A fast-forward: they are the line's own then (a merge commit's branch is never attributed in the folder, HI-2382).
+    git(['merge', '-q', '--ff-only', 'big'])
     const t0 = Date.now()
-    const attributed = await lib.until(async () => (await inv('tasks:facts', n)).filter((f) => f.kind === 'CommitAttributed').length >= COMMITS + 1 || null, HUNG_MS, 500)
-    console.log(`INFO ${COMMITS + 1} commits attributed ${attributed ? `in ${Date.now() - t0} ms` : 'not all in time'}`)
+    const attributed = await lib.until(async () => (await inv('tasks:facts', n)).filter((f) => f.kind === 'CommitAttributed').length >= COMMITS || null, HUNG_MS, 500)
+    console.log(`INFO ${COMMITS} commits attributed ${attributed ? `in ${Date.now() - t0} ms` : 'not all in time'}`)
     const longest = await app.evaluate(() => globalThis.__burstGap.max)
     console.log(`INFO main's longest stall meanwhile: ${longest} ms`)
     check(`every commit is attributed`, !!attributed)

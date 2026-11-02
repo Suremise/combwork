@@ -1,5 +1,5 @@
-// HI-2379: a shared folder's attribution after a merge that brings many commits into its line at once (the release
-// merge into main, 3,536 commits, held main's thread for 40 s: each commit was its own transaction, folding its card's
+// HI-2379: a shared folder's attribution after a fast-forward that brings many commits into its line at once (the
+// release merge into main, 3,536 commits, held main's thread for 40 s: each commit was its own transaction, folding its card's
 // whole log again). They are attributed in batches now: each commit once, its card's head moving from one to the next
 // as before, across the batches' edges too, and the card's log read once a batch, not once a commit. Main's stall in the
 // app is tests/e2e/mergeburst.cjs's.
@@ -76,7 +76,7 @@ describe('a shared folder attributes a burst of commits in batches (HI-2379)', (
     await reconcileNow(w, repo)
     const n = ATTRIBUTE_BATCH * 2 + 37
     manyCommits(repo, 'big', n)
-    git(repo, ['merge', '-q', '--no-ff', '-m', 'merge big', 'big'])
+    git(repo, ['merge', '-q', '--ff-only', 'big'])
     const reads = vi.spyOn(FactStore.prototype, 'facts')
     try {
       await reconcileNow(w, repo, ['main'])
@@ -87,7 +87,7 @@ describe('a shared folder attributes a burst of commits in batches (HI-2379)', (
       reads.mockRestore()
     }
     const all = [...git(repo, ['rev-list', '--reverse', 'main@{1}..main']).split('\n')]
-    expect(all).toHaveLength(n + 1)
+    expect(all).toHaveLength(n)
     expect(FactStore.forBoard(w, { project: 'p', key: '' }).folderCommits(repo).map((r) => r.sha)).toEqual(all)
     const facts = factsOf(w, card)
     expect(facts.filter((f) => f.kind === 'CommitAttributed').map((f) => (f.data as { commit: string }).commit)).toEqual(all)
@@ -111,7 +111,7 @@ describe('a shared folder attributes a burst of commits in batches (HI-2379)', (
     const edge = new Set([ATTRIBUTE_BATCH - 2, ATTRIBUTE_BATCH - 1, ATTRIBUTE_BATCH, ATTRIBUTE_BATCH + 1])
     manyCommits(repo, 'big', n, (i) => (edge.has(i) ? `P-${two}` : null))
     const all = (() => {
-      git(repo, ['merge', '-q', '--no-ff', '-m', 'merge big', 'big'])
+      git(repo, ['merge', '-q', '--ff-only', 'big'])
       return git(repo, ['rev-list', '--reverse', 'main@{1}..main']).split('\n')
     })()
     await reconcileNow(w, repo, ['main'])

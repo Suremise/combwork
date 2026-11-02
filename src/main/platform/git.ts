@@ -641,7 +641,6 @@ export function firstParents(repo: string, base: string, headRev: string): Promi
   })
 }
 
-/** The commits of a range, oldest first, with their author emails and `Hive-Card` trailers. */
 /** The commits in a range, newest first, as full ids: at most `max` (HI-2245: a bounded read). */
 export async function commitIds(repo: string, range: string, max: number): Promise<Maybe<string[]>> {
   const r = await git(repo, ['rev-list', `--max-count=${max}`, range])
@@ -649,8 +648,12 @@ export async function commitIds(repo: string, range: string, max: number): Promi
   return r.out.split(/\r?\n/).filter(Boolean)
 }
 
-export async function commits(repo: string, range: string): Promise<Maybe<CommitInfo[]>> {
-  const r = await git(repo, ['log', '--reverse', '--format=%H%x1f%ae%x1f%(trailers:key=Hive-Card,valueonly,separator=%x2C)%x1f%s%x1e', range])
+/**
+ * The commits of a range, oldest first, with their author emails and `Hive-Card` trailers. `firstParent`: only the line's
+ * own commits, its merges included but not the commits a merge brought in (HI-2382).
+ */
+export async function commits(repo: string, range: string, opts: { firstParent?: boolean } = {}): Promise<Maybe<CommitInfo[]>> {
+  const r = await git(repo, ['log', '--reverse', ...(opts.firstParent ? ['--first-parent'] : []), '--format=%H%x1f%ae%x1f%(trailers:key=Hive-Card,valueonly,separator=%x2C)%x1f%s%x1e', range])
   if (!r.ok) return unknown(U.commitsOf, { range })
   return r.out
     .split('\x1e')

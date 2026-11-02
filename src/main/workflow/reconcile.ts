@@ -77,7 +77,9 @@ async function attributeOnce(wf: Workflow, hooks: ReconcileHooks): Promise<'done
     for (const b of bases.slice(1)) if ((await G.isAncestor(project, b, from)) === true) from = b
   }
   if (from === head) return 'done'
-  const list = await G.commits(project, `${from}..${head}`)
+  // The line's own commits (HI-2382, Darren): a branch merged in keeps its commits on their own cards; the merge is
+  // attributed like any commit of the line.
+  const list = await G.commits(project, `${from}..${head}`, { firstParent: true })
   if (isUnknown(list)) return 'done'
   await hooks.afterRead?.()
   const decided = list.map((c) => {
