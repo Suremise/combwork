@@ -1222,6 +1222,21 @@ async function inboxPending(apiPort, project, agent, token) {
   return v ? (v.deliveries ?? []).filter((d) => d.state === 'queued' || d.state === 'offered' || d.state === 'uncertain').map((d) => ({ id: d.id, kind: d.kind, state: d.state, offered: d.offered ?? null, text: d.text })) : null
 }
 
+/**
+ * What is left on a fake CLI's input line after it read `s` (HI-2385): an Enter or a Ctrl+U clears it, a DEL or a
+ * Backspace erases its last character (as fake-claude does; Hive withdraws a doorbell it typed with DELs), the rest is
+ * typed onto it.
+ */
+function lineLeft(s) {
+  let line = []
+  for (const ch of s) {
+    if (ch === '\r' || ch === '\x15') line = []
+    else if (ch === '\x7f' || ch === '\b') line.pop()
+    else line.push(ch)
+  }
+  return line.join('')
+}
+
 async function typeLine(inv, key, home, agent, text, { live = null, taken = null, ready = null, strict = false, tries = 3, hungMs = TURN_HUNG_MS, disturb = null } = {}) {
   if (!live && !taken) throw new Error('typeLine: give it live or taken')
   if (!fs.existsSync(path.join(home, 'fake-log-input.txt'))) throw new Error(`typeLine: the fake's input log is off in ${home} (lib.logFakeInput before it starts)`)
@@ -1250,7 +1265,7 @@ async function typeLine(inv, key, home, agent, text, { live = null, taken = null
     const dropped = jsonl('fake-dropped.jsonl').length
     // Its line empty first: a wake Hive is typing (its Ctrl+U and text read, its Enter not yet) is let finish. Bounded:
     // what never clears is typed over, and seen as disturbed below.
-    await until(() => readAll().split(/[\r\x15]/).pop() === '', hungMs)
+    await until(() => lineLeft(readAll()) === '', hungMs)
     if (disturb === 'before' && attempt === 1) {
       const wake = '[Hive] A wake typed as the suite types.'
       await inv('pty:write', key, wake)
@@ -1272,10 +1287,10 @@ async function typeLine(inv, key, home, agent, text, { live = null, taken = null
       const i = s.indexOf(text, from)
       return i >= 0 && s.indexOf('\r', i) >= 0 ? s : null
     }, hungMs)
-    // Intact: nothing on the line before it (since the last Enter or Ctrl+U, however long before it was read), and
-    // nothing between it and its Enter.
+    // Intact: nothing on the line before it (since the last Enter or Ctrl+U, however long before it was read, and
+    // what a DEL erased gone, lineLeft), and nothing between it and its Enter.
     const at = read ? read.indexOf(text, from) : -1
-    const intact = !!read && read.slice(0, at).split(/[\r\x15]/).pop() === '' && read.slice(at + text.length, read.indexOf('\r', at)) === ''
+    const intact = !!read && lineLeft(read.slice(0, at)) === '' && read.slice(at + text.length, read.indexOf('\r', at)) === ''
     if (!intact) {
       lost.push(`disturbed: ${JSON.stringify((read ?? readAll()).slice(Math.max(0, from - 200)))}`)
       continue

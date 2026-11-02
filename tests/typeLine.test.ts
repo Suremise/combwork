@@ -62,3 +62,35 @@ describe('typeLine waits for its readiness (HI-1918)', () => {
     expect(t.writes.map((w) => w.data)).toEqual(['shell: echo hi', '\r'])
   })
 })
+
+/** What the CLI read before the suite types, logged as the fake's input log has it. */
+const readBefore = (home: string, ...data: string[]): void => {
+  for (const d of data) appendFileSync(join(home, 'fake-input.jsonl'), `${JSON.stringify({ agent: 'B1', data: d })}\n`)
+}
+
+describe("typeLine's line as the fake reads it (HI-2385)", () => {
+  const doorbell = '[Hive] New in your inbox: 1 card event (DE-1) (m8). Call hive_inbox to read it.'
+
+  it('a doorbell Hive withdrew with DELs leaves the line empty: typed at once, taken on the first attempt', async () => {
+    const t = terminal()
+    // As on HI-2384's run: Hive's probe ("x", DEL), the doorbell pasted, then erased one DEL a character.
+    readBefore(t.home, 'x', '\x7f', `\x1b[200~${doorbell}\x1b[201~`, '\x7f'.repeat(8), '\x7f'.repeat([...doorbell].length - 8))
+    const r = await typeLine(t.inv, 'k', t.home, 'B1', 'shell: echo hi', { taken: t.taken, hungMs: HUNG_MS })
+    expect(r).toEqual({ attempt: 1, lost: [] })
+    expect(t.writes.map((w) => w.data)).toEqual(['shell: echo hi', '\r'])
+  })
+
+  it('Backspace erases as DEL does', async () => {
+    const t = terminal()
+    readBefore(t.home, 'wake', '\b'.repeat(4))
+    expect(await typeLine(t.inv, 'k', t.home, 'B1', 'shell: echo hi', { taken: t.taken, hungMs: HUNG_MS })).toEqual({ attempt: 1, lost: [] })
+  })
+
+  it('a doorbell only partly erased is still on the line: disturbed, typed again', async () => {
+    const t = terminal()
+    readBefore(t.home, `\x1b[200~${doorbell}\x1b[201~`, '\x7f'.repeat(8))
+    const r = await typeLine(t.inv, 'k', t.home, 'B1', 'shell: echo hi', { taken: t.taken, tries: 2, hungMs: 300 })
+    expect(r.attempt).toBe(2)
+    expect(r.lost[0]).toMatch(/^disturbed: /)
+  })
+})
