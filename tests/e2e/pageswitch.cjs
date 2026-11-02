@@ -78,7 +78,11 @@ const check = (name, ok, extra = '') => {
     }, HUNG_MS)
     check('page 2 draws with WebGL, and a terminal of page 1 that gave its context back is out of the page', !!out, JSON.stringify(await terminals()))
     const parked = out ? out[0].key : page1[0]
-    await print(parked, 'printed while out of the page\r\n')
+    // Printed by its CLI, through its pty (the fake echoes what is typed into its input box), as an agent's output comes
+    // while its page is hidden. Written into xterm alone, it wasn't on the pty's screen: page 1's terminals can still be
+    // waiting for a fit as page 2 shows (shown with WebGL isn't fitted), and their resize back on page 1 has ConPTY repaint
+    // the screen without it (HI-2374).
+    await inv('pty:write', parked, 'printed while out of the page')
     check('what is printed into it meanwhile is kept', !!(await lib.until(async () => (await lines(parked)).includes('printed while out of the page'), HUNG_MS)), await lines(parked))
 
     // Back on page 1: in its pane again, with WebGL, fitted and inside its pane.
