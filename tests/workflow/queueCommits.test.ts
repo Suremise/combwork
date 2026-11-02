@@ -305,6 +305,18 @@ describe("a commit's stream, git's trace in it (#1350)", () => {
     expect(commitFailed(failed(stream('passing-hook-then-signer-waits')), true)).toMatchObject({ pause: 'signingWaits', message: expect.stringContaining('Inappropriate ioctl for device') })
   })
 
+  it('HI-2399: recorded with git 2.56, where git reprints the signer\'s text after it exits: the same diagnoses as 2.45\'s', () => {
+    const s = readCommitStream(stream('passing-hook-then-signer-2.56'))
+    expect(s.children.filter((c) => c.kind !== 'other')).toEqual([
+      { kind: 'hook', name: 'commit-msg', code: 0, text: 'passphrase policy validation passed\n', after: '' },
+      { kind: 'signer', code: 2, text: '', after: 'error: gpg failed to sign the data:\ngpg: signing failed: No secret key\n\nfatal: failed to write commit object\n' }
+    ])
+    const o = commitFailed(failed(stream('passing-hook-then-signer-2.56')), true)
+    expect(o).toMatchObject({ pause: 'signing' })
+    expect('message' in o && o.message).toBe('error: gpg failed to sign the data:\ngpg: signing failed: No secret key\n\nfatal: failed to write commit object')
+    expect(commitFailed(failed(stream('passing-hook-then-signer-waits-2.56')), true)).toMatchObject({ pause: 'signingWaits', message: expect.stringContaining('Inappropriate ioctl for device') })
+  })
+
   it("a failing hook whose last line has no newline, an event-looking fragment before git's own event: returned with its text intact, no event in it", () => {
     const err = stream('failing-hook-no-newline')
     const s = readCommitStream(err)
