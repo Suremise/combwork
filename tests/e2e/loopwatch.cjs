@@ -256,7 +256,8 @@ const check = (name, ok, extra = '') => {
   check('the reviewer watches it alone', !!(await until(async () => (await live(reviewer.id))?.status === 'watching', HUNG_MS)), await why(reviewer.id))
   await inv('watch:cancel', alpha, reviewer.id)
   check('…ends with no watch, and its grace check runs', !!(await until(async () => (await inv('loops:checks', alpha, reviewer.id)) > soloBefore, HUNG_MS)), String(await inv('loops:checks', alpha, reviewer.id)))
-  check("…and another's card with its own reviewer is never stalled for it", !(await stalledOf(solo)) && !((await live(reviewer.id))?.notWatching ?? []).includes(solo), JSON.stringify({ stalled: await stalledOf(solo), mark: (await live(reviewer.id))?.notWatching }))
+  // Its stall, if any, is its own builder's ("Other isn't running": never started here), never the Reviewer's.
+  check("…and another's card with its own reviewer is never stalled for it", !/^Reviewer\b/.test((await stalledOf(solo)) ?? '') && !((await live(reviewer.id))?.notWatching ?? []).includes(solo), JSON.stringify({ stalled: await stalledOf(solo), mark: (await live(reviewer.id))?.notWatching }))
 
   await inv('session:stop', alpha)
   await until(async () => (await inv('session:live')).length === 0, 15000)
