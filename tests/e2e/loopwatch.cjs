@@ -149,7 +149,9 @@ const check = (name, ok, extra = '') => {
   const tile = page.locator(`.task-card[data-task="${c1}"]`)
   check('the board shows the card stalled', !!(await until(async () => /Stalled: Reviewer hasn't taken the wake Hive typed/.test((await tile.innerText().catch(() => '')) ?? ''), 8000)), await tile.innerText().catch(() => ''))
   await page.screenshot({ path: path.join(lib.WORK, 'loopwatch-stalled.png') })
-  const told = () => notices().filter((n) => /hasn't taken a line Hive typed/.test(JSON.stringify(n)))
+  // Windows notifications only: each tell() also logs an `entry` line (HI-2320), not a second notice (HI-2369). Any line
+  // counts for "isn't watching" below, a bell-only notice too.
+  const told = () => notices().filter((n) => n.kind === 'notification' && /hasn't taken a line Hive typed/.test(JSON.stringify(n)))
   check('one notice tells the user', !!(await until(async () => told().length === 1, 5000)), JSON.stringify(notices()))
   await lib.sleep(4000) // on purpose: longer than the grace, to see no second notice comes
   check('…only once, and none saying it isn\'t watching (#777)', told().length === 1 && !notices().some((n) => /isn't watching/.test(n.title ?? '')), JSON.stringify(notices()))

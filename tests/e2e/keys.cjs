@@ -285,10 +285,18 @@ const check = (name, ok, extra = '') => { if (ok) pass++; else fail++; console.l
   await page.locator('.settings-top input.input').first().click()
   await page.keyboard.press('Control+Alt+Y'); await lib.until(async () => (await page.locator('.notif-panel').count()) === 1, HUNG_MS)
   check('new shortcut works', await page.locator('.notif-panel').count() === 1)
-  // Closed by its ×: Escape doesn't close the bell, and pop-ups give way to it while it is open (HI-2320), so the
-  // refusal below would go only to its list (HI-2373).
-  await page.locator('.notif-panel .icon-btn[aria-label="Close"]').click(); await lib.until(async () => (await page.locator('.notif-panel').count()) === 0, HUNG_MS)
-  check('bell closed', await page.locator('.notif-panel').count() === 0)
+  // The bell closes (HI-2376): its shortcut toggles it, and Escape closes it, but not from a field, which uses Escape
+  // itself. Escape in the search field first: the shortcut then closes the bell, which it would reopen had Escape closed it.
+  const bell = page.locator('.notif-panel')
+  await page.keyboard.press('Escape')
+  await page.keyboard.press('Control+Alt+Y'); await lib.until(async () => (await bell.count()) === 0, HUNG_MS)
+  check('Escape in a field leaves the bell open; its shortcut closes it', await bell.count() === 0)
+  await page.keyboard.press('Control+Alt+Y'); await lib.until(async () => (await bell.count()) === 1, HUNG_MS)
+  check('its shortcut opens it again', await bell.count() === 1)
+  await page.evaluate(() => document.activeElement?.blur())
+  // Closed, as the refusal below needs: pop-ups give way to the open bell (HI-2320, HI-2373).
+  await page.keyboard.press('Escape'); await lib.until(async () => (await bell.count()) === 0, HUNG_MS)
+  check('Escape closes the bell', await bell.count() === 0)
   // Chord
   await row.locator('.icon-btn[aria-label^="Change shortcut"]').click(); await sleep(200)
   // The chord's two presses a beat apart, as a person types them; then the wait for the saved chord.
