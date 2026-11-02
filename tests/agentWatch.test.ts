@@ -1257,7 +1257,9 @@ describe('agent watches (main/watches.ts)', async () => {
       expect(line).not.toMatch(/is in Review/)
       await vi.waitFor(async () => expect((await inWorkspace(w, () => tasks.getTask(c, w))).history.some((h) => h.by === 'Hive' && h.what.startsWith("Ended Builder (alpha)'s watch on it"))).toBe(true), HANG)
     }
-    // Two cards: one reassigned leaves quietly; the other never changes; the limit tells both.
+    // Two cards: one reassigned leaves quietly; the other never changes; the limit tells both. The other is Reviewer's card
+    // in Doing, which the watcher doesn't review: another agent's work going on, so it is watched again, not taken to the
+    // user (HI-2381 round 3).
     st.status = 'watching'
     const c1 = await card('One')
     const c2 = await card('Two')
@@ -1267,7 +1269,7 @@ describe('agent watches (main/watches.ts)', async () => {
     const before = st.typed.length
     await watches.tick(Date.now() + 31 * 60_000)
     await vi.waitFor(() => expect(st.told).toHaveLength(before + 1), HANG)
-    expect(st.told.at(-1)).toBe(`[Hive] #${c1} was reassigned to Second (your watch on it ended). No change on #${c2} in 30 min: your card watch has ended. Drop the first from your list; for the rest, tell the user (hive_notify) and ask what to do.`)
+    expect(st.told.at(-1)).toBe(`[Hive] #${c1} was reassigned to Second (your watch on it ended). No change on #${c2} in 30 min: your card watch has ended. #${c2} is in Doing with Reviewer. Drop the first from your list; watch #${c2} again: another agent's work is going on; don't tell the user about it.`)
     await disposeWorkspaceService(w)
   })
 
