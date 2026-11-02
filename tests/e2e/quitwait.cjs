@@ -44,7 +44,7 @@ async function launch(name) {
   const live = async () => (await inv('session:live')).find((s) => s.agentId === agent.id)
   await inv('session:start', alpha, { agentId: agent.id })
   const ready = await until(async () => (await live())?.status === 'ready', 20000)
-  return { app, page, inv, alpha, agent, live, ready }
+  return { app, page, inv, alpha, agent, live, ready, userData }
 }
 
 const until = async (fn, ms = 10000) => {
@@ -151,6 +151,49 @@ async function keepBusy(inv, alpha, agent, live, secs) {
     await inv('session:stop', alpha, agent.id).catch(() => undefined)
     await inv('settings:update', { general: { confirmOnQuit: 'never' } }).catch(() => undefined)
     await app.close().catch(() => undefined)
+  }
+
+  // --- HI-2336: Hive reopened during the wait, a file edited and left unsaved. Quit Now, and the agent finishing, ask about
+  // it (save or discard) rather than quit and lose it; Cancel there keeps Hive running.
+  {
+    const { app, page, inv, alpha, agent, live, ready, userData } = await launch('reopen')
+    const reentries = () => (fs.existsSync(path.join(userData, 'logs', 'hive.log')) ? fs.readFileSync(path.join(userData, 'logs', 'hive.log'), 'utf8').split('\n').filter((l) => l.includes('final look at unsaved files is already asking')).length : 0)
+    check('reopen: the agent starts', !!ready)
+    const dialog = page.locator('.dialog', { hasText: 'Quit Hive?' })
+    const waitToQuit = async (secs) => {
+      check('reopen: it is working', !!(await keepBusy(inv, alpha, agent, live, secs)))
+      await page.evaluate(() => window.hive.invoke('app:quit'))
+      await until(async () => (await dialog.count()) === 1, 5000)
+      await dialog.locator('button', { hasText: 'Quit when' }).click()
+      check('reopen: a quit is pending, the window hidden', !!(await until(async () => (await inv('app:quitState')).pending === true && !(await visible(app)), 5000)))
+      // Shown again from the tray (as Show Hive does; a test copy never takes the focus), and a file left unsaved there,
+      // as its page reports one.
+      await app.evaluate(({ BrowserWindow }) => BrowserWindow.getAllWindows()[0].showInactive())
+      await inv('files:setUnsaved', [path.join(alpha, 'notes.md')])
+    }
+    await waitToQuit(30)
+    // Quit Now while it waits: the dialog, listing the file, and Hive still running.
+    const closing = exited(app, 4000)
+    void page.evaluate(() => window.hive.invoke('app:quit')).catch(() => undefined)
+    check('Quit Now during the wait asks about the file edited since, rather than quit', !!(await until(async () => (await dialog.count()) === 1 && /1 file has unsaved changes/.test(await dialog.innerText()), 5000)) && !(await closing))
+    await page.screenshot({ path: path.join(lib.WORK, 'quitwait-3-reopened-unsaved.png') })
+    await dialog.locator('button', { hasText: 'Cancel' }).click()
+    check('Cancel there keeps Hive running and cancels the pending quit', !!(await until(async () => (await inv('app:quitState')).pending === false, 5000)) && (await dialog.count()) === 0)
+    await until(async () => (await live())?.status === 'finished', QUIT_HUNG_MS)
+    // Again, and this time the agent finishes during the wait: it asks too; Save and quit then quits.
+    await waitToQuit(4)
+    let closedAt = null
+    void app.waitForEvent('close', { timeout: 0 }).then(() => (closedAt = Date.now()), () => undefined)
+    check('the agent finishing asks about the file edited since, rather than quit', !!(await until(async () => (await dialog.count()) === 1 && /1 file has unsaved changes/.test(await dialog.innerText()), QUIT_HUNG_MS)) && !closedAt)
+    // A second request while it asks (Quit, which means "now" while a quit waits, as a session event's check does): Hive
+    // says it brought the open dialog forward rather than ask again; then still one dialog, and still running.
+    const before = reentries()
+    void page.evaluate(() => window.hive.invoke('app:quit')).catch(() => undefined)
+    check('a second request while it asks is taken by the dialog already open', !!(await until(() => reentries() > before, HUNG_MS)))
+    check('…once, and still running', (await page.locator('.dialog', { hasText: 'Quit Hive?' }).count()) === 1 && !closedAt)
+    await dialog.locator('button.primary, button.danger').last().click()
+    check('Save and quit then quits', !!(await until(() => closedAt, QUIT_HUNG_MS)))
+    if (!closedAt) await app.close().catch(() => undefined)
   }
 
   console.log(failed ? `${failed} check(s) failed` : 'all checks passed')

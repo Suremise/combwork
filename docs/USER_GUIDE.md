@@ -2015,7 +2015,7 @@ Quitting stops every running session, in every window. Nothing is lost: each con
 When it asks, you see a table of the agents: each one's project, what it's doing, its card, and what stopping it would interrupt. You can choose:
 
 - **Quit now**: stop everything straight away.
-- **Quit when agents finish**: Hive hides and quits by itself once no agent is working or waiting on background tasks. Until then the tray menu has **Quit Now** and **Cancel Pending Quit**, and opening the window shows a banner with the same choices.
+- **Quit when agents finish**: Hive hides and quits by itself once no agent is working or waiting on background tasks. Until then the tray menu has **Quit Now** and **Cancel Pending Quit**, and opening the window shows a banner with the same choices. If you open the window meanwhile and leave a file with unsaved changes, Hive asks about it (save or discard) before it quits, whether the last agent finished or you chose Quit Now; **Cancel** there keeps Hive running.
 - **Cancel**: keep working.
 
 If files have unsaved changes (in the Files tab, or a shared note, skill, instruction or memory file, or MCP server you're editing), Hive always asks, lists them at the top, and saves them (**Save and quit**) or discards them, as you choose. A file that changed on disk since you opened it isn't overwritten: Hive stays open so you can decide.
