@@ -3,13 +3,14 @@
 // anything (HI-2055). Here a "Hive" (tests/keeperHost.ts: the real JobHost, started as Hive starts it) holds a launch
 // job with a process of the test's own in it, and its main process is ended from outside, nothing else: its helper
 // stays, writes "live" with that process, then "ended" once the test ends it, and exits.
-import { spawn, type ChildProcess } from 'child_process'
+import { spawn, type ChildProcess, type ChildProcessWithoutNullStreams } from 'child_process'
+import type { Writable } from 'stream'
 import { existsSync, readFileSync, writeFileSync } from 'fs'
 import { createRequire } from 'module'
 import { join } from 'path'
 import { buildSync } from 'esbuild'
 import { afterEach, beforeAll, describe, expect, it, vi } from 'vitest'
-import { helperLaunch } from '../src/main/processSupervisor'
+import { helperLaunch, JobHost } from '../src/main/processSupervisor'
 import { tempDir } from './tempDir'
 
 const req = createRequire(import.meta.url)
@@ -116,5 +117,75 @@ app.on('window-all-closed', () => undefined)
     await exited(member)
     await waitFor(() => expect(receipt()).toMatchObject({ state: 'ended', helper: ready.self, total: 0 }))
     await waitFor(() => expect(stillSame(helper)).toEqual([]))
+  }, 60_000)
+
+  /** A launcher started as Hive starts it, on a script of the test's own: the launcher and its helper's identity. */
+  async function launched(script: string): Promise<{ launcher: ChildProcessWithoutNullStreams; helper: Identity[]; out: () => string }> {
+    const { file, args, stdio } = helperLaunch(script)
+    const launcher = spawn(file, args, { windowsHide: true, stdio, env: baseEnv(), cwd: dir }) as ChildProcessWithoutNullStreams
+    started.push(launcher)
+    let out = ''
+    launcher.stdout.setEncoding('utf8').on('data', (d: string) => (out += d))
+    const pid = await vi.waitFor(() => {
+      const m = /pid (\d+)/.exec(out)
+      if (!m) throw new Error(`no pid: ${out}`)
+      return Number(m[1])
+    }, { timeout: HUNG_MS, interval: 100 })
+    const helper = identify([pid])
+    helpers.push(...helper)
+    return { launcher, helper, out: () => out }
+  }
+  const code = (c: ChildProcess) => exited(c).then(() => c.exitCode)
+
+  it('a stuck helper is ended by its Hive only through its launcher, which holds its handle: never by an id (#603)', async () => {
+    // Ready, then answers nothing and ignores its input's end: only its launcher's handle can end it.
+    const stuck = "[Console]::Out.WriteLine('pid ' + $PID); $null = [Console]::In.ReadLine(); [Console]::Out.WriteLine('ready'); while ($true) { Start-Sleep -Milliseconds 200 }"
+    let proc: ChildProcessWithoutNullStreams | null = null
+    const host = new JobHost({
+      waitMs: () => 8_000,
+      testMode: () => '',
+      log: { warn: () => undefined },
+      onJoined: () => undefined,
+      onLost: () => undefined,
+      onFailed: () => undefined,
+      launch: () => {
+        const { file, args, stdio } = helperLaunch(stuck)
+        proc = spawn(file, args, { windowsHide: true, stdio, env: baseEnv(), cwd: dir }) as ChildProcessWithoutNullStreams
+        started.push(proc)
+        return proc
+      }
+    })
+    expect(await host.ensure()).toBe(true)
+    const helper = identify([host.pid!])
+    expect(helper).toHaveLength(1)
+    helpers.push(...helper)
+    // Its request isn't answered within the wait: the host ends it, and the launcher exits once it has.
+    expect(await host.request('list', 'stuck-run')).toBeNull()
+    expect(await code(proc!)).toBe(1)
+    expect(stillSame(helper)).toEqual([])
+  }, 60_000)
+
+  it('its launcher told to end it after it has exited by itself ends nothing more, and its control pipe’s end ends nothing', async () => {
+    // Exits with 7 at its input's end.
+    const own = "[Console]::Out.WriteLine('pid ' + $PID); while ($null -ne [Console]::In.ReadLine()) {}; exit 7"
+    const a = await launched(own)
+    // The control pipe ends (as Hive gone): the helper runs on, then exits at its input's end with its own code.
+    ;(a.launcher.stdio[3] as Writable).end()
+    a.launcher.stdin.end()
+    expect(await code(a.launcher)).toBe(7)
+    expect(stillSame(a.helper)).toEqual([])
+
+    // Told only once the helper has gone (its launcher about to exit, or exited): its own code, nothing ended.
+    const b = await launched(own)
+    const control = b.launcher.stdio[3] as Writable
+    control.on('error', () => undefined)
+    b.launcher.stdin.end()
+    await waitFor(() => expect(stillSame(b.helper)).toEqual([]))
+    const telling = setInterval(() => control.writable && control.write('e'), 10)
+    try {
+      expect(await code(b.launcher)).toBe(7)
+    } finally {
+      clearInterval(telling)
+    }
   }, 60_000)
 })

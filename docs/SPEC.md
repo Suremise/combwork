@@ -3983,8 +3983,9 @@ Whether a conversation may resume there is its **hold** (none: it may):
       started directly died with its Hive and kept nothing. The launcher ends with Hive, the helper it starts stays. It
       hands the helper only its pipes to Hive (a handle list), never what Electron itself could hand down (its own
       standard handles, such as a test's pipes to it, which a helper outliving Hive would hold open). It waits for the
-      helper and exits with its code; the helper's first line names its own id, by which Hive ends it while the
-      launcher still runs (a stuck helper, one not ready as Hive quits). Not Node's `detached`: PowerShell 5.1 started
+      helper and exits with its code. A helper Hive must end (stuck, or not ready as Hive quits) is ended by its
+      launcher, told on a control pipe of its own (Node's fourth, never handed on), through the handle it holds, never
+      by an id (#603); that pipe's end (Hive gone) ends nothing. Not Node's `detached`: PowerShell 5.1 started
       without a console runs nothing.
     - Each tracked run is bound to its helper (`leftovers.json`'s `helpers`, "pid:created") as it is given its job.
       Bindings are kept by need, never by age (HI-2303: kept to the newest 100, a busy day's launches pushed out the

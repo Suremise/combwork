@@ -1,6 +1,7 @@
 import { spawn, type ChildProcessWithoutNullStreams } from 'child_process'
 import { tmpdir } from 'os'
 import { join } from 'path'
+import type { Writable } from 'stream'
 
 /**
  * Hive's process supervisor (#507, #543, #659, #678; shared since #1360): one hidden PowerShell per Hive (its C#
@@ -1111,7 +1112,9 @@ const HOST_INPUT = Buffer.from(HOST_SOURCE, 'utf8').toString('base64') + '\n'
 /**
  * The helper's launcher (HI-2314): starts the command line given with only its own standard handles (its pipes to
  * Hive) to inherit, in a console of its own with no window, waits for it, and returns its exit code (-1: it couldn't
- * start it, said on its error output).
+ * start it, said on its error output). Its fourth pipe from Hive (fd 3, the C runtime's handles in its startup info,
+ * never handed on) is its control: an "e" read there ends the helper through the handle it holds (under the lock its
+ * closing takes, so never once that handle is closed); the pipe's end (Hive gone: a quit, a crash) ends nothing.
  */
 const LAUNCH_SOURCE = String.raw`
 using System;
@@ -1125,6 +1128,33 @@ public static class HiveLaunch {
     public IntPtr attributes;
   }
   [StructLayout(LayoutKind.Sequential)] struct ProcessInfo { public IntPtr process, thread; public int pid, tid; }
+  [DllImport("kernel32.dll")] static extern void GetStartupInfoW(ref StartupInfoEx si);
+  [DllImport("kernel32.dll", SetLastError=true)] static extern bool ReadFile(IntPtr h, byte[] buf, int n, out int read, IntPtr overlapped);
+  [DllImport("kernel32.dll")] static extern bool TerminateProcess(IntPtr h, int code);
+  static readonly object gate = new object();
+  /** The helper's handle while it is held (under gate); zero once closed. */
+  static IntPtr child = IntPtr.Zero;
+  /** Its fd 3 from the C runtime's handles in its startup info (Node's fourth pipe), or zero. */
+  static IntPtr Control() {
+    var s = new StartupInfoEx();
+    s.cb = Marshal.SizeOf(typeof(StartupInfoEx)) - IntPtr.Size;
+    GetStartupInfoW(ref s);
+    if (s.reserved2 == IntPtr.Zero || s.reserved2Size < 4) return IntPtr.Zero;
+    int n = Marshal.ReadInt32(s.reserved2);
+    if (n < 4 || s.reserved2Size < 4 + n + n * IntPtr.Size) return IntPtr.Zero;
+    IntPtr h = Marshal.ReadIntPtr(s.reserved2, 4 + n + 3 * IntPtr.Size);
+    return h == new IntPtr(-1) ? IntPtr.Zero : h;
+  }
+  static void Watch(object o) {
+    IntPtr h = (IntPtr)o;
+    var buf = new byte[64];
+    int read;
+    while (ReadFile(h, buf, buf.Length, out read, IntPtr.Zero) && read > 0) {
+      bool end = false;
+      for (int i = 0; i < read; i++) if (buf[i] == (byte)'e') end = true;
+      if (end) lock (gate) if (child != IntPtr.Zero) TerminateProcess(child, 1);
+    }
+  }
   [DllImport("kernel32.dll")] static extern IntPtr GetStdHandle(int which);
   [DllImport("kernel32.dll", SetLastError=true)] static extern bool SetHandleInformation(IntPtr h, int mask, int flags);
   [DllImport("kernel32.dll", SetLastError=true)] static extern bool InitializeProcThreadAttributeList(IntPtr list, int count, int flags, ref IntPtr size);
@@ -1135,6 +1165,9 @@ public static class HiveLaunch {
   [DllImport("kernel32.dll")] static extern bool GetExitCodeProcess(IntPtr h, out int code);
   [DllImport("kernel32.dll")] static extern bool CloseHandle(IntPtr h);
   public static int Run(string line) {
+    IntPtr control = Control();
+    // Never handed on (the handle list leaves it out too).
+    if (control != IntPtr.Zero) SetHandleInformation(control, 1, 0);
     var std = new System.Collections.Generic.List<IntPtr>();
     foreach (int which in new[] { -10, -11, -12 }) {
       IntPtr h = GetStdHandle(which);
@@ -1161,10 +1194,15 @@ public static class HiveLaunch {
         // EXTENDED_STARTUPINFO_PRESENT | CREATE_NO_WINDOW
         if (!CreateProcessW(null, new StringBuilder(line), IntPtr.Zero, IntPtr.Zero, std.Count > 0, 0x80000 | 0x8000000, IntPtr.Zero, null, ref si, out pi)) return Fail("start");
         CloseHandle(pi.thread);
+        lock (gate) child = pi.process;
+        if (control != IntPtr.Zero) new System.Threading.Thread(Watch) { IsBackground = true }.Start(control);
         WaitForSingleObject(pi.process, -1);
         int code;
-        if (!GetExitCodeProcess(pi.process, out code)) code = -1;
-        CloseHandle(pi.process);
+        lock (gate) {
+          if (!GetExitCodeProcess(pi.process, out code)) code = -1;
+          CloseHandle(pi.process);
+          child = IntPtr.Zero;
+        }
         return code;
       } finally { DeleteProcThreadAttributeList(attrs); }
     } finally { Marshal.FreeHGlobal(attrs); Marshal.FreeHGlobal(handles); }
@@ -1185,12 +1223,12 @@ const b64 = (s: string): string => Buffer.from(s, 'utf8').toString('base64')
  * ends, a quit or a crash alike, and lets their own children leave it silently: the launcher is in that job and ends
  * with Hive, the helper it starts is not. It hands the helper only its pipes to Hive: Electron's own standard handles
  * can be inherited (a test's pipes to it, say), and a helper outliving Hive would hold them. It waits for the helper and
- * exits with its exit code, so its owner's `exit` is the helper's, and holds its handle meanwhile, so the helper's id
- * (its "pid" line) is its own while the launcher runs (endHelper). Not Node's `detached`, which leaves that job too:
- * PowerShell 5.1 started without a console (DETACHED_PROCESS) exits at once, running nothing. Exported for the unit
- * tests, which start it as Hive does and then end the Hive.
+ * exits with its exit code, so its owner's `exit` is the helper's; it ends the helper when told on its control pipe
+ * (`stdio`'s fourth, endHelper), through the handle it holds, never by an id. Not Node's `detached`, which leaves that
+ * job too: PowerShell 5.1 started without a console (DETACHED_PROCESS) exits at once, running nothing. Exported for the
+ * unit tests, which start it as Hive does and then end the Hive.
  */
-export function helperLaunch(script = HOST_SCRIPT): { file: string; args: string[]; input: string } {
+export function helperLaunch(script = HOST_SCRIPT): { file: string; args: string[]; input: string; stdio: ['pipe', 'pipe', 'pipe', 'pipe'] } {
   const line = `"${POWERSHELL}" ${psArgs(script).join(' ')}`
   const launcher = `$ErrorActionPreference = 'Stop'
 Add-Type -TypeDefinition ([Text.Encoding]::UTF8.GetString([Convert]::FromBase64String('${b64(LAUNCH_SOURCE)}')))
@@ -1198,7 +1236,7 @@ exit [HiveLaunch]::Run([Text.Encoding]::UTF8.GetString([Convert]::FromBase64Stri
 `
   const args = psArgs(launcher)
   if (line.length > LINE_MAX || [POWERSHELL, ...args].join(' ').length + 8 > LINE_MAX) throw new Error('the helper’s command line is too long') // i18n-ignore: a technical error, logged (it can't happen with the scripts as they are)
-  return { file: POWERSHELL, args, input: HOST_INPUT }
+  return { file: POWERSHELL, args, input: HOST_INPUT, stdio: ['pipe', 'pipe', 'pipe', 'pipe'] }
 }
 function psArgs(script: string): string[] {
   return ['-NoProfile', '-NonInteractive', '-ExecutionPolicy', 'Bypass', '-EncodedCommand', Buffer.from(script, 'utf16le').toString('base64')] // i18n-ignore: PowerShell's arguments
@@ -1283,9 +1321,9 @@ export class JobHost {
         // helper is started through its launcher, to outlive Hive (helperLaunch).
         const mode = this.opts.testMode()
         direct = mode === 'silent' || mode === 'mute'
-        const { file, args } = direct ? { file: POWERSHELL, args: psArgs(mode === 'silent' ? '[System.Threading.Thread]::Sleep(-1)' : MUTE_SCRIPT) } : helperLaunch()
+        const { file, args, stdio } = direct ? { file: POWERSHELL, args: psArgs(mode === 'silent' ? '[System.Threading.Thread]::Sleep(-1)' : MUTE_SCRIPT), stdio: 'pipe' as const } : helperLaunch()
         // In the temp folder: nothing it might write lands in whatever folder Hive was started from.
-        p = this.opts.launch ? this.opts.launch(file, args) : spawn(file, args, { windowsHide: true, stdio: 'pipe', cwd: tmpdir() })
+        p = this.opts.launch ? this.opts.launch(file, args) : (spawn(file, args, { windowsHide: true, stdio, cwd: tmpdir() }) as ChildProcessWithoutNullStreams)
       } catch (e) {
         this.opts.log.warn('could not start the process job host: agents\u2019 leftover processes are not tracked', e)
         this.opts.onFailed({ kind: 'noPowerShell', error: (e as Error).message })
@@ -1441,25 +1479,27 @@ export class JobHost {
   }
 
   /**
-   * Ends a helper (stuck, or not ready when closing): the helper by its own id while its launcher still runs (which holds its
-   * handle until it exits, so the id is still the helper's), then the launcher, and its input closed. One that hadn't said its id
-   * yet sees its input end: it exits once it reads it.
+   * Ends a helper (stuck, or not ready when closing), never by an id (#603): its launcher is told on its control pipe and
+   * ends it through the handle it holds, then exits (its `exit`); its input is closed. One started without a launcher (a
+   * test mode), or with no control pipe, is ended as Hive's own child. A launcher that hasn't exited within the wait
+   * (stuck itself) is ended, and its helper then sees its input end.
    */
   private endHelper(p: ChildProcessWithoutNullStreams): void {
-    const own = this.alive.get(p)?.pid
-    if (own !== undefined && own !== p.pid && p.exitCode === null && p.signalCode === null) {
-      try {
-        process.kill(own) // its handle is held: by its launcher, still running, so the id is still the helper's
-      } catch {
-        // Gone already.
-      }
-    }
-    p.kill()
+    const control = p.stdio[3] as Writable | null | undefined
     try {
       p.stdin.destroy()
     } catch {
       // Gone already.
     }
+    if (!control?.writable) {
+      p.kill()
+      return
+    }
+    control.on('error', () => undefined)
+    control.write('e')
+    if (p.exitCode !== null || p.signalCode !== null) return
+    const bound = setTimeout(() => p.kill(), this.opts.waitMs())
+    p.once('exit', () => clearTimeout(bound))
   }
 
   /**

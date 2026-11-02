@@ -259,7 +259,8 @@ describe.runIf(process.platform === 'win32')('the keeper (HI-2055)', () => {
         onLost: () => undefined,
         onFailed: () => undefined,
         launch: (file, args) => {
-          helperProc = spawn(file, args, { windowsHide: true, stdio: 'pipe', env: baseEnv(), cwd: dir })
+          // As Hive starts it (its launcher, with its control pipe: helperLaunch).
+          helperProc = spawn(file, args, { windowsHide: true, stdio: ['pipe', 'pipe', 'pipe', 'pipe'], env: baseEnv(), cwd: dir }) as ChildProcessWithoutNullStreams
           started.push(helperProc)
           return helperProc
         }
