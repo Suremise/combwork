@@ -1,7 +1,7 @@
 {
   "name": "hive",
   "productName": "Hive Desktop",
-  "version": "1.0.0-rc.19",
+  "version": "1.0.0-rc.20",
   "description": "Hive Desktop — a streamlined, agent-first desktop workspace for AI-assisted coding.",
   "main": "./out/main/index.js",
   "author": "Darren Marshall",
