@@ -38,6 +38,7 @@ import { boardRead } from './boardStore'
 import { deliveriesOf, deliverNow, launchWith } from './deliveries'
 import { onHiveEvent } from './events'
 import { onLanesWritten, rawLanes } from './lanes'
+import { readyFor } from './readiness'
 import { createLogger, userText } from './logger'
 import { withCardNames } from './projectKeys'
 import { sessions } from './sessions'
@@ -55,16 +56,27 @@ const log = createLogger('reviewerPool')
 const POOL_REVIEW = 'pool-review'
 /** A delivery that ended without reaching its agent (never given): made again. */
 const NOT_GIVEN: ReadonlySet<string> = new Set(['cancelled', 'refused', 'expired', 'stale'])
-/** The statuses an agent isn't free in (Start Lane's): in a turn, starting, waiting for the user, its background tasks, a watch, a sign-in. */
-const BUSY: ReadonlySet<string> = new Set(['working', 'starting', 'waiting', 'background', 'watching', 'signin'])
+/**
+ * The statuses an agent isn't free in: in a turn, starting, waiting for the user, its background tasks, a sign-in. Not a
+ * card watch (HI-2333): a watching session is at its prompt, where the pool's line is typed as into an idle one, and
+ * Hive's loop wakes reach it; what it reviews or checks keeps it from the pool by itself (`reviewersNow`).
+ */
+const BUSY: ReadonlySet<string> = new Set(['working', 'starting', 'waiting', 'background', 'signin'])
 
 const same = (a: string, b: string): boolean => a.toLowerCase() === b.toLowerCase()
 
-/** Whether an agent is idle: not running, or running with no turn, nothing typed or queued, no run or background task, no watch. */
+/**
+ * Whether an agent is idle: not running, or running with no turn, nothing typed or queued, no run or background task (a
+ * card watch counts as idle, HI-2333), and able to take the pool's line now (`readyFor`'s `idle`, the need its line is
+ * typed with): so the pass never gives or tells what the delivery would refuse, which a pass at each status change
+ * would then try again at once.
+ */
 function idle(projectPath: string, agentId: string): boolean {
   const now = sessions.agentNow(projectPath, agentId)
   if (!now) return true
-  return !BUSY.has(now.status) && !agentBusy(projectPath, agentId) && now.backgroundTasks === 0 && agentRunsGoing(projectPath, agentId).length === 0
+  if (BUSY.has(now.status) || agentBusy(projectPath, agentId) || now.backgroundTasks !== 0 || agentRunsGoing(projectPath, agentId).length !== 0) return false
+  const st = sessions.liveFor(projectPath, agentId)
+  return !st || readyFor(st, 'idle')
 }
 
 function cardOf(wf: Workflow, n: number): CardRecord | null {
@@ -274,13 +286,44 @@ async function tell(ws: WorkspaceService, projectPath: string, wf: Workflow, slo
   const nd = { agentId: agent.id, agentName: agent.name, kind: 'card-event' as const, from: { kind: 'hive' as const, name: 'Hive' }, card: c.card, body, source: POOL_REVIEW, ref } // i18n-ignore: who a delivery is from, as agents read it
   log.info(`Telling ${userText(agent.name)} of #${c.card} ${c.loose ? 'outside a lane' : 'from the pool'} (${st ? 'typed' : 'started'})`)
   const r = st
-    ? await deliverNow(projectPath, { ...nd, need: 'free', conversation: st.sessionId || null }, still)
+    ? // As a wake (HI-2333): a reviewer watching a card in its loop takes it, and its watch carries on (`free` would
+      // refuse it: a watching agent takes no new work).
+      await deliverNow(projectPath, { ...nd, need: 'idle', conversation: st.sessionId || null }, still)
     : (
         await launchWith(projectPath, nd, (line) =>
           sessions.start(projectPath, { agentId: agent.id, prompt: line, purpose: 'review', allowed })
         ).catch((e) => ({ record: notStarted(e) }))
       ).record
-  if (!r || NOT_GIVEN.has(r.state)) log.info(`#${c.card}'s pool delivery to ${userText(agent.name)} wasn't given (${r?.state ?? 'none made'}): told at the next pass`)
+  if (!r || NOT_GIVEN.has(r.state)) {
+    log.info(`#${c.card}'s pool delivery to ${userText(agent.name)} wasn't given (${r?.state ?? 'none made'}): told at the next pass`)
+    // Its next try (HI-2333): a pass when the agent's state changes, or this one shortly, for a refusal that changes
+    // nothing it reports (the user typing, a watch's wake going first, a race at the boundary). Never at once.
+    retrySoon(ws, projectPath)
+  }
+}
+
+/** How long a refused pool line waits for its retry pass (HI-2333), and how many have fired; tests set it shorter. */
+export const poolTestHooks = { retryMs: 5000, retriesFired: 0 }
+/**
+ * A project's pending retry pass, one at a time, by the workspace that armed it (its service, not its path: one closed
+ * and opened again at the same path is another) and the project: never re-armed while it waits. Cleared when the pool
+ * stops; one whose workspace has closed does nothing when it fires, and the pass it runs checks everything again (the
+ * rules, the assignment still this agent's, its delivery not made already).
+ */
+const retries = new Map<WorkspaceService, Map<string, NodeJS.Timeout>>()
+function retrySoon(ws: WorkspaceService, projectPath: string): void {
+  const key = projectPath.toLowerCase()
+  const mine = retries.get(ws) ?? new Map<string, NodeJS.Timeout>()
+  if (mine.has(key) || ws.lifetime.aborted) return
+  const t = setTimeout(() => {
+    poolTestHooks.retriesFired++
+    mine.delete(key)
+    if (!mine.size && retries.get(ws) === mine) retries.delete(ws)
+    if (!ws.lifetime.aborted) void settleReviewerPool(ws, projectPath).catch((e) => log.warn('retrying the reviewer pool', e))
+  }, poolTestHooks.retryMs)
+  t.unref?.()
+  mine.set(key, t)
+  retries.set(ws, mine)
 }
 
 /** A pool's assignment given up (`ReviewerReleased`) while it is still the submission's and not started; the pass again. */
@@ -348,9 +391,16 @@ export function startReviewerPool(): void {
     }, 1000)
     soon.unref?.()
   }
+  // An agent's state as the pass reads it, by agent: a status event that changes none of it (a refused line's own, HI-2333) asks no pass.
+  const seen = new Map<string, string>()
   const offEvents = onHiveEvent((e) => {
     if (e.type === 'tasks-changed' || e.type === 'workspace-changed' || e.type === 'team-pause-changed') later()
-    else if (e.type === 'session-status' && freed(e.state)) {
+    else if (e.type === 'session-status') {
+      const key = `${e.state.projectPath.toLowerCase()}#${e.state.agentId}`
+      const now = poolStateKey(e.state, sessions.agentNow(e.state.projectPath, e.state.agentId))
+      if (seen.get(key) === now) return
+      seen.set(key, now)
+      if (!freed(e.state)) return
       const ws = workspaceFor(e.state.projectPath)
       if (ws && !ws.isAssistantHome(e.state.projectPath)) void settleReviewerPool(ws, e.state.projectPath)
     }
@@ -369,10 +419,21 @@ export function startReviewerPool(): void {
     offAdvanced()
     if (soon) clearTimeout(soon)
     clearInterval(hourly)
+    for (const mine of retries.values()) for (const t of mine.values()) clearTimeout(t)
+    retries.clear()
   }
 }
 
-/** A status an agent may be free in (its turn or its watch ended, or it stopped). */
+/**
+ * What of an agent's state its freedom for the pool reads (HI-2333): its status, turn, watch, hooks, a question or a
+ * line not taken, input blocked, and its pending input and background tasks. Not its inbox: a delivery made or refused
+ * changes only that, and a pass for it would try a refused line again at once.
+ */
+export function poolStateKey(st: LiveSessionState, now: { pending?: boolean; backgroundTasks?: number } | null): string {
+  return JSON.stringify([st.status, st.turn?.state ?? null, !!st.watch, !!st.hooksMissing, !!st.question, !!st.untakenLine, !!st.inputBlocked, now?.pending ?? null, now?.backgroundTasks ?? null])
+}
+
+/** A status an agent may be free in (its turn ended, with a card watch or none, or it stopped). */
 const freed = (st: LiveSessionState): boolean => !BUSY.has(st.status)
 
 export function stopReviewerPool(): void {
