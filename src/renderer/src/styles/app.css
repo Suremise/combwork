@@ -2026,6 +2026,13 @@ textarea.input {
 .journal-settings input[type='number'] {
   width: 80px;
 }
+/* Its numbers are NumberFields (HI-2345), inline in their sentence: the box keeps its width, a message under it. */
+.journal-settings .number-field {
+  width: auto;
+}
+.journal-settings .number-field-row .input {
+  flex: none;
+}
 .journal-settings .btn {
   align-self: flex-start;
 }

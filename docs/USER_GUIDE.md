@@ -1294,7 +1294,7 @@ It is in **Settings → Assistant → Journal**, for the workspace you have open
 
 - **Keep a journal** (on by default). Off, nothing is written and the Assistant's journal tools go at its next start; the entries are kept for when you turn it on again.
 - **What it may store**: decisions, plans, events, incidents and insights by default. **Your preferences** (how you like things done) and **Moments** (memorable moments of working together) are off until you turn them on. The Assistant can't store a kind you leave out, and it is told when you change them.
-- **Keep everyday entries for** 90 days by default. Important entries and the weekly digests the Assistant writes are kept longer.
+- **Keep everyday entries for** 90 days by default (7 to 3650). Important entries and the weekly digests the Assistant writes are kept longer. A number out of range is refused, saying so, and a box left empty keeps what it had: neither changes anything.
 - **Size cap**, 50 MB by default, or **No limit**. Past it, the oldest everyday entries go first. The journal's size and number of entries show below.
 - **Delete Journal…** asks first, then moves the journal to the Recycle Bin; the Assistant starts again with an empty one.
 

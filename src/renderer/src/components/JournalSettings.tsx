@@ -4,6 +4,7 @@ import { msg, tr } from '@shared/i18n'
 import { formatSize } from '@shared/units'
 import { call, errorMessage } from '../api'
 import { confirm, notify, useLanguage, useStore } from '../store'
+import { NumberField } from './NumberField'
 import { Icon, Switch } from './ui'
 
 /**
@@ -96,19 +97,25 @@ export function JournalSettingsPanel() {
           </label>
         ))}
       </div>
-      <label className="flex">
+      {/* NumberField (HI-2345): a blank box keeps the saved number and one out of range says so, saving nothing; a
+          bare box saved Number('') (0), which main raised to the minimum and pruned to at once. */}
+      <div className="flex journal-days">
         {tr(M.retention)}
-        <input type="number" className="input journal-days" min={JOURNAL_LIMITS.minRetentionDays} max={JOURNAL_LIMITS.maxRetentionDays} defaultValue={s.retentionDays} key={`d${s.retentionDays}`} disabled={busy} onBlur={(e) => Number(e.target.value) !== s.retentionDays && save({ retentionDays: Number(e.target.value) })} />
+        <NumberField value={s.retentionDays} min={JOURNAL_LIMITS.minRetentionDays} max={JOURNAL_LIMITS.maxRetentionDays} label={tr(M.retention)} disabled={busy} onCommit={(v) => {
+            if (v !== null) save({ retentionDays: v })
+          }} />
         {tr(M.days)}
-      </label>
-      <label className="flex">
+      </div>
+      <div className="flex journal-cap">
         {tr(M.cap)}
-        <input type="number" className="input journal-cap" min={JOURNAL_LIMITS.minCapMB} max={JOURNAL_LIMITS.maxCapMB} defaultValue={s.capMB ?? ''} key={`c${s.capMB}`} disabled={busy || s.capMB === null} onBlur={(e) => s.capMB !== null && Number(e.target.value) !== s.capMB && save({ capMB: Number(e.target.value) })} />
+        <NumberField value={s.capMB} min={JOURNAL_LIMITS.minCapMB} max={JOURNAL_LIMITS.maxCapMB} label={tr(M.cap)} disabled={busy || s.capMB === null} onCommit={(v) => {
+            if (v !== null && s.capMB !== null) save({ capMB: v })
+          }} />
         {tr(M.mb)}
         <label className="flex">
           <input type="checkbox" className="checkbox journal-nolimit" checked={s.capMB === null} disabled={busy} onChange={(e) => save({ capMB: e.target.checked ? null : 50 })} /> {tr(M.noLimit)}
         </label>
-      </label>
+      </div>
       <div className="journal-size muted">
         {status.entries || status.bytes ? tr(M.size, { size: formatSize(status.bytes), entries: status.entries }) : tr(M.none)} {tr(M.local)}
       </div>

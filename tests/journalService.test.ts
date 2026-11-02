@@ -133,6 +133,13 @@ describe('the journal in a workspace', () => {
     const db = new DatabaseSync(journal.journalFile(home()))
     db.prepare('UPDATE entries SET at = ? WHERE id = ?').run(new Date(Date.now() - 60 * 86_400_000).toISOString(), id)
     db.close()
+    // A number out of range (a blank box's 0, a 1, text, a fraction) is refused, never raised to the minimum and
+    // pruned to (HI-2345): the entry and the saved settings stay.
+    const kept = service.journalSettingsOf(w)
+    for (const bad of [{ retentionDays: 0 }, { retentionDays: 1 }, { retentionDays: Number.NaN }, { retentionDays: 30.5 }, { retentionDays: '30' as unknown as number }, { capMB: 0 }, { capMB: 1 }, { capMB: 20_000 }])
+      await expect(service.setJournalSettings(w, bad), JSON.stringify(bad)).rejects.toThrow(/Nothing was changed/)
+    expect(service.journalSettingsOf(w)).toEqual(kept)
+    expect(journal.readEntry(home(), id)).not.toBeNull()
     await service.setJournalSettings(w, { retentionDays: 30 })
     expect(journal.readEntry(home(), id)).toBeNull()
     await service.deleteWorkspaceJournal(w)
