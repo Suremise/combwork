@@ -32,7 +32,10 @@ const busyLines = () => lines().filter((l) => l.includes('[main] The main proces
       for (const until = Date.now() + 1500; Date.now() < until; );
       powerMonitor.emit('resume')
     })
-    const slept = await lib.until(() => busyLines().slice(before).find((l) => /\[INFO\] \[main\] The main process was paused for \d+ ms while the PC slept: not counted as busy/.test(l)), HUNG_MS)
+    // This sleep's own line, its 1.5 s: an earlier stall (Hive's start, under load) still being decided when the suspend
+    // is told is taken for the sleep's too, and its line can come first (HI-2317).
+    const sleepLine = (l) => Number(/\[INFO\] \[main\] The main process was paused for (\d+) ms while the PC slept: not counted as busy/.exec(l)?.[1] ?? 0) >= 1450
+    const slept = await lib.until(() => busyLines().slice(before).find(sleepLine), HUNG_MS)
     check('a gap spanning sleep is an info line', !!slept, busyLines().slice(before).join(' | '))
     check('and not a warning', !busyLines().slice(before).some((l) => l.includes('[WARN]')), busyLines().slice(before).join(' | '))
 
@@ -118,8 +121,13 @@ const busyLines = () => lines().filter((l) => l.includes('[main] The main proces
       await app.evaluate(() => {
         process.env.HIVE_TEST_BLOCK_IPC = 'app:info=700*1'
       })
+      const called = Date.now()
       await inv('app:info')
-      check('main held with the pool free is a busy warning', !!(await lib.until(() => since().find((l) => /\[WARN\] \[main\] The main process was busy for \d+ ms/.test(l) && l.includes('ipc app:info')), HUNG_MS)), since().filter((l) => l.includes('[main]')).join(' | '))
+      const calledMs = Date.now() - called
+      const busy = await lib.until(() => since().find((l) => /\[WARN\] \[main\] The main process was busy for \d+ ms/.test(l) && l.includes('ipc app:info')), HUNG_MS)
+      // Evidence for a miss (HI-2317): whether the call was held, and the stalls kept (kept before the log's quiet minute).
+      const keptNow = async () => JSON.stringify((await inv('performance:stalls')).stalls.slice(0, 3).map((s) => ({ ms: s.ms, work: s.work.map((w) => w.label) })))
+      check('main held with the pool free is a busy warning', !!busy, busy ? '' : `${since().filter((l) => l.includes('[main]')).join(' | ')} · app:info took ${calledMs} ms · stalls kept, newest first: ${await keptNow()}`)
       await holdAll()
       await lib.until(() => slowCalls().length >= 2, HUNG_MS)
       const took = slowCalls().map((l) => Number(/took (\d+) ms/.exec(l)[1]))

@@ -54,6 +54,23 @@ export function apiLabel(method: string | undefined, route: string): string {
 
 const seconds = (ms: number): string => `${(ms / 1000).toFixed(1)} s`
 
+/** A suspend or resume as powerMonitor told it, on `now`'s clock. */
+interface PowerEvent {
+  at: number
+  resume: boolean
+}
+
+/**
+ * Whether the PC slept over a stall or probe that began at `start`: a power event from `from - 1000` on (a suspend may be
+ * told just before the stall's measured start, a resume after its end), up to `until`. A resume before `start` ended
+ * that sleep before this began, so it and the events before it don't count (HI-2317: a busy stall soon after a resume
+ * was taken for the sleep's).
+ */
+function sleptOver(power: PowerEvent[], from: number, start: number, until = Infinity): boolean {
+  const woke = power.reduce((at, e) => (e.resume && e.at < start ? Math.max(at, e.at) : at), -Infinity)
+  return power.some((e) => e.at >= from - 1000 && e.at <= until && e.at > woke)
+}
+
 const overlapOf = (w: Work, from: number, to: number, now: number): number => Math.min(to, w.end ?? now) - Math.max(from, w.start)
 
 const labelOf = (w: Work): string => (typeof w.label === 'string' ? w.label : w.label())
@@ -129,8 +146,12 @@ export function resetStallsForTests(): void {
 
 export interface StallDeps {
   now(): number
-  /** The longest event loop delay since the last call, in ms (and starts measuring afresh). */
-  longestDelayMs(): number
+  /**
+   * The longest event loop delay since the last call, in ms (and starts measuring afresh), or null when it recorded none:
+   * its timer had no whole turn since, the loop held from about the last call on (HI-2317: Node's reset forgets its
+   * timer's last turn, so a block that begins before the next is never measured).
+   */
+  longestDelayMs(): number | null
   /** The main thread's CPU time so far in ms, or null where Node can't tell. */
   cpuMs(): number | null
   defer(fn: () => void, ms: number): void
@@ -145,15 +166,15 @@ export interface StallDeps {
 export const STALL_TIMING = { every: 500, over: 250, settleMs: 3000, quietMs: 60_000 }
 
 /** The watch itself, with what it reads given (unit tests fake them): tick() every `every` ms, power() on a suspend or resume. */
-export function stallWatcher(d: StallDeps, t = STALL_TIMING): { tick(): void; power(): void } {
+export function stallWatcher(d: StallDeps, t = STALL_TIMING): { tick(): void; power(resume?: boolean): void } {
   let last = d.now()
   let cpuLast = d.cpuMs()
   let logged = -Infinity
   let unlogged = 0
-  const power: number[] = []
+  const power: PowerEvent[] = []
   return {
-    power(): void {
-      power.push(d.now())
+    power(resume = false): void {
+      power.push({ at: d.now(), resume })
       if (power.length > 20) power.shift()
     },
     tick(): void {
@@ -161,7 +182,8 @@ export function stallWatcher(d: StallDeps, t = STALL_TIMING): { tick(): void; po
       const cpu = d.cpuMs()
       const cpuUsed = cpu !== null && cpuLast !== null ? cpu - cpuLast : null
       // The loop delay, or how late this timer itself is (whichever is longer: the histogram's timer may only fire next).
-      const delay = Math.max(d.longestDelayMs(), now - last - t.every)
+      // None recorded: the loop was held from about the last tick on, the whole time since.
+      const delay = Math.max(d.longestDelayMs() ?? now - last, now - last - t.every)
       const since = last
       last = now
       cpuLast = cpu
@@ -173,7 +195,7 @@ export function stallWatcher(d: StallDeps, t = STALL_TIMING): { tick(): void; po
       // ends just after.
       d.defer(() => {
         const ms = Math.round(delay)
-        if (power.some((p) => p >= from - 1000)) return d.info(`The main process was paused for ${ms} ms while the PC slept: not counted as busy`)
+        if (sleptOver(power, from, now - delay)) return d.info(`The main process was paused for ${ms} ms while the PC slept: not counted as busy`)
         if (d.pausedAlongside?.(now - delay, now)) return d.info(`The main process was paused for ${ms} ms with the rest of Hive's process (its watchdog thread stopped too: the PC or the process was paused): not counted as busy`)
         const cpuMs = cpuUsed === null ? null : Math.round(Math.min(cpuUsed, delay + t.every))
         // Kept before the log's quiet minute: the view lists the stalls the log leaves out too.
@@ -216,14 +238,14 @@ export const FILE_WAIT_TIMING = { every: 1000, settleMs: 3000, quietMs: 60_000 }
  * apart is the pool's wait from the disk's, so the line says both. A probe the PC's sleep or a pause of the whole
  * process covered isn't counted, decided a little later as the busy warning is.
  */
-export function fileWaitWatcher(d: FileWaitDeps, poolSize: number, t = FILE_WAIT_TIMING): { tick(): void; power(): void } {
+export function fileWaitWatcher(d: FileWaitDeps, poolSize: number, t = FILE_WAIT_TIMING): { tick(): void; power(resume?: boolean): void } {
   let seen = 0
   let logged = -Infinity
   let unlogged = 0
-  const power: number[] = []
+  const power: PowerEvent[] = []
   return {
-    power(): void {
-      power.push(d.now())
+    power(resume = false): void {
+      power.push({ at: d.now(), resume })
       if (power.length > 20) power.shift()
     },
     tick(): void {
@@ -232,7 +254,7 @@ export function fileWaitWatcher(d: FileWaitDeps, poolSize: number, t = FILE_WAIT
       seen = p.n
       const end = p.start + p.ms
       d.defer(() => {
-        if (power.some((at) => at >= p.start - 1000 && at <= end + t.settleMs)) return
+        if (sleptOver(power, p.start, p.start, end + t.settleMs)) return
         if (d.pausedAlongside?.(p.start, end)) return
         if (d.now() - logged < t.quietMs) {
           unlogged++
@@ -282,7 +304,7 @@ export function watchMainStalls(): void {
   const watch = stallWatcher({
     now: () => stallClock.mono(),
     longestDelayMs: () => {
-      const ms = delays.max / 1e6
+      const ms = delays.count ? delays.max / 1e6 : null
       delays.reset()
       return ms
     },
@@ -298,7 +320,7 @@ export function watchMainStalls(): void {
     record: (s, end) => keepStall({ at: Math.round(performance.timeOrigin + end), ...s })
   }, { ...STALL_TIMING, quietMs })
   powerMonitor.on('suspend', () => watch.power())
-  powerMonitor.on('resume', () => watch.power())
+  powerMonitor.on('resume', () => watch.power(true))
   setInterval(() => watch.tick(), STALL_TIMING.every).unref()
   const files = fileWaitWatcher({
     now: () => stallClock.mono(),
@@ -311,6 +333,6 @@ export function watchMainStalls(): void {
     pausedAlongside: (from, to) => (watchdog ? pausedAlongside(watchdog, performance.timeOrigin + from, performance.timeOrigin + to) : false)
   }, threadPoolSize, { ...FILE_WAIT_TIMING, quietMs })
   powerMonitor.on('suspend', () => files.power())
-  powerMonitor.on('resume', () => files.power())
+  powerMonitor.on('resume', () => files.power(true))
   setInterval(() => files.tick(), FILE_WAIT_TIMING.every).unref()
 }
