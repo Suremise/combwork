@@ -1667,6 +1667,14 @@
     "defaultMessage": "Merges: wait for another Hive",
     "description": "An advanced setting's title (Settings → Advanced), listed under Hive. Another Hive: the installed Hive and a dev or test Hive on the same machine."
   },
+  "settings.advanced.hive.none.baselineSeconds.desc": {
+    "defaultMessage": "In a project without version control, Hive reads the project's files in the background when a card starts, and when it is submitted, to find what changed outside the card's files. A read that takes longer than this is stopped: the card starts or is submitted without that list.",
+    "description": "What the advanced setting \"No version control: longest read of the project\" does (Settings → Advanced, under Hive)."
+  },
+  "settings.advanced.hive.none.baselineSeconds.title": {
+    "defaultMessage": "No version control: longest read of the project",
+    "description": "An advanced setting's title (Settings → Advanced), listed under Hive, followed by its value in seconds (\"120 s\"). In a project without version control, Hive reads every file of the project in the background when a card starts."
+  },
   "settings.advanced.hive.notes.deliverWorkspaceNotes.desc": {
     "defaultMessage": "Each agent and the Hive Assistant get the shared note Workspace notes in their instructions when they start, on every CLI and in whichever folder they work: notes about this machine that no committed file should hold. A project's agents get the parts for everyone and their own project's section. Turned off, or with the note empty, nothing is added, from each agent's next session.",
     "description": "What the advanced setting \"Deliver workspace notes to agents\" does (Settings → Advanced, under Hive). Workspace notes is the name of a shared note: keep it in English, as the Notes view shows it."

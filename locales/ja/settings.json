@@ -416,6 +416,8 @@
   "settings.advanced.hive.mcpCatalog.probeSeconds.title": "MCPカタログ：このPCの要件の確認",
   "settings.advanced.hive.merge.lockWaitSeconds.desc": "このコンピューター上の別のHiveが同じリポジトリにマージしている間、マージやリポジトリのブランチへのその他の変更（プル、ブランチの切り替え、エージェントのブランチの移動）が待つ時間です。この時間を過ぎると何も変更せず、どのHiveがリポジトリを使っているかを表示します。それが終わってから、もう一度試してください。Hiveは、まだ動いているHiveからリポジトリを奪うことはありません。",
   "settings.advanced.hive.merge.lockWaitSeconds.title": "マージ：別のHiveを待つ時間",
+  "settings.advanced.hive.none.baselineSeconds.desc": "バージョン管理のないプロジェクトでは、カードの開始時と提出時に、Hiveがバックグラウンドでプロジェクトのファイルを読み取り、カードのファイル以外で変わったものを探します。読み取りがこの時間を超えると中止され、その一覧なしでカードが開始または提出されます。",
+  "settings.advanced.hive.none.baselineSeconds.title": "バージョン管理なし：プロジェクト読み取りの上限時間",
   "settings.advanced.hive.notes.deliverWorkspaceNotes.desc": "各エージェントとHive Assistantは、起動時に共有ノートWorkspace notesを指示に含めて受け取ります。どのCLIでも、作業するどのフォルダーでも同じです。コミットされるファイルに書くべきでない、このマシンについてのノートです。プロジェクトのエージェントは、全員向けの部分と自分のプロジェクトのセクションを受け取ります。オフにするか、ノートが空の場合は、各エージェントの次のセッションから何も追加されません。",
   "settings.advanced.hive.notes.deliverWorkspaceNotes.title": "Workspace notesをエージェントに提供",
   "settings.advanced.hive.notes.workspaceNotesMax.desc": "エージェントの指示が共有ノートWorkspace notesから受け取る最大量（バイト）。これより長いノートは切り詰められ、残りはノートを読むようエージェントに伝えられます。すべてのエージェントが起動のたびに読むため、短いノートほどコストが下がります。",

@@ -418,6 +418,8 @@ interface HiveMessageValues {
   'settings.advanced.hive.mcpCatalog.probeSeconds.title': undefined
   'settings.advanced.hive.merge.lockWaitSeconds.desc': undefined
   'settings.advanced.hive.merge.lockWaitSeconds.title': undefined
+  'settings.advanced.hive.none.baselineSeconds.desc': undefined
+  'settings.advanced.hive.none.baselineSeconds.title': undefined
   'settings.advanced.hive.notes.deliverWorkspaceNotes.desc': undefined
   'settings.advanced.hive.notes.deliverWorkspaceNotes.title': undefined
   'settings.advanced.hive.notes.workspaceNotesMax.desc': undefined

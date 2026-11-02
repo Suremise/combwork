@@ -29,6 +29,8 @@ export interface StartPlan {
   slotWait?: string
   manifest?: Manifest
   deliverables?: Manifest
+  /** None (HI-2340): the adapter's generation its whole-project read was made under, checked again at the write. */
+  baselineGen?: number
 }
 
 /** A submission's platform side: the revision with its fixed endpoints, key and files, and the guards' platform inputs. */

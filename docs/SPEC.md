@@ -1560,6 +1560,17 @@ All Git calls go through the `git()` runner (`src/main/git.ts:47`); the two bypa
   system names them (`src` covers `src/x`, never `src-other/x`). Git cards and no-code cards are unchanged. **Not
   built yet:** the user's surface (the window shows no card's paths, and a user's submit names nothing of this; the
   Version Control tab listing above): HI-2352, by Darren's choice (HI-2339/r12, 2 Nov: "B", the agent side first).
+- **The start's baseline, off main's thread** (HI-2340): a code card's start keeps every deliverable's hash
+  (`Started.deliverables`, what its unclaimed changes are found against), and its unclaimed changes read the project
+  whole again. Both reads run in a worker thread (`noneBaseline.ts`), never on main's, where they held typing 0.4–4 s
+  on a few thousand files. A read takes at most **No version control: longest read of the project** (Settings →
+  Advanced, `hive.none.baselineSeconds`, 120 s); past it, or if the worker ends, the card goes on with no baseline and
+  no list, as with a project too large to read. What changed during a read is checked as before: the card's paths and
+  their content, and its kind (the evidence, again at the write), its column (`stillAt`), and the folders left out (the
+  adapter's generation: a start read under others is gathered again, once; an unclaimed list is read again, else
+  none). **A no-code card reads nothing of the project**: no baseline, no hash of its declared paths (its base is
+  none, its evidence its kind), and its unclaimed list is empty. A check's snapshot (`runChecks`) still walks the
+  project on main: HI-2358.
 - **Revision:** SHA-256 over the sorted list of (relative path, SHA-256 of content, or "deleted") of **the card's
   paths** (a folder means every deliverable file under it), together with the path list itself. It can be computed
   **at any time** from the card's current paths, not only at submit: a check run computes it when it starts and ends
