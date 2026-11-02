@@ -3273,8 +3273,8 @@ card's test-merge ref goes once its entry has an outcome, and its submissions' p
        "signing waits for you".
      - **A signer that exited non-zero:** pauses `signingWaits` when **its own** text says it needs a passphrase, a
        pinentry or a terminal, and `signing` otherwise, with its text and git's. Its own text is what it wrote while
-       it ran (git up to 2.47 lets the signer write to stderr), and git's text right after it exited, before any other
-       child starts (HI-2399: git 2.48 and later capture the signer's stderr and reprint it then, as
+       it ran (Git for Windows 2.45 lets the signer write to stderr), and git's text right after it exited, before any
+       other child starts (HI-2399: a newer git, such as Git for Windows 2.56, captures the signer's stderr and reprints it then, as
        `error: gpg failed to sign the data:` and gpg's lines). A hook's text is never either.
    - **After any of these:** the queue's worktree is left clean at the expected revision (`merge --abort`,
      `reset --hard`, `clean`), and nothing in the target changes.

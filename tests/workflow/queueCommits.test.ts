@@ -271,8 +271,8 @@ describe("a commit's stream, git's trace in it (#1350)", () => {
     expect('message' in o && o.message).toBe('gpg: signing failed: No secret key\nerror: gpg failed to sign the data\nfatal: failed to write commit object')
   })
 
-  it("HI-2399: git ≥ 2.48 reprints the signer's text after it exits (`gpg failed to sign the data:`): read as the signer's, never a hook's", () => {
-    // As git ≥ 2.48 writes it (gpg-interface.c sign_buffer_gpg): the signer run with --status-fd=2, its stderr captured,
+  it("HI-2399: a newer git reprints the signer's text after it exits (`gpg failed to sign the data:`): read as the signer's, never a hook's", () => {
+    // As a newer git (Git for Windows 2.56) writes it (gpg-interface.c sign_buffer_gpg): the signer run with --status-fd=2, its stderr captured,
     // nothing of it written while it runs, then git's error with it once it has exited.
     const ev = ({ event, ...rest }: { event: string } & Record<string, unknown>): string => JSON.stringify({ event, sid: 'T', time: 't', ...rest })
     const newer = (hookSays: string, gpgSays: string): string =>

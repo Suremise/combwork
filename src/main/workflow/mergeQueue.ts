@@ -356,7 +356,7 @@ export interface CommitChild {
   code?: number
   text: string
   /**
-   * git's own text once it had exited, until the next child starts (HI-2399): where git ≥ 2.48 reprints the signer's
+   * git's own text once it had exited, until the next child starts (HI-2399): where a newer git (Git for Windows 2.56) reprints the signer's
    * text, which it captured (`error: gpg failed to sign the data:` and gpg's lines; ssh-keygen's as `error: …`).
    */
   after: string
@@ -472,8 +472,8 @@ const joined = (...parts: (string | undefined)[]): string => parts.map((p) => p?
  *   nothing known in a repository that signs → `signingWaits`; else `needsYou`;
  * - a hook that exited non-zero → returned (`hook`) with its own text, then git's;
  * - the signer exiting non-zero → `signingWaits` when its own text says it needs a passphrase, a pinentry or a
- *   terminal, else `signing`, with its text and git's. Its own text is what it wrote while it ran (git ≤ 2.47 lets it
- *   write to stderr) and git's text right after it exited, before any other child (HI-2399: git ≥ 2.48 captures it and
+ *   terminal, else `signing`, with its text and git's. Its own text is what it wrote while it ran (Git for Windows
+ *   2.45 lets it write to stderr) and git's text right after it exited, before any other child (HI-2399: 2.56 captures it and
  *   reprints it then, `error: gpg failed to sign the data:` and gpg's lines); a hook's text is never either;
  * - anything else (an index lock, a broken repository) → `needsYou` with git's own lines, never a return.
  * With no trace (an old git), only git's own "Not committing merge" is a hook. A message never has an event in it.
