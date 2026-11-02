@@ -139,6 +139,7 @@ export function settleReviewerPool(ws: WorkspaceService, projectPath: string): P
       do {
         pass.again = false
         await settleOnce(ws, projectPath).catch((e) => log.warn(`settling the reviewer pool of ${userText(projectPath)}`, e))
+        poolTestHooks.passesRun++
       } while (pass.again && !ws.lifetime.aborted)
     } finally {
       passes.delete(key)
@@ -302,26 +303,36 @@ async function tell(ws: WorkspaceService, projectPath: string, wf: Workflow, slo
   }
 }
 
-/** How long a refused pool line waits for its retry pass (HI-2333), and how many have fired; tests set it shorter. */
-export const poolTestHooks = { retryMs: 5000, retriesFired: 0 }
 /**
- * A project's pending retry pass, one at a time, by the workspace that armed it (its service, not its path: one closed
- * and opened again at the same path is another) and the project: never re-armed while it waits. Cleared when the pool
- * stops; one whose workspace has closed does nothing when it fires, and the pass it runs checks everything again (the
- * rules, the assignment still this agent's, its delivery not made already).
+ * How long a refused pool line waits for its retry pass (HI-2333), how many have fired, how many wait now, and how many
+ * passes have run or are running (HI-2343: what its tests wait for); tests set `retryMs` shorter.
+ */
+export const poolTestHooks = { retryMs: 5000, retriesFired: 0, passesRun: 0, passesGoing: (): number => passes.size, retriesPending: (): number => [...retries.values()].reduce((n, m) => n + m.size, 0) }
+/**
+ * A project's pending retry pass, one at a time, by the workspace that armed it and the project: never re-armed while
+ * it waits. It belongs to the lifetime it was armed in (HI-2343: a service closed and opened again, at the same path or
+ * another, has a new one): that lifetime's end clears it, as the pool stopping does, so it never fires into the next.
+ * The pass it runs checks everything again (the rules, the assignment still this agent's, its delivery not made already).
  */
 const retries = new Map<WorkspaceService, Map<string, NodeJS.Timeout>>()
 function retrySoon(ws: WorkspaceService, projectPath: string): void {
+  const life = ws.lifetime
   const key = projectPath.toLowerCase()
   const mine = retries.get(ws) ?? new Map<string, NodeJS.Timeout>()
-  if (mine.has(key) || ws.lifetime.aborted) return
+  if (mine.has(key) || life.aborted) return
+  const forget = (): void => {
+    clearTimeout(t)
+    life.removeEventListener('abort', forget)
+    if (mine.get(key) === t) mine.delete(key)
+    if (!mine.size && retries.get(ws) === mine) retries.delete(ws)
+  }
   const t = setTimeout(() => {
     poolTestHooks.retriesFired++
-    mine.delete(key)
-    if (!mine.size && retries.get(ws) === mine) retries.delete(ws)
-    if (!ws.lifetime.aborted) void settleReviewerPool(ws, projectPath).catch((e) => log.warn('retrying the reviewer pool', e))
+    forget()
+    if (!life.aborted) void settleReviewerPool(ws, projectPath).catch((e) => log.warn('retrying the reviewer pool', e))
   }, poolTestHooks.retryMs)
   t.unref?.()
+  life.addEventListener('abort', forget, { once: true })
   mine.set(key, t)
   retries.set(ws, mine)
 }

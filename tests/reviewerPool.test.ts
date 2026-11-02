@@ -36,6 +36,10 @@ const state = vi.hoisted(() => ({
   deliveries: [] as { id: string; agentId: string; source?: string; ref?: string; state: string; body: string }[],
   /** The next deliveries: given, or not (its agent got busy: cancelled). */
   next: [] as ('given' | 'notGiven')[],
+  /** Agents whose every line is refused at the delivery's boundary until taken out (HI-2343: a persistent refusal). */
+  refuse: new Set<string>(),
+  /** Told of each refused line, as the real delivery's inbox change emits its agent's status (HI-2343). */
+  onRefused: null as null | ((agentId: string) => void),
   calls: [] as string[],
   /** Awaited as a stopped agent's launch prepares, before its `allowed` (HI-2046: a change landing meanwhile). */
   beforeSpawn: null as null | (() => void | Promise<void>)
@@ -65,8 +69,10 @@ vi.mock('../src/main/deliveries', async (orig) => {
   const actual = await orig<typeof import('../src/main/deliveries')>()
   let seq = 0
   const make = (nd: { agentId: string; source?: string; ref?: string; body: string }) => {
-    const r = { id: `m${++seq}`, agentId: nd.agentId, source: nd.source, ref: nd.ref, state: state.next.shift() === 'notGiven' ? 'cancelled' : 'offered', body: nd.body }
+    const refused = state.next.shift() === 'notGiven' || state.refuse.has(nd.agentId)
+    const r = { id: `m${++seq}`, agentId: nd.agentId, source: nd.source, ref: nd.ref, state: refused ? 'cancelled' : 'offered', body: nd.body }
     state.deliveries.push(r)
+    if (refused) state.onRefused?.(nd.agentId)
     return r
   }
   return {
@@ -82,7 +88,9 @@ vi.mock('../src/main/deliveries', async (orig) => {
   }
 })
 
-const { settleReviewerPool, poolStateKey, poolTestHooks } = await import('../src/main/reviewerPool')
+const { settleReviewerPool, poolStateKey, poolTestHooks, startReviewerPool, stopReviewerPool } = await import('../src/main/reviewerPool')
+const { emit } = await import('../src/main/events')
+const { createWorkspaceService } = await import('../src/main/workspace')
 const { poolReviewerOf } = await import('../src/main/loopReviewer')
 const { resolveOptions } = await import('../src/main/workflow/rulesets')
 
@@ -90,7 +98,7 @@ let env: Env | null = null
 afterEach(() => {
   env?.close()
   env = null
-  Object.assign(state, { enforced: true, wf: null, lanes: [], busy: new Set(), running: new Set(), status: new Map(), background: new Set(), runs: new Set(), pending: new Set(), hooksMissing: new Set(), deliveries: [], next: [], calls: [], beforeSpawn: null })
+  Object.assign(state, { enforced: true, wf: null, lanes: [], busy: new Set(), running: new Set(), status: new Map(), background: new Set(), runs: new Set(), pending: new Set(), hooksMissing: new Set(), deliveries: [], next: [], refuse: new Set(), onRefused: null, calls: [], beforeSpawn: null })
 })
 
 const E1 = agentActor('E1')
@@ -104,7 +112,7 @@ const AGENTS: AgentDef[] = [
 ] as AgentDef[]
 
 /** The workspace the pass is given: its folder, its project's agents. */
-const wsOf = (e: Env, agents: AgentDef[] = AGENTS) => ({ path: e.home, lifetime: { aborted: false }, projectConfig: async () => ({ agents }) }) as never
+const wsOf = (e: Env, agents: AgentDef[] = AGENTS, life = new AbortController()) => ({ path: e.home, lifetime: life.signal, projectConfig: async () => ({ agents }) }) as never
 
 /** A lane of the store, reviewed by the pool (its `extra`, as lanes.ts keeps it) or by its own reviewer; and the app's record of it. */
 function lane(e: Env, id: string, cards: number[], builder: string, reviewer: string | null): void {
@@ -932,24 +940,26 @@ describe('a reviewer watching a card is free for the pool (HI-2333): only what i
     }
   })
 
-  it('a retry armed by a workspace that has closed since does nothing; the workspace opened again gives the line', async () => {
+  it('a retry armed by a workspace that has closed since is cleared with its lifetime; the workspace opened again gives the line', async () => {
     const e = (env = setup({ ...optionsFor(1, 'pool', 'project'), platform: 'git' }, { autoRun: false }))
     state.wf = e.wf
     state.running = new Set(['R1'])
     state.status.set('R1', 'watching')
     state.next = ['notGiven']
     const was = poolTestHooks.retryMs
-    poolTestHooks.retryMs = 50
+    poolTestHooks.retryMs = 60_000
     try {
       const a = pooled(e, 'Closed meanwhile')
       await submitted(e, a)
-      const closing = wsOf(e, ONE) as { lifetime: { aborted: boolean } }
+      const life = new AbortController()
       const fired = poolTestHooks.retriesFired
-      await settleReviewerPool(closing as never, e.project)
+      await settleReviewerPool(wsOf(e, ONE, life), e.project)
       expect(state.deliveries.map((d) => d.state)).toEqual(['cancelled'])
-      // Closed before its retry fires: the retry does nothing.
-      closing.lifetime.aborted = true
-      await vi.waitFor(() => expect(poolTestHooks.retriesFired).toBe(fired + 1), { timeout: HUNG_MS })
+      expect(poolTestHooks.retriesPending()).toBe(1)
+      // Closed before its retry fires: the retry goes with it, and never fires (HI-2343).
+      life.abort()
+      expect(poolTestHooks.retriesPending()).toBe(0)
+      expect(poolTestHooks.retriesFired).toBe(fired)
       expect(state.deliveries.map((d) => d.state)).toEqual(['cancelled'])
       expect(state.calls).toEqual(['typed to R1'])
       // Opened again (another service at the same path): its pass tells the assignment still owed, once.
@@ -971,5 +981,236 @@ describe('a reviewer watching a card is free for the pool (HI-2333): only what i
     expect(key({ hooksMissing: { since: 't' } })).not.toBe(key({}))
     expect(key({}, { pending: true, backgroundTasks: 0 })).not.toBe(key({}))
     expect(key({}, { pending: false, backgroundTasks: 1 })).not.toBe(key({}))
+  })
+})
+
+/**
+ * HI-2343: the refused line's retry as the app runs it: the pool started, its passes asked by the events it listens to
+ * (each refusal emitting its agent's status, as the delivery's inbox change does), a real WorkspaceService (whose close
+ * aborts its lifetime and gives the same service a new one), and fake timers for the retry's deadline and the board's
+ * debounce. What it waits for are the pool's own counts (its passes run and going, its retries pending and fired).
+ */
+describe("a refused pool line's retry through the pool's events (HI-2343)", { timeout: 60_000 }, () => {
+  const ONE = AGENTS.filter((a) => a.id !== 'R2')
+  const RETRY = 5000
+  /** Polled on the event loop's check phase, which fake timers leave alone; bounded for a hung run. */
+  const until = async (what: string, cond: () => boolean): Promise<void> => {
+    const t0 = performance.now()
+    while (!cond()) {
+      if (performance.now() - t0 > HUNG_MS) throw new Error(`still waiting for ${what}`)
+      await new Promise((r) => setImmediate(r))
+    }
+  }
+  /** Every pass asked has finished, and at least `n` have run since `from`. */
+  const settled = (from: number, n = 1) => until(`${n} pass(es) settled`, () => poolTestHooks.passesRun >= from + n && poolTestHooks.passesGoing() === 0)
+  const attempts = () => state.calls.filter((c) => c === 'typed to R1').length
+  const given = (agent = 'R1') => state.deliveries.filter((d) => d.agentId === agent && d.state === 'offered').length
+  let inbox = 0
+  /** An agent's status event, as sessions emit it: its status as the stand-ins have it, its inbox counted on. */
+  const status = (e: Env, agent = 'R1') => emit({ type: 'session-status', state: { projectPath: e.project, agentId: agent, status: state.status.get(agent) ?? 'ready', watch: { label: 'watch' }, inbox: { unread: inbox } } } as never)
+
+  let ws: ReturnType<typeof createWorkspaceService> | null = null
+  /** The workspace as a window opens it: its path, its project, its agents (the same service each time it opens). */
+  const open = (e: Env, path = e.home, agents: AgentDef[] = ONE) => {
+    const w = (ws ??= createWorkspaceService())
+    w.path = path
+    Object.assign(w, { projectConfig: async () => ({ agents }), info: () => ({ projects: path === e.home ? [{ name: 'project', path: e.project }] : [] }) })
+    return w
+  }
+  const was = poolTestHooks.retryMs
+  afterEach(async () => {
+    stopReviewerPool()
+    vi.useRealTimers()
+    poolTestHooks.retryMs = was
+    inbox = 0
+    await ws?.close()
+    ws = null
+  })
+
+  /** A pool card submitted with R1 watching and its line refused until told otherwise, the pool started and given it once. */
+  const refusedOnce = async (agents: AgentDef[] = ONE) => {
+    const e = (env = setup({ ...optionsFor(1, 'pool', 'project'), platform: 'git' }, { autoRun: false }))
+    state.wf = e.wf
+    state.running = new Set(['R1'])
+    state.status.set('R1', 'watching')
+    state.refuse = new Set(['R1'])
+    // Each refusal changes R1's inbox, and so emits its status: the same state otherwise (HI-2333's loop at the boundary).
+    state.onRefused = (a) => {
+      inbox++
+      status(e, a)
+    }
+    poolTestHooks.retryMs = RETRY
+    vi.useFakeTimers({ toFake: ['setTimeout', 'clearTimeout', 'setInterval', 'clearInterval'] })
+    open(e, e.home, agents)
+    startReviewerPool()
+    // R1's status as the pool first sees it (an agent's events start with its session), before anything is owed.
+    let from = poolTestHooks.passesRun
+    status(e)
+    await settled(from)
+    const c = e.wf.createCard({ title: 'Refused' })
+    lane(e, 'L', [c.id], 'B1', null)
+    await submitted(e, c)
+    // The board changed: looked at once its debounce ends, and the line refused.
+    from = poolTestHooks.passesRun
+    emit({ type: 'tasks-changed' } as never)
+    await vi.advanceTimersByTimeAsync(1000)
+    await settled(from)
+    expect(assignedTo(e, c.id)).toEqual(['R1'])
+    expect(attempts()).toBe(1)
+    expect(poolTestHooks.retriesPending()).toBe(1)
+    return { e, c }
+  }
+  /** Time up to just before the retry's deadline, then to it: nothing until then, one attempt at it. */
+  const toDeadline = async (): Promise<void> => {
+    const [n, fired, from] = [attempts(), poolTestHooks.retriesFired, poolTestHooks.passesRun]
+    await vi.advanceTimersByTimeAsync(RETRY - 1)
+    expect(poolTestHooks.passesGoing()).toBe(0)
+    expect([attempts(), poolTestHooks.retriesFired, poolTestHooks.passesRun]).toEqual([n, fired, from])
+    await vi.advanceTimersByTimeAsync(1)
+    expect(poolTestHooks.retriesFired).toBe(fired + 1)
+    await settled(from)
+    expect(attempts()).toBe(n + 1)
+  }
+
+  it('a persistent refusal: one attempt at each deadline, none between, one retry pending; cleared, given once and no more retries', async () => {
+    const { e } = await refusedOnce()
+    for (let i = 0; i < 3; i++) {
+      await toDeadline()
+      // Refused again: one retry pending, its status event (an inbox change only) asks no pass.
+      expect(poolTestHooks.retriesPending()).toBe(1)
+      expect(given()).toBe(0)
+    }
+    // Board and status passes meanwhile: each tries the owed line (a pass tells what it owes), but never arms a second
+    // retry, nor moves the deadline the first set.
+    const timers = vi.getTimerCount()
+    const from = poolTestHooks.passesRun
+    emit({ type: 'tasks-changed' } as never)
+    await vi.advanceTimersByTimeAsync(1000)
+    await settled(from)
+    state.status.set('R1', 'ready')
+    status(e)
+    await settled(from, 2)
+    state.status.set('R1', 'watching')
+    status(e)
+    await settled(from, 3)
+    expect(attempts()).toBe(1 + 3 + 3)
+    expect(poolTestHooks.retriesPending()).toBe(1)
+    expect(vi.getTimerCount()).toBeLessThanOrEqual(timers)
+    // The blocker cleared: the retry still pending (armed by the last deadline's refusal) gives the line at its deadline.
+    state.refuse.clear()
+    const fired = poolTestHooks.retriesFired
+    const at = poolTestHooks.passesRun
+    await vi.advanceTimersByTimeAsync(RETRY - 1000)
+    expect(poolTestHooks.retriesFired).toBe(fired + 1)
+    await settled(at)
+    expect(given()).toBe(1)
+    expect(state.deliveries.at(-1)?.body).toMatch(/you review it from the pool/)
+    // And no more: nothing pending, nothing fired, nothing typed however long it waits.
+    expect(poolTestHooks.retriesPending()).toBe(0)
+    const total = attempts()
+    await vi.advanceTimersByTimeAsync(RETRY * 3)
+    expect([poolTestHooks.retriesFired, poolTestHooks.passesGoing(), attempts(), given()]).toEqual([fired + 1, 0, total, 1])
+  })
+
+  it('an eligibility change while the retry waits gives the line; the retry then finds it given, and nothing is typed twice', async () => {
+    const { e } = await refusedOnce()
+    state.refuse.clear()
+    // Its turn ended (a real change of what the pool reads): the event's pass gives it before the deadline.
+    const from = poolTestHooks.passesRun
+    state.status.set('R1', 'ready')
+    status(e)
+    await settled(from)
+    expect([attempts(), given()]).toEqual([2, 1])
+    // The retry fires at its deadline and runs a pass, which sees the delivery made: nothing typed.
+    const fired = poolTestHooks.retriesFired
+    await vi.advanceTimersByTimeAsync(RETRY)
+    expect(poolTestHooks.retriesFired).toBe(fired + 1)
+    await settled(from, 2)
+    expect([attempts(), given(), poolTestHooks.retriesPending()]).toEqual([2, 1, 0])
+  })
+
+  it('an eligibility change at the deadline itself: the event and the retry share one pass, and the line is given once', async () => {
+    const { e } = await refusedOnce()
+    state.refuse.clear()
+    await vi.advanceTimersByTimeAsync(RETRY - 1)
+    const from = poolTestHooks.passesRun
+    state.status.set('R1', 'ready')
+    status(e)
+    await vi.advanceTimersByTimeAsync(1)
+    await settled(from)
+    expect([attempts(), given(), poolTestHooks.retriesPending()]).toEqual([2, 1, 0])
+    await vi.advanceTimersByTimeAsync(RETRY * 2)
+    expect([attempts(), given(), poolTestHooks.passesGoing()]).toEqual([2, 1, 0])
+  })
+
+  it('superseded while the retry waits (R1 took a builder lease): released, given to R2 once, and R1 told nothing more', async () => {
+    const { e, c } = await refusedOnce(AGENTS)
+    lease(e, 'R1', true)
+    const from = poolTestHooks.passesRun
+    await vi.advanceTimersByTimeAsync(RETRY)
+    await settled(from)
+    expect(assignedTo(e, c.id)).toEqual(['R1', 'R2'])
+    expect([attempts(), given('R1'), given('R2')]).toEqual([1, 0, 1])
+    expect(state.calls).toContain('start R2 for review')
+    await vi.advanceTimersByTimeAsync(RETRY * 3)
+    expect([attempts(), given('R1'), given('R2'), poolTestHooks.retriesPending()]).toEqual([1, 0, 1, 0])
+  })
+
+  it('the pool stopped while the retry waits: cleared, nothing later; started again, it gives the line once', async () => {
+    const { e } = await refusedOnce()
+    stopReviewerPool()
+    expect(poolTestHooks.retriesPending()).toBe(0)
+    state.refuse.clear()
+    const fired = poolTestHooks.retriesFired
+    await vi.advanceTimersByTimeAsync(RETRY * 3)
+    expect([poolTestHooks.retriesFired, poolTestHooks.passesGoing(), attempts(), given()]).toEqual([fired, 0, 1, 0])
+    // Its events no longer ask passes.
+    status(e)
+    expect(poolTestHooks.passesGoing()).toBe(0)
+    // A fresh start: the board's next change gives the line owed, once.
+    startReviewerPool()
+    const from = poolTestHooks.passesRun
+    emit({ type: 'tasks-changed' } as never)
+    await vi.advanceTimersByTimeAsync(1000)
+    await settled(from)
+    expect([attempts(), given()]).toEqual([2, 1])
+    await vi.advanceTimersByTimeAsync(RETRY * 3)
+    expect([attempts(), given(), poolTestHooks.retriesPending()]).toEqual([2, 1, 0])
+  })
+
+  it('the workspace closed while the retry waits and opened again on the same service: the old retry never fires into the new lifetime', async () => {
+    const { e } = await refusedOnce()
+    const fired = poolTestHooks.retriesFired
+    await ws!.close()
+    expect(ws!.lifetime.aborted).toBe(false) // the same service's new lifetime (workspace.ts close)
+    expect(poolTestHooks.retriesPending()).toBe(0)
+    // Opened again, the refusal gone: the old deadline passes with nothing (HR2's note: before HI-2343 it ran a pass).
+    open(e)
+    state.refuse.clear()
+    await vi.advanceTimersByTimeAsync(RETRY * 3)
+    expect([poolTestHooks.retriesFired, poolTestHooks.passesGoing(), attempts(), given()]).toEqual([fired, 0, 1, 0])
+    // The opening's own event: the line still owed, given once.
+    const from = poolTestHooks.passesRun
+    emit({ type: 'workspace-changed' } as never)
+    await vi.advanceTimersByTimeAsync(1000)
+    await settled(from)
+    expect([attempts(), given(), poolTestHooks.retriesPending()]).toEqual([2, 1, 0])
+  })
+
+  it('the service switched to another workspace while the retry waits: no pass for the old project there, nor a delivery', async () => {
+    const { e } = await refusedOnce()
+    const fired = poolTestHooks.retriesFired
+    await ws!.close()
+    open(e, tempDir('other-ws-'))
+    state.refuse.clear()
+    const from = poolTestHooks.passesRun
+    await vi.advanceTimersByTimeAsync(RETRY * 3)
+    expect([poolTestHooks.retriesFired, poolTestHooks.passesRun, poolTestHooks.passesGoing(), attempts(), given()]).toEqual([fired, from, 0, 1, 0])
+    // The first workspace opened again (the same service): the line owed there is given once.
+    open(e)
+    emit({ type: 'workspace-changed' } as never)
+    await vi.advanceTimersByTimeAsync(1000)
+    await settled(from)
+    expect([attempts(), given()]).toEqual([2, 1])
   })
 })
