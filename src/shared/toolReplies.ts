@@ -258,6 +258,21 @@ function nextText(n: NextStep): string {
 }
 
 /** The hive tool of each intent: an old move's reply says to call it next time (#1268), an intent's names what's next (#1530). */
+/** A workflow refusal as the Agent API gives it (SPEC §16.8.3). */
+export interface Refused {
+  refused: true
+  rule: string
+  message: string
+  next: string
+  change?: string
+  override: string | null
+  /** HI-2339: what else to know (a None submit's files left out of its paths), each a line, as a moved reply's. */
+  warnings?: string[]
+}
+
+/** A refusal's three sentences, each on a line, and its rule: what was refused, what to do next, where the rule is changed; then its warnings. */
+export const refusedText = (r: Refused): string => [`${r.message} (${r.rule})`, r.next, ...(r.change ? [r.change] : []), ...(r.warnings ?? []).map((w) => `Warning: ${w}`)].join('\n')
+
 export const INTENT_TOOL: Record<string, string> = { start: 'hive_start_card', submit: 'hive_submit', verdict: 'hive_verdict', 'report merge': 'hive_report_merge', 'put back': 'hive_put_back', 'start review': 'hive_start_review' }
 
 /** At most this many of a list in an intent's reply (start review's files): the rest counted. */
