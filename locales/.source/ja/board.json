@@ -553,6 +553,7 @@
   "board.lanes.waitsPreparing": "waiting: preparing {slot}",
   "board.lanes.waitsSlotHeld": "waiting for {slot}: {held, select, session {{agent}’s session is still in it} broker {a process still has a file or folder in it open: Windows Sandbox’s broker ({broker}) is working in it{idle, select, yes {, with no Sandbox running} no {, with a Sandbox running} other {}}} other {a process still has a file or folder in it open}}",
   "board.lanes.waitsStart": "{card} waits to start: {why, select, watching {{agent} is waiting on other work} queued {a line of Hive’s is on its way to {agent}} failed {{agent}’s last start failed} refused {its start was refused for now, and Hive tries again} other {{agent} is in a turn}}",
+  "board.lanes.waitsStartHeld": "{card} waits to start: its start was refused for now, {slot} still in use ({held, select, session {{agent}’s session is still in it} broker {a process still has a file or folder in it open: Windows Sandbox’s broker ({broker}) is working in it{idle, select, yes {, with no Sandbox running} no {, with a Sandbox running} other {}}} other {a process still has a file or folder in it open}}), and Hive tries again",
   "board.leftOut.detail": "{hasPaths, select, yes {Its paths: {paths}.} other {It has no paths yet.}} A file changed meanwhile may be another card's work or your own: include only what belongs to {card}.",
   "board.leftOut.include": "{n, plural, one {Include It} other {Include Them}}",
   "board.leftOut.leave": "{n, plural, one {Leave It Out} other {Leave Them Out}}",

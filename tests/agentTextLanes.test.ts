@@ -79,6 +79,13 @@ function sharedTexts(): { name: string; text: string }[] {
     status({ reason: 'slot', slot: 'slot-b', held: 'session', agent: 'B1' }),
     status({ reason: 'slot', slot: 'slot-b', held: 'session' }),
     status({ reason: 'slot', slot: 'slot-b', held: 'process' }),
+    status({ reason: 'slot', slot: 'slot-b', held: 'broker', broker: 'WindowsSandboxServer', idle: true }),
+    status({ reason: 'slot', slot: 'slot-b', held: 'broker', broker: 'WindowsSandboxServer' }),
+    // HI-2468: a refused start, its slot held.
+    status({ reason: 'startWait', why: 'refused', agent: 'B1', slot: 'slot-b', held: 'session', heldBy: 'CB1' }),
+    status({ reason: 'startWait', why: 'refused', agent: 'B1', slot: 'slot-b', held: 'session' }),
+    status({ reason: 'startWait', why: 'refused', agent: 'B1', slot: 'slot-b', held: 'process' }),
+    status({ reason: 'startWait', why: 'refused', agent: 'B1', slot: 'slot-b', held: 'broker', broker: 'WindowsSandboxServer', idle: false }),
     ...(['busy', 'watching', 'queued', 'failed', 'refused'] as const).flatMap((why) => [status({ reason: 'startWait', why, agent: 'B1' }), status({ reason: 'startWait', why })]),
     status({ reason: 'startWait', why: 'dependencies', waitsFor: 'HI-9' }),
     status({ reason: 'startWait', why: 'dependencies' }),

@@ -533,6 +533,16 @@
       "card": "plain"
     }
   },
+  "lane.status.start.refusedHeld": {
+    "placeholders": {
+      "card": "plain",
+      "slot": "plain",
+      "held": "select",
+      "heldBy": "plain",
+      "broker": "plain",
+      "idle": "select"
+    }
+  },
   "lane.status.start.watching": {
     "placeholders": {
       "card": "plain",

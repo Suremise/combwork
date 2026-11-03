@@ -12,7 +12,8 @@
 // 4. B1, in a turn in slot-a, starts a process that outlives it (detached, a file in slot-a open); its lane is ended
 //    and its next one recorded over it while its turn still runs: Hive leaves the running builder as it is and gives it
 //    the lane's first card once it is free. Its turn ends and it is stopped; the card's start is refused while the
-//    process holds slot-a; once the process ends, the card starts in slot-a with no other call;
+//    process holds slot-a, its status (HI-2468) and its row in the Progress panel naming slot-a and the process in it
+//    (text, hover, screenshot); once the process ends, the card starts in slot-a with no other call;
 // 5. the Assistant's second sighting: B1 stopped, a process holding slot-a, a lane recorded through the API waits for a
 //    slot, its row in the Progress panel saying what holds it (screenshot), and is lent slot-a once the process ends.
 // HI-2467, Windows Sandbox's broker (a stand-in whose current folder is slot-a, HIVE_TEST_SYSTEM_BROKER):
@@ -123,6 +124,13 @@ const renamable = (dir) => {
       return { status: res.status, body: await res.json().catch(() => null) }
     }
     const laneOf = async (n) => (await inv('lanes:list', { all: true })).find((l) => !l.endedAt && l.cards.some((c) => c.number === n))
+    /** The Progress panel's Lanes tab, opened (the rail toggles the panel: clicked only while it is closed). */
+    const panel = page.locator('.progress-panel')
+    const openLanes = async () => {
+      if ((await panel.count()) === 0) await page.locator('.progress-rail').click().catch(() => undefined)
+      await until(async () => (await panel.count()) === 1, HUNG_MS)
+      await panel.locator('.progress-tab[data-tab="lanes"]').click()
+    }
     const card = async (n) => (await inv('tasks:list')).find((c) => c.number === n)
     /** The lane's status as it changes, each new one with when (ms from `t0`), until `stop` (what HR1 asked to see). */
     const watchStatus = (n, t0) => {
@@ -196,6 +204,20 @@ const renamable = (dir) => {
     fs.writeFileSync(turnGo, 'go')
     check('…B1’s turn ends and it is stopped (its old lane’s lease gone), the process still holding slot-a', !!(await until(async () => !(await live(b1.id)), HUNG_MS)) && beating(beat4) && !renamable(slotA), JSON.stringify(await live(b1.id)))
     check('…its card isn’t started while slot-a is held', !!(await until(async () => (await laneOf(c3))?.status?.reason === 'startWait' || (await laneOf(c3))?.status?.reason === 'slot', HUNG_MS)) && (await card(c3))?.column === 'todo' && beating(beat4), JSON.stringify((await laneOf(c3))?.status))
+    // HI-2468: its start refused (never a wait for a slot: B1 ran as it was recorded), its status naming slot-a and the
+    // process in it, in the lane's status and in its row in the Progress panel's Lanes tab, its hover saying it whole.
+    const refusedHeld = async () => {
+      const s = (await laneOf(c3))?.status
+      return s?.reason === 'startWait' && s.why === 'refused' && s.slot === 'slot-a' && s.held === 'process' && s.agent === 'B1' ? s : null
+    }
+    check('…its start refused, its status naming slot-a and the process in it', !!(await until(refusedHeld, HUNG_MS)) && (await card(c3))?.column === 'todo', JSON.stringify((await laneOf(c3))?.status))
+    await openLanes()
+    const why4 = panel.locator(`.progress-lane[data-lane="${(await laneOf(c3)).id}"] .progress-lane-why`)
+    const said4 = `${(await card(c3)).key} waits to start: its start was refused for now, slot-a still in use (a process still has a file or folder in it open), and Hive tries again`
+    check(`…its row in the Progress panel says "${said4}"`, !!(await until(async () => ((await why4.textContent().catch(() => '')) ?? '') === said4, HUNG_MS)), await why4.textContent().catch(() => ''))
+    check('…and its hover says it whole', ((await why4.getAttribute('title').catch(() => '')) ?? '').startsWith(said4), await why4.getAttribute('title').catch(() => ''))
+    fs.mkdirSync(shots, { recursive: true })
+    await panel.screenshot({ path: path.join(shots, 'lane-start-held.png') })
     fs.writeFileSync(go4, 'go')
     check('the process ends: the card starts in slot-a with no other call, B1 there', !!(await until(async () => (await card(c3))?.column === 'doing' && same((await live(b1.id))?.cwd, slotA) && (await laneOf(c3))?.slot === 'slot-a', HUNG_MS)), JSON.stringify({ card: (await card(c3))?.column, lane: await laneOf(c3), b1: await live(b1.id) }))
     console.log(`INFO step 4's lane, as it went: ${(await stop4()).join(' | ')}`)
@@ -215,11 +237,8 @@ const renamable = (dir) => {
     check('a lane recorded through the API over B1, stopped: it waits for a slot', fourth.status === 200 && !(await live(b1.id)), JSON.stringify(fourth.body))
     check('…its status naming slot-a and the process in it', !!(await until(async () => (await laneOf(c4))?.status?.reason === 'slot' && (await laneOf(c4))?.status?.held === 'process' && (await laneOf(c4))?.status?.slot === 'slot-a', HUNG_MS)), JSON.stringify((await laneOf(c4))?.status))
     // The window: its row in the Progress panel's Lanes tab says what holds the slot.
-    await page.locator('.progress-rail').click().catch(() => undefined)
-    const panel = page.locator('.progress-panel')
-    await until(async () => (await panel.count()) === 1, HUNG_MS)
-    await panel.locator('.progress-tab[data-tab="lanes"]').click()
-    const why = panel.locator(`.progress-lane[data-lane="${(await laneOf(c4)).id}"] .progress-lane-why`)
+    await openLanes()
+    const why =panel.locator(`.progress-lane[data-lane="${(await laneOf(c4)).id}"] .progress-lane-why`)
     const said = 'waiting for slot-a: a process still has a file or folder in it open'
     check(`…its row in the Progress panel says "${said}"`, !!(await until(async () => ((await why.textContent().catch(() => '')) ?? '') === said, HUNG_MS)), await why.textContent().catch(() => ''))
     fs.mkdirSync(shots, { recursive: true })

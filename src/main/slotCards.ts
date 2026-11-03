@@ -273,6 +273,11 @@ async function slotForStart(ws: WorkspaceService, projectPath: string, card: Pic
   if ('lease' in written) return leaseAt(pool, written.lease)
   if (o.dry) return couldLend(pool, projectPath, builder)
   const r = await pool.lend(lane ? { lane, agent: builder } : { card: card.id, agent: builder }, { ...(o.target ? { target: o.target } : {}), install: false })
+  // A lane's start refused for its slot held (HI-2468): what holds it kept for the lane's status; any other end forgets it.
+  if (lane) {
+    const busy = !r.ok && r.refusal.why === 'busy' ? r.refusal : null
+    noteStartHeld(projectPath, lane, busy ? { held: heldOf(pool, busy), folder: pool.slots().find((s) => s.name === busy.slot)?.folder ?? null } : null)
+  }
   if (!r.ok) return { wait: refusalText(r.refusal, name) }
   log.info(`Lent ${userText(r.slot.name)} to ${userText(name(builder))} for ${lane ? `lane ${lane}` : `#${card.id}`} (lease ${r.lease.id})`)
   // Its carried lease kept for a card it has left ends now that this start holds its own (HI-1731).
@@ -458,11 +463,52 @@ async function laneSlotStillHeld(ws: WorkspaceService, pool: SlotPool, lane: str
 /** What holds a slot, as a lend's `busy` refusal says (HI-2466), with the agent whose session is in it, by name, where that is known. */
 function heldOf(pool: SlotPool, r: Extract<SlotRefusal, { why: 'busy' }>): LaneSlotHeld {
   const held = r.held ?? 'process'
-  if (held === 'broker' && r.broker) return { slot: r.slot, held, broker: r.broker.name, ...(r.broker.idle !== null ? { idle: r.broker.idle } : {}) }
-  if (held !== 'session') return { slot: r.slot, held: 'process' }
+  if (held !== 'session') return heldOfBusy(r)
   const folder = pool.slots().find((s) => s.name === r.slot)?.folder
   const s = folder ? sessions.liveStates().find((x) => !!x.cwd && containsPlace(folder, x.cwd)) : undefined
   return { slot: r.slot, held, ...(s?.agentName ? { agent: s.agentName } : {}) }
+}
+
+/**
+ * The slot each lane's last start was refused as held (HI-2468: laneStarts' `refused`, as its builder ran), by
+ * "<project>\n<lane>", with when and the slot's folder: for that start's status. Bounded; forgotten by the lane's next
+ * lend that isn't so refused.
+ */
+const startHolds = new Map<string, { held: LaneSlotHeld; folder: string | null; at: number }>()
+const MAX_START_HOLDS = 200
+const startHoldKey = (projectPath: string, lane: string): string => `${projectPath.toLowerCase()}\n${lane}`
+function noteStartHeld(projectPath: string, lane: string, h: { held: LaneSlotHeld; folder: string | null } | null): void {
+  const key = startHoldKey(projectPath, lane)
+  startHolds.delete(key)
+  if (!h) return
+  startHolds.set(key, { ...h, at: Date.now() })
+  if (startHolds.size > MAX_START_HOLDS) startHolds.delete(startHolds.keys().next().value!)
+}
+
+/** What held the slot of lane `lane`'s start made at or after `since` (laneStarts' try), or null: refused otherwise, or lent. */
+export function startHeldSince(projectPath: string, lane: string, since: number): LaneSlotHeld | null {
+  const h = startHolds.get(startHoldKey(projectPath, lane))
+  return h && h.at >= since ? h.held : null
+}
+
+/**
+ * A refused start's held slot looked at again (HI-2468), between its tries: what holds it now, as the lend would say it
+ * (a session in it, else a process: slots.ts quiet, and the broker seen working in it); null once nothing does (its
+ * status then says only that the start was refused: the start is tried again as it always is). Never a lend.
+ */
+export async function startStillHeld(projectPath: string, lane: string): Promise<LaneSlotHeld | null> {
+  const h = startHolds.get(startHoldKey(projectPath, lane))
+  if (!h?.folder) return null
+  const folder = h.folder
+  const s = sessions.liveStates().find((x) => !!x.cwd && containsPlace(folder, x.cwd))
+  if (s) return { slot: h.held.slot, held: 'session', ...(s.agentName ? { agent: s.agentName } : {}) }
+  if (await quietFolder(folder)) return null
+  return heldOfBusy(await processHeld(h.held.slot, folder, brokerWorkingIn))
+}
+
+/** A `busy` refusal by a process as a lane's status carries it (HI-2467): the broker seen in it, else a process. */
+function heldOfBusy(r: Extract<SlotRefusal, { why: 'busy' }>): LaneSlotHeld {
+  return r.held === 'broker' && r.broker ? { slot: r.slot, held: 'broker', broker: r.broker.name, ...(r.broker.idle !== null ? { idle: r.broker.idle } : {}) } : { slot: r.slot, held: 'process' }
 }
 
 /** A start's end of its builder's left carried lease (endLeftCarried), its retry asked for when the slot was busy. */

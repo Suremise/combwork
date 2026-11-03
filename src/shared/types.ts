@@ -3973,10 +3973,12 @@ export interface LaneStatus {
   /** startWait `fresh` (HI-2034): no more automatic tries, and why (the user retries it, or ends the lane); the reason a failure gave. */
   freshBlocked?: 'timeout' | 'uncertain' | 'failed'
   freshWhy?: string
-  /** preparing (#1446): the slot being prepared; slot (HI-2466): the free slot it was refused as held. */
+  /** preparing (#1446): the slot being prepared; slot (HI-2466), and startWait `refused` (HI-2468): the free slot it was refused as held. */
   slot?: string
-  /** slot (HI-2466): what holds that free slot, a session or a process (a file or folder in it open); Hive tries again until it is free. */
+  /** slot (HI-2466), and startWait `refused` (HI-2468): what holds that free slot, a session or a process (a file or folder in it open); Hive tries again until it is free. */
   held?: 'session' | 'process' | 'broker'
+  /** startWait `refused` with `held` session (HI-2468): the agent whose session is in the slot (`agent` is the builder there). */
+  heldBy?: string
   /** held `broker` (HI-2467): the process name of Windows Sandbox's broker seen working in it (WindowsSandboxServer). */
   broker?: string
   /** held `broker` (HI-2467): whether no Sandbox runs (true) or one does (false); absent: not known. */

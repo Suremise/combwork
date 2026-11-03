@@ -553,6 +553,7 @@
   "board.lanes.waitsPreparing": "等待中：正在准备 {slot}",
   "board.lanes.waitsSlotHeld": "等待 {slot}：{held, select, session {{agent} 的会话仍在其中} broker {仍有进程打开着其中的文件或文件夹：Windows Sandbox 的代理程序（{broker}）正以它为工作文件夹{idle, select, yes {，且没有正在运行的 Sandbox} no {，且有 Sandbox 正在运行} other {}}} other {仍有进程打开着其中的文件或文件夹}}",
   "board.lanes.waitsStart": "{card} 等待开始：{why, select, watching {{agent} 正在等待其他工作} queued {Hive 的一行内容正在发往 {agent}} failed {{agent} 上次启动失败} refused {其启动暂时被拒绝，Hive 会再试} other {{agent} 正处于一个回合中}}",
+  "board.lanes.waitsStartHeld": "{card} 等待开始：{slot} 仍在使用中，其启动暂时被拒绝（{held, select, session {{agent} 的会话仍在其中} broker {仍有进程打开着其中的文件或文件夹：Windows Sandbox 的代理程序（{broker}）正以它为工作文件夹{idle, select, yes {，且没有正在运行的 Sandbox} no {，且有 Sandbox 正在运行} other {}}} other {仍有进程打开着其中的文件或文件夹}}），Hive 会再试",
   "board.leftOut.detail": "{hasPaths, select, yes {它的路径：{paths}。} other {它还没有路径。}}期间改动的文件可能是其他卡片的工作或你自己的改动：只包含属于 {card} 的文件。",
   "board.leftOut.include": "{n, plural, other {包含}}",
   "board.leftOut.leave": "{n, plural, other {不包含}}",
