@@ -60,13 +60,14 @@ export function worktreesRoot(workspacePath: string): string {
 
 /**
  * The branch checked out in a folder, or null when it is detached (git answers "HEAD"). Throws when git can't say
- * (#346): a failed read is not a detached HEAD, which callers deciding what is merged must tell apart.
+ * (#346): a failed read is not a detached HEAD, which callers deciding what is merged must tell apart. The full ref, cut
+ * here: --abbrev-ref would answer heads/main for main when a tag main exists too (HI-2422).
  */
 export async function checkedOutBranch(cwd: string): Promise<string | null> {
-  const r = await git(cwd, ['rev-parse', '--abbrev-ref', 'HEAD'])
+  const r = await git(cwd, ['rev-parse', '--symbolic-full-name', 'HEAD'])
   if (!r.ok) throw hiveError(M.readBranch, { folder: cwd, why: gitWhy(r.err, 'git rev-parse') }) // i18n-ignore: a git command, as it is
   const b = r.out.trim()
-  return b && b !== 'HEAD' ? b : null
+  return b.startsWith('refs/heads/') ? b.slice('refs/heads/'.length) : null
 }
 
 /** The branch checked out in a folder; null when it is detached or git can't say (for choices, never for what is merged). */
@@ -474,7 +475,12 @@ export async function mergeWorktree(projectPath: string, wt: WorktreeRef, opts: 
     return { ok: false, error: tr(msg({ id: 'worktrees.merge.staged', defaultMessage: 'The project folder has staged changes. Commit or unstage them before merging.', description: 'Why nothing was merged: changes are staged (git add) in the project folder.' })) }
   }
 
-  const check = await git(projectPath, ['merge-tree', '--write-tree', '--name-only', '--no-messages', into, wt.branch])
+  // The branch's commit, by its full ref: a bare name would be a same-named tag before the branch (HI-2422), and git
+  // would merge the tag's commit, or say it is up to date, with only a warning. The target is the folder's HEAD.
+  const tip = await git(projectPath, ['rev-parse', '--verify', `refs/heads/${wt.branch}^{commit}`])
+  if (!tip.ok) return { ok: false, error: tr(M.nothingMerged, { why: tip.err || 'git rev-parse' }) } // i18n-ignore: a git command, as it is
+  const source = tip.out.trim()
+  const check = await git(projectPath, ['merge-tree', '--write-tree', '--name-only', '--no-messages', 'HEAD', source])
   if (check.code === 1) {
     const conflicts = check.out.split(/\r?\n/).slice(1).map((l) => l.trim()).filter(Boolean)
     return { ok: false, conflicts: conflicts.length ? conflicts : [tr(msg({ id: 'worktrees.merge.unknownFiles', defaultMessage: '(unknown files)', description: "The list of a merge's conflicting files, when git didn't name them." }))] }
@@ -482,7 +488,7 @@ export async function mergeWorktree(projectPath: string, wt: WorktreeRef, opts: 
   // Any other failure means this git can't do the check (older than 2.38); the merge itself still refuses to lose work.
 
   if (opts.squash) {
-    const m = await git(projectPath, ['merge', '--squash', wt.branch])
+    const m = await git(projectPath, ['merge', '--squash', source])
     if (!m.ok) {
       await git(projectPath, ['reset', '--merge'])
       return { ok: false, error: m.err || m.out || tr(M.gitFailed, { command: 'git merge --squash' }) } // i18n-ignore: a git command, as it is
@@ -493,7 +499,7 @@ export async function mergeWorktree(projectPath: string, wt: WorktreeRef, opts: 
       return { ok: false, error: c.err || c.out || tr(M.gitFailed, { command: 'git commit' }) } // i18n-ignore: a git command, as it is
     }
   } else {
-    const m = await git(projectPath, ['merge', '--no-ff', '-m', message, wt.branch])
+    const m = await git(projectPath, ['merge', '--no-ff', '-m', message, source])
     if (!m.ok) {
       await git(projectPath, ['merge', '--abort'])
       return { ok: false, error: m.err || m.out || tr(M.gitFailed, { command: 'git merge' }) } // i18n-ignore: a git command, as it is
@@ -588,8 +594,9 @@ export async function moveBranchTo(projectPath: string, wt: WorktreeRef, into: s
   if (!existsSync(wt.path)) return tr(msg({ id: 'worktrees.move.missing', defaultMessage: '{folder} is missing.', description: "Why the agent's branch wasn't moved after a squash merge: its worktree folder {folder} is gone." }), { folder: wt.path })
   const head = await git(wt.path, ['symbolic-ref', '--short', 'HEAD'])
   if (!head.ok || head.out.trim() !== wt.branch) return tr(msg({ id: 'worktrees.move.notOnBranch', defaultMessage: "The worktree isn't on {branch}.", description: "Why the agent's branch wasn't moved after a squash merge: its worktree has another branch than {branch} checked out." }), { branch: wt.branch })
-  if (!(await alreadyMerged(projectPath, into, wt.branch))) return tr(msg({ id: 'worktrees.move.notEverything', defaultMessage: "{into} doesn't have everything on {branch}.", description: "Why the agent's branch {branch} wasn't moved after a squash merge: the branch merged into ({into}) lacks some of its changes." }), { into, branch: wt.branch })
-  const r = await git(wt.path, ['reset', '--keep', into])
+  // Both by their full refs: a same-named tag would otherwise be read, and the branch reset to it (HI-2422).
+  if (!(await alreadyMerged(projectPath, `refs/heads/${into}`, `refs/heads/${wt.branch}`))) return tr(msg({ id: 'worktrees.move.notEverything', defaultMessage: "{into} doesn't have everything on {branch}.", description: "Why the agent's branch {branch} wasn't moved after a squash merge: the branch merged into ({into}) lacks some of its changes." }), { into, branch: wt.branch })
+  const r = await git(wt.path, ['reset', '--keep', `refs/heads/${into}`])
   if (!r.ok) return r.err || r.out || tr(M.gitFailed, { command: 'git reset' }) // i18n-ignore: a git command, as it is
   log.info(`Moved ${userText(wt.branch)} to ${userText(into)} after the squash merge`)
   return true

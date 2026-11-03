@@ -8,6 +8,7 @@
 ### Fixes
 
 - **Turning the Assistant's Control down, or stopping it, stops a card or comment it already asked for.** A new card or comment the Assistant asked for just before, still waiting behind another change to the board, was still made. Now it's refused and nothing of it is saved, its files included (HI-2415).
+- **Merge a branch merges the branch, even with a tag of the same name.** Merging into the branch the project folder has checked out, a tag named like the branch merged was taken instead: Hive could say the merge was done when nothing of the branch's newer work was merged. A tag named like the target made the merge refuse, and could stop the agent's branch from moving after a squash. Hive now names branches by their full refs there (HI-2422).
 ### Security
 
 - **DOMPurify 3.4.17.** Hive cleans the Markdown it shows (cards, comments, docs, agents' messages) and the Files tab's editor with DOMPurify, and 3.4.16 has three advisories. None applied to how Hive or the editor use it (they need options neither sets), but the fixed version now ships (HI-2421).
