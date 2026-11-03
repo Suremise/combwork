@@ -349,5 +349,33 @@
       "c14c462f8054a84c"
     ]
   },
-  "dialects": {}
+  "dialects": {
+    "api/cli": [
+      "c91cf96256abb477"
+    ],
+    "claude-code/Haiku 5.5": [
+      "efeff9955746568b"
+    ],
+    "claude-code/Opus 5.5": [
+      "ac2f0517187a1c41"
+    ],
+    "claude-code/Sonnet 5.5": [
+      "830cc8d0e258971d"
+    ],
+    "claude-code/cli": [
+      "5829bbcaf8718323"
+    ],
+    "codex/GPT-6 Astra": [
+      "8c08bd7fe84e3a9a"
+    ],
+    "codex/GPT-6.1 Sol": [
+      "303ce734fa4effec"
+    ],
+    "codex/cli": [
+      "edf3d9e403f4b689"
+    ],
+    "copilot/cli": [
+      "2a428b5ff9d211fc"
+    ]
+  }
 }
