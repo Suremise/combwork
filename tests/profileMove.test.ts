@@ -1,7 +1,7 @@
 import { copyFileSync, existsSync, mkdirSync, readFileSync, readdirSync, readlinkSync, renameSync, symlinkSync, writeFileSync } from 'fs'
 import { join } from 'path'
 import { describe, expect, it } from 'vitest'
-import { backupPath, moveProfile, readRecord, REGENERATED, type MoveOps } from '../src/main/profileMove'
+import { backupPath, LOCK_STALE_MS, lockFile, moveProfile, readRecord, REGENERATED, STAGING_MARKER, type MoveOps } from '../src/main/profileMove'
 import { tempDir } from './tempDir'
 
 // HI-2461: the profile folders move from Hive's names to Combwork's at the first start, copied (never moved) so nothing
@@ -10,6 +10,7 @@ import { tempDir } from './tempDir'
 
 const NOW = new Date('2026-11-03T20:00:00Z')
 const BACKUP = 'Hive.backup-2026-11-03'
+const TOKEN = '0123456789abcdef'
 
 /** A 1.0 profile: settings, usage, logs, an account's folder, and Chromium's cache. */
 function oldProfile(parent: string): string {
@@ -25,7 +26,7 @@ function oldProfile(parent: string): string {
   return dir
 }
 
-const ops = (over: Partial<MoveOps> = {}): MoveOps => ({ copyFile: (a, b) => copyFileSync(a, b), rename: (a, b) => renameSync(a, b), alive: () => false, pid: 1000, ...over })
+const ops = (over: Partial<MoveOps> = {}): MoveOps => ({ copyFile: (a, b) => copyFileSync(a, b), rename: (a, b) => renameSync(a, b), alive: () => false, pid: 1000, now: () => Date.now(), ...over })
 const read = (p: string): string => readFileSync(p, 'utf8')
 
 describe('the profile move (HI-2461)', () => {
@@ -53,7 +54,9 @@ describe('the profile move (HI-2461)', () => {
     expect(existsSync(join(parent, 'Hive'))).toBe(false)
     expect(readdirSync(parent).sort()).toEqual(['Combwork', BACKUP])
     expect(readRecord(now)).toEqual({ v: 1, from: join(parent, 'Hive'), movedAt: NOW.toISOString(), backup: join(parent, BACKUP), opened: false })
-    expect(existsSync(join(now, '.profile-move-owner.json'))).toBe(false)
+    // Neither the staging marker nor the lock is left behind.
+    expect(existsSync(join(now, STAGING_MARKER))).toBe(false)
+    expect(existsSync(lockFile(parent, 'Combwork'))).toBe(false)
   })
 
   it('already moved: the new folder is used and nothing changes', () => {
@@ -99,25 +102,90 @@ describe('the profile move (HI-2461)', () => {
     expect(readdirSync(parent)).toEqual(['Hive'])
   })
 
-  it('a partial move left by a start that ended partway: its copy is made again from the old folder', () => {
+  it('a partial move left by a start that ended partway: its marked copy goes, and the copy is made again', () => {
     const parent = tempDir('pm-partial-')
     oldProfile(parent)
-    mkdirSync(join(parent, 'Combwork.moving'))
-    writeFileSync(join(parent, 'Combwork.moving', '.profile-move-owner.json'), '{"pid":4242}')
-    writeFileSync(join(parent, 'Combwork.moving', 'config.json'), '{"half":')
+    const left = join(parent, `Combwork.moving-${TOKEN}`)
+    mkdirSync(left)
+    writeFileSync(join(left, STAGING_MARKER), JSON.stringify({ token: TOKEN, pid: 4242 }))
+    writeFileSync(join(left, 'config.json'), '{"half":')
+    // Its lock too, its start ended.
+    writeFileSync(lockFile(parent, 'Combwork'), JSON.stringify({ v: 1, pid: 4242, token: TOKEN, at: NOW.toISOString() }))
     const o = moveProfile(parent, 'Hive', 'Combwork', { now: NOW, ops: ops({ alive: () => false }) })
     expect(o.kind).toBe('moved')
     expect(read(join(parent, 'Combwork', 'config.json'))).toBe('{"settings":{"theme":"dark"}}')
-    expect(existsSync(join(parent, 'Combwork.moving'))).toBe(false)
+    expect(existsSync(left)).toBe(false)
+    expect(readdirSync(parent).sort()).toEqual(['Combwork', BACKUP])
   })
 
-  it('another start copying now: this one gives way and changes nothing', () => {
+  it("never removes what isn't positively this move's: an unmarked staging folder, a mismatched marker, a folder of another name", () => {
+    const parent = tempDir('pm-unmarked-')
+    oldProfile(parent)
+    const unmarked = join(parent, `Combwork.moving-${TOKEN}`)
+    const mismatched = join(parent, 'Combwork.moving-1111111111111111')
+    const plain = join(parent, 'Combwork.moving')
+    for (const d of [unmarked, mismatched, plain]) {
+      mkdirSync(d)
+      writeFileSync(join(d, 'user-file.txt'), 'mine')
+    }
+    writeFileSync(join(mismatched, STAGING_MARKER), JSON.stringify({ token: TOKEN }))
+    expect(moveProfile(parent, 'Hive', 'Combwork', { now: NOW, ops: ops() }).kind).toBe('moved')
+    for (const d of [unmarked, mismatched, plain]) expect(read(join(d, 'user-file.txt'))).toBe('mine')
+  })
+
+  it('another start holding the move now (its lock fresh, its process alive): this one gives way and changes nothing', () => {
     const parent = tempDir('pm-busy-')
     oldProfile(parent)
-    mkdirSync(join(parent, 'Combwork.moving'))
-    writeFileSync(join(parent, 'Combwork.moving', '.profile-move-owner.json'), '{"pid":4242}')
+    writeFileSync(lockFile(parent, 'Combwork'), JSON.stringify({ v: 1, pid: 4242, token: TOKEN, at: NOW.toISOString() }))
     expect(moveProfile(parent, 'Hive', 'Combwork', { now: NOW, ops: ops({ alive: (pid) => pid === 4242 }) })).toEqual({ kind: 'busy', use: join(parent, 'Hive') })
-    expect(existsSync(join(parent, 'Combwork.moving', '.profile-move-owner.json'))).toBe(true)
+    expect(readdirSync(parent).sort()).toEqual(['Combwork.move-lock', 'Hive'])
+  })
+
+  it('a lock that is absent-then-unreadable, malformed, or a live start\'s left unrefreshed: never removed, and the old folder is used', () => {
+    for (const [what, body, alive, age] of [
+      ['malformed', '{"v":1,"pid":', false, 0],
+      ['not a lock', '{"hello":"world"}', false, 0],
+      ['empty', '', false, 0],
+      ['live but unrefreshed', JSON.stringify({ v: 1, pid: 4242, token: TOKEN, at: NOW.toISOString() }), true, LOCK_STALE_MS + 1000]
+    ] as const) {
+      const parent = tempDir('pm-badlock-')
+      oldProfile(parent)
+      const file = lockFile(parent, 'Combwork')
+      writeFileSync(file, body)
+      const o = moveProfile(parent, 'Hive', 'Combwork', { now: NOW, ops: ops({ alive: () => alive, now: () => Date.now() + age }) })
+      expect(o, what).toMatchObject({ kind: 'failed', use: join(parent, 'Hive') })
+      expect(read(file), what).toBe(body)
+      expect(readdirSync(parent).sort(), what).toEqual(['Combwork.move-lock', 'Hive'])
+    }
+  })
+
+  // The interleavings the round-1 review reproduced: a second start at each step of a first one's move.
+  for (const step of ['locked', 'staged', 'published'] as const) {
+    it(`a second start while the first is at "${step}": it gives way, and the first's move completes whole`, () => {
+      const parent = tempDir(`pm-race-${step}-`)
+      oldProfile(parent)
+      let second: ReturnType<typeof moveProfile> | null = null
+      const first = moveProfile(parent, 'Hive', 'Combwork', {
+        now: NOW,
+        ops: ops({
+          pid: 1000,
+          step: (s) => {
+            if (s === step) second = moveProfile(parent, 'Hive', 'Combwork', { now: NOW, ops: ops({ pid: 2000, alive: (pid) => pid === 1000 }) })
+          }
+        })
+      })
+      expect(second).toMatchObject({ kind: 'busy' })
+      expect(first).toEqual({ kind: 'moved', use: join(parent, 'Combwork'), backup: join(parent, BACKUP) })
+      expect(readdirSync(parent).sort()).toEqual(['Combwork', BACKUP])
+      expect(read(join(parent, 'Combwork', 'config.json'))).toBe('{"settings":{"theme":"dark"}}')
+    })
+  }
+
+  it('a second start after the first released the lock: the move is already done, and it uses the new folder', () => {
+    const parent = tempDir('pm-after-')
+    oldProfile(parent)
+    moveProfile(parent, 'Hive', 'Combwork', { now: NOW, ops: ops({ pid: 1000 }) })
+    expect(moveProfile(parent, 'Hive', 'Combwork', { now: NOW, ops: ops({ pid: 2000, alive: () => true }) })).toEqual({ kind: 'current', use: join(parent, 'Combwork') })
   })
 
   it('the old folder still in use after the copy: its backup is pending, and renamed at the next start', () => {

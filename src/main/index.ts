@@ -143,13 +143,19 @@ let quitting = false
 // them across before anything reads them (profileMove.ts), and a failed copy keeps the old folder for this run.
 const profileMoveLines: string[] = []
 if (process.env.HIVE_USER_DATA && !app.isPackaged && process.env.HIVE_TEST_PROFILE_MOVE === '1') {
-  // A test copy of the move (unpackaged only): its profile is the new folder, and `Hive-Dev` beside it the old one.
+  // A test copy of the move (unpackaged only): its profile is the new folder, and `Hive-Dev` beside it the old one; with
+  // HIVE_TEST_LOCAL_PROFILE, that folder is the new local one (its accounts), and `Hive-Dev` beside it the old one.
   const profile = resolve(process.env.HIVE_USER_DATA)
   const roaming = moveProfile(dirname(profile), legacyProfileFolder(false), basename(profile), { skip: REGENERATED })
   if (roaming.kind === 'busy') process.exit(0)
-  setProfileMoves({ roaming, local: null })
-  const line = outcomeLine(roaming, userText)
-  if (line) profileMoveLines.push(line)
+  const localTo = process.env.HIVE_TEST_LOCAL_PROFILE ? resolve(process.env.HIVE_TEST_LOCAL_PROFILE) : null
+  const localMove = localTo ? moveProfile(dirname(localTo), legacyProfileFolder(false), basename(localTo)) : null
+  if (localMove?.kind === 'busy') process.exit(0)
+  setProfileMoves({ roaming, local: localMove })
+  for (const o of [roaming, localMove]) {
+    const line = o && outcomeLine(o, userText)
+    if (line) profileMoveLines.push(line)
+  }
   app.setPath('userData', roaming.use)
 } else if (process.env.HIVE_USER_DATA) app.setPath('userData', process.env.HIVE_USER_DATA)
 else {

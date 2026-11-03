@@ -71,9 +71,10 @@ const CONFIRM_ROUNDS = 3
  * uses, as the profile move left it (HI-2461: the old `Hive` folder for a run whose copy failed).
  */
 export function accountsRoot(): string {
-  if (process.env.HIVE_USER_DATA) return join(process.env.HIVE_USER_DATA, 'accounts')
+  // The move's outcome first: a test copy's local move (HIVE_TEST_LOCAL_PROFILE) has one too.
   const inUse = localProfileInUse()
   if (inUse) return join(inUse, 'accounts')
+  if (process.env.HIVE_USER_DATA) return join(process.env.HIVE_USER_DATA, 'accounts')
   const local = process.env.LOCALAPPDATA || join(app.getPath('home'), 'AppData', 'Local')
   return join(local, profileFolder(app.isPackaged), 'accounts')
 }
