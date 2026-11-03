@@ -1,0 +1,224 @@
+{
+  "runtime.action.done": {
+    "placeholders": {}
+  },
+  "runtime.action.noCode": {
+    "placeholders": {}
+  },
+  "runtime.action.skipReview": {
+    "placeholders": {}
+  },
+  "runtime.action.unblock": {
+    "placeholders": {}
+  },
+  "runtime.choice.accept": {
+    "placeholders": {}
+  },
+  "runtime.choice.carryOn": {
+    "placeholders": {}
+  },
+  "runtime.choice.split": {
+    "placeholders": {}
+  },
+  "runtime.choice.takeOver": {
+    "placeholders": {}
+  },
+  "runtime.move.doneByOverride": {
+    "placeholders": {
+      "cards": "plain",
+      "card": "plain"
+    }
+  },
+  "runtime.repair.boardDone": {
+    "placeholders": {
+      "stage": "plain"
+    }
+  },
+  "runtime.review.everyTest": {
+    "placeholders": {}
+  },
+  "runtime.review.focusedChosenBy": {
+    "placeholders": {
+      "why": "plain"
+    }
+  },
+  "runtime.review.pickFailed": {
+    "placeholders": {}
+  },
+  "runtime.review.runYourself": {
+    "placeholders": {
+      "tests": "plain",
+      "check": "plain"
+    }
+  },
+  "runtime.start.blocked": {
+    "placeholders": {
+      "card": "plain",
+      "why": "plain"
+    }
+  },
+  "runtime.start.laneStarted": {
+    "placeholders": {
+      "card": "plain"
+    }
+  },
+  "runtime.start.slotMove": {
+    "placeholders": {
+      "slot": "plain",
+      "line": "plain",
+      "target": "plain",
+      "card": "plain"
+    }
+  },
+  "runtime.start.slotWait": {
+    "placeholders": {
+      "card": "plain",
+      "why": "plain"
+    }
+  },
+  "runtime.submit.movedAhead": {
+    "placeholders": {
+      "cards": "plain"
+    }
+  },
+  "runtime.submit.pathsLeaveOut": {
+    "placeholders": {
+      "card": "plain",
+      "files": "plain"
+    }
+  },
+  "runtime.submit.unclaimed": {
+    "placeholders": {
+      "card": "plain",
+      "files": "plain"
+    }
+  },
+  "runtime.wake.aheadInLane": {
+    "placeholders": {
+      "card": "plain",
+      "cards": "plain",
+      "next": "plain"
+    }
+  },
+  "runtime.wake.answered": {
+    "placeholders": {
+      "card": "plain",
+      "answer": "select",
+      "question": "plain"
+    }
+  },
+  "runtime.wake.answered.action": {
+    "placeholders": {
+      "said": "plain",
+      "action": "plain"
+    }
+  },
+  "runtime.wake.answered.choice": {
+    "placeholders": {
+      "said": "plain",
+      "choice": "plain"
+    }
+  },
+  "runtime.wake.answered.note": {
+    "placeholders": {
+      "said": "plain",
+      "note": "plain"
+    }
+  },
+  "runtime.wake.answered.rounds": {
+    "placeholders": {
+      "said": "plain",
+      "rounds": "plural"
+    }
+  },
+  "runtime.wake.answered.with": {
+    "placeholders": {
+      "said": "plain",
+      "note": "plain"
+    }
+  },
+  "runtime.wake.approvedMerge": {
+    "placeholders": {}
+  },
+  "runtime.wake.byDecision": {
+    "placeholders": {
+      "card": "plain",
+      "questions": "plain",
+      "recordedBy": "plain",
+      "decision": "plain"
+    }
+  },
+  "runtime.wake.byDecision.and": {
+    "placeholders": {
+      "list": "plain",
+      "item": "plain"
+    }
+  },
+  "runtime.wake.failedReview": {
+    "placeholders": {
+      "card": "plain"
+    }
+  },
+  "runtime.wake.focusedSkip": {
+    "placeholders": {
+      "card": "plain",
+      "merge": "select",
+      "why": "plain"
+    }
+  },
+  "runtime.wake.followUp": {
+    "placeholders": {
+      "card": "plain",
+      "revision": "plain",
+      "submission": "plain"
+    }
+  },
+  "runtime.wake.inReview": {
+    "placeholders": {
+      "card": "plain"
+    }
+  },
+  "runtime.wake.laneListChanged": {
+    "placeholders": {
+      "cards": "plain"
+    }
+  },
+  "runtime.wake.newDecision": {
+    "placeholders": {
+      "card": "plain"
+    }
+  },
+  "runtime.wake.questionDone": {
+    "placeholders": {
+      "card": "plain",
+      "question": "plain"
+    }
+  },
+  "runtime.wake.removed": {
+    "placeholders": {
+      "card": "plain",
+      "by": "select",
+      "reason": "plain"
+    }
+  },
+  "runtime.wake.reviewerAsks": {
+    "placeholders": {
+      "card": "plain",
+      "text": "plain"
+    }
+  },
+  "runtime.wake.squashed": {
+    "placeholders": {
+      "line": "plain",
+      "target": "plain",
+      "prev": "plain",
+      "next": "plain"
+    }
+  },
+  "runtime.wake.stale": {
+    "placeholders": {}
+  },
+  "runtime.wake.stalePaths": {
+    "placeholders": {}
+  }
+}

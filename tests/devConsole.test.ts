@@ -5,6 +5,7 @@ import { ConsoleRing, EVENT_MAX_BYTES, HOOK_FIELDS, RING_MAX_BYTES, TRANSCRIPT_F
 import { DevConsole, MAX_SOURCES, QUEUE_MAX_EVENTS } from '../src/main/devConsole'
 import { hookSummary, launchEvent, transcriptEvent } from '../src/main/devConsoleWords'
 import { CONSOLE_NOT_CAPTURED, consoleEventsText, consoleSourcesText } from '../src/shared/toolReplies'
+import { say } from '../src/shared/agentText'
 import { SECRET_SAMPLES } from './secretSamples'
 
 // The developer console's capture (#636): bounded rings, kept only while a console watches, each raw event redacted
@@ -597,7 +598,7 @@ describe('replies', () => {
     const events = [{ seq: 7, at: '2026-10-12T01:02:03.000Z', kind: 'hook', name: 'Stop', summary: 'Stop → stop; finished' }]
     const text = consoleEventsText({ source, events, older: 4, newest: 7 })
     expect(text).toBe("alpha · B1:\n#7 01:02:03 hook Stop → stop; finished\n4 earlier not shown.\nNext: since=7. seq=[n] gives an event's raw payload and what Hive made of it.")
-    expect(consoleEventsText({ source: { ...source, capturing: false, events: 0 }, events: [], newest: 0 })).toBe(`alpha · B1: ${CONSOLE_NOT_CAPTURED}`)
+    expect(consoleEventsText({ source: { ...source, capturing: false, events: 0 }, events: [], newest: 0 })).toBe(`alpha · B1: ${say(CONSOLE_NOT_CAPTURED)}`)
     expect(consoleEventsText({ source, events: [], newest: 0 })).toBe('alpha · B1: captured by the open console; no events yet.')
     expect(consoleEventsText({ source, events: [], missing: [3] })).toContain('Not in its buffer now: #3.')
   })

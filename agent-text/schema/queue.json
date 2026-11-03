@@ -1,0 +1,245 @@
+{
+  "queue.failure.check.environment": {
+    "placeholders": {
+      "what": "plain",
+      "cause": "plain",
+      "code": "plain"
+    }
+  },
+  "queue.failure.check.failed": {
+    "placeholders": {
+      "what": "plain"
+    }
+  },
+  "queue.failure.check.install": {
+    "placeholders": {}
+  },
+  "queue.failure.check.named": {
+    "placeholders": {
+      "check": "plain"
+    }
+  },
+  "queue.failure.check.some": {
+    "placeholders": {}
+  },
+  "queue.failure.conflict": {
+    "placeholders": {
+      "target": "plain"
+    }
+  },
+  "queue.failure.focused.newProof": {
+    "placeholders": {
+      "tests": "plain"
+    }
+  },
+  "queue.failure.focused.noProof": {
+    "placeholders": {
+      "tests": "plain"
+    }
+  },
+  "queue.failure.focused.noRunner": {
+    "placeholders": {}
+  },
+  "queue.failure.focused.none": {
+    "placeholders": {}
+  },
+  "queue.failure.focused.repick": {
+    "placeholders": {
+      "paths": "plain"
+    }
+  },
+  "queue.failure.folderBusy": {
+    "placeholders": {
+      "target": "plain"
+    }
+  },
+  "queue.failure.hook": {
+    "placeholders": {}
+  },
+  "queue.failure.in": {
+    "placeholders": {
+      "head": "plain",
+      "files": "plain"
+    }
+  },
+  "queue.failure.notUpToDate": {
+    "placeholders": {
+      "target": "plain"
+    }
+  },
+  "queue.failure.notUpToDate.files": {
+    "placeholders": {
+      "head": "plain",
+      "files": "plain"
+    }
+  },
+  "queue.failure.targetMoved": {
+    "placeholders": {
+      "target": "plain"
+    }
+  },
+  "queue.failure.temporary": {
+    "placeholders": {}
+  },
+  "queue.files.count": {
+    "placeholders": {
+      "n": "plain"
+    }
+  },
+  "queue.files.more": {
+    "placeholders": {
+      "files": "plain",
+      "n": "plain"
+    }
+  },
+  "queue.line.left": {
+    "placeholders": {
+      "who": "plain",
+      "why": "select"
+    }
+  },
+  "queue.line.merged": {
+    "placeholders": {}
+  },
+  "queue.line.notYet": {
+    "placeholders": {
+      "who": "plain"
+    }
+  },
+  "queue.line.paused": {
+    "placeholders": {
+      "who": "plain",
+      "target": "plain",
+      "reason": "plain",
+      "card": "plain",
+      "waits": "plain"
+    }
+  },
+  "queue.line.queued": {
+    "placeholders": {
+      "who": "plain",
+      "target": "plain",
+      "position": "plain"
+    }
+  },
+  "queue.line.returned": {
+    "placeholders": {
+      "who": "plain",
+      "returned": "plain"
+    }
+  },
+  "queue.line.stale": {
+    "placeholders": {
+      "who": "plain",
+      "approved": "plain",
+      "current": "plain"
+    }
+  },
+  "queue.line.testing": {
+    "placeholders": {
+      "who": "plain",
+      "step": "select",
+      "target": "plain"
+    }
+  },
+  "queue.line.unenforced": {
+    "placeholders": {}
+  },
+  "queue.line.who": {
+    "placeholders": {}
+  },
+  "queue.next.conflict": {
+    "placeholders": {
+      "target": "plain"
+    }
+  },
+  "queue.next.fix": {
+    "placeholders": {}
+  },
+  "queue.next.proof": {
+    "placeholders": {}
+  },
+  "queue.next.repick": {
+    "placeholders": {}
+  },
+  "queue.next.runner": {
+    "placeholders": {}
+  },
+  "queue.next.transient": {
+    "placeholders": {}
+  },
+  "queue.paused.approval": {
+    "placeholders": {
+      "target": "plain"
+    }
+  },
+  "queue.paused.fix": {
+    "placeholders": {}
+  },
+  "queue.paused.folder": {
+    "placeholders": {
+      "target": "plain"
+    }
+  },
+  "queue.paused.mergeChoice": {
+    "placeholders": {}
+  },
+  "queue.paused.resume": {
+    "placeholders": {}
+  },
+  "queue.paused.rules": {
+    "placeholders": {}
+  },
+  "queue.paused.stuck": {
+    "placeholders": {}
+  },
+  "queue.returned.lastLines": {
+    "placeholders": {
+      "lines": "plain"
+    }
+  },
+  "queue.returned.lead": {
+    "placeholders": {
+      "subject": "plain",
+      "cameBack": "plain",
+      "failure": "plain"
+    }
+  },
+  "queue.returned.log": {
+    "placeholders": {
+      "path": "plain"
+    }
+  },
+  "queue.returned.logPointer": {
+    "placeholders": {}
+  },
+  "queue.returned.subjectIt": {
+    "placeholders": {}
+  },
+  "queue.wake.left.decision": {
+    "placeholders": {
+      "card": "plain",
+      "to": "select"
+    }
+  },
+  "queue.wake.left.stale": {
+    "placeholders": {
+      "card": "plain"
+    }
+  },
+  "queue.wake.resubmitted": {
+    "placeholders": {
+      "card": "plain",
+      "failure": "plain",
+      "builder": "plain",
+      "conflict": "select"
+    }
+  },
+  "queue.wake.stale": {
+    "placeholders": {
+      "card": "plain",
+      "approved": "plain",
+      "current": "plain"
+    }
+  }
+}

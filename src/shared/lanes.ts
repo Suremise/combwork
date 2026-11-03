@@ -3,6 +3,7 @@ import type { LaneCard, LaneInfo, LaneSlotInfo, LaneState, LaneStatus, LaneWaitR
 import type { StageId } from './workflow/facts'
 import { cardRef } from './projectKeys'
 import { unsubmittedText, type UnsubmittedCard } from './unsubmitted'
+import { agentMsg, say, type AgentMsg } from './agentText'
 
 /**
  * Lanes (#483): a builder and a reviewer taking a project's cards in order, as the card-loop skill registers them. What
@@ -373,45 +374,144 @@ export function stampWait(was: WaitStamp | undefined, status: LaneStatus | null,
   return { key, since: now, observed: known }
 }
 
+/**
+ * What the hive tools say of lanes (dialects, HI-2435): a lane's line, its state and why it waits, and the replies of
+ * hive_lane. Said where the text is sent (hive-mcp.js formats these replies in its own process, with its session's
+ * dialect); `{card}` is a card's key or number, `{agent}` an agent's name.
+ */
+const L = {
+  aCard: agentMsg({ id: 'lane.status.aCard', text: 'a card', note: 'Where a lane waits on no particular card: put in place of {card} in the lines below.' }),
+  anAgent: agentMsg({ id: 'lane.status.anAgent', text: 'an agent', note: "Where the agent whose hooks aren't arriving isn't known: put in place of {agent}." }),
+  itsAgent: agentMsg({ id: 'lane.status.itsAgent', text: 'its agent', note: "Where the agent owed a new conversation isn't known by name: put in place of {agent}." }),
+  itsBuilder: agentMsg({ id: 'lane.status.itsBuilder', text: 'its builder', note: "Where the lane's builder isn't known by name: put in place of {agent}." }),
+  itsSlot: agentMsg({ id: 'lane.status.itsSlot', text: 'its slot', note: "Where the slot being prepared isn't known by name: put in place of {slot}." }),
+  aDependency: agentMsg({ id: 'lane.status.aDependency', text: 'a card it depends on', note: "Where the card a lane's next card waits for isn't known: put in place of {waitsFor}." }),
+  blocked: agentMsg({ id: 'lane.status.blocked', text: '{card} is blocked', note: "A lane waits: its card is blocked (the user's to unblock), no reason given." }),
+  blockedWhy: agentMsg({ id: 'lane.status.blockedWhy', text: '{card} is blocked ({why})', note: "A lane waits: its card is blocked; {why} is the card's blocked reason, as given." }),
+  hold: agentMsg({ id: 'lane.status.hold', text: '{card} is On Hold', note: 'A lane waits: its card is On Hold (a column name).' }),
+  you: agentMsg({ id: 'lane.status.you', text: 'waiting for the user on {card}', note: 'A lane waits: a request on its card waits for the user (For you).' }),
+  roundLimit: agentMsg({ id: 'lane.status.roundLimit', text: '{card} reached the round limit: waiting for the user', note: "A lane waits: its card failed review as many times as the lane's rounds allow; the user decides (§16.11.4)." }),
+  notMerged: agentMsg({ id: 'lane.status.notMerged', text: 'waiting: {card} not merged', note: 'A lane waits: its card passed but is not merged yet; a lane takes one card at a time (§16.11.2).' }),
+  merging: agentMsg({ id: 'lane.status.merging', text: 'waiting: {card} merging', note: 'A lane waits: its passed card is being merged.' }),
+  stale: agentMsg({ id: 'lane.status.stale', text: 'stale: {card} must be submitted again', note: "A lane's card's pass no longer holds (its work changed since): it is submitted again." }),
+  reviewer: agentMsg({ id: 'lane.status.reviewer', text: 'waiting for a reviewer on {card}', note: 'A lane waits: its card is in Review, or its design waits, and nobody reviews it yet.' }),
+  lineUpdate: agentMsg({ id: 'lane.status.lineUpdate', text: "waiting: bringing the builder's branch up to date before {card}", note: "A lane's next card waits while its builder's branch is brought up to date (§16.19.2)." }),
+  listChanges: agentMsg({ id: 'lane.status.listChanges', text: 'list changes after {card}', note: "A change of the lane's card list is queued: it applies once {card}, the card in flight, is Done." }),
+  hooks: agentMsg({ id: 'lane.status.hooks', text: "paused: {agent}'s hooks aren't arriving", note: "A lane pauses while its builder's or reviewer's hooks aren't arriving (#1336): nothing is typed into that agent." }),
+  checkCopy: agentMsg({ id: 'lane.status.checkCopy', text: 'waiting for a check copy for {card}', note: "A lane waits for a check copy (a copy at the card's revision for its checks)." }),
+  slot: agentMsg({ id: 'lane.status.slot', text: 'waiting for a slot', note: 'A lane started with no slot free waits for one to be lent to it (#1438).' }),
+  teamPause: agentMsg({ id: 'lane.status.teamPause', text: 'paused: the team is pausing', note: "The workspace's team is paused (before an update, HI-2081): nothing of a lane moves until it resumes." }),
+  preparing: agentMsg({ id: 'lane.status.preparing', text: 'waiting: preparing {slot}', note: "A lane's slot is being prepared (warming, its setup or an install, #1446); {slot} is its name." }),
+  freshTimeout: agentMsg({ id: 'lane.status.fresh.timeout', text: "{agent}'s new conversation didn't start (it wasn't free in time): retry it from the lane's row, or end the lane", note: "An agent owed a new conversation for its lane (HI-2034) wasn't free within the wait: no more automatic tries until the user retries it." }),
+  freshUncertain: agentMsg({ id: 'lane.status.fresh.uncertain', text: "{agent}'s new conversation didn't start (Hive closed as it started): retry it from the lane's row, or end the lane", note: 'An agent owed a new conversation (HI-2034) was being launched when Hive closed: never launched again by itself.' }),
+  freshFailed: agentMsg({ id: 'lane.status.fresh.failed', text: "{agent}'s new conversation didn't start ({why}): retry it from the lane's row, or end the lane", note: "An agent's new conversation for its lane (HI-2034) failed to launch; {why} is why, as recorded." }),
+  freshFailedBare: agentMsg({ id: 'lane.status.fresh.failedBare', text: "{agent}'s new conversation didn't start (its start failed): retry it from the lane's row, or end the lane", note: "An agent's new conversation for its lane (HI-2034) failed to launch, with no reason recorded." }),
+  freshWaits: agentMsg({ id: 'lane.status.fresh.waits', text: 'waiting: {agent} starts in a new conversation once it is free', note: 'An agent is owed a new conversation for its lane (HI-2034): Hive launches it once the agent is free.' }),
+  startDependencies: agentMsg({ id: 'lane.status.start.dependencies', text: '{card} waits to start: it waits for {waitsFor} to merge', note: "A lane's next card waits for a card it depends on to be merged (HI-2129); {waitsFor} is that card's key." }),
+  startWatching: agentMsg({ id: 'lane.status.start.watching', text: '{card} waits to start: {agent} is waiting on other work', note: "A lane's next card isn't started yet (HI-2029): its builder waits on a watch of other cards." }),
+  startQueued: agentMsg({ id: 'lane.status.start.queued', text: "{card} waits to start: a line of Hive's is on its way to {agent}", note: "A lane's next card isn't started yet (HI-2029): a line Hive types is on its way to the builder." }),
+  startFailed: agentMsg({ id: 'lane.status.start.failed', text: "{card} waits to start: {agent}'s last start failed", note: "A lane's next card isn't started yet (HI-2029): Hive's last start of it on the builder failed." }),
+  startRefused: agentMsg({ id: 'lane.status.start.refused', text: '{card} waits to start: its start was refused for now; Hive tries again', note: "A lane's next card isn't started yet (HI-2029): Hive's start of it was refused for now, and is tried again." }),
+  startBusy: agentMsg({ id: 'lane.status.start.busy', text: '{card} waits to start: {agent} is in a turn', note: "A lane's next card isn't started yet (HI-2029): its builder is in a turn, or starting." }),
+  column: {
+    hold: agentMsg({ id: 'lane.column.hold', text: 'On Hold', note: "A card's column in a lane's line (a column name)." }),
+    todo: agentMsg({ id: 'lane.column.todo', text: 'Todo', note: "A card's column in a lane's line (a column name)." }),
+    doing: agentMsg({ id: 'lane.column.doing', text: 'Doing', note: "A card's column in a lane's line (a column name)." }),
+    review: agentMsg({ id: 'lane.column.review', text: 'Review', note: "A card's column in a lane's line (a column name)." }),
+    passed: agentMsg({ id: 'lane.column.passed', text: 'Passed', note: "A card's column in a lane's line (a column name)." }),
+    done: agentMsg({ id: 'lane.column.done', text: 'Done', note: "A card's column in a lane's line (a column name)." }),
+    gone: agentMsg({ id: 'lane.column.gone', text: 'gone', note: "A lane's card that is gone (deleted, archived, or in another project now), in the lane's line." }),
+    unrecorded: agentMsg({ id: 'lane.column.unrecorded', text: 'not recorded', note: "An ended lane's card with no record of where it was when the lane ended (#512), in the lane's line." })
+  } satisfies Record<LaneCard['column'], AgentMsg>,
+  cardRound: agentMsg({ id: 'lane.card.round', text: 'r{round}', note: "A lane's card's review round, after its column in the lane's line (\"#405 Review r2\")." }),
+  cardBlocked: agentMsg({ id: 'lane.card.blocked', text: '(blocked)', note: "A lane's card that is blocked, after its column in the lane's line (\"#402 Doing (blocked)\")." }),
+  pair: agentMsg({ id: 'lane.line.pair', text: '{builder} / {reviewer} ({project})', note: "A lane's builder and reviewer, and its project, at the start of its line." }),
+  pairInSlot: agentMsg({ id: 'lane.line.pairInSlot', text: '{builder} / {reviewer} ({project}, in {slot})', note: "A lane's builder and reviewer, its project and the slot its cards are built in (#1438), at the start of its line." }),
+  pool: agentMsg({ id: 'lane.line.pool', text: 'the reviewer pool', note: "In place of {reviewer}: the lane is reviewed by the project's reviewer pool (#1443)." }),
+  noReviewer: agentMsg({ id: 'lane.line.noReviewer', text: 'no reviewer', note: 'In place of {reviewer}: the lane has no reviewer yet.' }),
+  line: agentMsg({ id: 'lane.line.text', text: '{pair}: {state}; {cards}; rounds {rounds}, wait {wait}. {id}', note: 'A lane in one line, for the hive tools: "B1 / R1 (hive): active, on #405; #483 Passed, #405 Review r2; rounds 10, wait 6 h. lane-3fa2". {cards}: its cards, each "key column"; {id}: the lane\'s id.' }),
+  lineNamed: agentMsg({ id: 'lane.line.named', text: '{pair} {name}: {state}; {cards}; rounds {rounds}, wait {wait}. {id}', note: "A lane in one line, as lane.line.text, with the lane's own name ({name})." }),
+  hours: agentMsg({ id: 'lane.wait.hours', text: '{n} h', note: 'A lane\'s wait in hours ("6 h", "1.5 h").' }),
+  minutes: agentMsg({ id: 'lane.wait.minutes', text: '{n} min', note: 'A lane\'s wait in minutes ("90 min").' }),
+  paused: agentMsg({ id: 'lane.state.paused', text: 'paused, {why}', note: 'A paused lane\'s state; {why} is why it waits ("paused, #412 is blocked").' }),
+  pausedRoundLimit: agentMsg({ id: 'lane.state.pausedRoundLimit', text: '{card} waits for the user at its round limit', note: "Why a lane is paused, where nothing more is known: its card at its round limit waits for the user's answer." }),
+  activeOn: agentMsg({ id: 'lane.state.activeOn', text: 'active, on {card}', note: "A running lane's state: the card it is on." }),
+  activeAllPassed: agentMsg({ id: 'lane.state.activeAllPassed', text: 'active, every card passed', note: "A running lane's state: every card passed, its merges remain." }),
+  ended: agentMsg({ id: 'lane.state.ended', text: 'ended', note: "An ended lane's state (every card Done)." }),
+  endedMerged: agentMsg({ id: 'lane.state.endedMerged', text: 'ended (merged {commit})', note: "An ended lane's state, with its merge commit ({commit})." }),
+  abandoned: agentMsg({ id: 'lane.state.abandoned', text: 'abandoned', note: "An abandoned lane's state (ended before its cards were Done)." }),
+  noLanes: agentMsg({ id: 'lane.list.none', text: 'No lanes.', note: 'hive_lane list with all: there are no lanes.' }),
+  noLanesListed: agentMsg({ id: 'lane.list.noneListed', text: 'No lanes running or recently ended.', note: 'hive_lane list: no lane is running or ended recently (an ended lane stays listed an hour).' }),
+  started: agentMsg({ id: 'lane.change.started', text: 'Lane started: {line}', note: "hive_lane start's reply for a new lane; {line} is the lane's line." }),
+  joined: agentMsg({ id: 'lane.change.joined', text: 'Joined the lane: {line}', note: "hive_lane join's reply; {line} is the lane's line." }),
+  updated: agentMsg({ id: 'lane.change.updated', text: 'Lane updated: {line}', note: "hive_lane start's reply for the builder's running lane, changed; {line} is the lane's line." }),
+  earlierEnded: agentMsg({ id: 'lane.change.earlierEnded', text: 'Your earlier lane {id} ended.', note: "After a start's reply: the builder's earlier lane, sharing no card with the new list, ended (nothing of it left to do)." }),
+  earlierAbandoned: agentMsg({ id: 'lane.change.earlierAbandoned', text: 'Your earlier lane {id} was abandoned.', note: "After a start's reply: the builder's earlier lane, sharing no card with the new list, was abandoned." }),
+  endEnded: agentMsg({ id: 'lane.end.ended', text: 'Lane ended: {line}', note: "hive_lane end's reply; {line} is the lane's line." }),
+  endAbandoned: agentMsg({ id: 'lane.end.abandoned', text: 'Lane abandoned: {line}', note: "hive_lane end's reply for an abandoned lane; {line} is the lane's line." }),
+  nextWaits: agentMsg({ id: 'lane.next.waits', text: 'The lane waits: {why}. Start nothing new meanwhile.', note: 'hive_lane next, for a paused lane (#1270): why it waits.' }),
+  nothingElse: agentMsg({ id: 'lane.next.nothingElse', text: 'Nothing else to start: the lane ends by itself once all are Done.', note: "hive_lane next, after its passed cards' places in the merge queue (#1354): no card is left to start." }),
+  allDone: agentMsg({ id: 'lane.next.allDone', text: 'Every card of the lane is Done or past review: nothing to start. The lane ends by itself once all are Done.', note: 'hive_lane next, with no card left to start.' }),
+  carryOn: agentMsg({ id: 'lane.next.carryOn', text: 'Carry on with {card}{also}.', note: 'hive_lane next: the card in flight (Doing or Review) to carry on; {card} is its key and title; {also} is " (why the lane waits)" or nothing.' }),
+  carryOnIn: agentMsg({ id: 'lane.next.carryOnIn', text: 'Carry on with {card} in {slot}{also}.', note: 'hive_lane next: the card in flight to carry on, in the slot its lane builds in (#1438); {also} as in lane.next.carryOn.' }),
+  afterQueue: agentMsg({ id: 'lane.next.afterQueue', text: 'Next: {card}, once {n, plural, one {it is} other {they are}} Done.', note: "hive_lane next, after its passed cards' places in the merge queue (#1354): the next card waits for them to be Done (one card at a time); {n} is how many." }),
+  start: agentMsg({ id: 'lane.next.start', text: 'Next: {card}. Start it.', note: 'hive_lane next: the card to start next; {card} is its key and title.' }),
+  startIn: agentMsg({ id: 'lane.next.startIn', text: 'Next: {card}. Start it: it is built in {slot}, on a new branch Hive makes there.', note: "hive_lane next: the card to start next, built in the lane's slot (#1438), where Hive makes its line as it starts." }),
+  cardsNone: agentMsg({ id: 'lane.args.cardsNone', text: 'cards must be the card numbers, in order (at least one)', note: "hive_lane start's refusal of its cards argument: none given, or not a list." }),
+  cardsMax: agentMsg({ id: 'lane.args.cardsMax', text: 'at most {max} cards in a lane', note: "hive_lane start's refusal: too many cards." }),
+  cardsNumbers: agentMsg({ id: 'lane.args.cardsNumbers', text: 'cards must be card numbers', note: "hive_lane start's refusal: a card in cards isn't a whole card number." }),
+  cardsRepeat: agentMsg({ id: 'lane.args.cardsRepeat', text: 'cards must not repeat', note: "hive_lane start's refusal: a card is named twice." }),
+  numberRange: agentMsg({ id: 'lane.args.numberRange', text: '{what} must be from 1 to {max}', note: "hive_lane start's refusal of rounds or waitMinutes ({what}, the argument's name) out of range." })
+}
+
 /** Why a lane waits, in a few English words for the hive tools ("waiting: HI-11 not merged"). */
 export function laneStatusText(s: LaneStatus): string {
-  const card = s.card !== null ? cardRef(s.card) : 'a card'
+  const card = s.card !== null ? cardRef(s.card) : say(L.aCard)
   switch (s.reason) {
     case 'blocked':
-      return `${card} is blocked${s.blocked ? ` (${s.blocked})` : ''}`
+      return s.blocked ? say(L.blockedWhy, { card, why: s.blocked }) : say(L.blocked, { card })
     case 'hold':
-      return `${card} is On Hold`
+      return say(L.hold, { card })
     case 'you':
-      return `waiting for the user on ${card}`
+      return say(L.you, { card })
     case 'roundLimit':
-      return `${card} reached the round limit: waiting for the user`
+      return say(L.roundLimit, { card })
     case 'notMerged':
-      return `waiting: ${card} not merged`
+      return say(L.notMerged, { card })
     case 'merging':
-      return `waiting: ${card} merging`
+      return say(L.merging, { card })
     case 'stale':
-      return `stale: ${card} must be submitted again`
+      return say(L.stale, { card })
     case 'reviewer':
-      return `waiting for a reviewer on ${card}`
+      return say(L.reviewer, { card })
     case 'lineUpdate':
-      return `waiting: bringing the builder's branch up to date before ${card}`
+      return say(L.lineUpdate, { card })
     case 'listChanges':
-      return `list changes after ${card}`
+      return say(L.listChanges, { card })
     case 'hooks':
-      return `paused: ${s.agent ?? 'an agent'}'s hooks aren't arriving`
+      return say(L.hooks, { agent: s.agent ?? say(L.anAgent) })
     case 'checkCopy':
-      return `waiting for a check copy for ${card}`
+      return say(L.checkCopy, { card })
     case 'slot':
-      return 'waiting for a slot'
+      return say(L.slot)
     case 'teamPause':
-      return 'paused: the team is pausing'
+      return say(L.teamPause)
     case 'preparing':
-      return `waiting: preparing ${s.slot ?? 'its slot'}`
-    case 'startWait':
+      return say(L.preparing, { slot: s.slot ?? say(L.itsSlot) })
+    case 'startWait': {
       // An agent owed its new conversation (HI-2034): said of the agent, whichever card.
-      if (s.why === 'fresh') return s.freshBlocked ? `${s.agent ?? 'its agent'}'s new conversation didn't start (${s.freshBlocked === 'timeout' ? "it wasn't free in time" : s.freshBlocked === 'uncertain' ? 'Hive closed as it started' : (s.freshWhy ?? 'its start failed')}): retry it from the lane's row, or end the lane` : `waiting: ${s.agent ?? 'its agent'} starts in a new conversation once it is free`
-      if (s.why === 'dependencies') return `${card} waits to start: it waits for ${s.waitsFor ?? 'a card it depends on'} to merge`
-      return `${card} waits to start: ${s.why === 'watching' ? `${s.agent ?? 'its builder'} is waiting on other work` : s.why === 'queued' ? `a line of Hive's is on its way to ${s.agent ?? 'its builder'}` : s.why === 'failed' ? `${s.agent ?? 'its builder'}'s last start failed` : s.why === 'refused' ? 'its start was refused for now; Hive tries again' : `${s.agent ?? 'its builder'} is in a turn`}`
+      if (s.why === 'fresh') {
+        const agent = s.agent ?? say(L.itsAgent)
+        if (!s.freshBlocked) return say(L.freshWaits, { agent })
+        if (s.freshBlocked === 'timeout') return say(L.freshTimeout, { agent })
+        if (s.freshBlocked === 'uncertain') return say(L.freshUncertain, { agent })
+        return s.freshWhy !== undefined ? say(L.freshFailed, { agent, why: s.freshWhy }) : say(L.freshFailedBare, { agent })
+      }
+      if (s.why === 'dependencies') return say(L.startDependencies, { card, waitsFor: s.waitsFor ?? say(L.aDependency) })
+      if (s.why === 'refused') return say(L.startRefused, { card })
+      const agent = s.agent ?? say(L.itsBuilder)
+      return say(s.why === 'watching' ? L.startWatching : s.why === 'queued' ? L.startQueued : s.why === 'failed' ? L.startFailed : L.startBusy, { card, agent })
+    }
   }
 }
 
@@ -505,10 +605,10 @@ export function readLanes(data: unknown): LaneRecord[] {
 
 /** A lane's cards, from untrusted arguments: whole card numbers, in order, no repeats, at least one. */
 export function laneCards(v: unknown): number[] | string {
-  if (!Array.isArray(v) || !v.length) return 'cards must be the card numbers, in order (at least one)'
-  if (v.length > LANE_MAX_CARDS) return `at most ${LANE_MAX_CARDS} cards in a lane`
-  if (!v.every((n) => whole(n, 1e9))) return 'cards must be card numbers'
-  if (new Set(v).size !== v.length) return 'cards must not repeat'
+  if (!Array.isArray(v) || !v.length) return say(L.cardsNone)
+  if (v.length > LANE_MAX_CARDS) return say(L.cardsMax, { max: LANE_MAX_CARDS })
+  if (!v.every((n) => whole(n, 1e9))) return say(L.cardsNumbers)
+  if (new Set(v).size !== v.length) return say(L.cardsRepeat)
   return v as number[]
 }
 
@@ -516,7 +616,7 @@ export function laneCards(v: unknown): number[] | string {
 export function laneNumber(v: unknown, what: 'rounds' | 'waitMinutes', fallback: number): number | string {
   if (v === undefined || v === null) return fallback
   const max = what === 'rounds' ? LANE_MAX_ROUNDS : LANE_MAX_WAIT_MINUTES
-  if (typeof v !== 'number' || !Number.isFinite(v) || Math.round(v) < 1 || Math.round(v) > max) return `${what} must be from 1 to ${max}`
+  if (typeof v !== 'number' || !Number.isFinite(v) || Math.round(v) < 1 || Math.round(v) > max) return say(L.numberRange, { what, max })
   return Math.round(v)
 }
 
@@ -529,20 +629,20 @@ export function laneName(v: unknown): string | null {
 }
 
 /** A wait in a few words: "6 h", "90 min". */
-export const waitText = (minutes: number): string => (minutes >= 60 && minutes % 60 === 0 ? `${minutes / 60} h` : minutes >= 60 ? `${Math.round((minutes / 60) * 10) / 10} h` : `${minutes} min`)
-
-const COLUMN_WORD: Record<LaneCard['column'], string> = { hold: 'On Hold', todo: 'Todo', doing: 'Doing', review: 'Review', passed: 'Passed', done: 'Done', gone: 'gone', unrecorded: 'not recorded' }
+export const waitText = (minutes: number): string => (minutes >= 60 && minutes % 60 === 0 ? say(L.hours, { n: minutes / 60 }) : minutes >= 60 ? say(L.hours, { n: Math.round((minutes / 60) * 10) / 10 }) : say(L.minutes, { n: minutes }))
 
 /** A lane's card in a few words: "#405 Review r2", "#412 Todo", "#402 Doing (blocked)". */
-const cardWord = (c: LaneCard): string => `${cardRef(c.number)} ${COLUMN_WORD[c.column]}${c.round > 1 && c.column !== 'gone' && c.column !== 'unrecorded' ? ` r${c.round}` : ''}${c.blocked ? ' (blocked)' : ''}`
+const cardWord = (c: LaneCard): string => `${cardRef(c.number)} ${say(L.column[c.column])}${c.round > 1 && c.column !== 'gone' && c.column !== 'unrecorded' ? ` ${say(L.cardRound, { round: c.round })}` : ''}${c.blocked ? ` ${say(L.cardBlocked)}` : ''}`
 
 /**
  * A lane in one line, for the hive tools: "B1 / R1 (hive) lanes and loops: active, on #405; #483 Passed, #405 Review r2,
  * #412 Todo; rounds 10, wait 6 h. lane-3fa2".
  */
 export function laneLine(l: LaneInfo): string {
-  const pair = `${l.builder.name} / ${l.reviewer?.name ?? (l.pool ? 'the reviewer pool' : 'no reviewer')} (${l.project}${l.slot ? `, in ${l.slot}` : ''})`
-  return `${pair}${l.name ? ` ${l.name}` : ''}: ${laneStateText(l)}; ${l.cards.map(cardWord).join(', ')}; rounds ${l.rounds}, wait ${waitText(l.waitMinutes)}. ${l.id}`
+  const who = { builder: l.builder.name, reviewer: l.reviewer?.name ?? say(l.pool ? L.pool : L.noReviewer), project: l.project }
+  const pair = l.slot ? say(L.pairInSlot, { ...who, slot: l.slot }) : say(L.pair, who)
+  const values = { pair, state: laneStateText(l), cards: l.cards.map(cardWord).join(', '), rounds: l.rounds, wait: waitText(l.waitMinutes), id: l.id }
+  return l.name ? say(L.lineNamed, { ...values, name: l.name }) : say(L.line, values)
 }
 
 /**
@@ -553,13 +653,17 @@ export function laneLine(l: LaneInfo): string {
 export function laneStateText(l: LaneInfo): string {
   const said = l.status ? `; ${laneStatusText(l.status)}` : ''
   const paused = l.cards.find((c) => c.number === l.pausedOn)
-  const why = l.status ? laneStatusText(l.status) : `${l.pausedOn !== null ? cardRef(l.pausedOn) : 'a card'} ${paused?.roundLimit && !paused.blocked ? 'waits for the user at its round limit' : 'is blocked'}`
-  return l.state === 'paused' ? `paused, ${why}` : l.state === 'active' ? `${l.current !== null ? `active, on ${cardRef(l.current)}` : 'active, every card passed'}${said}` : l.state === 'ended' ? `ended${l.mergeCommit ? ` (merged ${l.mergeCommit})` : ''}` : 'abandoned'
+  const card = l.pausedOn !== null ? cardRef(l.pausedOn) : say(L.aCard)
+  const why = l.status ? laneStatusText(l.status) : say(paused?.roundLimit && !paused.blocked ? L.pausedRoundLimit : L.blocked, { card })
+  if (l.state === 'paused') return say(L.paused, { why })
+  if (l.state === 'active') return `${l.current !== null ? say(L.activeOn, { card: cardRef(l.current) }) : say(L.activeAllPassed)}${said}`
+  if (l.state === 'ended') return l.mergeCommit ? say(L.endedMerged, { commit: l.mergeCommit }) : say(L.ended)
+  return say(L.abandoned)
 }
 
 /** A listing of lanes, a line each. */
 export function lanesText(lanes: readonly LaneInfo[], all = false): string {
-  if (!lanes.length) return all ? 'No lanes.' : 'No lanes running or recently ended.'
+  if (!lanes.length) return say(all ? L.noLanes : L.noLanesListed)
   return lanes.map(laneLine).join('\n')
 }
 
@@ -567,14 +671,14 @@ export function lanesText(lanes: readonly LaneInfo[], all = false): string {
 export type LaneChange = { lane: LaneInfo; did: 'started' | 'updated' | 'joined'; replaced?: LaneInfo | null; note?: string }
 
 export function laneChangeText(r: LaneChange): string {
-  const what = r.did === 'started' ? 'Lane started' : r.did === 'joined' ? 'Joined the lane' : 'Lane updated'
-  const before = r.replaced ? ` Your earlier lane ${r.replaced.id} ${r.replaced.state === 'ended' ? 'ended' : 'was abandoned'}.` : ''
-  return `${what}: ${laneLine(r.lane)}${before}${r.note ? ` ${r.note}` : ''}`
+  const what = say(r.did === 'started' ? L.started : r.did === 'joined' ? L.joined : L.updated, { line: laneLine(r.lane) })
+  const before = r.replaced ? ` ${say(r.replaced.state === 'ended' ? L.earlierEnded : L.earlierAbandoned, { id: r.replaced.id })}` : ''
+  return `${what}${before}${r.note ? ` ${r.note}` : ''}`
 }
 
 /** What an end did (and why a merge commit given was ignored, #1270). */
 export function laneEndText(l: LaneInfo & { note?: string }): string {
-  return `Lane ${l.state === 'ended' ? 'ended' : 'abandoned'}: ${laneLine(l)}${l.note ? ` ${l.note}` : ''}`
+  return `${say(l.state === 'ended' ? L.endEnded : L.endAbandoned, { line: laneLine(l) })}${l.note ? ` ${l.note}` : ''}`
 }
 
 /**
@@ -583,15 +687,17 @@ export function laneEndText(l: LaneInfo & { note?: string }): string {
  * at a time, so the next waits for them to be Done.
  */
 export function laneNextText(r: { lane: LaneInfo; next: { card: number; title: string; carryOn: boolean } | null; waits: LaneStatus | null; queue?: { card: number; line: string }[]; unsubmitted?: UnsubmittedCard[] }): string {
-  if (r.lane.state === 'paused' && r.waits) return `The lane waits: ${laneStatusText(r.waits)}. Start nothing new meanwhile.`
+  if (r.lane.state === 'paused' && r.waits) return say(L.nextWaits, { why: laneStatusText(r.waits) })
+  // Each passed card's place in the merge queue (#1354): its key, then the queue's own line.
   const queued = r.queue?.length ? r.queue.map((q) => `${cardRef(q.card)}: ${q.line}`).join(' ') : ''
-  if (!r.next) return queued ? `${queued} Nothing else to start: the lane ends by itself once all are Done.` : 'Every card of the lane is Done or past review: nothing to start. The lane ends by itself once all are Done.'
+  if (!r.next) return queued ? `${queued} ${say(L.nothingElse)}` : say(L.allDone)
   const card = `${cardRef(r.next.card)} ${r.next.title}`
   const also = r.waits ? ` (${laneStatusText(r.waits)})` : ''
   // Its slot (#1438): where the card is built; Hive makes its line there as it starts.
-  const where = r.lane.slot ? ` in ${r.lane.slot}` : ''
+  const slot = r.lane.slot
   // HI-2245: carried on in Review with commits past its submission: not handed over yet.
   const first = r.next.carryOn ? unsubmittedText(r.unsubmitted?.filter((u) => u.card === r.next!.card), undefined, true) : null
-  if (r.next.carryOn) return `Carry on with ${card}${where}${also}.${first ? ` ${first}` : ''}`
-  return queued ? `${queued} Next: ${card}, once ${r.queue!.length > 1 ? 'they are' : 'it is'} Done.` : `Next: ${card}. Start it${where ? `: it is built${where}, on a new branch Hive makes there` : ''}.`
+  if (r.next.carryOn) return `${slot ? say(L.carryOnIn, { card, slot, also }) : say(L.carryOn, { card, also })}${first ? ` ${first}` : ''}`
+  if (queued) return `${queued} ${say(L.afterQueue, { card, n: r.queue!.length })}`
+  return slot ? say(L.startIn, { card, slot }) : say(L.start, { card })
 }

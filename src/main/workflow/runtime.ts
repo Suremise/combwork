@@ -36,6 +36,8 @@ import { FactStore, type CardRecord, type Tx } from './factStore'
 import { finishAccepts, recordFinish } from './finish'
 import { NOT_RUN_HERE, pauseWait, queueLine, queueStateOf, type QueueLive } from './queueState'
 import { checksView } from '../../shared/toolReplies'
+import { agentMsg, say, type AgentMsg, type AgentValues } from '../../shared/agentText'
+import { inDefaultDialect } from '../../shared/agentText/asyncScope'
 
 import { ownRuleset, reviewSkipOf } from '../../shared/workflow/workView'
 
@@ -122,8 +124,8 @@ function focusedForReview(f: FocusedChoice | undefined): Record<string, string |
   const yours = tests.filter(reviewProved)
   return {
     focusedTests: tests.map((t) => t.id),
-    ...(f.source === 'manual' ? { focusedChosenBy: `its builder, as its picker couldn't choose (${f.state === 'tooBroad' ? 'it said every test' : (f.why ?? 'failed')}): check they cover the change` } : {}), // i18n-ignore: agent-facing
-    ...(yours.length ? { runYourself: `${yours.map((t) => t.id).join(', ')}: the merge queue doesn't run these (a real CLI or the installed app); each counts from your run at this revision, hive-progress --check "${focusedCheckName('<test>')}" --card <card> -- <its command>` } : {}) // i18n-ignore: agent-facing
+    ...(f.source === 'manual' ? { focusedChosenBy: say(W.focusedChosenBy, { why: f.state === 'tooBroad' ? say(W.everyTest) : (f.why ?? say(W.pickFailed)) }) } : {}),
+    ...(yours.length ? { runYourself: say(W.runYourself, { tests: yours.map((t) => t.id).join(', '), check: focusedCheckName('<test>') }) } : {})
   }
 }
 
@@ -241,10 +243,64 @@ const LOCK_STAGES: readonly StageId[] = ['active', 'review', 'approved', 'mergin
 /** A reviewer's intents (§16.7.2): refused outside Review, their next step is the reviewer's (`sideOf`, #1604). */
 const REVIEW_MOVES: ReadonlySet<string> = new Set(['start review', 'verdict']) // i18n-ignore: intent names (the window: texts.ts's MOVE_NAMES)
 
-/** The user's choice at the round limit, as an agent's wake says it (English). */
-const CHOICE_WORDS: Record<RoundChoice, string> = { carryOn: 'carry on', split: 'split it', accept: 'accept it with follow-ups', takeOver: 'the user takes it over' } // i18n-ignore: a wake, agent-facing
+/**
+ * What the workflow runtime tells agents (dialects, HI-2435): its wakes, its intents' warnings and reply fields. A wake
+ * is a durable action delivered later, and a fact's reason is stored: both are said in the Default (`stored`) until
+ * stored text is said when read (dialects, 4 and 5b); a reply's text is said in the caller's scope.
+ */
+const W = {
+  choiceCarryOn: agentMsg({ id: 'runtime.choice.carryOn', text: 'carry on', note: "The user's choice at a lane's round limit, as its answer's wake says it." }),
+  choiceSplit: agentMsg({ id: 'runtime.choice.split', text: 'split it', note: "The user's choice at a lane's round limit, as its answer's wake says it." }),
+  choiceAccept: agentMsg({ id: 'runtime.choice.accept', text: 'accept it with follow-ups', note: "The user's choice at a lane's round limit, as its answer's wake says it." }),
+  choiceTakeOver: agentMsg({ id: 'runtime.choice.takeOver', text: 'the user takes it over', note: "The user's choice at a lane's round limit, as its answer's wake says it." }),
+  actionDone: agentMsg({ id: 'runtime.action.done', text: 'moved it to Done', note: 'What the user did with an action a question offered (#1630), as its answer\'s wake says it.' }),
+  actionNoCode: agentMsg({ id: 'runtime.action.noCode', text: 'made it no code', note: 'What the user did with an action a question offered (#1630), as its answer\'s wake says it.' }),
+  actionUnblock: agentMsg({ id: 'runtime.action.unblock', text: 'unblocked it', note: 'What the user did with an action a question offered (#1630), as its answer\'s wake says it.' }),
+  actionSkipReview: agentMsg({ id: 'runtime.action.skipReview', text: 'skipped its review', note: 'What the user did with an action a question offered (#1630), as its answer\'s wake says it.' }),
+  focusedChosenBy: agentMsg({ id: 'runtime.review.focusedChosenBy', text: "its builder, as its picker couldn't choose ({why}): check they cover the change", note: "G20 (HI-1367): start review's focusedChosenBy, when the builder named the focused tests itself. {why}: the picker's reason (runtime.review.everyTest, or its own words)." }),
+  everyTest: agentMsg({ id: 'runtime.review.everyTest', text: 'it said every test', note: "Why the focused-test picker couldn't choose: it named every test." }),
+  pickFailed: agentMsg({ id: 'runtime.review.pickFailed', text: 'failed', note: "Why the focused-test picker couldn't choose, when it gave no reason." }),
+  runYourself: agentMsg({ id: 'runtime.review.runYourself', text: "{tests}: the merge queue doesn't run these (a real CLI or the installed app); each counts from your run at this revision, hive-progress --check \"{check}\" --card <card> -- <its command>", note: "G20 (HI-1367): start review's runYourself: focused tests the merge queue won't run, which count only from the reviewer's own run. {tests}: their ids. {check}: the check's name pattern (focused:<test>)." }),
+  questionDone: agentMsg({ id: 'runtime.wake.questionDone', text: '{card}: your question "{question}" no longer stands: the card is in Done.', note: "An asker's wake when the card reached Done with its question open. {question}: the question, quoted short (#1626)." }),
+  boardDone: agentMsg({ id: 'runtime.repair.boardDone', text: 'the board had it in Done while its stage was {stage}', note: "A repair's reason, stored on the card's Moved fact: the board's column and the card's stage disagreed. {stage}: the stage id." }),
+  laneStarted: agentMsg({ id: 'runtime.start.laneStarted', text: "Hive started {card} for you, as your lane's next card: carry on with it.", note: "HI-2092: a lane's builder starting the card Hive had already started for it: its start's warning." }),
+  blocked: agentMsg({ id: 'runtime.start.blocked', text: '{card} is blocked: {why}', note: "A start's warning: the card is blocked. {why}: the block's reason, in its author's words." }),
+  slotWait: agentMsg({ id: 'runtime.start.slotWait', text: '{card} waits for a slot: {why}', note: "A start's warning beside its refusal (#1438): why no slot is free." }),
+  slotMove: agentMsg({ id: 'runtime.start.slotMove', text: "You'll continue in {slot}, on {line}: Hive makes the line there from {target}, then gives you {card} there (a new conversation unless you already work there; your old one is kept). End your turn now.", note: "A start given a slot (#1438): the card's line is made there and the card given to the agent there, so it ends its turn now." }),
+  staleChange: agentMsg({ id: 'runtime.wake.stalePaths', text: 'stale: your paths changed since the pass, submit again', note: "The builder's wake when its declared paths changed after its pass." }),
+  approvedMerge: agentMsg({ id: 'runtime.wake.approvedMerge', text: 'approved: merge it and report the merge', note: "The builder's wake when its card passed and the builder merges it." }),
+  movedAhead: agentMsg({ id: 'runtime.submit.movedAhead', text: 'moved ahead of {cards} (not started); its reviewer is told', note: "A submit's lane field: the card was moved before its lane's cards nobody has started. {cards}: their keys." }),
+  followUp: agentMsg({ id: 'runtime.wake.followUp', text: '{card}: follow-up submitted for review at {revision} (submission {submission}). Start your review again (hive_start_review), which takes it and moves your review copy to it; a verdict on the earlier submission is refused', note: "HI-1832: the reviewer's wake for a follow-up (the card stays in Review, so no arrival wakes it). {revision}: short. {submission}: its number." }),
+  aheadInLane: agentMsg({ id: 'runtime.wake.aheadInLane', text: '{card} is in Review ahead of {cards}, earlier in its lane, which nobody has started: Hive moved it before them in the lane. Review {card} now; the lane goes on to {next} after it', note: "The reviewer's wake for a card submitted ahead of its lane's unstarted cards. {cards}: their keys. {next}: the first of them." }),
+  inReview: agentMsg({ id: 'runtime.wake.inReview', text: '{card} is in Review', note: "The reviewer's wake for a card's arrival in Review." }),
+  failedReview: agentMsg({ id: 'runtime.wake.failedReview', text: '{card} failed review', note: "The builder's wake for a failing verdict." }),
+  staleSubmit: agentMsg({ id: 'runtime.wake.stale', text: 'stale: submit again', note: "The builder's wake when its pass went stale at the verdict (its line moved)." }),
+  focusedSkip: agentMsg({ id: 'runtime.wake.focusedSkip', text: '{card}: its reviewer {merge, select, yes {accepted} other {declined}} the focused tests its merge skipped ({why})', note: "The builder's wake for its reviewer's hive_focused_skip. {merge}: yes when it accepted. {why}: the reviewer's reason." }),
+  answered: agentMsg({ id: 'runtime.wake.answered', text: '{card}: the user {answer, select, approved {approved} declined {declined} other {answered}} "{question}"', note: "An answer's wake: what the user did with a question. {answer}: approved, declined or another answer. {question}: the question, quoted short (#1626); what they chose or noted follows." }),
+  answeredChoice: agentMsg({ id: 'runtime.wake.answered.choice', text: '{said}: {choice}', note: "An answer's wake with the user's choice at the round limit. {said}: runtime.wake.answered. {choice}: runtime.choice.*." }),
+  moreRounds: agentMsg({ id: 'runtime.wake.answered.rounds', text: '{said} ({rounds, plural, one {{rounds} more round} other {{rounds} more rounds}})', note: '{said}: the answer and its choice. {rounds}: the rounds the user gave.' }),
+  answeredAction: agentMsg({ id: 'runtime.wake.answered.action', text: '{said}: {action}', note: "An answer's wake with the action the user took (#1630). {action}: runtime.action.*." }),
+  answeredNote: agentMsg({ id: 'runtime.wake.answered.note', text: '{said} ({note})', note: "An answer's action with the user's note: {note}, in their words." }),
+  answeredWith: agentMsg({ id: 'runtime.wake.answered.with', text: '{said}: {note}', note: "An answer's wake with the user's reply: {note}, in their words." }),
+  byDecision: agentMsg({ id: 'runtime.wake.byDecision', text: '{card}: the user answered {questions} with a decision (recorded by {recordedBy}): {decision}', note: '{questions}: the questions, each quoted short, joined by runtime.wake.byDecision.and. {recordedBy}: who recorded it. {decision}: its text.' }),
+  and: agentMsg({ id: 'runtime.wake.byDecision.and', text: '{list} and {item}', note: 'The questions a decision answered, joined: each one added to the list before it.' }),
+  reviewerAsks: agentMsg({ id: 'runtime.wake.reviewerAsks', text: '{card}: the reviewer asks: {text}', note: "#912: the builder's wake for its reviewer's request mid-review. {text}: the request, in the reviewer's words." }),
+  newDecision: agentMsg({ id: 'runtime.wake.newDecision', text: '{card} has a new decision', note: "The builder's (and a reviewing reviewer's) wake for a decision the user recorded on the card." }),
+  doneByOverride: agentMsg({ id: 'runtime.move.doneByOverride', text: "{cards} can start without {card}'s work in the target: it is Done by an override, not merged.", note: "A move's warning: cards waiting on this one can start, but its work isn't in their target. {cards}: their keys." }),
+  removed: agentMsg({ id: 'runtime.wake.removed', text: "{card} was taken out of the merge queue by {by, select, user {the user} other {the Assistant}}{reason}. It isn't merged; it is queued again only if the user retries it or it is approved again.", note: "The builder's wake for a card taken out of the queue. {by}: user or assistant. {reason}: \": \" and the reason, or nothing." }),
+  pathsLeaveOut: agentMsg({ id: 'runtime.submit.pathsLeaveOut', text: "{card}'s paths leave out files it recorded as its agents' edits: {files}. Its revision covers only its paths: to include them, submit with paths listing every file of its work (or declare its paths); to leave them out, carry on.", note: "A submit's warning (HI-2339): files its agents edited that its declared paths leave out. {files}: those files." }),
+  unclaimed: agentMsg({ id: 'runtime.submit.unclaimed', text: "Changed in the project since {card} started, in neither its paths nor what it recorded as its agents' edits: {files}. Not part of its revision: to include any, submit with paths listing every file of its work; else leave them.", note: "A submit's warning (HI-2339): files changed in the project that are neither its paths nor its agents' edits." }),
+  laneListChanged: agentMsg({ id: 'runtime.wake.laneListChanged', text: "Your lane's card list changed, as queued: its cards are now {cards}. hive_lane next names your next card.", note: "A lane's builder's wake when its queued list applied. {cards}: the keys, in order." }),
+  squashed: agentMsg({ id: 'runtime.wake.squashed', text: '{line} is up to date with {target} ({prev} was squashed into it): {next} can start.', note: "A builder's wake when its next card's line was moved onto the target after a squash merge. {prev}: the card squashed, {next}: the card that can start." })
+}
+
+/** Text a stored record keeps (a wake's action, a fact's reason): in the Default, whatever the caller's dialect. */
+const stored = (m: AgentMsg, values?: AgentValues): string => inDefaultDialect(() => say(m, values))
+
+/** The user's choice at the round limit, as an agent's wake says it. */
+const CHOICE_WORDS: Record<RoundChoice, AgentMsg> = { carryOn: W.choiceCarryOn, split: W.choiceSplit, accept: W.choiceAccept, takeOver: W.choiceTakeOver }
 /** What the user did with an action a question offered (#1630), as its answer's wake says it. */
-const ACTION_WORDS: Record<AskActionKind, string> = { done: 'moved it to Done', noCode: 'made it no code', unblock: 'unblocked it', skipReview: 'skipped its review' } // i18n-ignore: a wake, agent-facing
+const ACTION_WORDS: Record<AskActionKind, AgentMsg> = { done: W.actionDone, noCode: W.actionNoCode, unblock: W.actionUnblock, skipReview: W.actionSkipReview }
 
 /** How much of the question an answer's wake quotes before the user's reply (#1626). */
 const QUESTION_QUOTE_MAX = 200
@@ -595,7 +651,7 @@ export class Workflow {
       if (done && r.asker && r.asker !== agent) {
         const asked = [...r.text.replace(/\s+/g, ' ').trim()]
         const quoted = asked.length > QUESTION_QUOTE_MAX ? `${asked.slice(0, QUESTION_QUOTE_MAX - 1).join('')}…` : asked.join('')
-        this.wake(w, r.asker, `${w.card.key}: your question "${quoted}" no longer stands: the card is in Done.`, 'answer') // i18n-ignore: a wake, agent-facing
+        this.wake(w, r.asker, stored(W.questionDone, { card: w.card.key, question: quoted }), 'answer')
       }
     }
   }
@@ -678,7 +734,7 @@ export class Workflow {
     return this.write(card, null, 'hive', (w) => {
       const now = this.store.cardByKey(`#${id}`)
       if (!now || now.category !== 'done' || w.current === 'done') return false
-      w.move('done', 'repair', `the board had it in Done while its stage was ${w.current}`) // i18n-ignore: a fact's reason, agent-facing English
+      w.move('done', 'repair', stored(W.boardDone, { stage: w.current }))
       return true
     })
   }
@@ -702,6 +758,7 @@ export class Workflow {
   }
 
   /** A refusal: recorded as `Refused` when an agent or the Assistant was refused (the user's refused drags aren't). */
+  // agent-protocol: who can override a refusal, the Agent API's fixed `override` value (AGENT_API.md, §16.8.3)
   async refuse(card: CardRecord | null, actor: Actor, move: string, g: GuardRefusal, override: Refusal['override'] = 'the user'): Promise<Refusal> { // i18n-ignore: the override field, agent-facing (§16.8.3)
     // A Git card refused for what couldn't be read, its repository gone (S20): the next step is the offer (#1419).
     if (g.rule === 'platform.unknown' && card && this.rulesetOf(card).options.platform === 'git' && this.cfg.repositoryGone?.()) g = { ...g, values: { ...g.values, offer: 'repositoryGone' } }
@@ -834,7 +891,7 @@ export class Workflow {
     // start, not a refusal; Hive's landing between this start's checks and its write too (HI-2029's lanebrief run).
     const forIt = (st: CardState): Reply | null =>
       st.stage === 'active' && !!st.started && !!agentOf(actor) && st.started.builder === agentOf(actor) && this.store.facts(card.id).find((f) => f.seq === st.started!.seq)?.actor === 'hive'
-        ? this.ok(card, 'active', 'active', { folder: this.folderOf(st), line: st.started.line, base: st.started.base, target: st.started.target }, [`Hive started ${card.key} for you, as your lane's next card: carry on with it.`]) // i18n-ignore: agent-facing, the start's reply
+        ? this.ok(card, 'active', 'active', { folder: this.folderOf(st), line: st.started.line, base: st.started.base, target: st.started.target }, [say(W.laneStarted, { card: card.key })])
         : null
     const hives = forIt(s)
     if (hives) return hives
@@ -917,7 +974,7 @@ export class Workflow {
     // The agent it is started for: one named (the user's drag, an agent's old move giving it to another, #1268), else the starter.
     const builder = builderOpt ?? agentOf(actor) ?? 'user'
     const warnings: string[] = []
-    if (s.blocked && !r.guards.start.includes('start.notBlocked')) warnings.push(`${card.key} is blocked: ${s.blocked}`) // i18n-ignore: agent-facing warning in the spike's reply
+    if (s.blocked && !r.guards.start.includes('start.notBlocked')) warnings.push(say(W.blocked, { card: card.key, why: s.blocked }))
     // Its target's ref included, resolved as the plan resolves it (#1401: the default branch, when G7 is empty).
     const before = await this.evidenceOf(card, s, o, builder)
     const plan = await this.platform(o).start(card, o, builder, dry)
@@ -933,9 +990,9 @@ export class Workflow {
     }
     const data: FactData['Started'] = { ...planned, builder, cardKind: card.kind }
     if (dry) delete data.lease
-    if (slotWait) warnings.push(`${card.key} waits for a slot: ${slotWait}`) // i18n-ignore: agent-facing warning, beside the refusal
+    if (slotWait) warnings.push(say(W.slotWait, { card: card.key, why: slotWait }))
     // Where it is built (#1438): its builder is given it there once its line is made, so a builder starting it ends its turn.
-    if (data.lease && data.slot) warnings.push(`You'll continue in ${data.slot}, on ${data.line}: Hive makes the line there from ${data.target}, then gives you ${card.key} there (a new conversation unless you already work there; your old one is kept). End your turn now.`) // i18n-ignore: agent-facing, the start's reply
+    if (data.lease && data.slot) warnings.push(say(W.slotMove, { slot: String(data.slot), line: String(data.line), target: String(data.target), card: card.key }))
     // Dependencies Done by facts, in this card's target (§16.7.4).
     const waitingFor = r.guards.start.includes('start.dependenciesIntegrated') ? await this.waitingFor(card, data.target, o) : []
     return { r, o, data, existing: !!existing, ins: { agent: agentOf(actor), waitingFor, slotFree: !slotWait }, before, warnings, lent, ...(baselineGen !== undefined ? { baselineGen } : {}) }
@@ -1229,7 +1286,7 @@ export class Workflow {
       } else {
         w.fact('Stale', { approved, current: isUnknown(fin.currentRevision) ? null : (fin.currentRevision ?? null), why: 'change' }) // i18n-ignore: a fact's kind and codes, not text
         w.move(hasStage(r, 'review') ? 'review' : 'active', 'derived')
-        this.wake(w, s.started?.builder, 'stale: your paths changed since the pass, submit again') // i18n-ignore: a wake, agent-facing
+        this.wake(w, s.started?.builder, stored(W.staleChange))
       }
       return
     }
@@ -1246,7 +1303,7 @@ export class Workflow {
         // With no review and no OK before merging there is no Approved (§16.5.2): it waits for the merge in Active.
         if (hasStage(r, 'approved')) w.move('approved', 'derived')
         if (needOk) this.askUser(w, 'approve', 'okBefore', workflowText(FOR_YOU.okBefore, { card: w.card.key }))
-        else this.wake(w, s.started?.builder, 'approved: merge it and report the merge') // i18n-ignore: a wake, agent-facing
+        else this.wake(w, s.started?.builder, stored(W.approvedMerge))
         return
       case 'committed':
         // Its revision is on the folder's line by construction: done.contained.
@@ -1375,7 +1432,7 @@ export class Workflow {
     })
     if (out) return this.refuse(card, actor, 'submit', out)
     const reordered = ahead as CardRecord[] | null
-    return this.ok(card, from, this.state(card).stage, { revision: g.revision, base: g.base, files: g.files.length, ...(followUp ? { followUp: true } : {}), ...(reordered ? { lane: `moved ahead of ${reordered.map((c) => c.key).join(', ')} (not started); its reviewer is told` } : {}) }, g.warnings) // i18n-ignore: an intent's reply, agent-facing
+    return this.ok(card, from, this.state(card).stage, { revision: g.revision, base: g.base, files: g.files.length, ...(followUp ? { followUp: true } : {}), ...(reordered ? { lane: say(W.movedAhead, { cards: reordered.map((c) => c.key).join(', ') }) } : {}) }, g.warnings)
   }
 
   /**
@@ -1533,11 +1590,11 @@ export class Workflow {
       w.action('assignReviewer', { submission: sub.seq })
     }
     // A follow-up (HI-1832): the card stays in Review, so no arrival wakes its reviewer; told what to do, its words kept.
-    else if (reviewerAgent(g.o.review) && args.followUp) this.wake(w, this.reviewerOf(g.card), `${g.card.key}: follow-up submitted for review at ${(g.revision ?? '').slice(0, 7)} (submission ${sub.seq}). Start your review again (hive_start_review), which takes it and moves your review copy to it; a verdict on the earlier submission is refused`, 'review') // i18n-ignore: a wake, agent-facing
+    else if (reviewerAgent(g.o.review) && args.followUp) this.wake(w, this.reviewerOf(g.card), stored(W.followUp, { card: g.card.key, revision: (g.revision ?? '').slice(0, 7), submission: sub.seq }), 'review')
     else if (reviewerAgent(g.o.review) && ahead) {
       const keys = ahead.map((c) => c.key).join(', ')
-      this.wake(w, this.reviewerOf(g.card), `${g.card.key} is in Review ahead of ${keys}, earlier in its lane, which nobody has started: Hive moved it before them in the lane. Review ${g.card.key} now; the lane goes on to ${ahead[0].key} after it`, 'review') // i18n-ignore: a wake, agent-facing
-    } else if (reviewerAgent(g.o.review)) this.wake(w, this.reviewerOf(g.card), `${g.card.key} is in Review`) // i18n-ignore: a wake, agent-facing
+      this.wake(w, this.reviewerOf(g.card), stored(W.aheadInLane, { card: g.card.key, cards: keys, next: ahead[0].key }), 'review')
+    } else if (reviewerAgent(g.o.review)) this.wake(w, this.reviewerOf(g.card), stored(W.inReview, { card: g.card.key }))
     else this.askUser(w, 'approve', 'review', workflowText(FOR_YOU.review, { card: g.card.key }))
   }
 
@@ -1608,14 +1665,14 @@ export class Workflow {
       if (card.reviewerPool || !card.lane) w.action('assignReviewer', { submission: subId! })
       if (!args.pass) {
         w.move('active', 'intent')
-        this.wake(w, st.started?.builder, `${card.key} failed review`) // i18n-ignore: a wake, agent-facing
+        this.wake(w, st.started?.builder, stored(W.failedReview, { card: card.key }))
         this.askAtLimit(w)
         return null
       }
       if (moved && !moved.same) {
         w.fact('Stale', { approved: sub!.revision, current: moved.to, why: r.options.sameness === 'exact' ? 'exact' : 'change' }) // i18n-ignore: a fact's kind and codes, not text
         if (hasStage(r, 'approved')) w.move('approved', 'derived')
-        this.wake(w, st.started?.builder, 'stale: submit again') // i18n-ignore: a wake, agent-facing
+        this.wake(w, st.started?.builder, stored(W.staleSubmit))
         return null
       }
       if (moved?.same) w.fact('CarriedOver', { from: sub!.revision!, to: moved.to, toBase: moved.base, how: 'replay' })
@@ -1665,7 +1722,7 @@ export class Workflow {
       w.fact('Approval', { request, answer: merge ? 'approved' : 'declined', note: why, generation: st.generation }) // i18n-ignore: a fact's kind and codes, not text
       const e = st.entries.find((x) => x.id === req.entry)
       if (e) w.action('enqueue', { target: e.target })
-      w.answer = `${card.key}: its reviewer ${merge ? 'accepted' : 'declined'} the focused tests its merge skipped (${why})` // i18n-ignore: a wake, agent-facing
+      w.answer = stored(W.focusedSkip, { card: card.key, merge: merge ? 'yes' : 'no', why })
       this.wake(w, st.started?.builder, w.answer, 'answer')
       return null
     })
@@ -1706,7 +1763,17 @@ export class Workflow {
       // The question quoted short (its asker has it), so the reply after it is never cut off the wake (#1626).
       const asked = [...req.text.replace(/\s+/g, ' ').trim()]
       const quoted = asked.length > QUESTION_QUOTE_MAX ? `${asked.slice(0, QUESTION_QUOTE_MAX - 1).join('')}…` : asked.join('')
-      const said = `${card.key}: the user ${answer === 'approved' ? 'approved' : answer === 'declined' ? 'declined' : 'answered'} "${quoted}"${choice ? `: ${CHOICE_WORDS[choice]}${rounds ? ` (${rounds} more round${rounds === 1 ? '' : 's'})` : ''}` : ''}${action ? `: ${ACTION_WORDS[action]}${note ? ` (${note})` : ''}` : note ? `: ${note}` : ''}` // i18n-ignore: a wake, agent-facing
+      // The answer, then what the user chose (and the rounds they gave), then the action they took or their reply.
+      const said = inDefaultDialect(() => {
+        let t = say(W.answered, { card: card.key, answer: answer === 'approved' || answer === 'declined' ? answer : 'other', question: quoted })
+        if (choice) t = say(W.answeredChoice, { said: t, choice: say(CHOICE_WORDS[choice]) })
+        if (choice && rounds) t = say(W.moreRounds, { said: t, rounds })
+        if (action) {
+          t = say(W.answeredAction, { said: t, action: say(ACTION_WORDS[action]) })
+          if (note) t = say(W.answeredNote, { said: t, note })
+        } else if (note) t = say(W.answeredWith, { said: t, note })
+        return t
+      })
       w.answer = said
       if (req.gate === ROUND_LIMIT_GATE) {
         this.wake(w, builder, said, 'answer')
@@ -1749,7 +1816,7 @@ export class Workflow {
         if (!missing || (missing.missing === 'userOk' && approvedByUser(now, 'review'))) this.finish(w, fin)
       } else if (!missing && st.stage === 'approved') {
         if (r.options.finish === 'hiveMerges') this.enqueue(w)
-        else this.wake(w, builder, 'approved: merge it and report the merge') // i18n-ignore: a wake, agent-facing
+        else this.wake(w, builder, stored(W.approvedMerge))
       }
       // Whatever the approval led to (finished, queued, still waiting on another gate), its builder hears of it, once.
       if (!w.woken.includes(builder ?? '')) this.wake(w, builder, said)
@@ -1796,7 +1863,7 @@ export class Workflow {
         const who = req.asker ?? st.started?.builder
         if (who) byAgent.set(who, [...(byAgent.get(who) ?? []), `"${quoted}"`])
       }
-      const said = (qs: string[]): string => `${card.key}: the user answered ${qs.join(' and ')} with a decision (recorded by ${d.recordedBy}): ${d.text}` // i18n-ignore: a wake, agent-facing
+      const said = (qs: string[]): string => stored(W.byDecision, { card: card.key, questions: qs.length ? qs.reduce((list, item) => stored(W.and, { list, item })) : '', recordedBy: d.recordedBy, decision: d.text })
       w.answer = said([...byAgent.values()].flat())
       for (const [agent, qs] of byAgent) this.wake(w, agent, said(qs), 'answer')
       return null
@@ -1946,7 +2013,7 @@ export class Workflow {
     const s = this.state(card)
     await this.write(card, this.rulesetOf(card, s), actor, (w) => {
       w.fact('ReviewerRequest', { text })
-      this.wake(w, s.started?.builder, `${card.key}: the reviewer asks: ${text}`) // i18n-ignore: a wake, agent-facing
+      this.wake(w, s.started?.builder, stored(W.reviewerAsks, { card: card.key, text }))
     })
     return this.ok(card, s.stage, s.stage)
   }
@@ -2061,8 +2128,8 @@ export class Workflow {
       const now = w.state()
       const generation = now.generation + 1
       w.fact('Decision', { decision: `${card.key}/d${generation}`, generation, text }) // i18n-ignore: a fact's kind and codes, not text
-      this.wake(w, now.started?.builder, `${card.key} has a new decision`) // i18n-ignore: a wake, agent-facing
-      if (['review', 'approved', 'merging'].includes(now.stage)) this.wake(w, this.reviewerOf(card), `${card.key} has a new decision`) // i18n-ignore: a wake, agent-facing
+      this.wake(w, now.started?.builder, stored(W.newDecision, { card: card.key }))
+      if (['review', 'approved', 'merging'].includes(now.stage)) this.wake(w, this.reviewerOf(card), stored(W.newDecision, { card: card.key }))
       // The user's own review request was for the old generation (retired by the decision): asked again at once.
       if (r && now.stage === 'review' && r.options.review === 'you' && now.latest) this.askUser(w, 'approve', 'review', workflowText(FOR_YOU.newDecision, { card: card.key }))
       if (!r || (now.stage !== 'approved' && now.stage !== 'merging' && !awaitsAgentMerge(r, now))) return
@@ -2123,6 +2190,7 @@ export class Workflow {
   /** That move refused without the user's reason: `move.doingNobody`, naming the other rules it skips too. Null: it may go. */
   private async nobodyOn(card: CardRecord, to: StageId, by: 'user' | 'assistant', opts: { builder?: string; reason?: string }, others: string[]): Promise<Refusal | null> {
     if (!this.leavesNobody(to, by, opts) || opts.reason) return null
+    // agent-protocol: who can override a refusal, the Agent API's fixed `override` value (AGENT_API.md, §16.8.3)
     return this.refuse(card, 'assistant', 'move', { rule: 'move.doingNobody', values: { card: card.key, stage: to, also: others.length ? 'yes' : 'no', rules: others.join(', ') } }, 'the user or the Assistant') // i18n-ignore: select keys and who can override, agent-facing (§16.8.3)
   }
 
@@ -2201,6 +2269,7 @@ export class Workflow {
     if (opts.dry) return this.ok(card, from, to)
     const nobody = await this.nobodyOn(card, to, by, opts, others)
     if (nobody) return nobody
+    // agent-protocol: who can override a refusal, the Agent API's fixed `override` value (AGENT_API.md, §16.8.3)
     if (skipped.length && by === 'assistant' && !opts.reason) return this.refuse(card, 'assistant', 'move', { rule: 'move.needsOverride', values: { card: card.key, stage: to, rules: skipped.join(', ') } }, 'the user or the Assistant') // i18n-ignore: intent names (the window: texts.ts's MOVE_NAMES)
     const out = await this.write(card, r, by, (w) => {
       // The drag was made on the card as it was: if it moved on meanwhile, the user sees where it is now and drags again.
@@ -2216,7 +2285,7 @@ export class Workflow {
     if (out) return this.refuse(card, by, 'move', out)
     // An override's Done (Darren's option A, HI-2014): the reply says which cards waiting on it start without its work.
     const waiting = to === 'done' && skipped.length ? this.store.cards().filter((c) => c.blockedBy.includes(card.id) && c.stage !== 'done').map((c) => c.key) : []
-    return this.ok(card, from, to, undefined, waiting.length ? [`${waiting.join(', ')} can start without ${card.key}'s work in the target: it is Done by an override, not merged.`] : undefined) // i18n-ignore: a reply's warning (agents and the Agent API read it)
+    return this.ok(card, from, to, undefined, waiting.length ? [say(W.doneByOverride, { cards: waiting.join(', '), card: card.key })] : undefined)
   }
 
   /**
@@ -2270,9 +2339,11 @@ export class Workflow {
       const nobody = !!gs && this.leavesNobody(to, by, opts)
       if (nobody) rules.add('move.doingNobody')
       const skipped = [...rules]
+      // agent-protocol: who can override a refusal, the Agent API's fixed `override` value (AGENT_API.md, §16.8.3)
       const needs = (list: string[]): Ask | Refusal => (by === 'user' ? { ask: true, card: card.key, rules: list } : refusal('move.needsOverride', { card: card.key, stage: to, rules: list.join(', ') }, 'the user or the Assistant')) // i18n-ignore: who can override, agent-facing (§16.8.3)
       if (opts.dry && !skipped.length) return this.ok(card, from, s0.stage)
       if (nobody && asking) return (await this.nobodyOn(card, to, by, opts, others))!
+      // agent-protocol: who can override a refusal, the Agent API's fixed `override` value (AGENT_API.md, §16.8.3)
       if (skipped.length && asking) return by === 'user' ? needs(skipped) : this.refuse(card, 'assistant', 'move', { rule: 'move.needsOverride', values: { card: card.key, stage: to, rules: skipped.join(', ') } }, 'the user or the Assistant') // i18n-ignore: who can override, agent-facing (§16.8.3)
       await this.cfg.hooks?.beforeWrite?.('move')
       if (gs && (await this.revalidate(card, s, gs.o, gs.before))) return this.regather(card, () => this.dragForward(card, from, to, by, opts, fromHold))
@@ -2319,6 +2390,7 @@ export class Workflow {
       } catch (e) {
         if (!(e instanceof DragUndone)) throw e
         if (e.refused.rule === 'move.needsOverride' && by === 'user') return needs(String(e.refused.values.rules).split(', '))
+        // agent-protocol: who can override a refusal, the Agent API's fixed `override` value (AGENT_API.md, §16.8.3)
         return this.refuse(card, by, 'move', e.refused, e.refused.rule === 'move.needsOverride' ? 'the user or the Assistant' : 'the user') // i18n-ignore: who can override, agent-facing (§16.8.3)
       }
       return out ? this.refuse(card, by, 'move', out) : this.ok(card, from, this.state(card).stage)
@@ -2397,7 +2469,7 @@ export class Workflow {
       w.fact('IntegrationCancelled', { entry: e.id, reason: 'removed' }) // i18n-ignore: a fact's kind and codes, not text
       // Never into a stage the ruleset doesn't have (no review, no G10: no Approved).
       w.move(hasStage(r, 'approved') ? 'approved' : 'active', 'user')
-      this.wake(w, w.state().started?.builder, `${card.key} was taken out of the merge queue by ${by === 'user' ? 'the user' : 'the Assistant'}${reason ? `: ${reason}` : ''}. It isn't merged; it is queued again only if the user retries it or it is approved again.`) // i18n-ignore: a wake, agent-facing
+      this.wake(w, w.state().started?.builder, stored(W.removed, { card: card.key, by: by === 'user' ? 'user' : 'assistant', reason: reason ? `: ${reason}` : '' }))
       return null
     })
     if (out) return this.refuse(card, by, 'remove from queue', out) // i18n-ignore: intent names (the window: texts.ts's MOVE_NAMES)
@@ -2529,9 +2601,9 @@ export class Workflow {
     const paths = card.paths ?? []
     const out: string[] = []
     const outside = given ? [] : this.prefill(card).filter((p) => !this.none.covers(paths, p))
-    if (outside.length) out.push(`${card.key}'s paths leave out files it recorded as its agents' edits: ${outside.join(', ')}. Its revision covers only its paths: to include them, submit with paths listing every file of its work (or declare its paths); to leave them out, carry on.`) // i18n-ignore: agent-facing warning in the submit's reply
+    if (outside.length) out.push(say(W.pathsLeaveOut, { card: card.key, files: outside.join(', ') }))
     const unclaimed = (await this.unclaimed(card, { paths, signal })).filter((p) => !outside.includes(p))
-    if (unclaimed.length) out.push(`Changed in the project since ${card.key} started, in neither its paths nor what it recorded as its agents' edits: ${unclaimed.join(', ')}. Not part of its revision: to include any, submit with paths listing every file of its work; else leave them.`) // i18n-ignore: agent-facing warning in the submit's reply
+    if (unclaimed.length) out.push(say(W.unclaimed, { card: card.key, files: unclaimed.join(', ') }))
     return out
   }
 
@@ -2633,7 +2705,7 @@ export class Workflow {
     if (!now.applies) return
     this.saveLane({ ...l, cards: [...now.cards], pending: null })
     const builder = this.store.laneBuilder(l.id)
-    if (builder) this.wake(w, builder, `Your lane's card list changed, as queued: its cards are now ${now.cards.map((c) => this.store.card(c).key).join(', ')}. hive_lane next names your next card.`) // i18n-ignore: a wake, agent-facing
+    if (builder) this.wake(w, builder, stored(W.laneListChanged, { cards: now.cards.map((c) => this.store.card(c).key).join(', ') }))
   }
 
   /** A start refused for a card that waits in its lane (laneWaits), or null. */
@@ -2764,7 +2836,7 @@ export class Workflow {
     const line = b.line ?? b.folder
     await this.write(b.prev, null, 'hive', (w) => {
       w.fact('LineMoved', { line, from, to, why: 'squashContinuation' }) // i18n-ignore: a fact's kind and codes, not text
-      this.wake(w, b.builder, `${line} is up to date with ${b.target} (${b.prev.key} was squashed into it): ${b.next.key} can start.`) // i18n-ignore: a wake, agent-facing
+      this.wake(w, b.builder, stored(W.squashed, { line, target: b.target, prev: b.prev.key, next: b.next.key }))
       return null
     })
   }

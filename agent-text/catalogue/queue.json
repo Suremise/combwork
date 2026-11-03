@@ -1,0 +1,210 @@
+{
+  "queue.failure.check.environment": {
+    "text": "{what} failed for the environment, not the work ({cause}{code})",
+    "note": "{what}: the check (queue.failure.check.*). {cause}: why, as recorded (queue.failure.temporary when none). {code}: \": \" and its code, or nothing."
+  },
+  "queue.failure.check.failed": {
+    "text": "{what} failed on the merged result",
+    "note": "{what}: the check (queue.failure.check.*): it failed on the work merged with its target."
+  },
+  "queue.failure.check.install": {
+    "text": "the install before the merge checks",
+    "note": "The merge check that failed: the install that runs before them."
+  },
+  "queue.failure.check.named": {
+    "text": "the merge check {check}",
+    "note": "The merge check that failed, by its name."
+  },
+  "queue.failure.check.some": {
+    "text": "a merge check",
+    "note": "A merge check that failed, its name not known."
+  },
+  "queue.failure.conflict": {
+    "text": "a conflict with {target}",
+    "note": "What came back: a conflict merging into {target} (its files follow, queue.failure.in)."
+  },
+  "queue.failure.focused.newProof": {
+    "text": "the merge needs real-CLI or packaged focused tests its review never ran: {tests}",
+    "note": "G20 (HI-1367): the merge needs focused tests the queue doesn't run and the review didn't either. {tests}: the tests, as many as fit."
+  },
+  "queue.failure.focused.noProof": {
+    "text": "no counted review run at the submitted revision for its real-CLI or packaged focused tests: {tests}",
+    "note": "G20 (HI-1367): focused tests the queue doesn't run had no counted run at the submitted revision. {tests}: the tests, as many as fit."
+  },
+  "queue.failure.focused.noRunner": {
+    "text": "the project has no command to run its focused tests",
+    "note": "G20 (HI-1367): no focused-test command in the project."
+  },
+  "queue.failure.focused.none": {
+    "text": "no focused tests were chosen for its submission",
+    "note": "G20 (HI-1367): its submission had no focused tests chosen."
+  },
+  "queue.failure.focused.repick": {
+    "text": "its focused tests couldn't be chosen for what changed in the merge: {paths}",
+    "note": "G20 (HI-1367): its focused tests couldn't be picked for the merge. {paths}: the paths, as many as fit."
+  },
+  "queue.failure.folderBusy": {
+    "text": "the folder {target} is checked out in was busy",
+    "note": "What came back: the folder its target branch is checked out in was busy."
+  },
+  "queue.failure.hook": {
+    "text": "a git hook refused its merge commit",
+    "note": "What came back: a git hook refused the merge commit."
+  },
+  "queue.failure.in": {
+    "text": "{head} in {files}",
+    "note": "{head}: what came back (queue.failure.conflict). {files}: its files, each with where its conflicts are when they fit (HI-1181)."
+  },
+  "queue.failure.notUpToDate": {
+    "text": "it isn't up to date with {target}",
+    "note": "What came back: under Strict, the card isn't up to date with its target."
+  },
+  "queue.failure.notUpToDate.files": {
+    "text": "{head}: a conflict in {files}",
+    "note": "HI-1181 round 1: Strict's update conflicted. {head}: queue.failure.notUpToDate. {files}: its files and where, as a conflict's are."
+  },
+  "queue.failure.targetMoved": {
+    "text": "{target} moved while it was being merged",
+    "note": "What came back: its target branch moved during the merge."
+  },
+  "queue.failure.temporary": {
+    "text": "temporary",
+    "note": "The cause of a check that failed for its environment, when none was recorded."
+  },
+  "queue.files.count": {
+    "text": "{n} files",
+    "note": "A list of files when none of their names fits: how many."
+  },
+  "queue.files.more": {
+    "text": "{files} and {n} more",
+    "note": "A list of files cut to fit: {files} the first ones, {n} how many more."
+  },
+  "queue.line.left": {
+    "text": "{who} It left the merge queue: {why, select, decision {a decision since its approval needs it reviewed again} other {its pass is stale}}.",
+    "note": "{who}: queue.line.who. {why}: decision (a decision since its approval) or stale (its pass)."
+  },
+  "queue.line.merged": {
+    "text": "Hive merged this card.",
+    "note": "A card the merge queue merged."
+  },
+  "queue.line.notYet": {
+    "text": "{who} Once it is approved, the merge queue merges it and moves it to Done.",
+    "note": "{who}: queue.line.who. Not in the queue yet: it goes in once approved."
+  },
+  "queue.line.paused": {
+    "text": "{who} It is in the merge queue for {target}, which is paused ({reason}, on {card}); {waits}.",
+    "note": "{who}: queue.line.who. {reason}: the pause's code (as the window's queue names it). {card}: the card it paused on. {waits}: what it waits for (queue.paused.*), never a step of the agent's own (#1406)."
+  },
+  "queue.line.queued": {
+    "text": "{who} It is in the merge queue for {target}, position {position}; it moves to Done once merged.",
+    "note": "{who}: queue.line.who. {target}: the branch it merges into. {position}: 1 is next, after the one testing now."
+  },
+  "queue.line.returned": {
+    "text": "{who} {returned}",
+    "note": "{who}: queue.line.who. {returned}: what came back and what to do next (queue.returned.*)."
+  },
+  "queue.line.stale": {
+    "text": "{who} Its pass is for {approved}, but its line is at {current} (changed since): submit it again for review (hive_submit); it is queued once that is approved.",
+    "note": "HI-1763: approved with a stale pass, never queued (HI-1737 sat so, its lane paused, nobody told). {who}: queue.line.who. {approved}, {current}: short revisions (\"—\" for none)."
+  },
+  "queue.line.testing": {
+    "text": "{who} The merge queue is {step, select, advance {moving {target} to its merge} checks {running the merge checks on its merge into {target}} other {testing its merge into {target}}} now; it moves to Done once merged.",
+    "note": "{who}: queue.line.who. {target}: the branch it merges into. {step}: the queue's step with it (advance, checks; other: another or not known here)."
+  },
+  "queue.line.unenforced": {
+    "text": "Hive merges this card (its rules), but workflow rules aren't enforced: merge it yourself and report the merge (hive_report_merge).",
+    "note": "A card read under Hive merges while Settings → Advanced: workflow rules are enforced is off: nothing refuses, so the agent merges and reports as before 1.0."
+  },
+  "queue.line.who": {
+    "text": "Hive merges this card (its rules): don't merge it yourself.",
+    "note": "The first sentence of every queue line for a card Hive's merge queue merges (#1354): the agent never merges it itself."
+  },
+  "queue.next.conflict": {
+    "text": "Merge {target} into your worktree, resolve the conflict, commit and submit again (hive_submit).",
+    "note": "The next step after a conflict with {target}, the branch."
+  },
+  "queue.next.fix": {
+    "text": "Fix it in your worktree, commit and submit again (hive_submit).",
+    "note": "The next step after anything else that came back."
+  },
+  "queue.next.proof": {
+    "text": "Have its reviewer run those tests at the revision submitted (hive-progress --check \"focused:<test>\"), then submit the same revision again (hive_submit).",
+    "note": "The next step when its focused tests that the queue doesn't run need a counted run (G20, HI-1367)."
+  },
+  "queue.next.repick": {
+    "text": "Bring your worktree up to date, then submit again naming the tests the change needs (tests on hive_submit), for review.",
+    "note": "The next step when its focused tests couldn't be chosen (G20, HI-1367)."
+  },
+  "queue.next.runner": {
+    "text": "Tell the user: Version Control → Each card’s focused tests needs the command that runs them.",
+    "note": "The next step when the project has no focused-test command: the setting is the user's (a tab and option name, as the window shows them)."
+  },
+  "queue.next.transient": {
+    "text": "Submit the same revision again (hive_submit): it goes straight back into the queue, at most twice in a row.",
+    "note": "The next step after a failure of the environment, not the work."
+  },
+  "queue.paused.approval": {
+    "text": "it moves on once the user answers, in For you, whether to update {target} now",
+    "note": "What a queue paused for the user's answer waits for (#1406): whether to update a checked-out target now (Resume doesn't stand in for it). {target}: the branch."
+  },
+  "queue.paused.fix": {
+    "text": "it moves on once the user fixes what stopped it and resumes it",
+    "note": "What a queue paused on a step that needs the user waits for (#1406): git's error, a push (G18, #1179), then Resume."
+  },
+  "queue.paused.folder": {
+    "text": "it moves on once the user puts right the folder {target} is checked out in and resumes it",
+    "note": "What a queue paused on the folder its target is checked out in waits for (#1406). {target}: the branch."
+  },
+  "queue.paused.mergeChoice": {
+    "text": "it moves on once the user chooses, in For you, how Hive merges this project (merge style and commit message)",
+    "note": "What a queue paused for the project's merge style waits for (#1406)."
+  },
+  "queue.paused.resume": {
+    "text": "it moves on once the user resumes it",
+    "note": "What any other paused queue waits for: the user's Resume (#1406)."
+  },
+  "queue.paused.rules": {
+    "text": "it paused while workflow rules were off; it moves on once they are enforced again (if they already are, once the user resumes it)",
+    "note": "What a queue paused while workflow rules weren't enforced waits for (#1406): Hive resumes it once they are."
+  },
+  "queue.paused.stuck": {
+    "text": "it moves on once the user settles its interrupted advance (their answer in For you, or Resume)",
+    "note": "What a queue paused on an interrupted advance waits for (#1406): Decide in For you, or Resume once settled."
+  },
+  "queue.returned.lastLines": {
+    "text": "Its last lines: \"{lines}\".",
+    "note": "The last lines of a returned card's output, joined with \" | \" and cut from their start (\"…\") to fit."
+  },
+  "queue.returned.lead": {
+    "text": "{subject} {cameBack}: {failure}.",
+    "note": "{subject}: the card (its key, or queue.returned.subjectIt). {cameBack}: \"came back from the merge queue\". {failure}: what came back (queue.failure.*)."
+  },
+  "queue.returned.log": {
+    "text": "Its log: {path}.",
+    "note": "A returned card's log, by its path, where it fits."
+  },
+  "queue.returned.logPointer": {
+    "text": "Its log path: hive_read_task.",
+    "note": "Where a returned card's log path is, when the path itself doesn't fit."
+  },
+  "queue.returned.subjectIt": {
+    "text": "It",
+    "note": "The subject of a returned card's sentence in its own card read (a wake names it by its key)."
+  },
+  "queue.wake.left.decision": {
+    "text": "{card} left the merge queue: a decision since its approval needs it reviewed again. Read its decisions (hive_read_task){to, select, review {; it is back in Review, and queued again once approved.} other {, then submit again (hive_submit).}}",
+    "note": "#1354: its builder's wake for a card that left the queue for a decision since its approval. {to}: review (it went back to Review) or active."
+  },
+  "queue.wake.left.stale": {
+    "text": "{card} left the merge queue: its pass is stale (its revision changed since it was approved). Submit the current revision (hive_submit) for review.",
+    "note": "#1354: its builder's wake for a card that left the queue, its pass stale."
+  },
+  "queue.wake.resubmitted": {
+    "text": "{card} is back in Review after the merge queue returned it ({failure}); {builder} {conflict, select, yes {resolved it} other {changed it}} and submitted it again: review {conflict, select, yes {the resolution} other {what changed}}",
+    "note": "HI-2143: a card submitted again after the queue returned it, its reviewer's wake. {failure}: what came back (queue.failure.*). {conflict}: yes when it came back with a conflict."
+  },
+  "queue.wake.stale": {
+    "text": "{card}: its pass is stale: it is for {approved}, but its line is at {current} (changed since). Submit {current} for review (hive_submit).",
+    "note": "HI-1763: a pass gone stale, its builder's wake at once (HI-1737 sat in Approved, nobody told). {approved}, {current}: short revisions (\"—\" for none)."
+  }
+}
