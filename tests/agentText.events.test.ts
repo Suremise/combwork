@@ -16,9 +16,10 @@ const forClient = (event: HiveEvent, agent: typeof AGENT | null) => inRequestSco
 const noticeEvent = (n: Partial<Notice>): HiveEvent => ({ type: 'notice', notice: { id: 'n-1', kind: 'notice', title: 'Hive a été fermé', body: 'b', projectPath: AGENT.projectPath, ...n } as Notice }) as HiveEvent
 const titleOf = (e: Record<string, unknown> | null): unknown => (e?.notice as { title?: unknown } | undefined)?.title
 
-afterEach(() => setChainResolver(null))
 
 describe("the events stream's notification titles", () => {
+  // Each test's resolver is its own (the real one, sessions.ts's, is agentText.eventsStream.test.ts's).
+  afterEach(() => setChainResolver(null))
   const closed = closedNotice(2)
   const event = noticeEvent({ apiTitle: closed.apiTitle, apiTitleText: closed.apiTitleText })
 
