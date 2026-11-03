@@ -33,13 +33,14 @@ describe('the app name (#443)', () => {
     expect(pkg.name).toBe('hive')
   })
 
-  it('names the profile folders Combwork and Combwork-Dev (HI-2461), moved from Hive and Hive-Dev, set in main rather than taken from productName', () => {
+  it("names the profile folders Combwork and Combwork-Dev (HI-2461), Hive's and Hive-Dev's the fallback, set in main rather than taken from productName", () => {
     expect(profileFolder(true)).toBe('Combwork')
     expect(profileFolder(false)).toBe('Combwork-Dev')
     expect(legacyProfileFolder(true)).toBe('Hive')
     expect(legacyProfileFolder(false)).toBe('Hive-Dev')
     const index = read('src/main/index.ts')
-    expect(index).toContain("moveProfile(app.getPath('appData'), legacyProfileFolder(app.isPackaged), profileFolder(app.isPackaged)")
+    expect(index).toContain('chooseProfile(roamingParent, legacyProfileFolder(packaged), profileFolder(packaged))')
+    expect(index).toContain("else chooseProfiles(app.getPath('appData'), process.env.LOCALAPPDATA || join(app.getPath('home'), 'AppData', 'Local'), app.isPackaged)")
     expect(index).toContain("app.setPath('userData', roaming.use)")
   })
 

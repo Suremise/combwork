@@ -74,8 +74,6 @@ interface HiveMessageValues {
   'shell.command.notes.open': undefined
   'shell.command.notice.openTarget': undefined
   'shell.command.palette.show': undefined
-  'shell.command.profile.keepBackup': undefined
-  'shell.command.profile.removeBackup': undefined
   'shell.command.progress.toggle': undefined
   'shell.command.project.focus': undefined
   'shell.command.project.goto': undefined
@@ -226,8 +224,6 @@ interface HiveMessageValues {
   'shell.error.allowEdit': undefined
   'shell.error.endProcesses': undefined
   'shell.error.keepProcesses': undefined
-  'shell.error.keepProfileBackup': undefined
-  'shell.error.removeProfileBackup': undefined
   'shell.error.resumeAfterClose': undefined
   'shell.error.resumeRestart': undefined
   'shell.error.stopBackground': undefined

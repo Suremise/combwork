@@ -44,7 +44,7 @@ Hive is MIT-licensed. `THIRD_PARTY_NOTICES.md` is generated from what ships: a l
 
 ## Developing Hive from inside Hive
 
-- `npm run dev` (unpackaged) uses its own profile `%APPDATA%\Combwork-Dev` and Agent API port **47822**, and its title bar says **Hive Desktop Dev**. The installed app uses `%APPDATA%\Combwork` and port 47821. Both can run at once. Before 1.1 (HI-2461) the profiles were `Hive-Dev` and `Hive`: a build's first start copies its own across and keeps the old one as a dated backup (SPEC §4.3), so an installed 1.0 still runs from `%APPDATA%\Hive`.
+- `npm run dev` (unpackaged) uses its own profile `%APPDATA%\Combwork-Dev` and Agent API port **47822**, and its title bar says **Hive Desktop Dev**. The installed app uses `%APPDATA%\Combwork` and port 47821. Both can run at once. Before 1.1 (HI-2461) the profiles were `Hive-Dev` and `Hive`: a build uses the old one while the new one isn't there (SPEC §4.3). The installer renames the installed app's; rename `Hive-Dev` to `Combwork-Dev` yourself, with every dev build closed.
 - To update an installed copy: `npm run dist`, then quit Hive, run the installer, reopen and resume the sessions. Leave running the installer to the user.
 - Dev and test builds use the Windows app ID `com.hive.desktop.dev`; never give them the installed app's `com.hive.desktop`, or Windows shows Electron's icon and name for the real Hive.
 - Never kill Hive processes by name — the installed Hive hosting this session is also `Hive.exe`/`electron.exe`. Target processes by command line (e.g. paths containing `out\main` or a test profile).

@@ -4,7 +4,7 @@
 
 ### Changed
 
-- **Your data folders are now Combwork's** (HI-2461), part of the app's rename to Combwork: `%APPDATA%\Hive` becomes `%APPDATA%\Combwork`, and `%LOCALAPPDATA%\Hive` (accounts and their sign-ins) becomes `%LOCALAPPDATA%\Combwork`. The first start copies them across before anything else runs, with your settings, usage and logs, and keeps the old folders, renamed to a dated backup, until you remove them: from the start after the new folders first open, a notice offers **Remove** (to the Recycle Bin) or **Keep**. A copy that can't finish (a file in use, a full disk) changes nothing: Hive says so, uses the old folders as before and tries again next time. A connection whose sign-in didn't carry across is named once, to sign in to again.
+- **Your data folders are now Combwork's** (HI-2461), part of the app's rename to Combwork: `%APPDATA%\Hive` becomes `%APPDATA%\Combwork`, and `%LOCALAPPDATA%\Hive` (accounts and their sign-ins) becomes `%LOCALAPPDATA%\Combwork`. The installer renames them while Hive is closed, with your settings, usage and logs. Until they are renamed, Hive keeps running from the old folders and a notice at start says so. After the move, a connection whose sign-in didn't carry across is named once, so you can sign in to it again.
 
 ### Fixed
 

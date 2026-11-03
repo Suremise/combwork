@@ -999,41 +999,17 @@
     "defaultMessage": "{share, number, ::percent} of the {window, select, hours {{hours, plural, one {#-hour limit} other {#-hour limit}}} weekly {weekly limit} other {{label} limit}} used on {connection}",
     "description": "A notice (HI-1756): how much of a plan's usage limit is used ({share}: \"85%\") on one connection, a sign-in the user named ({connection}: \"Max 1\"). The limit is a rolling window of {hours} hours (the 5-hour one), the weekly one, or another the provider names itself ({label}, in English as the provider says it)."
   },
-  "main.profileMove.backupBody": {
-    "defaultMessage": "Hive now runs from the Combwork folders. The old ones are kept as {n, plural, one {a backup} other {backups}}: {folders}. Remove moves {n, plural, one {it} other {them}} to the Recycle Bin.",
-    "description": "The notice offering to remove the backup of the old data folders. {folders} lists their paths; {n} is how many."
+  "main.profileMove.fallbackBody": {
+    "defaultMessage": "{n, plural, one {The Combwork folder isn't there, so Hive runs from {folders}, as before.} other {The Combwork folders aren't there, so Hive runs from {folders}, as before.}} Installing Combwork with Hive closed moves {n, plural, one {it} other {them}}; nothing is lost meanwhile.",
+    "description": "The notice that Hive uses its old data folders. {folders} lists their paths; {n} is how many (1 or 2). \"Installing Combwork\": running the installer of the app under its new name."
   },
-  "main.profileMove.backupTitle": {
-    "defaultMessage": "Hive's old data folders are kept as a backup",
-    "description": "A notice at start (HI-2461): the app's data moved to the Combwork folders (the app's new name) and has opened from them; the old folders were kept, renamed, as a backup the user may remove."
+  "main.profileMove.fallbackBodyDev": {
+    "defaultMessage": "{n, plural, one {The {name} folder isn't there, so this dev build runs from {folders}.} other {The {name} folders aren't there, so this dev build runs from {folders}.}} To move {n, plural, one {it} other {them}}, close Hive and rename {n, plural, one {it} other {each}} to {name}.",
+    "description": "The same notice for a development build of Hive (no installer moves its folders). {name} is the new folder name (Combwork-Dev: keep it as it is); {folders} lists the old folders' paths; {n} is how many (1 or 2)."
   },
-  "main.profileMove.failedBody": {
-    "defaultMessage": "Copying {from} to {to} stopped: {why}. Nothing was lost: Hive is using {from} as before, and tries again the next time it starts.",
-    "description": "The notice that copying the data folder failed. {from} and {to} are folder paths; {why} is the error (a code and a file, such as EBUSY and the file that was in use)."
-  },
-  "main.profileMove.failedTitle": {
-    "defaultMessage": "Hive couldn't move its data to the Combwork folder",
-    "description": "A notice at start (HI-2461): the app's data folders are renamed from Hive's to Combwork's (the app's new name, keep it as it is) at the first start of this version, and copying them failed. Nothing was lost."
-  },
-  "main.profileMove.keep": {
-    "defaultMessage": "Keep",
-    "description": "A button in the notice about the old data folders kept as a backup: keeps them, and Hive doesn't ask again."
-  },
-  "main.profileMove.kept": {
-    "defaultMessage": "Kept",
-    "description": "What the notice about the old data folders says once Keep was taken."
-  },
-  "main.profileMove.remove": {
-    "defaultMessage": "Remove",
-    "description": "A button in the notice about the old data folders kept as a backup: moves them to the Recycle Bin."
-  },
-  "main.profileMove.removeFailed": {
-    "defaultMessage": "Couldn't move {folder} to the Recycle Bin: {why}",
-    "description": "An error after Remove in the notice about the old data folders: {folder} is the backup folder's path, {why} the error."
-  },
-  "main.profileMove.removed": {
-    "defaultMessage": "Moved to the Recycle Bin",
-    "description": "What the notice about the old data folders says once Remove was taken and worked."
+  "main.profileMove.fallbackTitle": {
+    "defaultMessage": "Hive is using its data folders from before Combwork",
+    "description": "A notice at start (HI-2461): the app's data folders are now named Combwork (the app's new name, keep it as it is), which the installer moves them to; they weren't moved yet, so Hive uses its old folders. Nothing is lost."
   },
   "main.profileMove.signInBody": {
     "defaultMessage": "Since Hive moved its data to the Combwork folder, {names} {n, plural, one {shows} other {show}} signed out. Sign in again in Settings → Accounts & Connections.",

@@ -210,10 +210,6 @@ export interface HiveRequests {
   'app:resumeAfterClose': () => { resumed: number; failed: number }
   /** The unexpected-close notice's Stop Them (#987): how many processes the agents had started were stopped. */
   'app:stopLeftAfterClose': () => number
-  /** The profile move's offer (HI-2461): the old folders' backups to the Recycle Bin; how many went. */
-  'app:removeProfileBackup': () => number
-  /** That offer's Keep: the backups stay, and it isn't made again. */
-  'app:keepProfileBackup': () => void
   /** The notice offering to resume the agents that were working when Hive closed (HI-1707): queues them; how many. */
   'app:resumeRestart': () => number
   /** That notice's Dismiss: none resumed, and the offer isn't made again; how many it offered. */

@@ -17,5 +17,5 @@ export const appName = (packaged: boolean): string => (packaged ? APP_NAME : DEV
  */
 export const profileFolder = (packaged: boolean): string => (packaged ? 'Combwork' : 'Combwork-Dev')
 
-/** The profile folder's name before HI-2461, which the first start of a Combwork build moves (main/profileMove.ts). */
+/** The profile folder's name before HI-2461, which the installer moves (HI-2460) and the app falls back to while it hasn't (main/profileFolders.ts). */
 export const legacyProfileFolder = (packaged: boolean): string => (packaged ? 'Hive' : 'Hive-Dev')

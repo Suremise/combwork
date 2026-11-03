@@ -251,15 +251,9 @@ interface HiveMessageValues {
   'main.plan.resetsOn': { when: string | number }
   'main.plan.used': { share: number; provider: string | number; window: string; hours: number; label: string | number }
   'main.plan.usedOn': { share: number; window: string; hours: number; label: string | number; connection: string | number }
-  'main.profileMove.backupBody': { n: number; folders: string | number }
-  'main.profileMove.backupTitle': undefined
-  'main.profileMove.failedBody': { from: string | number; to: string | number; why: string | number }
-  'main.profileMove.failedTitle': undefined
-  'main.profileMove.keep': undefined
-  'main.profileMove.kept': undefined
-  'main.profileMove.remove': undefined
-  'main.profileMove.removeFailed': { folder: string | number; why: string | number }
-  'main.profileMove.removed': undefined
+  'main.profileMove.fallbackBody': { n: number; folders: string | number }
+  'main.profileMove.fallbackBodyDev': { n: number; name: string | number; folders: string | number }
+  'main.profileMove.fallbackTitle': undefined
   'main.profileMove.signInBody': { names: string | number; n: number }
   'main.profileMove.signInTitle': { n: number }
   'main.quit.closed': undefined

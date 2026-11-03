@@ -291,14 +291,6 @@
     "defaultMessage": "Show All Commands",
     "description": "A command (the menus, the command palette, Settings → Keyboard Shortcuts), in the View category."
   },
-  "shell.command.profile.keepBackup": {
-    "defaultMessage": "Keep Hive's Old Data Folders",
-    "description": "A command (the menus, the command palette, Settings → Keyboard Shortcuts), in the Help category: keeps the backup of the app's data folders from before they moved to the Combwork folders (HI-2461), and Hive doesn't offer to remove it again. It isn't in the menus or the palette: notifications and buttons run it by its name."
-  },
-  "shell.command.profile.removeBackup": {
-    "defaultMessage": "Remove Hive's Old Data Folders",
-    "description": "A command (the menus, the command palette, Settings → Keyboard Shortcuts), in the Help category: moves the backup of the app's data folders from before they moved to the Combwork folders (HI-2461) to the Recycle Bin. It isn't in the menus or the palette: notifications and buttons run it by its name."
-  },
   "shell.command.progress.toggle": {
     "defaultMessage": "Toggle Progress Panel",
     "description": "A command (the menus, the command palette, Settings → Keyboard Shortcuts), in the View category."
@@ -898,14 +890,6 @@
   "shell.error.keepProcesses": {
     "defaultMessage": "Could not keep the processes",
     "description": "An error's title: keeping the processes an agent left running failed."
-  },
-  "shell.error.keepProfileBackup": {
-    "defaultMessage": "Could not keep the old data folders",
-    "description": "An error's title: recording that the backup of the app's old data folders is kept failed."
-  },
-  "shell.error.removeProfileBackup": {
-    "defaultMessage": "Could not remove the old data folders",
-    "description": "An error's title: moving the backup of the app's old data folders to the Recycle Bin failed."
   },
   "shell.error.resumeAfterClose": {
     "defaultMessage": "Could not resume the agents",
