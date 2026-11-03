@@ -214,12 +214,35 @@ describe('card history and Hive’s comments, said when read', () => {
     expect(asAgent(() => storedForAgents(english, stop))).toBe(english.replace(/In its terminal:.*$/, 'Use /model to switch back.'))
   })
 
-  it("keeps a line as stored when its English isn't its message's Default (older wording), or it has no message (before #845)", () => {
-    using({ 'tasks.history.moved': 'Now in {column}' })
+  it("says an override for a known id whatever wording its English was stored in; with none, as stored", () => {
     const moved = storedText(HISTORY.moved, { column: 'review' })
     expect(asAgent(() => storedForAgents('Moved into Review', moved))).toBe('Moved into Review')
+    using({ 'tasks.history.moved': 'DIALECT ARRIVAL {column}' })
+    expect(asAgent(() => storedForAgents('Moved into Review', moved))).toBe('DIALECT ARRIVAL Review')
+    expect(asAgent(() => entryForAgents({ at: 'x', by: 'HB1', what: 'Moved into Review', whatText: moved, id: 'e' }))).toEqual({ at: 'x', by: 'HB1', what: 'DIALECT ARRIVAL Review' })
+  })
+
+  it('keeps as stored: a line with no message (before #845), an id this Hive does not know, and agents’ own words', () => {
+    using({ 'tasks.history.moved': 'Now in {column}', 'tasks.history.queueReturned': 'Back: {reason}' })
     expect(asAgent(() => entryForAgents({ at: 'x', by: 'HB1', what: 'Moved to Review' }))).toEqual({ at: 'x', by: 'HB1', what: 'Moved to Review' })
-    expect(asAgent(() => entryForAgents({ at: 'x', by: 'Hive', text: 'Hello', hiveText: moved }))).toEqual({ at: 'x', by: 'Hive', text: 'Hello' })
+    expect(asAgent(() => storedForAgents('From a newer Hive', { id: 'tasks.history.fromTheFuture', values: { column: 'review' } }))).toBe('From a newer Hive')
+    // HI-2087's return comment: agents' longer English beside the window's message, marked own when written, and one from before the mark.
+    const back = storedText(HISTORY.queueReturned, { reason: 'conflict', target: 'main', check: '', files: 'none' })
+    expect(asAgent(() => entryForAgents({ at: 'x', by: 'Hive', text: 'HI-1 came back: a conflict with main. Merge main in…', hiveText: { ...back, own: true } }))).toEqual({ at: 'x', by: 'Hive', text: 'HI-1 came back: a conflict with main. Merge main in…' })
+    expect(asAgent(() => storedForAgents('HI-1 came back: a conflict with main.', back))).toBe('HI-1 came back: a conflict with main.')
+  })
+
+  it("says a nested id's override through entryForAgents, and a wake quotes Hive's comment in the reader's chain", async () => {
+    const { cardChange } = await import('../src/shared/watch')
+    const stop = { id: HISTORY.safeguardStop.id, values: { agent: 'HB1', stops: 0, model: 'none', time: '', to: 'opus', from: 'sonnet', since: '15:00', state: 'none', hasTools: 'no', tools: '', hasHelp: 'yes', help: { id: 'agents.claude.safeguardHelp' } } }
+    const english = said(stop)
+    const card = { number: 7, column: 'doing', history: [{ at: '2026-11-03T10:00:00.000Z', by: 'Hive', what: 'Moved to Doing' }], comments: [{ at: '2026-11-03T10:00:01.000Z', by: 'Hive', text: english, hiveText: stop, id: 'c1' }] }
+    const before = JSON.stringify(asAgent(() => cardChange(7, card as never, ['comment'])))
+    using({ 'agents.claude.safeguardHelp': 'Use /model to switch back.' })
+    expect(asAgent(() => entryForAgents(card.comments[0])).text).toBe(english.replace(/In its terminal:.*$/, 'Use /model to switch back.'))
+    expect(asAgent(() => cardChange(7, card as never, ['comment'])).comment?.firstLine).toContain('Use /model to switch back.')
+    setChainResolver(null)
+    expect(JSON.stringify(asAgent(() => cardChange(7, card as never, ['comment'])))).toBe(before)
   })
 })
 

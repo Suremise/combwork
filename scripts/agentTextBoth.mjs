@@ -45,7 +45,7 @@ const SCOPED = new Set(['withCardNames', 'inDefaultDialect', 'inDialectOf', 'inW
 const NOTHING = new Set(['saidText', 'agentMsg', 'errorText', 'say', 'String', 'cardRef', 'basename', 'userText'])
 
 /** English formatted for any reader (the Default's, whatever dialect reads it): only the agent-text module may, and the log. */
-const ONE_WAY = new Set(['englishText', 'englishError', 'workflowEnglish', 'problemEnglish', 'agentEnglish'])
+const ONE_WAY = { englishText: 'src/shared/advanced.ts', englishError: 'src/main/hiveError.ts', workflowEnglish: 'src/shared/workflow/texts.ts', problemEnglish: 'src/main/workflow/optionsForm.ts', agentEnglish: 'src/main/tasks.ts' }
 /** Where they are defined, and the formatting itself lives. */
 const ONE_WAY_FREE = [/^src\/shared\/advanced\.ts$/, /^src\/main\/hiveError\.ts$/, /^src\/shared\/agentText\//]
 /** A call inside a log line (`log.warn(…)`): the log's English. */
@@ -165,7 +165,8 @@ function analyzeFiles(root, files) {
           'CallExpression|NewExpression'(p) {
             // Only calls that can read text: by a name, a method of this class, a class (new) or a parent's constructor.
             const c = p.node.callee
-            if (c.type === 'Identifier' || c.type === 'Super' || (c.type === 'MemberExpression' && c.object.type === 'ThisExpression')) mod.calls.push(p)
+            const namespaced = c.type === 'MemberExpression' && c.object.type === 'Identifier' && !!p.scope.getBinding(c.object.name)?.path.isImportNamespaceSpecifier()
+            if (c.type === 'Identifier' || c.type === 'Super' || namespaced || (c.type === 'MemberExpression' && c.object.type === 'ThisExpression')) mod.calls.push(p)
           }
         })
       } catch {
@@ -527,6 +528,7 @@ function analyzeFiles(root, files) {
     if (c.type !== 'Identifier') return null
     if (c.name === ERROR_CLASS) return ERROR_CLASS
     const d = definition(p, c.name)
+    if (d?.isClassDeclaration() && d.node.id?.name === ERROR_CLASS && fileOf(d) === 'src/main/hiveError.ts') return ERROR_CLASS
     return d?.isClassDeclaration() && errorClasses.has(d.node) ? d.node : null
   }
   // Subclasses to a fixed point (a subclass of a subclass).
@@ -538,7 +540,8 @@ function analyzeFiles(root, files) {
         const s = p.node.superClass
         if (!s || s.type !== 'Identifier' || errorClasses.has(p.node)) continue
         const d = s.name === ERROR_CLASS ? ERROR_CLASS : definition(p, s.name)
-        if (d === ERROR_CLASS || (d?.isClassDeclaration?.() && errorClasses.has(d.node))) {
+        const isBase = d !== ERROR_CLASS && d?.isClassDeclaration?.() && d.node.id?.name === ERROR_CLASS && fileOf(d) === 'src/main/hiveError.ts'
+        if (d === ERROR_CLASS || isBase || (d?.isClassDeclaration?.() && errorClasses.has(d.node))) {
           errorClasses.add(p.node)
           grew = true
         }
@@ -546,11 +549,32 @@ function analyzeFiles(root, files) {
     }
   }
 
+  /**
+   * What a call's callee is, whatever it is called here: its definition (through an import's alias, a re-export or a
+   * namespace import), the name it is declared with, and the file it is declared in. Null for one it can't follow.
+   */
+  const identity = (p) => {
+    const c = p.node.callee
+    let d = null
+    if (c.type === 'Identifier') d = definition(p, c.name)
+    else if (c.type === 'MemberExpression' && !c.computed && c.object.type === 'Identifier' && c.property.type === 'Identifier') {
+      const b = p.scope.getBinding(c.object.name)
+      if (b?.path.isImportNamespaceSpecifier()) {
+        const to = resolveImport(fileOf(p), b.path.parentPath.node.source.value)
+        d = to ? exported(to, c.property.name) : null
+      }
+    }
+    if (!d?.node) return null
+    const name = d.isVariableDeclarator() ? (d.node.id.type === 'Identifier' ? d.node.id.name : '') : (d.node.id?.name ?? '')
+    return { def: d, name, file: fileOf(d) }
+  }
+
   /** The argument indexes of a call agents read text through: a rendering point, a wrapper, a HiveError's class. */
   const readsAt = (p) => {
     const n = p.node
     // Text as data said for an agent (agentField and its kin): its messages are found where the data was made.
-    if (OWN_DATA.has(calleeName(n.callee))) return null
+    const id = p.isNewExpression() || n.callee.type === 'Super' ? null : identity(p)
+    if (OWN_DATA.has(id?.name ?? calleeName(n.callee))) return null
     if (p.isNewExpression()) {
       const cls = errorClassOf(p)
       if (cls === ERROR_CLASS) return [[0, false]]
@@ -563,6 +587,7 @@ function analyzeFiles(root, files) {
           const s = parent.superClass
           if (s?.name === ERROR_CLASS) return [[0, false]]
           const d = s ? definition(p, s.name) : null
+          if (d?.isClassDeclaration() && d.node.id?.name === ERROR_CLASS && fileOf(d) === 'src/main/hiveError.ts') return [[0, false]]
           parent = d?.isClassDeclaration() ? d.node : null
           const pc = parent?.body.body.find((m) => m.type === 'ClassMethod' && m.kind === 'constructor')
           if (pc) return [...(wrappers.get(pc) ?? [])]
@@ -576,15 +601,11 @@ function analyzeFiles(root, files) {
       return cls && errorClasses.has(cls.node) ? [[0, false]] : null
     }
     const name = calleeName(n.callee)
-    if (n.callee.type === 'Identifier' && Object.hasOwn(POINTS, name)) {
-      const d = definition(p, name)
-      if (d && fileOf(d) === POINT_FILES[name]) return POINTS[name].map((i) => [i, false])
-    }
+    // A rendering point by what it is, not what it is called here (an import's alias, a namespace's member).
+    if (id && Object.hasOwn(POINTS, id.name) && id.file === POINT_FILES[id.name]) return POINTS[id.name].map((i) => [i, false])
     let fn = null
-    if (n.callee.type === 'Identifier') {
-      const d = definition(p, name)
-      fn = d?.isVariableDeclarator() ? unwrap(d.get('init'))?.node : d?.node
-    } else if (n.callee.type === 'MemberExpression' && n.callee.object.type === 'ThisExpression' && name) {
+    if (id) fn = id.def.isVariableDeclarator() ? unwrap(id.def.get('init'))?.node : id.def.node
+    else if (n.callee.type === 'MemberExpression' && n.callee.object.type === 'ThisExpression' && name) {
       const cls = p.findParent((x) => x.isClassBody())
       fn = cls?.node.body.find((m) => (m.type === 'ClassMethod' || m.type === 'ClassProperty') && m.key.name === name)
       if (fn?.type === 'ClassProperty') fn = fn.value
@@ -697,8 +718,10 @@ function analyzeFiles(root, files) {
     const mod = load(rel)
     if (!mod || ONE_WAY_FREE.some((re) => re.test(rel))) continue
     for (const p of mod.calls) {
-      const name = p.node.callee.type === 'Identifier' ? p.node.callee.name : ''
-      if (!ONE_WAY.has(name)) continue
+      // The formatter by what it is: an import's alias or a namespace's member is the same function.
+      const id = identity(p)
+      if (!id || !Object.hasOwn(ONE_WAY, id.name) || id.file !== ONE_WAY[id.name]) continue
+      const name = id.name
       const lineNo = p.node.loc?.start.line
       const mk = mod.marks.get(lineNo)
       if (mk?.later !== null && mk?.later !== undefined) {

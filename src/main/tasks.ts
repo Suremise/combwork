@@ -1284,16 +1284,26 @@ export function agentColumns(m: Msg, values?: TextValues): Text {
 }
 
 /**
- * A stored line or comment for an agent (dialects, HI-2440): said again in the reader's chain only where the chain
- * overrides a message it names and its stored English is that message's Default (Hive's words then; not a record whose
- * wording has changed since, nor one whose agents' English is longer than the window's, HI-2087): so with no override, a
- * line reads exactly as stored.
+ * A stored line or comment for an agent (dialects, HI-2440): said again in the reader's chain where the chain overrides
+ * a message it names (its own, or one stored inside its values), whatever wording the English had when it was stored:
+ * with no such override, a line reads exactly as stored. Also as stored: an id this Hive doesn't know (storedLineText's
+ * null), and a comment whose English is agents' own words rather than its message's (`own`, below).
  */
 // agent-text: HISTORY (each line by its stored id)
 setStoredForAgents((english, stored) => {
-  if (!overridesAny(storedIds(stored)) || storedLineText(stored, agentEnglish, lineMessage) !== english) return english
+  if (!overridesAny(storedIds(stored)) || agentsOwn(stored)) return english
   return storedLineText(stored, (m, values) => agentText(agentColumns(m, values)), lineMessage) ?? english
 })
+
+/**
+ * Whether a comment's English is agents' own words, not its message's (HI-2087: the queue's return comment tells agents
+ * what came back and what to do next, which the window's message doesn't): marked `own` when written (commentAsHive);
+ * a return comment from before the mark always was.
+ */
+const agentsOwn = (stored: unknown): boolean => {
+  const s = stored as Partial<StoredText> | null
+  return !!s && (s.own === true || s.id === HISTORY.queueReturned.id)
+}
 
 /** A board error naming columns: the window's words in its language, agents' as before (agentColumns), in their dialect. */
 export const columnError = (m: Msg, values: TextValues, options?: { kind?: HiveErrorKind }): HiveError => new HiveError(forAgents(withValues(m, values), agentColumns(m, values)), options)
@@ -2583,7 +2593,8 @@ export async function commentAsHive(n: number, said: string | StoredText | { tex
     const card = await getTask(n, ws)
     // `key` (HI-2014): the comment's id, written once on the card: a retry finds it and writes nothing.
     if (card.archived || !still(card) || (key && card.comments.some((c) => c.id === key))) return false
-    if (typeof said !== 'string' && 'shown' in said) addComment(card, BY.hive, said.text, said.shown, key)
+    // Agents' English beside the window's message: marked own where it isn't that message's (storedForAgents keeps it).
+    if (typeof said !== 'string' && 'shown' in said) addComment(card, BY.hive, said.text, said.text === englishSaid(said.shown) ? said.shown : { ...said.shown, own: true }, key)
     else addComment(card, BY.hive, typeof said === 'string' ? said : englishSaid(said), typeof said === 'string' ? undefined : said, key)
     await saveCard(ws, n, card)
     changed(ws)

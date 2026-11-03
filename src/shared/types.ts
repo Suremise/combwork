@@ -56,6 +56,8 @@ export interface StoredText {
   id: string
   /** A value can be a message of its own (#866: a CLI's sentence in a comment Hive writes), formatted in the same language. */
   values?: Record<string, string | number | StoredText>
+  /** On Hive's comment: its English is agents' own words, not this message's (HI-2087), so agents read it as stored (HI-2440). */
+  own?: true
 }
 /** The window's text as data beside an English field (above), by name: what the Agent API leaves out of its replies. */
 export type WindowTextField =

@@ -183,6 +183,25 @@ describe("the guard's rules for window messages agents read", () => {
     expect(lines(r, /^MARK LEADS NOWHERE/)).toEqual([expect.stringMatching(/^MARK LEADS NOWHERE src\/main\/somewhere\.ts:3 {2}agent-text: NOTHING_HERE/)])
   }, 60_000)
 
+  it('knows a formatter or HiveError by what it is, not what it is called: an import alias, a namespace, a re-export', async () => {
+    const ERROR = 'src/main/hiveError.ts'
+    const t = tree({ [ADVANCED]: STUB, [ERROR]: `export class HiveError extends Error {}\n`, 'src/main/texts.ts': M, [OTHER]: `import { M } from './texts'\nexport const a = () => M.gone\n` })
+    expect(t.run().exit).toBe(0)
+    t.write(OTHER, `import { M } from './texts'\nimport { englishText as render, agentText as forAgent } from '../shared/advanced'\nimport { HiveError as Refused } from './hiveError'\nexport const a = () => ({ error: render(M.gone) })\nexport const b = (o: { text: never }) => forAgent(o.text)\nexport const c = (o: { text: never }) => new Refused(o.text)\nexport const d = () => forAgent(M.busy)\n`)
+    let r = t.run()
+    expect(r.exit).toBe(1)
+    expect(lines(r, /^NEW AGENT TEXT/).sort()).toEqual(['NEW AGENT TEXT src/main/somewhere.ts:4  oneway|englishText|M.gone', 'NEW AGENT TEXT src/main/somewhere.ts:5  unresolved|forAgent|o.text', 'NEW AGENT TEXT src/main/somewhere.ts:6  unresolved|Refused|o.text'])
+    expect(Object.keys((await both(t.root)).messages).sort()).toEqual(['main.test.busy', 'main.test.gone'])
+    // A namespace import, and a re-export under another name.
+    t.write('src/main/fmt.ts', `export { englishText as fmt } from '../shared/advanced'\n`)
+    t.write(OTHER, `import { M } from './texts'\nimport * as A from '../shared/advanced'\nimport { fmt } from './fmt'\nexport const a = () => ({ error: A.englishText(M.gone) })\nexport const b = () => ({ error: fmt(M.busy) })\n`)
+    r = t.run()
+    expect(lines(r, /^NEW AGENT TEXT/).sort()).toEqual(['NEW AGENT TEXT src/main/somewhere.ts:4  oneway|englishText|M.gone', 'NEW AGENT TEXT src/main/somewhere.ts:5  oneway|englishText|M.busy'])
+    // A function of the same name that isn't the formatter is no such call.
+    t.write(OTHER, `const englishText = (s: string): string => s.toUpperCase()\nexport const a = () => ({ error: englishText('ok') })\n`)
+    expect(t.run().exit).toBe(0)
+  }, 60_000)
+
   it("fails English formatted for agents outside the agent-text module; the log, the window and a stored text's renderer pass", () => {
     const t = tree({ [ADVANCED]: STUB, 'src/main/texts.ts': M, [OTHER]: `import { M } from './texts'\nimport { agentText } from '../shared/advanced'\nexport const r = () => ({ reason: agentText(M.gone) })\n` })
     expect(t.run().exit).toBe(0)
