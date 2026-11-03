@@ -140,14 +140,14 @@ const check = (name, ok, extra = '') => {
   script('Reviewer', [`work 1 then ${wait(c1, { column: 'passed' })}`])
   await inv('tasks:update', c1, { column: 'doing' })
   await inv('tasks:update', c1, { column: 'review' })
-  const reason = `Reviewer hasn't taken the wake Combwork typed for #${c1}: it waits in its prompt.`
+  const reason = `Reviewer hasn't taken the wake Hive typed for #${c1}: it waits in its prompt.`
   check('a wake never taken: after the grace, the card is stalled, saying who and why', !!(await until(async () => (await stalledOf(c1)) === reason, 30000)), String(await stalledOf(c1)))
   check('…naming the card by key alone (#1219, HI-1661)', lib.KEYED.test(String(await rawStalled(c1))), String(await rawStalled(c1)))
   check('…the line was never sent, and Combwork says so', !!(await until(async () => /still wasn't taken/.test(hiveLog()), 8000)) && wakes('Reviewer').length === 1)
   check('…the reviewer shows idle, with the card it left', ['ready', 'finished'].includes((await live(reviewer.id))?.status) && JSON.stringify((await live(reviewer.id))?.notWatching) === JSON.stringify([c1]), JSON.stringify(await live(reviewer.id)))
   await page.getByRole('button', { name: 'Task Board' }).click()
   const tile = page.locator(`.task-card[data-task="${c1}"]`)
-  check('the board shows the card stalled', !!(await until(async () => /Stalled: Reviewer hasn't taken the wake Combwork typed/.test((await tile.innerText().catch(() => '')) ?? ''), 8000)), await tile.innerText().catch(() => ''))
+  check('the board shows the card stalled', !!(await until(async () => /Stalled: Reviewer hasn't taken the wake Hive typed/.test((await tile.innerText().catch(() => '')) ?? ''), 8000)), await tile.innerText().catch(() => ''))
   await page.screenshot({ path: path.join(lib.WORK, 'loopwatch-stalled.png') })
   // Windows notifications only: each tell() also logs an `entry` line (HI-2320), not a second notice (HI-2369). Any line
   // counts for "isn't watching" below, a bell-only notice too.

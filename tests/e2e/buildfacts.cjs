@@ -93,7 +93,7 @@ const builds = async (inv) => (await inv('journal:browse', { source: 'hive' })).
     await lib.openWorkspace(inv, page, ws)
     check('opening the workspace records it', !!(await lib.until(async () => (await builds(inv)).length === 2, HUNG_MS)), JSON.stringify(await builds(inv)))
     check('…and takes the marker away', !!(await lib.until(() => fs.readdirSync(markers).length === 0, HUNG_MS)), JSON.stringify(fs.readdirSync(markers)))
-    await page.locator('.activity-btn[aria-label="Assistant"]').click()
+    await page.locator('.activity-btn[aria-label="Assistent"]').click()
     await page.locator('.row[data-section="journal"]').click()
     const german = page.locator('.journal .journal-row', { hasText: `Combwork 9.9.9-rc.1 (Baseline) aus ${head().slice(0, 8)} auf main gebaut` })
     check('in German, Journal → Timeline shows both builds in German', !!(await lib.until(async () => (await german.count()) === 2, HUNG_MS)), await page.locator('.journal').innerText().catch(() => ''))

@@ -36,7 +36,7 @@ const logText = () => (fs.existsSync(logFile) ? fs.readFileSync(logFile, 'utf8')
 /** The log since the last start: this run's lines. */
 const thisRun = () => {
   const text = logText()
-  const at = text.lastIndexOf('] Combwork ')
+  const at = text.lastIndexOf('] Hive ')
   return at < 0 ? '' : text.slice(text.lastIndexOf('\n', at) + 1)
 }
 /**
@@ -150,7 +150,7 @@ const liveAgent = async (inv, agentId) => (await inv('session:live')).find((l) =
       const home = (await inv('workspace:refresh'))?.assistant?.path
       const told = () => {
         try {
-          return require('./storeDocs.cjs').deliveriesOf(home).find((r) => r.agentId === 'assistant' && r.from?.kind === 'hive' && /Combwork closed unexpectedly: last seen/.test(r.body))
+          return require('./storeDocs.cjs').deliveriesOf(home).find((r) => r.agentId === 'assistant' && r.from?.kind === 'hive' && /Hive closed unexpectedly: last seen/.test(r.body))
         } catch {
           return null
         }
