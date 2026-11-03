@@ -6,7 +6,7 @@
 // fs/promises' open: `beforeWrite` runs before the copy writes a file whose path it matches; `deny` refuses reads.
 import { existsSync, mkdirSync, readFileSync, readdirSync, rmSync, writeFileSync, appendFileSync } from 'fs'
 import { join } from 'path'
-import { afterAll, beforeEach, describe, expect, it, vi } from 'vitest'
+import { afterAll, beforeAll, beforeEach, describe, expect, it, vi } from 'vitest'
 import { tempDir } from './tempDir'
 
 const hooks: { beforeWrite: null | { match: RegExp; run: () => void }; deny: RegExp | null; writes: 'short' | 'none' | null; writeCalls: number } = { beforeWrite: null, deny: null, writes: null, writeCalls: 0 }
@@ -42,14 +42,30 @@ vi.mock('fs/promises', async (original) => {
   }
 })
 
-const { contentHash, swapIn } = await import('../src/main/fsutil')
+const { contentHash, HASH_LIMITS, swapIn } = await import('../src/main/fsutil')
 const { codex } = await import('../src/main/providers/codex/adapter')
 const { claudeCode } = await import('../src/main/providers/claude/adapter')
 ;(codex as unknown as { checkHookHashes: () => Promise<void> }).checkHookHashes = async () => undefined
 type Delivery = { revision: string | null; problem?: string; lasting?: true }
 
+// The entry and byte limits lowered for this file (HI-2453), as revisions.test.ts does (#215, #666): the copy and the
+// check read HASH_LIMITS as they go, so the same limits are kept over a tenth of the files and a 1 MB file. At Hive's own
+// 2000 entries and 64 MB a test wrote and copied 2000 files or 65 MB, and under a loaded full run one passed even its
+// 180 s bound. The real values are checked below, before they are lowered.
+const HIVE_LIMITS = { ...HASH_LIMITS }
+const LIMITS = { entries: 200, depth: HASH_LIMITS.depth, bytes: 1024 * 1024 }
+beforeAll(() => {
+  Object.assign(HASH_LIMITS, LIMITS)
+})
+afterAll(() => {
+  Object.assign(HASH_LIMITS, HIVE_LIMITS)
+})
+
+it("Hive's own limits, lowered for this file: 2000 entries, 12 folders deep, 64 MB", () => {
+  expect(HIVE_LIMITS).toEqual({ entries: 2000, depth: 12, bytes: 64 * MB })
+})
+
 const base = tempDir('hive-copy-limits-')
-afterAll(() => rmSync(base, { recursive: true, force: true }))
 beforeEach(() => {
   hooks.beforeWrite = null
   hooks.deny = null
@@ -71,9 +87,9 @@ function source(root: string, name: string, text = 'v1'): string {
 }
 /** Growth and changes, made while the copy writes its first file (a.md: the first in the folder's order). */
 const changes = {
-  bytes: (src: string) => appendFileSync(join(src, 'data.bin'), Buffer.alloc(65 * MB, 1)),
+  bytes: (src: string) => appendFileSync(join(src, 'data.bin'), Buffer.alloc(LIMITS.bytes + MB, 1)),
   entries: (src: string) => {
-    for (let i = 0; i < 2100; i++) writeFileSync(join(src, 'refs', `r${i}.md`), '')
+    for (let i = 0; i < LIMITS.entries + 100; i++) writeFileSync(join(src, 'refs', `r${i}.md`), '')
   },
   depth: (src: string) => mkdirSync(join(src, 'refs', ...'abcdefghijklm'.split('')), { recursive: true }),
   vanish: (src: string) => rmSync(join(src, 'b.md')),
@@ -84,8 +100,8 @@ const changes = {
   valid: (src: string) => writeFileSync(join(src, 'b.md'), 'b, edited while it was being copied')
 }
 const reason = {
-  bytes: 'it is too big for Hive to check (it is over 64 MB)',
-  entries: 'it is too big for Hive to check (it has more than 2000 files and folders)',
+  bytes: 'it is too big for Hive to check (it is over 1 MB)',
+  entries: 'it is too big for Hive to check (it has more than 200 files and folders)',
   depth: 'it is too big for Hive to check (it has folders more than 12 deep)',
   vanish: 'a file in it went while it was being copied',
   unreadable: 'its folder in the workspace could not be read (access denied)'
@@ -264,29 +280,29 @@ describe('a skill at the entry limit', () => {
   const launchClaude = (project: string, skills: { name: string; sourcePath: string }[]) =>
     claudeCode.prepareLaunch({ projectPath: project, agentId: 'a1', cwd: project, skills, mcpServers: {}, hookUrl: 'http://127.0.0.1:9/hook?run=x', env: {}, extraArgs: [], hookAuthFile: 'C:/hive/hook-auth/x.txt', privateDir: `${project}-private` } as never) as Promise<Record<string, Delivery>>
 
-  // 2000 entries are real file work, not a wait (#356): about 2.3 s idle (writing them, copying them twice, hashing),
-  // and 5 to 60+ s when the machine is busy with other suites. Nothing here waits on a condition, so the limit is the
-  // honest slowest run, not a race: 180 s. The test hashes the 2000 only once itself (HI-2423: a full run beside other
-  // lanes' reached the limit): the next launch's revision is its copy's own hash, so its equal to the first, the
-  // source's, says the copy is the source.
-  it("Codex: exactly 2000 is delivered, marker and all, and stays delivered on the next launch", async () => {
+  // At the file's lowered limit (LIMITS, above), not Hive's 2000: the same boundary over a tenth of the file work, which
+  // at 2000 passed even a 180 s bound under a loaded full run (#356, HI-2423, HI-2453). The test hashes the source only
+  // once itself: the next launch's revision is its copy's own hash, so its equal to the first, the source's, says the
+  // copy is the source.
+  const full = LIMITS.entries
+  it('Codex: exactly the limit is delivered, marker and all, and stays delivered on the next launch', async () => {
     const root = join(base, 'limit-codex')
     const cwd = join(root, 'project')
     mkdirSync(cwd, { recursive: true })
-    const s = sized(root, 'full', 2000)
+    const s = sized(root, 'full', full)
     const first = await launchCodex(cwd, [{ name: 'full', sourcePath: s }])
     const copy = join(cwd, '.agents', 'skills', 'hive-full')
     expect(existsSync(join(copy, '.hive-copy'))).toBe(true)
     expect(first.full).toEqual({ revision: await contentHash(s) })
     expect(await launchCodex(cwd, [{ name: 'full', sourcePath: s }])).toEqual(first)
-  }, 180_000)
+  })
 
-  it('Codex: 2001 is too big, first delivery (none) and update (the old copy kept), with a later skill delivered', async () => {
+  it('Codex: one more than the limit is too big, first delivery (none) and update (the old copy kept), with a later skill delivered', async () => {
     const root = join(base, 'over-codex')
     const cwd = join(root, 'project')
     mkdirSync(cwd, { recursive: true })
     const ok = source(root, 'ok')
-    const big = sized(root, 'big', 2001)
+    const big = sized(root, 'big', full + 1)
     const first = await launchCodex(cwd, [{ name: 'big', sourcePath: big }, { name: 'ok', sourcePath: ok }])
     expect(first.big).toEqual({ revision: null, problem: reason.entries, lasting: true })
     expect(existsSync(join(cwd, '.agents', 'skills', 'hive-big'))).toBe(false)
@@ -296,25 +312,22 @@ describe('a skill at the entry limit', () => {
     await launchCodex(cwd, [{ name: 'grows', sourcePath: grows }])
     const copy = join(cwd, '.agents', 'skills', 'hive-grows')
     const old = await contentHash(copy)
-    for (let i = 0; i < 1996; i++) writeFileSync(join(grows, 'refs', `r${i}.md`), '')
+    for (let i = 0; i < full - 4; i++) writeFileSync(join(grows, 'refs', `r${i}.md`), '')
     const update = await launchCodex(cwd, [{ name: 'grows', sourcePath: grows }])
     expect(update.grows).toEqual({ revision: old, problem: `${reason.entries}, so it kept its old copy`, lasting: true })
     expect(await contentHash(copy)).toBe(old)
-  }, 60_000)
+  })
 
-  // 2000 entries are real file work, not a wait (#356): about 2.3 s idle (writing them, copying them twice, hashing),
-  // and 5 to 60+ s when the machine is busy with other suites. Nothing here waits on a condition, so the limit is the
-  // honest slowest run, not a race: 180 s.
-  it('Claude Code: exactly 2000 is delivered; 2001 is not, and says why', async () => {
+  it('Claude Code: exactly the limit is delivered; one more is not, and says why', async () => {
     const root = join(base, 'limit-claude')
     const project = join(root, 'project')
     mkdirSync(project, { recursive: true })
-    const full = sized(root, 'full', 2000)
-    const big = sized(root, 'big', 2001)
-    const out = await launchClaude(project, [{ name: 'full', sourcePath: full }, { name: 'big', sourcePath: big }])
+    const atLimit = sized(root, 'full', full)
+    const big = sized(root, 'big', full + 1)
+    const out = await launchClaude(project, [{ name: 'full', sourcePath: atLimit }, { name: 'big', sourcePath: big }])
     const skills = join(project, '.hive', 'launch-a1', 'plugin', 'skills')
-    expect(out.full).toEqual({ revision: await contentHash(full) })
+    expect(out.full).toEqual({ revision: await contentHash(atLimit) })
     expect(out.big).toEqual({ revision: null, problem: reason.entries, lasting: true })
     expect(existsSync(join(skills, 'big'))).toBe(false)
-  }, 180_000)
+  })
 })
