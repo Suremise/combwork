@@ -1295,7 +1295,7 @@
     "audience": "both"
   },
   "settings.advanced.data.desc": {
-    "text": "Hive keeps its settings in %APPDATA%\\Hive\\config.json.",
+    "text": "Hive keeps its settings in %APPDATA%\\Combwork\\config.json.",
     "note": "What the setting \"Settings file\" does, under its title (Settings → Advanced).",
     "audience": "both"
   },
@@ -2874,7 +2874,7 @@
     "audience": "both"
   },
   "settings.agentApi.token.tip": {
-    "text": "Stored in %APPDATA%\\Hive\\agent-api.json, for your own scripts. Agents never get it: each session gets a token of its own, in the file that HIVE_API_TOKEN_FILE names.",
+    "text": "Stored in %APPDATA%\\Combwork\\agent-api.json, for your own scripts. Agents never get it: each session gets a token of its own, in the file that HIVE_API_TOKEN_FILE names.",
     "note": "The info tip of the setting \"Access token\" (Settings → Agent API): more on what it does and when it applies. HIVE_API_TOKEN_FILE is an environment variable name: keep it as it is.",
     "audience": "both"
   },
@@ -2889,7 +2889,7 @@
     "audience": "both"
   },
   "settings.agentApi.viewers.tip": {
-    "text": "Name each one for its app. Stored in %APPDATA%\\Hive\\agent-api-viewers.json. Revoking one cuts its app off at once. Apps find a running Hive by %APPDATA%\\Hive\\agent-api-discovery.json (the address, no token).",
+    "text": "Name each one for its app. Stored in %APPDATA%\\Combwork\\agent-api-viewers.json. Revoking one cuts its app off at once. Apps find a running Hive by %APPDATA%\\Combwork\\agent-api-discovery.json (the address, no token).",
     "note": "The info tip of the setting \"Viewer tokens\" (Settings → Agent API): more on what it does and when it applies.",
     "audience": "both"
   },
