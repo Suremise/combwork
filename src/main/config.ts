@@ -79,7 +79,7 @@ class ConfigStore {
 
   load(): void {
     // A damaged file is set aside and its last good copy (.bak) used; only with neither does Hive start fresh.
-    const raw = readKeptJsonSync<Record<string, any> | null>(this.path, null)
+    const raw = readKeptJsonSync<Record<string, any> | null>(this.path, null, { holder: this })
     if (!raw || typeof raw !== 'object') {
       this.data = structuredClone(DEFAULT_APP_CONFIG)
     } else {
@@ -339,7 +339,7 @@ class ConfigStore {
         await writeTextAtomic(this.statePath, text)
         this.stateWritten = text
       }
-      await writeKeptJson(this.path, saved, { compact: true, bakOncePerRun: true })
+      await writeKeptJson(this.path, saved, { compact: true, bakOncePerRun: true, holder: this })
       return true
     } catch (e) {
       log.error('Failed to save config', e)

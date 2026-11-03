@@ -56,6 +56,8 @@ const { KEPT_TRIES, KeptFileUnreadable, readKeptJson, readKeptJsonSync, retryWhi
 vi.setConfig({ testTimeout: 30_000 })
 
 const lock = (f: string): void => void reads.locked.add(f.toLowerCase())
+/** A kept file's text as writeKeptJson writes it. */
+const pretty = (v: unknown): string => JSON.stringify(v, null, 2) + '\n'
 function bytes(f: string): { file: string; bak: string } {
   reads.peeking = true
   try {
@@ -88,46 +90,64 @@ describe('a kept file that is there but unreadable (HI-2414)', () => {
     await expect(readKeptJson(f, {}, { unsettled: 'throw' })).resolves.toEqual({ n: 1 })
   })
 
-  it("a plain read gives its .bak's value, and nothing is written over it until a read succeeds again", async () => {
+  it("a plain read gives its .bak's value; a holder's saves are refused until its own read succeeds again", async () => {
     const f = await saved({ agents: ['a'], id: 'p1' })
     const before = bytes(f)
+    // The .bak older than the file (written separately, or an edit outside Hive): what a stale holder would save.
+    writeFileSync(`${f}.bak`, JSON.stringify({ agents: [] }))
+    const older = bytes(f)
+    const holder = {}
     lock(f)
-    await expect(readKeptJson(f, {})).resolves.toEqual({ agents: ['a'], id: 'p1' })
-    // Without a .bak: the caller's default for the read, still never written over the file.
+    await expect(readKeptJson(f, {}, { holder })).resolves.toEqual({ agents: [] })
+    // Without a .bak: the caller's default for the read.
     rmSync(`${f}.bak`)
     await expect(readKeptJson(f, { fresh: true })).resolves.toEqual({ fresh: true })
-    writeFileSync(`${f}.bak`, before.bak)
-    await expect(writeKeptJson(f, { fresh: true })).rejects.toBeInstanceOf(KeptFileUnreadable)
-    expect(bytes(f)).toEqual(before)
-    // Readable again: read, then saved as usual.
+    writeFileSync(`${f}.bak`, older.bak)
+    await expect(writeKeptJson(f, { agents: [], chime: 'on' }, { holder })).rejects.toBeInstanceOf(KeptFileUnreadable)
+    expect(bytes(f)).toEqual(older)
+    // Readable again, and read by someone else (HR3's round 1): that proves nothing about what the holder keeps.
     reads.locked.clear()
-    await expect(writeKeptJson(f, { fresh: true })).rejects.toBeInstanceOf(KeptFileUnreadable)
     await expect(readKeptJson(f, {})).resolves.toEqual({ agents: ['a'], id: 'p1' })
-    await writeKeptJson(f, { agents: ['a'], id: 'p1', chime: 'on' })
+    expect(readKeptJsonSync(f, null)).toEqual({ agents: ['a'], id: 'p1' })
+    await expect(writeKeptJson(f, { agents: [], chime: 'on' }, { holder })).rejects.toBeInstanceOf(KeptFileUnreadable)
+    expect(bytes(f)).toEqual(older)
+    // Another holder, and a write naming none (a change read for itself), aren't held back by this one.
+    await writeKeptJson(f, { agents: ['a'], id: 'p1' }, { holder: {} })
+    expect(bytes(f).file).toBe(before.file)
+    // The holder's own read: its saves go through again.
+    await expect(readKeptJson(f, {}, { holder })).resolves.toEqual({ agents: ['a'], id: 'p1' })
+    await writeKeptJson(f, { agents: ['a'], id: 'p1', chime: 'on' }, { holder })
     expect(JSON.parse(readFileSync(f, 'utf8'))).toEqual({ agents: ['a'], id: 'p1', chime: 'on' })
   })
 
   it('the synchronous read (config.json) the same way', async () => {
     const f = await saved({ settings: { theme: 'dark' } })
     const before = bytes(f)
+    const holder = {}
     lock(f)
-    expect(readKeptJsonSync(f, null)).toEqual({ settings: { theme: 'dark' } })
-    await expect(writeKeptJson(f, { settings: {} }, { compact: true, bakOncePerRun: true })).rejects.toBeInstanceOf(KeptFileUnreadable)
+    expect(readKeptJsonSync(f, null, { holder })).toEqual({ settings: { theme: 'dark' } })
+    reads.locked.clear()
+    await readKeptJson(f, null)
+    await expect(writeKeptJson(f, { settings: {} }, { compact: true, bakOncePerRun: true, holder })).rejects.toBeInstanceOf(KeptFileUnreadable)
     expect(bytes(f)).toEqual(before)
+    expect(readKeptJsonSync(f, null, { holder })).toEqual({ settings: { theme: 'dark' } })
+    await writeKeptJson(f, { settings: { theme: 'light' } }, { compact: true, holder })
+    expect(JSON.parse(readFileSync(f, 'utf8'))).toEqual({ settings: { theme: 'light' } })
   })
 
   it('a file that is gone is still new: the default, and written as usual', async () => {
     const f = join(dir, 'new.json')
+    const holder = {}
     await expect(readKeptJson(f, { fresh: true }, { unsettled: 'throw' })).resolves.toEqual({ fresh: true })
-    expect(readKeptJsonSync(f, null)).toBeNull()
-    await writeKeptJson(f, { fresh: true })
-    expect(bytes(f)).toEqual({ file: '{\n  "fresh": true\n}\n', bak: '{\n  "fresh": true\n}\n' })
-    // Unreadable once, then deleted: no longer kept from being written.
+    expect(readKeptJsonSync(f, null, { holder })).toBeNull()
+    await writeKeptJson(f, { fresh: true }, { holder })
+    expect(bytes(f)).toEqual({ file: pretty({ fresh: true }), bak: pretty({ fresh: true }) })
+    // Unreadable once, then deleted: no longer held back.
     lock(f)
-    await readKeptJson(f, {})
+    await readKeptJson(f, {}, { holder })
     rmSync(f)
     reads.locked.clear()
-    await writeKeptJson(f, { again: true })
+    await writeKeptJson(f, { again: true }, { holder })
     expect(JSON.parse(readFileSync(f, 'utf8'))).toEqual({ again: true })
   })
 
@@ -167,5 +187,33 @@ describe('a project setting saved while project.json is unreadable (HI-2414)', (
     const cfg = await w.updateProjectConfig(alpha, { chime: 'off' })
     expect(cfg.chime).toBe('off')
     expect(JSON.parse(readFileSync(file, 'utf8')).agents.map((a: { id: string }) => a.id)).toEqual(['a1'])
+  })
+})
+
+describe("workspace.json unreadable when its workspace opens (HI-2414, HR3's round 1)", () => {
+  it('its settings are never saved from the .bak, even once another reader has read the file', async () => {
+    const ws = join(base, 'ws-settings')
+    const file = join(ws, '.hive', 'workspace.json')
+    mkdirSync(join(ws, '.hive'), { recursive: true })
+    // The file has a server turned on; its .bak, from before, doesn't.
+    const saved = { version: 1, mcp: { enabled: ['saved-server'] } }
+    writeFileSync(file, pretty(saved))
+    writeFileSync(`${file}.bak`, pretty({ version: 1, mcp: { enabled: [] } }))
+    const before = bytes(file)
+    const w = createWorkspaceService()
+    onTestFinished(() => disposeWorkspaceService(w))
+    lock(file)
+    await w.open(ws)
+    reads.locked.clear()
+    // Another reader (the journal's, the accounts') reads the file as it is.
+    await expect(readKeptJson(file, {})).resolves.toMatchObject({ mcp: { enabled: ['saved-server'] } })
+    await expect(w.saveWorkspaceConfig()).rejects.toBeInstanceOf(KeptFileUnreadable)
+    await expect(w.saveWorkspaceConfigWith(() => ({}))).rejects.toBeInstanceOf(KeptFileUnreadable)
+    expect(bytes(file)).toEqual(before)
+    // Read again by the workspace (workspace.json changed on disk): saved as usual, its server kept.
+    writeFileSync(file, JSON.stringify(saved))
+    await (w as unknown as { reloadConfig: () => Promise<void> }).reloadConfig()
+    await w.saveWorkspaceConfig()
+    expect(JSON.parse(readFileSync(file, 'utf8')).mcp.enabled).toEqual(['saved-server'])
   })
 })

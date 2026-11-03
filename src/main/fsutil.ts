@@ -175,8 +175,13 @@ export class KeptFileUnreadable extends HiveError {
   }
 }
 
-/** How a read for a change treats a file still changing after the pauses: as today (the .bak's value), or `throw` (KeptFileBusy). */
-export type KeptReadOptions = { unsettled?: 'bak' | 'throw' }
+/**
+ * How a read treats a file still changing after the pauses: as today (the .bak's value), or `throw` (KeptFileBusy, for a
+ * change). `holder`: what keeps the value read to save it whole later (HI-2414: the settings object of config.json or
+ * workspace.json), passed to writeKeptJson too: given the .bak's value for an unreadable file, its saves are refused
+ * until its own read succeeds again.
+ */
+export type KeptReadOptions = { unsettled?: 'bak' | 'throw'; holder?: object }
 
 /** How many times in all `retryWhileSaving` runs a change (each read waits out the pauses first, about 1 s). */
 export const KEPT_TRIES = 3
@@ -217,11 +222,23 @@ function keptGoneSync(path: string): boolean {
 }
 
 /**
- * Kept files whose last read failed with the file there (HI-2414), by lower-case path: what that read gave was the
- * .bak's value or the caller's default, not the file's, so writeKeptJson refuses to write over them until a read of the
- * file succeeds again (or it is gone).
+ * The holders (KeptReadOptions.holder) whose last read of a kept file found it there but unreadable (HI-2414), by
+ * lower-case path: what they keep is the .bak's value or the caller's default, not the file's, so writeKeptJson refuses
+ * their saves of it until that holder's own read succeeds again (or the file is gone). Another reader's read proves
+ * nothing about what a holder keeps, so it never lets one go.
  */
-const unreadable = new Set<string>()
+const staleHolders = new Map<string, Set<object>>()
+
+/** Marks or lets go of a holder's value of a kept file: read from somewhere other than the file (`stale`), or from it. */
+function holderRead(path: string, holder: object | undefined, stale: boolean): void {
+  if (!holder) return
+  const k = path.toLowerCase()
+  const set = staleHolders.get(k)
+  if (stale) {
+    if (set) set.add(holder)
+    else staleHolders.set(k, new Set([holder]))
+  } else if (set?.delete(holder) && !set.size) staleHolders.delete(k)
+}
 
 /**
  * A kept file's text, read again after the pauses while it can't be read (a lock held for a moment); null when it isn't
@@ -241,16 +258,16 @@ async function readKeptText(path: string): Promise<string | null> {
 
 /**
  * A kept file that is there and couldn't be read (HI-2414). Read for a change, KeptFileUnreadable; otherwise its .bak's
- * value for this read (the caller's default without one), and the file is marked so nothing is written over it.
+ * value for this read (the caller's default without one), and a holder's saves of it are refused until it reads it again.
  */
-function unreadableValue<T>(path: string, e: unknown, bak: string | null, fallback: T, refuse: boolean): T {
+function unreadableValue<T>(path: string, e: unknown, bak: string | null, fallback: T, refuse: boolean, holder?: object): T {
   const code = (e as NodeJS.ErrnoException)?.code ?? 'no code' // i18n-ignore: log text
   if (refuse) {
     log.warn(`${userText(path)} couldn't be read (${code}): a change to it waits for it, nothing written`)
     throw new KeptFileUnreadable(path)
   }
-  log.warn(`${userText(path)} couldn't be read (${code}): its last good copy is used for now, and it isn't written over until it is read again`)
-  unreadable.add(path.toLowerCase())
+  log.warn(`${userText(path)} couldn't be read (${code}): its last good copy is used for now${holder ? ', and it is not saved over until it is read again' : ''}`)
+  holderRead(path, holder, true)
   const ok = bak === null ? null : parses(bak)
   return ok ? (ok.value as T) : fallback
 }
@@ -268,10 +285,10 @@ export async function readKeptJson<T>(path: string, fallback: T, opts: KeptReadO
   } catch (e) {
     // There, but not readable (HI-2414): never the caller's default as if it were new.
     const bak = refuse ? null : await readFile(`${path}.bak`, 'utf8').catch(() => null)
-    return unreadableValue(path, e, bak, fallback, refuse)
+    return unreadableValue(path, e, bak, fallback, refuse, opts.holder)
   }
-  // Read (or not there): what this gives is the file's, so it can be written over again.
-  unreadable.delete(path.toLowerCase())
+  // Read (or not there): what this gives its holder is the file's, so it can save it again.
+  holderRead(path, opts.holder, false)
   // Missing: the caller's default, as before. Nothing is set aside.
   if (text === null) return fallback
   try {
@@ -282,7 +299,7 @@ export async function readKeptJson<T>(path: string, fallback: T, opts: KeptReadO
       if (await keptGone(path)) return fallback
       // Unreadable while it was read again: as above.
       const bak = refuse ? null : await readFile(`${path}.bak`, 'utf8').catch(() => null)
-      return unreadableValue(path, new Error('unreadable while settling'), bak, fallback, refuse) // i18n-ignore: log text
+      return unreadableValue(path, new Error('unreadable while settling'), bak, fallback, refuse, opts.holder) // i18n-ignore: log text
     }
     if (typeof settled === 'object') return settled.value as T
     if (settled === 'unsettled' && opts.unsettled === 'throw') {
@@ -332,8 +349,8 @@ export async function readKeptJsonByStat<T, D>(path: string, fallback: T, derive
   if (st && kept && kept.derive === derive && kept.mtimeMs === st.mtimeMs && kept.size === st.size && kept.ino === st.ino) {
     // Read again: the most recently read now.
     keptByStat.set(key, kept)
-    // The file's value (HI-2414: it can be written over).
-    unreadable.delete(key)
+    // The file's value (HI-2414): its holder can save it again.
+    holderRead(path, opts.holder, false)
     return structuredClone(kept.derived) as D
   }
   if (!st) return derive(await readKeptJson(path, fallback, opts))
@@ -345,7 +362,7 @@ export async function readKeptJsonByStat<T, D>(path: string, fallback: T, derive
   } catch {
     return derive(await readKeptJson(path, fallback, opts))
   }
-  unreadable.delete(key)
+  holderRead(path, opts.holder, false)
   const derived = derive(value)
   if (st.mtimeMs < asked - KEPT_RACY_MS) {
     keptByStat.set(key, { mtimeMs: st.mtimeMs, size: st.size, ino: st.ino, derive, derived: structuredClone(derived) })
@@ -358,9 +375,9 @@ export async function readKeptJsonByStat<T, D>(path: string, fallback: T, derive
 }
 
 /** The same, for reads at startup that must be synchronous (config.json). */
-export function readKeptJsonSync<T>(path: string, fallback: T): T {
+export function readKeptJsonSync<T>(path: string, fallback: T, opts: { holder?: object } = {}): T {
   // Marked (HI-1692): read at start, and settled with pauses when it doesn't parse.
-  return timedStep(`kept file read ${basename(path)}`, () => readKeptJsonSyncNow(path, fallback))
+  return timedStep(`kept file read ${basename(path)}`, () => readKeptJsonSyncNow(path, fallback, opts.holder))
 }
 
 function readBakSync(path: string): string | null {
@@ -372,23 +389,23 @@ function readBakSync(path: string): string | null {
   }
 }
 
-function readKeptJsonSyncNow<T>(path: string, fallback: T): T {
+function readKeptJsonSyncNow<T>(path: string, fallback: T, holder?: object): T {
   let text: string
   try {
     text = readFileSync(path, 'utf8')
   } catch (e) {
-    // There, but not readable (HI-2414): its .bak's value, and not written over until it is read again. No pauses: this
-    // blocks the thread.
-    if (!absent(e)) return unreadableValue(path, e, readBakSync(path), fallback, false)
-    unreadable.delete(path.toLowerCase())
+    // There, but not readable (HI-2414): its .bak's value, and its holder's saves refused until it reads it again. No
+    // pauses: this blocks the thread.
+    if (!absent(e)) return unreadableValue(path, e, readBakSync(path), fallback, false, holder)
+    holderRead(path, holder, false)
     return fallback
   }
-  unreadable.delete(path.toLowerCase())
+  holderRead(path, holder, false)
   try {
     return JSON.parse(text) as T
   } catch {
     const settled = settleSync(path)
-    if (settled === 'missing') return keptGoneSync(path) ? fallback : unreadableValue(path, new Error('unreadable while settling'), readBakSync(path), fallback, false) // i18n-ignore: log text
+    if (settled === 'missing') return keptGoneSync(path) ? fallback : unreadableValue(path, new Error('unreadable while settling'), readBakSync(path), fallback, false, holder) // i18n-ignore: log text
     if (typeof settled === 'object') return settled.value as T
     const bak = readBakSync(path)
     if (settled === 'unsettled') return unsettled(path, bak, fallback)
@@ -475,18 +492,18 @@ const backedUp = new Set<string>()
  * of the run (#1111: config.json, saved often, then costs one write a save, not two). `existing`: its folder isn't made,
  * so a file whose folder went (moved or deleted) fails with ENOENT rather than bringing the folder back (HI-1817).
  *
- * A file whose last read found it there but unreadable (HI-2414) isn't written over, nor its .bak: what was read
- * instead wasn't its value, so this save could replace settings it never saw. KeptFileUnreadable, until a read of it
- * succeeds again (or it is gone).
+ * `holder` (KeptReadOptions.holder): a holder whose last read of the file found it there but unreadable (HI-2414) keeps
+ * the .bak's value or a default, not the file's, so its save could replace settings it never saw: KeptFileUnreadable,
+ * nothing written over the file or its .bak, until its own read of it succeeds again (or the file is gone).
  */
-export async function writeKeptJson(path: string, data: unknown, opts: { compact?: boolean; bakOncePerRun?: boolean; existing?: boolean } = {}): Promise<void> {
+export async function writeKeptJson(path: string, data: unknown, opts: { compact?: boolean; bakOncePerRun?: boolean; existing?: boolean; holder?: object } = {}): Promise<void> {
   const k = path.toLowerCase()
-  if (unreadable.has(k)) {
+  if (opts.holder && staleHolders.get(k)?.has(opts.holder)) {
     if (!(await keptGone(path))) {
-      log.warn(`${userText(path)} wasn't saved: it couldn't be read when last read, so this save could replace settings Hive never saw`)
+      log.warn(`${userText(path)} wasn't saved: it couldn't be read when last read for this save, so the save could replace settings Hive never saw`)
       throw new KeptFileUnreadable(path)
     }
-    unreadable.delete(k)
+    staleHolders.delete(k)
   }
   const text = (opts.compact ? JSON.stringify(data) : JSON.stringify(data, null, 2)) + '\n'
   const write = { mkdir: !opts.existing }
