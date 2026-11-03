@@ -15,6 +15,10 @@
 //    process holds slot-a; once the process ends, the card starts in slot-a with no other call;
 // 5. the Assistant's second sighting: B1 stopped, a process holding slot-a, a lane recorded through the API waits for a
 //    slot, its row in the Progress panel saying what holds it (screenshot), and is lent slot-a once the process ends.
+// HI-2467, Windows Sandbox's broker (a stand-in whose current folder is slot-a, HIVE_TEST_SYSTEM_BROKER):
+// 6. a broker working elsewhere while a process holds slot-a: only the process is said; the broker working in slot-a
+//    once the process has gone: a retry names it, idle (status and the Progress panel's row, screenshot); a Sandbox
+//    starting and stopping: later retries say so; the broker ending: the lane is lent slot-a with no other call.
 // Dev build, throwaway profile, workspace and CLAUDE_CONFIG_DIR.
 const lib = require('./lib.cjs')
 const fs = require('fs')
@@ -76,7 +80,15 @@ const renamable = (dir) => {
   const go4 = path.join(tools, 'hold4-go.txt')
   const beat4 = path.join(tools, 'hold4-beat.txt')
   fs.writeFileSync(turn, `const fs = require('fs'); const { spawn } = require('child_process'); const c = spawn(process.execPath, [${JSON.stringify(hold)}, require('path').join(process.cwd(), '.hive', 'hold4.lock'), ${JSON.stringify(go4)}, ${JSON.stringify(beat4)}, '${HUNG_MS * 4}'], { detached: true, stdio: 'ignore', windowsHide: true }); c.unref(); const t = Date.now(); const tick = () => { if (fs.existsSync(${JSON.stringify(turnGo)}) || Date.now() - t > ${HUNG_MS * 3}) process.exit(0); setTimeout(tick, 100) }; tick()\n`)
-  const env = lib.fakeClaude(userData, home, [alpha, ws, slotA])
+  // Step 6's stand-in broker (HI-2467): only its current folder in the slot, no file open, until stand-go.txt (bounded),
+  // writing its heartbeat. brokers.txt lists the stand-ins' ids (HIVE_TEST_SYSTEM_BROKER), brokers-active.txt the
+  // Sandbox's own processes running now (HIVE_TEST_SYSTEM_BROKER_ACTIVE; while it is missing, none).
+  const stand = path.join(tools, 'stand.js')
+  fs.writeFileSync(stand, `const fs = require('fs'); const [go, beat, ms] = process.argv.slice(2); const t = Date.now(); const tick = () => { if (fs.existsSync(go) || Date.now() - t > Number(ms)) process.exit(0); fs.writeFileSync(beat, String(Date.now())); setTimeout(tick, 100) }; tick()\n`)
+  const brokers = path.join(tools, 'brokers.txt')
+  const brokersActive = path.join(tools, 'brokers-active.txt')
+  fs.writeFileSync(brokers, '')
+  const env = { ...lib.fakeClaude(userData, home, [alpha, ws, slotA]), HIVE_TEST_SYSTEM_BROKER: brokers, HIVE_TEST_SYSTEM_BROKER_ACTIVE: brokersActive }
   const cfgFile = path.join(userData, 'config.json')
   const cfg = JSON.parse(fs.readFileSync(cfgFile, 'utf8'))
   cfg.settings.general = { ...cfg.settings.general, confirmOnQuit: 'never', showTips: false }
@@ -219,10 +231,63 @@ const renamable = (dir) => {
     check('the process ends: the lane is lent slot-a with no other call, B1 starts there', !!(await until(async () => (await laneOf(c4))?.slot === 'slot-a' && same((await live(b1.id))?.cwd, slotA), HUNG_MS)), JSON.stringify({ lane: await laneOf(c4), b1: await live(b1.id) }))
     check('…its row waits for a slot no more', !!(await until(async () => ((await why.textContent().catch(() => '')) ?? '') !== said, HUNG_MS)), await why.textContent().catch(() => ''))
     console.log(`INFO step 5's lane, as it went: ${(await stop5()).join(' | ')}`)
+
+    // --- 6. HI-2467: Windows Sandbox's broker working in slot-a (a stand-in: a process whose current folder is slot-a,
+    // its id in HIVE_TEST_SYSTEM_BROKER, so its path, read by the helper, is taken as the broker's). Named only while it
+    // is seen working there, idle or not as the Sandbox's own processes run, looked at again on each retry.
+    await inv('lanes:end', (await laneOf(c4)).id, true)
+    check('the lane is ended, B1 stopped, slot-a free and held by nothing', !!(await until(async () => !(await live(b1.id)) && !(await slotNow())?.lease && renamable(slotA), HUNG_MS)), JSON.stringify(await slotNow()))
+    const standGo = path.join(tools, 'stand-go.txt')
+    const standBeat = path.join(tools, 'stand-beat.txt')
+    /** A stand-in broker: runs with its current folder `cwd` (no file open) until stand-go.txt, its id listed as a broker's. */
+    const standIn = (cwd) => {
+      const c = spawn(process.execPath, [stand, standGo, standBeat, String(HUNG_MS * 3)], { cwd, stdio: 'ignore', windowsHide: true, env: { PATH: process.env.PATH ?? '', SystemRoot: process.env.SystemRoot ?? '' } })
+      fs.writeFileSync(brokers, `${c.pid}\n`)
+      return { c, exited: new Promise((r) => c.once('exit', r)) }
+    }
+    // 6a. The broker working elsewhere while a process holds slot-a (a file in it open): only the process is said.
+    const go6 = path.join(tools, 'hold6-go.txt')
+    const beat6 = path.join(tools, 'hold6-beat.txt')
+    const holder6 = spawn(process.execPath, [hold, path.join(slotA, '.hive', 'hold6.lock'), go6, beat6, String(HUNG_MS * 3)], { cwd: tools, stdio: 'ignore', windowsHide: true, env: { PATH: process.env.PATH ?? '', SystemRoot: process.env.SystemRoot ?? '' } })
+    const exited6 = new Promise((r) => holder6.once('exit', r))
+    const away = standIn(tools)
+    check('a process holds slot-a, the broker running elsewhere', !!(await until(() => beating(beat6) && beating(standBeat) && !renamable(slotA), HUNG_MS)))
+    const c5 = await create('Retry five')
+    const fifth = await apiLane([c5])
+    check('a lane recorded through the API: it waits for a slot', fifth.status === 200 && !(await live(b1.id)), JSON.stringify(fifth.body))
+    const status5 = async () => (await laneOf(c5))?.status ?? null
+    check('…its status names the process, not the broker working elsewhere', !!(await until(async () => (await status5())?.reason === 'slot' && (await status5())?.held === 'process' && !(await status5())?.broker, HUNG_MS)), JSON.stringify(await status5()))
+    fs.writeFileSync(standGo, 'go')
+    await away.exited
+    fs.rmSync(standGo, { force: true })
+    // 6b. The broker working in slot-a, the process gone: the broker is named, idle (none of the Sandbox's processes run).
+    const here = standIn(slotA)
+    check('the broker works in slot-a', !!(await until(() => beating(standBeat) && !renamable(slotA), HUNG_MS)))
+    fs.writeFileSync(go6, 'go')
+    await exited6
+    const brokerSaid = (idle) => async () => {
+      const s = await status5()
+      return s?.reason === 'slot' && s.held === 'broker' && s.broker === 'WindowsSandboxServer' && s.idle === idle ? s : null
+    }
+    check('…once the file is closed, a retry names the broker working in slot-a, idle', !!(await until(brokerSaid(true), HUNG_MS)), JSON.stringify(await status5()))
+    const why6 = panel.locator(`.progress-lane[data-lane="${(await laneOf(c5)).id}"] .progress-lane-why`)
+    const said6 = 'waiting for slot-a: a process still has a file or folder in it open: Windows Sandbox’s broker (WindowsSandboxServer) is working in it, with no Sandbox running'
+    check(`…its row in the Progress panel says "${said6}"`, !!(await until(async () => ((await why6.textContent().catch(() => '')) ?? '') === said6, HUNG_MS)), await why6.textContent().catch(() => ''))
+    await panel.screenshot({ path: path.join(shots, 'lane-slot-broker.png') })
+    // 6c. A Sandbox starts (its client running): a later retry says so; it stops again: idle again.
+    fs.writeFileSync(brokersActive, 'windowssandboxclient.exe\n')
+    check('a Sandbox running: a later retry says the broker works in slot-a with a Sandbox running', !!(await until(brokerSaid(false), HUNG_MS)), JSON.stringify(await status5()))
+    fs.rmSync(brokersActive, { force: true })
+    check('…and idle again once it has stopped', !!(await until(brokerSaid(true), HUNG_MS)), JSON.stringify(await status5()))
+    // 6d. The broker ends: the lane is lent slot-a with no other call, and its status names nothing any more.
+    fs.writeFileSync(standGo, 'go')
+    await here.exited
+    check('the broker ends: the lane is lent slot-a with no other call, B1 starts there', !!(await until(async () => (await laneOf(c5))?.slot === 'slot-a' && same((await live(b1.id))?.cwd, slotA), HUNG_MS)), JSON.stringify({ lane: await laneOf(c5), b1: await live(b1.id) }))
+    check('…its status waits for a slot no more', (await status5())?.reason !== 'slot', JSON.stringify(await status5()))
   } catch (e) {
     check('no exception', false, e?.stack ?? String(e))
   } finally {
-    for (const f of [holdGo, turnGo, path.join(tools, 'hold4-go.txt'), path.join(tools, 'hold5-go.txt')]) fs.writeFileSync(f, 'go')
+    for (const f of [holdGo, turnGo, path.join(tools, 'hold4-go.txt'), path.join(tools, 'hold5-go.txt'), path.join(tools, 'hold6-go.txt'), path.join(tools, 'stand-go.txt')]) fs.writeFileSync(f, 'go')
     if (holder && holder.exitCode === null) holder.kill()
     await app.close().catch(() => undefined)
   }

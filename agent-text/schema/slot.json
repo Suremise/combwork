@@ -205,7 +205,9 @@
   "slot.refusal.busy": {
     "placeholders": {
       "held": "select",
-      "slot": "plain"
+      "slot": "plain",
+      "name": "plain",
+      "idle": "select"
     }
   },
   "slot.refusal.inUse": {

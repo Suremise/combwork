@@ -420,8 +420,8 @@
     "note": "A lane started with no slot free waits for one to be lent to it (#1438)."
   },
   "lane.status.slotHeld": {
-    "text": "waiting for {slot}: {held, select, session {{agent}'s session is still in it} other {a process still has a file or folder in it open}}",
-    "note": "HI-2466: a lane waiting for a slot, the only free one ({slot}) held: a session of the agent {agent} still runs in it, or (other) a process holds it. Hive tries again until it is free."
+    "text": "waiting for {slot}: {held, select, session {{agent}'s session is still in it} broker {a process still has a file or folder in it open: Windows Sandbox's broker ({broker}) is working in it{idle, select, yes {, with no Sandbox running} no {, with a Sandbox running} other {}}} other {a process still has a file or folder in it open}}",
+    "note": "HI-2466: a lane waiting for a slot, the only free one ({slot}) held: a session of the agent {agent} still runs in it, or (other) a process holds it. broker (HI-2467): a process holds it, and Windows Sandbox's broker ({broker}: its process name, such as WindowsSandboxServer) has the slot as its current folder; idle: yes, no Sandbox runs; no, one does; other, not known. Hive tries again until it is free."
   },
   "lane.status.stale": {
     "text": "stale: {card} must be submitted again",

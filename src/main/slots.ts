@@ -52,6 +52,7 @@ import * as G from './platform/git'
 import { isUnknown } from './platform/types'
 import { copyIgnored, listWorktrees } from './worktrees'
 import { agentMsg, inDefaultDialect, say, type AgentMsg, type AgentValues } from '../shared/agentText'
+import { idleKey } from '../shared/laneBar'
 import { cardRef } from '../shared/projectKeys'
 import type { AppSettings, ProjectConfig, WorkspaceConfig } from '../shared/types'
 import { slotCopyOf, type SlotLevels } from '../shared/slotDefaults'
@@ -83,7 +84,7 @@ const T = {
   inUse: agentMsg({ id: 'slot.refusal.inUse', text: '{slot} is in use by {agent} for {what}', note: "A start's wait: the slot named is lent to another agent. {what} is the card's key or slot.refusal.lane." }),
   agentLeased: agentMsg({ id: 'slot.refusal.agentLeased', text: 'this agent already builds in {slot} for {what}', note: 'A start refused: one agent, one slot (HI-1762). {what} is the card\'s key or slot.refusal.lane.' }),
   warming: agentMsg({ id: 'slot.refusal.warming', text: '{slot} is being set up', note: "A start's wait: the slot's setup is running." }),
-  busy: agentMsg({ id: 'slot.refusal.busy', text: '{held, select, session {{slot} still has a session in it} process {{slot} still has a process running in it (a file or a folder in it open)} other {{slot} has a session or a process in it}}', note: "A start's wait: something still runs in a free slot, so it isn't lent (HI-2466: held, what: a session, a process, or not known). Hive tries again until it is free." }),
+  busy: agentMsg({ id: 'slot.refusal.busy', text: "{held, select, session {{slot} still has a session in it} process {{slot} still has a process running in it (a file or a folder in it open)} broker {{slot} still has a process running in it (a file or a folder in it open): Windows Sandbox's broker ({name}) is working in it{idle, select, yes {, with no Sandbox running} no {, with a Sandbox running} other {}}} other {{slot} has a session or a process in it}}", note: "A start's wait: something still runs in a free slot, so it isn't lent (HI-2466: held, what: a session, a process, or not known). broker (HI-2467): Windows Sandbox's broker ({name}: its process name, such as WindowsSandboxServer) has the slot as its current folder; idle: yes, no Sandbox runs; no, one does; other, not known. Hive tries again until it is free." }),
   notReady: agentMsg({ id: 'slot.refusal.notReady', text: "{slot} isn't ready ({why})", note: "A start's wait or refusal: the slot isn't ready. {why} is its setup's error, else its state." }),
   setupFailed: agentMsg({ id: 'slot.refusal.setupFailed', text: "{slot}'s setup failed: {error}", note: "A start refused: the slot's setup failed. {error} is why (one of slot.error.*, git's or the command's)." }),
   opLost: agentMsg({ id: 'slot.error.opLost', text: 'the operation no longer holds {slot}', note: "An operation on a slot stopped because another took the slot over (#1429). Caught by the pool; in the log if it ever escapes." }),
@@ -199,13 +200,31 @@ export type SlotRefusal =
   | { why: 'inUse'; slot: string; agent: string; card: number | null; lane: string | null }
   | { why: 'agentLeased'; slot: string; card: number | null; lane: string | null }
   | { why: 'warming'; slot: string }
-  /** HI-2466: what holds it, where the lend looked (a session in it, else a process: a file or folder in it open). */
-  | { why: 'busy'; slot: string; held?: SlotHeld }
+  /**
+   * HI-2466: what holds it, where the lend looked (a session in it, else a process: a file or folder in it open). HI-2467:
+   * `broker` when Windows' own broker is seen working in it (`broker`: its name, and whether a Sandbox runs, null unknown).
+   */
+  | { why: 'busy'; slot: string; held?: SlotHeld; broker?: SlotBroker }
   | { why: 'notReady'; slot: string; state: SlotState; error: string | null }
   | { why: 'setupFailed'; slot: string; error: string; log: string | null }
 
-/** What holds a free slot so it can't be lent now (HI-2466): a session running in it, or another process. */
-export type SlotHeld = 'session' | 'process'
+/**
+ * What holds a free slot so it can't be lent now (HI-2466): a session running in it, or another process; `broker`
+ * (HI-2467): a process, and one of them is Windows' own broker, seen working in it (systemBrokers.ts).
+ */
+export type SlotHeld = 'session' | 'process' | 'broker'
+
+/** The broker seen working in a held slot (HI-2467): its executable's name, and whether a Sandbox runs (null: not known). */
+export interface SlotBroker {
+  name: string
+  idle: boolean | null
+}
+
+/** A held slot's refusal as a lend says it (HI-2467): a broker named where one is seen working in it, else a process. */
+export async function processHeld(slot: string, folder: string, brokerIn: ((folder: string) => Promise<SlotBroker | null>) | undefined): Promise<Extract<SlotRefusal, { why: 'busy' }>> {
+  const broker = brokerIn ? await brokerIn(folder).catch(() => null) : null
+  return broker?.name ? { why: 'busy', slot, held: 'broker', broker } : { why: 'busy', slot, held: 'process' } // i18n-ignore: a refusal's codes (refusalText words them)
+}
 
 export type LendResult = { ok: true; lease: SlotLease; slot: Slot } | { ok: false; refusal: SlotRefusal }
 
@@ -240,7 +259,7 @@ export function refusalText(r: SlotRefusal, name: (agent: string) => string = (a
     case 'warming':
       return say(T.warming, { slot: r.slot })
     case 'busy':
-      return say(T.busy, { slot: r.slot, held: r.held ?? 'other' }) // i18n-ignore: a select key
+      return say(T.busy, { slot: r.slot, held: r.held ?? 'other', name: r.broker?.name ?? '', idle: idleKey(r.broker?.idle) }) // i18n-ignore: select keys
     case 'notReady':
       return say(T.notReady, { slot: r.slot, why: r.error ?? r.state })
     case 'setupFailed':
@@ -1050,6 +1069,8 @@ export interface PoolDeps {
   holder: OpHolder
   /** A session running in a folder: what it is (for the log), or null. */
   sessionIn?: (folder: string) => string | null
+  /** Windows' brokers seen working in a held folder now (HI-2467: agentProcesses' brokerWorkingIn), or null: only names what holds it. */
+  brokerIn?: (folder: string) => Promise<SlotBroker | null>
   /** Whether a card has a merge queue entry in flight. */
   inFlight?: (card: number) => boolean | Promise<boolean>
   /** Settings → Advanced, Remove idle slots after a day. */
@@ -1720,7 +1741,7 @@ export class SlotPool {
           const session = !!this.deps.sessionIn?.(slot.folder)
           if (session || !(await quiet(slot.folder))) {
             await pass('ready', 'busy')
-            return { why: 'busy', slot: name, held: session ? 'session' : 'process' }
+            return session ? { why: 'busy', slot: name, held: 'session' } : await processHeld(name, slot.folder, this.deps.brokerIn)
           }
         }
       }
