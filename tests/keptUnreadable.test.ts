@@ -1,7 +1,7 @@
 // Kept files that are there but can't be read (HI-2414): locked by another program, access refused, a disk error. Such
 // a read is never taken for a new file: a change to it is refused (KeptFileUnreadable), and a plain read gives its .bak's
 // value and keeps anything from being written over it, so neither the file nor its .bak is replaced by defaults.
-import { mkdirSync, readFileSync, rmSync, writeFileSync } from 'fs'
+import { mkdirSync, readFileSync, rmSync, utimesSync, writeFileSync } from 'fs'
 import { join } from 'path'
 import { afterAll, afterEach, describe, expect, it, onTestFinished, vi } from 'vitest'
 import * as electron from 'electron'
@@ -56,6 +56,12 @@ const { KEPT_TRIES, KeptFileUnreadable, readKeptJson, readKeptJsonSync, retryWhi
 vi.setConfig({ testTimeout: 30_000 })
 
 const lock = (f: string): void => void reads.locked.add(f.toLowerCase())
+/** Something else saving a kept file in place, part way (changed "a moment ago" for the whole read: unsettled, #1600). */
+function savingNow(f: string, text: string): void {
+  writeFileSync(f, text)
+  const soon = new Date(Date.now() + 60_000)
+  utimesSync(f, soon, soon)
+}
 /** A kept file's text as writeKeptJson writes it. */
 const pretty = (v: unknown): string => JSON.stringify(v, null, 2) + '\n'
 function bytes(f: string): { file: string; bak: string } {
@@ -151,6 +157,40 @@ describe('a kept file that is there but unreadable (HI-2414)', () => {
     expect(JSON.parse(readFileSync(f, 'utf8'))).toEqual({ again: true })
   })
 
+  it("a holder's read again that gets the .bak (the file still being saved) keeps its saves refused (HR3's round 2)", async () => {
+    const f = await saved({ projects: ['saved-project'], chime: true })
+    const finished = readFileSync(f, 'utf8')
+    writeFileSync(`${f}.bak`, JSON.stringify({ projects: [], chime: true }))
+    const older = bytes(f)
+    const holder = {}
+    lock(f)
+    await expect(readKeptJson(f, {}, { holder })).resolves.toEqual({ projects: [], chime: true })
+    reads.locked.clear()
+    // Something else saving it in place: part way, and "a moment ago" for the whole read, so still unsettled.
+    savingNow(f, '{')
+    await expect(readKeptJson(f, {}, { holder })).resolves.toEqual({ projects: [], chime: true })
+    expect(readKeptJsonSync(f, null, { holder })).toEqual({ projects: [], chime: true })
+    // The save finishes; the holder still has the .bak's value.
+    writeFileSync(f, finished)
+    await expect(writeKeptJson(f, { projects: [], chime: false }, { holder })).rejects.toBeInstanceOf(KeptFileUnreadable)
+    expect(bytes(f)).toEqual({ file: finished, bak: older.bak })
+    // Its read of the finished file: the file's settings, saved as usual.
+    await expect(readKeptJson(f, {}, { holder })).resolves.toEqual({ projects: ['saved-project'], chime: true })
+    await writeKeptJson(f, { projects: ['saved-project'], chime: false }, { holder })
+    expect(JSON.parse(readFileSync(f, 'utf8'))).toEqual({ projects: ['saved-project'], chime: false })
+  })
+
+  it('a damaged file recovered from its .bak is the file again: its holder can save', async () => {
+    const f = await saved({ n: 1 })
+    const holder = {}
+    writeFileSync(f, '{"n": ')
+    const old = new Date(Date.now() - 60_000) // damaged a while ago, not a save in progress (#1601)
+    utimesSync(f, old, old)
+    await expect(readKeptJson(f, null, { holder })).resolves.toEqual({ n: 1 })
+    await writeKeptJson(f, { n: 2 }, { holder })
+    expect(JSON.parse(readFileSync(f, 'utf8'))).toEqual({ n: 2 })
+  })
+
   it('retryWhileSaving runs a change again while the file is unreadable, KEPT_TRIES times in all', async () => {
     let runs = 0
     await expect(retryWhileSaving(async () => (++runs, Promise.reject(new KeptFileUnreadable('x.json'))))).rejects.toBeInstanceOf(KeptFileUnreadable)
@@ -215,5 +255,30 @@ describe("workspace.json unreadable when its workspace opens (HI-2414, HR3's rou
     await (w as unknown as { reloadConfig: () => Promise<void> }).reloadConfig()
     await w.saveWorkspaceConfig()
     expect(JSON.parse(readFileSync(file, 'utf8')).mcp.enabled).toEqual(['saved-server'])
+  })
+
+  it("unreadable, then read again part way through another program's save, then saved: the finished settings kept (HR3's round 2)", async () => {
+    const ws = join(base, 'ws-saving')
+    const file = join(ws, '.hive', 'workspace.json')
+    mkdirSync(join(ws, '.hive'), { recursive: true })
+    const saved = { version: 1, mcp: { enabled: ['saved-server'] } }
+    writeFileSync(file, pretty(saved))
+    writeFileSync(`${file}.bak`, pretty({ version: 1, mcp: { enabled: [] } }))
+    const older = bytes(file).bak
+    const w = createWorkspaceService()
+    onTestFinished(() => disposeWorkspaceService(w))
+    lock(file)
+    await w.open(ws)
+    reads.locked.clear()
+    // Another program saves it in place: read by the workspace part way (the .bak's value again), then finished.
+    savingNow(file, '{')
+    await (w as unknown as { reloadConfig: () => Promise<void> }).reloadConfig()
+    writeFileSync(file, pretty(saved))
+    // Refused, unless the workspace's watcher has read the finished file meanwhile (then it saves what it read): either
+    // way the server stays on, in the file and its .bak.
+    await w.saveWorkspaceConfig().catch((e: unknown) => expect(e).toBeInstanceOf(KeptFileUnreadable))
+    const after = bytes(file)
+    expect(JSON.parse(after.file).mcp.enabled).toEqual(['saved-server'])
+    expect(after.bak === older || JSON.parse(after.bak).mcp.enabled[0] === 'saved-server').toBe(true)
   })
 })
