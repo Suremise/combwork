@@ -4,11 +4,10 @@
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import { readFileSync, writeFileSync } from 'fs'
 import { join } from 'path'
-import { IntlMessageFormat } from 'intl-messageformat'
 import { tempDir } from './tempDir'
 import { agentList, agentMsg, currentChain, inDefaultDialect, inDialectOf, say, setAgentTextProblemReporter, setChainResolver, setProcessChain, type DialectChain } from '../src/shared/agentText'
 import { inRequestScope } from '../src/shared/agentText/asyncScope'
-import { formatIcu, IcuError, parseIcu, placeholdersOf } from '../src/shared/agentText/icu'
+import { formatIcu, IcuError, parseIcu, placeholdersOf, type Part } from '../src/shared/agentText/icu'
 import { chainFromFile, loadProcessDialect } from '../src/shared/agentText/processDialect'
 import { canaryProblems, canaryTexts } from '../src/shared/agentText/canary'
 import { boardSkillsLine, controlRules, hiveInstructions, journalRule, withLatestHandover } from '../src/shared/hiveGuidance'
@@ -34,89 +33,60 @@ afterEach(() => {
   setAgentTextProblemReporter(() => undefined)
 })
 
-describe('the agent text ICU formatter', () => {
-  /** Sample values for a message: every select option, and plurals at 0, 1, 2 and 1,200. */
+describe('the agent text ICU formatter (FormatJS, tags off)', () => {
+  /** Sample values for a message: every select option and one it hasn't, plain text, and numbers at 0, 1, 2 and 1,200. */
   function samples(text: string): Record<string, string | number>[] {
-    const ph = placeholdersOf(parseIcu(text))
-    const selects: Record<string, string[]> = {}
-    const walk = (parts: ReturnType<typeof parseIcu>): void => {
-      for (const p of parts) {
-        if (typeof p === 'string' || p.kind === 'arg' || p.kind === 'number' || p.kind === 'pound') continue
-        if (p.kind === 'select') selects[p.name] = [...new Set([...(selects[p.name] ?? []), ...Object.keys(p.options), 'unlisted'])]
-        for (const o of Object.values(p.options)) walk(o)
+    const selects: Record<string, string[]> = Object.create(null)
+    const walk = (parts: Part[]): void => {
+      for (const p of parts as { type: number; value?: string; options?: Record<string, { value: Part[] }> }[]) {
+        if (p.type === 5 && p.value) selects[p.value] = [...new Set([...(selects[p.value] ?? []), ...Object.keys(p.options ?? {}), 'unlisted'])]
+        for (const o of Object.values(p.options ?? {})) walk(o.value)
       }
     }
     walk(parseIcu(text))
     let out: Record<string, string | number>[] = [{}]
-    for (const [name, kind] of Object.entries(ph)) {
+    for (const [name, kind] of Object.entries(placeholdersOf(parseIcu(text)))) {
       const vals: (string | number)[] = kind === 'select' ? selects[name] : kind === 'plain' ? ['Żółw "x" {y}'] : [0, 1, 2, 1200]
       out = out.flatMap((v) => vals.map((x) => ({ ...v, [name]: x })))
     }
     return out
   }
 
-  it('formats every message of the catalogue as FormatJS does (its tags off), with every select and some plurals', () => {
+  it('formats every message of the catalogue, with every select option and some plurals', () => {
     expect(Object.keys(catalogue).length).toBeGreaterThan(40)
-    for (const [id, m] of Object.entries(catalogue)) {
-      const fj = new IntlMessageFormat(m.text, 'en', undefined, { ignoreTag: true })
-      for (const values of samples(m.text)) expect(formatIcu(m.text, values), `${id} ${JSON.stringify(values)}`).toBe(fj.format(values))
-    }
+    for (const [id, m] of Object.entries(catalogue)) for (const values of samples(m.text)) expect(() => formatIcu(m.text, values), `${id} ${JSON.stringify(values)}`).not.toThrow()
+    expect(formatIcu("Hive's {n, plural, one {# card} other {# cards}} '{'x'}' <command>", { n: 1200 })).toBe("Hive's 1,200 cards {x} <command>")
   })
 
-  it('reads apostrophes, plurals, offsets and numbers as FormatJS does', () => {
-    const cases: [string, Record<string, string | number>][] = [
-      ["Hive's tools, the projects' agents, don't", {}],
-      ["Braces quoted: '{literal}' and '' one, ''{x}''", { x: 'v' }],
-      ['{n, plural, =0 {no cards} one {# card} other {# cards}}', { n: 0 }],
-      ['{n, plural, =0 {no cards} one {# card} other {# cards}}', { n: 1 }],
-      ['{n, plural, =0 {no cards} one {# card} other {# cards}}', { n: 1234 }],
-      ["{n, plural, offset:1 =0 {none} one {you and # other} other {you and # others}} '#' #", { n: 3 }],
-      ['{n, plural, one {a {kind, select, bug {bug} other {card}}} other {# {kind, select, bug {bugs} other {cards}}}}', { n: 2, kind: 'bug' }],
-      ['Took {n, number} ms <command> `hive-progress --title "<what>"`', { n: 12345 }],
-      ['{a}{b} and {a}', { a: 'A', b: 7 }]
-    ]
-    for (const [text, values] of cases) expect(formatIcu(text, values), text).toBe(new IntlMessageFormat(text, 'en', undefined, { ignoreTag: true }).format(values))
+  // HI-2433 round 2: a value named like an Object property is a value with no option of its own, so other.
+  it("picks other for a select value named like an Object property, and keeps an option of that name its own", () => {
+    for (const x of ['constructor', 'toString', '__proto__', 'hasOwnProperty', 'valueOf']) expect(formatIcu('{x, select, a {A} other {fallback}}', { x }), x).toBe('fallback')
+    expect(formatIcu('{x, select, constructor {C} other {O}}', { x: 'constructor' })).toBe('C')
+    expect(formatIcu('{n, plural, =0 {none} one {#} other {# more}}', { n: 0 })).toBe('none')
   })
 
-  it('refuses text that isn\'t ICU, and a value it needs that is missing', () => {
-    for (const bad of ['{open', '{x, plural, one {a}}', '{x, date}', '{x, select, a {b} other {c}', '{, select, other {x}}', '{x, select, a {1} a {2} other {3}}']) expect(() => parseIcu(bad), bad).toThrow(IcuError)
-    expect(() => formatIcu('Hello {name}')).toThrow(/no value for \{name\}/)
+  it("refuses text that isn't ICU, and a value it needs that is missing", () => {
+    for (const bad of ['{open', '{x, plural, one {a}}', '{x, select, a {b} other {c}', '{, select, other {x}}', '{x, select, a {1} a {2} other {3}}']) expect(() => parseIcu(bad), bad).toThrow(IcuError)
+    expect(() => formatIcu('Hello {name}')).toThrow(IcuError)
   })
 
-  // HI-2433 round 1: what the extractor accepts (a descriptor passing check:repo, a dialect's text passing the schema)
-  // is what the formatter formats, and the same way; what it refuses, the formatter refuses too.
-  it('agrees with the extractor on what agent text may use, beyond the catalogue, and formats what both accept as FormatJS does', () => {
-    const CORPUS = [
-      // FormatJS reads these, agent text's subset doesn't: both refuse.
-      '{n, number, percent}', '{n, number, ::currency/USD}', '{n, number, integer}', '{d, date}', '{d, time, short}', '{n, selectordinal, one {#st} other {#th}}', '<b>bold</b> {x}',
-      '{n, plural, foo {x} other {y}}', '{n, plural, =1.5 {x} other {y}}', '{x, select, =1 {a} other {b}}', '{x-y}', '{x.y}', '{x, select, a-b {1} other {2}}',
-      // Neither reads these.
-      '{a b}', '{n, plural, offset:x other {#}}', '{x, select, a {1} other {2} extra}', '{x, select}', '{x,}', '{x, select, a {1}}', '{open', '{x, select, a {1} a {2} other {3}}',
-      // Both read these.
-      '{ x }', '{x , select , a {1} other {2}}', '{x, select, a{1}other{2}}', '{0}', '{x_1}', '#', "'#'", "{n, plural, other {'#'}}", '{n,plural,offset:1 other {#}}', '{n, plural, one {a} other {b} }',
-      'a < b <c>', 'close} and }}', "'{'", "''", "'{x}", "it's {x}'s", '{x, select, other {{y, select, other {z}}}}', '{n, plural, zero {z} =0 {none} one {#} other {# more}}',
-      '{n, plural, one {{m, plural, one {#} other {#}}} other {#}}', '{n, number} of {total, number}'
-    ]
-    const accepted: string[] = []
-    for (const text of CORPUS) {
+  it('reads one grammar with the extractor: what one accepts, the other does', () => {
+    const corpus = ['{n, number, percent}', '{d, date}', '{n, selectordinal, one {#st} other {#th}}', '<b>bold</b> {x}', 'close} and }}', "'{'", "it's {x}'s", '{x, select, constructor {C} other {O}}', '{a b}', '{x, select}', '{x, select, a {1}}', '{open', '{x-y}', '{n, plural, =1.5 {x} other {y}}']
+    for (const text of corpus) {
       const extractor = (messageProblems({ 'probe.text': { text } }) as string[]).length === 0
-      let formatter = true
+      let runtime = true
       try {
         parseIcu(text)
       } catch {
-        formatter = false
+        runtime = false
       }
-      expect(formatter, `${text}: the extractor ${extractor ? 'accepts' : 'refuses'} it`).toBe(extractor)
-      if (!extractor) continue
-      accepted.push(text)
-      const fj = new IntlMessageFormat(text, 'en', undefined, { ignoreTag: true })
-      for (const values of samples(text)) expect(formatIcu(text, values), `${text} ${JSON.stringify(values)}`).toBe(fj.format(values))
+      expect(runtime, `${text}: the extractor ${extractor ? 'accepts' : 'refuses'} it`).toBe(extractor)
     }
-    expect(accepted.length).toBeGreaterThan(15)
   })
 
-  it("lists a message's placeholders with their kinds, nested ones too", () => {
+  it("lists a message's placeholders with their kinds, nested ones too, whatever their names", () => {
     expect(placeholdersOf(parseIcu('{a} {n, plural, one {# {b}} other {{kind, select, x {y} other {{c, number}}}}}'))).toEqual({ a: 'plain', n: 'plural', b: 'plain', kind: 'select', c: 'number' })
+    expect({ ...placeholdersOf(parseIcu('{constructor} {toString, select, other {{__proto__}}}')) }).toEqual({ constructor: 'plain', toString: 'select', ['__proto__']: 'plain' })
   })
 })
 
@@ -137,7 +107,7 @@ describe('say', () => {
     expect(say(M, { name: 'Ann', n: 1 })).toBe('Hello Ann, 1 card.')
     expect(say(M, { name: 'Bo', n: 1 })).toBe('Hello Bo, 1 card.')
     expect(problems).toHaveLength(1)
-    expect(problems[0]).toMatch(/test\.thing\.case: its override doesn't format \(no value for \{nom\}\)/)
+    expect(problems[0]).toMatch(/test\.thing\.case: its override doesn't format \(.*"nom".*\)/)
   })
 
   it("resolves a scope's chain with the registered resolver, and the Default until one is registered", async () => {

@@ -1,6 +1,6 @@
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import { existsSync, globSync, mkdirSync, readFileSync, rmSync, writeFileSync } from 'fs'
-import { createRequire } from 'module'
+import { builtinModules, createRequire } from 'module'
 import { dirname, join, resolve } from 'path'
 import type { AppSettings } from '../src/shared/types'
 import { tempDir } from './tempDir'
@@ -282,7 +282,9 @@ describe("main's language", () => {
 
 describe('agent-facing scripts never load the translations', () => {
   // hive-mcp.js and hive-progress.js run outside the asar with Node built-ins and Hive's own chunks only (AGENTS.md):
-  // a shared module they import that imports FormatJS would break them, and agent-facing text stays English. msg.ts and
+  // a shared module they import that imports a package the build leaves in node_modules would break them, and
+  // agent-facing text stays English. The one package they reach is agent text's formatter, intl-messageformat, which the
+  // build bundles into the chunks (electron.vite.config.ts, HI-2433); never the window's translations. msg.ts and
   // the modules of messages and languages import nothing, so data modules (the settings catalogue) may hold messages;
   // locale.ts neither, so dates.ts can word its dates in the language (#851).
   const resolveImport = (from: string, spec: string): string | null => {
@@ -313,6 +315,8 @@ describe('agent-facing scripts never load the translations', () => {
     expect(files.length).toBeGreaterThan(1)
     expect(files.filter((f) => f.startsWith('src/shared/i18n/') && !/\/(msg|languages|languageText|locale)\.ts$/.test(f))).toEqual([])
     expect(packages.filter((p) => p.startsWith('@formatjs/'))).toEqual([])
+    // Node's built-ins, and agent text's formatter, which the build bundles into the chunks for them (HI-2433).
+    expect(packages.filter((p) => !builtinModules.includes(p.replace(/^node:/, '')) && p !== 'intl-messageformat')).toEqual([])
   })
 })
 

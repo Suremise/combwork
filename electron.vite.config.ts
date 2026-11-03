@@ -32,7 +32,9 @@ export function monacoDompurify(): Plugin {
 
 export default defineConfig({
   main: {
-    plugins: [externalizeDepsPlugin()],
+    // Agent text's formatter (HI-2433, shared/agentText/icu.ts) is bundled into the chunks, not loaded from node_modules:
+    // hive-mcp.js and hive-progress.js run outside the asar, where they find only Node's built-ins and Hive's chunks.
+    plugins: [externalizeDepsPlugin({ exclude: ['intl-messageformat', '@formatjs/icu-messageformat-parser'] })],
     build: {
       rollupOptions: {
         // Electron's fs without its .asar handling, which main uses (#246): electron-vite externalises Node's built-ins

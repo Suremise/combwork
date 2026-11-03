@@ -56,7 +56,33 @@ function initialize(def) {
   })
 }
 
+/**
+ * What a built script requires, through the chunks it loads: anything but Node's built-ins and Hive's own chunks. The
+ * scripts run outside the asar, where nothing in node_modules can be found (a dev build would find this checkout's, so
+ * only the built files can tell): agent text's formatter must be bundled in (HI-2433).
+ */
+function packagesRequired(entry) {
+  const builtin = new Set(require('module').builtinModules)
+  const seen = new Set()
+  const out = new Set()
+  const walk = (file) => {
+    if (seen.has(file)) return
+    seen.add(file)
+    for (const m of fs.readFileSync(file, 'utf8').matchAll(/require\(\s*['"]([^'"]+)['"]\s*\)/g)) {
+      const spec = m[1]
+      if (spec.startsWith('.')) walk(path.resolve(path.dirname(file), spec.endsWith('.js') ? spec : `${spec}.js`))
+      else if (!builtin.has(spec.replace(/^node:/, ''))) out.add(spec)
+    }
+  }
+  walk(entry)
+  return { files: seen.size, packages: [...out] }
+}
+
 ;(async () => {
+  for (const script of ['hive-mcp.js', 'hive-progress.js']) {
+    const r = packagesRequired(path.join(lib.ROOT, 'out', 'main', script))
+    check(`${script} and the chunks it loads require only Node's built-ins (agent text's formatter bundled in)`, r.files > 1 && r.packages.length === 0, JSON.stringify(r))
+  }
   for (const d of [userData, ws]) fs.rmSync(d, { recursive: true, force: true })
   lib.gitProject(alpha)
   const claudeEnv = lib.fakeClaude(userData, claudeHome, [alpha])
