@@ -194,6 +194,8 @@
   "tips.designCheck.title": "构建前先让人检查设计方案",
   "tips.developerConsole.text": "打开“设置”→“高级”→“显示开发者功能”后，“帮助”→“开发者控制台”会打开一个独立窗口：选择一个智能体，即可看到每个钩子和状态行，以及 Hive 对它的解读（已脱敏）。运行时可以筛选、搜索和暂停。",
   "tips.developerConsole.title": "查看 CLI 发给 Hive 的内容",
+  "tips.dialects.text": "“方言”视图显示 Hive 提供给智能体的每条文本，并允许某个模型、某个 CLI 或整个工作区用自己的方式表述其中一部分。复制一个文件，即可只在一个智能体上试用更改（“智能体设置”→“方言”）；更改在该智能体下次启动时生效。",
+  "tips.dialects.title": "调整 Hive 对智能体的措辞",
   "tips.editTemplates.text": "在“模板”视图中选择一个模板，然后选择“编辑…”：添加、复制、重新排序或删除其中的智能体，在“智能体设置”对话框中逐个修改（其中的“保存”也会保存模板），重命名模板并选择其布局。",
   "tips.editTemplates.title": "直接编辑模板",
   "tips.fileLinks.text": "智能体输出的文件路径（如 src/app.ts:42）都是链接：按住 Ctrl 单击即可在“文件”标签页中打开该文件并定位到那一行。",

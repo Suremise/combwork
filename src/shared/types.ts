@@ -3766,6 +3766,8 @@ export type HiveEvent =
   | { type: 'files-changed'; projectPath: string; dirs: string[] }
   | { type: 'skills-changed' }
   | { type: 'modes-changed' }
+  /** A file in the workspace's dialects folder changed (HI-2444: the Dialects view reads it again). */
+  | { type: 'dialects-changed' }
   /** A workspace's Assistant journal changed (#1033: its browser reads it again). */
   | { type: 'journal-changed'; workspacePath: string }
   /** The Hive Assistant acted, or asks the user something (its home's path names the window). */

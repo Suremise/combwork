@@ -31,6 +31,14 @@
     "defaultMessage": "The sources to watch must be a list.",
     "description": "The developer console asked to watch sources in a form Hive doesn't take (a programming error, rarely seen)."
   },
+  "errors.dialects.notDialect": {
+    "defaultMessage": "{path} isn't a dialect file Hive can change.",
+    "description": "An error in the Dialects view (HI-2444): the file asked for isn't one of the workspace's dialect files (or can't be reverted: it isn't shipped). {path} is its path in the dialects folder. Glossary: dialect."
+  },
+  "errors.dialects.pickAgain": {
+    "defaultMessage": "Choose the file to import again: the one chosen before has expired.",
+    "description": "An error in the Dialects view's Import (HI-2444): the file chosen earlier can no longer be used (too long ago, or chosen in another window). Glossary: dialect."
+  },
   "errors.dialog.addMcp": {
     "defaultMessage": "Add an MCP server from a file",
     "description": "Title of Windows' file picker for an MCP server."
@@ -47,6 +55,10 @@
     "defaultMessage": "Choose or create a folder for the new workspace",
     "description": "Title of Windows' folder picker for a new workspace."
   },
+  "errors.dialog.dialectFiles": {
+    "defaultMessage": "Dialect file",
+    "description": "The file type in Windows' file dialogs for dialect files (HI-2444, JSON). Glossary: dialect."
+  },
   "errors.dialog.exportBoard": {
     "defaultMessage": "Export Board to JSON: Choose a Folder",
     "description": "Title of Windows' folder picker for Export Board to JSON: the board's cards are saved as JSON files in a new folder inside the one chosen."
@@ -54,6 +66,10 @@
   "errors.dialog.exportBoardButton": {
     "defaultMessage": "Export Here",
     "description": "The button of Windows' folder picker for Export Board to JSON."
+  },
+  "errors.dialog.exportDialect": {
+    "defaultMessage": "Export Dialect File",
+    "description": "Title of Windows' save dialog in the Dialects view (HI-2444): where to write a dialect file. Glossary: dialect."
   },
   "errors.dialog.exportMetrics": {
     "defaultMessage": "Export Performance Metrics",
@@ -70,6 +86,10 @@
   "errors.dialog.importBenchmark": {
     "defaultMessage": "Import a Benchmark or Performance Export",
     "description": "Title of Windows' file picker in Performance → Compare."
+  },
+  "errors.dialog.importDialect": {
+    "defaultMessage": "Import a Dialect File",
+    "description": "Title of Windows' file picker in the Dialects view (HI-2444): a dialect file to add. Glossary: dialect."
   },
   "errors.dialog.importTemplate": {
     "defaultMessage": "Import a Template",

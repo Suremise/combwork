@@ -8,6 +8,9 @@
 ### Added
 
 - **Agents can attach files to cards from a folder you choose** (HI-2480). Agents, the Assistant and scripts could attach only files from their project's folders, the workspace and the temp folder, so evidence kept in a folder of your own had to be copied into Temp first. **Settings → Advanced → Card attachments: more folders** lists more folders they may attach from, for all of Hive or just the workspace (`%LOCALAPPDATA%\…` works). Only you can change it, not the Assistant, and another project's folders and Hive's own stay off limits. A refused file now says which folders are accepted and where to add one.
+### Added
+
+- **Dialects: tune the words Hive gives agents** (HI-2065, HI-2443, HI-2444). Everything Hive says to agents, from its guidance to its tools' replies and wakes, is now a list of texts a **dialect file** can reword for one model, one CLI or the whole workspace, leaving the rest as Hive wrote it. The new **Dialects** view in the activity bar shows every text with where it comes from, saves a change only once it has the placeholders it needs, and flags texts an update made outdated. Duplicate a file to try a change on one agent (Agent Settings → **Dialect**), then **Use for a Model** to give it to every agent on that model. A change applies at each agent's next launch; the files show **Restart to apply** until then. Hive ships empty files for Opus 5.5, Haiku 5.5, Sonnet 5.5, GPT-6.1 Sol and GPT-6 Astra.
 
 ### Fixed
 

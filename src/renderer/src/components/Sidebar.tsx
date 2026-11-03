@@ -13,6 +13,7 @@ import { get, notify, projectKeyOf, projectStarting, projectState, startingLabel
 import { cx, formatKeybinding } from '../util'
 import { Icon, IconButton, InfoTip, LoadFailed, OneLineTitle, SearchInput, StaleNote, StatusDot, STATUS_TEXT, Switch, Tooltip, useContextMenu, type MenuEntry } from './ui'
 import { addSkill, deleteSkill, DeliveredSwitch, HiveSkillsWarning, restoreBundled, SKILL_LEVEL_TIP, skillDescription, SkillRow } from './Skills'
+import { DialectsPanel } from './Dialects'
 import { TemplatesPanel } from './Templates'
 import { hasEditorDraftsUnder } from '../editorDrafts'
 import { useInbox } from '../inbox'
@@ -187,6 +188,7 @@ export function Sidebar() {
       {view === 'board' && <BoardPanel />}
       {view === 'notes' && <NotesPanel />}
       {view === 'skills' && <SkillsPanel />}
+      {view === 'dialects' && <DialectsPanel />}
       {view === 'templates' && <TemplatesPanel />}
       {view === 'mcp' && <McpPanel />}
       {view === 'assistant' && <AssistantSidePanel />}

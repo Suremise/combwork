@@ -194,6 +194,8 @@
   "tips.designCheck.title": "Have a design checked before the build",
   "tips.developerConsole.text": "Turn on Settings → Advanced → Show developer features, then Help → Developer Console opens a window of its own: pick an agent and see each hook and status line beside what Hive made of it, redacted. Filter, search and pause as it runs.",
   "tips.developerConsole.title": "Watch what a CLI sends Hive",
+  "tips.dialects.text": "The Dialects view shows every text Hive gives agents, and lets a model, a CLI or the workspace word some of them its own way. Duplicate a file to try a change on one agent (Agent Settings → Dialect); it applies at the agent's next launch.",
+  "tips.dialects.title": "Tune the words Hive gives agents",
   "tips.editTemplates.text": "Select a template in the Templates view and choose Edit…: add, copy, reorder or remove its agents, change each in the Agent Settings dialog (its Save saves the template too), rename it and pick its layout.",
   "tips.editTemplates.title": "Edit a template in place",
   "tips.fileLinks.text": "File paths an agent prints, like src/app.ts:42, are links: Ctrl+click one to open the file in the Files tab at that line.",

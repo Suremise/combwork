@@ -2,6 +2,7 @@
   "workspace.activity.activity": "活动",
   "workspace.activity.assistant": "Hive Assistant",
   "workspace.activity.board": "任务看板",
+  "workspace.activity.dialects": "方言",
   "workspace.activity.docs": "文档",
   "workspace.activity.forYou": "{n, plural, other {# 张卡片待你处理}}",
   "workspace.activity.mcp": "MCP 服务器",

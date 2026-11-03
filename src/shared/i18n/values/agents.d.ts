@@ -114,6 +114,12 @@ interface HiveMessageValues {
   'agents.copilot.plan': undefined
   'agents.copilot.planDescription': undefined
   'agents.copilot.signInHelp': undefined
+  'agents.dialect.auto': undefined
+  'agents.dialect.copy': { name: string | number }
+  'agents.dialect.hint': undefined
+  'agents.dialect.label': undefined
+  'agents.dialect.missing': { path: string | number }
+  'agents.dialect.model': { name: string | number; model: string | number }
   'agents.dialog.busy': undefined
   'agents.dialog.cancel': undefined
   'agents.dialog.codingAgent': undefined

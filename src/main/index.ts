@@ -95,6 +95,7 @@ import { clearDiscovery, clearDiscoveryNow } from './apiDiscovery'
 import { clearHookAuth } from './hookTokens'
 import { assistantHome, assistantTokenFile, endAssistant, newAssistantToken, newTurn } from './assistantControl'
 import { sessions } from './sessions'
+import { forgetPicks } from './dialects/view'
 import { usageHistory } from './usageHistory'
 import { notificationIcon } from './paths'
 import { createTray, destroyTray, resourcesDir, setTrayPendingQuit, showWindow } from './tray'
@@ -1342,6 +1343,11 @@ app.whenReady().then(async () => {
   void checkGit()
 })
 
+// A file picked to import in the Dialects view is its window's (HI-2444): gone when the window closes.
+app.on('browser-window-created', (_e, w) => {
+  const id = w.id
+  w.on('closed', () => forgetPicks({ window: id }))
+})
 app.on('second-instance', () => {
   const w = lastFocused()
   if (w) showWindow(w.win)

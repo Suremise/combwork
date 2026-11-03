@@ -779,6 +779,14 @@
     "defaultMessage": "Watch what a CLI sends Hive",
     "description": "A tip's title."
   },
+  "tips.dialects.text": {
+    "defaultMessage": "The Dialects view shows every text Hive gives agents, and lets a model, a CLI or the workspace word some of them its own way. Duplicate a file to try a change on one agent (Agent Settings → Dialect); it applies at the agent's next launch.",
+    "description": "A tip (HI-2444). Names of Hive's menus, views, settings and commands: keep them as Hive shows them. Glossary: dialect."
+  },
+  "tips.dialects.title": {
+    "defaultMessage": "Tune the words Hive gives agents",
+    "description": "A tip's title (HI-2444). Glossary: dialect."
+  },
   "tips.editTemplates.text": {
     "defaultMessage": "Select a template in the Templates view and choose Edit…: add, copy, reorder or remove its agents, change each in the Agent Settings dialog (its Save saves the template too), rename it and pick its layout.",
     "description": "A tip. Names of Hive's menus, views, settings and commands: keep them as Hive shows them."

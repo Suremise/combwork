@@ -11,39 +11,15 @@
  * Pure, and loadable in plain Node (imports name their `.ts`): the scenarios' harness reads a `--dialect` file with it.
  */
 import { IcuError, parseIcu, placeholdersOf, type PlaceholderKind } from '../../shared/agentText/icu.ts'
+import type { DialectFile, TextProblem } from '../../shared/dialects.ts'
 
 /** The schema (agent-text/schema/*.json, merged): each agent text's id → its placeholders and their kinds. */
 export type DialectSchema = Readonly<Record<string, Readonly<Record<string, PlaceholderKind>>>>
 
-/** One override: the text, and why it is worded so (the author's reason, shown in the Dialects view). */
-export interface DialectText {
-  text: string
-  why?: string
-}
-
-/** A dialect file as it is on disk. */
-export interface DialectFile {
-  name: string
-  /** A model file's real model ID ("claude-opus-5-5"); absent: a CLI, Workspace or API file, or a test copy. */
-  model?: string
-  texts: Record<string, DialectText>
-}
-
-/** Why a file can't be read as a dialect at all: not JSON, or not the shape above. */
-export type FileProblem = { problem: 'json' } | { problem: 'shape'; field: 'file' | 'name' | 'model' | 'texts' }
-
-/**
- * Why one override doesn't match the schema:
- * - `unknown`: no agent text has that id (it was removed or renamed);
- * - `shape`: its entry isn't `{ text, why? }` with strings;
- * - `unparsable`: its text isn't ICU agent text can use;
- * - `placeholders`: its placeholders aren't exactly its id's (`missing` ones, `extra` ones, ones of another kind).
- */
-export type TextProblem =
-  | { id: string; problem: 'unknown' }
-  | { id: string; problem: 'shape' }
-  | { id: string; problem: 'unparsable'; detail: string }
-  | { id: string; problem: 'placeholders'; missing: string[]; extra: string[]; changed: string[] }
+// The file's shape and its problems are the window's too (the Dialects view, HI-2444): declared in shared/dialects.ts.
+export type { DialectFile, DialectText, FileProblem, TextProblem } from '../../shared/dialects.ts'
+// Reading and writing a file are the window's too (the Dialects view's JSON tab).
+export { dialectFileText, parseDialectFile } from '../../shared/dialects.ts'
 
 /** The Workspace layer's file, in the dialects folder. */
 export const WORKSPACE_FILE = 'workspace.json'
@@ -55,25 +31,6 @@ export const STATE_FILE = '.state.json'
 export const API_FOLDER = 'api'
 
 const isRecord = (v: unknown): v is Record<string, unknown> => !!v && typeof v === 'object' && !Array.isArray(v)
-
-/** A file's text read as a dialect, or why it can't be. Its texts' entries aren't checked here (checkTexts does). */
-export function parseDialectFile(raw: string): { file: DialectFile } | { problem: FileProblem } {
-  let data: unknown
-  try {
-    // A BOM (Notepad's UTF-8) isn't the file's content.
-    data = JSON.parse(raw.replace(/^﻿/, ''))
-  } catch {
-    return { problem: { problem: 'json' } }
-  }
-  if (!isRecord(data)) return { problem: { problem: 'shape', field: 'file' } }
-  if (typeof data.name !== 'string') return { problem: { problem: 'shape', field: 'name' } }
-  if (data.model !== undefined && (typeof data.model !== 'string' || !data.model.trim())) return { problem: { problem: 'shape', field: 'model' } }
-  if (!isRecord(data.texts)) return { problem: { problem: 'shape', field: 'texts' } }
-  // Ids as data, never as an object's own properties ("__proto__" is an id like any other, and unknown).
-  const texts: Record<string, DialectText> = Object.create(null)
-  for (const [id, entry] of Object.entries(data.texts)) texts[id] = entry as DialectText
-  return { file: { name: data.name, ...(data.model !== undefined ? { model: (data.model as string).trim() } : {}), texts } }
-}
 
 /** What's wrong with one override against the schema, or null when it matches. */
 export function textProblem(schema: DialectSchema, id: string, entry: unknown): TextProblem | null {
@@ -103,25 +60,6 @@ export function checkTexts(file: Pick<DialectFile, 'texts'>, schema: DialectSche
     else texts[id] = entry.text
   }
   return { texts, outdated }
-}
-
-/**
- * A dialect file as Hive writes it: its fields in order, ids sorted, two-space JSON with a final newline. An entry that
- * isn't `{ text, why? }` (an outdated one written by hand: `null`, a number) is kept as it is, never dropped or fatal:
- * Hive doesn't rewrite what the user wrote (HR1, HI-2439 r1).
- */
-export function dialectFileText(file: DialectFile): string {
-  const texts: Record<string, unknown> = {}
-  for (const id of Object.keys(file.texts).sort()) {
-    const entry: unknown = file.texts[id]
-    if (!isRecord(entry) || typeof entry.text !== 'string') {
-      texts[id] = entry === undefined ? null : entry
-      continue
-    }
-    const { text, why, ...rest } = entry
-    texts[id] = { text, ...(why !== undefined ? { why } : {}), ...rest }
-  }
-  return JSON.stringify({ name: file.name, ...(file.model !== undefined ? { model: file.model } : {}), texts }, null, 2) + '\n'
 }
 
 /** The schema as agent-text/schema/<area>.json files hold it (id → { placeholders }), merged into one. */

@@ -157,6 +157,7 @@ interface HiveMessageValues {
   'shell.command.view.board': undefined
   'shell.command.view.compactSidebar': undefined
   'shell.command.view.devTools': undefined
+  'shell.command.view.dialects': undefined
   'shell.command.view.fullScreen': undefined
   'shell.command.view.mcp': undefined
   'shell.command.view.modes': undefined

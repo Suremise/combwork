@@ -16,7 +16,7 @@
   "project.banner.dangerous": "{count, plural, one {Mode actif dans ce projet} many {Modes actifs dans ce projet} other {Modes actifs dans ce projet}} : {modes}. L’agent exécute chaque commande et chaque modification sans demander.",
   "project.banner.dangerousMode": "{agent} : {mode}",
   "project.banner.restart": "Redémarrer la session",
-  "project.banner.restartNeeded": "Des compétences, serveurs MCP ou paramètres ont changé depuis le démarrage de {many, select, yes {la session de l’agent {agent}} other {cette session}}. Redémarre la session pour les appliquer : la conversation continue.",
+  "project.banner.restartNeeded": "Des compétences, serveurs MCP, dialectes ou paramètres ont changé depuis le démarrage de {many, select, yes {la session de l’agent {agent}} other {cette session}}. Redémarre la session pour les appliquer : la conversation continue.",
   "project.banner.restartWhenDone": "Redémarrer une fois son tour terminé",
   "project.banner.switchFailed": "Impossible de prévoir le redémarrage",
   "project.banner.unmanagedMcp": "Ce projet définit des serveurs MCP qui ne sont pas dans l’espace de travail : <b>{names}</b>. Ils restent désactivés tant qu’ils ne sont pas copiés dans l’espace de travail.",

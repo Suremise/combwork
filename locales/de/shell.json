@@ -155,6 +155,7 @@
   "shell.command.view.board": "Aufgabenboard anzeigen",
   "shell.command.view.compactSidebar": "Kompakte Seitenleiste ein/aus",
   "shell.command.view.devTools": "Entwicklertools ein-/ausblenden",
+  "shell.command.view.dialects": "Dialekte anzeigen",
   "shell.command.view.fullScreen": "Vollbild ein/aus",
   "shell.command.view.mcp": "MCP-Server anzeigen",
   "shell.command.view.modes": "Modi des Assistenten anzeigen",
