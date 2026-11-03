@@ -1146,6 +1146,70 @@ describe('loop wakes (main/loopWakes.ts, #405)', async () => {
     await disposeWorkspaceService(w)
   })
 
+  it.each(['pool', 'paired'] as const)("a %s reviewer that asked with hive_request_builder and ended its turn is woken by each answer of its builder (HI-2428)", async (mode) => {
+    await loopWakes.clearLoopWakes()
+    // A pool lane is the lane's (its card's reviewerPool); the review rules are WORKFLOW's, which take no reviewerMode here.
+    const { w, alpha } = await open({ ...WORKFLOW, ...(mode === 'pool' ? { agents: POOL.agents } : {}) })
+    const st = fake(alpha)
+    const c = (await inWorkspace(w, () => tasks.createTask({ title: 'Asked for a run', project: 'alpha' }, user))).number
+    await lanes.startLane(w, { project: 'alpha', builder: 'b1', reviewer: mode === 'pool' ? null : 'r1', ...(mode === 'pool' ? { pool: true } : {}), cards: [c], by: 'B1 (alpha)' })
+    const intent = (who: typeof b1, i: Parameters<typeof runCardIntent>[2]) => inWorkspace(w, () => runCardIntent({ n: c, plain: false }, who, i))
+    await intent(b1, { kind: 'start' })
+    await intent(b1, { kind: 'submit', summary: 'Ready', paths: ['a.txt'] })
+    if (mode === 'pool') {
+      // The pool's own assignment, as reviewerPool.ts writes it (its pass isn't running here).
+      const wf = (await workflowFor(w, alpha))!
+      const submission = wf.store.facts(c).findLast((f) => f.kind === 'Submitted')!.seq
+      await wf.write(wf.store.card(c), null, 'hive', (x) => void x.fact('ReviewerAssigned', { reviewer: 'r1', submission }))
+    }
+    await intent(r1, { kind: 'startReview' })
+    await drained()
+    await settled()
+    const k = st.typed.length
+    st.status.set('b1', 'ready')
+    st.status.set('r1', 'ready')
+    // HI-2410: the reviewer asks for a full run, and ends its turn with no watch.
+    await intent(r1, { kind: 'request', text: 'Please post a full npm test record.' })
+    await typedUntil(st, k + 1)
+    expect(st.typed[k].agent).toBe('b1')
+    // The builder answers at once, then posts the result later as a plain comment: each a comment alone, as
+    // hive_update_task with only a comment writes it (commentTask, which HI-2302's reply missed).
+    await inWorkspace(w, () => tasks.commentTask(c, "@R1: you're right, running it now.", b1))
+    await typedUntil(st, k + 2)
+    expect(st.typed[k + 1].agent).toBe('r1')
+    expect(st.typed[k + 1].text).toContain(`The builder replies: "@R1: you're right, running it now."`)
+    st.status.set('r1', 'ready')
+    await inWorkspace(w, () => tasks.commentTask(c, 'Full run: 8948 passed, log attached.', b1))
+    await typedUntil(st, k + 3)
+    expect(st.typed[k + 2].agent).toBe('r1')
+    expect(st.typed[k + 2].text).toContain('The builder replies: "Full run: 8948 passed, log attached."')
+    expect((await history(w, c)).filter((x) => x.includes('Replied to the reviewer'))).toHaveLength(2)
+    // Its verdict closes the round: a comment after it, in Passed, wakes nobody.
+    await intent(r1, { kind: 'verdict', pass: true, comment: 'Round 1: PASSED.' })
+    await settled()
+    const after = st.typed.length
+    await inWorkspace(w, () => tasks.commentTask(c, 'Thanks.', b1))
+    await settled()
+    expect(st.typed.slice(after).filter((t) => t.agent === 'r1')).toEqual([])
+    await disposeWorkspaceService(w)
+  })
+
+  it("a lane reviewer's comment alone, before its review, is its request to the builder (HI-2428, #1410)", async () => {
+    await loopWakes.clearLoopWakes()
+    const { w, alpha } = await open()
+    const st = fake(alpha)
+    const c = await newCard(w)
+    await lanes.startLane(w, { project: 'alpha', builder: 'b1', reviewer: 'r1', cards: [c], by: 'B1 (alpha)' })
+    await inWorkspace(w, () => tasks.updateTask(c, { column: 'review' }, b1))
+    await typedUntil(st, 1)
+    st.status.set('b1', 'ready')
+    await inWorkspace(w, () => tasks.commentTask(c, 'Waiting for #12 first: rebase on it.', r1))
+    await typedUntil(st, 2)
+    expect(st.typed[1].agent).toBe('b1')
+    expect(await history(w, c)).toContain('R1 (alpha): Asked the builder: "Waiting for #12 first: rebase on it."')
+    await disposeWorkspaceService(w)
+  })
+
   it("a builder's reply is only a comment while the project's loop wakes are off (HI-2302)", async () => {
     await loopWakes.clearLoopWakes()
     const { w, alpha } = await open({ loopWakes: false })

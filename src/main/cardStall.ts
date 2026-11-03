@@ -1,7 +1,7 @@
 import { basename, join } from 'path'
 import { projectAgents } from '../shared/defaults'
 import { agentRuntime } from '../shared/runtime'
-import { REVIEW_WAIT_STALL_MS, backgroundTaskMinutes, builderJobOf, columnSince, laneOrderWaitReason, loopStepWaitReason, notWatchingReason, pendingDesign, reviewVerdictWaitReason, reviewWaitReason, stalledReason, startFailedReason, startWaitingReason, type LaneOrderView, type StallAgent } from '../shared/tasks'
+import { REVIEW_WAIT_STALL_MS, backgroundTaskMinutes, builderJobOf, columnSince, laneOrderWaitReason, loopStepWaitReason, notWatchingReason, pendingDesign, reviewVerdictWaitReason, reviewWaitReason, stalledReason, startFailedReason, startWaitingReason, type BuilderJob, type LaneOrderView, type StallAgent } from '../shared/tasks'
 import type { AgentInfo, AgentStart, LaneStatus, ProgressRun, TaskCard } from '../shared/types'
 import { LOOP_STEP_WAIT_MINUTES, laneStatusText } from '../shared/lanes'
 import { forYouOfCards } from './workflow/cardWork'
@@ -85,6 +85,30 @@ export function staleWaitReason(c: Pick<TaskCard, 'number' | 'key' | 'column' | 
 
 /** A builder's statuses with no turn going (watching counts too: returnedWaitReason). */
 const IDLE = ['ready', 'finished', 'watching']
+
+/**
+ * Why a card in Review is stalled on its reviewer after its builder's reply (HI-2428), or null: the builder replied to
+ * it ("Replied to the reviewer", HI-2302), and since then, for REVIEW_WAIT_STALL_MS, nobody has moved: its reviewer (the
+ * review started on it) has written nothing on the card and isn't in a turn, watching or not; nor is its builder; and no
+ * job of the builder's for the card is running (`job`, builderJobOf: the clock starts again from its end). On HI-2410 a
+ * pool reviewer with no watch of its own asked its builder for a full run and sat idle for seven hours after the answer;
+ * #843's check counts only a reviewer that watches. While the builder works on what was asked it isn't the reviewer's
+ * stall: so its own reply ("running it now") starts nothing until it, too, is idle. Agent-facing.
+ */
+export function replyWaitReason(c: Pick<TaskCard, 'number' | 'key' | 'column' | 'archived' | 'blocked' | 'project' | 'review' | 'history' | 'comments'>, reviewer: { name: string; status: string } | null, builder: { status: string } | null, job?: BuilderJob | null, now = Date.now()): string | null {
+  if (!c.review || !reviewer || c.archived || c.blocked || c.column !== 'review' || job?.running) return null
+  if (!IDLE.includes(reviewer.status) || (builder && !IDLE.includes(builder.status))) return null
+  const reply = c.history.findLast((h) => /^Replied to the reviewer\b/.test(h.what))
+  if (!reply) return null
+  // Its board name, as its lines and comments are signed ("R1 (alpha)").
+  const names = new Set([c.review.agentName, reviewer.name].flatMap((n) => (n ? [n.toLowerCase(), `${n} (${c.project})`.toLowerCase()] : [])))
+  const by = (x: { at: string; by: string }): boolean => x.at > reply.at && names.has(x.by.toLowerCase())
+  if (c.history.some(by) || c.comments.some(by)) return null
+  const since = Math.max(Date.parse(reply.at) || 0, job?.endedAt ?? 0)
+  if (!since || now - since < REVIEW_WAIT_STALL_MS) return null
+  const min = Math.round((now - since) / 60_000)
+  return `${c.key ?? `#${c.number}`}'s builder replied to ${reviewer.name} ${min} min ago; ${reviewer.name} is ${reviewer.status === 'watching' ? 'only watching' : 'idle'}, with no verdict or answer since.` // i18n-ignore: agent-facing (the Agent API's stalled)
+}
 
 /** How long a running lane's next card waits in Todo after the card before it is Done, its builder idle (HI-1741). */
 export const LANE_NEXT_STALL_MS = 15 * 60_000
@@ -198,7 +222,15 @@ export function cardStall(c: TaskCard, agentNow: StallAgent | null, wsPath: stri
     const why = waited(REVIEW_WAIT_STALL_MS) ? reviewVerdictWaitReason(c, watchers, Date.now(), undefined, job) : null
     return why && wsPath && c.review && ownQuestionOpen(wsPath, c, c.review.agent) ? null : why
   }
-  return startFailedReason(c, agentNow) ?? startWaitingReason(c, agentNow) ?? stalledReason(c, agentNow) ?? notWatchingReason(c, live.filter((a) => a.notWatching?.length)) ?? back ?? (waited(REVIEW_WAIT_STALL_MS) ? reviewWaitReason(c, watchers) : null) ?? verdictWait() ?? (waited(REVIEW_WAIT_STALL_MS) ? laneOrderWaitReason(c, lane, watchers) : null) ?? (waited(REVIEW_WAIT_STALL_MS) ? loopStepWaitReason(c, watchers, stepWaitMs) : null) ?? (waited(IDLE_WATCH_STALL_MS) ? idleWatch(c, lane, live, wsPath) : null) ?? (waited(LANE_NEXT_STALL_MS) ? laneNext(c, lane, live, agentNow) : null) ?? reviewCopyWaitReason?.(c, wsPath) ?? null
+  // HI-2428: its builder's reply waiting on a reviewer, watching or not, while nobody moves.
+  const replyWait = (): string | null => {
+    if (!waited(REVIEW_WAIT_STALL_MS) || !c.review) return null
+    const of = (id: string) => live.find((a) => a.agentId === id && a.project.toLowerCase() === c.project.toLowerCase())
+    const reviewer = of(c.review.agent)
+    const why = replyWaitReason(c, reviewer ? { name: reviewer.name, status: reviewer.status } : null, c.agent ? (of(c.agent) ?? null) : null, job)
+    return why && wsPath && ownQuestionOpen(wsPath, c, c.review.agent) ? null : why
+  }
+  return startFailedReason(c, agentNow) ?? startWaitingReason(c, agentNow) ?? stalledReason(c, agentNow) ?? notWatchingReason(c, live.filter((a) => a.notWatching?.length)) ?? back ?? (waited(REVIEW_WAIT_STALL_MS) ? reviewWaitReason(c, watchers) : null) ?? verdictWait() ?? replyWait() ?? (waited(REVIEW_WAIT_STALL_MS) ? laneOrderWaitReason(c, lane, watchers) : null) ?? (waited(REVIEW_WAIT_STALL_MS) ? loopStepWaitReason(c, watchers, stepWaitMs) : null) ?? (waited(IDLE_WATCH_STALL_MS) ? idleWatch(c, lane, live, wsPath) : null) ?? (waited(LANE_NEXT_STALL_MS) ? laneNext(c, lane, live, agentNow) : null) ?? reviewCopyWaitReason?.(c, wsPath) ?? null
 }
 
 /**

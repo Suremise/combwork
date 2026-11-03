@@ -14,7 +14,7 @@ import { REVIEW_WAIT_STALL_MS } from '../src/shared/tasks'
 import { IDLE_WATCH_STALL_MS } from '../src/shared/idleWatch'
 import { tempDir } from './tempDir'
 import { follow } from './followDoorbell'
-import { LANE_NEXT_STALL_MS, laneNextWaitReason, RETURN_STALL_MS, returnedWaitReason, setStallRuns, STALE_STALL_MS, staleWaitReason } from '../src/main/cardStall'
+import { LANE_NEXT_STALL_MS, laneNextWaitReason, replyWaitReason, RETURN_STALL_MS, returnedWaitReason, setStallRuns, STALE_STALL_MS, staleWaitReason } from '../src/main/cardStall'
 import type { ProgressRun } from '../src/shared/types'
 import { resetAgentStartsForTests, startBegun, startEnded } from '../src/main/agentStarts'
 /** The merge queue's returns as queueReturnOf finds them (HI-1721), by card: none unless a test sets one. */
@@ -271,6 +271,53 @@ describe("an approved card whose pass went stale, waiting for its builder (HI-17
     expect(staleWaitReason({ ...c, column: 'doing' }, stale, watching, t + 2 * STALE_STALL_MS)).toBeNull()
     expect(staleWaitReason({ ...c, blocked: 'Which icon?' }, stale, watching, t + 2 * STALE_STALL_MS)).toBeNull()
     expect(staleWaitReason(c, null, watching, t + 2 * STALE_STALL_MS)).toBeNull()
+  })
+})
+
+describe("a builder's reply waiting on an idle reviewer (HI-2428's replyWaitReason)", () => {
+  const asked = '2026-11-03T03:57:01.000Z'
+  const replied = '2026-11-03T04:25:08.000Z'
+  const t = Date.parse(replied)
+  const c = {
+    number: 2458,
+    key: 'HI-2410',
+    column: 'review' as const,
+    archived: false,
+    blocked: null,
+    project: 'hive',
+    review: { agent: 'a-r1', agentName: 'HR1', since: '2026-11-03T03:53:20.000Z' },
+    history: [
+      { at: '2026-11-03T03:53:13.000Z', by: 'HB2 (hive)', what: 'Moved to Review' },
+      { at: asked, by: 'HR1 (hive)', what: 'Asked the builder: "Please post a full npm test record."' },
+      { at: replied, by: 'HB2 (hive)', what: 'Replied to the reviewer: "Full run: 8948 passed."' }
+    ],
+    comments: [
+      { at: asked, by: 'HR1 (hive)', text: 'Please post a full npm test record.' },
+      { at: replied, by: 'HB2 (hive)', text: 'Full run: 8948 passed.' }
+    ]
+  }
+  const idle = { name: 'HR1', status: 'finished' }
+  it('stalled 15 min after the reply while its reviewer, watching or not, and its builder are both out of a turn', () => {
+    expect(replyWaitReason(c, idle, { status: 'finished' }, null, t + REVIEW_WAIT_STALL_MS)).toBe("HI-2410's builder replied to HR1 15 min ago; HR1 is idle, with no verdict or answer since.")
+    expect(replyWaitReason(c, { name: 'HR1', status: 'watching' }, { status: 'watching' }, null, t + REVIEW_WAIT_STALL_MS)).toMatch(/HR1 is only watching/)
+    expect(replyWaitReason(c, idle, null, null, t + REVIEW_WAIT_STALL_MS - 1000)).toBeNull()
+  })
+  it('not while either is in a turn, the builder has a job for the card running, or the reviewer has written since', () => {
+    for (const status of ['working', 'starting', 'waiting']) {
+      expect(replyWaitReason(c, { name: 'HR1', status }, null, null, t + 3 * REVIEW_WAIT_STALL_MS), `reviewer ${status}`).toBeNull()
+      expect(replyWaitReason(c, idle, { status }, null, t + 3 * REVIEW_WAIT_STALL_MS), `builder ${status}`).toBeNull()
+    }
+    expect(replyWaitReason(c, idle, null, { running: true, endedAt: null }, t + 3 * REVIEW_WAIT_STALL_MS)).toBeNull()
+    // A job that ended starts the clock again from its end.
+    expect(replyWaitReason(c, idle, null, { running: false, endedAt: t + REVIEW_WAIT_STALL_MS }, t + REVIEW_WAIT_STALL_MS + 60_000)).toBeNull()
+    const later = new Date(t + 60_000).toISOString()
+    expect(replyWaitReason({ ...c, comments: [...c.comments, { at: later, by: 'HR1 (hive)', text: 'Reading it.' }] }, idle, null, null, t + 3 * REVIEW_WAIT_STALL_MS)).toBeNull()
+  })
+  it('not before any reply, nor for a card out of Review, blocked, or with no review started', () => {
+    expect(replyWaitReason({ ...c, history: c.history.slice(0, 2) }, idle, null, null, t + 3 * REVIEW_WAIT_STALL_MS)).toBeNull()
+    expect(replyWaitReason({ ...c, column: 'passed' }, idle, null, null, t + 3 * REVIEW_WAIT_STALL_MS)).toBeNull()
+    expect(replyWaitReason({ ...c, blocked: 'Which icon?' }, idle, null, null, t + 3 * REVIEW_WAIT_STALL_MS)).toBeNull()
+    expect(replyWaitReason({ ...c, review: undefined }, idle, null, null, t + 3 * REVIEW_WAIT_STALL_MS)).toBeNull()
   })
 })
 
