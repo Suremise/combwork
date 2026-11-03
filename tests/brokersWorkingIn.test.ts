@@ -58,6 +58,18 @@ describe('a broker working in a held slot (HI-2467)', () => {
     expect(await look(a, () => Promise.reject(new Error('no helper')))).toEqual({ name: 'WindowsSandboxServer', idle: null })
   })
 
+  it('an answer that leaves some out (over the bound, or one unread): the broker it saw is named, its idleness unknown; none seen, nothing named', async () => {
+    let asked = 0
+    const running = async (): Promise<string[]> => (asked++, [])
+    const cut = { ...answer({ cwd: SLOT }), complete: false }
+    expect(await look(cut, running)).toEqual({ name: 'WindowsSandboxServer', idle: null })
+    expect(await look({ ...answer({ cwd: `${dir}\\` }), complete: false }, running)).toBeNull()
+    expect(await look({ complete: false, processes: [] }, running)).toBeNull()
+    // Through the parser as the helper's answer comes, too (HR1's probe).
+    expect(await look(parseWorkingIn({ complete: false, processes: [{ id: '123:133000000000000000', path: BROKER, cwd: SLOT }] }, 32), running)).toEqual({ name: 'WindowsSandboxServer', idle: null })
+    expect(asked).toBe(0)
+  })
+
   it('a process gone or its id reused since (no longer in the answer), or no answer at all: nothing named', async () => {
     expect(await look(answer())).toBeNull()
     expect(await look(null)).toBeNull()

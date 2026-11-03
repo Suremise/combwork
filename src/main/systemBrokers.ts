@@ -115,7 +115,7 @@ export function parseWorkingIn(r: unknown, max: number): WorkingIn | null {
  * The known brokers working in a folder (HI-2467): Windows refuses to rename a folder that is a process's current
  * folder, and an idle Sandbox broker keeps the one it was started in. `name`: its executable's name, as Windows gives
  * it (WindowsSandboxServer; the first by name where several differ); `idle`: none of what they serve runs (true), some does (false), or it can't be told
- * (null). Only what was read in that one answer counts: a process counts when its path is a known broker's and its
+ * (null; always null for an answer that isn't whole, `complete` false). Only what was read in that one answer counts: a process counts when its path is a known broker's and its
  * current folder is `folder` or inside it (`inside`). An unread path or folder, another executable, a folder elsewhere:
  * not counted, never guessed. Null when none counts, or the answer is unusable: the caller says only that something
  * holds the folder. `stands`: test copies' stand-in ids, whose path (read by the helper all the same) is taken as
@@ -139,6 +139,8 @@ export async function brokersWorkingIn(answer: WorkingIn | null, folder: string,
   if (!found.length) return null
   const name = found.map((f) => (f.path.split(/[\\/]/).pop() ?? '').replace(/\.exe$/i, '')).filter(Boolean).sort()[0]
   if (!name) return null
+  // An answer that leaves some out (HR1 on HI-2467): the broker it saw is named, its idleness never claimed.
+  if (!answer.complete) return { name, idle: null }
   const active = [...new Set(found.flatMap((f) => f.broker.active))]
   const now = await opts.running(active).catch(() => null)
   return { name, idle: now ? !now.length : null }
