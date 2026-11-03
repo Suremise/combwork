@@ -381,6 +381,15 @@ describe('the advanced store', () => {
       await settled()
       expect([fileValues(), advanced.get('hive.showDeveloperFeatures'), settings.advanced.showDeveloperFeatures]).toEqual([{ 'hive.showDeveloperFeatures': true }, true, true])
       expect(given).toEqual([false, true, false, true])
+      // Turned off, and the file edited (still on) before that change is written: the write is refused (an edit made
+      // meanwhile), and the edit wins: the setting follows the file, nothing echoing.
+      cfg.updateSettings({ advanced: { showDeveloperFeatures: false } })
+      writeFileSync(file, JSON.stringify({ format: 1, values: { 'hive.showDeveloperFeatures': true } }, null, 2))
+      await settled()
+      await settled()
+      await settled()
+      expect([fileValues(), advanced.get('hive.showDeveloperFeatures'), settings.advanced.showDeveloperFeatures]).toEqual([{ 'hive.showDeveloperFeatures': true }, true, true])
+      expect(given).toEqual([false, true, false, true, false, true])
     } finally {
       advanced.stop()
     }

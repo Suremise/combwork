@@ -416,9 +416,15 @@ export function bindAdvancedSettings(cfg: { settings: AppSettings; updateSetting
   // Settings changes queued for the file and not yet written (HI-2418): until they are, the file is behind the setting,
   // and following it would turn the setting back (a change made while the last was being written, then an echo of each).
   const pending = new Map<string, number>()
+  // A change of the file's not followed for that reason: followed once the queued changes are done, so a write they
+  // lost to an edit made meanwhile (write's conflict) leaves the setting the file's, not the change refused.
+  const deferred = new Set<string>()
   const fromFile = (): void => {
     for (const d of bound) {
-      if (pending.get(d.id)) continue
+      if (pending.get(d.id)) {
+        deferred.add(d.id)
+        continue
+      }
       if (migrating.has(d.id)) {
         if (advanced.overrides()[d.id] === undefined) continue
         migrating.delete(d.id)
@@ -441,7 +447,11 @@ export function bindAdvancedSettings(cfg: { settings: AppSettings; updateSetting
           migrating.delete(d.id)
         })
         .catch((e) => log.warn(`Couldn't keep ${d.id} in advanced.json`, e))
-        .finally(() => pending.set(d.id, pending.get(d.id)! - 1))
+        .finally(() => {
+          pending.set(d.id, pending.get(d.id)! - 1)
+          // Written: the file is the setting, and following it changes nothing. Refused: the file wins.
+          if (!pending.get(d.id) && deferred.delete(d.id)) fromFile()
+        })
     }
   }
   // The first start: the setting as it was is the file's, unless the file already says.
