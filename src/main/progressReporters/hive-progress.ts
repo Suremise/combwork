@@ -1,5 +1,7 @@
 // The hive-progress command (a .cmd and a sh script in Hive's bin folder, on each session's PATH, start this with
 // Hive's own executable as Node): see wrapper.ts.
+// The session's dialect (HI-2065), loaded before the wrapper says anything: first, on purpose.
+import '../../shared/agentText/processDialect'
 import { runWrapped } from './wrapper'
 
 // Ctrl+C reaches the command too: wait for it to end, so its exit code is returned and Hive hears how it ended.

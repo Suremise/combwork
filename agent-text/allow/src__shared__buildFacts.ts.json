@@ -1,0 +1,15 @@
+{
+  "prose|prop:other|release candidate": 1,
+  "prose|prop:text|builtAt is a date and time (ISO).": 1,
+  "prose|prop:text|by is dist or release.": 1,
+  "prose|prop:text|commit is a commit id (7 to 64 hex characters).": 1,
+  "prose|prop:text|installer is the installer's path (at most 1,000 characters).": 1,
+  "prose|prop:text|kind is one of: {}.": 1,
+  "prose|prop:text|version is required (at most 100 characters).": 1,
+  "prose|return|Installer: {} Built: {}{}": 1,
+  "prose|return|Uploaded to a draft GitHub release (npm run release).": 1,
+  "prose|return|on {}": 1,
+  "prose|return|{} Hive {} ({}) from {}{}": 1,
+  "prose|var|Built": 1,
+  "prose|var|Uploaded a draft of": 1
+}

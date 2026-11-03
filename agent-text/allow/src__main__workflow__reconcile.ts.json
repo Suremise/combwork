@@ -1,0 +1,10 @@
+{
+  "prose|call|{} Or put its branch back at {}.": 2,
+  "prose|call|{}: back at its approved revision, so its pass holds again; it is queued again; don't submit it again": 1,
+  "prose|call|{}: back at its approved revision, so its pass holds again; {}": 1,
+  "prose|var|it stays in the merge queue": 1,
+  "prose|var|it waits for the reviewer to check your follow-up": 1,
+  "prose|var|it waits for the user's OK": 1,
+  "prose|var|merge it and report the merge": 1,
+  "prose|var|{}: your paths changed since the pass, submit again": 1
+}

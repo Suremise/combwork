@@ -1,0 +1,10 @@
+{
+  "prose|call|the user released it": 1,
+  "prose|error|Agents are waiting to merge into {} (the merge slot): merge when they are done.": 1,
+  "prose|error|The merge slot for {} changed hands meanwhile, so nothing was released. Look again before releasing it.": 1,
+  "prose|error|branch must be a branch name": 2,
+  "prose|error|cards must be up to {} card numbers": 1,
+  "prose|error|{} into {} (the merge slot): merge when it is done.": 1,
+  "prose|var|it expired after {} minutes": 1,
+  "prose|var|it was your turn, but you didn't claim it within {} minutes": 1
+}

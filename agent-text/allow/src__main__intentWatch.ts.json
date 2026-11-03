@@ -1,0 +1,8 @@
+{
+  "prose|return|Hive watches {} for you, for {}, up to {}: end your turn, and it wakes you.": 1,
+  "prose|return|You already watch {} ({}): end your turn.": 1,
+  "prose|return|Your watch ({}) stays: Hive's loop wake tells you when {} comes back.": 1,
+  "prose|return|{} is already {}: carry on.": 1,
+  "prose|var|its next round in Review": 1,
+  "prose|var|its review (a verdict, a move or a comment)": 1
+}

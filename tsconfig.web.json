@@ -12,11 +12,14 @@
     "resolveJsonModule": true,
     "isolatedModules": true,
     "noEmit": true,
+    "allowImportingTsExtensions": true,
     "paths": {
       "@shared/*": ["./src/shared/*"],
       "@docs/*": ["./docs/*"],
       "@root/*": ["./*"]
     }
   },
-  "include": ["src/renderer/src/**/*", "src/shared/**/*", "src/preload/*.d.ts"]
+  "include": ["src/renderer/src/**/*", "src/shared/**/*", "src/preload/*.d.ts"],
+  // Agent text's Node-only parts (HI-2065): main's scopes, and the dialect file hive-mcp.js and hive-progress.js load.
+  "exclude": ["src/shared/agentText/asyncScope.ts", "src/shared/agentText/processDialect.ts"]
 }

@@ -1,0 +1,8 @@
+{
+  "prose|prop:text|Hive": 1,
+  "prose|return|, outside a lane: you review it": 1,
+  "prose|return|: you review it from the pool": 1,
+  "prose|return|{}{} is in Review{}. Review its latest submission with the review-agent-work skill; your verdict frees you for the next card.": 1,
+  "prose|return|{}{}: follow-up submitted for review (submission {}), still yours to review. Start your review again (hive_start_review), which takes it and moves your review copy to it; a verdict on the earlier submission is refused.": 1,
+  "prose|return|{}{}: its builder posted a design for a check ({}/s{}), which you take from the pool. Read it (the card's latest comment) and answer with hive_loop_step, step ok or gaps, design {}/s{}; not a review: no verdict. You're then preferred to review the card when it is submitted.": 1
+}

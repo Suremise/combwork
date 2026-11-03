@@ -99,6 +99,17 @@ function initialize(def) {
     const withGuidance = await initialize(on)
     check("on: the hive server answers with Hive's guidance as its instructions", typeof withGuidance?.instructions === 'string' && /hive_inbox|Hive/.test(withGuidance.instructions), JSON.stringify(withGuidance).slice(0, 300))
 
+    // ---- The canary dialect (HI-2065): the same server given a dialect file with every catalogue text in markers. Its
+    // instructions must come through the catalogue whole: a word outside the markers bypassed it.
+    const catalogueDir = path.join(lib.ROOT, 'agent-text', 'catalogue')
+    const catalogue = Object.assign({}, ...fs.readdirSync(catalogueDir).filter((f) => f.endsWith('.json')).map((f) => JSON.parse(fs.readFileSync(path.join(catalogueDir, f), 'utf8'))))
+    const { canaryTexts, canaryProblems } = require('../../src/shared/agentText/canary.ts')
+    const dialectFile = path.join(lib.probeDir('agentguidance-canary'), 'dialect.json')
+    fs.writeFileSync(dialectFile, JSON.stringify({ texts: canaryTexts(catalogue), files: ['canary'], hash: 'canary' }))
+    const canary = await initialize({ ...on, env: { ...on.env, HIVE_DIALECT_FILE: dialectFile, HIVE_DIALECT: 'canary' } })
+    const problems = typeof canary?.instructions === 'string' ? canaryProblems(canary.instructions, new Set(Object.keys(catalogue)), ['alpha']) : ['no instructions']
+    check("canary: the server reads the dialect file, and every word of its instructions is the catalogue's", problems.length === 0 && canary.instructions.includes('⟦contract.agent.host⟧'), `${problems.join('; ')} | ${String(canary?.instructions).slice(0, 300)}`)
+
     // ---- Off: the same server, its tools still there, no instructions.
     await inv('advanced:set', GUIDANCE, false)
     const off = await hiveServer()

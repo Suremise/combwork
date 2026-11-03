@@ -1,0 +1,18 @@
+{
+  "prose|call|Hive can't give {} to {} yet: its conversation in {} can't resume now ({}).": 3,
+  "prose|call|Hive couldn't resume {}'s conversation in {} for {} (three tries): {}. Resume {} from Sessions, or start it fresh, and Hive gives it {}.": 1,
+  "prose|call|changed while it was taken over": 1,
+  "prose|prop:other|Hive couldn't get {} ready: {}": 1,
+  "prose|prop:other|its conversation in {} didn't resume ({} tries): {}": 1,
+  "prose|prop:other|{}'s own slot {}, its run still there, {}: this start waits for it rather than take a second slot": 1,
+  "prose|prop:text|Hive": 1,
+  "prose|return|its agent keeps another slot ({})": 1,
+  "prose|return|its agent reviews now": 1,
+  "prose|return|its last session there is still ending": 1,
+  "prose|return|its slot {} changed since it ran": 1,
+  "prose|return|its slot {} holds other work now": 1,
+  "prose|return|its slot {} is free, for a Resume by hand": 1,
+  "prose|return|its slot {} is gone": 1,
+  "prose|return|its slot's lease {} ended while the start took it: the start tries again": 1,
+  "prose|var|Hive couldn't get {} ready for {}: {}": 1
+}

@@ -1,0 +1,15 @@
+{
+  "prose|prop:other|card event": 1,
+  "prose|prop:other|card events": 1,
+  "prose|return|, act on {} and ack {}": 1,
+  "prose|return|, act on {}, then ack {}": 1,
+  "prose|return|; act on {} and ack {}": 1,
+  "prose|return|and act on {}": 1,
+  "prose|return|{} and {}": 1,
+  "prose|return|{} and {} more": 1,
+  "prose|return|{}Before you finish: your inbox has {} you haven't read. Call hive_inbox{} before you end your turn.": 1,
+  "prose|return|{}Lanes are running ({}) and nothing will wake you about them: watch the lanes (hive_wait_for_tasks with lanes [\"all\"], wake) before you finish.": 1,
+  "prose|return|{}New in your inbox: {}. Call hive_inbox now to read {}{}, then carry on.": 1,
+  "prose|return|{}New in your inbox: {}. Call hive_inbox to read {}{}.": 1,
+  "prose|var|and {} more": 1
+}

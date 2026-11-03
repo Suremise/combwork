@@ -1,0 +1,10 @@
+{
+  "prose|prop:other|is starting": 1,
+  "prose|prop:other|is waiting for the user": 1,
+  "prose|prop:other|is waiting on background tasks it started": 1,
+  "prose|prop:other|is waiting on cards (a card watch): it takes no other work until it is woken, or the watch is cancelled (Cancel in its header)": 1,
+  "prose|prop:other|is working": 1,
+  "prose|prop:text|the Assistant": 1,
+  "prose|prop:text|the user": 1,
+  "prose|var|{} {}. Start the task once it's idle, or give it to another agent.": 1
+}

@@ -1,0 +1,6 @@
+{
+  "prose|return|{} is held by {}, left running by {}'s last run: it is free once they end (End in {}'s ⋯ ends them)": 1,
+  "prose|return|{} is in use by {}'s session there": 1,
+  "prose|return|{} is still held by {}'s last run, not known to have ended (Release Slot… in {}'s ⋯ frees it)": 1,
+  "prose|var|and {} more": 1
+}

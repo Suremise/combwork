@@ -1,0 +1,22 @@
+{
+  "prose|prop:other|Copilot’s own footer still says Manual Approval: Hive starts it with edits in its folder approved (an allow rule), which Copilot’s label doesn’t show.": 1,
+  "prose|prop:text|Accept edits": 1,
+  "prose|prop:text|Allow all": 1,
+  "prose|prop:text|Allow all, and it carries on by itself until the task is done (up to 5 continuations) without handing back to you. Once it has run, the session approves every tool, path and web request, also after you switch out of it. Use only where unattended changes are acceptable.": 1,
+  "prose|prop:text|Approves every tool, path and web request without asking, in its folder and outside it.": 1,
+  "prose|prop:text|Ask": 1,
+  "prose|prop:text|Autopilot": 1,
+  "prose|prop:text|Edits files in its folder without asking (not where the folder’s path has parentheses: Copilot can’t approve them there); still asks before other commands, other MCP tools, web access and changes outside its folder.": 1,
+  "prose|prop:text|Extra high": 1,
+  "prose|prop:text|High": 1,
+  "prose|prop:text|Low": 1,
+  "prose|prop:text|Max": 1,
+  "prose|prop:text|Medium": 1,
+  "prose|prop:text|Minimal": 1,
+  "prose|prop:text|None": 1,
+  "prose|prop:text|Older versions": 1,
+  "prose|prop:text|Others": 1,
+  "prose|prop:text|Plan": 1,
+  "prose|prop:text|Plans the work and asks before changing anything.": 1,
+  "prose|prop:text|Reads files and runs harmless commands without asking; asks before edits, other commands, other MCP tools and web access.": 1
+}

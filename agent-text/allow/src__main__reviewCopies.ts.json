@@ -1,0 +1,22 @@
+{
+  "prose|prop:text|Hive": 1,
+  "prose|prop:text|it couldn't be leased: {}": 1,
+  "prose|prop:text|one is being set up": 1,
+  "prose|prop:text|the card has no submitted revision": 1,
+  "prose|prop:text|the review ended": 1,
+  "prose|prop:text|the review is not going": 1,
+  "prose|return|No review copy ({}): review the builder's work read-only from where you are.": 1,
+  "prose|return|Waiting for a review copy ({}): Hive tells you when one is ready, with its folder. Meanwhile git can show the submission from where you are.": 1,
+  "prose|return|being freed": 1,
+  "prose|return|held back by {}": 1,
+  "prose|return|review copies are off (Settings → Advanced, Reviewers review in review copies)": 1,
+  "prose|return|workflow rules aren't enforced (Settings → Advanced, Workflow rules are enforced)": 1,
+  "prose|return|{}'s review by {} has waited {} min for a review copy: {}.": 1,
+  "prose|return|{}'s review copy is ready.": 1,
+  "prose|return|{}; the longest lent, {}, for {} (a {} of {})": 1,
+  "prose|return|{}; {}, returned {} ago, is {}": 1,
+  "prose|return|{}Review in {} at {}: read and run commands there, with it as their working directory; your session stays where it is.": 1,
+  "prose|var|copies are": 1,
+  "prose|var|copy is": 1,
+  "prose|var|the pool's {} {} in use": 1
+}

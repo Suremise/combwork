@@ -1,0 +1,13 @@
+{
+  "prose|assign|Cancelled": 1,
+  "prose|assign|Denied": 1,
+  "prose|prop:other|Agent": 1,
+  "prose|prop:other|Bash": 1,
+  "prose|prop:other|Edit": 1,
+  "prose|prop:other|Glob": 1,
+  "prose|prop:other|Grep": 1,
+  "prose|prop:other|Question": 1,
+  "prose|prop:other|Read": 1,
+  "prose|prop:other|Write": 1,
+  "prose|return|Copilot isn’t signed in.": 1
+}

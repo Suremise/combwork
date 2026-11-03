@@ -1,0 +1,5 @@
+{
+  "prose|prop:text|Hive's process supervisor isn't running, so it can't run a slot's commands": 1,
+  "prose|prop:text|its job couldn't be made: {}": 1,
+  "prose|prop:text|the workspace closed": 1
+}
