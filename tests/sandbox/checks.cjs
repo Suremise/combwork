@@ -7,7 +7,7 @@
  * to --report. Moved from the hive-mcp repo (servers/windows-sandbox/scenarios/hive-checks.js at c5dee8a, HI-2298).
  *
  *   npm run sandbox-checks -- --installer <Combwork-Setup-x.y.z.exe> [--previous <older installer>] [--hive <Hive repo>]
- *        [--server <windows-sandbox server.js>] [--report <folder>] [--only fresh|upgrade] [--wait-min N]
+ *        [--server <windows-sandbox server.js>] [--report <folder>] [--only fresh|upgrade|manual|edges] [--short <installer>] [--wait-min N]
  *        [--smart-app-control off]
  *
  * --hive (or HIVE_REPO; default this checkout) is where --previous is looked for: the newest Combwork-Setup-*.exe or Hive-Setup-*.exe in
@@ -30,6 +30,17 @@ const { server } = require('./client.cjs')
 const { stopConfirmed, list, hostProblem, SAC_QUERY, sacState } = require('./wsb.cjs')
 const { evaluate, markdown, verdict, KINDS } = require('./report.cjs')
 const { childEnv } = require('../e2e/runContext.cjs')
+
+/**
+ * The names the build gives the app (HI-2458, HI-2460): productName (its Installed-apps name), the shortcuts' name and the
+ * exe's, from this checkout's package.json and electron-builder.yml, which the build checked is made from.
+ */
+function appNames() {
+  const yml = fs.readFileSync(path.join(REPO, 'electron-builder.yml'), 'utf8')
+  const field = (k) => (new RegExp(`^\\s*${k}:\\s*(.+?)\\s*$`, 'm').exec(yml) || [])[1]
+  const productName = JSON.parse(fs.readFileSync(path.join(REPO, 'package.json'), 'utf8')).productName
+  return { productName, shortcutName: field('shortcutName') || productName, exeName: field('executableName') || productName }
+}
 
 /** This checkout: its tests folder and playwright-core are mapped into the Sandbox. */
 const REPO = path.resolve(__dirname, '..', '..')
@@ -122,17 +133,23 @@ function plan(argv) {
   if (!serverJs) throw new Error(`No windows-sandbox server found (looked in ${serverCandidates(hive).join(' and ')}): pass --server <its server.js> (or WSB_SERVER), or install it from Hive's MCP catalogue`)
   if (!fs.existsSync(serverJs)) throw new Error(`--server ${serverJs} doesn't exist: name the windows-sandbox server's server.js`)
   const installer = opt('--installer') && path.resolve(opt('--installer'))
+  // The edge cases' second installer (HI-2460): built with HIVE_TEST_SHORT_LEGACY_WAIT=1, its legacy-mutex wait 20 s.
+  const short = opt('--short') && path.resolve(opt('--short'))
   if (!installer || !fs.existsSync(installer) || !versionOf(installer)) throw new Error('--installer must name an existing Combwork-Setup-<version>.exe (or Hive-Setup-, before HI-2458)')
-  const ran = only ? [only] : [...KINDS]
+  // By default the release checks' two kinds; the install by hand over the previous release (manual, HI-2460) and the
+  // edge cases (edges) run when asked for (--only).
+  const ran = only ? [only] : ['fresh', 'upgrade']
   let previous = opt('--previous') && path.resolve(opt('--previous'))
-  if (!previous && ran.includes('upgrade')) {
+  const overOld = ran.includes('upgrade') || ran.includes('manual') || ran.includes('edges')
+  if (ran.includes('edges') && (!short || !fs.existsSync(short))) throw new Error('--only edges needs --short <an installer built with HIVE_TEST_SHORT_LEGACY_WAIT=1>, beside --installer')
+  if (!previous && overOld) {
     const dist = path.join(hive, 'dist')
     const cands = fs.existsSync(dist) ? fs.readdirSync(dist).filter(f => versionOf(f)).map(f => path.join(dist, f)).filter(f => f.toLowerCase() !== installer.toLowerCase()) : []
     previous = cands.sort((a, b) => cmpVersion(versionOf(b), versionOf(a)))[0]
     if (!previous) throw new Error(`No previous installer in ${dist}: pass --previous`)
   }
   if (previous && (!fs.existsSync(previous) || !versionOf(previous))) throw new Error('--previous must name an existing Combwork-Setup-<version>.exe (or Hive-Setup-, before HI-2458)')
-  const upgrade = ran.includes('upgrade')
+  const upgrade = overOld
   const root = buildRoot(installer, upgrade ? previous : null)
   const buildInfo = (() => { try { return JSON.parse(fs.readFileSync(path.join(path.dirname(installer), 'build-info.json'), 'utf8')) } catch { return null } })()
   const sha = f => crypto.createHash('sha256').update(fs.readFileSync(f)).digest('hex')
@@ -146,9 +163,11 @@ function plan(argv) {
     previous: upgrade ? previous : null,
     root,
     buildInfo,
+    app: appNames(),
     sameInstaller: upgrade && sha(installer) === sha(previous),
     guestInstaller: guest(installer),
     guestPrevious: upgrade ? guest(previous) : null,
+    guestShort: short ? guest(short) : null,
     report: path.resolve(opt('--report', path.join(process.env.LOCALAPPDATA, 'hive-test', 'sandbox-reports', stamp))),
     waitMin: Number(opt('--wait-min', 0)),
     sacOff: sac === 'off'
@@ -255,7 +274,7 @@ function steps(srv, ctx) {
   return { run, ps, drive, desktop, collect, record, readSac, install }
 }
 
-const SCENARIO_OF = { fresh: 1, upgrade: 4 }
+const SCENARIO_OF = { fresh: 1, upgrade: 4, manual: 7, edges: 8 }
 // How long Settings gets to open inside the Sandbox before its screenshot (nothing there to wait on from the host); the
 // unit tests, whose fake server shows nothing, set it to 0.
 const SETTINGS_OPEN_MS = Number(process.env.HIVE_SANDBOX_TEST_SETTINGS_MS ?? 6000)
@@ -294,6 +313,23 @@ async function main(argv) {
   const ctx = { report: p.report, files: {}, shots: [], steps: [], timings: {}, leftRunning: [], notRun: {}, sac: null, sacOff: p.sacOff }
   const start = { build: p.root, network: false, session: true, tools: ['node', 'playwright', 'hive-tests'], maxMinutes: 30, ...(p.sacOff ? { smartAppControl: 'off' } : {}) }
   const time = async (k, fn) => { const t = Date.now(); const r = await fn(); ctx.timings[k] = `${((Date.now() - t) / 1000).toFixed(1)} s`; return r }
+  const overPrevious = async (srv, n, pre, args) => {
+    const s = steps(srv, ctx)
+    await s.readSac()
+    await time(`${n}. previous release install`, () => s.install(n, `${n}. install previous`, p.guestPrevious, `-Arguments "/S" -Name ${pre}-prev`, { timeoutSec: 300 }))
+    await s.drive(n, `${n}. change settings`, 'mark', `${pre}-mark`)
+    await s.desktop(n, `${pre}-desktop-before`)
+    // The previous release running as the new installer starts, as when its updater runs it (or a user didn't quit it):
+    // its exact main process up with a window first (start-app.ps1 fails the step otherwise), then the installer.
+    await s.ps(n, `${n}. start the previous release, running with a window`, 'start-app.ps1', `-Exe "%LOCALAPPDATA%\\Programs\\Hive\\Hive.exe" -Name ${pre}-prev-started`, { timeoutSec: 120 })
+    await time(`${n}. install over it (${args})`, () => s.install(n, `${n}. install new`, p.guestInstaller, `-Arguments "${args}" -Name ${pre}-new`, { timeoutSec: 300 }))
+    await s.drive(n, `${n}. after the upgrade`, 'after-upgrade', `${pre}-after`)
+    await s.desktop(n, `${pre}-desktop-after`)
+    // A notification from the upgraded app, its banner on the desktop (HI-2460: it shows Combwork's name and icon).
+    await s.drive(n, `${n}. a notification`, 'notify', `${pre}-notify`)
+    await s.desktop(n, `${pre}-toast`)
+    await s.collect(n, [pre])
+  }
   const bodies = {
     fresh: async srv => {
       const s = steps(srv, ctx)
@@ -307,20 +343,22 @@ async function main(argv) {
       await time('1-2. first run, Provider Setup, both themes', () => s.drive(2, '1-2. first run', 'first-run', 's1'))
       await time('3. a CLI appears while Hive runs', () => s.drive(3, '3. CLI appears', 'cli-appears', 's3'))
       await time('6. a new workspace', () => s.drive(6, '6. new workspace', 'workspace', 's6'))
-      await time('5. silent uninstall', () => s.ps(5, '5. uninstall', 'install.ps1', '-Exe "%LOCALAPPDATA%\\Programs\\Hive\\Uninstall Hive.exe" -Arguments "/S" -Name s5 -Uninstall', { timeoutSec: 300 }))
+      await time('5. silent uninstall', () => s.ps(5, '5. uninstall', 'install.ps1', `-Exe "%LOCALAPPDATA%\\Programs\\${p.app.exeName}\\Uninstall ${p.app.exeName}.exe" -Arguments "/S" -Name s5 -Uninstall`, { timeoutSec: 300 }))
       await s.desktop(5, 's5-desktop')
       await s.collect(5, ['s1', 's3', 's5', 's6'])
     },
-    upgrade: async srv => {
+    // Over the previous release, with it running (HI-2460: the installer must close it, then remove it): as its updater
+    // runs the new installer (scenario 4) and as a user installs it by hand (7).
+    upgrade: srv => overPrevious(srv, 4, 's4', '--updated /S --force-run'),
+    manual: srv => overPrevious(srv, 7, 's7', '/S --force-run'),
+    // The installer's edge cases over Hive Desktop (edges.ps1), then a notification under the new app ID (HI-2460).
+    edges: async srv => {
       const s = steps(srv, ctx)
       await s.readSac()
-      await time('4. previous release install', () => s.install(4, '4. install previous', p.guestPrevious, '-Arguments "/S" -Name s4-prev', { timeoutSec: 300 }))
-      await s.drive(4, '4. change settings', 'mark', 's4-mark')
-      await s.desktop(4, 's4-desktop-before')
-      await time('4. update install (--updated /S --force-run)', () => s.install(4, '4. install new', p.guestInstaller, '-Arguments "--updated /S --force-run" -Name s4-new', { timeoutSec: 300 }))
-      await s.drive(4, '4. after the upgrade', 'after-upgrade', 's4-after')
-      await s.desktop(4, 's4-desktop-after')
-      await s.collect(4, ['s4'])
+      await time('8. edge cases', () => s.ps(8, '8. edge cases (edges.ps1)', 'edges.ps1', `-Prev "${p.guestPrevious}" -New "${p.guestInstaller}" -Short "${p.guestShort}"`, { timeoutSec: 1500 }))
+      await s.drive(8, '8. a notification', 'notify', 's8')
+      await s.desktop(8, 's8-desktop')
+      await s.collect(8, ['edges', 's8'])
     }
   }
   for (const kind of p.ran) {
@@ -357,6 +395,7 @@ async function main(argv) {
     installerVersion: versionOf(p.installer),
     buildInfo: p.buildInfo,
     server: p.serverJs,
+    app: p.app,
     previous: p.previous && path.relative(p.root, p.previous),
     previousVersion: p.previous && versionOf(p.previous),
     sameInstaller: p.sameInstaller,

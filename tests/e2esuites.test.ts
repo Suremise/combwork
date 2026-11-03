@@ -1526,13 +1526,16 @@ describe("a restart's trust question (lib.acceptRelaunchTrust, #341)", () => {
 })
 
 describe('the Hives a suite starts (lib.cjs testExecutable, keepPackagedQuiet, #1253)', () => {
-  type Lib = { ROOT: string; ELECTRON: string; PACKAGED_ARGS: string[]; testExecutable: (exe: string) => string; keepPackagedQuiet: (m: object) => string[] }
+  type Lib = { ROOT: string; ELECTRON: string; PACKAGED_EXE: string; PACKAGED_ARGS: string[]; testExecutable: (exe: string) => string; keepPackagedQuiet: (m: object) => string[] }
   const lib = createRequire(import.meta.url)('./e2e/lib.cjs') as Lib
 
   it("this checkout's Electron is the dev build; its dist and the test folders' are packaged; the installed Hive and any other are refused", () => {
     expect(lib.testExecutable(lib.ELECTRON)).toBe('dev')
+    expect(lib.testExecutable(lib.PACKAGED_EXE)).toBe('packaged')
     expect(lib.testExecutable(join(lib.ROOT, 'dist', 'win-unpacked', 'Hive.exe'))).toBe('packaged')
     expect(lib.testExecutable(join(process.env.LOCALAPPDATA ?? '', 'hive-test', 'builds', 'Hive.exe'))).toBe('packaged')
+    // Combwork's install (HI-2460) and Hive Desktop's from before.
+    expect(() => lib.testExecutable(join(process.env.LOCALAPPDATA ?? '', 'Programs', 'Combwork', 'Combwork.exe'))).toThrow(/never start the installed Hive/)
     expect(() => lib.testExecutable(join(process.env.LOCALAPPDATA ?? '', 'Programs', 'Hive', 'Hive.exe'))).toThrow(/never start the installed Hive/)
     expect(() => lib.testExecutable(join(process.env.LOCALAPPDATA ?? '', 'programs', 'hive', 'Hive.exe'))).toThrow(/never start the installed Hive/)
     expect(() => lib.testExecutable('C:\\Elsewhere\\Hive.exe')).toThrow(/never C:\\Elsewhere\\Hive\.exe/)

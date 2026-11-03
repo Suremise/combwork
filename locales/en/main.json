@@ -1020,7 +1020,7 @@
     "description": "A notice (HI-1756): how much of a plan's usage limit is used ({share}: \"85%\") on one connection, a sign-in the user named ({connection}: \"Max 1\"). The limit is a rolling window of {hours} hours (the 5-hour one), the weekly one, or another the provider names itself ({label}, in English as the provider says it)."
   },
   "main.profileMove.fallbackBody": {
-    "defaultMessage": "{n, plural, one {The Combwork folder isn't there, so Combwork runs from {folders}, as before.} other {The Combwork folders aren't there, so Combwork runs from {folders}, as before.}} Installing Combwork with Combwork closed moves {n, plural, one {it} other {them}}; nothing is lost meanwhile.",
+    "defaultMessage": "{n, plural, one {The Combwork folder isn't there, so Combwork runs from {folders}, Hive Desktop's, as before.} other {The Combwork folders aren't there, so Combwork runs from {folders}, Hive Desktop's, as before.}} Running the Combwork installer with Combwork closed moves {n, plural, one {it} other {them}}; nothing is lost meanwhile.",
     "description": "The notice that Hive uses its old data folders. {folders} lists their paths; {n} is how many (1 or 2). \"Installing Combwork\": running the installer of the app under its new name."
   },
   "main.profileMove.fallbackBodyDev": {
@@ -1028,11 +1028,11 @@
     "description": "The same notice for a development build of Hive (no installer moves its folders). {name} is the new folder name (Combwork-Dev: keep it as it is); {folders} lists the old folders' paths; {n} is how many (1 or 2)."
   },
   "main.profileMove.fallbackTitle": {
-    "defaultMessage": "Combwork is using its data folders from before Combwork",
+    "defaultMessage": "Combwork is using Hive Desktop's data folders",
     "description": "A notice at start (HI-2461): the app's data folders are now named Combwork (the app's new name, keep it as it is), which the installer moves them to; they weren't moved yet, so Hive uses its old folders. Nothing is lost."
   },
   "main.profileMove.signInBody": {
-    "defaultMessage": "Since Combwork moved its data to the Combwork folder, {names} {n, plural, one {shows} other {show}} signed out. Sign in again in Settings → Accounts & Connections.",
+    "defaultMessage": "Since its data moved to the Combwork folder, {names} {n, plural, one {shows} other {show}} signed out. Sign in again in Settings → Accounts & Connections.",
     "description": "The notice naming the connections that show signed out after the data moved. {names} lists them by name; {n} is how many."
   },
   "main.profileMove.signInTitle": {

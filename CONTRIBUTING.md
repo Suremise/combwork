@@ -84,7 +84,7 @@ Say a German button reads badly.
    translation that wasn't outdated needs no record.
 6. **Look at it in Hive** (optional, but the best check of length and tone). Any one of these:
    - **Installed Hive:** quit Hive, then start it with `--lang=de`. In PowerShell:
-     `& "$env:LOCALAPPDATA\Programs\Hive\Hive.exe" --lang=de`. Your edited file only appears once a build includes it,
+     `& "$env:LOCALAPPDATA\Programs\Combwork\Combwork.exe" --lang=de`. Your edited file only appears once a build includes it,
      so this shows the current release's German.
    - **From the source:** `npx install-electron --no` once, then `npm run dev -- -- --lang=de` (both `--` are
      needed: the first is npm's, the second electron-vite's).

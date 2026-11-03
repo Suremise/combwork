@@ -10,7 +10,7 @@ Unit tests don't show what the user sees. This is how to see it without touching
 ## Build what you are checking
 
 - Build the code under review in the folder Hive gave you (the card's slot, or the review copy): `npx electron-vite build` there. Suites run `out/` of the folder they're started from, so a build from another branch tests something else.
-- When behaviour and source disagree, first find out which build ran. The installed Hive (`%LOCALAPPDATA%\Programs\Hive`) and a dev build are different code. `GET /v1/status` gives `app.version` and `guidance.revision`, and `/v1/projects/{name}` gives each running agent's `launched` revisions.
+- When behaviour and source disagree, first find out which build ran. The installed app (`%LOCALAPPDATA%\Programs\Combwork`; an installed 1.0, `Programs\Hive`) and a dev build are different code. `GET /v1/status` gives `app.version` and `guidance.revision`, and `/v1/projects/{name}` gives each running agent's `launched` revisions.
 - Start test copies with the run context's environment: the suites and `lib.launch()` do, and a Playwright script of your own passes `require('./tests/e2e/lib.cjs').hiveEnv({ HIVE_USER_DATA: <temp dir> })` as its `env`. Nothing of your shell's then reaches the copy (`ELECTRON_RUN_AS_NODE`, with which `electron.exe` runs as plain Node; `NO_COLOR`; your session's `HIVE_*`).
 
 ## Choose the suites

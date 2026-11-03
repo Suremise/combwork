@@ -1,4 +1,4 @@
-// The hive-progress wrapper as installed (#137): dist/win-unpacked's hive-progress.js, outside the asar, run with Hive.exe
+// The hive-progress wrapper as installed (#137): dist/win-unpacked's hive-progress.js, outside the asar, run with Combwork.exe
 // as Node (as its shims run it), against a stand-in for the Agent API's progress endpoints. Checked: output and exit
 // code pass through, the run is reported with its steps (step lines taken out of the output), the second run has an
 // estimate, and with Hive unreachable the command still runs. HIVE_PROGRESS_CHECK_DEV=1 checks the dev build instead.
@@ -9,7 +9,7 @@ const http = require('http')
 const { spawn } = require('child_process')
 
 const dev = process.env.HIVE_PROGRESS_CHECK_DEV === '1'
-const exe = dev ? path.join(lib.ROOT, 'node_modules', 'electron', 'dist', 'electron.exe') : path.join(lib.ROOT, 'dist', 'win-unpacked', 'Hive.exe')
+const exe = dev ? path.join(lib.ROOT, 'node_modules', 'electron', 'dist', 'electron.exe') : lib.PACKAGED_EXE
 const script = dev ? path.join(lib.ROOT, 'out', 'main', 'hive-progress.js') : path.join(lib.ROOT, 'dist', 'win-unpacked', 'resources', 'app.asar.unpacked', 'out', 'main', 'hive-progress.js')
 const data = path.join(lib.WORK, 'packaged-progress-data')
 let failed = 0

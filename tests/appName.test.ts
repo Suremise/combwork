@@ -17,16 +17,15 @@ describe('the app name (#443, HI-2458)', () => {
     expect([APP_NAME, DEV_APP_NAME, appName(true), appName(false)]).toEqual(['Combwork', 'Combwork Dev', 'Combwork', 'Combwork Dev'])
     expect(pkg.productName).toBe(APP_NAME)
     expect(builder.productName).toBe(APP_NAME)
-    // The shortcuts' name is HI-2460's to change with the installer's other names (the Assistant's split of electron-builder.yml).
-    expect(builder.nsis.shortcutName).toBe('Hive Desktop')
     expect(builder.nsis.uninstallDisplayName).toBeUndefined() // "${productName} ${version}": Combwork 1.1.0
     expect(read('src/renderer/index.html')).toContain('<title>Combwork</title>')
   })
 
-  it('keeps the app ID, exe and update feed (HI-2460 moves them); the installer file says Combwork', () => {
-    expect(builder.appId).toBe('com.hive.desktop')
-    expect(read('src/main/index.ts')).toContain("app.isPackaged ? 'com.hive.desktop' : 'com.hive.desktop.dev'")
-    expect(builder.win.executableName).toBe('Hive')
+  it("has Combwork's app ID, exe and shortcut (HI-2460), its installer file (HI-2458), and keeps the update feed", () => {
+    expect(builder.appId).toBe('it.surmise.combwork')
+    expect(read('src/main/index.ts')).toContain("app.isPackaged ? 'it.surmise.combwork' : 'it.surmise.combwork.dev'")
+    expect(builder.win.executableName).toBe('Combwork')
+    expect(builder.nsis.shortcutName).toBe('Combwork')
     expect(builder.nsis.artifactName).toBe('Combwork-Setup-${version}.${ext}')
     expect(builder.publish).toMatchObject({ owner: 'Suremise', repo: 'hive-desktop' })
     expect(builder.publish).toMatchObject(RELEASES_REPO) // the updater's feed (HI-2311)
@@ -45,11 +44,11 @@ describe('the app name (#443, HI-2458)', () => {
     expect(index).toContain("app.setPath('userData', roaming.use)")
   })
 
-  it('keeps the install folder %LOCALAPPDATA%\\Programs\\Hive, as electron-builder names it', () => {
+  it('installs in %LOCALAPPDATA%\\Programs\\Combwork (HI-2460), as electron-builder names it', () => {
     // The installer's folder (APP_FILENAME) is the product file name, which executableName sets (assisted installer).
     const require = createRequire(import.meta.url)
     const { getWindowsInstallationDirName } = require('app-builder-lib/out/targets/targetUtil') as { getWindowsInstallationDirName: (info: { productFilename: string; sanitizedName: string }, tryProductName: boolean) => string }
     const { sanitizeFileName } = require('builder-util/out/filename') as { sanitizeFileName: (name: string) => string }
-    expect(getWindowsInstallationDirName({ productFilename: sanitizeFileName(builder.win.executableName), sanitizedName: pkg.name }, true)).toBe('Hive')
+    expect(getWindowsInstallationDirName({ productFilename: sanitizeFileName(builder.win.executableName), sanitizedName: pkg.name }, true)).toBe('Combwork')
   })
 })

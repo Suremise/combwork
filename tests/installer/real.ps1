@@ -5,9 +5,10 @@
 # timeout (about 11 minutes).
 param([string]$Dir = 'C:\build', [switch]$Timeout)
 $ErrorActionPreference = 'Stop'
-# electron-builder's APP_GUID for appId com.hive.desktop (UUID v5 in its namespace): the installers' mutex.
-$mutex = '35960567-b95c-520c-a9f1-e8bb85764724'
-$installed = Join-Path $env:LOCALAPPDATA 'Programs\Hive'
+# electron-builder's APP_GUID for appId it.surmise.combwork (UUID v5 in its namespace, HI-2460): the installers' mutex.
+$mutex = '10a7595a-0e90-558c-b6b6-ae33bdd80748'
+$installed = Join-Path $env:LOCALAPPDATA 'Programs\Combwork'
+$exeName = 'Combwork.exe'
 $out = 'C:\out\real-results.txt'
 $fails = 0
 function Say($ok, $what, $detail) {
@@ -87,8 +88,8 @@ $p = Start-Process -FilePath $un.FullName -ArgumentList '/S' -PassThru
 $uc = Wait-Exit $p 120
 $took = ((Get-Date) - $t0).TotalSeconds
 # electron-builder's uninstaller copies itself and runs from a temp folder: give that a moment to remove the app.
-for ($i = 0; $i -lt 300 -and (Test-Path (Join-Path $installed 'Hive.exe')); $i++) { Start-Sleep -Milliseconds 100 }
-Say ($uc -eq 0 -and $took -lt 45 -and -not (Test-Path (Join-Path $installed 'Hive.exe'))) 'the uninstaller, the mutex held: no wait, and it uninstalls' "exit $uc; took $([int]$took) s"
+for ($i = 0; $i -lt 300 -and (Test-Path (Join-Path $installed $exeName)); $i++) { Start-Sleep -Milliseconds 100 }
+Say ($uc -eq 0 -and $took -lt 45 -and -not (Test-Path (Join-Path $installed $exeName))) 'the uninstaller, the mutex held: no wait, and it uninstalls' "exit $uc; took $([int]$took) s"
 Stop-Process -Id $h.Id -ErrorAction SilentlyContinue
 
 # 6. A release installer alone, with nothing installed: installs (no wait compiled into it).
