@@ -39,7 +39,8 @@ export interface ProfileChoice {
 
 /**
  * The folder to use in `parent` (`%APPDATA%` or `%LOCALAPPDATA%`): `current` (Combwork's) when it is a folder, Hive's
- * `legacy` one when Combwork's is confirmed missing (or a file of that name is there) and Hive's is a folder, else
+ * `legacy` one when Combwork's is confirmed missing (or a file of that name is there) and Hive's is a folder or can't be
+ * confirmed missing, else
  * `current` (a new profile, made as usual). Reads only.
  */
 export function chooseProfile(parent: string, legacy: string, current: string, stat: Stat = statSync): ProfileChoice {
@@ -48,12 +49,17 @@ export function chooseProfile(parent: string, legacy: string, current: string, s
   const seen = look(now, stat)
   if (seen === 'folder') return { use: now, current: now, fallback: false }
   if (typeof seen === 'object') return { use: now, current: now, fallback: false, unreadable: seen.error }
-  return look(old, stat) === 'folder' ? { use: old, current: now, fallback: true } : { use: now, current: now, fallback: false }
+  const was = look(old, stat)
+  if (was === 'folder') return { use: old, current: now, fallback: true }
+  // Hive's that can't be looked at isn't taken for missing either: it is used (and said), never a blank Combwork made in
+  // its place, which would win at every later start.
+  if (typeof was === 'object') return { use: old, current: now, fallback: true, unreadable: was.error }
+  return { use: now, current: now, fallback: false }
 }
 
 /** The log's line for a choice, in English (index.ts wraps the paths in userText), or null when there's nothing to say. */
 export function choiceLine(c: ProfileChoice, show: (p: string) => string): string | null {
-  if (c.fallback) return `profile: ${show(c.current)} isn't there; using ${show(c.use)}, from before Combwork` // i18n-ignore: the log (English)
+  if (c.fallback) return `profile: ${show(c.current)} isn't there; using ${show(c.use)}, from before Combwork${c.unreadable ? `, which couldn't be looked at (${c.unreadable})` : ''}` // i18n-ignore: the log (English)
   if (c.unreadable) return `profile: ${show(c.current)} couldn't be looked at (${c.unreadable}); using it` // i18n-ignore: the log (English)
   return null
 }

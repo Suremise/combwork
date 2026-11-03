@@ -71,6 +71,8 @@ export async function startProfileNotices(): Promise<void> {
   const { roaming, local } = profileChoices()
   tellFallback([roaming, local].filter((c): c is ProfileChoice => !!c?.fallback))
   if (local && !local.fallback) await checkSignInsAfterMove(local.use)
+  // The notices' phase is over (tests wait for this line before saying none came).
+  log.info('profile: start notices done')
 }
 
 function tellFallback(used: ProfileChoice[]): void {

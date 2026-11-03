@@ -69,6 +69,25 @@ describe('choosing the profile folder (HI-2461)', () => {
     }
   })
 
+  it("Hive's folder that can't be looked at, Combwork's missing: Hive's is used (never a blank Combwork in its place), for roaming and local alike", () => {
+    const p = tempDir('pf-legacy-unreadable-')
+    for (const parent of [join(p, 'appdata'), join(p, 'localappdata')]) {
+      mkdirSync(parent, { recursive: true })
+      for (const code of ['EPERM', 'EACCES', 'EIO', 'EBUSY']) {
+        const stat = (path: string) => {
+          if (path === join(parent, 'Combwork')) throw Object.assign(new Error('ENOENT'), { code: 'ENOENT' })
+          if (path === join(parent, 'Hive')) throw Object.assign(new Error(code), { code })
+          return statSync(path)
+        }
+        const c = chooseProfile(parent, 'Hive', 'Combwork', stat)
+        expect(c, `${parent} ${code}`).toEqual({ use: join(parent, 'Hive'), current: join(parent, 'Combwork'), fallback: true, unreadable: code })
+        expect(choiceLine(c, (x) => x), code).toContain(code)
+      }
+      // Nothing was made in either place.
+      expect(tree(parent)).toEqual([])
+    }
+  })
+
   it("only ENOENT and ENOTDIR count as missing: Hive's folder is used then", () => {
     const p = tempDir('pf-missing-')
     mkdirSync(join(p, 'Hive'))

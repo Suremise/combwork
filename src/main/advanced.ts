@@ -17,7 +17,7 @@ const log = createLogger('advanced')
 
 /**
  * Advanced settings (#367): Hive's overridable defaults (shared/advanced.ts), with the user's overrides in
- * %APPDATA%\Hive\advanced.json. Settings → Advanced and the Assistant's settings tools change them through set(); the file
+ * %APPDATA%\Combwork\advanced.json. Settings → Advanced and the Assistant's settings tools change them through set(); the file
  * can also be edited by hand, and Hive reads it again when it changes (a file it can't read as it is keeps what Hive had,
  * and says why). Code asks for a value with get(), pattern() or regExpOf(): an override that doesn't check out falls back
  * to the default (warned once in the log). Before load() (unit tests), every value is its default.

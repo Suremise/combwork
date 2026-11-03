@@ -50,7 +50,7 @@ export function testTipsOff(env: NodeJS.ProcessEnv = process.env, packaged = app
   return takesTestSeams(env, packaged) && env.HIVE_TEST_TIPS === 'off'
 }
 
-/** App-level configuration stored in %APPDATA%/Hive/config.json. */
+/** App-level configuration stored in %APPDATA%/Combwork/config.json (the profile folder, profileFolders.ts). */
 class ConfigStore {
   private data: AppConfig = structuredClone(DEFAULT_APP_CONFIG)
   private saveTimer: NodeJS.Timeout | null = null
