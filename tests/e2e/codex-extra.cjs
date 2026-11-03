@@ -153,7 +153,7 @@ const post = (url, token, body) =>
     await page.screenshot({ path: path.join(scratch, 'cxe-3-lock-ask.png') })
     check('the locked edit is held back', !/from agent 1/.test(notes()), `${w?.status}`)
     // Exactly Allow (HI-2386): the entry's own text is a button too (it opens the agent), and says "Allow Codex to edit it too?".
-    check('Hive asks with an Allow button', (await asking.getByRole('button', { name: 'Allow', exact: true }).count()) > 0)
+    check('Combwork asks with an Allow button', (await asking.getByRole('button', { name: 'Allow', exact: true }).count()) > 0)
   })
   const notes0 = notes()
   // Allow as soon as Hive asks, as a user does: usually while Codex is still replying to the refusal, so Hive's
@@ -195,7 +195,7 @@ const post = (url, token, body) =>
       await waitFor(a1.id, (x) => x?.status === 'finished' || x?.status === 'waiting', 60000)
     }
     check('the locked shell edit is held back', !/from agent 1/.test(shellText()), shellText())
-    check('Hive asks about the shell edit with an Allow button', (await askingShell.getByRole('button', { name: 'Allow', exact: true }).count()) > 0)
+    check('Combwork asks about the shell edit with an Allow button', (await askingShell.getByRole('button', { name: 'Allow', exact: true }).count()) > 0)
   })
   // Decline: Esc interrupts.
   await inv('pty:write', key1, '\x1b')

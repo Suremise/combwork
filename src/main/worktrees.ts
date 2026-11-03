@@ -583,7 +583,7 @@ async function mergeElsewhere(projectPath: string, wt: WorktreeRef, into: string
   if (!commit.ok) return fail(commit.err || 'git commit-tree') // i18n-ignore: a git command, as it is
   const made = commit.out.trim()
   const moved = await git(projectPath, ['update-ref', '-m', `hive: merge ${wt.branch}`, `refs/heads/${into}`, made, from]) // i18n-ignore: a reflog line, git's
-  if (!moved.ok) return { ok: false, error: tr(msg({ id: 'worktrees.merge.targetMoved', defaultMessage: '{branch} changed while Hive was merging into it. Nothing was merged: merge again.', description: 'Why nothing was merged: the branch merged into ({branch}) moved on meanwhile (another merge or commit).' }), { branch: into }) }
+  if (!moved.ok) return { ok: false, error: tr(msg({ id: 'worktrees.merge.targetMoved', defaultMessage: '{branch} changed while Combwork was merging into it. Nothing was merged: merge again.', description: 'Why nothing was merged: the branch merged into ({branch}) moved on meanwhile (another merge or commit).' }), { branch: into }) }
   log.info(`Merged ${userText(wt.branch)} into ${userText(into)} (not checked out)${squash ? ' (squash)' : ''}`)
   return afterMerge(projectPath, wt, into, made, squash && !!moveBranch)
 }

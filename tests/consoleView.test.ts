@@ -70,7 +70,7 @@ describe('sourceGroups', () => {
   it("names an agent's session by the agent, with its events when it has some", () => {
     expect(sourceOption(src({ label: 'alpha · B1', project: 'alpha', agent: 'B1' }))).toBe('B1')
     expect(sourceOption(src({ label: 'Hive', kind: 'hive', events: 12 }))).toBe('Hive (12)')
-    expect(sourceOption(src({ label: 'Assistant', kind: 'assistant' }))).toBe('Hive Assistant')
+    expect(sourceOption(src({ label: 'Assistant', kind: 'assistant' }))).toBe('Assistant')
   })
 })
 

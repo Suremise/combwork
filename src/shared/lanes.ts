@@ -203,6 +203,8 @@ export interface LaneStartWait {
   agent: string
   /** `dependencies`: the card it waits for, by its key. */
   waitsFor?: string
+  /** `refused` (HI-2468): the slot its start was refused as held, and what holds it (as a lane waiting for a slot says it). */
+  held?: LaneSlotHeld
 }
 
 /**
@@ -213,11 +215,23 @@ export interface LaneStartWait {
  */
 export interface LaneSlotHeld {
   slot: string
-  held: 'session' | 'process' | 'broker'
+  /**
+   * HI-2468, a refused start's: `left`, programs the last run of `agent` left running there (`program`, the first by
+   * name, and `more` beyond it); `lastRun`, that run of `agent`'s not known to have ended.
+   */
+  held: 'session' | 'process' | 'broker' | 'left' | 'lastRun'
   agent?: string
   broker?: string
   idle?: boolean
+  program?: string
+  more?: number
 }
+
+/**
+ * A held slot as a refused start's status carries it (HI-2468): the slot, what holds it, and the agent whose session
+ * is in it as `heldBy` (the status's `agent` is the builder there), with the broker seen in it, if any.
+ */
+const heldStatus = (h: LaneSlotHeld): Pick<LaneStatus, 'slot' | 'held' | 'heldBy' | 'broker' | 'idle' | 'program' | 'more'> => ({ slot: h.slot, held: h.held, ...(h.agent ? { heldBy: h.agent } : {}), ...(h.broker ? { broker: h.broker } : {}), ...(h.idle !== undefined ? { idle: h.idle } : {}), ...(h.program ? { program: h.program } : {}), ...(h.more ? { more: h.more } : {}) })
 
 /** Whether a lane reads its cards as it left them (ended or abandoned, with its snapshot) rather than from the board. */
 export const isFrozen = (rec: Pick<LaneRecord, 'state' | 'frozen'>): boolean => !running(rec) && !!rec.frozen
@@ -258,7 +272,7 @@ export function laneView(rec: LaneRecord, cards: ReadonlyMap<number, TaskCard | 
   const preparing = running(rec) && !unrecorded && slot?.info?.state === 'preparing' ? { reason: 'preparing' as const, card: current, slot: slot.info.name } : null
   // Its card due to start and not started yet (HI-2029, laneStarts.ts: `startWait`), only while that card is the current
   // one and nothing else says why the lane waits: never "active" with its card untouched and nothing said. Not a pause.
-  const waitsStart = running(rec) && !unrecorded && startWait && startWait.card === current && list.find((c) => c.number === current)?.column === 'todo' ? { reason: 'startWait' as const, card: startWait.card, why: startWait.why, agent: startWait.agent, ...(startWait.waitsFor ? { waitsFor: startWait.waitsFor } : {}) } : null
+  const waitsStart = running(rec) && !unrecorded && startWait && startWait.card === current && list.find((c) => c.number === current)?.column === 'todo' ? { reason: 'startWait' as const, card: startWait.card, why: startWait.why, agent: startWait.agent, ...(startWait.waitsFor ? { waitsFor: startWait.waitsFor } : {}), ...(startWait.why === 'refused' && startWait.held ? heldStatus(startWait.held) : {}) } : null
   // An agent still owed its new conversation (HI-2034, `freshStart`; its builder's first): said while Hive waits for it
   // to be free, and before anything else but its hooks and its slot once no more is tried (the user retries it or ends
   // the lane). Not a pause.
@@ -427,6 +441,7 @@ const L = {
   startWatching: agentMsg({ id: 'lane.status.start.watching', text: '{card} waits to start: {agent} is waiting on other work', note: "A lane's next card isn't started yet (HI-2029): its builder waits on a watch of other cards." }),
   startQueued: agentMsg({ id: 'lane.status.start.queued', text: "{card} waits to start: a line of Hive's is on its way to {agent}", note: "A lane's next card isn't started yet (HI-2029): a line Hive types is on its way to the builder." }),
   startFailed: agentMsg({ id: 'lane.status.start.failed', text: "{card} waits to start: {agent}'s last start failed", note: "A lane's next card isn't started yet (HI-2029): Hive's last start of it on the builder failed." }),
+  startRefusedHeld: agentMsg({ id: 'lane.status.start.refusedHeld', text: "{card} waits to start: its start was refused for now, {slot} still in use ({held, select, session {{heldBy}'s session is still in it} left {{heldBy}'s last run left {program}{more, plural, =0 {} other { and # more}} running in it} lastRun {{heldBy}'s last run there isn't known to have ended} broker {a process still has a file or folder in it open: Windows Sandbox's broker ({broker}) is working in it{idle, select, yes {, with no Sandbox running} no {, with a Sandbox running} other {}}} other {a process still has a file or folder in it open}}); Hive tries again", note: "A lane's next card isn't started yet (HI-2468): Hive's start of it was refused because its slot {slot} is still in use: a session of the agent {heldBy} still runs in it; left, the agent {heldBy}'s last run left programs running in it ({program}: the first one's name, such as node; {more}: how many more); lastRun, that run isn't known to have ended; or (broker) a process holds it, and Windows Sandbox's broker ({broker}: its process name) has the slot as its current folder, idle: yes, no Sandbox runs; no, one does; other, not known; or (other) a process holds it. Hive tries the start again." }),
   startRefused: agentMsg({ id: 'lane.status.start.refused', text: '{card} waits to start: its start was refused for now; Hive tries again', note: "A lane's next card isn't started yet (HI-2029): Hive's start of it was refused for now, and is tried again." }),
   startBusy: agentMsg({ id: 'lane.status.start.busy', text: '{card} waits to start: {agent} is in a turn', note: "A lane's next card isn't started yet (HI-2029): its builder is in a turn, or starting." }),
   column: {
@@ -524,6 +539,7 @@ export function laneStatusText(s: LaneStatus): string {
         return s.freshWhy !== undefined ? say(L.freshFailed, { agent, why: s.freshWhy }) : say(L.freshFailedBare, { agent })
       }
       if (s.why === 'dependencies') return say(L.startDependencies, { card, waitsFor: s.waitsFor ?? say(L.aDependency) })
+      if (s.why === 'refused' && s.slot && s.held) return say(L.startRefusedHeld, { card, slot: s.slot, held: s.held, heldBy: s.heldBy ?? say(L.anAgent), broker: s.broker ?? '', idle: idleKey(s.idle), program: s.program ?? '', more: s.more ?? 0 })
       if (s.why === 'refused') return say(L.startRefused, { card })
       const agent = s.agent ?? say(L.itsBuilder)
       return say(s.why === 'watching' ? L.startWatching : s.why === 'queued' ? L.startQueued : s.why === 'failed' ? L.startFailed : L.startBusy, { card, agent })

@@ -4,7 +4,7 @@
     "description": "Why advanced.json can't be used, in English (kept from before Hive translated it). Keep it as {problem} alone."
   },
   "service.advanced.changedOutside": {
-    "defaultMessage": "advanced.json was changed outside Hive meanwhile: Settings shows it now. Try again.",
+    "defaultMessage": "advanced.json was changed outside Combwork meanwhile: Settings shows it now. Try again.",
     "description": "An error changing an advanced setting: advanced.json (a file name: keep it) was edited elsewhere meanwhile, so the change wasn't written."
   },
   "service.advanced.fixFirst": {
@@ -16,7 +16,7 @@
     "description": "An error resetting every advanced setting while advanced.json (a file name: keep it) can't be read; {problem} says why, a sentence. Settings → Advanced → Open advanced.json is where to open it: use its translated names."
   },
   "service.advanced.newer": {
-    "defaultMessage": "advanced.json is from a newer Hive (format {format}): this one reads format {supported}.",
+    "defaultMessage": "advanced.json is from a newer Combwork (format {format}): this one reads format {supported}.",
     "description": "Above Settings → Advanced's list: advanced.json (a file name: keep it) was written by a newer version of Hive, in a format ({format}) this one can't read ({supported} is the one it reads)."
   },
   "service.advanced.notJson": {
@@ -40,7 +40,7 @@
     "description": "A notification's title (a banner, a Windows notification): the user answered an agent's question on card {card} (its key, such as HI-12), and the Hive Assistant, which could act on it, couldn't be told."
   },
   "service.assistantAsk.title": {
-    "defaultMessage": "{card}: the Hive Assistant didn't get an agent's request",
+    "defaultMessage": "{card}: the Assistant didn't get an agent's request",
     "description": "A notification's title (a banner, a Windows notification), HI-1866: an agent asked the Hive Assistant for something on card {card} (its key, such as HI-12), and the request couldn't reach the Assistant."
   },
   "service.attachments.badFolder": {
@@ -52,7 +52,7 @@
     "description": "An error: the file {file} where Hive records attachments it renamed can't be read as one (damaged)."
   },
   "service.attachments.notOwn": {
-    "defaultMessage": "{folder} is a link or not a folder of the project's own, so Hive keeps no attachments in it.",
+    "defaultMessage": "{folder} is a link or not a folder of the project's own, so Combwork keeps no attachments in it.",
     "description": "An error keeping a pasted or dropped file for a session: its folder {folder} (in the project's .hive) is a link or leads elsewhere, so Hive writes nothing through it."
   },
   "service.benchmarks.allPinned": {
@@ -72,7 +72,7 @@
     "description": "An error on the Performance page: a kept comparison's file can't be read."
   },
   "service.benchmarks.evictedStays": {
-    "defaultMessage": "An evicted comparison couldn’t be removed yet: Hive will try again.",
+    "defaultMessage": "An evicted comparison couldn’t be removed yet: Combwork will try again.",
     "description": "A note on the Performance page: an old comparison taken off the list to make room couldn't be deleted yet; Hive tries again later."
   },
   "service.benchmarks.fileGone": {
@@ -100,7 +100,7 @@
     "description": "An error on the Performance page: kept comparisons need a workspace open."
   },
   "service.benchmarks.notRemoved": {
-    "defaultMessage": "It is off the list, but its file couldn’t be removed yet: Hive will try again.",
+    "defaultMessage": "It is off the list, but its file couldn’t be removed yet: Combwork will try again.",
     "description": "An error removing a kept comparison on the Performance page: it is no longer listed, but its file couldn't be deleted yet."
   },
   "service.benchmarks.notWaiting": {
@@ -124,7 +124,7 @@
     "description": "A note on the Performance page: kept comparison files the list had no entry for were moved to the quarantine/ folder (a folder name: keep it)."
   },
   "service.benchmarks.stuck": {
-    "defaultMessage": "{n, plural, one {# removed comparison’s file couldn’t be deleted yet (in use?): nothing more can be kept until it is.} other {# removed comparisons’ files couldn’t be deleted yet (in use?): nothing more can be kept until they are.}} Hive retries each time it reads the list.",
+    "defaultMessage": "{n, plural, one {# removed comparison’s file couldn’t be deleted yet (in use?): nothing more can be kept until it is.} other {# removed comparisons’ files couldn’t be deleted yet (in use?): nothing more can be kept until they are.}} Combwork retries each time it reads the list.",
     "description": "An error keeping a comparison on the Performance page: {n} removed comparisons' files couldn't be deleted yet (another program may have them open), and the list has no room until they are."
   },
   "service.benchmarks.switched": {
@@ -136,7 +136,7 @@
     "description": "An error importing a comparison on the Performance page: the file is larger than {mb} MB."
   },
   "service.benchmarks.unwritable": {
-    "defaultMessage": "Hive refused to write a list of kept comparisons it couldn’t read back: nothing was changed.",
+    "defaultMessage": "Combwork refused to write a list of kept comparisons it couldn’t read back: nothing was changed.",
     "description": "An error on the Performance page: the list of kept comparisons Hive was about to write wouldn't read back as valid, so it wasn't written."
   },
   "service.benchmarks.why": {
@@ -172,7 +172,7 @@
     "description": "An error attaching a file to a card by its path (HI-1700): it is missing, a folder or a link, or in a place the caller may not attach from (another project, Hive’s own folders). Nothing was attached."
   },
   "service.cardAttach.refusedFrom": {
-    "defaultMessage": "{path} is not a file that can be attached here. Files can come from {caller, select, agent {your own project (its folder, its slots)} other {the workspace and its projects}}, the temp folder ({temp}){more, select, yes { and the folders of Settings → Advanced → Card attachments: more folders ({folders})} other {}}. To attach from another folder, the user adds it there (Settings → Advanced → Card attachments: more folders, Hive's or this workspace's): don't copy the file into the temp folder. Nothing was attached.",
+    "defaultMessage": "{path} is not a file that can be attached here. Files can come from {caller, select, agent {your own project (its folder, its slots)} other {the workspace and its projects}}, the temp folder ({temp}){more, select, yes { and the folders of Settings → Advanced → Card attachments: more folders ({folders})} other {}}. To attach from another folder, the user adds it there (Settings → Advanced → Card attachments: more folders, Combwork's or this workspace's): don't copy the file into the temp folder. Nothing was attached.",
     "description": "An error attaching a file to a card by its path (HI-1700, HI-2480): it is missing, a folder or a link, or in a place the caller may not attach from. {caller} is agent for a project's agent, else the Assistant or a script; {temp} is the temp folder's path; {more} is yes when the user listed more folders, {folders} those folders. Card attachments: more folders is an advanced setting's title: use it as Settings shows it. Nothing was attached."
   },
   "service.cardAttach.tooLarge": {
@@ -224,7 +224,7 @@
     "description": "An error opening or deleting a session's attachment: the path isn't a file in a session's attachments folder."
   },
   "service.files.notKept": {
-    "defaultMessage": "Not one of the session attachments Hive keeps.",
+    "defaultMessage": "Not one of the session attachments Combwork keeps.",
     "description": "An error deleting a session's attachment (a file pasted or dropped into a session): it isn't one Hive keeps, or it is a link."
   },
   "service.files.outside": {
@@ -412,7 +412,7 @@
     "description": "After pulling in the Git view: {n} commits came from the remote branch {upstream}."
   },
   "service.gitRepo.pushAllRefused": {
-    "defaultMessage": "{remote} refused {n, plural, one {# branch or tag} other {# branches and tags}} (Hive never forces a push): it has commits they haven't, so pull or merge them first. What happened to each:",
+    "defaultMessage": "{remote} refused {n, plural, one {# branch or tag} other {# branches and tags}} (Combwork never forces a push): it has commits they haven't, so pull or merge them first. What happened to each:",
     "description": "An error after Push to… with all branches and tags in the Git view: the first line, the remote {remote} refused {n} of them; a line for each outcome follows (service.gitRepo.pushOutcome)."
   },
   "service.gitRepo.pushFailed": {
@@ -436,7 +436,7 @@
     "description": "After Push to… with all branches and tags in the Git view: the first line, what went to the remote {remote}; a line for each outcome follows (service.gitRepo.pushOutcome)."
   },
   "service.gitRepo.rejected": {
-    "defaultMessage": "{to} has commits {branch} hasn't, so the push was refused (Hive never forces a push). Pull first, or merge them in a terminal.",
+    "defaultMessage": "{to} has commits {branch} hasn't, so the push was refused (Combwork never forces a push). Pull first, or merge them in a terminal.",
     "description": "An error pushing the branch {branch} in the Git view: the remote branch {to} has commits it hasn't, so the remote refused."
   },
   "service.gitRepo.remoteBranchesDeleted": {
@@ -564,11 +564,11 @@
     "description": "An error updating a branch from its target (Version Control → Branches, HI-1180): the project's workflow target (or the repository's default branch) doesn't exist in this repository. {branch} is the branch."
   },
   "service.gitRepo.update.notUndone": {
-    "defaultMessage": "Updating {branch} from {target} stopped, and Hive couldn't undo it: {folder} is {state, select, none {left changed} merge {still in the middle of a merge} rebase {still in the middle of a rebase} other {still in the middle of a git operation}}. Finish or abort it there yourself (git status says how), then check {branch}. Git said: {why}",
+    "defaultMessage": "Updating {branch} from {target} stopped, and Combwork couldn't undo it: {folder} is {state, select, none {left changed} merge {still in the middle of a merge} rebase {still in the middle of a rebase} other {still in the middle of a git operation}}. Finish or abort it there yourself (git status says how), then check {branch}. Git said: {why}",
     "description": "An error updating a branch from its target (HI-1180): git stopped, and Hive's own abort failed, so the folder ({folder}: a slot's name, a folder's name or a path) is left as git left it ({state}: none, merge, rebase or another operation; select: translate each). {why} is git's own words."
   },
   "service.gitRepo.update.notUndoneTemporary": {
-    "defaultMessage": "Updating {branch} from {target} stopped, and Hive couldn't undo it in its temporary folder {folder}, kept as git left it: {branch} itself is as it was. Remove that folder in Unused worktrees once you have looked. Git said: {why}",
+    "defaultMessage": "Updating {branch} from {target} stopped, and Combwork couldn't undo it in its temporary folder {folder}, kept as git left it: {branch} itself is as it was. Remove that folder in Unused worktrees once you have looked. Git said: {why}",
     "description": "An error updating a branch from its target (HI-1180) that was checked out nowhere: git stopped in the temporary folder Hive made ({folder}: its path), and Hive's abort failed, so the folder is kept; the branch itself wasn't moved. {state} is unused here. {why} is git's own words."
   },
   "service.gitRepo.update.queued": {
@@ -580,7 +580,7 @@
     "description": "After Update from <target> with Rebase (HI-1180): the branch {branch} has its {n} commits replayed onto the target {target}; {commit} is its new head (a short id: keep it as it is)."
   },
   "service.gitRepo.update.temporaryLeft": {
-    "defaultMessage": "Hive couldn't remove its temporary folder {folder}: remove it in Unused worktrees.",
+    "defaultMessage": "Combwork couldn't remove its temporary folder {folder}: remove it in Unused worktrees.",
     "description": "A second line after Update from <target> on a branch checked out nowhere (HI-1180): the temporary folder Hive made for it ({folder}: its path) could not be removed."
   },
   "service.gitRepo.update.upToDate": {
@@ -628,7 +628,7 @@
     "description": "An error: an intent (a card's start, submission, verdict…) was asked for a card that has no workflow, because it belongs to no project or its project's version control (Git or None) isn't chosen yet. {card} is the card's key (HI-12)."
   },
   "service.intent.queueNotAgents": {
-    "defaultMessage": "Only the user, or the Hive Assistant within Settings → Assistant → Control, takes a card out of the merge queue or retries its merge.",
+    "defaultMessage": "Only the user, or the Assistant within Settings → Assistant → Control, takes a card out of the merge queue or retries its merge.",
     "description": "An error: an agent or a script asked to remove a card from the merge queue or retry its merge, which only the user and the Hive Assistant (within its Control setting, a setting name: use it as Hive shows it) can do."
   },
   "service.keys.closed": {
@@ -656,7 +656,7 @@
     "description": "An error changing a project's key: {key} (letters such as AM) belongs to another project now or did before (its old keys stay its aliases)."
   },
   "service.keys.unknownProject": {
-    "defaultMessage": "That project has no id yet, so it can’t have a key: open it in Hive first.",
+    "defaultMessage": "That project has no id yet, so it can’t have a key: open it in Combwork first.",
     "description": "An error changing a project's key: the project hasn't been given Hive's id (it hasn't been opened yet)."
   },
   "service.laneStart.busy": {
@@ -700,7 +700,7 @@
     "description": "An error starting a lane from the window: the builder or reviewer chosen ({agent}) isn't an agent of the project ({project})."
   },
   "service.laneStarts.freshBlockedBody": {
-    "defaultMessage": "{why, select, timeout {It wasn’t free within {minutes, plural, one {# minute} other {# minutes}}.} uncertain {Hive closed while starting it, so it may not have started.} other {{reason}}} Retry it from the lane’s row in the Progress panel, or end the lane. Its cards wait until then.",
+    "defaultMessage": "{why, select, timeout {It wasn’t free within {minutes, plural, one {# minute} other {# minutes}}.} uncertain {Combwork closed while starting it, so it may not have started.} other {{reason}}} Retry it from the lane’s row in the Progress panel, or end the lane. Its cards wait until then.",
     "description": "A notification's text (HI-2034), under \"{agent}'s new conversation didn't start\". why (select): the agent wasn't free (in a turn) within the wait, {minutes} minutes (Settings → Advanced); Hive closed while it was starting it; or (other) its start failed, {reason} saying why (a sentence, may be in English). Translate each."
   },
   "service.laneStarts.freshBlockedTitle": {
@@ -720,7 +720,7 @@
     "description": "An error: there is no lane (a card loop) with the id {id}, perhaps removed meanwhile."
   },
   "service.mcp.addedDropped": {
-    "defaultMessage": "Each project and the Hive Assistant lists the servers that ran there. {n, plural, one {# choice kept for a server that was off in the workspace was} other {# choices kept for servers that were off in the workspace were}} dropped: add a server in a project’s MCP tab where you need it.",
+    "defaultMessage": "Each project and the Assistant lists the servers that ran there. {n, plural, one {# choice kept for a server that was off in the workspace was} other {# choices kept for servers that were off in the workspace were}} dropped: add a server in a project’s MCP tab where you need it.",
     "description": "A quiet notice once after the upgrade that made MCP servers added to projects and the Hive Assistant: nothing that ran changed; {n} choices remembered for servers the workspace had switched off were not carried over. \"MCP tab\" as Hive names it."
   },
   "service.mcp.addedTitle": {
@@ -748,7 +748,7 @@
     "description": "On the Performance page, under What isn't measured: what a coding agent CLI puts in its model's context itself."
   },
   "service.metrics.notNetwork": {
-    "defaultMessage": "Provider network traffic: Hive starts the CLIs; it is not a proxy between them and their providers.",
+    "defaultMessage": "Provider network traffic: Combwork starts the CLIs; it is not a proxy between them and their providers.",
     "description": "On the Performance page, under What isn't measured: the coding agent CLIs' own network traffic."
   },
   "service.metrics.notPerProvider": {
@@ -760,7 +760,7 @@
     "description": "On the Performance page, under What isn't measured: whether a model read a skill Hive gave it."
   },
   "service.metrics.notTokens": {
-    "defaultMessage": "Provider tokens per Hive tool or per guidance part: providers report a session’s usage, not what each part of its context cost.",
+    "defaultMessage": "Provider tokens per Combwork tool or per guidance part: providers report a session’s usage, not what each part of its context cost.",
     "description": "On the Performance page, under What isn't measured: Hive can't tell how many tokens each of its tools or guidance parts cost."
   },
   "service.metrics.notTransport": {
@@ -768,11 +768,11 @@
     "description": "On the Performance page, under What isn't measured: the Agent API's request and response sizes count only the bodies."
   },
   "service.metrics.sharedNumbers": {
-    "defaultMessage": "The skill service and Hive-wide numbers are shared: not per role or provider.",
+    "defaultMessage": "The skill service and Combwork-wide numbers are shared: not per role or provider.",
     "description": "A note on the Performance page while it is filtered by role or provider: these numbers can't be narrowed."
   },
   "service.providers.keysStopped": {
-    "defaultMessage": "{task}: Hive stopped typing into it, as {why}. Finish it in the terminal.",
+    "defaultMessage": "{task}: Combwork stopped typing into it, as {why}. Finish it in the terminal.",
     "description": "A notification: Hive stopped typing the keys of a coding agent CLI's task ({task}: \"Codex setup\") into its terminal; {why} says why (a clause: \"its terminal closed\")."
   },
   "service.providers.noSetup": {
@@ -784,7 +784,7 @@
     "description": "An error running a coding agent CLI's task (update, sign-in, setup): the CLI {cli} (\"Codex\") is not installed."
   },
   "service.providers.pickNotFound": {
-    "defaultMessage": "{task}: Hive couldn't find {item}. Do it in the terminal, or update Hive.",
+    "defaultMessage": "{task}: Combwork couldn't find {item}. Do it in the terminal, or update Combwork.",
     "description": "A notification: Hive types the keys of a coding agent CLI's task ({task}: \"Codex setup\") into its terminal, and couldn't find the menu item {item} (the CLI's own words) on its screen."
   },
   "service.providers.retryUnavailable": {
@@ -796,11 +796,11 @@
     "description": "An error: Provider Setup was asked to sign a coding agent CLI ({cli}: \"Claude Code\") in, but its logins are accounts (Settings → Accounts & Connections names a section)."
   },
   "service.providers.stillLooking": {
-    "defaultMessage": "Hive is still looking for {cli}. Try again in a moment.",
+    "defaultMessage": "Combwork is still looking for {cli}. Try again in a moment.",
     "description": "An error: Hive hasn't finished finding the coding agent CLI {cli} (\"Codex\"), so it can't use it yet."
   },
   "service.providers.stillLookingAll": {
-    "defaultMessage": "Hive is still looking for the coding agent CLIs. Try again in a moment.",
+    "defaultMessage": "Combwork is still looking for the coding agent CLIs. Try again in a moment.",
     "description": "An error: Hive hasn't finished finding the coding agent CLIs installed (it does when it starts), so it can't choose one yet."
   },
   "service.providers.stopFirst": {
@@ -848,19 +848,19 @@
     "description": "An error when the user clicks Revert on a provider's models setting the Assistant changed: the models it had removed are different now. {path} is where the setting is (\"Settings → Claude Code → Models\"). \"There\" is that place in Settings."
   },
   "service.slots.notPrepared": {
-    "defaultMessage": "Hive couldn't get {slot} ready for {card}: {why}",
+    "defaultMessage": "Combwork couldn't get {slot} ready for {card}: {why}",
     "description": "A notice: a card was started in a slot (a worktree Hive lends to a card or a lane), and Hive couldn't check out the card's branch there or install its dependencies. {slot} is the slot's name (slot-b), {card} the card's key, {why} git's or the setup's reason, in English."
   },
   "service.slots.resumeFailed": {
-    "defaultMessage": "Hive couldn't resume {agent}'s conversation in {slot} for {card} (three tries): {why}. Resume {agent} from Sessions, or start it fresh, and Hive gives it {card}.",
+    "defaultMessage": "Combwork couldn't resume {agent}'s conversation in {slot} for {card} (three tries): {why}. Resume {agent} from Sessions, or start it fresh, and Combwork gives it {card}.",
     "description": "A notice (HI-1746): a card was started for an agent (its builder) in a slot, and Hive's resumes of the agent's last conversation there failed three times, so it stopped trying. Once the user resumes the agent, or starts it, Hive hands it the card. {card} is the card's key, {agent} the agent's name, {slot} the slot's name (slot-b), {why} the last failure's reason, in English."
   },
   "service.slots.resumeHeld": {
-    "defaultMessage": "Hive can't give {card} to {agent} yet: {agent}'s conversation in {slot} can't resume now ({why}). Hive gives it {card} once it can.",
+    "defaultMessage": "Combwork can't give {card} to {agent} yet: {agent}'s conversation in {slot} can't resume now ({why}). Combwork gives it {card} once it can.",
     "description": "A notice (HI-1746): a card was started for an agent (its builder) in a slot, and Hive hasn't handed the card to it yet; the agent's last conversation, in that slot, can't be resumed now, and Hive never starts a new conversation instead. {card} is the card's key, {agent} the agent's name, {slot} the slot's name (slot-b), {why} the reason, in English."
   },
   "service.templates.v09": {
-    "defaultMessage": "1.0 templates don’t pin agents to worktrees, so the Hive templates take their place. A copy of {n, plural, one {the template} other {the # templates}} is kept with the 0.9 board backup.",
+    "defaultMessage": "1.0 templates don’t pin agents to worktrees, so the Combwork templates take their place. A copy of {n, plural, one {the template} other {the # templates}} is kept with the 0.9 board backup.",
     "description": "A quiet notice once after the upgrade to Hive 1.0: the {n} agent templates saved in 0.9 aren't used; a copy of each was put in the folder of the board's 0.9 backup. \"The Hive templates\" are Hive's own templates (the Templates view's Hive group)."
   },
   "service.templates.v09Title": {
@@ -872,7 +872,7 @@
     "description": "An error opening a session's conversation in the Sessions tab while it is being archived or deleted."
   },
   "service.transcripts.exported": {
-    "defaultMessage": "{session} · exported from Hive {date}",
+    "defaultMessage": "{session} · exported from Combwork {date}",
     "description": "The line under the title of a conversation exported as Markdown (Sessions tab → Export): {session} says which session it was, {date} when it was exported."
   },
   "service.transcripts.imageNotKept": {
@@ -892,7 +892,7 @@
     "description": "An error in the Sessions tab: the session's CLI hasn't written its conversation's file yet."
   },
   "service.workflow.changedMeanwhile": {
-    "defaultMessage": "The workflow options changed meanwhile (in another window, or by the Hive Assistant), so nothing was saved. The section shows them as they are now.",
+    "defaultMessage": "The workflow options changed meanwhile (in another window, or by the Assistant), so nothing was saved. The section shows them as they are now.",
     "description": "Why saving the Workflow section of the Version Control tab was refused: the options changed after the section was read. It reloads them."
   },
   "service.workflow.closed": {
@@ -1004,11 +1004,11 @@
     "description": "An error opening a workspace: the folder {folder} is the workspace of another Hive window."
   },
   "service.workspace.platformGitFound": {
-    "defaultMessage": "{project} is a Git repository now. Hive goes on treating it as a project without version control until you switch it in its Version Control tab.",
+    "defaultMessage": "{project} is a Git repository now. Combwork goes on treating it as a project without version control until you switch it in its Version Control tab.",
     "description": "A notice: someone ran git init in a project Hive treats as having no version control. Hive does not switch it by itself: the Version Control tab offers the switch (glossary 2.1: Version Control)."
   },
   "service.workspace.platformInvalid": {
-    "defaultMessage": "{project}'s project.json names a version control Hive doesn't know (platform: {value}). Until it says \"git\" or \"none\", Hive uses what it finds in the folder.",
+    "defaultMessage": "{project}'s project.json names a version control Combwork doesn't know (platform: {value}). Until it says \"git\" or \"none\", Combwork uses what it finds in the folder.",
     "description": "A notice: the platform setting in the project {project}'s .hive/project.json is {value}, which is not one Hive has (only \"git\" and \"none\" are: keep them as they are, they are setting values)."
   },
   "service.workspace.platformInvalidTitle": {
@@ -1020,7 +1020,7 @@
     "description": "A button on the notice that a project's version control changed: shows the project's Version Control tab, where Hive offers the switch (glossary 2.1)."
   },
   "service.workspace.platformOtherFound": {
-    "defaultMessage": "{vcs} was found in {project}. Hive doesn't support it yet, and goes on treating the project as a Git project until you switch it to None in its Version Control tab.",
+    "defaultMessage": "{vcs} was found in {project}. Combwork doesn't support it yet, and goes on treating the project as a Git project until you switch it to None in its Version Control tab.",
     "description": "A notice: another version control system ({vcs}: Mercurial, Jujutsu…) was found in a project Hive treats as a Git project. Hive does not switch it by itself: the Version Control tab offers the switch to None (glossary 2.1)."
   },
   "service.workspace.platformRepositoryGone": {

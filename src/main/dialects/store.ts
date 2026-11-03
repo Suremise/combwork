@@ -17,8 +17,9 @@ import { join } from 'path'
 import { readJson, withFileLock, writeJsonAtomic, writeTextAtomic } from '../fsutil'
 import { createLogger, userText } from '../logger'
 import type { DialectChain } from '../../shared/agentText'
-import { API_FOLDER, CLI_FILE, checkTexts, dialectFileText, parseDialectFile, STATE_FILE, textProblem, WORKSPACE_FILE, type DialectFile, type DialectSchema, type FileProblem, type TextProblem } from './format'
+import { API_FOLDER, CLI_FILE, checkTexts, dialectFileText, parseDialectFile, STATE_FILE, textProblem, WORKSPACE_FILE, type DialectFile, type DialectSchema } from './format'
 import type { DialectFolder, DialectSet, LoadedDialect } from './chain'
+import type { DialectRefusal } from '../../shared/dialects'
 
 const log = createLogger('dialects')
 
@@ -30,22 +31,8 @@ const FOLDER = /^[a-z0-9][a-z0-9-]*$/
 /** A file's label, as its file name has it: no path, nothing Windows refuses, not hidden. */
 const LABEL = /^[^\\/:*?"<>|\x00-\x1f.][^\\/:*?"<>|\x00-\x1f]*$/
 
-/** Why a change to a dialect file was refused. */
-export type DialectRefusal =
-  /** The path isn't a dialect file's (workspace.json, or <folder>/<label>.json). */
-  | { refused: 'path' }
-  /** The file isn't a dialect (not JSON, or not its shape). */
-  | { refused: 'file'; problem: FileProblem }
-  /** Texts that don't match the schema. */
-  | { refused: 'texts'; problems: TextProblem[] }
-  /** Only a model file or a test copy in a CLI folder has a model: not the Workspace, CLI or API files. */
-  | { refused: 'modelHere' }
-  /** Another file of the folder already claims that model (decision: one file per model). */
-  | { refused: 'modelClaimed'; model: string; by: string }
-  /** A file of that name is already there. */
-  | { refused: 'nameTaken'; path: string }
-  /** The file it acts on isn't there (or can't be read as a dialect). */
-  | { refused: 'missing'; path: string }
+/** Why a change to a dialect file was refused: shared/dialects.ts (the Dialects view says it in its words). */
+export type { DialectRefusal } from '../../shared/dialects'
 
 /** Where a path in the dialects folder belongs: the Workspace file, or a folder's file (its CLI file or another). */
 export type DialectPlace = { kind: 'workspace' } | { kind: 'folder'; folder: string; file: string; cli: boolean }
@@ -192,14 +179,51 @@ async function writeChecked(dir: string, path: string, place: DialectPlace, file
   return null
 }
 
+/** A file's text on disk, as read ('' when it isn't there). */
+const rawOf = (dir: string, path: string): Promise<string> => readFile(join(dir, ...path.split('/')), 'utf8').catch(() => '')
+
 /**
  * Saves a dialect file (the Dialects view's Save): refused, and nothing written, when a text fails the schema, the file
  * may not have a model, or another file of its folder claims its model. It applies at each agent's next launch.
+ * `base` (HI-2444): the text on disk the draft was made from. Under the same lock as the write, a file that now differs
+ * is refused (`changedOnDisk`, with its text), so a change made meanwhile (an editor, another window) is never lost.
  */
-export async function saveDialect(dir: string, path: string, file: DialectFile, schema: DialectSchema): Promise<DialectRefusal | null> {
+export async function saveDialect(dir: string, path: string, file: DialectFile, schema: DialectSchema, opts: { base?: string } = {}): Promise<DialectRefusal | null> {
   const place = placeOf(path)
   if (!place) return { refused: 'path' }
-  return withFileLock(lockOf(dir, place), () => writeChecked(dir, path, place, file, schema))
+  return withFileLock(lockOf(dir, place), async () => {
+    if (opts.base !== undefined) {
+      const disk = await rawOf(dir, path)
+      if (disk !== opts.base) return { refused: 'changedOnDisk', disk }
+    }
+    return writeChecked(dir, path, place, file, schema)
+  })
+}
+
+/** Saves a file from its JSON as typed (the view's JSON tab): refused when it isn't a dialect file; else as saveDialect. */
+export async function saveDialectRaw(dir: string, path: string, raw: string, schema: DialectSchema, opts: { base?: string } = {}): Promise<DialectRefusal | null> {
+  const parsed = parseDialectFile(raw)
+  if ('problem' in parsed) return { refused: 'file', problem: parsed.problem }
+  return saveDialect(dir, path, parsed.file, schema, opts)
+}
+
+/**
+ * Deletes a file the user made (a test copy, an import), to the Recycle Bin (`remove`: trash()). The Workspace file, a
+ * CLI's (or the API's) file and a shipped file are refused (`protected`): they are the chain's baseline, and Revert puts
+ * a shipped one back. Checked under its folder's lock, against the file as it is then. Its on/off switch goes with it.
+ */
+export async function deleteDialect(dir: string, path: string, opts: { shipped: ReadonlySet<string>; remove: (file: string) => Promise<void> }): Promise<DialectRefusal | null> {
+  const place = placeOf(path)
+  if (!place) return { refused: 'path' }
+  if (place.kind === 'workspace' || place.cli || [...opts.shipped].some((id) => `${id}.json`.toLowerCase() === path.toLowerCase())) return { refused: 'protected' }
+  const removed = await withFileLock(lockOf(dir, place), async (): Promise<DialectRefusal | null> => {
+    const at = join(dir, ...path.split('/'))
+    if ((await readFile(at, 'utf8').catch(() => null)) === null) return { refused: 'missing', path }
+    await opts.remove(at)
+    return null
+  })
+  if (!removed) await setDialectOn(dir, path, true)
+  return removed
 }
 
 /**

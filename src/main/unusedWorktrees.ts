@@ -292,10 +292,10 @@ export async function unusedBranchOf(projectPath: string, path: string): Promise
 }
 
 /** Why the pool or Hive couldn't check a slot or folder (#1450), a clause. */
-const CANT_CHECK = msg({ id: 'main.unused.slot.cantCheck', defaultMessage: "Hive couldn't check it ({detail})", description: "Why Hive won't remove a slot listed in Unused worktrees: git couldn't say what it holds ({detail}: why, in English). A clause." })
+const CANT_CHECK = msg({ id: 'main.unused.slot.cantCheck', defaultMessage: "Combwork couldn't check it ({detail})", description: "Why Hive won't remove a slot listed in Unused worktrees: git couldn't say what it holds ({detail}: why, in English). A clause." })
 
 /** Why a slot has no Remove anyway (#1450): only the pool's guarded clean-up removes it. */
-const SLOT_GUARDED = msg({ id: 'main.unused.why.slotGuarded', defaultMessage: 'it is a slot, which Hive removes only when it is clean and its work is merged', description: "Why Hive won't remove a slot anyway from Unused worktrees (#1450): slots go only through the guarded clean-up. A clause." })
+const SLOT_GUARDED = msg({ id: 'main.unused.why.slotGuarded', defaultMessage: 'it is a slot, which Combwork removes only when it is clean and its work is merged', description: "Why Hive won't remove a slot anyway from Unused worktrees (#1450): slots go only through the guarded clean-up. A clause." })
 
 /** Why the pool keeps a slot (#1450), in the window's language: a row's reason, and Remove's refusal. */
 export async function keptText(projectPath: string, k: SlotKept): Promise<string> {
@@ -319,11 +319,11 @@ export async function keptText(projectPath: string, k: SlotKept): Promise<string
     case 'archiveFailed':
       return tr(msg({ id: 'main.unused.slot.archiveFailed', defaultMessage: 'its archive command failed ({error})', description: "Why Hive didn't remove a slot listed in Unused worktrees: the project's archive command, run first, failed ({error}: why, in English). A clause." }), { error: k.error })
     case 'busy':
-      return tr(msg({ id: 'main.unused.slot.busy', defaultMessage: 'Hive is setting it up or removing it now', description: "Why Hive won't remove a slot listed in Unused worktrees: another operation of Hive's has it. A clause." }))
+      return tr(msg({ id: 'main.unused.slot.busy', defaultMessage: 'Combwork is setting it up or removing it now', description: "Why Hive won't remove a slot listed in Unused worktrees: another operation of Hive's has it. A clause." }))
     case 'gitRefused':
       return tr(msg({ id: 'main.unused.slot.gitRefused', defaultMessage: "git didn't remove it ({detail})", description: "Why Hive didn't remove a slot listed in Unused worktrees: git worktree remove refused ({detail}: git's message). A clause." }), { detail: k.detail })
     case 'editedSkillCopy':
-      return tr(msg({ id: 'main.unused.slot.editedSkillCopy', defaultMessage: "{copies, plural, one {its skill folder {names} isn't an unchanged copy of Hive's} other {its skill folders {names} aren't unchanged copies of Hive's}}", description: "Why Hive didn't remove a slot listed in Unused worktrees (#1500): Hive removed its own skill copies from the slot's .agents/skills, but a folder named hive-… is left there (changed since Hive copied it, or the user's own), so the slot is kept. {names}: the folders' names, e.g. hive-merge-ready; {copies}: how many. A clause." }), { copies: k.copies.length, names: fmt.list(k.copies) })
+      return tr(msg({ id: 'main.unused.slot.editedSkillCopy', defaultMessage: "{copies, plural, one {its skill folder {names} isn't an unchanged copy of Combwork's} other {its skill folders {names} aren't unchanged copies of Combwork's}}", description: "Why Hive didn't remove a slot listed in Unused worktrees (#1500): Hive removed its own skill copies from the slot's .agents/skills, but a folder named hive-… is left there (changed since Hive copied it, or the user's own), so the slot is kept. {names}: the folders' names, e.g. hive-merge-ready; {copies}: how many. A clause." }), { copies: k.copies.length, names: fmt.list(k.copies) })
   }
 }
 
@@ -543,7 +543,7 @@ async function fingerprint(root: string): Promise<string> {
 /** The snapshot of an unused worktree as it is now; throws (saying why) when git or the folder can't say. */
 async function snapshot(projectPath: string, path: string): Promise<Snapshot> {
   const fail = (why: string): never => {
-    throw new Error(tr(msg({ id: 'main.unused.cantCheck', defaultMessage: "Hive couldn't check what it holds: {why}", description: "An error asking to Remove anyway one of the Overview's unused worktrees (Remove, Remove anyway, Merge). {why} says why (main.unused.read.*, or git's message)." }), { why: gitProblem() ?? why }))
+    throw new Error(tr(msg({ id: 'main.unused.cantCheck', defaultMessage: "Combwork couldn't check what it holds: {why}", description: "An error asking to Remove anyway one of the Overview's unused worktrees (Remove, Remove anyway, Merge). {why} says why (main.unused.read.*, or git's message)." }), { why: gitProblem() ?? why }))
   }
   const head = await git(path, ['rev-parse', '--verify', '--quiet', 'HEAD'])
   const tip = head.ok ? head.out.trim() : ''
@@ -610,7 +610,7 @@ export async function removalPreview(projectPath: string, path: string): Promise
     () => true
   )
   const why = (await unsafe(projectPath, listed.path)) ?? (isSlot ? tr(SLOT_GUARDED) : await stillUnused(projectPath, listed.path))
-  if (why) throw new Error(tr(msg({ id: 'main.unused.refused', defaultMessage: "Hive doesn't remove it: {why}.", description: "An error asking to Remove anyway one of the Overview's unused worktrees (Remove, Remove anyway, Merge). {why} says why (main.unused.why.*)." }), { why }))
+  if (why) throw new Error(tr(msg({ id: 'main.unused.refused', defaultMessage: "Combwork doesn't remove it: {why}.", description: "An error asking to Remove anyway one of the Overview's unused worktrees (Remove, Remove anyway, Merge). {why} says why (main.unused.why.*)." }), { why }))
   const snap = await snapshot(projectPath, listed.path)
   const now = Date.now()
   for (const [k, p] of previews) if (now - p.at > PREVIEW_MS) previews.delete(k)

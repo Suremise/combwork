@@ -116,7 +116,7 @@ describe('Claude Code auto-compaction settings (#242)', () => {
   it('says a default is an estimate: what Hive cannot read could change it', () => {
     const d = autoCompactOf([], {}, [], OPUS)
     expect(d.estimate).toBe(UNREAD_SOURCES)
-    expect(autoCompactLine('claude-code', 200_000, d)).toMatch(/its default for this window \(an estimate: managed policies Hive can't read \(such as Windows registry policies/)
+    expect(autoCompactLine('claude-code', 200_000, d)).toMatch(/its default for this window \(an estimate: managed policies Combwork can't read \(such as Windows registry policies/)
     // A value a setting gives is no estimate.
     expect(autoCompactOf(['--autocompact', '300000'], {}, [], OPUS).estimate).toBeUndefined()
   })
@@ -200,7 +200,7 @@ describe('Claude Code auto-compaction settings (#242)', () => {
     expect(bogus.map((s) => s.label)).toEqual(["the project's .claude/settings.local.json", "the project's .claude/settings.json", "Claude Code's settings.json", '--setting-sources bogus'])
     expect(autoCompactOf([], {}, bogus, OPUS)).toEqual({ window: 150_000, source: "CLAUDE_CODE_AUTO_COMPACT_WINDOW (env in the project's .claude/settings.json)", estimate: "an estimate: --setting-sources bogus isn't a list Claude Code takes (user, project, local)" })
     const safe = settingsScopes(cwd, home, ['--safe-mode', '--setting-sources', '']).slice(1)
-    expect(autoCompactOf([], {}, safe, OPUS)).toEqual({ window: null, source: null, estimate: "an estimate: managed policies Hive can't read (such as Windows registry policies or your organisation's server-managed settings) could change it and --safe-mode may stop Claude Code reading some settings files" })
+    expect(autoCompactOf([], {}, safe, OPUS)).toEqual({ window: null, source: null, estimate: "an estimate: managed policies Combwork can't read (such as Windows registry policies or your organisation's server-managed settings) could change it and --safe-mode may stop Claude Code reading some settings files" })
     expect(settingsScopes(cwd, home, ['--bare']).at(-1)).toEqual({ label: '--bare', json: null, unsure: 'may stop Claude Code reading some settings files' })
     // Turned off, or a window set: the estimate is said too.
     expect(autoCompactLine('claude-code', 200_000, autoCompactOf([], { DISABLE_COMPACT: '1' }, safe, OPUS))).toBe("Claude Code doesn't compact by itself: auto-compaction is off (DISABLE_COMPACT) (an estimate: --safe-mode may stop Claude Code reading some settings files)")

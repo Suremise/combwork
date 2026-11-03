@@ -87,25 +87,25 @@ const MOVED_TITLE = msg({
 })
 const MOVED_BODY = msg({
   id: 'main.usageMove.movedBody',
-  defaultMessage: "{from} has used {share, number, ::percent} of its {window, select, weekly {weekly limit} other {5-hour limit}}. {agents}: each moves to the matching connection on {to} and resumes its conversation there, a working agent once its turn ends. Hive doesn't move them back: to move one back, choose its connection in Agent Settings.",
+  defaultMessage: "{from} has used {share, number, ::percent} of its {window, select, weekly {weekly limit} other {5-hour limit}}. {agents}: each moves to the matching connection on {to} and resumes its conversation there, a working agent once its turn ends. Combwork doesn't move them back: to move one back, choose its connection in Agent Settings.",
   description: "A notice's text (HI-2195), under the title saying agents move from one account to another. {from} and {to} are accounts' names, {share} how much of the limit is used (\"98%\"), {agents} the agents' names joined into a list. The limit is the weekly one or the 5-hour one. Agent Settings names a dialog."
 })
 const BLOCKED_TITLE = msg({
   id: 'main.usageMove.blockedTitle',
-  defaultMessage: "Hive can't move {from}'s agents to {to}",
+  defaultMessage: "Combwork can't move {from}'s agents to {to}",
   description: "A notice's title (HI-2195): an account ({from}) reached the share of its usage limit its rule sets, but its agents can't move to the account the rule names ({to}); the text says why."
 })
 const BLOCKED_BODY = msg({
   id: 'main.usageMove.blockedBody',
   defaultMessage:
-    "{reason, select, missing {That account is gone, or isn't for the same CLI: choose another in Settings → Accounts & Connections.} signedOut {{to} is signed out: sign it in, and they move then.} noConnections {{to} has no connections: add one, and they move then.} full {{to} has also used {share, number, ::percent} of its {window, select, weekly {weekly limit} other {5-hour limit}}, so they stay where they are.} off {{to} isn't on in {workspace}: turn it on in Settings → Accounts & Connections, and they move then.} other {Their connection couldn't be saved: {agents}. Hive stops trying until the limit resets.}}",
+    "{reason, select, missing {That account is gone, or isn't for the same CLI: choose another in Settings → Accounts & Connections.} signedOut {{to} is signed out: sign it in, and they move then.} noConnections {{to} has no connections: add one, and they move then.} full {{to} has also used {share, number, ::percent} of its {window, select, weekly {weekly limit} other {5-hour limit}}, so they stay where they are.} off {{to} isn't on in {workspace}: turn it on in Settings → Accounts & Connections, and they move then.} other {Their connection couldn't be saved: {agents}. Combwork stops trying until the limit resets.}}",
   description: "Why an account's agents can't move to another (HI-2195), under the title saying so. {to} is the account they should move to, {workspace} a workspace's name, {share} a share of a usage limit (\"98%\"), {agents} agents' names joined into a list. The limit is the weekly one or the 5-hour one. Settings → Accounts & Connections names a section."
 })
 
 /** Tells a notice as plan usage's are (planUsage.ts, HI-2320): once, a pop-up or a Windows notification. */
 function notify(level: 'warning' | 'error' | 'info', title: Msg, body: Msg, values: Record<string, string | number>): void {
-  // agent-later: HI-2465 says the events stream's titles in each caller's dialect
-  tell({ kind: 'usage', level, title: tr(title, values), message: tr(body, values), apiTitle: englishText({ m: title, values }) })
+  // agent-stored: agentField says the events stream's title again in each caller's dialect, from apiTitleText (apiEvents.ts, HI-2465)
+  tell({ kind: 'usage', level, title: tr(title, values), message: tr(body, values), apiTitle: englishText({ m: title, values }), apiTitleText: { m: title, values } })
 }
 
 const windowOf = (l: Pick<PlanLimit, 'windowMinutes'>): 'weekly' | 'fiveHour' => limitKind(l) ?? 'fiveHour'

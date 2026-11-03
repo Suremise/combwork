@@ -2,6 +2,7 @@ import { basename, dirname, join, resolve as resolvePath } from 'path'
 import type { HiveEvent, LiveSessionState, ProgressRun } from '../shared/types'
 import { activityFields, publicReason } from '../shared/assistantActivity'
 import { cardRefText } from '../shared/progress'
+import { agentField } from '../shared/advanced'
 
 /**
  * What the Agent API's event stream (`GET /v1/events`) sends of Hive's events, and to whom (#620). Pure, so it is unit
@@ -184,7 +185,8 @@ export function apiEventFor(event: HiveEvent, agent: StreamScope | null): Record
     case 'notice': {
       const n = event.notice
       if (!own(n.projectPath)) return null
-      return { type: event.type, notice: { id: n.id, kind: n.kind, title: n.apiTitle ?? n.title, projectPath: n.projectPath, ...(n.agentId ? { agentId: n.agentId } : {}) } }
+      // Its title in the client's dialect (HI-2465: broadcast says each client's line in its scope), else its English.
+      return { type: event.type, notice: { id: n.id, kind: n.kind, title: agentField(n.apiTitle ?? n.title, n.apiTitleText), projectPath: n.projectPath, ...(n.agentId ? { agentId: n.agentId } : {}) } }
     }
     case 'notice-resolved':
     case 'agent-added':

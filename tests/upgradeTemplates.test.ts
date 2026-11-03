@@ -130,7 +130,7 @@ describe("0.9's agent templates at the upgrade to 1.0 (#1436)", () => {
     await step.sayV09TemplatesOnce(w)
     await expect.poll(() => store.boardValue(w, 'templates.v09.notice'), { timeout: HUNG_MS }).toBe('said')
     await step.sayV09TemplatesOnce(w)
-    expect(said).toEqual([{ title: 'Your 0.9 agent templates aren’t used in 1.0', message: '1.0 templates don’t pin agents to worktrees, so the Hive templates take their place. A copy of the 3 templates is kept with the 0.9 board backup.' }])
+    expect(said).toEqual([{ title: 'Your 0.9 agent templates aren’t used in 1.0', message: '1.0 templates don’t pin agents to worktrees, so the Combwork templates take their place. A copy of the 3 templates is kept with the 0.9 board backup.' }])
     await close(w)
   })
 

@@ -41,7 +41,7 @@ export const OPTION_TEXT: Partial<Record<OptionKey, OptionText>> = {
   },
   finish: {
     title: msg({ id: 'workflow.option.finish.title', defaultMessage: 'Who merges', description: 'A workflow option (glossary 2.6, G5).' }),
-    desc: msg({ id: 'workflow.option.finish.desc', defaultMessage: 'When a card is done: once Hive’s merge queue has merged it, once its agent has merged it and Hive finds the work in the target branch, once it is committed, or whenever it is moved there.', description: 'What the workflow option “Who merges” does (glossary 2.1: merge queue).' })
+    desc: msg({ id: 'workflow.option.finish.desc', defaultMessage: 'When a card is done: once Combwork’s merge queue has merged it, once its agent has merged it and Combwork finds the work in the target branch, once it is committed, or whenever it is moved there.', description: 'What the workflow option “Who merges” does (glossary 2.1: merge queue).' })
   },
   style: {
     title: msg({ id: 'workflow.option.style.title', defaultMessage: 'Merge style', description: 'A workflow option (glossary 2.6, G6).' }),
@@ -53,7 +53,7 @@ export const OPTION_TEXT: Partial<Record<OptionKey, OptionText>> = {
   },
   mergeChecks: {
     title: msg({ id: 'workflow.option.mergeChecks.title', defaultMessage: 'Checks pass on the merged result', description: 'A workflow option (glossary 2.6, G9): named commands Hive’s merge queue runs on a card’s work merged with the target branch.' }),
-    desc: msg({ id: 'workflow.option.mergeChecks.desc', defaultMessage: 'Hive’s merge queue runs these named commands on the card’s work merged with the target branch, and moves the target only once each one has passed.', description: 'What the workflow option “Checks pass on the merged result” does (glossary 2.1: merge queue).' })
+    desc: msg({ id: 'workflow.option.mergeChecks.desc', defaultMessage: 'Combwork’s merge queue runs these named commands on the card’s work merged with the target branch, and moves the target only once each one has passed.', description: 'What the workflow option “Checks pass on the merged result” does (glossary 2.1: merge queue).' })
   },
   focusedTests: {
     title: msg({ id: 'workflow.option.focusedTests.title', defaultMessage: 'Each card’s focused tests pass on the merged result', description: 'A workflow option (glossary 2.6, G20): the tests a card’s change needs are chosen when it is submitted, and Hive’s merge queue runs them on its work merged with the target branch.' }),
@@ -69,7 +69,7 @@ export const OPTION_TEXT: Partial<Record<OptionKey, OptionText>> = {
   },
   commitMessage: {
     title: msg({ id: 'workflow.option.commitMessage.title', defaultMessage: 'Commit message', description: 'A workflow option (glossary 2.6, G19): the message of the commit Hive’s merge queue makes when it merges a card (a merge commit, or a squash’s one commit).' }),
-    desc: msg({ id: 'workflow.option.commitMessage.desc', defaultMessage: 'The message of the commit the merge queue makes: Hive’s names the card’s key and title and adds Hive’s trailers, and the branch’s own uses the message its commits have, with no card key or trailers, while Hive still knows which card it merged.', description: 'What the workflow option “Commit message” does (glossary 2.1: merge queue). Trailers are git’s name for the “Key: value” lines at the end of a commit message: keep the word if your language’s git terms do.' })
+    desc: msg({ id: 'workflow.option.commitMessage.desc', defaultMessage: 'The message of the commit the merge queue makes: Combwork’s names the card’s key and title and adds Combwork’s trailers, and the branch’s own uses the message its commits have, with no card key or trailers, while Combwork still knows which card it merged.', description: 'What the workflow option “Commit message” does (glossary 2.1: merge queue). Trailers are git’s name for the “Key: value” lines at the end of a commit message: keep the word if your language’s git terms do.' })
   },
   mergeInstall: {
     title: msg({ id: 'workflow.option.mergeInstall.title', defaultMessage: 'Install dependencies from scratch', description: 'A workflow option (G9’s install): when the merge queue installs the project’s dependencies afresh before the merge checks.' }),
@@ -81,7 +81,7 @@ export const OPTION_TEXT: Partial<Record<OptionKey, OptionText>> = {
   },
   folder: {
     title: msg({ id: 'workflow.option.folder.title', defaultMessage: 'Where cards are built', description: 'A workflow option (glossary 2.6, G11).' }),
-    desc: msg({ id: 'workflow.option.folder.desc', defaultMessage: 'In its own folder, a slot Hive lends to the card or its lane, each card is built on a branch of its own, apart from other agents’ work; in the project folder, everyone sees each other’s unfinished changes.', description: 'What the workflow option “Where cards are built” does (glossary 2.5: slot, a worktree Hive lends to a card or a lane).' })
+    desc: msg({ id: 'workflow.option.folder.desc', defaultMessage: 'In its own folder, a slot Combwork lends to the card or its lane, each card is built on a branch of its own, apart from other agents’ work; in the project folder, everyone sees each other’s unfinished changes.', description: 'What the workflow option “Where cards are built” does (glossary 2.5: slot, a worktree Hive lends to a card or a lane).' })
   },
   slotsUpToDate: {
     title: msg({ id: 'workflow.option.slotsUpToDate.title', defaultMessage: 'Slots are brought up to date before each card', description: 'A workflow option (glossary 2.6, G15; glossary 2.5: slot): before a card starts in a slot, the slot is brought to the target branch’s latest work.' }),
@@ -106,7 +106,7 @@ export const OPTION_TEXT: Partial<Record<OptionKey, OptionText>> = {
   },
   reviewerMode: {
     title: msg({ id: 'workflow.option.reviewerMode.title', defaultMessage: 'Reviewers', description: 'A workflow option (glossary 2.6, G17): whether each lane has its own reviewer agent or the lanes share a pool of reviewers.' }),
-    desc: msg({ id: 'workflow.option.reviewerMode.desc', defaultMessage: 'One reviewer per lane, or a shared pool: Hive gives each card submitted in a pool lane, oldest first, to the next free reviewer that didn’t build it.', description: 'What the workflow option “Reviewers” does (glossary 2.6, G17; glossary: lane, pool).' })
+    desc: msg({ id: 'workflow.option.reviewerMode.desc', defaultMessage: 'One reviewer per lane, or a shared pool: Combwork gives each card submitted in a pool lane, oldest first, to the next free reviewer that didn’t build it.', description: 'What the workflow option “Reviewers” does (glossary 2.6, G17; glossary: lane, pool).' })
   },
   commands: {
     title: msg({ id: 'workflow.option.commands.title', defaultMessage: 'Check commands', description: 'A workflow setting: the command each named check runs (the checks of “Checks pass before review”).' }),
@@ -126,7 +126,7 @@ export const OPTION_TEXT: Partial<Record<OptionKey, OptionText>> = {
   },
   loopWakes: {
     title: msg({ id: 'workflow.option.loopWakes.title', defaultMessage: 'Wake reviewers and builders', description: 'A workflow option, under Card loops: Hive wakes the agents of a card loop for its handoffs (glossary: card loop).' }),
-    desc: msg({ id: 'workflow.option.loopWakes.desc', defaultMessage: 'When a card with a reviewer arrives in Review, Hive wakes the reviewer, and on the review’s verdict the card’s builder; off, only the agents’ own card watches wake them.', description: 'What the workflow option “Wake reviewers and builders” does.' })
+    desc: msg({ id: 'workflow.option.loopWakes.desc', defaultMessage: 'When a card with a reviewer arrives in Review, Combwork wakes the reviewer, and on the review’s verdict the card’s builder; off, only the agents’ own card watches wake them.', description: 'What the workflow option “Wake reviewers and builders” does.' })
   },
   maxAgents: {
     title: msg({ id: 'workflow.option.maxAgents.title', defaultMessage: 'Maximum agents', description: 'A workflow option (HI-2001): the most agents the project has, its team size. Nobody adds agents past it: the user, the Hive Assistant or a program (HI-2058).' }),
@@ -160,8 +160,8 @@ export const VALUE_TEXT = {
     exact: msg({ id: 'workflow.value.sameness.exact', defaultMessage: 'Exact revision only', description: 'A value of the workflow option “A pass survives a clean rebase” (glossary 2.6, G4).' })
   },
   finish: {
-    hiveMerges: msg({ id: 'workflow.value.finish.hiveMerges', defaultMessage: 'Hive merges', description: 'A value of the workflow option “Who merges” (glossary 2.6, G5).' }),
-    agentMerges: msg({ id: 'workflow.value.finish.agentMerges', defaultMessage: 'The agent merges, Hive checks', description: 'A value of the workflow option “Who merges” (glossary 2.6, G5).' }),
+    hiveMerges: msg({ id: 'workflow.value.finish.hiveMerges', defaultMessage: 'Combwork merges', description: 'A value of the workflow option “Who merges” (glossary 2.6, G5).' }),
+    agentMerges: msg({ id: 'workflow.value.finish.agentMerges', defaultMessage: 'The agent merges, Combwork checks', description: 'A value of the workflow option “Who merges” (glossary 2.6, G5).' }),
     committed: msg({ id: 'workflow.value.finish.committed', defaultMessage: 'Committed is done', description: 'A value of the workflow option “Who merges” (glossary 2.6, G5).' }),
     notChecked: msg({ id: 'workflow.value.finish.notChecked', defaultMessage: 'Not checked', description: 'A value of the workflow option “Who merges” (glossary 2.6, G5).' })
   },
@@ -171,7 +171,7 @@ export const VALUE_TEXT = {
     rebase: msg({ id: 'workflow.value.style.rebase', defaultMessage: 'Rebase and fast-forward', description: 'A value of the workflow option “Merge style” (glossary 2.6, G6; #1184): Hive’s merge queue rebases the card’s commits onto the target branch and moves the branch forward to them, so the history stays linear, with no merge commit.' })
   },
   commitMessage: {
-    hive: msg({ id: 'workflow.value.commitMessage.hive', defaultMessage: 'Hive’s: the card’s key and title, with trailers', description: 'A value of the workflow option “Commit message” (glossary 2.6, G19): the commit is titled with the card’s key and title (HI-12: Fix the login) and ends with Hive’s trailers (Hive-Card: HI-12 and others). Trailers: git’s “Key: value” lines at a message’s end.' }),
+    hive: msg({ id: 'workflow.value.commitMessage.hive', defaultMessage: 'Combwork’s: the card’s key and title, with trailers', description: 'A value of the workflow option “Commit message” (glossary 2.6, G19): the commit is titled with the card’s key and title (HI-12: Fix the login) and ends with Hive’s trailers (Hive-Card: HI-12 and others). Trailers: git’s “Key: value” lines at a message’s end.' }),
     branch: msg({ id: 'workflow.value.commitMessage.branch', defaultMessage: 'The branch’s own, with no card key or trailers', description: 'A value of the workflow option “Commit message” (glossary 2.6, G19): the commit takes the message the branch’s commits have (with several, the first one’s subject and each one’s message), never the card’s key or Hive’s trailers. Trailers: git’s “Key: value” lines at a message’s end.' })
   },
   mergeInstall: {
@@ -245,12 +245,12 @@ export const OPTION_WHY: Partial<Record<OptionKey, Msg>> = {
   noSelfReview: msg({ id: 'workflow.why.noSelfReview', defaultMessage: 'A builder never passes its own work.', description: 'Why the presets turn on “Nobody reviews their own work” wherever there is a reviewer.' }),
   preChecks: msg({ id: 'workflow.why.preChecks', defaultMessage: 'Cheap checks before review catch most of the rounds that would be lost, and a team adds its tests.', description: 'Why the presets set “Checks pass before review” as they do (Pair: the quick checks; Team: the tests too).' }),
   sameness: msg({ id: 'workflow.why.sameness', defaultMessage: 'A clean rebase doesn’t change what was reviewed, so the pass still counts.', description: 'Why every preset sets “A pass survives a clean rebase” to Same change.' }),
-  finish: msg({ id: 'workflow.why.finish', defaultMessage: 'Merged through Hive’s queue, red work never reaches the target branch; working solo, a card is done once it’s committed.', description: 'Why the presets set “Who merges” as they do (glossary 2.1: merge queue).' }),
-  style: msg({ id: 'workflow.why.style', defaultMessage: 'A merge commit keeps each card’s own commits, as Hive has always merged.', description: 'Why the presets set “Merge style” to Merge commit.' }),
+  finish: msg({ id: 'workflow.why.finish', defaultMessage: 'Merged through Combwork’s queue, red work never reaches the target branch; working solo, a card is done once it’s committed.', description: 'Why the presets set “Who merges” as they do (glossary 2.1: merge queue).' }),
+  style: msg({ id: 'workflow.why.style', defaultMessage: 'A merge commit keeps each card’s own commits, as Combwork has always merged.', description: 'Why the presets set “Merge style” to Merge commit.' }),
   target: msg({ id: 'workflow.why.target', defaultMessage: 'Finished work goes to the repository’s default branch; working solo, to the branch the project is on.', description: 'Why the presets set “Work merges into” as they do.' }),
   strict: msg({ id: 'workflow.why.strict', defaultMessage: 'The merge queue tests the merged result anyway, so this mostly changes the history’s shape.', description: 'Why the presets leave “Work is up to date with its target branch before it merges” off.' }),
   pushTarget: msg({ id: 'workflow.why.pushTarget', defaultMessage: 'Pushing reaches your remote and its sign-in, so it stays yours unless you turn it on.', description: 'Why the presets leave “Push the target branch after merging” off.' }),
-  commitMessage: msg({ id: 'workflow.why.commitMessage', defaultMessage: 'Card titles can name people and details a public history shouldn’t keep; choose Hive’s for the card’s key, linking each merge to its card.', description: 'Why the presets set “Commit message” to the branch’s own (HI-1997), and what choosing Hive’s (the card’s key and title, with trailers) gives instead.' }),
+  commitMessage: msg({ id: 'workflow.why.commitMessage', defaultMessage: 'Card titles can name people and details a public history shouldn’t keep; choose Combwork’s for the card’s key, linking each merge to its card.', description: 'Why the presets set “Commit message” to the branch’s own (HI-1997), and what choosing Hive’s (the card’s key and title, with trailers) gives instead.' }),
   mergeChecks: msg({ id: 'workflow.why.mergeChecks', defaultMessage: 'The checks run on the work as it will be once merged, not only as it was built.', description: 'Why the presets set “Checks pass on the merged result” when Hive merges.' }),
   focusedTests: msg({ id: 'workflow.why.focusedTests', defaultMessage: 'Each card’s own tests on the merged result catch what its change breaks there, without running every test for every card.', description: 'Why Team turns on “Each card’s focused tests pass on the merged result” when the project has the command that runs them.' }),
   mergeInstall: msg({ id: 'workflow.why.mergeInstall', defaultMessage: 'A clean install before every merge catches a dependency that only worked on the builder’s machine.', description: 'Why Team installs dependencies from scratch before every merge.' }),
@@ -269,8 +269,8 @@ export const OPTION_WHY: Partial<Record<OptionKey, Msg>> = {
 export const PRESET_SUMMARY: Record<PlatformId, Partial<Record<PresetId, Msg>>> = {
   git: {
     solo: msg({ id: 'workflow.summary.git.solo', defaultMessage: 'Everyone in the project folder, no review: a card is done once it’s committed.', description: 'What the Solo preset sets up, for a Git project (glossary 2.1: Solo).' }),
-    pairAgent: msg({ id: 'workflow.summary.git.pairAgent', defaultMessage: 'A reviewer agent passes each card, then its builder merges it and Hive checks the work is in the target.', description: 'What the preset “Pair (the agent merges)” sets up (glossary 2.1: Pair).' }),
-    pair: msg({ id: 'workflow.summary.git.pair', defaultMessage: 'A reviewer agent passes each card, then Hive’s merge queue merges it once the checks pass on the merged result.', description: 'What the Pair preset sets up, for a Git project (glossary 2.1: Pair, merge queue).' }),
+    pairAgent: msg({ id: 'workflow.summary.git.pairAgent', defaultMessage: 'A reviewer agent passes each card, then its builder merges it and Combwork checks the work is in the target.', description: 'What the preset “Pair (the agent merges)” sets up (glossary 2.1: Pair).' }),
+    pair: msg({ id: 'workflow.summary.git.pair', defaultMessage: 'A reviewer agent passes each card, then Combwork’s merge queue merges it once the checks pass on the merged result.', description: 'What the Pair preset sets up, for a Git project (glossary 2.1: Pair, merge queue).' }),
     team: msg({ id: 'workflow.summary.git.team', defaultMessage: 'Pair with stricter checks: the unit tests too, a clean install before every merge, and your OK for cards labelled ui or release.', description: 'What the Team preset sets up, for a Git project (glossary 2.1: Team, Pair).' })
   },
   none: {

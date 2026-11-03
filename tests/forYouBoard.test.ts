@@ -632,7 +632,7 @@ describe("an answer that needs someone other than the card's agent (HI-1734)", a
     await inWorkspace(w, () => wf.askTheUser(`#${card}`, 'agent:a1', { kind: 'decide', text: 'Nothing to merge: Done?', actions: [{ kind: 'done' }] }))
     await answer(w, card, forYou(w).items[0].request, { outcome: 'answered', reply: 'Yes' })
     expect(relayed(w)).toEqual([])
-    await vi.waitFor(async () => expect(await historyOf(w, card)).toContain("Builder (p) can't move this card to Done by itself, and the Hive Assistant couldn't be told of your answer: do it yourself if you agreed to it"), { timeout: 10_000 })
+    await vi.waitFor(async () => expect(await historyOf(w, card)).toContain("Builder (p) can't move this card to Done by itself, and the Assistant couldn't be told of your answer: do it yourself if you agreed to it"), { timeout: 10_000 })
     // Allowed when the answer is given, turned down before the Assistant takes it.
     assistant().control = 'projects'
     await inWorkspace(w, () => wf.askTheUser(`#${card}`, 'agent:a1', { kind: 'decide', text: 'Which database?' }))
@@ -642,7 +642,7 @@ describe("an answer that needs someone other than the card's agent (HI-1734)", a
     // The Assistant reads its inbox: checked as it is handed out, it isn't given, and is cancelled.
     expect((await deliveries.readInbox(w.assistantHome, 'assistant')).items).toEqual([])
     await vi.waitFor(() => expect(relayed(w).map((r) => r.state)).toEqual(['cancelled']), { timeout: 10_000 })
-    await vi.waitFor(async () => expect(await historyOf(w, card)).toContain("The Hive Assistant couldn't be told of your answer to Builder (p)'s question: only Builder (p) has it"), { timeout: 10_000 })
+    await vi.waitFor(async () => expect(await historyOf(w, card)).toContain("The Assistant couldn't be told of your answer to Builder (p)'s question: only Builder (p) has it"), { timeout: 10_000 })
   })
 
   it("a bare Approve or Decline of a no-action, no-proposal question on a Doing card reaches the Assistant too, saying which, with nothing written (HR1's round 1 finding 1)", async () => {

@@ -1,8 +1,8 @@
 {
   "name": "hive",
-  "productName": "Hive Desktop",
+  "productName": "Combwork",
   "version": "1.0.0",
-  "description": "Hive Desktop — a streamlined, agent-first desktop workspace for AI-assisted coding.",
+  "description": "Combwork — a streamlined, agent-first desktop workspace for AI-assisted coding.",
   "main": "./out/main/index.js",
   "author": "Darren Marshall",
   "license": "MIT",

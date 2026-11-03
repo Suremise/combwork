@@ -141,7 +141,7 @@ describe("a start between the installer's record and its rename (HI-2460)", () =
     accounts.list = [{ id: 'a-out', name: 'Work' }]
     setProfileChoices({ roaming: chooseProfile(join(p, 'appdata'), 'Hive-Dev', 'Combwork-Dev'), local: chooseProfile(join(p, 'localappdata'), 'Hive-Dev', 'Combwork-Dev') })
     await startProfileNotices()
-    expect(toasts.map((t) => t.title)).toEqual(['Hive is using its data folders from before Combwork'])
+    expect(toasts.map((t) => t.title)).toEqual(["Combwork is using Hive Desktop's data folders"])
     expect(readFileSync(join(oldLocal, MOVE_RECORD), 'utf8')).toBe(rec)
     setProfileChoices({ roaming: null, local: null })
   })

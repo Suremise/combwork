@@ -13,6 +13,7 @@ import { get, notify, projectKeyOf, projectStarting, projectState, startingLabel
 import { cx, formatKeybinding } from '../util'
 import { Icon, IconButton, InfoTip, LoadFailed, OneLineTitle, SearchInput, StaleNote, StatusDot, STATUS_TEXT, Switch, Tooltip, useContextMenu, type MenuEntry } from './ui'
 import { addSkill, deleteSkill, DeliveredSwitch, HiveSkillsWarning, restoreBundled, SKILL_LEVEL_TIP, skillDescription, SkillRow } from './Skills'
+import { DialectsPanel } from './Dialects'
 import { TemplatesPanel } from './Templates'
 import { hasEditorDraftsUnder } from '../editorDrafts'
 import { useInbox } from '../inbox'
@@ -83,7 +84,7 @@ const M = {
   notePlaceholder: msg({ id: 'assistant.sidebar.notePlaceholder', defaultMessage: 'note-name.md', description: "Placeholder of the New Note dialog's name box: an example file name (lower case, a dash, .md). Keep .md." }),
   folderPlaceholder: msg({ id: 'assistant.sidebar.folderPlaceholder', defaultMessage: 'folder-name', description: "Placeholder of the New Folder dialog's name box (Shared Notes): an example folder name (lower case, a dash)." }),
   folderMessage: msg({ id: 'assistant.sidebar.folderMessage', defaultMessage: 'Folder inside .hive/shared', description: 'Shared Notes, New Folder. Keep .hive/shared as it is.' }),
-  noteMessage: msg({ id: 'assistant.sidebar.noteMessage', defaultMessage: 'Markdown note inside .hive/shared. Agents can read it through the Hive MCP tools.', description: 'Shared Notes, New Note. Keep .hive/shared as it is.' }),
+  noteMessage: msg({ id: 'assistant.sidebar.noteMessage', defaultMessage: 'Markdown note inside .hive/shared. Agents can read it through the Combwork MCP tools.', description: 'Shared Notes, New Note. Keep .hive/shared as it is.' }),
   create: msg({ id: 'assistant.sidebar.create', defaultMessage: 'Create', description: "New Note's, New Folder's and New MCP Server's button." }),
   createFailed: msg({ id: 'assistant.sidebar.createFailed', defaultMessage: 'Could not create', description: 'An error notice: a shared note or folder.' }),
   newNoteHere: msg({ id: 'assistant.sidebar.newNoteHere', defaultMessage: 'New Note Here', description: "A shared notes folder's right-click menu." }),
@@ -102,28 +103,28 @@ const M = {
   openFolder: msg({ id: 'assistant.sidebar.openFolder', defaultMessage: 'Open Folder', description: "Shared Notes: a button that opens .hive/shared in Explorer." }),
   workspaceNotes: msg({ id: 'assistant.sidebar.workspaceNotes', defaultMessage: 'Workspace notes', description: "The pinned first row of Shared Notes: the note Hive gives every agent when it starts (notes about this machine). Keep Workspace notes in English: it is the note's name (its file is Workspace notes.md) and what agents are told." }),
   workspaceNotesTip: msg({ id: 'assistant.sidebar.workspaceNotesTip', defaultMessage: "Notes about this machine (a full path, a local tool's version) that every agent gets when it starts, on every coding agent and in any folder. Kept in .hive/shared, out of git.", description: 'Tooltip on the pinned Workspace notes row of Shared Notes. Keep .hive/shared as it is.' }),
-  noNotes: msg({ id: 'assistant.sidebar.noNotes', defaultMessage: 'No notes yet. Create one, or ask an agent to write a handover with the Hive MCP tools.', description: "The Shared Notes sidebar when the workspace has no notes." }),
+  noNotes: msg({ id: 'assistant.sidebar.noNotes', defaultMessage: 'No notes yet. Create one, or ask an agent to write a handover with the Combwork MCP tools.', description: "The Shared Notes sidebar when the workspace has no notes." }),
   openFirst: msg({ id: 'assistant.sidebar.openFirst', defaultMessage: 'Open a workspace first', description: 'A notice: adding a skill with no workspace open.' }),
   skills: msg({ id: 'assistant.sidebar.skills', defaultMessage: 'Skills', description: "The heading of the Skills sidebar: the workspace's Hive skills." }),
   newSkill: msg({ id: 'assistant.sidebar.newSkill', defaultMessage: 'New Skill…', description: "A button over the Hive skills: creates a skill." }),
   skillFromFile: msg({ id: 'assistant.sidebar.skillFromFile', defaultMessage: 'Add Skill from File (.md or .zip)…', description: 'The Skills sidebar: a button. Keep .md and .zip as they are.' }),
-  openSkillsFolder: msg({ id: 'assistant.sidebar.openSkillsFolder', defaultMessage: 'Open Hive Skills Folder', description: 'The Skills sidebar: a button that opens .hive/skills in Explorer.' }),
+  openSkillsFolder: msg({ id: 'assistant.sidebar.openSkillsFolder', defaultMessage: 'Open Combwork Skills Folder', description: 'The Skills sidebar: a button that opens .hive/skills in Explorer.' }),
   filterSkills: msg({ id: 'assistant.sidebar.filterSkills', defaultMessage: 'Filter skills', description: "The Skills sidebar's filter box, empty." }),
-  hiveGroup: msg({ id: 'assistant.sidebar.hiveGroup', defaultMessage: 'Hive', description: "The Skills sidebar: the section of the workspace's Hive skills. Usually kept as Hive." }),
-  noWorkspaceSkills: msg({ id: 'assistant.sidebar.noWorkspaceSkills', defaultMessage: 'Open a workspace to manage Hive skills.', description: 'The Skills sidebar with no workspace open.' }),
+  hiveGroup: msg({ id: 'assistant.sidebar.hiveGroup', defaultMessage: 'Combwork', description: "The Skills sidebar: the section of the workspace's Hive skills. Usually kept as Hive." }),
+  noWorkspaceSkills: msg({ id: 'assistant.sidebar.noWorkspaceSkills', defaultMessage: 'Open a workspace to manage Combwork skills.', description: 'The Skills sidebar with no workspace open.' }),
   skillsLoadTarget: msg({ id: 'assistant.sidebar.skillsLoadTarget', defaultMessage: 'the skills', description: 'What could not be loaded when the Hive skills were first read: shown in "Could not load {what}: {error}", with Retry.' }),
   skillsRefreshTarget: msg({ id: 'assistant.sidebar.skillsRefreshTarget', defaultMessage: 'the skills', description: 'What could not be refreshed while the skills shown stay on screen: shown in "Could not refresh {what}; last updated …", with Retry.' }),
   loading: msg({ id: 'assistant.sidebar.loading', defaultMessage: 'Loading…', description: "The Skills sidebar while the Hive skills are read." }),
-  noSkills: msg({ id: 'assistant.sidebar.noSkills', defaultMessage: 'No Hive skills yet. Create one with +, or add one from a .md or .zip.', description: 'The Skills sidebar with no Hive skills. + is the add button.' }),
-  restoreSkill: msg({ id: 'assistant.sidebar.restoreSkill', defaultMessage: 'Restore this skill that ships with Hive', description: "A button beside a deleted skill of Hive's own." }),
+  noSkills: msg({ id: 'assistant.sidebar.noSkills', defaultMessage: 'No Combwork skills yet. Create one with +, or add one from a .md or .zip.', description: 'The Skills sidebar with no Hive skills. + is the add button.' }),
+  restoreSkill: msg({ id: 'assistant.sidebar.restoreSkill', defaultMessage: 'Restore this skill that ships with Combwork', description: "A button beside a deleted skill of Hive's own." }),
   deleteSkill: msg({ id: 'assistant.sidebar.deleteSkill', defaultMessage: 'Delete skill', description: "A trash button beside a Hive skill: deletes it." }),
-  skillsHint: msg({ id: 'assistant.sidebar.skillsHint', defaultMessage: "Each goes to the project agents in every project, unless it's marked <b>Assistant</b> (only the Hive Assistant gets it) or <b>Agents + Assistant</b>. A project's own skills, and your user and plugin skills, are in its <b>Skills</b> tab.", description: "Under the Skills sidebar's list. <b> is bold: the badges' words (Assistant, Agents + Assistant) and the tab's name, as they show." }),
+  skillsHint: msg({ id: 'assistant.sidebar.skillsHint', defaultMessage: "Each goes to the project agents in every project, unless it's marked <b>Assistant</b> (only the Assistant gets it) or <b>Agents + Assistant</b>. A project's own skills, and your user and plugin skills, are in its <b>Skills</b> tab.", description: "Under the Skills sidebar's list. <b> is bold: the badges' words (Assistant, Agents + Assistant) and the tab's name, as they show." }),
   mcpServers: msg({ id: 'assistant.sidebar.mcpServers', defaultMessage: 'MCP Servers', description: "The heading of the MCP sidebar: the workspace's MCP servers." }),
   newServerTitle: msg({ id: 'assistant.sidebar.newServerTitle', defaultMessage: 'New MCP Server', description: "The title of the dialog that creates an MCP server." }),
   newServerMessage: msg({ id: 'assistant.sidebar.newServerMessage', defaultMessage: 'Creates {file} in the workspace from a template you can edit.', description: 'New MCP Server. {file} is .hive/mcp/<name>.json, <name> standing for the name you type.' }),
   serverNameRule: msg({ id: 'assistant.sidebar.serverNameRule', defaultMessage: 'Use letters, numbers, "-" and "_". "hive" is reserved.', description: "New MCP Server: a name that can't be used. Keep hive as it is (the built-in server's name)." }),
   createServerFailed: msg({ id: 'assistant.sidebar.createServerFailed', defaultMessage: 'Could not create server', description: "An error notice: New MCP Server couldn't create the server's file; the reason follows." }),
-  mcpTip: msg({ id: 'assistant.sidebar.mcpTipAdded', defaultMessage: "MCP servers deployed to the workspace (.hive/mcp) are available to every project and the Hive Assistant, and run only where they are added: a project's MCP tab, the Assistant's view, or Add to… here. Changes apply to new sessions.", description: 'Tooltip on MCP Servers (HI-2059). Keep .hive/mcp as it is; "MCP tab" and "Add to…" as Hive shows them.' }),
+  mcpTip: msg({ id: 'assistant.sidebar.mcpTipAdded', defaultMessage: "MCP servers deployed to the workspace (.hive/mcp) are available to every project and the Assistant, and run only where they are added: a project's MCP tab, the Assistant's view, or Add to… here. Changes apply to new sessions.", description: 'Tooltip on MCP Servers (HI-2059). Keep .hive/mcp as it is; "MCP tab" and "Add to…" as Hive shows them.' }),
   newServer: msg({ id: 'assistant.sidebar.newServer', defaultMessage: 'New MCP Server…', description: "A button over the MCP servers: creates a server from a template." }),
   serverFromFile: msg({ id: 'assistant.sidebar.serverFromFile', defaultMessage: 'Add MCP Server from File (.json or .zip)…', description: 'The MCP sidebar: a button. Keep .json and .zip as they are.' }),
   openMcpFolder: msg({ id: 'assistant.sidebar.openMcpFolder', defaultMessage: 'Open MCP Folder', description: 'The MCP sidebar: a button that opens .hive/mcp in Explorer.' }),
@@ -134,7 +135,7 @@ const M = {
   noServers: msg({ id: 'assistant.sidebar.noServers', defaultMessage: 'No MCP servers yet. Create one with +, or add one from a .json definition or a .zip of a server folder.', description: 'The MCP sidebar with no servers. + is the add button.' }),
   deleteServer: msg({ id: 'assistant.sidebar.deleteServer', defaultMessage: 'Delete server', description: "A trash button beside an MCP server of the workspace: deletes it." }),
   builtIn: msg({ id: 'assistant.sidebar.builtIn', defaultMessage: 'Built-in', description: "The MCP sidebar: the section of Hive's own server." }),
-  hiveServerDesc: msg({ id: 'assistant.sidebar.hiveServerDesc', defaultMessage: 'Hive tools for agents: projects, shared notes, handovers, notifications', description: "Under the built-in hive server: what it gives agents." }),
+  hiveServerDesc: msg({ id: 'assistant.sidebar.hiveServerDesc', defaultMessage: 'Combwork tools for agents: projects, shared notes, handovers, notifications', description: "Under the built-in hive server: what it gives agents." }),
   hiveServerTip: msg({ id: 'assistant.sidebar.hiveServerTip', defaultMessage: 'Controlled in Settings → Agent API', description: "Tooltip on the built-in server's On or Off." }),
   on: msg({ id: 'assistant.sidebar.on', defaultMessage: 'On', description: 'A badge: the built-in hive server is on.' }),
   off: msg({ id: 'assistant.sidebar.off', defaultMessage: 'Off', description: 'A badge: the built-in hive server is off.' })
@@ -187,6 +188,7 @@ export function Sidebar() {
       {view === 'board' && <BoardPanel />}
       {view === 'notes' && <NotesPanel />}
       {view === 'skills' && <SkillsPanel />}
+      {view === 'dialects' && <DialectsPanel />}
       {view === 'templates' && <TemplatesPanel />}
       {view === 'mcp' && <McpPanel />}
       {view === 'assistant' && <AssistantSidePanel />}

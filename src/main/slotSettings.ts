@@ -19,7 +19,7 @@ const KEYS: readonly SlotSettingKey[] = ['setup', 'archive', 'copy', 'copiesSize
 const MAX_TEXT = 4000
 
 const M = {
-  bad: msg({ id: 'slots.setting.bad', defaultMessage: 'That isn’t a slot setting Hive has.', description: 'An error: a request to change a setting of “Slots and copies” named one that doesn’t exist.' }),
+  bad: msg({ id: 'slots.setting.bad', defaultMessage: 'That isn’t a slot setting Combwork has.', description: 'An error: a request to change a setting of “Slots and copies” named one that doesn’t exist.' }),
   badSize: msg({ id: 'slots.setting.badSize', defaultMessage: 'The number of review and check copies is a whole number from {min, number} to {max, number}.', description: 'An error: the number of review and check copies given isn’t a whole number from 1 to 32. {min} and {max} are the limits (1 and 32).' }),
   badText: msg({ id: 'slots.setting.badText', defaultMessage: 'A slot script or list of files is text of at most {max, number} characters.', description: 'An error: a slot script or list of copied files given isn’t text, or is too long. {max} is the limit (4,000).' })
 }

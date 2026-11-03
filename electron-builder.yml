@@ -1,8 +1,9 @@
 appId: it.surmise.combwork
-# The Windows app ID and install identity (HI-2460): it.surmise.combwork, installed as Combwork.exe in
-# %LOCALAPPDATA%\Programs\Combwork (from executableName). Its installer removes Hive Desktop (appId com.hive.desktop) and
-# moves its profile folders (build/installer.nsh, hiveUpgrade.ps1); main sets the profile folder (shared/appName.ts).
-productName: Hive Desktop
+# The displayed name (#443, HI-2458: Combwork) and the install identity (HI-2460): app ID it.surmise.combwork, installed as
+# Combwork.exe in %LOCALAPPDATA%\Programs\Combwork (from executableName). Its installer removes Hive Desktop (appId
+# com.hive.desktop) and moves its profile folders (build/installer.nsh, hiveUpgrade.ps1); main sets the profile folder
+# (shared/appName.ts).
+productName: Combwork
 copyright: Copyright © 2026 Darren Marshall
 directories:
   buildResources: build
@@ -49,7 +50,7 @@ nsis:
   shortcutName: Combwork
   installerIcon: build/icon.ico
   uninstallerIcon: build/icon.ico
-  artifactName: Hive-Setup-${version}.${ext}
+  artifactName: Combwork-Setup-${version}.${ext}
   deleteAppDataOnUninstall: false
   # Hive's languages (#767), so the installer, which follows Windows' display language without asking, never speaks one
   # the app doesn't. electron-builder's NSIS messages come in all of them (one or two of its own fall back to English).

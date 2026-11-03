@@ -16,17 +16,17 @@ import { BusyButton, Icon, Markdown, Modal, useBusy } from './ui'
  */
 
 const M = {
-  title: msg({ id: 'board.setAside.title', defaultMessage: 'Cards Made by an Older Hive', description: "Title of the dialog listing cards an older version of Hive saved in this workspace after the board moved to its database; they were kept aside, not added to the board." }),
-  intro: msg({ id: 'board.setAside.intro', defaultMessage: 'This workspace was opened in an older Hive, which saved these cards where it keeps them. They were set aside, unchanged, and not added to the board. Add each one, or discard it.', description: 'The top of the dialog listing cards an older Hive saved.' }),
+  title: msg({ id: 'board.setAside.title', defaultMessage: 'Cards Made by an Older Combwork', description: "Title of the dialog listing cards an older version of Hive saved in this workspace after the board moved to its database; they were kept aside, not added to the board." }),
+  intro: msg({ id: 'board.setAside.intro', defaultMessage: 'This workspace was opened in an older Combwork, which saved these cards where it keeps them. They were set aside, unchanged, and not added to the board. Add each one, or discard it.', description: 'The top of the dialog listing cards an older Hive saved.' }),
   links: msg({ id: 'board.setAside.links', defaultMessage: "Nothing is rewritten for them: a card here that links to one by its old number keeps that number, and a card added under a new number keeps its own links as they were.", description: 'A note in the dialog listing cards an older Hive saved: Hive changes no references between cards when adding them.' }),
   none: msg({ id: 'board.setAside.none', defaultMessage: 'No cards are set aside.', description: 'The dialog listing cards an older Hive saved, when none are left.' }),
   loading: msg({ id: 'board.setAside.loading', defaultMessage: 'Reading the set-aside cards…', description: 'The dialog listing cards an older Hive saved, while it reads them.' }),
-  number: msg({ id: 'board.setAside.number', defaultMessage: '#{n} in the older Hive', description: "A set-aside card's number as the older Hive gave it. {n} is the number (after #)." }),
+  number: msg({ id: 'board.setAside.number', defaultMessage: '#{n} in the older Combwork', description: "A set-aside card's number as the older Hive gave it. {n} is the number (after #)." }),
   keeps: msg({ id: 'board.setAside.keeps', defaultMessage: 'Add keeps #{n}', description: "Beside a set-aside card: its old number {n} is free on this board, so Add gives it that number." }),
   taken: msg({ id: 'board.setAside.taken', defaultMessage: '#{n} is taken here: Add gives the next free number', description: "Beside a set-aside card: a card on this board has its old number {n}, so Add gives it a new one." }),
   made: msg({ id: 'board.setAside.made', defaultMessage: 'Made by {by} on {when}', description: "Who made a set-aside card ({by}: a name, You or Assistant) and when ({when}: a date and time)." }),
   where: msg({ id: 'board.setAside.where', defaultMessage: '{project, select, none {The workspace} other {{project}}} · {column} · {comments, plural, =0 {no comments} one {# comment} other {# comments}}', description: "A set-aside card's project (a folder name; none: about the whole workspace), its board column, and how many comments it has." }),
-  unreadable: msg({ id: 'board.setAside.unreadable', defaultMessage: "This file isn't a card Hive can read: it can only be discarded.", description: 'A set-aside file that is not a valid card.' }),
+  unreadable: msg({ id: 'board.setAside.unreadable', defaultMessage: "This file isn't a card Combwork can read: it can only be discarded.", description: 'A set-aside file that is not a valid card.' }),
   add: msg({ id: 'board.setAside.add', defaultMessage: 'Add to Board', description: 'Button: adds the set-aside card to the board as a new card.' }),
   adding: msg({ id: 'board.setAside.adding', defaultMessage: 'Adding…', description: 'The Add to Board button while the card is being added.' }),
   discard: msg({ id: 'board.setAside.discard', defaultMessage: 'Discard…', description: 'Button: discards the set-aside card (asks first). The … says it asks: keep it.' }),

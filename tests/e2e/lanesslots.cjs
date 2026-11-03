@@ -24,7 +24,7 @@ const shots = at('shots')
 const alpha = path.join(ws, 'alpha')
 const slotA = path.join(`${ws}.worktrees`, 'alpha', 'slot-a')
 const PORT = Number(lib.port(47806))
-const identity = { name: 'Hive Lanes Test', email: 'lanes@example.com' }
+const identity = { name: 'Combwork Lanes Test', email: 'lanes@example.com' }
 let failed = 0
 const check = (name, ok, extra = '') => {
   lib.checked(ok)
@@ -108,7 +108,7 @@ const lines = (file) => {
     const first = await inv('lanes:start', alpha, { builder: b1.id, reviewer: null, pool: true, cards: [c1] })
     check('the lane is lent slot-a', first.slot === 'slot-a', JSON.stringify(first))
     const warm = await until(async () => (await inv('progress:snapshot')).runs.find((r) => r.defaultName === 'slot' && r.slot === 'slot-a'), HUNG_MS)
-    check("slot-a's setup is a run of Hive's for slot-a", !!warm && warm.source === 'hive', JSON.stringify(warm))
+    check("slot-a's setup is a run of Combwork's for slot-a", !!warm && warm.source === 'hive', JSON.stringify(warm))
     await page.locator('.progress-rail').click().catch(() => undefined)
     const panel = page.locator('.progress-panel')
     await until(async () => (await panel.count()) === 1, HUNG_MS)
@@ -166,9 +166,9 @@ const lines = (file) => {
     // HI-1710: copy-1's set-up run is R1's (its lease held the copy), never "Hive (copy copy-1)".
     const copyWarm = (await inv('progress:snapshot')).runs.find((r) => r.source === 'hive' && r.copy === 'copy-1')
     check("copy-1's set-up run is credited to R1, in copy-1", !!copyWarm && copyWarm.agentId === r1.id && copyWarm.agentName === 'R1' && !copyWarm.defaultName, JSON.stringify(copyWarm))
-    check('the Runs tab’s Agent filter has "Hive (slot slot-a)" and R1 once, and no "Hive (copy …)"', !!(await until(async () => {
+    check('the Runs tab’s Agent filter has "Combwork (slot slot-a)" and R1 once, and no "Combwork (copy …)"', !!(await until(async () => {
         const choices = await agentChoices()
-        return ['Hive (slot slot-a)', 'R1'].every((x) => choices.includes(x)) && choices.filter((x) => x === 'R1').length === 1 && !choices.some((x) => x.startsWith('Hive (copy'))
+        return ['Combwork (slot slot-a)', 'R1'].every((x) => choices.includes(x)) && choices.filter((x) => x === 'R1').length === 1 && !choices.some((x) => x.startsWith('Combwork (copy'))
       }, HUNG_MS)), JSON.stringify(await agentChoices()))
     const runRow = panel.locator(`.progress-tab-runs [data-run="${checkRun?.id}"]`)
     // In its card's runs (HI-1701), opened: closed once they all passed. What it ran for and where is in its hover.
@@ -194,7 +194,7 @@ const lines = (file) => {
     await page.locator('[role="tab"][data-section="branches"]').click()
     const copyRow = page.locator('.git-worktree[data-hive="copy"]')
     const copyLine = `copy-1: R1 reviewing ${key1} at ${rev.slice(0, 7)}`
-    check(`Branches & remotes lists copy-1 under "Review copies (Hive’s)": "${copyLine}"`, !!(await until(async () => (await page.locator('[data-worktrees="copies"]').count()) === 1 && ((await copyRow.textContent().catch(() => '')) ?? '').includes(copyLine), HUNG_MS)), await copyRow.allInnerTexts().catch(() => []))
+    check(`Branches & remotes lists copy-1 under "Review copies (Combwork’s)": "${copyLine}"`, !!(await until(async () => (await page.locator('[data-worktrees="copies"]').count()) === 1 && ((await copyRow.textContent().catch(() => '')) ?? '').includes(copyLine), HUNG_MS)), await copyRow.allInnerTexts().catch(() => []))
     check('…with no button, and not among the worktrees', (await copyRow.locator('button').count()) === 0 && (await page.locator('.git-worktree:not([data-hive])', { hasText: 'copy-1' }).count()) === 0)
     await shoot('branches-copies', page.locator('.git-branches'))
 

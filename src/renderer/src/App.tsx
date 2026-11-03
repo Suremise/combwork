@@ -41,6 +41,7 @@ import { AssistantMain } from './components/AssistantView'
 import { reloadAssistantChanges } from './assistantUndo'
 import { agentOnScreen, applyLeftovers, applyLiveState, bumpUsage, noteAssistantAction, flushLiveStates, setLoaded, setWithLive, showWorkspace, liveStateOf, assistantOnLeft, assistantWasOpen, clearStartFailure, filesListeners, agentStartChanged, findProject, get, loadTasks, noteAgentAdded, noteEnd, projectKey, pushToast, resolveToasts, set, updateToasts, useLanguage, useStore } from './store'
 import { DocsView, McpView, NotesView, SkillView, WelcomeView } from './views/OtherViews'
+import { DialectView } from './components/Dialects'
 import { TemplatesView } from './components/Templates'
 import { ProjectView } from './views/ProjectView'
 import { SettingsView } from './views/SettingsView'
@@ -283,6 +284,9 @@ function handleEvent(e: HiveEvent): void {
     case 'modes-changed':
       setLoaded((s) => ({ modesVersion: s.modesVersion + 1 }))
       break
+    case 'dialects-changed':
+      setLoaded((s) => ({ dialectsVersion: s.dialectsVersion + 1 }))
+      break
     case 'journal-changed':
       if (e.workspacePath.toLowerCase() === get().workspace?.path.toLowerCase()) set((s) => ({ journalVersion: s.journalVersion + 1 }))
       break
@@ -522,6 +526,8 @@ export function App() {
         return <NotesView />
       case 'skills':
         return <SkillView />
+      case 'dialects':
+        return <DialectView />
       case 'templates':
         return <TemplatesView />
       case 'mcp':

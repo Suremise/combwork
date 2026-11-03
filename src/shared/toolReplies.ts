@@ -5,7 +5,8 @@
  * returns a short row per item, and full detail comes on request. No imports beyond shared code without side
  * effects: hive-mcp.js runs outside the app bundle.
  */
-import type { LiveSessionState, MergeSlotInfo, TaskCard, TaskColumn, TaskDecision } from './types'
+import type { LiveSessionState, MergeSlotInfo, StoredText, TaskCard, TaskColumn, TaskDecision } from './types'
+import { storedForAgents } from './taskHistory'
 import { holderText, minutes, slotLine } from './mergeSlot'
 import { columnLabel, commentSummary } from './tasks'
 import { cardName, cardRef, namedBy, namesFrom, namesOf } from './projectKeys'
@@ -337,10 +338,12 @@ export interface CardRequest {
  * A card's open requests for its reader (HI-1992): whole, or with `summary` each one's text cut as a comment's summary is
  * (#532). Absent when none waits, so a card with none reads as before.
  */
-export function cardRequests(items: readonly { request: string; kind: string; gate: string; text: string; asker: string | null; since: string }[], summary = false): CardRequest[] | undefined {
+export function cardRequests(items: readonly { request: string; kind: string; gate: string; text: string; shown?: StoredText; asker: string | null; since: string }[], summary = false): CardRequest[] | undefined {
   if (!items.length) return undefined
   return items.map((i) => {
-    const said = summary ? commentSummary({ text: i.text }) : { text: i.text }
+    // Hive's own request (`shown`, its message as data): said again in the reader's chain, else its English as stored (HI-2464).
+    const text = storedForAgents(i.text, i.shown)
+    const said = summary ? commentSummary({ text }) : { text }
     return { request: i.request, kind: i.kind, gate: i.gate, ...said, ...(i.asker ? { asker: i.asker } : {}), since: i.since }
   })
 }

@@ -51,8 +51,11 @@ export function provenanceProblem(before, after) {
   return changed.length ? `the ${changed.join(', ')} changed while it was built (${changed.map((k) => `${before[k]} → ${after[k]}`).join('; ')})` : null
 }
 
+/** The installer's file name for a version: electron-builder.yml's artifactName (Combwork since HI-2458; Hive-Setup before). */
+export const installerName = (version) => `Combwork-Setup-${version}.exe`
+
 /** The files `npm run dist` makes for a version that belong with the installer; build-info.json last. */
-export const installerFiles = (version) => [`Hive-Setup-${version}.exe`, `Hive-Setup-${version}.exe.blockmap`, 'latest.yml', 'build-info.json']
+export const installerFiles = (version) => [installerName(version), `${installerName(version)}.blockmap`, 'latest.yml', 'build-info.json']
 
 /** build-info.json in a dist folder, or null (none, or unreadable). */
 export function readBuildInfo(dir) {
@@ -70,7 +73,7 @@ export function readBuildInfo(dir) {
  * main checkout (planCopy) and `npm run release`'s build in its own dist (makeRelease) ask it first (HI-2411).
  */
 export function replaceProblem({ dir, version, info, theirs = readBuildInfo(dir), replace = false }) {
-  const exe = join(dir, `Hive-Setup-${version}.exe`)
+  const exe = join(dir, installerName(version))
   if (replace || !existsSync(exe)) return null
   if (!theirs || theirs.version !== version) return `${exe} is already there, built from code it can't tell (no build-info.json)`
   if (theirs.code !== info.code) return `${exe} is already there, built from other code: ${theirs.code}${theirs.branch ? ` (${theirs.branch})` : ''} at ${theirs.builtAt}, where this one is ${info.code}${info.branch ? ` (${info.branch})` : ''}`
@@ -161,7 +164,7 @@ export function copyToMain({ root, version, info, here = false, replace = false 
   const c = checkoutOf(root)
   if (!c?.worktree) return []
   const from = join(root, 'dist')
-  if (here) return [`Installer: ${join(from, `Hive-Setup-${version}.exe`)} (kept in this worktree: --here)`]
+  if (here) return [`Installer: ${join(from, installerName(version))} (kept in this worktree: --here)`]
   const to = join(c.main, 'dist')
   let mainHead = null
   try {
@@ -181,11 +184,11 @@ export function copyToMain({ root, version, info, here = false, replace = false 
       return p
     })
   } catch (e) {
-    return [`Not copied to the main checkout: ${e.message}.`, `Installer: ${join(from, `Hive-Setup-${version}.exe`)} (this worktree).`]
+    return [`Not copied to the main checkout: ${e.message}.`, `Installer: ${join(from, installerName(version))} (this worktree).`]
   }
-  if (plan.busy) return [`Not copied to the main checkout: ${plan.busy}.`, `Installer: ${join(from, `Hive-Setup-${version}.exe`)} (this worktree). Run npm run dist again once that build has ended to copy it.`]
-  if (plan.refuse) return [`Not copied to the main checkout: ${plan.refuse}.`, `Installer: ${join(from, `Hive-Setup-${version}.exe`)} (this worktree). Run again with --replace to copy it over anyway.`]
-  return [`Installer: ${join(to, `Hive-Setup-${version}.exe`)} (copied from this worktree, which keeps its own)`, ...(plan.note ? [`Note: ${plan.note}.`] : [])]
+  if (plan.busy) return [`Not copied to the main checkout: ${plan.busy}.`, `Installer: ${join(from, installerName(version))} (this worktree). Run npm run dist again once that build has ended to copy it.`]
+  if (plan.refuse) return [`Not copied to the main checkout: ${plan.refuse}.`, `Installer: ${join(from, installerName(version))} (this worktree). Run again with --replace to copy it over anyway.`]
+  return [`Installer: ${join(to, installerName(version))} (copied from this worktree, which keeps its own)`, ...(plan.note ? [`Note: ${plan.note}.`] : [])]
 }
 
 /**
@@ -252,7 +255,7 @@ export function makeDist({ root, here = false, replace = false, run, buildStampe
  */
 export function finishDist({ root, before, after, builtAt = new Date().toISOString(), here = false, replace = false, copy = true }) {
   const dist = join(root, 'dist')
-  const exe = join(dist, `Hive-Setup-${after.version}.exe`)
+  const exe = join(dist, installerName(after.version))
   const problem = provenanceProblem(before, after)
   if (problem) {
     clearDistInfo(dist)

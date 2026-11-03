@@ -487,7 +487,7 @@ describe('Release Slot… on a held writer (#1506)', () => {
     const run = (await start()).runId
     expect(await heldWriter(project, 'slot-a')).toMatchObject({ run, agent: 'b1', live: true, hive: { self: true } })
     expect((await heldSlots(project)).size).toBe(0)
-    await expect(releaseHeldWriter(project, 'slot-a', run, { end: false })).rejects.toThrow(/still running in this Hive/)
+    await expect(releaseHeldWriter(project, 'slot-a', run, { end: false })).rejects.toThrow(/still running in this Combwork/)
     expect(writer()?.run).toBe(run)
     manager.live.clear()
     manager.runs.clear()
@@ -519,7 +519,7 @@ describe('Release Slot… on a held writer (#1506)', () => {
         await release
         expect(writer()).toBeNull()
       } else {
-        await expect(release).rejects.toThrow(/another Hive that is still running/)
+        await expect(release).rejects.toThrow(/another Combwork that is still running/)
         expect(writer()?.run).toBe(`other-${others}`)
         await store.clearWriterRun(`other-${others}`)
       }
@@ -562,7 +562,7 @@ describe('Release Slot… on a held writer (#1506)', () => {
     await plant('r-crash')
     expect((await heldWriter(project, 'slot-a'))?.processes).toEqual({ list: [node], more: 0, from: 'restart' })
     tracker.endWorks = false
-    await expect(releaseHeldWriter(project, 'slot-a', 'r-crash', { end: true })).rejects.toThrow(/didn't let Hive end them, so slot-a wasn't released/)
+    await expect(releaseHeldWriter(project, 'slot-a', 'r-crash', { end: true })).rejects.toThrow(/didn't let Combwork end them, so slot-a wasn't released/)
     expect(writer()?.run).toBe('r-crash')
     tracker.endWorks = true
     await releaseHeldWriter(project, 'slot-a', 'r-crash', { end: true })
@@ -1002,7 +1002,7 @@ describe('Release Slot through the Agent API and the Assistant (#1561)', () => {
   it("the window's refusals: its run live in this Hive, or another Hive holding it still running (or not known)", async () => {
     hostOn()
     const run = (await start()).runId
-    expect(await refusal(release('slot-a', { kind: 'writer', confirm: { slot: 'slot-a', run } }))).toMatch(/still running in this Hive/)
+    expect(await refusal(release('slot-a', { kind: 'writer', confirm: { slot: 'slot-a', run } }))).toMatch(/still running in this Combwork/)
     expect(writer()?.run).toBe(run)
     manager.live.clear()
     manager.runs.clear()
@@ -1012,7 +1012,7 @@ describe('Release Slot through the Agent API and the Assistant (#1561)', () => {
     for (const others of [true, null]) {
       hostOn(others)
       await plant(`r-${others}`)
-      expect(await refusal(release('slot-a', { kind: 'writer', confirm: { slot: 'slot-a', run: `r-${others}` } }))).toMatch(/another Hive that is still running/)
+      expect(await refusal(release('slot-a', { kind: 'writer', confirm: { slot: 'slot-a', run: `r-${others}` } }))).toMatch(/another Combwork that is still running/)
       expect(writer()?.run).toBe(`r-${others}`)
       await store.clearWriterRun(`r-${others}`)
     }

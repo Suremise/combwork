@@ -16,7 +16,7 @@
     "description": "In the Activity tab, under Now: Hive's file lock blocked the agent's edit of a file another agent is editing, while that stands. {file} is the file's path; {holder} the agent editing it."
   },
   "activity.block.for": {
-    "defaultMessage": "Hive's file lock · {time}",
+    "defaultMessage": "Combwork's file lock · {time}",
     "description": "The second line of a lock block in the Activity tab: what blocked the edit, and for how long it has stood ({time}, such as \"2 min\")."
   },
   "activity.block.tip": {
@@ -148,7 +148,7 @@
     "description": "A button in the Activity tab's details: opens the session's transcript in the Sessions tab."
   },
   "activity.orphanFact": {
-    "defaultMessage": "The process that started it has exited, and it has run for over ten minutes. The agent is told; Hive doesn’t end it.",
+    "defaultMessage": "The process that started it has exited, and it has run for over ten minutes. The agent is told; Combwork doesn’t end it.",
     "description": "The value beside Left running in the Activity tab's details (HI-2111): why this process counts as left running."
   },
   "activity.orphanFor": {

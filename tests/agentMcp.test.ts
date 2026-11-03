@@ -59,7 +59,7 @@ describe("an agent's choice", () => {
     const read = readTemplate(JSON.parse(JSON.stringify(t)))
     expect(isAgentTemplate(read) && read.agents.map((a) => a.mcpServers)).toEqual([['windows-sandbox'], undefined])
     const bad = readTemplate({ ...t, agents: [{ ...t.agents[0], mcpServers: ['hive'] }] })
-    expect(!isAgentTemplate(bad) && englishText(bad)).toBe("Tester's MCP servers aren't a list Hive can use.")
+    expect(!isAgentTemplate(bad) && englishText(bad)).toBe("Tester's MCP servers aren't a list Combwork can use.")
   })
 })
 

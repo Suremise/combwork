@@ -95,7 +95,7 @@ import type { DeliveryHooks, NewDelivery } from './deliveries'
 import { readyFor } from './readiness'
 import { HAND_OVER_TEXT, handOverNow } from '../shared/handOver'
 import { NOTICE_PREFIX } from '../shared/doorbell'
-import { FinishBatcher, finishedApiTitle, finishedNotice } from '../shared/bursts'
+import { FinishBatcher, finishedApiTitle, finishedApiTitleText, finishedNotice } from '../shared/bursts'
 import { notifyRoute, type NotifyRoute } from '../shared/notify'
 import { askOffer, focusedHive, notifyPending, offerOpen, resolveOffer, resolveOffers, tell } from './notify'
 import { OUTCOME } from './outcomes'
@@ -122,6 +122,7 @@ import { say, setChainResolver } from '../shared/agentText'
 import { inDefaultDialect, inDialectOf } from '../shared/agentText/asyncScope'
 import { agentTextSchema, chainKey, dialectsDir, loadDialects, pickOf, sessionChainOf, writeDialectFile, type DialectSet, type ModelSlot, type ResolvedChain, type SessionDialect } from './dialects'
 import { apiChainChanged, forgetApiChain, requestApiChain } from './dialects/apiChain'
+import type { DialectUsage } from '../shared/dialects'
 import { SESSION } from './sessionText'
 import { reportPlanUsage } from './planUsage'
 import { devConsole, sessionSourceId } from './devConsole'
@@ -169,17 +170,17 @@ const M = {
   connectionFallbackTitle: msg({ id: 'session.connection.fallbackTitle', defaultMessage: '{agent} runs on another connection', description: "A notice's title (HI-2108): an agent started on another connection than its own (its own is off in this workspace, or was removed). {agent} is the agent." }),
   connectionFallback: msg({ id: 'session.connection.fallback', defaultMessage: "{why, select, missing {The connection chosen for it was removed} other {Its connection {wanted} is off in this workspace}}, so it started on {name}, its CLI's first usable one here. Choose another in its Agent Settings.", description: "A notice (HI-2108) when an agent starts on another connection than its own: its own was removed, or is on an account turned off in this workspace ({wanted}: its name). {name} is the account it started on. Agent Settings names a dialog." }),
   noSession: msg({ id: 'session.error.noSession', defaultMessage: 'No session is running for this agent.', description: "An action on an agent's session is refused: the agent isn't running." }),
-  moveFailed: msg({ id: 'session.start.moveFailed', defaultMessage: "Hive couldn't move {project}'s model settings to its agents: {error}. Start it again.", description: "Starting an agent is refused (HI-1770): moving its project's own model, effort and context settings onto the project's agents (connections now hold the defaults) failed. {project} is the project's name, {error} why (often in English). It is tried again at the next start." }),
+  moveFailed: msg({ id: 'session.start.moveFailed', defaultMessage: "Combwork couldn't move {project}'s model settings to its agents: {error}. Start it again.", description: "Starting an agent is refused (HI-1770): moving its project's own model, effort and context settings onto the project's agents (connections now hold the defaults) failed. {project} is the project's name, {error} why (often in English). It is tried again at the next start." }),
   stoppedBeforeStart: msg({ id: 'session.error.stoppedBeforeStart', defaultMessage: 'The agent was stopped before it had started.', description: "Starting an agent failed: it was stopped (or its workspace closed) while it was starting." }),
   stoppedBeforePrompt: msg({ id: 'session.error.stoppedBeforePrompt', defaultMessage: 'The agent stopped before the prompt was sent.', description: 'Typing a prompt into an agent failed: it stopped or restarted meanwhile.' }),
-  typingBusy: msg({ id: 'session.error.typingBusy', defaultMessage: 'Hive is already typing a prompt into this agent; it is busy.', description: 'An action on an agent is refused: Hive is typing a prompt into it now.' }),
+  typingBusy: msg({ id: 'session.error.typingBusy', defaultMessage: 'Combwork is already typing a prompt into this agent; it is busy.', description: 'An action on an agent is refused: Hive is typing a prompt into it now.' }),
   inUseElsewhere: msg({ id: 'session.error.inUseElsewhere', defaultMessage: 'Another program has its transcript open. Close it, then try again.', description: "Archiving or deleting a session is refused: another program holds its transcript file open." }),
   stopFirst: msg({ id: 'session.error.stopFirst', defaultMessage: '{action, select, archive {Stop the session before you archive it.} unarchive {Stop the session before you unarchive it.} other {Stop the session before you delete it.}}', description: 'Archiving, unarchiving or deleting a session is refused while it runs. {action} says which.' }),
   sessionRunning: msg({ id: 'session.error.running', defaultMessage: 'The session is running.', description: "Clean Up… is refused for a session: it is running." }),
   handOverNotNow: msg({ id: 'session.handOver.notNow', defaultMessage: "{agent} is working, merging or on a card loop's card, so its conversation isn't ended now. Hand it over to a new conversation when it has finished.", description: 'Handing an agent over to itself (a new conversation) is refused: it is working, holds the merge slot or works on a card of a running card loop. {agent} is its name.' }),
   handOverMomentLost: msg({ id: 'session.handOver.momentLost', defaultMessage: '{agent} took the merge slot, started other work or changed while it wrote its handover, so its conversation wasn\'t ended. The handover "{handover}" is kept.', description: 'Handing an agent over to itself stopped before ending its conversation: while it wrote its handover it began merging (the merge slot), began other work (a task, a card loop\'s card) or restarted. {agent} is its name, {handover} the handover\'s path in the shared notes.' }),
   handOverBusy: msg({ id: 'session.handOver.busy', defaultMessage: '{agent} is busy. Hand over once it has finished.', description: "Hand Over to… is refused: the agent named is working. {agent} is the agent's name." }),
-  switchEnded: msg({ id: 'session.mode.ended', defaultMessage: 'The session ended before Hive could switch it to {mode}.', description: "Switching a running agent's permission mode failed: its session ended. {mode} is the mode's name." }),
+  switchEnded: msg({ id: 'session.mode.ended', defaultMessage: 'The session ended before Combwork could switch it to {mode}.', description: "Switching a running agent's permission mode failed: its session ended. {mode} is the mode's name." }),
   needsInput: msg({ id: 'session.notice.needsInput', defaultMessage: '{agent} needs your input', description: "A notification's title: an agent waits for the user. {agent} is the agent (\"hive · B1\", or the project when it has one agent)." }),
   finished: msg({ id: 'session.notice.finished', defaultMessage: '{agent} finished', description: "A notification's title: an agent's turn has ended. {agent} is the agent (\"hive · B1\", or the project when it has one agent)." }),
   longConversation: msg({ id: 'session.notice.longConversation', defaultMessage: '{agent}: long conversation', description: "A notice's title: an agent's transcript has grown past the size set in Settings → Sessions. {agent} is the agent." })
@@ -1256,7 +1257,7 @@ class SessionManager {
     cancel: (host: string, source: string, ref: string | null, why: string) => Promise<number>
   } | null = null
   private delivery(): NonNullable<SessionManager['deliveries']> {
-    if (!this.deliveries) throw hiveError(msg({ id: 'session.error.noDeliveries', defaultMessage: "Hive's delivery service isn't running.", description: "Giving an agent a message failed: the part of Hive that delivers them hasn't started (or has stopped)." }), undefined, { kind: 'conflict' })
+    if (!this.deliveries) throw hiveError(msg({ id: 'session.error.noDeliveries', defaultMessage: "Combwork's delivery service isn't running.", description: "Giving an agent a message failed: the part of Hive that delivers them hasn't started (or has stopped)." }), undefined, { kind: 'conflict' })
     return this.deliveries
   }
   hookUrl = ''
@@ -1852,7 +1853,7 @@ class SessionManager {
     if (this.live.has(id) || this.starting.has(id)) throw hiveError(msg({ id: 'session.start.alreadyRunning', defaultMessage: 'This agent is already running or starting. Stop it first.', description: 'Starting an agent is refused: it runs, or is starting, already.' }), undefined, { kind: 'conflict' })
     // Two terminals on one conversation would both append to its transcript.
     if (opts.resumeId && [...this.starting.values()].some((p) => p.resumeId === opts.resumeId)) throw hiveError(msg({ id: 'session.start.beingOpened', defaultMessage: 'This conversation is already being opened in another agent.', description: 'Resuming a conversation is refused: another agent is starting on it now.' }), undefined, { kind: 'conflict' })
-    if (opts.resumeId && this.cleaning.has(`${projectPath.toLowerCase()}|${opts.resumeId.toLowerCase()}`)) throw hiveError(msg({ id: 'session.start.cleaning', defaultMessage: "Hive is archiving, deleting or cleaning up this session's files. Try again in a moment.", description: "Resuming a conversation is refused for a moment: Hive is moving or removing its files." }), undefined, { kind: 'conflict' })
+    if (opts.resumeId && this.cleaning.has(`${projectPath.toLowerCase()}|${opts.resumeId.toLowerCase()}`)) throw hiveError(msg({ id: 'session.start.cleaning', defaultMessage: "Combwork is archiving, deleting or cleaning up this session's files. Try again in a moment.", description: "Resuming a conversation is refused for a moment: Hive is moving or removing its files." }), undefined, { kind: 'conflict' })
     const pending: PendingStart = { projectPath, resumeId: opts.resumeId, cancelled: false, done: Promise.resolve(), outcome: Promise.resolve(null as never), runId: randomBytes(12).toString('hex') }
     this.starting.set(id, pending)
     // A new start: an earlier one's failure is over (HI-1976). Cleared here, before it runs, never once it settles: its
@@ -1883,12 +1884,12 @@ class SessionManager {
    * or while its workspace's upgrade to 1.0 waits.
    */
   private assertStartsAllowed(projectPath: string): void {
-    if (this.shuttingDown || workspaceFor(projectPath)?.closing) throw hiveError(msg({ id: 'session.start.closing', defaultMessage: "Hive is stopping this workspace's agents, so none can start now.", description: 'Starting an agent is refused: Hive is quitting, or its workspace is closing.' }), undefined, { kind: 'conflict' })
+    if (this.shuttingDown || workspaceFor(projectPath)?.closing) throw hiveError(msg({ id: 'session.start.closing', defaultMessage: "Combwork is stopping this workspace's agents, so none can start now.", description: 'Starting an agent is refused: Hive is quitting, or its workspace is closing.' }), undefined, { kind: 'conflict' })
     // Its workspace's upgrade to 1.0 waits (#1207): hive.db takes no writes, so the session couldn't be recorded.
     const ws = workspaceFor(projectPath)?.path
     if (ws) assertUpgraded(ws)
     if (workspaceFor(projectPath)?.openGate?.held) throw hiveError(msg({ id: 'session.start.openCommands', defaultMessage: "This workspace's open commands are still running: agents start once they're done or you move on.", description: "Starting an agent is refused while the commands the user set to run as the workspace opens are running (Settings → Workspace → When this workspace opens, run), shown in a dialog with Don't wait." }), undefined, { kind: 'conflict' })
-    if (workspaceFor(projectPath)?.repairingMove) throw hiveError(msg({ id: 'session.start.repairing', defaultMessage: 'Hive is repairing this moved workspace: start the agent when Repair has finished.', description: "Starting an agent is refused while Repair… fixes a moved workspace's paths." }), undefined, { kind: 'conflict' })
+    if (workspaceFor(projectPath)?.repairingMove) throw hiveError(msg({ id: 'session.start.repairing', defaultMessage: 'Combwork is repairing this moved workspace: start the agent when Repair has finished.', description: "Starting an agent is refused while Repair… fixes a moved workspace's paths." }), undefined, { kind: 'conflict' })
     const why = this.fenced.get(resolve(projectPath).toLowerCase())?.at(-1)
     if (why) throw hiveError(msg({ id: 'session.start.fenced', defaultMessage: "{why}, so its agents can't start now.", description: "Starting an agent is refused while something changes its project. {why} says what, as a sentence without its full stop (\"This project is being removed\")." }), { why }, { kind: 'conflict' })
   }
@@ -2391,7 +2392,7 @@ class SessionManager {
         }
       },
       waits: (e) => (e instanceof SlotHeld ? e.why : null),
-      told: (why) => toast('warning', tr(msg({ id: 'session.switch.waitsTitle', defaultMessage: "{agent}'s switch of connection waits for {slot}", description: "A notice's title (HI-2304): an agent was stopped to switch it to another connection (account), and Hive can't resume it yet because its slot (a worktree Hive lends it, \"slot-a\") is still held. {agent} is the agent's name." }), { agent: l.state.agentName ?? this.label(l.state), slot: heldSlot ?? '' }), tr(msg({ id: 'session.switch.waits', defaultMessage: '{why}. Hive resumes it once the slot is free.', description: "The notice that an agent's switch of connection waits (HI-2304): {why} says what holds its slot, in English (\"slot-a is held by WindowsSandboxServer, left running by MB1's last run\"), without its full stop." }), { why }), undefined, projectPath, agentTarget(projectPath, l.state.agentId, l.state.agentName ?? this.label(l.state))),
+      told: (why) => toast('warning', tr(msg({ id: 'session.switch.waitsTitle', defaultMessage: "{agent}'s switch of connection waits for {slot}", description: "A notice's title (HI-2304): an agent was stopped to switch it to another connection (account), and Hive can't resume it yet because its slot (a worktree Hive lends it, \"slot-a\") is still held. {agent} is the agent's name." }), { agent: l.state.agentName ?? this.label(l.state), slot: heldSlot ?? '' }), tr(msg({ id: 'session.switch.waits', defaultMessage: '{why}. Combwork resumes it once the slot is free.', description: "The notice that an agent's switch of connection waits (HI-2304): {why} says what holds its slot, in English (\"slot-a is held by WindowsSandboxServer, left running by MB1's last run\"), without its full stop." }), { why }), undefined, projectPath, agentTarget(projectPath, l.state.agentId, l.state.agentName ?? this.label(l.state))),
       // A slot of its project freed (HI-2304): what its resume waits for, when it does.
       watch: (look) => {
         const offEvents = onHiveEvent((e) => {
@@ -2501,6 +2502,26 @@ class SessionManager {
     if (!l.dialect) return false
     const now = await this.launchDialect(projectPath, { ...l.dialect.input, pick: pickOf(agent.dialect) }, reads).catch(() => null)
     return !!now && now.key !== l.dialect.key
+  }
+
+  /**
+   * Which files each running session of a workspace speaks, and whether its chain moved (HI-2444, the Dialects view;
+   * never the Agent API): from the chains pinned at their launches, with one read of the dialect files for them all.
+   * `moved` is the chain's own "restart to apply" (dialectMoved), apart from skills, settings or a connection.
+   */
+  async dialectUsage(workspacePath: string): Promise<DialectUsage[]> {
+    const reads = new LaunchReads()
+    const ws = workspacePath.toLowerCase()
+    const running = [...this.live.values()].filter((l) => l.dialect && workspaceFor(l.state.projectPath)?.path?.toLowerCase() === ws)
+    return whenAll(
+      running.map(async (l) => {
+        const st = l.state
+        const d = l.dialect!
+        const agent = await workspaceOf(st.projectPath).savedAgent(st.projectPath, st.agentId).catch(() => undefined)
+        const moved = agent ? await this.dialectMoved(st.projectPath, agent, l, reads) : false
+        return { projectPath: st.projectPath, agentId: st.agentId, agent: agent?.name ?? this.label(st), cli: d.input.cli, files: d.chain.layers.flatMap((x) => (x.file ? [x.file] : [])), moved }
+      })
+    )
   }
 
   /** The chain a running session speaks (the resolver's session scope): null for the Default, or one not running. */
@@ -3163,7 +3184,7 @@ class SessionManager {
     const since = Date.now()
     const stillSame = (): void => {
       if (!same()) throw hiveError(msg({ id: 'session.compact.stopped', defaultMessage: 'The agent stopped before Compact was sent.', description: 'Compact failed: the agent stopped or restarted while Hive typed the command.' }), undefined, { kind: 'conflict' })
-      if (this.userTypedAt(projectPath, agentId) >= since) throw hiveError(msg({ id: 'session.compact.userTyped', defaultMessage: "You typed in the agent's terminal while Hive was sending Compact, so it wasn't sent: what you typed stays.", description: "Compact failed: the user typed in the agent's terminal while Hive was clearing its input or typing the command, so Hive stopped." }), undefined, { kind: 'conflict' })
+      if (this.userTypedAt(projectPath, agentId) >= since) throw hiveError(msg({ id: 'session.compact.userTyped', defaultMessage: "You typed in the agent's terminal while Combwork was sending Compact, so it wasn't sent: what you typed stays.", description: "Compact failed: the user typed in the agent's terminal while Hive was clearing its input or typing the command, so Hive stopped." }), undefined, { kind: 'conflict' })
     }
     const pause = async (ms: number): Promise<void> => {
       await new Promise((r) => setTimeout(r, ms))
@@ -3379,7 +3400,7 @@ class SessionManager {
     const key = this.key(projectPath, agentId)
     // The composer is reserved while the keys go in (#649), as for a line Hive types: none is typed into the menu, nor
     // the keys into a line.
-    if (this.delivering.has(key)) throw hiveError(msg({ id: 'session.mode.typing', defaultMessage: 'Hive is typing a line into this agent. Switch the mode in a moment.', description: "Switching an agent's permission mode is refused for a moment: Hive is typing into its terminal." }), undefined, { kind: 'conflict' })
+    if (this.delivering.has(key)) throw hiveError(msg({ id: 'session.mode.typing', defaultMessage: 'Combwork is typing a line into this agent. Switch the mode in a moment.', description: "Switching an agent's permission mode is refused for a moment: Hive is typing into its terminal." }), undefined, { kind: 'conflict' })
     this.delivering.add(key)
     try {
       return await this.switchModeKeys(l, mode, how)
@@ -3439,14 +3460,14 @@ class SessionManager {
         if (e instanceof KeysStopped) {
           // Nothing more typed, nothing chosen: what went in already may still be in its input.
           log.warn(`${userText(this.label(st))}: ${name}: stopped switching to ${mode}: ${e.why}`)
-          return notSwitched(tr(msg({ id: 'session.mode.stopped', defaultMessage: "Hive didn't switch to {mode}, as {why}. Check its terminal, or switch there.", description: "Switching an agent's permission mode stopped part-way. {mode} is the mode's name; {why} says why, as a clause." }), { mode: permissionLabel(p, mode, tr), why: stoppedWhy ? shownText(stoppedWhy) : e.why }))
+          return notSwitched(tr(msg({ id: 'session.mode.stopped', defaultMessage: "Combwork didn't switch to {mode}, as {why}. Check its terminal, or switch there.", description: "Switching an agent's permission mode stopped part-way. {mode} is the mode's name; {why} says why, as a clause." }), { mode: permissionLabel(p, mode, tr), why: stoppedWhy ? shownText(stoppedWhy) : e.why }))
         }
         if (!(e instanceof PickNotFound)) throw e
         // The menu doesn't show the mode (another CLI version): closed again, nothing chosen, nothing assumed. Escape
         // goes only into this session, and not over a question it asks meanwhile.
         if (same() && !asking()) writePty(key, '\x1b')
         log.warn(`${userText(this.label(st))}: ${name}: couldn't find ${e.what}`)
-        return notSwitched(tr(msg({ id: 'session.mode.notFound', defaultMessage: "Hive couldn't find {what}, so it didn't switch to {mode}. Check its terminal, or switch there.", description: "Switching an agent's permission mode failed: the CLI's menu didn't show what Hive looked for. {what} names it, in the CLI's words; {mode} is the mode's name." }), { what: e.what, mode: permissionLabel(p, mode, tr) }))
+        return notSwitched(tr(msg({ id: 'session.mode.notFound', defaultMessage: "Combwork couldn't find {what}, so it didn't switch to {mode}. Check its terminal, or switch there.", description: "Switching an agent's permission mode failed: the CLI's menu didn't show what Hive looked for. {what} names it, in the CLI's words; {mode} is the mode's name." }), { what: e.what, mode: permissionLabel(p, mode, tr) }))
       }
       if (!same()) return notSwitched(tr(M.switchEnded, { mode: permissionLabel(p, mode, tr) }))
       // The CLI records the new settings in its transcript at once: read them back rather than assume.
@@ -3610,7 +3631,7 @@ class SessionManager {
     // Once a conversation (a restart with the same hooks problem says it again only in its pane).
     if (!this.hooksTold.first(`${st.agentId}\n${st.sessionId || st.runId}`)) return
     // A toast, kept in Notifications.
-    toast('warning', tr(msg({ id: 'session.notice.hooksMissingTitle', defaultMessage: "Hive isn't hearing from {agent}'s hooks", description: "A notification's title: an agent's coding agent has stopped sending Hive its hooks (the calls that tell Hive what it is doing). {agent} is the agent." }), { agent: label }), tr(HOOKS_MISSING_NOTE, { provider: l.adapter.descriptor.name, why: why ?? 'other', where: offIn ?? '', after }), undefined, st.projectPath, agentTarget(st.projectPath, st.agentId, label)) // i18n-ignore: select keys, never shown
+    toast('warning', tr(msg({ id: 'session.notice.hooksMissingTitle', defaultMessage: "Combwork isn't hearing from {agent}'s hooks", description: "A notification's title: an agent's coding agent has stopped sending Hive its hooks (the calls that tell Hive what it is doing). {agent} is the agent." }), { agent: label }), tr(HOOKS_MISSING_NOTE, { provider: l.adapter.descriptor.name, why: why ?? 'other', where: offIn ?? '', after }), undefined, st.projectPath, agentTarget(st.projectPath, st.agentId, label)) // i18n-ignore: select keys, never shown
   }
 
   /** Its hooks came again (#1336): its status is Hive's to tell again, and its lanes go on. */
@@ -3645,9 +3666,9 @@ class SessionManager {
     if (l.adapter?.idleQuestion && l.screen) void this.inHookOrder(runId, () => (this.live.get(id) === l ? this.lookAtIdleScreen(id, l) : undefined)).catch((e) => log.warn('lost line: check failed', e))
     const label = this.label(l.state)
     const body = retried
-      ? msg({ id: 'session.notice.untakenRetried', defaultMessage: "Hive typed it and pressed Enter twice, but its CLI wasn't reading its input. Show it, click its terminal and press Enter.", description: "The notification that an agent's CLI didn't take a line Hive typed into it." })
-      : msg({ id: 'session.notice.untaken', defaultMessage: "Hive typed it, but couldn't press Enter again (the agent was busy, or you were typing there). Show it, click its terminal and press Enter.", description: "The notification that an agent's CLI didn't take a line Hive typed into it." })
-    this.notify(projectPath, withValues(msg({ id: 'session.notice.untakenTitle', defaultMessage: "{agent} hasn't taken a line Hive typed", description: "A notification's title: an agent's CLI didn't take a line Hive typed into it (a wake, a message). {agent} is the agent." }), { agent: label }), body, 'waiting', l.state.agentName, agentId)
+      ? msg({ id: 'session.notice.untakenRetried', defaultMessage: "Combwork typed it and pressed Enter twice, but its CLI wasn't reading its input. Show it, click its terminal and press Enter.", description: "The notification that an agent's CLI didn't take a line Hive typed into it." })
+      : msg({ id: 'session.notice.untaken', defaultMessage: "Combwork typed it, but couldn't press Enter again (the agent was busy, or you were typing there). Show it, click its terminal and press Enter.", description: "The notification that an agent's CLI didn't take a line Hive typed into it." })
+    this.notify(projectPath, withValues(msg({ id: 'session.notice.untakenTitle', defaultMessage: "{agent} hasn't taken a line Combwork typed", description: "A notification's title: an agent's CLI didn't take a line Hive typed into it (a wake, a message). {agent} is the agent." }), { agent: label }), body, 'waiting', l.state.agentName, agentId)
   }
 
   /**
@@ -3816,7 +3837,7 @@ class SessionManager {
     const words = (box: string | null): string => (box ?? '').replace(/\s+/g, ' ').trim()
     const notCleared = (why: string): Error => {
       log.info(`${userText(this.label(l.state))}: its input wasn't seen empty, so nothing is typed into it: ${why}`) // i18n-ignore: why, for the log
-      return hiveError(msg({ id: 'session.prompt.inputNotCleared', defaultMessage: "Its input couldn't be seen empty after Hive cleared it: nothing is typed into it until it can be.", description: "Typing into an agent is refused (a message's notice is put off and tried again; Compact fails): Hive pressed keys to clear the draft in its coding agent's input, and didn't see the input empty afterwards." }), undefined, { kind: 'conflict' })
+      return hiveError(msg({ id: 'session.prompt.inputNotCleared', defaultMessage: "Its input couldn't be seen empty after Combwork cleared it: nothing is typed into it until it can be.", description: "Typing into an agent is refused (a message's notice is put off and tried again; Compact fails): Hive pressed keys to clear the draft in its coding agent's input, and didn't see the input empty afterwards." }), undefined, { kind: 'conflict' })
     }
     const waitMs = advanced.number(CLEAR_KEY_WAIT) * 1000
     // Refused because a key went unanswered while the box read empty (HI-2191): something else may take its keys.
@@ -3993,7 +4014,7 @@ class SessionManager {
     if (this.delivering.has(key)) throw hiveError(M.typingBusy, undefined, { kind: 'conflict' })
     // A line typed before isn't taken yet (#430): typing more would clear it, or be lost behind it.
     const waiting = (): void => {
-      if (this.lineBlocked(this.live.get(liveId(projectPath, agentId)))) throw hiveError(msg({ id: 'session.prompt.untaken', defaultMessage: "Its CLI hasn't taken the line Hive typed before; nothing more is typed until it does.", description: "Typing into an agent is refused: its CLI hasn't taken the line Hive typed before." }), undefined, { kind: 'conflict' })
+      if (this.lineBlocked(this.live.get(liveId(projectPath, agentId)))) throw hiveError(msg({ id: 'session.prompt.untaken', defaultMessage: "Its CLI hasn't taken the line Combwork typed before; nothing more is typed until it does.", description: "Typing into an agent is refused: its CLI hasn't taken the line Hive typed before." }), undefined, { kind: 'conflict' })
     }
     // Its CLI's own question on its screen (HI-1959): it takes the keys, and Enter answers it.
     const asked = (): void => {
@@ -4157,7 +4178,7 @@ class SessionManager {
       : undefined
     // To itself: the agent carries on in a new conversation (a long transcript made short again).
     const self = fromAgentId === toAgentId
-    if (!this.hiveMcp(projectPath)) throw hiveError(msg({ id: 'session.handOver.noTools', defaultMessage: 'Handing over needs Hive\'s tools in sessions: turn on "Provide Hive tools to sessions" in Settings → Agent API.', description: 'Hand Over to… is refused: agents need Hive\'s tools to write and read a handover. "Provide Hive tools to sessions" is a setting in Settings → Agent API: keep its name as Hive shows it.' }), undefined, { kind: 'conflict' })
+    if (!this.hiveMcp(projectPath)) throw hiveError(msg({ id: 'session.handOver.noTools', defaultMessage: 'Handing over needs Combwork\'s tools in sessions: turn on "Provide Combwork tools to sessions" in Settings → Agent API.', description: 'Hand Over to… is refused: agents need Hive\'s tools to write and read a handover. "Provide Hive tools to sessions" is a setting in Settings → Agent API: keep its name as Hive shows it.' }), undefined, { kind: 'conflict' })
     const { agent: to } = await this.agentDef(projectPath, toAgentId)
     const { agent: from } = await this.agentDef(projectPath, fromAgentId)
     // Ending its conversation only while it may (#1057): what the notice, the footer and the dialog offer, checked here
@@ -4329,7 +4350,7 @@ class SessionManager {
     if (l.state.status === 'waiting') throw hiveError(msg({ id: 'session.plan.asking', defaultMessage: 'The agent is asking you something. Answer it first.', description: 'Turning Plan mode on or off is refused: the agent waits for the user.' }), undefined, { kind: 'conflict' })
     if (!!l.state.planMode === on) return
     // Not into a line Hive is typing (#649: the composer is reserved meanwhile).
-    if (this.delivering.has(this.key(projectPath, agentId))) throw hiveError(msg({ id: 'session.plan.typing', defaultMessage: 'Hive is typing a line into this agent. Try again in a moment.', description: 'Turning Plan mode on or off is refused for a moment: Hive is typing into the terminal.' }), undefined, { kind: 'conflict' })
+    if (this.delivering.has(this.key(projectPath, agentId))) throw hiveError(msg({ id: 'session.plan.typing', defaultMessage: 'Combwork is typing a line into this agent. Try again in a moment.', description: 'Turning Plan mode on or off is refused for a moment: Hive is typing into the terminal.' }), undefined, { kind: 'conflict' })
     writePty(this.key(projectPath, agentId), l.adapter.planToggleKey)
     l.state.planMode = on
     this.emitState(l.state)
@@ -4701,7 +4722,7 @@ class SessionManager {
       'warning',
       tr(msg({ id: 'session.leftovers.title', defaultMessage: '{agent} left {processes} running', description: "A notice's title: an agent's processes still run after it stopped. {agent} is the agent; {processes} how many (\"2 processes\")." }), { agent: label, processes: processCount(n, tr) }),
       failed
-        ? tr(msg({ id: 'session.leftovers.notEndedBody', defaultMessage: "{processes}. {n, plural, one {It was started by the agent and may hold the project's folder or ports. Hive couldn't end it by itself.} other {They were started by the agent and may hold the project's folder or ports. Hive couldn't end them by itself.}}", description: "The notice of processes an agent left running, which Hive tried to end and couldn't. {processes} lists them (\"node serve.js, 4 × tail -f …\"); {n} is how many." }), { processes: summary, n })
+        ? tr(msg({ id: 'session.leftovers.notEndedBody', defaultMessage: "{processes}. {n, plural, one {It was started by the agent and may hold the project's folder or ports. Combwork couldn't end it by itself.} other {They were started by the agent and may hold the project's folder or ports. Combwork couldn't end them by itself.}}", description: "The notice of processes an agent left running, which Hive tried to end and couldn't. {processes} lists them (\"node serve.js, 4 × tail -f …\"); {n} is how many." }), { processes: summary, n })
         : tr(msg({ id: 'session.leftovers.body', defaultMessage: "{processes}. {n, plural, one {It was started by the agent and may hold the project's folder or ports.} other {They were started by the agent and may hold the project's folder or ports.}}", description: "The notice of processes an agent left running. {processes} lists them (\"node serve.js, 4 × tail -f …\"); {n} is how many." }), { processes: summary, n }),
       [
         { label: tr(msg({ id: 'session.leftovers.end', defaultMessage: 'End Them', description: "A notice's button: ends the processes the agent left running." })), command: 'session.settleLeftovers', args: [left.projectPath, left.agentId, 'end', offer] },
@@ -5275,7 +5296,7 @@ class SessionManager {
     if (l.typed && (l.prompts ?? 0) <= l.typed.prompts) l.typed = undefined
     this.noteComposer(l, this.key(st.projectPath, st.agentId))
     if (rang.length) this.lineLost(st.projectPath, st.agentId, st.runId, rang)
-    else this.notify(st.projectPath, withValues(msg({ id: 'session.notice.lineLostTitle', defaultMessage: "{agent} didn't get a line Hive typed", description: "A notification's title: a line Hive typed into an agent's terminal (a message, a prompt) was taken by a screen of its coding agent before it was sent, so the agent never got it. {agent} is the agent." }), { agent: this.label(st) }), withValues(msg({ id: 'session.notice.lineLost', defaultMessage: 'A screen of its CLI took it before it was sent. Send it again if it is still wanted: {text}', description: "The notification that a line Hive typed into an agent was lost (a screen of its coding agent took it). {text} is the line, as Hive typed it." }), { text }), 'notice', undefined, st.agentId)
+    else this.notify(st.projectPath, withValues(msg({ id: 'session.notice.lineLostTitle', defaultMessage: "{agent} didn't get a line Combwork typed", description: "A notification's title: a line Hive typed into an agent's terminal (a message, a prompt) was taken by a screen of its coding agent before it was sent, so the agent never got it. {agent} is the agent." }), { agent: this.label(st) }), withValues(msg({ id: 'session.notice.lineLost', defaultMessage: 'A screen of its CLI took it before it was sent. Send it again if it is still wanted: {text}', description: "The notification that a line Hive typed into an agent was lost (a screen of its coding agent took it). {text} is the line, as Hive typed it." }), { text }), 'notice', undefined, st.agentId)
   }
 
   /** Reads the transcript for background tasks now (at a turn's end, before choosing between finished and background). */
@@ -6931,7 +6952,7 @@ class SessionManager {
    */
   private notify(projectPath: string, titleText: Text, bodyText: TextPart, kind: 'finished' | 'waiting' | 'notice', agentName?: string, agentId?: string, action?: { label: Text; command: string; args?: unknown[] }): void {
     const title = shownText(titleText)
-    // agent-later: HI-2465 says the events stream's titles in each caller's dialect
+    // agent-stored: agentField says the events stream's title again in each caller's dialect, from apiTitleText (apiEvents.ts, HI-2465)
     const apiTitle = englishText(titleText)
     const body = shownText(bodyText)
     if (kind !== 'notice') {
@@ -6956,10 +6977,10 @@ class SessionManager {
       }
       const assistant = workspace.isAssistantHome(projectPath)
       // i18n-ignore: a fallback name, never seen (every agent that finishes has its name)
-      this.finishes.add({ projectPath, project: assistant ? ASSISTANT_NAME : basename(projectPath), agent: assistant ? ASSISTANT_NAME : (agentName ?? 'Agent'), ...(agentId ? { agentId } : {}), title, apiTitle, body }) // agent-protocol: a fallback name, never seen
+      this.finishes.add({ projectPath, project: assistant ? ASSISTANT_NAME : basename(projectPath), agent: assistant ? ASSISTANT_NAME : (agentName ?? 'Agent'), ...(agentId ? { agentId } : {}), title, apiTitle, apiTitleText: titleText, body }) // agent-protocol: a fallback name, never seen
       return
     }
-    this.deliver(projectPath, title, body, notifyKind, agentId, agentName, apiTitle, action && { label: shownText(action.label), command: action.command, ...(action.args ? { args: action.args } : {}) })
+    this.deliver(projectPath, title, body, notifyKind, agentId, agentName, apiTitle, action && { label: shownText(action.label), command: action.command, ...(action.args ? { args: action.args } : {}) }, { apiTitleText: titleText })
   }
 
   /**
@@ -6970,8 +6991,8 @@ class SessionManager {
    */
   notice(projectPath: string, title: Text, body: TextPart, action?: { label: Text; command: string; args?: unknown[] }, extra?: { kind?: 'needsYou' | 'work'; offer?: string; target?: ToastTarget }): void {
     if (!extra?.kind && !extra?.offer && !extra?.target) return this.notify(projectPath, title, body, 'notice', undefined, undefined, action)
-    // agent-later: HI-2465 says the events stream's titles in each caller's dialect
-    this.deliver(projectPath, shownText(title), shownText(body), extra.kind ?? 'work', undefined, undefined, englishText(title), action && { label: shownText(action.label), command: action.command, ...(action.args ? { args: action.args } : {}) }, extra)
+    // agent-stored: agentField says the events stream's title again in each caller's dialect, from apiTitleText (apiEvents.ts, HI-2465)
+    this.deliver(projectPath, shownText(title), shownText(body), extra.kind ?? 'work', undefined, undefined, englishText(title), action && { label: shownText(action.label), command: action.command, ...(action.args ? { args: action.args } : {}) }, { ...extra, apiTitleText: title })
   }
 
   /** Where a notice about this project goes now: the settings, and the Hive window the user is using (notifyRoute), with why for the log. */
@@ -6984,7 +7005,7 @@ class SessionManager {
    * longer asking resolves it; its link is the agent's pane, or the project. `apiTitle`: its title in English, when
    * `title` is translated.
    */
-  private deliver(projectPath: string, title: string, body: string, kind: NotifyKind, agentId?: string, agentName?: string, apiTitle?: string, action?: ToastAction, extra?: { offer?: string; target?: ToastTarget }): void {
+  private deliver(projectPath: string, title: string, body: string, kind: NotifyKind, agentId?: string, agentName?: string, apiTitle?: string, action?: ToastAction, extra?: { offer?: string; target?: ToastTarget; apiTitleText?: TextPart }): void {
     const assistant = workspace.isAssistantHome(projectPath)
     const target: ToastTarget | undefined = extra?.target ?? (agentId ? { kind: 'agent', projectPath, agentId, name: assistant ? ASSISTANT_NAME : (agentName ?? this.agentName(projectPath, agentId)), project: assistant ? ASSISTANT_NAME : basename(projectPath) } : undefined)
     const offer = extra?.offer ?? (kind === 'needsYou' && agentId ? askOffer(projectPath, agentId) : undefined)
@@ -6993,6 +7014,7 @@ class SessionManager {
       title,
       message: body,
       apiTitle,
+      ...(extra?.apiTitleText !== undefined ? { apiTitleText: extra.apiTitleText } : {}),
       projectPath,
       ...(agentId ? { agentId } : {}),
       ...(target ? { target } : {}),
@@ -7056,7 +7078,8 @@ class SessionManager {
         if (!group.length) continue
         const { title, body } = finishedNotice(group)
         const one = group.length === 1 ? group[0] : null
-        this.deliver(group[0].projectPath, title, body, 'finished', one?.agentId, one?.agent, finishedApiTitle(group))
+        const apiTitleText = finishedApiTitleText(group)
+        this.deliver(group[0].projectPath, title, body, 'finished', one?.agentId, one?.agent, finishedApiTitle(group), undefined, apiTitleText !== undefined ? { apiTitleText } : undefined)
       }
     },
     Date.now,
@@ -7233,10 +7256,10 @@ class SessionManager {
     log.warn(`${name} ${usage.cliVersion ?? ''}: a ${Math.round(size / 1024)} KB transcript showed no usage (${usage.sessionId})`)
     toast(
       'warning',
-      tr(msg({ id: 'session.format.title', defaultMessage: 'Hive may not fully understand this {provider} version', description: "A notice's title: a coding agent's transcripts show no token use, so its format probably changed. {provider} is the coding agent's name." }), { provider: name }),
+      tr(msg({ id: 'session.format.title', defaultMessage: 'Combwork may not fully understand this {provider} version', description: "A notice's title: a coding agent's transcripts show no token use, so its format probably changed. {provider} is the coding agent's name." }), { provider: name }),
       usage.cliVersion
-        ? tr(msg({ id: 'session.format.bodyVersion', defaultMessage: 'A {provider} {version} session with activity showed no token use, so the Overview and costs may be incomplete. A Hive update will fix it.', description: "The notice that a coding agent's transcripts show no token use. {provider} is the coding agent's name, {version} its version (\"2.1.299\")." }), { provider: name, version: usage.cliVersion })
-        : tr(msg({ id: 'session.format.body', defaultMessage: 'A {provider} session with activity showed no token use, so the Overview and costs may be incomplete. A Hive update will fix it.', description: "The notice that a coding agent's transcripts show no token use. {provider} is the coding agent's name." }), { provider: name })
+        ? tr(msg({ id: 'session.format.bodyVersion', defaultMessage: 'A {provider} {version} session with activity showed no token use, so the Overview and costs may be incomplete. A Combwork update will fix it.', description: "The notice that a coding agent's transcripts show no token use. {provider} is the coding agent's name, {version} its version (\"2.1.299\")." }), { provider: name, version: usage.cliVersion })
+        : tr(msg({ id: 'session.format.body', defaultMessage: 'A {provider} session with activity showed no token use, so the Overview and costs may be incomplete. A Combwork update will fix it.', description: "The notice that a coding agent's transcripts show no token use. {provider} is the coding agent's name." }), { provider: name })
     )
   }
 
@@ -7674,7 +7697,7 @@ class SessionManager {
   async archive(projectPath: string, sessionId: string, archived: boolean): Promise<void> {
     projectPath = workspace.assertSessionHost(projectPath)
     assertSessionId(sessionId)
-    if (!(await workspace.sessionsFile(projectPath)).sessions.some((s) => s.id === sessionId)) throw hiveError(msg({ id: 'session.archive.notKept', defaultMessage: 'Only sessions Hive keeps can be archived: adopt it first.', description: "Archiving a session is refused: it was started outside Hive, so Hive has no copy of it (Adopt keeps one)." }))
+    if (!(await workspace.sessionsFile(projectPath)).sessions.some((s) => s.id === sessionId)) throw hiveError(msg({ id: 'session.archive.notKept', defaultMessage: 'Only sessions Combwork keeps can be archived: adopt it first.', description: "Archiving a session is refused: it was started outside Hive, so Hive has no copy of it (Adopt keeps one)." }))
     const action = archived ? 'archive' : 'unarchive'
     const active = this.backupPath(projectPath, sessionId)
     const arch = this.backupPath(projectPath, sessionId, true)
@@ -7840,8 +7863,8 @@ class SessionManager {
    */
   private async inUse(projectPath: string, sessionId: string, opts: { writing: boolean }): Promise<SessionInUse | null> {
     if (this.liveAnywhere(sessionId)) return new SessionInUse('live', msg({ id: 'session.inUse.running', defaultMessage: 'It is running. Stop it first.', description: 'A session is left alone (archive, delete): it is running.' }))
-    if (beingRead(projectPath, sessionId)) return new SessionInUse('reading', msg({ id: 'session.inUse.reading', defaultMessage: 'Hive is reading its transcript (an export or a search). Try again in a moment.', description: "A session is left alone (archive, delete) for a moment: Hive is reading its transcript." }))
-    if (viewingWindows(projectPath, sessionId).length) return new SessionInUse('open', msg({ id: 'session.inUse.open', defaultMessage: 'Its transcript is open in Hive. Close it, then try again.', description: "A session is left alone (archive, delete): its transcript is open in Hive's Sessions tab." }))
+    if (beingRead(projectPath, sessionId)) return new SessionInUse('reading', msg({ id: 'session.inUse.reading', defaultMessage: 'Combwork is reading its transcript (an export or a search). Try again in a moment.', description: "A session is left alone (archive, delete) for a moment: Hive is reading its transcript." }))
+    if (viewingWindows(projectPath, sessionId).length) return new SessionInUse('open', msg({ id: 'session.inUse.open', defaultMessage: 'Its transcript is open in Combwork. Close it, then try again.', description: "A session is left alone (archive, delete): its transcript is open in Hive's Sessions tab." }))
     const t = await this.providerTranscript(projectPath, sessionId).catch(() => null)
     if (!t) return null
     if (await heldOpen(t.path)) return new SessionInUse('in-use', M.inUseElsewhere)
@@ -7967,7 +7990,7 @@ class SessionManager {
   /** Runs fn (an archive or delete) with the session reserved, as whileCleaning; one already reserved is in use. */
   private async whileReserved<T>(projectPath: string, sessionId: string, fn: () => Promise<T>): Promise<T> {
     const k = `${projectPath.toLowerCase()}|${sessionId.toLowerCase()}`
-    if (this.cleaning.has(k)) throw new SessionInUse('in-use', msg({ id: 'session.inUse.reserved', defaultMessage: 'Hive is already archiving, deleting or cleaning up this session.', description: 'A session is left alone (archive, delete) for a moment: Hive is moving or removing its files already.' }))
+    if (this.cleaning.has(k)) throw new SessionInUse('in-use', msg({ id: 'session.inUse.reserved', defaultMessage: 'Combwork is already archiving, deleting or cleaning up this session.', description: 'A session is left alone (archive, delete) for a moment: Hive is moving or removing its files already.' }))
     this.cleaning.add(k)
     try {
       return await fn()
@@ -8007,7 +8030,7 @@ class SessionManager {
       this.withBackupsLocked(projectPath, sessionId, async () => {
         await this.assertCleanable(projectPath, sessionId, expected)
         if (!(await this.providerTranscript(projectPath, sessionId))) throw hiveError(msg({ id: 'session.cleanUp.cliGone', defaultMessage: "The CLI no longer has this session's transcript.", description: "Clean Up… kept a session's backups: the coding agent's own transcript is gone since the preview." }))
-        if (!(await usageHistory.recordNow(projectPath, sessionId).catch(() => false))) throw hiveError(msg({ id: 'session.cleanUp.unreadBackups', defaultMessage: "Hive couldn't read what the session used, so its backups are kept.", description: "Clean Up… kept a session's backups: Hive couldn't read its usage, which the project's totals keep." }))
+        if (!(await usageHistory.recordNow(projectPath, sessionId).catch(() => false))) throw hiveError(msg({ id: 'session.cleanUp.unreadBackups', defaultMessage: "Combwork couldn't read what the session used, so its backups are kept.", description: "Clean Up… kept a session's backups: Hive couldn't read its usage, which the project's totals keep." }))
         await this.assertCleanable(projectPath, sessionId, expected)
         for (const b of this.backupFiles(projectPath, sessionId)) await trash(b)
       })
@@ -8028,11 +8051,11 @@ class SessionManager {
     assertSessionId(sessionId)
     const check = async (): Promise<void> => {
       if (this.liveAnywhere(sessionId)) throw new SessionInUse('live', msg({ id: 'session.purge.running', defaultMessage: 'It is running.', description: 'Purge left a session alone: it is running (or starting) now.' }))
-      if (beingRead(projectPath, sessionId)) throw new SessionInUse('reading', msg({ id: 'session.purge.reading', defaultMessage: 'Hive is reading its transcript (an export or a search). Try again in a moment.', description: 'Purge left a session alone for a moment: Hive is reading its transcript.' }))
+      if (beingRead(projectPath, sessionId)) throw new SessionInUse('reading', msg({ id: 'session.purge.reading', defaultMessage: 'Combwork is reading its transcript (an export or a search). Try again in a moment.', description: 'Purge left a session alone for a moment: Hive is reading its transcript.' }))
       // A view reads the CLI's transcript while the CLI has it: only a last copy going takes what it shows.
-      if (listed.lastCopy && viewingWindows(projectPath, sessionId).length) throw new SessionInUse('open', msg({ id: 'session.purge.open', defaultMessage: 'Its transcript is open in Hive. Close it, then try again.', description: "Purge left a session alone: its transcript is open in Hive's Sessions tab." }))
+      if (listed.lastCopy && viewingWindows(projectPath, sessionId).length) throw new SessionInUse('open', msg({ id: 'session.purge.open', defaultMessage: 'Its transcript is open in Combwork. Close it, then try again.', description: "Purge left a session alone: its transcript is open in Hive's Sessions tab." }))
       const rec = (await workspace.sessionsFile(projectPath)).sessions.find((s) => s.id === sessionId)
-      if (!rec) throw hiveError(msg({ id: 'session.purge.gone', defaultMessage: 'The session is no longer in Hive.', description: 'Purge left a session alone: it was deleted since the preview.' }))
+      if (!rec) throw hiveError(msg({ id: 'session.purge.gone', defaultMessage: 'The session is no longer in Combwork.', description: 'Purge left a session alone: it was deleted since the preview.' }))
       const want = new Set(listed.backups.map((b) => b.toLowerCase()))
       const has = this.backupFiles(projectPath, sessionId).map((b) => b.toLowerCase())
       if (want.size && (has.length !== want.size || !has.every((b) => want.has(b)))) throw hiveError(msg({ id: 'session.purge.changed', defaultMessage: "The session's copies changed since the preview.", description: "Purge left a session alone: Hive's copies of its transcript changed since the preview." }))
@@ -8044,7 +8067,7 @@ class SessionManager {
           throw hiveError(listed.lastCopy ? msg({ id: 'session.purge.cliBack', defaultMessage: "The CLI has this session's transcript again.", description: "Purge left a session alone: the coding agent's own transcript is back since the preview, so Hive's backups are no longer its last copy." }) : msg({ id: 'session.purge.cliGone', defaultMessage: "The CLI no longer has this session's transcript.", description: "Purge left a session alone: the coding agent's own transcript went since the preview, so Hive's backups are now its last copy." }))
         }
         if ((listed.backups.length || listed.keptUsage) && !(await usageHistory.recordNow(projectPath, sessionId).catch(() => false))) {
-          throw hiveError(msg({ id: 'session.purge.unread', defaultMessage: "Hive couldn't record what the session used, so it is kept.", description: "Purge left a session alone: Hive couldn't save its usage in the usage history, which the totals keep." }))
+          throw hiveError(msg({ id: 'session.purge.unread', defaultMessage: "Combwork couldn't record what the session used, so it is kept.", description: "Purge left a session alone: Hive couldn't save its usage in the usage history, which the totals keep." }))
         }
         // Again after the waits above, and the files as listed (`unchanged`): nothing else is awaited before the first removal.
         await check()
@@ -8113,7 +8136,7 @@ class SessionManager {
         const rec = (await workspace.sessionsFile(projectPath)).sessions.find((s) => s.id === sessionId)
         // Not recorded (the worker ended, a write another Hive held): the session stays, Delete and Clean Up alike.
         const recorded = rec ? await usageHistory.recordNow(projectPath, sessionId).catch(() => false) : true
-        if (!recorded) throw hiveError(msg({ id: 'session.cleanUp.unread', defaultMessage: "Hive couldn't read what the session used, so it is kept.", description: "Clean Up… kept a session: Hive couldn't read its usage, which the project's totals keep." }))
+        if (!recorded) throw hiveError(msg({ id: 'session.cleanUp.unread', defaultMessage: "Combwork couldn't read what the session used, so it is kept.", description: "Clean Up… kept a session: Hive couldn't read its usage, which the project's totals keep." }))
         if (expected) await this.assertCleanable(projectPath, sessionId, expected)
         this.assertNotLive(sessionId, 'delete')
         const files = this.backupFiles(projectPath, sessionId)

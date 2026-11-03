@@ -8,7 +8,7 @@ import { afterAll, afterEach, beforeAll, describe, expect, it, vi } from 'vitest
 import * as electron from 'electron'
 import type { HiveEvent, TaskCard } from '../src/shared/types'
 import { preferencesOf } from '../src/shared/workflow/preferences'
-import { allDone, keptLanes, laneLine, laneNextText, laneView, listedLanes, readLane, readLanes, laneCards, laneNumber, laneName, LANE_LINGER_MS, LANE_KEEP_MS, MAX_LANES, type LaneRecord } from '../src/shared/lanes'
+import { allDone, keptLanes, laneLine, laneNextText, laneView, listedLanes, readLane, readLanes, laneCards, laneNumber, laneName, LANE_LINGER_MS, LANE_KEEP_MS, MAX_LANES, type LaneRecord, type LaneSlotHeld } from '../src/shared/lanes'
 import { tempDir } from './tempDir'
 import { storeDocs } from './storeDocs'
 // The longest a wait here waits for what it waits on: a bound for a hung run, never how long it should take (#570).
@@ -98,11 +98,40 @@ describe('a lane on slots (#1438)', () => {
     expect(laneLine(held)).toContain("waiting for slot-a: CB1's session is still in it")
     const process = laneView(rec(), cards, undefined, null, undefined, null, undefined, null, null, { slot: null, waiting: true, held: { slot: 'slot-a', held: 'process' } })
     expect(laneLine(process)).toContain('waiting for slot-a: a process still has a file or folder in it open')
-    const blocked = laneView(rec(), new Map([[1, card(1, 'doing', { blocked: 'Asked the user' })], [2, card(2, 'todo')], [3, card(3, 'todo')]]), undefined, null, undefined, null, undefined, null, null, { slot: null, waiting: true })
+    // HI-2467: Windows Sandbox's broker seen working in it, idle, a Sandbox running, or that not known.
+    const broker = (idle?: boolean) => laneLine(laneView(rec(), cards, undefined, null, undefined, null, undefined, null, null, { slot: null, waiting: true, held: { slot: 'slot-a', held: 'broker', broker: 'WindowsSandboxServer', ...(idle !== undefined ? { idle } : {}) } }))
+    expect(broker(true)).toContain("waiting for slot-a: a process still has a file or folder in it open: Windows Sandbox's broker (WindowsSandboxServer) is working in it, with no Sandbox running")
+    expect(broker(false)).toContain("Windows Sandbox's broker (WindowsSandboxServer) is working in it, with a Sandbox running")
+    expect(broker()).toContain("Windows Sandbox's broker (WindowsSandboxServer) is working in it")
+    expect(broker()).not.toMatch(/Sandbox running/)
+    const blocked =laneView(rec(), new Map([[1, card(1, 'doing', { blocked: 'Asked the user' })], [2, card(2, 'todo')], [3, card(3, 'todo')]]), undefined, null, undefined, null, undefined, null, null, { slot: null, waiting: true })
     expect(blocked.status?.reason).toBe('blocked')
     // Ended: no slot, no wait.
     const ended = laneView(rec({ state: 'ended', endedAt: '2026-10-09T11:00:00.000Z' }), cards, undefined, null, undefined, null, undefined, null, null, { slot: 'slot-b', waiting: true })
     expect([ended.slot, ended.status]).toEqual([null, null])
+  })
+
+  it('HI-2468: a running builder\'s start refused for its slot held names the slot and what holds it; refused otherwise, as before', () => {
+    const view = (held?: LaneSlotHeld) => laneView(rec(), cards, undefined, null, undefined, null, undefined, null, null, null, undefined, { card: 2, why: 'refused', agent: 'B1', ...(held ? { held } : {}) })
+    // Still a start's wait (never a wait for a slot): the builder is B1, and the session in the slot its own field.
+    const session = view({ slot: 'slot-a', held: 'session', agent: 'CB1' })
+    expect(session.status).toEqual({ reason: 'startWait', card: 2, why: 'refused', agent: 'B1', slot: 'slot-a', held: 'session', heldBy: 'CB1' })
+    expect(laneLine(session)).toContain("#2 waits to start: its start was refused for now, slot-a still in use (CB1's session is still in it); Hive tries again")
+    expect(laneLine(view({ slot: 'slot-a', held: 'process' }))).toContain('#2 waits to start: its start was refused for now, slot-a still in use (a process still has a file or folder in it open); Hive tries again')
+    const broker = view({ slot: 'slot-a', held: 'broker', broker: 'WindowsSandboxServer', idle: false })
+    expect(broker.status).toMatchObject({ reason: 'startWait', why: 'refused', slot: 'slot-a', held: 'broker', broker: 'WindowsSandboxServer', idle: false })
+    expect(laneLine(broker)).toContain("slot-a still in use (a process still has a file or folder in it open: Windows Sandbox's broker (WindowsSandboxServer) is working in it, with a Sandbox running); Hive tries again")
+    // No slot free, as its builder's own last run still holds it: what that run left there, or that it isn't known to have ended.
+    expect(laneLine(view({ slot: 'slot-a', held: 'left', agent: 'B1', program: 'node' }))).toContain("slot-a still in use (B1's last run left node running in it); Hive tries again")
+    expect(laneLine(view({ slot: 'slot-a', held: 'left', agent: 'B1', program: 'node', more: 2 }))).toContain("slot-a still in use (B1's last run left node and 2 more running in it); Hive tries again")
+    expect(view({ slot: 'slot-a', held: 'left', agent: 'B1', program: 'node', more: 2 }).status).toMatchObject({ held: 'left', heldBy: 'B1', program: 'node', more: 2 })
+    expect(laneLine(view({ slot: 'slot-a', held: 'lastRun', agent: 'B1' }))).toContain("slot-a still in use (B1's last run there isn't known to have ended); Hive tries again")
+    // Refused for another reason, or nothing held any more: as before HI-2468.
+    const bare = view()
+    expect(bare.status).toEqual({ reason: 'startWait', card: 2, why: 'refused', agent: 'B1' })
+    expect(laneLine(bare)).toContain('#2 waits to start: its start was refused for now; Hive tries again')
+    // A held slot kept with another reason (the builder busy) never shows: only a refused start says it.
+    expect(laneView(rec(), cards, undefined, null, undefined, null, undefined, null, null, null, undefined, { card: 2, why: 'busy', agent: 'B1', held: { slot: 'slot-a', held: 'process' } }).status).toEqual({ reason: 'startWait', card: 2, why: 'busy', agent: 'B1' })
   })
 
   it("hive_lane next says where the next card is built", () => {

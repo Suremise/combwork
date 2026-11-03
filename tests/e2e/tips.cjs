@@ -119,7 +119,7 @@ const check = (name, ok, extra = '') => {
   await page.keyboard.press('Control+Shift+E')
   await page.locator('.menubar-item', { hasText: 'Help' }).first().click()
   await page.locator('.menu .menu-item', { hasText: 'Tips…' }).click()
-  const sw = dialog.getByRole('switch', { name: 'Show a tip when Hive starts' })
+  const sw = dialog.getByRole('switch', { name: 'Show a tip when Combwork starts' })
   check('the list has the setting, on', (await sw.getAttribute('aria-checked')) === 'true')
   await dialog.getByRole('button', { name: 'Close' }).last().click()
   // Another window shows the day's tip while this one is still loading (#295): this one's older snapshot mustn't undo

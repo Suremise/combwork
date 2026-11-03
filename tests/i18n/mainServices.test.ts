@@ -55,7 +55,7 @@ const { initRepo } = await import('../../src/main/gitInit')
 const GERMAN = {
   'main.plan.used': '{share, number, ::percent} Ihres {window, select, hours {{hours, plural, one {#-Stunden-Limits} other {#-Stunden-Limits}}} weekly {Wochenlimits} other {{label}-Limits}} für {provider} verbraucht',
   'main.finished.inProject': '{n} Agenten in {project} fertig',
-  'main.quit.closed': 'Hive wurde geschlossen',
+  'main.quit.closed': 'Combwork wurde geschlossen',
   'main.move.copied':
     "{n, plural, one {{owner, select, project {{host}: {n, number} Datei von {provider} für das Projekt kopiert.} assistant {{host}: {n, number} Datei von {provider} für den Assistenten kopiert.} worktree {{host}: {n, number} Datei von {provider} für das Arbeitsverzeichnis von {agent} kopiert.} other {{host}: {n, number} Datei von {provider} für {of} kopiert.}}} other {{owner, select, project {{host}: {n, number} Dateien von {provider} für das Projekt kopiert.} assistant {{host}: {n, number} Dateien von {provider} für den Assistenten kopiert.} worktree {{host}: {n, number} Dateien von {provider} für das Arbeitsverzeichnis von {agent} kopiert.} other {{host}: {n, number} Dateien von {provider} für {of} kopiert.}}}}"
 }
@@ -107,7 +107,7 @@ describe('notices: in the language shown, their Agent API title in English', () 
     setLanguage('de', GERMAN, 'de-DE')
     const c = closedNotice(2)
     tell({ kind: 'quit', title: c.title, message: c.body, apiTitle: c.apiTitle })
-    expect(told()).toEqual([{ user: 'Hive wurde geschlossen', api: 'Hive has closed' }])
+    expect(told()).toEqual([{ user: 'Combwork wurde geschlossen', api: 'Combwork has closed' }])
   })
 
   it('finishes that came together; one alone keeps its own title', () => {

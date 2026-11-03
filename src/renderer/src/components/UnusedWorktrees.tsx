@@ -15,7 +15,7 @@ import { agentFolder } from '../agentPlace'
 
 const M = {
   loading: msg({ id: 'workspace.unusedList.loading', defaultMessage: 'Loading…', description: "The Changes tab's Unused worktrees while git lists them." }),
-  gitProblem: msg({ id: 'workspace.unusedList.gitProblem', defaultMessage: "{problem}, so Hive can't list the unused worktrees.", description: "The Changes tab's Unused worktrees when git can't run ({problem}: what is wrong with git)." }),
+  gitProblem: msg({ id: 'workspace.unusedList.gitProblem', defaultMessage: "{problem}, so Combwork can't list the unused worktrees.", description: "The Changes tab's Unused worktrees when git can't run ({problem}: what is wrong with git)." }),
   none: msg({ id: 'workspace.unusedList.none', defaultMessage: '{project} has no unused worktrees: every worktree belongs to an agent.', description: "The Changes tab's Unused worktrees with none." }),
   mainBranch: msg({ id: 'workspace.unusedList.mainBranch', defaultMessage: 'the main branch', description: "Unused worktrees: what they'd be merged into when git doesn't say which branch. Lower case." }),
   keptTitle: msg({ id: 'workspace.unusedList.keptTitle', defaultMessage: '{name} was kept', description: "A notice: an unused worktree ({name}: its branch or folder) wasn't removed; the reason follows." }),

@@ -83,7 +83,8 @@ describe('a build fact', () => {
   it("shows a build's line and detail in every language, and any other entry as written", () => {
     const f = buildFactOf({ ...fact, by: 'release', kind: 'rc' }) as Exclude<ReturnType<typeof buildFactOf>, { error: string }>
     const e = { source: 'hive' as const, summary: buildFactSummary(f), detail: buildFactDetail(f) }
-    expect(journalSummary(e)).toBe(e.summary)
+    // Stored in English as agents read it ("Hive", until HI-2463); the window says the app's name (HI-2458).
+    expect(journalSummary(e)).toBe(e.summary.replace(' Hive ', ' Combwork '))
     expect(journalSummary({ ...e, source: 'assistant' })).toBe(e.summary)
     expect(journalBuildDetail({ ...e, source: 'assistant' })).toBeNull()
     expect(journalBuildDetail(e)?.[0]).toBe(`Installer: ${fact.installer}`)

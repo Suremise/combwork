@@ -4,6 +4,7 @@ interface HiveMessageValues {
   'workspace.activity.activity': undefined
   'workspace.activity.assistant': undefined
   'workspace.activity.board': undefined
+  'workspace.activity.dialects': undefined
   'workspace.activity.docs': undefined
   'workspace.activity.forYou': { n: number }
   'workspace.activity.mcp': undefined

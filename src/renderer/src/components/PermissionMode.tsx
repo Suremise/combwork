@@ -103,8 +103,8 @@ function menuItems(project: ProjectInfo, a: AgentInfo, settings: AppSettings, vi
       ...(cliOwn
         ? [
             {
-              label: tr(msg({ id: 'agents.permission.cliOwnNoSwitchTitle', defaultMessage: "Hive can't switch this session's mode", description: "In a running agent's permission mode menu, for a session started in \"The CLI's own setting\" (Hive passed no mode): a short line saying no mode switches live. Keep it short." })),
-              detail: tr(msg({ id: 'agents.permission.cliOwnNoSwitch', defaultMessage: "It started in the CLI's own setting, so Hive doesn't know which mode it is in. A choice here restarts it.", description: "In a running agent's permission mode menu, under \"Hive can't switch this session's mode\" (a session started in \"The CLI's own setting\", Hive passed no mode): why, and what a choice does." })),
+              label: tr(msg({ id: 'agents.permission.cliOwnNoSwitchTitle', defaultMessage: "Combwork can't switch this session's mode", description: "In a running agent's permission mode menu, for a session started in \"The CLI's own setting\" (Hive passed no mode): a short line saying no mode switches live. Keep it short." })),
+              detail: tr(msg({ id: 'agents.permission.cliOwnNoSwitch', defaultMessage: "It started in the CLI's own setting, so Combwork doesn't know which mode it is in. A choice here restarts it.", description: "In a running agent's permission mode menu, under \"Hive can't switch this session's mode\" (a session started in \"The CLI's own setting\", Hive passed no mode): why, and what a choice does." })),
               icon: 'info',
               disabled: true
             }

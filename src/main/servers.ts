@@ -32,7 +32,7 @@ import { reviewCopyOnStart, reviewCopyOnVerdict } from './reviewCopies'
 import { COLUMN_CHOICES, columnLabel, commentSummary, isTaskColumn, reviewStalled } from '../shared/tasks'
 import type { HandoverAuthor } from '../shared/hiveGuidance'
 import { inDefaultDialect, inRequestScope } from '../shared/agentText/asyncScope'
-import { apiChainReady, inApiWorkspace } from './dialects/apiChain'
+import { apiChainReady, inApiWorkspace, requestApiWorkspace } from './dialects/apiChain'
 import { say, type AgentMsg, type AgentValues } from '../shared/agentText'
 import { API } from './apiText'
 import { cardRequests, commentsParam, laneOrderNote, modelInUse, newestComments, progressLabel, retryWaitsView, taskRow, withoutHistory, type CardRequest, type IntentDone, type ProjectRow, type SkillRow, type TaskBatch, type TaskChange, type TaskReorder, type TaskView, type AccountUsagePublic } from '../shared/toolReplies'
@@ -336,7 +336,8 @@ let apiError: string | undefined
  * Event-stream clients: the project agent each is (null: a script or a viewer, which gets every event) with the launch
  * whose token it came with (`run`), and the viewer token it came with.
  */
-const sseClients = new Map<ServerResponse, { agent: AgentIdentity | null; run: string | null; viewer: string | null }>()
+/** Each events stream: its agent (null: the workspace token or a viewer); for one with none, the .hive folder of the workspace its request was for (`apiDir`, HI-2465), whose API chain its lines are said in. */
+const sseClients = new Map<ServerResponse, { agent: AgentIdentity | null; apiDir: string | null; run: string | null; viewer: string | null }>()
 
 /** What an Agent API request is measured as (metrics.ts), filled in as it is handled and recorded when it ends. */
 interface ApiRequest {
@@ -4433,7 +4434,10 @@ async function serveApi(req: IncomingMessage, res: ServerResponse, url: URL): Pr
     if (assistantCaller()) return send(res, 403, { error: say(API.http.eventsForCallers) })
     res.writeHead(200, { 'Content-Type': 'text/event-stream', 'Cache-Control': 'no-cache', Connection: 'keep-alive' })
     res.write(': connected\n\n')
-    sseClients.set(res, { agent: agentCaller(), run: agentCallerRun(), viewer: viewerCaller()?.id ?? null })
+    // A caller with no session keeps the workspace its request was for (the one it names, or the only one open): its
+    // stream's lines are said in that workspace's API chain, whatever request is running when an event comes (HI-2465).
+    const agent = agentCaller()
+    sseClients.set(res, { agent, apiDir: agent ? null : requestApiWorkspace(), run: agentCallerRun(), viewer: viewerCaller()?.id ?? null })
     // A stream is counted as one (connections, events, bytes, how long it stayed open), not as a request's latency.
     m.skip = true
     // Named so in a "main process was busy" warning (mainStalls.ts), which leaves it out once it is just open.
@@ -4620,19 +4624,31 @@ function statusFor(e: Error): number {
   return 500
 }
 
+/**
+ * Each stream client's line for an event (apiEvents.ts: every event for the workspace token and viewers, a project agent
+ * its project's), said in that client's own dialect scope (HI-2465), bound here whatever request or none is running as
+ * the event comes: an agent's session's chain; for the workspace token and viewers, the API chain of the workspace their
+ * stream was opened for while it is open (`open`, .hive folders in lower case; closed, or none named: the Default). One
+ * line per agent, and per such workspace.
+ */
+function streamLines(event: HiveEvent, open: ReadonlySet<string>): (client: { agent: AgentIdentity | null; apiDir: string | null }) => string | null {
+  const lines = new Map<AgentIdentity | string, string | null>()
+  return ({ agent, apiDir }) => {
+    const dir = !agent && apiDir && open.has(apiDir.toLowerCase()) ? apiDir : null
+    const key = agent ?? `api:${dir?.toLowerCase() ?? ''}`
+    if (!lines.has(key)) {
+      const payload = inApiWorkspace(dir, () => inRequestScope(agent ? { projectPath: agent.projectPath, agentId: agent.agentId } : null, () => apiEventFor(event, agent)))
+      lines.set(key, payload ? `event: ${event.type}\ndata: ${replyText(payload)}\n\n` : null)
+    }
+    return lines.get(key)!
+  }
+}
+
 function broadcast(event: HiveEvent): void {
   if (!sseClients.size || !(API_EVENTS as readonly string[]).includes(event.type)) return
-  // What each client gets (apiEvents.ts): every event for the workspace token and viewers, a project agent its project's.
-  const lines = new Map<AgentIdentity | null, string | null>()
-  const lineFor = (agent: AgentIdentity | null): string | null => {
-    if (!lines.has(agent)) {
-      const payload = apiEventFor(event, agent)
-      lines.set(agent, payload ? `event: ${event.type}\ndata: ${replyText(payload)}\n\n` : null)
-    }
-    return lines.get(agent)!
-  }
-  for (const [c, { agent }] of sseClients) {
-    const line = lineFor(agent)
+  const lineFor = streamLines(event, new Set(openWorkspaces().map((w) => w.hiveDir.toLowerCase())))
+  for (const [c, client] of sseClients) {
+    const line = lineFor(client)
     if (line === null) continue
     // A client that stopped reading would make Hive hold every event for it: it is disconnected instead.
     if (c.writableLength > SSE_MAX_BUFFERED) {
@@ -4750,4 +4766,4 @@ onAgentTokenEnded(endLaunchStreams)
 onWatchPlacing(watchWhilePlaced)
 
 /** For unit tests: request parts whose refusals tests say through the canary (tests/agentTextApi.test.ts, HI-2436). */
-export const apiTextTestHooks = { notifyTarget, isolatedFor, lanePlacement, readUsageWatch }
+export const apiTextTestHooks = { notifyTarget, isolatedFor, lanePlacement, readUsageWatch, streamLines }

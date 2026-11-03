@@ -77,6 +77,9 @@ const requestDir = new AsyncLocalStorage<string | null>()
  */
 export const inApiWorkspace = <T>(hiveDir: string | null, fn: () => T): T => requestDir.run(hiveDir, fn)
 
+/** The .hive folder bound for the current request (inApiWorkspace); null: none. A stream keeps it for its later events (HI-2465). */
+export const requestApiWorkspace = (): string | null => requestDir.getStore() ?? null
+
 /** The API chain of the current request's workspace (inApiWorkspace); null: the Default. */
 export function requestApiChain(): ResolvedChain | null {
   const dir = requestDir.getStore()

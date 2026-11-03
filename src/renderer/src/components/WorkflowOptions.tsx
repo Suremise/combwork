@@ -41,7 +41,7 @@ const T = {
   noPreset: msg({ id: 'workflow.form.noPreset', defaultMessage: 'No preset chosen', description: 'The Workflow section’s preset line when the options didn’t start from a preset (glossary 2.1: preset).' }),
   presetsLabel: msg({ id: 'workflow.form.presetsLabel', defaultMessage: 'Presets', description: 'Accessible name of the list of presets in the Workflow section (glossary 2.1: preset).' }),
   allOff: msg({ id: 'workflow.form.allOff', defaultMessage: 'All off', description: 'A choice beside the presets in the Workflow section: every rule off (SPEC §16.6.4).' }),
-  allOffSummary: msg({ id: 'workflow.form.allOffSummary', defaultMessage: 'No review, nothing checked, everyone in the project folder: cards move freely, and Hive still records what happens.', description: 'What the choice “All off” sets up, under its name in the Workflow section.' }),
+  allOffSummary: msg({ id: 'workflow.form.allOffSummary', defaultMessage: 'No review, nothing checked, everyone in the project folder: cards move freely, and Combwork still records what happens.', description: 'What the choice “All off” sets up, under its name in the Workflow section.' }),
   previewHead: msg({ id: 'workflow.form.previewHead', defaultMessage: 'What {preset} sets, and why:', description: 'Above the list of options a preset sets, in its preview in the Workflow section (glossary 2.1: preset). {preset} is its name.' }),
   previewChanges: msg({ id: 'workflow.form.previewChanges', defaultMessage: '{n, plural, =0 {Nothing here changes.} one {Marked: the option it changes here.} other {Marked: the # options it changes here.}}', description: 'In a preset’s preview in the Workflow section: how many of the options it sets differ from the form now (those are marked).' }),
   previewNow: msg({ id: 'workflow.form.previewNow', defaultMessage: 'Now: {value}', description: 'In a preset’s preview, beside an option it changes: its value in the form now.' }),
@@ -50,7 +50,7 @@ const T = {
   neverOffHead: msg({ id: 'workflow.form.neverOffHead', defaultMessage: 'What never turns off, to keep your work safe:', description: 'Above the list of protections that stay on with every rule off (SPEC §16.6.4), in the Workflow section.' }),
   neverOff: {
     fileLocks: msg({ id: 'workflow.form.neverOff.fileLocks', defaultMessage: 'File locks, while their own setting has them on.', description: 'A protection that stays on with every rule off: agents can’t edit one file at once (its own setting decides).' }),
-    indexLock: msg({ id: 'workflow.form.neverOff.indexLock', defaultMessage: 'Hive never deletes git’s index.lock.', description: 'A protection that stays on with every rule off. Keep index.lock (a file name).' }),
+    indexLock: msg({ id: 'workflow.form.neverOff.indexLock', defaultMessage: 'Combwork never deletes git’s index.lock.', description: 'A protection that stays on with every rule off. Keep index.lock (a file name).' }),
     folderGit: msg({ id: 'workflow.form.neverOff.folderGit', defaultMessage: 'No branch switch, pull or other git that changes the folder while an agent works there.', description: 'A protection that stays on with every rule off.' }),
     queue: msg({ id: 'workflow.form.neverOff.queue', defaultMessage: 'The merge queue moves a target branch only if nothing else moved it meanwhile.', description: 'A protection that stays on with every rule off (glossary 2.1: merge queue).' })
   },
@@ -95,7 +95,7 @@ const T = {
   pasteTitle: msg({ id: 'workflow.form.pasteTitle', defaultMessage: 'Paste Workflow Options', description: 'The title of the dialog pasting workflow options as JSON.' }),
   pasteMessage: msg({ id: 'workflow.form.pasteMessage', defaultMessage: 'Paste options copied from a project with the same version control. They replace the form’s, to save afterwards.', description: 'The message of the dialog pasting workflow options as JSON.' }),
   pasteApply: msg({ id: 'workflow.form.pasteApply', defaultMessage: 'Use These Options', description: 'The confirm button of the dialog pasting workflow options.' }),
-  pasteBad: msg({ id: 'workflow.form.pasteBad', defaultMessage: 'That isn’t workflow options copied from Hive.', description: 'An error pasting workflow options: the text isn’t the JSON Hive copies.' }),
+  pasteBad: msg({ id: 'workflow.form.pasteBad', defaultMessage: 'That isn’t workflow options copied from Combwork.', description: 'An error pasting workflow options: the text isn’t the JSON Hive copies.' }),
   pastePlatform: msg({ id: 'workflow.form.pastePlatform', defaultMessage: 'These options are for another version control.', description: 'An error pasting workflow options: they were copied from a project with another version control.' }),
   cantSave: msg({ id: 'workflow.form.cantSave', defaultMessage: 'These options can’t be saved:', description: 'Above the reasons the workflow options can’t be saved, each a sentence of its own.' }),
   confirmTitle: msg({ id: 'workflow.form.confirmTitle', defaultMessage: 'Save Workflow Options', description: 'The title of the dialog before saving workflow options.' }),

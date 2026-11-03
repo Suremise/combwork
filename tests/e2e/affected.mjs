@@ -555,10 +555,13 @@ export const AREAS = [
   { paths: ['resources/modes/', 'src/main/assistantMode.ts'], suites: ['assistant', 'assistant-control', 'assistantend', 'assistantmode', 'assistantresume'] },
   // The shipped dialect files (HI-2442): synced into each workspace as it opens, beside the skills and modes, and each
   // session's chain is pinned from them at its launch (HI-2443).
-  { paths: ['resources/dialects/'], suites: ['skills', 'openspeed', 'dialectlaunch'] },
+  { paths: ['resources/dialects/'], suites: ['skills', 'openspeed', 'dialectlaunch', 'dialectsview'] },
   // The dialects service wired into sessions and the Agent API (HI-2443): chains pinned at launch, the Dialect setting,
   // the launch record, HIVE_DIALECT_FILE for hive-mcp.js and hive-progress, the API chain.
-  { paths: ['src/main/dialects/', 'tests/e2e/dialectlaunch.cjs'], suites: ['dialectlaunch', 'agentguidance'] },
+  { paths: ['src/main/dialects/', 'tests/e2e/dialectlaunch.cjs'], suites: ['dialectlaunch', 'agentguidance', 'dialectsview'] },
+  // The Dialects view (HI-2444): its list, a file's texts and layers, Save's checks, the JSON tab, the file actions,
+  // Agent Settings' Dialect.
+  { paths: ['src/renderer/src/components/Dialects.tsx', 'src/shared/dialects.ts', 'tests/e2e/dialectsview.cjs'], suites: ['dialectsview'] },
   // Bundled into the Docs view (About's licence pages, Release Notes, the Agent API reference).
   { paths: ['docs/', 'CHANGELOG.md', 'LICENSE', 'THIRD_PARTY_NOTICES.md', 'scripts/licenses.mjs', 'scripts/licenseText.mjs', 'scripts/thirdPartyNotices.mjs', 'scripts/notices/'], suites: ['about'] },
   // The i18n screenshot route (#769): its case files (each area's, found by name), the translations it shows (every

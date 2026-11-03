@@ -65,7 +65,7 @@ export async function ownAttachmentsFolder(host: string, sessionFolder?: string)
     if (!(await lstat(p).catch(() => null))) await mkdir(p).catch((e: NodeJS.ErrnoException) => (e.code === 'EEXIST' ? undefined : Promise.reject(e)))
     if (!(await isOwnFolder(host, p))) {
       log.warn(`${userText(p)} is a link or not a folder: no attachments are kept through it`)
-      throw hiveError(msg({ id: 'service.attachments.notOwn', defaultMessage: "{folder} is a link or not a folder of the project's own, so Hive keeps no attachments in it.", description: "An error keeping a pasted or dropped file for a session: its folder {folder} (in the project's .hive) is a link or leads elsewhere, so Hive writes nothing through it." }), { folder: p })
+      throw hiveError(msg({ id: 'service.attachments.notOwn', defaultMessage: "{folder} is a link or not a folder of the project's own, so Combwork keeps no attachments in it.", description: "An error keeping a pasted or dropped file for a session: its folder {folder} (in the project's .hive) is a link or leads elsewhere, so Hive writes nothing through it." }), { folder: p })
     }
   }
   return chain[chain.length - 1]

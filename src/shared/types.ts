@@ -96,6 +96,8 @@ export interface Notice {
   title: string
   /** The title in English, for the Agent API (agent-facing text stays English), when `title` is a translated one. */
   apiTitle?: string
+  /** The title's text as data (HI-2465), as `statusText` sits beside `statusMessage`: the events stream says it in each client's dialect. */
+  apiTitleText?: TextPart
   body: string
   /** The project it is about (null: app-wide, such as plan usage); clicking the banner shows it. */
   projectPath: string | null
@@ -3766,6 +3768,8 @@ export type HiveEvent =
   | { type: 'files-changed'; projectPath: string; dirs: string[] }
   | { type: 'skills-changed' }
   | { type: 'modes-changed' }
+  /** A file in the workspace's dialects folder changed (HI-2444: the Dialects view reads it again). */
+  | { type: 'dialects-changed' }
   /** A workspace's Assistant journal changed (#1033: its browser reads it again). */
   | { type: 'journal-changed'; workspacePath: string }
   /** The Hive Assistant acted, or asks the user something (its home's path names the window). */
@@ -3976,10 +3980,16 @@ export interface LaneStatus {
   /** startWait `fresh` (HI-2034): no more automatic tries, and why (the user retries it, or ends the lane); the reason a failure gave. */
   freshBlocked?: 'timeout' | 'uncertain' | 'failed'
   freshWhy?: string
-  /** preparing (#1446): the slot being prepared; slot (HI-2466): the free slot it was refused as held. */
+  /** preparing (#1446): the slot being prepared; slot (HI-2466), and startWait `refused` (HI-2468): the free slot it was refused as held. */
   slot?: string
-  /** slot (HI-2466): what holds that free slot, a session or a process (a file or folder in it open); Hive tries again until it is free. */
-  held?: 'session' | 'process' | 'broker'
+  /** slot (HI-2466), and startWait `refused` (HI-2468): what holds that free slot, a session or a process (a file or folder in it open); Hive tries again until it is free. */
+  held?: 'session' | 'process' | 'broker' | 'left' | 'lastRun'
+  /** startWait `refused`, held `left` (HI-2468): the first program by name that `heldBy`'s last run left running in the slot. */
+  program?: string
+  /** held `left` (HI-2468): how many more it left running beyond `program`. */
+  more?: number
+  /** startWait `refused` with `held` session (HI-2468): the agent whose session is in the slot (`agent` is the builder there). */
+  heldBy?: string
   /** held `broker` (HI-2467): the process name of Windows Sandbox's broker seen working in it (WindowsSandboxServer). */
   broker?: string
   /** held `broker` (HI-2467): whether no Sandbox runs (true) or one does (false); absent: not known. */

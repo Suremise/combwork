@@ -1,8 +1,8 @@
 {
   "language.automatic": "自动（Windows：{language}）",
-  "language.forced": "Hive 以 {language} 启动（--lang）：此设置将在下次启动时生效。",
-  "language.restart": "Hive 自身的文字已切换语言。Chromium 提供的部分（PDF 查看器、日期选择器）将在 Hive 下次启动时跟着切换。",
-  "language.setting.desc": "Hive 显示的语言。“自动”跟随 Windows 的显示语言。",
-  "language.setting.tip": "标记为 AI 翻译的语言由智能体起草，欢迎改进。无论这里怎么设置，Hive 与智能体和 Hive Assistant 交流时都使用英语；它们仍可以用你的语言回答你。使用 --lang 启动的 Hive 会一直使用该语言，直到下次启动。",
+  "language.forced": "Combwork 以 {language} 启动（--lang）：此设置将在下次启动时生效。",
+  "language.restart": "Combwork 自身的文字已切换语言。Chromium 提供的部分（PDF 查看器、日期选择器）将在 Combwork 下次启动时跟着切换。",
+  "language.setting.desc": "Combwork 显示的语言。“自动”跟随 Windows 的显示语言。",
+  "language.setting.tip": "标记为 AI 翻译的语言由智能体起草，欢迎改进。无论这里怎么设置，Combwork 与智能体和助手交流时都使用英语；它们仍可以用你的语言回答你。使用 --lang 启动的 Combwork 会一直使用该语言，直到下次启动。",
   "language.setting.title": "语言"
 }

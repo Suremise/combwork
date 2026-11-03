@@ -68,7 +68,7 @@ describe("an agent's request for the Assistant (HI-1866)", () => {
     const r = await ask(w, card, text)
     const c = await read(w, card)
     expect(c.comments.at(-1)).toMatchObject({ by: 'B1 (alpha)', text })
-    expect(c.history.at(-1)?.what).toMatch(/^Asked the Hive Assistant: "Please put the follow-up On Hold/)
+    expect(c.history.at(-1)?.what).toMatch(/^Asked the Assistant: "Please put the follow-up On Hold/)
     expect(c.column).toBe('doing')
     const got = asked(w)
     expect(got).toHaveLength(1)
@@ -128,7 +128,7 @@ describe("an agent's request for the Assistant (HI-1866)", () => {
     // Checked as it is handed out: not given, and cancelled.
     expect((await deliveries.readInbox(w.assistantHome, 'assistant')).items).toEqual([])
     await vi.waitFor(() => expect(asked(w).map((r) => r.state)).toEqual(['cancelled']), { timeout: HUNG_MS })
-    await vi.waitFor(async () => expect((await read(w, card)).history.map((h) => h.what)).toContain("The Hive Assistant couldn't be told of B1 (alpha)'s request on this card: read it in the card's comments and act on it yourself if it needs doing"), { timeout: HUNG_MS })
+    await vi.waitFor(async () => expect((await read(w, card)).history.map((h) => h.what)).toContain("The Assistant couldn't be told of B1 (alpha)'s request on this card: read it in the card's comments and act on it yourself if it needs doing"), { timeout: HUNG_MS })
     // The notice follows the card's note, once its write has let go of the board's lock: the history can be read first.
     await vi.waitFor(() => expect(notice).toHaveBeenCalledWith(join(w.path!, 'alpha'), expect.anything(), expect.anything()), { timeout: HUNG_MS })
   })

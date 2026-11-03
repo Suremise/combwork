@@ -55,7 +55,7 @@ const check = (name, ok, extra = '') => {
   check('two imports: the newest is the run, the one before it the baseline', !!(await until(async () => (await page.locator(`${pageSel} .perf-scenarios`).count()) === 1, HUNG_MS)))
   check('comparable: the same scenarios, provider and setup', (await page.locator(`${pageSel} .banner.success`, { hasText: 'Comparable' }).count()) === 1)
   // The Hive context column's tip names the Assistant's working mode as the Performance page does (#358).
-  await page.locator(`${pageSel} .perf-scenarios th`, { hasText: 'Hive context' }).first().locator('.info-icon').hover()
+  await page.locator(`${pageSel} .perf-scenarios th`, { hasText: 'Combwork context' }).first().locator('.info-icon').hover()
   const tipText = async () => (await page.locator('.tip:visible').allInnerTexts()).join(' ')
   check('the Hive context tip says the Assistant’s role and mode, not persona', !!(await until(async () => (await tipText()).includes('the Assistant’s role and mode'), 5000)) && !/persona/i.test(await tipText()), await tipText())
   await page.mouse.move(0, 0)

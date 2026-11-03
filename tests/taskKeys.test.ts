@@ -283,7 +283,7 @@ describe('runTask: the setup keys go in once Codex has loaded and is idle', () =
     expect(typed()).toEqual(['\x15', '/permissions'])
     await vi.advanceTimersByTimeAsync(2000)
     expect(typed()).toEqual(['\x15', '/permissions'])
-    expect(toasts).toHaveBeenCalledWith('warning', 'Codex setup: Hive stopped typing into it, as it stayed busy for 30 seconds. Finish it in the terminal.')
+    expect(toasts).toHaveBeenCalledWith('warning', 'Codex setup: Combwork stopped typing into it, as it stayed busy for 30 seconds. Finish it in the terminal.')
     // Free later: still nothing (it stopped).
     pty.onData!(draw('codex-0.161-held-idle'))
     await vi.advanceTimersByTimeAsync(10_000)

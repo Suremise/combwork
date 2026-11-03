@@ -249,7 +249,7 @@ export class LeftoverStops {
 
 /** The notice's text: when, what was running, what became of it, what it started that still runs, a crash dump, merges left half done. */
 export function unexpectedCloseText(c: { lastSeen: string; agents: readonly RunningAgent[]; dump: boolean; merges: readonly LeftMerge[]; stillRunning?: readonly AgentProcess[]; kept?: readonly AgentProcess[] }, r: ResumeReport | null): string {
-  const lines = [tr(msg({ id: 'main.unexpectedClose.when', defaultMessage: 'Hive was last seen on {date} at {time}.', description: 'The notice at start that the last run of Hive ended without quitting (its title says so): when that run was last seen running ({date}, {time}).' }), { date: formatDate(c.lastSeen), time: formatTime(c.lastSeen) })]
+  const lines = [tr(msg({ id: 'main.unexpectedClose.when', defaultMessage: 'Combwork was last seen on {date} at {time}.', description: 'The notice at start that the last run of Hive ended without quitting (its title says so): when that run was last seen running ({date}, {time}).' }), { date: formatDate(c.lastSeen), time: formatTime(c.lastSeen) })]
   lines.push(tr(msg({ id: 'main.unexpectedClose.agents', defaultMessage: '{n, plural, =0 {No agents were running.} one {One agent was running in {projects}.} other {# agents were running in {projects}.}}', description: 'The notice that Hive closed unexpectedly: how many agents were running ({n}) and in which projects ({projects}: their names, listed).' }), { n: c.agents.length, projects: fmt.list(projectsOf(c.agents)) }))
   if (r) {
     lines.push(tr(msg({ id: 'main.unexpectedClose.resumed', defaultMessage: '{n, plural, =0 {None was resumed.} one {One was resumed, as Settings → Sessions says.} other {# were resumed, as Settings → Sessions says.}}', description: 'The notice that Hive closed unexpectedly, with "Resume agents after an unexpected close" on: how many of the agents Hive resumed ({n}).' }), { n: r.resumed.length }))
@@ -257,7 +257,7 @@ export function unexpectedCloseText(c: { lastSeen: string; agents: readonly Runn
     if (r.held?.length) lines.push(resumeHeldLine(r.held))
   } else if (c.agents.length) lines.push(tr(msg({ id: 'main.unexpectedClose.notResumed', defaultMessage: 'Nothing was resumed.', description: 'The notice that Hive closed unexpectedly: Hive did not resume the agents that were running (the user chooses).' })))
   if (c.stillRunning?.length) lines.push(stillRunningLine(c.stillRunning, c.kept))
-  if (c.dump) lines.push(tr(msg({ id: 'main.unexpectedClose.dump', defaultMessage: 'Hive kept a crash dump of it: Help → Copy Diagnostics names it.', description: 'The notice that Hive closed unexpectedly: a crash dump of that run was saved on this PC.' })))
+  if (c.dump) lines.push(tr(msg({ id: 'main.unexpectedClose.dump', defaultMessage: 'Combwork kept a crash dump of it: Help → Copy Diagnostics names it.', description: 'The notice that Hive closed unexpectedly: a crash dump of that run was saved on this PC.' })))
   for (const m of c.merges) {
     const cards = fmt.list(m.cardNames ?? m.cards.map(cardRef))
     lines.push(

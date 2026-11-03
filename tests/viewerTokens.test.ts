@@ -56,7 +56,7 @@ describe('a viewer token refused', () => {
     expect((await told(createViewerToken('x'.repeat(41)))).english).toBe("A viewer token's name is at most 40 characters")
     await fill()
     expect((await told(createViewerToken('apiary'))).english).toBe('There is already a viewer token named "apiary"')
-    expect((await told(createViewerToken('one more'))).english).toBe('Hive keeps at most 20 viewer tokens: revoke one first')
+    expect((await told(createViewerToken('one more'))).english).toBe('Combwork keeps at most 20 viewer tokens: revoke one first')
   })
 
   it("and in the language Hive shows, with the log's English kept", async () => {
@@ -69,7 +69,7 @@ describe('a viewer token refused', () => {
     await fill()
     expect((await told(createViewerToken('APIARY'))).shown).toBe('Es gibt bereits ein Lese-Token namens „APIARY“')
     const many = await told(createViewerToken('one more'))
-    expect(many.shown).toBe('Hive behält höchstens 20 Lese-Tokens: Widerrufe zuerst eines')
-    expect(many.english).toBe('Hive keeps at most 20 viewer tokens: revoke one first')
+    expect(many.shown).toBe('Combwork behält höchstens 20 Lese-Tokens: Widerrufe zuerst eines')
+    expect(many.english).toBe('Combwork keeps at most 20 viewer tokens: revoke one first')
   })
 })

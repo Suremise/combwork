@@ -199,7 +199,7 @@ async function removeFromHive(ws: WorkspaceService, p: string, info: ProjectRemo
   const held = unmergedWork(info.worktrees)
   if (held) throw new Error(held)
   const { ok, refused } = await checkedWorktrees(ws, p, agents)
-  if (refused.length) throw new Error(tr(msg({ id: 'main.removal.wontRemove', defaultMessage: "Hive won't remove {worktrees}. Fix or remove that agent first.", description: "Why Remove from Hive refused: agents' worktrees it won't remove. {worktrees} lists them, joined with “or” (main.removal.refusedTree)." }), { worktrees: fmt.list(refused, 'disjunction') }))
+  if (refused.length) throw new Error(tr(msg({ id: 'main.removal.wontRemove', defaultMessage: "Combwork won't remove {worktrees}. Fix or remove that agent first.", description: "Why Remove from Hive refused: agents' worktrees it won't remove. {worktrees} lists them, joined with “or” (main.removal.refusedTree)." }), { worktrees: fmt.list(refused, 'disjunction') }))
   // Packed first: everything after it can be undone from the pack.
   await pack(ws, p, info.handovers)
   // Its sessions' records too (#1061): out of the workspace's database, into its folder, which takes them wherever it goes.

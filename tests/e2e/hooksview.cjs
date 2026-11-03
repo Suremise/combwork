@@ -178,7 +178,7 @@ const check = (name, ok, extra = '') => {
     await lib.menuEntry(page, 'Hooks…').click()
     const dialog = page.locator('.dialog', { hasText: 'Hooks: Cl' })
     check('the dialog opens from ⋯ → Hooks…', !!(await lib.until(async () => (await dialog.locator('[data-table="fired"] tbody tr').count()) > 0, HUNG_MS)))
-    check("…listing the user's hook as not observed by Hive", (await dialog.locator('[data-table="loaded"] tr[data-source="user"]', { hasText: 'Not observed by Hive' }).count()) === 1)
+    check("…listing the user's hook as not observed by Combwork", (await dialog.locator('[data-table="loaded"] tr[data-source="user"]', { hasText: 'Not observed by Combwork' }).count()) === 1)
     check('…the blocked edit and an ignored hook under What fired', (await dialog.locator('[data-table="fired"] tr[data-response="blocked"]').count()) >= 1 && (await dialog.locator('[data-table="fired"] tr[data-ledger="ignored"]').count()) >= 1)
     await themed('hooks-dialog')
     await dialog.locator('[data-table="fired"]').scrollIntoViewIfNeeded()

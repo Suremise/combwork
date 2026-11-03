@@ -67,10 +67,10 @@ describe('install folder permissions', () => {
 
   it('names what still lacks the entry', () => {
     const folder = cantStartMessage(DIR)
-    expect(folder.text).toContain(`the folder Hive is installed in:\n${DIR}\n`)
+    expect(folder.text).toContain(`the folder Combwork is installed in:\n${DIR}\n`)
     expect(folder.command).toBe(grantCommand(DIR))
     const file = cantStartMessage(DIR, ICU)
-    expect(file.text).toContain(`a file in the folder Hive is installed in:\n${ICU}\n`)
+    expect(file.text).toContain(`a file in the folder Combwork is installed in:\n${ICU}\n`)
     expect(file.command).toBe(grantCommand(DIR, ICU))
   })
 })
@@ -168,14 +168,14 @@ describe("telling the user Hive can't start", () => {
   it('shows the window with Copy Command', () => {
     const t = ui(false, true)
     tellCantStart(DIR, undefined, t)
-    expect(t.calls).toEqual(["record Hive can't start", "window Hive can't start"])
+    expect(t.calls).toEqual(["record Combwork can't start", "window Combwork can't start"])
   })
 
   it("falls back to Electron's error box, with the command, when the window can't be shown", () => {
     const t = ui(false, false)
     tellCantStart(DIR, undefined, t)
-    expect(t.calls.slice(0, 2)).toEqual(["record Hive can't start", "window Hive can't start"])
-    expect(t.calls[2]).toContain("errorBox Hive can't start: ")
+    expect(t.calls.slice(0, 2)).toEqual(["record Combwork can't start", "window Combwork can't start"])
+    expect(t.calls[2]).toContain("errorBox Combwork can't start: ")
     expect(t.calls[2]).toContain(cantStartMessage(DIR).command)
     expect(t.calls[2]).toContain(DIR)
   })
@@ -184,10 +184,10 @@ describe("telling the user Hive can't start", () => {
     vi.stubEnv('HIVE_TEST_DIALOG_SNAPSHOT', '')
     const t = ui(true, false)
     tellCantStart(DIR, undefined, t)
-    expect(t.calls).toEqual(["record Hive can't start"])
+    expect(t.calls).toEqual(["record Combwork can't start"])
     vi.stubEnv('HIVE_TEST_DIALOG_SNAPSHOT', 'C:\\shot.png')
     const u = ui(true, false)
     tellCantStart(DIR, undefined, u)
-    expect(u.calls).toEqual(["record Hive can't start", "window Hive can't start to C:\\shot.png"])
+    expect(u.calls).toEqual(["record Combwork can't start", "window Combwork can't start to C:\\shot.png"])
   })
 })

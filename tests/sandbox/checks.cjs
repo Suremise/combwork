@@ -6,11 +6,11 @@
  * only, nothing signed in; every command has a timeout. Writes a short report (report.md, report.json) with screenshots
  * to --report. Moved from the hive-mcp repo (servers/windows-sandbox/scenarios/hive-checks.js at c5dee8a, HI-2298).
  *
- *   npm run sandbox-checks -- --installer <Hive-Setup-x.y.z.exe> [--previous <older installer>] [--hive <Hive repo>]
+ *   npm run sandbox-checks -- --installer <Combwork-Setup-x.y.z.exe> [--previous <older installer>] [--hive <Hive repo>]
  *        [--server <windows-sandbox server.js>] [--report <folder>] [--only fresh|upgrade|manual|edges] [--short <installer>] [--wait-min N]
  *        [--smart-app-control off]
  *
- * --hive (or HIVE_REPO; default this checkout) is where --previous is looked for: the newest Hive-Setup-*.exe in
+ * --hive (or HIVE_REPO; default this checkout) is where --previous is looked for: the newest Combwork-Setup-*.exe or Hive-Setup-*.exe in
  * <hive>\dist other than --installer, so pass the main checkout from a worktree. Both installers must sit under one
  * folder (not a drive root), which is mapped read-only at C:\build. This checkout's tests folder (the scripts in
  * tests\sandbox\inside and the e2e fake CLIs) and its playwright-core are mapped read-only too; Node is this one's folder.
@@ -53,8 +53,8 @@ function serverCandidates(hive) {
   return [path.join(hive, '..', '.hive', 'mcp', 'windows-sandbox', 'server.js'), path.join(hive, '..', 'mcp', 'servers', 'windows-sandbox', 'server.js')]
 }
 
-// Hive Desktop's installers (Hive-Setup-…) and Combwork's (Combwork-Setup-…, HI-2458).
-const versionOf = f => (/(?:Hive|Combwork)-Setup-(\d+\.\d+\.\d+(?:-[\w.]+)?)\.exe$/i.exec(f) || [])[1]
+// The installer's name: Combwork-Setup since HI-2458, Hive-Setup before (a previous release's, kept in dist).
+const versionOf = f => (/(?:Combwork|Hive)-Setup-(\d+\.\d+\.\d+(?:-[\w.]+)?)\.exe$/i.exec(f) || [])[1]
 /**
  * Semver order: major.minor.patch, then a release above its prereleases (0.9.0 > 0.9.0-rc.1 > 0.9.0-beta.1), whose
  * dot-separated parts compare numerically when both are numbers, else as text (numbers first), the shorter first on a tie.
@@ -135,9 +135,9 @@ function plan(argv) {
   const installer = opt('--installer') && path.resolve(opt('--installer'))
   // The edge cases' second installer (HI-2460): built with HIVE_TEST_SHORT_LEGACY_WAIT=1, its legacy-mutex wait 20 s.
   const short = opt('--short') && path.resolve(opt('--short'))
-  if (!installer || !fs.existsSync(installer) || !versionOf(installer)) throw new Error('--installer must name an existing Combwork-Setup-<version>.exe (or Hive-Setup-)')
-  // By default the release checks' two kinds; the install by hand over the previous release (manual, HI-2460) runs when
-  // asked for (--only manual).
+  if (!installer || !fs.existsSync(installer) || !versionOf(installer)) throw new Error('--installer must name an existing Combwork-Setup-<version>.exe (or Hive-Setup-, before HI-2458)')
+  // By default the release checks' two kinds; the install by hand over the previous release (manual, HI-2460) and the
+  // edge cases (edges) run when asked for (--only).
   const ran = only ? [only] : ['fresh', 'upgrade']
   let previous = opt('--previous') && path.resolve(opt('--previous'))
   const overOld = ran.includes('upgrade') || ran.includes('manual') || ran.includes('edges')
@@ -148,7 +148,7 @@ function plan(argv) {
     previous = cands.sort((a, b) => cmpVersion(versionOf(b), versionOf(a)))[0]
     if (!previous) throw new Error(`No previous installer in ${dist}: pass --previous`)
   }
-  if (previous && (!fs.existsSync(previous) || !versionOf(previous))) throw new Error('--previous must name an existing Hive-Setup-<version>.exe')
+  if (previous && (!fs.existsSync(previous) || !versionOf(previous))) throw new Error('--previous must name an existing Combwork-Setup-<version>.exe (or Hive-Setup-, before HI-2458)')
   const upgrade = overOld
   const root = buildRoot(installer, upgrade ? previous : null)
   const buildInfo = (() => { try { return JSON.parse(fs.readFileSync(path.join(path.dirname(installer), 'build-info.json'), 'utf8')) } catch { return null } })()

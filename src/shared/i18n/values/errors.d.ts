@@ -9,16 +9,21 @@ interface HiveMessageValues {
   'errors.console.notRecording': undefined
   'errors.console.notSource': undefined
   'errors.console.sourcesList': undefined
+  'errors.dialects.notDialect': { path: string | number }
+  'errors.dialects.pickAgain': undefined
   'errors.dialog.addMcp': undefined
   'errors.dialog.addSkill': undefined
   'errors.dialog.createWorkspace': undefined
   'errors.dialog.createWorkspaceTitle': undefined
+  'errors.dialog.dialectFiles': undefined
   'errors.dialog.exportBoard': undefined
   'errors.dialog.exportBoardButton': undefined
+  'errors.dialog.exportDialect': undefined
   'errors.dialog.exportMetrics': undefined
   'errors.dialog.exportTemplate': undefined
   'errors.dialog.exportTranscript': undefined
   'errors.dialog.importBenchmark': undefined
+  'errors.dialog.importDialect': undefined
   'errors.dialog.importTemplate': undefined
   'errors.dialog.locateAgentWorktree': undefined
   'errors.dialog.locateWorktree': { agent: string | number }

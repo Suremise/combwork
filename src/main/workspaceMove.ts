@@ -46,7 +46,7 @@ import { emitTo } from './events'
 
 const log = createLogger('move')
 
-const assistantName = (): string => tr(msg({ id: 'main.move.assistant', defaultMessage: 'Hive Assistant', description: "The Hive Assistant's name, where Repair (after a workspace moved) lists what it repairs and the agents still running." }))
+const assistantName = (): string => tr(msg({ id: 'main.move.assistant', defaultMessage: 'Assistant', description: "The Hive Assistant's name, where Repair (after a workspace moved) lists what it repairs and the agents still running." }))
 const PROJECT_FILE = join(HIVE_DIR, 'project.json')
 
 /** Whether p is inside root (or is it). */
@@ -330,7 +330,7 @@ const F = {
   relinked: msg({ id: 'main.move.folder.relinked', defaultMessage: '{host}: {what} at {path} is linked to the project again.', description: "A line of Repair's report, after a workspace or project moved: one of the project's slots, review copies or old reviewer folders ({what}: its name, such as \"slot-b (HI-B1, AM-12)\") is linked to the project again. {host} is the project, {path} the folder." }),
   movedTo: msg({ id: 'main.move.folder.movedTo', defaultMessage: '{host}: {what} is now at {path}.', description: "A line of Repair's report, after a workspace or project moved: one of the project's slots, copies or old reviewer folders ({what}: its name) is now at {path}. {host} is the project." }),
   failed: msg({ id: 'main.move.folder.failed', defaultMessage: "{host}: {what} at {path} couldn't be recorded ({why}). Repair tries again.", description: "A line of Repair's report, after a workspace or project moved: one of the project's slots, copies or old reviewer folders ({what}: its name) was found at {path}, but Hive's record of it couldn't be updated ({why}). {host} is the project." }),
-  busy: msg({ id: 'main.move.folder.busy', defaultMessage: 'Hive is using it now', description: "Why Repair couldn't update its record of a slot or copy (in main.move.folder.failed's {why}): one of Hive's own steps (setting it up, removing it) holds it now. A clause." }),
+  busy: msg({ id: 'main.move.folder.busy', defaultMessage: 'Combwork is using it now', description: "Why Repair couldn't update its record of a slot or copy (in main.move.folder.failed's {why}): one of Hive's own steps (setting it up, removing it) holds it now. A clause." }),
   recreated: msg({ id: 'main.move.folder.recreated', defaultMessage: '{host}: {what} was made again on {branch}, at {path}.', description: "A line of Repair's report: a slot lent to an agent, whose folder was gone, was made again on its branch ({branch}) at {path}; the agent keeps it. {what} is its name, {host} the project." }),
   recreateFailed: msg({ id: 'main.move.folder.recreateFailed', defaultMessage: "{host}: {what} couldn't be made again: {why}", description: "A line of Repair's report: a lent slot whose folder was gone couldn't be made again ({why}: the reason, often in English from git). {what} is its name, {host} the project." }),
   released: msg({ id: 'main.move.folder.released', defaultMessage: "{host}: {what} was released; it's made again where it belongs when it is next lent.", description: "A line of Repair's report: a lent slot whose folder was gone was released (its agent no longer has it); Hive makes it again at its next use. {what} is its name, {host} the project." }),
@@ -741,7 +741,7 @@ async function carryProfile(ws: WorkspaceService, report?: MoveReport): Promise<
     if (r.going.length) log.info(`${r.going.length} close-command run(s) still going at ${userText(m.from)}: they follow once ended`)
     for (const s of r.stuck) {
       const why = s.why
-      if (report) say(report, 'failed', tr(msg({ id: 'main.move.closeRunsFailed', defaultMessage: "Hive's records of the workspace's close command couldn't all follow it from the old folder ({why}). Hive tries again.", description: "A line of Repair's report, after a workspace moved to another folder: the output Hive keeps of the workspace's close command couldn't all be moved from the old folder's records. {why} is the system's message." }), { why }), { what: { kind: 'closeRuns' }, result: tr(R.failedWhy, { why }) })
+      if (report) say(report, 'failed', tr(msg({ id: 'main.move.closeRunsFailed', defaultMessage: "Combwork's records of the workspace's close command couldn't all follow it from the old folder ({why}). Combwork tries again.", description: "A line of Repair's report, after a workspace moved to another folder: the output Hive keeps of the workspace's close command couldn't all be moved from the old folder's records. {why} is the system's message." }), { why }), { what: { kind: 'closeRuns' }, result: tr(R.failedWhy, { why }) })
       else log.warn(`carrying a close-command run from ${userText(m.from)}: ${userText(why)}`)
     }
     if (!pinKeptAt(m.from) && !viewPrefsKeptAt(m.from) && !r.going.length && !r.stuck.length && !r.stopped) end()
@@ -1088,7 +1088,7 @@ async function repairNow(ws: WorkspaceService, opts: MoveOptions): Promise<MoveR
           ...(space && space.toLowerCase() !== refPart(basename(ws.path ?? ''), 'workspace').toLowerCase() && !(cfg.branchSpaces ?? []).some((s) => s.toLowerCase() === space.toLowerCase()) ? { branchSpaces: [...(cfg.branchSpaces ?? []), space] } : {})
         }))
       } catch (e) {
-        say(report, 'failed', tr(msg({ id: 'main.move.branchUnrecorded', defaultMessage: "{host}: the branch of agent {agent} is now {to}, but Hive couldn't record it yet ({why}). Repair finishes it.", description: "A line of Repair's report, after a workspace or project moved to another folder: git renamed an agent's branch, and Hive's record of it (or of the cards on it) couldn't be written; the next Repair finishes it. {host} is the project; {agent} an agent; {to} the branch's new name; {why} the system's message. A noun before the name (glossary §1 rule 4)." }), { host: h.name, agent: b.agentName, to: b.to, why: whyOf(e) }), { ...branchRow, now: b.to, result: tr(R.unrecorded, { why: whyOf(e) }) })
+        say(report, 'failed', tr(msg({ id: 'main.move.branchUnrecorded', defaultMessage: "{host}: the branch of agent {agent} is now {to}, but Combwork couldn't record it yet ({why}). Repair finishes it.", description: "A line of Repair's report, after a workspace or project moved to another folder: git renamed an agent's branch, and Hive's record of it (or of the cards on it) couldn't be written; the next Repair finishes it. {host} is the project; {agent} an agent; {to} the branch's new name; {why} the system's message. A noun before the name (glossary §1 rule 4)." }), { host: h.name, agent: b.agentName, to: b.to, why: whyOf(e) }), { ...branchRow, now: b.to, result: tr(R.unrecorded, { why: whyOf(e) }) })
         continue
       }
       say(
@@ -1203,7 +1203,7 @@ async function repairNow(ws: WorkspaceService, opts: MoveOptions): Promise<MoveR
       if (r) say(report, r.outcome === 'done' ? 'done' : r.outcome === 'refused' ? 'skipped' : 'failed', r.message, { what: { kind: 'defender' }, result: r.message })
     } catch (e) {
       const why = e instanceof Error ? e.message : String(e)
-      say(report, 'failed', tr(msg({ id: 'main.move.defenderFailed', defaultMessage: "Hive's Defender exclusions couldn't be moved to the new folders ({why}).", description: "A line of Repair's report, after a workspace moved to another folder: moving Hive's Microsoft Defender exclusions from the old folders to the new ones failed. {why} is the system's message." }), { why }), { what: { kind: 'defender' }, result: tr(R.failedWhy, { why }) })
+      say(report, 'failed', tr(msg({ id: 'main.move.defenderFailed', defaultMessage: "Combwork's Defender exclusions couldn't be moved to the new folders ({why}).", description: "A line of Repair's report, after a workspace moved to another folder: moving Hive's Microsoft Defender exclusions from the old folders to the new ones failed. {why} is the system's message." }), { why }), { what: { kind: 'defender' }, result: tr(R.failedWhy, { why }) })
     }
   }
   await recordDone(ws, repaired, repaired.length === plan.hosts.length)

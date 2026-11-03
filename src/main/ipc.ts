@@ -77,10 +77,14 @@ import { advanced, resetSettingsChecked, updateSettingsChecked } from './advance
 import type { AdvancedState } from '../shared/advanced'
 import { switchMode } from './assistantMode'
 import * as modes from './modes'
-import { syncBundled } from './bundled'
+import { bundledIds, restoreBundled, syncBundled } from './bundled'
+import { API_FOLDER, agentTextSchema, deleteDialect, dialectsDir, duplicateDialect, importDialect, placeOf, promoteDialect, saveDialect, saveDialectRaw, setDialectOn } from './dialects'
+import { dialectCatalogue, dialectChoices, dialectFileView, forgetPicks, listDialects, pickOfToken, rememberPick, spendPick } from './dialects/view'
+import type { DialectFile } from '../shared/dialects'
+import { trash } from './trash'
 import { checkMoved, finishPending, movePlan, repairMove } from './workspaceMove'
 import { missingWorktree, recreateWorktree, unlinkMissingWorktree } from './agentWorktree'
-import { projectAgents as agentsOf } from '../shared/defaults'
+import { HIVE_DIR, projectAgents as agentsOf } from '../shared/defaults'
 import type { MoveOptions, TaskCard } from '../shared/types'
 import { killPty, ptyBuffer, ptySize, resizePty, writePty } from './ptyHost'
 import { apiInfo, createViewer, regenerateToken, revokeViewer } from './servers'
@@ -152,14 +156,14 @@ import { endParkedProcess, installIfParked, teamPauseState } from './teamParked'
  * and anything else that calls these services reads English. The native dialogs' text is the window's too.
  */
 const M = {
-  queueMerges: msg({ id: 'errors.merge.queueMerges', defaultMessage: "Hive merges {card} through the merge queue. Merge it there, or choose Merge anyway in the Merge dialog.", description: "Refusal of a Merge of an agent's branch whose card Hive's merge queue merges (the dialog's state was out of date). {card} is the card's key. Merge anyway is a button: keep it as Hive shows it. Glossary 2.5: merge queue." }),
+  queueMerges: msg({ id: 'errors.merge.queueMerges', defaultMessage: "Combwork merges {card} through the merge queue. Merge it there, or choose Merge anyway in the Merge dialog.", description: "Refusal of a Merge of an agent's branch whose card Hive's merge queue merges (the dialog's state was out of date). {card} is the card's key. Merge anyway is a button: keep it as Hive shows it. Glossary 2.5: merge queue." }),
   unknownProvider: msg({ id: 'errors.provider.unknown', defaultMessage: 'Unknown provider "{provider}".', description: "A call named a coding-agent CLI this version of Hive doesn't know. {provider} is the id it gave." }),
-  insideArchive: msg({ id: 'errors.file.insideArchive', defaultMessage: 'Hive opens no files inside .asar archives.', description: 'Refusal to open a file inside an Electron .asar archive. Keep ".asar" as it is.' }),
-  outsideWorkspace: msg({ id: 'errors.file.outsideWorkspace', defaultMessage: "Hive can only read and write files inside the workspace, and the agents' instruction, memory and skill files.", description: 'Refusal to open or save a file outside what Hive may touch.' }),
+  insideArchive: msg({ id: 'errors.file.insideArchive', defaultMessage: 'Combwork opens no files inside .asar archives.', description: 'Refusal to open a file inside an Electron .asar archive. Keep ".asar" as it is.' }),
+  outsideWorkspace: msg({ id: 'errors.file.outsideWorkspace', defaultMessage: "Combwork can only read and write files inside the workspace, and the agents' instruction, memory and skill files.", description: 'Refusal to open or save a file outside what Hive may touch.' }),
   noLog: msg({ id: 'errors.log.none', defaultMessage: 'That run reported no log.', description: "Progress panel: a run's log can't be opened because the run never said where it was." }),
   logNotFull: msg({ id: 'errors.log.notFullPath', defaultMessage: 'The run reported its log without a full path: {path}', description: "Progress panel: a run gave its log as a relative path, which Hive won't open. {path} is that path." }),
   logGone: msg({ id: 'errors.log.gone', defaultMessage: "The log isn't there any more: {path}", description: "Progress panel: a run's log file was deleted or moved. {path} is where it was." }),
-  logNotText: msg({ id: 'errors.log.notText', defaultMessage: 'Hive opens only text logs and reports, not {file}: use Show in folder.', description: "Progress panel: a run's log isn't a text file, so Hive won't open it. {file} is its file name. \"Show in folder\" is the menu item beside it." }),
+  logNotText: msg({ id: 'errors.log.notText', defaultMessage: 'Combwork opens only text logs and reports, not {file}: use Show in folder.', description: "Progress panel: a run's log isn't a text file, so Hive won't open it. {file} is its file name. \"Show in folder\" is the menu item beside it." }),
   commandsMoved: msg({ id: 'errors.commands.otherWorkspace', defaultMessage: "This window shows another workspace now, so the commands you changed weren't saved.", description: "An error: the user changed a workspace's commands in Settings (HI-1954), and the window switched to another workspace before the change was saved, so Hive didn't save it into the wrong one." }),
   notProjectPref: msg({ id: 'errors.pref.notProjectPref', defaultMessage: 'Not a project preference.', description: "Refusal of a call to save a per-project view setting that doesn't exist (a programming error, rarely seen)." }),
   notPrefValue: msg({ id: 'errors.pref.notValue', defaultMessage: 'Not a {pref} value.', description: "Refusal of a per-project view setting's value. {pref} is the setting's internal name." }),
@@ -172,7 +176,7 @@ const M = {
   removeHow: msg({ id: 'errors.project.removeHow', defaultMessage: 'Unknown way to remove a project: {how}', description: "Refusal of a call to remove a project in a way that doesn't exist (a programming error, rarely seen). {how} is what it asked for." }),
   stopFirst: msg({ id: 'errors.project.stopFirst', defaultMessage: 'Stop the running session before deactivating this project.', description: 'Turning a project off while one of its agents is running.' }),
   noRepo: msg({ id: 'errors.hive.noRepo', defaultMessage: 'No git repository holds this project: exclude .hive in the version control or sync service you use.', description: "Exclude .hive from git: the project isn't in a git repository. Keep \".hive\" as it is." }),
-  stillTracked: msg({ id: 'errors.hive.notIgnored', defaultMessage: "Git still doesn't ignore .hive here: a rule in a .gitignore (a line starting with !) may bring it back. Hive doesn't edit .gitignore files.", description: 'Exclude .hive from git: after excluding it, git still sees it. Keep ".hive", ".gitignore" and "!" as they are.' }),
+  stillTracked: msg({ id: 'errors.hive.notIgnored', defaultMessage: "Git still doesn't ignore .hive here: a rule in a .gitignore (a line starting with !) may bring it back. Combwork doesn't edit .gitignore files.", description: 'Exclude .hive from git: after excluding it, git still sees it. Keep ".hive", ".gitignore" and "!" as they are.' }),
   cantList: msg({ id: 'errors.hive.cantList', defaultMessage: "Git couldn't list the files it tracks in .hive.", description: 'Listing the files of .hive that git tracks failed. Keep ".hive" as it is.' }),
   notImage: msg({ id: 'errors.image.not', defaultMessage: 'Not an image', description: "Copy image: the file isn't an image Hive can read." }),
   holdRequired: msg({ id: 'errors.mergeSlot.holdRequired', defaultMessage: 'Which hold to release is required', description: 'Releasing a merge slot without saying which (a programming error, rarely seen).' }),
@@ -196,7 +200,12 @@ const M = {
   useFolder: msg({ id: 'errors.dialog.useFolder', defaultMessage: 'Use This Folder', description: "Button of Windows' folder picker in Repair." }),
   exportTemplate: msg({ id: 'errors.dialog.exportTemplate', defaultMessage: 'Export Template', description: "Title of Windows' save dialog for a template." }),
   importTemplate: msg({ id: 'errors.dialog.importTemplate', defaultMessage: 'Import a Template', description: "Title of Windows' file picker for a template." }),
-  templateFiles: msg({ id: 'errors.dialog.templateFiles', defaultMessage: 'Hive template', description: "The file type in Windows' file dialogs for templates." }),
+  templateFiles: msg({ id: 'errors.dialog.templateFiles', defaultMessage: 'Combwork template', description: "The file type in Windows' file dialogs for templates." }),
+  notDialect: msg({ id: 'errors.dialects.notDialect', defaultMessage: "{path} isn't a dialect file Combwork can change.", description: "An error in the Dialects view (HI-2444): the file asked for isn't one of the workspace's dialect files (or can't be reverted: it isn't shipped). {path} is its path in the dialects folder. Glossary: dialect." }),
+  pickAgain: msg({ id: 'errors.dialects.pickAgain', defaultMessage: 'Choose the file to import again: the one chosen before has expired.', description: "An error in the Dialects view's Import (HI-2444): the file chosen earlier can no longer be used (too long ago, or chosen in another window). Glossary: dialect." }),
+  importDialect: msg({ id: 'errors.dialog.importDialect', defaultMessage: 'Import a Dialect File', description: "Title of Windows' file picker in the Dialects view (HI-2444): a dialect file to add. Glossary: dialect." }),
+  exportDialect: msg({ id: 'errors.dialog.exportDialect', defaultMessage: 'Export Dialect File', description: "Title of Windows' save dialog in the Dialects view (HI-2444): where to write a dialect file. Glossary: dialect." }),
+  dialectFiles: msg({ id: 'errors.dialog.dialectFiles', defaultMessage: 'Dialect file', description: "The file type in Windows' file dialogs for dialect files (HI-2444, JSON). Glossary: dialect." }),
   exportTranscript: msg({ id: 'errors.dialog.exportTranscript', defaultMessage: 'Export Transcript as Markdown', description: "Title of Windows' save dialog for a session's transcript." }),
   addSkill: msg({ id: 'errors.dialog.addSkill', defaultMessage: 'Add a skill from a file', description: "Title of Windows' file picker for a skill." }),
   skillFiles: msg({ id: 'errors.dialog.skillFiles', defaultMessage: 'Skill (.md or .zip)', description: "The file type in Windows' file picker for a skill. Keep \".md\" and \".zip\" as they are." }),
@@ -472,6 +481,11 @@ export function registerIpc(getAppInfo: () => ReturnType<HiveRequests['app:info'
     // A project added since (made, or a folder opened): its key (#1219).
     void keyProjects(ws).catch((e) => log.warn('giving the projects their keys', e))
   }
+  /** The window's workspace's dialect files changed (HI-2444): its Dialects view reads them again (the watch also tells it). */
+  const dialectsChanged = (): void => contextWorkspace()?.emit({ type: 'dialects-changed' })
+  // A file picked to import is its window's and workspace's: gone with either (HR1 on HI-2444's design; a window's
+  // close is index.ts's, where the app's window events are).
+  WorkspaceService.closingListeners.add((path) => forgetPicks({ hiveDir: join(path, HIVE_DIR) }))
   /** The window the current request came from. */
   const win = (): BrowserWindow => {
     const w = contextWorkspace()?.window
@@ -1188,6 +1202,75 @@ export function registerIpc(getAppInfo: () => ReturnType<HiveRequests['app:info'
       return templates.inspectImport(r.filePaths[0])
     },
     'templates:import': (path, to, onClash) => templates.importTemplate(path, to, onClash),
+    // The Dialects view (HI-2444): in the window's workspace, on paths the service accepts (placeOf), its changes checked there.
+    'dialects:catalogue': () => dialectCatalogue(),
+    'dialects:list': () => listDialects(workspace.hiveDir),
+    'dialects:file': (path) => dialectFileView(workspace.hiveDir, String(path)),
+    'dialects:usage': () => sessions.dialectUsage(currentWorkspace().path ?? ''),
+    'dialects:save': async (path, draft, base) => {
+      const dir = dialectsDir(workspace.hiveDir)
+      const opts = { base: typeof base === 'string' ? base : '' }
+      const r = draft && typeof draft === 'object' && 'raw' in draft ? await saveDialectRaw(dir, String(path), String(draft.raw), agentTextSchema(), opts) : await saveDialect(dir, String(path), (draft as { file: DialectFile }).file, agentTextSchema(), opts)
+      if (!r) dialectsChanged()
+      return r
+    },
+    'dialects:setOn': async (path, on) => {
+      if (!placeOf(String(path))) throw hiveError(M.notDialect, { path: String(path) }, { kind: 'invalid' })
+      await setDialectOn(dialectsDir(workspace.hiveDir), String(path), on === true)
+      dialectsChanged()
+    },
+    'dialects:duplicate': async (path, label) => {
+      const r = await duplicateDialect(dialectsDir(workspace.hiveDir), String(path), String(label).trim())
+      if ('path' in r) dialectsChanged()
+      return r
+    },
+    'dialects:promote': async (path, model) => {
+      const r = await promoteDialect(dialectsDir(workspace.hiveDir), String(path), String(model))
+      if ('from' in r) dialectsChanged()
+      return r
+    },
+    'dialects:revert': async (path) => {
+      const id = String(path).replace(/\.json$/i, '')
+      if (!placeOf(String(path)) || !(await bundledIds('dialects')).some((x) => x.toLowerCase() === id.toLowerCase())) throw hiveError(M.notDialect, { path: String(path) }, { kind: 'invalid' })
+      await restoreBundled('dialects', id)
+      dialectsChanged()
+    },
+    'dialects:delete': async (path) => {
+      const r = await deleteDialect(dialectsDir(workspace.hiveDir), String(path), { shipped: new Set(await bundledIds('dialects')), remove: (f) => trash(f) })
+      if (!r) dialectsChanged()
+      return r
+    },
+    'dialects:pickImport': async () => {
+      const w = win()
+      const r = await dialog.showOpenDialog(w, { title: tr(M.importDialect), properties: ['openFile'], filters: [{ name: tr(M.dialectFiles), extensions: ['json'] }] })
+      if (r.canceled || !r.filePaths[0]) return null
+      return { token: rememberPick(r.filePaths[0], w.id, workspace.hiveDir), label: basename(r.filePaths[0]).replace(/\.json$/i, '') }
+    },
+    'dialects:import': async (token, folder, label) => {
+      const file = pickOfToken(String(token), win().id, workspace.hiveDir)
+      if (!file) throw hiveError(M.pickAgain, undefined, { kind: 'conflict' })
+      const f = String(folder)
+      if (f !== API_FOLDER && !isKnownProvider(f)) throw hiveError(M.unknownProvider, { provider: f }, { kind: 'invalid' })
+      const path = `${f}/${String(label).trim()}.json`
+      const raw = await readFile(file, 'utf8')
+      const r = await importDialect(dialectsDir(workspace.hiveDir), path, raw, agentTextSchema())
+      if ('testCopy' in r) {
+        spendPick(String(token))
+        dialectsChanged()
+        return { path, testCopy: r.testCopy }
+      }
+      return r
+    },
+    'dialects:export': async (path) => {
+      const p = String(path)
+      const view = await dialectFileView(workspace.hiveDir, p)
+      if (!view) throw hiveError(M.notDialect, { path: p }, { kind: 'notFound' })
+      const r = await dialog.showSaveDialog(win(), { title: tr(M.exportDialect), defaultPath: join(app.getPath('downloads'), basename(p)), filters: [{ name: tr(M.dialectFiles), extensions: ['json'] }] })
+      if (r.canceled || !r.filePath) return null
+      await writeTextAtomic(r.filePath, view.raw)
+      return r.filePath
+    },
+    'dialects:choices': (cli) => dialectChoices(workspace.hiveDir, String(cli)),
     'agents:gitInfo': (p) => projectAgents.gitInfo(p),
     'agents:worktreeMatch': (p, branch, base, name) => projectAgents.worktreeMatch(p, branch, base, name),
     'agents:branchStatus': async (p, id) => {

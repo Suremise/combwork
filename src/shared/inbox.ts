@@ -60,7 +60,7 @@ const idle = (live: LiveSessionState | null): boolean => !live || live.status ==
 const byAge = (a: InboxItem, b: InboxItem): number => (a.since || '￿').localeCompare(b.since || '￿')
 
 /** The Hive Assistant's name where an inbox row names its project. */
-const ASSISTANT_NAME = msg({ id: 'board.inbox.assistant', defaultMessage: 'Hive Assistant', description: "The Hive Assistant, named in the attention inbox (status bar popover, tray menu) where a project name goes. Hive is the app's name: keep it." })
+const ASSISTANT_NAME = msg({ id: 'board.inbox.assistant', defaultMessage: 'Assistant', description: "The Hive Assistant, named in the attention inbox (status bar popover, tray menu) where a project name goes. Hive is the app's name: keep it." })
 
 /**
  * An inbox row's project as the window shows it, worded when shown (#798): the Assistant's name follows a change of

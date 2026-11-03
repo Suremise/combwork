@@ -296,7 +296,7 @@ const steps = {
     const runs = await until(async () => { const v = runValues(); return v.some((x) => /\\Combwork\.exe/i.test(x.command)) && v }, 15_000)
     res.facts.runAfter = runs || runValues()
     check('4.login-moved', 'Launch at login starts Combwork.exe, and nothing starts Hive.exe', !!runs && !runs.some((x) => /\\Hive\.exe/i.test(x.command)), JSON.stringify(res.facts.runAfter))
-    const fallback = await page.locator('.toast', { hasText: 'from before Combwork' }).count()
+    const fallback = await page.locator('.toast', { hasText: "Hive Desktop's data folders" }).count()
     check('4.no-fallback', 'No notice that Hive runs from its old folders', fallback === 0, `${fallback} such notice(s)`)
     await shot('after-upgrade-light')
     await theme('dark')

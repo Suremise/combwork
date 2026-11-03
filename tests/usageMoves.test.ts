@@ -374,7 +374,7 @@ describe('usageMoves.ts', () => {
     config.update((c) => (c.accounts = c.accounts!.map((a) => (a.id === 'a2' ? { ...a, observed: { at: '', loggedIn: false } } : a))))
     setUsage('a1', [weekly(98)])
     for (let i = 0; i < 3; i++) await settle()
-    expect(H.notices.map((n) => n.api)).toEqual(["Hive can't move Anthropic-1's agents to Anthropic-2"])
+    expect(H.notices.map((n) => n.api)).toEqual(["Combwork can't move Anthropic-1's agents to Anthropic-2"])
     expect(connectionOf('stopped')).toBeUndefined()
     // Signed in again: the next look moves them, with the moved notice.
     config.update((c) => (c.accounts = c.accounts!.map((a) => (a.id === 'a2' ? { ...a, observed: { at: '', loggedIn: true } } : a))))

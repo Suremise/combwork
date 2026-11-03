@@ -196,6 +196,8 @@ interface HiveMessageValues {
   'tips.designCheck.title': undefined
   'tips.developerConsole.text': undefined
   'tips.developerConsole.title': undefined
+  'tips.dialects.text': undefined
+  'tips.dialects.title': undefined
   'tips.editTemplates.text': undefined
   'tips.editTemplates.title': undefined
   'tips.fileLinks.text': undefined

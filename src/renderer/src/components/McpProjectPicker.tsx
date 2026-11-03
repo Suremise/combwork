@@ -18,7 +18,7 @@ export function McpProjectPicker({ projects, initial, assistant, warnings, onCha
   const said = warnings.map((w) => <p key={w}>{w}</p>)
   const assistantRow = (
     <label className="flex" data-assistant>
-      <input type="checkbox" className="checkbox" checked={forAssistant} onChange={(e) => pick(on, e.target.checked)} /> {tr(msg({ id: 'mcp.enable.assistant', defaultMessage: 'Hive Assistant', description: 'The MCP view’s Add to… dialog: the box that adds the server for the Hive Assistant, after the projects.' }))}
+      <input type="checkbox" className="checkbox" checked={forAssistant} onChange={(e) => pick(on, e.target.checked)} /> {tr(msg({ id: 'mcp.enable.assistant', defaultMessage: 'Assistant', description: 'The MCP view’s Add to… dialog: the box that adds the server for the Hive Assistant, after the projects.' }))}
     </label>
   )
   return (

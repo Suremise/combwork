@@ -325,7 +325,7 @@ export async function skillFiles(dir: string, lim = SKILL_FILES_LIMITS): Promise
 export async function listedSkillFiles(dir: string, projectPath?: string): Promise<{ files: string[]; truncated: boolean }> {
   const want = resolve(String(dir)).toLowerCase()
   const listed = [...(await hiveSkills(true)), ...(projectPath ? await listSkills(projectPath) : [])]
-  if (!listed.some((s) => resolve(s.path).toLowerCase() === want)) throw hiveError(msg({ id: 'content.skill.notListed', defaultMessage: "That folder isn't a skill Hive lists.", description: "An error listing a skill's files for its page: the folder asked for isn't one of the skills Hive shows (the workspace's skills or a project's)." }), undefined, { kind: 'forbidden' })
+  if (!listed.some((s) => resolve(s.path).toLowerCase() === want)) throw hiveError(msg({ id: 'content.skill.notListed', defaultMessage: "That folder isn't a skill Combwork lists.", description: "An error listing a skill's files for its page: the folder asked for isn't one of the skills Hive shows (the workspace's skills or a project's)." }), undefined, { kind: 'forbidden' })
   return skillFiles(dir)
 }
 
@@ -510,14 +510,14 @@ async function deletableSkill(dir: string): Promise<boolean> {
 
 /** Moves a Hive or local skill folder to the Recycle Bin. */
 export async function deleteSkill(dir: string): Promise<void> {
-  if (!(await deletableSkill(dir)) || !existsSync(join(dir, 'SKILL.md'))) throw hiveError(msg({ id: 'content.skill.cantDelete', defaultMessage: "Only Hive skills and a project's local skills can be deleted in Hive.", description: "An error deleting a skill Hive doesn't manage (a CLI's own, from the user's profile or a plugin)." }), undefined, { kind: 'forbidden' })
-  if (existsSync(join(dir, HIVE_COPY_MARKER))) throw hiveError(msg({ id: 'content.skill.isCopy', defaultMessage: "That's Hive's own copy of a workspace skill; delete the skill in the workspace instead.", description: "An error deleting a skill in a project's folder that is Hive's copy of a workspace skill (Hive puts it there for a coding agent)." }), undefined, { kind: 'forbidden' })
+  if (!(await deletableSkill(dir)) || !existsSync(join(dir, 'SKILL.md'))) throw hiveError(msg({ id: 'content.skill.cantDelete', defaultMessage: "Only Combwork skills and a project's local skills can be deleted in Combwork.", description: "An error deleting a skill Hive doesn't manage (a CLI's own, from the user's profile or a plugin)." }), undefined, { kind: 'forbidden' })
+  if (existsSync(join(dir, HIVE_COPY_MARKER))) throw hiveError(msg({ id: 'content.skill.isCopy', defaultMessage: "That's Combwork's own copy of a workspace skill; delete the skill in the workspace instead.", description: "An error deleting a skill in a project's folder that is Hive's copy of a workspace skill (Hive puts it there for a coding agent)." }), undefined, { kind: 'forbidden' })
   await trash(dir)
 }
 
 /** Puts back a bundled skill as this version of Hive ships it: the workspace copy (edited) goes to the Recycle Bin. */
 export async function restoreBundledSkill(name: string): Promise<SkillInfo> {
-  if (!(await bundledIds('skills')).includes(name)) throw hiveError(msg({ id: 'content.skill.notBundled', defaultMessage: '"{name}" isn\'t one of Hive\'s bundled skills.', description: 'An error restoring a skill Hive ships: Hive ships no skill called {name}.' }), { name }, { kind: 'notFound' })
+  if (!(await bundledIds('skills')).includes(name)) throw hiveError(msg({ id: 'content.skill.notBundled', defaultMessage: '"{name}" isn\'t one of Combwork\'s bundled skills.', description: 'An error restoring a skill Hive ships: Hive ships no skill called {name}.' }), { name }, { kind: 'notFound' })
   const dest = join(workspace.skillsDir, name)
   if (existsSync(dest)) await trash(dest)
   await restoreBundled('skills', name)
@@ -528,7 +528,7 @@ export async function restoreBundledSkill(name: string): Promise<SkillInfo> {
 /** Deploys a Local or Machine skill into the workspace so Hive can manage it. */
 export async function copySkillToWorkspace(skillPath: string): Promise<SkillInfo> {
   const name = basename(skillPath)
-  if (!validSkillName(name)) throw hiveError(msg({ id: 'content.skill.cantCopyName', defaultMessage: '"{name}" can\'t be a Hive skill name: use letters, numbers, "-" and "_" (rename the folder first).', description: "An error copying a skill into the workspace: its folder's name {name} can't be a Hive skill's name." }), { name }, { kind: 'invalid' })
+  if (!validSkillName(name)) throw hiveError(msg({ id: 'content.skill.cantCopyName', defaultMessage: '"{name}" can\'t be a Combwork skill name: use letters, numbers, "-" and "_" (rename the folder first).', description: "An error copying a skill into the workspace: its folder's name {name} can't be a Hive skill's name." }), { name }, { kind: 'invalid' })
   const dest = join(workspace.skillsDir, name)
   if (existsSync(dest)) throw hiveError(msg({ id: 'content.skill.copyExists', defaultMessage: 'The workspace already has a skill named "{name}"', description: 'An error copying a skill into the workspace: it has one called {name} already.' }), { name }, { kind: 'conflict' })
   if (!(await isFile(join(skillPath, 'SKILL.md')))) throw hiveError(msg({ id: 'content.skill.notSkill', defaultMessage: 'Not a skill folder (no SKILL.md)', description: 'An error copying a skill into the workspace: its folder has no SKILL.md (a file name: keep it).' }))

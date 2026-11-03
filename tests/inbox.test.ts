@@ -119,7 +119,7 @@ describe('attention inbox', () => {
     const box = inbox([a, b], assistant, () => null)
     expect(box.needYou.map((i) => `${i.projectName}/${i.agentId}/${i.kind}`)).toEqual(['beta/three/waiting'])
     expect(box.needYou[0].message).toBe('Allow Bash?')
-    expect(box.finished.map((i) => `${i.projectName}/${i.agentId}/${i.kind}`)).toEqual(['Hive Assistant/assistant/finished', 'alpha/one/finished'])
+    expect(box.finished.map((i) => `${i.projectName}/${i.agentId}/${i.kind}`)).toEqual(['Assistant/assistant/finished', 'alpha/one/finished'])
     expect(box.finished[0].assistant).toBe(true)
   })
 

@@ -247,7 +247,7 @@ export async function dismissMovedNotice(ws: WorkspaceService, keys: string[]): 
   config.update((c) => void (c.ui.connectionsNoticeDismissed = [...new Set([...(c.ui.connectionsNoticeDismissed ?? []), ...add])]))
 }
 
-const MOVE_FAILED = msg({ id: 'main.connections.moveFailed', defaultMessage: "Hive couldn't move {project}'s model settings to its agents", description: "A notice's title (HI-1770): moving a project's own model, effort and context settings onto its agents (connections now hold the defaults) failed; it is tried again at the next start. {project} is the project's name." })
+const MOVE_FAILED = msg({ id: 'main.connections.moveFailed', defaultMessage: "Combwork couldn't move {project}'s model settings to its agents", description: "A notice's title (HI-1770): moving a project's own model, effort and context settings onto its agents (connections now hold the defaults) failed; it is tried again at the next start. {project} is the project's name." })
 
 
 /** Workspaces migrated since Hive started; an account added or turned on looks at them again (agents waiting for one). */

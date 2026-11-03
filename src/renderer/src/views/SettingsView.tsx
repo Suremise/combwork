@@ -165,11 +165,11 @@ function PriceTable({ provider }: { provider: ProviderId }) {
         <div className="fallback-source price-note">
           <Icon name="info" />
           <span>
-            {tRich(msg({ id: 'settings.prices.noReports', defaultMessage: "{provider} doesn't report costs, so Hive estimates them from these prices. Check them against <link>{company}'s pricing</link>.", description: "Above a provider's price table when the provider reports no costs. {provider} is its name, {company} the company's; <link> opens the company's price page." }), { provider: p.name, company: p.company, link: linkTo(p.pricingUrl) })}
+            {tRich(msg({ id: 'settings.prices.noReports', defaultMessage: "{provider} doesn't report costs, so Combwork estimates them from these prices. Check them against <link>{company}'s pricing</link>.", description: "Above a provider's price table when the provider reports no costs. {provider} is its name, {company} the company's; <link> opens the company's price page." }), { provider: p.name, company: p.company, link: linkTo(p.pricingUrl) })}
           </span>
         </div>
       )}
-      <div className="fallback-source faint">{tr(msg({ id: 'settings.prices.checked', defaultMessage: "Hive's starting prices, checked {checked}: edit them if they are out of date.", description: "Above a provider's price table. {checked} is a date." }), { checked: PRICES_CHECKED })}</div>
+      <div className="fallback-source faint">{tr(msg({ id: 'settings.prices.checked', defaultMessage: "Combwork's starting prices, checked {checked}: edit them if they are out of date.", description: "Above a provider's price table. {checked} is a date." }), { checked: PRICES_CHECKED })}</div>
       {/* Narrower than the table even with its boxes narrowed, it scrolls sideways in its own box (#887). */}
       <div className="price-table-wrap">
       <table className="table price-table">
@@ -202,7 +202,7 @@ function PriceTable({ provider }: { provider: ProviderId }) {
                 </td>
               ))}
               <td className="row-actions">
-                {isEdited && isShipped && <IconButton icon="discard" title={tr(msg({ id: 'settings.prices.back', defaultMessage: "Back to Hive's price", description: "Button on an edited model in a price table: puts Hive's price back." }))} onClick={() => back(m)} />}
+                {isEdited && isShipped && <IconButton icon="discard" title={tr(msg({ id: 'settings.prices.back', defaultMessage: "Back to Combwork's price", description: "Button on an edited model in a price table: puts Hive's price back." }))} onClick={() => back(m)} />}
                 {price && <IconButton icon="trash" title={tr(msg({ id: 'settings.prices.remove', defaultMessage: 'Remove from the table', description: 'Button on a model in a price table: removes it.' }))} onClick={() => remove(m)} />}
               </td>
             </tr>
@@ -580,16 +580,16 @@ function McpCatalogSources() {
           <Icon name="package" />
           <div className="ti-text">
             <div className="ti-name">{'Suremise/hive-mcp' /* i18n-ignore: the catalogue's name */}</div>
-            <div className="ti-desc">{tr(msg({ id: 'settings.mcpCatalogs.ours', defaultMessage: "Hive's own catalogue, checked by Hive.", description: 'Settings → MCP Catalogues (HI-545): under the name of Hive’s own catalogue (Suremise/hive-mcp).' }))}</div>
+            <div className="ti-desc">{tr(msg({ id: 'settings.mcpCatalogs.ours', defaultMessage: "Combwork's own catalogue, checked by Combwork.", description: 'Settings → MCP Catalogues (HI-545): under the name of Hive’s own catalogue (Suremise/hive-mcp).' }))}</div>
           </div>
-          <Switch checked={saved.oursOn} label={tr(msg({ id: 'settings.mcpCatalogs.oursSwitch', defaultMessage: "Hive's own catalogue listed", description: "Settings → MCP Catalogues (HI-545): the switch of Hive's own catalogue, for screen readers." }))} onChange={(v) => save({ ...saved, oursOn: v })} />
+          <Switch checked={saved.oursOn} label={tr(msg({ id: 'settings.mcpCatalogs.oursSwitch', defaultMessage: "Combwork's own catalogue listed", description: "Settings → MCP Catalogues (HI-545): the switch of Hive's own catalogue, for screen readers." }))} onChange={(v) => save({ ...saved, oursOn: v })} />
         </div>
         {saved.sources.map((s, i) => (
           <div key={s.url} className="toggle-item" data-catalog-source={s.url}>
             <Icon name="link" />
             <div className="ti-text">
               <div className="ti-name mono">{s.url}</div>
-              <div className="ti-desc">{tr(msg({ id: 'settings.mcpCatalogs.theirs', defaultMessage: "Its servers aren't checked by Hive.", description: 'Settings → MCP Catalogues (HI-545): under a catalogue the user added.' }))}</div>
+              <div className="ti-desc">{tr(msg({ id: 'settings.mcpCatalogs.theirs', defaultMessage: "Its servers aren't checked by Combwork.", description: 'Settings → MCP Catalogues (HI-545): under a catalogue the user added.' }))}</div>
             </div>
             <IconButton icon="arrow-up" disabled={i === 0} title={tr(msg({ id: 'settings.mcpCatalogs.up', defaultMessage: 'Move up', description: 'Settings → MCP Catalogues (HI-545): moves a catalogue up the list.' }))} onClick={() => move(i, -1)} />
             <IconButton icon="arrow-down" disabled={i === saved.sources.length - 1} title={tr(msg({ id: 'settings.mcpCatalogs.down', defaultMessage: 'Move down', description: 'Settings → MCP Catalogues (HI-545): moves a catalogue down the list.' }))} onClick={() => move(i, 1)} />
@@ -850,7 +850,7 @@ function ViewerTokens() {
     if (
       !(await confirm({
         title: tr(msg({ id: 'settings.viewers.revokeTitle', defaultMessage: 'Revoke "{name}"?', description: 'Title of the question before a viewer token is revoked. {name} is its name.' }), { name: label }),
-        message: tr(msg({ id: 'settings.viewers.revokeMessage', defaultMessage: 'The app using it can no longer read Hive, and its event stream ends now.', description: 'The question before a viewer token is revoked.' })),
+        message: tr(msg({ id: 'settings.viewers.revokeMessage', defaultMessage: 'The app using it can no longer read Combwork, and its event stream ends now.', description: 'The question before a viewer token is revoked.' })),
         confirmLabel: tr(msg({ id: 'settings.viewers.revoke', defaultMessage: 'Revoke', description: 'Button: revokes a viewer token.' })),
         danger: true
       }))

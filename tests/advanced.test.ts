@@ -199,7 +199,7 @@ describe('advanced.json', () => {
     expect(parseAdvancedFile(text)).toEqual({ values: { 'claude-code.trust.prompt': 'I trust', 'hive.mcp.replySeconds': 600 }, madeFor: { 'claude-code.trust.prompt': { version: '2.1.296', value: 'I trust' } }, unknown: [] })
     expect(parseAdvancedFile('{ "values": ')).toMatchObject({ error: expect.stringContaining("isn't valid JSON") })
     expect(parseAdvancedFile('[]')).toMatchObject({ error: expect.stringContaining('object') })
-    expect(parseAdvancedFile('{"format":2,"values":{}}')).toMatchObject({ error: expect.stringContaining('newer Hive') })
+    expect(parseAdvancedFile('{"format":2,"values":{}}')).toMatchObject({ error: expect.stringContaining('newer Combwork') })
     expect(parseAdvancedFile('{"values":[]}')).toMatchObject({ error: expect.stringContaining('"values"') })
     expect(parseAdvancedFile('{"values":{"hive.nope":1,"hive.mcp.replySeconds":400}}')).toMatchObject({ unknown: ['hive.nope'] })
     // A record for a value no longer there is dropped.
@@ -384,7 +384,7 @@ describe('the advanced store', () => {
       // meanwhile), and the edit is what both keep; the setting was never off.
       const off = change(false)
       writeFileSync(file, JSON.stringify({ format: 1, values: { 'hive.showDeveloperFeatures': true } }, null, 2))
-      await expect(off).rejects.toThrow(/changed outside Hive/)
+      await expect(off).rejects.toThrow(/changed outside Combwork/)
       await settled()
       expect(all()).toEqual([{ 'hive.showDeveloperFeatures': true }, true, true])
       expect(given.slice(before)).not.toContain(false)
@@ -437,7 +437,7 @@ describe('the advanced store', () => {
       await vi.waitFor(() => expect(advanced.state(null).fileError).toBeNull(), { timeout: 10_000 })
       advanced.stop()
       writeFileSync(file, JSON.stringify({ values: { 'hive.showDeveloperFeatures': true, 'hive.mcp.replySeconds': 400 } }))
-      await expect(updateSettingsChecked({ advanced: { showDeveloperFeatures: false } }, update)).rejects.toThrow('changed outside Hive')
+      await expect(updateSettingsChecked({ advanced: { showDeveloperFeatures: false } }, update)).rejects.toThrow('changed outside Combwork')
       expect(updates).toHaveLength(2)
       expect(advanced.number('hive.mcp.replySeconds')).toBe(400)
     } finally {
@@ -475,7 +475,7 @@ describe('the advanced store', () => {
     await s.set('hive.mcp.replySeconds', 600)
     s.stop()
     writeFileSync(file, advancedFileText({ 'hive.mcp.replySeconds': 1200 }, {}))
-    await expect(s.set('hive.mcp.replySeconds', 700)).rejects.toThrow('changed outside Hive')
+    await expect(s.set('hive.mcp.replySeconds', 700)).rejects.toThrow('changed outside Combwork')
     expect(read(file).values).toEqual({ 'hive.mcp.replySeconds': 1200 })
     expect(s.number('hive.mcp.replySeconds')).toBe(1200)
   })
