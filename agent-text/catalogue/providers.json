@@ -1,0 +1,152 @@
+{
+  "providers.action.install": {
+    "text": "Install",
+    "note": "Provider Setup's button: installs the coding agent's CLI in a terminal.",
+    "audience": "both"
+  },
+  "providers.action.signIn": {
+    "text": "Sign in",
+    "note": "Provider Setup's button: signs the coding agent's CLI in, in a terminal.",
+    "audience": "both"
+  },
+  "providers.action.update": {
+    "text": "Update",
+    "note": "Provider Setup's button: updates the coding agent's CLI in a terminal.",
+    "audience": "both"
+  },
+  "providers.cmdTooLong": {
+    "text": "{file} has to run through cmd.exe, which takes a command line of at most {max, number} characters, and this launch needs about {length, number}. Set the CLI's path in Settings to its .exe (or install the standalone CLI), which has no such limit.",
+    "note": "Starting an agent is refused: its CLI is a .cmd or .bat launcher, and cmd.exe can't take a command line this long. {file} is the launcher's file name; {max} and {length} are numbers of characters. Keep cmd.exe and .exe as they are.",
+    "audience": "both"
+  },
+  "providers.codex.nativeHive": {
+    "text": "Your Codex config has an MCP server named hive, reached over HTTP ({file}). Codex merges it into Hive’s own hive server, and can’t start with both. Rename yours there to start Codex agents.",
+    "note": "Why a Codex agent didn't start: the user's own Codex config has an MCP server named hive. {file} is that config file's path. hive is the name of Hive's MCP server: keep it.",
+    "audience": "both"
+  },
+  "providers.codex.sandbox.needed": {
+    "text": "Codex needs a one-time setup of its Windows sandbox; until then it asks before every command.",
+    "note": "Provider Setup and Settings → Providers: Codex's Windows sandbox isn't set up yet.",
+    "audience": "both"
+  },
+  "providers.codex.sandbox.nonAdminUsed": {
+    "text": "Codex uses its non-admin sandbox.",
+    "note": "Provider Setup and Settings → Providers: Codex runs commands in its non-admin sandbox (Windows), which can be upgraded.",
+    "audience": "both"
+  },
+  "providers.codex.sandbox.setUpAction": {
+    "text": "Set up",
+    "note": "Provider Setup's button: opens Codex's sandbox setup in a terminal.",
+    "audience": "both"
+  },
+  "providers.codex.sandbox.upgrade": {
+    "text": "**Upgrade** switches Codex to its default sandbox, which runs commands under separate Windows accounts instead of your own. Windows asks for Administrator permission once. Codex agents that are running keep their sandbox until they restart.",
+    "note": "Provider Setup, under Codex's sandbox setup (Windows): what Upgrade does. **…** marks bold text: keep the marks.",
+    "audience": "both"
+  },
+  "providers.codex.sandbox.upgradeAction": {
+    "text": "Upgrade",
+    "note": "Provider Setup's button: switches Codex to its default sandbox.",
+    "audience": "both"
+  },
+  "providers.codex.storePwsh.fix": {
+    "text": "To avoid it, replace the Store's PowerShell 7 with the installer's, in this order. First uninstall the Store one (Settings → Apps → Installed apps → PowerShell → Uninstall, or `Get-AppxPackage Microsoft.PowerShell | Remove-AppxPackage`): while it is there, winget takes it for the same app and installs nothing. Then install PowerShell 7 (`winget install --id Microsoft.PowerShell --source winget --installer-type wix`). Then restart Hive and its Codex agents: they keep their old PATH until they restart. Hive leaves your shell as it is.",
+    "note": "Provider Setup (#585, #1512), under the warning about the Microsoft Store's PowerShell 7: what to do, in an order that must stay (uninstall the Store copy first, then install, then restart). `…` marks a command to type: keep it as it is. Settings → Apps → Installed apps is Windows 11's settings page: use Windows' own names for it in your language.",
+    "audience": "both"
+  },
+  "providers.codex.storePwsh.label": {
+    "text": "PowerShell 7 from the Microsoft Store is installed",
+    "note": "Provider Setup and Settings → Providers (#585, #1404): the short label of the warning about the Microsoft Store's PowerShell 7 (a badge and the banner atop the window); the explanation follows under it.",
+    "audience": "both"
+  },
+  "providers.codex.storePwsh.symptom": {
+    "text": "The symptom: a Codex command fails at once with `CreateProcessAsUserW failed: 5` (access denied), and works again once every PowerShell 7 window and command is closed.",
+    "note": "Provider Setup (#585), under the warning about the Microsoft Store's PowerShell 7: how the problem shows. `…` marks the error as Codex prints it: keep it as it is.",
+    "audience": "both"
+  },
+  "providers.codex.storePwsh.warning": {
+    "text": "Codex agents' commands can fail while a PowerShell 7 from the Microsoft Store is open: Codex's Windows sandbox can't start that PowerShell while another copy of it runs.",
+    "note": "Provider Setup and Settings → Providers (#585): a warning that Codex's commands fail (Windows) while the Microsoft Store's PowerShell 7, the one found first, is running anywhere, e.g. in a terminal. Codex is the coding agent's name.",
+    "audience": "both"
+  },
+  "providers.copilot.planNote": {
+    "text": "Copilot Free uses Auto only; choosing a model needs a paid plan.",
+    "note": "A note in Provider Setup under GitHub Copilot. Copilot Free is the plan's name; Auto is Copilot's model choice: keep both names.",
+    "audience": "both"
+  },
+  "providers.copilot.updateAnyway": {
+    "text": "Update anyway",
+    "note": "Provider Setup button: explicitly retry a failed WinGet Copilot update with --force, replacing the old package despite changed files.",
+    "audience": "both"
+  },
+  "providers.copilot.updateModified": {
+    "text": "WinGet could not remove the old Copilot package. Its installed files may have changed since WinGet installed them, often because Copilot updated itself. Update anyway asks WinGet to replace them with --force. Stop Copilot agents first.",
+    "note": "Provider Setup after WinGet portable removal failed. The exit code can also mean other removal failures, so the cause is tentative. Update anyway is the adjacent button; keep WinGet, Copilot and --force unchanged.",
+    "audience": "both"
+  },
+  "providers.readiness.notInstalled": {
+    "text": "{provider} is not installed.",
+    "note": "Provider Setup and Settings → Providers: Hive didn't find the coding agent's CLI. {provider} is its name (Claude Code).",
+    "audience": "both"
+  },
+  "providers.readiness.signedOut": {
+    "text": "{provider} is not signed in.",
+    "note": "Provider Setup and Settings → Providers: the coding agent's CLI has no sign-in. {provider} is its name.",
+    "audience": "both"
+  },
+  "providers.readiness.update": {
+    "text": "{provider} {version} is available.",
+    "note": "Provider Setup and Settings → Providers: a newer version of the coding agent is out. {provider} is its name, {version} the version.",
+    "audience": "both"
+  },
+  "providers.settings.hooksOff": {
+    "text": "{source, select, inline {The --settings in Extra arguments} other {The settings file {file} (--settings in Extra arguments)}} turns off all hooks (disableAllHooks). Hive's hooks are how it knows what the agent is doing (its status, file locks, what it is told) and they carry its status line, so Hive doesn't start an agent without them. Take disableAllHooks out of those settings, or remove the --settings from Extra arguments in Agent Settings or Settings → Claude Code.",
+    "note": "Starting a Claude Code agent is refused: its settings turn Claude Code's hooks off. {source} is inline (settings written in the argument itself) or file; {file} is the file's path as the user wrote it. Keep --settings, disableAllHooks and the setting names as they are; \"Agent Settings\" and \"Settings → Claude Code\" are where to change it, as Hive shows them.",
+    "audience": "both"
+  },
+  "providers.settings.noFile": {
+    "text": "there is no such file",
+    "note": "Why a settings file can't be read, after \"can't be read:\" in another message: it doesn't exist.",
+    "audience": "both"
+  },
+  "providers.settings.noValue": {
+    "text": "The last --settings in Extra arguments has no value. Give it a settings file or inline JSON (--settings '''<file or JSON>'''), or remove it in Agent Settings or Settings → Claude Code.",
+    "note": "Starting a Claude Code agent is refused: its extra arguments end with --settings and nothing after it. Keep --settings as it is, and the straight quotes around <file or JSON>: each three apostrophes show one (ICU); the words file or JSON may be translated; \"Agent Settings\" and \"Settings → Claude Code\" are where to change it, as Hive shows them.",
+    "audience": "both"
+  },
+  "providers.settings.notAFile": {
+    "text": "it isn't a file",
+    "note": "Why a settings file can't be read, after \"can't be read:\" in another message: the path is a folder or a device.",
+    "audience": "both"
+  },
+  "providers.settings.notJson": {
+    "text": "The settings file {file} (--settings in Extra arguments) isn't valid JSON ({why}). Fix it or remove it in Agent Settings or Settings → Claude Code.",
+    "note": "Starting a Claude Code agent is refused: its settings file isn't JSON. {file} is its path; {why} is the JSON parser's own words (English). Keep --settings and JSON as they are.",
+    "audience": "both"
+  },
+  "providers.settings.notList": {
+    "text": "{source, select, inline {The --settings in Extra arguments} other {The settings file {file} (--settings in Extra arguments)}} sets {key} to something other than a list, which stops Hive's hooks reaching it. Make it a list ([ … ]) or remove it in Agent Settings or Settings → Claude Code.",
+    "note": "Starting a Claude Code agent is refused: a hook allowlist in its settings isn't a list. {key} is the setting's name. {source} is inline (settings written in the argument itself) or file; {file} is the file's path as the user wrote it. Keep --settings and the setting names as they are; \"Agent Settings\" and \"Settings → Claude Code\" are where to change it, as Hive shows them. Keep [ … ] as it is.",
+    "audience": "both"
+  },
+  "providers.settings.notObject": {
+    "text": "{source, select, inline {The --settings in Extra arguments} other {The settings file {file} (--settings in Extra arguments)}} isn't a settings object ('{ … }'). Fix it or remove it in Agent Settings or Settings → Claude Code.",
+    "note": "Starting a Claude Code agent is refused: its settings aren't an object. {source} is inline (settings written in the argument itself) or file; {file} is the file's path as the user wrote it. Keep --settings and the setting names as they are; \"Agent Settings\" and \"Settings → Claude Code\" are where to change it, as Hive shows them. Keep { … } as it is.",
+    "audience": "both"
+  },
+  "providers.settings.tooLarge": {
+    "text": "it's over Claude Code's 2 MiB limit for settings files",
+    "note": "Why a settings file can't be read, after \"can't be read:\" in another message: it is larger than Claude Code takes. Keep 2 MiB as it is.",
+    "audience": "both"
+  },
+  "providers.settings.unreadable": {
+    "text": "The settings file {file} (--settings in Extra arguments) can't be read: {why}. Fix it or remove it in Agent Settings or Settings → Claude Code.",
+    "note": "Starting a Claude Code agent is refused: the settings file in its extra arguments can't be read. {file} is its path; {why} is the reason (\"there is no such file\", \"it isn't a file\", or the system's own words). Keep --settings as it is.",
+    "audience": "both"
+  },
+  "providers.unknown": {
+    "text": "Unknown provider \"{provider}\". It may need a newer version of Hive.",
+    "note": "An agent or a setting names a coding-agent CLI this version of Hive doesn't know, as when a newer Hive wrote it. {provider} is the id.",
+    "audience": "both"
+  }
+}

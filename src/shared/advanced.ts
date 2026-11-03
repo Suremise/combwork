@@ -17,6 +17,8 @@
  * its errors read the English.
  */
 import { createIntl, createIntlCache } from '@formatjs/intl'
+import { currentChain, overrideOf, type AgentMsg } from './agentText'
+import { formatIcu } from './agentText/icu'
 import { CLAUDE_FOOTER_MODES } from './claude'
 import { COPILOT_FOOTER_MODES } from './copilot'
 import { fmt, language, msg, tr, type Msg } from './i18n'
@@ -31,7 +33,7 @@ import { WORKSPACE_NOTES_MAX } from './workspaceNotes'
  * errors read its English (`englishText`), so what the Assistant is told never follows the user's language. The
  * settings catalogue's rows hold their text this way too.
  */
-export type Text = Msg | { m: Msg; values: TextValues } | { list: TextPart[]; type?: ListType } | { lines: TextPart[] } | { cap: TextPart } | { shown: TextPart; english: string }
+export type Text = Msg | { m: Msg; values: TextValues } | { list: TextPart[]; type?: ListType } | { lines: TextPart[] } | { cap: TextPart } | { shown: TextPart; agent: TextPart } | { said: AgentMsg; values?: TextValues }
 /** A part of text: text of its own, or a name or a number that is the same in every language. */
 export type TextPart = string | number | Text
 export type TextValues = Record<string, TextPart>
@@ -50,9 +52,14 @@ export const linesOf = (lines: TextPart[]): Text => ({ lines })
 
 /**
  * Text the window words differently from what agents read (#910): `shown` in the window, in its language (English too),
- * and `english`, word for word, for agents and the Agent API, whose replies don't change when the window's words do.
+ * and `agent` for agents and the Agent API, whose replies don't change when the window's words do. `agent` is text of its
+ * own (dialects, HI-2440): an agent message (`agentText`), or the window's message with agents' values, so a dialect can
+ * override it as any other.
  */
-export const forAgents = (shown: TextPart, english: string): Text => ({ shown, english })
+export const forAgents = (shown: TextPart, agent: TextPart): Text => ({ shown, agent })
+
+/** An agent message as text (dialects, HI-2440): said in the reader's dialect for agents; the window never shows one alone. */
+export const saidText = (said: AgentMsg, values?: TextValues): Text => (values ? { said, values } : { said })
 
 /** Text whose first letter is upper case in the language it is shown in: clauses joined into a list that starts a sentence. */
 export const capitalised = (cap: TextPart): Text => ({ cap })
@@ -61,6 +68,8 @@ const ENGLISH = createIntl({ locale: 'en', defaultLocale: 'en', messages: {}, on
 
 interface Formatter {
   one: (m: Msg, values?: Record<string, string | number>) => string
+  /** An agent message (`saidText`): English, in the reader's dialect for agents. */
+  said: (m: AgentMsg, values?: Record<string, string | number>) => string
   list: (items: string[], type: ListType) => string
   /** A letter in upper case, as the language writes it. */
   upper: (s: string) => string
@@ -77,22 +86,52 @@ function formatText(t: TextPart, f: Formatter): string {
     const s = formatText(t.cap, f)
     return f.upper(s.charAt(0)) + s.slice(1)
   }
-  if ('shown' in t) return f.agents ? t.english : formatText(t.shown, f)
-  const values = Object.fromEntries(Object.entries(t.values).map(([k, v]) => [k, typeof v === 'object' ? formatText(v, f) : v]))
+  if ('shown' in t) return f.agents ? formatText(t.agent, f) : formatText(t.shown, f)
+  const values = t.values && Object.fromEntries(Object.entries(t.values).map(([k, v]) => [k, typeof v === 'object' ? formatText(v, f) : v]))
+  if ('said' in t) return f.said(t.said, values)
   return f.one(t.m, values)
 }
 
+const englishOne = (m: Msg, values?: Record<string, string | number>): string => (!values && !/[{}<]|''/.test(m.defaultMessage) ? m.defaultMessage : (ENGLISH.formatMessage(m, values) as string))
+const englishSaid = (m: AgentMsg, values?: Record<string, string | number>): string => formatIcu(m.text, values)
+
 const IN_ENGLISH: Formatter = {
-  one: (m, values) => (!values && !/[{}<]|''/.test(m.defaultMessage) ? m.defaultMessage : (ENGLISH.formatMessage(m, values) as string)),
+  one: englishOne,
+  said: englishSaid,
   // Hive's English is British: "A, B and C", as the tools always said it.
   list: (items, type) => new Intl.ListFormat('en-GB', { type, style: type === 'unit' ? 'short' : 'long' }).format(items),
   upper: (s) => s.toLocaleUpperCase('en'),
   agents: true
 }
-const AS_SHOWN: Formatter = { one: (m, values) => tr(m, values), list: (items, type) => fmt.list(items, type), upper: (s) => s.toLocaleUpperCase(language()), agents: false }
+/** For agents (dialects, HI-2440): each message's override in the current chain, else its English as IN_ENGLISH says it. */
+const IN_AGENTS: Formatter = {
+  ...IN_ENGLISH,
+  one: (m, values) => overrideOf(m.id, m.defaultMessage, values) ?? englishOne(m, values),
+  said: (m, values) => overrideOf(m.id, m.text, values) ?? englishSaid(m, values)
+}
+// An agent message never reaches the window alone (forAgents shows `shown`); if one did, it would read its English.
+const AS_SHOWN: Formatter = { one: (m, values) => tr(m, values), said: englishSaid, list: (items, type) => fmt.list(items, type), upper: (s) => s.toLocaleUpperCase(language()), agents: false }
 
-/** Text in English, whatever language Hive shows: for the Assistant's tools, the log and errors (agents' words, `forAgents`). */
+/**
+ * Text in the Default's English, whatever language Hive shows or dialect a reader has: the log, a comparison, and what
+ * is stored once for any reader and rendered for each when read. What an agent is told is `agentText`.
+ */
 export const englishText = (t: TextPart): string => formatText(t, IN_ENGLISH)
+
+/**
+ * Text for an agent (dialects, HI-2440; design section 2, decision 13): the current chain's override of each message
+ * (the window's messages keep their UI id), else its English, exactly as `englishText` says it. Call it where the text
+ * is sent, in the reader's scope (the Agent API's request, a wake's `inDialectOf`).
+ */
+export const agentText = (t: TextPart): string => formatText(t, IN_AGENTS)
+
+/**
+ * An English field kept beside its text as data (`statusMessage` and `statusText`, #845), as an agent reads it where it
+ * is sent: said again in the reader's chain when one is in force and the English is that text's Default (Hive's own
+ * words, not a CLI's that took its place), else as kept. So with no chain, exactly the field (dialects, HI-2440).
+ */
+export const agentField = <T extends string | null | undefined>(english: T, text: TextPart | null | undefined): T =>
+  typeof english === 'string' && text !== null && text !== undefined && currentChain() && englishText(text) === english ? (agentText(text) as T) : english
 
 /** Text in the language Hive shows now (call it when the text is rendered, never when a module loads). */
 export const shownText = (t: TextPart): string => formatText(t, AS_SHOWN)
@@ -2979,6 +3018,7 @@ const SOURCES: readonly AdvancedSource[] = [
 ]
 
 /** Every advanced value, in the order Settings lists them (by group), with its English beside its messages. */
+// agent-later: HI-2441 (5c) says the advanced settings' titles and descriptions through agentText, with the settings catalogue
 export const ADVANCED_DEFS: readonly AdvancedDef[] = SOURCES.map((d) => ({ ...d, title: englishText(d.title), desc: englishText(d.desc), text: { title: d.title, desc: d.desc } }))
 
 const BY_ID = new Map(ADVANCED_DEFS.map((d) => [d.id, d]))
@@ -3183,7 +3223,7 @@ export function advancedRow(def: AdvancedDef, state: Pick<AdvancedState, 'values
     value,
     override,
     workspaceValue: own ?? undefined,
-    problem: problemText && englishText(problemText),
+    problem: problemText && englishText(problemText), // agent-text: checkAdvanced, sampleMissText
     problemText,
     miss: missText && englishText(missText),
     missText,

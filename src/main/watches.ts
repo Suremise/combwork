@@ -991,7 +991,8 @@ export function onWatchPlacing(fn: (ws: WorkspaceService, projectPath: string, a
 const assertNotPlacing = async (ws: WorkspaceService, projectPath: string, agentId: string, scope: string | null): Promise<void> => {
   if (scope === null) return
   const why = await placing(ws, projectPath, agentId)
-  if (why) throw new HiveError({ shown: why, english: why }, { kind: 'conflict' })
+  // agent-protocol: the placing check's reason as its owner said it (onWatchPlacing)
+  if (why) throw new HiveError({ shown: why, agent: why }, { kind: 'conflict' })
 }
 
 /** Told when an agent's card watch begins (HI-1721: loopWakes tells a builder of its returned card it waits on). */

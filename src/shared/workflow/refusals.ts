@@ -2,7 +2,8 @@
 // under the card's ruleset, and where the rule is changed. Three whole sentences, each its own message, never glued from
 // pieces; agents get them in English (`refusal`), the window shows them translated (`refusalLines`), each a line.
 
-import { englishText } from '../advanced'
+import { agentText, englishText } from '../advanced'
+import { currentChain } from '../agentText'
 import { msg, type Msg } from '../i18n/msg'
 import type { StoredText } from '../types'
 import type { GuardId } from './pieces'
@@ -366,7 +367,10 @@ const FOR_USER: Partial<Record<RuleId, Partial<Omit<RefusalText, 'change'>>>> = 
   }
 }
 
+// agent-stored: a refusal's sentences, said again in the reader's dialect by refusalBody (dialects, HI-2440)
 const IN_ENGLISH: RefusalFormat = { one: (m, values) => englishText(values ? { m, values } : m), list: (items) => items.join(', '), names: false, reader: 'agent' }
+/** Agents' sentences in the current chain (dialects, HI-2440): each message's override, else IN_ENGLISH's words. */
+const IN_AGENTS: RefusalFormat = { ...IN_ENGLISH, one: (m, values) => agentText(values ? { m, values } : m) }
 
 /**
  * Values a rule's text takes that refusals recorded earlier don't have (their facts keep the values of their time), and
@@ -413,9 +417,14 @@ export function refusalLines(rule: RuleId, values: RefusalValues, f: RefusalForm
   return { message: f.one(user?.message ?? t.message, vals), next: f.one(next, vals), change: t.change ? f.one(t.change, vals) : null }
 }
 
-/** A workflow refusal as the Agent API gives it (SPEC §16.8.3): its rule, three English sentences, who can override, and its warnings (HI-2339). */
+/**
+ * A workflow refusal as the Agent API gives it (SPEC §16.8.3): its rule, three sentences, who can override, and its
+ * warnings (HI-2339). The sentences are the reader's (dialects, HI-2440): with a chain that overrides texts, they are said
+ * again from the rule and its values in it; with none, they are those the refusal was made with, as they always were.
+ */
 export function refusalBody(x: Refusal): Record<string, unknown> {
-  return { refused: true, rule: x.rule, message: x.message, next: x.next, ...(x.change ? { change: x.change } : {}), override: x.override, ...(x.warnings?.length ? { warnings: x.warnings } : {}) }
+  const l = currentChain() ? refusalLines(x.rule, x.values, IN_AGENTS) : { message: x.message, next: x.next, change: x.change ?? null }
+  return { refused: true, rule: x.rule, message: l.message, next: l.next, ...(l.change ? { change: l.change } : {}), override: x.override, ...(x.warnings?.length ? { warnings: x.warnings } : {}) }
 }
 
 /** Builds a refusal from its rule and values: three English sentences, each from its own message. */

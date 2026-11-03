@@ -1,0 +1,95 @@
+{
+  "git.busy.agent": {
+    "placeholders": {
+      "agent": "plain",
+      "status": "select",
+      "action": "select"
+    }
+  },
+  "git.busy.slotHeld": {
+    "placeholders": {
+      "agent": "plain",
+      "branch": "plain",
+      "action": "select"
+    }
+  },
+  "git.busy.slotWaiting": {
+    "placeholders": {
+      "agents": "plain",
+      "count": "plural",
+      "branch": "plain",
+      "action": "select"
+    }
+  },
+  "git.busy.yourMerge": {
+    "placeholders": {
+      "branch": "plain",
+      "action": "select"
+    }
+  },
+  "git.parentRepo": {
+    "placeholders": {
+      "folder": "plain"
+    }
+  },
+  "git.repoLock.busy": {
+    "placeholders": {
+      "profile": "plain"
+    }
+  },
+  "git.repoLock.noGitDir": {
+    "placeholders": {
+      "folder": "plain",
+      "why": "plain"
+    }
+  },
+  "git.tool.missing": {
+    "placeholders": {}
+  },
+  "git.tool.tooOld": {
+    "placeholders": {
+      "version": "plain",
+      "min": "plain"
+    }
+  },
+  "git.validate.enterName": {
+    "placeholders": {}
+  },
+  "git.validate.enterUrl": {
+    "placeholders": {}
+  },
+  "git.validate.nameLine": {
+    "placeholders": {}
+  },
+  "git.validate.notEmail": {
+    "placeholders": {}
+  },
+  "git.validate.notUrl": {
+    "placeholders": {}
+  },
+  "git.validate.remoteName": {
+    "placeholders": {}
+  },
+  "git.validate.wholeUrl": {
+    "placeholders": {}
+  },
+  "git.vc.git": {
+    "placeholders": {}
+  },
+  "git.vc.none": {
+    "placeholders": {}
+  },
+  "git.vc.switch.changed": {
+    "placeholders": {
+      "platform": "plain"
+    }
+  },
+  "git.vc.switch.noGit": {
+    "placeholders": {}
+  },
+  "git.vc.switch.otherFound": {
+    "placeholders": {
+      "vcs": "plain"
+    }
+  }
+}

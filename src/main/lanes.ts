@@ -1,5 +1,6 @@
 import { randomBytes } from 'crypto'
 import { join } from 'path'
+import { refusalBody, type Refusal } from '../shared/workflow/refusals'
 import { projectPreferences } from './workflow/preferences'
 import { existsSync } from 'original-fs'
 import { HIVE_DIR, projectAgents } from '../shared/defaults'
@@ -994,7 +995,8 @@ async function putBackForReorder(ws: WorkspaceService, s: StartLane, builder: La
   const { runIntent, HIVE_LANE_START } = await import('./tasks')
   const { reply } = await runIntent(wf, flying.number, HIVE_LANE_START, (w) => w.putBack(`#${flying.number}`, 'hive', { why: inDefaultDialect(() => say(A.putBackWhy, { by: s.by })) }), undefined, s.commit)
   const r = reply as { ok?: boolean; refused?: boolean; message?: string }
-  if (r.refused) throw new LaneError(409, r.message ?? say(A.notPutBack, { card: key }))
+  // agent-protocol: a refusal's message, said again in the reader's dialect by refusalBody
+  if (r.refused) throw new LaneError(409, (r.refused && typeof (reply as Refusal).rule === 'string' && (reply as Refusal).values ? (refusalBody(reply as Refusal).message as string) : r.message) ?? say(A.notPutBack, { card: key }))
   log.info(`Lane ${was.id}: #${flying.number} put back by a reorder applied now (${userText(s.by)})`)
   return { lane: was.id, cards: [...was.cards], pending: was.pending ? [...was.pending] : null, putBack: key, line: state.started?.line ?? null }
 }

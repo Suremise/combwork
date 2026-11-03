@@ -8,7 +8,7 @@
 
 import { msg, type Msg } from '../i18n/msg'
 import type { Tr } from '../tasks'
-import { englishText, withValues, type Text } from '../advanced'
+import { agentText, englishText, withValues, type Text } from '../advanced'
 import { CATEGORY_STAGE, STAGE_CATEGORY, type Category, type StageId } from './facts'
 
 /** Every stage, in board order (§16.5.2). */
@@ -46,7 +46,7 @@ export function stageName(id: string, names?: StageNames | null, tr?: Tr): strin
   if (own) return own
   const m = isStageId(id) ? STAGE_TEXT[id] : null
   if (!m) return id
-  return tr ? tr(m) : englishText(m)
+  return tr ? tr(m) : agentText(m)
 }
 
 /** The stages of a ruleset (its `stages`, already in board order), each with its category and name. */
@@ -98,6 +98,7 @@ export function stageNameProblems(names: StageNames | null | undefined, tr?: Tr)
   const out: StageNameProblem[] = []
   if (!names) return out
   const fold = (n: string): string => keptStageName(n).toLocaleLowerCase('en')
+  // agent-protocol: the names a stage is matched by (what agents and the user type), not text sent
   const namesOf = (id: StageId): string[] => (names[id] !== undefined ? [fold(names[id]!)] : [fold(englishText(STAGE_TEXT[id])), ...(tr ? [fold(tr(STAGE_TEXT[id]))] : [])])
   const why = (id: StageId, raw: string): StageNameProblem['why'] | null => {
     const name = keptStageName(raw)

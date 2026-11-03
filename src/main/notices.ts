@@ -9,6 +9,7 @@ const CLOSED_BODY = msg({ id: 'main.quit.closedBody', defaultMessage: '{n, plura
 
 /** The notice after Hive quit without asking: in the language shown, its title in English for the Agent API too. */
 export function closedNotice(stopped: number): { title: string; body: string; apiTitle: string } {
+  // agent-later: HI-2465 says the events stream's titles in each caller's dialect
   return { title: tr(CLOSED), body: tr(CLOSED_BODY, { n: stopped }), apiTitle: englishText(CLOSED) }
 }
 

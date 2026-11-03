@@ -1,0 +1,112 @@
+{
+  "settings.advanced.error.badPattern": {
+    "text": "{title} isn't a valid regular expression: {why}",
+    "note": "Why an advanced setting's new value isn't taken. {title} is the setting's title; {why} the browser engine's own reason, in English.",
+    "audience": "both"
+  },
+  "settings.advanced.error.boolean": {
+    "text": "{title} takes true or false.",
+    "note": "Why an advanced setting's new value isn't taken. {title} is the setting's title; true and false are the values as written: keep them.",
+    "audience": "both"
+  },
+  "settings.advanced.error.choice": {
+    "text": "{title} takes one of {choices}.",
+    "note": "Why an advanced setting's new value isn't taken. {title} is the setting's title; {choices} lists the values it takes as advanced.json writes them (allow, ask, block): keep them.",
+    "audience": "both"
+  },
+  "settings.advanced.error.field": {
+    "text": "{title} takes a field name: letters, digits and _ (not starting with a digit).",
+    "note": "Why an advanced setting's new value isn't taken: it must be a field name of a CLI's data. {title} is the setting's title.",
+    "audience": "both"
+  },
+  "settings.advanced.error.list": {
+    "text": "{title} takes 1 to 10 names (letters, digits, - and _), as a list or separated by commas.",
+    "note": "Why an advanced setting's new value isn't taken. {title} is the setting's title.",
+    "audience": "both"
+  },
+  "settings.advanced.error.matchesAll": {
+    "text": "{title} would match anything (it matches empty text).",
+    "note": "Why an advanced setting's new value (a regular expression) isn't taken. {title} is the setting's title.",
+    "audience": "both"
+  },
+  "settings.advanced.error.number": {
+    "text": "{title} takes a whole number from {min} to {max}.",
+    "note": "Why an advanced setting's new value isn't taken. {title} is the setting's title; {min} and {max} are numbers.",
+    "audience": "both"
+  },
+  "settings.advanced.error.oneLine": {
+    "text": "{title} takes one line of at most {most} characters.",
+    "note": "Why an advanced setting's new value isn't taken. {title} is the setting's title; {most} a number of characters.",
+    "audience": "both"
+  },
+  "settings.advanced.error.pattern": {
+    "text": "{title} takes a regular expression (as text).",
+    "note": "Why an advanced setting's new value isn't taken (Settings → Advanced). {title} is the setting's title.",
+    "audience": "both"
+  },
+  "settings.advanced.error.text": {
+    "text": "{title} takes text.",
+    "note": "Why an advanced setting's new value isn't taken. {title} is the setting's title.",
+    "audience": "both"
+  },
+  "settings.advanced.miss.field": {
+    "text": "{cli} {version} sent no field \"{field}\" here (it sent {fields}). Fine if {cli} has changed since.",
+    "note": "Under an advanced setting whose value no longer reads what the CLI was recorded sending (Settings → Advanced). {cli} is the CLI's name, {version} its version; {field} and {fields} are field names, as the CLI sends them.",
+    "audience": "both"
+  },
+  "settings.advanced.miss.list": {
+    "text": "{cli} {version} sent {missing}, which this list doesn't have (it sent {fields}). Fine if {cli} has changed since.",
+    "note": "Under an advanced setting listing the fields Hive knows a CLI sends, when the CLI was recorded sending one it leaves out (Settings → Advanced). {cli} is the CLI's name, {version} its version; {missing} and {fields} are field names, as the CLI sends them.",
+    "audience": "both"
+  },
+  "settings.advanced.miss.text": {
+    "text": "It doesn't find what {cli} {version} showed (\"{shown}\"). Fine if {cli} has changed since.",
+    "note": "Under an advanced setting whose value no longer finds what the CLI was recorded showing (Settings → Advanced). {cli} is the CLI's name, {version} its version; {shown} is the CLI's own text, in English.",
+    "audience": "both"
+  },
+  "settings.advanced.takes.boolean": {
+    "text": "On or off (true or false).",
+    "note": "What an advanced setting takes (Settings → Advanced). true and false are the values as written in advanced.json: keep them.",
+    "audience": "both"
+  },
+  "settings.advanced.takes.choice": {
+    "text": "One of {choices}.",
+    "note": "What an advanced setting takes (Settings → Advanced): one of a few values. {choices} lists them as advanced.json writes them (allow, ask, block): keep them.",
+    "audience": "both"
+  },
+  "settings.advanced.takes.field": {
+    "text": "A field name.",
+    "note": "What an advanced setting takes (Settings → Advanced): the name of a field in a CLI's data.",
+    "audience": "both"
+  },
+  "settings.advanced.takes.list": {
+    "text": "Names separated by commas.",
+    "note": "What an advanced setting takes (Settings → Advanced).",
+    "audience": "both"
+  },
+  "settings.advanced.takes.number": {
+    "text": "A whole number of {unit, select, s {seconds} lanes {lanes} agents {agents} other {units}}, {min} to {max}.",
+    "note": "What an advanced setting takes (its info tip in Settings → Advanced). {unit} picks the word; {min} and {max} are numbers, as advanced.json takes them.",
+    "audience": "both"
+  },
+  "settings.advanced.takes.pattern": {
+    "text": "A regular expression (JavaScript).",
+    "note": "What an advanced setting takes (Settings → Advanced).",
+    "audience": "both"
+  },
+  "settings.advanced.takes.patternFlags": {
+    "text": "A regular expression (JavaScript, flags {flags}).",
+    "note": "What an advanced setting takes (Settings → Advanced). {flags} are a regular expression's flags (such as i): keep them.",
+    "audience": "both"
+  },
+  "settings.advanced.takes.text": {
+    "text": "Text, found as it is.",
+    "note": "What an advanced setting takes (Settings → Advanced): text Hive looks for on a CLI's screen, as it is.",
+    "audience": "both"
+  },
+  "settings.advanced.workspaceProblem": {
+    "text": "This workspace's: {problem}",
+    "note": "Why a workspace's own advanced value isn't used (Settings → Advanced). {problem} is the reason.",
+    "audience": "both"
+  }
+}

@@ -1,0 +1,487 @@
+{
+  "main.accounts.badTarget": {
+    "text": "Hive won't link a connection to {target}: it isn't one of {cli}'s own folders.",
+    "note": "An error adding a connection: the folder a connection's shared folder would link to ({target}, a path) isn't in the coding agent CLI's ({cli}) own folder.",
+    "audience": "both"
+  },
+  "main.accounts.checkHeld": {
+    "text": "{name} is being checked: Hive is still making sure {cli}'s check of it has ended. Try again in a moment.",
+    "note": "An error signing in or removing a connection ({name}, its name in Settings → Accounts & Connections): the coding agent CLI's ({cli}: \"Codex\") check of who it is signed in as hasn't been confirmed ended yet, so the connection is held.",
+    "audience": "both"
+  },
+  "main.accounts.folderNotUsable": {
+    "text": "{name}'s folder isn't the one Hive made (it is missing, or was moved or replaced), so nothing was started on it. Remove the connection and add it again.",
+    "note": "An error signing a connection in or starting on it ({name}, its name): its folder is missing or isn't the one Hive made.",
+    "audience": "both"
+  },
+  "main.accounts.inUse": {
+    "text": "{name} is in use: stop the agents on it and close its sign-in, then remove it.",
+    "note": "An error removing a connection ({name}, its name in Settings → Accounts & Connections): agents run on it, or its sign-in terminal is open.",
+    "audience": "both"
+  },
+  "main.accounts.keyRemoveFailed": {
+    "text": "{name} wasn't removed: its key couldn't be deleted. Nothing was changed; Remove tries again.",
+    "note": "An error removing a server connection ({name}, its name in Settings → Accounts & Connections): its stored API key couldn't be deleted, so the connection was left as it was.",
+    "audience": "both"
+  },
+  "main.accounts.leftover": {
+    "text": "{name} is half removed: remove it again first.",
+    "note": "An error signing a connection in ({name}): an earlier removal stopped partway, so it can't be used.",
+    "audience": "both"
+  },
+  "main.accounts.makeFailed": {
+    "text": "Couldn't make the connection's folder: {error}",
+    "note": "An error adding a connection: its folder or link couldn't be made. {error} is the reason, in English.",
+    "audience": "both"
+  },
+  "main.accounts.noHome": {
+    "text": "{cli}'s folder ({folder}) isn't there yet: run {cli} once, then add the connection.",
+    "note": "An error adding a connection: the coding agent CLI's ({cli}) own folder ({folder}, a path) doesn't exist on this PC.",
+    "audience": "both"
+  },
+  "main.accounts.noName": {
+    "text": "Give the connection a name.",
+    "note": "An error adding or renaming a connection in Settings → Accounts & Connections: its name is empty.",
+    "audience": "both"
+  },
+  "main.accounts.noProvider": {
+    "text": "{cli} can't have sign-in connections in Hive yet.",
+    "note": "An error: connections were asked for a coding agent CLI ({cli}: \"Codex\") that Hive keeps no connections for.",
+    "audience": "both"
+  },
+  "main.accounts.notFound": {
+    "text": "There is no such connection.",
+    "note": "An error: a connection named by its id is not in Settings → Accounts & Connections (removed meanwhile).",
+    "audience": "both"
+  },
+  "main.accounts.nothingToKeep": {
+    "text": "{name} isn't signed in as anyone Hive could check, so there's no login to keep.",
+    "note": "An error: Keep the new login was asked for a connection ({name}) whose latest check didn't find it signed in.",
+    "audience": "both"
+  },
+  "main.accounts.removeFailed": {
+    "text": "{name} wasn't removed: {error}. Nothing outside its folder was touched; Remove tries again.",
+    "note": "An error removing a connection ({name}): its folder couldn't all be deleted. {error} is the reason, in English.",
+    "audience": "both"
+  },
+  "main.accounts.running": {
+    "text": "{name} has agents running on it: stop them, then remove it.",
+    "note": "An error removing a connection ({name}, its name in Settings → Accounts & Connections): agents run on it, or one is starting.",
+    "audience": "both"
+  },
+  "main.accounts.setUpCancelled": {
+    "text": "{name}'s Set Up didn't open: the connection was removed or its workspace closed while Hive checked its folders.",
+    "note": "An error opening a connection's Set Up (Settings → Accounts & Connections, HI-1870; {name}, its name): Hive was checking which of the workspace's folders its coding agent CLI trusts when the connection was removed or the workspace closed, so nothing was started.",
+    "audience": "both"
+  },
+  "main.accounts.usageMove.bad": {
+    "text": "Choose a share from 1% to 100%, a limit, and another account of the same CLI to move its agents to.",
+    "note": "An error setting an account's usage move in Settings → Accounts & Connections (HI-2195): the share, the limit or the account to move to isn't one it can be.",
+    "audience": "both"
+  },
+  "main.branchMerge.cardWork": {
+    "text": "{branch} is {card}'s work: merge it through its card, or confirm merging it here.",
+    "note": "An error merging from the Merge dialog: the branch ({branch}) is the line of a card ({card}: its key) that isn't Done, and the merge wasn't confirmed for that card (the dialog asks first).",
+    "audience": "both"
+  },
+  "main.branchMerge.notBranch": {
+    "text": "{branch} is not a local branch of the project.",
+    "note": "An error merging from the Merge dialog (#1450): the branch picked ({branch}) isn't one of the repository's local branches (deleted meanwhile, say).",
+    "audience": "both"
+  },
+  "main.branchMerge.same": {
+    "text": "{branch} can't be merged into itself.",
+    "note": "An error merging from the Merge dialog: the branch picked and the target are the same ({branch}).",
+    "audience": "both"
+  },
+  "main.connections.badMode": {
+    "text": "{cli} has no permission mode {mode}.",
+    "note": "An error saving a connection (HI-2107): the permission mode asked for ({mode}, as given) is not one of the coding agent CLI's ({cli}: \"Codex\").",
+    "audience": "both"
+  },
+  "main.connections.beingRemoved": {
+    "text": "{name} is being removed already.",
+    "note": "An error removing a connection (HI-2107): a removal of it ({name}, its name) is already under way.",
+    "audience": "both"
+  },
+  "main.connections.choice.missing": {
+    "text": "The connection chosen for {agent} no longer exists. Choose another, or the workspace's default.",
+    "note": "An error saving an agent's settings (or adding one): the connection chosen for it ({agent}, its name) was removed. A connection is how a coding agent CLI signs in or reaches its model (Settings → Accounts & Connections).",
+    "audience": "both"
+  },
+  "main.connections.choice.off": {
+    "text": "{name} isn't on in this workspace. Turn it on in Settings → Accounts & Connections, or choose another for {agent}.",
+    "note": "An error saving an agent's settings (or adding one): the connection chosen ({name}) is off in this workspace, so it can't be the agent's ({agent}, its name). Settings → Accounts & Connections names a section.",
+    "audience": "both"
+  },
+  "main.connections.choice.otherCli": {
+    "text": "{name} is for another CLI than {agent}'s. Choose one of its own.",
+    "note": "An error saving an agent's settings (or adding one): the connection chosen ({name}) belongs to another coding agent CLI than the agent's ({agent}, its name).",
+    "audience": "both"
+  },
+  "main.connections.inUse": {
+    "text": "Still in use, so {name} was kept: {users}. Choose another connection for them first, then remove it.",
+    "note": "An error removing a connection (Settings → Accounts & Connections, HI-2107): agents or the Assistant use it ({users}: their names, listed, each with its project).",
+    "audience": "both"
+  },
+  "main.connections.launch.changedAgain": {
+    "text": "{agent}'s connection was changed again while it was starting. Start it again.",
+    "note": "Starting an agent ({agent}, its name) failed: the connection chosen for it was changed while it was starting, and again while Hive started it once more on the new choice. A connection is how a coding agent CLI signs in or reaches its model (Settings → Accounts & Connections).",
+    "audience": "both"
+  },
+  "main.connections.launch.changing": {
+    "text": "{name}'s login kept changing while Hive checked it. Try starting {agent} again in a moment.",
+    "note": "Starting an agent ({agent}) is refused: its connection's ({name}) login changed again and again while Hive checked who it is signed in as.",
+    "audience": "both"
+  },
+  "main.connections.launch.deleted": {
+    "text": "The connection chosen for {agent} no longer exists. Choose another in its Agent Settings.",
+    "note": "Starting an agent ({agent}) is refused: the connection chosen for it was removed. Agent Settings names a dialog.",
+    "audience": "both"
+  },
+  "main.connections.launch.noKey": {
+    "text": "{name} has no key. Add one in Settings → Accounts & Connections, then start {agent}.",
+    "note": "Starting an agent ({agent}) is refused: its server account ({name}) reaches a server that needs an API key, and none is saved for it. Settings → Accounts & Connections names a section.",
+    "audience": "both"
+  },
+  "main.connections.launch.none": {
+    "text": "No {cli} account is on in this workspace. Add one in Settings → Accounts & Connections and sign it in, then start {agent} again.",
+    "note": "Starting an agent ({agent}, its name) is refused: its workspace has no account on for its coding agent CLI ({cli}: \"Claude Code\"). Settings → Accounts & Connections names a section.",
+    "audience": "both"
+  },
+  "main.connections.launch.offNoDefault": {
+    "text": "{agent}'s account, {name}, is off in this workspace, and no other {cli} account is on. Turn one on in Settings → Accounts & Connections.",
+    "note": "Starting an agent ({agent}) is refused: the connection chosen for it ({name}) is off in this workspace and there's no default to use instead. {cli} is the coding agent CLI.",
+    "audience": "both"
+  },
+  "main.connections.launch.otherProvider": {
+    "text": "The connection chosen for {agent} is for another CLI. Pick a {cli} connection in its Agent Settings.",
+    "note": "Starting an agent ({agent}) is refused: the connection chosen for it belongs to another coding agent CLI. {cli} is the agent's CLI (\"Claude Code\").",
+    "audience": "both"
+  },
+  "main.connections.launch.signedOut": {
+    "text": "{name} is signed out. Sign it in again in Settings → Accounts & Connections, then start {agent}.",
+    "note": "Starting an agent ({agent}) is refused: its account ({name}) isn't signed in.",
+    "audience": "both"
+  },
+  "main.connections.nameTaken": {
+    "text": "{account} already has a connection named {name}. Choose another name.",
+    "note": "An error saving a connection (Settings → Accounts & Connections, HI-2107): another connection on the same account ({account}, its name) has this name ({name}).",
+    "audience": "both"
+  },
+  "main.connections.noName": {
+    "text": "Give the connection a name.",
+    "note": "An error saving a connection (Settings → Accounts & Connections, HI-2107): its name is empty.",
+    "audience": "both"
+  },
+  "main.connections.notFound": {
+    "text": "There is no such connection.",
+    "note": "An error (HI-2107): a connection named by its id is not in Settings → Accounts & Connections (removed meanwhile).",
+    "audience": "both"
+  },
+  "main.freshStart.notFound": {
+    "text": "No agent {agent} in this project.",
+    "note": "Start Fresh for one agent is refused: the agent named ({agent}, its id) is not in the project.",
+    "audience": "both"
+  },
+  "main.gitInit.already": {
+    "text": "This folder is a git repository already.",
+    "note": "Why a folder can't be made a git repository again.",
+    "audience": "both"
+  },
+  "main.gitInit.failed.commit": {
+    "text": "couldn't make the first commit",
+    "note": "What failed in making a git repository, a clause (main.gitInit.stoppedAfter).",
+    "audience": "both"
+  },
+  "main.gitInit.failed.config": {
+    "text": "couldn't set {key}",
+    "note": "What failed in making a git repository, a clause (main.gitInit.stoppedAfter). {key} is a git setting (user.name, user.email).",
+    "audience": "both"
+  },
+  "main.gitInit.failed.exclude": {
+    "text": "couldn't keep .hive out of git",
+    "note": "What failed in making a git repository, a clause (main.gitInit.stoppedAfter). .hive is a folder's name.",
+    "audience": "both"
+  },
+  "main.gitInit.failed.gitignore": {
+    "text": "couldn't write the .gitignore",
+    "note": "What failed in making a git repository, a clause (main.gitInit.stoppedAfter). .gitignore is a file name.",
+    "audience": "both"
+  },
+  "main.gitInit.failed.identity": {
+    "text": "{which, select, name {git has no name to make the first commit as here} email {git has no email to make the first commit as here} other {git has no name or email to make the first commit as here}}",
+    "note": "What failed in making a git repository, a clause (main.gitInit.stoppedAfter): git has no identity to commit as. {which} says what it lacks.",
+    "audience": "both"
+  },
+  "main.gitInit.failed.ignored": {
+    "text": "git still doesn't ignore .hive here (a rule in a .gitignore may bring it back), so nothing was committed",
+    "note": "What failed in making a git repository, a clause (main.gitInit.stoppedAfter). .hive and .gitignore are names.",
+    "audience": "both"
+  },
+  "main.gitInit.failed.init": {
+    "text": "couldn't initialise the repository",
+    "note": "What failed in making a git repository, a clause (main.gitInit.stoppedAfter).",
+    "audience": "both"
+  },
+  "main.gitInit.failed.stage": {
+    "text": "couldn't stage the folder's files",
+    "note": "What failed in making a git repository, a clause (main.gitInit.stoppedAfter).",
+    "audience": "both"
+  },
+  "main.gitInit.failed.staged": {
+    "text": ".hive was staged, so nothing was committed",
+    "note": "What failed in making a git repository, a clause (main.gitInit.stoppedAfter). .hive is a folder's name.",
+    "audience": "both"
+  },
+  "main.gitInit.fix.commit": {
+    "text": "{git}. Commit in a terminal, or ask an agent to",
+    "note": "Why the first commit failed and what to do. {git} is git's own message.",
+    "audience": "both"
+  },
+  "main.gitInit.fix.identity": {
+    "text": "{which, select, name {enter it and choose Make first commit} email {enter it and choose Make first commit} other {enter them and choose Make first commit}}",
+    "note": "What to do when git has no name or email to commit as (main.gitInit.failed.identity). Make first commit is a button: use its name as shown.",
+    "audience": "both"
+  },
+  "main.gitInit.fix.ignored": {
+    "text": "fix that, then choose Make first commit in the Version Control tab",
+    "note": "What to do after .hive was found not ignored by git (main.gitInit.failed.ignored). Make first commit is a button in the Version Control tab (glossary 2.1): use its name as shown.",
+    "audience": "both"
+  },
+  "main.gitInit.fix.staged": {
+    "text": "check the .gitignore for a rule that brings .hive back",
+    "note": "What to do after .hive was staged (main.gitInit.failed.staged).",
+    "audience": "both"
+  },
+  "main.gitInit.nested": {
+    "text": "This folder is inside the git repository in {root}. Confirm that you want a repository of its own inside it.",
+    "note": "Why a folder wasn't made a git repository yet: it is inside another one, {root}, and the user didn't confirm a repository of its own.",
+    "audience": "both"
+  },
+  "main.gitInit.noEmail": {
+    "text": "Git has no email to make the first commit as: enter one.",
+    "note": "Why a folder was not made a git repository: no email address to commit as is set, and the user entered none.",
+    "audience": "both"
+  },
+  "main.gitInit.noGit": {
+    "text": "{problem}: Provider Setup says how to fix it.",
+    "note": "Why a folder can't be made a git repository (the Initialise Git Repository dialog): git is missing or broken. {problem} says what's wrong. Provider Setup is a view's name.",
+    "audience": "both"
+  },
+  "main.gitInit.noName": {
+    "text": "Git has no name to make the first commit as: enter one.",
+    "note": "Why a folder was not made a git repository: no name to commit as is set, and the user entered none.",
+    "audience": "both"
+  },
+  "main.gitInit.otherVcs": {
+    "text": "{vcs} keeps this folder (in {root}): Hive makes a git repository only where no other version control system is.",
+    "note": "Why a folder can't be made a git repository: another version control system (Jujutsu, Mercurial…), {vcs}, keeps it. {root} is the folder it keeps.",
+    "audience": "both"
+  },
+  "main.gitInit.stopped": {
+    "text": "{what}: {why}",
+    "note": "Why making a git repository failed at its first step. {what} is what failed (main.gitInit.failed.*, which starts with a small letter in English), {why} why.",
+    "audience": "both"
+  },
+  "main.gitInit.stoppedAfter": {
+    "text": "{done}, but {what}: {why}",
+    "note": "Why making a git repository stopped part way. {done} lists the steps that worked (main.gitInit.step.*), {what} what failed (main.gitInit.failed.*), {why} why (git's message, or what to do).",
+    "audience": "both"
+  },
+  "main.gitInit.unreadable": {
+    "text": "Git couldn't read this repository: {why}",
+    "note": "Why a folder can't be made a git repository. {why} is git's own message.",
+    "audience": "both"
+  },
+  "main.keys.maskingFull": {
+    "text": "Hive can't keep masking for another key: it already keeps the most it can. The key wasn't saved.",
+    "note": "An error saving a server connection's API key: Hive keeps a fingerprint of every key ever saved (to hide it in logs and exports) and has reached its limit.",
+    "audience": "both"
+  },
+  "main.keys.maskingUnreadable": {
+    "text": "Hive can't check this for API keys: its masking data can't be read. See Settings → Accounts & Connections.",
+    "note": "An error: an export, Copy Diagnostics or a recording was refused because the data Hive uses to hide server connections' API keys can't be read. Settings → Accounts & Connections names a section, where it can be reset.",
+    "audience": "both"
+  },
+  "main.keys.unsafe": {
+    "text": "Hive can't store a key safely on this system, so it wasn't saved.",
+    "note": "An error saving a server connection's API key (Settings → Accounts & Connections): Windows' protection for stored secrets isn't available, and Hive won't keep a key in plain text.",
+    "audience": "both"
+  },
+  "main.leftovers.offerNotEnded": {
+    "text": "{n, plural, one {Windows didn't let Hive end the process listed. Try again.} other {Windows didn't let Hive end all # processes listed. Try again.}}",
+    "note": "An error after End Them on the notice of processes an agent left running: some of the processes it listed still run (HI-2320). {n} is how many it listed.",
+    "audience": "both"
+  },
+  "main.leftovers.offerUnchecked": {
+    "text": "Hive couldn't check what runs now, so it ended nothing. Try again.",
+    "note": "An error after End Them or Keep Running on the notice of processes an agent left running: Hive couldn't read what the agent's processes are now, so it did nothing (HI-2320).",
+    "audience": "both"
+  },
+  "main.outage.gaveUpBody": {
+    "text": "{n, plural, one {It was resumed once in the past hour} other {It was resumed # times in the past hour}} and stopped again, so Hive won't resume it again by itself. This PC's network may not have recovered: try renewing its network adapter's addresses (ipconfig /renew), flushing DNS (ipconfig /flushdns) or restarting the PC, then resume it.",
+    "note": "The notice that Hive stopped resuming an agent whose connection kept dropping. {n} is how many times it was resumed in the past hour. ipconfig /renew and ipconfig /flushdns are Windows commands: keep them.",
+    "audience": "both"
+  },
+  "main.outage.gaveUpTitle": {
+    "text": "{agent}'s connection keeps dropping",
+    "note": "A notice's title: an agent's connection dropped again after Hive had resumed it several times in an hour, so Hive stopped resuming it. {agent} is the agent's name.",
+    "audience": "both"
+  },
+  "main.outage.progressTitle": {
+    "text": "{agent}: waiting for the connection",
+    "note": "A Progress panel run's title while Hive waits for an agent's connection to come back, to resume it. {agent} is the agent's name.",
+    "audience": "both"
+  },
+  "main.outage.progressWaiting": {
+    "text": "the connection to come back",
+    "note": "What a Progress panel run waits for, after \"Waiting for\": the connection of an agent whose turn a dropped connection ended.",
+    "audience": "both"
+  },
+  "main.outage.resumedSummary": {
+    "text": "Resumed: the connection dropped at {dropped} and came back at {back}.",
+    "note": "A Progress panel run's summary: Hive resumed an agent once its connection came back. {dropped} and {back} are times of day.",
+    "audience": "both"
+  },
+  "main.outage.timedOutBody": {
+    "text": "Hive waited {minutes, plural, one {# minute} other {# minutes}} and stopped waiting. If other apps can reach the internet, this PC's network may not have recovered: try renewing its network adapter's addresses (ipconfig /renew), flushing DNS (ipconfig /flushdns) or restarting the PC, then resume it.",
+    "note": "The notice that Hive stopped waiting for an agent's connection. {minutes} is how long it waited. ipconfig /renew and ipconfig /flushdns are Windows commands: keep them.",
+    "audience": "both"
+  },
+  "main.outage.timedOutTitle": {
+    "text": "{agent}'s connection didn't come back",
+    "note": "A notice's title: Hive waited for an agent's connection to come back, to resume it, and gave up. {agent} is the agent's name.",
+    "audience": "both"
+  },
+  "main.plan.used": {
+    "text": "{share, number, ::percent} of your {provider} {window, select, hours {{hours, plural, one {#-hour limit} other {#-hour limit}}} weekly {weekly limit} other {{label} limit}} used",
+    "note": "A notice: how much of a plan's usage limit is used ({share}: \"85%\"). {provider} is the coding agent. The limit is a rolling window of {hours} hours (the 5-hour one), the weekly one, or another the provider names itself ({label}, in English as the provider says it).",
+    "audience": "both"
+  },
+  "main.plan.usedOn": {
+    "text": "{share, number, ::percent} of the {window, select, hours {{hours, plural, one {#-hour limit} other {#-hour limit}}} weekly {weekly limit} other {{label} limit}} used on {connection}",
+    "note": "A notice (HI-1756): how much of a plan's usage limit is used ({share}: \"85%\") on one connection, a sign-in the user named ({connection}: \"Max 1\"). The limit is a rolling window of {hours} hours (the 5-hour one), the weekly one, or another the provider names itself ({label}, in English as the provider says it).",
+    "audience": "both"
+  },
+  "main.quit.closed": {
+    "text": "Hive has closed",
+    "note": "A notice after Hive quit without asking, its sessions stopped.",
+    "audience": "both"
+  },
+  "main.server.key.chars": {
+    "text": "A key has no spaces or special characters outside plain ASCII. Check what was pasted.",
+    "note": "An error saving a server connection's API key (Settings → Accounts & Connections): it has spaces, line breaks or non-ASCII characters. The key itself is never shown.",
+    "audience": "both"
+  },
+  "main.server.key.inField": {
+    "text": "The key appears in the {field, select, name {name} url {base URL} other {model list}}: take it out of there first. Nothing was saved.",
+    "note": "An error saving a server connection's API key: the key was also typed into another field ({field}: its name, its base URL or its models), where it would be kept unencrypted.",
+    "audience": "both"
+  },
+  "main.server.key.length": {
+    "text": "A key is between {min, number} and {max, number} characters long. Check what was pasted.",
+    "note": "An error saving a server connection's API key: it is too short or too long. {min} and {max} are numbers. The key itself is never shown.",
+    "audience": "both"
+  },
+  "main.server.notServer": {
+    "text": "That connection doesn't get its model from a server.",
+    "note": "An error: an action for a server connection (its key, its models, its Set Up) was asked for a connection signed in through its CLI instead.",
+    "audience": "both"
+  },
+  "main.server.setUp.noKey": {
+    "text": "{name} has no key yet. Add its key first, then set it up.",
+    "note": "An error opening Set Up for a server connection ({name}, its name in Settings → Accounts & Connections): its server needs an API key and none is saved.",
+    "audience": "both"
+  },
+  "main.server.unsupported": {
+    "text": "{cli} can't get its model from a server in Hive.",
+    "note": "An error adding a server connection for a coding agent CLI ({cli}: \"Codex\") that Hive has no server connections for.",
+    "audience": "both"
+  },
+  "main.server.url.extra": {
+    "text": "The URL can't have a query (?…) or a fragment (#…): give the key in its own field.",
+    "note": "An error saving a server connection's base URL: it has a query string or a fragment, which Hive won't keep (a key could be in it).",
+    "audience": "both"
+  },
+  "main.server.url.invalid": {
+    "text": "That isn't a URL Hive can use: write it in full, such as https://api.example.com.",
+    "note": "An error saving a server connection's base URL (Settings → Accounts & Connections): it can't be read as a URL.",
+    "audience": "both"
+  },
+  "main.server.url.remoteHttp": {
+    "text": "A server on another computer needs https://. Plain http:// is only for a server on this PC (localhost).",
+    "note": "An error saving a server connection's base URL: it uses http:// to a server that isn't on this computer, which would send the key unencrypted.",
+    "audience": "both"
+  },
+  "main.server.url.scheme": {
+    "text": "The URL must start with https:// (or http:// for a server on this PC).",
+    "note": "An error saving a server connection's base URL: it isn't http or https.",
+    "audience": "both"
+  },
+  "main.server.url.userinfo": {
+    "text": "The URL can't hold a user name or password: give the key in its own field.",
+    "note": "An error saving a server connection's base URL: it has user:password@ in it, which Hive won't keep.",
+    "audience": "both"
+  },
+  "main.storage.purgeChanged": {
+    "text": "It changed since the preview.",
+    "note": "Purge skipped a file the preview listed: it was changed (written to) since.",
+    "audience": "both"
+  },
+  "main.storage.purgeClaimed": {
+    "text": "It belongs to a session again.",
+    "note": "Purge skipped a file or folder of a session Hive no longer had: it has one again.",
+    "audience": "both"
+  },
+  "main.storage.purgeExpired": {
+    "text": "This preview is out of date. Open Purge again to see what goes now.",
+    "note": "Purge refused: the preview it was asked to apply was already applied, or is too old.",
+    "audience": "both"
+  },
+  "main.storage.purgeNotKept": {
+    "text": "The folder isn't one Hive keeps attachments in, so it is left alone.",
+    "note": "Purge skipped a session's attachments: their folder isn't a real folder in the project's attachments folder (a link, say).",
+    "audience": "both"
+  },
+  "main.storage.purgeRunning": {
+    "text": "Its session is running.",
+    "note": "Purge skipped a file or folder: its session is running now.",
+    "audience": "both"
+  },
+  "main.storage.purgeSessionChanged": {
+    "text": "One of the session's backups changed since the preview, so nothing of it goes.",
+    "note": "Purge left a session alone: one of Hive's copies of its transcript changed since the preview (it was resumed, say).",
+    "audience": "both"
+  },
+  "main.storage.purgeUnrecorded": {
+    "text": "Hive couldn't record it in the usage history, so it is kept.",
+    "note": "Purge kept a deleted session's old usage: Hive couldn't save it in the usage history, which the totals keep.",
+    "audience": "both"
+  },
+  "main.unexpectedClose.notChecked": {
+    "text": "{u, plural, one {A process started by a test run may still be running: Windows let Hive neither end nor check it, so Hive can't find it again. Look for process ID {ids} in Task Manager's Details.} other {# processes started by a test run may still be running: Windows let Hive neither end nor check them, so Hive can't find them again. Look for process IDs {ids} in Task Manager's Details.}}",
+    "note": "Stop Them (in the notice that Hive closed unexpectedly) ended what it could, but {u} processes a test run had started may still run: Windows let Hive neither end nor check them, and with what started them ended Hive can't tell them from other processes any more, so pressing Stop Them again won't reach them. {ids} lists their process IDs (\"4242, 4250\"), to look for in Task Manager's Details tab.",
+    "audience": "both"
+  },
+  "main.unexpectedClose.notStopped": {
+    "text": "{n, plural, one {# process is still running: Windows didn't let Hive end it.} other {# processes are still running: Windows didn't let Hive end them.}} Stop Them in the notice tries again.",
+    "note": "Stopping the processes the agents had started before Hive closed unexpectedly failed for some. {n} is how many still run; Stop Them is the notice's button.",
+    "audience": "both"
+  },
+  "main.unexpectedClose.notStoppedNorChecked": {
+    "text": "{n, plural, one {# process is still running: Windows didn't let Hive end it; Stop Them in the notice tries again.} other {# processes are still running: Windows didn't let Hive end them; Stop Them in the notice tries again.}} {u, plural, one {Another, started by a test run, may still be running: Windows let Hive neither end nor check it, so Hive can't find it again. Look for process ID {ids} in Task Manager's Details.} other {# others, started by a test run, may still be running: Windows let Hive neither end nor check them, so Hive can't find them again. Look for process IDs {ids} in Task Manager's Details.}}",
+    "note": "Stopping the processes the agents had started before Hive closed unexpectedly failed for some. {n} is how many still run, which Stop Them (the notice's button) tries again; {u} is how many more, started by a test run, Windows let Hive neither end nor check, so Hive can't tell them from other processes any more: {ids} lists their process IDs (\"4242, 4250\"), to look for in Task Manager's Details tab.",
+    "audience": "both"
+  },
+  "main.usageMove.blockedTitle": {
+    "text": "Hive can't move {from}'s agents to {to}",
+    "note": "A notice's title (HI-2195): an account ({from}) reached the share of its usage limit its rule sets, but its agents can't move to the account the rule names ({to}); the text says why.",
+    "audience": "both"
+  },
+  "main.usageMove.movedTitle": {
+    "text": "{count, plural, one {# agent moves} other {# agents move}} from {from} to {to}",
+    "note": "A notice's title (HI-2195): an account ({from}, the user's name for it in Settings → Accounts & Connections) reached the share of its plan's usage limit its rule sets, so Hive moves its agents to another account ({to}).",
+    "audience": "both"
+  }
+}

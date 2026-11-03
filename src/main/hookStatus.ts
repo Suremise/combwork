@@ -221,6 +221,7 @@ export function markedIdle(s: HookStatusInput): HookStep {
 
 /** What an agent idle after its CLI's safeguard prompt was answered shows (#606): `SAFEGUARD_IDLE_MESSAGE` is its English, which Hive compares. */
 export const SAFEGUARD_IDLE_TEXT = msg({ id: 'session.status.safeguardIdle', defaultMessage: 'Idle after a safeguard stop: give it a nudge', description: "An agent's status: its CLI's safety classifier stopped a response, the user answered its prompt about it, and the agent now waits for a new prompt." })
+// agent-stored: agentField says it for each agent where its status is sent (servers.ts statusMessageOf); Hive compares the English
 export const SAFEGUARD_IDLE_MESSAGE = englishText(SAFEGUARD_IDLE_TEXT)
 
 /**

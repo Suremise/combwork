@@ -1,0 +1,192 @@
+{
+  "worktrees.agent.badPlacement": {
+    "text": "The panes can't be placed like that in this layout.",
+    "note": "An error: saving where the user put the agents' panes in a layout (dragging a pane to another cell) was given a layout or places Hive doesn't know.",
+    "audience": "both"
+  },
+  "worktrees.agent.badWorkflowRole": {
+    "text": "A role in the workflow is builder, reviewer, either or generalist.",
+    "note": "An error: an agent's role in the workflow was given as something else. builder, reviewer, either and generalist are values: keep them in English.",
+    "audience": "both"
+  },
+  "worktrees.agent.chooseMove": {
+    "text": "Choose where to move the agent.",
+    "note": "An error: an agent was to be moved in the project's order, with no place given.",
+    "audience": "both"
+  },
+  "worktrees.agent.effortRefused": {
+    "text": "{chosen, select, yes {{model}} other {The CLI's default model}} doesn't take {effort} effort. Choose one of the levels it takes.",
+    "note": "An error saving an agent's (or a connection's) settings (HI-2106): the model that would run (its name, {model}, when one is chosen; else the CLI's own default) has no such reasoning effort level ({effort}: \"max\").",
+    "audience": "both"
+  },
+  "worktrees.agent.enterName": {
+    "text": "Enter a name.",
+    "note": "An error: an agent's name was emptied.",
+    "audience": "both"
+  },
+  "worktrees.agent.gone": {
+    "text": "That agent no longer exists.",
+    "note": "An error: the agent being changed was removed meanwhile.",
+    "audience": "both"
+  },
+  "worktrees.agent.nameTaken": {
+    "text": "There is already an agent called \"{name}\".",
+    "note": "An error: the project already has an agent with the name {name}.",
+    "audience": "both"
+  },
+  "worktrees.agent.noTree": {
+    "text": "This agent works in the project folder, not a worktree.",
+    "note": "An error: something only a worktree agent has (its branch's state, a merge) was asked of an agent working in the project folder.",
+    "audience": "both"
+  },
+  "worktrees.agent.notPinned": {
+    "text": "Agents aren’t pinned to worktrees in 1.0: slots are lent per card or lane.",
+    "note": "An error: an agent was to be added in a worktree of its own (a new or an existing one), which 1.0 doesn't do: Hive lends a working folder (a slot) to each card or lane instead (glossary 2.5: slot, lane).",
+    "audience": "both"
+  },
+  "worktrees.agent.providerChangedMeanwhile": {
+    "text": "{agent}'s provider was changed meanwhile: nothing was changed. Try again.",
+    "note": "An error saving an agent's settings (HI-1771): its provider (coding agent CLI) was changed by something else while this change was being saved, so nothing was saved. {agent} is its name.",
+    "audience": "both"
+  },
+  "worktrees.agent.removing": {
+    "text": "That worktree is already being removed or merged.",
+    "note": "An error: the worktree is being removed or merged by another action right now.",
+    "audience": "both"
+  },
+  "worktrees.agent.roleTooLong": {
+    "text": "A role is at most {max} characters.",
+    "note": "An error: an agent's role (what it does, in a few words) is longer than it may be ({max}, a number).",
+    "audience": "both"
+  },
+  "worktrees.agent.stopForProvider": {
+    "text": "Stop the agent before changing its provider.",
+    "note": "An error: an agent's provider (its coding-agent CLI) can't change while it runs.",
+    "audience": "both"
+  },
+  "worktrees.agent.stopToMerge": {
+    "text": "Stop {agent} before merging and removing its worktree.",
+    "note": "An error: a merge that also removes the worktree needs the agent {agent} (its name) stopped first.",
+    "audience": "both"
+  },
+  "worktrees.agent.stopToRemove": {
+    "text": "Stop the agent before removing it.",
+    "note": "An error: a running agent can't be removed.",
+    "audience": "both"
+  },
+  "worktrees.agent.unknownProvider": {
+    "text": "Unknown provider \"{provider}\".",
+    "note": "An error: {provider} is not a coding-agent CLI this Hive knows (Claude Code, Codex…).",
+    "audience": "both"
+  },
+  "worktrees.badBranchName": {
+    "text": "\"{branch}\" is not a valid branch name.",
+    "note": "An error: git doesn't take {branch} as a branch name.",
+    "audience": "both"
+  },
+  "worktrees.branchInWay": {
+    "text": "Git can't make the branch {branch}: a branch {parent} is in the way. Choose another branch.",
+    "note": "An error: a new branch {branch} can't be made, because a branch {parent} exists and git can't have a branch inside another's name.",
+    "audience": "both"
+  },
+  "worktrees.cantCheck": {
+    "text": "Git couldn't check {branch}: {why}.",
+    "note": "An error: git couldn't count the branch {branch}'s unmerged commits or its worktree's uncommitted files; {why} says why.",
+    "audience": "both"
+  },
+  "worktrees.deleteBranch": {
+    "text": "Could not delete branch {branch}",
+    "note": "An error: the branch {branch} could not be deleted, and git said nothing about why.",
+    "audience": "both"
+  },
+  "worktrees.gitFailed": {
+    "text": "{command} failed",
+    "note": "Why git couldn't do something, when git said nothing itself. {command} is the git command (\"git rev-parse\"): keep it as it is.",
+    "audience": "both"
+  },
+  "worktrees.gitProblem": {
+    "text": "{problem}.",
+    "note": "An error: git cannot run. {problem} says why (git is missing, or too old), without its full stop.",
+    "audience": "both"
+  },
+  "worktrees.listBranches": {
+    "text": "git couldn't list the branches ({why})",
+    "note": "An error: git couldn't list the repository's branches; {why} is git's reason.",
+    "audience": "both"
+  },
+  "worktrees.missing.noAgent": {
+    "text": "That agent no longer exists.",
+    "note": "An error: the agent whose missing worktree was to be recreated or unlinked was removed meanwhile.",
+    "audience": "both"
+  },
+  "worktrees.missing.noBranch": {
+    "text": "{agent}'s branch {branch} is gone, and the project folder isn't on a branch to start a new one from.",
+    "note": "An error: the missing worktree of the agent {agent} (its name) can't be recreated: its branch {branch} is gone too, and there's no branch to make a new one from.",
+    "audience": "both"
+  },
+  "worktrees.missing.noTree": {
+    "text": "{agent} doesn't work in a worktree.",
+    "note": "An error: the agent {agent} (its name) works in the project folder, so it has no worktree to recreate or unlink.",
+    "audience": "both"
+  },
+  "worktrees.missing.slotFailed": {
+    "text": "Slot {slot} of agent {agent} couldn't be made again: {why}",
+    "note": "An error: a slot lent to the agent {agent} (its name), whose folder was gone, couldn't be made again ({slot}: the slot's name; {why}: why, often git's message in English). A noun before the name (glossary §1 rule 4).",
+    "audience": "both"
+  },
+  "worktrees.missing.stillListed": {
+    "text": "git still lists {folder} as a worktree (it may be locked): unlock it, or run git worktree prune, then try again.",
+    "note": "An error: git still has the missing worktree {folder} on its list, so it can't be recreated there. git worktree prune is a git command: keep it.",
+    "audience": "both"
+  },
+  "worktrees.missing.stopFirst": {
+    "text": "Stop {agent} first.",
+    "note": "An error: the agent {agent} (its name) is running; its missing worktree can't be recreated until it stops.",
+    "audience": "both"
+  },
+  "worktrees.missing.thereRecreate": {
+    "text": "{agent}'s worktree folder is there ({folder}): there's nothing to recreate.",
+    "note": "An error: the worktree folder {folder} of the agent {agent} (its name) exists, so it isn't missing.",
+    "audience": "both"
+  },
+  "worktrees.missing.thereUnlink": {
+    "text": "{agent}'s worktree folder is there ({folder}): remove the agent to remove its worktree.",
+    "note": "An error: the worktree folder {folder} of the agent {agent} (its name) exists, so its link can't be dropped as a missing one.",
+    "audience": "both"
+  },
+  "worktrees.missing.wouldPrune": {
+    "text": "Recreating runs git worktree prune, which would also drop git's link to {folders} (missing too). Locate, recreate or remove {n, plural, one {that worktree} other {those worktrees}} first.",
+    "note": "An error: recreating a missing worktree runs git worktree prune (a git command: keep it), which would also forget the other missing worktrees {folders} (a list of folders); {n} is how many.",
+    "audience": "both"
+  },
+  "worktrees.names.closed": {
+    "text": "The workspace was closed or switched: nothing was changed.",
+    "note": "An error: the workspace closed, or another opened in its window, while a project's name was being recorded; nothing changed.",
+    "audience": "both"
+  },
+  "worktrees.names.projectGone": {
+    "text": "That project is no longer in the workspace.",
+    "note": "An error: the project whose name was being recorded was removed from the workspace meanwhile.",
+    "audience": "both"
+  },
+  "worktrees.readBranch": {
+    "text": "git couldn't read the branch checked out in {folder} ({why})",
+    "note": "An error: git couldn't say which branch the folder {folder} has checked out; {why} is git's reason.",
+    "audience": "both"
+  },
+  "worktrees.readOriginHead": {
+    "text": "git couldn't read origin/HEAD ({why})",
+    "note": "An error: git couldn't read which branch is the remote's main branch (origin/HEAD, git's name: keep it); {why} is git's reason.",
+    "audience": "both"
+  },
+  "worktrees.statusFailed": {
+    "text": "git status failed in its folder",
+    "note": "Why git couldn't check a worktree (after \"Git couldn't check <branch>:\"): git status failed in the worktree's folder. Lower case.",
+    "audience": "both"
+  },
+  "worktrees.unknownError": {
+    "text": "unknown error",
+    "note": "Why git couldn't do something, when nothing at all was said. Lower case: it follows a colon.",
+    "audience": "both"
+  }
+}

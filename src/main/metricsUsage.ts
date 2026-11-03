@@ -116,7 +116,8 @@ export async function providerUsage(w: WorkspaceService, f: UsageFilter, from: n
 export async function metricsReport(w: WorkspaceService, q: MetricsQuery): Promise<MetricsReport> {
   const r = queryMetrics(w, q)
   const usage = await providerUsage(w, { project: r.scope.kind === 'project' ? r.scope.project : null, own: r.filters.own, role: r.filters.role, provider: r.filters.provider }, Date.parse(r.from), Date.parse(r.to))
-  return { ...r, providers: usage.providers, ...(usage.safeguards ? { safeguards: usage.safeguards } : {}), ...(usage.note ? { providersNote: englishText(usage.note), providersNoteText: usage.note } : {}), ...(usage.unreadable ? { providersUnreadable: usage.unreadable, providersHosts: usage.hosts } : {}) }
+  // agent-stored: metricsForAgents says the note for the agent reading the report (servers.ts)
+  return { ...r, providers: usage.providers, ...(usage.safeguards ? { safeguards: usage.safeguards } : {}), ...(usage.note ? { providersNote: englishText(usage.note), providersNoteText: usage.note } : {}), ...(usage.unreadable ? { providersUnreadable: usage.unreadable, providersHosts: usage.hosts } : {}) } // agent-text: providerUsage
 }
 
 /** Safeguard counts with their project and agent names replaced (an export's sanitize). */

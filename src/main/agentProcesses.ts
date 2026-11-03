@@ -208,12 +208,14 @@ export type TrackResult = { tracked: true } | { tracked: false; reason: string; 
  * nothing is assigned to it after.
  */
 export async function trackLaunch(launch: Launch, pid: number, cancelled?: AbortSignal): Promise<TrackResult> {
+  // log: TrackResult.reason is the log's (and the launch gate's, for a launch stopped before it started); the notice says its text (sessions.ts untracked)
   if (process.platform !== 'win32') return { tracked: false, reason: englishText(TRACKER.windowsOnly), text: TRACKER.windowsOnly }
   // A lost helper's revocation is written before any launch is given to the one that replaces it (HI-2055), however
   // late the loss: before this launch, while its helper is made ready, or while its job is made (HR2's round 1).
   const unrevoked = (): TrackResult => {
     log.warn(`could not track the processes of ${userText(launch.agentName)}: a lost helper's revocation couldn't be kept`)
     problem = TRACKER.noStart
+    // log: as above, the log's reason; the notice says its text
     return { tracked: false, reason: englishText(TRACKER.noStart), text: TRACKER.noStart }
   }
   if (!(await revocationsWritten())) return unrevoked()
@@ -250,6 +252,7 @@ export async function trackLaunch(launch: Launch, pid: number, cancelled?: Abort
     return { tracked: false, reason: STOPPED_BEFORE_START }
   }
   const text: TextPart = r === null ? (host.usable ? TRACKER.noAnswer : (problem ?? TRACKER.noStart)) : String(r)
+  // log: the warning below
   const reason = englishText(text)
   log.warn(`could not track the processes of ${userText(launch.agentName)}: ${reason}`)
   problem = text
@@ -1151,10 +1154,12 @@ export function warmProcessTracking(): void {
 
 /** Why agents' processes aren't being tracked, for Diagnostics (in English); null when they are. */
 export function trackingProblem(): string | null {
+  // window: Help → Diagnostics, in English
   return process.platform !== 'win32' || problem === null ? null : englishText(problem)
 }
 
 /** The same as text, for the notice (noteUntracked). */
+// agent-text: TRACKER, failureText
 export function trackingProblemText(): TextPart | null {
   return process.platform !== 'win32' ? null : problem
 }

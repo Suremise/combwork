@@ -55,6 +55,7 @@ export const NOTICE_TEXT = {
 }
 
 /** A notice of Hive's: its English text (the transcript's own words, as cached) and the same as data, for the window. */
+// window: a notice in the window's view of a conversation (transcripts.ts shownNotice); no agent reads it
 export const noticeOf = (message: Text, level: 'info' | 'error'): { kind: 'notice'; text: string; level: 'info' | 'error'; message: Text } => ({ kind: 'notice', text: englishText(message), level, message })
 
 /** A notice's text in the language the window shows: Hive's own words translated, a CLI's as they are. */

@@ -117,6 +117,7 @@ const hiveHost: OutageHost = {
     return !!st && st.runId === a.runId && st.failedTurn?.since === a.turn
   },
   waiting(a) {
+    // agent-text: M
     sessions.connectionWait(a.projectPath, a.agentId, a.runId, M.waiting)
     startRun(a)
   },

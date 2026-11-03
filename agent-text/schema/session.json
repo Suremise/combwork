@@ -4,8 +4,145 @@
       "id": "plain"
     }
   },
+  "session.archive.notKept": {
+    "placeholders": {}
+  },
+  "session.background.cantStop": {
+    "placeholders": {
+      "provider": "plain"
+    }
+  },
   "session.carryOn": {
     "placeholders": {}
+  },
+  "session.carryOn.already": {
+    "placeholders": {}
+  },
+  "session.cleanUp.already": {
+    "placeholders": {}
+  },
+  "session.cleanUp.changed": {
+    "placeholders": {}
+  },
+  "session.cleanUp.cliBack": {
+    "placeholders": {}
+  },
+  "session.cleanUp.cliGone": {
+    "placeholders": {}
+  },
+  "session.cleanUp.unarchived": {
+    "placeholders": {}
+  },
+  "session.cleanUp.unread": {
+    "placeholders": {}
+  },
+  "session.cleanUp.unreadBackups": {
+    "placeholders": {}
+  },
+  "session.compact.already": {
+    "placeholders": {}
+  },
+  "session.compact.busy": {
+    "placeholders": {}
+  },
+  "session.compact.stopped": {
+    "placeholders": {}
+  },
+  "session.compact.userTyped": {
+    "placeholders": {}
+  },
+  "session.compact.waiting": {
+    "placeholders": {}
+  },
+  "session.error.agentGone": {
+    "placeholders": {}
+  },
+  "session.error.inUseElsewhere": {
+    "placeholders": {}
+  },
+  "session.error.noAgents": {
+    "placeholders": {}
+  },
+  "session.error.noDeliveries": {
+    "placeholders": {}
+  },
+  "session.error.noSession": {
+    "placeholders": {}
+  },
+  "session.error.running": {
+    "placeholders": {}
+  },
+  "session.error.severalAgents": {
+    "placeholders": {}
+  },
+  "session.error.stopFirst": {
+    "placeholders": {
+      "action": "select"
+    }
+  },
+  "session.error.stoppedBeforePrompt": {
+    "placeholders": {}
+  },
+  "session.error.stoppedBeforeStart": {
+    "placeholders": {}
+  },
+  "session.error.typingBusy": {
+    "placeholders": {}
+  },
+  "session.handOver.asking": {
+    "placeholders": {
+      "agent": "plain"
+    }
+  },
+  "session.handOver.busy": {
+    "placeholders": {
+      "agent": "plain"
+    }
+  },
+  "session.handOver.didntStop": {
+    "placeholders": {
+      "agent": "plain",
+      "handover": "plain"
+    }
+  },
+  "session.handOver.momentLost": {
+    "placeholders": {
+      "agent": "plain",
+      "handover": "plain"
+    }
+  },
+  "session.handOver.noTools": {
+    "placeholders": {}
+  },
+  "session.handOver.none": {
+    "placeholders": {
+      "project": "plain"
+    }
+  },
+  "session.handOver.noneWritten": {
+    "placeholders": {
+      "agent": "plain"
+    }
+  },
+  "session.handOver.notNow": {
+    "placeholders": {
+      "agent": "plain"
+    }
+  },
+  "session.handOver.notRunning": {
+    "placeholders": {
+      "agent": "plain"
+    }
+  },
+  "session.handOver.slow": {
+    "placeholders": {
+      "agent": "plain"
+    }
+  },
+  "session.handOver.stopped": {
+    "placeholders": {
+      "agent": "plain"
+    }
   },
   "session.handover.ask": {
     "placeholders": {
@@ -18,6 +155,36 @@
       "handover": "plain",
       "self": "select",
       "from": "plain"
+    }
+  },
+  "session.inUse.attaching": {
+    "placeholders": {}
+  },
+  "session.inUse.open": {
+    "placeholders": {}
+  },
+  "session.inUse.reading": {
+    "placeholders": {}
+  },
+  "session.inUse.reserved": {
+    "placeholders": {}
+  },
+  "session.inUse.running": {
+    "placeholders": {}
+  },
+  "session.inUse.writing": {
+    "placeholders": {}
+  },
+  "session.keyRefused.title": {
+    "placeholders": {
+      "n": "plural",
+      "agent": "plain",
+      "name": "plain"
+    }
+  },
+  "session.leftovers.notEnded": {
+    "placeholders": {
+      "n": "plural"
     }
   },
   "session.lock.anotherAgent": {
@@ -56,9 +223,350 @@
       "file": "plain"
     }
   },
+  "session.mode.asking": {
+    "placeholders": {}
+  },
+  "session.mode.assistantCliOwn": {
+    "placeholders": {}
+  },
+  "session.mode.off": {
+    "placeholders": {
+      "mode": "plain",
+      "provider": "plain"
+    }
+  },
+  "session.mode.starting": {
+    "placeholders": {}
+  },
+  "session.mode.typing": {
+    "placeholders": {}
+  },
+  "session.mode.working": {
+    "placeholders": {
+      "provider": "plain"
+    }
+  },
+  "session.newConversation.didntStop": {
+    "placeholders": {}
+  },
+  "session.newConversation.notRunning": {
+    "placeholders": {}
+  },
+  "session.newConversation.pending": {
+    "placeholders": {}
+  },
+  "session.notice.finished": {
+    "placeholders": {
+      "agent": "plain"
+    }
+  },
+  "session.notice.lineLostTitle": {
+    "placeholders": {
+      "agent": "plain"
+    }
+  },
+  "session.notice.needsInput": {
+    "placeholders": {
+      "agent": "plain"
+    }
+  },
+  "session.notice.notWatching": {
+    "placeholders": {
+      "agent": "plain",
+      "cards": "plain"
+    }
+  },
+  "session.notice.question": {
+    "placeholders": {
+      "agent": "plain"
+    }
+  },
+  "session.notice.safeguardSwitch": {
+    "placeholders": {
+      "agent": "plain",
+      "model": "plain"
+    }
+  },
+  "session.notice.untakenTitle": {
+    "placeholders": {
+      "agent": "plain"
+    }
+  },
+  "session.plan.asking": {
+    "placeholders": {}
+  },
+  "session.plan.noToggle": {
+    "placeholders": {
+      "provider": "plain"
+    }
+  },
+  "session.plan.typing": {
+    "placeholders": {}
+  },
+  "session.prompt.cliAsks": {
+    "placeholders": {}
+  },
+  "session.prompt.inputBlocked": {
+    "placeholders": {}
+  },
+  "session.prompt.inputNotCleared": {
+    "placeholders": {}
+  },
+  "session.prompt.untaken": {
+    "placeholders": {}
+  },
+  "session.purge.changed": {
+    "placeholders": {}
+  },
+  "session.purge.cliBack": {
+    "placeholders": {}
+  },
+  "session.purge.cliGone": {
+    "placeholders": {}
+  },
+  "session.purge.gone": {
+    "placeholders": {}
+  },
+  "session.purge.open": {
+    "placeholders": {}
+  },
+  "session.purge.reading": {
+    "placeholders": {}
+  },
+  "session.purge.running": {
+    "placeholders": {}
+  },
+  "session.purge.unread": {
+    "placeholders": {}
+  },
+  "session.restartMode.didntStop": {
+    "placeholders": {
+      "agent": "plain"
+    }
+  },
+  "session.signIn.many": {
+    "placeholders": {
+      "n": "plural",
+      "provider": "plain"
+    }
+  },
+  "session.signIn.notSignedIn": {
+    "placeholders": {
+      "provider": "plain"
+    }
+  },
+  "session.signIn.one": {
+    "placeholders": {
+      "agent": "plain",
+      "provider": "plain"
+    }
+  },
   "session.skillNotGiven": {
     "placeholders": {
       "why": "plain"
     }
+  },
+  "session.start.agentRunning": {
+    "placeholders": {
+      "agent": "plain"
+    }
+  },
+  "session.start.alreadyRunning": {
+    "placeholders": {}
+  },
+  "session.start.anotherAgent": {
+    "placeholders": {}
+  },
+  "session.start.archived": {
+    "placeholders": {}
+  },
+  "session.start.args": {
+    "placeholders": {
+      "problem": "plain",
+      "connection": "plain"
+    }
+  },
+  "session.start.beingOpened": {
+    "placeholders": {}
+  },
+  "session.start.cleaning": {
+    "placeholders": {}
+  },
+  "session.start.cliRequired": {
+    "placeholders": {
+      "provider": "plain"
+    }
+  },
+  "session.start.closing": {
+    "placeholders": {}
+  },
+  "session.start.fenced": {
+    "placeholders": {
+      "why": "plain"
+    }
+  },
+  "session.start.moveFailed": {
+    "placeholders": {
+      "project": "plain",
+      "error": "plain"
+    }
+  },
+  "session.start.openCommands": {
+    "placeholders": {}
+  },
+  "session.start.openIn": {
+    "placeholders": {
+      "agent": "plain"
+    }
+  },
+  "session.start.otherFolder": {
+    "placeholders": {
+      "folder": "plain"
+    }
+  },
+  "session.start.projectRunning": {
+    "placeholders": {}
+  },
+  "session.start.providerMissing": {
+    "placeholders": {
+      "resuming": "select",
+      "provider": "plain",
+      "agent": "plain"
+    }
+  },
+  "session.start.providerOff": {
+    "placeholders": {
+      "provider": "plain",
+      "resuming": "select",
+      "agent": "plain"
+    }
+  },
+  "session.start.repairing": {
+    "placeholders": {}
+  },
+  "session.start.slotBusy": {
+    "placeholders": {
+      "slot": "plain",
+      "agent": "plain"
+    }
+  },
+  "session.start.slotChanged": {
+    "placeholders": {
+      "slot": "plain",
+      "agent": "plain"
+    }
+  },
+  "session.start.slotSetup": {
+    "placeholders": {
+      "slot": "plain",
+      "agent": "plain"
+    }
+  },
+  "session.start.subSession": {
+    "placeholders": {
+      "kind": "plain",
+      "provider": "plain"
+    }
+  },
+  "session.start.turnedOff": {
+    "placeholders": {
+      "provider": "plain",
+      "agent": "plain"
+    }
+  },
+  "session.start.worktreeMissing": {
+    "placeholders": {
+      "agent": "plain",
+      "folder": "plain"
+    }
+  },
+  "session.status.asksAtStart": {
+    "placeholders": {}
+  },
+  "session.status.asksTrust": {
+    "placeholders": {}
+  },
+  "session.status.cliAsks": {
+    "placeholders": {
+      "provider": "plain",
+      "question": "plain"
+    }
+  },
+  "session.status.compacting": {
+    "placeholders": {}
+  },
+  "session.status.connectionKeepsDropping": {
+    "placeholders": {}
+  },
+  "session.status.connectionNotBack": {
+    "placeholders": {}
+  },
+  "session.status.failedTurn": {
+    "placeholders": {}
+  },
+  "session.status.inputBlocked": {
+    "placeholders": {}
+  },
+  "session.status.safeguardAsks": {
+    "placeholders": {
+      "provider": "plain"
+    }
+  },
+  "session.status.safeguardAsksTools": {
+    "placeholders": {
+      "provider": "plain",
+      "tools": "plain"
+    }
+  },
+  "session.status.safeguardIdle": {
+    "placeholders": {}
+  },
+  "session.status.settingUp": {
+    "placeholders": {
+      "command": "plain"
+    }
+  },
+  "session.status.signedInAgain": {
+    "placeholders": {}
+  },
+  "session.status.tasksDropped": {
+    "placeholders": {
+      "minutes": "plural"
+    }
+  },
+  "session.status.waitingForConnection": {
+    "placeholders": {}
+  },
+  "session.tracker.helperFailed": {
+    "placeholders": {
+      "why": "plain"
+    }
+  },
+  "session.tracker.noAnswer": {
+    "placeholders": {}
+  },
+  "session.tracker.noPowerShell": {
+    "placeholders": {
+      "error": "plain"
+    }
+  },
+  "session.tracker.noStart": {
+    "placeholders": {}
+  },
+  "session.tracker.refused": {
+    "placeholders": {}
+  },
+  "session.tracker.slowHelper": {
+    "placeholders": {
+      "seconds": "plural"
+    }
+  },
+  "session.tracker.stopped": {
+    "placeholders": {
+      "why": "plain"
+    }
+  },
+  "session.tracker.windowsOnly": {
+    "placeholders": {}
   }
 }

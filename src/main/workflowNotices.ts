@@ -92,7 +92,7 @@ async function notifyFromAction(a: ActionRow, ws: WorkspaceService, ctx: Paramet
   const shown = a.payload.shown ? workflowLine(a.payload.shown, (m, values) => shownText(values ? withValues(m, values) : m)) : null
   // An agent's own words are Markdown (#1637): the notice (a banner, a Windows notification: plain text) has their gist,
   // the Agent API them whole; the card's For you shows them rendered.
-  const body: TextPart[] = shown ? [{ shown, english: text || shown }] : text ? [{ shown: gist(text, NOTICE_GIST), english: text }] : []
+  const body: TextPart[] = shown ? [{ shown, agent: text || shown }] : text ? [{ shown: gist(text, NOTICE_GIST), agent: text }] : []
   // Shown once its dispatch is counted under a lease that holds (uncertain until the action is marked).
   await ctx.dispatch(() => tell(at.projectPath, withValues(M.forYou, { card: cardLabel(at.card) }), body, ws.path ? { kind: 'needsYou', card: { number: at.card.number, label: cardLabel(at.card) }, workspacePath: ws.path } : undefined))
 }

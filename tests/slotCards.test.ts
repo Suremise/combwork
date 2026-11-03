@@ -195,7 +195,7 @@ vi.mock('../src/main/sessions', async (orig) => {
       if (how === 'busy') {
         const { HiveError } = await vi.importActual<typeof import('../src/main/hiveError')>('../src/main/hiveError')
         const text = 'slot-a still has another session in it (test)'
-        throw new HiveError({ shown: text, english: text }, { kind: 'conflict' })
+        throw new HiveError({ shown: text, agent: text }, { kind: 'conflict' })
       }
       if (how === 'lost') {
         // Another start of it (the restart queue, Resume All) won: it runs there now, and this one is refused.

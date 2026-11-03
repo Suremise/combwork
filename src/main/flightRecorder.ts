@@ -200,6 +200,7 @@ class FlightRecorder {
   private fire(trigger: FlightTrigger, who: FlightAgent, seen: FlightWhat): void {
     if (!this.on(trigger)) return
     const shown: FlightWhat = { id: seen.id, values: Object.fromEntries(Object.entries(seen.values).map(([k, v]) => [k, typeof v === 'string' ? clean(v) : v])) }
+    // window: what the flight recorder saw, in its recording's header (the developer console)
     const what = clean(englishText(withValues(FLIGHT_WHAT[shown.id], shown.values)))
     const source = sessionSourceId(who.projectPath, who.agentId)
     const key = `${trigger}|${source}`

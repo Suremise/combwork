@@ -3,9 +3,194 @@
     "text": "Adopted session {id}",
     "note": "The stored name of a session Hive adopted that has no title (its id, cut): agents read it and the user can rename it."
   },
+  "session.archive.notKept": {
+    "text": "Only sessions Hive keeps can be archived: adopt it first.",
+    "note": "Archiving a session is refused: it was started outside Hive, so Hive has no copy of it (Adopt keeps one).",
+    "audience": "both"
+  },
+  "session.background.cantStop": {
+    "text": "{provider} can't stop background sessions.",
+    "note": "Stop It and Resume is refused: the coding agent can't stop its background service's job. {provider} is its name.",
+    "audience": "both"
+  },
   "session.carryOn": {
     "text": "Your last turn stopped because your sign-in had expired. It is renewed now: carry on where you left off.",
     "note": "What Resume types into an agent whose turn stopped while its sign-in had expired."
+  },
+  "session.carryOn.already": {
+    "text": "It has already carried on.",
+    "note": "Resume is refused for an agent whose turn a refused sign-in stopped: it carried on by itself meanwhile.",
+    "audience": "both"
+  },
+  "session.cleanUp.already": {
+    "text": "Clean Up is already removing this session's files.",
+    "note": "Clean Up… is refused for a session: it is removing its files already.",
+    "audience": "both"
+  },
+  "session.cleanUp.changed": {
+    "text": "The session's copies changed since the preview.",
+    "note": "Clean Up… left a session alone: Hive's copies of its transcript changed since the preview.",
+    "audience": "both"
+  },
+  "session.cleanUp.cliBack": {
+    "text": "The CLI has this session's transcript again.",
+    "note": "Clean Up… kept a session: the coding agent's own transcript is back since the preview.",
+    "audience": "both"
+  },
+  "session.cleanUp.cliGone": {
+    "text": "The CLI no longer has this session's transcript.",
+    "note": "Clean Up… kept a session's backups: the coding agent's own transcript is gone since the preview.",
+    "audience": "both"
+  },
+  "session.cleanUp.unarchived": {
+    "text": "The session is no longer archived.",
+    "note": "Clean Up… left a session alone: it was unarchived since the preview.",
+    "audience": "both"
+  },
+  "session.cleanUp.unread": {
+    "text": "Hive couldn't read what the session used, so it is kept.",
+    "note": "Clean Up… kept a session: Hive couldn't read its usage, which the project's totals keep.",
+    "audience": "both"
+  },
+  "session.cleanUp.unreadBackups": {
+    "text": "Hive couldn't read what the session used, so its backups are kept.",
+    "note": "Clean Up… kept a session's backups: Hive couldn't read its usage, which the project's totals keep.",
+    "audience": "both"
+  },
+  "session.compact.already": {
+    "text": "This session is already compacting.",
+    "note": "Compact is refused: the conversation is being compacted already.",
+    "audience": "both"
+  },
+  "session.compact.busy": {
+    "text": "The agent is busy. Compact once it has finished.",
+    "note": "Compact is refused: the agent is working.",
+    "audience": "both"
+  },
+  "session.compact.stopped": {
+    "text": "The agent stopped before Compact was sent.",
+    "note": "Compact failed: the agent stopped or restarted while Hive typed the command.",
+    "audience": "both"
+  },
+  "session.compact.userTyped": {
+    "text": "You typed in the agent's terminal while Hive was sending Compact, so it wasn't sent: what you typed stays.",
+    "note": "Compact failed: the user typed in the agent's terminal while Hive was clearing its input or typing the command, so Hive stopped.",
+    "audience": "both"
+  },
+  "session.compact.waiting": {
+    "text": "The agent is waiting for your answer. Compact after it has finished.",
+    "note": "Compact is refused: the agent waits for the user.",
+    "audience": "both"
+  },
+  "session.error.agentGone": {
+    "text": "That agent no longer exists.",
+    "note": "An action on an agent is refused: it was removed meanwhile.",
+    "audience": "both"
+  },
+  "session.error.inUseElsewhere": {
+    "text": "Another program has its transcript open. Close it, then try again.",
+    "note": "Archiving or deleting a session is refused: another program holds its transcript file open.",
+    "audience": "both"
+  },
+  "session.error.noAgents": {
+    "text": "This project has no agents yet. Add one first.",
+    "note": "An action on an agent is refused: the project has none.",
+    "audience": "both"
+  },
+  "session.error.noDeliveries": {
+    "text": "Hive's delivery service isn't running.",
+    "note": "Giving an agent a message failed: the part of Hive that delivers them hasn't started (or has stopped).",
+    "audience": "both"
+  },
+  "session.error.noSession": {
+    "text": "No session is running for this agent.",
+    "note": "An action on an agent's session is refused: the agent isn't running.",
+    "audience": "both"
+  },
+  "session.error.running": {
+    "text": "The session is running.",
+    "note": "Clean Up… is refused for a session: it is running.",
+    "audience": "both"
+  },
+  "session.error.severalAgents": {
+    "text": "This project has several agents: choose which one.",
+    "note": "An action that names no agent is refused: the project has more than one.",
+    "audience": "both"
+  },
+  "session.error.stopFirst": {
+    "text": "{action, select, archive {Stop the session before you archive it.} unarchive {Stop the session before you unarchive it.} other {Stop the session before you delete it.}}",
+    "note": "Archiving, unarchiving or deleting a session is refused while it runs. {action} says which.",
+    "audience": "both"
+  },
+  "session.error.stoppedBeforePrompt": {
+    "text": "The agent stopped before the prompt was sent.",
+    "note": "Typing a prompt into an agent failed: it stopped or restarted meanwhile.",
+    "audience": "both"
+  },
+  "session.error.stoppedBeforeStart": {
+    "text": "The agent was stopped before it had started.",
+    "note": "Starting an agent failed: it was stopped (or its workspace closed) while it was starting.",
+    "audience": "both"
+  },
+  "session.error.typingBusy": {
+    "text": "Hive is already typing a prompt into this agent; it is busy.",
+    "note": "An action on an agent is refused: Hive is typing a prompt into it now.",
+    "audience": "both"
+  },
+  "session.handOver.asking": {
+    "text": "{agent} is asking you something before it can write the handover. Answer it, then hand over again without a new handover.",
+    "note": "Hand Over to… stopped: the agent handing over waits for the user. {agent} is its name.",
+    "audience": "both"
+  },
+  "session.handOver.busy": {
+    "text": "{agent} is busy. Hand over once it has finished.",
+    "note": "Hand Over to… is refused: the agent named is working. {agent} is the agent's name.",
+    "audience": "both"
+  },
+  "session.handOver.didntStop": {
+    "text": "{agent} didn't stop. Stop it, then start it and ask it to read the handover \"{handover}\".",
+    "note": "Handing over to the same agent failed: it didn't stop to start a new conversation. {agent} is its name, {handover} the handover's path in the shared notes.",
+    "audience": "both"
+  },
+  "session.handOver.momentLost": {
+    "text": "{agent} took the merge slot, started other work or changed while it wrote its handover, so its conversation wasn't ended. The handover \"{handover}\" is kept.",
+    "note": "Handing an agent over to itself stopped before ending its conversation: while it wrote its handover it began merging (the merge slot), began other work (a task, a card loop's card) or restarted. {agent} is its name, {handover} the handover's path in the shared notes.",
+    "audience": "both"
+  },
+  "session.handOver.noTools": {
+    "text": "Handing over needs Hive's tools in sessions: turn on \"Provide Hive tools to sessions\" in Settings → Agent API.",
+    "note": "Hand Over to… is refused: agents need Hive's tools to write and read a handover. \"Provide Hive tools to sessions\" is a setting in Settings → Agent API: keep its name as Hive shows it.",
+    "audience": "both"
+  },
+  "session.handOver.none": {
+    "text": "There is no handover for {project} yet. Hand over with a new handover instead.",
+    "note": "Hand Over to… with the latest handover is refused: the project has none. {project} is its name.",
+    "audience": "both"
+  },
+  "session.handOver.noneWritten": {
+    "text": "{agent} finished without writing a handover. Ask it to write one, then hand over again without a new handover.",
+    "note": "Hand Over to… failed: the agent finished its turn without writing a handover. {agent} is its name.",
+    "audience": "both"
+  },
+  "session.handOver.notNow": {
+    "text": "{agent} is working, merging or on a card loop's card, so its conversation isn't ended now. Hand it over to a new conversation when it has finished.",
+    "note": "Handing an agent over to itself (a new conversation) is refused: it is working, holds the merge slot or works on a card of a running card loop. {agent} is its name.",
+    "audience": "both"
+  },
+  "session.handOver.notRunning": {
+    "text": "{agent} isn't running. Resume it to write a handover, or hand over the latest handover.",
+    "note": "Hand Over to… with a new handover is refused: the agent handing over isn't running. {agent} is its name.",
+    "audience": "both"
+  },
+  "session.handOver.slow": {
+    "text": "{agent} didn't write its handover in 15 minutes.",
+    "note": "Hand Over to… gave up waiting for the handover. {agent} is the agent's name.",
+    "audience": "both"
+  },
+  "session.handOver.stopped": {
+    "text": "{agent} stopped before writing a handover.",
+    "note": "Hand Over to… failed: the agent handing over stopped. {agent} is its name.",
+    "audience": "both"
   },
   "session.handover.ask": {
     "text": "Please write a handover of this work with the hive_create_handover tool, so that {self, select, yes {you can continue it in a new conversation} other {another agent ({to}) can continue it}}: the goal, what is done, decisions made and why, the current state, open problems and the next steps. Then stop.",
@@ -14,6 +199,46 @@
   "session.handover.read": {
     "text": "Read the handover \"{handover}\" with the hive_read_shared_note tool and continue the work from it. It was written by {self, select, yes {you, in your previous conversation} other {{from}}}.",
     "note": "The delivery giving an agent the handover it continues from: another agent's ({from}), or its own."
+  },
+  "session.inUse.attaching": {
+    "text": "It is running, and may attach more files. Stop it first.",
+    "note": "Removing a session's attachments is refused: it is running.",
+    "audience": "both"
+  },
+  "session.inUse.open": {
+    "text": "Its transcript is open in Hive. Close it, then try again.",
+    "note": "A session is left alone (archive, delete): its transcript is open in Hive's Sessions tab.",
+    "audience": "both"
+  },
+  "session.inUse.reading": {
+    "text": "Hive is reading its transcript (an export or a search). Try again in a moment.",
+    "note": "A session is left alone (archive, delete) for a moment: Hive is reading its transcript.",
+    "audience": "both"
+  },
+  "session.inUse.reserved": {
+    "text": "Hive is already archiving, deleting or cleaning up this session.",
+    "note": "A session is left alone (archive, delete) for a moment: Hive is moving or removing its files already.",
+    "audience": "both"
+  },
+  "session.inUse.running": {
+    "text": "It is running. Stop it first.",
+    "note": "A session is left alone (archive, delete): it is running.",
+    "audience": "both"
+  },
+  "session.inUse.writing": {
+    "text": "Its CLI is still writing its transcript. Try again in a moment.",
+    "note": "A session is left alone (archive, delete) for a moment: its coding agent is still writing its transcript.",
+    "audience": "both"
+  },
+  "session.keyRefused.title": {
+    "text": "{n, plural, one {{agent} stopped: {name}'s key was refused} other {# agents stopped: {name}'s key was refused}}",
+    "note": "A notification's title: the server of a server connection ({name}) refused its API key, so agents on it stopped. {n} is how many agents, {agent} the first one's name.",
+    "audience": "both"
+  },
+  "session.leftovers.notEnded": {
+    "text": "{n, plural, one {# process is still running: Windows didn't let Hive end it. It stays listed in the ⋯ menu on the agent's pane, to try again or keep.} other {# processes are still running: Windows didn't let Hive end them. They stay listed in the ⋯ menu on the agent's pane, to try again or keep.}}",
+    "note": "Ending the processes an agent left running failed. {n} is how many are still running; the ⋯ menu on the agent's pane lists them with End and Keep.",
+    "audience": "both"
   },
   "session.lock.anotherAgent": {
     "text": "Another agent",
@@ -43,8 +268,418 @@
     "text": "Note: {holder} is also editing {file} right now. Check the file's current content before changing it, and keep your edit small.",
     "note": "The file lock's note with an edit it lets through (warn mode)."
   },
+  "session.mode.asking": {
+    "text": "The agent is asking you something. Answer it first, then switch the mode.",
+    "note": "Switching an agent's permission mode is refused: it waits for the user's answer.",
+    "audience": "both"
+  },
+  "session.mode.assistantCliOwn": {
+    "text": "The Assistant can't use the CLI's own setting: its Control setting relies on knowing the mode it runs in. Choose one of the CLI's modes.",
+    "note": "Switching the Hive Assistant to the permission choice \"The CLI's own setting\" is refused. Control is the name of an Assistant setting.",
+    "audience": "both"
+  },
+  "session.mode.off": {
+    "text": "{mode} is turned off in Settings → {provider}.",
+    "note": "Switching an agent's permission mode is refused: that mode is turned off. {mode} is the mode's name; {provider} the coding agent's (its Settings section).",
+    "audience": "both"
+  },
+  "session.mode.starting": {
+    "text": "The session is still starting. Try again in a moment.",
+    "note": "Switching an agent's permission mode is refused for a moment: it is starting.",
+    "audience": "both"
+  },
+  "session.mode.typing": {
+    "text": "Hive is typing a line into this agent. Switch the mode in a moment.",
+    "note": "Switching an agent's permission mode is refused for a moment: Hive is typing into its terminal.",
+    "audience": "both"
+  },
+  "session.mode.working": {
+    "text": "{provider} is working. Switch the mode once it has finished.",
+    "note": "Switching an agent's permission mode is refused while it works. {provider} is the coding agent's name.",
+    "audience": "both"
+  },
+  "session.newConversation.didntStop": {
+    "text": "It didn't stop, so no new conversation was started.",
+    "note": "Giving an agent a task in a new conversation failed: it didn't stop.",
+    "audience": "both"
+  },
+  "session.newConversation.notRunning": {
+    "text": "It isn't running.",
+    "note": "Giving an agent a task in a new conversation is refused: it isn't running.",
+    "audience": "both"
+  },
+  "session.newConversation.pending": {
+    "text": "It has just been given a prompt that its CLI has not taken yet.",
+    "note": "Giving an agent a task in a new conversation is refused: a prompt Hive typed hasn't been taken yet.",
+    "audience": "both"
+  },
+  "session.notice.finished": {
+    "text": "{agent} finished",
+    "note": "A notification's title: an agent's turn has ended. {agent} is the agent (\"hive · B1\", or the project when it has one agent).",
+    "audience": "both"
+  },
+  "session.notice.lineLostTitle": {
+    "text": "{agent} didn't get a line Hive typed",
+    "note": "A notification's title: a line Hive typed into an agent's terminal (a message, a prompt) was taken by a screen of its coding agent before it was sent, so the agent never got it. {agent} is the agent.",
+    "audience": "both"
+  },
+  "session.notice.needsInput": {
+    "text": "{agent} needs your input",
+    "note": "A notification's title: an agent waits for the user. {agent} is the agent (\"hive · B1\", or the project when it has one agent).",
+    "audience": "both"
+  },
+  "session.notice.notWatching": {
+    "text": "{agent} isn't watching {cards}",
+    "note": "A notification's title: an agent working through cards in a loop ended its turn without watching them. {agent} is the agent; {cards} the cards (\"#12, #13\").",
+    "audience": "both"
+  },
+  "session.notice.question": {
+    "text": "{agent} has a question for you",
+    "note": "A notification's title: an agent asks something without stopping for it. {agent} is the agent.",
+    "audience": "both"
+  },
+  "session.notice.safeguardSwitch": {
+    "text": "{agent} now runs on {model}",
+    "note": "A notification's title: after its CLI's safety classifier stopped a response, the agent runs on another model. {agent} is the agent, {model} the model's name.",
+    "audience": "both"
+  },
+  "session.notice.untakenTitle": {
+    "text": "{agent} hasn't taken a line Hive typed",
+    "note": "A notification's title: an agent's CLI didn't take a line Hive typed into it (a wake, a message). {agent} is the agent.",
+    "audience": "both"
+  },
+  "session.plan.asking": {
+    "text": "The agent is asking you something. Answer it first.",
+    "note": "Turning Plan mode on or off is refused: the agent waits for the user.",
+    "audience": "both"
+  },
+  "session.plan.noToggle": {
+    "text": "{provider} has no Plan mode toggle.",
+    "note": "Turning Plan mode on or off is refused: the coding agent has no such toggle. {provider} is its name.",
+    "audience": "both"
+  },
+  "session.plan.typing": {
+    "text": "Hive is typing a line into this agent. Try again in a moment.",
+    "note": "Turning Plan mode on or off is refused for a moment: Hive is typing into the terminal.",
+    "audience": "both"
+  },
+  "session.prompt.cliAsks": {
+    "text": "Its CLI shows a question for you: nothing is typed into it until you answer it there.",
+    "note": "Typing into an agent is refused: its coding agent shows a question of its own on its screen (such as Claude Code's offer to teach auto mode about your environment), which the keys would answer.",
+    "audience": "both"
+  },
+  "session.prompt.inputBlocked": {
+    "text": "Something on its screen is taking its keys: nothing is typed into it until you answer it there.",
+    "note": "Typing into an agent is refused: keys Hive typed into its coding agent's input didn't reach it (a dialog or question of the coding agent's own takes them).",
+    "audience": "both"
+  },
+  "session.prompt.inputNotCleared": {
+    "text": "Its input couldn't be seen empty after Hive cleared it: nothing is typed into it until it can be.",
+    "note": "Typing into an agent is refused (a message's notice is put off and tried again; Compact fails): Hive pressed keys to clear the draft in its coding agent's input, and didn't see the input empty afterwards.",
+    "audience": "both"
+  },
+  "session.prompt.untaken": {
+    "text": "Its CLI hasn't taken the line Hive typed before; nothing more is typed until it does.",
+    "note": "Typing into an agent is refused: its CLI hasn't taken the line Hive typed before.",
+    "audience": "both"
+  },
+  "session.purge.changed": {
+    "text": "The session's copies changed since the preview.",
+    "note": "Purge left a session alone: Hive's copies of its transcript changed since the preview.",
+    "audience": "both"
+  },
+  "session.purge.cliBack": {
+    "text": "The CLI has this session's transcript again.",
+    "note": "Purge left a session alone: the coding agent's own transcript is back since the preview, so Hive's backups are no longer its last copy.",
+    "audience": "both"
+  },
+  "session.purge.cliGone": {
+    "text": "The CLI no longer has this session's transcript.",
+    "note": "Purge left a session alone: the coding agent's own transcript went since the preview, so Hive's backups are now its last copy.",
+    "audience": "both"
+  },
+  "session.purge.gone": {
+    "text": "The session is no longer in Hive.",
+    "note": "Purge left a session alone: it was deleted since the preview.",
+    "audience": "both"
+  },
+  "session.purge.open": {
+    "text": "Its transcript is open in Hive. Close it, then try again.",
+    "note": "Purge left a session alone: its transcript is open in Hive's Sessions tab.",
+    "audience": "both"
+  },
+  "session.purge.reading": {
+    "text": "Hive is reading its transcript (an export or a search). Try again in a moment.",
+    "note": "Purge left a session alone for a moment: Hive is reading its transcript.",
+    "audience": "both"
+  },
+  "session.purge.running": {
+    "text": "It is running.",
+    "note": "Purge left a session alone: it is running (or starting) now.",
+    "audience": "both"
+  },
+  "session.purge.unread": {
+    "text": "Hive couldn't record what the session used, so it is kept.",
+    "note": "Purge left a session alone: Hive couldn't save its usage in the usage history, which the totals keep.",
+    "audience": "both"
+  },
+  "session.restartMode.didntStop": {
+    "text": "{agent} didn't stop in time, so it wasn't restarted in the new mode. Try again once it has stopped.",
+    "note": "Switching a running agent's permission mode (it restarts in the new mode) is refused: the agent ({agent}, its name) was told to stop but hadn't ended yet, so nothing was started.",
+    "audience": "both"
+  },
+  "session.signIn.many": {
+    "text": "{n, plural, other {# agents need you to sign in to {provider}}}",
+    "note": "A notification's title: the CLI sign-in of several agents has expired. {n} is how many (2 or more), {provider} the coding agent's name.",
+    "audience": "both"
+  },
+  "session.signIn.notSignedIn": {
+    "text": "{provider} isn't signed in.",
+    "note": "Why an agent's turn stopped, when its CLI didn't say: its sign-in was refused. {provider} is the coding agent's name.",
+    "audience": "both"
+  },
+  "session.signIn.one": {
+    "text": "{agent} needs you to sign in to {provider}",
+    "note": "A notification's title: an agent's CLI sign-in has expired. {agent} is the agent, {provider} the coding agent's name.",
+    "audience": "both"
+  },
   "session.skillNotGiven": {
     "text": "nobody gets it: {why}",
     "note": "A skill not delivered at a launch, in the launch record the Agent API's project status shows (stored)."
+  },
+  "session.start.agentRunning": {
+    "text": "{agent} is already running. Stop it first.",
+    "note": "Starting an agent is refused: it runs already. {agent} is the agent's name.",
+    "audience": "both"
+  },
+  "session.start.alreadyRunning": {
+    "text": "This agent is already running or starting. Stop it first.",
+    "note": "Starting an agent is refused: it runs, or is starting, already.",
+    "audience": "both"
+  },
+  "session.start.anotherAgent": {
+    "text": "another agent",
+    "note": "Stands for an agent whose name isn't known, in the middle of a sentence (\"This conversation is already open in another agent.\").",
+    "audience": "both"
+  },
+  "session.start.archived": {
+    "text": "This session is archived. Unarchive it before resuming.",
+    "note": "Resuming an archived session is refused (Sessions tab: Unarchive).",
+    "audience": "both"
+  },
+  "session.start.args": {
+    "text": "{problem} Fix it in its connection, {connection}, in Settings → Accounts & Connections.",
+    "note": "Starting an agent or the Assistant is refused: its connection's extra arguments are wrong (HI-2140). {problem} says why, as a sentence; {connection} is the connection's name, as in Settings → Accounts & Connections.",
+    "audience": "both"
+  },
+  "session.start.beingOpened": {
+    "text": "This conversation is already being opened in another agent.",
+    "note": "Resuming a conversation is refused: another agent is starting on it now.",
+    "audience": "both"
+  },
+  "session.start.cleaning": {
+    "text": "Hive is archiving, deleting or cleaning up this session's files. Try again in a moment.",
+    "note": "Resuming a conversation is refused for a moment: Hive is moving or removing its files.",
+    "audience": "both"
+  },
+  "session.start.cliRequired": {
+    "text": "{provider} is required to run sessions.",
+    "note": "Starting an agent failed: its coding agent's CLI wasn't found. {provider} is the coding agent's name.",
+    "audience": "both"
+  },
+  "session.start.closing": {
+    "text": "Hive is stopping this workspace's agents, so none can start now.",
+    "note": "Starting an agent is refused: Hive is quitting, or its workspace is closing.",
+    "audience": "both"
+  },
+  "session.start.fenced": {
+    "text": "{why}, so its agents can't start now.",
+    "note": "Starting an agent is refused while something changes its project. {why} says what, as a sentence without its full stop (\"This project is being removed\").",
+    "audience": "both"
+  },
+  "session.start.moveFailed": {
+    "text": "Hive couldn't move {project}'s model settings to its agents: {error}. Start it again.",
+    "note": "Starting an agent is refused (HI-1770): moving its project's own model, effort and context settings onto the project's agents (connections now hold the defaults) failed. {project} is the project's name, {error} why (often in English). It is tried again at the next start.",
+    "audience": "both"
+  },
+  "session.start.openCommands": {
+    "text": "This workspace's open commands are still running: agents start once they're done or you move on.",
+    "note": "Starting an agent is refused while the commands the user set to run as the workspace opens are running (Settings → Workspace → When this workspace opens, run), shown in a dialog with Don't wait.",
+    "audience": "both"
+  },
+  "session.start.openIn": {
+    "text": "This conversation is already open in {agent}. An agent can only resume a session no other agent is running.",
+    "note": "Resuming a conversation is refused: another agent is running it. {agent} is that agent's name.",
+    "audience": "both"
+  },
+  "session.start.otherFolder": {
+    "text": "This session ran in {folder}. Resume it with the agent that works in that folder.",
+    "note": "Resuming a session is refused: it ran in another folder (another agent's worktree). {folder} is that folder's path.",
+    "audience": "both"
+  },
+  "session.start.projectRunning": {
+    "text": "A session is already running for this project. Stop it first.",
+    "note": "Starting a project's only agent is refused: it runs already.",
+    "audience": "both"
+  },
+  "session.start.providerMissing": {
+    "text": "{resuming, select, yes {{provider} is required to resume this conversation. Install it from Help → Provider Setup.} other {{provider} is required to run {agent}. Install it from Help → Provider Setup.}}",
+    "note": "Starting an agent is refused: its coding agent's CLI isn't installed. {provider} is the coding agent's name (Claude Code), {agent} the agent's; {resuming} says whether it resumes a conversation. Help → Provider Setup is a menu command.",
+    "audience": "both"
+  },
+  "session.start.providerOff": {
+    "text": "{provider} is turned off. {resuming, select, yes {Turn it on in Settings → Providers to resume this conversation.} other {Turn it on in Settings → Providers to run {agent}.}}",
+    "note": "Starting an agent is refused: its coding agent is turned off in Settings → Providers. {provider} is the coding agent's name (Claude Code), {agent} the agent's; {resuming} says whether it resumes a conversation.",
+    "audience": "both"
+  },
+  "session.start.repairing": {
+    "text": "Hive is repairing this moved workspace: start the agent when Repair has finished.",
+    "note": "Starting an agent is refused while Repair… fixes a moved workspace's paths.",
+    "audience": "both"
+  },
+  "session.start.slotBusy": {
+    "text": "{slot} still has another session in it, or processes one left running there. {agent} can start there once they have ended.",
+    "note": "Starting or resuming an agent in a slot (a worktree Hive lends to a card) is refused (#1434): another session (of a card that has ended, or of another Hive) still runs in it, or processes a session left running there aren't known to have ended. {slot} is the slot's name (\"slot-b\"), {agent} the agent's.",
+    "audience": "both"
+  },
+  "session.start.slotChanged": {
+    "text": "{slot} isn't {agent}'s any more: its card or lane ended, or another agent's work has it. Start or resume {agent} again.",
+    "note": "Starting or resuming an agent in a slot (a worktree Hive lends to a card) is refused (#1434): the slot's lease ended or changed hands while the start was getting ready. {slot} is the slot's name (\"slot-b\"), {agent} the agent's.",
+    "audience": "both"
+  },
+  "session.start.slotSetup": {
+    "text": "{slot} is still being set up. {agent} can start there once it is ready.",
+    "note": "Starting or resuming an agent in a slot (a worktree Hive lends to a card) is refused (#1434): Hive is still setting the slot up (its setup or install command runs), or a command of it hasn't ended yet. {slot} is the slot's name (\"slot-b\"), {agent} the agent's.",
+    "audience": "both"
+  },
+  "session.start.subSession": {
+    "text": "That session is a {kind} {provider} ran for another session, not a conversation: it can't be resumed.",
+    "note": "Resuming a session is refused: the coding agent ran it for another session (a guardian review). {kind} is the coding agent's name for it, as it came; {provider} the coding agent's name (Codex).",
+    "audience": "both"
+  },
+  "session.start.turnedOff": {
+    "text": "{provider} was turned off while {agent} was starting.",
+    "note": "Starting an agent failed: its coding agent was turned off in Settings meanwhile. {provider} is the coding agent's name, {agent} the agent's.",
+    "audience": "both"
+  },
+  "session.start.worktreeMissing": {
+    "text": "{agent}'s worktree folder is missing: {folder}. Start {agent} from its pane to recreate the worktree on its branch (Repair… if the workspace moved), or remove the agent.",
+    "note": "Starting an agent is refused: its git worktree's folder is gone. {agent} is the agent's name, {folder} the folder's path. Repair… is a command.",
+    "audience": "both"
+  },
+  "session.status.asksAtStart": {
+    "text": "Asks something before it starts",
+    "note": "An agent's status: its CLI asks the user something before it starts.",
+    "audience": "both"
+  },
+  "session.status.asksTrust": {
+    "text": "Asks whether to trust this folder",
+    "note": "An agent's status: its CLI asks, before it starts, whether to trust the project's folder.",
+    "audience": "both"
+  },
+  "session.status.cliAsks": {
+    "text": "{provider} asks: {question}",
+    "note": "An agent's status: its coding agent ({provider}, e.g. Claude Code) shows a question of its own on its screen and waits for the user to answer it there. {question} is the question, in the coding agent's own words (English).",
+    "audience": "both"
+  },
+  "session.status.compacting": {
+    "text": "Compacting the conversation…",
+    "note": "An agent's status while its CLI summarises the conversation to free up context space.",
+    "audience": "both"
+  },
+  "session.status.connectionKeepsDropping": {
+    "text": "Stopped: its connection keeps dropping",
+    "note": "An agent's status once Hive stopped resuming it: its connection dropped again after several resumes in an hour.",
+    "audience": "both"
+  },
+  "session.status.connectionNotBack": {
+    "text": "Stopped: its connection didn't come back",
+    "note": "An agent's status once Hive stopped waiting for its connection to come back.",
+    "audience": "both"
+  },
+  "session.status.failedTurn": {
+    "text": "The turn ended on an error",
+    "note": "An agent's status when its CLI ended its turn on an error (an API connection error, say) without saying what.",
+    "audience": "both"
+  },
+  "session.status.inputBlocked": {
+    "text": "Something on its screen is taking its keys: answer it there, then Try again",
+    "note": "An agent's status: Hive typed into its coding agent's input and nothing reached it (a dialog or question of the coding agent's own, which Hive doesn't recognise, takes the keys). The user answers it in the agent's terminal. Try again is the button beside this status: keep its name as it is translated there.",
+    "audience": "both"
+  },
+  "session.status.safeguardAsks": {
+    "text": "A safety classifier stopped a response: {provider} asks what to do",
+    "note": "An agent's status: its CLI's safety classifier stopped a response, and the CLI asks the user what to do. {provider} is the coding agent's name.",
+    "audience": "both"
+  },
+  "session.status.safeguardAsksTools": {
+    "text": "A safety classifier stopped a response: {provider} asks what to do (its last tool calls: {tools})",
+    "note": "An agent's status: its CLI's safety classifier stopped a response, and the CLI asks the user what to do. {provider} is the coding agent's name; {tools} the names of its last tool calls, as they came.",
+    "audience": "both"
+  },
+  "session.status.safeguardIdle": {
+    "text": "Idle after a safeguard stop: give it a nudge",
+    "note": "An agent's status: its CLI's safety classifier stopped a response, the user answered its prompt about it, and the agent now waits for a new prompt.",
+    "audience": "both"
+  },
+  "session.status.settingUp": {
+    "text": "Setting up the worktree: {command}",
+    "note": "An agent's status while the project's worktree setup command runs in its terminal. {command} is that command, as written.",
+    "audience": "both"
+  },
+  "session.status.signedInAgain": {
+    "text": "Stopped while signed out",
+    "note": "An agent's status once its CLI is signed in again: its turn stopped while the CLI's sign-in had expired, and Resume carries it on.",
+    "audience": "both"
+  },
+  "session.status.tasksDropped": {
+    "text": "{minutes, plural, one {Stopped counting its background tasks after # minute} other {Stopped counting its background tasks after # minutes}}",
+    "note": "An agent's status: Hive stopped counting the background tasks it started after the time limit in Settings. {minutes} is that limit.",
+    "audience": "both"
+  },
+  "session.status.waitingForConnection": {
+    "text": "Waiting for the connection…",
+    "note": "An agent's status while Hive waits for its CLI's connection to come back, to resume it (Settings → Advanced, Resume agents after a connection drops).",
+    "audience": "both"
+  },
+  "session.tracker.helperFailed": {
+    "text": "The PowerShell helper of Hive's process tracker didn't start ({why})",
+    "note": "Why Hive can't track the processes agents start (a notice's first sentence, without its full stop). {why} is a technical detail, as it came (\"exit 1\").",
+    "audience": "both"
+  },
+  "session.tracker.noAnswer": {
+    "text": "Hive's process tracker didn't answer",
+    "note": "Why Hive couldn't track the processes an agent starts (a notice's first sentence, without its full stop).",
+    "audience": "both"
+  },
+  "session.tracker.noPowerShell": {
+    "text": "PowerShell couldn't be started ({error})",
+    "note": "Why Hive can't track the processes agents start (a notice's first sentence, without its full stop). {error} is Windows' error, as it came.",
+    "audience": "both"
+  },
+  "session.tracker.noStart": {
+    "text": "Hive's process tracker couldn't start",
+    "note": "Why Hive can't track the processes agents start (a notice's first sentence, without its full stop).",
+    "audience": "both"
+  },
+  "session.tracker.refused": {
+    "text": "PowerShell refused to run its helper (Constrained Language Mode or a policy)",
+    "note": "Why Hive can't track the processes agents start (a notice's first sentence, without its full stop). Constrained Language Mode is PowerShell's term.",
+    "audience": "both"
+  },
+  "session.tracker.slowHelper": {
+    "text": "The PowerShell helper of Hive's process tracker didn't start within {seconds, plural, one {# second} other {# seconds}}",
+    "note": "Why Hive can't track the processes agents start (a notice's first sentence, without its full stop). {seconds} is how many seconds Hive waited.",
+    "audience": "both"
+  },
+  "session.tracker.stopped": {
+    "text": "Hive's process tracker stopped ({why})",
+    "note": "Why Hive no longer tracks the processes agents start (a notice's first sentence, without its full stop). {why} is a technical detail, as it came (\"exit 1\").",
+    "audience": "both"
+  },
+  "session.tracker.windowsOnly": {
+    "text": "Tracking processes needs Windows",
+    "note": "Why Hive can't track the processes agents start (a notice's first sentence, without its full stop).",
+    "audience": "both"
   }
 }

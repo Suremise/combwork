@@ -10,7 +10,7 @@ import { allOff, contradictions, CONTRADICTIONS, NAME_OPTIONS, ownsTarget, PREFE
 import { PREFERENCE_DEFAULTS } from '../../shared/workflow/preferences'
 import { detect } from '../platform/registry'
 import { stageNameProblems, stageNameProblemText, type StageNameProblem } from '../../shared/workflow/stages'
-import { englishText, type Text } from '../../shared/advanced'
+import { agentText, type Text } from '../../shared/advanced'
 import { tr } from '../../shared/i18n'
 import type { PlatformId } from '../../shared/platform/descriptors'
 import type { ProjectConfig, WorkflowDefaults } from '../../shared/types'
@@ -135,12 +135,13 @@ export function checkOptions(platform: PlatformId, levels: OptionLevels): { reso
 
 /** A problem as text for the window (its message, in the user's language), or its English reason. */
 export function problemShownOf(p: OptionsProblem): Text {
-  if (p.kind === 'bad') return { shown: p.why, english: p.why }
+  if (p.kind === 'bad') return { shown: p.why, agent: p.why }
   return p.kind === 'contradiction' ? CONTRADICTIONS[p.id] : stageNameProblemText(p)
 }
 
 /** A problem in English, for the Assistant's tools and the log. */
-export const problemText = (p: OptionsProblem): string => (p.kind === 'bad' ? p.why : englishText(problemShownOf(p)))
+// agent-text: problemShownOf
+export const problemText = (p: OptionsProblem): string => (p.kind === 'bad' ? p.why : agentText(problemShownOf(p)))
 
 /** Tells the workspace's windows that a project's workflow was written (#1417): its stages and their names may have changed. */
 export function workflowChanged(ws: Pick<WorkspaceService, 'path' | 'emit'>, projectPath: string): void {

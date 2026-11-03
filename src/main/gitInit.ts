@@ -63,6 +63,7 @@ export async function initCheck(projectPath: string): Promise<GitInitCheck> {
   projectPath = workspace.assertProject(projectPath)
   const base = { identity: {}, hasGitignore: existsSync(join(projectPath, '.gitignore')), empty: await isEmpty(projectPath) }
   // Refused: its English for the log and the error initRepo throws (#881), its text for the window.
+  // window: the Git init dialog's check (it shows refusedText); a refusal is thrown as a HiveError of refusedText
   const refuse = (text: Text): GitInitCheck => ({ ...base, refused: englishText(text), refusedText: text })
   const problem = gitProblemData(gitTool())
   if (problem) return refuse(withValues(msg({ id: 'main.gitInit.noGit', defaultMessage: '{problem}: Provider Setup says how to fix it.', description: "Why a folder can't be made a git repository (the Initialise Git Repository dialog): git is missing or broken. {problem} says what's wrong. Provider Setup is a view's name." }), { problem }))
@@ -94,6 +95,7 @@ export async function initRepo(projectPath: string, opts: GitInitOptions): Promi
   return oneAtATime(projectPath, async () => {
     // Checked again here: the folder may have changed since the dialog asked.
     const check = await initCheck(projectPath)
+    // agent-text: initCheck
     if (check.refusedText) throw new HiveError(check.refusedText)
     if (check.parentRepo && opts.nested !== true) throw hiveError(msg({ id: 'main.gitInit.nested', defaultMessage: 'This folder is inside the git repository in {root}. Confirm that you want a repository of its own inside it.', description: "Why a folder wasn't made a git repository yet: it is inside another one, {root}, and the user didn't confirm a repository of its own." }), { root: check.parentRepo })
     // With conditional includes, only the new repository knows its identity: checked once it exists, below.

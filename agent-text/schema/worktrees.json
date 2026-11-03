@@ -1,0 +1,173 @@
+{
+  "worktrees.agent.badPlacement": {
+    "placeholders": {}
+  },
+  "worktrees.agent.badWorkflowRole": {
+    "placeholders": {}
+  },
+  "worktrees.agent.chooseMove": {
+    "placeholders": {}
+  },
+  "worktrees.agent.effortRefused": {
+    "placeholders": {
+      "chosen": "select",
+      "model": "plain",
+      "effort": "plain"
+    }
+  },
+  "worktrees.agent.enterName": {
+    "placeholders": {}
+  },
+  "worktrees.agent.gone": {
+    "placeholders": {}
+  },
+  "worktrees.agent.nameTaken": {
+    "placeholders": {
+      "name": "plain"
+    }
+  },
+  "worktrees.agent.noTree": {
+    "placeholders": {}
+  },
+  "worktrees.agent.notPinned": {
+    "placeholders": {}
+  },
+  "worktrees.agent.providerChangedMeanwhile": {
+    "placeholders": {
+      "agent": "plain"
+    }
+  },
+  "worktrees.agent.removing": {
+    "placeholders": {}
+  },
+  "worktrees.agent.roleTooLong": {
+    "placeholders": {
+      "max": "plain"
+    }
+  },
+  "worktrees.agent.stopForProvider": {
+    "placeholders": {}
+  },
+  "worktrees.agent.stopToMerge": {
+    "placeholders": {
+      "agent": "plain"
+    }
+  },
+  "worktrees.agent.stopToRemove": {
+    "placeholders": {}
+  },
+  "worktrees.agent.unknownProvider": {
+    "placeholders": {
+      "provider": "plain"
+    }
+  },
+  "worktrees.badBranchName": {
+    "placeholders": {
+      "branch": "plain"
+    }
+  },
+  "worktrees.branchInWay": {
+    "placeholders": {
+      "branch": "plain",
+      "parent": "plain"
+    }
+  },
+  "worktrees.cantCheck": {
+    "placeholders": {
+      "branch": "plain",
+      "why": "plain"
+    }
+  },
+  "worktrees.deleteBranch": {
+    "placeholders": {
+      "branch": "plain"
+    }
+  },
+  "worktrees.gitFailed": {
+    "placeholders": {
+      "command": "plain"
+    }
+  },
+  "worktrees.gitProblem": {
+    "placeholders": {
+      "problem": "plain"
+    }
+  },
+  "worktrees.listBranches": {
+    "placeholders": {
+      "why": "plain"
+    }
+  },
+  "worktrees.missing.noAgent": {
+    "placeholders": {}
+  },
+  "worktrees.missing.noBranch": {
+    "placeholders": {
+      "agent": "plain",
+      "branch": "plain"
+    }
+  },
+  "worktrees.missing.noTree": {
+    "placeholders": {
+      "agent": "plain"
+    }
+  },
+  "worktrees.missing.slotFailed": {
+    "placeholders": {
+      "slot": "plain",
+      "agent": "plain",
+      "why": "plain"
+    }
+  },
+  "worktrees.missing.stillListed": {
+    "placeholders": {
+      "folder": "plain"
+    }
+  },
+  "worktrees.missing.stopFirst": {
+    "placeholders": {
+      "agent": "plain"
+    }
+  },
+  "worktrees.missing.thereRecreate": {
+    "placeholders": {
+      "agent": "plain",
+      "folder": "plain"
+    }
+  },
+  "worktrees.missing.thereUnlink": {
+    "placeholders": {
+      "agent": "plain",
+      "folder": "plain"
+    }
+  },
+  "worktrees.missing.wouldPrune": {
+    "placeholders": {
+      "folders": "plain",
+      "n": "plural"
+    }
+  },
+  "worktrees.names.closed": {
+    "placeholders": {}
+  },
+  "worktrees.names.projectGone": {
+    "placeholders": {}
+  },
+  "worktrees.readBranch": {
+    "placeholders": {
+      "folder": "plain",
+      "why": "plain"
+    }
+  },
+  "worktrees.readOriginHead": {
+    "placeholders": {
+      "why": "plain"
+    }
+  },
+  "worktrees.statusFailed": {
+    "placeholders": {}
+  },
+  "worktrees.unknownError": {
+    "placeholders": {}
+  }
+}

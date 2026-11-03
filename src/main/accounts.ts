@@ -570,6 +570,7 @@ function savedValues(a: Account, now: LaunchValues, patch: ConnectionPatch): Lau
   if (mode && !modeOption(a.provider, mode as LaunchValues['permissionMode'])) throw hiveError(BAD_MODE, { cli: providerDescriptor(a.provider).name, mode }, { kind: 'invalid' })
   // A bare "--" (#523): Hive passes the task after its own, and a launch refuses it; refused here, before it is saved.
   const argsProblem = typeof next.extraArgs === 'string' ? capturedText((t) => extraArgsProblem(next.extraArgs as string, t)) : null
+  // agent-text: extraArgsProblem
   if (argsProblem) throw new HiveError(argsProblem, { kind: 'invalid' })
   // Kept as the user chose it (a mode the CLI calls its default is still the user's choice), only emptied values dropped.
   const out = launchValues(next as LaunchValues, a.provider, isServer(a))

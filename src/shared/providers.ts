@@ -390,6 +390,7 @@ export function contextLines(u: { provider: ProviderId; contextTokens: number; c
 }
 
 /** A message of a provider's own text (`text`) by its id, or null: a comment Hive wrote on a card names one (#866). */
+// agent-text: CLAUDE_DESCRIPTOR.text.safeguardHelp, CODEX_DESCRIPTOR.text.safeguardHelp (a CLI's sentences stored by id in a card comment, said when read)
 export const providerMessage = (id: string): Msg | null => PROVIDERS.flatMap((p) => Object.values(p.text ?? {})).find((m): m is Msg => !!m && m.id === id) ?? null
 
 export function providerDescriptor(id: ProviderId | null | undefined): ProviderDescriptor {

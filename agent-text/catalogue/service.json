@@ -1,0 +1,842 @@
+{
+  "service.advanced.asIs": {
+    "text": "{problem}",
+    "note": "Why advanced.json can't be used, in English (kept from before Hive translated it). Keep it as {problem} alone.",
+    "audience": "both"
+  },
+  "service.advanced.changedOutside": {
+    "text": "advanced.json was changed outside Hive meanwhile: Settings shows it now. Try again.",
+    "note": "An error changing an advanced setting: advanced.json (a file name: keep it) was edited elsewhere meanwhile, so the change wasn't written.",
+    "audience": "both"
+  },
+  "service.advanced.fixFirst": {
+    "text": "{problem} Fix advanced.json (Settings → Advanced → Open advanced.json) before changing settings here.",
+    "note": "An error changing an advanced setting while advanced.json (a file name: keep it) can't be read; {problem} says why, a sentence. Settings → Advanced → Open advanced.json is where to open it: use its translated names.",
+    "audience": "both"
+  },
+  "service.advanced.fixOrDelete": {
+    "text": "{problem} Fix or delete advanced.json first (Settings → Advanced → Open advanced.json).",
+    "note": "An error resetting every advanced setting while advanced.json (a file name: keep it) can't be read; {problem} says why, a sentence. Settings → Advanced → Open advanced.json is where to open it: use its translated names.",
+    "audience": "both"
+  },
+  "service.advanced.newer": {
+    "text": "advanced.json is from a newer Hive (format {format}): this one reads format {supported}.",
+    "note": "Above Settings → Advanced's list: advanced.json (a file name: keep it) was written by a newer version of Hive, in a format ({format}) this one can't read ({supported} is the one it reads).",
+    "audience": "both"
+  },
+  "service.advanced.notJson": {
+    "text": "advanced.json isn't valid JSON ({error}).",
+    "note": "Above Settings → Advanced's list: Hive's advanced settings file (advanced.json, a file name: keep it) can't be read as JSON; {error} is the JSON reader's own words (English, with no full stop of its own). A sentence of its own: more follows it.",
+    "audience": "both"
+  },
+  "service.advanced.notObject": {
+    "text": "advanced.json should hold an object: {example}.",
+    "note": "Above Settings → Advanced's list: advanced.json (a file name: keep it) holds JSON that isn't an object; {example} is what it should look like (JSON: keep it).",
+    "audience": "both"
+  },
+  "service.advanced.notValues": {
+    "text": "advanced.json's \"values\" should be an object of setting → value.",
+    "note": "Above Settings → Advanced's list: the \"values\" field of advanced.json (keep both as they are) isn't a set of settings and their values.",
+    "audience": "both"
+  },
+  "service.advanced.unknown": {
+    "text": "No advanced setting \"{id}\".",
+    "note": "An error changing an advanced setting: Hive has none with the id {id}.",
+    "audience": "both"
+  },
+  "service.attachments.badFolder": {
+    "text": "Not a session folder name.",
+    "note": "An error: a name given for a session's attachments folder isn't one Hive makes (a session id).",
+    "audience": "both"
+  },
+  "service.attachments.badRecord": {
+    "text": "{file} is not a record of moved files",
+    "note": "An error: the file {file} where Hive records attachments it renamed can't be read as one (damaged).",
+    "audience": "both"
+  },
+  "service.attachments.notOwn": {
+    "text": "{folder} is a link or not a folder of the project's own, so Hive keeps no attachments in it.",
+    "note": "An error keeping a pasted or dropped file for a session: its folder {folder} (in the project's .hive) is a link or leads elsewhere, so Hive writes nothing through it.",
+    "audience": "both"
+  },
+  "service.benchmarks.allPinned": {
+    "text": "{n} are kept and all are pinned: unpin or remove one first.",
+    "note": "An error keeping a comparison on the Performance page: the most that can be kept ({n}) are kept, all pinned, so none can make room.",
+    "audience": "both"
+  },
+  "service.benchmarks.cantRead": {
+    "text": "The kept comparisons can’t be read: {error}",
+    "note": "An error on the Performance page: the list of kept comparisons (benchmarks kept to compare) can't be read; {error} is why (the system's words).",
+    "audience": "both"
+  },
+  "service.benchmarks.closed": {
+    "text": "The workspace was closed or switched: nothing was changed.",
+    "note": "An error on the Performance page: the workspace closed, or another opened in its window, while kept comparisons were being changed; nothing changed.",
+    "audience": "both"
+  },
+  "service.benchmarks.damaged": {
+    "text": "That comparison file is missing or damaged: remove it and import it again.",
+    "note": "An error on the Performance page: a kept comparison's file can't be read.",
+    "audience": "both"
+  },
+  "service.benchmarks.noSuch": {
+    "text": "No such comparison",
+    "note": "An error on the Performance page: the kept comparison asked for is not there.",
+    "audience": "both"
+  },
+  "service.benchmarks.noSuchHere": {
+    "text": "No such comparison for this scope",
+    "note": "An error on the Performance page: the kept comparison asked for isn't one of the scope shown (the workspace, or a project).",
+    "audience": "both"
+  },
+  "service.benchmarks.noWorkspace": {
+    "text": "No workspace is open.",
+    "note": "An error on the Performance page: kept comparisons need a workspace open.",
+    "audience": "both"
+  },
+  "service.benchmarks.notRemoved": {
+    "text": "It is off the list, but its file couldn’t be removed yet: Hive will try again.",
+    "note": "An error removing a kept comparison on the Performance page: it is no longer listed, but its file couldn't be deleted yet.",
+    "audience": "both"
+  },
+  "service.benchmarks.stuck": {
+    "text": "{n, plural, one {# removed comparison’s file couldn’t be deleted yet (in use?): nothing more can be kept until it is.} other {# removed comparisons’ files couldn’t be deleted yet (in use?): nothing more can be kept until they are.}} Hive retries each time it reads the list.",
+    "note": "An error keeping a comparison on the Performance page: {n} removed comparisons' files couldn't be deleted yet (another program may have them open), and the list has no room until they are.",
+    "audience": "both"
+  },
+  "service.benchmarks.switched": {
+    "text": "The workspace was switched: nothing was kept.",
+    "note": "An error keeping the Performance page's report as a comparison: the window opened another workspace meanwhile.",
+    "audience": "both"
+  },
+  "service.benchmarks.unwritable": {
+    "text": "Hive refused to write a list of kept comparisons it couldn’t read back: nothing was changed.",
+    "note": "An error on the Performance page: the list of kept comparisons Hive was about to write wouldn't read back as valid, so it wasn't written.",
+    "audience": "both"
+  },
+  "service.benchmarks.why": {
+    "text": "{why, select, missing {the list of kept comparisons was missing} damaged {the list of kept comparisons was damaged} entry {an entry of the list of kept comparisons was damaged} other {the list of kept comparisons had too many entries}}",
+    "note": "Why Hive rebuilt the list of kept comparisons from their files: it was missing, damaged, had a damaged entry, or had too many entries. A clause, lower case (it follows \"Recovered:\").",
+    "audience": "both"
+  },
+  "service.benchmarks.wrongScope": {
+    "text": "That comparison file doesn’t match its scope: remove it and import it again.",
+    "note": "An error on the Performance page: a kept comparison's file is of another scope than its entry in the list says.",
+    "audience": "both"
+  },
+  "service.cardAttach.moveFailed": {
+    "text": "The card's attachments couldn't be copied to {project}, so it wasn't moved: {why}",
+    "note": "An error moving a card to another project (HI-1700): its attached files couldn't be copied there; the card stays where it was. {project} is the project's name, {why} the reason.",
+    "audience": "both"
+  },
+  "service.cardAttach.moved": {
+    "text": "The card moved to another project meanwhile: attach again.",
+    "note": "An error attaching files to a card (HI-1700): the card moved to another project while they were copied; nothing was attached.",
+    "audience": "both"
+  },
+  "service.cardAttach.noAttachment": {
+    "text": "The card has no such attachment.",
+    "note": "An error removing a card attachment (HI-1700) that is gone.",
+    "audience": "both"
+  },
+  "service.cardAttach.noCard": {
+    "text": "No such card.",
+    "note": "An error attaching a file to a card (HI-1700): the card is gone.",
+    "audience": "both"
+  },
+  "service.cardAttach.noProject": {
+    "text": "{project} is not a project of the workspace. Nothing was attached.",
+    "note": "An error attaching files to a card (HI-1700): the project named for it is not one of the workspace’s (a path, or a name no project has); nothing was copied.",
+    "audience": "both"
+  },
+  "service.cardAttach.refused": {
+    "text": "{path} is not a file that can be attached here: give the path of a file of your own project (its folder, its slots) or of the temp folder. Nothing was attached.",
+    "note": "An error attaching a file to a card by its path (HI-1700): it is missing, a folder or a link, or in a place the caller may not attach from (another project, Hive’s own folders). Nothing was attached.",
+    "audience": "both"
+  },
+  "service.cardAttach.tooLarge": {
+    "text": "{name} is larger than {max}, the most a card keeps in one file (Settings → Advanced → Card attachments: largest file). Nothing was attached.",
+    "note": "An error attaching files to a card (HI-1700): one is larger than the limit ({max}: a size such as 25 MB); none of them was attached.",
+    "audience": "both"
+  },
+  "service.cardAttach.tooMuch": {
+    "text": "At most {files, number} files and {total} can be attached at once. Nothing was attached.",
+    "note": "An error attaching files to a card (HI-1700): more files, or more bytes in all ({total}: a size such as 100 MB), than one change takes; none was attached.",
+    "audience": "both"
+  },
+  "service.cardCleanup.stale": {
+    "text": "This list is out of date: nothing was removed. Open Clean Up Now again.",
+    "note": "An error of Clean Up Now (Project Settings → Storage, HI-1842): the list of archived cards' files it showed expired, was used already, or belongs to a workspace closed since; nothing was removed.",
+    "audience": "both"
+  },
+  "service.files.badName": {
+    "text": "\"{name}\" is not a valid name",
+    "note": "An error making or renaming a file or folder: {name} is empty, . or .., or has a character Windows can't have in a name.",
+    "audience": "both"
+  },
+  "service.files.exists": {
+    "text": "\"{name}\" already exists",
+    "note": "An error making or renaming a file or folder in the Files tab: one called {name} is already there.",
+    "audience": "both"
+  },
+  "service.files.existsIn": {
+    "text": "{root, select, yes {\"{name}\" already exists in the project root} other {\"{name}\" already exists in {folder}}}",
+    "note": "An error moving files: the folder they go to already has one called {name}. {root} is yes when that folder is the project's own (its root), else {folder} is its path in the project.",
+    "audience": "both"
+  },
+  "service.files.groupInUse": {
+    "text": "Another program has one of these files open. Close it, then try again.",
+    "note": "An error deleting a session's attachments: another program has one of them open, so none was moved.",
+    "audience": "both"
+  },
+  "service.files.inUse": {
+    "text": "Another program has this file open. Close it, then try again.",
+    "note": "An error deleting a session's attachment: another program has the file open, so Windows won't move it.",
+    "audience": "both"
+  },
+  "service.files.insideItself": {
+    "text": "Cannot put \"{name}\" inside itself",
+    "note": "An error moving a folder ({name}) into itself, or into a folder inside it.",
+    "audience": "both"
+  },
+  "service.files.nameRequired": {
+    "text": "A name is required",
+    "note": "An error making a file or folder with no name.",
+    "audience": "both"
+  },
+  "service.files.needsEntry": {
+    "text": "This action needs a file or folder inside the project",
+    "note": "An error in the Files tab: the action (rename, move, delete…) was given the project's own folder, not something in it.",
+    "audience": "both"
+  },
+  "service.files.notAttachment": {
+    "text": "Not a session attachment",
+    "note": "An error opening or deleting a session's attachment: the path isn't a file in a session's attachments folder.",
+    "audience": "both"
+  },
+  "service.files.notKept": {
+    "text": "Not one of the session attachments Hive keeps.",
+    "note": "An error deleting a session's attachment (a file pasted or dropped into a session): it isn't one Hive keeps, or it is a link.",
+    "audience": "both"
+  },
+  "service.files.outside": {
+    "text": "Path is outside the project",
+    "note": "An error in the Files tab: a file's path leads out of the project.",
+    "audience": "both"
+  },
+  "service.files.throughLink": {
+    "text": "Path leads outside the project (through a link)",
+    "note": "An error in the Files tab: a file's path goes through a link (a symbolic link or junction) to somewhere outside the project.",
+    "audience": "both"
+  },
+  "service.fsutil.keptBusy": {
+    "text": "{file} is being saved by something else: nothing was changed. Try again in a moment.",
+    "note": "An error: one of Hive's settings or records files ({file}: its path) was still being written by another program (an editor, a script), so Hive's change to it wasn't made.",
+    "audience": "both"
+  },
+  "service.fsutil.keptUnreadable": {
+    "text": "{file} couldn't be read: nothing was changed. Try again in a moment.",
+    "note": "An error: one of Hive's settings or records files ({file}: its path) is there but couldn't be read (another program had it locked, or a disk error), so Hive's change to it wasn't made and the file was left as it is.",
+    "audience": "both"
+  },
+  "service.fsutil.notCopied": {
+    "text": "{name} could not be copied",
+    "note": "An error putting back one of Hive's skills or modes: its copy couldn't be made ({name}: its folder or file name); nothing was replaced.",
+    "audience": "both"
+  },
+  "service.git.exitCode": {
+    "text": "exit code {code}",
+    "note": "Why a git command failed when git said nothing: the number it exited with.",
+    "audience": "both"
+  },
+  "service.git.failed": {
+    "text": "{command} failed: {why}",
+    "note": "An error in the Changes tab: a git command ({command}, as it is: \"git status\") failed; {why} is git's own first line, or why git can't run.",
+    "audience": "both"
+  },
+  "service.git.outside": {
+    "text": "Path is outside the project",
+    "note": "An error showing a file's changes: its path leads out of the project.",
+    "audience": "both"
+  },
+  "service.gitCompare.noBranch": {
+    "text": "There's no branch {branch} here any more.",
+    "note": "An error comparing two branches in the Changes tab: the branch {branch} was deleted or renamed since the list was read.",
+    "audience": "both"
+  },
+  "service.gitRepo.addFailed": {
+    "text": "Couldn't add {remote}: {why}",
+    "note": "An error adding the remote {remote} in the Git view; {why} is git's own words.",
+    "audience": "both"
+  },
+  "service.gitRepo.badName": {
+    "text": "{kind, select, tag {{hasName, select, yes {{name} isn't a valid tag name.} other {That isn't a valid tag name.}}} other {{hasName, select, yes {{name} isn't a valid branch name.} other {That isn't a valid branch name.}}}}",
+    "note": "An error creating a branch or a tag ({kind}): its name {name} is one git refuses. {hasName} is no when no name was given (then it says That).",
+    "audience": "both"
+  },
+  "service.gitRepo.chooseRemote": {
+    "text": "Choose the remote to push to.",
+    "note": "An error pushing in the Git view: the repository has several remotes and none was chosen.",
+    "audience": "both"
+  },
+  "service.gitRepo.command": {
+    "text": "{command}: {why}",
+    "note": "An error in the Git view: a git command ({command}, as it is: \"git log\") failed; {why} is git's own words, or why git can't run.",
+    "audience": "both"
+  },
+  "service.gitRepo.createFailed": {
+    "text": "Couldn't create {name}: {why}",
+    "note": "An error creating the branch or tag {name}; {why} is git's own words.",
+    "audience": "both"
+  },
+  "service.gitRepo.detachedPull": {
+    "text": "HEAD is detached: switch to a branch to pull.",
+    "note": "An error pulling in the Git view: the project folder is on no branch (a detached HEAD: keep HEAD as it is).",
+    "audience": "both"
+  },
+  "service.gitRepo.detachedPush": {
+    "text": "HEAD is detached: switch to a branch to push.",
+    "note": "An error pushing in the Git view: the project folder is on no branch (a detached HEAD: keep HEAD as it is).",
+    "audience": "both"
+  },
+  "service.gitRepo.diverged": {
+    "text": "{branch} and {upstream} have diverged ({ahead, plural, one {# commit} other {# commits}} here, {behind, number} there), so pulling needs a merge or rebase. Do that in a terminal, or ask an agent to.",
+    "note": "An error pulling in the Git view: the branch {branch} has {ahead} commits the remote branch {upstream} hasn't, and it has {behind} the branch hasn't; Hive pulls only when no merge is needed.",
+    "audience": "both"
+  },
+  "service.gitRepo.exitCode": {
+    "text": "exit code {code}",
+    "note": "Why a git command failed when git said nothing: the number it exited with.",
+    "audience": "both"
+  },
+  "service.gitRepo.fetchFailed": {
+    "text": "Couldn't fetch: {why}",
+    "note": "An error fetching from the repository's remotes; {why} is git's own words (any password in a URL hidden).",
+    "audience": "both"
+  },
+  "service.gitRepo.gaveUp": {
+    "text": "git gave up after {minutes} minutes (no answer from the remote, or a sign-in left open).",
+    "note": "Why fetching, pulling or pushing failed: git waited {minutes} minutes for the remote (or a sign-in window) and stopped.",
+    "audience": "both"
+  },
+  "service.gitRepo.inWorktree": {
+    "text": "{branch} is checked out in another worktree ({folder}): a branch can be in only one folder at a time.",
+    "note": "An error switching branch in the Git view: the branch {branch} is checked out in the worktree {folder}.",
+    "audience": "both"
+  },
+  "service.gitRepo.midOperation": {
+    "text": "Git is in the middle of a {state}: finish or abort it first.",
+    "note": "An error pulling in the Git view: a git operation is under way in the project folder; {state} is git's word for it (merge, rebase, cherry-pick, revert or bisect: keep it as it is).",
+    "audience": "both"
+  },
+  "service.gitRepo.noBranch": {
+    "text": "There's no branch {branch}.",
+    "note": "An error in the Git view (switching branch, choosing what a branch tracks): the repository has no branch called {branch}.",
+    "audience": "both"
+  },
+  "service.gitRepo.noCommits": {
+    "text": "The repository has no commits yet: commit something first.",
+    "note": "An error creating a branch in a repository with no commit yet.",
+    "audience": "both"
+  },
+  "service.gitRepo.noRemote": {
+    "text": "There's no remote {remote}.",
+    "note": "An error pushing or tagging: the repository has no remote called {remote}.",
+    "audience": "both"
+  },
+  "service.gitRepo.noRemotes": {
+    "text": "This repository has no remotes: add one first.",
+    "note": "An error pushing in the Git view: the repository has no remote.",
+    "audience": "both"
+  },
+  "service.gitRepo.noRemotesFetch": {
+    "text": "This repository has no remotes to fetch from: add one first.",
+    "note": "An error fetching in the Git view: the repository has no remote.",
+    "audience": "both"
+  },
+  "service.gitRepo.noTarget": {
+    "text": "There's no branch {target} here to check the branches against.",
+    "note": "An error deleting branches in Version Control → Branches & remotes: the branch the project's work merges into ({target}; the default branch when none is set) isn't in the repository, so Hive can't tell which branches are merged.",
+    "audience": "both"
+  },
+  "service.gitRepo.noUpstream": {
+    "text": "{branch} tracks no remote branch: push it first, or switch to one that does.",
+    "note": "An error pulling in the Git view: the branch {branch} follows no remote branch.",
+    "audience": "both"
+  },
+  "service.gitRepo.notOnRemote": {
+    "text": "{remote} has no {branch} (as of the last fetch): push it there first, or fetch.",
+    "note": "An error choosing what a branch tracks in the Git view: the remote {remote} has no branch {branch} that Hive knows of.",
+    "audience": "both"
+  },
+  "service.gitRepo.notRepo": {
+    "text": "{folder} isn't a git repository.",
+    "note": "An error in the Git view: the project folder {folder} is not in a git repository.",
+    "audience": "both"
+  },
+  "service.gitRepo.nothingToPush": {
+    "text": "The repository has no commits yet: nothing to push.",
+    "note": "An error pushing in the Git view: the repository has no commit yet.",
+    "audience": "both"
+  },
+  "service.gitRepo.nothingToTag": {
+    "text": "The repository has no commits yet: nothing to tag.",
+    "note": "An error tagging in the Git view: the repository has no commit yet.",
+    "audience": "both"
+  },
+  "service.gitRepo.pullFailed": {
+    "text": "Couldn't pull: {why}",
+    "note": "An error pulling in the Git view; {why} is git's own words.",
+    "audience": "both"
+  },
+  "service.gitRepo.pushAllRefused": {
+    "text": "{remote} refused {n, plural, one {# branch or tag} other {# branches and tags}} (Hive never forces a push): it has commits they haven't, so pull or merge them first. What happened to each:",
+    "note": "An error after Push to… with all branches and tags in the Git view: the first line, the remote {remote} refused {n} of them; a line for each outcome follows (service.gitRepo.pushOutcome).",
+    "audience": "both"
+  },
+  "service.gitRepo.pushFailed": {
+    "text": "Couldn't push to {to}: {why}",
+    "note": "An error pushing to the remote branch {to} in the Git view; {why} is git's own words.",
+    "audience": "both"
+  },
+  "service.gitRepo.pushedAll": {
+    "text": "Pushed every branch and tag to {remote}:",
+    "note": "After Push to… with all branches and tags in the Git view: the first line, what went to the remote {remote}; a line for each outcome follows (service.gitRepo.pushOutcome).",
+    "audience": "both"
+  },
+  "service.gitRepo.rejected": {
+    "text": "{to} has commits {branch} hasn't, so the push was refused (Hive never forces a push). Pull first, or merge them in a terminal.",
+    "note": "An error pushing the branch {branch} in the Git view: the remote branch {to} has commits it hasn't, so the remote refused.",
+    "audience": "both"
+  },
+  "service.gitRepo.remoteBranchesDeleted": {
+    "text": "{n, plural, one {Deleted {branches} on {remote}.} other {Deleted # branches on {remote}: {branches}.}}",
+    "note": "After deleting branches on the remote {remote} (Clean Up Merged Branches): {branches} lists them ({n}).",
+    "audience": "both"
+  },
+  "service.gitRepo.remoteDeleteRefused": {
+    "text": "{remote} refused to delete {branches}: it has commits there you haven't fetched, or it doesn't allow deleting them.",
+    "note": "After deleting branches on the remote {remote}: it refused those listed in {branches} (Hive deletes a remote branch only at the commit you were shown).",
+    "audience": "both"
+  },
+  "service.gitRepo.remoteTaken": {
+    "text": "There is a remote called {remote} already.",
+    "note": "An error renaming a remote in the Git view: another remote has that name ({remote}).",
+    "audience": "both"
+  },
+  "service.gitRepo.remoteTrackingChanged": {
+    "text": "The branches tracking {remote} changed since you were asked, so nothing was removed: look at them again.",
+    "note": "An error removing a remote in the Git view: the local branches tracking it are not the ones the confirmation listed (one started or stopped tracking it meanwhile).",
+    "audience": "both"
+  },
+  "service.gitRepo.removeRemoteFailed": {
+    "text": "Couldn't remove {remote}: {why}",
+    "note": "An error removing the remote {remote} in the Git view; {why} is git's own words.",
+    "audience": "both"
+  },
+  "service.gitRepo.renameRemoteFailed": {
+    "text": "Couldn't rename {remote}: {why}",
+    "note": "An error renaming the remote {remote} in the Git view; {why} is git's own words.",
+    "audience": "both"
+  },
+  "service.gitRepo.setFailed": {
+    "text": "Couldn't set {key}: {why}",
+    "note": "An error setting the repository's commit identity in the Git view: the git setting {key} (user.name or user.email: keep it) couldn't be set; {why} is git's own words.",
+    "audience": "both"
+  },
+  "service.gitRepo.switchFailed": {
+    "text": "Couldn't switch to {branch}: {why}",
+    "note": "An error switching the project folder to the branch {branch}; {why} is git's own words.",
+    "audience": "both"
+  },
+  "service.gitRepo.tagPushFailed": {
+    "text": "Tagged {commit} {name}, but couldn't push it to {remote}: {why}",
+    "note": "An error in the Git view: the commit {commit} was tagged {name}, but pushing the tag to the remote {remote} failed; {why} is git's own words.",
+    "audience": "both"
+  },
+  "service.gitRepo.update.agentBusy": {
+    "text": "{agent} {status, select, starting {is starting} working {is working} waiting {is waiting for your answer} background {is waiting on background tasks it started} watching {is waiting for cards to change (a card watch)} other {stopped in the middle of a task when its sign-in expired}} in {folder}: update {branch} once it has finished.",
+    "note": "Why updating a branch from its target is refused now: an agent works in the folder the branch is checked out in ({folder}: a slot's name, such as slot-a, or a folder's name or path). {agent} is the agent's name; {status} what it is doing (select: translate each); {branch} the branch.",
+    "audience": "both"
+  },
+  "service.gitRepo.update.conflict": {
+    "text": "{how, select, rebase {Rebasing} other {Merging}} {branch} with {target} stopped at a conflict in {files}, so it was undone: {branch} is as it was. Update it by hand, or ask its builder to.",
+    "note": "An error updating a branch from its target: git stopped at a conflict, and Hive aborted it, leaving the branch and its folder as they were. {how}: merge or rebase (select: translate each); {branch} the branch, {target} the target; {files} the files in conflict, joined (src/a.ts and src/b.ts).",
+    "audience": "both"
+  },
+  "service.gitRepo.update.dirty": {
+    "text": "{folder} has uncommitted changes: commit them, or set them aside, before updating {branch}.",
+    "note": "Why updating a branch from its target is refused: the folder it is checked out in ({folder}: a slot's name, a folder's name or a path) has changes not committed. {branch} is the branch.",
+    "audience": "both"
+  },
+  "service.gitRepo.update.failed": {
+    "text": "Couldn't update {branch} from {target}, so it is as it was: {why}",
+    "note": "An error updating a branch from its target that isn't a conflict (a hook refused the commit, signing failed…); Hive undid what git started. {why} is git's own words.",
+    "audience": "both"
+  },
+  "service.gitRepo.update.isTarget": {
+    "text": "{branch} is the target itself.",
+    "note": "An error updating a branch from its target: the branch picked ({branch}) is the target.",
+    "audience": "both"
+  },
+  "service.gitRepo.update.midOperation": {
+    "text": "Git is in the middle of a {state} in {folder}: finish or abort it first.",
+    "note": "Why updating a branch from its target is refused: a git operation ({state}: merge, rebase…, as git names it) is under way in the folder the branch is checked out in ({folder}: a slot's name, a folder's name or a path).",
+    "audience": "both"
+  },
+  "service.gitRepo.update.missed": {
+    "text": "{branch} was changed, but it still lacks commits of {target}: check it in History before going on.",
+    "note": "An error after Update from <target> (HI-1180): git said it succeeded, but the branch {branch} still doesn't contain the target {target}'s head.",
+    "audience": "both"
+  },
+  "service.gitRepo.update.moved": {
+    "text": "{branch} changed while it was being updated, so nothing was changed: try again.",
+    "note": "An error updating a branch from its target: the branch moved to another commit meanwhile (a commit, a push), so Hive left it as it is.",
+    "audience": "both"
+  },
+  "service.gitRepo.update.noTarget": {
+    "text": "The project has no target branch here, so there is nothing to update {branch} from.",
+    "note": "An error updating a branch from its target (Version Control → Branches, HI-1180): the project's workflow target (or the repository's default branch) doesn't exist in this repository. {branch} is the branch.",
+    "audience": "both"
+  },
+  "service.gitRepo.update.notUndone": {
+    "text": "Updating {branch} from {target} stopped, and Hive couldn't undo it: {folder} is {state, select, none {left changed} merge {still in the middle of a merge} rebase {still in the middle of a rebase} other {still in the middle of a git operation}}. Finish or abort it there yourself (git status says how), then check {branch}. Git said: {why}",
+    "note": "An error updating a branch from its target (HI-1180): git stopped, and Hive's own abort failed, so the folder ({folder}: a slot's name, a folder's name or a path) is left as git left it ({state}: none, merge, rebase or another operation; select: translate each). {why} is git's own words.",
+    "audience": "both"
+  },
+  "service.gitRepo.update.notUndoneTemporary": {
+    "text": "Updating {branch} from {target} stopped, and Hive couldn't undo it in its temporary folder {folder}, kept as git left it: {branch} itself is as it was. Remove that folder in Unused worktrees once you have looked. Git said: {why}",
+    "note": "An error updating a branch from its target (HI-1180) that was checked out nowhere: git stopped in the temporary folder Hive made ({folder}: its path), and Hive's abort failed, so the folder is kept; the branch itself wasn't moved. {state} is unused here. {why} is git's own words.",
+    "audience": "both"
+  },
+  "service.gitRepo.update.queued": {
+    "text": "{card} is in the merge queue, which brings it up to date itself: take it out of the queue first to update {branch} here.",
+    "note": "Why updating a branch from its target is refused: the branch is the line of a card ({card}: its key, such as HI-12) that Hive's merge queue is merging now. {branch} is the branch.",
+    "audience": "both"
+  },
+  "service.gitRepo.update.temporaryLeft": {
+    "text": "Hive couldn't remove its temporary folder {folder}: remove it in Unused worktrees.",
+    "note": "A second line after Update from <target> on a branch checked out nowhere (HI-1180): the temporary folder Hive made for it ({folder}: its path) could not be removed.",
+    "audience": "both"
+  },
+  "service.gitRepo.upstreamGone": {
+    "text": "{upstream} is gone from the remote.",
+    "note": "An error pulling in the Git view: the remote branch {upstream} the branch follows was deleted there.",
+    "audience": "both"
+  },
+  "service.gitRepo.urlFailed": {
+    "text": "Couldn't change {remote}'s URL: {why}",
+    "note": "An error changing the address of the remote {remote} in the Git view; {why} is git's own words.",
+    "audience": "both"
+  },
+  "service.hiveVcs.cantList": {
+    "text": "Git couldn't list the files it tracks in .hive.",
+    "note": "An error untracking the project's .hive folder from git: git couldn't list them. Keep .hive as it is (a folder name).",
+    "audience": "both"
+  },
+  "service.hiveVcs.cantListWhy": {
+    "text": "Git couldn't list the files it tracks in .hive ({problem}).",
+    "note": "An error untracking the project's .hive folder from git: git can't run; {problem} says why (\"Git isn't installed\"). Keep .hive as it is (a folder name).",
+    "audience": "both"
+  },
+  "service.hiveVcs.changed": {
+    "text": "The files git tracks in .hive changed since you were shown them: nothing was untracked. Look again.",
+    "note": "An error untracking the project's .hive folder from git: the list of its tracked files changed after Hive showed it, so nothing changed. Keep .hive as it is.",
+    "audience": "both"
+  },
+  "service.hiveVcs.exitCode": {
+    "text": "exit code {code}",
+    "note": "Why a git command failed when git said nothing: the number it exited with.",
+    "audience": "both"
+  },
+  "service.hiveVcs.noRepo": {
+    "text": "No git repository holds this project.",
+    "note": "An error untracking the project's .hive folder (Hive's own files) from git: the project isn't in a git repository.",
+    "audience": "both"
+  },
+  "service.hiveVcs.rmFailed": {
+    "text": "git rm --cached failed: {why}",
+    "note": "An error untracking the project's .hive folder from git: the git command (git rm --cached: keep it) failed; {why} is git's own first line, or why git can't run.",
+    "audience": "both"
+  },
+  "service.intent.noWorkflow": {
+    "text": "{card} has no workflow: it is a card about the workspace, or its project has no version control chosen yet. Move it on the board instead.",
+    "note": "An error: an intent (a card's start, submission, verdict…) was asked for a card that has no workflow, because it belongs to no project or its project's version control (Git or None) isn't chosen yet. {card} is the card's key (HI-12).",
+    "audience": "both"
+  },
+  "service.intent.queueNotAgents": {
+    "text": "Only the user, or the Hive Assistant within Settings → Assistant → Control, takes a card out of the merge queue or retries its merge.",
+    "note": "An error: an agent or a script asked to remove a card from the merge queue or retry its merge, which only the user and the Hive Assistant (within its Control setting, a setting name: use it as Hive shows it) can do.",
+    "audience": "both"
+  },
+  "service.keys.closed": {
+    "text": "The workspace was closed, or the window opened another, before the key was changed: nothing changed.",
+    "note": "An error changing a project's key: its workspace closed (or the window switched to another workspace) while the change waited; nothing was changed.",
+    "audience": "both"
+  },
+  "service.keys.form": {
+    "text": "A project key is 2 to 4 letters, A to Z.",
+    "note": "An error changing a project's key (Project Settings): the key typed isn't 2–4 letters A–Z.",
+    "audience": "both"
+  },
+  "service.keys.prefix": {
+    "text": "{key} and another project’s key {other} begin alike: no key can be the start of another.",
+    "note": "An error changing a project's key: {key} and another project's key {other} (both letters such as AM and AMB) would be one the start of the other, which isn't allowed.",
+    "audience": "both"
+  },
+  "service.keys.taken": {
+    "text": "{key} is another project’s key, or was: a key stays with its project for good.",
+    "note": "An error changing a project's key: {key} (letters such as AM) belongs to another project now or did before (its old keys stay its aliases).",
+    "audience": "both"
+  },
+  "service.keys.unknownProject": {
+    "text": "That project has no id yet, so it can’t have a key: open it in Hive first.",
+    "note": "An error changing a project's key: the project hasn't been given Hive's id (it hasn't been opened yet).",
+    "audience": "both"
+  },
+  "service.laneStart.busy": {
+    "text": "{status, select, working {Agent {agent} is working.} starting {Agent {agent} is starting.} waiting {Agent {agent} is waiting for your answer.} background {Agent {agent} is waiting on background tasks it started.} signin {Agent {agent} needs you to sign in again.} other {Agent {agent} is waiting on cards (a card watch).}} Start the lane once it's idle, or choose another agent.",
+    "note": "An error starting a lane from the window: the agent {agent} can't start in a new conversation now, because of what it is doing ({status}; keep the select keys). The window offers to wait until it's idle. Each {status} a whole sentence with a noun before the name (HI-1585: glossary §1 rules 3 and 4).",
+    "audience": "both"
+  },
+  "service.laneStart.done": {
+    "text": "{card} is Done already.",
+    "note": "An error starting a lane from the window: a card chosen ({card}, its key) is already Done.",
+    "audience": "both"
+  },
+  "service.laneStart.needsReviewer": {
+    "text": "{project}'s rules have a reviewer agent review each card: choose a reviewer.",
+    "note": "An error starting a lane from the window: the project's workflow options have a reviewer agent review the work, and no reviewer was chosen.",
+    "audience": "both"
+  },
+  "service.laneStart.noCards": {
+    "text": "Choose the cards for the lane.",
+    "note": "An error starting a lane (a builder and a reviewer working through cards in turn) from the window: no card was chosen.",
+    "audience": "both"
+  },
+  "service.laneStart.notTheProjects": {
+    "text": "{card} isn't one of {project}'s cards, or it is archived.",
+    "note": "An error starting a lane from the window: a card chosen ({card}, its key) isn't this project's ({project}), or is archived.",
+    "audience": "both"
+  },
+  "service.laneStart.poolEmpty": {
+    "text": "None of {project}'s agents besides the builder reviews, so the pool has nobody to review the cards.",
+    "note": "An error starting a lane from the window with the reviewer pool chosen: no agent of the project other than the builder has a role that reviews (Reviewer or Either).",
+    "audience": "both"
+  },
+  "service.laneStart.poolNotOffered": {
+    "text": "{project}'s rules have one reviewer per lane: choose a reviewer, or set Reviewers to a shared pool.",
+    "note": "An error starting a lane from the window with the reviewer pool chosen: the project's workflow options (G17, “Reviewers”, a value “A shared pool”) don't have a pool, or workflow rules are off.",
+    "audience": "both"
+  },
+  "service.laneStart.sameAgent": {
+    "text": "The builder can't be its own reviewer.",
+    "note": "An error starting a lane from the window: the same agent was chosen as builder and reviewer.",
+    "audience": "both"
+  },
+  "service.laneStart.starting": {
+    "text": "The lane of agent {agent} is being started already.",
+    "note": "An error starting a lane from the window: one with the same builder ({agent}) is being started right now. A noun before the name (glossary §1 rule 4).",
+    "audience": "both"
+  },
+  "service.laneStart.unknownAgent": {
+    "text": "{agent} isn't one of {project}'s agents.",
+    "note": "An error starting a lane from the window: the builder or reviewer chosen ({agent}) isn't an agent of the project ({project}).",
+    "audience": "both"
+  },
+  "service.lanes.noWorkspace": {
+    "text": "No workspace is open",
+    "note": "An error changing a workspace's lanes (card loops) while no workspace is open in the window.",
+    "audience": "both"
+  },
+  "service.lanes.teamPaused": {
+    "text": "The team is paused (before an update): resume the team first, then start the lane.",
+    "note": "An error starting a lane (a card loop) while the user or the Hive Assistant has paused the whole team before an update (HI-2081): nothing of a lane starts until the team resumes (Resume the Team, in the Progress panel's Lanes).",
+    "audience": "both"
+  },
+  "service.lanes.unknown": {
+    "text": "Unknown lane {id}",
+    "note": "An error: there is no lane (a card loop) with the id {id}, perhaps removed meanwhile.",
+    "audience": "both"
+  },
+  "service.metrics.badProvider": {
+    "text": "provider must be a provider id",
+    "note": "An error reading metrics: the provider filter isn't a provider's id. Keep provider as it is (a parameter's name).",
+    "audience": "both"
+  },
+  "service.metrics.badRange": {
+    "text": "from and to must be ISO times, from before to",
+    "note": "An error reading metrics: the range asked for is not two times in order. from and to are the parameters' names: keep them, and ISO.",
+    "audience": "both"
+  },
+  "service.metrics.badRole": {
+    "text": "role must be agent, assistant, api or viewer",
+    "note": "An error reading metrics: the role filter isn't one of its values. Keep role, agent, assistant, api and viewer as they are (a parameter and its values).",
+    "audience": "both"
+  },
+  "service.providers.noSetup": {
+    "text": "{cli} has no setup task.",
+    "note": "An error: the coding agent CLI {cli} (\"Codex\") has no setup task for Hive to run.",
+    "audience": "both"
+  },
+  "service.providers.notInstalled": {
+    "text": "{cli} is not installed.",
+    "note": "An error running a coding agent CLI's task (update, sign-in, setup): the CLI {cli} (\"Codex\") is not installed.",
+    "audience": "both"
+  },
+  "service.providers.retryUnavailable": {
+    "text": "This update retry is no longer available. Check again, then try Update.",
+    "note": "Provider Setup error when a user tries to retry an update whose failure is no longer current. Check again and Update are buttons.",
+    "audience": "both"
+  },
+  "service.providers.signInConnections": {
+    "text": "{cli} signs in per account: sign in from Settings → Accounts & Connections.",
+    "note": "An error: Provider Setup was asked to sign a coding agent CLI ({cli}: \"Claude Code\") in, but its logins are accounts (Settings → Accounts & Connections names a section).",
+    "audience": "both"
+  },
+  "service.providers.stillLooking": {
+    "text": "Hive is still looking for {cli}. Try again in a moment.",
+    "note": "An error: Hive hasn't finished finding the coding agent CLI {cli} (\"Codex\"), so it can't use it yet.",
+    "audience": "both"
+  },
+  "service.providers.stillLookingAll": {
+    "text": "Hive is still looking for the coding agent CLIs. Try again in a moment.",
+    "note": "An error: Hive hasn't finished finding the coding agent CLIs installed (it does when it starts), so it can't choose one yet.",
+    "audience": "both"
+  },
+  "service.providers.stopFirst": {
+    "text": "Stop all running {cli} agents before updating it.",
+    "note": "An error updating the coding agent CLI {cli} (\"Codex\") while agents run it.",
+    "audience": "both"
+  },
+  "service.slots.notPrepared": {
+    "text": "Hive couldn't get {slot} ready for {card}: {why}",
+    "note": "A notice: a card was started in a slot (a worktree Hive lends to a card or a lane), and Hive couldn't check out the card's branch there or install its dependencies. {slot} is the slot's name (slot-b), {card} the card's key, {why} git's or the setup's reason, in English.",
+    "audience": "both"
+  },
+  "service.slots.resumeFailed": {
+    "text": "Hive couldn't resume {agent}'s conversation in {slot} for {card} (three tries): {why}. Resume {agent} from Sessions, or start it fresh, and Hive gives it {card}.",
+    "note": "A notice (HI-1746): a card was started for an agent (its builder) in a slot, and Hive's resumes of the agent's last conversation there failed three times, so it stopped trying. Once the user resumes the agent, or starts it, Hive hands it the card. {card} is the card's key, {agent} the agent's name, {slot} the slot's name (slot-b), {why} the last failure's reason, in English.",
+    "audience": "both"
+  },
+  "service.slots.resumeHeld": {
+    "text": "Hive can't give {card} to {agent} yet: {agent}'s conversation in {slot} can't resume now ({why}). Hive gives it {card} once it can.",
+    "note": "A notice (HI-1746): a card was started for an agent (its builder) in a slot, and Hive hasn't handed the card to it yet; the agent's last conversation, in that slot, can't be resumed now, and Hive never starts a new conversation instead. {card} is the card's key, {agent} the agent's name, {slot} the slot's name (slot-b), {why} the reason, in English.",
+    "audience": "both"
+  },
+  "service.transcripts.busy": {
+    "text": "This session is being archived or deleted. Try again in a moment.",
+    "note": "An error opening a session's conversation in the Sessions tab while it is being archived or deleted.",
+    "audience": "both"
+  },
+  "service.transcripts.imageNotKept": {
+    "text": "The image is not stored in the transcript",
+    "note": "An error in the Sessions tab: the conversation's file mentions the image but doesn't hold it.",
+    "audience": "both"
+  },
+  "service.transcripts.noImage": {
+    "text": "No such image",
+    "note": "An error in the Sessions tab: the image asked for isn't in the conversation (any more).",
+    "audience": "both"
+  },
+  "service.transcripts.noTool": {
+    "text": "No such tool call",
+    "note": "An error in the Sessions tab: the tool call asked for isn't in the conversation (any more).",
+    "audience": "both"
+  },
+  "service.transcripts.none": {
+    "text": "This session has no transcript yet.",
+    "note": "An error in the Sessions tab: the session's CLI hasn't written its conversation's file yet.",
+    "audience": "both"
+  },
+  "service.workflow.changedMeanwhile": {
+    "text": "The workflow options changed meanwhile (in another window, or by the Hive Assistant), so nothing was saved. The section shows them as they are now.",
+    "note": "Why saving the Workflow section of the Version Control tab was refused: the options changed after the section was read. It reloads them.",
+    "audience": "both"
+  },
+  "service.workflow.closed": {
+    "text": "The workspace this card belongs to has closed",
+    "note": "An error: a change to a card was asked for in a workspace that has since closed, or whose window opened another workspace.",
+    "audience": "both"
+  },
+  "service.workflow.inheritor": {
+    "text": "Project {project} inherits these options, and the change would make its options contradict each other:",
+    "note": "Why saving workflow defaults (Settings → Workflow defaults or Settings → Workspace) was refused: a project that inherits them would have contradictory options. The reason follows on its own line. {project} is its name.",
+    "audience": "both"
+  },
+  "service.workspace.advancedNotHere": {
+    "text": "{setting} can't be set for a workspace.",
+    "note": "An error: the advanced setting {setting} (its title, or its id) has no value of its own for a workspace, only for Hive.",
+    "audience": "both"
+  },
+  "service.workspace.agentGone": {
+    "text": "That agent no longer exists.",
+    "note": "An error changing an agent's settings: it was removed meanwhile.",
+    "audience": "both"
+  },
+  "service.workspace.badName": {
+    "text": "Project names cannot start with \".\" or contain {chars}",
+    "note": "An error making a project: a project's name (its folder's) can't start with a dot or hold the characters {chars}, which Windows doesn't allow in a folder's name.",
+    "audience": "both"
+  },
+  "service.workspace.closed": {
+    "text": "The workspace was closed",
+    "note": "An error: the workspace was closed (or the window opened another) while the action was under way.",
+    "audience": "both"
+  },
+  "service.workspace.connectionGone": {
+    "text": "The connection chosen for {agent} was removed, or is being removed. Choose another.",
+    "note": "An error saving an agent (HI-2107): the connection chosen for it ({agent}, the agent's name) was removed from Settings → Accounts & Connections meanwhile.",
+    "audience": "both"
+  },
+  "service.workspace.folderExists": {
+    "text": "A folder named \"{name}\" already exists",
+    "note": "An error making a project: the workspace already has a folder called {name}.",
+    "audience": "both"
+  },
+  "service.workspace.holdsOpen": {
+    "text": "The workspace {workspace}, open in another window, is inside {folder}. Close it first to open {name} as a workspace.",
+    "note": "An error opening a workspace: another Hive window's workspace {workspace} is inside the folder {folder} (its name: {name}).",
+    "audience": "both"
+  },
+  "service.workspace.insideOpen": {
+    "text": "{folder} is inside the workspace {workspace}, which is open in another window. Close that workspace first, or open this folder's projects from there.",
+    "note": "An error opening a workspace: the folder {folder} is inside {workspace}, the workspace of another Hive window (a workspace inside another would share its projects).",
+    "audience": "both"
+  },
+  "service.workspace.none": {
+    "text": "No workspace is open",
+    "note": "An error: the action needs a workspace, and none is open in this window.",
+    "audience": "both"
+  },
+  "service.workspace.notFound": {
+    "text": "Folder not found: {folder}",
+    "note": "An error opening a workspace: the folder {folder} is not there.",
+    "audience": "both"
+  },
+  "service.workspace.notProject": {
+    "text": "Not a project in the open workspace: {path}",
+    "note": "An error: {path} isn't one of the open workspace's projects (a folder in it, not hidden).",
+    "audience": "both"
+  },
+  "service.workspace.notRoot": {
+    "text": "Not a project or agent worktree in the open workspace: {path}",
+    "note": "An error: {path} is neither one of the open workspace's projects nor the worktree of one of their agents.",
+    "audience": "both"
+  },
+  "service.workspace.openElsewhere": {
+    "text": "{folder} is already open in another window.",
+    "note": "An error opening a workspace: the folder {folder} is the workspace of another Hive window.",
+    "audience": "both"
+  },
+  "service.workspace.stillClosing": {
+    "text": "{name} is still closing: wait for it to finish, then try again.",
+    "note": "An error opening, making or closing a workspace while this window is still closing its workspace {name}.",
+    "audience": "both"
+  },
+  "service.workspace.stillOpening": {
+    "text": "{name} is still opening: wait for it to finish, then try again.",
+    "note": "An error opening, making or closing a workspace while this window is still opening its workspace {name} (bringing its skills up to date, or upgrading it to Hive 1.0).",
+    "audience": "both"
+  }
+}

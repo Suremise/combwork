@@ -439,6 +439,7 @@ function roundLimit(tx: Tx, n: number, key: string, ruleset: { ruleset?: string 
   if (!atRoundLimit(s, card.rounds)) return
   // The card's key as the runtime names it (service.ts: its project's name).
   const shown = workflowText(FOR_YOU.roundLimit, { card: key, rounds: s.rounds })
+  // agent-later: HI-2464 says For-you requests and workflow notices in each reader's dialect
   const text = workflowEnglish(shown)
   const asked = tx.append(n, { kind: 'ApprovalRequested', actor: 'hive', source: 'recorded', ...ruleset, data: { request: `${key}/r${s.lastSeq + 1}`, kind: 'decide', gate: ROUND_LIMIT_GATE, text, requestText: shown, for: 'user', stage: s.stage, generation: s.generation } })
   tx.action(n, 'notify', { text, shown }, asked.seq)

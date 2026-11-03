@@ -12,6 +12,15 @@
 // `// agent-protocol: <reason>` on its line, or on a line of its own just above. A bare `agent-protocol`, with no
 // reason, fails. A file the parser can't read fails; it is never skipped.
 //
+// And for the window's messages agents read (HI-2440, agentTextBoth.mjs), in src/main and src/shared:
+//   - `unresolved|<call>|<argument>`: a call that reads text (agentText, englishText, storedText, a HiveError and its
+//     subclasses, any function passing its parameter on to one) whose argument it can't follow to its messages. Mark it
+//     `// agent-text: <the table, message or function its messages are in>` (followed into the catalogue; one that leads
+//     nowhere fails) or `// agent-protocol: <why>`;
+//   - `oneway|<function>|<argument>`: English formatted for agents outside the agent-text module (englishText,
+//     englishError, workflowEnglish, problemEnglish, agentEnglish), which no reader's dialect reaches. Say it with
+//     agentText where it is sent, or mark it `// log`, `// window: <why>`, `// agent-stored: <the function that says it
+//     again for each reader>` (one the source declares), or `// agent-later: <card> <what>` for work a card has taken on.
 // A site is `prose|<context>|<text>` (no line numbers); a file's list (agent-text/allow/<path with / as __>.json) is its
 // sites with their counts. Modes, as the i18n guard's:
 //   (none)    check: a site seen more often than its file's list allows fails; the lists are compared with the merge
@@ -27,6 +36,7 @@ import traverseModule from '@babel/traverse'
 import { ROOT, rootArg, sourceFiles } from './i18nExtract.mjs'
 import { allowName, baseLists, defaultBaseRef, growth, proseItems, readLists } from './i18nGuard.mjs'
 import { agentReason, isAgentFile } from './agentTextFiles.mjs'
+import { analyzeBoth } from './agentTextBoth.mjs'
 
 const traverse = traverseModule.default ?? traverseModule
 
@@ -103,11 +113,25 @@ export function runAgentGuard({ root = ROOT, allowDir = join(root, ALLOW_DIR), m
   const list = files?.length ? files : candidates(root)
   const seenFiles = new Set()
   mkdirSync(allowDir, { recursive: true })
-  for (const rel of list) {
+  // The window's messages agents read (HI-2440): each rendering call followed to its messages or marked, and no English
+  // formatted for agents outside the agent-text module. Their sites ratchet in the same lists.
+  const both = analyzeBoth(root)
+  const bothSites = new Map()
+  for (const u of [...both.unresolved, ...both.oneway]) {
+    if (!bothSites.has(u.file)) bothSites.set(u.file, [])
+    bothSites.get(u.file).push({ site: u.site, line: u.line })
+  }
+  if (mode === 'check') {
+    failures += both.problems.length
+    out.push(...both.problems)
+  }
+  for (const rel of [...new Set([...list, ...[...bothSites.keys()].filter((f) => !files?.length || files.includes(f))])]) {
     const code = readFileSync(join(root, rel), 'utf8')
-    // A file that is neither agent-facing nor has an ignore can't have a site: not parsed.
-    if (!isAgentFile(rel) && !code.includes('i18n-ignore') && !code.includes('agent-protocol')) continue
-    const { sites, problems, unparseable } = agentSitesOf(rel, code)
+    // A file that is neither agent-facing nor has an ignore (nor a call the scan follows) can't have a site: not parsed.
+    if (!isAgentFile(rel) && !code.includes('i18n-ignore') && !code.includes('agent-protocol') && !bothSites.has(rel)) continue
+    const own = agentSitesOf(rel, code)
+    const { problems, unparseable } = own
+    const sites = [...own.sites, ...(bothSites.get(rel) ?? [])]
     if (unparseable && mode !== 'check') {
       out.push(problems[0])
       continue
@@ -165,7 +189,7 @@ export function runAgentGuard({ root = ROOT, allowDir = join(root, ALLOW_DIR), m
       failures += grew.length
       out.push(...grew)
     }
-    if (failures) out.push("Text agents get is an agent message: agentMsg({ id, text, note }) said with say() (shared/agentText). Text that isn't wording (a name, a path, a prefix code parses) takes // agent-protocol: <reason>.")
+    if (failures) out.push("Text agents get is an agent message: agentMsg({ id, text, note }) said with say() (shared/agentText). Text that isn't wording (a name, a path, a prefix code parses) takes // agent-protocol: <reason>. A window message agents read goes through agentText() where it is sent (unresolved: mark the call // agent-text: <the table or function its messages are in>; oneway: say it with agentText, or mark // log, // window: <why>, // agent-stored: <the function that says it again for each reader>).")
     out.push(`${total} agent text sites; ${failures} failures; ${stale} allowed sites gone (--prune drops them)`)
   }
   return { exit: failures ? 1 : 0, lines: out }

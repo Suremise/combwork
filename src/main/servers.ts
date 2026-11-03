@@ -43,6 +43,7 @@ import { addAgent, updateAgent } from './projectAgents'
 import { DOC_MAX, SHARED_PREFIX, readDoc } from './docSections'
 import { docOutline, findHeading, sectionText, type DocHeading } from '../shared/docSections'
 import { providerService } from './providerService'
+import { agentInstallInfo } from './providers/common'
 import { config } from './config'
 import { refusal, refusalBody } from '../shared/workflow/refusals'
 import { testsGiven, type FocusedTest } from '../shared/workflow/focused'
@@ -127,7 +128,9 @@ import { hookTokenMatches, refusedHookNote } from './hookTokens'
 import { unusedWorktreeCounts } from './unusedWorktrees'
 import { devConsole, hiveSourceId, sessionSourceId } from './devConsole'
 import { consoleSources } from './devConsoleSources'
-import { englishError, HiveError, shownError } from './hiveError'
+import { agentError, HiveError, shownError } from './hiveError'
+import { agentField, agentText, type TextPart } from '../shared/advanced'
+import { storedForAgents } from '../shared/taskHistory'
 import { CONSOLE_KINDS, hiveName, mayRead, type ConsoleEvent, type ConsoleKind, type ConsoleReader, type ConsoleSource } from '../shared/devConsole'
 import { cardLabel, cardName, cardRef, namesOf } from '../shared/projectKeys'
 import { pauseTeam, resumeTeam } from './teamPause'
@@ -165,11 +168,16 @@ class HttpError extends Error {
     public status: number,
     message: string,
     /** More of the reply's body, beside `error` (a conflict's current revision). */
-    public extra?: Record<string, unknown>
+    public extra?: Record<string, unknown>,
+    /** The text of the HiveError it answers (httpFrom), said in the request's dialect (dialects, HI-2440). */
+    public text?: TextPart
   ) {
     super(message)
   }
 }
+
+/** An error answered with another status: its message, and a HiveError's text, so the reply says it in the caller's dialect. */
+const httpFrom = (status: number, e: unknown, extra?: Record<string, unknown>): HttpError => new HttpError(status, (e as Error).message, extra, e instanceof HiveError ? e.text : undefined)
 
 /** A reply's body as sent: its JSON as it is, whatever names its data uses (a console event's raw payload, #845). */
 export const replyText = (body: unknown): string => (body === undefined ? '' : JSON.stringify(body))
@@ -507,12 +515,12 @@ const statusMessageOf = (live: LiveSessionState | null | undefined): string | nu
     : live?.status === 'watching'
     ? (live.watch?.label ?? null)
     : live?.status === 'signin'
-      ? say(API.status.signInExpired, { reason: live.signIn?.message ?? say(API.status.notSignedIn) })
+      ? say(API.status.signInExpired, { reason: agentField(live.signIn?.message, live.signIn?.messageText) ?? say(API.status.notSignedIn) })
       : retryWaitText(live)
         ? say(API.status.retryWait, { state: retryWaitText(live) ?? '' })
         : unknownStateText(live)
           ? say(API.status.unknownState, { state: unknownStateText(live) ?? '' })
-          : (live?.statusMessage ?? live?.mergeSlot ?? null)
+          : (agentField(live?.statusMessage, live?.statusText) ?? agentField(live?.mergeSlot, live?.mergeSlotText) ?? null)
 
 async function projectSummary(p: string) {
   const info = await workspace.projectInfo(p)
@@ -617,7 +625,7 @@ const sayNow = ([m, values]: Said): string => say(m, values)
 const sayStored = ([m, values]: Said): string => inDefaultDialect(() => say(m, values))
 
 /** A refusal of the Assistant's change boundary, or of a batch's request, as the Agent API answers it. */
-const httpOf = (e: unknown): unknown => (e instanceof assistant.ChangeRefused ? new HttpError(e.status, e.message, e.extra) : e)
+const httpOf = (e: unknown): unknown => (e instanceof assistant.ChangeRefused ? httpFrom(e.status, e, e.extra) : e)
 
 async function asRefused<T>(fn: () => Promise<T>): Promise<T> {
   try {
@@ -774,7 +782,8 @@ route('GET', '/v1/status', async () => ({
   caller: await callerInfo(),
   // The guidance this Hive gives sessions, and the request's workspace's Hive skills (null without one).
   guidance: { revision: GUIDANCE_REVISION, skills: await hiveSkillsNow() },
-  providers: providerService.all(),
+  // Hive's words in them in the caller's dialect (dialects, HI-2440).
+  providers: Object.fromEntries(Object.entries(providerService.all()).map(([id, info]) => [id, agentInstallInfo(info)])),
   /** The request's workspace (or the only open one); `workspaces` lists every window's. */
   workspace: contextWorkspace()?.path ? { name: basename(contextWorkspace()!.path!), path: contextWorkspace()!.path } : null,
   workspaces: openWorkspaces().map((w) => ({ name: basename(w.path!), path: w.path })),
@@ -980,7 +989,7 @@ route('GET', '/v1/providers', async () => {
       version: info.version,
       // The version this Hive release was tested with, and how the installed one compares (#365).
       tested: info.tested ? { version: info.tested.version, installed: info.found ? info.tested.installed : say(API.provider.notInstalled) } : null,
-      problem: info.readiness?.find((r) => r.level === 'error')?.message ?? null,
+      problem: agentInstallInfo(info).readiness?.find((r) => r.level === 'error')?.message ?? null,
       defaultModel: info.defaultModel ?? null,
       // What the pickers offer: the CLI's own models, else the fallback list in Settings (#125).
       models: modelGroups(p.id, info, s).filter((g) => !g.unavailable).flatMap((g) => g.models.map((m) => ({ value: m.value, label: m.label }))),
@@ -1006,7 +1015,7 @@ async function settingsCall<T>(fn: () => Promise<T> | T): Promise<T> {
   try {
     return await fn()
   } catch (e) {
-    throw e instanceof SettingRefused ? new HttpError(e.status, e.message) : e
+    throw e instanceof SettingRefused ? httpFrom(e.status, e) : e
   }
 }
 
@@ -1080,7 +1089,7 @@ async function settingsChange(e: SettingEntry, value: unknown, projectPath: stri
     return { id: e.id, title: e.title, path, ...(projectPath ? { project: basename(projectPath) } : {}), changed, old: oldText, new: newText, ...(restart ? { restart } : {}), ...(r.note ? { note: r.note } : {}) }
   } catch (err) {
     assistant.record(ws, act, line, (err as Error).message, { reason: publicReason(statusOf(err)) })
-    throw err instanceof SettingRefused ? new HttpError(err.status, err.message) : err
+    throw err instanceof SettingRefused ? httpFrom(err.status, err) : err
   }
 }
 
@@ -1119,7 +1128,7 @@ route('POST', '/v1/assistant/undo', async ({ body }) => {
       // meanwhile, the rest isn't undone.
       results = await undoChanges(ws, change ? { change } : { group }, 'assistant', guard)
     } catch (e) {
-      throw e instanceof UndoNotFound ? new HttpError(404, e.message) : e
+      throw e instanceof UndoNotFound ? httpFrom(404, e) : e
     }
     const undone = results.filter((r) => r.undone.length).length
     const skipped = results.reduce((n, r) => n + r.skipped.length, 0)
@@ -1359,7 +1368,7 @@ async function connectionsCall<T>(fn: () => T | Promise<T>): Promise<T> {
     return await fn()
   } catch (e) {
     if (e instanceof HttpError) throw e
-    throw new HttpError(e instanceof HiveError && e.kind === 'notFound' ? 404 : 409, (e as Error).message)
+    throw httpFrom(e instanceof HiveError && e.kind === 'notFound' ? 404 : 409, e)
   }
 }
 
@@ -1598,7 +1607,7 @@ route('POST', '/v1/projects/:name/agents/:agent/message', async ({ params, body 
     guard()
     // Its sender saved with it: the Assistant's launch, whose permission is worked out again at every step (#645).
     const r = await leaveMessage(p, agentId, a.name, callerSender(), text, card).catch((e: Error) => {
-      throw new HttpError(409, e.message)
+      throw httpFrom(409, e)
     })
     if (r.fate === 'cancelled' || r.fate === 'expired' || r.fate === 'refused' || r.fate === 'stale') throw new HttpError(409, say(API.agent.messageNotTyped, { agent: a.name, why: r.fate === 'cancelled' ? (r.detail ?? 'cancelled') : `${r.fate}, ${r.detail ?? ''}` }))
     const typed = r.fate === 'typed'
@@ -1640,8 +1649,8 @@ function journalCall<T>(fn: () => T): T {
   try {
     return fn()
   } catch (e) {
-    if (e instanceof JournalBusy) throw new HttpError(409, e.message)
-    if (e instanceof JournalError) throw new HttpError(400, e.message)
+    if (e instanceof JournalBusy) throw httpFrom(409, e)
+    if (e instanceof JournalError) throw httpFrom(400, e)
     throw e
   }
 }
@@ -1975,7 +1984,7 @@ const slotCall = async <T>(fn: () => Promise<T> | T): Promise<T> => {
     // The cards the slot's holders merge, named by key for the hive tools' words (#1219).
     return withCardsNamed(await fn())
   } catch (e) {
-    throw e instanceof MergeSlotError ? new HttpError(e.status, e.message) : e
+    throw e instanceof MergeSlotError ? httpFrom(e.status, e) : e
   }
 }
 
@@ -2024,7 +2033,7 @@ const laneCall = async <T>(fn: () => Promise<T> | T): Promise<T> => {
   try {
     return lanesNamed(await fn())
   } catch (e) {
-    throw e instanceof lanes.LaneError ? new HttpError(e.status, e.message) : e
+    throw e instanceof lanes.LaneError ? httpFrom(e.status, e) : e
   }
 }
 
@@ -2401,7 +2410,7 @@ route('POST', '/v1/team/resume', async () => {
 const publicHeld = (w: HeldRow) => ({ slot: w.slot, agent: w.agentName, run: w.run, hive: w.hive.self ? say(API.slot.heldThisHive) : say(API.slot.heldGone, { pid: String(w.hive.pid) }), processes: w.processes ? { list: w.processes.list.map((p) => ({ pid: p.pid, label: p.label })), more: w.processes.more } : null })
 
 /** Release Slot's refusals (#1561) as the Agent API answers them. */
-const slotRefusal = (e: unknown): unknown => (e instanceof SlotReleaseRefused ? new HttpError(e.status, e.message) : e)
+const slotRefusal = (e: unknown): unknown => (e instanceof SlotReleaseRefused ? httpFrom(e.status, e) : e)
 
 // What a project has to release (#1561): carried slots (#1441) and held writers (#1506), as the agents' ⋯ offer them.
 route('GET', '/v1/projects/:name/slots/releasable', async ({ params }) => {
@@ -3410,7 +3419,7 @@ route('POST', '/v1/tasks/wait', async ({ body: raw }) => {
     if (!Number.isFinite(limit) || limit < 1 || limit > WATCH_MAX_LIMIT_MINUTES) throw new HttpError(400, say(API.watch.limitMinutes, { max: String(WATCH_MAX_LIMIT_MINUTES) }))
     const r = await registerUsageWatch(ws, who!.projectPath, who!.agentId, usage, limit).catch((e: Error) => {
       // agent-protocol: the start of the usage watch's own refusal (usageWatch.ts), matched for its status
-      throw new HttpError(e.message.startsWith('Not a project') ? 400 : 409, e.message)
+      throw httpFrom(e.message.startsWith('Not a project') ? 400 : 409, e)
     })
     const left = r.lanesLeft ? { lanesLeft: r.lanesLeft } : {}
     if ('already' in r) return { usageAlready: r.already, ...(r.replaced ? { replaced: r.replaced } : {}), ...left }
@@ -3449,7 +3458,7 @@ route('POST', '/v1/tasks/wait', async ({ body: raw }) => {
       stillOpen()
     }
     const r = await registerLaneWatch(ws, who.projectPath, who.agentId, lc, limit, { ...extra, ...(laneAgents ? { agents: { agents: laneAgents, ignoreBackground: false } } : {}) }).catch((e: Error) => {
-      throw e instanceof HttpError ? e : new HttpError(/^(No such lane|Unknown task)/.test(e.message) ? 404 : /^(You can't watch yourself|Not a project)/.test(e.message) ? 400 : 409, e.message)
+      throw e instanceof HttpError ? e : httpFrom(/^(No such lane|Unknown task)/.test(e.message) ? 404 : /^(You can't watch yourself|Not a project)/.test(e.message) ? 400 : 409, e)
     })
     return { watching: await withUsage(r.watching.label), limitAt: r.watching.limitAt, events: lc.events, ...(r.replaced ? { replaced: r.replaced } : {}), ...(r.cards ? { cards: r.cards, ...withNames([...r.cards.now, ...(r.cards.replaced ?? []), ...(r.cards.dropped ?? [])]) } : {}), ...(r.agents ? { agents: r.agents } : {}) }
   }
@@ -3793,7 +3802,7 @@ route('POST', '/v1/tasks/:n/ask-assistant', async ({ params, body }) => {
     const { card, id } = await askAssistant(ws, ref.n, actor, text)
     return { ok: true, card: card.key ?? cardRef(ref.n), delivery: id }
   } catch (e) {
-    if (e instanceof AskRefused) throw new HttpError(e.status, e.message)
+    if (e instanceof AskRefused) throw httpFrom(e.status, e)
     throw e
   }
 })
@@ -3839,7 +3848,7 @@ const skillRow = (s: SkillInfo): SkillRow & Pick<SkillInfo, 'bundled' | 'updateA
   ...(s.provider ? { provider: s.provider } : {}),
   ...(s.plugin ? { plugin: s.plugin } : {}),
   ...(s.audience ? { audience: s.audience } : {}),
-  ...(s.problem ? { problem: s.problem } : {}),
+  ...(s.problem ? { problem: agentField(s.problem, s.problemText) } : {}),
   ...(s.bundled ? { bundled: s.bundled } : {}),
   ...(s.updateAvailable ? { updateAvailable: s.updateAvailable } : {})
 })
@@ -3904,7 +3913,7 @@ route('GET', '/v1/metrics', async ({ query }) => {
   const role = query.get('role') ?? undefined
   if (role !== undefined && role !== 'agent' && role !== 'assistant' && role !== 'api') throw new HttpError(400, say(API.metrics.roleArg))
   return metricsReport(w, { scope, from: query.get('from') ?? undefined, to: query.get('to') ?? undefined, trend: query.get('trend') === '1', role, provider: query.get('provider') || undefined, own: query.get('own') === '1' }).then((r) => metricsForAgents(withPersonaAliases(r)), (e) => {
-    throw e instanceof HttpError ? e : new HttpError(400, (e as Error).message)
+    throw e instanceof HttpError ? e : httpFrom(400, e)
   })
 })
 
@@ -4043,7 +4052,7 @@ async function progressCall<T>(ignored: T, change: (caller: ProgressCaller) => T
   try {
     return await admitReport(progressGate, ignored, progressCaller, change)
   } catch (e) {
-    throw e instanceof ProgressError ? new HttpError(e.status, e.message) : e
+    throw e instanceof ProgressError ? httpFrom(e.status, e) : e
   }
 }
 
@@ -4205,7 +4214,7 @@ async function runLinkOf(body: Record<string, unknown>) {
     const caller = await progressCallerIn(requireWorkspace().path!)
     return { caller, link: await resolveRunLink(caller, body, runLinkDeps) }
   } catch (e) {
-    throw e instanceof ProgressError ? new HttpError(e.status, e.message) : e
+    throw e instanceof ProgressError ? httpFrom(e.status, e) : e
   }
 }
 
@@ -4300,7 +4309,7 @@ route('POST', '/v1/progress', async ({ body }) => {
       }
     )
   } catch (e) {
-    throw e instanceof ProgressError ? new HttpError(e.status, e.message) : e
+    throw e instanceof ProgressError ? httpFrom(e.status, e) : e
   }
 })
 
@@ -4547,9 +4556,14 @@ async function decisionsNotice(ws: WorkspaceService | null, before: Map<number, 
   return noticeText(now)
 }
 
-/** The Agent API's answer to an error: its status, and its English whatever language Hive shows (#845). */
+/**
+ * The Agent API's answer to an error: its status, and its text whatever language Hive shows (#845), in the caller's
+ * dialect (dialects, HI-2440: a HiveError's text, also one answered with another status, said in the request's scope).
+ */
 export function apiErrorReply(e: unknown): { status: number; body: Record<string, unknown> } {
-  return { status: errorStatus(e), body: { error: englishError(e), ...(e instanceof HttpError ? e.extra : undefined), ...(e instanceof tasks.WorkflowRefusedError ? refusalBody(e.refusal) : undefined) } }
+  // agent-protocol: a HiveError's text, carried by httpFrom: its messages are found where it was thrown
+  const error = e instanceof HttpError && e.text !== undefined ? agentText(e.text) : agentError(e)
+  return { status: errorStatus(e), body: { error, ...(e instanceof HttpError ? e.extra : undefined), ...(e instanceof tasks.WorkflowRefusedError ? refusalBody(e.refusal) : undefined) } }
 }
 
 /**
@@ -4557,8 +4571,12 @@ export function apiErrorReply(e: unknown): { status: number; body: Record<string
  * the English. Replies are built field by field (sessions' status, skills, MCP servers, events); where a whole object
  * goes out, these leave its companions behind, and only them: the rest of the object, whatever it holds, as it is.
  */
-/** A card's history entry or comment: without its id (replies stay lean) or its text as data. */
-export const entryForAgents = <T extends { id?: string; whatText?: unknown; hiveText?: unknown }>({ id: _id, whatText: _what, hiveText: _hive, ...rest }: T): Omit<T, 'id' | 'whatText' | 'hiveText'> => rest
+/**
+ * A card's history entry or comment: without its id (replies stay lean) or its text as data, its English said in the
+ * reader's dialect where its chain overrides the line's message (storedForAgents, dialects HI-2440), else as stored.
+ */
+export const entryForAgents = <T extends { id?: string; what?: string; text?: string; whatText?: unknown; hiveText?: unknown }>({ id: _id, whatText, hiveText, ...rest }: T): Omit<T, 'id' | 'whatText' | 'hiveText'> =>
+  ({ ...rest, ...(typeof rest.what === 'string' && whatText ? { what: storedForAgents(rest.what, whatText) } : {}), ...(typeof rest.text === 'string' && hiveText ? { text: storedForAgents(rest.text, hiveText) } : {}) }) as Omit<T, 'id' | 'whatText' | 'hiveText'>
 /** A metrics report: its lists of what wasn't measured or filtered in English only. */
 /**
  * /v1/metrics in 0.9.3 only (#1084; deprecated, gone in the next release): each guidance series also under its names from before 0.9.3, when the
@@ -4569,17 +4587,20 @@ export function withPersonaAliases(r: MetricsReport): MetricsReport {
   return { ...r, projects: Object.fromEntries(Object.entries(r.projects).map(([k, p]) => [k, part(p)])), ...(r.workspace ? { workspace: part(r.workspace) } : {}) }
 }
 
-export function metricsForAgents<R extends { notMeasuredText?: unknown; providersNoteText?: unknown; filters?: { notFilteredText?: unknown } }>(r: R): Omit<R, 'notMeasuredText' | 'providersNoteText'> {
-  const { notMeasuredText: _m, providersNoteText: _p, ...rest } = r
-  if (!rest.filters) return rest
-  const { notFilteredText: _f, ...filters } = rest.filters
-  return { ...rest, filters }
+export function metricsForAgents<R extends { notMeasured?: string[]; notMeasuredText?: TextPart[]; providersNote?: string; providersNoteText?: TextPart; filters?: { notFiltered?: string[]; notFilteredText?: TextPart[] } }>(r: R): Omit<R, 'notMeasuredText' | 'providersNoteText'> {
+  // Their English said in the caller's dialect (agentField, dialects HI-2440), each item from its text as data.
+  const said = (english: string[] | undefined, texts: TextPart[] | undefined): string[] | undefined => english?.map((e, i) => agentField(e, texts?.[i]))
+  const { notMeasuredText, providersNoteText, ...rest } = r
+  const out = { ...rest, ...(rest.notMeasured ? { notMeasured: said(rest.notMeasured, notMeasuredText) } : {}), ...(rest.providersNote !== undefined ? { providersNote: agentField(rest.providersNote, providersNoteText) } : {}) }
+  if (!out.filters) return out
+  const { notFilteredText, ...filters } = out.filters
+  return { ...out, filters: { ...filters, ...(filters.notFiltered ? { notFiltered: said(filters.notFiltered, notFilteredText) } : {}) } }
 }
 /** An agent just added: its reuse note in English only. */
-export function addedForAgents<A extends { reuse?: { notReusedText?: unknown } }>(a: A): A {
+export function addedForAgents<A extends { reuse?: { notReused?: string; notReusedText?: TextPart } }>(a: A): A {
   if (!a.reuse) return a
-  const { notReusedText: _n, ...reuse } = a.reuse
-  return { ...a, reuse }
+  const { notReusedText, ...reuse } = a.reuse
+  return { ...a, reuse: { ...reuse, ...(reuse.notReused !== undefined ? { notReused: agentField(reuse.notReused, notReusedText) } : {}) } }
 }
 
 /** What a HiveError's kind answers with (#845). */

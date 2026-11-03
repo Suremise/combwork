@@ -100,6 +100,7 @@ async function switchPlatform(ws: WorkspaceService, projectPath: string, raw: un
     const refused = switchRefused(to, now.detected)
     if (refused) {
       const t = switchRefusalText(refused)
+      // agent-text: switchRefusalText
       throw new HiveError(t.values ? withValues(t.m, t.values) : t.m, { kind: 'conflict' })
     }
     // A project from before 1.0 the upgrade hasn't given options yet has no `workflow`: only its platform changes. What

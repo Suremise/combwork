@@ -1,0 +1,123 @@
+{
+  "providers.action.install": {
+    "placeholders": {}
+  },
+  "providers.action.signIn": {
+    "placeholders": {}
+  },
+  "providers.action.update": {
+    "placeholders": {}
+  },
+  "providers.cmdTooLong": {
+    "placeholders": {
+      "file": "plain",
+      "max": "number",
+      "length": "number"
+    }
+  },
+  "providers.codex.nativeHive": {
+    "placeholders": {
+      "file": "plain"
+    }
+  },
+  "providers.codex.sandbox.needed": {
+    "placeholders": {}
+  },
+  "providers.codex.sandbox.nonAdminUsed": {
+    "placeholders": {}
+  },
+  "providers.codex.sandbox.setUpAction": {
+    "placeholders": {}
+  },
+  "providers.codex.sandbox.upgrade": {
+    "placeholders": {}
+  },
+  "providers.codex.sandbox.upgradeAction": {
+    "placeholders": {}
+  },
+  "providers.codex.storePwsh.fix": {
+    "placeholders": {}
+  },
+  "providers.codex.storePwsh.label": {
+    "placeholders": {}
+  },
+  "providers.codex.storePwsh.symptom": {
+    "placeholders": {}
+  },
+  "providers.codex.storePwsh.warning": {
+    "placeholders": {}
+  },
+  "providers.copilot.planNote": {
+    "placeholders": {}
+  },
+  "providers.copilot.updateAnyway": {
+    "placeholders": {}
+  },
+  "providers.copilot.updateModified": {
+    "placeholders": {}
+  },
+  "providers.readiness.notInstalled": {
+    "placeholders": {
+      "provider": "plain"
+    }
+  },
+  "providers.readiness.signedOut": {
+    "placeholders": {
+      "provider": "plain"
+    }
+  },
+  "providers.readiness.update": {
+    "placeholders": {
+      "provider": "plain",
+      "version": "plain"
+    }
+  },
+  "providers.settings.hooksOff": {
+    "placeholders": {
+      "source": "select",
+      "file": "plain"
+    }
+  },
+  "providers.settings.noFile": {
+    "placeholders": {}
+  },
+  "providers.settings.noValue": {
+    "placeholders": {}
+  },
+  "providers.settings.notAFile": {
+    "placeholders": {}
+  },
+  "providers.settings.notJson": {
+    "placeholders": {
+      "file": "plain",
+      "why": "plain"
+    }
+  },
+  "providers.settings.notList": {
+    "placeholders": {
+      "source": "select",
+      "file": "plain",
+      "key": "plain"
+    }
+  },
+  "providers.settings.notObject": {
+    "placeholders": {
+      "source": "select",
+      "file": "plain"
+    }
+  },
+  "providers.settings.tooLarge": {
+    "placeholders": {}
+  },
+  "providers.settings.unreadable": {
+    "placeholders": {
+      "file": "plain",
+      "why": "plain"
+    }
+  },
+  "providers.unknown": {
+    "placeholders": {
+      "provider": "plain"
+    }
+  }
+}

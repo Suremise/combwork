@@ -10,7 +10,8 @@ import { emit } from './events'
 import { addAgent, removeAgent } from './projectAgents'
 import { sessions } from './sessions'
 import { HiveError, hiveError, errorText } from './hiveError'
-import { RAW_CARD_START, forAgents, withValues } from '../shared/advanced'
+import { RAW_CARD_START, forAgents, saidText, withValues } from '../shared/advanced'
+import { agentMsg } from '../shared/agentText'
 import { advanced } from './advanced'
 import { columnError, getTask, setContextProblems, UNKNOWN_AGENT, updateTask, type TaskActor } from './tasks'
 import { createLogger, userText } from './logger'
@@ -31,19 +32,19 @@ const BUSY_STATUSES = new Set(['working', 'starting', 'waiting', 'background', '
 /** A Start refused because the agent is busy (#846): its status chooses the words. */
 const AGENT_BUSY = msg({ id: 'tasks.start.agentBusy', defaultMessage: "{agent} {status, select, working {is working} starting {is starting} waiting {is waiting for the user} background {is waiting on background tasks it started} other {is waiting on cards (a card watch): it takes no other work until it is woken, or the watch is cancelled (Cancel in its header)}}. Start the card once it's idle, or give it to another agent.", description: "An error: a card can't be started with the agent {agent} (its name) now, because of what it is doing ({status}, select: working, starting, waiting for the user, waiting on background tasks it started, or waiting on cards in a card watch; translate each). Cancel is the button in the agent's header." })
 
-/** What agents read for AGENT_BUSY: the words the Agent API always gave (#910), where the window says card. */
-const BUSY_FOR_AGENTS: Record<string, string> = {
-  working: 'is working', // i18n-ignore: agent-facing: the Agent API's words, as before
-  starting: 'is starting', // i18n-ignore: agent-facing: the Agent API's words, as before
-  waiting: 'is waiting for the user', // i18n-ignore: agent-facing: the Agent API's words, as before
-  background: 'is waiting on background tasks it started', // i18n-ignore: agent-facing: the Agent API's words, as before
-  watching: 'is waiting on cards (a card watch): it takes no other work until it is woken, or the watch is cancelled (Cancel in its header)' // i18n-ignore: agent-facing: the Agent API's words, as before
-}
+/**
+ * What agents read for AGENT_BUSY: the words the Agent API always gave (#910), where the window says card. An agent
+ * message (dialects, HI-2440), the agent branch of `forAgents`.
+ */
+const BUSY_FOR_AGENTS = agentMsg({
+  id: 'board.agent.agentBusy',
+  text: "{agent} {status, select, working {is working} starting {is starting} waiting {is waiting for the user} background {is waiting on background tasks it started} other {is waiting on cards (a card watch): it takes no other work until it is woken, or the watch is cancelled (Cancel in its header)}}. Start the task once it's idle, or give it to another agent.",
+  note: '#910: the words the Agent API always gave (the window says card). status: what the agent is doing (working, starting, waiting, background; other: a card watch).'
+})
 
 /** A Start refused because the agent is busy: the window's words, and the agents' as they always were. */
 export function agentBusyError(agent: string, status: string): HiveError {
-  const english = `${agent} ${BUSY_FOR_AGENTS[status] ?? BUSY_FOR_AGENTS.watching}. Start the task once it's idle, or give it to another agent.` // i18n-ignore: agent-facing: the Agent API's words, as before
-  return new HiveError(forAgents(withValues(AGENT_BUSY, { agent, status }), english), { kind: 'conflict' })
+  return new HiveError(forAgents(withValues(AGENT_BUSY, { agent, status }), saidText(BUSY_FOR_AGENTS, { agent, status: BUSY_STATUSES.has(status) && status !== 'watching' ? status : 'other' })), { kind: 'conflict' })
 }
 
 /** A Start undone because the card's start got no slot where its project builds in slots (HI-1966). */

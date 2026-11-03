@@ -36,7 +36,7 @@ describe('the settings catalog', () => {
   })
 
   it("a tip giving a setting's range takes it from the setting, as values, not written into the words (#911)", () => {
-    const ranged = SETTINGS_CATALOG.filter((e) => e.text.tip && typeof e.text.tip === 'object' && 'values' in e.text.tip && 'min' in e.text.tip.values)
+    const ranged = SETTINGS_CATALOG.filter((e) => e.text.tip && typeof e.text.tip === 'object' && 'values' in e.text.tip && !!e.text.tip.values && 'min' in e.text.tip.values)
     expect(ranged.map((e) => e.id).sort()).toEqual(['agents.backgroundTaskMinutes', 'sessions.usageCacheSize'])
     for (const e of ranged) {
       const values = (e.text.tip as { values: Record<string, unknown> }).values

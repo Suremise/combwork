@@ -1068,6 +1068,7 @@ const NOT_MEASURED_TEXT = [
   msg({ id: 'service.metrics.notSkillReads', defaultMessage: 'Whether a model read a skill: delivered skills are counted, reading one is not observable.', description: "On the Performance page, under What isn't measured: whether a model read a skill Hive gave it." }),
   msg({ id: 'service.metrics.notTransport', defaultMessage: 'HTTP headers and transport: request sizes are the body bytes received, response sizes the JSON body written (an aborted reply may not all have been sent).', description: "On the Performance page, under What isn't measured: the Agent API's request and response sizes count only the bodies." })
 ]
+// agent-stored: metricsForAgents says each for the agent reading the report (servers.ts)
 const NOT_MEASURED = NOT_MEASURED_TEXT.map((m) => englishText(m))
 
 /** What a role or provider filter can't narrow (#850), each item's text for the window. */
@@ -1191,6 +1192,7 @@ export function queryMetrics(w: WorkspaceService, q: MetricsQuery): Omit<Metrics
     ...((f.role || f.provider) && q.scope.kind === 'workspace' ? [NOT_FILTERED.shared] : []),
     ...(f.role || f.provider ? [NOT_FILTERED.dropped] : [])
   ]
+  // agent-stored: metricsForAgents says each for the agent reading the report (servers.ts)
   const notFiltered = notFilteredText.map((m) => englishText(m))
   const filters: MetricsFilters = { ...(f.role ? { role: f.role } : {}), ...(f.provider ? { provider: f.provider } : {}), ...(own ? { own: true as const } : {}), notFiltered, ...(notFilteredText.length ? { notFilteredText } : {}) }
   const base = { workspacePath: w.path ?? '', from: new Date(from).toISOString(), to: new Date(to).toISOString(), recording: recording(), notMeasured: NOT_MEASURED, notMeasuredText: NOT_MEASURED_TEXT, filters, coverage }

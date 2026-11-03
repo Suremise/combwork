@@ -53,6 +53,7 @@ export function finishedNotice(items: readonly Finish[]): { title: string; body:
 
 /** That notification's title in English, whatever language Hive shows, for the Agent API (#796: agent-facing text stays English). */
 export function finishedApiTitle(items: readonly Finish[]): string {
+  // agent-later: HI-2465 says the events stream's titles in each caller's dialect
   return items.length === 1 ? (items[0].apiTitle ?? items[0].title) : groupTitle(items, (m, values) => englishText({ m, values: { ...values } }))
 }
 
