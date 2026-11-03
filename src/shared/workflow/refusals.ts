@@ -11,7 +11,7 @@ import { MOVE_NAMES, RULE_NAMES, workflowLine } from './texts'
 import { STAGE_TEXT, isStageId, type StageNames } from './stages'
 
 /** Refusals that aren't a guard of the piece library: the move itself, card references, facts that couldn't be read. */
-export type MoveRule = 'move.notFromHere' | 'move.noStage' | 'move.useIntent' | 'move.needsOverride' | 'move.doingNobody' | 'lane.oneAtATime' | 'lane.lineBehind' | 'card.plainNumber' | 'paths.excluded' | 'platform.unknown' | 'review.noSubmission' | 'review.headMoved' | 'submit.empty' | 'submit.unchanged' | 'submit.sameRevisionNote' | 'submit.followUpNotBuilder' | 'check.revisionMismatch' | 'evidence.changed' | 'loop.roundLimit' | 'loop.stepNotYours' | 'loop.stepNotHere' | 'loop.noStep' | 'loop.noReviewer' | 'loop.staleStep' | 'loop.tooEarly' | 'loop.followUpChecked' | 'loop.followUpMerging'| 'merge.hiveMerges' | 'queue.advancing'
+export type MoveRule = 'move.notFromHere' | 'move.noStage' | 'move.useIntent' | 'move.needsOverride' | 'move.doingNobody' | 'lane.oneAtATime' | 'lane.lineBehind' | 'card.plainNumber' | 'paths.excluded' | 'platform.unknown' | 'review.noSubmission' | 'review.inProgress' | 'review.headMoved' | 'submit.empty' | 'submit.unchanged' | 'submit.sameRevisionNote' | 'submit.followUpNotBuilder' | 'check.revisionMismatch' | 'evidence.changed' | 'loop.roundLimit' | 'loop.stepNotYours' | 'loop.stepNotHere' | 'loop.noStep' | 'loop.noReviewer' | 'loop.staleStep' | 'loop.tooEarly' | 'loop.followUpChecked' | 'loop.followUpMerging'| 'merge.hiveMerges' | 'queue.advancing'
 
 export type RuleId = GuardId | MoveRule
 
@@ -223,6 +223,12 @@ export const REFUSALS: Record<RuleId, RefusalText> = {
   'review.noSubmission': r(
     msg({ id: 'workflow.refused.review.noSubmission.message', defaultMessage: '{card} has nothing submitted to review.', description: 'A refused review: the card has no submission.' }),
     msg({ id: 'workflow.refused.review.noSubmission.next', defaultMessage: 'Wait for its builder to submit it.', description: 'The next step when there is nothing to review.' })
+  ),
+  // HI-2487: another reviewer has the submission's review in progress (a stale wake once took HI-2444's from HR2).
+  'review.inProgress': r(
+    msg({ id: 'workflow.refused.review.inProgress.message', defaultMessage: "{reviewer} is reviewing {card}'s submission {submission}, and has been for {minutes, plural, =0 {less than a minute} one {# minute} other {# minutes}}.", description: "A refused start of a review (HI-2487): another reviewer agent started reviewing the same submission and hasn't given its verdict. {reviewer} is that agent's name, {card} a card key like AM-12, {submission} the submission's number, {minutes} how long ago its review started." }),
+    msg({ id: 'workflow.refused.review.inProgress.next', defaultMessage: "Leave it to {reviewer}: don't review {card} or give it a verdict.", description: 'The next step after a review refused because another reviewer agent is reviewing the card. {reviewer} is its name, {card} a card key.' }),
+    msg({ id: 'workflow.refused.review.inProgress.change', defaultMessage: 'Only the user takes a review over; one whose reviewer has left the project or stopped is free again.', description: "Who can take over a review in progress (HI-2487): only the user; it is free again once its reviewer agent is removed from the project or its session has stopped." })
   ),
   'review.headMoved': r(
     msg({ id: 'workflow.refused.review.headMoved.message', defaultMessage: "{card}'s line has moved since it was submitted: it was submitted at {submitted}, and its head is now {head}, a different change. A pass covers only the revision submitted.", description: "A refused passing verdict (HI-1763): the card's branch has new commits since the revision under review (a follow-up, say). {card} is the card's key; {submitted} and {head} are commits' short hashes." }),

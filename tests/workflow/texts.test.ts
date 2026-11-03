@@ -33,6 +33,8 @@ const SAMPLE: RefusalValues = {
   waiting: 'AM-12/s44',
   step: 'followUp',
   minutes: 12,
+  // review.inProgress (HI-2487): who has the review.
+  reviewer: 'HR2',
   files: 'src/a.ts',
   path: 'node_modules/pad/index.js',
   folder: 'D:\\work\\am',
