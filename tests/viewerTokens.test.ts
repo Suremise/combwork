@@ -1,6 +1,6 @@
 // The Agent API's viewer tokens (#620): why one isn't made is the window's text (HI-2459), shown in Settings → Agent API
 // → Viewer tokens in the user's language, with its English for the log. Each test has a profile of its own.
-import { readdirSync, readFileSync, rmSync } from 'fs'
+import { readFileSync, rmSync } from 'fs'
 import { join } from 'path'
 import { afterAll, afterEach, describe, expect, it, vi } from 'vitest'
 import { tempDir } from './tempDir'
@@ -46,10 +46,8 @@ async function fresh() {
   return { createViewerToken, told, fill, setLanguage }
 }
 
-const locale = (code: string): Record<string, string> => {
-  const dir = join(__dirname, '..', 'locales', code)
-  return Object.assign({}, ...readdirSync(dir).filter((f) => f.endsWith('.json')).map((f) => JSON.parse(readFileSync(join(dir, f), 'utf8'))))
-}
+/** A language's messages of main's area, where these are (enough for them). */
+const locale = (code: string): Record<string, string> => JSON.parse(readFileSync(join(__dirname, '..', 'locales', code, 'main.json'), 'utf8'))
 
 describe('a viewer token refused', () => {
   it('says why in English as before', async () => {
