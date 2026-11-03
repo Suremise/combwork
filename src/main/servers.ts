@@ -4626,7 +4626,8 @@ function broadcast(event: HiveEvent): void {
   const lines = new Map<AgentIdentity | null, string | null>()
   const lineFor = (agent: AgentIdentity | null): string | null => {
     if (!lines.has(agent)) {
-      const payload = apiEventFor(event, agent)
+      // In the client's dialect scope (HI-2465): an agent's chain, or the API's for the workspace and viewer tokens.
+      const payload = inRequestScope(agent ? { projectPath: agent.projectPath, agentId: agent.agentId } : null, () => apiEventFor(event, agent))
       lines.set(agent, payload ? `event: ${event.type}\ndata: ${replyText(payload)}\n\n` : null)
     }
     return lines.get(agent)!

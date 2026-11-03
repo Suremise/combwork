@@ -179,6 +179,16 @@
     "note": "An error (HI-2107): a connection named by its id is not in Settings → Accounts & Connections (removed meanwhile).",
     "audience": "both"
   },
+  "main.finished.inProject": {
+    "text": "{n, plural, one {# agent finished in {project}} other {# agents finished in {project}}}",
+    "note": "A notification for several agents of one project that finished together. {n} is how many (2 or more); the agents are listed under it.",
+    "audience": "both"
+  },
+  "main.finished.many": {
+    "text": "{n, plural, one {# agent finished} other {# agents finished}}",
+    "note": "A notification for agents of several projects that finished together. {n} is how many (2 or more); the projects are listed under it.",
+    "audience": "both"
+  },
   "main.freshStart.notFound": {
     "text": "No agent {agent} in this project.",
     "note": "Start Fresh for one agent is refused: the agent named ({agent}, its id) is not in the project.",

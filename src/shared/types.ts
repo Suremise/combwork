@@ -96,6 +96,8 @@ export interface Notice {
   title: string
   /** The title in English, for the Agent API (agent-facing text stays English), when `title` is a translated one. */
   apiTitle?: string
+  /** The title's text as data (HI-2465), as `statusText` sits beside `statusMessage`: the events stream says it in each client's dialect. */
+  apiTitleText?: TextPart
   body: string
   /** The project it is about (null: app-wide, such as plan usage); clicking the banner shows it. */
   projectPath: string | null

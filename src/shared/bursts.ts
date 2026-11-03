@@ -3,7 +3,7 @@
  * pop-up each. Waiting for input is never grouped or delayed (main/sessions.ts notify()). Where they go is shared/notify.ts'.
  */
 
-import { englishText } from './advanced'
+import { englishText, type TextPart } from './advanced'
 import { fmt, msg, tr, type Msg } from './i18n'
 
 /** At most one chime this often (per window). */
@@ -27,6 +27,8 @@ export interface Finish {
   /** The notification it would get alone; `apiTitle`, its title in English for the Agent API (#847), when `title` is translated. */
   title: string
   apiTitle?: string
+  /** Its title's text as data (HI-2465): the events stream says it in each client's dialect. */
+  apiTitleText?: TextPart
   body: string
 }
 
@@ -53,8 +55,21 @@ export function finishedNotice(items: readonly Finish[]): { title: string; body:
 
 /** That notification's title in English, whatever language Hive shows, for the Agent API (#796: agent-facing text stays English). */
 export function finishedApiTitle(items: readonly Finish[]): string {
-  // agent-later: HI-2465 says the events stream's titles in each caller's dialect
+  // agent-stored: agentField says the events stream's title again in each caller's dialect, from apiTitleText (apiEvents.ts, HI-2465)
   return items.length === 1 ? (items[0].apiTitle ?? items[0].title) : groupTitle(items, (m, values) => englishText({ m, values: { ...values } }))
+}
+
+/** That title's text as data (HI-2465), for the stream to say in each client's dialect: alone, its own; a group's, its message. */
+export function finishedApiTitleText(items: readonly Finish[]): TextPart | undefined {
+  if (items.length === 1) return items[0].apiTitleText
+  return groupTitleText(items)
+}
+
+/** A group's title as text: the message and values groupTitle formats. */
+// agent-text: IN_PROJECT, MANY
+function groupTitleText(items: readonly Finish[]): TextPart {
+  const projects = new Set(items.map((i) => i.project))
+  return projects.size === 1 ? { m: IN_PROJECT, values: { n: items.length, project: items[0].project } } : { m: MANY, values: { n: items.length } }
 }
 
 /**

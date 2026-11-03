@@ -104,8 +104,8 @@ const BLOCKED_BODY = msg({
 
 /** Tells a notice as plan usage's are (planUsage.ts, HI-2320): once, a pop-up or a Windows notification. */
 function notify(level: 'warning' | 'error' | 'info', title: Msg, body: Msg, values: Record<string, string | number>): void {
-  // agent-later: HI-2465 says the events stream's titles in each caller's dialect
-  tell({ kind: 'usage', level, title: tr(title, values), message: tr(body, values), apiTitle: englishText({ m: title, values }) })
+  // agent-stored: agentField says the events stream's title again in each caller's dialect, from apiTitleText (apiEvents.ts, HI-2465)
+  tell({ kind: 'usage', level, title: tr(title, values), message: tr(body, values), apiTitle: englishText({ m: title, values }), apiTitleText: { m: title, values } })
 }
 
 const windowOf = (l: Pick<PlanLimit, 'windowMinutes'>): 'weekly' | 'fiveHour' => limitKind(l) ?? 'fiveHour'

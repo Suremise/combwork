@@ -1,4 +1,4 @@
-import { englishText } from '../shared/advanced'
+import { englishText, type TextPart } from '../shared/advanced'
 import { msg, tr } from '../shared/i18n'
 import { createHash } from 'crypto'
 import type { ConnectionPlanUsage, PlanLimit, PlanUsage, ProviderId } from '../shared/types'
@@ -99,12 +99,12 @@ const USED_ON = msg({ id: 'main.plan.usedOn', defaultMessage: '{share, number, :
  * The notice that a limit is `level`% used: in the language shown, its title in English for the Agent API too. On a
  * connection (HI-1756), it names the connection, whose own limit it is. Exported for tests.
  */
-export function planNotice(provider: ProviderId, l: Pick<PlanLimit, 'usedPercent' | 'resetsAt' | 'label' | 'windowMinutes'>, level: number, connection?: string): { title: string; body: string; apiTitle: string } {
+export function planNotice(provider: ProviderId, l: Pick<PlanLimit, 'usedPercent' | 'resetsAt' | 'label' | 'windowMinutes'>, level: number, connection?: string): { title: string; body: string; apiTitle: string; apiTitleText: TextPart } {
   const values = { share: Math.round(l.usedPercent) / 100, provider: providerName(provider), ...usedWindow(l), label: l.label, connection: connection ?? '' }
   const m = connection ? USED_ON : USED
   const body = `${level >= 95 ? tr(msg({ id: 'main.plan.pause', defaultMessage: 'Sessions will pause when it runs out.', description: 'A plan-usage notice, at 95% used or more.' })) : tr(msg({ id: 'main.plan.close', defaultMessage: 'You are getting close to the limit.', description: 'A plan-usage notice, below 95% used.' }))}${resetText(l.resetsAt)}`
-  // agent-later: HI-2465 says the events stream's titles in each caller's dialect
-  return { title: tr(m, values), body, apiTitle: englishText({ m, values }) }
+  // agent-stored: agentField says the events stream's title again in each caller's dialect, from apiTitleText (apiEvents.ts, HI-2465)
+  return { title: tr(m, values), body, apiTitle: englishText({ m, values }), apiTitleText: { m, values } }
 }
 
 /**
@@ -148,10 +148,10 @@ export function reportPlanUsage(provider: ProviderId, report: PlanUsage, reporte
     const level = nextWarning(l, config.get().planWarnings[key])
     if (level === null) continue
     config.update((cfg) => (cfg.planWarnings[key] = { resetsAt: l.resetsAt, level }))
-    const { title, body, apiTitle } = planNotice(provider, l, level, connection?.name)
+    const { title, body, apiTitle, apiTitleText } = planNotice(provider, l, level, connection?.name)
     // Told once (HI-2320): a pop-up in the window you are using (kept in its bell), a Windows notification with Hive in
     // the background (its bell row kept quietly), or nothing (notifications off).
-    tell({ kind: 'usage', level: level >= 95 ? 'error' : 'warning', title, message: body, apiTitle })
+    tell({ kind: 'usage', level: level >= 95 ? 'error' : 'warning', title, message: body, apiTitle, apiTitleText })
   }
 }
 

@@ -186,6 +186,17 @@
   "main.connections.notFound": {
     "placeholders": {}
   },
+  "main.finished.inProject": {
+    "placeholders": {
+      "n": "plural",
+      "project": "plain"
+    }
+  },
+  "main.finished.many": {
+    "placeholders": {
+      "n": "plural"
+    }
+  },
   "main.freshStart.notFound": {
     "placeholders": {
       "agent": "plain"

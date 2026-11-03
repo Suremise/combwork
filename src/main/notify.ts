@@ -2,6 +2,7 @@ import { randomUUID } from 'crypto'
 import { Notification, type BrowserWindow } from 'electron'
 import { kindOfLevel, notifyRoute, toldWhenAway, type FocusedHive, type NotifyRoute } from '../shared/notify'
 import type { Notice, NotifyKind, ToastAction, ToastLevel, ToastMessage, ToastTarget } from '../shared/types'
+import type { TextPart } from '../shared/advanced'
 import { config } from './config'
 import { emit, emitTo, setToastTeller, tellListeners } from './events'
 import { createLogger, userText } from './logger'
@@ -50,6 +51,8 @@ export interface TellSpec {
   message?: string
   /** The title in English, for the Agent API's stream (#796), when `title` is translated. */
   apiTitle?: string
+  /** The title's text as data: the stream says it again in each client's dialect (HI-2465). Its English is `apiTitle` (or `title`). */
+  apiTitleText?: TextPart
   /** The project it is about (null: Hive-wide): its scope, its owner window when none is focused, and its link. */
   projectPath?: string | null
   /** The agent it is about, for the Agent API's stream and its link. */
@@ -131,7 +134,7 @@ export function tell(spec: TellSpec): Told {
   testNotifyLog({ kind: 'entry', id, notifyKind: spec.kind, route, title: spec.title, owner: owner && !owner.isDestroyed() ? owner.webContents.id : null })
   if (spec.offer) register(spec.offer, id, owner)
   if (toldWhenAway(spec.kind)) {
-    const notice: Notice = { id, kind: apiKind(spec.kind), title: spec.title, ...(spec.apiTitle && spec.apiTitle !== spec.title ? { apiTitle: spec.apiTitle } : {}), body: spec.message ?? '', projectPath, ...(spec.agentId ? { agentId: spec.agentId } : {}) }
+    const notice: Notice = { id, kind: apiKind(spec.kind), title: spec.title, ...(spec.apiTitle && spec.apiTitle !== spec.title ? { apiTitle: spec.apiTitle } : {}), ...(spec.apiTitleText !== undefined ? { apiTitleText: spec.apiTitleText } : {}), body: spec.message ?? '', projectPath, ...(spec.agentId ? { agentId: spec.agentId } : {}) }
     tellListeners({ type: 'notice', notice, ...(route === 'windows' ? { windows: true as const } : {}) })
   }
   // Hive has closed: its windows are closing, so a Windows notification alone. No window to own it (none open yet): the
