@@ -563,7 +563,8 @@ export async function launchFresh(ws: WorkspaceService, projectPath: string, lan
  * cancellation that fails fails the Retry, nothing owed again. Then each, still the same blocked obligation under the
  * lanes' lock, is owed again from now (retryFreshStarts). How many.
  */
-export async function retryFreshStart(ws: WorkspaceService, laneId: string): Promise<number> {
+/** `commit`: a revocable caller's authority (HI-2420, the Assistant's guard), checked again in each write it makes. */
+export async function retryFreshStart(ws: WorkspaceService, laneId: string, commit?: () => void): Promise<number> {
   const lane = (await rawLanes(ws)).find((l) => l.id === laneId)
   if (!lane || lane.state !== 'active' || !ws.path) return 0
   const blocked = (lane.freshStart ?? []).filter((f) => f.blocked)
@@ -574,9 +575,9 @@ export async function retryFreshStart(ws: WorkspaceService, laneId: string): Pro
     const earlier = new Set((await deliveriesOf(projectPath, f.agent)).filter((r) => r.source === BRIEF && r.ref === ref).map((r) => r.id))
     // For tests: the cancellation held (a pass running meanwhile finds the obligation still blocked).
     await laneStartTestHooks.retryCancelling?.()
-    if (earlier.size) await cancelDeliveries(projectPath, f.agent, 'the retry of its new conversation', undefined, (r) => earlier.has(r.id)) // i18n-ignore: who cancelled a delivery (agent-facing, the log)
+    if (earlier.size) await cancelDeliveries(projectPath, f.agent, 'the retry of its new conversation', undefined, (r) => earlier.has(r.id), commit) // i18n-ignore: who cancelled a delivery (agent-facing, the log)
   }
-  const retried = await retryFreshStarts(ws, laneId, new Set(blocked.map((f) => f.id)))
+  const retried = await retryFreshStarts(ws, laneId, new Set(blocked.map((f) => f.id)), commit)
   if (retried.length) log.info(`Lane ${laneId}: ${retried.map((f) => f.role).join(' and ')}'s new conversation tried again`)
   return retried.length
 }

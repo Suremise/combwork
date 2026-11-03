@@ -553,9 +553,11 @@ export async function changeFreshStart(ws: WorkspaceService, id: string, entryId
  * `POST /v1/lanes/{id}/fresh-start`): each of `ids` still blocked (the same obligation the caller cleaned up after)
  * becomes a new one (new id, its wait from now), the same old conversation to leave and note. Which were.
  */
-export async function retryFreshStarts(ws: WorkspaceService, id: string, ids: ReadonlySet<string>): Promise<FreshStart[]> {
+export async function retryFreshStarts(ws: WorkspaceService, id: string, ids: ReadonlySet<string>, commit?: () => void): Promise<FreshStart[]> {
   let retried: FreshStart[] = []
-  await mutate(ws, (lanes) => {
+  await mutate(ws, (lanes, checks) => {
+    // A revocable caller's authority (HI-2420), checked again in the save.
+    if (commit) checks.push(commit)
     retried = []
     const l = lanes.find((x) => x.id === id)
     if (!l || !running(l) || !l.freshStart) return
@@ -823,6 +825,11 @@ export interface StartLane {
    * off is the Assistant's, the user's or a script's.
    */
   ownBuilder?: boolean
+  /**
+   * A revocable caller's authority (HI-2420, the Assistant's guard): checked again in the lanes' save, with nothing
+   * awaited before it, and as a reorder applied now puts its card back; once it no longer holds, nothing is saved.
+   */
+  commit?: () => void
 }
 
 /** Where a new card goes on its builder's lane (HI-2167). */
@@ -924,7 +931,7 @@ async function putBackForReorder(ws: WorkspaceService, s: StartLane, builder: La
     if (!Array.isArray(d) || d.length) throw new LaneError(409, `${key}'s folder has changes that aren't committed: commit them first (or ask ${builder.name} to), then reorder again, so its work stays on its branch.`) // i18n-ignore: hive_lane's refusal (agents)
   }
   const { runIntent, HIVE_LANE_START } = await import('./tasks')
-  const { reply } = await runIntent(wf, flying.number, HIVE_LANE_START, (w) => w.putBack(`#${flying.number}`, 'hive', { why: `Put back by a lane reorder applied now (${s.by})` })) // i18n-ignore: a fact's reason, agent-facing English
+  const { reply } = await runIntent(wf, flying.number, HIVE_LANE_START, (w) => w.putBack(`#${flying.number}`, 'hive', { why: `Put back by a lane reorder applied now (${s.by})` }), undefined, s.commit) // i18n-ignore: a fact's reason, agent-facing English
   const r = reply as { ok?: boolean; refused?: boolean; message?: string }
   if (r.refused) throw new LaneError(409, r.message ?? `${key} couldn't be put back`) // i18n-ignore: hive_lane's refusal (agents)
   log.info(`Lane ${was.id}: #${flying.number} put back by a reorder applied now (${userText(s.by)})`)
@@ -1013,6 +1020,7 @@ export async function startLane(ws: WorkspaceService, s: StartLane): Promise<Lan
   // One decision a save (HR6's #1270 round 2): a change applied at once is saved only while none of the lane's cards is
   // in flight, checked under the board's lock; a card started meanwhile makes it decide again, and queue it.
   const decide = () => mutate(ws, async (lanes, checks, also) => {
+    if (s.commit) checks.push(s.commit)
     queuedAfter = null
     ended.length = 0
     carried = null
@@ -1142,13 +1150,15 @@ export async function startLane(ws: WorkspaceService, s: StartLane): Promise<Lan
  * first), one is started from `cards` as the builder's start would (ending that earlier lane), which the builder's own
  * start then updates.
  */
-export async function joinLane(ws: WorkspaceService, j: { project: string; builder: string; reviewer: string; cards?: number[]; by: string }): Promise<LaneChange> {
+/** `commit`: a revocable caller's authority (HI-2420), checked again in the lanes' save (as startLane's). */
+export async function joinLane(ws: WorkspaceService, j: { project: string; builder: string; reviewer: string; cards?: number[]; by: string; commit?: () => void }): Promise<LaneChange> {
   const reviewer = await agentIn(ws, j.project, j.reviewer)
   const builder = await agentIn(ws, j.project, j.builder)
   if (!reviewer || !builder) throw new LaneError(404, 'Unknown agent: the builder and reviewer must be agents of the project') // i18n-ignore: hive_lane's refusal, which only agents get
   if (reviewer.id === builder.id) throw new LaneError(400, "A lane's builder can't be its reviewer") // i18n-ignore: hive_lane's refusal, which only agents get
   await refuseGeneralist(ws, j.project, [builder.id, reviewer.id])
-  const found = await mutate(ws, (lanes, _checks, also) => {
+  const found = await mutate(ws, (lanes, checks, also) => {
+    if (j.commit) checks.push(j.commit)
     const l = lanes.find((x) => running(x) && same(x.project, j.project) && x.builder.id === builder.id)
     if (!l || (j.cards?.length && !l.cards.some((n) => j.cards!.includes(n)))) return null
     // Reviewed by the pool (#1443): nobody joins it; each card's assignment is its reviewer's start.
@@ -1164,7 +1174,7 @@ export async function joinLane(ws: WorkspaceService, j: { project: string; build
     return { lane: (await views(ws, [found]))[0], did: 'joined' }
   }
   if (!j.cards?.length) throw new LaneError(404, `${builder.name} has no lane running yet: give the cards too, and the lane starts with you as its reviewer`) // i18n-ignore: hive_lane's refusal, which only agents get
-  const r = await startLane(ws, { project: j.project, builder: builder.id, reviewer: reviewer.id, cards: j.cards, by: j.by })
+  const r = await startLane(ws, { project: j.project, builder: builder.id, reviewer: reviewer.id, cards: j.cards, by: j.by, ...(j.commit ? { commit: j.commit } : {}) })
   return { ...r, did: 'joined', note: `${builder.name} hadn't registered it yet: its own start updates it.` } // i18n-ignore: hive_lane's reply (agents)
 }
 
@@ -1250,11 +1260,13 @@ export async function abandonLaneIf(ws: WorkspaceService, id: string, expect: Re
  * Ends a lane (its builder after the merge, the Assistant, the user): ended, with the merge commit if given, unless
  * `abandoned`. `agent`: a project agent ending it, which must be its builder or reviewer.
  */
-export async function endLane(ws: WorkspaceService, id: string, o: { abandoned?: boolean; mergeCommit?: string | null; project?: string; agent?: string }): Promise<LaneInfo> {
+/** `commit`: a revocable caller's authority (HI-2420), checked again in the lanes' save (as startLane's). */
+export async function endLane(ws: WorkspaceService, id: string, o: { abandoned?: boolean; mergeCommit?: string | null; project?: string; agent?: string; commit?: () => void }): Promise<LaneInfo> {
   let ended = false
   const on = await enforced()
   const verified: EndedLane[] = []
   const rec = await mutate(ws, async (lanes, checks) => {
+    if (o.commit) checks.push(o.commit)
     ended = false
     verified.length = 0
     const l = lanes.find((x) => x.id === id && (!o.project || same(x.project, o.project)))

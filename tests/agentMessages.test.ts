@@ -274,6 +274,26 @@ describe('messages left for agents (#530, #647)', async () => {
     await vi.waitFor(() => expect(st.typed.at(-1)).toBe(bell('1 message and 1 card event', 'm5, m6')), { timeout: HUNG_MS })
   })
 
+  it("the Assistant's cancel revoked after its deliveries were read, before they're planned: none cancelled (HI-2420)", async () => {
+    expect((await leave('Queued for later.')).fate).toBe('queued')
+    let revoked = false
+    const guard = () => {
+      if (revoked) throw new Error('Control was turned down meanwhile')
+    }
+    // Revoked while the cancel holds the host's lock, its read made: the plan's check refuses it.
+    deliveries.setBeforePlanForTests(() => void (revoked = true))
+    try {
+      await expect(messages.cancelMessages(alpha, 'b1', 'the Assistant', guard)).rejects.toThrow(/turned down/)
+    } finally {
+      deliveries.setBeforePlanForTests(null)
+    }
+    expect(await states()).toEqual(['m1 queued'])
+    // Not revoked: the same call cancels it.
+    revoked = false
+    expect(await messages.cancelMessages(alpha, 'b1', 'the Assistant', guard)).toBe(1)
+    expect(await states()).toEqual(['m1 cancelled: cancelled by the Assistant'])
+  })
+
   it('cancelled while it is being typed: never typed, and the reply says so, not that it was typed', async () => {
     st.status = 'ready'
     st.during = () => messages.cancelMessages(alpha, 'b1', 'the user')

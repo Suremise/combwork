@@ -48,7 +48,8 @@ export async function leaveMessage(projectPath: string, agentId: string, agentNa
 }
 
 /** Cancels an agent's messages waiting (by: who cancelled). How many there were. */
-export const cancelMessages = (projectPath: string, agentId: string, by: string): Promise<number> => cancelDeliveries(projectPath, agentId, by, ['rebrief'])
+// `commit`: a revocable caller's check (HI-2420, the Assistant's guard), made in the deliveries' transaction (cancelDeliveries).
+export const cancelMessages = (projectPath: string, agentId: string, by: string, commit?: () => void): Promise<number> => cancelDeliveries(projectPath, agentId, by, ['rebrief'], undefined, commit)
 
 /** Deliver Now (#1432): what waits for the agent, every kind, offered once as the user asks, whatever Wake an idle agent says. Whether its line was typed. */
 export const deliverWaiting = (projectPath: string, agentId: string): Promise<boolean> => offerNow(projectPath, agentId, undefined, true)

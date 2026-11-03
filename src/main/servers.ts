@@ -798,7 +798,9 @@ route('POST', '/v1/projects/:name/activate', async ({ params }) => {
   const p = projectByName(params[0])
   ownProjectOnly(p, 'Activating a project')
   if (assistantCaller()) {
-    return assistantChange('agents', `activate the project ${basename(p)}`, { kind: 'activate-project', project: basename(p) }, async () => {
+    return assistantChange('agents', `activate the project ${basename(p)}`, { kind: 'activate-project', project: basename(p) }, async (guard) => {
+      // Its guard checked again just before the write (HI-2420), which is synchronous: nothing comes between.
+      guard()
       workspace.setActive(p, true)
       await workspaceOf(p).refresh()
       return { done: `Activated ${basename(p)}`, result: await projectSummary(p) }
@@ -918,12 +920,15 @@ route('POST', '/v1/projects/:name/handover', async ({ params, body }) => {
     await start()
     return { ok: true }
   }
-  return assistantChange('agents', `hand ${name(from)}'s work over to ${name(to)} in ${basename(p)}`, act, async () => {
+  return assistantChange('agents', `hand ${name(from)}'s work over to ${name(to)} in ${basename(p)}`, act, async (guard) => {
     // Known at once rather than minutes later: without Hive's tools agents can't write or read a handover.
     if (!sessions.hiveMcp(p)) throw new HttpError(409, "The project's agents don't have Hive's tools (Settings → Agent API is off, or Provide Hive tools to sessions), so they can't write or read a handover. Tell the user.")
     for (const id of [from, to]) {
       if (sessions.userMayBeTyping(p, id)) throw new HttpError(409, `The user has just typed in ${name(id)}'s terminal and may still be writing there. Ask the user before handing over.`)
     }
+    // Its guard checked again as it is set off (HI-2420), synchronously after it. From there it runs on its own for
+    // minutes, reported in Hive, as the user's does: the change is the hand-over begun.
+    guard()
     await start()
     return {
       done: `Handing ${name(from)}'s work over to ${name(to)} in ${basename(p)}${handover ? '' : ' (from the latest handover)'}`,
@@ -1101,7 +1106,10 @@ route('POST', '/v1/assistant/undo', async ({ body }) => {
 route('POST', '/v1/projects', async ({ body }) => {
   const name = String(body?.name ?? '').trim()
   if (!name) throw new HttpError(400, 'name is required')
-  return assistantChange('projects', `create the project "${name}"`, { kind: 'create-project', project: name }, async () => {
+  return assistantChange('projects', `create the project "${name}"`, { kind: 'create-project', project: name }, async (guard) => {
+    // Its guard checked again just before the write (HI-2420): createProject makes the folder before its first await.
+    // What follows only sets up the project that is then there (activated, listed), never left half made.
+    guard()
     await workspace.createProject(name)
     const p = join(workspace.path!, name)
     workspace.setActive(p, true)
@@ -1548,8 +1556,9 @@ route('POST', '/v1/projects/:name/agents/:agent/message', async ({ params, body 
   const agentId = await agentParam(p, decodeURIComponent(params[1]))
   const a = await agentDefOf(p, agentId)
   if (body?.cancel === true) {
-    return assistantChange<{ cancelled: number }>('agents', `cancel the messages waiting for ${a.name} in ${basename(p)}`, { kind: 'cancel-messages', project: basename(p), agent: actAgent(a) }, async () => {
-      const n = await cancelMessages(p, agentId, 'the Assistant')
+    return assistantChange<{ cancelled: number }>('agents', `cancel the messages waiting for ${a.name} in ${basename(p)}`, { kind: 'cancel-messages', project: basename(p), agent: actAgent(a) }, async (guard) => {
+      // Checked again in the deliveries' own transaction (HI-2420): revoked while it waited for their lock, none is cancelled.
+      const n = await cancelMessages(p, agentId, 'the Assistant', guard)
       return { done: n ? `Cancelled ${n === 1 ? 'the message' : `${n} messages`} waiting for ${a.name} in ${basename(p)}` : `No message was waiting for ${a.name} in ${basename(p)}`, result: { cancelled: n } }
     })
   }
@@ -2121,18 +2130,19 @@ async function laneStartCall(body: any, place?: lanes.LanePlace): Promise<LaneCh
   if (pool && a) throw new HttpError(403, "A lane reviewed by the pool is started by the Assistant or the user (Start Lane): an agent's own lane names its reviewer")
   if (pool && body?.reviewer !== undefined && body.reviewer !== null && body.reviewer !== '') throw new HttpError(400, 'A lane reviewed by the pool has no reviewer of its own: leave reviewer out')
   if (pool) await checkLanePool(ws, p, builder)
-  const start = async () => {
+  // `commit`: the Assistant's guard, checked again in the lanes' save (HI-2420).
+  const start = async (commit?: () => void) => {
     // Hive's own start of the lane's card waits for this one to launch its agents (HI-2029); a builder registering its
     // own loop is at work already.
     const release = a ? null : lanes.holdLaneStart(ws, basename(p), builder)
     try {
-      return await started()
+      return await started(commit)
     } finally {
       release?.()
     }
   }
-  const started = async () => {
-    const r = await lanes.startLane(ws, { project: basename(p), builder, reviewer, ...(unknownReviewer !== undefined ? { unknownReviewer } : {}), cards: args.cards!, rounds: args.rounds, waitMinutes: args.waitMinutes, name: args.name, brief: args.brief, briefNotIn: sessions.liveFor(p, builder)?.sessionId ?? null, by: await laneBy(), ...(pool ? { pool: true } : {}), ...(applyNow ? { applyNow: true } : {}), ...(place ? { place } : {}), ...(a ? { ownBuilder: true } : {}) })
+  const started = async (commit?: () => void) => {
+    const r = await lanes.startLane(ws, { project: basename(p), builder, reviewer, ...(unknownReviewer !== undefined ? { unknownReviewer } : {}), cards: args.cards!, rounds: args.rounds, waitMinutes: args.waitMinutes, name: args.name, brief: args.brief, briefNotIn: sessions.liveFor(p, builder)?.sessionId ?? null, by: await laneBy(), ...(pool ? { pool: true } : {}), ...(applyNow ? { applyNow: true } : {}), ...(place ? { place } : {}), ...(a ? { ownBuilder: true } : {}), ...(commit ? { commit } : {}) })
     // Its brief given where it goes (HI-1795): outside slots, delivered now (and again by laneBriefs' next look if not).
     // A new lane's brief carried from the builder's lane that had just ended (HI-2097) too.
     const rec = (await lanes.rawLanes(ws)).find((l) => l.id === r.lane.id)
@@ -2157,9 +2167,10 @@ async function laneStartCall(body: any, place?: lanes.LanePlace): Promise<LaneCh
   }
   if (!assistantCaller()) return start()
   const builderAct = await knownAgent(basename(p), builder)
-  return assistantChange('agents', `start a lane in ${basename(p)}`, { kind: 'lane-start', project: basename(p), ...(args.cards ? { cards: args.cards } : {}), ...(builderAct ? { agent: builderAct } : {}) }, async () => {
-    // Recorded for undo by lanes.ts, from the lane as read under its lock, in its save (#1282).
-    const r = await start()
+  return assistantChange('agents', `start a lane in ${basename(p)}`, { kind: 'lane-start', project: basename(p), ...(args.cards ? { cards: args.cards } : {}), ...(builderAct ? { agent: builderAct } : {}) }, async (guard) => {
+    // Recorded for undo by lanes.ts, from the lane as read under its lock, in its save (#1282), where its guard is
+    // checked again (HI-2420). The agents launched for it after that save are its own (as the user's Start Lane…).
+    const r = await start(guard)
     // #402: a lane the Assistant starts but doesn't watch goes unfollowed ("they'll tell you"): its reply says so. A
     // lane watch (#531) on every running lane, or on this one, follows it.
     const w = sessions.watchFor(ws.assistantHome, ASSISTANT_AGENT_ID)
@@ -2181,11 +2192,12 @@ route('POST', '/v1/lanes/join', async ({ body }) =>
     const reviewer = a ? a.agentId : await agentParam(p, body?.reviewer)
     if (typeof body?.builder !== 'string' || !body.builder) throw new HttpError(400, "builder is required: the name of the lane's builder")
     const builder = await agentParam(p, body.builder)
-    const joined = async () => lanes.joinLane(ws, { project: basename(p), builder, reviewer, cards: args.cards, by: await laneBy() })
+    const joined = async (commit?: () => void) => lanes.joinLane(ws, { project: basename(p), builder, reviewer, cards: args.cards, by: await laneBy(), ...(commit ? { commit } : {}) })
     if (!assistantCaller()) return joined()
     const reviewerAct = await knownAgent(basename(p), reviewer)
-    return assistantChange('agents', `join a lane in ${basename(p)}`, { kind: 'lane-join', project: basename(p), ...(args.cards ? { cards: args.cards } : {}), ...(reviewerAct ? { agent: reviewerAct } : {}) }, async () => {
-      const r = await joined()
+    return assistantChange('agents', `join a lane in ${basename(p)}`, { kind: 'lane-join', project: basename(p), ...(args.cards ? { cards: args.cards } : {}), ...(reviewerAct ? { agent: reviewerAct } : {}) }, async (guard) => {
+      // Its guard checked again in the lanes' save (HI-2420).
+      const r = await joined(guard)
       return { done: `${r.lane.reviewer?.name ?? 'A reviewer'} joined lane ${r.lane.id} in ${basename(p)}`, act: { ...laneAct(r.lane), ...(r.lane.reviewer ? { agent: actAgent(r.lane.reviewer) } : {}) }, result: r }
     })
   })
@@ -2200,11 +2212,12 @@ route('POST', '/v1/lanes/:id/end', async ({ params, body }) =>
     if (commit !== undefined && commit !== null && (typeof commit !== 'string' || !/^[0-9a-zA-Z._/-]{4,64}$/.test(commit))) throw new HttpError(400, 'mergeCommit must be a commit (its hash)')
     // With rules enforced Hive records the merge from the cards' facts (#1270, §16.8.2): an agent's commit is ignored, said.
     const ignored = commit && a && (await lanes.lanesEnforced()) ? { note: 'mergeCommit is ignored: Hive records the lane\'s merge from its cards\' facts.' } : {} // i18n-ignore: an agent's reply (English)
-    const end = async () => ({ ...(await lanes.endLane(ws, id, { abandoned: body?.abandoned === true, mergeCommit: commit ?? null, ...(a ? { project: basename(a.projectPath), agent: a.agentId } : {}) })), ...ignored })
+    const end = async (guard?: () => void) => ({ ...(await lanes.endLane(ws, id, { abandoned: body?.abandoned === true, mergeCommit: commit ?? null, ...(a ? { project: basename(a.projectPath), agent: a.agentId } : {}), ...(guard ? { commit: guard } : {}) })), ...ignored })
     if (!assistantCaller()) return end()
     const laneId = /^[\w.-]{1,64}$/.test(id) ? id : null
-    return assistantChange('agents', laneId ? `end lane ${laneId}` : 'end a lane', { kind: 'lane-end', ...(laneId ? { lane: laneId } : {}) }, async () => {
-      const l = await end()
+    return assistantChange('agents', laneId ? `end lane ${laneId}` : 'end a lane', { kind: 'lane-end', ...(laneId ? { lane: laneId } : {}) }, async (guard) => {
+      // Its guard checked again in the lanes' save (HI-2420).
+      const l = await end(guard)
       return { done: `Lane ${l.id} in ${l.project}: ${l.state}`, act: laneAct(l), result: l }
     })
   })
@@ -2219,10 +2232,11 @@ route('POST', '/v1/lanes/:id/fresh-start', async ({ params }) =>
     const id = decodeURIComponent(params[0])
     const lane = (await lanes.rawLanes(ws)).find((l) => l.id === id)
     if (!lane) throw new HttpError(404, `No lane ${id}`)
-    const retry = async () => ({ retried: await retryFreshStart(ws, id) })
+    const retry = async (guard?: () => void) => ({ retried: await retryFreshStart(ws, id, guard) })
     if (!assistantCaller()) return retry()
-    return assistantChange('agents', `retry lane ${id}'s new conversations`, { kind: 'lane-fresh-start', lane: id, project: lane.project }, async () => {
-      const r = await retry()
+    return assistantChange('agents', `retry lane ${id}'s new conversations`, { kind: 'lane-fresh-start', lane: id, project: lane.project }, async (guard) => {
+      // Its guard checked again in each write it makes (HI-2420).
+      const r = await retry(guard)
       return { done: r.retried ? `Lane ${id}: ${r.retried} new conversation${r.retried > 1 ? 's' : ''} tried again` : `Lane ${id}: no new conversation was waiting to be retried`, result: r }
     })
   })
@@ -3204,8 +3218,9 @@ route('POST', '/v1/tasks/reorder', async ({ body }) => {
   if (actor.kind !== 'assistant') return view(await tasks.reorderTasks(column, cards, actor))
   const count = Array.isArray(cards) ? cards.length : 0
   const ordered = Array.isArray(cards) ? cards.map((x) => Number(String(x).replace(/^#/, ''))).filter((x) => Number.isInteger(x) && x > 0) : []
-  return assistantChange('agents', `put ${count} card${count === 1 ? '' : 's'} in order in ${columnLabel(column)}`, { kind: 'reorder-tasks', column, cards: ordered }, async () => {
-    const list = await tasks.reorderTasks(column, cards, actor)
+  return assistantChange('agents', `put ${count} card${count === 1 ? '' : 's'} in order in ${columnLabel(column)}`, { kind: 'reorder-tasks', column, cards: ordered }, async (guard) => {
+    // Checked again as each card is saved, in one batch (HI-2420): revoked while it waited for the board, none moves.
+    const list = await tasks.reorderTasks(column, cards, actor, { commit: guard })
     const top = (cards as unknown[]).map((x) => cardRef(Number(String(x).replace(/^#/, '')))).join(', ')
     return { done: `Put ${top} at the top of ${columnLabel(column)}`, result: await view(list) }
   })
@@ -3620,8 +3635,9 @@ async function cardIntent(param: string, intent: CardIntent): Promise<IntentDone
   }
   const was = await tasks.getTask(ref.n).catch(() => null)
   const what = INTENT_WORDS[intent.kind]
-  return assistantChange('agents', `${what} ${cardRef(ref.n)}`, { kind: 'update-task', card: ref.n, ...(was?.project ? { project: was.project } : {}) }, async () => {
-    const { done: ran, card } = await runCardIntent(ref, actor, intent)
+  return assistantChange('agents', `${what} ${cardRef(ref.n)}`, { kind: 'update-task', card: ref.n, ...(was?.project ? { project: was.project } : {}) }, async (guard) => {
+    // Its guard checked again in each write as the card is saved (HI-2420): one revoked while the intent waited saves nothing.
+    const { done: ran, card } = await runCardIntent(ref, actor, intent, { commit: guard })
     const done = await withLaneOrder(intent, card, ran)
     const moved = done.from && done.to && done.from !== done.to ? `, ${done.from} → ${done.to}` : ''
     return { done: `${cardName(card)} ${clip(card.title, 60)}: ${INTENT_DONE[intent.kind]}${moved}`, act: { column: card.column, agent: await cardAgent(card) }, result: done, ...(INTENT_STAYS[intent.kind] ? { stays: INTENT_STAYS[intent.kind] } : {}) }
@@ -3799,8 +3815,10 @@ route('POST', '/v1/tasks/:n/start', async ({ params, body }) => {
     : { kind: 'new-agent', name: body?.name ? String(body.name) : undefined, ...(conn?.connection ? { connection: conn.connection } : {}) }
   // The agent it is started on, when it exists (a new one is named once added).
   const named = target.kind === 'agent' ? await knownAgent(card.project, target.agentId) : undefined
-  return assistantChange('agents', `start ${cardRef(n)} ${target.kind === 'agent' ? `on ${named?.name ?? 'an agent'}` : 'on a new agent'}${card.project ? ` in ${card.project}` : ''}`, { kind: 'start-task', card: n, ...(card.project ? { project: card.project } : {}), ...(named ? { agent: named } : {}) }, async () => {
-    const r = await startTask(n, target, { kind: 'assistant' }, typeof body?.note === 'string' ? body.note : undefined)
+  return assistantChange('agents', `start ${cardRef(n)} ${target.kind === 'agent' ? `on ${named?.name ?? 'an agent'}` : 'on a new agent'}${card.project ? ` in ${card.project}` : ''}`, { kind: 'start-task', card: n, ...(card.project ? { project: card.project } : {}), ...(named ? { agent: named } : {}) }, async (guard) => {
+    // Its guard checked again as the card is taken, and before the task is typed or its agent launched (HI-2420): a
+    // revoked start is undone, the card back where it was and a new agent removed.
+    const r = await startTask(n, target, { kind: 'assistant' }, typeof body?.note === 'string' ? body.note : undefined, undefined, undefined, guard)
     return {
       done: `Started ${cardRef(n)} on ${r.added ? 'a new agent, ' : ''}${r.agentName} in ${card.project}: ${clip(card.title, 80)}`,
       act: { agent: { id: r.agentId, name: r.agentName }, column: r.card.column },

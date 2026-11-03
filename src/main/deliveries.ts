@@ -1094,9 +1094,12 @@ function taken(store: Store, r: DeliveryRecord): boolean {
  * Cancels an agent's deliveries not read yet (one being typed now stops; its hive_inbox no longer lists them), all of
  * them or those of `kinds` (or those `match` picks); by: who cancelled. How many.
  */
-export async function cancelDeliveries(host: string, agentId: string, by: string, kinds?: readonly DeliveryKind[], match?: (r: DeliveryRecord) => boolean): Promise<number> {
+export async function cancelDeliveries(host: string, agentId: string, by: string, kinds?: readonly DeliveryKind[], match?: (r: DeliveryRecord) => boolean, commit?: () => void): Promise<number> {
   const store = await load(host)
   const n = await transact(store, (d) => {
+    // A revocable caller's authority (HI-2420, the Assistant's guard): checked in the plan, under the host's lock with
+    // nothing awaited before its save (made again if a stale save plans again), so a refusal cancels nothing.
+    commit?.()
     let count = 0
     for (const r of [...d.records]) {
       if (r.agentId !== agentId || (kinds && !kinds.includes(r.kind)) || (match && !match(r))) continue

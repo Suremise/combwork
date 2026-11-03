@@ -1080,13 +1080,14 @@ function placement(all: CardPlace[], card: TaskCard, column: TaskColumn, patch: 
 /**
  * Puts cards at the top of a column in the order given; the column's other cards keep their order below them. The
  * listed cards have to be in that column already (this never moves cards between columns), and only the user puts
- * Done in order. An agent's or the Assistant's list adds a line to each card it moved.
+ * Done in order. An agent's or the Assistant's list adds a line to each card it moved. `commit`: a revocable caller's
+ * check (HI-2420, the Assistant's guard), made as each card is saved: one batch, so a refusal part way saves none.
  */
-export function reorderTasks(column: TaskColumn, numbers: unknown, actor: TaskActor): Promise<TaskCard[]> {
-  return recordingAs(actor, () => cardBatch(workspace, () => boardLock(workspace, () => reorderTasksLocked(column, numbers, actor))))
+export function reorderTasks(column: TaskColumn, numbers: unknown, actor: TaskActor, opts: { commit?: () => void } = {}): Promise<TaskCard[]> {
+  return recordingAs(actor, () => cardBatch(workspace, () => boardLock(workspace, () => reorderTasksLocked(column, numbers, actor, opts.commit))))
 }
 
-async function reorderTasksLocked(column: TaskColumn, numbers: unknown, actor: TaskActor): Promise<TaskCard[]> {
+async function reorderTasksLocked(column: TaskColumn, numbers: unknown, actor: TaskActor, commit?: () => void): Promise<TaskCard[]> {
   if (!isTaskColumn(column)) throw unknownColumn(column)
   if (column === 'done' && actor.kind !== 'user') throw new TaskPermissionError(ERR.onlyUserDone)
   if (!Array.isArray(numbers) || !numbers.length) throw hiveError(msg({ id: 'tasks.error.orderNone', defaultMessage: 'cards: list the card numbers in the order wanted.', description: 'An error: a call to put cards in order listed none. "cards:" is the name of the call\'s field: keep it as it is.' }), undefined, { kind: 'invalid' })
@@ -1123,7 +1124,7 @@ async function reorderTasksLocked(column: TaskColumn, numbers: unknown, actor: T
       if (card.column !== column || card.archived) throw hiveError(msg({ id: 'tasks.error.orderChanged', defaultMessage: '{card} changed while the cards were being put in order; read the board again.', description: 'An error: card {card} (its key, such as HI-12) moved or was archived while the cards were being put in order, so the order asked for no longer holds.' }), { card: cardRef(x) }, { kind: 'conflict' })
       card.order = orderAt(i)
       if (was !== i && actor.kind !== 'user') note(card, by, i === 0 ? storedText(HISTORY.movedTop, { column }) : storedText(HISTORY.placed, { place: i + 1, column }))
-      await saveCard(ws, x, card)
+      await saveCard(ws, x, card, undefined, undefined, commit)
     })()
   }
   log.info(`${W} put in order by ${userText(by)}: ${nums.map((x) => `#${x}`).join(', ')}`)
@@ -1640,7 +1641,10 @@ export async function runIntent<R>(
   n: number,
   actor: TaskActor,
   call: (wf: Workflow) => Promise<R>,
-  zero9: (w: Pick<Write, 'was' | 'current' | 'written'>, first: boolean) => { patch?: TaskPatch; opts?: Parameters<typeof updateTaskLocked>[3] } = () => ({})
+  zero9: (w: Pick<Write, 'was' | 'current' | 'written'>, first: boolean) => { patch?: TaskPatch; opts?: Parameters<typeof updateTaskLocked>[3] } = () => ({}),
+  // A revocable caller's check (HI-2420, the Assistant's guard): made as each of the card's writes saves the card, in
+  // the write's own transaction after the runtime's facts, so a refusal undoes its facts too.
+  commit?: () => void
 ): Promise<{ reply: R; saved: TaskCard | null }> {
   let saved: TaskCard | null = null
   let first = true
@@ -1661,7 +1665,7 @@ export async function runIntent<R>(
           // Its column only when it moved: a write that moves nothing (an answer, a review's start) leaves the card's
           // place, so a failed card still in Review isn't "returned for review" by it (#1269 round 3).
           const p: TaskPatch = { ...extra.patch, ...(moved !== null ? { column: STAGE_CATEGORY[w.current] } : {}) }
-          saved = await recordingByRuntime(() => updateTaskAs(n, p, actor, { ...extra.opts, was: STAGE_CATEGORY[w.was] }), moved)
+          saved = await recordingByRuntime(() => updateTaskAs(n, p, actor, { ...extra.opts, was: STAGE_CATEGORY[w.was], ...(commit ? { commit } : {}) }), moved)
         }
       },
       // One git step (#1376): what it asks git about fixed commits is asked once in it.
@@ -2390,7 +2394,12 @@ async function updateTaskAs(n: number, patch: TaskPatch, actor: TaskActor, opts:
     }
     // What changed, in the history's words (English), for a caller that confirms it (the hive tools' short replies).
     opts.said?.push(...said.map(englishSaid))
-    if (!said.length && !reordered && !reviewed && !comment) return card
+    if (!said.length && !reordered && !reviewed && !comment) {
+      // Nothing of the card's own to save, but a runtime write (an intent's facts, HI-2420) may be in this transaction:
+      // the caller's authority checked here too, after the last await, so a revoked one leaves those undone.
+      opts.commit?.()
+      return card
+    }
     // One change, one time (HI-2016): its lines share it, so what reads them as one change (a failed verdict's own move
     // back to Doing, watch.ts wakeAbout) does so however slowly they are written.
     const at = changeTime(card)
