@@ -553,6 +553,7 @@
   "board.lanes.waitsPreparing": "待機中：{slot}を準備中",
   "board.lanes.waitsSlotHeld": "{slot}を待機中：{held, select, session {{agent}のセッションがまだその中にあります} broker {プロセスがまだその中のファイルかフォルダーを開いています：Windows Sandbox のブローカー（{broker}）がそこを作業フォルダーにしています{idle, select, yes {（Sandbox は実行されていません）} no {（Sandbox が実行中です）} other {}}} other {プロセスがまだその中のファイルかフォルダーを開いています}}",
   "board.lanes.waitsStart": "{card}は開始待ちです：{why, select, watching {{agent}は別の作業を待っています} queued {Hiveの行が{agent}に届く途中です} failed {{agent}の前回の開始が失敗しました} refused {開始はいったん拒否され、Hiveが再試行します} other {{agent}はターンの最中です}}",
+  "board.lanes.waitsStartHeld": "{card}は開始待ちです：{slot}がまだ使用中のため、開始はいったん拒否されました（{held, select, session {{agent}のセッションがまだその中にあります} left {{agent}の前回の実行が{program}{more, plural, =0 {} other {ほか#個}}をその中で動かしたままにしています} lastRun {{agent}のそこでの前回の実行が終わったかどうか分かりません} broker {プロセスがまだその中のファイルかフォルダーを開いています：Windows Sandbox のブローカー（{broker}）がそこを作業フォルダーにしています{idle, select, yes {（Sandbox は実行されていません）} no {（Sandbox が実行中です）} other {}}} other {プロセスがまだその中のファイルかフォルダーを開いています}}）。Hiveが再試行します",
   "board.leftOut.detail": "{hasPaths, select, yes {現在のパス：{paths}。} other {まだパスがありません。}} その間に変更されたファイルは、別のカードの作業やあなた自身の変更かもしれません。{card}に属するものだけを含めてください。",
   "board.leftOut.include": "{n, plural, other {含める}}",
   "board.leftOut.leave": "{n, plural, other {含めない}}",

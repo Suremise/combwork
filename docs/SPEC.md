@@ -4354,6 +4354,21 @@ Whether a conversation may resume there is its **hold** (none: it may):
   running, or unknown), else the slot is held by a `process` as before. Each retry looks again, so what is said follows
   the broker starting, stopping or ending. It only names what holds the slot: whether the slot can be lent is still the
   rename alone, and Hive ends nothing (HI-2309).
+  **A refused start, its slot held** (HI-2468): a lane recorded over a builder that is still running isn't waiting for
+  a slot. Hive's own start gives it its first card (`laneStarts.ts`), and that start can be refused for its slot
+  (`start.slotAvailable`). The start's wait (`startWait`, `why: "refused"`) then names the slot and what holds it
+  (`startSlotHold` in `slotCards.ts`):
+  - its lend passed over a free slot as held (`busy`): what the lend found, which the lend keeps for that lane: a
+    session in it, a process, or the broker;
+  - no slot free, as the builder's own last run still holds one as its writer (the usual case for a builder stopped
+    after starting something that outlives it): what that run left running there, named from the slot's writer
+    (`heldWriter`: *B1's last run left node running in it*), or that the run isn't known to have ended.
+
+  For example: *HI-12 waits to start: its start was refused for now, slot-a still in use (B1's last run left node
+  running in it); Hive tries again*. The status keeps its builder as `agent` and puts the holder's agent in `heldBy`.
+  Between tries (every 30 s, as before) each look checks the slot again (a session, the rename, the broker, the
+  writer), so the status follows what holds it. Once nothing can be told, it says only that the start was refused, as
+  does a start refused for any other rule. The retry and the start's own rules are unchanged.
 - **The stand-in** (an agent's 0.9 worktree as the card's folder, `existing: true`, the line updater) acts only for an
   agent whose `legacyWorktree` is still its folder: until #1441 migrates the project (then its carried lease).
 - **Off switches:** G11 another value: nothing of this. `hive.workflow.enforce` off: nothing is lent, refused,

@@ -447,6 +447,10 @@
     "text": "{card} waits to start: its start was refused for now; Hive tries again",
     "note": "A lane's next card isn't started yet (HI-2029): Hive's start of it was refused for now, and is tried again."
   },
+  "lane.status.start.refusedHeld": {
+    "text": "{card} waits to start: its start was refused for now, {slot} still in use ({held, select, session {{heldBy}'s session is still in it} left {{heldBy}'s last run left {program}{more, plural, =0 {} other { and # more}} running in it} lastRun {{heldBy}'s last run there isn't known to have ended} broker {a process still has a file or folder in it open: Windows Sandbox's broker ({broker}) is working in it{idle, select, yes {, with no Sandbox running} no {, with a Sandbox running} other {}}} other {a process still has a file or folder in it open}}); Hive tries again",
+    "note": "A lane's next card isn't started yet (HI-2468): Hive's start of it was refused because its slot {slot} is still in use: a session of the agent {heldBy} still runs in it; left, the agent {heldBy}'s last run left programs running in it ({program}: the first one's name, such as node; {more}: how many more); lastRun, that run isn't known to have ended; or (broker) a process holds it, and Windows Sandbox's broker ({broker}: its process name) has the slot as its current folder, idle: yes, no Sandbox runs; no, one does; other, not known; or (other) a process holds it. Hive tries the start again."
+  },
   "lane.status.start.watching": {
     "text": "{card} waits to start: {agent} is waiting on other work",
     "note": "A lane's next card isn't started yet (HI-2029): its builder waits on a watch of other cards."

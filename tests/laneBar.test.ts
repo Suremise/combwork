@@ -510,6 +510,18 @@ describe("a segment's hover: what the card's facts say (#1225)", () => {
     // HI-2466: its only free slot held, and by what.
     expect(laneWaitText({ reason: 'slot', card: 12, slot: 'slot-a', held: 'session', agent: 'CB1' }, name, tr)).toBe('waiting for slot-a: CB1’s session is still in it')
     expect(laneWaitText({ reason: 'slot', card: 12, slot: 'slot-a', held: 'process' }, name, tr)).toBe('waiting for slot-a: a process still has a file or folder in it open')
+    // HI-2467: Windows Sandbox's broker seen working in it; its idleness said only when known.
+    expect(laneWaitText({ reason: 'slot', card: 12, slot: 'slot-a', held: 'broker', broker: 'WindowsSandboxServer', idle: true }, name, tr)).toBe('waiting for slot-a: a process still has a file or folder in it open: Windows Sandbox’s broker (WindowsSandboxServer) is working in it, with no Sandbox running')
+    expect(laneWaitText({ reason: 'slot', card: 12, slot: 'slot-a', held: 'broker', broker: 'WindowsSandboxServer' }, name, tr)).toBe('waiting for slot-a: a process still has a file or folder in it open: Windows Sandbox’s broker (WindowsSandboxServer) is working in it')
+    // HI-2468: a running builder's start refused for its slot held: the slot and what holds it; else as before.
+    const refusedStart = { reason: 'startWait' as const, card: 12, why: 'refused' as const, agent: 'B1' }
+    expect(laneWaitText({ ...refusedStart, slot: 'slot-a', held: 'session', heldBy: 'CB1' }, name, tr)).toBe('HI-12 waits to start: its start was refused for now, slot-a still in use (CB1’s session is still in it), and Hive tries again')
+    expect(laneWaitText({ ...refusedStart, slot: 'slot-a', held: 'process' }, name, tr)).toBe('HI-12 waits to start: its start was refused for now, slot-a still in use (a process still has a file or folder in it open), and Hive tries again')
+    expect(laneWaitText({ ...refusedStart, slot: 'slot-a', held: 'broker', broker: 'WindowsSandboxServer', idle: false }, name, tr)).toBe('HI-12 waits to start: its start was refused for now, slot-a still in use (a process still has a file or folder in it open: Windows Sandbox’s broker (WindowsSandboxServer) is working in it, with a Sandbox running), and Hive tries again')
+    expect(laneWaitText({ ...refusedStart, slot: 'slot-a', held: 'left', heldBy: 'B1', program: 'node' }, name, tr)).toBe('HI-12 waits to start: its start was refused for now, slot-a still in use (B1’s last run left node running in it), and Hive tries again')
+    expect(laneWaitText({ ...refusedStart, slot: 'slot-a', held: 'left', heldBy: 'B1', program: 'node', more: 1 }, name, tr)).toBe('HI-12 waits to start: its start was refused for now, slot-a still in use (B1’s last run left node and 1 more running in it), and Hive tries again')
+    expect(laneWaitText({ ...refusedStart, slot: 'slot-a', held: 'lastRun', heldBy: 'B1' }, name, tr)).toBe('HI-12 waits to start: its start was refused for now, slot-a still in use (B1’s last run there isn’t known to have ended), and Hive tries again')
+    expect(laneWaitText(refusedStart, name, tr)).toBe('HI-12 waits to start: its start was refused for now, and Hive tries again')
     expect(laneWaitText({ reason: 'checkCopy', card: 12 }, name, tr)).toBe('waiting for a check copy for HI-12')
     expect(laneWaitText({ reason: 'preparing', card: 12, slot: 'slot-b' }, name, tr)).toBe('waiting: preparing slot-b')
   })
