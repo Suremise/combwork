@@ -1656,7 +1656,7 @@ interface LaneBoard {
 /** A card's newest open request for the user (HI-1991), as a lane watch tells it; null for none. */
 function newestAsk(items: readonly ForYouItem[] | undefined): LaneAsked | null {
   const i = items?.reduce<ForYouItem | null>((a, b) => (!a || b.since > a.since ? b : a), null)
-  return i ? { since: i.since, by: i.asker, text: i.text } : null
+  return i ? { since: i.since, by: i.asker, text: i.text, ...(i.shown ? { shown: i.shown } : {}) } : null
 }
 
 function laneBoard(ws: WorkspaceService): LaneBoard {

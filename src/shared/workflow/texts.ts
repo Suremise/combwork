@@ -178,5 +178,5 @@ export function unreadWhy(field: string, of: { unknown: Record<string, string>; 
 }
 
 /** A stored workflow text in English (agents, the Agent API, the log); its id when this Hive doesn't know it. */
-// agent-later: HI-2464 says For-you requests and workflow notices in each reader's dialect
+// agent-stored: storedForAgents says a request again for each reader (its forYou rows, a lane wake's detail; HI-2464)
 export const workflowEnglish = (s: StoredText): string => workflowLine(s, (m, values) => englishText(values ? { m, values } : m)) ?? s.id
