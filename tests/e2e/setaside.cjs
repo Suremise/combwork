@@ -52,11 +52,11 @@ const olderCard = (number, fields) =>
     await lib.openWorkspace(inv, page, ws)
 
     // The notice, with Review….
-    const toast = page.locator('.toast', { hasText: 'made by an older Hive' })
-    check('a notice says three cards made by an older Hive were found', !!(await lib.until(async () => (await toast.count()) === 1, HUNG_MS)) && /3 cards made by an older Hive/.test(await toast.innerText()), await toast.innerText().catch(() => ''))
+    const toast = page.locator('.toast', { hasText: 'made by an older Combwork' })
+    check('a notice says three cards made by an older Combwork were found', !!(await lib.until(async () => (await toast.count()) === 1, HUNG_MS)) && /3 cards made by an older Combwork/.test(await toast.innerText()), await toast.innerText().catch(() => ''))
     await page.screenshot({ path: path.join(lib.WORK, 'setaside-notice.png') })
     await toast.getByRole('button', { name: 'Review…' }).click()
-    const dialog = page.locator('.dialog', { hasText: 'Cards Made by an Older Hive' })
+    const dialog = page.locator('.dialog', { hasText: 'Cards Made by an Older Combwork' })
     const rows = dialog.locator('.set-aside-card')
     check('Review… lists the three files', !!(await lib.until(async () => (await rows.count()) === 3, HUNG_MS)), String(await rows.count()))
     const row = (file) => dialog.locator(`.set-aside-card[data-file="${file}"]`)
@@ -77,7 +77,7 @@ const olderCard = (number, fields) =>
     check('Add takes it out of the list', !!(await lib.until(async () => (await rows.count()) === 2, HUNG_MS)))
     const added = (await inv('tasks:list')).find((c) => c.number === free)
     const last = added?.history?.at(-1)
-    check('it is on the board under its old number, as it was', added?.title === 'Made in the older Hive' && added.labels.join() === 'old' && added.comments.length === 1, JSON.stringify(added))
+    check('it is on the board under its old number, as it was', added?.title === 'Made in the older Combwork' && added.labels.join() === 'old' && added.comments.length === 1, JSON.stringify(added))
     check('its history says where it came from, by Repair', last?.by === 'Repair' && last.what === `Added from an older Hive, where it was made as #${free}`, JSON.stringify(last))
 
     // Add the clashing one: the next free number; #1 and the link to it unchanged.

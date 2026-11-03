@@ -107,7 +107,7 @@ const until = async (fn, ms = 10000) => {
     return s.every((x) => x?.status === 'ready') ? s : null
   }, 10000)
   check('the others are idle again, marked as stopped by the sign-in', !!others && others.every((s) => s.signIn && s.statusMessage === 'Stopped while signed out'), JSON.stringify((others ?? []).map((s) => [s?.status, s?.statusMessage, !!s?.signIn])))
-  check('Hive says so, counting only the two it stopped', !!(await until(async () => ((await page.getByText("2 agents stopped while it was signed out: Resume in the project's header carries them on.").count()) ? true : null), 5000)))
+  check('Combwork says so, counting only the two it stopped', !!(await until(async () => ((await page.getByText("2 agents stopped while it was signed out: Resume in the project's header carries them on.").count()) ? true : null), 5000)))
   const back = await until(async () => {
     const i = (await inv('provider:info'))['claude-code']
     return i && !i.checking && i.loggedIn === true ? i : null

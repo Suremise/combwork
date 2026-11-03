@@ -515,12 +515,12 @@ const lineOf = (head) => head.evaluate((el) => `${el.querySelector('.progress-re
     const aLines = ['Hive (merge queue) · lint, typecheck', 'B1 · final typecheck ×2 · all passed', 'B1 · cardloop on base c0ffee1', 'R1 · Review delivery typecheck', 'B1 · unit: 6 files ×3 · 2 failed, then passed']
     check(`${a.key}'s runs, a line each, newest first: the merge queue's checks in one, its key left out of a title`, JSON.stringify(await lines(a.number)) === JSON.stringify(aLines), JSON.stringify(await lines(a.number)))
     // The queue's titles carry the key and revision (HR6's round 1): opened, its runs name only their check.
-    await group(a.number).locator('.progress-run-group').filter({ hasText: 'Hive (merge queue)' }).locator('.progress-group-head').click()
+    await group(a.number).locator('.progress-run-group').filter({ hasText: 'Combwork (merge queue)' }).locator('.progress-group-head').click()
     const queueRuns = () => group(a.number).locator('.progress-group-runs .progress-recent-text').allTextContents()
     check("…opened, the queue's runs, newest first, each its check alone", !!(await until(async () => JSON.stringify(await queueRuns()) === JSON.stringify(['typecheck', 'lint', 'lint']), HUNG_MS)), JSON.stringify(await queueRuns()))
     const itemsText = await group(a.number).locator('.progress-card-items').innerText()
     check(`…no key nor revision in ${a.key}'s lines`, !itemsText.includes(a.key) && !itemsText.includes(REV.slice(0, 7)) && !itemsText.includes(REV2.slice(0, 7)), itemsText)
-    await group(a.number).locator('.progress-run-group').filter({ hasText: 'Hive (merge queue)' }).locator('.progress-group-head').click()
+    await group(a.number).locator('.progress-run-group').filter({ hasText: 'Combwork (merge queue)' }).locator('.progress-group-head').click()
     check('…one row shape: no line under a run, no copy name shown', (await group(a.number).locator('.progress-run-for').count()) === 0 && !/copy-5/.test(await group(a.number).innerText()))
     check('…the retries a warning (failed, then passed), the failed run a failure', (await group(a.number).locator('.progress-run-group').filter({ hasText: 'unit: 6 files' }).locator('.progress-group-head .codicon-warning').count()) === 1 && (await group(a.number).locator('.progress-recent-item[data-run="a-cardloop"] .progress-recent .codicon-error').count()) === 1)
     const reviewRow = group(a.number).locator('.progress-recent-item[data-run="a-review"] .progress-recent > .tip-wrap').first()

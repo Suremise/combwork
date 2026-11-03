@@ -90,7 +90,7 @@ const check = (name, ok, extra = '') => {
     const configTab = () => JSON.parse(fs.readFileSync(path.join(userData, 'config.json'), 'utf8')).ui?.tabs?.['settings.workflow']
     check('Settings → Version Control has two tabs, in order, the workspace’s named after it, Hive defaults first chosen', !!(await lib.until(async () => JSON.stringify(await tabs()) === JSON.stringify([{ id: 'workflow.defaults', name: 'Hive defaults', selected: true }, { id: 'workflow.workspaceDefaults', name: 'Workspace defaults (workflowdefaults-ws)', selected: false }]), HUNG_MS)), JSON.stringify(await tabs()))
     check('…the intro line above them, saying the order', (await text(group.locator(':scope > p'))).includes('A project’s own options'), await text(group.locator(':scope > p')))
-    check('…and Hive defaults shows only its own form and line', !!(await lib.until(async () => JSON.stringify(await shownParts()) === JSON.stringify({ panels: ['workflow.defaults'], levels: ['global'] }), HUNG_MS)) && (await text(group.locator('[role="tabpanel"][data-setting="workflow.defaults"] > .s-text > .s-desc').first())).startsWith('For every workspace'), JSON.stringify(await shownParts()))
+    check('…and Combwork defaults shows only its own form and line', !!(await lib.until(async () => JSON.stringify(await shownParts()) === JSON.stringify({ panels: ['workflow.defaults'], levels: ['global'] }), HUNG_MS)) && (await text(group.locator('[role="tabpanel"][data-setting="workflow.defaults"] > .s-text > .s-desc').first())).startsWith('For every workspace'), JSON.stringify(await shownParts()))
     await shots('tabs-hive', group.locator('h2'))
     // The keyboard: the selected tab is the one in the Tab order; an arrow selects and focuses the next.
     await tab('workflow.defaults').focus()
@@ -198,7 +198,7 @@ const check = (name, ok, extra = '') => {
     }, HUNG_MS)
     check('…Hive’s tab no longer marked once saved', !!(await lib.until(async () => (await unsaved()).join() === 'workflow.workspaceDefaults', HUNG_MS)), JSON.stringify(await unsaved()))
     await tab('workflow.workspaceDefaults').click()
-    check('…the workspace’s draft is still there, unsaved, after switching back and Hive’s save', !!(await lib.until(async () => (await selectedTab()) === 'workflow.workspaceDefaults', HUNG_MS)) && (await form.locator('[data-action="save"]').isEnabled()) && wsJson().workflow?.git?.stopOwnRuns === undefined, JSON.stringify(wsJson().workflow?.git))
+    check('…the workspace’s draft is still there, unsaved, after switching back and Combwork’s save', !!(await lib.until(async () => (await selectedTab()) === 'workflow.workspaceDefaults', HUNG_MS)) && (await form.locator('[data-action="save"]').isEnabled()) && wsJson().workflow?.git?.stopOwnRuns === undefined, JSON.stringify(wsJson().workflow?.git))
     await form.getByRole('button', { name: 'Discard Changes' }).click()
     check('…and Discard Changes drops it, nothing written, its mark gone', !!(await lib.until(async () => !(await form.locator('[data-action="save"]').isEnabled()) && (await unsaved()).length === 0, HUNG_MS)) && wsJson().workflow?.git?.stopOwnRuns === undefined)
     await tab('workflow.defaults').click()
@@ -258,7 +258,7 @@ const check = (name, ok, extra = '') => {
     await inv('slots:setLevelDefault', 'global', 'copy', null)
     check('…and inherits the default again once both are unset', !!(await lib.until(async () => { const c = await copyOf(wsCopy); return c.origin === 'default' && c.text.includes('.env*') }, HUNG_MS)), JSON.stringify(await copyOf(wsCopy)))
     // The workspace's level shows Hive's as what it inherits.
-    check('the workspace’s level inherits it: From Hive defaults', !!(await lib.until(async () => (await row('dependenciesDone').innerText().catch(() => '')).includes('From Hive defaults'), HUNG_MS)))
+    check('the workspace’s level inherits it: From Combwork defaults', !!(await lib.until(async () => (await row('dependenciesDone').innerText().catch(() => '')).includes('From Combwork defaults'), HUNG_MS)))
     // Its "From Hive defaults" opens Hive defaults' tab, where that value is set; and the copied files' too.
     await row('dependenciesDone').locator('[data-origin-link="global"]').click()
     check('…a link to Hive defaults’ tab', !!(await lib.until(async () => (await selectedTab()) === 'workflow.defaults' && (await hiveRow('dependenciesDone').isVisible()), HUNG_MS)), String(await selectedTab()))

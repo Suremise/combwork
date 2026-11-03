@@ -212,7 +212,7 @@ export async function createProject(): Promise<void> {
   let key = ''
   const name = await prompt({
     title: tr(msg({ id: 'actions.project.newTitle', defaultMessage: 'New Project', description: 'Title of the New Project dialog.' })),
-    message: tr(msg({ id: 'actions.project.newMessage', defaultMessage: 'A new folder is created in the workspace. Hive adds its .hive metadata folder automatically.', description: 'The New Project dialog. Keep .hive as it is.' })),
+    message: tr(msg({ id: 'actions.project.newMessage', defaultMessage: 'A new folder is created in the workspace. Combwork adds its .hive metadata folder automatically.', description: 'The New Project dialog. Keep .hive as it is.' })),
     placeholder: tr(msg({ id: 'actions.project.namePlaceholder', defaultMessage: 'project-name', description: "Placeholder of the New Project dialog's name box: an example folder name (lower case, a dash)." })),
     confirmLabel: tr(msg({ id: 'actions.project.create', defaultMessage: 'Create', description: 'Button: creates the project.' })),
     validate: (v) =>
@@ -370,7 +370,7 @@ async function detectedProvider(resolve: () => ProviderId, auto: () => boolean):
 /** Said when Hive hasn't finished finding which CLIs are installed. */
 const LOOKING = {
   title: msg({ id: 'actions.provider.lookingTitle', defaultMessage: 'Still looking for the coding agents', description: "A warning's title: Hive hasn't finished finding which coding agent CLIs are installed." }),
-  message: msg({ id: 'actions.provider.lookingMessage', defaultMessage: 'Hive is still finding out which coding agent CLIs are installed. Try again in a moment.', description: 'Under the warning that Hive is still looking for the coding agent CLIs.' })
+  message: msg({ id: 'actions.provider.lookingMessage', defaultMessage: 'Combwork is still finding out which coding agent CLIs are installed. Try again in a moment.', description: 'Under the warning that Hive is still looking for the coding agent CLIs.' })
 }
 
 /**
@@ -383,7 +383,7 @@ async function goneSlot(path: string, agentId: string, gone: { agentName: string
     title: tr(msg({ id: 'actions.slot.goneTitle', defaultMessage: 'The slot is gone', description: "Title of the question when the folder of a slot an agent holds (a working folder Hive lends it for a card or lane) is missing." })),
     message: gone.branchExists
       ? tr(msg({ id: 'actions.slot.goneMessage', defaultMessage: "{agent}'s slot {slot} is missing its folder ({path}). Its branch {branch} is still in the repository: make the slot again on it, with its commits, and start?", description: "The question when a slot's ({slot}) folder ({path}) is missing; the agent ({agent}) holds it, and its branch ({branch}) is still there." }), { agent: gone.agentName, slot: gone.slot ?? '', path: gone.path, branch: gone.branch })
-      : tr(msg({ id: 'actions.slot.goneNoBranch', defaultMessage: "{agent}'s slot {slot} is missing its folder ({path}), and its branch is gone too. Release the slot? Hive makes it again the next time it lends it.", description: "The question when a slot's ({slot}) folder ({path}) and its branch are missing; the agent ({agent}) holds it." }), { agent: gone.agentName, slot: gone.slot ?? '', path: gone.path }),
+      : tr(msg({ id: 'actions.slot.goneNoBranch', defaultMessage: "{agent}'s slot {slot} is missing its folder ({path}), and its branch is gone too. Release the slot? Combwork makes it again the next time it lends it.", description: "The question when a slot's ({slot}) folder ({path}) and its branch are missing; the agent ({agent}) holds it." }), { agent: gone.agentName, slot: gone.slot ?? '', path: gone.path }),
     detail: tr(msg({ id: 'actions.slot.goneDetail', defaultMessage: 'If the workspace moved, Repair… in its banner can also locate the folder.', description: "Under the question when a slot's folder is missing: Repair… is a button in the workspace's banner." })),
     choices: gone.branchExists ? [release, { label: tr(msg({ id: 'actions.slot.recreate', defaultMessage: 'Recreate and Start', description: 'Button: makes the slot again on its branch and starts the agent.' })), value: 'recreate' }] : [release]
   })
@@ -407,7 +407,7 @@ async function ensureWorktree(path: string, agentId: string): Promise<boolean> {
   const gone = await call('agents:missingWorktree', path, agentId).catch(() => null)
   if (!gone) return true
   if (gone.slot) return goneSlot(path, agentId, gone)
-  const setup = tr(msg({ id: 'actions.worktree.setup', defaultMessage: "Hive copies in the files it copies into new worktrees, and the project's worktree setup command, if it has one, runs before the agent starts. Nothing is deleted.", description: "Under the question before recreating an agent's missing worktree: what making it again involves." }))
+  const setup = tr(msg({ id: 'actions.worktree.setup', defaultMessage: "Combwork copies in the files it copies into new worktrees, and the project's worktree setup command, if it has one, runs before the agent starts. Nothing is deleted.", description: "Under the question before recreating an agent's missing worktree: what making it again involves." }))
   if (gone.branchExists) {
     return confirm({
       title: tr(msg({ id: 'actions.worktree.recreateTitle', defaultMessage: 'Recreate the worktree?', description: "Title of the question when a worktree agent's folder is missing but its branch is there." })),
@@ -1008,7 +1008,7 @@ export async function addMcpServer(place: McpPlace): Promise<boolean> {
   const ok = await confirm({
     title:
       place === 'assistant'
-        ? tr(msg({ id: 'mcp.add.titleAssistant', defaultMessage: 'Add a server for the Hive Assistant', description: "Title of the Add server picker (HI-2059) in the Hive Assistant's view." }))
+        ? tr(msg({ id: 'mcp.add.titleAssistant', defaultMessage: 'Add a server for the Assistant', description: "Title of the Add server picker (HI-2059) in the Hive Assistant's view." }))
         : tr(msg({ id: 'mcp.add.title', defaultMessage: 'Add a server to {project}', description: "Title of the Add server picker (HI-2059) in a project's MCP tab. {project} is the project." }), { project: place.name }),
     message: tr(msg({ id: 'mcp.add.message', defaultMessage: 'The workspace’s servers not added here yet. Sessions started from now on get the one you add.', description: 'The Add server picker (HI-2059), above its search and list: the workspace servers not added to this project (or the Hive Assistant); new sessions start the one added.' })),
     content: createElement(McpServerPicker, { servers: can, onPick: (m: McpServerInfo | null) => (picked = m) }),
@@ -1080,7 +1080,7 @@ export async function chooseMcpPlaces(server: Pick<McpServerInfo, 'name' | 'def'
 }
 
 /** "Hive Assistant", where a server is added. */
-const MCP_ASSISTANT = msg({ id: 'mcp.where.assistantName', defaultMessage: 'the Hive Assistant', description: 'Where an MCP server is added (HI-2059), in a list of places beside project names.' })
+const MCP_ASSISTANT = msg({ id: 'mcp.where.assistantName', defaultMessage: 'the Assistant', description: 'Where an MCP server is added (HI-2059), in a list of places beside project names.' })
 
 // ---------------------------------------------------------------------------
 // MCP catalogues (HI-545): Install and Update, each shown before anything is written.
@@ -1113,7 +1113,7 @@ export async function installCatalogServer(row: Pick<McpCatalogRow, 'source' | '
   const done = await attempt(tr(CATALOG_FAILED, { name: row.name }), () => call('mcp:catalogInstall', p.id, picked.name, picked.replace).then(() => true))
   if (!done) return false
   set((s) => ({ skillsVersion: s.skillsVersion + 1, mcpCatalogVersion: s.mcpCatalogVersion + 1, mcpTab: 'installed', selectedMcp: picked.name }))
-  notify('success', tr(msg({ id: 'mcp.catalog.installed', defaultMessage: 'Installed {name}', description: "A notification's title (HI-545): a catalogue server was installed." }), { name: picked.name }), tr(msg({ id: 'mcp.catalog.installedNext', defaultMessage: 'It runs nowhere yet: Add to… in its view adds it to the projects (and the Hive Assistant) that need it.', description: 'Under "Installed {name}" (HI-545): what to do next. Add to… is the button in the server\'s view in the MCP view.' })))
+  notify('success', tr(msg({ id: 'mcp.catalog.installed', defaultMessage: 'Installed {name}', description: "A notification's title (HI-545): a catalogue server was installed." }), { name: picked.name }), tr(msg({ id: 'mcp.catalog.installedNext', defaultMessage: 'It runs nowhere yet: Add to… in its view adds it to the projects (and the Assistant) that need it.', description: 'Under "Installed {name}" (HI-545): what to do next. Add to… is the button in the server\'s view in the MCP view.' })))
   await refreshWorkspace()
   return true
 }
@@ -1174,8 +1174,8 @@ export function mcpWhereText(server: Pick<McpServerInfo, 'def' | 'projects' | 'a
   const hidden = server.projects.filter((p) => !projects.some((x) => samePath(x.path, p))).length
   const on = hidden ? [...named, tr(msg({ id: 'mcp.where.hidden', defaultMessage: '{n, plural, one {# hidden project} other {# hidden projects}}', description: 'Where an MCP server is added (HI-2059), after the projects named: the hidden projects it is added to.' }), { n: hidden })] : named
   const assistant = !!server.def && server.assistant
-  if (on.length && assistant) return tr(msg({ id: 'mcp.where.addedSomeAndAssistant', defaultMessage: 'Added in {projects} and for the Hive Assistant', description: 'Where an MCP server is added (HI-2059), under it in the MCP view: in some projects and for the Hive Assistant. {projects} lists the projects.' }), { projects: fmt.list(on) })
-  if (assistant) return tr(msg({ id: 'mcp.where.addedAssistantOnly', defaultMessage: 'Added for the Hive Assistant only', description: 'Where an MCP server is added (HI-2059), under it in the MCP view: for the Hive Assistant, in no project.' }))
+  if (on.length && assistant) return tr(msg({ id: 'mcp.where.addedSomeAndAssistant', defaultMessage: 'Added in {projects} and for the Assistant', description: 'Where an MCP server is added (HI-2059), under it in the MCP view: in some projects and for the Hive Assistant. {projects} lists the projects.' }), { projects: fmt.list(on) })
+  if (assistant) return tr(msg({ id: 'mcp.where.addedAssistantOnly', defaultMessage: 'Added for the Assistant only', description: 'Where an MCP server is added (HI-2059), under it in the MCP view: for the Hive Assistant, in no project.' }))
   return on.length
     ? tr(msg({ id: 'mcp.where.addedSome', defaultMessage: 'Added in {projects}', description: 'Where an MCP server is added (HI-2059), under it in the MCP view. {projects} lists the projects.' }), { projects: fmt.list(on) })
     : tr(msg({ id: 'mcp.where.addedNone', defaultMessage: 'Not added anywhere', description: 'Where an MCP server is added (HI-2059), under it in the MCP view: no project and not the Hive Assistant, so it runs nowhere.' }))
@@ -1197,7 +1197,7 @@ export async function addMcpServerFromFile(): Promise<McpServerInfo | null> {
     message: tr(
       msg({
         id: 'mcp.addFile.messageAdded',
-        defaultMessage: 'Adds {file} to the workspace (.hive/mcp){files, plural, =0 {} one {, with its file in a folder of its own} other {, with its # files in a folder of its own}}, added to no project yet. Add it where it should run: a project’s MCP tab, the Hive Assistant’s view, or Add to… here. It runs:',
+        defaultMessage: 'Adds {file} to the workspace (.hive/mcp){files, plural, =0 {} one {, with its file in a folder of its own} other {, with its # files in a folder of its own}}, added to no project yet. Add it where it should run: a project’s MCP tab, the Assistant’s view, or Add to… here. It runs:',
         description: 'Add MCP Server from File (HI-2059), above the command the server runs. {file} is the file added; {files} how many files a .zip brings. Keep .hive/mcp as it is; "MCP tab" and "Add to…" as Hive shows them.'
       }),
       { file: basename(file), files: server.files }
@@ -1241,7 +1241,7 @@ async function chooseServerName(o: { title: string; message: string; list: strin
     const choice = await choose({
       title: tr(msg({ id: 'actions.mcp.replaceTitle', defaultMessage: 'Replace {name}?', description: 'Title of the question when the workspace already has an MCP server of that name ({name}).' }), { name }),
       message: tr(msg({ id: 'actions.mcp.replaceMessage', defaultMessage: 'The workspace has a server named {name}.', description: 'The question when the workspace already has an MCP server of that name ({name}).' }), { name }),
-      detail: tr(msg({ id: 'mcp.addFile.replaceDetailAdded', defaultMessage: 'Replace moves it (and the folder of one added from a .zip) to the Recycle Bin and adds this one to no project yet: projects and the Hive Assistant that had the old one lose it. Or choose another name.', description: 'When a server of that name exists, under Replace or Choose Another Name (HI-2059).' })),
+      detail: tr(msg({ id: 'mcp.addFile.replaceDetailAdded', defaultMessage: 'Replace moves it (and the folder of one added from a .zip) to the Recycle Bin and adds this one to no project yet: projects and the Assistant that had the old one lose it. Or choose another name.', description: 'When a server of that name exists, under Replace or Choose Another Name (HI-2059).' })),
       danger: true,
       choices: [
         { label: tr(msg({ id: 'actions.mcp.rename', defaultMessage: 'Choose Another Name', description: 'Button: goes back to choose another name for the MCP server.' })), value: 'rename' },
@@ -1866,7 +1866,7 @@ export async function releaseCarriedSlot(path: string, agentId: string): Promise
   if (!a?.carriedSlot) return
   const ok = await confirm({
     title: tr(msg({ id: 'actions.releaseSlot.title', defaultMessage: "Release {agent}'s slot {slot}?", description: "Title of the question before releasing an agent's ({agent}) slot ({slot}, such as hb2): its own worktree from before 1.0, kept for it as a slot since the upgrade." }), { agent: a.name, slot: a.carriedSlot }),
-    message: tr(msg({ id: 'actions.releaseSlot.message', defaultMessage: '{slot} stops being kept for {agent}. Its folder and branch stay; Hive lends it to new work once it is clean, and may rename its folder to a slot name.', description: "The question before releasing an agent's ({agent}) slot ({slot}): what happens to it after." }), { agent: a.name, slot: a.carriedSlot }),
+    message: tr(msg({ id: 'actions.releaseSlot.message', defaultMessage: '{slot} stops being kept for {agent}. Its folder and branch stay; Combwork lends it to new work once it is clean, and may rename its folder to a slot name.', description: "The question before releasing an agent's ({agent}) slot ({slot}): what happens to it after." }), { agent: a.name, slot: a.carriedSlot }),
     detail: tr(msg({ id: 'actions.releaseSlot.detail', defaultMessage: "{agent}'s conversations there can be resumed while nothing else uses the slot.", description: "Under the question before releasing an agent's ({agent}) slot." }), { agent: a.name }),
     confirmLabel: tr(msg({ id: 'actions.releaseSlot.confirm', defaultMessage: 'Release', description: "Button: releases the agent's slot." }))
   })
@@ -1894,14 +1894,14 @@ export async function releaseHeldSlot(path: string, slot: string): Promise<void>
     message: idle
       ? tr(msg({ id: 'actions.releaseHeld.messageIdleBroker', defaultMessage: "{slot} is held by {names}, Windows' idle Sandbox broker, left by {agent}'s last session there (run {run}). No Sandbox is running, so releasing it is safe.", description: "Release Slot… (HI-2309): the slot ({slot}) is held only by Windows' own idle Windows Sandbox broker ({names}: its process names, such as WindowsSandboxServer), which the agent's ({agent}) last session left; no Sandbox runs, so nothing can write in the slot through it. {run} is the session's run id (a code such as 3f9a1c…)." }), { slot, names, agent, run: w.run })
       : w.hive.self
-      ? tr(msg({ id: 'actions.releaseHeld.messageSelf', defaultMessage: "{agent}'s last session in {slot} (run {run}) has ended in this Hive (process {pid}, running), but Hive doesn't know that everything it started there has: until you release it, nothing else uses the slot.", description: "Release Slot…: why the slot ({slot}) is held. The session of the agent ({agent}) ended in this Hive; its processes were kept running or Hive could not follow them. {run} is the session's run id (a code such as 3f9a1c…), {pid} this Hive's process id: they tell one launch from another." }), { agent, slot, run: w.run, pid: w.hive.pid })
-      : tr(msg({ id: 'actions.releaseHeld.messageGone', defaultMessage: "{slot} is held by a session of agent {agent} (run {run}) in a Hive that is no longer running (process {pid}). Hive can't tell whether what it started still runs: until you release it, nothing else uses the slot.", description: "Release Slot…: why the slot ({slot}) is held. The agent ({agent}) ran there in a copy of Hive that quit or closed unexpectedly; {run} is the session's run id (a code such as 3f9a1c…), {pid} that Hive's process id: they tell one launch from another. A noun before the name (glossary §1 rule 4)." }), { agent, slot, run: w.run, pid: w.hive.pid }),
+      ? tr(msg({ id: 'actions.releaseHeld.messageSelf', defaultMessage: "{agent}'s last session in {slot} (run {run}) has ended in this Combwork (process {pid}, running), but Combwork doesn't know that everything it started there has: until you release it, nothing else uses the slot.", description: "Release Slot…: why the slot ({slot}) is held. The session of the agent ({agent}) ended in this Hive; its processes were kept running or Hive could not follow them. {run} is the session's run id (a code such as 3f9a1c…), {pid} this Hive's process id: they tell one launch from another." }), { agent, slot, run: w.run, pid: w.hive.pid })
+      : tr(msg({ id: 'actions.releaseHeld.messageGone', defaultMessage: "{slot} is held by a session of agent {agent} (run {run}) in a Combwork that is no longer running (process {pid}). Combwork can't tell whether what it started still runs: until you release it, nothing else uses the slot.", description: "Release Slot…: why the slot ({slot}) is held. The agent ({agent}) ran there in a copy of Hive that quit or closed unexpectedly; {run} is the session's run id (a code such as 3f9a1c…), {pid} that Hive's process id: they tell one launch from another. A noun before the name (glossary §1 rule 4)." }), { agent, slot, run: w.run, pid: w.hive.pid }),
     ...(w.processes?.list.length ? { list: w.processes.list.map((p) => tr(msg({ id: 'actions.releaseHeld.process', defaultMessage: '{label} (process {pid})', description: "Release Slot…: one process the agent's session left running, as listed: what it runs ({label}, such as node serve.js) and its process id ({pid})." }), { label: p.label, pid: p.pid })), listOnly: true } : {}),
     detail: idle
       ? tr(msg({ id: 'actions.releaseHeld.detailIdleBroker', defaultMessage: 'Released, the broker is left running: it is Windows’ own, and closes by itself.', description: "Release Slot… (HI-2309), under the question about a slot held only by Windows' idle Sandbox broker: releasing doesn't end it unless the box below is ticked." }))
       : w.processes?.list.length
-      ? tr(msg({ id: 'actions.releaseHeld.detailListed', defaultMessage: '{n, plural, one {Hive lists # process its session left running.} other {Hive lists # processes its session left running.}} Released while they run, they may still write in the slot as other work uses it.', description: "Release Slot…: under the list of processes the agent's session left running ({n}: how many)." }), { n: w.processes.list.length + w.processes.more })
-      : tr(msg({ id: 'actions.releaseHeld.detailUnknown', defaultMessage: "Hive doesn't know which of the processes its session started still run. Release it once you know nothing of it still writes in the slot.", description: "Release Slot…: Hive lists no processes the agent's session left running, so it can't say whether any still run." })),
+      ? tr(msg({ id: 'actions.releaseHeld.detailListed', defaultMessage: '{n, plural, one {Combwork lists # process its session left running.} other {Combwork lists # processes its session left running.}} Released while they run, they may still write in the slot as other work uses it.', description: "Release Slot…: under the list of processes the agent's session left running ({n}: how many)." }), { n: w.processes.list.length + w.processes.more })
+      : tr(msg({ id: 'actions.releaseHeld.detailUnknown', defaultMessage: "Combwork doesn't know which of the processes its session started still run. Release it once you know nothing of it still writes in the slot.", description: "Release Slot…: Hive lists no processes the agent's session left running, so it can't say whether any still run." })),
     ...(w.processes?.list.length ? { check: { label: tr(msg({ id: 'actions.releaseHeld.endFirst', defaultMessage: 'End these processes first', description: "Release Slot…: a tick box, on by default: Hive ends the listed processes before releasing the slot." })), initial: !idle, set: (v: boolean) => (end = v) } } : {}),
     confirmLabel: tr(msg({ id: 'actions.releaseHeld.confirm', defaultMessage: 'Release', description: 'Button: releases the slot.' })),
     danger: true,

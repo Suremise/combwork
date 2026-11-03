@@ -69,7 +69,7 @@ function publish(dir, version, script, name = 'Test catalogue') {
     await page.locator('[data-mcp-tab="catalogue"]').click()
     const row = (n) => page.locator(`.sidebar [data-catalog-server="${n}"]`)
     check('the Catalogue lists the source as a category with its servers', !!(await lib.until(async () => (await row('demo').count()) === 1 && (await row('mac-only').count()) === 1, HUNG_MS)) && (await page.locator('.sidebar .section-header', { hasText: 'Test catalogue' }).count()) === 1)
-    check("…with the note that Hive doesn't check its servers", (await page.locator('[data-catalog-unvetted]').count()) === 1)
+    check("…with the note that Combwork doesn't check its servers", (await page.locator('[data-catalog-unvetted]').count()) === 1)
     check('…said once: remembered in Hive\'s settings', !!(await lib.until(async () => cfgNow().sources[0].noted === true, HUNG_MS)), JSON.stringify(cfgNow()))
     check("mac-only says it can't run here", (await row('mac-only').innerText()).includes("Can't run here"))
     await page.locator('[data-catalog-filter]').selectOption('meets')

@@ -1,4 +1,4 @@
-// npm run dist [-- --here | --replace | --kind <beta|baseline|rc|release>]: builds Hive and its Windows installer (dist/Hive-Setup-<version>.exe, with its
+// npm run dist [-- --here | --replace | --kind <beta|baseline|rc|release>]: builds Hive and its Windows installer (dist/Combwork-Setup-<version>.exe, with its
 // blockmap and latest.yml; never published: npm run release does that, RELEASING.md), and writes dist/build-info.json:
 // what the installer was built from (the code's fingerprint, commit, branch, version, time), only if that didn't change
 // while it was built. Built in an agent's git worktree, the installer is also copied to the main checkout's dist, where

@@ -36,7 +36,7 @@
     "description": "A notice when Chromium's licence file can't be opened."
   },
   "shell.about.noLicencesDetail": {
-    "defaultMessage": "The Chromium licence file is in the folder Hive is installed in.",
+    "defaultMessage": "The Chromium licence file is in the folder Combwork is installed in.",
     "description": "More in the notice that Chromium's licence file wasn't found."
   },
   "shell.about.productOf": {
@@ -180,11 +180,11 @@
     "description": "A command (the menus, the command palette, Settings → Keyboard Shortcuts), in the File category."
   },
   "shell.command.app.quitAll": {
-    "defaultMessage": "Exit Hive (all windows)",
+    "defaultMessage": "Exit Combwork (all windows)",
     "description": "The File menu's Exit, with several windows open: it closes them all."
   },
   "shell.command.assistant.answer": {
-    "defaultMessage": "Answer the Hive Assistant",
+    "defaultMessage": "Answer the Assistant",
     "description": "A command (the menus, the command palette, Settings → Keyboard Shortcuts), in the Assistant category. It isn't in the menus or the palette: notifications and buttons run it by its name."
   },
   "shell.command.assistant.moveLeft": {
@@ -204,11 +204,11 @@
     "description": "A command (the menus, the command palette, Settings → Keyboard Shortcuts), in the Assistant category. The … says it opens a dialog first: keep it."
   },
   "shell.command.assistant.start": {
-    "defaultMessage": "Start the Hive Assistant",
+    "defaultMessage": "Start the Assistant",
     "description": "A command (the menus, the command palette, Settings → Keyboard Shortcuts), in the Assistant category."
   },
   "shell.command.assistant.toggle": {
-    "defaultMessage": "Toggle Hive Assistant",
+    "defaultMessage": "Toggle Assistant",
     "description": "A command (the menus, the command palette, Settings → Keyboard Shortcuts), in the Assistant category."
   },
   "shell.command.console.showCapture": {
@@ -436,7 +436,7 @@
     "description": "A command (the menus, the command palette, Settings → Keyboard Shortcuts), in the Session category. The … says it opens a dialog first: keep it."
   },
   "shell.command.session.dismissRestart": {
-    "defaultMessage": "Don't Resume the Agents Working When Hive Closed",
+    "defaultMessage": "Don't Resume the Agents Working When Combwork Closed",
     "description": "A command (the menus, the command palette, Settings → Keyboard Shortcuts), in the Session category: declines the offer to resume the agents that were working when Hive was last quit or restarted. It isn't in the menus or the palette: notifications and buttons run it by its name."
   },
   "shell.command.session.focusTerminal": {
@@ -472,11 +472,11 @@
     "description": "A command (the menus, the command palette, Settings → Keyboard Shortcuts), in the Session category."
   },
   "shell.command.session.resumeAfterClose": {
-    "defaultMessage": "Resume the Agents Running When Hive Closed",
+    "defaultMessage": "Resume the Agents Running When Combwork Closed",
     "description": "A command (the menus, the command palette, Settings → Keyboard Shortcuts), in the Session category. It isn't in the menus or the palette: notifications and buttons run it by its name."
   },
   "shell.command.session.resumeRestart": {
-    "defaultMessage": "Resume the Agents Working When Hive Closed",
+    "defaultMessage": "Resume the Agents Working When Combwork Closed",
     "description": "A command (the menus, the command palette, Settings → Keyboard Shortcuts), in the Session category: resumes the agents that were working when Hive was last quit or restarted. It isn't in the menus or the palette: notifications and buttons run it by its name."
   },
   "shell.command.session.settleLeftovers": {
@@ -508,7 +508,7 @@
     "description": "A command (the menus, the command palette, Settings → Keyboard Shortcuts), in the Session category. It isn't in the menus or the palette: notifications and buttons run it by its name."
   },
   "shell.command.session.stopLeftAfterClose": {
-    "defaultMessage": "Stop What the Agents Started Before Hive Closed",
+    "defaultMessage": "Stop What the Agents Started Before Combwork Closed",
     "description": "A command (the menus, the command palette, Settings → Keyboard Shortcuts), in the Session category: ends the processes the agents had started that still run after Hive closed unexpectedly. It isn't in the menus or the palette: notifications and buttons run it by its name."
   },
   "shell.command.session.toggleView": {
@@ -548,7 +548,7 @@
     "description": "A command (the menus, the command palette, Settings → Keyboard Shortcuts), in the Tasks category. The … says it opens a dialog first: keep it."
   },
   "shell.command.task.reviewSetAside": {
-    "defaultMessage": "Review Cards Made by an Older Hive…",
+    "defaultMessage": "Review Cards Made by an Older Combwork…",
     "description": "A command (the menus, the command palette, Settings → Keyboard Shortcuts), in the Tasks category: opens the dialog listing cards an older version of Hive saved, set aside, to add each to the board or discard it. The … says it opens a dialog first: keep it."
   },
   "shell.command.task.undoArchive": {
@@ -576,15 +576,15 @@
     "description": "A command (the menus, the command palette, Settings → Keyboard Shortcuts), in the Session category. The … says it opens a dialog first: keep it."
   },
   "shell.command.update.install": {
-    "defaultMessage": "Restart and Update Hive",
+    "defaultMessage": "Restart and Update Combwork",
     "description": "A command (the menus, the command palette, Settings → Keyboard Shortcuts), in the Help category."
   },
   "shell.command.update.releaseNotes": {
-    "defaultMessage": "What's New in Hive",
+    "defaultMessage": "What's New in Combwork",
     "description": "A command (the menus, the command palette, Settings → Keyboard Shortcuts), in the Help category."
   },
   "shell.command.update.show": {
-    "defaultMessage": "Show Hive Update",
+    "defaultMessage": "Show Combwork Update",
     "description": "A command (the menus, the command palette, Settings → Keyboard Shortcuts), in the Help category."
   },
   "shell.command.view.activity": {
@@ -596,7 +596,7 @@
     "description": "A command (the menus, the command palette, Settings → Keyboard Shortcuts), in the View category."
   },
   "shell.command.view.assistant": {
-    "defaultMessage": "Show Hive Assistant View",
+    "defaultMessage": "Show Assistant View",
     "description": "A command (the menus, the command palette, Settings → Keyboard Shortcuts), in the View category."
   },
   "shell.command.view.assistantConversations": {
@@ -808,7 +808,7 @@
     "description": "The title of Help → Copy Diagnostics."
   },
   "shell.diagnostics.what": {
-    "defaultMessage": "For a bug report: Hive's version, your coding agents, counts, the settings that change how Hive behaves and the end of its log. Folders, workspace, project and agent names, and anything that looks like a key or token are taken out. This is exactly what will be copied.",
+    "defaultMessage": "For a bug report: Combwork's version, your coding agents, counts, the settings that change how Combwork behaves and the end of its log. Folders, workspace, project and agent names, and anything that looks like a key or token are taken out. This is exactly what will be copied.",
     "description": "Copy Diagnostics: what it copies (shown below it)."
   },
   "shell.diagnostics.what2": {
@@ -916,7 +916,7 @@
     "description": "Button under a view that failed: opens the folder of Hive's log files."
   },
   "shell.errorBoundary.named": {
-    "defaultMessage": "{view, select, assistant {The Assistant ran into a problem and couldn't be shown.} progress {The Progress panel ran into a problem and couldn't be shown.} tab {This tab ran into a problem and couldn't be shown.} devConsole {The developer console ran into a problem and couldn't be shown.} other {Hive ran into a problem and couldn't be shown.}}",
+    "defaultMessage": "{view, select, assistant {The Assistant ran into a problem and couldn't be shown.} progress {The Progress panel ran into a problem and couldn't be shown.} tab {This tab ran into a problem and couldn't be shown.} devConsole {The developer console ran into a problem and couldn't be shown.} other {Combwork ran into a problem and couldn't be shown.}}",
     "description": "Where a part of the window failed to show. {view} picks which: the Hive Assistant, the Progress panel, a project's tab, the developer console's window, or the whole window (other: Hive)."
   },
   "shell.errorBoundary.reload": {
@@ -1132,7 +1132,7 @@
     "description": "The quit dialog's main button with no sessions running. {action} picks what it does."
   },
   "shell.quit.alwaysAsks": {
-    "defaultMessage": "Hive always asks about unsaved files.",
+    "defaultMessage": "Combwork always asks about unsaved files.",
     "description": "Tooltip of the quit dialog's \"Don't ask again\" box while files are unsaved."
   },
   "shell.quit.busy": {
@@ -1144,7 +1144,7 @@
     "description": "A warning when quitting: files were edited while Hive saved them."
   },
   "shell.quit.changedWhileSavingDetail": {
-    "defaultMessage": "Hive is still open, so your latest edits are kept. Save them, then try again.",
+    "defaultMessage": "Combwork is still open, so your latest edits are kept. Save them, then try again.",
     "description": "More in the warning that files changed while they were saved."
   },
   "shell.quit.discard": {
@@ -1164,7 +1164,7 @@
     "description": "The quit dialog's main button with sessions running: do it now, stopping them. {action} picks what it does."
   },
   "shell.quit.saveFailed": {
-    "defaultMessage": "{n, plural, one {Couldn't save a file, so Hive is still open} other {Couldn't save # files, so Hive is still open}}",
+    "defaultMessage": "{n, plural, one {Couldn't save a file, so Combwork is still open} other {Couldn't save # files, so Combwork is still open}}",
     "description": "An error's title when quitting: unsaved files couldn't be saved, so Hive didn't quit. The reasons are listed under it."
   },
   "shell.quit.saveThem": {
@@ -1200,7 +1200,7 @@
     "description": "The quit dialog: what closing or quitting stops, a sentence each. {how} is what it does: close the workspace, switch it, close the window, quit with {windows} windows open (allWindows: their sessions in every workspace stop; a plural on {windows}, for the word windows) or quit (other); {busy} is yes when an agent is busy (then the sentence before says so, and \"its session\" is that agent's); {n} is how many sessions."
   },
   "shell.quit.title": {
-    "defaultMessage": "{how, select, workspace {Close this workspace?} switch {Switch workspace?} window {Close this window?} allWindows {Quit Hive and close all {windows} windows?} other {Quit Hive?}}",
+    "defaultMessage": "{how, select, workspace {Close this workspace?} switch {Switch workspace?} window {Close this window?} allWindows {Quit Combwork and close all {windows} windows?} other {Quit Combwork?}}",
     "description": "The quit dialog's title: closing the workspace, switching it, closing the window, or quitting Hive (with {windows} windows open, 2 or more)."
   },
   "shell.quit.unsaved": {
@@ -1212,7 +1212,7 @@
     "description": "The quit dialog's button: quit once the working agents finish. {action} picks what it does (quit, or save and quit); {working} is how many agents are working."
   },
   "shell.quit.whenTip": {
-    "defaultMessage": "Hide Hive and quit as soon as no agent is working",
+    "defaultMessage": "Hide Combwork and quit as soon as no agent is working",
     "description": "Tooltip of the quit dialog's button that quits once the agents finish."
   },
   "shell.quit.windowOnly": {
@@ -1228,7 +1228,7 @@
     "description": "The banner's button: quits without waiting."
   },
   "shell.quitPending.text": {
-    "defaultMessage": "{n, plural, one {Hive will quit when the working agent finishes.} other {Hive will quit when # working agents finish.}}",
+    "defaultMessage": "{n, plural, one {Combwork will quit when the working agent finishes.} other {Combwork will quit when # working agents finish.}}",
     "description": "A banner while Hive waits for agents to finish before it quits."
   },
   "shell.refreshFailed": {
@@ -1304,7 +1304,7 @@
     "description": "Provider Setup when Hive couldn't run git to check it."
   },
   "shell.setup.gitUnknownDetail": {
-    "defaultMessage": "{error}. Hive needs Git {min} or later for worktrees, merging and the Version Control tab.",
+    "defaultMessage": "{error}. Combwork needs Git {min} or later for worktrees, merging and the Version Control tab.",
     "description": "Provider Setup when git couldn't be checked. {error} is the error, as given."
   },
   "shell.setup.install": {
@@ -1312,7 +1312,7 @@
     "description": "Provider Setup's button: installs the CLI. {provider} is its name."
   },
   "shell.setup.installed": {
-    "defaultMessage": "{provider} is installed and Hive has found it: agents you start now can use it, without restarting Hive (the installer's advice to restart your terminal is for terminals already open). Agents already running get the new PATH when they restart.",
+    "defaultMessage": "{provider} is installed and Combwork has found it: agents you start now can use it, without restarting Combwork (the installer's advice to restart your terminal is for terminals already open). Agents already running get the new PATH when they restart.",
     "description": "Provider Setup, after an install found the coding agent's CLI. {provider} is its name; PATH is a Windows setting: keep it."
   },
   "shell.setup.looking": {
@@ -1324,7 +1324,7 @@
     "description": "Provider Setup while Hive looks for git."
   },
   "shell.setup.notFound": {
-    "defaultMessage": "The install ended, but Hive can't find {provider}. If the installer reported an error, it's shown below; if it says it worked, Check again, or set {provider}'s path in Settings → {provider}.",
+    "defaultMessage": "The install ended, but Combwork can't find {provider}. If the installer reported an error, it's shown below; if it says it worked, Check again, or set {provider}'s path in Settings → {provider}.",
     "description": "Provider Setup, after an install ended without Hive finding the CLI. {provider} is its name; Check again is the dialog's button."
   },
   "shell.setup.notInstalled": {
@@ -1332,11 +1332,11 @@
     "description": "Provider Setup when a CLI isn't installed. {provider} is its name."
   },
   "shell.setup.notInstalledDetail": {
-    "defaultMessage": "Hive runs the standalone {provider} command-line tool in each project. It isn't bundled with Hive — install it with {company}'s official installer.",
+    "defaultMessage": "Combwork runs the standalone {provider} command-line tool in each project. It isn't bundled with Combwork — install it with {company}'s official installer.",
     "description": "Provider Setup, under \"<provider> is not installed\". {provider} is the coding agent's name, {company} its maker's."
   },
   "shell.setup.off": {
-    "defaultMessage": "{provider} is turned off, so Hive doesn't run it. <on>Turn it on</on>",
+    "defaultMessage": "{provider} is turned off, so Combwork doesn't run it. <on>Turn it on</on>",
     "description": "Provider Setup for a provider that is turned off. {provider} is its name; <on> is a link that turns it on."
   },
   "shell.setup.openConnections": {
@@ -1344,7 +1344,7 @@
     "description": "Provider Setup's button (HI-2108): opens Settings → Accounts & Connections, where a coding agent CLI's accounts are added and signed in."
   },
   "shell.setup.rejected": {
-    "defaultMessage": "{n, plural, one {Ignored a copy} other {Ignored copies}} bundled with an editor extension ({path}). Hive only uses the standalone CLI.",
+    "defaultMessage": "{n, plural, one {Ignored a copy} other {Ignored copies}} bundled with an editor extension ({path}). Combwork only uses the standalone CLI.",
     "description": "Provider Setup when it found a CLI only inside an editor's extension. {n} is how many; {path} is where (one of them)."
   },
   "shell.setup.setUp": {
@@ -1368,7 +1368,7 @@
     "description": "A tab of Provider Setup for a provider that is turned off. {provider} is its name; <faint> is greyed."
   },
   "shell.setup.testedAt": {
-    "defaultMessage": "Hive's tests ran against {version} on {date}",
+    "defaultMessage": "Combwork's tests ran against {version} on {date}",
     "description": "Tooltip of Provider Setup's tested-version line. {version} is the CLI's version; {date} when Hive's tests ran."
   },
   "shell.setup.title": {
@@ -1596,7 +1596,7 @@
     "description": "Two sentences one after the other, each ending in its own full stop: put the space your language leaves between sentences (none in Japanese or Chinese)."
   },
   "shell.tip.app.quit": {
-    "defaultMessage": "Quit Hive",
+    "defaultMessage": "Quit Combwork",
     "description": "What a command does, on hover in the menus."
   },
   "shell.tip.app.quitAll": {
@@ -1604,7 +1604,7 @@
     "description": "What a command does, on hover in the menus. {n} is how many windows are open (2 or more)."
   },
   "shell.tip.help.devConsole": {
-    "defaultMessage": "What each CLI sends Hive, next to what Hive made of it, in a window of its own",
+    "defaultMessage": "What each CLI sends Combwork, next to what Combwork made of it, in a window of its own",
     "description": "What a command does, on hover in the menus."
   },
   "shell.tip.help.improveTranslation": {
@@ -1612,11 +1612,11 @@
     "description": "What a command does, on hover in the menus."
   },
   "shell.tip.help.restoreBoard09": {
-    "defaultMessage": "Puts back the board as it was before its upgrade to 1.0, to go back to Hive 0.9",
+    "defaultMessage": "Puts back the board as it was before its upgrade to 1.0, to go back to Combwork 0.9",
     "description": "What a command does, on hover in the menus."
   },
   "shell.tip.window.closeQuit": {
-    "defaultMessage": "Close the window and quit Hive",
+    "defaultMessage": "Close the window and quit Combwork",
     "description": "What a command does, on hover in the menus. With one window, and Close to tray off."
   },
   "shell.tip.window.closeSeveral": {
@@ -1624,7 +1624,7 @@
     "description": "What a command does, on hover in the menus. With several windows open."
   },
   "shell.tip.window.closeToTray": {
-    "defaultMessage": "Close the window; Hive keeps running in the tray",
+    "defaultMessage": "Close the window; Combwork keeps running in the tray",
     "description": "What a command does, on hover in the menus. With one window, and Close to tray on."
   },
   "shell.tip.workspace.clearRecent": {

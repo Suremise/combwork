@@ -192,7 +192,7 @@ const write = (file, text) => {
   let got = await previewIs([`attachments/${OLD_CLI}`, `attachments/${OLD_GONE}`])
   check("by default: old archived sessions' attachments", got === true, JSON.stringify(got))
   await dialog.locator('label.choice', { hasText: 'Attachments of deleted sessions' }).locator('input').check()
-  await dialog.locator('label.choice', { hasText: "Hive's backups of archived sessions" }).locator('input[type=checkbox]').check()
+  await dialog.locator('label.choice', { hasText: "Combwork's backups of archived sessions" }).locator('input[type=checkbox]').check()
   got = await previewIs([`attachments/${OLD_CLI}`, `attachments/${OLD_GONE}`, `attachments/${DELETED}`, 'attachments/run-deadbeef', `archive/${OLD_CLI}.jsonl.gz`])
   check('orphan attachments (not the running launch’s) and the backup the CLI still has', got === true, JSON.stringify(got))
   check('no warning before the last-copies option', (await dialog.locator('.banner.danger').count()) === 0)

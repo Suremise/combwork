@@ -99,7 +99,7 @@ function board(sql, ...args) {
       await saveAll()
       check(`…${id} saved with them`, !!(await until(() => projectJson().workflow?.preset === id && projectJson().workflow.options.slotsUpToDate === true && projectJson().workflow.options.reviewerMode === 'lane', HUNG_MS)), JSON.stringify(projectJson().workflow))
     }
-    check('G11 says what a slot is, and the old "builder’s worktree" line is gone', (await row('folder').innerText()).includes('a slot Hive lends to the card or its lane') && !(await row('folder').innerText()).includes('worktree'), await row('folder').innerText())
+    check('G11 says what a slot is, and the old "builder’s worktree" line is gone', (await row('folder').innerText()).includes('a slot Combwork lends to the card or its lane') && !(await row('folder').innerText()).includes('worktree'), await row('folder').innerText())
     check('G15 and G17 are shown, with slots and a reviewer agent', (await row('slotsUpToDate').count()) === 1 && (await row('reviewerMode').count()) === 1)
     await shot('rows-slots', row('folder'))
 
@@ -199,7 +199,7 @@ function board(sql, ...args) {
     await inv('slots:setLevelDefault', 'global', 'copy', '.env*\nconfig/hive.json')
     const copyOrigin = slotsGroup.locator('[data-slot-option="copy"] .workflow-origin')
     await slotsGroup.locator('[data-action="inherit-copy"]').click()
-    check('the copied files inherit Hive’s slot default, From Hive defaults', !!(await until(async () => !('copy' in (projectJson().slots ?? {})) && (await copyOrigin.getAttribute('data-origin')) === 'global' && (await copyOrigin.innerText()).includes('config/hive.json'), HUNG_MS)), `${JSON.stringify(projectJson().slots)} ${await copyOrigin.innerText().catch(() => '')}`)
+    check('the copied files inherit Hive’s slot default, From Combwork defaults', !!(await until(async () => !('copy' in (projectJson().slots ?? {})) && (await copyOrigin.getAttribute('data-origin')) === 'global' && (await copyOrigin.innerText()).includes('config/hive.json'), HUNG_MS)), `${JSON.stringify(projectJson().slots)} ${await copyOrigin.innerText().catch(() => '')}`)
     await shot('copy-global', slotsGroup.locator('[data-slot-option="copy"]'))
     await page.keyboard.press('Control+,')
     // The workspace's part of Settings → Version Control (HI-1768), its own tab since HI-1837.
@@ -217,7 +217,7 @@ function board(sql, ...args) {
     await inv('slots:setLevelDefault', 'workspace', 'copy', null)
     // Hive's level changing tells the window, which reads the project's copied files again (the workspace's now unset).
     await inv('slots:setLevelDefault', 'global', 'copy', '.env*\nconfig/again.json')
-    check('…and Hive’s again once the workspace’s is unset', !!(await until(async () => (await copyOrigin.getAttribute('data-origin')) === 'global' && (await copyOrigin.innerText()).includes('config/again.json'), HUNG_MS)), await copyOrigin.innerText().catch(() => ''))
+    check('…and Combwork’s again once the workspace’s is unset', !!(await until(async () => (await copyOrigin.getAttribute('data-origin')) === 'global' && (await copyOrigin.innerText()).includes('config/again.json'), HUNG_MS)), await copyOrigin.innerText().catch(() => ''))
     await slotsGroup.locator('[data-action="none-copy"]').click()
     check('…are set to none from there with Set to none', !!(await until(async () => projectJson().slots?.copy === '' && (await copyOrigin.getAttribute('data-origin')) === 'none', HUNG_MS)), JSON.stringify(projectJson().slots))
     await shot('copy-none', slotsGroup)

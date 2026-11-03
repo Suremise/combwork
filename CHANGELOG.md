@@ -2,6 +2,10 @@
 
 ## Unreleased
 
+### Changed
+
+- **Hive Desktop is now Combwork** (HI-2458). Another open-source app called Hive (also Hive Desktop) runs coding agents too, and names around agent tools with bees and hives in them are crowded, so the app has a name of its own. The window, the title bar, About, the tray, notifications, the installer, the Start menu and desktop shortcuts and Installed apps say **Combwork**, in every language, and the Assistant is just **the Assistant**. The honeycomb icon and the colours stay. For now nothing else moves: your settings stay in `%APPDATA%\Hive`, the app stays installed as `Hive.exe`, and a workspace keeps its `.hive` folder. Agents still see Hive's tools and messages under their old names.
+
 ### Fixed
 
 - **Why a viewer token can't be made is in your language** (HI-2459). Settings → Agent API → Viewer tokens said why it couldn't make one (no name, a name too long or already taken, too many tokens) in English whatever language Hive showed.

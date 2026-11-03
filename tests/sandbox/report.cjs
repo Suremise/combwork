@@ -19,6 +19,9 @@ const SCENARIOS = {
   6: 'A new workspace in the fresh install (for the fresh-install comparison)'
 }
 const KINDS = ['fresh', 'upgrade']
+// The installed app's names: Installed apps says "${productName} ${version}" (Combwork since HI-2458); the shortcuts take
+// electron-builder.yml's shortcutName, which HI-2460 renames with the install folder, exe and app ID.
+const NAMES = { app: 'Combwork', shortcut: 'Hive Desktop' }
 
 // What each run kind must produce: the drivers' check ids and facts, and the screenshots.
 const REQUIRED = {
@@ -87,10 +90,10 @@ function evaluate(meta, files) {
     if (run) add(1, `Silent install (/S) succeeds (${run.seconds} s)`, run.exitCode === 0, `exit ${run.exitCode}`)
     if (st) {
       const e = entriesOf(st)
-      add(1, `One Installed-apps entry: "Hive Desktop ${version}"`, e.length === 1 && e[0].displayName === `Hive Desktop ${version}`, JSON.stringify(e.map(x => x.displayName)))
+      add(1, `One Installed-apps entry: "${NAMES.app} ${version}"`, e.length === 1 && e[0].displayName === `${NAMES.app} ${version}`, JSON.stringify(e.map(x => x.displayName)))
       add(1, 'Installed in %LOCALAPPDATA%\\Programs\\Hive (Hive.exe, Uninstall Hive.exe)', st.installDir?.hiveExe && st.installDir?.uninstaller, JSON.stringify(st.installDir))
       const l = shortcutsOf(st)
-      add(1, 'Shortcuts named "Hive Desktop" on the Desktop and in the Start menu', l.length >= 2 && l.every(x => x.name === 'Hive Desktop' && /\\Hive\\Hive\.exe$/i.test(x.target)) && l.some(inDesktop) && l.some(inStart), describeShortcuts(l))
+      add(1, `Shortcuts named "${NAMES.shortcut}" on the Desktop and in the Start menu`, l.length >= 2 && l.every(x => x.name === NAMES.shortcut && /\\Hive\\Hive\.exe$/i.test(x.target)) && l.some(inDesktop) && l.some(inStart), describeShortcuts(l))
     }
     const s1 = driver('fresh', 's1')
     if (s1?.facts?.version !== undefined) add(1, `The app reports version ${version}`, s1.facts.version === version, `reports ${s1.facts.version}`)
@@ -121,9 +124,9 @@ function evaluate(meta, files) {
     }
     if (newSt) {
       const e = entriesOf(newSt)
-      add(4, `One Installed-apps entry after the upgrade: "Hive Desktop ${version}"`, e.length === 1 && e[0].displayName === `Hive Desktop ${version}`, `before: ${JSON.stringify(prevNames)}; after: ${JSON.stringify(e.map(x => x.displayName))}`)
+      add(4, `One Installed-apps entry after the upgrade: "${NAMES.app} ${version}"`, e.length === 1 && e[0].displayName === `${NAMES.app} ${version}`, `before: ${JSON.stringify(prevNames)}; after: ${JSON.stringify(e.map(x => x.displayName))}`)
       const l = shortcutsOf(newSt)
-      add(4, `Shortcuts renamed or kept: only "Hive Desktop", on the Desktop and in the Start menu (before: ${describeShortcuts(shortcutsOf(prevSt))})`, l.length >= 2 && l.every(x => x.name === 'Hive Desktop') && l.some(inDesktop) && l.some(inStart), describeShortcuts(l))
+      add(4, `Shortcuts renamed or kept: only "${NAMES.shortcut}", on the Desktop and in the Start menu (before: ${describeShortcuts(shortcutsOf(prevSt))})`, l.length >= 2 && l.every(x => x.name === NAMES.shortcut) && l.some(inDesktop) && l.some(inStart), describeShortcuts(l))
       add(4, 'Same install folder, Hive.exe there', newSt.installDir?.hiveExe, JSON.stringify(newSt.installDir))
       // Test builds carry the previous release's version number: the app code's hash shows the new build went in.
       const before = prevSt?.installDir?.appAsarSha256
@@ -141,7 +144,7 @@ function evaluate(meta, files) {
   const passed = checks.filter(c => c.ok).length
   const differences = []
   if (ran.includes('upgrade') && meta.previousVersion === meta.installerVersion) {
-    differences.push(`The previous release and this build both say **${meta.installerVersion}**: the in-app updater (no downgrades, only newer versions) would not offer this build, so the upgrade check is a reinstall over it, run by hand with the updater's arguments. The "Hive Desktop updated to …" notice can't show.`)
+    differences.push(`The previous release and this build both say **${meta.installerVersion}**: the in-app updater (no downgrades, only newer versions) would not offer this build, so the upgrade check is a reinstall over it, run by hand with the updater's arguments. The "Combwork updated to …" notice can't show.`)
   }
   const s1 = files.s1
   if (s1?.facts?.gitMissing || files['s1-state']?.git === false) differences.push('**No Git** on a fresh machine: Hive shows its Git warning (status bar "Git", Provider Setup "Git not found"). Expected; a fresh-install difference.')

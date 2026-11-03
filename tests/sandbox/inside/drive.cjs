@@ -103,7 +103,7 @@ const steps = {
     const health = await api('/v1/health')
     res.facts.version = health.version
     res.facts.profileExists = fs.existsSync(PROFILE)
-    check('1.start-screen', 'First launch shows the start screen ("Hive Desktop")', (await page.locator('.welcome h1', { hasText: 'Hive Desktop' }).count()) > 0, (await bodyText()).slice(0, 400))
+    check('1.start-screen', 'First launch shows the start screen ("Combwork")', (await page.locator('.welcome h1', { hasText: 'Combwork' }).count()) > 0, (await bodyText()).slice(0, 400))
     check('1.profile', 'The profile is %APPDATA%\\Hive', fs.existsSync(path.join(PROFILE, 'config.json')), PROFILE)
     const text = await bodyText()
     const banner = (await page.locator('.providers-banner').allInnerTexts()).join(' | ')

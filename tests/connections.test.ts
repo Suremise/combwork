@@ -280,7 +280,7 @@ describe('a launch on a connection (connectionForLaunch)', () => {
     rmSync(join(folder, 'projects'))
     renameSync(folder, `${folder}-real`)
     symlinkSync(home, folder, 'junction')
-    expect(await outcome(launch())).toMatch(/isn't the one Hive made/)
+    expect(await outcome(launch())).toMatch(/isn't the one Combwork made/)
     rmSync(folder)
   })
 
@@ -1465,11 +1465,11 @@ describe('connections as Settings → Accounts & Connections changes them (HI-21
 
   it('extra arguments with a bare "--" are refused before anything is saved; --option=-- is kept (HR1, round 1)', async () => {
     const a = await signedInConnection('Personal', 'me@example.com')
-    expect(await outcome(Promise.resolve().then(() => accounts.addConnection(a.id, { name: 'Dashes', extraArgs: '--verbose -- task' })))).toMatch(/Hive passes the task after "--"/)
+    expect(await outcome(Promise.resolve().then(() => accounts.addConnection(a.id, { name: 'Dashes', extraArgs: '--verbose -- task' })))).toMatch(/Combwork passes the task after "--"/)
     expect(accounts.allConnections().some((c) => c.name === 'Dashes')).toBe(false)
     const first = baseOf(a.id)
     const was = structuredClone(accounts.getConnection(first))
-    expect(await outcome(Promise.resolve().then(() => accounts.updateConnection(first, { extraArgs: '--' })))).toMatch(/Hive passes the task after "--"/)
+    expect(await outcome(Promise.resolve().then(() => accounts.updateConnection(first, { extraArgs: '--' })))).toMatch(/Combwork passes the task after "--"/)
     expect(accounts.getConnection(first)).toEqual(was)
     expect(accounts.updateConnection(first, { extraArgs: '--append-system-prompt=--' }).extraArgs).toBe('--append-system-prompt=--')
   })

@@ -724,7 +724,7 @@ function addFromTemplateItems(project: ProjectInfo, list: TemplateEntry[]): Menu
   const full = project.agents.length >= agentLimit(project)
   return all.length
     ? all.flatMap((t) => [
-        { header: true, label: tr(msg({ id: 'panes.template.heading', defaultMessage: '{template} · {scope, select, hive {Hive} workspace {workspace} other {this project}}', description: "A heading in Add Agent from Template: the template's name ({template}) and where it is kept (lower case; Hive: one of Hive's own templates, #1436)." }), { template: templateTitle(t), scope: t.scope }) },
+        { header: true, label: tr(msg({ id: 'panes.template.heading', defaultMessage: '{template} · {scope, select, hive {Combwork} workspace {workspace} other {this project}}', description: "A heading in Add Agent from Template: the template's name ({template}) and where it is kept (lower case; Hive: one of Hive's own templates, #1436)." }), { template: templateTitle(t), scope: t.scope }) },
         ...t.agents.map((a, i) => ({
           // Their names as this project's, as main made them with its key (HI-1948: Hive's own are patterns of it, HI-B1);
           // none from main, `{key}` stays.
@@ -745,7 +745,7 @@ function templateMenuItems(project: ProjectInfo, all: TemplateEntry[]): MenuEntr
         const here = all.filter((t) => t.scope === scope)
         return here.length
           ? [
-              { header: true, label: tr(msg({ id: 'panes.template.scopeHeading', defaultMessage: "{scope, select, hive {Hive's templates} workspace {Workspace templates} other {This project's templates}}", description: "A heading in + Add ▾ → Templates above Hive's own templates (#1436), those kept in the workspace, or in this project." }), { scope }) },
+              { header: true, label: tr(msg({ id: 'panes.template.scopeHeading', defaultMessage: "{scope, select, hive {Combwork's templates} workspace {Workspace templates} other {This project's templates}}", description: "A heading in + Add ▾ → Templates above Hive's own templates (#1436), those kept in the workspace, or in this project." }), { scope }) },
               ...here.map((t) => ({ label: templateTitle(t), icon: 'library', detail: shownProblem(t) ?? tr(msg({ id: 'panes.template.detail', defaultMessage: '{n, plural, one {# agent} other {# agents}} · {layout}', description: "A template's detail in + Add ▾ → Templates: how many agents it has and its layout ({layout}: \"two columns\")." }), { n: t.agents.length, layout: layoutName(t.layout) }), disabled: !!t.problem, onClick: () => void actions.loadTemplate(project.path, t) }))
             ]
           : []
@@ -1351,7 +1351,7 @@ function PaneHeader({ project, a, focused }: { project: ProjectInfo; a: AgentInf
       ) : live?.inputBlocked ? (
         // Something on its screen takes its keys (HI-2191): the user answers it there; Try again checks its input takes keys.
         <span className="pane-status input-blocked">
-          <Tooltip content={tr(msg({ id: 'panes.header.inputBlockedTip', defaultMessage: "Keys Hive typed into this agent's input didn't reach it: something on its screen, such as a question of its CLI's own, is taking them. Hive types nothing more into it and gives it nothing until it takes keys again. Answer it in its terminal, then press Try again.", description: "Tooltip of a pane's status when the agent's input takes no keys. Try again is the button beside it: keep its name as it is translated there." }))}>
+          <Tooltip content={tr(msg({ id: 'panes.header.inputBlockedTip', defaultMessage: "Keys Combwork typed into this agent's input didn't reach it: something on its screen, such as a question of its CLI's own, is taking them. Combwork types nothing more into it and gives it nothing until it takes keys again. Answer it in its terminal, then press Try again.", description: "Tooltip of a pane's status when the agent's input takes no keys. Try again is the button beside it: keep its name as it is translated there." }))}>
             <span className="faint pane-status asks">{tr(INPUT_BLOCKED)}</span>
           </Tooltip>
           {!narrow && (
@@ -1362,8 +1362,8 @@ function PaneHeader({ project, a, focused }: { project: ProjectInfo; a: AgentInf
         </span>
       ) : live?.untakenLine ? (
         // A line Hive typed that its CLI didn't take (#430): the user sees to it, nothing more is typed meanwhile.
-        <Tooltip content={tr(msg({ id: 'panes.header.untakenTip', defaultMessage: "Hive typed this, but its CLI hasn't taken it (it wasn't reading its input): \"{line}\". Click its terminal and press Enter. Hive types nothing more into it until its CLI takes it.", description: "Tooltip of a pane's status when a line Hive typed into the agent's CLI wasn't taken ({line}: the line)." }), { line: live.untakenLine.text })}>
-          <span className="faint pane-status asks">{tr(msg({ id: 'panes.header.untaken', defaultMessage: "A line Hive typed wasn't taken", description: "A pane's status: a line Hive typed into the agent's CLI wasn't taken." }))}</span>
+        <Tooltip content={tr(msg({ id: 'panes.header.untakenTip', defaultMessage: "Combwork typed this, but its CLI hasn't taken it (it wasn't reading its input): \"{line}\". Click its terminal and press Enter. Combwork types nothing more into it until its CLI takes it.", description: "Tooltip of a pane's status when a line Hive typed into the agent's CLI wasn't taken ({line}: the line)." }), { line: live.untakenLine.text })}>
+          <span className="faint pane-status asks">{tr(msg({ id: 'panes.header.untaken', defaultMessage: "A line Combwork typed wasn't taken", description: "A pane's status: a line Hive typed into the agent's CLI wasn't taken." }))}</span>
         </Tooltip>
       ) : retryWaitText(live, Date.now(), tr) ? (
         // Its CLI waits to retry its model request (HI-1972): what it waits on and until when, rather than "Working…".
@@ -1374,7 +1374,7 @@ function PaneHeader({ project, a, focused }: { project: ProjectInfo; a: AgentInf
         // A running turn Hive has heard nothing of, with no sign of its end (#648): not idle, so nothing is typed into it.
         // Mark idle stays beside it (and in ⋯): the agent is stuck until someone looks.
         <span className="pane-status unknown-state">
-          <Tooltip content={tr(msg({ id: 'panes.header.unknownTip', defaultMessage: "Hive has heard nothing of this agent's turn for a while and sees no sign that it ended: no Stop from its CLI, nothing in its CLI's records, no idle prompt on its screen. Until it hears more, the agent counts as busy and nothing is typed into it. If its terminal shows it waiting at its prompt, mark it idle.", description: "Tooltip of a pane's status when the agent's state is unknown. Stop is the CLI's event: keep it. \"mark it idle\" refers to the Mark idle button beside it." }))}>
+          <Tooltip content={tr(msg({ id: 'panes.header.unknownTip', defaultMessage: "Combwork has heard nothing of this agent's turn for a while and sees no sign that it ended: no Stop from its CLI, nothing in its CLI's records, no idle prompt on its screen. Until it hears more, the agent counts as busy and nothing is typed into it. If its terminal shows it waiting at its prompt, mark it idle.", description: "Tooltip of a pane's status when the agent's state is unknown. Stop is the CLI's event: keep it. \"mark it idle\" refers to the Mark idle button beside it." }))}>
             <span className="faint pane-status asks">{unknownStateText(live, Date.now(), tr)}</span>
           </Tooltip>
           {!narrow && (
@@ -1393,7 +1393,7 @@ function PaneHeader({ project, a, focused }: { project: ProjectInfo; a: AgentInf
           content={tr(
             msg({
               id: 'panes.header.watchTip',
-              defaultMessage: '{watch}: Hive types a line into it when {kind, select, agent {{n, plural, one {it finishes} other {one of them finishes}}, waits for you or stops} lane {a review fails, a card is blocked or stalled, or a lane is due to merge or ends} other {{n, plural, one {the card changes} other {one of them changes}}}}, or at {limit} if nothing does. Nothing runs meanwhile, and it takes no other work.',
+              defaultMessage: '{watch}: Combwork types a line into it when {kind, select, agent {{n, plural, one {it finishes} other {one of them finishes}}, waits for you or stops} lane {a review fails, a card is blocked or stalled, or a lane is due to merge or ends} other {{n, plural, one {the card changes} other {one of them changes}}}}, or at {limit} if nothing does. Nothing runs meanwhile, and it takes no other work.',
               description: "Tooltip of a watching agent's status: what it waits for ({watch}: \"Waiting for #12 → Review\"), what wakes it (an agent watch: the agents finishing; a lane watch: lane events; a card watch: its cards changing; {n} is how many agents or cards), and when it is woken anyway ({limit}: a time)."
             }),
             { watch: watchText(live.watch, tr, (l) => fmt.list(l, 'unit')), kind: live.watch.lanes ? 'lane' : live.watch.agents ? 'agent' : 'card', n: live.watch.agents && !live.watch.lanes ? live.watch.agents.length : live.watch.cards.length, limit: formatWhen(live.watch.limitAt) }
@@ -1595,7 +1595,7 @@ export function PaneFooter({
     tr(
       msg({
         id: 'panes.footer.transcriptTip',
-        defaultMessage: "Transcript: {size}{limit, select, none {} other { (flagged over {limit} MB: Settings → Sessions)}}. A long conversation slows down the CLI and Hive, and compacting doesn't shrink the file: it keeps the whole history.{advice, select, none {} other { {advice}}}",
+        defaultMessage: "Transcript: {size}{limit, select, none {} other { (flagged over {limit} MB: Settings → Sessions)}}. A long conversation slows down the CLI and Combwork, and compacting doesn't shrink the file: it keeps the whole history.{advice, select, none {} other { {advice}}}",
         description: "Hover of a pane footer's transcript warning, and a line of its context's hover ({size}: \"12 MB\"): the size it is flagged over ({limit} MB, set in Settings → Sessions; none: leave that branch empty), why a long one matters, and when it is long what to do ({advice}; none: leave it empty)."
       }),
       {
@@ -1699,7 +1699,7 @@ export function PaneFooter({
           key="cost"
           content={
             <span style={{ whiteSpace: 'pre-line' }}>
-              {`${estimated ? tr(msg({ id: 'panes.footer.costEstimated', defaultMessage: 'API-equivalent cost of this session, estimated by Hive from its tokens', description: "Hover of a pane footer's cost (≈): Hive estimated it from the session's tokens at API prices." })) : tr(msg({ id: 'panes.footer.costReported', defaultMessage: 'API-equivalent cost of this session, as the provider reports it', description: "Hover of a pane footer's cost: the provider reported it, at API prices." }))}${costClick ? `\n\n${tr(COST_CLICK)}` : ''}`}
+              {`${estimated ? tr(msg({ id: 'panes.footer.costEstimated', defaultMessage: 'API-equivalent cost of this session, estimated by Combwork from its tokens', description: "Hover of a pane footer's cost (≈): Hive estimated it from the session's tokens at API prices." })) : tr(msg({ id: 'panes.footer.costReported', defaultMessage: 'API-equivalent cost of this session, as the provider reports it', description: "Hover of a pane footer's cost: the provider reported it, at API prices." }))}${costClick ? `\n\n${tr(COST_CLICK)}` : ''}`}
             </span>
           }
         >
@@ -1779,7 +1779,7 @@ const CONNECTION_TEXT = {
   tip: msg({ id: 'panes.footer.connectionTip', defaultMessage: 'Runs on the connection {name}.', description: "Hover of the connection in a pane's footer (HI-1755): the connection this session launched on ({name})." }),
   offFallback: msg({ id: 'panes.footer.connectionOffHere', defaultMessage: "The connection chosen for it is on an account that's off in this workspace, so it runs on its CLI's first usable connection.", description: "Added to the hover of a pane footer's connection (HI-2108): the agent's own connection is on an account turned off in this workspace, so its CLI's first usable connection runs it." }),
   missing: msg({ id: 'panes.footer.connectionRemoved', defaultMessage: "The connection chosen for it was removed, so it runs on its CLI's first usable connection. Choose another in its Agent Settings.", description: "Added to the hover of a pane footer's connection (HI-2108): the agent's connection was removed, so its CLI's first usable connection runs it. Agent Settings names a dialog." }),
-  unknownLogin: msg({ id: 'panes.footer.connectionUnknown', defaultMessage: "Hive couldn't check who this connection is signed in as when it started.", description: "Added to the hover of a pane footer's connection: the connection's sign-in couldn't be checked at launch (not the same as signed out)." }),
+  unknownLogin: msg({ id: 'panes.footer.connectionUnknown', defaultMessage: "Combwork couldn't check who this connection is signed in as when it started.", description: "Added to the hover of a pane footer's connection: the connection's sign-in couldn't be checked at launch (not the same as signed out)." }),
   loginChanged: msg({ id: 'panes.footer.connectionChanged', defaultMessage: 'Its login changed since it was added: see Settings → Accounts & Connections.', description: "Added to the hover of a pane footer's connection: its account is signed in as another login than the one it was added with. Settings → Accounts & Connections names a section." }),
   switching: msg({ id: 'panes.footer.connectionSwitching', defaultMessage: 'switches once its turn is over', description: "After the connection in a pane's footer (lower case): the agent moves to another connection once its turn is over, then carries on." }),
   switchingTip: msg({ id: 'panes.footer.connectionSwitchingTip', defaultMessage: 'Once its turn is over, it ends and carries on, on the connection chosen for it now.', description: "Added to the hover of a pane footer's connection while a switch waits for the agent's turn to be over." })

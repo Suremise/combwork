@@ -179,7 +179,7 @@ function acceptable(index: Index): boolean {
 }
 
 async function writeIndex(ctx: BenchContext, index: Index): Promise<void> {
-  if (!acceptable(index)) throw hiveError(msg({ id: 'service.benchmarks.unwritable', defaultMessage: 'Hive refused to write a list of kept comparisons it couldn’t read back: nothing was changed.', description: "An error on the Performance page: the list of kept comparisons Hive was about to write wouldn't read back as valid, so it wasn't written." }))
+  if (!acceptable(index)) throw hiveError(msg({ id: 'service.benchmarks.unwritable', defaultMessage: 'Combwork refused to write a list of kept comparisons it couldn’t read back: nothing was changed.', description: "An error on the Performance page: the list of kept comparisons Hive was about to write wouldn't read back as valid, so it wasn't written." }))
   await commit(ctx, join(ctx.dir, 'index.json'), JSON.stringify(index, null, 2))
 }
 
@@ -409,7 +409,7 @@ function keep(ctx: BenchContext, a: Artifact): Promise<KeptEntry> {
     // before anything is recorded, if that would pass what the index may hold.
     if (index.entries.length + 1 > MAX_ENTRIES) {
       const waiting = index.entries.filter((e) => e.state === 'removing').length
-      throw hiveError(msg({ id: 'service.benchmarks.stuck', defaultMessage: '{n, plural, one {# removed comparison’s file couldn’t be deleted yet (in use?): nothing more can be kept until it is.} other {# removed comparisons’ files couldn’t be deleted yet (in use?): nothing more can be kept until they are.}} Hive retries each time it reads the list.', description: "An error keeping a comparison on the Performance page: {n} removed comparisons' files couldn't be deleted yet (another program may have them open), and the list has no room until they are." }), { n: waiting }, { kind: 'conflict' })
+      throw hiveError(msg({ id: 'service.benchmarks.stuck', defaultMessage: '{n, plural, one {# removed comparison’s file couldn’t be deleted yet (in use?): nothing more can be kept until it is.} other {# removed comparisons’ files couldn’t be deleted yet (in use?): nothing more can be kept until they are.}} Combwork retries each time it reads the list.', description: "An error keeping a comparison on the Performance page: {n} removed comparisons' files couldn't be deleted yet (another program may have them open), and the list has no room until they are." }), { n: waiting }, { kind: 'conflict' })
     }
     const txn = randomBytes(6).toString('hex')
     const id = randomBytes(6).toString('hex')
@@ -435,7 +435,7 @@ function keep(ctx: BenchContext, a: Artifact): Promise<KeptEntry> {
       const gone = new Set<string>()
       for (const e of evicted) if (await removeFile(ctx, e.id)) gone.add(e.id)
       if (gone.size) await writeIndex(ctx, { ...index, entries: [...others, ...evicted.filter((e) => !gone.has(e.id)).map((e) => ({ ...e, state: 'removing' as const, txn })), entry] }).catch((err) => log.warn('recording evicted comparisons as removed', err))
-      if (gone.size < evicted.length) notice(ctx, tr(msg({ id: 'service.benchmarks.evictedStays', defaultMessage: 'An evicted comparison couldn’t be removed yet: Hive will try again.', description: "A note on the Performance page: an old comparison taken off the list to make room couldn't be deleted yet; Hive tries again later." })))
+      if (gone.size < evicted.length) notice(ctx, tr(msg({ id: 'service.benchmarks.evictedStays', defaultMessage: 'An evicted comparison couldn’t be removed yet: Combwork will try again.', description: "A note on the Performance page: an old comparison taken off the list to make room couldn't be deleted yet; Hive tries again later." })))
     }
     return entry
   })
@@ -608,7 +608,7 @@ export function removeBenchmark(ctx: BenchContext, scope: CompareScope, id: stri
     const txn = randomBytes(6).toString('hex')
     const marked: Index = { ...index, entries: index.entries.map((e) => (e.id === id ? { ...e, state: 'removing' as const, txn } : e)) }
     await writeIndex(ctx, marked)
-    if (!(await removeFile(ctx, id))) throw hiveError(msg({ id: 'service.benchmarks.notRemoved', defaultMessage: 'It is off the list, but its file couldn’t be removed yet: Hive will try again.', description: "An error removing a kept comparison on the Performance page: it is no longer listed, but its file couldn't be deleted yet." }))
+    if (!(await removeFile(ctx, id))) throw hiveError(msg({ id: 'service.benchmarks.notRemoved', defaultMessage: 'It is off the list, but its file couldn’t be removed yet: Combwork will try again.', description: "An error removing a kept comparison on the Performance page: it is no longer listed, but its file couldn't be deleted yet." }))
     await writeIndex(ctx, { ...index, entries: index.entries.filter((e) => e.id !== id) })
   })
 }

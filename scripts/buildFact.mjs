@@ -8,7 +8,7 @@ import { existsSync, mkdirSync, readFileSync, renameSync, writeFileSync } from '
 import { request } from 'http'
 import { dirname, join } from 'path'
 import { randomBytes } from 'crypto'
-import { checkoutOf, readBuildInfo } from './distCopy.mjs'
+import { checkoutOf, installerName, readBuildInfo } from './distCopy.mjs'
 
 /** As src/shared/buildFacts.ts's BUILD_KINDS (tests/buildFacts.test.ts checks they agree). */
 export const BUILD_KINDS = ['beta', 'baseline', 'rc', 'release']
@@ -159,5 +159,5 @@ export async function recordBuild({ root, version, commit, branch = null, instal
 export async function recordDist({ root, lines, kind = null }, opts) {
   const info = readBuildInfo(join(root, 'dist'))
   if (!info) return null
-  return recordBuild({ root, version: info.version, commit: info.head, branch: info.branch, installer: installerOf(lines) ?? join(root, 'dist', `Hive-Setup-${info.version}.exe`), builtAt: info.builtAt, by: 'dist', kind }, opts)
+  return recordBuild({ root, version: info.version, commit: info.head, branch: info.branch, installer: installerOf(lines) ?? join(root, 'dist', installerName(info.version)), builtAt: info.builtAt, by: 'dist', kind }, opts)
 }

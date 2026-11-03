@@ -310,7 +310,7 @@ export class AdvancedStore {
     } catch (e) {
       if ((e as Error).message === 'CONFLICT') {
         await this.reload()
-        throw hiveError(msg({ id: 'service.advanced.changedOutside', defaultMessage: 'advanced.json was changed outside Hive meanwhile: Settings shows it now. Try again.', description: "An error changing an advanced setting: advanced.json (a file name: keep it) was edited elsewhere meanwhile, so the change wasn't written." }), undefined, { kind: 'conflict', cause: e })
+        throw hiveError(msg({ id: 'service.advanced.changedOutside', defaultMessage: 'advanced.json was changed outside Combwork meanwhile: Settings shows it now. Try again.', description: "An error changing an advanced setting: advanced.json (a file name: keep it) was edited elsewhere meanwhile, so the change wasn't written." }), undefined, { kind: 'conflict', cause: e })
       }
       throw e
     }

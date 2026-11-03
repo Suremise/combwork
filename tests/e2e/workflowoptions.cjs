@@ -211,7 +211,7 @@ async function theForm(page, app, inv) {
     await themes('preview', preview)
     await preview.locator('[data-action="use-choice"]').click()
     check('Use: the agent merges', !!(await lib.until(async () => (await row('finish').locator('select').inputValue()) === 'agentMerges', HUNG_MS)))
-    check('…each card in its own folder (a slot lent per card or lane), G1 read as before it’s merged', (await row('folder').locator('select').inputValue()) === 'slots' && (await row('folder').innerText()).includes('a slot Hive lends to the card or its lane') && !(await row('folder').innerText()).includes('worktree') && (await row('review').innerText()).startsWith('Work is reviewed before it’s merged'))
+    check('…each card in its own folder (a slot lent per card or lane), G1 read as before it’s merged', (await row('folder').locator('select').inputValue()) === 'slots' && (await row('folder').innerText()).includes('a slot Combwork lends to the card or its lane') && !(await row('folder').innerText()).includes('worktree') && (await row('review').innerText()).startsWith('Work is reviewed before it’s merged'))
     check('…the shared-folder warning not shown with each card in its own folder', (await row('sharedFolderWarning').count()) === 0)
     check('…no push after merging while the agent merges (G18: only the merge queue pushes)', (await row('pushTarget').count()) === 0)
     check('…the quick checks from its scripts, with their commands', JSON.stringify(await values('preChecks')) === JSON.stringify(['typecheck', 'npm run typecheck', 'lint', 'npm run lint']), JSON.stringify(await values('preChecks')))
@@ -322,7 +322,7 @@ async function theForm(page, app, inv) {
 
     // --- Pair (Hive merges, #1355): Hive merges, G9's checks suggested from the scripts with their commands, the install.
     await applyChoice('pair')
-    check('Pair: Hive merges into the repository’s own default branch, by name (master here)', (await row('finish').locator('select').inputValue()) === 'hiveMerges' && (await row('target').locator('input').inputValue()) === 'master', await row('target').locator('input').inputValue())
+    check('Pair: Combwork merges into the repository’s own default branch, by name (master here)', (await row('finish').locator('select').inputValue()) === 'hiveMerges' && (await row('target').locator('input').inputValue()) === 'master', await row('target').locator('input').inputValue())
     check('…G9 in Checks: the quick checks from its scripts, with their commands', JSON.stringify(await inGroup('checks')) === JSON.stringify(['preChecks', 'mergeChecks', 'focusedTests', 'mergeInstall']) && JSON.stringify(await values('mergeChecks')) === JSON.stringify(['typecheck', 'npm run typecheck', 'lint', 'npm run lint']), JSON.stringify(await values('mergeChecks')))
     check('…G8 shown in Merging while Hive merges', (await inGroup('merging')).includes('strict'))
     // G18 (#1179): pushing the target after a merge, shown while Hive merges, off in the preset; switched on and saved.

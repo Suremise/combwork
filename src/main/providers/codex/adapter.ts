@@ -73,7 +73,7 @@ const configOf = (home?: string): Record<string, any> => (home ? readToml(join(h
 
 /** Provider Setup's explanation of the two choices Codex's sandbox setup offers, for someone working in Hive. */
 const SANDBOX_CHOICE = [
-  msg({ id: 'providers.codex.sandbox.setUp', defaultMessage: "**Set up** opens Codex's sandbox setup, which offers two choices. With either, Codex agents in **Ask for approval** or **Approve for me** can edit files in their own folder (the project, or the agent's worktree) and run commands there without asking, and ask before going online or writing anywhere else. Hive's own features (status, file locks, handovers, shared notes) work the same with both.", description: "Provider Setup, under Codex's sandbox setup (Windows): what Set up does. **…** marks bold text: keep the marks. Set up is the button; Ask for approval and Approve for me are Codex's permission modes as Hive names them: use their names as shown." }),
+  msg({ id: 'providers.codex.sandbox.setUp', defaultMessage: "**Set up** opens Codex's sandbox setup, which offers two choices. With either, Codex agents in **Ask for approval** or **Approve for me** can edit files in their own folder (the project, or the agent's worktree) and run commands there without asking, and ask before going online or writing anywhere else. Combwork's own features (status, file locks, handovers, shared notes) work the same with both.", description: "Provider Setup, under Codex's sandbox setup (Windows): what Set up does. **…** marks bold text: keep the marks. Set up is the button; Ask for approval and Approve for me are Codex's permission modes as Hive names them: use their names as shown." }),
   msg({ id: 'providers.codex.sandbox.default', defaultMessage: '**Set up default sandbox** (recommended): commands run under two local Windows accounts Codex creates for them (`CodexSandboxOffline` and `CodexSandboxOnline`), with a firewall rule that keeps them offline unless you allow it. It isolates commands best. Windows asks for Administrator permission once.', description: "Provider Setup, under Codex's sandbox setup (Windows): its first choice. **Set up default sandbox** is the choice as Codex names it (in English); `…` marks account names: keep them." }),
   msg({ id: 'providers.codex.sandbox.nonAdmin', defaultMessage: '**Use non-admin sandbox**: needs no Administrator permission. Commands run under your own account with restricted rights. It protects your files and blocks internet access in most cases, but Codex warns it carries more risk if the agent is tricked by instructions hidden in a file or web page it reads (prompt injection). You can upgrade to the default sandbox from here later.', description: "Provider Setup, under Codex's sandbox setup (Windows): its second choice. **Use non-admin sandbox** is the choice as Codex names it (in English)." })
 ]
@@ -458,7 +458,7 @@ const HTTP_KEYS = ['url', 'bearer_token_env_var', 'http_headers', 'env_http_head
 /** Why a Codex agent can't start beside a native HTTP server named hive (outrankNativeHive). */
 const NATIVE_HIVE = msg({
   id: 'providers.codex.nativeHive',
-  defaultMessage: 'Your Codex config has an MCP server named hive, reached over HTTP ({file}). Codex merges it into Hive’s own hive server, and can’t start with both. Rename yours there to start Codex agents.',
+  defaultMessage: 'Your Codex config has an MCP server named hive, reached over HTTP ({file}). Codex merges it into Combwork’s own hive server, and can’t start with both. Rename yours there to start Codex agents.',
   description: "Why a Codex agent didn't start: the user's own Codex config has an MCP server named hive. {file} is that config file's path. hive is the name of Hive's MCP server: keep it."
 })
 
@@ -906,12 +906,12 @@ export class CodexAdapter implements ProviderAdapter {
     if (unread === 'assistant')
       return {
         title: tr(msg({ id: 'providers.codex.developerUnread.assistantTitle', defaultMessage: 'The Assistant started with its role only', description: "A notice as the Hive Assistant starts on Codex: Hive couldn't tell which of the user's own Codex instructions apply, so it gives the Assistant only its role." })),
-        message: tr(msg({ id: 'providers.codex.developerUnread.assistantMessage', defaultMessage: "Codex couldn't say which developer_instructions this session gets, so Hive gives the Assistant its role alone this time, without them or Hive's guidance. Restart the Assistant to try again.", description: 'The notice that the Hive Assistant on Codex got only its role. developer_instructions is a Codex setting: keep it.' }))
+        message: tr(msg({ id: 'providers.codex.developerUnread.assistantMessage', defaultMessage: "Codex couldn't say which developer_instructions this session gets, so Combwork gives the Assistant its role alone this time, without them or Combwork's guidance. Restart the Assistant to try again.", description: 'The notice that the Hive Assistant on Codex got only its role. developer_instructions is a Codex setting: keep it.' }))
       }
     if (unread === 'agent')
       return {
-        title: tr(msg({ id: 'providers.codex.developerUnread.agentTitle', defaultMessage: "Hive's guidance is missing for this agent", description: "A notice as a Codex agent starts: Hive couldn't tell which of the user's own Codex instructions apply, so it added none of its guidance." })),
-        message: tr(msg({ id: 'providers.codex.developerUnread.agentMessage', defaultMessage: "Codex couldn't say which developer_instructions this session gets, so Hive leaves yours as they are and adds none of its guidance this time: the agent has Hive's tools without it. Restart the agent to try again.", description: "The notice that a Codex agent started without Hive's guidance. developer_instructions is a Codex setting: keep it." }))
+        title: tr(msg({ id: 'providers.codex.developerUnread.agentTitle', defaultMessage: "Combwork's guidance is missing for this agent", description: "A notice as a Codex agent starts: Hive couldn't tell which of the user's own Codex instructions apply, so it added none of its guidance." })),
+        message: tr(msg({ id: 'providers.codex.developerUnread.agentMessage', defaultMessage: "Codex couldn't say which developer_instructions this session gets, so Combwork leaves yours as they are and adds none of its guidance this time: the agent has Combwork's tools without it. Restart the agent to try again.", description: "The notice that a Codex agent started without Hive's guidance. developer_instructions is a Codex setting: keep it." }))
       }
     return null
   }

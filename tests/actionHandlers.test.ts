@@ -1312,9 +1312,9 @@ describe('workspaces apart, and the durable notice (#1266 round 5)', () => {
     const lines = async () => (await inWorkspace(w, () => tasks.getTask(c, w))).history.filter((h) => h.whatText?.id === 'tasks.history.notified')
     expect((await lines()).map((l) => l.whatText!.values!.why)).toEqual(written)
     expect((await lines()).map((l) => l.what)).toEqual([
-      "Notified you that it needs you: Hive couldn't get slot-a ready for AL-1: git checkout failed (test)",
-      "Notified you that it needs you: Hive can't give AL-1 to B1 yet: B1's conversation in slot-a can't resume now (its slot holds other work now). Hive gives it AL-1 once it can.",
-      "Notified you that it needs you: Hive couldn't resume B1's conversation in slot-a for AL-1 (three tries): its CLI couldn't start (test). Resume B1 from Sessions, or start it fresh, and Hive gives it AL-1."
+      "Notified you that it needs you: Combwork couldn't get slot-a ready for AL-1: git checkout failed (test)",
+      "Notified you that it needs you: Combwork can't give AL-1 to B1 yet: B1's conversation in slot-a can't resume now (its slot holds other work now). Combwork gives it AL-1 once it can.",
+      "Notified you that it needs you: Combwork couldn't resume B1's conversation in slot-a for AL-1 (three tries): its CLI couldn't start (test). Resume B1 from Sessions, or start it fresh, and Combwork gives it AL-1."
     ])
     // Shown in the window's language, as its history shows a line (Board.tsx's storedLine): German, from its catalogue.
     const { storedLineText } = await import('../src/shared/taskHistory')
@@ -1326,9 +1326,9 @@ describe('workspaces apart, and the durable notice (#1266 round 5)', () => {
     setLanguage('de', Object.assign({}, ...readdirSync(de).filter((f) => f.endsWith('.json')).map((f) => JSON.parse(readFileSync(join(de, f), 'utf8')))))
     try {
       const german = (await lines()).map((l) => storedLineText(l.whatText, (m, values) => tr(m, values), (id) => providerMessage(id) ?? workflowMessage(id)))
-      expect(german[0]).toContain('Hive konnte slot-a nicht für AL-1 vorbereiten: git checkout failed (test)')
-      expect(german[1]).toContain('Hive kann B1 die Karte AL-1 noch nicht geben')
-      expect(german[2]).toContain('Hive konnte die Unterhaltung von B1 in slot-a für AL-1 nicht fortsetzen (drei Versuche)')
+      expect(german[0]).toContain('Combwork konnte slot-a nicht für AL-1 vorbereiten: git checkout failed (test)')
+      expect(german[1]).toContain('Combwork kann B1 die Karte AL-1 noch nicht geben')
+      expect(german[2]).toContain('Combwork konnte die Unterhaltung von B1 in slot-a für AL-1 nicht fortsetzen (drei Versuche)')
     } finally {
       setLanguage('en', {})
     }

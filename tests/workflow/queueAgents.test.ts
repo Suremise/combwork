@@ -43,7 +43,7 @@ describe('refusals under Hive merges (the card says what to do)', () => {
     const { card: first } = await queued(e, 'One')
     const { card } = await queued(e, 'Two')
     const r = refusedBy(await e.wf.reportMerge(card.key, B1), 'merge.hiveMerges')
-    expect(r.message).toBe(`Hive merges ${card.key}: agents don't merge it or report its merge.`)
+    expect(r.message).toBe(`Combwork merges ${card.key}: agents don't merge it or report its merge.`)
     expect(r.next).toBe('It is in the merge queue for main (position 2) and moves to Done once merged: wait for that, or for it to come back.')
     expect(r.change).toBe('This rule is set in Version Control → Who merges. A card keeps the rules it started with.')
     expect(r.override).toBeNull()

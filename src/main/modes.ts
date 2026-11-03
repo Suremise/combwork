@@ -70,7 +70,7 @@ export async function deleteMode(id: string): Promise<void> {
 /** Puts back a bundled mode as this version of Hive ships it; the workspace's copy goes to the Recycle Bin. */
 export async function restoreMode(id: string): Promise<ModeInfo> {
   const src = join(bundledModesDir(), `${id}.md`)
-  if (!validId(id) || !existsSync(src)) throw hiveError(msg({ id: 'content.mode.notBundled', defaultMessage: '"{mode}" isn\'t one of Hive\'s modes.', description: "An error restoring a mode Hive ships: Hive ships no mode called {mode}." }), { mode: id }, { kind: 'notFound' })
+  if (!validId(id) || !existsSync(src)) throw hiveError(msg({ id: 'content.mode.notBundled', defaultMessage: '"{mode}" isn\'t one of Combwork\'s modes.', description: "An error restoring a mode Hive ships: Hive ships no mode called {mode}." }), { mode: id }, { kind: 'notFound' })
   const dest = join(workspace.modesDir, `${id}.md`)
   if (existsSync(dest)) await trash(dest)
   await restoreBundled('modes', id)

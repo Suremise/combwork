@@ -84,7 +84,7 @@ async function endFromOutside(app) {
 }
 
 /** The notice's text in the window, once it is shown. */
-const notice = (page) => page.evaluate(() => [...document.querySelectorAll('.toast')].map((t) => t.innerText).find((t) => t.includes('Hive closed unexpectedly')) ?? '')
+const notice = (page) => page.evaluate(() => [...document.querySelectorAll('.toast')].map((t) => t.innerText).find((t) => t.includes('Combwork closed unexpectedly')) ?? '')
 const liveAgent = async (inv, agentId) => (await inv('session:live')).find((l) => l.agentId === agentId)
 
 ;(async () => {
@@ -146,7 +146,7 @@ const liveAgent = async (inv, agentId) => (await inv('session:live')).find((l) =
       check('…with Resume All and Show Overview', /Resume All/.test(text) && /Show Overview/.test(text), text)
       check('…and the merge left half done, with the folder it was in', text.includes(`Steady was merging main (#7): check ${proj} for a merge left half done (git status there)`), text)
       await page.screenshot({ path: path.join(lib.WORK, 'unexpectedclose-notice.png') })
-      check('…told in that notice, not one of its own', (await page.evaluate(() => [...document.querySelectorAll('.toast')].filter((t) => t.innerText.includes('was merging when Hive closed')).length)) === 0)
+      check('…told in that notice, not one of its own', (await page.evaluate(() => [...document.querySelectorAll('.toast')].filter((t) => t.innerText.includes('was merging when Combwork closed')).length)) === 0)
       const home = (await inv('workspace:refresh'))?.assistant?.path
       const told = () => {
         try {
@@ -161,7 +161,7 @@ const liveAgent = async (inv, agentId) => (await inv('session:live')).find((l) =
       check('hive.log says so, with the time', thisRun().includes(`ended without quitting: last seen ${left.lastSeen}`), thisRun().split('\n').slice(0, 8).join(' | '))
       check('Copy Diagnostics says the last run ended without quitting', /The last run ended without quitting: last seen [^;]+; 1 agent\(s\) were running/.test(await inv('app:diagnostics')))
       check('this run has its own marker', !!(await lib.until(() => marker()?.startedAt && marker().startedAt !== left.startedAt, HUNG_MS)))
-      await page.locator('.toast', { hasText: 'Hive closed unexpectedly' }).getByRole('button', { name: 'Resume All' }).click()
+      await page.locator('.toast', { hasText: 'Combwork closed unexpectedly' }).getByRole('button', { name: 'Resume All' }).click()
       const back = await lib.until(async () => {
         const l = await liveAgent(inv, agent.id)
         return l?.status === 'ready' ? l : null

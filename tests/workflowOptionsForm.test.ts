@@ -683,7 +683,7 @@ describe("the Assistant's settings tool (#1278)", () => {
   it('takes each option by its value or label, null inherits; a change that contradicts the others is refused under the lock', async () => {
     const e = settingEntry('project.workflow.finish')!
     expect(e).toMatchObject({ scope: 'project', workflow: 'finish', inherits: true })
-    expect(checkSettingValue(e, 'The agent merges, Hive checks')).toEqual({ value: 'agentMerges' })
+    expect(checkSettingValue(e, 'The agent merges, Combwork checks')).toEqual({ value: 'agentMerges' })
     expect(checkSettingValue(e, 'hiveMerges')).toEqual({ value: 'hiveMerges' })
     expect(checkSettingValue(e, 'typo')).toMatchObject({ error: expect.stringMatching(/takes one of: hiveMerges, agentMerges, committed, notChecked, or null to inherit/) })
     expect(checkSettingValue(settingEntry('project.workflow.mergeChecks')!, ['lint', 'test'])).toEqual({ value: ['lint', 'test'] })
@@ -935,7 +935,7 @@ describe('G15 and G17 in the form (#1445)', () => {
     expect(FORM_GROUPS.none.flatMap((g) => g.options)).not.toEqual(expect.arrayContaining(['slotsUpToDate']))
     expect(FORM_GROUPS.none.flatMap((g) => g.options)).not.toContain('reviewerMode')
     expect(englishText(OPTION_TEXT.slotsUpToDate!.title)).toBe('Slots are brought up to date before each card')
-    expect(englishText(OPTION_TEXT.folder!.desc)).toMatch(/slot Hive lends to the card or its lane/)
+    expect(englishText(OPTION_TEXT.folder!.desc)).toMatch(/slot Combwork lends to the card or its lane/)
     expect(OPTION_WHY.slotsUpToDate).toBeDefined()
     expect(OPTION_WHY.reviewerMode).toBeDefined()
   })

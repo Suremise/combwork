@@ -123,7 +123,7 @@ const invOn = (page) => (ch, ...a) => page.evaluate(([c, x]) => window.hive.invo
   // Close Window on the last window: as its X, it quits (asking first). Cancelled both ways: the same dialog.
   await clickMenu(p1, 'Close Window')
   const lastByMenu = await waitDialog(p1)
-  check('Close Window on the last window asks to quit, as X does', lastByMenu?.title === 'Quit Hive?' && lastByMenu.rows.length === 1, JSON.stringify(lastByMenu))
+  check('Close Window on the last window asks to quit, as X does', lastByMenu?.title === 'Quit Combwork?' && lastByMenu.rows.length === 1, JSON.stringify(lastByMenu))
   check('…with no "Close this window only" (one window)', !!lastByMenu && !lastByMenu.buttons.some((b) => /this window only/.test(b)), JSON.stringify(lastByMenu?.buttons))
   await cancel(p1)
   await app.evaluate(({ BrowserWindow }) => BrowserWindow.getAllWindows()[0].close())
@@ -192,7 +192,7 @@ const invOn = (page) => (ch, ...a) => page.evaluate(([c, x]) => window.hive.invo
   const asked = await lib.until(async () => ((await dialogIn(p1)) ? p1 : (await dialogIn(p2)) ? p2 : null), 8000)
   const quit = asked ? await dialogIn(asked) : null
   check('Exit asks in one window', !!quit)
-  check('its title says it closes all 2 windows', quit?.title === 'Quit Hive and close all 2 windows?', quit?.title)
+  check('its title says it closes all 2 windows', quit?.title === 'Quit Combwork and close all 2 windows?', quit?.title)
   check('its text says every workspace', /closes all 2 windows and stops/.test(quit?.text ?? '') && /every workspace/.test(quit?.text ?? ''), quit?.text)
   check('the agents are grouped by workspace', JSON.stringify([...(quit?.groups ?? [])].sort()) === JSON.stringify(['closewindow-ws-a', 'closewindow-ws-b']), JSON.stringify(quit?.groups))
   check('…each under its own', JSON.stringify([...(quit?.rows ?? [])].sort()) === JSON.stringify(['closewindow-ws-a|alpha', 'closewindow-ws-b|beta']), JSON.stringify(quit?.rows))
@@ -311,7 +311,7 @@ const invOn = (page) => (ch, ...a) => page.evaluate(([c, x]) => window.hive.invo
   const dupPages = [stays, pDup1, pDup2]
   const dupAt = await lib.until(async () => { for (const pg of dupPages) if (await dialogIn(pg)) return pg; return null }, 8000)
   const dupQuit = dupAt ? await dialogIn(dupAt) : null
-  check('Exit with three windows asks', dupQuit?.title === 'Quit Hive and close all 3 windows?', dupQuit?.title)
+  check('Exit with three windows asks', dupQuit?.title === 'Quit Combwork and close all 3 windows?', dupQuit?.title)
   const heads = dupAt
     ? await dupAt.evaluate(() => [...document.querySelectorAll('.dialog .quit-group')].map((g) => ({ where: g.querySelector('.quit-group-where')?.textContent ?? '', name: g.textContent.replace(g.querySelector('.quit-group-where')?.textContent ?? '', '').trim(), title: g.getAttribute('title') ?? '' })))
     : []

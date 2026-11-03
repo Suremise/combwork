@@ -34,7 +34,7 @@
   "worktrees.merge.sameBranch": "La carpeta del proyecto está en la rama {branch}.",
   "worktrees.merge.staged": "La carpeta del proyecto tiene cambios preparados (staged). Haz commit de ellos o quítalos del área de preparación antes de fusionar.",
   "worktrees.merge.targetElsewhere": "{branch} está activa en {folder}. Fusiona allí, o cambia antes a otra rama en esa carpeta.",
-  "worktrees.merge.targetMoved": "{branch} cambió mientras Hive fusionaba en ella. No se fusionó nada: vuelve a fusionar.",
+  "worktrees.merge.targetMoved": "{branch} cambió mientras Combwork fusionaba en ella. No se fusionó nada: vuelve a fusionar.",
   "worktrees.merge.uncommitted": "No se fusionó nada: {files, plural, one {# archivo del worktree no tiene commit. Haz commit o stash de él} many {# archivos del worktree no tienen commit. Haz commit o stash de ellos} other {# archivos del worktree no tienen commit. Haz commit o stash de ellos}} en el worktree y después fusiona.",
   "worktrees.merge.unknownFiles": "(archivos desconocidos)",
   "worktrees.missing.noAgent": "Ese agente ya no existe.",

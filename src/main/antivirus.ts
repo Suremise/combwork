@@ -191,7 +191,7 @@ async function holdsHive(w: WorkspaceService): Promise<boolean> {
   for (const p of await w.listProjectPaths().catch(() => [] as string[])) {
     try {
       const pkg = JSON.parse(await readFile(join(p, 'package.json'), 'utf8')) as { name?: unknown; productName?: unknown }
-      if (pkg.name === 'hive' && (pkg.productName === 'Hive Desktop' || pkg.productName === 'Hive')) return true
+      if (pkg.name === 'hive' && (pkg.productName === 'Combwork' || pkg.productName === 'Hive Desktop' || pkg.productName === 'Hive')) return true
     } catch {
       // Not a Node project.
     }
@@ -364,11 +364,11 @@ const prepared = new Map<string, Prepared>()
  */
 async function planFor(w: WorkspaceService, action: AvAction): Promise<{ status: AntivirusStatus; paths: string[] }> {
   const status = await statusFor(w, true)
-  if (status.scan !== 'defender') throw new Error(status.scan === 'other' ? tr(msg({ id: 'main.antivirus.other', defaultMessage: 'Another antivirus is active: Hive can only change Microsoft Defender’s exclusions.', description: 'An error in Settings → Workspace → Antivirus scanning. Microsoft Defender is a name.' })) : tr(msg({ id: 'main.antivirus.notDefender', defaultMessage: 'Microsoft Defender isn’t the active antivirus here.', description: 'An error in Settings → Workspace → Antivirus scanning.' })))
+  if (status.scan !== 'defender') throw new Error(status.scan === 'other' ? tr(msg({ id: 'main.antivirus.other', defaultMessage: 'Another antivirus is active: Combwork can only change Microsoft Defender’s exclusions.', description: 'An error in Settings → Workspace → Antivirus scanning. Microsoft Defender is a name.' })) : tr(msg({ id: 'main.antivirus.notDefender', defaultMessage: 'Microsoft Defender isn’t the active antivirus here.', description: 'An error in Settings → Workspace → Antivirus scanning.' })))
   const added = (remembered().added ?? []).map(normPath)
   const safe = status.paths.filter((p) => !p.unsafe)
   const paths = action === 'add' ? safe.filter((p) => p.state !== 'excluded').map((p) => p.path) : action === 'remove' ? [...safe.filter((p) => added.includes(normPath(p.path))).map((p) => p.path), ...(status.gone ?? []).map((g) => g.path)] : []
-  if (action !== 'check' && !paths.length) throw new Error(action === 'add' ? tr(msg({ id: 'main.antivirus.allExcluded', defaultMessage: 'Every folder Hive may offer is already excluded.', description: 'An error in Settings → Workspace → Antivirus scanning: nothing to add.' })) : tr(msg({ id: 'main.antivirus.noneAdded', defaultMessage: 'Hive added no exclusions for this workspace.', description: 'An error in Settings → Workspace → Antivirus scanning: nothing to remove.' })))
+  if (action !== 'check' && !paths.length) throw new Error(action === 'add' ? tr(msg({ id: 'main.antivirus.allExcluded', defaultMessage: 'Every folder Combwork may offer is already excluded.', description: 'An error in Settings → Workspace → Antivirus scanning: nothing to add.' })) : tr(msg({ id: 'main.antivirus.noneAdded', defaultMessage: 'Combwork added no exclusions for this workspace.', description: 'An error in Settings → Workspace → Antivirus scanning: nothing to remove.' })))
   return { status, paths }
 }
 

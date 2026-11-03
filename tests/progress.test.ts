@@ -1158,7 +1158,7 @@ describe("Hive's set-up runs in review copies (HI-1710)", () => {
     expect(runDetailsText(held, 'alpha', now)).toContain('copy-1')
     const idle = [s.start(hive({ copy: 'copy-1' }), { title: 'npm ci' }), s.start(hive({ copy: 'copy-2' }), { title: 'npm ci' })]
     expect(idle.map((r) => [r.agentId, r.agentName, r.defaultName, r.copy])).toEqual([[null, 'Hive (review copies)', 'copy', 'copy-1'], [null, 'Hive (review copies)', 'copy', 'copy-2']])
-    expect(idle.map((r) => runAgentName(r, tr))).toEqual(['Hive (review copies)', 'Hive (review copies)'])
+    expect(idle.map((r) => runAgentName(r, tr))).toEqual(['Combwork (review copies)', 'Combwork (review copies)'])
     // A slot's run never takes a reviewer.
     expect(s.start(hive({ slot: 'slot-b', reviewer: { agentId: 'r-6', agentName: 'HR6' } }), { title: 'npm ci' })).toMatchObject({ agentId: null, agentName: 'Hive (slot slot-b)', defaultName: 'slot' })
     // The reviewer's run is still Hive's: the agent can't change or end it.

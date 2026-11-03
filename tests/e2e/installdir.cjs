@@ -109,7 +109,7 @@ function pasted(message) {
   check("the locked folder's permissions can't be changed", lacks(locked), sddl(locked))
   const a = await cantStart(locked, { HIVE_TEST_DIALOG_SNAPSHOT: snapshot })
   check('Hive quit with an error instead of starting', a.code === 1, String(a.code))
-  check("it told the user Hive can't start", a.message?.title === "Hive can't start", JSON.stringify(a.notes))
+  check("it told the user Combwork can't start", a.message?.title === "Combwork can't start", JSON.stringify(a.notes))
   check('naming the folder', !!a.message?.body.includes(`the folder Hive is installed in:\n${locked}\n`), a.message?.body)
   const pa = pasted(a.message)
   check('with the command to run in PowerShell, exactly', JSON.stringify(pa.calls) === JSON.stringify([[locked, '/grant', FOLDER_ENTRY]]), pa.detail)

@@ -79,7 +79,7 @@ async function agentWithWork(inv, project, name) {
     const other = rev('other')
     let bDone = false
     const mergeB = b.inv('agents:merge', beta, two.id, { squash: false, message: 'Two into other', cleanup: false }).finally(() => (bDone = true))
-    const notice = b.page.locator('.toast', { hasText: 'Another Hive is merging into this repository (repolock-a)' })
+    const notice = b.page.locator('.toast', { hasText: 'Another Combwork is merging into this repository (repolock-a)' })
     check("B waits, and its window names A's Hive", !!(await lib.until(async () => (await notice.count()) > 0, HUNG_MS)), await b.page.locator('.toast').allInnerTexts().catch(() => []).then(String))
     await b.page.screenshot({ path: path.join(lib.WORK, 'repolock-1-waiting.png') })
     check('…B has merged nothing meanwhile', !bDone && rev('other') === other)

@@ -194,7 +194,7 @@ describe('the board area', () => {
     const assistant = { path: 'C:\\ws\\.hive\\assistant', name: 'assistant', agents: [{ id: 'assistant', name: 'Assistant', live: { status: 'waiting', statusSince: '' }, place: { folder: 'C:\\ws\\.hive\\assistant', is: 'project', name: null, branch: null } }] } as unknown as Parameters<typeof inbox>[1]
     const [item] = inbox(projects, assistant, () => null).needYou
     expect(item.assistant).toBe(true)
-    expect(inboxName(item)).toBe('Hive Assistant')
+    expect(inboxName(item)).toBe('Assistant')
     setLanguage(PSEUDO_LANGUAGE, {})
     expect(pseudo(inboxName(item)), inboxName(item)).toBe(true)
     expect(pseudo(inboxStateText(item))).toBe(true)

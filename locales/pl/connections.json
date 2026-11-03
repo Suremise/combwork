@@ -11,7 +11,7 @@
   "connections.choice.unavailable": "{name} – {why}",
   "connections.intro.add": "Dodaj konto",
   "connections.intro.dismiss": "Zamknij",
-  "connections.intro.text": "Agenci działają teraz na kontach: dodaj konto dla {clis} w Ustawienia → Konta i połączenia i tam je zaloguj. Hive nie korzysta już z logowania Twojego własnego terminala, które pozostaje bez zmian.",
+  "connections.intro.text": "Agenci działają teraz na kontach: dodaj konto dla {clis} w Ustawienia → Konta i połączenia i tam je zaloguj. Combwork nie korzysta już z logowania Twojego własnego terminala, które pozostaje bez zmian.",
   "connections.mark.anotherMark": "Działa na innym połączeniu niż wybrane",
   "connections.mark.none": "Brak połączenia",
   "connections.mark.noneUsable": "W tym obszarze roboczym nie jest włączone żadne konto {cli}: agent nie może się uruchomić, dopóki któreś nie zostanie włączone (Ustawienia → Konta i połączenia).",

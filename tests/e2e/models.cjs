@@ -252,7 +252,7 @@ const check = (name, ok, extra = '') => {
   await prices.getByRole('button', { name: 'Reset to defaults' }).click()
   await lib.until(async () => !Object.keys((await update({})).providers['claude-code'].prices).length, HUNG_MS)
   const afterReset = await update({})
-  check("Reset to defaults: Hive's prices again", !Object.keys(afterReset.providers['claude-code'].prices).length && !afterReset.providers['claude-code'].pricesRemoved && (await prices.locator('tr', { hasText: 'claude-haiku-4-5' }).count()) === 1)
+  check("Reset to defaults: Combwork's prices again", !Object.keys(afterReset.providers['claude-code'].prices).length && !afterReset.providers['claude-code'].pricesRemoved && (await prices.locator('tr', { hasText: 'claude-haiku-4-5' }).count()) === 1)
 
   // The CLI back: its models again.
   await update({ providers: { 'claude-code': { executablePath: FAKE_CLAUDE } } })
@@ -289,7 +289,7 @@ const check = (name, ok, extra = '') => {
   await openSection('Codex')
   check('Codex: no Session costs choice', (await costRow.count()) === 0)
   const note = page.locator('.price-note')
-  check("…but a note that it doesn't report costs, with OpenAI's pricing link", !!(await lib.until(async () => (await note.count()) === 1, HUNG_MS)) && /Codex doesn't report costs, so Hive estimates them from these prices/.test(await note.innerText()) && (await note.locator('a', { hasText: "OpenAI's pricing" }).count()) === 1)
+  check("…but a note that it doesn't report costs, with OpenAI's pricing link", !!(await lib.until(async () => (await note.count()) === 1, HUNG_MS)) && /Codex doesn't report costs, so Combwork estimates them from these prices/.test(await note.innerText()) && (await note.locator('a', { hasText: "OpenAI's pricing" }).count()) === 1)
   check('…and a shipped model Codex no longer lists (gpt-5.3-codex) greyed', (await row('gpt-5.3-codex').locator('.badge', { hasText: "not in Codex's list" }).count()) === 1)
   await page.screenshot({ path: path.join(lib.WORK, 'models-prices-codex.png') })
 

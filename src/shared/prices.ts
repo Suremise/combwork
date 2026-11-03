@@ -135,7 +135,7 @@ export function unpricedModel(provider: ProviderId, model: string | null | undef
 
 const UNPRICED = msg({
   id: 'project.cost.unpriced',
-  defaultMessage: "Hive has no API price for {model}, so it can't estimate this session's cost. Add one in Settings → {provider} → API prices.",
+  defaultMessage: "Combwork has no API price for {model}, so it can't estimate this session's cost. Add one in Settings → {provider} → API prices.",
   description: 'Tooltip on a cost shown as Unknown. {model} is the model; {provider} the provider (Claude Code, Codex…). Settings → {provider} → API prices is where prices are set: name it as Settings does.'
 })
 

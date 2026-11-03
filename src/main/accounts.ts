@@ -135,7 +135,7 @@ function mustGet(id: string): Account {
  */
 function assertNotHeld(a: Account): void {
   if (!provider(a.provider).accountHeld?.(accountFolder(a.id))) return
-  throw hiveError(msg({ id: 'main.accounts.checkHeld', defaultMessage: "{name} is being checked: Hive is still making sure {cli}'s check of it has ended. Try again in a moment.", description: "An error signing in or removing a connection ({name}, its name in Settings → Accounts & Connections): the coding agent CLI's ({cli}: \"Codex\") check of who it is signed in as hasn't been confirmed ended yet, so the connection is held." }), { name: a.name, cli: providerDescriptor(a.provider).name }, { kind: 'conflict' })
+  throw hiveError(msg({ id: 'main.accounts.checkHeld', defaultMessage: "{name} is being checked: Combwork is still making sure {cli}'s check of it has ended. Try again in a moment.", description: "An error signing in or removing a connection ({name}, its name in Settings → Accounts & Connections): the coding agent CLI's ({cli}: \"Codex\") check of who it is signed in as hasn't been confirmed ended yet, so the connection is held." }), { name: a.name, cli: providerDescriptor(a.provider).name }, { kind: 'conflict' })
 }
 
 /** Whether the CLI's sign-in names an organisation, which an identity then needs (HI-1757: Codex's names none). */
@@ -145,7 +145,7 @@ const namesOrgs = (id: ProviderId): boolean => providerDescriptor(id).capabiliti
 function support(id: ProviderId): { homeEnv: string; shared: readonly string[]; adapter: ReturnType<typeof provider> } {
   const caps = providerDescriptor(id).capabilities.connections
   const adapter = provider(id)
-  if (!caps || !adapter.accountStatus || !adapter.accountSharedTarget || !adapter.configHome) throw hiveError(msg({ id: 'main.accounts.noProvider', defaultMessage: "{cli} can't have sign-in connections in Hive yet.", description: 'An error: connections were asked for a coding agent CLI ({cli}: "Codex") that Hive keeps no connections for.' }), { cli: providerDescriptor(id).name }, { kind: 'invalid' })
+  if (!caps || !adapter.accountStatus || !adapter.accountSharedTarget || !adapter.configHome) throw hiveError(msg({ id: 'main.accounts.noProvider', defaultMessage: "{cli} can't have sign-in connections in Combwork yet.", description: 'An error: connections were asked for a coding agent CLI ({cli}: "Codex") that Hive keeps no connections for.' }), { cli: providerDescriptor(id).name }, { kind: 'invalid' })
   return { homeEnv: caps.homeEnv, shared: caps.shared, adapter }
 }
 
@@ -244,7 +244,7 @@ function sharedTarget(id: ProviderId, name: string): string {
   const root = resolve(accountsRoot()).toLowerCase()
   const t = target.toLowerCase()
   if (!samePath(resolve(target, '..'), home) || t === root || t.startsWith(root + '\\') || root.startsWith(t + '\\'))
-    throw hiveError(msg({ id: 'main.accounts.badTarget', defaultMessage: "Hive won't link a connection to {target}: it isn't one of {cli}'s own folders.", description: "An error adding a connection: the folder a connection's shared folder would link to ({target}, a path) isn't in the coding agent CLI's ({cli}) own folder." }), { target, cli: providerDescriptor(id).name }, { kind: 'invalid' })
+    throw hiveError(msg({ id: 'main.accounts.badTarget', defaultMessage: "Combwork won't link a connection to {target}: it isn't one of {cli}'s own folders.", description: "An error adding a connection: the folder a connection's shared folder would link to ({target}, a path) isn't in the coding agent CLI's ({cli}) own folder." }), { target, cli: providerDescriptor(id).name }, { kind: 'invalid' })
   return target
 }
 
@@ -1116,7 +1116,7 @@ export async function setUpPlace(id: string): Promise<ConnectionTrust['setUpIn']
   const st = requestTrust(id, workspace.path, projectsFor(a), true)
   const answer = await new Promise<TrustAnswer | null | 'cancelled'>((r) => st.waiters.push(r))
   // Removed, or its workspace closed, while Hive checked: Set Up opens nowhere (never its own folder instead).
-  if (answer === 'cancelled') throw hiveError(msg({ id: 'main.accounts.setUpCancelled', defaultMessage: "{name}'s Set Up didn't open: the connection was removed or its workspace closed while Hive checked its folders.", description: "An error opening a connection's Set Up (Settings → Accounts & Connections, HI-1870; {name}, its name): Hive was checking which of the workspace's folders its coding agent CLI trusts when the connection was removed or the workspace closed, so nothing was started." }), { name: a.name }, { kind: 'conflict' })
+  if (answer === 'cancelled') throw hiveError(msg({ id: 'main.accounts.setUpCancelled', defaultMessage: "{name}'s Set Up didn't open: the connection was removed or its workspace closed while Combwork checked its folders.", description: "An error opening a connection's Set Up (Settings → Accounts & Connections, HI-1870; {name}, its name): Hive was checking which of the workspace's folders its coding agent CLI trusts when the connection was removed or the workspace closed, so nothing was started." }), { name: a.name }, { kind: 'conflict' })
   return answer ? setUpTarget(a, answer.pending) : undefined
 }
 
@@ -1323,7 +1323,7 @@ async function assertUsable(a: Account): Promise<void> {
     await assertRealFolder(accountFolder(a.id))
   } catch (e) {
     log.warn(`account ${a.id}'s folder can't be used: ${userText(String((e as Error).message ?? e))}`)
-    throw hiveError(msg({ id: 'main.accounts.folderNotUsable', defaultMessage: "{name}'s folder isn't the one Hive made (it is missing, or was moved or replaced), so nothing was started on it. Remove the connection and add it again.", description: "An error signing a connection in or starting on it ({name}, its name): its folder is missing or isn't the one Hive made." }), { name: a.name }, { kind: 'conflict' })
+    throw hiveError(msg({ id: 'main.accounts.folderNotUsable', defaultMessage: "{name}'s folder isn't the one Combwork made (it is missing, or was moved or replaced), so nothing was started on it. Remove the connection and add it again.", description: "An error signing a connection in or starting on it ({name}, its name): its folder is missing or isn't the one Hive made." }), { name: a.name }, { kind: 'conflict' })
   }
 }
 
@@ -1331,7 +1331,7 @@ async function assertUsable(a: Account): Promise<void> {
 export function keepNewLogin(id: string): void {
   const a = mustGet(id)
   const ok = acceptable(a.observed, namesOrgs(a.provider))
-  if (!ok) throw hiveError(msg({ id: 'main.accounts.nothingToKeep', defaultMessage: "{name} isn't signed in as anyone Hive could check, so there's no login to keep.", description: "An error: Keep the new login was asked for a connection ({name}) whose latest check didn't find it signed in." }), { name: a.name }, { kind: 'conflict' })
+  if (!ok) throw hiveError(msg({ id: 'main.accounts.nothingToKeep', defaultMessage: "{name} isn't signed in as anyone Combwork could check, so there's no login to keep.", description: "An error: Keep the new login was asked for a connection ({name}) whose latest check didn't find it signed in." }), { name: a.name }, { kind: 'conflict' })
   changeAccount(id, (x) => (x.accepted = ok))
 }
 
@@ -1756,7 +1756,7 @@ const LAUNCH = {
   changedAgain: msg({ id: 'main.connections.launch.changedAgain', defaultMessage: "{agent}'s connection was changed again while it was starting. Start it again.", description: "Starting an agent ({agent}, its name) failed: the connection chosen for it was changed while it was starting, and again while Hive started it once more on the new choice. A connection is how a coding agent CLI signs in or reaches its model (Settings → Accounts & Connections)." }),
   otherProvider: msg({ id: 'main.connections.launch.otherProvider', defaultMessage: 'The connection chosen for {agent} is for another CLI. Pick a {cli} connection in its Agent Settings.', description: 'Starting an agent ({agent}) is refused: the connection chosen for it belongs to another coding agent CLI. {cli} is the agent\'s CLI ("Claude Code").' }),
   signedOut: msg({ id: 'main.connections.launch.signedOut', defaultMessage: '{name} is signed out. Sign it in again in Settings → Accounts & Connections, then start {agent}.', description: "Starting an agent ({agent}) is refused: its account ({name}) isn't signed in." }),
-  changing: msg({ id: 'main.connections.launch.changing', defaultMessage: "{name}'s login kept changing while Hive checked it. Try starting {agent} again in a moment.", description: "Starting an agent ({agent}) is refused: its connection's ({name}) login changed again and again while Hive checked who it is signed in as." }),
+  changing: msg({ id: 'main.connections.launch.changing', defaultMessage: "{name}'s login kept changing while Combwork checked it. Try starting {agent} again in a moment.", description: "Starting an agent ({agent}) is refused: its connection's ({name}) login changed again and again while Hive checked who it is signed in as." }),
   noKey: msg({ id: 'main.connections.launch.noKey', defaultMessage: '{name} has no key. Add one in Settings → Accounts & Connections, then start {agent}.', description: "Starting an agent ({agent}) is refused: its server account ({name}) reaches a server that needs an API key, and none is saved for it. Settings → Accounts & Connections names a section." })
 }
 

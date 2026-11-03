@@ -1,4 +1,4 @@
-# Français (`fr`): style for Hive
+# Français (`fr`): style for Combwork
 
 **Status:** drafted by AI (Claude, October 2026, card #855), not yet reviewed by a native speaker. Its entry in
 `src/shared/i18n/languages.ts` says the same (`ai: true` until it is reviewed).
@@ -15,14 +15,14 @@ native speaker has reviewed the whole language, its `ai` flag comes off.
 
 ## Voice
 
-Hive's English is plain and direct: short sentences, everyday words, *you* for the reader, and it says what happens.
+Combwork's English is plain and direct: short sentences, everyday words, *you* for the reader, and it says what happens.
 Translate the meaning, not the words, and keep the result as short and plain.
 
-- **Addressing the reader:** the informal *tu* (*Choisis un projet*, *tes agents*), as Hive's translation design
+- **Addressing the reader:** the informal *tu* (*Choisis un projet*, *tes agents*), as Combwork's translation design
   decided for every language that has one. Never *vous* for the reader. (The plural *vous* is fine when it means
   several people.)
-- **Tone:** friendly and direct, never familiar or jokey. Prefer active sentences: *Hive enregistre la session*, not
-  *La session est enregistrée par Hive*. Avoid administrative phrasing (*procéder à*, *effectuer*, *veuillez*).
+- **Tone:** friendly and direct, never familiar or jokey. Prefer active sentences: *Combwork enregistre la session*, not
+  *La session est enregistrée par Combwork*. Avoid administrative phrasing (*procéder à*, *effectuer*, *veuillez*).
 - **Sentence length:** keep one English sentence as one French sentence where it reads well; split a long one rather
   than chain *qui* and *dont* clauses. French runs about 20% longer than English: in buttons, titles and column
   headings, choose the shorter word.
@@ -34,7 +34,7 @@ Translate the meaning, not the words, and keep the result as short and plain.
 - **Buttons and menu commands:** the infinitive (*Enregistrer*, *Ajouter un agent…*, *Afficher les notes
   partagées*). The same form everywhere, including the command palette.
 - **Capitalisation:** sentence case everywhere: titles, buttons, menus, headings, tabs, settings and column names
-  (*Paramètres de l’agent*, *Redémarrer et mettre à jour Hive*). Don't copy the English Title Case. Product names and
+  (*Paramètres de l’agent*, *Redémarrer et mettre à jour Combwork*). Don't copy the English Title Case. Product names and
   the glossary's kept names keep theirs.
 - **A trailing `…`** (the command asks something before it acts) stays, with no space before it: *Retirer
   l’agent…*. Always the single character …, never three dots.
@@ -42,7 +42,7 @@ Translate the meaning, not the words, and keep the result as short and plain.
   *En cours* (Active, was Doing), *Relecture*, *Validé* (Approved, was Passed), *Fusion en cours* (Merging, a stage
   inside Validé), *Terminé*. In running text name the column (*dans la colonne Relecture*, *passe en Terminé*,
   *revient en Validé*), never an agreed participle (*jusqu’à ce qu’elle passe en Terminé*, not *soit Terminée*).
-- **Where things are:** paths through menus and settings keep Hive's arrows, with each name as Hive shows it in
+- **Where things are:** paths through menus and settings keep Combwork's arrows, with each name as Combwork shows it in
   French: *Paramètres → Fournisseurs*, *Aide → Configuration des fournisseurs*.
 
 ## Grammar
@@ -58,7 +58,7 @@ Translate the meaning, not the words, and keep the result as short and plain.
   *1 carte*). *many* is for large round numbers (1 000 000), which French says like *other*. Every plural message
   gives all three, *many* the same as *other*: `{n, plural, one {# carte} many {# cartes} other {# cartes}}`. Exact
   cases from the English (`=0`) stay.
-- **Lists:** Hive joins lists itself (*One, Two et Three*). Never write *et* or *ou* into a message around a list
+- **Lists:** Combwork joins lists itself (*One, Two et Three*). Never write *et* or *ou* into a message around a list
   placeholder.
 
 ## Punctuation and typography
@@ -70,15 +70,15 @@ Translate the meaning, not the words, and keep the result as short and plain.
 - **Apostrophe:** always the typographic ’ (*l’agent*, *aujourd’hui*). In ICU a straight `'` before `{`, `}` or `#`
   starts a quotation and hides text, so the straight apostrophe is never used.
 - **Ellipsis, dashes:** the single character …; a dash in running text is –, with spaces.
-- **Numbers, dates, money, durations:** formatted by Hive in the reader's locale. Never write them into a message.
+- **Numbers, dates, money, durations:** formatted by Combwork in the reader's locale. Never write them into a message.
 - **Capitals keep their accents:** *À faire*, *État*, *Écrire*.
 - **Keys:** a single key named in running text takes the label French keyboards print: *Entrée*, *Échap*, *Maj*,
-  *Suppr* (*Échap ferme les boîtes de dialogue*). A shortcut written as keys keeps Hive's notation, as its menus show
+  *Suppr* (*Échap ferme les boîtes de dialogue*). A shortcut written as keys keeps Combwork's notation, as its menus show
   it: `Ctrl+Shift+J`, `Shift+Tab`, and so does a key inside `<kbd>`.
 
 ## Terms
 
-The words French uses for Hive's terms ([glossary.md](glossary.md)). Use them every time. Where a term is kept in
+The words French uses for Combwork's terms ([glossary.md](glossary.md)). Use them every time. Where a term is kept in
 English, it says so.
 
 | English | Français | Notes |
@@ -88,7 +88,7 @@ English, it says so.
 | agent | agent | Masculine: *l’agent {agent}*. |
 | provider | fournisseur | |
 | session | session | *Starting a session*: *démarrer une session*; signing in is *se connecter* (below). |
-| the Assistant | l’Assistant | Capitalised. The full name *Hive Assistant* stays in English: *le Hive Assistant*. |
+| the Assistant | l’Assistant | Capitalised. Its only name: the full English name *Hive Assistant* went with the rename (HI-2458). |
 | persona (now: working mode) | mode (mode de travail) | The Assistant's personas became *modes*; the old *persona* is *personnage*. |
 | task board / board | tableau des tâches / tableau | The *Tasks* tab is *Tâches*. |
 | card | carte | Never *tâche* in running text. |
@@ -107,7 +107,7 @@ English, it says so.
 | review copy | copie de relecture | Never *revue*. |
 | refused / override / Move anyway | refusé / dérogation / Déplacer quand même | |
 | returned (to its builder) | renvoyée | Of a card. |
-| no-code card / before 1.0 / outside Hive | carte sans code / antérieure à 1.0 / hors de Hive | |
+| no-code card / before 1.0 / outside Combwork | carte sans code / antérieure à 1.0 / hors de Combwork | |
 | Work (a card's section) | Travail | |
 | paused (a lane) / Pause queue / Resume queue | en pause / Suspendre la file / Reprendre la file | A paused merge queue is *suspendue*. |
 | merge queue / test merge | file de fusion / fusion d’essai | *La file de fusion vers {target}*, never *de {target}*. |
@@ -118,7 +118,7 @@ English, it says so.
 | blocked / stalled | bloquée / à l’arrêt | Of a card. |
 | builder / reviewer / either | auteur / relecteur / les deux | The builder is who does the card's work (not who created it: *créée par*; never *constructeur*). A review is a *relecture*; to review, *relire*. A review's *verdict* is *verdict*. |
 | card loop / lane / round / Start lane… | boucle de cartes / couloir / tour / Démarrer un couloir… | |
-| merge slot | créneau de fusion | An agent's turn to merge. From 1.0, cards Hive merges go through the merge queue (*file de fusion*, above). |
+| merge slot | créneau de fusion | An agent's turn to merge. From 1.0, cards Combwork merges go through the merge queue (*file de fusion*, above). |
 | inbox / message / wake | boîte de réception / message / réveiller | *Wake* as a noun is *réveil*. A card *watch* is a *surveillance* (*surveiller*). |
 | handover / shared notes | passation / notes partagées | |
 | skill / template | compétence / modèle | A skill's own name (`work-on-card`) is kept. |
@@ -151,7 +151,7 @@ English, it says so.
 | Remove agent… | Retirer l’agent… |
 | {name} has {n, plural, one {# open card} other {# open cards}} | {name} : {n, plural, one {# carte ouverte} many {# cartes ouvertes} other {# cartes ouvertes}} |
 | {agent} was removed. Its sessions stay in the Sessions tab. | L’agent {agent} a été retiré. Ses sessions restent dans l’onglet Sessions. |
-| Hive was started in {language} (--lang): this setting applies from its next start. | Hive a été démarré avec la langue {language} (--lang) : ce paramètre s’applique au prochain démarrage. |
+| Combwork was started in {language} (--lang): this setting applies from its next start. | Combwork a été démarré avec la langue {language} (--lang) : ce paramètre s’applique au prochain démarrage. |
 
 ## Checking
 

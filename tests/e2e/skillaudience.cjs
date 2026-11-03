@@ -154,12 +154,12 @@ const assistantOnly = bundledForAssistant.length + 1
   }
   const ca = await copyAndRead('local-assistant')
   check('Copy to workspace tooltip: not "every agent"', /unless its SKILL.md's header sets another audience/.test(ca.tip) && !/every agent in every project gets it/.test(ca.tip), ca.tip)
-  check('copied: an Assistant skill says the Assistant gets it', /The Hive Assistant now gets it as a Hive skill/.test(ca.toast), ca.toast)
+  check('copied: an Assistant skill says the Assistant gets it', /The Hive Assistant now gets it as a Combwork skill/.test(ca.toast), ca.toast)
   const cp = await copyAndRead('local-plain')
-  check('copied: a plain skill says the project agents get it', /The project agents now get it as a Hive skill/.test(cp.toast), cp.toast)
+  check('copied: a plain skill says the project agents get it', /The project agents now get it as a Combwork skill/.test(cp.toast), cp.toast)
   for (const [name, why] of [['local-misspelt', 'its audience is "assitant", not agents, assistant or all'], ['local-empty', 'its audience is empty, not agents, assistant or all']]) {
     const c = await copyAndRead(name)
-    check(`copied: ${name} says nobody gets it yet, and why`, c.toast.includes('but nobody gets it yet') && c.toast.includes(why) && !/now gets? it as a Hive skill/.test(c.toast) && /Claude Code agents here also still load the local copy/.test(c.toast), c.toast)
+    check(`copied: ${name} says nobody gets it yet, and why`, c.toast.includes('but nobody gets it yet') && c.toast.includes(why) && !/now gets? it as a Combwork skill/.test(c.toast) && /Claude Code agents here also still load the local copy/.test(c.toast), c.toast)
   }
   await page.screenshot({ path: path.join(lib.WORK, 'skillaudience-project.png') })
 

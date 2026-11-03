@@ -34,7 +34,7 @@
   "worktrees.merge.sameBranch": "プロジェクトフォルダーで{branch}がチェックアウトされています。",
   "worktrees.merge.staged": "プロジェクトフォルダーにステージ済みの変更があります。マージする前にコミットするか、ステージを解除してください。",
   "worktrees.merge.targetElsewhere": "{branch}は{folder}でチェックアウトされています。そこでマージするか、先にそのフォルダーで別のブランチをチェックアウトしてください。",
-  "worktrees.merge.targetMoved": "Hiveがマージしている間に{branch}が変更されました。何もマージしていません。もう一度マージしてください。",
+  "worktrees.merge.targetMoved": "Combworkがマージしている間に{branch}が変更されました。何もマージしていません。もう一度マージしてください。",
   "worktrees.merge.uncommitted": "何もマージしていません：ワークツリーに未コミットのファイルが{files, plural, other {#件}}あります。ワークツリーでコミットまたはスタッシュしてから、マージしてください。",
   "worktrees.merge.unknownFiles": "（不明なファイル）",
   "worktrees.missing.noAgent": "そのエージェントはもう存在しません。",

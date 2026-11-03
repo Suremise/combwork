@@ -300,7 +300,7 @@ async function retirePersonas(m: Manifest): Promise<void> {
     toast(
       'info',
       tr(msg({ id: 'main.modes.retiredTitle', defaultMessage: "The Assistant's personas are now working modes", description: "A notice once, after an update: the Assistant's character personas became working modes." })),
-      tr(msg({ id: 'main.modes.retiredBody', defaultMessage: "Coordinator, Planner, QA triager and Release manager replace Hive's character personas ({moved}). Switch modes from the Assistant's header; your own personas are unchanged.", description: 'The notice that personas became working modes. The four names are the modes\' own names: keep them. {moved} lists which persona became which mode ("Pirate → Coordinator").' }), { moved: fmt.list(moved) })
+      tr(msg({ id: 'main.modes.retiredBody', defaultMessage: "Coordinator, Planner, QA triager and Release manager replace Combwork's character personas ({moved}). Switch modes from the Assistant's header; your own personas are unchanged.", description: 'The notice that personas became working modes. The four names are the modes\' own names: keep them. {moved} lists which persona became which mode ("Pirate → Coordinator").' }), { moved: fmt.list(moved) })
     )
 }
 

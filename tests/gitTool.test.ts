@@ -64,7 +64,7 @@ describe('git versions', () => {
     expect(gitUnusable({ state: 'old', version: '2.16.0' })).toBe(true)
     expect(gitUnusable({ state: 'missing' })).toBe(true)
     expect(gitUnusable({ state: 'ok', version: '2.45.0' })).toBe(false)
-    expect(gitProblemText({ state: 'missing' })).toBe("Git isn't installed (or isn't on Hive's PATH)")
+    expect(gitProblemText({ state: 'missing' })).toBe("Git isn't installed (or isn't on Combwork's PATH)")
     expect(gitProblemText({ state: 'old', version: '2.16.0' })).toMatch(/too old/)
     expect(gitProblemText({ state: 'unknown' })).toBeNull()
     expect(gitFixText({ state: 'missing' })).toMatch(/Install Git for Windows/)
@@ -89,7 +89,7 @@ describe('git missing', () => {
     const r = await git(p, ['check-ignore', '-q', '--no-index', '--', '.hive/'])
     expect(r).toMatchObject({ ok: false, missing: true, code: -1 })
     expect(gitTool().state).toBe('missing')
-    expect(gitProblem()).toBe("Git isn't installed (or isn't on Hive's PATH)")
+    expect(gitProblem()).toBe("Git isn't installed (or isn't on Combwork's PATH)")
     expect((await checkGit()).state).toBe('missing')
   })
 
@@ -102,7 +102,7 @@ describe('git missing', () => {
   it('the Changes tab hears git is missing, not that the folder is no repository', async () => {
     const { p } = await project()
     hideGit()
-    expect(await gitStatus(p)).toMatchObject({ isRepo: false, gitProblem: "Git isn't installed (or isn't on Hive's PATH)" })
+    expect(await gitStatus(p)).toMatchObject({ isRepo: false, gitProblem: "Git isn't installed (or isn't on Combwork's PATH)" })
   })
 
   it('never removable, never merged, never clean: the worktree and its branch stay', async () => {
@@ -110,7 +110,7 @@ describe('git missing', () => {
     const check = await worktreeCheck(p, wt)
     expect(check.removable).toBe(true)
     hideGit()
-    expect(await worktreeCheck(p, wt)).toMatchObject({ removable: false, reason: "Git isn't installed (or isn't on Hive's PATH)" })
+    expect(await worktreeCheck(p, wt)).toMatchObject({ removable: false, reason: "Git isn't installed (or isn't on Combwork's PATH)" })
     await expect(branchStatus(p, wt)).rejects.toThrow(/isn't installed/)
     // A check made while git ran, applied once it can't: nothing goes.
     expect((await removeCheckedWorktree(p, wt, check)).deleted).toBe(false)

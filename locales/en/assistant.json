@@ -84,11 +84,11 @@
     "description": "The journal browser's project filter: entries of every project and of the workspace."
   },
   "assistant.journal.allSources": {
-    "defaultMessage": "Hive and the Assistant",
+    "defaultMessage": "Combwork and the Assistant",
     "description": "The journal browser's source filter: entries written by either."
   },
   "assistant.journal.build.built": {
-    "defaultMessage": "Built Hive {version} ({kind}) from {commit} on {branch}",
+    "defaultMessage": "Built Combwork {version} ({kind}) from {commit} on {branch}",
     "description": "A journal entry Hive writes when Hive itself is built from its source code: {version} its version (1.0.0-rc.1), {kind} what kind of build (baseline, release candidate…), {commit} the commit's short id, {branch} the git branch."
   },
   "assistant.journal.build.builtAt": {
@@ -96,7 +96,7 @@
     "description": "In a journal entry for a build of Hive: when it was built ({when}, a date and time)."
   },
   "assistant.journal.build.builtDetached": {
-    "defaultMessage": "Built Hive {version} ({kind}) from {commit}",
+    "defaultMessage": "Built Combwork {version} ({kind}) from {commit}",
     "description": "As \"Built Hive {version} ({kind}) from {commit} on {branch}\", for a build made from no branch."
   },
   "assistant.journal.build.installer": {
@@ -120,11 +120,11 @@
     "description": "A kind of build of Hive itself, in a journal line such as \"Uploaded a draft of Hive 1.0.0 (release) from 1fef5341 on main\"."
   },
   "assistant.journal.build.uploaded": {
-    "defaultMessage": "Uploaded a draft of Hive {version} ({kind}) from {commit} on {branch}",
+    "defaultMessage": "Uploaded a draft of Combwork {version} ({kind}) from {commit} on {branch}",
     "description": "A journal entry Hive writes when a release of Hive itself is built and uploaded as a draft GitHub release: {version} its version, {kind} what kind of build (release, release candidate…), {commit} the commit's short id, {branch} the git branch."
   },
   "assistant.journal.build.uploadedDetached": {
-    "defaultMessage": "Uploaded a draft of Hive {version} ({kind}) from {commit}",
+    "defaultMessage": "Uploaded a draft of Combwork {version} ({kind}) from {commit}",
     "description": "As \"Uploaded a draft of Hive {version} ({kind}) from {commit} on {branch}\", for a build made from no branch."
   },
   "assistant.journal.build.uploadedNote": {
@@ -192,7 +192,7 @@
     "description": "After when a journal entry was written: when it was last changed."
   },
   "assistant.journal.empty": {
-    "defaultMessage": "No entries yet. The Assistant writes decisions, plans and what it learns as it works, and Hive adds its own facts: lanes, merges, unexpected closes.",
+    "defaultMessage": "No entries yet. The Assistant writes decisions, plans and what it learns as it works, and Combwork adds its own facts: lanes, merges, unexpected closes.",
     "description": "The journal browser when the journal has no entries."
   },
   "assistant.journal.emptyDigests": {
@@ -340,7 +340,7 @@
     "description": "The journal browser with no workspace open."
   },
   "assistant.journal.off": {
-    "defaultMessage": "The journal is off: the Assistant doesn't write to it and Hive records nothing. What it has is kept, and you can still read, correct and delete it here.",
+    "defaultMessage": "The journal is off: the Assistant doesn't write to it and Combwork records nothing. What it has is kept, and you can still read, correct and delete it here.",
     "description": "A note at the top of the journal browser while the journal is off (Settings → Assistant → Journal)."
   },
   "assistant.journal.openEntry": {
@@ -372,7 +372,7 @@
     "description": "Who wrote a journal entry: the Hive Assistant."
   },
   "assistant.journal.source.hive": {
-    "defaultMessage": "Hive",
+    "defaultMessage": "Combwork",
     "description": "Who wrote a journal entry: Hive itself (its own facts: lanes, merges, unexpected closes). Hive's name stays as it is."
   },
   "assistant.journal.sourceLabel": {
@@ -412,7 +412,7 @@
     "description": "The heading of the Assistant's journal browser (the Assistant view's main area)."
   },
   "assistant.journal.titleTip": {
-    "defaultMessage": "What the Assistant keeps in its journal in this workspace, and Hive's own facts (lanes, merges, unexpected closes), newest first. Open an entry to read it in full, correct it or delete it. It stays on this computer.",
+    "defaultMessage": "What the Assistant keeps in its journal in this workspace, and Combwork's own facts (lanes, merges, unexpected closes), newest first. Open an entry to read it in full, correct it or delete it. It stays on this computer.",
     "description": "The info tip of the journal browser's heading."
   },
   "assistant.journal.to": {
@@ -504,7 +504,7 @@
     "description": "An error notice: a mode's file couldn't be deleted; the reason follows."
   },
   "assistant.modes.deleteMessage": {
-    "defaultMessage": "{file} goes to the Recycle Bin.{bundled, select, yes { It ships with Hive, so you can restore it later.} other {}}",
+    "defaultMessage": "{file} goes to the Recycle Bin.{bundled, select, yes { It ships with Combwork, so you can restore it later.} other {}}",
     "description": "Confirmation before a mode is deleted: {file} is its file (advisor.md). The second sentence when it is one of Hive's own."
   },
   "assistant.modes.deleteTip": {
@@ -560,7 +560,7 @@
     "description": "A button on a deleted mode of Hive's own: puts it back in the workspace."
   },
   "assistant.modes.restoreTip": {
-    "defaultMessage": "Restore this mode that ships with Hive",
+    "defaultMessage": "Restore this mode that ships with Combwork",
     "description": "A button beside a deleted mode of Hive's own."
   },
   "assistant.modes.revert": {
@@ -572,15 +572,15 @@
     "description": "A button on an edited mode of Hive's own: puts it back as Hive ships it."
   },
   "assistant.modes.revertMessage": {
-    "defaultMessage": "Your copy goes to the Recycle Bin and Hive puts back the mode as this version ships it.",
+    "defaultMessage": "Your copy goes to the Recycle Bin and Combwork puts back the mode as this version ships it.",
     "description": "Confirmation before a mode is put back as Hive ships it."
   },
   "assistant.modes.revertTip": {
-    "defaultMessage": "Put back the mode as Hive ships it (your copy goes to the Recycle Bin). Hive keeps edited copies as they are; unedited ones it updates itself.",
+    "defaultMessage": "Put back the mode as Combwork ships it (your copy goes to the Recycle Bin). Combwork keeps edited copies as they are; unedited ones it updates itself.",
     "description": "Tooltip on Revert to Default, over an edited mode that ships with Hive."
   },
   "assistant.modes.revertTitle": {
-    "defaultMessage": "Revert {name} to Hive's version?",
+    "defaultMessage": "Revert {name} to Combwork's version?",
     "description": "Confirmation before an edited mode that ships with Hive is put back as Hive ships it."
   },
   "assistant.modes.selectOne": {
@@ -620,11 +620,11 @@
     "description": "What a mode of the Hive Assistant that ships with Hive (Release manager) is for, in a line: under its name in the mode menu and the Assistant view."
   },
   "assistant.modes.shipsMissing": {
-    "defaultMessage": "Ships with Hive. Restore it to use it.",
+    "defaultMessage": "Ships with Combwork. Restore it to use it.",
     "description": "Under a mode of Hive's own that was deleted from the workspace."
   },
   "assistant.modes.tip": {
-    "defaultMessage": "A mode is how the Hive Assistant works: what it puts first and how it hands things back, in a Markdown file in the workspace (.hive/modes). The panel's mode menu switches between them at once, keeping the conversation; Settings → Assistant sets the default.",
+    "defaultMessage": "A mode is how the Assistant works: what it puts first and how it hands things back, in a Markdown file in the workspace (.hive/modes). The panel's mode menu switches between them at once, keeping the conversation; Settings → Assistant sets the default.",
     "description": "Tooltip on the Modes section of the Assistant view. Keep .hive/modes as it is."
   },
   "assistant.modes.updateBadge": {
@@ -632,7 +632,7 @@
     "description": "A badge on an edited mode of Hive's own when Hive ships a newer version."
   },
   "assistant.modes.updateTip": {
-    "defaultMessage": "This copy was edited, so Hive didn't update it. This Hive ships a newer version: Revert to Default brings it in.",
+    "defaultMessage": "This copy was edited, so Combwork didn't update it. This Combwork ships a newer version: Revert to Default brings it in.",
     "description": "Tooltip on Update available, over an edited mode. Revert to Default is the button beside it."
   },
   "assistant.modes.useHere": {
@@ -896,7 +896,7 @@
     "description": "A line of an agent's tooltip in the Assistant's workspace section, with Connections on (HI-1769): its CLI ({provider}: \"Claude Code\") and the connection it runs on or would start on ({connection}: \"Max 1\", with ⟳ when it runs on another than the one chosen, or why none can run it)."
   },
   "assistant.panel.railLabel": {
-    "defaultMessage": "Hive Assistant",
+    "defaultMessage": "Assistant",
     "description": "The hidden Assistant panel's strip, written down it. Hive's name stays as it is."
   },
   "assistant.panel.restart": {
@@ -984,11 +984,11 @@
     "description": "The Assistant's footer: its settings button, and the Assistant Settings dialog's title."
   },
   "assistant.panel.show": {
-    "defaultMessage": "Show the Hive Assistant",
+    "defaultMessage": "Show the Assistant",
     "description": "The hidden Assistant panel's strip, for screen readers."
   },
   "assistant.panel.showTip": {
-    "defaultMessage": "{hasKey, select, yes {Show the Hive Assistant ({key})} other {Show the Hive Assistant}}",
+    "defaultMessage": "{hasKey, select, yes {Show the Assistant ({key})} other {Show the Assistant}}",
     "description": "Tooltip on the hidden Assistant panel's strip, with its shortcut ({key}: \"Ctrl+Alt+I\")."
   },
   "assistant.panel.start": {
@@ -1152,11 +1152,11 @@
     "description": "Placeholder of the New Folder dialog's name box (Shared Notes): an example folder name (lower case, a dash)."
   },
   "assistant.sidebar.hiveGroup": {
-    "defaultMessage": "Hive",
+    "defaultMessage": "Combwork",
     "description": "The Skills sidebar: the section of the workspace's Hive skills. Usually kept as Hive."
   },
   "assistant.sidebar.hiveServerDesc": {
-    "defaultMessage": "Hive tools for agents: projects, shared notes, handovers, notifications",
+    "defaultMessage": "Combwork tools for agents: projects, shared notes, handovers, notifications",
     "description": "Under the built-in hive server: what it gives agents."
   },
   "assistant.sidebar.hiveServerTip": {
@@ -1200,7 +1200,7 @@
     "description": "The heading of the MCP sidebar: the workspace's MCP servers."
   },
   "assistant.sidebar.mcpTipAdded": {
-    "defaultMessage": "MCP servers deployed to the workspace (.hive/mcp) are available to every project and the Hive Assistant, and run only where they are added: a project's MCP tab, the Assistant's view, or Add to… here. Changes apply to new sessions.",
+    "defaultMessage": "MCP servers deployed to the workspace (.hive/mcp) are available to every project and the Assistant, and run only where they are added: a project's MCP tab, the Assistant's view, or Add to… here. Changes apply to new sessions.",
     "description": "Tooltip on MCP Servers (HI-2059). Keep .hive/mcp as it is; \"MCP tab\" and \"Add to…\" as Hive shows them."
   },
   "assistant.sidebar.needYou": {
@@ -1264,7 +1264,7 @@
     "description": "A button with no workspace open: creates a workspace."
   },
   "assistant.sidebar.noNotes": {
-    "defaultMessage": "No notes yet. Create one, or ask an agent to write a handover with the Hive MCP tools.",
+    "defaultMessage": "No notes yet. Create one, or ask an agent to write a handover with the Combwork MCP tools.",
     "description": "The Shared Notes sidebar when the workspace has no notes."
   },
   "assistant.sidebar.noProjects": {
@@ -1280,7 +1280,7 @@
     "description": "An active project's status when no session runs."
   },
   "assistant.sidebar.noSkills": {
-    "defaultMessage": "No Hive skills yet. Create one with +, or add one from a .md or .zip.",
+    "defaultMessage": "No Combwork skills yet. Create one with +, or add one from a .md or .zip.",
     "description": "The Skills sidebar with no Hive skills. + is the add button."
   },
   "assistant.sidebar.noWorkspace": {
@@ -1288,11 +1288,11 @@
     "description": "The sidebar with no workspace open (Projects, Shared Notes or MCP Servers)."
   },
   "assistant.sidebar.noWorkspaceSkills": {
-    "defaultMessage": "Open a workspace to manage Hive skills.",
+    "defaultMessage": "Open a workspace to manage Combwork skills.",
     "description": "The Skills sidebar with no workspace open."
   },
   "assistant.sidebar.noteMessage": {
-    "defaultMessage": "Markdown note inside .hive/shared. Agents can read it through the Hive MCP tools.",
+    "defaultMessage": "Markdown note inside .hive/shared. Agents can read it through the Combwork MCP tools.",
     "description": "Shared Notes, New Note. Keep .hive/shared as it is."
   },
   "assistant.sidebar.notePlaceholder": {
@@ -1324,7 +1324,7 @@
     "description": "The MCP sidebar: a button that opens .hive/mcp in Explorer."
   },
   "assistant.sidebar.openSkillsFolder": {
-    "defaultMessage": "Open Hive Skills Folder",
+    "defaultMessage": "Open Combwork Skills Folder",
     "description": "The Skills sidebar: a button that opens .hive/skills in Explorer."
   },
   "assistant.sidebar.openWorkspace": {
@@ -1376,7 +1376,7 @@
     "description": "Tooltip on a project's restart mark."
   },
   "assistant.sidebar.restoreSkill": {
-    "defaultMessage": "Restore this skill that ships with Hive",
+    "defaultMessage": "Restore this skill that ships with Combwork",
     "description": "A button beside a deleted skill of Hive's own."
   },
   "assistant.sidebar.resumeAll": {
@@ -1420,7 +1420,7 @@
     "description": "The heading of the Skills sidebar: the workspace's Hive skills."
   },
   "assistant.sidebar.skillsHint": {
-    "defaultMessage": "Each goes to the project agents in every project, unless it's marked <b>Assistant</b> (only the Hive Assistant gets it) or <b>Agents + Assistant</b>. A project's own skills, and your user and plugin skills, are in its <b>Skills</b> tab.",
+    "defaultMessage": "Each goes to the project agents in every project, unless it's marked <b>Assistant</b> (only the Assistant gets it) or <b>Agents + Assistant</b>. A project's own skills, and your user and plugin skills, are in its <b>Skills</b> tab.",
     "description": "Under the Skills sidebar's list. <b> is bold: the badges' words (Assistant, Agents + Assistant) and the tab's name, as they show."
   },
   "assistant.sidebar.skillsLoadTarget": {
@@ -1500,7 +1500,7 @@
     "description": "A Hive skill's badge: the project agents get it."
   },
   "assistant.skills.audienceAgentsTip": {
-    "defaultMessage": "For the project agents: every agent in every project of this workspace gets it. The Hive Assistant doesn't. This is the default; to change it, set <code>audience</code> under <code>metadata:</code> in its SKILL.md's header (<code>assistant</code>, or <code>all</code> for both).",
+    "defaultMessage": "For the project agents: every agent in every project of this workspace gets it. The Assistant doesn't. This is the default; to change it, set <code>audience</code> under <code>metadata:</code> in its SKILL.md's header (<code>assistant</code>, or <code>all</code> for both).",
     "description": "Tooltip on Project agents. Keep the <code> tags and what is inside them (audience, metadata:, assistant, all) as they are, and SKILL.md."
   },
   "assistant.skills.audienceAll": {
@@ -1508,7 +1508,7 @@
     "description": "A Hive skill's badge: the project agents and the Hive Assistant get it. Keep it short."
   },
   "assistant.skills.audienceAllTip": {
-    "defaultMessage": "For both the project agents (every agent in every project) and the Hive Assistant (<code>audience: all</code> in its SKILL.md's header).",
+    "defaultMessage": "For both the project agents (every agent in every project) and the Assistant (<code>audience: all</code> in its SKILL.md's header).",
     "description": "Tooltip on Agents + Assistant. Keep the <code> tags and audience: all inside them as they are, and SKILL.md."
   },
   "assistant.skills.audienceAssistant": {
@@ -1516,7 +1516,7 @@
     "description": "A Hive skill's badge: the Hive Assistant gets it."
   },
   "assistant.skills.audienceAssistantTip": {
-    "defaultMessage": "For the Hive Assistant only (<code>audience: assistant</code> in its SKILL.md's header). Project agents don't get it.",
+    "defaultMessage": "For the Assistant only (<code>audience: assistant</code> in its SKILL.md's header). Project agents don't get it.",
     "description": "Tooltip on Assistant. Keep the <code> tags and audience: assistant inside them as they are, and SKILL.md."
   },
   "assistant.skills.copied": {
@@ -1524,7 +1524,7 @@
     "description": "A notice: a skill was copied into the workspace's Hive skills."
   },
   "assistant.skills.copiedDetail": {
-    "defaultMessage": "{audience, select, assistant {The Hive Assistant now gets it} all {The project agents and the Hive Assistant now get it} other {The project agents now get it}} as a Hive skill, from their next session.",
+    "defaultMessage": "{audience, select, assistant {The Assistant now gets it} all {The project agents and the Assistant now get it} other {The project agents now get it}} as a Combwork skill, from their next session.",
     "description": "Under Copied … to the workspace: who gets it now."
   },
   "assistant.skills.copiedNobody": {
@@ -1544,7 +1544,7 @@
     "description": "An error notice: a skill couldn't be copied into the workspace; the reason follows."
   },
   "assistant.skills.copyTip": {
-    "defaultMessage": "Copy it into the workspace's Hive skills. The project agents in every project get it, unless its SKILL.md's header sets another audience.",
+    "defaultMessage": "Copy it into the workspace's Combwork skills. The project agents in every project get it, unless its SKILL.md's header sets another audience.",
     "description": "Tooltip on Copy to workspace. Keep SKILL.md as it is."
   },
   "assistant.skills.create": {
@@ -1560,7 +1560,7 @@
     "description": "An error notice: a skill couldn't be deleted; the reason follows."
   },
   "assistant.skills.deleteHive": {
-    "defaultMessage": "It's removed from the workspace, so new sessions of {audience, select, assistant {the Hive Assistant} all {the project agents and the Hive Assistant} other {the project agents}} no longer get it. A running Claude Code session keeps its own copy until it restarts. Codex sessions share the copy in their folder: a running one loses it when another Codex session in that folder starts.",
+    "defaultMessage": "It's removed from the workspace, so new sessions of {audience, select, assistant {the Assistant} all {the project agents and the Assistant} other {the project agents}} no longer get it. A running Claude Code session keeps its own copy until it restarts. Codex sessions share the copy in their folder: a running one loses it when another Codex session in that folder starts.",
     "description": "Confirmation before a Hive skill is deleted: who loses it and when."
   },
   "assistant.skills.deleteLocal": {
@@ -1604,11 +1604,11 @@
     "description": "A Hive skill's switch in the Skills view and a project's Skills tab (Delivered to agents), for screen readers: whether agents are given the skill. {name} is the skill."
   },
   "assistant.skills.delivered.tipProject": {
-    "defaultMessage": "Delivered to agents: on, this project's agents get this skill from their next session; off, they don't, and Hive removes its copies at their next launch.",
+    "defaultMessage": "Delivered to agents: on, this project's agents get this skill from their next session; off, they don't, and Combwork removes its copies at their next launch.",
     "description": "Tooltip on a Hive skill's switch in a project's Skills tab."
   },
   "assistant.skills.delivered.tipWorkspace": {
-    "defaultMessage": "Delivered to agents: on, every project's agents get this skill from their next session; off, none of them do, and Hive removes its copies at their next launch.",
+    "defaultMessage": "Delivered to agents: on, every project's agents get this skill from their next session; off, none of them do, and Combwork removes its copies at their next launch.",
     "description": "Tooltip on a Hive skill's switch in the workspace's Skills view."
   },
   "assistant.skills.editInWorkspace": {
@@ -1616,7 +1616,7 @@
     "description": "A button over a Hive skill in a project: opens it in the Skills view."
   },
   "assistant.skills.editTip": {
-    "defaultMessage": "Hive skills are edited in the workspace's Skills view, since every project shares them. This takes you there.",
+    "defaultMessage": "Combwork skills are edited in the workspace's Skills view, since every project shares them. This takes you there.",
     "description": "Tooltip on Edit in workspace, over a Hive skill in a project."
   },
   "assistant.skills.fileMessage": {
@@ -1640,7 +1640,7 @@
     "description": "Tooltip on the tabs of a skill's files: an agent reads SKILL.md whenever it uses the skill, and each reference file only when it follows SKILL.md's link to it."
   },
   "assistant.skills.levelHive": {
-    "defaultMessage": "Hive",
+    "defaultMessage": "Combwork",
     "description": "A skill's kind, on a badge: one of the workspace's Hive skills. Usually kept as Hive."
   },
   "assistant.skills.levelLocal": {
@@ -1704,11 +1704,11 @@
     "description": "Confirmation before an edited skill is put back as Hive ships it."
   },
   "assistant.skills.revertMessage": {
-    "defaultMessage": "Replace the workspace's \"{name}\" with the version that ships with this version of Hive?",
+    "defaultMessage": "Replace the workspace's \"{name}\" with the version that ships with this version of Combwork?",
     "description": "Confirmation before an edited skill is put back as Hive ships it. {name} is the skill."
   },
   "assistant.skills.revertTip": {
-    "defaultMessage": "This skill ships with Hive, and this copy was edited. Hive keeps edited copies as they are; unedited ones it updates itself.",
+    "defaultMessage": "This skill ships with Combwork, and this copy was edited. Combwork keeps edited copies as they are; unedited ones it updates itself.",
     "description": "Tooltip on Revert to default, over an edited skill that ships with Hive."
   },
   "assistant.skills.revertTitle": {
@@ -1792,7 +1792,7 @@
     "description": "Under Copied … to the workspace, for a project's own skill: the project's copy stays. {provider} is Claude Code, Codex…"
   },
   "assistant.skills.tipHive": {
-    "defaultMessage": "Hive skills live in the workspace (.hive/skills). Each goes to the project agents (every agent in every project, of every provider), to the Hive Assistant, or to both, as the audience in its SKILL.md says (the project agents if it says none). Hive copies them for each session when it starts, so edits reach new sessions. Add, edit and delete them in the Skills view.",
+    "defaultMessage": "Combwork skills live in the workspace (.hive/skills). Each goes to the project agents (every agent in every project, of every provider), to the Assistant, or to both, as the audience in its SKILL.md says (the project agents if it says none). Combwork copies them for each session when it starts, so edits reach new sessions. Add, edit and delete them in the Skills view.",
     "description": "Tooltip on the Hive skills. Keep .hive/skills, SKILL.md and audience as they are."
   },
   "assistant.skills.tipLocal": {
@@ -1804,7 +1804,7 @@
     "description": "Tooltip on Claude Code plugins' skills."
   },
   "assistant.skills.tipUser": {
-    "defaultMessage": "Skills in your user profile (~/.claude/skills for Claude Code, ~/.codex/skills for Codex). That provider's agents always load them, in every project. Listed for reference; manage them outside Hive.",
+    "defaultMessage": "Skills in your user profile (~/.claude/skills for Claude Code, ~/.codex/skills for Codex). That provider's agents always load them, in every project. Listed for reference; manage them outside Combwork.",
     "description": "Tooltip on the user's own skills. Keep the paths as they are."
   },
   "assistant.skills.updateAvailable": {
@@ -1816,11 +1816,11 @@
     "description": "A badge on an edited skill of Hive's own when Hive ships a newer version."
   },
   "assistant.skills.updateTip": {
-    "defaultMessage": "This copy was edited, so Hive didn't update it. This Hive ships a newer version: Revert to default brings it in (your copy goes to the Recycle Bin).",
+    "defaultMessage": "This copy was edited, so Combwork didn't update it. This Combwork ships a newer version: Revert to default brings it in (your copy goes to the Recycle Bin).",
     "description": "Tooltip on Update available, over an edited skill. Revert to default is the button beside it."
   },
   "assistant.skills.warning": {
-    "defaultMessage": "<b>Warning:</b> Editing these skills may change agent behaviour in Hive",
+    "defaultMessage": "<b>Warning:</b> Editing these skills may change agent behaviour in Combwork",
     "description": "A banner over the Hive skills and a Hive skill being edited. <b> is bold."
   },
   "assistant.skills.whereHive": {
@@ -1880,7 +1880,7 @@
     "description": "The Assistant panel's status line: its session is starting."
   },
   "assistant.status.untaken": {
-    "defaultMessage": "A line Hive typed wasn't taken: press Enter in its terminal",
+    "defaultMessage": "A line Combwork typed wasn't taken: press Enter in its terminal",
     "description": "The Assistant panel's status line: a line Hive typed into the Assistant's terminal is still waiting there; the user presses Enter in it."
   },
   "assistant.status.waiting": {
@@ -1900,7 +1900,7 @@
     "description": "Why a template file can't be used: its agent number {n} (1, 2…) has no usable name."
   },
   "assistant.template.badMcp": {
-    "defaultMessage": "{name}'s MCP servers aren't a list Hive can use.",
+    "defaultMessage": "{name}'s MCP servers aren't a list Combwork can use.",
     "description": "Why a template file can't be used: an agent's list of MCP servers."
   },
   "assistant.template.badName": {
@@ -1920,7 +1920,7 @@
     "description": "Why a template file can't be used: an agent's name pattern ({name}) holds {token}, a token Hive doesn't know. The quoted '{key}' and '{n}' are shown as {key} and {n}: keep them, with their straight quotes, as they are."
   },
   "assistant.template.from09": {
-    "defaultMessage": "This template is from Hive 0.9 and can't be loaded in 1.0. Recreate it from your agents with Save as Template.",
+    "defaultMessage": "This template is from Combwork 0.9 and can't be loaded in 1.0. Recreate it from your agents with Save as Template.",
     "description": "Why a template file can't be used: Hive 0.9 made it (its agents had worktrees of their own; 1.0's don't). Save as Template is a command: as Hive names it."
   },
   "assistant.template.longNote": {
@@ -1928,7 +1928,7 @@
     "description": "Why a template file can't be used: an agent's note (what it is for, in the user's words) is too long. {max} is the limit, a number. A noun before the name (glossary §1 rule 4)."
   },
   "assistant.template.newer": {
-    "defaultMessage": "It was made by a newer version of Hive: update Hive to use it.",
+    "defaultMessage": "It was made by a newer version of Combwork: update Combwork to use it.",
     "description": "Why a template file can't be used: a newer Hive made it."
   },
   "assistant.template.noAgents": {
@@ -1936,11 +1936,11 @@
     "description": "Why a template file can't be used: it holds no agents."
   },
   "assistant.template.noVersion": {
-    "defaultMessage": "It isn't a Hive agent template (no version).",
+    "defaultMessage": "It isn't a Combwork agent template (no version).",
     "description": "Why a template file can't be used: it has no format version."
   },
   "assistant.template.notTemplate": {
-    "defaultMessage": "It isn't a Hive agent template.",
+    "defaultMessage": "It isn't a Combwork agent template.",
     "description": "Why a template file can't be used: it isn't one."
   },
   "assistant.template.sameName": {
@@ -2112,7 +2112,7 @@
     "description": "The Load template dialog (HI-1910): how many of the project's workflow options the template's would change ({n}); the list follows. {platform}: None or Git, as Hive names them."
   },
   "assistant.templateWorkflow.dropped": {
-    "defaultMessage": "{count, plural, one {Its workflow for {platforms} can’t be used (made by another version of Hive, or changed by hand), so it isn’t applied.} other {Its workflows for {platforms} can’t be used (made by another version of Hive, or changed by hand), so they aren’t applied.}}",
+    "defaultMessage": "{count, plural, one {Its workflow for {platforms} can’t be used (made by another version of Combwork, or changed by hand), so it isn’t applied.} other {Its workflows for {platforms} can’t be used (made by another version of Combwork, or changed by hand), so they aren’t applied.}}",
     "description": "The Load template dialog and the Templates view (HI-1910): the template's workflow sections for {platforms} (None, Git: a list; {count} of them) have values Hive can't use, so they are left out."
   },
   "assistant.templateWorkflow.head": {
@@ -2188,7 +2188,7 @@
     "description": "A badge on a template that can't be used (damaged, made by a newer Hive…)."
   },
   "assistant.templates.cantEdit": {
-    "defaultMessage": "This Hive doesn't know its coding agent: it can be moved or removed, not edited",
+    "defaultMessage": "This Combwork doesn't know its coding agent: it can be moved or removed, not edited",
     "description": "The template editor: the edit button of an agent whose coding agent isn't known here."
   },
   "assistant.templates.changesNotSaved": {
@@ -2348,7 +2348,7 @@
     "description": "A notice after a template was saved as a file; the file's path follows."
   },
   "assistant.templates.exportedDetail": {
-    "defaultMessage": "It holds the agents' roles, notes and settings and the layout: no paths, sessions or names of people. Import it into any Hive.",
+    "defaultMessage": "It holds the agents' roles, notes and settings and the layout: no paths, sessions or names of people. Import it into any Combwork.",
     "description": "Under Template exported, after the file's path."
   },
   "assistant.templates.fullTip": {
@@ -2360,11 +2360,11 @@
     "description": "The Templates view: the selected template was deleted or moved."
   },
   "assistant.templates.hive": {
-    "defaultMessage": "Hive",
+    "defaultMessage": "Combwork",
     "description": "A badge, a group and a filter: Hive's own templates (#1436, shipped with Hive, read-only)."
   },
   "assistant.templates.hiveSummary": {
-    "defaultMessage": "{count, plural, one {# agent} other {# agents}}, {layout}. One of Hive's own templates: read-only. <b>Duplicate…</b> copies it into the workspace or a project to change it.",
+    "defaultMessage": "{count, plural, one {# agent} other {# agents}}, {layout}. One of Combwork's own templates: read-only. <b>Duplicate…</b> copies it into the workspace or a project to change it.",
     "description": "Over one of Hive's own templates' agents: how many, its layout (\"two columns layout\"). <b> is bold; Duplicate… is the button."
   },
   "assistant.templates.import": {
@@ -2432,7 +2432,7 @@
     "description": "Tooltip on Load into This Project."
   },
   "assistant.templates.loadMessage": {
-    "defaultMessage": "It replaces every agent of the project you choose, and its layout. Hive lists who goes and who comes before anything changes.",
+    "defaultMessage": "It replaces every agent of the project you choose, and its layout. Combwork lists who goes and who comes before anything changes.",
     "description": "Load into Project: the dialog that asks which project."
   },
   "assistant.templates.loadTarget": {
@@ -2500,7 +2500,7 @@
     "description": "Under Workspace, when the workspace has no templates."
   },
   "assistant.templates.noneHive": {
-    "defaultMessage": "Hive's own templates couldn't be listed.",
+    "defaultMessage": "Combwork's own templates couldn't be listed.",
     "description": "The Templates view, under Hive, when none of Hive's own templates is listed (shouldn't happen)."
   },
   "assistant.templates.noneOfItsOwn": {
@@ -2624,7 +2624,7 @@
     "description": "Where to keep a template: a project, in a list."
   },
   "assistant.templates.tip": {
-    "defaultMessage": "A template is a project's agents (their roles in the workflow and settings) and layout, saved under a name. Hive's own are read-only: duplicate one to change it. The workspace's are for every project, a project's are its own (kept in its .hive, out of git). Export one to share it as a file.",
+    "defaultMessage": "A template is a project's agents (their roles in the workflow and settings) and layout, saved under a name. Combwork's own are read-only: duplicate one to change it. The workspace's are for every project, a project's are its own (kept in its .hive, out of git). Export one to share it as a file.",
     "description": "Tooltip on Templates (the Templates view and a project's Templates tab). Keep .hive as it is. Glossary: workflow role."
   },
   "assistant.templates.title": {
@@ -2632,7 +2632,7 @@
     "description": "The Templates view's and a project's Templates tab's heading."
   },
   "assistant.templates.unknown": {
-    "defaultMessage": "It uses a coding agent this Hive doesn't know ({ids}): it can be kept, but not loaded until Hive knows it.",
+    "defaultMessage": "It uses a coding agent this Combwork doesn't know ({ids}): it can be kept, but not loaded until Combwork knows it.",
     "description": "A template whose agents use a CLI this Hive doesn't know (one from a newer Hive). {ids} lists them."
   },
   "assistant.templates.unknownAgent": {
@@ -2876,7 +2876,7 @@
     "description": "Why a change of the Assistant's can't be undone: it closed (deactivated) a project."
   },
   "assistant.undo.why.projectMade": {
-    "defaultMessage": "A project it made stays: remove it from Hive if it isn't wanted.",
+    "defaultMessage": "A project it made stays: remove it from Combwork if it isn't wanted.",
     "description": "Why a change of the Assistant's can't be undone: it created a project."
   },
   "assistant.undo.why.projectOpened": {
@@ -2984,7 +2984,7 @@
     "description": "The Assistant view: the section of the Assistant's journal (its memory across sessions)."
   },
   "assistant.view.journalTip": {
-    "defaultMessage": "What the Assistant keeps in its journal (decisions, plans, what happened and why) and Hive's own facts. Search it, correct it, or forget what you'd rather it didn't keep.",
+    "defaultMessage": "What the Assistant keeps in its journal (decisions, plans, what happened and why) and Combwork's own facts. Search it, correct it, or forget what you'd rather it didn't keep.",
     "description": "The Assistant view: the info tip of its Journal section."
   },
   "assistant.view.mcp": {
@@ -3060,7 +3060,7 @@
     "description": "The Assistant view, Journal: the row that shows every journal entry, newest first."
   },
   "assistant.view.title": {
-    "defaultMessage": "Hive Assistant",
+    "defaultMessage": "Assistant",
     "description": "The Assistant view's heading in the sidebar. Hive's name stays as it is."
   },
   "assistant.view.titleTip": {

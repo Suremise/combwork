@@ -119,7 +119,7 @@ function inUse(project, name) {
   check('then the list: both unused worktrees', !!(await lib.until(async () => (await rows.count()) === 2, 15000)), await page.locator('.split-main').innerText().catch(() => ''))
   const row = (p) => section.locator(`.unused-wt[data-path="${p.replace(/\\/g, '\\\\')}"]`)
   check('…B4\'s labelled "was B4" (its session ran there)', (await row(b4).locator('[data-origin="hive"]').innerText().catch(() => '')) === 'was B4', await row(b4).innerText().catch(() => ''))
-  check('…the other "not made by Hive"', (await row(other).locator('[data-origin="other"]').innerText().catch(() => '')) === 'not made by Hive', await row(other).innerText().catch(() => ''))
+  check('…the other "not made by Combwork"', (await row(other).locator('[data-origin="other"]').innerText().catch(() => '')) === 'not made by Combwork', await row(other).innerText().catch(() => ''))
   // The branch comparisons (HI-1824) come first, in a group of their own: these checks are of the folders after them.
   const all = await picker.locator('option').evaluateAll((os) => os.map((o) => ({ value: o.value, label: o.textContent ?? '' })))
   const folders = all.filter((o) => !(o.value.startsWith('compare:') || o.value === 'leftovers'))

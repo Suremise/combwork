@@ -277,7 +277,7 @@ describe('the installed version against the tested one (#365)', () => {
     expect(testedSummary(t('newer'), '2.1.290')).toBe('Tested with 2.1.287 · installed 2.1.290')
     expect(testedSummary(t('unknown'), null)).toBe('Tested with 2.1.287 · installed version unknown')
     expect(testedNote(t('same'))).toBeNull()
-    expect(testedNote(t('newer'))).toBe('This version came out after this Hive release was tested. Most updates work; if something behaves oddly, report it (Copy Diagnostics).')
+    expect(testedNote(t('newer'))).toBe('This version came out after this Combwork release was tested. Most updates work; if something behaves oddly, report it (Copy Diagnostics).')
     expect(testedNote(t('older'))).toBe('Older than tested; consider updating.')
     expect(testedNote(t('unknown'))).toMatch(/couldn't tell which version is installed/)
     expect(['same', 'newer', 'older', 'unknown'].map((k) => testedComparison(t(k as 'same')))).toEqual(['the tested version', 'newer than tested', 'older than tested', 'version unknown'])

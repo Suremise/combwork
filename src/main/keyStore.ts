@@ -99,7 +99,7 @@ export function keyInfo(id: string): KeyInfo | undefined {
   return known.get(id)
 }
 
-const UNSAFE = msg({ id: 'main.keys.unsafe', defaultMessage: "Hive can't store a key safely on this system, so it wasn't saved.", description: "An error saving a server connection's API key (Settings → Accounts & Connections): Windows' protection for stored secrets isn't available, and Hive won't keep a key in plain text." })
+const UNSAFE = msg({ id: 'main.keys.unsafe', defaultMessage: "Combwork can't store a key safely on this system, so it wasn't saved.", description: "An error saving a server connection's API key (Settings → Accounts & Connections): Windows' protection for stored secrets isn't available, and Hive won't keep a key in plain text." })
 
 /** Whether a key can be stored encrypted: never in plain text (safeStorage's `basic_text` backend, off Windows). */
 function assertSafe(): void {

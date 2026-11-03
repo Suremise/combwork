@@ -137,7 +137,7 @@ let quitting = false
 // Development builds use their own profile (and Agent API port, see servers.ts) so they can run
 // alongside the installed Hive — e.g. while developing Hive from a session inside Hive.
 // HIVE_USER_DATA overrides the profile folder for tests. The installed app's is set too: Electron would name it after
-// productName, "Hive Desktop", but users' settings and conversations are in %APPDATA%\Hive (#443).
+// productName, "Combwork", but users' settings and conversations are in %APPDATA%\Hive (#443, HI-2458).
 if (process.env.HIVE_USER_DATA) app.setPath('userData', process.env.HIVE_USER_DATA)
 else app.setPath('userData', join(app.getPath('appData'), profileFolder(app.isPackaged)))
 // Key masking as the profile's files say, before the first line is logged (HI-1855): strict only where a key may be.
@@ -178,7 +178,7 @@ const APP_ID = app.isPackaged ? 'com.hive.desktop' : 'com.hive.desktop.dev'
 app.setAppUserModelId(APP_ID)
 if (!app.isPackaged && process.platform === 'win32') registerDevAppId()
 
-/** Names the dev app ID "Hive Desktop Dev" with the Hive icon, so its notifications don't say "Electron". */
+/** Names the dev app ID "Combwork Dev" (DEV_APP_NAME) with the app's icon, so its notifications don't say "Electron". */
 function registerDevAppId(): void {
   const key = ['HKCU', 'Software', 'Classes', 'AppUserModelId', APP_ID].join('\\')
   const icon = notificationIcon()
@@ -771,10 +771,10 @@ async function quitLeftovers(): Promise<void> {
       const n = left.reduce((sum, l) => sum + l.processes.length + l.more, 0)
       const { response } = await dialog.showMessageBox(shown.win, {
         type: 'question',
-        title: tr(msg({ id: 'main.quit.dialogTitle', defaultMessage: 'Quit Hive', description: 'The title of the question, as Hive quits, about the processes agents left running.' })),
+        title: tr(msg({ id: 'main.quit.dialogTitle', defaultMessage: 'Quit Combwork', description: 'The title of the question, as Hive quits, about the processes agents left running.' })),
         message: tr(msg({ id: 'main.leftovers.quitMessage', defaultMessage: '{n, plural, one {Agents left # process running} other {Agents left # processes running}}', description: 'The question as Hive quits: processes the agents started are still running. {n} is how many.' }), { n }),
         // The processes, a line per agent, then the question.
-        detail: `${left.map((l) => `${basename(l.projectPath)} · ${l.agentName}: ${leftoversSummary(l, undefined, { tr, list: fmt.list })}`).join('\n')}\n\n${tr(msg({ id: 'main.leftovers.quitDetail', defaultMessage: '{n, plural, one {The agents started it, and it may hold project folders or ports. End it as Hive quits, or leave it running?} other {The agents started them, and they may hold project folders or ports. End them as Hive quits, or leave them running?}}', description: 'The question as Hive quits, under the list of the processes agents left running. {n} is how many.' }), { n })}`,
+        detail: `${left.map((l) => `${basename(l.projectPath)} · ${l.agentName}: ${leftoversSummary(l, undefined, { tr, list: fmt.list })}`).join('\n')}\n\n${tr(msg({ id: 'main.leftovers.quitDetail', defaultMessage: '{n, plural, one {The agents started it, and it may hold project folders or ports. End it as Combwork quits, or leave it running?} other {The agents started them, and they may hold project folders or ports. End them as Combwork quits, or leave them running?}}', description: 'The question as Hive quits, under the list of the processes agents left running. {n} is how many.' }), { n })}`,
         buttons: [tr(msg({ id: 'main.leftovers.end', defaultMessage: 'End Them', description: 'Button: ends the processes the agents left running.' })), tr(msg({ id: 'main.leftovers.leave', defaultMessage: 'Leave Running', description: 'Button: leaves the processes the agents left running.' }))],
         defaultId: 0,
         cancelId: 1,
@@ -806,7 +806,7 @@ async function offerRestoredLeftovers(): Promise<void> {
     toast(
       'warning',
       tr(msg({ id: 'main.leftovers.restoredTitle', defaultMessage: '{n, plural, one {{agent} left # process running} other {{agent} left # processes running}}', description: 'A notice at start: processes an agent started before Hive last closed still run. {agent} is the agent (or project) name; {n} how many.' }), { agent: l.agentName || basename(l.projectPath), n }),
-      tr(msg({ id: 'main.leftovers.restoredBody', defaultMessage: "{n, plural, one {{processes}. It was started by the agent before Hive last closed, and may hold the project's folder or ports.} other {{processes}. They were started by the agent before Hive last closed, and may hold the project's folder or ports.}}", description: 'The notice at start about processes an agent left running. {processes} lists them ("node serve.js, 2 × tail -f capture.log"); {n} is how many.' }), { processes: leftoversSummary(l, undefined, { tr, list: fmt.list }), n }),
+      tr(msg({ id: 'main.leftovers.restoredBody', defaultMessage: "{n, plural, one {{processes}. It was started by the agent before Combwork last closed, and may hold the project's folder or ports.} other {{processes}. They were started by the agent before Combwork last closed, and may hold the project's folder or ports.}}", description: 'The notice at start about processes an agent left running. {processes} lists them ("node serve.js, 2 × tail -f capture.log"); {n} is how many.' }), { processes: leftoversSummary(l, undefined, { tr, list: fmt.list }), n }),
       [
         { label: tr(msg({ id: 'main.leftovers.end', defaultMessage: 'End Them', description: 'Button: ends the processes the agents left running.' })), command: 'session.settleLeftovers', args: [l.projectPath, l.agentId, 'end', offer] },
         { label: tr(msg({ id: 'main.leftovers.keep', defaultMessage: 'Keep Running', description: 'Button: leaves the processes an agent left running.' })), command: 'session.settleLeftovers', args: [l.projectPath, l.agentId, 'keep', offer] }
@@ -911,7 +911,7 @@ function showCorrupt(file: string, aside: string, restored: boolean): void {
   toast(
     restored ? 'warning' : 'error',
     restored ? tr(msg({ id: 'main.corrupt.restored', defaultMessage: '{file} was damaged and has been restored', description: "A notice: one of Hive's settings or record files couldn't be read, and Hive went back to its last good copy. {file} is its name." }), { file: basename(file) }) : tr(msg({ id: 'main.corrupt.damaged', defaultMessage: '{file} was damaged', description: "A notice: one of Hive's settings or record files couldn't be read. {file} is its name." }), { file: basename(file) }),
-    restored ? tr(msg({ id: 'main.corrupt.restoredBody', defaultMessage: 'Hive went back to its last good copy. The damaged file was kept as {aside}.', description: 'The notice about a damaged file Hive restored. {aside} is where the damaged file was kept.' }), { aside }) : tr(msg({ id: 'main.corrupt.defaultsBody', defaultMessage: 'Hive had no good copy, so it started from defaults. The damaged file was kept as {aside}.', description: 'The notice about a damaged file Hive had no good copy of. {aside} is where the damaged file was kept.' }), { aside }),
+    restored ? tr(msg({ id: 'main.corrupt.restoredBody', defaultMessage: 'Combwork went back to its last good copy. The damaged file was kept as {aside}.', description: 'The notice about a damaged file Hive restored. {aside} is where the damaged file was kept.' }), { aside }) : tr(msg({ id: 'main.corrupt.defaultsBody', defaultMessage: 'Combwork had no good copy, so it started from defaults. The damaged file was kept as {aside}.', description: 'The notice about a damaged file Hive had no good copy of. {aside} is where the damaged file was kept.' }), { aside }),
     undefined,
     file
   )
@@ -922,7 +922,7 @@ onBoardNotice((path, n) => {
     if (!n.damaged.length) return
     toast('warning', tr(msg({ id: 'main.board.damagedTitle', defaultMessage: "{n, plural, one {# card file couldn't be read} other {# card files couldn't be read}}", description: "A notice as Hive moved the board's cards into its database: some card files weren't valid. {n} is how many." }), { n: n.damaged.length }), tr(msg({ id: 'main.board.damagedBody', defaultMessage: '{files} stayed out of the board. They are kept in {folder}.', description: "The notice about card files Hive couldn't read as it moved the board into its database: {files} lists them, {folder} is where they are kept." }), { files: fmt.list(n.damaged.slice(0, 5), 'unit'), folder: join(path, '.hive', n.folder) }), undefined, 'board')
   } else {
-    toast('warning', tr(msg({ id: 'main.board.foundTitle', defaultMessage: '{n, plural, one {# card made by an older Hive was found: review it} other {# cards made by an older Hive were found: review them}}', description: "A notice: this workspace was opened in an older Hive meanwhile, and it saved cards; they weren't added to the board, but kept for the user to review. {n} is how many." }), { n: n.cards }), tr(msg({ id: 'main.board.foundBody', defaultMessage: 'They are kept, unchanged, in {folder}. Nothing on the board was changed for them: Review… adds each to the board or discards it.', description: 'The notice about cards an older Hive saved: {folder} is the folder where they are kept.' }), { folder: join(path, '.hive', n.folder) }), [{ label: tr(msg({ id: 'main.board.review', defaultMessage: 'Review…', description: "A button on the notice about cards an older Hive saved: opens a dialog listing them, to add each to the board or discard it." })), command: 'task.reviewSetAside' }], 'board')
+    toast('warning', tr(msg({ id: 'main.board.foundTitle', defaultMessage: '{n, plural, one {# card made by an older Combwork was found: review it} other {# cards made by an older Combwork were found: review them}}', description: "A notice: this workspace was opened in an older Hive meanwhile, and it saved cards; they weren't added to the board, but kept for the user to review. {n} is how many." }), { n: n.cards }), tr(msg({ id: 'main.board.foundBody', defaultMessage: 'They are kept, unchanged, in {folder}. Nothing on the board was changed for them: Review… adds each to the board or discards it.', description: 'The notice about cards an older Hive saved: {folder} is the folder where they are kept.' }), { folder: join(path, '.hive', n.folder) }), [{ label: tr(msg({ id: 'main.board.review', defaultMessage: 'Review…', description: "A button on the notice about cards an older Hive saved: opens a dialog listing them, to add each to the board or discard it." })), command: 'task.reviewSetAside' }], 'board')
   }
 })
 

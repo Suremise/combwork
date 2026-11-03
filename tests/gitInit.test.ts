@@ -302,7 +302,7 @@ describe('the guards', () => {
     execFileSync('git', ['init', '-q', '-b', 'main', colo])
     const inner = project('inner', { 'file.txt': 'f\n' }, colo)
     const coloCheck = await initCheck(inner)
-    expect(coloCheck.refused).toBe(`Jujutsu keeps this folder (in ${colo}): Hive makes a git repository only where no other version control system is.`)
+    expect(coloCheck.refused).toBe(`Jujutsu keeps this folder (in ${colo}): Combwork makes a git repository only where no other version control system is.`)
     expect(coloCheck.parentRepo).toBeUndefined()
     await expect(initRepo(inner, { gitignore: 'none', nested: true })).rejects.toThrow(/^Jujutsu keeps this folder/)
     expect(existsSync(join(inner, '.git'))).toBe(false)

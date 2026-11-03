@@ -94,7 +94,7 @@ process.on('uncaughtException', (e) => {
     await lib.sleep(1000) // A fixed wait on purpose: the crash has to take the page down first, so what follows sees the reloaded page, not the old one.
   }
   const pageBack = () => until(() => js("!!window.hive && !!document.querySelector('.menubar')"), 20000)
-  const toastText = () => js(`[...document.querySelectorAll('.toast')].map((t) => t.innerText).find((t) => t.includes("Hive's window stopped and was reloaded")) ?? ''`)
+  const toastText = () => js(`[...document.querySelectorAll('.toast')].map((t) => t.innerText).find((t) => t.includes("Combwork's window stopped and was reloaded")) ?? ''`)
 
   // --- A crash: reloaded, with a note, the agent still running and its terminal attached.
   await crash()

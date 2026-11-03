@@ -2,5 +2,5 @@
   "commands.migrated.close": "Commande à la fermeture",
   "commands.migrated.quit": "Commande en quittant",
   "commands.run.gone": "Cette commande n’existe plus.",
-  "commands.run.testCopy": "Ceci est une copie de test de Hive : elle n’exécute pas tes commandes."
+  "commands.run.testCopy": "Ceci est une copie de test de Combwork : elle n’exécute pas tes commandes."
 }

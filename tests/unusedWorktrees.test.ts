@@ -177,9 +177,9 @@ describe('listing', () => {
       expect(of(hive.path).origin).toEqual({ madeBy: 'hive' })
       expect(of(other.path).origin).toEqual({ madeBy: 'other' })
       expect(originLabel(of(ran.path))).toBe('was B4')
-      expect(originLabel(of(hive.path))).toBe('made by Hive')
-      expect(originLabel(of(other.path))).toBe('not made by Hive')
-      expect(unusedPickerLabel(of(other.path))).toBe(`feature/other${n} · not made by Hive · merged, clean`)
+      expect(originLabel(of(hive.path))).toBe('made by Combwork')
+      expect(originLabel(of(other.path))).toBe('not made by Combwork')
+      expect(unusedPickerLabel(of(other.path))).toBe(`feature/other${n} · not made by Combwork · merged, clean`)
     } finally {
       await run(() => w.mutateSessions(proj, (f) => void (f.sessions = [])))
     }
@@ -213,7 +213,7 @@ describe('listing', () => {
       await run(() => boardWrite(w, async () => store.takeQueueLease(held, null) && store.setQueueFolder({ folder: t, target: 'main', lease })))
       // Its runner merging in it: not listed, not removable, even though nothing else needs it.
       expect(await find(t)).toBeUndefined()
-      await expect(run(() => removalPreview(proj, t))).rejects.toThrow(/Hive doesn't remove it/)
+      await expect(run(() => removalPreview(proj, t))).rejects.toThrow(/Combwork doesn't remove it/)
       expect(existsSync(t)).toBe(true)
       // Its Hive crashed (the lease names a process that has ended): the queue's, while the queue needs it.
       const ended = execFileSync(process.execPath, ['-e', 'process.stdout.write(String(process.pid))'], { encoding: 'utf8', env: { SystemRoot: process.env.SystemRoot ?? '' } })
@@ -223,7 +223,7 @@ describe('listing', () => {
       // Released cleanly and kept warm for the next merge (Darren's case): still the queue's while it needs it.
       await run(() => boardWrite(w, async () => store.dropQueueLease(lease, 't2') && store.setQueueFolder({ folder: t, target: 'main', lease: null })))
       expect(await find(t)).toBeUndefined()
-      await expect(run(() => removalPreview(proj, t))).rejects.toThrow(/Hive doesn't remove it/)
+      await expect(run(() => removalPreview(proj, t))).rejects.toThrow(/Combwork doesn't remove it/)
       // Whether it does can't be said: kept, never offered.
       need = new Error('no workflow')
       expect(await find(t)).toBeUndefined()
@@ -716,8 +716,8 @@ describe('without git (#346)', () => {
   it('lists nothing, says why, and removes nothing', async () => {
     const t = await tree(`nogit${++n}`)
     process.env.PATH = (PATH ?? '').split(delimiter).filter((d) => d && !gitOnPath({ PATH: d })).join(delimiter)
-    expect(await run(() => unusedWorktrees(proj))).toEqual({ worktrees: [], gitProblem: "Git isn't installed (or isn't on Hive's PATH)" })
-    expect(await run(() => removeUnusedWorktree(proj, t.path))).toMatchObject({ deleted: false, reason: "Git isn't installed (or isn't on Hive's PATH)" })
+    expect(await run(() => unusedWorktrees(proj))).toEqual({ worktrees: [], gitProblem: "Git isn't installed (or isn't on Combwork's PATH)" })
+    expect(await run(() => removeUnusedWorktree(proj, t.path))).toMatchObject({ deleted: false, reason: "Git isn't installed (or isn't on Combwork's PATH)" })
     await expect(run(() => removalPreview(proj, t.path))).rejects.toThrow(/isn't installed/)
     expect(existsSync(t.path)).toBe(true)
   })

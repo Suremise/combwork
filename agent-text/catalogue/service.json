@@ -5,7 +5,7 @@
     "audience": "both"
   },
   "service.advanced.changedOutside": {
-    "text": "advanced.json was changed outside Hive meanwhile: Settings shows it now. Try again.",
+    "text": "advanced.json was changed outside Combwork meanwhile: Settings shows it now. Try again.",
     "note": "An error changing an advanced setting: advanced.json (a file name: keep it) was edited elsewhere meanwhile, so the change wasn't written.",
     "audience": "both"
   },
@@ -20,7 +20,7 @@
     "audience": "both"
   },
   "service.advanced.newer": {
-    "text": "advanced.json is from a newer Hive (format {format}): this one reads format {supported}.",
+    "text": "advanced.json is from a newer Combwork (format {format}): this one reads format {supported}.",
     "note": "Above Settings → Advanced's list: advanced.json (a file name: keep it) was written by a newer version of Hive, in a format ({format}) this one can't read ({supported} is the one it reads).",
     "audience": "both"
   },
@@ -55,7 +55,7 @@
     "audience": "both"
   },
   "service.attachments.notOwn": {
-    "text": "{folder} is a link or not a folder of the project's own, so Hive keeps no attachments in it.",
+    "text": "{folder} is a link or not a folder of the project's own, so Combwork keeps no attachments in it.",
     "note": "An error keeping a pasted or dropped file for a session: its folder {folder} (in the project's .hive) is a link or leads elsewhere, so Hive writes nothing through it.",
     "audience": "both"
   },
@@ -95,12 +95,12 @@
     "audience": "both"
   },
   "service.benchmarks.notRemoved": {
-    "text": "It is off the list, but its file couldn’t be removed yet: Hive will try again.",
+    "text": "It is off the list, but its file couldn’t be removed yet: Combwork will try again.",
     "note": "An error removing a kept comparison on the Performance page: it is no longer listed, but its file couldn't be deleted yet.",
     "audience": "both"
   },
   "service.benchmarks.stuck": {
-    "text": "{n, plural, one {# removed comparison’s file couldn’t be deleted yet (in use?): nothing more can be kept until it is.} other {# removed comparisons’ files couldn’t be deleted yet (in use?): nothing more can be kept until they are.}} Hive retries each time it reads the list.",
+    "text": "{n, plural, one {# removed comparison’s file couldn’t be deleted yet (in use?): nothing more can be kept until it is.} other {# removed comparisons’ files couldn’t be deleted yet (in use?): nothing more can be kept until they are.}} Combwork retries each time it reads the list.",
     "note": "An error keeping a comparison on the Performance page: {n} removed comparisons' files couldn't be deleted yet (another program may have them open), and the list has no room until they are.",
     "audience": "both"
   },
@@ -110,7 +110,7 @@
     "audience": "both"
   },
   "service.benchmarks.unwritable": {
-    "text": "Hive refused to write a list of kept comparisons it couldn’t read back: nothing was changed.",
+    "text": "Combwork refused to write a list of kept comparisons it couldn’t read back: nothing was changed.",
     "note": "An error on the Performance page: the list of kept comparisons Hive was about to write wouldn't read back as valid, so it wasn't written.",
     "audience": "both"
   },
@@ -215,7 +215,7 @@
     "audience": "both"
   },
   "service.files.notKept": {
-    "text": "Not one of the session attachments Hive keeps.",
+    "text": "Not one of the session attachments Combwork keeps.",
     "note": "An error deleting a session's attachment (a file pasted or dropped into a session): it isn't one Hive keeps, or it is a link.",
     "audience": "both"
   },
@@ -390,7 +390,7 @@
     "audience": "both"
   },
   "service.gitRepo.pushAllRefused": {
-    "text": "{remote} refused {n, plural, one {# branch or tag} other {# branches and tags}} (Hive never forces a push): it has commits they haven't, so pull or merge them first. What happened to each:",
+    "text": "{remote} refused {n, plural, one {# branch or tag} other {# branches and tags}} (Combwork never forces a push): it has commits they haven't, so pull or merge them first. What happened to each:",
     "note": "An error after Push to… with all branches and tags in the Git view: the first line, the remote {remote} refused {n} of them; a line for each outcome follows (service.gitRepo.pushOutcome).",
     "audience": "both"
   },
@@ -405,7 +405,7 @@
     "audience": "both"
   },
   "service.gitRepo.rejected": {
-    "text": "{to} has commits {branch} hasn't, so the push was refused (Hive never forces a push). Pull first, or merge them in a terminal.",
+    "text": "{to} has commits {branch} hasn't, so the push was refused (Combwork never forces a push). Pull first, or merge them in a terminal.",
     "note": "An error pushing the branch {branch} in the Git view: the remote branch {to} has commits it hasn't, so the remote refused.",
     "audience": "both"
   },
@@ -500,12 +500,12 @@
     "audience": "both"
   },
   "service.gitRepo.update.notUndone": {
-    "text": "Updating {branch} from {target} stopped, and Hive couldn't undo it: {folder} is {state, select, none {left changed} merge {still in the middle of a merge} rebase {still in the middle of a rebase} other {still in the middle of a git operation}}. Finish or abort it there yourself (git status says how), then check {branch}. Git said: {why}",
+    "text": "Updating {branch} from {target} stopped, and Combwork couldn't undo it: {folder} is {state, select, none {left changed} merge {still in the middle of a merge} rebase {still in the middle of a rebase} other {still in the middle of a git operation}}. Finish or abort it there yourself (git status says how), then check {branch}. Git said: {why}",
     "note": "An error updating a branch from its target (HI-1180): git stopped, and Hive's own abort failed, so the folder ({folder}: a slot's name, a folder's name or a path) is left as git left it ({state}: none, merge, rebase or another operation; select: translate each). {why} is git's own words.",
     "audience": "both"
   },
   "service.gitRepo.update.notUndoneTemporary": {
-    "text": "Updating {branch} from {target} stopped, and Hive couldn't undo it in its temporary folder {folder}, kept as git left it: {branch} itself is as it was. Remove that folder in Unused worktrees once you have looked. Git said: {why}",
+    "text": "Updating {branch} from {target} stopped, and Combwork couldn't undo it in its temporary folder {folder}, kept as git left it: {branch} itself is as it was. Remove that folder in Unused worktrees once you have looked. Git said: {why}",
     "note": "An error updating a branch from its target (HI-1180) that was checked out nowhere: git stopped in the temporary folder Hive made ({folder}: its path), and Hive's abort failed, so the folder is kept; the branch itself wasn't moved. {state} is unused here. {why} is git's own words.",
     "audience": "both"
   },
@@ -515,7 +515,7 @@
     "audience": "both"
   },
   "service.gitRepo.update.temporaryLeft": {
-    "text": "Hive couldn't remove its temporary folder {folder}: remove it in Unused worktrees.",
+    "text": "Combwork couldn't remove its temporary folder {folder}: remove it in Unused worktrees.",
     "note": "A second line after Update from <target> on a branch checked out nowhere (HI-1180): the temporary folder Hive made for it ({folder}: its path) could not be removed.",
     "audience": "both"
   },
@@ -565,7 +565,7 @@
     "audience": "both"
   },
   "service.intent.queueNotAgents": {
-    "text": "Only the user, or the Hive Assistant within Settings → Assistant → Control, takes a card out of the merge queue or retries its merge.",
+    "text": "Only the user, or the Assistant within Settings → Assistant → Control, takes a card out of the merge queue or retries its merge.",
     "note": "An error: an agent or a script asked to remove a card from the merge queue or retry its merge, which only the user and the Hive Assistant (within its Control setting, a setting name: use it as Hive shows it) can do.",
     "audience": "both"
   },
@@ -590,7 +590,7 @@
     "audience": "both"
   },
   "service.keys.unknownProject": {
-    "text": "That project has no id yet, so it can’t have a key: open it in Hive first.",
+    "text": "That project has no id yet, so it can’t have a key: open it in Combwork first.",
     "note": "An error changing a project's key: the project hasn't been given Hive's id (it hasn't been opened yet).",
     "audience": "both"
   },
@@ -695,12 +695,12 @@
     "audience": "both"
   },
   "service.providers.stillLooking": {
-    "text": "Hive is still looking for {cli}. Try again in a moment.",
+    "text": "Combwork is still looking for {cli}. Try again in a moment.",
     "note": "An error: Hive hasn't finished finding the coding agent CLI {cli} (\"Codex\"), so it can't use it yet.",
     "audience": "both"
   },
   "service.providers.stillLookingAll": {
-    "text": "Hive is still looking for the coding agent CLIs. Try again in a moment.",
+    "text": "Combwork is still looking for the coding agent CLIs. Try again in a moment.",
     "note": "An error: Hive hasn't finished finding the coding agent CLIs installed (it does when it starts), so it can't choose one yet.",
     "audience": "both"
   },
@@ -710,17 +710,17 @@
     "audience": "both"
   },
   "service.slots.notPrepared": {
-    "text": "Hive couldn't get {slot} ready for {card}: {why}",
+    "text": "Combwork couldn't get {slot} ready for {card}: {why}",
     "note": "A notice: a card was started in a slot (a worktree Hive lends to a card or a lane), and Hive couldn't check out the card's branch there or install its dependencies. {slot} is the slot's name (slot-b), {card} the card's key, {why} git's or the setup's reason, in English.",
     "audience": "both"
   },
   "service.slots.resumeFailed": {
-    "text": "Hive couldn't resume {agent}'s conversation in {slot} for {card} (three tries): {why}. Resume {agent} from Sessions, or start it fresh, and Hive gives it {card}.",
+    "text": "Combwork couldn't resume {agent}'s conversation in {slot} for {card} (three tries): {why}. Resume {agent} from Sessions, or start it fresh, and Combwork gives it {card}.",
     "note": "A notice (HI-1746): a card was started for an agent (its builder) in a slot, and Hive's resumes of the agent's last conversation there failed three times, so it stopped trying. Once the user resumes the agent, or starts it, Hive hands it the card. {card} is the card's key, {agent} the agent's name, {slot} the slot's name (slot-b), {why} the last failure's reason, in English.",
     "audience": "both"
   },
   "service.slots.resumeHeld": {
-    "text": "Hive can't give {card} to {agent} yet: {agent}'s conversation in {slot} can't resume now ({why}). Hive gives it {card} once it can.",
+    "text": "Combwork can't give {card} to {agent} yet: {agent}'s conversation in {slot} can't resume now ({why}). Combwork gives it {card} once it can.",
     "note": "A notice (HI-1746): a card was started for an agent (its builder) in a slot, and Hive hasn't handed the card to it yet; the agent's last conversation, in that slot, can't be resumed now, and Hive never starts a new conversation instead. {card} is the card's key, {agent} the agent's name, {slot} the slot's name (slot-b), {why} the reason, in English.",
     "audience": "both"
   },
@@ -750,7 +750,7 @@
     "audience": "both"
   },
   "service.workflow.changedMeanwhile": {
-    "text": "The workflow options changed meanwhile (in another window, or by the Hive Assistant), so nothing was saved. The section shows them as they are now.",
+    "text": "The workflow options changed meanwhile (in another window, or by the Assistant), so nothing was saved. The section shows them as they are now.",
     "note": "Why saving the Workflow section of the Version Control tab was refused: the options changed after the section was read. It reloads them.",
     "audience": "both"
   },

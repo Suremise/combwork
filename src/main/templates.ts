@@ -95,9 +95,9 @@ const M = {
   takenNothing: msg({ id: 'content.templates.takenNothing', defaultMessage: '{names} {count, plural, one {is already an agent} other {are already agents}} in {projects}: agent names are unique across the workspace, so rename {count, plural, one {it} other {them}}. Nothing was changed.', description: "An error loading a template: agents of other projects ({projects}) took its agents' names {names} ({count} of them) while it loaded, so nothing changed. {names} and {projects} are lists, in the language's way (\"B1 and R1\")." }),
   overMax: msg({ id: 'content.templates.overMax', defaultMessage: 'It has {count, number} agents, and this project’s workflow allows {max, plural, one {# agent} other {# agents}}: raise Maximum agents in Version Control → Workflow first, or load it with its workflow. Nothing was changed.', description: "An error loading a template (HI-2058): its agents ({count}) are more than the project's workflow option Maximum agents ({max}), and its workflow, which would raise it, isn't applied. Maximum agents, Version Control and Workflow are names in the window: as translated there." }),
   nothing: msg({ id: 'content.templates.nothing', defaultMessage: '{problem} Nothing was changed.', description: "An error loading a template, nothing changed: {problem} is why, a sentence of its own (how many agents a project can have)." }),
-  noKey: msg({ id: 'content.templates.noKey', defaultMessage: "Hive couldn't read {project}'s key, and this template's agent names are made from it. Try again, or check the key in Project Settings → General.", description: "An error loading a template, or adding one of its agents, whose names hold the project's key (HI-B1 in a project whose key is HI): the key of the project ({project}, its name) couldn't be read. Project Settings → Agents is where the key is changed: use its translation." }),
-  noKeySave: msg({ id: 'content.templates.noKeySave', defaultMessage: "Hive couldn't read {project}'s key, so the names can't be saved with it. Try again, or save without Use the project key in names.", description: "An error saving a project's agents as a template with \"Use the project key in names\" ticked: the key of the project ({project}, its name) couldn't be read. \"Use the project key in names\" is the tick box's label: use its translation." }),
-  hiveOnly: msg({ id: 'content.templates.hiveOnly', defaultMessage: "Hive's own templates can't be changed: duplicate one into the workspace or a project to change it.", description: "An error: saving, renaming, editing, importing into or deleting one of Hive's own templates (the Hive scope, read-only). Duplicate is a button: as Hive names it." })
+  noKey: msg({ id: 'content.templates.noKey', defaultMessage: "Combwork couldn't read {project}'s key, and this template's agent names are made from it. Try again, or check the key in Project Settings → General.", description: "An error loading a template, or adding one of its agents, whose names hold the project's key (HI-B1 in a project whose key is HI): the key of the project ({project}, its name) couldn't be read. Project Settings → Agents is where the key is changed: use its translation." }),
+  noKeySave: msg({ id: 'content.templates.noKeySave', defaultMessage: "Combwork couldn't read {project}'s key, so the names can't be saved with it. Try again, or save without Use the project key in names.", description: "An error saving a project's agents as a template with \"Use the project key in names\" ticked: the key of the project ({project}, its name) couldn't be read. \"Use the project key in names\" is the tick box's label: use its translation." }),
+  hiveOnly: msg({ id: 'content.templates.hiveOnly', defaultMessage: "Combwork's own templates can't be changed: duplicate one into the workspace or a project to change it.", description: "An error: saving, renaming, editing, importing into or deleting one of Hive's own templates (the Hive scope, read-only). Duplicate is a button: as Hive names it." })
 }
 
 const checkScope = (scope: unknown): TemplateScope => {
@@ -412,12 +412,12 @@ export async function exportTemplate(ref: TemplateRef, dest: string, mask: <T>(v
 export async function readImport(path: string): Promise<AgentTemplate> {
   const info = await stat(path).catch(() => null)
   if (!info?.isFile()) throw refusal(msg({ id: 'content.templates.noFile', defaultMessage: "That file isn't there.", description: 'An error importing a template: the file chosen is gone.' }), undefined, 'notFound')
-  if (info.size > TEMPLATE_IMPORT_MAX) throw refusal(msg({ id: 'content.templates.importTooLarge', defaultMessage: "It isn't a Hive agent template (over {kb} KB).", description: 'An error importing a template: the file is larger than {kb} KB, more than any template.' }), { kb: TEMPLATE_IMPORT_MAX / 1024 })
+  if (info.size > TEMPLATE_IMPORT_MAX) throw refusal(msg({ id: 'content.templates.importTooLarge', defaultMessage: "It isn't a Combwork agent template (over {kb} KB).", description: 'An error importing a template: the file is larger than {kb} KB, more than any template.' }), { kb: TEMPLATE_IMPORT_MAX / 1024 })
   let raw: unknown
   try {
     raw = JSON.parse((await readFile(path, 'utf8')).replace(/^﻿/, ''))
   } catch {
-    throw refusal(msg({ id: 'content.templates.importNotJson', defaultMessage: "It isn't a Hive agent template (not JSON).", description: "An error importing a template: the file isn't JSON." }))
+    throw refusal(msg({ id: 'content.templates.importNotJson', defaultMessage: "It isn't a Combwork agent template (not JSON).", description: "An error importing a template: the file isn't JSON." }))
   }
   const t = readTemplate(raw)
   // agent-text: readTemplate
@@ -555,7 +555,7 @@ async function planFor(projectPath: string, scope: TemplateScope, file: string, 
       try {
         dirty = (await status(tree)).dirty
       } catch (e) {
-        blocked.push(withValues(msg({ id: 'content.templates.checkFailed', defaultMessage: "Hive couldn't check {agent}'s worktree ({folder}): {error}", description: "Why a template can't be loaded: git couldn't tell whether the worktree {folder} of the agent {agent} it would remove has uncommitted work; {error} is why (often git's own words)." }), { agent: a.name, folder: tree.path, error: firstLine(e) }))
+        blocked.push(withValues(msg({ id: 'content.templates.checkFailed', defaultMessage: "Combwork couldn't check {agent}'s worktree ({folder}): {error}", description: "Why a template can't be loaded: git couldn't tell whether the worktree {folder} of the agent {agent} it would remove has uncommitted work; {error} is why (often git's own words)." }), { agent: a.name, folder: tree.path, error: firstLine(e) }))
       }
     }
     remove.push({ id: a.id, name: a.name, running, dirty, ...(tree ? { worktree: { path: tree.path, branch: tree.branch } } : {}) })

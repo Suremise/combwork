@@ -119,10 +119,10 @@ const check = (name, ok, extra = '') => {
   await shot('added-dark')
 
   // Remove: only what Hive added; the user's own exclusion stays.
-  await panel.getByRole('button', { name: 'Remove Hive’s Exclusions…' }).click()
-  const removeDialog = page.locator('.dialog', { hasText: 'Remove the exclusions Hive added?' })
+  await panel.getByRole('button', { name: 'Remove Combwork’s Exclusions…' }).click()
+  const removeDialog = page.locator('.dialog', { hasText: 'Remove the exclusions Combwork added?' })
   await lib.until(async () => (await removeDialog.count()) === 1, 5000)
-  check('Remove lists only the folder Hive added, on its own line', JSON.stringify(await removeDialog.locator('.dialog-list li').allInnerTexts()) === JSON.stringify([tests]) &&!(await removeDialog.innerText()).split('\n').some((l) => l.trim() === root), await removeDialog.innerText())
+  check('Remove lists only the folder Combwork added, on its own line', JSON.stringify(await removeDialog.locator('.dialog-list li').allInnerTexts()) === JSON.stringify([tests]) &&!(await removeDialog.innerText()).split('\n').some((l) => l.trim() === root), await removeDialog.innerText())
   await removeDialog.locator('.btn.primary').click()
   check('…one elevated call, for it alone', !!(await lib.until(async () => changes('remove').length === 1, 10000)) && JSON.stringify(changes('remove')[0].paths) === JSON.stringify([tests]), JSON.stringify(changes('remove')))
   check('…the user’s exclusion stays: the workspace excluded, the test area scanned again', !!(await lib.until(async () => /Excluded/.test(await rowText(0)) && /Scanned/.test(await rowText(1)), 5000)), await panel.innerText())

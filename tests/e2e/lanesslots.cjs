@@ -194,7 +194,7 @@ const lines = (file) => {
     await page.locator('[role="tab"][data-section="branches"]').click()
     const copyRow = page.locator('.git-worktree[data-hive="copy"]')
     const copyLine = `copy-1: R1 reviewing ${key1} at ${rev.slice(0, 7)}`
-    check(`Branches & remotes lists copy-1 under "Review copies (Hive’s)": "${copyLine}"`, !!(await until(async () => (await page.locator('[data-worktrees="copies"]').count()) === 1 && ((await copyRow.textContent().catch(() => '')) ?? '').includes(copyLine), HUNG_MS)), await copyRow.allInnerTexts().catch(() => []))
+    check(`Branches & remotes lists copy-1 under "Review copies (Combwork’s)": "${copyLine}"`, !!(await until(async () => (await page.locator('[data-worktrees="copies"]').count()) === 1 && ((await copyRow.textContent().catch(() => '')) ?? '').includes(copyLine), HUNG_MS)), await copyRow.allInnerTexts().catch(() => []))
     check('…with no button, and not among the worktrees', (await copyRow.locator('button').count()) === 0 && (await page.locator('.git-worktree:not([data-hive])', { hasText: 'copy-1' }).count()) === 0)
     await shoot('branches-copies', page.locator('.git-branches'))
 

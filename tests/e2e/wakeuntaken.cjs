@@ -107,7 +107,7 @@ const check = (name, ok, extra = '') => {
   const drops = () => fs.readFileSync(path.join(claudeHome, 'fake-drop-enters-Watcher.txt'), 'utf8').trim()
   check('Hive pressed Enter twice, never a third time (the CLI dropped both)', !!(await until(async () => drops() === '0', HUNG_MS)) && wakes().length === 1, JSON.stringify({ left: drops(), wakes: wakes().length }))
   check('the log says: Enter again, still not taken', /wasn't taken: pressed Enter again/.test(hiveLog()) && /still wasn't taken/.test(hiveLog()))
-  check('its pane says so', !!(await until(async () => (await page.locator('.pane-status', { hasText: "A line Hive typed wasn't taken" }).count()) >= 1, HUNG_MS)))
+  check('its pane says so', !!(await until(async () => (await page.locator('.pane-status', { hasText: "A line Combwork typed wasn't taken" }).count()) >= 1, HUNG_MS)))
   await page.screenshot({ path: path.join(lib.WORK, 'wakeuntaken-marked.png') })
   const toldOf = () => notices().filter((n) => /hasn't taken a line Hive typed/.test(JSON.stringify(n)))
   const told = (await until(async () => toldOf().length > 0 && toldOf(), HUNG_MS)) || []

@@ -86,7 +86,7 @@ function pathWithoutGit() {
   check('Review opens Changes at Unused worktrees (2)', !!(await lib.until(async () => (await section.count()) === 1 && /Unused worktrees\s*2/.test(await section.locator('h2').innerText()), 10000)) && (await page.locator('.tab.active, .tab[aria-selected="true"]', { hasText: 'Version Control' }).count()) >= 1, await section.innerText().catch(() => ''))
   const picker = page.locator('.split-list .root-select')
   check('…the folder picker shows "Unused worktrees (2)", first, in its group (#476)', (await picker.inputValue()) === 'unused' && (await picker.locator('optgroup[label^="Unused worktrees"] option').allInnerTexts()).join('|').includes('Unused worktrees (2)') && (await picker.locator('option').evaluateAll((os) => os.map((o) => o.value).find((v) => !(v.startsWith('compare:') || v === 'leftovers')))) === 'unused', (await picker.locator('option').allInnerTexts()).join('|'))
-  check('…each made by Hive (its agent never ran a session there)', (await section.locator('[data-origin="hive"]').count()) === 2, await section.innerText().catch(() => ''))
+  check('…each made by Combwork (its agent never ran a session there)', (await section.locator('[data-origin="hive"]').count()) === 2, await section.innerText().catch(() => ''))
   check('…and says what they are', (await section.locator('.info-icon, [aria-label*="info" i]').count()) >= 1)
   // Its ⓘ says where they come from, without promising a template gives them back (#1562: 1.0's agents get no worktree).
   await section.locator('h2 .info-icon').first().hover()

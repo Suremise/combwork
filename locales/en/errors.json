@@ -96,7 +96,7 @@
     "description": "The file type in Windows' file picker for a skill. Keep \".md\" and \".zip\" as they are."
   },
   "errors.dialog.templateFiles": {
-    "defaultMessage": "Hive template",
+    "defaultMessage": "Combwork template",
     "description": "The file type in Windows' file dialogs for templates."
   },
   "errors.dialog.useFolder": {
@@ -104,11 +104,11 @@
     "description": "Button of Windows' folder picker in Repair."
   },
   "errors.file.insideArchive": {
-    "defaultMessage": "Hive opens no files inside .asar archives.",
+    "defaultMessage": "Combwork opens no files inside .asar archives.",
     "description": "Refusal to open a file inside an Electron .asar archive. Keep \".asar\" as it is."
   },
   "errors.file.outsideWorkspace": {
-    "defaultMessage": "Hive can only read and write files inside the workspace, and the agents' instruction, memory and skill files.",
+    "defaultMessage": "Combwork can only read and write files inside the workspace, and the agents' instruction, memory and skill files.",
     "description": "Refusal to open or save a file outside what Hive may touch."
   },
   "errors.hive.cantList": {
@@ -120,7 +120,7 @@
     "description": "Exclude .hive from git: the project isn't in a git repository. Keep \".hive\" as it is."
   },
   "errors.hive.notIgnored": {
-    "defaultMessage": "Git still doesn't ignore .hive here: a rule in a .gitignore (a line starting with !) may bring it back. Hive doesn't edit .gitignore files.",
+    "defaultMessage": "Git still doesn't ignore .hive here: a rule in a .gitignore (a line starting with !) may bring it back. Combwork doesn't edit .gitignore files.",
     "description": "Exclude .hive from git: after excluding it, git still sees it. Keep \".hive\", \".gitignore\" and \"!\" as they are."
   },
   "errors.image.not": {
@@ -148,11 +148,11 @@
     "description": "Progress panel: a run gave its log as a relative path, which Hive won't open. {path} is that path."
   },
   "errors.log.notText": {
-    "defaultMessage": "Hive opens only text logs and reports, not {file}: use Show in folder.",
+    "defaultMessage": "Combwork opens only text logs and reports, not {file}: use Show in folder.",
     "description": "Progress panel: a run's log isn't a text file, so Hive won't open it. {file} is its file name. \"Show in folder\" is the menu item beside it."
   },
   "errors.merge.queueMerges": {
-    "defaultMessage": "Hive merges {card} through the merge queue. Merge it there, or choose Merge anyway in the Merge dialog.",
+    "defaultMessage": "Combwork merges {card} through the merge queue. Merge it there, or choose Merge anyway in the Merge dialog.",
     "description": "Refusal of a Merge of an agent's branch whose card Hive's merge queue merges (the dialog's state was out of date). {card} is the card's key. Merge anyway is a button: keep it as Hive shows it. Glossary 2.5: merge queue."
   },
   "errors.mergeSlot.holdRequired": {

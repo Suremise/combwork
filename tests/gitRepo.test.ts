@@ -381,7 +381,7 @@ describe('pull and push', () => {
     const before = git(proj, 'rev-parse', 'HEAD')
     await expect(repo.pull(proj)).rejects.toThrow('main and origin/main have diverged (1 commit here, 1 there)')
     expect(git(proj, 'rev-parse', 'HEAD')).toBe(before)
-    await expect(repo.push(proj)).rejects.toThrow(/push was refused \(Hive never forces a push\)/)
+    await expect(repo.push(proj)).rejects.toThrow(/push was refused \(Combwork never forces a push\)/)
     expect(git(remote, 'rev-parse', 'main')).not.toBe(before)
   })
 
@@ -446,7 +446,7 @@ describe('Push to…, remotes and tracking (#1385)', () => {
     git(proj, 'branch', 'feature/same', git(backup, 'rev-parse', 'main'))
     git(proj, 'push', '-q', 'backup', 'feature/same')
     // Each branch by name with its outcome: pushed, already up to date, refused.
-    await expect(repo.pushToRemote(proj, 'backup', 'all')).rejects.toThrow("backup refused 1 branch or tag (Hive never forces a push): it has commits they haven't, so pull or merge them first. What happened to each:\nPushed: feature/b, main.\nAlready up to date: feature/same.\nRefused: feature/a.")
+    await expect(repo.pushToRemote(proj, 'backup', 'all')).rejects.toThrow("backup refused 1 branch or tag (Combwork never forces a push): it has commits they haven't, so pull or merge them first. What happened to each:\nPushed: feature/b, main.\nAlready up to date: feature/same.\nRefused: feature/a.")
     expect(git(backup, 'rev-parse', 'feature/a')).toBe(theirs)
     expect(git(backup, 'rev-parse', 'feature/b')).toBe(git(proj, 'rev-parse', 'HEAD'))
     // This branch alone: named as Push names it.
@@ -1291,7 +1291,7 @@ describe('Update from <target> (HI-1180)', () => {
     const was = head('card')
     const unhook = lockingHook()
     try {
-      await expect(repo.updateBranch(proj, 'card', 'merge')).rejects.toThrow(`Updating card from main stopped, and Hive couldn't undo it: ${wt} is still in the middle of a merge. Finish or abort it there yourself (git status says how), then check card.`)
+      await expect(repo.updateBranch(proj, 'card', 'merge')).rejects.toThrow(`Updating card from main stopped, and Combwork couldn't undo it: ${wt} is still in the middle of a merge. Finish or abort it there yourself (git status says how), then check card.`)
       expect(existsSync(join(git(wt, 'rev-parse', '--absolute-git-dir'), 'MERGE_HEAD'))).toBe(true)
       expect(head('card')).toBe(was)
     } finally {
@@ -1305,7 +1305,7 @@ describe('Update from <target> (HI-1180)', () => {
     const was = head('card')
     const unhook = lockingHook()
     try {
-      await expect(repo.updateBranch(proj, 'card', 'merge')).rejects.toThrow(/Updating card from main stopped, and Hive couldn't undo it in its temporary folder .+update-[0-9a-f]{8}, kept as git left it: card itself is as it was\./)
+      await expect(repo.updateBranch(proj, 'card', 'merge')).rejects.toThrow(/Updating card from main stopped, and Combwork couldn't undo it in its temporary folder .+update-[0-9a-f]{8}, kept as git left it: card itself is as it was\./)
       expect(head('card')).toBe(was)
       expect(worktrees().length).toBe(2)
     } finally {
@@ -1323,7 +1323,7 @@ describe('Update from <target> (HI-1180)', () => {
     gitFails = (a) => a[0] === 'worktree' && a[1] === 'remove'
     const done = await repo.updateBranch(proj, 'card', 'merge')
     gitFails = null
-    expect(done).toMatch(/^Merged main into card \([0-9a-f]{7}\)\.\nHive couldn't remove its temporary folder .+update-[0-9a-f]{8}: remove it in Unused worktrees\.$/)
+    expect(done).toMatch(/^Merged main into card \([0-9a-f]{7}\)\.\nCombwork couldn't remove its temporary folder .+update-[0-9a-f]{8}: remove it in Unused worktrees\.$/)
     expect(contains('card', head('main'))).toBe(true)
     for (const w of worktrees().filter((x) => /update-[0-9a-f]{8}$/.test(x))) git(proj, 'worktree', 'remove', '--force', w)
   })

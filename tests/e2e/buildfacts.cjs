@@ -67,7 +67,7 @@ const builds = async (inv) => (await inv('journal:browse', { source: 'hive' })).
     // The Assistant view's Journal shows it, marked as Hive's.
     await page.locator('.activity-btn[aria-label="Hive Assistant"]').click()
     await page.locator('.row[data-section="journal"]').click()
-    const row = page.locator('.journal .journal-row', { hasText: 'Built Hive 9.9.9-rc.1 (baseline)' })
+    const row = page.locator('.journal .journal-row', { hasText: 'Built Combwork 9.9.9-rc.1 (baseline)' })
     check('Journal → Timeline shows the build', !!(await lib.until(async () => (await row.count()) === 1, HUNG_MS)))
     check("…marked as Hive's", (await row.locator('.journal-source-mark[aria-label="Hive"]').count()) === 1)
     await page.screenshot({ path: path.join(lib.WORK, 'buildfacts-journal.png') })

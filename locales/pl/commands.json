@@ -2,5 +2,5 @@
   "commands.migrated.close": "Polecenie przy zamykaniu obszaru roboczego",
   "commands.migrated.quit": "Polecenie przy zamykaniu Hive",
   "commands.run.gone": "Tego polecenia już nie ma.",
-  "commands.run.testCopy": "To jest testowa kopia Hive: nie uruchamia Twoich poleceń."
+  "commands.run.testCopy": "To jest testowa kopia Combwork: nie uruchamia Twoich poleceń."
 }

@@ -34,7 +34,7 @@
   "worktrees.merge.sameBranch": "W folderze projektu jest wybrana gałąź {branch}.",
   "worktrees.merge.staged": "Folder projektu ma zmiany dodane do indeksu (staged). Zrób commit albo usuń je z indeksu przed scaleniem.",
   "worktrees.merge.targetElsewhere": "Gałąź {branch} jest wybrana w folderze {folder}. Scal tam albo najpierw wybierz w tym folderze inną gałąź.",
-  "worktrees.merge.targetMoved": "Gałąź {branch} zmieniła się, gdy Hive do niej scalał. Nic nie zostało scalone: scal ponownie.",
+  "worktrees.merge.targetMoved": "Gałąź {branch} zmieniła się, gdy Combwork do niej scalał. Nic nie zostało scalone: scal ponownie.",
   "worktrees.merge.uncommitted": "Nic nie zostało scalone: {files, plural, one {# plik w worktree nie ma commita. Zrób commit lub stash tego pliku} few {# pliki w worktree nie mają commita. Zrób commit lub stash tych plików} many {# plików w worktree nie ma commita. Zrób commit lub stash tych plików} other {# pliku w worktree nie ma commita. Zrób commit lub stash tych plików}} w worktree, a potem scal.",
   "worktrees.merge.unknownFiles": "(nieznane pliki)",
   "worktrees.missing.noAgent": "Ten agent już nie istnieje.",

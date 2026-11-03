@@ -252,7 +252,7 @@ describe('what a queue card says', () => {
     const push = ['pushRejected', 'pushFailed', 'pushNoRemote', 'pushUnreadable']
     const english = push.map((reason) => pauseText({ reason, card: 'HI-61', files: [], by: null, at: null }, 'main', tr, list))
     for (const t of english) expect(t).toMatch(/^HI-61 is merged/)
-    expect(english[3]).toBe('HI-61 is merged, and main still has to be pushed, but Hive couldn’t read main to do it. Resume to try again; or turn off “Push the target branch after merging” and resume to keep merging locally.')
+    expect(english[3]).toBe('HI-61 is merged, and main still has to be pushed, but Combwork couldn’t read main to do it. Resume to try again; or turn off “Push the target branch after merging” and resume to keep merging locally.')
     const DE = join(__dirname, '..', 'locales', 'de')
     setLanguage('de', Object.assign({}, ...readdirSync(DE).filter((f) => f.endsWith('.json')).map((f) => JSON.parse(readFileSync(join(DE, f), 'utf8')))))
     try {

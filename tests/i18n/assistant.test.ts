@@ -101,9 +101,9 @@ describe('what Hive works out in shared code is in the language when it is worke
       return t
     }
     const cases: [Text, string][] = [
-      [problem('nope'), "It isn't a Hive agent template."],
+      [problem('nope'), "It isn't a Combwork agent template."],
       [problem({ version: 2, name: 'T', agents: [{ name: 'A', provider: 'claude-code', role: 'boss' }] }), "A's role in the workflow isn't builder, reviewer, either or generalist."],
-      [problem({ version: 2, name: 'T', agents: [{ name: 'A', mcpServers: 'all' }] }), "A's MCP servers aren't a list Hive can use."]
+      [problem({ version: 2, name: 'T', agents: [{ name: 'A', mcpServers: 'all' }] }), "A's MCP servers aren't a list Combwork can use."]
     ]
     for (const [t, english] of cases) expect(shownText(t)).toBe(english)
     const empty = problem({ version: 2, name: 'T', agents: [] })
@@ -160,12 +160,12 @@ describe('the sentences once built by hand read as before, in English', () => {
   })
 
   it("who gets a skill, and where it goes", () => {
-    expect(tr(m('assistant.skills.copiedDetail'), { audience: 'assistant' })).toBe('The Hive Assistant now gets it as a Hive skill, from their next session.')
-    expect(tr(m('assistant.skills.copiedDetail'), { audience: 'agents' })).toBe('The project agents now get it as a Hive skill, from their next session.')
-    expect(tr(m('assistant.skills.deleteHive'), { audience: 'all' })).toMatch(/^It's removed from the workspace, so new sessions of the project agents and the Hive Assistant no longer get it\./)
+    expect(tr(m('assistant.skills.copiedDetail'), { audience: 'assistant' })).toBe('The Assistant now gets it as a Combwork skill, from their next session.')
+    expect(tr(m('assistant.skills.copiedDetail'), { audience: 'agents' })).toBe('The project agents now get it as a Combwork skill, from their next session.')
+    expect(tr(m('assistant.skills.deleteHive'), { audience: 'all' })).toMatch(/^It's removed from the workspace, so new sessions of the project agents and the Assistant no longer get it\./)
     expect(tr(m('assistant.skills.deleteLocal'), { known: 'yes', provider: 'Codex' })).toBe('Codex agents in this project no longer load it in new sessions.')
     expect(tr(m('assistant.skills.deleteLocal'), { known: 'no', provider: '' })).toBe('The agents in this project no longer load it in new sessions.')
-    expect(tr(m('assistant.modes.deleteMessage'), { file: 'advisor.md', bundled: 'yes' })).toBe('advisor.md goes to the Recycle Bin. It ships with Hive, so you can restore it later.')
+    expect(tr(m('assistant.modes.deleteMessage'), { file: 'advisor.md', bundled: 'yes' })).toBe('advisor.md goes to the Recycle Bin. It ships with Combwork, so you can restore it later.')
   })
 
   it('templates: where they are kept, and the import', () => {

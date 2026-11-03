@@ -313,8 +313,8 @@ const check = (name, ok, extra = '') => {
       await inv('settings:update', { appearance: { theme: 'dark' } })
 
       // Remove Hive's Exclusions… covers them (the workspace has none of Hive's: the button is there for them alone).
-      await panel.getByRole('button', { name: 'Remove Hive’s Exclusions…' }).click()
-      const removeDialog = page.locator('.dialog', { hasText: 'Remove the exclusions Hive added?' })
+      await panel.getByRole('button', { name: 'Remove Combwork’s Exclusions…' }).click()
+      const removeDialog = page.locator('.dialog', { hasText: 'Remove the exclusions Combwork added?' })
       await lib.until(async () => (await removeDialog.count()) === 1, HUNG_MS)
       const listedNow = await removeDialog.locator('.dialog-list li').allInnerTexts()
       check('Remove lists them, Hive’s alone', listedNow.includes(inner.ws) && listedNow.includes(tools.ws) && !listedNow.includes(scratch.trees) && !listedNow.includes(fourth.trees), JSON.stringify(listedNow))
@@ -322,7 +322,7 @@ const check = (name, ok, extra = '') => {
       await removeDialog.locator('.btn.primary').click()
       check('…one elevated run asks Defender to remove exactly the entries it lists', !!(await lib.until(async () => changes('remove-requested').length === before + 1, HUNG_MS)) && JSON.stringify([...changes('remove-requested').at(-1).paths].sort()) === JSON.stringify([inner.ws, tools.ws].sort()), JSON.stringify(changes().slice(-2)))
       // config.json is saved a moment after a change: waited for.
-      check('…then the panel lists none, and Hive no longer records them', !!(await lib.until(async () => (await gonePanel.count()) === 0 && !ours(inner.ws) && !ours(tools.ws), HUNG_MS)), await panel.innerText())
+      check('…then the panel lists none, and Combwork no longer records them', !!(await lib.until(async () => (await gonePanel.count()) === 0 && !ours(inner.ws) && !ours(tools.ws), HUNG_MS)), await panel.innerText())
       const after = await inv('antivirus:status', true)
       check('…nor Hive’s other gone ones Defender no longer lists (forgotten once the list is read)', !(after.gone ?? []).length && !!(await lib.until(() => !ours(third.ws), HUNG_MS)), JSON.stringify({ gone: after.gone, added: JSON.parse(fs.readFileSync(path.join(userData, 'config.json'), 'utf8')).antivirus?.added }))
     } finally {

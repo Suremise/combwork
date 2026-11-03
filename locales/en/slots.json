@@ -1,6 +1,6 @@
 {
   "slots.idleBroker.body": {
-    "defaultMessage": "{names} is Windows' idle Sandbox broker, left by {agent}'s last session in a Hive that has since closed. No Sandbox is running, so releasing the slot is safe: Release Slot… frees it for other work, and the broker is left running.",
+    "defaultMessage": "{names} is Windows' idle Sandbox broker, left by {agent}'s last session in a Combwork that has since closed. No Sandbox is running, so releasing the slot is safe: Release Slot… frees it for other work, and the broker is left running.",
     "description": "The notice (HI-2309) that a slot stays held only by Windows' idle Windows Sandbox broker after Hive restarted: Hive doesn't release it by itself, and asks the user. {names}: the broker's process names (WindowsSandboxServer); {agent}: the agent whose session left it. Release Slot… is the button's name."
   },
   "slots.idleBroker.release": {
@@ -16,19 +16,19 @@
     "description": "Release Slot… refused: the slot ({slot}, such as slot-b) was released or taken by another run while the question was open."
   },
   "slots.release.live": {
-    "defaultMessage": "{slot}'s writer is still running in this Hive: stop the agent, or end or keep what it left running, first.",
+    "defaultMessage": "{slot}'s writer is still running in this Combwork: stop the agent, or end or keep what it left running, first.",
     "description": "Release Slot… refused: the session writing in the slot ({slot}) still runs in this Hive, or Hive still follows the processes it left running (End or Keep Running in the agent's ⋯ menu settles them)."
   },
   "slots.release.notEnded": {
-    "defaultMessage": "Some of the processes listed still run: Windows didn't let Hive end them, so {slot} wasn't released. Try again, or release it without ending them.",
+    "defaultMessage": "Some of the processes listed still run: Windows didn't let Combwork end them, so {slot} wasn't released. Try again, or release it without ending them.",
     "description": "Release Slot… with \"End these processes first\": ending the listed processes failed (Windows refused), so the slot ({slot}) was left as it was."
   },
   "slots.release.otherHive": {
-    "defaultMessage": "{slot} is held by another Hive that is still running (process {pid}): release it there, or quit that Hive first.",
+    "defaultMessage": "{slot} is held by another Combwork that is still running (process {pid}): release it there, or quit that Combwork first.",
     "description": "Release Slot… refused: another running copy of Hive (its process id {pid}) holds the slot ({slot})."
   },
   "slots.setting.bad": {
-    "defaultMessage": "That isn’t a slot setting Hive has.",
+    "defaultMessage": "That isn’t a slot setting Combwork has.",
     "description": "An error: a request to change a setting of “Slots and copies” named one that doesn’t exist."
   },
   "slots.setting.badSize": {

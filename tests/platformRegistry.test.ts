@@ -210,8 +210,8 @@ describe('in ProjectInfo', () => {
     }
     expect(notices(p).map((t) => t.title)).toEqual(['Unknown version control setting in delta', 'Unknown version control setting in delta'])
     expect(notices(p).map((t) => [t.level, t.message])).toEqual([
-      ['warning', `delta's project.json names a version control Hive doesn't know (platform: mercurial). Until it says "git" or "none", Hive uses what it finds in the folder.`],
-      ['warning', `delta's project.json names a version control Hive doesn't know (platform: 7). Until it says "git" or "none", Hive uses what it finds in the folder.`]
+      ['warning', `delta's project.json names a version control Combwork doesn't know (platform: mercurial). Until it says "git" or "none", Combwork uses what it finds in the folder.`],
+      ['warning', `delta's project.json names a version control Combwork doesn't know (platform: 7). Until it says "git" or "none", Combwork uses what it finds in the folder.`]
     ])
   })
 

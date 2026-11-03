@@ -30,11 +30,11 @@ export const GIT_DOWNLOAD = 'https://git-scm.com/download/win'
 export const GIT_GUIDE = 'git'
 
 const M = {
-  missing: msg({ id: 'git.tool.missing', defaultMessage: "Git isn't installed (or isn't on Hive's PATH)", description: 'Said wherever git is needed when Hive cannot run git. No full stop: some places add more after it.' }),
-  tooOld: msg({ id: 'git.tool.tooOld', defaultMessage: 'Git {version} is too old for Hive (it needs {min} or later)', description: 'Said wherever git is needed when the installed git is too old to run. {version} and {min} are git versions. No full stop: some places add more after it.' }),
+  missing: msg({ id: 'git.tool.missing', defaultMessage: "Git isn't installed (or isn't on Combwork's PATH)", description: 'Said wherever git is needed when Hive cannot run git. No full stop: some places add more after it.' }),
+  tooOld: msg({ id: 'git.tool.tooOld', defaultMessage: 'Git {version} is too old for Combwork (it needs {min} or later)', description: 'Said wherever git is needed when the installed git is too old to run. {version} and {min} are git versions. No full stop: some places add more after it.' }),
   fixOld: msg({ id: 'git.tool.fixOld', defaultMessage: 'Update Git for Windows to {min} or later, then Check again in Provider Setup.', description: 'How to fix a git that is too old. {min} is a git version; Check again is a button in Provider Setup.' }),
-  fixMissing: msg({ id: 'git.tool.fixMissing', defaultMessage: 'Install Git for Windows ({min} or later), or add the folder holding git.exe to your PATH, then Check again in Provider Setup (no need to restart Hive).', description: 'How to fix git missing. {min} is a git version; Check again is a button in Provider Setup.' }),
-  tooOldToRun: msg({ id: 'git.tool.tooOldToRun', defaultMessage: "Hive's git commands fail with Git {version}: worktrees, merging, the Version Control tab's Git sections and the unmerged counts don't work.", description: "Provider Setup, for a git too old for any of Hive's git commands. {version} is its version." }),
+  fixMissing: msg({ id: 'git.tool.fixMissing', defaultMessage: 'Install Git for Windows ({min} or later), or add the folder holding git.exe to your PATH, then Check again in Provider Setup (no need to restart Combwork).', description: 'How to fix git missing. {min} is a git version; Check again is a button in Provider Setup.' }),
+  tooOldToRun: msg({ id: 'git.tool.tooOldToRun', defaultMessage: "Combwork's git commands fail with Git {version}: worktrees, merging, the Version Control tab's Git sections and the unmerged counts don't work.", description: "Provider Setup, for a git too old for any of Hive's git commands. {version} is its version." }),
   oldLoses: msg({
     id: 'git.tool.oldLoses',
     defaultMessage:

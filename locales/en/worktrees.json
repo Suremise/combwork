@@ -140,7 +140,7 @@
     "description": "Why nothing was merged: the branch to merge into ({branch}) is checked out in another folder ({folder}) than the project folder."
   },
   "worktrees.merge.targetMoved": {
-    "defaultMessage": "{branch} changed while Hive was merging into it. Nothing was merged: merge again.",
+    "defaultMessage": "{branch} changed while Combwork was merging into it. Nothing was merged: merge again.",
     "description": "Why nothing was merged: the branch merged into ({branch}) moved on meanwhile (another merge or commit)."
   },
   "worktrees.merge.uncommitted": {

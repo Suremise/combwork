@@ -90,7 +90,7 @@ const check = (name, ok, extra = '') => {
   const bar = await page.locator('.activitybar .activity-btn').evaluateAll((els) => els.map((e) => e.getAttribute('aria-label')))
   check('the Templates icon is next to Skills on the activity bar', bar.indexOf('Templates') === bar.indexOf('Skills') + 1, JSON.stringify(bar))
   await page.locator('.activitybar [aria-label="Templates"]').click()
-  check("the view lists Hive's own, the workspace's templates, then each project's under its name", !!(await lib.until(async () => JSON.stringify(await groups()) === '["hive 6","workspace 1","alpha 1"]', 5000)) && JSON.stringify(await rowNames(sidebar)) === '["Pair","Solo"]' && JSON.stringify(await sidebar.locator('.template-row[data-scope="hive"]').evaluateAll((l) => l.map((x) => x.getAttribute('aria-label')))) === JSON.stringify(HIVE_NAMES), JSON.stringify([await groups(), await rowNames(sidebar)]))
+  check("the view lists Combwork's own, the workspace's templates, then each project's under its name", !!(await lib.until(async () => JSON.stringify(await groups()) === '["hive 6","workspace 1","alpha 1"]', 5000)) && JSON.stringify(await rowNames(sidebar)) === '["Pair","Solo"]' && JSON.stringify(await sidebar.locator('.template-row[data-scope="hive"]').evaluateAll((l) => l.map((x) => x.getAttribute('aria-label')))) === JSON.stringify(HIVE_NAMES), JSON.stringify([await groups(), await rowNames(sidebar)]))
   await sidebar.locator('select[aria-label="Show templates of"]').selectOption({ label: 'alpha' })
   check('the filter shows one project\'s', !!(await lib.until(async () => JSON.stringify(await rowNames(sidebar)) === '["Solo"]', HUNG_MS)))
   await sidebar.locator('select[aria-label="Show templates of"]').selectOption({ label: 'All templates' })
@@ -167,7 +167,7 @@ const check = (name, ok, extra = '') => {
   await openFile(bad)
   const before = templatesOf(wsTemplates).length + templatesOf(own(alpha)).length + templatesOf(own(beta)).length
   await sidebar.locator('[aria-label="Import Template…"]').click()
-  check('an invalid file is refused, saying why', !!(await toast(/Could not import the template[\s\S]*newer version of Hive/)) && (await page.locator('.dialog').count()) === 0 && templatesOf(wsTemplates).length + templatesOf(own(alpha)).length + templatesOf(own(beta)).length === before)
+  check('an invalid file is refused, saying why', !!(await toast(/Could not import the template[\s\S]*newer version of Combwork/)) && (await page.locator('.dialog').count()) === 0 && templatesOf(wsTemplates).length + templatesOf(own(alpha)).length + templatesOf(own(beta)).length === before)
 
   // Delete Team (2).
   await userRow(sidebar, 'Team (2)').click()

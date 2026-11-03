@@ -1,12 +1,12 @@
 {
-  "slots.idleBroker.body": "{names} to bezczynny broker Piaskownicy Windows, który zostawiła ostatnia sesja agenta {agent} w zamkniętym już Hive. Żadna Piaskownica nie działa, więc zwolnienie slotu jest bezpieczne: „Zwolnij slot…” udostępnia go innej pracy, a broker działa dalej.",
+  "slots.idleBroker.body": "{names} to bezczynny broker Piaskownicy Windows, który zostawiła ostatnia sesja agenta {agent} w zamkniętym już Combwork. Żadna Piaskownica nie działa, więc zwolnienie slotu jest bezpieczne: „Zwolnij slot…” udostępnia go innej pracy, a broker działa dalej.",
   "slots.idleBroker.release": "Zwolnij slot…",
   "slots.idleBroker.title": "Slot {slot} trzyma {names}",
   "slots.release.changed": "Slot {slot} zmienił się w międzyczasie: zapisuje w nim już nie ta sesja, która jest pokazana. Sprawdź ponownie.",
-  "slots.release.live": "Sesja zapisująca w slocie {slot} nadal działa w tym Hive: najpierw zatrzymaj agenta albo zakończ lub zachowaj to, co zostawił uruchomione.",
-  "slots.release.notEnded": "Niektóre z wymienionych procesów nadal działają: Windows nie pozwolił Hive ich zakończyć, więc slot {slot} nie został zwolniony. Spróbuj ponownie albo zwolnij go bez kończenia ich.",
-  "slots.release.otherHive": "Slot {slot} jest zajęty przez inny Hive, który nadal działa (proces {pid}): zwolnij go tam albo najpierw zamknij tamten Hive.",
-  "slots.setting.bad": "Hive nie ma takiego ustawienia slotów.",
+  "slots.release.live": "Sesja zapisująca w slocie {slot} nadal działa w tym Combwork: najpierw zatrzymaj agenta albo zakończ lub zachowaj to, co zostawił uruchomione.",
+  "slots.release.notEnded": "Niektóre z wymienionych procesów nadal działają: Windows nie pozwolił Combwork ich zakończyć, więc slot {slot} nie został zwolniony. Spróbuj ponownie albo zwolnij go bez kończenia ich.",
+  "slots.release.otherHive": "Slot {slot} jest zajęty przez inny Combwork, który nadal działa (proces {pid}): zwolnij go tam albo najpierw zamknij tamten Combwork.",
+  "slots.setting.bad": "Combwork nie ma takiego ustawienia slotów.",
   "slots.setting.badSize": "Liczba kopii do recenzji i sprawdzeń to liczba całkowita od {min, number} do {max, number}.",
   "slots.setting.badText": "Skrypt slotu lub lista plików to tekst o długości najwyżej {max, number} znaków."
 }

@@ -59,7 +59,7 @@ const shot = (page, name) => page.screenshot({ path: path.join(lib.WORK, `gitvie
   const branches = page.locator('[data-git-branches]')
   check('it opens Git → Branches & remotes', !!(await lib.until(async () => (await branches.count()) === 1, HUNG_MS)) && (await page.locator('.tab.active', { hasText: 'Version Control' }).count()) === 1)
   check('the current branch and its upstream', !!(await lib.until(async () => (await text(branches.locator('[data-git-head]'))) === 'main' && (await text(branches.locator('[data-git-upstream]'))).includes('origin/main · ↑0 ↓0'), HUNG_MS)))
-  check("it says it's never fetched (Hive never fetches by itself)", /Never fetched\. Hive never fetches by itself/.test(await text(branches.locator('[data-git-fetched]'))), await text(branches.locator('[data-git-fetched]')))
+  check("it says it's never fetched (Combwork never fetches by itself)", /Never fetched\. Combwork never fetches by itself/.test(await text(branches.locator('[data-git-fetched]'))), await text(branches.locator('[data-git-fetched]')))
   await shot(page, '1-branches')
 
   // --- Another clone pushes: nothing moves until Fetch; Pull then brings it in.

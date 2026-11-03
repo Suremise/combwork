@@ -134,7 +134,7 @@ const hooksOff = (agent, off) => {
     check('its mark is stalled', !!(await until(async () => (await header.locator('.state-mark.stalled').count()) > 0, HUNG_MS)), await header.innerHTML().catch(() => ''))
     await header.click()
     const banner = page.locator('.banner.hooks-missing')
-    check("the project's banner says why it may be wrong and what to do, with Restart session", !!(await until(async () => (await banner.count()) === 1 && /Hive isn't hearing from Claude Code's hooks, so its status may be wrong\..*Restart the session/.test(await banner.innerText()) && (await banner.locator('button', { hasText: 'Restart session' }).count()) === 1, HUNG_MS)), await banner.innerText().catch(() => ''))
+    check("the project's banner says why it may be wrong and what to do, with Restart session", !!(await until(async () => (await banner.count()) === 1 && /Combwork isn't hearing from Claude Code's hooks, so its status may be wrong\..*Restart the session/.test(await banner.innerText()) && (await banner.locator('button', { hasText: 'Restart session' }).count()) === 1, HUNG_MS)), await banner.innerText().catch(() => ''))
 
     const paused = await until(async () => {
       const l = await laneNow()
@@ -147,7 +147,7 @@ const hooksOff = (agent, off) => {
 
     // Told once in Notifications.
     await page.locator('.activitybar button[aria-label="Notifications"]').click()
-    const told = page.locator('.notif-panel .toast-title', { hasText: /Hive isn't hearing from .*Builder's hooks/ })
+    const told = page.locator('.notif-panel .toast-title', { hasText: /Combwork isn't hearing from .*Builder's hooks/ })
     check('a Notifications entry, once', !!(await until(async () => (await told.count()) === 1, HUNG_MS)), `${await told.count()}: ${await page.locator('.notif-panel').innerText().catch((e) => String(e))}`)
     await page.locator('.notif-panel button[aria-label="Close"]').click()
 

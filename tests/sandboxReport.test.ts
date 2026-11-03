@@ -15,7 +15,7 @@ const lnk = (name: string, folder: string) => ({ name, folder: `${HOME}\\${folde
 const DESKTOP = 'Desktop'
 const START = 'AppData\\Roaming\\Microsoft\\Windows\\Start Menu\\Programs'
 const state = (over: Json = {}): Json => ({
-  uninstallEntries: [{ displayName: 'Hive Desktop 0.6.0' }],
+  uninstallEntries: [{ displayName: 'Combwork 0.6.0' }],
   installDir: { exists: true, hiveExe: true, uninstaller: true, appAsarSha256: 'bbbb' },
   profileDir: { exists: true },
   shortcuts: [lnk('Hive Desktop', DESKTOP), lnk('Hive Desktop', START)],
@@ -59,7 +59,7 @@ test('all facts as expected: every check passes, and the report says so', () => 
 
 test('each wrong fact fails its check, named in "Failed checks"', () => {
   const f = good()
-  f['s1-state'] = state({ uninstallEntries: [{ displayName: 'Hive Desktop 0.6.0' }, { displayName: 'Hive 0.4.1' }] })
+  f['s1-state'] = state({ uninstallEntries: [{ displayName: 'Combwork 0.6.0' }, { displayName: 'Hive 0.4.1' }] })
   f['s4-new-state'] = state({ shortcuts: [lnk('Hive Desktop', DESKTOP), lnk('Hive', START)], installDir: { exists: true, hiveExe: true, appAsarSha256: 'aaaa' } })
   f['s4-new-run'].hiveRunning = false
   f['s5-state'] = state({ uninstallEntries: [], installDir: { exists: false }, shortcuts: [], profileDir: { exists: false } })
@@ -67,7 +67,7 @@ test('each wrong fact fails its check, named in "Failed checks"', () => {
   f.s3.checks[4].detail = 'not found'
   const r = evaluate(meta(), f)
   const failed = failedNames(r)
-  for (const re of [/One Installed-apps entry: "Hive Desktop 0.6.0"/, /only "Hive Desktop"/, /--force-run starts Hive/, /profile .* is kept/, /check 3\.check-again-finds/, /app code changed/]) {
+  for (const re of [/One Installed-apps entry: "Combwork 0.6.0"/, /only "Hive Desktop"/, /--force-run starts Hive/, /profile .* is kept/, /check 3\.check-again-finds/, /app code changed/]) {
     assert.ok(failed.some(n => re.test(n)), `${re} not among ${JSON.stringify(failed)}`)
   }
   const md = markdown(r)

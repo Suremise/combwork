@@ -147,7 +147,7 @@ const check = (name, ok, extra = '') => {
   check('…the reviewer shows idle, with the card it left', ['ready', 'finished'].includes((await live(reviewer.id))?.status) && JSON.stringify((await live(reviewer.id))?.notWatching) === JSON.stringify([c1]), JSON.stringify(await live(reviewer.id)))
   await page.getByRole('button', { name: 'Task Board' }).click()
   const tile = page.locator(`.task-card[data-task="${c1}"]`)
-  check('the board shows the card stalled', !!(await until(async () => /Stalled: Reviewer hasn't taken the wake Hive typed/.test((await tile.innerText().catch(() => '')) ?? ''), 8000)), await tile.innerText().catch(() => ''))
+  check('the board shows the card stalled', !!(await until(async () => /Stalled: Reviewer hasn't taken the wake Combwork typed/.test((await tile.innerText().catch(() => '')) ?? ''), 8000)), await tile.innerText().catch(() => ''))
   await page.screenshot({ path: path.join(lib.WORK, 'loopwatch-stalled.png') })
   // Windows notifications only: each tell() also logs an `entry` line (HI-2320), not a second notice (HI-2369). Any line
   // counts for "isn't watching" below, a bell-only notice too.

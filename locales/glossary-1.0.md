@@ -1,4 +1,4 @@
-# Hive 1.0 glossary: the workflow layer's terms in every language
+# Combwork 1.0 glossary: the workflow layer's terms in every language
 
 **Status:** written in 1.0 P1 (#1117), 20 Oct 2026, for every 1.0 phase (P2–P8) and the translation review (#1126).
 The English labels, category and stage names were agreed by Darren as proposed on 20 Oct (SPEC §16.20, OP-1 and
@@ -6,7 +6,7 @@ OP-2, recorded on #1117). A label that changes later is translated again here fi
 `locales/<code>/<area>.json`.
 
 **How it relates to the other glossaries:**
-- [docs/translating/glossary.md](../docs/translating/glossary.md) is Hive's glossary of every term, with *keep* or
+- [docs/translating/glossary.md](../docs/translating/glossary.md) is Combwork's glossary of every term, with *keep* or
   *translate*; each language's style page (`docs/translating/<code>.md`) records the word it uses. This file adds the
   1.0 workflow terms. Its words agree with the style pages where a term already exists (*card*, *verdict*, *merge*,
   *worktree*, *run*), and a change to an existing word is marked **changed** with its reason.
@@ -76,7 +76,7 @@ the English word stays in that language.
 | **preset** | One click that fills in every option. | Voreinstellung | ajuste predefinido | préréglage | プリセット | ustawienie wstępne | predefinição | 预设 |
 | **Solo** | Preset: one person, one agent at a time, no reviewer. | Solo | Individual | Solo | ソロ | Solo | Solo | 单人 |
 | **Pair** | Preset: a builder and a reviewer. | Paar | Pareja | Binôme | ペア | Para | Dupla | 结对 |
-| **Team** | Preset: several builders and reviewers, Hive merges, stricter checks. | Team | Equipo | Équipe | チーム | Zespół | Equipe | 团队 |
+| **Team** | Preset: several builders and reviewers, Combwork merges, stricter checks. | Team | Equipo | Équipe | チーム | Zespół | Equipe | 团队 |
 | **Custom** | The options no longer match a preset. | Benutzerdefiniert | Personalizado | Personnalisé | カスタム | Własne | Personalizado | 自定义 |
 | **rule** | Something the workflow checks before a card moves (internally a *gate*). | Regel | regla | règle | ルール | reguła | regra | 规则 |
 | **old rules** | A card or lane still under the options it started with, after you changed them. | alte Regeln | reglas anteriores | anciennes règles | 旧ルール | stare reguły | regras antigas | 旧规则 |
@@ -87,7 +87,7 @@ the English word stays in that language.
 
 ### 2.2 The board: categories and stages
 
-Categories are fixed and Hive's machinery works on them (decision A, #1112). Stages are the board's columns; each
+Categories are fixed and Combwork's machinery works on them (decision A, #1112). Stages are the board's columns; each
 sits in one category. The English category names were agreed on 20 Oct (OP-1): today's *Doing* and *Passed* columns become
 the *Active* and *Approved* categories; the ids agents use (`doing`, `passed`) don't change.
 
@@ -100,7 +100,7 @@ the *Active* and *Approved* categories; the ids agents use (`doing`, `passed`) d
 | **Active** (was *Doing*) | Category and default stage: being worked on. | In Arbeit | En curso | En cours | 進行中 | Aktywne (**changed** from *W toku*, #1104's feedback) | Fazendo | 进行中 |
 | **Review** | Category and stage: waiting for, or in, review. | Review | Revisión | Relecture | レビュー | Recenzja | Revisão | 评审 |
 | **Approved** (was *Passed*) | Category and stage: its revision passed review (or your approval) and isn't merged yet. | Genehmigt (**changed** from *Geprüft*, which reads as "checked"; not *Freigegeben*, which also reads as "released") | Aprobado | Validé | 承認済み | Zatwierdzone | Aprovado | 已批准 (**changed** from 已通过, which reads as a run that passed) |
-| **Merging** | Stage in Approved: in Hive's merge queue. | Wird gemergt | Fusionando | Fusion en cours | マージ中 | Scalanie | Em merge | 合并中 |
+| **Merging** | Stage in Approved: in Combwork's merge queue. | Wird gemergt | Fusionando | Fusion en cours | マージ中 | Scalanie | Em merge | 合并中 |
 | **Done** | Category and stage: the approved work is in the target (Git), or accepted (None). | Erledigt | Hecho | Terminé | 完了 | Gotowe | Concluído | 已完成 |
 
 ### 2.3 Revisions, checks and reviews
@@ -130,8 +130,8 @@ the *Active* and *Approved* categories; the ids agents use (`doing`, `passed`) d
 | **override** (noun), **Move anyway** (the button) | Your (or the Assistant's, within Control) explicit exception to a rule, recorded on the card with the reason. | Ausnahme / Trotzdem verschieben | excepción / Mover de todos modos | dérogation / Déplacer quand même | 例外 / それでも移動 | wyjątek / Przenieś mimo to | exceção / Mover mesmo assim | 例外放行 / 仍然移动 |
 | **returned** (to its builder) | A card the merge queue sent back: a conflict or failed merge checks. | zurückgegeben | devuelta | renvoyée | 差し戻し | zwrócona | devolvido | 已退回 |
 | **no-code card** | A card with no commits to review or merge (design, investigation, docs on request). | Karte ohne Code | tarjeta sin código | carte sans code | コードなしのカード | karta bez kodu | cartão sem código | 无代码卡片 |
-| **before 1.0** (a card) | A card from before the workflow layer: it has no work record, and Hive invents none. | vor 1.0 | anterior a 1.0 | antérieure à 1.0 | 1.0以前 | sprzed 1.0 | anterior à 1.0 | 1.0 之前 |
-| **outside Hive** | Work Hive saw happen elsewhere (a commit or merge in a terminal or another tool). | außerhalb von Hive | fuera de Hive | hors de Hive | Hiveの外 | poza Hive | fora do Hive | 在 Hive 之外 |
+| **before 1.0** (a card) | A card from before the workflow layer: it has no work record, and Combwork invents none. | vor 1.0 | anterior a 1.0 | antérieure à 1.0 | 1.0以前 | sprzed 1.0 | anterior à 1.0 | 1.0 之前 |
+| **outside Combwork** | Work Combwork saw happen elsewhere (a commit or merge in a terminal or another tool). | außerhalb von Combwork | fuera de Combwork | hors de Combwork | Combworkの外 | poza Combwork | fora do Combwork | 在 Combwork 之外 |
 | **work** (a card's Work section) | What the card's facts say: branch, revisions, verdicts, checks, merge (internally *facts*). | Arbeit | trabajo | travail | 作業 | praca | trabalho | 工作记录 |
 | **couldn't within the rules** | An agent's report that it can't meet a rule without breaking one: a question for you, never a failure. | im Rahmen der Regeln nicht möglich | no fue posible dentro de las reglas | impossible dans le respect des règles | ルールの範囲では不可 | niemożliwe w ramach reguł | não foi possível dentro das regras | 无法在规则内完成 |
 | **paused** (a lane) | A lane that can't go on yet, with why (waiting for you, a dependency, a reviewer, a slot). | pausiert | en pausa | en pause | 一時停止中 | wstrzymany | pausada | 已暂停 |
@@ -142,7 +142,7 @@ the *Active* and *Approved* categories; the ids agents use (`doing`, `passed`) d
 
 | English | Meaning | de | es | fr | ja | pl | pt-BR | zh-CN |
 |---|---|---|---|---|---|---|---|---|
-| **merge queue** | Hive's queue of approved cards, merged one at a time per target after a test merge. Where Hive merges, it replaces the *merge slot*; the merge slot stays where agents merge (one agent merge at a time into a branch, SPEC §6.2), and keeps a word of its own (pl *blokada scalania*). | Merge-Warteschlange | cola de fusión | file de fusion | マージキュー | kolejka scalania (the word *merge slot* had; it moves to the queue) | fila de merge | 合并队列 |
+| **merge queue** | Combwork's queue of approved cards, merged one at a time per target after a test merge. Where Combwork merges, it replaces the *merge slot*; the merge slot stays where agents merge (one agent merge at a time into a branch, SPEC §6.2), and keeps a word of its own (pl *blokada scalania*). | Merge-Warteschlange | cola de fusión | file de fusion | マージキュー | kolejka scalania (the word *merge slot* had; it moves to the queue) | fila de merge | 合并队列 |
 | **test merge** | The target plus the change, built aside and checked before the target moves. | Test-Merge | fusión de prueba | fusion d’essai | テストマージ | scalanie próbne | merge de teste | 试合并 |
 | **Pause queue** / **Resume queue** | Your controls on the merge queue. | Warteschlange anhalten / fortsetzen | Pausar la cola / Reanudar la cola | Suspendre la file / Reprendre la file | キューを一時停止 / 再開 | Wstrzymaj kolejkę / Wznów kolejkę | Pausar a fila / Retomar a fila | 暂停队列 / 恢复队列 |
 | **slot** | A working folder (a Git worktree) from the project's pool, lent to a card or lane. | Slot | slot (*keep*, masculine: *el slot*) | emplacement | スロット | slot (*slotu, sloty*) | slot (*keep*, masculine) | 槽位 |
@@ -151,7 +151,7 @@ the *Active* and *Approved* categories; the ids agents use (`doing`, `passed`) d
 | **project key** | A project's 2–4 letters (`HI`, `AM`), used in card keys, branch names and agent names. | Projektschlüssel | clave del proyecto | clé du projet | プロジェクトキー | klucz projektu | chave do projeto | 项目键 |
 | **builder** / **reviewer** / **either** (workflow role) | Which side of the workflow an agent takes. | Bearbeiter / Reviewer / beides | autor / revisor / ambos | auteur / relecteur / les deux | ビルダー / レビュアー / どちらも | wykonawca / recenzent / dowolna | executor / revisor / ambos | 构建者 / 评审者 / 均可 |
 | **generalist** (workflow role, HI-686) | Takes no side: does what the user asks in its pane, never a lane's builder or reviewer. | Generalist | generalista | généraliste | ゼネラリスト | generalista | generalista | 通才 |
-| **lane** | Hive's record of a card loop (existing term). | Lane | carril | couloir | レーン | tor | raia | 通道 |
+| **lane** | Combwork's record of a card loop (existing term). | Lane | carril | couloir | レーン | tor | raia | 通道 |
 | **Start lane…** | Start a card loop from the board or the Progress panel, without the Assistant. | Lane starten… | Iniciar carril… | Démarrer un couloir… | レーンを開始… | Uruchom tor… | Iniciar raia… | 启动通道… |
 
 ### 2.6 The Version Control tab's options and values
@@ -179,7 +179,7 @@ page's (*du*, *tú*, *tu*, *ty*, *você*, 你; Japanese leaves the reader out an
 | G4 | A pass survives a clean rebase | Ein bestandenes Review übersteht einen sauberen Rebase | Una revisión superada se mantiene tras un rebase limpio | Une relecture validée reste valable après un rebase propre | クリーンなリベース後も合格を引き継ぐ | Zaliczona recenzja zostaje po czystym rebase | Uma revisão bem-sucedida continua valendo após um rebase limpo | 干净变基后评审通过仍然有效 |
 | G4 values | Same change · Exact revision only | Dieselbe Änderung · Nur exakt dieselbe Revision | El mismo cambio · Solo la versión exacta | La même modification · Uniquement la révision exacte | 同じ変更 · 完全に同じリビジョンのみ | Ta sama zmiana · Tylko dokładnie ta rewizja | A mesma alteração · Somente a versão exata | 相同的变更 · 仅限完全相同的修订版本 |
 | G5 | Who merges | Wer mergt | Quién fusiona | Qui fusionne | マージする人 | Kto scala | Quem faz o merge | 由谁合并 |
-| G5 values | Hive merges · The agent merges, Hive checks · Committed is done · Not checked | Hive mergt · Der Agent mergt, Hive prüft · Committet ist erledigt · Nicht geprüft | Hive fusiona · El agente fusiona y Hive comprueba · Hacer commit es terminar · Sin comprobar | Hive fusionne · L’agent fusionne, Hive vérifie · Un commit suffit · Non vérifié | Hiveがマージ · エージェントがマージしHiveが確認 · コミットで完了 · 確認しない | Hive scala · Agent scala, Hive sprawdza · Commit oznacza gotowe · Bez sprawdzania | O Hive faz o merge · O agente faz o merge e o Hive verifica · Commit é concluir · Sem verificação | Hive 合并 · 智能体合并，Hive 检查 · 提交即完成 · 不检查 |
+| G5 values | Combwork merges · The agent merges, Combwork checks · Committed is done · Not checked | Combwork mergt · Der Agent mergt, Combwork prüft · Committet ist erledigt · Nicht geprüft | Combwork fusiona · El agente fusiona y Combwork comprueba · Hacer commit es terminar · Sin comprobar | Combwork fusionne · L’agent fusionne, Combwork vérifie · Un commit suffit · Non vérifié | Combworkがマージ · エージェントがマージしCombworkが確認 · コミットで完了 · 確認しない | Combwork scala · Agent scala, Combwork sprawdza · Commit oznacza gotowe · Bez sprawdzania | O Combwork faz o merge · O agente faz o merge e o Combwork verifica · Commit é concluir · Sem verificação | Combwork 合并 · 智能体合并，Combwork 检查 · 提交即完成 · 不检查 |
 | G6 | Merge style | Merge-Art | Tipo de fusión | Type de fusion | マージ方法 | Sposób scalania | Tipo de merge | 合并方式 |
 | G6 values | Merge commit · Squash | Merge-Commit · Squash | Commit de fusión · Squash | Commit de fusion · Squash | マージコミット · スカッシュ | Commit scalający · Squash | Commit de merge · Squash | 合并提交 · 压缩合并 |
 | G7 | Work merges into | Arbeit wird gemergt in | El trabajo se fusiona en | Le travail est fusionné dans | マージ先 | Praca jest scalana do | O trabalho é mesclado em | 工作合并到 |
@@ -215,7 +215,7 @@ tool names), never *capability* or *sameness*.
 | integration, integrate | merge (Git); accept (None) | Each platform names its own. |
 | ruleset (compiled options) | the options the card started with; old rules | |
 | platform, adapter | version control | |
-| observed fact | outside Hive | |
+| observed fact | outside Combwork | |
 | pre-workflow | before 1.0 | |
 | category id `doing`, `passed` | Active, Approved | Ids unchanged in the Agent API. |
 

@@ -216,7 +216,7 @@
     "description": "Under a session's cost."
   },
   "project.card.sessionCostTip": {
-    "defaultMessage": "{estimated, select, yes {What this session would have cost at {company} API prices, estimated by Hive from its token counts. On a subscription you are not charged this; it shows how heavy the session has been.} other {What this session would have cost at {company} API prices, as {provider} calculates it. On a subscription you are not charged this; it shows how heavy the session has been.}}",
+    "defaultMessage": "{estimated, select, yes {What this session would have cost at {company} API prices, estimated by Combwork from its token counts. On a subscription you are not charged this; it shows how heavy the session has been.} other {What this session would have cost at {company} API prices, as {provider} calculates it. On a subscription you are not charged this; it shows how heavy the session has been.}}",
     "description": "The (i) beside a session's cost. {company} is Anthropic, OpenAI…; {provider} Claude Code, Codex…"
   },
   "project.card.sessionEstimated": {
@@ -284,7 +284,7 @@
     "description": "In place of the diff of a binary file."
   },
   "project.changes.cantShow": {
-    "defaultMessage": "{problem}, so Hive can't show {project}'s changes.",
+    "defaultMessage": "{problem}, so Combwork can't show {project}'s changes.",
     "description": "The Changes tab when git cannot run. {problem} says why, such as \"Git isn't installed (or isn't on Hive's PATH)\"."
   },
   "project.changes.checkingAgain": {
@@ -336,7 +336,7 @@
     "description": "In place of the unused worktrees while Hive lists them."
   },
   "project.changes.lookingHint": {
-    "defaultMessage": "Hive asks git about each of {project}'s worktrees, which can take a few seconds.",
+    "defaultMessage": "Combwork asks git about each of {project}'s worktrees, which can take a few seconds.",
     "description": "Under \"Looking for unused worktrees…\"."
   },
   "project.changes.lookingTip": {
@@ -668,7 +668,7 @@
     "description": "The cost of sessions run only on a model server on this PC (Ollama, for example): nothing (HI-1772). Lower case, short: it stands where a cost such as \"$1.20\" would."
   },
   "project.cost.tip": {
-    "defaultMessage": "What this work would have cost at API prices: reported by the provider where it does (Claude Code), else estimated by Hive from token counts and the prices in Settings → the provider. On a subscription you are not charged this; it shows how heavy the work was.",
+    "defaultMessage": "What this work would have cost at API prices: reported by the provider where it does (Claude Code), else estimated by Combwork from token counts and the prices in Settings → the provider. On a subscription you are not charged this; it shows how heavy the work was.",
     "description": "The (i) beside API-equivalent cost in the Overview."
   },
   "project.cost.unknown": {
@@ -676,7 +676,7 @@
     "description": "A cost Hive cannot work out: no price is known for the model."
   },
   "project.cost.unpriced": {
-    "defaultMessage": "Hive has no API price for {model}, so it can't estimate this session's cost. Add one in Settings → {provider} → API prices.",
+    "defaultMessage": "Combwork has no API price for {model}, so it can't estimate this session's cost. Add one in Settings → {provider} → API prices.",
     "description": "Tooltip on a cost shown as Unknown. {model} is the model; {provider} the provider (Claude Code, Codex…). Settings → {provider} → API prices is where prices are set: name it as Settings does."
   },
   "project.cost.withFree": {
@@ -844,7 +844,7 @@
     "description": "Accessible name of the project key box (Project Settings): 2–4 letters such as AM that the project's cards are named by."
   },
   "project.key.none": {
-    "defaultMessage": "Hive gives it a key once its board is open.",
+    "defaultMessage": "Combwork gives it a key once its board is open.",
     "description": "Project Settings, in place of the project key box: the project has no key yet (its board hasn't been opened or upgraded)."
   },
   "project.key.prefix": {
@@ -860,7 +860,7 @@
     "description": "Under the project key box while a new key is typed (Project Settings). {key} is the key typed, {old} the key it has: AM-12 style card names."
   },
   "project.leftovers.about": {
-    "defaultMessage": "Branches nothing uses now: not {target} or the default branch, not checked out in a worktree or slot, and no open card’s. A Done or archived card’s branch, an agent’s from before slots, or one of no card. Delete removes only the branch, and Hive checks again first that nothing uses it.",
+    "defaultMessage": "Branches nothing uses now: not {target} or the default branch, not checked out in a worktree or slot, and no open card’s. A Done or archived card’s branch, an agent’s from before slots, or one of no card. Delete removes only the branch, and Combwork checks again first that nothing uses it.",
     "description": "The sentence at the top of the Changes tab's leftover branches. {target} is the branch the project's work merges into."
   },
   "project.leftovers.ahead": {
@@ -936,11 +936,11 @@
     "description": "Under a plan limit's percent. {when} is when it resets: \"in 2 h 5 min\", or a day and time."
   },
   "project.limit.tip": {
-    "defaultMessage": "How much of your plan’s {window, select, fiveHour {5-hour} weekly {weekly} other {{label}}} allowance is used, across all your {provider} sessions (not just Hive).",
+    "defaultMessage": "How much of your plan’s {window, select, fiveHour {5-hour} weekly {weekly} other {{label}}} allowance is used, across all your {provider} sessions (not just Combwork).",
     "description": "The (i) beside a plan limit."
   },
   "project.limit.tipConnection": {
-    "defaultMessage": "How much of the plan’s {window, select, fiveHour {5-hour} weekly {weekly} other {{label}}} allowance is used on {name}, across all its sessions (not just Hive's).",
+    "defaultMessage": "How much of the plan’s {window, select, fiveHour {5-hour} weekly {weekly} other {{label}}} allowance is used on {name}, across all its sessions (not just Combwork's).",
     "description": "The (i) beside a plan limit of one connection (HI-1756): {name} is the connection, a sign-in the user named (\"Max 1\")."
   },
   "project.limit.title": {
@@ -1376,7 +1376,7 @@
     "description": "Tooltip on the add-from-file button of the Local group."
   },
   "project.skills.assistantOnly": {
-    "defaultMessage": "{count, plural, one {# Hive skill is for the Hive Assistant only, so it isn't listed: this project's agents don't get it.} other {# Hive skills are for the Hive Assistant only, so they aren't listed: this project's agents don't get them.}}",
+    "defaultMessage": "{count, plural, one {# Combwork skill is for the Assistant only, so it isn't listed: this project's agents don't get it.} other {# Combwork skills are for the Assistant only, so they aren't listed: this project's agents don't get them.}}",
     "description": "Under the Hive skills, when some are for the Hive Assistant alone."
   },
   "project.skills.delete": {
@@ -1388,7 +1388,7 @@
     "description": "Under the Hive skills in a project's Skills tab: what the switch beside each skill does. Delivered to agents is the switch's name; the Skills view is the workspace's list of skills."
   },
   "project.skills.editInWorkspace": {
-    "defaultMessage": "Edit in the workspace's Skills view (Hive skills are shared by every project)",
+    "defaultMessage": "Edit in the workspace's Skills view (Combwork skills are shared by every project)",
     "description": "Tooltip on the button beside a Hive skill."
   },
   "project.skills.heading": {
@@ -1396,7 +1396,7 @@
     "description": "Heading of the project's Skills tab list."
   },
   "project.skills.hive": {
-    "defaultMessage": "Hive",
+    "defaultMessage": "Combwork",
     "description": "The group of Hive's own skills (the workspace's). Usually kept as Hive."
   },
   "project.skills.local": {
@@ -1408,7 +1408,7 @@
     "description": "Tooltip on the + of the Local group."
   },
   "project.skills.noHive": {
-    "defaultMessage": "No Hive skills in this workspace.",
+    "defaultMessage": "No Combwork skills in this workspace.",
     "description": "Under the Hive group when it is empty."
   },
   "project.skills.noneLocal": {
@@ -1432,7 +1432,7 @@
     "description": "Link after the note about skills for the Hive Assistant."
   },
   "project.skills.select": {
-    "defaultMessage": "Select a skill to view it. <b>Hive</b> skills reach every project's agents (those for the Hive Assistant alone aren't listed here) and are edited in the workspace's Skills view; <b>local</b> skills belong to this project and one provider, and you can add, edit and delete them here.",
+    "defaultMessage": "Select a skill to view it. <b>Combwork</b> skills reach every project's agents (those for the Assistant alone aren't listed here) and are edited in the workspace's Skills view; <b>local</b> skills belong to this project and one provider, and you can add, edit and delete them here.",
     "description": "The Skills tab when no skill is selected. <b> marks the group names, in bold."
   },
   "project.skills.showOf": {
