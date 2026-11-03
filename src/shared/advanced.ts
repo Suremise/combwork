@@ -424,7 +424,8 @@ const FOOTER_SAMPLES: Record<string, AdvancedSample> = {
   'copilot.autopilot': { from: `${FIX}/advanced/footer-copilot-1.0.95-autopilot.txt`, version: '1.0.95', text: '· Autopilot · Manual Approval ·' } // i18n-ignore: a CLI's recorded text (#367)
 }
 
-/** Every advanced value as written, in the order Settings lists them (by group). */
+/** Every advanced value as written, in the order Settings lists them (by group). Agents read their titles and descriptions too (the settings tools, HI-2441). */
+// agent-text: SOURCES
 const SOURCES: readonly AdvancedSource[] = [
   // Hive's own
   {
@@ -3019,7 +3020,7 @@ const SOURCES: readonly AdvancedSource[] = [
 ]
 
 /** Every advanced value, in the order Settings lists them (by group), with its English beside its messages. */
-// agent-later: HI-2441 (5c) says the advanced settings' titles and descriptions through agentText, with the settings catalogue
+// window: the English kept beside the messages is Settings → Advanced's search; agents read the settings catalogue's rows, said with agentText (settingsCatalog.ts agentSetting)
 export const ADVANCED_DEFS: readonly AdvancedDef[] = SOURCES.map((d) => ({ ...d, title: englishText(d.title), desc: englishText(d.desc), text: { title: d.title, desc: d.desc } }))
 
 const BY_ID = new Map(ADVANCED_DEFS.map((d) => [d.id, d]))
@@ -3314,8 +3315,8 @@ export function parseAdvancedFile(text: string): { values: Record<string, unknow
   return { values, madeFor, unknown: Object.keys(values).filter((k) => !BY_ID.has(k) && !LEGACY_ADVANCED.has(k)) }
 }
 
-/** What a value takes, in words, in English (the Assistant's tools). */
-export const advancedTakes = (d: AdvancedDef): string => englishText(advancedTakesText(d))
+/** What a value takes, in words, as an agent reads it (the Assistant's tools; said in its chain, HI-2441). */
+export const advancedTakes = (d: AdvancedDef): string => agentText(advancedTakesText(d))
 
 /** What a value takes, as Settings shows it. */
 export function advancedTakesText(d: AdvancedDef): Text {

@@ -175,6 +175,201 @@
   "workflow.move.verdict": {
     "placeholders": {}
   },
+  "workflow.option.commands.desc": {
+    "placeholders": {}
+  },
+  "workflow.option.commands.title": {
+    "placeholders": {}
+  },
+  "workflow.option.commitMessage.desc": {
+    "placeholders": {}
+  },
+  "workflow.option.commitMessage.title": {
+    "placeholders": {}
+  },
+  "workflow.option.dependenciesDone.desc": {
+    "placeholders": {}
+  },
+  "workflow.option.dependenciesDone.none": {
+    "placeholders": {}
+  },
+  "workflow.option.dependenciesDone.title": {
+    "placeholders": {}
+  },
+  "workflow.option.excluded.desc": {
+    "placeholders": {}
+  },
+  "workflow.option.excluded.title": {
+    "placeholders": {}
+  },
+  "workflow.option.fileLocks.desc": {
+    "placeholders": {}
+  },
+  "workflow.option.fileLocks.title": {
+    "placeholders": {}
+  },
+  "workflow.option.finish.desc": {
+    "placeholders": {}
+  },
+  "workflow.option.finish.title": {
+    "placeholders": {}
+  },
+  "workflow.option.focusedTests.desc": {
+    "placeholders": {}
+  },
+  "workflow.option.focusedTests.title": {
+    "placeholders": {}
+  },
+  "workflow.option.folder.desc": {
+    "placeholders": {}
+  },
+  "workflow.option.folder.title": {
+    "placeholders": {}
+  },
+  "workflow.option.identity.desc": {
+    "placeholders": {}
+  },
+  "workflow.option.identity.title": {
+    "placeholders": {}
+  },
+  "workflow.option.loopRounds.desc": {
+    "placeholders": {}
+  },
+  "workflow.option.loopRounds.title": {
+    "placeholders": {}
+  },
+  "workflow.option.loopStepWaitMinutes.desc": {
+    "placeholders": {}
+  },
+  "workflow.option.loopStepWaitMinutes.title": {
+    "placeholders": {}
+  },
+  "workflow.option.loopWaitHours.desc": {
+    "placeholders": {}
+  },
+  "workflow.option.loopWaitHours.title": {
+    "placeholders": {}
+  },
+  "workflow.option.loopWakes.desc": {
+    "placeholders": {}
+  },
+  "workflow.option.loopWakes.title": {
+    "placeholders": {}
+  },
+  "workflow.option.maxAgents.desc": {
+    "placeholders": {}
+  },
+  "workflow.option.maxAgents.title": {
+    "placeholders": {}
+  },
+  "workflow.option.mergeChecks.desc": {
+    "placeholders": {}
+  },
+  "workflow.option.mergeChecks.title": {
+    "placeholders": {}
+  },
+  "workflow.option.mergeInstall.desc": {
+    "placeholders": {}
+  },
+  "workflow.option.mergeInstall.title": {
+    "placeholders": {}
+  },
+  "workflow.option.noSelfReview.desc": {
+    "placeholders": {}
+  },
+  "workflow.option.noSelfReview.title": {
+    "placeholders": {}
+  },
+  "workflow.option.okBefore.desc": {
+    "placeholders": {}
+  },
+  "workflow.option.okBefore.title": {
+    "placeholders": {}
+  },
+  "workflow.option.preChecks.desc": {
+    "placeholders": {}
+  },
+  "workflow.option.preChecks.title": {
+    "placeholders": {}
+  },
+  "workflow.option.pushTarget.desc": {
+    "placeholders": {}
+  },
+  "workflow.option.pushTarget.title": {
+    "placeholders": {}
+  },
+  "workflow.option.review.desc": {
+    "placeholders": {}
+  },
+  "workflow.option.review.none": {
+    "placeholders": {}
+  },
+  "workflow.option.review.shared": {
+    "placeholders": {}
+  },
+  "workflow.option.review.title": {
+    "placeholders": {}
+  },
+  "workflow.option.reviewerMode.desc": {
+    "placeholders": {}
+  },
+  "workflow.option.reviewerMode.title": {
+    "placeholders": {}
+  },
+  "workflow.option.reviewers.desc": {
+    "placeholders": {}
+  },
+  "workflow.option.reviewers.title": {
+    "placeholders": {}
+  },
+  "workflow.option.sameness.desc": {
+    "placeholders": {}
+  },
+  "workflow.option.sameness.title": {
+    "placeholders": {}
+  },
+  "workflow.option.sharedFolderWarning.desc": {
+    "placeholders": {}
+  },
+  "workflow.option.sharedFolderWarning.title": {
+    "placeholders": {}
+  },
+  "workflow.option.slotsUpToDate.desc": {
+    "placeholders": {}
+  },
+  "workflow.option.slotsUpToDate.title": {
+    "placeholders": {}
+  },
+  "workflow.option.stageNames.desc": {
+    "placeholders": {}
+  },
+  "workflow.option.stageNames.title": {
+    "placeholders": {}
+  },
+  "workflow.option.stopOwnRuns.desc": {
+    "placeholders": {}
+  },
+  "workflow.option.stopOwnRuns.title": {
+    "placeholders": {}
+  },
+  "workflow.option.strict.desc": {
+    "placeholders": {}
+  },
+  "workflow.option.strict.title": {
+    "placeholders": {}
+  },
+  "workflow.option.style.desc": {
+    "placeholders": {}
+  },
+  "workflow.option.style.title": {
+    "placeholders": {}
+  },
+  "workflow.option.target.desc": {
+    "placeholders": {}
+  },
+  "workflow.option.target.title": {
+    "placeholders": {}
+  },
   "workflow.refused.approval.given.change": {
     "placeholders": {}
   },
@@ -1029,5 +1224,71 @@
     "placeholders": {
       "folder": "plain"
     }
+  },
+  "workflow.value.commitMessage.branch": {
+    "placeholders": {}
+  },
+  "workflow.value.commitMessage.hive": {
+    "placeholders": {}
+  },
+  "workflow.value.finish.agentMerges": {
+    "placeholders": {}
+  },
+  "workflow.value.finish.committed": {
+    "placeholders": {}
+  },
+  "workflow.value.finish.hiveMerges": {
+    "placeholders": {}
+  },
+  "workflow.value.finish.notChecked": {
+    "placeholders": {}
+  },
+  "workflow.value.folder.project": {
+    "placeholders": {}
+  },
+  "workflow.value.folder.slots": {
+    "placeholders": {}
+  },
+  "workflow.value.mergeInstall.always": {
+    "placeholders": {}
+  },
+  "workflow.value.mergeInstall.onManifestChange": {
+    "placeholders": {}
+  },
+  "workflow.value.review.agent": {
+    "placeholders": {}
+  },
+  "workflow.value.review.agentThenYou": {
+    "placeholders": {}
+  },
+  "workflow.value.review.none": {
+    "placeholders": {}
+  },
+  "workflow.value.review.noneNone": {
+    "placeholders": {}
+  },
+  "workflow.value.review.you": {
+    "placeholders": {}
+  },
+  "workflow.value.reviewerMode.lane": {
+    "placeholders": {}
+  },
+  "workflow.value.reviewerMode.pool": {
+    "placeholders": {}
+  },
+  "workflow.value.sameness.change": {
+    "placeholders": {}
+  },
+  "workflow.value.sameness.exact": {
+    "placeholders": {}
+  },
+  "workflow.value.style.merge": {
+    "placeholders": {}
+  },
+  "workflow.value.style.rebase": {
+    "placeholders": {}
+  },
+  "workflow.value.style.squash": {
+    "placeholders": {}
   }
 }

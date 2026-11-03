@@ -5,6 +5,30 @@
   "agents.codex.safeguardHelp": {
     "placeholders": {}
   },
+  "agents.fileLock.ask": {
+    "placeholders": {}
+  },
+  "agents.fileLock.askDescription": {
+    "placeholders": {}
+  },
+  "agents.fileLock.block": {
+    "placeholders": {}
+  },
+  "agents.fileLock.blockDescription": {
+    "placeholders": {}
+  },
+  "agents.fileLock.off": {
+    "placeholders": {}
+  },
+  "agents.fileLock.offDescription": {
+    "placeholders": {}
+  },
+  "agents.fileLock.warn": {
+    "placeholders": {}
+  },
+  "agents.fileLock.warnDescription": {
+    "placeholders": {}
+  },
   "agents.limit.most": {
     "placeholders": {
       "most": "number"
