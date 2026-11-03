@@ -12,7 +12,7 @@
 // 4. B1, in a turn in slot-a, starts a process that outlives it (detached, a file in slot-a open); its lane is ended
 //    and its next one recorded over it while its turn still runs: Hive leaves the running builder as it is and gives it
 //    the lane's first card once it is free. Its turn ends and it is stopped; the card's start is refused while the
-//    process holds slot-a, its status (HI-2468) and its row in the Progress panel naming slot-a and the process in it
+//    process holds slot-a, its status (HI-2468) and its row in the Progress panel naming slot-a and the program B1's run left
 //    (text, hover, screenshot); once the process ends, the card starts in slot-a with no other call;
 // 5. the Assistant's second sighting: B1 stopped, a process holding slot-a, a lane recorded through the API waits for a
 //    slot, its row in the Progress panel saying what holds it (screenshot), and is lent slot-a once the process ends.
@@ -204,16 +204,18 @@ const renamable = (dir) => {
     fs.writeFileSync(turnGo, 'go')
     check('…B1’s turn ends and it is stopped (its old lane’s lease gone), the process still holding slot-a', !!(await until(async () => !(await live(b1.id)), HUNG_MS)) && beating(beat4) && !renamable(slotA), JSON.stringify(await live(b1.id)))
     check('…its card isn’t started while slot-a is held', !!(await until(async () => (await laneOf(c3))?.status?.reason === 'startWait' || (await laneOf(c3))?.status?.reason === 'slot', HUNG_MS)) && (await card(c3))?.column === 'todo' && beating(beat4), JSON.stringify((await laneOf(c3))?.status))
-    // HI-2468: its start refused (never a wait for a slot: B1 ran as it was recorded), its status naming slot-a and the
-    // process in it, in the lane's status and in its row in the Progress panel's Lanes tab, its hover saying it whole.
+    // HI-2468: its start refused for its slot (never a wait for a slot: B1 ran as it was recorded), its status naming
+    // slot-a and what holds it: the program B1's own last run left there (slot-a's writer, so no slot is free), in the
+    // lane's status and in its row in the Progress panel's Lanes tab, its hover saying it whole.
     const refusedHeld = async () => {
       const s = (await laneOf(c3))?.status
-      return s?.reason === 'startWait' && s.why === 'refused' && s.slot === 'slot-a' && s.held === 'process' && s.agent === 'B1' ? s : null
+      return s?.reason === 'startWait' && s.why === 'refused' && s.slot === 'slot-a' && s.held === 'left' && s.heldBy === 'B1' && s.program === 'node' && s.agent === 'B1' ? s : null
     }
-    check('…its start refused, its status naming slot-a and the process in it', !!(await until(refusedHeld, HUNG_MS)) && (await card(c3))?.column === 'todo', JSON.stringify((await laneOf(c3))?.status))
+    const held4 = await until(refusedHeld, HUNG_MS)
+    check('…its start refused, its status naming slot-a and the program B1’s last run left in it', !!held4 && (await card(c3))?.column === 'todo', JSON.stringify((await laneOf(c3))?.status))
     await openLanes()
     const why4 = panel.locator(`.progress-lane[data-lane="${(await laneOf(c3)).id}"] .progress-lane-why`)
-    const said4 = `${(await card(c3)).key} waits to start: its start was refused for now, slot-a still in use (a process still has a file or folder in it open), and Hive tries again`
+    const said4 = `${(await card(c3)).key} waits to start: its start was refused for now, slot-a still in use (B1’s last run left node${held4?.more ? ` and ${held4.more} more` : ''} running in it), and Hive tries again`
     check(`…its row in the Progress panel says "${said4}"`, !!(await until(async () => ((await why4.textContent().catch(() => '')) ?? '') === said4, HUNG_MS)), await why4.textContent().catch(() => ''))
     check('…and its hover says it whole', ((await why4.getAttribute('title').catch(() => '')) ?? '').startsWith(said4), await why4.getAttribute('title').catch(() => ''))
     fs.mkdirSync(shots, { recursive: true })

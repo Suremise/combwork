@@ -485,25 +485,45 @@ function noteStartHeld(projectPath: string, lane: string, h: { held: LaneSlotHel
   if (startHolds.size > MAX_START_HOLDS) startHolds.delete(startHolds.keys().next().value!)
 }
 
-/** What held the slot of lane `lane`'s start made at or after `since` (laneStarts' try), or null: refused otherwise, or lent. */
-export function startHeldSince(projectPath: string, lane: string, since: number): LaneSlotHeld | null {
+/**
+ * What keeps lane `lane`'s start, refused for its slot (`start.slotAvailable`), from its slot (HI-2468), for its
+ * status; null when it can't be told (the status then says only that the start was refused). `since`: the try just
+ * made (its lend's `busy` refusal, kept by slotForStart, counts only from then); without, a look between tries.
+ * - its lend refused a free slot as held: what held it (a session, a process, the broker), looked at again between tries;
+ * - else, no slot free: the one its builder's own last run still holds (or the only one so held, no lease on it), as
+ *   its writer says: the programs it left running there, or that run not known to have ended (agentFolders' heldWriter).
+ * Never a lend, and never what decides the start: it is tried again as it always is.
+ */
+export async function startSlotHold(ws: WorkspaceService, projectPath: string, lane: string, builder: string, since?: number): Promise<LaneSlotHeld | null> {
   const h = startHolds.get(startHoldKey(projectPath, lane))
-  return h && h.at >= since ? h.held : null
+  if (h && since !== undefined && h.at >= since) return h.held
+  if (h?.folder && since === undefined) {
+    const folder = h.folder
+    const s = sessions.liveStates().find((x) => !!x.cwd && containsPlace(folder, x.cwd))
+    if (s) return { slot: h.held.slot, held: 'session', ...(s.agentName ? { agent: s.agentName } : {}) }
+    if (!(await quietFolder(folder))) return heldOfBusy(await processHeld(h.held.slot, folder, brokerWorkingIn))
+  }
+  return writerHold(ws, projectPath, builder)
 }
 
-/**
- * A refused start's held slot looked at again (HI-2468), between its tries: what holds it now, as the lend would say it
- * (a session in it, else a process: slots.ts quiet, and the broker seen working in it); null once nothing does (its
- * status then says only that the start was refused: the start is tried again as it always is). Never a lend.
- */
-export async function startStillHeld(projectPath: string, lane: string): Promise<LaneSlotHeld | null> {
-  const h = startHolds.get(startHoldKey(projectPath, lane))
-  if (!h?.folder) return null
-  const folder = h.folder
-  const s = sessions.liveStates().find((x) => !!x.cwd && containsPlace(folder, x.cwd))
-  if (s) return { slot: h.held.slot, held: 'session', ...(s.agentName ? { agent: s.agentName } : {}) }
-  if (await quietFolder(folder)) return null
-  return heldOfBusy(await processHeld(h.held.slot, folder, brokerWorkingIn))
+/** The free slot (no lease on it) a run still holds as its writer (HI-2468): its builder's own, else the only one. */
+async function writerHold(ws: WorkspaceService, projectPath: string, builder: string): Promise<LaneSlotHeld | null> {
+  const pool = await poolFor(ws, projectPath)
+  const held = pool.slots().filter((s) => !!s.writer && s.state === 'ready' && !s.op && !s.job && !pool.openLease(s.name))
+  const slot = held.find((s) => s.writer!.agent === builder) ?? (held.length === 1 ? held[0] : null)
+  if (!slot) return null
+  const { heldWriter } = await import('./agentFolders')
+  const w = await heldWriter(projectPath, slot.name)
+  if (!w) return null
+  const who = projectAgents(await ws.projectConfig(projectPath)).find((a) => a.id === w.agent)?.name ?? w.agent
+  const list = w.processes?.list ?? []
+  if (list.length) {
+    const more = list.length - 1 + (w.processes?.more ?? 0)
+    return { slot: slot.name, held: 'left', agent: who, program: list[0].name.replace(/\.exe$/i, ''), ...(more > 0 ? { more } : {}) }
+  }
+  const s = sessions.liveStates().find((x) => !!x.cwd && containsPlace(slot.folder, x.cwd))
+  if (s) return { slot: slot.name, held: 'session', ...(s.agentName ? { agent: s.agentName } : {}) }
+  return { slot: slot.name, held: 'lastRun', agent: who }
 }
 
 /** A `busy` refusal by a process as a lane's status carries it (HI-2467): the broker seen in it, else a process. */

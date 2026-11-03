@@ -121,6 +121,11 @@ describe('a lane on slots (#1438)', () => {
     const broker = view({ slot: 'slot-a', held: 'broker', broker: 'WindowsSandboxServer', idle: false })
     expect(broker.status).toMatchObject({ reason: 'startWait', why: 'refused', slot: 'slot-a', held: 'broker', broker: 'WindowsSandboxServer', idle: false })
     expect(laneLine(broker)).toContain("slot-a still in use (a process still has a file or folder in it open: Windows Sandbox's broker (WindowsSandboxServer) is working in it, with a Sandbox running); Hive tries again")
+    // No slot free, as its builder's own last run still holds it: what that run left there, or that it isn't known to have ended.
+    expect(laneLine(view({ slot: 'slot-a', held: 'left', agent: 'B1', program: 'node' }))).toContain("slot-a still in use (B1's last run left node running in it); Hive tries again")
+    expect(laneLine(view({ slot: 'slot-a', held: 'left', agent: 'B1', program: 'node', more: 2 }))).toContain("slot-a still in use (B1's last run left node and 2 more running in it); Hive tries again")
+    expect(view({ slot: 'slot-a', held: 'left', agent: 'B1', program: 'node', more: 2 }).status).toMatchObject({ held: 'left', heldBy: 'B1', program: 'node', more: 2 })
+    expect(laneLine(view({ slot: 'slot-a', held: 'lastRun', agent: 'B1' }))).toContain("slot-a still in use (B1's last run there isn't known to have ended); Hive tries again")
     // Refused for another reason, or nothing held any more: as before HI-2468.
     const bare = view()
     expect(bare.status).toEqual({ reason: 'startWait', card: 2, why: 'refused', agent: 'B1' })

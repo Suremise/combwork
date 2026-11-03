@@ -17,7 +17,7 @@ import { offerNow, waitingForRun } from './deliveries'
 import { whyNoLine } from './lineWriter'
 import { sessions } from './sessions'
 import { startTask } from './taskStart'
-import { HIVE_LANE_START } from './tasks'
+import { HIVE_LANE_START, WorkflowRefusedError } from './tasks'
 import { teamPauseOf } from './teamPause'
 import { inWorkspace, openWorkspaces, workspaceFor, type WorkspaceService } from './workspace'
 
@@ -57,7 +57,7 @@ const RETRY_MS = 30_000
 /** Next cards waiting for their builder ("<workspace>#<project>|<builder>" → the card), looked at again as it changes. */
 const waiting = new Map<string, number>()
 /** When each card's start was last tried ("<workspace>#<lane>#<n>"), and the refusal last logged. */
-const tried = new Map<string, { at: number; why: string; builder: string; held?: LaneSlotHeld | null }>()
+const tried = new Map<string, { at: number; why: string; builder: string; slot?: boolean }>()
 const timers = new Map<string, NodeJS.Timeout>()
 const inFlight = new Set<Promise<unknown>>()
 /**
@@ -128,6 +128,12 @@ async function dependencyWait(ws: WorkspaceService, projectPath: string, n: numb
   } catch {
     return null
   }
+}
+
+/** Whether a start was refused for its slot (HI-2468): the start's rule `start.slotAvailable`, however it was wrapped. */
+function slotRefused(e: unknown): boolean {
+  for (let x: unknown = e, i = 0; x instanceof Error && i < 5; x = x.cause, i++) if (x instanceof WorkflowRefusedError && x.refusal.rule === 'start.slotAvailable') return true
+  return false
 }
 
 /** A start the lane no longer asks for: its lane ended, was changed or isn't the builder's, or the card isn't its next. */
@@ -202,8 +208,8 @@ async function lookAt(ws: WorkspaceService, path: string): Promise<void> {
     const key = `${path.toLowerCase()}#${lane.id}#${next.number}`
     const last = tried.get(key)
     if (last && Date.now() - last.at < RETRY_MS) {
-      // Refused for its slot held (HI-2468): looked at again, so its status follows what holds the slot until the next try.
-      wait('refused', undefined, last.held ? await (await import('./slotCards')).startStillHeld(projectPath, lane.id).catch(() => null) : null)
+      // Refused for its slot (HI-2468): what holds it looked at again, so its status follows it until the next try.
+      wait('refused', undefined, last.slot ? await (await import('./slotCards')).startSlotHold(ws, projectPath, lane.id, lane.builder.id).catch(() => null) : null)
       continue
     }
     const prev = lane.cards.slice(0, lane.cards.indexOf(next)).findLast((x) => x.column === 'done')
@@ -226,11 +232,11 @@ async function lookAt(ws: WorkspaceService, path: string): Promise<void> {
         continue
       }
       const why = e instanceof Error ? e.message : String(e)
-      // Its slot held as this try's lend found it (HI-2468): the status names the slot and what holds it.
-      const held = (await import('./slotCards')).startHeldSince(projectPath, lane.id, triedAt)
-      wait('refused', undefined, held)
+      // Refused for its slot (HI-2468, the start's rule): the status names the slot and what holds it, as this try found it.
+      const slot = slotRefused(e)
+      wait('refused', undefined, slot ? await (await import('./slotCards')).startSlotHold(ws, projectPath, lane.id, lane.builder.id, triedAt).catch(() => null) : null)
       if (last?.why !== why) log.info(`Lane ${lane.id}: #${next.number} not started yet: ${userText(why)}`)
-      tried.set(key, { at: Date.now(), why, builder: builderKey(path, lane.project, lane.builder.id), held })
+      tried.set(key, { at: Date.now(), why, builder: builderKey(path, lane.project, lane.builder.id), ...(slot ? { slot } : {}) })
       if (tried.size > 500) tried.delete(tried.keys().next().value!)
     }
   }

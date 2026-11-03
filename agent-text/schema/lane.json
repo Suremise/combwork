@@ -539,6 +539,8 @@
       "slot": "plain",
       "held": "select",
       "heldBy": "plain",
+      "program": "plain",
+      "more": "plural",
       "broker": "plain",
       "idle": "select"
     }
