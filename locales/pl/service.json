@@ -42,6 +42,7 @@
   "service.cardAttach.noCard": "Nie ma takiej karty.",
   "service.cardAttach.noProject": "{project} nie jest projektem obszaru roboczego. Nic nie dołączono.",
   "service.cardAttach.refused": "{path} nie jest plikiem, który można tu dołączyć: podaj ścieżkę pliku z własnego projektu (jego folderu, jego slotów) lub folderu tymczasowego. Nic nie dołączono.",
+  "service.cardAttach.refusedFrom": "{path} nie jest plikiem, który można tu dołączyć. Pliki mogą pochodzić z {caller, select, agent {własnego projektu (jego folderu, jego slotów)} other {obszaru roboczego i jego projektów}}, folderu tymczasowego ({temp}){more, select, yes { oraz folderów z Ustawienia → Zaawansowane → Załączniki kart: więcej folderów ({folders})} other {}}. Aby dołączyć z innego folderu, użytkownik dodaje go tam (Ustawienia → Zaawansowane → Załączniki kart: więcej folderów, dla Hive lub tego obszaru roboczego): nie kopiuj pliku do folderu tymczasowego. Nic nie dołączono.",
   "service.cardAttach.tooLarge": "{name} przekracza {max}, najwięcej, ile karta przechowuje w jednym pliku (Ustawienia → Zaawansowane → Załączniki kart: największy plik). Nic nie dołączono.",
   "service.cardAttach.tooMuch": "Naraz można dołączyć najwyżej {files, number} plików i {total}. Nic nie dołączono.",
   "service.cardCleanup.stale": "Ta lista jest nieaktualna: nic nie usunięto. Otwórz ponownie Wyczyść teraz….",

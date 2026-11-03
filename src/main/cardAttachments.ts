@@ -15,7 +15,7 @@ import { pipeline } from 'stream/promises'
 import { basename, join, resolve, sep } from 'path'
 import { tmpdir } from 'os'
 import { ATTACHMENTS_DIR, CARD_ATTACHMENTS_DIR, attachmentKind } from '../shared/attachments'
-import { CARD_ATTACHMENT_MAX_ID } from '../shared/advanced'
+import { CARD_ATTACHMENT_FOLDERS_ID, CARD_ATTACHMENT_MAX_ID } from '../shared/advanced'
 import { ATTACH_MAX_FILES, ATTACH_MAX_TOTAL, type CardAttachment, type CardAttachmentGroup, type CardDrafts } from '../shared/cardAttachments'
 import { HIVE_DIR, projectAgents } from '../shared/defaults'
 import { msg } from '../shared/i18n'
@@ -42,6 +42,8 @@ const M = {
   tooLarge: msg({ id: 'service.cardAttach.tooLarge', defaultMessage: '{name} is larger than {max}, the most a card keeps in one file (Settings → Advanced → Card attachments: largest file). Nothing was attached.', description: 'An error attaching files to a card (HI-1700): one is larger than the limit ({max}: a size such as 25 MB); none of them was attached.' }),
   tooMuch: msg({ id: 'service.cardAttach.tooMuch', defaultMessage: 'At most {files, number} files and {total} can be attached at once. Nothing was attached.', description: 'An error attaching files to a card (HI-1700): more files, or more bytes in all ({total}: a size such as 100 MB), than one change takes; none was attached.' }),
   refused: msg({ id: 'service.cardAttach.refused', defaultMessage: '{path} is not a file that can be attached here: give the path of a file of your own project (its folder, its slots) or of the temp folder. Nothing was attached.', description: 'An error attaching a file to a card by its path (HI-1700): it is missing, a folder or a link, or in a place the caller may not attach from (another project, Hive’s own folders). Nothing was attached.' }),
+  // HI-2480: an agent's, the Assistant's or a script's: where files may come from, and where another folder is added.
+  refusedFrom: msg({ id: 'service.cardAttach.refusedFrom', defaultMessage: "{path} is not a file that can be attached here. Files can come from {caller, select, agent {your own project (its folder, its slots)} other {the workspace and its projects}}, the temp folder ({temp}){more, select, yes { and the folders of Settings → Advanced → Card attachments: more folders ({folders})} other {}}. To attach from another folder, the user adds it there (Settings → Advanced → Card attachments: more folders, Hive's or this workspace's): don't copy the file into the temp folder. Nothing was attached.", description: "An error attaching a file to a card by its path (HI-1700, HI-2480): it is missing, a folder or a link, or in a place the caller may not attach from. {caller} is agent for a project's agent, else the Assistant or a script; {temp} is the temp folder's path; {more} is yes when the user listed more folders, {folders} those folders. Card attachments: more folders is an advanced setting's title: use it as Settings shows it. Nothing was attached." }),
   noCard: msg({ id: 'service.cardAttach.noCard', defaultMessage: 'No such card.', description: 'An error attaching a file to a card (HI-1700): the card is gone.' }),
   noProject: msg({ id: 'service.cardAttach.noProject', defaultMessage: '{project} is not a project of the workspace. Nothing was attached.', description: 'An error attaching files to a card (HI-1700): the project named for it is not one of the workspace’s (a path, or a name no project has); nothing was copied.' }),
   noAttachment: msg({ id: 'service.cardAttach.noAttachment', defaultMessage: 'The card has no such attachment.', description: 'An error removing a card attachment (HI-1700) that is gone.' }),
@@ -182,12 +184,30 @@ function throughHive(real: string): { hive: string; next: string | undefined } |
 }
 
 /**
+ * The folders the user listed in Settings → Advanced → Card attachments: more folders (HI-2480), the workspace's own list
+ * over Hive's: each full path, a %VARIABLE% at its start filled in from the environment (one that isn't set, or that
+ * doesn't give a full path, leaves the folder out). Checked as a file's other allowed folders are, after the protected ones.
+ */
+export function extraFolders(ws: WorkspaceService): string[] {
+  const listed = advanced.get<string[]>(CARD_ATTACHMENT_FOLDERS_ID, ws.config?.advanced ?? null)
+  if (!Array.isArray(listed)) return []
+  const env = new Map(Object.entries(process.env).map(([k, v]) => [k.toLowerCase(), v]))
+  return listed.flatMap((f) => {
+    const filled = typeof f === 'string' ? f.replace(/^%([a-z_][a-z0-9_]*)%/i, (all, name: string) => env.get(name.toLowerCase()) ?? all) : ''
+    return /^(?:[a-zA-Z]:[\\/]|\\\\[^\\/])/.test(filled) ? [resolve(filled)] : []
+  })
+}
+
+/**
  * The real path of a file the caller may attach, or the refusal (the same whether the file is there or not): a regular
  * file (no folder or link at the end), whose real path, every folder above it resolved (a junction anywhere counts), is in
  * a folder the caller may read from and in no protected host's.
  */
 export async function attachableSource(ws: WorkspaceService, caller: AttachCaller, path: string): Promise<string> {
+  const temp = tmpdir()
+  const more = caller.kind === 'agent' || caller.kind === 'workspace' ? extraFolders(ws) : []
   const refuse = (): never => {
+    if (caller.kind === 'agent' || caller.kind === 'workspace') throw hiveError(M.refusedFrom, { path, caller: caller.kind, temp, more: more.length ? 'yes' : 'no', folders: more.join('; ') }, { kind: 'invalid' })
     throw hiveError(M.refused, { path }, { kind: 'invalid' })
   }
   if (typeof path !== 'string' || !path || !/^[a-zA-Z]:[\\/]|^\\\\/.test(path)) refuse()
@@ -201,7 +221,6 @@ export async function attachableSource(ws: WorkspaceService, caller: AttachCalle
     return real
   }
   const projects = await allProjects(ws)
-  const temp = tmpdir()
   const hive = throughHive(real)
   if (caller.kind === 'agent') {
     const own = projects.find((p) => basename(p).toLowerCase() === caller.project.toLowerCase())
@@ -213,14 +232,14 @@ export async function attachableSource(ws: WorkspaceService, caller: AttachCalle
     if (within(real, [...others, ws.assistantHome, join(ws.path!, HIVE_DIR)])) refuse()
     // A .hive only through its own project's attachments.
     if (hive && !(hive.hive.toLowerCase() === realPath(join(own!, HIVE_DIR)).toLowerCase() && hive.next === ATTACHMENTS_DIR)) refuse()
-    if (!within(real, [...ownFolders, temp])) refuse()
+    if (!within(real, [...ownFolders, temp, ...more])) refuse()
     return real
   }
   // The Assistant and scripts: the workspace, every project's working folders wherever they are, the Assistant's home,
-  // the temp folder; any .hive only through its attachments.
+  // the temp folder and the listed folders; any .hive only through its attachments.
   if (hive && hive.next !== ATTACHMENTS_DIR) refuse()
   const all = (await Promise.all(projects.map((p) => workFolders(ws, p)))).flat()
-  if (!within(real, [ws.path!, ...all, ws.assistantHome, temp])) refuse()
+  if (!within(real, [ws.path!, ...all, ws.assistantHome, temp, ...more])) refuse()
   return real
 }
 

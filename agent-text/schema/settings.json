@@ -831,6 +831,12 @@
       "title": "plain"
     }
   },
+  "settings.advanced.error.folders": {
+    "placeholders": {
+      "title": "plain",
+      "most": "plain"
+    }
+  },
   "settings.advanced.error.list": {
     "placeholders": {
       "title": "plain"
@@ -874,6 +880,12 @@
     "placeholders": {}
   },
   "settings.advanced.hive.assistant.startView.title": {
+    "placeholders": {}
+  },
+  "settings.advanced.hive.cards.attachmentFolders.desc": {
+    "placeholders": {}
+  },
+  "settings.advanced.hive.cards.attachmentFolders.title": {
     "placeholders": {}
   },
   "settings.advanced.hive.cards.attachmentMax.desc": {
@@ -1409,6 +1421,9 @@
     }
   },
   "settings.advanced.takes.field": {
+    "placeholders": {}
+  },
+  "settings.advanced.takes.folders": {
     "placeholders": {}
   },
   "settings.advanced.takes.list": {

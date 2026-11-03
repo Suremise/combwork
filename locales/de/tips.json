@@ -119,6 +119,8 @@
   "tips.cardAttachments.title": "Einen Screenshot bei seiner Karte behalten",
   "tips.cardAttachmentsCleanup.text": "Dateien, die mit einer Karte aufbewahrt werden, kommen 30 Tage nach ihrem Archivieren in den Papierkorb. Wähle 3, 7 oder 90 Tage oder Nie unter Projekteinstellungen → Speicher, wo „Jetzt aufräumen…“ entfernt, was fällig ist. Offene und erledigte Karten behalten ihre.",
   "tips.cardAttachmentsCleanup.title": "Screenshots archivierter Karten räumen sich selbst auf",
+  "tips.cardAttachmentsFolders.text": "Agenten hängen Dateien aus ihrem eigenen Projekt und dem Temp-Ordner an Karten an. Du hebst Testbelege in einem eigenen Ordner auf? Trage ihn unter Einstellungen → Erweitert → Karten-Anhänge: weitere Ordner ein, dann können sie von dort anhängen, ohne nach Temp zu kopieren.",
+  "tips.cardAttachmentsFolders.title": "Agenten deine Testbelege dort anhängen lassen, wo sie liegen",
   "tips.cardCost.text": "Das Panel einer Karte zeigt, was ihre Agenten verbraucht haben, während sie sie hatten, „{example}“, mit den Anteilen von Bearbeiter und Reviewer und den Tokens beim Darüberfahren. „Leistung“ listet die Kosten jeder Karte, und beim Darüberfahren über eine Lane im Fortschrittspanel siehst du ihren Overhead.",
   "tips.cardCost.title": "Was eine Karte gekostet hat",
   "tips.cardCostRounds.text": "Der Abschnitt „Arbeit“ einer Karte endet mit ihren Kosten nach Runde: die Anteile von Bearbeiter und Reviewer in jeder Runde, die zusammen die Kosten der Karte ergeben. So siehst du, ob zusätzliche Runden oder ein langes Einlesen sie verursacht haben.",

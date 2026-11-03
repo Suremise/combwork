@@ -42,6 +42,7 @@
   "service.cardAttach.noCard": "No such card.",
   "service.cardAttach.noProject": "{project} is not a project of the workspace. Nothing was attached.",
   "service.cardAttach.refused": "{path} is not a file that can be attached here: give the path of a file of your own project (its folder, its slots) or of the temp folder. Nothing was attached.",
+  "service.cardAttach.refusedFrom": "{path} is not a file that can be attached here. Files can come from {caller, select, agent {your own project (its folder, its slots)} other {the workspace and its projects}}, the temp folder ({temp}){more, select, yes { and the folders of Settings → Advanced → Card attachments: more folders ({folders})} other {}}. To attach from another folder, the user adds it there (Settings → Advanced → Card attachments: more folders, Hive's or this workspace's): don't copy the file into the temp folder. Nothing was attached.",
   "service.cardAttach.tooLarge": "{name} is larger than {max}, the most a card keeps in one file (Settings → Advanced → Card attachments: largest file). Nothing was attached.",
   "service.cardAttach.tooMuch": "At most {files, number} files and {total} can be attached at once. Nothing was attached.",
   "service.cardCleanup.stale": "This list is out of date: nothing was removed. Open Clean Up Now again.",

@@ -2,6 +2,10 @@
 
 ## Unreleased
 
+### Added
+
+- **Agents can attach files to cards from a folder you choose** (HI-2480). Agents, the Assistant and scripts could attach only files from their project's folders, the workspace and the temp folder, so evidence kept in a folder of your own had to be copied into Temp first. **Settings → Advanced → Card attachments: more folders** lists more folders they may attach from, for all of Hive or just the workspace (`%LOCALAPPDATA%\…` works). Another project's folders and Hive's own stay off limits. A refused file now says which folders are accepted and where to add one.
+
 ### Fixed
 
 - **Why a viewer token can't be made is in your language** (HI-2459). Settings → Agent API → Viewer tokens said why it couldn't make one (no name, a name too long or already taken, too many tokens) in English whatever language Hive showed.

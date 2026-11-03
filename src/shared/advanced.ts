@@ -187,6 +187,8 @@ export interface AdvancedDef {
   default: string | number | string[] | boolean
   /** A pattern's flags: part of the default, not of the value. */
   flags?: string
+  /** A `list` of folders (HI-2480): full paths (a %VARIABLE% at the start allowed), separated by semicolons, none at all allowed. */
+  paths?: boolean
   /** A `choice` value's choices, in the order Settings lists them. */
   choices?: readonly AdvancedChoice[]
   min?: number
@@ -363,6 +365,8 @@ export const WORKSPACE_NOTES_MAX_ID = 'hive.notes.workspaceNotesMax'
 /** The largest file kept with a card (HI-1700), in bytes. */
 export const CARD_ATTACHMENT_MAX_ID = 'hive.cards.attachmentMax'
 export const CARD_ATTACHMENT_MAX = 25 * 1024 * 1024
+/** More folders agents, the Assistant and scripts may attach files to a card from (HI-2480), beside their own and Temp. */
+export const CARD_ATTACHMENT_FOLDERS_ID = 'hive.cards.attachmentFolders'
 
 /**
  * Where Hive removes its skill copies (.agents/skills/hive-*) once no agent of Hive's works in the folder (#1431, #966 row
@@ -397,6 +401,9 @@ const MAX_PATTERN = 500
 const MAX_TEXT = 200
 const FIELD = /^[A-Za-z_][A-Za-z0-9_]*$/
 const NAME = /^[a-z0-9][a-z0-9_-]*$/i
+/** A folder as a paths list takes it (HI-2480): a drive's or a share's full path, or one starting with a %VARIABLE%. */
+const FOLDER = /^(?:[a-z]:[\\/]|\\\\[^\\/]|%[a-z_][a-z0-9_]*%)/i
+const MAX_FOLDER = 1000
 
 const FIX = 'tests/fixtures'
 
@@ -1365,6 +1372,23 @@ const SOURCES: readonly AdvancedSource[] = [
     min: 1024 * 1024,
     max: 1024 * 1024 * 1024,
     unit: 'bytes',
+    applies: 'now'
+  },
+  // HI-2480: a folder of the user's own for test evidence (excluded from Defender, say) instead of copying into Temp.
+  {
+    id: CARD_ATTACHMENT_FOLDERS_ID,
+    group: 'hive',
+    title: msg({ id: 'settings.advanced.hive.cards.attachmentFolders.title', defaultMessage: 'Card attachments: more folders', description: "An advanced setting's title (Settings → Advanced), followed by a list of folders: where else agents may attach files to a card from." }),
+    desc: msg({
+      id: 'settings.advanced.hive.cards.attachmentFolders.desc',
+      defaultMessage: "More folders an agent, the Assistant or a script may attach files to a card from, besides its own project's folders and the temp folder: full paths, separated by semicolons (%LOCALAPPDATA% and other variables at the start are filled in). Another project's folders and Hive's own stay refused, even inside one. Empty: none.",
+      description: 'What the advanced setting "Card attachments: more folders" does (Settings → Advanced, under Hive). %LOCALAPPDATA% is a Windows variable: keep it.'
+    }),
+    kind: 'list',
+    paths: true,
+    default: [],
+    max: 20,
+    workspace: true,
     applies: 'now'
   },
   // Hive's skill copies for Codex and Copilot outlive their sessions (#1431, #966 row 15): a CLI run on its own in the
@@ -3048,6 +3072,7 @@ const NOT_TAKEN = {
   text: msg({ id: 'settings.advanced.error.text', defaultMessage: '{title} takes text.', description: "Why an advanced setting's new value isn't taken. {title} is the setting's title." }),
   field: msg({ id: 'settings.advanced.error.field', defaultMessage: '{title} takes a field name: letters, digits and _ (not starting with a digit).', description: "Why an advanced setting's new value isn't taken: it must be a field name of a CLI's data. {title} is the setting's title." }),
   list: msg({ id: 'settings.advanced.error.list', defaultMessage: '{title} takes 1 to 10 names (letters, digits, - and _), as a list or separated by commas.', description: "Why an advanced setting's new value isn't taken. {title} is the setting's title." }),
+  folders: msg({ id: 'settings.advanced.error.folders', defaultMessage: '{title} takes up to {most} folders, each a full path (C:\\…, \\\\server\\…, or starting with a variable such as %LOCALAPPDATA%), separated by semicolons.', description: "Why an advanced setting's new value (a list of folders) isn't taken. {title} is the setting's title; {most} a number of folders. C:\\…, \\\\server\\… and %LOCALAPPDATA% are written as Windows writes them: keep them." }),
   choice: msg({ id: 'settings.advanced.error.choice', defaultMessage: '{title} takes one of {choices}.', description: "Why an advanced setting's new value isn't taken. {title} is the setting's title; {choices} lists the values it takes as advanced.json writes them (allow, ask, block): keep them." }),
   boolean: msg({ id: 'settings.advanced.error.boolean', defaultMessage: '{title} takes true or false.', description: "Why an advanced setting's new value isn't taken. {title} is the setting's title; true and false are the values as written: keep them." }),
   number: msg({ id: 'settings.advanced.error.number', defaultMessage: '{title} takes a whole number from {min} to {max}.', description: "Why an advanced setting's new value isn't taken. {title} is the setting's title; {min} and {max} are numbers." })
@@ -3083,6 +3108,12 @@ export function checkAdvanced(def: AdvancedDef, raw: unknown): { value: string |
       return { value: raw }
     }
     case 'list': {
+      if (def.paths) {
+        // Folders (HI-2480): semicolons apart, as Windows lists paths (a comma can be in a folder's name); none is a value.
+        const folders = Array.isArray(raw) ? raw.map((x) => (typeof x === 'string' ? x.trim() : x)).filter((x) => x !== '') : typeof raw === 'string' ? raw.split(';').map((s) => s.trim()).filter(Boolean) : null
+        if (!folders || folders.length > (def.max ?? 10) || folders.some((x) => typeof x !== 'string' || x.length > MAX_FOLDER || !FOLDER.test(x))) return refused(withValues(NOT_TAKEN.folders, { title, most: String(def.max ?? 10) }))
+        return { value: folders as string[] }
+      }
       const list = Array.isArray(raw) ? raw : typeof raw === 'string' ? raw.split(',').map((s) => s.trim()).filter(Boolean) : null
       if (!list || !list.length || list.length > (def.max ?? 10) || list.some((x) => typeof x !== 'string' || !NAME.test(x))) return refused(withValues(NOT_TAKEN.list, { title }))
       return { value: list as string[] }
@@ -3236,7 +3267,7 @@ export function advancedRow(def: AdvancedDef, state: Pick<AdvancedState, 'values
 /** A value as the tools show it, in English: "300 s", "on", "activity, project-name". */
 export function advancedText(def: AdvancedDef, v: unknown): string {
   if (v === undefined || v === null) return '—'
-  if (Array.isArray(v)) return v.join(', ')
+  if (Array.isArray(v)) return v.join(def.paths ? '; ' : ', ')
   if (typeof v === 'boolean') return v ? 'on' : 'off' // i18n-ignore: the tools' English (advancedShown is Settings')
   if (def.kind === 'number') return `${String(v)}${def.unit ? ` ${def.unit}` : ''}`
   return String(v)
@@ -3337,6 +3368,7 @@ export function advancedTakesText(d: AdvancedDef): Text {
     case 'field':
       return msg({ id: 'settings.advanced.takes.field', defaultMessage: 'A field name.', description: "What an advanced setting takes (Settings → Advanced): the name of a field in a CLI's data." })
     case 'list':
+      if (d.paths) return msg({ id: 'settings.advanced.takes.folders', defaultMessage: 'Folders, each a full path, separated by semicolons (a variable such as %LOCALAPPDATA% at the start is filled in).', description: 'What an advanced setting takes (Settings → Advanced): a list of folders. %LOCALAPPDATA% is a Windows variable: keep it.' })
       return msg({ id: 'settings.advanced.takes.list', defaultMessage: 'Names separated by commas.', description: 'What an advanced setting takes (Settings → Advanced).' })
     case 'text':
       return msg({ id: 'settings.advanced.takes.text', defaultMessage: 'Text, found as it is.', description: "What an advanced setting takes (Settings → Advanced): text Hive looks for on a CLI's screen, as it is." })

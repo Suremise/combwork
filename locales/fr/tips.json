@@ -119,6 +119,8 @@
   "tips.cardAttachments.title": "Garder une capture avec sa carte",
   "tips.cardAttachmentsCleanup.text": "Les fichiers gardés avec une carte vont dans la Corbeille 30 jours après son archivage. Choisis 3, 7 ou 90 jours, ou Jamais, dans Paramètres du projet → Stockage, où Nettoyer maintenant… retire tout de suite ce qui est dû. Les cartes ouvertes et celles en Terminé gardent les leurs.",
   "tips.cardAttachmentsCleanup.title": "Les captures des cartes archivées se nettoient seules",
+  "tips.cardAttachmentsFolders.text": "Les agents joignent aux cartes des fichiers de leur propre projet et du dossier temporaire. Tu gardes tes preuves de test dans un dossier à toi ? Ajoute-le dans Paramètres → Avancé → Pièces jointes des cartes : autres dossiers, et ils pourront joindre depuis là sans copier dans Temp.",
+  "tips.cardAttachmentsFolders.title": "Laisser les agents joindre tes preuves de test là où elles sont",
   "tips.cardCost.text": "Le panneau d’une carte indique ce que ses agents ont utilisé pendant qu’ils l’avaient en main, « {example} », avec au survol la part de l’auteur et du relecteur et les jetons. Performances liste le coût de chaque carte, et le survol d’un couloir dans le panneau Progression son coût hors carte.",
   "tips.cardCost.title": "Ce qu’une carte a coûté",
   "tips.cardCostRounds.text": "La section Travail d’une carte se termine par son coût par tour : la part de l’auteur et du relecteur à chaque tour, qui totalisent le coût de la carte. Vois si ce sont des tours en plus ou une longue lecture qui l’ont fait monter.",
