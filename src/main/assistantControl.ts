@@ -11,6 +11,7 @@ import { config } from './config'
 import { emit } from './events'
 import { resolveOffer, tell } from './notify'
 import { msg, tr } from '../shared/i18n'
+import { englishText, shownText, withValues, type Text } from '../shared/advanced'
 import { agentMsg, inDefaultDialect, say, type AgentMsg, type AgentValues } from '../shared/agentText'
 import { hashText, writeJsonAtomic } from './fsutil'
 import { createLogger, userText } from './logger'
@@ -222,6 +223,45 @@ function emitQuestions(workspacePath: string): void {
 }
 
 /** Questions told as a notification (HI-2320), by id: once each. */
+/**
+ * The question asked before the Assistant stops a busy agent (HI-1994): the user's to answer, in the window's language
+ * (HI-2449). {state} is what the agent is doing, from its live status.
+ */
+const STOP_QUESTION = {
+  title: msg({ id: 'main.assistantQuestion.stop.title', defaultMessage: 'Stop {agent} in {project}?', description: "A question from the Hive Assistant to the user, in its panel (and a notification while the panel is hidden): it wants to stop an agent that is busy. {agent} is the agent's name, {project} its project's." }),
+  message: msg({
+    id: 'main.assistantQuestion.stop.message',
+    defaultMessage: 'The Assistant wants to stop {agent}, which is {state}.{hasReason, select, yes { Its reason: {reason}} other {}} Its conversation is kept and can be resumed.',
+    description: "Under the question \"Stop <agent> in <project>?\". {state} is what the agent is doing (main.assistantQuestion.stop.state); {reason} is the Assistant's own reason, as it wrote it, ending with a full stop."
+  }),
+  state: msg({
+    id: 'main.assistantQuestion.stop.state',
+    defaultMessage: '{status, select, working {working} waiting {waiting for the user} signin {waiting for the user to sign in to its CLI again (its sign-in expired)} starting {starting} background {waiting on background tasks it started} watching {waiting for cards to change (a card watch: its card loop pauses until it is resumed)} ready {idle} finished {idle (finished its task)} error {in error} stopped {stopped} other {{status}}}',
+    description: 'What an agent is doing, inside "The Assistant wants to stop <agent>, which is …". The other branch is its status as Hive names it in code: keep {status}.'
+  }),
+  yes: msg({ id: 'main.assistantQuestion.stop.yes', defaultMessage: 'Stop', description: 'The button that answers yes to "Stop <agent> in <project>?" (the Assistant asks before stopping a busy agent).' }),
+  no: msg({ id: 'main.assistantQuestion.stop.no', defaultMessage: "Don't stop", description: 'The button that answers no to "Stop <agent> in <project>?".' })
+}
+
+/** The question asked before the Assistant stops a busy agent: the window's text as data, and its English. */
+export function stopQuestion(o: { agent: string; project: string; status: string; reason: string }): Omit<AssistantQuestion, 'id'> {
+  const reason = o.reason && !/[.!?]$/.test(o.reason) ? `${o.reason}.` : o.reason
+  const text = {
+    title: withValues(STOP_QUESTION.title, { agent: o.agent, project: o.project }),
+    message: withValues(STOP_QUESTION.message, { agent: o.agent, state: withValues(STOP_QUESTION.state, { status: o.status }), hasReason: reason ? 'yes' : 'no', reason }),
+    yes: STOP_QUESTION.yes,
+    no: STOP_QUESTION.no
+  }
+  return { ...questionEnglish(text), text }
+}
+
+/** A question's English (the log's, the event stream's), from its text. */
+// window: a question of the window's; its English is the log's and the event stream's notification title
+const questionEnglish = (t: NonNullable<AssistantQuestion['text']>): Pick<AssistantQuestion, 'title' | 'message' | 'yes' | 'no'> => ({ title: englishText(t.title), message: englishText(t.message), yes: englishText(t.yes), no: englishText(t.no) })
+
+/** A question as the window shows it now: its text in the language Hive shows, or its English with none. */
+const shown = (q: AssistantQuestion, field: 'title' | 'message' | 'yes' | 'no'): string => (q.text ? shownText(q.text[field] as Text) : q[field])
+
 const toldQuestions = new Set<string>()
 const QUESTION_ANSWERED = msg({ id: 'main.assistantQuestion.answered', defaultMessage: 'Answered', description: "What the notification of a question from the Hive Assistant says once it is answered or no longer waits (HI-2320), in place of its buttons. Keep it short." })
 
@@ -239,14 +279,16 @@ export function tellQuestion(workspacePath: string, id: string): boolean {
   tell({
     kind: 'needsYou',
     level: 'warning',
-    title: q.title,
-    message: q.message,
+    title: shown(q, 'title'),
+    message: shown(q, 'message'),
+    // The event stream's title stays English, as the rest of the Agent API does.
+    apiTitle: q.title,
     projectPath: home,
     agentId: ASSISTANT_AGENT_ID,
     target: { kind: 'agent', projectPath: home, agentId: ASSISTANT_AGENT_ID, name: ASSISTANT_NAME, project: ASSISTANT_NAME },
     actions: [
-      { label: q.yes, command: 'assistant.answer', args: [id, true] },
-      { label: q.no, command: 'assistant.answer', args: [id, false] }
+      { label: shown(q, 'yes'), command: 'assistant.answer', args: [id, true] },
+      { label: shown(q, 'no'), command: 'assistant.answer', args: [id, false] }
     ],
     offer: `aq:${id}`
   })

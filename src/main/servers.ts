@@ -1157,18 +1157,6 @@ route('POST', '/v1/projects', async ({ body }) => {
 })
 
 const busy = (s: LiveSessionState | null): boolean => !!s && (s.status === 'working' || s.status === 'waiting' || s.status === 'starting' || s.status === 'background' || s.status === 'signin')
-const STATUS_WORDS: Record<string, string> = {
-  working: 'working',
-  waiting: 'waiting for the user',
-  signin: 'waiting for the user to sign in to its CLI again (its sign-in expired)',
-  starting: 'starting',
-  background: 'waiting on background tasks it started',
-  watching: 'waiting for cards to change (a card watch: its card loop pauses until it is resumed)',
-  ready: 'idle',
-  finished: 'idle (finished its task)',
-  error: 'in error',
-  stopped: 'stopped'
-}
 const clip = (t: string, n: number): string => (t.length > n ? `${t.slice(0, n)}…` : t)
 
 async function agentDefOf(p: string, agentId: string) {
@@ -1511,18 +1499,9 @@ route('POST', '/v1/projects/:name/agents/:agent/stop', async ({ params, body, si
     if (!st) return { done: [API.done.notRunning, { agent: a.name, project: basename(p) }], result: { ok: true, wasRunning: false } }
     // Stopping an agent in the middle of something is the user's call; one only watching is idle (HI-1994).
     if (stopAsksUser(st.status) && ws) {
-      const said = typeof body?.reason === 'string' ? clip(body.reason.trim(), 300) : ''
-      const reason = said ? ` Its reason: ${said}${/[.!?]$/.test(said) ? '' : '.'}` : ''
-      const how = await assistant.ask(
-        ws,
-        {
-          title: `Stop ${a.name} in ${basename(p)}?`,
-          message: `The Assistant wants to stop ${a.name}, which is ${STATUS_WORDS[st.status] ?? st.status}.${reason} Its conversation is kept and can be resumed.`,
-          yes: 'Stop',
-          no: "Don't stop"
-        },
-        { timeoutMs: STOP_ASK_MS, signal }
-      )
+      // The user's question, in the window's language (HI-2449).
+      const reason = typeof body?.reason === 'string' ? clip(body.reason.trim(), 300) : ''
+      const how = await assistant.ask(ws, assistant.stopQuestion({ agent: a.name, project: basename(p), status: st.status, reason }), { timeoutMs: STOP_ASK_MS, signal })
       // Its question closed, whatever ended it: never left open in the panel with nobody waiting on it (HI-1994).
       if (how === 'timedOut') throw new HttpError(408, say(API.agent.stopAskTimedOut, { agent: a.name, seconds: String(STOP_ASK_MS / 1000) }))
       if (how === 'gone') throw new HttpError(409, say(API.agent.stopAskWithdrawn, { agent: a.name }))

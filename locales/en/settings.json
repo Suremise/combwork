@@ -1419,6 +1419,10 @@
     "defaultMessage": "{title} takes a field name: letters, digits and _ (not starting with a digit).",
     "description": "Why an advanced setting's new value isn't taken: it must be a field name of a CLI's data. {title} is the setting's title."
   },
+  "settings.advanced.error.folders": {
+    "defaultMessage": "{title} takes up to {most} folders, each a full path (C:\\…, \\\\server\\…, or starting with a variable such as %LOCALAPPDATA%), separated by semicolons.",
+    "description": "Why an advanced setting's new value (a list of folders) isn't taken. {title} is the setting's title; {most} a number of folders. C:\\…, \\\\server\\… and %LOCALAPPDATA% are written as Windows writes them: keep them."
+  },
   "settings.advanced.error.list": {
     "defaultMessage": "{title} takes 1 to 10 names (letters, digits, - and _), as a list or separated by commas.",
     "description": "Why an advanced setting's new value isn't taken. {title} is the setting's title."
@@ -1458,6 +1462,14 @@
   "settings.advanced.hive.assistant.startView.title": {
     "defaultMessage": "The Assistant starts with Hive's start view",
     "description": "An advanced setting's title (Settings → Advanced), listed under Hive. The start view is what Hive tells the Hive Assistant of the workspace's state as it starts."
+  },
+  "settings.advanced.hive.cards.attachmentFolders.desc": {
+    "defaultMessage": "More folders an agent, the Assistant or a script may attach files to a card from, besides its own project's folders and the temp folder: full paths, separated by semicolons (%LOCALAPPDATA% and other variables at the start are filled in). Another project's folders and Hive's own stay refused, even inside one. Empty: none.",
+    "description": "What the advanced setting \"Card attachments: more folders\" does (Settings → Advanced, under Hive). %LOCALAPPDATA% is a Windows variable: keep it."
+  },
+  "settings.advanced.hive.cards.attachmentFolders.title": {
+    "defaultMessage": "Card attachments: more folders",
+    "description": "An advanced setting's title (Settings → Advanced), followed by a list of folders: where else agents may attach files to a card from."
   },
   "settings.advanced.hive.cards.attachmentMax.desc": {
     "defaultMessage": "The largest file Hive keeps with a card, in bytes: pasted or dropped into the card, attached from an agent's pane, or given by an agent or the Assistant. A larger file is refused, saying so. Files already kept stay.",
@@ -2162,6 +2174,10 @@
   "settings.advanced.takes.field": {
     "defaultMessage": "A field name.",
     "description": "What an advanced setting takes (Settings → Advanced): the name of a field in a CLI's data."
+  },
+  "settings.advanced.takes.folders": {
+    "defaultMessage": "Folders, each a full path, separated by semicolons (a variable such as %LOCALAPPDATA% at the start is filled in).",
+    "description": "What an advanced setting takes (Settings → Advanced): a list of folders. %LOCALAPPDATA% is a Windows variable: keep it."
   },
   "settings.advanced.takes.list": {
     "defaultMessage": "Names separated by commas.",

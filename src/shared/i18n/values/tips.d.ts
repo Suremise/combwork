@@ -121,6 +121,8 @@ interface HiveMessageValues {
   'tips.cardAttachments.title': undefined
   'tips.cardAttachmentsCleanup.text': undefined
   'tips.cardAttachmentsCleanup.title': undefined
+  'tips.cardAttachmentsFolders.text': undefined
+  'tips.cardAttachmentsFolders.title': undefined
   'tips.cardCost.text': { example: string | number }
   'tips.cardCost.title': undefined
   'tips.cardCostRounds.text': undefined

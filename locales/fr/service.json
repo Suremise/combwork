@@ -42,6 +42,7 @@
   "service.cardAttach.noCard": "Cette carte n’existe pas.",
   "service.cardAttach.noProject": "{project} n’est pas un projet de l’espace de travail. Rien n’a été joint.",
   "service.cardAttach.refused": "{path} n’est pas un fichier qui peut être joint ici : donne le chemin d’un fichier de ton propre projet (son dossier, ses emplacements) ou du dossier temporaire. Rien n’a été joint.",
+  "service.cardAttach.refusedFrom": "{path} n’est pas un fichier qui peut être joint ici. Les fichiers peuvent venir de {caller, select, agent {ton propre projet (son dossier, ses emplacements)} other {l’espace de travail et ses projets}}, du dossier temporaire ({temp}){more, select, yes { et des dossiers de Paramètres → Avancé → Pièces jointes des cartes : autres dossiers ({folders})} other {}}. Pour joindre depuis un autre dossier, l’utilisateur l’y ajoute (Paramètres → Avancé → Pièces jointes des cartes : autres dossiers, de Hive ou de cet espace de travail) : ne copie pas le fichier dans le dossier temporaire. Rien n’a été joint.",
   "service.cardAttach.tooLarge": "{name} dépasse {max}, le maximum qu’une carte garde dans un fichier (Paramètres → Avancé → Pièces jointes des cartes : plus gros fichier). Rien n’a été joint.",
   "service.cardAttach.tooMuch": "Au plus {files, number} fichiers et {total} peuvent être joints à la fois. Rien n’a été joint.",
   "service.cardCleanup.stale": "Cette liste n’est plus à jour : rien n’a été retiré. Rouvre Nettoyer maintenant…",

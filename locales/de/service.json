@@ -42,6 +42,7 @@
   "service.cardAttach.noCard": "Diese Karte gibt es nicht.",
   "service.cardAttach.noProject": "{project} ist kein Projekt des Arbeitsbereichs. Nichts wurde angehängt.",
   "service.cardAttach.refused": "{path} ist keine Datei, die hier angehängt werden kann: Gib den Pfad einer Datei deines eigenen Projekts (seines Ordners, seiner Slots) oder des Temp-Ordners an. Nichts wurde angehängt.",
+  "service.cardAttach.refusedFrom": "{path} ist keine Datei, die hier angehängt werden kann. Dateien können aus {caller, select, agent {deinem eigenen Projekt (seinem Ordner, seinen Slots)} other {dem Arbeitsbereich und seinen Projekten}}, dem Temp-Ordner ({temp}){more, select, yes { und den Ordnern unter Einstellungen → Erweitert → Karten-Anhänge: weitere Ordner ({folders})} other {}} kommen. Um aus einem anderen Ordner anzuhängen, fügt der Benutzer ihn dort hinzu (Einstellungen → Erweitert → Karten-Anhänge: weitere Ordner, für Hive oder diesen Arbeitsbereich): Kopiere die Datei nicht in den Temp-Ordner. Nichts wurde angehängt.",
   "service.cardAttach.tooLarge": "{name} ist größer als {max}, das Höchste, was eine Karte in einer Datei behält (Einstellungen → Erweitert → Karten-Anhänge: größte Datei). Nichts wurde angehängt.",
   "service.cardAttach.tooMuch": "Höchstens {files, number} Dateien und {total} können auf einmal angehängt werden. Nichts wurde angehängt.",
   "service.cardCleanup.stale": "Diese Liste ist veraltet: Es wurde nichts entfernt. Öffne „Jetzt aufräumen…“ erneut.",

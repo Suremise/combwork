@@ -119,6 +119,8 @@
   "tips.cardAttachments.title": "Keep a screenshot with its card",
   "tips.cardAttachmentsCleanup.text": "Files kept with a card go to the Recycle Bin 30 days after it is archived. Choose 3, 7 or 90 days, or Never, in Project Settings → Storage, where Clean Up Now… removes what is due at once. Open and Done cards keep theirs.",
   "tips.cardAttachmentsCleanup.title": "Archived cards' screenshots clean up after themselves",
+  "tips.cardAttachmentsFolders.text": "Agents attach files to cards from their own project and the temp folder. Keep test evidence in a folder of your own? List it in Settings → Advanced → Card attachments: more folders, and they can attach from there without copying into Temp.",
+  "tips.cardAttachmentsFolders.title": "Let agents attach your test evidence where it is",
   "tips.cardCost.text": "A card's panel says what its agents used while they held it, \"{example}\", with the builder's and reviewer's parts and tokens on hover. Performance lists every card's cost, and a lane's hover in the Progress panel its overhead.",
   "tips.cardCost.title": "What a card cost",
   "tips.cardCostRounds.text": "A card's Work section ends with its cost by round: the builder's and reviewer's parts in each round, adding up to the card's cost. See whether extra rounds or one long read drove it.",

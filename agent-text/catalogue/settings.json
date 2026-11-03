@@ -1329,6 +1329,11 @@
     "note": "Why an advanced setting's new value isn't taken: it must be a field name of a CLI's data. {title} is the setting's title.",
     "audience": "both"
   },
+  "settings.advanced.error.folders": {
+    "text": "{title} takes up to {most} folders, each a full path (C:\\…, \\\\server\\…, or starting with a variable such as %LOCALAPPDATA%), separated by semicolons.",
+    "note": "Why an advanced setting's new value (a list of folders) isn't taken. {title} is the setting's title; {most} a number of folders. C:\\…, \\\\server\\… and %LOCALAPPDATA% are written as Windows writes them: keep them.",
+    "audience": "both"
+  },
   "settings.advanced.error.list": {
     "text": "{title} takes 1 to 10 names (letters, digits, - and _), as a list or separated by commas.",
     "note": "Why an advanced setting's new value isn't taken. {title} is the setting's title.",
@@ -1377,6 +1382,16 @@
   "settings.advanced.hive.assistant.startView.title": {
     "text": "The Assistant starts with Hive's start view",
     "note": "An advanced setting's title (Settings → Advanced), listed under Hive. The start view is what Hive tells the Hive Assistant of the workspace's state as it starts.",
+    "audience": "both"
+  },
+  "settings.advanced.hive.cards.attachmentFolders.desc": {
+    "text": "More folders an agent, the Assistant or a script may attach files to a card from, besides its own project's folders and the temp folder: full paths, separated by semicolons (%LOCALAPPDATA% and other variables at the start are filled in). Another project's folders and Hive's own stay refused, even inside one. Empty: none.",
+    "note": "What the advanced setting \"Card attachments: more folders\" does (Settings → Advanced, under Hive). %LOCALAPPDATA% is a Windows variable: keep it.",
+    "audience": "both"
+  },
+  "settings.advanced.hive.cards.attachmentFolders.title": {
+    "text": "Card attachments: more folders",
+    "note": "An advanced setting's title (Settings → Advanced), followed by a list of folders: where else agents may attach files to a card from.",
     "audience": "both"
   },
   "settings.advanced.hive.cards.attachmentMax.desc": {
@@ -2244,6 +2259,11 @@
     "note": "What an advanced setting takes (Settings → Advanced): the name of a field in a CLI's data.",
     "audience": "both"
   },
+  "settings.advanced.takes.folders": {
+    "text": "Folders, each a full path, separated by semicolons (a variable such as %LOCALAPPDATA% at the start is filled in).",
+    "note": "What an advanced setting takes (Settings → Advanced): a list of folders. %LOCALAPPDATA% is a Windows variable: keep it.",
+    "audience": "both"
+  },
   "settings.advanced.takes.list": {
     "text": "Names separated by commas.",
     "note": "What an advanced setting takes (Settings → Advanced).",
@@ -2540,6 +2560,10 @@
   "settings.agent.sensitive.assistantRuns": {
     "text": "It decides how the Assistant itself runs (its provider, working mode, model, effort, permission mode and arguments): only the user can change it, in {path}.",
     "note": "Why the Assistant can't change how it runs itself (#186). {path} is where the user changes it."
+  },
+  "settings.agent.sensitive.attachmentFolders": {
+    "text": "It decides which folders agents, the Assistant and scripts may attach files to cards from: only the user can change it, in {path}.",
+    "note": "Why the Assistant can't change Card attachments: more folders (HI-2480): it would widen where it and agents may read files from. {path} is where the user changes it."
   },
   "settings.agent.sensitive.backgroundSessions": {
     "text": "It lets sessions run out of Hive's reach (Hive can't see or stop them): only the user can change it, in {path}.",

@@ -42,6 +42,7 @@
   "service.cardAttach.noCard": "Esse cartão não existe.",
   "service.cardAttach.noProject": "{project} não é um projeto do espaço de trabalho. Nada foi anexado.",
   "service.cardAttach.refused": "{path} não é um arquivo que possa ser anexado aqui: informe o caminho de um arquivo do seu próprio projeto (a pasta dele, os slots dele) ou da pasta temporária. Nada foi anexado.",
+  "service.cardAttach.refusedFrom": "{path} não é um arquivo que possa ser anexado aqui. Os arquivos podem vir {caller, select, agent {do seu próprio projeto (a pasta dele, os slots dele)} other {do espaço de trabalho e dos projetos dele}}, da pasta temporária ({temp}){more, select, yes { e das pastas de Configurações → Avançado → Anexos de cartões: mais pastas ({folders})} other {}}. Para anexar de outra pasta, o usuário a adiciona lá (Configurações → Avançado → Anexos de cartões: mais pastas, do Hive ou deste espaço de trabalho): não copie o arquivo para a pasta temporária. Nada foi anexado.",
   "service.cardAttach.tooLarge": "{name} passa de {max}, o máximo que um cartão mantém em um arquivo (Configurações → Avançado → Anexos de cartões: maior arquivo). Nada foi anexado.",
   "service.cardAttach.tooMuch": "No máximo {files, number} arquivos e {total} podem ser anexados de uma vez. Nada foi anexado.",
   "service.cardCleanup.stale": "Esta lista está desatualizada: nada foi removido. Abra Limpar agora… de novo.",

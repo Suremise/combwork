@@ -271,11 +271,14 @@ function InboxAvailableNote() {
   )
 }
 
+/** A value as its text box shows it: a list of folders semicolons apart, as it is read back (HI-2480: a comma can be in a folder's name). */
+const boxText = (def: AdvancedDef, v: unknown): string => (v === null || v === undefined ? '' : Array.isArray(v) ? v.join(def.paths ? '; ' : ', ') : String(v))
+
 /** The value's box: a switch, a number field, or text saved on Enter or leaving it (empty: back to the default, or Settings'). */
 function ValueBox({ def, value, label, placeholder, onCommit }: { def: AdvancedDef; value: unknown; label: string; placeholder?: string; onCommit: (v: unknown) => Promise<void> }) {
-  const shown = (v: unknown): string => (v === null || v === undefined ? '' : Array.isArray(v) ? v.join(', ') : String(v))
+  const shown = (v: unknown): string => boxText(def, v)
   const [draft, setDraft] = useState(shown(value))
-  useEffect(() => setDraft(shown(value)), [value])
+  useEffect(() => setDraft(boxText(def, value)), [def, value])
   // A workspace's own switch or choice (HI-2344): a select whose first option follows Settings' value (null, so no
   // override), shown as that value, then each value; a bare switch couldn't show inheriting or go back to it.
   if (placeholder !== undefined && (def.kind === 'boolean' || def.kind === 'choice')) {

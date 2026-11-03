@@ -119,6 +119,8 @@
   "tips.cardAttachments.title": "将截图随卡片保留",
   "tips.cardAttachmentsCleanup.text": "卡片保留的文件会在卡片归档 30 天后移到回收站。可在“项目设置”→“存储”中选择 3、7 或 90 天，或“从不”；在那里，“立即清理…”会马上删除已到期的内容。未关闭的卡片和“已完成”的卡片保留各自的文件。",
   "tips.cardAttachmentsCleanup.title": "已归档卡片的截图会自动清理",
+  "tips.cardAttachmentsFolders.text": "智能体从自己的项目和临时文件夹向卡片附加文件。你把测试证据放在自己的文件夹里？在“设置”→“高级”→“卡片附件：更多文件夹”中添加它，智能体就能从那里附加，而无需复制到 Temp。",
+  "tips.cardAttachmentsFolders.title": "让智能体从测试证据所在之处附加",
   "tips.cardCost.text": "卡片面板会显示其智能体持有它期间的用量，如“{example}”，悬停可查看构建者和评审者各自的部分及 Token。“性能”列出每张卡片的费用，进度面板中通道的悬停提示则显示其额外开销。",
   "tips.cardCost.title": "一张卡片花了多少",
   "tips.cardCostRounds.text": "卡片的“工作记录”部分最后是按轮次的费用：每轮中构建者和评审者各自的部分，加起来等于这张卡片的费用。看看是多出的轮次还是一次长时间读取推高了费用。",
