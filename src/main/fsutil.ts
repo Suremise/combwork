@@ -200,14 +200,14 @@ export async function retryWhileSaving<T>(fn: () => Promise<T>): Promise<T> {
 const absent = (e: unknown): boolean => ['ENOENT', 'ENOTDIR'].includes((e as NodeJS.ErrnoException)?.code ?? '')
 
 /** Whether a kept file isn't there now (a stat that fails otherwise, as for a locked file, is not that). */
-async function gone(path: string): Promise<boolean> {
+async function keptGone(path: string): Promise<boolean> {
   return stat(path).then(
     () => false,
     (e) => absent(e)
   )
 }
 
-function goneSync(path: string): boolean {
+function keptGoneSync(path: string): boolean {
   try {
     statSync(path)
     return false
@@ -279,7 +279,7 @@ export async function readKeptJson<T>(path: string, fallback: T, opts: KeptReadO
   } catch {
     const settled = await settle(path)
     if (settled === 'missing') {
-      if (await gone(path)) return fallback
+      if (await keptGone(path)) return fallback
       // Unreadable while it was read again: as above.
       const bak = refuse ? null : await readFile(`${path}.bak`, 'utf8').catch(() => null)
       return unreadableValue(path, new Error('unreadable while settling'), bak, fallback, refuse) // i18n-ignore: log text
@@ -388,7 +388,7 @@ function readKeptJsonSyncNow<T>(path: string, fallback: T): T {
     return JSON.parse(text) as T
   } catch {
     const settled = settleSync(path)
-    if (settled === 'missing') return goneSync(path) ? fallback : unreadableValue(path, new Error('unreadable while settling'), readBakSync(path), fallback, false) // i18n-ignore: log text
+    if (settled === 'missing') return keptGoneSync(path) ? fallback : unreadableValue(path, new Error('unreadable while settling'), readBakSync(path), fallback, false) // i18n-ignore: log text
     if (typeof settled === 'object') return settled.value as T
     const bak = readBakSync(path)
     if (settled === 'unsettled') return unsettled(path, bak, fallback)
@@ -482,7 +482,7 @@ const backedUp = new Set<string>()
 export async function writeKeptJson(path: string, data: unknown, opts: { compact?: boolean; bakOncePerRun?: boolean; existing?: boolean } = {}): Promise<void> {
   const k = path.toLowerCase()
   if (unreadable.has(k)) {
-    if (!(await gone(path))) {
+    if (!(await keptGone(path))) {
       log.warn(`${userText(path)} wasn't saved: it couldn't be read when last read, so this save could replace settings Hive never saw`)
       throw new KeptFileUnreadable(path)
     }
