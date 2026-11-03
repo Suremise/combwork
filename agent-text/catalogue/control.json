@@ -1,0 +1,38 @@
+{
+  "control.level.agents": {
+    "text": "Control agents",
+    "note": "The control level Control agents (Settings → Assistant → Control), as the Assistant's refusals name it."
+  },
+  "control.level.look": {
+    "text": "Look and advise",
+    "note": "The control level Look and advise (Settings → Assistant → Control), as the Assistant's refusals name it."
+  },
+  "control.level.projects": {
+    "text": "Control agents and create projects",
+    "note": "The control level Control agents and create projects (Settings → Assistant → Control), as the Assistant's refusals name it."
+  },
+  "control.notAllowed": {
+    "text": "not allowed by Settings → Assistant → Control",
+    "note": "Why a change was refused, in the Assistant's activity list beside the change (#763)."
+  },
+  "control.notAllowedReason": {
+    "text": "Not allowed by Settings → Assistant → Control",
+    "note": "Why a change was refused, as the Agent API's event stream says it (a refusal's reason, #763)."
+  },
+  "control.refused": {
+    "text": "The user's settings (Settings → Assistant → Control: {level}) don't let you {what}. Tell the user what you would do instead.",
+    "note": "The Assistant's change refused by its control level (#186). {level} is the level's name (control.level.*); {what} what the change is called, lower case (\"create a card\")."
+  },
+  "control.sessionEnded": {
+    "text": "The Assistant's session that asked for this ended before the change was made: nothing changed here.",
+    "note": "The Assistant's change refused at the moment it was to be made: the session that asked was restarted or ended while it waited."
+  },
+  "control.tokenNote": {
+    "text": "The Hive Assistant's Agent API token for one workspace. Hive replaces it each time the Assistant starts.",
+    "note": "The note beside the Assistant's token in its file, for whoever opens it."
+  },
+  "control.turnedDown": {
+    "text": "The user turned Settings → Assistant → Control down before this change was made: nothing changed here.",
+    "note": "The Assistant's change refused at the moment it was to be made: the control level was lowered while it waited."
+  }
+}
