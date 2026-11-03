@@ -3,8 +3,9 @@
 // (the worktree keeps its own). It never replaces an installer of the same name built from other code without saying
 // so: build-info.json beside each says what it was built from, and is only written when that is certain (the code
 // didn't change while it was built). Several worktrees can copy at once: a lock in the main dist makes each check and
-// copy the whole set in turn. Kept apart from dist.mjs so tests/distcopy.test.ts can check it with a temporary
-// repository and worktrees.
+// copy the whole set in turn. npm run release builds in its own checkout's dist by the same rules (makeRelease, HI-2411).
+// Kept apart from dist.mjs and release.mjs so tests/distcopy.test.ts can check it with a temporary repository and
+// worktrees, and with the build and upload faked.
 import { execFileSync } from 'child_process'
 import { copyFileSync, existsSync, mkdirSync, readFileSync, renameSync, rmSync, statSync, writeFileSync } from 'fs'
 import { join, resolve } from 'path'
@@ -62,12 +63,26 @@ export function readBuildInfo(dir) {
 }
 
 /**
+ * Why the installer of this version in dir mustn't be replaced by a build of info's code, or null. Unless replace, it
+ * mustn't when one is there built from other code (another fingerprint in its build-info.json) or from code it can't
+ * tell (no build-info.json for this version); one built from the same code may be. Both `npm run dist`'s copy to the
+ * main checkout (planCopy) and `npm run release`'s build in its own dist (makeRelease) ask it first (HI-2411).
+ */
+export function replaceProblem({ dir, version, info, theirs = readBuildInfo(dir), replace = false }) {
+  const exe = join(dir, `Hive-Setup-${version}.exe`)
+  if (replace || !existsSync(exe)) return null
+  if (!theirs || theirs.version !== version) return `${exe} is already there, built from code it can't tell (no build-info.json)`
+  if (theirs.code !== info.code) return `${exe} is already there, built from other code: ${theirs.code}${theirs.branch ? ` (${theirs.branch})` : ''} at ${theirs.builtAt}, where this one is ${info.code}${info.branch ? ` (${info.branch})` : ''}`
+  return null
+}
+
+/**
  * What to do with a worktree's installer: { copy: [file names], refuse: why or null, note: or null }. It copies the
  * whole set or nothing: it refuses when a file of the set is missing in the worktree's dist, or when the build there
  * isn't the one described (build-info.json for another version or code). It refuses (unless replace) when the main
- * dist already has an installer of this name built from other code (another fingerprint) or from code it can't tell
- * (no build-info.json); one built from the same code is replaced. note: the main checkout is at another commit than
- * this build, which AGENTS.md says it should match.
+ * dist already has an installer of this name built from other code or from code it can't tell (replaceProblem); one
+ * built from the same code is replaced. note: the main checkout is at another commit than this build, which AGENTS.md
+ * says it should match.
  */
 export function planCopy({ version, from, to, info, theirs = readBuildInfo(to), mainHead = null, replace = false }) {
   const files = installerFiles(version)
@@ -75,12 +90,7 @@ export function planCopy({ version, from, to, info, theirs = readBuildInfo(to), 
   if (missing.length) return { copy: [], refuse: `${missing.join(', ')} missing in ${from}`, note: null }
   const ours = readBuildInfo(from)
   if (!ours || ours.version !== version || ours.code !== info.code) return { copy: [], refuse: `${join(from, 'build-info.json')} doesn't describe this build`, note: null }
-  const exe = `Hive-Setup-${version}.exe`
-  let refuse = null
-  if (existsSync(join(to, exe)) && !replace) {
-    if (!theirs || theirs.version !== version) refuse = `${join(to, exe)} is already there, built from code it can't tell (no build-info.json)`
-    else if (theirs.code !== info.code) refuse = `${join(to, exe)} is already there, built from other code: ${theirs.code}${theirs.branch ? ` (${theirs.branch})` : ''} at ${theirs.builtAt}, where this one is ${info.code}${info.branch ? ` (${info.branch})` : ''}`
-  }
+  const refuse = replaceProblem({ dir: to, version, info, theirs, replace })
   const note = mainHead && info.head && mainHead !== info.head ? `the main checkout is at ${mainHead.slice(0, 12)}, not at this build's commit ${info.head.slice(0, 12)}` : null
   return { copy: refuse ? [] : files, refuse, note }
 }
@@ -161,6 +171,9 @@ export function copyToMain({ root, version, info, here = false, replace = false 
   let plan
   try {
     plan = withCopyLock(to, () => {
+      // A release building in the main dist owns it until it ends (makeRelease, HI-2411): even --replace waits for it.
+      const release = releaseClaim(to)
+      if (release) return { busy: `npm run release is building there (pid ${release.pid}, since ${release.at})` }
       const p = planCopy({ version, from, to, info, mainHead, replace })
       if (!p.refuse) copySet(from, to, p.copy)
       return p
@@ -168,6 +181,7 @@ export function copyToMain({ root, version, info, here = false, replace = false 
   } catch (e) {
     return [`Not copied to the main checkout: ${e.message}.`, `Installer: ${join(from, `Hive-Setup-${version}.exe`)} (this worktree).`]
   }
+  if (plan.busy) return [`Not copied to the main checkout: ${plan.busy}.`, `Installer: ${join(from, `Hive-Setup-${version}.exe`)} (this worktree). Run npm run dist again once the release has ended to copy it.`]
   if (plan.refuse) return [`Not copied to the main checkout: ${plan.refuse}.`, `Installer: ${join(from, `Hive-Setup-${version}.exe`)} (this worktree). Run again with --replace to copy it over anyway.`]
   return [`Installer: ${join(to, `Hive-Setup-${version}.exe`)} (copied from this worktree, which keeps its own)`, ...(plan.note ? [`Note: ${plan.note}.`] : [])]
 }
@@ -219,22 +233,93 @@ export function makeDist({ root, here = false, replace = false, run, buildStampe
 
 /**
  * After the build: writes dist/build-info.json and win-unpacked's record (UNPACKED_INFO), and copies to the main
- * checkout (copyToMain), only if what the build is made from didn't change while it ran (before and after:
- * buildIdentity). Otherwise neither record (old ones are removed: they would describe other code) and nothing is
- * copied: the installer's code can't be told, so it must be built again on code that stays put. Returns the lines to
- * print.
+ * checkout (copyToMain; not with copy false, as for `npm run release`), only if what the build is made from didn't
+ * change while it ran (before and after: buildIdentity). Otherwise neither record (old ones are removed: they would
+ * describe other code) and nothing is copied: the installer's code can't be told, so it must be built again on code
+ * that stays put. Returns the lines to print.
  */
-export function finishDist({ root, before, after, builtAt = new Date().toISOString(), here = false, replace = false }) {
+export function finishDist({ root, before, after, builtAt = new Date().toISOString(), here = false, replace = false, copy = true }) {
   const dist = join(root, 'dist')
   const exe = join(dist, `Hive-Setup-${after.version}.exe`)
   const problem = provenanceProblem(before, after)
   if (problem) {
     clearDistInfo(dist)
+    if (!copy) return [`The build's code can't be told: ${problem}. No build-info.json was written: build again once the code stays put.`, `Installer: ${exe} (unlabelled)`]
     return [`The build's code can't be told: ${problem}. No build-info.json was written and nothing was copied to the main checkout: build again once the code stays put.`, `Installer: ${exe} (this worktree, unlabelled)`]
   }
   const info = { ...before, builtAt, builtIn: root }
   if (existsSync(join(dist, 'win-unpacked'))) writeFileSync(join(dist, UNPACKED_INFO), JSON.stringify(info, null, 2))
   writeFileSync(join(dist, 'build-info.json'), JSON.stringify(info, null, 2))
-  const lines = copyToMain({ root, version: before.version, info, here, replace })
+  const lines = copy ? copyToMain({ root, version: before.version, info, here, replace }) : []
   return lines.length ? lines : [`Installer: ${exe}`]
+}
+
+/**
+ * A release's claim on the dist it builds in (makeRelease, HI-2411): `.release-build.json`, naming its process. The
+ * build takes minutes, longer than the copy lock may be held (withCopyLock's staleMs), so the release takes the claim
+ * under that lock with its check, and holds it, not the lock, until it ends; a worktree's copy there (copyToMain) and
+ * another release refuse while it stands.
+ */
+export const RELEASE_CLAIM = '.release-build.json'
+
+/** Whether process pid is running (EPERM: it is, as another user's). */
+export function pidAlive(pid) {
+  try {
+    process.kill(pid, 0)
+    return true
+  } catch (e) {
+    return e.code === 'EPERM'
+  }
+}
+
+/**
+ * The release claim standing on dir ({ pid, at, code }), or null: none, unreadable, or left by a release that ended
+ * without removing it (its process is gone: release.mjs exits on a failed step; or older than maxAgeMs, should its pid
+ * have been reused).
+ */
+export function releaseClaim(dir, { alive = pidAlive, now = Date.now(), maxAgeMs = 6 * 3_600_000 } = {}) {
+  let claim
+  try {
+    claim = JSON.parse(readFileSync(join(dir, RELEASE_CLAIM), 'utf8'))
+  } catch {
+    return null
+  }
+  if (!Number.isInteger(claim?.pid) || !alive(claim.pid)) return null
+  const at = Date.parse(claim.at)
+  return Number.isNaN(at) || now - at > maxAgeMs ? null : claim
+}
+
+/**
+ * What npm run release does once its own checks pass (scripts/release.mjs gives it the real steps; tests give fakes,
+ * HI-2411), by dist's rules. It builds in its checkout's own dist, so under the dist's copy lock (which worktrees copying
+ * there take too) it first refuses (unless replace) to build over an installer of the same name there built from other
+ * code or from code it can't tell (replaceProblem), or while another release holds the dist; otherwise it takes the
+ * release claim (RELEASE_CLAIM) in the same hold, so no copy lands between that check and its build. Then it removes an
+ * earlier build's records (clearDistInfo); builds out/ (run), stamps the app as a release (local: false, #1647), and
+ * publishes (publish: the draft and electron-builder's upload); then finishDist without a copy, so
+ * dist/build-info.json describes the installer it uploaded; and gives up its claim (a failed step that exits leaves it
+ * to its dead pid). Returns { refused: why } (nothing built) or { lines } to print.
+ */
+export function makeRelease({ root, replace = false, run, publish, identity = buildIdentity, clear = clearDistInfo, finish = finishDist, stampApp = writeAppIdentity }) {
+  const dist = join(root, 'dist')
+  const claimFile = join(dist, RELEASE_CLAIM)
+  const before = identity(root)
+  const refused = withCopyLock(dist, () => {
+    const other = releaseClaim(dist)
+    if (other) return `Not built: another npm run release is building in ${dist} (pid ${other.pid}, since ${other.at}). Run again once it has ended.`
+    const problem = replaceProblem({ dir: dist, version: before.version, info: before, replace })
+    if (problem) return `Not built: ${problem}. Move it aside to keep it, or run again with --replace to build over it.`
+    writeFileSync(claimFile, JSON.stringify({ pid: process.pid, at: new Date().toISOString(), code: before.code }, null, 2))
+    return null
+  })
+  if (refused) return { refused }
+  try {
+    clear(dist)
+    run('npm run build')
+    stampApp(root, { version: before.version, commit: before.head, local: false })
+    publish()
+    return { lines: finish({ root, before, after: identity(root), copy: false }) }
+  } finally {
+    withCopyLock(dist, () => rmSync(claimFile, { force: true }))
+  }
 }
