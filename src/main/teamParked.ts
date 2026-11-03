@@ -1,5 +1,6 @@
 import { basename } from 'path'
 import { projectAgents } from '../shared/defaults'
+import { agentMsg, say } from '../shared/agentText'
 import { agentRuntime } from '../shared/runtime'
 import type { AgentProcess } from '../shared/agentProcesses'
 import type { ParkedItem, TeamPauseState, TeamPauseView } from '../shared/teamPause'
@@ -32,6 +33,26 @@ import { openWorkspaces, type WorkspaceService } from './workspace'
  * own turn isn't counted (no self-wait); any other Assistant's is, and what it left running always is.
  */
 
+/**
+ * What the check says of each item (agent-facing: the Agent API and the Assistant's tools read it, and the log): said in
+ * the dialect of whoever asked (the request's scope), as the window words its own from `kind` and `label`.
+ */
+const T = {
+  writer: agentMsg({ id: 'notice.parked.writer', text: 'holds {slot}, whose processes still run', note: "HI-2081: what keeps an agent from being parked: it holds a slot's writer (slot: its name) whose processes still run." }),
+  leftover: agentMsg({ id: 'notice.parked.leftover', text: 'left running: {label} (pid {pid})', note: "HI-2081, HI-2055: a process an agent's launches left running (label: its command), by its process id." }),
+  more: agentMsg({ id: 'notice.parked.more', text: '{n} more processes left running, not listed', note: "HI-2081: more processes an agent's launches left running than the check lists (n: how many more)." }),
+  process: agentMsg({ id: 'notice.parked.process', text: 'process {pid}', note: 'HI-2111: a process left running whose command is not known, by its process id.' }),
+  orphan: agentMsg({ id: 'notice.parked.orphan', text: 'its command left running: {label} (pid {pid})', note: "HI-2111: a process an agent's running launch's command left running, its parent gone (label: its command)." }),
+  state: agentMsg({ id: 'notice.parked.state', text: 'its state is {status}', note: "HI-2081: an agent the check can't take as parked: its status (status: Hive's code for it) isn't one it knows." }),
+  silent: agentMsg({ id: 'notice.parked.silent', text: 'silent {minutes} min, its state unknown', note: "HI-2081: an agent the check can't take as parked: nothing heard from it for minutes." }),
+  background: agentMsg({ id: 'notice.parked.background', text: '{n} background task(s)', note: "HI-2081: what keeps an agent from being parked: the tasks its CLI says run in the background (n: how many)." }),
+  run: agentMsg({ id: 'notice.parked.run', text: '{title} (Progress run, {minutes} min)', note: "HI-2081: a Progress run still open in the paused workspace (title: the run's own title), and for how long." }),
+  noProjects: agentMsg({ id: 'notice.parked.noProjects', text: "its projects can't be read now", note: "HI-2081: the check can't read the workspace's projects, so nothing of them can be told." }),
+  noSlots: agentMsg({ id: 'notice.parked.noSlots', text: "its slots can't be read now", note: "HI-2081: the check can't read a project's slots." }),
+  failed: agentMsg({ id: 'notice.parked.failed', text: 'the scan failed: {error}', note: "HI-2081: the check failed (error: what failed, in English)." }),
+  changed: agentMsg({ id: 'notice.parked.changed', text: 'the workspace changed while it was read', note: 'HI-2081: the workspace closed or switched during the check: what was read is not its own any more.' })
+}
+
 /** A Windows FILETIME (100 ns since 1601), as the job records keep it, as an ISO time. */
 const isoOf = (created: string | undefined): string | undefined => (created ? new Date(Number((BigInt(created) - 116444736000000000n) / 10000n)).toISOString() : undefined)
 
@@ -46,14 +67,14 @@ const AT_QUESTION = new Set(['waiting', 'signin'])
 async function agentItems(project: string, projectPath: string, agentId: string, agent: string, st: LiveSessionState | null, writer: string | undefined, self: boolean): Promise<ParkedItem[]> {
   const out: ParkedItem[] = []
   const add = (i: Omit<ParkedItem, 'project' | 'agent' | 'agentId'>): void => void out.push({ project, agent, agentId, ...i })
-  if (writer) add({ state: 'busy', kind: 'writer', label: writer, what: `holds ${writer}, whose processes still run` })
+  if (writer) add({ state: 'busy', kind: 'writer', label: writer, what: say(T.writer, { slot: writer }) })
   const left = leftoversOf(projectPath, agentId)
-  for (const p of left.processes) add({ state: 'busy', kind: 'process', label: p.label, what: `left running: ${p.label} (pid ${p.pid})`, ...(p.created ? { process: { pid: p.pid, created: p.created, name: p.name }, since: isoOf(p.created) } : {}) })
-  if (left.more) add({ state: 'unknown', kind: 'process', what: `${left.more} more processes left running, not listed` })
+  for (const p of left.processes) add({ state: 'busy', kind: 'process', label: p.label, what: say(T.leftover, { label: p.label, pid: String(p.pid) }), ...(p.created ? { process: { pid: p.pid, created: p.created, name: p.name }, since: isoOf(p.created) } : {}) })
+  if (left.more) add({ state: 'unknown', kind: 'process', what: say(T.more, { n: String(left.more) }) })
   // What its running launch's commands left running (HI-2111: its parent gone), as soon as it is seen, shown or not.
   for (const o of orphansOf(projectPath, agentId)) {
-    const label = o.label ?? `process ${o.pid}`
-    add({ state: 'busy', kind: 'process', label, what: `its command left running: ${label} (pid ${o.pid})`, process: { pid: o.pid, created: o.created, name: label }, since: isoOf(o.created) })
+    const label = o.label ?? say(T.process, { pid: String(o.pid) })
+    add({ state: 'busy', kind: 'process', label, what: say(T.orphan, { label, pid: String(o.pid) }), process: { pid: o.pid, created: o.created, name: label }, since: isoOf(o.created) })
   }
   // A start of it under way, its session not made yet (round 3: reserved by sessions.start, or its slot being prepared):
   // starting, never stopped.
@@ -65,11 +86,11 @@ async function agentItems(project: string, projectPath: string, agentId: string,
   // Only the asking Assistant's own turn isn't counted (no self-wait, round 1 finding 4).
   if (!self) {
     if (status === 'working' || status === 'starting') add({ state: 'busy', kind: status, what: status })
-    else if (!KNOWN_IDLE.has(status) && !AT_QUESTION.has(status) && status !== 'background') add({ state: 'unknown', kind: 'status', what: `its state is ${status}` })
-    else if (agentRuntime(st).silentMinutes !== undefined) add({ state: 'unknown', kind: 'status', what: `silent ${agentRuntime(st).silentMinutes} min, its state unknown` })
+    else if (!KNOWN_IDLE.has(status) && !AT_QUESTION.has(status) && status !== 'background') add({ state: 'unknown', kind: 'status', what: say(T.state, { status }) })
+    else if (agentRuntime(st).silentMinutes !== undefined) add({ state: 'unknown', kind: 'status', what: say(T.silent, { minutes: String(agentRuntime(st).silentMinutes) }) })
   }
   // Its CLI's own count of the tasks it runs in the background (a shell command, a subagent): relayed as it says.
-  if ((st.backgroundTasks ?? 0) > 0 || status === 'background') add({ state: 'busy', kind: 'background', what: `${st.backgroundTasks ?? 1} background task(s)` })
+  if ((st.backgroundTasks ?? 0) > 0 || status === 'background') add({ state: 'busy', kind: 'background', what: say(T.background, { n: String(st.backgroundTasks ?? 1) }) })
   return out
 }
 
@@ -95,22 +116,23 @@ export async function scanWorkspace(ws: WorkspaceService, asker: ScanAsker = {})
   try {
     // Every run still open in the workspace (a test run, a check in a copy, a merge, a slot's warming): by its agent.
     const open = progress.list(path).filter((r) => r.finishedAt === null)
-    for (const r of open) items.push({ project: r.projectPath ? basename(r.projectPath) : '', agent: r.agentName, agentId: r.agentId ?? '', state: 'busy', kind: r.defaultName === 'mergeQueue' ? 'merge' : r.defaultName === 'copy' ? 'copy' : 'run', label: r.title, what: `${r.title} (Progress run, ${Math.max(0, Math.round((Date.now() - r.startedAt) / 60_000))} min)`, run: r.id, since: new Date(r.startedAt).toISOString() })
+    for (const r of open) items.push({ project: r.projectPath ? basename(r.projectPath) : '', agent: r.agentName, agentId: r.agentId ?? '', state: 'busy', kind: r.defaultName === 'mergeQueue' ? 'merge' : r.defaultName === 'copy' ? 'copy' : 'run', label: r.title, what: say(T.run, { title: r.title, minutes: String(Math.max(0, Math.round((Date.now() - r.startedAt) / 60_000))) }), run: r.id, since: new Date(r.startedAt).toISOString() })
     // Its projects unreadable (round 1, finding 5): nothing of them can be told.
     const projects = ws.info()?.projects
-    if (!projects) cant("its projects can't be read now")
+    if (!projects) cant(say(T.noProjects))
     for (const p of projects ?? []) {
       const writers = await heldSlots(p.path).catch(() => null)
-      if (!writers) items.push({ project: p.name, agent: '', agentId: '', state: 'unknown', kind: 'scan', what: "its slots can't be read now" })
+      if (!writers) items.push({ project: p.name, agent: '', agentId: '', state: 'unknown', kind: 'scan', what: say(T.noSlots) })
       for (const a of projectAgents(p.config)) items.push(...(await agentItems(p.name, p.path, a.id, a.name, sessions.liveFor(p.path, a.id), writers?.get(a.id), false)))
     }
     const home = ws.assistantHome
-    items.push(...(await agentItems('', home, ASSISTANT_AGENT_ID, 'Assistant', sessions.liveFor(home, ASSISTANT_AGENT_ID), undefined, asker.assistantOf === ws))) // i18n-ignore: the Assistant as the check names it (agent-facing; the window words it)
+    // agent-protocol: the Assistant's name as the check's rows name it (as an agent's name is), which the window words itself
+    items.push(...(await agentItems('', home, ASSISTANT_AGENT_ID, 'Assistant', sessions.liveFor(home, ASSISTANT_AGENT_ID), undefined, asker.assistantOf === ws)))
   } catch (e) {
-    cant(`the scan failed: ${e instanceof Error ? e.message : String(e)}`)
+    cant(say(T.failed, { error: e instanceof Error ? e.message : String(e) }))
   }
   // The workspace closed or switched while it was read: what was read isn't its own any more.
-  if (life?.aborted || ws.path !== path) cant('the workspace changed while it was read')
+  if (life?.aborted || ws.path !== path) cant(say(T.changed))
   return { workspacePath: path, pause, parked: items.length === 0, items, at }
 }
 

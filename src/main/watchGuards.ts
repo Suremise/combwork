@@ -6,6 +6,12 @@ import { liveCardHeads, readTask, scopeOf, type TaskActor } from './tasks'
 import { cardOfRef } from './projectKeys'
 import { cardKeyOf } from './boardStore'
 import type { WorkspaceService } from './workspace'
+import { agentMsg, say } from '../shared/agentText'
+
+const T = {
+  whilePlaced: agentMsg({ id: 'wake.watch.whilePlaced', text: 'Hive is giving you {card} in {slot}: end your turn with no watch. The card comes to you as a task; a watch now would hold it off.', note: 'HI-2197: a watch refused while Hive is placing a card of the agent\'s in a slot (a watch would hold that placement off). card: its key ("HI-12"); slot: the slot\'s name.' }),
+  numberClash: agentMsg({ id: 'wake.watch.numberClash', text: '{n} is {key}\'s number (#{n}), not {prefix}-{n}, which is another card. Name cards by key: "{prefix}-{n}" or "{key}".', note: 'A watch refused for naming a card by a plain number that reads as another card\'s key (2189 is HI-2182\'s number while HI-2189 is another card). n: the number; key: the card it is the number of; prefix: the project\'s key.' })
+}
 
 /**
  * The card Hive is about to give an agent in a slot (a start of its own, its placement not made yet), or null. A watch
@@ -24,7 +30,7 @@ export async function placementComing(ws: WorkspaceService, projectPath: string,
 /** Why an agent's watch is refused while Hive is giving it a card in a slot, or null. */
 export async function watchWhilePlaced(ws: WorkspaceService, projectPath: string, agentId: string): Promise<string | null> {
   const due = await placementComing(ws, projectPath, agentId)
-  return due ? `Hive is giving you ${due.key} in ${due.slot}: end your turn with no watch. The card comes to you as a task; a watch now would hold it off.` : null
+  return due ? say(T.whilePlaced, { card: due.key, slot: due.slot }) : null
 }
 
 /**
@@ -43,7 +49,7 @@ export async function clashingNumber(ws: WorkspaceService, cards: unknown, actor
     if (!prefix || card.key === `${prefix}-${plain}`) continue
     const other = cardOfRef(ws, `${prefix}-${plain}`, scopeOf(actor))
     if (other === null || other === plain) continue
-    return `${plain} is ${card.key}'s number (#${plain}), not ${prefix}-${plain}, which is another card. Name cards by key: "${prefix}-${plain}" or "${card.key}".`
+    return say(T.numberClash, { n: String(plain), key: card.key ?? '', prefix })
   }
   return null
 }

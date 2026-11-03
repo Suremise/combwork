@@ -6,7 +6,8 @@ import { basename, join } from 'path'
 import { ASSISTANT_AGENT_ID } from '../shared/assistant'
 import { RESTART_READY_SECONDS, RESUME_AFTER_UPDATE } from '../shared/advanced'
 import { fmt, msg, tr } from '../shared/i18n'
-import { agentKey, atStart, checkRequest, isFinal, mergeSnapshot, parseRecord, recordOpen, REQUEST_FILE, REQUEST_MAX_BYTES, RESTARTING_LINE, resumeNote, STALL_HOLD_MS, ackFile, takenFile, type RestartEntry, type RestartReason, type RestartRecord, type RestartState } from '../shared/restartResume'
+import { agentMsg, inDialectOf, say } from '../shared/agentText'
+import { agentKey, atStart, checkRequest, isFinal, mergeSnapshot, parseRecord, recordOpen, REQUEST_FILE, REQUEST_MAX_BYTES, restartingLine, resumeNote, STALL_HOLD_MS, ackFile, takenFile, type RestartEntry, type RestartReason, type RestartRecord, type RestartState } from '../shared/restartResume'
 import type { LaneInfo, LiveSessionState, TaskCard, ToastAction } from '../shared/types'
 import type { RunningAgent } from '../shared/unexpectedClose'
 import { advanced } from './advanced'
@@ -35,6 +36,14 @@ import { pausedFor } from './teamPause'
 const log = createLogger('restart')
 const HIVE = { kind: 'hive', name: 'Hive' } as const // i18n-ignore: the product's name, as a delivery's sender
 const RECORD_FILE = 'restart.json'
+
+const T = {
+  assistant: agentMsg({
+    id: 'notice.restart.assistant',
+    text: "Hive restarted{quit, select, yes { after a quit} other { for an update}}{versions}. Resumed: {hasResumed, select, yes {{resumed}} other {none}}.{hasNot, select, yes { Not resumed: {not}.} other {}} Each resumed agent was told where it was; check their lanes carry on.",
+    note: "HI-1707: the Assistant's notice after Hive resumed agents at a start. quit: yes after a quit (else an update, an install or a restart); versions: ' (1.0.0 → 1.0.1)' or nothing; resumed: those resumed, each 'name (project)', ', ' between; not: those not resumed, each 'name (project): state, why' (codes), '; ' between."
+  })
+}
 
 let recordFileForTests: string | null = null
 const recordFile = (): string => recordFileForTests ?? join(app.getPath('userData'), RECORD_FILE)
@@ -245,7 +254,7 @@ export async function recordClosing(reason: RestartReason, o: { snapshotMs?: num
   } else log.warn(`Reading the cards and lanes of the agents took over ${o.snapshotMs ?? 2000} ms as Hive closed: every running conversation is kept to resume`)
   if (snapshot.length) log.info(`Recorded ${snapshot.length} agent(s) as Hive closes (${reason}): ${snapshot.map((e) => `${userText(e.agentName)} in ${userText(e.project)}`).join(', ')}`) // i18n-ignore: a line of hive.log
   if (reason !== 'quit' && snapshot.length) {
-    const tell = Promise.allSettled(snapshot.map((e) => inWorkspace(workspaceOf(e.projectPath), () => createDelivery(e.projectPath, { agentId: e.agentId, agentName: e.agentName, kind: 'control', from: HIVE, body: RESTARTING_LINE }))))
+    const tell = Promise.allSettled(snapshot.map((e) => inWorkspace(workspaceOf(e.projectPath), () => createDelivery(e.projectPath, { agentId: e.agentId, agentName: e.agentName, kind: 'control', from: HIVE, body: inDialectOf({ projectPath: e.projectPath, agentId: e.agentId }, restartingLine) }))))
     await bounded(tell, o.tellMs ?? 1500, [])
   }
   return snapshot.length
@@ -597,7 +606,7 @@ async function resumeOne(e: RestartEntry, gen: number): Promise<'done' | 'cancel
   }
   try {
     try {
-      runId = (await inWorkspace(ws, () => sessions.start(e.projectPath, { agentId: e.agentId, resumeId: e.sessionId, auto: true, allowed, ...(e.sessionName ? { name: e.sessionName } : {}), prompt: resumeNote(e, app.getVersion(), policy()) }))).runId
+      runId = (await inWorkspace(ws, () => sessions.start(e.projectPath, { agentId: e.agentId, resumeId: e.sessionId, auto: true, allowed, ...(e.sessionName ? { name: e.sessionName } : {}), prompt: inDialectOf({ projectPath: e.projectPath, agentId: e.agentId }, () => resumeNote(e, app.getVersion(), policy())) }))).runId
     } catch (err) {
       if (err instanceof TeamPausedNow || (err instanceof Error && err.cause instanceof TeamPausedNow)) return closed()
       throw err
@@ -702,7 +711,8 @@ async function tellAssistants(resumed: readonly RestartEntry[], not: readonly Re
     if (!existsSync(join(home, '.hive', 'project.json'))) continue
     const first = r.resumed[0] ?? r.not[0]
     const versions = first.from && first.from !== app.getVersion() ? ` (${first.from} → ${app.getVersion()})` : ''
-    const body = `Hive restarted${policy() === 'quit' ? ' after a quit' : ' for an update'}${versions}. Resumed: ${r.resumed.map((e) => `${e.agentName} (${e.project})`).join(', ') || 'none'}.${r.not.length ? ` Not resumed: ${r.not.map((e) => `${e.agentName} (${e.project}): ${e.state}${e.why ? `, ${e.why}` : ''}`).join('; ')}.` : ''} Each resumed agent was told where it was; check their lanes carry on.` // i18n-ignore: the Assistant's inbox (agent-facing, English)
+    const resumedList = r.resumed.map((e) => `${e.agentName} (${e.project})`).join(', ')
+    const body = inDialectOf({ projectPath: home, agentId: ASSISTANT_AGENT_ID }, () => say(T.assistant, { quit: policy() === 'quit' ? 'yes' : 'no', versions, hasResumed: resumedList ? 'yes' : 'no', resumed: resumedList, hasNot: r.not.length ? 'yes' : 'no', not: r.not.map((e) => `${e.agentName} (${e.project}): ${e.state}${e.why ? `, ${e.why}` : ''}`).join('; ') }))
     await leaveDelivery(home, { agentId: ASSISTANT_AGENT_ID, kind: 'control', from: HIVE, body }).catch((e) => log.warn('telling the Assistant what was resumed after the restart', e))
   }
 }

@@ -1,6 +1,0 @@
-{
-  "prose|call|(Settings → Advanced: Resume agents after a connection drops.)": 1,
-  "prose|call|{}'s connection didn't come back within {} minutes: Hive stopped waiting. The user was told the likely fixes.": 1,
-  "prose|call|{}'s connection dropped again after {} resumes in an hour: Hive stopped resuming it. The PC's network may not have recovered; the user was told the likely fixes (ipconfig /renew, ipconfig /flushdns, a restart).": 1,
-  "prose|call|{}'s connection dropped at {}; it came back at {} and Hive resumed it.": 1
-}

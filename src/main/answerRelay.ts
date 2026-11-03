@@ -2,6 +2,7 @@ import { join } from 'path'
 import { HISTORY, storedText } from '../shared/taskHistory'
 import { msg } from '../shared/i18n'
 import { withValues } from '../shared/advanced'
+import { agentMsg, inDialectOf, say } from '../shared/agentText'
 import { cardRef } from '../shared/projectKeys'
 import type { AskActionKind } from '../shared/workflow/facts'
 import { allows } from './assistantControl'
@@ -31,8 +32,28 @@ const ASSISTANT = 'assistant'
 /** Hive's own deliveries come from it. */
 const HIVE = { kind: 'hive', name: 'Hive' } as const // i18n-ignore: the product's name, as a delivery's sender
 
-/** What the Assistant is asked to do, by action (agent-facing: English). */
-const NEED_WORDS: Record<AskActionKind, string> = { done: 'move it to Done', noCode: 'make it no code', unblock: 'unblock it', skipReview: 'skip its review' } // i18n-ignore: agent-facing (the Assistant's inbox)
+/** The Assistant's line for an answer (relayLine), said in its dialect (agent-facing). */
+const T = {
+  reply: agentMsg({ id: 'inbox.relay.reply', text: 'Their reply, whole: <<<{reply}>>>', note: "In the Assistant's line for the user's answer to an agent's question (HI-1734): the user's reply, never cut (a condition at its end must reach whoever acts on it)." }),
+  decision: agentMsg({ id: 'inbox.relay.decision', text: "Recorded as the card's decision, whole: <<<{decision}>>>", note: "In the Assistant's line for the user's answer to an agent's question (HI-1734): the decision recorded on the card, never cut. After the reply (inbox.relay.reply), joined by \". \"." }),
+  replyIsDecision: agentMsg({ id: 'inbox.relay.replyIsDecision', text: "Their reply, whole, recorded as the card's decision too: <<<{reply}>>>", note: "In the Assistant's line for the user's answer to an agent's question: an approval's note, which is its reply and the card's decision too, said once (HI-2286)." }),
+  said: agentMsg({
+    id: 'inbox.relay.said',
+    text: "the user {outcome, select, approved {approved} declined {declined} other {answered}} {asker}'s question on {card}. The question, whole: <<<{question}>>>.{wrote, select, yes { {words}.} answered {} other { Nothing was written with it.}} (Both stay on the card: hive_read_task {card}.)",
+    note: "What the user did with an agent's question, in the Assistant's line (HI-1734), after its opening (inbox.relay.declined, .needed, .check). asker: the asking agent's name; card: its card (HI-12); question: the question, whole; wrote: yes with words (the reply and decision: inbox.relay.reply, .decision), answered for an answer with none, no for a bare approval or decline."
+  }),
+  declined: agentMsg({ id: 'inbox.relay.declined', text: 'For your information: {said} The user declined: nothing is to be done for it.', note: "The Assistant's line when the user declined an agent's question (HI-1734): never worded as a grant. said: what the user did (inbox.relay.said)." }),
+  needed: agentMsg({
+    id: 'inbox.relay.needed',
+    text: "This needs you: {said} {asker} can't {need, select, done {move it to Done} noCode {make it no code} unblock {unblock it} other {skip its review}} by itself. {outcome, select, approved {Their approval is a yes, within any conditions its reply sets} other {Do it only if the answer agrees, within any conditions it sets}}, with the answer as the reason (hive_update_task).",
+    note: "The Assistant's line when the user answered or approved an agent's question on a card that needs what only the Assistant or the user can do (HI-1734). said: what the user did (inbox.relay.said); asker: the asking agent's name; need: done, noCode, unblock or skipReview; outcome: approved or answered."
+  }),
+  check: agentMsg({
+    id: 'inbox.relay.check',
+    text: "For you to check: {said} If it grants a change {asker} can't make itself (Done past its rules, no code, skipping its review), make it, within any conditions it sets, with the answer as the reason; otherwise nothing is needed.",
+    note: "The Assistant's line when the user answered or approved an agent's question and nothing on the card says what is needed (HI-1734): Hive never reads consent into a reply. said: what the user did (inbox.relay.said); asker: the asking agent's name."
+  })
+}
 
 const M = {
   title: msg({ id: 'service.answerRelay.title', defaultMessage: '{card}: nobody else has your answer', description: "A notification's title (a banner, a Windows notification): the user answered an agent's question on card {card} (its key, such as HI-12), and the Hive Assistant, which could act on it, couldn't be told." })
@@ -66,14 +87,12 @@ export interface AnswerToRelay {
  * reply at most 20,000), where it stays on the board, and what to do. A decline is never worded as a grant. Agent-facing.
  */
 export function relayLine(a: AnswerToRelay): string {
-  const how = a.outcome === 'approved' ? 'approved' : a.outcome === 'declined' ? 'declined' : 'answered'
   // HI-2286: an approval's note is its reply and the card's decision too: said once.
-  const words = a.reply && a.decision === a.reply ? `Their reply, whole, recorded as the card's decision too: <<<${a.reply}>>>` : [a.reply ? `Their reply, whole: <<<${a.reply}>>>` : '', a.decision ? `Recorded as the card's decision, whole: <<<${a.decision}>>>` : ''].filter(Boolean).join('. ') // i18n-ignore: agent-facing (the Assistant's inbox)
-  const said = `the user ${how} ${a.askerName}'s question on ${a.key}. The question, whole: <<<${a.question}>>>.${words ? ` ${words}.` : a.outcome === 'answered' ? '' : ' Nothing was written with it.'} (Both stay on the card: hive_read_task ${a.key}.)` // i18n-ignore: agent-facing (the Assistant's inbox)
-  if (a.outcome === 'declined') return `For your information: ${said} The user declined: nothing is to be done for it.` // i18n-ignore: agent-facing (the Assistant's inbox)
-  const agrees = a.outcome === 'approved' ? 'Their approval is a yes, within any conditions its reply sets' : 'Do it only if the answer agrees, within any conditions it sets' // i18n-ignore: agent-facing (the Assistant's inbox)
-  if (a.need) return `This needs you: ${said} ${a.askerName} can't ${NEED_WORDS[a.need]} by itself. ${agrees}, with the answer as the reason (hive_update_task).` // i18n-ignore: agent-facing (the Assistant's inbox)
-  return `For you to check: ${said} If it grants a change ${a.askerName} can't make itself (Done past its rules, no code, skipping its review), make it, within any conditions it sets, with the answer as the reason; otherwise nothing is needed.` // i18n-ignore: agent-facing (the Assistant's inbox)
+  const words = a.reply && a.decision === a.reply ? say(T.replyIsDecision, { reply: a.reply }) : [a.reply ? say(T.reply, { reply: a.reply }) : '', a.decision ? say(T.decision, { decision: a.decision }) : ''].filter(Boolean).join('. ')
+  const said = say(T.said, { outcome: a.outcome, asker: a.askerName, card: a.key, question: a.question, wrote: words ? 'yes' : a.outcome === 'answered' ? 'answered' : 'no', words })
+  if (a.outcome === 'declined') return say(T.declined, { said })
+  if (a.need) return say(T.needed, { said, asker: a.askerName, need: a.need, outcome: a.outcome })
+  return say(T.check, { said, asker: a.askerName })
 }
 
 /**
@@ -84,7 +103,7 @@ export async function relayAnswer(ws: WorkspaceService, a: AnswerToRelay): Promi
   try {
     if (!assistantCanAct(ws)) return await untold(ws, a.card, a.project, a.askerName, a.need)
     const meta = { card: a.card, project: a.project, askerName: a.askerName, ...(a.need ? { need: a.need } : {}) }
-    await createDelivery(ws.assistantHome, { agentId: ASSISTANT, kind: 'control', from: HIVE, card: a.card, body: relayLine(a), source: SOURCE, ref: `#${a.card}/${a.request}`, meta })
+    await createDelivery(ws.assistantHome, { agentId: ASSISTANT, kind: 'control', from: HIVE, card: a.card, body: inDialectOf({ projectPath: ws.assistantHome, agentId: ASSISTANT }, () => relayLine(a)), source: SOURCE, ref: `#${a.card}/${a.request}`, meta })
     await offerNow(ws.assistantHome, ASSISTANT)
   } catch (e) {
     log.warn(`giving the Assistant the user's answer on #${a.card}`, e)
@@ -117,6 +136,7 @@ registerSource(SOURCE, {
     const m = r.meta ?? {}
     if (!ws || typeof m.card !== 'number' || typeof m.project !== 'string') return
     const need = typeof m.need === 'string' ? (m.need as AskActionKind) : null
+    // agent-protocol: a stand-in asker's name for the user's note and notice (window text), never said to an agent
     void untold(ws, m.card, m.project, typeof m.askerName === 'string' ? m.askerName : 'its agent', need) // i18n-ignore: a stand-in agent name, never shown (every relay keeps its asker's).catch((e) => log.warn('telling the user an answer reached nobody else', e))
   }
 })

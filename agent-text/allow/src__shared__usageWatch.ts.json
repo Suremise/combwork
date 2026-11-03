@@ -1,9 +1,0 @@
-{
-  "prose|prop:other|either limit": 1,
-  "prose|prop:other|its 5-hour limit": 1,
-  "prose|prop:other|its weekly limit": 1,
-  "prose|return|[Hive] No account reached its share in {} minutes ({}). Your watch has ended: watch again if you still need to.": 1,
-  "prose|return|[Hive] Usage reached: {}. Your watch has ended: carry on (hive_connection list for every account's usage).": 1,
-  "prose|return|{} at {}% of {}": 1,
-  "prose|return|{} {}% (resets {}Z)": 1
-}

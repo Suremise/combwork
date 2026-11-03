@@ -1,0 +1,150 @@
+{
+  "notice.decision.card": {
+    "text": "{card} has {count} new {n, plural, one {decision} other {decisions}}",
+    "note": "#357, #401: a card in a line about new decisions (a reply's flag, a decision wake), joined by \", \". card: its key (\"HI-12\"); count and n: how many."
+  },
+  "notice.decision.flag": {
+    "text": "{cards} since you last read {n, plural, one {it} other {them}}: read {n, plural, one {the card} other {each card}} (hive_read_task) at your next checkpoint.",
+    "note": "#357: the flag after \"[Hive] \" in a hive tool's reply, when decisions were recorded or changed on the agent's cards since it last read them. cards: each card's decisions (notice.decision.card); n: how many cards."
+  },
+  "notice.intent.already": {
+    "text": "{card} is already {column}: carry on.",
+    "note": "#1639: an intent's reply in a running lane, when the card already reached the column its watch would wait for (a quick reviewer). column: the column's id (\"passed\")."
+  },
+  "notice.intent.armed": {
+    "text": "Hive watches {card} for you, for {what, select, review {its review (a verdict, a move or a comment)} other {its next round in Review}}, up to {limit}: end your turn, and it wakes you.",
+    "note": "#1639: an intent's reply in a running lane: the card watch Hive armed for the agent. what: review after a builder's submit, round after a reviewer's failed verdict; limit: the lane's wait (\"2h\")."
+  },
+  "notice.intent.ownCovers": {
+    "text": "You already watch {card} ({label}): end your turn.",
+    "note": "#1639: an intent's reply (a submit, a failed review) in a running lane, when the agent's own watch already covers its card. card: the card (\"HI-12 (title)\"); label: the watch's label."
+  },
+  "notice.intent.ownStays": {
+    "text": "Your watch ({label}) stays: Hive's loop wake tells you when {card} comes back.",
+    "note": "#1639: an intent's reply in a running lane, when the agent has another watch of its own (kept, not replaced). label: that watch's label; card: the card."
+  },
+  "notice.orphan.process": {
+    "text": "pid {pid} {known, select, yes {`{command}`} other {(its command line could not be read)}} (running {min} min)",
+    "note": "One process an agent's command left running, in the orphan notice's list (HI-2111). pid: its process id; known: yes when its command line was read; command: that command line, cut to 200 characters; min: how many minutes it has run."
+  },
+  "notice.orphan.running": {
+    "text": "{n, plural, one {A process your command started is} other {{count} processes your commands started are}} still running with the shell that started {n, plural, one {it} other {them}} gone: {list}. End {n, plural, one {it} other {them}} if not needed; Hive won't.",
+    "note": "After \"[Hive] \", at the agent's next tool call or turn's end: processes its commands started still run with their shell gone (HI-2111), told once; Hive doesn't end them. n and count: how many; list: each process (notice.orphan.process), joined by \"; \"."
+  },
+  "notice.outage.after": {
+    "text": "(Settings → Advanced: Resume agents after a connection drops.)",
+    "note": "HI-1612: what ends the Assistant's connection notices: the setting that turns these resumes on and off."
+  },
+  "notice.outage.back": {
+    "text": "The connection dropped at {dropped} and came back at {back}: check what was cut off, rerun it, and carry on.",
+    "note": "HI-1612: the note an agent's conversation is given once its dropped connection is back. dropped, back: times of day (notice.outage.clock)."
+  },
+  "notice.outage.clock": {
+    "text": "{time} (UTC{offset})",
+    "note": "HI-1612: a time of day as the connection notices give it: 24-hour, local (time: \"11:47\"), with its offset from UTC (offset: \"+01:00\")."
+  },
+  "notice.outage.gaveUp": {
+    "text": "{agent}'s connection dropped again after {resumes} resumes in an hour: Hive stopped resuming it. The PC's network may not have recovered; the user was told the likely fixes (ipconfig /renew, ipconfig /flushdns, a restart).",
+    "note": "HI-1612: the Assistant's notice that Hive stopped resuming an agent whose connection kept dropping. agent: its name; resumes: how many in the past hour. ipconfig /renew and /flushdns are Windows commands."
+  },
+  "notice.outage.resumed": {
+    "text": "{agent}'s connection dropped at {dropped}; it came back at {back} and Hive resumed it.",
+    "note": "HI-1612: the Assistant's notice that an agent's dropped connection came back and Hive resumed it. agent: its name; dropped, back: times of day (notice.outage.clock)."
+  },
+  "notice.outage.timedOut": {
+    "text": "{agent}'s connection didn't come back within {minutes} minutes: Hive stopped waiting. The user was told the likely fixes.",
+    "note": "HI-1612: the Assistant's notice that Hive stopped waiting for an agent's connection. agent: its name; minutes: how long it waited."
+  },
+  "notice.parked.background": {
+    "text": "{n} background task(s)",
+    "note": "HI-2081: what keeps an agent from being parked: the tasks its CLI says run in the background (n: how many)."
+  },
+  "notice.parked.changed": {
+    "text": "the workspace changed while it was read",
+    "note": "HI-2081: the workspace closed or switched during the check: what was read is not its own any more."
+  },
+  "notice.parked.failed": {
+    "text": "the scan failed: {error}",
+    "note": "HI-2081: the check failed (error: what failed, in English)."
+  },
+  "notice.parked.leftover": {
+    "text": "left running: {label} (pid {pid})",
+    "note": "HI-2081, HI-2055: a process an agent's launches left running (label: its command), by its process id."
+  },
+  "notice.parked.more": {
+    "text": "{n} more processes left running, not listed",
+    "note": "HI-2081: more processes an agent's launches left running than the check lists (n: how many more)."
+  },
+  "notice.parked.noProjects": {
+    "text": "its projects can't be read now",
+    "note": "HI-2081: the check can't read the workspace's projects, so nothing of them can be told."
+  },
+  "notice.parked.noSlots": {
+    "text": "its slots can't be read now",
+    "note": "HI-2081: the check can't read a project's slots."
+  },
+  "notice.parked.orphan": {
+    "text": "its command left running: {label} (pid {pid})",
+    "note": "HI-2111: a process an agent's running launch's command left running, its parent gone (label: its command)."
+  },
+  "notice.parked.process": {
+    "text": "process {pid}",
+    "note": "HI-2111: a process left running whose command is not known, by its process id."
+  },
+  "notice.parked.run": {
+    "text": "{title} (Progress run, {minutes} min)",
+    "note": "HI-2081: a Progress run still open in the paused workspace (title: the run's own title), and for how long."
+  },
+  "notice.parked.silent": {
+    "text": "silent {minutes} min, its state unknown",
+    "note": "HI-2081: an agent the check can't take as parked: nothing heard from it for minutes."
+  },
+  "notice.parked.state": {
+    "text": "its state is {status}",
+    "note": "HI-2081: an agent the check can't take as parked: its status (status: Hive's code for it) isn't one it knows."
+  },
+  "notice.parked.writer": {
+    "text": "holds {slot}, whose processes still run",
+    "note": "HI-2081: what keeps an agent from being parked: it holds a slot's writer (slot: its name) whose processes still run."
+  },
+  "notice.restart.assistant": {
+    "text": "Hive restarted{quit, select, yes { after a quit} other { for an update}}{versions}. Resumed: {hasResumed, select, yes {{resumed}} other {none}}.{hasNot, select, yes { Not resumed: {not}.} other {}} Each resumed agent was told where it was; check their lanes carry on.",
+    "note": "HI-1707: the Assistant's notice after Hive resumed agents at a start. quit: yes after a quit (else an update, an install or a restart); versions: ' (1.0.0 → 1.0.1)' or nothing; resumed: those resumed, each 'name (project)', ', ' between; not: those not resumed, each 'name (project): state, why' (codes), '; ' between."
+  },
+  "notice.restart.restarting": {
+    "text": "Hive is restarting for an update. Your work is saved; you'll be resumed.",
+    "note": "HI-1707: the notice an agent finds in its inbox as Hive closes for an update, an install or a restart."
+  },
+  "notice.restart.resumed": {
+    "text": "{reason, select, quit {Hive was quit and started again} restart {Hive restarted} other {Hive restarted for an update}}{versions} at {time} UTC; your session was stopped and is resumed now.{where}{watch, select, yes { Carry on: re-arm your card watch if you were waiting.} other { Carry on where you were.}}",
+    "note": "HI-1707: the first prompt a resumed agent is given. reason: quit, restart or update (an install too); versions: \" (1.0.0 → 1.0.1)\" when the version changed, or nothing; time: when Hive closed (\"10:00\"); where: what it was on (notice.restart.where), after a space, or nothing; watch: yes when it was watching or in a lane."
+  },
+  "notice.restart.where": {
+    "text": "{onCard, select, yes {You were on {card}{hasRound, select, yes {, round {round}} other {}}{inLane, select, yes {, in lane ''{lane}'' (its {role, select, builder {builder} other {reviewer}})} other {}}} other {You were in lane ''{lane}'' (its {role, select, builder {builder} other {reviewer}})}}.",
+    "note": "HI-1707: what a resumed agent was on as Hive closed. onCard: yes with its card (card: \"HI-12\"; round: its round when hasRound is yes); inLane: yes with its lane (lane: its name or id; role: builder or reviewer). One of the two at least."
+  },
+  "notice.retry.after": {
+    "text": "(Settings → Advanced: Retry wait: tell the Assistant after.)",
+    "note": "HI-1973: what ends the Assistant's retry wait notices: the setting that says when it is told."
+  },
+  "notice.retry.waiting": {
+    "text": "{agent} ({cli}) has been waiting {minutes} min to retry its model request: {why, select, network {it can't reach {cli}'s service} rate {{cli}'s service is refusing its requests as too many for now (429, a request-rate limit, not its usage limit)} status {its requests are refused (HTTP {status})} other {its requests fail}} ({max, select, yes {try {attempt} of {of}} other {try {attempt}}}).{why, select, rate { Each request sends the whole conversation: if its context is large, a new conversation (a handover, then a fresh session) sends less. Only a suggestion for the user; nothing is needed if it recovers.} other {}}",
+    "note": "HI-1973: the Assistant's notice of an agent whose CLI has waited a while to retry its model request. agent: its name; cli: its CLI's name; minutes: how long; why: network (it can't reach the service), rate (429: a request-rate limit, never the account's usage limit), status (status: the HTTP status) or other; attempt: its try, of: the most when max is yes."
+  },
+  "notice.team.noWorkspace": {
+    "text": "No workspace is open",
+    "note": "HI-2081: a team pause refused: the window it was asked of has no workspace open."
+  },
+  "notice.team.paused": {
+    "text": "The team is pausing for an update. Finish this turn, end the runs you started (tests, builds, dev servers, test copies of Hive), commit your work, then end your turn. Until the team resumes Hive starts no card and sends you no card events or watch wakes; a message or an answer can still reach you.",
+    "note": "HI-2081: the notice each running agent is given once per team pause, true to what the hold does (HR1's s8 check): no card starts or events, while a message or an answer still comes."
+  },
+  "notice.title.details": {
+    "text": "A title says the outcome or the problem in words: retitle it without {list} (hive_update_task with title), keeping {n, plural, one {it} other {them}} in the description.",
+    "note": "HI-2061, HI-2260: a line in a tool's reply when an agent's card title names paths, files, cards or measurements: a step to take (told to put them in a description that already had them, agents kept the title). list: what it named, each in double quotes, joined (\"a.ts\" and \"20 MB\"); n: how many."
+  },
+  "notice.title.long": {
+    "text": "Titles over {limit} characters are cut in git and on the board: consider a shorter one (the detail belongs in the description).",
+    "note": "HI-1872: a line in a tool's reply when an agent gave a card a title longer than Settings → Advanced allows. limit: that length."
+  }
+}
