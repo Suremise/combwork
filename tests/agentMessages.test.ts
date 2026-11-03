@@ -274,6 +274,30 @@ describe('messages left for agents (#530, #647)', async () => {
     await vi.waitFor(() => expect(st.typed.at(-1)).toBe(bell('1 message and 1 card event', 'm5, m6')), { timeout: HUNG_MS })
   })
 
+  it("the Assistant's cancel revoked before it is planned, or once planned while its save waits: none cancelled (HI-2420)", async () => {
+    expect((await leave('Queued for later.')).fate).toBe('queued')
+    let revoked = false
+    const guard = () => {
+      if (revoked) throw new Error('Control was turned down meanwhile')
+    }
+    // Revoked while the cancel holds the host's lock: its read made (the plan's check), then once planned, as its save
+    // begins (HR1's round 1: the save's own transaction checks again). Its own refusal either way, not NotSaved's.
+    for (const set of [deliveries.setBeforePlanForTests, deliveries.setBeforeSaveForTests]) {
+      revoked = false
+      set(() => void (revoked = true))
+      try {
+        await expect(messages.cancelMessages(alpha, 'b1', 'the Assistant', guard)).rejects.toThrow(/^Control was turned down meanwhile$/)
+      } finally {
+        set(null)
+      }
+      expect(await states()).toEqual(['m1 queued'])
+    }
+    // Not revoked: the same call cancels it.
+    revoked = false
+    expect(await messages.cancelMessages(alpha, 'b1', 'the Assistant', guard)).toBe(1)
+    expect(await states()).toEqual(['m1 cancelled: cancelled by the Assistant'])
+  })
+
   it('cancelled while it is being typed: never typed, and the reply says so, not that it was typed', async () => {
     st.status = 'ready'
     st.during = () => messages.cancelMessages(alpha, 'b1', 'the user')

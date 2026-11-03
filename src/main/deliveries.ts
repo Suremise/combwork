@@ -191,6 +191,13 @@ interface Draft {
   dirty: boolean
   /** What to do once it is published (log lines, the Assistant's activity list, sources told): nothing for a plan that isn't. */
   after: (() => void)[]
+  /**
+   * A revocable caller's authority (HI-2420, the Assistant's guard), set by the plan: checked again in the save's own
+   * transaction, after every await of the save, so one revoked meanwhile saves nothing.
+   */
+  commit?: () => void
+  /** What `commit` threw in the save: given to the caller as it is (the Assistant's refusal), never as NotSaved. */
+  refused?: unknown
 }
 
 const stores = new Map<string, Store>()
@@ -361,6 +368,8 @@ function transactAfter<P, T>(store: Store, read: () => Promise<P>, plan: (d: Dra
           await reread(store)
           continue
         }
+        // The caller's authority refused it (HI-2420): its own refusal, nothing saved.
+        if (d.refused !== undefined) throw d.refused
         throw new NotSaved(`Hive couldn't save the deliveries (${(e as Error).message}): nothing changed.`, { cause: e })
       }
       const was = new Set(store.records)
@@ -616,6 +625,12 @@ async function save(store: Store, d: Draft): Promise<void> {
   // Read from a database since replaced (the upgrade to 1.0, a restore): never saved over what the file has now.
   const guard = (): void => {
     if (store.gen !== dbGenerationAt(store.place.key)) throw new Error("the workspace's database was replaced since these deliveries were read") // i18n-ignore: a save refused for the log; the transaction's NotSaved says it
+    try {
+      d.commit?.()
+    } catch (e) {
+      d.refused = e
+      throw e
+    }
   }
   // Only what this transaction changed (#1211's rows), the next id and the entries kept aside beside them, in one
   // transaction, against the rows as they are committed (#1266): a row another Hive changed since this store read it
@@ -1094,9 +1109,13 @@ function taken(store: Store, r: DeliveryRecord): boolean {
  * Cancels an agent's deliveries not read yet (one being typed now stops; its hive_inbox no longer lists them), all of
  * them or those of `kinds` (or those `match` picks); by: who cancelled. How many.
  */
-export async function cancelDeliveries(host: string, agentId: string, by: string, kinds?: readonly DeliveryKind[], match?: (r: DeliveryRecord) => boolean): Promise<number> {
+export async function cancelDeliveries(host: string, agentId: string, by: string, kinds?: readonly DeliveryKind[], match?: (r: DeliveryRecord) => boolean, commit?: () => void): Promise<number> {
   const store = await load(host)
   const n = await transact(store, (d) => {
+    // A revocable caller's authority (HI-2420, the Assistant's guard): checked in the plan, and again in the save's own
+    // transaction after its awaits (Draft.commit; set again on a stale save's new plan), so a refusal cancels nothing.
+    commit?.()
+    d.commit = commit
     let count = 0
     for (const r of [...d.records]) {
       if (r.agentId !== agentId || (kinds && !kinds.includes(r.kind)) || (match && !match(r))) continue

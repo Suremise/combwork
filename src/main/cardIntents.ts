@@ -72,11 +72,12 @@ export interface CardRefIn {
  * Runs an intent of a card for an actor (an agent by its own token, the Assistant, a script): the card read in the
  * caller's view (another project's is unknown to an agent), its runtime's intent with the card named as the runtime takes
  * it (an agent's plain number refused there), and the card's 0.9 fields in each write. Throws the runtime's refusal.
+ * `commit`: a revocable caller's check (the Assistant's guard, HI-2420), made in each write just before it is saved.
  */
 /** The intents after which a reply says what comes next (#1530): those that can change it. */
 const NEXT_AFTER = new Set<CardIntent['kind']>(['start', 'putBack', 'submit', 'verdict', 'reportMerge', 'removeFromQueue', 'retryMerge'])
 
-export async function runCardIntent(ref: CardRefIn, actor: TaskActor, intent: CardIntent): Promise<{ done: IntentDone; card: TaskCard }> {
+export async function runCardIntent(ref: CardRefIn, actor: TaskActor, intent: CardIntent, opts: { commit?: () => void } = {}): Promise<{ done: IntentDone; card: TaskCard }> {
   const ws = workspace
   const before = await readTask(ref.n, actor)
   const wf = ws.path && before.project ? await workflowFor(ws, join(ws.path, before.project)) : null
@@ -134,7 +135,7 @@ export async function runCardIntent(ref: CardRefIn, actor: TaskActor, intent: Ca
 
   // Declaring paths moves nothing: the runtime's own change of the card, in a change of the board.
   if (intent.kind === 'declarePaths') {
-    const r = await boardLock(ws, () => wf.declarePaths(named, who, intent.paths))
+    const r = await boardLock(ws, () => wf.declarePaths(named, who, intent.paths, opts.commit))
     if (isRefusal(r)) throw new WorkflowRefusedError(r)
     const card = await readTask(ref.n, actor)
     return { done: { ok: true, card: card.key ?? `#${ref.n}`, from: '', to: '', data: { prefill: r.prefill, unclaimed: r.unclaimed, revision: r.revision } }, card }
@@ -177,7 +178,8 @@ export async function runCardIntent(ref: CardRefIn, actor: TaskActor, intent: Ca
     }
   }
   if (intent.kind === 'loopStep') await testHooks.beforeDesignWrite?.()
-  const { reply, saved } = await runIntent(wf, ref.n, actor, call, zero9)
+  // `commit` (HI-2420): the Assistant's guard, checked again in each write as the card is saved (runIntent).
+  const { reply, saved } = await runIntent(wf, ref.n, actor, call, zero9, opts.commit)
   if (isRefusal(reply)) throw new WorkflowRefusedError(reply)
   const card = saved ?? (await readTask(ref.n, actor))
   const m = reply as Moved

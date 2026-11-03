@@ -139,4 +139,40 @@ describe('a handover links the conversations it joins, whenever the target names
     expect(old.handedOverFrom).toBeUndefined()
     expect(internals.live.get(key('dst'))?.handedOverFrom).toBeUndefined()
   })
+
+  // HI-2420 (HR1's round 1): the Assistant's hand-over carries its guard. Revoked while the handover is still being read
+  // (before anything is given or launched), the target gets nothing: neither a delivery nor a launch.
+  for (const running of [false, true]) {
+    it(`the Assistant's hand-over revoked while its handover is read: the ${running ? 'running' : 'stopped'} target is given nothing (HI-2420)`, async () => {
+      if (running) launch('dst', 'run-h')
+      const start = vi.spyOn(sessions, 'start').mockImplementation(async (_p, opts) => {
+        opts.allowed?.()
+        return launch(opts.agentId!, 'run-i').state as never
+      })
+      let release!: () => void
+      let reached!: () => void
+      const held = new Promise<void>((r) => (release = r))
+      const reading = new Promise<void>((r) => (reached = r))
+      vi.spyOn(sessions, 'latestHandover').mockImplementationOnce(async () => {
+        reached()
+        await held
+        return { relPath: 'handovers/2026-10-17-demo.md' } as never
+      })
+      let revoked = false
+      const allowed = () => {
+        if (revoked) throw new Error('Control was turned down meanwhile')
+      }
+      try {
+        const op = run(() => sessions.handOver(proj, 'src', 'dst', { handover: false, allowed }))
+        await reading
+        revoked = true
+        release()
+        await expect(op).rejects.toThrow(/turned down/)
+        expect(start).not.toHaveBeenCalled()
+        expect(given).toEqual({ now: [], launched: [] })
+      } finally {
+        start.mockRestore()
+      }
+    })
+  }
 })

@@ -2466,13 +2466,17 @@ export class Workflow {
   }
 
   /** declare paths (None): sets the card's paths; replies with the pre-fill, the unclaimed changes and the revision. */
-  async declarePaths(ref: unknown, actor: Actor, paths: string[]): Promise<{ prefill: string[]; unclaimed: string[]; revision: string | null } | Refusal> {
+  /** `commit`: a revocable caller's check (HI-2420, the Assistant's guard), made in the write, before the paths are saved. */
+  async declarePaths(ref: unknown, actor: Actor, paths: string[], commit?: () => void): Promise<{ prefill: string[]; unclaimed: string[]; revision: string | null } | Refusal> {
     const card0 = this.resolve(ref, actor)
     if (isRefusal(card0)) return card0
     // A card's paths narrow the deliverables, never widen them (#1511): none under `.hive`, `.git` or an excluded folder.
     const bad = this.excludedPath(paths)
     if (bad) return refusal('paths.excluded', { card: card0.key, ...bad }, null)
-    const card = await this.locked(() => this.store.updateCard(card0.id, { paths }))
+    const card = await this.locked(() => {
+      commit?.()
+      return this.store.updateCard(card0.id, { paths })
+    })
     const rev = this.none.revision(paths)
     return { prefill: this.prefill(card), unclaimed: await this.unclaimed(card), revision: isUnknown(rev) ? null : rev.revision }
   }
