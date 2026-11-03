@@ -182,12 +182,29 @@ const check = (name, ok, extra = '') => {
   await lib.sleep(3000) // A fixed wait on purpose: this checks that nothing comes.
   check('a card with no reviewer wakes no one', wakes('Reviewer').length === 4, JSON.stringify(wakes('Reviewer').slice(4)))
 
+  // HI-2428 (HI-2410): the reviewer starts its review, asks its builder with hive_request_builder and ends its turn with
+  // no watch; the builder answers with a comment alone (hive_update_task with only a comment) at once, then posts the
+  // result later as a plain comment. Each wakes the reviewer.
+  await say(other.id, `boardreview ${c5} start then hive hive_request_builder ${JSON.stringify({ card: n5, text: 'Please post a full npm test record.' })}`)
+  check("the reviewer's request wakes the builder", !!(await until(async () => wakes('Builder').some((x) => x.includes('Please post a full npm test record.')), 20000)), JSON.stringify(wakes('Builder').slice(-2)))
+  await until(async () => (await idle(other.id)) && (await idle(builder.id)), 15000)
+  const otherBefore = wakes('Other').length
+  await say(builder.id, `hive hive_update_task ${JSON.stringify({ number: c5, comment: "@Other: you're right, running it now." })}`)
+  check("the builder's first answer, a comment alone, wakes the reviewer", !!(await until(async () => wakes('Other').length === otherBefore + 1, 20000)) && wakes('Other')[otherBefore].includes(`The builder replies: "@Other: you're right, running it now."`), JSON.stringify(wakes('Other').slice(otherBefore)))
+  await until(async () => (await idle(other.id)) && (await idle(builder.id)), 15000)
+  await say(builder.id, `boardcomment ${c5}`)
+  check('…and so does its later plain comment', !!(await until(async () => wakes('Other').length === otherBefore + 2, 20000)) && wakes('Other')[otherBefore + 1].includes('The builder replies: "Fake: done, see the files."'), JSON.stringify(wakes('Other').slice(otherBefore)))
+  check('…each kept in the history', (await said(c5)).filter((x) => x.startsWith('Builder (alpha): Replied to the reviewer')).length === 2, JSON.stringify(await said(c5)))
+  await until(async () => (await idle(other.id)) && (await idle(builder.id)), 15000)
+  // Other's wakes so far: the checks below count from here.
+  const otherSeen = wakes('Other').length
+
   // Turned off for the project: a lane card arriving in Review wakes no one.
   await lib.setOwnOptions(inv, alpha, { loopWakes: false })
   await say(builder.id, `boardmove ${c3} review`)
   await until(async () => (await card(c3))?.column === 'review', 10000)
   await lib.sleep(3000) // A fixed wait on purpose: this checks that nothing comes.
-  check('turned off in its options: no one is woken', wakes('Reviewer').length === 4 && wakes('Other').length === 1 && !(await said(c3)).some((x) => x.startsWith('Hive: Woke')), JSON.stringify({ wakes: [...wakes('Reviewer').slice(4), ...wakes('Other').slice(1)], history: await said(c3) }))
+  check('turned off in its options: no one is woken', wakes('Reviewer').length === 4 && wakes('Other').length === otherSeen && !(await said(c3)).some((x) => x.startsWith('Hive: Woke')), JSON.stringify({ wakes: [...wakes('Reviewer').slice(4), ...wakes('Other').slice(otherSeen)], history: await said(c3) }))
 
   // #1475, on again: a blocked card's news wakes a lane watch, and a lane abandoned ends its reviewer's card watch, which
   // leaves it idle for the next lane's prompt in a new conversation.
@@ -217,7 +234,7 @@ const check = (name, ok, extra = '') => {
   await say(other.id, `hive hive_wait_for_tasks ${JSON.stringify({ cards: [c7], column: 'review', wake: true })}`)
   check('Other waits for the card in Review', !!(await until(async () => (await live(other.id))?.status === 'watching', 15000)))
   await inv('lanes:end', lane2.id, true)
-  check("an abandoned lane ends its reviewer's card watch, saying there's nothing more to wait for", !!(await until(async () => wakes('Other').length === 2, 20000)) && wakes('Other')[1] === `[Hive] ${n7}'s lane was abandoned (your watch on it ended). Your card watch has ended: there is nothing more to wait for on it. Don't watch it again; end your turn unless you have other work.`, JSON.stringify(wakes('Other').slice(1)))
+  check("an abandoned lane ends its reviewer's card watch, saying there's nothing more to wait for", !!(await until(async () => wakes('Other').length === otherSeen + 1, 20000)) && wakes('Other')[otherSeen] === `[Hive] ${n7}'s lane was abandoned (your watch on it ended). Your card watch has ended: there is nothing more to wait for on it. Don't watch it again; end your turn unless you have other work.`, JSON.stringify(wakes('Other').slice(otherSeen)))
   check('…noted on the card', !!(await until(async () => (await said(c7)).includes("Hive: Ended Other (alpha)'s watch on it: its lane was abandoned"), 10000)), JSON.stringify(await said(c7)))
   check('…and leaves it idle with no watch', !!(await until(async () => (await idle(other.id)) && !(await live(other.id))?.watch, 15000)), JSON.stringify(await live(other.id)))
   // The next lane's prompt reaches it in a new conversation (the Assistant's hive_prompt_agent, with its token).

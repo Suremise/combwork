@@ -1188,6 +1188,18 @@ async function builderReplies(ws: WorkspaceService, card: TaskCard, patch: TaskP
 export const replyNote = (said: string): StoredText => storedText(HISTORY.builderReply, { text: clip(said) })
 
 /**
+ * A comment's own history line in a card loop, whichever way it is written (a change with a comment, or a comment alone,
+ * HI-2428: hive_update_task with only a comment is commentTask's, where neither was read, so on HI-2410 a pool
+ * reviewer's builder answered it twice and nobody was woken): a lane reviewer's request to its builder (#1410), or its
+ * builder's reply to its reviewer (HI-2302). Null: only a comment.
+ */
+async function commentNote(ws: WorkspaceService, card: TaskCard, patch: TaskPatch, actor: TaskActor, said: StoredText[], comment: string): Promise<StoredText | null> {
+  if (await laneReviewerAsks(ws, card, patch, actor, said)) return requestNote(comment)
+  if (await builderReplies(ws, card, patch, actor, said)) return replyNote(comment)
+  return null
+}
+
+/**
  * Whether the acting agent is the reviewer of a card it moves back from Review or Passed (HI-1832): the one reviewing it
  * now (its board review), or its running lane's reviewer (the board's own record). Such a move leaves the card its
  * builder's: on HI-1772 a reviewer's move to Doing gave the card to the reviewer and ended its builder's watch. Anyone
@@ -2372,8 +2384,10 @@ async function updateTaskAs(n: number, patch: TaskPatch, actor: TaskActor, opts:
     // A loop step's line keeps the column it was written in (#1495), a value its words don't show: what pendingStep reads
     // when the history that said so has been trimmed.
     if (opts.note) said.push(...opts.note.map((s) => (s.id === HISTORY.loopStep.id ? { ...s, values: { ...s.values, column: card.column } } : s)))
-    else if (comment && (await laneReviewerAsks(ws, card, patch, actor, said))) said.push(requestNote(comment))
-    else if (comment && (await builderReplies(ws, card, patch, actor, said))) said.push(replyNote(comment))
+    else if (comment) {
+      const asked = await commentNote(ws, card, patch, actor, said, comment)
+      if (asked) said.push(asked)
+    }
     // What changed, in the history's words (English), for a caller that confirms it (the hive tools' short replies).
     opts.said?.push(...said.map(englishSaid))
     if (!said.length && !reordered && !reviewed && !comment) return card
@@ -2703,7 +2717,13 @@ export async function commentTask(n: number, comment: string, actor: TaskActor, 
     const c = await getTask(n, ws)
     if (!inScope(c, scopeOf(actor))) throw unknownTask(n)
     if (c.archived && actor.kind !== 'user') throw new TaskPermissionError(withValues(ERR.archived, { card: cardRef(n) }))
-    addComment(c, actorName(actor), t)
+    // A loop's request or reply (HI-2428), as updateTask's comment: its history line, which watches count and the
+    // recorder wakes the other side with, in the same change.
+    const own = await commentNote(ws, c, {}, actor, [], t)
+    const by = actorName(actor)
+    const at = changeTime(c)
+    if (own) note(c, by, own, at)
+    addComment(c, by, t, undefined, undefined, at)
     await saveCard(ws, n, c, undefined, undefined, opts.commit)
     changed(ws)
     return c
