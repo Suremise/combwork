@@ -604,13 +604,14 @@ export async function placementDue(ws: WorkspaceService, projectPath: string, n:
  * Whether a card's current start was written outside the slots of a project that builds its cards in them (HI-1966): the
  * rules enforced, the card Active, its last start with no lease, under a ruleset that builds in slots, and its folder
  * neither a slot (a carried one stands in for one, #1441) nor its builder's own 0.9 worktree not migrated yet (#1434).
- * startTask undoes such a start rather than launch its builder in the project folder. False when it can't be told.
+ * startTask undoes such a start rather than launch its builder in the project folder. False when it can't be told, and
+ * for a no-code card, which takes no slot (HI-2335) and starts where its agent is, a direct start as a lane's (HI-2395).
  */
 export async function startedOutsideSlots(ws: WorkspaceService, projectPath: string, n: number): Promise<boolean> {
   if (!workflowEnforced()) return false
   const wf = await workflowFor(ws, projectPath).catch(() => null)
   const card = wf ? cardOf(wf, n) : null
-  if (!wf || !card) return false
+  if (!wf || !card || card.kind === 'no-code') return false
   const s = wf.state(card)
   const started = s.started
   if (s.stage !== 'active' || !started || started.lease || wf.rulesetOf(card, s).options.folder !== 'slots') return false
