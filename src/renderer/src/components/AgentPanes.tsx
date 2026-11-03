@@ -7,6 +7,7 @@ import { cardsText } from '@shared/agentTable'
 import { cardLabel } from '@shared/projectKeys'
 import { modelCaps, serverModelLabel } from '@shared/models'
 import { serverDefaultModel, serverModelOf } from '@shared/serverConnection'
+import { launchedName } from '@shared/connectionLabel'
 import { agentChoosesMcp, agentMcpText } from '@shared/agentMcp'
 import { SESSION_LAYOUTS, agentLimitText, agentsPerPage, compactThreshold, contextPercent, agentModelShown, effortLabel, footerChoices, isCompacting, layoutPanes, mergeBlocked, mostUrgent, projectLayout, sessionInAgentFolder, transcriptWarnLimit, unmergedWork } from '@shared/defaults'
 import { cellPage, cellPageCount, neighbourCell, pageCells, pageIds, type CellDirection } from '@shared/paneCells'
@@ -1758,7 +1759,7 @@ export function PaneFooter({
           {sep('s0')}
           <Tooltip content={connectionTip(live.launchedConnection, !!live.switchPending, email)}>
             <span className="pane-foot-item foot-connection fit-clip" data-connection={live.launchedConnection.id} onClick={() => (onSettings ? onSettings() : set({ agentSettingsFor: { project: project.path, agentId: a.id } }))}>
-              {live.launchedConnection.note && <Icon name="warning" />} {live.launchedConnection.name}
+              {live.launchedConnection.note && <Icon name="warning" />} {launchedName(live.launchedConnection).name}
               {live.switchPending && <span className="faint"> · {tr(CONNECTION_TEXT.switching)}</span>}
             </span>
           </Tooltip>
@@ -1790,7 +1791,7 @@ const CONNECTION_TEXT = {
  */
 function connectionTip(c: NonNullable<AgentInfo['live']>['launchedConnection'], switching: boolean, email?: string): string {
   if (!c) return ''
-  const parts = [tr(CONNECTION_TEXT.tip, { name: c.name })]
+  const parts = [tr(CONNECTION_TEXT.tip, { name: launchedName(c).name })]
   if (email) parts.push(tr(CONNECTION_TEXT.email, { email }))
   if (c.note) parts.push(tr(CONNECTION_TEXT[c.note]))
   if (switching) parts.push(tr(CONNECTION_TEXT.switchingTip))

@@ -2409,11 +2409,15 @@ export interface LiveSessionState {
   launchSignature: string
   /**
    * The connection this run launched on (HI-1755), kept for the run whatever is chosen meanwhile; absent: a provider
-   * without connections (or a test copy on its CLI test home). `note`: why it isn't the one chosen (its choice was off).
+   * without connections (or a test copy on its CLI test home). `id` and `name` are its account's (HI-2106: its home,
+   * login and usage); `connection`, the named connection on it whose values it launched with (HI-2397), is what the
+   * window names. `note`: why it isn't the one chosen (its choice was off).
    */
   launchedConnection?: {
     id: string
     name: string
+    /** The connection (`c-…`) it launched with, as named then (HI-2397); absent from a launch before it: its account's name stands in. */
+    connection?: { id: string; name: string }
     note?: 'offFallback' | 'missing' | 'unknownLogin' | 'loginChanged'
     /** Who it launched as (HI-1756: its plan usage is that login's), as plan usage keeps a login (a hash); absent: unknown. */
     login?: string

@@ -586,6 +586,8 @@ export interface EffectiveSettings {
   connection: string | null
   /** That connection's name, for messages (HI-2140); not part of the signature (a rename asks for no restart). */
   connectionName?: string
+  /** The connection itself (HI-2397: `connection` is its account), for what the window names; not part of the signature either. */
+  connectionId?: string
 }
 
 /** Files read once for a whole session list (instead of once per session). */
@@ -1649,12 +1651,12 @@ class SessionManager {
     const chime = pc.chime === 'inherit' ? s.notifications.chimeEnabled : pc.chime === 'on'
     // Never the CLI's own setting for the Assistant (#1284: Control relies on knowing its mode), whatever its connection says.
     const permissionMode = assistant && isCliOwnMode(l.permissionMode) ? providerDescriptor(cli).assistantMode : l.permissionMode
-    return { provider: l.provider, skills, skillHashes, skillProblems, mcpServers, model: l.model, effort: l.effort, permissionMode, extraArgs, use200kContext: l.use200kContext, chime, connection, ...(choice.ok ? { connectionName: choice.connection.name } : {}) }
+    return { provider: l.provider, skills, skillHashes, skillProblems, mcpServers, model: l.model, effort: l.effort, permissionMode, extraArgs, use200kContext: l.use200kContext, chime, connection, ...(choice.ok ? { connectionName: choice.connection.name, connectionId: choice.connection.id } : {}) }
   }
 
   signature(e: EffectiveSettings): string {
     // The permission mode can be switched live (setPermissionMode), so it doesn't ask for a restart.
-    const { chime: _c, skills: _s, permissionMode: _p, connectionName: _n, ...rest } = e
+    const { chime: _c, skills: _s, permissionMode: _p, connectionName: _n, connectionId: _i, ...rest } = e
     return hashText(JSON.stringify(rest))
   }
 
@@ -2581,7 +2583,9 @@ class SessionManager {
     if (l.stopRequested || this.live.get(id) !== l || this.starting.get(id)?.cancelled || !workspaceFor(projectPath) || this.shuttingDown || workspaceFor(projectPath)?.closing) throw hiveError(M.stoppedBeforeStart)
     // The model and effort it was given (HI-1996), and whether that model was chosen (its connection's) or its CLI's.
     state.launchedWith = launchedWithOf(ctx.model, ctx.effort)
-    state.launchedConnection = conn ? { id: conn.id, name: conn.name, ...(conn.note ? { note: conn.note } : {}), ...(conn.login ? { login: conn.login } : {}), ...(conn.server ? { server: { models: conn.server.models, local: conn.server.local } } : {}) } : undefined
+    // Its account (conn), and the connection on it whose values it launched with (HI-2397), which the window names.
+    const named = conn && eff.connectionId && eff.connection === conn.id ? { connection: { id: eff.connectionId, name: eff.connectionName ?? conn.name } } : {}
+    state.launchedConnection = conn ? { id: conn.id, name: conn.name, ...named, ...(conn.note ? { note: conn.note } : {}), ...(conn.login ? { login: conn.login } : {}), ...(conn.server ? { server: { models: conn.server.models, local: conn.server.local } } : {}) } : undefined
     if (conn?.server && state.sessionId) (l.serverSids ??= new Set()).add(state.sessionId)
     // Decision H (HI-2108): its connection is off here or gone, so it runs on its CLI's first usable one: said once a launch.
     if (conn?.note === 'offFallback' || conn?.note === 'missing') toast('warning', tr(M.connectionFallbackTitle, { agent: this.label(state) }), tr(M.connectionFallback, { why: conn.note, wanted: getConnection(agent.connection)?.name ?? '', name: conn.name }), undefined, projectPath, agentTarget(projectPath, state.agentId, this.label(state))) // i18n-ignore: select keys, never shown

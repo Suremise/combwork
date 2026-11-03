@@ -7,9 +7,10 @@ import { isProviderEnabled } from './providers'
  * (resolveAgentConnection, decision H), so the window and a start never disagree:
  * - `desired`: its connection as it resolves now: its own when its account is on here; its own off here or removed, its
  *   CLI's first usable one (`note`: offFallback, missing); else why none can run it (none usable).
- * - `shown`: what a row names: the desired connection; while it runs on another account than the desired one's, that
- *   account (it keeps it until it restarts); null when none can run it.
- * - `other`: running on another account than the desired one's, or the desired is now unusable: the ⟳ mark.
+ * - `shown`: what a row names: the desired connection; while it runs on another than the desired one, the one it runs
+ *   on (it keeps it until it restarts: launchedName); null when none can run it.
+ * - `other`: running on another connection than the desired one (HI-2397: another on the same account too; a launch
+ *   from before it, on another account), or the desired is now unusable: the ⟳ mark.
  * Null where connections aren't shown: a CLI without them, a test copy on its CLI test home.
  */
 export interface ConnectionShown {
@@ -30,13 +31,18 @@ export function connectionsHere(view: ConnectionsView, cli?: ProviderId): Connec
   return usableConnections({ connections: view.workspace }, orderedAccounts(view), view.connectionRows ?? [], cli)
 }
 
+/** The connection a run launched on, as the window names it (HI-2397): the named connection, else (a launch from before it) its account. */
+export function launchedName(launched: NonNullable<LiveSessionState['launchedConnection']>): { id: string; name: string } {
+  return launched.connection ?? { id: launched.id, name: launched.name }
+}
+
 export function connectionOf(own: string | undefined, provider: ProviderId, launched: LiveSessionState['launchedConnection'] | undefined, view: ConnectionsView | null): ConnectionShown | null {
   if (!view || !connectionsApply(view, provider)) return null
   const r = resolveAgentConnection({ connections: view.workspace }, provider, own, orderedAccounts(view), view.connectionRows ?? [])
   const wantedName = own ? view.connectionRows?.find((c) => c.id === own)?.name : undefined
   const desired: ConnectionShown['desired'] = r.ok ? { ok: true, id: r.connection.id, name: r.connection.name, account: r.account.id, ...(r.note ? { note: r.note } : {}) } : { ok: false, why: r.why, ...(wantedName ? { wantedName } : {}) }
-  const other = !!launched && (!desired.ok || desired.account !== launched.id)
-  const shown = other ? { id: launched!.id, name: launched!.name } : desired.ok ? { id: desired.id, name: desired.name } : null
+  const other = !!launched && (!desired.ok || (launched.connection ? desired.id !== launched.connection.id : desired.account !== launched.id))
+  const shown = other ? launchedName(launched!) : desired.ok ? { id: desired.id, name: desired.name } : null
   return { desired, shown, other }
 }
 
