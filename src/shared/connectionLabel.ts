@@ -36,6 +36,16 @@ export function launchedName(launched: NonNullable<LiveSessionState['launchedCon
   return launched.connection ?? { id: launched.id, name: launched.name }
 }
 
+/**
+ * Whether a running agent is due a switch to the connection it would launch on now (HI-1755; HI-2413: by connection, as
+ * connectionOf's `other`, not by account, so another connection on the same account counts too). `now` is what it would
+ * launch on: `connection` its account (`!<why>`: none usable), `connectionId` the connection. A launch from before
+ * HI-2397, which kept only its account, is compared by account. Its own connection chosen again is no change.
+ */
+export function connectionSwitchDue(launched: NonNullable<LiveSessionState['launchedConnection']>, now: { connection: string | null; connectionId?: string }): boolean {
+  return launched.connection && now.connectionId ? now.connectionId !== launched.connection.id : now.connection !== launched.id
+}
+
 export function connectionOf(own: string | undefined, provider: ProviderId, launched: LiveSessionState['launchedConnection'] | undefined, view: ConnectionsView | null): ConnectionShown | null {
   if (!view || !connectionsApply(view, provider)) return null
   const r = resolveAgentConnection({ connections: view.workspace }, provider, own, orderedAccounts(view), view.connectionRows ?? [])

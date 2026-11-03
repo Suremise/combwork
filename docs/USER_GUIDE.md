@@ -613,7 +613,7 @@ Set a project's agents up once, see them work, and reuse the setup anywhere: a *
 
 **Project Settings → Agents → Choose Connections…** opens the same **Connections** choice over the project's agents as they are: a choice for each role they have, **Same for all**, and **Per agent**. It's how you give every builder here a higher effort, say: choose *Claude · High* for **Builders** and **Apply**. Each choice starts at **Keep each one's**, and a table shows each agent's connection now and after. Only their connections change: no agent is replaced and their conversations stay (another coding agent's connection starts a fresh one, as in Agent Settings).
 
-- A **running** agent keeps its connection until it restarts. After **Apply**, Hive offers **Switch Them When Their Turn Is Over** (each ends once its turn is over and carries on, on the connection chosen), or **Later**.
+- A **running** agent keeps its connection until it restarts. After **Apply**, Hive offers **Switch Them When Their Turn Is Over** (each ends once its turn is over and carries on, on the connection chosen, another connection on the same sign-in too), or **Later**.
 - A running agent can't take **another coding agent's** connection (stop it first): those are greyed out for it, and a role's choice skips it, saying so.
 
 ### A template's workflow <a id="template-workflow"></a>

@@ -3,6 +3,7 @@ import { useCallback, useEffect, useState } from 'react'
 import type { Account, PlanLimit, ProviderId } from '@shared/types'
 import { accountState, connectionReadiness, duplicateLogins, type AccountView, type ConnectionRow, type ConnectionsView, type ConnectionState } from '@shared/accounts'
 import { COPILOT_ACCOUNT } from '@shared/connectionDefaults'
+import { connectionOf } from '@shared/connectionLabel'
 import { isProviderEnabled, providerDescriptor } from '@shared/providers'
 import { fmt, msg, tr } from '@shared/i18n'
 import { call, errorMessage } from '../api'
@@ -141,8 +142,10 @@ export function AccountsSettings() {
   useEffect(() => load(false), [load, projectsKey, assistantKey])
 
   if (!view) return <div className="faint">{tr(M.loading)}</div>
-  // Agents running on a connection other than the one chosen for them now (HI-1755), not yet waiting to switch.
-  const affected = (projects ?? []).flatMap((p) => p.agents).filter((a) => a.restartNeeded && a.live?.launchedConnection && !a.live.switchPending).length
+  // Agents running on a connection other than the one chosen for them now (HI-1755), not yet waiting to switch: by
+  // connection, as the switch and the window's ⟳ mark judge it (HI-2413: another on the same account too), not by any
+  // restart its settings ask for, which the button wouldn't make.
+  const affected = (projects ?? []).flatMap((p) => p.agents).filter((a) => a.live?.launchedConnection && !a.live.switchPending && connectionOf(a.connection, a.live.provider, a.live.launchedConnection, view)?.other).length
   const dups = duplicateLogins(view.connections)
   const nameOf = (id: string): string => view.connections.find((a) => a.id === id)?.name ?? id
   // One list in the one order (decision A): Hive's accounts of the CLIs turned on, and Copilot's sign-in while it is on.

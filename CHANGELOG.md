@@ -5,6 +5,9 @@
 ### Fixed
 
 - **A card read with `comments: 0` gives none of its comments.** `hive_read_task` with `comments: 0`, asked for so as not to see a card's comments, returned every one of them; the Agent API refused `comments=0`. Both now give no comments, with `commentsOmitted` counting them, and none of their attachments (HI-2412).
+### Fixes
+
+- **Switch Them When Their Turn Is Over switches to another connection on the same sign-in.** An agent moved to another connection on the account it runs on, say with another model or effort, kept running on its old one after its turn ended: the switch compared accounts, not connections. Settings → Accounts & Connections' banner now counts the agents its button switches, too (HI-2413).
 - **Turning the Assistant's Control down, or stopping it, stops a card or comment it already asked for.** A new card or comment the Assistant asked for just before, still waiting behind another change to the board, was still made. Now it's refused and nothing of it is saved, its files included (HI-2415).
 ### Security
 
