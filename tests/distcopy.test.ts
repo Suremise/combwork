@@ -6,7 +6,7 @@ import { join, resolve } from 'path'
 import { pathToFileURL } from 'url'
 import { afterAll, describe, expect, it } from 'vitest'
 // @ts-expect-error: a plain .mjs module without types
-import { checkoutOf, clearDistInfo, copySet, copyToMain, finishDist, installerFiles, makeRelease, planCopy, provenanceProblem, readUnpackedInfo } from '../scripts/distCopy.mjs'
+import { checkoutOf, clearDistInfo, copySet, copyToMain, finishDist, installerFiles, makeRelease, planCopy, provenanceProblem, readUnpackedInfo, releaseClaim, RELEASE_CLAIM } from '../scripts/distCopy.mjs'
 // @ts-expect-error: a plain .mjs module without types
 import { packagedStatus } from './e2e/runner.mjs'
 import { tempDir } from './tempDir'
@@ -247,14 +247,18 @@ describe('a release build in dist (makeRelease)', () => {
     return root
   }
   /** makeRelease with fakes: steps lists what ran, in order; the "upload" writes the installer as electron-builder does. */
-  const release = (root: string, { code = 'new', after = code, replace = false }: { code?: string; after?: string; replace?: boolean } = {}) => {
+  const release = (root: string, { code = 'new', after = code, replace = false, during }: { code?: string; after?: string; replace?: boolean; during?: () => void } = {}) => {
     const steps: string[] = []
     const idents = [ident(code), ident(after)]
     const made = makeRelease({
       root,
       replace,
       identity: () => idents.shift(),
-      run: (cmd: string) => steps.push(cmd),
+      // during: what happens elsewhere while it builds.
+      run: (cmd: string) => {
+        steps.push(cmd)
+        during?.()
+      },
       stampApp: (_root: string, id: { version: string; commit: string; local: boolean }) => steps.push(`stamp local=${id.local}`),
       publish: () => {
         steps.push('publish')
@@ -309,5 +313,57 @@ describe('a release build in dist (makeRelease)', () => {
     expect(made.lines[0]).toMatch(/^The build's code can't be told: the code changed .*No build-info\.json was written: build again once the code stays put\.$/)
     expect(made.lines[1]).toBe(`Installer: ${exe(root)} (unlabelled)`)
     expect(existsSync(join(root, 'dist', 'build-info.json'))).toBe(false)
+  })
+
+  it('a worktree’s copy while it builds is refused, even with --replace; after it ends it copies by the usual rules', () => {
+    // A main checkout and a worktree whose npm run dist built other code, ready to copy (copyToMain).
+    const main = join(base, 'git-main')
+    const wt = join(base, 'git-wt')
+    const git = (cwd: string, ...a: string[]) => execFileSync('git', ['-c', 'user.name=t', '-c', 'user.email=t@t', ...a], { cwd, encoding: 'utf8' }).trim()
+    mkdirSync(main)
+    git(main, 'init', '-q', '-b', 'main')
+    writeFileSync(join(main, 'a.txt'), 'a\n')
+    git(main, 'add', '.')
+    git(main, 'commit', '-qm', 'one')
+    git(main, 'worktree', 'add', '-q', '-b', 'hive/agent', wt)
+    mkdirSync(join(wt, 'dist'))
+    for (const f of installerFiles('9.9.9').filter((x: string) => x !== 'build-info.json')) writeFileSync(join(wt, 'dist', f), `${f} from wt`)
+    const wtInfo = { ...ident('wt'), branch: 'hive/agent', builtAt: '2026-11-03T03:00:00Z' }
+    writeFileSync(join(wt, 'dist', 'build-info.json'), JSON.stringify(wtInfo))
+    const copies: string[][] = []
+    const { made } = release(main, { during: () => copies.push(copyToMain({ root: wt, version: '9.9.9', info: wtInfo }), copyToMain({ root: wt, version: '9.9.9', info: wtInfo, replace: true })) })
+    for (const lines of copies) {
+      expect(lines[0]).toMatch(/^Not copied to the main checkout: npm run release is building there \(pid \d+, since .+\)\.$/)
+      expect(lines[1]).toMatch(/Run npm run dist again once the release has ended/)
+    }
+    // The release's own installer and record, and its claim gone.
+    expect(made.lines).toEqual([`Installer: ${exe(main)}`])
+    expect(readFileSync(exe(main), 'utf8')).toBe('installer from new')
+    expect(buildInfo(main).code).toBe('new')
+    expect(existsSync(join(main, 'dist', RELEASE_CLAIM))).toBe(false)
+    // Once it has ended, the copy is refused for the release's installer, other code, as any other.
+    expect(copyToMain({ root: wt, version: '9.9.9', info: wtInfo })[0]).toMatch(/built from other code: new \(main\)/)
+  })
+
+  it('another release building in the same dist is refused; a claim its ended release left behind is not', () => {
+    const root = checkout()
+    const claim = join(root, 'dist', RELEASE_CLAIM)
+    writeFileSync(claim, JSON.stringify({ pid: process.pid, at: new Date().toISOString(), code: 'other' }))
+    const busy = release(root, { replace: true })
+    expect(busy.steps).toEqual([])
+    expect(busy.made.refused).toMatch(/^Not built: another npm run release is building in .* \(pid \d+, since .+\)\. Run again once it has ended\.$/)
+    // Left by a release that exited part way (its process gone), or so old its pid may be another's: no claim.
+    expect(releaseClaim(join(root, 'dist'), { alive: () => false })).toBeNull()
+    expect(releaseClaim(join(root, 'dist'), { now: Date.now() + 7 * 3_600_000 })).toBeNull()
+    expect(releaseClaim(join(root, 'dist'))?.code).toBe('other')
+    writeFileSync(claim, JSON.stringify({ pid: 2 ** 30, at: new Date().toISOString(), code: 'other' }))
+    expect(release(root).made.lines).toEqual([`Installer: ${exe(root)}`])
+    expect(existsSync(claim)).toBe(false)
+  })
+
+  it('a step that fails gives up the claim', () => {
+    const root = checkout()
+    expect(() => makeRelease({ root, identity: () => ident('new'), run: () => {}, stampApp: () => {}, publish: () => { throw new Error('upload failed') } })).toThrow('upload failed')
+    expect(existsSync(join(root, 'dist', RELEASE_CLAIM))).toBe(false)
   })
 })
