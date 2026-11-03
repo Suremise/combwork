@@ -33,8 +33,8 @@ function pushing(on = true): { e: Env; bare: string } {
   const bare = join(tempDir('remote-'), 'origin.git')
   execFileSync('git', ['init', '-q', '--bare', '-b', 'main', bare])
   sh(e.project, 'remote', 'add', 'origin', bare)
-  sh(e.project, 'push', '-q', 'origin', 'main')
-  sh(e.project, 'branch', '-q', '--set-upstream-to=origin/main', 'main')
+  // Pushed and tracked in one git (HI-2423: each git started counts on a loaded machine).
+  sh(e.project, 'push', '-q', '-u', 'origin', 'main')
   return { e, bare }
 }
 

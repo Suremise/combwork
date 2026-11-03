@@ -266,7 +266,9 @@ describe('a skill at the entry limit', () => {
 
   // 2000 entries are real file work, not a wait (#356): about 2.3 s idle (writing them, copying them twice, hashing),
   // and 5 to 60+ s when the machine is busy with other suites. Nothing here waits on a condition, so the limit is the
-  // honest slowest run, not a race: 180 s.
+  // honest slowest run, not a race: 180 s. The test hashes the 2000 only once itself (HI-2423: a full run beside other
+  // lanes' reached the limit): the next launch's revision is its copy's own hash, so its equal to the first, the
+  // source's, says the copy is the source.
   it("Codex: exactly 2000 is delivered, marker and all, and stays delivered on the next launch", async () => {
     const root = join(base, 'limit-codex')
     const cwd = join(root, 'project')
@@ -276,7 +278,6 @@ describe('a skill at the entry limit', () => {
     const copy = join(cwd, '.agents', 'skills', 'hive-full')
     expect(existsSync(join(copy, '.hive-copy'))).toBe(true)
     expect(first.full).toEqual({ revision: await contentHash(s) })
-    expect(await contentHash(copy)).toBe(await contentHash(s))
     expect(await launchCodex(cwd, [{ name: 'full', sourcePath: s }])).toEqual(first)
   }, 180_000)
 
