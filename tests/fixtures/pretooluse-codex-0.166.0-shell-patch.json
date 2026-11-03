@@ -1,0 +1,37 @@
+{
+  "cli": "codex",
+  "version": "0.166.0",
+  "recorded": "2026-11-03 (HI-2408): codex exec in a signed-in test home copy, workspace-write with the unelevated sandbox, Hive's PreToolUse/PostToolUse/PermissionRequest hooks forwarding their bodies to a local server. The prompt asked for the edit as an exec_command shell command. Both edits were applied (notes.txt gained the line); Codex sent no PostToolUse for them. Paths replaced.",
+  "hooks": [
+    {
+      "about": "apply_patch with a quoted heredoc, as the model wrote it in HI-2407's real-tier failure",
+      "session_id": "01a19f0f-e14f-7d30-89b2-571d2f39023a",
+      "turn_id": "01a19f0f-e2d7-76d0-ab66-174567b95082",
+      "transcript_path": "C:\\probe\\home\\sessions\\2026\\11\\03\\rollout-2026-11-03T01-39-40-01a19f0f-e14f-7d30-89b2-571d2f39023a.jsonl",
+      "cwd": "C:\\probe\\work",
+      "hook_event_name": "PreToolUse",
+      "model": "gpt-6.1-sol",
+      "permission_mode": "bypassPermissions",
+      "tool_name": "Bash",
+      "tool_input": {
+        "command": "apply_patch <<'PATCH'\n*** Begin Patch\n*** Update File: notes.txt\n@@\n hi\n+from agent 1\n*** End Patch\nPATCH"
+      },
+      "tool_use_id": "exec-76261b57-51dc-4ad7-8bc2-fdf5f7dcff41"
+    },
+    {
+      "about": "after cd, with an unquoted heredoc, adding one file and updating another",
+      "session_id": "01a19f0f-e150-7182-b97a-f37d0ee0ed96",
+      "turn_id": "01a19f0f-e305-73e3-9250-af3487e30630",
+      "transcript_path": "C:\\probe\\home\\sessions\\2026\\11\\03\\rollout-2026-11-03T01-39-40-01a19f0f-e150-7182-b97a-f37d0ee0ed96.jsonl",
+      "cwd": "C:\\probe\\work",
+      "hook_event_name": "PreToolUse",
+      "model": "gpt-6.1-sol",
+      "permission_mode": "bypassPermissions",
+      "tool_name": "Bash",
+      "tool_input": {
+        "command": "cd . && apply_patch <<EOF\n*** Begin Patch\n*** Add File: added.txt\n+new\n*** Update File: notes.txt\n@@\n hi\n+from agent 1\n*** End Patch\nEOF"
+      },
+      "tool_use_id": "exec-22d95fd2-e273-4782-9a14-ca29541c005f"
+    }
+  ]
+}

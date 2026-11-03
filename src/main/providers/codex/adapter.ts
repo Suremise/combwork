@@ -28,7 +28,7 @@ import { codexSafeguards } from './safeguards'
 import { codexTranscriptTurns } from './turns'
 import { codexRetryWait } from './retryLog'
 import type { SafeguardEvent } from '../../../shared/safeguards'
-import { CodexConversationParser, CodexUsageParser, codexImageData, parseRollout, patchPaths, rolloutDetails, rolloutSubSession } from './rollout'
+import { CodexConversationParser, CodexUsageParser, codexImageData, parseRollout, patchPaths, rolloutDetails, shellPatchPaths, rolloutSubSession } from './rollout'
 import { parseCodexModels } from './models'
 import { atMost } from '../../../shared/atMost'
 import { permissionsMenuLabel, permissionsMenuNumber } from './permissionsMenu'
@@ -1071,6 +1071,8 @@ export class CodexAdapter implements ProviderAdapter {
         } else {
           out.event = { kind: 'toolStart' }
           if (tool === 'apply_patch' || tool === 'Edit' || tool === 'Write') out.editedPaths = patchPaths(String(input.command ?? input.patch ?? ''))
+          // apply_patch run as a shell command (HI-2408): Codex applies it as an edit too, so it claims and checks the same.
+          else if (tool === 'Bash') out.editedPaths = shellPatchPaths(String(input.command ?? ''))
         }
         break
       case 'PostToolUse':

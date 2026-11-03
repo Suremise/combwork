@@ -57,6 +57,26 @@ describe('Codex hooks', () => {
     expect(patchPaths('*** Begin Patch\n*** Add File: a b/c.ts\n+x\n*** End Patch')).toEqual(['a b/c.ts'])
     expect(patchPaths('no patch')).toEqual([])
   })
+  it('claims the files of an apply_patch run as a shell command (HI-2408, recorded from Codex 0.166.0)', async () => {
+    const { codex } = await import('../src/main/providers/codex/adapter')
+    const { shellPatchPaths } = await import('../src/main/providers/codex/rollout')
+    const recorded = JSON.parse(readText(joinPath(__dirname, 'fixtures', 'pretooluse-codex-0.166.0-shell-patch.json'), 'utf8')).hooks
+    expect(recorded.map((b: Record<string, unknown>) => codex.normalizeHook(b))).toMatchObject([
+      { event: { kind: 'toolStart' }, editedPaths: ['notes.txt'] },
+      { event: { kind: 'toolStart' }, editedPaths: ['added.txt', 'notes.txt'] }
+    ])
+    // The other forms Codex takes: its other name, the patch as the argument, a cd that the paths are relative to.
+    const patch = '*** Begin Patch\n*** Update File: a.ts\n@@\n-x\n+y\n*** End Patch'
+    expect(shellPatchPaths(`applypatch <<"EOF"\n${patch}\nEOF`)).toEqual(['a.ts'])
+    expect(shellPatchPaths(`apply_patch '${patch}'`)).toEqual(['a.ts'])
+    expect(shellPatchPaths(`cd "src dir" && apply_patch <<'EOF'\n${patch}\nEOF`)).toEqual([joinPath('src dir', 'a.ts')])
+    expect(shellPatchPaths(`cd sub && apply_patch <<'EOF'\n${patch.replace('a.ts', 'C:\\abs\\a.ts')}\nEOF`)).toEqual(['C:\\abs\\a.ts'])
+    // Not an apply_patch run: no file claimed (other shell edits stay out of locks).
+    expect(shellPatchPaths(`cat > x.patch <<'EOF'\n${patch}\nEOF`)).toEqual([])
+    expect(shellPatchPaths(`echo apply_patch`)).toEqual([])
+    expect(shellPatchPaths('apply_patch_helper <<EOF\n' + patch + '\nEOF')).toEqual([])
+    expect(shellPatchPaths("Set-Content notes.txt 'x'")).toEqual([])
+  })
 })
 
 describe('Codex: when a person must act', () => {

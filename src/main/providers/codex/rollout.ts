@@ -1,3 +1,4 @@
+import { isAbsolute, join } from 'path'
 import type { CompactionEvent, DayUsage, PlanLimit, PlanUsage, SessionUsage, SubSession, TranscriptImageRef, TranscriptItem, TranscriptTool, UsageTokens } from '../../../shared/types'
 import { emptyDay, localDay } from '../../../shared/usageDays'
 import { TimelineBuilder } from '../../../shared/usageTimeline'
@@ -315,6 +316,24 @@ export function patchPaths(patch: string): string[] {
   const out: string[] = []
   for (const m of patch.matchAll(PATCH_FILE)) out.push(m[2].trim())
   return [...new Set(out)]
+}
+
+// A shell command that runs apply_patch (HI-2408), as Codex itself takes one for an edit: `apply_patch <<'EOF' … EOF` (the
+// delimiter quoted or not) or the patch as its argument, under either of its names, after an optional `cd <dir> &&`.
+const SHELL_PATCH = /^\s*(?:cd\s+("[^"]*"|'[^']*'|[^\s&;|]+)\s*&&\s*)?(?:apply_patch|applypatch)(?=\s|$)/
+
+/**
+ * The files a shell command's apply_patch touches (HI-2408: Codex 0.166 sends it to PreToolUse as Bash, tool_input.command),
+ * read from the patch's own headers; relative to the command's `cd` folder where it has one. [] for any other command:
+ * other shell edits (Set-Content, sed, redirection) aren't read (SPEC, File locks).
+ */
+export function shellPatchPaths(command: string): string[] {
+  const m = SHELL_PATCH.exec(command)
+  if (!m) return []
+  const rest = command.slice(m[0].length)
+  if (!rest.includes('*** Begin Patch')) return []
+  const dir = m[1]?.replace(/^(["'])(.*)\1$/, '$2')
+  return patchPaths(rest).map((f) => (dir && dir !== '.' && !isAbsolute(f) ? join(dir, f) : f))
 }
 
 /** The patch in a code-mode script that only applies one (tools.apply_patch("…")); null for anything else. */
