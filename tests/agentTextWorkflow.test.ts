@@ -1,0 +1,142 @@
+// Agent text (dialects, HI-2065), card 3a (HI-2435): the canary dialect over where a card is with the merge queue
+// (queueState.ts: card reads, a lane's next, wakes, the queue's comment) and the workflow runtime's replies and wakes.
+// Every word of what they say comes through the catalogue, every queue id is said by some case, and text a record keeps
+// (a wake's action, the queue's comment) stays the Default under any dialect until stored text is said when read (5b).
+import { afterEach, describe, expect, it } from 'vitest'
+import { readFileSync } from 'fs'
+import { join } from 'path'
+import { setChainResolver, setProcessChain, type DialectChain } from '../src/shared/agentText'
+import { canaryProblems, canaryTexts } from '../src/shared/agentText/canary'
+import { leftWake, queueLine, resubmittedText, returnedComment, returnedText, staleWake, type QueueState } from '../src/main/workflow/queueState'
+import { CAME_BACK } from '../src/shared/workflow/queue'
+import type { FactData } from '../src/shared/workflow/facts'
+// @ts-expect-error: a plain .mjs module without types
+import { readCatalogue } from '../scripts/agentTextExtract.mjs'
+import { B1, commit, moved, R1, setup, type Env } from './workflow/harness'
+import { preset } from '../src/shared/workflow/options'
+
+const ROOT = join(__dirname, '..')
+const catalogue = readCatalogue(ROOT) as Record<string, { text: string }>
+const ids = new Set(Object.keys(catalogue))
+const chain = (texts: Record<string, string>): DialectChain => ({ texts, files: ['test.json'], hash: 'test' })
+const canary = (): void => setProcessChain(chain(canaryTexts(catalogue)))
+
+let env: Env | null = null
+afterEach(() => {
+  setProcessChain(null)
+  setChainResolver(null)
+  env?.close()
+  env = null
+})
+
+type Failed = FactData['IntegrationFailed']
+const base: Failed = { entry: 'HI-7/e3', revision: 'abc1234', target: 'main', reason: 'conflict', transient: false }
+/** Every kind of return, with what a test passes in it. */
+const FAILURES: Failed[] = [
+  { ...base, files: ['src/a.ts', 'src/b.ts'], logPath: 'C:/logs/q.log', log: 'one\ntwo\nthree' },
+  { ...base, files: Array.from({ length: 30 }, (_, i) => `src/file${i}.ts`) },
+  { ...base, files: Array.from({ length: 30 }, (_, i) => `src/a-very-long-folder-name/and-another-one/file-number-${i}.ts`) },
+  { ...base },
+  // A log path too long for a wake: the pointer to the card instead.
+  { ...base, reason: 'hook', logPath: `C:/logs/${'deep/'.repeat(120)}q.log` },
+  { ...base, reason: 'checks', check: 'install' },
+  { ...base, reason: 'checks', check: 'quick' },
+  { ...base, reason: 'checks' },
+  { ...base, reason: 'checks', check: 'quick', transient: true, cause: 'network', code: 'ECONNRESET' },
+  { ...base, reason: 'checks', transient: true },
+  { ...base, reason: 'hook' },
+  { ...base, reason: 'targetMoved' },
+  { ...base, reason: 'folderBusy' },
+  { ...base, reason: 'notUpToDate' },
+  { ...base, reason: 'notUpToDate', files: ['src/a.ts'] },
+  { ...base, reason: 'focused', focused: { why: 'repick', paths: ['src/a.ts'] } as never },
+  { ...base, reason: 'focused', focused: { why: 'repick' } as never },
+  { ...base, reason: 'focused', focused: { why: 'noProof', tests: ['e2e:real-chat'] } as never },
+  { ...base, reason: 'focused', focused: { why: 'newProof', tests: ['e2e:packaged'] } as never },
+  { ...base, reason: 'focused', focused: { why: 'noRunner' } as never },
+  { ...base, reason: 'focused' }
+]
+const STATES: QueueState[] = [
+  { state: 'queued', target: 'main', position: 2 },
+  { state: 'testing', target: 'main', step: 'advance' },
+  { state: 'testing', target: 'main', step: 'checks' },
+  { state: 'testing', target: 'main', step: null },
+  ...(['approval', 'mergeChoice', 'needsYou', 'pushFailed', 'folderBusy', 'rulesOff', 'user'] as const).map((reason) => ({ state: 'paused' as const, target: 'main', reason, card: 'HI-6' })),
+  { state: 'paused', target: 'main', reason: 'needsYou', card: 'HI-6', stuck: true },
+  { state: 'returned', reason: 'conflict', transient: false, failure: FAILURES[0] },
+  { state: 'left', why: 'stale' },
+  { state: 'left', why: 'decision' },
+  { state: 'stale', approved: 'abc1234def', current: null },
+  { state: 'merged' },
+  { state: 'notYet' }
+]
+/** What the tests pass in, which isn't Hive's wording: names, codes, paths and the queue's fixed words. */
+const VALUES = ['HI-7', 'HI-6', 'main', 'abc1234', 'quick', 'network', 'ECONNRESET', 'C:/logs/q.log', 'one | two | three', 'src/a.ts', 'src/b.ts', 'e2e:real-chat', 'e2e:packaged', 'Coder', CAME_BACK, 'approval', 'mergeChoice', 'needsYou', 'pushFailed', 'folderBusy', 'rulesOff', 'user', '—', 'line 3', 'lines 1, 2', ...FAILURES.flatMap((f) => f.files ?? [])]
+
+function queueTexts(): { name: string; text: string }[] {
+  const out: { name: string; text: string }[] = []
+  for (const q of STATES) out.push({ name: `line ${JSON.stringify(q)}`, text: queueLine(q) })
+  out.push({ name: 'line unenforced', text: queueLine({ state: 'notYet' }, false) })
+  for (const [i, f] of FAILURES.entries()) {
+    out.push({ name: `returned ${i}`, text: returnedText('HI-7', f) })
+    out.push({ name: `returned ${i} short`, text: returnedText('HI-7', f, 160) })
+    out.push({ name: `resubmitted ${i}`, text: resubmittedText('HI-7', f, 'Coder') })
+  }
+  out.push({ name: 'stale', text: staleWake('HI-7', 'abc1234', null) })
+  for (const to of ['review', 'active'] as const) out.push({ name: `left decision ${to}`, text: leftWake('HI-7', 'decision', to) })
+  out.push({ name: 'left stale', text: leftWake('HI-7', 'stale', 'review') })
+  return out
+}
+
+describe('the canary dialect over the merge queue lines (queueState.ts)', () => {
+  it('finds every word in the catalogue, and every queue id in some case', () => {
+    canary()
+    const seen = new Set<string>()
+    for (const { name, text } of queueTexts()) {
+      expect(canaryProblems(text, ids, VALUES), name).toEqual([])
+      for (const m of text.matchAll(/⟦([^/⟧][^⟧]*)⟧/g)) seen.add(m[1])
+    }
+    expect([...ids].filter((id) => id.startsWith('queue.') && !seen.has(id))).toEqual([])
+  })
+
+  it('says each the same as before in the Default', () => {
+    expect(queueLine({ state: 'queued', target: 'main', position: 2 })).toBe("Hive merges this card (its rules): don't merge it yourself. It is in the merge queue for main, position 2; it moves to Done once merged.")
+    expect(queueLine({ state: 'testing', target: 'main', step: null })).toBe("Hive merges this card (its rules): don't merge it yourself. The merge queue is testing its merge into main now; it moves to Done once merged.")
+    expect(leftWake('HI-7', 'decision', 'active')).toBe('HI-7 left the merge queue: a decision since its approval needs it reviewed again. Read its decisions (hive_read_task), then submit again (hive_submit).')
+    expect(resubmittedText('HI-7', { ...base, files: ['src/a.ts'] }, 'Coder')).toBe('HI-7 is back in Review after the merge queue returned it (a conflict with main in src/a.ts); Coder resolved it and submitted it again: review the resolution')
+    expect(returnedText('HI-7', { ...base, reason: 'checks', check: 'quick', transient: true })).toBe(`HI-7 ${CAME_BACK}: the merge check quick failed for the environment, not the work (temporary). Submit the same revision again (hive_submit): it goes straight back into the queue, at most twice in a row.`)
+  })
+
+  it("keeps the queue's comment on a returned card in the Default: it is stored, and any reader reads it", () => {
+    const before = returnedComment('HI-7', FAILURES[0]).text
+    canary()
+    expect(returnedComment('HI-7', FAILURES[0]).text).toBe(before)
+    expect(before).not.toContain('⟦')
+  })
+})
+
+describe('the canary dialect over the workflow runtime (runtime.ts)', () => {
+  const team = (): Env => (env = setup({ ...preset('git', 'team', { quick: ['quick'], tests: [] }), preChecks: [], okBefore: { mode: 'never', labels: [] }, commands: { quick: 'npm run quick' } }))
+
+  it("says a reply's warnings in the caller's dialect, and keeps the wakes it records in the Default", async () => {
+    const e = team()
+    const card = e.wf.createCard({ title: 'Change' })
+    canary()
+    const s = await e.wf.start(card.key, B1)
+    moved(s)
+    for (const w of s.warnings ?? []) expect(canaryProblems(w, ids, [card.key, String(s.data?.slot ?? ''), String(s.data?.line ?? ''), String(s.data?.target ?? '')]), w).toEqual([])
+    commit(s.data!.folder as string, { 'src/a.txt': 'a\n' }, `${card.key}: change`)
+    moved(await e.wf.submit(card.key, B1, { summary: 'x' }))
+    moved(await e.wf.startReview(card.key, R1))
+    moved(await e.wf.verdict(card.key, R1, { pass: false, comment: 'no' }))
+    const wakes = e.wakes.map((w) => w.why)
+    expect(wakes).toContain(`${card.key} failed review`)
+    for (const w of wakes) expect(w).not.toContain('⟦')
+  })
+})
+
+// The schema has every id this card's files say, each with the placeholders its text has (agentTextExtract.mjs --check
+// keeps it current; this names the areas so a missing file fails here).
+it('has the queue and runtime areas in the catalogue', () => {
+  for (const area of ['queue', 'runtime']) expect(Object.keys(JSON.parse(readFileSync(join(ROOT, 'agent-text', 'schema', `${area}.json`), 'utf8'))).length).toBeGreaterThan(10)
+})

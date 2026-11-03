@@ -420,7 +420,7 @@ export function refusalBody(x: Refusal): Record<string, unknown> {
 
 /** Builds a refusal from its rule and values: three English sentences, each from its own message. */
 // i18n-ignore: the override field's values are agent-facing English (§16.8.3)
-export function refusal(rule: RuleId, values: RefusalValues, override: Refusal['override'] = 'the user'): Refusal {
+export function refusal(rule: RuleId, values: RefusalValues, override: Refusal['override'] = /* agent-protocol: who can override, the Agent API's fixed `override` value (AGENT_API.md) */ 'the user'): Refusal {
   const l = refusalLines(rule, values, IN_ENGLISH)
   return { refused: true, rule, message: l.message, next: l.next, ...(l.change !== null ? { change: l.change } : {}), override, values }
 }

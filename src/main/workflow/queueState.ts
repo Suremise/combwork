@@ -11,6 +11,64 @@ import type { Workflow } from './runtime'
 import { conflictPlaces } from '../../shared/workflow/conflicts'
 import { HISTORY, storedText } from '../../shared/taskHistory'
 import type { StoredText } from '../../shared/types'
+import { agentMsg, say } from '../../shared/agentText'
+import { inDefaultDialect } from '../../shared/agentText/asyncScope'
+
+/** What agents are told of a card and the merge queue (dialects, HI-2435): card reads, a lane's next, wakes, the queue's comment. */
+const Q = {
+  unenforced: agentMsg({ id: 'queue.line.unenforced', text: "Hive merges this card (its rules), but workflow rules aren't enforced: merge it yourself and report the merge (hive_report_merge).", note: 'A card read under Hive merges while Settings → Advanced: workflow rules are enforced is off: nothing refuses, so the agent merges and reports as before 1.0.' }),
+  who: agentMsg({ id: 'queue.line.who', text: "Hive merges this card (its rules): don't merge it yourself.", note: "The first sentence of every queue line for a card Hive's merge queue merges (#1354): the agent never merges it itself." }),
+  queued: agentMsg({ id: 'queue.line.queued', text: '{who} It is in the merge queue for {target}, position {position}; it moves to Done once merged.', note: '{who}: queue.line.who. {target}: the branch it merges into. {position}: 1 is next, after the one testing now.' }),
+  testing: agentMsg({ id: 'queue.line.testing', text: '{who} The merge queue is {step, select, advance {moving {target} to its merge} checks {running the merge checks on its merge into {target}} other {testing its merge into {target}}} now; it moves to Done once merged.', note: "{who}: queue.line.who. {target}: the branch it merges into. {step}: the queue's step with it (advance, checks; other: another or not known here)." }),
+  paused: agentMsg({ id: 'queue.line.paused', text: '{who} It is in the merge queue for {target}, which is paused ({reason}, on {card}); {waits}.', note: "{who}: queue.line.who. {reason}: the pause's code (as the window's queue names it). {card}: the card it paused on. {waits}: what it waits for (queue.paused.*), never a step of the agent's own (#1406)." }),
+  returned: agentMsg({ id: 'queue.line.returned', text: '{who} {returned}', note: '{who}: queue.line.who. {returned}: what came back and what to do next (queue.returned.*).' }),
+  left: agentMsg({ id: 'queue.line.left', text: '{who} It left the merge queue: {why, select, decision {a decision since its approval needs it reviewed again} other {its pass is stale}}.', note: "{who}: queue.line.who. {why}: decision (a decision since its approval) or stale (its pass)." }),
+  stale: agentMsg({ id: 'queue.line.stale', text: '{who} Its pass is for {approved}, but its line is at {current} (changed since): submit it again for review (hive_submit); it is queued once that is approved.', note: 'HI-1763: approved with a stale pass, never queued (HI-1737 sat so, its lane paused, nobody told). {who}: queue.line.who. {approved}, {current}: short revisions ("—" for none).' }),
+  merged: agentMsg({ id: 'queue.line.merged', text: 'Hive merged this card.', note: 'A card the merge queue merged.' }),
+  notYet: agentMsg({ id: 'queue.line.notYet', text: '{who} Once it is approved, the merge queue merges it and moves it to Done.', note: '{who}: queue.line.who. Not in the queue yet: it goes in once approved.' }),
+  waitsApproval: agentMsg({ id: 'queue.paused.approval', text: 'it moves on once the user answers, in For you, whether to update {target} now', note: "What a queue paused for the user's answer waits for (#1406): whether to update a checked-out target now (Resume doesn't stand in for it). {target}: the branch." }),
+  waitsMergeChoice: agentMsg({ id: 'queue.paused.mergeChoice', text: 'it moves on once the user chooses, in For you, how Hive merges this project (merge style and commit message)', note: "What a queue paused for the project's merge style waits for (#1406)." }),
+  waitsStuck: agentMsg({ id: 'queue.paused.stuck', text: 'it moves on once the user settles its interrupted advance (their answer in For you, or Resume)', note: 'What a queue paused on an interrupted advance waits for (#1406): Decide in For you, or Resume once settled.' }),
+  waitsFix: agentMsg({ id: 'queue.paused.fix', text: 'it moves on once the user fixes what stopped it and resumes it', note: "What a queue paused on a step that needs the user waits for (#1406): git's error, a push (G18, #1179), then Resume." }),
+  waitsFolder: agentMsg({ id: 'queue.paused.folder', text: 'it moves on once the user puts right the folder {target} is checked out in and resumes it', note: 'What a queue paused on the folder its target is checked out in waits for (#1406). {target}: the branch.' }),
+  waitsRules: agentMsg({ id: 'queue.paused.rules', text: 'it paused while workflow rules were off; it moves on once they are enforced again (if they already are, once the user resumes it)', note: "What a queue paused while workflow rules weren't enforced waits for (#1406): Hive resumes it once they are." }),
+  waitsResume: agentMsg({ id: 'queue.paused.resume', text: 'it moves on once the user resumes it', note: "What any other paused queue waits for: the user's Resume (#1406)." }),
+  subjectIt: agentMsg({ id: 'queue.returned.subjectIt', text: 'It', note: "The subject of a returned card's sentence in its own card read (a wake names it by its key)." }),
+  lead: agentMsg({ id: 'queue.returned.lead', text: '{subject} {cameBack}: {failure}.', note: '{subject}: the card (its key, or queue.returned.subjectIt). {cameBack}: "came back from the merge queue". {failure}: what came back (queue.failure.*).' }),
+  log: agentMsg({ id: 'queue.returned.log', text: 'Its log: {path}.', note: "A returned card's log, by its path, where it fits." }),
+  logPointer: agentMsg({ id: 'queue.returned.logPointer', text: 'Its log path: hive_read_task.', note: "Where a returned card's log path is, when the path itself doesn't fit." }),
+  lastLines: agentMsg({ id: 'queue.returned.lastLines', text: 'Its last lines: "{lines}".', note: "The last lines of a returned card's output, joined with \" | \" and cut from their start (\"…\") to fit." }),
+  more: agentMsg({ id: 'queue.files.more', text: '{files} and {n} more', note: 'A list of files cut to fit: {files} the first ones, {n} how many more.' }),
+  filesCount: agentMsg({ id: 'queue.files.count', text: '{n} files', note: 'A list of files when none of their names fits: how many.' }),
+  conflict: agentMsg({ id: 'queue.failure.conflict', text: 'a conflict with {target}', note: 'What came back: a conflict merging into {target} (its files follow, queue.failure.in).' }),
+  failureIn: agentMsg({ id: 'queue.failure.in', text: '{head} in {files}', note: '{head}: what came back (queue.failure.conflict). {files}: its files, each with where its conflicts are when they fit (HI-1181).' }),
+  checkInstall: agentMsg({ id: 'queue.failure.check.install', text: 'the install before the merge checks', note: 'The merge check that failed: the install that runs before them.' }),
+  checkNamed: agentMsg({ id: 'queue.failure.check.named', text: 'the merge check {check}', note: 'The merge check that failed, by its name.' }),
+  checkSome: agentMsg({ id: 'queue.failure.check.some', text: 'a merge check', note: 'A merge check that failed, its name not known.' }),
+  checkEnv: agentMsg({ id: 'queue.failure.check.environment', text: '{what} failed for the environment, not the work ({cause}{code})', note: '{what}: the check (queue.failure.check.*). {cause}: why, as recorded (queue.failure.temporary when none). {code}: ": " and its code, or nothing.' }),
+  temporary: agentMsg({ id: 'queue.failure.temporary', text: 'temporary', note: "The cause of a check that failed for its environment, when none was recorded." }),
+  checkFailed: agentMsg({ id: 'queue.failure.check.failed', text: '{what} failed on the merged result', note: '{what}: the check (queue.failure.check.*): it failed on the work merged with its target.' }),
+  hook: agentMsg({ id: 'queue.failure.hook', text: 'a git hook refused its merge commit', note: 'What came back: a git hook refused the merge commit.' }),
+  targetMoved: agentMsg({ id: 'queue.failure.targetMoved', text: '{target} moved while it was being merged', note: 'What came back: its target branch moved during the merge.' }),
+  folderBusy: agentMsg({ id: 'queue.failure.folderBusy', text: 'the folder {target} is checked out in was busy', note: 'What came back: the folder its target branch is checked out in was busy.' }),
+  notUpToDate: agentMsg({ id: 'queue.failure.notUpToDate', text: "it isn't up to date with {target}", note: 'What came back: under Strict, the card isn\'t up to date with its target.' }),
+  notUpToDateFiles: agentMsg({ id: 'queue.failure.notUpToDate.files', text: '{head}: a conflict in {files}', note: "HI-1181 round 1: Strict's update conflicted. {head}: queue.failure.notUpToDate. {files}: its files and where, as a conflict's are." }),
+  repick: agentMsg({ id: 'queue.failure.focused.repick', text: "its focused tests couldn't be chosen for what changed in the merge: {paths}", note: 'G20 (HI-1367): its focused tests couldn\'t be picked for the merge. {paths}: the paths, as many as fit.' }),
+  noProof: agentMsg({ id: 'queue.failure.focused.noProof', text: 'no counted review run at the submitted revision for its real-CLI or packaged focused tests: {tests}', note: 'G20 (HI-1367): focused tests the queue doesn\'t run had no counted run at the submitted revision. {tests}: the tests, as many as fit.' }),
+  newProof: agentMsg({ id: 'queue.failure.focused.newProof', text: 'the merge needs real-CLI or packaged focused tests its review never ran: {tests}', note: 'G20 (HI-1367): the merge needs focused tests the queue doesn\'t run and the review didn\'t either. {tests}: the tests, as many as fit.' }),
+  noRunner: agentMsg({ id: 'queue.failure.focused.noRunner', text: 'the project has no command to run its focused tests', note: 'G20 (HI-1367): no focused-test command in the project.' }),
+  noneChosen: agentMsg({ id: 'queue.failure.focused.none', text: 'no focused tests were chosen for its submission', note: 'G20 (HI-1367): its submission had no focused tests chosen.' }),
+  nextProof: agentMsg({ id: 'queue.next.proof', text: 'Have its reviewer run those tests at the revision submitted (hive-progress --check "focused:<test>"), then submit the same revision again (hive_submit).', note: 'The next step when its focused tests that the queue doesn\'t run need a counted run (G20, HI-1367).' }),
+  nextRunner: agentMsg({ id: 'queue.next.runner', text: 'Tell the user: Version Control → Each card’s focused tests needs the command that runs them.', note: 'The next step when the project has no focused-test command: the setting is the user\'s (a tab and option name, as the window shows them).' }),
+  nextRepick: agentMsg({ id: 'queue.next.repick', text: 'Bring your worktree up to date, then submit again naming the tests the change needs (tests on hive_submit), for review.', note: "The next step when its focused tests couldn't be chosen (G20, HI-1367)." }),
+  nextTransient: agentMsg({ id: 'queue.next.transient', text: 'Submit the same revision again (hive_submit): it goes straight back into the queue, at most twice in a row.', note: 'The next step after a failure of the environment, not the work.' }),
+  nextConflict: agentMsg({ id: 'queue.next.conflict', text: 'Merge {target} into your worktree, resolve the conflict, commit and submit again (hive_submit).', note: 'The next step after a conflict with {target}, the branch.' }),
+  nextFix: agentMsg({ id: 'queue.next.fix', text: 'Fix it in your worktree, commit and submit again (hive_submit).', note: 'The next step after anything else that came back.' }),
+  staleWake: agentMsg({ id: 'queue.wake.stale', text: '{card}: its pass is stale: it is for {approved}, but its line is at {current} (changed since). Submit {current} for review (hive_submit).', note: "HI-1763: a pass gone stale, its builder's wake at once (HI-1737 sat in Approved, nobody told). {approved}, {current}: short revisions (\"—\" for none)." }),
+  resubmitted: agentMsg({ id: 'queue.wake.resubmitted', text: '{card} is back in Review after the merge queue returned it ({failure}); {builder} {conflict, select, yes {resolved it} other {changed it}} and submitted it again: review {conflict, select, yes {the resolution} other {what changed}}', note: "HI-2143: a card submitted again after the queue returned it, its reviewer's wake. {failure}: what came back (queue.failure.*). {conflict}: yes when it came back with a conflict." }),
+  leftDecision: agentMsg({ id: 'queue.wake.left.decision', text: '{card} left the merge queue: a decision since its approval needs it reviewed again. Read its decisions (hive_read_task){to, select, review {; it is back in Review, and queued again once approved.} other {, then submit again (hive_submit).}}', note: "#1354: its builder's wake for a card that left the queue for a decision since its approval. {to}: review (it went back to Review) or active." }),
+  leftStale: agentMsg({ id: 'queue.wake.left.stale', text: '{card} left the merge queue: its pass is stale (its revision changed since it was approved). Submit the current revision (hive_submit) for review.', note: "#1354: its builder's wake for a card that left the queue, its pass stale." })
+}
 
 export type QueueState =
   /** Waiting in the queue: `position` 1 is next, after the one testing now. */
@@ -158,15 +216,15 @@ export function pauseWait(reason: PauseReason, stuck = false): PauseWait {
 function pausedWaits(q: Extract<QueueState, { state: 'paused' }>): string {
   switch (pauseWait(q.reason, q.stuck)) {
     case 'answer':
-      return q.reason === 'approval' ? `it moves on once the user answers, in For you, whether to update ${q.target} now` : q.reason === 'mergeChoice' ? 'it moves on once the user chooses, in For you, how Hive merges this project (merge style and commit message)' : 'it moves on once the user settles its interrupted advance (their answer in For you, or Resume)'
+      return q.reason === 'approval' ? say(Q.waitsApproval, { target: q.target }) : q.reason === 'mergeChoice' ? say(Q.waitsMergeChoice) : say(Q.waitsStuck)
     case 'fix':
-      return 'it moves on once the user fixes what stopped it and resumes it'
+      return say(Q.waitsFix)
     case 'folder':
-      return `it moves on once the user puts right the folder ${q.target} is checked out in and resumes it`
+      return say(Q.waitsFolder, { target: q.target })
     case 'rules':
-      return 'it paused while workflow rules were off; it moves on once they are enforced again (if they already are, once the user resumes it)'
+      return say(Q.waitsRules)
     case 'resume':
-      return 'it moves on once the user resumes it'
+      return say(Q.waitsResume)
   }
 }
 
@@ -175,25 +233,25 @@ function pausedWaits(q: Extract<QueueState, { state: 'paused' }>): string {
  * workflow rules not enforced): nothing refuses, so the agent merges and reports as before 1.0.
  */
 export function queueLine(q: QueueState, enforced = true): string {
-  if (!enforced) return "Hive merges this card (its rules), but workflow rules aren't enforced: merge it yourself and report the merge (hive_report_merge)."
-  const who = "Hive merges this card (its rules): don't merge it yourself."
+  if (!enforced) return say(Q.unenforced)
+  const who = say(Q.who)
   switch (q.state) {
     case 'queued':
-      return `${who} It is in the merge queue for ${q.target}, position ${q.position}; it moves to Done once merged.`
+      return say(Q.queued, { who, target: q.target, position: q.position })
     case 'testing':
-      return `${who} The merge queue is ${q.step === 'advance' ? `moving ${q.target} to its merge` : q.step === 'checks' ? `running the merge checks on its merge into ${q.target}` : `testing its merge into ${q.target}`} now; it moves to Done once merged.`
+      return say(Q.testing, { who, target: q.target, step: q.step === 'advance' || q.step === 'checks' ? q.step : 'other' })
     case 'paused':
-      return `${who} It is in the merge queue for ${q.target}, which is paused (${q.reason}, on ${q.card}); ${pausedWaits(q)}.`
+      return say(Q.paused, { who, target: q.target, reason: q.reason, card: q.card, waits: pausedWaits(q) })
     case 'returned':
-      return `${who} ${returnedText('It', q.failure, READ_MAX, READ_LINES)}`
+      return say(Q.returned, { who, returned: returnedText(say(Q.subjectIt), q.failure, READ_MAX, READ_LINES) })
     case 'left':
-      return `${who} It left the merge queue: ${q.why === 'decision' ? 'a decision since its approval needs it reviewed again' : 'its pass is stale'}.`
+      return say(Q.left, { who, why: q.why })
     case 'stale':
-      return `${who} Its pass is for ${shortRev(q.approved)}, but its line is at ${shortRev(q.current)} (changed since): submit it again for review (hive_submit); it is queued once that is approved.`
+      return say(Q.stale, { who, approved: shortRev(q.approved), current: shortRev(q.current) })
     case 'merged':
-      return 'Hive merged this card.'
+      return say(Q.merged)
     case 'notYet':
-      return `${who} Once it is approved, the merge queue merges it and moves it to Done.`
+      return say(Q.notYet, { who })
   }
 }
 
@@ -221,11 +279,14 @@ function listed(files: string[], room: number): string {
   if (files.length <= FILES_NAMED && all.length <= room) return all
   const shown: string[] = []
   for (const f of files.slice(0, FILES_NAMED)) {
-    if (`${[...shown, f].join(', ')} and ${files.length - shown.length - 1} more`.length > room) break
+    if (say(Q.more, { files: [...shown, f].join(', '), n: files.length - shown.length - 1 }).length > room) break
     shown.push(f)
   }
-  return shown.length ? `${shown.join(', ')} and ${files.length - shown.length} more` : `${files.length} files`
+  return shown.length ? say(Q.more, { files: shown.join(', '), n: files.length - shown.length }) : say(Q.filesCount, { n: files.length })
 }
+
+/** A message's length with `value` left empty: the room its own words take, so what it frames is fitted to the rest. */
+const frame = (m: Parameters<typeof say>[0], values: Record<string, string | number>, value: string): number => say(m, { ...values, [value]: '' }).length
 
 /**
  * A conflict's files in `room` characters, each with where its conflicts are (HI-1181) when they all fit, else the files
@@ -244,35 +305,34 @@ function placedFiles(f: FactData['IntegrationFailed'], room: number): string {
 function failureText(f: FactData['IntegrationFailed'], room: number): string {
   switch (f.reason) {
     case 'conflict': {
-      const head = `a conflict with ${f.target}`
-      return f.files?.length ? `${head} in ${placedFiles(f, room - head.length - ' in '.length)}` : head
+      const head = say(Q.conflict, { target: f.target })
+      return f.files?.length ? say(Q.failureIn, { head, files: placedFiles(f, room - frame(Q.failureIn, { head }, 'files')) }) : head
     }
     case 'checks': {
-      const what = f.check === 'install' ? 'the install before the merge checks' : f.check ? `the merge check ${f.check}` : 'a merge check'
-      return f.transient ? `${what} failed for the environment, not the work (${f.cause ?? 'temporary'}${f.code ? `: ${f.code}` : ''})` : `${what} failed on the merged result`
+      const what = f.check === 'install' ? say(Q.checkInstall) : f.check ? say(Q.checkNamed, { check: f.check }) : say(Q.checkSome)
+      return f.transient ? say(Q.checkEnv, { what, cause: f.cause ?? say(Q.temporary), code: f.code ? `: ${f.code}` : '' }) : say(Q.checkFailed, { what })
     }
     case 'hook':
-      return 'a git hook refused its merge commit'
+      return say(Q.hook)
     case 'targetMoved':
-      return `${f.target} moved while it was being merged`
+      return say(Q.targetMoved, { target: f.target })
     case 'folderBusy':
-      return `the folder ${f.target} is checked out in was busy`
+      return say(Q.folderBusy, { target: f.target })
     case 'notUpToDate': {
       // Strict's update conflicted (HI-1181 round 1): its files and where, as a conflict's are; else as before.
-      const head = `it isn't up to date with ${f.target}`
+      const head = say(Q.notUpToDate, { target: f.target })
       if (!f.files?.length) return head
-      const lead = `${head}: a conflict in `
-      return `${lead}${placedFiles(f, room - lead.length)}`
+      return say(Q.notUpToDateFiles, { head, files: placedFiles(f, room - frame(Q.notUpToDateFiles, { head }, 'files')) })
     }
     case 'focused': {
       // G20 (HI-1367): what stopped its focused tests, with the tests or paths named (as many as fit).
       const q = f.focused
-      const named = (xs: string[] | undefined, lead: string): string => (xs?.length ? `${lead}${listed(xs, room - lead.length)}` : lead)
-      if (q?.why === 'repick') return named(q.paths, "its focused tests couldn't be chosen for what changed in the merge: ")
-      if (q?.why === 'noProof') return named(q.tests, 'no counted review run at the submitted revision for its real-CLI or packaged focused tests: ')
-      if (q?.why === 'newProof') return named(q.tests, 'the merge needs real-CLI or packaged focused tests its review never ran: ')
-      if (q?.why === 'noRunner') return 'the project has no command to run its focused tests'
-      return 'no focused tests were chosen for its submission'
+      const named = (xs: string[] | undefined, m: Parameters<typeof say>[0], value: string): string => say(m, { [value]: xs?.length ? listed(xs, room - frame(m, {}, value)) : '' })
+      if (q?.why === 'repick') return named(q.paths, Q.repick, 'paths')
+      if (q?.why === 'noProof') return named(q.tests, Q.noProof, 'tests')
+      if (q?.why === 'newProof') return named(q.tests, Q.newProof, 'tests')
+      if (q?.why === 'noRunner') return say(Q.noRunner)
+      return say(Q.noneChosen)
     }
   }
 }
@@ -280,13 +340,13 @@ function failureText(f: FactData['IntegrationFailed'], room: number): string {
 /** What to do next: a transient failure is the same revision submitted again; anything else a fix. */
 function nextStep(f: FactData['IntegrationFailed']): string {
   if (f.reason === 'focused') {
-    if (f.focused?.why === 'noProof' || f.focused?.why === 'newProof') return `Have its reviewer run those tests at the revision submitted (hive-progress --check "focused:<test>"), then submit the same revision again (hive_submit).`
-    if (f.focused?.why === 'noRunner') return 'Tell the user: Version Control → Each card’s focused tests needs the command that runs them.'
-    return 'Bring your worktree up to date, then submit again naming the tests the change needs (tests on hive_submit), for review.'
+    if (f.focused?.why === 'noProof' || f.focused?.why === 'newProof') return say(Q.nextProof)
+    if (f.focused?.why === 'noRunner') return say(Q.nextRunner)
+    return say(Q.nextRepick)
   }
-  if (f.transient) return 'Submit the same revision again (hive_submit): it goes straight back into the queue, at most twice in a row.'
-  if (f.reason === 'conflict') return `Merge ${f.target} into your worktree, resolve the conflict, commit and submit again (hive_submit).`
-  return 'Fix it in your worktree, commit and submit again (hive_submit).'
+  if (f.transient) return say(Q.nextTransient)
+  if (f.reason === 'conflict') return say(Q.nextConflict, { target: f.target })
+  return say(Q.nextFix)
 }
 
 /** The output's last `n` non-blank lines, on one line. */
@@ -307,24 +367,23 @@ function lastLines(log: string, n: number): string {
  */
 export function returnedText(subject: string, f: FactData['IntegrationFailed'], max = WAKE_NOTE_MAX, lines = WAKE_LINES): string {
   const named: FactData['IntegrationFailed'] = { ...f, target: clip(f.target, NAME_MAX), ...(f.check ? { check: clip(f.check, NAME_MAX) } : {}), ...(f.code ? { code: clip(f.code, NAME_MAX) } : {}) }
-  const lead = `${clip(subject, NAME_MAX)} ${CAME_BACK}: `
+  const lead = { subject: clip(subject, NAME_MAX), cameBack: CAME_BACK }
   const next = ` ${nextStep(named)}`
   // The reason and the next step are fixed; the files take what's left, keeping LINES_MIN for the rest.
-  const fixed = lead.length + '.'.length + next.length
-  const head = `${lead}${failureText(named, max - fixed - LINES_MIN)}.`
+  const fixed = frame(Q.lead, lead, 'failure') + next.length
+  const head = say(Q.lead, { ...lead, failure: failureText(named, max - fixed - LINES_MIN) })
   let room = max - head.length - next.length
   let path = ''
   if (f.logPath) {
-    const whole = ` Its log: ${f.logPath}.`
-    const pointer = ' Its log path: hive_read_task.'
+    const whole = ` ${say(Q.log, { path: f.logPath })}`
+    const pointer = ` ${say(Q.logPointer)}`
     path = whole.length <= room ? whole : pointer.length <= room ? pointer : ''
     room -= path.length
   }
   const tail = f.log ? lastLines(f.log, lines) : ''
-  const frame = ' Its last lines: "".'.length
-  const fit = room - frame
+  const fit = room - ' '.length - frame(Q.lastLines, {}, 'lines')
   const shown = tail && fit >= LINES_MIN ? (tail.length > fit ? `…${tail.slice(tail.length - fit + 1)}` : tail) : ''
-  return `${head}${path}${shown ? ` Its last lines: "${shown}".` : ''}${next}`
+  return `${head}${path}${shown ? ` ${say(Q.lastLines, { lines: shown })}` : ''}${next}`
 }
 
 /** A revision as a wake or a line names it: its first 7 characters ("—" when there is none). */
@@ -334,8 +393,7 @@ const shortRev = (r: string | null | undefined): string => (r ? r.slice(0, 7) : 
  * A pass gone stale (HI-1763): what it was for, where the card's line is now, and what to do (its builder's wake, at
  * once: HI-1737 sat in Approved, nobody told).
  */
-export const staleWake = (key: string, approved: string | null | undefined, current: string | null | undefined): string =>
-  `${key}: its pass is stale: it is for ${shortRev(approved)}, but its line is at ${shortRev(current)} (changed since). Submit ${shortRev(current)} for review (hive_submit).` // i18n-ignore: a wake, agent-facing
+export const staleWake = (key: string, approved: string | null | undefined, current: string | null | undefined): string => say(Q.staleWake, { card: key, approved: shortRev(approved), current: shortRev(current) })
 
 /** A returned card's wake (#1354): its key, what came back, and what to do next. */
 export const returnedWake = (key: string, f: FactData['IntegrationFailed']): string => returnedText(key, f)
@@ -351,9 +409,7 @@ const RESUBMITTED_ROOM = 200
 export function resubmittedText(key: string, f: FactData['IntegrationFailed'], builder: string): string {
   const named: FactData['IntegrationFailed'] = { ...f, target: clip(f.target, NAME_MAX), ...(f.check ? { check: clip(f.check, NAME_MAX) } : {}), ...(f.code ? { code: clip(f.code, NAME_MAX) } : {}) }
   const conflict = f.reason === 'conflict' || (f.reason === 'notUpToDate' && !!f.files?.length)
-  const lead = `${clip(key, NAME_MAX)} is back in Review after the merge queue returned it (`
-  const tail = `); ${clip(builder, NAME_MAX)} ${conflict ? 'resolved it' : 'changed it'} and submitted it again: review ${conflict ? 'the resolution' : 'what changed'}`
-  return `${lead}${failureText(named, RESUBMITTED_ROOM)}${tail}`
+  return say(Q.resubmitted, { card: clip(key, NAME_MAX), failure: failureText(named, RESUBMITTED_ROOM), builder: clip(builder, NAME_MAX), conflict: conflict ? 'yes' : 'no' })
 }
 
 /** How long the queue's comment on a returned card is, and how many of its output's last lines it quotes (HI-2087). */
@@ -370,11 +426,12 @@ const COMMENT_FILES = 10
 export function returnedComment(key: string, f: FactData['IntegrationFailed']): { text: string; shown: StoredText } {
   const reason = f.reason === 'checks' ? (f.check === 'install' ? 'install' : f.transient ? 'checksEnv' : f.check ? 'checks' : 'checksSome') : f.reason
   const files = f.files?.length ? `${f.files.slice(0, COMMENT_FILES).join(', ')}${f.files.length > COMMENT_FILES ? ', …' : ''}` : 'none'
-  return { text: returnedText(key, f, COMMENT_MAX, COMMENT_LINES), shown: storedText(HISTORY.queueReturned, { reason, target: f.target, check: f.check ?? '', files }) }
+  // A comment is stored, and any reader reads it: in the Default until stored text is said when read (dialects, 5b).
+  return { text: inDefaultDialect(() => returnedText(key, f, COMMENT_MAX, COMMENT_LINES)), shown: storedText(HISTORY.queueReturned, { reason, target: f.target, check: f.check ?? '', files }) }
 }
 
 /** A card that left the queue, not approved any more (#1354): why, and what to do next (`to`: where it went). */
 export function leftWake(key: string, why: 'stale' | 'decision', to: 'review' | 'active'): string {
-  if (why === 'decision') return `${key} left the merge queue: a decision since its approval needs it reviewed again. Read its decisions (hive_read_task)${to === 'review' ? '; it is back in Review, and queued again once approved.' : ', then submit again (hive_submit).'}`
-  return `${key} left the merge queue: its pass is stale (its revision changed since it was approved). Submit the current revision (hive_submit) for review.`
+  if (why === 'decision') return say(Q.leftDecision, { card: key, to })
+  return say(Q.leftStale, { card: key })
 }
