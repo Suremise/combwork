@@ -492,6 +492,8 @@ export const AREAS = [
   { paths: ['src/shared/appName.ts'], suites: ['about', 'update', 'welcomefit', 'taskbar', 'packaged'] },
   // Which profile folders a run uses, and its start notices (HI-2461): the accounts folder follows the local choice.
   { paths: ['src/main/profileFolders.ts', 'src/main/profileNotices.ts'], suites: ['accounts'] },
+  // Launch at login written again at start (HI-2460): the installed app's only.
+  { paths: ['src/main/loginItem.ts'], suites: ['packaged'] },
   { paths: ['src/shared/instructions.ts'], suites: ['skilldelivery'] },
   { paths: ['src/shared/resumeAll.ts'], suites: ['resumeall', 'signin'] },
   { paths: ['src/shared/projectTabs.ts'], suites: ['tabstrip', 'startall', 'gitview'] },
