@@ -131,7 +131,9 @@ const GUIDANCE_COUNTS = ['launches', 'guidanceBytes', 'guidanceChars', 'customBy
 const CATALOG_COUNTS = ['starts', 'tools', 'toolsBytes', 'toolsChars', 'charStarts', 'partStarts', 'partToolsChars', 'descriptionChars', 'paramChars'] as const
 const newBucket = (start: number, span: Bucket['span']): Bucket => ({ start, span, projects: dict(), workspace: emptyPart(), skills: emptySkills(), dropped: 0, droppedBy: dict(), series: 0 })
 const emptyCatalog = (role: CatalogSeries['role'], workflow: CatalogSeries['workflow']): CatalogSeries => ({ role, workflow, starts: 0, tools: 0, toolsBytes: 0, toolsChars: 0, charStarts: 0, partStarts: 0, partToolsChars: 0, descriptionChars: 0, paramChars: 0 })
-const emptyGuidance = (provider: string, role: GuidanceSeries['role'], workflow: GuidanceSeries['workflow']): GuidanceSeries => ({ provider, role, workflow, launches: 0, guidanceBytes: 0, guidanceChars: 0, customBytes: 0, customChars: 0, roleBytes: 0, roleChars: 0, modeBytes: 0, modeChars: 0, skills: 0, skillCatalogBytes: 0, skillBytes: 0, skillsNotDelivered: 0, skillsUnmeasured: 0 })
+/** A guidance series' key: by CLI, role and workflow side, and its dialect chain where one overrides text (HI-2443). */
+const guidanceKey = (provider: string, role: string, workflow: string, dialect?: string): string => `${provider} ${role} ${workflow}${dialect ? ` ${dialect}` : ''}`
+const emptyGuidance = (provider: string, role: GuidanceSeries['role'], workflow: GuidanceSeries['workflow'], dialect?: string): GuidanceSeries => ({ provider, role, workflow, ...(dialect ? { dialect } : {}), launches: 0, guidanceBytes: 0, guidanceChars: 0, customBytes: 0, customChars: 0, roleBytes: 0, roleChars: 0, modeBytes: 0, modeChars: 0, skills: 0, skillCatalogBytes: 0, skillBytes: 0, skillsNotDelivered: 0, skillsUnmeasured: 0 })
 
 // ---------------------------------------------------------------------------
 // Labels: each from a fixed set. Anything else is "(other)", so a label never grows or carries what it shouldn't.
@@ -249,8 +251,9 @@ function readPart(v: unknown, b: Bucket, owner: string): PartData {
     if (!c || (s.role !== 'agent' && s.role !== 'assistant')) return
     const provider = inSet(PROVIDER_IDS, s.provider)
     const workflow = workflowOf(s.workflow)
-    const key = `${provider} ${s.role} ${workflow}`
-    const g = part.guidance[key] ?? (room() ? (part.guidance[key] = emptyGuidance(provider, s.role, workflow)) : null)
+    const dialect = typeof s.dialect === 'string' && /^[0-9a-f]{1,64}$/.test(s.dialect) ? s.dialect : undefined
+    const key = guidanceKey(provider, s.role, workflow, dialect)
+    const g = part.guidance[key] ?? (room() ? (part.guidance[key] = emptyGuidance(provider, s.role, workflow, dialect)) : null)
     if (g) for (const k of GUIDANCE_COUNTS) g[k] += c[k]
   })
   each(o.catalog, (s) => {
@@ -702,7 +705,7 @@ function mergePart(bucket: Bucket, a: PartData, b: PartData, capped: boolean, ow
     t.bytes += v.bytes
   }
   for (const [k, v] of Object.entries(b.guidance)) {
-    const t = a.guidance[k] ?? (room() ? (a.guidance[k] = emptyGuidance(v.provider, v.role, v.workflow)) : null)
+    const t = a.guidance[k] ?? (room() ? (a.guidance[k] = emptyGuidance(v.provider, v.role, v.workflow, v.dialect)) : null)
     if (!t) continue
     for (const f of GUIDANCE_COUNTS) t[f] += v[f] ?? 0
   }
@@ -1011,7 +1014,8 @@ export function recordLaunch(h: MetricsHandle | null, project: string | null, g:
     if (!part) return at.store.changed()
     const provider = inSet(PROVIDER_IDS, g.provider)
     const workflow = workflowOf(g.workflow)
-    const s = series(at.b, ownerOf(project), part.guidance, `${provider} ${g.role} ${workflow}`, () => emptyGuidance(provider, g.role, workflow))
+    const dialect = g.dialect || undefined
+    const s = series(at.b, ownerOf(project), part.guidance, guidanceKey(provider, g.role, workflow, dialect), () => emptyGuidance(provider, g.role, workflow, dialect))
     if (s) {
       s.launches++
       for (const f of GUIDANCE_COUNTS) if (f !== 'launches') s[f] += Math.max(0, Math.floor(g[f]))

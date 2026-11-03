@@ -32,6 +32,7 @@ import { reviewCopyOnStart, reviewCopyOnVerdict } from './reviewCopies'
 import { COLUMN_CHOICES, columnLabel, commentSummary, isTaskColumn, reviewStalled } from '../shared/tasks'
 import type { HandoverAuthor } from '../shared/hiveGuidance'
 import { inDefaultDialect, inRequestScope } from '../shared/agentText/asyncScope'
+import { apiChainReady, inApiWorkspace } from './dialects/apiChain'
 import { say, type AgentMsg, type AgentValues } from '../shared/agentText'
 import { API } from './apiText'
 import { cardRequests, commentsParam, laneOrderNote, modelInUse, newestComments, progressLabel, retryWaitsView, taskRow, withoutHistory, type CardRequest, type IntentDone, type ProjectRow, type SkillRow, type TaskBatch, type TaskChange, type TaskReorder, type TaskView, type AccountUsagePublic } from '../shared/toolReplies'
@@ -4420,8 +4421,20 @@ async function handleApi(req: IncomingMessage, res: ServerResponse): Promise<voi
   who = caller
   // An agent's work is its project's; the Assistant's and scripts' are the workspace's own (not spread over projects).
   if (caller.kind === 'agent') m.project = basename(caller.projectPath)
-  // Its replies are in the caller's dialect (HI-2065): its session's, or the API chain's for a caller with none.
-  return callerStore.run(caller, () => inRequestScope(caller.kind === 'agent' ? caller : caller.kind === 'assistant' ? { projectPath: join(caller.workspace, HIVE_DIR, ASSISTANT_DIR), agentId: ASSISTANT_AGENT_ID } : null, () => serveApi(req, res, url)))
+  // Its replies are in the caller's dialect (HI-2065): its session's, or for a caller with none the API chain of the
+  // workspace the request names (or the only one open), decided here once for the whole request, its early and error
+  // replies too, never from the window with the focus (HR1 on HI-2443); none named among several: the Default. Loaded
+  // first where it isn't yet (kept until that workspace's dialect files change).
+  const apiWs = caller.kind === 'agent' || caller.kind === 'assistant' ? null : callerStore.run(caller, () => {
+    try {
+      return requestWorkspace(req, url)
+    } catch {
+      return null
+    }
+  })
+  const apiDir = apiWs?.path ? apiWs.hiveDir : null
+  if (apiDir) await apiChainReady(apiDir)
+  return callerStore.run(caller, () => inApiWorkspace(apiDir, () => inRequestScope(caller.kind === 'agent' ? caller : caller.kind === 'assistant' ? { projectPath: join(caller.workspace, HIVE_DIR, ASSISTANT_DIR), agentId: ASSISTANT_AGENT_ID } : null, () => serveApi(req, res, url))))
 }
 
 async function serveApi(req: IncomingMessage, res: ServerResponse, url: URL): Promise<void> {

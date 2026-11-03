@@ -126,6 +126,7 @@ export const SUITES = [
   { name: 'defaultprovider' },
   { name: 'deliveries' },
   { name: 'devconsole' },
+  { name: 'dialectlaunch' },
   { name: 'dialogs' },
   { name: 'docsections' },
   { name: 'doingmove' },

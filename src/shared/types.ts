@@ -1813,10 +1813,37 @@ export interface AgentDef {
    * (decision H). In a window's AgentInfo, its account's id (the adapter until HI-2108; `connectionId` is the connection's).
    */
   connection?: string
+  /**
+   * Its "Dialect" setting (dialects, HI-2443): the file of its CLI's dialects folder that fills its chain's model slot,
+   * by its path there ("claude-code/Opus 5.5 v2.json"), for an A/B test or a model Hive can't identify. Absent: Auto (the
+   * model file whose `model` is the real model ID it runs). Applies at its next launch; changing its CLI clears it.
+   */
+  dialect?: string
 }
 
 /** A change to an agent's settings: empty values (null for use200kContext and mcpServers) clear an override so it follows the project. */
-export type AgentPatch = Partial<Pick<AgentDef, 'name' | 'provider' | 'mode' | 'role'>> & { mcpServers?: string[] | null; workflowRole?: WorkflowRole | null; connection?: string | null }
+export type AgentPatch = Partial<Pick<AgentDef, 'name' | 'provider' | 'mode' | 'role'>> & { mcpServers?: string[] | null; workflowRole?: WorkflowRole | null; connection?: string | null; /** null, '' or 'auto': Auto again. */ dialect?: string | null }
+
+/**
+ * The dialect chain a session was launched on (dialects, HI-2443), in its launch record: pinned at launch, so an edit
+ * applies at its next one.
+ */
+export interface LaunchDialect {
+  /** Each layer, top first, with the file that filled it (null: empty, off or missing). */
+  layers: { layer: 'model' | 'cli' | 'workspace'; file: string | null }[]
+  /** A hash of the texts it overrides; '' when it overrides none (it speaks the Default). */
+  hash: string
+  /** Hive's guidance revision as said in this chain: the Default's (`guidance`) unless the chain changes its text. */
+  guidance: string
+  /** The real model ID it launched with, which Auto matches by; absent when Hive couldn't name it. */
+  model?: string
+  /** Hive couldn't name the model, so Auto left the model slot empty ("model unknown"); never with a file picked. */
+  modelUnknown?: true
+  /** The file the agent picked, when it did (its Dialect setting). */
+  pick?: string
+  /** The file it picked is gone: Auto filled the slot instead. */
+  pickMissing?: true
+}
 
 /** Why a connection can't be an agent's own choice here (HI-1769): removed, another CLI's, or off in its workspace. */
 export type ConnectionProblem = 'missing' | 'otherCli' | 'off'
@@ -2441,9 +2468,14 @@ export interface LiveSessionState {
   costFree?: boolean
   /**
    * What it was given at launch (GET /v1/projects/{name}): Hive's guidance revision, the content hash of each Hive skill's
-   * copy it reads, and why a skill isn't as asked for (a folder of the user's has its name, an old copy kept while in use).
+   * copy it reads, and why a skill isn't as asked for (a folder of the user's has its name, an old copy kept while in use),
+   * and the dialect chain it speaks (HI-2443).
    */
-  launched?: { guidance: string; skills: Record<string, string>; problems?: Record<string, string> }
+  /**
+   * `dialect`: its chain where a dialect is set (a text overridden, or a file picked); on the Default, only
+   * `{ modelUnknown: true }` where Hive couldn't name its model (decision Q4); absent otherwise.
+   */
+  launched?: { guidance: string; skills: Record<string, string>; problems?: Record<string, string>; dialect?: LaunchDialect | { modelUnknown: true } }
   /** Finished or waiting since its pane was last on screen in a focused window (the renderer marks it seen). */
   unseen: boolean
   /** Its wake-on-change watch, while it has one (status `watching` while its turn has ended). */

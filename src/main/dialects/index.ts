@@ -8,13 +8,13 @@
  * - match.ts: which file fills a session's model slot (Auto by the real model ID, or the agent's pick);
  * - chain.ts: Model file → CLI → Workspace → Default, or API → Workspace → Default for a caller with no session.
  *
- * Nothing calls it yet but its tests and the scenarios: card 6b registers it with agent text's chain resolver and
- * pins each session's chain at its launch.
+ * Sessions (card 6b, HI-2443) pin each session's chain at its launch (sessions.ts) and register the resolver; callers
+ * with no session get the API chain (apiChain.ts).
  */
 import { agentTextSchema } from './schema'
 import { loadDialects } from './store'
 import { modelSlot, type DialectPick, type ModelSlot } from './match'
-import { resolveChain, type ResolvedChain } from './chain'
+import { resolveChain, type DialectSet, type ResolvedChain } from './chain'
 import type { DialectSchema } from './format'
 
 export { agentTextSchema } from './schema'
@@ -30,12 +30,22 @@ export interface SessionDialect {
   pick?: DialectPick
 }
 
-/** A session's chain from a workspace's dialects folder: its model slot filled, then each id resolved down the chain. */
-export async function resolveSessionChain(dir: string, s: SessionDialect, schema: DialectSchema = agentTextSchema()): Promise<ResolvedChain & { slot: ModelSlot }> {
-  const set = await loadDialects(dir, schema)
+/** A session's chain from a workspace's dialects as loaded: its model slot filled, then each id resolved down the chain. */
+export function sessionChainOf(set: DialectSet, s: SessionDialect): ResolvedChain & { slot: ModelSlot } {
   const slot = modelSlot(set.folders[s.cli], s.modelId, s.pick)
   return { ...resolveChain(set, { kind: 'session', cli: s.cli, modelFile: slot.file, modelUnknown: slot.modelUnknown }), slot }
 }
+
+/** A session's chain from a workspace's dialects folder: its model slot filled, then each id resolved down the chain. */
+export async function resolveSessionChain(dir: string, s: SessionDialect, schema: DialectSchema = agentTextSchema()): Promise<ResolvedChain & { slot: ModelSlot }> {
+  return sessionChainOf(await loadDialects(dir, schema), s)
+}
+
+/** An agent's Dialect setting as saved (AgentDef.dialect) as a pick: absent, empty or "auto" is Auto. */
+export const pickOf = (saved: string | null | undefined): DialectPick => (saved && saved.trim() && saved.trim().toLowerCase() !== 'auto' ? { file: saved.trim() } : 'auto')
+
+/** What decides whether a session's chain is still the one it was launched on: its files and the texts they give. */
+export const chainKey = (c: ResolvedChain): string => JSON.stringify([c.hash, c.layers, c.modelUnknown ?? false])
 
 /** The chain of a caller with no session (a script, curl): API → Workspace → Default. */
 export async function resolveApiChain(dir: string, schema: DialectSchema = agentTextSchema()): Promise<ResolvedChain> {
