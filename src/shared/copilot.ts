@@ -5,6 +5,7 @@ import { codexModelLabel } from './codex'
 import { EFFORT_TEXT, OLDER_VERSIONS } from './claude'
 import { withCliOwn } from './cliOwnMode'
 import { msg } from './i18n/msg'
+import { agentMsg, say } from './agentText'
 
 /**
  * GitHub Copilot's side of the shared provider data (the Copilot CLI, `copilot`): its modes, reasoning levels and models.
@@ -19,12 +20,31 @@ import { msg } from './i18n/msg'
 export const COPILOT = 'copilot'
 
 // Hive's own tools (the hive MCP server) never ask, in any mode: the adapter pre-approves them.
+/** GitHub Copilot's permission modes as agents and the Agent API read them (dialects, HI-2065): said when read (the getters below), so in the reader's dialect. The window has its own messages (`text`). */
+const M = {
+  askLabel: agentMsg({ id: 'mode.copilot.ask.label', text: 'Ask', note: "GitHub Copilot's permission mode ask: its name, as agents and the Agent API read it (the window has its own message)." }),
+  askDescription: agentMsg({ id: 'mode.copilot.ask.desc', text: 'Reads files and runs harmless commands without asking; asks before edits, other commands, other MCP tools and web access.', note: "What GitHub Copilot's permission mode ask does, as agents and the Agent API read it (the window has its own message)." }),
+  acceptEditsLabel: agentMsg({ id: 'mode.copilot.acceptEdits.label', text: 'Accept edits', note: "GitHub Copilot's permission mode accept-edits: its name, as agents and the Agent API read it (the window has its own message)." }),
+  acceptEditsDescription: agentMsg({ id: 'mode.copilot.acceptEdits.desc', text: 'Edits files in its folder without asking (not where the folder’s path has parentheses: Copilot can’t approve them there); still asks before other commands, other MCP tools, web access and changes outside its folder.', note: "What GitHub Copilot's permission mode accept-edits does, as agents and the Agent API read it (the window has its own message)." }),
+  acceptEditsCliNote: agentMsg({ id: 'mode.copilot.acceptEdits.cliNote', text: 'Copilot’s own footer still says Manual Approval: Hive starts it with edits in its folder approved (an allow rule), which Copilot’s label doesn’t show.', note: "GitHub Copilot's permission mode accept-edits: why the CLI's own screen names another mode (shown with Hive's mode badge while a session runs in it)." }),
+  planLabel: agentMsg({ id: 'mode.copilot.plan.label', text: 'Plan', note: "GitHub Copilot's permission mode plan: its name, as agents and the Agent API read it (the window has its own message)." }),
+  planDescription: agentMsg({ id: 'mode.copilot.plan.desc', text: 'Plans the work and asks before changing anything.', note: "What GitHub Copilot's permission mode plan does, as agents and the Agent API read it (the window has its own message)." }),
+  autopilotLabel: agentMsg({ id: 'mode.copilot.autopilot.label', text: 'Autopilot', note: "GitHub Copilot's permission mode autopilot: its name, as agents and the Agent API read it (the window has its own message)." }),
+  autopilotDescription: agentMsg({ id: 'mode.copilot.autopilot.desc', text: 'Allow all, and it carries on by itself until the task is done (up to 5 continuations) without handing back to you. Once it has run, the session approves every tool, path and web request, also after you switch out of it. Use only where unattended changes are acceptable.', note: "What GitHub Copilot's permission mode autopilot does, as agents and the Agent API read it (the window has its own message)." }),
+  allowAllLabel: agentMsg({ id: 'mode.copilot.allowAll.label', text: 'Allow all', note: "GitHub Copilot's permission mode allow-all: its name, as agents and the Agent API read it (the window has its own message)." }),
+  allowAllDescription: agentMsg({ id: 'mode.copilot.allowAll.desc', text: 'Approves every tool, path and web request without asking, in its folder and outside it.', note: "What GitHub Copilot's permission mode allow-all does, as agents and the Agent API read it (the window has its own message)." })
+}
+
 // The English labels and descriptions are what agents and the Agent API read; `text` is the window's (#800).
 export const COPILOT_PERMISSION_MODES: ModeOption[] = [
   {
     value: 'ask',
-    label: 'Ask', // i18n-ignore: agent-facing English (text is the window's)
-    description: 'Reads files and runs harmless commands without asking; asks before edits, other commands, other MCP tools and web access.', // i18n-ignore: agent-facing English (text is the window's)
+    get label() {
+      return say(M.askLabel)
+    },
+    get description() {
+      return say(M.askDescription)
+    },
     text: {
       label: msg({ id: 'agents.copilot.ask', defaultMessage: 'Ask', description: "GitHub Copilot's permission mode: it asks before edits and most commands. Keep it short." }),
       description: msg({ id: 'agents.copilot.askDescription', defaultMessage: 'Reads files and runs harmless commands without asking; asks before edits, other commands, other MCP tools and web access.', description: "What GitHub Copilot's Ask mode does (the mode picker). MCP is a protocol's name: keep it." })
@@ -32,9 +52,15 @@ export const COPILOT_PERMISSION_MODES: ModeOption[] = [
   },
   {
     value: 'accept-edits',
-    label: 'Accept edits', // i18n-ignore: agent-facing English (text is the window's)
-    description: 'Edits files in its folder without asking (not where the folder’s path has parentheses: Copilot can’t approve them there); still asks before other commands, other MCP tools, web access and changes outside its folder.', // i18n-ignore: agent-facing English (text is the window's)
-    cliNote: 'Copilot’s own footer still says Manual Approval: Hive starts it with edits in its folder approved (an allow rule), which Copilot’s label doesn’t show.', // i18n-ignore: agent-facing English (text is the window's)
+    get label() {
+      return say(M.acceptEditsLabel)
+    },
+    get description() {
+      return say(M.acceptEditsDescription)
+    },
+    get cliNote() {
+      return say(M.acceptEditsCliNote)
+    },
     text: {
       label: msg({ id: 'agents.copilot.acceptEdits', defaultMessage: 'Accept edits', description: "GitHub Copilot's permission mode: it edits files in its folder without asking. Keep it short." }),
       description: msg({ id: 'agents.copilot.acceptEditsDescription', defaultMessage: 'Edits files in its folder without asking (not where the folder’s path has parentheses: Copilot can’t approve them there); still asks before other commands, other MCP tools, web access and changes outside its folder.', description: "What GitHub Copilot's Accept edits mode does (the mode picker). MCP is a protocol's name: keep it." }),
@@ -43,8 +69,12 @@ export const COPILOT_PERMISSION_MODES: ModeOption[] = [
   },
   {
     value: 'plan',
-    label: 'Plan', // i18n-ignore: agent-facing English (text is the window's)
-    description: 'Plans the work and asks before changing anything.', // i18n-ignore: agent-facing English (text is the window's)
+    get label() {
+      return say(M.planLabel)
+    },
+    get description() {
+      return say(M.planDescription)
+    },
     text: {
       label: msg({ id: 'agents.copilot.plan', defaultMessage: 'Plan', description: "GitHub Copilot's permission mode: it plans first. Keep it short." }),
       description: msg({ id: 'agents.copilot.planDescription', defaultMessage: 'Plans the work and asks before changing anything.', description: "What GitHub Copilot's Plan mode does (the mode picker)." })
@@ -53,8 +83,12 @@ export const COPILOT_PERMISSION_MODES: ModeOption[] = [
   // Behind the opt-in: entering it approves everything for the rest of the session, and it doesn't hand back (#490).
   {
     value: 'autopilot',
-    label: 'Autopilot', // i18n-ignore: agent-facing English (text is the window's)
-    description: 'Allow all, and it carries on by itself until the task is done (up to 5 continuations) without handing back to you. Once it has run, the session approves every tool, path and web request, also after you switch out of it. Use only where unattended changes are acceptable.', // i18n-ignore: agent-facing English (text is the window's)
+    get label() {
+      return say(M.autopilotLabel)
+    },
+    get description() {
+      return say(M.autopilotDescription)
+    },
     danger: true,
     text: {
       label: msg({ id: 'agents.copilot.autopilot', defaultMessage: 'Autopilot', description: "GitHub Copilot's permission mode that carries on by itself and approves everything. Keep it short." }),
@@ -64,8 +98,12 @@ export const COPILOT_PERMISSION_MODES: ModeOption[] = [
   // Not behind the opt-in (Darren, #490): Copilot's one low-interaction mode; its description says plainly what it does.
   {
     value: 'allow-all',
-    label: 'Allow all', // i18n-ignore: agent-facing English (text is the window's)
-    description: 'Approves every tool, path and web request without asking, in its folder and outside it.', // i18n-ignore: agent-facing English (text is the window's)
+    get label() {
+      return say(M.allowAllLabel)
+    },
+    get description() {
+      return say(M.allowAllDescription)
+    },
     text: {
       label: msg({ id: 'agents.copilot.allowAll', defaultMessage: 'Allow all', description: "GitHub Copilot's permission mode that approves everything. Keep it short." }),
       description: msg({ id: 'agents.copilot.allowAllDescription', defaultMessage: 'Approves every tool, path and web request without asking, in its folder and outside it.', description: "What GitHub Copilot's Allow all mode does (the mode picker)." })

@@ -592,9 +592,10 @@ const FAKE_FIXTURES = ['tests/fixtures/claude-initialize.json', 'tests/fixtures/
  * (HI-2065), with the guard's lists in agent-text/allow/. tests/progressReport.mts and tests/runTemp.mts are the runners' and in
  * EVERYTHING. The 1.0 workflow core spike (#1118) too: nothing in the app loads it, and tests/workflow runs its
  * scenarios; the phase that wires it into the app (P3, P4) gives it an area (the 1.0 schema, src/main/schema, has the
- * board's since its cards step, #1209, as the fact store and the actions worker do since #1215).
+ * board's since its cards step, #1209, as the fact store and the actions worker do since #1215). The dialects service
+ * (src/main/dialects, HI-2439) too, until card 6b wires it into sessions and gives it an area.
  */
-export const UNIT_ONLY = ['vitest.config.ts', '.github/workflows/ci.yml', 'scripts/testWaits.mjs', 'scripts/i18nExtract.mjs', 'scripts/i18nValues.mjs', 'scripts/i18nCheck.mjs', 'scripts/i18nCoverage.mjs', 'scripts/i18nGuard.mjs', 'i18n/allow/', 'scripts/agentTextExtract.mjs', 'scripts/agentTextGuard.mjs', 'scripts/agentTextFiles.mjs', 'agent-text/allow/', 'tests/i18n/', 'tests/workflow/', 'src/shared/workflow/', 'src/shared/platform/', 'src/main/workflow/', 'src/main/platform/']
+export const UNIT_ONLY = ['src/main/dialects/','vitest.config.ts', '.github/workflows/ci.yml', 'scripts/testWaits.mjs', 'scripts/i18nExtract.mjs', 'scripts/i18nValues.mjs', 'scripts/i18nCheck.mjs', 'scripts/i18nCoverage.mjs', 'scripts/i18nGuard.mjs', 'i18n/allow/', 'scripts/agentTextExtract.mjs', 'scripts/agentTextGuard.mjs', 'scripts/agentTextFiles.mjs', 'agent-text/allow/', 'tests/i18n/', 'tests/workflow/', 'src/shared/workflow/', 'src/shared/platform/', 'src/main/workflow/', 'src/main/platform/']
 
 /** Whether a file is a unit test (tests/*.test.ts, their helpers and fixtures, UNIT_ONLY): npm test covers it, no e2e suite. */
 export const unitTest = (f) => /^tests\/[^/]+\.ts$/i.test(f) || under(f, UNIT_ONLY) || (/^tests\/fixtures\//i.test(f) && !FAKE_FIXTURES.includes(f))
@@ -735,6 +736,8 @@ export const UNIT_SCANS = [
   { test: 'tests/agentTextGuard.test.ts', paths: ['src/', 'agent-text/allow/'] },
   { test: 'tests/agentText.test.ts', paths: ['agent-text/catalogue/', 'agent-text/schema/'] },
   { test: 'tests/agentText.test.ts', paths: ['src/'], lines: ['agentMsg\\('] },
+  // The dialects service checks files against the schema it bundles (an import glob, which --changed doesn't follow).
+  { test: 'tests/dialects.test.ts', paths: ['agent-text/schema/'] },
   { test: 'tests/i18nshots.test.ts', paths: ['tests/e2e/i18nshots/', 'tests/e2e/i18nshots.cjs'] },
   // German or Polish read from locales/ to check a screen in that language.
   { test: 'tests/actionHandlers.test.ts', paths: ['locales/de/'] },

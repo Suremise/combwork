@@ -257,3 +257,25 @@ export function cliDefaultEffort(provider: ProviderId, tr: Tr): string {
 
 /** The key observedDefaultEffort keeps a model's effort under. */
 export const observedEffortKey = modelKey
+
+/**
+ * A model's base ID, which a dialect's model file matches when no file has the exact ID (dialects, HI-2439): without a
+ * context suffix ("[1m]") or a snapshot date ("-20261015"), in lower case ("claude-opus-5-5[1m]" → "claude-opus-5-5").
+ */
+export const baseModelId = modelKey
+
+/** A bare alias ("opus", "opus[1m]", "default"): a word, not a model ID, which always has a version in it. */
+const BARE_ALIAS = /^[a-z]+(\[[^\]]*\])?$/i
+
+/**
+ * The real model ID a launch runs, which picks its dialect's model file (dialects, HI-2439): the choice (else the CLI's
+ * default, when Hive knows it) with an alias resolved through the CLI's catalogue ("opus" → "claude-opus-5-5"), a full
+ * ID as it is. Null when Hive can't name it: no choice and no known default, or an alias the catalogue doesn't resolve
+ * (the launch record says "model unknown"). Never the friendly name: names are for display.
+ */
+export function dialectModelId(info: Info, chosen: string | null | undefined): string | null {
+  const model = (chosen?.trim() || info?.defaultModel?.trim()) ?? ''
+  if (!model) return null
+  const id = resolvedModel(info, model).trim()
+  return id && !BARE_ALIAS.test(id) ? id : null
+}

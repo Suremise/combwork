@@ -10,6 +10,48 @@ import { HiveError } from './hiveError'
 import { createLogger, userText } from './logger'
 import { timedStep } from './stallWork'
 import { placeKey, realPath, relativeInside } from './places'
+import { agentMsg, inDefaultDialect, say, type AgentMsg, type AgentValues } from '../shared/agentText'
+
+/**
+ * Why a skill's delivery or a swap failed, for agents (dialects, HI-2065): the launch's problems and a kept revision's
+ * reason store it, and the log writes it, so it is said in the Default (stored text any reader reads, until stored
+ * records are said when read).
+ */
+const A = {
+  fileWent: agentMsg({ id: 'skillCopy.source.fileWent', text: 'a file in it went while it was being copied', note: "A skill delivery's problem: a file of the skill's folder in the workspace went while Hive copied it." }),
+  folderGone: agentMsg({ id: 'skillCopy.source.folderGone', text: 'its folder in the workspace is gone', note: "A skill delivery's problem: the skill's folder in the workspace is gone." }),
+  denied: agentMsg({ id: 'skillCopy.source.denied', text: 'its folder in the workspace could not be read (access denied)', note: "A skill delivery's problem: Windows refused to read the skill's folder in the workspace." }),
+  notCopied: agentMsg({
+    id: 'skillCopy.source.notCopied',
+    text: 'it could not be copied{hasCode, select, yes { ({code})} other {}}',
+    note: "A skill delivery's problem: making its copy failed (a disk full, a write that failed). hasCode: yes with the error's code (code: ENOSPC…)."
+  }),
+  changedBeforeReplaced: agentMsg({ id: 'skillCopy.swap.changedBeforeReplaced', text: '{name} changed before it could be replaced', note: "Why a swap was abandoned (a skill's or mode's copy; name: its folder or file name): it was edited before Hive replaced it. Nothing was replaced." }),
+  changedWhileReplaced: agentMsg({ id: 'skillCopy.swap.changedWhileReplaced', text: '{name} changed while it was being replaced', note: 'Why a swap was abandoned: it was edited while Hive replaced it, and was put back as it was.' }),
+  putBackWhileReplaced: agentMsg({ id: 'skillCopy.swap.putBackWhileReplaced', text: '{name} was put back while it was being replaced', note: 'Why a swap was abandoned: something new took its place while Hive replaced it.' }),
+  changedKeptBeside: agentMsg({
+    id: 'skillCopy.swap.changedKeptBeside',
+    text: '{name} changed while it was being replaced; the edited copy is kept beside it',
+    note: 'Why a swap was abandoned: it was edited while Hive replaced it; the edited copy is kept beside it as a -conflict- copy.'
+  }),
+  changedBeforeRemoved: agentMsg({ id: 'skillCopy.swap.changedBeforeRemoved', text: '{name} changed before it could be removed', note: 'Why a removal was abandoned: it was edited before Hive removed it. Nothing was removed.' }),
+  changedWhileRemoved: agentMsg({ id: 'skillCopy.swap.changedWhileRemoved', text: '{name} changed while it was being removed', note: 'Why a removal was abandoned: it was edited while Hive removed it, and was put back (or kept as a -conflict- copy).' }),
+  overBytes: agentMsg({ id: 'skillCopy.tooBig.bytes', text: 'it is over {mb} MB', note: "Why a skill or mode is too big for Hive to check (HASH_LIMITS): mb is the limit in MB, a whole number. A delivery's problem and a kept revision's reason." }),
+  tooDeep: agentMsg({ id: 'skillCopy.tooBig.depth', text: 'it has folders more than {depth} deep', note: 'Why a skill or mode is too big for Hive to check (HASH_LIMITS): depth is the most folder levels.' }),
+  tooMany: agentMsg({ id: 'skillCopy.tooBig.entries', text: 'it has more than {entries} files and folders', note: 'Why a skill or mode is too big for Hive to check (HASH_LIMITS): entries is the most files and folders.' }),
+  tooBigToDeliver: agentMsg({ id: 'skillCopy.tooBig.deliver', text: 'it is too big for Hive to check ({why})', note: "A launch's problem for a skill over HASH_LIMITS: why is one of skillCopy.tooBig.*." }),
+  linksNotCopied: agentMsg({
+    id: 'skillCopy.links.notCopied',
+    text: "{n, plural, =1 {the link {paths} is} other {the links {paths} are}} missing from its copy: Windows didn't let Hive make {n, plural, =1 {it} other {them}} (a link to a file needs a privilege)",
+    note: "What a skill's links that couldn't be copied mean for the session that gets it. paths: the links' paths, joined with commas; n: how many."
+  })
+}
+
+/** Its messages, for the canary's tests (tests/agentText.launch.test.ts). */
+export const SKILL_COPY_MESSAGES = A
+
+/** A message said in the Default: these reasons are stored and logged (see A). */
+const stored = (m: AgentMsg, values?: AgentValues): string => inDefaultDialect(() => say(m, values))
 
 export { placeKey, placeMatcher, realPath, relativeInside, samePlace } from './places'
 
@@ -959,10 +1001,10 @@ export class CopyFailed extends HiveError {}
  */
 export function sourceProblem(e: unknown, source: string): string {
   const code = ((e instanceof CopyFailed ? e.cause : e) as NodeJS.ErrnoException)?.code
-  if (code === 'ENOENT') return existsSync(source) ? 'a file in it went while it was being copied' : 'its folder in the workspace is gone' // i18n-ignore: a skill delivery's problem, which the launch's problems (agents) say
-  if (code === 'EACCES' || code === 'EPERM') return 'its folder in the workspace could not be read (access denied)' // i18n-ignore: a skill delivery's problem, which the launch's problems (agents) say
+  if (code === 'ENOENT') return stored(existsSync(source) ? A.fileWent : A.folderGone)
+  if (code === 'EACCES' || code === 'EPERM') return stored(A.denied)
   // Anything else (a disk full, a write that failed) is about making the copy, not the source.
-  return `it could not be copied${code ? ` (${code})` : ''}` // i18n-ignore: a skill delivery's problem, which the launch's problems (agents) say
+  return stored(A.notCopied, { hasCode: code ? 'yes' : 'no', code: code ?? '' })
 }
 
 /** What a path holds, to compare with what a swap expects: its contentHash, null if nothing is there. */
@@ -1044,17 +1086,17 @@ export async function swapIn(src: string, dest: string, o: { prepare?: (copy: st
     else await keepAsConflict(p, parent, name)
   }
   const publish = async (): Promise<void> => {
-    if (check && (await hashOrNone(dest)) !== o.expected) throw new SwapAbandoned(`${name} changed before it could be replaced`) // i18n-ignore: why a swap was abandoned, for the log and a skill delivery's problem (agents); no person is shown it
+    if (check && (await hashOrNone(dest)) !== o.expected) throw new SwapAbandoned(stored(A.changedBeforeReplaced, { name }))
     const had = await exists(dest)
     // A file in the old one held open by a running session keeps it from moving: a few tries, then it stays.
     if (had) await renameRetrying(dest, old, 5)
     if (had && check && (await hashOrNone(old)) !== o.expected) {
       await renameRetrying(old, dest).catch(() => keepAsConflict(old, parent, name))
-      throw new SwapAbandoned(`${name} changed while it was being replaced`) // i18n-ignore: why a swap was abandoned, for the log and a skill delivery's problem (agents); no person is shown it
+      throw new SwapAbandoned(stored(A.changedWhileReplaced, { name }))
     }
     try {
       // Something new in its place meanwhile (the user's): it stays. On Windows the rename would fail anyway.
-      if (check && (await exists(dest))) throw new SwapAbandoned(`${name} was put back while it was being replaced`) // i18n-ignore: why a swap was abandoned, for the log and a skill delivery's problem (agents); no person is shown it
+      if (check && (await exists(dest))) throw new SwapAbandoned(stored(A.putBackWhileReplaced, { name }))
       // The copy was just written: a scanner may be looking at it for a moment.
       await renameRetrying(fresh, dest)
     } catch (e) {
@@ -1075,17 +1117,17 @@ export async function swapIn(src: string, dest: string, o: { prepare?: (copy: st
       } catch {
         // The new version can't move: it stays, and the user's edited old one is kept beside it.
         await keepAsConflict(old, parent, name)
-        throw new SwapAbandoned(`${name} changed while it was being replaced; the edited copy is kept beside it`) // i18n-ignore: why a swap was abandoned, for the log and a skill delivery's problem (agents); no person is shown it
+        throw new SwapAbandoned(stored(A.changedKeptBeside, { name }))
       }
       try {
         await renameRetrying(old, dest)
       } catch {
         await renameRetrying(back, dest).catch(() => keepAsConflict(back, parent, name))
         await keepAsConflict(old, parent, name)
-        throw new SwapAbandoned(`${name} changed while it was being replaced; the edited copy is kept beside it`) // i18n-ignore: why a swap was abandoned, for the log and a skill delivery's problem (agents); no person is shown it
+        throw new SwapAbandoned(stored(A.changedKeptBeside, { name }))
       }
       await dispose(back, staged)
-      throw new SwapAbandoned(`${name} changed while it was being replaced`) // i18n-ignore: why a swap was abandoned, for the log and a skill delivery's problem (agents); no person is shown it
+      throw new SwapAbandoned(stored(A.changedWhileReplaced, { name }))
     }
     await rm(old, { recursive: true, force: true }).catch(() => undefined)
   }
@@ -1112,17 +1154,17 @@ export async function swapOut(dest: string, expected: string): Promise<void> {
   const name = dest.slice(parent.length + 1)
   const old = join(parent, `.${name}.hive-old-${tag}`)
   const remove = async (): Promise<void> => {
-    if ((await hashOrNone(dest)) !== expected) throw new SwapAbandoned(`${name} changed before it could be removed`) // i18n-ignore: why a swap was abandoned, for the log and a skill delivery's problem (agents); no person is shown it
+    if ((await hashOrNone(dest)) !== expected) throw new SwapAbandoned(stored(A.changedBeforeRemoved, { name }))
     await renameRetrying(dest, old, 5)
     const putBack = async (why: string): Promise<never> => {
       if (!(await exists(dest))) await renameRetrying(old, dest).catch(() => keepAsConflict(old, parent, name))
       else await keepAsConflict(old, parent, name)
       throw new SwapAbandoned(why)
     }
-    if ((await hashOrNone(old)) !== expected) await putBack(`${name} changed while it was being removed`) // i18n-ignore: why a swap was abandoned, for the log and a skill delivery's problem (agents); no person is shown it
+    if ((await hashOrNone(old)) !== expected) await putBack(stored(A.changedWhileRemoved, { name }))
     // Something new in its place meanwhile is the user's: it stays, and so does what was moved aside (as a conflict copy
     // if it was changed: it is removed only while it is still exactly Hive's).
-    if ((await hashOrNone(old)) !== expected) await putBack(`${name} changed while it was being removed`) // i18n-ignore: why a swap was abandoned, for the log and a skill delivery's problem (agents); no person is shown it
+    if ((await hashOrNone(old)) !== expected) await putBack(stored(A.changedWhileRemoved, { name }))
     await rm(old, { recursive: true, force: true })
   }
   await withFileLocks(await filesIn(dest), remove)
@@ -1214,10 +1256,10 @@ export const HASH_LIMITS = { entries: 2000, depth: 12, bytes: 64 * 1024 * 1024 }
 export class ContentTooLarge extends Error {}
 
 /** ContentTooLarge's reason for content over the byte limit (the same whether a stat or the read found it). */
-export const overBytes = (limit: number): string => `it is over ${Math.round(limit / 1024 / 1024)} MB` // i18n-ignore: why a skill is too big, a delivery's problem (agents) and a kept revision's reason
+export const overBytes = (limit: number): string => stored(A.overBytes, { mb: String(Math.round(limit / 1024 / 1024)) })
 
 /** A launch's problem for a skill over HASH_LIMITS. */
-export const tooBigToDeliver = (e: ContentTooLarge): string => `it is too big for Hive to check (${e.message})` // i18n-ignore: a skill delivery's problem, which the launch's problems (agents) say
+export const tooBigToDeliver = (e: ContentTooLarge): string => stored(A.tooBigToDeliver, { why: e.message })
 
 export interface HashOptions {
   /** Stops the work (a closed workspace): the call rejects with the signal's reason. */
@@ -1243,12 +1285,12 @@ async function treeEntries(path: string, o: HashOptions): Promise<TreeEntry[]> {
   let seen = 0
   const walk = async (rel: string, depth: number): Promise<void> => {
     o.signal?.throwIfAborted()
-    if (depth > lim.depth) throw new ContentTooLarge(`it has folders more than ${lim.depth} deep`) // i18n-ignore: why a skill is too big, a delivery's problem (agents) and a kept revision's reason
+    if (depth > lim.depth) throw new ContentTooLarge(stored(A.tooDeep, { depth: String(lim.depth) }))
     // The limit is on the skill's own entries: Hive's copy marker (one a folder at most) comes on top, so a skill at the
     // limit is still within it once Hive has marked its copy. The listing stays bounded: at most one more than allowed.
     const list = await readDirBounded(rel ? join(path, rel) : path, lim.entries - seen + 1, o.signal, o.count)
     const own = list.entries.length - (list.entries.some((e) => e.name === COPY_MARKER) ? 1 : 0)
-    if (list.more || seen + own > lim.entries) throw new ContentTooLarge(`it has more than ${lim.entries} files and folders`) // i18n-ignore: why a skill is too big, a delivery's problem (agents) and a kept revision's reason
+    if (list.more || seen + own > lim.entries) throw new ContentTooLarge(stored(A.tooMany, { entries: String(lim.entries) }))
     seen += own
     for (const e of list.entries) {
       const r = rel ? `${rel}/${e.name}` : e.name
@@ -1380,10 +1422,10 @@ export async function copySkillTree(src: string, dest: string, o: HashOptions = 
   const budget = { entries: lim.entries, bytes: lim.bytes }
   const walk = async (from: string, to: string, rel: string, depth: number): Promise<void> => {
     o.signal?.throwIfAborted()
-    if (depth > lim.depth) throw new ContentTooLarge(`it has folders more than ${lim.depth} deep`) // i18n-ignore: why a skill is too big, a delivery's problem (agents) and a kept revision's reason
+    if (depth > lim.depth) throw new ContentTooLarge(stored(A.tooDeep, { depth: String(lim.depth) }))
     await mkdir(to, { recursive: true })
     const list = await readDirBounded(from, budget.entries, o.signal)
-    if (list.more) throw new ContentTooLarge(`it has more than ${lim.entries} files and folders`) // i18n-ignore: why a skill is too big, a delivery's problem (agents) and a kept revision's reason
+    if (list.more) throw new ContentTooLarge(stored(A.tooMany, { entries: String(lim.entries) }))
     budget.entries -= list.entries.length
     for (const e of list.entries) {
       const f = join(from, e.name)
@@ -1433,8 +1475,7 @@ async function copyBounded(from: string, to: string, budget: { bytes: number }, 
 }
 
 /** What a skill's links that couldn't be copied mean for the session that gets it. */
-// i18n-ignore: a skill delivery's problem, which the launch's problems (agents) say
-export const linksNotCopied = (paths: string[]): string => `${paths.length === 1 ? `the link ${paths[0]} is` : `the links ${paths.join(', ')} are`} missing from its copy: Windows didn't let Hive make ${paths.length === 1 ? 'it' : 'them'} (a link to a file needs a privilege)`
+export const linksNotCopied = (paths: string[]): string => stored(A.linksNotCopied, { n: paths.length, paths: paths.join(', ') })
 
 /** Files that aren't part of a skill's content: Hive's own copy marker and the operating systems' folder files. */
 const CONTENT_HASH_SKIP = new Set([COPY_MARKER, '.DS_Store', 'Thumbs.db', 'desktop.ini'])

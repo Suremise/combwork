@@ -133,9 +133,16 @@ describe('the board area', () => {
       doing: { label: 'Active', description: 'Being worked on: its agent shows what it is doing now.' },
       passed: { label: 'Approved', description: 'Its work passed review (or your OK) and waits to be merged. A reviewer moves a card here when it passes.' }
     }
+    // The columns' descriptions as agents read them before the window renamed two (HI-2438 removed the unused copy).
+    const AGENT_DESCRIPTION: Record<string, string> = {
+      hold: 'Parked: nobody picks these up until they move to Todo. Only you and the Assistant put cards here.',
+      todo: 'Ready to start.',
+      review: 'Work done, waiting for its review.',
+      done: 'Merged: its builder moves it here after merging (or you do). Archive cards when you no longer need to see them.'
+    }
     for (const c of TASK_COLUMNS) {
       expect(tr(COLUMN_TEXT[c.id].label)).toBe(window[c.id]?.label ?? c.label)
-      expect(tr(COLUMN_TEXT[c.id].description)).toBe(window[c.id]?.description ?? c.description)
+      expect(tr(COLUMN_TEXT[c.id].description)).toBe(window[c.id]?.description ?? AGENT_DESCRIPTION[c.id])
       expect(columnName(c.id, tr)).toBe(window[c.id]?.label ?? columnLabel(c.id))
     }
     const doing = card(4, 'doing', { agent: 'a-1', agentName: 'B1' })

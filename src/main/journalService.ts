@@ -8,6 +8,7 @@ import { browseEntry, closeJournal, deleteEntry, deleteJournal, forgetJournal, f
 import { emit } from './events'
 import { createLogger } from './logger'
 import type { WorkspaceService } from './workspace'
+import type { StoredText } from '../shared/types'
 
 const log = createLogger('journal')
 
@@ -123,6 +124,8 @@ export interface Fact {
   links?: { type: LinkType; ref: string }[]
   tags?: string[]
   detail?: string
+  /** The summary as Hive's message, beside its English (dialects, HI-2438). */
+  summaryText?: StoredText
 }
 
 /**
