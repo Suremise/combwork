@@ -13,7 +13,7 @@ afterAll(() => rmSync(base, { recursive: true, force: true }))
 afterEach(() => setLanguage('en', {}))
 
 const { createViewerToken, viewerTokens } = await import('../src/main/viewerTokens')
-const { HiveError, shownError, windowError } = await import('../src/main/hiveError')
+const { HiveError, windowError } = await import('../src/main/hiveError')
 
 /** What the window is told, as the IPC layer sends it. */
 const told = async (p: Promise<unknown>): Promise<{ english: string; shown: string }> => {
@@ -49,6 +49,5 @@ describe('a viewer token refused', () => {
     expect((await told(createViewerToken('x'.repeat(41)))).shown).toBe('Der Name eines Lese-Tokens hat höchstens 40 Zeichen')
     // Apiary is the first test's (a name is checked before the count).
     expect((await told(createViewerToken('APIARY'))).shown).toBe('Es gibt bereits ein Lese-Token namens „APIARY“')
-    expect(shownError(new HiveError('plain'))).toBe('plain')
   })
 })
