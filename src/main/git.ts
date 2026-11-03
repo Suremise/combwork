@@ -213,6 +213,16 @@ export function gitErrorLine(err: string): string {
   return lines.find((l) => /^(fatal|error):/.test(l)) ?? lines[0] ?? ''
 }
 
+/**
+ * The branch a full ref names (`refs/heads/main` → `main`), or null for anything else (a detached HEAD's "HEAD", a remote
+ * branch). Read the full ref (`symbolic-ref -q HEAD`) and cut it here: `--short` and `--abbrev-ref` answer
+ * `heads/main` for main when a tag main exists too (HI-2422, HI-2426).
+ */
+export function branchOfRef(ref: string, prefix = 'refs/heads/'): string | null {
+  const r = ref.trim()
+  return r.startsWith(prefix) && r.length > prefix.length ? r.slice(prefix.length) : null
+}
+
 /** For tests: how many repositories have a worktree change under way or waiting. */
 export const worktreeChangesPending = (): number => worktreeChanges.size
 

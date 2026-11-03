@@ -190,6 +190,19 @@ describe('Git adapter', () => {
     expect(isUnknown(e.head)).toBe(true)
   })
 
+  it('branch names the branch by its whole ref, though a tag has its name; null detached (HI-2426)', async () => {
+    repo = gitRepo(join(tempDir('git-'), 'r'))
+    branchWith('hive/card', { 'c.txt': 'c\n' })
+    sh(repo, 'tag', 'main')
+    sh(repo, 'tag', 'hive/card', 'main')
+    expect(await G.branch(repo)).toBe('main')
+    sh(repo, 'switch', '-q', 'hive/card')
+    expect(await G.branch(repo)).toBe('hive/card')
+    expect((await G.heads(repo, 'main')).line).toBe('hive/card')
+    sh(repo, 'checkout', '-q', '--detach')
+    expect(await G.branch(repo)).toBeNull()
+  })
+
   it('an answer about fixed commits is asked once in a step (#1376) and kept after it (HI-2115); refs are read again; names and unknowns always asked', async () => {
     repo = gitRepo(join(tempDir('git-'), 'r'))
     const [base, rev] = branchWith('one', { 'one.txt': '1\n' })

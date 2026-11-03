@@ -8,7 +8,7 @@ import { AsyncLocalStorage } from 'async_hooks'
 import { closeSync, copyFileSync, existsSync, openSync, readFileSync, renameSync, statSync, unlinkSync } from 'original-fs'
 import { access } from 'original-fs/promises'
 import { isAbsolute, join, resolve as resolvePath } from 'path'
-import { git, gitRouted } from '../git'
+import { branchOfRef, git, gitRouted } from '../git'
 import { gitExe } from '../gitTool'
 import { plainRepo, refSync } from './repoRefs'
 import type { FileChange } from '../../shared/workflow/facts'
@@ -234,10 +234,10 @@ export async function head(folder: string): Promise<Maybe<string>> {
   return r.ok ? r.out.trim() : withDetail(unknown(U.head, { where: folder }), r.err)
 }
 
-/** The branch checked out in a folder, or null when HEAD is detached. */
+/** The branch checked out in a folder, or null when HEAD is detached. The full ref, cut: `--short` says heads/x beside a tag x (HI-2426). */
 export async function branch(folder: string): Promise<Maybe<string | null>> {
-  const r = await git(folder, ['symbolic-ref', '-q', '--short', 'HEAD'])
-  if (r.ok) return r.out.trim()
+  const r = await git(folder, ['symbolic-ref', '-q', 'HEAD'])
+  if (r.ok) return branchOfRef(r.out)
   if (r.code === 1) return null
   return withDetail(unknown(U.branch, { folder }), r.err)
 }

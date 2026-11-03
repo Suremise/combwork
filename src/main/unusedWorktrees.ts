@@ -11,7 +11,7 @@ import { COPIES_DIR } from './copies'
 import type { SlotKept, SlotPool } from './slots'
 import { sessions as liveSessions } from './sessions'
 import { containsPlace, placeKey, realPath } from './fsutil'
-import { git, gitReading } from './git'
+import { branchOfRef, git, gitReading } from './git'
 import { gitProblem } from './gitTool'
 import { createLogger, userText } from './logger'
 import { checkProject } from './branchWatch'
@@ -548,10 +548,11 @@ async function snapshot(projectPath: string, path: string): Promise<Snapshot> {
   const head = await git(path, ['rev-parse', '--verify', '--quiet', 'HEAD'])
   const tip = head.ok ? head.out.trim() : ''
   if (!tip) fail(tr(msg({ id: 'main.unused.read.head', defaultMessage: 'git could not read its HEAD', description: "Why Hive couldn't check what one of the Overview's unused worktrees (Remove, Remove anyway, Merge) holds: a clause (main.unused.cantCheck). HEAD is git's term." })))
-  const sym = await git(path, ['symbolic-ref', '--quiet', '--short', 'HEAD'])
+  const sym = await git(path, ['symbolic-ref', '--quiet', 'HEAD'])
   // Exit 1 with nothing said: detached. Anything else that fails: can't tell.
   if (!sym.ok && !(sym.code === 1 && !sym.err)) fail(tr(msg({ id: 'main.unused.read.branch', defaultMessage: 'git could not read its branch', description: "Why Hive couldn't check what one of the Overview's unused worktrees (Remove, Remove anyway, Merge) holds: a clause (main.unused.cantCheck)." })))
-  const branch = sym.ok ? sym.out.trim() : null
+  // The full ref, cut: `--short` says heads/x beside a tag x, which would exclude no branch below (HI-2426).
+  const branch = sym.ok ? branchOfRef(sym.out) : null
   // Strictly: a main branch git couldn't look for is not "none" (that would count the commits against no branch).
   let into: string | null = null
   try {

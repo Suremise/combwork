@@ -99,6 +99,9 @@ describe('worktreeCheck', () => {
     run(m.project, 'update-ref', 'refs/remotes/origin/trunk', 'HEAD')
     run(m.project, 'symbolic-ref', 'refs/remotes/origin/HEAD', 'refs/remotes/origin/trunk')
     expect(await primaryBranch(m.project)).toBe('trunk')
+    // A tag named as origin's branch: still origin's default, by its whole ref (git's short name is remotes/origin/trunk, HI-2426).
+    run(m.project, 'tag', 'origin/trunk')
+    expect(await primaryBranch(m.project)).toBe('trunk')
     rmSync(root, { recursive: true, force: true })
     const n = await makeProject('develop')
     const wt = await n.tree('x')
