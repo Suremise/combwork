@@ -1,5 +1,11 @@
 # Release Notes
 
+## Unreleased
+
+### Security
+
+- **DOMPurify 3.4.17.** Hive cleans the Markdown it shows (cards, comments, docs, agents' messages) and the Files tab's editor with DOMPurify, and 3.4.16 has three advisories. None applied to how Hive or the editor use it (they need options neither sets), but the fixed version now ships (HI-2421).
+
 ## 1.0.0 — 2026-11-03
 
 **Hive 1.0 runs your board by your project's rules.** Choose how a card goes from Todo to Done (who reviews it, which checks pass first, who merges it, where it is built) with the Solo, Pair or Team presets; agents tell Hive what they did, and Hive moves the card, asks you only what's yours to answer, and can merge approved work itself, each card in its own slot. Agents run on connections Hive keeps (several sign-ins side by side), one notification system tells each thing once, and the Activity view shows what every agent is doing now.

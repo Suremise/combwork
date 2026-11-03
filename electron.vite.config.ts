@@ -11,9 +11,9 @@ const MONACO_SANITIZE = /[\\/]monaco-editor[\\/]esm[\\/]vs[\\/]base[\\/]browser[
  * Monaco's DOMPurify is Hive's (#1141). monaco-editor 0.57.0 bundles its own copy of DOMPurify 3.4.15 (two IN_PLACE
  * advisories: Monaco doesn't sanitise in place, but the copy ships) and never imports the dompurify package it lists, so
  * package.json's override alone wouldn't change what ships. Its one import, from vs/base/browser/domSanitize.js, is Hive's
- * dompurify (3.4.16, the same library a patch on) instead, and a build that would still take Monaco's copy fails. The
- * dev server's pre-bundled Monaco keeps its copy (development only). Remove this and the override once Monaco bundles
- * 3.4.16 or later: tests/monacoDompurify.test.ts fails then to say so.
+ * dompurify (3.4.17 since HI-2421, the same library two patches on) instead, and a build that would still take Monaco's
+ * copy fails. The dev server's pre-bundled Monaco keeps its copy (development only). Remove this and the override once
+ * Monaco bundles 3.4.17 or later: tests/monacoDompurify.test.ts fails then to say so.
  */
 export function monacoDompurify(): Plugin {
   return {
