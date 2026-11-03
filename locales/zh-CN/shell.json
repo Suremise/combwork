@@ -155,6 +155,7 @@
   "shell.command.view.board": "显示任务看板",
   "shell.command.view.compactSidebar": "切换紧凑侧边栏",
   "shell.command.view.devTools": "显示/隐藏开发者工具",
+  "shell.command.view.dialects": "显示“方言”",
   "shell.command.view.fullScreen": "切换全屏",
   "shell.command.view.mcp": "显示 MCP 服务器",
   "shell.command.view.modes": "显示助手模式",

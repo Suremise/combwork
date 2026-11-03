@@ -155,6 +155,7 @@
   "shell.command.view.board": "Mostrar quadro de tarefas",
   "shell.command.view.compactSidebar": "Alternar barra lateral compacta",
   "shell.command.view.devTools": "Alternar ferramentas de desenvolvedor",
+  "shell.command.view.dialects": "Mostrar Dialetos",
   "shell.command.view.fullScreen": "Alternar tela cheia",
   "shell.command.view.mcp": "Mostrar servidores MCP",
   "shell.command.view.modes": "Mostrar modos do Assistente",

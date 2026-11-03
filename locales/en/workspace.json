@@ -11,6 +11,10 @@
     "defaultMessage": "Task Board",
     "description": "The activity bar (left edge): the task board."
   },
+  "workspace.activity.dialects": {
+    "defaultMessage": "Dialects",
+    "description": "The activity bar (left edge): the Dialects view (HI-2444), where the wording Hive gives agents is tuned per model and CLI. Glossary: dialect."
+  },
   "workspace.activity.docs": {
     "defaultMessage": "Documentation",
     "description": "The activity bar (left edge): Hive's documentation."

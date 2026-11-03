@@ -155,6 +155,7 @@
   "shell.command.view.board": "Mostrar el tablero de tareas",
   "shell.command.view.compactSidebar": "Alternar la barra lateral compacta",
   "shell.command.view.devTools": "Mostrar u ocultar las herramientas de desarrollo",
+  "shell.command.view.dialects": "Mostrar los dialectos",
   "shell.command.view.fullScreen": "Pantalla completa",
   "shell.command.view.mcp": "Mostrar los servidores MCP",
   "shell.command.view.modes": "Mostrar los modos del Asistente",

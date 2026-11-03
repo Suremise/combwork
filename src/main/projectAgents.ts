@@ -402,6 +402,17 @@ export function cleanWorkflowRole(role: unknown): WorkflowRole {
   throw hiveError(msg({ id: 'worktrees.agent.badWorkflowRole', defaultMessage: 'A role in the workflow is builder, reviewer, either or generalist.', description: "An error: an agent's role in the workflow was given as something else. builder, reviewer, either and generalist are values: keep them in English." }), undefined, { kind: 'invalid' })
 }
 
+/**
+ * An agent's Dialect setting as saved (HI-2443): Auto (undefined) for null, empty or "auto", else the file's path in
+ * the dialects folder as given ("claude-code/Opus 5.5 v2.json"). A path that names no file of the agent's CLI folder is
+ * kept: its launch fills the slot by Auto then and says so (`pickMissing`), so a file made later is picked up.
+ */
+export function cleanDialectPick(v: unknown): string | undefined {
+  if (typeof v !== 'string') return undefined
+  const t = v.trim().replace(/\\/g, '/')
+  return t && t.toLowerCase() !== 'auto' ? t.slice(0, 400) : undefined
+}
+
 export async function updateAgent(projectPath: string, agentId: string, patch: AgentPatch, opts: { check?: (current: AgentDef) => void; session?: string | null } = {}): Promise<AgentDef> {
   // The Hive Assistant's settings for this workspace are its agent's, too (it keeps its name).
   projectPath = workspace.assertSessionHost(projectPath)
@@ -419,7 +430,7 @@ export async function updateAgent(projectPath: string, agentId: string, patch: A
   const namedCli = accountById(getConnection(patch.connection)?.account)?.provider
   if (namedCli && patch.provider === undefined) patch.provider = namedCli
   // An empty role: its name is its role. A model, effort, mode or context sent (from before HI-2122) is no agent's: dropped.
-  const { mcpServers, workflowRole, connection, ...withLaunch } = patch
+  const { mcpServers, workflowRole, connection, dialect, ...withLaunch } = patch
   const { model: _m, effort: _e, permissionMode: _p, use200kContext: _c, ...rest } = withLaunch as typeof withLaunch & { model?: unknown; effort?: unknown; permissionMode?: unknown; use200kContext?: unknown }
   const clean: Partial<AgentDef> = { ...rest }
   if ('role' in clean) clean.role = cleanRole(clean.role) || undefined
@@ -429,6 +440,8 @@ export async function updateAgent(projectPath: string, agentId: string, patch: A
   // null: all of the project's servers again (#537).
   if (mcpServers !== undefined) clean.mcpServers = cleanMcpServers(mcpServers)
   if ('mode' in clean && !clean.mode) clean.mode = undefined
+  // Its Dialect setting (HI-2443): null, empty or "auto" is Auto again; else a file of a CLI folder by its path.
+  if (dialect !== undefined) clean.dialect = cleanDialectPick(dialect)
   // Its connection or CLI (connectionFor), worked out before the write and checked again with it.
   const touches = connection !== undefined || patch.provider !== undefined
   let cfgNow = cfg
@@ -455,6 +468,8 @@ export async function updateAgent(projectPath: string, agentId: string, patch: A
     clean.connection = connectionFor(projectPath, cli, connection || undefined, changedCli || cleared ? undefined : getConnection(before.connection), before.name)
     // Another CLI's: what it kept from before HI-2106 while it had no account (placeUnplaced's) isn't carried over.
     if (changedCli) Object.assign(clean, { model: undefined, effort: undefined, permissionMode: undefined, use200kContext: undefined })
+    // Its Dialect pick was a file of the old CLI's folder (HI-2443): Auto on the new one, unless this patch picks one.
+    if (changedCli && dialect === undefined) clean.dialect = undefined
     // A test home's account made for it is saved before the agent naming it is.
     await saveConnections()
   }

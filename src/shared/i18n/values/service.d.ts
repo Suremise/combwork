@@ -44,6 +44,7 @@ interface HiveMessageValues {
   'service.cardAttach.noCard': undefined
   'service.cardAttach.noProject': { project: string | number }
   'service.cardAttach.refused': { path: string | number }
+  'service.cardAttach.refusedFrom': { path: string | number; caller: string; temp: string | number; more: string; folders: string | number }
   'service.cardAttach.tooLarge': { name: string | number; max: string | number }
   'service.cardAttach.tooMuch': { files: number; total: string | number }
   'service.cardCleanup.stale': undefined
@@ -207,6 +208,11 @@ interface HiveMessageValues {
   'service.providers.task': { task: string; cli: string | number }
   'service.providers.taskDone': { task: string | number }
   'service.providers.taskFailed': { task: string | number; code: string | number }
+  'service.settingsRevert.busy': undefined
+  'service.settingsRevert.changed': { path: string | number; value: string | number }
+  'service.settingsRevert.done': undefined
+  'service.settingsRevert.gone': undefined
+  'service.settingsRevert.models': { path: string | number }
   'service.slots.notPrepared': { slot: string | number; card: string | number; why: string | number }
   'service.slots.resumeFailed': { agent: string | number; slot: string | number; card: string | number; why: string | number }
   'service.slots.resumeHeld': { card: string | number; agent: string | number; slot: string | number; why: string | number }

@@ -32,6 +32,7 @@ import { reviewCopyOnStart, reviewCopyOnVerdict } from './reviewCopies'
 import { COLUMN_CHOICES, columnLabel, commentSummary, isTaskColumn, reviewStalled } from '../shared/tasks'
 import type { HandoverAuthor } from '../shared/hiveGuidance'
 import { inDefaultDialect, inRequestScope } from '../shared/agentText/asyncScope'
+import { apiChainReady, inApiWorkspace } from './dialects/apiChain'
 import { say, type AgentMsg, type AgentValues } from '../shared/agentText'
 import { API } from './apiText'
 import { cardRequests, commentsParam, laneOrderNote, modelInUse, newestComments, progressLabel, retryWaitsView, taskRow, withoutHistory, type CardRequest, type IntentDone, type ProjectRow, type SkillRow, type TaskBatch, type TaskChange, type TaskReorder, type TaskView, type AccountUsagePublic } from '../shared/toolReplies'
@@ -647,7 +648,7 @@ async function assistantChange<T>(need: AssistantControl, what: Said, act: Activ
   // What is recorded (its activity, undo's records) is said in the Default; its refusals in the caller's scope.
   const stored = sayStored(what)
   const line = stored.charAt(0).toUpperCase() + stored.slice(1)
-  const guard = await asRefused(async () => assistant.admit(ws, assistantCallerToken() ?? '', need, sayNow(what), act))
+  const guard = await asRefused(async () => assistant.admit(ws, assistantCallerToken() ?? '', need, what, act))
   try {
     // `said`: what the line quotes (a prompt, a message), which the Agent API's event stream leaves out.
     // `brief`: the line in Hive's own words when `done` carries an error's text (#763: the stream never does).
@@ -731,7 +732,7 @@ function assistantMay(need: AssistantControl, what: Said, act: ActivityTarget): 
   const ws = assistantCaller()
   if (!ws) return
   try {
-    assistant.refuseUnlessAllowed(ws, need, sayNow(what), act)
+    assistant.refuseUnlessAllowed(ws, need, what, act)
   } catch (e) {
     throw httpOf(e)
   }
@@ -1156,18 +1157,6 @@ route('POST', '/v1/projects', async ({ body }) => {
 })
 
 const busy = (s: LiveSessionState | null): boolean => !!s && (s.status === 'working' || s.status === 'waiting' || s.status === 'starting' || s.status === 'background' || s.status === 'signin')
-const STATUS_WORDS: Record<string, string> = {
-  working: 'working',
-  waiting: 'waiting for the user',
-  signin: 'waiting for the user to sign in to its CLI again (its sign-in expired)',
-  starting: 'starting',
-  background: 'waiting on background tasks it started',
-  watching: 'waiting for cards to change (a card watch: its card loop pauses until it is resumed)',
-  ready: 'idle',
-  finished: 'idle (finished its task)',
-  error: 'in error',
-  stopped: 'stopped'
-}
 const clip = (t: string, n: number): string => (t.length > n ? `${t.slice(0, n)}…` : t)
 
 async function agentDefOf(p: string, agentId: string) {
@@ -1510,25 +1499,16 @@ route('POST', '/v1/projects/:name/agents/:agent/stop', async ({ params, body, si
     if (!st) return { done: [API.done.notRunning, { agent: a.name, project: basename(p) }], result: { ok: true, wasRunning: false } }
     // Stopping an agent in the middle of something is the user's call; one only watching is idle (HI-1994).
     if (stopAsksUser(st.status) && ws) {
-      const said = typeof body?.reason === 'string' ? clip(body.reason.trim(), 300) : ''
-      const reason = said ? ` Its reason: ${said}${/[.!?]$/.test(said) ? '' : '.'}` : ''
-      const how = await assistant.ask(
-        ws,
-        {
-          title: `Stop ${a.name} in ${basename(p)}?`,
-          message: `The Assistant wants to stop ${a.name}, which is ${STATUS_WORDS[st.status] ?? st.status}.${reason} Its conversation is kept and can be resumed.`,
-          yes: 'Stop',
-          no: "Don't stop"
-        },
-        { timeoutMs: STOP_ASK_MS, signal }
-      )
+      // The user's question, in the window's language (HI-2449).
+      const reason = typeof body?.reason === 'string' ? clip(body.reason.trim(), 300) : ''
+      const how = await assistant.ask(ws, assistant.stopQuestion({ agent: a.name, project: basename(p), status: st.status, reason }), { timeoutMs: STOP_ASK_MS, signal })
       // Its question closed, whatever ended it: never left open in the panel with nobody waiting on it (HI-1994).
       if (how === 'timedOut') throw new HttpError(408, say(API.agent.stopAskTimedOut, { agent: a.name, seconds: String(STOP_ASK_MS / 1000) }))
       if (how === 'gone') throw new HttpError(409, say(API.agent.stopAskWithdrawn, { agent: a.name }))
       if (how === 'no') throw new HttpError(409, say(API.agent.stopAskDeclined, { agent: a.name }))
       // The answer can come minutes later: only the run the user was asked about, and only if Control still allows it.
       if (sessions.liveFor(p, agentId)?.runId !== st.runId) return { done: [API.done.alreadyStopped, { agent: a.name, project: basename(p) }], result: { ok: true, wasRunning: false } }
-      if (!assistant.allows('agents')) throw new HttpError(403, say(API.agent.stopNotAllowed, { level: assistant.LEVEL_NAME[assistant.controlLevel()] }))
+      if (!assistant.allows('agents')) throw new HttpError(403, say(API.agent.stopNotAllowed, { level: assistant.levelName(assistant.controlLevel()) }))
     }
     // Control and the Assistant's session that asked, checked again just before the stop (HI-2328).
     guard()
@@ -4420,8 +4400,20 @@ async function handleApi(req: IncomingMessage, res: ServerResponse): Promise<voi
   who = caller
   // An agent's work is its project's; the Assistant's and scripts' are the workspace's own (not spread over projects).
   if (caller.kind === 'agent') m.project = basename(caller.projectPath)
-  // Its replies are in the caller's dialect (HI-2065): its session's, or the API chain's for a caller with none.
-  return callerStore.run(caller, () => inRequestScope(caller.kind === 'agent' ? caller : caller.kind === 'assistant' ? { projectPath: join(caller.workspace, HIVE_DIR, ASSISTANT_DIR), agentId: ASSISTANT_AGENT_ID } : null, () => serveApi(req, res, url)))
+  // Its replies are in the caller's dialect (HI-2065): its session's, or for a caller with none the API chain of the
+  // workspace the request names (or the only one open), decided here once for the whole request, its early and error
+  // replies too, never from the window with the focus (HR1 on HI-2443); none named among several: the Default. Loaded
+  // first where it isn't yet (kept until that workspace's dialect files change).
+  const apiWs = caller.kind === 'agent' || caller.kind === 'assistant' ? null : callerStore.run(caller, () => {
+    try {
+      return requestWorkspace(req, url)
+    } catch {
+      return null
+    }
+  })
+  const apiDir = apiWs?.path ? apiWs.hiveDir : null
+  if (apiDir) await apiChainReady(apiDir)
+  return callerStore.run(caller, () => inApiWorkspace(apiDir, () => inRequestScope(caller.kind === 'agent' ? caller : caller.kind === 'assistant' ? { projectPath: join(caller.workspace, HIVE_DIR, ASSISTANT_DIR), agentId: ASSISTANT_AGENT_ID } : null, () => serveApi(req, res, url))))
 }
 
 async function serveApi(req: IncomingMessage, res: ServerResponse, url: URL): Promise<void> {

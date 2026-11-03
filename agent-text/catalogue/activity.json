@@ -1,4 +1,8 @@
 {
+  "activity.batch.update": {
+    "text": "change {n} {count, plural, one {card} other {cards}} on the board",
+    "note": "What the Assistant's batch of card changes is called (hive_update_tasks), lower case: in a refusal (\"…don't let you {what}\") and its activity line. {n} is the number of cards as digits; {count} the same number, choosing the word."
+  },
   "activity.reason.conflict": {
     "text": "Not possible now",
     "note": "An Assistant action refused with 409, as its public error (#763)."

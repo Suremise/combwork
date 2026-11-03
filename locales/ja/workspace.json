@@ -2,6 +2,7 @@
   "workspace.activity.activity": "アクティビティ",
   "workspace.activity.assistant": "アシスタント",
   "workspace.activity.board": "タスクボード",
+  "workspace.activity.dialects": "ダイアレクト",
   "workspace.activity.docs": "ドキュメント",
   "workspace.activity.forYou": "{n, plural, other {要対応のカード#件}}",
   "workspace.activity.mcp": "MCPサーバー",

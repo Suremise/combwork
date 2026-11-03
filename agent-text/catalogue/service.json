@@ -154,6 +154,11 @@
     "note": "An error attaching a file to a card by its path (HI-1700): it is missing, a folder or a link, or in a place the caller may not attach from (another project, Hive’s own folders). Nothing was attached.",
     "audience": "both"
   },
+  "service.cardAttach.refusedFrom": {
+    "text": "{path} is not a file that can be attached here. Files can come from {caller, select, agent {your own project (its folder, its slots)} other {the workspace and its projects}}, the temp folder ({temp}){more, select, yes { and the folders of Settings → Advanced → Card attachments: more folders ({folders})} other {}}. To attach from another folder, the user adds it there (Settings → Advanced → Card attachments: more folders, Combwork's or this workspace's): don't copy the file into the temp folder. Nothing was attached.",
+    "note": "An error attaching a file to a card by its path (HI-1700, HI-2480): it is missing, a folder or a link, or in a place the caller may not attach from. {caller} is agent for a project's agent, else the Assistant or a script; {temp} is the temp folder's path; {more} is yes when the user listed more folders, {folders} those folders. Card attachments: more folders is an advanced setting's title: use it as Settings shows it. Nothing was attached.",
+    "audience": "both"
+  },
   "service.cardAttach.tooLarge": {
     "text": "{name} is larger than {max}, the most a card keeps in one file (Settings → Advanced → Card attachments: largest file). Nothing was attached.",
     "note": "An error attaching files to a card (HI-1700): one is larger than the limit ({max}: a size such as 25 MB); none of them was attached.",
@@ -707,6 +712,31 @@
   "service.providers.stopFirst": {
     "text": "Stop all running {cli} agents before updating it.",
     "note": "An error updating the coding agent CLI {cli} (\"Codex\") while agents run it.",
+    "audience": "both"
+  },
+  "service.settingsRevert.busy": {
+    "text": "It is being reverted.",
+    "note": "An error when the user clicks Revert on a setting the Assistant changed: a revert of that change is already running.",
+    "audience": "both"
+  },
+  "service.settingsRevert.changed": {
+    "text": "{path} has changed since (it is {value} now): change it there.",
+    "note": "An error when the user clicks Revert on a setting the Assistant changed: the setting was changed again since. {path} is where the setting is (\"Settings → Sessions → Idle timeout\"), {value} its value now as the panel shows values (on, off, a number, a model's name). \"There\" is that place in Settings.",
+    "audience": "both"
+  },
+  "service.settingsRevert.done": {
+    "text": "It has already been reverted.",
+    "note": "An error when the user clicks Revert on a setting the Assistant changed: that change was reverted already.",
+    "audience": "both"
+  },
+  "service.settingsRevert.gone": {
+    "text": "That change is no longer listed.",
+    "note": "An error when the user clicks Revert on a setting the Assistant changed (the Assistant panel's list of its changes): the change isn't in the list any more.",
+    "audience": "both"
+  },
+  "service.settingsRevert.models": {
+    "text": "{path} has changed since (its removed models differ): change it there.",
+    "note": "An error when the user clicks Revert on a provider's models setting the Assistant changed: the models it had removed are different now. {path} is where the setting is (\"Settings → Claude Code → Models\"). \"There\" is that place in Settings.",
     "audience": "both"
   },
   "service.slots.notPrepared": {

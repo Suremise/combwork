@@ -121,6 +121,8 @@ interface HiveMessageValues {
   'tips.cardAttachments.title': undefined
   'tips.cardAttachmentsCleanup.text': undefined
   'tips.cardAttachmentsCleanup.title': undefined
+  'tips.cardAttachmentsFolders.text': undefined
+  'tips.cardAttachmentsFolders.title': undefined
   'tips.cardCost.text': { example: string | number }
   'tips.cardCost.title': undefined
   'tips.cardCostRounds.text': undefined
@@ -194,6 +196,8 @@ interface HiveMessageValues {
   'tips.designCheck.title': undefined
   'tips.developerConsole.text': undefined
   'tips.developerConsole.title': undefined
+  'tips.dialects.text': undefined
+  'tips.dialects.title': undefined
   'tips.editTemplates.text': undefined
   'tips.editTemplates.title': undefined
   'tips.fileLinks.text': undefined

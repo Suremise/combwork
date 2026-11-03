@@ -171,6 +171,10 @@
     "defaultMessage": "{path} is not a file that can be attached here: give the path of a file of your own project (its folder, its slots) or of the temp folder. Nothing was attached.",
     "description": "An error attaching a file to a card by its path (HI-1700): it is missing, a folder or a link, or in a place the caller may not attach from (another project, Hive’s own folders). Nothing was attached."
   },
+  "service.cardAttach.refusedFrom": {
+    "defaultMessage": "{path} is not a file that can be attached here. Files can come from {caller, select, agent {your own project (its folder, its slots)} other {the workspace and its projects}}, the temp folder ({temp}){more, select, yes { and the folders of Settings → Advanced → Card attachments: more folders ({folders})} other {}}. To attach from another folder, the user adds it there (Settings → Advanced → Card attachments: more folders, Combwork's or this workspace's): don't copy the file into the temp folder. Nothing was attached.",
+    "description": "An error attaching a file to a card by its path (HI-1700, HI-2480): it is missing, a folder or a link, or in a place the caller may not attach from. {caller} is agent for a project's agent, else the Assistant or a script; {temp} is the temp folder's path; {more} is yes when the user listed more folders, {folders} those folders. Card attachments: more folders is an advanced setting's title: use it as Settings shows it. Nothing was attached."
+  },
   "service.cardAttach.tooLarge": {
     "defaultMessage": "{name} is larger than {max}, the most a card keeps in one file (Settings → Advanced → Card attachments: largest file). Nothing was attached.",
     "description": "An error attaching files to a card (HI-1700): one is larger than the limit ({max}: a size such as 25 MB); none of them was attached."
@@ -822,6 +826,26 @@
   "service.providers.taskFailed": {
     "defaultMessage": "{task} exited with code {code}",
     "description": "A notification: a coding agent CLI's task ({task}: \"Codex install\") ended with the exit code {code}."
+  },
+  "service.settingsRevert.busy": {
+    "defaultMessage": "It is being reverted.",
+    "description": "An error when the user clicks Revert on a setting the Assistant changed: a revert of that change is already running."
+  },
+  "service.settingsRevert.changed": {
+    "defaultMessage": "{path} has changed since (it is {value} now): change it there.",
+    "description": "An error when the user clicks Revert on a setting the Assistant changed: the setting was changed again since. {path} is where the setting is (\"Settings → Sessions → Idle timeout\"), {value} its value now as the panel shows values (on, off, a number, a model's name). \"There\" is that place in Settings."
+  },
+  "service.settingsRevert.done": {
+    "defaultMessage": "It has already been reverted.",
+    "description": "An error when the user clicks Revert on a setting the Assistant changed: that change was reverted already."
+  },
+  "service.settingsRevert.gone": {
+    "defaultMessage": "That change is no longer listed.",
+    "description": "An error when the user clicks Revert on a setting the Assistant changed (the Assistant panel's list of its changes): the change isn't in the list any more."
+  },
+  "service.settingsRevert.models": {
+    "defaultMessage": "{path} has changed since (its removed models differ): change it there.",
+    "description": "An error when the user clicks Revert on a provider's models setting the Assistant changed: the models it had removed are different now. {path} is where the setting is (\"Settings → Claude Code → Models\"). \"There\" is that place in Settings."
   },
   "service.slots.notPrepared": {
     "defaultMessage": "Combwork couldn't get {slot} ready for {card}: {why}",

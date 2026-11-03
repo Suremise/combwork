@@ -16,7 +16,7 @@
   "project.banner.dangerous": "このプロジェクトでは{modes}{count, plural, other {}}がオンです：エージェントはすべてのコマンドと編集を確認なしで実行します。",
   "project.banner.dangerousMode": "{agent}：{mode}",
   "project.banner.restart": "セッションを再起動",
-  "project.banner.restartNeeded": "{many, select, yes {{agent}の} other {この}}セッションの開始後に、スキル、MCPサーバー、または設定が変更されました。適用するにはセッションを再起動してください。会話は続きます。",
+  "project.banner.restartNeeded": "{many, select, yes {{agent}の} other {この}}セッションの開始後に、スキル、MCPサーバー、ダイアレクト、または設定が変更されました。適用するにはセッションを再起動してください。会話は続きます。",
   "project.banner.restartWhenDone": "ターンが終わったら再起動",
   "project.banner.switchFailed": "再起動を予約できませんでした",
   "project.banner.unmanagedMcp": "このプロジェクトには、ワークスペースにないMCPサーバーが定義されています：<b>{names}</b>。ワークスペースにコピーするまで無効のままです。",

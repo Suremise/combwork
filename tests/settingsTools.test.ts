@@ -1,13 +1,19 @@
 // The Assistant's settings tools (#186) on a provider's prices (#315): null puts back Hive's prices as Settings' Reset to
 // defaults does, the shipped models removed from the table too; a table keeps them removed; Revert puts the removed list
 // back with the overrides, and is refused when it changed since.
+import { readdirSync, readFileSync } from 'fs'
+import { join } from 'path'
 import { describe, expect, it, vi } from 'vitest'
 import { config } from '../src/main/config'
 import * as assistant from '../src/main/assistantControl'
+import { HiveError, shownError } from '../src/main/hiveError'
 import { applySetting, revertSetting } from '../src/main/settingsTools'
 import { inWorkspace } from '../src/main/workspace'
+import { setLanguage } from '../src/shared/i18n'
 import type { WorkspaceConfig } from '../src/shared/types'
-import { settingChangeTexts, settingEntry } from '../src/shared/settingsCatalog'
+import { settingChangeTexts, settingEntry, settingPath, settingReadOnly, shownSettingPath } from '../src/shared/settingsCatalog'
+import { advanced } from '../src/main/advanced'
+import { CARD_ATTACHMENT_FOLDERS_ID } from '../src/shared/advanced'
 
 const prices = settingEntry('codex.prices')!
 const mine = { 'gpt-7': { input: 1, cachedInput: 0.1, output: 5 } }
@@ -74,6 +80,42 @@ describe("the settings tools on a provider's prices", () => {
       await expect(revertSetting(WS, action.id)).rejects.toThrow(/has changed since/)
       expect(config.settings.providers.codex.pricesRemoved).toEqual(['gpt-5.4'])
     })
+  })
+
+  // HI-2471: its refusals are window messages, in the language Hive shows, the path as Settings shows it; English for the log.
+  it("…its refusals said in the window's language, the setting's path as Settings shows it", async () => {
+    const de = join(__dirname, '..', 'locales', 'de')
+    await withPrices(mine, ['gpt-5.5'], async () => {
+      const action = listed(await applySetting(prices, null, null))
+      config.setProviderPrices('codex', {}, ['gpt-5.4'])
+      const english = await revertSetting(WS, action.id).catch((e: unknown) => e)
+      expect(english).toBeInstanceOf(HiveError)
+      expect((english as HiveError).message).toBe(`${shownSettingPath(prices)} has changed since (its removed models differ): change it there.`)
+      expect((english as HiveError).kind).toBe('conflict')
+      setLanguage('de', Object.assign({}, ...readdirSync(de).filter((f) => f.endsWith('.json')).map((f) => JSON.parse(readFileSync(join(de, f), 'utf8')))))
+      try {
+        const path = shownSettingPath(prices)
+        expect(path).not.toBe(settingPath(prices))
+        const changed = await revertSetting(WS, action.id).catch((e: unknown) => e)
+        expect(shownError(changed)).toBe(`${path} wurde seitdem geändert (die entfernten Modelle sind andere): Ändere es dort.`)
+        const gone = await revertSetting(WS, 'no-such-change').catch((e: unknown) => e)
+        expect(shownError(gone)).toBe('Diese Änderung ist nicht mehr aufgeführt.')
+        expect((gone as HiveError).message).toBe('That change is no longer listed.')
+      } finally {
+        setLanguage('en', {})
+      }
+    })
+  })
+
+  // HI-2480 round 2: where agents may attach files from is a permission: the Assistant reads it and never sets it.
+  it("Card attachments: more folders is the user's: read and explained, never set by the Assistant, Hive's or a workspace's", async () => {
+    for (const id of ['advanced.hive.cards.attachmentFolders', 'workspace.advanced.hive.cards.attachmentFolders']) {
+      const e = settingEntry(id)!
+      expect(e, id).toMatchObject({ sensitive: true })
+      expect(settingReadOnly(e), id).toMatch(/^It decides which folders agents, the Assistant and scripts may attach files to cards from: only the user can change it, in /)
+      await expect(applySetting(e, ['C:\\Evidence'], null), id).rejects.toMatchObject({ status: 403 })
+    }
+    expect(advanced.get(CARD_ATTACHMENT_FOLDERS_ID)).toEqual([])
   })
 
   it("Revert of a table edit leaves the removed models as they are then", async () => {

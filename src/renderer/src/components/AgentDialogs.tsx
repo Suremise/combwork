@@ -324,6 +324,48 @@ interface AgentFields {
   mcp: string[] | null
   /** The connection it runs on (HI-2108): its id. A template's agent has none. */
   connection: string
+  /** Its Dialect setting (HI-2444): a file of its CLI's dialects folder, '' for Auto. A template's agent has none. */
+  dialect?: string
+}
+
+const DIALECT = {
+  label: msg({ id: 'agents.dialect.label', defaultMessage: 'Dialect', description: "Agent Settings (HI-2444): the choice of the dialect file that fills the agent's model slot. Glossary: dialect." }),
+  auto: msg({ id: 'agents.dialect.auto', defaultMessage: 'Auto (the file for the model it runs)', description: "Agent Settings' Dialect choice: Hive picks the model file whose model ID is the one the agent runs. Glossary: dialect." }),
+  model: msg({ id: 'agents.dialect.model', defaultMessage: '{name} (model {model})', description: "Agent Settings' Dialect choice: a model file, {name}, for model ID {model}. Glossary: dialect." }),
+  copy: msg({ id: 'agents.dialect.copy', defaultMessage: '{name} (test copy)', description: "Agent Settings' Dialect choice: a test copy (a dialect file with no model), {name}, for trying wording on one agent. Glossary: test copy." }),
+  missing: msg({ id: 'agents.dialect.missing', defaultMessage: '{path} (not there: Auto is used)', description: "Agent Settings' Dialect choice: the file chosen before is gone, so the agent uses Auto. {path} is its path. Glossary: dialect." }),
+  hint: msg({ id: 'agents.dialect.hint', defaultMessage: "Which dialect file adjusts the wording Combwork gives this agent, over its CLI's and the workspace's. Pick a test copy to try a change on this agent alone.", description: "Under Agent Settings' Dialect choice (HI-2444). Glossary: dialect, test copy." })
+}
+
+/** Agent Settings' Dialect (HI-2444): Auto, or a file of the agent's CLI folder, read from the workspace's dialects. */
+function DialectChoice({ cli, value, onChange }: { cli: ProviderId; value: string; onChange: (v: string) => void }) {
+  const version = useStore((s) => s.dialectsVersion)
+  const [choices, setChoices] = useState<{ path: string; name: string; model?: string }[] | null>(null)
+  useEffect(() => {
+    let live = true
+    call('dialects:choices', cli)
+      .then((c) => live && setChoices(c))
+      .catch(() => live && setChoices([]))
+    return () => {
+      live = false
+    }
+  }, [cli, version])
+  const known = !value || !choices || choices.some((c) => c.path === value)
+  return (
+    <>
+      <label htmlFor="agent-dialect">{tr(DIALECT.label)}</label>
+      <select id="agent-dialect" className="input" data-agent-dialect value={value} onChange={(e) => onChange(e.target.value)}>
+        <option value="">{tr(DIALECT.auto)}</option>
+        {(choices ?? []).map((c) => (
+          <option key={c.path} value={c.path}>
+            {c.model ? tr(DIALECT.model, { name: c.name, model: c.model }) : tr(DIALECT.copy, { name: c.name })}
+          </option>
+        ))}
+        {!known && <option value={value}>{tr(DIALECT.missing, { path: value })}</option>}
+      </select>
+      <div className="hint span2">{tr(DIALECT.hint)}</div>
+    </>
+  )
 }
 
 /**
@@ -404,6 +446,7 @@ function AgentSettingsModal({
   mcpWhere,
   cliLocked,
   suggestOnly,
+  dialectCli,
   note,
   nameProblem,
   confirmSave,
@@ -419,6 +462,8 @@ function AgentSettingsModal({
   mcpWhere: 'project' | 'workspace'
   cliLocked?: { cli: ProviderId; why: ReactNode }
   suggestOnly?: boolean
+  /** A project's agent: the CLI whose dialect files its Dialect setting offers (HI-2444); none for a template's agent. */
+  dialectCli?: ProviderId
   note?: ReactNode
   nameProblem?: (name: string) => string | null
   confirmSave?: (f: AgentFields) => Promise<boolean>
@@ -486,6 +531,7 @@ function AgentSettingsModal({
         {/* Its connection holds its model, effort, context and mode; its CLI follows from it (HI-2108). */}
         {!suggestOnly && <ConnectionChoice id="agent-connection" value={f.connection} cli={cliLocked?.cli} onChange={(connection) => put({ connection })} onNew={setNewOn} />}
         {!suggestOnly && cliLocked && <div className="hint span2" data-cli-locked>{cliLocked.why}</div>}
+        {dialectCli && <DialectChoice cli={dialectCli} value={f.dialect ?? ''} onChange={(dialect) => put({ dialect })} />}
       </div>
       <WorkflowRoleChoice value={f.workflowRole} onChange={(workflowRole) => put({ workflowRole })} />
       {suggestOnly && (
@@ -530,7 +576,7 @@ export function AgentSettingsDialog() {
   const close = (): void => set({ agentSettingsFor: null })
   const own = legacyOf(agent)
   // Its role as it reads now (the guess, for an agent from before 1.0), stored once the user saves (#1430).
-  const initial: AgentFields = { name: agent.name, role: agent.role ?? '', workflowRole: agentWorkflowRole(agent), provider: current, mcp: agent.mcpServers ? [...agent.mcpServers] : null, connection: agent.connection ?? '' }
+  const initial: AgentFields = { name: agent.name, role: agent.role ?? '', workflowRole: agentWorkflowRole(agent), provider: current, mcp: agent.mcpServers ? [...agent.mcpServers] : null, connection: agent.connection ?? '', dialect: agent.dialect ?? '' }
   return (
     <AgentSettingsModal
       title={tr(msg({ id: 'agents.settings.title', defaultMessage: '{agent} settings', description: 'Title of the Agent Settings dialog. {agent} is the agent.' }), { agent: agent.name })}
@@ -539,6 +585,7 @@ export function AgentSettingsDialog() {
       roles={roleSuggestions(project.agents)}
       mcpProject={project.path}
       mcpWhere="project"
+      dialectCli={current}
       works={
         // Where it works now (#1442): its 0.9 worktree, a slot, carried slot or home, or the project folder.
         own ? (
@@ -575,7 +622,9 @@ export function AgentSettingsDialog() {
           role: f.role,
           workflowRole: f.workflowRole,
           mcpServers: f.mcp,
-          ...(f.connection !== initial.connection ? { connection: f.connection || null } : {})
+          ...(f.connection !== initial.connection ? { connection: f.connection || null } : {}),
+          // Its Dialect (HI-2444), when changed: '' is Auto. A change of CLI clears it in main unless one is picked here.
+          ...(f.dialect !== initial.dialect ? { dialect: f.dialect || null } : {})
         })
         await actions.refreshWorkspace()
       }}

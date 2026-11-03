@@ -21,7 +21,7 @@ const store = await import('../src/main/boardStore')
 const att = await import('../src/main/cardAttachments')
 const { advanced } = await import('../src/main/advanced')
 const { planCleanup, planPurge } = await import('../src/shared/storage')
-const { CARD_ATTACHMENT_MAX_ID } = await import('../src/shared/advanced')
+const { CARD_ATTACHMENT_FOLDERS_ID, CARD_ATTACHMENT_MAX_ID, advancedDef, advancedText, checkAdvanced } = await import('../src/shared/advanced')
 const { attachmentMarkdown, attachmentRefs, escapeLinkText, withAttachmentPaths, withStoredIds } = await import('../src/shared/cardAttachments')
 
 advanced.load(join(base, 'profile'))
@@ -335,6 +335,77 @@ describe('where a file may come from (HI-1700, s13 §2)', () => {
     expect(await att.attachableSource(w, ws, file(join(root, 'q'), 'theirs.png', 't'))).toBeTruthy()
     expect(await att.attachableSource(w, ws, file(join(w.assistantHome, '.hive', 'attachments', 's1'), 'pasted.png', 'a'))).toBeTruthy()
     await expect(att.attachableSource(w, ws, join(root, 'q', '.hive', 'project.json'))).rejects.toThrow()
+  })
+
+  // HI-2480: a folder the user lists (Settings → Advanced → Card attachments: more folders, Hive's or the workspace's).
+  it('more folders: a file under one attaches; outside every accepted folder it is refused, saying which are and where to add one', async () => {
+    const { w, root } = await workspace()
+    const agent = { kind: 'agent', project: 'p' } as const
+    const script = { kind: 'workspace' } as const
+    // Everything a test makes is in the run's temp folder: the temp folder is one of its own here, so the rest is outside it.
+    const was = process.env.HIVE_EVIDENCE
+    const temp = tempDir('hive-temp-')
+    att.attachTestHooks.temp = temp
+    const evidence = tempDir('hive-evidence-')
+    const zip = file(join(evidence, 'run4'), 'run4.zip', 'zip bytes')
+    const elsewhere = file(tempDir('hive-elsewhere-'), 'other.zip', 'other')
+    try {
+      // Not listed: refused, naming the accepted folders, Temp's path and where to add one.
+      const refused = await att.attachableSource(w, agent, zip).then(() => 'attached', (e: Error) => e.message)
+      expect(refused).toBe(`${zip} is not a file that can be attached here. Files can come from your own project (its folder, its slots), the temp folder (${temp}). To attach from another folder, the user adds it there (Settings → Advanced → Card attachments: more folders, Combwork's or this workspace's): don't copy the file into the temp folder. Nothing was attached.`)
+      await expect(att.attachableSource(w, script, zip)).rejects.toThrow(/Files can come from the workspace and its projects, the temp folder/)
+      expect(await att.attachableSource(w, agent, file(temp, 'shot.png', 's'))).toBeTruthy()
+
+      // Hive's own list, with a variable at its start: the agent's and the script's file attaches; elsewhere is still refused.
+      process.env.HIVE_EVIDENCE = evidence
+      await advanced.set(CARD_ATTACHMENT_FOLDERS_ID, '%hive_evidence%; Q:\\not\\there')
+      expect(att.extraFolders(w)).toEqual([evidence, 'Q:\\not\\there'])
+      expect(await att.attachableSource(w, agent, zip)).toBe(zip)
+      expect(await att.attachableSource(w, script, zip)).toBe(zip)
+      const still = await att.attachableSource(w, agent, elsewhere).then(() => 'attached', (e: Error) => e.message)
+      expect(still).toContain(` and the folders of Settings → Advanced → Card attachments: more folders (${evidence}; Q:\\not\\there). To attach from another folder`)
+      // And a card keeps it, as the tools attach a path once it is checked.
+      const c = await card(w)
+      const a = await inWorkspace(w, async () => att.attachToCard(w, c, [{ path: await att.attachableSource(w, agent, zip) }], 'HB1'))
+      expect(a.attachments.map((x) => x.name)).toEqual(['run4.zip'])
+      // Protected folders stay refused inside a listed one: another project's, and a .hive beyond its attachments.
+      await advanced.set(CARD_ATTACHMENT_FOLDERS_ID, root)
+      await expect(att.attachableSource(w, agent, file(join(root, 'q'), 'theirs.png', 't'))).rejects.toThrow(/not a file that can be attached/)
+      await expect(att.attachableSource(w, agent, file(join(root, '.hive'), 'x.txt', 'x'))).rejects.toThrow(/not a file that can be attached/)
+
+      // The workspace's own list over Hive's; unset, Hive's again. A variable that isn't set leaves its folder out.
+      await w.setAdvanced(CARD_ATTACHMENT_FOLDERS_ID, [evidence])
+      expect(att.extraFolders(w)).toEqual([evidence])
+      await w.setAdvanced(CARD_ATTACHMENT_FOLDERS_ID, '%HIVE_NOT_SET_2480%\\x')
+      expect(att.extraFolders(w)).toEqual([])
+      await expect(att.attachableSource(w, agent, zip)).rejects.toThrow(/not a file that can be attached/)
+      // A workspace's [] (written by hand or the API) is Hive's list, as its emptied box in Settings is.
+      await w.setAdvanced(CARD_ATTACHMENT_FOLDERS_ID, [])
+      expect(att.extraFolders(w)).toEqual([root])
+      await w.setAdvanced(CARD_ATTACHMENT_FOLDERS_ID, null)
+      expect(att.extraFolders(w)).toEqual([root])
+    } finally {
+      await advanced.set(CARD_ATTACHMENT_FOLDERS_ID, null)
+      att.attachTestHooks.temp = null
+      if (was === undefined) delete process.env.HIVE_EVIDENCE
+      else process.env.HIVE_EVIDENCE = was
+    }
+  })
+
+  it('more folders takes full paths, separated by semicolons; anything else is refused, saying what it takes', async () => {
+    const def = advancedDef(CARD_ATTACHMENT_FOLDERS_ID)!
+    expect(def).toMatchObject({ kind: 'list', paths: true, default: [], workspace: true })
+    expect(checkAdvanced(def, 'C:\\Evidence; D:/runs;\\\\server\\share\\x; %LOCALAPPDATA%\\combwork-cli')).toEqual({ value: ['C:\\Evidence', 'D:/runs', '\\\\server\\share\\x', '%LOCALAPPDATA%\\combwork-cli'] })
+    expect(checkAdvanced(def, 'C:\\a, b\\c')).toEqual({ value: ['C:\\a, b\\c'] })
+    // As shown and read back (Settings' box joins a list of folders with "; "): every folder kept apart.
+    const two = ['C:\\Evidence, runs', 'D:\\Runs']
+    expect(checkAdvanced(def, advancedText(def, two))).toEqual({ value: two })
+    // Empty only as the default is written (HI-2480 round 2): text with no folder is refused (Settings' empty box resets).
+    expect(checkAdvanced(def, [])).toEqual({ value: [] })
+    for (const bad of ['evidence', 'C:\\a; relative\\b', '..\\up', ['C:\\a', 3], Array.from({ length: 21 }, (_, i) => `C:\\f${i}`), '', ' ; ', ['', ' ']]) {
+      const r = checkAdvanced(def, bad)
+      expect('error' in r && r.error, JSON.stringify(bad)).toBe('Card attachments: more folders takes up to 20 folders, each a full path (C:\\…, \\\\server\\…, or starting with a variable such as %LOCALAPPDATA%), separated by semicolons.')
+    }
   })
 
   it("Attach to card from a pane: only that host's session attachments", async () => {

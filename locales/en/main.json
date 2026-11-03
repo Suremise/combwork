@@ -119,6 +119,26 @@
     "defaultMessage": "Answered",
     "description": "What the notification of a question from the Hive Assistant says once it is answered or no longer waits (HI-2320), in place of its buttons. Keep it short."
   },
+  "main.assistantQuestion.stop.message": {
+    "defaultMessage": "The Assistant wants to stop {agent}, which is {state}.{hasReason, select, yes { Its reason: {reason}} other {}} Its conversation is kept and can be resumed.",
+    "description": "Under the question \"Stop <agent> in <project>?\". {state} is what the agent is doing (main.assistantQuestion.stop.state); {reason} is the Assistant's own reason, as it wrote it, ending with a full stop."
+  },
+  "main.assistantQuestion.stop.no": {
+    "defaultMessage": "Don't stop",
+    "description": "The button that answers no to \"Stop <agent> in <project>?\"."
+  },
+  "main.assistantQuestion.stop.state": {
+    "defaultMessage": "{status, select, working {working} waiting {waiting for the user} signin {waiting for the user to sign in to its CLI again (its sign-in expired)} starting {starting} background {waiting on background tasks it started} watching {waiting for cards to change (a card watch: its card loop pauses until it is resumed)} ready {idle} finished {idle (finished its task)} error {in error} stopped {stopped} other {{status}}}",
+    "description": "What an agent is doing, inside \"The Assistant wants to stop <agent>, which is …\". The other branch is its status as Hive names it in code: keep {status}."
+  },
+  "main.assistantQuestion.stop.title": {
+    "defaultMessage": "Stop {agent} in {project}?",
+    "description": "A question from the Hive Assistant to the user, in its panel (and a notification while the panel is hidden): it wants to stop an agent that is busy. {agent} is the agent's name, {project} its project's."
+  },
+  "main.assistantQuestion.stop.yes": {
+    "defaultMessage": "Stop",
+    "description": "The button that answers yes to \"Stop <agent> in <project>?\" (the Assistant asks before stopping a busy agent)."
+  },
   "main.board.damagedBody": {
     "defaultMessage": "{files} stayed out of the board. They are kept in {folder}.",
     "description": "The notice about card files Hive couldn't read as it moved the board into its database: {files} lists them, {folder} is where they are kept."
@@ -998,6 +1018,26 @@
   "main.plan.usedOn": {
     "defaultMessage": "{share, number, ::percent} of the {window, select, hours {{hours, plural, one {#-hour limit} other {#-hour limit}}} weekly {weekly limit} other {{label} limit}} used on {connection}",
     "description": "A notice (HI-1756): how much of a plan's usage limit is used ({share}: \"85%\") on one connection, a sign-in the user named ({connection}: \"Max 1\"). The limit is a rolling window of {hours} hours (the 5-hour one), the weekly one, or another the provider names itself ({label}, in English as the provider says it)."
+  },
+  "main.profileMove.fallbackBody": {
+    "defaultMessage": "{n, plural, one {The Combwork folder isn't there, so Combwork runs from {folders}, as before.} other {The Combwork folders aren't there, so Combwork runs from {folders}, as before.}} Installing Combwork with Combwork closed moves {n, plural, one {it} other {them}}; nothing is lost meanwhile.",
+    "description": "The notice that Hive uses its old data folders. {folders} lists their paths; {n} is how many (1 or 2). \"Installing Combwork\": running the installer of the app under its new name."
+  },
+  "main.profileMove.fallbackBodyDev": {
+    "defaultMessage": "{n, plural, one {The {name} folder isn't there, so this dev build runs from {folders}.} other {The {name} folders aren't there, so this dev build runs from {folders}.}} To move {n, plural, one {it} other {them}}, close Combwork and rename {n, plural, one {it} other {each}} to {name}.",
+    "description": "The same notice for a development build of Hive (no installer moves its folders). {name} is the new folder name (Combwork-Dev: keep it as it is); {folders} lists the old folders' paths; {n} is how many (1 or 2)."
+  },
+  "main.profileMove.fallbackTitle": {
+    "defaultMessage": "Combwork is using its data folders from before Combwork",
+    "description": "A notice at start (HI-2461): the app's data folders are now named Combwork (the app's new name, keep it as it is), which the installer moves them to; they weren't moved yet, so Hive uses its old folders. Nothing is lost."
+  },
+  "main.profileMove.signInBody": {
+    "defaultMessage": "Since Combwork moved its data to the Combwork folder, {names} {n, plural, one {shows} other {show}} signed out. Sign in again in Settings → Accounts & Connections.",
+    "description": "The notice naming the connections that show signed out after the data moved. {names} lists them by name; {n} is how many."
+  },
+  "main.profileMove.signInTitle": {
+    "defaultMessage": "{n, plural, one {Sign in to # connection again} other {Sign in to # connections again}}",
+    "description": "A notice at start (HI-2461), once: after the app's data moved to the Combwork folder (the app's new name), some connections' sign-ins didn't carry across. {n} is how many."
   },
   "main.quit.closed": {
     "defaultMessage": "Combwork has closed",

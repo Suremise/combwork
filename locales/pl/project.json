@@ -16,7 +16,7 @@
   "project.banner.dangerous": "{count, plural, one {Włączony tryb} few {Włączone tryby} many {Włączone tryby} other {Włączone tryby}} w tym projekcie: {modes}. Agent wykonuje każde polecenie i edycję bez pytania.",
   "project.banner.dangerousMode": "{agent}: {mode}",
   "project.banner.restart": "Uruchom sesję ponownie",
-  "project.banner.restartNeeded": "Umiejętności, serwery MCP lub ustawienia zmieniły się od rozpoczęcia {many, select, yes {sesji agenta {agent}} other {tej sesji}}. Uruchom sesję ponownie, aby je zastosować – rozmowa będzie kontynuowana.",
+  "project.banner.restartNeeded": "Umiejętności, serwery MCP, dialekty lub ustawienia zmieniły się od rozpoczęcia {many, select, yes {sesji agenta {agent}} other {tej sesji}}. Uruchom sesję ponownie, aby je zastosować – rozmowa będzie kontynuowana.",
   "project.banner.restartWhenDone": "Uruchom ponownie po zakończeniu tury",
   "project.banner.switchFailed": "Nie udało się zaplanować ponownego uruchomienia",
   "project.banner.unmanagedMcp": "Ten projekt definiuje serwery MCP, których nie ma w obszarze roboczym: <b>{names}</b>. Pozostają wyłączone, dopóki nie skopiujesz ich do obszaru roboczego.",

@@ -1,4 +1,5 @@
-import type { LaneState, LaneStatus, SessionStatus, TaskCard, TaskColumn } from './types'
+import type { LaneState, LaneStatus, SessionStatus, StoredText, TaskCard, TaskColumn } from './types'
+import { storedForAgents } from './taskHistory'
 import { laneStatusText } from './lanes'
 import { columnLabel } from './tasks'
 import { brief, cardPart, historyBlocked, historyVerdict, WAKE_MAX_BYTES, WATCH_CHANGES, WATCH_MAX_CARDS, type CardChange, type WatchChange } from './watch'
@@ -135,7 +136,9 @@ export interface LaneNow {
 export interface LaneAsked {
   since: string
   by: string | null
+  /** Its English as stored; `shown`, Hive's own request as data, which a reader's chain says again (HI-2464). */
   text: string
+  shown?: StoredText
 }
 
 /** One lane's events since its mark: what the wake line tells. */
@@ -250,7 +253,7 @@ export function laneHits(before: LaneMark | null | undefined, now: LaneNow, even
     if (on.has('moved') && is.c !== was.c) parts.push({ n: c.number, event: 'moved', text: say(T.moved, { card, column: columnLabel(is.c) }) })
     // A new request for the user on it (HI-1991): an agent's question (hive_ask_user) or Hive's own, under For you. The
     // agent asking isn't waiting at a prompt, so `waiting` never tells it. A mark from before has no `q`.
-    if (on.has('paused-user') && was.q !== undefined && is.q !== undefined && is.q > was.q) parts.push({ n: c.number, event: 'paused-user', text: say(T.asked, { card, who: !c.asked ? 'none' : c.asked.by ? 'agent' : 'hive', by: c.asked?.by ?? '' }), ...(c.asked?.text ? { detail: firstLine(c.asked.text) } : {}) })
+    if (on.has('paused-user') && was.q !== undefined && is.q !== undefined && is.q > was.q) parts.push({ n: c.number, event: 'paused-user', text: say(T.asked, { card, who: !c.asked ? 'none' : c.asked.by ? 'agent' : 'hive', by: c.asked?.by ?? '' }), ...(c.asked?.text ? { detail: firstLine(storedForAgents(c.asked.text, c.asked.shown)) } : {}) })
   }
   if (on.has('merge-due') && now.mark.mergeDue && !before.mergeDue && now.mark.state !== 'ended' && now.mark.state !== 'abandoned') parts.push({ n: null, event: 'merge-due', text: say(T.mergeDue) })
   if (on.has('stalled') && now.mark.ms && !before.ms) parts.push({ n: null, event: 'stalled', text: say(T.mergeStalled), ...(now.mergeStall ? { detail: now.mergeStall } : {}) })

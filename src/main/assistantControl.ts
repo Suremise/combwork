@@ -11,6 +11,8 @@ import { config } from './config'
 import { emit } from './events'
 import { resolveOffer, tell } from './notify'
 import { msg, tr } from '../shared/i18n'
+import { englishText, shownText, withValues, type Text } from '../shared/advanced'
+import { agentMsg, inDefaultDialect, say, type AgentMsg, type AgentValues } from '../shared/agentText'
 import { hashText, writeJsonAtomic } from './fsutil'
 import { createLogger, userText } from './logger'
 import { recordTestToken } from './testQuiet'
@@ -72,8 +74,7 @@ export async function newAssistantToken(workspacePath: string): Promise<void> {
   s.token = token
   const file = assistantTokenFile(workspacePath)
   await mkdir(dirname(file), { recursive: true })
-  // i18n-ignore: the token file is the Assistant's to read, not the window's
-  await writeJsonAtomic(file, { token: s.token, note: "The Hive Assistant's Agent API token for one workspace. Hive replaces it each time the Assistant starts." })
+  await writeJsonAtomic(file, { token: s.token, note: inDefaultDialect(() => say(CONTROL.tokenNote)) })
 }
 
 /** Whether a token is the workspace's Assistant's current one: its running session's, not one from before a restart. */
@@ -132,6 +133,34 @@ export function actions(workspacePath: string): AssistantAction[] {
   return stateOf(workspacePath).actions
 }
 
+/**
+ * What the Assistant's change is called, as data (HI-2450): said in its caller's scope where the Assistant reads it (a
+ * refusal), and in the Default where it is kept (its activity line). Its first word is lower case ("change 3 cards…").
+ */
+export type Said = readonly [AgentMsg, AgentValues?]
+/** In the caller's scope: what it reads. */
+const sayNow = ([m, values]: Said): string => say(m, values)
+/** In the Default: text kept for any reader (the Assistant's activity). */
+const sayStored = ([m, values]: Said): string => inDefaultDialect(() => say(m, values))
+
+/** The change boundary's words (dialects, HI-2450): the Assistant reads its refusals; its activity keeps the record's. */
+const CONTROL = {
+  refused: agentMsg({ id: 'control.refused', text: "The user's settings (Settings → Assistant → Control: {level}) don't let you {what}. Tell the user what you would do instead.", note: "The Assistant's change refused by its control level (#186). {level} is the level's name (control.level.*); {what} what the change is called, lower case (\"create a card\")." }),
+  turnedDown: agentMsg({ id: 'control.turnedDown', text: 'The user turned Settings → Assistant → Control down before this change was made: nothing changed here.', note: "The Assistant's change refused at the moment it was to be made: the control level was lowered while it waited." }),
+  sessionEnded: agentMsg({ id: 'control.sessionEnded', text: "The Assistant's session that asked for this ended before the change was made: nothing changed here.", note: "The Assistant's change refused at the moment it was to be made: the session that asked was restarted or ended while it waited." }),
+  notAllowed: agentMsg({ id: 'control.notAllowed', text: 'not allowed by Settings → Assistant → Control', note: "Why a change was refused, in the Assistant's activity list beside the change (#763)." }),
+  notAllowedReason: agentMsg({ id: 'control.notAllowedReason', text: 'Not allowed by Settings → Assistant → Control', note: "Why a change was refused, as the Agent API's event stream says it (a refusal's reason, #763)." }),
+  tokenNote: agentMsg({ id: 'control.tokenNote', text: "The Hive Assistant's Agent API token for one workspace. Hive replaces it each time the Assistant starts.", note: "The note beside the Assistant's token in its file, for whoever opens it." }),
+  level: {
+    look: agentMsg({ id: 'control.level.look', text: 'Look and advise', note: 'The control level Look and advise (Settings → Assistant → Control), as the Assistant\'s refusals name it.' }),
+    agents: agentMsg({ id: 'control.level.agents', text: 'Control agents', note: 'The control level Control agents (Settings → Assistant → Control), as the Assistant\'s refusals name it.' }),
+    projects: agentMsg({ id: 'control.level.projects', text: 'Control agents and create projects', note: 'The control level Control agents and create projects (Settings → Assistant → Control), as the Assistant\'s refusals name it.' })
+  } satisfies Record<AssistantControl, AgentMsg>
+}
+
+/** A control level's name, as the Assistant's refusals name it (in its caller's scope). */
+export const levelName = (level: AssistantControl): string => say(CONTROL.level[level])
+
 /** A change the Assistant may not make: the Agent API's status, and what it reports beside the error. */
 export class ChangeRefused extends Error {
   constructor(
@@ -143,16 +172,13 @@ export class ChangeRefused extends Error {
   }
 }
 
-// i18n-ignore: the control levels as the Assistant's refusals name them (Agent API replies stay English)
-export const LEVEL_NAME: Record<AssistantControl, string> = { look: 'Look and advise', agents: 'Control agents', projects: 'Control agents and create projects' }
-
 /** Refuses (and records) a change the control level doesn't allow: the Assistant's change boundary, before anything changes. */
-export function refuseUnlessAllowed(workspacePath: string, need: AssistantControl, what: string, act: ActivityTarget): void {
+export function refuseUnlessAllowed(workspacePath: string, need: AssistantControl, what: Said, act: ActivityTarget): void {
   if (allows(need)) return
-  // i18n-ignore: the Agent API's event stream (#763) speaks English, as the rest of the API does
-  record(workspacePath, act, what.charAt(0).toUpperCase() + what.slice(1), 'not allowed by Settings → Assistant → Control', { reason: 'Not allowed by Settings → Assistant → Control' })
-  // i18n-ignore: a refusal the Assistant reads (Agent API replies stay English)
-  throw new ChangeRefused(403, `The user's settings (Settings → Assistant → Control: ${LEVEL_NAME[controlLevel()]}) don't let you ${what}. Tell the user what you would do instead.`)
+  // Kept in the Assistant's activity: said in the Default, whatever its caller reads (HI-2450).
+  const stored = sayStored(what)
+  record(workspacePath, act, stored.charAt(0).toUpperCase() + stored.slice(1), sayStored([CONTROL.notAllowed]), { reason: sayStored([CONTROL.notAllowedReason]) })
+  throw new ChangeRefused(403, say(CONTROL.refused, { level: levelName(controlLevel()), what: sayNow(what) }))
 }
 
 /**
@@ -161,13 +187,11 @@ export function refuseUnlessAllowed(workspacePath: string, need: AssistantContro
  * per message (#1170: undo, not a count, protects the board). Returns the guard to run again as each card is written: the
  * control level and the session must still allow the change then, after the last read, or nothing is saved.
  */
-export function admit(workspacePath: string, token: string, need: AssistantControl, what: string, act: ActivityTarget): () => void {
+export function admit(workspacePath: string, token: string, need: AssistantControl, what: Said, act: ActivityTarget): () => void {
   refuseUnlessAllowed(workspacePath, need, what, act)
   return () => {
-    // i18n-ignore: a refusal the Assistant reads (Agent API replies stay English)
-    if (!allows(need)) throw new ChangeRefused(403, 'The user turned Settings → Assistant → Control down before this change was made: nothing changed here.')
-    // i18n-ignore: a refusal the Assistant reads (Agent API replies stay English)
-    if (!isCurrentToken(workspacePath, token)) throw new ChangeRefused(409, "The Assistant's session that asked for this ended before the change was made: nothing changed here.")
+    if (!allows(need)) throw new ChangeRefused(403, say(CONTROL.turnedDown))
+    if (!isCurrentToken(workspacePath, token)) throw new ChangeRefused(409, say(CONTROL.sessionEnded))
   }
 }
 
@@ -199,6 +223,45 @@ function emitQuestions(workspacePath: string): void {
 }
 
 /** Questions told as a notification (HI-2320), by id: once each. */
+/**
+ * The question asked before the Assistant stops a busy agent (HI-1994): the user's to answer, in the window's language
+ * (HI-2449). {state} is what the agent is doing, from its live status.
+ */
+const STOP_QUESTION = {
+  title: msg({ id: 'main.assistantQuestion.stop.title', defaultMessage: 'Stop {agent} in {project}?', description: "A question from the Hive Assistant to the user, in its panel (and a notification while the panel is hidden): it wants to stop an agent that is busy. {agent} is the agent's name, {project} its project's." }),
+  message: msg({
+    id: 'main.assistantQuestion.stop.message',
+    defaultMessage: 'The Assistant wants to stop {agent}, which is {state}.{hasReason, select, yes { Its reason: {reason}} other {}} Its conversation is kept and can be resumed.',
+    description: "Under the question \"Stop <agent> in <project>?\". {state} is what the agent is doing (main.assistantQuestion.stop.state); {reason} is the Assistant's own reason, as it wrote it, ending with a full stop."
+  }),
+  state: msg({
+    id: 'main.assistantQuestion.stop.state',
+    defaultMessage: '{status, select, working {working} waiting {waiting for the user} signin {waiting for the user to sign in to its CLI again (its sign-in expired)} starting {starting} background {waiting on background tasks it started} watching {waiting for cards to change (a card watch: its card loop pauses until it is resumed)} ready {idle} finished {idle (finished its task)} error {in error} stopped {stopped} other {{status}}}',
+    description: 'What an agent is doing, inside "The Assistant wants to stop <agent>, which is …". The other branch is its status as Hive names it in code: keep {status}.'
+  }),
+  yes: msg({ id: 'main.assistantQuestion.stop.yes', defaultMessage: 'Stop', description: 'The button that answers yes to "Stop <agent> in <project>?" (the Assistant asks before stopping a busy agent).' }),
+  no: msg({ id: 'main.assistantQuestion.stop.no', defaultMessage: "Don't stop", description: 'The button that answers no to "Stop <agent> in <project>?".' })
+}
+
+/** The question asked before the Assistant stops a busy agent: the window's text as data, and its English. */
+export function stopQuestion(o: { agent: string; project: string; status: string; reason: string }): Omit<AssistantQuestion, 'id'> {
+  const reason = o.reason && !/[.!?]$/.test(o.reason) ? `${o.reason}.` : o.reason
+  const text = {
+    title: withValues(STOP_QUESTION.title, { agent: o.agent, project: o.project }),
+    message: withValues(STOP_QUESTION.message, { agent: o.agent, state: withValues(STOP_QUESTION.state, { status: o.status }), hasReason: reason ? 'yes' : 'no', reason }),
+    yes: STOP_QUESTION.yes,
+    no: STOP_QUESTION.no
+  }
+  return { ...questionEnglish(text), text }
+}
+
+/** A question's English (the log's, the event stream's), from its text. */
+// window: a question of the window's; its English is the log's and the event stream's notification title
+const questionEnglish = (t: NonNullable<AssistantQuestion['text']>): Pick<AssistantQuestion, 'title' | 'message' | 'yes' | 'no'> => ({ title: englishText(t.title), message: englishText(t.message), yes: englishText(t.yes), no: englishText(t.no) })
+
+/** A question as the window shows it now: its text in the language Hive shows, or its English with none. */
+const shown = (q: AssistantQuestion, field: 'title' | 'message' | 'yes' | 'no'): string => (q.text ? shownText(q.text[field] as Text) : q[field])
+
 const toldQuestions = new Set<string>()
 const QUESTION_ANSWERED = msg({ id: 'main.assistantQuestion.answered', defaultMessage: 'Answered', description: "What the notification of a question from the Hive Assistant says once it is answered or no longer waits (HI-2320), in place of its buttons. Keep it short." })
 
@@ -216,14 +279,16 @@ export function tellQuestion(workspacePath: string, id: string): boolean {
   tell({
     kind: 'needsYou',
     level: 'warning',
-    title: q.title,
-    message: q.message,
+    title: shown(q, 'title'),
+    message: shown(q, 'message'),
+    // The event stream's title stays English, as the rest of the Agent API does.
+    apiTitle: q.title,
     projectPath: home,
     agentId: ASSISTANT_AGENT_ID,
     target: { kind: 'agent', projectPath: home, agentId: ASSISTANT_AGENT_ID, name: ASSISTANT_NAME, project: ASSISTANT_NAME },
     actions: [
-      { label: q.yes, command: 'assistant.answer', args: [id, true] },
-      { label: q.no, command: 'assistant.answer', args: [id, false] }
+      { label: shown(q, 'yes'), command: 'assistant.answer', args: [id, true] },
+      { label: shown(q, 'no'), command: 'assistant.answer', args: [id, false] }
     ],
     offer: `aq:${id}`
   })

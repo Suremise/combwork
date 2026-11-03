@@ -494,7 +494,9 @@
     "placeholders": {
       "slot": "plain",
       "held": "select",
-      "agent": "plain"
+      "agent": "plain",
+      "broker": "plain",
+      "idle": "select"
     }
   },
   "lane.status.stale": {
@@ -529,6 +531,18 @@
   "lane.status.start.refused": {
     "placeholders": {
       "card": "plain"
+    }
+  },
+  "lane.status.start.refusedHeld": {
+    "placeholders": {
+      "card": "plain",
+      "slot": "plain",
+      "held": "select",
+      "heldBy": "plain",
+      "program": "plain",
+      "more": "plural",
+      "broker": "plain",
+      "idle": "select"
     }
   },
   "lane.status.start.watching": {

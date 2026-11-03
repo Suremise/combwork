@@ -126,6 +126,15 @@
       "path": "plain"
     }
   },
+  "service.cardAttach.refusedFrom": {
+    "placeholders": {
+      "path": "plain",
+      "caller": "select",
+      "temp": "plain",
+      "more": "select",
+      "folders": "plain"
+    }
+  },
   "service.cardAttach.tooLarge": {
     "placeholders": {
       "name": "plain",
@@ -663,6 +672,26 @@
   "service.providers.stopFirst": {
     "placeholders": {
       "cli": "plain"
+    }
+  },
+  "service.settingsRevert.busy": {
+    "placeholders": {}
+  },
+  "service.settingsRevert.changed": {
+    "placeholders": {
+      "path": "plain",
+      "value": "plain"
+    }
+  },
+  "service.settingsRevert.done": {
+    "placeholders": {}
+  },
+  "service.settingsRevert.gone": {
+    "placeholders": {}
+  },
+  "service.settingsRevert.models": {
+    "placeholders": {
+      "path": "plain"
     }
   },
   "service.slots.notPrepared": {

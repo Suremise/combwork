@@ -150,14 +150,14 @@ describe("hive_connection's change, checked at the moment of it (HI-2108 round 1
     try {
       await control.newAssistantToken(wsPath)
       // Admitted for its session, which then restarts (a new token) before the change.
-      const stale = control.admit(wsPath, tokenNow(), 'look', 'make a connection', act)
+      const stale = control.admit(wsPath, tokenNow(), 'look', [{ id: 'test.what', text: 'make a connection' }], act)
       await control.newAssistantToken(wsPath)
       const before = structuredClone(accounts.allConnections())
       let made = false
       expect(() => atTheChange(stale, () => ((made = true), accounts.addConnection(a.id, { name: 'Stale' })))).toThrow(/session that asked for this ended/)
       expect([made, accounts.allConnections()]).toEqual([false, before])
       // Change settings turned off meanwhile: refused the same, before the session is even looked at.
-      const current = control.admit(wsPath, tokenNow(), 'look', 'make a connection', act)
+      const current = control.admit(wsPath, tokenNow(), 'look', [{ id: 'test.what', text: 'make a connection' }], act)
       config.settings.assistant.changeSettings = false
       expect(() => atTheChange(current, () => accounts.addConnection(a.id, { name: 'Off' }))).toThrow(/Change settings is off/)
       expect(accounts.allConnections()).toEqual(before)

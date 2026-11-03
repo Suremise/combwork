@@ -1,4 +1,10 @@
 {
+  "activity.batch.update": {
+    "placeholders": {
+      "n": "plain",
+      "count": "plural"
+    }
+  },
   "activity.reason.conflict": {
     "placeholders": {}
   },

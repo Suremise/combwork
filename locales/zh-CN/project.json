@@ -16,7 +16,7 @@
   "project.banner.dangerous": "此项目开启了{count, plural, other {}}{modes}：智能体会不经询问地执行所有命令和编辑。",
   "project.banner.dangerousMode": "{agent}：{mode}",
   "project.banner.restart": "重启会话",
-  "project.banner.restartNeeded": "自{many, select, yes { {agent} 的} other {此}}会话启动以来，技能、MCP 服务器或设置已更改。重启会话即可应用，对话会继续。",
+  "project.banner.restartNeeded": "自{many, select, yes { {agent} 的} other {此}}会话启动以来，技能、MCP 服务器、方言或设置已更改。重启会话即可应用，对话会继续。",
   "project.banner.restartWhenDone": "回合结束后重启",
   "project.banner.switchFailed": "无法安排重启",
   "project.banner.unmanagedMcp": "此项目定义了不在工作区中的 MCP 服务器：<b>{names}</b>。在复制到工作区之前，它们会保持禁用。",

@@ -549,7 +549,7 @@ export async function repoHistory(root: string, opts: { ref?: string | null; pag
   const page = Math.min(pages, Math.max(1, Math.floor(Number(opts.page) || 1)))
   const [log_, tags] = await Promise.all([
     git(root, ['log', '-n', String(HISTORY_COMMITS), '--skip', String((page - 1) * HISTORY_COMMITS), '--format=%H%x00%h%x00%an%x00%ae%x00%at%x00%D%x00%s%x1e', spec, '--']),
-    git(root, ['for-each-ref', '--sort=-creatordate', '--format=%(refname:short)%00%(objecttype)%00%(*objectname:short)%00%(objectname:short)%00%(creatordate:unix)%00%(contents:subject)%00%(*subject)', 'refs/tags'])
+    git(root, ['for-each-ref', '--sort=-creatordate', '--format=%(refname)%00%(objecttype)%00%(*objectname:short)%00%(objectname:short)%00%(creatordate:unix)%00%(contents:subject)%00%(*subject)', 'refs/tags'])
   ])
   if (!log_.ok) throw commandFailed('git log', log_) // i18n-ignore: a git command, as it is
   if (!tags.ok) throw commandFailed('git for-each-ref', tags) // i18n-ignore: a git command, as it is
@@ -563,7 +563,9 @@ export async function repoHistory(root: string, opts: { ref?: string | null; pag
     })
   const all = tags.out
     .split('\n')
+    // Named whole and cut (HI-2429): git shortens a tag to `tags/<name>` when a branch has its name.
     .map((l) => l.split('\0'))
+    .map((f) => [branchOfRef(f[0], 'refs/tags/') ?? '', ...f.slice(1)])
     .filter((f) => f.length >= 7 && f[0])
     .map((f) => {
       const annotated = f[1] === 'tag'

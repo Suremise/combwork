@@ -5,8 +5,8 @@ import { emit, onHiveEvent, toast } from './events'
 import { resolveOffer } from './notify'
 import { readJson, writeJsonAtomic } from './fsutil'
 import { createLogger, userText } from './logger'
-import { JobHost, MAX_LISTED, type HostFailure, type JobList } from './processSupervisor'
-import { brokersOnly, mayBeBroker } from './systemBrokers'
+import { JobHost, MAX_LISTED, MAX_WORKING_IN, type HostFailure, type JobList } from './processSupervisor'
+import { brokersOnly, brokersWorkingIn, folderInside, mayBeBroker, parseWorkingIn, SYSTEM_BROKERS } from './systemBrokers'
 import { hiveError } from './hiveError'
 import { processLabel, progressRunTitle, type AgentLeftovers, type AgentProcess } from '../shared/agentProcesses'
 import type { ActivityProcess } from '../shared/activity'
@@ -799,6 +799,17 @@ async function pathsOf(processes: readonly AgentProcess[]): Promise<Map<string, 
     out.set(id, test?.has(Number(id.split(':')[0])) ? TEST_BROKER_PATH() : path)
   }
   return out
+}
+
+/**
+ * Windows' brokers (systemBrokers.ts) working in a folder now (HI-2467), read by the helper in one look: what keeps a
+ * free slot from being renamed when no session is in it, by name, and whether a Sandbox runs. Null when none is, or it
+ * can't be told: the caller then says only that a process holds it. Ends and decides nothing.
+ */
+export async function brokerWorkingIn(folder: string): Promise<{ name: string; idle: boolean | null } | null> {
+  const stands = testBrokers()
+  const r = await host.request('workingin', [...new Set(SYSTEM_BROKERS.map((b) => b.exe))].join(','), stands?.size ? [...stands].join('-') : undefined)
+  return brokersWorkingIn(parseWorkingIn(r, MAX_WORKING_IN), folder, { inside: folderInside, stands, standPath: TEST_BROKER_PATH(), running: runningNamed })
 }
 
 /** Which of the executable names (lower case) run on the machine now, or null when it can't be told (HI-2304). */

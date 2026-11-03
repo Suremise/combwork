@@ -553,8 +553,9 @@ interface HiveMessageValues {
   'board.lanes.waitsFresh': { agent: string | number }
   'board.lanes.waitsLink': undefined
   'board.lanes.waitsPreparing': { slot: string | number }
-  'board.lanes.waitsSlotHeld': { slot: string | number; held: string; agent: string | number }
+  'board.lanes.waitsSlotHeld': { slot: string | number; held: string; agent: string | number; broker: string | number; idle: string }
   'board.lanes.waitsStart': { card: string | number; why: string; agent: string | number }
+  'board.lanes.waitsStartHeld': { card: string | number; slot: string | number; held: string; agent: string | number; program: string | number; more: number; broker: string | number; idle: string }
   'board.leftOut.detail': { hasPaths: string; paths: string | number; card: string | number }
   'board.leftOut.include': { n: number }
   'board.leftOut.leave': { n: number }

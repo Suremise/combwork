@@ -63,7 +63,7 @@ import { withAction } from '@shared/assistantChangeList'
 import { sessionEndBook, type EndsChange, type SessionEnd } from '@shared/sessionEnd'
 import { rememberTab, shownTab } from '@shared/tabs'
 
-export type Activity = 'projects' | 'overview' | 'activity' | 'performance' | 'board' | 'notes' | 'skills' | 'templates' | 'mcp' | 'assistant' | 'docs' | 'settings'
+export type Activity = 'projects' | 'overview' | 'activity' | 'performance' | 'board' | 'notes' | 'skills' | 'dialects' | 'templates' | 'mcp' | 'assistant' | 'docs' | 'settings'
 export type { ProjectTab } from '@shared/projectTabs'
 
 /**
@@ -292,6 +292,8 @@ interface State {
   projectTabs: Record<string, ProjectTab>
   selectedNote: string | null
   selectedSkill: string | null
+  /** The dialect file the Dialects view shows (HI-2444): its path in the dialects folder. */
+  selectedDialect: string | null
   /** The template the Templates view shows (templateKey), and which ones its list shows: all, workspace or a project's path. */
   selectedTemplate: string | null
   templateFilter: string
@@ -348,6 +350,8 @@ interface State {
   /** Agents the Assistant added that the user hasn't looked at yet, by project path (their page's button shows a dot). */
   newAgents: Record<string, string[]>
   modesVersion: number
+  /** Bumped when the workspace's dialect files change (HI-2444): the Dialects view reads them again. */
+  dialectsVersion: number
   docsPage: string
   /** The id of a heading of the shown doc to scroll to (Learn more on a tip, #1535), cleared once there. */
   docsAnchor: string | null
@@ -600,6 +604,7 @@ export const useStore = create<State>(() => ({
   projectTabs: {},
   selectedNote: null,
   selectedSkill: null,
+  selectedDialect: null,
   selectedTemplate: null,
   templateFilter: 'all',
   skillEdit: null,
@@ -628,6 +633,7 @@ export const useStore = create<State>(() => ({
   assistantUndone: {},
   newAgents: {},
   modesVersion: 0,
+  dialectsVersion: 0,
   docsPage: 'guide',
   docsAnchor: null,
   settingsSection: 'general',
@@ -752,7 +758,7 @@ let liveTimer: ReturnType<typeof setTimeout> | null = null
  * The parts set with setLoaded (HI-1938): a direct set of one shows the changes waiting first, so an older answer
  * waiting never replaces what was set after it.
  */
-const LOADED = new Set<string>(['lanes', 'laneOrder', 'mergeSlots', 'assistantActions', 'assistantQuestions', 'assistantChanges', 'queues', 'queueKept', 'advanced', 'recent', 'openProgress', 'skillsVersion', 'modesVersion'] satisfies (keyof State)[])
+const LOADED = new Set<string>(['lanes', 'laneOrder', 'mergeSlots', 'assistantActions', 'assistantQuestions', 'assistantChanges', 'queues', 'queueKept', 'advanced', 'recent', 'openProgress', 'skillsVersion', 'modesVersion', 'dialectsVersion'] satisfies (keyof State)[])
 
 /** Sets the store, noting which of its parts changed (HI-1775): a long task's line in hive.log names the updates made in it. */
 export const set: typeof useStore.setState = ((partial: Parameters<typeof useStore.setState>[0], replace?: boolean) => {

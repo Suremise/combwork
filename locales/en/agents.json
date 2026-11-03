@@ -451,6 +451,30 @@
     "defaultMessage": "Sign in again: run copilot login in a terminal (Help → Provider Setup → GitHub Copilot shows how).",
     "description": "How to sign in to GitHub Copilot again after its sign-in expired (an agent's pane, a notification). copilot login is a command: keep it; Help → Provider Setup → GitHub Copilot is a menu path in Hive."
   },
+  "agents.dialect.auto": {
+    "defaultMessage": "Auto (the file for the model it runs)",
+    "description": "Agent Settings' Dialect choice: Hive picks the model file whose model ID is the one the agent runs. Glossary: dialect."
+  },
+  "agents.dialect.copy": {
+    "defaultMessage": "{name} (test copy)",
+    "description": "Agent Settings' Dialect choice: a test copy (a dialect file with no model), {name}, for trying wording on one agent. Glossary: test copy."
+  },
+  "agents.dialect.hint": {
+    "defaultMessage": "Which dialect file adjusts the wording Combwork gives this agent, over its CLI's and the workspace's. Pick a test copy to try a change on this agent alone.",
+    "description": "Under Agent Settings' Dialect choice (HI-2444). Glossary: dialect, test copy."
+  },
+  "agents.dialect.label": {
+    "defaultMessage": "Dialect",
+    "description": "Agent Settings (HI-2444): the choice of the dialect file that fills the agent's model slot. Glossary: dialect."
+  },
+  "agents.dialect.missing": {
+    "defaultMessage": "{path} (not there: Auto is used)",
+    "description": "Agent Settings' Dialect choice: the file chosen before is gone, so the agent uses Auto. {path} is its path. Glossary: dialect."
+  },
+  "agents.dialect.model": {
+    "defaultMessage": "{name} (model {model})",
+    "description": "Agent Settings' Dialect choice: a model file, {name}, for model ID {model}. Glossary: dialect."
+  },
   "agents.dialog.busy": {
     "defaultMessage": "Busy. Choose it once it has finished.",
     "description": "Under an agent in the Continue with… dialog: it is working, so it can't be chosen now."

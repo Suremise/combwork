@@ -192,7 +192,7 @@ describe("the Assistant's authority, checked again at each write (HR3's round 1 
       setControl('agents')
       await control.newAssistantToken(ws)
       const token = JSON.parse(readFileSync(control.assistantTokenFile(ws), 'utf8')).token as string
-      const guard = control.admit(ws, token, 'agents', 'change the merge queue', { kind: 'queue-pause', project: 'p' })
+      const guard = control.admit(ws, token, 'agents', [{ id: 'test.what', text: 'change the merge queue' }], { kind: 'queue-pause', project: 'p' })
       const b = { calls: 0, guard: () => (b.calls++, guard()) }
       return b
     }

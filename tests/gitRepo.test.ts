@@ -729,6 +729,21 @@ describe('remotes, tags, history and identity', () => {
     expect(h.tags.find((t) => t.name === 'light')).toMatchObject({ annotated: false, commit: head })
   })
 
+  it('lists each tag by its name though a branch has it, not tags/<name> (HI-2429)', async () => {
+    const head = git(proj, 'rev-parse', '--short', 'HEAD')
+    git(proj, 'tag', 'v2')
+    git(proj, 'tag', '-a', '-m', 'Second', 'v3')
+    git(proj, 'branch', 'v2')
+    git(proj, 'branch', 'v3')
+    // As git shortens them beside a same-named branch: what the list showed before.
+    expect(git(proj, 'for-each-ref', '--format=%(refname:short)', 'refs/tags').split(/\r?\n/).sort()).toEqual(['tags/v2', 'tags/v3'])
+    const h = await repo.repoHistory(proj)
+    expect(h.tags.map((t) => t.name).sort()).toEqual(['v2', 'v3'])
+    expect(h.tags.find((t) => t.name === 'v2')).toMatchObject({ annotated: false, commit: head })
+    expect(h.tags.find((t) => t.name === 'v3')).toMatchObject({ annotated: true, subject: 'Second', commit: head })
+    expect(h.branches).toEqual(['main', 'v2', 'v3'])
+  })
+
   it('History shows the project’s target by default, any branch asked for, a page at a time (#1643)', async () => {
     git(proj, 'checkout', '-q', '-b', 'release')
     for (let i = 1; i <= 25; i++) commit(proj, `r${i}.txt`)

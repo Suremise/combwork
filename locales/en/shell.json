@@ -623,6 +623,10 @@
     "defaultMessage": "Toggle Developer Tools",
     "description": "A command (the menus, the command palette, Settings → Keyboard Shortcuts), in the Developer category."
   },
+  "shell.command.view.dialects": {
+    "defaultMessage": "Show Dialects",
+    "description": "A command (the menus, the command palette, Settings → Keyboard Shortcuts), in the View category (HI-2444: the Dialects view, where the wording Hive gives agents is tuned per model). Glossary: dialect."
+  },
   "shell.command.view.fullScreen": {
     "defaultMessage": "Toggle Full Screen",
     "description": "A command (the menus, the command palette, Settings → Keyboard Shortcuts), in the View category."

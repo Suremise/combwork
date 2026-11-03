@@ -16,7 +16,7 @@
   "project.banner.dangerous": "{count, plural, one {Modo activo en este proyecto} many {Modos activos en este proyecto} other {Modos activos en este proyecto}}: {modes}. El agente ejecuta todos los comandos y ediciones sin preguntar.",
   "project.banner.dangerousMode": "{agent}: {mode}",
   "project.banner.restart": "Reiniciar la sesión",
-  "project.banner.restartNeeded": "Las habilidades, los servidores MCP o la configuración cambiaron desde que empezó {many, select, yes {la sesión del agente {agent}} other {esta sesión}}. Reinicia la sesión para aplicarlos; la conversación continúa.",
+  "project.banner.restartNeeded": "Las habilidades, los servidores MCP, los dialectos o la configuración cambiaron desde que empezó {many, select, yes {la sesión del agente {agent}} other {esta sesión}}. Reinicia la sesión para aplicarlos; la conversación continúa.",
   "project.banner.restartWhenDone": "Reiniciar cuando termine su turno",
   "project.banner.switchFailed": "No se pudo programar el reinicio",
   "project.banner.unmanagedMcp": "Este proyecto define servidores MCP que no están en el espacio de trabajo: <b>{names}</b>. Siguen desactivados hasta que se copien al espacio de trabajo.",

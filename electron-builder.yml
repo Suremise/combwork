@@ -1,6 +1,6 @@
 appId: com.hive.desktop
 # The displayed name (#443). The install folder (%LOCALAPPDATA%\Programs\Hive) comes from executableName and the
-# profile folder (%APPDATA%\Hive) is set in main (shared/appName.ts), so neither moves; appId keeps the uninstall entry.
+# profile folder (%APPDATA%\Combwork since HI-2461; the installer moves Hive's, HI-2460) is set in main (shared/appName.ts); appId keeps the uninstall entry.
 productName: Combwork
 copyright: Copyright © 2026 Darren Marshall
 directories:

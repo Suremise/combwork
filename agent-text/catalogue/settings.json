@@ -1295,7 +1295,7 @@
     "audience": "both"
   },
   "settings.advanced.data.desc": {
-    "text": "Combwork keeps its settings in %APPDATA%\\Hive\\config.json.",
+    "text": "Combwork keeps its settings in %APPDATA%\\Combwork\\config.json.",
     "note": "What the setting \"Settings file\" does, under its title (Settings → Advanced).",
     "audience": "both"
   },
@@ -1327,6 +1327,11 @@
   "settings.advanced.error.field": {
     "text": "{title} takes a field name: letters, digits and _ (not starting with a digit).",
     "note": "Why an advanced setting's new value isn't taken: it must be a field name of a CLI's data. {title} is the setting's title.",
+    "audience": "both"
+  },
+  "settings.advanced.error.folders": {
+    "text": "{title} takes up to {most} folders, each a full path (C:\\…, \\\\server\\…, or starting with a variable such as %LOCALAPPDATA%), separated by semicolons.",
+    "note": "Why an advanced setting's new value (a list of folders) isn't taken. {title} is the setting's title; {most} a number of folders. C:\\…, \\\\server\\… and %LOCALAPPDATA% are written as Windows writes them: keep them.",
     "audience": "both"
   },
   "settings.advanced.error.list": {
@@ -1377,6 +1382,16 @@
   "settings.advanced.hive.assistant.startView.title": {
     "text": "The Assistant starts with Combwork's start view",
     "note": "An advanced setting's title (Settings → Advanced), listed under Hive. The start view is what Hive tells the Hive Assistant of the workspace's state as it starts.",
+    "audience": "both"
+  },
+  "settings.advanced.hive.cards.attachmentFolders.desc": {
+    "text": "More folders an agent, the Assistant or a script may attach files to a card from, besides its own project's folders and the temp folder: full paths, separated by semicolons (%LOCALAPPDATA% and other variables at the start are filled in). Another project's folders and Combwork's own stay refused, even inside one. Empty: none.",
+    "note": "What the advanced setting \"Card attachments: more folders\" does (Settings → Advanced, under Hive). %LOCALAPPDATA% is a Windows variable: keep it.",
+    "audience": "both"
+  },
+  "settings.advanced.hive.cards.attachmentFolders.title": {
+    "text": "Card attachments: more folders",
+    "note": "An advanced setting's title (Settings → Advanced), followed by a list of folders: where else agents may attach files to a card from.",
     "audience": "both"
   },
   "settings.advanced.hive.cards.attachmentMax.desc": {
@@ -2244,6 +2259,11 @@
     "note": "What an advanced setting takes (Settings → Advanced): the name of a field in a CLI's data.",
     "audience": "both"
   },
+  "settings.advanced.takes.folders": {
+    "text": "Folders, each a full path, separated by semicolons (a variable such as %LOCALAPPDATA% at the start is filled in).",
+    "note": "What an advanced setting takes (Settings → Advanced): a list of folders. %LOCALAPPDATA% is a Windows variable: keep it.",
+    "audience": "both"
+  },
   "settings.advanced.takes.list": {
     "text": "Names separated by commas.",
     "note": "What an advanced setting takes (Settings → Advanced).",
@@ -2540,6 +2560,10 @@
   "settings.agent.sensitive.assistantRuns": {
     "text": "It decides how the Assistant itself runs (its provider, working mode, model, effort, permission mode and arguments): only the user can change it, in {path}.",
     "note": "Why the Assistant can't change how it runs itself (#186). {path} is where the user changes it."
+  },
+  "settings.agent.sensitive.attachmentFolders": {
+    "text": "It decides which folders agents, the Assistant and scripts may attach files to cards from: only the user can change it, in {path}.",
+    "note": "Why the Assistant can't change Card attachments: more folders (HI-2480): it would widen where it and agents may read files from. {path} is where the user changes it."
   },
   "settings.agent.sensitive.backgroundSessions": {
     "text": "It lets sessions run out of Hive's reach (Hive can't see or stop them): only the user can change it, in {path}.",
@@ -2874,7 +2898,7 @@
     "audience": "both"
   },
   "settings.agentApi.token.tip": {
-    "text": "Stored in %APPDATA%\\Hive\\agent-api.json, for your own scripts. Agents never get it: each session gets a token of its own, in the file that HIVE_API_TOKEN_FILE names.",
+    "text": "Stored in %APPDATA%\\Combwork\\agent-api.json, for your own scripts. Agents never get it: each session gets a token of its own, in the file that HIVE_API_TOKEN_FILE names.",
     "note": "The info tip of the setting \"Access token\" (Settings → Agent API): more on what it does and when it applies. HIVE_API_TOKEN_FILE is an environment variable name: keep it as it is.",
     "audience": "both"
   },
@@ -2889,7 +2913,7 @@
     "audience": "both"
   },
   "settings.agentApi.viewers.tip": {
-    "text": "Name each one for its app. Stored in %APPDATA%\\Hive\\agent-api-viewers.json. Revoking one cuts its app off at once. Apps find a running Combwork by %APPDATA%\\Hive\\agent-api-discovery.json (the address, no token).",
+    "text": "Name each one for its app. Stored in %APPDATA%\\Combwork\\agent-api-viewers.json. Revoking one cuts its app off at once. Apps find a running Combwork by %APPDATA%\\Combwork\\agent-api-discovery.json (the address, no token).",
     "note": "The info tip of the setting \"Viewer tokens\" (Settings → Agent API): more on what it does and when it applies.",
     "audience": "both"
   },
