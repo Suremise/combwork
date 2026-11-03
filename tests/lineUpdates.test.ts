@@ -49,6 +49,7 @@ const service = await import('../src/main/workflow/service')
 const G = await import('../src/main/platform/git')
 const { gitTestHooks } = await import('../src/main/git')
 const { Workflow } = await import('../src/main/workflow/runtime')
+const { GIT_HEAVY_MS } = await import('./workflow/harness')
 
 advanced.load(join(base, 'profile'))
 type WS = ReturnType<typeof createWorkspaceService>
@@ -267,7 +268,10 @@ describe("an agent's branch between a lane's cards (#1271)", () => {
     expect(move).toHaveBeenCalledTimes(1)
   })
 
-  it('switched off, the user is asked every time: approved, Hive moves it once; declined, it stays for the user', async () => {
+  // GIT_HEAVY_MS (HI-2025's rule): two cards squash-merged through real git on a real board, the branch asked about twice;
+  // 3.7 s alone, 10 s beside three spinner workers, and past 20 s in HI-2453's loaded full run, every step slow (about
+  // 2 s each), none hung.
+  it('switched off, the user is asked every time: approved, Hive moves it once; declined, it stays for the user', { timeout: GIT_HEAVY_MS }, async () => {
     await advanced.set(lines.UPDATE_AGENT_BRANCH, false)
     const { w, repo, wt, cards } = await workspace()
     const [c1, c2, c3] = cards

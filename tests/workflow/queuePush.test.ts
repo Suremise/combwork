@@ -3,7 +3,7 @@
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import { join } from 'path'
 import { execFileSync } from 'child_process'
-import { B1, commit, moved, setup, sh, type Env } from './harness'
+import { B1, commit, GIT_HEAVY_MS, moved, setup, sh, type Env } from './harness'
 import { tempDir } from '../tempDir'
 import { formShows, preset } from '../../src/shared/workflow/options'
 import { ruleOptions } from '../../src/shared/workflow/compile'
@@ -72,7 +72,10 @@ function restarted(e: Env): MergeQueue {
 }
 
 describe('the merge queue pushes its target after merging (G18, #1179)', () => {
-  it('on: each merge is pushed to the remote main tracks, and nothing stays owed', async () => {
+  // GIT_HEAVY_MS (HI-2025's rule) for this test and the three marked below: two cards queued and merged, each merge pushed
+  // to a bare remote (with a crash and a restart in the others). 4.3 to 5.1 s alone, 8.1 to 10.4 s beside three spinner
+  // workers; past 20 s in HI-2453's loaded full run (this one in its rerun of the files).
+  it('on: each merge is pushed to the remote main tracks, and nothing stays owed', { timeout: GIT_HEAVY_MS }, async () => {
     const { e, bare } = pushing()
     const a = await queued(e, 'A', 'a.txt')
     const b = await queued(e, 'B', 'b.txt')
@@ -164,7 +167,8 @@ describe('the merge queue pushes its target after merging (G18, #1179)', () => {
     expect(p?.message).toBeTruthy()
   })
 
-  it('the push is owed in the same write as the merge: a crash before the push, and a restart pushes it before the next card', async () => {
+  // GIT_HEAVY_MS: see the first test.
+  it('the push is owed in the same write as the merge: a crash before the push, and a restart pushes it before the next card', { timeout: GIT_HEAVY_MS }, async () => {
     const { e, bare } = pushing()
     const before = remoteMain(bare)
     const a = await queued(e, 'A', 'a.txt')
@@ -192,7 +196,8 @@ describe('the merge queue pushes its target after merging (G18, #1179)', () => {
     expect(owed(e)).toBeNull()
   })
 
-  it('a crash after a successful push, before its clear: the retry is harmless (up to date) and later cards merge', async () => {
+  // GIT_HEAVY_MS: see the first test.
+  it('a crash after a successful push, before its clear: the retry is harmless (up to date) and later cards merge', { timeout: GIT_HEAVY_MS }, async () => {
     const { e, bare } = pushing()
     await queued(e, 'A', 'a.txt')
     await expect(
@@ -236,8 +241,9 @@ describe('the merge queue pushes its target after merging (G18, #1179)', () => {
     expect(owed(e)).toBeNull()
   })
 
+  // GIT_HEAVY_MS: see the first test (the isAncestor case past 20 s; the lineHead case shares its test).
   for (const read of ['lineHead', 'isAncestor'] as const) {
-    it(`owed, and ${read === 'lineHead' ? 'the target' : 'whether the target has the merge'} can't be read: paused, the next card waits; Resume pushes and goes on (HR2 r1 f1)`, async () => {
+    it(`owed, and ${read === 'lineHead' ? 'the target' : 'whether the target has the merge'} can't be read: paused, the next card waits; Resume pushes and goes on (HR2 r1 f1)`, { timeout: GIT_HEAVY_MS }, async () => {
       const { e, bare } = pushing()
       await queued(e, 'A', 'a.txt')
       await expect(e.queue({ git: withPush(() => Promise.reject(new Error('crash'))) }).drain('main')).rejects.toThrow('crash')

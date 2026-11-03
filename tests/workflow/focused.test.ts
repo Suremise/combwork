@@ -184,7 +184,9 @@ describe('chosen at submit, in the card folder at exactly the revision', () => {
     expect(f.change).toEqual([expect.objectContaining({ status: 'A', newPath: 'src/c.txt' })])
   })
 
-  it("a picker that fails, says every test or has none refuses the submit; the builder's list stands in, reviewed", async () => {
+  // GIT_HEAVY_MS: three projects, each a card built in its own repository and submitted twice (a refused pick, then the
+  // builder's list); 4.1 s alone, 8.9 s beside three spinner workers, past 20 s in HI-2453's loaded full run.
+  it("a picker that fails, says every test or has none refuses the submit; the builder's list stands in, reviewed", { timeout: GIT_HEAVY_MS }, async () => {
     for (const pick of [picker('fail'), picker([{ every: true }]), null]) {
       const e = team(pick, runner().command)
       const { card } = await built(e)
