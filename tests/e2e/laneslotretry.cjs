@@ -123,6 +123,11 @@ const renamable = (dir) => {
       const res = await fetch(`http://127.0.0.1:${PORT}/v1/lanes`, { method: 'POST', headers: { Authorization: `Bearer ${workspaceToken}`, 'Content-Type': 'application/json' }, body: JSON.stringify({ project: 'alpha', builder: 'B1', reviewer: 'R1', cards }) })
       return { status: res.status, body: await res.json().catch(() => null) }
     }
+    /**
+     * slot-a free and settled: B1 stopped, no lease, no writer (its run released: HI-2468's run found step 6 set up its
+     * holders while B1's ended run still held slot-a, whose release then let the lend through), nothing holding it.
+     */
+    const settled = async () => !(await live(b1.id)) && !(await slotNow())?.lease && !(await slotNow())?.writer && renamable(slotA)
     const laneOf = async (n) => (await inv('lanes:list', { all: true })).find((l) => !l.endedAt && l.cards.some((c) => c.number === n))
     /** The Progress panel's Lanes tab, opened (the rail toggles the panel: clicked only while it is closed). */
     const panel = page.locator('.progress-panel')
@@ -227,7 +232,7 @@ const renamable = (dir) => {
     // --- 5. Through the API, B1 stopped, a process holding slot-a: the lane waits, says why, and is lent it once free.
     const third4 = await laneOf(c3)
     await inv('lanes:end', third4.id, true)
-    check('the lane is ended, B1 stopped, slot-a free and held by nothing', !!(await until(async () => !(await live(b1.id)) && !(await slotNow())?.lease && renamable(slotA), HUNG_MS)), JSON.stringify(await slotNow()))
+    check('the lane is ended, B1 stopped, slot-a free and held by nothing', !!(await until(settled, HUNG_MS)), JSON.stringify(await slotNow()))
     const go5 = path.join(tools, 'hold5-go.txt')
     const beat5 = path.join(tools, 'hold5-beat.txt')
     const holder5 = spawn(process.execPath, [hold, path.join(slotA, '.hive', 'hold5.lock'), go5, beat5, String(HUNG_MS * 3)], { cwd: tools, stdio: 'ignore', windowsHide: true, env: { PATH: process.env.PATH ?? '', SystemRoot: process.env.SystemRoot ?? '' } })
@@ -257,7 +262,7 @@ const renamable = (dir) => {
     // its id in HIVE_TEST_SYSTEM_BROKER, so its path, read by the helper, is taken as the broker's). Named only while it
     // is seen working there, idle or not as the Sandbox's own processes run, looked at again on each retry.
     await inv('lanes:end', (await laneOf(c4)).id, true)
-    check('the lane is ended, B1 stopped, slot-a free and held by nothing', !!(await until(async () => !(await live(b1.id)) && !(await slotNow())?.lease && renamable(slotA), HUNG_MS)), JSON.stringify(await slotNow()))
+    check('the lane is ended, B1 stopped, slot-a free and held by nothing', !!(await until(settled, HUNG_MS)), JSON.stringify(await slotNow()))
     const standGo = path.join(tools, 'stand-go.txt')
     const standBeat = path.join(tools, 'stand-beat.txt')
     /** A stand-in broker: runs with its current folder `cwd` (no file open) until stand-go.txt, its id listed as a broker's. */
