@@ -1,8 +1,8 @@
 {
   "language.automatic": "Automatique (Windows : {language})",
-  "language.forced": "Hive a été démarré avec la langue {language} (--lang) : ce paramètre s’applique au prochain démarrage.",
-  "language.restart": "Le texte de Hive a changé de langue. Les parties de Chromium (la visionneuse PDF, les sélecteurs de date) suivront au prochain démarrage de Hive.",
-  "language.setting.desc": "La langue de Hive. Automatique suit les langues d’affichage de Windows.",
-  "language.setting.tip": "Les langues marquées comme traduites par IA ont été rédigées par des agents, et les améliorations sont les bienvenues. Hive parle en anglais aux agents et au Hive Assistant, quel que soit ce paramètre ; ils peuvent quand même te répondre dans ta langue. Démarré avec --lang, Hive utilise cette langue jusqu’à son prochain démarrage.",
+  "language.forced": "Combwork a été démarré avec la langue {language} (--lang) : ce paramètre s’applique au prochain démarrage.",
+  "language.restart": "Le texte de Combwork a changé de langue. Les parties de Chromium (la visionneuse PDF, les sélecteurs de date) suivront au prochain démarrage de Combwork.",
+  "language.setting.desc": "La langue de Combwork. Automatique suit les langues d’affichage de Windows.",
+  "language.setting.tip": "Les langues marquées comme traduites par IA ont été rédigées par des agents, et les améliorations sont les bienvenues. Combwork parle en anglais aux agents et à l’Assistant, quel que soit ce paramètre ; ils peuvent quand même te répondre dans ta langue. Démarré avec --lang, Combwork utilise cette langue jusqu’à son prochain démarrage.",
   "language.setting.title": "Langue"
 }

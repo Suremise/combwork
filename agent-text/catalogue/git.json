@@ -20,27 +20,27 @@
     "audience": "both"
   },
   "git.parentRepo": {
-    "text": "This project is inside the git repository in {folder}, so the Version Control tab only shows it: Hive changes only a project's own repository.",
+    "text": "This project is inside the git repository in {folder}, so the Version Control tab only shows it: Combwork changes only a project's own repository.",
     "note": "Banner in the Version Control tab of a project whose folder is inside another repository (a workspace kept in git). {folder} is that repository's folder.",
     "audience": "both"
   },
   "git.repoLock.busy": {
-    "text": "Another Hive is merging into this repository ({profile}). Nothing was changed: try again once it has finished.",
+    "text": "Another Combwork is merging into this repository ({profile}). Nothing was changed: try again once it has finished.",
     "note": "An error: a merge or another change to a repository didn't start, because another Hive (its profile folder's name, {profile}) still held the repository's merge lock after Hive had waited for it.",
     "audience": "both"
   },
   "git.repoLock.noGitDir": {
-    "text": "Hive couldn't find the git folder of {folder}, so nothing was changed: {why}",
+    "text": "Combwork couldn't find the git folder of {folder}, so nothing was changed: {why}",
     "note": "An error: a merge or another change to a repository didn't start, because git couldn't name the repository's git folder (where Hive's merge lock lives). {why} is git's message.",
     "audience": "both"
   },
   "git.tool.missing": {
-    "text": "Git isn't installed (or isn't on Hive's PATH)",
+    "text": "Git isn't installed (or isn't on Combwork's PATH)",
     "note": "Said wherever git is needed when Hive cannot run git. No full stop: some places add more after it.",
     "audience": "both"
   },
   "git.tool.tooOld": {
-    "text": "Git {version} is too old for Hive (it needs {min} or later)",
+    "text": "Git {version} is too old for Combwork (it needs {min} or later)",
     "note": "Said wherever git is needed when the installed git is too old to run. {version} and {min} are git versions. No full stop: some places add more after it.",
     "audience": "both"
   },

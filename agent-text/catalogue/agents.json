@@ -65,7 +65,7 @@
     "audience": "both"
   },
   "agents.provider.extraArgsDashes": {
-    "text": "Hive passes the task after \"--\"; remove it from extra arguments. For an option whose value is \"--\", write --option=--.",
+    "text": "Combwork passes the task after \"--\"; remove it from extra arguments. For an option whose value is \"--\", write --option=--.",
     "note": "Why extra arguments for a CLI are refused: they contain a bare \"--\". Keep \"--\" and --option=-- exactly as they are.",
     "audience": "both"
   },

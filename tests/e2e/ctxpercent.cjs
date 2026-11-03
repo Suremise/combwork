@@ -104,7 +104,7 @@ const until = async (fn, ms = 10000) => {
   await until(async () => /^\s*ctx 0%$/.test(await text()), 8000)
   await ctxItem.hover()
   check('…and where Claude Code compacts by itself, for a 200K window: its default, nothing set (#242)', !!(await until(async () => (await tip.innerText().catch(() => '')).includes('Claude Code compacts by itself at about 167,000, its default for this window'), 5000)), await tip.innerText().catch(() => ''))
-  check("…called an estimate, since policies Hive can't read could change it (#273)", (await tip.innerText().catch(() => '')).includes("(an estimate: managed policies Hive can't read"), await tip.innerText().catch(() => ''))
+  check("…called an estimate, since policies Combwork can't read could change it (#273)", (await tip.innerText().catch(() => '')).includes("(an estimate: managed policies Combwork can't read"), await tip.innerText().catch(() => ''))
   await page.mouse.move(5, 5)
 
   // --- A narrow footer keeps the percentage whole (the model and the mode give way first: footerfit has the order).

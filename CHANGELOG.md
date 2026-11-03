@@ -4,6 +4,7 @@
 
 ### Changed
 
+- **Hive Desktop is now Combwork** (HI-2458). Another open-source app called Hive (also Hive Desktop) runs coding agents too, and names around agent tools with bees and hives in them are crowded, so the app has a name of its own. The window, the title bar, About, the tray, notifications, the installer, the Start menu and desktop shortcuts and Installed apps say **Combwork**, in every language, and the Assistant is just **the Assistant**. The honeycomb icon and the colours stay. For now nothing else moves: your settings stay in `%APPDATA%\Hive`, the app stays installed as `Hive.exe`, and a workspace keeps its `.hive` folder. Agents still see Hive's tools and messages under their old names.
 - **Your data folders are now Combwork's** (HI-2461), part of the app's rename to Combwork: `%APPDATA%\Hive` becomes `%APPDATA%\Combwork`, and `%LOCALAPPDATA%\Hive` (accounts and their sign-ins) becomes `%LOCALAPPDATA%\Combwork`. The installer renames them while Hive is closed, with your settings, usage and logs. Until they are renamed, Hive keeps running from the old folders and a notice at start says so. After the move, a connection whose sign-in didn't carry across is named once, so you can sign in to it again.
 ### Added
 

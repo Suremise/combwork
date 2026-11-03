@@ -57,7 +57,7 @@ const saved = () => {
     const card = await inv('tasks:create', { title: 'Shipped it', project: 'alpha' })
     await inv('tasks:update', card.number, { column: 'done' })
     await openSection()
-    check('Hive recorded the merge: its size and one entry show', !!(await lib.until(async () => /Now [\d.,]+ [KM]?B, 1 entry\./.test(await panel.innerText()), HUNG_MS)), await panel.innerText())
+    check('Combwork recorded the merge: its size and one entry show', !!(await lib.until(async () => /Now [\d.,]+ [KM]?B, 1 entry\./.test(await panel.innerText()), HUNG_MS)), await panel.innerText())
     for (const theme of ['dark', 'light']) {
       await page.evaluate((t) => document.documentElement.setAttribute('data-theme', t), theme)
       await panel.scrollIntoViewIfNeeded()

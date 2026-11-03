@@ -17,11 +17,11 @@ import { timeAgo } from '../util'
 
 const M = {
   heading: msg({ id: 'performance.stalls.heading', defaultMessage: 'Main process stalls', description: "Heading of the Performance page's table of the times Hive's main process was busy long enough to be felt." }),
-  since: msg({ id: 'performance.stalls.since', defaultMessage: 'since Hive started', description: 'After the Main process stalls heading: the table covers the time since Hive started, not the page\'s range. Lower case.' }),
+  since: msg({ id: 'performance.stalls.since', defaultMessage: 'since Combwork started', description: 'After the Main process stalls heading: the table covers the time since Hive started, not the page\'s range. Lower case.' }),
   tip: msg({
     id: 'performance.stalls.tip',
     defaultMessage:
-      "Times Hive's main process was busy for more than 250 ms. Every pane's typing goes through it, so a stall is felt as lag. Step is the work that held it, where Hive knows it (a database or file step); During it is what else was under way, which may only have waited behind it. Little CPU means it was waiting (on the disk, a lock, another program); it is measured from half a second before, so it can be a little more than the length. The last {kept, number} since Hive started, kept in memory only; hive.log notes them too, at most one line a minute.",
+      "Times Combwork's main process was busy for more than 250 ms. Every pane's typing goes through it, so a stall is felt as lag. Step is the work that held it, where Combwork knows it (a database or file step); During it is what else was under way, which may only have waited behind it. Little CPU means it was waiting (on the disk, a lock, another program); it is measured from half a second before, so it can be a little more than the length. The last {kept, number} since Combwork started, kept in memory only; hive.log notes them too, at most one line a minute.",
     description: 'Info tip beside the Main process stalls heading of the Performance page. Step and During it are its columns: keep them as named there. hive.log is a file name.'
   }),
   when: msg({ id: 'performance.stalls.when', defaultMessage: 'When', description: "Column header of the Performance page's Main process stalls table: when the stall ended (a time)." }),
@@ -37,8 +37,8 @@ const M = {
   seconds: msg({ id: 'performance.stalls.seconds', defaultMessage: '{s} s', description: 'A length in seconds ("1.5 s", the number already formatted) in the Performance page\'s Main process stalls table.' }),
   running: msg({ id: 'performance.stalls.running', defaultMessage: '{length}, still running', description: "A work's length in a stall's During it or Step cell, while it was still under way when the stall was recorded ({length}: \"1.5 s\")." }),
   repeated: msg({ id: 'performance.stalls.repeated', defaultMessage: '×{n, number} · {length}', description: "After a work's name in a stall's During it or Step cell when there were several of it: how many ({n}) and their length in all ({length}: \"81 ms\", or \"1.5 s, still running\")." }),
-  count: msg({ id: 'performance.stalls.count', defaultMessage: '{total, plural, one {# stall since Hive started} other {# stalls since Hive started}}{listed, select, all {} other {; the last {kept, number} are listed}}.', description: "Under the Performance page's Main process stalls table: how many stalls there were since Hive started, and that only the last {kept} are listed when there were more. {listed} is a key (all or some): don't translate the keys, only the texts." }),
-  empty: msg({ id: 'performance.stalls.empty', defaultMessage: 'No stalls since Hive started.', description: "The Performance page's Main process stalls table when there were none." }),
+  count: msg({ id: 'performance.stalls.count', defaultMessage: '{total, plural, one {# stall since Combwork started} other {# stalls since Combwork started}}{listed, select, all {} other {; the last {kept, number} are listed}}.', description: "Under the Performance page's Main process stalls table: how many stalls there were since Hive started, and that only the last {kept} are listed when there were more. {listed} is a key (all or some): don't translate the keys, only the texts." }),
+  empty: msg({ id: 'performance.stalls.empty', defaultMessage: 'No stalls since Combwork started.', description: "The Performance page's Main process stalls table when there were none." }),
   loadTarget: msg({ id: 'performance.stalls.loadTarget', defaultMessage: "the main process's stalls", description: 'What could not be read on the Performance page: shown in "Could not load {what}: {error}".' })
 }
 

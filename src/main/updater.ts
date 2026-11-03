@@ -77,7 +77,7 @@ const testCache = (): string => {
 const packagedTestCopy = (): boolean => app.isPackaged && testQuiet()
 
 function enabledReason(): string | null {
-  if (packagedTestCopy()) return tr(msg({ id: 'main.update.testCopy', defaultMessage: "A test copy of Hive doesn't check for updates.", description: 'Settings → Updates in a copy of Hive started by its tests, which never checks for updates.' }))
+  if (packagedTestCopy()) return tr(msg({ id: 'main.update.testCopy', defaultMessage: "A test copy of Combwork doesn't check for updates.", description: 'Settings → Updates in a copy of Hive started by its tests, which never checks for updates.' }))
   if (app.isPackaged) return null
   if (testFeed()) return null
   return tr(msg({ id: 'main.update.devBuild', defaultMessage: 'Updates are checked by the installed app, not development builds.', description: 'Settings → Updates in a development build of Hive, which never updates.' }))
@@ -111,7 +111,7 @@ function notesOf(info: UpdateInfo): string | undefined {
 
 function friendlyError(e: unknown): string {
   const said = String((e as Error)?.message ?? e)
-  if (/\b404\b|not found|no published versions|unable to find latest version|cannot find latest\.yml/i.test(said)) return tr(msg({ id: 'main.update.noRelease', defaultMessage: 'No release of Hive has been published yet.', description: 'Why checking for updates found none.' }))
+  if (/\b404\b|not found|no published versions|unable to find latest version|cannot find latest\.yml/i.test(said)) return tr(msg({ id: 'main.update.noRelease', defaultMessage: 'No release of Combwork has been published yet.', description: 'Why checking for updates found none.' }))
   if (/ENOTFOUND|ETIMEDOUT|ECONNREFUSED|ECONNRESET|EAI_AGAIN|net::ERR_/i.test(said)) return tr(msg({ id: 'main.update.offline', defaultMessage: "Couldn't reach GitHub to check for updates. Check your internet connection.", description: 'Why checking for updates failed. GitHub is a name.' }))
   if (/sha512|checksum/i.test(said)) return tr(msg({ id: 'main.update.checksum', defaultMessage: 'The downloaded update did not match its checksum and was discarded.', description: 'Why a downloaded update was thrown away.' }))
   return said.split('\n')[0].slice(0, 300)
@@ -149,7 +149,7 @@ export async function check(manual: boolean): Promise<UpdateState> {
         toast(
           'info',
           tr(msg({ id: 'main.update.sameVersion', defaultMessage: 'A published {app} {version} is available', description: "A notice: the user runs a local build (one they built themselves) of a version, and a published release of the same version exists. {app} is Hive's name." }), { app: APP_NAME, version: same }),
-          tr(msg({ id: 'main.update.sameVersionBody', defaultMessage: "You're running a local build of {version}{hasCommit, select, yes { ({commit})} other {}}. Hive doesn't install a release of the same version over it.", description: "The notice that a published release has the same version as the user's local build. {commit} is the commit it was built from." }), { version: same, hasCommit: running.commit ? 'yes' : 'no', commit: running.commit?.slice(0, 7) ?? '' }),
+          tr(msg({ id: 'main.update.sameVersionBody', defaultMessage: "You're running a local build of {version}{hasCommit, select, yes { ({commit})} other {}}. Combwork doesn't install a release of the same version over it.", description: "The notice that a published release has the same version as the user's local build. {commit} is the commit it was built from." }), { version: same, hasCommit: running.commit ? 'yes' : 'no', commit: running.commit?.slice(0, 7) ?? '' }),
           [{ label: tr(msg({ id: 'main.update.openReleasePage', defaultMessage: 'Open Release Page', description: "The notice's button: opens that release's page on GitHub in the browser (it doesn't install anything)." })), command: 'update.releaseNotes', args: [same] }]
         )
       }
@@ -225,7 +225,7 @@ export function markInstalling(): void {
 /** Why a downloaded update isn't installed, for the notice. */
 function notInstalledText(): string {
   return state.notInstalled === 'unreadable'
-    ? tr(msg({ id: 'main.update.notInstalledUnreadable', defaultMessage: "Hive couldn't read the copy installed on this computer, so it didn't replace it. Try again once any other Hive installer has finished.", description: 'Why Hive did not install a downloaded update: it could not read the installed copy (another installer may be replacing it).' }))
+    ? tr(msg({ id: 'main.update.notInstalledUnreadable', defaultMessage: "Combwork couldn't read the copy installed on this computer, so it didn't replace it. Try again once any other Combwork installer has finished.", description: 'Why Hive did not install a downloaded update: it could not read the installed copy (another installer may be replacing it).' }))
     : tr(msg({ id: 'main.update.notInstalledNotNewer', defaultMessage: 'The copy installed on this computer is the same version or newer (a local build, say).', description: 'Why Hive did not install a downloaded update: what is installed is not older than it.' }))
 }
 
@@ -304,7 +304,7 @@ export function initUpdater(opts: { restart: () => void }): void {
     toast(
       'info',
       tr(msg({ id: 'main.update.ready', defaultMessage: '{app} {version} is ready', description: "A notice: an update was downloaded. {app} is Hive's name, {version} the new version." }), { app: APP_NAME, version: info.version }),
-      auto ? tr(msg({ id: 'main.update.readyAuto', defaultMessage: 'It installs when you quit Hive, or restart now.', description: 'The notice that an update is ready, with updates installed automatically.' })) : tr(msg({ id: 'main.update.readyManual', defaultMessage: 'Restart Hive to install it.', description: 'The notice that an update is ready, with updates installed manually.' })),
+      auto ? tr(msg({ id: 'main.update.readyAuto', defaultMessage: 'It installs when you quit Combwork, or restart now.', description: 'The notice that an update is ready, with updates installed automatically.' })) : tr(msg({ id: 'main.update.readyManual', defaultMessage: 'Restart Combwork to install it.', description: 'The notice that an update is ready, with updates installed manually.' })),
       [{ label: tr(msg({ id: 'main.update.restart', defaultMessage: 'Restart and Update', description: "The notice's button: restarts Hive and installs the update." })), command: 'update.install', args: [info.version] }],
       undefined,
       undefined,

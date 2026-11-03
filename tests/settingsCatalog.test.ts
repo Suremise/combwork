@@ -182,7 +182,7 @@ describe('the settings catalog', () => {
   it("says why a value can't be set, and where the user sets it, its level too (HI-2470)", () => {
     // A level default's read-only reason names the path Settings has, with its level.
     expect(settingReadOnly(entry('workspace.workflow.git.maxAgents'))).toBe("Maximum agents is the user's team size, the most agents you may add: only the user can change it, in Settings → Version Control → Workspace defaults → Maximum agents.")
-    expect(settingReadOnly(entry('workflow.git.maxAgents'))).toContain('in Settings → Version Control → Hive defaults → Maximum agents.')
+    expect(settingReadOnly(entry('workflow.git.maxAgents'))).toContain('in Settings → Version Control → Combwork defaults → Maximum agents.')
     expect(settingReadOnly(entry('assistant.control'))).toBe("These are the Assistant's own permissions: only the user can change it, in Settings → Assistant → Control.")
     // A control of Settings' own the tools don't set: no "(undefined)", whatever it is.
     for (const id of ['accounts.list', 'assistant.journal', 'mcpCatalogs.sources', 'workflow.git.preChecks', 'workspace.workflow.none.stageNames']) {

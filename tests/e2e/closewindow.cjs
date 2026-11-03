@@ -123,7 +123,7 @@ const invOn = (page) => (ch, ...a) => page.evaluate(([c, x]) => window.hive.invo
   // Close Window on the last window: as its X, it quits (asking first). Cancelled both ways: the same dialog.
   await clickMenu(p1, 'Close Window')
   const lastByMenu = await waitDialog(p1)
-  check('Close Window on the last window asks to quit, as X does', lastByMenu?.title === 'Quit Hive?' && lastByMenu.rows.length === 1, JSON.stringify(lastByMenu))
+  check('Close Window on the last window asks to quit, as X does', lastByMenu?.title === 'Quit Combwork?' && lastByMenu.rows.length === 1, JSON.stringify(lastByMenu))
   check('…with no "Close this window only" (one window)', !!lastByMenu && !lastByMenu.buttons.some((b) => /this window only/.test(b)), JSON.stringify(lastByMenu?.buttons))
   await cancel(p1)
   await app.evaluate(({ BrowserWindow }) => BrowserWindow.getAllWindows()[0].close())
@@ -147,13 +147,13 @@ const invOn = (page) => (ch, ...a) => page.evaluate(([c, x]) => window.hive.invo
   let p2 = await openB()
   let inv2 = invOn(p2)
   check('an agent runs in B', await startAgent(inv2, beta))
-  check('Hive counts two windows', !!(await lib.until(async () => (await inv1('window:count')) === 2, HUNG_MS)))
+  check('Combwork counts two windows', !!(await lib.until(async () => (await inv1('window:count')) === 2, HUNG_MS)))
   menu = await fileMenu(p1)
   await closeMenu(p1)
   const exit = menu.find((m) => m[0].startsWith('Exit'))
-  check('with two windows, Exit reads "Exit Hive (all windows)"', exit?.[0] === 'Exit Hive (all windows)', JSON.stringify(exit))
+  check('with two windows, Exit reads "Exit Combwork (all windows)"', exit?.[0] === 'Exit Combwork (all windows)', JSON.stringify(exit))
   check('…and its tooltip says it closes both', /all 2 windows/.test(exit?.[2] ?? ''), exit?.[2])
-  check('the palette says so too', (await palette(p1, 'exit')).some((t) => t.includes('File: Exit Hive (all windows)')))
+  check('the palette says so too', (await palette(p1, 'exit')).some((t) => t.includes('File: Exit Combwork (all windows)')))
   // The palette's first Escape clears what was typed (#433), the next closes it.
   await p1.keyboard.press('Escape')
   if (await p1.locator('.palette').count()) await p1.keyboard.press('Escape')
@@ -188,11 +188,11 @@ const invOn = (page) => (ch, ...a) => page.evaluate(([c, x]) => window.hive.invo
   p2 = await openB()
   inv2 = invOn(p2)
   check('an agent runs in B again', await startAgent(inv2, beta, 'Two'))
-  await clickMenu(p1, 'Exit Hive (all windows)')
+  await clickMenu(p1, 'Exit Combwork (all windows)')
   const asked = await lib.until(async () => ((await dialogIn(p1)) ? p1 : (await dialogIn(p2)) ? p2 : null), 8000)
   const quit = asked ? await dialogIn(asked) : null
   check('Exit asks in one window', !!quit)
-  check('its title says it closes all 2 windows', quit?.title === 'Quit Hive and close all 2 windows?', quit?.title)
+  check('its title says it closes all 2 windows', quit?.title === 'Quit Combwork and close all 2 windows?', quit?.title)
   check('its text says every workspace', /closes all 2 windows and stops/.test(quit?.text ?? '') && /every workspace/.test(quit?.text ?? ''), quit?.text)
   check('the agents are grouped by workspace', JSON.stringify([...(quit?.groups ?? [])].sort()) === JSON.stringify(['closewindow-ws-a', 'closewindow-ws-b']), JSON.stringify(quit?.groups))
   check('…each under its own', JSON.stringify([...(quit?.rows ?? [])].sort()) === JSON.stringify(['closewindow-ws-a|alpha', 'closewindow-ws-b|beta']), JSON.stringify(quit?.rows))
@@ -210,7 +210,7 @@ const invOn = (page) => (ch, ...a) => page.evaluate(([c, x]) => window.hive.invo
   if (asked) await asked.locator('.dialog button', { hasText: 'Close this window only' }).click()
   check('"Close this window only" closes that window', await closedOnly)
   const invOther = invOn(other)
-  check('without asking again: one window left, Hive still running', !!(await lib.until(async () => (await invOther('window:count')) === 1, 5000)))
+  check('without asking again: one window left, Combwork still running', !!(await lib.until(async () => (await invOther('window:count')) === 1, 5000)))
   check("that window's agent stopped", !!(await lib.until(async () => !(await liveIn(invOther, mine)), 5000)))
   check("the other window's agent runs on", await liveIn(invOther, theirs))
   check('the other window has no dialog', !(await dialogIn(other)))
@@ -253,7 +253,7 @@ const invOn = (page) => (ch, ...a) => page.evaluate(([c, x]) => window.hive.invo
         }
       return { bad, buttons: [...d.querySelectorAll('button')].map((b) => b.textContent.trim()).filter(Boolean) }
     })
-  await clickMenu(other, 'Exit Hive (all windows)')
+  await clickMenu(other, 'Exit Combwork (all windows)')
   const busyAt = await lib.until(async () => ((await dialogIn(other)) ? other : (await dialogIn(pNew)) ? pNew : null), 8000)
   check('Exit with busy agents asks', !!busyAt)
   if (busyAt) {
@@ -279,7 +279,7 @@ const invOn = (page) => (ch, ...a) => page.evaluate(([c, x]) => window.hive.invo
   // asks about that window's agents (they weren't listed), and the other window and its agent stay.
   await invOther('files:setUnsaved', [path.join(theirs, 'a.ts')])
   await invNew('files:setUnsaved', [path.join(missingProject, 'a.ts')])
-  await clickMenu(other, 'Exit Hive (all windows)')
+  await clickMenu(other, 'Exit Combwork (all windows)')
   const firstAt = await lib.until(async () => ((await dialogIn(other)) ? other : (await dialogIn(pNew)) ? pNew : null), 8000)
   const first = firstAt ? await dialogIn(firstAt) : null
   check('Exit first asks one window about its unsaved file only', first?.unsaved === 1 && first.rows.length === 0, JSON.stringify(first))
@@ -307,11 +307,11 @@ const invOn = (page) => (ch, ...a) => page.evaluate(([c, x]) => window.hive.invo
   const pDup1 = await openWindow(invStays, wsDup1)
   const pDup2 = await openWindow(invStays, wsDup2)
   check('an agent runs in each "work" workspace', !!(await startAgent(invOn(pDup1), gamma)) && !!(await startAgent(invOn(pDup2), delta)))
-  await clickMenu(stays, 'Exit Hive (all windows)')
+  await clickMenu(stays, 'Exit Combwork (all windows)')
   const dupPages = [stays, pDup1, pDup2]
   const dupAt = await lib.until(async () => { for (const pg of dupPages) if (await dialogIn(pg)) return pg; return null }, 8000)
   const dupQuit = dupAt ? await dialogIn(dupAt) : null
-  check('Exit with three windows asks', dupQuit?.title === 'Quit Hive and close all 3 windows?', dupQuit?.title)
+  check('Exit with three windows asks', dupQuit?.title === 'Quit Combwork and close all 3 windows?', dupQuit?.title)
   const heads = dupAt
     ? await dupAt.evaluate(() => [...document.querySelectorAll('.dialog .quit-group')].map((g) => ({ where: g.querySelector('.quit-group-where')?.textContent ?? '', name: g.textContent.replace(g.querySelector('.quit-group-where')?.textContent ?? '', '').trim(), title: g.getAttribute('title') ?? '' })))
     : []

@@ -15,7 +15,7 @@ const M = {
   untrackTitle: msg({ id: 'git.hiveVcs.untrackTitle', defaultMessage: '{count, plural, one {Untrack this file?} other {Untrack these # files?}}', description: "Title of the confirmation before Hive stops git tracking files in the project's .hive." }),
   untrackMessage: msg({
     id: 'git.hiveVcs.untrackMessage',
-    defaultMessage: '{count, plural, one {Hive runs git rm --cached on it in {project}, and nothing else: git stops tracking it and stages its removal from the repository. The file stays on disk. Commit afterwards to finish.} other {Hive runs git rm --cached on them in {project}, and nothing else: git stops tracking them and stages their removal from the repository. The files stay on disk. Commit afterwards to finish.}}',
+    defaultMessage: '{count, plural, one {Combwork runs git rm --cached on it in {project}, and nothing else: git stops tracking it and stages its removal from the repository. The file stays on disk. Commit afterwards to finish.} other {Combwork runs git rm --cached on them in {project}, and nothing else: git stops tracking them and stages their removal from the repository. The files stay on disk. Commit afterwards to finish.}}',
     description: "The confirmation before untracking .hive's files, above the list of them. {project} is the project's name. Keep git rm --cached as it is."
   }),
   more: msg({ id: 'git.hiveVcs.more', defaultMessage: '… and {count, plural, one {# more} other {# more}}', description: 'Last line of a long list of files: how many more are not listed.' }),

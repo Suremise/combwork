@@ -70,7 +70,7 @@
     "audience": "both"
   },
   "mcp.catalog.tooManySources": {
-    "text": "Hive lists at most {max, number} catalogues of your own: remove one first.",
+    "text": "Combwork lists at most {max, number} catalogues of your own: remove one first.",
     "note": "An error adding an MCP catalogue source (Settings → MCP Catalogues, HI-545): the list is full.",
     "audience": "both"
   },

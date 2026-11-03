@@ -199,7 +199,7 @@ describe('Add MCP Server from File', () => {
     await refused(zipSync({ 'hive-mcp.json': def, 'C:/evil.js': strToU8('x') }), 'unsafe path')
     await refused(zipSync({ 'hive-mcp.json': def, 'x/file.js:stream': strToU8('x') }), 'unsafe path')
     await refused(zipSync({ 'hive-mcp.json': def, 'con.js': strToU8('x') }), 'unsafe path')
-    await refused(withLink({ 'hive-mcp.json': def }, 'escape'), "has a link, which Hive doesn't unpack: escape")
+    await refused(withLink({ 'hive-mcp.json': def }, 'escape'), "has a link, which Combwork doesn't unpack: escape")
     await refused(zipSync({ 'server.js': strToU8('x') }), 'No hive-mcp.json or hive-mcp.example.json found')
     await refused(zipSync({ 'a/hive-mcp.json': def, 'b/x.js': strToU8('x') }), 'No hive-mcp.json')
     await refused(zipSync({ 'hive-mcp.json': strToU8('{oops') }), "hive-mcp.json isn't valid JSON")

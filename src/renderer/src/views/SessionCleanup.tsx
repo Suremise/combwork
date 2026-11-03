@@ -133,13 +133,13 @@ const ACTIONS: { id: CleanupAction; icon: string; label: Msg; summary: Msg }[] =
     id: 'archive',
     icon: 'archive',
     label: msg({ id: 'sessions.cleanup.archive', defaultMessage: 'Archive', description: 'A choice in Clean Up (Sessions tab): archive the old sessions (the default). Keep it short.' }),
-    summary: msg({ id: 'sessions.cleanup.archiveSummary', defaultMessage: "Hive's own sessions are hidden from the list and their transcripts kept in .hive/archive: tick Archived to see them, and unarchive any at any time.", description: 'Under the Archive choice in Clean Up: what archiving does (.hive/archive is a folder; Archived is a checkbox above the Sessions list: use its translation).' })
+    summary: msg({ id: 'sessions.cleanup.archiveSummary', defaultMessage: "Combwork's own sessions are hidden from the list and their transcripts kept in .hive/archive: tick Archived to see them, and unarchive any at any time.", description: 'Under the Archive choice in Clean Up: what archiving does (.hive/archive is a folder; Archived is a checkbox above the Sessions list: use its translation).' })
   },
   {
     id: 'delete',
     icon: 'trash',
     label: msg({ id: 'sessions.cleanup.delete', defaultMessage: 'Delete', description: 'A choice in Clean Up (Sessions tab): delete the old sessions from Hive. Keep it short.' }),
-    summary: msg({ id: 'sessions.cleanup.deleteSummary', defaultMessage: "Archived ones too. Hive's copies of their transcripts go to the Recycle Bin and Hive stops listing them; what they used stays in the totals. Each CLI keeps its own transcript.", description: "Under the Delete choice in Clean Up: it takes archived sessions too; Hive's copies go to the Recycle Bin, usage stays counted, and the coding agents' CLIs keep their own transcripts." })
+    summary: msg({ id: 'sessions.cleanup.deleteSummary', defaultMessage: "Archived ones too. Combwork's copies of their transcripts go to the Recycle Bin and Combwork stops listing them; what they used stays in the totals. Each CLI keeps its own transcript.", description: "Under the Delete choice in Clean Up: it takes archived sessions too; Hive's copies go to the Recycle Bin, usage stays counted, and the coding agents' CLIs keep their own transcripts." })
   }
 ]
 

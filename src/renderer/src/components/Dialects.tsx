@@ -43,7 +43,7 @@ import { Icon, IconButton, LoadFailed, SearchInput, Switch, Tooltip } from './ui
 
 const M = {
   title: msg({ id: 'dialects.title', defaultMessage: 'Dialects', description: 'Title of the Dialects view (HI-2444): the wording Hive gives agents, tuned per model and CLI. Glossary: dialect.' }),
-  tip: msg({ id: 'dialects.tip', defaultMessage: "The wording Hive gives agents: its guidance, its tools' descriptions and replies, its wakes. A dialect file changes some of it, for a model, a CLI or the whole workspace; everything else stays Hive's own. A change applies at each agent's next launch.", description: "Tooltip on the Dialects view's title (HI-2444). Glossary: dialect." }),
+  tip: msg({ id: 'dialects.tip', defaultMessage: "The wording Combwork gives agents: its guidance, its tools' descriptions and replies, its wakes. A dialect file changes some of it, for a model, a CLI or the whole workspace; everything else stays Combwork's own. A change applies at each agent's next launch.", description: "Tooltip on the Dialects view's title (HI-2444). Glossary: dialect." }),
   import: msg({ id: 'dialects.import', defaultMessage: 'Import Dialect File…', description: 'A button in the Dialects view (HI-2444): adds a dialect file from a file. Glossary: dialect.' }),
   refresh: msg({ id: 'dialects.refresh', defaultMessage: 'Refresh', description: 'A button in the Dialects view: reads the dialect files again.' }),
   filter: msg({ id: 'dialects.filter', defaultMessage: 'Filter files', description: "The Dialects view's search box placeholder: filters the list of dialect files by name or model." }),
@@ -89,7 +89,7 @@ const M = {
   exported: msg({ id: 'dialects.exported', defaultMessage: 'Exported to {path}', description: 'A notice after exporting a dialect file. {path} is where it was written.' }),
   revert: msg({ id: 'dialects.revert', defaultMessage: 'Revert to Shipped', description: 'A button of an edited shipped dialect file: puts back the file as Hive ships it. Glossary: dialect.' }),
   revertTitle: msg({ id: 'dialects.revertTitle', defaultMessage: 'Revert {name}?', description: 'Title of the confirmation before reverting a dialect file. {name} is the file.' }),
-  revertMessage: msg({ id: 'dialects.revertMessage', defaultMessage: "Your changes to it are lost, and it follows Hive's updates again.", description: 'The confirmation before reverting a dialect file to the version Hive ships. Glossary: dialect.' }),
+  revertMessage: msg({ id: 'dialects.revertMessage', defaultMessage: "Your changes to it are lost, and it follows Combwork's updates again.", description: 'The confirmation before reverting a dialect file to the version Hive ships. Glossary: dialect.' }),
   promote: msg({ id: 'dialects.promote', defaultMessage: 'Use for a Model…', description: "A button of a test copy in the Dialects view: makes it the file Auto picks for a model ID (the file that had it becomes a test copy). Glossary: test copy." }),
   promoteTitle: msg({ id: 'dialects.promoteTitle', defaultMessage: 'Use {name} for a model', description: 'Title of the Promote dialog of a test copy. {name} is the file. Glossary: dialect.' }),
   promoteMessage: msg({ id: 'dialects.promoteMessage', defaultMessage: "Agents on Auto running this model ID get this file from their next launch. A file that had the model keeps its texts, as a test copy.", description: 'The Promote dialog of a test copy (Dialects view). Glossary: dialect, test copy.' }),
@@ -99,7 +99,7 @@ const M = {
   deleteTitle: msg({ id: 'dialects.deleteTitle', defaultMessage: 'Delete {name}?', description: 'Title of the confirmation before deleting a dialect file. {name} is the file.' }),
   deleteMessage: msg({ id: 'dialects.deleteMessage', defaultMessage: 'It goes to the Recycle Bin. Agents whose Dialect setting names it use Auto from their next launch.', description: 'The confirmation before deleting a dialect file. Glossary: dialect.' }),
   restart: msg({ id: 'dialects.restart', defaultMessage: '{count, plural, one {Restart to apply: {agents} runs on this file as it was.} other {Restart to apply: {agents} run on this file as it was.}}', description: 'A banner on a dialect file in the Dialects view: running agents whose dialect chain this file changed since their launch; they get the change when they restart. {agents} is their names. Glossary: dialect.' }),
-  changedOutside: msg({ id: 'dialects.changedOutside', defaultMessage: 'This file changed outside Hive while you were editing it.', description: 'A banner in the Dialects view: the dialect file changed on disk (an editor, git, another window) while it has unsaved changes here.' }),
+  changedOutside: msg({ id: 'dialects.changedOutside', defaultMessage: 'This file changed outside Combwork while you were editing it.', description: 'A banner in the Dialects view: the dialect file changed on disk (an editor, git, another window) while it has unsaved changes here.' }),
   reload: msg({ id: 'dialects.reload', defaultMessage: 'Reload (Lose My Changes)', description: "The Dialects view's button on a file changed outside Hive: reads it again, dropping the unsaved changes." }),
   keepMine: msg({ id: 'dialects.keepMine', defaultMessage: 'Keep My Changes', description: "The Dialects view's button on a file changed outside Hive: keeps the unsaved changes; the next Save writes over the change made outside." }),
   tabTexts: msg({ id: 'dialects.tab.texts', defaultMessage: 'Texts', description: "A tab of a dialect file in the Dialects view: every text, with the file's overrides." }),
@@ -137,10 +137,10 @@ const M = {
   text: msg({ id: 'dialects.text', defaultMessage: 'Text', description: "The field for an override's text in the Dialects view." }),
   override: msg({ id: 'dialects.override', defaultMessage: 'Change Here', description: "A button on an inherited text in the Dialects view: starts this file's own override of it, from the text it inherits." }),
   removeOverride: msg({ id: 'dialects.removeOverride', defaultMessage: 'Remove Override', description: "A button on a text this dialect file overrides: removes the override, so the text inherits again." }),
-  noDefault: msg({ id: 'dialects.noDefault', defaultMessage: 'No current Default: this text was removed or renamed in this Hive.', description: "In the Dialects view, beside an outdated override whose id this Hive no longer has. Glossary: Default (dialects), outdated." }),
+  noDefault: msg({ id: 'dialects.noDefault', defaultMessage: 'No current Default: this text was removed or renamed in this Combwork.', description: "In the Dialects view, beside an outdated override whose id this Hive no longer has. Glossary: Default (dialects), outdated." }),
   defaultNow: msg({ id: 'dialects.defaultNow', defaultMessage: 'The Default now: {text}', description: "In the Dialects view, beside an outdated override: Hive's current wording of the text. Glossary: Default (dialects), outdated." }),
   problem: {
-    unknown: msg({ id: 'dialects.problem.unknown', defaultMessage: '{id}: no such text in this Hive (removed or renamed).', description: 'Why a dialect override is outdated or refused: its id ({id}) isn\'t one of this Hive\'s texts.' }),
+    unknown: msg({ id: 'dialects.problem.unknown', defaultMessage: '{id}: no such text in this Combwork (removed or renamed).', description: 'Why a dialect override is outdated or refused: its id ({id}) isn\'t one of this Hive\'s texts.' }),
     shape: msg({ id: 'dialects.problem.shape', defaultMessage: '{id}: not a "text" with an optional "why".', description: "Why a dialect override is outdated or refused: its entry ({id}) isn't an object with a text and an optional reason. \"text\" and \"why\" are the file's field names: keep them." }),
     unparsable: msg({ id: 'dialects.problem.unparsable', defaultMessage: "{id}: its text can't be read ({detail}).", description: "Why a dialect override is outdated or refused: its text ({id}) isn't valid message syntax; {detail} is the parser's English error." }),
     missing: msg({ id: 'dialects.problem.missing', defaultMessage: '{id}: missing {names}.', description: 'Why a dialect override is outdated or refused: its text ({id}) lacks placeholders it needs ({names}: "{project}, {count}").' }),
@@ -155,7 +155,7 @@ const M = {
     modelClaimed: msg({ id: 'dialects.refused.modelClaimed', defaultMessage: '{by} already claims model {model}: a folder has one file per model.', description: "A dialect file's save refused: another file of the folder ({by}) claims the same model ID ({model}). Glossary: dialect." }),
     nameTaken: msg({ id: 'dialects.refused.nameTaken', defaultMessage: '{path} is already there: choose another name.', description: "A dialect file's import or copy refused: a file of that name ({path}) exists. Glossary: dialect." }),
     missing: msg({ id: 'dialects.refused.missing', defaultMessage: '{path} is no longer there.', description: 'A change to a dialect file refused: the file ({path}) was deleted meanwhile.' }),
-    changedOnDisk: msg({ id: 'dialects.refused.changedOnDisk', defaultMessage: 'The file changed outside Hive since you started editing it: nothing was saved.', description: "A dialect file's save refused: it changed on disk meanwhile (an editor, git, another window). The view then offers Reload or Keep My Changes." }),
+    changedOnDisk: msg({ id: 'dialects.refused.changedOnDisk', defaultMessage: 'The file changed outside Combwork since you started editing it: nothing was saved.', description: "A dialect file's save refused: it changed on disk meanwhile (an editor, git, another window). The view then offers Reload or Keep My Changes." }),
     protected: msg({ id: 'dialects.refused.protected', defaultMessage: "The Workspace file, a CLI's file and a shipped file can't be deleted.", description: 'A dialect file\'s delete refused: it is part of the chain\'s baseline (a shipped one has Revert).' })
   },
   fileProblem: {
@@ -163,7 +163,7 @@ const M = {
     shape: msg({ id: 'dialects.fileProblem.shape', defaultMessage: '"{field}" is missing or of the wrong kind', description: 'Why a text isn\'t a dialect file (Dialects view): one of its fields ({field}: name, model, texts) is wrong. Lower case: it follows a colon.' })
   },
   importTitle: msg({ id: 'dialects.importTitle', defaultMessage: 'Import {file}', description: 'Title of the Import dialog of a dialect file. {file} is the file chosen.' }),
-  importMessage: msg({ id: 'dialects.importMessage', defaultMessage: "It is checked against this Hive's texts. If its model is already claimed in the folder, it comes in as a test copy.", description: 'The Import dialog of a dialect file. Glossary: dialect, test copy.' }),
+  importMessage: msg({ id: 'dialects.importMessage', defaultMessage: "It is checked against this Combwork's texts. If its model is already claimed in the folder, it comes in as a test copy.", description: 'The Import dialog of a dialect file. Glossary: dialect, test copy.' }),
   importFolder: msg({ id: 'dialects.importFolder', defaultMessage: 'Folder', description: "The Import dialog's choice of folder: a CLI's, or the API's." }),
   importName: msg({ id: 'dialects.importName', defaultMessage: 'Name', description: "The Import and Duplicate dialogs' field: the file's name." }),
   imported: msg({ id: 'dialects.imported', defaultMessage: '{path} imported.', description: 'A notice after importing a dialect file. {path} is where it went.' }),

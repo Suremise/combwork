@@ -135,7 +135,7 @@ export function createTray(getWindow: () => BrowserWindow | null, actions: TrayA
     if (!projectItems.length) projectItems.push({ label: tr(msg({ id: 'main.tray.noProjects', defaultMessage: 'No active projects', description: 'The tray menu when no project is active.' })), enabled: false })
     tray.setContextMenu(
       Menu.buildFromTemplate([
-        { label: tr(msg({ id: 'main.tray.show', defaultMessage: 'Show Hive', description: "The tray menu: brings Hive's window up." })), click: () => { const w = getWindow(); if (w) showWindow(w) } },
+        { label: tr(msg({ id: 'main.tray.show', defaultMessage: 'Show Combwork', description: "The tray menu: brings Hive's window up." })), click: () => { const w = getWindow(); if (w) showWindow(w) } },
         { type: 'separator' },
         ...inboxSection(tr(msg({ id: 'main.tray.needYou', defaultMessage: 'Need you', description: 'A section of the tray menu: agents waiting for you.' })), (b) => b.needYou),
         // Finished since you last looked (#1632): apart from what needs you, and not counted with it.
@@ -152,7 +152,7 @@ export function createTray(getWindow: () => BrowserWindow | null, actions: TrayA
               { label: tr(msg({ id: 'main.tray.quitNow', defaultMessage: 'Quit Now', description: 'The tray menu: quits without waiting for the agents.' })), click: actions.quitNow },
               { label: tr(msg({ id: 'main.tray.cancelQuit', defaultMessage: 'Cancel Pending Quit', description: 'The tray menu: Hive no longer quits when the agents finish.' })), click: actions.cancelPendingQuit }
             ]
-          : [{ label: tr(msg({ id: 'main.tray.quit', defaultMessage: 'Quit Hive', description: 'The tray menu: quits Hive.' })), click: actions.quit }])
+          : [{ label: tr(msg({ id: 'main.tray.quit', defaultMessage: 'Quit Combwork', description: 'The tray menu: quits Hive.' })), click: actions.quit }])
       ])
     )
   }

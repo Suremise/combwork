@@ -55,7 +55,7 @@ export type CardIntent =
   | { kind: 'retryMerge'; reason: string; guard?: () => void }
 
 const M = {
-  queueNotAgents: msg({ id: 'service.intent.queueNotAgents', defaultMessage: 'Only the user, or the Hive Assistant within Settings → Assistant → Control, takes a card out of the merge queue or retries its merge.', description: "An error: an agent or a script asked to remove a card from the merge queue or retry its merge, which only the user and the Hive Assistant (within its Control setting, a setting name: use it as Hive shows it) can do." }),
+  queueNotAgents: msg({ id: 'service.intent.queueNotAgents', defaultMessage: 'Only the user, or the Assistant within Settings → Assistant → Control, takes a card out of the merge queue or retries its merge.', description: "An error: an agent or a script asked to remove a card from the merge queue or retry its merge, which only the user and the Hive Assistant (within its Control setting, a setting name: use it as Hive shows it) can do." }),
   noWorkflow: msg({ id: 'service.intent.noWorkflow', defaultMessage: '{card} has no workflow: it is a card about the workspace, or its project has no version control chosen yet. Move it on the board instead.', description: "An error: an intent (a card's start, submission, verdict…) was asked for a card that has no workflow, because it belongs to no project or its project's version control (Git or None) isn't chosen yet. {card} is the card's key (HI-12)." })
 }
 

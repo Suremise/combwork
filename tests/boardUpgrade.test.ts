@@ -334,7 +334,7 @@ describe("the board's upgrade to 1.0 (#1207)", () => {
     const other = new DatabaseSync(store.boardFile(ws))
     other.prepare('SELECT count(*) FROM cards').get()
     try {
-      await expect(inWorkspace(w, () => store.upgradeBoard(w))).rejects.toThrow('Another Hive has this workspace open: close it first.')
+      await expect(inWorkspace(w, () => store.upgradeBoard(w))).rejects.toThrow('Another Combwork has this workspace open: close it first.')
       expect(inWorkspace(w, () => store.boardState(w)).readOnly).toBe('upgrade')
       expect(await titles(w)).toEqual(['From 0.9'])
       expect(existsSync(join(hiveOf(ws), 'backups')) ? readdirSync(join(hiveOf(ws), 'backups')).filter((x) => x.includes('before-1.0')) : []).toEqual([])
@@ -478,7 +478,7 @@ describe('while the upgrade waits, nothing needing hive.db starts or writes (#12
     const ws = await board09()
     const w = await open(ws)
     expect(inWorkspace(w, () => store.upgradeWaiting(ws))).toBe(true)
-    await expect(inWorkspace(w, () => sessions.start(join(ws, 'p'), { agentId: 'a1' }))).rejects.toThrow('This workspace is from Hive 0.9: upgrade it to 1.0 before starting agents')
+    await expect(inWorkspace(w, () => sessions.start(join(ws, 'p'), { agentId: 'a1' }))).rejects.toThrow('This workspace is from Combwork 0.9: upgrade it to 1.0 before starting agents')
     expect(sessions.agentsIn(ws)).toBe(0)
     // The Assistant's home is in the workspace: refused the same way.
     await expect(inWorkspace(w, () => sessions.start(join(ws, '.hive', 'assistant'), { agentId: 'assistant' }))).rejects.toThrow('upgrade it to 1.0 before starting agents')

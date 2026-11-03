@@ -34,7 +34,7 @@
   "worktrees.merge.sameBranch": "Im Projektordner ist {branch} ausgecheckt.",
   "worktrees.merge.staged": "Der Projektordner hat bereitgestellte Änderungen. Committe sie oder nimm sie aus der Bereitstellung, bevor du mergst.",
   "worktrees.merge.targetElsewhere": "{branch} ist in {folder} ausgecheckt. Merge dort oder checke in diesem Ordner zuerst einen anderen Branch aus.",
-  "worktrees.merge.targetMoved": "{branch} hat sich geändert, während Hive hineingemergt hat. Es wurde nichts gemergt: Merge erneut.",
+  "worktrees.merge.targetMoved": "{branch} hat sich geändert, während Combwork hineingemergt hat. Es wurde nichts gemergt: Merge erneut.",
   "worktrees.merge.uncommitted": "Es wurde nichts gemergt: {files, plural, one {# Datei im Worktree ist nicht committet} other {# Dateien im Worktree sind nicht committet}}. Committe oder stashe sie im Worktree und merge dann.",
   "worktrees.merge.unknownFiles": "(unbekannte Dateien)",
   "worktrees.missing.noAgent": "Diesen Agenten gibt es nicht mehr.",

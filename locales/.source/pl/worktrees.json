@@ -35,7 +35,7 @@
   "worktrees.merge.sameBranch": "The project folder has {branch} checked out.",
   "worktrees.merge.staged": "The project folder has staged changes. Commit or unstage them before merging.",
   "worktrees.merge.targetElsewhere": "{branch} is checked out in {folder}. Merge there, or check out another branch in that folder first.",
-  "worktrees.merge.targetMoved": "{branch} changed while Hive was merging into it. Nothing was merged: merge again.",
+  "worktrees.merge.targetMoved": "{branch} changed while Combwork was merging into it. Nothing was merged: merge again.",
   "worktrees.merge.uncommitted": "Nothing was merged: {files, plural, one {# file in the worktree isn't committed} other {# files in the worktree aren't committed}}. Commit or stash {files, plural, one {it} other {them}} in the worktree, then merge.",
   "worktrees.merge.unknownFiles": "(unknown files)",
   "worktrees.missing.noAgent": "That agent no longer exists.",

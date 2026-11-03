@@ -23,7 +23,7 @@ import { msg, tr } from '@shared/i18n'
 
 const M = {
   summaryTip: msg({ id: 'assistant.view.summaryTip', defaultMessage: "What this workspace's Assistant has used across its conversations, in the period chosen (by calendar day: Today is since midnight). It isn't counted in any project's Overview. The cost is what the work would have cost at API prices: on a subscription you are not charged this.", description: "The Assistant view: tooltip on Used so far. Today and Overview as Hive names them." }),
-  title: msg({ id: 'assistant.view.title', defaultMessage: 'Hive Assistant', description: "The Assistant view's heading in the sidebar. Hive's name stays as it is." }),
+  title: msg({ id: 'assistant.view.title', defaultMessage: 'Assistant', description: "The Assistant view's heading in the sidebar. Hive's name stays as it is." }),
   titleTip: msg({ id: 'assistant.view.titleTip', defaultMessage: "Your workspace's overseer: what it has used, its modes, its conversations and the files attached to them. Its panel is on the right (Ctrl+Alt+I); its defaults are in Settings → Assistant.", description: "The Assistant view: tooltip on its heading. Keep the shortcut as it is." }),
   showPanel: msg({ id: 'assistant.view.showPanel', defaultMessage: "Show the Assistant's panel", description: "The Assistant view: a button that opens the Assistant's panel on the right." }),
   noWorkspace: msg({ id: 'assistant.view.noWorkspace', defaultMessage: 'Open a workspace to see its Assistant.', description: 'The Assistant view with no workspace open.' }),
@@ -35,7 +35,7 @@ const M = {
   allConversations: msg({ id: 'assistant.view.allConversations', defaultMessage: 'All Conversations', description: "The Assistant view: the row that shows the Assistant's conversations." }),
   attachments: msg({ id: 'assistant.view.attachments', defaultMessage: 'Attachments', description: 'The Assistant view: the section of the files attached to its conversations.' }),
   journal: msg({ id: 'assistant.view.journal', defaultMessage: 'Journal', description: "The Assistant view: the section of the Assistant's journal (its memory across sessions)." }),
-  journalTip: msg({ id: 'assistant.view.journalTip', defaultMessage: "What the Assistant keeps in its journal (decisions, plans, what happened and why) and Hive's own facts. Search it, correct it, or forget what you'd rather it didn't keep.", description: "The Assistant view: the info tip of its Journal section." }),
+  journalTip: msg({ id: 'assistant.view.journalTip', defaultMessage: "What the Assistant keeps in its journal (decisions, plans, what happened and why) and Combwork's own facts. Search it, correct it, or forget what you'd rather it didn't keep.", description: "The Assistant view: the info tip of its Journal section." }),
   timeline: msg({ id: 'assistant.view.timeline', defaultMessage: 'Timeline', description: "The Assistant view, Journal: the row that shows every journal entry, newest first." }),
   digests: msg({ id: 'assistant.view.digests', defaultMessage: 'Weekly Digests', description: "The Assistant view, Journal: the row that shows only the Assistant's weekly digests." }),
   allAttachments: msg({ id: 'assistant.view.allAttachments', defaultMessage: 'All Attachments', description: 'The Assistant view: the row that shows the files attached to its conversations.' }),

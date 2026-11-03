@@ -112,7 +112,7 @@ const portHolders = () => {
 }
 
 /** The notice's text in the window, once it is shown. */
-const notice = (page) => page.evaluate(() => [...document.querySelectorAll('.toast')].map((t) => t.innerText).find((t) => t.includes('Hive closed unexpectedly')) ?? '')
+const notice = (page) => page.evaluate(() => [...document.querySelectorAll('.toast')].map((t) => t.innerText).find((t) => t.includes('Combwork closed unexpectedly')) ?? '')
 
 ;(async () => {
   fs.rmSync(base, { recursive: true, force: true })
@@ -221,7 +221,7 @@ const notice = (page) => page.evaluate(() => [...document.querySelectorAll('.toa
       await page.screenshot({ path: path.join(lib.WORK, 'unexpectedclose-leftovers-notice.png') })
       check('Copy Diagnostics says how many the agents had started and how many still run', /the agents had started \d+ process\(es\), \d+ still running now/.test(await inv('app:diagnostics')))
       check('nothing is stopped on its own', lib.processRunning(node) && lib.processRunning(progressNode) && lib.processRunning(stranger.pid))
-      await page.locator('.toast', { hasText: 'Hive closed unexpectedly' }).getByRole('button', { name: 'Stop Them' }).click()
+      await page.locator('.toast', { hasText: 'Combwork closed unexpectedly' }).getByRole('button', { name: 'Stop Them' }).click()
       check('Stop Them ends the node', !!(await lib.until(() => !lib.processRunning(node), HUNG_MS)))
       check("…and the hive-progress run's whole tree", !!(await lib.until(() => !runPids.some((p) => lib.processRunning(p)), HUNG_MS)), JSON.stringify(runPids.filter((p) => lib.processRunning(p))))
       check('…and says so', !!(await lib.until(async () => (await page.locator('.toast', { hasText: /Stopped \d+ processes/ }).count()) > 0, HUNG_MS)))

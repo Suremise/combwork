@@ -855,7 +855,7 @@ function LaneQueue({ lane: l, badges }: { lane: Lane; badges: Map<number, WorkBa
 }
 
 const WAITED_AT_LEAST = msg({ id: 'board.lanes.waitedAtLeast', defaultMessage: '{time}+', description: "How long a lane has waited, in its header (Progress panel), when Hive didn't see its wait begin (it was already waiting when Hive started): at least {time} (4 min, 1 h 5 min)." })
-const WAITED_AT_LEAST_TIP = msg({ id: 'board.lanes.waitedAtLeastTip', defaultMessage: 'It was already waiting when Hive first saw it: it has waited at least this long.', description: "Tooltip of a lane's wait time with a + in its header (Progress panel): Hive didn't see the wait begin." })
+const WAITED_AT_LEAST_TIP = msg({ id: 'board.lanes.waitedAtLeastTip', defaultMessage: 'It was already waiting when Combwork first saw it: it has waited at least this long.', description: "Tooltip of a lane's wait time with a + in its header (Progress panel): Hive didn't see the wait begin." })
 
 /**
  * One segment: a card (a click opens it), or the finished cards folded together, or the rest of a long lane. `work`:

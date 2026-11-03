@@ -82,7 +82,7 @@ const forceClose = async (app) => {
     // Its sessions up and idle, so quitting finds them running.
     await untilReady(inv, 2)
     await page.evaluate(() => window.hive.invoke('app:quit')) // same entry point as the tray's Quit Hive
-    const dialogShown = () => becomes(async () => (await page.locator('.dialog', { hasText: 'Quit Hive?' }).count()) === 1)
+    const dialogShown = () => becomes(async () => (await page.locator('.dialog', { hasText: 'Quit Combwork?' }).count()) === 1)
     check('dialog: shown in-app', await dialogShown())
     check('dialog: lists both sessions', await becomes(async () => (await page.locator('.quit-row').count()) === 2))
     check('dialog: no "quit when finished" when nothing is working', (await page.locator('.dialog button', { hasText: 'Quit when' }).count()) === 0)

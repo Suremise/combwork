@@ -1,19 +1,19 @@
-# 日本語 (`ja`): style for Hive
+# 日本語 (`ja`): style for Combwork
 
 **Status:** drafted by AI (Claude, October 2026), not yet reviewed by a native speaker. Its entry in
 `src/shared/i18n/languages.ts` says the same (`ai: true` until it is reviewed).
 
 **In the language picker:** 日本語, marked (AI) while drafted by AI, with the note 「AI による翻訳です。改善を歓迎します。」
 
-**Improving it:** every Japanese message is in `locales/ja/<area>.json`, one file per part of Hive. If a word is
+**Improving it:** every Japanese message is in `locales/ja/<area>.json`, one file per part of Combwork. If a word is
 wrong, stiff or unclear, change it there and open a pull request on GitHub (`Suremise/hive-desktop`):
 `CONTRIBUTING.md` says how, and a small fix can be made in GitHub's web editor. If you change a term from the table
-below, change it in every message and on this page in the same pull request, so Hive keeps one voice. A native
+below, change it in every message and on this page in the same pull request, so Combwork keeps one voice. A native
 speaker's review takes the (AI) mark off.
 
 ## Voice
 
-Hive's English is plain and direct: short sentences, everyday words, *you* for the reader, and it says what happens.
+Combwork's English is plain and direct: short sentences, everyday words, *you* for the reader, and it says what happens.
 Translate the meaning, not the words, and keep the result as short and plain.
 
 - **Politeness:** sentences end in the polite form (です／ます): descriptions, tooltips, messages, dialogs, errors
@@ -46,7 +46,7 @@ Translate the meaning, not the words, and keep the result as short and plain.
   (「#個のエージェント」). Lines: 行. Steps: ステップ. Use the counter, not a bare number, wherever a noun is counted.
 - **Placeholders:** a placeholder like `{project}` or `{agent}` is a name inserted as it is. A placeholder that holds a
   sentence or a status is placed after a colon (：), so it can stand on its own.
-- **Lists:** Hive joins lists itself (「One、Two、Three」). Never write 「と」 or 「または」 into a message around a list
+- **Lists:** Combwork joins lists itself (「One、Two、Three」). Never write 「と」 or 「または」 into a message around a list
   placeholder.
 
 ## Punctuation and typography
@@ -62,11 +62,11 @@ Translate the meaning, not the words, and keep the result as short and plain.
   name or command.
 - **Apostrophe:** Japanese has none. Before `{`, `}` or `#`, a straight apostrophe starts an ICU quotation: keep the
   English's `'{'` exactly as it is.
-- **Numbers, dates, money, durations:** formatted by Hive in the Japanese way. Never write them into a message.
+- **Numbers, dates, money, durations:** formatted by Combwork in the Japanese way. Never write them into a message.
 
 ## Terms
 
-The words Japanese uses for Hive's terms ([glossary.md](glossary.md)). Use them every time.
+The words Japanese uses for Combwork's terms ([glossary.md](glossary.md)). Use them every time.
 
 | English | 日本語 | Notes |
 |---|---|---|
@@ -75,7 +75,7 @@ The words Japanese uses for Hive's terms ([glossary.md](glossary.md)). Use them 
 | agent | エージェント | |
 | provider | プロバイダー | Claude Code, Codex or Copilot. |
 | session | セッション | |
-| the Assistant | アシスタント | The full name *Hive Assistant* stays in English. |
+| the Assistant | アシスタント | Its only name: the full English name *Hive Assistant* went with the rename (HI-2458). |
 | persona | ペルソナ | |
 | task board / board | タスクボード / ボード | The *Tasks* tab is 「タスク」. |
 | card | カード | Never 「タスク」 for a card in running text. |
@@ -87,10 +87,10 @@ The words Japanese uses for Hive's terms ([glossary.md](glossary.md)). Use them 
 | builder / reviewer | ビルダー / レビュアー | |
 | review (the act) | レビュー | |
 | card loop / lane / round | カードループ / レーン / ラウンド | |
-| merge slot | マージ枠 | Agents' turn-taking when they merge themselves. Hive's own merging is the merge queue. |
+| merge slot | マージ枠 | Agents' turn-taking when they merge themselves. Combwork's own merging is the merge queue. |
 | merge queue / test merge / Pause queue / Resume queue | マージキュー / テストマージ / キューを一時停止 / キューを再開 | |
 | merge checks / checks before review / check | マージ前のチェック / レビュー前のチェック / チェック | |
-| slot / pool / ready (a slot) | スロット / プール / 準備済み | A slot is a working folder Hive lends to a card or lane. |
+| slot / pool / ready (a slot) | スロット / プール / 準備済み | A slot is a working folder Combwork lends to a card or lane. |
 | Version Control (the tab) / version control / None | 「バージョン管理」タブ / バージョン管理 / なし | The tab was called Git before 1.0. |
 | workflow / workflow options / preset | ワークフロー / ワークフローのオプション / プリセット | Presets: ソロ、ペア、チーム、カスタム. |
 | rule / old rules | ルール / 旧ルール | |
@@ -102,7 +102,7 @@ The words Japanese uses for Hive's terms ([glossary.md](glossary.md)). Use them 
 | review copy | レビュー用コピー | |
 | refused / returned (to its builder) | 拒否 / 差し戻し | |
 | override / Move anyway | 例外 / それでも移動 | |
-| no-code card / before 1.0 / outside Hive | コードなしのカード / 1.0以前 / Hiveの外 | |
+| no-code card / before 1.0 / outside Combwork | コードなしのカード / 1.0以前 / Combworkの外 | |
 | work (a card's Work section) / deliverables | 作業 / 成果物 | |
 | either (a workflow role, beside builder and reviewer) | どちらも | |
 | Start lane… | レーンを開始… | |
@@ -116,11 +116,11 @@ The words Japanese uses for Hive's terms ([glossary.md](glossary.md)). Use them 
 | Workspace Overview | ワークスペース概要 | |
 | permission mode (Manual, Accept edits, Plan, Auto, Don't ask) | 権限モード（手動、編集を承認、プラン、自動、確認しない） | The CLIs' own screens stay in English. |
 | effort / usage / cost / tokens | エフォート / 使用量 / コスト / トークン | Effort levels: 低、中、高、最高… *API-equivalent cost*: 「API換算コスト」. |
-| banner / notification / tip | バナー / 通知 / ヒント | A *notification* is Windows'; a *banner* is inside Hive's window. |
+| banner / notification / tip | バナー / 通知 / ヒント | A *notification* is Windows'; a *banner* is inside Combwork's window. |
 | sign in / sign out | サインイン / サインアウト | |
 | tab / settings | タブ / 設定 | |
 | conversation / transcript | 会話 / トランスクリプト | |
-| status line (a CLI's) / status bar (Hive's) | ステータスライン / ステータスバー | |
+| status line (a CLI's) / status bar (Combwork's) | ステータスライン / ステータスバー | |
 | compact / compaction | コンパクト化 | |
 | prompt / prompt cache | プロンプト / プロンプトキャッシュ | |
 | archive / unarchive | アーカイブ / アーカイブから戻す | |
@@ -153,7 +153,7 @@ The words Japanese uses for Hive's terms ([glossary.md](glossary.md)). Use them 
 | Remove agent… | エージェントを削除… |
 | {name} has {n, plural, one {# open card} other {# open cards}} | {name}：未完了のカード{n, plural, other {#件}} |
 | {agent} was removed. Its sessions stay in the Sessions tab. | {agent}を削除しました。セッションは「セッション」タブに残ります。 |
-| Hive was started in {language} (--lang): this setting applies from its next start. | Hiveは{language}で起動されています（--lang）。この設定は次回の起動から適用されます。 |
+| Combwork was started in {language} (--lang): this setting applies from its next start. | Combworkは{language}で起動されています（--lang）。この設定は次回の起動から適用されます。 |
 | Could not load {what}: {error} | {what}を読み込めませんでした：{error} |
 
 ## Checking

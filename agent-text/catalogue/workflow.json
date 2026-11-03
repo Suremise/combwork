@@ -15,7 +15,7 @@
     "audience": "both"
   },
   "workflow.contradiction.mergeNeedsSlots": {
-    "text": "When Hive or the agent merges, each card needs its own folder.",
+    "text": "When Combwork or the agent merges, each card needs its own folder.",
     "note": "Why workflow options cannot be saved: a merging option was chosen while everyone works in the project folder.",
     "audience": "both"
   },
@@ -65,7 +65,7 @@
     "audience": "both"
   },
   "workflow.forYou.lineAsk": {
-    "text": "{line} still has {card}'s work, squashed into {target}: approve and Hive brings the branch up to date once, or decline and do it yourself before {next} starts.",
+    "text": "{line} still has {card}'s work, squashed into {target}: approve and Combwork brings the branch up to date once, or decline and do it yourself before {next} starts.",
     "note": "A For you request (approve or decline, §16.19.2): Settings → Advanced has Hive ask before moving an agent's branch after a squash merge. Approving lets Hive move it this once (git reset --keep, which never overwrites uncommitted work); declining leaves it to the user. {line} a branch name; {card} and {next} card keys like AM-12; {target} the branch merged into.",
     "audience": "both"
   },
@@ -75,7 +75,7 @@
     "audience": "both"
   },
   "workflow.forYou.lineUnfinished": {
-    "text": "Hive's move of {line} to {to} didn't finish and couldn't be put back. Bring the branch to {target} with its files and index clean, or back where it was: {next} starts once it is settled.",
+    "text": "Combwork's move of {line} to {to} didn't finish and couldn't be put back. Bring the branch to {target} with its files and index clean, or back where it was: {next} starts once it is settled.",
     "note": "A For you request (Decide, §16.19.2): moving the builder's branch failed part way and Hive couldn't undo it, so the branch, its files or its index may disagree; the lane waits. {line} a branch name, {to} a short commit id, {target} the branch merged into, {next} a card key.",
     "audience": "both"
   },
@@ -85,7 +85,7 @@
     "audience": "both"
   },
   "workflow.forYou.mergeChoice": {
-    "text": "How should Hive merge {project}'s cards into {target}? Choose the merge style and the commit message: until now Hive made a merge commit with its own message (the card's key and title, with trailers). The merge queue waits for your answer.",
+    "text": "How should Combwork merge {project}'s cards into {target}? Choose the merge style and the commit message: until now Combwork made a merge commit with its own message (the card's key and title, with trailers). The merge queue waits for your answer.",
     "note": "A For you request (Decide, HI-1697): a project from before Hive 1.0 reached the merge queue for the first time, and nobody chose how its cards are merged, so the queue asks. {project} is a project's name, {target} the branch merged into. Merge style and Commit message are workflow options' names (glossary 2.6): use their words. Trailers: git's “Key: value” lines at a message's end.",
     "audience": "both"
   },
@@ -110,7 +110,7 @@
     "audience": "both"
   },
   "workflow.forYou.queueStuck": {
-    "text": "{card}'s merge into {target} stopped part way in {folder}, with {files, plural, one {# file} other {# files}} left between the two, and Hive changes nothing more there. The card's Work section lists each file and its side, and the commands to copy. {how, select, both {To finish it, run {finish} (PowerShell) in {project}; to undo it, run {undo} (PowerShell) in {folder}.} finish {To finish it, run {finish} (PowerShell) in {folder}.} undo {To undo it, run {undo} (PowerShell) in {folder}.} other {Its files are neither as they were nor as merged: put them right by hand.}} Then answer here, and the queue looks again.",
+    "text": "{card}'s merge into {target} stopped part way in {folder}, with {files, plural, one {# file} other {# files}} left between the two, and Combwork changes nothing more there. The card's Work section lists each file and its side, and the commands to copy. {how, select, both {To finish it, run {finish} (PowerShell) in {project}; to undo it, run {undo} (PowerShell) in {folder}.} finish {To finish it, run {finish} (PowerShell) in {folder}.} undo {To undo it, run {undo} (PowerShell) in {folder}.} other {Its files are neither as they were nor as merged: put them right by hand.}} Then answer here, and the queue looks again.",
     "note": "A For you request (Decide, §16.9.2's terminal state): the merge queue was updating the branch {target}, checked out in the folder {folder}, and something (a crash, another program) left it half done, so the merge queue for {target} is paused until the user settles it. {card} is a card key like AM-12; {files} how many files the merge left part way; the card's Work section is a section of the card's dialog (glossary 2.4: work); {project} the project folder; {finish} and {undo} are git commands for PowerShell (keep them exactly, with (PowerShell) after them). Translate each choice of {how}; keep the codes before the braces.",
     "audience": "both"
   },
@@ -125,7 +125,7 @@
     "audience": "both"
   },
   "workflow.forYou.slotDirty": {
-    "text": "{card} is Done, but {slot} has uncommitted changes, so it stays on {line}. Commit or discard them there: Hive then detaches the slot at {target}, ready for its next card.",
+    "text": "{card} is Done, but {slot} has uncommitted changes, so it stays on {line}. Commit or discard them there: Combwork then detaches the slot at {target}, ready for its next card.",
     "note": "A For you request (Decide, HI-2014): a card reached Done while its slot (a reused working folder, such as slot-b) had uncommitted changes, so Hive left the slot on the card's branch {line} instead of detaching it at the target branch {target}. {card} is a card key like AM-12; {slot}, {line} and {target} are names, kept as they are.",
     "audience": "both"
   },
@@ -205,7 +205,7 @@
     "audience": "both"
   },
   "workflow.option.commitMessage.desc": {
-    "text": "The message of the commit the merge queue makes: Hive’s names the card’s key and title and adds Hive’s trailers, and the branch’s own uses the message its commits have, with no card key or trailers, while Hive still knows which card it merged.",
+    "text": "The message of the commit the merge queue makes: Combwork’s names the card’s key and title and adds Combwork’s trailers, and the branch’s own uses the message its commits have, with no card key or trailers, while Combwork still knows which card it merged.",
     "note": "What the workflow option “Commit message” does (glossary 2.1: merge queue). Trailers are git’s name for the “Key: value” lines at the end of a commit message: keep the word if your language’s git terms do.",
     "audience": "both"
   },
@@ -250,7 +250,7 @@
     "audience": "both"
   },
   "workflow.option.finish.desc": {
-    "text": "When a card is done: once Hive’s merge queue has merged it, once its agent has merged it and Hive finds the work in the target branch, once it is committed, or whenever it is moved there.",
+    "text": "When a card is done: once Combwork’s merge queue has merged it, once its agent has merged it and Combwork finds the work in the target branch, once it is committed, or whenever it is moved there.",
     "note": "What the workflow option “Who merges” does (glossary 2.1: merge queue).",
     "audience": "both"
   },
@@ -270,7 +270,7 @@
     "audience": "both"
   },
   "workflow.option.folder.desc": {
-    "text": "In its own folder, a slot Hive lends to the card or its lane, each card is built on a branch of its own, apart from other agents’ work; in the project folder, everyone sees each other’s unfinished changes.",
+    "text": "In its own folder, a slot Combwork lends to the card or its lane, each card is built on a branch of its own, apart from other agents’ work; in the project folder, everyone sees each other’s unfinished changes.",
     "note": "What the workflow option “Where cards are built” does (glossary 2.5: slot, a worktree Hive lends to a card or a lane).",
     "audience": "both"
   },
@@ -320,7 +320,7 @@
     "audience": "both"
   },
   "workflow.option.loopWakes.desc": {
-    "text": "When a card with a reviewer arrives in Review, Hive wakes the reviewer, and on the review’s verdict the card’s builder; off, only the agents’ own card watches wake them.",
+    "text": "When a card with a reviewer arrives in Review, Combwork wakes the reviewer, and on the review’s verdict the card’s builder; off, only the agents’ own card watches wake them.",
     "note": "What the workflow option “Wake reviewers and builders” does.",
     "audience": "both"
   },
@@ -340,7 +340,7 @@
     "audience": "both"
   },
   "workflow.option.mergeChecks.desc": {
-    "text": "Hive’s merge queue runs these named commands on the card’s work merged with the target branch, and moves the target only once each one has passed.",
+    "text": "Combwork’s merge queue runs these named commands on the card’s work merged with the target branch, and moves the target only once each one has passed.",
     "note": "What the workflow option “Checks pass on the merged result” does (glossary 2.1: merge queue).",
     "audience": "both"
   },
@@ -420,7 +420,7 @@
     "audience": "both"
   },
   "workflow.option.reviewerMode.desc": {
-    "text": "One reviewer per lane, or a shared pool: Hive gives each card submitted in a pool lane, oldest first, to the next free reviewer that didn’t build it.",
+    "text": "One reviewer per lane, or a shared pool: Combwork gives each card submitted in a pool lane, oldest first, to the next free reviewer that didn’t build it.",
     "note": "What the workflow option “Reviewers” does (glossary 2.6, G17; glossary: lane, pool).",
     "audience": "both"
   },
@@ -570,12 +570,12 @@
     "audience": "both"
   },
   "workflow.refused.evidence.changed.message": {
-    "text": "What Hive read for {card} changed while it decided.",
+    "text": "What Combwork read for {card} changed while it decided.",
     "note": "A refused intent: a branch head, a file or another card the rule depends on changed between Hive's reading it and recording the move. {card} is a card key.",
     "audience": "both"
   },
   "workflow.refused.evidence.changed.next": {
-    "text": "Try again: Hive reads it afresh.",
+    "text": "Try again: Combwork reads it afresh.",
     "note": "The next step after a refusal because what a rule read changed meanwhile.",
     "audience": "both"
   },
@@ -620,7 +620,7 @@
     "audience": "both"
   },
   "workflow.refused.lane.lineBehind.change": {
-    "text": "Settings → Advanced → Bring an agent's branch up to date after a squash merge says whether Hive moves it or asks first.",
+    "text": "Settings → Advanced → Bring an agent's branch up to date after a squash merge says whether Combwork moves it or asks first.",
     "note": "Where it is decided whether Hive moves the branch itself or asks the user first (a setting name: use it as Hive shows it).",
     "audience": "both"
   },
@@ -630,7 +630,7 @@
     "audience": "both"
   },
   "workflow.refused.lane.lineBehind.next": {
-    "text": "{reader, select, you {Leave it as it is: Hive brings {line} up to date with {target} once the agent is idle, or asks you first, and tells the agent when {card} can start.} other {Leave it as it is: Hive brings {line} up to date with {target} once you are idle, or asks the user, and tells you when {card} can start.}}",
+    "text": "{reader, select, you {Leave it as it is: Combwork brings {line} up to date with {target} once the agent is idle, or asks you first, and tells the agent when {card} can start.} other {Leave it as it is: Combwork brings {line} up to date with {target} once you are idle, or asks the user, and tells you when {card} can start.}}",
     "note": "The next step after a start refused because the branch still has squashed work: wait (end the turn); Hive moves the branch, or asks the user first, and says when the card can start. {line} a branch name, {target} the branch merged into, {card} a card key. {reader} (select): you is the window's wording, other the agent's (the user named as the user); translate both whole sentences.",
     "audience": "both"
   },
@@ -695,7 +695,7 @@
     "audience": "both"
   },
   "workflow.refused.loop.roundLimit.next": {
-    "text": "The question is on the card (For you): once it is answered, Hive wakes the agents waiting on it.",
+    "text": "The question is on the card (For you): once it is answered, Combwork wakes the agents waiting on it.",
     "note": "The next step while a card waits at its round limit for its question (For you, a label: use it as Hive shows it) to be answered. Read by agents and shown in the window alike: it names no one (never \"the user\"); Hive then wakes the agents that wait on the card.",
     "audience": "both"
   },
@@ -750,7 +750,7 @@
     "audience": "both"
   },
   "workflow.refused.merge.hiveMerges.message": {
-    "text": "Hive merges {card}: agents don't merge it or report its merge.",
+    "text": "Combwork merges {card}: agents don't merge it or report its merge.",
     "note": "A refused report of a merge, or a claim of the merge slot, for a card whose rules say Hive merges it (the merge queue). {card} is a card key like AM-12.",
     "audience": "both"
   },
@@ -830,7 +830,7 @@
     "audience": "both"
   },
   "workflow.refused.platform.unknown.message": {
-    "text": "{card}: Hive couldn't read {what}, so the rule {rule} can't be checked.",
+    "text": "{card}: Combwork couldn't read {what}, so the rule {rule} can't be checked.",
     "note": "A refused move: a fact a rule needs could not be read (git missing, folder gone). {what} says what, {rule} the rule id.",
     "audience": "both"
   },
@@ -1010,7 +1010,7 @@
     "audience": "both"
   },
   "workflow.refused.submit.focusedChosen.message": {
-    "text": "Review refused: {card}'s focused tests couldn't be chosen for {revision}: {state, select, tooBroad {its project's picker says the change needs every test.} other {{why, select, noPicker {the project has no picker.} timedOut {its project's picker took too long.} badOutput {its project's picker gave output Hive can't read.} tooMany {its project's picker named too many tests.} moved {its folder moved to another revision while the picker ran.} dirty {its folder had uncommitted changes.} changed {files changed in its folder while the picker ran.} noChange {its change couldn't be read.} other {its project's picker failed.}}}}",
+    "text": "Review refused: {card}'s focused tests couldn't be chosen for {revision}: {state, select, tooBroad {its project's picker says the change needs every test.} other {{why, select, noPicker {the project has no picker.} timedOut {its project's picker took too long.} badOutput {its project's picker gave output Combwork can't read.} tooMany {its project's picker named too many tests.} moved {its folder moved to another revision while the picker ran.} dirty {its folder had uncommitted changes.} changed {files changed in its folder while the picker ran.} noChange {its change couldn't be read.} other {its project's picker failed.}}}}",
     "note": "A refused submit (G20, HI-1367): the tests the card's change needs couldn't be chosen. {card} is its key, {revision} a short commit id; {state} and {why} pick the reason (keep each branch's key as it is).",
     "audience": "both"
   },
@@ -1150,7 +1150,7 @@
     "audience": "both"
   },
   "workflow.rule.done.contained": {
-    "text": "Hive checks the merge",
+    "text": "Combwork checks the merge",
     "note": "A rule of the workflow, named where a move skips or can't check it: a card is done only when its work is in its target (glossary 2.6: G5).",
     "audience": "both"
   },
@@ -1480,12 +1480,12 @@
     "audience": "both"
   },
   "workflow.value.commitMessage.hive": {
-    "text": "Hive’s: the card’s key and title, with trailers",
+    "text": "Combwork’s: the card’s key and title, with trailers",
     "note": "A value of the workflow option “Commit message” (glossary 2.6, G19): the commit is titled with the card’s key and title (HI-12: Fix the login) and ends with Hive’s trailers (Hive-Card: HI-12 and others). Trailers: git’s “Key: value” lines at a message’s end.",
     "audience": "both"
   },
   "workflow.value.finish.agentMerges": {
-    "text": "The agent merges, Hive checks",
+    "text": "The agent merges, Combwork checks",
     "note": "A value of the workflow option “Who merges” (glossary 2.6, G5).",
     "audience": "both"
   },
@@ -1495,7 +1495,7 @@
     "audience": "both"
   },
   "workflow.value.finish.hiveMerges": {
-    "text": "Hive merges",
+    "text": "Combwork merges",
     "note": "A value of the workflow option “Who merges” (glossary 2.6, G5).",
     "audience": "both"
   },

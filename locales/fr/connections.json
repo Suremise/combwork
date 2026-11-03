@@ -11,7 +11,7 @@
   "connections.choice.unavailable": "{name} – {why}",
   "connections.intro.add": "Ajouter un compte",
   "connections.intro.dismiss": "Ignorer",
-  "connections.intro.text": "Les agents fonctionnent désormais avec des comptes : ajoutes-en un pour {clis} dans Paramètres → Comptes et connexions et connecte-le depuis là. Hive n’utilise plus l’identification de ton propre terminal, qui reste telle quelle.",
+  "connections.intro.text": "Les agents fonctionnent désormais avec des comptes : ajoutes-en un pour {clis} dans Paramètres → Comptes et connexions et connecte-le depuis là. Combwork n’utilise plus l’identification de ton propre terminal, qui reste telle quelle.",
   "connections.mark.anotherMark": "Tourne sur une autre connexion que celle choisie",
   "connections.mark.none": "Aucune connexion",
   "connections.mark.noneUsable": "Aucun compte {cli} n’est activé dans cet espace de travail : l’agent ne peut pas démarrer tant qu’aucun ne l’est (Paramètres → Comptes et connexions).",

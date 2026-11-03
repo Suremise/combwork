@@ -41,7 +41,7 @@ const becomes = async (fn) => !!(await lib.until(fn, HUNG_MS))
   await page.keyboard.press('Escape'); await sleep(300)
   await page.evaluate(() => window.hive.invoke('app:info')) // warm
   await page.keyboard.press('F1')
-  await page.locator('.split-list .row', { hasText: 'About Hive' }).click()
+  await page.locator('.split-list .row', { hasText: 'About Combwork' }).click()
   check('About shows MIT link', await becomes(() => page.locator('.about-licence a', { hasText: 'MIT License' }).isVisible()))
   await page.screenshot({ path: path.join(scratch, 'about-1.png') })
   await page.locator('.about-licence a', { hasText: 'MIT License' }).click()

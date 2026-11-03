@@ -75,7 +75,7 @@ describe('the actions area', () => {
     expect(tr(large, { n: 1 })).toBe('Attach a large file?')
     expect(tr(large, { n: 3 })).toBe('Attach 3 large files?')
     const detail = message('actions.attach.largeDetail')
-    expect(tr(detail, { copy: 'yes' })).toBe('An agent may not manage a file this large: its CLI can refuse it, or reading it can fill much of its context. Hive keeps a copy with the session.')
+    expect(tr(detail, { copy: 'yes' })).toBe('An agent may not manage a file this large: its CLI can refuse it, or reading it can fill much of its context. Combwork keeps a copy with the session.')
     expect(tr(detail, { copy: 'no' })).toBe('An agent may not manage a file this large: its CLI can refuse it, or reading it can fill much of its context.')
   })
 

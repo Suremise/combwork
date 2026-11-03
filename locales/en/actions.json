@@ -80,7 +80,7 @@
     "description": "An error's title: attaching files to an agent's prompt failed."
   },
   "actions.attach.largeDetail": {
-    "defaultMessage": "An agent may not manage a file this large: its CLI can refuse it, or reading it can fill much of its context.{copy, select, yes { Hive keeps a copy with the session.} other {}}",
+    "defaultMessage": "An agent may not manage a file this large: its CLI can refuse it, or reading it can fill much of its context.{copy, select, yes { Combwork keeps a copy with the session.} other {}}",
     "description": "Why attaching a large file needs a confirmation; then, when Hive copies it into the session's attachments, that it keeps a copy (copy: yes)."
   },
   "actions.attach.largeMany": {
@@ -372,7 +372,7 @@
     "description": "Placeholder of the New Project dialog's name box: an example folder name (lower case, a dash)."
   },
   "actions.project.newMessage": {
-    "defaultMessage": "A new folder is created in the workspace. Hive adds its .hive metadata folder automatically.",
+    "defaultMessage": "A new folder is created in the workspace. Combwork adds its .hive metadata folder automatically.",
     "description": "The New Project dialog. Keep .hive as it is."
   },
   "actions.project.newTitle": {
@@ -388,7 +388,7 @@
     "description": "Button: stops the project's agents and marks it inactive."
   },
   "actions.provider.lookingMessage": {
-    "defaultMessage": "Hive is still finding out which coding agent CLIs are installed. Try again in a moment.",
+    "defaultMessage": "Combwork is still finding out which coding agent CLIs are installed. Try again in a moment.",
     "description": "Under the warning that Hive is still looking for the coding agent CLIs."
   },
   "actions.provider.lookingTitle": {
@@ -536,11 +536,11 @@
     "description": "Release Slot… (HI-2309), under the question about a slot held only by Windows' idle Sandbox broker: releasing doesn't end it unless the box below is ticked."
   },
   "actions.releaseHeld.detailListed": {
-    "defaultMessage": "{n, plural, one {Hive lists # process its session left running.} other {Hive lists # processes its session left running.}} Released while they run, they may still write in the slot as other work uses it.",
+    "defaultMessage": "{n, plural, one {Combwork lists # process its session left running.} other {Combwork lists # processes its session left running.}} Released while they run, they may still write in the slot as other work uses it.",
     "description": "Release Slot…: under the list of processes the agent's session left running ({n}: how many)."
   },
   "actions.releaseHeld.detailUnknown": {
-    "defaultMessage": "Hive doesn't know which of the processes its session started still run. Release it once you know nothing of it still writes in the slot.",
+    "defaultMessage": "Combwork doesn't know which of the processes its session started still run. Release it once you know nothing of it still writes in the slot.",
     "description": "Release Slot…: Hive lists no processes the agent's session left running, so it can't say whether any still run."
   },
   "actions.releaseHeld.endFirst": {
@@ -548,7 +548,7 @@
     "description": "Release Slot…: a tick box, on by default: Hive ends the listed processes before releasing the slot."
   },
   "actions.releaseHeld.messageGone": {
-    "defaultMessage": "{slot} is held by a session of agent {agent} (run {run}) in a Hive that is no longer running (process {pid}). Hive can't tell whether what it started still runs: until you release it, nothing else uses the slot.",
+    "defaultMessage": "{slot} is held by a session of agent {agent} (run {run}) in a Combwork that is no longer running (process {pid}). Combwork can't tell whether what it started still runs: until you release it, nothing else uses the slot.",
     "description": "Release Slot…: why the slot ({slot}) is held. The agent ({agent}) ran there in a copy of Hive that quit or closed unexpectedly; {run} is the session's run id (a code such as 3f9a1c…), {pid} that Hive's process id: they tell one launch from another. A noun before the name (glossary §1 rule 4)."
   },
   "actions.releaseHeld.messageIdleBroker": {
@@ -556,7 +556,7 @@
     "description": "Release Slot… (HI-2309): the slot ({slot}) is held only by Windows' own idle Windows Sandbox broker ({names}: its process names, such as WindowsSandboxServer), which the agent's ({agent}) last session left; no Sandbox runs, so nothing can write in the slot through it. {run} is the session's run id (a code such as 3f9a1c…)."
   },
   "actions.releaseHeld.messageSelf": {
-    "defaultMessage": "{agent}'s last session in {slot} (run {run}) has ended in this Hive (process {pid}, running), but Hive doesn't know that everything it started there has: until you release it, nothing else uses the slot.",
+    "defaultMessage": "{agent}'s last session in {slot} (run {run}) has ended in this Combwork (process {pid}, running), but Combwork doesn't know that everything it started there has: until you release it, nothing else uses the slot.",
     "description": "Release Slot…: why the slot ({slot}) is held. The session of the agent ({agent}) ended in this Hive; its processes were kept running or Hive could not follow them. {run} is the session's run id (a code such as 3f9a1c…), {pid} this Hive's process id: they tell one launch from another."
   },
   "actions.releaseHeld.process": {
@@ -584,7 +584,7 @@
     "description": "An error's title: releasing an agent's slot failed."
   },
   "actions.releaseSlot.message": {
-    "defaultMessage": "{slot} stops being kept for {agent}. Its folder and branch stay; Hive lends it to new work once it is clean, and may rename its folder to a slot name.",
+    "defaultMessage": "{slot} stops being kept for {agent}. Its folder and branch stay; Combwork lends it to new work once it is clean, and may rename its folder to a slot name.",
     "description": "The question before releasing an agent's ({agent}) slot ({slot}): what happens to it after."
   },
   "actions.releaseSlot.title": {
@@ -836,7 +836,7 @@
     "description": "The question when a slot's ({slot}) folder ({path}) is missing; the agent ({agent}) holds it, and its branch ({branch}) is still there."
   },
   "actions.slot.goneNoBranch": {
-    "defaultMessage": "{agent}'s slot {slot} is missing its folder ({path}), and its branch is gone too. Release the slot? Hive makes it again the next time it lends it.",
+    "defaultMessage": "{agent}'s slot {slot} is missing its folder ({path}), and its branch is gone too. Release the slot? Combwork makes it again the next time it lends it.",
     "description": "The question when a slot's ({slot}) folder ({path}) and its branch are missing; the agent ({agent}) holds it."
   },
   "actions.slot.goneTitle": {
@@ -1232,7 +1232,7 @@
     "description": "The Recreate and Start button while it works."
   },
   "actions.worktree.setup": {
-    "defaultMessage": "Hive copies in the files it copies into new worktrees, and the project's worktree setup command, if it has one, runs before the agent starts. Nothing is deleted.",
+    "defaultMessage": "Combwork copies in the files it copies into new worktrees, and the project's worktree setup command, if it has one, runs before the agent starts. Nothing is deleted.",
     "description": "Under the question before recreating an agent's missing worktree: what making it again involves."
   },
   "actions.worktree.unlink": {

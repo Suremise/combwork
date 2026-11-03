@@ -70,7 +70,7 @@ export interface SettingsScope {
 }
 
 /** Why a default is an estimate: what Hive can't read could still change it (#273). */
-const UNREAD = msg({ id: 'providers.autoCompact.unreadReason', defaultMessage: "managed policies Hive can't read (such as Windows registry policies or your organisation's server-managed settings) could change it", description: "Where Claude Code's auto-compaction setting comes from, in the context tooltip of an agent's footer: why its default is an estimate. A clause, in a list of such reasons (providers.autoCompact.estimate)." })
+const UNREAD = msg({ id: 'providers.autoCompact.unreadReason', defaultMessage: "managed policies Combwork can't read (such as Windows registry policies or your organisation's server-managed settings) could change it", description: "Where Claude Code's auto-compaction setting comes from, in the context tooltip of an agent's footer: why its default is an estimate. A clause, in a list of such reasons (providers.autoCompact.estimate)." })
 /** A setting labelled an estimate, with why: clauses, joined as the language joins a list. */
 const ESTIMATE = msg({ id: 'providers.autoCompact.estimate', defaultMessage: 'an estimate: {unsure}', description: "Where Claude Code's auto-compaction setting comes from, in the context tooltip of an agent's footer: it is an estimate, in brackets after the window. {unsure} lists why, clauses joined as a list (\"managed policies Hive can't read … could change it and Claude Code's settings.json couldn't be read (EACCES)\")." })
 /** A default's label in English (#797): the window is shown it in its language. */

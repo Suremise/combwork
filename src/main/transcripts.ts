@@ -228,7 +228,7 @@ export const transcripts = {
     const e = await parsed(projectPath, sessionId)
     const project = workspace.assertSessionHost(projectPath)
     const p = provider(e.provider)
-    const subtitle = tr(msg({ id: 'service.transcripts.exported', defaultMessage: '{session} · exported from Hive {date}', description: 'The line under the title of a conversation exported as Markdown (Sessions tab → Export): {session} says which session it was, {date} when it was exported.' }), { session: p.exportSubtitle(sessionId, project), date: formatDateTime(new Date()) })
+    const subtitle = tr(msg({ id: 'service.transcripts.exported', defaultMessage: '{session} · exported from Combwork {date}', description: 'The line under the title of a conversation exported as Markdown (Sessions tab → Export): {session} says which session it was, {date} when it was exported.' }), { session: p.exportSubtitle(sessionId, project), date: formatDateTime(new Date()) })
     return transcriptMarkdown(e.parser.items, title, subtitle, p.descriptor.assistant)
   }
 }

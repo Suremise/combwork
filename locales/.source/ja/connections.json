@@ -17,7 +17,7 @@
   "connections.choice.unavailable": "{name} — {why}",
   "connections.intro.add": "Add an Account",
   "connections.intro.dismiss": "Dismiss",
-  "connections.intro.text": "Agents now run on accounts: add one for {clis} in Settings → Accounts & Connections and sign it in there. Hive no longer uses the sign-in of your own terminal, which stays as it is.",
+  "connections.intro.text": "Agents now run on accounts: add one for {clis} in Settings → Accounts & Connections and sign it in there. Combwork no longer uses the sign-in of your own terminal, which stays as it is.",
   "connections.mark.anotherMark": "Running on another connection than the one chosen",
   "connections.mark.deleted": "Connection removed",
   "connections.mark.deletedTip": "The connection chosen for it was removed: it can't start until you choose another in its Agent Settings, or the workspace's default.",

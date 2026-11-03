@@ -86,7 +86,7 @@ async function stopSession(inv) {
       await row.getByRole('switch').click()
       check('turning it on writes it to advanced.json', !!(await lib.until(() => readFile().values[ID] === true, HUNG_MS)), JSON.stringify(readFile().values))
       const offer = row.locator('[data-note="restart"]')
-      check('…and offers Restart Hive', !!(await lib.until(async () => (await offer.count()) === 1 && /Restart Hive to apply this/.test(await offer.innerText()), HUNG_MS)))
+      check('…and offers Restart Combwork', !!(await lib.until(async () => (await offer.count()) === 1 && /Restart Combwork to apply this/.test(await offer.innerText()), HUNG_MS)))
       await page.screenshot({ path: path.join(lib.WORK, 'hwaccel-1-offer.png') })
       // Back as Hive started: nothing to restart for.
       await row.getByRole('switch').click()
@@ -95,7 +95,7 @@ async function stopSession(inv) {
       check('on once more, it is offered again', !!(await lib.until(async () => (await offer.count()) === 1, HUNG_MS)))
       const quitting = await lib.quitWatch(app)
       const clicked = Date.now()
-      await offer.getByRole('button', { name: 'Restart Hive' }).click()
+      await offer.getByRole('button', { name: 'Restart Combwork' }).click()
       check('Restart Hive quits Hive', !!(await quitting.untilDecided(START_MS)) && (await quitting.gone(START_MS)), quitting.timings(clicked))
       const [made] = relaunches()
       check('…and starts it again, as it was started', relaunches().length === 1 && made.args.includes(lib.ROOT) && !made.args.includes('--disable-gpu'), JSON.stringify(relaunches()))
@@ -121,7 +121,7 @@ async function stopSession(inv) {
       const row = page.locator(`.advanced-row[data-advanced="${ID}"]`)
       check('its switch shows on, with no restart offered', !!(await lib.until(async () => (await row.count()) === 1 && (await row.getByRole('switch').getAttribute('aria-checked')) === 'true', HUNG_MS)) && (await row.locator('[data-note="restart"]').count()) === 0)
       await row.getByRole('switch').click()
-      check('turning it off offers Restart Hive', !!(await lib.until(async () => !(ID in readFile().values) && (await row.locator('[data-note="restart"]').count()) === 1, HUNG_MS)), JSON.stringify(readFile().values))
+      check('turning it off offers Restart Combwork', !!(await lib.until(async () => !(ID in readFile().values) && (await row.locator('[data-note="restart"]').count()) === 1, HUNG_MS)), JSON.stringify(readFile().values))
     } finally {
       await app.close().catch(() => undefined)
     }

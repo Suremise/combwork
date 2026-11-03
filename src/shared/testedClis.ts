@@ -19,11 +19,11 @@ export function testedNote(t: TestedCli): string | null {
     case 'same':
       return null
     case 'newer':
-      return tr(msg({ id: 'agents.tested.newer', defaultMessage: 'This version came out after this Hive release was tested. Most updates work; if something behaves oddly, report it (Copy Diagnostics).', description: "Provider Setup: the installed CLI is newer than the one this Hive release was tested with. Copy Diagnostics is a Help command: use its translated name." }))
+      return tr(msg({ id: 'agents.tested.newer', defaultMessage: 'This version came out after this Combwork release was tested. Most updates work; if something behaves oddly, report it (Copy Diagnostics).', description: "Provider Setup: the installed CLI is newer than the one this Hive release was tested with. Copy Diagnostics is a Help command: use its translated name." }))
     case 'older':
       return tr(msg({ id: 'agents.tested.older', defaultMessage: 'Older than tested; consider updating.', description: 'Provider Setup: the installed CLI is older than the one this Hive release was tested with.' }))
     case 'unknown':
-      return tr(msg({ id: 'agents.tested.unknown', defaultMessage: "Hive couldn't tell which version is installed, so it can't compare it with the tested one.", description: "Provider Setup: Hive couldn't read the installed CLI's version." }))
+      return tr(msg({ id: 'agents.tested.unknown', defaultMessage: "Combwork couldn't tell which version is installed, so it can't compare it with the tested one.", description: "Provider Setup: Hive couldn't read the installed CLI's version." }))
   }
 }
 

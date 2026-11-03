@@ -230,7 +230,7 @@ export function TipsDialog() {
       <div className="tips-top">
         <SearchInput autoFocus placeholder={tr(msg({ id: 'tips.ui.search', defaultMessage: 'Search tips', description: "Placeholder of Help → Tips' search box." }))} value={query} onChange={setQuery} />
         <label className="flex muted tips-switch">
-          <Switch checked={on} label={tr(msg({ id: 'tips.ui.showOnStart', defaultMessage: 'Show a tip when Hive starts', description: 'A switch in Help → Tips: shows a tip of the day when Hive starts (the same as Settings → General → Show a tip when Hive starts).' }))} onChange={(v) => void call('settings:update', { general: { showTips: v } }).then((s) => set({ settings: s }))} /> {tr(msg({ id: 'tips.ui.showOnStart', defaultMessage: 'Show a tip when Hive starts', description: 'A switch in Help → Tips: shows a tip of the day when Hive starts (the same as Settings → General → Show a tip when Hive starts).' }))}
+          <Switch checked={on} label={tr(msg({ id: 'tips.ui.showOnStart', defaultMessage: 'Show a tip when Combwork starts', description: 'A switch in Help → Tips: shows a tip of the day when Hive starts (the same as Settings → General → Show a tip when Hive starts).' }))} onChange={(v) => void call('settings:update', { general: { showTips: v } }).then((s) => set({ settings: s }))} /> {tr(msg({ id: 'tips.ui.showOnStart', defaultMessage: 'Show a tip when Combwork starts', description: 'A switch in Help → Tips: shows a tip of the day when Hive starts (the same as Settings → General → Show a tip when Hive starts).' }))}
         </label>
       </div>
       <div className="tips-list">

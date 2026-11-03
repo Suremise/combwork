@@ -248,7 +248,7 @@ export async function sayMcpAddedOnce(ws: WorkspaceService): Promise<void> {
   const n = ws.config.mcp.droppedNotice
   if (!n) return
   const title = tr(msg({ id: 'service.mcp.addedTitle', defaultMessage: 'MCP servers are now added where they run', description: "A quiet notice's title, once after the upgrade that made a workspace's MCP servers added to projects and the Hive Assistant, in place of switches." }))
-  const message = tr(msg({ id: 'service.mcp.addedDropped', defaultMessage: 'Each project and the Hive Assistant lists the servers that ran there. {n, plural, one {# choice kept for a server that was off in the workspace was} other {# choices kept for servers that were off in the workspace were}} dropped: add a server in a project’s MCP tab where you need it.', description: "A quiet notice once after the upgrade that made MCP servers added to projects and the Hive Assistant: nothing that ran changed; {n} choices remembered for servers the workspace had switched off were not carried over. \"MCP tab\" as Hive names it." }), { n })
+  const message = tr(msg({ id: 'service.mcp.addedDropped', defaultMessage: 'Each project and the Assistant lists the servers that ran there. {n, plural, one {# choice kept for a server that was off in the workspace was} other {# choices kept for servers that were off in the workspace were}} dropped: add a server in a project’s MCP tab where you need it.', description: "A quiet notice once after the upgrade that made MCP servers added to projects and the Hive Assistant: nothing that ran changed; {n} choices remembered for servers the workspace had switched off were not carried over. \"MCP tab\" as Hive names it." }), { n })
   ws.emit({ type: 'toast', toast: { id: randomUUID(), level: 'info', title, message, timestamp: new Date().toISOString(), quiet: true } })
   await inWorkspace(ws, () => ws.saveWorkspaceConfigWith((c) => ({ mcp: { ...c.mcp, droppedNotice: undefined } })))
 }
@@ -426,7 +426,7 @@ const MCP_JSON_MAX_BYTES = 1024 * 1024
 export function checkMcpDef(raw: unknown): McpServerDef {
   if (!raw || typeof raw !== 'object' || Array.isArray(raw)) throw hiveError(msg({ id: 'content.mcp.notObject', defaultMessage: 'The definition must be a JSON object, as in {path}.', description: "An error adding an MCP server from a file whose definition holds JSON that isn't an object. {path} is where a workspace keeps one (.hive/mcp/<name>.json)." }), { path: '.hive/mcp/<name>.json' })
   const def = raw as McpServerDef
-  if (typeof def.command !== 'string' && typeof def.url !== 'string') throw hiveError(msg({ id: 'content.mcp.noCommand', defaultMessage: 'The definition needs a "command" (a server Hive starts) or a "url" (an http or sse server).', description: 'An error adding an MCP server from a file whose definition has neither field that says what it is. Keep "command", "url", http and sse as they are.' }))
+  if (typeof def.command !== 'string' && typeof def.url !== 'string') throw hiveError(msg({ id: 'content.mcp.noCommand', defaultMessage: 'The definition needs a "command" (a server Combwork starts) or a "url" (an http or sse server).', description: 'An error adding an MCP server from a file whose definition has neither field that says what it is. Keep "command", "url", http and sse as they are.' }))
   if (def.command !== undefined && (typeof def.command !== 'string' || !def.command.trim())) throw hiveError(msg({ id: 'content.mcp.badCommand', defaultMessage: '"command" must be the program to run.', description: 'An error adding an MCP server from a file: its definition\'s "command" field (keep it as it is) is empty or not text.' }))
   if (def.url !== undefined && (typeof def.url !== 'string' || !/^https?:\/\//i.test(def.url))) throw hiveError(msg({ id: 'content.mcp.badUrl', defaultMessage: '"url" must be an http:// or https:// address.', description: 'An error adding an MCP server from a file: its definition\'s "url" field (keep it as it is) isn\'t a web address.' }))
   if (def.args !== undefined && (!Array.isArray(def.args) || def.args.some((a) => typeof a !== 'string'))) throw hiveError(msg({ id: 'content.mcp.badArgs', defaultMessage: '"args" must be a list of strings.', description: 'An error adding an MCP server from a file: its definition\'s "args" field (keep it as it is) isn\'t a list of text.' }))
@@ -473,7 +473,7 @@ export function zipLinks(data: Uint8Array): string[] {
  */
 export function serverFromZip(data: Uint8Array): { def: McpServerDef; files: Map<string, Uint8Array>; folder: string | null } {
   const links = zipLinks(data)
-  if (links.length) throw hiveError(msg({ id: 'content.mcp.zipLink', defaultMessage: "The .zip has a link, which Hive doesn't unpack: {path}", description: 'An error adding an MCP server from a .zip with a symbolic link in it ({path}), which could point outside its folder.' }), { path: links[0] })
+  if (links.length) throw hiveError(msg({ id: 'content.mcp.zipLink', defaultMessage: "The .zip has a link, which Combwork doesn't unpack: {path}", description: 'An error adding an MCP server from a .zip with a symbolic link in it ({path}), which could point outside its folder.' }), { path: links[0] })
   let total = 0
   const entries = unzipSync(data, {
     filter: (f) => {

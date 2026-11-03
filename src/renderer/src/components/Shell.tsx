@@ -37,7 +37,7 @@ const M = {
   dialects: msg({ id: 'workspace.activity.dialects', defaultMessage: 'Dialects', description: "The activity bar (left edge): the Dialects view (HI-2444), where the wording Hive gives agents is tuned per model and CLI. Glossary: dialect." }),
   templates: msg({ id: 'workspace.activity.templates', defaultMessage: 'Templates', description: "The activity bar (left edge): agent templates." }),
   mcp: msg({ id: 'workspace.activity.mcp', defaultMessage: 'MCP Servers', description: "The activity bar (left edge): the workspace's MCP servers." }),
-  assistant: msg({ id: 'workspace.activity.assistant', defaultMessage: 'Hive Assistant', description: "The activity bar (left edge): the Hive Assistant's view. Hive's name stays as it is." }),
+  assistant: msg({ id: 'workspace.activity.assistant', defaultMessage: 'Assistant', description: "The activity bar (left edge): the Hive Assistant's view. Hive's name stays as it is." }),
   docs: msg({ id: 'workspace.activity.docs', defaultMessage: 'Documentation', description: "The activity bar (left edge): Hive's documentation." }),
   settings: msg({ id: 'workspace.activity.settings', defaultMessage: 'Settings', description: "The activity bar (left edge): Hive's settings." }),
   withKey: msg({ id: 'workspace.activity.withKey', defaultMessage: '{label} ({key})', description: 'Tooltip on an activity bar button: its name and its shortcut ({key}: "Ctrl+Shift+E").' }),

@@ -561,7 +561,7 @@ describe("Hive's guidance for agents (#1285, row 13)", () => {
       writeFileSync(said, '!fail')
       const failed = await launch()
       expect(failed.all).toEqual([])
-      expect(failed.notice?.title).toBe("Hive's guidance is missing for this agent")
+      expect(failed.notice?.title).toBe("Combwork's guidance is missing for this agent")
       expect(failed.notice?.message).toMatch(/leaves yours as they are and adds none of its guidance/)
       const theirsKept = await launch({ extraArgs: ['-c', 'developer_instructions="EXTRA-ONLY"'] })
       expect(theirsKept.all).toEqual(['EXTRA-ONLY'])

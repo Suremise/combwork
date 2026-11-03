@@ -35,7 +35,7 @@ const check = (name, ok, extra = '') => {
 }
 const git = (cwd, ...a) => lib.git(cwd, ['-c', 'user.email=t@t', '-c', 'user.name=t', ...a])
 
-/** A worktree agent of `project` as Add Agent saves it, its worktree made with git in Hive's folder. */
+/** A worktree agent of `project` as Add Agent saves it, its worktree made with git in Combwork's folder. */
 function inUse(project, name) {
   const main = git(project, 'rev-parse', '--abbrev-ref', 'HEAD').trim()
   const wt = { path: path.join(trees, path.basename(project), name.toLowerCase()), branch: `hive/${name.toLowerCase()}`, base: main }
@@ -119,7 +119,7 @@ function inUse(project, name) {
   check('then the list: both unused worktrees', !!(await lib.until(async () => (await rows.count()) === 2, 15000)), await page.locator('.split-main').innerText().catch(() => ''))
   const row = (p) => section.locator(`.unused-wt[data-path="${p.replace(/\\/g, '\\\\')}"]`)
   check('…B4\'s labelled "was B4" (its session ran there)', (await row(b4).locator('[data-origin="hive"]').innerText().catch(() => '')) === 'was B4', await row(b4).innerText().catch(() => ''))
-  check('…the other "not made by Hive"', (await row(other).locator('[data-origin="other"]').innerText().catch(() => '')) === 'not made by Hive', await row(other).innerText().catch(() => ''))
+  check('…the other "not made by Combwork"', (await row(other).locator('[data-origin="other"]').innerText().catch(() => '')) === 'not made by Combwork', await row(other).innerText().catch(() => ''))
   // The branch comparisons (HI-1824) come first, in a group of their own: these checks are of the folders after them.
   const all = await picker.locator('option').evaluateAll((os) => os.map((o) => ({ value: o.value, label: o.textContent ?? '' })))
   const folders = all.filter((o) => !(o.value.startsWith('compare:') || o.value === 'leftovers'))
@@ -127,7 +127,7 @@ function inUse(project, name) {
   const labels = folders.map((o) => o.label)
   check('the picker: Branches first, then Unused worktrees, then each unused one, then those in use, then the project folder last', all[0].value.startsWith('compare:') && all.findIndex((o) => !(o.value.startsWith('compare:') || o.value === 'leftovers')) === all.length - folders.length, JSON.stringify(all.map((o) => o.value)))
   check('…its folders: Unused worktrees first, then each unused one, then those in use, then the project folder last', values[0] === 'unused' && values[values.length - 1] === '' && values.indexOf(coder.id) > values.findIndex((v) => v.startsWith('unused:')) && values.filter((v) => v.startsWith('unused:')).length === 2, JSON.stringify(labels))
-  check('…each unused one says who made it', labels.some((l) => l.startsWith('hive/b4 · was B4')) && labels.some((l) => l.startsWith('experiment · not made by Hive')), JSON.stringify(labels))
+  check('…each unused one says who made it', labels.some((l) => l.startsWith('hive/b4 · was B4')) && labels.some((l) => l.startsWith('experiment · not made by Combwork')), JSON.stringify(labels))
   check('…and Unused worktrees counts them', labels[0] === 'Unused worktrees (2)', labels[0])
   await shots('populated')
 

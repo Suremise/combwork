@@ -18,7 +18,7 @@ export function hasProvider(id: unknown): id is ProviderId {
 }
 
 /** A provider id this version doesn't know (#842): read by the window and agents alike, so a HiveError. */
-const UNKNOWN = msg({ id: 'providers.unknown', defaultMessage: 'Unknown provider "{provider}". It may need a newer version of Hive.', description: 'An agent or a setting names a coding-agent CLI this version of Hive doesn\'t know, as when a newer Hive wrote it. {provider} is the id.' })
+const UNKNOWN = msg({ id: 'providers.unknown', defaultMessage: 'Unknown provider "{provider}". It may need a newer version of Combwork.', description: 'An agent or a setting names a coding-agent CLI this version of Hive doesn\'t know, as when a newer Hive wrote it. {provider} is the id.' })
 
 /** The adapter for a provider id; throws for an unknown one (e.g. a config written by a newer Hive). */
 export function provider(id: ProviderId): ProviderAdapter {

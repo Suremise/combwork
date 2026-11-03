@@ -16,12 +16,12 @@
     "note": "#910: the words the Agent API always gave (the window says card). Also what a confined agent is told about a card outside its project."
   },
   "board.error.inUse": {
-    "text": "Another Hive has this workspace open: close it first.",
+    "text": "Another Combwork has this workspace open: close it first.",
     "note": "An error: the board can't be upgraded to 1.0 (or its 0.9 backup put back) while another copy of Hive (an older version, or another profile) has the workspace open. Nothing was changed.",
     "audience": "both"
   },
   "board.error.newer": {
-    "text": "This board was saved by a newer version of Hive. It is shown read-only: update Hive to change it.",
+    "text": "This board was saved by a newer version of Combwork. It is shown read-only: update Combwork to change it.",
     "note": "An error: the workspace's task board was saved by a newer Hive, whose format this version doesn't know; cards can be read but not changed.",
     "audience": "both"
   },
@@ -36,7 +36,7 @@
     "audience": "both"
   },
   "board.error.stopAgentsFirst": {
-    "text": "Stop this workspace's agents and its Assistant first: once the 0.9 board is back, Hive can't record them.",
+    "text": "Stop this workspace's agents and its Assistant first: once the 0.9 board is back, Combwork can't record them.",
     "note": "An error from Help → Restore the 0.9 Board Backup…: agents of the workspace are running or starting; the board put back is read-only in this Hive, so their sessions couldn't be recorded. Nothing was changed.",
     "audience": "both"
   },
@@ -46,12 +46,12 @@
     "audience": "both"
   },
   "board.error.upgradeFirst": {
-    "text": "This board is from Hive 0.9: it is read-only until it is upgraded to 1.0 (Upgrade… on the board's banner).",
+    "text": "This board is from Combwork 0.9: it is read-only until it is upgraded to 1.0 (Upgrade… on the board's banner).",
     "note": "An error: the workspace's task board hasn't been upgraded to Hive 1.0's format yet (the user was asked and said not now), so cards can be read but not changed. Upgrade… is the button on the banner above the board.",
     "audience": "both"
   },
   "board.error.upgradeFirstStart": {
-    "text": "This workspace is from Hive 0.9: upgrade it to 1.0 before starting agents (Upgrade… on the banner at the top of the window).",
+    "text": "This workspace is from Combwork 0.9: upgrade it to 1.0 before starting agents (Upgrade… on the banner at the top of the window).",
     "note": "An error: an agent (or the Assistant) can't start while the workspace's data waits for its upgrade to Hive 1.0's format (the user said Not Now): Hive couldn't record its session. Upgrade… is the button on the banner at the top of the window.",
     "audience": "both"
   }

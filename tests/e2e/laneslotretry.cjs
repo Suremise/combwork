@@ -220,7 +220,7 @@ const renamable = (dir) => {
     check('…its start refused, its status naming slot-a and the program B1’s last run left in it', !!held4 && (await card(c3))?.column === 'todo', JSON.stringify((await laneOf(c3))?.status))
     await openLanes()
     const why4 = panel.locator(`.progress-lane[data-lane="${(await laneOf(c3)).id}"] .progress-lane-why`)
-    const said4 = `${(await card(c3)).key} waits to start: its start was refused for now, slot-a still in use (B1’s last run left node${held4?.more ? ` and ${held4.more} more` : ''} running in it), and Hive tries again`
+    const said4 = `${(await card(c3)).key} waits to start: its start was refused for now, slot-a still in use (B1’s last run left node${held4?.more ? ` and ${held4.more} more` : ''} running in it), and Combwork tries again`
     check(`…its row in the Progress panel says "${said4}"`, !!(await until(async () => ((await why4.textContent().catch(() => '')) ?? '') === said4, HUNG_MS)), await why4.textContent().catch(() => ''))
     check('…and its hover says it whole', ((await why4.getAttribute('title').catch(() => '')) ?? '').startsWith(said4), await why4.getAttribute('title').catch(() => ''))
     fs.mkdirSync(shots, { recursive: true })
