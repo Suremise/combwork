@@ -81,7 +81,10 @@ function fake(alpha: string, status: Record<string, string> = { b1: 'ready', r1:
       state.typed.push({ agent: id, text: await follow(alpha, id, text) })
     },
     watchChanged: () => undefined,
-    notice: (_p: string, title: unknown, body: unknown) => void state.notices.push({ title, body })
+    notice: (p: string, title: unknown, body: unknown) => {
+      // Other tests' workspaces can still finish a lane check after this stand-in is installed (HI-2431).
+      if (p.toLowerCase() === alpha.toLowerCase()) state.notices.push({ title, body })
+    }
   })
   return state
 }
@@ -601,6 +604,22 @@ describe('notices (#1266, §16.11.4)', () => {
   const stateOf = (ws: string, id: number) => ({ ...(store.workspaceDb(ws).reader.prepare('SELECT state, attempts FROM card_actions WHERE id = ?').get(id) as { state: string; attempts: number }) })
   /** What the notices told so far, as one text (their titles and lines). */
   const toldText = (st: { notices: unknown[] }) => JSON.stringify(st.notices)
+
+  it('HI-2431: a late notice from another workspace is not counted for the current project', async () => {
+    const first = await open()
+    const one = await newCard(first.w)
+    const second = await open()
+    const two = await newCard(second.w)
+    await settled()
+    const st = fake(second.alpha)
+    // Earlier tests' workspaces stay open: their actions can finish after fake() changes the session stand-in.
+    noticeAction(first.ws, one, 'notify', { text: 'Earlier workspace' })
+    noticeAction(second.ws, two, 'notify', { text: 'Current project' })
+    await Promise.all([worker.runActions(first.w), worker.runActions(second.w)])
+    expect(st.notices).toHaveLength(1)
+    expect(toldText(st)).toContain('Current project')
+    expect(toldText(st)).not.toContain('Earlier workspace')
+  })
 
   it('a notify action is shown once, however often the actions run at once', async () => {
     const { w, ws, alpha } = await open()
