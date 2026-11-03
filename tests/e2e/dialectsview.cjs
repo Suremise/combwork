@@ -160,7 +160,39 @@ const read = (rel) => fs.readFileSync(path.join(dialects, ...rel.split('/')), 'u
   check("invalid JSON saved at once is refused (it isn't JSON), never the earlier draft", !!(await until(async () => /isn't JSON/.test(await refused.innerText().catch(() => '')), HUNG_MS)) && read(TEST_COPY).includes('MINE {hasProject'), await refused.innerText().catch(() => ''))
   check('…the JSON tab says so, and keeps what was typed', (await pane.locator('[data-dialect-json-bad]').count()) === 1)
   await shot('json-error', pane)
+  // The invalid draft is kept across another file and leaving the view (HR2 on HI-2444 r1): back on its JSON tab, as
+  // typed, still flagged, and the Texts tab still asks before dropping it.
+  const editorText = async () => (await editor.innerText().catch(() => '')).replace(/ /g, ' ')
+  const jsonTabOn = async () => (await pane.locator('[data-dialect-tab="json"]').getAttribute('aria-selected').catch(() => null)) === 'true'
+  const reopen = async (via) => {
+    if (via === 'file') {
+      await row('workspace.json').click()
+      await page.locator('.dialect-detail[data-dialect-file="workspace.json"]').waitFor({ timeout: HUNG_MS })
+    } else {
+      await command('view.projects')
+      await command('view.dialects')
+    }
+    await row(TEST_COPY).click()
+    await pane.waitFor({ timeout: HUNG_MS })
+    await until(async () => (await editorText()).includes('"texts"'), HUNG_MS)
+  }
+  for (const via of ['file', 'view']) {
+    await reopen(via)
+    const shown = await editorText()
+    check(`back after ${via === 'file' ? 'another file' : 'leaving the view'}, the invalid JSON draft is on its JSON tab, as typed and still flagged`, (await jsonTabOn()) && (await pane.locator('[data-dialect-json-bad]').count()) === 1 && shown.includes('"texts": {') && !shown.includes('MINE'), shown)
+  }
+  await pane.locator('[data-dialect-tab="texts"]').click()
+  const leave = page.locator('.dialog').last()
+  check('…and the Texts tab still asks before dropping it', !!(await until(() => leave.count(), HUNG_MS)))
+  await leave.locator('.btn.subtle').first().click()
+  check('…Keep editing leaves it on the JSON tab, as typed', (await jsonTabOn()) && (await editorText()).includes('"texts": {'))
+  // A JSON draft typed and the file left at once, before the parse that follows typing: it comes back as typed.
   await paste(JSON.stringify({ name: 'Mark v2', texts: { [HOST]: { text: 'JSON {project}', why: 'a test' } } }, null, 2))
+  await row('workspace.json').click()
+  await row(TEST_COPY).click()
+  await pane.waitFor({ timeout: HUNG_MS })
+  await until(async () => (await editorText()).includes('JSON {project}'), HUNG_MS)
+  check('a JSON draft typed just before leaving the file comes back as typed, on its JSON tab', (await jsonTabOn()) && (await editorText()).includes('JSON {project}'), await editorText())
   await pane.locator('[data-dialect-save]').click()
   check('a JSON text that fails the schema is refused the same way', !!(await until(async () => /missing \{hasProject\}/.test(await refused.innerText().catch(() => '')), HUNG_MS)) && !read(TEST_COPY).includes('JSON {project}'))
   await paste(JSON.stringify({ name: 'Mark v2', texts: { [HOST]: { text: 'JSON {hasProject, select, yes {{project}} other {}}.', why: 'a test' } } }, null, 2))
@@ -201,7 +233,19 @@ const read = (rel) => fs.readFileSync(path.join(dialects, ...rel.split('/')), 'u
   await page.locator('.dialect-detail[data-dialect-file="claude-code/Opus 5.5.json"] [data-dialect-revert]').click()
   await answer()
   check('Revert to shipped puts back the file as Hive ships it', !!(await until(() => JSON.parse(read('claude-code/Opus 5.5.json')).model === 'claude-opus-5-5', HUNG_MS)))
-  await inv('dialects:delete', 'claude-code/Opus 5.5 v2.json')
+  // A file deleted, or renamed, outside while it is shown: it says it is no longer there, never loading forever (HR2 r1).
+  const goneShown = () => until(() => page.locator('[data-dialect-gone]').count(), HUNG_MS)
+  await row('claude-code/Opus 5.5 v2.json').click()
+  await page.locator('.dialect-detail[data-dialect-file="claude-code/Opus 5.5 v2.json"]').waitFor({ timeout: HUNG_MS })
+  fs.rmSync(path.join(dialects, 'claude-code', 'Opus 5.5 v2.json'))
+  check('a file deleted outside while shown says it is no longer there', !!(await goneShown()))
+  fs.writeFileSync(path.join(dialects, 'claude-code', 'Renamed.json'), file('Renamed', {}))
+  await until(() => row('claude-code/Renamed.json').count(), HUNG_MS)
+  await row('claude-code/Renamed.json').click()
+  await page.locator('.dialect-detail[data-dialect-file="claude-code/Renamed.json"]').waitFor({ timeout: HUNG_MS })
+  fs.renameSync(path.join(dialects, 'claude-code', 'Renamed.json'), path.join(dialects, 'claude-code', 'Renamed 2.json'))
+  check('…and one renamed outside too', !!(await goneShown()))
+  fs.rmSync(path.join(dialects, 'claude-code', 'Renamed 2.json'))
   await row('workspace.json').locator('.skill-delivered [role="switch"], .skill-delivered input, .skill-delivered button').first().click()
   check('the on/off switch keeps its state apart from the file', !!(await until(() => fs.existsSync(path.join(dialects, '.state.json')) && JSON.parse(fs.readFileSync(path.join(dialects, '.state.json'), 'utf8')).off.includes('workspace.json'), HUNG_MS)))
   await inv('dialects:setOn', 'workspace.json', true)

@@ -445,7 +445,8 @@ export function DialectView() {
     )
   }
   if (loaded.error && !loaded.data) return <LoadFailed what={tr(M.fileTarget)} error={loaded.error} onRetry={reloadDialects} />
-  if (loaded.data === null && !loaded.error) {
+  // Not read yet (no answer, no error): loading. Read, and null: the file is gone (deleted or renamed meanwhile).
+  if (loaded.data === null && !loaded.error && !loaded.at) {
     return (
       <div className="empty-state" style={{ paddingTop: '18vh' }}>
         <Icon name="loading" spin />
@@ -454,7 +455,7 @@ export function DialectView() {
   }
   if (!loaded.data) {
     return (
-      <div className="empty-state" style={{ paddingTop: '18vh' }}>
+      <div className="empty-state" style={{ paddingTop: '18vh' }} data-dialect-gone>
         <Icon name="warning" />
         {tr(M.gone)}
       </div>
@@ -476,7 +477,9 @@ function DialectFilePane({ ws, view, catalogue, usage }: { ws: string; view: Dia
   const dirty = !!draft
   const file = draft ? draft.file : view.file
   const changedOutside = !!draft && draft.base !== view.raw
-  const [tab, setTab] = useState<'texts' | 'json'>(view.file ? 'texts' : 'json')
+  // A draft whose JSON tab holds text of its own (one that isn't a dialect file, or worded apart from the form) opens
+  // on that tab, as it was left (HR2 on HI-2444 r1): the Texts tab never shows over it, nor edits it unasked.
+  const [tab, setTab] = useState<'texts' | 'json'>(() => (drafts.get(key)?.json != null || !view.file ? 'json' : 'texts'))
   const [refusal, setRefusal] = useState<string[] | null>(null)
   const [busy, setBusy] = useState(false)
   const edit = useCallback(
@@ -490,7 +493,8 @@ function DialectFilePane({ ws, view, catalogue, usage }: { ws: string; view: Dia
   const startDraft = (): Draft => drafts.get(key) ?? { base: view.raw, file: view.file ? structuredClone(view.file) : null, json: null, jsonProblem: null }
   const changeFile = (fn: (f: DialectFile) => void): void => {
     const d = startDraft()
-    if (!d.file) return
+    // A form edit only over a draft that reads as a file: JSON text that doesn't is kept until it is fixed or dropped.
+    if (!d.file || d.jsonProblem) return
     const f = structuredClone(d.file)
     fn(f)
     edit({ ...d, file: f, json: null, jsonProblem: null })
@@ -514,8 +518,13 @@ function DialectFilePane({ ws, view, catalogue, usage }: { ws: string; view: Dia
     edit(next)
     return next
   }, [key, view.raw, view.file, edit])
+  // Leaving the pane (another file, another view) with JSON typed and not yet read: read now, into the draft kept for
+  // the file, so what comes back is what was typed, its problem with it (HR2 on HI-2444 r1).
+  const flushRef = useRef(flushJson)
+  flushRef.current = flushJson
   useEffect(() => () => {
     if (jsonTimer.current) clearTimeout(jsonTimer.current)
+    if (pendingJson.current !== null) flushRef.current()
   }, [])
   const typeJson = (text: string): void => {
     // The editor reports its own content as a change too (shown first, or put back after a reload): text that is what
