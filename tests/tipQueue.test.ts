@@ -68,3 +68,17 @@ describe('a queued tip behind a group of finishes', () => {
     expect(tips.queuedTip()).toBe(null)
   })
 })
+
+// HI-2424: with agent pop-ups set to None, a "needs you" comes quietly (bell only). It still closes a tip showing, and
+// stays out of the pop-ups.
+describe('a quiet entry arriving', () => {
+  it('closes a tip showing and goes only to the bell', async () => {
+    const store = (await import(/* @vite-ignore */ STORE)) as Store
+    store.set({ tipShown: 'agent-layouts', toasts: [] })
+    store.pushToast({ id: 'n1', kind: 'needsYou', level: 'info', title: 'alpha · One needs you', quiet: true, timestamp: new Date().toISOString() })
+    const s = store.get() as unknown as { tipShown: string | null; toasts: { id: string }[]; notifications: { id: string }[] }
+    expect(s.tipShown).toBe(null)
+    expect(s.toasts.map((x) => x.id)).not.toContain('n1')
+    expect(s.notifications.map((x) => x.id)).toContain('n1')
+  })
+})

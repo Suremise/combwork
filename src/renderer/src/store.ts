@@ -1565,7 +1565,8 @@ export function pushToast(t: ToastMessage): void {
     toasts: t.quiet ? s.toasts.filter((x) => x.id !== t.id) : keepPopups([t, ...s.toasts.filter((x) => x.id !== t.id)], (x) => staysUntilHandled(x, waitingStays)),
     notifications: [t, ...s.notifications.filter((x) => x.id !== t.id)].slice(0, BELL_MAX),
     unread: s.showNotifications ? s.unread : s.unread + 1,
-    ...(t.quiet || !s.tipShown ? {} : { tipShown: null })
+    // Any entry closes a tip showing, a quiet one too (HI-2424: a bell-only "needs you" left the tip up).
+    ...(s.tipShown ? { tipShown: null } : {})
   }))
 }
 
