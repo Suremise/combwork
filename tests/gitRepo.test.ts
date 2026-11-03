@@ -830,6 +830,9 @@ describe('branches by state, and cleaning up the merged ones (#1642)', () => {
     git(proj, 'checkout', '-q', 'main')
     git(proj, 'worktree', 'add', '-q', join(proj, '..', 'slot-a'), 'hive/slot')
     git(proj, 'push', '-q', 'origin', '1.0.0', 'hive/hb1', 'hive/hb2', 'hive/slot', 'hive/card', 'spike/x')
+    // No origin/HEAD, on any git: 2.48 and later make it on fetch (remote.<name>.followRemoteHEAD), and origin/main would
+    // then be kept as the remote's default branch, not as the project's (HI-2401). Older git ignores the setting.
+    git(proj, 'config', 'remote.origin.followRemoteHEAD', 'never')
     git(proj, 'fetch', '-q', 'origin')
     cardLines = [{ line: 'hive/card', stage: 'review' }]
     return Object.fromEntries(['hive/hb1', 'hive/hb2', 'hive/slot', 'hive/card', 'spike/x', 'main', '1.0.0'].map((b) => [b, git(proj, 'rev-parse', b)]))

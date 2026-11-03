@@ -1,5 +1,9 @@
 # Release Notes
 
+## Unreleased
+
+- **A signer that wants your passphrase pauses the merge queue as "Signing waits for you" with newer Git too.** Newer Git (Git for Windows 2.56, for one) prints the signer's message only after the signer has stopped, and the queue read that as "Signing failed" with the wrong advice. Now it reads it as the signer's, and a hook's words still never count (HI-2399).
+
 ## 1.0.0 — 2026-11-02
 
 **Hive 1.0 runs your board by your project's rules.** Choose how a card goes from Todo to Done (who reviews it, which checks pass first, who merges it, where it is built) with the Solo, Pair or Team presets; agents tell Hive what they did, and Hive moves the card, asks you only what's yours to answer, and can merge approved work itself, each card in its own slot. Agents run on connections Hive keeps (several sign-ins side by side), one notification system tells each thing once, and the Activity view shows what every agent is doing now.
