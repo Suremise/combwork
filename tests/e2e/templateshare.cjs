@@ -90,7 +90,7 @@ const check = (name, ok, extra = '') => {
   const bar = await page.locator('.activitybar .activity-btn').evaluateAll((els) => els.map((e) => e.getAttribute('aria-label')))
   check('the Templates icon is next to Skills on the activity bar', bar.indexOf('Templates') === bar.indexOf('Skills') + 1, JSON.stringify(bar))
   await page.locator('.activitybar [aria-label="Templates"]').click()
-  check("the view lists Hive's own, the workspace's templates, then each project's under its name", !!(await lib.until(async () => JSON.stringify(await groups()) === '["hive 6","workspace 1","alpha 1"]', 5000)) && JSON.stringify(await rowNames(sidebar)) === '["Pair","Solo"]' && JSON.stringify(await sidebar.locator('.template-row[data-scope="hive"]').evaluateAll((l) => l.map((x) => x.getAttribute('aria-label')))) === JSON.stringify(HIVE_NAMES), JSON.stringify([await groups(), await rowNames(sidebar)]))
+  check("the view lists Combwork's own, the workspace's templates, then each project's under its name", !!(await lib.until(async () => JSON.stringify(await groups()) === '["combwork 6","workspace 1","alpha 1"]', 5000)) && JSON.stringify(await rowNames(sidebar)) === '["Pair","Solo"]' && JSON.stringify(await sidebar.locator('.template-row[data-scope="hive"]').evaluateAll((l) => l.map((x) => x.getAttribute('aria-label')))) === JSON.stringify(HIVE_NAMES), JSON.stringify([await groups(), await rowNames(sidebar)]))
   await sidebar.locator('select[aria-label="Show templates of"]').selectOption({ label: 'alpha' })
   check('the filter shows one project\'s', !!(await lib.until(async () => JSON.stringify(await rowNames(sidebar)) === '["Solo"]', HUNG_MS)))
   await sidebar.locator('select[aria-label="Show templates of"]').selectOption({ label: 'All templates' })
@@ -111,7 +111,7 @@ const check = (name, ok, extra = '') => {
   await detail.getByRole('button', { name: 'Duplicate…' }).click()
   await dialog.locator('select').selectOption({ label: 'beta (this project only)' })
   await dialog.getByRole('button', { name: 'Duplicate', exact: true }).click()
-  check('Duplicate… copies it into another project', !!(await lib.until(async () => templatesOf(own(beta)).length === 1, 5000)) && !!(await lib.until(async () => JSON.stringify(await groups()) === '["hive 6","workspace 1","alpha 1","beta 1"]', 5000)), JSON.stringify(await groups()))
+  check('Duplicate… copies it into another project', !!(await lib.until(async () => templatesOf(own(beta)).length === 1, 5000)) && !!(await lib.until(async () => JSON.stringify(await groups()) === '["combwork 6","workspace 1","alpha 1","beta 1"]', 5000)), JSON.stringify(await groups()))
 
   // Load into Project…: the project chosen, then the list of who goes and who comes.
   await userRow(sidebar, 'Team').first().click()
@@ -167,7 +167,7 @@ const check = (name, ok, extra = '') => {
   await openFile(bad)
   const before = templatesOf(wsTemplates).length + templatesOf(own(alpha)).length + templatesOf(own(beta)).length
   await sidebar.locator('[aria-label="Import Template…"]').click()
-  check('an invalid file is refused, saying why', !!(await toast(/Could not import the template[\s\S]*newer version of Hive/)) && (await page.locator('.dialog').count()) === 0 && templatesOf(wsTemplates).length + templatesOf(own(alpha)).length + templatesOf(own(beta)).length === before)
+  check('an invalid file is refused, saying why', !!(await toast(/Could not import the template[\s\S]*newer version of Combwork/)) && (await page.locator('.dialog').count()) === 0 && templatesOf(wsTemplates).length + templatesOf(own(alpha)).length + templatesOf(own(beta)).length === before)
 
   // Delete Team (2).
   await userRow(sidebar, 'Team (2)').click()
@@ -183,7 +183,7 @@ const check = (name, ok, extra = '') => {
   await tab.waitFor({ timeout: 5000 })
   // Each row's name and the badge saying where it is kept.
   const tabRows = async () => tab.locator('.template-row .label').evaluateAll((els) => els.map((el) => `${el.firstChild.textContent.trim()}: ${el.querySelector('.badge')?.textContent.trim() ?? ''}`))
-  check("the project's tab lists its own, the workspace's and Hive's, each with its scope", !!(await lib.until(async () => JSON.stringify(await tabRows()) === JSON.stringify(['Solo: alpha', 'Team: alpha', 'Team: Workspace', ...HIVE_NAMES.map((n) => `${n}: Hive`)]), 5000)), JSON.stringify(await tabRows()))
+  check("the project's tab lists its own, the workspace's and Combwork's, each with its scope", !!(await lib.until(async () => JSON.stringify(await tabRows()) === JSON.stringify(['Solo: alpha', 'Team: alpha', 'Team: Workspace', ...HIVE_NAMES.map((n) => `${n}: Combwork`)]), 5000)), JSON.stringify(await tabRows()))
   await userRow(tab, 'Solo').click()
   const tabDetail = page.locator('.split-main .template-detail')
   const ids = JSON.stringify(projectCfg(alpha).agents.map((a) => a.id))
@@ -420,7 +420,7 @@ const check = (name, ok, extra = '') => {
     await shot(`quit-asks-${theme}`)
   }
   await quitDialog.getByRole('button', { name: 'Save and quit' }).click()
-  check('…Save and quit saves it, then Hive quits', !!(await q.untilDecided(8000)) && teamNow().name === 'Team at quit', JSON.stringify(teamNow().name))
+  check('…Save and quit saves it, then Combwork quits', !!(await q.untilDecided(8000)) && teamNow().name === 'Team at quit', JSON.stringify(teamNow().name))
   await q.gone(30000)
   console.log(failed ? `${failed} check(s) failed` : 'all checks passed')
   process.exit(failed ? 1 : 0)

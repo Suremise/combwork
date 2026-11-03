@@ -117,7 +117,7 @@ export function watchRenderer(entry: HiveWindow, opts: { quitting: () => boolean
         // Give the page a moment to subscribe to events.
         setTimeout(() => {
           if (win.isDestroyed()) return
-          emitTo(win, { type: 'toast', toast: { id: randomUUID(), level: 'warning', title: tr(msg({ id: 'main.window.reloadedTitle', defaultMessage: "Hive's window stopped and was reloaded", description: "A notice's title after Hive's window crashed and was reloaded." })), message: reloadedMessage(unsaved), timestamp: new Date().toISOString() } })
+          emitTo(win, { type: 'toast', toast: { id: randomUUID(), level: 'warning', title: tr(msg({ id: 'main.window.reloadedTitle', defaultMessage: "Combwork's window stopped and was reloaded", description: "A notice's title after Hive's window crashed and was reloaded." })), message: reloadedMessage(unsaved), timestamp: new Date().toISOString() } })
         }, 1500)
       })
     }
@@ -143,9 +143,9 @@ export function watchRenderer(entry: HiveWindow, opts: { quitting: () => boolean
         const choice = await ask({
           type: 'error',
           title: APP_NAME,
-          message: tr(msg({ id: 'main.window.stopped', defaultMessage: "Hive's window stopped working.", description: "Hive's question when its window crashed again soon after a reload." })),
+          message: tr(msg({ id: 'main.window.stopped', defaultMessage: "Combwork's window stopped working.", description: "Hive's question when its window crashed again soon after a reload." })),
           detail: stillRunning(),
-          buttons: [tr(msg({ id: 'main.window.reload', defaultMessage: 'Reload', description: "Button: reloads Hive's window." })), tr(msg({ id: 'main.window.openLogs', defaultMessage: 'Open Logs', description: "Button: opens the folder of Hive's log files." })), tr(msg({ id: 'main.window.quit', defaultMessage: 'Quit Hive', description: 'Button: quits Hive.' }))],
+          buttons: [tr(msg({ id: 'main.window.reload', defaultMessage: 'Reload', description: "Button: reloads Hive's window." })), tr(msg({ id: 'main.window.openLogs', defaultMessage: 'Open Logs', description: "Button: opens the folder of Hive's log files." })), tr(msg({ id: 'main.window.quit', defaultMessage: 'Quit Combwork', description: 'Button: quits Hive.' }))],
           defaultId: 0,
           cancelId: 0
         })
@@ -189,7 +189,7 @@ export function watchRenderer(entry: HiveWindow, opts: { quitting: () => boolean
         {
           type: 'warning',
           title: APP_NAME,
-          message: tr(msg({ id: 'main.window.unresponsive', defaultMessage: "Hive's window isn't responding.", description: "Hive's question when its window has stopped responding." })),
+          message: tr(msg({ id: 'main.window.unresponsive', defaultMessage: "Combwork's window isn't responding.", description: "Hive's question when its window has stopped responding." })),
           detail: tr(msg({ id: 'main.window.unresponsiveDetail', defaultMessage: '{stillRunning} Wait for it, or reload it.', description: "Hive's question when its window isn't responding. {stillRunning} says the agents are still running." }), { stillRunning: stillRunning() }),
           buttons: [tr(msg({ id: 'main.window.wait', defaultMessage: 'Wait', description: "Button: waits for Hive's window to respond." })), tr(msg({ id: 'main.window.reload', defaultMessage: 'Reload', description: "Button: reloads Hive's window." }))],
           defaultId: 0,

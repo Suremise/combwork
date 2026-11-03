@@ -1,16 +1,16 @@
 {
   "main.accounts.badTarget": {
-    "text": "Hive won't link a connection to {target}: it isn't one of {cli}'s own folders.",
+    "text": "Combwork won't link a connection to {target}: it isn't one of {cli}'s own folders.",
     "note": "An error adding a connection: the folder a connection's shared folder would link to ({target}, a path) isn't in the coding agent CLI's ({cli}) own folder.",
     "audience": "both"
   },
   "main.accounts.checkHeld": {
-    "text": "{name} is being checked: Hive is still making sure {cli}'s check of it has ended. Try again in a moment.",
+    "text": "{name} is being checked: Combwork is still making sure {cli}'s check of it has ended. Try again in a moment.",
     "note": "An error signing in or removing a connection ({name}, its name in Settings → Accounts & Connections): the coding agent CLI's ({cli}: \"Codex\") check of who it is signed in as hasn't been confirmed ended yet, so the connection is held.",
     "audience": "both"
   },
   "main.accounts.folderNotUsable": {
-    "text": "{name}'s folder isn't the one Hive made (it is missing, or was moved or replaced), so nothing was started on it. Remove the connection and add it again.",
+    "text": "{name}'s folder isn't the one Combwork made (it is missing, or was moved or replaced), so nothing was started on it. Remove the connection and add it again.",
     "note": "An error signing a connection in or starting on it ({name}, its name): its folder is missing or isn't the one Hive made.",
     "audience": "both"
   },
@@ -45,7 +45,7 @@
     "audience": "both"
   },
   "main.accounts.noProvider": {
-    "text": "{cli} can't have sign-in connections in Hive yet.",
+    "text": "{cli} can't have sign-in connections in Combwork yet.",
     "note": "An error: connections were asked for a coding agent CLI ({cli}: \"Codex\") that Hive keeps no connections for.",
     "audience": "both"
   },
@@ -55,7 +55,7 @@
     "audience": "both"
   },
   "main.accounts.nothingToKeep": {
-    "text": "{name} isn't signed in as anyone Hive could check, so there's no login to keep.",
+    "text": "{name} isn't signed in as anyone Combwork could check, so there's no login to keep.",
     "note": "An error: Keep the new login was asked for a connection ({name}) whose latest check didn't find it signed in.",
     "audience": "both"
   },
@@ -70,7 +70,7 @@
     "audience": "both"
   },
   "main.accounts.setUpCancelled": {
-    "text": "{name}'s Set Up didn't open: the connection was removed or its workspace closed while Hive checked its folders.",
+    "text": "{name}'s Set Up didn't open: the connection was removed or its workspace closed while Combwork checked its folders.",
     "note": "An error opening a connection's Set Up (Settings → Accounts & Connections, HI-1870; {name}, its name): Hive was checking which of the workspace's folders its coding agent CLI trusts when the connection was removed or the workspace closed, so nothing was started.",
     "audience": "both"
   },
@@ -130,7 +130,7 @@
     "audience": "both"
   },
   "main.connections.launch.changing": {
-    "text": "{name}'s login kept changing while Hive checked it. Try starting {agent} again in a moment.",
+    "text": "{name}'s login kept changing while Combwork checked it. Try starting {agent} again in a moment.",
     "note": "Starting an agent ({agent}) is refused: its connection's ({name}) login changed again and again while Hive checked who it is signed in as.",
     "audience": "both"
   },
@@ -285,7 +285,7 @@
     "audience": "both"
   },
   "main.gitInit.otherVcs": {
-    "text": "{vcs} keeps this folder (in {root}): Hive makes a git repository only where no other version control system is.",
+    "text": "{vcs} keeps this folder (in {root}): Combwork makes a git repository only where no other version control system is.",
     "note": "Why a folder can't be made a git repository: another version control system (Jujutsu, Mercurial…), {vcs}, keeps it. {root} is the folder it keeps.",
     "audience": "both"
   },
@@ -305,32 +305,32 @@
     "audience": "both"
   },
   "main.keys.maskingFull": {
-    "text": "Hive can't keep masking for another key: it already keeps the most it can. The key wasn't saved.",
+    "text": "Combwork can't keep masking for another key: it already keeps the most it can. The key wasn't saved.",
     "note": "An error saving a server connection's API key: Hive keeps a fingerprint of every key ever saved (to hide it in logs and exports) and has reached its limit.",
     "audience": "both"
   },
   "main.keys.maskingUnreadable": {
-    "text": "Hive can't check this for API keys: its masking data can't be read. See Settings → Accounts & Connections.",
+    "text": "Combwork can't check this for API keys: its masking data can't be read. See Settings → Accounts & Connections.",
     "note": "An error: an export, Copy Diagnostics or a recording was refused because the data Hive uses to hide server connections' API keys can't be read. Settings → Accounts & Connections names a section, where it can be reset.",
     "audience": "both"
   },
   "main.keys.unsafe": {
-    "text": "Hive can't store a key safely on this system, so it wasn't saved.",
+    "text": "Combwork can't store a key safely on this system, so it wasn't saved.",
     "note": "An error saving a server connection's API key (Settings → Accounts & Connections): Windows' protection for stored secrets isn't available, and Hive won't keep a key in plain text.",
     "audience": "both"
   },
   "main.leftovers.offerNotEnded": {
-    "text": "{n, plural, one {Windows didn't let Hive end the process listed. Try again.} other {Windows didn't let Hive end all # processes listed. Try again.}}",
+    "text": "{n, plural, one {Windows didn't let Combwork end the process listed. Try again.} other {Windows didn't let Combwork end all # processes listed. Try again.}}",
     "note": "An error after End Them on the notice of processes an agent left running: some of the processes it listed still run (HI-2320). {n} is how many it listed.",
     "audience": "both"
   },
   "main.leftovers.offerUnchecked": {
-    "text": "Hive couldn't check what runs now, so it ended nothing. Try again.",
+    "text": "Combwork couldn't check what runs now, so it ended nothing. Try again.",
     "note": "An error after End Them or Keep Running on the notice of processes an agent left running: Hive couldn't read what the agent's processes are now, so it did nothing (HI-2320).",
     "audience": "both"
   },
   "main.outage.gaveUpBody": {
-    "text": "{n, plural, one {It was resumed once in the past hour} other {It was resumed # times in the past hour}} and stopped again, so Hive won't resume it again by itself. This PC's network may not have recovered: try renewing its network adapter's addresses (ipconfig /renew), flushing DNS (ipconfig /flushdns) or restarting the PC, then resume it.",
+    "text": "{n, plural, one {It was resumed once in the past hour} other {It was resumed # times in the past hour}} and stopped again, so Combwork won't resume it again by itself. This PC's network may not have recovered: try renewing its network adapter's addresses (ipconfig /renew), flushing DNS (ipconfig /flushdns) or restarting the PC, then resume it.",
     "note": "The notice that Hive stopped resuming an agent whose connection kept dropping. {n} is how many times it was resumed in the past hour. ipconfig /renew and ipconfig /flushdns are Windows commands: keep them.",
     "audience": "both"
   },
@@ -355,7 +355,7 @@
     "audience": "both"
   },
   "main.outage.timedOutBody": {
-    "text": "Hive waited {minutes, plural, one {# minute} other {# minutes}} and stopped waiting. If other apps can reach the internet, this PC's network may not have recovered: try renewing its network adapter's addresses (ipconfig /renew), flushing DNS (ipconfig /flushdns) or restarting the PC, then resume it.",
+    "text": "Combwork waited {minutes, plural, one {# minute} other {# minutes}} and stopped waiting. If other apps can reach the internet, this PC's network may not have recovered: try renewing its network adapter's addresses (ipconfig /renew), flushing DNS (ipconfig /flushdns) or restarting the PC, then resume it.",
     "note": "The notice that Hive stopped waiting for an agent's connection. {minutes} is how long it waited. ipconfig /renew and ipconfig /flushdns are Windows commands: keep them.",
     "audience": "both"
   },
@@ -375,7 +375,7 @@
     "audience": "both"
   },
   "main.quit.closed": {
-    "text": "Hive has closed",
+    "text": "Combwork has closed",
     "note": "A notice after Hive quit without asking, its sessions stopped.",
     "audience": "both"
   },
@@ -405,7 +405,7 @@
     "audience": "both"
   },
   "main.server.unsupported": {
-    "text": "{cli} can't get its model from a server in Hive.",
+    "text": "{cli} can't get its model from a server in Combwork.",
     "note": "An error adding a server connection for a coding agent CLI ({cli}: \"Codex\") that Hive has no server connections for.",
     "audience": "both"
   },
@@ -415,7 +415,7 @@
     "audience": "both"
   },
   "main.server.url.invalid": {
-    "text": "That isn't a URL Hive can use: write it in full, such as https://api.example.com.",
+    "text": "That isn't a URL Combwork can use: write it in full, such as https://api.example.com.",
     "note": "An error saving a server connection's base URL (Settings → Accounts & Connections): it can't be read as a URL.",
     "audience": "both"
   },
@@ -450,7 +450,7 @@
     "audience": "both"
   },
   "main.storage.purgeNotKept": {
-    "text": "The folder isn't one Hive keeps attachments in, so it is left alone.",
+    "text": "The folder isn't one Combwork keeps attachments in, so it is left alone.",
     "note": "Purge skipped a session's attachments: their folder isn't a real folder in the project's attachments folder (a link, say).",
     "audience": "both"
   },
@@ -465,27 +465,27 @@
     "audience": "both"
   },
   "main.storage.purgeUnrecorded": {
-    "text": "Hive couldn't record it in the usage history, so it is kept.",
+    "text": "Combwork couldn't record it in the usage history, so it is kept.",
     "note": "Purge kept a deleted session's old usage: Hive couldn't save it in the usage history, which the totals keep.",
     "audience": "both"
   },
   "main.unexpectedClose.notChecked": {
-    "text": "{u, plural, one {A process started by a test run may still be running: Windows let Hive neither end nor check it, so Hive can't find it again. Look for process ID {ids} in Task Manager's Details.} other {# processes started by a test run may still be running: Windows let Hive neither end nor check them, so Hive can't find them again. Look for process IDs {ids} in Task Manager's Details.}}",
+    "text": "{u, plural, one {A process started by a test run may still be running: Windows let Combwork neither end nor check it, so Combwork can't find it again. Look for process ID {ids} in Task Manager's Details.} other {# processes started by a test run may still be running: Windows let Combwork neither end nor check them, so Combwork can't find them again. Look for process IDs {ids} in Task Manager's Details.}}",
     "note": "Stop Them (in the notice that Hive closed unexpectedly) ended what it could, but {u} processes a test run had started may still run: Windows let Hive neither end nor check them, and with what started them ended Hive can't tell them from other processes any more, so pressing Stop Them again won't reach them. {ids} lists their process IDs (\"4242, 4250\"), to look for in Task Manager's Details tab.",
     "audience": "both"
   },
   "main.unexpectedClose.notStopped": {
-    "text": "{n, plural, one {# process is still running: Windows didn't let Hive end it.} other {# processes are still running: Windows didn't let Hive end them.}} Stop Them in the notice tries again.",
+    "text": "{n, plural, one {# process is still running: Windows didn't let Combwork end it.} other {# processes are still running: Windows didn't let Combwork end them.}} Stop Them in the notice tries again.",
     "note": "Stopping the processes the agents had started before Hive closed unexpectedly failed for some. {n} is how many still run; Stop Them is the notice's button.",
     "audience": "both"
   },
   "main.unexpectedClose.notStoppedNorChecked": {
-    "text": "{n, plural, one {# process is still running: Windows didn't let Hive end it; Stop Them in the notice tries again.} other {# processes are still running: Windows didn't let Hive end them; Stop Them in the notice tries again.}} {u, plural, one {Another, started by a test run, may still be running: Windows let Hive neither end nor check it, so Hive can't find it again. Look for process ID {ids} in Task Manager's Details.} other {# others, started by a test run, may still be running: Windows let Hive neither end nor check them, so Hive can't find them again. Look for process IDs {ids} in Task Manager's Details.}}",
+    "text": "{n, plural, one {# process is still running: Windows didn't let Combwork end it; Stop Them in the notice tries again.} other {# processes are still running: Windows didn't let Combwork end them; Stop Them in the notice tries again.}} {u, plural, one {Another, started by a test run, may still be running: Windows let Combwork neither end nor check it, so Combwork can't find it again. Look for process ID {ids} in Task Manager's Details.} other {# others, started by a test run, may still be running: Windows let Combwork neither end nor check them, so Combwork can't find them again. Look for process IDs {ids} in Task Manager's Details.}}",
     "note": "Stopping the processes the agents had started before Hive closed unexpectedly failed for some. {n} is how many still run, which Stop Them (the notice's button) tries again; {u} is how many more, started by a test run, Windows let Hive neither end nor check, so Hive can't tell them from other processes any more: {ids} lists their process IDs (\"4242, 4250\"), to look for in Task Manager's Details tab.",
     "audience": "both"
   },
   "main.usageMove.blockedTitle": {
-    "text": "Hive can't move {from}'s agents to {to}",
+    "text": "Combwork can't move {from}'s agents to {to}",
     "note": "A notice's title (HI-2195): an account ({from}) reached the share of its usage limit its rule sets, but its agents can't move to the account the rule names ({to}); the text says why.",
     "audience": "both"
   },

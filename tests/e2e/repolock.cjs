@@ -79,8 +79,8 @@ async function agentWithWork(inv, project, name) {
     const other = rev('other')
     let bDone = false
     const mergeB = b.inv('agents:merge', beta, two.id, { squash: false, message: 'Two into other', cleanup: false }).finally(() => (bDone = true))
-    const notice = b.page.locator('.toast', { hasText: 'Another Hive is merging into this repository (repolock-a)' })
-    check("B waits, and its window names A's Hive", !!(await lib.until(async () => (await notice.count()) > 0, HUNG_MS)), await b.page.locator('.toast').allInnerTexts().catch(() => []).then(String))
+    const notice = b.page.locator('.toast', { hasText: 'Another Combwork is merging into this repository (repolock-a)' })
+    check("B waits, and its window names A's Combwork", !!(await lib.until(async () => (await notice.count()) > 0, HUNG_MS)), await b.page.locator('.toast').allInnerTexts().catch(() => []).then(String))
     await b.page.screenshot({ path: path.join(lib.WORK, 'repolock-1-waiting.png') })
     check('…B has merged nothing meanwhile', !bDone && rev('other') === other)
     fs.rmSync(hold)
@@ -105,7 +105,7 @@ async function agentWithWork(inv, project, name) {
       (r) => `merged: ${JSON.stringify(r)}`,
       (e) => String(e?.message ?? e)
     )
-    check('B gives up after its wait, naming A, changing nothing', /Another Hive is merging into this repository \(repolock-a\)\. Nothing was changed/.test(refused) && rev('other') === before, refused)
+    check('B gives up after its wait, naming A, changing nothing', /Another Combwork is merging into this repository \(repolock-a\)\. Nothing was changed/.test(refused) && rev('other') === before, refused)
     fs.rmSync(hold)
     const ra2 = await mergeA2
     check("…A's merge isn't disturbed", ra2.ok && ra2.mergeCommit === rev('HEAD'), JSON.stringify(ra2))

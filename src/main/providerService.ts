@@ -190,8 +190,8 @@ class ProviderService {
   /** detected(), refusing when Hive is still looking: what calls it would otherwise commit to a guess (#506). */
   async settle(id?: ProviderId): Promise<void> {
     if (await this.detected(id)) return
-    if (!id) throw hiveError(msg({ id: 'service.providers.stillLookingAll', defaultMessage: 'Hive is still looking for the coding agent CLIs. Try again in a moment.', description: "An error: Hive hasn't finished finding the coding agent CLIs installed (it does when it starts), so it can't choose one yet." }), undefined, { kind: 'conflict' })
-    throw hiveError(msg({ id: 'service.providers.stillLooking', defaultMessage: 'Hive is still looking for {cli}. Try again in a moment.', description: "An error: Hive hasn't finished finding the coding agent CLI {cli} (\"Codex\"), so it can't use it yet." }), { cli: provider(id).descriptor.name }, { kind: 'conflict' })
+    if (!id) throw hiveError(msg({ id: 'service.providers.stillLookingAll', defaultMessage: 'Combwork is still looking for the coding agent CLIs. Try again in a moment.', description: "An error: Hive hasn't finished finding the coding agent CLIs installed (it does when it starts), so it can't choose one yet." }), undefined, { kind: 'conflict' })
+    throw hiveError(msg({ id: 'service.providers.stillLooking', defaultMessage: 'Combwork is still looking for {cli}. Try again in a moment.', description: "An error: Hive hasn't finished finding the coding agent CLI {cli} (\"Codex\"), so it can't use it yet." }), { cli: provider(id).descriptor.name }, { kind: 'conflict' })
   }
 
   /**
@@ -313,10 +313,10 @@ class ProviderService {
         // stays open for the user to do it.
         if (e instanceof PickNotFound) {
           log.warn(`${label}: couldn't find ${e.what}`)
-          toast('warning', tr(msg({ id: 'service.providers.pickNotFound', defaultMessage: "{task}: Hive couldn't find {item}. Do it in the terminal, or update Hive.", description: "A notification: Hive types the keys of a coding agent CLI's task ({task}: \"Codex setup\") into its terminal, and couldn't find the menu item {item} (the CLI's own words) on its screen." }), { task: shown(), item: e.what }))
+          toast('warning', tr(msg({ id: 'service.providers.pickNotFound', defaultMessage: "{task}: Combwork couldn't find {item}. Do it in the terminal, or update Combwork.", description: "A notification: Hive types the keys of a coding agent CLI's task ({task}: \"Codex setup\") into its terminal, and couldn't find the menu item {item} (the CLI's own words) on its screen." }), { task: shown(), item: e.what }))
         } else if (e instanceof KeysStopped) {
           log.warn(`${label}: stopped typing: ${e.why}`)
-          if (hasPty(key)) toast('warning', tr(msg({ id: 'service.providers.keysStopped', defaultMessage: '{task}: Hive stopped typing into it, as {why}. Finish it in the terminal.', description: "A notification: Hive stopped typing the keys of a coding agent CLI's task ({task}: \"Codex setup\") into its terminal; {why} says why (a clause: \"its terminal closed\")." }), { task: shown(), why: stoppedText(e.why) }))
+          if (hasPty(key)) toast('warning', tr(msg({ id: 'service.providers.keysStopped', defaultMessage: '{task}: Combwork stopped typing into it, as {why}. Finish it in the terminal.', description: "A notification: Hive stopped typing the keys of a coding agent CLI's task ({task}: \"Codex setup\") into its terminal; {why} says why (a clause: \"its terminal closed\")." }), { task: shown(), why: stoppedText(e.why) }))
         } else throw e
       } finally {
         gate?.dispose()

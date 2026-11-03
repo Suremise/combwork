@@ -62,7 +62,7 @@ const busyLines = () => lines().filter((l) => l.includes('[main] The main proces
     const row = table.locator('tbody tr', { hasText: 'ipc app:info' })
     const shown = await lib.until(async () => ((await row.count()) >= 1 ? (await row.first().innerText()).replace(/\s+/g, ' ') : null), HUNG_MS)
     check('the Performance view lists it: its length and the IPC call during it', !!shown && /\b1\.\d s\b/.test(shown) && shown.includes('ipc app:info'), shown ?? (await page.locator('.performance-page:visible').innerText().catch(() => '')).slice(-600))
-    check('…and how many there were since Hive started', /stalls? since Hive started/.test(await page.locator('[data-stalls-count]').innerText().catch(() => '')))
+    check('…and how many there were since Combwork started', /stalls? since Combwork started/.test(await page.locator('[data-stalls-count]').innerText().catch(() => '')))
     await table.scrollIntoViewIfNeeded().catch(() => undefined)
     await page.screenshot({ path: path.join(lib.WORK, 'stalls-performance.png') })
 

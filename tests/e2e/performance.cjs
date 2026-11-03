@@ -106,7 +106,7 @@ const check = (name, ok, extra = '') => {
   check('the tools table is sorted by characters', (await page.locator('.table-wrap').first().locator('tbody tr td:first-child').allInnerTexts()).join() === 'hive_read_task,hive_list_tasks', (await page.locator('.table-wrap').first().locator('tbody tr td:first-child').allInnerTexts()).join())
   check('the skill service is shown for the workspace', (await page.locator('h2', { hasText: 'Skill service' }).count()) === 1)
   check('the 24 hours don’t reach history removed for space', !/removed to keep/.test(await page.locator('.perf-coverage').innerText()))
-  check('coverage: how long Hive was recording, and the gap', /Recorded for \d+ h/.test(await page.locator('.perf-coverage').innerText()), await page.locator('.perf-coverage').innerText())
+  check('coverage: how long Combwork was recording, and the gap', /Recorded for \d+ h/.test(await page.locator('.perf-coverage').innerText()), await page.locator('.perf-coverage').innerText())
   check('…the unrecorded hours are hatched in the trend, not shown as zero', (await page.locator('.perf-trend .daily-col.unobserved').count()) >= 3, String(await page.locator('.perf-trend .daily-col.unobserved').count()))
   // Each table sorts by a header, and remembers it (#250): the tools by calls, the routes by failures, launches by count.
   const perfTable = (header) => page.locator('.performance-page:visible .data-table', { has: page.locator('th', { hasText: header }) }).first()
@@ -200,7 +200,7 @@ const check = (name, ok, extra = '') => {
   const who = page.locator('.performance-page:visible .perf-group', { has: page.locator('select[aria-label="Who did the work"]') }).first()
   const byProvider = page.locator('.performance-page:visible .perf-by-provider')
   check('Who frames the cards, chart and tables, not the skill service', (await who.locator('.cards').count()) === 1 && (await who.locator('.perf-trend').count()) === 1 && (await who.locator('h2', { hasText: 'Skill service' }).count()) === 0 && (await page.locator('.performance-page:visible .perf-controls select[aria-label="Who did the work"]').count()) === 0)
-  check('Provider frames only launches and the providers’ usage', (await byProvider.locator('select[aria-label="Provider"]').count()) === 1 && (await byProvider.locator('.cards').count()) === 0 && (await byProvider.locator('h2', { hasText: 'Hive tools' }).count()) === 0 && (await byProvider.locator('h2', { hasText: 'Guidance at launch' }).count()) === 1)
+  check('Provider frames only launches and the providers’ usage', (await byProvider.locator('select[aria-label="Provider"]').count()) === 1 && (await byProvider.locator('.cards').count()) === 0 && (await byProvider.locator('h2', { hasText: 'Combwork tools' }).count()) === 0 && (await byProvider.locator('h2', { hasText: 'Guidance at launch' }).count()) === 1)
   const providerOptions = () => page.locator('select[aria-label="Provider"] option').allInnerTexts()
   const guidanceRows = () => byProvider.locator('.data-table', { has: page.locator('th', { hasText: 'Launches' }) }).locator('tbody tr td:first-child').allInnerTexts()
   check('…offering every provider with data', (await providerOptions()).join() === 'All providers,Claude Code,Codex', (await providerOptions()).join())

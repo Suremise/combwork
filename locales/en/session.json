@@ -1,6 +1,6 @@
 {
   "session.archive.notKept": {
-    "defaultMessage": "Only sessions Hive keeps can be archived: adopt it first.",
+    "defaultMessage": "Only sessions Combwork keeps can be archived: adopt it first.",
     "description": "Archiving a session is refused: it was started outside Hive, so Hive has no copy of it (Adopt keeps one)."
   },
   "session.autoCompact.body": {
@@ -56,11 +56,11 @@
     "description": "Clean Up… left a session alone: it was unarchived since the preview."
   },
   "session.cleanUp.unread": {
-    "defaultMessage": "Hive couldn't read what the session used, so it is kept.",
+    "defaultMessage": "Combwork couldn't read what the session used, so it is kept.",
     "description": "Clean Up… kept a session: Hive couldn't read its usage, which the project's totals keep."
   },
   "session.cleanUp.unreadBackups": {
-    "defaultMessage": "Hive couldn't read what the session used, so its backups are kept.",
+    "defaultMessage": "Combwork couldn't read what the session used, so its backups are kept.",
     "description": "Clean Up… kept a session's backups: Hive couldn't read its usage, which the project's totals keep."
   },
   "session.compact.already": {
@@ -76,7 +76,7 @@
     "description": "Compact failed: the agent stopped or restarted while Hive typed the command."
   },
   "session.compact.userTyped": {
-    "defaultMessage": "You typed in the agent's terminal while Hive was sending Compact, so it wasn't sent: what you typed stays.",
+    "defaultMessage": "You typed in the agent's terminal while Combwork was sending Compact, so it wasn't sent: what you typed stays.",
     "description": "Compact failed: the user typed in the agent's terminal while Hive was clearing its input or typing the command, so Hive stopped."
   },
   "session.compact.waiting": {
@@ -104,7 +104,7 @@
     "description": "An action on an agent is refused: the project has none."
   },
   "session.error.noDeliveries": {
-    "defaultMessage": "Hive's delivery service isn't running.",
+    "defaultMessage": "Combwork's delivery service isn't running.",
     "description": "Giving an agent a message failed: the part of Hive that delivers them hasn't started (or has stopped)."
   },
   "session.error.noSession": {
@@ -132,19 +132,19 @@
     "description": "Starting an agent failed: it was stopped (or its workspace closed) while it was starting."
   },
   "session.error.typingBusy": {
-    "defaultMessage": "Hive is already typing a prompt into this agent; it is busy.",
+    "defaultMessage": "Combwork is already typing a prompt into this agent; it is busy.",
     "description": "An action on an agent is refused: Hive is typing a prompt into it now."
   },
   "session.format.body": {
-    "defaultMessage": "A {provider} session with activity showed no token use, so the Overview and costs may be incomplete. A Hive update will fix it.",
+    "defaultMessage": "A {provider} session with activity showed no token use, so the Overview and costs may be incomplete. A Combwork update will fix it.",
     "description": "The notice that a coding agent's transcripts show no token use. {provider} is the coding agent's name."
   },
   "session.format.bodyVersion": {
-    "defaultMessage": "A {provider} {version} session with activity showed no token use, so the Overview and costs may be incomplete. A Hive update will fix it.",
+    "defaultMessage": "A {provider} {version} session with activity showed no token use, so the Overview and costs may be incomplete. A Combwork update will fix it.",
     "description": "The notice that a coding agent's transcripts show no token use. {provider} is the coding agent's name, {version} its version (\"2.1.299\")."
   },
   "session.format.title": {
-    "defaultMessage": "Hive may not fully understand this {provider} version",
+    "defaultMessage": "Combwork may not fully understand this {provider} version",
     "description": "A notice's title: a coding agent's transcripts show no token use, so its format probably changed. {provider} is the coding agent's name."
   },
   "session.handOver.apiFailed": {
@@ -168,7 +168,7 @@
     "description": "Handing an agent over to itself stopped before ending its conversation: while it wrote its handover it began merging (the merge slot), began other work (a task, a card loop's card) or restarted. {agent} is its name, {handover} the handover's path in the shared notes."
   },
   "session.handOver.noTools": {
-    "defaultMessage": "Handing over needs Hive's tools in sessions: turn on \"Provide Hive tools to sessions\" in Settings → Agent API.",
+    "defaultMessage": "Handing over needs Combwork's tools in sessions: turn on \"Provide Combwork tools to sessions\" in Settings → Agent API.",
     "description": "Hand Over to… is refused: agents need Hive's tools to write and read a handover. \"Provide Hive tools to sessions\" is a setting in Settings → Agent API: keep its name as Hive shows it."
   },
   "session.handOver.none": {
@@ -212,15 +212,15 @@
     "description": "Removing a session's attachments is refused: it is running."
   },
   "session.inUse.open": {
-    "defaultMessage": "Its transcript is open in Hive. Close it, then try again.",
+    "defaultMessage": "Its transcript is open in Combwork. Close it, then try again.",
     "description": "A session is left alone (archive, delete): its transcript is open in Hive's Sessions tab."
   },
   "session.inUse.reading": {
-    "defaultMessage": "Hive is reading its transcript (an export or a search). Try again in a moment.",
+    "defaultMessage": "Combwork is reading its transcript (an export or a search). Try again in a moment.",
     "description": "A session is left alone (archive, delete) for a moment: Hive is reading its transcript."
   },
   "session.inUse.reserved": {
-    "defaultMessage": "Hive is already archiving, deleting or cleaning up this session.",
+    "defaultMessage": "Combwork is already archiving, deleting or cleaning up this session.",
     "description": "A session is left alone (archive, delete) for a moment: Hive is moving or removing its files already."
   },
   "session.inUse.running": {
@@ -256,11 +256,11 @@
     "description": "The last item of a list of the processes an agent left running, after the first few: how many more there are. Hive joins it to the list (\"node serve.js, 2 × tail -f capture.log and 3 more processes\")."
   },
   "session.leftovers.notEnded": {
-    "defaultMessage": "{n, plural, one {# process is still running: Windows didn't let Hive end it. It stays listed in the ⋯ menu on the agent's pane, to try again or keep.} other {# processes are still running: Windows didn't let Hive end them. They stay listed in the ⋯ menu on the agent's pane, to try again or keep.}}",
+    "defaultMessage": "{n, plural, one {# process is still running: Windows didn't let Combwork end it. It stays listed in the ⋯ menu on the agent's pane, to try again or keep.} other {# processes are still running: Windows didn't let Combwork end them. They stay listed in the ⋯ menu on the agent's pane, to try again or keep.}}",
     "description": "Ending the processes an agent left running failed. {n} is how many are still running; the ⋯ menu on the agent's pane lists them with End and Keep."
   },
   "session.leftovers.notEndedBody": {
-    "defaultMessage": "{processes}. {n, plural, one {It was started by the agent and may hold the project's folder or ports. Hive couldn't end it by itself.} other {They were started by the agent and may hold the project's folder or ports. Hive couldn't end them by itself.}}",
+    "defaultMessage": "{processes}. {n, plural, one {It was started by the agent and may hold the project's folder or ports. Combwork couldn't end it by itself.} other {They were started by the agent and may hold the project's folder or ports. Combwork couldn't end them by itself.}}",
     "description": "The notice of processes an agent left running, which Hive tried to end and couldn't. {processes} lists them (\"node serve.js, 4 × tail -f …\"); {n} is how many."
   },
   "session.leftovers.times": {
@@ -344,7 +344,7 @@
     "description": "Switching the Hive Assistant to the permission choice \"The CLI's own setting\" is refused. Control is the name of an Assistant setting."
   },
   "session.mode.ended": {
-    "defaultMessage": "The session ended before Hive could switch it to {mode}.",
+    "defaultMessage": "The session ended before Combwork could switch it to {mode}.",
     "description": "Switching a running agent's permission mode failed: its session ended. {mode} is the mode's name."
   },
   "session.mode.endedUnconfirmed": {
@@ -352,7 +352,7 @@
     "description": "Switching an agent's permission mode failed: its session ended first. {provider} is the coding agent's name, {mode} the mode's."
   },
   "session.mode.notFound": {
-    "defaultMessage": "Hive couldn't find {what}, so it didn't switch to {mode}. Check its terminal, or switch there.",
+    "defaultMessage": "Combwork couldn't find {what}, so it didn't switch to {mode}. Check its terminal, or switch there.",
     "description": "Switching an agent's permission mode failed: the CLI's menu didn't show what Hive looked for. {what} names it, in the CLI's words; {mode} is the mode's name."
   },
   "session.mode.notOffered": {
@@ -376,11 +376,11 @@
     "description": "Switching an agent's permission mode is refused for a moment: it is starting."
   },
   "session.mode.stopped": {
-    "defaultMessage": "Hive didn't switch to {mode}, as {why}. Check its terminal, or switch there.",
+    "defaultMessage": "Combwork didn't switch to {mode}, as {why}. Check its terminal, or switch there.",
     "description": "Switching an agent's permission mode stopped part-way. {mode} is the mode's name; {why} says why, as a clause."
   },
   "session.mode.typing": {
-    "defaultMessage": "Hive is typing a line into this agent. Switch the mode in a moment.",
+    "defaultMessage": "Combwork is typing a line into this agent. Switch the mode in a moment.",
     "description": "Switching an agent's permission mode is refused for a moment: Hive is typing into its terminal."
   },
   "session.mode.unconfirmed": {
@@ -440,7 +440,7 @@
     "description": "The notification that an agent finished, when it left no last message to show."
   },
   "session.notice.hooksMissingTitle": {
-    "defaultMessage": "Hive isn't hearing from {agent}'s hooks",
+    "defaultMessage": "Combwork isn't hearing from {agent}'s hooks",
     "description": "A notification's title: an agent's coding agent has stopped sending Hive its hooks (the calls that tell Hive what it is doing). {agent} is the agent."
   },
   "session.notice.lineLost": {
@@ -448,7 +448,7 @@
     "description": "The notification that a line Hive typed into an agent was lost (a screen of its coding agent took it). {text} is the line, as Hive typed it."
   },
   "session.notice.lineLostTitle": {
-    "defaultMessage": "{agent} didn't get a line Hive typed",
+    "defaultMessage": "{agent} didn't get a line Combwork typed",
     "description": "A notification's title: a line Hive typed into an agent's terminal (a message, a prompt) was taken by a screen of its coding agent before it was sent, so the agent never got it. {agent} is the agent."
   },
   "session.notice.longConversation": {
@@ -484,15 +484,15 @@
     "description": "The notification that an agent finished once the background tasks it started ended."
   },
   "session.notice.untaken": {
-    "defaultMessage": "Hive typed it, but couldn't press Enter again (the agent was busy, or you were typing there). Show it, click its terminal and press Enter.",
+    "defaultMessage": "Combwork typed it, but couldn't press Enter again (the agent was busy, or you were typing there). Show it, click its terminal and press Enter.",
     "description": "The notification that an agent's CLI didn't take a line Hive typed into it."
   },
   "session.notice.untakenRetried": {
-    "defaultMessage": "Hive typed it and pressed Enter twice, but its CLI wasn't reading its input. Show it, click its terminal and press Enter.",
+    "defaultMessage": "Combwork typed it and pressed Enter twice, but its CLI wasn't reading its input. Show it, click its terminal and press Enter.",
     "description": "The notification that an agent's CLI didn't take a line Hive typed into it."
   },
   "session.notice.untakenTitle": {
-    "defaultMessage": "{agent} hasn't taken a line Hive typed",
+    "defaultMessage": "{agent} hasn't taken a line Combwork typed",
     "description": "A notification's title: an agent's CLI didn't take a line Hive typed into it (a wake, a message). {agent} is the agent."
   },
   "session.notice.waitingForInput": {
@@ -516,7 +516,7 @@
     "description": "Turning Plan mode on or off is refused: the coding agent has no such toggle. {provider} is its name."
   },
   "session.plan.typing": {
-    "defaultMessage": "Hive is typing a line into this agent. Try again in a moment.",
+    "defaultMessage": "Combwork is typing a line into this agent. Try again in a moment.",
     "description": "Turning Plan mode on or off is refused for a moment: Hive is typing into the terminal."
   },
   "session.prompt.cliAsks": {
@@ -528,11 +528,11 @@
     "description": "Typing into an agent is refused: keys Hive typed into its coding agent's input didn't reach it (a dialog or question of the coding agent's own takes them)."
   },
   "session.prompt.inputNotCleared": {
-    "defaultMessage": "Its input couldn't be seen empty after Hive cleared it: nothing is typed into it until it can be.",
+    "defaultMessage": "Its input couldn't be seen empty after Combwork cleared it: nothing is typed into it until it can be.",
     "description": "Typing into an agent is refused (a message's notice is put off and tried again; Compact fails): Hive pressed keys to clear the draft in its coding agent's input, and didn't see the input empty afterwards."
   },
   "session.prompt.untaken": {
-    "defaultMessage": "Its CLI hasn't taken the line Hive typed before; nothing more is typed until it does.",
+    "defaultMessage": "Its CLI hasn't taken the line Combwork typed before; nothing more is typed until it does.",
     "description": "Typing into an agent is refused: its CLI hasn't taken the line Hive typed before."
   },
   "session.purge.changed": {
@@ -548,15 +548,15 @@
     "description": "Purge left a session alone: the coding agent's own transcript went since the preview, so Hive's backups are now its last copy."
   },
   "session.purge.gone": {
-    "defaultMessage": "The session is no longer in Hive.",
+    "defaultMessage": "The session is no longer in Combwork.",
     "description": "Purge left a session alone: it was deleted since the preview."
   },
   "session.purge.open": {
-    "defaultMessage": "Its transcript is open in Hive. Close it, then try again.",
+    "defaultMessage": "Its transcript is open in Combwork. Close it, then try again.",
     "description": "Purge left a session alone: its transcript is open in Hive's Sessions tab."
   },
   "session.purge.reading": {
-    "defaultMessage": "Hive is reading its transcript (an export or a search). Try again in a moment.",
+    "defaultMessage": "Combwork is reading its transcript (an export or a search). Try again in a moment.",
     "description": "Purge left a session alone for a moment: Hive is reading its transcript."
   },
   "session.purge.running": {
@@ -564,7 +564,7 @@
     "description": "Purge left a session alone: it is running (or starting) now."
   },
   "session.purge.unread": {
-    "defaultMessage": "Hive couldn't record what the session used, so it is kept.",
+    "defaultMessage": "Combwork couldn't record what the session used, so it is kept.",
     "description": "Purge left a session alone: Hive couldn't save its usage in the usage history, which the totals keep."
   },
   "session.restartMode.didntStop": {
@@ -632,7 +632,7 @@
     "description": "Resuming a conversation is refused: another agent is starting on it now."
   },
   "session.start.cleaning": {
-    "defaultMessage": "Hive is archiving, deleting or cleaning up this session's files. Try again in a moment.",
+    "defaultMessage": "Combwork is archiving, deleting or cleaning up this session's files. Try again in a moment.",
     "description": "Resuming a conversation is refused for a moment: Hive is moving or removing its files."
   },
   "session.start.cliRequired": {
@@ -640,7 +640,7 @@
     "description": "Starting an agent failed: its coding agent's CLI wasn't found. {provider} is the coding agent's name."
   },
   "session.start.closing": {
-    "defaultMessage": "Hive is stopping this workspace's agents, so none can start now.",
+    "defaultMessage": "Combwork is stopping this workspace's agents, so none can start now.",
     "description": "Starting an agent is refused: Hive is quitting, or its workspace is closing."
   },
   "session.start.couldNot": {
@@ -652,7 +652,7 @@
     "description": "Starting an agent is refused while something changes its project. {why} says what, as a sentence without its full stop (\"This project is being removed\")."
   },
   "session.start.moveFailed": {
-    "defaultMessage": "Hive couldn't move {project}'s model settings to its agents: {error}. Start it again.",
+    "defaultMessage": "Combwork couldn't move {project}'s model settings to its agents: {error}. Start it again.",
     "description": "Starting an agent is refused (HI-1770): moving its project's own model, effort and context settings onto the project's agents (connections now hold the defaults) failed. {project} is the project's name, {error} why (often in English). It is tried again at the next start."
   },
   "session.start.openCommands": {
@@ -684,7 +684,7 @@
     "description": "Why an agent can't start (followed by \", so its agents can't start now.\")."
   },
   "session.start.repairing": {
-    "defaultMessage": "Hive is repairing this moved workspace: start the agent when Repair has finished.",
+    "defaultMessage": "Combwork is repairing this moved workspace: start the agent when Repair has finished.",
     "description": "Starting an agent is refused while Repair… fixes a moved workspace's paths."
   },
   "session.start.slotBusy": {
@@ -808,7 +808,7 @@
     "description": "An agent's status while Hive waits for its CLI's connection to come back, to resume it (Settings → Advanced, Resume agents after a connection drops)."
   },
   "session.switch.waits": {
-    "defaultMessage": "{why}. Hive resumes it once the slot is free.",
+    "defaultMessage": "{why}. Combwork resumes it once the slot is free.",
     "description": "The notice that an agent's switch of connection waits (HI-2304): {why} says what holds its slot, in English (\"slot-a is held by WindowsSandboxServer, left running by MB1's last run\"), without its full stop."
   },
   "session.switch.waitsTitle": {
@@ -824,7 +824,7 @@
     "description": "The notice that Hive can't track agents' processes: what that means."
   },
   "session.tracker.helperFailed": {
-    "defaultMessage": "The PowerShell helper of Hive's process tracker didn't start ({why})",
+    "defaultMessage": "The PowerShell helper of Combwork's process tracker didn't start ({why})",
     "description": "Why Hive can't track the processes agents start (a notice's first sentence, without its full stop). {why} is a technical detail, as it came (\"exit 1\")."
   },
   "session.tracker.lost": {
@@ -836,7 +836,7 @@
     "description": "The notice after Hive's process tracker stopped: what is no longer tracked. {listed} is how many processes agents left running were listed in their panes; {launches} how many agents were running."
   },
   "session.tracker.noAnswer": {
-    "defaultMessage": "Hive's process tracker didn't answer",
+    "defaultMessage": "Combwork's process tracker didn't answer",
     "description": "Why Hive couldn't track the processes an agent starts (a notice's first sentence, without its full stop)."
   },
   "session.tracker.noPowerShell": {
@@ -844,7 +844,7 @@
     "description": "Why Hive can't track the processes agents start (a notice's first sentence, without its full stop). {error} is Windows' error, as it came."
   },
   "session.tracker.noStart": {
-    "defaultMessage": "Hive's process tracker couldn't start",
+    "defaultMessage": "Combwork's process tracker couldn't start",
     "description": "Why Hive can't track the processes agents start (a notice's first sentence, without its full stop)."
   },
   "session.tracker.refused": {
@@ -852,15 +852,15 @@
     "description": "Why Hive can't track the processes agents start (a notice's first sentence, without its full stop). Constrained Language Mode is PowerShell's term."
   },
   "session.tracker.slowHelper": {
-    "defaultMessage": "The PowerShell helper of Hive's process tracker didn't start within {seconds, plural, one {# second} other {# seconds}}",
+    "defaultMessage": "The PowerShell helper of Combwork's process tracker didn't start within {seconds, plural, one {# second} other {# seconds}}",
     "description": "Why Hive can't track the processes agents start (a notice's first sentence, without its full stop). {seconds} is how many seconds Hive waited."
   },
   "session.tracker.stopped": {
-    "defaultMessage": "Hive's process tracker stopped ({why})",
+    "defaultMessage": "Combwork's process tracker stopped ({why})",
     "description": "Why Hive no longer tracks the processes agents start (a notice's first sentence, without its full stop). {why} is a technical detail, as it came (\"exit 1\")."
   },
   "session.tracker.title": {
-    "defaultMessage": "Hive can't keep track of agents' processes",
+    "defaultMessage": "Combwork can't keep track of agents' processes",
     "description": "A notice's title: Hive can't track the processes agents start, so those they leave running aren't listed."
   },
   "session.tracker.unavailable": {

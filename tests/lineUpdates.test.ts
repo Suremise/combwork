@@ -283,7 +283,7 @@ describe("an agent's branch between a lane's cards (#1271)", () => {
     await update(w)
     let asked = forYou(w).items.filter((i) => i.card === c2)
     expect(asked).toMatchObject([{ kind: 'approve' }])
-    expect(asked[0].text).toMatch(/^card still has .+'s work, squashed into main: approve and Hive brings the branch up to date once/)
+    expect(asked[0].text).toMatch(/^card still has .+'s work, squashed into main: approve and Combwork brings the branch up to date once/)
     expect(facts(w, c1).some((f) => f.kind === 'LineMoved')).toBe(false)
     await inWorkspace(w, () => tasks.answerTask(c2, asked[0].request, { outcome: 'approved' }))
     await update(w)

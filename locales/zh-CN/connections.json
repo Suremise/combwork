@@ -11,7 +11,7 @@
   "connections.choice.unavailable": "{name}——{why}",
   "connections.intro.add": "添加账号",
   "connections.intro.dismiss": "关闭",
-  "connections.intro.text": "智能体现在通过账号运行：请在“设置”→“账号与连接”中为 {clis} 添加一个账号，并在那里登录。Hive 不再使用你自己终端的登录，那个登录保持不变。",
+  "connections.intro.text": "智能体现在通过账号运行：请在“设置”→“账号与连接”中为 {clis} 添加一个账号，并在那里登录。Combwork 不再使用你自己终端的登录，那个登录保持不变。",
   "connections.mark.anotherMark": "正在使用与所选连接不同的连接运行",
   "connections.mark.none": "无连接",
   "connections.mark.noneUsable": "此工作区中没有已启用的 {cli} 账号：启用一个之前它无法启动（“设置”→“账号与连接”）。",

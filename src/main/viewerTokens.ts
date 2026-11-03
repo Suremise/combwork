@@ -72,7 +72,7 @@ const REFUSED = {
   noName: msg({ id: 'main.viewerTokens.noName', defaultMessage: 'Give the viewer token a name, such as the app it is for', description: 'Why a viewer token was not made (Settings → Agent API → Viewer tokens): its name is empty. Shown under "Could not make the viewer token".' }),
   tooLong: msg({ id: 'main.viewerTokens.tooLong', defaultMessage: "A viewer token's name is at most {most, number} characters", description: 'Why a viewer token was not made: its name is too long. {most} is the most characters a name may have (40).' }),
   taken: msg({ id: 'main.viewerTokens.taken', defaultMessage: 'There is already a viewer token named "{name}"', description: 'Why a viewer token was not made: another one has that name (letter case aside). {name} is the name the user gave it.' }),
-  tooMany: msg({ id: 'main.viewerTokens.tooMany', defaultMessage: 'Hive keeps at most {most, number} viewer tokens: revoke one first', description: 'Why a viewer token was not made: Hive already keeps the most it keeps. {most} is that number (20). Revoke is the button beside each token.' })
+  tooMany: msg({ id: 'main.viewerTokens.tooMany', defaultMessage: 'Combwork keeps at most {most, number} viewer tokens: revoke one first', description: 'Why a viewer token was not made: Hive already keeps the most it keeps. {most} is that number (20). Revoke is the button beside each token.' })
 }
 
 /** A new viewer token named `name`. Refuses an empty or taken name, and more than 20 tokens. */

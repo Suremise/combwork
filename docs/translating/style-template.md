@@ -1,4 +1,4 @@
-# &lt;Language&gt; (`<code>`): style for Hive
+# &lt;Language&gt; (`<code>`): style for Combwork
 
 <!--
 This is the template for a language's style page. Copy it to docs/translating/<code>.md (de.md, pt-BR.md), replace
@@ -15,12 +15,12 @@ the note <its AI note, in its own words>.
 
 ## Voice
 
-Hive's English is plain and direct: short sentences, everyday words, *you* for the reader, and it says what happens.
+Combwork's English is plain and direct: short sentences, everyday words, *you* for the reader, and it says what happens.
 Translate the meaning, not the words, and keep the result as short and plain.
 
 - **Addressing the reader:** <the informal "you" (du / tu / ty…), or why this language uses another form>.
   <Whether "you" is capitalised in this language (Polish "Ci" in letters, German "du" is lower case), and the rule
-  for Hive.>
+  for Combwork.>
 - **Tone:** <how to keep it friendly and direct without being casual: what to avoid (bureaucratic phrasing, passive
   constructions where the language prefers active…)>.
 - **Sentence length:** <whether to split long English sentences, and how to avoid the language's typical long
@@ -45,7 +45,7 @@ Translate the meaning, not the words, and keep the result as short and plain.
   `other`.>
 - **Cases and placeholders:** a placeholder like `{project}` or `{agent}` is a name inserted as it is, uninflected.
   <How to build sentences so the name stays in the nominative (e.g. "in the project {project}", "for agent {agent}").>
-- **Lists:** Hive joins lists itself ("One, Two and Three"), in this language's way. Never write the conjunction
+- **Lists:** Combwork joins lists itself ("One, Two and Three"), in this language's way. Never write the conjunction
   into a message around a list placeholder.
 
 ## Punctuation and typography
@@ -55,11 +55,11 @@ Translate the meaning, not the words, and keep the result as short and plain.
   `''`.
 - **Spaces:** <e.g. French's no-break space before : ; ? !, written as the character U+00A0, or none>.
 - **Dashes, colons, ellipsis:** <this language's conventions where they differ from English>.
-- **Numbers, dates, money, durations:** formatted by Hive in this language's way. Never write them into a message.
+- **Numbers, dates, money, durations:** formatted by Combwork in this language's way. Never write them into a message.
 
 ## Terms
 
-The words this language uses for Hive's terms ([glossary.md](glossary.md)). Use them every time. Where a term is
+The words this language uses for Combwork's terms ([glossary.md](glossary.md)). Use them every time. Where a term is
 kept in English, say so.
 
 | English | <Language> | Notes |
@@ -69,7 +69,7 @@ kept in English, say so.
 | agent | | |
 | provider | | |
 | session | | |
-| the Assistant | | The full name *Hive Assistant* stays in English. |
+| the Assistant | | Its only name (HI-2458: there is no English full name to keep). |
 | persona | | |
 | task board / board | | |
 | card | | |
@@ -100,7 +100,7 @@ placeholder, a plural and a button.
 | Remove agent… | |
 | {name} has {n, plural, one {# open card} other {# open cards}} | |
 | {agent} was removed. Its sessions stay in the Sessions tab. | |
-| Hive was started in {language} (--lang): this setting applies from its next start. | |
+| Combwork was started in {language} (--lang): this setting applies from its next start. | |
 
 ## Checking
 

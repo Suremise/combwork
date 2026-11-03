@@ -34,7 +34,7 @@
   "worktrees.merge.sameBranch": "Le dossier du projet est sur la branche {branch}.",
   "worktrees.merge.staged": "Le dossier du projet a des modifications indexées. Fais-en un commit ou retire-les de l’index avant de fusionner.",
   "worktrees.merge.targetElsewhere": "La branche {branch} est extraite dans {folder}. Fusionne là-bas, ou extrais d’abord une autre branche dans ce dossier.",
-  "worktrees.merge.targetMoved": "La branche {branch} a changé pendant que Hive y fusionnait. Rien n’a été fusionné : relance la fusion.",
+  "worktrees.merge.targetMoved": "La branche {branch} a changé pendant que Combwork y fusionnait. Rien n’a été fusionné : relance la fusion.",
   "worktrees.merge.uncommitted": "Rien n’a été fusionné : {files, plural, one {# fichier du worktree n’est pas commité. Fais un commit ou un stash de ce fichier} many {# fichiers du worktree ne sont pas commités. Fais un commit ou un stash de ces fichiers} other {# fichiers du worktree ne sont pas commités. Fais un commit ou un stash de ces fichiers}} dans le worktree, puis fusionne.",
   "worktrees.merge.unknownFiles": "(fichiers inconnus)",
   "worktrees.missing.noAgent": "Cet agent n’existe plus.",

@@ -41,5 +41,5 @@ body:
     id: hive-version
     attributes:
       label: Hive version
-      description: Help → About Hive Desktop shows it.
+      description: Help → About Combwork shows it.
       placeholder: "0.9.0"

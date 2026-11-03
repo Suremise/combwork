@@ -55,12 +55,12 @@ describe('the notice (#984)', () => {
 
   it('says when, what was running where, and that nothing was resumed', () => {
     const text = unexpectedCloseText({ lastSeen, agents: [agent('B1', 'hive'), agent('R1', 'ambrosia')], dump: false, merges: [] }, null)
-    expect(text).toMatch(/^Hive was last seen on .+ at .+\. 2 agents were running in hive and ambrosia\. Nothing was resumed\.$/)
+    expect(text).toMatch(/^Combwork was last seen on .+ at .+\. 2 agents were running in hive and ambrosia\. Nothing was resumed\.$/)
     expect(text).not.toMatch(/crash dump/)
   })
 
   it('with no agents, says so and nothing about resuming', () => {
-    expect(unexpectedCloseText({ lastSeen, agents: [], dump: false, merges: [] }, null)).toMatch(/^Hive was last seen on .+\. No agents were running\.$/)
+    expect(unexpectedCloseText({ lastSeen, agents: [], dump: false, merges: [] }, null)).toMatch(/^Combwork was last seen on .+\. No agents were running\.$/)
   })
 
   it('with the setting on, says how many were resumed and which could not', () => {
@@ -78,7 +78,7 @@ describe('the notice (#984)', () => {
 
   it('names a crash dump, and each merge left half done with the folder it was in', () => {
     const text = unexpectedCloseText({ lastSeen, agents: [agent('B1', 'hive')], dump: true, merges: [{ agentName: 'HB5', branch: 'feature/090-session', cards: [977], folder: 'D:/wt/hb5' }, { agentName: 'HB2', branch: 'main', cards: [], folder: 'D:/ws/hive' }] }, null)
-    expect(text).toContain('Hive kept a crash dump of it: Help → Copy Diagnostics names it.')
+    expect(text).toContain('Combwork kept a crash dump of it: Help → Copy Diagnostics names it.')
     expect(text).toContain('HB5 was merging feature/090-session (#977): check D:/wt/hb5 for a merge left half done (git status there) before the next merge.')
     expect(text).toContain('HB2 was merging main: check D:/ws/hive for a merge left half done')
   })

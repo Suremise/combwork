@@ -206,8 +206,8 @@ describe("an ended lane's segments (#512)", () => {
   })
 
   it("says when the lane kept no record of a card, never where the board has it now", () => {
-    expect(frozenSegment(lc(11, 'unrecorded'))).toEqual({ kind: 'card', number: 11, name: '#11', state: 'unrecorded', failed: false, round: null, label: '#11 Card 11 · not recorded: the lane ended before Hive kept where its cards were', notes: [] })
-    expect(frozenSegment(lc(12, 'unrecorded', { title: '' })).label).toBe('#12 · not recorded: the lane ended before Hive kept where its cards were')
+    expect(frozenSegment(lc(11, 'unrecorded'))).toEqual({ kind: 'card', number: 11, name: '#11', state: 'unrecorded', failed: false, round: null, label: '#11 Card 11 · not recorded: the lane ended before Combwork kept where its cards were', notes: [] })
+    expect(frozenSegment(lc(12, 'unrecorded', { title: '' })).label).toBe('#12 · not recorded: the lane ended before Combwork kept where its cards were')
     // Not finished, not worked: such a lane has no current card to show.
     expect(laneSummary([frozenSegment(lc(11, 'unrecorded'))])).toMatchObject({ finished: 0, total: 1 })
   })
@@ -515,13 +515,13 @@ describe("a segment's hover: what the card's facts say (#1225)", () => {
     expect(laneWaitText({ reason: 'slot', card: 12, slot: 'slot-a', held: 'broker', broker: 'WindowsSandboxServer' }, name, tr)).toBe('waiting for slot-a: a process still has a file or folder in it open: Windows Sandbox’s broker (WindowsSandboxServer) is working in it')
     // HI-2468: a running builder's start refused for its slot held: the slot and what holds it; else as before.
     const refusedStart = { reason: 'startWait' as const, card: 12, why: 'refused' as const, agent: 'B1' }
-    expect(laneWaitText({ ...refusedStart, slot: 'slot-a', held: 'session', heldBy: 'CB1' }, name, tr)).toBe('HI-12 waits to start: its start was refused for now, slot-a still in use (CB1’s session is still in it), and Hive tries again')
-    expect(laneWaitText({ ...refusedStart, slot: 'slot-a', held: 'process' }, name, tr)).toBe('HI-12 waits to start: its start was refused for now, slot-a still in use (a process still has a file or folder in it open), and Hive tries again')
-    expect(laneWaitText({ ...refusedStart, slot: 'slot-a', held: 'broker', broker: 'WindowsSandboxServer', idle: false }, name, tr)).toBe('HI-12 waits to start: its start was refused for now, slot-a still in use (a process still has a file or folder in it open: Windows Sandbox’s broker (WindowsSandboxServer) is working in it, with a Sandbox running), and Hive tries again')
-    expect(laneWaitText({ ...refusedStart, slot: 'slot-a', held: 'left', heldBy: 'B1', program: 'node' }, name, tr)).toBe('HI-12 waits to start: its start was refused for now, slot-a still in use (B1’s last run left node running in it), and Hive tries again')
-    expect(laneWaitText({ ...refusedStart, slot: 'slot-a', held: 'left', heldBy: 'B1', program: 'node', more: 1 }, name, tr)).toBe('HI-12 waits to start: its start was refused for now, slot-a still in use (B1’s last run left node and 1 more running in it), and Hive tries again')
-    expect(laneWaitText({ ...refusedStart, slot: 'slot-a', held: 'lastRun', heldBy: 'B1' }, name, tr)).toBe('HI-12 waits to start: its start was refused for now, slot-a still in use (B1’s last run there isn’t known to have ended), and Hive tries again')
-    expect(laneWaitText(refusedStart, name, tr)).toBe('HI-12 waits to start: its start was refused for now, and Hive tries again')
+    expect(laneWaitText({ ...refusedStart, slot: 'slot-a', held: 'session', heldBy: 'CB1' }, name, tr)).toBe('HI-12 waits to start: its start was refused for now, slot-a still in use (CB1’s session is still in it), and Combwork tries again')
+    expect(laneWaitText({ ...refusedStart, slot: 'slot-a', held: 'process' }, name, tr)).toBe('HI-12 waits to start: its start was refused for now, slot-a still in use (a process still has a file or folder in it open), and Combwork tries again')
+    expect(laneWaitText({ ...refusedStart, slot: 'slot-a', held: 'broker', broker: 'WindowsSandboxServer', idle: false }, name, tr)).toBe('HI-12 waits to start: its start was refused for now, slot-a still in use (a process still has a file or folder in it open: Windows Sandbox’s broker (WindowsSandboxServer) is working in it, with a Sandbox running), and Combwork tries again')
+    expect(laneWaitText({ ...refusedStart, slot: 'slot-a', held: 'left', heldBy: 'B1', program: 'node' }, name, tr)).toBe('HI-12 waits to start: its start was refused for now, slot-a still in use (B1’s last run left node running in it), and Combwork tries again')
+    expect(laneWaitText({ ...refusedStart, slot: 'slot-a', held: 'left', heldBy: 'B1', program: 'node', more: 1 }, name, tr)).toBe('HI-12 waits to start: its start was refused for now, slot-a still in use (B1’s last run left node and 1 more running in it), and Combwork tries again')
+    expect(laneWaitText({ ...refusedStart, slot: 'slot-a', held: 'lastRun', heldBy: 'B1' }, name, tr)).toBe('HI-12 waits to start: its start was refused for now, slot-a still in use (B1’s last run there isn’t known to have ended), and Combwork tries again')
+    expect(laneWaitText(refusedStart, name, tr)).toBe('HI-12 waits to start: its start was refused for now, and Combwork tries again')
     expect(laneWaitText({ reason: 'checkCopy', card: 12 }, name, tr)).toBe('waiting for a check copy for HI-12')
     expect(laneWaitText({ reason: 'preparing', card: 12, slot: 'slot-b' }, name, tr)).toBe('waiting: preparing slot-b')
   })
@@ -698,7 +698,7 @@ describe('refusals name the user as you in the window, as the user to agents (HI
     expect(r.next).toBe("Move it anyway only with the user's reason. One they gave with their request is enough (\"I merged it by hand\", say): move it again with override and that reason, in their words. With none, tell them which rules this skips and ask for theirs.")
     expect(r.change).toBe('These rules are set in Version Control, where the user can change them.')
     expect(refusal('loop.followUpChecked', { card: 'AL-1' }).next).toBe("Wait for the reviewer's ok or gaps; if none comes, ask the user.")
-    expect(refusal('lane.lineBehind', { card: 'AL-2', line: 'hive/AL-2', target: 'main', earlier: 'AL-1' }).next).toBe('Leave it as it is: Hive brings hive/AL-2 up to date with main once you are idle, or asks the user, and tells you when AL-2 can start.')
+    expect(refusal('lane.lineBehind', { card: 'AL-2', line: 'hive/AL-2', target: 'main', earlier: 'AL-1' }).next).toBe('Leave it as it is: Combwork brings hive/AL-2 up to date with main once you are idle, or asks the user, and tells you when AL-2 can start.')
     expect(refusal('merge.hiveMerges', { card: 'AL-1', target: 'main', queue: 'paused', waits: 'answer' }).next).toBe('It is in the merge queue for main, which is paused until the user answers in For you: wait for Done, or for it to come back.')
     expect(refusal('platform.unknown', { card: 'AL-1', offer: 'repositoryGone' }).next).toMatch(/^The project's Git repository is gone: ask the user to restore it/)
   })

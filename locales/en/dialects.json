@@ -4,7 +4,7 @@
     "description": "A warning badge on a dialect file in the Dialects view: it isn't JSON or a dialect file's shape, so it adds nothing. Glossary: dialect."
   },
   "dialects.changedOutside": {
-    "defaultMessage": "This file changed outside Hive while you were editing it.",
+    "defaultMessage": "This file changed outside Combwork while you were editing it.",
     "description": "A banner in the Dialects view: the dialect file changed on disk (an editor, git, another window) while it has unsaved changes here."
   },
   "dialects.claimTaken": {
@@ -128,7 +128,7 @@
     "description": "The Import dialog's choice of folder: a CLI's, or the API's."
   },
   "dialects.importMessage": {
-    "defaultMessage": "It is checked against this Hive's texts. If its model is already claimed in the folder, it comes in as a test copy.",
+    "defaultMessage": "It is checked against this Combwork's texts. If its model is already claimed in the folder, it comes in as a test copy.",
     "description": "The Import dialog of a dialect file. Glossary: dialect, test copy."
   },
   "dialects.importName": {
@@ -204,7 +204,7 @@
     "description": "The Import and Duplicate dialogs: the name has a character Windows refuses in a file name, or starts with a dot. Keep the characters."
   },
   "dialects.noDefault": {
-    "defaultMessage": "No current Default: this text was removed or renamed in this Hive.",
+    "defaultMessage": "No current Default: this text was removed or renamed in this Combwork.",
     "description": "In the Dialects view, beside an outdated override whose id this Hive no longer has. Glossary: Default (dialects), outdated."
   },
   "dialects.noMatch": {
@@ -272,7 +272,7 @@
     "description": "Why a dialect override is outdated or refused: its entry ({id}) isn't an object with a text and an optional reason. \"text\" and \"why\" are the file's field names: keep them."
   },
   "dialects.problem.unknown": {
-    "defaultMessage": "{id}: no such text in this Hive (removed or renamed).",
+    "defaultMessage": "{id}: no such text in this Combwork (removed or renamed).",
     "description": "Why a dialect override is outdated or refused: its id ({id}) isn't one of this Hive's texts."
   },
   "dialects.problem.unparsable": {
@@ -304,7 +304,7 @@
     "description": "A button in the Dialects view: reads the dialect files again."
   },
   "dialects.refused.changedOnDisk": {
-    "defaultMessage": "The file changed outside Hive since you started editing it: nothing was saved.",
+    "defaultMessage": "The file changed outside Combwork since you started editing it: nothing was saved.",
     "description": "A dialect file's save refused: it changed on disk meanwhile (an editor, git, another window). The view then offers Reload or Keep My Changes."
   },
   "dialects.refused.file": {
@@ -356,7 +356,7 @@
     "description": "A button of an edited shipped dialect file: puts back the file as Hive ships it. Glossary: dialect."
   },
   "dialects.revertMessage": {
-    "defaultMessage": "Your changes to it are lost, and it follows Hive's updates again.",
+    "defaultMessage": "Your changes to it are lost, and it follows Combwork's updates again.",
     "description": "The confirmation before reverting a dialect file to the version Hive ships. Glossary: dialect."
   },
   "dialects.revertTitle": {
@@ -432,7 +432,7 @@
     "description": "The field for an override's text in the Dialects view."
   },
   "dialects.tip": {
-    "defaultMessage": "The wording Hive gives agents: its guidance, its tools' descriptions and replies, its wakes. A dialect file changes some of it, for a model, a CLI or the whole workspace; everything else stays Hive's own. A change applies at each agent's next launch.",
+    "defaultMessage": "The wording Combwork gives agents: its guidance, its tools' descriptions and replies, its wakes. A dialect file changes some of it, for a model, a CLI or the whole workspace; everything else stays Combwork's own. A change applies at each agent's next launch.",
     "description": "Tooltip on the Dialects view's title (HI-2444). Glossary: dialect."
   },
   "dialects.title": {

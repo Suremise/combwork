@@ -263,7 +263,7 @@ describe('workflow scenarios, None', () => {
     rmSync(join(g.project, '.git'), { recursive: true, force: true })
     expect(offer('git', detect(g.project))).toEqual({ offer: 'none', why: 'repositoryGone' })
     const r = refusedBy(await g.wf.submit(card.key, B1, { summary: 'x' }), 'platform.unknown')
-    expect(r.message).toContain("Hive couldn't read")
+    expect(r.message).toContain("Combwork couldn't read")
     g.close()
     const n = (env = setup({ platform: 'none' }, { files }))
     expect(offer('none', detect(n.project))).toBeNull()

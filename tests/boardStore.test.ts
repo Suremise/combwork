@@ -494,7 +494,7 @@ describe('reviewing the set-aside cards (#1044, Darren\'s decision on #1017: the
     // Its links as saved (a gone card's left out when read, never rewritten); #2's link to #7 now finds it.
     expect(store.cardDoc(w, 7)!.links).toEqual([1, 40])
     expect((await inWorkspace(w, () => tasks.getTask(2, w))).links).toEqual([7])
-    expect(c.history.at(-1)).toMatchObject({ by: 'Repair', what: 'Added from an older Hive, where it was made as #7' })
+    expect(c.history.at(-1)).toMatchObject({ by: 'Repair', what: 'Added from an older Combwork, where it was made as #7' })
     // The older Hive's file goes to the Recycle Bin, recoverable.
     await vi.waitFor(() => expect(asideIn(ws)).toEqual([]), { timeout: HUNG_MS })
     await vi.waitFor(() => expect(trashedFrom(ws)).toEqual([join('.hive', store.SET_ASIDE, '7.json')]), { timeout: HUNG_MS })
@@ -517,7 +517,7 @@ describe('reviewing the set-aside cards (#1044, Darren\'s decision on #1017: the
     const c = await inWorkspace(w, () => tasks.getTask(6, w))
     expect(c.title).toBe('Made as #1')
     expect(c.order).toBeGreaterThan((await inWorkspace(w, () => tasks.getTask(5, w))).order)
-    expect(c.history.at(-1)).toMatchObject({ by: 'Repair', what: 'Added from an older Hive, where it was made as #1' })
+    expect(c.history.at(-1)).toMatchObject({ by: 'Repair', what: 'Added from an older Combwork, where it was made as #1' })
     await vi.waitFor(() => expect(asideIn(ws)).toEqual([]), { timeout: HUNG_MS })
     // A new card after it takes the next number on.
     expect((await inWorkspace(w, () => tasks.createTask({ title: 'After', project: 'p' }, user))).number).toBe(7)
@@ -566,7 +566,7 @@ describe('reviewing the set-aside cards (#1044, Darren\'s decision on #1017: the
     expect(store.cardDoc(w, 8)!.held).toEqual([goodHold])
     expect(store.cardDoc(w, 8)!.custom).toBe(1)
     expect((await got(9)).history.map((h) => h.by)).toEqual(['Repair'])
-    expect((await got(10)).history.map((h) => h.what)).toEqual(['Created in Todo', 'Added from an older Hive, where it was made as #10'])
+    expect((await got(10)).history.map((h) => h.what)).toEqual(['Created in Todo', 'Added from an older Combwork, where it was made as #10'])
     const partial = await got(11)
     expect(partial).toMatchObject({ title: 'Only a title', description: '', column: 'todo', comments: [] })
     expect(store.cardDoc(w, 11)!.mine).toEqual({ kept: true })
@@ -809,7 +809,7 @@ describe('a board saved by a newer Hive (#1017)', () => {
     raw.close()
     w = await open(ws)
     expect((await inWorkspace(w, () => tasks.allTasks(w))).map((c) => c.number)).toEqual([1])
-    await expect(inWorkspace(w, () => tasks.createTask({ title: 'No', project: 'p' }, user))).rejects.toThrow(/saved by a newer version of Hive/)
+    await expect(inWorkspace(w, () => tasks.createTask({ title: 'No', project: 'p' }, user))).rejects.toThrow(/saved by a newer version of Combwork/)
   })
 })
 

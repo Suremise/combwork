@@ -193,7 +193,7 @@ describe("what a platform couldn't read", () => {
     expect(u.what).toBe('the work in site: it has over 20,000 files')
     expect(u.whatText).toEqual({ id: 'workflow.unreadable.deliverables', values: { project: 'site', n: 20000 } })
     const r = refusal('platform.unknown', { card: 'AM-12', what: unknown(UNREADABLE.head, { where: 'D:\\work\\am' }).whatText!, rule: 'submit.checksPassed' })
-    expect(r.message).toBe("AM-12: Hive couldn't read the latest commit in D:\\work\\am, so the rule submit.checksPassed can't be checked.")
+    expect(r.message).toBe("AM-12: Combwork couldn't read the latest commit in D:\\work\\am, so the rule submit.checksPassed can't be checked.")
     const fr = await loadCatalogue('fr')
     setLanguage('fr', fr, 'fr')
     const shown = refusalLines('platform.unknown', r.values, WINDOW)
@@ -215,10 +215,10 @@ describe("what a platform couldn't read", () => {
     const failed = { unknown: { revision: head.what, base: UNREAD_NOTES.noTarget, files: UNREAD_NOTES.noBaseOrHead }, unknownText: { revision: head.whatText! } }
     const lines = (): string[] => [tr(revision, unreadWhy('revision', before, format)), tr(files, unreadWhy('files', before, format)), tr(notRead, unreadWhy('line', before, format)), tr(revision, unreadWhy('revision', failed, format)), tr(notRead, unreadWhy('base', failed, format)), tr(files, unreadWhy('files', failed, format))]
     expect(lines()).toEqual([
-      "No revision recorded: Hive didn't read one when the card went to Review. Its next submission reads it again.",
+      "No revision recorded: Combwork didn't read one when the card went to Review. Its next submission reads it again.",
       'Files not read',
       'Not read when its work started',
-      "Revision not read when it was submitted: Hive couldn't read the latest commit in D:\\work\\am. Its next submission reads it again.",
+      "Revision not read when it was submitted: Combwork couldn't read the latest commit in D:\\work\\am. Its next submission reads it again.",
       'Not read: there was no target branch to start from',
       'Files not read: there was no base or revision to compare'
     ])

@@ -56,7 +56,7 @@ function whyNotShown(s: StoreState, r: ProgressRun): string | null {
   if (r.source === 'assistant') return s.workspace?.assistant ? null : tr(msg({ id: 'board.progress.noAssistant', defaultMessage: 'The Assistant is not in this workspace.', description: "Why a Progress panel run's agent can't be shown: the run is the Hive Assistant's, and this workspace has none." }))
   if (r.source === 'api') return tr(msg({ id: 'board.progress.scriptRun', defaultMessage: 'A script reported it, not an agent: there is no agent to show.', description: "Why a Progress panel run's agent can't be shown: a script reported the run." }))
   // Hive's setup run in a review copy names the agent whose lease held it (HI-1710): shown as that agent's.
-  if (r.source === 'hive' && !r.agentId) return tr(msg({ id: 'board.progress.hiveRun', defaultMessage: 'Hive’s merge queue ran it, not an agent: there is no agent to show.', description: "Why a Progress panel run's agent can't be shown: Hive's merge queue ran the run itself (a merge check on a card's merged result; glossary 2.5: merge queue)." }))
+  if (r.source === 'hive' && !r.agentId) return tr(msg({ id: 'board.progress.hiveRun', defaultMessage: 'Combwork’s merge queue ran it, not an agent: there is no agent to show.', description: "Why a Progress panel run's agent can't be shown: Hive's merge queue ran the run itself (a merge check on a card's merged result; glossary 2.5: merge queue)." }))
   const p = r.projectPath ? findProject(s, r.projectPath) : null
   if (!p) return tr(msg({ id: 'board.progress.projectGone', defaultMessage: 'Its project is no longer in this workspace.', description: "Why a Progress panel run's agent can't be shown: its project was removed from the workspace." }))
   if (!r.agentId || !p.agents.some((a) => a.id === r.agentId)) return tr(msg({ id: 'board.progress.agentGone', defaultMessage: '{agent} has been removed from {project}.', description: "Why a Progress panel run's agent can't be shown: the agent ({agent}) was removed from its project ({project})." }), { agent: runAgentName(r, tr), project: p.name })
@@ -320,7 +320,7 @@ export function ProgressPanel() {
           (merging.length || shownQueue.length ? (
             <MergesList queues={shownQueue} slots={merging} runs={runs} now={now} projectName={nameOf} showProject={multi} stepOf={stepOf} agent={filter.agent ?? null} />
           ) : (
-            <div className="pane-empty progress-empty">{tr(msg({ id: 'board.progress.noMerges', defaultMessage: "No merge is going on. While Hive's merge queue merges a card, or an agent merges its branch, it shows here with its cards, its checks and what waits.", description: "The Progress panel's Merges tab when nothing is merging: no merge queue shows, and no agent holds the merge slot. Glossary 2.5: merge queue." }))}</div>
+            <div className="pane-empty progress-empty">{tr(msg({ id: 'board.progress.noMerges', defaultMessage: "No merge is going on. While Combwork's merge queue merges a card, or an agent merges its branch, it shows here with its cards, its checks and what waits.", description: "The Progress panel's Merges tab when nothing is merging: no merge queue shows, and no agent holds the merge slot. Glossary 2.5: merge queue." }))}</div>
           ))}
         {tab === 'runs' && <RunsTab runs={shown} lanes={shownLanes} now={now} detail={detail} toggle={toggle} filter={runsFilter} setFilter={setRunsFilter} />}
         {tab === 'lanes' && <LanesSection lanes={shownLanes} all={lanes} width={width} runs={shown} full />}

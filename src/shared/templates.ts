@@ -176,10 +176,10 @@ const isObj = (v: unknown): v is Record<string, unknown> => !!v && typeof v === 
 const text = (v: unknown, max: number): v is string => typeof v === 'string' && v.trim().length > 0 && v.length <= max
 // Why a template file can't be used: shown in the Templates view and the dialogs that read one (window text).
 const M = {
-  notTemplate: msg({ id: 'assistant.template.notTemplate', defaultMessage: "It isn't a Hive agent template.", description: "Why a template file can't be used: it isn't one." }),
-  noVersion: msg({ id: 'assistant.template.noVersion', defaultMessage: "It isn't a Hive agent template (no version).", description: "Why a template file can't be used: it has no format version." }),
-  newer: msg({ id: 'assistant.template.newer', defaultMessage: 'It was made by a newer version of Hive: update Hive to use it.', description: "Why a template file can't be used: a newer Hive made it." }),
-  from09: msg({ id: 'assistant.template.from09', defaultMessage: "This template is from Hive 0.9 and can't be loaded in 1.0. Recreate it from your agents with Save as Template.", description: "Why a template file can't be used: Hive 0.9 made it (its agents had worktrees of their own; 1.0's don't). Save as Template is a command: as Hive names it." }),
+  notTemplate: msg({ id: 'assistant.template.notTemplate', defaultMessage: "It isn't a Combwork agent template.", description: "Why a template file can't be used: it isn't one." }),
+  noVersion: msg({ id: 'assistant.template.noVersion', defaultMessage: "It isn't a Combwork agent template (no version).", description: "Why a template file can't be used: it has no format version." }),
+  newer: msg({ id: 'assistant.template.newer', defaultMessage: 'It was made by a newer version of Combwork: update Combwork to use it.', description: "Why a template file can't be used: a newer Hive made it." }),
+  from09: msg({ id: 'assistant.template.from09', defaultMessage: "This template is from Combwork 0.9 and can't be loaded in 1.0. Recreate it from your agents with Save as Template.", description: "Why a template file can't be used: Hive 0.9 made it (its agents had worktrees of their own; 1.0's don't). Save as Template is a command: as Hive names it." }),
   badName: msg({ id: 'assistant.template.badName', defaultMessage: 'Its name is missing or longer than {max} characters.', description: "Why a template file can't be used: the template's name." }),
   noAgents: msg({ id: 'assistant.template.noAgents', defaultMessage: 'It has no agents.', description: "Why a template file can't be used: it holds no agents." }),
   tooManyAny: msg({ id: 'assistant.template.tooMany', defaultMessage: 'It has {count} agents; a project can have up to {max}.', description: "Why a template file can't be used: more agents than any project can have." }),
@@ -189,7 +189,7 @@ const M = {
   longNote: msg({ id: 'assistant.template.longNote', defaultMessage: 'The note of agent {name} is over {max, number} characters.', description: "Why a template file can't be used: an agent's note (what it is for, in the user's words) is too long. {max} is the limit, a number. A noun before the name (glossary §1 rule 4)." }),
   badToken: msg({ id: 'assistant.template.badToken', defaultMessage: "{name} uses {token}: an agent’s name may only hold '{key}' (the project’s key) and '{n}' (its number among the agents with that name).", description: "Why a template file can't be used: an agent's name pattern ({name}) holds {token}, a token Hive doesn't know. The quoted '{key}' and '{n}' are shown as {key} and {n}: keep them, with their straight quotes, as they are." }),
   badPairs: msg({ id: 'assistant.template.badPairs', defaultMessage: 'Its pairs of builders and reviewers name agents it doesn’t have, or an agent twice.', description: "Why a template file can't be used: its list of builders paired with reviewers (glossary: builder, reviewer) doesn't match its agents." }),
-  badMcp: msg({ id: 'assistant.template.badMcp', defaultMessage: "{name}'s MCP servers aren't a list Hive can use.", description: "Why a template file can't be used: an agent's list of MCP servers." })
+  badMcp: msg({ id: 'assistant.template.badMcp', defaultMessage: "{name}'s MCP servers aren't a list Combwork can use.", description: "Why a template file can't be used: an agent's list of MCP servers." })
 }
 
 /** Why a template of `count` agents can't be loaded into a project that can have `limit` (#562), as text (#870). */

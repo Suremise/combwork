@@ -16,15 +16,15 @@
     "description": "Title of the Add server picker (HI-2059) in a project's MCP tab. {project} is the project."
   },
   "mcp.add.titleAssistant": {
-    "defaultMessage": "Add a server for the Hive Assistant",
+    "defaultMessage": "Add a server for the Assistant",
     "description": "Title of the Add server picker (HI-2059) in the Hive Assistant's view."
   },
   "mcp.addFile.messageAdded": {
-    "defaultMessage": "Adds {file} to the workspace (.hive/mcp){files, plural, =0 {} one {, with its file in a folder of its own} other {, with its # files in a folder of its own}}, added to no project yet. Add it where it should run: a project’s MCP tab, the Hive Assistant’s view, or Add to… here. It runs:",
+    "defaultMessage": "Adds {file} to the workspace (.hive/mcp){files, plural, =0 {} one {, with its file in a folder of its own} other {, with its # files in a folder of its own}}, added to no project yet. Add it where it should run: a project’s MCP tab, the Assistant’s view, or Add to… here. It runs:",
     "description": "Add MCP Server from File (HI-2059), above the command the server runs. {file} is the file added; {files} how many files a .zip brings. Keep .hive/mcp as it is; \"MCP tab\" and \"Add to…\" as Hive shows them."
   },
   "mcp.addFile.replaceDetailAdded": {
-    "defaultMessage": "Replace moves it (and the folder of one added from a .zip) to the Recycle Bin and adds this one to no project yet: projects and the Hive Assistant that had the old one lose it. Or choose another name.",
+    "defaultMessage": "Replace moves it (and the folder of one added from a .zip) to the Recycle Bin and adds this one to no project yet: projects and the Assistant that had the old one lose it. Or choose another name.",
     "description": "When a server of that name exists, under Replace or Choose Another Name (HI-2059)."
   },
   "mcp.catalog.allSources": {
@@ -160,7 +160,7 @@
     "description": "A catalogue server's view (HI-545): the version installed."
   },
   "mcp.catalog.installedNext": {
-    "defaultMessage": "It runs nowhere yet: Add to… in its view adds it to the projects (and the Hive Assistant) that need it.",
+    "defaultMessage": "It runs nowhere yet: Add to… in its view adds it to the projects (and the Assistant) that need it.",
     "description": "Under \"Installed {name}\" (HI-545): what to do next. Add to… is the button in the server's view in the MCP view."
   },
   "mcp.catalog.loading": {
@@ -216,7 +216,7 @@
     "description": "An error downloading from an MCP catalogue (HI-545): more than 5 redirects. {url} is the address asked for."
   },
   "mcp.catalog.refreshAgain": {
-    "defaultMessage": "Refresh (↻) to list this catalogue again: Hive keeps only so many in memory.",
+    "defaultMessage": "Refresh (↻) to list this catalogue again: Combwork keeps only so many in memory.",
     "description": "A catalogue source in the MCP view's Catalogue (HI-545) whose list Hive no longer holds (too much in memory): ↻ reads it again."
   },
   "mcp.catalog.requires": {
@@ -260,15 +260,15 @@
     "description": "An error downloading from an MCP catalogue (HI-545): the download went past the size its catalogue gives, or the limit. {url} is the address."
   },
   "mcp.catalog.tooManySources": {
-    "defaultMessage": "Hive lists at most {max, number} catalogues of your own: remove one first.",
+    "defaultMessage": "Combwork lists at most {max, number} catalogues of your own: remove one first.",
     "description": "An error adding an MCP catalogue source (Settings → MCP Catalogues, HI-545): the list is full."
   },
   "mcp.catalog.unknown": {
-    "defaultMessage": "Hive can't check this: make sure it's there",
+    "defaultMessage": "Combwork can't check this: make sure it's there",
     "description": "A requirement's state in a catalogue server's view (HI-545): Hive can't check it on this PC."
   },
   "mcp.catalog.unvetted": {
-    "defaultMessage": "Servers from this source aren't checked by Hive. Look at what one runs before you install it.",
+    "defaultMessage": "Servers from this source aren't checked by Combwork. Look at what one runs before you install it.",
     "description": "A note under a catalogue source the user added (HI-545), shown once: Hive does not vet its servers."
   },
   "mcp.catalog.updateAction": {
@@ -304,7 +304,7 @@
     "description": "The MCP view’s Add to… dialog: a button that ticks every project (not the Hive Assistant, which has its own box)."
   },
   "mcp.enable.assistant": {
-    "defaultMessage": "Hive Assistant",
+    "defaultMessage": "Assistant",
     "description": "The MCP view’s Add to… dialog: the box that adds the server for the Hive Assistant, after the projects."
   },
   "mcp.enable.none": {
@@ -436,7 +436,7 @@
     "description": "Under Added servers in a project's MCP tab (HI-2059)."
   },
   "mcp.tab.projectDefinedAdded": {
-    "defaultMessage": "These servers are in the project's own agent config (such as .mcp.json). Hive starts sessions with only workspace servers, so they stay disabled until copied to the workspace, which adds them here.",
+    "defaultMessage": "These servers are in the project's own agent config (such as .mcp.json). Combwork starts sessions with only workspace servers, so they stay disabled until copied to the workspace, which adds them here.",
     "description": "Under Defined by the project in a project's MCP tab (HI-2059: copying one to the workspace adds it to this project). Keep .mcp.json as it is."
   },
   "mcp.view.addTo": {
@@ -444,7 +444,7 @@
     "description": "A button in an MCP server's view (HI-2059): chooses the projects, and the Hive Assistant, it is added to."
   },
   "mcp.where.addedAssistantOnly": {
-    "defaultMessage": "Added for the Hive Assistant only",
+    "defaultMessage": "Added for the Assistant only",
     "description": "Where an MCP server is added (HI-2059), under it in the MCP view: for the Hive Assistant, in no project."
   },
   "mcp.where.addedNone": {
@@ -456,11 +456,11 @@
     "description": "Where an MCP server is added (HI-2059), under it in the MCP view. {projects} lists the projects."
   },
   "mcp.where.addedSomeAndAssistant": {
-    "defaultMessage": "Added in {projects} and for the Hive Assistant",
+    "defaultMessage": "Added in {projects} and for the Assistant",
     "description": "Where an MCP server is added (HI-2059), under it in the MCP view: in some projects and for the Hive Assistant. {projects} lists the projects."
   },
   "mcp.where.assistantName": {
-    "defaultMessage": "the Hive Assistant",
+    "defaultMessage": "the Assistant",
     "description": "Where an MCP server is added (HI-2059), in a list of places beside project names."
   },
   "mcp.where.hidden": {

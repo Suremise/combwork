@@ -278,7 +278,7 @@ const pids = (file) => (fs.existsSync(file) ? fs.readFileSync(file, 'utf8').trim
     check('6: …its keeper ended from outside (by its identity), its receipt left', lib.endExactly(crash6.keeper) === 1 && !!(await until(() => lib.stillSame(crash6.keeper).length === 0, HUNG_MS)))
     await start()
     const notice = h.page.locator('.toast', { hasText: 'slot-a is held by node' })
-    check('the next Hive keeps slot-a held, and says once that only the idle broker holds it and releasing is safe', !!(await until(async () => (await notice.count()) === 1, HUNG_MS)) && /Windows' idle Sandbox broker.*releasing the slot is safe/.test(await notice.innerText()) && !!(await slotA())?.writer, await h.page.locator('.toast').allInnerTexts().then((t) => t.join(' | ')))
+    check('the next Combwork keeps slot-a held, and says once that only the idle broker holds it and releasing is safe', !!(await until(async () => (await notice.count()) === 1, HUNG_MS)) && /Windows' idle Sandbox broker.*releasing the slot is safe/.test(await notice.innerText()) && !!(await slotA())?.writer, await h.page.locator('.toast').allInnerTexts().then((t) => t.join(' | ')))
     await h.page.screenshot({ path: path.join(shots, 'slotbroker-notice.png') })
     // Exactly its button: the entry's text, which names Release Slot…, is the button that shows the project (HI-2320, HI-2371).
     await notice.getByRole('button', { name: 'Release Slot…', exact: true }).click()

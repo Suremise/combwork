@@ -175,7 +175,7 @@ describe('installing a downloaded update (#1647)', () => {
   it('over an older copy: the quit installs it (no restart), Restart and Update too (with one)', async () => {
     const { updater, restarts } = await start({ version: '9.1.0' })
     downloaded(updater)
-    expect(st.toasts.map((t) => t.title)).toEqual(['Hive Desktop 9.1.1 is ready'])
+    expect(st.toasts.map((t) => t.title)).toEqual(['Combwork 9.1.1 is ready'])
     expect(updater.installsOnQuit()).toBe(true)
     updater.installNow(false)
     expect(st.installs).toEqual([[true, false]])
@@ -192,7 +192,7 @@ describe('installing a downloaded update (#1647)', () => {
     expect(st.resolved).toEqual([])
     // The quit goes ahead (index.ts quitNow): now the notice says Installing in place of its button.
     updater.markInstalling()
-    expect(st.resolved).toEqual([['update:9.1.1', 'Installing: Hive restarts']])
+    expect(st.resolved).toEqual([['update:9.1.1', 'Installing: Combwork restarts']])
     // An older version's click resolves its own entry and asks for nothing.
     updater.restartAndInstall('9.0.0')
     expect(restarts.n).toBe(1)
@@ -209,7 +209,7 @@ describe('installing a downloaded update (#1647)', () => {
     expect(updater.updateState().notInstalled).toBe('notNewer')
     updater.restartAndInstall()
     expect(restarts.n).toBe(0)
-    expect(st.toasts.at(-1)).toMatchObject({ level: 'warning', title: "Hive Desktop 9.1.1 wasn't installed" })
+    expect(st.toasts.at(-1)).toMatchObject({ level: 'warning', title: "Combwork 9.1.1 wasn't installed" })
     // Reached anyway (asked before the copy changed): quits without installing.
     updater.installNow(true)
     expect(st.installs).toEqual([])

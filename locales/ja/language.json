@@ -1,8 +1,8 @@
 {
   "language.automatic": "自動（Windows：{language}）",
-  "language.forced": "Hiveは{language}で起動されています（--lang）。この設定は次回の起動から適用されます。",
-  "language.restart": "Hive自体の表示言語を変更しました。Chromiumの部分（PDFビューアー、日付の選択）は、次回Hiveを起動したときに切り替わります。",
-  "language.setting.desc": "Hiveの表示言語です。「自動」はWindowsの表示言語に従います。",
-  "language.setting.tip": "AIによる翻訳と表示されている言語はエージェントが下書きしたもので、改善を歓迎します。この設定にかかわらず、HiveはエージェントやHive Assistantには英語で話しかけますが、日本語で答えてもらうことはできます。--langを付けて起動したHiveは、次に起動するまでその言語を使います。",
+  "language.forced": "Combworkは{language}で起動されています（--lang）。この設定は次回の起動から適用されます。",
+  "language.restart": "Combwork自体の表示言語を変更しました。Chromiumの部分（PDFビューアー、日付の選択）は、次回Combworkを起動したときに切り替わります。",
+  "language.setting.desc": "Combworkの表示言語です。「自動」はWindowsの表示言語に従います。",
+  "language.setting.tip": "AIによる翻訳と表示されている言語はエージェントが下書きしたもので、改善を歓迎します。この設定にかかわらず、Combworkはエージェントやアシスタントには英語で話しかけますが、日本語で答えてもらうことはできます。--langを付けて起動したCombworkは、次に起動するまでその言語を使います。",
   "language.setting.title": "言語"
 }

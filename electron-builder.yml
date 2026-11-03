@@ -1,7 +1,7 @@
 appId: com.hive.desktop
 # The displayed name (#443). The install folder (%LOCALAPPDATA%\Programs\Hive) comes from executableName and the
 # profile folder (%APPDATA%\Combwork since HI-2461; the installer moves Hive's, HI-2460) is set in main (shared/appName.ts); appId keeps the uninstall entry.
-productName: Hive Desktop
+productName: Combwork
 copyright: Copyright © 2026 Darren Marshall
 directories:
   buildResources: build
@@ -48,7 +48,7 @@ nsis:
   shortcutName: Hive Desktop
   installerIcon: build/icon.ico
   uninstallerIcon: build/icon.ico
-  artifactName: Hive-Setup-${version}.${ext}
+  artifactName: Combwork-Setup-${version}.${ext}
   deleteAppDataOnUninstall: false
   # Hive's languages (#767), so the installer, which follows Windows' display language without asking, never speaks one
   # the app doesn't. electron-builder's NSIS messages come in all of them (one or two of its own fall back to English).

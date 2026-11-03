@@ -12,7 +12,7 @@ import { join } from 'path'
 import { fileURLToPath } from 'url'
 import { MANIFEST, manifestStale } from './testedClis.mjs'
 import { recordBuild } from './buildFact.mjs'
-import { makeRelease } from './distCopy.mjs'
+import { installerName, makeRelease } from './distCopy.mjs'
 import { dialectCheckArgs, dialectReleaseProblem, lastReleaseTag } from './dialectRelease.mjs'
 
 const pkg = JSON.parse(readFileSync(new URL('../package.json', import.meta.url), 'utf8'))
@@ -72,7 +72,7 @@ if (dialectsOnly) {
 // The committed notices must match what ships (#386): the build would otherwise regenerate them after the clean-tree check.
 if (spawnSync('node', ['scripts/licenses.mjs', '--check'], { stdio: 'inherit', cwd: root }).status !== 0) process.exit(1)
 
-console.log(`Building Hive Desktop ${pkg.version} and uploading a draft release…`)
+console.log(`Building ${pkg.productName} ${pkg.version} and uploading a draft release…`)
 const run = (cmd) => {
   const r = spawnSync(cmd, { cwd: root, stdio: 'inherit', shell: true, env: { ...process.env, GH_TOKEN: token } })
   if (r.status !== 0) process.exit(r.status ?? 1)
@@ -88,7 +88,7 @@ const publish = () => {
     console.error(`${tag} is already published. Bump the version in package.json for a new release.`)
     process.exit(1)
   }
-  if (!exists) run(`gh release create ${tag} --draft --title "Hive Desktop ${pkg.version}" --notes ""`)
+  if (!exists) run(`gh release create ${tag} --draft --title "${pkg.productName} ${pkg.version}" --notes ""`)
   run('npx electron-builder --win --publish always')
 }
 // The build, the draft and the upload, by npm run dist's rules (makeRelease): a release says so in its identity file
@@ -103,4 +103,4 @@ console.log(`\nDraft release ${tag} uploaded. Review it at https://github.com/Su
 if (dialectsOnly) console.log('Before publishing a dialect-only release: the packaged checks on this build and the Sandbox upgrade check (RELEASING.md, A dialect-only release).')
 // The uploaded build, recorded in Hive's journal (buildFact.mjs, #1534).
 const git = (...a) => execSync(`git ${a.join(' ')}`, { cwd: root }).toString().trim()
-console.log(await recordBuild({ root, version: pkg.version, commit: git('rev-parse', 'HEAD'), branch: git('branch', '--show-current') || null, installer: join(root, 'dist', `Hive-Setup-${pkg.version}.exe`), by: 'release' }))
+console.log(await recordBuild({ root, version: pkg.version, commit: git('rev-parse', 'HEAD'), branch: git('branch', '--show-current') || null, installer: join(root, 'dist', installerName(pkg.version)), by: 'release' }))

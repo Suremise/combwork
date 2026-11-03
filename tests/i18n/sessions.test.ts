@@ -45,7 +45,7 @@ describe('the sessions area', () => {
     expect(gone.label).toBe('Helper (removed) · Worktree · hive/b1')
     expect(gone.detail).toBe('Ran in C:\\ws\\hive-wt\\b1\nIts agent (a-2) has since been removed.')
     expect(unnamed.agent).toBe('Removed agent')
-    expect(none.detail).toBe(`Ran in ${PROJECT}\nNo agent recorded (adopted, or from before Hive recorded agents).`)
+    expect(none.detail).toBe(`Ran in ${PROJECT}\nNo agent recorded (adopted, or from before Combwork recorded agents).`)
     expect(attachmentLabel('image', ['image'], 'Claude Code')).toEqual({ label: 'Image', native: true, detail: 'Claude Code sees the image itself.' })
     expect(attachmentLabel('pdf', ['image'], 'Codex')).toEqual({ label: 'PDF · by path', native: false, detail: "Codex doesn't read PDFs itself: the agent gets its path and opens it with its tools." })
     expect(attachmentLabel('file', [], 'Codex').detail).toBe("Codex doesn't read this kind of file itself: the agent gets its path and opens it with its tools.")

@@ -44,7 +44,7 @@ export function sessionOrigin(projectPath: string, agents: readonly { id: string
   const now = s.agentId ? agents.find((a) => a.id === s.agentId) : undefined
   const agent = !s.agentId ? null : now ? now.name : removedAgentName(s.agentName)
   const who = !s.agentId
-    ? tr(msg({ id: 'sessions.origin.noAgent', defaultMessage: 'No agent recorded (adopted, or from before Hive recorded agents).', description: "A session's origin hover (the Sessions tab): Hive has no record of which agent ran it." }))
+    ? tr(msg({ id: 'sessions.origin.noAgent', defaultMessage: 'No agent recorded (adopted, or from before Combwork recorded agents).', description: "A session's origin hover (the Sessions tab): Hive has no record of which agent ran it." }))
     : now
       ? tr(msg({ id: 'sessions.origin.agent', defaultMessage: 'Agent {agent} ({id}).', description: "A session's origin hover (the Sessions tab): the agent that ran it, by name ({agent}) and id ({id})." }), { agent: now.name, id: s.agentId })
       : tr(msg({ id: 'sessions.origin.removed', defaultMessage: 'Its agent ({id}) has since been removed.', description: "A session's origin hover (the Sessions tab): the agent that ran it ({id}: its id) was removed from the project." }), { id: s.agentId })

@@ -352,7 +352,7 @@ describe('where a file may come from (HI-1700, s13 §2)', () => {
     try {
       // Not listed: refused, naming the accepted folders, Temp's path and where to add one.
       const refused = await att.attachableSource(w, agent, zip).then(() => 'attached', (e: Error) => e.message)
-      expect(refused).toBe(`${zip} is not a file that can be attached here. Files can come from your own project (its folder, its slots), the temp folder (${temp}). To attach from another folder, the user adds it there (Settings → Advanced → Card attachments: more folders, Hive's or this workspace's): don't copy the file into the temp folder. Nothing was attached.`)
+      expect(refused).toBe(`${zip} is not a file that can be attached here. Files can come from your own project (its folder, its slots), the temp folder (${temp}). To attach from another folder, the user adds it there (Settings → Advanced → Card attachments: more folders, Combwork's or this workspace's): don't copy the file into the temp folder. Nothing was attached.`)
       await expect(att.attachableSource(w, script, zip)).rejects.toThrow(/Files can come from the workspace and its projects, the temp folder/)
       expect(await att.attachableSource(w, agent, file(temp, 'shot.png', 's'))).toBeTruthy()
 

@@ -11,7 +11,7 @@
   "connections.choice.unavailable": "{name} – {why}",
   "connections.intro.add": "Konto hinzufügen",
   "connections.intro.dismiss": "Ausblenden",
-  "connections.intro.text": "Agenten laufen jetzt über Konten: Füge unter Einstellungen → Konten & Verbindungen eines für {clis} hinzu und melde es dort an. Hive nutzt die Anmeldung deines eigenen Terminals nicht mehr; sie bleibt, wie sie ist.",
+  "connections.intro.text": "Agenten laufen jetzt über Konten: Füge unter Einstellungen → Konten & Verbindungen eines für {clis} hinzu und melde es dort an. Combwork nutzt die Anmeldung deines eigenen Terminals nicht mehr; sie bleibt, wie sie ist.",
   "connections.mark.anotherMark": "Läuft mit einer anderen als der gewählten Verbindung",
   "connections.mark.none": "Keine Verbindung",
   "connections.mark.noneUsable": "In diesem Arbeitsbereich ist kein Konto für {cli} eingeschaltet: Der Agent kann erst starten, wenn eines eingeschaltet ist (Einstellungen → Konten & Verbindungen).",

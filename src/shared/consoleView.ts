@@ -6,7 +6,7 @@ import { jsonBytes, type ConsoleEvent, type ConsoleSource } from './devConsole'
 import { msg, tr } from './i18n'
 
 const M = {
-  assistant: msg({ id: 'console.assistant', defaultMessage: 'Hive Assistant', description: "The developer console's source picker: the Hive Assistant's session as a source. Hive's name stays as it is." }),
+  assistant: msg({ id: 'console.assistant', defaultMessage: 'Assistant', description: "The developer console's source picker: the Hive Assistant's session as a source. Hive's name stays as it is." }),
   withCount: msg({ id: 'console.sourceCount', defaultMessage: '{name} ({n, number})', description: "The developer console's source picker: a source ({name}: an agent, the Assistant or Hive) with how many events it has captured." })
 }
 

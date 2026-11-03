@@ -26,7 +26,7 @@ import { TemplateWorkflowSection } from './TemplateWorkflowView'
  * agents in the Agent Settings dialog), and load, rename, duplicate, delete, export and import them.
  */
 
-export const TEMPLATES_TIP = msg({ id: 'assistant.templates.tip', defaultMessage: "A template is a project's agents (their roles in the workflow and settings) and layout, saved under a name. Hive's own are read-only: duplicate one to change it. The workspace's are for every project, a project's are its own (kept in its .hive, out of git). Export one to share it as a file.", description: 'Tooltip on Templates (the Templates view and a project\'s Templates tab). Keep .hive as it is. Glossary: workflow role.' })
+export const TEMPLATES_TIP = msg({ id: 'assistant.templates.tip', defaultMessage: "A template is a project's agents (their roles in the workflow and settings) and layout, saved under a name. Combwork's own are read-only: duplicate one to change it. The workspace's are for every project, a project's are its own (kept in its .hive, out of git). Export one to share it as a file.", description: 'Tooltip on Templates (the Templates view and a project\'s Templates tab). Keep .hive as it is. Glossary: workflow role.' })
 
 const M = {
   newAgentName: msg({ id: 'assistant.templates.newAgentName', defaultMessage: 'Agent', description: 'The name suggested for a new agent of a template (a number follows when it is taken: Agent 2).' }),
@@ -36,14 +36,14 @@ const M = {
   layoutPhrase: msg({ id: 'assistant.templates.layoutPhrase', defaultMessage: '{layout, select, auto {automatic layout} single {one at a time layout} columns2 {two columns layout} columns3 {three columns layout} grid {grid of four layout} grid6 {grid of six layout} other {{layout} layout}}', description: 'A template\'s layout of agent panes inside a sentence ("2 agents, two columns layout").' }),
   agents: msg({ id: 'assistant.templates.agents', defaultMessage: '{count, plural, one {# agent} other {# agents}}', description: 'How many agents a template has.' }),
   aProject: msg({ id: 'assistant.templates.aProject', defaultMessage: 'a project', description: "A template's project when its name isn't known." }),
-  unknown: msg({ id: 'assistant.templates.unknown', defaultMessage: "It uses a coding agent this Hive doesn't know ({ids}): it can be kept, but not loaded until Hive knows it.", description: "A template whose agents use a CLI this Hive doesn't know (one from a newer Hive). {ids} lists them." }),
+  unknown: msg({ id: 'assistant.templates.unknown', defaultMessage: "It uses a coding agent this Combwork doesn't know ({ids}): it can be kept, but not loaded until Combwork knows it.", description: "A template whose agents use a CLI this Hive doesn't know (one from a newer Hive). {ids} lists them." }),
   everyProject: msg({ id: 'assistant.templates.everyProject', defaultMessage: 'The workspace (every project)', description: 'Where to keep a template: a choice in a list.' }),
   thisProjectOnly: msg({ id: 'assistant.templates.thisProjectOnly', defaultMessage: '{project} (this project only)', description: 'Where to keep a template: a project, in a list.' }),
   keepIn: msg({ id: 'assistant.templates.keepIn', defaultMessage: 'Keep it in', description: 'Where to keep a template: the label of the list.' }),
   noProjects: msg({ id: 'assistant.templates.noProjects', defaultMessage: 'No projects', description: 'A notice: Load into Project with no projects in the workspace.' }),
   addProjectFirst: msg({ id: 'assistant.templates.addProjectFirst', defaultMessage: 'Add a project to the workspace first.', description: "Under the notice No projects, from Load into Project." }),
   loadTitle: msg({ id: 'assistant.templates.loadTitle', defaultMessage: 'Load "{name}" into a project', description: 'Load into Project: the dialog that asks which project.' }),
-  loadMessage: msg({ id: 'assistant.templates.loadMessage', defaultMessage: 'It replaces every agent of the project you choose, and its layout. Hive lists who goes and who comes before anything changes.', description: 'Load into Project: the dialog that asks which project.' }),
+  loadMessage: msg({ id: 'assistant.templates.loadMessage', defaultMessage: 'It replaces every agent of the project you choose, and its layout. Combwork lists who goes and who comes before anything changes.', description: 'Load into Project: the dialog that asks which project.' }),
   project: msg({ id: 'assistant.templates.project', defaultMessage: 'Project', description: 'Load into Project: the label of the list of projects.' }),
   continue: msg({ id: 'assistant.templates.continue', defaultMessage: 'Continue', description: "Load into Project: the dialog's button (the plan is shown next)." }),
   renameTitle: msg({ id: 'assistant.templates.renameTitle', defaultMessage: 'Rename "{name}"', description: "The title of the dialog that renames a template ({name}: the template)." }),
@@ -64,7 +64,7 @@ const M = {
   deleting: msg({ id: 'assistant.templates.deleting', defaultMessage: 'Deleting…', description: "Delete's button while it works." }),
   exportFailed: msg({ id: 'assistant.templates.exportFailed', defaultMessage: 'Could not export the template', description: "An error notice: a template couldn't be saved as a file; the reason follows." }),
   exported: msg({ id: 'assistant.templates.exported', defaultMessage: 'Template exported', description: "A notice after a template was saved as a file; the file's path follows." }),
-  exportedDetail: msg({ id: 'assistant.templates.exportedDetail', defaultMessage: "It holds the agents' roles, notes and settings and the layout: no paths, sessions or names of people. Import it into any Hive.", description: "Under Template exported, after the file's path." }),
+  exportedDetail: msg({ id: 'assistant.templates.exportedDetail', defaultMessage: "It holds the agents' roles, notes and settings and the layout: no paths, sessions or names of people. Import it into any Combwork.", description: "Under Template exported, after the file's path." }),
   importFailed: msg({ id: 'assistant.templates.importFailed', defaultMessage: 'Could not import the template', description: "An error notice: a template file couldn't be imported; the reason follows." }),
   importTitle: msg({ id: 'assistant.templates.importTitle', defaultMessage: 'Import "{name}"', description: "Import's dialog title: {name} is the template's." }),
   importMessage: msg({ id: 'assistant.templates.importMessage', defaultMessage: '{count, plural, one {# agent} other {# agents}}.{hasUnknown, select, yes { {unknown}} other {}} Where should it be kept?', description: "Import's dialog: how many agents the template has; {unknown} says when its coding agents aren't known here." }),
@@ -77,8 +77,8 @@ const M = {
   imported: msg({ id: 'assistant.templates.imported', defaultMessage: 'Template imported', description: "A notice after a template file was imported; where it is kept follows." }),
   importedDetail: msg({ id: 'assistant.templates.importedDetail', defaultMessage: '"{name}", in {scope, select, workspace {the workspace} other {{project}}}.{hasUnknown, select, yes { {unknown}} other {}}', description: "Under Template imported: the template and where it is kept; {unknown} says when its coding agents aren't known here." }),
   workspace: msg({ id: 'assistant.templates.workspace', defaultMessage: 'Workspace', description: "A badge, a group and a filter: the workspace's templates (for every project)." }),
-  hive: msg({ id: 'assistant.templates.hive', defaultMessage: 'Hive', description: "A badge, a group and a filter: Hive's own templates (#1436, shipped with Hive, read-only)." }),
-  hiveSummary: msg({ id: 'assistant.templates.hiveSummary', defaultMessage: "{count, plural, one {# agent} other {# agents}}, {layout}. One of Hive's own templates: read-only. <b>Duplicate…</b> copies it into the workspace or a project to change it.", description: 'Over one of Hive\'s own templates\' agents: how many, its layout ("two columns layout"). <b> is bold; Duplicate… is the button.' }),
+  hive: msg({ id: 'assistant.templates.hive', defaultMessage: 'Combwork', description: "A badge, a group and a filter: Hive's own templates (#1436, shipped with Hive, read-only)." }),
+  hiveSummary: msg({ id: 'assistant.templates.hiveSummary', defaultMessage: "{count, plural, one {# agent} other {# agents}}, {layout}. One of Combwork's own templates: read-only. <b>Duplicate…</b> copies it into the workspace or a project to change it.", description: 'Over one of Hive\'s own templates\' agents: how many, its layout ("two columns layout"). <b> is bold; Duplicate… is the button.' }),
   suggests: msg({ id: 'assistant.templates.suggests', defaultMessage: 'Suggests the {preset} preset: loading it offers to switch the project’s workflow options to it.{pool, select, yes { Its reviewers are a pool shared by every builder.} other {}}', description: "Over a template's agents: the workflow preset it suggests ({preset}: Solo, Pair, Team); pool when its reviewers are shared by all builders rather than one per lane. Glossary: preset, workflow, reviewer, builder, lane." }),
   pairedWith: msg({ id: 'assistant.templates.pairedWith', defaultMessage: 'paired: {name}', description: "A template's table, under an agent's role: the agent it is paired with ({name}). Lower case. The name after a colon (glossary §1 rule 4)." }),
   unsavedTip: msg({ id: 'assistant.templates.unsavedTip', defaultMessage: 'It is open in the editor with changes not saved yet', description: 'Tooltip on Not saved, beside a template.' }),
@@ -122,7 +122,7 @@ const M = {
 
   mcpServers: msg({ id: 'assistant.templates.mcpServers', defaultMessage: 'MCP servers: {servers}', description: "A template's table, under an agent's coding agent: the MCP servers it chose." }),
   editAgent: msg({ id: 'assistant.templates.editAgent', defaultMessage: 'Edit {name}…', description: "The template editor: a button on an agent's row." }),
-  cantEdit: msg({ id: 'assistant.templates.cantEdit', defaultMessage: "This Hive doesn't know its coding agent: it can be moved or removed, not edited", description: "The template editor: the edit button of an agent whose coding agent isn't known here." }),
+  cantEdit: msg({ id: 'assistant.templates.cantEdit', defaultMessage: "This Combwork doesn't know its coding agent: it can be moved or removed, not edited", description: "The template editor: the edit button of an agent whose coding agent isn't known here." }),
   copyAgent: msg({ id: 'assistant.templates.copyAgent', defaultMessage: 'Copy {name}', description: "The template editor: a button on an agent's row." }),
   moveUp: msg({ id: 'assistant.templates.moveUp', defaultMessage: 'Move {name} up', description: "The template editor: a button on an agent's row." }),
   moveDown: msg({ id: 'assistant.templates.moveDown', defaultMessage: 'Move {name} down', description: "The template editor: a button on an agent's row." }),
@@ -152,7 +152,7 @@ const M = {
   noWorkspaceTemplates: msg({ id: 'assistant.templates.noWorkspaceTemplates', defaultMessage: 'No workspace templates.', description: "Under Workspace, when the workspace has no templates." }),
   noneOfItsOwn: msg({ id: 'assistant.templates.noneOfItsOwn', defaultMessage: 'No templates of its own.', description: "The Templates view, under a project with no templates." }),
   panelHint: msg({ id: 'assistant.templates.panelHint', defaultMessage: "Save a project's agents as a template from its Session tab (<b>Save Template…</b>). Export one to share it; Import brings one in.", description: "Under the Templates view's list. <b> is bold; Save Template… is the Session tab's button." }),
-  noneHive: msg({ id: 'assistant.templates.noneHive', defaultMessage: "Hive's own templates couldn't be listed.", description: "The Templates view, under Hive, when none of Hive's own templates is listed (shouldn't happen)." }),
+  noneHive: msg({ id: 'assistant.templates.noneHive', defaultMessage: "Combwork's own templates couldn't be listed.", description: "The Templates view, under Hive, when none of Hive's own templates is listed (shouldn't happen)." }),
   gone: msg({ id: 'assistant.templates.gone', defaultMessage: 'That template is no longer there.', description: 'The Templates view: the selected template was deleted or moved.' }),
   selectOne: msg({ id: 'assistant.templates.selectOne', defaultMessage: 'Select a template to see its agents and layout, load it into a project, or export it to share.', description: "The Templates view's main area with no template selected." }),
   thisProject: msg({ id: 'assistant.templates.thisProject', defaultMessage: 'This project', description: "A project's Templates tab: the group of its own templates." }),

@@ -197,7 +197,7 @@ const sameBase = (a: { preset: PresetId | null; options: Partial<WorkflowOptions
 const sorted = (o: object): string => JSON.stringify(Object.fromEntries(Object.entries(o).filter(([, v]) => v !== undefined).sort(([x], [y]) => x.localeCompare(y))))
 
 const M = {
-  changedMeanwhile: msg({ id: 'service.workflow.changedMeanwhile', defaultMessage: 'The workflow options changed meanwhile (in another window, or by the Hive Assistant), so nothing was saved. The section shows them as they are now.', description: 'Why saving the Workflow section of the Version Control tab was refused: the options changed after the section was read. It reloads them.' })
+  changedMeanwhile: msg({ id: 'service.workflow.changedMeanwhile', defaultMessage: 'The workflow options changed meanwhile (in another window, or by the Assistant), so nothing was saved. The section shows them as they are now.', description: 'Why saving the Workflow section of the Version Control tab was refused: the options changed after the section was read. It reloads them.' })
 }
 
 /** A form's save refused: the options changed after it read them (#1418). */

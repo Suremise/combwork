@@ -205,7 +205,7 @@ describe('the Assistant panel’s status line (#312)', () => {
   })
   it("a line Hive typed that it didn't take (#430): the user is asked to press Enter, over working or watching", () => {
     const untakenLine = { since: '2026-10-08T08:25:59.000Z', text: '[Hive] #356 is in Passed' }
-    for (const status of ['finished', 'watching', 'working'] as const) expect(line({ status, untakenLine })).toEqual({ says: "A line Hive typed wasn't taken: press Enter in its terminal", cards: [], tone: 'attention' })
+    for (const status of ['finished', 'watching', 'working'] as const) expect(line({ status, untakenLine })).toEqual({ says: "A line Combwork typed wasn't taken: press Enter in its terminal", cards: [], tone: 'attention' })
   })
   it('an agent watch (#416): the agents it waits for and until when, no card chips', () => {
     const watch = { cards: [], changes: [], agents: ['B6'], label: 'Waiting for B6 to finish', since: '2026-10-07T20:00:00.000Z', limitAt: '2026-10-07T22:22:00.000Z' }

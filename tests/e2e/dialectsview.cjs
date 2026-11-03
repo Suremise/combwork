@@ -119,7 +119,7 @@ const read = (rel) => fs.readFileSync(path.join(dialects, ...rel.split('/')), 'u
   // --- Outdated: flagged with the Default beside them; an id this Hive no longer has, with no Default.
   const outdated = pane.locator('.dialect-area[data-area="outdated"]')
   check('the outdated overrides are listed first', (await outdated.locator('.dialect-text').count()) === 2)
-  check('…an id this Hive no longer has says there is no current Default', (await outdated.locator('.dialect-text[data-text-id="gone.text"] [data-problem="unknown"]').count()) === 1 && /No current Default/.test(await outdated.locator('.dialect-text[data-text-id="gone.text"]').innerText()))
+  check('…an id this Combwork no longer has says there is no current Default', (await outdated.locator('.dialect-text[data-text-id="gone.text"] [data-problem="unknown"]').count()) === 1 && /No current Default/.test(await outdated.locator('.dialect-text[data-text-id="gone.text"]').innerText()))
   check('…a text missing a placeholder says which, with the Default now beside it', /missing \{path\}/.test(await outdated.locator('.dialect-text[data-text-id="api.http.noRoute"]').innerText()) && /No route for/.test(await outdated.locator('.dialect-text[data-text-id="api.http.noRoute"]').innerText()))
   await shot('inherited-outdated', pane)
 
@@ -206,7 +206,7 @@ const read = (rel) => fs.readFileSync(path.join(dialects, ...rel.split('/')), 'u
   await until(() => host.locator('[data-dialect-edit-text]').count(), HUNG_MS)
   await host.locator('[data-dialect-edit-text]').fill('DRAFT {hasProject, select, yes {{project}} other {}}.')
   fs.writeFileSync(path.join(dialects, ...TEST_COPY.split('/')), file('Mark v2', { [HOST]: 'OUTSIDE {hasProject, select, yes {{project}} other {}}.' }))
-  check('a change made outside while editing shows "changed outside Hive"', !!(await until(() => pane.locator('[data-dialect-outside]').count(), HUNG_MS)))
+  check('a change made outside while editing shows "changed outside Combwork"', !!(await until(() => pane.locator('[data-dialect-outside]').count(), HUNG_MS)))
   check('…and the draft is kept across the reload', (await host.locator('[data-dialect-edit-text]').inputValue()).startsWith('DRAFT'))
   fs.writeFileSync(path.join(dialects, ...TEST_COPY.split('/')), file('Mark v2', { [HOST]: 'OUTSIDE2 {hasProject, select, yes {{project}} other {}}.' }))
   await pane.locator('[data-dialect-outside] .btn').last().click()

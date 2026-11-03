@@ -178,11 +178,11 @@ describe('what follows', () => {
   })
 
   it('the note says why when Hive can tell, and what to do', () => {
-    expect(hooksMissingNote(live({ hooksMissing: missing }), tr)).toMatch(/^Hive isn't hearing from Claude Code's hooks, so its status may be wrong\. None came after a prompt it went to work on\. .*Restart the session/)
+    expect(hooksMissingNote(live({ hooksMissing: missing }), tr)).toMatch(/^Combwork isn't hearing from Claude Code's hooks, so its status may be wrong\. None came after a prompt it went to work on\. .*Restart the session/)
     expect(hooksMissingNote(live({ hooksMissing: { ...missing, after: 'start' } }), tr)).toContain('None came after it started.')
     expect(hooksMissingNote(live({ hooksMissing: { ...missing, why: 'off', offIn: 'managed settings' } }), tr)).toContain('managed settings turns hooks off (disableAllHooks).')
-    expect(hooksMissingNote(live({ hooksMissing: { ...missing, why: 'refused' } }), tr)).toContain("Hive refused its hooks: they didn't carry this session's token.")
-    expect(hooksMissingNote(live({ hooksMissing: { ...missing, why: 'newer' } }), tr)).toContain('This Claude Code is newer than the version Hive was tested with')
+    expect(hooksMissingNote(live({ hooksMissing: { ...missing, why: 'refused' } }), tr)).toContain("Combwork refused its hooks: they didn't carry this session's token.")
+    expect(hooksMissingNote(live({ hooksMissing: { ...missing, why: 'newer' } }), tr)).toContain('This Claude Code is newer than the version Combwork was tested with')
     expect(hooksMissingNote(live(), tr)).toBeNull()
   })
 

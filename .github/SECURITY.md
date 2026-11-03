@@ -12,7 +12,7 @@ Please include:
 
 - what the problem is, and what someone could do with it;
 - the steps to show it, or a proof of concept;
-- the Hive version (Help → About Hive Desktop) and Windows version;
+- the Combwork version (Help → About Combwork) and Windows version;
 - whether it involves a coding agent's CLI (Claude Code, Codex, GitHub Copilot), and its version.
 
 Leave out real tokens, keys and private files. If **Help → Copy Diagnostics…** helps, paste what it shows: it leaves

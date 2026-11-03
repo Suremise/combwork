@@ -11,7 +11,7 @@
   "connections.choice.unavailable": "{name} — {why}",
   "connections.intro.add": "アカウントを追加",
   "connections.intro.dismiss": "閉じる",
-  "connections.intro.text": "エージェントはアカウントで動くようになりました。「設定」→「アカウントと接続」で{clis}のアカウントを追加し、そこでサインインしてください。Hiveはお使いのターミナルのサインインを使わなくなりました（そのサインインはそのまま残ります）。",
+  "connections.intro.text": "エージェントはアカウントで動くようになりました。「設定」→「アカウントと接続」で{clis}のアカウントを追加し、そこでサインインしてください。Combworkはお使いのターミナルのサインインを使わなくなりました（そのサインインはそのまま残ります）。",
   "connections.mark.anotherMark": "選んだ接続とは別の接続で実行中",
   "connections.mark.none": "接続なし",
   "connections.mark.noneUsable": "このワークスペースで有効な{cli}のアカウントがありません。アカウントを有効にするまで起動できません（「設定」→「アカウントと接続」）。",

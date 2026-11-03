@@ -4,7 +4,7 @@
     "description": "The developer console's provider filter: no filter, every coding agent CLI's events."
   },
   "console.assistant": {
-    "defaultMessage": "Hive Assistant",
+    "defaultMessage": "Assistant",
     "description": "The developer console's source picker: the Hive Assistant's session as a source. Hive's name stays as it is."
   },
   "console.bytes": {
@@ -32,7 +32,7 @@
     "description": "The developer console's button and list of the flight recorder's captures: recent events Hive saved by itself when something rare happened to an agent."
   },
   "console.capturesNone": {
-    "defaultMessage": "No captures yet. Turn on a flight recorder trigger in Settings → Advanced, and Hive saves an agent's recent events by itself when it fires.",
+    "defaultMessage": "No captures yet. Turn on a flight recorder trigger in Settings → Advanced, and Combwork saves an agent's recent events by itself when it fires.",
     "description": "The developer console's list of captures, while there are none. Settings → Advanced is where the triggers are: use its name as Hive shows it."
   },
   "console.capturing": {
@@ -52,11 +52,11 @@
     "description": "The developer console's status bar: events that came too fast for the window, so it never got them."
   },
   "console.emptyRedacted": {
-    "defaultMessage": "Pick a source to watch. Hive captures a source only while this window watches it, and what it captures is redacted: no prompt or reply text, commands, tokens or sign-in details.",
+    "defaultMessage": "Pick a source to watch. Combwork captures a source only while this window watches it, and what it captures is redacted: no prompt or reply text, commands, tokens or sign-in details.",
     "description": "The developer console while no source is picked."
   },
   "console.emptyText": {
-    "defaultMessage": "Pick a source to watch. Hive captures a source only while this window watches it, and what it captures is redacted: no tokens or sign-in details (this window shows prompt, reply and command text while the setting is on).",
+    "defaultMessage": "Pick a source to watch. Combwork captures a source only while this window watches it, and what it captures is redacted: no tokens or sign-in details (this window shows prompt, reply and command text while the setting is on).",
     "description": "The developer console while no source is picked, with the setting that shows text on (Settings → Advanced)."
   },
   "console.eventTypes": {
@@ -136,23 +136,23 @@
     "description": "What the flight recorder saw: an agent working on a turn has said nothing for {seconds} seconds, past its limit, so Hive can't tell what it is doing."
   },
   "console.flight.what.unknownEvent": {
-    "defaultMessage": "hook {event}, an event Hive doesn't know",
+    "defaultMessage": "hook {event}, an event Combwork doesn't know",
     "description": "What the flight recorder saw: the CLI sent a hook (a message telling Hive what it is doing) with an event name Hive doesn't know. {event} is that name, as the CLI sends it."
   },
   "console.flight.what.unknownEventFields": {
-    "defaultMessage": "hook {event}, an event Hive doesn't know, with fields Hive doesn't know: {fields}",
+    "defaultMessage": "hook {event}, an event Combwork doesn't know, with fields Combwork doesn't know: {fields}",
     "description": "What the flight recorder saw: the CLI sent a hook with an event name and fields Hive doesn't know. {event} is the name, {fields} the fields' names, as the CLI sends them (\"brand_new, other_one\")."
   },
   "console.flight.what.unknownFields": {
-    "defaultMessage": "a hook with fields Hive doesn't know: {fields}",
+    "defaultMessage": "a hook with fields Combwork doesn't know: {fields}",
     "description": "What the flight recorder saw: the CLI sent a hook with fields Hive doesn't know. {fields} are the fields' names, as the CLI sends them."
   },
   "console.flight.what.unknownHookFields": {
-    "defaultMessage": "hook {event} with fields Hive doesn't know: {fields}",
+    "defaultMessage": "hook {event} with fields Combwork doesn't know: {fields}",
     "description": "What the flight recorder saw: the CLI sent a hook (its event name {event}, which Hive knows) with fields Hive doesn't know. {fields} are the fields' names, as the CLI sends them."
   },
   "console.flight.what.unknownStatusFields": {
-    "defaultMessage": "status line with fields Hive doesn't know: {fields}",
+    "defaultMessage": "status line with fields Combwork doesn't know: {fields}",
     "description": "What the flight recorder saw: Claude Code sent a status line (what it reports of its model, cost and limits) with fields Hive doesn't know. {fields} are the fields' names."
   },
   "console.flight.what.version": {
@@ -168,7 +168,7 @@
     "description": "The developer console's indicator: events show as they come."
   },
   "console.made": {
-    "defaultMessage": "What Hive made of it",
+    "defaultMessage": "What Combwork made of it",
     "description": "The developer console's event detail: the heading of what Hive read from what came in."
   },
   "console.noMatch": {

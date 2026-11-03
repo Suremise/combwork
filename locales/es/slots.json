@@ -1,12 +1,12 @@
 {
-  "slots.idleBroker.body": "{names} es el broker inactivo del Espacio aislado de Windows, que dejó la última sesión del agente {agent} en un Hive que ya se cerró. No hay ningún Espacio aislado en ejecución, así que liberar el slot es seguro: «Liberar slot…» lo deja libre para otro trabajo, y el broker sigue en ejecución.",
+  "slots.idleBroker.body": "{names} es el broker inactivo del Espacio aislado de Windows, que dejó la última sesión del agente {agent} en un Combwork que ya se cerró. No hay ningún Espacio aislado en ejecución, así que liberar el slot es seguro: «Liberar slot…» lo deja libre para otro trabajo, y el broker sigue en ejecución.",
   "slots.idleBroker.release": "Liberar slot…",
   "slots.idleBroker.title": "{names} retiene el slot {slot}",
   "slots.release.changed": "{slot} cambió mientras tanto: quien escribe en él ya no es el que se muestra. Vuelve a mirarlo.",
-  "slots.release.live": "Quien escribe en {slot} sigue en ejecución en este Hive: primero detén el agente, o termina o conserva lo que dejó en ejecución.",
-  "slots.release.notEnded": "Algunos de los procesos de la lista siguen en ejecución: Windows no dejó que Hive los terminara, así que {slot} no se liberó. Vuelve a intentarlo o libéralo sin terminarlos.",
-  "slots.release.otherHive": "{slot} está retenido por otro Hive que sigue en ejecución (proceso {pid}): libéralo allí o cierra primero ese Hive.",
-  "slots.setting.bad": "Hive no tiene esa opción de slot.",
+  "slots.release.live": "Quien escribe en {slot} sigue en ejecución en este Combwork: primero detén el agente, o termina o conserva lo que dejó en ejecución.",
+  "slots.release.notEnded": "Algunos de los procesos de la lista siguen en ejecución: Windows no dejó que Combwork los terminara, así que {slot} no se liberó. Vuelve a intentarlo o libéralo sin terminarlos.",
+  "slots.release.otherHive": "{slot} está retenido por otro Combwork que sigue en ejecución (proceso {pid}): libéralo allí o cierra primero ese Combwork.",
+  "slots.setting.bad": "Combwork no tiene esa opción de slot.",
   "slots.setting.badSize": "El número de copias de revisión y comprobación es un número entero de {min, number} a {max, number}.",
   "slots.setting.badText": "Un script de slot o una lista de archivos es un texto de {max, number} caracteres como máximo."
 }

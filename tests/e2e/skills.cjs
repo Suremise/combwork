@@ -18,7 +18,7 @@ const sleep = lib.sleep
 const HUNG_MS = 10000
 /** Whether fn() comes true (checked until it does, up to HUNG_MS). */
 const becomes = async (fn) => !!(await lib.until(fn, HUNG_MS))
-/** The bundled skills from before Hive kept track of them (an existing workspace without them deleted them), and the newer ones. */
+/** The bundled skills from before Combwork kept track of them (an existing workspace without them deleted them), and the newer ones. */
 const EARLIER = ['handover', 'merge-ready', 'pick-up', 'review-agent-work', 'split-work', 'workspace-note']
 const NEWER = ['board-hygiene', 'card-loop', 'coordinate-agents', 'generalist', 'journal', 'licence-audit', 'run-lanes', 'triage-report', 'tune-settings', 'use-hive-api', 'work-on-card']
 const BUNDLED = [...EARLIER, ...NEWER]
@@ -75,7 +75,7 @@ const check = (name, ok, extra = '') => {
   await page.keyboard.press('Control+Shift+K')
   check('Skills view lists them', await becomes(async () => (await page.locator('.skill-row').count()) === BUNDLED.length), String(await page.locator('.skill-row').count()))
   const viewWarning = await page.locator('.sidebar .skills-warning').allInnerTexts()
-  check('Skills view: the warning over the list (#120)', viewWarning.length === 1 && viewWarning[0].trim() === 'Warning: Editing these skills may change agent behaviour in Hive', JSON.stringify(viewWarning))
+  check('Skills view: the warning over the list (#120)', viewWarning.length === 1 && viewWarning[0].trim() === 'Warning: Editing these skills may change agent behaviour in Combwork', JSON.stringify(viewWarning))
   await page.screenshot({ path: path.join(lib.WORK, 'skills-view.png') })
 
   // Edited → changed → Revert to default → same.
@@ -84,7 +84,7 @@ const check = (name, ok, extra = '') => {
   check('an edited bundled skill is "changed"', await becomes(async () => (await inv('skills:workspace')).find((s) => s.name === 'pick-up')?.bundled === 'changed'))
   await page.locator('.skill-row', { hasText: 'pick-up' }).click()
   check('its page offers Revert to default', await becomes(async () => (await page.getByText('Revert to default').count()) === 1))
-  check('a Hive skill in preview: no warning over it', (await page.locator('.split .skills-warning').count()) === 0)
+  check('a Combwork skill in preview: no warning over it', (await page.locator('.split .skills-warning').count()) === 0)
   await page.getByText('Revert to default').click()
   await sleep(400)
   await page.locator('.dialog .btn.primary', { hasText: 'Revert' }).click()
@@ -203,16 +203,16 @@ const check = (name, ok, extra = '') => {
   await lib.until(async () => (await pick.count()) === 1, 10000)
   const pickOptions = await pick.locator('option').allInnerTexts()
   check('project tab: a dropdown of the providers, starting on the default one', pickOptions.length === 2 && pickOptions[0].startsWith('Claude Code') && pickOptions[1].startsWith('Codex') && (await pick.inputValue()) === 'claude-code', JSON.stringify({ pickOptions, value: await pick.inputValue() }))
-  const hiveToggle = page.locator('.skill-group-toggle', { hasText: 'Hive' }).first()
+  const hiveToggle = page.locator('.skill-group-toggle', { hasText: 'Combwork' }).first()
   const providerToggle = page.locator('.skill-provider-toggle')
-  check('project tab: Hive skills at the top, open', (await hiveToggle.getAttribute('aria-expanded')) === 'true' && (await page.locator('.split-list .skill-row', { hasText: 'workspace-note' }).count()) === 1)
+  check('project tab: Combwork skills at the top, open', (await hiveToggle.getAttribute('aria-expanded')) === 'true' && (await page.locator('.split-list .skill-row', { hasText: 'workspace-note' }).count()) === 1)
   check('…then that provider’s skills only, folded', (await page.locator('.skill-provider').count()) === 1 && /claude code skills/i.test(await providerToggle.innerText()) && (await providerToggle.getAttribute('aria-expanded')) === 'false' && (await page.locator('.skill-provider .skill-group', { hasText: 'Local' }).count()) === 0)
   await page.screenshot({ path: path.join(lib.WORK, 'skills-project-folded.png') })
   await providerToggle.click()
   check('the provider’s skills open: Local, User', (await providerToggle.getAttribute('aria-expanded')) === 'true' && (await page.locator('.skill-provider .skill-group', { hasText: 'Local (User Managed)' }).count()) === 1 && (await page.locator('.skill-provider .skill-group', { hasText: /^\s*User\s*$/i }).count()) === 1, JSON.stringify(await page.locator('.skill-provider .skill-group').allInnerTexts()))
   await pick.selectOption('codex')
   await lib.until(async () => (await pick.inputValue()) === 'codex', HUNG_MS)
-  check("project tab: Codex's skills, where Hive's Codex copy isn't a local skill", (await page.locator('.skill-provider').count()) === 1 && (await page.locator('.skill-provider .skill-row', { hasText: 'handover' }).count()) === 0)
+  check("project tab: Codex's skills, where Combwork's Codex copy isn't a local skill", (await page.locator('.skill-provider').count()) === 1 && (await page.locator('.skill-provider .skill-row', { hasText: 'handover' }).count()) === 0)
   await pick.selectOption('claude-code')
   await page.locator('.skill-provider').first().locator('.skill-group', { hasText: 'Local' }).locator('button[aria-label^="New local skill"]').click()
   await lib.until(async () => (await page.locator('.dialog input.input').count()) === 1, HUNG_MS)
@@ -250,11 +250,11 @@ const check = (name, ok, extra = '') => {
 
   // "Edit in workspace" on a Hive skill opens it in the Skills view, in the editor. Hive's group unfolded first.
   await hiveToggle.click()
-  check('the Hive group unfolds', (await hiveToggle.getAttribute('aria-expanded')) === 'true' && !!(await lib.until(async () => (await page.locator('.split-list .skill-row', { hasText: 'workspace-note' }).count()) === 1, HUNG_MS)))
+  check('the Combwork group unfolds', (await hiveToggle.getAttribute('aria-expanded')) === 'true' && !!(await lib.until(async () => (await page.locator('.split-list .skill-row', { hasText: 'workspace-note' }).count()) === 1, HUNG_MS)))
   const hiveRow = page.locator('.skill-row', { hasText: 'workspace-note' }).first()
   await hiveRow.click()
   await lib.until(async () => (await page.locator('.split .editor-toolbar', { hasText: 'workspace-note' }).count()) === 1, 5000)
-  check('project tab: a Hive skill (view only) has no warning', (await page.locator('.skills-warning').count()) === 0)
+  check('project tab: a Combwork skill (view only) has no warning', (await page.locator('.skills-warning').count()) === 0)
   await hiveRow.hover()
   await hiveRow.locator('button[aria-label^="Edit in the workspace"]').click()
   // The project tab's row for the same skill stays in the DOM, hidden and selected, and the Skills view draws its own row
@@ -278,7 +278,7 @@ const check = (name, ok, extra = '') => {
     const bar = split?.querySelector('.editor-toolbar')
     return w && host && bar ? { text: w.textContent.trim(), between: bar.getBoundingClientRect().bottom <= w.getBoundingClientRect().top + 0.5 && w.getBoundingClientRect().bottom <= host.getBoundingClientRect().top + 0.5 } : null
   })
-  check('editing a Hive skill: the same warning, above the editor (#120)', editWarning?.text === 'Warning: Editing these skills may change agent behaviour in Hive' && editWarning.between, JSON.stringify(editWarning))
+  check('editing a Combwork skill: the same warning, above the editor (#120)', editWarning?.text === 'Warning: Editing these skills may change agent behaviour in Combwork' && editWarning.between, JSON.stringify(editWarning))
   await page.screenshot({ path: path.join(lib.WORK, 'skills-edit.png') })
   await inv('settings:update', { appearance: { theme: 'light' } })
   await sleep(300)

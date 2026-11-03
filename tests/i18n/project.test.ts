@@ -125,7 +125,7 @@ describe('costs', () => {
     expect(moneyLabel(150.4)).toBe('$150')
     expect(costText({ cost: 1.2, estimated: true, priced: 1, unpriced: 1 })).toBe('≈ $1.20 + ?')
     expect(costText({ cost: 0, estimated: false, priced: 0, unpriced: 2 })).toBe('Unknown')
-    expect(unpricedText('gpt-9', 'Codex')).toBe("Hive has no API price for gpt-9, so it can't estimate this session's cost. Add one in Settings → Codex → API prices.")
+    expect(unpricedText('gpt-9', 'Codex')).toBe("Combwork has no API price for gpt-9, so it can't estimate this session's cost. Add one in Settings → Codex → API prices.")
   })
 
   it("follow the window's language, while money() stays fixed English for agents", () => {
@@ -178,7 +178,7 @@ describe('the sentences once built by hand read as before, in English', () => {
     expect(tr(m('project.changes.status'), { status: 'U' })).toBe('Conflict')
     expect(tr(m('project.changes.staged'), { status: 'Modified', path: 'a.ts' })).toBe('Modified (staged): a.ts')
     expect(tr(m('project.apply.new'), { live: 'yes' })).toBe('Changes apply to new sessions — restart the running session to apply them.')
-    expect(tr(m('project.skills.assistantOnly'), { count: 1 })).toBe("1 Hive skill is for the Hive Assistant only, so it isn't listed: this project's agents don't get it.")
+    expect(tr(m('project.skills.assistantOnly'), { count: 1 })).toBe("1 Combwork skill is for the Assistant only, so it isn't listed: this project's agents don't get it.")
     expect(tr(m('project.settings.inherit'), { value: 'on' })).toBe('Inherit (on)')
   })
 })

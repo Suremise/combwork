@@ -90,9 +90,9 @@ describe('errors thrown at a launch (#842): English for the Agent API, as before
       [await caught(userSettings(['--settings', 'big.json'], dir)), `The settings file big.json (--settings in Extra arguments) can't be read: it's over Claude Code's 2 MiB limit for settings files. ${fix}`, 'Die Einstellungsdatei big.json (--settings in Zusätzliche Argumente) kann nicht gelesen werden: sie ist größer als 2 MiB.'],
       [await caught(userSettings(['--settings', 'folder.json'], dir)), `The settings file folder.json (--settings in Extra arguments) can't be read: it isn't a file. ${fix}`, "Die Einstellungsdatei folder.json (--settings in Zusätzliche Argumente) kann nicht gelesen werden: it isn't a file."],
       [await caught(userSettings(['--settings', 'list.json'], dir)), `The settings file list.json (--settings in Extra arguments) isn't a settings object ({ … }). ${fix}`, null],
-      [await caught(userSettings(['--settings', '{"disableAllHooks":true}'], dir)), "The --settings in Extra arguments turns off all hooks (disableAllHooks). Hive's hooks are how it knows what the agent is doing (its status, file locks, what it is told) and they carry its status line, so Hive doesn't start an agent without them. Take disableAllHooks out of those settings, or remove the --settings from Extra arguments in Agent Settings or Settings → Claude Code.", 'Das --settings in Zusätzliche Argumente schaltet alle Hooks ab (disableAllHooks).'],
-      [await caught(userSettings(['--settings', '{"allowedHttpHookUrls":"x"}'], dir)), "The --settings in Extra arguments sets allowedHttpHookUrls to something other than a list, which stops Hive's hooks reaching it. Make it a list ([ … ]) or remove it in Agent Settings or Settings → Claude Code.", null],
-      [await caught(() => provider('nope')), 'Unknown provider "nope". It may need a newer version of Hive.', 'Unbekannter Anbieter „nope“.']
+      [await caught(userSettings(['--settings', '{"disableAllHooks":true}'], dir)), "The --settings in Extra arguments turns off all hooks (disableAllHooks). Combwork's hooks are how it knows what the agent is doing (its status, file locks, what it is told) and they carry its status line, so Combwork doesn't start an agent without them. Take disableAllHooks out of those settings, or remove the --settings from Extra arguments in Agent Settings or Settings → Claude Code.", 'Das --settings in Zusätzliche Argumente schaltet alle Hooks ab (disableAllHooks).'],
+      [await caught(userSettings(['--settings', '{"allowedHttpHookUrls":"x"}'], dir)), "The --settings in Extra arguments sets allowedHttpHookUrls to something other than a list, which stops Combwork's hooks reaching it. Make it a list ([ … ]) or remove it in Agent Settings or Settings → Claude Code.", null],
+      [await caught(() => provider('nope')), 'Unknown provider "nope". It may need a newer version of Combwork.', 'Unbekannter Anbieter „nope“.']
     ]
     for (const [e, english, german] of cases) {
       // The Agent API's reply (and every reader of .message): the English, as before.
@@ -133,7 +133,7 @@ describe("a provider's install info: English for agents and Hive's own code, the
     setLanguage(PSEUDO_LANGUAGE, {})
     const english = copilotReadiness(info({ provider: 'copilot', loggedIn: false }), { GH_TOKEN: 'x' })
     expect(english[0]).toMatchObject({ message: 'GitHub Copilot is not signed in.', action: { label: 'Sign in' } })
-    expect(english[0].detail?.at(-1)).toBe('Copilot agents don’t get `GH_TOKEN` from Hive’s environment, so it doesn’t sign them in. For a token of Copilot’s own, set `COPILOT_GITHUB_TOKEN`.')
+    expect(english[0].detail?.at(-1)).toBe('Copilot agents don’t get `GH_TOKEN` from Combwork’s environment, so it doesn’t sign them in. For a token of Copilot’s own, set `COPILOT_GITHUB_TOKEN`.')
     const shown = shownInstallInfo(info({ provider: 'copilot', readiness: english, notes: [installText(COPILOT_PLAN_NOTE)] }))
     const issue = shown.readiness![0]
     expect([issue.message, issue.action!.label, ...issue.detail!, ...shown.notes!].every((t) => PSEUDO.test(t))).toBe(true)

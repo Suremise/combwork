@@ -280,7 +280,7 @@ export function notWatchingReason(card: Pick<TaskCard, 'number' | 'column' | 'ar
   if (!a) return null
   // #777: it did watch the card; its wake, which Hive typed, waits untaken in its prompt (its CLI didn't take the line).
   if (a.untaken) {
-    if (tr) return tr(msg({ id: 'board.stalled.wakeUntaken', defaultMessage: "{agent} hasn't taken the wake Hive typed for {card}: it waits in its prompt.", description: 'Why a card in a card loop is stalled: the agent watched the card, and Hive typed its wake line into the agent\'s terminal, but the agent\'s CLI never sent it. {agent} is its name, {card} the card\'s name: its key, such as AM-12, or #12 for a card with none.' }), { agent: a.name, card: cardLabel(card) })
+    if (tr) return tr(msg({ id: 'board.stalled.wakeUntaken', defaultMessage: "{agent} hasn't taken the wake Combwork typed for {card}: it waits in its prompt.", description: 'Why a card in a card loop is stalled: the agent watched the card, and Hive typed its wake line into the agent\'s terminal, but the agent\'s CLI never sent it. {agent} is its name, {card} the card\'s name: its key, such as AM-12, or #12 for a card with none.' }), { agent: a.name, card: cardLabel(card) })
     return say(ST.wakeUntaken, { agent: a.name, card: cardName(card) })
   }
   if (tr) return tr(msg({ id: 'board.stalled.notWatching', defaultMessage: "{agent} isn't watching {card}: its turn ended with no card watch.", description: 'Why a card in a card loop is stalled: the agent looping on it stopped without waiting for the card to change. {agent} is its name, {card} the card’s name: its key, such as AM-12, or #12 for a card with none. A card watch is what wakes an agent when a card changes.' }), { agent: a.name, card: cardLabel(card) })

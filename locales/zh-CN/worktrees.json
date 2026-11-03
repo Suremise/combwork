@@ -34,7 +34,7 @@
   "worktrees.merge.sameBranch": "项目文件夹已检出 {branch}。",
   "worktrees.merge.staged": "项目文件夹中有已暂存的更改。请先提交或取消暂存，再合并。",
   "worktrees.merge.targetElsewhere": "{branch} 已在 {folder} 中检出。请在那里合并，或先在该文件夹中检出其他分支。",
-  "worktrees.merge.targetMoved": "Hive 向 {branch} 合并时，它发生了变化。没有合并任何内容：请重新合并。",
+  "worktrees.merge.targetMoved": "Combwork 向 {branch} 合并时，它发生了变化。没有合并任何内容：请重新合并。",
   "worktrees.merge.uncommitted": "没有合并任何内容：工作树中有 {files, plural, other {# 个文件}}未提交。请先在工作树中提交或储藏（stash）它们，然后再合并。",
   "worktrees.merge.unknownFiles": "（未知文件）",
   "worktrees.missing.noAgent": "该智能体已不存在。",

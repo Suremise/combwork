@@ -37,7 +37,7 @@ const M = {
   runs: msg({ id: 'settings.closeCommand.runs', defaultMessage: 'Runs: {command}', description: 'Under the close command in Settings: the command exactly as Hive would run it, its placeholders filled in. {command} is that command: keep it as it is.' }),
   hint: msg({
     id: 'settings.closeCommand.hint',
-    defaultMessage: 'Hive waits for it, showing it running. A command that shouldn\'t hold Hive up can start its job and return, e.g. start "" "backup.cmd".',
+    defaultMessage: 'Combwork waits for it, showing it running. A command that shouldn\'t hold Combwork up can start its job and return, e.g. start "" "backup.cmd".',
     description: 'A hint under the close command in Settings. start "" "backup.cmd" is a Windows command (cmd.exe starts the file and returns at once): keep it as it is.'
   }),
   save: msg({ id: 'settings.commands.save', defaultMessage: 'Save', description: 'The command dialog\'s button (HI-1954).' }),
@@ -48,10 +48,10 @@ const M = {
   pointEmpty: msg({ id: 'settings.commands.pointEmpty', defaultMessage: 'Nothing runs.', description: 'A point such as "When this workspace opens, run" (HI-1954) with no command picked.' }),
   pointAdd: msg({ id: 'settings.commands.pointAdd', defaultMessage: 'Add a command to run here…', description: 'A drop-down under a point such as "When this workspace opens, run" (HI-1954): picks one of the commands to run there, after those already picked.' }),
   pointRemove: msg({ id: 'settings.commands.pointRemove', defaultMessage: "Don't run it here", description: 'A button beside a command a point runs (HI-1954): takes it off that point; the command itself stays.' }),
-  hiveBadge: msg({ id: 'settings.commands.hiveBadge', defaultMessage: 'Hive', description: "A short tag beside a command in a workspace's point (HI-1954): one of Hive's own commands (Settings → General → Commands), not the workspace's." }),
+  hiveBadge: msg({ id: 'settings.commands.hiveBadge', defaultMessage: 'Combwork', description: "A short tag beside a command in a workspace's point (HI-1954): one of Hive's own commands (Settings → General → Commands), not the workspace's." }),
   gone: msg({ id: 'settings.commands.gone', defaultMessage: '(deleted)', description: 'A command a point still names but which was deleted (HI-1954): it is skipped.' }),
   cantFill: msg({ id: 'settings.commands.cantFill', defaultMessage: "{placeholders} can't be filled here: it won't run", description: "A warning beside a command a point runs (HI-1954): placeholders in it have no value at that point (for example {workspace} as Hive quits), so Hive won't run it there. {placeholders} lists them as written." }),
-  onUpdate: msg({ id: 'settings.closeCommand.onUpdate', defaultMessage: 'Also when Hive restarts to install an update', description: 'A checkbox under the close command (Settings → Workspace → When this workspace closes, run, and Settings → General → When Hive quits, run): run it too when Hive restarts to install an update (by default it is skipped then).' })
+  onUpdate: msg({ id: 'settings.closeCommand.onUpdate', defaultMessage: 'Also when Combwork restarts to install an update', description: 'A checkbox under the close command (Settings → Workspace → When this workspace closes, run, and Settings → General → When Hive quits, run): run it too when Hive restarts to install an update (by default it is skipped then).' })
 }
 
 /**

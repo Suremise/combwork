@@ -67,7 +67,7 @@ const CONSOLE_MIN = { width: 560, height: 320 }
 
 /** Opens the Hive window's console on its workspace, or brings it forward when it is open. */
 export function openConsoleWindow(owner: HiveWindow): BrowserWindow {
-  if (!owner.ws.path) throw new Error(tr(msg({ id: 'main.console.noWorkspace', defaultMessage: "Open a workspace first: the developer console shows a workspace's agents and Hive's work there.", description: 'An error when the developer console is opened with no workspace open.' })))
+  if (!owner.ws.path) throw new Error(tr(msg({ id: 'main.console.noWorkspace', defaultMessage: "Open a workspace first: the developer console shows a workspace's agents and Combwork's work there.", description: 'An error when the developer console is opened with no workspace open.' })))
   followWorkspaces()
   const open = consoleWindowOf(owner)
   if (open) {
