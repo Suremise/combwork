@@ -18,7 +18,7 @@ const DESKTOP = 'Desktop'
 const START = 'AppData\\Roaming\\Microsoft\\Windows\\Start Menu\\Programs'
 const combwork = { path: `${HOME}\\AppData\\Local\\Programs\\Combwork`, exe: 'Combwork.exe', exists: true, hiveExe: true, uninstaller: true, appAsarSha256: 'bbbb' }
 const state = (over: Json = {}): Json => ({
-  uninstallEntries: [{ displayName: 'Combwork 0.6.0' }],
+  uninstallEntries: [{ displayName: 'Combwork 0.6.0', key: '10a7595a-0e90-558c-b6b6-ae33bdd80748' }],
   installs: { combwork, hive: { exists: false } },
   installDir: combwork,
   profiles: { roamingCombwork: { exists: true }, roamingHive: { exists: false }, localCombwork: { exists: true, record: '{"v":1,"from":"x","movedAt":"t","by":"installer"}' }, localHive: { exists: false } },

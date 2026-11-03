@@ -20,6 +20,8 @@ const SCENARIOS = {
   7: 'Install by hand over the previous release, running (/S --force-run)'
 }
 const KINDS = ['fresh', 'upgrade', 'manual']
+/** electron-builder's APP_GUID for appId it.surmise.combwork (HI-2460): its uninstall entry's key. */
+const COMBWORK_GUID = '10a7595a-0e90-558c-b6b6-ae33bdd80748'
 
 // What each run kind must produce: the drivers' check ids and facts, and the screenshots.
 const REQUIRED = {
@@ -135,7 +137,8 @@ function evaluate(meta, files) {
     if (newSt) {
       const e = entriesOf(newSt)
       // HI-2460: Hive Desktop's entry gone, one of the new app's: "nobody ends up with both installed".
-      add(n, `One Installed-apps entry after the upgrade: "${app.productName} ${version}", no Hive Desktop`, e.length === 1 && e[0].displayName === `${app.productName} ${version}`, `before: ${JSON.stringify(prevNames)}; after: ${JSON.stringify(e.map(x => x.displayName))}`)
+      // Its key is the new app ID's (it.surmise.combwork's APP_GUID), whatever the display name says.
+      add(n, `One Installed-apps entry after the upgrade: "${app.productName} ${version}", Combwork's own (${COMBWORK_GUID}), no Hive Desktop`, e.length === 1 && e[0].displayName === `${app.productName} ${version}` && String(e[0].key).toLowerCase() === COMBWORK_GUID, `before: ${JSON.stringify(prevNames)}; after: ${JSON.stringify(e.map(x => x.displayName))}`)
       const l = shortcutsOf(newSt)
       add(n, `Shortcuts: only "${app.shortcutName}", starting ${app.exeName}.exe, on the Desktop and in the Start menu (before: ${describeShortcuts(shortcutsOf(prevSt))})`, l.length >= 2 && l.every(x => x.name === app.shortcutName && exeIn(x.target, app.exeName)) && l.some(inDesktop) && l.some(inStart), describeShortcuts(l))
       const ins = newSt.installs || {}
