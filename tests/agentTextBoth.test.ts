@@ -222,14 +222,42 @@ describe('card history and Hive’s comments, said when read', () => {
     expect(asAgent(() => entryForAgents({ at: 'x', by: 'HB1', what: 'Moved into Review', whatText: moved, id: 'e' }))).toEqual({ at: 'x', by: 'HB1', what: 'DIALECT ARRIVAL Review' })
   })
 
-  it('keeps as stored: a line with no message (before #845), an id this Hive does not know, and agents’ own words', () => {
-    using({ 'tasks.history.moved': 'Now in {column}', 'tasks.history.queueReturned': 'Back: {reason}' })
+  it('keeps as stored: a line with no message (before #845), and an id this Hive does not know', () => {
+    using({ 'tasks.history.moved': 'Now in {column}' })
     expect(asAgent(() => entryForAgents({ at: 'x', by: 'HB1', what: 'Moved to Review' }))).toEqual({ at: 'x', by: 'HB1', what: 'Moved to Review' })
     expect(asAgent(() => storedForAgents('From a newer Hive', { id: 'tasks.history.fromTheFuture', values: { column: 'review' } }))).toBe('From a newer Hive')
-    // HI-2087's return comment: agents' longer English beside the window's message, marked own when written, and one from before the mark.
-    const back = storedText(HISTORY.queueReturned, { reason: 'conflict', target: 'main', check: '', files: 'none' })
-    expect(asAgent(() => entryForAgents({ at: 'x', by: 'Hive', text: 'HI-1 came back: a conflict with main. Merge main in…', hiveText: { ...back, own: true } }))).toEqual({ at: 'x', by: 'Hive', text: 'HI-1 came back: a conflict with main. Merge main in…' })
-    expect(asAgent(() => storedForAgents('HI-1 came back: a conflict with main.', back))).toBe('HI-1 came back: a conflict with main.')
+  })
+
+  it("the queue's return comment (HI-2087), as written and stored: its agents' English said again in the reader's chain, through a card read and a wake", async () => {
+    const { returnedComment } = await import('../src/main/workflow/queueState')
+    const { cardChange } = await import('../src/shared/watch')
+    const failure = { entry: 'q-1', revision: 'abc1234', target: 'main', reason: 'conflict' as const, transient: false, files: ['a.ts'], log: Array.from({ length: 40 }, (_, i) => `line ${i}`).join('\n') }
+    const written = returnedComment('HI-1', failure)
+    // What commentAsHive keeps: the English and the window's message as they are, through the card file's JSON.
+    const comment = { at: '2026-11-03T10:00:01.000Z', by: 'Hive', text: written.text, hiveText: JSON.parse(JSON.stringify(written.shown)), id: 'c1' }
+    const card = { number: 1, column: 'doing', history: [{ at: '2026-11-03T10:00:00.000Z', by: 'Hive', what: 'Moved to Doing' }], comments: [comment] }
+    expect(written.text).toMatch(/^HI-1 came back from the merge queue: a conflict with main in a\.ts\./)
+    expect(written.text).toContain('line 39')
+    // Its data keeps only the log lines the comment quotes.
+    expect(JSON.stringify(written.shown).length).toBeLessThan(800)
+    const window = shownText(withValues(HISTORY.queueReturned, written.shown.values as never))
+    const wake = JSON.stringify(asAgent(() => cardChange(1, card as never, ['comment'])))
+    // No chain, or one that changes none of its texts: exactly as stored.
+    expect(asAgent(() => entryForAgents(comment)).text).toBe(written.text)
+    using({ 'tasks.history.moved': 'Now in {column}' })
+    expect(asAgent(() => entryForAgents(comment)).text).toBe(written.text)
+    expect(JSON.stringify(asAgent(() => cardChange(1, card as never, ['comment'])))).toBe(wake)
+    // An override of its agent message: said in the reader's chain, the rest of it (files, last lines, next step) kept.
+    using({ 'queue.returned.lead': 'DIALECT QUEUE {subject} {cameBack} {failure}' })
+    const read = asAgent(() => entryForAgents(comment)).text
+    expect(read).toMatch(/^DIALECT QUEUE HI-1 came back from the merge queue a conflict with main in a\.ts/)
+    expect(read).toContain('line 39')
+    expect(asAgent(() => cardChange(1, card as never, ['comment'])).comment?.firstLine).toMatch(/^DIALECT QUEUE HI-1/)
+    // The window's text of it doesn't change.
+    expect(asAgent(() => shownText(withValues(HISTORY.queueReturned, written.shown.values as never)))).toBe(window)
+    // A return comment written before its data was kept can't be said again: as stored.
+    const { agent: _agent, ...legacy } = comment.hiveText
+    expect(asAgent(() => storedForAgents(written.text, legacy))).toBe(written.text)
   })
 
   it("says a nested id's override through entryForAgents, and a wake quotes Hive's comment in the reader's chain", async () => {

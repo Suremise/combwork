@@ -4,10 +4,11 @@ import { mkdir, writeFile } from 'original-fs/promises'
 import { projectAgents } from '../shared/defaults'
 import { ASSISTANT_AGENT_ID } from '../shared/assistant'
 import { agentText, englishText, forAgents, saidText, withValues, type Text, type TextPart, type TextValues } from '../shared/advanced'
-import { agentMsg, overridesAny } from '../shared/agentText'
+import { agentMsg, currentChain, inDefaultDialect, overridesAny } from '../shared/agentText'
+import { RETURNED_COMMENT, returnedCommentFrom } from './workflow/queueState'
 import { msg, tr, type Msg } from '../shared/i18n'
 import { COLUMN_CHOICES, TASK_COLUMNS, cardMatches, isTaskColumn, restoreOrders, searchedWords, sortCards } from '../shared/tasks'
-import { HISTORY, setStoredForAgents, storedIds, storedLineText, storedText } from '../shared/taskHistory'
+import { HISTORY, setStoredAgentRenderer, setStoredForAgents, storedAgentText, storedIds, storedLineText, storedText } from '../shared/taskHistory'
 import { MAX_CONTEXT, MAX_CONTEXT_REF, parseDocRef } from '../shared/docRefs'
 import { contextProblems } from './docSections'
 import { providerMessage } from '../shared/providers'
@@ -1286,24 +1287,24 @@ export function agentColumns(m: Msg, values?: TextValues): Text {
 /**
  * A stored line or comment for an agent (dialects, HI-2440): said again in the reader's chain where the chain overrides
  * a message it names (its own, or one stored inside its values), whatever wording the English had when it was stored:
- * with no such override, a line reads exactly as stored. Also as stored: an id this Hive doesn't know (storedLineText's
- * null), and a comment whose English is agents' own words rather than its message's (`own`, below).
+ * with no such override, a line reads exactly as stored. An id this Hive doesn't know (storedLineText's null) reads as
+ * stored too. A comment whose agents' English is worded apart from its window message (`agent`, HI-2087's return) is
+ * said again from its own data: as stored unless the chain changes what it says.
  */
 // agent-text: HISTORY (each line by its stored id)
 setStoredForAgents((english, stored) => {
-  if (!overridesAny(storedIds(stored)) || agentsOwn(stored)) return english
+  const s = stored as Partial<StoredText> | null
+  if (s?.agent) {
+    if (!currentChain()) return english
+    const said = storedAgentText(s.agent)
+    return said === null || said === inDefaultDialect(() => storedAgentText(s.agent!)) ? english : said
+  }
+  // Compatibility: a return comment written before its data was kept (HI-2440 round 3) can't be said again: as stored.
+  if (s?.id === HISTORY.queueReturned.id) return english
+  if (!overridesAny(storedIds(stored))) return english
   return storedLineText(stored, (m, values) => agentText(agentColumns(m, values)), lineMessage) ?? english
 })
-
-/**
- * Whether a comment's English is agents' own words, not its message's (HI-2087: the queue's return comment tells agents
- * what came back and what to do next, which the window's message doesn't): marked `own` when written (commentAsHive);
- * a return comment from before the mark always was.
- */
-const agentsOwn = (stored: unknown): boolean => {
-  const s = stored as Partial<StoredText> | null
-  return !!s && (s.own === true || s.id === HISTORY.queueReturned.id)
-}
+setStoredAgentRenderer(RETURNED_COMMENT, returnedCommentFrom)
 
 /** A board error naming columns: the window's words in its language, agents' as before (agentColumns), in their dialect. */
 export const columnError = (m: Msg, values: TextValues, options?: { kind?: HiveErrorKind }): HiveError => new HiveError(forAgents(withValues(m, values), agentColumns(m, values)), options)
@@ -2593,8 +2594,8 @@ export async function commentAsHive(n: number, said: string | StoredText | { tex
     const card = await getTask(n, ws)
     // `key` (HI-2014): the comment's id, written once on the card: a retry finds it and writes nothing.
     if (card.archived || !still(card) || (key && card.comments.some((c) => c.id === key))) return false
-    // Agents' English beside the window's message: marked own where it isn't that message's (storedForAgents keeps it).
-    if (typeof said !== 'string' && 'shown' in said) addComment(card, BY.hive, said.text, said.text === englishSaid(said.shown) ? said.shown : { ...said.shown, own: true }, key)
+    // Agents' English beside the window's message (and, where it is worded apart, what it is said from: `agent`).
+    if (typeof said !== 'string' && 'shown' in said) addComment(card, BY.hive, said.text, said.shown, key)
     else addComment(card, BY.hive, typeof said === 'string' ? said : englishSaid(said), typeof said === 'string' ? undefined : said, key)
     await saveCard(ws, n, card)
     changed(ws)

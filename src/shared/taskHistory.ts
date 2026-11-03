@@ -164,6 +164,19 @@ export function storedIds(s: unknown, depth = 0, into: string[] = []): string[] 
   return into
 }
 
+const agentRenderers = new Map<string, (data: unknown) => string | null>()
+
+/** Registers how a comment's own agents' English is said from its stored data (`StoredText.agent`), by name. */
+export function setStoredAgentRenderer(name: string, fn: (data: unknown) => string | null): void {
+  agentRenderers.set(name, fn)
+}
+
+/** A comment's own agents' English, said from its stored data in the current chain; null where no renderer takes it. */
+export function storedAgentText(agent: { render: string; data: unknown }): string | null {
+  const fn = typeof agent?.render === 'string' ? agentRenderers.get(agent.render) : undefined
+  return fn ? fn(agent.data) : null
+}
+
 let forAgents: ((english: string, stored: unknown) => string) | null = null
 
 /** Registers how a stored line is said for an agent (main's board service, tasks.ts): see storedForAgents. */
