@@ -324,6 +324,9 @@ const prose = (seed, n) => {
     check('…with attachments: true, all 31, each from its comment', lastAll.attachments?.length === 31 && !('attachmentsOmitted' in lastAll) && lastAll.attachments.every((a) => a.from.startsWith('comment by ')), JSON.stringify({ n: lastAll.attachments?.length, from: lastAll.attachments?.map((a) => a.from).filter((f) => !f.startsWith('comment by ')) }))
     const two = JSON.parse(measure('hive_read_task (comments: 2, 31 attachments)', tool('hive_read_task', { number: many, comments: 2 })))
     check("…comments: 2: the two comments' 11, the other 20 counted", two.attachments?.length === 11 && two.attachmentsOmitted === 20 && two.attachments.every((a) => /^(last-run|run-2-\d)\.log$/.test(a.name)), JSON.stringify({ n: two.attachments?.length, omitted: two.attachmentsOmitted }))
+    // HI-2412: comments: 0 is none of them, every one counted, not a full read.
+    const none = JSON.parse(tool('hive_read_task', { number: many, comments: 0 }).text)
+    check('…comments: 0: no comments and none of their attachments, all counted', none.comments?.length === 0 && none.commentsOmitted === whole.comments.length && !('attachments' in none) && none.attachmentsOmitted === 31, JSON.stringify({ n: none.comments?.length, omitted: none.commentsOmitted, attachments: none.attachments?.length, attachmentsOmitted: none.attachmentsOmitted }))
     const gist = JSON.parse(measure('hive_read_task (summary, 31 attachments)', tool('hive_read_task', { number: many, summary: true })))
     check('…summary: none (its comments are their first lines), all 31 counted', !('attachments' in gist) && gist.attachmentsOmitted === 31, JSON.stringify({ n: gist.attachments?.length, omitted: gist.attachmentsOmitted }))
     check('…and the narrowed read is the smaller by far', sizes['hive_read_task (latestComment, 31 attachments)'] * 4 < sizes['hive_read_task (31 attachments)'], JSON.stringify(sizes))

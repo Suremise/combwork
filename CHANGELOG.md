@@ -1,5 +1,11 @@
 # Release Notes
 
+## Unreleased
+
+### Fixed
+
+- **A card read with `comments: 0` gives none of its comments.** `hive_read_task` with `comments: 0`, asked for so as not to see a card's comments, returned every one of them; the Agent API refused `comments=0`. Both now give no comments, with `commentsOmitted` counting them, and none of their attachments (HI-2412).
+
 ## 1.0.0 — 2026-11-03
 
 **Hive 1.0 runs your board by your project's rules.** Choose how a card goes from Todo to Done (who reviews it, which checks pass first, who merges it, where it is built) with the Solo, Pair or Team presets; agents tell Hive what they did, and Hive moves the card, asks you only what's yours to answer, and can merge approved work itself, each card in its own slot. Agents run on connections Hive keeps (several sign-ins side by side), one notification system tells each thing once, and the Activity view shows what every agent is doing now.

@@ -31,7 +31,7 @@ import { assignIsolated, copiesFor, copyAt, isolatedLinked, isolatedRequest, iso
 import { reviewCopyOnStart, reviewCopyOnVerdict } from './reviewCopies'
 import { COLUMN_CHOICES, columnLabel, commentSummary, isTaskColumn, reviewStalled } from '../shared/tasks'
 import type { HandoverAuthor } from '../shared/hiveGuidance'
-import { cardRequests, laneOrderNote, modelInUse, newestComments, progressLabel, retryWaitsView, taskRow, withoutHistory, type CardRequest, type IntentDone, type ProjectRow, type SkillRow, type TaskBatch, type TaskChange, type TaskReorder, type TaskView, type AccountUsagePublic } from '../shared/toolReplies'
+import { cardRequests, commentsParam, laneOrderNote, modelInUse, newestComments, progressLabel, retryWaitsView, taskRow, withoutHistory, type CardRequest, type IntentDone, type ProjectRow, type SkillRow, type TaskBatch, type TaskChange, type TaskReorder, type TaskView, type AccountUsagePublic } from '../shared/toolReplies'
 import * as assistant from './assistantControl'
 import { STOP_ASK_MS } from './mcp/agentApiCall'
 import { SettingRefused, applySetting, checkedValue, entryOf, projectOf, restartText, settingDetail, settingRows } from './settingsTools'
@@ -2947,14 +2947,16 @@ route('GET', '/v1/tasks/:n', async ({ params, query }) => {
   requireWorkspace()
   // The card with its decision generation, read together (#1216): what this reply gives an agent is what its receipt records.
   const seen = await tasks.readTaskSeen(taskNumber(params[0]), await taskActor())
-  const raw = query.get('comments')
-  const n = raw === null ? null : Number(raw)
-  if (n !== null && (!Number.isInteger(n) || n < 1)) throw new HttpError(400, `comments must be a whole number from 1: "${raw}"`)
+  // comments=0 (HI-2412): none of them, every one counted in commentsOmitted.
+  const parsed = commentsParam(query.get('comments'))
+  if (parsed !== null && typeof parsed === 'object') throw new HttpError(400, parsed.error)
+  const n = parsed
   const summary = query.get('summary') === 'true'
   // A narrowed read (HI-2402) keeps only the attachments of the comments it returns in full (none under summary=true,
   // whose comments are their first lines), unless attachments=true; a full read keeps them all.
   const narrowed = (n !== null || summary) && query.get('attachments') !== 'true'
-  const inFull = summary ? [] : n === null ? seen.card.comments : seen.card.comments.slice(-n)
+  // Never slice(-n): slice(-0) is every comment (HI-2412).
+  const inFull = summary ? [] : n === null ? seen.card.comments : seen.card.comments.slice(Math.max(0, seen.card.comments.length - n))
   const view = await taskView(seen.card, undefined, undefined, narrowed ? new Set(inFull.flatMap((x) => (x.id ? [x.id] : []))) : undefined)
   // Read in full, decisions included: those aren't new to the agent any more (#357).
   const me = agentCaller()
