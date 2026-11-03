@@ -3,6 +3,7 @@ import { app } from 'electron'
 import { mkdir } from 'original-fs/promises'
 import { dirname, join } from 'path'
 import { hashText, writeJsonAtomic } from './fsutil'
+import { createLogger } from './logger'
 import { recordTestToken } from './testQuiet'
 
 /**
@@ -18,6 +19,7 @@ export interface AgentIdentity {
   agentId: string
 }
 
+const log = createLogger('agent-tokens')
 const tokens = new Map<string, AgentIdentity & { token: string; runId: string }>()
 const key = (projectPath: string, agentId: string): string => `${projectPath.toLowerCase()}#${agentId}`
 
@@ -26,11 +28,39 @@ export function agentTokenFile(projectPath: string, agentId: string): string {
   return join(app.getPath('userData'), 'agent-api', `${hashText(key(projectPath, agentId))}.json`)
 }
 
+/** A launch whose token stopped working: ended with the agent, or replaced by its next launch. */
+export type EndedLaunch = AgentIdentity & { runId: string }
+const endedListeners = new Set<(ended: EndedLaunch) => void>()
+
+/**
+ * Told, at once, each time a launch's token stops working (HI-2416): what the token opened and keeps open (the Agent API's
+ * event streams) ends with it, as a viewer token's streams end when it is revoked. Returns the unsubscribe.
+ */
+export function onAgentTokenEnded(fn: (ended: EndedLaunch) => void): () => void {
+  endedListeners.add(fn)
+  return () => void endedListeners.delete(fn)
+}
+
+function ended(t: EndedLaunch): void {
+  const launch: EndedLaunch = { workspace: t.workspace, projectPath: t.projectPath, agentId: t.agentId, runId: t.runId }
+  // A listener's failure never stops the token ending, nor the others being told.
+  for (const fn of endedListeners) {
+    try {
+      fn(launch)
+    } catch (e) {
+      log.warn('ending what an agent token kept open', e)
+    }
+  }
+}
+
 /** A new token for an agent's launch (`runId`); the previous one stops working. */
 export async function newAgentToken(id: AgentIdentity, runId: string): Promise<string> {
   const token = randomBytes(32).toString('hex')
   recordTestToken('agent', token)
-  tokens.set(key(id.projectPath, id.agentId), { ...id, token, runId })
+  const k = key(id.projectPath, id.agentId)
+  const was = tokens.get(k)
+  tokens.set(k, { ...id, token, runId })
+  if (was) ended(was)
   const file = agentTokenFile(id.projectPath, id.agentId)
   await mkdir(dirname(file), { recursive: true })
   await writeJsonAtomic(file, { token, note: "One Hive agent's Agent API token. Hive replaces it each time the agent starts." })
@@ -45,7 +75,10 @@ export function agentToken(projectPath: string, agentId: string): string | null 
 /** The agent's launch `runId` ended: its token stops working (not a newer launch's, if it was restarted meanwhile). */
 export function endAgentToken(projectPath: string, agentId: string, runId: string): void {
   const k = key(projectPath, agentId)
-  if (tokens.get(k)?.runId === runId) tokens.delete(k)
+  const t = tokens.get(k)
+  if (t?.runId !== runId) return
+  tokens.delete(k)
+  ended(t)
 }
 
 /** The agent a token belongs to, with the launch it was made for, or null. */

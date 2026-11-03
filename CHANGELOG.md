@@ -5,12 +5,11 @@
 ### Fixed
 
 - **A card read with `comments: 0` gives none of its comments.** `hive_read_task` with `comments: 0`, asked for so as not to see a card's comments, returned every one of them; the Agent API refused `comments=0`. Both now give no comments, with `commentsOmitted` counting them, and none of their attachments (HI-2412).
-### Fixes
-
 - **Turning the Assistant's Control down, or stopping it, stops a card or comment it already asked for.** A new card or comment the Assistant asked for just before, still waiting behind another change to the board, was still made. Now it's refused and nothing of it is saved, its files included (HI-2415).
 ### Security
 
 - **DOMPurify 3.4.17.** Hive cleans the Markdown it shows (cards, comments, docs, agents' messages) and the Files tab's editor with DOMPurify, and 3.4.16 has three advisories. None applied to how Hive or the editor use it (they need options neither sets), but the fixed version now ships (HI-2421).
+- **An agent's event stream ends when the agent does.** A program following Hive's events with an agent's own token (`GET /v1/events`) kept receiving its project's events after that agent stopped or restarted, though every new request with the token was refused. Now the stream closes as soon as the token stops working, as a revoked viewer token's streams do (HI-2416).
 
 ## 1.0.0 — 2026-11-03
 

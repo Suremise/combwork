@@ -116,7 +116,7 @@ import { apiOutcome, appMetrics, clock as metricsClock, knownRoute, metricsHandl
 import { metricsReport } from './metricsUsage'
 import { apiLabel, beginWork, hookLabel } from './mainStalls'
 import type { GuidanceSeries, MetricOutcome, MetricsPart, MetricsQuery, MetricsReport } from '../shared/metrics'
-import { agentForToken, agentToken, agentTokenFile, type AgentIdentity } from './agentTokens'
+import { agentForToken, agentToken, agentTokenFile, onAgentTokenEnded, type AgentIdentity, type EndedLaunch } from './agentTokens'
 import { API_EVENTS, apiEventFor, publicRun } from './apiEvents'
 import { clearDiscovery, writeDiscovery } from './apiDiscovery'
 import { createViewerToken, loadViewerTokens, revokeViewerToken, viewerForToken, viewerTokens } from './viewerTokens'
@@ -316,8 +316,11 @@ function assistantCallerToken(): string | null {
   return c?.kind === 'assistant' ? c.token : null
 }
 let apiError: string | undefined
-/** Event-stream clients: the project agent each is (null: a script or a viewer, which gets every event), and the viewer token it came with. */
-const sseClients = new Map<ServerResponse, { agent: AgentIdentity | null; viewer: string | null }>()
+/**
+ * Event-stream clients: the project agent each is (null: a script or a viewer, which gets every event) with the launch
+ * whose token it came with (`run`), and the viewer token it came with.
+ */
+const sseClients = new Map<ServerResponse, { agent: AgentIdentity | null; run: string | null; viewer: string | null }>()
 
 /** What an Agent API request is measured as (metrics.ts), filled in as it is handled and recorded when it ends. */
 interface ApiRequest {
@@ -4399,7 +4402,7 @@ async function serveApi(req: IncomingMessage, res: ServerResponse, url: URL): Pr
     if (assistantCaller()) return send(res, 403, { error: 'The event stream is for Agent API callers. Use hive_wait_for_agents to follow agents.' })
     res.writeHead(200, { 'Content-Type': 'text/event-stream', 'Cache-Control': 'no-cache', Connection: 'keep-alive' })
     res.write(': connected\n\n')
-    sseClients.set(res, { agent: agentCaller(), viewer: viewerCaller()?.id ?? null })
+    sseClients.set(res, { agent: agentCaller(), run: agentCallerRun(), viewer: viewerCaller()?.id ?? null })
     // A stream is counted as one (connections, events, bytes, how long it stayed open), not as a request's latency.
     m.skip = true
     // Named so in a "main process was busy" warning (mainStalls.ts), which leaves it out once it is just open.
@@ -4682,6 +4685,21 @@ export async function revokeViewer(id: string): Promise<AgentApiInfo> {
   return apiInfo()
 }
 
+/**
+ * A project agent's launch whose token stopped working (it ended, or a new launch replaced it): its open event streams
+ * end, as a revoked viewer's do (HI-2416); a new request with that token is refused (401). Only that launch's: the next
+ * launch's streams, with its own token, stay open.
+ */
+function endLaunchStreams(ended: EndedLaunch): void {
+  for (const [c, client] of sseClients) {
+    const a = client.agent
+    if (!a || client.run !== ended.runId || a.agentId !== ended.agentId || a.projectPath.toLowerCase() !== ended.projectPath.toLowerCase()) continue
+    sseClients.delete(c)
+    c.end()
+  }
+}
+
 onHiveEvent(broadcast)
+onAgentTokenEnded(endLaunchStreams)
 // A project agent's watch refused, under the watches' lock, while Hive is giving it a card in a slot (HI-2197).
 onWatchPlacing(watchWhilePlaced)
