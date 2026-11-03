@@ -104,6 +104,11 @@ export interface TaskView extends Omit<TaskCard, 'agent' | 'decisions' | 'held'>
    * when, and where it came (a comment's author and time, the description, a session). `missing`: its file is gone.
    */
   attachments?: { path: string; name: string; size: number; by: string; at: string; from: string; missing?: true }[]
+  /**
+   * A narrowed read (HI-2402: `comments=n`, `summary=true`): how many attachments it leaves out, those that didn't come
+   * with a comment returned in full (`attachments=true` gives them all). Absent when none is left out.
+   */
+  attachmentsOmitted?: number
   /** Its 1.0 stage (#1223): `column` is the stage's category. Last, after the card's own fields. */
   stage: StageId
   /**

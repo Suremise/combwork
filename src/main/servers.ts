@@ -8,7 +8,7 @@ import { withAttachmentPaths, type CardAttachment } from '../shared/cardAttachme
 import { existsSync } from 'original-fs'
 import { stat } from 'original-fs/promises'
 import { LISTEN_RETRY_BOUND_MS, listenWithRetry } from './listenRetry'
-import type { AgentApiInfo, AgentDef, AgentInfo, Connection, AssistantControl, AssistantUndoResult, LaneInfo, EffortLevel, HiveEvent, LiveSessionState, McpServerInfo, PermissionMode, ProgressRun, ProjectConfig, ProviderId, SkillInfo, TaskCard, TaskColumn, TaskPatch, TaskStartTarget, ToastLevel, ToastMessage, ToastTarget, WorkspaceConnections } from '../shared/types'
+import type { AgentApiInfo, AgentDef, AgentInfo, Connection, AssistantControl, AssistantUndoResult, LaneInfo, EffortLevel, HiveEvent, LiveSessionState, McpServerInfo, PermissionMode, ProgressRun, ProjectConfig, ProviderId, SkillInfo, TaskCard, TaskColumn, TaskComment, TaskPatch, TaskStartTarget, ToastLevel, ToastMessage, ToastTarget, WorkspaceConnections } from '../shared/types'
 import { callsMade } from '../shared/activity'
 import { DEFAULT_API_PORT, HIVE_DIR, projectAgents, stopAsksUser, transcriptWarnLimit } from '../shared/defaults'
 import { PROVIDERS, agentProvider, isProviderEnabled, offeredModes, providerDescriptor, providerName } from '../shared/providers'
@@ -2680,7 +2680,11 @@ async function requestsFor(items: readonly ForYouItem[], agents = new Map<string
   return cardRequests(items.map((i) => (i.asker ? { ...i, asker: defs.find((a) => a.id === i.asker)?.name ?? i.asker } : i)), summary)
 }
 
-async function taskView(c: TaskCard, agents =new Map<string, Promise<ReturnType<typeof projectAgents>>>(), waitingOf?: ReadonlyMap<number, ForYouItem[]>): Promise<TaskView> {
+/**
+ * A card as agents read it. `attachmentsOf` (HI-2402, a narrowed read): only the attachments that came with those
+ * comments (by id), the rest counted in `attachmentsOmitted`.
+ */
+async function taskView(c: TaskCard, agents =new Map<string, Promise<ReturnType<typeof projectAgents>>>(), waitingOf?: ReadonlyMap<number, ForYouItem[]>, attachmentsOf?: ReadonlySet<string>): Promise<TaskView> {
   let agent: { id: string; name: string; status: string; backgroundTasks: number } | null = null
   let now: StallAgent | null = null
   if (c.agent && c.project) {
@@ -2751,13 +2755,15 @@ async function taskView(c: TaskCard, agents =new Map<string, Promise<ReturnType<
   const merge = c.project && !c.archived ? await queueLineFor(c.project, c.number) : null
   // A code card's checks before review and how to run one (HI-2276): additive, only when its rules name some.
   const checks = c.project && !c.archived ? await checksFor(c.project, c.number) : null
-  const attachments = files.length ? files.map((a) => attachmentForAgents(a, c)) : null
-  return { ...(elsewhere.length ? { ...view, elsewhere } : view), ...(attachments ? { attachments } : {}), ...(k ? { kind: k.kind, ...(k.kindProposed ? { kindProposed: k.kindProposed } : {}) } : {}), ...(rs?.skip ? { reviewSkipped: rs.skip } : {}), ...(rs?.proposed != null ? { reviewSkipProposed: rs.proposed } : {}), stage, ...(merge ? { merge } : {}), ...checks }
+  const kept = attachmentsOf ? files.filter((a) => !!a.comment && attachmentsOf.has(a.comment)) : files
+  const attachments = kept.length ? kept.map((a) => attachmentForAgents(a, c.comments)) : null
+  const omitted = files.length - kept.length
+  return { ...(elsewhere.length ? { ...view, elsewhere } : view), ...(attachments ? { attachments } : {}), ...(omitted ? { attachmentsOmitted: omitted } : {}), ...(k ? { kind: k.kind, ...(k.kindProposed ? { kindProposed: k.kindProposed } : {}) } : {}), ...(rs?.skip ? { reviewSkipped: rs.skip } : {}), ...(rs?.proposed != null ? { reviewSkipProposed: rs.proposed } : {}), stage, ...(merge ? { merge } : {}), ...checks }
 }
 
 /** A card attachment as agents read it (HI-1700): its path, name and size, who added it and when, and where it came. */
-function attachmentForAgents(a: CardAttachment, c: TaskCard): NonNullable<TaskView['attachments']>[number] {
-  const said = a.comment && a.comment !== 'description' && a.comment !== 'pane' ? c.comments.find((x) => x.id === a.comment) : undefined
+function attachmentForAgents(a: CardAttachment, comments: readonly Pick<TaskComment, 'id' | 'by' | 'at'>[]): NonNullable<TaskView['attachments']>[number] {
+  const said = a.comment && a.comment !== 'description' && a.comment !== 'pane' ? comments.find((x) => x.id === a.comment) : undefined
   const from = said ? `comment by ${said.by} at ${said.at}` : a.comment === 'description' ? 'description' : a.comment === 'pane' ? 'attached from a session' : a.comment ? 'a comment no longer on the card' : 'attached to the card' // i18n-ignore: agent-facing
   return { path: a.path, name: a.name, size: a.size, by: a.by, at: a.at, from, ...(a.missing ? { missing: true as const } : {}) }
 }
@@ -2935,7 +2941,15 @@ route('GET', '/v1/tasks/:n', async ({ params, query }) => {
   requireWorkspace()
   // The card with its decision generation, read together (#1216): what this reply gives an agent is what its receipt records.
   const seen = await tasks.readTaskSeen(taskNumber(params[0]), await taskActor())
-  const view = await taskView(seen.card)
+  const raw = query.get('comments')
+  const n = raw === null ? null : Number(raw)
+  if (n !== null && (!Number.isInteger(n) || n < 1)) throw new HttpError(400, `comments must be a whole number from 1: "${raw}"`)
+  const summary = query.get('summary') === 'true'
+  // A narrowed read (HI-2402) keeps only the attachments of the comments it returns in full (none under summary=true,
+  // whose comments are their first lines), unless attachments=true; a full read keeps them all.
+  const narrowed = (n !== null || summary) && query.get('attachments') !== 'true'
+  const inFull = summary ? [] : n === null ? seen.card.comments : seen.card.comments.slice(-n)
+  const view = await taskView(seen.card, undefined, undefined, narrowed ? new Set(inFull.flatMap((x) => (x.id ? [x.id] : []))) : undefined)
   // Read in full, decisions included: those aren't new to the agent any more (#357).
   const me = agentCaller()
   if (me) {
@@ -2945,13 +2959,10 @@ route('GET', '/v1/tasks/:n', async ({ params, query }) => {
     const ws = contextWorkspace()
     if (ws) void recordDecisionsReceived(ws, me.agentId, view.number, seen.generation, view.project)
   }
-  const raw = query.get('comments')
-  const n = raw === null ? null : Number(raw)
-  if (n !== null && (!Number.isInteger(n) || n < 1)) throw new HttpError(400, `comments must be a whole number from 1: "${raw}"`)
   const lean = n === null ? view : newestComments(view, n)
   // summary=true (#532): each comment as its first line, with the whole comment's length when there is more; its open
   // requests' words too (HI-1992).
-  const told = query.get('summary') === 'true' ? { ...lean, ...(lean.forYou ? { forYou: lean.forYou.map(commentSummary) } : {}), comments: lean.comments.map(commentSummary) } : lean
+  const told = summary ? { ...lean, ...(lean.forYou ? { forYou: lean.forYou.map(commentSummary) } : {}), comments: lean.comments.map(commentSummary) } : lean
   return query.get('history') === 'false' ? withoutHistory(told) : told
 })
 
@@ -3225,7 +3236,14 @@ route('GET', '/v1/tasks/:n/comments/latest', async ({ params, query }) => {
   // Its open requests first (HI-1992): "check the latest comment" is where an Assistant looks for a question, and an
   // agent's question is in For you, not its comments.
   const forYou = await requestsFor(forYouOfCards(workspace, [r.number]).get(r.number) ?? [], undefined, summary)
-  return { number: r.number, ...(forYou ? { forYou } : {}), comment: summary && r.comment ? commentSummary(r.comment) : r.comment }
+  // Its attachments (HI-2402): those that came with this comment (none under summary=true), its links to them read as
+  // their paths, the card's others counted in attachmentsOmitted; attachments=true gives them all.
+  const files = await cardAttachments(workspace, r.number)
+  const all = query.get('attachments') === 'true'
+  const kept = all ? files : summary || !r.commentId ? [] : files.filter((a) => a.comment === r.commentId)
+  const comment = r.comment && files.length ? { ...r.comment, text: withAttachmentPaths(r.comment.text, files) } : r.comment
+  const omitted = files.length - kept.length
+  return { number: r.number, ...(forYou ? { forYou } : {}), comment: summary && comment ? commentSummary(comment) : comment, ...(kept.length ? { attachments: kept.map((a) => attachmentForAgents(a, r.sources)) } : {}), ...(omitted ? { attachmentsOmitted: omitted } : {}) }
 })
 
 // A card's facts (#1223, SPEC §16.4): a short row each (seq, kind, time, actor and a few words, revisions as its project's

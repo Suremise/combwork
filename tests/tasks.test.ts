@@ -1461,12 +1461,16 @@ describe("a project agent's board", () => {
 
   it('reads only the latest comment, as far as it may read the card', async () => {
     const l = (await run(() => tasks.createTask({ title: 'Long', description: 'x'.repeat(5000), project: 'alpha' }, user))).number
-    expect(await run(() => tasks.latestComment(l, alphaAgent))).toEqual({ number: l, comment: null })
+    expect(await run(() => tasks.latestComment(l, alphaAgent))).toEqual({ number: l, comment: null, commentId: null, sources: [] })
     await run(() => tasks.commentTask(l, 'first', user))
     await run(() => tasks.commentTask(l, 'second', assistant))
     await run(() => tasks.commentTask(l, 'third, '.repeat(400), alphaAgent))
     const got = await run(() => tasks.latestComment(l, alphaAgent))
-    expect(Object.keys(got)).toEqual(['number', 'comment'])
+    // Its id and the card's comments' authors and times (HI-2402: where its attachments came), never their words.
+    expect(Object.keys(got)).toEqual(['number', 'comment', 'commentId', 'sources'])
+    expect(got.sources).toHaveLength(3)
+    expect(got.sources.every((x) => Object.keys(x).join() === 'id,by,at' && !!x.id)).toBe(true)
+    expect(got.sources.at(-1)?.by).toBe('Agent 1 (alpha)')
     expect(got.comment?.by).toBe('Agent 1 (alpha)')
     expect(got.comment?.text).toBe('third, '.repeat(400).trim())
     expect(JSON.stringify(got)).not.toMatch(/first|second|xxxx/)
@@ -1477,7 +1481,7 @@ describe("a project agent's board", () => {
     await run(() => tasks.commentTask(n.B1, 'from the Assistant', assistant))
     for (const x of [n.B1, n.W, 999]) await expect(run(() => tasks.latestComment(x, alphaAgent))).rejects.toThrow(`Unknown task #${x}`)
     expect((await run(() => tasks.latestComment(n.B1, assistant))).comment?.text).toBe('from the Assistant')
-    expect(await run(() => tasks.latestComment(n.W, script))).toEqual({ number: n.W, comment: null })
+    expect((await run(() => tasks.latestComment(n.W, script))).comment).toBeNull()
     await run(() => tasks.deleteTask(l))
   })
 })

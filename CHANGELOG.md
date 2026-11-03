@@ -1,5 +1,9 @@
 # Release Notes
 
+## Unreleased
+
+- **Leaner card reads for agents** (HI-2402): reading a card's latest comment, its newest comments or its summary no longer brings back every file attached to the card, only those of the comments read, with a count of the rest. A busy card's latest step costs agents far fewer tokens; a full read still lists them all.
+
 ## 1.0.0 — 2026-11-02
 
 **Hive 1.0 runs your board by your project's rules.** Choose how a card goes from Todo to Done (who reviews it, which checks pass first, who merges it, where it is built) with the Solo, Pair or Team presets; agents tell Hive what they did, and Hive moves the card, asks you only what's yours to answer, and can merge approved work itself, each card in its own slot. Agents run on connections Hive keeps (several sign-ins side by side), one notification system tells each thing once, and the Activity view shows what every agent is doing now.

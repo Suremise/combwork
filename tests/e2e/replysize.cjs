@@ -304,6 +304,30 @@ const prose = (seed, n) => {
   check('…the pages joined are the file', firstPage.slice(firstPage.indexOf('\n\n') + 2) + rest.slice(rest.indexOf('\n\n') + 2) === bigText && !/more from offset/.test(rest), rest.slice(0, 200))
   const image = measure('hive_read_attachment (an image)', tool('hive_read_attachment', { card: target, name: 'shot.png' }), 400)
   check('…an image: its path, to open with the CLI', /^shot\.png: an image \(8 bytes\)\. Open it with your own file reading: .*shot\.png$/.test(image), image)
+  // A card with many attachments (HI-2402, as CL-8's 30): a narrowed read keeps only those of the comments it returns in
+  // full, counting the rest; a full read and attachments=true keep them all.
+  {
+    const many = todo[25]
+    const evidence = path.join(ws, 'alpha', 'attach-many')
+    fs.mkdirSync(evidence, { recursive: true })
+    const file = (name) => {
+      fs.writeFileSync(path.join(evidence, name), `evidence ${name}\n`)
+      return path.join(evidence, name)
+    }
+    for (let round = 0; round < 3; round++) tool('hive_update_task', { number: many, comment: `Round ${round + 1}: evidence.`, attachments: Array.from({ length: 10 }, (_x, i) => file(`run-${round}-${i}.log`)) })
+    tool('hive_update_task', { number: many, comment: 'Round 4: the last run.', attachments: [file('last-run.log')] })
+    const whole = JSON.parse(measure('hive_read_task (31 attachments)', tool('hive_read_task', { number: many })))
+    check('…a full read: every attachment, none counted out', whole.attachments?.length === 31 && !('attachmentsOmitted' in whole), JSON.stringify({ n: whole.attachments?.length, omitted: whole.attachmentsOmitted }))
+    const last = JSON.parse(measure('hive_read_task (latestComment, 31 attachments)', tool('hive_read_task', { number: many, latestComment: true }), 900))
+    check("…latestComment: only its own comment's attachment, its link as the path, the other 30 counted", last.attachments?.length === 1 && last.attachments[0].name === 'last-run.log' && last.attachments[0].from.startsWith('comment by ') && last.attachmentsOmitted === 30 && last.comment.text.includes(last.attachments[0].path) && !last.comment.text.includes('attachment:'), JSON.stringify(last).slice(0, 400))
+    const lastAll = JSON.parse(tool('hive_read_task', { number: many, latestComment: true, attachments: true }).text)
+    check('…with attachments: true, all 31, each from its comment', lastAll.attachments?.length === 31 && !('attachmentsOmitted' in lastAll) && lastAll.attachments.every((a) => a.from.startsWith('comment by ')), JSON.stringify({ n: lastAll.attachments?.length, from: lastAll.attachments?.map((a) => a.from).filter((f) => !f.startsWith('comment by ')) }))
+    const two = JSON.parse(measure('hive_read_task (comments: 2, 31 attachments)', tool('hive_read_task', { number: many, comments: 2 })))
+    check("…comments: 2: the two comments' 11, the other 20 counted", two.attachments?.length === 11 && two.attachmentsOmitted === 20 && two.attachments.every((a) => /^(last-run|run-2-\d)\.log$/.test(a.name)), JSON.stringify({ n: two.attachments?.length, omitted: two.attachmentsOmitted }))
+    const gist = JSON.parse(measure('hive_read_task (summary, 31 attachments)', tool('hive_read_task', { number: many, summary: true })))
+    check('…summary: none (its comments are their first lines), all 31 counted', !('attachments' in gist) && gist.attachmentsOmitted === 31, JSON.stringify({ n: gist.attachments?.length, omitted: gist.attachmentsOmitted }))
+    check('…and the narrowed read is the smaller by far', sizes['hive_read_task (latestComment, 31 attachments)'] * 4 < sizes['hive_read_task (31 attachments)'], JSON.stringify(sizes))
+  }
   const created = measure('hive_create_task', tool('hive_create_task', { title: 'Measured card', description: prose(500, 1800), labels: ['bug'] }), 400)
   check('a new card: its key, number and place', new RegExp(`^${CARD} created in Todo \\(51st of 51\\) for alpha: Measured card$`).test(created) && /^[A-Z]{2,4}-\d+ /.test(created), created)
   const commented = measure('hive_update_task (comment)', tool('hive_update_task', { number: target, comment: 'Looked at it.' }), 400)
