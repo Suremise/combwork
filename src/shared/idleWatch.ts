@@ -9,7 +9,7 @@
 
 import { cardName } from './projectKeys'
 import { shortDuration } from './progress'
-import { pendingStep } from './tasks'
+import { columnSince, pendingStep } from './tasks'
 import type { TaskCard } from './types'
 
 /** How long a lane's builder may only watch its own card with nothing waiting on it before the card is stalled. */
@@ -36,13 +36,16 @@ export function idleWatchText(card: Pick<TaskCard, 'number' | 'key'>): string {
  * Why a running lane's card is stalled by its builder only watching it with nothing waiting on it (`nothingWaitsOn`
  * already true), or null: the lane active (a paused one parks its agents), the card the lane's and its builder's, the
  * builder's turn over (status watching) with a card watch on this card alone (`watchesMore`: usage, lanes or agents beside
- * it, a wait on more than the card), for IDLE_WATCH_STALL_MS since the watch began. Agent-facing.
+ * it, a wait on more than the card), for IDLE_WATCH_STALL_MS since the later of the watch's start and the card's coming
+ * into Doing (HI-2445: a watch kept through Review, as a builder waits for its verdict, isn't idle time in Doing; a failed
+ * verdict flagged HI-2433 the instant it sent it back, its builder's wake still on its way). Agent-facing.
  */
 export function idleWatchReason(card: IdleCard, lane: { builder: string; state?: string; cards: { number: number }[] } | null | undefined, watcher: { name: string; agentId: string; cards: number[]; watchesMore?: boolean; status?: string; watchSince?: string } | undefined, now = Date.now()): string | null {
   if (!lane || lane.state !== 'active' || !watcher || card.agent !== lane.builder || watcher.agentId !== lane.builder) return null
   if (!lane.cards.some((c) => c.number === card.number)) return null
   if (watcher.status !== 'watching' || watcher.watchesMore || watcher.cards.length !== 1 || watcher.cards[0] !== card.number) return null
-  const since = Date.parse(watcher.watchSince ?? '')
+  const watched = Date.parse(watcher.watchSince ?? '')
+  const since = Math.max(watched, Date.parse(columnSince(card) ?? '') || 0)
   if (!Number.isFinite(since) || now - since < IDLE_WATCH_STALL_MS) return null
   return `${watcher.name} only watches ${cardName(card)} (${shortDuration(now - since)}), and nothing waits on it: no question for the user, no design step, not submitted.` // i18n-ignore: agent-facing (the Agent API's stalled)
 }
