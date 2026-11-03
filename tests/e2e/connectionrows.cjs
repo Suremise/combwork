@@ -101,7 +101,7 @@ const lines = (f) => (fs.existsSync(f) ? fs.readFileSync(f, 'utf8').trim().split
     await page.locator('.settings-nav').waitFor({ timeout: HUNG_MS })
     await page.locator('.settings-nav .row[data-section="accounts"]').click()
     const banner = page.locator('[data-switch-affected]')
-    check('the banner counts One, on another connection of the same account', !!(await lib.until(async () => /^1 running agent runs on another connection/.test((await banner.innerText().catch(() => '')).trim()), HUNG_MS)), await banner.innerText().catch(() => ''))
+    check('the banner counts One, on another connection of the same account', !!(await lib.until(async () => (await banner.innerText().catch(() => '')).trim().startsWith('1 running agent runs on another connection'), HUNG_MS)), await banner.innerText().catch(() => ''))
     await banner.getByRole('button', { name: 'Switch Them When Their Turn Is Over' }).click()
     const switched = await lib.until(async () => {
       const st = await live('a-one')
