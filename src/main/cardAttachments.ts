@@ -188,6 +188,9 @@ function throughHive(real: string): { hive: string; next: string | undefined } |
  * over Hive's: each full path, a %VARIABLE% at its start filled in from the environment (one that isn't set, or that
  * doesn't give a full path, leaves the folder out). Checked as a file's other allowed folders are, after the protected ones.
  */
+/** For tests: the temp folder attachableSource accepts (a test's own files are all in its run's temp folder). */
+export const attachTestHooks: { temp: string | null } = { temp: null }
+
 export function extraFolders(ws: WorkspaceService): string[] {
   const listed = advanced.get<string[]>(CARD_ATTACHMENT_FOLDERS_ID, ws.config?.advanced ?? null)
   if (!Array.isArray(listed)) return []
@@ -204,7 +207,7 @@ export function extraFolders(ws: WorkspaceService): string[] {
  * a folder the caller may read from and in no protected host's.
  */
 export async function attachableSource(ws: WorkspaceService, caller: AttachCaller, path: string): Promise<string> {
-  const temp = tmpdir()
+  const temp = attachTestHooks.temp ?? tmpdir()
   const more = caller.kind === 'agent' || caller.kind === 'workspace' ? extraFolders(ws) : []
   const refuse = (): never => {
     if (caller.kind === 'agent' || caller.kind === 'workspace') throw hiveError(M.refusedFrom, { path, caller: caller.kind, temp, more: more.length ? 'yes' : 'no', folders: more.join('; ') }, { kind: 'invalid' })

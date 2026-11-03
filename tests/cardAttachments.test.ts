@@ -342,10 +342,10 @@ describe('where a file may come from (HI-1700, s13 §2)', () => {
     const { w, root } = await workspace()
     const agent = { kind: 'agent', project: 'p' } as const
     const script = { kind: 'workspace' } as const
-    // Everything a test makes is in the run's temp folder: Temp is a folder of its own here, so the rest is outside it.
-    const was = { TEMP: process.env.TEMP, TMP: process.env.TMP, HIVE_EVIDENCE: process.env.HIVE_EVIDENCE }
+    // Everything a test makes is in the run's temp folder: the temp folder is one of its own here, so the rest is outside it.
+    const was = process.env.HIVE_EVIDENCE
     const temp = tempDir('hive-temp-')
-    process.env.TEMP = process.env.TMP = temp
+    att.attachTestHooks.temp = temp
     const evidence = tempDir('hive-evidence-')
     const zip = file(join(evidence, 'run4'), 'run4.zip', 'zip bytes')
     const elsewhere = file(tempDir('hive-elsewhere-'), 'other.zip', 'other')
@@ -383,10 +383,9 @@ describe('where a file may come from (HI-1700, s13 §2)', () => {
       expect(att.extraFolders(w)).toEqual([root])
     } finally {
       await advanced.set(CARD_ATTACHMENT_FOLDERS_ID, null)
-      for (const [k, v] of Object.entries(was)) {
-        if (v === undefined) delete process.env[k]
-        else process.env[k] = v
-      }
+      att.attachTestHooks.temp = null
+      if (was === undefined) delete process.env.HIVE_EVIDENCE
+      else process.env.HIVE_EVIDENCE = was
     }
   })
 
