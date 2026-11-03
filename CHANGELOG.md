@@ -8,6 +8,9 @@
 ### Fixes
 
 - **Turning the Assistant's Control down, or stopping it, stops a card or comment it already asked for.** A new card or comment the Assistant asked for just before, still waiting behind another change to the board, was still made. Now it's refused and nothing of it is saved, its files included (HI-2415).
+### Security
+
+- **DOMPurify 3.4.17.** Hive cleans the Markdown it shows (cards, comments, docs, agents' messages) and the Files tab's editor with DOMPurify, and 3.4.16 has three advisories. None applied to how Hive or the editor use it (they need options neither sets), but the fixed version now ships (HI-2421).
 
 ## 1.0.0 — 2026-11-03
 
