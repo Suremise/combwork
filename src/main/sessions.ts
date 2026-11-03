@@ -33,13 +33,14 @@ import { copiesDirOf, grantsCopies } from './copies'
 import { agentWorkflowRole, launchWorkflow, reviewsWork, type LaunchWorkflow } from '../shared/workflow/roles'
 import { agentLaunchSettings, agentProvider, autoProviderPending, canSwitchModeLive, extraArgsProblem, isProviderEnabled, modeAllowed, permissionLabel, providerDescriptor, providerSettings, splitArgs, tasksWillWake } from '../shared/providers'
 import { isCliOwnMode, modeInEffect } from '../shared/cliOwnMode'
-import { resolvedModel } from '../shared/models'
+import { dialectModelId, resolvedModel } from '../shared/models'
 import type {
   AutoCompactSetting,
   AgentDef,
   AgentInfo,
   EffortLevel,
   FileLockMode,
+  LaunchDialect,
   LiveSessionState,
   RuntimeFacts,
   McpServerDef,
@@ -116,9 +117,11 @@ import { copyBook, sessionEnded } from './skillCopies'
 import { workspaceNotesFor } from './workspaceNotes'
 import { skillOff } from '../shared/skillDelivery'
 import { samePath } from '../shared/movePaths'
-import { GUIDANCE_REVISION, launchParts, launchRecord } from './guidance'
-import { say } from '../shared/agentText'
-import { inDefaultDialect } from '../shared/agentText/asyncScope'
+import { chainGuidanceRevision, GUIDANCE_REVISION, launchParts, launchRecord } from './guidance'
+import { say, setChainResolver } from '../shared/agentText'
+import { inDefaultDialect, inDialectOf } from '../shared/agentText/asyncScope'
+import { agentTextSchema, chainKey, dialectsDir, loadDialects, pickOf, sessionChainOf, writeDialectFile, type DialectSet, type ModelSlot, type ResolvedChain, type SessionDialect } from './dialects'
+import { apiChainChanged, forgetApiChain, requestApiChain } from './dialects/apiChain'
 import { SESSION } from './sessionText'
 import { reportPlanUsage } from './planUsage'
 import { devConsole, sessionSourceId } from './devConsole'
@@ -528,6 +531,13 @@ interface LiveSession {
   turnScreen?: (screen: string) => 'idle' | 'working' | null
   /** The environment it was launched with: where its CLI keeps its records (HI-1972, ProviderAdapter.retryWait). */
   launchEnv?: NodeJS.ProcessEnv
+  /**
+   * The dialect chain it speaks (dialects, HI-2443), pinned at its launch: what agent text says to it (the resolver
+   * below), and in hive-mcp.js and hive-progress.js through HIVE_DIALECT_FILE. `input`: what it was resolved from (its
+   * CLI, the real model ID it launched with, its pick), so the refresh can tell when its files would give another
+   * (`key`) and show "restart to apply".
+   */
+  dialect?: PinnedDialect
   /** When its latest hook reached Hive (ms, as it arrived). */
   lastHookAt?: number
   /** Its CLI's retry wait (HI-1972, checkRetry): a look under way, when it last looked, and the turn the wait shown is of. */
@@ -987,15 +997,45 @@ interface Place {
   foreign: boolean
 }
 
+/** A session's dialect chain as pinned at its launch (HI-2443): the chain, what it was resolved from, and its key (chainKey). */
+interface PinnedDialect {
+  chain: ResolvedChain & { slot: ModelSlot }
+  input: SessionDialect
+  key: string
+}
+
+/** A pinned chain as its launch record shows it (LiveSessionState.launched.dialect). */
+function launchDialectOf(d: PinnedDialect, guidance: string): LaunchDialect {
+  const { chain, input } = d
+  return {
+    layers: chain.layers.map((x) => ({ layer: x.layer === 'model' || x.layer === 'cli' ? x.layer : 'workspace', file: x.file })),
+    hash: chain.hash,
+    guidance,
+    ...(input.modelId ? { model: input.modelId } : {}),
+    ...(chain.modelUnknown ? { modelUnknown: true as const } : {}),
+    ...(input.pick && input.pick !== 'auto' ? { pick: input.pick.file } : {}),
+    ...(chain.slot.pickMissing ? { pickMissing: true as const } : {})
+  }
+}
+
 /**
- * The workspace's skills (their list and each one's revision) and MCP servers, read once for the agents whose launch
- * settings are worked out together (#1002): a refresh worked out every running agent's, reading them all again for each
- * one. The first read is made in the caller's workspace; one set of reads is never used for another workspace.
+ * The workspace's skills (their list and each one's revision), MCP servers and dialect files (HI-2443), read once for
+ * the agents whose launch settings are worked out together (#1002): a refresh worked out every running agent's, reading
+ * them all again for each one. The first read is made in the caller's workspace; one set of reads is never used for another workspace.
  */
 export class LaunchReads {
   private skillList: Promise<SkillInfo[]> | null = null
   private serverList: Promise<McpServerInfo[]> | null = null
   private revisions = new Map<string, Promise<string>>()
+  private dialectSets = new Map<string, Promise<DialectSet | null>>()
+
+  /** A workspace's dialect files, checked against the schema (dialects, HI-2443); null when they can't be read. */
+  dialects(hiveDir: string): Promise<DialectSet | null> {
+    const key = hiveDir.toLowerCase()
+    let d = this.dialectSets.get(key)
+    if (!d) this.dialectSets.set(key, (d = loadDialects(dialectsDir(hiveDir), agentTextSchema()).catch(() => null)))
+    return d
+  }
 
   skills(): Promise<SkillInfo[]> {
     return (this.skillList ??= hiveSkills())
@@ -1688,7 +1728,7 @@ class SessionManager {
         if (l && !l.state.settingUp) {
           try {
             const eff = await this.effective(projectPath, pinProvider(a, l.state.provider), reads, cfg)
-            restartNeeded = this.signature(eff) !== l.state.launchSignature
+            restartNeeded = this.signature(eff) !== l.state.launchSignature || (await this.dialectMoved(projectPath, a, l, reads))
             this.noticeModeSetting(l, eff.permissionMode)
           } catch {
             // Settings can't be read right now; don't nag.
@@ -2435,7 +2475,41 @@ class SessionManager {
     return ((await workspaceOf(projectPath).savedAgent(projectPath, agent.id)) ?? agent).connection
   }
 
-  private async launchOn(projectPath: string, agent: AgentDef, opts: { sessionId: string; name: string; resume: boolean }, times: StepTimes | undefined, conn: LaunchConnection | null, lastLook: () => Promise<void>): Promise<void> {
+  /**
+   * A launch says its text in the dialect of the session it starts (HI-2443), whoever asked for it (another agent's
+   * request has its own scope): its guidance, notes and the files its CLI reads, once its chain is pinned (launchOnHere).
+   */
+  private launchOn(projectPath: string, agent: AgentDef, opts: { sessionId: string; name: string; resume: boolean }, times: StepTimes | undefined, conn: LaunchConnection | null, lastLook: () => Promise<void>): Promise<void> {
+    return inDialectOf({ projectPath, agentId: agent.id }, () => this.launchOnHere(projectPath, agent, opts, times, conn, lastLook))
+  }
+
+  /** The session's dialect chain, resolved for a launch from its workspace's files (null: they can't be read). */
+  private async launchDialect(projectPath: string, input: SessionDialect, reads = new LaunchReads()): Promise<PinnedDialect | null> {
+    const set = await reads.dialects(workspaceOf(projectPath).hiveDir)
+    if (!set) return null
+    const chain = sessionChainOf(set, input)
+    return { chain, input, key: chainKey(chain) }
+  }
+
+  /**
+   * Whether a running session's dialect chain is no longer what a launch now would give it (HI-2443, Q6: "restart to
+   * apply"): a file in its chain edited, switched off, added or gone, or its Dialect setting changed. Resolved from what
+   * it launched with (its CLI and real model ID: a change of model asks for a restart by itself), so the refresh reads no
+   * CLI's config. Files that can't be read now don't nag.
+   */
+  private async dialectMoved(projectPath: string, agent: AgentDef, l: LiveSession, reads: LaunchReads): Promise<boolean> {
+    if (!l.dialect) return false
+    const now = await this.launchDialect(projectPath, { ...l.dialect.input, pick: pickOf(agent.dialect) }, reads).catch(() => null)
+    return !!now && now.key !== l.dialect.key
+  }
+
+  /** The chain a running session speaks (the resolver's session scope): null for the Default, or one not running. */
+  pinnedChain(projectPath: string, agentId: string): ResolvedChain | null {
+    const d = this.live.get(liveId(projectPath, agentId))?.dialect
+    return d?.chain.hash ? d.chain : null
+  }
+
+  private async launchOnHere(projectPath: string, agent: AgentDef, opts: { sessionId: string; name: string; resume: boolean }, times: StepTimes | undefined, conn: LaunchConnection | null, lastLook: () => Promise<void>): Promise<void> {
     const id = liveId(projectPath, agent.id)
     const l = this.live.get(id)!
     const { state, adapter } = l
@@ -2476,6 +2550,16 @@ class SessionManager {
     times?.mark('skills up to date')
     const eff = await this.effective(projectPath, pinProvider(agent, state.provider))
     times?.mark('effective')
+    // The model it runs as, the choice's (an alias resolved) or the CLI's default: for its dialect and its compaction.
+    const chosenModel = eff.model || (conn ? adapter.configuredDefaultModel(conn.folder) : null) || info.defaultModel || ''
+    // Its dialect chain, pinned for this launch (HI-2443): from its CLI, the real model ID it runs and its Dialect
+    // setting as saved now, before any text of this launch is said. Files that can't be read: the Default.
+    const pick = pickOf(((await workspaceOf(projectPath).savedAgent(projectPath, agent.id)) ?? agent).dialect)
+    l.dialect = (await this.launchDialect(projectPath, { cli: adapter.id, modelId: dialectModelId(info, chosenModel), pick }).catch((e) => {
+      log.warn(`${userText(this.label(state))}: its dialect couldn't be resolved, so it speaks the Default`, e)
+      return null
+    })) ?? undefined
+    times?.mark('dialect')
     // Extra arguments saved before Settings refused a bare "--" (#523) stop the launch before anything changes.
     const argsProblem = capturedText((t) => extraArgsProblem(eff.extraArgs, t))
     if (argsProblem)
@@ -2494,6 +2578,15 @@ class SessionManager {
     l.mode = !resume ? assistantText?.modeId || undefined : undefined
     // This launch's own hook token (#345): in its environment for HTTP hooks, in a file outside the project for hook commands.
     const hookAuth = await newHookToken(state.runId)
+    // Its chain's texts for hive-mcp.js and hive-progress.js (HI-2443), in the same private folder: a chain that
+    // overrides nothing writes nothing, and they speak the Default as before.
+    const pinned = l.dialect?.chain
+    const dialectEnv: Record<string, string> = pinned?.hash
+      ? ((await writeDialectFile(hookAuth.dir, pinned).catch((e) => {
+          log.warn(`${userText(this.label(state))}: its dialect file couldn't be written, so its hive tools and hive-progress speak the Default`, e)
+          return null
+        }))?.env ?? {})
+      : {}
     times?.mark('tokens')
     const guidance = await this.hiveGuidance(projectPath).catch(() => '')
     // The Workspace notes note as it is now (#1433): every agent, whatever its tools or folder; a running one keeps its own.
@@ -2523,7 +2616,7 @@ class SessionManager {
       resume,
       name: opts.name,
       skills: eff.skills,
-      mcpServers: eff.mcpServers,
+      mcpServers: eff.mcpServers.hive && dialectEnv.HIVE_DIALECT_FILE ? { ...eff.mcpServers, hive: { ...eff.mcpServers.hive, env: { ...eff.mcpServers.hive.env, ...dialectEnv } } } : eff.mcpServers,
       model: eff.model,
       // An effort the model that runs doesn't take (HI-1770: one moved onto it, or a connection's default) is kept, not used.
       effort: eff.effort && eff.connection && !eff.connection.startsWith('!') && !effortUsable(adapter.id, eff.model, conn, eff.effort) ? null : eff.effort,
@@ -2556,6 +2649,8 @@ class SessionManager {
         ...(state.sessionId ? { HIVE_SESSION_ID: state.sessionId } : {}),
         HIVE_AGENT: agent.name,
         HIVE_PROVIDER: adapter.id,
+        // Its dialect's file (HI-2443), for hive-progress run in its shell; none while it speaks the Default.
+        ...dialectEnv,
         // Its slot's name and port block (#1429's slotEnv), while it runs in one.
         ...l.slotEnv,
         // Its connection's folder as the CLI's home (HI-1755): its login, settings and memory, its transcripts shared.
@@ -2604,8 +2699,7 @@ class SessionManager {
       toast('warning', `${this.label(state)}: ${notice.title}`, notice.message, undefined, projectPath, agentTarget(projectPath, state.agentId, this.label(state)))
     }
     this.checkFolder(projectPath, ctx.cwd)
-    // Where it compacts by itself (#242): for the model it runs as, the choice's (an alias resolved) or the CLI's default.
-    const chosenModel = eff.model || (conn ? adapter.configuredDefaultModel(conn.folder) : null) || info.defaultModel || ''
+    // Where it compacts by itself (#242): for the model it runs as (chosenModel, above).
     // Once the session reports the model it runs, that model alone: another model's window isn't its own.
     const modelsFor = (running?: string): string[] => (running ? [running] : [chosenModel && resolvedModel(info, chosenModel), chosenModel].filter((m): m is string => !!m))
     l.autoCompactFor = adapter.autoCompact ? (running) => adapter.autoCompact!(ctx, cmd, modelsFor(running)) : undefined
@@ -2631,7 +2725,11 @@ class SessionManager {
     const notGiven = Object.fromEntries(Object.entries(eff.skillProblems).map(([name, why]) => [name, { revision: null, problem: inDefaultDialect(() => say(SESSION.skillNotGiven, { why })), lasting: true as const }]))
     const record = launchRecord(eff.skillHashes, { ...delivered, ...notGiven })
     state.launchSignature = this.signature({ ...eff, skillHashes: record.settled })
-    state.launched = { guidance: GUIDANCE_REVISION, skills: record.skills, ...(record.problems ? { problems: record.problems } : {}) }
+    // Its dialect chain (HI-2443): each layer's file, "model unknown", and the guidance revision as said in it, where a
+    // dialect is set (a text overridden, or a file picked). Speaking the Default, its record is as before, but for
+    // "model unknown" (decision Q4), said compactly: the status every agent reads carries it (replysize).
+    const dialect = !l.dialect ? undefined : l.dialect.chain.hash || l.dialect.input.pick !== 'auto' ? launchDialectOf(l.dialect, chainGuidanceRevision()) : l.dialect.chain.modelUnknown ? { modelUnknown: true as const } : undefined
+    state.launched = { guidance: GUIDANCE_REVISION, skills: record.skills, ...(record.problems ? { problems: record.problems } : {}), ...(dialect ? { dialect } : {}) }
     // Performance metrics: what Hive gave this session, exact sizes. The session contract once (whichever way the
     // provider gets it); the skills that reached it, measured on their copies; the ones asked for that didn't.
     const given = Object.keys(record.skills)
@@ -2640,6 +2738,8 @@ class SessionManager {
       provider: adapter.id,
       role: workspace.isAssistantHome(projectPath) ? 'assistant' : 'agent',
       workflow: l.workflow,
+      // Split by its dialect chain where one overrides text (HI-2443), so Compare tells it from the Default's.
+      ...(dialect && 'hash' in dialect && dialect.hash ? { dialect: dialect.hash } : {}),
       ...parts,
       skills: given.length,
       skillCatalogBytes: deliveredSizes.catalog,
@@ -5971,6 +6071,17 @@ class SessionManager {
    * own); else nothing.
    */
   hookReply(runId: string | null, body: Record<string, any>): Promise<Record<string, unknown> | null> {
+    // What a hook's reply says is said to its session, in its pinned chain (HI-2443).
+    return this.inLaunchDialect(runId, body.session_id, () => this.hookReplyHere(runId, body))
+  }
+
+  /** Runs fn in the dialect of the launch a hook comes from (HI-2443); a hook of no running launch, as it is. */
+  private inLaunchDialect<T>(runId: string | null, sessionId: unknown, fn: () => T): T {
+    const st = this.findLaunch(runId, sessionId)?.[1].state
+    return st ? inDialectOf({ projectPath: st.projectPath, agentId: st.agentId }, fn) : fn()
+  }
+
+  private hookReplyHere(runId: string | null, body: Record<string, any>): Promise<Record<string, unknown> | null> {
     if (body.hook_event_name === 'SessionStart') return this.startReply(runId, body)
     const afterCompaction = this.compactionContextReply(runId, body)
     if (afterCompaction) return afterCompaction
@@ -6142,7 +6253,8 @@ class SessionManager {
     }
     // Its start is heard (#1336); whether it answers a prompt is the turn ledger's to say, in the launch's order.
     if (launch?.hooksWatch) hookSeen(launch.hooksWatch, at)
-    return this.inHookOrder(runId ?? `session:${String(body.session_id ?? '')}`, () => this.handleHookNow(runId, body, arrived, before, reply, at))
+    // Handled in its session's pinned chain (HI-2443): what it tells the agent (a notice, a doorbell) is said in it.
+    return this.inLaunchDialect(runId, body.session_id, () => this.inHookOrder(runId ?? `session:${String(body.session_id ?? '')}`, () => this.handleHookNow(runId, body, arrived, before, reply, at)))
   }
 
   /** Runs `fn` after what is queued for the launch (its hooks, its title), in the order they came. */
@@ -8150,3 +8262,9 @@ export const sessions = new SessionManager()
 // A workspace closing (HI-1829): its server markers whose records couldn't be saved can't be kept for its reopening.
 WorkspaceService.closingListeners.add((path) => serverMarks.closing(path))
 onLanguageChange(() => sessions.relabel())
+// Agent text's chain resolver (dialects, HI-2443): a session's chain is the one pinned at its launch; a caller with no
+// session (the Agent API's scripts and viewers) gets the API chain of the workspace its request is for, which follows
+// the files (servers.ts binds it: inApiWorkspace).
+setChainResolver((scope) => (scope.kind === 'session' ? sessions.pinnedChain(scope.session.projectPath, scope.session.agentId) : requestApiChain()))
+WorkspaceService.dialectsListeners.add((ws) => apiChainChanged(ws.hiveDir))
+WorkspaceService.closingListeners.add((path) => forgetApiChain(join(path, HIVE_DIR)))

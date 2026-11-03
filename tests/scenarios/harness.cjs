@@ -32,7 +32,8 @@ const claudeSignedIn = () => fs.existsSync(path.join(CLAUDE_TEST_HOME, '.credent
  * the chain it gives in the model slot (its files and hash, as the launch record will hold them). Each trial's workspace
  * gets it as a test copy in `.hive/dialects/<CLI>/` (placeDialect). Null with no --dialect: the shipped files, all
  * empty, so the Default. Throws, saying why, for a file that isn't a dialect.
- * Until card 6b wires the dialects into sessions, Hive doesn't apply the file yet: the run records the chain it gives.
+ * The run's agents pick it (their Dialect setting, HI-2443), so Hive pins it in their chain at launch and their launch
+ * record shows it.
  */
 function dialectForRun(file, providerKey) {
   if (!file) return null
@@ -597,6 +598,8 @@ async function runScenario(sc, providerKey, opts = {}) {
     const launch = { provider: p.provider, model: opts.model ?? '', effort: opts.effort ?? '', permissionMode: p.mode, extraArgs: p.extraArgs ?? '' }
     const coder = await lib.addAgent(inv, alpha, { name: 'Coder', ...launch })
     const implementer = await lib.addAgent(inv, alpha, { name: 'Implementer', ...launch })
+    // The run's dialect in their model slot (HI-2443: their Dialect setting), applied at their launch.
+    if (opts.dialect) for (const a of [coder, implementer]) await inv('agents:update', alpha, a.id, { dialect: opts.dialect.path })
     const ctx = {
       api,
       inv,

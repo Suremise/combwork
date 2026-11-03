@@ -323,8 +323,9 @@ same code while every required check still runs:
   phase of five merges took hours) and was the load Hive crashed under (#988). Every card has already passed review
   with its focused suites, which its reviewer checked. A pre-merge run still goes first in the slot queue (#558). A
   real suite skipped for the environment doesn't block a merge, but the record says so and the reviewer decides
-  whether it must run again first. The full unit run (`npm test`, about 7 minutes) is a release's final checks, and
-  on request; CI runs only the unit tests.
+  whether it must run again first. The full unit run (`npm test`, about 7 minutes) is a release's checks, and on
+  request, never a card's while building (AGENTS.md, Tests per card: no builder or reviewer runs or asks for it); CI
+  runs only the unit tests.
 - **The full set runs at checkpoints**: `npm run e2e -- --all --build --record` **on the integration branch when the
   lanes go quiet** (a phase's end, overnight with the load capped, before a long pause; a failure is carded at once and
   bisected over the merge commits since the last full run), for **every RC and release** (RELEASING.md, with the real
@@ -332,8 +333,9 @@ same code while every required check still runs:
   (`--all --only-real`) **after updating Claude Code or Codex**. `--affected` (below) stays a tool for picking the
   suites a change needs, such as a review round's fixes, and isn't any merge's gate.
 - **A flake fix, or a change to a suite's waits**, is proven by focused repeats under load (the `investigate-flake`
-  skill): the suite with its neighbours (its area's suites in `affected.mjs`, filling the four jobs) five times,
-  `npm run e2e -- <suite> <neighbours> --build --record --repeat 5`. The full-set check is the next quiet-time or
+  skill): the suite with its neighbours (its area's suites in `affected.mjs`, filling the four jobs) three times,
+  `npm run e2e -- <suite> <neighbours> --build --record --repeat 3` (within AGENTS.md's flake caps, Tests per card;
+  a flake seen only under a full run's load waits for the release window unless it blocks merges). The full-set check is the next quiet-time or
   release run (above), not the card's or the merge's; the full set repeated (`--all --repeat 5`) runs only when the
   user asks: it holds a heavy slot for over an hour while other lanes queue, and under that load it fails on their
   flakes (a failure in another lane's suite is a card of its own, not a reason to fail the fix).
@@ -773,7 +775,7 @@ terminals with the real Codex (one short prompt).
 
 **Copilot's skills from folders above** (#1308, Copilot 1.0.100, checked with `copilot skill list` and marker skills): besides its project's `.github/skills`, `.agents/skills` and `.claude/skills`, Copilot takes as "inherited" skills those of every folder above its working folder, up to the git root inside a repository, otherwise up to its profile folder (`USERPROFILE`/`HOME`, not included) or the drive's root. A test folder is under the user's profile (`%LOCALAPPDATA%\hive-test`) while the test's profile is elsewhere, so a Copilot working outside a repository (the Assistant's home, `<workspace>\.hive\assistant`) walked up to the user's own `~\.claude\skills`. So `copilotTestEnv(api, dir, { above })` makes `above`, a folder above every folder the test's Copilot works in (the suite's `lib.WORK`, a scenario's run folder), its profile folder, where the walk stops; it's required. Hive's own Copilot sessions do the same as Copilot run by hand: a project in a git repository stops at its root; the Assistant's home, or a project outside a repository, under the user's profile takes the user's `~\.claude\skills` too.
 
-**A fake Codex** (`fake-codex/fake-codex.cmd`) does the same for Codex: set it as `settings.providers.codex.executablePath` and start Hive with `CODEX_HOME` pointing at a test folder (with `[windows] sandbox = "unelevated"` in its `config.toml`, so nothing is left to set up). It reports itself as Codex 0.160.0 (`FAKE_CODEX_VERSION` changes it) and sends Codex's hooks and terminal titles for a few prompts: `review allow` / `review deny` (its auto-reviewer answers a permission request), `approve` (an approval prompt: `y` approves, Esc rejects) and `question` (an async question it works on beside: `a` answers it). Each prompt is a turn with its own id in its hooks (`turn_id`) and its rollout (`task_started`, and `task_complete` after its Stop), as Codex 0.162.1 has them; for the turn ledger (#648), `latetool` sends a command's PostToolUse after the turn's Stop, `loststop` sends no Stop (the rollout still records the end) and `silent` neither. `attention`, `turnledger` and `flightrecorder` use it, and so does `skilldelivery` (with the fake Claude Code); each launch is recorded in `fake-launches.jsonl` in `CODEX_HOME` (its folder and arguments).
+**A fake Codex** (`fake-codex/fake-codex.cmd`) does the same for Codex: set it as `settings.providers.codex.executablePath` and start Hive with `CODEX_HOME` pointing at a test folder (with `[windows] sandbox = "unelevated"` in its `config.toml`, so nothing is left to set up). It reports itself as Codex 0.160.0 (`FAKE_CODEX_VERSION` changes it) and sends Codex's hooks and terminal titles for a few prompts: `review allow` / `review deny` (its auto-reviewer answers a permission request), `approve` (an approval prompt: `y` approves, Esc rejects) and `question` (an async question it works on beside: `a` answers it). Each prompt is a turn with its own id in its hooks (`turn_id`) and its rollout (`task_started`, and `task_complete` after its Stop), as Codex 0.162.1 has them; for the turn ledger (#648), `latetool` sends a command's PostToolUse after the turn's Stop, `loststop` sends no Stop (the rollout still records the end) and `silent` neither. `attention`, `turnledger` and `flightrecorder` use it, and so do `skilldelivery` and `dialectlaunch` (with the fake Claude Code); each launch is recorded in `fake-launches.jsonl` in `CODEX_HOME` (its folder and arguments).
 
 Print `PASS name` / `FAIL name` per check, and add the suite to `SUITES` in `run.mjs`.
 

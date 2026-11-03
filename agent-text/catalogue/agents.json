@@ -9,6 +9,46 @@
     "note": "What happens after Codex's safety check flags a request (an agent's safeguard note). Trusted Access for Cyber is the name of OpenAI's program: keep it.",
     "audience": "both"
   },
+  "agents.fileLock.ask": {
+    "text": "Ask me",
+    "note": "A file lock mode (Settings, a project's settings): the user approves an edit of a file another agent is editing. Keep it short.",
+    "audience": "both"
+  },
+  "agents.fileLock.askDescription": {
+    "text": "The edit waits for your approval, like a permission prompt.",
+    "note": "What the Ask me file lock mode does.",
+    "audience": "both"
+  },
+  "agents.fileLock.block": {
+    "text": "Block",
+    "note": "A file lock mode (Settings, a project's settings): an agent may not edit a file another agent is editing. Keep it short.",
+    "audience": "both"
+  },
+  "agents.fileLock.blockDescription": {
+    "text": "An agent that tries to edit a file another agent is editing is told to wait or work on something else.",
+    "note": "What the Block file lock mode does.",
+    "audience": "both"
+  },
+  "agents.fileLock.off": {
+    "text": "Off",
+    "note": "A file lock mode (Settings, a project's settings): no locking. Keep it short.",
+    "audience": "both"
+  },
+  "agents.fileLock.offDescription": {
+    "text": "Agents edit freely. Use with care when several agents share the project folder.",
+    "note": "What the Off file lock mode does.",
+    "audience": "both"
+  },
+  "agents.fileLock.warn": {
+    "text": "Warn",
+    "note": "A file lock mode (Settings, a project's settings): the edit goes ahead with a warning to the agent. Keep it short.",
+    "audience": "both"
+  },
+  "agents.fileLock.warnDescription": {
+    "text": "The edit goes ahead, and the agent is told another agent is editing the file.",
+    "note": "What the Warn file lock mode does.",
+    "audience": "both"
+  },
   "agents.limit.most": {
     "text": "A project can have up to {most, number} agents.",
     "note": "Why another agent can't be added to a project: it has as many as Hive allows ({most}, 24).",

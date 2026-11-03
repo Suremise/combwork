@@ -18,7 +18,7 @@ import { allOff, FORM_OPTIONS, PRESET_TEAM, preset, previewRows, takesOption, wi
 import { compile, ruleOptions } from '../src/shared/workflow/compile'
 import { AGENTS_PER_PROJECT, migrateWorkspacePreferences, preferencesOf } from '../src/shared/workflow/preferences'
 import { TEMPLATE_CARRIED } from '../src/shared/workflow/templateOptions'
-import { settingEntry } from '../src/shared/settingsCatalog'
+import { settingEntry, settingReadOnly } from '../src/shared/settingsCatalog'
 import type { AgentDef } from '../src/shared/types'
 import { tempDir } from './tempDir'
 
@@ -86,7 +86,7 @@ describe('the option', () => {
     for (const id of ['project.workflow.maxAgents', 'workflow.git.maxAgents', 'workspace.workflow.none.maxAgents']) {
       const e = settingEntry(id)
       expect(e, id).toMatchObject({ sensitive: true })
-      expect(e!.readOnly).toMatch(/team size/)
+      expect(settingReadOnly(e!)).toMatch(/team size/)
     }
   })
 

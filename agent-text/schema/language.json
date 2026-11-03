@@ -1,0 +1,24 @@
+{
+  "language.automatic": {
+    "placeholders": {
+      "language": "plain"
+    }
+  },
+  "language.forced": {
+    "placeholders": {
+      "language": "plain"
+    }
+  },
+  "language.restart": {
+    "placeholders": {}
+  },
+  "language.setting.desc": {
+    "placeholders": {}
+  },
+  "language.setting.tip": {
+    "placeholders": {}
+  },
+  "language.setting.title": {
+    "placeholders": {}
+  }
+}

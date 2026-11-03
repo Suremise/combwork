@@ -9,7 +9,7 @@ import { englishText, shownText, type Text } from '../../src/shared/advanced'
 import { connectionValues, templateLoadDetail } from '../../src/shared/templateLoad'
 import type { ConnectionOption } from '../../src/shared/templateConnections'
 import { findSecretWarnings } from '../../src/main/mcpSecrets'
-import { LEVEL_NAME } from '../../src/main/assistantControl'
+import { levelName } from '../../src/main/assistantControl'
 import { assistantStatusLine } from '../../src/shared/assistantStatus'
 import { installSourceText } from '../../src/shared/providers'
 import type { AppSettings } from '../../src/shared/types'
@@ -232,6 +232,6 @@ describe("the Assistant panel's status line is window text (#885)", () => {
 describe('what the Assistant reads stays English', () => {
   it("the control levels its refusals name don't follow the window's language", () => {
     setLanguage(PSEUDO_LANGUAGE, {})
-    expect(LEVEL_NAME).toEqual({ look: 'Look and advise', agents: 'Control agents', projects: 'Control agents and create projects' })
+    expect((['look', 'agents', 'projects'] as const).map(levelName)).toEqual(['Look and advise', 'Control agents', 'Control agents and create projects'])
   })
 })

@@ -32,13 +32,14 @@ import { reviewCopyOnStart, reviewCopyOnVerdict } from './reviewCopies'
 import { COLUMN_CHOICES, columnLabel, commentSummary, isTaskColumn, reviewStalled } from '../shared/tasks'
 import type { HandoverAuthor } from '../shared/hiveGuidance'
 import { inDefaultDialect, inRequestScope } from '../shared/agentText/asyncScope'
+import { apiChainReady, inApiWorkspace } from './dialects/apiChain'
 import { say, type AgentMsg, type AgentValues } from '../shared/agentText'
 import { API } from './apiText'
 import { cardRequests, commentsParam, laneOrderNote, modelInUse, newestComments, progressLabel, retryWaitsView, taskRow, withoutHistory, type CardRequest, type IntentDone, type ProjectRow, type SkillRow, type TaskBatch, type TaskChange, type TaskReorder, type TaskView, type AccountUsagePublic } from '../shared/toolReplies'
 import * as assistant from './assistantControl'
 import { STOP_ASK_MS } from './mcp/agentApiCall'
 import { SettingRefused, applySetting, checkedValue, entryOf, projectOf, restartText, settingDetail, settingRows } from './settingsTools'
-import { settingChangeTexts, settingPath, type SettingEntry, type SettingScope } from '../shared/settingsCatalog'
+import { agentTitle, settingChangeTexts, settingPath, settingReadOnly, type SettingEntry, type SettingScope } from '../shared/settingsCatalog'
 import { addAgent, updateAgent } from './projectAgents'
 import { DOC_MAX, SHARED_PREFIX, readDoc } from './docSections'
 import { docOutline, findHeading, sectionText, type DocHeading } from '../shared/docSections'
@@ -647,7 +648,7 @@ async function assistantChange<T>(need: AssistantControl, what: Said, act: Activ
   // What is recorded (its activity, undo's records) is said in the Default; its refusals in the caller's scope.
   const stored = sayStored(what)
   const line = stored.charAt(0).toUpperCase() + stored.slice(1)
-  const guard = await asRefused(async () => assistant.admit(ws, assistantCallerToken() ?? '', need, sayNow(what), act))
+  const guard = await asRefused(async () => assistant.admit(ws, assistantCallerToken() ?? '', need, what, act))
   try {
     // `said`: what the line quotes (a prompt, a message), which the Agent API's event stream leaves out.
     // `brief`: the line in Hive's own words when `done` carries an error's text (#763: the stream never does).
@@ -731,7 +732,7 @@ function assistantMay(need: AssistantControl, what: Said, act: ActivityTarget): 
   const ws = assistantCaller()
   if (!ws) return
   try {
-    assistant.refuseUnlessAllowed(ws, need, sayNow(what), act)
+    assistant.refuseUnlessAllowed(ws, need, what, act)
   } catch (e) {
     throw httpOf(e)
   }
@@ -1045,13 +1046,15 @@ route('PATCH', '/v1/settings/:id', ({ params, body }) =>
  * and listed in its panel with old → new for Revert. Other callers can't.
  */
 async function settingsChange(e: SettingEntry, value: unknown, projectPath: string | null) {
+  // Where it is, as the caller reads it; and as records keep it, in the Default (dialects, HI-2441).
   const path = settingPath(e)
+  const storedPath = inDefaultDialect(() => settingPath(e))
   // Where: a project's setting names its project (` in webapp`).
   const where = projectPath ? { where: 'project', project: basename(projectPath) } : { where: 'none', project: '' }
   const ws = assistantCaller()
   if (!ws) throw new HttpError(403, say(API.settings.onlyAssistant, { path }))
   // Recorded lines are said in the Default (stored); refusals in the caller's scope.
-  const line = sayStored([API.settings.line, { path, ...where }])
+  const line = sayStored([API.settings.line, { path: storedPath, ...where }])
   // Which setting, never its value (#763).
   const act: ActivityTarget = { kind: 'setting', settingId: e.id, ...(projectPath ? { project: basename(projectPath) } : {}) }
   if (config.settings.assistant?.changeSettings !== true) {
@@ -1060,7 +1063,7 @@ async function settingsChange(e: SettingEntry, value: unknown, projectPath: stri
   }
   if (e.sensitive) {
     assistant.record(ws, act, line, sayStored([API.settings.userOnly]), { reason: sayStored([API.settings.userOnlyReason]) })
-    throw new HttpError(403, say(API.settings.readOnly, { readOnly: e.readOnly ?? '' }))
+    throw new HttpError(403, say(API.settings.readOnly, { readOnly: settingReadOnly(e) ?? '' }))
   }
   // Checked before the change: a value it can't take is the Assistant's to fix.
   await settingsCall(() => checkedValue(e, value, projectPath))
@@ -1077,16 +1080,17 @@ async function settingsChange(e: SettingEntry, value: unknown, projectPath: stri
     const r = await applySetting(e, value, projectPath, stillAllowed)
     // What changed, as the list and the reply show it: a table's changed entries, not its size.
     const { oldText, newText } = settingChangeTexts(e, r.old, r.new, r.removed)
+    const stored = inDefaultDialect(() => settingChangeTexts(e, r.old, r.new, r.removed))
     const changed = JSON.stringify(r.old) !== JSON.stringify(r.new) || !!r.removed
     if (changed) {
       // The event stream says which setting, not its values (`brief`).
-      assistant.record(ws, act, sayStored([API.settings.changedLine, { path, ...where, old: oldText, new: newText }]), undefined, { brief: sayStored([API.settings.changedBrief, { path, ...where }]), setting: { id: e.id, ...(projectPath ? { project: projectPath } : {}), path, old: r.old, new: r.new, ...(r.removed ? { removed: r.removed } : {}), oldText, newText } })
+      assistant.record(ws, act, sayStored([API.settings.changedLine, { path: storedPath, ...where, old: stored.oldText, new: stored.newText }]), undefined, { brief: sayStored([API.settings.changedBrief, { path: storedPath, ...where }]), setting: { id: e.id, ...(projectPath ? { project: projectPath } : {}), path: storedPath, old: r.old, new: r.new, ...(r.removed ? { removed: r.removed } : {}), oldText: stored.oldText, newText: stored.newText } })
       // For undo (#1282): its value (and a provider's removed models) as it was and as set.
       const fields = [{ field: 'value', old: r.old, new: r.new }, ...(r.removed ? [{ field: 'removed', old: r.removed.old, new: r.removed.new }] : [])]
-      await recordingChanges(ws, 'setting', sayStored([API.change.setting, { path, ...where }]), () => noteChange(requireWorkspace(), { kind: 'setting', project: projectPath ? basename(projectPath) : null, target: e.id, fields }))
+      await recordingChanges(ws, 'setting', sayStored([API.change.setting, { path: storedPath, ...where }]), () => noteChange(requireWorkspace(), { kind: 'setting', project: projectPath ? basename(projectPath) : null, target: e.id, fields }))
     }
     const restart = restartText(e)
-    return { id: e.id, title: e.title, path, ...(projectPath ? { project: basename(projectPath) } : {}), changed, old: oldText, new: newText, ...(restart ? { restart } : {}), ...(r.note ? { note: r.note } : {}) }
+    return { id: e.id, title: agentTitle(e), path, ...(projectPath ? { project: basename(projectPath) } : {}), changed, old: oldText, new: newText, ...(restart ? { restart } : {}), ...(r.note ? { note: r.note } : {}) }
   } catch (err) {
     assistant.record(ws, act, line, (err as Error).message, { reason: publicReason(statusOf(err)) })
     throw err instanceof SettingRefused ? httpFrom(err.status, err) : err
@@ -1525,7 +1529,7 @@ route('POST', '/v1/projects/:name/agents/:agent/stop', async ({ params, body, si
       if (how === 'no') throw new HttpError(409, say(API.agent.stopAskDeclined, { agent: a.name }))
       // The answer can come minutes later: only the run the user was asked about, and only if Control still allows it.
       if (sessions.liveFor(p, agentId)?.runId !== st.runId) return { done: [API.done.alreadyStopped, { agent: a.name, project: basename(p) }], result: { ok: true, wasRunning: false } }
-      if (!assistant.allows('agents')) throw new HttpError(403, say(API.agent.stopNotAllowed, { level: assistant.LEVEL_NAME[assistant.controlLevel()] }))
+      if (!assistant.allows('agents')) throw new HttpError(403, say(API.agent.stopNotAllowed, { level: assistant.levelName(assistant.controlLevel()) }))
     }
     // Control and the Assistant's session that asked, checked again just before the stop (HI-2328).
     guard()
@@ -4417,8 +4421,20 @@ async function handleApi(req: IncomingMessage, res: ServerResponse): Promise<voi
   who = caller
   // An agent's work is its project's; the Assistant's and scripts' are the workspace's own (not spread over projects).
   if (caller.kind === 'agent') m.project = basename(caller.projectPath)
-  // Its replies are in the caller's dialect (HI-2065): its session's, or the API chain's for a caller with none.
-  return callerStore.run(caller, () => inRequestScope(caller.kind === 'agent' ? caller : caller.kind === 'assistant' ? { projectPath: join(caller.workspace, HIVE_DIR, ASSISTANT_DIR), agentId: ASSISTANT_AGENT_ID } : null, () => serveApi(req, res, url)))
+  // Its replies are in the caller's dialect (HI-2065): its session's, or for a caller with none the API chain of the
+  // workspace the request names (or the only one open), decided here once for the whole request, its early and error
+  // replies too, never from the window with the focus (HR1 on HI-2443); none named among several: the Default. Loaded
+  // first where it isn't yet (kept until that workspace's dialect files change).
+  const apiWs = caller.kind === 'agent' || caller.kind === 'assistant' ? null : callerStore.run(caller, () => {
+    try {
+      return requestWorkspace(req, url)
+    } catch {
+      return null
+    }
+  })
+  const apiDir = apiWs?.path ? apiWs.hiveDir : null
+  if (apiDir) await apiChainReady(apiDir)
+  return callerStore.run(caller, () => inApiWorkspace(apiDir, () => inRequestScope(caller.kind === 'agent' ? caller : caller.kind === 'assistant' ? { projectPath: join(caller.workspace, HIVE_DIR, ASSISTANT_DIR), agentId: ASSISTANT_AGENT_ID } : null, () => serveApi(req, res, url))))
 }
 
 async function serveApi(req: IncomingMessage, res: ServerResponse, url: URL): Promise<void> {

@@ -709,6 +709,31 @@
     "note": "An error updating the coding agent CLI {cli} (\"Codex\") while agents run it.",
     "audience": "both"
   },
+  "service.settingsRevert.busy": {
+    "text": "It is being reverted.",
+    "note": "An error when the user clicks Revert on a setting the Assistant changed: a revert of that change is already running.",
+    "audience": "both"
+  },
+  "service.settingsRevert.changed": {
+    "text": "{path} has changed since (it is {value} now): change it there.",
+    "note": "An error when the user clicks Revert on a setting the Assistant changed: the setting was changed again since. {path} is where the setting is (\"Settings → Sessions → Idle timeout\"), {value} its value now as the panel shows values (on, off, a number, a model's name). \"There\" is that place in Settings.",
+    "audience": "both"
+  },
+  "service.settingsRevert.done": {
+    "text": "It has already been reverted.",
+    "note": "An error when the user clicks Revert on a setting the Assistant changed: that change was reverted already.",
+    "audience": "both"
+  },
+  "service.settingsRevert.gone": {
+    "text": "That change is no longer listed.",
+    "note": "An error when the user clicks Revert on a setting the Assistant changed (the Assistant panel's list of its changes): the change isn't in the list any more.",
+    "audience": "both"
+  },
+  "service.settingsRevert.models": {
+    "text": "{path} has changed since (its removed models differ): change it there.",
+    "note": "An error when the user clicks Revert on a provider's models setting the Assistant changed: the models it had removed are different now. {path} is where the setting is (\"Settings → Claude Code → Models\"). \"There\" is that place in Settings.",
+    "audience": "both"
+  },
   "service.slots.notPrepared": {
     "text": "Hive couldn't get {slot} ready for {card}: {why}",
     "note": "A notice: a card was started in a slot (a worktree Hive lends to a card or a lane), and Hive couldn't check out the card's branch there or install its dependencies. {slot} is the slot's name (slot-b), {card} the card's key, {why} git's or the setup's reason, in English.",

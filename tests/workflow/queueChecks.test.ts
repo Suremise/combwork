@@ -470,7 +470,10 @@ describe('merge checks as Hive\'s runs (temporary repositories)', () => {
     expect(r.started[0].noInstall).toBe(true)
   })
 
-  it('uncounted: a check that edits a tracked file and restores it passes but proves nothing → no advance, retested, then paused', async () => {
+  // GIT_HEAVY_MS, for these two (HI-2025's rule): a card drained through the queue, its check bracketed by status reads;
+  // this one is retested MAX_RETESTS times, the next checks out another commit and back. 4.0 and 4.2 s alone, 9.0 and
+  // 8.4 s beside three spinner workers; this one past 20 s in HI-2453's loaded full run, the next in its rerun of the files.
+  it('uncounted: a check that edits a tracked file and restores it passes but proves nothing → no advance, retested, then paused', { timeout: GIT_HEAVY_MS }, async () => {
     const e = team({}, script("const fs = require('fs'); const t = fs.readFileSync('README.md'); fs.writeFileSync('README.md', 'x'); fs.writeFileSync('README.md', t)"))
     const r = runner()
     const { card } = await queued(e)
@@ -487,7 +490,7 @@ describe('merge checks as Hive\'s runs (temporary repositories)', () => {
     expect(q.paused('main')).toMatchObject({ reason: 'uncounted', card: card.key })
   })
 
-  it('uncounted: a check that checks out another commit and back → no advance, paused', async () => {
+  it('uncounted: a check that checks out another commit and back → no advance, paused', { timeout: GIT_HEAVY_MS }, async () => {
     const e = team({}, script("const { execFileSync: x } = require('child_process'); const h = x('git', ['rev-parse', 'HEAD']).toString().trim(); x('git', ['checkout', '-q', '--detach', 'HEAD~1']); x('git', ['checkout', '-q', '--detach', h])"))
     const r = runner()
     const { card } = await queued(e)

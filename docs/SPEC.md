@@ -4342,6 +4342,18 @@ Whether a conversation may resume there is its **hold** (none: it may):
   again after a pause (1 s, doubling, at most 30 s) and at once when a session there ends or goes idle, until the lane
   is lent one or no slot is held: a process ending tells Hive nothing. While the slot is still held and is the only
   one it could have, the look writes no lease.
+  **Windows Sandbox's broker in a held slot** (HI-2467): Windows refuses to rename a folder that is a process's current
+  folder, and Windows Sandbox's broker (`WindowsSandboxServer.exe`) keeps the folder it was started in as its own long
+  after the Sandbox and the session that started it have ended: a Sandbox started through the windows-sandbox MCP
+  server from an agent in a slot so holds the slot (the server starts `wsb.exe` in the agent's folder; its fix is the
+  mcp project's MC-1484). When a held slot's rename fails, Hive looks at each process running a known broker's
+  executable (systemBrokers.ts), through its process helper (never on main's thread): its executable's path and its
+  current folder, read from its PEB (x64 only; anything else, or an inconsistent read, is unread). One counts only when,
+  in that one look, its path is the broker's in WindowsApps and its current folder is the slot or inside it; it is then
+  named (`held`: `broker`, with its process name and whether one of the Sandbox's own processes runs: idle, a Sandbox
+  running, or unknown), else the slot is held by a `process` as before. Each retry looks again, so what is said follows
+  the broker starting, stopping or ending. It only names what holds the slot: whether the slot can be lent is still the
+  rename alone, and Hive ends nothing (HI-2309).
 - **The stand-in** (an agent's 0.9 worktree as the card's folder, `existing: true`, the line updater) acts only for an
   agent whose `legacyWorktree` is still its folder: until #1441 migrates the project (then its carried lease).
 - **Off switches:** G11 another value: nothing of this. `hive.workflow.enforce` off: nothing is lent, refused,

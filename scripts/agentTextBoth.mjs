@@ -20,7 +20,8 @@
 //   - `// agent-text: <name>[, <name>…]`: the table, descriptor or function (its return values) whose messages it passes,
 //     which this module then follows like any argument (a name that leads to no message fails); or
 //   - `// agent-protocol: <why>`: a name, a path or text already said, not wording.
-// The settings catalogue (src/shared/settingsCatalog.ts) is card 5c's, and left out here.
+// The settings catalogue (src/shared/settingsCatalog.ts) is scanned too since card 5c (HI-2441): its rows' messages are
+// found through the marks on agentSetting, settingPath and settingOptions.
 import { existsSync, readFileSync, statSync } from 'fs'
 import { join, posix } from 'path'
 import { parse } from '@babel/parser'
@@ -51,8 +52,8 @@ const ONE_WAY_FREE = [/^src\/shared\/advanced\.ts$/, /^src\/main\/hiveError\.ts$
 /** A call inside a log line (`log.warn(…)`): the log's English. */
 const inLogCall = (p) => !!p.findParent((q) => q.isCallExpression() && q.node.callee.type === 'MemberExpression' && q.node.callee.object.type === 'Identifier' && /^(log|logger|console)$/.test(q.node.callee.object.name))
 
-/** Files left out: the window's, and the settings catalogue (5c's). */
-const LEFT_OUT = [/^src\/renderer\//, /^src\/preload\//, /^src\/main\/ipc\.ts$/, /^src\/shared\/settingsCatalog\.ts$/]
+/** Files left out: the window's. */
+const LEFT_OUT = [/^src\/renderer\//, /^src\/preload\//, /^src\/main\/ipc\.ts$/]
 export const isScanned = (rel) => /^src\/(main|shared)\//.test(rel) && !LEFT_OUT.some((re) => re.test(rel)) && !/\.test\.tsx?$/.test(rel)
 
 const calleeName = (c) => (c?.type === 'Identifier' ? c.name : (c?.type === 'MemberExpression' || c?.type === 'OptionalMemberExpression') && !c.computed && c.property.type === 'Identifier' ? c.property.name : '')

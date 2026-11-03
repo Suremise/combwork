@@ -551,7 +551,7 @@
   "board.lanes.waitsFresh": "en attente : {agent} démarre dans une nouvelle conversation dès qu’il est libre",
   "board.lanes.waitsLink": "Clique pour l’afficher.",
   "board.lanes.waitsPreparing": "en attente : préparation de {slot}",
-  "board.lanes.waitsSlotHeld": "en attente de {slot} : {held, select, session {la session de {agent} y est encore} other {un processus y a encore un fichier ou un dossier ouvert}}",
+  "board.lanes.waitsSlotHeld": "en attente de {slot} : {held, select, session {la session de {agent} y est encore} broker {un processus y a encore un fichier ou un dossier ouvert : le broker de Windows Sandbox ({broker}) y travaille{idle, select, yes {, sans aucun Sandbox en cours} no {, avec un Sandbox en cours} other {}}} other {un processus y a encore un fichier ou un dossier ouvert}}",
   "board.lanes.waitsStart": "{card} attend de démarrer : {why, select, watching {{agent} attend un autre travail} queued {une ligne de Hive est en route vers {agent}} failed {le dernier démarrage de {agent} a échoué} refused {son démarrage a été refusé pour l’instant, et Hive réessaie} other {{agent} est en plein tour}}",
   "board.leftOut.detail": "{hasPaths, select, yes {Ses chemins : {paths}.} other {Elle n’a pas encore de chemins.}} Un fichier modifié entre-temps peut être le travail d’une autre carte ou le tien : n’inclus que ce qui appartient à {card}.",
   "board.leftOut.include": "{n, plural, one {L’inclure} many {Les inclure} other {Les inclure}}",

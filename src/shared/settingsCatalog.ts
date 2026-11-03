@@ -10,6 +10,11 @@
  * The rows' text is messages (#767): Settings shows it in the user's language (shownSetting), while the tools, their
  * checks and the paths they name keep the English (an entry's title, desc and tip), whatever the user chose. Text only
  * the Assistant reads (when a setting helps, why it is read-only, what a value takes) stays English.
+ *
+ * Dialects (HI-2065, card 5c HI-2441): what the tools say is said where they say it, in the reader's chain. The rows'
+ * messages through agentText (agentSetting, settingPath, settingOptions), the Assistant's own text as agent messages
+ * (`AGENT`, said with say()). The English kept on an entry is the Default's, for Settings and searching; with no chain
+ * the two are the same, byte for byte.
  */
 import type { AppSettings, CommandPoint, CustomCommand, ProjectConfig, ProviderId, WorkflowLevel, WorkspaceConfig } from './types'
 import type { PlatformId } from './platform/descriptors'
@@ -17,7 +22,8 @@ import { LANE_MAX_ROUNDS, LOOP_STEP_WAIT_MAX_MINUTES, LOOP_WAIT_MAX_HOURS } from
 import { AGENT_LIMIT_MAX, DEFAULT_PROJECT_CONFIG, DEFAULT_SETTINGS, FILE_LOCK_MODES, SLOT_COPY_DEFAULT } from './defaults'
 import { SLOT_COPY_TEXT } from './slotDefaults'
 import { PRICES_CHECKED } from './prices'
-import { ADVANCED_DEFS, advancedDef, advancedTakesText, advancedText, checkAdvanced, cliFacing, englishText, groupName, linesOf, listOf, shownText, withValues, type Text, type TextPart } from './advanced'
+import { ADVANCED_DEFS, advancedDef, advancedTakesText, advancedText, agentText, checkAdvanced, cliFacing, englishText, groupName, linesOf, listOf, shownText, withValues, type Text, type TextPart } from './advanced'
+import { agentMsg, say, type AgentMsg } from './agentText'
 import { language, msg } from './i18n'
 import { FORM_GROUPS, takesOption, type OptionKey } from './workflow/options'
 import { OPTION_TEXT, optionTitle, VALUE_TEXT } from './workflow/optionTexts'
@@ -143,14 +149,14 @@ export interface SettingEntry extends Omit<Row, 'title' | 'desc' | 'tip' | 'opti
   confirmOn?: { title: string; message: string; detail?: string }
   /** The text Settings shows, in the user's language (shownSetting). */
   text: { title: Text; desc: Text | null; tip: Text | null; off?: Text; confirmOn?: { title: Text; message: Text; detail?: Text }; englishTitle?: boolean }
-  /** When it helps: the signal that makes it worth suggesting (the tune-settings skill's opportunities). */
-  helps?: string
+  /** When it helps: the signal that makes it worth suggesting (the tune-settings skill's opportunities), said with say(). */
+  helps?: AgentMsg
   /** No value: a button, a status or a list. The tools leave it out. */
   action?: boolean
   /** What the tools take for a custom control (a model is any text); without it, a custom setting is read-only to them. */
   value?: 'text' | 'boolean' | 'select' | 'effort' | 'table'
-  /** Read-only to the Hive Assistant, and why (it can still read and explain it). */
-  readOnly?: string
+  /** Read-only to the Hive Assistant, and why (it can still read and explain it): settingReadOnly() says it, with its {path}. */
+  readOnly?: AgentMsg
   /** Sensitive: permissions, what runs, the Agent API, the Assistant's own settings (readOnly says which). */
   sensitive?: boolean
   /** Who takes a change only when restarted: running agents' sessions, the Assistant, or Hive itself (#676). */
@@ -170,7 +176,10 @@ export interface SettingsSectionInfo<Id extends string = string> {
   text: { label: TextPart; desc: Text }
 }
 
-const sectionInfo = <Id extends string>(id: Id, label: TextPart, desc: Text, provider?: ProviderId): SettingsSectionInfo<Id> => ({ id, label: englishText(label), desc: englishText(desc), ...(provider ? { provider } : {}), text: { label, desc } })
+/** The Default's English kept beside a message: Settings' and searching's. What agents read is said from the message (agentSetting, settingPath). */
+const english = (t: TextPart): string => englishText(t) // window: the Default's English kept on an entry or section (Settings' "Język (Language)", searching); agents read agentSetting() and settingPath()
+
+const sectionInfo = <Id extends string>(id: Id, label: TextPart, desc: Text, provider?: ProviderId): SettingsSectionInfo<Id> => ({ id, label: english(label), desc: english(desc), ...(provider ? { provider } : {}), text: { label, desc } })
 
 /** A row's text as Settings shows it, in the user's language; a title that also says its English does so in any other language. */
 export function shownSetting(e: SettingEntry): { title: string; desc: string; tip: string } {
@@ -875,21 +884,21 @@ const CUSTOM_VALUES: Record<string, SettingEntry['value']> = {
 }
 
 /** Read-only to the Assistant because they decide what agents or the Assistant may do, or what runs (#186). */
-const SENSITIVE: [RegExp, string][] = [
-  [/^agentApi\./, 'The Agent API decides what other programs can do through Hive'], // i18n-ignore: the Assistant's tools (English)
-  [/^assistant\.(control|changeSettings|typingPause|enterEndsPause|tellReplies)$/, "These are the Assistant's own permissions"], // i18n-ignore: the Assistant's tools (English)
-  [/^assistant\.(provider|mode)$|^assistant\.provider:|^assistant\.[\w-]+\.\w+$/, 'It decides how the Assistant itself runs (its provider, working mode, model, effort, permission mode and arguments)'], // i18n-ignore: the Assistant's tools (English)
-  [/^(project\.)?[\w-]+\.(defaultPermissionMode|permissionMode|enableDangerousMode)$/, 'A permission mode decides how much agents do without asking'], // i18n-ignore: the Assistant's tools (English)
-  [/^(project\.)?[\w-]+\.(executablePath|extraArgs)$/, 'It decides what Hive runs: a CLI and its arguments'], // i18n-ignore: the Assistant's tools (English)
-  [/^[\w-]+\.allowBackgroundSessions$/, "It lets sessions run out of Hive's reach (Hive can't see or stop them)"], // i18n-ignore: the Assistant's tools (English)
-  [/^project\.worktreeSetup$/, 'It is a command Hive runs in every new worktree'], // i18n-ignore: the Assistant's tools (English)
-  [/^workspace\.(onClose|onOpen|commands)$|^general\.(onQuit|commands)$/, 'Its commands run on this machine by themselves or by hand: the user saves them, the Assistant may only propose (HI-1954)'], // i18n-ignore: the Assistant's tools (English)
-  [/^updates\.prerelease$/, 'It decides which builds of Hive install'], // i18n-ignore: the Assistant's tools (English)
-  [/(^|\.)maxAgents$/, "Maximum agents is the user's team size, the most agents you may add"] // i18n-ignore: the Assistant's tools (English)
+const SENSITIVE: [RegExp, AgentMsg][] = [
+  [/^agentApi\./, agentMsg({ id: 'settings.agent.sensitive.agentApi', text: 'The Agent API decides what other programs can do through Hive: only the user can change it, in {path}.', note: "Why the Assistant can't change an Agent API setting (#186). {path} is where the user changes it (Settings → …)." })],
+  [/^assistant\.(control|changeSettings|typingPause|enterEndsPause|tellReplies)$/, agentMsg({ id: 'settings.agent.sensitive.assistantPermissions', text: "These are the Assistant's own permissions: only the user can change it, in {path}.", note: "Why the Assistant can't change its own permissions (Control, Change settings and the like, #186). {path} is where the user changes it." })],
+  [/^assistant\.(provider|mode)$|^assistant\.provider:|^assistant\.[\w-]+\.\w+$/, agentMsg({ id: 'settings.agent.sensitive.assistantRuns', text: 'It decides how the Assistant itself runs (its provider, working mode, model, effort, permission mode and arguments): only the user can change it, in {path}.', note: "Why the Assistant can't change how it runs itself (#186). {path} is where the user changes it." })],
+  [/^(project\.)?[\w-]+\.(defaultPermissionMode|permissionMode|enableDangerousMode)$/, agentMsg({ id: 'settings.agent.sensitive.permissionMode', text: 'A permission mode decides how much agents do without asking: only the user can change it, in {path}.', note: "Why the Assistant can't change a permission mode setting (#186). {path} is where the user changes it." })],
+  [/^(project\.)?[\w-]+\.(executablePath|extraArgs)$/, agentMsg({ id: 'settings.agent.sensitive.whatRuns', text: 'It decides what Hive runs: a CLI and its arguments: only the user can change it, in {path}.', note: "Why the Assistant can't change a CLI's path or arguments (#186). {path} is where the user changes it." })],
+  [/^[\w-]+\.allowBackgroundSessions$/, agentMsg({ id: 'settings.agent.sensitive.backgroundSessions', text: "It lets sessions run out of Hive's reach (Hive can't see or stop them): only the user can change it, in {path}.", note: "Why the Assistant can't allow background sessions (#186). {path} is where the user changes it." })],
+  [/^project\.worktreeSetup$/, agentMsg({ id: 'settings.agent.sensitive.worktreeSetup', text: 'It is a command Hive runs in every new worktree: only the user can change it, in {path}.', note: "Why the Assistant can't change a project's worktree setup command (#186). {path} is where the user changes it." })],
+  [/^workspace\.(onClose|onOpen|commands)$|^general\.(onQuit|commands)$/, agentMsg({ id: 'settings.agent.sensitive.commands', text: 'Its commands run on this machine by themselves or by hand: the user saves them, the Assistant may only propose (HI-1954): only the user can change it, in {path}.', note: "Why the Assistant can't save commands (HI-1954): it may only propose them. {path} is where the user changes them." })],
+  [/^updates\.prerelease$/, agentMsg({ id: 'settings.agent.sensitive.prerelease', text: 'It decides which builds of Hive install: only the user can change it, in {path}.', note: "Why the Assistant can't choose pre-release builds (#186). {path} is where the user changes it." })],
+  [/(^|\.)maxAgents$/, agentMsg({ id: 'settings.agent.sensitive.maxAgents', text: "Maximum agents is the user's team size, the most agents you may add: only the user can change it, in {path}.", note: "Why the Assistant can't change Maximum agents, the user's team size. {path} is where the user changes it." })]
 ]
 
 /** Read-only to the Assistant for now, though not sensitive (#186: keybindings). */
-const READ_ONLY: [RegExp, string][] = [[/^keybindings\./, 'Shortcuts are read-only to the Assistant for now']] // i18n-ignore: the Assistant's tools (English)
+const READ_ONLY: [RegExp, AgentMsg][] = [[/^keybindings\./, agentMsg({ id: 'settings.agent.readOnly.keybindings', text: 'Shortcuts are read-only to the Assistant for now: the user changes them in {path}.', note: "Why the Assistant can't change a keyboard shortcut (#186). {path} is where the user changes them." })]]
 
 const RESTART: [RegExp, NonNullable<SettingEntry['restart']>][] = [
   [/^(project\.)?[\w-]+\.(executablePath|defaultModel|defaultEffort|model|effort|extraArgs|use200kContext|allowBackgroundSessions|defaultPermissionMode|permissionMode)$/, 'sessions'],
@@ -898,40 +907,40 @@ const RESTART: [RegExp, NonNullable<SettingEntry['restart']>][] = [
 ]
 
 /** When a setting is worth suggesting: the signal to look for (the tune-settings skill reads these). */
-const HELPS: Record<string, string> = {
-  'general.progressPanel': "Agents run long tests or builds and the user can't see how far along they are.", // i18n-ignore: the Assistant's tools (English)
-  'general.progressCommands': "Agents' long commands don't show in the Progress panel, or the user wants them shown only on request.", // i18n-ignore: the Assistant's tools (English)
-  'general.keepAwake': 'Long runs stop when the PC sleeps (agents left working while the user is away).', // i18n-ignore: the Assistant's tools (English)
-  'general.confirmOnQuit': 'The user quits Hive and stops agents by mistake, or finds the question tiresome.', // i18n-ignore: the Assistant's tools (English)
-  'general.dateFormat': 'Session names and lists show dates in a format the user finds unfamiliar.', // i18n-ignore: the Assistant's tools (English)
-  'general.language': 'The user would rather use Hive in another language, or Hive shows a language they did not choose.', // i18n-ignore: the Assistant's tools (English)
-  'general.showTips': 'The user finds the daily tip distracting, or wants to learn what Hive can do.', // i18n-ignore: the Assistant's tools (English)
-  'appearance.uiFontSize': 'Menus and panels are hard to read at the current size.', // i18n-ignore: the Assistant's tools (English)
-  'appearance.terminalFontSize': "The agents' terminals are hard to read, or too little fits.", // i18n-ignore: the Assistant's tools (English)
-  'notifications.chimeEnabled': 'The chime distracts the user during focused work, or they miss agents finishing.', // i18n-ignore: the Assistant's tools (English)
-  'notifications.desktopNotifications': 'Too many notifications, or agents waiting for the user go unnoticed.', // i18n-ignore: the Assistant's tools (English)
-  'notifications.whileFocused': 'Banners interrupt the user while they work in Hive.', // i18n-ignore: the Assistant's tools (English)
-  'notifications.flashOnWaiting': 'Agents wait for answers while Hive is in the background and nobody notices.', // i18n-ignore: the Assistant's tools (English)
-  'notifications.suggestFreshStart': 'Long conversations get slower and cost more to carry on; a finished piece of work is the moment to start fresh.', // i18n-ignore: the Assistant's tools (English)
-  'sessions.backupTranscripts': 'Old conversations should stay readable after the CLI deletes its transcripts.', // i18n-ignore: the Assistant's tools (English)
-  'sessions.backupRetention': "Hive's backups take a lot of disk space for sessions the CLI still has.", // i18n-ignore: the Assistant's tools (English)
-  'sessions.compactSuggestTokens': 'Agents work with big contexts for long stretches, so every message costs more: a lower threshold suggests compacting sooner.', // i18n-ignore: the Assistant's tools (English)
-  'sessions.transcriptWarnMB': "Agents' transcripts grow to tens of MB and typing or the CLI slows down: a lower value flags them sooner, for a handover to a new conversation.", // i18n-ignore: the Assistant's tools (English)
-  'sessions.confirmStop': 'Agents get stopped by mistake.', // i18n-ignore: the Assistant's tools (English)
-  'sessions.defaultView': 'The user runs many agents per project and wants new projects to open on Tiles, a small tile per agent.', // i18n-ignore: the Assistant's tools (English)
-  'sessions.tileOrder': 'The user watches many agents in the Tiles view and wants those waiting for them or stalled first, rather than in the panes order.', // i18n-ignore: the Assistant's tools (English)
-  'sessions.resumeAfterUnexpectedClose': "Hive closed unexpectedly and the user wants the agents that were running to carry on by themselves at the next start.", // i18n-ignore: the Assistant's tools (English)
-  'sessions.followTranscripts': 'The user reads running sessions in the Sessions tab and wants new messages to appear as they come.', // i18n-ignore: the Assistant's tools (English)
-  'assistant.compactSuggestTokens': "The Assistant's own conversation gets long and slow: a lower threshold suggests compacting it sooner.", // i18n-ignore: the Assistant's tools (English)
-  'assistant.panelSide': 'Windows notifications or other apps cover the right of the screen.', // i18n-ignore: the Assistant's tools (English)
-  'board.archiveDoneDays': 'The Done column has grown long with finished cards.', // i18n-ignore: the Assistant's tools (English)
-  'workflow.git.slotCopy': "New slots and review copies miss git-ignored files such as .env, so agents' builds or tests fail there.", // i18n-ignore: the Assistant's tools (English)
-  'agents.leftoverProcesses': "A folder can't be renamed or deleted (in use), or a port is taken, after its agents have stopped: processes they started are still running.", // i18n-ignore: the Assistant's tools (English)
-  'agents.backgroundTaskMinutes': "Agents' background tasks (long test runs) count as finished too soon, or a dev server keeps an agent waiting long after its work is done.", // i18n-ignore: the Assistant's tools (English)
-  'project.compactSuggestTokens': "One project's conversations run much longer than others'.", // i18n-ignore: the Assistant's tools (English)
-  'project.transcriptWarnMB': "One project's conversations grow much bigger than others'.", // i18n-ignore: the Assistant's tools (English)
-  'project.cardAttachmentCleanup': "A project's archived cards keep screenshots and logs that take a lot of disk space: fewer days removes them sooner.", // i18n-ignore: the Assistant's tools (English)
-  'project.slotCopy': 'New slots and review copies of this project miss git-ignored files its builds need.', // i18n-ignore: the Assistant's tools (English)
+const HELPS: Record<string, AgentMsg> = {
+  'general.progressPanel': agentMsg({ id: 'settings.agent.helps.general.progressPanel', text: "Agents run long tests or builds and the user can't see how far along they are.", note: 'When the setting general.progressPanel is worth suggesting: the signal the Assistant looks for (hive_read_setting, the tune-settings skill).' }),
+  'general.progressCommands': agentMsg({ id: 'settings.agent.helps.general.progressCommands', text: "Agents' long commands don't show in the Progress panel, or the user wants them shown only on request.", note: 'When the setting general.progressCommands is worth suggesting: the signal the Assistant looks for (hive_read_setting, the tune-settings skill).' }),
+  'general.keepAwake': agentMsg({ id: 'settings.agent.helps.general.keepAwake', text: 'Long runs stop when the PC sleeps (agents left working while the user is away).', note: 'When the setting general.keepAwake is worth suggesting: the signal the Assistant looks for (hive_read_setting, the tune-settings skill).' }),
+  'general.confirmOnQuit': agentMsg({ id: 'settings.agent.helps.general.confirmOnQuit', text: 'The user quits Hive and stops agents by mistake, or finds the question tiresome.', note: 'When the setting general.confirmOnQuit is worth suggesting: the signal the Assistant looks for (hive_read_setting, the tune-settings skill).' }),
+  'general.dateFormat': agentMsg({ id: 'settings.agent.helps.general.dateFormat', text: 'Session names and lists show dates in a format the user finds unfamiliar.', note: 'When the setting general.dateFormat is worth suggesting: the signal the Assistant looks for (hive_read_setting, the tune-settings skill).' }),
+  'general.language': agentMsg({ id: 'settings.agent.helps.general.language', text: 'The user would rather use Hive in another language, or Hive shows a language they did not choose.', note: 'When the setting general.language is worth suggesting: the signal the Assistant looks for (hive_read_setting, the tune-settings skill).' }),
+  'general.showTips': agentMsg({ id: 'settings.agent.helps.general.showTips', text: 'The user finds the daily tip distracting, or wants to learn what Hive can do.', note: 'When the setting general.showTips is worth suggesting: the signal the Assistant looks for (hive_read_setting, the tune-settings skill).' }),
+  'appearance.uiFontSize': agentMsg({ id: 'settings.agent.helps.appearance.uiFontSize', text: 'Menus and panels are hard to read at the current size.', note: 'When the setting appearance.uiFontSize is worth suggesting: the signal the Assistant looks for (hive_read_setting, the tune-settings skill).' }),
+  'appearance.terminalFontSize': agentMsg({ id: 'settings.agent.helps.appearance.terminalFontSize', text: "The agents' terminals are hard to read, or too little fits.", note: 'When the setting appearance.terminalFontSize is worth suggesting: the signal the Assistant looks for (hive_read_setting, the tune-settings skill).' }),
+  'notifications.chimeEnabled': agentMsg({ id: 'settings.agent.helps.notifications.chimeEnabled', text: 'The chime distracts the user during focused work, or they miss agents finishing.', note: 'When the setting notifications.chimeEnabled is worth suggesting: the signal the Assistant looks for (hive_read_setting, the tune-settings skill).' }),
+  'notifications.desktopNotifications': agentMsg({ id: 'settings.agent.helps.notifications.desktopNotifications', text: 'Too many notifications, or agents waiting for the user go unnoticed.', note: 'When the setting notifications.desktopNotifications is worth suggesting: the signal the Assistant looks for (hive_read_setting, the tune-settings skill).' }),
+  'notifications.whileFocused': agentMsg({ id: 'settings.agent.helps.notifications.whileFocused', text: 'Banners interrupt the user while they work in Hive.', note: 'When the setting notifications.whileFocused is worth suggesting: the signal the Assistant looks for (hive_read_setting, the tune-settings skill).' }),
+  'notifications.flashOnWaiting': agentMsg({ id: 'settings.agent.helps.notifications.flashOnWaiting', text: 'Agents wait for answers while Hive is in the background and nobody notices.', note: 'When the setting notifications.flashOnWaiting is worth suggesting: the signal the Assistant looks for (hive_read_setting, the tune-settings skill).' }),
+  'notifications.suggestFreshStart': agentMsg({ id: 'settings.agent.helps.notifications.suggestFreshStart', text: 'Long conversations get slower and cost more to carry on; a finished piece of work is the moment to start fresh.', note: 'When the setting notifications.suggestFreshStart is worth suggesting: the signal the Assistant looks for (hive_read_setting, the tune-settings skill).' }),
+  'sessions.backupTranscripts': agentMsg({ id: 'settings.agent.helps.sessions.backupTranscripts', text: 'Old conversations should stay readable after the CLI deletes its transcripts.', note: 'When the setting sessions.backupTranscripts is worth suggesting: the signal the Assistant looks for (hive_read_setting, the tune-settings skill).' }),
+  'sessions.backupRetention': agentMsg({ id: 'settings.agent.helps.sessions.backupRetention', text: "Hive's backups take a lot of disk space for sessions the CLI still has.", note: 'When the setting sessions.backupRetention is worth suggesting: the signal the Assistant looks for (hive_read_setting, the tune-settings skill).' }),
+  'sessions.compactSuggestTokens': agentMsg({ id: 'settings.agent.helps.sessions.compactSuggestTokens', text: 'Agents work with big contexts for long stretches, so every message costs more: a lower threshold suggests compacting sooner.', note: 'When the setting sessions.compactSuggestTokens is worth suggesting: the signal the Assistant looks for (hive_read_setting, the tune-settings skill).' }),
+  'sessions.transcriptWarnMB': agentMsg({ id: 'settings.agent.helps.sessions.transcriptWarnMB', text: "Agents' transcripts grow to tens of MB and typing or the CLI slows down: a lower value flags them sooner, for a handover to a new conversation.", note: 'When the setting sessions.transcriptWarnMB is worth suggesting: the signal the Assistant looks for (hive_read_setting, the tune-settings skill).' }),
+  'sessions.confirmStop': agentMsg({ id: 'settings.agent.helps.sessions.confirmStop', text: 'Agents get stopped by mistake.', note: 'When the setting sessions.confirmStop is worth suggesting: the signal the Assistant looks for (hive_read_setting, the tune-settings skill).' }),
+  'sessions.defaultView': agentMsg({ id: 'settings.agent.helps.sessions.defaultView', text: 'The user runs many agents per project and wants new projects to open on Tiles, a small tile per agent.', note: 'When the setting sessions.defaultView is worth suggesting: the signal the Assistant looks for (hive_read_setting, the tune-settings skill).' }),
+  'sessions.tileOrder': agentMsg({ id: 'settings.agent.helps.sessions.tileOrder', text: 'The user watches many agents in the Tiles view and wants those waiting for them or stalled first, rather than in the panes order.', note: 'When the setting sessions.tileOrder is worth suggesting: the signal the Assistant looks for (hive_read_setting, the tune-settings skill).' }),
+  'sessions.resumeAfterUnexpectedClose': agentMsg({ id: 'settings.agent.helps.sessions.resumeAfterUnexpectedClose', text: 'Hive closed unexpectedly and the user wants the agents that were running to carry on by themselves at the next start.', note: 'When the setting sessions.resumeAfterUnexpectedClose is worth suggesting: the signal the Assistant looks for (hive_read_setting, the tune-settings skill).' }),
+  'sessions.followTranscripts': agentMsg({ id: 'settings.agent.helps.sessions.followTranscripts', text: 'The user reads running sessions in the Sessions tab and wants new messages to appear as they come.', note: 'When the setting sessions.followTranscripts is worth suggesting: the signal the Assistant looks for (hive_read_setting, the tune-settings skill).' }),
+  'assistant.compactSuggestTokens': agentMsg({ id: 'settings.agent.helps.assistant.compactSuggestTokens', text: "The Assistant's own conversation gets long and slow: a lower threshold suggests compacting it sooner.", note: 'When the setting assistant.compactSuggestTokens is worth suggesting: the signal the Assistant looks for (hive_read_setting, the tune-settings skill).' }),
+  'assistant.panelSide': agentMsg({ id: 'settings.agent.helps.assistant.panelSide', text: 'Windows notifications or other apps cover the right of the screen.', note: 'When the setting assistant.panelSide is worth suggesting: the signal the Assistant looks for (hive_read_setting, the tune-settings skill).' }),
+  'board.archiveDoneDays': agentMsg({ id: 'settings.agent.helps.board.archiveDoneDays', text: 'The Done column has grown long with finished cards.', note: 'When the setting board.archiveDoneDays is worth suggesting: the signal the Assistant looks for (hive_read_setting, the tune-settings skill).' }),
+  'workflow.git.slotCopy': agentMsg({ id: 'settings.agent.helps.workflow.git.slotCopy', text: "New slots and review copies miss git-ignored files such as .env, so agents' builds or tests fail there.", note: 'When the setting workflow.git.slotCopy is worth suggesting: the signal the Assistant looks for (hive_read_setting, the tune-settings skill).' }),
+  'agents.leftoverProcesses': agentMsg({ id: 'settings.agent.helps.agents.leftoverProcesses', text: "A folder can't be renamed or deleted (in use), or a port is taken, after its agents have stopped: processes they started are still running.", note: 'When the setting agents.leftoverProcesses is worth suggesting: the signal the Assistant looks for (hive_read_setting, the tune-settings skill).' }),
+  'agents.backgroundTaskMinutes': agentMsg({ id: 'settings.agent.helps.agents.backgroundTaskMinutes', text: "Agents' background tasks (long test runs) count as finished too soon, or a dev server keeps an agent waiting long after its work is done.", note: 'When the setting agents.backgroundTaskMinutes is worth suggesting: the signal the Assistant looks for (hive_read_setting, the tune-settings skill).' }),
+  'project.compactSuggestTokens': agentMsg({ id: 'settings.agent.helps.project.compactSuggestTokens', text: "One project's conversations run much longer than others'.", note: 'When the setting project.compactSuggestTokens is worth suggesting: the signal the Assistant looks for (hive_read_setting, the tune-settings skill).' }),
+  'project.transcriptWarnMB': agentMsg({ id: 'settings.agent.helps.project.transcriptWarnMB', text: "One project's conversations grow much bigger than others'.", note: 'When the setting project.transcriptWarnMB is worth suggesting: the signal the Assistant looks for (hive_read_setting, the tune-settings skill).' }),
+  'project.cardAttachmentCleanup': agentMsg({ id: 'settings.agent.helps.project.cardAttachmentCleanup', text: "A project's archived cards keep screenshots and logs that take a lot of disk space: fewer days removes them sooner.", note: 'When the setting project.cardAttachmentCleanup is worth suggesting: the signal the Assistant looks for (hive_read_setting, the tune-settings skill).' }),
+  'project.slotCopy': agentMsg({ id: 'settings.agent.helps.project.slotCopy', text: 'New slots and review copies of this project miss git-ignored files its builds need.', note: 'When the setting project.slotCopy is worth suggesting: the signal the Assistant looks for (hive_read_setting, the tune-settings skill).' }),
 }
 
 /** The id of the user guide's heading for each section (Help → User Guide). */
@@ -982,19 +991,19 @@ const DOCS_BY_ID: Record<string, string> = {
 }
 
 /** Where a setting is, in English (the tools name it so) or as the user sees it: "Settings → Sessions → Suggest compacting above". */
-function settingPathOf(e: Pick<SettingEntry, 'section' | 'text' | 'workflowLevel' | 'slotLevel'>, scope: SettingScope, say: (t: TextPart) => string): string {
+function settingPathOf(e: Pick<SettingEntry, 'section' | 'text' | 'workflowLevel' | 'slotLevel'>, scope: SettingScope, format: (t: TextPart) => string): string {
   const where = (list: SettingsSectionInfo[]): string => {
     const found = list.find((x) => x.id === e.section)
-    return found ? say(found.text.label) : e.section
+    return found ? format(found.text.label) : e.section
   }
-  const title = say(e.text.title)
+  const title = format(e.text.title)
   // A project's workflow options are its Version Control tab's (HI-1766), not a section of Project Settings.
-  if (scope === 'project' && e.section === 'workflow') return say(withValues(PATHS.versionControl, { title }))
+  if (scope === 'project' && e.section === 'workflow') return format(withValues(PATHS.versionControl, { title }))
   // A level's default (HI-1768): Settings → Version Control, its part (Hive defaults or Workspace defaults).
   const level = e.workflowLevel?.level ?? (e.slotLevel === 'global' || e.slotLevel === 'workspace' ? e.slotLevel : null)
-  if (level) return say(withValues(PATHS.level, { section: say(SETTINGS_SECTIONS.find((x) => x.id === 'workflow')!.text.label), part: say(level === 'global' ? LEVEL_PART.global : LEVEL_PART.workspace), title }))
-  if (scope === 'project') return say(withValues(PATHS.project, { section: where(PROJECT_SETTINGS_SECTIONS), title }))
-  return say(withValues(PATHS.settings, { section: where(SETTINGS_SECTIONS), title }))
+  if (level) return format(withValues(PATHS.level, { section: format(SETTINGS_SECTIONS.find((x) => x.id === 'workflow')!.text.label), part: format(level === 'global' ? LEVEL_PART.global : LEVEL_PART.workspace), title }))
+  if (scope === 'project') return format(withValues(PATHS.project, { section: where(PROJECT_SETTINGS_SECTIONS), title }))
+  return format(withValues(PATHS.settings, { section: where(SETTINGS_SECTIONS), title }))
 }
 
 /** Settings → Version Control's two parts (HI-1768), as a level default's path names them. */
@@ -1011,7 +1020,7 @@ const PATHS = {
   versionControl: msg({ id: 'settings.path.versionControl', defaultMessage: 'Version Control → Workflow → {title}', description: "Where a project's workflow option is: the project's Version Control tab, its Workflow section, and the option's title (glossary 2.1)." }),
 }
 
-const toOption = (o: RowOption): SettingOption => ({ value: o.value, label: englishText(o.label), text: o.label })
+const toOption = (o: RowOption): SettingOption => ({ value: o.value, label: english(o.label), text: o.label })
 
 function entry(row: Row, id: string, scope: SettingScope, docs: string): SettingEntry {
   const sensitive = SENSITIVE.find(([re]) => re.test(id))
@@ -1022,30 +1031,53 @@ function entry(row: Row, id: string, scope: SettingScope, docs: string): Setting
   const restart = row.advanced ? (applies === 'sessions' ? 'sessions' : applies === 'restart' ? 'hive' : undefined) : RESTART.find(([re]) => re.test(id))?.[1]
   const { title, desc, tip, options, off, confirmOn, englishTitle, ...rest } = row
   const text: SettingEntry['text'] = { title, desc: desc ?? null, tip: tip ?? null, ...(off ? { off } : {}), ...(confirmOn ? { confirmOn } : {}), ...(englishTitle ? { englishTitle } : {}) }
-  const path = settingPathOf({ section: row.section, text }, scope, englishText)
   return {
     ...rest,
     id,
     scope,
-    title: englishText(title),
-    desc: desc ? englishText(desc) : '',
-    tip: tip ? englishText(tip) : '',
+    title: english(title),
+    desc: desc ? english(desc) : '',
+    tip: tip ? english(tip) : '',
     ...(options ? { options: options.map(toOption) } : {}),
-    ...(off ? { off: englishText(off) } : {}),
-    ...(confirmOn ? { confirmOn: { title: englishText(confirmOn.title), message: englishText(confirmOn.message), ...(confirmOn.detail ? { detail: englishText(confirmOn.detail) } : {}) } } : {}),
+    ...(off ? { off: english(off) } : {}),
+    ...(confirmOn ? { confirmOn: { title: english(confirmOn.title), message: english(confirmOn.message), ...(confirmOn.detail ? { detail: english(confirmOn.detail) } : {}) } } : {}),
     text,
     docs: row.advanced || id === 'advanced.values' ? 'advanced-settings' : row.workflowLevel ? 'workflow-defaults' : row.workflow ? 'workflow-options' : (DOCS_BY_ID[id] ?? docs), // i18n-ignore: a user guide heading's id (#1535)
     ...(HELPS[id] ? { helps: HELPS[id] } : {}),
     ...(action ? { action: true } : {}),
     ...(value ? { value } : {}),
-    ...(sensitive && !action ? { sensitive: true, readOnly: `${sensitive[1]}: only the user can change it, in ${path}.` } : readOnly ? { readOnly: `${readOnly[1]}: the user changes them in ${path}.` } : {}), // i18n-ignore: the Assistant's tools (English)
+    ...(sensitive && !action ? { sensitive: true, readOnly: sensitive[1] } : readOnly ? { readOnly: readOnly[1] } : {}),
     ...(restart ? { restart } : {}),
     ...((scope === 'project' && !action && row.key !== 'worktreeSetup') || row.advanced?.scope === 'workspace' ? { inherits: true } : {})
   }
 }
 
-/** Where the user finds it, in English (the tools name it so): "Settings → Sessions → Suggest compacting above", "Project Settings → Claude Code → Model". */
-export const settingPath = (e: SettingEntry): string => settingPathOf(e, e.scope, englishText)
+/**
+ * Where the user finds it, as the tools name it (in English, said in the reader's chain): "Settings → Sessions → Suggest
+ * compacting above", "Project Settings → Claude Code → Model". A record kept for later says it in the Default.
+ */
+// agent-text: PATHS, LEVEL_PART, SETTINGS_SECTIONS, PROJECT_SETTINGS_SECTIONS
+export const settingPath = (e: SettingEntry): string => settingPathOf(e, e.scope, agentText)
+
+/** A setting's text as an agent reads it (dialects, HI-2441): said from its messages in the reader's chain; with none, exactly the entry's English. */
+export function agentSetting(e: SettingEntry): { title: string; desc: string; tip: string; off?: string } {
+  const t = e.text
+  return {
+    title: agentText(t.title), // agent-text: APP_ROWS, PROJECT_ROWS, levelRows, advancedRows, providerRows, optionRows, workflowRows, slotCopyRow, LANGUAGE_TEXT
+    desc: t.desc ? agentText(t.desc) : '', // agent-text: APP_ROWS, PROJECT_ROWS, levelRows, advancedRows, providerRows, optionRows, workflowRows, slotCopyRow, LANGUAGE_TEXT
+    tip: t.tip ? agentText(t.tip) : '', // agent-text: APP_ROWS, PROJECT_ROWS, levelRows, advancedRows, providerRows, optionRows, workflowRows, slotCopyRow, LANGUAGE_TEXT
+    ...(t.off ? { off: agentText(t.off) } : {}) // agent-text: APP_ROWS, PROJECT_ROWS, levelRows, advancedRows, providerRows, optionRows, workflowRows, slotCopyRow, LANGUAGE_TEXT
+  }
+}
+
+/** A setting's title as an agent reads it (agentSetting's). */
+export const agentTitle = (e: SettingEntry): string => agentText(e.text.title) // agent-text: APP_ROWS, PROJECT_ROWS, levelRows, advancedRows, providerRows, optionRows, workflowRows, slotCopyRow, LANGUAGE_TEXT
+
+/** Why the Assistant can't change it, with where the user does, a level default's level too (undefined: it can; HI-2470). */
+export const settingReadOnly = (e: SettingEntry): string | undefined => (e.readOnly ? say(e.readOnly, { path: settingPath(e) }) : undefined)
+
+/** When it is worth suggesting (undefined: no signal recorded). */
+export const settingHelps = (e: SettingEntry): string | undefined => (e.helps ? say(e.helps) : undefined)
 
 /** Where the user finds it, as the user sees it, in the language Hive shows: "Ustawienia → Sesje → …". */
 export const shownSettingPath = (e: SettingEntry): string => settingPathOf(e, e.scope, shownText)
@@ -1131,13 +1163,69 @@ export function settingDefault(e: SettingEntry): unknown {
 }
 
 
+/**
+ * What the settings tools say of a value and what it takes, and why one isn't taken (the Assistant's, #186): agent
+ * messages, said where the tools say them (dialects, HI-2441). JSON shapes, values and names stay code: placeholders.
+ * Numbers go in as text ({min}, {n}), as the tools always wrote them (no grouping).
+ */
+const AGENT = {
+  automatic: agentMsg({ id: 'settings.agent.option.automatic', text: 'Automatic', note: 'The Language setting\'s choice "auto" (follow Windows), as the tools name it.' }),
+  defaultChoice: agentMsg({ id: 'settings.agent.option.default', text: '"" (default)', note: 'A select setting\'s empty value, the default, in the list of what it takes. "" is the value as written: keep it.' }),
+  // Why a value isn't taken.
+  notSettable: agentMsg({ id: 'settings.agent.error.notSettable', text: "{title} isn't a value that can be set this way ({why}): change it in {path}.", note: "hive_update_setting on a setting with no value the tools set. {why} is settings.agent.error.isAction or why it is read-only; {path} where the user changes it." }),
+  isAction: agentMsg({ id: 'settings.agent.error.isAction', text: 'it is a button, a status or a list', note: "Why a setting has no value to set: it is a button, a status or a list (inside settings.agent.error.notSettable's brackets)." }),
+  notSettableHere: agentMsg({ id: 'settings.agent.error.notSettableHere', text: "{title} isn't a value the settings tools set: change it in {path}.", note: "hive_update_setting on a setting Settings edits with a control of its own that the tools don't set (Accounts & Connections, MCP catalogues, check commands…), neither an action nor read-only (HI-2470). {path} is where the user changes it." }),
+  unknownAdvanced: agentMsg({ id: 'settings.agent.error.unknownAdvanced', text: "{title} isn't known.", note: 'An advanced setting this version of Hive has no definition of.' }),
+  boolean: agentMsg({ id: 'settings.agent.error.boolean', text: '{title} takes true or false.', note: 'A value that is not a boolean. true and false are the values as written: keep them.' }),
+  notNumber: agentMsg({ id: 'settings.agent.error.notNumber', text: '{title} takes a number{hasOff, select, yes { (0 for {off})} other {}}{inherit, select, yes {, or null to inherit} other {}}.', note: "A value that isn't a number. {off} is the label 0 stands for (Never); inherit is yes where null inherits Hive's value." }),
+  range: agentMsg({ id: 'settings.agent.error.range', text: '{title} takes {min} to {max}{hasOff, select, yes {, or 0 for {off}} other {}}.', note: 'A number out of range. {min} and {max} are numbers as written; {off} is the label 0 stands for (Never).' }),
+  choice: agentMsg({ id: 'settings.agent.error.choice', text: '{title} takes one of: {choices}.', note: 'A value that is none of a select setting\'s choices. {choices} lists the values as written.' }),
+  effortType: agentMsg({ id: 'settings.agent.error.effortType', text: '{title} takes an effort level: {levels}.', note: 'An effort setting given something other than text. {levels} is settings.agent.takes.effort*.' }),
+  effort: agentMsg({ id: 'settings.agent.error.effort', text: '{title} takes {levels}.', note: 'An effort level the picker does not offer for the model. {levels} is settings.agent.takes.effort*.' }),
+  text: agentMsg({ id: 'settings.agent.error.text', text: '{title} takes text.', note: 'A text setting given something other than text.' }),
+  oneLine: agentMsg({ id: 'settings.agent.error.oneLine', text: '{title} takes one line of text (at most {most} characters).', note: 'Text too long or with line breaks. {most} is a number as written.' }),
+  workflow: agentMsg({ id: 'settings.agent.error.workflow', text: '{title} takes {what}.', note: "A workflow option's value it doesn't take (#1278). {what} is settings.agent.takes.orInherit." }),
+  colorsShape: agentMsg({ id: 'settings.agent.error.colorsShape', text: "{title} takes an object of column → colour, e.g. {example} (columns: {columns}), or null for Hive's.", note: "Board colours given something other than an object. {example} is JSON and {columns} the columns' ids: code, as written." }),
+  colorBad: agentMsg({ id: 'settings.agent.error.colorBad', text: '{title}: "{column}" isn\'t a column with a #rrggbb colour (columns: {columns}).', note: "A board colour for no column, or not a colour. #rrggbb is the colour's form; {columns} the columns' ids." }),
+  pricesShape: agentMsg({ id: 'settings.agent.error.pricesShape', text: "{title} takes an object of model → {shape} in USD per million tokens, or null for Hive's prices.", note: "A provider's prices given something other than an object. {shape} is the JSON fields of a price: code, as written." }),
+  priceBad: agentMsg({ id: 'settings.agent.error.priceBad', text: '{title}: "{model}" needs input, cachedInput and output (and optionally cacheWrite), each a number from 0.', note: "A model's price missing a field or not a number. input, cachedInput, output and cacheWrite are JSON fields: keep them." }),
+  fallbackShape: agentMsg({ id: 'settings.agent.error.fallbackShape', text: "{title} takes a list of {shape}, or null for Hive's list.", note: "A provider's fallback list given something other than a list. {shape} is an entry's JSON fields: code, as written." }),
+  fallbackEntry: agentMsg({ id: 'settings.agent.error.fallbackEntry', text: '{title}: each entry needs a value (text) and a label.', note: "A fallback list's entry without a value or with a label that isn't text." }),
+  // What a workflow option or an effort setting takes (in settings.agent.error.workflow and the setting's detail).
+  orInherit: agentMsg({ id: 'settings.agent.takes.orInherit', text: '{what}, or null to inherit', note: "What a workflow option takes: {what} (settings.agent.takes.*), and null, which inherits the level's value." }),
+  wholeNumber: agentMsg({ id: 'settings.agent.takes.wholeNumber', text: 'a whole number from {min} to {max}', note: 'What a number workflow option takes. {min} and {max} are numbers as written.' }),
+  trueFalse: agentMsg({ id: 'settings.agent.takes.trueFalse', text: 'true or false', note: 'What a boolean setting takes: the values as written (keep them).' }),
+  oneOf: agentMsg({ id: 'settings.agent.takes.oneOf', text: 'one of: {choices}', note: "What a select setting takes. {choices} lists its values as written." }),
+  branch: agentMsg({ id: 'settings.agent.takes.branch', text: 'a branch name ("" for the repository\'s default branch)', note: 'What a workflow option naming a branch takes. "" is the value as written.' }),
+  aValue: agentMsg({ id: 'settings.agent.takes.aValue', text: 'a value', note: "What a workflow option takes when there's nothing more to say." }),
+  preChecks: agentMsg({ id: 'settings.agent.takes.preChecks', text: 'a list of check names, e.g. ["typecheck", "lint"] (each with its command in project.workflow.commands)', note: "What the workflow option preChecks takes. The JSON and project.workflow.commands (a setting's id) are code: keep them." }),
+  mergeChecks: agentMsg({ id: 'settings.agent.takes.mergeChecks', text: 'a list of check names the merge queue runs on the merged result when Hive merges, e.g. ["typecheck", "lint"] (each with its command in project.workflow.commands)', note: "What the workflow option mergeChecks takes. The JSON and project.workflow.commands (a setting's id) are code: keep them." }),
+  commands: agentMsg({ id: 'settings.agent.takes.commands', text: 'an object of check name → command, e.g. {example}', note: 'What the workflow option commands takes. {example} is JSON: code.' }),
+  okBefore: agentMsg({ id: 'settings.agent.takes.okBefore', text: 'an object {shape}', note: "What the workflow option okBefore takes. {shape} is the object's JSON form: code." }),
+  identity: agentMsg({ id: 'settings.agent.takes.identity', text: 'null (off) or {shape}', note: "What the workflow option identity takes. {shape} is the object's JSON form: code." }),
+  excluded: agentMsg({ id: 'settings.agent.takes.excluded', text: 'a list of folders and files left out of the work, e.g. ["node_modules"]', note: 'What the workflow option excluded takes. The JSON is code: keep it.' }),
+  stageNames: agentMsg({ id: 'settings.agent.takes.stageNames', text: 'an object of stage id → the name the user gives it, e.g. {example} (ids: hold, todo, active, review, approved, merging, done; names are for the user, agents keep the ids; each at most 24 characters, unique, applies at once)', note: "What the workflow option stageNames takes (#1417). {example} is JSON; the stage ids are code: keep them." }),
+  effortDefault: agentMsg({ id: 'settings.agent.takes.effortDefault', text: '"" (the default)', note: 'The empty effort level, the default. "" is the value as written: keep it.' }),
+  effortLevels: agentMsg({ id: 'settings.agent.takes.effortLevels', text: 'one of: {levels}, or {base}', note: 'What an effort setting takes: the levels the picker offers for its model, or {base} ("inherit", or settings.agent.takes.effortDefault).' }),
+  effortNone: agentMsg({ id: 'settings.agent.takes.effortNone', text: '{base} (no levels are known for its model)', note: 'What an effort setting takes when no levels are known for its model. {base} is "inherit" or settings.agent.takes.effortDefault.' }),
+  // A value as the tools show it.
+  offValue: agentMsg({ id: 'settings.agent.value.off', text: '0 ({off})', note: 'A number setting at 0, which turns it off. {off} is what 0 stands for (Never).' }),
+  empty: agentMsg({ id: 'settings.agent.value.empty', text: '(empty)', note: 'A text setting with no text.' }),
+  size: agentMsg({ id: 'settings.agent.value.size', text: '({n} {kind, select, list {entries} other {keys}})', note: "A table's size in a listing: {n} is a number as written (the word stays plural, as the tools always said it); kind is list or object." }),
+  hiveList: agentMsg({ id: 'settings.agent.value.hiveList', text: "(Hive's list)", note: "A fallback list left empty: Hive's own list applies." }),
+  none: agentMsg({ id: 'settings.agent.value.none', text: '(none)', note: 'A table with nothing in it, or an entry one side of a change has not got.' }),
+  removed: agentMsg({ id: 'settings.agent.value.removed', text: 'removed', note: "A change to a provider's prices: a shipped model removed from its table." }),
+  hivePrice: agentMsg({ id: 'settings.agent.value.hivePrice', text: "Hive's price", note: "A change to a provider's prices: a shipped model at Hive's own price (not removed)." }),
+  older: agentMsg({ id: 'settings.agent.value.older', text: '{label} (older)', note: "A model fallback list's entry marked older, in a change: {label} is its label." })
+}
+
 /** The values a select setting (or a custom one the tools set as a select) takes. */
 export function settingOptions(e: SettingEntry): { value: string; label: string }[] | null {
   // The tools' choices, in English: the Assistant sets a value by it or by its label as the tools name it.
-  if (e.options) return e.options
+  if (e.options) return e.options.map((o) => ({ ...o, label: agentText(o.text) })) // agent-text: APP_ROWS, PROJECT_ROWS, levelRows, advancedRows, providerRows, optionRows, workflowRows, INHERIT, ON_OFF, FILE_LOCK_MODES
   if (e.id === 'notifications.chimeSound') return ['chime', 'bell', 'soft', 'pop'].map((v) => ({ value: v, label: v.charAt(0).toUpperCase() + v.slice(1) }))
   // The Assistant's tools name languages in English (Polish, or pl); Settings shows each by its own name.
-  if (e.id === 'general.language') return [{ value: 'auto', label: 'Automatic' }, ...LANGUAGES.map((l) => ({ value: l.code, label: l.english }))] // i18n-ignore: the Assistant's tools (English)
+  if (e.id === 'general.language') return [{ value: 'auto', label: say(AGENT.automatic) }, ...LANGUAGES.map((l) => ({ value: l.code, label: l.english }))]
   return null
 }
 
@@ -1167,26 +1255,26 @@ const price = (n: unknown): boolean => typeof n === 'number' && Number.isFinite(
 function checkTable(e: SettingEntry, raw: unknown): { value: unknown } | { error: string } {
   if (e.id === 'board.colors') {
     if (raw === null) return { value: { ...DEFAULT_SETTINGS.board.colors } }
-    if (!isObject(raw) || !Object.keys(raw).length) return { error: `${e.title} takes an object of column → colour, e.g. {"doing":"#3b82f6"} (columns: ${COLUMNS.join(', ')}), or null for Hive's.` } // i18n-ignore: the Assistant's tools (English)
+    if (!isObject(raw) || !Object.keys(raw).length) return { error: say(AGENT.colorsShape, { title: agentTitle(e), example: '{"doing":"#3b82f6"}', columns: COLUMNS.join(', ') }) } // agent-protocol: JSON, a column's colour
     const bad = Object.entries(raw).find(([k, v]) => !COLUMNS.includes(k) || typeof v !== 'string' || !COLOR.test(v))
-    if (bad) return { error: `${e.title}: "${bad[0]}" isn't a column with a #rrggbb colour (columns: ${COLUMNS.join(', ')}).` } // i18n-ignore: the Assistant's tools (English)
+    if (bad) return { error: say(AGENT.colorBad, { title: agentTitle(e), column: bad[0], columns: COLUMNS.join(', ') }) }
     return { value: Object.fromEntries(Object.entries(raw).map(([k, v]) => [k, String(v).toLowerCase()])) }
   }
   if (e.key === 'prices') {
     if (raw === null) return { value: {} }
-    if (!isObject(raw)) return { error: `${e.title} takes an object of model → {input, cachedInput, output, cacheWrite?} in USD per million tokens, or null for Hive's prices.` } // i18n-ignore: the Assistant's tools (English)
+    if (!isObject(raw)) return { error: say(AGENT.pricesShape, { title: agentTitle(e), shape: '{input, cachedInput, output, cacheWrite?}' }) } // agent-protocol: a price's JSON fields
     for (const [model, p] of Object.entries(raw)) {
-      if (!model.trim() || !isObject(p) || !price(p.input) || !price(p.cachedInput) || !price(p.output) || (p.cacheWrite !== undefined && !price(p.cacheWrite))) return { error: `${e.title}: "${model}" needs input, cachedInput and output (and optionally cacheWrite), each a number from 0.` } // i18n-ignore: the Assistant's tools (English)
+      if (!model.trim() || !isObject(p) || !price(p.input) || !price(p.cachedInput) || !price(p.output) || (p.cacheWrite !== undefined && !price(p.cacheWrite))) return { error: say(AGENT.priceBad, { title: agentTitle(e), model }) }
     }
     return { value: Object.fromEntries(Object.entries(raw).map(([m, p]) => [m.trim(), { input: (p as Record<string, number>).input, cachedInput: (p as Record<string, number>).cachedInput, output: (p as Record<string, number>).output, ...((p as Record<string, number>).cacheWrite !== undefined ? { cacheWrite: (p as Record<string, number>).cacheWrite } : {}) }])) }
   }
   // A fallback list: [{ value, label, older? }]; [] or null puts back Hive's own.
   if (raw === null) return { value: [] }
-  if (!Array.isArray(raw)) return { error: `${e.title} takes a list of {value, label${e.key === 'modelFallback' ? ', older?' : ''}}, or null for Hive's list.` } // i18n-ignore: the Assistant's tools (English)
+  if (!Array.isArray(raw)) return { error: say(AGENT.fallbackShape, { title: agentTitle(e), shape: `{value, label${e.key === 'modelFallback' ? ', older?' : ''}}` }) } // agent-protocol: an entry's JSON fields
   const seen = new Set<string>()
   const list: Record<string, unknown>[] = []
   for (const r of raw) {
-    if (!isObject(r) || typeof r.value !== 'string' || !r.value.trim() || (r.label !== undefined && typeof r.label !== 'string')) return { error: `${e.title}: each entry needs a value (text) and a label.` } // i18n-ignore: the Assistant's tools (English)
+    if (!isObject(r) || typeof r.value !== 'string' || !r.value.trim() || (r.label !== undefined && typeof r.label !== 'string')) return { error: say(AGENT.fallbackEntry, { title: agentTitle(e) }) }
     const v = r.value.trim()
     if (seen.has(v.toLowerCase())) continue
     seen.add(v.toLowerCase())
@@ -1202,12 +1290,18 @@ function checkTable(e: SettingEntry, raw: unknown): { value: unknown } | { error
  */
 export function checkSettingValue(e: SettingEntry, raw: unknown, ctx: SettingContext = {}): { value: unknown } | { error: string } {
   const kind = settingKind(e)
-  if (!kind) return { error: `${e.title} isn't a value that can be set this way (${e.action ? 'it is a button, a status or a list' : e.readOnly}): change it in ${settingPath(e)}.` } // i18n-ignore: the Assistant's tools (English)
+  if (!kind) {
+    // A control of Settings' own that the tools don't set, with no reason recorded, says so (HI-2470: it said "(undefined)").
+    const why = e.action ? say(AGENT.isAction) : settingReadOnly(e)
+    return { error: why ? say(AGENT.notSettable, { title: agentTitle(e), why, path: settingPath(e) }) : say(AGENT.notSettableHere, { title: agentTitle(e), path: settingPath(e) }) }
+  }
   // An advanced value: as advanced.json takes it; null puts the default back (a workspace's: Settings → Advanced's).
   if (e.advanced) {
     if (raw === null || (e.advanced.scope === 'workspace' && raw === 'inherit')) return { value: null }
     const def = advancedDef(e.advanced.id)
-    return def ? checkAdvanced(def, raw) : { error: `${e.title} isn't known.` }
+    if (!def) return { error: say(AGENT.unknownAdvanced, { title: agentTitle(e) }) }
+    const checked = checkAdvanced(def, raw)
+    return 'error' in checked ? { ...checked, error: agentText(checked.errorText) } : checked // agent-text: checkAdvanced
   }
   if (e.workflow) return checkWorkflowValue(e, kind, raw)
   const inheritable = e.scope === 'project' && !!e.inherits
@@ -1219,39 +1313,39 @@ export function checkSettingValue(e: SettingEntry, raw: unknown, ctx: SettingCon
       if (typeof raw === 'boolean') return { value: raw }
       if (raw === 'on' || raw === 'true') return { value: true }
       if (raw === 'off' || raw === 'false') return { value: false }
-      return { error: `${e.title} takes true or false.` } // i18n-ignore: the Assistant's tools (English)
+      return { error: say(AGENT.boolean, { title: agentTitle(e) }) }
     case 'number': {
       const n = typeof raw === 'number' ? raw : typeof raw === 'string' && raw.trim() !== '' ? Number(raw.replace(/[,_\s]/g, '')) : NaN
-      if (!Number.isFinite(n)) return { error: `${e.title} takes a number${e.off ? ` (0 for ${e.off})` : ''}${inheritable ? ', or null to inherit' : ''}.` } // i18n-ignore: the Assistant's tools (English)
+      if (!Number.isFinite(n)) return { error: say(AGENT.notNumber, { title: agentTitle(e), hasOff: e.off ? 'yes' : 'no', off: agentSetting(e).off ?? '', inherit: inheritable ? 'yes' : 'no' }) }
       if (n === 0 && e.off) return { value: 0 }
       const min = e.min ?? -Infinity
       const max = e.max ?? Infinity
-      if (n < min || n > max) return { error: `${e.title} takes ${min} to ${max}${e.off ? `, or 0 for ${e.off}` : ''}.` } // i18n-ignore: the Assistant's tools (English)
+      if (n < min || n > max) return { error: say(AGENT.range, { title: agentTitle(e), min: String(min), max: String(max), hasOff: e.off ? 'yes' : 'no', off: agentSetting(e).off ?? '' }) }
       return { value: e.step === undefined || e.step >= 1 ? Math.round(n) : n }
     }
     case 'select': {
       const options = settingOptions(e) ?? []
       const v = String(raw ?? '')
       const hit = options.find((o) => o.value === v) ?? options.find((o) => o.label.toLowerCase() === v.toLowerCase())
-      if (!hit) return { error: `${e.title} takes one of: ${options.map((o) => (o.value === '' ? '"" (default)' : o.value)).join(', ')}.` } // i18n-ignore: the Assistant's tools (English)
+      if (!hit) return { error: say(AGENT.choice, { title: agentTitle(e), choices: options.map((o) => (o.value === '' ? say(AGENT.defaultChoice) : o.value)).join(', ') }) }
       return { value: hit.value }
     }
     case 'effort': {
       // As the effort picker: the levels it offers for the model that would run, or the default ("" / inherit).
       const levels = ctx.efforts?.(e) ?? []
       const v = typeof raw === 'string' ? raw.trim() : ''
-      if (typeof raw !== 'string') return { error: `${e.title} takes an effort level: ${effortTakes(e, levels)}.` } // i18n-ignore: the Assistant's tools (English)
+      if (typeof raw !== 'string') return { error: say(AGENT.effortType, { title: agentTitle(e), levels: effortTakes(e, levels) }) }
       if (v === '' || v === 'inherit') return { value: e.scope === 'project' ? 'inherit' : '' }
       const hit = levels.find((l) => l.value.toLowerCase() === v.toLowerCase()) ?? levels.find((l) => l.label.toLowerCase() === v.toLowerCase())
-      if (!hit) return { error: `${e.title} takes ${effortTakes(e, levels)}.` } // i18n-ignore: the Assistant's tools (English)
+      if (!hit) return { error: say(AGENT.effort, { title: agentTitle(e), levels: effortTakes(e, levels) }) }
       return { value: hit.value }
     }
     case 'table':
       return checkTable(e, raw)
     case 'text': {
-      if (typeof raw !== 'string') return { error: `${e.title} takes text.` } // i18n-ignore: the Assistant's tools (English)
+      if (typeof raw !== 'string') return { error: say(AGENT.text, { title: agentTitle(e) }) }
       const v = raw.trim()
-      if (v.length > MAX_TEXT || (/[\r\n]/.test(v) && !e.slotLevel)) return { error: `${e.title} takes one line of text (at most ${MAX_TEXT} characters).` } // i18n-ignore: the Assistant's tools (English)
+      if (v.length > MAX_TEXT || (/[\r\n]/.test(v) && !e.slotLevel)) return { error: say(AGENT.oneLine, { title: agentTitle(e), most: String(MAX_TEXT) }) }
       if (e.scope === 'project' && e.provider && e.key === 'model') return { value: v || 'inherit' }
       // A slot default (HI-1765): an empty one is that level's none, kept.
       if (e.slotLevel) return { value: v }
@@ -1276,29 +1370,38 @@ function checkWorkflowValue(e: SettingEntry, kind: NonNullable<ReturnType<typeof
   // A stage's name (N5) is kept trimmed (#1417).
   if (e.workflow === 'stageNames' && v && typeof v === 'object' && !Array.isArray(v)) v = Object.fromEntries(Object.entries(v).map(([k, x]) => [k, typeof x === 'string' ? x.trim() : x]))
   if (v !== undefined && v !== 'inherit' && takesOption(e.workflow!, v)) return { value: v }
-  return { error: `${e.title} takes ${workflowTakes(e, kind)}.` } // i18n-ignore: the Assistant's tools (English)
+  return { error: say(AGENT.workflow, { title: agentTitle(e), what: workflowTakes(e, kind) }) }
 }
 
 /** What a workflow option takes, in words (the tools'). */
 export function workflowTakes(e: SettingEntry, kind: ReturnType<typeof settingKind>): string {
-  const shapes: Partial<Record<OptionKey, string>> = {
-    preChecks: 'a list of check names, e.g. ["typecheck", "lint"] (each with its command in project.workflow.commands)', // i18n-ignore: the Assistant's tools (English)
-    mergeChecks: 'a list of check names the merge queue runs on the merged result when Hive merges, e.g. ["typecheck", "lint"] (each with its command in project.workflow.commands)', // i18n-ignore: the Assistant's tools (English)
-    commands: 'an object of check name → command, e.g. {"lint": "npm run lint"}', // i18n-ignore: the Assistant's tools (English)
-    okBefore: 'an object {"mode": "never" | "labels" | "every", "labels": [...]}', // i18n-ignore: the Assistant's tools (English)
-    identity: 'null (off) or {"name": ..., "email": ...}', // i18n-ignore: the Assistant's tools (English)
-    excluded: 'a list of folders and files left out of the work, e.g. ["node_modules"]', // i18n-ignore: the Assistant's tools (English)
-    stageNames: 'an object of stage id → the name the user gives it, e.g. {"active": "Building"} (ids: hold, todo, active, review, approved, merging, done; names are for the user, agents keep the ids; each at most 24 characters, unique, applies at once)' // i18n-ignore: the Assistant's tools (English)
+  const shapes: Partial<Record<OptionKey, () => string>> = {
+    preChecks: () => say(AGENT.preChecks),
+    mergeChecks: () => say(AGENT.mergeChecks),
+    commands: () => say(AGENT.commands, { example: '{"lint": "npm run lint"}' }), // agent-protocol: JSON
+    okBefore: () => say(AGENT.okBefore, { shape: '{"mode": "never" | "labels" | "every", "labels": [...]}' }), // agent-protocol: JSON
+    identity: () => say(AGENT.identity, { shape: '{"name": ..., "email": ...}' }), // agent-protocol: JSON
+    excluded: () => say(AGENT.excluded),
+    stageNames: () => say(AGENT.stageNames, { example: '{"active": "Building"}' }) // agent-protocol: JSON
   }
   const choices = (settingOptions(e) ?? []).filter((o) => o.value !== 'inherit').map((o) => o.value)
-  const what = kind === 'number' ? `a whole number from ${e.min ?? 1} to ${e.max}` : kind === 'boolean' ? 'true or false' : kind === 'select' ? `one of: ${choices.join(', ')}` : kind === 'text' ? `a branch name ("" for the repository's default branch)` : (shapes[e.workflow!] ?? 'a value') // i18n-ignore: the Assistant's tools (English)
-  return `${what}, or null to inherit` // i18n-ignore: the Assistant's tools (English)
+  const what =
+    kind === 'number'
+      ? say(AGENT.wholeNumber, { min: String(e.min ?? 1), max: String(e.max) })
+      : kind === 'boolean'
+        ? say(AGENT.trueFalse)
+        : kind === 'select'
+          ? say(AGENT.oneOf, { choices: choices.join(', ') })
+          : kind === 'text'
+            ? say(AGENT.branch)
+            : (shapes[e.workflow!]?.() ?? say(AGENT.aValue))
+  return say(AGENT.orInherit, { what })
 }
 
 /** The effort levels a setting takes, in words. */
 export function effortTakes(e: SettingEntry, levels: { value: string }[]): string {
-  const base = e.scope === 'project' ? '"inherit"' : '"" (the default)' // i18n-ignore: the Assistant's tools (English)
-  return levels.length ? `one of: ${levels.map((l) => l.value).join(', ')}, or ${base}` : `${base} (no levels are known for its model)` // i18n-ignore: the Assistant's tools (English)
+  const base = e.scope === 'project' ? '"inherit"' : say(AGENT.effortDefault)
+  return levels.length ? say(AGENT.effortLevels, { levels: levels.map((l) => l.value).join(', '), base }) : say(AGENT.effortNone, { base })
 }
 
 /**
@@ -1356,11 +1459,11 @@ export function settingValueText(e: SettingEntry, v: unknown, full = false): str
   if (e.advanced && v !== null) return advancedText(advancedDef(e.advanced.id)!, v)
   if (v === null || v === 'inherit') return 'inherit'
   if (typeof v === 'boolean') return v ? 'on' : 'off'
-  if (typeof v === 'number') return v === 0 && e.off ? `0 (${e.off})` : String(v)
-  if (typeof v === 'string') return v === '' ? '(empty)' : v
+  if (typeof v === 'number') return v === 0 && e.off ? say(AGENT.offValue, { off: agentSetting(e).off ?? '' }) : String(v)
+  if (typeof v === 'string') return v === '' ? say(AGENT.empty) : v
   if (!full) {
     const n = Array.isArray(v) ? v.length : Object.keys(v as object).length
-    return n ? `(${n} ${Array.isArray(v) ? 'entries' : 'keys'})` : Array.isArray(v) ? "(Hive's list)" : '(none)'
+    return n ? say(AGENT.size, { n: String(n), kind: Array.isArray(v) ? 'list' : 'object' }) : Array.isArray(v) ? say(AGENT.hiveList) : say(AGENT.none)
   }
   const json = JSON.stringify(v)
   return json.length > 3000 ? `${json.slice(0, 2999)}…` : json
@@ -1378,8 +1481,8 @@ export function settingChangeTexts(e: SettingEntry, old: unknown, now: unknown, 
     const shown = (prices: unknown, gone: string[], other: string[]): Record<string, unknown> => {
       const own = isObject(prices) ? prices : {}
       const out: Record<string, unknown> = { ...own }
-      for (const m of other) if (!(m in own) && !gone.includes(m)) out[m] = "Hive's price" // i18n-ignore: the Assistant's tools (English)
-      for (const m of gone) if (!(m in own)) out[m] = 'removed'
+      for (const m of other) if (!(m in own) && !gone.includes(m)) out[m] = say(AGENT.hivePrice)
+      for (const m of gone) if (!(m in own)) out[m] = say(AGENT.removed)
       return out
     }
     return settingChangeTexts(e, shown(old, removed.old, removed.new), shown(now, removed.new, removed.old))
@@ -1387,7 +1490,7 @@ export function settingChangeTexts(e: SettingEntry, old: unknown, now: unknown, 
   const cut = (s: string): string => (s.length > 200 ? `${s.slice(0, 199)}…` : s)
   if (Array.isArray(old) || Array.isArray(now)) {
     const valueOf = (x: unknown): string => (isObject(x) && typeof x.value === 'string' ? x.value : JSON.stringify(x))
-    const values = (v: unknown): string => (Array.isArray(v) && v.length ? v.map(valueOf).join(', ') : "(Hive's list)")
+    const values = (v: unknown): string => (Array.isArray(v) && v.length ? v.map(valueOf).join(', ') : say(AGENT.hiveList))
     const a = Array.isArray(old) ? old : []
     const b = Array.isArray(now) ? now : []
     // From or back to Hive's list: the whole list. Otherwise the entries that changed, by value, as an object's are
@@ -1399,9 +1502,10 @@ export function settingChangeTexts(e: SettingEntry, old: unknown, now: unknown, 
       const keys = [...new Set([...A.keys(), ...B.keys()])].filter((k) => JSON.stringify(A.get(k)) !== JSON.stringify(B.get(k)))
       const shown = (m: Map<string, unknown>, k: string): string => {
         const x = m.get(k)
-        if (x === undefined) return `${k}: (none)`
+        if (x === undefined) return `${k}: ${say(AGENT.none)}`
         if (!isObject(x)) return `${k}: ${JSON.stringify(x)}`
-        return `${k}: ${typeof x.label === 'string' && x.label ? x.label : k}${x.older === true ? ' (older)' : ''}`
+        const label = typeof x.label === 'string' && x.label ? x.label : k
+        return `${k}: ${x.older === true ? say(AGENT.older, { label }) : label}`
       }
       // No entry changed means the order did: the whole lists show it.
       if (keys.length) return { oldText: cut(keys.map((k) => shown(A, k)).join(', ')), newText: cut(keys.map((k) => shown(B, k)).join(', ')) }
@@ -1412,7 +1516,7 @@ export function settingChangeTexts(e: SettingEntry, old: unknown, now: unknown, 
     const a = isObject(old) ? old : {}
     const b = isObject(now) ? now : {}
     const keys = [...new Set([...Object.keys(a), ...Object.keys(b)])].filter((k) => JSON.stringify(a[k]) !== JSON.stringify(b[k]))
-    const side = (o: Record<string, unknown>): string => (keys.length ? keys.map((k) => `${k}: ${k in o ? (typeof o[k] === 'string' ? o[k] : JSON.stringify(o[k])) : '(none)'}`).join(', ') : settingValueText(e, o))
+    const side = (o: Record<string, unknown>): string => (keys.length ? keys.map((k) => `${k}: ${k in o ? (typeof o[k] === 'string' ? o[k] : JSON.stringify(o[k])) : say(AGENT.none)}`).join(', ') : settingValueText(e, o))
     return { oldText: cut(side(a)), newText: cut(side(b)) }
   }
   return { oldText: settingValueText(e, old), newText: settingValueText(e, now) }

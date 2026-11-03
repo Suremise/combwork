@@ -4,7 +4,6 @@
   "prose|call|Unknown column \"{}\": {}.": 1,
   "prose|call|Unknown position \"{}\": top or bottom.": 1,
   "prose|call|blocked is the reason as text, or empty to clear it.": 1,
-  "prose|call|change {} card{} on the board": 2,
   "prose|call|labels is a list of text.": 1,
   "prose|call|labels replaces each card's labels: give it alone, or addLabels and removeLabels to change only those.": 1,
   "prose|call|no change": 1,

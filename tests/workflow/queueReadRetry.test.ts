@@ -9,7 +9,7 @@
 import { existsSync, mkdirSync, readFileSync, writeFileSync } from 'fs'
 import { join } from 'path'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
-import { B1, commit, moved, R1, setup, sh, type Env } from './harness'
+import { B1, commit, GIT_HEAVY_MS, moved, R1, setup, sh, type Env } from './harness'
 import { preset, type WorkflowOptions } from '../../src/shared/workflow/options'
 import { gitTree, READ_RETRIES, type QueueConfig, type QueueGitResult } from '../../src/main/workflow/mergeQueue'
 import { git } from '../../src/main/git'
@@ -541,9 +541,12 @@ describe("whether the repository signs, read by a git that couldn't answer (HI-2
     ["strict's update of the card", { strict: true }, 'merge --no-ff --no-edit'],
     ["Rebase and fast-forward's rebase", { style: 'rebase' }, 'rebase --no-rebase-merges']
   ]
+  // GIT_HEAVY_MS (HI-2025's rule) for strict's four, whose card is behind main: a commit, the card brought up to date, and
+  // the signing read again before its merge. 2.8 to 3.1 s alone, 5.4 to 5.8 s beside three spinner workers; the
+  // "ended at a bound" case past 20 s in HI-2453's loaded full run.
   for (const [what, o, next] of callers)
     for (const [how, failed] of notAnswers)
-      it(`${what}, the read by a git that ${how} once: again before it goes on, read again, merged once`, async () => {
+      it(`${what}, the read by a git that ${how} once: again before it goes on, read again, merged once`, o.strict ? { timeout: GIT_HEAVY_MS } : {}, async () => {
         const e = project(o)
         const card = await queued(e)
         if (o.strict || o.style === 'rebase') commit(e.project, { 'other.txt': 'meanwhile\n' }, 'meanwhile')

@@ -891,7 +891,12 @@ describe("the repository's AGENTS.md", () => {
       /`TIP_ENTRIES`/,
       /\*\*Merge checks\*\*, this repository's \(#1010\): a merge into main or an integration branch .* runs typecheck, lint and `npm run check:repo` .* and the cards' own focused e2e suites/,
       // HI-2244: where the full unit run happens, now that a merge doesn't run it.
-      /The full unit run \(`npm test`\) is a release's final checks, and on request/,
+      /The full unit run \(`npm test`\) is a release's checks \(Tests per card, below\), and on request/,
+      // HI-2477: two modes, lean while building (no full unit run per card), thorough when preparing a release.
+      /\*\*Tests per card\*\* \(HI-2003, HI-2477\): two modes\. \*\*While building\*\* is the default.*\*\*Preparing a release\*\* applies only when a release card or an RC is in hand/,
+      /No full unit run \(`npm test`\), before the first submit or after\./,
+      /It never asks for a full unit run or other wide re-runs\./,
+      /\*\*Flake work:\*\* at most 2 spinner workers and 3 repeats per repro \(`--repeat 3`; the `investigate-flake` skill\)\. A flake seen only under a full run's load waits for the release window, unless it blocks merges\./,
       /never open the main checkout .* with one until the 1\.0 baseline is installed \(#1288\)/,
       /\*\*Test isolation\*\*/,
       /\*\*The machine is shared\*\*/,
@@ -997,7 +1002,10 @@ describe("Hive's development skills", () => {
   it('keep flake and load runs to modest, bounded load: a few spinner workers, never one per core', () => {
     const flake = readFileSync(join(ROOT, claude, 'investigate-flake', 'SKILL.md'), 'utf8')
     // K7 (HI-2009, HI-2013): one number, AGENTS.md's, which the skill points to.
-    expect(flake).toMatch(/Keep the load modest and bounded: AGENTS\.md's spinner cap \(\*\*The machine is shared\*\*\), never one per core\./)
+    expect(flake).toMatch(/Keep the load modest and bounded: AGENTS\.md's caps on spinners and repeats \(\*\*Tests per card\*\*, flake work\), never one per core\./)
+    // HI-2477: no per-card full run, in AGENTS.md or the skill.
+    expect(flake).not.toMatch(/--repeat 5|five times/)
+    expect(readFileSync(join(ROOT, 'AGENTS.md'), 'utf8')).not.toMatch(/A full unit run once, before the first submit/)
     expect(readFileSync(join(ROOT, 'AGENTS.md'), 'utf8')).toMatch(/Added load is two or three CPU spinner workers at most beside a run, never one per core/)
   })
 })

@@ -453,6 +453,17 @@ describe('the saved file is untrusted', () => {
     await disposeWorkspaceService(w)
   })
 
+  it('HI-2443: a saved launch series keeps its dialect chain; one that is not a hash counts as the Default', async () => {
+    const { w, path } = await open()
+    await w.close()
+    const g = { provider: 'codex', role: 'agent', workflow: 'builder', launches: 1, guidanceBytes: 100, guidanceChars: 100, customBytes: 0, customChars: 0, roleBytes: 0, roleChars: 0, modeBytes: 0, modeChars: 0, skills: 0, skillCatalogBytes: 0, skillBytes: 0, skillsNotDelivered: 0, skillsUnmeasured: 0 }
+    write(path, { version: 1, buckets: [{ start: hourOf(T0) - HOUR, span: 'hour', workspace: { guidance: { a: { ...g, dialect: 'abcdef0123456789' }, b: { ...g, dialect: '../x' }, c: g } } }] })
+    await w.open(path)
+    const r = metrics.queryMetrics(w, { scope: { kind: 'workspace' }, from: new Date(T0 - 2 * HOUR).toISOString() })
+    expect(r.workspace!.guidance.map((s) => [s.dialect ?? null, s.launches]).sort()).toEqual([[null, 2], ['abcdef0123456789', 1]])
+    await disposeWorkspaceService(w)
+  })
+
   it('/v1/metrics also gives each guidance series its persona names of before 0.9.3, in 0.9.3 (#1084)', async () => {
     const { withPersonaAliases } = await import('../src/main/servers')
     const g = { provider: 'claude-code', role: 'assistant' as const, launches: 1, guidanceBytes: 100, guidanceChars: 100, customBytes: 0, customChars: 0, roleBytes: 40, roleChars: 40, modeBytes: 70, modeChars: 60, skills: 0, skillCatalogBytes: 0, skillBytes: 0, skillsNotDelivered: 0, skillsUnmeasured: 0 }
@@ -1451,6 +1462,18 @@ describe('HI-2049: launches and tool lists by workflow role', () => {
     metrics.recordLaunch(h, 'alpha', launch('reviewer'))
     const g = metrics.queryMetrics(w, { scope: { kind: 'project', project: 'alpha' } }).projects.alpha.guidance
     expect(g.map((s) => [s.workflow, s.launches]).sort()).toEqual([['builder', 1], ['reviewer', 2]])
+    await disposeWorkspaceService(w)
+  })
+
+  it('HI-2443: launches on a dialect chain are a series of their own, kept by its hash; the Default has none', async () => {
+    const { w } = await open()
+    const h = metrics.metricsHandle(w)
+    metrics.recordLaunch(h, 'alpha', launch('builder'))
+    metrics.recordLaunch(h, 'alpha', { ...launch('builder'), dialect: '0123456789abcdef' })
+    metrics.recordLaunch(h, 'alpha', { ...launch('builder'), dialect: '0123456789abcdef' })
+    const g = metrics.queryMetrics(w, { scope: { kind: 'project', project: 'alpha' } }).projects.alpha.guidance
+    expect(g.map((s) => [s.dialect ?? null, s.launches]).sort()).toEqual([[null, 1], ['0123456789abcdef', 2]])
+    expect(g.find((s) => !s.dialect)).not.toHaveProperty('dialect')
     await disposeWorkspaceService(w)
   })
 

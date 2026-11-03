@@ -1811,6 +1811,22 @@
     "defaultMessage": "{count, plural, one {# agent moves} other {# agents move}} from {from} to {to}",
     "description": "A notice's title (HI-2195): an account ({from}, the user's name for it in Settings → Accounts & Connections) reached the share of its plan's usage limit its rule sets, so Hive moves its agents to another account ({to})."
   },
+  "main.viewerTokens.noName": {
+    "defaultMessage": "Give the viewer token a name, such as the app it is for",
+    "description": "Why a viewer token was not made (Settings → Agent API → Viewer tokens): its name is empty. Shown under \"Could not make the viewer token\"."
+  },
+  "main.viewerTokens.taken": {
+    "defaultMessage": "There is already a viewer token named \"{name}\"",
+    "description": "Why a viewer token was not made: another one has that name (letter case aside). {name} is the name the user gave it."
+  },
+  "main.viewerTokens.tooLong": {
+    "defaultMessage": "A viewer token's name is at most {most, number} characters",
+    "description": "Why a viewer token was not made: its name is too long. {most} is the most characters a name may have (40)."
+  },
+  "main.viewerTokens.tooMany": {
+    "defaultMessage": "Hive keeps at most {most, number} viewer tokens: revoke one first",
+    "description": "Why a viewer token was not made: Hive already keeps the most it keeps. {most} is that number (20). Revoke is the button beside each token."
+  },
   "main.window.openLogs": {
     "defaultMessage": "Open Logs",
     "description": "Button: opens the folder of Hive's log files."

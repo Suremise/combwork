@@ -11,6 +11,7 @@ import { config } from './config'
 import { emit } from './events'
 import { resolveOffer, tell } from './notify'
 import { msg, tr } from '../shared/i18n'
+import { agentMsg, inDefaultDialect, say, type AgentMsg, type AgentValues } from '../shared/agentText'
 import { hashText, writeJsonAtomic } from './fsutil'
 import { createLogger, userText } from './logger'
 import { recordTestToken } from './testQuiet'
@@ -72,8 +73,7 @@ export async function newAssistantToken(workspacePath: string): Promise<void> {
   s.token = token
   const file = assistantTokenFile(workspacePath)
   await mkdir(dirname(file), { recursive: true })
-  // i18n-ignore: the token file is the Assistant's to read, not the window's
-  await writeJsonAtomic(file, { token: s.token, note: "The Hive Assistant's Agent API token for one workspace. Hive replaces it each time the Assistant starts." })
+  await writeJsonAtomic(file, { token: s.token, note: inDefaultDialect(() => say(CONTROL.tokenNote)) })
 }
 
 /** Whether a token is the workspace's Assistant's current one: its running session's, not one from before a restart. */
@@ -132,6 +132,34 @@ export function actions(workspacePath: string): AssistantAction[] {
   return stateOf(workspacePath).actions
 }
 
+/**
+ * What the Assistant's change is called, as data (HI-2450): said in its caller's scope where the Assistant reads it (a
+ * refusal), and in the Default where it is kept (its activity line). Its first word is lower case ("change 3 cards…").
+ */
+export type Said = readonly [AgentMsg, AgentValues?]
+/** In the caller's scope: what it reads. */
+const sayNow = ([m, values]: Said): string => say(m, values)
+/** In the Default: text kept for any reader (the Assistant's activity). */
+const sayStored = ([m, values]: Said): string => inDefaultDialect(() => say(m, values))
+
+/** The change boundary's words (dialects, HI-2450): the Assistant reads its refusals; its activity keeps the record's. */
+const CONTROL = {
+  refused: agentMsg({ id: 'control.refused', text: "The user's settings (Settings → Assistant → Control: {level}) don't let you {what}. Tell the user what you would do instead.", note: "The Assistant's change refused by its control level (#186). {level} is the level's name (control.level.*); {what} what the change is called, lower case (\"create a card\")." }),
+  turnedDown: agentMsg({ id: 'control.turnedDown', text: 'The user turned Settings → Assistant → Control down before this change was made: nothing changed here.', note: "The Assistant's change refused at the moment it was to be made: the control level was lowered while it waited." }),
+  sessionEnded: agentMsg({ id: 'control.sessionEnded', text: "The Assistant's session that asked for this ended before the change was made: nothing changed here.", note: "The Assistant's change refused at the moment it was to be made: the session that asked was restarted or ended while it waited." }),
+  notAllowed: agentMsg({ id: 'control.notAllowed', text: 'not allowed by Settings → Assistant → Control', note: "Why a change was refused, in the Assistant's activity list beside the change (#763)." }),
+  notAllowedReason: agentMsg({ id: 'control.notAllowedReason', text: 'Not allowed by Settings → Assistant → Control', note: "Why a change was refused, as the Agent API's event stream says it (a refusal's reason, #763)." }),
+  tokenNote: agentMsg({ id: 'control.tokenNote', text: "The Hive Assistant's Agent API token for one workspace. Hive replaces it each time the Assistant starts.", note: "The note beside the Assistant's token in its file, for whoever opens it." }),
+  level: {
+    look: agentMsg({ id: 'control.level.look', text: 'Look and advise', note: 'The control level Look and advise (Settings → Assistant → Control), as the Assistant\'s refusals name it.' }),
+    agents: agentMsg({ id: 'control.level.agents', text: 'Control agents', note: 'The control level Control agents (Settings → Assistant → Control), as the Assistant\'s refusals name it.' }),
+    projects: agentMsg({ id: 'control.level.projects', text: 'Control agents and create projects', note: 'The control level Control agents and create projects (Settings → Assistant → Control), as the Assistant\'s refusals name it.' })
+  } satisfies Record<AssistantControl, AgentMsg>
+}
+
+/** A control level's name, as the Assistant's refusals name it (in its caller's scope). */
+export const levelName = (level: AssistantControl): string => say(CONTROL.level[level])
+
 /** A change the Assistant may not make: the Agent API's status, and what it reports beside the error. */
 export class ChangeRefused extends Error {
   constructor(
@@ -143,16 +171,13 @@ export class ChangeRefused extends Error {
   }
 }
 
-// i18n-ignore: the control levels as the Assistant's refusals name them (Agent API replies stay English)
-export const LEVEL_NAME: Record<AssistantControl, string> = { look: 'Look and advise', agents: 'Control agents', projects: 'Control agents and create projects' }
-
 /** Refuses (and records) a change the control level doesn't allow: the Assistant's change boundary, before anything changes. */
-export function refuseUnlessAllowed(workspacePath: string, need: AssistantControl, what: string, act: ActivityTarget): void {
+export function refuseUnlessAllowed(workspacePath: string, need: AssistantControl, what: Said, act: ActivityTarget): void {
   if (allows(need)) return
-  // i18n-ignore: the Agent API's event stream (#763) speaks English, as the rest of the API does
-  record(workspacePath, act, what.charAt(0).toUpperCase() + what.slice(1), 'not allowed by Settings → Assistant → Control', { reason: 'Not allowed by Settings → Assistant → Control' })
-  // i18n-ignore: a refusal the Assistant reads (Agent API replies stay English)
-  throw new ChangeRefused(403, `The user's settings (Settings → Assistant → Control: ${LEVEL_NAME[controlLevel()]}) don't let you ${what}. Tell the user what you would do instead.`)
+  // Kept in the Assistant's activity: said in the Default, whatever its caller reads (HI-2450).
+  const stored = sayStored(what)
+  record(workspacePath, act, stored.charAt(0).toUpperCase() + stored.slice(1), sayStored([CONTROL.notAllowed]), { reason: sayStored([CONTROL.notAllowedReason]) })
+  throw new ChangeRefused(403, say(CONTROL.refused, { level: levelName(controlLevel()), what: sayNow(what) }))
 }
 
 /**
@@ -161,13 +186,11 @@ export function refuseUnlessAllowed(workspacePath: string, need: AssistantContro
  * per message (#1170: undo, not a count, protects the board). Returns the guard to run again as each card is written: the
  * control level and the session must still allow the change then, after the last read, or nothing is saved.
  */
-export function admit(workspacePath: string, token: string, need: AssistantControl, what: string, act: ActivityTarget): () => void {
+export function admit(workspacePath: string, token: string, need: AssistantControl, what: Said, act: ActivityTarget): () => void {
   refuseUnlessAllowed(workspacePath, need, what, act)
   return () => {
-    // i18n-ignore: a refusal the Assistant reads (Agent API replies stay English)
-    if (!allows(need)) throw new ChangeRefused(403, 'The user turned Settings → Assistant → Control down before this change was made: nothing changed here.')
-    // i18n-ignore: a refusal the Assistant reads (Agent API replies stay English)
-    if (!isCurrentToken(workspacePath, token)) throw new ChangeRefused(409, "The Assistant's session that asked for this ended before the change was made: nothing changed here.")
+    if (!allows(need)) throw new ChangeRefused(403, say(CONTROL.turnedDown))
+    if (!isCurrentToken(workspacePath, token)) throw new ChangeRefused(409, say(CONTROL.sessionEnded))
   }
 }
 
