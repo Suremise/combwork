@@ -97,20 +97,94 @@ LangString hiveInstallerBusy 2052 "另一个 Hive 安装程序仍在运行，或
 !endif
 !endif
 
-; Before the template's check ends a running Hive (HI-1707): the Hive of this install folder is asked to close for the
-; install, so it records its agents and tells them, and resumes them when it starts again (hiveAskToClose.ps1 says how).
-; Its result goes to the installer's log only: whatever it was, the template's check runs after it as before, ending a
-; Hive that didn't close. The outer instance only (the user's, whose profile Hive's is), never the uninstaller.
+; The upgrade from Hive Desktop (HI-2460, SPEC §4.3), before anything is installed. The outer instance only (the user's,
+; whose profile and Hive Desktop's per-user install these are), never the uninstaller.
+; 1. Hive Desktop's installer identity is held too: its mutex (1.0's APP_GUID, from appId com.hive.desktop) taken and
+;    kept until this installer exits, so a 1.0 installer or updater started meanwhile finds it held and quits; one
+;    running now is waited for (at most HIVE_INSTALLER_WAIT_MS). WAIT_ABANDONED counts as taken. electron-builder's
+;    uninstaller never takes its installer's mutex (ALLOW_ONLY_ONE_INSTALLER_INSTANCE is the installer's), so Hive
+;    Desktop's uninstaller, run below, isn't held up by it. Any failing call: nothing changed (exit 4).
+; 2. hiveUpgrade.ps1: the apps of both installations asked to close (hiveAskToClose.ps1, HI-1707: they record their
+;    agents and resume them at the next start) and checked to have exited, Hive Desktop removed with its data kept, and
+;    the profile folders moved (with the installer's record, HI-2461). It says why it stopped: an app still running
+;    (exit 5, nothing changed) or Hive Desktop not removed (exit 6, the profile folders untouched); the installer stops
+;    then too, saying so, and nothing is installed. Its lines go to the installer's log.
 !ifndef BUILD_UNINSTALLER
 ; This file's folder (build), as it is included: inside the macro, __FILEDIR__ would be where the macro is inserted.
 !define HIVE_BUILD_DIR "${__FILEDIR__}"
+!define HIVE_LEGACY_GUID "35960567-b95c-520c-a9f1-e8bb85764724"
+!define /ifndef HIVE_INSTALLER_WAIT_MS 600000
+
+LangString hiveLegacyBusy 1033 "A Hive Desktop installer is still running, or Combwork couldn't tell whether one is. Nothing was installed: run this installer again once the other one has finished."
+LangString hiveLegacyBusy 1031 "Ein Hive-Desktop-Installationsprogramm läuft noch, oder Combwork konnte nicht feststellen, ob eines läuft. Es wurde nichts installiert: Starten Sie dieses Installationsprogramm erneut, sobald das andere fertig ist."
+LangString hiveLegacyBusy 3082 "Todavía se está ejecutando un instalador de Hive Desktop, o Combwork no ha podido saber si lo hay. No se ha instalado nada: vuelve a ejecutar este instalador cuando el otro haya terminado."
+LangString hiveLegacyBusy 1036 "Un programme d'installation de Hive Desktop est encore en cours, ou Combwork n'a pas pu savoir s'il y en a un. Rien n'a été installé : relancez ce programme d'installation une fois l'autre terminé."
+LangString hiveLegacyBusy 1041 "Hive Desktop のインストーラーがまだ実行中か、実行中かどうかを Combwork が確認できませんでした。何もインストールされていません。もう一方が終了してから、このインストーラーをもう一度実行してください。"
+LangString hiveLegacyBusy 1045 "Instalator Hive Desktop nadal działa albo Combwork nie mógł ustalić, czy działa. Nic nie zostało zainstalowane: uruchom ten instalator ponownie, gdy tamten się zakończy."
+LangString hiveLegacyBusy 1046 "Um instalador do Hive Desktop ainda está em execução, ou o Combwork não conseguiu saber se há um. Nada foi instalado: execute este instalador de novo quando o outro terminar."
+LangString hiveLegacyBusy 2052 "Hive Desktop 安装程序仍在运行，或者 Combwork 无法确定是否有安装程序在运行。未安装任何内容：请在另一个安装程序结束后重新运行此安装程序。"
+
+LangString hiveStillRunning 1033 "Combwork or Hive Desktop is still running. Nothing was installed: close it, then run this installer again."
+LangString hiveStillRunning 1031 "Combwork oder Hive Desktop läuft noch. Es wurde nichts installiert: Schließen Sie das Programm und starten Sie dieses Installationsprogramm erneut."
+LangString hiveStillRunning 3082 "Combwork o Hive Desktop todavía se está ejecutando. No se ha instalado nada: ciérralo y vuelve a ejecutar este instalador."
+LangString hiveStillRunning 1036 "Combwork ou Hive Desktop est encore en cours d'exécution. Rien n'a été installé : fermez-le, puis relancez ce programme d'installation."
+LangString hiveStillRunning 1041 "Combwork または Hive Desktop がまだ実行中です。何もインストールされていません。終了してから、このインストーラーをもう一度実行してください。"
+LangString hiveStillRunning 1045 "Combwork lub Hive Desktop nadal działa. Nic nie zostało zainstalowane: zamknij program, a potem uruchom ten instalator ponownie."
+LangString hiveStillRunning 1046 "O Combwork ou o Hive Desktop ainda está em execução. Nada foi instalado: feche-o e execute este instalador de novo."
+LangString hiveStillRunning 2052 "Combwork 或 Hive Desktop 仍在运行。未安装任何内容：请关闭它，然后重新运行此安装程序。"
+
+LangString hiveOldNotRemoved 1033 "Hive Desktop couldn't be uninstalled, so Combwork wasn't installed and your data folders weren't moved. Its uninstall may have stopped partway: check Installed apps, then run this installer again."
+LangString hiveOldNotRemoved 1031 "Hive Desktop konnte nicht deinstalliert werden, daher wurde Combwork nicht installiert und Ihre Datenordner wurden nicht verschoben. Die Deinstallation wurde möglicherweise unterbrochen: Prüfen Sie die installierten Apps und starten Sie dieses Installationsprogramm erneut."
+LangString hiveOldNotRemoved 3082 "No se ha podido desinstalar Hive Desktop, así que no se ha instalado Combwork ni se han movido tus carpetas de datos. Puede que la desinstalación se haya detenido a medias: revisa las aplicaciones instaladas y vuelve a ejecutar este instalador."
+LangString hiveOldNotRemoved 1036 "Hive Desktop n'a pas pu être désinstallé : Combwork n'a donc pas été installé et vos dossiers de données n'ont pas été déplacés. La désinstallation s'est peut-être arrêtée en cours de route : vérifiez les applications installées, puis relancez ce programme d'installation."
+LangString hiveOldNotRemoved 1041 "Hive Desktop をアンインストールできなかったため、Combwork はインストールされず、データフォルダーも移動されていません。アンインストールが途中で止まった可能性があります。インストール済みのアプリを確認してから、このインストーラーをもう一度実行してください。"
+LangString hiveOldNotRemoved 1045 "Nie udało się odinstalować Hive Desktop, więc Combwork nie został zainstalowany, a foldery danych nie zostały przeniesione. Deinstalacja mogła zatrzymać się w połowie: sprawdź zainstalowane aplikacje i uruchom ten instalator ponownie."
+LangString hiveOldNotRemoved 1046 "Não foi possível desinstalar o Hive Desktop, então o Combwork não foi instalado e suas pastas de dados não foram movidas. A desinstalação pode ter parado no meio: verifique os aplicativos instalados e execute este instalador de novo."
+LangString hiveOldNotRemoved 2052 "无法卸载 Hive Desktop，因此未安装 Combwork，也未移动你的数据文件夹。卸载可能中途停止：请检查已安装的应用，然后重新运行此安装程序。"
+
 !macro customInit
   ${IfNot} ${UAC_IsInnerInstance}
+    ; 1. Hive Desktop's installer mutex, kept open (and owned) until this installer exits.
+    StrCpy $4 "go"
+    System::Call 'kernel32::CreateMutexW(i 0, i 1, w "${HIVE_LEGACY_GUID}") i.r1 ?e'
+    Pop $0
+    ${If} $1 = 0
+      StrCpy $4 "fail"
+    ${ElseIf} $0 = 183
+      ; ERROR_ALREADY_EXISTS: another holds it (not ours yet). WAIT_OBJECT_0 (0) or WAIT_ABANDONED (0x80): ours now.
+      System::Call 'kernel32::WaitForSingleObject(i r1, i ${HIVE_INSTALLER_WAIT_MS}) i.r2'
+      ${If} $2 <> 0
+      ${AndIf} $2 <> 0x80
+        StrCpy $4 "fail"
+      ${EndIf}
+    ${EndIf}
+    ${If} $4 == "fail"
+      DetailPrint "Hive Desktop's installer mutex: not taken (handle $1, error $0, wait $2)"
+      MessageBox MB_OK|MB_ICONSTOP "$(hiveLegacyBusy)" /SD IDOK
+      SetErrorLevel 4
+      Quit
+    ${EndIf}
+    ; 2. The upgrade.
     InitPluginsDir
     File "/oname=$PLUGINSDIR\hiveAskToClose.ps1" "${HIVE_BUILD_DIR}\hiveAskToClose.ps1"
-    nsExec::Exec '"$SYSDIR\WindowsPowerShell\v1.0\powershell.exe" -NoProfile -NonInteractive -ExecutionPolicy Bypass -File "$PLUGINSDIR\hiveAskToClose.ps1" -InstallDir "$INSTDIR"'
+    File "/oname=$PLUGINSDIR\hiveUpgrade.ps1" "${HIVE_BUILD_DIR}\hiveUpgrade.ps1"
+    nsExec::ExecToLog '"$SYSDIR\WindowsPowerShell\v1.0\powershell.exe" -NoProfile -NonInteractive -ExecutionPolicy Bypass -File "$PLUGINSDIR\hiveUpgrade.ps1" -InstallDir "$INSTDIR" -WorkDir "$PLUGINSDIR"'
     Pop $0
-    DetailPrint "Asked Hive to close for the install: $0"
+    DetailPrint "The upgrade from Hive Desktop: $0"
+    ${If} $0 == "5"
+      MessageBox MB_OK|MB_ICONSTOP "$(hiveStillRunning)" /SD IDOK
+      SetErrorLevel 5
+      Quit
+    ${ElseIf} $0 == "6"
+      MessageBox MB_OK|MB_ICONSTOP "$(hiveOldNotRemoved)" /SD IDOK
+      SetErrorLevel 6
+      Quit
+    ${ElseIf} $0 != "0"
+      ; The script didn't run or ended unexpectedly ("error", a PowerShell failure): nothing it would do is known done.
+      MessageBox MB_OK|MB_ICONSTOP "$(hiveOldNotRemoved)" /SD IDOK
+      SetErrorLevel 6
+      Quit
+    ${EndIf}
   ${EndIf}
 !macroend
 !endif

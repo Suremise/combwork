@@ -5,6 +5,7 @@
 ### Changed
 
 - **Your data folders are now Combwork's** (HI-2461), part of the app's rename to Combwork: `%APPDATA%\Hive` becomes `%APPDATA%\Combwork`, and `%LOCALAPPDATA%\Hive` (accounts and their sign-ins) becomes `%LOCALAPPDATA%\Combwork`. The installer renames them while Hive is closed, with your settings, usage and logs. Until they are renamed, Hive keeps running from the old folders and a notice at start says so. After the move, a connection whose sign-in didn't carry across is named once, so you can sign in to it again.
+- **Combwork installs as Combwork and replaces Hive Desktop** (HI-2460). It installs in `%LOCALAPPDATA%\Programs\Combwork` as `Combwork.exe`, under Windows app ID `it.surmise.combwork`, with a Combwork Start menu entry. Installing it, or updating from 1.0, asks a running Hive Desktop to close, uninstalls it with your data kept, then moves your data folders, so only Combwork is left in Installed apps. Launch at login follows the new app. A taskbar pin of Hive Desktop and its notification history don't carry over. If Hive Desktop won't close or can't be uninstalled, the installer says so and changes nothing.
 
 ### Fixed
 

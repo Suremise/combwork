@@ -17,15 +17,15 @@ describe('the app name (#443)', () => {
     expect([APP_NAME, DEV_APP_NAME, appName(true), appName(false)]).toEqual(['Hive Desktop', 'Hive Desktop Dev', 'Hive Desktop', 'Hive Desktop Dev'])
     expect(pkg.productName).toBe(APP_NAME)
     expect(builder.productName).toBe(APP_NAME)
-    expect(builder.nsis.shortcutName).toBe(APP_NAME)
     expect(builder.nsis.uninstallDisplayName).toBeUndefined() // "${productName} ${version}": Hive Desktop 0.5.0
     expect(read('src/renderer/index.html')).toContain('<title>Hive Desktop</title>')
   })
 
-  it('keeps the app ID, exe, installer file and update feed', () => {
-    expect(builder.appId).toBe('com.hive.desktop')
-    expect(read('src/main/index.ts')).toContain("app.isPackaged ? 'com.hive.desktop' : 'com.hive.desktop.dev'")
-    expect(builder.win.executableName).toBe('Hive')
+  it("has Combwork's app ID, exe and shortcut (HI-2460), and keeps the installer file and update feed", () => {
+    expect(builder.appId).toBe('it.surmise.combwork')
+    expect(read('src/main/index.ts')).toContain("app.isPackaged ? 'it.surmise.combwork' : 'it.surmise.combwork.dev'")
+    expect(builder.win.executableName).toBe('Combwork')
+    expect(builder.nsis.shortcutName).toBe('Combwork')
     expect(builder.nsis.artifactName).toBe('Hive-Setup-${version}.${ext}')
     expect(builder.publish).toMatchObject({ owner: 'Suremise', repo: 'hive-desktop' })
     expect(builder.publish).toMatchObject(RELEASES_REPO) // the updater's feed (HI-2311)
@@ -44,11 +44,11 @@ describe('the app name (#443)', () => {
     expect(index).toContain("app.setPath('userData', roaming.use)")
   })
 
-  it('keeps the install folder %LOCALAPPDATA%\\Programs\\Hive, as electron-builder names it', () => {
+  it('installs in %LOCALAPPDATA%\\Programs\\Combwork (HI-2460), as electron-builder names it', () => {
     // The installer's folder (APP_FILENAME) is the product file name, which executableName sets (assisted installer).
     const require = createRequire(import.meta.url)
     const { getWindowsInstallationDirName } = require('app-builder-lib/out/targets/targetUtil') as { getWindowsInstallationDirName: (info: { productFilename: string; sanitizedName: string }, tryProductName: boolean) => string }
     const { sanitizeFileName } = require('builder-util/out/filename') as { sanitizeFileName: (name: string) => string }
-    expect(getWindowsInstallationDirName({ productFilename: sanitizeFileName(builder.win.executableName), sanitizedName: pkg.name }, true)).toBe('Hive')
+    expect(getWindowsInstallationDirName({ productFilename: sanitizeFileName(builder.win.executableName), sanitizedName: pkg.name }, true)).toBe('Combwork')
   })
 })
