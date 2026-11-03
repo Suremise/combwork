@@ -54,6 +54,8 @@ export interface GuidanceSeries {
   role: 'agent' | 'assistant'
   /** The launch's side of the workflow (HI-2049); `unknown`: recorded before Hive counted it. */
   workflow: LaunchWorkflow | 'unknown'
+  /** The hash of the dialect chain its launches spoke (HI-2443), where one overrides text; absent: the Default. */
+  dialect?: string
   launches: number
   /**
    * Each part of what Hive tells the session at launch, counted once a launch whichever way the provider gets it (the

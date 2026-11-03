@@ -32,6 +32,7 @@ import { reviewCopyOnStart, reviewCopyOnVerdict } from './reviewCopies'
 import { COLUMN_CHOICES, columnLabel, commentSummary, isTaskColumn, reviewStalled } from '../shared/tasks'
 import type { HandoverAuthor } from '../shared/hiveGuidance'
 import { inDefaultDialect, inRequestScope } from '../shared/agentText/asyncScope'
+import { apiChainReady } from './dialects/apiChain'
 import { say, type AgentMsg, type AgentValues } from '../shared/agentText'
 import { API } from './apiText'
 import { cardRequests, commentsParam, laneOrderNote, modelInUse, newestComments, progressLabel, retryWaitsView, taskRow, withoutHistory, type CardRequest, type IntentDone, type ProjectRow, type SkillRow, type TaskBatch, type TaskChange, type TaskReorder, type TaskView, type AccountUsagePublic } from '../shared/toolReplies'
@@ -4417,7 +4418,9 @@ async function handleApi(req: IncomingMessage, res: ServerResponse): Promise<voi
   who = caller
   // An agent's work is its project's; the Assistant's and scripts' are the workspace's own (not spread over projects).
   if (caller.kind === 'agent') m.project = basename(caller.projectPath)
-  // Its replies are in the caller's dialect (HI-2065): its session's, or the API chain's for a caller with none.
+  // Its replies are in the caller's dialect (HI-2065): its session's, or the API chain's for a caller with none, loaded
+  // first where it isn't yet (HI-2443: kept until the workspace's dialect files change).
+  if (caller.kind !== 'agent' && caller.kind !== 'assistant') await Promise.all(openWorkspaces().flatMap((w) => (w.path ? [apiChainReady(w.hiveDir)] : [])))
   return callerStore.run(caller, () => inRequestScope(caller.kind === 'agent' ? caller : caller.kind === 'assistant' ? { projectPath: join(caller.workspace, HIVE_DIR, ASSISTANT_DIR), agentId: ASSISTANT_AGENT_ID } : null, () => serveApi(req, res, url)))
 }
 

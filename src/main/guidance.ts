@@ -1,4 +1,4 @@
-import { agentMsg, say, type AgentMsg, type AgentValues } from '../shared/agentText'
+import { agentMsg, currentChain, say, type AgentMsg, type AgentValues } from '../shared/agentText'
 import { inDefaultDialect } from '../shared/agentText/asyncScope'
 import { assistantSkillsLine, controlRules, hiveInstructions, journalRule, sessionContract } from '../shared/hiveGuidance'
 import { taskPrompt } from '../shared/tasks'
@@ -20,8 +20,11 @@ import { currentWorkspace, inWorkspace, type WorkspaceService } from './workspac
  * A hash of Hive's guidance text (the session contracts, the control rules, a card's prompt): changes when its wording
  * does. The Default's: a dialect's own revision is its chain's hash.
  */
-export const GUIDANCE_REVISION = inDefaultDialect(() =>
-  hashText(
+export const GUIDANCE_REVISION = inDefaultDialect(guidanceHash)
+
+/** The guidance text the revision hashes, said in the current chain. */
+function guidanceHash(): string {
+  return hashText(
     [
       hiveInstructions('{project}', 'agent'),
       hiveInstructions('{project}', 'agent', false),
@@ -35,7 +38,27 @@ export const GUIDANCE_REVISION = inDefaultDialect(() =>
       taskPrompt({ number: 0, title: '{title}', description: '', blockedBy: [], comments: [] } as never, true, { inLane: true })
     ].join('\n')
   )
-)
+}
+
+/** Each chain's guidance revision, by the chain's hash. */
+const chainRevisions = new Map<string, string>()
+
+/**
+ * Hive's guidance revision as said in the current chain (dialects, HI-2443): a session's, in its launch record. The
+ * Default's (`GUIDANCE_REVISION`) where no chain is in force or it overrides none of the guidance's texts; otherwise the
+ * hash of the guidance as that chain says it, so two launches on the same chain have the same revision.
+ */
+export function chainGuidanceRevision(): string {
+  const hash = currentChain()?.hash
+  if (!hash) return GUIDANCE_REVISION
+  let r = chainRevisions.get(hash)
+  if (r === undefined) {
+    r = guidanceHash()
+    if (chainRevisions.size >= 64) chainRevisions.clear()
+    chainRevisions.set(hash, r)
+  }
+  return r
+}
 
 const S = {
   notDelivered: agentMsg({ id: 'contract.skill.notDelivered', text: 'it was not delivered', note: "Why a skill a launch asked for isn't as asked: its launch didn't deliver it (the launch record, the Agent API's status)." }),

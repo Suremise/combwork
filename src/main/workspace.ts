@@ -43,6 +43,9 @@ import { migrateProjectPreferences } from '../shared/workflow/preferences'
 
 const log = createLogger('workspace')
 
+/** The workspace's dialect files (dialects, HI-2065), in .hive: as dialects/store.ts's dialectsDir names it. */
+const DIALECTS_DIR = 'dialects'
+
 /**
  * workspace.json as read: Hive's defaults under it, and its older forms brought up to date (HI-1954: HI-1368's close
  * command adopted into its commands, the old field dropped; written with its next save, and the same again until then).
@@ -223,6 +226,8 @@ export class WorkspaceService {
   static readonly closingListeners = new Set<(path: string, place: string) => void>()
   /** Told each time a workspace has opened (after onOpened), so services repair what a close left (#1392). Never awaited. */
   static readonly openedListeners = new Set<(ws: WorkspaceService) => void>()
+  /** Told when a file in a workspace's dialects folder changes (HI-2443): the API chain is loaded again. */
+  static readonly dialectsListeners = new Set<(ws: WorkspaceService) => void>()
   /**
    * Awaited as a workspace starts closing, its board still open: what must end and be written down first (the merge
    * queue's runners give up their leases, #1360). A failure is logged and the close goes on.
@@ -714,7 +719,7 @@ export class WorkspaceService {
     // Only the folders whose files are shown (HI-1797): chokidar read .hive's own listing again, and filtered each entry,
     // on every change at its top, and the board's database files there change with every board write. .hive itself is
     // watched natively below, for workspace.json and for one of these folders appearing.
-    const folders = ['shared', 'skills', 'mcp', MODES_DIR, LEGACY_MODES_DIR]
+    const folders = ['shared', 'skills', 'mcp', MODES_DIR, LEGACY_MODES_DIR, DIALECTS_DIR]
     const watched = new Set(folders.filter((f) => existsSync(join(this.hiveDir, f))))
     this.watcher = chokidar.watch(
       [...watched].map((f) => join(this.hiveDir, f)),
@@ -742,6 +747,18 @@ export class WorkspaceService {
         this.scheduleRefresh()
       }
       else if (rel.startsWith(`${HIVE_DIR}/${MODES_DIR}`) || rel.startsWith(`${HIVE_DIR}/${LEGACY_MODES_DIR}`)) this.emit({ type: 'modes-changed' })
+      else if (rel.startsWith(`${HIVE_DIR}/${DIALECTS_DIR}`)) {
+        // HI-2443: callers with no session follow the files; running agents whose chain they change show "restart to
+        // apply", worked out by the refresh (sessions' liveInfo) as for skills.
+        for (const l of WorkspaceService.dialectsListeners) {
+          try {
+            l(this)
+          } catch (e) {
+            log.warn('dialects changed', e)
+          }
+        }
+        this.scheduleRefresh()
+      }
       else if (rel === `${HIVE_DIR}/workspace.json`) void this.reloadConfig()
     }
     const chokidarWatcher = this.watcher
