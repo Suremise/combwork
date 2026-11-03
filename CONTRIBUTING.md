@@ -4,7 +4,7 @@ Thank you for helping. This page is mostly about **translations**: fixing a word
 adding a new language. You can do a small fix in GitHub's web editor without installing anything. The checks run on
 your pull request. Code changes are covered briefly at the end.
 
-**Found a bug, or have an idea?** [Open an issue](https://github.com/Suremise/hive-desktop/issues/new/choose): there
+**Found a bug, or have an idea?** [Open an issue](https://github.com/Suremise/combwork/issues/new/choose): there
 are forms for a bug report (with **Help → Copy Diagnostics…**), a feature request, a translation and anything else.
 A **security problem** goes privately, never in an issue: see [SECURITY.md](.github/SECURITY.md). Pull requests start
 from [a short template](.github/PULL_REQUEST_TEMPLATE.md). Everyone taking part follows the
@@ -96,7 +96,7 @@ Say a German button reads badly.
 
    A language started this way stays for that run only. The setting (**Settings → General → Language**) says so and
    applies from the next start.
-7. **Open a pull request** against `main` on [Suremise/hive-desktop](https://github.com/Suremise/hive-desktop). Say
+7. **Open a pull request** against `main` on [Suremise/combwork](https://github.com/Suremise/combwork). Say
    what you changed and why, and add a screenshot if you have one. Keep each pull request to one language.
 
 **The English itself is wrong?** English text lives in the code, not in `locales/`. Open an issue, or change the

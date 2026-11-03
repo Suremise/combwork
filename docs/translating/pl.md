@@ -7,7 +7,7 @@
 mile widziane.”
 
 **Improving it:** every Polish message is in `locales/pl/<area>.json`, one file per part of Combwork. If a word is wrong,
-stiff or unclear, change it there and open a pull request on GitHub (`Suremise/hive-desktop`): `CONTRIBUTING.md` says
+stiff or unclear, change it there and open a pull request on GitHub (`Suremise/combwork`): `CONTRIBUTING.md` says
 how, and a small fix can be made in GitHub's web editor. If you change a term from the table below, change it in every
 message and on this page in the same pull request, so Combwork keeps one voice. A native speaker's review takes the (AI)
 mark off.

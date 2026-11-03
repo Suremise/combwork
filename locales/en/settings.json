@@ -3989,7 +3989,7 @@
   },
   "settings.mcpCatalogs.ours": {
     "defaultMessage": "Combwork's own catalogue, checked by Combwork.",
-    "description": "Settings → MCP Catalogues (HI-545): under the name of Hive’s own catalogue (Suremise/hive-mcp)."
+    "description": "Settings → MCP Catalogues (HI-545): under the name of Hive’s own catalogue (Suremise/combwork-mcp)."
   },
   "settings.mcpCatalogs.oursSwitch": {
     "defaultMessage": "Combwork's own catalogue listed",

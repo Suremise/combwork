@@ -6,7 +6,7 @@ body:
     attributes:
       value: |
         Hive's languages besides English are drafted by AI, so corrections from people who speak them are very welcome.
-        You can also fix it yourself with a pull request, in GitHub's web editor and without installing anything: Help → Improve This Translation opens the guide, [Fix a translation](https://github.com/Suremise/hive-desktop/blob/main/CONTRIBUTING.md#fix-a-translation). Each language's style page is in [docs/translating](https://github.com/Suremise/hive-desktop/tree/main/docs/translating).
+        You can also fix it yourself with a pull request, in GitHub's web editor and without installing anything: Help → Improve This Translation opens the guide, [Fix a translation](https://github.com/Suremise/combwork/blob/main/CONTRIBUTING.md#fix-a-translation). Each language's style page is in [docs/translating](https://github.com/Suremise/combwork/tree/main/docs/translating).
         Wrong English? Use the bug report instead.
   - type: dropdown
     id: language

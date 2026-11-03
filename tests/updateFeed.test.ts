@@ -13,11 +13,11 @@ import { HiveGitHubProvider, pickTag, withFirst } from '../src/main/updateFeed'
 // recognised as one, and reads as a stable version.
 const { SemVer } = createRequire(createRequire(import.meta.url).resolve('electron-updater/out/providers/GitHubProvider'))('semver') as { SemVer: new (version: string) => unknown }
 
-const BASE = 'https://github.com/Suremise/hive-desktop/releases'
+const BASE = 'https://github.com/Suremise/combwork/releases'
 
 const entry = (tag: string): string =>
   `<entry><id>tag:github.com,2008:Repository/1/${tag}</id><updated>2026-11-01T00:00:00Z</updated><link rel="alternate" type="text/html" href="${BASE}/tag/${tag}"/><title>Hive ${tag}</title><content type="html">Notes of ${tag}</content></entry>`
-const atom = (tags: string[]): string => `<?xml version="1.0" encoding="UTF-8"?>\n<feed xmlns="http://www.w3.org/2005/Atom"><id>tag:github.com,2008:${BASE}</id><title>Release notes from hive-desktop</title>${tags.map(entry).join('')}</feed>`
+const atom = (tags: string[]): string => `<?xml version="1.0" encoding="UTF-8"?>\n<feed xmlns="http://www.w3.org/2005/Atom"><id>tag:github.com,2008:${BASE}</id><title>Release notes from combwork</title>${tags.map(entry).join('')}</feed>`
 const yml = (tag: string): string => {
   const v = tag.replace(/^v/, '')
   return `version: ${v}\nfiles:\n  - url: Hive-Setup-${v}.exe\n    sha512: abc\n    size: 1\npath: Hive-Setup-${v}.exe\nsha512: abc\nreleaseDate: '2026-11-01T00:00:00.000Z'\n`
@@ -44,7 +44,7 @@ async function check(running: string, tags: string[], opts: { prerelease?: boole
   }
   const updater = { allowPrerelease: opts.prerelease ?? true, currentVersion: new SemVer(running), channel: null, fullChangelog: false } as unknown as AppUpdater
   const runtime = { isUseMultipleRangeRequest: false, platform: 'win32', executor } as never
-  const provider = opts.upstream ? new GitHubProvider({ provider: 'github', owner: 'Suremise', repo: 'hive-desktop' }, updater, runtime) : new HiveGitHubProvider({ provider: 'custom', owner: 'Suremise', repo: 'hive-desktop' } as never, updater, runtime)
+  const provider = opts.upstream ? new GitHubProvider({ provider: 'github', owner: 'Suremise', repo: 'combwork' }, updater, runtime) : new HiveGitHubProvider({ provider: 'custom', owner: 'Suremise', repo: 'combwork' } as never, updater, runtime)
   try {
     const info = await provider.getLatestVersion()
     return { version: info.version, tag: info.tag, notes: info.releaseNotes, asked, unexpected }

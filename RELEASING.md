@@ -1,6 +1,6 @@
 # Releasing Hive
 
-Hive updates itself from this repository's [GitHub Releases](https://github.com/Suremise/hive-desktop/releases) using [electron-updater](https://www.electron.build/auto-update). A release is only seen by installed copies once it is **published** (not a draft) and the repository is **public**: the updater reads releases without credentials, and Hive never ships a token.
+Hive updates itself from this repository's [GitHub Releases](https://github.com/Suremise/combwork/releases) using [electron-updater](https://www.electron.build/auto-update). A release is only seen by installed copies once it is **published** (not a draft) and the repository is **public**: the updater reads releases without credentials, and Hive never ships a token.
 
 ## What a release contains
 

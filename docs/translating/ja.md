@@ -6,7 +6,7 @@
 **In the language picker:** 日本語, marked (AI) while drafted by AI, with the note 「AI による翻訳です。改善を歓迎します。」
 
 **Improving it:** every Japanese message is in `locales/ja/<area>.json`, one file per part of Combwork. If a word is
-wrong, stiff or unclear, change it there and open a pull request on GitHub (`Suremise/hive-desktop`):
+wrong, stiff or unclear, change it there and open a pull request on GitHub (`Suremise/combwork`):
 `CONTRIBUTING.md` says how, and a small fix can be made in GitHub's web editor. If you change a term from the table
 below, change it in every message and on this page in the same pull request, so Combwork keeps one voice. A native
 speaker's review takes the (AI) mark off.

@@ -9,7 +9,7 @@ melhorias são bem-vindas.”
 **Improving it:** every Brazilian Portuguese text is in `locales/pt-BR/<area>.json`, one file per area (settings,
 board, tasks…), next to the English it was made from in `locales/en/<area>.json` (generated from the code: don't edit
 it). Change a text there, run `npm run i18n:check` (it must pass) and `npm run i18n:coverage`, and open a pull request
-on [Suremise/hive-desktop](https://github.com/Suremise/hive-desktop). A screenshot of the screen you changed helps the
+on [Suremise/combwork](https://github.com/Suremise/combwork). A screenshot of the screen you changed helps the
 review: start Combwork with `--lang=pt-BR` (`npm run dev -- --lang=pt-BR`). To change a term below, change it here first,
 in the same pull request, then in every message that uses it. A native speaker's review takes the (IA) mark off.
 
