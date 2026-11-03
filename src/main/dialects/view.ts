@@ -76,7 +76,7 @@ async function rowOf(dir: string, f: LoadedDialect, shipped: ReadonlySet<string>
 }
 
 /** The Workspace file before anything is saved in it: Hive never makes it unasked, and the first Save does. */
-const EMPTY_WORKSPACE: LoadedDialect = { path: WORKSPACE_FILE, name: 'Workspace', texts: {}, outdated: [], on: true }
+const EMPTY_WORKSPACE: LoadedDialect = { path: WORKSPACE_FILE, name: 'Workspace', texts: {}, outdated: [], on: true } // i18n-ignore: the file's own name field, written into it at its first Save (each file shows its own)
 
 /**
  * A workspace's dialect files as the view lists them: the Workspace file (shown empty while it isn't there yet, so
