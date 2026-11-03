@@ -119,6 +119,26 @@
     "defaultMessage": "Answered",
     "description": "What the notification of a question from the Hive Assistant says once it is answered or no longer waits (HI-2320), in place of its buttons. Keep it short."
   },
+  "main.assistantQuestion.stop.message": {
+    "defaultMessage": "The Assistant wants to stop {agent}, which is {state}.{hasReason, select, yes { Its reason: {reason}} other {}} Its conversation is kept and can be resumed.",
+    "description": "Under the question \"Stop <agent> in <project>?\". {state} is what the agent is doing (main.assistantQuestion.stop.state); {reason} is the Assistant's own reason, as it wrote it, ending with a full stop."
+  },
+  "main.assistantQuestion.stop.no": {
+    "defaultMessage": "Don't stop",
+    "description": "The button that answers no to \"Stop <agent> in <project>?\"."
+  },
+  "main.assistantQuestion.stop.state": {
+    "defaultMessage": "{status, select, working {working} waiting {waiting for the user} signin {waiting for the user to sign in to its CLI again (its sign-in expired)} starting {starting} background {waiting on background tasks it started} watching {waiting for cards to change (a card watch: its card loop pauses until it is resumed)} ready {idle} finished {idle (finished its task)} error {in error} stopped {stopped} other {{status}}}",
+    "description": "What an agent is doing, inside \"The Assistant wants to stop <agent>, which is …\". The other branch is its status as Hive names it in code: keep {status}."
+  },
+  "main.assistantQuestion.stop.title": {
+    "defaultMessage": "Stop {agent} in {project}?",
+    "description": "A question from the Hive Assistant to the user, in its panel (and a notification while the panel is hidden): it wants to stop an agent that is busy. {agent} is the agent's name, {project} its project's."
+  },
+  "main.assistantQuestion.stop.yes": {
+    "defaultMessage": "Stop",
+    "description": "The button that answers yes to \"Stop <agent> in <project>?\" (the Assistant asks before stopping a busy agent)."
+  },
   "main.board.damagedBody": {
     "defaultMessage": "{files} stayed out of the board. They are kept in {folder}.",
     "description": "The notice about card files Hive couldn't read as it moved the board into its database: {files} lists them, {folder} is where they are kept."

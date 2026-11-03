@@ -31,6 +31,11 @@ interface HiveMessageValues {
   'main.antivirus.unreadable': undefined
   'main.antivirus.windowsOnly': undefined
   'main.assistantQuestion.answered': undefined
+  'main.assistantQuestion.stop.message': { agent: string | number; state: string | number; hasReason: string; reason: string | number }
+  'main.assistantQuestion.stop.no': undefined
+  'main.assistantQuestion.stop.state': { status: string }
+  'main.assistantQuestion.stop.title': { agent: string | number; project: string | number }
+  'main.assistantQuestion.stop.yes': undefined
   'main.board.damagedBody': { files: string | number; folder: string | number }
   'main.board.damagedTitle': { n: number }
   'main.board.foundBody': { folder: string | number }

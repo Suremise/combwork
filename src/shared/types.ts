@@ -442,10 +442,13 @@ export interface AssistantSettingChange {
 /** A question the Hive Assistant's action is waiting on (e.g. stopping a busy agent), shown as a card in its panel. */
 export interface AssistantQuestion {
   id: string
+  /** In English: the log, and the Agent API's event stream when it is told as a notification. */
   title: string
   message: string
   yes: string
   no: string
+  /** The same, as the window shows it in the language Hive shows (#845, HI-2449): what the panel and its notification say. */
+  text?: { title: Text; message: Text; yes: Text; no: Text }
 }
 
 /** Empty values follow the provider's own settings; an empty permission mode is the provider's assistantMode (reads freely, asks before changing anything). */
