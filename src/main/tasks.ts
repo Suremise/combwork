@@ -635,11 +635,14 @@ const keptCards = new WeakMap<WorkspaceService, { path: string; generation: numb
  * Saves a card (in a board change) with its project's id beside its name (#508). A card whose project the workspace doesn't
  * have now (removed, or renamed before it had an id) keeps the id it was saved with, if any, and never takes another
  * project's: shown as goneProject's while another project has its name, it is saved with that name as it was.
+ * `commit`: a caller whose authority can change while it waits (the Assistant's Control and session, assistantChange's
+ * guard) checks it here, after the last await and just before the write (HI-2415), so a revoked change saves nothing.
  */
-async function saveCard(ws: WorkspaceService, n: number, card: TaskCard, before?: TaskCard | null, withRow?: () => void): Promise<void> {
+async function saveCard(ws: WorkspaceService, n: number, card: TaskCard, before?: TaskCard | null, withRow?: () => void, commit?: () => void): Promise<void> {
   // Who holds it now, for its cost (#602): a hold that ended gets its end, a new one starts.
   trackHolds(card, new Date().toISOString())
   const ids = await ws.projectIds()
+  commit?.()
   const saved = savedProjectName(card.project)
   let projectId = saved && saved === card.project ? projectIdNamed(ids, saved) : null
   // The card as it was, for its facts (#1216): given by a caller that has it (null: a new card), else read.
@@ -1362,10 +1365,8 @@ async function createTaskLocked(
     updatedAt: now
   }
   const store = kind === 'no-code' ? FactStore.forBoard(ws, { project: card.project, key: '' }) : null
-  // The last thing before the write, after every await above (HI-2415): a caller whose authority can change meanwhile
-  // (the Assistant's control and session, assistantChange's guard) checks it here, so a revoked one makes no card.
-  opts.commit?.()
-  await saveCard(ws, n, card, null, store && !proposes ? () => store.updateCard(n, { kind }) : undefined)
+  // A revocable caller's authority checked as it is written (HI-2415: saveCard's `commit`), so a revoked one makes no card.
+  await saveCard(ws, n, card, null, store && !proposes ? () => store.updateCard(n, { kind }) : undefined, opts.commit)
   if (store && proposes) store.tx((tx) => tx.append(n, { kind: 'KindProposed', actor: actorOf(actor), source: 'recorded', data: { kind } }))
   if (skipReason !== null) {
     const facts = store ?? FactStore.forBoard(ws, { project: card.project, key: '' })
@@ -1831,11 +1832,10 @@ export async function setKind(n: number, kind: unknown, actor: TaskActor, o: { c
       if (actor.kind === 'user' && !o.confirm) return { ask: true as const }
       if (actor.kind === 'assistant' && !reason) throw new TaskConflictError(KIND.needsReason)
       // The caller's authority, checked last before anything is written (the Assistant's Control and session, under this
-      // lock: HR3's #1277 round 1), as updateTask's `commit`.
-      o.commit?.()
+      // lock: HR3's #1277 round 1; as it is written, HI-2415), as updateTask's `commit`.
       const before = structuredClone(card)
       note(card, actorName(actor), storedText(HISTORY.kind, { how: 'changed', kind: to }))
-      await saveCard(ws, n, card, before)
+      await saveCard(ws, n, card, before, undefined, o.commit)
       const proposed = kindProposal(store, n)
       store.updateCard(n, { kind: to })
       store.tx((tx) => {
@@ -1862,10 +1862,9 @@ export async function confirmKind(n: number, accept: boolean, actor: TaskActor, 
       const proposed = kindProposal(store, n)
       if (!proposed) throw new TaskConflictError(withValues(KIND.noProposal, { card: cardRef(n), kind: store.card(n).kind }))
       const kind: CardKind = accept ? proposed : 'code'
-      o.commit?.()
       const before = structuredClone(card)
       note(card, actorName(actor), storedText(HISTORY.kind, { how: accept ? 'confirmed' : 'kept', kind }))
-      await saveCard(ws, n, card, before)
+      await saveCard(ws, n, card, before, undefined, o.commit)
       store.updateCard(n, { kind })
       store.tx((tx) => tx.append(n, { kind: 'KindDecided', actor: actorOf(actor), source: 'recorded', data: { kind, proposed } }))
       changed(ws)
@@ -1930,11 +1929,10 @@ export async function setReviewSkip(n: number, skip: boolean, actor: TaskActor, 
       const stage = rules?.stage ?? 'todo'
       if (stage === 'review') throw new TaskConflictError(withValues(SKIP.inReview, { card: cardRef(n) }))
       if (stage === 'approved' || stage === 'merging' || stage === 'done') throw new TaskConflictError(withValues(SKIP.past, { card: cardRef(n), stage }))
-      o.commit?.()
       const before = structuredClone(card)
       const how = now.proposed !== null ? (skip ? 'confirmed' : 'kept') : skip ? 'set' : 'removed'
       note(card, actorName(actor), storedText(HISTORY.reviewSkip, { how }))
-      await saveCard(ws, n, card, before)
+      await saveCard(ws, n, card, before, undefined, o.commit)
       const by = actor.kind === 'assistant' ? 'assistant' : 'user'
       store.tx((tx) => tx.append(n, { kind: 'ReviewSkipSet', actor: actorOf(actor), source: 'recorded', data: { skip, by, reason, ...(now.proposed !== null ? { proposed: now.proposed } : {}) } }))
       // A started card's stages are its rules with no review from now on: stored, so the board shows them at once.
@@ -2384,11 +2382,10 @@ async function updateTaskAs(n: number, patch: TaskPatch, actor: TaskActor, opts:
     const at = changeTime(card)
     for (const s of said) note(card, by, s, at)
     if (comment) addComment(card, by, comment, undefined, undefined, at)
-    // The last thing before the write, after every read above: a caller whose authority can change while those awaits run
-    // (the Assistant's control and session) checks it here, so a revoked change saves nothing. Unlike `check`, it doesn't
-    // see the card as it was before this change.
-    opts.commit?.()
-    await saveCard(ws, n, card, before)
+    // The last thing before the write, after every read (saveCard's own too, HI-2415): a caller whose authority can change
+    // while those awaits run (the Assistant's control and session) checks it there, so a revoked change saves nothing.
+    // Unlike `check`, it doesn't see the card as it was before this change.
+    await saveCard(ws, n, card, before, undefined, opts.commit)
     // Nobody on it, by the user's reason: recorded as an override is (setKind's), with the rule it passes.
     if (nobody) FactStore.forBoard(ws, { project: card.project, key: '' }).tx((tx) => tx.append(n, { kind: 'Override', actor: actorOf(actor), source: 'recorded', data: { rules: ['move.doingNobody'], move: `${CATEGORY_STAGE[before.column]}→active`, by: 'assistant', reason: nobody } })) // i18n-ignore: a fact's kind and codes, not text
     return card
@@ -2707,8 +2704,7 @@ export async function commentTask(n: number, comment: string, actor: TaskActor, 
     if (!inScope(c, scopeOf(actor))) throw unknownTask(n)
     if (c.archived && actor.kind !== 'user') throw new TaskPermissionError(withValues(ERR.archived, { card: cardRef(n) }))
     addComment(c, actorName(actor), t)
-    opts.commit?.()
-    await saveCard(ws, n, c)
+    await saveCard(ws, n, c, undefined, undefined, opts.commit)
     changed(ws)
     return c
   }))
@@ -2777,8 +2773,7 @@ export async function changeWithAttachments(actor: TaskActor, files: ChangeAttac
       const fresh = pub.attachments.filter((_a, i) => pub.added[i]).map((a) => a.id)
       if (comment?.id) linkToComment(ws, n, fresh.filter((id) => inComment.has(id)), comment.id)
       linkToComment(ws, n, fresh.filter((id) => !inComment.has(id)), 'description')
-      commit?.()
-      await saveCard(ws, n, card, before)
+      await saveCard(ws, n, card, before, undefined, commit)
       changed(ws)
       return { ...card, attached: pub.attachments.map((a, i) => ({ name: a.name, path: a.path, added: pub.added[i] })) }
     })

@@ -60,7 +60,57 @@ function holdBoard(w: WS): { release: () => void; done: Promise<void> } {
   return { release, done }
 }
 
+/**
+ * Holds the card's save at its own read of the project ids (saveCard's last await before the write, HR2's round 1): `reached`
+ * once it waits there, until released. Only that read, so the change's checks before it have all run.
+ */
+function holdSave(w: WS): { reached: Promise<void>; release: () => void; restore: () => void } {
+  const original = w.projectIds.bind(w)
+  let reach!: () => void
+  let release!: () => void
+  const reached = new Promise<void>((r) => (reach = r))
+  const gate = new Promise<void>((r) => (release = r))
+  let armed = true
+  w.projectIds = async (...args: Parameters<WS['projectIds']>) => {
+    if (armed && new Error().stack?.includes('saveCard')) {
+      armed = false
+      reach()
+      await gate
+    }
+    return original(...args)
+  }
+  return { reached, release, restore: () => void (w.projectIds = original) }
+}
+
 describe("the Assistant's queued board changes, revoked before they're written (HI-2415)", () => {
+  it("revoked while the save itself reads the project ids (after every other check): no card, comment or change saved (HR2's round 1)", async () => {
+    const w = await workspace()
+    const c = await inWorkspace(w, () => tasks.createTask({ title: 'Card', project: 'p' }, user))
+    const before = cardCount(w)
+    const cases: [string, (guard: () => void) => Promise<unknown>][] = [
+      ['a new card', (guard) => tasks.createTask({ title: 'Held', project: 'p' }, assistant, { commit: guard })],
+      ['a comment', (guard) => tasks.commentTask(c.number, 'Held comment', assistant, { commit: guard })],
+      ['a change', (guard) => tasks.updateTask(c.number, { title: 'Renamed while held' }, assistant, { commit: guard })]
+    ]
+    for (const [what, run] of cases) {
+      const a = authority()
+      const hold = holdSave(w)
+      try {
+        const op = inWorkspace(w, () => run(a.guard))
+        await hold.reached
+        a.revoke()
+        hold.release()
+        await expect(op, what).rejects.toThrow(/turned down/)
+      } finally {
+        hold.restore()
+      }
+    }
+    expect(cardCount(w)).toBe(before)
+    const now = await inWorkspace(w, () => tasks.getTask(c.number, w))
+    expect(now.title).toBe('Card')
+    expect(now.comments).toEqual([])
+  })
+
   it('a card added while another board write holds the lock, revoked meanwhile: no card', async () => {
     const w = await workspace()
     const before = cardCount(w)
