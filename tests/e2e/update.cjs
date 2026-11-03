@@ -182,8 +182,8 @@ const log = (profile) => { try { return fs.readFileSync(path.join(scratch, profi
   st = await inv('update:state')
   check('dev build: disabled', st.status === 'disabled' && /installed app/.test(st.error))
   await page.keyboard.press('F1'); await sleep(400)
-  await page.locator('.split-list .row', { hasText: 'About Combwork' }).click(); await sleep(400)
-  check('About shows the update status', /installed app/.test(await page.locator('.about-update').innerText()))
+  await page.locator('.split-list .row', { hasText: 'About Combwork' }).click()
+  check('About shows the update status', await waitFor(async () => /installed app/.test(await page.locator('.about-update').innerText().catch(() => '')), HUNG_MS))
   await page.screenshot({ path: path.join(scratch, 'upd-6-about.png') })
   await app.close()
 
