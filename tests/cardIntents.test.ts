@@ -171,7 +171,10 @@ describe('a card by intent (#1267)', () => {
       await act(w, card, reviewer, { kind: 'startReview' })
       // a3, on a stale wake: refused, naming a2 and how long it has reviewed, and nothing written.
       const before = kinds(w, card).length
-      const err = await act(w, card, other, { kind: 'startReview' }).catch((e) => e as { refusal?: { rule: string; message: string; next: string; change?: string } })
+      const err = (await act(w, card, other, { kind: 'startReview' }).then(
+        () => ({}),
+        (e: unknown) => e
+      )) as { refusal?: { rule: string; message: string; next: string; change?: string } }
       expect(err.refusal).toMatchObject({ rule: 'review.inProgress', message: "Reviewer is reviewing p-1's submission 3, and has been for less than a minute.", next: "Leave it to Reviewer: don't review p-1 or give it a verdict." })
       expect(err.refusal?.change).toMatch(/Only the user takes a review over/)
       expect(kinds(w, card).slice(before)).toEqual(['Refused'])
