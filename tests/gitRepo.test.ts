@@ -159,6 +159,20 @@ describe('the summary', () => {
     expect(after.fetchedAt).toBeGreaterThan(0)
   })
 
+  it('names the branch by its whole ref, with its upstream, though a tag has its name (HI-2426)', async () => {
+    git(proj, 'tag', 'main')
+    git(proj, 'tag', 'origin/main')
+    const s = await repo.repoSummary(proj)
+    expect(s).toMatchObject({ branch: 'main', upstream: { name: 'origin/main', remote: 'origin', ahead: 0, behind: 0 } })
+    expect(gitStatusText(s)).toBe('main · origin · ↑0 ↓0')
+    // Branches & remotes names them so too, the folder's branch marked current.
+    const info = await repo.repoInfo(proj)
+    expect(info.branches.map((b) => [b.name, b.current, b.upstream])).toEqual([['main', true, 'origin/main']])
+    expect([info.remoteBranches, info.remoteRows?.map((r) => [r.remote, r.branch])]).toEqual([['origin/main'], [['origin', 'main']]])
+    // And the branches a remote's removal names.
+    expect(await repo.remoteTracking(proj, 'origin')).toEqual(['main'])
+  })
+
   it('says a folder without git is no repository, and a detached HEAD by its commit', async () => {
     const plain = join(outer, 'plain')
     mkdirSync(plain, { recursive: true })
@@ -919,6 +933,17 @@ describe('branches by state, and cleaning up the merged ones (#1642)', () => {
     expect(said).toMatch(/Deleted hive\/hb1\./)
     expect(git(proj, 'tag', '--list', 'hive/hb1')).toBe('hive/hb1')
   })
+
+  it('keeps the branch checked out in the project folder, here and on the remote, though a tag has its name (HI-2426)', async () => {
+    const at = setUp()
+    git(proj, 'checkout', '-q', 'hive/hb1')
+    git(proj, 'tag', 'hive/hb1', 'main')
+    // With a free branch beside it, so each says what it did rather than refusing the whole request.
+    expect(await repo.deleteRemoteBranches(proj, 'origin', [{ name: 'origin/hive/hb1', sha: at['hive/hb1'] }, { name: 'origin/hive/hb2', sha: at['hive/hb2'] }])).toContain('origin/hive/hb1 is checked out in the project folder')
+    expect(await repo.deleteBranches(proj, [{ name: 'hive/hb1', sha: at['hive/hb1'] }, { name: 'hive/hb2', sha: at['hive/hb2'] }])).toContain('hive/hb1 is checked out in the project folder')
+    const has = (cwd: string, b: string): boolean => git(cwd, 'for-each-ref', '--format=%(refname)', `refs/heads/${b}`) !== ''
+    expect([has(proj, 'hive/hb1'), has(remote, 'hive/hb1'), has(proj, 'hive/hb2')]).toEqual([true, true, false])
+  }, 120_000)
 
   it('deletes only what it was shown, merged and unused, and says why each other one is kept', async () => {
     const at = setUp()

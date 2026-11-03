@@ -13,7 +13,7 @@ import type { TextPart } from '../shared/advanced'
 import { fmt, msg, tr } from '../shared/i18n'
 import { gitProblemData, gitProblemText } from '../shared/gitTool'
 import { copyDir, isDir, placeKey, samePlace } from './fsutil'
-import { git, gitReading } from './git'
+import { branchOfRef, git, gitReading } from './git'
 import { gitTool } from './gitTool'
 import { errorText, hiveError, shownError } from './hiveError'
 import { createLogger, userText } from './logger'
@@ -79,11 +79,14 @@ export async function localBranches(cwd: string): Promise<string[]> {
   return localBranchesStrict(cwd).catch(() => [])
 }
 
-/** The local branches; throws when git can't list them (#353: a removal never takes an unknown main branch for none). */
+/**
+ * The local branches; throws when git can't list them (#353: a removal never takes an unknown main branch for none). By
+ * their whole refs: `refname:short` says heads/main beside a tag main, and main would be no branch here (HI-2426).
+ */
 async function localBranchesStrict(cwd: string): Promise<string[]> {
-  const r = await git(cwd, ['for-each-ref', '--format=%(refname:short)', 'refs/heads'])
+  const r = await git(cwd, ['for-each-ref', '--format=%(refname)', 'refs/heads'])
   if (!r.ok) throw hiveError(M.listBranches, { why: gitWhy(r.err, 'for-each-ref') })
-  return r.out.split(/\r?\n/).map((l) => l.trim()).filter(Boolean)
+  return r.out.split(/\r?\n/).map((l) => branchOfRef(l)).filter((b): b is string => !!b)
 }
 
 /** The project's worktrees (including the project folder itself), from `git worktree list`; none when git can't list them. */
@@ -303,9 +306,10 @@ export async function primaryBranch(projectPath: string): Promise<string | null>
  */
 export async function primaryBranchStrict(projectPath: string, reads?: RepoReads): Promise<string | null> {
   const local = new Set(await (reads ? reads.branchesStrict() : localBranchesStrict(projectPath)))
-  const remote = await git(projectPath, ['symbolic-ref', '--quiet', '--short', 'refs/remotes/origin/HEAD'])
+  const remote = await git(projectPath, ['symbolic-ref', '--quiet', 'refs/remotes/origin/HEAD'])
   if (!remote.ok && !(remote.code === 1 && !remote.err)) throw hiveError(M.readOriginHead, { why: gitWhy(remote.err, 'symbolic-ref') })
-  const named = remote.ok ? remote.out.trim().replace(/^origin\//, '') : ''
+  // The full ref, cut: `--short` says remotes/origin/x beside a tag origin/x (HI-2426).
+  const named = (remote.ok && branchOfRef(remote.out, 'refs/remotes/origin/')) || ''
   return [named, 'main', 'master'].find((b) => b && local.has(b)) ?? null
 }
 

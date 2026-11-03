@@ -50,7 +50,7 @@ import { checkProject } from './branchWatch'
 import { samePlace } from './fsutil'
 import type { AgentDef } from '../shared/types'
 import { withRepoLock } from './repoLock'
-import { git, type GitResult } from './git'
+import { branchOfRef, git, type GitResult } from './git'
 import { gitProblem, gitTool } from './gitTool'
 import { gitProblemData } from '../shared/gitTool'
 import { englishText, linesOf, listOf, shownText, withValues, type Text, type TextPart, type TextValues } from '../shared/advanced'
@@ -308,24 +308,31 @@ async function readSummary(root: string): Promise<{ summary: GitRepoSummary; git
   const parentRepo = top && !samePlace(top, root) ? resolve(top) : undefined
   // HI-2115: the config files git reads here (system, global, the repository's, included), which the summary's key
   // watches: an entry's origin is `file:<path>`; other origins (the command line, a blob) aren't files to watch.
-  const [sym, head, remotes, origins] = await Promise.all([git(root, ['symbolic-ref', '-q', '--short', 'HEAD']), git(root, ['rev-parse', '-q', '--verify', '--short', 'HEAD']), git(root, ['remote']), git(root, ['config', '--list', '--show-origin', '-z'])])
+  const [sym, head, remotes, origins] = await Promise.all([git(root, ['symbolic-ref', '-q', 'HEAD']), git(root, ['rev-parse', '-q', '--verify', '--short', 'HEAD']), git(root, ['remote']), git(root, ['config', '--list', '--show-origin', '-z'])])
   const configs = origins.ok ? configOrigins(origins.out, root) : null
   // symbolic-ref says 1 for a detached HEAD; anything else is a failure, not "detached" (#346).
   if (!sym.ok && sym.code !== 1) throw commandFailed('git symbolic-ref', sym) // i18n-ignore: a git command, as it is
   if (!remotes.ok) throw commandFailed('git remote', remotes) // i18n-ignore: a git command, as it is
-  const branch = sym.ok ? sym.out.trim() : null
+  // The full ref, cut: `--short` says heads/x beside a tag x, a name no ref or card matches (HI-2426).
+  const branch = sym.ok ? branchOfRef(sym.out) : null
   let upstream: GitRepoSummary['upstream'] = null
   if (branch) {
-    const r = await git(root, ['for-each-ref', '--format=%(refname)%00%(upstream:short)%00%(upstream:remotename)%00%(upstream:track,nobracket)', `refs/heads/${branch}`])
+    const r = await git(root, ['for-each-ref', '--format=%(refname)%00%(upstream)%00%(upstream:remotename)%00%(upstream:track,nobracket)', `refs/heads/${branch}`])
     if (!r.ok) throw commandFailed('git for-each-ref', r) // i18n-ignore: a git command, as it is
     const row = r.out.split('\n').map((l) => l.split('\0')).find((f) => f[0] === `refs/heads/${branch}`)
-    if (row?.[1]) upstream = { name: row[1], remote: row[2] && row[2] !== '.' ? row[2] : null, ...parseTrack(row[3] ?? '') }
+    if (row?.[1]) upstream = { name: upstreamName(row[1]), remote: row[2] && row[2] !== '.' ? row[2] : null, ...parseTrack(row[3] ?? '') }
     if (upstream && !upstream.gone) delete upstream.gone
   }
   const summary = { isRepo: true, branch, head: head.ok ? head.out.trim() || null : null, upstream, remotes: remotes.out.split(/\r?\n/).map((l) => l.trim()).filter(Boolean), ...(await fileParts(gitDir)), ...(parentRepo ? { parentRepo } : {}) }
   // A folder inside another repository is never kept: its `.git` isn't its own (summaryKey reads none).
   return { summary, gitDir: parentRepo ? null : gitDir, configs }
 }
+
+/**
+ * A branch's upstream by its whole ref (`%(upstream)`): `origin/main`, or a local branch's name. `%(upstream:short)` says
+ * remotes/origin/main beside a tag origin/main, a name no ref matches (HI-2426).
+ */
+const upstreamName = (full: string): string => branchOfRef(full, 'refs/remotes/') ?? branchOfRef(full) ?? full.trim()
 
 /** `git remote -v`: each remote's fetch and push URL (passwords hidden). */
 export function parseRemotes(out: string): GitRemote[] {
@@ -379,7 +386,7 @@ export async function repoInfo(root: string, workTarget?: string | null): Promis
   const summary = await repoSummary(root)
   const none: GitRepoInfo = { summary, branches: [], remoteBranches: [], remotes: [], worktrees: [], identity: { local: {}, global: {}, effective: {} } }
   if (!summary.isRepo) return none
-  const fields = ['%(refname)', '%(refname:short)', '%(upstream:short)', '%(upstream:track,nobracket)', '%(objectname:short)', '%(committerdate:unix)', '%(contents:subject)', '%(upstream:remotename)', '%(objectname)', '%(symref)']
+  const fields = ['%(refname)', '%(refname:short)', '%(upstream)', '%(upstream:track,nobracket)', '%(objectname:short)', '%(committerdate:unix)', '%(contents:subject)', '%(upstream:remotename)', '%(objectname)', '%(symref)']
   const [refs, remotes, wts, id, targets] = await Promise.all([
     git(root, ['for-each-ref', '--sort=-committerdate', `--format=${fields.join('%00')}`, 'refs/heads', 'refs/remotes']),
     git(root, ['remote', '-v']),
@@ -406,13 +413,16 @@ export async function repoInfo(root: string, workTarget?: string | null): Promis
         if (f[9]) remoteHeads.add(f[9].replace(/^refs\/remotes\//, ''))
         continue
       }
-      remoteBranches.push(f[1])
-      const remote = remoteOf(f[1])
-      if (remote) remoteRows.push({ name: f[1], remote, branch: f[1].slice(remote.length + 1), sha: f[8], date: Number(f[5]) * 1000, toTarget: null, remoteHead: false })
+      // Each named off its whole ref, as summary.branch is: `refname:short` says heads/x, remotes/o/x beside a tag x, o/x (HI-2426).
+      const name = branchOfRef(f[0], 'refs/remotes/') ?? f[1]
+      remoteBranches.push(name)
+      const remote = remoteOf(name)
+      if (remote) remoteRows.push({ name, remote, branch: name.slice(remote.length + 1), sha: f[8], date: Number(f[5]) * 1000, toTarget: null, remoteHead: false })
       continue
     }
-    const wt = worktrees.find((w) => w.branch === f[1])
-    branches.push({ name: f[1], current: f[1] === summary.branch, upstream: f[2] || null, ...parseTrack(f[3]), worktree: wt?.path ?? null, commit: f[4], date: Number(f[5]) * 1000, subject: f[6], upstreamRemote: f[7] && f[7] !== '.' ? f[7] : null, sha: f[8] })
+    const name = branchOfRef(f[0]) ?? f[1]
+    const wt = worktrees.find((w) => w.branch === name)
+    branches.push({ name, current: name === summary.branch, upstream: f[2] ? upstreamName(f[2]) : null, ...parseTrack(f[3]), worktree: wt?.path ?? null, commit: f[4], date: Number(f[5]) * 1000, subject: f[6], upstreamRemote: f[7] && f[7] !== '.' ? f[7] : null, sha: f[8] })
   }
   for (const r of remoteRows) r.remoteHead = remoteHeads.has(r.name)
   const shown = branches.slice(0, BRANCHES_SHOWN)
@@ -912,9 +922,10 @@ export async function remoteTracking(projectPath: string, remote: string): Promi
 }
 
 async function trackingRemote(projectPath: string, remote: string): Promise<string[]> {
-  const r = await git(projectPath, ['for-each-ref', '--format=%(refname:short)%00%(upstream:remotename)', 'refs/heads'])
+  // By whole refs: `refname:short` says heads/x beside a tag x (HI-2426).
+  const r = await git(projectPath, ['for-each-ref', '--format=%(refname)%00%(upstream:remotename)', 'refs/heads'])
   if (!r.ok) throw commandFailed('git for-each-ref', r) // i18n-ignore: a git command, as it is
-  return r.out.split(/\r?\n/).map((l) => l.split('\0')).filter((f) => f[1] === remote).map((f) => f[0])
+  return r.out.split(/\r?\n/).map((l) => l.split('\0')).filter((f) => f[1] === remote).map((f) => branchOfRef(f[0])).filter((b): b is string => !!b)
 }
 
 /**
@@ -969,9 +980,9 @@ export async function setUpstream(projectPath: string, branch: string, remote: s
   return oneAtATime(projectPath, async () => {
     const s = await summaryOf(projectPath)
     if (!branch || branch.startsWith('-') || !(await git(projectPath, ['show-ref', '--verify', '-q', `refs/heads/${branch}`])).ok) throw refusal(M.noBranch, { branch })
-    const up = await git(projectPath, ['for-each-ref', '--format=%(upstream:short)', `refs/heads/${branch}`])
+    const up = await git(projectPath, ['for-each-ref', '--format=%(upstream)', `refs/heads/${branch}`])
     if (!up.ok) throw commandFailed('git for-each-ref', up) // i18n-ignore: a git command, as it is
-    const was = up.out.trim()
+    const was = up.out.trim() && upstreamName(up.out)
     if (remote === null) {
       if (!was) return tr(msg({ id: 'service.gitRepo.trackedNothing', defaultMessage: '{branch} tracks no remote branch already.', description: 'After Stop tracking in the Git view, when the branch {branch} tracked nothing.' }), { branch })
       const r = await git(projectPath, ['branch', '--unset-upstream', '--', branch])
@@ -1242,10 +1253,10 @@ async function targetOrRefuse(projectPath: string): Promise<string> {
  */
 async function branchUseNow(projectPath: string, branch: string): Promise<{ why: ReturnType<typeof localUse>; target: string | null; defaultBranch: string | null }> {
   const targets = await branchTargets(projectPath, await workTargetOf(projectPath))
-  const [head, wts] = await Promise.all([git(projectPath, ['symbolic-ref', '-q', '--short', 'HEAD']), git(projectPath, ['worktree', 'list', '--porcelain'])])
+  const [head, wts] = await Promise.all([git(projectPath, ['symbolic-ref', '-q', 'HEAD']), git(projectPath, ['worktree', 'list', '--porcelain'])])
   if (!wts.ok) throw commandFailed('git worktree list', wts) // i18n-ignore: a git command, as it is
   const worktree = parseWorktrees(wts.out).find((w) => w.branch === branch)?.path ?? null
-  const why = localUse({ name: branch, current: head.ok && head.out.trim() === branch, worktree }, targets, cardLines(projectPath))
+  const why = localUse({ name: branch, current: head.ok && branchOfRef(head.out) === branch, worktree }, targets, cardLines(projectPath))
   return { why, ...targets }
 }
 

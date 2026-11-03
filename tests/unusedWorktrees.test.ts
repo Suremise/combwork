@@ -277,7 +277,7 @@ describe('listing', () => {
       // The runner's write is asked for there, so it holds the board's lock before the removal's claim asks for it.
       let late: Promise<unknown> | null = null
       failing = (args) => {
-        if (!late && args[0] === 'symbolic-ref' && args.includes('--short')) late = run(() => boardWrite(w, async () => takes('during-snapshot')))
+        if (!late && args[0] === 'symbolic-ref' && args.includes('--quiet') && args.at(-1) === 'HEAD') late = run(() => boardWrite(w, async () => takes('during-snapshot')))
         return false
       }
       expect(await run(() => removeUnusedWorktree(proj, t, { force: preview.token }))).toEqual({ deleted: false, reason: 'the merge queue is using it' })
@@ -341,7 +341,7 @@ describe('listing', () => {
       gitTestHooks.started = undefined
     }
     const count = (re: RegExp): number => by.filter((a) => re.test(a)).length
-    return { worktrees: count(/^worktree list/), branches: count(/^for-each-ref --format=%\(refname:short\) refs\/heads$/), originHead: count(/^symbolic-ref /), mainTip: count(/^rev-parse --verify --quiet refs\/heads\/main\^\{commit\}$/) }
+    return { worktrees: count(/^worktree list/), branches: count(/^for-each-ref --format=%\(refname\) refs\/heads$/), originHead: count(/^symbolic-ref /), mainTip: count(/^rev-parse --verify --quiet refs\/heads\/main\^\{commit\}$/) }
   }
   const ONCE = { worktrees: 1, branches: 1, originHead: 1, mainTip: 1 }
 
@@ -423,6 +423,21 @@ describe('Remove anyway', () => {
     expect(branches()).not.toContain(t.branch)
     // A token is good for one removal.
     expect((await anyway(t.path, p.token)).deleted).toBe(false)
+  })
+
+  it('a tag named as its branch: the confirmation names the branch, and it goes by that name, the tag kept (HI-2426)', async () => {
+    const t = await tree(`tagged${++n}`)
+    commit(t.path, 'w.txt')
+    git(proj, 'tag', t.branch, 'main')
+    try {
+      const p = await preview(t.path)
+      expect([p.branch, p.lost[0]]).toEqual([t.branch, `1 commit on ${t.branch} not on main`])
+      expect(await anyway(t.path, p.token)).toEqual({ deleted: true })
+      expect(branches()).not.toContain(t.branch)
+      expect(git(proj, 'tag', '--list', t.branch).trim()).toBe(t.branch)
+    } finally {
+      git(proj, 'tag', '-d', t.branch)
+    }
   })
 
   it('refuses a token past its 15 minutes, with no other preview since; one inside them still works (#373)', async () => {
