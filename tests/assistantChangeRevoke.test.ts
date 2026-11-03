@@ -90,8 +90,7 @@ const holdLanes = (w: WS) => hold((held) => lanes.mutateLanes(w, () => held as u
 
 /** Runs `change` while the lock `held` holds it, revokes its authority, then lets it go: what the change did. */
 async function revokedWhileHeld<T>(lock: { release: () => void; done: Promise<unknown> }, a: ReturnType<typeof authority>, change: Promise<T>): Promise<T> {
-  // Its awaits before the lock run first: give them a turn, so it waits at the lock itself.
-  await new Promise((r) => setImmediate(r))
+  // Revoked while the lock is held: whether the change has reached it yet or not, its check is at its write, after the lock.
   a.revoke()
   lock.release()
   await lock.done
