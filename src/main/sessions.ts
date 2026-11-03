@@ -122,6 +122,7 @@ import { say, setChainResolver } from '../shared/agentText'
 import { inDefaultDialect, inDialectOf } from '../shared/agentText/asyncScope'
 import { agentTextSchema, chainKey, dialectsDir, loadDialects, pickOf, sessionChainOf, writeDialectFile, type DialectSet, type ModelSlot, type ResolvedChain, type SessionDialect } from './dialects'
 import { apiChainChanged, forgetApiChain, requestApiChain } from './dialects/apiChain'
+import type { DialectUsage } from '../shared/dialects'
 import { SESSION } from './sessionText'
 import { reportPlanUsage } from './planUsage'
 import { devConsole, sessionSourceId } from './devConsole'
@@ -2501,6 +2502,26 @@ class SessionManager {
     if (!l.dialect) return false
     const now = await this.launchDialect(projectPath, { ...l.dialect.input, pick: pickOf(agent.dialect) }, reads).catch(() => null)
     return !!now && now.key !== l.dialect.key
+  }
+
+  /**
+   * Which files each running session of a workspace speaks, and whether its chain moved (HI-2444, the Dialects view;
+   * never the Agent API): from the chains pinned at their launches, with one read of the dialect files for them all.
+   * `moved` is the chain's own "restart to apply" (dialectMoved), apart from skills, settings or a connection.
+   */
+  async dialectUsage(workspacePath: string): Promise<DialectUsage[]> {
+    const reads = new LaunchReads()
+    const ws = workspacePath.toLowerCase()
+    const running = [...this.live.values()].filter((l) => l.dialect && workspaceFor(l.state.projectPath)?.path?.toLowerCase() === ws)
+    return whenAll(
+      running.map(async (l) => {
+        const st = l.state
+        const d = l.dialect!
+        const agent = await workspaceOf(st.projectPath).savedAgent(st.projectPath, st.agentId).catch(() => undefined)
+        const moved = agent ? await this.dialectMoved(st.projectPath, agent, l, reads) : false
+        return { projectPath: st.projectPath, agentId: st.agentId, agent: this.label(st), cli: d.input.cli, files: d.chain.layers.flatMap((x) => (x.file ? [x.file] : [])), moved }
+      })
+    )
   }
 
   /** The chain a running session speaks (the resolver's session scope): null for the Default, or one not running. */

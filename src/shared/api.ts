@@ -1,5 +1,6 @@
 import type { CardAttachment, CardAttachmentGroup, CardDrafts } from './cardAttachments'
 import type { CardCleanupItem } from './cardCleanup'
+import type { DialectCatalogue, DialectFile, DialectFileView, DialectRefusal, DialectRow, DialectUsage } from './dialects'
 import type { ActivityCardAgent, ActivityDetail, ActivityNow, ActivityTurns, EndProcessResult } from './activity'
 import type { SessionHooks } from './hooks'
 import type { AgentLeftovers } from './agentProcesses'
@@ -789,6 +790,35 @@ export interface HiveRequests {
   'skills:openFolder': () => void
   /** A listed skill's files (HI-2011), relative with "/", SKILL.md among them; `projectPath`: its project's tab. */
   'skills:files': (skillPath: string, projectPath?: string) => { files: string[]; truncated: boolean }
+
+  // The Dialects view (HI-2444), in the window's workspace; paths are a dialect file's in .hive/dialects ("claude-code/Opus 5.5.json").
+  /** Every agent text a dialect can override (the Default beneath every file), by area: read once. */
+  'dialects:catalogue': () => DialectCatalogue
+  /** The workspace's dialect files: the Workspace file, each CLI's folder, the API's. */
+  'dialects:list': () => DialectRow[]
+  /** A file with the layers beneath it; null when it isn't there. */
+  'dialects:file': (path: string) => DialectFileView | null
+  /** Which running sessions speak which files, and whose chain moved ("restart to apply"): the view's only. */
+  'dialects:usage': () => DialectUsage[]
+  /** Saves a file (the form's draft, or the JSON tab's text), checked; `base`: the text on disk the draft started from. */
+  'dialects:save': (path: string, draft: { file: DialectFile } | { raw: string }, base: string) => DialectRefusal | null
+  'dialects:setOn': (path: string, on: boolean) => void
+  /** A test copy beside a file of a CLI folder, under a new label (no model). */
+  'dialects:duplicate': (path: string, label: string) => { path: string } | DialectRefusal
+  /** Moves the model's claim onto a test copy; the file that had it becomes a test copy. */
+  'dialects:promote': (path: string, model: string) => { from: string | null } | DialectRefusal
+  /** Puts back a shipped file as this Hive ships it. */
+  'dialects:revert': (path: string) => void
+  /** Moves a file the user made to the Recycle Bin (the Workspace, CLI and shipped files are refused). */
+  'dialects:delete': (path: string) => DialectRefusal | null
+  /** Chooses a file to import: an opaque token for this window and workspace, and its suggested label; null if cancelled. */
+  'dialects:pickImport': () => { token: string; label: string } | null
+  /** Imports the picked file into a folder under a label: as a test copy when its model is taken (or can't be there). */
+  'dialects:import': (token: string, folder: string, label: string) => { path: string; testCopy: boolean } | DialectRefusal
+  /** Writes a file as it is where the user chooses; the path written, or null if cancelled. */
+  'dialects:export': (path: string) => string | null
+  /** The files an agent of this CLI can pick (Agent Settings → Dialect): its folder's model files and test copies. */
+  'dialects:choices': (cli: string) => { path: string; name: string; model?: string }[]
 
   /** The workspace's servers, each with where it is added (HI-2059: the projects and the Hive Assistant). */
   'mcp:list': () => McpServerInfo[]

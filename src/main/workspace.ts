@@ -757,6 +757,8 @@ export class WorkspaceService {
             log.warn('dialects changed', e)
           }
         }
+        // The Dialects view reads them again (HI-2444): a change made outside it (an editor, git, another window) too.
+        this.emit({ type: 'dialects-changed' })
         this.scheduleRefresh()
       }
       else if (rel === `${HIVE_DIR}/workspace.json`) void this.reloadConfig()

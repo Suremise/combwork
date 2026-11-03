@@ -14779,3 +14779,223 @@ button.progress-lane-retry {
   gap: 4px;
   width: 100%;
 }
+
+/* The Dialects view (HI-2444): a file's head (name, actions, banners, tabs), then its texts or its JSON. */
+.dialect-detail {
+  flex: 1;
+  min-width: 0;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+}
+.dialect-head {
+  flex-shrink: 0;
+  border-bottom: 1px solid var(--border-subtle);
+}
+.dialect-title {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 10px 16px 4px;
+}
+.dialect-title > .codicon {
+  font-size: 18px;
+  color: var(--accent);
+}
+.dialect-title > div {
+  flex: 1;
+}
+.dialect-name {
+  font-size: 14px;
+  font-weight: 600;
+  color: var(--fg-strong);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.dialect-name .faint {
+  font-weight: normal;
+  font-size: 12px;
+  margin-left: 6px;
+}
+.dialect-actions {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 6px;
+  padding: 4px 16px 8px;
+}
+.dialect-refused {
+  align-items: flex-start;
+  flex-direction: column;
+  gap: 4px;
+}
+.dialect-refused ul {
+  margin: 0;
+  padding-left: 18px;
+  font-family: var(--font-mono, monospace);
+  overflow-wrap: anywhere;
+}
+.dialect-tabs {
+  margin: 8px 16px;
+  width: max-content;
+}
+.dialect-json {
+  flex: 1;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+}
+.dialect-json > :last-child {
+  flex: 1;
+  min-height: 0;
+}
+.dialect-texts {
+  flex: 1;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+}
+.dialect-filters {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 8px 16px;
+  border-bottom: 1px solid var(--border-subtle);
+}
+.dialect-filters select {
+  width: auto;
+}
+.dialect-text-list {
+  flex: 1;
+  min-height: 0;
+  overflow: auto;
+  padding: 4px 0 24px;
+}
+.dialect-area-head {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  width: 100%;
+  padding: 6px 16px;
+  border: 0;
+  background: none;
+  color: var(--fg-strong);
+  font: inherit;
+  font-weight: 600;
+  text-align: left;
+  cursor: pointer;
+}
+.dialect-area-head:hover {
+  background: var(--bg-hover);
+}
+.dialect-area.outdated .dialect-area-head {
+  color: var(--warning);
+  cursor: default;
+}
+.dialect-text {
+  border-top: 1px solid var(--border-subtle);
+}
+.dialect-text-head {
+  display: grid;
+  grid-template-columns: minmax(160px, 28%) 1fr auto;
+  gap: 12px;
+  align-items: baseline;
+  width: 100%;
+  padding: 6px 16px 6px 34px;
+  border: 0;
+  background: none;
+  color: var(--fg);
+  font: inherit;
+  font-size: 12px;
+  text-align: left;
+  cursor: pointer;
+}
+.dialect-text-head:hover {
+  background: var(--bg-hover);
+}
+.dialect-id {
+  font-family: var(--font-mono, monospace);
+  color: var(--fg-muted);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.dialect-value {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  color: var(--fg-strong);
+}
+.dialect-text.expanded .dialect-value {
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+}
+/* Inherited from a layer beneath (or the Default): dimmed, with where it comes from. */
+.dialect-text.inherited .dialect-value {
+  color: var(--fg-faint);
+}
+.dialect-source {
+  white-space: nowrap;
+  font-size: 11px;
+}
+.dialect-text.outdated .dialect-source {
+  color: var(--warning);
+}
+.dialect-problem {
+  padding: 0 16px 6px 34px;
+  font-size: 12px;
+  color: var(--warning);
+}
+.dialect-text-body {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  padding: 4px 16px 10px 34px;
+  font-size: 12px;
+}
+.dialect-layers {
+  display: grid;
+  grid-template-columns: max-content 1fr;
+  gap: 2px 12px;
+  padding: 6px 10px;
+  border: 1px solid var(--border-subtle);
+  border-radius: 4px;
+  background: var(--bg-elevated);
+}
+.dialect-layer {
+  display: contents;
+}
+.dialect-layer > :last-child {
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+}
+.dialect-layer.off > :last-child {
+  text-decoration: line-through;
+  color: var(--fg-faint);
+}
+.dialect-edit {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+.dialect-edit textarea {
+  font-family: var(--font-mono, monospace);
+  font-size: 12px;
+  resize: vertical;
+}
+.dialect-more {
+  margin: 4px 34px;
+}
+.dialect-row.off .row-name {
+  color: var(--fg-faint);
+  text-decoration: line-through;
+}
+.dialect-users {
+  display: inline-flex;
+  align-items: center;
+  gap: 3px;
+  font-size: 11px;
+  color: var(--fg-muted);
+  margin-right: 6px;
+}

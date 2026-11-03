@@ -68,8 +68,8 @@
     "description": "Button in that banner."
   },
   "project.banner.restartNeeded": {
-    "defaultMessage": "Skills, MCP servers or settings changed since {many, select, yes {{agent}'s} other {this}} session started. Restart the session to apply them — the conversation continues.",
-    "description": "Banner over a running session whose skills, MCP servers or settings changed. {agent} is the focused agent's name (when there are several)."
+    "defaultMessage": "Skills, MCP servers, dialects or settings changed since {many, select, yes {{agent}'s} other {this}} session started. Restart the session to apply them — the conversation continues.",
+    "description": "Banner over a running session whose skills, MCP servers, dialect files (HI-2444) or settings changed. {agent} is the focused agent's name (when there are several)."
   },
   "project.banner.restartWhenDone": {
     "defaultMessage": "Restart When Its Turn Is Over",
