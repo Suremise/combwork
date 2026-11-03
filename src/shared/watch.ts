@@ -120,9 +120,9 @@ export function movedIntoSince(card: TaskCard | null, column: TaskColumn, since:
  */
 type HistoryLine = { what: string; whatText?: StoredText }
 const H = HISTORY
-const said = (e: HistoryLine): StoredText | null => (e.whatText && typeof e.whatText.id === 'string' ? e.whatText : null)
+const lineMsg = (e: HistoryLine): StoredText | null => (e.whatText && typeof e.whatText.id === 'string' ? e.whatText : null)
 const isId = (e: HistoryLine, ...ms: { id: string }[]): boolean => {
-  const s = said(e)
+  const s = lineMsg(e)
   return !!s && ms.some((m) => m.id === s.id)
 }
 /** The lines that move a card into the column their `column` value names (placing it before another, or Nth, isn't one). */
@@ -142,27 +142,27 @@ const HANDS = /^(Given to|Taken from)\b/
 
 /** The column a history line puts a card in (a move, made there, returned for review), else null. */
 const intoColumn = (e: HistoryLine): TaskColumn | null => {
-  const s = said(e)
+  const s = lineMsg(e)
   if (s) return s.id === H.returned.id ? 'review' : s.id === H.created.id || MOVES.some((m) => m.id === s.id) ? columnValue(s) : null
   const m = INTO_COLUMN.exec(e.what)
   return m ? (m[2] ? 'review' : COLUMN_OF[m[1]]) : null
 }
 /** The column a line moves a card to (not made there, nor returned for review), else null. */
 const movedTo = (e: HistoryLine): TaskColumn | null => {
-  const s = said(e)
+  const s = lineMsg(e)
   if (s) return MOVES.some((m) => m.id === s.id) ? columnValue(s) : null
   const m = MOVED_TO.exec(e.what)
   return m ? COLUMN_OF[m[1]] : null
 }
 /** A review's verdict in a line, else null. */
 const verdictOf = (e: HistoryLine): 'passed' | 'failed' | null => {
-  const s = said(e)
+  const s = lineMsg(e)
   if (s) return s.id === H.reviewPassed.id ? 'passed' : s.id === H.reviewFailed.id ? 'failed' : null
   const m = VERDICT.exec(e.what)
   return m ? (m[1] as 'passed' | 'failed') : null
 }
 /** Given to an agent or taken from one. */
-const hands = (e: HistoryLine): boolean => (said(e) ? isId(e, H.given, H.takenFrom, H.takenFromAgent, H.takenFromOf, H.takenFromOfWorkspace) : HANDS.test(e.what))
+const hands = (e: HistoryLine): boolean => (lineMsg(e) ? isId(e, H.given, H.takenFrom, H.takenFromAgent, H.takenFromOf, H.takenFromOfWorkspace) : HANDS.test(e.what))
 
 // agent-protocol: stored history lines from before #845, matched by their fixed English
 const REVIEW_STEP = /^(?:(Started reviewing)|Review (passed|failed)|(Review by .* stopped))/
@@ -173,21 +173,21 @@ const REVIEW_STEP_WHOLE = /^(?:(Started reviewing)|Review (passed|failed))$/
  * nothing more ("Review passed"), as each caller read them before.
  */
 export function reviewStep(e: HistoryLine, whole = false): 'started' | 'passed' | 'failed' | 'stopped' | null {
-  const s = said(e)
+  const s = lineMsg(e)
   if (s) return s.id === H.reviewStarted.id ? 'started' : s.id === H.reviewStopped.id || s.id === H.reviewEnded.id ? 'stopped' : verdictOf(e)
   const m = (whole ? REVIEW_STEP_WHOLE : REVIEW_STEP).exec(e.what)
   return !m ? null : m[1] ? 'started' : m[2] ? (m[2] as 'passed' | 'failed') : 'stopped'
 }
 
 /** Marked blocked, in a line. */
-export const historyBlocked = (e: HistoryLine): boolean => (said(e) ? isId(e, H.blocked) : BLOCKED.test(e.what))
+export const historyBlocked = (e: HistoryLine): boolean => (lineMsg(e) ? isId(e, H.blocked) : BLOCKED.test(e.what))
 /** A review's verdict, in a line read whole (a line from before #845: "Review passed", nothing more). */
 export const historyWholeVerdict = (e: HistoryLine): boolean => {
   const s = reviewStep(e, true)
   return s === 'passed' || s === 'failed'
 }
 /** Returned for review (#214), in a line. */
-export const historyReturned = (e: HistoryLine): boolean => (said(e) ? isId(e, H.returned) : RETURNED_ANY.test(e.what))
+export const historyReturned = (e: HistoryLine): boolean => (lineMsg(e) ? isId(e, H.returned) : RETURNED_ANY.test(e.what))
 // agent-protocol: a stored history line from before #845, matched by its fixed English
 const RETURNED_ANY = /^Returned for review/
 
@@ -358,7 +358,7 @@ const REPLY = /^Replied to the reviewer: /
 const DECISION = /^(Recorded a decision|Changed a decision|Removed a decision)\b/
 /** Whether a history entry is a decision recorded, changed or removed, and which (null: none). */
 export function decisionLine(e: HistoryLine): 'recorded' | 'changed' | 'removed' | null {
-  const s = said(e)
+  const s = lineMsg(e)
   if (s) return s.id === H.decision.id ? 'recorded' : s.id === H.decisionChanged.id ? 'changed' : s.id === H.decisionRemoved.id ? 'removed' : null
   const m = DECISION.exec(e.what)
   return m ? (m[1] === 'Recorded a decision' ? 'recorded' : m[1] === 'Changed a decision' ? 'changed' : 'removed') : null
@@ -376,7 +376,7 @@ export const hearsHandoffs = (cond: Pick<WatchCondition, 'changes' | 'column' | 
 function handoffsIn(h: readonly (HistoryLine & { by: string })[], cond: Pick<WatchCondition, 'changes' | 'column' | 'moveInto'>, watcher?: string): WatchChange[] {
   if (!hearsHandoffs(cond)) return []
   const others = watcher ? h.filter((e) => e.by !== watcher) : h
-  return [...(others.some((e) => (said(e) ? isId(e, H.reviewerRequest) : REQUEST.test(e.what))) ? ['request' as const] : []), ...(others.some((e) => decisionLine(e) !== null) ? ['decision' as const] : []), ...(others.some((e) => (said(e) ? isId(e, H.loopStep, H.builderReply) : isLoopStepEntry(e.what) || REPLY.test(e.what))) ? ['step' as const] : [])]
+  return [...(others.some((e) => (lineMsg(e) ? isId(e, H.reviewerRequest) : REQUEST.test(e.what))) ? ['request' as const] : []), ...(others.some((e) => decisionLine(e) !== null) ? ['decision' as const] : []), ...(others.some((e) => (lineMsg(e) ? isId(e, H.loopStep, H.builderReply) : isLoopStepEntry(e.what) || REPLY.test(e.what))) ? ['step' as const] : [])]
 }
 
 /**
@@ -390,7 +390,7 @@ export const handoffsSince = (card: TaskCard | null, since: string, cond: Pick<W
 // agent-protocol: a stored history line from before #845, matched by its fixed English
 const RETURNED = /^Returned for review, round (\d+)/
 function returnedRound(e: HistoryLine): number | null {
-  const s = said(e)
+  const s = lineMsg(e)
   if (s) return s.id === H.returned.id && Number.isFinite(Number(s.values?.round)) ? Number(s.values!.round) : null
   const m = RETURNED.exec(e.what)
   return m ? Number(m[1]) : null
@@ -520,7 +520,7 @@ export interface WakeAbout {
 const NEW_ROUND = /^(Moved to (the (top|bottom) of )?(On Hold|Todo|Doing|Review)\b|Created in |Given to |Taken from |Moved to the workspace|Started reviewing|Returned for review)/
 const ROUND_COLUMNS: readonly (TaskColumn | null)[] = ['hold', 'todo', 'doing', 'review']
 function newRound(e: HistoryLine): boolean {
-  if (!said(e)) return NEW_ROUND.test(e.what)
+  if (!lineMsg(e)) return NEW_ROUND.test(e.what)
   return ROUND_COLUMNS.includes(movedTo(e) ?? null) || hands(e) || isId(e, H.created, H.toWorkspace, H.reviewStarted, H.returned)
 }
 

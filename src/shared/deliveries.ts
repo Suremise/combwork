@@ -6,6 +6,7 @@
  * inbox's reply. No imports beyond shared files with none of their own: hive-mcp.js runs outside the app bundle.
  */
 import type { InboxBrief, InboxSummary } from './types'
+import { agentMsg, say } from './agentText'
 import { inboxNotice } from './doorbell'
 import { cardRef } from './projectKeys'
 
@@ -185,6 +186,7 @@ export function inboxItems(records: readonly DeliveryRecord[]): InboxItem[] {
       if (had) {
         had.item.ids.push(r.id)
         had.events.push(r)
+        // agent-protocol: the senders' join, which this line splits back to find a sender already named
         if (!had.item.from.split(' and ').includes(r.from.name)) had.item.from += ` and ${r.from.name}`
         continue
       }
@@ -208,12 +210,27 @@ export function inboxItems(records: readonly DeliveryRecord[]): InboxItem[] {
 function coalesced(events: readonly DeliveryRecord[]): string {
   if (events.length === 1 && events[0].body) return events[0].body
   const i = events.findLastIndex((r) => r.meta?.queueReturn === true)
-  const counted = `${events.length} ${events.length === 1 ? 'change' : 'changes'}, read the card`
-  if (i < 0 || !events.slice(i + 1).every((r) => r.meta?.commentOnly === true)) return counted
-  return `${events[i].body} (with ${events.length - 1} more ${events.length === 2 ? 'change' : 'changes'}: read the card)`
+  if (i < 0 || !events.slice(i + 1).every((r) => r.meta?.commentOnly === true)) return say(T.counted, { n: events.length, count: String(events.length) })
+  return say(T.withMore, { body: events[i].body, n: events.length - 1, more: String(events.length - 1) })
 }
 
 const idList = (ids: readonly string[]): string => ids.join(', ')
+
+const T = {
+  counted: agentMsg({ id: 'inbox.cardEvents.counted', text: '{n, plural, one {{count} change} other {{count} changes}}, read the card', note: "A card's events in one inbox item, counted (several changes to a watched card since the agent last read its inbox). n and count: how many." }),
+  withMore: agentMsg({ id: 'inbox.cardEvents.withMore', text: '{body} (with {more} more {n, plural, one {change} other {changes}}: read the card)', note: "A card's events in one inbox item, led by the merge queue's return of the card while only comments came after it (HI-2087). body: the return's own line; n and more: how many events came after it." }),
+  again: agentMsg({ id: 'inbox.offer.again', text: '({ids} again: {why}, so {n, plural, one {it} other {they}} may repeat.)', note: 'After the doorbell: deliveries offered again, which the agent may have seen before. ids: their ids ("m12, m14"); why: why each is offered again, joined by "; " (inbox.again.*); n: how many.' }),
+  watchOn: agentMsg({ id: 'inbox.offer.watchOn', text: '(Your watch is still on, {watch}: do what this asks, then end your turn, and Hive wakes you when it changes.)', note: "After the doorbell, typed into an agent waiting on a watch: its watch carries on. watch: the watch's label, its first letter in lower case (\"waiting on HI-12\")." }),
+  older: agentMsg({ id: 'inbox.read.older', text: 'Received before, not acked yet: {ids}.', note: "In hive_inbox's reply: deliveries the agent read before and has not acked. ids: their ids (\"m12, m14\")." }),
+  nothingNew: agentMsg({ id: 'inbox.read.nothingNew', text: 'Nothing new.', note: "hive_inbox's reply when nothing is unread (before inbox.read.older, if any)." }),
+  newCount: agentMsg({ id: 'inbox.read.newCount', text: '{count} new:', note: "hive_inbox's first line, before one line per item (ids · sender · card: text). count: how many items." }),
+  ackEach: agentMsg({ id: 'inbox.read.ackEach', text: 'Ack each with hive_inbox (ack: its ids) once you have acted on it.', note: "hive_inbox's last line, after what is new." }),
+  acked: agentMsg({ id: 'inbox.ack.acked', text: 'Acked {ids}.', note: "hive_inbox ack's reply: what it acked. ids: their ids (\"m12, m14\")." }),
+  nothingAcked: agentMsg({ id: 'inbox.ack.none', text: 'Nothing acked.', note: "hive_inbox ack's reply when none of the ids was acked." }),
+  notReadBefore: agentMsg({ id: 'inbox.ack.notReadBefore', text: 'Not read before: {ids}, not acked: ack {n, plural, one {it} other {them}} once you have acted on {n, plural, one {it} other {them}}.', note: "In hive_inbox ack's reply with read: true (#1531): ids it was asked to ack that the agent hadn't read, now in the read that follows. ids: their ids; n: how many." }),
+  notReadYet: agentMsg({ id: 'inbox.ack.notReadYet', text: 'Not read yet: {ids}: read {n, plural, one {it} other {them}} with hive_inbox first.', note: "In hive_inbox ack's reply: ids it was asked to ack that the agent hasn't read. ids: their ids; n: how many." }),
+  unknown: agentMsg({ id: 'inbox.ack.unknown', text: 'Not in your inbox: {ids}.', note: "In hive_inbox ack's reply: ids it was asked to ack that aren't the agent's deliveries. ids: those ids." })
+}
 
 /**
  * The line that offers deliveries by typing, one line: the CLI's prompt. The doorbell (#650, plans/2026-10-12-messaging-
@@ -225,25 +242,24 @@ export function offerLine(records: readonly DeliveryRecord[], watchLabel: string
   const sorted = [...records].sort((a, b) => a.seq - b.seq)
   const bell = inboxNotice('doorbell', sorted.map((r) => ({ id: r.id, kind: r.kind, ...(r.card ? { card: r.card } : {}) })))
   const again = sorted.filter((r) => r.again)
-  const repeat = again.length ? ` (${idList(again.map((r) => r.id))} again: ${[...new Set(again.map((r) => r.again))].join('; ')}, so ${again.length === 1 ? 'it' : 'they'} may repeat.)` : ''
-  const tail = watchLabel ? ` (Your watch is still on, ${watchLabel.charAt(0).toLowerCase()}${watchLabel.slice(1)}: do what this asks, then end your turn, and Hive wakes you when it changes.)` : ''
+  const repeat = again.length ? ` ${say(T.again, { ids: idList(again.map((r) => r.id)), why: [...new Set(again.map((r) => r.again))].join('; '), n: again.length })}` : ''
+  const tail = watchLabel ? ` ${say(T.watchOn, { watch: `${watchLabel.charAt(0).toLowerCase()}${watchLabel.slice(1)}` })}` : ''
   return `${bell}${repeat}${tail}`
 }
 
 /** hive_inbox's reply: what is new (now received), and what was received before and isn't acked yet. */
 export function inboxText(items: readonly InboxItem[], unacked: readonly string[]): string {
-  const older = unacked.length ? `Received before, not acked yet: ${idList(unacked)}.` : ''
-  if (!items.length) return `Nothing new.${older ? ` ${older}` : ''}`
+  const older = unacked.length ? say(T.older, { ids: idList(unacked) }) : ''
+  if (!items.length) return `${say(T.nothingNew)}${older ? ` ${older}` : ''}`
   const rows = items.map((i) => `${i.ids.join(',')} · ${i.from}${i.card ? ` · ${cardRef(i.card)}` : ''}: ${i.text}`)
-  return [`${items.length} new:`, ...rows, ...(older ? [older] : []), 'Ack each with hive_inbox (ack: its ids) once you have acted on it.'].join('\n')
+  return [say(T.newCount, { count: String(items.length) }), ...rows, ...(older ? [older] : []), say(T.ackEach)].join('\n')
 }
 
 /** hive_inbox ack's reply; `reading`: with read: true (#1531), the ids not read yet are in the read that follows. */
 export function ackText(acked: readonly string[], unknown: readonly string[], unread: readonly string[] = [], reading = false): string {
-  const a = acked.length ? `Acked ${idList(acked)}.` : 'Nothing acked.'
-  const it = unread.length === 1 ? 'it' : 'them'
-  const notRead = unread.length ? (reading ? ` Not read before: ${idList(unread)}, not acked: ack ${it} once you have acted on ${it}.` : ` Not read yet: ${idList(unread)}: read ${it} with hive_inbox first.`) : ''
-  return `${a}${notRead}${unknown.length ? ` Not in your inbox: ${idList(unknown)}.` : ''}`
+  const a = acked.length ? say(T.acked, { ids: idList(acked) }) : say(T.nothingAcked)
+  const notRead = unread.length ? ` ${say(reading ? T.notReadBefore : T.notReadYet, { ids: idList(unread), n: unread.length })}` : ''
+  return `${a}${notRead}${unknown.length ? ` ${say(T.unknown, { ids: idList(unknown) })}` : ''}`
 }
 
 const clip = (s: string, n: number): string => {

@@ -14,7 +14,8 @@ import { getTask, noteOnCard } from './tasks'
 import { actionsRunning, actionsSettled, onAction } from './workflow/actionWorker'
 import type { ActionRow } from './workflow/factStore'
 import { cardFacts } from './workflow/recorder'
-import { inFlightNow as watchesInFlight, onWatchStarted, settled as watchesSettled, watchCovers, watchTold } from './watches'
+import { inFlightNow as watchesInFlight, itsBuilder, onWatchStarted, settled as watchesSettled, watchCovers, watchTold } from './watches'
+import { agentMsg, inDialectOf, say, type AgentMsg } from '../shared/agentText'
 import { actionDelivered, cancelFromSource, createDelivery, everyFromSource, offerNow, registerSource } from './deliveries'
 import { isWaiting, type DeliveryRecord } from '../shared/deliveries'
 import { workspaceFor, type WorkspaceService } from './workspace'
@@ -45,9 +46,20 @@ import { rulesEnforced } from './workflow/recorder'
 const log = createLogger('loopWakes')
 
 /** Hive's own deliveries come from it. */
+// agent-protocol: the sender's name a delivery is labelled with (deliveries name their senders)
 const HIVE = { kind: 'hive', name: 'Hive' } as const
 /** The user's answer comes from them, as a decision does (decisionWakes.ts). */
+// agent-protocol: the sender's name a delivery is labelled with (deliveries name their senders)
 const USER = { kind: 'user', name: 'the user' } as const
+
+const T = {
+  unreadable: agentMsg({ id: 'inbox.loopEnded.unreadable', text: 'not a loop wake Hive can read', note: "Why a loop wake (#405, a delivery) was cancelled just before it was given: what it was made from can't be read back." }),
+  projectClosed: agentMsg({ id: 'inbox.loopEnded.projectClosed', text: 'its project is no longer open', note: 'Why a loop wake was cancelled just before it was given: its workspace closed, or its window opened another.' }),
+  notDue: agentMsg({ id: 'inbox.loopEnded.notDue', text: 'no longer due', note: 'Why a loop wake was cancelled just before it was given: the card moved on, the agent acted on it, or its own watch told it (#578).' }),
+  otherAgent: agentMsg({ id: 'inbox.loopEnded.otherAgent', text: "it is another agent's wake now", note: "Why a loop wake was cancelled just before it was given: the card's roles changed (another reviewer), and that agent gets it instead." })
+}
+/** Why a loop wake is cancelled, in the dialect of the agent it was for (its host and id). */
+const endedWhy = (host: string, agentId: string, why: AgentMsg): string => inDialectOf({ projectPath: host, agentId }, () => say(why))
 
 const keyOf = (projectPath: string, agentId: string, n: number): string => `${projectPath.toLowerCase()}#${agentId}#${n}`
 /** How long a wake waits for its agent to be idle (its session running) before it is dropped. */
@@ -205,7 +217,7 @@ function laneNextOf(ws: WorkspaceService, card: TaskCard, agentId: string, kind:
 async function wakeAboutFor(ws: WorkspaceService, projectPath: string, card: TaskCard, kind: LoopWakeKind, agentId: string): Promise<WakeAbout> {
   const about = wakeAbout(card, kindsOf(kind), agentId)
   if (kind !== 'review' || card.column !== 'review') return about
-  const again = await resubmittedOf(ws, projectPath, card.number, card.agentName ?? card.agent ?? 'its builder').catch(() => null)
+  const again = await resubmittedOf(ws, projectPath, card.number, card.agentName ?? card.agent ?? itsBuilder()).catch(() => null)
   return again ? { ...about, resubmitted: again } : about
 }
 
@@ -218,8 +230,8 @@ async function enqueue(ws: WorkspaceService, projectPath: string, card: TaskCard
   // Kept with the wake (HI-2325): a pool design's notice stays with that design's reviewer when it is made again.
   const keepTo = w.kind === 'answer' || (w.kind === 'stepNotice' && poolCard(ws, card))
   if (covered(projectPath, to.id, card, w.kind)) return
-  // Its line names cards by key, its workspace's (#1219).
-  await withCardNames(ws, async () => {
+  // Its line names cards by key, its workspace's (#1219), in the dialect of the agent it is for.
+  await inDialectOf({ projectPath, agentId: to.id }, () => withCardNames(ws, async () => {
     if (!ws.path || !ws.isProjectPath(projectPath)) return
     const kinds = kindsOf(w.kind)
     const answer = w.kind === 'answer'
@@ -229,7 +241,7 @@ async function enqueue(ws: WorkspaceService, projectPath: string, card: TaskCard
     const ref = answer ? `#${card.number}/answer${action ? `/${action}` : ''}` : `#${card.number}`
     await createDelivery(projectPath, { agentId: to.id, agentName: to.name, kind: answer ? 'answer' : 'card-event', from: answer ? USER : HIVE, card: card.number, body: loopWakeLine({ ...cardChange(card.number, card, kinds), about: await wakeAboutFor(ws, projectPath, card, w.kind, to.id) }, w.kind, w.text), expiresMs: KEEP_MS, source: 'loop', ref, replace: true, meta, ...(action ? { action } : {}) })
     await offerNow(projectPath, to.id)
-  }, scopeOfHost(projectPath))
+  }, scopeOfHost(projectPath)))
 }
 
 /**
@@ -394,9 +406,9 @@ registerSource('loop', {
   refresh: async (r, host) => {
     const p = wakeOf(r)
     const ws = workspaceFor(host)
-    if (!p) return { cancel: 'not a loop wake Hive can read' }
+    if (!p) return { cancel: endedWhy(host, r.agentId, T.unreadable) }
     // Its workspace closed, or switched to another folder: dropped.
-    if (!ws?.path || !ws.isProjectPath(host)) return { cancel: 'its project is no longer open' }
+    if (!ws?.path || !ws.isProjectPath(host)) return { cancel: endedWhy(host, r.agentId, T.projectClosed) }
     // Roles can change while it is checked or typed (the lane's reviewer, the card's agent): then it is worked out again.
     // What it is decided from is read first, before anything is awaited (HI-1687).
     const seq = rolesSeq
@@ -409,22 +421,24 @@ registerSource('loop', {
     // entry when they were made (the merge queue's return writes none of its own), which a watch begun after them has
     // read, so the return to its builder was dropped as told and the builder waited for Done for three hours.
     const told = !!card && !!p.since && p.kind !== 'note' && p.kind !== 'answer' && watchTold(host, r.agentId, card, p.since, p.kind === 'request' || isStep(p.kind))
-    if (!card || !stillDue({ ...p, agentId: r.agentId }, card, inRunningLane(ws, p.n)) || covered(host, r.agentId, card, p.kind) || told || !(await wakesOn(ws, host))) return { cancel: 'no longer due' }
+    if (!card || !stillDue({ ...p, agentId: r.agentId }, card, inRunningLane(ws, p.n)) || covered(host, r.agentId, card, p.kind) || told || !(await wakesOn(ws, host))) return { cancel: endedWhy(host, r.agentId, T.notDue) }
     // Only to whose wake it is now: another reviewer given the lane meanwhile gets it instead (#405 round 1 finding).
     // The user's answer stays with the agent waiting on it (#1626), while it is one of the project's agents.
     // A pool design's notice stays with that design's reviewer (HI-2325).
     const to = await targetOf(ws, host, card, p.kind, p.kind === 'answer' || p.kind === 'stepNotice' ? p.to : undefined)
     if (to?.id !== r.agentId) {
       if (to) inBackground('a loop wake', enqueue(ws, host, card, p, to))
-      return { cancel: 'it is another agent\'s wake now' }
+      return { cancel: endedWhy(host, r.agentId, T.otherAgent) }
     }
     const v = ++versions
     madeFrom.set(madeKey(host, r.id, v), { seq, column: card.column, key })
     if (madeFrom.size > 1000) madeFrom.delete(madeFrom.keys().next().value!)
     const kinds = kindsOf(p.kind)
-    // laneNextOf first, without waiting (HI-1990).
-    const next = laneNextOf(ws, card, r.agentId, p.kind)
-    return { body: loopWakeLine({ ...cardChange(p.n, card, kinds), about: await wakeAboutFor(ws, host, card, p.kind, r.agentId) }, p.kind, p.text, next), meta: { ...r.meta, v } }
+    // In the dialect of the agent it is for; laneNextOf first, without waiting (HI-1990).
+    return inDialectOf({ projectPath: host, agentId: r.agentId }, async () => {
+      const next = laneNextOf(ws, card, r.agentId, p.kind)
+      return { body: loopWakeLine({ ...cardChange(p.n, card, kinds), about: await wakeAboutFor(ws, host, card, p.kind, r.agentId) }, p.kind, p.text, next), meta: { ...r.meta, v } }
+    })
   },
   // Its version made, its watch not telling it, and what it was decided from as it was: for a line being typed, also
   // nothing on the board or lanes changed (#578 round 2: it stops at once); for a hand-out (hive_inbox, and the notices
@@ -501,5 +515,6 @@ export const tryLoopWakes = async (): Promise<void> => {
 }
 /** Forgets every waiting wake, for tests. */
 export const clearLoopWakes = async (): Promise<void> => {
+  // agent-protocol: a test's own reason, never given in the app
   for (const host of new Set(everyFromSource('loop').map((x) => x.host))) await cancelFromSource(host, 'loop', null, 'cleared by a test')
 }

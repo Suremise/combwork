@@ -3,6 +3,8 @@
  * installer's request to close for an install, and the lines agents are given. Pure: main/restartResume.ts keeps the
  * record and runs the queue.
  */
+import { agentMsg, say } from './agentText'
+import { NOTICE_PREFIX } from './doorbell'
 
 /** Why Hive closed: an installer asked (install), an update installing (update), Restart Hive (restart), or a quit. */
 export type RestartReason = 'install' | 'update' | 'restart' | 'quit'
@@ -162,36 +164,47 @@ export type RequestCheck = { ok: true; request: RestartRequest } | { ok: false; 
  * A nonce already handled is a replay.
  */
 export function checkRequest(text: string, t: RequestTarget, samePath: (a: string, b: string) => boolean): RequestCheck {
-  if (new TextEncoder().encode(text).length > REQUEST_MAX_BYTES) return { ok: false, why: 'too big' }
+  if (new TextEncoder().encode(text).length > REQUEST_MAX_BYTES) return { ok: false, why: 'too big' } // agent-protocol: the installer request's check, written only to the log
   let v: Partial<RestartRequest>
   try {
     v = JSON.parse(text.replace(/^﻿/, '')) as Partial<RestartRequest>
   } catch {
-    return { ok: false, why: 'malformed (partial or not JSON)' }
+    return { ok: false, why: 'malformed (partial or not JSON)' } // agent-protocol: the installer request's check, written only to the log
   }
   if (!v || typeof v !== 'object' || v.v !== 1 || v.reason !== 'install') return { ok: false, why: 'malformed' }
-  if (typeof v.nonce !== 'string' || !GUID.test(v.nonce)) return { ok: false, why: 'malformed (its nonce)' }
+  if (typeof v.nonce !== 'string' || !GUID.test(v.nonce)) return { ok: false, why: 'malformed (its nonce)' } // agent-protocol: the installer request's check, written only to the log
   const nonce = v.nonce
-  if (t.seen.has(nonce.toLowerCase())) return { ok: false, why: 'a replay (already handled)', nonce }
+  if (t.seen.has(nonce.toLowerCase())) return { ok: false, why: 'a replay (already handled)', nonce } // agent-protocol: the installer request's check, written only to the log
   if (typeof v.pid !== 'number' || typeof v.pidCreated !== 'string' || typeof v.exe !== 'string' || typeof v.at !== 'string') return { ok: false, why: 'malformed', nonce }
-  if (v.pid !== t.pid) return { ok: false, why: `for another process (${v.pid})`, nonce }
+  if (v.pid !== t.pid) return { ok: false, why: `for another process (${v.pid})`, nonce } // agent-protocol: the installer request's check, written only to the log
   const created = Date.parse(v.pidCreated)
-  if (Number.isNaN(created) || Math.abs(created - t.startedAt) > START_TOLERANCE_MS) return { ok: false, why: 'for an earlier process with the same id', nonce }
-  if (!samePath(v.exe, t.exe)) return { ok: false, why: 'for another copy of Hive', nonce }
+  if (Number.isNaN(created) || Math.abs(created - t.startedAt) > START_TOLERANCE_MS) return { ok: false, why: 'for an earlier process with the same id', nonce } // agent-protocol: the installer request's check, written only to the log
+  if (!samePath(v.exe, t.exe)) return { ok: false, why: 'for another copy of Hive', nonce } // agent-protocol: the installer request's check, written only to the log
   const at = Date.parse(v.at)
   if (Number.isNaN(at) || t.now - at > REQUEST_MAX_AGE_MS || at - t.now > START_TOLERANCE_MS) return { ok: false, why: 'stale', nonce }
   return { ok: true, request: v as RestartRequest }
 }
 
 // ---------------------------------------------------------------------------
-// What agents are told (agent-facing: English).
+// What agents are told (agent-facing: agent messages, said in the dialect of the agent each is for).
 // ---------------------------------------------------------------------------
 
-/** The line an agent finds in its inbox as Hive closes for an update. */
-export const RESTARTING_LINE = "Hive is restarting for an update. Your work is saved; you'll be resumed." // i18n-ignore: agent-facing
+const T = {
+  restarting: agentMsg({ id: 'notice.restart.restarting', text: "Hive is restarting for an update. Your work is saved; you'll be resumed.", note: 'HI-1707: the notice an agent finds in its inbox as Hive closes for an update, an install or a restart.' }),
+  resumed: agentMsg({
+    id: 'notice.restart.resumed',
+    text: '{reason, select, quit {Hive was quit and started again} restart {Hive restarted} other {Hive restarted for an update}}{versions} at {time} UTC; your session was stopped and is resumed now.{where}{watch, select, yes { Carry on: re-arm your card watch if you were waiting.} other { Carry on where you were.}}',
+    note: 'HI-1707: the first prompt a resumed agent is given. reason: quit, restart or update (an install too); versions: " (1.0.0 → 1.0.1)" when the version changed, or nothing; time: when Hive closed ("10:00"); where: what it was on (notice.restart.where), after a space, or nothing; watch: yes when it was watching or in a lane.'
+  }),
+  where: agentMsg({
+    id: 'notice.restart.where',
+    text: "{onCard, select, yes {You were on {card}{hasRound, select, yes {, round {round}} other {}}{inLane, select, yes {, in lane ''{lane}'' (its {role, select, builder {builder} other {reviewer}})} other {}}} other {You were in lane ''{lane}'' (its {role, select, builder {builder} other {reviewer}})}}.",
+    note: 'HI-1707: what a resumed agent was on as Hive closed. onCard: yes with its card (card: "HI-12"; round: its round when hasRound is yes); inLane: yes with its lane (lane: its name or id; role: builder or reviewer). One of the two at least.'
+  })
+}
 
-/** "10:00 UTC" from an ISO time. */
-const clock = (iso: string): string => `${iso.slice(11, 16)} UTC`
+/** The line an agent finds in its inbox as Hive closes for an update (said per agent, in its dialect). */
+export const restartingLine = (): string => say(T.restarting)
 
 /**
  * The first line a resumed agent is given: why Hive restarted, from which version to which and when, what it was on,
@@ -199,10 +212,6 @@ const clock = (iso: string): string => `${iso.slice(11, 16)} UTC`
  */
 export function resumeNote(e: Pick<RestartEntry, 'from' | 'at' | 'status' | 'card' | 'lane'>, to: string, reason: RestartReason): string {
   const versions = e.from && e.from !== to ? ` (${e.from} → ${to})` : ''
-  const why = reason === 'quit' ? `Hive was quit and started again${versions}` : reason === 'restart' ? `Hive restarted${versions}` : `Hive restarted for an update${versions}`
-  const on = e.card ? `You were on ${e.card.label}${e.card.round ? `, round ${e.card.round}` : ''}` : ''
-  const lane = e.lane ? `${on ? ',' : 'You were'} in lane '${e.lane.name ?? e.lane.id}' (its ${e.lane.role})` : ''
-  const was = on || lane ? ` ${on}${lane}.` : ''
-  const watch = e.status === 'watching' || e.lane ? ' Carry on: re-arm your card watch if you were waiting.' : ' Carry on where you were.'
-  return `[Hive] ${why} at ${clock(e.at)}; your session was stopped and is resumed now.${was}${watch}` // i18n-ignore: agent-facing
+  const where = e.card || e.lane ? ` ${say(T.where, { onCard: e.card ? 'yes' : 'no', card: e.card?.label ?? '', hasRound: e.card?.round ? 'yes' : 'no', round: String(e.card?.round ?? ''), inLane: e.lane ? 'yes' : 'no', lane: e.lane ? (e.lane.name ?? e.lane.id) : '', role: e.lane?.role ?? '' })}` : ''
+  return NOTICE_PREFIX + say(T.resumed, { reason: reason === 'quit' || reason === 'restart' ? reason : 'update', versions, time: e.at.slice(11, 16), where, watch: e.status === 'watching' || e.lane ? 'yes' : 'no' })
 }

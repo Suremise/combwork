@@ -1,5 +1,0 @@
-{
-  "prose|error|A message is at most {} characters (this one has {}).": 1,
-  "prose|error|text is required": 1,
-  "prose|error|{} already has {} messages waiting, the most Hive keeps for an agent: wait until they are delivered (hive_agent_activity), or cancel them.": 1
-}

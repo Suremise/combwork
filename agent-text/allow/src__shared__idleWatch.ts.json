@@ -1,4 +1,0 @@
-{
-  "prose|return|Nothing waits on {}: it is in Doing and not submitted, with no question open for the user and no design step out for the reviewer, so nobody will change it for you. Carry on with its work now rather than end your turn; if you need someone, ask: hive_ask_user for the user, hive_loop_step with a design for the reviewer, or hive_submit once it is ready. Keep this watch only for something you asked for that Hive doesn't track (a comment you requested): if you only watch it, {} shows as stalled after {}.": 1,
-  "prose|return|{} only watches {} ({}), and nothing waits on it: no question for the user, no design step, not submitted.": 1
-}

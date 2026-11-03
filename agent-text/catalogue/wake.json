@@ -1,0 +1,634 @@
+{
+  "wake.agent.again": {
+    "text": "{what} (working again now)",
+    "note": "An agent watch wake: a watched agent did something (what: that part), and is working again since."
+  },
+  "wake.agent.changed": {
+    "text": "{agents} changed",
+    "note": "An agent watch wake too long to tell in full: these agents changed (by name, else counted)."
+  },
+  "wake.agent.counted": {
+    "text": "{n, plural, one {{n} watched agent} other {{n} watched agents}}",
+    "note": "An agent watch wake too long to name the agents: how many."
+  },
+  "wake.agent.error": {
+    "text": "{name} ({project}) is in error{quote}",
+    "note": "An agent watch wake: a watched agent is in error. quote: its status message, quoted after a colon, or nothing."
+  },
+  "wake.agent.idle": {
+    "text": "{name} ({project}) {already, select, yes {is idle} other {finished}}{also, select, watch { ({watch})} background { ({n, plural, one {{n} background task} other {{n} background tasks}} still running)} other {}}{quote}",
+    "note": "An agent watch wake: a watched agent's turn ended. already: yes when it was idle as the watch began; also: watch (it now watches: watch is its watch's label, \"now waiting for HI-12 → Review\"), background (n background tasks still run) or none; quote: the start of its reply, quoted after a colon, or nothing."
+  },
+  "wake.agent.label": {
+    "text": "Waiting for {agents} to finish",
+    "note": "An agent watch's label (#416): a watching agent's status, what hive_agent_activity and the Agent API read. agents: the names, \", \" between."
+  },
+  "wake.agent.limit": {
+    "text": "{agents} {n, plural, one {is} other {are}} still working after {hours, select, yes {{time} h} other {{time} min}}: your agent watch has ended. Check on {n, plural, one {it} other {them}} (hive_agent_activity) and watch again, or tell the user (hive_notify) if {n, plural, one {it seems} other {one seems}} stuck.",
+    "note": "Typed when an agent watch's limit passes with every agent still working. agents: their names, \", \" between; n: how many; hours: yes when time is in hours (\"1.5\"), else minutes."
+  },
+  "wake.agent.line": {
+    "text": "{changes}. Your agent watch has ended: carry on (hive_agent_activity for more).",
+    "note": "An agent watch wake (#416): what each watched agent did (\"; \" between), then what to do."
+  },
+  "wake.agent.nowWaiting": {
+    "text": "now waiting",
+    "note": "Put in place of the \"Waiting\" a watching agent's watch label starts with, in an agent watch wake: \"B6 (alpha) finished (now waiting for HI-12 → Review)\"."
+  },
+  "wake.agent.replied": {
+    "text": "{user} replied to {agent}{where}{quote}",
+    "note": "A wake (#418): what the user sent an agent from its pane. user: the user's name (#426); agent: its name; where: \" (alpha)\", its project, or nothing; quote: the reply's start, quoted after a colon, or nothing."
+  },
+  "wake.agent.repliedTo": {
+    "text": "{user} replied to {agents}",
+    "note": "An agent watch wake too long to tell in full: the user (user: their name) replied to these agents (by name, else counted)."
+  },
+  "wake.agent.signin": {
+    "text": "{name} ({project}) is waiting for the user to sign in to its CLI again",
+    "note": "An agent watch wake: a watched agent's CLI waits for the user to sign in again."
+  },
+  "wake.agent.stopped": {
+    "text": "{name} ({project}) {already, select, yes {is stopped} other {stopped}}",
+    "note": "An agent watch wake: a watched agent stopped. already: yes when it was stopped as the watch began (an answer at once)."
+  },
+  "wake.agent.untaken": {
+    "text": "{name} ({project}) is idle: its CLI hasn't taken the prompt it was given",
+    "note": "An agent watch wake (#712): a watched agent is idle without having taken the prompt it was given (its CLI dropped it)."
+  },
+  "wake.agent.waiting": {
+    "text": "{name} ({project}) is waiting for the user{quote}",
+    "note": "An agent watch wake: a watched agent waits for the user. quote: what it asks, quoted after a colon, or nothing."
+  },
+  "wake.brief.blocked": {
+    "text": "blocked",
+    "note": "#226, #726: after a card in a few words: it became blocked."
+  },
+  "wake.brief.decision": {
+    "text": "a decision",
+    "note": "#226, #1272: after a card in a few words: a new decision."
+  },
+  "wake.brief.failed": {
+    "text": "failed",
+    "note": "#226: after a card in a few words: its review failed."
+  },
+  "wake.brief.gone": {
+    "text": "{card} {archived, select, yes {archived} other {gone}}",
+    "note": "#226: a card in a few words, in a wake too long to tell each in full: archived, or gone from view."
+  },
+  "wake.brief.in": {
+    "text": "{card} in {column}",
+    "note": "#226: a card in a few words: its column. What changed follows, each after \", \" (wake.brief.passed…)."
+  },
+  "wake.brief.passed": {
+    "text": "passed",
+    "note": "#226: after a card in a few words: its review passed."
+  },
+  "wake.brief.request": {
+    "text": "a request",
+    "note": "#226, #912: after a card in a few words: its reviewer's request."
+  },
+  "wake.brief.returned": {
+    "text": "{card} returned for review (round {round})",
+    "note": "#226: a card in a few words: returned for review."
+  },
+  "wake.brief.step": {
+    "text": "a loop step",
+    "note": "#226, #1382: after a card in a few words: a card loop's step."
+  },
+  "wake.card.archived": {
+    "text": "was archived (off the board: only the user brings it back)",
+    "note": "#351: after the card's key, in a wake: it was archived."
+  },
+  "wake.card.blocked": {
+    "text": "and blocked",
+    "note": "#726: after where a card is, in a wake: it became blocked (its reason left out to fit)."
+  },
+  "wake.card.blockedWhy": {
+    "text": "and blocked: \"{why}\"",
+    "note": "#726: after where a card is, in a wake: it became blocked, and why (cut with … to fit)."
+  },
+  "wake.card.decision": {
+    "text": "a new decision from the user: read its decisions",
+    "note": "#1272: in a wake's brackets: the user recorded or changed a decision on the card."
+  },
+  "wake.card.ended": {
+    "text": "{more, plural, =0 {} one { (and # more watched card changed)} other { (and # more watched cards changed)}}. Your card watch has ended: carry on (hive_read_task with latestComment for the comment in full).",
+    "note": "The end of a card watch's wake line, after the card and where it is now. more: other watched cards that changed too."
+  },
+  "wake.card.gone": {
+    "text": "is gone from your board (archived, deleted or moved to another project)",
+    "note": "After the card's key, in a wake: the card is out of the agent's view."
+  },
+  "wake.card.inColumn": {
+    "text": "{owner} is in {column}{verdict}{merged}{blocked}{said}",
+    "note": "After the card's key, in a wake: where it is now (a column's name). owner, verdict, merged, blocked and said are the line's other parts, or empty."
+  },
+  "wake.card.itsBuilder": {
+    "text": "its builder",
+    "note": "HI-2143: who submitted a card again after the merge queue returned it, in a wake to whoever watches or reviews it, when the card names no agent."
+  },
+  "wake.card.lanesRunning": {
+    "text": "Lanes are still running (hive_lane list): before you end your turn, watch them again in one lane watch, with any card outside them as cards (hive_wait_for_tasks with lanes [\"all\"], cards, wake; run-lanes).",
+    "note": "#402: what the Assistant's card wake ends with while lanes run: its watch has ended, and the lanes still need one. Kept whole: the rest of the line is cut to make room."
+  },
+  "wake.card.notMerged": {
+    "text": "(Passed isn't merged)",
+    "note": "#170: another agent's card in Passed: the review passed, the work isn't merged (Done is)."
+  },
+  "wake.card.owner": {
+    "text": "({owner}'s card)",
+    "note": "After the card's key, in a wake, when another agent has the card: its agent's name."
+  },
+  "wake.card.partComment": {
+    "text": "{head} (latest comment by {by}: \"{comment}\")",
+    "note": "One card's part in a wake telling several: head the card and where it is, by the comment's author, comment its first line (cut with … to fit)."
+  },
+  "wake.card.request": {
+    "text": "its reviewer asks you something",
+    "note": "#912: in a wake's brackets: the card's reviewer asked its builder for something."
+  },
+  "wake.card.resubmitted": {
+    "text": "{card} is back in Review after the merge queue returned it",
+    "note": "HI-2143: for its reviewer, a card submitted again after the merge queue returned it (its details left out to fit)."
+  },
+  "wake.card.returned": {
+    "text": "{owner} was returned for review (round {round}){verdict}{blocked}{said}",
+    "note": "#214: after the card's key, in a wake: a failed card returned for review without leaving Review. owner, verdict, blocked and said are the line's other parts, or empty."
+  },
+  "wake.card.step": {
+    "text": "a card loop step: read its latest comment",
+    "note": "#1382: in a wake's brackets: a card loop's step (a design, a follow-up, an answer)."
+  },
+  "wake.card.verdict": {
+    "text": ": {by} {passed, select, yes {passed} other {failed}} it",
+    "note": "After where a card is, in a wake: its review's verdict and reviewer. passed: yes or no."
+  },
+  "wake.card.withComment": {
+    "text": "{head}; latest comment by {by}: \"{comment}\"{tail}",
+    "note": "A wake line with the card's latest comment: head is the card and where it is now, by the comment's author, comment its first line (cut with … to fit), tail what to do."
+  },
+  "wake.condition.cards": {
+    "text": "cards must be card numbers (at least one, no repeats)",
+    "note": "A card watch's or wait's arguments refused."
+  },
+  "wake.condition.changes": {
+    "text": "changes must be any of {choices}",
+    "note": "A card watch's or wait's arguments refused. choices: the changes' names."
+  },
+  "wake.condition.column": {
+    "text": "column must be {choices}",
+    "note": "A card watch's or wait's arguments refused. choices: the columns' ids."
+  },
+  "wake.condition.columnChange": {
+    "text": "with column, changes must include \"column\" (or leave changes out to wait only for the card to be in that column)",
+    "note": "#434: a card watch's or wait's arguments refused."
+  },
+  "wake.condition.fresh": {
+    "text": "fresh must be true or false",
+    "note": "A card watch's or wait's arguments refused."
+  },
+  "wake.condition.freshColumn": {
+    "text": "fresh needs a column: it waits for the next move into it",
+    "note": "A card watch's or wait's arguments refused."
+  },
+  "wake.condition.tooMany": {
+    "text": "at most {max} cards",
+    "note": "A card watch's or wait's arguments refused: too many cards."
+  },
+  "wake.decision.line": {
+    "text": "{cards} from the user: read {one, select, yes {it} other {them}} (hive_read_task) {reviewer, select, yes {before your next verdict on {n, plural, one {it} other {them}}.} other {and carry on from where you asked.}}",
+    "note": "#401: the line after \"[Hive] \" given to an agent waiting for the user (or a decision wake, #1266) when the user's decisions were recorded on its cards. cards: each card's decisions (notice.decision.card), joined by \", \"; one: yes for a single decision on one card; reviewer: yes when the agent only reviews those cards (HI-2261: told to carry on, a reviewer that had asked nothing made the decided change itself); n: how many cards."
+  },
+  "wake.idle.reply": {
+    "text": "Nothing waits on {card}: it is in Doing and not submitted, with no question open for the user and no design step out for the reviewer, so nobody will change it for you. Carry on with its work now rather than end your turn; if you need someone, ask: hive_ask_user for the user, hive_loop_step with a design for the reviewer, or hive_submit once it is ready. Keep this watch only for something you asked for that Hive doesn't track (a comment you requested): if you only watch it, {card} shows as stalled after {after}.",
+    "note": "HI-2285: hive_wait_for_tasks's warning to a lane's builder watching only its own card while nothing on it waits on anyone (CB1 watched CL-5 for a comment and ended its turn). card: its name (HI-12); after: how long until it shows as stalled (5 min)."
+  },
+  "wake.idle.stalled": {
+    "text": "{agent} only watches {card} ({since}), and nothing waits on it: no question for the user, no design step, not submitted.",
+    "note": "HI-2285: why a lane's card is stalled (the Agent API, lane watches): its builder (agent) only watches it. card: its name; since: for how long (7 min)."
+  },
+  "wake.lane.abandoned": {
+    "text": "was abandoned",
+    "note": "A lane watch wake's event: the lane was abandoned."
+  },
+  "wake.lane.agentWaiting": {
+    "text": "{name} ({project}) is waiting for the user{onCard, select, yes { on {card}} other {}}{what}",
+    "note": "A lane watch wake (#726): an agent of the followed projects started waiting for the user. name, project: the agent's; card: \"HI-12\" when onCard is yes; what: what it asks, quoted after a colon, or nothing."
+  },
+  "wake.lane.agentsChanged": {
+    "text": "agents changed: {agents}",
+    "note": "A lane watch wake too long to tell in full: the agents it follows (HI-1987) that changed, each \"name (project) event\" (event: finished, waiting, stopped, error, untaken)."
+  },
+  "wake.lane.badCards": {
+    "text": "cards must be card numbers (no repeats), or [] for none",
+    "note": "A lane watch's refusal: its cards argument isn't a list of card numbers."
+  },
+  "wake.lane.badChanges": {
+    "text": "changes must be any of {changes}",
+    "note": "A lane watch's refusal: its changes argument names none it knows. changes: those it takes (\"comment, column, …\")."
+  },
+  "wake.lane.badEvents": {
+    "text": "events must be any of {events}",
+    "note": "A lane watch's refusal: its events argument names none it knows. events: those it takes (\"failed, blocked, …\")."
+  },
+  "wake.lane.badLanes": {
+    "text": "lanes must be lane ids (hive_lane list), at most {max}, or [\"all\"]",
+    "note": "A lane watch's refusal: its lanes argument isn't lane ids or [\"all\"]. max: how many it takes."
+  },
+  "wake.lane.blocked": {
+    "text": "{card} is blocked",
+    "note": "A lane watch wake's event: a lane's card became blocked (its reason follows). card: \"HI-12\"."
+  },
+  "wake.lane.countAgents": {
+    "text": "{n} of your agents changed",
+    "note": "A lane watch wake with only counts left: how many of the agents it follows changed."
+  },
+  "wake.lane.countCards": {
+    "text": "{n} of your cards changed",
+    "note": "A lane watch wake with only counts left: how many of the cards beside its lanes changed."
+  },
+  "wake.lane.countLanes": {
+    "text": "{n, plural, one {{n} lane changed} other {{n} lanes changed}}",
+    "note": "A lane watch wake with only counts left: how many lanes changed."
+  },
+  "wake.lane.countWaits": {
+    "text": "{n, plural, one {{n} agent is waiting for the user} other {{n} agents are waiting for the user}}",
+    "note": "A lane watch wake with only counts left: how many agents wait for the user."
+  },
+  "wake.lane.counted": {
+    "text": "{what}: list them (hive_lane list, hive_list_projects, hive_agent_activity) and read their cards.",
+    "note": "A lane watch wake with only counts left. what: the counts, \", \" between (\"2 lanes changed, 1 of your cards changed\")."
+  },
+  "wake.lane.ended": {
+    "text": "{merged, select, yes {ended: merged at {commit}} other {ended (merged)}}",
+    "note": "A lane watch wake's event: the lane ended. merged: yes with its merge commit (commit: its first 12 characters), verified from its cards' facts (#1270)."
+  },
+  "wake.lane.failed": {
+    "text": "{card} failed review{by}",
+    "note": "A lane watch wake's event: a lane's card failed review. card: \"HI-12\"; by: \" (R1 (alpha))\", its reviewer, or nothing."
+  },
+  "wake.lane.label": {
+    "text": "Waiting on {lanes, select, all {all running lanes} one {lane {lane}} other {{n} lanes}}{also, select, yes { and {list}} other {}}",
+    "note": "A lane watch's label (a watching agent's status, the Agent API). lanes: all (every running lane), one (lane: its id) or some (n: how many); also: yes with the cards and agents beside them (list: \"HI-12, HI-14, B2\")."
+  },
+  "wake.lane.lane": {
+    "text": "Lane {lane}: {events}",
+    "note": "A lane watch wake: one lane and what happened in it. lane: its label (\"B1 / R1 (greetings)\") or id; events: its events, \"; \" between."
+  },
+  "wake.lane.lanesChanged": {
+    "text": "{n, plural, one {{n} lane changed} other {{n} lanes changed}}: {lanes}",
+    "note": "A lane watch wake too long to tell in full: how many lanes changed, then each lane's id with its events by name (\"l-1 (HI-12 failed, merge-due)\")."
+  },
+  "wake.lane.last": {
+    "text": "That was your lane's last card: the lane ends by itself, so end your turn unless you have other work",
+    "note": "HI-1990: a builder's Done wake on its lane's last card."
+  },
+  "wake.lane.limit": {
+    "text": "Nothing to tell on {lanes, select, all {the running lanes} one {lane {lane}} other {{n} lanes}}{also, select, yes { or {list}} other {}} in {hours, select, yes {{time} h} other {{time} min}}: your lane watch has ended. Check them (hive_lane list{agents, select, yes {, hive_agent_activity} other {}}), then watch again, or tell the user (hive_notify) if one seems stuck.",
+    "note": "Typed when a lane watch's limit passes with nothing to tell. lanes: all, one (lane: its id) or some (n: how many); also: yes with the cards and agents beside them (list); hours: yes when time is in hours (\"1.5\"), else minutes; agents: yes when it follows agents (HI-1987)."
+  },
+  "wake.lane.mergeDue": {
+    "text": "all its cards passed: its merge is due",
+    "note": "A lane watch wake's event: every card of the lane passed, so its merge is due."
+  },
+  "wake.lane.mergeStallIdle": {
+    "text": "Every card passed, but {builder} has been idle for {minutes} min with no merge slot claimed.",
+    "note": "Why a lane's merge has stalled (#869), in a lane watch's wake and the Agent API: its builder idle with no merge slot claimed. builder: its name; minutes: how long."
+  },
+  "wake.lane.mergeStallNotRunning": {
+    "text": "Every card passed, but {builder} isn't running.",
+    "note": "Why a lane's merge has stalled (#869): its builder isn't running. builder: its name."
+  },
+  "wake.lane.mergeStalled": {
+    "text": "its merge is stalled",
+    "note": "A lane watch wake's event (#869): the lane's merge is due but nobody is doing it (why follows)."
+  },
+  "wake.lane.moved": {
+    "text": "{card} is in {column}",
+    "note": "A lane watch wake's event: a lane's card moved. card: \"HI-12\"; column: the board column's name (\"Review\")."
+  },
+  "wake.lane.nextHiveStarts": {
+    "text": "Your lane's next card is {card} (\"{title}\"): Hive starts it for you once your turn ends, so end your turn now",
+    "note": "HI-1990: a builder's Done wake, its lane's rules on: Hive starts the next card."
+  },
+  "wake.lane.nextStart": {
+    "text": "Your lane's next card is {card} (\"{title}\"): start it now (hive_lane next, then hive_start_card); this card's own prompt doesn't narrow the lane",
+    "note": "HI-1990: a builder's Done wake, its lane's rules off: it starts the next card."
+  },
+  "wake.lane.nextStarted": {
+    "text": "Your lane's next card, {card} (\"{title}\"), is under way: carry on with it",
+    "note": "HI-1990: a builder's Done wake when its next card is already under way."
+  },
+  "wake.lane.nextWaits": {
+    "text": "Your lane's next card is {card} (\"{title}\"): hive_lane next says when it can start",
+    "note": "HI-1990: a builder's Done wake when its next card can't start yet."
+  },
+  "wake.lane.passed": {
+    "text": "{card} passed review{by}",
+    "note": "A lane watch wake's event: a lane's card passed review. card: \"HI-12\"; by: \" (R1 (alpha))\", its reviewer, or nothing."
+  },
+  "wake.lane.paused": {
+    "text": "Your lane is paused: hive_lane next says why",
+    "note": "HI-1990: a builder's Done wake when its lane is paused."
+  },
+  "wake.lane.pausedMerge": {
+    "text": "paused for a merge: {status}",
+    "note": "A lane watch wake's event (#1270): the lane waits for a card to merge. status: the lane's status (\"waiting: HI-12 not merged\")."
+  },
+  "wake.lane.reblocked": {
+    "text": "{card} is still blocked, with news",
+    "note": "A lane watch wake's event (#1475): a blocked card's reason changed, or its agent commented. card: \"HI-12\"."
+  },
+  "wake.lane.stalled": {
+    "text": "{card} is stalled",
+    "note": "A lane watch wake's event: a lane's card stalled (why follows). card: \"HI-12\"."
+  },
+  "wake.lane.tail": {
+    "text": "Your lane watch has ended: read the cards named (hive_read_task), act on them, {asks, select, yes {tell the user what an agent waits for (hive_notify) and never answer it for them, } other {}}then watch the lanes again (hive_wait_for_tasks with lanes{keep, select, both {; your cards and agents stay unless you pass them, less the agents told here} cards {; your cards stay unless you pass cards} agents {; your agents stay unless you pass agents, less the agents told here} other {}}).",
+    "note": "How a lane watch's wake ends: what to do. asks: yes when an agent waits for the user (#726, HI-1991); keep: what else the watch had beside its lanes, which stays when it is watched again (cards, agents (HI-1987), both or none)."
+  },
+  "wake.lane.tooManyCards": {
+    "text": "at most {max} cards",
+    "note": "A lane watch's refusal: too many cards beside its lanes. max: the most."
+  },
+  "wake.lane.unblocked": {
+    "text": "{card} is no longer blocked",
+    "note": "A lane watch wake's event (#922): a lane's card's block lifted. card: \"HI-12\"."
+  },
+  "wake.lane.waitingNames": {
+    "text": "waiting for the user: {agents}",
+    "note": "A lane watch wake too long to tell in full: the agents waiting for the user, each \"name (project)\"."
+  },
+  "wake.lane.waitsForUser": {
+    "text": "{card} waits for the user{who, select, agent { ({by} asks)} hive { (Hive asks)} other {}}",
+    "note": "A lane watch wake's event (HI-1991): a new request for the user on a lane's card (what it asks follows). card: \"HI-12\"; who: agent (by: the asking agent's name), hive (Hive asked), or none (not known)."
+  },
+  "wake.limit.ask": {
+    "text": "{rest, select, yes {for the rest, } other {}}tell the user (hive_notify) and ask what to do",
+    "note": "A step in a timed-out watch's wake: the cards with no news. rest: yes after other steps. Its first letter is capitalised in code when it comes first."
+  },
+  "wake.limit.drop": {
+    "text": "drop {n, plural, one {the first} other {those}} from your list",
+    "note": "#420: a step in a timed-out watch's wake, for the cards that left it (told first). Its first letter is capitalised in code when it comes first."
+  },
+  "wake.limit.ended": {
+    "text": "No change on {cards} in {dur}: your card watch has ended.",
+    "note": "The start of a watch's wake when its limit passes with no change."
+  },
+  "wake.limit.hours": {
+    "text": "{h} h",
+    "note": "A watch's limit in hours (1.5), in its timed-out wake."
+  },
+  "wake.limit.inReview": {
+    "text": "{cards} {n, plural, one {is in Review} other {are in Review}}",
+    "note": "HI-2295: a timed-out watch's cards in Review, when their details don't fit."
+  },
+  "wake.limit.left": {
+    "text": "{cards} left your watch (reassigned, or reviewed by another).",
+    "note": "#420: a timed-out watch's cards that left it, when their details don't fit."
+  },
+  "wake.limit.minutes": {
+    "text": "{m} min",
+    "note": "A watch's limit in minutes, in its timed-out wake."
+  },
+  "wake.limit.waiting": {
+    "text": "{cards} {n, plural, one {waits on work in progress} other {wait on work in progress}}",
+    "note": "HI-2381: a timed-out watch's cards waiting on others' work, when their details don't fit."
+  },
+  "wake.limit.watchReview": {
+    "text": "watch {cards} again for {n, plural, one {its} other {their}} verdict (in a card loop, Hive wakes you with it); don't tell the user about {n, plural, one {it} other {them}}",
+    "note": "HI-2295: a step in a timed-out watch's wake: a review on its way is nothing to tell the user. Its first letter is capitalised in code when it comes first."
+  },
+  "wake.limit.watchWaiting": {
+    "text": "watch {cards} again: another agent's work is going on; don't tell the user about {n, plural, one {it} other {them}}",
+    "note": "HI-2381: a step in a timed-out watch's wake: cards waiting on other agents' work. Its first letter is capitalised in code when it comes first."
+  },
+  "wake.loop.answer": {
+    "text": "The user answered: carry on from where you asked",
+    "note": "#1269: a wake with the user's answer to an agent's question."
+  },
+  "wake.loop.own": {
+    "text": "This is your card in its loop: carry on",
+    "note": "#405: what a loop wake tells a card's builder (a verdict, a request, a note)."
+  },
+  "wake.loop.reply": {
+    "text": "You review this card in its loop: carry on with your review",
+    "note": "HI-2302: a loop wake telling a reviewer its builder's reply."
+  },
+  "wake.loop.review": {
+    "text": "You review this card in its loop: carry on with it",
+    "note": "#405: what a loop wake tells a card's reviewer as it arrives in Review."
+  },
+  "wake.loop.said": {
+    "text": ". {whose, select, reviewerAsks {The reviewer asks} builderReplies {The builder replies} builder {The builder} reviewer {The reviewer} other {Hive}}: \"{text}\"",
+    "note": "#912, #1382: in a loop wake, what a request, step or Hive's note says (cut with … to fit), and whose it is."
+  },
+  "wake.loop.step": {
+    "text": "You review this card in its loop: check it and answer with hive_loop_step (ok, or gaps saying what's missing, and its id)",
+    "note": "#1382: what a loop wake tells a card's reviewer about a design or follow-up to check."
+  },
+  "wake.loop.stepNotice": {
+    "text": "Nothing to answer: carry on with your loop",
+    "note": "#1382: a loop wake telling a reviewer its builder went ahead with a design unchecked."
+  },
+  "wake.loop.tail": {
+    "text": ". {who} (hive_read_task with latestComment for the comment in full).",
+    "note": "#405: the end of a loop wake: who is what it tells the agent (wake.loop.review…, or its lane's next card)."
+  },
+  "wake.many.count": {
+    "text": "{n} watched cards changed{short}",
+    "note": "#226: a wake line counting its cards, when not even their keys fit; short is its end."
+  },
+  "wake.many.ended": {
+    "text": ". Your card watch has ended: carry on (hive_read_task with latestComment on each card for its comment in full).",
+    "note": "#224: the end of a wake line telling several watched cards."
+  },
+  "wake.many.numbers": {
+    "text": "{cards} changed{short}",
+    "note": "#226: a wake line naming its cards by key alone (\"HI-1, HI-2\"); short is its end (wake.many.short)."
+  },
+  "wake.many.numbersMore": {
+    "text": "{cards} and {more, plural, one {# more watched card} other {# more watched cards}} changed{short}",
+    "note": "#226: a wake line naming as many cards as fit, the rest counted; short is its end (wake.many.short)."
+  },
+  "wake.many.short": {
+    "text": ". Your card watch has ended. Details were left out to fit: read each card (hive_read_task) before you carry on.",
+    "note": "#226: the end of a wake line telling too many cards to say each in full."
+  },
+  "wake.released.blocked": {
+    "text": "{card} is blocked{quoted, select, yes {: \"{why}\"} other {}}",
+    "note": "#420: a card that left a watch saved before #481: blocked, and why when quoted is yes."
+  },
+  "wake.released.done": {
+    "text": "{card} is in Done",
+    "note": "#1475: a card that left a watch: it reached Done (merged)."
+  },
+  "wake.released.dropTail": {
+    "text": ". Your card watch has ended: drop {n, plural, one {it} other {them}} from your list and carry on with your next card.",
+    "note": "#420: the end of a wake whose every card left the watch."
+  },
+  "wake.released.ended": {
+    "text": "{head} (your watch on it ended)",
+    "note": "#420: after what happened to a card that left a watch."
+  },
+  "wake.released.laneEnded": {
+    "text": "{card}'s lane {abandoned, select, yes {was abandoned} other {ended}}",
+    "note": "#1475: a card that left a watch: the watcher's lane on it ended, or was abandoned."
+  },
+  "wake.released.left": {
+    "text": "{cards} left your watch ({over, select, yes {done, or its lane ended} other {reassigned, or reviewed by another}}){tail}",
+    "note": "#420: a wake whose cards left the watch, when their details don't fit; tail is its end."
+  },
+  "wake.released.overTail": {
+    "text": ". Your card watch has ended: there is nothing more to wait for on {n, plural, one {it} other {them}}. Don't watch {n, plural, one {it} other {them}} again; end your turn unless you have other work.",
+    "note": "#1475: the end of a wake whose every card left for good (Done, its lane ended): the agent ends its turn, so the next prompt finds it free."
+  },
+  "wake.released.reassigned": {
+    "text": "{card} was reassigned (it has no agent now)",
+    "note": "#420: a card that left a watch: taken from its agent, given to none."
+  },
+  "wake.released.reassignedTo": {
+    "text": "{card} was reassigned to {agent}",
+    "note": "#420: a card that left a watch: given to another agent."
+  },
+  "wake.released.reviewTaken": {
+    "text": "{card}'s review was taken from you",
+    "note": "#420: a card that left a reviewer's watch: its review was stopped or cleared by someone else."
+  },
+  "wake.released.reviewedBy": {
+    "text": "{card} is reviewed by {reviewer}",
+    "note": "#420: a card that left a watch: another agent reviews it."
+  },
+  "wake.reply.changed": {
+    "text": "{cards} changed",
+    "note": "In the Assistant's short card wake: the watched cards that changed, by key."
+  },
+  "wake.reply.ended": {
+    "text": ". Your card watch has ended: carry on (hive_read_task for the card, hive_agent_activity for the agent).",
+    "note": "#418: the end of the Assistant's card wake telling only the user's replies."
+  },
+  "wake.reply.leftWatch": {
+    "text": "{cards} left your watch",
+    "note": "#420: in the Assistant's short card wake: cards that left its watch."
+  },
+  "wake.reply.note": {
+    "text": "{user} replied to {agent} on {cards}{quoted, select, yes {: \"{text}\"} other {}}",
+    "note": "#418: in the Assistant's card wake: the user's reply to an agent of watched cards. user: the user's name; text: the reply's first line, when quoted is yes."
+  },
+  "wake.reply.repliedTo": {
+    "text": "{user} replied to {who}",
+    "note": "#418: in the Assistant's short card wake: the user replied to these agents."
+  },
+  "wake.reply.repliedToAgents": {
+    "text": "{user} replied to agents of your watched cards{short}",
+    "note": "#418: the Assistant's card wake when nothing more fits; short is its end (wake.reply.short)."
+  },
+  "wake.reply.short": {
+    "text": ". Your card watch has ended. Details were left out to fit: read each card (hive_read_task) and agent (hive_agent_activity) before you carry on.",
+    "note": "#418: the end of the Assistant's card wake when its details don't fit."
+  },
+  "wake.step.design": {
+    "text": "design{id} posted for your check (answer with its id)",
+    "note": "#1382: a loop wake's step: a design to check. id: the design's id after a space, or empty."
+  },
+  "wake.step.followUp": {
+    "text": "follow-up{id} ready for your check (answer with its id)",
+    "note": "#1467: a loop wake's step: a follow-up to check. id: its id after a space, or empty."
+  },
+  "wake.step.gaps": {
+    "text": "{of, select, followUp {follow-up} other {design}}{id} has gaps",
+    "note": "#1382: a loop wake's step: the reviewer's answer. of: what it checked."
+  },
+  "wake.step.ok": {
+    "text": "{of, select, followUp {follow-up} other {design}}{id} is OK",
+    "note": "#1382: a loop wake's step: the reviewer's answer. of: what it checked."
+  },
+  "wake.step.proceed": {
+    "text": "no check of design{id} came in time: the builder goes ahead with it as posted",
+    "note": "#1382: a loop wake's step: the builder went ahead unchecked."
+  },
+  "wake.usage.hit": {
+    "text": "{limit} {percent}% (resets {resets})",
+    "note": "A usage watch wake: a limit that reached its share. limit: its name (\"Weekly\"); percent: how much is used; resets: when, UTC (\"2026-11-03T10:00Z\")."
+  },
+  "wake.usage.label": {
+    "text": "{name} at {percent}% of {limit, select, weekly {its weekly limit} fiveHour {its 5-hour limit} other {either limit}}",
+    "note": "What a usage watch waits for (HI-2195), in its label and lines: an account (name), the share (percent) and which of its limits (limit: weekly, fiveHour or any)."
+  },
+  "wake.usage.limit": {
+    "text": "No account reached its share in {minutes} minutes ({watching}). Your watch has ended: watch again if you still need to.",
+    "note": "Typed when a usage watch's limit passes first. minutes: its limit; watching: what it waited for (its label)."
+  },
+  "wake.usage.reached": {
+    "text": "Usage reached: {hits}. Your watch has ended: carry on (hive_connection list for every account's usage).",
+    "note": "Typed when a usage watch fires (HI-2195). hits: each account and the limits that reached their share (\"Anthropic-1: Weekly 98% (resets …)\"), \"; \" between."
+  },
+  "wake.watch.label": {
+    "text": "Waiting for {cards}{hasColumn, select, yes { → {column}} other {}}",
+    "note": "What a watching agent shows (the Agent API's watch, its header): its cards, and the column it waits for."
+  },
+  "wake.watch.notCancelled": {
+    "text": "Could not cancel the watch: {error}",
+    "note": "An agent's watch not cancelled: the change could not be saved. error: why (as it is)."
+  },
+  "wake.watch.notEnded": {
+    "text": "Could not end the watch ({why}): {error}",
+    "note": "HI-2197: an agent's watch not ended as a new conversation starts, or as Hive gives it a card in a slot (a start's reply): the change could not be saved. why: why it was being ended (the log's words); error: why it failed."
+  },
+  "wake.watch.notSaved": {
+    "text": "Could not save the watch: {error}",
+    "note": "A watch refused: it could not be saved. error: why (the system's or Hive's own error, as it is)."
+  },
+  "wake.watch.numberClash": {
+    "text": "{n} is {key}'s number (#{n}), not {prefix}-{n}, which is another card. Name cards by key: \"{prefix}-{n}\" or \"{key}\".",
+    "note": "A watch refused for naming a card by a plain number that reads as another card's key (2189 is HI-2182's number while HI-2189 is another card). n: the number; key: the card it is the number of; prefix: the project's key."
+  },
+  "wake.watch.tooBig": {
+    "text": "Too many watches to keep in this workspace: wait for some to end",
+    "note": "An agent or lane watch refused: the watches would no longer fit the file Hive keeps them in."
+  },
+  "wake.watch.tooMany": {
+    "text": "This workspace already has {max} watches, the most Hive keeps: wait for some to end",
+    "note": "An agent, lane or usage watch refused: the workspace has as many watches as Hive keeps. max: how many."
+  },
+  "wake.watch.usageLabel": {
+    "text": "Waiting for usage: {accounts}",
+    "note": "HI-2195: a usage watch's label (alone), as replies and the agent's watch show it. accounts: each account with its share and limit (\"Max 1 at 98% of its weekly limit\")."
+  },
+  "wake.watch.wakeNotCancelled": {
+    "text": "Could not cancel the wake of the watch ({why}): {error}",
+    "note": "HI-2197: an agent's watch ended, but the wake it had handed over couldn't be cancelled (the watch is put back). why: why it was being ended (the log's words); error: why it failed."
+  },
+  "wake.watch.whilePlaced": {
+    "text": "Hive is giving you {card} in {slot}: end your turn with no watch. The card comes to you as a task; a watch now would hold it off.",
+    "note": "HI-2197: a watch refused while Hive is placing a card of the agent's in a slot (a watch would hold that placement off). card: its key (\"HI-12\"); slot: the slot's name."
+  },
+  "wake.watch.withUsage": {
+    "text": "{label}, and usage: {accounts}",
+    "note": "HI-2195: a watch's label with a usage watch beside its cards or lanes. label: the watch's own label; accounts: as in wake.watch.usageLabel."
+  },
+  "wake.where.assigned": {
+    "text": "{card} is in Review: the reviewer pool gave it to {agent}, who hasn't started yet",
+    "note": "HI-2295: a timed-out watch's card the reviewer pool gave to a reviewer that hasn't started."
+  },
+  "wake.where.pool": {
+    "text": "{card} is in Review, waiting for the reviewer pool to give it to a reviewer",
+    "note": "HI-2295: a timed-out watch's card waiting for the reviewer pool."
+  },
+  "wake.where.review": {
+    "text": "{card} is in Review, waiting for its reviewer",
+    "note": "HI-2295: a timed-out watch's card waiting for its reviewer."
+  },
+  "wake.where.reviewing": {
+    "text": "{card} is in Review, being reviewed by {agent}",
+    "note": "HI-2295: a timed-out watch's card in Review, being reviewed."
+  },
+  "wake.where.waits": {
+    "text": "{card} waits on {on}",
+    "note": "HI-2381: a timed-out watch's card waiting on other agents' cards in progress (on: their keys)."
+  },
+  "wake.where.working": {
+    "text": "{card} is in Doing with {agent}",
+    "note": "HI-2381: a timed-out watch's card that another agent is building."
+  }
+}

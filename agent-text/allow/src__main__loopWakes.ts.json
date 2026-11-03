@@ -6,14 +6,6 @@
   "prose|call|SELECT max(seq) AS last, count(*) AS n FROM card_facts WHERE card = ?": 1,
   "prose|call|a loop handoff": 1,
   "prose|call|a loop wake": 1,
-  "prose|call|cleared by a test": 1,
-  "prose|call|its builder": 1,
   "prose|call|noting a loop wake on #{}": 1,
-  "prose|call|telling a builder of its returned card": 1,
-  "prose|prop:text|Hive": 1,
-  "prose|prop:text|it is another agent's wake now": 1,
-  "prose|prop:text|its project is no longer open": 1,
-  "prose|prop:text|no longer due": 1,
-  "prose|prop:text|not a loop wake Hive can read": 1,
-  "prose|prop:text|the user": 1
+  "prose|call|telling a builder of its returned card": 1
 }

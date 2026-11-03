@@ -1,6 +1,7 @@
 import { request as httpRequest } from 'http'
 import { request as httpsRequest } from 'https'
 import { OUTAGE_NOT_CONNECTION, outagePatternId } from '../shared/advanced'
+import { agentMsg, inDialectOf, say } from '../shared/agentText'
 import type { ProviderId } from '../shared/types'
 import { createLogger, userText } from './logger'
 
@@ -9,6 +10,11 @@ import { createLogger, userText } from './logger'
  * turns it is for, the checks backing off, the resume, and when it gives up.
  */
 const log = createLogger('outage')
+
+const T = {
+  back: agentMsg({ id: 'notice.outage.back', text: 'The connection dropped at {dropped} and came back at {back}: check what was cut off, rerun it, and carry on.', note: "HI-1612: the note an agent's conversation is given once its dropped connection is back. dropped, back: times of day (notice.outage.clock)." }),
+  clock: agentMsg({ id: 'notice.outage.clock', text: '{time} (UTC{offset})', note: 'HI-1612: a time of day as the connection notices give it: 24-hour, local (time: "11:47"), with its offset from UTC (offset: "+01:00").' })
+}
 
 /**
  * Whether a failed turn's words are a dropped connection of its CLI's: its CLI's pattern finds them, and Hive's for
@@ -59,9 +65,9 @@ export interface OutageHost {
   resumesPerHour(): number
 }
 
-/** The note an agent's conversation is given once its connection is back (agent-facing, English). */
+/** The note an agent's conversation is given once its connection is back (agent-facing: said in its dialect). */
 export function resumeNote(droppedAt: number, backAt: number): string {
-  return `The connection dropped at ${clock(droppedAt)} and came back at ${clock(backAt)}: check what was cut off, rerun it, and carry on.` // i18n-ignore: typed to the agent (agent-facing text stays English)
+  return say(T.back, { dropped: clock(droppedAt), back: clock(backAt) })
 }
 
 /** A time of day as agents read it: 24-hour, local, with its offset ("11:47 (UTC+01:00)"). */
@@ -70,7 +76,7 @@ export function clock(at: number): string {
   const two = (n: number): string => String(n).padStart(2, '0')
   const off = -d.getTimezoneOffset()
   const sign = off < 0 ? '-' : '+'
-  return `${two(d.getHours())}:${two(d.getMinutes())} (UTC${sign}${two(Math.floor(Math.abs(off) / 60))}:${two(Math.abs(off) % 60)})`
+  return say(T.clock, { time: `${two(d.getHours())}:${two(d.getMinutes())}`, offset: `${sign}${two(Math.floor(Math.abs(off) / 60))}:${two(Math.abs(off) % 60)}` })
 }
 
 /** The wait before check `n` (0 first): the first's, doubling, at most the most's. */
@@ -170,7 +176,8 @@ export class OutageResume {
     w.checks++
     if (up) {
       this.stop(w)
-      const given = await this.host.resume(w.agent, resumeNote(w.droppedAt, now)).catch((e) => {
+      const note = inDialectOf({ projectPath: w.agent.projectPath, agentId: w.agent.agentId }, () => resumeNote(w.droppedAt, now))
+      const given = await this.host.resume(w.agent, note).catch((e) => {
         log.warn('resuming an agent after the connection came back', e)
         return false
       })

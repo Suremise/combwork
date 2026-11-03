@@ -1,6 +1,12 @@
 import { CARD_TITLE_NUDGE } from '../shared/advanced'
 import { advanced } from './advanced'
 import type { TaskActor } from './tasks'
+import { agentList, agentMsg, say } from '../shared/agentText'
+
+const T = {
+  long: agentMsg({ id: 'notice.title.long', text: 'Titles over {limit} characters are cut in git and on the board: consider a shorter one (the detail belongs in the description).', note: 'HI-1872: a line in a tool\'s reply when an agent gave a card a title longer than Settings → Advanced allows. limit: that length.' }),
+  details: agentMsg({ id: 'notice.title.details', text: 'A title says the outcome or the problem in words: retitle it without {list} (hive_update_task with title), keeping {n, plural, one {it} other {them}} in the description.', note: 'HI-2061, HI-2260: a line in a tool\'s reply when an agent\'s card title names paths, files, cards or measurements: a step to take (told to put them in a description that already had them, agents kept the title). list: what it named, each in double quotes, joined ("a.ts" and "20 MB"); n: how many.' })
+}
 
 /** A file name's extension, of code, docs, data or logs (a title naming a file: HI-2061). */
 const FILE_EXT = /\.(?:ts|tsx|js|jsx|mjs|cjs|json|jsonc|md|mdx|yml|yaml|toml|py|rs|go|cs|java|c|h|cpp|css|scss|html|sh|ps1|bat|cmd|exe|dll|log|txt|db|sql|lock|xml|ini|cfg|env|csv)$/i
@@ -40,13 +46,11 @@ export function titleNudge(title: unknown, actor: TaskActor, keys: readonly stri
   if (actor.kind === 'user' || typeof title !== 'string') return null
   const lines: string[] = []
   const limit = advanced.number(CARD_TITLE_NUDGE)
-  if (limit && [...title.trim()].length > limit) lines.push(`Titles over ${limit} characters are cut in git and on the board: consider a shorter one (the detail belongs in the description).`) // i18n-ignore: agent-facing (a tool reply's line)
+  if (limit && [...title.trim()].length > limit) lines.push(say(T.long, { limit: String(limit) }))
   const details = titleDetails(title, keys)
   if (details.length) {
-    const quoted = details.map((d) => `"${d}"`)
-    const list = quoted.length > 1 ? `${quoted.slice(0, -1).join(', ')} and ${quoted[quoted.length - 1]}` : quoted[0] // i18n-ignore: agent-facing (a tool reply's line)
     // A step to take, not a place to put it (HI-2260: told to put it in a description that already had it, agents kept the title).
-    lines.push(`A title says the outcome or the problem in words: retitle it without ${list} (hive_update_task with title), keeping ${details.length > 1 ? 'them' : 'it'} in the description.`) // i18n-ignore: agent-facing (a tool reply's line)
+    lines.push(say(T.details, { list: agentList(details.map((d) => `"${d}"`)), n: details.length }))
   }
   return lines.length ? lines.join(' ') : null
 }

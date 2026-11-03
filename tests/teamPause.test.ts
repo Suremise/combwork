@@ -6,7 +6,7 @@ import { existsSync, mkdirSync, writeFileSync } from 'fs'
 import { join } from 'path'
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import { laneStartDue, laneView, type LaneRecord } from '../src/shared/lanes'
-import { TEAM_PAUSE_LINE } from '../src/shared/teamPause'
+import { teamPauseLine } from '../src/shared/teamPause'
 import type { TaskCard } from '../src/shared/types'
 import * as electron from 'electron'
 import { tempDir } from './tempDir'
@@ -65,7 +65,7 @@ describe("a workspace's pause (HI-2081)", () => {
     const p = await tp.pauseTeam(ws(w), 'user')
     expect(tp.teamPauseOf(ws(w))).toEqual(p)
     expect(tp.pausedFor(join(w.path, 'alpha'))).toEqual(p)
-    expect(state.told).toEqual([expect.objectContaining({ agentId: 'b1', source: 'team-pause', ref: p.pauseId, body: TEAM_PAUSE_LINE })])
+    expect(state.told).toEqual([expect.objectContaining({ agentId: 'b1', source: 'team-pause', ref: p.pauseId, body: teamPauseLine() })])
     expect(state.events.at(-1)).toMatchObject({ type: 'team-pause-changed', pause: p })
     // Paused again with the same id (the user's pause reaching it twice): nothing more told.
     await tp.pauseTeam(ws(w), 'user', p.pauseId)

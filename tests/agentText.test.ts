@@ -20,6 +20,16 @@ import * as revisions from '../src/main/revisions'
 import { createWorkspaceService, disposeWorkspaceService, inWorkspace } from '../src/main/workspace'
 import { cardPart, cardWakeLine, laneNextWords, limitLine, LOOP_WAKE_KINDS, loopStepWords, loopWakeLine, readCondition, releasedLine, wakeLine, wakeLines, watchLabel, withLanesTail, type CardChange, type Released, type ReviewWhere } from '../src/shared/watch'
 import { inboxNotice, isDoorbell, unwatchedLanesNotice, type NoticeItem } from '../src/shared/doorbell'
+import { ackText, inboxItems, inboxText, offerLine, type DeliveryRecord } from '../src/shared/deliveries'
+import { relayLine } from '../src/main/answerRelay'
+import { decisionLine } from '../src/main/decisionWakes'
+import { cardDecisions } from '../src/main/decisionNotices'
+import { laneLimitLine, laneWakeLine, laneWatchLabel, readLaneCards, readLaneCondition } from '../src/shared/laneWatch'
+import { agentLimitLine, agentWatchLabel, replyPart } from '../src/shared/agentWatch'
+import { usageLimitLine, usageWakeLine, usageWatchLabel } from '../src/shared/usageWatch'
+import { restartingLine, resumeNote as restartResumeNote } from '../src/shared/restartResume'
+import { resumeNote as outageResumeNote } from '../src/main/outageCore'
+import { teamPauseLine } from '../src/shared/teamPause'
 // @ts-expect-error: a plain .mjs module without types
 import { extractAgentMessages, extractDrift, messageProblems, readCatalogue } from '../scripts/agentTextExtract.mjs'
 
@@ -340,6 +350,64 @@ describe('the canary dialect over wakes, doorbells and the inbox (card 4, HI-243
     const bell = inDialectOf({ projectPath: 'C:/ws/p', agentId: 'a2' }, () => inboxNotice('doorbell', [{ id: 'm1', kind: 'task' }]))
     expect(bell).toBe('[Hive] New in your inbox: 1 task (m1): read it.')
     expect(isDoorbell(bell)).toBe(true)
+  })
+})
+
+describe("the canary dialect over the inbox's, lane, agent and usage watches' and Hive's notices' builders (card 4)", () => {
+  const ids = new Set(Object.keys(catalogue))
+  const PROTOCOL = ['[Hive]', 'New in your inbox:', 'User']
+  const VALUES = ['HB1', 'HB2', 'alpha', 'Ship it', 'Yes', 'hello', 'Anthropic', 'greet', 'l-1', '1.0.0', '1.0.1', 'UTC', 'nope', 'x']
+  const ms = Array.from({ length: 30 }, (_, i) => `m${i + 1}`)
+  const record = (n: number, over: Partial<DeliveryRecord> = {}): DeliveryRecord => ({ id: `m${n}`, seq: n, agentId: 'a1', conversation: null, kind: 'card-event', from: { kind: 'hive', name: 'Hive' }, card: 7, body: 'hello', state: 'offered', created: '2026-11-03T10:00:00.000Z', expires: '2026-11-04T10:00:00.000Z', ...over })
+  const agent = { projectPath: 'C:/ws/alpha', agentId: 'b1', name: 'HB1', project: 'alpha' }
+
+  function texts(): { name: string; text: string; values?: string[] }[] {
+    const out: { name: string; text: string; values?: string[] }[] = []
+    const add = (name: string, text: string | null | undefined, values: string[] = []): void => void out.push({ name, text: text ?? '', values })
+    // The inbox (shared/deliveries.ts) and the user's answers relayed to the Assistant (answerRelay.ts).
+    add('offer', offerLine([record(1), record(2, { kind: 'task', again: 'Hive restarted while offering it' })], 'Waiting for #12'), ['Hive restarted while offering it'])
+    add('offer, no watch', offerLine([record(1)], null))
+    add('inbox', inboxText(inboxItems([record(1), record(2), record(3, { kind: 'task', card: 9 })]), ['m1']), ['Hive'])
+    add('inbox, empty', inboxText([], ['m3']))
+    add('ack', ackText(['m1'], ['m9'], ['m2'], true))
+    add('ack, unread', ackText([], [], ['m2', 'm3']))
+    for (const outcome of ['approved', 'declined', 'answered'] as const)
+      for (const need of ['done', null] as const) add(`relay ${outcome} ${need}`, relayLine({ card: 12, key: '#12', project: 'alpha', asker: 'a1', askerName: 'HB1', request: 'r1', question: 'Ship it', outcome, ...(outcome !== 'declined' ? { reply: 'Yes', ...(outcome === 'approved' ? { decision: 'Yes' } : {}) } : {}), need }))
+    // Decisions (decisionWakes.ts, decisionNotices.ts).
+    add('decisions', decisionLine(new Map([[7, { count: 1 }], [9, { count: 3 }]]), new Set([7])))
+    add('decision', decisionLine(new Map([[7, { count: 2 }]])))
+    add('decision notice', cardDecisions(7, 2))
+    // Lane, agent and usage watches.
+    add('lane label', laneWatchLabel({ ids: 'all', events: [] }, [4], [{ name: 'HB2' }]))
+    add('lane label, ids', laneWatchLabel({ ids: ['l-1'], events: [] }))
+    add('lane limit', laneLimitLine({ ids: ['l-1', 'l-2'], events: [] }, 90, [4], [{ name: 'HB2' }]), ['l-2'])
+    add('lane waits', laneWakeLine([], { cards: [], waits: [{ name: 'HB1', project: 'alpha', card: 12, what: 'Ship it' }, { name: 'HB2', project: 'alpha', card: null, what: null }], watching: true, following: true }))
+    add('lane cards', readLaneCards({ cards: 'x' }) as string)
+    add('lane changes', readLaneCards({ changes: ['nope'] }) as string, ['column', 'comment', 'verdict', 'agent'])
+    add('lane lanes', readLaneCondition({ lanes: 5 }) as string)
+    add('lane events', readLaneCondition({ lanes: 'all', events: ['nope'] }) as string, ['failed', 'passed', 'blocked', 'unblocked', 'reblocked', 'stalled', 'moved', 'merge-due', 'ended', 'abandoned', 'waiting', 'paused-merge', 'paused-user'])
+    add('agent label', agentWatchLabel({ agents: [agent], ignoreBackground: false }))
+    add('agent limit', agentLimitLine({ agents: [agent], ignoreBackground: false }, 45))
+    add('agent reply', replyPart('HB1', '(alpha)', 'hello'))
+    const usage = [{ account: 'a', name: 'Anthropic', percent: 98, limit: 'weekly' as const }]
+    add('usage label', usageWatchLabel(usage))
+    add('usage wake', usageWakeLine(['Anthropic']))
+    add('usage limit', usageLimitLine(usage, 60))
+    // Hive's notices: restarts, outages, a team pause.
+    add('restarting', restartingLine())
+    add('resumed', restartResumeNote({ from: '1.0.0', at: '2026-11-03T10:00:00Z', status: 'watching', card: { label: '#12', round: 2 }, lane: { id: 'l-1', name: 'greet', role: 'builder' } }, '1.0.1', 'update'))
+    add('resumed, quit', restartResumeNote({ from: '1.0.0', at: '2026-11-03T10:00:00Z', status: 'working' }, '1.0.0', 'quit'))
+    add('outage', outageResumeNote(Date.parse('2026-10-25T11:47:00Z'), Date.parse('2026-10-25T11:57:00Z')))
+    add('team pause', teamPauseLine())
+    return out
+  }
+
+  it('finds every word of them in the catalogue', () => {
+    setProcessChain(chain(canaryTexts(catalogue)))
+    for (const { name, text, values } of texts()) {
+      expect(text, name).not.toBe('')
+      expect(canaryProblems(text, ids, [...PROTOCOL, ...VALUES, ...ms, ...(values ?? [])]), name).toEqual([])
+    }
   })
 })
 
