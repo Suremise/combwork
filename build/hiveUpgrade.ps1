@@ -31,7 +31,9 @@ param(
   [int]$ExitMs = 30000,
   [int]$RunningWaitMs = 30000,
   [int]$UninstallMs = 300000,
-  [switch]$SkipAsk
+  [switch]$SkipAsk,
+  # Tests only: the process list to look at instead of Windows' (Candidates).
+  [string]$ProcessesFile = ''
 )
 $ErrorActionPreference = 'Stop'
 $here = Split-Path -Parent $MyInvocation.MyCommand.Path
@@ -55,13 +57,28 @@ function Look([string]$p) {
   }
 }
 
-# The main processes (no --type=) of an exact executable: their ids, or $null when they couldn't be listed.
+# The processes named like an executable: Windows' list, or -ProcessesFile's (a test's: a JSON array of { Name,
+# ExecutablePath, CommandLine, ProcessId }, so an unreadable identity can be given).
+function Candidates([string]$name) {
+  if ($ProcessesFile) { return @([IO.File]::ReadAllText($ProcessesFile) | ConvertFrom-Json | Where-Object { $_.Name -ieq $name }) }
+  return @(Get-CimInstance Win32_Process -Filter "Name = '$($name.Replace("'", "''"))'" -ErrorAction Stop)
+}
+
+# The main processes of an exact executable: their ids, or $null when whether it runs can't be told. Of the processes
+# named like it, one whose executable can't be read (no path given: another user's, a protected one) makes it unknown,
+# never "not running"; one positively elsewhere (another installation) is left out; one of this executable counts unless
+# its command line positively says it is a child (--type=: Chromium's helpers), an unreadable command line counting too.
 function Running([string]$exe) {
   try {
-    $name = Split-Path -Leaf $exe
-    $all = @(Get-CimInstance Win32_Process -Filter "Name = '$($name.Replace("'", "''"))'" -ErrorAction Stop)
-    # The leading comma keeps an empty list a list (PowerShell would return $null, read as "couldn't be listed").
-    return , @($all | Where-Object { $_.ExecutablePath -and (Same $_.ExecutablePath $exe) -and ($_.CommandLine -notmatch '--type=') } | ForEach-Object { $_.ProcessId })
+    $ids = @()
+    foreach ($p in Candidates (Split-Path -Leaf $exe)) {
+      if (-not $p.ExecutablePath) { return $null }
+      if (-not (Same $p.ExecutablePath $exe)) { continue }
+      if ($p.CommandLine -and $p.CommandLine -match '--type=') { continue }
+      $ids += $p.ProcessId
+    }
+    # The leading comma keeps an empty list a list (PowerShell would return $null, read as "can't be told").
+    return , $ids
   } catch {
     return $null
   }

@@ -17,9 +17,10 @@ const SCENARIOS = {
   4: 'Upgrade from the previous release, running, as its updater runs the installer (--updated /S --force-run)',
   5: 'Uninstall',
   6: 'A new workspace in the fresh install (for the fresh-install comparison)',
-  7: 'Install by hand over the previous release, running (/S --force-run)'
+  7: 'Install by hand over the previous release, running (/S --force-run)',
+  8: "The installer's edge cases over the previous release, and a notification under the new app ID"
 }
-const KINDS = ['fresh', 'upgrade', 'manual']
+const KINDS = ['fresh', 'upgrade', 'manual', 'edges']
 /** electron-builder's APP_GUID for appId it.surmise.combwork (HI-2460): its uninstall entry's key. */
 const COMBWORK_GUID = '10a7595a-0e90-558c-b6b6-ae33bdd80748'
 
@@ -34,8 +35,12 @@ const REQUIRED = {
     shots: ['s1-desktop.jpg', 's1-installed-apps.jpg', 's1-start-dark.png', 's1-start-light.png', 's1-agent-setup-dark.png', 's1-agent-setup-light.png', 's3-missing-dark.png', 's3-found-dark.png', 's3-found-light.png', 's6-workspace.png', 's6-workspace-overview.png', 's6-skills.png', 's6-mcp-servers.png', 's6-hive-assistant.png', 's5-desktop.jpg']
   },
   upgrade: overPrevious(4, 's4'),
-  manual: overPrevious(7, 's7')
+  manual: overPrevious(7, 's7'),
+  edges: { drivers: { s8: { scenario: 8, ids: ['8.notification'], facts: ['exe'] } }, shots: ['s8-notified.png', 's8-desktop.jpg'] }
 }
+
+/** The edge cases' checks edges.ps1 must record (HI-2460). */
+const EDGE_IDS = ['8.wait', '8.wait-unchanged', '8.continues', '8.refuses', '8.refuses-unchanged', '8.running', '8.running-unchanged', '8.uninstall-fails', '8.uninstall-fails-unchanged', '8.fallback-running', '8.fallback-moved']
 
 /** An upgrade over the previous release (scenario n, its files' prefix pre): the drivers' checks (HI-2460's too) and shots. */
 function overPrevious(n, pre) {
@@ -127,6 +132,8 @@ function evaluate(meta, files) {
     if (prevRun) add(n, `The previous release installs (${prevRun.seconds} s)`, prevRun.exitCode === 0, `exit ${prevRun.exitCode}`)
     const prevNames = entriesOf(prevSt).map(x => x.displayName)
     driver(kind, `${pre}-mark`)
+    const started = need(n, `${pre}-prev-started`)
+    if (started) add(n, `The previous release ran (pid ${started.pid}, with a window) as the new installer started`, started.window === true && !!started.pid, JSON.stringify(started))
     const newRun = need(n, `${pre}-new-run`)
     const newSt = need(n, `${pre}-new-state`)
     if (newRun) {
@@ -152,6 +159,17 @@ function evaluate(meta, files) {
     }
     const after = driver(kind, `${pre}-after`)
     if (after?.facts?.version !== undefined) add(n, `After the upgrade the app reports ${version}`, after.facts.version === version, `reports ${after.facts.version}`)
+  }
+
+  if (ran.includes('edges')) {
+    const e = need(8, 'edges')
+    if (e) {
+      if (e.completed !== true) add(8, 'edges.ps1 finished', false, 'it stopped before the end')
+      const list = [].concat(e.checks || [])
+      for (const c of list) add(8, c.name, c.ok === true, c.detail)
+      for (const id of EDGE_IDS) if (!list.some(c => c.id === id)) add(8, `edge check "${id}" ran`, false, 'missing from edges.json')
+    }
+    driver('edges', 's8')
   }
 
   for (const id of meta.leftRunning || []) add(0, `CLEANUP: Sandbox ${id} confirmed stopped`, false, `CLEANUP NOT CONFIRMED: Sandbox ${id} may still be running`)

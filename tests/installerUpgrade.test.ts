@@ -236,6 +236,35 @@ describe('the installer upgrades from Hive Desktop (hiveUpgrade.ps1, HI-2460)', 
     })
   }
 
+  // Round 1's review: whether an app runs is known only from a process whose identity can be read.
+  for (const [what, rows, code] of [
+    ["a same-name process whose executable can't be read", () => [{ Name: 'Combwork.exe', ExecutablePath: null, CommandLine: null, ProcessId: 424242 }], 5],
+    ["this exe with an unreadable command line (counts as its main process)", (f: Fixture) => [{ Name: 'Combwork.exe', ExecutablePath: join(f.install, 'Combwork.exe'), CommandLine: null, ProcessId: 424243 }], 5],
+    ["Hive Desktop's exe whose path can't be read", () => [{ Name: 'Hive.exe', ExecutablePath: null, CommandLine: null, ProcessId: 424244 }], 5],
+    ['another installation of the same name, positively elsewhere', () => [{ Name: 'Combwork.exe', ExecutablePath: 'C:\\Elsewhere\\Combwork\\Combwork.exe', CommandLine: '"C:\\Elsewhere\\Combwork\\Combwork.exe"', ProcessId: 424245 }], 0],
+    ["this exe's Chromium helper (--type=)", (f: Fixture) => [{ Name: 'Combwork.exe', ExecutablePath: join(f.install, 'Combwork.exe'), CommandLine: `"${join(f.install, 'Combwork.exe')}" --type=renderer`, ProcessId: 424246 }], 0]
+  ] as const) {
+    it(`${what}: ${code === 5 ? 'stops (5), Hive Desktop and the profile folders untouched' : 'goes on'}`, () => {
+      const f = fixture(`identity-${randomUUID().slice(0, 8)}`)
+      const old = installOld(f)
+      profile(f.appData)
+      profile(f.local)
+      const list = join(f.work, 'processes.json')
+      writeFileSync(list, JSON.stringify(rows(f)))
+      const r = upgrade(f, ['-ProcessesFile', list])
+      expect(r.code, r.out).toBe(code)
+      if (code === 5) {
+        expect(r.out).toContain('still running:')
+        expect(existsSync(join(old, 'Hive.exe'))).toBe(true)
+        expect(existsSync(join(f.seen, 'args.json'))).toBe(false)
+        expect(readdirSync(f.appData)).toEqual(['Hive'])
+        expect(readdirSync(f.local)).toEqual(['Hive'])
+      } else {
+        expect(readdirSync(f.local)).toEqual(['Combwork'])
+      }
+    })
+  }
+
   it('Combwork still running (on Hive\'s folders, HI-2461\'s fallback): stops (5), nothing changed', async () => {
     const f = fixture('running')
     profile(f.appData)

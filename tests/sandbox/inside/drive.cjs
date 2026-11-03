@@ -256,6 +256,23 @@ const steps = {
     await shot('before-upgrade')
   },
 
+  // Scenario 8 (HI-2460): a Windows notification from the installed app, under its own app ID: Windows records an app
+  // that has notified under Notifications\Settings\<its AUMID>.
+  async notify() {
+    await launch()
+    const aumid = 'it.surmise.combwork'
+    res.facts.exe = HIVE_EXE
+    res.facts.shown = await app.evaluate(({ Notification }) => {
+      if (!Notification.isSupported()) return false
+      new Notification({ title: 'Combwork check', body: 'A notification from the installed app' }).show()
+      return true
+    })
+    const key = `HKCU:\\Software\\Microsoft\\Windows\\CurrentVersion\\Notifications\\Settings\\${aumid}`
+    const known = await until(async () => ps(`Test-Path '${key}'`) === 'True', 20_000)
+    check('8.notification', `A notification shows under the app ID ${aumid} (Windows lists it in Notifications)`, res.facts.shown && known, `shown ${res.facts.shown}; ${key} ${known ? 'there' : 'missing'}`)
+    await shot('notified')
+  },
+
   async 'after-upgrade'() {
     res.facts.closedForceRun = closeRunningHive()
     await launch()

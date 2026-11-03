@@ -48,6 +48,7 @@ const good = (): Json => ({
   's4-prev-run': { exitCode: 0, seconds: 10 },
   's4-prev-state': hiveState(),
   's4-mark': driverOk('upgrade', 's4-mark'),
+  's4-prev-started': { pid: 4242, window: true, seconds: 5 },
   's4-new-run': { exitCode: 0, seconds: 20, hiveRunning: true, running: ['combwork'], arguments: '--updated /S --force-run' },
   's4-new-state': state(),
   's4-after': driverOk('upgrade', 's4-after')

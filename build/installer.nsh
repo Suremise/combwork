@@ -101,7 +101,7 @@ LangString hiveInstallerBusy 2052 "另一个 Hive 安装程序仍在运行，或
 ; whose profile and Hive Desktop's per-user install these are), never the uninstaller.
 ; 1. Hive Desktop's installer identity is held too: its mutex (1.0's APP_GUID, from appId com.hive.desktop) taken and
 ;    kept until this installer exits, so a 1.0 installer or updater started meanwhile finds it held and quits; one
-;    running now is waited for (at most HIVE_INSTALLER_WAIT_MS). WAIT_ABANDONED counts as taken. electron-builder's
+;    running now is waited for (at most HIVE_LEGACY_WAIT_MS). WAIT_ABANDONED counts as taken. electron-builder's
 ;    uninstaller never takes its installer's mutex (ALLOW_ONLY_ONE_INSTALLER_INSTANCE is the installer's), so Hive
 ;    Desktop's uninstaller, run below, isn't held up by it. Any failing call: nothing changed (exit 4).
 ; 2. hiveUpgrade.ps1: the apps of both installations asked to close (hiveAskToClose.ps1, HI-1707: they record their
@@ -113,7 +113,13 @@ LangString hiveInstallerBusy 2052 "另一个 Hive 安装程序仍在运行，或
 ; This file's folder (build), as it is included: inside the macro, __FILEDIR__ would be where the macro is inserted.
 !define HIVE_BUILD_DIR "${__FILEDIR__}"
 !define HIVE_LEGACY_GUID "35960567-b95c-520c-a9f1-e8bb85764724"
-!define /ifndef HIVE_INSTALLER_WAIT_MS 600000
+; How long a held Hive Desktop installer mutex is waited for (ms): 10 minutes, or 20 s in an installer built for the
+; Sandbox's refusal check (HIVE_TEST_SHORT_LEGACY_WAIT=1 in npm run dist's environment; a release never sets it).
+!if "$%HIVE_TEST_SHORT_LEGACY_WAIT%" == "1"
+  !define HIVE_LEGACY_WAIT_MS 20000
+!else
+  !define HIVE_LEGACY_WAIT_MS 600000
+!endif
 
 LangString hiveLegacyBusy 1033 "A Hive Desktop installer is still running, or Combwork couldn't tell whether one is. Nothing was installed: run this installer again once the other one has finished."
 LangString hiveLegacyBusy 1031 "Ein Hive-Desktop-Installationsprogramm läuft noch, oder Combwork konnte nicht feststellen, ob eines läuft. Es wurde nichts installiert: Starten Sie dieses Installationsprogramm erneut, sobald das andere fertig ist."
@@ -152,7 +158,7 @@ LangString hiveOldNotRemoved 2052 "无法卸载 Hive Desktop，因此未安装 C
       StrCpy $4 "fail"
     ${ElseIf} $0 = 183
       ; ERROR_ALREADY_EXISTS: another holds it (not ours yet). WAIT_OBJECT_0 (0) or WAIT_ABANDONED (0x80): ours now.
-      System::Call 'kernel32::WaitForSingleObject(i r1, i ${HIVE_INSTALLER_WAIT_MS}) i.r2'
+      System::Call 'kernel32::WaitForSingleObject(i r1, i ${HIVE_LEGACY_WAIT_MS}) i.r2'
       ${If} $2 <> 0
       ${AndIf} $2 <> 0x80
         StrCpy $4 "fail"

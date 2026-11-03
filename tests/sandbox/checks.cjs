@@ -7,7 +7,7 @@
  * to --report. Moved from the hive-mcp repo (servers/windows-sandbox/scenarios/hive-checks.js at c5dee8a, HI-2298).
  *
  *   npm run sandbox-checks -- --installer <Hive-Setup-x.y.z.exe> [--previous <older installer>] [--hive <Hive repo>]
- *        [--server <windows-sandbox server.js>] [--report <folder>] [--only fresh|upgrade|manual] [--wait-min N]
+ *        [--server <windows-sandbox server.js>] [--report <folder>] [--only fresh|upgrade|manual|edges] [--short <installer>] [--wait-min N]
  *        [--smart-app-control off]
  *
  * --hive (or HIVE_REPO; default this checkout) is where --previous is looked for: the newest Hive-Setup-*.exe in
@@ -133,12 +133,15 @@ function plan(argv) {
   if (!serverJs) throw new Error(`No windows-sandbox server found (looked in ${serverCandidates(hive).join(' and ')}): pass --server <its server.js> (or WSB_SERVER), or install it from Hive's MCP catalogue`)
   if (!fs.existsSync(serverJs)) throw new Error(`--server ${serverJs} doesn't exist: name the windows-sandbox server's server.js`)
   const installer = opt('--installer') && path.resolve(opt('--installer'))
+  // The edge cases' second installer (HI-2460): built with HIVE_TEST_SHORT_LEGACY_WAIT=1, its legacy-mutex wait 20 s.
+  const short = opt('--short') && path.resolve(opt('--short'))
   if (!installer || !fs.existsSync(installer) || !versionOf(installer)) throw new Error('--installer must name an existing Combwork-Setup-<version>.exe (or Hive-Setup-)')
   // By default the release checks' two kinds; the install by hand over the previous release (manual, HI-2460) runs when
   // asked for (--only manual).
   const ran = only ? [only] : ['fresh', 'upgrade']
   let previous = opt('--previous') && path.resolve(opt('--previous'))
-  const overOld = ran.includes('upgrade') || ran.includes('manual')
+  const overOld = ran.includes('upgrade') || ran.includes('manual') || ran.includes('edges')
+  if (ran.includes('edges') && (!short || !fs.existsSync(short))) throw new Error('--only edges needs --short <an installer built with HIVE_TEST_SHORT_LEGACY_WAIT=1>, beside --installer')
   if (!previous && overOld) {
     const dist = path.join(hive, 'dist')
     const cands = fs.existsSync(dist) ? fs.readdirSync(dist).filter(f => versionOf(f)).map(f => path.join(dist, f)).filter(f => f.toLowerCase() !== installer.toLowerCase()) : []
@@ -164,6 +167,7 @@ function plan(argv) {
     sameInstaller: upgrade && sha(installer) === sha(previous),
     guestInstaller: guest(installer),
     guestPrevious: upgrade ? guest(previous) : null,
+    guestShort: short ? guest(short) : null,
     report: path.resolve(opt('--report', path.join(process.env.LOCALAPPDATA, 'hive-test', 'sandbox-reports', stamp))),
     waitMin: Number(opt('--wait-min', 0)),
     sacOff: sac === 'off'
@@ -270,7 +274,7 @@ function steps(srv, ctx) {
   return { run, ps, drive, desktop, collect, record, readSac, install }
 }
 
-const SCENARIO_OF = { fresh: 1, upgrade: 4, manual: 7 }
+const SCENARIO_OF = { fresh: 1, upgrade: 4, manual: 7, edges: 8 }
 // How long Settings gets to open inside the Sandbox before its screenshot (nothing there to wait on from the host); the
 // unit tests, whose fake server shows nothing, set it to 0.
 const SETTINGS_OPEN_MS = Number(process.env.HIVE_SANDBOX_TEST_SETTINGS_MS ?? 6000)
@@ -315,8 +319,9 @@ async function main(argv) {
     await time(`${n}. previous release install`, () => s.install(n, `${n}. install previous`, p.guestPrevious, `-Arguments "/S" -Name ${pre}-prev`, { timeoutSec: 300 }))
     await s.drive(n, `${n}. change settings`, 'mark', `${pre}-mark`)
     await s.desktop(n, `${pre}-desktop-before`)
-    // The previous release running as the new installer starts, as when its updater runs it (or a user didn't quit it).
-    await s.run(n, `${n}. start the previous release`, 'powershell.exe -NoProfile -Command "Start-Process -FilePath (Join-Path $env:LOCALAPPDATA \'Programs\\Hive\\Hive.exe\')"', { timeoutSec: 30 })
+    // The previous release running as the new installer starts, as when its updater runs it (or a user didn't quit it):
+    // its exact main process up with a window first (start-app.ps1 fails the step otherwise), then the installer.
+    await s.ps(n, `${n}. start the previous release, running with a window`, 'start-app.ps1', `-Exe "%LOCALAPPDATA%\\Programs\\Hive\\Hive.exe" -Name ${pre}-prev-started`, { timeoutSec: 120 })
     await time(`${n}. install over it (${args})`, () => s.install(n, `${n}. install new`, p.guestInstaller, `-Arguments "${args}" -Name ${pre}-new`, { timeoutSec: 300 }))
     await s.drive(n, `${n}. after the upgrade`, 'after-upgrade', `${pre}-after`)
     await s.desktop(n, `${pre}-desktop-after`)
@@ -342,7 +347,16 @@ async function main(argv) {
     // Over the previous release, with it running (HI-2460: the installer must close it, then remove it): as its updater
     // runs the new installer (scenario 4) and as a user installs it by hand (7).
     upgrade: srv => overPrevious(srv, 4, 's4', '--updated /S --force-run'),
-    manual: srv => overPrevious(srv, 7, 's7', '/S --force-run')
+    manual: srv => overPrevious(srv, 7, 's7', '/S --force-run'),
+    // The installer's edge cases over Hive Desktop (edges.ps1), then a notification under the new app ID (HI-2460).
+    edges: async srv => {
+      const s = steps(srv, ctx)
+      await s.readSac()
+      await time('8. edge cases', () => s.ps(8, '8. edge cases (edges.ps1)', 'edges.ps1', `-Prev "${p.guestPrevious}" -New "${p.guestInstaller}" -Short "${p.guestShort}"`, { timeoutSec: 1500 }))
+      await s.drive(8, '8. a notification', 'notify', 's8')
+      await s.desktop(8, 's8-desktop')
+      await s.collect(8, ['edges', 's8'])
+    }
   }
   for (const kind of p.ran) {
     const before = ctx.steps.length
