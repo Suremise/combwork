@@ -116,9 +116,9 @@ const renamable = (dir) => {
     const watchStatus = (n, t0) => {
       const seen = []
       let last = ''
-      let on = true
+      const watching = { on: true }
       const look = async () => {
-        while (on) {
+        while (watching.on) {
           const l = await laneOf(n).catch(() => null)
           const s = await slotNow().catch(() => null)
           const now = JSON.stringify({ state: l?.state, status: l?.status ? { reason: l.status.reason, why: l.status.why, slot: l.status.slot, held: l.status.held } : null, slot: l?.slot ?? null, lease: s?.lease?.lane ?? null, b1: (await live(b1.id).catch(() => null))?.status ?? 'stopped' })
@@ -128,7 +128,7 @@ const renamable = (dir) => {
         }
       }
       const done = look()
-      return async () => ((on = false), await done, seen)
+      return async () => ((watching.on = false), await done, seen)
     }
 
     // --- 1. The first lane in slot-a, then ended: B1 stopped, slot-a free.
