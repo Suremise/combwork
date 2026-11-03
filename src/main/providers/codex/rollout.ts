@@ -318,9 +318,11 @@ export function patchPaths(patch: string): string[] {
   return [...new Set(out)]
 }
 
-// A shell command that runs apply_patch (HI-2408), as Codex itself takes one for an edit: `apply_patch <<'EOF' … EOF` (the
-// delimiter quoted or not) or the patch as its argument, under either of its names, after an optional `cd <dir> &&`.
-const SHELL_PATCH = /^\s*(?:cd\s+("[^"]*"|'[^']*'|[^\s&;|]+)\s*&&\s*)?(?:apply_patch|applypatch)(?=\s|$)/
+// A shell command Codex applies as an edit itself (HI-2408), and only that: the whole command one heredoc,
+// `apply_patch <<'EOF' … EOF` (the delimiter quoted or not, under either of its names), after an optional `cd <dir> &&`.
+// With anything after it, or the patch as an argument, Codex 0.166 runs it in the shell as any other command (recorded:
+// tests/fixtures/pretooluse-codex-0.166.0-shell-patch.json), so it isn't one.
+const SHELL_PATCH = /^\s*(?:cd\s+("[^"]*"|'[^']*'|[^\s&;|'"]+)\s*&&\s*)?(?:apply_patch|applypatch)\s*<<\s*(['"]?)([A-Za-z_][\w-]*)\2[ \t]*\r?\n([\s\S]*)\r?\n\3\s*$/
 
 /**
  * The files a shell command's apply_patch touches (HI-2408: Codex 0.166 sends it to PreToolUse as Bash, tool_input.command),
@@ -330,10 +332,11 @@ const SHELL_PATCH = /^\s*(?:cd\s+("[^"]*"|'[^']*'|[^\s&;|]+)\s*&&\s*)?(?:apply_p
 export function shellPatchPaths(command: string): string[] {
   const m = SHELL_PATCH.exec(command)
   if (!m) return []
-  const rest = command.slice(m[0].length)
-  if (!rest.includes('*** Begin Patch')) return []
-  const dir = m[1]?.replace(/^(["'])(.*)\1$/, '$2')
-  return patchPaths(rest).map((f) => (dir && dir !== '.' && !isAbsolute(f) ? join(dir, f) : f))
+  const [, quotedDir, , delimiter, body] = m
+  // The heredoc ends at its first delimiter line: one earlier than the last means more commands after it.
+  if (body.split(/\r?\n/).includes(delimiter) || !body.includes('*** Begin Patch')) return []
+  const dir = quotedDir?.replace(/^(["'])(.*)\1$/, '$2')
+  return patchPaths(body).map((f) => (dir && dir !== '.' && !isAbsolute(f) ? join(dir, f) : f))
 }
 
 /** The patch in a code-mode script that only applies one (tools.apply_patch("…")); null for anything else. */

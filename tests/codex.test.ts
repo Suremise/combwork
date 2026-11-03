@@ -60,18 +60,18 @@ describe('Codex hooks', () => {
   it('claims the files of an apply_patch run as a shell command (HI-2408, recorded from Codex 0.166.0)', async () => {
     const { codex } = await import('../src/main/providers/codex/adapter')
     const { shellPatchPaths } = await import('../src/main/providers/codex/rollout')
-    const recorded = JSON.parse(readText(joinPath(__dirname, 'fixtures', 'pretooluse-codex-0.166.0-shell-patch.json'), 'utf8')).hooks
-    expect(recorded.map((b: Record<string, unknown>) => codex.normalizeHook(b))).toMatchObject([
-      { event: { kind: 'toolStart' }, editedPaths: ['notes.txt'] },
-      { event: { kind: 'toolStart' }, editedPaths: ['added.txt', 'notes.txt'] }
-    ])
-    // The other forms Codex takes: its other name, the patch as the argument, a cd that the paths are relative to.
+    // Each recorded command: the files claimed where Codex applied the patch itself, none where it ran it in the shell.
+    const recorded: { about: string; appliedByCodex: boolean; files: string[] }[] = JSON.parse(readText(joinPath(__dirname, 'fixtures', 'pretooluse-codex-0.166.0-shell-patch.json'), 'utf8')).hooks
+    expect(recorded.filter((b) => b.appliedByCodex).length).toBe(3)
+    for (const b of recorded) expect({ about: b.about, ...codex.normalizeHook(b) }).toMatchObject({ about: b.about, event: { kind: 'toolStart' }, editedPaths: b.files })
+    // A cd that the paths are relative to (absolute ones stay), and CRLF lines.
     const patch = '*** Begin Patch\n*** Update File: a.ts\n@@\n-x\n+y\n*** End Patch'
-    expect(shellPatchPaths(`applypatch <<"EOF"\n${patch}\nEOF`)).toEqual(['a.ts'])
-    expect(shellPatchPaths(`apply_patch '${patch}'`)).toEqual(['a.ts'])
     expect(shellPatchPaths(`cd "src dir" && apply_patch <<'EOF'\n${patch}\nEOF`)).toEqual([joinPath('src dir', 'a.ts')])
-    expect(shellPatchPaths(`cd sub && apply_patch <<'EOF'\n${patch.replace('a.ts', 'C:\\abs\\a.ts')}\nEOF`)).toEqual(['C:\\abs\\a.ts'])
-    // Not an apply_patch run: no file claimed (other shell edits stay out of locks).
+    expect(shellPatchPaths(`cd sub && apply_patch <<'EOF'\n${patch.replace('a.ts', 'C:\\abs\\a.ts')}\nEOF\n`)).toEqual(['C:\\abs\\a.ts'])
+    expect(shellPatchPaths(`apply_patch <<'EOF'\r\n${patch.split('\n').join('\r\n')}\r\nEOF`)).toEqual(['a.ts'])
+    // Not one Codex applies: no file claimed (other shell edits stay out of locks).
+    expect(shellPatchPaths(`apply_patch <<'EOF'\n${patch}\nEOF\nEOF`)).toEqual([])
+    expect(shellPatchPaths(`apply_patch $'${patch.split('\n').join('\\n')}'`)).toEqual([])
     expect(shellPatchPaths(`cat > x.patch <<'EOF'\n${patch}\nEOF`)).toEqual([])
     expect(shellPatchPaths(`echo apply_patch`)).toEqual([])
     expect(shellPatchPaths('apply_patch_helper <<EOF\n' + patch + '\nEOF')).toEqual([])
