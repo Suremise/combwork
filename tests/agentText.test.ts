@@ -1,7 +1,7 @@
 // Agent text (dialects, HI-2065; plans/2026-11-03-dialects-design.md, sections 2 and 6): the ICU formatter hive-mcp.js
 // can load, say() and its chains (scopes, the resolver hook, the process's dialect file), and the canary dialect over the
 // session contract, the first area extracted (card 1). Later extraction cards add their builders to the canary here.
-import { afterEach, describe, expect, it } from 'vitest'
+import { afterEach, describe, expect, it, vi } from 'vitest'
 import { readFileSync, writeFileSync } from 'fs'
 import { join } from 'path'
 import { IntlMessageFormat } from 'intl-messageformat'
@@ -15,9 +15,12 @@ import { boardSkillsLine, controlRules, hiveInstructions, journalRule, withLates
 import { deliveredNotes } from '../src/shared/workspaceNotes'
 import { instructionsStarter } from '../src/shared/projectTabs'
 import { shareInstructions } from '../src/shared/instructions'
-import { launchRecord } from '../src/main/guidance'
+import { launchRecord, skillRevisions } from '../src/main/guidance'
+import * as skills from '../src/main/skills'
+import * as revisions from '../src/main/revisions'
+import { createWorkspaceService, disposeWorkspaceService, inWorkspace } from '../src/main/workspace'
 // @ts-expect-error: a plain .mjs module without types
-import { extractAgentMessages, extractDrift, readCatalogue } from '../scripts/agentTextExtract.mjs'
+import { extractAgentMessages, extractDrift, messageProblems, readCatalogue } from '../scripts/agentTextExtract.mjs'
 
 const ROOT = join(__dirname, '..')
 type Catalogue = Record<string, { text: string; note?: string }>
@@ -76,8 +79,40 @@ describe('the agent text ICU formatter', () => {
   })
 
   it('refuses text that isn\'t ICU, and a value it needs that is missing', () => {
-    for (const bad of ['{open', 'close}', '{x, plural, one {a}}', '{x, date}', '{x, select, a {b} other {c}', '{, select, other {x}}', '{x, select, a {1} a {2} other {3}}']) expect(() => parseIcu(bad), bad).toThrow(IcuError)
+    for (const bad of ['{open', '{x, plural, one {a}}', '{x, date}', '{x, select, a {b} other {c}', '{, select, other {x}}', '{x, select, a {1} a {2} other {3}}']) expect(() => parseIcu(bad), bad).toThrow(IcuError)
     expect(() => formatIcu('Hello {name}')).toThrow(/no value for \{name\}/)
+  })
+
+  // HI-2433 round 1: what the extractor accepts (a descriptor passing check:repo, a dialect's text passing the schema)
+  // is what the formatter formats, and the same way; what it refuses, the formatter refuses too.
+  it('agrees with the extractor on what agent text may use, beyond the catalogue, and formats what both accept as FormatJS does', () => {
+    const CORPUS = [
+      // FormatJS reads these, agent text's subset doesn't: both refuse.
+      '{n, number, percent}', '{n, number, ::currency/USD}', '{n, number, integer}', '{d, date}', '{d, time, short}', '{n, selectordinal, one {#st} other {#th}}', '<b>bold</b> {x}',
+      '{n, plural, foo {x} other {y}}', '{n, plural, =1.5 {x} other {y}}', '{x, select, =1 {a} other {b}}', '{x-y}', '{x.y}', '{x, select, a-b {1} other {2}}',
+      // Neither reads these.
+      '{a b}', '{n, plural, offset:x other {#}}', '{x, select, a {1} other {2} extra}', '{x, select}', '{x,}', '{x, select, a {1}}', '{open', '{x, select, a {1} a {2} other {3}}',
+      // Both read these.
+      '{ x }', '{x , select , a {1} other {2}}', '{x, select, a{1}other{2}}', '{0}', '{x_1}', '#', "'#'", "{n, plural, other {'#'}}", '{n,plural,offset:1 other {#}}', '{n, plural, one {a} other {b} }',
+      'a < b <c>', 'close} and }}', "'{'", "''", "'{x}", "it's {x}'s", '{x, select, other {{y, select, other {z}}}}', '{n, plural, zero {z} =0 {none} one {#} other {# more}}',
+      '{n, plural, one {{m, plural, one {#} other {#}}} other {#}}', '{n, number} of {total, number}'
+    ]
+    const accepted: string[] = []
+    for (const text of CORPUS) {
+      const extractor = (messageProblems({ 'probe.text': { text } }) as string[]).length === 0
+      let formatter = true
+      try {
+        parseIcu(text)
+      } catch {
+        formatter = false
+      }
+      expect(formatter, `${text}: the extractor ${extractor ? 'accepts' : 'refuses'} it`).toBe(extractor)
+      if (!extractor) continue
+      accepted.push(text)
+      const fj = new IntlMessageFormat(text, 'en', undefined, { ignoreTag: true })
+      for (const values of samples(text)) expect(formatIcu(text, values), `${text} ${JSON.stringify(values)}`).toBe(fj.format(values))
+    }
+    expect(accepted.length).toBeGreaterThan(15)
   })
 
   it("lists a message's placeholders with their kinds, nested ones too", () => {
@@ -209,8 +244,42 @@ describe('the canary dialect over the session contract (card 1)', () => {
 })
 
 describe('the skill status lines in guidance.ts', () => {
-  it('are agent text, in the canary too', () => {
+  // HI-2433 round 1: callers asking at once share one scan, which must hold no text; each caller says its skills'
+  // problems in its own dialect. A, then B and C while A's scan is held: B and C share the next scan.
+  it("say a shared scan's problems in each caller's own dialect", async () => {
+    const w = createWorkspaceService()
+    let release = (): void => undefined
+    let reached = (): void => undefined
+    const held = new Promise<void>((r) => (release = r))
+    const reading = new Promise<void>((r) => (reached = r))
+    let scans = 0
+    vi.spyOn(skills, 'hiveSkills').mockImplementation(async () => {
+      if (scans++ === 0) {
+        reached()
+        await held
+      }
+      return [{ name: 'broken', path: 'C:/missing', problem: 'bad header' }] as never
+    })
+    vi.spyOn(revisions, 'revisionOf').mockResolvedValue('r1')
+    setChainResolver((scope) => chain({ 'contract.skill.nobody': scope.kind === 'session' ? `${scope.session.agentId}: {why}` : 'api: {why}' }))
+    const call = (id: string): Promise<{ problem?: string }[]> => inWorkspace(w, () => inDialectOf({ projectPath: 'C:/ws/p', agentId: id }, () => skillRevisions()))
+    try {
+      const a = call('A')
+      await reading
+      const [b, c] = [call('B'), call('C')]
+      release()
+      expect((await Promise.all([a, b, c])).map((r) => r[0].problem)).toEqual(['A: bad header', 'B: bad header', 'C: bad header'])
+      expect(scans).toBe(2)
+    } finally {
+      vi.restoreAllMocks()
+      await disposeWorkspaceService(w)
+    }
+  })
+
+  it("keep a launch record's problem in the Default: it is stored, and any caller reads it", () => {
     setProcessChain(chain(canaryTexts(catalogue)))
-    expect(launchRecord({ a: 'r1' }, {}).problems).toEqual({ a: '⟦contract.skill.notDelivered⟧it was not delivered⟦/⟧' })
+    setChainResolver(() => chain(canaryTexts(catalogue)))
+    expect(inDialectOf({ projectPath: 'C:/ws/p', agentId: 'a1' }, () => launchRecord({ a: 'r1' }, {}).problems)).toEqual({ a: 'it was not delivered' })
+    expect(launchRecord({ a: 'r1' }, {}).problems).toEqual({ a: 'it was not delivered' })
   })
 })

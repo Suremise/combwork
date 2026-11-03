@@ -1,4 +1,4 @@
-import { agentMsg, say } from '../shared/agentText'
+import { agentMsg, say, type AgentMsg, type AgentValues } from '../shared/agentText'
 import { inDefaultDialect } from '../shared/agentText/asyncScope'
 import { assistantSkillsLine, controlRules, hiveInstructions, journalRule, sessionContract } from '../shared/hiveGuidance'
 import { taskPrompt } from '../shared/tasks'
@@ -56,7 +56,9 @@ export function launchRecord(requested: Record<string, string>, delivered: Recor
   const problems: Record<string, string> = {}
   const settled: Record<string, string> = {}
   for (const [name, wanted] of Object.entries(requested)) {
-    const d = delivered[name] ?? { revision: null, problem: say(S.notDelivered) }
+    // Stored with the session and read by any caller (its project's status): the Default's words, as stored history's
+    // English is, until stored records are said when read (dialects, cards 5b and 6b).
+    const d = delivered[name] ?? { revision: null, problem: inDefaultDialect(() => say(S.notDelivered)) }
     if (d.revision) skills[name] = d.revision
     if (d.problem) problems[name] = d.problem
     settled[name] = d.lasting ? wanted : (d.revision ?? '')
@@ -77,13 +79,21 @@ export interface SkillRevision {
   updateAvailable?: true
 }
 
-const scans = new WeakMap<WorkspaceService, { lifetime: AbortSignal; scan: () => Promise<SkillRevision[]> }>()
+/** A scanned skill: its problems as messages and values, not yet said (a scan is shared by callers of any dialect). */
+type ScannedRevision = Omit<SkillRevision, 'problem'> & { problems: [AgentMsg, AgentValues][] }
+
+const scans = new WeakMap<WorkspaceService, { lifetime: AbortSignal; scan: () => Promise<ScannedRevision[]> }>()
 
 /**
  * The workspace's Hive skills with their revisions (the Agent API's status). Revisions are kept between calls
- * (revisions.ts); callers asking at the same time share one scan.
+ * (revisions.ts); callers asking at the same time share one scan, which holds no text: each caller says its problems in
+ * its own dialect once the scan is done (HI-2433).
  */
-export function skillRevisions(): Promise<SkillRevision[]> {
+export async function skillRevisions(): Promise<SkillRevision[]> {
+  return (await scannedRevisions()).map(({ problems, ...r }) => (problems.length ? { ...r, problem: problems.map(([m, v]) => say(m, v)).join('; ') } : r))
+}
+
+function scannedRevisions(): Promise<ScannedRevision[]> {
   const w = currentWorkspace()
   let s = scans.get(w)
   if (!s || s.lifetime !== w.lifetime) {
@@ -109,19 +119,19 @@ export function skillRevisions(): Promise<SkillRevision[]> {
   return s.scan()
 }
 
-async function scanRevisions(): Promise<SkillRevision[]> {
-  const out: SkillRevision[] = []
+async function scanRevisions(): Promise<ScannedRevision[]> {
+  const out: ScannedRevision[] = []
   for (const s of await hiveSkills()) {
-    const r: SkillRevision = { name: s.name, audience: s.audience ?? 'agents', revision: '' }
+    const r: ScannedRevision = { name: s.name, audience: s.audience ?? 'agents', revision: '', problems: [] }
     // Nobody gets it (its header is broken or its audience unknown): its audience is none, and why.
     if (s.problem) {
       r.audience = 'none'
-      r.problem = say(S.nobody, { why: s.problem })
+      r.problems.push([S.nobody, { why: s.problem }])
     }
     try {
       r.revision = await revisionOf(s.path)
     } catch (e) {
-      if (e instanceof ContentTooLarge) r.problem = [r.problem, say(S.tooBig, { why: e.message })].filter(Boolean).join('; ')
+      if (e instanceof ContentTooLarge) r.problems.push([S.tooBig, { why: e.message }])
     }
     if (s.bundled === 'same' || s.bundled === 'changed') r.bundled = s.bundled
     if (s.updateAvailable) r.updateAvailable = true

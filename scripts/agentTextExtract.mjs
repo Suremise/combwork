@@ -75,7 +75,16 @@ export function extractAgentMessages(root = ROOT) {
   return Object.fromEntries(Object.entries(out).map(([id, { m }]) => [id, m]))
 }
 
-/** A message's placeholders and their kinds, nested ones too (as shared/agentText/icu.ts reads them). Throws on text that isn't ICU. */
+/** A placeholder's name, or a select's value; a plural's keys (shared/agentText/icu.ts reads the same). */
+const NAME = /^[A-Za-z0-9_]+$/
+const PLURAL_KEY = /^(zero|one|two|few|many|other|=\d+)$/
+
+/**
+ * A message's placeholders and their kinds, nested ones too. Throws on text that isn't ICU, or is ICU that agent text's
+ * formatter (shared/agentText/icu.ts, which hive-mcp.js loads in place of FormatJS) doesn't format: number styles and
+ * skeletons, dates, times, ordinals, tags, or names, plural keys and select values outside its rules. What passes here
+ * formats there (tests/agentText.test.ts checks the two agree).
+ */
 export function placeholders(text) {
   const out = {}
   const walk = (els) => {
@@ -83,7 +92,10 @@ export function placeholders(text) {
       const kind = el.type === TYPE.argument ? 'plain' : el.type === TYPE.number ? 'number' : el.type === TYPE.plural ? 'plural' : el.type === TYPE.select ? 'select' : null
       if (el.type === TYPE.date || el.type === TYPE.time || el.type === TYPE.tag) throw new Error(`{${el.value}}: agent text has no dates, times or tags`)
       if (!kind) continue
+      if (!NAME.test(el.value)) throw new Error(`{${el.value}}: a placeholder's name is letters, digits and _`)
+      if (el.type === TYPE.number && el.style) throw new Error(`{${el.value}, number, …}: agent text's numbers take no style or skeleton`)
       if (el.type === TYPE.plural && el.pluralType === 'ordinal') throw new Error(`{${el.value}, selectordinal}: agent text has no ordinals`)
+      if (el.options) for (const key of Object.keys(el.options)) if (el.type === TYPE.plural ? !PLURAL_KEY.test(key) : !NAME.test(key)) throw new Error(`{${el.value}}: option ${key} isn't a ${el.type === TYPE.plural ? 'plural category or =N' : 'select value of letters, digits and _'}`)
       if (!out[el.value] || out[el.value] === 'plain') out[el.value] = kind
       if (el.options) for (const o of Object.values(el.options)) walk(o.value)
     }

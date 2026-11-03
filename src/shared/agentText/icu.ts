@@ -6,9 +6,12 @@
  * - `{n, number}`: a number in English ("1,234");
  * - `{n, plural, =0 {none} one {# card} other {# cards}}` (`offset:k` too): `#` is the number;
  * - `{x, select, yes {…} other {…}}`;
+ * - names and select values of letters, digits and _; plural keys its categories or =N;
  * - apostrophes as FormatJS reads them: `''` is one, and one before `{`, `}` (or `#` in a plural) quotes up to the next;
  *   any other is text. `<` is text: agent text has no tags.
- * tests/agentText.test.ts checks this formats every message of the catalogue as FormatJS does.
+ * Nothing else: no number styles or skeletons, dates, times or ordinals. The extractor (scripts/agentTextExtract.mjs)
+ * accepts exactly this subset; tests/agentText.test.ts checks the two agree on a corpus beside the catalogue, and that
+ * this formats every message of the catalogue as FormatJS does.
  */
 
 export type Part =
@@ -25,6 +28,9 @@ export type PlaceholderKind = 'plain' | 'number' | 'plural' | 'select'
 export class IcuError extends Error {}
 
 const SPACE = /\s/
+/** A placeholder's name, or a select's value: what FormatJS reads as one. */
+const NAME = /^[A-Za-z0-9_]+$/
+const PLURAL_KEY = /^(zero|one|two|few|many|other|=\d+)$/
 
 /** A message's parts; throws IcuError on text that isn't ICU (an unclosed brace, an unknown type, a select with no other). */
 export function parseIcu(text: string): Part[] {
@@ -78,8 +84,10 @@ export function parseIcu(text: string): Part[] {
         flush()
         out.push(argument())
       } else if (c === '}') {
-        if (!nested) fail('an unmatched }')
-        break
+        // Outside any option, a lone } is text (as FormatJS reads it); inside one, it closes the option.
+        if (nested) break
+        lit += c
+        at++
       } else if (c === '#' && inPlural) {
         flush()
         out.push({ kind: 'pound' })
@@ -99,6 +107,8 @@ export function parseIcu(text: string): Part[] {
       if (text[at] === '}') break
       const key = word()
       if (!key) fail('an option with no key')
+      // FormatJS's keys: a plural's are its categories or =N; a select's a name.
+      if (inPlural ? !PLURAL_KEY.test(key) : !NAME.test(key)) fail(`option ${key} isn't a ${inPlural ? 'plural category or =N' : 'select value'}`)
       if (Object.hasOwn(opts, key)) fail(`a second option ${key}`)
       skipSpace()
       if (text[at] !== '{') fail(`option ${key} has no {…}`)
@@ -115,6 +125,7 @@ export function parseIcu(text: string): Part[] {
     skipSpace()
     const name = word()
     if (!name) fail('a placeholder with no name')
+    if (!NAME.test(name)) fail(`placeholder ${name} isn't a name (letters, digits and _)`)
     skipSpace()
     if (text[at] === '}') {
       at++
@@ -146,9 +157,7 @@ export function parseIcu(text: string): Part[] {
     at++ // }
     return type === 'plural' ? { kind: 'plural', name, offset, options: opts } : { kind: 'select', name, options: opts }
   }
-  const out = parts(false, false)
-  if (at < text.length) fail('an unmatched }')
-  return out
+  return parts(false, false)
 }
 
 // English, always: agent text is the dialect's, never the window's language.
