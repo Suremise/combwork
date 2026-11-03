@@ -15,7 +15,7 @@ import { join } from 'path'
 import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, it, vi } from 'vitest'
 import * as electron from 'electron'
 import { connectionRef, connectionsFor, connectionShown, resolveConnection, type ConnectionsView } from '../src/shared/accounts'
-import { cliReadyOf, connectionCli, connectionOf, firstReadyConnection, firstUsableConnection, offeredConnections } from '../src/shared/connectionLabel'
+import { cliReadyOf, connectionCli, connectionOf, firstReadyConnection, firstUsableConnection, launchedName, offeredConnections } from '../src/shared/connectionLabel'
 import type { Account, LiveSessionState } from '../src/shared/types'
 import { tempDir } from './tempDir'
 
@@ -739,6 +739,21 @@ describe('what an agent row names (connectionOf, HI-1769; HI-2108: connections)'
     expect(connectionOf('a2', 'claude-code', ran('b'), view())).toMatchObject({ shown: { id: 'b', name: 'Account b' }, other: true, desired: { ok: true, id: 'a2' } })
     const none = view({ workspace: { 'claude-code': { on: [], default: null } } })
     expect(connectionOf('b1', 'claude-code', ran('a'), none)).toMatchObject({ shown: { id: 'a' }, other: true, desired: { ok: false } })
+  })
+  it("HI-2397: running, it names the connection it launched with, not its account: ⟳ when another on the same account is chosen now", () => {
+    const on = (account: string, id: string) => ({ ...ran(account), connection: { id, name: `Name ${id}` } })
+    // Two connections on one account: each agent names its own, the account never.
+    expect(connectionOf('a1', 'claude-code', on('a', 'a1'), view())).toMatchObject({ shown: { id: 'a1', name: 'Name a1' }, other: false })
+    expect(connectionOf('a2', 'claude-code', on('a', 'a2'), view())).toMatchObject({ shown: { id: 'a2', name: 'Name a2' }, other: false })
+    // Switched to a2 while it runs on a1 (the same account): a1, ⟳, until it restarts.
+    expect(connectionOf('a2', 'claude-code', on('a', 'a1'), view())).toMatchObject({ shown: { id: 'a1', name: 'Name a1' }, other: true, desired: { ok: true, id: 'a2' } })
+    // Fallback (its own off here): it runs on its CLI's first usable connection, which it names, noted.
+    expect(connectionOf('b1', 'claude-code', on('a', 'a1'), view())).toMatchObject({ shown: { id: 'a1', name: 'Name a1' }, other: false, desired: { note: 'offFallback' } })
+    // On another account: the connection it launched with there.
+    expect(connectionOf('a2', 'claude-code', on('b', 'b1'), view())).toMatchObject({ shown: { id: 'b1', name: 'Name b1' }, other: true })
+    // A launch from before HI-2397 (no connection kept): its account, as before.
+    expect(launchedName(ran('a'))).toEqual({ id: 'a', name: 'Account a' })
+    expect(launchedName(on('a', 'a2'))).toEqual({ id: 'a2', name: 'Name a2' })
   })
   it('nothing where connections aren’t shown: a CLI without them (or turned off), no view yet', () => {
     expect(connectionOf('a1', 'claude-code', undefined, view({ providers: [] }))).toBeNull()
