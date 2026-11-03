@@ -50,13 +50,21 @@ describe('what to do with a bundled item', () => {
 
 describe('recorded versions', () => {
   it('include the version of each bundled skill and mode that ships now, as its latest', async () => {
-    const history = HISTORY as Record<'skills' | 'modes', Record<string, string[]>>
+    const history = HISTORY as Record<'skills' | 'modes' | 'dialects', Record<string, string[]>>
     for (const name of readdirSync(join(RES, 'skills'))) {
       expect(history.skills[name]?.at(-1), `${name}: run npm run bundled-history`).toBe(await contentHash(join(RES, 'skills', name)))
     }
     for (const f of readdirSync(join(RES, 'modes'))) {
       const id = f.replace(/\.md$/, '')
       expect(history.modes[id]?.at(-1), `${id}: run npm run bundled-history`).toBe(await contentHash(join(RES, 'modes', f)))
+    }
+    // Dialect files (HI-2439), each `<folder>/<label>`, once Hive ships them.
+    const dialects = join(RES, 'dialects')
+    for (const folder of existsSync(dialects) ? readdirSync(dialects) : []) {
+      for (const f of readdirSync(join(dialects, folder)).filter((n) => n.endsWith('.json'))) {
+        const id = `${folder}/${f.slice(0, -5)}`
+        expect(history.dialects[id]?.at(-1), `${id}: run npm run bundled-history`).toBe(await contentHash(join(dialects, folder, f)))
+      }
     }
   })
 

@@ -1,6 +1,6 @@
-// Records each version of Hive's bundled skills and modes (resources/skills, resources/modes) in
-// src/main/bundledHistory.json, oldest first, so a workspace's untouched copy of an older version can be told from one
-// the user changed (src/main/bundled.ts). Run it after changing a bundled skill or mode: `npm run bundled-history`
+// Records each version of Hive's bundled skills, modes and dialect files (resources/skills, resources/modes,
+// resources/dialects/<folder>/*.json, HI-2439) in src/main/bundledHistory.json, oldest first, so a workspace's untouched copy of an older version can be told from one
+// the user changed (src/main/bundled.ts). Run it after changing a bundled skill, mode or dialect file: `npm run bundled-history`
 // (tests/bundled.test.ts fails until the current versions are recorded). Entries are only ever appended.
 // `--from-git` also walks the git history for versions not yet recorded (how the file was first made).
 import { execFileSync } from 'child_process'
@@ -56,7 +56,7 @@ function gitVersions(rel, isFile) {
 }
 
 const fromGit = process.argv.includes('--from-git')
-const history = existsSync(out) ? JSON.parse(readFileSync(out, 'utf8')) : { skills: {}, modes: {} }
+const history = { skills: {}, modes: {}, dialects: {}, ...(existsSync(out) ? JSON.parse(readFileSync(out, 'utf8')) : {}) }
 let added = 0
 const record = (kind, id, h) => {
   const list = (history[kind][id] ??= [])
@@ -74,6 +74,20 @@ for (const [kind, dir, isFile] of [['skills', 'resources/skills', false], ['mode
     record(kind, id, hash(filesOnDisk(join(root, rel))))
   }
 }
+// Dialect files: one per file in each folder (a provider's id, or api), their id `<folder>/<label>`.
+const DIALECTS = 'resources/dialects'
+if (existsSync(join(root, DIALECTS))) {
+  for (const f of readdirSync(join(root, DIALECTS), { withFileTypes: true })) {
+    if (!f.isDirectory() || !/^[a-z0-9][a-z0-9-]*$/.test(f.name)) continue
+    for (const e of readdirSync(join(root, DIALECTS, f.name), { withFileTypes: true })) {
+      if (!e.isFile() || !e.name.endsWith('.json') || e.name.startsWith('.')) continue
+      const id = `${f.name}/${e.name.slice(0, -5)}`
+      const rel = `${DIALECTS}/${f.name}/${e.name}`
+      if (fromGit) for (const h of gitVersions(rel, true)) if (!(history.dialects[id] ?? []).includes(h)) record('dialects', id, h)
+      record('dialects', id, hash(filesOnDisk(join(root, rel))))
+    }
+  }
+}
 const sorted = (o) => Object.fromEntries(Object.keys(o).sort().map((k) => [k, o[k]]))
-writeFileSync(out, JSON.stringify({ skills: sorted(history.skills), modes: sorted(history.modes) }, null, 2) + '\n')
+writeFileSync(out, JSON.stringify({ skills: sorted(history.skills), modes: sorted(history.modes), dialects: sorted(history.dialects) }, null, 2) + '\n')
 console.log(added ? `Recorded ${added} new version(s) in src/main/bundledHistory.json` : 'Every bundled version is already recorded.')
