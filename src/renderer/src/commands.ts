@@ -369,6 +369,22 @@ const COMMAND_DEFS: CommandDef[] = [
     run: () => actions.attempt(tr(msg({ id: 'shell.error.stopLeftAfterClose', defaultMessage: 'Could not stop the processes', description: "An error's title: ending the processes the agents had started before Hive closed unexpectedly failed." })), () => call('app:stopLeftAfterClose'))
   },
   {
+    id: 'profile.removeBackup',
+    name: msg({ id: 'shell.command.profile.removeBackup', defaultMessage: "Remove Hive's Old Data Folders", description: "A command (the menus, the command palette, Settings → Keyboard Shortcuts), in the Help category: moves the backup of the app's data folders from before they moved to the Combwork folders (HI-2461) to the Recycle Bin. It isn't in the menus or the palette: notifications and buttons run it by its name." }),
+    category: 'help',
+    // Only from the notice offering it (HI-2461), which names the folders.
+    internal: true,
+    run: () => actions.attempt(tr(msg({ id: 'shell.error.removeProfileBackup', defaultMessage: "Could not remove the old data folders", description: "An error's title: moving the backup of the app's old data folders to the Recycle Bin failed." })), () => call('app:removeProfileBackup'))
+  },
+  {
+    id: 'profile.keepBackup',
+    name: msg({ id: 'shell.command.profile.keepBackup', defaultMessage: "Keep Hive's Old Data Folders", description: "A command (the menus, the command palette, Settings → Keyboard Shortcuts), in the Help category: keeps the backup of the app's data folders from before they moved to the Combwork folders (HI-2461), and Hive doesn't offer to remove it again. It isn't in the menus or the palette: notifications and buttons run it by its name." }),
+    category: 'help',
+    // Only from the notice offering it (HI-2461).
+    internal: true,
+    run: () => actions.attempt(tr(msg({ id: 'shell.error.keepProfileBackup', defaultMessage: "Could not keep the old data folders", description: "An error's title: recording that the backup of the app's old data folders is kept failed." })), () => call('app:keepProfileBackup'))
+  },
+  {
     id: 'session.resumeRestart',
     name: msg({ id: 'shell.command.session.resumeRestart', defaultMessage: 'Resume the Agents Working When Hive Closed', description: "A command (the menus, the command palette, Settings → Keyboard Shortcuts), in the Session category: resumes the agents that were working when Hive was last quit or restarted. It isn't in the menus or the palette: notifications and buttons run it by its name." }),
     category: 'session',

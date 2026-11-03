@@ -46,6 +46,7 @@ import { closeCommandsRun, closeCommandState, closeWithCommand, controlRun, dism
 import { cleanHive, cleanWorkspace } from '../shared/commands'
 import { diagnostics } from './diagnostics'
 import { resumeAfterClose, startupStep, stopLeftAfterClose } from './lastRun'
+import { keepProfileBackups, removeProfileBackups } from './profileMoveNotices'
 import { dismissOffered, resumeOffered, workspaceRecovering } from './restartResume'
 import { keepAwakeCount } from './power'
 import { progress, progressSeq } from './progressService'
@@ -532,6 +533,8 @@ export function registerIpc(getAppInfo: () => ReturnType<HiveRequests['app:info'
       return { resumed: r.resumed.length, failed: r.failed.length }
     },
     'app:stopLeftAfterClose': () => stopLeftAfterClose(),
+    'app:removeProfileBackup': () => removeProfileBackups(),
+    'app:keepProfileBackup': () => keepProfileBackups(),
     'app:resumeRestart': () => resumeOffered(),
     'app:dismissRestart': () => dismissOffered(),
     'update:state': () => updater.updateState(),

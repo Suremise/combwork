@@ -2,6 +2,10 @@
 
 ## Unreleased
 
+### Changed
+
+- **Your data folders are now Combwork's** (HI-2461), part of the app's rename to Combwork: `%APPDATA%\Hive` becomes `%APPDATA%\Combwork`, and `%LOCALAPPDATA%\Hive` (accounts and their sign-ins) becomes `%LOCALAPPDATA%\Combwork`. The first start copies them across before anything else runs, with your settings, usage and logs, and keeps the old folders, renamed to a dated backup, until you remove them: from the start after the new folders first open, a notice offers **Remove** (to the Recycle Bin) or **Keep**. A copy that can't finish (a file in use, a full disk) changes nothing: Hive says so, uses the old folders as before and tries again next time. A connection whose sign-in didn't carry across is named once, to sign in to again.
+
 ### Fixed
 
 - **A lane waiting for a slot gets it once the slot is free** (HI-2466). A lane started just after its builder's last one ended could find the only free slot still in use for a moment: the builder's last processes still closing there. It then waited for a slot even after that one came free, until the lane was ended and started again, and said every slot was in use. Hive now looks again until the slot is free, and the lane says which slot it waits for and what still uses it.

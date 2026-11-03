@@ -22,7 +22,7 @@ import { initAssistantModes } from './assistantMode'
 import { app, BrowserWindow, dialog, Menu, nativeTheme, protocol, screen, session, shell } from 'electron'
 import { execFile } from 'child_process'
 import { appendFileSync, createReadStream, existsSync } from 'original-fs'
-import { basename, join, resolve, sep } from 'path'
+import { basename, dirname, join, resolve, sep } from 'path'
 import { appendFile, readFile, stat } from 'original-fs/promises'
 import { Readable } from 'stream'
 import type { AppInfo, CloseReason, McpServerDef, QuitChoice, QuitScope, QuitSession, TaskCard, WindowState } from '../shared/types'
@@ -36,7 +36,9 @@ import { handoversFor } from './notes'
 import { assistantInstructions } from './modes'
 import { ASSISTANT_NAME, assistantModeId } from '../shared/assistant'
 import { MARKED_LOG } from '../shared/redact'
-import { APP_NAME, DEV_APP_NAME, appName, profileFolder } from '../shared/appName'
+import { APP_NAME, DEV_APP_NAME, appName, legacyProfileFolder, profileFolder } from '../shared/appName'
+import { moveProfile, outcomeLine, REGENERATED, setProfileMoves } from './profileMove'
+import { startProfileMoveNotices } from './profileMoveNotices'
 import { PROVIDERS, dangerModes, labelList, projectProviderConfig, providerSettings } from '../shared/providers'
 import { projectAgents } from '../shared/defaults'
 import { setDateStyle } from '../shared/dates'
@@ -137,9 +139,33 @@ let quitting = false
 // Development builds use their own profile (and Agent API port, see servers.ts) so they can run
 // alongside the installed Hive — e.g. while developing Hive from a session inside Hive.
 // HIVE_USER_DATA overrides the profile folder for tests. The installed app's is set too: Electron would name it after
-// productName, "Hive Desktop", but users' settings and conversations are in %APPDATA%\Hive (#443).
-if (process.env.HIVE_USER_DATA) app.setPath('userData', process.env.HIVE_USER_DATA)
-else app.setPath('userData', join(app.getPath('appData'), profileFolder(app.isPackaged)))
+// productName. The profile folders moved from Hive's names to Combwork's (HI-2461): the first start of this build copies
+// them across before anything reads them (profileMove.ts), and a failed copy keeps the old folder for this run.
+const profileMoveLines: string[] = []
+if (process.env.HIVE_USER_DATA && !app.isPackaged && process.env.HIVE_TEST_PROFILE_MOVE === '1') {
+  // A test copy of the move (unpackaged only): its profile is the new folder, and `Hive-Dev` beside it the old one.
+  const profile = resolve(process.env.HIVE_USER_DATA)
+  const roaming = moveProfile(dirname(profile), legacyProfileFolder(false), basename(profile), { skip: REGENERATED })
+  if (roaming.kind === 'busy') process.exit(0)
+  setProfileMoves({ roaming, local: null })
+  const line = outcomeLine(roaming, userText)
+  if (line) profileMoveLines.push(line)
+  app.setPath('userData', roaming.use)
+} else if (process.env.HIVE_USER_DATA) app.setPath('userData', process.env.HIVE_USER_DATA)
+else {
+  const local = process.env.LOCALAPPDATA || join(app.getPath('home'), 'AppData', 'Local')
+  const roaming = moveProfile(app.getPath('appData'), legacyProfileFolder(app.isPackaged), profileFolder(app.isPackaged), { skip: REGENERATED })
+  // Another start copying now: it becomes the Hive that runs, as a second start does.
+  if (roaming.kind === 'busy') process.exit(0)
+  const localMove = moveProfile(local, legacyProfileFolder(app.isPackaged), profileFolder(app.isPackaged))
+  if (localMove.kind === 'busy') process.exit(0)
+  setProfileMoves({ roaming, local: localMove })
+  for (const o of [roaming, localMove]) {
+    const line = outcomeLine(o, userText)
+    if (line) profileMoveLines.push(line)
+  }
+  app.setPath('userData', roaming.use)
+}
 // Key masking as the profile's files say, before the first line is logged (HI-1855): strict only where a key may be.
 startCoverageEarly()
 // Every way out from here on is logged (#985).
@@ -969,6 +995,7 @@ app.whenReady().then(async () => {
   Menu.setApplicationMenu(null)
   // Says the log marks the user's own text (userText()), so Copy Diagnostics can tell this run's lines from older ones.
   log.info(`Hive ${app.getVersion()} starting (Electron ${process.versions.electron}; ${MARKED_LOG})`)
+  for (const line of profileMoveLines) log.info(line)
   logCrashDumps()
   // The last run's marker (#984): still there, it ended without quitting; then this run's own.
   // The agents a restart or quit recorded (HI-1707), read first: the unexpected-close notice leaves those to it.
@@ -1287,12 +1314,14 @@ app.whenReady().then(async () => {
       void offerRestoredLeftovers().catch((e) => log.warn('offering what agents left running before Hive restarted', e))
       void tellUnexpectedClose().catch((e) => log.warn('telling Hive closed unexpectedly', e))
       void startRestartRecovery().catch((e) => log.warn('resuming the agents a restart recorded', e))
+      void startProfileMoveNotices().catch((e) => log.warn('telling what the profile move did', e))
     }, 1500)
   })
   if (!first) {
     void offerRestoredLeftovers().catch((e) => log.warn('offering what agents left running before Hive restarted', e))
     void tellUnexpectedClose().catch((e) => log.warn('telling Hive closed unexpectedly', e))
     void startRestartRecovery().catch((e) => log.warn('resuming the agents a restart recorded', e))
+    void startProfileMoveNotices().catch((e) => log.warn('telling what the profile move did', e))
   }
   createTray(() => lastFocused()?.win ?? null, {
     quit: () => void requestQuit(),

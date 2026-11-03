@@ -12,7 +12,10 @@ export const DEV_APP_NAME = 'Hive Desktop Dev'
 export const appName = (packaged: boolean): string => (packaged ? APP_NAME : DEV_APP_NAME)
 
 /**
- * The profile folder in %APPDATA%: the names from before the rename, kept so nothing users stored moves. Electron
- * would take productName ("Hive Desktop") for it, so main sets it explicitly.
+ * The profile folder, in %APPDATA% and %LOCALAPPDATA% (HI-2461): Combwork's. Electron would take productName for it, so
+ * main sets it explicitly.
  */
-export const profileFolder = (packaged: boolean): string => (packaged ? 'Hive' : 'Hive-Dev')
+export const profileFolder = (packaged: boolean): string => (packaged ? 'Combwork' : 'Combwork-Dev')
+
+/** The profile folder's name before HI-2461, which the first start of a Combwork build moves (main/profileMove.ts). */
+export const legacyProfileFolder = (packaged: boolean): string => (packaged ? 'Hive' : 'Hive-Dev')

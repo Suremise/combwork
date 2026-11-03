@@ -10,6 +10,7 @@ import { baseValues, cliDefaults, connectionFor, COPILOT_ACCOUNT, homeAccount, s
 import { acceptable, accountState, baseConnection, connectionsOn, launchValues, movedInGroup, resolveAgentConnection, type AgentConnection, type ConnectionPatch, type ConnectionRow, type ConnectionTrust, type ConnectionUser, movedConnection, topOfOrder, valuesOf, workspaceAccounts, switchedOn, type ConnectionsView } from '../shared/accounts'
 import { ASSISTANT_NAME } from '../shared/assistant'
 import { profileFolder } from '../shared/appName'
+import { localProfileInUse } from './profileMove'
 import { agentProvider, extraArgsProblem, isProviderEnabled, modeOption, providerDescriptor, PROVIDERS } from '../shared/providers'
 import { fmt, msg, tr, type Msg } from '../shared/i18n'
 import { advanced } from './advanced'
@@ -65,11 +66,14 @@ const CONFIRM_ROUNDS = 3
 // ---------------------------------------------------------------------------
 
 /**
- * The accounts folder: the installed Hive's `%LOCALAPPDATA%\Hive\accounts`, a dev build's `Hive-Dev`'s, and a test
- * profile's own (under HIVE_USER_DATA), so no test reaches the user's.
+ * The accounts folder: the installed app's `%LOCALAPPDATA%\Combwork\accounts`, a dev build's `Combwork-Dev`'s, and a
+ * test profile's own (under HIVE_USER_DATA), so no test reaches the user's. The local profile folder is the one this run
+ * uses, as the profile move left it (HI-2461: the old `Hive` folder for a run whose copy failed).
  */
 export function accountsRoot(): string {
   if (process.env.HIVE_USER_DATA) return join(process.env.HIVE_USER_DATA, 'accounts')
+  const inUse = localProfileInUse()
+  if (inUse) return join(inUse, 'accounts')
   const local = process.env.LOCALAPPDATA || join(app.getPath('home'), 'AppData', 'Local')
   return join(local, profileFolder(app.isPackaged), 'accounts')
 }

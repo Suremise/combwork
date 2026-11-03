@@ -41,7 +41,7 @@ An app that shows Hive, such as Apiary, reads it with a **viewer token**: read-o
 - **Every other request is refused (403)**, before its body is read or its route looked up: every `POST`, `PUT`, `PATCH` and `DELETE`, including the waits (`POST /v1/tasks/wait`, `POST /v1/agents/wait`) and progress reports. It changes nothing.
 - It works while the Agent API is on, as the workspace token does.
 
-The **discovery file**, `agent-api-discovery.json` in Hive's profile (`%APPDATA%\Hive`; the development build's is `%APPDATA%\Hive-Dev`), tells another app where a running Hive's API is, without reading Hive's private `config.json`:
+The **discovery file**, `agent-api-discovery.json` in Hive's profile (`%APPDATA%\Combwork`; the development build's is `%APPDATA%\Combwork-Dev`; before 1.1, `Hive` and `Hive-Dev`), tells another app where a running Hive's API is, without reading Hive's private `config.json`:
 
 ```json
 { "app": "Hive", "version": "0.6.1", "api": 4, "url": "http://127.0.0.1:47821", "port": 47821, "pid": 12345, "startedAt": "2026-10-11T19:30:00.000Z", "note": "…" }
