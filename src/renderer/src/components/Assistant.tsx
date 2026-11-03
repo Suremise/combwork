@@ -8,7 +8,8 @@ import { formatTime } from '@shared/dates'
 import { agentOpenRun, runWords } from '@shared/progress'
 import { columnName } from '@shared/tasks'
 import { agentProvider, modeOption, providerDescriptor } from '@shared/providers'
-import type { AgentInfo, AgentPatch, Connection, ModeInfo, ProgressRun, ProjectInfo, ProviderId } from '@shared/types'
+import type { AgentInfo, AgentPatch, AssistantQuestion, Connection, ModeInfo, ProgressRun, ProjectInfo, ProviderId } from '@shared/types'
+import { shownText } from '@shared/advanced'
 import { withSnapshot } from '@shared/assistantChangeList'
 import * as actions from '../actions'
 import { call } from '../api'
@@ -650,6 +651,9 @@ function AssistantHeader({ project, a }: { project: ProjectInfo; a: AgentInfo })
   )
 }
 
+/** A question's text as the window shows it (HI-2449): in the language Hive shows, or as Hive sent it with none. */
+const questionText = (q: AssistantQuestion, field: 'title' | 'message' | 'yes' | 'no'): string => (q.text ? shownText(q.text[field]) : q[field])
+
 /** Questions the Assistant's actions wait on (e.g. stopping a busy agent): the user answers on the card. */
 function AssistantQuestions() {
   const questions = useStore((s) => s.assistantQuestions)
@@ -658,18 +662,18 @@ function AssistantQuestions() {
   return (
     <div className="assistant-questions">
       {questions.map((q) => (
-        <div key={q.id} className="assistant-question" role="alertdialog" aria-label={q.title}>
+        <div key={q.id} className="assistant-question" role="alertdialog" aria-label={questionText(q, 'title')}>
           <div className="assistant-question-title">
-            <Icon name="question" /> {q.title}
+            <Icon name="question" /> {questionText(q, 'title')}
           </div>
-          <div className="assistant-question-message">{q.message}</div>
+          <div className="assistant-question-message">{questionText(q, 'message')}</div>
           <div className="assistant-question-buttons">
             {/* Answered once: a second click while the answer goes is ignored. */}
             <button className="btn small subtle" disabled={!!answering[`answer:${q.id}`]} onClick={() => void runOnce(`answer:${q.id}`, () => call('assistant:answer', q.id, false))}>
-              {q.no}
+              {questionText(q, 'no')}
             </button>
             <button className="btn small danger" disabled={!!answering[`answer:${q.id}`]} onClick={() => void runOnce(`answer:${q.id}`, () => call('assistant:answer', q.id, true))}>
-              {q.yes}
+              {questionText(q, 'yes')}
             </button>
           </div>
         </div>
@@ -696,7 +700,7 @@ function AssistantStatus({ a }: { a: AgentInfo }) {
   const done = useDoneCount()
   const ws = useStore((s) => s.workspace?.path ?? '')
   const open = useStore((s) => s.panes[doneOpenKey(ws)] === 1)
-  const line = assistantStatusLine(live, (iso) => formatTime(iso), approvals.map((q) => q.title))
+  const line = assistantStatusLine(live, (iso) => formatTime(iso), approvals.map((q) => questionText(q, 'title')))
   const whole = tr(M.status, { text: `${line.text}${line.cards.map((n) => cardLabelOf({ tasks }, n)).join(', ')}${line.after}` })
   const toggle = (): void => {
     const key = doneOpenKey(ws)
