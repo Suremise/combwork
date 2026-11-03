@@ -15,6 +15,8 @@ import { HISTORY } from './taskHistory'
 import { COLUMN_CHOICES, COLUMN_IDS, TASK_COLUMNS, columnLabel, isLoopStepEntry } from './tasks'
 import { cardRef } from './projectKeys'
 import { CAME_BACK } from './workflow/queue'
+import { agentMsg, say } from './agentText'
+import { NOTICE_PREFIX } from './doorbell'
 
 /**
  * What counts as a change: a column move, a new comment, a review verdict, a change of agent. Default: any. `blocked` (a
@@ -541,6 +543,106 @@ export function wakeAbout(card: TaskCard | null, changes: WatchChange[] | 'gone'
   return { owner, verdict: wanted && current ? { passed, by: current.by } : null, ...(returned !== null ? { returned } : {}) }
 }
 
+/**
+ * The wake lines' words (dialects, HI-2437): each said in the dialect of the session the wake is for (the caller's scope:
+ * inDialectOf). `[Hive] ` (NOTICE_PREFIX) is protocol, prepended in code. A line is cut to fit WAKE_MAX_BYTES by giving
+ * way in its parts (a comment's first line, then details), so a line is said from its parts, each a message.
+ */
+const W = {
+  lanesRunning: agentMsg({ id: 'wake.card.lanesRunning', text: 'Lanes are still running (hive_lane list): before you end your turn, watch them again in one lane watch, with any card outside them as cards (hive_wait_for_tasks with lanes ["all"], cards, wake; run-lanes).', note: "#402: what the Assistant's card wake ends with while lanes run: its watch has ended, and the lanes still need one. Kept whole: the rest of the line is cut to make room." }),
+  cardEnded: agentMsg({ id: 'wake.card.ended', text: '{more, plural, =0 {} one { (and # more watched card changed)} other { (and # more watched cards changed)}}. Your card watch has ended: carry on (hive_read_task with latestComment for the comment in full).', note: "The end of a card watch's wake line, after the card and where it is now. more: other watched cards that changed too." }),
+  withComment: agentMsg({ id: 'wake.card.withComment', text: '{head}; latest comment by {by}: "{comment}"{tail}', note: "A wake line with the card's latest comment: head is the card and where it is now, by the comment's author, comment its first line (cut with … to fit), tail what to do." }),
+  archived: agentMsg({ id: 'wake.card.archived', text: 'was archived (off the board: only the user brings it back)', note: '#351: after the card\'s key, in a wake: it was archived.' }),
+  gone: agentMsg({ id: 'wake.card.gone', text: 'is gone from your board (archived, deleted or moved to another project)', note: "After the card's key, in a wake: the card is out of the agent's view." }),
+  owner: agentMsg({ id: 'wake.card.owner', text: "({owner}'s card)", note: "After the card's key, in a wake, when another agent has the card: its agent's name." }),
+  verdict: agentMsg({ id: 'wake.card.verdict', text: ': {by} {passed, select, yes {passed} other {failed}} it', note: 'After where a card is, in a wake: its review\'s verdict and reviewer. passed: yes or no.' }),
+  notMerged: agentMsg({ id: 'wake.card.notMerged', text: "(Passed isn't merged)", note: "#170: another agent's card in Passed: the review passed, the work isn't merged (Done is)." }),
+  blocked: agentMsg({ id: 'wake.card.blocked', text: 'and blocked', note: '#726: after where a card is, in a wake: it became blocked (its reason left out to fit).' }),
+  blockedWhy: agentMsg({ id: 'wake.card.blockedWhy', text: 'and blocked: "{why}"', note: '#726: after where a card is, in a wake: it became blocked, and why (cut with … to fit).' }),
+  returned: agentMsg({ id: 'wake.card.returned', text: '{owner} was returned for review (round {round}){verdict}{blocked}{said}', note: "#214: after the card's key, in a wake: a failed card returned for review without leaving Review. owner, verdict, blocked and said are the line's other parts, or empty." }),
+  inColumn: agentMsg({ id: 'wake.card.inColumn', text: '{owner} is in {column}{verdict}{merged}{blocked}{said}', note: "After the card's key, in a wake: where it is now (a column's name). owner, verdict, merged, blocked and said are the line's other parts, or empty." }),
+  handRequest: agentMsg({ id: 'wake.card.request', text: 'its reviewer asks you something', note: "#912: in a wake's brackets: the card's reviewer asked its builder for something." }),
+  handDecision: agentMsg({ id: 'wake.card.decision', text: 'a new decision from the user: read its decisions', note: '#1272: in a wake\'s brackets: the user recorded or changed a decision on the card.' }),
+  handStep: agentMsg({ id: 'wake.card.step', text: 'a card loop step: read its latest comment', note: "#1382: in a wake's brackets: a card loop's step (a design, a follow-up, an answer)." }),
+  resubmitted: agentMsg({ id: 'wake.card.resubmitted', text: '{card} is back in Review after the merge queue returned it', note: 'HI-2143: for its reviewer, a card submitted again after the merge queue returned it (its details left out to fit).' }),
+  partComment: agentMsg({ id: 'wake.card.partComment', text: '{head} (latest comment by {by}: "{comment}")', note: "One card's part in a wake telling several: head the card and where it is, by the comment's author, comment its first line (cut with … to fit)." }),
+  manyEnded: agentMsg({ id: 'wake.many.ended', text: '. Your card watch has ended: carry on (hive_read_task with latestComment on each card for its comment in full).', note: '#224: the end of a wake line telling several watched cards.' }),
+  manyShort: agentMsg({ id: 'wake.many.short', text: '. Your card watch has ended. Details were left out to fit: read each card (hive_read_task) before you carry on.', note: '#226: the end of a wake line telling too many cards to say each in full.' }),
+  numbersChanged: agentMsg({ id: 'wake.many.numbers', text: '{cards} changed{short}', note: '#226: a wake line naming its cards by key alone ("HI-1, HI-2"); short is its end (wake.many.short).' }),
+  numbersMore: agentMsg({ id: 'wake.many.numbersMore', text: '{cards} and {more, plural, one {# more watched card} other {# more watched cards}} changed{short}', note: '#226: a wake line naming as many cards as fit, the rest counted; short is its end (wake.many.short).' }),
+  countChanged: agentMsg({ id: 'wake.many.count', text: '{n} watched cards changed{short}', note: '#226: a wake line counting its cards, when not even their keys fit; short is its end.' }),
+  briefGone: agentMsg({ id: 'wake.brief.gone', text: '{card} {archived, select, yes {archived} other {gone}}', note: '#226: a card in a few words, in a wake too long to tell each in full: archived, or gone from view.' }),
+  briefReturned: agentMsg({ id: 'wake.brief.returned', text: '{card} returned for review (round {round})', note: '#226: a card in a few words: returned for review.' }),
+  briefIn: agentMsg({ id: 'wake.brief.in', text: '{card} in {column}', note: '#226: a card in a few words: its column. What changed follows, each after ", " (wake.brief.passed…).' }),
+  briefPassed: agentMsg({ id: 'wake.brief.passed', text: 'passed', note: '#226: after a card in a few words: its review passed.' }),
+  briefFailed: agentMsg({ id: 'wake.brief.failed', text: 'failed', note: '#226: after a card in a few words: its review failed.' }),
+  briefBlocked: agentMsg({ id: 'wake.brief.blocked', text: 'blocked', note: '#226, #726: after a card in a few words: it became blocked.' }),
+  briefRequest: agentMsg({ id: 'wake.brief.request', text: 'a request', note: "#226, #912: after a card in a few words: its reviewer's request." }),
+  briefDecision: agentMsg({ id: 'wake.brief.decision', text: 'a decision', note: '#226, #1272: after a card in a few words: a new decision.' }),
+  briefStep: agentMsg({ id: 'wake.brief.step', text: 'a loop step', note: "#226, #1382: after a card in a few words: a card loop's step." }),
+  replyNote: agentMsg({ id: 'wake.reply.note', text: '{user} replied to {agent} on {cards}{quoted, select, yes {: "{text}"} other {}}', note: "#418: in the Assistant's card wake: the user's reply to an agent of watched cards. user: the user's name; text: the reply's first line, when quoted is yes." }),
+  repliesEnded: agentMsg({ id: 'wake.reply.ended', text: '. Your card watch has ended: carry on (hive_read_task for the card, hive_agent_activity for the agent).', note: "#418: the end of the Assistant's card wake telling only the user's replies." }),
+  repliesShort: agentMsg({ id: 'wake.reply.short', text: '. Your card watch has ended. Details were left out to fit: read each card (hive_read_task) and agent (hive_agent_activity) before you carry on.', note: "#418: the end of the Assistant's card wake when its details don't fit." }),
+  leftWatch: agentMsg({ id: 'wake.reply.leftWatch', text: '{cards} left your watch', note: "#420: in the Assistant's short card wake: cards that left its watch." }),
+  repliedTo: agentMsg({ id: 'wake.reply.repliedTo', text: '{user} replied to {who}', note: "#418: in the Assistant's short card wake: the user replied to these agents." }),
+  changed: agentMsg({ id: 'wake.reply.changed', text: '{cards} changed', note: "In the Assistant's short card wake: the watched cards that changed, by key." }),
+  repliedToAgents: agentMsg({ id: 'wake.reply.repliedToAgents', text: '{user} replied to agents of your watched cards{short}', note: "#418: the Assistant's card wake when nothing more fits; short is its end (wake.reply.short)." }),
+  relBlocked: agentMsg({ id: 'wake.released.blocked', text: '{card} is blocked{quoted, select, yes {: "{why}"} other {}}', note: '#420: a card that left a watch saved before #481: blocked, and why when quoted is yes.' }),
+  relReviewedBy: agentMsg({ id: 'wake.released.reviewedBy', text: '{card} is reviewed by {reviewer}', note: '#420: a card that left a watch: another agent reviews it.' }),
+  relReviewTaken: agentMsg({ id: 'wake.released.reviewTaken', text: "{card}'s review was taken from you", note: "#420: a card that left a reviewer's watch: its review was stopped or cleared by someone else." }),
+  relDone: agentMsg({ id: 'wake.released.done', text: '{card} is in Done', note: '#1475: a card that left a watch: it reached Done (merged).' }),
+  relLaneEnded: agentMsg({ id: 'wake.released.laneEnded', text: "{card}'s lane {abandoned, select, yes {was abandoned} other {ended}}", note: "#1475: a card that left a watch: the watcher's lane on it ended, or was abandoned." }),
+  relReassignedTo: agentMsg({ id: 'wake.released.reassignedTo', text: '{card} was reassigned to {agent}', note: '#420: a card that left a watch: given to another agent.' }),
+  relReassigned: agentMsg({ id: 'wake.released.reassigned', text: '{card} was reassigned (it has no agent now)', note: '#420: a card that left a watch: taken from its agent, given to none.' }),
+  relEnded: agentMsg({ id: 'wake.released.ended', text: '{head} (your watch on it ended)', note: '#420: after what happened to a card that left a watch.' }),
+  relOverTail: agentMsg({ id: 'wake.released.overTail', text: ". Your card watch has ended: there is nothing more to wait for on {n, plural, one {it} other {them}}. Don't watch {n, plural, one {it} other {them}} again; end your turn unless you have other work.", note: '#1475: the end of a wake whose every card left for good (Done, its lane ended): the agent ends its turn, so the next prompt finds it free.' }),
+  relDropTail: agentMsg({ id: 'wake.released.dropTail', text: '. Your card watch has ended: drop {n, plural, one {it} other {them}} from your list and carry on with your next card.', note: '#420: the end of a wake whose every card left the watch.' }),
+  relLeft: agentMsg({ id: 'wake.released.left', text: '{cards} left your watch ({over, select, yes {done, or its lane ended} other {reassigned, or reviewed by another}}){tail}', note: '#420: a wake whose cards left the watch, when their details don\'t fit; tail is its end.' }),
+  whereWaits: agentMsg({ id: 'wake.where.waits', text: '{card} waits on {on}', note: "HI-2381: a timed-out watch's card waiting on other agents' cards in progress (on: their keys)." }),
+  whereWorking: agentMsg({ id: 'wake.where.working', text: '{card} is in Doing with {agent}', note: "HI-2381: a timed-out watch's card that another agent is building." }),
+  whereReviewing: agentMsg({ id: 'wake.where.reviewing', text: '{card} is in Review, being reviewed by {agent}', note: "HI-2295: a timed-out watch's card in Review, being reviewed." }),
+  whereAssigned: agentMsg({ id: 'wake.where.assigned', text: "{card} is in Review: the reviewer pool gave it to {agent}, who hasn't started yet", note: "HI-2295: a timed-out watch's card the reviewer pool gave to a reviewer that hasn't started." }),
+  wherePool: agentMsg({ id: 'wake.where.pool', text: '{card} is in Review, waiting for the reviewer pool to give it to a reviewer', note: "HI-2295: a timed-out watch's card waiting for the reviewer pool." }),
+  whereReview: agentMsg({ id: 'wake.where.review', text: '{card} is in Review, waiting for its reviewer', note: "HI-2295: a timed-out watch's card waiting for its reviewer." }),
+  hours: agentMsg({ id: 'wake.limit.hours', text: '{h} h', note: "A watch's limit in hours (1.5), in its timed-out wake." }),
+  minutes: agentMsg({ id: 'wake.limit.minutes', text: '{m} min', note: "A watch's limit in minutes, in its timed-out wake." }),
+  limitEnded: agentMsg({ id: 'wake.limit.ended', text: 'No change on {cards} in {dur}: your card watch has ended.', note: "The start of a watch's wake when its limit passes with no change." }),
+  stepDrop: agentMsg({ id: 'wake.limit.drop', text: 'drop {n, plural, one {the first} other {those}} from your list', note: '#420: a step in a timed-out watch\'s wake, for the cards that left it (told first). Its first letter is capitalised in code when it comes first.' }),
+  stepWatchReview: agentMsg({ id: 'wake.limit.watchReview', text: "watch {cards} again for {n, plural, one {its} other {their}} verdict (in a card loop, Hive wakes you with it); don't tell the user about {n, plural, one {it} other {them}}", note: 'HI-2295: a step in a timed-out watch\'s wake: a review on its way is nothing to tell the user. Its first letter is capitalised in code when it comes first.' }),
+  stepWatchWaiting: agentMsg({ id: 'wake.limit.watchWaiting', text: "watch {cards} again: another agent's work is going on; don't tell the user about {n, plural, one {it} other {them}}", note: "HI-2381: a step in a timed-out watch's wake: cards waiting on other agents' work. Its first letter is capitalised in code when it comes first." }),
+  stepAsk: agentMsg({ id: 'wake.limit.ask', text: '{rest, select, yes {for the rest, } other {}}tell the user (hive_notify) and ask what to do', note: "A step in a timed-out watch's wake: the cards with no news. rest: yes after other steps. Its first letter is capitalised in code when it comes first." }),
+  shortInReview: agentMsg({ id: 'wake.limit.inReview', text: '{cards} {n, plural, one {is in Review} other {are in Review}}', note: "HI-2295: a timed-out watch's cards in Review, when their details don't fit." }),
+  shortWaiting: agentMsg({ id: 'wake.limit.waiting', text: '{cards} {n, plural, one {waits on work in progress} other {wait on work in progress}}', note: "HI-2381: a timed-out watch's cards waiting on others' work, when their details don't fit." }),
+  leftWatchReassigned: agentMsg({ id: 'wake.limit.left', text: '{cards} left your watch (reassigned, or reviewed by another).', note: "#420: a timed-out watch's cards that left it, when their details don't fit." }),
+  label: agentMsg({ id: 'wake.watch.label', text: 'Waiting for {cards}{hasColumn, select, yes { → {column}} other {}}', note: "What a watching agent shows (the Agent API's watch, its header): its cards, and the column it waits for." }),
+  badCards: agentMsg({ id: 'wake.condition.cards', text: 'cards must be card numbers (at least one, no repeats)', note: "A card watch's or wait's arguments refused." }),
+  tooManyCards: agentMsg({ id: 'wake.condition.tooMany', text: 'at most {max} cards', note: "A card watch's or wait's arguments refused: too many cards." }),
+  badColumn: agentMsg({ id: 'wake.condition.column', text: 'column must be {choices}', note: "A card watch's or wait's arguments refused. choices: the columns' ids." }),
+  badChanges: agentMsg({ id: 'wake.condition.changes', text: 'changes must be any of {choices}', note: "A card watch's or wait's arguments refused. choices: the changes' names." }),
+  columnNeedsChange: agentMsg({ id: 'wake.condition.columnChange', text: 'with column, changes must include "column" (or leave changes out to wait only for the card to be in that column)', note: "#434: a card watch's or wait's arguments refused." }),
+  badFresh: agentMsg({ id: 'wake.condition.fresh', text: 'fresh must be true or false', note: "A card watch's or wait's arguments refused." }),
+  freshNeedsColumn: agentMsg({ id: 'wake.condition.freshColumn', text: 'fresh needs a column: it waits for the next move into it', note: "A card watch's or wait's arguments refused." }),
+  loopReview: agentMsg({ id: 'wake.loop.review', text: 'You review this card in its loop: carry on with it', note: "#405: what a loop wake tells a card's reviewer as it arrives in Review." }),
+  loopStep: agentMsg({ id: 'wake.loop.step', text: "You review this card in its loop: check it and answer with hive_loop_step (ok, or gaps saying what's missing, and its id)", note: "#1382: what a loop wake tells a card's reviewer about a design or follow-up to check." }),
+  loopStepNotice: agentMsg({ id: 'wake.loop.stepNotice', text: 'Nothing to answer: carry on with your loop', note: "#1382: a loop wake telling a reviewer its builder went ahead with a design unchecked." }),
+  loopReply: agentMsg({ id: 'wake.loop.reply', text: 'You review this card in its loop: carry on with your review', note: "HI-2302: a loop wake telling a reviewer its builder's reply." }),
+  loopAnswer: agentMsg({ id: 'wake.loop.answer', text: 'The user answered: carry on from where you asked', note: "#1269: a wake with the user's answer to an agent's question." }),
+  loopOwn: agentMsg({ id: 'wake.loop.own', text: 'This is your card in its loop: carry on', note: "#405: what a loop wake tells a card's builder (a verdict, a request, a note)." }),
+  loopTail: agentMsg({ id: 'wake.loop.tail', text: '. {who} (hive_read_task with latestComment for the comment in full).', note: "#405: the end of a loop wake: who is what it tells the agent (wake.loop.review…, or its lane's next card)." }),
+  loopSaid: agentMsg({ id: 'wake.loop.said', text: '. {whose, select, reviewerAsks {The reviewer asks} builderReplies {The builder replies} builder {The builder} reviewer {The reviewer} other {Hive}}: "{text}"', note: "#912, #1382: in a loop wake, what a request, step or Hive's note says (cut with … to fit), and whose it is." }),
+  lanePaused: agentMsg({ id: 'wake.lane.paused', text: 'Your lane is paused: hive_lane next says why', note: "HI-1990: a builder's Done wake when its lane is paused." }),
+  laneLast: agentMsg({ id: 'wake.lane.last', text: "That was your lane's last card: the lane ends by itself, so end your turn unless you have other work", note: "HI-1990: a builder's Done wake on its lane's last card." }),
+  laneNextHiveStarts: agentMsg({ id: 'wake.lane.nextHiveStarts', text: "Your lane's next card is {card} (\"{title}\"): Hive starts it for you once your turn ends, so end your turn now", note: "HI-1990: a builder's Done wake, its lane's rules on: Hive starts the next card." }),
+  laneNextStart: agentMsg({ id: 'wake.lane.nextStart', text: "Your lane's next card is {card} (\"{title}\"): start it now (hive_lane next, then hive_start_card); this card's own prompt doesn't narrow the lane", note: "HI-1990: a builder's Done wake, its lane's rules off: it starts the next card." }),
+  laneNextStarted: agentMsg({ id: 'wake.lane.nextStarted', text: "Your lane's next card, {card} (\"{title}\"), is under way: carry on with it", note: "HI-1990: a builder's Done wake when its next card is already under way." }),
+  laneNextWaits: agentMsg({ id: 'wake.lane.nextWaits', text: "Your lane's next card is {card} (\"{title}\"): hive_lane next says when it can start", note: "HI-1990: a builder's Done wake when its next card can't start yet." }),
+  stepDesign: agentMsg({ id: 'wake.step.design', text: 'design{id} posted for your check (answer with its id)', note: "#1382: a loop wake's step: a design to check. id: the design's id after a space, or empty." }),
+  stepFollowUp: agentMsg({ id: 'wake.step.followUp', text: 'follow-up{id} ready for your check (answer with its id)', note: "#1467: a loop wake's step: a follow-up to check. id: its id after a space, or empty." }),
+  stepProceed: agentMsg({ id: 'wake.step.proceed', text: 'no check of design{id} came in time: the builder goes ahead with it as posted', note: "#1382: a loop wake's step: the builder went ahead unchecked." }),
+  stepOk: agentMsg({ id: 'wake.step.ok', text: '{of, select, followUp {follow-up} other {design}}{id} is OK', note: "#1382: a loop wake's step: the reviewer's answer. of: what it checked." }),
+  stepGaps: agentMsg({ id: 'wake.step.gaps', text: '{of, select, followUp {follow-up} other {design}}{id} has gaps', note: "#1382: a loop wake's step: the reviewer's answer. of: what it checked." })
+}
+
 /** The most characters a name takes in a wake line (an agent's, a reviewer's, a comment's author): one line, cut with "…". */
 const NAME_MAX = 40
 const shortName = (name: string): string => {
@@ -556,15 +658,16 @@ const jsonBytes = (s: string): number => new TextEncoder().encode(JSON.stringify
  * What the Assistant's card wake ends with while lanes are running (#402): its watch has ended, and the lanes still need
  * one. Kept whole: the rest of the line is cut to make room.
  */
-export const LANES_RUNNING_TAIL = ' Lanes are still running (hive_lane list): before you end your turn, watch them again in one lane watch, with any card outside them as cards (hive_wait_for_tasks with lanes ["all"], cards, wake; run-lanes).'
+export const lanesRunningTail = (): string => ` ${say(W.lanesRunning)}`
 export function withLanesTail(line: string, max = WAKE_MAX_BYTES): string {
-  if (line.endsWith(LANES_RUNNING_TAIL)) return line
+  const tail = lanesRunningTail()
+  if (line.endsWith(tail)) return line
   let s = line
-  if (jsonBytes(s + LANES_RUNNING_TAIL) > max) {
-    while (s && jsonBytes(`${s}…${LANES_RUNNING_TAIL}`) > max) s = s.slice(0, -1)
+  if (jsonBytes(s + tail) > max) {
+    while (s && jsonBytes(`${s}…${tail}`) > max) s = s.slice(0, -1)
     s = `${s}…`
   }
-  return s + LANES_RUNNING_TAIL
+  return s + tail
 }
 
 const firstLine = (text: string, max = 160): string => {
@@ -587,8 +690,7 @@ const columnWord = (c: TaskColumn | 'gone'): string => (c === 'gone' ? 'gone' : 
  * comment's author and first line, then what to do. Kept to one short line (the CLI sends a new line at once).
  */
 export function wakeLine(change: CardChange, more = 0): string {
-  const others = more ? ` (and ${more} more watched card${more === 1 ? '' : 's'} changed)` : ''
-  return lineOf(change, `${others}. Your card watch has ended: carry on (hive_read_task with latestComment for the comment in full).`)
+  return lineOf(change, say(W.cardEnded, { more }))
 }
 
 /**
@@ -614,23 +716,17 @@ export const isReturnNote = (kind: LoopWakeKind, text?: string): boolean => kind
 
 export function loopWakeLine(change: CardChange, kind: LoopWakeKind, text?: string, next?: string): string {
   const who =
-    kind === 'done' && next ? next : kind === 'review' ? 'You review this card in its loop: carry on with it' : kind === 'step'
-        ? "You review this card in its loop: check it and answer with hive_loop_step (ok, or gaps saying what's missing, and its id)"
-        : kind === 'stepNotice'
-          ? 'Nothing to answer: carry on with your loop'
-          : kind === 'reply'
-            ? 'You review this card in its loop: carry on with your review'
-          : kind === 'answer' ? 'The user answered: carry on from where you asked' : 'This is your card in its loop: carry on'
+    kind === 'done' && next ? next : say(kind === 'review' ? W.loopReview : kind === 'step' ? W.loopStep : kind === 'stepNotice' ? W.loopStepNotice : kind === 'reply' ? W.loopReply : kind === 'answer' ? W.loopAnswer : W.loopOwn)
   // A reviewer's request (#912), a card loop's step (#1382) or Hive's own note (stale, an answer, what came back from the
   // merge queue and what to do next: #1354, up to NOTE_MAX): what it says, short, before what to do.
   const said = text ? [...text.replace(/\s+/g, ' ').trim()] : []
   const max = kind === 'request' || kind === 'step' || kind === 'stepAnswer' || kind === 'stepNotice' || kind === 'reply' ? REQUEST_MAX : kind === 'answer' ? ANSWER_MAX : NOTE_MAX
-  const whose = kind === 'request' ? 'The reviewer asks' : kind === 'reply' ? 'The builder replies' : kind === 'step' || kind === 'stepNotice' ? 'The builder' : kind === 'stepAnswer' ? 'The reviewer' : 'Hive'
-  const tail = `. ${who} (hive_read_task with latestComment for the comment in full).`
+  const whose = kind === 'request' ? 'reviewerAsks' : kind === 'reply' ? 'builderReplies' : kind === 'step' || kind === 'stepNotice' ? 'builder' : kind === 'stepAnswer' ? 'reviewer' : 'hive'
+  const tail = say(W.loopTail, { who })
   // HI-2087: Hive's note that the merge queue returned the card leads the line, as a watch's does: its column and the
   // review's pass first made HB2 take HI-2046 for merged.
   if (isReturnNote(kind, text)) return lineOf({ ...change, about: { owner: null, verdict: null, ...change.about, queueReturn: said.slice(0, max).join('') } }, tail)
-  const what = !said.length ? '' : `. ${whose}: "${said.length > max ? `${said.slice(0, max - 1).join('')}…` : said.join('')}"`
+  const what = !said.length ? '' : say(W.loopSaid, { whose, text: said.length > max ? `${said.slice(0, max - 1).join('')}…` : said.join('') })
   return lineOf(change, `${what}${tail}`)
 }
 
@@ -640,19 +736,19 @@ export function loopWakeLine(change: CardChange, kind: LoopWakeKind, text?: stri
  * (`started`) or not yet startable (`waits`); the lane paused; or none left.
  */
 export function laneNextWords(next: { card: number; title: string; is: 'hiveStarts' | 'start' | 'started' | 'waits' } | 'paused' | 'last'): string {
-  if (next === 'paused') return 'Your lane is paused: hive_lane next says why'
-  if (next === 'last') return "That was your lane's last card: the lane ends by itself, so end your turn unless you have other work"
+  if (next === 'paused') return say(W.lanePaused)
+  if (next === 'last') return say(W.laneLast)
   const title = [...next.title.trim()]
-  const card = `${cardRef(next.card)} ("${title.length > 60 ? `${title.slice(0, 59).join('')}…` : title.join('')}")`
+  const values = { card: cardRef(next.card), title: title.length > 60 ? `${title.slice(0, 59).join('')}…` : title.join('') }
   switch (next.is) {
     case 'hiveStarts':
-      return `Your lane's next card is ${card}: Hive starts it for you once your turn ends, so end your turn now`
+      return say(W.laneNextHiveStarts, values)
     case 'start':
-      return `Your lane's next card is ${card}: start it now (hive_lane next, then hive_start_card); this card's own prompt doesn't narrow the lane`
+      return say(W.laneNextStart, values)
     case 'started':
-      return `Your lane's next card, ${card}, is under way: carry on with it`
+      return say(W.laneNextStarted, values)
     case 'waits':
-      return `Your lane's next card is ${card}: hive_lane next says when it can start`
+      return say(W.laneNextWaits, values)
   }
 }
 
@@ -670,24 +766,23 @@ export const LOOP_WAKE_KINDS = ['review', 'verdict', 'approved', 'done', 'reques
  * (its id, which an answer names; `of`: which an answer checked), then its text (English, agent-facing).
  */
 export function loopStepWords(step: string, text: string, design?: string, of?: string): string {
-  const id = design ? ` ${design}` : ''
-  const checked = of === 'followUp' ? 'follow-up' : 'design'
-  const what: Record<string, string> = { design: `design${id} posted for your check (answer with its id)`, followUp: `follow-up${id} ready for your check (answer with its id)`, proceed: `no check of design${id} came in time: the builder goes ahead with it as posted`, ok: `${checked}${id} is OK`, gaps: `${checked}${id} has gaps` }
-  return `${what[step] ?? step}: ${text}`
+  const values = { id: design ? ` ${design}` : '', of: of === 'followUp' ? 'followUp' : 'design' }
+  const what = step === 'design' ? W.stepDesign : step === 'followUp' ? W.stepFollowUp : step === 'proceed' ? W.stepProceed : step === 'ok' ? W.stepOk : step === 'gaps' ? W.stepGaps : null
+  return `${what ? say(what, values) : step}: ${text}`
 }
 export type LoopWakeKind = (typeof LOOP_WAKE_KINDS)[number]
 
 function lineOf(change: CardChange, tail: string): string {
   // HI-2087: a card the merge queue returned leads with the return and its reason (its words name the card).
-  if (change.about?.queueReturn) return returnLine(change.about.queueReturn, (t) => `[Hive] ${t}${tail}`)
+  if (change.about?.queueReturn) return returnLine(change.about.queueReturn, (t) => `${NOTICE_PREFIX}${t}${tail}`)
   // HI-2143: and a card submitted again after that return, for its reviewer.
-  if (change.about?.resubmitted && change.changes !== 'gone') return returnLine(change.about.resubmitted, (t) => `[Hive] ${t}${tail}`)
-  const head = `[Hive] ${cardRef(change.number)}${whereNow(change)}`
-  if (!change.comment) return head + tail
+  if (change.about?.resubmitted && change.changes !== 'gone') return returnLine(change.about.resubmitted, (t) => `${NOTICE_PREFIX}${t}${tail}`)
+  const head = `${cardRef(change.number)}${whereNow(change)}`
+  if (!change.comment) return NOTICE_PREFIX + head + tail
   // The card, its state and what to do always fit (names are short); the comment's first line gives way, cut with "…".
   const by = shortName(change.comment.by)
   let text = [...change.comment.firstLine]
-  const line = (cut: boolean): string => `${head}; latest comment by ${by}: "${text.join('')}${cut ? '…' : ''}"${tail}`
+  const line = (cut: boolean): string => NOTICE_PREFIX + say(W.withComment, { head, by, comment: `${text.join('')}${cut ? '…' : ''}`, tail })
   if (jsonBytes(line(false)) <= WAKE_MAX_BYTES) return line(false)
   while (text.length && jsonBytes(line(true)) > WAKE_MAX_BYTES) text = text.slice(0, -1)
   return line(true)
@@ -737,20 +832,20 @@ function returnLine(back: string, wrap: (t: string) => string): string {
 function whereNow(change: CardChange, blockedMax = 120): string {
   const about = change.about
   // Gone also covers a card moved out of what the agent may see (another project): nothing about it is said then.
-  if (change.changes === 'gone') return change.archived ? ' was archived (off the board: only the user brings it back)' : ' is gone from your board (archived, deleted or moved to another project)'
-  const owner = about?.owner ? ` (${shortName(about.owner)}'s card)` : ''
-  const verdict = about?.verdict ? `: ${shortName(about.verdict.by)} ${about.verdict.passed ? 'passed' : 'failed'} it` : ''
+  if (change.changes === 'gone') return ` ${say(change.archived ? W.archived : W.gone)}`
+  const owner = about?.owner ? ` ${say(W.owner, { owner: shortName(about.owner) })}` : ''
+  const verdict = about?.verdict ? say(W.verdict, { by: shortName(about.verdict.by), passed: about.verdict.passed ? 'yes' : 'no' }) : ''
   // Passed means the review passed, not that the work is merged: Done is merged (#170).
-  const merged = about?.owner && change.column === 'passed' ? " (Passed isn't merged)" : ''
+  const merged = about?.owner && change.column === 'passed' ? ` ${say(W.notMerged)}` : ''
   const why = change.blocked ? [...change.blocked.replace(/\s+/g, ' ').trim()] : []
-  const blocked = change.blocked ? ` and blocked${blockedMax > 0 ? `: "${why.length > blockedMax ? `${why.slice(0, blockedMax - 1).join('')}…` : why.join('')}"` : ''}` : ''
+  const blocked = change.blocked ? ` ${blockedMax > 0 ? say(W.blockedWhy, { why: why.length > blockedMax ? `${why.slice(0, blockedMax - 1).join('')}…` : why.join('') }) : say(W.blocked)}` : ''
   const said = handoffWords(change.changes)
-  return about?.returned ? `${owner} was returned for review (round ${about.returned})${verdict}${blocked}${said}` : `${owner} is in ${columnWord(change.column)}${verdict}${merged}${blocked}${said}`
+  return about?.returned ? say(W.returned, { owner, round: String(about.returned), verdict, blocked, said }) : say(W.inColumn, { owner, column: columnWord(change.column), verdict, merged, blocked, said })
 }
 
 /** What a wake adds for a reviewer's request and a new decision (#1272): " (its reviewer asks you something; a new decision)". */
 function handoffWords(changes: WatchChange[]): string {
-  const said = [changes.includes('request') ? 'its reviewer asks you something' : '', changes.includes('decision') ? 'a new decision from the user: read its decisions' : '', changes.includes('step') ? 'a card loop step: read its latest comment' : ''].filter(Boolean)
+  const said = [changes.includes('request') ? say(W.handRequest) : '', changes.includes('decision') ? say(W.handDecision) : '', changes.includes('step') ? say(W.handStep) : ''].filter(Boolean)
   return said.length ? ` (${said.join('; ')})` : ''
 }
 
@@ -761,7 +856,6 @@ function handoffWords(changes: WatchChange[]): string {
  * named, in a few words (#226: "#217 in Review, passed; #119 in Review, failed"), or by number alone, with the agent told
  * that details were left out. Never cut mid-way, one line, within WAKE_MAX_BYTES.
  */
-const MANY_TAIL = '. Your card watch has ended: carry on (hive_read_task with latestComment on each card for its comment in full).'
 /**
  * A card's part of a line telling several (#224), its latest comment's first line (and why it is blocked, #726) cut to
  * `max` characters (0: left out). A lane watch's line tells its cards with it.
@@ -771,48 +865,49 @@ export function cardPart(c: CardChange, max: number): string {
   const back = c.about?.queueReturn
   if (back && c.changes !== 'gone') {
     const t = [...back.replace(/\.$/, '')]
+    // agent-protocol: CAME_BACK is the return note's own words (shared/workflow/queue.ts), which isReturnNote finds it by
     return max > 0 ? (t.length > max * 2 ? `${t.slice(0, max * 2 - 1).join('')}…` : t.join('')) : `${cardRef(c.number)} ${CAME_BACK}`
   }
   // HI-2143: a card submitted again after that return, for its reviewer.
   const again = c.about?.resubmitted
   if (again && c.changes !== 'gone') {
     const t = [...again.replace(/\s+/g, ' ').trim()]
-    return max > 0 ? (t.length > max * 2 ? `${t.slice(0, max * 2 - 1).join('')}…` : t.join('')) : `${cardRef(c.number)} is back in Review after the merge queue returned it`
+    return max > 0 ? (t.length > max * 2 ? `${t.slice(0, max * 2 - 1).join('')}…` : t.join('')) : say(W.resubmitted, { card: cardRef(c.number) })
   }
   const head = `${cardRef(c.number)}${whereNow(c, max)}`
   if (!c.comment || max <= 0 || c.changes === 'gone') return head
   const t = [...c.comment.firstLine]
-  return `${head} (latest comment by ${shortName(c.comment.by)}: "${t.length > max ? `${t.slice(0, max - 1).join('')}…` : t.join('')}")`
+  return say(W.partComment, { head, by: shortName(c.comment.by), comment: t.length > max ? `${t.slice(0, max - 1).join('')}…` : t.join('') })
 }
 
 export function wakeLines(changes: CardChange[]): string {
   if (changes.length <= 1) return changes.length ? wakeLine(changes[0]) : ''
-  const tail = MANY_TAIL
+  const tail = say(W.manyEnded)
   const part = cardPart
-  const full = (max: number): string => `[Hive] ${changes.map((c) => part(c, max)).join('; ')}${tail}`
+  const full = (max: number): string => `${NOTICE_PREFIX}${changes.map((c) => part(c, max)).join('; ')}${tail}`
   for (const max of [160, 80, 40, 0]) if (jsonBytes(full(max)) <= WAKE_MAX_BYTES) return full(max)
   // Too many to tell in full (#226): every card is still named, with where it is and its verdict, but not whose it is,
   // who reviewed it or what was said; failing that, by number alone. The agent is told to read them.
-  const short = '. Your card watch has ended. Details were left out to fit: read each card (hive_read_task) before you carry on.'
-  const compact = `[Hive] ${changes.map(brief).join('; ')}${short}`
+  const short = say(W.manyShort)
+  const compact = `${NOTICE_PREFIX}${changes.map(brief).join('; ')}${short}`
   if (jsonBytes(compact) <= WAKE_MAX_BYTES) return compact
-  const numbers = `[Hive] ${changes.map((c) => `${cardRef(c.number)}`).join(', ')} changed${short}`
+  const numbers = NOTICE_PREFIX + say(W.numbersChanged, { cards: cards(changes.map((c) => c.number)), short })
   if (jsonBytes(numbers) <= WAKE_MAX_BYTES) return numbers
   // More cards than a watch can have (WATCH_MAX_CARDS): as many numbers as fit, the rest counted.
   for (let shown = changes.length - 1; shown >= 1; shown--) {
-    const more = changes.length - shown
-    const line = `[Hive] ${changes.slice(0, shown).map((c) => `${cardRef(c.number)}`).join(', ')} and ${more} more watched card${more === 1 ? '' : 's'} changed${short}`
+    const line = NOTICE_PREFIX + say(W.numbersMore, { cards: cards(changes.slice(0, shown).map((c) => c.number)), more: changes.length - shown, short })
     if (jsonBytes(line) <= WAKE_MAX_BYTES) return line
   }
-  return `[Hive] ${changes.length} watched cards changed${short}`
+  return NOTICE_PREFIX + say(W.countChanged, { n: String(changes.length), short })
 }
 
 /** A card in a few words, for a wake line too long to tell each in full: where it is, its verdict, nothing else. */
 export function brief(c: CardChange): string {
-  if (c.changes === 'gone' || c.column === 'gone') return `${cardRef(c.number)} ${c.archived ? 'archived' : 'gone'}`
+  if (c.changes === 'gone' || c.column === 'gone') return say(W.briefGone, { card: cardRef(c.number), archived: c.archived ? 'yes' : 'no' })
   const a = c.about
-  if (a?.returned) return `${cardRef(c.number)} returned for review (round ${a.returned})`
-  return `${cardRef(c.number)} in ${columnWord(c.column)}${a?.verdict ? (a.verdict.passed ? ', passed' : ', failed') : ''}${c.blocked ? ', blocked' : ''}${c.changes.includes('request') ? ', a request' : ''}${c.changes.includes('decision') ? ', a decision' : ''}${c.changes.includes('step') ? ', a loop step' : ''}`
+  if (a?.returned) return say(W.briefReturned, { card: cardRef(c.number), round: String(a.returned) })
+  const flags = [a?.verdict ? say(a.verdict.passed ? W.briefPassed : W.briefFailed) : '', c.blocked ? say(W.briefBlocked) : '', c.changes.includes('request') ? say(W.briefRequest) : '', c.changes.includes('decision') ? say(W.briefDecision) : '', c.changes.includes('step') ? say(W.briefStep) : ''].filter(Boolean)
+  return say(W.briefIn, { card: cardRef(c.number), column: columnWord(c.column) }) + flags.map((f) => `, ${f}`).join('')
 }
 
 /**
@@ -826,6 +921,7 @@ export interface ReplyNote {
 }
 
 /** How the user is named in the Assistant's wake lines (#426): Settings → General → Your name, "User" when empty. */
+// agent-protocol: a name, the user's when they set none (Settings → General → Your name), as a name they set is shown
 export const DEFAULT_USER_NAME = 'User'
 export function userNameOf(name: string | undefined): string {
   // One line, a few words: a name can't break the line or take its room.
@@ -835,7 +931,7 @@ export function userNameOf(name: string | undefined): string {
 
 const replyNote = (r: ReplyNote, max: number, user: string): string => {
   const t = [...r.text]
-  return `${user} replied to ${shortName(r.agentName)} on ${cards(r.cards)}${max > 0 ? `: "${t.length > max ? `${t.slice(0, max - 1).join('')}…` : t.join('')}"` : ''}`
+  return say(W.replyNote, { user, agent: shortName(r.agentName), cards: cards(r.cards), quoted: max > 0 ? 'yes' : 'no', text: t.length > max ? `${t.slice(0, max - 1).join('')}…` : t.join('') })
 }
 
 /**
@@ -847,20 +943,20 @@ const replyNote = (r: ReplyNote, max: number, user: string): string => {
 export function cardWakeLine(changes: CardChange[], replies: ReplyNote[], released: Released[] = [], user = DEFAULT_USER_NAME): { line: string; repliesTold: boolean } {
   if (!replies.length && !released.length) return { line: wakeLines(changes), repliesTold: false }
   if (!replies.length && !changes.length) return { line: releasedLine(released), repliesTold: false }
-  const tail = changes.length ? MANY_TAIL : '. Your card watch has ended: carry on (hive_read_task for the card, hive_agent_activity for the agent).'
+  const tail = say(changes.length ? W.manyEnded : W.repliesEnded)
   const fits = (line: string): boolean => jsonBytes(line) <= WAKE_MAX_BYTES
   for (const [max, rmax] of [[160, 120], [80, 80], [40, 40], [0, 40], [0, 0]]) {
-    const line = `[Hive] ${[...released.map((r) => releasedPart(r, true)), ...replies.map((r) => replyNote(r, rmax, user)), ...changes.map((c) => cardPart(c, max))].join('; ')}${tail}`
+    const line = `${NOTICE_PREFIX}${[...released.map((r) => releasedPart(r, true)), ...replies.map((r) => replyNote(r, rmax, user)), ...changes.map((c) => cardPart(c, max))].join('; ')}${tail}`
     if (fits(line)) return { line, repliesTold: true }
   }
-  const short = '. Your card watch has ended. Details were left out to fit: read each card (hive_read_task) and agent (hive_agent_activity) before you carry on.'
-  const compact = `[Hive] ${[...released.map((r) => releasedPart(r, false)), ...replies.map((r) => replyNote(r, 0, user)), ...changes.map(brief)].join('; ')}${short}`
+  const short = say(W.repliesShort)
+  const compact = `${NOTICE_PREFIX}${[...released.map((r) => releasedPart(r, false)), ...replies.map((r) => replyNote(r, 0, user)), ...changes.map(brief)].join('; ')}${short}`
   if (fits(compact)) return { line: compact, repliesTold: true }
   const who = [...new Set(replies.map((r) => shortName(r.agentName)))].join(', ')
-  const numbers = `[Hive] ${[released.length ? `${cards(released.map((r) => r.number))} left your watch` : '', replies.length ? `${user} replied to ${who}` : '', changes.length ? `${changes.map((c) => `${cardRef(c.number)}`).join(', ')} changed` : ''].filter(Boolean).join('; ')}${short}`
+  const numbers = `${NOTICE_PREFIX}${[released.length ? say(W.leftWatch, { cards: cards(released.map((r) => r.number)) }) : '', replies.length ? say(W.repliedTo, { user, who }) : '', changes.length ? say(W.changed, { cards: cards(changes.map((c) => c.number)) }) : ''].filter(Boolean).join('; ')}${short}`
   if (fits(numbers)) return { line: numbers, repliesTold: true }
   // Never past the limit: the cards as a card line tells them; the replies are told by a later wake.
-  return { line: wakeLines(changes) || `[Hive] ${user} replied to agents of your watched cards${short}`, repliesTold: !changes.length }
+  return { line: wakeLines(changes) || NOTICE_PREFIX + say(W.repliedToAgents, { user, short }), repliesTold: !changes.length }
 }
 
 /**
@@ -883,19 +979,22 @@ const over = (r: Released): boolean => r.why === 'done' || r.why === 'laneEnded'
 
 /** What happened to a released card, for a wake line: "#354 was reassigned to B4", "#356 is blocked: "…"". */
 function releasedPart(r: Released, full: boolean): string {
+  const card = cardRef(r.number)
   const head =
     r.why === 'blocked'
-      ? `${cardRef(r.number)} is blocked${full && r.detail ? `: "${[...r.detail].length > 120 ? `${[...r.detail].slice(0, 119).join('')}…` : r.detail}"` : ''}`
+      ? say(W.relBlocked, { card, quoted: full && r.detail ? 'yes' : 'no', why: r.detail ? ([...r.detail].length > 120 ? `${[...r.detail].slice(0, 119).join('')}…` : r.detail) : '' })
       : r.why === 'reviewer'
         ? r.detail
-          ? `${cardRef(r.number)} is reviewed by ${shortName(r.detail)}`
-          : `${cardRef(r.number)}'s review was taken from you`
+          ? say(W.relReviewedBy, { card, reviewer: shortName(r.detail) })
+          : say(W.relReviewTaken, { card })
         : r.why === 'done'
-          ? `${cardRef(r.number)} is in Done`
+          ? say(W.relDone, { card })
           : r.why === 'laneEnded'
-            ? `${cardRef(r.number)}'s lane ${r.detail === 'abandoned' ? 'was abandoned' : 'ended'}`
-            : `${cardRef(r.number)} was reassigned${r.detail ? ` to ${shortName(r.detail)}` : ' (it has no agent now)'}`
-  return `${head} (your watch on it ended)`
+            ? say(W.relLaneEnded, { card, abandoned: r.detail === 'abandoned' ? 'yes' : 'no' })
+            : r.detail
+              ? say(W.relReassignedTo, { card, agent: shortName(r.detail) })
+              : say(W.relReassigned, { card })
+  return say(W.relEnded, { head })
 }
 
 /**
@@ -904,15 +1003,13 @@ function releasedPart(r: Released, full: boolean): string {
  * has other work, so the next lane's prompt finds it free.
  */
 export function releasedLine(released: Released[]): string {
-  const one = released.length === 1
-  const tail = released.every(over)
-    ? `. Your card watch has ended: there is nothing more to wait for on ${one ? 'it' : 'them'}. Don't watch ${one ? 'it' : 'them'} again; end your turn unless you have other work.`
-    : `. Your card watch has ended: drop ${one ? 'it' : 'them'} from your list and carry on with your next card.`
+  const n = released.length
+  const tail = say(released.every(over) ? W.relOverTail : W.relDropTail, { n })
   for (const full of [true, false]) {
-    const line = `[Hive] ${released.map((r) => releasedPart(r, full)).join('; ')}${tail}`
+    const line = `${NOTICE_PREFIX}${released.map((r) => releasedPart(r, full)).join('; ')}${tail}`
     if (jsonBytes(line) <= WAKE_MAX_BYTES) return line
   }
-  return `[Hive] ${cards(released.map((r) => r.number))} left your watch (${released.every(over) ? 'done, or its lane ended' : 'reassigned, or reviewed by another'})${tail}`
+  return NOTICE_PREFIX + say(W.relLeft, { cards: cards(released.map((r) => r.number)), over: released.every(over) ? 'yes' : 'no', tail })
 }
 
 /**
@@ -933,16 +1030,9 @@ export interface ReviewWhere {
 const dependencyState = (w: ReviewWhere): boolean => w.state === 'waits' || w.state === 'working'
 
 function wherePart(w: ReviewWhere): string {
-  const ref = cardRef(w.number)
-  if (w.state === 'waits') return `${ref} waits on ${cards(w.on ?? [])}`
-  if (w.state === 'working') return `${ref} is in Doing with ${shortName(w.reviewer ?? '')}`
-  return w.state === 'reviewing'
-    ? `${ref} is in Review, being reviewed by ${shortName(w.reviewer ?? '')}`
-    : w.state === 'assigned'
-      ? `${ref} is in Review: the reviewer pool gave it to ${shortName(w.reviewer ?? '')}, who hasn't started yet`
-      : w.state === 'pool'
-        ? `${ref} is in Review, waiting for the reviewer pool to give it to a reviewer`
-        : `${ref} is in Review, waiting for its reviewer`
+  const values = { card: cardRef(w.number), agent: shortName(w.reviewer ?? ''), on: cards(w.on ?? []) }
+  const m = w.state === 'waits' ? W.whereWaits : w.state === 'working' ? W.whereWorking : w.state === 'reviewing' ? W.whereReviewing : w.state === 'assigned' ? W.whereAssigned : w.state === 'pool' ? W.wherePool : W.whereReview
+  return say(m, values)
 }
 
 /**
@@ -952,7 +1042,7 @@ function wherePart(w: ReviewWhere): string {
  * waiting on another agent's card in progress, and that card (HI-2381): watched again quietly, the lane showing the wait.
  */
 export function limitLine(cond: WatchCondition, minutes: number, released: Released[] = [], where: ReviewWhere[] = []): string {
-  const dur = minutes >= 60 ? `${Math.round((minutes / 60) * 10) / 10} h` : `${minutes} min`
+  const dur = minutes >= 60 ? say(W.hours, { h: String(Math.round((minutes / 60) * 10) / 10) }) : say(W.minutes, { m: String(minutes) })
   const gone = new Set(released.map((r) => r.number))
   const placed = where.filter((w) => cond.cards.includes(w.number) && !gone.has(w.number))
   const inReview = placed.filter((w) => !dependencyState(w))
@@ -960,47 +1050,47 @@ export function limitLine(cond: WatchCondition, minutes: number, released: Relea
   const known = new Set(placed.map((w) => w.number))
   const rest = cond.cards.filter((n) => !gone.has(n) && !known.has(n))
   const steps: string[] = []
-  if (released.length) steps.push(`drop ${released.length === 1 ? 'the first' : 'those'} from your list`)
-  if (inReview.length) steps.push(`watch ${cards(inReview.map((w) => w.number))} again for ${inReview.length === 1 ? 'its' : 'their'} verdict (in a card loop, Hive wakes you with it); don't tell the user about ${inReview.length === 1 ? 'it' : 'them'}`)
-  if (waiting.length) steps.push(`watch ${cards(waiting.map((w) => w.number))} again: another agent's work is going on; don't tell the user about ${waiting.length === 1 ? 'it' : 'them'}`)
-  if (rest.length || !steps.length) steps.push(`${steps.length ? 'for the rest, ' : ''}tell the user (hive_notify) and ask what to do`)
+  if (released.length) steps.push(say(W.stepDrop, { n: released.length }))
+  if (inReview.length) steps.push(say(W.stepWatchReview, { cards: cards(inReview.map((w) => w.number)), n: inReview.length }))
+  if (waiting.length) steps.push(say(W.stepWatchWaiting, { cards: cards(waiting.map((w) => w.number)), n: waiting.length }))
+  if (rest.length || !steps.length) steps.push(say(W.stepAsk, { rest: steps.length ? 'yes' : 'no' }))
   const todo = steps.join('; ')
-  const ended = `No change on ${cards(cond.cards)} in ${dur}: your card watch has ended. `
-  const short = (ws: ReviewWhere[], what: string, whats: string): string => `${cards(ws.map((w) => w.number))} ${ws.length === 1 ? what : whats}`
-  const shortParts = [...(inReview.length ? [short(inReview, 'is in Review', 'are in Review')] : []), ...(waiting.length ? [short(waiting, 'waits on work in progress', 'wait on work in progress')] : [])]
-  const tailOf = (full: boolean): string => `${ended}${placed.length ? `${full ? [...inReview, ...waiting].map(wherePart).join('; ') : shortParts.join('; ')}. ` : ''}${todo[0].toUpperCase()}${todo.slice(1)}.`
+  const ended = say(W.limitEnded, { cards: cards(cond.cards), dur })
+  const shortParts = [...(inReview.length ? [say(W.shortInReview, { cards: cards(inReview.map((w) => w.number)), n: inReview.length })] : []), ...(waiting.length ? [say(W.shortWaiting, { cards: cards(waiting.map((w) => w.number)), n: waiting.length })] : [])]
+  // The first step starts a sentence: its first letter is capitalised here (as the contract's first route is, card 1).
+  const tailOf = (full: boolean): string => `${ended} ${placed.length ? `${full ? [...inReview, ...waiting].map(wherePart).join('; ') : shortParts.join('; ')}. ` : ''}${todo[0].toUpperCase()}${todo.slice(1)}.`
   for (const full of [true, false]) {
     const head = released.length ? `${released.map((r) => releasedPart(r, full)).join('; ')}. ` : ''
-    const line = `[Hive] ${head}${tailOf(full)}`
+    const line = `${NOTICE_PREFIX}${head}${tailOf(full)}`
     if (jsonBytes(line) <= WAKE_MAX_BYTES) return line
   }
-  return `[Hive] ${released.length ? `${cards(released.map((r) => r.number))} left your watch (reassigned, or reviewed by another). ` : ''}${tailOf(false)}`
+  return `${NOTICE_PREFIX}${released.length ? `${say(W.leftWatchReassigned, { cards: cards(released.map((r) => r.number)) })} ` : ''}${tailOf(false)}`
 }
 
 const cards = (ns: number[]): string => ns.map((n) => `${cardRef(n)}`).join(', ')
 
 /** What a watching agent shows (its header, tab, the Agent API): "Waiting for #12 → Review", "Waiting for #12, #13". */
 export function watchLabel(cond: Pick<WatchCondition, 'cards' | 'column'>): string {
-  return `Waiting for ${cards(cond.cards)}${cond.column ? ` → ${columnWord(cond.column)}` : ''}`
+  return say(W.label, { cards: cards(cond.cards), hasColumn: cond.column ? 'yes' : 'no', column: cond.column ? columnWord(cond.column) : '' })
 }
 
 /** A condition from untrusted arguments, or an error saying what is wrong. */
 export function readCondition(args: { cards?: unknown; changes?: unknown; until?: unknown; column?: unknown; fresh?: unknown }): WatchCondition | string {
   const raw = Array.isArray(args.cards) ? args.cards : []
   const ns = [...new Set(raw.map(Number))].filter((n) => Number.isInteger(n) && n > 0)
-  if (!ns.length || ns.length !== raw.length) return 'cards must be card numbers (at least one, no repeats)'
-  if (ns.length > WATCH_MAX_CARDS) return `at most ${WATCH_MAX_CARDS} cards`
+  if (!ns.length || ns.length !== raw.length) return say(W.badCards)
+  if (ns.length > WATCH_MAX_CARDS) return say(W.tooManyCards, { max: String(WATCH_MAX_CARDS) })
   const column = args.column
-  if (column !== undefined && !COLUMNS.includes(column as TaskColumn)) return `column must be ${COLUMN_CHOICES}`
+  if (column !== undefined && !COLUMNS.includes(column as TaskColumn)) return say(W.badColumn, { choices: COLUMN_CHOICES })
   const list = args.changes ?? args.until
   const given = list !== undefined && list !== 'any'
   // A column alone: arriving in it is all that counts. Otherwise the kinds listed (default: any).
   const changes = !given ? (column ? ['column'] : [...WATCH_CHANGES]) : Array.isArray(list) ? [...new Set(list)] : [list]
-  if (!changes.length || changes.some((c) => !WATCH_CHANGES.includes(c as WatchChange))) return `changes must be any of ${WATCH_CHANGES.join(', ')}`
-  if (column && !changes.includes('column')) return 'with column, changes must include "column" (or leave changes out to wait only for the card to be in that column)'
-  if (args.fresh !== undefined && typeof args.fresh !== 'boolean') return 'fresh must be true or false'
+  if (!changes.length || changes.some((c) => !WATCH_CHANGES.includes(c as WatchChange))) return say(W.badChanges, { choices: WATCH_CHANGES.join(', ') })
+  if (column && !changes.includes('column')) return say(W.columnNeedsChange)
+  if (args.fresh !== undefined && typeof args.fresh !== 'boolean') return say(W.badFresh)
   const fresh = args.fresh === true
-  if (fresh && !column) return 'fresh needs a column: it waits for the next move into it'
+  if (fresh && !column) return say(W.freshNeedsColumn)
   // A column with `column` named among the changes: a move into it, met at once by a card already there (#434). Fresh:
   // only the next move into it (a card already there waits for it to come back).
   const moveInto = !!column && (given || fresh)

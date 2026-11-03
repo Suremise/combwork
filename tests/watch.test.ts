@@ -9,7 +9,7 @@ import { existsSync, mkdirSync, readdirSync, readFileSync, rmSync, writeFileSync
 import { basename, join } from 'path'
 import { afterAll, describe, expect, it, vi } from 'vitest'
 import * as electron from 'electron'
-import { alreadyThere, loopWakeLine, changesBetween, decodeSince, encodeSince, limitLine, markOf, movedIntoSince, readCondition, returnRound, WAKE_MAX_BYTES, wakeAbout, wakeLine, wakeLines, carriedOver, changesSince, entryWithin, seenOf, watchLabel, cardChange, LANES_RUNNING_TAIL, withLanesTail, brief, handoffsSince, hearsHandoffs } from '../src/shared/watch'
+import { alreadyThere, loopWakeLine, changesBetween, decodeSince, encodeSince, limitLine, markOf, movedIntoSince, readCondition, returnRound, WAKE_MAX_BYTES, wakeAbout, wakeLine, wakeLines, carriedOver, changesSince, entryWithin, seenOf, watchLabel, cardChange, lanesRunningTail, withLanesTail, brief, handoffsSince, hearsHandoffs } from '../src/shared/watch'
 import { taskWaitText } from '../src/shared/toolReplies'
 import { resubmittedText, returnedWake } from '../src/main/workflow/queueState'
 import { hookStep } from '../src/main/hookStatus'
@@ -2484,14 +2484,53 @@ describe("the lanes-running tail of the Assistant's wake", () => {
   const bytes = (x: string) => Buffer.byteLength(JSON.stringify(x))
   it('is added once, after the line', () => {
     const line = '[Hive] #1 is in Doing. Your card watch has ended: carry on.'
-    expect(withLanesTail(line)).toBe(line + LANES_RUNNING_TAIL)
-    expect(withLanesTail(withLanesTail(line))).toBe(line + LANES_RUNNING_TAIL)
+    expect(withLanesTail(line)).toBe(line + lanesRunningTail())
+    expect(withLanesTail(withLanesTail(line))).toBe(line + lanesRunningTail())
     // #726: a card outside the lanes goes in the same watch.
-    expect(LANES_RUNNING_TAIL).toMatch(/one lane watch, with any card outside them as cards \(hive_wait_for_tasks with lanes \["all"\], cards, wake; run-lanes\)/)
+    expect(lanesRunningTail()).toMatch(/one lane watch, with any card outside them as cards \(hive_wait_for_tasks with lanes \["all"\], cards, wake; run-lanes\)/)
   })
   it('a long line is cut to make room: the tail is always whole, and the line fits', () => {
     const out = withLanesTail('[Hive] ' + 'x'.repeat(2000))
-    expect(out.endsWith('…' + LANES_RUNNING_TAIL)).toBe(true)
+    expect(out.endsWith('…' + lanesRunningTail())).toBe(true)
     expect(bytes(out)).toBeLessThanOrEqual(WAKE_MAX_BYTES)
+  })
+})
+
+describe("a card's history read by its lines' messages, not their words (dialects, HI-2437)", () => {
+  // A line written since #845 keeps its message (whatText): watches read that, so a line's English (here made up, as a
+  // dialect might word it) never decides. A line from before, with only its English, is read by that English.
+  const line = (m: number, id: string, values?: Record<string, string | number>, what = '(worded otherwise)', by = 'B') => ({ at: at(m), by, what, whatText: { id, ...(values ? { values } : {}) } })
+
+  it('moves, returns and verdicts by id', () => {
+    const moved = cardOf({ column: 'review', history: [line(10, 'tasks.history.moved', { column: 'doing' }), line(11, 'tasks.history.movedTop', { column: 'review' })] })
+    expect(movedIntoSince(moved, 'review', at(9))).toBe(true)
+    expect(movedIntoSince(moved, 'doing', at(9))).toBe(true)
+    expect(movedIntoSince(moved, 'passed', at(9))).toBe(false)
+    // English that reads as a move, on a line whose message isn't one: not a move.
+    expect(movedIntoSince(cardOf({ history: [line(10, 'tasks.history.toProject', { project: 'Review' }, 'Moved to Review')] }), 'review', at(9))).toBe(false)
+    // Placed before another card in a column, or Nth in it: not a move into it (as their English never read as one).
+    expect(movedIntoSince(cardOf({ history: [line(10, 'tasks.history.movedBeforeIn', { column: 'review', before: '#3' })] }), 'review', at(9))).toBe(false)
+    expect(movedIntoSince(cardOf({ column: 'review', history: [line(10, 'tasks.history.returned', { round: 2 })] }), 'review', at(9))).toBe(true)
+    const verdict = cardOf({ history: [line(5, 'tasks.history.reviewFailed', undefined, 'Review passed')] })
+    expect(markOf(verdict).verdict).toBe(Date.parse(at(5)))
+    expect(markOf(cardOf({ history: [line(5, 'tasks.history.description', undefined, 'Review passed')] })).verdict).toBe(0)
+    // Its round: the failures since it last passed, by id.
+    const failed = cardOf({ column: 'review', history: [line(1, 'tasks.history.reviewPassed', undefined, 'x'), line(2, 'tasks.history.reviewFailed', undefined, 'y'), line(3, 'tasks.history.moved', { column: 'review' }), line(4, 'tasks.history.reviewFailed', undefined, 'z')] })
+    expect(returnRound(failed)).toBe(3)
+    expect(wakeAbout(cardOf({ column: 'review', history: [line(4, 'tasks.history.reviewFailed'), line(5, 'tasks.history.returned', { round: 4 })] }), ['column'], 'a1').returned).toBe(4)
+  })
+
+  it('requests, decisions and loop steps by id, also in a wait that compares marks', () => {
+    const cond = { changes: ['verdict' as const, 'column' as const] }
+    expect(handoffsSince(cardOf({ history: [line(3, 'tasks.history.reviewerRequest', { text: 'logs?' })] }), at(2), cond)).toEqual(['request'])
+    expect(handoffsSince(cardOf({ history: [line(3, 'tasks.history.decisionChanged', { decision: 'a', was: 'b' })] }), at(2), cond)).toEqual(['decision'])
+    expect(handoffsSince(cardOf({ history: [line(3, 'tasks.history.loopStep', { step: 'design', text: 't' })] }), at(2), cond)).toEqual(['step'])
+    expect(handoffsSince(cardOf({ history: [line(3, 'tasks.history.builderReply', { text: 't' })] }), at(2), cond)).toEqual(['step'])
+    expect(handoffsSince(cardOf({ history: [line(3, 'tasks.history.labels', { labels: 'x' }, 'Asked the builder: "logs?"')] }), at(2), cond)).toEqual([])
+  })
+
+  it('a line from before #845 is still read by its English', () => {
+    expect(movedIntoSince(cardOf({ history: [{ at: at(10), by: 'B', what: 'Returned for review, round 2' }] }), 'review', at(9))).toBe(true)
+    expect(handoffsSince(cardOf({ history: [{ at: at(3), by: 'B', what: 'Recorded a decision: "x"' }] }), at(2), { changes: ['verdict'] })).toEqual(['decision'])
   })
 })
