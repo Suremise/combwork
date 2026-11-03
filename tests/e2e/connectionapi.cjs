@@ -188,7 +188,8 @@ const lines = (f) => (fs.existsSync(f) ? fs.readFileSync(f, 'utf8').trim().split
     // launched with, beside the account, for the workspace and for a project agent (both usable here).
     const sonnet = await inv('connection:add', max1.id, { name: 'Max 1 · Sonnet', model: 'sonnet' })
     const viaid = (await api('GET', '/v1/projects/alpha')).body.agents.find((a) => a.name === 'Viaid')
-    await api('PATCH', `/v1/projects/alpha/agents/${viaid.id}`, { connection: sonnet.id })
+    const moved = await asAssistant('PATCH', `/v1/projects/alpha/agents/${viaid.id}`, { connection: sonnet.id })
+    check('Viaid moved onto Max 1 · Sonnet', moved.status === 200 && (await api('GET', '/v1/projects/alpha')).body.agents.find((a) => a.id === viaid.id)?.connection?.id === sonnet.id, JSON.stringify({ status: moved.status, error: moved.body?.error, sonnet }))
     await inv('session:start', alpha, { agentId: viaid.id })
     const runs = async (token) => {
       const agents = (await api('GET', '/v1/projects/alpha', null, token)).body?.agents ?? []
