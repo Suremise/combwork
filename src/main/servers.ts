@@ -1124,7 +1124,7 @@ route('POST', '/v1/assistant/undo', async ({ body }) => {
     const undone = results.filter((r) => r.undone.length).length
     const skipped = results.reduce((n, r) => n + r.skipped.length, 0)
     const cards = [...new Set(results.flatMap((r) => (r.card !== undefined ? [r.card] : [])))]
-    return { done: [API.done.undid, { undone: String(undone), count: results.length, skipped }], act: cards.length === 1 ? { card: cards[0] } : cards.length ? { cards } : {}, result: { results } }
+    return { done: [API.done.undid, { undone: String(undone), count: results.length, total: String(results.length), skipped, skippedTotal: String(skipped) }], act: cards.length === 1 ? { card: cards[0] } : cards.length ? { cards } : {}, result: { results } }
   })
 })
 
@@ -1544,7 +1544,7 @@ route('POST', '/v1/projects/:name/agents/:agent/prompt', async ({ params, body }
     if (st.status === 'signin') throw new HttpError(409, say(API.agent.promptSignIn, { agent: a.name }))
     if (st.status === 'watching') throw new HttpError(409, say(API.agent.promptWatching, { agent: a.name, waiting: st.watch?.label.replace(/^Waiting/, 'waiting') ?? say(API.agent.waitingOnCards), watch: st.watch?.agents && !st.watch.lanes ? 'agents' : 'cards' }))
     if (st.status === 'background') {
-      throw new HttpError(409, say(API.agent.promptBackground, { agent: a.name, tasks: st.backgroundTasks ?? 0 }))
+      throw new HttpError(409, say(API.agent.promptBackground, { agent: a.name, tasks: st.backgroundTasks ?? 0, total: String(st.backgroundTasks ?? 0) }))
     }
     if (sessions.userMayBeTyping(p, agentId)) throw new HttpError(409, say(API.agent.promptUserTyping, { agent: a.name }))
     // A line Hive typed that its CLI hasn't taken (#430): more typing would be lost behind it, or clear it.
@@ -1583,7 +1583,7 @@ route('POST', '/v1/projects/:name/agents/:agent/message', async ({ params, body 
     return assistantChange<{ cancelled: number }>('agents', [API.change.cancelMessages, { agent: a.name, project: basename(p) }], { kind: 'cancel-messages', project: basename(p), agent: actAgent(a) }, async (guard) => {
       // Checked again in the deliveries' own transaction (HI-2420): revoked while it waited for their lock, none is cancelled.
       const n = await cancelMessages(p, agentId, sayStored([API.delivery.byAssistant]), guard)
-      return { done: [API.done.cancelledMessages, { agent: a.name, project: basename(p), n }], result: { cancelled: n } }
+      return { done: [API.done.cancelledMessages, { agent: a.name, project: basename(p), n, total: String(n) }], result: { cancelled: n } }
     })
   }
   const text = typeof body?.text === 'string' ? body.text.trim() : ''
@@ -2263,7 +2263,7 @@ route('POST', '/v1/lanes/:id/fresh-start', async ({ params }) =>
     return assistantChange('agents', [API.change.retryFresh, { lane: id }], { kind: 'lane-fresh-start', lane: id, project: lane.project }, async (guard) => {
       // Its guard checked again in each write it makes (HI-2420).
       const r = await retry(guard)
-      return { done: [API.done.freshRetried, { lane: id, retried: r.retried }], result: r }
+      return { done: [API.done.freshRetried, { lane: id, retried: r.retried, total: String(r.retried) }], result: r }
     })
   })
 )
@@ -2474,7 +2474,7 @@ route('POST', '/v1/projects/:name/templates/apply', async ({ params, body }) => 
   const p = projectByName(params[0])
   return assistantChange('agents', [API.change.chooseConnections, { project: basename(p) }], { kind: 'update-agent', project: basename(p) }, async (guard) => {
     const r = await applyForAssistant(p, body?.connections, guard)
-    return { done: [API.done.connectionsChosen, { project: r.project, changed: String(r.changed.length), skipped: r.skipped.length }], result: r }
+    return { done: [API.done.connectionsChosen, { project: r.project, changed: String(r.changed.length), skipped: r.skipped.length, skippedTotal: String(r.skipped.length) }], result: r }
   })
 })
 
@@ -3248,7 +3248,7 @@ route('POST', '/v1/tasks/reorder', async ({ body }) => {
   if (actor.kind !== 'assistant') return view(await tasks.reorderTasks(column, cards, actor))
   const count = Array.isArray(cards) ? cards.length : 0
   const ordered = Array.isArray(cards) ? cards.map((x) => Number(String(x).replace(/^#/, ''))).filter((x) => Number.isInteger(x) && x > 0) : []
-  return assistantChange('agents', [API.change.reorderTasks, { count, column: columnLabel(column) }], { kind: 'reorder-tasks', column, cards: ordered }, async (guard) => {
+  return assistantChange('agents', [API.change.reorderTasks, { count, total: String(count), column: columnLabel(column) }], { kind: 'reorder-tasks', column, cards: ordered }, async (guard) => {
     // Checked again as each card is saved, in one batch (HI-2420): revoked while it waited for the board, none moves.
     const list = await tasks.reorderTasks(column, cards, actor, { commit: guard })
     const top = (cards as unknown[]).map((x) => cardRef(Number(String(x).replace(/^#/, '')))).join(', ')
@@ -4732,3 +4732,6 @@ onHiveEvent(broadcast)
 onAgentTokenEnded(endLaunchStreams)
 // A project agent's watch refused, under the watches' lock, while Hive is giving it a card in a slot (HI-2197).
 onWatchPlacing(watchWhilePlaced)
+
+/** For unit tests: request parts whose refusals tests say through the canary (tests/agentTextApi.test.ts, HI-2436). */
+export const apiTextTestHooks = { notifyTarget, isolatedFor, lanePlacement, readUsageWatch }

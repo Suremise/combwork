@@ -58,7 +58,7 @@
     "note": "what: api.own.*. HI-2330."
   },
   "api.agent.promptBackground": {
-    "text": "{agent} is waiting on {tasks, plural, one {# background task} other {# background tasks}} it started (such as a test run) and carries on by itself when they end. Wait for it (hive_wait_for_agents), then give it the task, or leave it a message it gets when it is idle (hive_message_agent). If it seems stuck, tell the user."
+    "text": "{agent} is waiting on {total} {tasks, plural, one {background task} other {background tasks}} it started (such as a test run) and carries on by itself when they end. Wait for it (hive_wait_for_agents), then give it the task, or leave it a message it gets when it is idle (hive_message_agent). If it seems stuck, tell the user."
   },
   "api.agent.promptFailed": {
     "text": "{agent} wasn't given the task: {error}."
@@ -390,7 +390,8 @@
     "text": "take a card out of the merge queue"
   },
   "api.change.reorderTasks": {
-    "text": "put {count, plural, one {# card} other {# cards}} in order in {column}"
+    "text": "put {total} {count, plural, one {card} other {cards}} in order in {column}",
+    "note": "count: the number, for its plural; total: the same number as written."
   },
   "api.change.resumeAQueue": {
     "text": "resume a merge queue"
@@ -591,7 +592,7 @@
     "text": "{agent} in {project} had already stopped"
   },
   "api.done.cancelledMessages": {
-    "text": "{n, plural, =0 {No message was waiting for {agent} in {project}} one {Cancelled the message waiting for {agent} in {project}} other {Cancelled # messages waiting for {agent} in {project}}}"
+    "text": "{n, plural, =0 {No message was waiting for {agent} in {project}} one {Cancelled the message waiting for {agent} in {project}} other {Cancelled {total} messages waiting for {agent} in {project}}}"
   },
   "api.done.cardAdded": {
     "text": "Added {card} to the board{inProject, select, yes { ({project})} other {}}: {title}"
@@ -607,13 +608,13 @@
     "text": "Commented on {card}"
   },
   "api.done.connectionsChosen": {
-    "text": "Chose connections in {project}: {changed} agents changed{skipped, plural, =0 {} other {, # skipped}}"
+    "text": "Chose connections in {project}: {changed} agents changed{skipped, plural, =0 {} other {, {skippedTotal} skipped}}"
   },
   "api.done.createdProject": {
     "text": "Created the project {name}"
   },
   "api.done.freshRetried": {
-    "text": "{retried, plural, =0 {Lane {lane}: no new conversation was waiting to be retried} one {Lane {lane}: # new conversation tried again} other {Lane {lane}: # new conversations tried again}}"
+    "text": "{retried, plural, =0 {Lane {lane}: no new conversation was waiting to be retried} one {Lane {lane}: {total} new conversation tried again} other {Lane {lane}: {total} new conversations tried again}}"
   },
   "api.done.handingOver": {
     "text": "Handing {from}'s work over to {to} in {project}{latest, select, yes { (from the latest handover)} other {}}"
@@ -671,7 +672,8 @@
     "text": "Loaded the template \"{template}\" into {project}: {agents} agents{workflow, select, saved {, and its workflow ({options} options changed)} notSaved {; its workflow was not saved} other {}}"
   },
   "api.done.undid": {
-    "text": "Undid {undone} of {count, plural, one {# change} other {# changes}} of its own{skipped, plural, =0 {} one { (# field left: changed since or gone)} other { (# fields left: changed since or gone)}}"
+    "text": "Undid {undone} of {total} {count, plural, one {change} other {changes}} of its own{skipped, plural, =0 {} one { ({skippedTotal} field left: changed since or gone)} other { ({skippedTotal} fields left: changed since or gone)}}",
+    "note": "Each number is twice: as a number for its plural (count, skipped) and as written (total, skippedTotal), so a count over 999 has no comma."
   },
   "api.done.updatedAgent": {
     "text": "Changed {agent}'s settings in {project}{live, select, yes { (it applies them when restarted)} other {}}"

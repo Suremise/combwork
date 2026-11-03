@@ -80,6 +80,7 @@
   "api.agent.promptBackground": {
     "placeholders": {
       "agent": "plain",
+      "total": "plain",
       "tasks": "plural"
     }
   },
@@ -548,6 +549,7 @@
   },
   "api.change.reorderTasks": {
     "placeholders": {
+      "total": "plain",
       "count": "plural",
       "column": "plain"
     }
@@ -845,7 +847,8 @@
     "placeholders": {
       "n": "plural",
       "agent": "plain",
-      "project": "plain"
+      "project": "plain",
+      "total": "plain"
     }
   },
   "api.done.cardAdded": {
@@ -882,7 +885,8 @@
     "placeholders": {
       "project": "plain",
       "changed": "plain",
-      "skipped": "plural"
+      "skipped": "plural",
+      "skippedTotal": "plain"
     }
   },
   "api.done.createdProject": {
@@ -893,7 +897,8 @@
   "api.done.freshRetried": {
     "placeholders": {
       "retried": "plural",
-      "lane": "plain"
+      "lane": "plain",
+      "total": "plain"
     }
   },
   "api.done.handingOver": {
@@ -1038,8 +1043,10 @@
   "api.done.undid": {
     "placeholders": {
       "undone": "plain",
+      "total": "plain",
       "count": "plural",
-      "skipped": "plural"
+      "skipped": "plural",
+      "skippedTotal": "plain"
     }
   },
   "api.done.updatedAgent": {

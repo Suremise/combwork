@@ -22,7 +22,7 @@ const base = tempDir('hive-agenttext-api-')
 mkdirSync(join(base, 'profile'), { recursive: true })
 ;(electron.app as unknown as { getPath: () => string }).getPath = () => join(base, 'profile')
 
-const { INTENT_ROUTES, apiErrorReply, connectionValuesArg, refuseOldFields } = await import('../src/main/servers')
+const { INTENT_ROUTES, apiErrorReply, apiTextTestHooks, connectionValuesArg, refuseOldFields } = await import('../src/main/servers')
 
 const ROOT = join(__dirname, '..')
 const traverse = ((traverseModule as unknown as { default?: unknown }).default ?? traverseModule) as (ast: unknown, visitors: Record<string, (p: never) => void>) => void
@@ -76,6 +76,57 @@ describe("the Agent API's and sessions' agent text (card 3b)", () => {
         const text = inRequestScope(null, () => say(m, values))
         expect(text.startsWith(`⟦${m.id}⟧`), `${m.id} ${JSON.stringify(values)}`).toBe(true)
         expect(canaryProblems(text, ids, ['VALUE']), `${m.id} ${JSON.stringify(values)}`).toEqual([])
+      }
+  })
+
+  it('prints every count as written, never through a plural\'s #, which groups four digits (HR2\'s round 1)', () => {
+    // A plural chooses the words; the number is a plain value beside it, as the base's template printed it (1000, not 1,000).
+    for (const m of [...API_MESSAGES, ...SESSION_MESSAGES]) {
+      const pound = (parts: Part[]): boolean => (parts as { type: number; options?: Record<string, { value: Part[] }> }[]).some((p) => p.type === 7 || Object.values(p.options ?? {}).some((o) => pound(o.value)))
+      expect(pound(parseIcu(m.text)), m.id).toBe(false)
+    }
+    // The base's templates at four and five digits.
+    for (const n of [1, 2, 1000, 12345]) {
+      const s = n === 1 ? '' : 's'
+      expect(say(API.change.reorderTasks, { count: n, total: String(n), column: 'Todo' })).toBe(`put ${n} card${s} in order in Todo`)
+      expect(say(API.done.undid, { undone: String(n), count: n, total: String(n), skipped: n, skippedTotal: String(n) })).toBe(`Undid ${n} of ${n} change${s} of its own (${n} field${s} left: changed since or gone)`)
+      expect(say(API.done.cancelledMessages, { agent: 'a', project: 'p', n, total: String(n) })).toBe(`Cancelled ${n === 1 ? 'the message' : `${n} messages`} waiting for a in p`)
+      expect(say(API.done.freshRetried, { lane: 'L1', retried: n, total: String(n) })).toBe(`Lane L1: ${n} new conversation${n > 1 ? 's' : ''} tried again`)
+      expect(say(API.done.connectionsChosen, { project: 'p', changed: '2', skipped: n, skippedTotal: String(n) })).toBe(`Chose connections in p: 2 agents changed, ${n} skipped`)
+      expect(say(API.agent.promptBackground, { agent: 'a', tasks: n, total: String(n) })).toMatch(new RegExp(`^a is waiting on ${n} background task${s} it started`))
+    }
+  })
+
+  it("the refusals of a request's parts are said through the canary, and are the English they were with none", async () => {
+    const { isolatedFor, lanePlacement, notifyTarget, readUsageWatch } = apiTextTestHooks
+    const ws = {} as Parameters<typeof isolatedFor>[0]
+    const script = { source: 'api' } as Parameters<typeof isolatedFor>[1]
+    const agent = { source: 'agent', projectPath: join(base, 'p') } as Parameters<typeof isolatedFor>[1]
+    const link = (l: object): Parameters<typeof isolatedFor>[2] => l as Parameters<typeof isolatedFor>[2]
+    const cases: [() => Promise<unknown> | unknown, string, string][] = [
+      [() => notifyTarget([]), 'api.notify.targetArg', 'target is { agent, project? } or { card }'],
+      [() => notifyTarget({ agent: 'a', card: 3 }), 'api.notify.targetBoth', 'target is an agent or a card, not both'],
+      [() => isolatedFor(ws, script, link({ check: 'lint', card: 1, revision: 'abc' })), 'api.check.isolatedAgentsOnly', "--isolated runs an agent's check in a copy of its own: run it in an agent's session"],
+      [() => isolatedFor(ws, agent, link({ check: null, card: 1, revision: 'abc' })), 'api.check.isolatedNeedsCheck', '--isolated runs a check in a copy of its own: use it with --check <name>'],
+      [() => isolatedFor(ws, agent, link({ check: 'lint', card: null, revision: null })), 'api.check.isolatedNeedsCard', "--isolated runs a check at its card's revision: name the card (--card), or work on one in Doing"],
+      [() => lanePlacement({ builder: 'HB1', colour: 'red' }, {}), 'api.card.laneArgField', 'lane takes builder, reviewer, brief, name and position, not colour'],
+      [() => readUsageWatch([], {} as Parameters<typeof readUsageWatch>[1]), 'api.watch.usageShape', 'usage must be a list of { account, percent, limit? }, limit weekly, fiveHour or any']
+    ]
+    const errorOf = async (fn: () => Promise<unknown> | unknown, session: Parameters<typeof inRequestScope>[0]): Promise<string> => {
+      try {
+        await inRequestScope(session, async () => await fn())
+      } catch (e) {
+        return String((apiErrorReply(e).body as { error: string }).error)
+      }
+      return '(no refusal)'
+    }
+    for (const [fn, , english] of cases) expect(await errorOf(fn, null)).toBe(english)
+    withCanary()
+    for (const session of [null, { projectPath: join(base, 'p'), agentId: 'a1' }])
+      for (const [fn, id] of cases) {
+        const error = await errorOf(fn, session)
+        expect(error.startsWith(`⟦${id}⟧`), `${id}: ${error}`).toBe(true)
+        expect(canaryProblems(error, ids, ['colour']), id).toEqual([])
       }
   })
 
