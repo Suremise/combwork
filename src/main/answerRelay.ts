@@ -137,6 +137,6 @@ registerSource(SOURCE, {
     if (!ws || typeof m.card !== 'number' || typeof m.project !== 'string') return
     const need = typeof m.need === 'string' ? (m.need as AskActionKind) : null
     // agent-protocol: a stand-in asker's name for the user's note and notice (window text), never said to an agent
-    void untold(ws, m.card, m.project, typeof m.askerName === 'string' ? m.askerName : 'its agent', need) // i18n-ignore: a stand-in agent name, never shown (every relay keeps its asker's).catch((e) => log.warn('telling the user an answer reached nobody else', e))
+    void untold(ws, m.card, m.project, typeof m.askerName === 'string' ? m.askerName : 'its agent', need).catch((e) => log.warn('telling the user an answer reached nobody else', e)) // i18n-ignore: a stand-in agent name, never shown (every relay keeps its asker's)
   }
 })
