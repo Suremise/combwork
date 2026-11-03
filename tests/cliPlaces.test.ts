@@ -155,19 +155,26 @@ describe("Claude Code's transcript folder (#493)", () => {
     process.env.CLAUDE_CONFIG_DIR = join(p.base, 'claude-home')
     const projects = join(process.env.CLAUDE_CONFIG_DIR, 'projects')
     mkdirSync(join(projects, encodeProjectPath(join(p.base, 'Other'))), { recursive: true })
+    // Read a minute after its time: settled, whatever the real clock says.
     const old = new Date(Date.now() - 60_000)
-    utimesSync(projects, old, old)
-    const claude = new ClaudeCodeAdapter()
-    expect(await claude.transcriptPath(p.real, ID)).toBeNull()
-    const dir = join(projects, encodeProjectPath(p.real))
-    mkdirSync(dir)
-    writeFileSync(join(dir, `${ID}.jsonl`), '{"type":"user"}\n')
-    // Its time as it was: its names are the kept ones, so the new folder isn't seen until the time changes.
-    utimesSync(projects, old, old)
-    expect(await claude.transcriptPath(p.real, ID)).toBeNull()
-    const now = new Date()
-    utimesSync(projects, now, now)
-    expect(await claude.transcriptPath(p.real, ID)).toBe(join(dir, `${ID}.jsonl`))
+    vi.useFakeTimers({ toFake: ['Date'] })
+    vi.setSystemTime(old.getTime() + 60_000)
+    try {
+      utimesSync(projects, old, old)
+      const claude = new ClaudeCodeAdapter()
+      expect(await claude.transcriptPath(p.real, ID)).toBeNull()
+      const dir = join(projects, encodeProjectPath(p.real))
+      mkdirSync(dir)
+      writeFileSync(join(dir, `${ID}.jsonl`), '{"type":"user"}\n')
+      // Its time as it was: its names are the kept ones, so the new folder isn't seen until the time changes.
+      utimesSync(projects, old, old)
+      expect(await claude.transcriptPath(p.real, ID)).toBeNull()
+      const later = new Date(old.getTime() + 1000)
+      utimesSync(projects, later, later)
+      expect(await claude.transcriptPath(p.real, ID)).toBe(join(dir, `${ID}.jsonl`))
+    } finally {
+      vi.useRealTimers()
+    }
   })
 
   it("copies a moved folder's data from every folder it is kept under, the first one winning", async () => {
