@@ -17,13 +17,14 @@ import { inAgentLaunch, processSupervisor } from './agentProcesses'
 import { boardRead } from './boardStore'
 import { config } from './config'
 import { containsPlace } from './fsutil'
+import { agentMsg, say } from '../shared/agentText'
 import { createLogger, userText } from './logger'
 import { progress } from './progressService'
 import { sessions } from './sessions'
 import { appRunner, appSettle, boardConn, holder, journalsOf, retireSealOf, sweepSealsOf } from './slotsApp'
 import { slotLevelsOf, slotOptionsOf } from './slots'
 import { openWorkspaces, WorkspaceService } from './workspace'
-import { CopyPool, CopyStore, copiesDirOf, copyPoolSize, IsolatedRequests, type CopyLease } from './copies'
+import { COPY_TEXT, CopyPool, CopyStore, copiesDirOf, copyPoolSize, IsolatedRequests, type CopyLease } from './copies'
 import { journalPath, LeaseJob } from './workflow/queueJobs'
 import { LINK_TTL_MS } from './workflow/runLink'
 import { projectAgents } from '../shared/defaults'
@@ -122,6 +123,19 @@ function leaseOver(workspacePath: string, l: CopyLease): boolean | null {
   return Date.now() - Date.parse(l.from) > LINK_TTL_MS
 }
 
+/** An isolated check's agent text (dialects, HI-2447): hive-progress --isolated's waits and refusals. */
+const T = {
+  stillInUse: agentMsg({ id: 'copy.isolated.stillInUse', text: 'a check copy ({copy} is still in use by {by})', note: 'What hive-progress --isolated waits for: a check copy, the one it would get still held. {by} says by what.' }),
+  setupFailed: agentMsg({ id: 'copy.isolated.setupFailed', text: "{copy}'s setup failed ({error}), so nothing was run", note: "hive-progress --isolated's refusal: its check copy's setup failed." }),
+  noLease: agentMsg({ id: 'copy.isolated.noLease', text: 'no check copy could be leased', note: "hive-progress --isolated's refusal: no check copy could be lent, for another reason." }),
+  noSupervisor: agentMsg({ id: 'copy.isolated.noSupervisor', text: "Hive's process supervisor isn't running, so an isolated check can't be run", note: "hive-progress --isolated's refusal: Hive can't run the check in a job of its own (#1435)." }),
+  noLease2: agentMsg({ id: 'copy.assign.noLease', text: 'no such check copy lease', note: "Why hive-progress's launcher wasn't put in its check copy's job: the lease it named isn't this agent's." }),
+  notOwn: agentMsg({ id: 'copy.assign.notOwn', text: "that process isn't one of this agent's own", note: "Why hive-progress's launcher wasn't put in its check copy's job: the process isn't the agent's (HR1's #1435 round 1)." }),
+  noLauncher: agentMsg({ id: 'copy.assign.noLauncher', text: "its check copy's job takes no launcher now", note: "Why hive-progress's launcher wasn't put in its check copy's job: it has one already, or no job." }),
+  returned: agentMsg({ id: 'copy.assign.returned', text: 'its check copy was returned', note: "Why hive-progress's launcher wasn't put in its check copy's job: the copy was given back meanwhile." }),
+  notPut: agentMsg({ id: 'copy.assign.notPut', text: "the check's launcher couldn't be put in its check copy's job", note: "Why hive-progress's launcher wasn't put in its check copy's job: Windows refused it." })
+}
+
 /**
  * Leases a check copy for an isolated run (the Agent API's resolve) and opens its job: the lease and the copy's folder,
  * or why not (`wait`: none free yet; `refused`: its setup failed).
@@ -130,10 +144,10 @@ export async function isolatedLease(ws: WorkspaceService, projectPath: string, r
   const pool = await copiesFor(ws, projectPath)
   const r = await pool.leaseCopy({ kind: 'check', card: req.card, revision: req.revision, agent: req.agent })
   if (!r.ok) {
-    if (r.refusal.why === 'noCopy') return { wait: 'a check copy' } // i18n-ignore: hive-progress's words, agent-facing
-    if (r.refusal.why === 'stillInUse') return { wait: `a check copy (${r.refusal.copy} is still in use by ${r.refusal.by})` } // i18n-ignore: hive-progress's words, agent-facing
-    if (r.refusal.why === 'returned') return { wait: 'a check copy' } // i18n-ignore: hive-progress's words, agent-facing
-    return { refused: r.refusal.why === 'setupFailed' ? `${r.refusal.copy}'s setup failed (${r.refusal.error}), so nothing was run` : 'no check copy could be leased' } // i18n-ignore: hive-progress's words, agent-facing
+    if (r.refusal.why === 'noCopy') return { wait: say(COPY_TEXT.waitCopy) }
+    if (r.refusal.why === 'stillInUse') return { wait: say(T.stillInUse, { copy: r.refusal.copy, by: r.refusal.by }) }
+    if (r.refusal.why === 'returned') return { wait: say(COPY_TEXT.waitCopy) }
+    return { refused: r.refusal.why === 'setupFailed' ? say(T.setupFailed, { copy: r.refusal.copy, error: r.refusal.error }) : say(T.noLease) }
   }
   // The job its run's processes go in: recorded on the lease before it exists, then made (kill on close, journaled).
   const job = await pool.setLeaseJob(r.lease.id)
@@ -142,7 +156,7 @@ export async function isolatedLease(ws: WorkspaceService, projectPath: string, r
   const opened = job && host.usable && (await host.ensure()) ? await LeaseJob.open(host, job, await journalPath(root, job, journalsOf(root))) : null
   if (!opened || 'problem' in opened) {
     await pool.returnCopy(r.lease.id, 'noJob')
-    return { refused: "Hive's process supervisor isn't running, so an isolated check can't be run" } // i18n-ignore: hive-progress's words, agent-facing
+    return { refused: say(T.noSupervisor) }
   }
   jobs.set(r.lease.id, opened)
   return { lease: r.lease, folder: r.copy.folder, copy: r.copy.name }
@@ -178,14 +192,14 @@ const assigned = new Set<string>()
 export async function assignIsolated(ws: WorkspaceService, projectPath: string, agent: string, a: { lease: string; pid: number; after: number; before: number }): Promise<string | null> {
   const pool = await copiesFor(ws, projectPath)
   const l = pool.lease(a.lease)
-  if (!l || l.agent !== agent) return 'no such check copy lease' // i18n-ignore: hive-progress's words, agent-facing
-  if (!(await inAgentLaunch(projectPath, agent, a.pid, a.after, a.before))) return "that process isn't one of this agent's own" // i18n-ignore: hive-progress's words, agent-facing
+  if (!l || l.agent !== agent) return say(T.noLease2)
+  if (!(await inAgentLaunch(projectPath, agent, a.pid, a.after, a.before))) return say(T.notOwn)
   const job = jobs.get(a.lease)
-  if (!job || assigned.has(a.lease)) return "its check copy's job takes no launcher now" // i18n-ignore: hive-progress's words, agent-facing
+  if (!job || assigned.has(a.lease)) return say(T.noLauncher)
   // Taken before the await that assigns: a second call for the lease is refused, never two launchers in it.
   assigned.add(a.lease)
-  if (pool.lease(a.lease)?.returned) return 'its check copy was returned' // i18n-ignore: hive-progress's words, agent-facing
-  return (await job.assign(a.pid, a.after, a.before)) ? null : "the check's launcher couldn't be put in its check copy's job" // i18n-ignore: hive-progress's words, agent-facing
+  if (pool.lease(a.lease)?.returned) return say(T.returned)
+  return (await job.assign(a.pid, a.after, a.before)) ? null : say(T.notPut)
 }
 
 /** The lease a run holds (its isolated check), in any open pool of the workspace. */

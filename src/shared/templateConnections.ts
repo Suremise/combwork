@@ -119,7 +119,9 @@ export function badAnswers(keys: readonly string[], answers: unknown): string[] 
   const map = (k: 'roles' | 'agents'): Record<string, unknown> => (a[k] && typeof a[k] === 'object' && !Array.isArray(a[k]) ? (a[k] as Record<string, unknown>) : {})
   if (a.roles !== undefined && (typeof a.roles !== 'object' || Array.isArray(a.roles))) bad.push('roles')
   if (a.agents !== undefined && (typeof a.agents !== 'object' || Array.isArray(a.agents))) bad.push('agents')
+  // agent-protocol: what was given, named by its field (roles or agents) and its key, not wording
   for (const [k, v] of Object.entries(map('roles'))) if (!(WORKFLOW_ROLES as readonly string[]).includes(k) || !text(v)) bad.push(`role ${k}`) // i18n-ignore: what was given, named as it was (role or agent and its key), not prose
+  // agent-protocol: as above
   for (const [k, v] of Object.entries(map('agents'))) if (!keys.includes(k) || !text(v)) bad.push(`agent ${k}`) // i18n-ignore: what was given, named as it was (role or agent and its key), not prose
   return bad
 }

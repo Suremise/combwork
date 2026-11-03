@@ -26,7 +26,7 @@ function launchesDir(): string {
 
 /** A launch's private folder, outside the project: for its files that may hold secrets. */
 export function launchPrivateDir(runId: string): string {
-  if (!/^[A-Za-z0-9_-]+$/.test(runId)) throw new Error('Not a run id.')
+  if (!/^[A-Za-z0-9_-]+$/.test(runId)) throw new Error('Not a run id.') // agent-protocol: a programming error (its caller's), never an agent's
   return join(launchesDir(), runId)
 }
 
@@ -69,11 +69,15 @@ const refusedTold = new Set<string>()
  */
 export function refusedHookNote(runId: string | null): string | null {
   const ours = !!runId && issued.has(runId)
+  // agent-protocol: a key of refusedTold, not wording
   const key = ours ? runId! : runId ? '(not ours)' : '(none)'
   if (refusedTold.has(key) || refusedTold.size >= 200) return null
   refusedTold.add(key)
+  // agent-protocol: hive.log's line (servers.ts logs it), never an agent's
   if (!runId) return 'Refused a hook call that named no launch'
+  // agent-protocol: hive.log's line, as above
   if (!ours) return "Refused a hook call naming a run this Hive didn't start"
+  // agent-protocol: hive.log's line, as above
   return `Refused a hook call for run ${runId}: ${tokens.has(runId!) ? "its token didn't match the launch's" : 'that launch has ended'}`
 }
 

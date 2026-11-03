@@ -2,6 +2,7 @@ import { randomBytes, randomUUID, timingSafeEqual } from 'crypto'
 import { app } from 'electron'
 import { join } from 'path'
 import type { ViewerToken } from '../shared/types'
+import { agentMsg, inDefaultDialect, say } from '../shared/agentText'
 import { readJson, writeJsonAtomic } from './fsutil'
 
 /**
@@ -47,11 +48,14 @@ export function viewerForToken(bearer: string): ViewerToken | null {
   return null
 }
 
+/** The note in the viewer tokens' file (dialects, HI-2447): written for any reader, so said in the Default. */
+const FILE_NOTE = agentMsg({ id: 'token.file.viewerNote', text: 'Read-only Agent API tokens. Make and revoke them in Settings → Agent API → Viewer tokens.', note: "The note beside the viewer tokens in their file (#620), for whoever opens it." })
+
 function change<T>(fn: () => T): Promise<T> {
   const run = writes.then(async () => {
     await loadViewerTokens()
     const result = fn()
-    await writeJsonAtomic(file(), { viewers, note: 'Read-only Agent API tokens. Make and revoke them in Settings → Agent API → Viewer tokens.' })
+    await writeJsonAtomic(file(), { viewers, note: inDefaultDialect(() => say(FILE_NOTE)) })
     return result
   })
   writes = run.catch(() => undefined)

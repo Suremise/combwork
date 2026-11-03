@@ -9,6 +9,7 @@ import { isKnownProvider } from './providers'
 import { cleanMcpServers } from './agentMcp'
 import type { AgentDef, PageLayout, ProviderId } from './types'
 import { msg } from './i18n/msg'
+import { agentMsg, say } from './agentText'
 import { shownText, withValues, type Text } from './advanced'
 import { agentWorkflowRole, buildsWork, isWorkflowRole, reviewsWork, type ReviewerMode, type WorkflowRole } from './workflow/roles'
 import { hasWorkflow, readTemplateWorkflows, TEMPLATE_PLATFORMS, type TemplateWorkflows } from './workflow/templateOptions'
@@ -196,8 +197,12 @@ const M = {
  * Why the Assistant can't load a template into a project (HI-2001): more agents than its Maximum agents. Only the
  * Assistant's loads keep to it (the user's go past it), so it stays English.
  */
-export const templateLimitText = (count: number, max: number): string =>
-  `It has ${count} agents, and this project's workflow allows ${max} (Maximum agents, the user's team size, in Version Control → Workflow). The user can load it themselves, or raise Maximum agents first.` // i18n-ignore: English for the Assistant (agents read it)
+export const templateLimitText = (count: number, max: number): string => say(TOO_MANY, { count: String(count), max: String(max) })
+const TOO_MANY = agentMsg({
+  id: 'template.load.tooMany',
+  text: "It has {count} agents, and this project's workflow allows {max} (Maximum agents, the user's team size, in Version Control → Workflow). The user can load it themselves, or raise Maximum agents first.",
+  note: "Why the Assistant can't load a template (HI-2001): more agents than the project's Maximum agents, which only the Assistant's loads keep to. {count} and {max} are digits."
+})
 
 /** Why a listed template can't be used, in the language Hive shows now (call it when rendering); undefined when it can be. */
 export const shownProblem = (t: Pick<TemplateEntry, 'problem' | 'problemText'>): string | undefined => (t.problemText ? shownText(t.problemText) : t.problem)

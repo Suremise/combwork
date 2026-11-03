@@ -1,0 +1,342 @@
+{
+  "slot.archive.exit": {
+    "placeholders": {
+      "code": "plain"
+    }
+  },
+  "slot.archive.noStart": {
+    "placeholders": {}
+  },
+  "slot.archive.notEnded": {
+    "placeholders": {}
+  },
+  "slot.archive.timedOut": {
+    "placeholders": {}
+  },
+  "slot.check.noBase": {
+    "placeholders": {
+      "target": "plain"
+    }
+  },
+  "slot.check.noBranch": {
+    "placeholders": {
+      "target": "plain"
+    }
+  },
+  "slot.check.noTarget": {
+    "placeholders": {}
+  },
+  "slot.error.closed": {
+    "placeholders": {}
+  },
+  "slot.error.deleting": {
+    "placeholders": {}
+  },
+  "slot.error.gitRead": {
+    "placeholders": {
+      "what": "plain"
+    }
+  },
+  "slot.error.interrupted": {
+    "placeholders": {}
+  },
+  "slot.error.notListed": {
+    "placeholders": {}
+  },
+  "slot.error.opLost": {
+    "placeholders": {
+      "slot": "plain"
+    }
+  },
+  "slot.error.setupExit": {
+    "placeholders": {
+      "code": "plain"
+    }
+  },
+  "slot.error.setupNoStart": {
+    "placeholders": {
+      "command": "plain"
+    }
+  },
+  "slot.error.setupNotEnded": {
+    "placeholders": {}
+  },
+  "slot.error.setupTimedOut": {
+    "placeholders": {}
+  },
+  "slot.error.worktreeAdd": {
+    "placeholders": {
+      "error": "plain"
+    }
+  },
+  "slot.hold.byHand": {
+    "placeholders": {
+      "slot": "plain"
+    }
+  },
+  "slot.hold.changed": {
+    "placeholders": {
+      "slot": "plain"
+    }
+  },
+  "slot.hold.draining": {
+    "placeholders": {}
+  },
+  "slot.hold.gone": {
+    "placeholders": {
+      "slot": "plain"
+    }
+  },
+  "slot.hold.otherSlot": {
+    "placeholders": {
+      "slot": "plain"
+    }
+  },
+  "slot.hold.otherWork": {
+    "placeholders": {
+      "slot": "plain"
+    }
+  },
+  "slot.hold.reviews": {
+    "placeholders": {}
+  },
+  "slot.laneEnd.merged": {
+    "placeholders": {
+      "card": "plain",
+      "commit": "plain"
+    }
+  },
+  "slot.laneEnd.more": {
+    "placeholders": {
+      "count": "plain"
+    }
+  },
+  "slot.laneEnd.notMerged": {
+    "placeholders": {
+      "card": "plain"
+    }
+  },
+  "slot.laneEnd.note": {
+    "placeholders": {
+      "abandoned": "select",
+      "lane": "plain",
+      "listed": "select",
+      "list": "plain"
+    }
+  },
+  "slot.place.cantResume": {
+    "placeholders": {
+      "card": "plain",
+      "agent": "plain",
+      "slot": "plain",
+      "why": "plain"
+    }
+  },
+  "slot.place.notReady": {
+    "placeholders": {
+      "slot": "plain",
+      "error": "plain"
+    }
+  },
+  "slot.place.notReadyFor": {
+    "placeholders": {
+      "slot": "plain",
+      "card": "plain",
+      "error": "plain"
+    }
+  },
+  "slot.place.resumeEnded": {
+    "placeholders": {
+      "slot": "plain",
+      "tries": "plain",
+      "why": "plain"
+    }
+  },
+  "slot.place.resumeFailed": {
+    "placeholders": {
+      "agent": "plain",
+      "slot": "plain",
+      "card": "plain",
+      "why": "plain"
+    }
+  },
+  "slot.prepare.branchUnread": {
+    "placeholders": {
+      "slot": "plain"
+    }
+  },
+  "slot.prepare.busy": {
+    "placeholders": {
+      "slot": "plain"
+    }
+  },
+  "slot.prepare.filesUnread": {
+    "placeholders": {
+      "slot": "plain"
+    }
+  },
+  "slot.prepare.leaseEnded": {
+    "placeholders": {}
+  },
+  "slot.prepare.switchFailed": {
+    "placeholders": {
+      "error": "plain"
+    }
+  },
+  "slot.prepare.takenOver": {
+    "placeholders": {
+      "slot": "plain"
+    }
+  },
+  "slot.prepare.uncommitted": {
+    "placeholders": {
+      "slot": "plain"
+    }
+  },
+  "slot.refusal.aSlot": {
+    "placeholders": {}
+  },
+  "slot.refusal.agentLeased": {
+    "placeholders": {
+      "slot": "plain",
+      "what": "plain"
+    }
+  },
+  "slot.refusal.busy": {
+    "placeholders": {
+      "slot": "plain"
+    }
+  },
+  "slot.refusal.inUse": {
+    "placeholders": {
+      "slot": "plain",
+      "agent": "plain",
+      "what": "plain"
+    }
+  },
+  "slot.refusal.lane": {
+    "placeholders": {
+      "lane": "plain"
+    }
+  },
+  "slot.refusal.noSlot": {
+    "placeholders": {
+      "size": "plain",
+      "count": "plural"
+    }
+  },
+  "slot.refusal.notReady": {
+    "placeholders": {
+      "slot": "plain",
+      "why": "plain"
+    }
+  },
+  "slot.refusal.setupFailed": {
+    "placeholders": {
+      "slot": "plain",
+      "error": "plain"
+    }
+  },
+  "slot.refusal.warming": {
+    "placeholders": {
+      "slot": "plain"
+    }
+  },
+  "slot.release.both": {
+    "placeholders": {
+      "slot": "plain",
+      "agent": "plain"
+    }
+  },
+  "slot.release.carriedChanged": {
+    "placeholders": {
+      "slot": "plain",
+      "agent": "plain"
+    }
+  },
+  "slot.release.confirm": {
+    "placeholders": {
+      "slot": "plain"
+    }
+  },
+  "slot.release.noSlot": {
+    "placeholders": {
+      "slot": "plain",
+      "listed": "select",
+      "slots": "plain"
+    }
+  },
+  "slot.release.notCarried": {
+    "placeholders": {
+      "slot": "plain"
+    }
+  },
+  "slot.release.nothing": {
+    "placeholders": {
+      "slot": "plain"
+    }
+  },
+  "slot.release.writerChanged": {
+    "placeholders": {
+      "slot": "plain"
+    }
+  },
+  "slot.remove.failed": {
+    "placeholders": {}
+  },
+  "slot.run.closed": {
+    "placeholders": {}
+  },
+  "slot.run.noJob": {
+    "placeholders": {
+      "problem": "plain"
+    }
+  },
+  "slot.run.noSupervisor": {
+    "placeholders": {}
+  },
+  "slot.start.leaseEnded": {
+    "placeholders": {
+      "lease": "plain"
+    }
+  },
+  "slot.start.ownSlotWaits": {
+    "placeholders": {
+      "agent": "plain",
+      "slot": "plain",
+      "because": "plain"
+    }
+  },
+  "slot.takeover.busy": {
+    "placeholders": {}
+  },
+  "slot.takeover.changed": {
+    "placeholders": {}
+  },
+  "slot.takeover.gone": {
+    "placeholders": {}
+  },
+  "slot.takeover.holdsLease": {
+    "placeholders": {}
+  },
+  "slot.takeover.job": {
+    "placeholders": {}
+  },
+  "slot.takeover.lent": {
+    "placeholders": {}
+  },
+  "slot.takeover.notReady": {
+    "placeholders": {
+      "state": "plain"
+    }
+  },
+  "slot.takeover.otherHive": {
+    "placeholders": {}
+  },
+  "slot.takeover.otherRun": {
+    "placeholders": {}
+  },
+  "slot.takeover.setupFailed": {
+    "placeholders": {}
+  }
+}
