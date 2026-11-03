@@ -1,5 +1,11 @@
 # Release Notes
 
+## Unreleased
+
+### Fixes
+
+- **File locks hold back a Codex edit made as a shell command.** Codex sometimes applies its patch by running `apply_patch` in a shell rather than as its own edit, and that edit went through even when another agent held the file. Hive now reads the files from the patch and locks, asks or warns as it does for any other edit (HI-2408).
+
 ## 1.0.0 — 2026-11-03
 
 **Hive 1.0 runs your board by your project's rules.** Choose how a card goes from Todo to Done (who reviews it, which checks pass first, who merges it, where it is built) with the Solo, Pair or Team presets; agents tell Hive what they did, and Hive moves the card, asks you only what's yours to answer, and can merge approved work itself, each card in its own slot. Agents run on connections Hive keeps (several sign-ins side by side), one notification system tells each thing once, and the Activity view shows what every agent is doing now.

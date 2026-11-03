@@ -168,6 +168,35 @@ const post = (url, token, body) =>
   console.log('TERMINAL TAIL:', (await text(a1.id)).slice(-400))
   await page.screenshot({ path: path.join(scratch, 'cxe-4-allowed.png') })
   fs.writeFileSync(path.join(proj, 'notes.txt'), notes0)
+
+  // --- The same lock when Codex runs apply_patch as a shell command (HI-2408: Codex 0.166 applies it as an edit; its
+  // PreToolUse is Bash). Agent 2 claims shell.txt; agent 1 is asked to edit it that way, which is held back and asked about.
+  fs.writeFileSync(path.join(proj, 'shell.txt'), 'hi\n')
+  const shellClaim = await post(`${m[2]}?run=${l2.runId}`, m[1], {
+    hook_event_name: 'PreToolUse',
+    session_id: l2.sessionId || 'pending',
+    cwd: proj,
+    tool_name: 'apply_patch',
+    tool_input: { command: '*** Begin Patch\n*** Update File: shell.txt\n@@\n+claimed\n*** End Patch' }
+  })
+  check('agent 2 claims shell.txt', shellClaim.status === 200, `${shellClaim.status} ${shellClaim.body}`)
+  await lib.until(async () => ((await live(a2.id))?.lockedFiles ?? []).some((f) => /shell\.txt$/i.test(f)), 10000)
+  const askingShell = page.locator('.toast', { hasText: 'wants to edit shell.txt' })
+  const shellText = () => fs.readFileSync(path.join(proj, 'shell.txt'), 'utf8')
+  const shellPrompt = 'Run exactly this command with your exec_command tool (shell "bash"), not the apply_patch tool, and do nothing else: apply_patch <<\'PATCH\' then the lines *** Begin Patch / *** Update File: shell.txt / @@ / " hi" / +from agent 1 / *** End Patch, each on its own line, then PATCH.'
+  await lib.cliStep('the locked shell edit', { session: key1 }, async () => {
+    for (let attempt = 0; attempt < 3; attempt++) {
+      const since = (await live(a1.id))?.statusSince
+      await lib.sendPrompt(inv, key1, shellPrompt, { submitted: async () => (await live(a1.id))?.statusSince !== since })
+      await lib.until(async () => (await askingShell.count()) > 0 || /from agent 1/.test(shellText()) || ['finished', 'waiting'].includes((await live(a1.id))?.status), 120000, 300)
+      if (await lib.until(async () => (await askingShell.count()) > 0, 5000)) break
+      if (/from agent 1/.test(shellText())) break
+      console.log(`Codex didn't try the shell edit (attempt ${attempt + 1}): asking again`)
+      await waitFor(a1.id, (x) => x?.status === 'finished' || x?.status === 'waiting', 60000)
+    }
+    check('the locked shell edit is held back', !/from agent 1/.test(shellText()), shellText())
+    check('Hive asks about the shell edit with an Allow button', (await askingShell.getByRole('button', { name: 'Allow', exact: true }).count()) > 0)
+  })
   // Decline: Esc interrupts.
   await inv('pty:write', key1, '\x1b')
   await lib.until(async () => ['ready', 'finished'].includes((await inv('session:live')).find((x) => x.agentId === a1.id)?.status), 15000) // the interrupt landed

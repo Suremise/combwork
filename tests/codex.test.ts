@@ -57,6 +57,29 @@ describe('Codex hooks', () => {
     expect(patchPaths('*** Begin Patch\n*** Add File: a b/c.ts\n+x\n*** End Patch')).toEqual(['a b/c.ts'])
     expect(patchPaths('no patch')).toEqual([])
   })
+  it('claims the files of an apply_patch run as a shell command (HI-2408, recorded from Codex 0.166.0)', async () => {
+    const { codex } = await import('../src/main/providers/codex/adapter')
+    const { shellPatchPaths } = await import('../src/main/providers/codex/rollout')
+    // Each recorded command: the files claimed where Codex applied the patch itself, none where it ran it in the shell.
+    const recorded: { about: string; appliedByCodex: boolean; files: string[] }[] = JSON.parse(readText(joinPath(__dirname, 'fixtures', 'pretooluse-codex-0.166.0-shell-patch.json'), 'utf8')).hooks
+    expect(recorded.filter((b) => b.appliedByCodex).length).toBe(3)
+    for (const b of recorded) expect({ about: b.about, ...codex.normalizeHook(b) }).toMatchObject({ about: b.about, event: { kind: 'toolStart' }, editedPaths: b.files })
+    // A cd that the paths are relative to (absolute ones stay), and CRLF lines.
+    const patch = '*** Begin Patch\n*** Update File: a.ts\n@@\n-x\n+y\n*** End Patch'
+    expect(shellPatchPaths(`cd "src dir" && apply_patch <<'EOF'\n${patch}\nEOF`)).toEqual([joinPath('src dir', 'a.ts')])
+    expect(shellPatchPaths(`cd sub && apply_patch <<'EOF'\n${patch.replace('a.ts', 'C:\\abs\\a.ts')}\nEOF\n`)).toEqual(['C:\\abs\\a.ts'])
+    expect(shellPatchPaths(`apply_patch <<'EOF'\r\n${patch.split('\n').join('\r\n')}\r\nEOF`)).toEqual(['a.ts'])
+    // Not one Codex applies: no file claimed (other shell edits stay out of locks).
+    expect(shellPatchPaths(`apply_patch <<'EOF'\n${patch}\nEOF\nEOF`)).toEqual([])
+    // A later statement's text isn't the patch's (HI-2408 round 1: locked.txt was claimed from cat's heredoc).
+    expect(shellPatchPaths(`apply_patch <<'PATCH'\n${patch}\nPATCH\ncat <<'EXAMPLE'\n*** Update File: locked.txt\nEXAMPLE`)).toEqual([])
+    expect(shellPatchPaths(`cd src && apply_patch <<'PATCH'\n${patch}\nPATCH\ncd ../other && apply_patch <<'PATCH'\n${patch}\nPATCH`)).toEqual([])
+    expect(shellPatchPaths(`apply_patch $'${patch.split('\n').join('\\n')}'`)).toEqual([])
+    expect(shellPatchPaths(`cat > x.patch <<'EOF'\n${patch}\nEOF`)).toEqual([])
+    expect(shellPatchPaths(`echo apply_patch`)).toEqual([])
+    expect(shellPatchPaths('apply_patch_helper <<EOF\n' + patch + '\nEOF')).toEqual([])
+    expect(shellPatchPaths("Set-Content notes.txt 'x'")).toEqual([])
+  })
 })
 
 describe('Codex: when a person must act', () => {
