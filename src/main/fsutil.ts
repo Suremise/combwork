@@ -165,6 +165,16 @@ export class KeptFileBusy extends HiveError {
   }
 }
 
+/**
+ * A kept file that is there but can't be read (HI-2414: locked by another program, access refused, a disk error), even
+ * after the pauses: its value isn't known, so a change to it isn't made, and nothing is written over it or its .bak.
+ */
+export class KeptFileUnreadable extends HiveError {
+  constructor(path: string) {
+    super(withValues(msg({ id: 'service.fsutil.keptUnreadable', defaultMessage: "{file} couldn't be read: nothing was changed. Try again in a moment.", description: "An error: one of Hive's settings or records files ({file}: its path) is there but couldn't be read (another program had it locked, or a disk error), so Hive's change to it wasn't made and the file was left as it is." }), { file: path }), { kind: 'conflict' })
+  }
+}
+
 /** How a read for a change treats a file still changing after the pauses: as today (the .bak's value), or `throw` (KeptFileBusy). */
 export type KeptReadOptions = { unsettled?: 'bak' | 'throw' }
 
@@ -173,37 +183,107 @@ export const KEPT_TRIES = 3
 
 /**
  * Runs a read-modify-write of a kept file (read with `unsettled: 'throw'`) again while the file is still being saved by
- * something else, KEPT_TRIES times in all: still busy, its KeptFileBusy is thrown, nothing written. `fn` must take its
- * lock and read the file again each time.
+ * something else or can't be read for a moment, KEPT_TRIES times in all: still so, its KeptFileBusy (or
+ * KeptFileUnreadable) is thrown, nothing written. `fn` must take its lock and read the file again each time.
  */
 export async function retryWhileSaving<T>(fn: () => Promise<T>): Promise<T> {
   for (let n = 1; ; n++) {
     try {
       return await fn()
     } catch (e) {
-      if (!(e instanceof KeptFileBusy) || n >= KEPT_TRIES) throw e
+      if (!(e instanceof KeptFileBusy || e instanceof KeptFileUnreadable) || n >= KEPT_TRIES) throw e
+    }
+  }
+}
+
+/** Whether a failed read or stat means the file isn't there (its folder neither), not that it can't be read. */
+const absent = (e: unknown): boolean => ['ENOENT', 'ENOTDIR'].includes((e as NodeJS.ErrnoException)?.code ?? '')
+
+/** Whether a kept file isn't there now (a stat that fails otherwise, as for a locked file, is not that). */
+async function gone(path: string): Promise<boolean> {
+  return stat(path).then(
+    () => false,
+    (e) => absent(e)
+  )
+}
+
+function goneSync(path: string): boolean {
+  try {
+    statSync(path)
+    return false
+  } catch (e) {
+    return absent(e)
+  }
+}
+
+/**
+ * Kept files whose last read failed with the file there (HI-2414), by lower-case path: what that read gave was the
+ * .bak's value or the caller's default, not the file's, so writeKeptJson refuses to write over them until a read of the
+ * file succeeds again (or it is gone).
+ */
+const unreadable = new Set<string>()
+
+/**
+ * A kept file's text, read again after the pauses while it can't be read (a lock held for a moment); null when it isn't
+ * there. Still unreadable after them, the last error is thrown.
+ */
+async function readKeptText(path: string): Promise<string | null> {
+  for (let i = 0; ; i++) {
+    try {
+      return await readFile(path, 'utf8')
+    } catch (e) {
+      if (absent(e)) return null
+      if (i >= SETTLE_PAUSES.length) throw e
+      await new Promise((r) => setTimeout(r, SETTLE_PAUSES[i]))
     }
   }
 }
 
 /**
+ * A kept file that is there and couldn't be read (HI-2414). Read for a change, KeptFileUnreadable; otherwise its .bak's
+ * value for this read (the caller's default without one), and the file is marked so nothing is written over it.
+ */
+function unreadableValue<T>(path: string, e: unknown, bak: string | null, fallback: T, refuse: boolean): T {
+  const code = (e as NodeJS.ErrnoException)?.code ?? 'no code' // i18n-ignore: log text
+  if (refuse) {
+    log.warn(`${userText(path)} couldn't be read (${code}): a change to it waits for it, nothing written`)
+    throw new KeptFileUnreadable(path)
+  }
+  log.warn(`${userText(path)} couldn't be read (${code}): its last good copy is used for now, and it isn't written over until it is read again`)
+  unreadable.add(path.toLowerCase())
+  const ok = bak === null ? null : parses(bak)
+  return ok ? (ok.value as T) : fallback
+}
+
+/**
  * A kept file's value. Read for a change written back (read-modify-write), pass `{ unsettled: 'throw' }`: a file still
  * being saved by something else throws KeptFileBusy rather than giving the .bak's value, which written back would undo
- * that save once it finishes (#1600).
+ * that save once it finishes (#1600); one that is there but can't be read throws KeptFileUnreadable (HI-2414).
  */
 export async function readKeptJson<T>(path: string, fallback: T, opts: KeptReadOptions = {}): Promise<T> {
-  let text: string
+  const refuse = opts.unsettled === 'throw'
+  let text: string | null
   try {
-    text = await readFile(path, 'utf8')
-  } catch {
-    // Missing (or briefly locked): the caller's default, as before. Nothing is set aside.
-    return fallback
+    text = await readKeptText(path)
+  } catch (e) {
+    // There, but not readable (HI-2414): never the caller's default as if it were new.
+    const bak = refuse ? null : await readFile(`${path}.bak`, 'utf8').catch(() => null)
+    return unreadableValue(path, e, bak, fallback, refuse)
   }
+  // Read (or not there): what this gives is the file's, so it can be written over again.
+  unreadable.delete(path.toLowerCase())
+  // Missing: the caller's default, as before. Nothing is set aside.
+  if (text === null) return fallback
   try {
     return JSON.parse(text) as T
   } catch {
     const settled = await settle(path)
-    if (settled === 'missing') return fallback
+    if (settled === 'missing') {
+      if (await gone(path)) return fallback
+      // Unreadable while it was read again: as above.
+      const bak = refuse ? null : await readFile(`${path}.bak`, 'utf8').catch(() => null)
+      return unreadableValue(path, new Error('unreadable while settling'), bak, fallback, refuse) // i18n-ignore: log text
+    }
     if (typeof settled === 'object') return settled.value as T
     if (settled === 'unsettled' && opts.unsettled === 'throw') {
       log.warn(`${userText(path)} doesn't parse and had changed within ${DAMAGED_AGE_MS} ms (or was still changing after ${SETTLE_MS} ms): a change to it waits for it`)
@@ -252,6 +332,8 @@ export async function readKeptJsonByStat<T, D>(path: string, fallback: T, derive
   if (st && kept && kept.derive === derive && kept.mtimeMs === st.mtimeMs && kept.size === st.size && kept.ino === st.ino) {
     // Read again: the most recently read now.
     keptByStat.set(key, kept)
+    // The file's value (HI-2414: it can be written over).
+    unreadable.delete(key)
     return structuredClone(kept.derived) as D
   }
   if (!st) return derive(await readKeptJson(path, fallback, opts))
@@ -263,6 +345,7 @@ export async function readKeptJsonByStat<T, D>(path: string, fallback: T, derive
   } catch {
     return derive(await readKeptJson(path, fallback, opts))
   }
+  unreadable.delete(key)
   const derived = derive(value)
   if (st.mtimeMs < asked - KEPT_RACY_MS) {
     keptByStat.set(key, { mtimeMs: st.mtimeMs, size: st.size, ino: st.ino, derive, derived: structuredClone(derived) })
@@ -280,25 +363,34 @@ export function readKeptJsonSync<T>(path: string, fallback: T): T {
   return timedStep(`kept file read ${basename(path)}`, () => readKeptJsonSyncNow(path, fallback))
 }
 
+function readBakSync(path: string): string | null {
+  try {
+    return readFileSync(`${path}.bak`, 'utf8')
+  } catch {
+    // No copy yet.
+    return null
+  }
+}
+
 function readKeptJsonSyncNow<T>(path: string, fallback: T): T {
   let text: string
   try {
     text = readFileSync(path, 'utf8')
-  } catch {
+  } catch (e) {
+    // There, but not readable (HI-2414): its .bak's value, and not written over until it is read again. No pauses: this
+    // blocks the thread.
+    if (!absent(e)) return unreadableValue(path, e, readBakSync(path), fallback, false)
+    unreadable.delete(path.toLowerCase())
     return fallback
   }
+  unreadable.delete(path.toLowerCase())
   try {
     return JSON.parse(text) as T
   } catch {
     const settled = settleSync(path)
-    if (settled === 'missing') return fallback
+    if (settled === 'missing') return goneSync(path) ? fallback : unreadableValue(path, new Error('unreadable while settling'), readBakSync(path), fallback, false) // i18n-ignore: log text
     if (typeof settled === 'object') return settled.value as T
-    let bak: string | null = null
-    try {
-      bak = readFileSync(`${path}.bak`, 'utf8')
-    } catch {
-      // No copy yet.
-    }
+    const bak = readBakSync(path)
     if (settled === 'unsettled') return unsettled(path, bak, fallback)
     const r = recoverText(path, bak)!
     if (r.restored) {
@@ -382,13 +474,24 @@ const backedUp = new Set<string>()
  * Saves a kept file and its .bak copy. `compact`: JSON without spaces; `bakOncePerRun`: the .bak only at the first save
  * of the run (#1111: config.json, saved often, then costs one write a save, not two). `existing`: its folder isn't made,
  * so a file whose folder went (moved or deleted) fails with ENOENT rather than bringing the folder back (HI-1817).
+ *
+ * A file whose last read found it there but unreadable (HI-2414) isn't written over, nor its .bak: what was read
+ * instead wasn't its value, so this save could replace settings it never saw. KeptFileUnreadable, until a read of it
+ * succeeds again (or it is gone).
  */
 export async function writeKeptJson(path: string, data: unknown, opts: { compact?: boolean; bakOncePerRun?: boolean; existing?: boolean } = {}): Promise<void> {
+  const k = path.toLowerCase()
+  if (unreadable.has(k)) {
+    if (!(await gone(path))) {
+      log.warn(`${userText(path)} wasn't saved: it couldn't be read when last read, so this save could replace settings Hive never saw`)
+      throw new KeptFileUnreadable(path)
+    }
+    unreadable.delete(k)
+  }
   const text = (opts.compact ? JSON.stringify(data) : JSON.stringify(data, null, 2)) + '\n'
   const write = { mkdir: !opts.existing }
   forgetKeptStat(path)
   await writeTextAtomic(path, text, write).finally(() => forgetKeptStat(path))
-  const k = path.toLowerCase()
   if (opts.bakOncePerRun && backedUp.has(k)) return
   await writeTextAtomic(`${path}.bak`, text, write).then(
     () => void backedUp.add(k),

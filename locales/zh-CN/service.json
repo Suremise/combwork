@@ -58,6 +58,7 @@
   "service.files.outside": "路径在项目之外",
   "service.files.throughLink": "路径（通过链接）指向项目之外",
   "service.fsutil.keptBusy": "{file} 正由其他程序保存：未做任何更改。请稍后再试。",
+  "service.fsutil.keptUnreadable": "无法读取 {file}：未做任何更改。请稍后再试。",
   "service.fsutil.notCopied": "无法复制 {name}",
   "service.git.exitCode": "退出码 {code}",
   "service.git.failed": "{command} 失败：{why}",

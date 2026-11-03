@@ -58,6 +58,7 @@
   "service.files.outside": "Der Pfad liegt außerhalb des Projekts",
   "service.files.throughLink": "Der Pfad führt (über eine Verknüpfung) aus dem Projekt hinaus",
   "service.fsutil.keptBusy": "{file} wird gerade von einem anderen Programm gespeichert: Es wurde nichts geändert. Versuche es gleich noch einmal.",
+  "service.fsutil.keptUnreadable": "{file} konnte nicht gelesen werden: Es wurde nichts geändert. Versuche es gleich noch einmal.",
   "service.fsutil.notCopied": "{name} konnte nicht kopiert werden",
   "service.git.exitCode": "Exitcode {code}",
   "service.git.failed": "{command} fehlgeschlagen: {why}",

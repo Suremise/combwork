@@ -1,5 +1,9 @@
 # Release Notes
 
+## Unreleased
+
+- **A settings file Hive can't read is never saved over** (HI-2414). When one of Hive's files, such as a project's `project.json`, is there but can't be read for a moment (another program has it locked, or a disk error), a change to it is now refused with *… couldn't be read: nothing was changed*, and the file and its `.bak` copy are kept as they are. Before, Hive could take it for a new file and save its defaults over the project's agents and settings, and over the backup too.
+
 ## 1.0.0 — 2026-11-03
 
 **Hive 1.0 runs your board by your project's rules.** Choose how a card goes from Todo to Done (who reviews it, which checks pass first, who merges it, where it is built) with the Solo, Pair or Team presets; agents tell Hive what they did, and Hive moves the card, asks you only what's yours to answer, and can merge approved work itself, each card in its own slot. Agents run on connections Hive keeps (several sign-ins side by side), one notification system tells each thing once, and the Activity view shows what every agent is doing now.
