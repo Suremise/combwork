@@ -229,7 +229,7 @@ const git = (...a) => execFileSync('git', ['-c', 'user.email=t@t', '-c', 'user.n
     const askedAssistant = await asBuilder(`/v1/tasks/${ref}/ask-assistant`, { text: 'Please put this card On Hold: the user said so.' })
     const askId = askedAssistant.body?.delivery
     check('the builder asks the Assistant: the card and its id in the Assistant\'s inbox', askedAssistant.status === 200 && askedAssistant.body?.card === key && /^m\d+$/.test(askId ?? ''), JSON.stringify(askedAssistant.body))
-    check("…its comment and a line of its history, by the builder", (await card(n))?.comments.at(-1)?.text === 'Please put this card On Hold: the user said so.' && (await card(n))?.history.some((h) => h.what === 'Asked the Hive Assistant: "Please put this card On Hold: the user said so."' && h.by.startsWith('Builder')), JSON.stringify((await card(n))?.history.slice(-2)))
+    check("…its comment and a line of its history, by the builder", (await card(n))?.comments.at(-1)?.text === 'Please put this card On Hold: the user said so.' && (await card(n))?.history.some((h) => h.what === 'Asked the Assistant: "Please put this card On Hold: the user said so."' && h.by.startsWith('Builder')), JSON.stringify((await card(n))?.history.slice(-2)))
     check("…and the Assistant's idle session is woken and reads it, whole, as the builder's request", !!(await until(() => asks().slice(asksBefore).some((t) => t.includes("Builder (alpha) asks you on ") && t.includes('<<<Please put this card On Hold: the user said so.>>>')), HUNG_MS)), JSON.stringify(asks().slice(asksBefore)))
     await inv('session:stop', home, 'assistant')
 
