@@ -7,7 +7,10 @@ import { join } from 'path'
 import { afterAll, afterEach, beforeAll, describe, expect, it, vi } from 'vitest'
 import * as electron from 'electron'
 import type { LaneInfo, LaneStatus, TaskCard } from '../src/shared/types'
-import { setChainResolver, setProcessChain, type DialectChain } from '../src/shared/agentText'
+import { agentMsg, say, setChainResolver, setProcessChain, type DialectChain } from '../src/shared/agentText'
+import { DatabaseSync } from 'node:sqlite'
+import { admitted } from './admitted'
+import { journalSettings } from '../src/shared/journal'
 import { canaryProblems, canaryTexts } from '../src/shared/agentText/canary'
 import { laneCards, laneChangeText, laneEndText, laneLine, laneNextText, laneNumber, lanesText, laneStatusText, laneView, waitText, type LaneRecord } from '../src/shared/lanes'
 import { tempDir } from './tempDir'
@@ -21,6 +24,7 @@ const { createWorkspaceService, disposeWorkspaceService, inWorkspace } = await i
 const tasks = await import('../src/main/tasks')
 const lanes = await import('../src/main/lanes')
 const journal = await import('../src/main/journalService')
+const journalStore = await import('../src/main/journal')
 
 vi.setConfig({ testTimeout: 30_000 })
 
@@ -179,8 +183,10 @@ describe('the canary dialect over the lanes service (main/lanes.ts)', () => {
 
   it("say hive_lane's refusals and notes through the catalogue; a lane's journal fact stays the Default", async () => {
     const facts: string[] = []
+    const kept: Parameters<typeof journal.journalFact>[1][] = []
     const spy = vi.spyOn(journal, 'journalFact').mockImplementation((_ws, f) => {
       facts.push(f.summary)
+      kept.push(f)
       return true
     })
     try {
@@ -247,6 +253,30 @@ describe('the canary dialect over the lanes service (main/lanes.ts)', () => {
       expect(facts.length).toBeGreaterThan(0)
       for (const f of facts) expect(f, f).not.toMatch(/⟦/)
       expect(facts).toContain(`Lane started: B1 / R1, #${c1.number}`)
+      // Each is kept as its message too (summaryText, HI-2438's journal field): its id and values, which say its English
+      // again, and which the journal stores beside the summary.
+      for (const f of kept) {
+        expect(f.summaryText?.id, f.summary).toBe('lane.journal.fact')
+        setProcessChain(null)
+        expect(say(agentMsg({ id: 'lane.journal.fact', text: catalogue['lane.journal.fact'].text }), f.summaryText!.values as Record<string, string>)).toBe(f.summary)
+      }
+      const started = kept.find((f) => f.summary === `Lane started: B1 / R1, #${c1.number}`)!
+      expect(started.summaryText!.values).toMatchObject({ named: 'no', state: 'started', who: 'B1 / R1', cards: `#${c1.number}` })
+      const h = join(base, 'journal-ws', '.hive', 'assistant')
+      const out = admitted(join(base, 'journal-ws'))
+      try {
+        const id = journalStore.writeEntry(h, journalSettings({ enabled: true }), { kind: 'event', ...started, tags: ['hive', ...(started.tags ?? [])] }, 'hive')
+        journalStore.closeJournal(h)
+        const raw = new DatabaseSync(journalStore.journalFile(h), { readOnly: true })
+        try {
+          expect(JSON.parse((raw.prepare('SELECT summary_text AS t FROM entries WHERE id = ?').get(id) as { t: string }).t)).toEqual(started.summaryText)
+        } finally {
+          raw.close()
+        }
+      } finally {
+        journalStore.closeJournal(h)
+        out()
+      }
     } finally {
       spy.mockRestore()
     }

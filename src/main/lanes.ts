@@ -363,9 +363,12 @@ function laneFact(ws: WorkspaceService, l: LaneRecord): void {
   const cards = withCardNames(ws, () => l.cards.map(cardRef).join(', '))
   const state = l.state === 'active' ? 'started' : l.state === 'ended' ? (l.mergeCommit ? 'merged' : 'ended') : 'abandoned'
   // Stored for any reader (the Assistant, the journal browser): in the Default, until stored text is said when read.
-  const summary = inDefaultDialect(() => say(A.journal, { named: l.name ? 'yes' : 'no', name: l.name ?? '', state, commit: l.mergeCommit ?? '', who, cards }))
+  // Kept as its message too (HI-2438's summaryText), so a later reader can be told it in their own dialect.
+  const values = { named: l.name ? 'yes' : 'no', name: l.name ?? '', state, commit: l.mergeCommit ?? '', who, cards }
+  const summary = inDefaultDialect(() => say(A.journal, values))
   journalFact(ws, {
     summary,
+    summaryText: { id: A.journal.id, values },
     project: l.project,
     importance: l.mergeCommit ? 2 : 1,
     links: [...l.cards.map((n) => ({ type: 'card' as const, ref: String(n) })), ...(l.mergeCommit ? [{ type: 'commit' as const, ref: l.mergeCommit }] : [])].slice(0, 40),
