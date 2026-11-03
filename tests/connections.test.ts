@@ -15,7 +15,7 @@ import { join } from 'path'
 import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, it, vi } from 'vitest'
 import * as electron from 'electron'
 import { connectionRef, connectionsFor, connectionShown, resolveConnection, type ConnectionsView } from '../src/shared/accounts'
-import { cliReadyOf, connectionCli, connectionOf, firstReadyConnection, firstUsableConnection, launchedName, offeredConnections } from '../src/shared/connectionLabel'
+import { cliReadyOf, connectionCli, connectionOf, connectionSwitchDue, firstReadyConnection, firstUsableConnection, launchedName, offeredConnections } from '../src/shared/connectionLabel'
 import type { Account, LiveSessionState } from '../src/shared/types'
 import { tempDir } from './tempDir'
 
@@ -754,6 +754,21 @@ describe('what an agent row names (connectionOf, HI-1769; HI-2108: connections)'
     // A launch from before HI-2397 (no connection kept): its account, as before.
     expect(launchedName(ran('a'))).toEqual({ id: 'a', name: 'Account a' })
     expect(launchedName(on('a', 'a2'))).toEqual({ id: 'a2', name: 'Name a2' })
+  })
+  it('HI-2413: Switch Them switches by connection, as ⟳ marks it: another on the same account too; its own chosen again, no change', () => {
+    const on = (account: string, id: string) => ({ ...ran(account), connection: { id, name: `Name ${id}` } })
+    // Runs on a1; a2 (the same account) chosen now: due, as the window's ⟳ says.
+    expect(connectionSwitchDue(on('a', 'a1'), { connection: 'a', connectionId: 'a2' })).toBe(true)
+    expect(connectionOf('a2', 'claude-code', on('a', 'a1'), view())?.other).toBe(true)
+    // a1 chosen again (or another account's connection chosen, then a1 back): nothing to switch.
+    expect(connectionSwitchDue(on('a', 'a1'), { connection: 'a', connectionId: 'a1' })).toBe(false)
+    // Another account: due, as before.
+    expect(connectionSwitchDue(on('a', 'a1'), { connection: 'b', connectionId: 'b1' })).toBe(true)
+    // None usable now (`!<why>`): due, as before.
+    expect(connectionSwitchDue(on('a', 'a1'), { connection: '!none' })).toBe(true)
+    // A launch from before HI-2397 kept only its account: compared by account.
+    expect(connectionSwitchDue(ran('a'), { connection: 'a', connectionId: 'a2' })).toBe(false)
+    expect(connectionSwitchDue(ran('a'), { connection: 'b', connectionId: 'b1' })).toBe(true)
   })
   it('nothing where connections aren’t shown: a CLI without them (or turned off), no view yet', () => {
     expect(connectionOf('a1', 'claude-code', undefined, view({ providers: [] }))).toBeNull()

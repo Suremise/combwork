@@ -70,6 +70,7 @@ import { runSwitch, SlotHeld, SwitchIntents, type SwitchOp, type UsageIntent } f
 import { agentLaunchView, allAccounts, allConnections, checkAccount, firstUsableAccount, getConnection, launchOnChosen, onConnectionSignedIn, setAccountSessions, type LaunchConnection } from './accounts'
 import { effortUsable, ensureMigrated, migrationDue } from './connectionMoves'
 import { resolveAgentConnection } from '../shared/accounts'
+import { connectionSwitchDue } from '../shared/connectionLabel'
 import { recacheEstimate, withoutAccountEnv, withServerEnv } from './providers/common'
 import { GZ, compressFile, decompressTo, expandBackup, isGz } from './transcriptFiles'
 import { usesOwnPrices } from '../shared/prices'
@@ -2405,7 +2406,8 @@ class SessionManager {
       const host = workspaceOf(st.projectPath)
       const agent = (await host.projectConfig(st.projectPath).then((pc) => projectAgents(pc).find((a) => a.id === st.agentId)).catch(() => undefined)) ?? undefined
       const eff = await this.effective(st.projectPath, agent).catch(() => null)
-      if (!eff || eff.connection === st.launchedConnection.id) continue
+      // By connection, not account (HI-2413): another connection on the same account is switched to too.
+      if (!eff || !connectionSwitchDue(st.launchedConnection, eff)) continue
       out.push({ projectPath: st.projectPath, agentId: st.agentId, result: this.switchAtSafePoint(st.projectPath, st.agentId) })
     }
     return out
