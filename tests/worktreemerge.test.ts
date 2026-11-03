@@ -113,11 +113,14 @@ describe('mergeWorktree (#1347)', () => {
     it(`merges the branch, not a same-named tag, into the checked-out target (${squash ? 'squash' : 'merge commit'})`, async () => {
       const { project, a } = await twoBranches()
       run(project, 'tag', a.branch, 'refs/heads/main')
-      const r = await mergeWorktree(project, a, { squash, message: 'A' })
-      expect(r).toEqual({ ok: true, mergeCommit: run(project, 'rev-parse', 'refs/heads/main').trim() })
+      // A squash keeping the worktree moves its branch too: the check that the worktree is on it reads it past the tag.
+      const r = await mergeWorktree(project, a, { squash, message: 'A', ...(squash ? { moveBranch: true } : {}) })
+      const main = run(project, 'rev-parse', 'refs/heads/main').trim()
+      expect(r).toEqual({ ok: true, mergeCommit: main, ...(squash ? { branchMoved: true } : {}) })
       expect(readFileSync(join(project, 'CHANGELOG.md'), 'utf8')).toContain('- Entry from A.')
       expect(run(project, 'log', '-1', '--format=%P', 'refs/heads/main').trim().split(' ')).toHaveLength(squash ? 1 : 2)
       expect(run(project, 'status', '--porcelain')).toBe('')
+      if (squash) expect(run(project, 'rev-parse', `refs/heads/${a.branch}`).trim()).toBe(main)
     })
   }
 

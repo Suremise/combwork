@@ -592,8 +592,9 @@ async function mergeElsewhere(projectPath: string, wt: WorktreeRef, into: string
  */
 export async function moveBranchTo(projectPath: string, wt: WorktreeRef, into: string): Promise<true | string> {
   if (!existsSync(wt.path)) return tr(msg({ id: 'worktrees.move.missing', defaultMessage: '{folder} is missing.', description: "Why the agent's branch wasn't moved after a squash merge: its worktree folder {folder} is gone." }), { folder: wt.path })
-  const head = await git(wt.path, ['symbolic-ref', '--short', 'HEAD'])
-  if (!head.ok || head.out.trim() !== wt.branch) return tr(msg({ id: 'worktrees.move.notOnBranch', defaultMessage: "The worktree isn't on {branch}.", description: "Why the agent's branch wasn't moved after a squash merge: its worktree has another branch than {branch} checked out." }), { branch: wt.branch })
+  // The full ref: --short answers heads/<branch> beside a same-named tag (HI-2422).
+  const head = await git(wt.path, ['symbolic-ref', 'HEAD'])
+  if (!head.ok || head.out.trim() !== `refs/heads/${wt.branch}`) return tr(msg({ id: 'worktrees.move.notOnBranch', defaultMessage: "The worktree isn't on {branch}.", description: "Why the agent's branch wasn't moved after a squash merge: its worktree has another branch than {branch} checked out." }), { branch: wt.branch })
   // Both by their full refs: a same-named tag would otherwise be read, and the branch reset to it (HI-2422).
   if (!(await alreadyMerged(projectPath, `refs/heads/${into}`, `refs/heads/${wt.branch}`))) return tr(msg({ id: 'worktrees.move.notEverything', defaultMessage: "{into} doesn't have everything on {branch}.", description: "Why the agent's branch {branch} wasn't moved after a squash merge: the branch merged into ({into}) lacks some of its changes." }), { into, branch: wt.branch })
   const r = await git(wt.path, ['reset', '--keep', `refs/heads/${into}`])
