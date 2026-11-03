@@ -13,11 +13,13 @@
 // record) happens holding the move's lock, `<new>.move-lock` beside the folders. It is taken atomically: written whole
 // to a file of its own, then hard-linked to the lock's name, which fails if one is there, so a lock is never seen half
 // written. The copy refreshes it as it goes. A lock held by a live start that refreshed it lately makes this start give
-// way (index.ts exits, as a second start does); one whose start has ended is claimed by renaming it to a name of this
-// start's own (only one contender's rename succeeds) and checked to be the one judged; anything else (a lock that can't
-// be read, or a live start's that hasn't moved for a while) is never removed: this run uses the old folder and says so.
-// A staging folder is only ever removed by the lock's holder, and only when its marker says it is this move's: a folder
-// of any other name, or without the marker, is left as it is.
+// way (index.ts exits, as a second start does). One whose start has ended is removed only by the one reclaimer (round
+// 3): under a reclaim guard taken the same way, it is read again and removed only if it is still that very lock, its
+// process still gone, so a newer holder's lock is never moved or removed on an older observation. Anything else (a lock
+// that can't be read, a live start's that hasn't moved for a while, a guard an ended start left) is never removed: this
+// run uses the old folder and says so. A staging folder is only ever removed by the lock's holder, and only when its
+// marker says it is this move's and its start no longer runs: a folder of any other name, or without the marker, is
+// left as it is.
 //
 // The record (`profile-move.json`, in the new folder) says where it came from, its backup, whether the new folder has
 // opened once, and what the user answered the offer to remove the backup. The backup is only ever removed on the user's
@@ -86,7 +88,7 @@ export interface MoveOps {
   pid: number
   now: () => number
   /** A step of the move, for tests to run another start in between (`staged`, `published`). */
-  step?: (name: 'locked' | 'staged' | 'published') => void
+  step?: (name: 'judged' | 'reclaiming' | 'locked' | 'staged' | 'published') => void
 }
 
 const realOps: MoveOps = {
@@ -196,23 +198,34 @@ function drop(file: string): void {
 }
 
 /**
- * Takes the move's lock: `held`, `busy` (a live start holds it and refreshed it lately) or `refused` (one that can't be
- * read, or a live start's left unrefreshed, which is never removed). An ended start's lock is claimed, then taken.
+ * Makes `file` holding `info`, only if no file has that name: written whole to a file of its own, then hard-linked to
+ * the name (which fails with EEXIST when it is taken), so it is never seen half written. Throws what the link threw.
+ */
+function createExclusive(file: string, info: LockInfo): void {
+  const mine = `${file}.${info.token}.tmp`
+  try {
+    writeFileSync(mine, JSON.stringify(info), { flag: 'wx' })
+    linkSync(mine, file)
+  } finally {
+    drop(mine)
+  }
+}
+
+const newInfo = (ops: MoveOps): LockInfo => ({ v: 1, pid: ops.pid, token: randomBytes(8).toString('hex'), at: new Date(ops.now()).toISOString() })
+
+/**
+ * Takes the move's lock: `held`, `busy` (a live start holds it and refreshed it lately, or is reclaiming it) or
+ * `refused` (one that can't be read, a live start's left unrefreshed, or a reclaim an ended start left: never removed).
+ * An ended start's lock is removed only under the reclaim guard (reclaim()), then the lock is taken as usual.
  */
 function takeLock(file: string, ops: MoveOps): { held: Held } | { busy: true } | { refused: string } {
   for (let attempt = 0; attempt < 5; attempt++) {
-    const token = randomBytes(8).toString('hex')
-    const mine = `${file}.${token}.tmp`
+    const info = newInfo(ops)
     try {
-      writeFileSync(mine, JSON.stringify({ v: 1, pid: ops.pid, token, at: new Date(ops.now()).toISOString() } satisfies LockInfo), { flag: 'wx' })
-      // Whole before it has the lock's name: a hard link fails if the name is taken.
-      linkSync(mine, file)
-      return { held: { file, token, refreshed: ops.now() } }
+      createExclusive(file, info)
+      return { held: { file, token: info.token, refreshed: ops.now() } }
     } catch (e) {
-      const code = (e as NodeJS.ErrnoException).code
-      if (code !== 'EEXIST') return { refused: reason(e) }
-    } finally {
-      drop(mine)
+      if ((e as NodeJS.ErrnoException).code !== 'EEXIST') return { refused: reason(e) }
     }
     const other = readLock(file)
     if (!other) {
@@ -221,27 +234,40 @@ function takeLock(file: string, ops: MoveOps): { held: Held } | { busy: true } |
       return { refused: `the move's lock ${file} can't be read` } // i18n-ignore: the notice's reason, a detail
     }
     if (ops.alive(other.pid)) return lockAge(file, ops) < LOCK_STALE_MS ? { busy: true } : { refused: `the move's lock is held by process ${other.pid}, which hasn't moved for a while` } // i18n-ignore: the notice's reason, a detail
-    // Its start has ended: claimed by renaming it to a name of this start's own (one contender's rename succeeds), then
-    // checked to be the very lock judged ended. One taken over meanwhile goes back.
-    const claimed = `${file}.claimed-${randomBytes(8).toString('hex')}`
-    try {
-      renameSync(file, claimed)
-    } catch {
-      continue
-    }
-    if (readLock(claimed)?.token === other.token) {
-      drop(claimed)
-      continue
-    }
-    try {
-      linkSync(claimed, file)
-      drop(claimed)
-    } catch {
-      // The name is another's again: theirs stays; this copy of the one taken over is kept for inspection.
-    }
-    return { busy: true }
+    ops.step?.('judged')
+    const r = reclaim(file, other.token, ops)
+    if (r) return r
   }
   return { refused: "the move's lock kept changing" } // i18n-ignore: the notice's reason, a detail
+}
+
+/**
+ * Removes an ended start's lock (HI-2461 round 3), as the one reclaimer: under the reclaim guard (`<lock>.reclaim`, taken
+ * as the lock is), the lock is read again and removed only if it is still the very one judged ended, its process still
+ * gone. Nothing else ever removes another start's lock, and a lock name holding a lock is never freed but by its owner
+ * or this, so no newer holder's lock is ever moved or removed on an older observation. Null: try to take the lock again.
+ * A guard held by a live start: `busy`. One an ended start left: refused, never removed (the notice names it).
+ */
+function reclaim(file: string, judged: string, ops: MoveOps): { busy: true } | { refused: string } | null {
+  const guard = `${file}.reclaim`
+  const mine = newInfo(ops)
+  try {
+    createExclusive(guard, mine)
+  } catch (e) {
+    if ((e as NodeJS.ErrnoException).code !== 'EEXIST') return { refused: reason(e) }
+    const g = readLock(guard)
+    if (g && ops.alive(g.pid)) return { busy: true }
+    if (!g && !existsSync(guard)) return null
+    return { refused: `an ended start left the move's reclaim guard ${guard}: remove it once no copy of Hive is running` } // i18n-ignore: the notice's reason, a detail
+  }
+  try {
+    ops.step?.('reclaiming')
+    const now = readLock(file)
+    if (now && now.token === judged && !ops.alive(now.pid)) drop(file)
+    return null
+  } finally {
+    if (readLock(guard)?.token === mine.token) drop(guard)
+  }
 }
 
 /** Refreshes the lock's time now and then, so a copy under way never looks ended. */
@@ -296,24 +322,30 @@ function copyTree(from: string, to: string, root: { old: string; final: string }
 
 const STAGING = /^(.+)\.moving-([0-9a-f]{16})$/
 
-/** The token in a staging folder's marker, when it names the folder's own (a folder of this move's), else null. */
-function stagingToken(dir: string, name: string): string | null {
+/** A staging folder's marker, when it names the folder's own token (a folder of this move's), else null. */
+function stagingMarker(dir: string, name: string): { token: string; pid: number | null } | null {
   const m = STAGING.exec(name)
   if (!m) return null
   try {
-    const t = (JSON.parse(readFileSync(join(dir, STAGING_MARKER), 'utf8')) as { token?: unknown }).token
-    return t === m[2] ? m[2] : null
+    const k = JSON.parse(readFileSync(join(dir, STAGING_MARKER), 'utf8')) as { token?: unknown; pid?: unknown }
+    return k.token === m[2] ? { token: m[2], pid: typeof k.pid === 'number' ? k.pid : null } : null
   } catch {
     return null
   }
 }
 
-/** Staging folders an ended attempt left: only those marked as this move's are removed (the lock's holder alone). */
-function removeLeftStaging(parent: string, newName: string, mine: string): void {
+const stagingToken = (dir: string, name: string): string | null => stagingMarker(dir, name)?.token ?? null
+
+/**
+ * Staging folders an ended attempt left: only those marked as this move's, whose start is no longer running, are
+ * removed (by the lock's holder alone).
+ */
+function removeLeftStaging(parent: string, newName: string, mine: string, ops: MoveOps): void {
   for (const name of readdirSync(parent)) {
     if (!name.startsWith(`${newName}.moving-`) || name.endsWith(mine)) continue
     const dir = join(parent, name)
-    if (!stagingToken(dir, name)) continue
+    const marker = stagingMarker(dir, name)
+    if (!marker || marker.pid === null || ops.alive(marker.pid)) continue
     try {
       rmSync(dir, { recursive: true, force: true })
     } catch {
@@ -356,7 +388,7 @@ export function moveProfile(parent: string, oldName: string, newName: string, op
       }
       return { kind: 'both', use: newDir, other: oldDir }
     }
-    removeLeftStaging(parent, newName, held.token)
+    removeLeftStaging(parent, newName, held.token, ops)
     const temp = join(parent, `${newName}.moving-${held.token}`)
     try {
       mkdirSync(temp)

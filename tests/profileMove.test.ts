@@ -1,4 +1,4 @@
-import { copyFileSync, existsSync, mkdirSync, readFileSync, readdirSync, readlinkSync, renameSync, symlinkSync, writeFileSync } from 'fs'
+import { copyFileSync, existsSync, mkdirSync, readFileSync, readdirSync, readlinkSync, renameSync, symlinkSync, unlinkSync, writeFileSync } from 'fs'
 import { join } from 'path'
 import { describe, expect, it } from 'vitest'
 import { backupPath, LOCK_STALE_MS, lockFile, moveProfile, readRecord, REGENERATED, STAGING_MARKER, type MoveOps } from '../src/main/profileMove'
@@ -180,6 +180,116 @@ describe('the profile move (HI-2461)', () => {
       expect(read(join(parent, 'Combwork', 'config.json'))).toBe('{"settings":{"theme":"dark"}}')
     })
   }
+
+  // Round 3: reclaiming an ended start's lock while ownership changes (the round-2 review's interleaving).
+  const DEAD = 4242
+  const aliveBut = (pid: number): boolean => pid !== DEAD
+  const deadLock = (parent: string): void => writeFileSync(lockFile(parent, 'Combwork'), JSON.stringify({ v: 1, pid: DEAD, token: TOKEN, at: NOW.toISOString() }))
+
+  it("an ended start's lock, judged by X, taken over meanwhile by B; a third start C during B's copy: one owner at a time, B's staging kept", () => {
+    const parent = tempDir('pm-reclaim-race-')
+    oldProfile(parent)
+    deadLock(parent)
+    let b: ReturnType<typeof moveProfile> | null = null
+    let c: ReturnType<typeof moveProfile> | null = null
+    let stagingDuringC: string[] = []
+    const x = moveProfile(parent, 'Hive', 'Combwork', {
+      now: NOW,
+      ops: ops({
+        pid: 1000,
+        alive: aliveBut,
+        step: (s) => {
+          if (s !== 'judged' || b) return
+          b = moveProfile(parent, 'Hive', 'Combwork', {
+            now: NOW,
+            ops: ops({
+              pid: 2000,
+              alive: aliveBut,
+              step: (t) => {
+                if (t !== 'staged') return
+                c = moveProfile(parent, 'Hive', 'Combwork', { now: NOW, ops: ops({ pid: 3000, alive: aliveBut }) })
+                stagingDuringC = readdirSync(parent).filter((n) => n.startsWith('Combwork.moving-'))
+              }
+            })
+          })
+        }
+      })
+    })
+    expect(c).toMatchObject({ kind: 'busy' })
+    expect(stagingDuringC).toHaveLength(1)
+    expect(b).toEqual({ kind: 'moved', use: join(parent, 'Combwork'), backup: join(parent, BACKUP) })
+    // X, resuming on its old observation, removes nothing and finds the move done.
+    expect(x).toEqual({ kind: 'current', use: join(parent, 'Combwork') })
+    expect(readdirSync(parent).sort()).toEqual(['Combwork', BACKUP])
+    expect(read(join(parent, 'Combwork', 'config.json'))).toBe('{"settings":{"theme":"dark"}}')
+  })
+
+  it("a lock replaced by a live holder after X judged the old one ended: X never removes it, and gives way", () => {
+    const parent = tempDir('pm-reclaim-replaced-')
+    oldProfile(parent)
+    deadLock(parent)
+    const file = lockFile(parent, 'Combwork')
+    const live = JSON.stringify({ v: 1, pid: 2000, token: 'fedcba9876543210', at: NOW.toISOString() })
+    const staging = join(parent, 'Combwork.moving-fedcba9876543210')
+    const x = moveProfile(parent, 'Hive', 'Combwork', {
+      now: NOW,
+      ops: ops({
+        pid: 1000,
+        alive: aliveBut,
+        step: (s) => {
+          if (s !== 'judged') return
+          // As B would after its own reclaim: the ended lock gone, B's live lock and marked staging there.
+          unlinkSync(file)
+          writeFileSync(file, live)
+          mkdirSync(staging)
+          writeFileSync(join(staging, STAGING_MARKER), JSON.stringify({ token: 'fedcba9876543210', pid: 2000 }))
+          writeFileSync(join(staging, 'live-copy.txt'), 'copying')
+        }
+      })
+    })
+    expect(x).toMatchObject({ kind: 'busy' })
+    expect(read(file)).toBe(live)
+    expect(read(join(staging, 'live-copy.txt'))).toBe('copying')
+    expect(existsSync(join(parent, 'Hive'))).toBe(true)
+    expect(existsSync(join(parent, 'Combwork'))).toBe(false)
+  })
+
+  it('a third start while X reclaims (its guard held): it gives way, and X then moves the profile', () => {
+    const parent = tempDir('pm-reclaim-guard-')
+    oldProfile(parent)
+    deadLock(parent)
+    let c: ReturnType<typeof moveProfile> | null = null
+    const x = moveProfile(parent, 'Hive', 'Combwork', {
+      now: NOW,
+      ops: ops({ pid: 1000, alive: aliveBut, step: (s) => { if (s === 'reclaiming' && !c) c = moveProfile(parent, 'Hive', 'Combwork', { now: NOW, ops: ops({ pid: 3000, alive: aliveBut }) }) } })
+    })
+    expect(c).toMatchObject({ kind: 'busy' })
+    expect(x.kind).toBe('moved')
+    expect(readdirSync(parent).sort()).toEqual(['Combwork', BACKUP])
+  })
+
+  it('a reclaim guard an ended start left: never removed, and the old folder is used', () => {
+    const parent = tempDir('pm-reclaim-left-')
+    oldProfile(parent)
+    deadLock(parent)
+    const guard = `${lockFile(parent, 'Combwork')}.reclaim`
+    const body = JSON.stringify({ v: 1, pid: DEAD, token: '1111111111111111', at: NOW.toISOString() })
+    writeFileSync(guard, body)
+    const o = moveProfile(parent, 'Hive', 'Combwork', { now: NOW, ops: ops({ pid: 1000, alive: aliveBut }) })
+    expect(o).toMatchObject({ kind: 'failed', use: join(parent, 'Hive') })
+    expect(read(guard)).toBe(body)
+    expect(existsSync(lockFile(parent, 'Combwork'))).toBe(true)
+  })
+
+  it("a live start's staging folder is never removed, even by the lock's holder", () => {
+    const parent = tempDir('pm-live-staging-')
+    oldProfile(parent)
+    const live = join(parent, 'Combwork.moving-fedcba9876543210')
+    mkdirSync(live)
+    writeFileSync(join(live, STAGING_MARKER), JSON.stringify({ token: 'fedcba9876543210', pid: 2000 }))
+    expect(moveProfile(parent, 'Hive', 'Combwork', { now: NOW, ops: ops({ pid: 1000, alive: (pid) => pid === 2000 }) }).kind).toBe('moved')
+    expect(existsSync(join(live, STAGING_MARKER))).toBe(true)
+  })
 
   it('a second start after the first released the lock: the move is already done, and it uses the new folder', () => {
     const parent = tempDir('pm-after-')
