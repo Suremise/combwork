@@ -1,4 +1,4 @@
-import { currentCard, laneCardState } from './laneBar'
+import { currentCard, idleKey, laneCardState } from './laneBar'
 import type { LaneCard, LaneInfo, LaneSlotInfo, LaneState, LaneStatus, LaneWaitReason, TaskCard } from './types'
 import type { StageId } from './workflow/facts'
 import { cardRef } from './projectKeys'
@@ -207,12 +207,16 @@ export interface LaneStartWait {
 
 /**
  * The free slot a lane waiting for a slot was last refused as held (HI-2466), and what holds it: a session (`agent`,
- * its agent's name) or a process (a file or folder in it open). Hive tries the lend again until it is free.
+ * its agent's name) or a process (a file or folder in it open). Hive tries the lend again until it is free. `broker`
+ * (HI-2467): a process, and Windows Sandbox's broker (`broker`: its process name) was seen working in it, a Sandbox
+ * running or not (`idle`; absent: not known).
  */
 export interface LaneSlotHeld {
   slot: string
-  held: 'session' | 'process'
+  held: 'session' | 'process' | 'broker'
   agent?: string
+  broker?: string
+  idle?: boolean
 }
 
 /** Whether a lane reads its cards as it left them (ended or abandoned, with its snapshot) rather than from the board. */
@@ -249,7 +253,7 @@ export function laneView(rec: LaneRecord, cards: ReadonlyMap<number, TaskCard | 
   // Waiting for a slot (#1438, `slot`: the main side's): lent none yet, so nothing of it can start; only what already
   // waits for the user, or its hooks, says more. A free slot held (HI-2466): which, and what holds it.
   const held = slot?.held ?? null
-  const noSlot = running(rec) && !unrecorded && slot?.waiting && !(found && USERS.has(found.reason)) ? { reason: 'slot' as const, card: current, ...(held ? { slot: held.slot, held: held.held, ...(held.agent ? { agent: held.agent } : {}) } : {}) } : null
+  const noSlot = running(rec) && !unrecorded && slot?.waiting && !(found && USERS.has(found.reason)) ? { reason: 'slot' as const, card: current, ...(held ? { slot: held.slot, held: held.held, ...(held.agent ? { agent: held.agent } : {}), ...(held.broker ? { broker: held.broker } : {}), ...(held.idle !== undefined ? { idle: held.idle } : {}) } : {}) } : null
   // Its slot being prepared (#1446: G15's warming, its setup or an install): said when nothing else is, never pausing.
   const preparing = running(rec) && !unrecorded && slot?.info?.state === 'preparing' ? { reason: 'preparing' as const, card: current, slot: slot.info.name } : null
   // Its card due to start and not started yet (HI-2029, laneStarts.ts: `startWait`), only while that card is the current
@@ -411,7 +415,7 @@ const L = {
   hooks: agentMsg({ id: 'lane.status.hooks', text: "paused: {agent}'s hooks aren't arriving", note: "A lane pauses while its builder's or reviewer's hooks aren't arriving (#1336): nothing is typed into that agent." }),
   checkCopy: agentMsg({ id: 'lane.status.checkCopy', text: 'waiting for a check copy for {card}', note: "A lane waits for a check copy (a copy at the card's revision for its checks)." }),
   slot: agentMsg({ id: 'lane.status.slot', text: 'waiting for a slot', note: 'A lane started with no slot free waits for one to be lent to it (#1438).' }),
-  slotHeld: agentMsg({ id: 'lane.status.slotHeld', text: "waiting for {slot}: {held, select, session {{agent}'s session is still in it} other {a process still has a file or folder in it open}}", note: 'HI-2466: a lane waiting for a slot, the only free one ({slot}) held: a session of the agent {agent} still runs in it, or (other) a process holds it. Hive tries again until it is free.' }),
+  slotHeld: agentMsg({ id: 'lane.status.slotHeld', text: "waiting for {slot}: {held, select, session {{agent}'s session is still in it} broker {a process still has a file or folder in it open: Windows Sandbox's broker ({broker}) is working in it{idle, select, yes {, with no Sandbox running} no {, with a Sandbox running} other {}}} other {a process still has a file or folder in it open}}", note: "HI-2466: a lane waiting for a slot, the only free one ({slot}) held: a session of the agent {agent} still runs in it, or (other) a process holds it. broker (HI-2467): a process holds it, and Windows Sandbox's broker ({broker}: its process name, such as WindowsSandboxServer) has the slot as its current folder; idle: yes, no Sandbox runs; no, one does; other, not known. Hive tries again until it is free." }),
   teamPause: agentMsg({ id: 'lane.status.teamPause', text: 'paused: the team is pausing', note: "The workspace's team is paused (before an update, HI-2081): nothing of a lane moves until it resumes." }),
   preparing: agentMsg({ id: 'lane.status.preparing', text: 'waiting: preparing {slot}', note: "A lane's slot is being prepared (warming, its setup or an install, #1446); {slot} is its name." }),
   freshTimeout: agentMsg({ id: 'lane.status.fresh.timeout', text: "{agent}'s new conversation didn't start (it wasn't free in time): retry it from the lane's row, or end the lane", note: "An agent owed a new conversation for its lane (HI-2034) wasn't free within the wait: no more automatic tries until the user retries it." }),
@@ -505,7 +509,7 @@ export function laneStatusText(s: LaneStatus): string {
     case 'checkCopy':
       return say(L.checkCopy, { card })
     case 'slot':
-      return s.slot && s.held ? say(L.slotHeld, { slot: s.slot, held: s.held, agent: s.agent ?? say(L.anAgent) }) : say(L.slot)
+      return s.slot && s.held ? say(L.slotHeld, { slot: s.slot, held: s.held, agent: s.agent ?? say(L.anAgent), broker: s.broker ?? '', idle: idleKey(s.idle) }) : say(L.slot)
     case 'teamPause':
       return say(L.teamPause)
     case 'preparing':

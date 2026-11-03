@@ -494,7 +494,9 @@
     "placeholders": {
       "slot": "plain",
       "held": "select",
-      "agent": "plain"
+      "agent": "plain",
+      "broker": "plain",
+      "idle": "select"
     }
   },
   "lane.status.stale": {

@@ -15,7 +15,7 @@ import { basename, join } from 'path'
 import { agentMsg, inDefaultDialect, inDialectOf, say, type AgentMsg, type AgentValues } from '../shared/agentText'
 import { app } from 'electron'
 import { advanced } from './advanced'
-import { processSupervisor } from './agentProcesses'
+import { brokerWorkingIn, processSupervisor } from './agentProcesses'
 import { boardRead, boardWrite, boardWriteOp, cardKeyOf } from './boardStore'
 import { config } from './config'
 import { agentReadsInbox, cancelFromSource, createDelivery, deliveriesOf, fromSource, offerNow, onDeliveriesChanged, waitingForRunNow } from './deliveries'
@@ -274,6 +274,7 @@ export function poolFor(ws: WorkspaceService, projectPath: string): Promise<Slot
       },
       holder,
       sessionIn,
+      brokerIn: brokerWorkingIn,
       inFlight: async (card) => {
         const wf = await workflowFor(ws, projectPath).catch(() => null)
         try {

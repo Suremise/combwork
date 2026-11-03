@@ -29,7 +29,10 @@ const POWERSHELL = join(process.env.SystemRoot || 'C:\\Windows', 'System32', 'Wi
 export type HostFailure = { kind: 'test' } | { kind: 'noPowerShell'; error: string } | { kind: 'slowHelper'; seconds: number } | { kind: 'refused' } | { kind: 'helperFailed'; why: string }
 
 /** The host's requests (HiveJobs.Answer). */
-export type HostCommand = 'add' | 'list' | 'kill' | 'forget' | 'identify' | 'endexact' | 'endtree' | 'memory' | 'lineage' | 'open' | 'assign' | 'empty' | 'endnamed' | 'hasjob' | 'follow' | 'keeper' | 'running' | 'paths'
+export type HostCommand = 'add' | 'list' | 'kill' | 'forget' | 'identify' | 'endexact' | 'endtree' | 'memory' | 'lineage' | 'open' | 'assign' | 'empty' | 'endnamed' | 'hasjob' | 'follow' | 'keeper' | 'running' | 'paths' | 'workingin'
+
+/** The most processes one `workingin` answer describes (HI-2467); more, and it says it isn't whole. */
+export const MAX_WORKING_IN = 32
 
 export interface JobHostOptions {
   /** How long it gets to start, and then to answer each request. */
@@ -427,6 +430,87 @@ public static class HiveJobs {
       first = false;
     }
     return b.Append('}').ToString();
+  }
+  [DllImport("ntdll.dll")] static extern int NtQueryInformationProcess(IntPtr p, int cls, ref BasicInfo info, int len, out int ret);
+  [StructLayout(LayoutKind.Sequential)] struct BasicInfo { public IntPtr exit, peb, affinity, priority, pid, parent; }
+  [DllImport("kernel32.dll", SetLastError=true)] static extern bool ReadProcessMemory(IntPtr p, IntPtr at, byte[] buf, IntPtr size, out IntPtr read);
+  [DllImport("kernel32.dll", SetLastError=true)] static extern bool IsWow64Process(IntPtr p, out bool wow);
+  /** n bytes of another process's memory at at, all of them, or null. */
+  static byte[] ReadAt(IntPtr p, long at, int n) {
+    var b = new byte[n]; IntPtr got;
+    return at != 0 && ReadProcessMemory(p, new IntPtr(at), b, new IntPtr(n), out got) && got.ToInt64() == n ? b : null;
+  }
+  /**
+   * A process's current folder (HI-2467: what Windows refuses to rename while it is one), read from its PEB: its
+   * ProcessParameters (PEB + 0x20), whose CurrentDirectory.DosPath is a UNICODE_STRING at + 0x38 (length, maximum, its
+   * buffer at + 0x40). That layout is x64's (and an x64 or ARM64 process's on ARM64): only a 64-bit helper reads it, and
+   * only of a 64-bit process (a WOW64 one keeps a 32-bit copy). "" for anything else, or a read that fails or is
+   * inconsistent (an odd or empty length, longer than its maximum): never a guess. p needs QUERY_LIMITED and VM_READ.
+   */
+  static string CwdOf(IntPtr p) {
+    if (IntPtr.Size != 8) return "";
+    bool wow;
+    if (!IsWow64Process(p, out wow) || wow) return "";
+    var bi = new BasicInfo(); int ret;
+    if (NtQueryInformationProcess(p, 0, ref bi, Marshal.SizeOf(typeof(BasicInfo)), out ret) != 0) return "";
+    byte[] pp = ReadAt(p, bi.peb.ToInt64() + 0x20, 8);
+    if (pp == null) return "";
+    byte[] cd = ReadAt(p, BitConverter.ToInt64(pp, 0) + 0x38, 16);
+    if (cd == null) return "";
+    int len = BitConverter.ToUInt16(cd, 0), max = BitConverter.ToUInt16(cd, 2);
+    if (len == 0 || len % 2 != 0 || len > max) return "";
+    byte[] s = ReadAt(p, BitConverter.ToInt64(cd, 8), len);
+    return s == null ? "" : Encoding.Unicode.GetString(s);
+  }
+  /**
+   * The processes running an executable named in names (lower case, comma separated), and (pids, "n-n-…": the unit and
+   * e2e tests' stand-ins, which the host sends only for test copies) those ids, each with its executable's path and
+   * current folder (HI-2467: which of Windows' brokers keeps a slot as its folder). JSON {"complete": bool, "processes":
+   * [{"id": "pid:created", "path", "cwd"}]}: "" where one is unread (access denied, CwdOf's cases). complete is false
+   * when the answer leaves some out: more than max matched, or one runs that couldn't be opened at all. A process gone
+   * since the snapshot is left out (it holds nothing). A snapshot not read whole is an error, never "none".
+   */
+  public static string WorkingIn(string names, string pids, int max) {
+    var want = new HashSet<string>(names.ToLowerInvariant().Split(','));
+    var also = new HashSet<uint>();
+    foreach (string s in (pids ?? "").Split('-')) { uint n; if (uint.TryParse(s, out n) && n > 0) also.Add(n); }
+    var found = new List<int>();
+    bool complete = true;
+    IntPtr snap = SnapshotFailsForTests() ? IntPtr.Zero : CreateToolhelp32Snapshot(2, 0);
+    if (snap == IntPtr.Zero || snap == new IntPtr(-1)) return Q("error: no snapshot");
+    try {
+      var e = new ProcessEntry(); e.size = (uint)Marshal.SizeOf(typeof(ProcessEntry));
+      if (!Process32FirstW(snap, ref e)) return Q("error: no snapshot");
+      for (bool more = true; more; ) {
+        if (e.pid != 0 && (want.Contains((e.exe ?? "").ToLowerInvariant()) || also.Contains(e.pid))) {
+          if (found.Count < max) found.Add((int)e.pid); else complete = false;
+        }
+        more = Process32NextW(snap, ref e);
+      }
+      if (Marshal.GetLastWin32Error() != 18) return Q("error: snapshot cut short");
+    } finally { CloseHandle(snap); }
+    var b = new StringBuilder("[");
+    bool first = true;
+    foreach (int pid in found) {
+      // QUERY_LIMITED and VM_READ for its folder; refused that, QUERY_LIMITED alone for its path.
+      IntPtr p = OpenProcess(0x1010, false, pid);
+      bool read = p != IntPtr.Zero;
+      if (!read) p = OpenProcess(0x1000, false, pid);
+      // ERROR_INVALID_PARAMETER: gone since the snapshot. Anything else: it runs, unread, so the answer isn't whole.
+      if (p == IntPtr.Zero) { if (Marshal.GetLastWin32Error() != 87) complete = false; continue; }
+      try {
+        uint code; long c, x, k, u;
+        if (!GetProcessTimes(p, out c, out x, out k, out u) || !GetExitCodeProcess(p, out code)) { complete = false; continue; }
+        if (code != 259) continue;
+        string path = "";
+        var name = new StringBuilder(32768); int n = name.Capacity;
+        if (QueryFullProcessImageNameW(p, 0, name, ref n)) path = name.ToString(0, n);
+        string cwd = read ? CwdOf(p) : "";
+        b.Append(first ? "" : ",").Append("{\"id\":").Append(Q(pid + ":" + c)).Append(",\"path\":").Append(Q(path)).Append(",\"cwd\":").Append(Q(cwd)).Append('}');
+        first = false;
+      } finally { CloseHandle(p); }
+    }
+    return "{\"complete\":" + (complete ? "true" : "false") + ",\"processes\":" + b.Append(']').ToString() + "}";
   }
   /**
    * Ends processes by id and start time ("pid:created,…", #614), each only while it is still that process: one gone, or
@@ -1204,6 +1288,7 @@ public static class HiveJobs {
         case "memory": r = Memory(a[2]); break;
         case "running": r = Running(a[2]); break;
         case "paths": r = Paths(a[2]); break;
+        case "workingin": r = WorkingIn(a[2], a.Length > 3 ? a[3] : null, ${MAX_WORKING_IN}); break;
         case "lineage": r = Lineage(a[2]); break;
         // Its journal's path, in base64url (requests are words).
         case "open": r = Q(Open(a[2], a.Length > 3 ? Encoding.UTF8.GetString(Convert.FromBase64String(a[3].Replace('-', '+').Replace('_', '/').PadRight(a[3].Length + (4 - a[3].Length % 4) % 4, '='))) : null)); break;
@@ -1577,8 +1662,10 @@ export class JobHost {
   async request(command: HostCommand, job: string, ...args: (number | string | undefined)[]): Promise<unknown> {
     // A job's id, or (identify, endexact) a list of processes by id and start time: "pid:created,…", or (memory) of jobs:
     // "job,job,…", or (running, HI-2304) of executables' names: "name.exe,name.exe" (words, dots and hyphens, no spaces).
-    const word = command === 'running' ? /^[\w.-]+(,[\w.-]+)*$/ : /^[\w:,-]+$/
+    // workingin (HI-2467): names as running's, and its test stand-ins ("n-n-…") only for a host that allows test requests.
+    const word = command === 'running' || command === 'workingin' ? /^[\w.-]+(,[\w.-]+)*$/ : /^[\w:,-]+$/
     if (this.failed || !word.test(job) || (command === 'follow' && !this.opts.testRequests)) return null
+    if (command === 'workingin' && args.some((a) => a !== undefined) && (!this.opts.testRequests || !args.every((a) => a === undefined || (typeof a === 'string' && /^\d+(-\d+)*$/.test(a))))) return null
     if (!(await this.start()) || !this.proc) return null
     const p = this.proc
     const n = this.next++

@@ -3944,7 +3944,11 @@ export interface LaneStatus {
   /** preparing (#1446): the slot being prepared; slot (HI-2466): the free slot it was refused as held. */
   slot?: string
   /** slot (HI-2466): what holds that free slot, a session or a process (a file or folder in it open); Hive tries again until it is free. */
-  held?: 'session' | 'process'
+  held?: 'session' | 'process' | 'broker'
+  /** held `broker` (HI-2467): the process name of Windows Sandbox's broker seen working in it (WindowsSandboxServer). */
+  broker?: string
+  /** held `broker` (HI-2467): whether no Sandbox runs (true) or one does (false); absent: not known. */
+  idle?: boolean
   /**
    * When this wait began (HI-1926, epoch ms): when Hive first saw this reason for this card (and ask), kept while they
    * stay the same. `atLeast`: Hive didn't see it begin (it was already waiting when this Hive first listed the lane), so

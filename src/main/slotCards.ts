@@ -56,7 +56,8 @@ import { isResuming, onResumeEntry } from './restartResume'
 import { sessions } from './sessions'
 import { startBegun, startEnded, startWaits } from './agentStarts'
 import { holder, poolFor, setSlotFreed } from './slotsApp'
-import { quiet as quietFolder, refusalText, setBuilderCount, type Slot, type SlotLease, type SlotPool, type SlotRefusal } from './slots'
+import { brokerWorkingIn } from './agentProcesses'
+import { processHeld, quiet as quietFolder, refusalText, setBuilderCount, type Slot, type SlotLease, type SlotPool, type SlotRefusal } from './slots'
 import { carriedOf, keptFor, keptGoing } from './slotMigration'
 import { getTask } from './tasks'
 import { HiveError } from './hiveError'
@@ -435,13 +436,13 @@ const laneHoldKey = (wsPath: string, lane: string): string => `${wsPath.toLowerC
 /** Lane `lane`'s held slot as its last try found it, or null (lanes.ts reads it into the lane's status). */
 export function laneSlotHeld(wsPath: string, lane: string): LaneSlotHeld | null {
   const h = laneHolds.get(laneHoldKey(wsPath, lane))
-  return h ? { slot: h.slot, held: h.held, ...(h.agent ? { agent: h.agent } : {}) } : null
+  return h ? { slot: h.slot, held: h.held, ...(h.agent ? { agent: h.agent } : {}), ...(h.broker ? { broker: h.broker } : {}), ...(h.idle !== undefined ? { idle: h.idle } : {}) } : null
 }
 
 /**
  * A waiting lane's slot as its last lend found it held (HI-2466), still held now and the only one it could be lent: what
- * holds it, as the lend would say it (a session in it, else a process: the pool's own look, slots.ts quiet); else null,
- * and the lane's lend is tried. Never a lend, so a slot held for long writes no lease each time it is looked at.
+ * holds it, as the lend would say it (a session in it, else a process: the pool's own look, slots.ts quiet, and HI-2467's
+ * broker seen working in it, looked at again each time); else null, and the lane's lend is tried. Never a lend, so a slot held for long writes no lease each time it is looked at.
  */
 async function laneSlotStillHeld(ws: WorkspaceService, pool: SlotPool, lane: string): Promise<Extract<SlotRefusal, { why: 'busy' }> | null> {
   const was = laneHolds.get(laneHoldKey(ws.path ?? '', lane))
@@ -451,13 +452,14 @@ async function laneSlotStillHeld(ws: WorkspaceService, pool: SlotPool, lane: str
   const slot = slots.find((s) => s.name === was.slot)
   if (!slot || !free(slot) || slots.some((s) => s !== slot && free(s)) || slots.length < (await pool.size())) return null
   if (sessions.liveStates().some((x) => !!x.cwd && containsPlace(slot.folder, x.cwd))) return { why: 'busy', slot: slot.name, held: 'session' } // i18n-ignore: a refusal's code (refusalText words it)
-  return (await quietFolder(slot.folder)) ? null : { why: 'busy', slot: slot.name, held: 'process' } // i18n-ignore: a refusal's code (refusalText words it)
+  return (await quietFolder(slot.folder)) ? null : await processHeld(slot.name, slot.folder, brokerWorkingIn)
 }
 
 /** What holds a slot, as a lend's `busy` refusal says (HI-2466), with the agent whose session is in it, by name, where that is known. */
 function heldOf(pool: SlotPool, r: Extract<SlotRefusal, { why: 'busy' }>): LaneSlotHeld {
   const held = r.held ?? 'process'
-  if (held !== 'session') return { slot: r.slot, held }
+  if (held === 'broker' && r.broker) return { slot: r.slot, held, broker: r.broker.name, ...(r.broker.idle !== null ? { idle: r.broker.idle } : {}) }
+  if (held !== 'session') return { slot: r.slot, held: 'process' }
   const folder = pool.slots().find((s) => s.name === r.slot)?.folder
   const s = folder ? sessions.liveStates().find((x) => !!x.cwd && containsPlace(folder, x.cwd)) : undefined
   return { slot: r.slot, held, ...(s?.agentName ? { agent: s.agentName } : {}) }
@@ -1723,7 +1725,7 @@ async function startWaitingLanes(ws: WorkspaceService, projectPath: string, pool
   const setHold = (lane: string, h: LaneSlotHeld | null): void => {
     const key = laneHoldKey(wsPath, lane)
     const was = laneHolds.get(key)
-    if (h ? was && was.slot === h.slot && was.held === h.held && was.agent === h.agent : !was) return
+    if (h ? was && was.slot === h.slot && was.held === h.held && was.agent === h.agent && was.broker === h.broker && was.idle === h.idle : !was) return
     if (h) laneHolds.set(key, { ...h, ws: wsPath.toLowerCase(), project, lane })
     else laneHolds.delete(key)
     holdsChanged = true
