@@ -1,4 +1,5 @@
 import { msg } from './i18n/msg'
+import { agentMsg, say } from './agentText'
 import type { ModeOption } from './providers'
 import type { PermissionMode } from './types'
 
@@ -22,13 +23,29 @@ export const isCliOwnMode = (mode: PermissionMode | '' | null | undefined): bool
 export const modeInEffect = (s: { permissionMode?: PermissionMode; modeObserved?: PermissionMode } | null | undefined): PermissionMode | undefined =>
   isCliOwnMode(s?.permissionMode) ? s?.modeObserved : s?.permissionMode
 
+/** The CLI's own setting as agents and the Agent API read it (dialects, HI-2065): said when read (the getters below), so in the reader's dialect. The window has its own messages (`text`). */
+const M = {
+  cliOwnLabel: agentMsg({ id: 'mode.cliOwn.label', text: "The CLI's own setting", note: "The CLI's own setting, a permission choice every CLI offers (Hive passes no mode): its name, as agents and the Agent API read it (the window has its own message)." }),
+  cliOwnShort: agentMsg({ id: 'mode.cliOwn.short', text: "CLI's own", note: "The CLI's own setting: its short name, on its badge." }),
+  cliOwnDescription: agentMsg({ id: 'mode.cliOwn.desc', text: "Hive passes no permission mode: the CLI starts in the mode its own config sets, or its default. Hive can't switch it in a running session.", note: "What the CLI's own setting (Hive passes no mode) does, as agents and the Agent API read it (the window has its own message)." }),
+  cliOwnCliNote: agentMsg({ id: 'mode.cliOwn.cliNote', text: "Hive passed no mode, so the CLI's own screen shows the one it is in.", note: "The CLI's own setting: why the CLI's own screen names the mode, not Hive (shown with Hive's mode badge while a session runs in it)." })
+}
+
 // The English label and description are what agents and the Agent API read; `text` is the window's (#800).
 export const CLI_OWN_OPTION: ModeOption = {
   value: CLI_OWN_MODE,
-  label: "The CLI's own setting", // i18n-ignore: agent-facing English (text is the window's)
-  short: "CLI's own", // i18n-ignore: agent-facing English (text is the window's)
-  description: "Hive passes no permission mode: the CLI starts in the mode its own config sets, or its default. Hive can't switch it in a running session.", // i18n-ignore: agent-facing English (text is the window's)
-  cliNote: "Hive passed no mode, so the CLI's own screen shows the one it is in.", // i18n-ignore: agent-facing English (text is the window's)
+  get label() {
+    return say(M.cliOwnLabel)
+  },
+  get short() {
+    return say(M.cliOwnShort)
+  },
+  get description() {
+    return say(M.cliOwnDescription)
+  },
+  get cliNote() {
+    return say(M.cliOwnCliNote)
+  },
   cliOwn: true,
   text: {
     label: msg({ id: 'agents.cliOwn.label', defaultMessage: "The CLI's own setting", description: "A permission mode choice offered for every coding agent's CLI: Hive passes no mode, so the CLI uses the one its own config sets. Keep it short." }),

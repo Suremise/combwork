@@ -11,6 +11,7 @@ import { createLogger, userText } from './logger'
 import { checkpointWhenIdle, checkpointsReleased } from './walCheckpoint'
 import { assertPlaceAdmitted, isAdmitted, ownerOf, refusedOpen } from './openingFence'
 import { trash } from './trash'
+import type { StoredText } from '../shared/types'
 
 const log = createLogger('journal')
 
@@ -81,6 +82,14 @@ export const JOURNAL_MIGRATIONS: Migration[] = [
           INSERT INTO entries_fts(rowid, summary, detail, why) VALUES (new.id, new.summary, journal_text(new.detail, new.detail_z), coalesce(new.why, ''));
         END;
       `)
+  },
+  {
+    // Dialects (HI-2065, HI-2438): a summary Hive writes keeps its message id and values beside its English, as card
+    // history keeps whatText (#845), so it can be said in each reader's dialect when it is read (5b, 6b). JSON of a
+    // StoredText; null for the Assistant's own entries, for Hive's from before, and once the summary is edited.
+    version: 2,
+    name: 'summary text', // agent-protocol: a migration's name, recorded in schema_version
+    up: (db) => db.exec('ALTER TABLE entries ADD COLUMN summary_text TEXT')
   }
 ]
 
@@ -261,6 +270,8 @@ export interface EntryInput {
   tags?: string[]
   /** The period a digest sums up ("2026-W42"). */
   digestOf?: string | null
+  /** The summary as Hive's message (its id and values), beside its English: a fact Hive writes (dialects, HI-2438). */
+  summaryText?: StoredText | null
 }
 
 const oneLine = (s: string): string => s.replace(/\s+/g, ' ').trim()
@@ -356,6 +367,7 @@ function entryOf(settings: JournalSettings, input: EntryInput) {
     why: checkText('why', input.why, ENTRY_LIMITS.why),
     project: checkText('project', input.project, ENTRY_LIMITS.project),
     digestOf: checkText('digestOf', input.digestOf, 100),
+    summaryText: input.summaryText ? JSON.stringify(input.summaryText) : null,
     importance: checkImportance(input.importance),
     links: checkLinks(input.links),
     tags: checkTags(input.tags)
@@ -367,7 +379,7 @@ function entryOf(settings: JournalSettings, input: EntryInput) {
  * nothing (null) when an entry by `source` with this summary and detail is already linked to it.
  */
 function insertEntry(w: Db['writer'], e: ReturnType<typeof entryOf>, source: JournalSource, once: { type: LinkType; ref: string } | null = null): number | null {
-  const { kind, summary, detail, why, project, digestOf, importance, links, tags } = e
+  const { kind, summary, detail, why, project, digestOf, summaryText, importance, links, tags } = e
   const d = storedDetail(detail)
   return transaction(w, () => {
     if (once) {
@@ -376,8 +388,9 @@ function insertEntry(w: Db['writer'], e: ReturnType<typeof entryOf>, source: Jou
     }
     for (const l of links.filter((x) => x.type === 'entry')) if (!w.prepare('SELECT 1 FROM entries WHERE id = ?').get(Number(l.ref))) fail(`There is no entry ${l.ref} to link to.`)
     const r = w
-      .prepare('INSERT INTO entries (at, kind, project, summary, detail, detail_z, why, source, importance, digest_of) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)')
-      .run(new Date().toISOString(), kind, project, summary, d.detail, d.z, why, source, importance, digestOf)
+      // agent-protocol: SQL
+      .prepare('INSERT INTO entries (at, kind, project, summary, detail, detail_z, why, source, importance, digest_of, summary_text) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)')
+      .run(new Date().toISOString(), kind, project, summary, d.detail, d.z, why, source, importance, digestOf, summaryText)
     const n = Number(r.lastInsertRowid)
     const link = w.prepare('INSERT OR IGNORE INTO links (entry_id, type, ref) VALUES (?, ?, ?)')
     for (const l of links) link.run(n, l.type, l.ref)
@@ -528,7 +541,11 @@ export function updateEntry(home: string, settings: JournalSettings, id: number,
     sets.push(clause)
     args.push(value)
   }
-  if (patch.summary !== undefined) set('summary = ?', oneLine(checkText('summary', patch.summary, ENTRY_LIMITS.summary, true)!))
+  if (patch.summary !== undefined) {
+    set('summary = ?', oneLine(checkText('summary', patch.summary, ENTRY_LIMITS.summary, true)!))
+    // Edited: its words are the editor's now, no longer Hive's message.
+    set('summary_text = ?', null)
+  }
   if (patch.kind !== undefined) {
     if (!JOURNAL_KINDS.includes(patch.kind as JournalKind)) fail(`kind is one of: ${JOURNAL_KINDS.join(', ')}.`)
     if (!inScope(settings, patch.kind as JournalKind)) fail(`The user's journal scope doesn't include ${patch.kind} entries (Settings → Assistant → Journal allows: ${settings.scope.join(', ') || 'none'}).`)

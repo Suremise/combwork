@@ -1,4 +1,5 @@
 import { basename } from 'path'
+import { agentMsg, say } from '../shared/agentText'
 import { ASSISTANT_START_VIEW } from '../shared/advanced'
 import { inScope, type JournalKind } from '../shared/journal'
 import { utf8Bytes } from '../shared/metrics'
@@ -26,7 +27,10 @@ const PICK = { decisions: 6, decisionDays: 14, incidents: 3, incidentDays: 7, ca
 
 const DAY = 86_400_000
 
-const cardOf = (c: TaskCard): ViewCard => ({ number: c.number, title: c.title, column: c.column, project: c.project || '(workspace)', agent: c.agentName ?? c.agent, reviewer: c.review?.agentName ?? null, blocked: c.blocked, labels: c.labels, updatedAt: c.updatedAt })
+/** A workspace card's project, in the view (dialects, HI-2065). */
+const WORKSPACE = agentMsg({ id: 'startView.workspaceCard', text: '(workspace)', note: "In place of a project's name, for a card of the workspace's own (no project)." })
+
+const cardOf = (c: TaskCard, workspace: string): ViewCard => ({ number: c.number, title: c.title, column: c.column, project: c.project || workspace, agent: c.agentName ?? c.agent, reviewer: c.review?.agentName ?? null, blocked: c.blocked, labels: c.labels, updatedAt: c.updatedAt })
 const entryOf = (r: RecallRow): ViewEntry => ({ id: r.id, at: r.at, kind: r.kind, project: r.project, summary: r.summary, importance: r.importance })
 
 /**
@@ -41,9 +45,10 @@ export async function assistantStartView(ws: WorkspaceService, live: LiveSession
   const projects = (await ws.listProjectPaths()).map((p) => ({ path: p.toLowerCase(), name: basename(p) }))
   const nameOf = (p: string): string | null => projects.find((x) => x.path === p.toLowerCase())?.name ?? null
   const cards = await allTasks(ws, { archived: false })
+  const workspace = say(WORKSPACE)
   const counts = new Map<string, Record<string, number>>()
   for (const c of cards) {
-    const k = c.project || '(workspace)'
+    const k = c.project || workspace
     const m = counts.get(k) ?? {}
     m[c.column] = (m[c.column] ?? 0) + 1
     counts.set(k, m)
@@ -89,8 +94,8 @@ export async function assistantStartView(ws: WorkspaceService, live: LiveSession
     now,
     source,
     counts: [...counts].map(([project, columns]) => ({ project, columns })),
-    active: active.map(cardOf),
-    blocked: cards.filter((c) => c.blocked && c.column !== 'done').map(cardOf),
+    active: active.map((c) => cardOf(c, workspace)),
+    blocked: cards.filter((c) => c.blocked && c.column !== 'done').map((c) => cardOf(c, workspace)),
     lanes: lanes.map((l) => ({ project: l.project, builder: l.builder.name, reviewer: l.reviewer?.name ?? null, current: l.current, state: l.state, pausedOn: l.pausedOn })),
     agents,
     journal

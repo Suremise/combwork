@@ -1,4 +1,0 @@
-{
-  "prose|return|Hive started this card for you: it is your lane's first card. Use card-loop as its builder (hive_lane next names your cards).": 1,
-  "prose|return|Hive started this card for you: it is your lane's next card, after {} went Done.": 1
-}

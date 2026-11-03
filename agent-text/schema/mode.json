@@ -1,0 +1,111 @@
+{
+  "mode.claude.acceptEdits.desc": {
+    "placeholders": {}
+  },
+  "mode.claude.acceptEdits.label": {
+    "placeholders": {}
+  },
+  "mode.claude.auto.desc": {
+    "placeholders": {}
+  },
+  "mode.claude.auto.label": {
+    "placeholders": {}
+  },
+  "mode.claude.autoMaybe": {
+    "placeholders": {
+      "model": "plain"
+    }
+  },
+  "mode.claude.autoUnsupported": {
+    "placeholders": {
+      "model": "plain"
+    }
+  },
+  "mode.claude.bypassPermissions.desc": {
+    "placeholders": {}
+  },
+  "mode.claude.bypassPermissions.label": {
+    "placeholders": {}
+  },
+  "mode.claude.dontAsk.desc": {
+    "placeholders": {}
+  },
+  "mode.claude.dontAsk.label": {
+    "placeholders": {}
+  },
+  "mode.claude.manual.desc": {
+    "placeholders": {}
+  },
+  "mode.claude.manual.label": {
+    "placeholders": {}
+  },
+  "mode.claude.plan.desc": {
+    "placeholders": {}
+  },
+  "mode.claude.plan.label": {
+    "placeholders": {}
+  },
+  "mode.cliOwn.cliNote": {
+    "placeholders": {}
+  },
+  "mode.cliOwn.desc": {
+    "placeholders": {}
+  },
+  "mode.cliOwn.label": {
+    "placeholders": {}
+  },
+  "mode.cliOwn.short": {
+    "placeholders": {}
+  },
+  "mode.codex.approveForMe.desc": {
+    "placeholders": {}
+  },
+  "mode.codex.ask.desc": {
+    "placeholders": {}
+  },
+  "mode.codex.fullAccess.desc": {
+    "placeholders": {}
+  },
+  "mode.codex.fullAccess.label": {
+    "placeholders": {}
+  },
+  "mode.codex.readOnly.desc": {
+    "placeholders": {}
+  },
+  "mode.codex.readOnly.label": {
+    "placeholders": {}
+  },
+  "mode.copilot.acceptEdits.cliNote": {
+    "placeholders": {}
+  },
+  "mode.copilot.acceptEdits.desc": {
+    "placeholders": {}
+  },
+  "mode.copilot.acceptEdits.label": {
+    "placeholders": {}
+  },
+  "mode.copilot.allowAll.desc": {
+    "placeholders": {}
+  },
+  "mode.copilot.allowAll.label": {
+    "placeholders": {}
+  },
+  "mode.copilot.ask.desc": {
+    "placeholders": {}
+  },
+  "mode.copilot.ask.label": {
+    "placeholders": {}
+  },
+  "mode.copilot.autopilot.desc": {
+    "placeholders": {}
+  },
+  "mode.copilot.autopilot.label": {
+    "placeholders": {}
+  },
+  "mode.copilot.plan.desc": {
+    "placeholders": {}
+  },
+  "mode.copilot.plan.label": {
+    "placeholders": {}
+  }
+}

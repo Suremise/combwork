@@ -1,0 +1,14 @@
+{
+  "finish.cancel.cardDone": {
+    "placeholders": {}
+  },
+  "finish.journal.done": {
+    "placeholders": {
+      "card": "plain",
+      "title": "plain",
+      "how": "select",
+      "byUser": "select",
+      "by": "plain"
+    }
+  }
+}

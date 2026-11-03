@@ -1,0 +1,73 @@
+{
+  "skillCopy.links.notCopied": {
+    "placeholders": {
+      "n": "plural",
+      "paths": "plain"
+    }
+  },
+  "skillCopy.source.denied": {
+    "placeholders": {}
+  },
+  "skillCopy.source.fileWent": {
+    "placeholders": {}
+  },
+  "skillCopy.source.folderGone": {
+    "placeholders": {}
+  },
+  "skillCopy.source.notCopied": {
+    "placeholders": {
+      "hasCode": "select",
+      "code": "plain"
+    }
+  },
+  "skillCopy.swap.changedBeforeRemoved": {
+    "placeholders": {
+      "name": "plain"
+    }
+  },
+  "skillCopy.swap.changedBeforeReplaced": {
+    "placeholders": {
+      "name": "plain"
+    }
+  },
+  "skillCopy.swap.changedKeptBeside": {
+    "placeholders": {
+      "name": "plain"
+    }
+  },
+  "skillCopy.swap.changedWhileRemoved": {
+    "placeholders": {
+      "name": "plain"
+    }
+  },
+  "skillCopy.swap.changedWhileReplaced": {
+    "placeholders": {
+      "name": "plain"
+    }
+  },
+  "skillCopy.swap.putBackWhileReplaced": {
+    "placeholders": {
+      "name": "plain"
+    }
+  },
+  "skillCopy.tooBig.bytes": {
+    "placeholders": {
+      "mb": "plain"
+    }
+  },
+  "skillCopy.tooBig.deliver": {
+    "placeholders": {
+      "why": "plain"
+    }
+  },
+  "skillCopy.tooBig.depth": {
+    "placeholders": {
+      "depth": "plain"
+    }
+  },
+  "skillCopy.tooBig.entries": {
+    "placeholders": {
+      "entries": "plain"
+    }
+  }
+}

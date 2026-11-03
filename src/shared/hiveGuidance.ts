@@ -310,6 +310,8 @@ export interface HandoverAuthor {
 export function handoverHeader(title: string, project: string, by: HandoverAuthor | null, at: Date): string {
   const pad = (n: number): string => String(n).padStart(2, '0')
   const local = `${at.getFullYear()}-${pad(at.getMonth() + 1)}-${pad(at.getDate())} ${pad(at.getHours())}:${pad(at.getMinutes())}`
+  // agent-protocol: the header's labels and "(workspace)" are written into the file once, for any reader, and parsed back
+  // (handoverProject, handoverSession, latest-handover lookups): fixed, never a dialect's (dialects, HI-2438).
   const lines = [`- **Project:** ${project || '(workspace)'}`]
   if (by) lines.push(`- **Author:** ${by.author}`)
   if (by?.session) lines.push(`- **Session:** ${by.session}`)
