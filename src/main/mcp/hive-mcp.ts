@@ -763,11 +763,11 @@ const tools: Tool[] = [
       type: 'object',
       properties: {
         number: cardArg,
-        comments: { type: 'number', description: 'Only the newest n comments.' },
+        comments: { type: 'number', description: 'Only the newest n.' },
         latestComment: { type: 'boolean', description: 'Only the newest comment.' },
         summary: { type: 'boolean', description: 'Each comment as its first line, with its whole length.' },
         history: { type: 'boolean' },
-        attachments: { type: 'boolean', description: 'With those: every attachment, not only those of comments read in full.' }
+        attachments: { type: 'boolean', description: 'All, when narrowed.' }
       },
       required: ['number']
     },

@@ -308,7 +308,7 @@ const prose = (seed, n) => {
   // full, counting the rest; a full read and attachments=true keep them all.
   {
     const many = todo[25]
-    const evidence = path.join(ws, 'alpha', 'attach-many')
+    const evidence = path.join(attachSrc, 'many')
     fs.mkdirSync(evidence, { recursive: true })
     const file = (name) => {
       fs.writeFileSync(path.join(evidence, name), `evidence ${name}\n`)
