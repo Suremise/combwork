@@ -73,7 +73,7 @@ import { revertSetting } from './settingsTools'
 import { finalWhys } from '../shared/assistantActivity'
 import { changeGroups } from './assistantChanges'
 import { UndoNotFound, userUndo } from './assistantUndo'
-import { advanced, updateSettingsChecked } from './advanced'
+import { advanced, resetSettingsChecked, updateSettingsChecked } from './advanced'
 import type { AdvancedState } from '../shared/advanced'
 import { switchMode } from './assistantMode'
 import * as modes from './modes'
@@ -640,8 +640,12 @@ export function registerIpc(getAppInfo: () => ReturnType<HiveRequests['app:info'
     'settings:setProviderFallback': (provider, kind, list) => config.setProviderFallback(knownProvider(provider), kind === 'efforts' ? 'efforts' : 'models', list),
     'settings:reset': async (section) => {
       // All of them: advanced.json's overrides too (#367), first, as it can refuse (a file it can't read).
-      if (!section) await advanced.resetAll()
-      return config.resetSettings(section)
+      if (!section) {
+        await advanced.resetAll()
+        return config.resetSettings()
+      }
+      // A section with a value kept there too (Show developer features): the file first, in one turn (HI-2418).
+      return resetSettingsChecked(section, () => config.resetSettings(section))
     },
     // Advanced settings (#367): the overrides in advanced.json, and this window's workspace's own values.
     'advanced:state': () => advancedState(),

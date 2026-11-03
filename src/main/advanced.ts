@@ -401,11 +401,13 @@ export function mcpAdvancedEnv(): Record<string, string> {
 
 /**
  * Hive's settings shown among the advanced values and kept in advanced.json too (`setting`: Show developer features,
- * whose key stays settings.advanced.showDeveloperFeatures): the file and the setting are one value. A hand edit of the
- * file changes the setting; a change of the setting (Settings, the Assistant, Reset) is written to the file. At the
- * first start with this, a setting already on is written to the file.
+ * whose key stays settings.advanced.showDeveloperFeatures): the file and the setting are one value, the file's. The
+ * setting follows the file (a hand edit, the advanced list), never the other way (HI-2418: following both ways, each
+ * write could turn the other back); whatever changes the setting changes the file first, in the same turn
+ * (updateSettingsChecked: Settings, the Assistant; resetSettingsChecked and advanced.resetAll: Reset). At the first
+ * start with this, a setting already on is written to the file.
  */
-export function bindAdvancedSettings(cfg: { settings: AppSettings; updateSettings: (patch: SettingsPatch) => AppSettings; onSettingsChanged: (fn: (s: AppSettings) => void) => void }): void {
+export function bindAdvancedSettings(cfg: { settings: AppSettings; updateSettings: (patch: SettingsPatch) => AppSettings; onSettingsCheck: (check: (next: AppSettings, prev: AppSettings) => void) => unknown }): void {
   const bound = ADVANCED_DEFS.filter((d) => d.setting)
   const settingOf = (d: AdvancedDef, s: AppSettings): unknown => {
     const [section, key] = d.setting!.split('.')
@@ -413,18 +415,8 @@ export function bindAdvancedSettings(cfg: { settings: AppSettings; updateSetting
   }
   // Written to the file at the first start (below): the file isn't the setting's until then.
   const migrating = new Set(bound.filter((d) => advanced.overrides()[d.id] === undefined && settingOf(d, cfg.settings) !== d.default).map((d) => d.id))
-  // Settings changes queued for the file and not yet written (HI-2418): until they are, the file is behind the setting,
-  // and following it would turn the setting back (a change made while the last was being written, then an echo of each).
-  const pending = new Map<string, number>()
-  // A change of the file's not followed for that reason: followed once the queued changes are done, so a write they
-  // lost to an edit made meanwhile (write's conflict) leaves the setting the file's, not the change refused.
-  const deferred = new Set<string>()
   const fromFile = (): void => {
     for (const d of bound) {
-      if (pending.get(d.id)) {
-        deferred.add(d.id)
-        continue
-      }
       if (migrating.has(d.id)) {
         if (advanced.overrides()[d.id] === undefined) continue
         migrating.delete(d.id)
@@ -435,30 +427,37 @@ export function bindAdvancedSettings(cfg: { settings: AppSettings; updateSetting
       cfg.updateSettings({ [section]: { [key]: v } } as SettingsPatch)
     }
   }
-  // In the change's turn, with the setting as it is then (HI-2418): the file's value read at once can be stale (a write
-  // still landing, the first start's), and a value taken at once can be one a later change has replaced.
-  const toFile = (): void => {
-    for (const d of bound) {
-      pending.set(d.id, (pending.get(d.id) ?? 0) + 1)
-      void advanced
-        .transact(async () => {
-          const v = settingOf(d, cfg.settings)
-          if (v !== advanced.get(d.id)) await advanced.setNow(d.id, v)
-          migrating.delete(d.id)
-        })
-        .catch((e) => log.warn(`Couldn't keep ${d.id} in advanced.json`, e))
-        .finally(() => {
-          pending.set(d.id, pending.get(d.id)! - 1)
-          // Written: the file is the setting, and following it changes nothing. Refused: the file wins.
-          if (!pending.get(d.id) && deferred.delete(d.id)) fromFile()
-        })
-    }
-  }
-  // The first start: the setting as it was is the file's, unless the file already says.
-  if (migrating.size) toFile()
+  // The first start: the setting as it is in its turn is the file's, unless the file says by then (its write then
+  // reaches the setting through fromFile). Refused (a file Hive can't read), the setting stays until the file says.
+  if (migrating.size)
+    void advanced
+      .transact(async () => {
+        for (const d of bound) if (migrating.has(d.id) && advanced.overrides()[d.id] === undefined) await advanced.setNow(d.id, settingOf(d, cfg.settings))
+      })
+      .catch((e) => log.warn("Couldn't keep Hive's settings in advanced.json", e))
   fromFile()
   advanced.onChange(fromFile)
-  cfg.onSettingsChanged(toFile)
+  // A change of the setting that doesn't come from the file (made without updateSettingsChecked) would leave the two
+  // apart: refused, so a new way of changing it can't miss the file.
+  cfg.onSettingsCheck((next, prev) => {
+    for (const d of bound) {
+      const v = settingOf(d, next)
+      if (v !== settingOf(d, prev) && v !== advanced.get(d.id)) throw new Error(`${d.setting} is kept in advanced.json too: change it with updateSettingsChecked`)
+    }
+  })
+}
+
+/**
+ * Resets a section of Hive's settings (Settings → Reset), any of its values kept in advanced.json too removed from the
+ * file first, in one turn as updateSettingsChecked does: refused, nothing reset, when the file can't take it.
+ */
+export function resetSettingsChecked(section: string, reset: () => AppSettings): Promise<AppSettings> {
+  const bound = ADVANCED_DEFS.filter((d) => d.setting?.split('.')[0] === section)
+  if (!bound.length) return Promise.resolve(reset())
+  return advanced.transact(async () => {
+    for (const d of bound) await advanced.setNow(d.id, null)
+    return reset()
+  })
 }
 
 /**
