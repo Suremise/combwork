@@ -449,6 +449,10 @@ interface HiveMessageValues {
   'main.usageMove.blockedTitle': { from: string | number; to: string | number }
   'main.usageMove.movedBody': { from: string | number; share: number; window: string; agents: string | number; to: string | number }
   'main.usageMove.movedTitle': { count: number; from: string | number; to: string | number }
+  'main.viewerTokens.noName': undefined
+  'main.viewerTokens.taken': { name: string | number }
+  'main.viewerTokens.tooLong': { most: number }
+  'main.viewerTokens.tooMany': { most: number }
   'main.window.openLogs': undefined
   'main.window.quit': undefined
   'main.window.reload': undefined
