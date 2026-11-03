@@ -3,7 +3,9 @@
 // request scope servers.ts opens takes its chain, and the errors servers.ts makes are said through the catalogue there,
 // and byte for byte the English they were before with no dialect.
 import { join } from 'path'
-import { mkdirSync } from 'fs'
+import { mkdirSync, readFileSync } from 'fs'
+import { parse } from '@babel/parser'
+import traverseModule from '@babel/traverse'
 import { afterEach, describe, expect, it } from 'vitest'
 import * as electron from 'electron'
 import { tempDir } from './tempDir'
@@ -23,6 +25,7 @@ mkdirSync(join(base, 'profile'), { recursive: true })
 const { INTENT_ROUTES, apiErrorReply, connectionValuesArg, refuseOldFields } = await import('../src/main/servers')
 
 const ROOT = join(__dirname, '..')
+const traverse = ((traverseModule as unknown as { default?: unknown }).default ?? traverseModule) as (ast: unknown, visitors: Record<string, (p: never) => void>) => void
 const catalogue = readCatalogue(ROOT) as Record<string, { text: string }>
 const ids = new Set(Object.keys(catalogue))
 const canary: DialectChain = { texts: canaryTexts(catalogue), files: ['canary.json'], hash: 'canary' }
@@ -74,6 +77,28 @@ describe("the Agent API's and sessions' agent text (card 3b)", () => {
         expect(text.startsWith(`⟦${m.id}⟧`), `${m.id} ${JSON.stringify(values)}`).toBe(true)
         expect(canaryProblems(text, ids, ['VALUE']), `${m.id} ${JSON.stringify(values)}`).toEqual([])
       }
+  })
+
+  it("servers.ts gives no error a literal message, whatever the guard's prose heuristic reads as prose (HR2's round 1)", () => {
+    const code = readFileSync(join(ROOT, 'src', 'main', 'servers.ts'), 'utf8')
+    const ast = parse(code, { sourceType: 'module', plugins: ['typescript'] })
+    const literal = (n: { type: string } | undefined | null): boolean => !!n && (n.type === 'StringLiteral' || n.type === 'TemplateLiteral')
+    const found: string[] = []
+    traverse(ast, {
+      NewExpression(p: { node: { callee: { type: string; name?: string }; arguments: { type: string; loc?: { start: { line: number } } }[] } }) {
+        const { callee, arguments: args } = p.node
+        // HttpError(status, message, extra) and SettingRefused(status, message): the message is the second argument.
+        if (callee.type === 'Identifier' && (callee.name === 'HttpError' || callee.name === 'SettingRefused') && literal(args[1])) found.push(`${callee.name} at line ${args[1].loc?.start.line}`)
+      },
+      ObjectProperty(p: { node: { key: { type: string; name?: string }; value: { type: string; loc?: { start: { line: number } } } }; parentPath: { parentPath: { node: { type: string; callee?: { type: string; name?: string } } } } }) {
+        // send(res, status, { error: '…' }): an error reply's body.
+        const call = p.parentPath.parentPath.node
+        if (p.node.key.type === 'Identifier' && p.node.key.name === 'error' && call.type === 'CallExpression' && call.callee?.type === 'Identifier' && call.callee.name === 'send' && literal(p.node.value)) found.push(`send's error at line ${p.node.value.loc?.start.line}`)
+      }
+    })
+    // The hook server's replies to a CLI's hooks (not an agent's): marked agent-protocol beside them.
+    const protocolLines = new Set(code.split(/\r?\n/).flatMap((l, i) => (/agent-protocol: the hook server/.test(l) ? [`line ${i + 2}`] : [])))
+    expect(found.filter((f) => !protocolLines.has(f.replace(/^.* at /, '')))).toEqual([])
   })
 
   it("the errors servers.ts makes are said in the request's chain, and are the English they were with none", () => {

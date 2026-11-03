@@ -202,6 +202,7 @@ export async function startHookServer(): Promise<string> {
       // In the log too, once a run (#711): a hook the CLI sent but Hive refused leaves a trace on Hive's side.
       const note = refusedHookNote(run)
       if (note) log.info(note)
+      // agent-protocol: the hook server answers a CLI hook, not an agent
       return send(res, 401, { error: 'unauthorized' })
     }
     // Tests lose every hook while the file HIVE_TEST_DROP_HOOKS names is there (#1371: a CLI whose hooks Hive can't
@@ -3408,6 +3409,7 @@ route('POST', '/v1/tasks/wait', async ({ body: raw }) => {
     const limit = body?.limitMinutes === undefined ? WATCH_DEFAULT_LIMIT_MINUTES : Number(body.limitMinutes)
     if (!Number.isFinite(limit) || limit < 1 || limit > WATCH_MAX_LIMIT_MINUTES) throw new HttpError(400, say(API.watch.limitMinutes, { max: String(WATCH_MAX_LIMIT_MINUTES) }))
     const r = await registerUsageWatch(ws, who!.projectPath, who!.agentId, usage, limit).catch((e: Error) => {
+      // agent-protocol: the start of the usage watch's own refusal (usageWatch.ts), matched for its status
       throw new HttpError(e.message.startsWith('Not a project') ? 400 : 409, e.message)
     })
     const left = r.lanesLeft ? { lanesLeft: r.lanesLeft } : {}
@@ -3427,11 +3429,11 @@ route('POST', '/v1/tasks/wait', async ({ body: raw }) => {
     // Agents beside the lanes (HI-1987): each { project, agent }; left out, the last lane watch's are kept, [] drops them.
     let laneAgents: WatchedAgent[] | undefined
     if (body.agents !== undefined) {
-      if (!Array.isArray(body.agents)) throw new HttpError(400, 'agents must be a list of { project, agent }')
+      if (!Array.isArray(body.agents)) throw new HttpError(400, say(API.watch.agentsArg))
       if (body.agents.length > AGENT_WATCH_MAX_AGENTS) throw new HttpError(400, say(API.watch.maxAgents, { max: String(AGENT_WATCH_MAX_AGENTS) }))
       laneAgents = []
       for (const x of body.agents as { project?: unknown; agent?: unknown }[]) {
-        if (!x || typeof x !== 'object' || typeof x.project !== 'string') throw new HttpError(400, 'agents must be a list of { project, agent }')
+        if (!x || typeof x !== 'object' || typeof x.project !== 'string') throw new HttpError(400, say(API.watch.agentsArg))
         const p = projectByName(x.project)
         const id = await agentParam(p, x.agent as string | undefined)
         if (!laneAgents.some((a) => resolvePath(a.projectPath).toLowerCase() === resolvePath(p).toLowerCase() && a.agentId === id)) laneAgents.push({ projectPath: p, agentId: id, name: (await agentDefOf(p, id)).name, project: basename(p) })
@@ -3974,7 +3976,7 @@ route('POST', '/v1/notify', async ({ body }) => {
  */
 async function notifyTarget(raw: unknown): Promise<ToastTarget | undefined> {
   if (raw === undefined || raw === null) return undefined
-  if (typeof raw !== 'object' || Array.isArray(raw)) throw new HttpError(400, 'target is { agent, project? } or { card }')
+  if (typeof raw !== 'object' || Array.isArray(raw)) throw new HttpError(400, say(API.notify.targetArg))
   const t = raw as { agent?: unknown; project?: unknown; card?: unknown }
   const agent = typeof t.agent === 'string' && t.agent ? t.agent : null
   const card = typeof t.card === 'string' || typeof t.card === 'number' ? String(t.card).trim() : ''
@@ -4233,9 +4235,9 @@ route('POST', '/v1/progress/resolve', async ({ body }) => {
  * Refused (400) for anything else, with what to do; 409 with `wait` while no copy is free (hive-progress asks again).
  */
 async function isolatedFor(ws: WorkspaceService, caller: ProgressCaller, link: RunLink, ticket?: string): Promise<{ project: string; lease: string; folder: string; copy: string }> {
-  if (caller.source !== 'agent') throw new HttpError(400, "--isolated runs an agent's check in a copy of its own: run it in an agent's session")
-  if (!link.check) throw new HttpError(400, '--isolated runs a check in a copy of its own: use it with --check <name>')
-  if (link.card === null || !link.revision) throw new HttpError(400, "--isolated runs a check at its card's revision: name the card (--card), or work on one in Doing")
+  if (caller.source !== 'agent') throw new HttpError(400, say(API.check.isolatedAgentsOnly))
+  if (!link.check) throw new HttpError(400, say(API.check.isolatedNeedsCheck))
+  if (link.card === null || !link.revision) throw new HttpError(400, say(API.check.isolatedNeedsCard))
   const cfg = await ws.projectConfig(caller.projectPath).catch(() => null)
   // None has no check copies (OP-16): its remedy is running again once the deliverables are quiet.
   if (platformIdOf(caller.projectPath, cfg?.platform) !== 'git') throw new HttpError(400, say(API.check.noVcs))

@@ -627,6 +627,15 @@
       "card": "plain"
     }
   },
+  "api.check.isolatedAgentsOnly": {
+    "placeholders": {}
+  },
+  "api.check.isolatedNeedsCard": {
+    "placeholders": {}
+  },
+  "api.check.isolatedNeedsCheck": {
+    "placeholders": {}
+  },
   "api.check.leaseArgs": {
     "placeholders": {}
   },
@@ -1320,6 +1329,9 @@
   "api.notify.sayProject": {
     "placeholders": {}
   },
+  "api.notify.targetArg": {
+    "placeholders": {}
+  },
   "api.notify.targetBoth": {
     "placeholders": {}
   },
@@ -1567,6 +1579,9 @@
     "placeholders": {}
   },
   "api.undo.onlyAssistant": {
+    "placeholders": {}
+  },
+  "api.watch.agentsArg": {
     "placeholders": {}
   },
   "api.watch.agentsWithLanes": {

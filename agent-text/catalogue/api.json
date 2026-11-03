@@ -440,6 +440,15 @@
   "api.change.updateTask": {
     "text": "change {card} on the board"
   },
+  "api.check.isolatedAgentsOnly": {
+    "text": "--isolated runs an agent's check in a copy of its own: run it in an agent's session"
+  },
+  "api.check.isolatedNeedsCard": {
+    "text": "--isolated runs a check at its card's revision: name the card (--card), or work on one in Doing"
+  },
+  "api.check.isolatedNeedsCheck": {
+    "text": "--isolated runs a check in a copy of its own: use it with --check <name>"
+  },
   "api.check.leaseArgs": {
     "text": "lease, pid, after and before are required"
   },
@@ -894,6 +903,9 @@
   "api.notify.sayProject": {
     "text": "Say which project the agent is in: target.project"
   },
+  "api.notify.targetArg": {
+    "text": "target is '{ agent, project? }' or '{ card }'"
+  },
   "api.notify.targetBoth": {
     "text": "target is an agent or a card, not both"
   },
@@ -1090,6 +1102,9 @@
   },
   "api.undo.onlyAssistant": {
     "text": "Only the Hive Assistant has changes to undo: they are its own."
+  },
+  "api.watch.agentsArg": {
+    "text": "agents must be a list of '{ project, agent }'"
   },
   "api.watch.agentsWithLanes": {
     "text": "agents goes with lanes (a lane watch, HI-1987): to watch agents alone, use hive_wait_for_agents (POST /v1/agents/wait)"

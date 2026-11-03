@@ -161,6 +161,9 @@ export const API = {
     updateTask: agentMsg({ id: 'api.change.updateTask', text: 'change {card} on the board' })
   },
   check: {
+    isolatedAgentsOnly: agentMsg({ id: 'api.check.isolatedAgentsOnly', text: '--isolated runs an agent\'s check in a copy of its own: run it in an agent\'s session' }),
+    isolatedNeedsCard: agentMsg({ id: 'api.check.isolatedNeedsCard', text: '--isolated runs a check at its card\'s revision: name the card (--card), or work on one in Doing' }),
+    isolatedNeedsCheck: agentMsg({ id: 'api.check.isolatedNeedsCheck', text: '--isolated runs a check in a copy of its own: use it with --check <name>' }),
     leaseArgs: agentMsg({ id: 'api.check.leaseArgs', text: 'lease, pid, after and before are required' }),
     noVcs: agentMsg({ id: 'api.check.noVcs', text: 'This project has no version control, so there are no check copies: run the check again without --isolated once nobody is changing the card\'s files' }),
     onlyIsolated: agentMsg({ id: 'api.check.onlyIsolated', text: 'Only an agent\'s isolated check puts its launcher in a check copy\'s job' }),
@@ -341,6 +344,7 @@ export const API = {
   },
   notify: {
     sayProject: agentMsg({ id: 'api.notify.sayProject', text: 'Say which project the agent is in: target.project' }),
+    targetArg: agentMsg({ id: 'api.notify.targetArg', text: 'target is \'{ agent, project? }\' or \'{ card }\'' }),
     targetBoth: agentMsg({ id: 'api.notify.targetBoth', text: 'target is an agent or a card, not both' }),
     targetNames: agentMsg({ id: 'api.notify.targetNames', text: 'target names an agent or a card' })
   },
@@ -428,6 +432,7 @@ export const API = {
     onlyAssistant: agentMsg({ id: 'api.undo.onlyAssistant', text: 'Only the Hive Assistant has changes to undo: they are its own.' })
   },
   watch: {
+    agentsArg: agentMsg({ id: 'api.watch.agentsArg', text: 'agents must be a list of \'{ project, agent }\'' }),
     agentsWithLanes: agentMsg({ id: 'api.watch.agentsWithLanes', text: 'agents goes with lanes (a lane watch, HI-1987): to watch agents alone, use hive_wait_for_agents (POST /v1/agents/wait)' }),
     cancelled: agentMsg({ id: 'api.watch.cancelled', text: 'Cancelled your {kind} watch.' }),
     cancelledOne: agentMsg({ id: 'api.watch.cancelledOne', text: 'Cancelled your {kind, select, lane {lane} agent {agent} other {card}} watch.' }),
