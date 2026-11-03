@@ -509,9 +509,13 @@ export async function startSlotHold(ws: WorkspaceService, projectPath: string, l
 /** The free slot (no lease on it) a run still holds as its writer (HI-2468): its builder's own, else the only one. */
 async function writerHold(ws: WorkspaceService, projectPath: string, builder: string): Promise<LaneSlotHeld | null> {
   const pool = await poolFor(ws, projectPath)
-  const held = pool.slots().filter((s) => !!s.writer && s.state === 'ready' && !s.op && !s.job && !pool.openLease(s.name))
+  // Its writer is what holds it (a job settling what the run left, or a warm-up, doesn't change that): no lease on it.
+  const held = pool.slots().filter((s) => !!s.writer && !pool.openLease(s.name))
   const slot = held.find((s) => s.writer!.agent === builder) ?? (held.length === 1 ? held[0] : null)
-  if (!slot) return null
+  if (!slot) {
+    log.info(`A start refused for its slot in ${userText(basename(projectPath))}: no slot held by a run's writer to name (${pool.slots().map((s) => `${userText(s.name)} ${s.state}${s.writer ? ' writer' : ''}${s.job ? ' job' : ''}${s.op ? ' op' : ''}${pool.openLease(s.name) ? ' leased' : ''}`).join(', ')})`)
+    return null
+  }
   const { heldWriter } = await import('./agentFolders')
   const w = await heldWriter(projectPath, slot.name)
   if (!w) return null
