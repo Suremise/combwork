@@ -1,0 +1,831 @@
+{
+  "tool.activateProject.description": {
+    "placeholders": {}
+  },
+  "tool.activateProject.reply.on": {
+    "placeholders": {
+      "project": "plain"
+    }
+  },
+  "tool.addAgent.arg.name": {
+    "placeholders": {}
+  },
+  "tool.addAgent.arg.prompt": {
+    "placeholders": {}
+  },
+  "tool.addAgent.description": {
+    "placeholders": {}
+  },
+  "tool.addAgent.reply.added": {
+    "placeholders": {
+      "agent": "plain",
+      "id": "plain",
+      "project": "plain",
+      "hasProvider": "select",
+      "provider": "plain",
+      "hasConnection": "select",
+      "connection": "plain",
+      "inProject": "select",
+      "folder": "plain",
+      "hasStatus": "select",
+      "status": "plain"
+    }
+  },
+  "tool.agentActivity.description": {
+    "placeholders": {}
+  },
+  "tool.arg.agent": {
+    "placeholders": {}
+  },
+  "tool.arg.attachments": {
+    "placeholders": {
+      "role": "select",
+      "where": "select"
+    }
+  },
+  "tool.arg.card": {
+    "placeholders": {}
+  },
+  "tool.arg.cards": {
+    "placeholders": {
+      "what": "plain"
+    }
+  },
+  "tool.arg.connection": {
+    "placeholders": {}
+  },
+  "tool.arg.context": {
+    "placeholders": {}
+  },
+  "tool.arg.from": {
+    "placeholders": {}
+  },
+  "tool.arg.mcpServers": {
+    "placeholders": {}
+  },
+  "tool.arg.override": {
+    "placeholders": {}
+  },
+  "tool.arg.project": {
+    "placeholders": {}
+  },
+  "tool.arg.projectDefault": {
+    "placeholders": {
+      "project": "plain"
+    }
+  },
+  "tool.arg.workflowRole": {
+    "placeholders": {}
+  },
+  "tool.askAssistant.arg.text": {
+    "placeholders": {}
+  },
+  "tool.askAssistant.description": {
+    "placeholders": {}
+  },
+  "tool.askUser.arg.actionReason": {
+    "placeholders": {}
+  },
+  "tool.askUser.arg.actions": {
+    "placeholders": {}
+  },
+  "tool.askUser.arg.checklist": {
+    "placeholders": {}
+  },
+  "tool.askUser.arg.revision": {
+    "placeholders": {}
+  },
+  "tool.askUser.arg.text": {
+    "placeholders": {}
+  },
+  "tool.askUser.description": {
+    "placeholders": {}
+  },
+  "tool.call.error": {
+    "placeholders": {
+      "message": "plain"
+    }
+  },
+  "tool.call.error.http": {
+    "placeholders": {
+      "status": "plain"
+    }
+  },
+  "tool.call.error.projectNeeded": {
+    "placeholders": {}
+  },
+  "tool.call.error.projectRequired": {
+    "placeholders": {}
+  },
+  "tool.call.error.unknownTool": {
+    "placeholders": {
+      "name": "plain"
+    }
+  },
+  "tool.cannotWithinRules.arg.rule": {
+    "placeholders": {}
+  },
+  "tool.cannotWithinRules.description": {
+    "placeholders": {}
+  },
+  "tool.connection.arg.account": {
+    "placeholders": {}
+  },
+  "tool.connection.arg.connection": {
+    "placeholders": {}
+  },
+  "tool.connection.arg.mode": {
+    "placeholders": {}
+  },
+  "tool.connection.arg.model": {
+    "placeholders": {}
+  },
+  "tool.connection.description": {
+    "placeholders": {}
+  },
+  "tool.connection.error.action": {
+    "placeholders": {}
+  },
+  "tool.connection.error.connectionRequired": {
+    "placeholders": {}
+  },
+  "tool.console.arg.agent": {
+    "placeholders": {}
+  },
+  "tool.console.arg.agent.assistant": {
+    "placeholders": {}
+  },
+  "tool.console.arg.limit": {
+    "placeholders": {}
+  },
+  "tool.console.arg.offset": {
+    "placeholders": {}
+  },
+  "tool.console.arg.seq": {
+    "placeholders": {}
+  },
+  "tool.console.arg.since": {
+    "placeholders": {}
+  },
+  "tool.console.description": {
+    "placeholders": {
+      "role": "select"
+    }
+  },
+  "tool.createHandover.description": {
+    "placeholders": {}
+  },
+  "tool.createHandover.reply.saved": {
+    "placeholders": {
+      "path": "plain",
+      "hasSuggest": "select",
+      "suggest": "plain"
+    }
+  },
+  "tool.createProject.arg.name": {
+    "placeholders": {}
+  },
+  "tool.createProject.description": {
+    "placeholders": {}
+  },
+  "tool.createProject.reply.created": {
+    "placeholders": {
+      "project": "plain"
+    }
+  },
+  "tool.createTask.arg.agent": {
+    "placeholders": {}
+  },
+  "tool.createTask.arg.blocked": {
+    "placeholders": {}
+  },
+  "tool.createTask.arg.blockedBy": {
+    "placeholders": {}
+  },
+  "tool.createTask.arg.description": {
+    "placeholders": {}
+  },
+  "tool.createTask.arg.kind": {
+    "placeholders": {}
+  },
+  "tool.createTask.arg.kind.assistant": {
+    "placeholders": {}
+  },
+  "tool.createTask.arg.lane": {
+    "placeholders": {}
+  },
+  "tool.createTask.arg.lane.assistant": {
+    "placeholders": {}
+  },
+  "tool.createTask.arg.lanePosition": {
+    "placeholders": {}
+  },
+  "tool.createTask.arg.links": {
+    "placeholders": {}
+  },
+  "tool.createTask.arg.skipReview": {
+    "placeholders": {}
+  },
+  "tool.createTask.arg.skipReview.assistant": {
+    "placeholders": {}
+  },
+  "tool.createTask.arg.title": {
+    "placeholders": {}
+  },
+  "tool.createTask.description": {
+    "placeholders": {
+      "role": "select"
+    }
+  },
+  "tool.createTask.reply.notPlaced": {
+    "placeholders": {
+      "why": "plain"
+    }
+  },
+  "tool.declarePaths.description": {
+    "placeholders": {}
+  },
+  "tool.docOutline.description": {
+    "placeholders": {}
+  },
+  "tool.focusedSkip.arg.request": {
+    "placeholders": {}
+  },
+  "tool.focusedSkip.arg.why": {
+    "placeholders": {}
+  },
+  "tool.focusedSkip.description": {
+    "placeholders": {}
+  },
+  "tool.handOver.description": {
+    "placeholders": {}
+  },
+  "tool.inbox.arg.ack": {
+    "placeholders": {}
+  },
+  "tool.inbox.arg.read": {
+    "placeholders": {}
+  },
+  "tool.inbox.description": {
+    "placeholders": {
+      "minutes": "plain"
+    }
+  },
+  "tool.intent.arg.revision": {
+    "placeholders": {}
+  },
+  "tool.intent.arg.submission": {
+    "placeholders": {}
+  },
+  "tool.journalEntry.description": {
+    "placeholders": {}
+  },
+  "tool.journalRecall.description": {
+    "placeholders": {}
+  },
+  "tool.journalUpdate.description": {
+    "placeholders": {}
+  },
+  "tool.journalUpdate.reply.deleted": {
+    "placeholders": {
+      "id": "plain"
+    }
+  },
+  "tool.journalUpdate.reply.updated": {
+    "placeholders": {
+      "id": "plain"
+    }
+  },
+  "tool.journalWrite.arg.linkRef": {
+    "placeholders": {}
+  },
+  "tool.journalWrite.arg.project": {
+    "placeholders": {}
+  },
+  "tool.journalWrite.arg.summary": {
+    "placeholders": {
+      "max": "plain"
+    }
+  },
+  "tool.journalWrite.arg.why": {
+    "placeholders": {}
+  },
+  "tool.journalWrite.description": {
+    "placeholders": {}
+  },
+  "tool.journalWrite.reply.written": {
+    "placeholders": {
+      "id": "plain"
+    }
+  },
+  "tool.lane.arg.applyNow": {
+    "placeholders": {}
+  },
+  "tool.lane.arg.brief": {
+    "placeholders": {}
+  },
+  "tool.lane.arg.builder": {
+    "placeholders": {}
+  },
+  "tool.lane.arg.builderJoin": {
+    "placeholders": {}
+  },
+  "tool.lane.arg.cards": {
+    "placeholders": {}
+  },
+  "tool.lane.arg.lane": {
+    "placeholders": {}
+  },
+  "tool.lane.arg.name": {
+    "placeholders": {}
+  },
+  "tool.lane.arg.pool": {
+    "placeholders": {}
+  },
+  "tool.lane.arg.reviewer": {
+    "placeholders": {}
+  },
+  "tool.lane.description": {
+    "placeholders": {}
+  },
+  "tool.lane.description.assistant": {
+    "placeholders": {
+      "agentsAllowed": "select"
+    }
+  },
+  "tool.lane.error.action": {
+    "placeholders": {}
+  },
+  "tool.lane.error.laneRequired": {
+    "placeholders": {}
+  },
+  "tool.listProjects.description": {
+    "placeholders": {}
+  },
+  "tool.listProviders.description": {
+    "placeholders": {}
+  },
+  "tool.listSettings.arg.offset": {
+    "placeholders": {}
+  },
+  "tool.listSettings.arg.project": {
+    "placeholders": {}
+  },
+  "tool.listSettings.description": {
+    "placeholders": {}
+  },
+  "tool.listSharedNotes.description": {
+    "placeholders": {}
+  },
+  "tool.listSkills.description": {
+    "placeholders": {}
+  },
+  "tool.listSkills.description.assistant": {
+    "placeholders": {}
+  },
+  "tool.listTasks.arg.details": {
+    "placeholders": {}
+  },
+  "tool.listTasks.arg.offset": {
+    "placeholders": {}
+  },
+  "tool.listTasks.arg.project": {
+    "placeholders": {}
+  },
+  "tool.listTasks.description": {
+    "placeholders": {
+      "role": "select",
+      "max": "plain"
+    }
+  },
+  "tool.loopStep.arg.design": {
+    "placeholders": {}
+  },
+  "tool.loopStep.arg.text": {
+    "placeholders": {}
+  },
+  "tool.loopStep.description": {
+    "placeholders": {}
+  },
+  "tool.mergeSlot.arg.cards": {
+    "placeholders": {}
+  },
+  "tool.mergeSlot.description": {
+    "placeholders": {}
+  },
+  "tool.mergeSlot.error.action": {
+    "placeholders": {}
+  },
+  "tool.messageAgent.arg.card": {
+    "placeholders": {}
+  },
+  "tool.messageAgent.description": {
+    "placeholders": {}
+  },
+  "tool.messageAgent.reply.cancelled": {
+    "placeholders": {
+      "count": "plural",
+      "agent": "plain"
+    }
+  },
+  "tool.messageAgent.reply.noneWaiting": {
+    "placeholders": {
+      "agent": "plain"
+    }
+  },
+  "tool.messageAgent.reply.theAgent": {
+    "placeholders": {}
+  },
+  "tool.messageAgent.reply.tied": {
+    "placeholders": {
+      "card": "plain",
+      "round": "plain"
+    }
+  },
+  "tool.messageAgent.reply.told": {
+    "placeholders": {
+      "agent": "plain",
+      "id": "plain",
+      "tied": "plain",
+      "watching": "select"
+    }
+  },
+  "tool.notify.arg.target": {
+    "placeholders": {}
+  },
+  "tool.notify.description": {
+    "placeholders": {}
+  },
+  "tool.projectStatus.description": {
+    "placeholders": {}
+  },
+  "tool.promptAgent.description": {
+    "placeholders": {}
+  },
+  "tool.putBack.arg.why": {
+    "placeholders": {}
+  },
+  "tool.putBack.description": {
+    "placeholders": {}
+  },
+  "tool.queue.arg.reason": {
+    "placeholders": {}
+  },
+  "tool.queue.arg.target": {
+    "placeholders": {}
+  },
+  "tool.queue.description": {
+    "placeholders": {}
+  },
+  "tool.queue.description.assistant": {
+    "placeholders": {
+      "agentsAllowed": "select"
+    }
+  },
+  "tool.queue.error.action": {
+    "placeholders": {}
+  },
+  "tool.queue.error.action.assistant": {
+    "placeholders": {}
+  },
+  "tool.readAttachment.arg.name": {
+    "placeholders": {}
+  },
+  "tool.readAttachment.arg.offset": {
+    "placeholders": {}
+  },
+  "tool.readAttachment.description": {
+    "placeholders": {}
+  },
+  "tool.readAttachment.error.nameRequired": {
+    "placeholders": {}
+  },
+  "tool.readLatestHandover.description": {
+    "placeholders": {}
+  },
+  "tool.readLatestHandover.reply.none": {
+    "placeholders": {
+      "hasProject": "select",
+      "project": "plain"
+    }
+  },
+  "tool.readSection.description": {
+    "placeholders": {}
+  },
+  "tool.readSetting.arg.id": {
+    "placeholders": {}
+  },
+  "tool.readSetting.description": {
+    "placeholders": {}
+  },
+  "tool.readSharedNote.description": {
+    "placeholders": {}
+  },
+  "tool.readTask.arg.attachments": {
+    "placeholders": {}
+  },
+  "tool.readTask.arg.comments": {
+    "placeholders": {}
+  },
+  "tool.readTask.arg.latestComment": {
+    "placeholders": {}
+  },
+  "tool.readTask.arg.summary": {
+    "placeholders": {}
+  },
+  "tool.readTask.description": {
+    "placeholders": {}
+  },
+  "tool.releaseSlot.arg.confirm": {
+    "placeholders": {}
+  },
+  "tool.releaseSlot.arg.end": {
+    "placeholders": {}
+  },
+  "tool.releaseSlot.arg.kind": {
+    "placeholders": {}
+  },
+  "tool.releaseSlot.arg.slot": {
+    "placeholders": {}
+  },
+  "tool.releaseSlot.description": {
+    "placeholders": {
+      "agentsAllowed": "select"
+    }
+  },
+  "tool.releaseSlot.error.action": {
+    "placeholders": {}
+  },
+  "tool.releaseSlot.error.slotRequired": {
+    "placeholders": {}
+  },
+  "tool.reorderTasks.arg.cards": {
+    "placeholders": {}
+  },
+  "tool.reorderTasks.description": {
+    "placeholders": {}
+  },
+  "tool.reportMerge.arg.result": {
+    "placeholders": {}
+  },
+  "tool.reportMerge.description": {
+    "placeholders": {}
+  },
+  "tool.requestBuilder.description": {
+    "placeholders": {}
+  },
+  "tool.sessionUsage.description": {
+    "placeholders": {}
+  },
+  "tool.startAgent.description": {
+    "placeholders": {}
+  },
+  "tool.startAgent.reply.started": {
+    "placeholders": {
+      "resumed": "select",
+      "agent": "plain",
+      "project": "plain",
+      "status": "plain",
+      "hasSession": "select",
+      "session": "plain"
+    }
+  },
+  "tool.startCard.description": {
+    "placeholders": {}
+  },
+  "tool.startReview.description": {
+    "placeholders": {}
+  },
+  "tool.startTask.arg.connection": {
+    "placeholders": {}
+  },
+  "tool.startTask.arg.name": {
+    "placeholders": {}
+  },
+  "tool.startTask.arg.note": {
+    "placeholders": {}
+  },
+  "tool.startTask.description": {
+    "placeholders": {}
+  },
+  "tool.startTask.reply.started": {
+    "placeholders": {
+      "card": "plain",
+      "title": "plain",
+      "added": "select",
+      "agent": "plain",
+      "hasProject": "select",
+      "project": "plain",
+      "column": "select"
+    }
+  },
+  "tool.stopAgent.description": {
+    "placeholders": {
+      "seconds": "plain"
+    }
+  },
+  "tool.submit.arg.followUp": {
+    "placeholders": {}
+  },
+  "tool.submit.arg.note": {
+    "placeholders": {}
+  },
+  "tool.submit.arg.paths": {
+    "placeholders": {}
+  },
+  "tool.submit.arg.summary": {
+    "placeholders": {}
+  },
+  "tool.submit.arg.tests": {
+    "placeholders": {}
+  },
+  "tool.submit.description": {
+    "placeholders": {}
+  },
+  "tool.team.description": {
+    "placeholders": {
+      "agentsAllowed": "select"
+    }
+  },
+  "tool.team.error.action": {
+    "placeholders": {}
+  },
+  "tool.template.arg.connections": {
+    "placeholders": {}
+  },
+  "tool.template.arg.from": {
+    "placeholders": {}
+  },
+  "tool.template.arg.names": {
+    "placeholders": {}
+  },
+  "tool.template.arg.scope": {
+    "placeholders": {}
+  },
+  "tool.template.arg.template": {
+    "placeholders": {}
+  },
+  "tool.template.arg.workflow": {
+    "placeholders": {}
+  },
+  "tool.template.description": {
+    "placeholders": {}
+  },
+  "tool.template.error.action": {
+    "placeholders": {}
+  },
+  "tool.undo.arg.change": {
+    "placeholders": {}
+  },
+  "tool.undo.arg.group": {
+    "placeholders": {}
+  },
+  "tool.undo.description": {
+    "placeholders": {}
+  },
+  "tool.updateAgent.description": {
+    "placeholders": {}
+  },
+  "tool.updateSetting.arg.value": {
+    "placeholders": {}
+  },
+  "tool.updateSetting.description": {
+    "placeholders": {}
+  },
+  "tool.updateTask.arg.addLabels": {
+    "placeholders": {}
+  },
+  "tool.updateTask.arg.agent": {
+    "placeholders": {}
+  },
+  "tool.updateTask.arg.answers": {
+    "placeholders": {}
+  },
+  "tool.updateTask.arg.before": {
+    "placeholders": {}
+  },
+  "tool.updateTask.arg.blockedBy": {
+    "placeholders": {}
+  },
+  "tool.updateTask.arg.comment": {
+    "placeholders": {}
+  },
+  "tool.updateTask.arg.confirmKind": {
+    "placeholders": {}
+  },
+  "tool.updateTask.arg.decision": {
+    "placeholders": {}
+  },
+  "tool.updateTask.arg.kind": {
+    "placeholders": {}
+  },
+  "tool.updateTask.arg.labels": {
+    "placeholders": {}
+  },
+  "tool.updateTask.arg.links": {
+    "placeholders": {}
+  },
+  "tool.updateTask.arg.position": {
+    "placeholders": {}
+  },
+  "tool.updateTask.arg.removeLabels": {
+    "placeholders": {}
+  },
+  "tool.updateTask.arg.review": {
+    "placeholders": {}
+  },
+  "tool.updateTask.arg.skipReview": {
+    "placeholders": {}
+  },
+  "tool.updateTask.arg.title": {
+    "placeholders": {}
+  },
+  "tool.updateTask.description": {
+    "placeholders": {}
+  },
+  "tool.updateTask.description.assistant": {
+    "placeholders": {}
+  },
+  "tool.updateTask.reply.journalNote": {
+    "placeholders": {}
+  },
+  "tool.updateTasks.arg.addLabels": {
+    "placeholders": {}
+  },
+  "tool.updateTasks.arg.agent": {
+    "placeholders": {}
+  },
+  "tool.updateTasks.arg.blocked": {
+    "placeholders": {}
+  },
+  "tool.updateTasks.arg.labels": {
+    "placeholders": {}
+  },
+  "tool.updateTasks.arg.numbers": {
+    "placeholders": {}
+  },
+  "tool.updateTasks.arg.position": {
+    "placeholders": {}
+  },
+  "tool.updateTasks.arg.removeLabels": {
+    "placeholders": {}
+  },
+  "tool.updateTasks.description": {
+    "placeholders": {}
+  },
+  "tool.updateTasks.description.assistant": {
+    "placeholders": {}
+  },
+  "tool.verdict.arg.comment": {
+    "placeholders": {}
+  },
+  "tool.verdict.arg.failKind": {
+    "placeholders": {}
+  },
+  "tool.verdict.description": {
+    "placeholders": {}
+  },
+  "tool.waitForAgents.arg.timeoutSeconds": {
+    "placeholders": {
+      "max": "plain"
+    }
+  },
+  "tool.waitForAgents.description": {
+    "placeholders": {}
+  },
+  "tool.waitForTasks.arg.agents": {
+    "placeholders": {}
+  },
+  "tool.waitForTasks.arg.cards": {
+    "placeholders": {}
+  },
+  "tool.waitForTasks.arg.changes": {
+    "placeholders": {}
+  },
+  "tool.waitForTasks.arg.events": {
+    "placeholders": {}
+  },
+  "tool.waitForTasks.arg.fresh": {
+    "placeholders": {}
+  },
+  "tool.waitForTasks.arg.lanes": {
+    "placeholders": {}
+  },
+  "tool.waitForTasks.arg.since": {
+    "placeholders": {}
+  },
+  "tool.waitForTasks.arg.timeoutSeconds": {
+    "placeholders": {
+      "max": "plain"
+    }
+  },
+  "tool.waitForTasks.arg.usage": {
+    "placeholders": {}
+  },
+  "tool.waitForTasks.description": {
+    "placeholders": {}
+  },
+  "tool.writeSharedNote.description": {
+    "placeholders": {}
+  }
+}

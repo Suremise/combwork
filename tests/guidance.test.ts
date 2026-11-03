@@ -17,6 +17,14 @@ import type { Finisher, ReviewBy } from '../src/shared/workflow/options'
 const ROOT = join(__dirname, '..')
 const SKILLS = join(ROOT, 'resources', 'skills')
 /**
+ * What the hive tools say (HI-2434): their descriptions, replies and errors are agent messages in hive-mcp.ts, read here
+ * from their catalogue (id → English, both roles' and every Control level's); the server's source for the code that
+ * says them (`T['<id after tool.>']`).
+ */
+const TOOL_TEXTS: Record<string, string> = Object.fromEntries(Object.entries(JSON.parse(readFileSync(join(ROOT, 'agent-text', 'catalogue', 'tool.json'), 'utf8')) as Record<string, { text: string }>).map(([id, m]) => [id, m.text]))
+const TOOL_DESCRIPTIONS = Object.entries(TOOL_TEXTS).filter(([id]) => /\.(description|arg)\b/.test(id) || id.startsWith('tool.arg.')).map(([, text]) => text)
+const TOOLS_SOURCE = readFileSync(join(ROOT, 'src', 'main', 'mcp', 'hive-mcp.ts'), 'utf8')
+/**
  * Each bundled skill: its SKILL.md (`skill`), its reference files beside it (HI-2011: SKILL.md as a contents page, the
  * rest read only when needed), and `text`, all of them together, which the checks of what the skills say read, so a
  * rule moved into a reference file is still checked.
@@ -165,8 +173,7 @@ describe('one owner per rule', () => {
   // Places stating one besides its owner today, until lanes A and B (#1524–#1528) and #1530 rewrite them. The list only
   // shrinks: one no longer stating it fails until it's taken off.
   const NOT_YET: Record<string, string[]> = {}
-  const tools = readFileSync(join(ROOT, 'src', 'main', 'mcp', 'hive-mcp.ts'), 'utf8')
-  const descriptions = [...tools.matchAll(/description:\s*(?:ASSISTANT\s*\?\s*)?(["'`])((?:\\.|(?!\1).)*)\1(?:\s*:\s*(["'`])((?:\\.|(?!\3).)*)\3)?/g)].map((m) => `${m[2]}\n${m[4] ?? ''}`).join('\n')
+  const descriptions = TOOL_DESCRIPTIONS.join('\n')
   const places = (role: 'agent' | 'assistant'): [string, string][] => [
     ['contract', role === 'agent' ? hiveInstructions('web') : [hiveInstructions('', 'assistant'), controlRules('projects', true), journalRule(['decision'])].join('\n')],
     ...[...catalog].filter(([, s]) => skillFor(s.audience, role)).map(([name, s]): [string, string] => [name, s.text]),
@@ -194,7 +201,7 @@ describe('one owner per rule', () => {
 // #1530 (P8): the tools' texts say arguments, side effects and refusals as Hive enforces them, and stay true for every
 // project's options (no version control, review off, merges not checked, a shared folder); #1346's text fixes.
 describe("the tools' descriptions", () => {
-  const tools = readFileSync(join(ROOT, 'src', 'main', 'mcp', 'hive-mcp.ts'), 'utf8')
+  const tools = Object.values(TOOL_TEXTS).join('\n')
   const toolsDetail = readFileSync(join(ROOT, 'resources', 'skills', 'use-hive-api', 'tools.md'), 'utf8')
   it('describe moves as the intents, with no workflow stated as the rule', () => {
     // The old moves are one sentence of hive_update_task's (HI-2012: its cases in use-hive-api's tools.md): translated
@@ -206,19 +213,23 @@ describe("the tools' descriptions", () => {
     expect(tools).toMatch(/Report a card's work merged, where its agent merges it or merges aren't checked/)
   })
   it("point to use-hive-api's tools.md for their detail, which names only tools there are (HI-2012)", () => {
-    const names = new Set([...tools.matchAll(/name: '(hive_\w+)'|intent\(\s*'(hive_\w+)'/g)].map((m) => m[1] ?? m[2]))
+    const names = new Set([...TOOLS_SOURCE.matchAll(/name: '(hive_\w+)'|intent\(\s*'(hive_\w+)'/g)].map((m) => m[1] ?? m[2]))
     const named = new Set([...toolsDetail.matchAll(/`(hive_\w+)`/g)].map((m) => m[1]))
     expect(names.size).toBeGreaterThan(40)
     for (const n of named) expect(names, n).toContain(n)
     // Each tool whose description sends the caller to tools.md has its detail there.
-    const pointing = [...tools.matchAll(/name: '(hive_\w+)',\s*description:[^\n]*\n?[^\n]*\(detail: use-hive-api, tools\.md\)/g)].map((m) => m[1])
+    // A tool's description is the message (or each role's) its source says by id on its description's line.
+    const pointing = [...TOOLS_SOURCE.matchAll(/name: '(hive_\w+)',\s*description:\s*([^\n]*)|intent\(\s*'(hive_\w+)',\s*'[\w-]+',\s*([^\n]*)/g)]
+      .filter((m) => [...(m[2] ?? m[4]).matchAll(/T\['([^']+)'\]/g)].some((t) => (TOOL_TEXTS[`tool.${t[1]}`] ?? '').includes('(detail: use-hive-api, tools.md)')))
+      .map((m) => m[1] ?? m[3])
     expect(pointing.length).toBeGreaterThan(5)
     for (const n of pointing) expect(named, n).toContain(n)
   })
   it("carry #1346's text fixes: a lane watch takes lanes only; a decision nudges the Assistant's journal", () => {
     expect(tools).toMatch(/for a lane, pass lanes only, not its cards\./)
     expect(toolsDetail).toMatch(/For a lane, pass `lanes` only:\*\* adding its cards wakes you on every move\./)
-    expect(tools).toMatch(/ASSISTANT && JOURNAL && typeof a\.decision === 'string'[^\n]*Note it in your journal \(hive_journal_write\)\./)
+    expect(TOOLS_SOURCE).toMatch(/ASSISTANT && JOURNAL && typeof a\.decision === 'string'[^\n]*T\['updateTask\.reply\.journalNote'\]/)
+    expect(TOOL_TEXTS['tool.updateTask.reply.journalNote']).toBe('Note it in your journal (hive_journal_write).')
   })
 })
 
@@ -263,8 +274,7 @@ describe('the bundled skills', () => {
   it("tell no agent to use a worktree of its own or to review in the builder's folder (#1444: P7's slots and review copies)", () => {
     const own = /\b(?:its|your|their|an agent's) (?:own )?(?:git )?worktree\b|\bown (?:git )?worktree\b|\bagents? with (?:its|their) own\b/i
     const builders = /\breview\w* (?:in|from) (?:the )?builder's (?:worktree|folder|slot)\b/i
-    const tools = readFileSync(join(ROOT, 'src', 'main', 'mcp', 'hive-mcp.ts'), 'utf8')
-    const descriptions = [...tools.matchAll(/description:\s*(?:ASSISTANT\s*\?\s*)?(["'`])((?:\\.|(?!\1).)*)\1/g)].map((m) => m[2])
+    const descriptions = TOOL_DESCRIPTIONS
     expect(descriptions.length).toBeGreaterThan(50)
     for (const [name, s] of catalog) {
       expect(s.text, name).not.toMatch(own)
