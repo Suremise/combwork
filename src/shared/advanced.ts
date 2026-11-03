@@ -33,7 +33,7 @@ import { WORKSPACE_NOTES_MAX } from './workspaceNotes'
  * errors read its English (`englishText`), so what the Assistant is told never follows the user's language. The
  * settings catalogue's rows hold their text this way too.
  */
-export type Text = Msg | { m: Msg; values: TextValues } | { list: TextPart[]; type?: ListType } | { lines: TextPart[] } | { cap: TextPart } | { shown: TextPart; agent: TextPart } | { said: AgentMsg; values?: TextValues }
+export type Text = Msg | { m: Msg; values: TextValues } | { list: TextPart[]; type?: ListType } | { lines: TextPart[] } | { cap: TextPart } | { shown: TextPart; agent: TextPart } | { shown: TextPart; english: string } | { said: AgentMsg; values?: TextValues }
 /** A part of text: text of its own, or a name or a number that is the same in every language. */
 export type TextPart = string | number | Text
 export type TextValues = Record<string, TextPart>
@@ -86,7 +86,8 @@ function formatText(t: TextPart, f: Formatter): string {
     const s = formatText(t.cap, f)
     return f.upper(s.charAt(0)) + s.slice(1)
   }
-  if ('shown' in t) return f.agents ? formatText(t.agent, f) : formatText(t.shown, f)
+  // `english`: text kept in that shape before HI-2440 (a notice's body): its agents' English as it was written.
+  if ('shown' in t) return f.agents ? ('agent' in t ? formatText(t.agent, f) : String(t.english)) : formatText(t.shown, f)
   const values = t.values && Object.fromEntries(Object.entries(t.values).map(([k, v]) => [k, typeof v === 'object' ? formatText(v, f) : v]))
   if ('said' in t) return f.said(t.said, values)
   return f.one(t.m, values)

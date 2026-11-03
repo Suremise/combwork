@@ -141,6 +141,14 @@ describe("forAgents: agents' own words as agent messages", () => {
     expect(asAgent(() => apiErrorReply(e)).body.error).toBe('Card not in Doing')
   })
 
+  it('text kept in the shape before HI-2440 ({ shown, english }, a notice body) still says its English to agents', () => {
+    const old = { shown: 'window words', english: 'Agents read this.' } as TextPart
+    expect(englishText(old)).toBe('Agents read this.')
+    expect(shownText(old)).toBe('window words')
+    using({})
+    expect(asAgent(() => agentText(old))).toBe('Agents read this.')
+  })
+
   it('a split branch is overridable as data too (saidText): Default, then an override', () => {
     const t: TextPart = forAgents('window words', saidText({ id: 'board.agent.needsTitle', text: 'A task needs a title.' }))
     expect(englishText(t)).toBe('A task needs a title.')

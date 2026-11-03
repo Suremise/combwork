@@ -619,7 +619,7 @@ function scrubText(t: TextPart, secrets: string[]): TextPart {
   if ('list' in t) return { ...t, list: t.list.map((x) => scrubText(x, secrets)) }
   if ('lines' in t) return { lines: t.lines.map((x) => scrubText(x, secrets)) }
   if ('cap' in t) return { cap: scrubText(t.cap, secrets) }
-  if ('shown' in t) return { shown: scrubText(t.shown, secrets), agent: scrubText(t.agent, secrets) }
+  if ('shown' in t) return 'agent' in t ? { shown: scrubText(t.shown, secrets), agent: scrubText(t.agent, secrets) } : { shown: scrubText(t.shown, secrets), english: scrubSecrets(t.english, secrets) }
   const values = t.values && Object.fromEntries(Object.entries(t.values).map(([k, v]) => [k, scrubText(v, secrets)]))
   if ('said' in t) return values ? { said: t.said, values } : { said: t.said }
   return { m: t.m, values: values! }
