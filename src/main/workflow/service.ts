@@ -53,6 +53,15 @@ export function setRunsGoing(fn: ((project: string, agent: string) => string[]) 
 export const agentRunsGoing = (project: string, agent: string): string[] => runsGoing?.(project, agent) ?? []
 
 /**
+ * Whether an agent's session runs now (HI-2487: a review it has in progress holds another agent's start of it until it
+ * stops). Given by the app as it starts (sessions are its; none running in unit tests).
+ */
+let agentRunning: ((project: string, agent: string) => boolean) | null = null
+export function setAgentRunning(fn: ((project: string, agent: string) => boolean) | null): void {
+  agentRunning = fn
+}
+
+/**
  * What runs a target's queue in this Hive now (queueHost's queueLive: the queue's order, which card reads and refusals
  * give agents, #1354). Given by the app as it starts (none in unit tests: nothing runs a queue here).
  */
@@ -194,6 +203,12 @@ function make(ws: WorkspaceService, project: { path: string; name: string }, lif
     // Actions run by the actions worker after the commit, never here.
     autoRun: false,
     runsOf: (agent) => runsGoing?.(project.path, agent) ?? [],
+    // HI-2487: the project's agents whose sessions run, who may have a review in progress that another's start waits for.
+    reviewersPresent: async () => {
+      const running = agentRunning
+      if (!running) return new Map()
+      return new Map(projectAgents(await ws.projectConfig(project.path)).filter((a) => running(project.path, a.id)).map((a) => [a.id, a.name]))
+    },
     // G16 (#1481): the file locks seen before an intent are in the cards' records before it reads them.
     locksSettled: () => locksSettled(ws, project.path),
     // #1651: a check run that has finished is in its card's facts before a submit reads them.

@@ -2,7 +2,8 @@
 // (fake Claude Code agents, their own tokens as their hive tools use them) and the Hive Assistant through Settings →
 // Assistant → Control. An agent's plain number is refused naming the card's key alone (S48); start, submit, start
 // review, the reviewer's request (which ends the builder's wait for its verdict, #1272) and a failed verdict move the
-// card by its workflow (the card stays its builder's); the builder can't review its own card; ask the user leaves it
+// card by its workflow (the card stays its builder's); the builder can't review its own card; a second reviewer can't
+// start a review another's running session has in progress, and can once that session stops (HI-2487); ask the user leaves it
 // where it is; missing arguments are 400; the Assistant's intent is refused at Look and advise and runs at Control
 // agents; and an agent's hive tool (hive_start_card) runs the start intent. Dev build, throwaway profile, workspace and
 // CLAUDE_CONFIG_DIR.
@@ -61,9 +62,11 @@ const git = (...a) => execFileSync('git', ['-c', 'user.email=t@t', '-c', 'user.n
     await inv('workflow:setOptions', alpha, { preset: null, options: { review: 'agent', noSelfReview: true, finish: 'committed', folder: 'project' } })
     const builder = await lib.addAgent(inv, alpha, { name: 'Builder' })
     const reviewer = await lib.addAgent(inv, alpha, { name: 'Reviewer' })
+    // HI-2487: a second reviewer, whose start of a review Reviewer has in progress is refused while Reviewer's session runs.
+    const second = await lib.addAgent(inv, alpha, { name: 'Second Reviewer' })
     const live = async (id) => (await inv('session:live')).find((s) => s.projectPath.toLowerCase() === alpha.toLowerCase() && s.agentId === id)
-    for (const a of [builder, reviewer]) await inv('session:start', alpha, { agentId: a.id })
-    check('the agents start', !!(await until(async () => (await live(builder.id))?.status === 'ready' && (await live(reviewer.id))?.status === 'ready', HUNG_MS)))
+    for (const a of [builder, reviewer, second]) await inv('session:start', alpha, { agentId: a.id })
+    check('the agents start', !!(await until(async () => (await live(builder.id))?.status === 'ready' && (await live(reviewer.id))?.status === 'ready' && (await live(second.id))?.status === 'ready', HUNG_MS)))
 
     // Each agent's own token, from its launch (by its session id) as its hive tools read it.
     const launchesFile = path.join(claudeHome, 'fake-launches.jsonl')
@@ -74,15 +77,15 @@ const git = (...a) => execFileSync('git', ['-c', 'user.email=t@t', '-c', 'user.n
     /** An agent's hive server as its launch has it (command and environment), or null. */
     const hiveOf = async (id) => {
       const sessionId = (await live(id))?.sessionId
-      const launch = await until(() => launches().find((l) => l.sessionId === sessionId && l.opts['--mcp-config']), HUNG_MS)
+      const launch = await until(() => launches().findLast((l) => l.sessionId === sessionId && l.opts['--mcp-config']), HUNG_MS)
       return launch ? JSON.parse(fs.readFileSync(launch.opts['--mcp-config'], 'utf8')).mcpServers.hive : null
     }
     const tokenOf = async (id) => {
       const hive = await hiveOf(id)
       return hive ? JSON.parse(fs.readFileSync(hive.env.HIVE_API_TOKEN_FILE, 'utf8')).token : null
     }
-    const tokens = { builder: await tokenOf(builder.id), reviewer: await tokenOf(reviewer.id) }
-    check('each agent has its own token', !!tokens.builder && !!tokens.reviewer && tokens.builder !== tokens.reviewer)
+    const tokens = { builder: await tokenOf(builder.id), reviewer: await tokenOf(reviewer.id), second: await tokenOf(second.id) }
+    check('each agent has its own token', !!tokens.builder && !!tokens.reviewer && !!tokens.second && new Set([tokens.builder, tokens.reviewer, tokens.second]).size === 3)
     const call = async (token, p, body) => {
       const res = await fetch(`http://127.0.0.1:${PORT}${p}`, { method: 'POST', headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' }, body: JSON.stringify(body ?? {}) })
       return { status: res.status, body: await res.json().catch(() => null) }
@@ -119,6 +122,21 @@ const git = (...a) => execFileSync('git', ['-c', 'user.email=t@t', '-c', 'user.n
     check("the builder can't start reviewing its own card (409, review.notAuthor)", own.status === 409 && own.body?.rule === 'review.notAuthor', JSON.stringify(own.body))
     const review = await asReviewer(`/v1/tasks/${ref}/start-review`)
     check('the reviewer starts reviewing: the revision to review', review.status === 200 && review.body?.to === 'review' && !!review.body.data?.revision, JSON.stringify(review.body))
+    // HI-2487: another reviewer's start, while Reviewer's session runs (index.ts's sessions), is refused naming it.
+    const taken = await call(tokens.second, `/v1/tasks/${ref}/start-review`)
+    check("another reviewer can't start the review in progress (409, review.inProgress), naming who has it", taken.status === 409 && taken.body?.rule === 'review.inProgress' && (taken.body.message ?? '').startsWith('Reviewer is reviewing '), JSON.stringify(taken.body))
+    check('…and nothing of it is written', !(await card(n))?.history.some((h) => h.what === 'Started reviewing' && h.by.startsWith('Second Reviewer')), JSON.stringify((await card(n))?.history.slice(-3)))
+    // Reviewer's session stopped: the review is free for the second; it stopped too, Reviewer started again takes it back.
+    const stopped = async (id) => (await inv('session:stop', alpha, id), !!(await until(async () => !(await live(id)) || (await live(id)).status === 'stopped', HUNG_MS)))
+    check("Reviewer's session stops", await stopped(reviewer.id))
+    const freed = await call(tokens.second, `/v1/tasks/${ref}/start-review`)
+    check('…then the second reviewer can start it', freed.status === 200 && freed.body?.to === 'review', JSON.stringify(freed.body))
+    check("the second reviewer's session stops", await stopped(second.id))
+    await inv('session:start', alpha, { agentId: reviewer.id })
+    check('Reviewer starts again', !!(await until(async () => (await live(reviewer.id))?.status === 'ready', HUNG_MS)))
+    tokens.reviewer = await tokenOf(reviewer.id)
+    const back = await asReviewer(`/v1/tasks/${ref}/start-review`)
+    check('…and takes its review back, the second stopped', back.status === 200 && back.body?.to === 'review', JSON.stringify(back.body))
     // The builder waits for its verdict or Passed (#912's case: not comments), from a point taken before the request.
     const mark = await asBuilder('/v1/tasks/wait', { cards: [n], changes: ['verdict', 'column'], column: 'passed', timeoutSeconds: 1 })
     const waiting = asBuilder('/v1/tasks/wait', { cards: [n], changes: ['verdict', 'column'], column: 'passed', timeoutSeconds: 30, since: mark.body?.since })
@@ -211,7 +229,7 @@ const git = (...a) => execFileSync('git', ['-c', 'user.email=t@t', '-c', 'user.n
     const askedAssistant = await asBuilder(`/v1/tasks/${ref}/ask-assistant`, { text: 'Please put this card On Hold: the user said so.' })
     const askId = askedAssistant.body?.delivery
     check('the builder asks the Assistant: the card and its id in the Assistant\'s inbox', askedAssistant.status === 200 && askedAssistant.body?.card === key && /^m\d+$/.test(askId ?? ''), JSON.stringify(askedAssistant.body))
-    check("…its comment and a line of its history, by the builder", (await card(n))?.comments.at(-1)?.text === 'Please put this card On Hold: the user said so.' && (await card(n))?.history.some((h) => h.what === 'Asked the Hive Assistant: "Please put this card On Hold: the user said so."' && h.by.startsWith('Builder')), JSON.stringify((await card(n))?.history.slice(-2)))
+    check("…its comment and a line of its history, by the builder", (await card(n))?.comments.at(-1)?.text === 'Please put this card On Hold: the user said so.' && (await card(n))?.history.some((h) => h.what === 'Asked the Assistant: "Please put this card On Hold: the user said so."' && h.by.startsWith('Builder')), JSON.stringify((await card(n))?.history.slice(-2)))
     check("…and the Assistant's idle session is woken and reads it, whole, as the builder's request", !!(await until(() => asks().slice(asksBefore).some((t) => t.includes("Builder (alpha) asks you on ") && t.includes('<<<Please put this card On Hold: the user said so.>>>')), HUNG_MS)), JSON.stringify(asks().slice(asksBefore)))
     await inv('session:stop', home, 'assistant')
 

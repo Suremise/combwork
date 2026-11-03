@@ -11,7 +11,7 @@ import { attributeFolder } from '../src/main/workflow/reconcile'
 import { compile, loadRuleset } from '../src/shared/workflow/compile'
 import { agentActor } from '../src/shared/workflow/facts'
 import { allOff, contradictions, preset, reviewerModeOf, takesOption, type WorkflowOptions } from '../src/shared/workflow/options'
-import { designReviewer, openDesign, poolAssignments, preferredReviewer, submissionReviewers, type PoolAgent, type PoolCard } from '../src/shared/workflow/reviewerPool'
+import { designReviewer, openDesign, poolAssignments, preferredReviewer, reviewsInProgress, submissionReviewers, type PoolAgent, type PoolCard } from '../src/shared/workflow/reviewerPool'
 import type { LaneRecord } from '../src/shared/lanes'
 import type { AgentDef } from '../src/shared/types'
 
@@ -279,6 +279,17 @@ describe("the pool's choice (#1443)", () => {
     expect(submissionReviewers([f(6, 'ReviewerAssigned', 'R1'), f(7, 'ReviewStarted', 'R1'), f(8, 'Verdict', 'R1')], 5, known)).toEqual({ seen: ['R1'], reviewing: null })
     // An earlier submission's, or an agent removed since, doesn't hold the card.
     expect(submissionReviewers([f(3, 'ReviewerAssigned', 'R1', 2), f(6, 'ReviewerAssigned', 'gone')], 5, known)).toEqual({ seen: ['gone'], reviewing: null })
+  })
+
+  it("a submission's reviews in progress (HI-2487): started with no verdict, by an agent still here, oldest first and since its first start", () => {
+    const f = (seq: number, kind: string, reviewer: string, at: string, submission = 5) => ({ seq, kind, at, data: { reviewer, submission } })
+    const here = (id: string) => id !== 'gone'
+    const facts = [f(6, 'ReviewerAssigned', 'R1', 't6'), f(7, 'ReviewStarted', 'R1', 't7'), f(8, 'ReviewStarted', 'R2', 't8'), f(9, 'ReviewStarted', 'R1', 't9'), f(10, 'ReviewStarted', 'gone', 't10'), f(11, 'ReviewStarted', 'user', 't11'), f(12, 'ReviewStarted', 'R3', 't12', 4)]
+    // The user's counts, always present (HR1's round 1: a review the user took is the user's until its verdict).
+    expect(reviewsInProgress(facts, 5, here)).toEqual([{ reviewer: 'R1', since: 't7' }, { reviewer: 'R2', since: 't8' }, { reviewer: 'user', since: 't11' }])
+    // A verdict ends its reviewer's; one only given (not started) isn't in progress.
+    expect(reviewsInProgress([...facts, f(13, 'Verdict', 'R1', 't13'), f(14, 'Verdict', 'user', 't14')], 5, here)).toEqual([{ reviewer: 'R2', since: 't8' }])
+    expect(reviewsInProgress([f(6, 'ReviewerAssigned', 'R1', 't6')], 5, here)).toEqual([])
   })
 })
 

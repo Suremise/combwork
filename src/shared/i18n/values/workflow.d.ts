@@ -311,6 +311,9 @@ interface HiveMessageValues {
   'workflow.refused.review.decisionsReceived.next': undefined
   'workflow.refused.review.headMoved.message': { card: string | number; submitted: string | number; head: string | number }
   'workflow.refused.review.headMoved.next': { head: string | number }
+  'workflow.refused.review.inProgress.change': undefined
+  'workflow.refused.review.inProgress.message': { who: string; card: string | number; submission: string | number; reviewer: string | number; minutes: number }
+  'workflow.refused.review.inProgress.next': { who: string; reviewer: string | number; card: string | number }
   'workflow.refused.review.noSubmission.message': { card: string | number }
   'workflow.refused.review.noSubmission.next': undefined
   'workflow.refused.review.notAuthor.change': undefined
@@ -378,6 +381,7 @@ interface HiveMessageValues {
   'workflow.rule.move.doingNobody': undefined
   'workflow.rule.requeue.allowed': undefined
   'workflow.rule.review.decisionsReceived': undefined
+  'workflow.rule.review.inProgress': undefined
   'workflow.rule.review.notAuthor': undefined
   'workflow.rule.start.dependenciesIntegrated': undefined
   'workflow.rule.start.notBlocked': undefined
@@ -476,6 +480,7 @@ interface HiveMessageValues {
   'workflow.unreadable.pathOutside': { path: string | number }
   'workflow.unreadable.replay': { revision: string | number; onto: string | number }
   'workflow.unreadable.replayedFiles': undefined
+  'workflow.unreadable.reviewers': { card: string | number }
   'workflow.unreadable.revision': { revision: string | number }
   'workflow.unreadable.revisionIn': { folder: string | number }
   'workflow.unreadable.state': { folder: string | number }

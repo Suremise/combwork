@@ -16,6 +16,7 @@
 
 ### Fixed
 
+- **A reviewer can no longer take over another reviewer's review by mistake** (HI-2487). A reviewer acting on an old wake could start reviewing a card another reviewer was already reviewing, and silently took the review from it. Hive now refuses that start, saying who is reviewing it and for how long; you can still take a review over, and one whose reviewer was removed or stopped is free again. A reviewer's watch on a card someone else now reviews ends on that card and says who reviews it, rather than waking it as if the card were its to review.
 - **The Assistant asks to stop a busy agent in your language** (HI-2449). Its question in the Assistant's panel, and the notification while the panel is hidden ("Stop <agent> in <project>?", what the agent is doing, Stop and Don't stop), was English whatever language Hive showed.
 - **A lane whose first card can't start yet says which slot is still in use, and by what** (HI-2468). A lane started while its builder was still running, whose slot something still held, said only that its card's start was refused for now. It now names the slot and what holds it: a program the builder's last run left running there, a session, a program with a file open in it, or Windows Sandbox's broker. It follows that until the slot is free. Hive tries the start again as before.
 - **Why a viewer token can't be made is in your language** (HI-2459). Settings → Agent API → Viewer tokens said why it couldn't make one (no name, a name too long or already taken, too many tokens) in English whatever language Hive showed.

@@ -720,6 +720,25 @@
       "head": "plain"
     }
   },
+  "workflow.refused.review.inProgress.change": {
+    "placeholders": {}
+  },
+  "workflow.refused.review.inProgress.message": {
+    "placeholders": {
+      "who": "select",
+      "card": "plain",
+      "submission": "plain",
+      "reviewer": "plain",
+      "minutes": "plural"
+    }
+  },
+  "workflow.refused.review.inProgress.next": {
+    "placeholders": {
+      "who": "select",
+      "reviewer": "plain",
+      "card": "plain"
+    }
+  },
   "workflow.refused.review.noSubmission.message": {
     "placeholders": {
       "card": "plain"
@@ -977,6 +996,9 @@
   "workflow.rule.review.decisionsReceived": {
     "placeholders": {}
   },
+  "workflow.rule.review.inProgress": {
+    "placeholders": {}
+  },
   "workflow.rule.review.notAuthor": {
     "placeholders": {}
   },
@@ -1189,6 +1211,11 @@
   },
   "workflow.unreadable.replayedFiles": {
     "placeholders": {}
+  },
+  "workflow.unreadable.reviewers": {
+    "placeholders": {
+      "card": "plain"
+    }
   },
   "workflow.unreadable.revision": {
     "placeholders": {

@@ -1239,6 +1239,18 @@
     "defaultMessage": "A commit you asked for: ask its builder to submit {head} as a follow-up (hive_request_builder), which keeps it in Review with no round counted, then start your review again. Otherwise give a failing verdict saying so (hive_verdict, pass: false), and its builder submits it as the next round.",
     "description": "The next step after a pass refused because the branch moved on (HI-1763, HI-1832): a commit the reviewer asked for is submitted by the builder as a follow-up (the card stays in Review, no round counted) and reviewed again; any other is failed so the builder submits it as a new round. {head} is a commit's short hash; keep the tool names and the argument as they are."
   },
+  "workflow.refused.review.inProgress.change": {
+    "defaultMessage": "Only the user takes a review over; one whose reviewer has left the project or stopped is free again.",
+    "description": "Who can take over a review in progress (HI-2487): only the user; it is free again once its reviewer agent is removed from the project or its session has stopped."
+  },
+  "workflow.refused.review.inProgress.message": {
+    "defaultMessage": "{who, select, user {The user is reviewing {card}'s submission {submission}} other {{reviewer} is reviewing {card}'s submission {submission}}}, and has been for {minutes, plural, =0 {less than a minute} one {# minute} other {# minutes}}.",
+    "description": "A refused start of a review (HI-2487): someone else started reviewing the same submission and hasn't given its verdict. {who}: user (the user reviews it) or agent (another reviewer agent, named by {reviewer}, its name). {card} is a card key like AM-12, {submission} the submission's number, {minutes} how long ago its review started (select: translate each branch)."
+  },
+  "workflow.refused.review.inProgress.next": {
+    "defaultMessage": "{who, select, user {Leave it to the user} other {Leave it to {reviewer}}}: don't review {card} or give it a verdict.",
+    "description": "The next step after a review refused because someone else is reviewing the card (HI-2487). {who}: user (the user reviews it) or agent (another reviewer agent, named by {reviewer}). {card} is a card key (select: translate each branch)."
+  },
   "workflow.refused.review.noSubmission.message": {
     "defaultMessage": "{card} has nothing submitted to review.",
     "description": "A refused review: the card has no submission."
@@ -1506,6 +1518,10 @@
   "workflow.rule.review.decisionsReceived": {
     "defaultMessage": "The reviewer has read every decision",
     "description": "A rule of the workflow, named where a move skips or can't check it (glossary 2.5: reviewer)."
+  },
+  "workflow.rule.review.inProgress": {
+    "defaultMessage": "One reviewer at a time",
+    "description": "A rule of the workflow, named where a move can't check it (HI-2487): a reviewer agent doesn't start a review another reviewer is still doing; only the user takes one over."
   },
   "workflow.rule.review.notAuthor": {
     "defaultMessage": "Nobody reviews their own work",
@@ -1898,6 +1914,10 @@
   "workflow.unreadable.replayedFiles": {
     "defaultMessage": "the files of the change applied again",
     "description": "What Hive couldn't read, the object of \"Hive couldn't read …\": the result of applying the change again on another commit, to tell whether two revisions are the same change."
+  },
+  "workflow.unreadable.reviewers": {
+    "defaultMessage": "whether the reviewers of {card} are still running",
+    "description": "What Hive couldn't read, the object of \"Hive couldn't read …\" (HI-2487): which of the agents reviewing the card are still in the project with their sessions running. {card} is a card key like AM-12."
   },
   "workflow.unreadable.revision": {
     "defaultMessage": "the revision {revision}",

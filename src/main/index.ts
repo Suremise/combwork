@@ -83,7 +83,7 @@ import { startCopies, stopCopies } from './copiesApp'
 import { startReviewCopies, stopReviewCopies } from './reviewCopies'
 import { setAgentBusy, startLineUpdates } from './workflow/lineUpdates'
 import { startLockRecords } from './workflow/lockRecord'
-import { setQueueLive, setRunsGoing, workflowFor } from './workflow/service'
+import { setAgentRunning, setQueueLive, setRunsGoing, workflowFor } from './workflow/service'
 import { isOpenRun } from '../shared/progress'
 import { createLogger, userText, logsDir } from './logger'
 import { killAll } from './ptyHost'
@@ -1250,6 +1250,12 @@ app.whenReady().then(async () => {
     const runs = openWorkspaces().flatMap((w) => (w.path ? progress.list(w.path) : [])).filter((r) => r.source === 'agent' && r.agentId === agent && r.projectPath?.toLowerCase() === p && isOpenRun(r))
     const tasks = sessions.agentNow(project, agent)?.backgroundTasks ?? 0
     return [...runs.map((r) => r.title), ...(tasks ? [`its background tasks (${tasks})`] : [])] // i18n-ignore: agent-facing: what a refused submit names
+  })
+
+  // A review in progress holds another agent's start of it while its reviewer's session runs (HI-2487).
+  setAgentRunning((project, agent) => {
+    const now = sessions.agentNow(project, agent)
+    return !!now && now.status !== 'stopped' && now.status !== 'error'
   })
 
   // A review waiting on its builder's Progress run for the card isn't stalled (HI-1993).
