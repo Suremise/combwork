@@ -325,6 +325,9 @@ async function main(argv) {
     await time(`${n}. install over it (${args})`, () => s.install(n, `${n}. install new`, p.guestInstaller, `-Arguments "${args}" -Name ${pre}-new`, { timeoutSec: 300 }))
     await s.drive(n, `${n}. after the upgrade`, 'after-upgrade', `${pre}-after`)
     await s.desktop(n, `${pre}-desktop-after`)
+    // A notification from the upgraded app, its banner on the desktop (HI-2460: it shows Combwork's name and icon).
+    await s.drive(n, `${n}. a notification`, 'notify', `${pre}-notify`)
+    await s.desktop(n, `${pre}-toast`)
     await s.collect(n, [pre])
   }
   const bodies = {

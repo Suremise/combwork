@@ -264,12 +264,15 @@ const steps = {
     res.facts.exe = HIVE_EXE
     res.facts.shown = await app.evaluate(({ Notification }) => {
       if (!Notification.isSupported()) return false
-      new Notification({ title: 'Combwork check', body: 'A notification from the installed app' }).show()
+      // Kept on screen until dismissed, for the desktop screenshot the host takes next (its banner shows the app's name).
+      new Notification({ title: 'Combwork check', body: 'A notification from the installed app', timeoutType: 'never' }).show()
       return true
     })
     const key = `HKCU:\\Software\\Microsoft\\Windows\\CurrentVersion\\Notifications\\Settings\\${aumid}`
     const known = await until(async () => ps(`Test-Path '${key}'`) === 'True', 20_000)
-    check('8.notification', `A notification shows under the app ID ${aumid} (Windows lists it in Notifications)`, res.facts.shown && known, `shown ${res.facts.shown}; ${key} ${known ? 'there' : 'missing'}`)
+    // Its scenario: the prefix's (s4-notify → 4), else 8.
+    const sc = /^s(\d+)/.exec(prefix)?.[1] || '8'
+    check(`${sc}.notification`, `A notification shows under the app ID ${aumid} (Windows lists it in Notifications)`, res.facts.shown && known, `shown ${res.facts.shown}; ${key} ${known ? 'there' : 'missing'}`)
     await shot('notified')
   },
 

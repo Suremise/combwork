@@ -33,7 +33,7 @@ const hiveState = (): Json => state({ uninstallEntries: [{ displayName: 'Hive De
 /** A finished driver record with all its required checks passing. */
 const driverOk = (kind: string, key: string): Json => {
   const req = REQUIRED[kind].drivers[key]
-  return { completed: true, checks: req.ids.map((id: string) => ({ id, scenario: Number(id.split('.')[0]), name: `check ${id}`, ok: true })), facts: { version: '0.6.0', gitMissing: true, hive: ['workspace.json'], views: {} } }
+  return { completed: true, checks: req.ids.map((id: string) => ({ id, scenario: Number(id.split('.')[0]), name: `check ${id}`, ok: true })), facts: { version: '0.6.0', exe: 'Combwork.exe', gitMissing: true, hive: ['workspace.json'], views: {} } }
 }
 const allShots = [...REQUIRED.fresh.shots, ...REQUIRED.upgrade.shots]
 const meta = (over: Json = {}): Json => ({ app: APP, installer: 'Combwork-Setup-0.6.0.exe', installerVersion: '0.6.0', previousVersion: '0.5.1', ran: ['fresh', 'upgrade'], date: 'd', hostBuild: '10.0.26200', minutes: '3.0', shots: allShots, steps: [{ scenario: 1, what: '1. install', ok: true }], ...over })
@@ -51,7 +51,8 @@ const good = (): Json => ({
   's4-prev-started': { pid: 4242, window: true, seconds: 5 },
   's4-new-run': { exitCode: 0, seconds: 20, hiveRunning: true, running: ['combwork'], arguments: '--updated /S --force-run' },
   's4-new-state': state(),
-  's4-after': driverOk('upgrade', 's4-after')
+  's4-after': driverOk('upgrade', 's4-after'),
+  's4-notify': driverOk('upgrade', 's4-notify')
 })
 const failedNames = (r: Json): string[] => r.checks.filter((c: Json) => !c.ok).map((c: Json) => c.name)
 
@@ -99,7 +100,7 @@ test('a driver interrupted after a passing check fails: not finished, and its ot
 
 test('empty driver records fail every required check and fact', () => {
   const f = good()
-  for (const k of ['s1', 's3', 's6', 's4-mark', 's4-after']) f[k] = {}
+  for (const k of ['s1', 's3', 's6', 's4-mark', 's4-after', 's4-notify']) f[k] = {}
   const r = evaluate(meta(), f)
   const failed = failedNames(r)
   const required = [...Object.values(REQUIRED.fresh.drivers as Json), ...Object.values(REQUIRED.upgrade.drivers as Json)].reduce((n: number, d: Json) => n + d.ids.length, 0)

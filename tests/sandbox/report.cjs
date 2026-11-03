@@ -47,9 +47,10 @@ function overPrevious(n, pre) {
   return {
     drivers: {
       [`${pre}-mark`]: { scenario: n, ids: ['4.settings-saved', '4.login-registered'], facts: ['version'] },
-      [`${pre}-after`]: { scenario: n, ids: ['4.settings-kept', '4.theme-applied', '4.combwork-runs', '4.local-moved', '4.roaming-moved', '4.record', '4.login-moved', '4.no-fallback'], facts: ['version'] }
+      [`${pre}-after`]: { scenario: n, ids: ['4.settings-kept', '4.theme-applied', '4.combwork-runs', '4.local-moved', '4.roaming-moved', '4.record', '4.login-moved', '4.no-fallback'], facts: ['version'] },
+      [`${pre}-notify`]: { scenario: n, ids: [`${n}.notification`], facts: ['exe'] }
     },
-    shots: [`${pre}-mark-before-upgrade.png`, `${pre}-desktop-before.jpg`, `${pre}-desktop-after.jpg`, `${pre}-after-after-upgrade-light.png`, `${pre}-after-after-upgrade-dark.png`]
+    shots: [`${pre}-mark-before-upgrade.png`, `${pre}-desktop-before.jpg`, `${pre}-desktop-after.jpg`, `${pre}-after-after-upgrade-light.png`, `${pre}-after-after-upgrade-dark.png`, `${pre}-toast.jpg`]
   }
 }
 
@@ -157,6 +158,7 @@ function evaluate(meta, files) {
       const run = [].concat(newSt.run || [])
       add(n, "Hive Desktop's Launch at login removed by the installer", !run.some(v => /\\Hive\.exe/i.test(v.command)), JSON.stringify(run))
     }
+    driver(kind, `${pre}-notify`)
     const after = driver(kind, `${pre}-after`)
     if (after?.facts?.version !== undefined) add(n, `After the upgrade the app reports ${version}`, after.facts.version === version, `reports ${after.facts.version}`)
   }
