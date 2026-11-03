@@ -5,6 +5,9 @@
 ### Changed
 
 - **Your data folders are now Combwork's** (HI-2461), part of the app's rename to Combwork: `%APPDATA%\Hive` becomes `%APPDATA%\Combwork`, and `%LOCALAPPDATA%\Hive` (accounts and their sign-ins) becomes `%LOCALAPPDATA%\Combwork`. The installer renames them while Hive is closed, with your settings, usage and logs. Until they are renamed, Hive keeps running from the old folders and a notice at start says so. After the move, a connection whose sign-in didn't carry across is named once, so you can sign in to it again.
+### Added
+
+- **Agents can attach files to cards from a folder you choose** (HI-2480). Agents, the Assistant and scripts could attach only files from their project's folders, the workspace and the temp folder, so evidence kept in a folder of your own had to be copied into Temp first. **Settings → Advanced → Card attachments: more folders** lists more folders they may attach from, for all of Hive or just the workspace (`%LOCALAPPDATA%\…` works). Only you can change it, not the Assistant, and another project's folders and Hive's own stay off limits. A refused file now says which folders are accepted and where to add one.
 
 ### Fixed
 

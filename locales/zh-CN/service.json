@@ -42,6 +42,7 @@
   "service.cardAttach.noCard": "没有这张卡片。",
   "service.cardAttach.noProject": "{project} 不是工作区中的项目。未附加任何内容。",
   "service.cardAttach.refused": "{path} 不是可在此附加的文件：请提供你自己项目（其文件夹、其槽位）或临时文件夹中文件的路径。未附加任何内容。",
+  "service.cardAttach.refusedFrom": "{path} 不是可在此附加的文件。文件可以来自{caller, select, agent {你自己的项目（其文件夹、其槽位）} other {工作区及其项目}}、临时文件夹（{temp}）{more, select, yes {，以及“设置”→“高级”→“卡片附件：更多文件夹”中的文件夹（{folders}）} other {}}。要从其他文件夹附加，需由用户在那里添加（“设置”→“高级”→“卡片附件：更多文件夹”，针对 Hive 或此工作区）：不要把文件复制到临时文件夹。未附加任何内容。",
   "service.cardAttach.tooLarge": "{name} 超过 {max}，即卡片单个文件可保留的上限（“设置”→“高级”→“卡片附件：最大文件”）。未附加任何内容。",
   "service.cardAttach.tooMuch": "一次最多可附加 {files, number} 个文件、{total}。未附加任何内容。",
   "service.cardCleanup.stale": "此列表已过期：没有删除任何内容。请重新打开“立即清理…”。",

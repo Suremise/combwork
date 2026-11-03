@@ -119,6 +119,8 @@
   "tips.cardAttachments.title": "Mantenha uma captura com seu cartão",
   "tips.cardAttachmentsCleanup.text": "Os arquivos guardados com um cartão vão para a Lixeira 30 dias depois de ele ser arquivado. Escolha 3, 7 ou 90 dias, ou Nunca, em Configurações do projeto → Armazenamento, onde Limpar agora… remove na hora o que já venceu. Cartões abertos e concluídos mantêm os seus.",
   "tips.cardAttachmentsCleanup.title": "As capturas dos cartões arquivados se limpam sozinhas",
+  "tips.cardAttachmentsFolders.text": "Os agentes anexam arquivos aos cartões a partir do próprio projeto e da pasta temporária. Guarda evidências de teste em uma pasta sua? Adicione-a em Configurações → Avançado → Anexos de cartões: mais pastas, e eles poderão anexar de lá sem copiar para o Temp.",
+  "tips.cardAttachmentsFolders.title": "Deixe os agentes anexarem suas evidências de teste onde elas estão",
   "tips.cardCost.text": "O painel de um cartão diz o que os agentes dele usaram enquanto estavam com ele, “{example}”, com as partes e os tokens do executor e do revisor ao passar o mouse. Desempenho lista o custo de cada cartão, e a dica de uma raia no painel Progresso mostra o custo extra dela.",
   "tips.cardCost.title": "Quanto um cartão custou",
   "tips.cardCostRounds.text": "A seção Trabalho de um cartão termina com o custo por rodada: as partes do executor e do revisor em cada rodada, que somam o custo do cartão. Veja se foram rodadas a mais ou uma leitura longa que o aumentaram.",

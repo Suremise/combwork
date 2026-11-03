@@ -171,6 +171,10 @@
     "defaultMessage": "{path} is not a file that can be attached here: give the path of a file of your own project (its folder, its slots) or of the temp folder. Nothing was attached.",
     "description": "An error attaching a file to a card by its path (HI-1700): it is missing, a folder or a link, or in a place the caller may not attach from (another project, Hive’s own folders). Nothing was attached."
   },
+  "service.cardAttach.refusedFrom": {
+    "defaultMessage": "{path} is not a file that can be attached here. Files can come from {caller, select, agent {your own project (its folder, its slots)} other {the workspace and its projects}}, the temp folder ({temp}){more, select, yes { and the folders of Settings → Advanced → Card attachments: more folders ({folders})} other {}}. To attach from another folder, the user adds it there (Settings → Advanced → Card attachments: more folders, Hive's or this workspace's): don't copy the file into the temp folder. Nothing was attached.",
+    "description": "An error attaching a file to a card by its path (HI-1700, HI-2480): it is missing, a folder or a link, or in a place the caller may not attach from. {caller} is agent for a project's agent, else the Assistant or a script; {temp} is the temp folder's path; {more} is yes when the user listed more folders, {folders} those folders. Card attachments: more folders is an advanced setting's title: use it as Settings shows it. Nothing was attached."
+  },
   "service.cardAttach.tooLarge": {
     "defaultMessage": "{name} is larger than {max}, the most a card keeps in one file (Settings → Advanced → Card attachments: largest file). Nothing was attached.",
     "description": "An error attaching files to a card (HI-1700): one is larger than the limit ({max}: a size such as 25 MB); none of them was attached."

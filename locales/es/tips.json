@@ -119,6 +119,8 @@
   "tips.cardAttachments.title": "Conserva una captura con su tarjeta",
   "tips.cardAttachmentsCleanup.text": "Los archivos guardados con una tarjeta van a la Papelera de reciclaje 30 días después de archivarla. Elige 3, 7 o 90 días, o Nunca, en Configuración del proyecto → Almacenamiento, donde Limpiar ahora… quita al momento lo que ya toca. Las tarjetas abiertas y las de Hecho conservan los suyos.",
   "tips.cardAttachmentsCleanup.title": "Las capturas de las tarjetas archivadas se limpian solas",
+  "tips.cardAttachmentsFolders.text": "Los agentes adjuntan archivos a las tarjetas desde su propio proyecto y la carpeta temporal. ¿Guardas las pruebas en una carpeta propia? Añádela en Configuración → Avanzado → Adjuntos de tarjetas: más carpetas, y podrán adjuntar desde allí sin copiar a Temp.",
+  "tips.cardAttachmentsFolders.title": "Deja que los agentes adjunten tus pruebas donde están",
   "tips.cardCost.text": "El panel de una tarjeta dice lo que usaron sus agentes mientras la tenían, “{example}”, con las partes del autor y del revisor y los tokens al pasar el puntero. Rendimiento muestra el costo de cada tarjeta, y al pasar el puntero por un carril en el panel Progreso, sus gastos generales.",
   "tips.cardCost.title": "Lo que costó una tarjeta",
   "tips.cardCostRounds.text": "La sección Trabajo de una tarjeta termina con su costo por ronda: las partes del autor y del revisor en cada ronda, que suman el costo de la tarjeta. Mira si lo causaron rondas de más o una lectura larga.",

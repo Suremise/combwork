@@ -42,6 +42,7 @@
   "service.cardAttach.noCard": "No existe esa tarjeta.",
   "service.cardAttach.noProject": "{project} no es un proyecto del espacio de trabajo. No se adjuntó nada.",
   "service.cardAttach.refused": "{path} no es un archivo que se pueda adjuntar aquí: indica la ruta de un archivo de tu propio proyecto (su carpeta, sus slots) o de la carpeta temporal. No se adjuntó nada.",
+  "service.cardAttach.refusedFrom": "{path} no es un archivo que se pueda adjuntar aquí. Los archivos pueden venir de {caller, select, agent {tu propio proyecto (su carpeta, sus slots)} other {el espacio de trabajo y sus proyectos}}, la carpeta temporal ({temp}){more, select, yes { y las carpetas de Configuración → Avanzado → Adjuntos de tarjetas: más carpetas ({folders})} other {}}. Para adjuntar desde otra carpeta, el usuario la añade allí (Configuración → Avanzado → Adjuntos de tarjetas: más carpetas, de Hive o de este espacio de trabajo): no copies el archivo en la carpeta temporal. No se adjuntó nada.",
   "service.cardAttach.tooLarge": "{name} supera {max}, lo máximo que una tarjeta conserva en un archivo (Configuración → Avanzado → Adjuntos de tarjetas: archivo más grande). No se adjuntó nada.",
   "service.cardAttach.tooMuch": "Se pueden adjuntar como máximo {files, number} archivos y {total} a la vez. No se adjuntó nada.",
   "service.cardCleanup.stale": "Esta lista está desactualizada: no se quitó nada. Vuelve a abrir Limpiar ahora…",

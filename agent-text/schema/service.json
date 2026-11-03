@@ -126,6 +126,15 @@
       "path": "plain"
     }
   },
+  "service.cardAttach.refusedFrom": {
+    "placeholders": {
+      "path": "plain",
+      "caller": "select",
+      "temp": "plain",
+      "more": "select",
+      "folders": "plain"
+    }
+  },
   "service.cardAttach.tooLarge": {
     "placeholders": {
       "name": "plain",
