@@ -2353,6 +2353,10 @@
     "text": "{title} isn't a value that can be set this way ({why}): change it in {path}.",
     "note": "hive_update_setting on a setting with no value the tools set. {why} is settings.agent.error.isAction or why it is read-only; {path} where the user changes it."
   },
+  "settings.agent.error.notSettableHere": {
+    "text": "{title} isn't a value the settings tools set: change it in {path}.",
+    "note": "hive_update_setting on a setting Settings edits with a control of its own that the tools don't set (Accounts & Connections, MCP catalogues, check commands…), neither an action nor read-only (HI-2470). {path} is where the user changes it."
+  },
   "settings.agent.error.oneLine": {
     "text": "{title} takes one line of text (at most {most} characters).",
     "note": "Text too long or with line breaks. {most} is a number as written."

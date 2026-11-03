@@ -179,6 +179,22 @@ describe('the settings catalog', () => {
     for (const id of ['claude-code.prices', 'codex.modelFallback', 'claude-code.effortFallback', 'board.colors']) expect(settingKind(entry(id)), id).toBe('table')
   })
 
+  it("says why a value can't be set, and where the user sets it, its level too (HI-2470)", () => {
+    // A level default's read-only reason names the path Settings has, with its level.
+    expect(settingReadOnly(entry('workspace.workflow.git.maxAgents'))).toBe("Maximum agents is the user's team size, the most agents you may add: only the user can change it, in Settings → Version Control → Workspace defaults → Maximum agents.")
+    expect(settingReadOnly(entry('workflow.git.maxAgents'))).toContain('in Settings → Version Control → Hive defaults → Maximum agents.')
+    expect(settingReadOnly(entry('assistant.control'))).toBe("These are the Assistant's own permissions: only the user can change it, in Settings → Assistant → Control.")
+    // A control of Settings' own the tools don't set: no "(undefined)", whatever it is.
+    for (const id of ['accounts.list', 'assistant.journal', 'mcpCatalogs.sources', 'workflow.git.preChecks', 'workspace.workflow.none.stageNames']) {
+      const e = entry(id)
+      expect(settingKind(e), id).toBeNull()
+      expect(checkSettingValue(e, 'x'), id).toEqual({ error: `${e.title} isn't a value the settings tools set: change it in ${settingPath(e)}.` })
+    }
+    // An action and a read-only one keep their reason.
+    expect(checkSettingValue(entry('advanced.reset'), 'x')).toEqual({ error: "Reset all settings isn't a value that can be set this way (it is a button, a status or a list): change it in Settings → Advanced → Reset all settings." })
+    expect(checkSettingValue(entry('keybindings.editor'), 'x')).toMatchObject({ error: expect.stringMatching(/\(Shortcuts are read-only to the Assistant for now: the user changes them in Settings → Keyboard Shortcuts → .+\.\): change it in Settings → Keyboard Shortcuts → /) })
+  })
+
   it("checks tables: column colours, prices, fallback lists (null puts back Hive's)", () => {
     const v = (id: string, x: unknown) => checkSettingValue(entry(id), x)
     expect(v('board.colors', { doing: '#FF0000' })).toEqual({ value: { doing: '#ff0000' } })

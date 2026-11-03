@@ -1073,11 +1073,8 @@ export function agentSetting(e: SettingEntry): { title: string; desc: string; ti
 /** A setting's title as an agent reads it (agentSetting's). */
 export const agentTitle = (e: SettingEntry): string => agentText(e.text.title) // agent-text: APP_ROWS, PROJECT_ROWS, levelRows, advancedRows, providerRows, optionRows, workflowRows, slotCopyRow, LANGUAGE_TEXT
 
-/**
- * Why the Assistant can't change it, with where the user does (undefined: it can). Its path is the section's and the
- * title's alone, as it always was: a level default's names no level part (HI-2470).
- */
-export const settingReadOnly = (e: SettingEntry): string | undefined => (e.readOnly ? say(e.readOnly, { path: settingPathOf({ section: e.section, text: e.text }, e.scope, agentText) }) : undefined)
+/** Why the Assistant can't change it, with where the user does, a level default's level too (undefined: it can; HI-2470). */
+export const settingReadOnly = (e: SettingEntry): string | undefined => (e.readOnly ? say(e.readOnly, { path: settingPath(e) }) : undefined)
 
 /** When it is worth suggesting (undefined: no signal recorded). */
 export const settingHelps = (e: SettingEntry): string | undefined => (e.helps ? say(e.helps) : undefined)
@@ -1177,6 +1174,7 @@ const AGENT = {
   // Why a value isn't taken.
   notSettable: agentMsg({ id: 'settings.agent.error.notSettable', text: "{title} isn't a value that can be set this way ({why}): change it in {path}.", note: "hive_update_setting on a setting with no value the tools set. {why} is settings.agent.error.isAction or why it is read-only; {path} where the user changes it." }),
   isAction: agentMsg({ id: 'settings.agent.error.isAction', text: 'it is a button, a status or a list', note: "Why a setting has no value to set: it is a button, a status or a list (inside settings.agent.error.notSettable's brackets)." }),
+  notSettableHere: agentMsg({ id: 'settings.agent.error.notSettableHere', text: "{title} isn't a value the settings tools set: change it in {path}.", note: "hive_update_setting on a setting Settings edits with a control of its own that the tools don't set (Accounts & Connections, MCP catalogues, check commands…), neither an action nor read-only (HI-2470). {path} is where the user changes it." }),
   unknownAdvanced: agentMsg({ id: 'settings.agent.error.unknownAdvanced', text: "{title} isn't known.", note: 'An advanced setting this version of Hive has no definition of.' }),
   boolean: agentMsg({ id: 'settings.agent.error.boolean', text: '{title} takes true or false.', note: 'A value that is not a boolean. true and false are the values as written: keep them.' }),
   notNumber: agentMsg({ id: 'settings.agent.error.notNumber', text: '{title} takes a number{hasOff, select, yes { (0 for {off})} other {}}{inherit, select, yes {, or null to inherit} other {}}.', note: "A value that isn't a number. {off} is the label 0 stands for (Never); inherit is yes where null inherits Hive's value." }),
@@ -1292,8 +1290,11 @@ function checkTable(e: SettingEntry, raw: unknown): { value: unknown } | { error
  */
 export function checkSettingValue(e: SettingEntry, raw: unknown, ctx: SettingContext = {}): { value: unknown } | { error: string } {
   const kind = settingKind(e)
-  // A custom control the tools don't set, with no reason recorded, has always said "undefined" here.
-  if (!kind) return { error: say(AGENT.notSettable, { title: agentTitle(e), why: e.action ? say(AGENT.isAction) : String(settingReadOnly(e)), path: settingPath(e) }) }
+  if (!kind) {
+    // A control of Settings' own that the tools don't set, with no reason recorded, says so (HI-2470: it said "(undefined)").
+    const why = e.action ? say(AGENT.isAction) : settingReadOnly(e)
+    return { error: why ? say(AGENT.notSettable, { title: agentTitle(e), why, path: settingPath(e) }) : say(AGENT.notSettableHere, { title: agentTitle(e), path: settingPath(e) }) }
+  }
   // An advanced value: as advanced.json takes it; null puts the default back (a workspace's: Settings → Advanced's).
   if (e.advanced) {
     if (raw === null || (e.advanced.scope === 'workspace' && raw === 'inherit')) return { value: null }
