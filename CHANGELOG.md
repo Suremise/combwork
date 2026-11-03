@@ -17,6 +17,9 @@
 - **DOMPurify 3.4.17.** Hive cleans the Markdown it shows (cards, comments, docs, agents' messages) and the Files tab's editor with DOMPurify, and 3.4.16 has three advisories. None applied to how Hive or the editor use it (they need options neither sets), but the fixed version now ships (HI-2421).
 - **An agent's event stream ends when the agent does.** A program following Hive's events with an agent's own token (`GET /v1/events`) kept receiving its project's events after that agent stopped or restarted, though every new request with the token was refused. Now the stream closes as soon as the token stops working, as a revoked viewer token's streams do (HI-2416).
 - **A settings file Hive can't read is never saved over** (HI-2414). When one of Hive's files, such as a project's `project.json`, is there but can't be read for a moment (another program has it locked, or a disk error), a change to it is now refused with *… couldn't be read: nothing was changed*, and the file and its `.bak` copy are kept as they are. Before, Hive could take it for a new file and save its defaults over the project's agents and settings, and over the backup too.
+### Fixes
+
+- **A background task's end is no longer reported as your reply.** When a Claude Code agent's background task ended soon after you pressed Enter in its pane (answering a permission question, say), Hive could tell the Hive Assistant that you had replied to the agent with the task's notification. Only what you send counts as your reply now (HI-2410).
 
 ## 1.0.0 — 2026-11-03
 

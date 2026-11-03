@@ -145,6 +145,8 @@ interface HiveMessageValues {
   'settings.advanced.claude-code.override.statusLine.title': undefined
   'settings.advanced.claude-code.prompt.clearKeySeconds.desc': undefined
   'settings.advanced.claude-code.prompt.clearKeySeconds.title': undefined
+  'settings.advanced.claude-code.prompt.cliTurn.desc': undefined
+  'settings.advanced.claude-code.prompt.cliTurn.title': undefined
   'settings.advanced.claude-code.retry.attemptField.desc': undefined
   'settings.advanced.claude-code.retry.attemptField.title': undefined
   'settings.advanced.claude-code.retry.checkAfterSeconds.desc': undefined

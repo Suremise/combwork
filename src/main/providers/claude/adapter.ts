@@ -766,9 +766,13 @@ export class ClaudeCodeAdapter implements ProviderAdapter {
       case 'SessionStart':
         out.event = { kind: 'start', source: typeof body.source === 'string' ? body.source : null }
         break
-      case 'UserPromptSubmit':
-        out.event = { kind: 'prompt', text: typeof body.prompt === 'string' ? body.prompt : null }
+      case 'UserPromptSubmit': {
+        const text = typeof body.prompt === 'string' ? body.prompt : null
+        // A turn Claude Code starts by itself (a background task's end, HI-2410) sends this hook with the same fields as
+        // the user's prompt: only its text tells them apart.
+        out.event = { kind: 'prompt', text, ...(text !== null && advanced.pattern('claude-code.prompt.cliTurn').test(text) ? { cli: true as const } : {}) }
         break
+      }
       case 'PreToolUse': {
         out.event = { kind: 'toolStart' }
         const input = body.tool_input ?? {}

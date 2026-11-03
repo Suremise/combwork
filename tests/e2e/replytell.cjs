@@ -1,7 +1,7 @@
 // The user's replies to agents told to the Assistant (#418), on fake Claude Code sessions (fake-claude/): the Assistant
 // watches a card (hive_wait_for_tasks with wake); the user answers the card's agent by typing in its pane, and the
 // Assistant is woken once with the reply's first line. Not for keystrokes without Enter, nor for a line Hive types into
-// the agent, nor with Settings → Assistant → Tell the Assistant when I reply to an agent off. Dev build, throwaway
+// the agent, nor for a turn its CLI starts by itself after the user's Enter (HI-2410: a background task's end), nor with Settings → Assistant → Tell the Assistant when I reply to an agent off. Dev build, throwaway
 // profile, workspace and CLAUDE_CONFIG_DIR.
 const lib = require('./lib.cjs')
 const { _electron } = require('playwright-core')
@@ -130,6 +130,21 @@ const check = (name, ok, extra = '') => {
   await type(alpha, builder.id, 'Go ahead and push')
   const told = await until(() => wakes().slice(before).find((x) => x.startsWith('[Hive] Darren replied to Builder (alpha): "Go ahead and push"')), HUNG_MS)
   check('the reply reaches the Assistant within seconds with no watch of its own (#1099)', !!told && Date.now() - t0 < 15000, JSON.stringify({ wakes: wakes().slice(before), ms: Date.now() - t0 }))
+
+  // HI-2410: a turn Claude Code starts by itself (a background task's end, its prompt hook a <task-notification>) soon
+  // after the user pressed Enter in the pane (answering a dialog, say: no prompt of theirs) isn't the user's reply.
+  await until(() => idle(alpha, builder.id), HUNG_MS)
+  const b0 = wakes().length
+  await type(alpha, builder.id, 'background 8')
+  check("the user's prompt that starts a background task is told", !!(await until(() => wakes().slice(b0).find((x) => x.startsWith('[Hive] Darren replied to Builder (alpha): "background 8"')), HUNG_MS)), JSON.stringify(wakes().slice(b0)))
+  // Its turn is over, the task runs on: the user's Enter, with nothing typed, before the task ends.
+  check('Builder waits on its background task', !!(await until(async () => (await live(alpha, builder.id))?.status === 'background', HUNG_MS)), (await live(alpha, builder.id))?.status)
+  await inv('pty:write', lib.ptyKey(alpha, builder.id), '\r')
+  // The task ends: its own turn starts and ends.
+  check("the task's end starts a turn by itself", !!(await until(async () => (await live(alpha, builder.id))?.status === 'working', HUNG_MS)), (await live(alpha, builder.id))?.status)
+  await until(() => idle(alpha, builder.id), HUNG_MS)
+  await lib.sleep(2000) // A fixed wait on purpose: this checks that the task's turn tells nothing.
+  check("the task's own turn isn't told as the user's reply", wakes().length === b0 + 1 && !wakes().some((x) => x.includes('task-notification')), JSON.stringify(wakes().slice(b0)))
 
   await app.close()
   console.log(failed ? `\n${failed} FAILED` : '\nALL PASSED')

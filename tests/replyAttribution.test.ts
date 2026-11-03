@@ -3,6 +3,8 @@
 // confirm loop, before `typed` was recorded); or a launch's task on its command line was taken just after the user
 // answered its start screen. With the real SessionManager on a stand-in Claude Code input: no reply is told for Hive's
 // line or task; the user's own prompt after it still is.
+import { readFileSync } from 'node:fs'
+import { join } from 'node:path'
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import { claudeInput } from './claudeInputStandIn'
 
@@ -98,5 +100,47 @@ describe("Hive's own line isn't the user's reply (HI-2218)", () => {
     sessions.noteUserInput(pty, 'Blue\r')
     prompted(e, 'Blue')
     expect(replies).toEqual(['Blue'])
+  })
+})
+
+describe("a turn Claude Code starts by itself isn't the user's reply (HI-2410)", () => {
+  // Claude Code 2.1.317's prompt hooks: the user's prompt, then the turn it started when that prompt's background
+  // command ended. The same fields; only the text differs.
+  const recorded = (JSON.parse(readFileSync(join(__dirname, 'fixtures/advanced/prompt-task-notification-claude-2.1.317.json'), 'utf8')) as { hooks: Record<string, unknown>[] }).hooks
+  /** Its CLI sends a recorded hook, read by the adapter as it would be. */
+  const sent = (e: Entry, body: Record<string, unknown>): void => {
+    const ev = claudeCode.normalizeHook(body).event
+    s.carryOut(key, e, hookStep(ev, s.statusInput(e) as never), 'Hook', ev)
+  }
+
+  afterEach(() => {
+    s.live.delete(key)
+    s.userInput.delete(pty)
+    s.userEnter.delete(pty)
+    echo.to = null
+    vi.restoreAllMocks()
+  })
+
+  it('reads the recorded hooks: the task\'s wake is the CLI\'s own prompt, the user\'s is not', () => {
+    expect(recorded.map((b) => b.hook_event_name)).toEqual(['UserPromptSubmit', 'UserPromptSubmit'])
+    expect(Object.keys(recorded[0]).sort()).toEqual(Object.keys(recorded[1]).sort())
+    expect(claudeCode.normalizeHook(recorded[0]).event).toEqual({ kind: 'prompt', text: 'run a background task' })
+    expect(claudeCode.normalizeHook(recorded[1]).event).toMatchObject({ kind: 'prompt', cli: true })
+  })
+
+  it("the user's Enter (a permission dialog answered), then a background task's end: no reply; the user's own prompt after it is one", () => {
+    const replies: string[] = []
+    vi.spyOn(sessions, 'userReplied').mockImplementation((_p, _a, _n, text) => void replies.push(text))
+    const e = running()
+    sent(e, recorded[0])
+    // The user answers a permission dialog in the pane with Enter: no prompt of theirs. Within 15 s the task ends.
+    sessions.noteUserInput(pty, '\r')
+    sent(e, recorded[1])
+    expect(replies, "the task's wake is told as nobody's reply").toEqual([])
+    expect(e.prompts, 'it is still a turn').toBe(2)
+    // The user then sends a prompt of their own: told.
+    sessions.noteUserInput(pty, 'Green\r')
+    sent(e, { ...recorded[0], prompt: 'Green' })
+    expect(replies).toEqual(['Green'])
   })
 })

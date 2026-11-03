@@ -143,6 +143,8 @@
   "settings.advanced.claude-code.override.statusLine.title": "用 Hive 的状态行代替你的",
   "settings.advanced.claude-code.prompt.clearKeySeconds.desc": "Claude Code 的 Ctrl+U 只会删除折行成多行的草稿中的一行，所以 Hive 在输入前会一次按一个 Ctrl+U，直到输入框（屏幕：输入框）显示为空。这是 Hive 等待 Claude Code 显示每次按键效果的时间。未能及时显示时，Hive 不输入任何内容，稍后再试：设得太短，Claude Code 忙碌时 Hive 会更频繁地推迟消息。",
   "settings.advanced.claude-code.prompt.clearKeySeconds.title": "清除输入：每个按键的等待时间",
+  "settings.advanced.claude-code.prompt.cliTurn.desc": "Claude Code 自行开始一个轮次时（例如后台任务结束时），提示钩子文本的开头。Hive 从不把这样的轮次当作你的回复告诉 Hive Assistant。若设置有误，你在智能体窗格中按下 Enter 后不久结束的后台任务可能会被当作你的回复。",
+  "settings.advanced.claude-code.prompt.cliTurn.title": "提示钩子：Claude Code 自己的轮次",
   "settings.advanced.claude-code.retry.attemptField.desc": "该条目中表示第几次尝试（1、2…）的字段。设置错误时，等待中的智能体只会显示“工作中”。",
   "settings.advanced.claude-code.retry.attemptField.title": "会话记录：重试条目的尝试字段",
   "settings.advanced.claude-code.retry.checkAfterSeconds.desc": "工作中的 Claude Code 会话在没有任何钩子多久之后，Hive 会到其会话记录的末尾查找重试模型请求的等待；之后在它保持安静期间每 15 秒查看一次。",

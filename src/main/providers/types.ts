@@ -230,8 +230,9 @@ export type HookEvent =
   /**
    * A prompt the CLI took: `text`, what it says (when the CLI reports it), for telling who sent what (#418).
    * `injected`: one Hive put into the running turn itself (the turn ledger knows it, #648): not a new prompt.
+   * `cli`: one the CLI started by itself (Claude Code's task-notification wake, HI-2410): a turn, never the user's words.
    */
-  | { kind: 'prompt'; text?: string | null; injected?: true }
+  | { kind: 'prompt'; text?: string | null; injected?: true; cli?: true }
   /** `resumes`: the tool starts a turn Hive took as over, or one it saw no prompt for (the turn ledger says, #648). */
   | { kind: 'toolStart'; resumes?: true }
   /** `call`: which tool call ended, when the CLI says (see Ask.call). */

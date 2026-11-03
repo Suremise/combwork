@@ -575,6 +575,14 @@
     "defaultMessage": "Clearing the input: wait for each key",
     "description": "An advanced setting's title (Settings → Advanced), listed under its CLI or Hive."
   },
+  "settings.advanced.claude-code.prompt.cliTurn.desc": {
+    "defaultMessage": "What a prompt hook's text starts with when Claude Code starts a turn by itself, such as when a background task ends. Hive never reports such a turn to the Hive Assistant as your reply. Wrong, a background task's end soon after you pressed Enter in the agent's pane can be reported as your reply.",
+    "description": "What the advanced setting \"Prompt hook: Claude Code's own turn\" is for, and what goes wrong when it is wrong (Settings → Advanced)."
+  },
+  "settings.advanced.claude-code.prompt.cliTurn.title": {
+    "defaultMessage": "Prompt hook: Claude Code's own turn",
+    "description": "An advanced setting's title (Settings → Advanced), listed under its CLI or Hive."
+  },
   "settings.advanced.claude-code.retry.attemptField.desc": {
     "defaultMessage": "The field of that entry with which try it is (1, 2…). Wrong, a waiting agent just shows Working.",
     "description": "What the advanced setting \"Transcript: retry entry's try field\" is for, and what goes wrong when it is wrong (Settings → Advanced)."
