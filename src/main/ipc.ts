@@ -483,11 +483,8 @@ export function registerIpc(getAppInfo: () => ReturnType<HiveRequests['app:info'
   }
   /** The window's workspace's dialect files changed (HI-2444): its Dialects view reads them again (the watch also tells it). */
   const dialectsChanged = (): void => contextWorkspace()?.emit({ type: 'dialects-changed' })
-  // A file picked to import is its window's and workspace's: gone with either (HR1 on HI-2444's design).
-  app.on('browser-window-created', (_e, w) => {
-    const id = w.id
-    w.on('closed', () => forgetPicks({ window: id }))
-  })
+  // A file picked to import is its window's and workspace's: gone with either (HR1 on HI-2444's design; a window's
+  // close is index.ts's, where the app's window events are).
   WorkspaceService.closingListeners.add((path) => forgetPicks({ hiveDir: join(path, HIVE_DIR) }))
   /** The window the current request came from. */
   const win = (): BrowserWindow => {
