@@ -96,6 +96,26 @@ describe("a summary's message", () => {
     j.updateEntry(h, all, fact, { summary: 'AM-1 is Done, and shipped' })
     expect(stored(h, fact)).toBeNull()
   })
+
+  // HI-2451: a journal from before the column (version 1) gains it once opened; its entries read as before, with no message.
+  it('is added to a journal written before it, whose entries still read as they were', () => {
+    const h = home()
+    const old = j.writeEntry(h, all, { kind: 'event', summary: 'AM-2 "Old" is Done', detail: 'finish queue', links: [{ type: 'card', ref: '2' }], tags: ['done'] }, 'hive')
+    const before = j.readEntry(h, old)
+    j.closeJournal(h)
+    const raw = new DatabaseSync(j.journalFile(h))
+    try {
+      raw.exec('ALTER TABLE entries DROP COLUMN summary_text; DELETE FROM schema_version WHERE version = 2')
+    } finally {
+      raw.close()
+    }
+    expect(j.readEntry(h, old)).toEqual(before)
+    expect(stored(h, old)).toBeNull()
+    expect(j.recall(h, { query: 'Old' }).map((r) => r.id)).toEqual([old])
+    const text = { id: 'lane.journal.fact', values: { named: 'no', name: '', state: 'started', commit: '', who: 'B1 / R1', cards: 'AM-2' } }
+    const fact = j.writeEntry(h, all, { kind: 'event', summary: 'Lane B1 / R1 started: AM-2', summaryText: text }, 'hive')
+    expect(JSON.parse(stored(h, fact)!)).toEqual(text)
+  })
 })
 
 describe('the scope', () => {
