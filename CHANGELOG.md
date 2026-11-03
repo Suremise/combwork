@@ -4,6 +4,7 @@
 
 ### Fixed
 
+- **A notification kept only in the bell closes a tip that is showing.** With *Show pop-ups about agents for* set to None, an agent needing you went to the bell, but a tip on screen stayed there until you closed it. Any notification arriving now closes it, as the user guide says.
 - **A card read with `comments: 0` gives none of its comments.** `hive_read_task` with `comments: 0`, asked for so as not to see a card's comments, returned every one of them; the Agent API refused `comments=0`. Both now give no comments, with `commentsOmitted` counting them, and none of their attachments (HI-2412).
 ### Fixes
 
