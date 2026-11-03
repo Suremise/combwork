@@ -434,7 +434,7 @@
   "tips.shareTemplates.title": "Udostępniaj szablony agentów",
   "tips.sharedNotes.text": "Notatki wspólne i przekazania są przechowywane w obszarze roboczym, więc agenci każdego projektu mogą je czytać narzędziami Combwork.",
   "tips.sharedNotes.title": "Notatki wspólne dla wszystkich projektów",
-  "tips.signInExpired.text": "Jeśli logowanie w Claude Code lub Codex wygaśnie, jego agenci pokazują Wymaga logowania (fioletowa kropka), a Hive raz Cię o tym informuje. Zaloguj się ponownie, a potem Wznów wszystkich agentów w nagłówku projektu wznowi tych, którzy się zatrzymali.",
+  "tips.signInExpired.text": "Jeśli logowanie w Claude Code lub Codex wygaśnie, jego agenci pokazują Wymaga logowania (fioletowa kropka), a Combwork raz Cię o tym informuje. Zaloguj się ponownie, a potem Wznów wszystkich agentów w nagłówku projektu wznowi tych, którzy się zatrzymali.",
   "tips.signInExpired.title": "Gdy logowanie wygaśnie",
   "tips.silentUnknown.text": "Combwork nigdy nie zgaduje, że agent jest bezczynny: gdy jego tura od dłuższego czasu milczy bez oznak końca, jego panel to mówi. Jeśli jego terminal czeka na prompt, Oznacz jako bezczynny to naprawia.",
   "tips.silentUnknown.title": "Agent milczy, a jego stan jest nieznany",

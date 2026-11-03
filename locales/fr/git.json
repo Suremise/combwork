@@ -124,7 +124,7 @@
   "git.init.kept": "Son propre .gitignore est conservé.",
   "git.init.looking": "Examen du dossier…",
   "git.init.makeFirstCommit": "Faire le premier commit",
-  "git.init.makes": "Hive fait du projet {name} un dépôt git sur une branche nommée main, garde son .hive hors de git et {empty, select, yes {fait un premier commit vide (rien à y mettre pour l’instant)} other {fait un premier commit avec tout le contenu du dossier}}, pour que les agents puissent travailler tout de suite dans des worktrees.",
+  "git.init.makes": "Combwork fait du projet {name} un dépôt git sur une branche nommée main, garde son .hive hors de git et {empty, select, yes {fait un premier commit vide (rien à y mettre pour l’instant)} other {fait un premier commit avec tout le contenu du dossier}}, pour que les agents puissent travailler tout de suite dans des worktrees.",
   "git.init.namePlaceholder": "Prénom Nom",
   "git.init.nested": "Le projet se trouve dans le dépôt git du dossier {folder} : un dépôt dans un autre est en général une erreur, et celui-ci ne verra plus les fichiers d’ici comme les siens.",
   "git.init.nestedAnyway": "Créer quand même un dépôt distinct dans {folder}",

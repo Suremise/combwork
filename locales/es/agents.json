@@ -304,7 +304,7 @@
   "agents.provider.lastTurn": "{input, number} de entrada + {output, number} de salida en el último turno (razonamiento incluido)",
   "agents.resume.goneWorktree": "Se ejecutó en un worktree que ya no usa ningún agente ({folder}). Agrega un agente para ese worktree para reanudarla.",
   "agents.resume.hold.after": "{agent} está con {kind, select, card {{work}} other {su carril}} en {slot}: reanuda esta conversación después de {kind, select, card {{work}} other {su carril}}.",
-  "agents.resume.hold.byHand": "Su slot ({slot}) está libre: Reanudar lo vuelve a tomar para {agent}. Reanudar todos y el inicio de Hive lo dejan, para que los slots libres queden para trabajo nuevo.",
+  "agents.resume.hold.byHand": "Su slot ({slot}) está libre: Reanudar lo vuelve a tomar para {agent}. Reanudar todos y el inicio de Combwork lo dejan, para que los slots libres queden para trabajo nuevo.",
   "agents.resume.hold.changed": "El slot de esta conversación ({slot}) cambió desde que se ejecutó, así que no puede reanudarse allí. Lee su transcripción o empieza de nuevo con un traspaso.",
   "agents.resume.hold.draining": "El slot de esta conversación ({slot}) aún se está devolviendo desde su última sesión. Vuelve a intentarlo en un momento.",
   "agents.resume.hold.gone": "El slot de esta conversación ({slot}) ya no está en el disco. Lee su transcripción o empieza de nuevo con un traspaso.",

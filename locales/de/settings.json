@@ -1337,7 +1337,7 @@
   "settings.updates.install.tip": "Automatisch: Das Update wird installiert, wenn du Combwork das nächste Mal beendest (nie während es läuft, damit deine Sitzungen nicht unterbrochen werden); „Neu starten und aktualisieren“ installiert es sofort. Manuell: Es wird nur installiert, wenn du „Neu starten und aktualisieren“ wählst. So oder so fragt Combwork, bevor es arbeitende Agenten stoppt.",
   "settings.updates.install.title": "Updates installieren",
   "settings.updates.prerelease.desc": "Auch Betaversionen anbieten, die vor einem vollständigen Release erscheinen.",
-  "settings.updates.prerelease.tip": "Vorabversionen bekommen neue Funktionen zuerst und können noch Ecken und Kanten haben. Schaltest du das wieder aus, wartet Hive auf das nächste vollständige Release, statt zurückzugehen.",
+  "settings.updates.prerelease.tip": "Vorabversionen bekommen neue Funktionen zuerst und können noch Ecken und Kanten haben. Schaltest du das wieder aus, wartet Combwork auf das nächste vollständige Release, statt zurückzugehen.",
   "settings.updates.prerelease.title": "Vorabversionen einbeziehen",
   "settings.updates.status.tip": "Die Version, die du verwendest, und das Ergebnis der letzten Prüfung.",
   "settings.updates.status.title": "Version von Combwork",

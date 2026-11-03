@@ -1269,7 +1269,7 @@
   "settings.sessions.cacheTtl.option.1h": "1 heure",
   "settings.sessions.cacheTtl.option.5m": "5 minutes",
   "settings.sessions.cacheTtl.option.auto": "Détection automatique",
-  "settings.sessions.cacheTtl.tip": "Détection automatique : Hive déduit le type de cache de la transcription (5 minutes ou 1 heure).",
+  "settings.sessions.cacheTtl.tip": "Détection automatique : Combwork déduit le type de cache de la transcription (5 minutes ou 1 heure).",
   "settings.sessions.cacheTtl.title": "Durée du cache des prompts",
   "settings.sessions.compactSuggestTokens.desc": "Taille du contexte, en jetons, à partir de laquelle le contexte dans le pied du volet d’un agent passe en orange. Jamais : cela n’arrive jamais.",
   "settings.sessions.compactSuggestTokens.off": "Jamais",

@@ -206,7 +206,7 @@
   "session.tracker.body": "{reason}。{detail}“帮助”→“复制诊断信息”会说明原因。",
   "session.tracker.detail": "智能体照常启动，但它们停止时留下运行的进程不会列出，也不会提示结束。",
   "session.tracker.helperFailed": "Combwork 进程跟踪器的 PowerShell 辅助程序未启动（{why}）",
-  "session.tracker.lost": "{launches, plural, =0 {智能体重新启动前，Hive 不会跟踪它们启动的进程。} =1 {正在运行的智能体重新启动前，Hive 不会跟踪它启动的进程。} other {# 个正在运行的智能体重新启动前，Hive 不会跟踪它们启动的进程。}}",
+  "session.tracker.lost": "{launches, plural, =0 {智能体重新启动前，Combwork 不会跟踪它们启动的进程。} =1 {正在运行的智能体重新启动前，Combwork 不会跟踪它启动的进程。} other {# 个正在运行的智能体重新启动前，Combwork 不会跟踪它们启动的进程。}}",
   "session.tracker.lostListed": "{listed, plural, =1 {# 个列为遗留运行的进程不再受跟踪（它仍在运行）。} other {# 个列为遗留运行的进程不再受跟踪（它们仍在运行）。}}{launches, plural, =0 {智能体重新启动前，它们启动的进程也不受跟踪。} =1 {正在运行的智能体重新启动前，它启动的进程也不受跟踪。} other {# 个正在运行的智能体重新启动前，它们启动的进程也不受跟踪。}}",
   "session.tracker.noAnswer": "Combwork 的进程跟踪器没有响应",
   "session.tracker.noPowerShell": "无法启动 PowerShell（{error}）",

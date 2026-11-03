@@ -330,7 +330,7 @@
   "tips.modes.title": "Modi für den Assistenten",
   "tips.moreAgents.text": "Brauchst du mehr als {usual, plural, one {# Agent} other {# Agenten}} in einem Projekt? Erhöhe die Höchstzahl an Agenten unter Versionsverwaltung → Workflow, bis zu {most, number}, und füge sie dann hinzu. Über {usual, number} zeigt sie, was sie kosten: den Speicher, den deine laufenden Agenten belegen, und wie viel frei ist.",
   "tips.moreAgents.title": "Mehr als {usual, plural, one {# Agent} other {# Agenten}}",
-  "tips.moveAnyway.text": "Ziehst du eine Karte an einer Regel ihres Projekts vorbei (etwa nach Erledigt vor ihrem Review), fragt Hive zuerst und nennt die übergangenen Regeln. „Trotzdem verschieben“ vermerkt eine Ausnahme auf der Karte, mit deiner Begründung: Ein offenes Schloss auf der Karte zeigt, wer, welche Regeln und warum.",
+  "tips.moveAnyway.text": "Ziehst du eine Karte an einer Regel ihres Projekts vorbei (etwa nach Erledigt vor ihrem Review), fragt Combwork zuerst und nennt die übergangenen Regeln. „Trotzdem verschieben“ vermerkt eine Ausnahme auf der Karte, mit deiner Begründung: Ein offenes Schloss auf der Karte zeigt, wer, welche Regeln und warum.",
   "tips.moveAnyway.title": "Eine Karte an ihren Regeln vorbei verschieben, mit Begründung",
   "tips.myPrices.text": "Die Kosten von Claude Code sind seine eigene Angabe, aus seiner Preistabelle. Hast du andere Tarife (einen Rabatt, eine andere Stufe)? Stell „Sitzungskosten“ auf „Eigene Preise“, dann berechnet Combwork jede Sitzung nach deiner Tabelle.",
   "tips.myPrices.title": "Eigene Preise für Claude Code",

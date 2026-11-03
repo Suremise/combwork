@@ -457,7 +457,7 @@
   "main.window.reloaded": "Tus agentes siguieron en ejecución.",
   "main.window.reloadedLost": "{n, plural, one {Tus agentes siguieron en ejecución. Se perdieron los cambios sin guardar de un archivo.} many {Tus agentes siguieron en ejecución. Se perdieron los cambios sin guardar de # archivos.} other {Tus agentes siguieron en ejecución. Se perdieron los cambios sin guardar de # archivos.}}",
   "main.window.reloadedTitle": "La ventana de Combwork se detuvo y se recargó",
-  "main.window.stillRunning": "Tus agentes siguen en ejecución: al recargar la ventana, Hive vuelve a conectarse con ellos.",
+  "main.window.stillRunning": "Tus agentes siguen en ejecución: al recargar la ventana, Combwork vuelve a conectarse con ellos.",
   "main.window.stopped": "La ventana de Combwork dejó de funcionar.",
   "main.window.unresponsive": "La ventana de Combwork no responde.",
   "main.window.unresponsiveDetail": "{stillRunning} Espera o recárgala.",

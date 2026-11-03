@@ -46,7 +46,7 @@
   "mcp.catalog.needs": "{name}はこのPCで実行できません：{needs}。",
   "mcp.catalog.no": "満たしていない",
   "mcp.catalog.noMatch": "一致するサーバーはありません。",
-  "mcp.catalog.none": "オンのカタログがありません。「設定」→「MCPカタログ」で、Hiveのカタログをオンにするか、カタログを追加してください。",
+  "mcp.catalog.none": "オンのカタログがありません。「設定」→「MCPカタログ」で、Combworkのカタログをオンにするか、カタログを追加してください。",
   "mcp.catalog.notInstalled": "{name}はこのカタログからインストールされていません。代わりにインストールしてください。",
   "mcp.catalog.notRead": "このカタログを読み込めませんでした：{reason}",
   "mcp.catalog.ok": "満たしている",

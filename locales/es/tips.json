@@ -330,7 +330,7 @@
   "tips.modes.title": "Modos para el Asistente",
   "tips.moreAgents.text": "¿Necesitas más de {usual, plural, one {# agente} many {# agentes} other {# agentes}} en un proyecto? Sube el Máximo de agentes en Control de versiones → Flujo de trabajo, hasta {most, number}, y luego agrégalos. Por encima de {usual, number}, muestra lo que cuestan: la memoria que ocupan tus agentes en ejecución y cuánta queda libre.",
   "tips.moreAgents.title": "Más de {usual, plural, one {# agente} many {# agentes} other {# agentes}}",
-  "tips.moveAnyway.text": "Si arrastras una tarjeta más allá de una regla de su proyecto (a Hecho antes de su revisión, por ejemplo), Hive pregunta primero y nombra las reglas que se salta. Mover de todos modos registra una excepción en la tarjeta, con tu motivo: un candado abierto en la tarjeta indica quién, qué reglas y por qué.",
+  "tips.moveAnyway.text": "Si arrastras una tarjeta más allá de una regla de su proyecto (a Hecho antes de su revisión, por ejemplo), Combwork pregunta primero y nombra las reglas que se salta. Mover de todos modos registra una excepción en la tarjeta, con tu motivo: un candado abierto en la tarjeta indica quién, qué reglas y por qué.",
   "tips.moveAnyway.title": "Mueve una tarjeta saltándote sus reglas, con un motivo",
   "tips.myPrices.text": "El costo de Claude Code es su propia cifra, de su tabla de precios. ¿Tienes otras tarifas (un descuento, otro nivel)? Pon Costos de las sesiones en Mis precios, y Combwork calcula el precio de cada sesión con tu tabla.",
   "tips.myPrices.title": "Tus propios precios para Claude Code",

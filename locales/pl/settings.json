@@ -466,7 +466,7 @@
   "settings.advanced.hive.queue.networkCodes.title": "Kolejka scalania: błędy sieci uznawane za tymczasowe",
   "settings.advanced.hive.queue.signSeconds.desc": "Gdy repozytorium podpisuje swoje commity: jak długo kolejka scalania czeka na swój commit scalenia, razem z hookami, zanim uzna, że program podpisujący czeka na hasło. Wtedy kończy commit, niczego nie zmienia w gałęzi docelowej i wstrzymuje kolejkę z komunikatem „podpisywanie czeka na Ciebie”. Zwiększ tę wartość, gdy podpisywanie lub hooki commitów repozytorium naprawdę trwają dłużej; zbyt długa, a program podpisujący, który czeka na Ciebie, tak długo wstrzymuje kolejkę.",
   "settings.advanced.hive.queue.signSeconds.title": "Kolejka scalania: najdłuższy czas podpisanego commita scalenia",
-  "settings.advanced.hive.recorder.afterSeconds.desc": "Jak długo Hive czeka po wyzwalaczu, zanim zapisze zrzut, żeby zawierał też to, co nastąpiło później: kolejne kroki CLI.",
+  "settings.advanced.hive.recorder.afterSeconds.desc": "Jak długo Combwork czeka po wyzwalaczu, zanim zapisze zrzut, żeby zawierał też to, co nastąpiło później: kolejne kroki CLI.",
   "settings.advanced.hive.recorder.afterSeconds.title": "Rejestrator lotu: oczekiwanie po wyzwalaczu",
   "settings.advanced.hive.recorder.keep.desc": "Ile zrzutów Combwork przechowuje w folderze console-recordings: powyżej tej liczby usuwa najstarsze. Nagrania zrobione przez Ciebie w konsoli deweloperskiej nigdy nie są usuwane.",
   "settings.advanced.hive.recorder.keep.title": "Rejestrator lotu: przechowywane zrzuty",

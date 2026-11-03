@@ -304,7 +304,7 @@
   "agents.provider.lastTurn": "Ostatnia tura (tokeny): wejście {input, number} + wyjście {output, number} (z myśleniem)",
   "agents.resume.goneWorktree": "Działała w worktree, którego nie używa już żaden agent ({folder}). Dodaj agenta dla tego worktree, aby ją wznowić.",
   "agents.resume.hold.after": "Agent {agent} pracuje nad {kind, select, card {kartą {work}} other {swoim torem}} w {slot}: wznów tę rozmowę po zakończeniu {kind, select, card {karty {work}} other {jego toru}}.",
-  "agents.resume.hold.byHand": "Jej slot ({slot}) jest wolny: „Wznów” znów zajmie go dla agenta {agent}. „Wznów wszystkich” i start Hive go pomijają, żeby wolne sloty zostały dla nowej pracy.",
+  "agents.resume.hold.byHand": "Jej slot ({slot}) jest wolny: „Wznów” znów zajmie go dla agenta {agent}. „Wznów wszystkich” i start Combwork go pomijają, żeby wolne sloty zostały dla nowej pracy.",
   "agents.resume.hold.changed": "Slot tej rozmowy ({slot}) zmienił się od jej uruchomienia, więc nie można jej tam wznowić. Przeczytaj jej transkrypcję albo zacznij od nowa z przekazaniem.",
   "agents.resume.hold.draining": "Slot tej rozmowy ({slot}) jest jeszcze zwalniany po jej ostatniej sesji. Spróbuj ponownie za chwilę.",
   "agents.resume.hold.gone": "Slotu tej rozmowy ({slot}) nie ma już na dysku. Przeczytaj jej transkrypcję albo zacznij od nowa z przekazaniem.",

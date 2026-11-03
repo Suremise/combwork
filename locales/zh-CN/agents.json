@@ -304,7 +304,7 @@
   "agents.provider.lastTurn": "上一回合：输入 {input, number} + 输出 {output, number}（含思考）",
   "agents.resume.goneWorktree": "它运行在一个已没有智能体使用的工作树中（{folder}）。请为该工作树添加一个智能体以恢复它。",
   "agents.resume.hold.after": "{agent} 正在 {slot} 中处理{kind, select, card {{work}} other {它的通道}}：请在{kind, select, card {{work}} other {该通道}}结束后再恢复此对话。",
-  "agents.resume.hold.byHand": "它的槽位（{slot}）空闲：“恢复”会再次为 {agent} 占用它。“全部恢复”和 Hive 启动时不会恢复它，以便空闲槽位留给新工作。",
+  "agents.resume.hold.byHand": "它的槽位（{slot}）空闲：“恢复”会再次为 {agent} 占用它。“全部恢复”和 Combwork 启动时不会恢复它，以便空闲槽位留给新工作。",
   "agents.resume.hold.changed": "此对话的槽位（{slot}）在它运行后已发生变化，因此无法在那里恢复。请阅读它的会话记录，或通过交接说明重新开始。",
   "agents.resume.hold.draining": "此对话的槽位（{slot}）仍在从它的上一个会话交还。请稍后再试。",
   "agents.resume.hold.gone": "此对话的槽位（{slot}）已不在磁盘上。请阅读它的会话记录，或通过交接说明重新开始。",

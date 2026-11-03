@@ -304,7 +304,7 @@
   "agents.provider.lastTurn": "直前のターン：入力{input, number}＋出力{output, number}（思考を含む）",
   "agents.resume.goneWorktree": "どのエージェントも使っていないワークツリー（{folder}）で実行されていました。再開するには、そのワークツリーにエージェントを追加してください。",
   "agents.resume.hold.after": "{agent}は{slot}で{kind, select, card {{work}} other {自分のレーン}}に取り組んでいます。{kind, select, card {{work}} other {そのレーン}}が終わってから、この会話を再開してください。",
-  "agents.resume.hold.byHand": "このスロット（{slot}）は空いています。「再開」を押すと、再び{agent}がこのスロットを使います。「すべて再開」とHiveの起動時には再開しないため、空きスロットは新しい作業に使えます。",
+  "agents.resume.hold.byHand": "このスロット（{slot}）は空いています。「再開」を押すと、再び{agent}がこのスロットを使います。「すべて再開」とCombworkの起動時には再開しないため、空きスロットは新しい作業に使えます。",
   "agents.resume.hold.changed": "この会話のスロット（{slot}）は実行後に変更されたため、そこでは再開できません。トランスクリプトを読むか、引き継ぎメモで新しく始めてください。",
   "agents.resume.hold.draining": "この会話のスロット（{slot}）は、最後のセッションからまだ返却中です。少ししてからもう一度試してください。",
   "agents.resume.hold.gone": "この会話のスロット（{slot}）はディスク上にもうありません。トランスクリプトを読むか、引き継ぎメモで新しく始めてください。",

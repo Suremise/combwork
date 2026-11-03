@@ -1,6 +1,6 @@
 {
   "agents.add.add": "Agent hinzufügen",
-  "agents.add.checkingConnection": "Hive prüft, welche Coding-Agenten installiert sind, um die erste Verbindung zu wählen, die laufen kann…",
+  "agents.add.checkingConnection": "Combwork prüft, welche Coding-Agenten installiert sind, um die erste Verbindung zu wählen, die laufen kann…",
   "agents.add.failed": "Agent konnte nicht hinzugefügt werden",
   "agents.add.full": "{limit} Zuerst einen entfernen.",
   "agents.add.nameTaken": "Das Projekt {project} hat schon einen Agenten namens {agent}: Agentennamen sind im ganzen Arbeitsbereich eindeutig.",
@@ -304,7 +304,7 @@
   "agents.provider.lastTurn": "{input, number} Eingabe + {output, number} Ausgabe im letzten Durchgang (Denkprozess eingerechnet)",
   "agents.resume.goneWorktree": "Die Sitzung lief in einem Worktree, den kein Agent mehr nutzt ({folder}). Füge einen Agenten für diesen Worktree hinzu, um sie fortzusetzen.",
   "agents.resume.hold.after": "{agent} arbeitet in {slot} an {kind, select, card {{work}} other {seiner Lane}}: Setze diese Unterhaltung fort, wenn {kind, select, card {{work}} other {die Lane}} beendet ist.",
-  "agents.resume.hold.byHand": "Der Slot dieser Unterhaltung ({slot}) ist frei: „Fortsetzen“ übernimmt ihn wieder für {agent}. „Alle fortsetzen“ und der Start von Hive lassen ihn aus, damit freie Slots für neue Arbeit bleiben.",
+  "agents.resume.hold.byHand": "Der Slot dieser Unterhaltung ({slot}) ist frei: „Fortsetzen“ übernimmt ihn wieder für {agent}. „Alle fortsetzen“ und der Start von Combwork lassen ihn aus, damit freie Slots für neue Arbeit bleiben.",
   "agents.resume.hold.changed": "Der Slot dieser Unterhaltung ({slot}) hat sich seit ihrem Lauf geändert, darum kann sie dort nicht fortgesetzt werden. Lies das Transkript oder beginne mit einer Übergabe neu.",
   "agents.resume.hold.draining": "Der Slot dieser Unterhaltung ({slot}) wird noch von ihrer letzten Sitzung zurückgegeben. Versuche es gleich noch einmal.",
   "agents.resume.hold.gone": "Der Slot dieser Unterhaltung ({slot}) ist nicht mehr auf dem Datenträger. Lies das Transkript oder beginne mit einer Übergabe neu.",

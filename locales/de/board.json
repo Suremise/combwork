@@ -861,7 +861,7 @@
   "board.stalled.startWaiting": "Agent {agent} wartet auf den Start: {why}",
   "board.stalled.wakeUntaken": "Agent {agent} hat den Weckruf, den Combwork für {card} getippt hat, nicht übernommen: Er wartet in der Eingabe des Agenten.",
   "board.start.busy": "{status}. Wähle den Agenten, sobald er untätig ist.",
-  "board.start.checkingConnection": "Hive prüft, welche Coding-Agenten installiert sind, um die erste Verbindung zu wählen, die laufen kann…",
+  "board.start.checkingConnection": "Combwork prüft, welche Coding-Agenten installiert sind, um die erste Verbindung zu wählen, die laufen kann…",
   "board.start.idle": "{status}: bekommt die Karte als nächste Nachricht.",
   "board.start.intro": "Der Agent bekommt die Karte als Prompt (Titel und Beschreibung), und die Karte kommt nach In Arbeit. Ein gestoppter Agent beginnt eine neue Unterhaltung; ein untätiger bekommt sie als nächste Nachricht.",
   "board.start.name": "Name",

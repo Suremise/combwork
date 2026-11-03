@@ -304,7 +304,7 @@
   "agents.provider.lastTurn": "{input, number} en entrée + {output, number} en sortie au dernier tour (réflexion comprise)",
   "agents.resume.goneWorktree": "Elle tournait dans un worktree qu’aucun agent n’utilise plus ({folder}). Ajoute un agent pour ce worktree pour la reprendre.",
   "agents.resume.hold.after": "{agent} travaille sur {kind, select, card {{work}} other {son couloir}} dans {slot} : reprends cette conversation après {kind, select, card {{work}} other {son couloir}}.",
-  "agents.resume.hold.byHand": "Son emplacement ({slot}) est libre : Reprendre l’attribue de nouveau à {agent}. Tout reprendre et le démarrage de Hive le laissent, pour que les emplacements libres restent disponibles pour du nouveau travail.",
+  "agents.resume.hold.byHand": "Son emplacement ({slot}) est libre : Reprendre l’attribue de nouveau à {agent}. Tout reprendre et le démarrage de Combwork le laissent, pour que les emplacements libres restent disponibles pour du nouveau travail.",
   "agents.resume.hold.changed": "L’emplacement de cette conversation ({slot}) a changé depuis qu’elle a tourné, elle ne peut donc pas y reprendre. Lis sa transcription, ou repars de zéro avec une passation.",
   "agents.resume.hold.draining": "L’emplacement de cette conversation ({slot}) est encore en train d’être rendu par sa dernière session. Réessaie dans un instant.",
   "agents.resume.hold.gone": "L’emplacement de cette conversation ({slot}) n’existe plus sur le disque. Lis sa transcription, ou repars de zéro avec une passation.",

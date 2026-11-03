@@ -434,7 +434,7 @@
   "tips.shareTemplates.title": "Partager des modèles d’agents",
   "tips.sharedNotes.text": "Les notes partagées et les passations sont dans l’espace de travail, pour que les agents de chaque projet puissent les lire avec les outils de Combwork.",
   "tips.sharedNotes.title": "Des notes que tous les projets partagent",
-  "tips.signInExpired.text": "Si la connexion de Claude Code ou de Codex expire, ses agents affichent Connexion requise (un point violet) et Hive te prévient une fois. Reconnecte-toi, puis Reprendre tous les agents, dans l’en-tête du projet, relance ceux qui se sont arrêtés.",
+  "tips.signInExpired.text": "Si la connexion de Claude Code ou de Codex expire, ses agents affichent Connexion requise (un point violet) et Combwork te prévient une fois. Reconnecte-toi, puis Reprendre tous les agents, dans l’en-tête du projet, relance ceux qui se sont arrêtés.",
   "tips.signInExpired.title": "Quand une connexion expire",
   "tips.silentUnknown.text": "Combwork ne devine jamais qu’un agent est inactif : quand son tour est silencieux depuis un moment sans signe de fin, son volet le dit. Si son terminal attend à son prompt, Marquer comme inactif rétablit les choses.",
   "tips.silentUnknown.title": "Un agent silencieux, d’état inconnu",
