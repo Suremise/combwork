@@ -344,25 +344,43 @@ describe('the advanced store', () => {
     const file = join(dir, 'advanced.json')
     let settings = mergeDefaults(structuredClone(DEFAULT_SETTINGS), { advanced: { showDeveloperFeatures: true } }) as AppSettings
     const listeners: ((s: AppSettings) => void)[] = []
+    // Each value the setting is given, by the test or by the binding following the file.
+    const given: unknown[] = []
     const cfg = {
       get settings() {
         return settings
       },
       updateSettings: (patch: Parameters<typeof mergeDefaults>[1]) => {
         settings = mergeDefaults(structuredClone(settings), patch) as AppSettings
+        given.push(settings.advanced.showDeveloperFeatures)
         for (const l of listeners) l(settings)
         return settings
       },
       onSettingsChanged: (fn: (s: AppSettings) => void) => void listeners.push(fn)
     }
+    // Every change queued so far has run (each turn runs after those before it).
+    const settled = (): Promise<void> => advanced.transact(async () => undefined)
+    const fileValues = (): unknown => (existsSync(file) ? read(file).values : {})
     try {
       advanced.load(dir)
       // The first start writes the setting (on) to the file; turned off before that write is taken in, the off is kept.
       bindAdvancedSettings(cfg as never)
       cfg.updateSettings({ advanced: { showDeveloperFeatures: false } })
-      await vi.waitFor(() => expect(existsSync(file) && read(file).values).toEqual({}), { timeout: 10_000 })
-      await vi.waitFor(() => expect(advanced.get('hive.showDeveloperFeatures')).toBe(false), { timeout: 10_000 })
-      expect(settings.advanced.showDeveloperFeatures).toBe(false)
+      await settled()
+      expect([fileValues(), advanced.get('hive.showDeveloperFeatures'), settings.advanced.showDeveloperFeatures]).toEqual([{}, false, false])
+      // And it stays settled: no write of the file's turns the setting back, to be written again (an echo).
+      await settled()
+      await settled()
+      expect(given).toEqual([false])
+      // Changed again and again, quicker than the file is written: the last change is what both keep.
+      cfg.updateSettings({ advanced: { showDeveloperFeatures: true } })
+      await Promise.resolve()
+      cfg.updateSettings({ advanced: { showDeveloperFeatures: false } })
+      cfg.updateSettings({ advanced: { showDeveloperFeatures: true } })
+      await settled()
+      await settled()
+      expect([fileValues(), advanced.get('hive.showDeveloperFeatures'), settings.advanced.showDeveloperFeatures]).toEqual([{ 'hive.showDeveloperFeatures': true }, true, true])
+      expect(given).toEqual([false, true, false, true])
     } finally {
       advanced.stop()
     }

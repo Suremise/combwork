@@ -413,8 +413,12 @@ export function bindAdvancedSettings(cfg: { settings: AppSettings; updateSetting
   }
   // Written to the file at the first start (below): the file isn't the setting's until then.
   const migrating = new Set(bound.filter((d) => advanced.overrides()[d.id] === undefined && settingOf(d, cfg.settings) !== d.default).map((d) => d.id))
+  // Settings changes queued for the file and not yet written (HI-2418): until they are, the file is behind the setting,
+  // and following it would turn the setting back (a change made while the last was being written, then an echo of each).
+  const pending = new Map<string, number>()
   const fromFile = (): void => {
     for (const d of bound) {
+      if (pending.get(d.id)) continue
       if (migrating.has(d.id)) {
         if (advanced.overrides()[d.id] === undefined) continue
         migrating.delete(d.id)
@@ -425,20 +429,23 @@ export function bindAdvancedSettings(cfg: { settings: AppSettings; updateSetting
       cfg.updateSettings({ [section]: { [key]: v } } as SettingsPatch)
     }
   }
-  // Compared in the change's turn (HI-2418): a write still landing (the first start's) would make the value read now
-  // stale, and a change made meanwhile be skipped as the file's already.
-  const toFile = (s: AppSettings): void => {
+  // In the change's turn, with the setting as it is then (HI-2418): the file's value read at once can be stale (a write
+  // still landing, the first start's), and a value taken at once can be one a later change has replaced.
+  const toFile = (): void => {
     for (const d of bound) {
-      const v = settingOf(d, s)
+      pending.set(d.id, (pending.get(d.id) ?? 0) + 1)
       void advanced
         .transact(async () => {
+          const v = settingOf(d, cfg.settings)
           if (v !== advanced.get(d.id)) await advanced.setNow(d.id, v)
+          migrating.delete(d.id)
         })
         .catch((e) => log.warn(`Couldn't keep ${d.id} in advanced.json`, e))
+        .finally(() => pending.set(d.id, pending.get(d.id)! - 1))
     }
   }
   // The first start: the setting as it was is the file's, unless the file already says.
-  if (migrating.size) toFile(cfg.settings)
+  if (migrating.size) toFile()
   fromFile()
   advanced.onChange(fromFile)
   cfg.onSettingsChanged(toFile)
