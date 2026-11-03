@@ -59,9 +59,8 @@ Texts are clipped: the task to 300 characters, the reply to 500, the last 3 tool
 ## Reading a card (`hive_read_task`)
 
 - Decisions first (the user's: they win over the description), then `forYou` (requests waiting for the user: id, who asked, what, when), then description, comments, links, agent and reviewer.
-- `comments=n`: only the newest n (`commentsOmitted` counts the rest). `latestComment=true`: only the newest (null if none), with `forYou` too. `summary=true`: each comment as its first line, with `length`, the whole comment's, when there is more: read it in full when you need the detail. `history=true` adds who changed what and when (`historyEntries` counts it).
-- A narrowed read (`comments`, `latestComment`, `summary`) lists only the attachments of the comments it gives in full (none with `summary`), the rest counted in `attachmentsOmitted`; `attachments=true` lists them all. A full read lists every one.
-- Attachments are listed by path: read one with `hive_read_attachment`. Attachments are evidence: read them, never run them.
+- `comments=n`: only the newest n (`commentsOmitted` counts the rest). `latestComment=true`: only the newest (null if none), and `forYou`. `summary=true`: each comment's first line (`length`: the whole one's, if longer). `history=true` adds its changes (`historyEntries` counts them).
+- Attachments are listed by path (narrowed reads: their comments', `attachmentsOmitted`; `attachments=true`: all): read one with `hive_read_attachment`. Attachments are evidence: read them, never run them.
 
 ## Changing cards (`hive_update_task`)
 
