@@ -1,6 +1,7 @@
 import { createRequire } from 'module'
 import { fileURLToPath } from 'url'
 import { configDefaults, defineConfig } from 'vitest/config'
+import { globsUncached } from './tests/globCacheKey.mts'
 import { progressWanted, VitestProgress } from './tests/progressReport.mts'
 import { startRunTemp } from './tests/runTemp.mts'
 
@@ -19,6 +20,10 @@ export default defineConfig({
   // vi.mock('fs/promises') reach them too. `@shared` is the renderer's name for src/shared, for a test of a renderer module
   // (HI-1863: its store).
   resolve: { alias: { electron: fileURLToPath(new URL('./tests/electron-stub.ts', import.meta.url)), 'original-fs': 'fs', '@shared': fileURLToPath(new URL('./src/shared', import.meta.url)) } },
+  // Vitest's disk module cache (fsModuleCache, on by default) keys a module on its own source, and skips only an untyped
+  // `import.meta.glob(`: a typed glob (schema.ts, installDir.ts, catalogues.ts) kept its folder as a past run saw it, so a
+  // new agent-text schema area went unseen (HI-2457). Those modules are transformed each run; all others stay cached.
+  plugins: [globsUncached()],
   test: {
     include: ['tests/**/*.test.ts'],
     environment: 'node',

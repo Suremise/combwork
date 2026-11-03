@@ -741,6 +741,8 @@ export const UNIT_SCANS = [
   // extracted from the agentMsg() descriptors, current.
   { test: 'tests/agentTextGuard.test.ts', paths: ['src/', 'agent-text/allow/'] },
   { test: 'tests/agentText.test.ts', paths: ['agent-text/catalogue/', 'agent-text/schema/'] },
+  // HI-2457: agentTextSchema() against the schema area files on disk; each glob user's source read (none imported but schema.ts).
+  { test: 'tests/globCache.test.ts', paths: ['agent-text/schema/', 'src/main/installDir.ts', 'src/shared/i18n/catalogues.ts'] },
   { test: 'tests/agentText.test.ts', paths: ['src/'], lines: ['agentMsg\\('] },
   // HI-2440: the window's messages agents read, followed from the calls that read text (the catalogue's audience both).
   { test: 'tests/agentText.test.ts', paths: ['src/main/', 'src/shared/'], lines: ['msg\\(', 'agent-text:', 'HiveError', 'englishText', 'agentText'] },
