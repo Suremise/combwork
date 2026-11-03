@@ -507,6 +507,9 @@ describe("a segment's hover: what the card's facts say (#1225)", () => {
     expect(laneWaitText({ reason: 'hold', card: 3 }, name, tr)).toBe('HI-3 is On Hold')
     // #1438's and #1435's, and #1446's slot being prepared.
     expect(laneWaitText({ reason: 'slot', card: null }, name, tr)).toBe('waiting for a slot')
+    // HI-2466: its only free slot held, and by what.
+    expect(laneWaitText({ reason: 'slot', card: 12, slot: 'slot-a', held: 'session', agent: 'CB1' }, name, tr)).toBe('waiting for slot-a: CB1’s session is still in it')
+    expect(laneWaitText({ reason: 'slot', card: 12, slot: 'slot-a', held: 'process' }, name, tr)).toBe('waiting for slot-a: a process still has a file or folder in it open')
     expect(laneWaitText({ reason: 'checkCopy', card: 12 }, name, tr)).toBe('waiting for a check copy for HI-12')
     expect(laneWaitText({ reason: 'preparing', card: 12, slot: 'slot-b' }, name, tr)).toBe('waiting: preparing slot-b')
   })

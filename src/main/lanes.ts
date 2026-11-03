@@ -4,7 +4,7 @@ import { projectPreferences } from './workflow/preferences'
 import { existsSync } from 'original-fs'
 import { HIVE_DIR, projectAgents } from '../shared/defaults'
 import { agentWorkflowRole } from '../shared/workflow/roles'
-import { allDone, isFrozen, keptLanes, laneView, listedLanes, nextBrief, ownOpen, readLanes, running, stampWait, type LaneAgent, type FreshStart, type LaneCardFacts, type LaneChange, type LaneRecord, type LaneStartWait, type WaitStamp } from '../shared/lanes'
+import { allDone, isFrozen, keptLanes, laneView, listedLanes, nextBrief, ownOpen, readLanes, running, stampWait, type LaneAgent, type FreshStart, type LaneCardFacts, type LaneChange, type LaneRecord, type LaneSlotHeld, type LaneStartWait, type WaitStamp } from '../shared/lanes'
 import type { HiveErrorKind, LaneCard, LaneInfo, LaneSlotInfo, TaskCard } from '../shared/types'
 import { designReviewer, reviewingNow } from '../shared/workflow/reviewerPool'
 import { withValues, type Text } from '../shared/advanced'
@@ -544,12 +544,16 @@ function withWaitTimes(ws: WorkspaceService, list: LaneInfo[]): LaneInfo[] {
   })
 }
 
-/** A running lane's slot, and whether it waits for one (Start Lane… found none free, `slotWait`, and it has none yet). */
-function slotView(ws: WorkspaceService, l: LaneRecord): { slot: string | null; waiting: boolean; info: LaneSlotInfo | null } {
+/**
+ * A running lane's slot, and whether it waits for one (Start Lane… found none free, `slotWait`, and it has none yet),
+ * with the free slot it was last refused as held, and what holds it (HI-2466).
+ */
+function slotView(ws: WorkspaceService, l: LaneRecord): { slot: string | null; waiting: boolean; info: LaneSlotInfo | null; held: LaneSlotHeld | null } {
   const info = slotOf ? slotOf(ws, l) : null
   // A lane waits for a slot only for one lent to it: its builder's carried slot doesn't end the wait.
   const lent = info && !info.carried ? info.name : null
-  return { slot: info?.name ?? null, waiting: !lent && !!l.slotWait, info }
+  const waiting = !lent && !!l.slotWait
+  return { slot: info?.name ?? null, waiting, info, held: waiting && ws.path ? slotHeldOf(ws.path, l.id) : null }
 }
 
 /**
@@ -667,6 +671,12 @@ export async function lanesWaitingForSlot(ws: WorkspaceService): Promise<LaneRec
 let slotOf: ((ws: WorkspaceService, lane: LaneRecord) => LaneSlotInfo | null) | null = null
 export function setLaneSlots(fn: typeof slotOf): void {
   slotOf = fn
+}
+
+/** The free slot a lane waiting for one was last refused as held, and what holds it (HI-2466: slotCards.ts gives it), by workspace folder and lane. */
+let slotHeldOf: (wsPath: string, lane: string) => LaneSlotHeld | null = () => null
+export function setLaneSlotHeld(fn: typeof slotHeldOf | null): void {
+  slotHeldOf = fn ?? (() => null)
 }
 
 /** A decision about a lane made on a read its cards have since moved on from (#1270): not saved; the lanes are read again. */

@@ -551,6 +551,7 @@
   "board.lanes.waitsFresh": "czeka: agent {agent} zacznie w nowej rozmowie, gdy tylko będzie wolny",
   "board.lanes.waitsLink": "Kliknij, aby pokazać.",
   "board.lanes.waitsPreparing": "czeka: przygotowanie slotu {slot}",
+  "board.lanes.waitsSlotHeld": "czeka na {slot}: {held, select, session {sesja agenta {agent} wciąż w nim działa} other {proces wciąż ma w nim otwarty plik lub folder}}",
   "board.lanes.waitsStart": "Karta {card} czeka na rozpoczęcie: {why, select, watching {agent {agent} czeka na inną pracę} queued {wiadomość od Hive jest w drodze do agenta {agent}} failed {ostatnie uruchomienie agenta {agent} się nie powiodło} refused {rozpoczęcie zostało na razie odrzucone, a Hive spróbuje ponownie} other {agent {agent} jest w trakcie tury}}",
   "board.leftOut.detail": "{hasPaths, select, yes {Jej ścieżki: {paths}.} other {Nie ma jeszcze ścieżek.}} Plik zmieniony w tym czasie może być pracą innej karty albo twoją własną: dołącz tylko to, co należy do karty {card}.",
   "board.leftOut.include": "{n, plural, one {Dołącz go} few {Dołącz je} many {Dołącz je} other {Dołącz je}}",

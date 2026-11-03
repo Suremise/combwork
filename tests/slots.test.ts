@@ -5,7 +5,7 @@
 // operations that own a slot while it changes (HR1's round 1): two pools on one hive.db as two Hives (each its own
 // connection and holder process), commands held at a gate, a holder that dies, jobs that can't be emptied.
 import { spawn, spawn as nodeSpawn, type ChildProcess } from 'child_process'
-import { existsSync, mkdirSync, readFileSync, rmSync, symlinkSync, writeFileSync } from 'fs'
+import { closeSync, existsSync, mkdirSync, openSync, readFileSync, rmSync, symlinkSync, writeFileSync } from 'fs'
 import { createRequire } from 'module'
 import { join } from 'path'
 import { createInterface } from 'readline'
@@ -15,7 +15,7 @@ import { afterAll, afterEach, describe, expect, it, vi } from 'vitest'
 import { tempDir } from './tempDir'
 import { admitted } from './admitted'
 import { boardFile, closeBoard, workspaceDb } from '../src/main/boardStore'
-import { fileSlotConn, IDLE_MS, INTERRUPTED, lockHash, nextSlotName, PORT_FLOOR, quiet, setBuilderCount, builderCountOf, SlotPool, slotEnv, slotName, slotOptionsOf, SlotStore, type OpHolder, type SlotRun, type SlotRunEnd } from '../src/main/slots'
+import { fileSlotConn, IDLE_MS, INTERRUPTED, lockHash, nextSlotName, PORT_FLOOR, quiet, refusalText, setBuilderCount, builderCountOf, SlotPool, slotEnv, slotName, slotOptionsOf, SlotStore, type OpHolder, type SlotRefusal, type SlotRun, type SlotRunEnd } from '../src/main/slots'
 import { BoundedLog, execCommand, FILE_IO } from '../src/main/workflow/queueChecks'
 import { say } from '../src/shared/agentText'
 import { claimIn, type ClaimRefused } from '../src/main/agentFolders'
@@ -1328,7 +1328,7 @@ describe("an operation is its pool's from before its reservation (HR1 round 2)",
     const r = await lent(w, { agent: 'a1', card: 1 })
     await w.pool.release(r.lease.id, 'done')
     w.set.sessions.set(r.slot.folder.toLowerCase(), 'someone')
-    expect(await w.pool.lend({ agent: 'a2', card: 2, slot: 'slot-a' })).toEqual({ ok: false, refusal: { why: 'busy', slot: 'slot-a' } })
+    expect(await w.pool.lend({ agent: 'a2', card: 2, slot: 'slot-a' })).toEqual({ ok: false, refusal: { why: 'busy', slot: 'slot-a', held: 'session' } })
     const db = new DatabaseSync(boardFile(w.ws))
     try {
       expect(db.prepare("SELECT why FROM slot_leases WHERE slot = 'slot-a' AND card = 2").all()).toEqual([{ why: 'busy' }])
@@ -1336,6 +1336,27 @@ describe("an operation is its pool's from before its reservation (HR1 round 2)",
       db.close()
     }
     expect(w.store.slot('slot-a')).toMatchObject({ state: 'ready', op: null })
+  })
+
+  it("HI-2466: the pool's only free slot held is named, with what holds it (a session, else a process), never 'every slot in use'; once free, it is lent", async () => {
+    const w = world({ builders: 1 })
+    const r = await lent(w, { agent: 'a1', lane: 'lane-1' })
+    await w.pool.release(r.lease.id, 'laneEnded')
+    w.set.sessions.set(r.slot.folder.toLowerCase(), 'a1 (working)')
+    expect(await w.pool.lend({ agent: 'a1', lane: 'lane-2' })).toEqual({ ok: false, refusal: { why: 'busy', slot: 'slot-a', held: 'session' } })
+    w.set.sessions.clear()
+    // A process with a file in it open (a CLI's child closing): Windows won't rename the folder (slots.ts quiet).
+    mkdirSync(join(r.slot.folder, 'warm'), { recursive: true })
+    const fd = openSync(join(r.slot.folder, 'warm', 'held.txt'), 'w')
+    try {
+      const held = await w.pool.lend({ agent: 'a1', lane: 'lane-2' })
+      expect(held).toEqual({ ok: false, refusal: { why: 'busy', slot: 'slot-a', held: 'process' } })
+      expect(refusalText((held as { refusal: SlotRefusal }).refusal)).toBe('slot-a still has a process running in it (a file or a folder in it open)')
+    } finally {
+      closeSync(fd)
+    }
+    expect(w.store.slot('slot-a')).toMatchObject({ state: 'ready', op: null })
+    expect(await w.pool.lend({ agent: 'a1', lane: 'lane-2' })).toMatchObject({ ok: true, slot: { name: 'slot-a' } })
   })
 })
 

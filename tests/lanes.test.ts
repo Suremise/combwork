@@ -92,6 +92,12 @@ describe('a lane on slots (#1438)', () => {
     const waiting = laneView(rec(), cards, undefined, null, undefined, null, undefined, null, null, { slot: null, waiting: true })
     expect([waiting.state, waiting.status?.reason, waiting.slot]).toEqual(['paused', 'slot', null])
     expect(laneLine(waiting)).toContain('waiting for a slot')
+    // HI-2466: its only free slot held: which, and by what.
+    const held = laneView(rec(), cards, undefined, null, undefined, null, undefined, null, null, { slot: null, waiting: true, held: { slot: 'slot-a', held: 'session', agent: 'CB1' } })
+    expect([held.state, held.status]).toEqual(['paused', { reason: 'slot', card: 2, slot: 'slot-a', held: 'session', agent: 'CB1' }])
+    expect(laneLine(held)).toContain("waiting for slot-a: CB1's session is still in it")
+    const process = laneView(rec(), cards, undefined, null, undefined, null, undefined, null, null, { slot: null, waiting: true, held: { slot: 'slot-a', held: 'process' } })
+    expect(laneLine(process)).toContain('waiting for slot-a: a process still has a file or folder in it open')
     const blocked = laneView(rec(), new Map([[1, card(1, 'doing', { blocked: 'Asked the user' })], [2, card(2, 'todo')], [3, card(3, 'todo')]]), undefined, null, undefined, null, undefined, null, null, { slot: null, waiting: true })
     expect(blocked.status?.reason).toBe('blocked')
     // Ended: no slot, no wait.

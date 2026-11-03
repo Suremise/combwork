@@ -490,6 +490,13 @@
   "lane.status.slot": {
     "placeholders": {}
   },
+  "lane.status.slotHeld": {
+    "placeholders": {
+      "slot": "plain",
+      "held": "select",
+      "agent": "plain"
+    }
+  },
   "lane.status.stale": {
     "placeholders": {
       "card": "plain"

@@ -4329,6 +4329,14 @@ Whether a conversation may resume there is its **hold** (none: it may):
   its agents (the lane's builder and reviewer then, re-read) started once (their brief's delivery identity is the lane
   and role) and its wait cleared. A lane ended or abandoned while it waits is never started. `hive_lane` names the
   lane's slot.
+  **A free slot held** (HI-2466): a lend passes over a free slot with a session in it, or one a process holds (a file or
+  folder in it open, so the pool can't rename it: often the last builder's processes still closing after its session
+  ended). With no other to lend, the refusal is `busy`, naming the slot and what holds it (`held`: `session` or
+  `process`), never "every slot in use". A waiting lane so refused keeps that for its status (*waiting for slot-a:
+  B1's session is still in it*, *…: a process still has a file or folder in it open*) and its project's pass looks
+  again after a pause (1 s, doubling, at most 30 s) and at once when a session there ends or goes idle, until the lane
+  is lent one or no slot is held: a process ending tells Hive nothing. While the slot is still held and is the only
+  one it could have, the look writes no lease.
 - **The stand-in** (an agent's 0.9 worktree as the card's folder, `existing: true`, the line updater) acts only for an
   agent whose `legacyWorktree` is still its folder: until #1441 migrates the project (then its carried lease).
 - **Off switches:** G11 another value: nothing of this. `hive.workflow.enforce` off: nothing is lent, refused,

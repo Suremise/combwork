@@ -551,6 +551,7 @@
   "board.lanes.waitsFresh": "esperando: {agent} empieza en una conversación nueva en cuanto esté libre",
   "board.lanes.waitsLink": "Haz clic para verlo.",
   "board.lanes.waitsPreparing": "esperando: preparando {slot}",
+  "board.lanes.waitsSlotHeld": "esperando {slot}: {held, select, session {la sesión de {agent} sigue en él} other {un proceso aún tiene abierto un archivo o una carpeta en él}}",
   "board.lanes.waitsStart": "{card} espera para iniciarse: {why, select, watching {{agent} está esperando otro trabajo} queued {una línea de Hive va de camino a {agent}} failed {el último inicio de {agent} falló} refused {su inicio se rechazó por ahora y Hive lo vuelve a intentar} other {{agent} está en un turno}}",
   "board.leftOut.detail": "{hasPaths, select, yes {Sus rutas: {paths}.} other {Aún no tiene rutas.}} Un archivo que cambió entretanto puede ser trabajo de otra tarjeta o tuyo: incluye solo lo que pertenece a {card}.",
   "board.leftOut.include": "{n, plural, one {Incluirlo} many {Incluirlos} other {Incluirlos}}",

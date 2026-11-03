@@ -204,6 +204,7 @@
   },
   "slot.refusal.busy": {
     "placeholders": {
+      "held": "select",
       "slot": "plain"
     }
   },

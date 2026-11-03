@@ -19,7 +19,7 @@ import { withRepoLock } from '../src/main/repoLock'
 import type { Fact } from '../src/shared/workflow/facts'
 import { DatabaseSync } from 'node:sqlite'
 import { boardFile } from '../src/main/boardStore'
-import { readFileSync, rmSync, writeFileSync } from 'fs'
+import { closeSync, mkdirSync, openSync, readFileSync, rmSync, writeFileSync } from 'fs'
 
 /** The longest a wait here waits for what it waits on: a bound for a hung run, never how long it should take. */
 const HUNG_MS = 30_000
@@ -78,7 +78,9 @@ const state = vi.hoisted(() => ({
   held: null as string | null,
   heldLooks: 0,
   /** Freed just after the pass's look (HR1's round 1): before its wait listens, with no event to come. */
-  freeAfterHeldLook: false
+  freeAfterHeldLook: false,
+  /** Folders sessions run in (sessions.liveStates' cwd, HI-2466). */
+  sessionsIn: [] as string[]
 }))
 vi.mock('../src/main/agentFolders', async (orig) => ({
   ...(await orig<object>()),
@@ -180,6 +182,8 @@ vi.mock('../src/main/sessions', async (orig) => {
   const actual = await orig<typeof import('../src/main/sessions')>()
   const stub = {
     liveFor: () => (state.live ? { ...state.live, status: 'ready' } : null),
+    // The sessions running, where they run (HI-2466: one in a lane's held slot holds it).
+    liveStates: () => state.sessionsIn.map((cwd) => ({ cwd, agentId: 'b9', agentName: 'B9', status: 'working' })),
     // The pause after the user typed in its builder's pane, while it holds (HI-2191): when it ends.
     userQuietAt: () => state.quietAt,
     hiveToolsWaiting: () => false,
@@ -254,7 +258,7 @@ const { gitTestHooks } = await import('../src/main/git')
 const { observer } = await import('../src/main/platform/observe')
 const { withWriteFence } = await import('../src/main/workflow/factStore')
 const { LeaseLost } = await import('../src/main/workflow/queueRunner')
-const { cycleIn, deleteMergedLine, expectStartPrompt, finishedSlot, finishedSlots, laneSlotIn, place, placementDue, placementTracksForTests, quitSlotCards, settleSlotCards, startSlotCards, stopSlotCards, unsettledDeletions } = await import('../src/main/slotCards')
+const { cycleIn, deleteMergedLine, expectStartPrompt, finishedSlot, finishedSlots, heldRetryOf, laneSlotHeld, laneSlotIn, place, placementDue, placementTracksForTests, quitSlotCards, settleSlotCards, startSlotCards, stopSlotCards, unsettledDeletions } = await import('../src/main/slotCards')
 const { resetAgentStartsForTests, startBegun, startNow } = await import('../src/main/agentStarts')
 
 let env: Env | null = null
@@ -262,7 +266,7 @@ afterEach(() => {
   env?.close()
   env = null
   resetAgentStartsForTests()
-  Object.assign(state, { enforced: true, afterList: null, afterRemove: null, restoreFails: false, live: null, slot: '', deliveries: [], next: [], calls: [], wf: null, deleteOn: true, lanes: null, waitingLooks: 0, waiting: [], noCode: [], pool: {}, logged: [], conv: { is: 'none' }, starts: [], resuming: false, convFails: false, busy: null, quietAt: null, freeAfterLook: null, held: null, heldLooks: 0, freeAfterHeldLook: false })
+  Object.assign(state, { enforced: true, afterList: null, afterRemove: null, restoreFails: false, live: null, slot: '', deliveries: [], next: [], calls: [], wf: null, deleteOn: true, lanes: null, waitingLooks: 0, waiting: [], noCode: [], pool: {}, logged: [], conv: { is: 'none' }, starts: [], resuming: false, convFails: false, busy: null, quietAt: null, freeAfterLook: null, held: null, heldLooks: 0, freeAfterHeldLook: false, sessionsIn: [] })
 })
 
 /**
@@ -1526,6 +1530,59 @@ describe('Hive quitting (#1628)', { timeout: 60_000 }, () => {
     await settleSlotCards(ws, e.project)
     expect(lends).toEqual(['lane-a'])
     expect(state.calls).toEqual(['start lane lane-b with no slot', 'lane lane-b waits no more'])
+  })
+
+  it("HI-2466: a lane whose only free slot is held keeps what holds it for its status and is looked at again with no lend while it is held; once it isn't, it is lent and started", async () => {
+    const e = (env = setup({ platform: 'git', review: 'none', finish: 'agentMerges', folder: 'slots', target: 'main' }, { autoRun: false }))
+    state.wf = e.wf
+    state.waiting = [{ id: 'lane-1', project: 'project', builder: { id: 'b1', name: 'B1' }, cards: [7], slotWait: { since: '2026-10-25T00:00:00.000Z' } }]
+    const folder = join(tempDir('held-slot-'), 'slot-a')
+    mkdirSync(folder, { recursive: true })
+    const slot = { name: 'slot-a', folder, state: 'ready', op: null, job: null, writer: null, warmError: null }
+    let lends = 0
+    let refusal: unknown = { why: 'busy', slot: 'slot-a', held: 'process' }
+    state.pool = {
+      leaseOf: () => null,
+      leasesOf: () => [],
+      slots: () => [slot],
+      size: async () => 1,
+      openLease: () => null,
+      lend: async () => (lends++, refusal ? { ok: false, refusal } : { ok: true, lease: { id: 'l-9', slot: 'slot-a' }, slot }),
+    }
+    const life = new AbortController()
+    const ws = { path: e.home, lifetime: life.signal, info: () => ({ projects: [{ name: 'project', path: e.project }] }), projectConfig: async () => ({ agents: [] }) } as never
+    try {
+      // The lend refused: a process holds slot-a. Kept for its status, and a pass asked for later.
+      await settleSlotCards(ws, e.project)
+      expect(lends).toBe(1)
+      expect(laneSlotHeld(e.home, 'lane-1')).toEqual({ slot: 'slot-a', held: 'process' })
+      expect(heldRetryOf(e.home, e.project)).toEqual({ tries: 1, waiting: true })
+      // Looked at again while a file in it is open: still held, and no lend tried (no lease written each time).
+      const fd = openSync(join(folder, 'held.txt'), 'w')
+      try {
+        await settleSlotCards(ws, e.project)
+      } finally {
+        closeSync(fd)
+      }
+      expect(lends).toBe(1)
+      expect(laneSlotHeld(e.home, 'lane-1')).toEqual({ slot: 'slot-a', held: 'process' })
+      // A session in it holds it too: said with its agent's name.
+      state.sessionsIn = [join(folder, 'sub')]
+      await settleSlotCards(ws, e.project)
+      expect(lends).toBe(1)
+      expect(laneSlotHeld(e.home, 'lane-1')).toEqual({ slot: 'slot-a', held: 'session', agent: 'B9' })
+      expect(state.calls).toEqual([])
+      // Nothing holds it any more: lent, the lane started, its hold forgotten.
+      state.sessionsIn = []
+      refusal = null
+      await settleSlotCards(ws, e.project)
+      expect(lends).toBe(2)
+      expect(state.calls).toEqual(['start lane lane-1', 'lane lane-1 waits no more'])
+      expect(laneSlotHeld(e.home, 'lane-1')).toBeNull()
+    } finally {
+      life.abort()
+    }
+    expect(heldRetryOf(e.home, e.project)).toBeNull()
   })
 
   it('a pass that never ends holds the quit only for its bound', async () => {
