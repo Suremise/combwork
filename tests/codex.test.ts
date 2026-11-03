@@ -71,6 +71,9 @@ describe('Codex hooks', () => {
     expect(shellPatchPaths(`apply_patch <<'EOF'\r\n${patch.split('\n').join('\r\n')}\r\nEOF`)).toEqual(['a.ts'])
     // Not one Codex applies: no file claimed (other shell edits stay out of locks).
     expect(shellPatchPaths(`apply_patch <<'EOF'\n${patch}\nEOF\nEOF`)).toEqual([])
+    // A later statement's text isn't the patch's (HI-2408 round 1: locked.txt was claimed from cat's heredoc).
+    expect(shellPatchPaths(`apply_patch <<'PATCH'\n${patch}\nPATCH\ncat <<'EXAMPLE'\n*** Update File: locked.txt\nEXAMPLE`)).toEqual([])
+    expect(shellPatchPaths(`cd src && apply_patch <<'PATCH'\n${patch}\nPATCH\ncd ../other && apply_patch <<'PATCH'\n${patch}\nPATCH`)).toEqual([])
     expect(shellPatchPaths(`apply_patch $'${patch.split('\n').join('\\n')}'`)).toEqual([])
     expect(shellPatchPaths(`cat > x.patch <<'EOF'\n${patch}\nEOF`)).toEqual([])
     expect(shellPatchPaths(`echo apply_patch`)).toEqual([])
