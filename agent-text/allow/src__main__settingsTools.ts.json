@@ -1,7 +1,0 @@
-{
-  "prose|error|It has already been reverted.": 1,
-  "prose|error|It is being reverted.": 1,
-  "prose|error|That change is no longer listed.": 1,
-  "prose|error|{} has changed since (it is {} now): change it there.": 1,
-  "prose|error|{} has changed since (its removed models differ): change it there.": 1
-}

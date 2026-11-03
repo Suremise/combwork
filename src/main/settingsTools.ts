@@ -8,14 +8,14 @@ import { projectProviderConfig, providerSettings } from '../shared/providers'
 import { SETTINGS_CATALOG, agentSetting, checkSettingValue, effortTakes, settingDefault, settingEntry, settingHelps, settingKind, settingOptions, settingPatch, settingPath, settingReadOnly, settingValue, settingValueText, shownSettingPath, workflowTakes, PLATFORM_SETTING_KEY, type SettingContext, type SettingEntry, type SettingScope } from '../shared/settingsCatalog'
 import { checkOptions, problemText, workflowChanged } from './workflow/rulesets'
 import { checkPlatformSwitch, oldRulesLine, setPlatform } from './workflow/platformSwitch'
-import { agentError, HiveError } from './hiveError'
+import { agentError, hiveError, HiveError } from './hiveError'
 import { levelOwn, setLevelOptions } from './workflow/levels'
 import { setSlotDefault } from './slotSettings'
 import { workflowWrite } from './workflow/writes'
 import { withRepoLocks } from './repoLock'
 import { problemEnglish, WorkflowRefused } from './workflow/optionsForm'
 import type { SettingDetail, SettingRow } from '../shared/toolReplies'
-import { language } from '../shared/i18n'
+import { language, msg } from '../shared/i18n'
 import { docOutline } from '../shared/docSections'
 import userGuideDoc from '../../docs/USER_GUIDE.md?raw'
 import { SOURCE_LANGUAGE } from '../shared/i18n/languages'
@@ -379,6 +379,15 @@ function checkWorkflowPatch(projectPath: string, patch: Partial<ProjectConfig>):
 /** Reverts in progress, by the change's action id: a second click while one runs is refused. */
 const reverting = new Set<string>()
 
+/** Why a Revert is refused (HI-2471): the window's text, in the language Hive shows (only the Assistant panel's Revert reaches it). */
+const REVERT = {
+  gone: msg({ id: 'service.settingsRevert.gone', defaultMessage: 'That change is no longer listed.', description: "An error when the user clicks Revert on a setting the Assistant changed (the Assistant panel's list of its changes): the change isn't in the list any more." }),
+  busy: msg({ id: 'service.settingsRevert.busy', defaultMessage: 'It is being reverted.', description: 'An error when the user clicks Revert on a setting the Assistant changed: a revert of that change is already running.' }),
+  done: msg({ id: 'service.settingsRevert.done', defaultMessage: 'It has already been reverted.', description: 'An error when the user clicks Revert on a setting the Assistant changed: that change was reverted already.' }),
+  changed: msg({ id: 'service.settingsRevert.changed', defaultMessage: '{path} has changed since (it is {value} now): change it there.', description: "An error when the user clicks Revert on a setting the Assistant changed: the setting was changed again since. {path} is where the setting is (\"Settings → Sessions → Idle timeout\"), {value} its value now as the panel shows values (on, off, a number, a model's name). \"There\" is that place in Settings." }),
+  models: msg({ id: 'service.settingsRevert.models', defaultMessage: '{path} has changed since (its removed models differ): change it there.', description: "An error when the user clicks Revert on a provider's models setting the Assistant changed: the models it had removed are different now. {path} is where the setting is (\"Settings → Claude Code → Models\"). \"There\" is that place in Settings." })
+}
+
 /**
  * The user's Revert on a setting the Assistant changed (its panel's list): sets it back to what it was, through the same
  * checked change, and lists that too. Refused once reverted, or when the setting has changed again since (the user
@@ -386,15 +395,17 @@ const reverting = new Set<string>()
  */
 export async function revertSetting(workspacePath: string, actionId: string): Promise<void> {
   const change = assistant.actions(workspacePath).find((a) => a.id === actionId)?.setting
-  if (!change) throw new Error('That change is no longer listed.')
-  if (reverting.has(actionId)) throw new Error('It is being reverted.')
+  if (!change) throw hiveError(REVERT.gone, undefined, { kind: 'notFound' })
+  if (reverting.has(actionId)) throw hiveError(REVERT.busy, undefined, { kind: 'conflict' })
   reverting.add(actionId)
   try {
     const e = entryOf(change.id)
+    // Where the setting is, as the user sees it in Settings (HI-2471), not the tools' English path the change recorded.
+    const path = shownSettingPath(e)
     const guard = (current: unknown): void => {
-      if (assistant.actions(workspacePath).some((a) => a.revertOf === actionId)) throw new Error('It has already been reverted.')
-      if (JSON.stringify(current) !== JSON.stringify(change.new)) throw new Error(`${change.path} has changed since (it is ${settingValueText(e, current)} now): change it there.`)
-      if (change.removed && e.provider && JSON.stringify(removedPrices(e.provider)) !== JSON.stringify(change.removed.new)) throw new Error(`${change.path} has changed since (its removed models differ): change it there.`)
+      if (assistant.actions(workspacePath).some((a) => a.revertOf === actionId)) throw hiveError(REVERT.done, undefined, { kind: 'conflict' })
+      if (JSON.stringify(current) !== JSON.stringify(change.new)) throw hiveError(REVERT.changed, { path, value: settingValueText(e, current) }, { kind: 'conflict' })
+      if (change.removed && e.provider && JSON.stringify(removedPrices(e.provider)) !== JSON.stringify(change.removed.new)) throw hiveError(REVERT.models, { path }, { kind: 'conflict' })
     }
     await applySetting(e, change.old, change.project ?? null, guard, change.removed?.old)
     // Kept in the Assistant's activity: said in the Default, as its other lines are.

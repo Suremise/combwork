@@ -823,6 +823,26 @@
     "defaultMessage": "{task} exited with code {code}",
     "description": "A notification: a coding agent CLI's task ({task}: \"Codex install\") ended with the exit code {code}."
   },
+  "service.settingsRevert.busy": {
+    "defaultMessage": "It is being reverted.",
+    "description": "An error when the user clicks Revert on a setting the Assistant changed: a revert of that change is already running."
+  },
+  "service.settingsRevert.changed": {
+    "defaultMessage": "{path} has changed since (it is {value} now): change it there.",
+    "description": "An error when the user clicks Revert on a setting the Assistant changed: the setting was changed again since. {path} is where the setting is (\"Settings → Sessions → Idle timeout\"), {value} its value now as the panel shows values (on, off, a number, a model's name). \"There\" is that place in Settings."
+  },
+  "service.settingsRevert.done": {
+    "defaultMessage": "It has already been reverted.",
+    "description": "An error when the user clicks Revert on a setting the Assistant changed: that change was reverted already."
+  },
+  "service.settingsRevert.gone": {
+    "defaultMessage": "That change is no longer listed.",
+    "description": "An error when the user clicks Revert on a setting the Assistant changed (the Assistant panel's list of its changes): the change isn't in the list any more."
+  },
+  "service.settingsRevert.models": {
+    "defaultMessage": "{path} has changed since (its removed models differ): change it there.",
+    "description": "An error when the user clicks Revert on a provider's models setting the Assistant changed: the models it had removed are different now. {path} is where the setting is (\"Settings → Claude Code → Models\"). \"There\" is that place in Settings."
+  },
   "service.slots.notPrepared": {
     "defaultMessage": "Hive couldn't get {slot} ready for {card}: {why}",
     "description": "A notice: a card was started in a slot (a worktree Hive lends to a card or a lane), and Hive couldn't check out the card's branch there or install its dependencies. {slot} is the slot's name (slot-b), {card} the card's key, {why} git's or the setup's reason, in English."
