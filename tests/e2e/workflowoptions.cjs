@@ -32,7 +32,7 @@ const check = (name, ok, extra = '') => {
   console.log(`${ok ? 'PASS' : 'FAIL'} ${name}${ok || !extra ? '' : ` (${extra})`}`)
 }
 
-/** Writes to the workspace's board from outside Hive, as another process would (the upgrade's marks, a lane's rows). */
+/** Writes to the workspace's board from outside Combwork, as another process would (the upgrade's marks, a lane's rows). */
 function board(sql, ...args) {
   const db = new DatabaseSync(path.join(ws, '.hive', 'hive.db'), { timeout: 5000 })
   try {
@@ -187,7 +187,7 @@ async function theForm(page, app, inv) {
     check('Git’s groups, in order', JSON.stringify(await groups()) === JSON.stringify(['presets', 'team', 'review', 'checks', 'merging', 'where', 'slots', 'loops', 'stages']), JSON.stringify(await groups()))
     const inGroup = async (g) => section.locator(`.workflow-group[data-group="${g}"] .workflow-option`).evaluateAll((els) => els.map((e) => e.getAttribute('data-option')))
     const layout = { review: await inGroup('review'), checks: await inGroup('checks'), merging: await inGroup('merging'), where: await inGroup('where'), loops: await inGroup('loops'), stages: await inGroup('stages') }
-    check('each group has its options (G4 and G17 in Review, G17 with a reviewer agent; G9 and G8 hidden while the agent doesn’t merge through Hive; G15 only with slots)', JSON.stringify(layout) === JSON.stringify({ review: ['review', 'reviewers', 'reviewerMode', 'noSelfReview', 'sameness', 'okBefore'], checks: ['preChecks'], merging: ['finish', 'style', 'target', 'dependenciesDone'], where: ['folder', 'identity', 'stopOwnRuns', 'sharedFolderWarning', 'fileLocks'], loops: ['loopWakes', 'loopRounds', 'loopWaitHours', 'loopStepWaitMinutes'], stages: ['stageNames'] }), JSON.stringify(layout))
+    check('each group has its options (G4 and G17 in Review, G17 with a reviewer agent; G9 and G8 hidden while the agent doesn’t merge through Combwork; G15 only with slots)', JSON.stringify(layout) === JSON.stringify({ review: ['review', 'reviewers', 'reviewerMode', 'noSelfReview', 'sameness', 'okBefore'], checks: ['preChecks'], merging: ['finish', 'style', 'target', 'dependenciesDone'], where: ['folder', 'identity', 'stopOwnRuns', 'sharedFolderWarning', 'fileLocks'], loops: ['loopWakes', 'loopRounds', 'loopWaitHours', 'loopStepWaitMinutes'], stages: ['stageNames'] }), JSON.stringify(layout))
     check('no Version control row: the header has the choice', (await section.locator('.workflow-platform').count()) === 0)
     check('no preset chosen', (await section.locator('.workflow-preset-now').innerText()).trim() === 'No preset chosen')
     check('every preset is offered, with All off', JSON.stringify(await section.locator('.workflow-choice').evaluateAll((els) => els.map((e) => e.getAttribute('data-choice')))) === JSON.stringify(['solo', 'pairAgent', 'pair', 'team', 'allOff']))
@@ -222,7 +222,7 @@ async function theForm(page, app, inv) {
     await save.click()
     await dialog.waitFor({ timeout: HUNG_MS })
     const said = await dialog.innerText()
-    check('the warning lists what changes, each option old → new, from the next card', said.includes('apply from the next card') && said.includes('Who merges: Not checked → The agent merges, Hive checks') && said.includes('Where cards are built: Everyone in the project folder → Each card in its own folder'), said)
+    check('the warning lists what changes, each option old → new, from the next card', said.includes('apply from the next card') && said.includes('Who merges: Not checked → The agent merges, Combwork checks') && said.includes('Where cards are built: Everyone in the project folder → Each card in its own folder'), said)
     check('…and lists the running lane, which keeps the old rules', said.includes('keeps the old rules') && said.includes('Builder B1'), said)
     await themes('save', dialog)
     await dialog.getByRole('button', { name: 'Save', exact: true }).click()
@@ -257,7 +257,7 @@ async function theForm(page, app, inv) {
     await row('folder').locator('select').selectOption('project')
     check('resolved: the reasons go, Save is on', !!(await lib.until(async () => (await reasons('finish')).length === 0 && (await reasons('folder')).length === 0 && (await save.isEnabled()), HUNG_MS)))
     await row('finish').locator('select').selectOption('hiveMerges')
-    check('Hive merges in the project folder: under both rows', !!(await lib.until(() => both('mergeNeedsSlots', 'finish', 'folder'), HUNG_MS)) && (await save.isDisabled()))
+    check('Combwork merges in the project folder: under both rows', !!(await lib.until(() => both('mergeNeedsSlots', 'finish', 'folder'), HUNG_MS)) && (await save.isDisabled()))
     await discard()
     await row('reviewers').locator('select').selectOption('2')
     await row('review').locator('select').selectOption('you')
@@ -324,10 +324,10 @@ async function theForm(page, app, inv) {
     await applyChoice('pair')
     check('Pair: Combwork merges into the repository’s own default branch, by name (master here)', (await row('finish').locator('select').inputValue()) === 'hiveMerges' && (await row('target').locator('input').inputValue()) === 'master', await row('target').locator('input').inputValue())
     check('…G9 in Checks: the quick checks from its scripts, with their commands', JSON.stringify(await inGroup('checks')) === JSON.stringify(['preChecks', 'mergeChecks', 'focusedTests', 'mergeInstall']) && JSON.stringify(await values('mergeChecks')) === JSON.stringify(['typecheck', 'npm run typecheck', 'lint', 'npm run lint']), JSON.stringify(await values('mergeChecks')))
-    check('…G8 shown in Merging while Hive merges', (await inGroup('merging')).includes('strict'))
+    check('…G8 shown in Merging while Combwork merges', (await inGroup('merging')).includes('strict'))
     // G18 (#1179): pushing the target after a merge, shown while Hive merges, off in the preset; switched on and saved.
     const push = row('pushTarget').locator('[role="switch"]')
-    check('…G18 shown in Merging while Hive merges, off', (await inGroup('merging')).includes('pushTarget') && (await push.getAttribute('aria-checked')) === 'false')
+    check('…G18 shown in Merging while Combwork merges, off', (await inGroup('merging')).includes('pushTarget') && (await push.getAttribute('aria-checked')) === 'false')
     await push.click()
     await themes('push', row('pushTarget'))
     // G6's third value (#1184): offered by name, chosen, and saved below.
@@ -341,7 +341,7 @@ async function theForm(page, app, inv) {
     await themes('filelocks-slots', row('fileLocks'))
     await row('mergeInstall').locator('select').selectOption('always')
     await saveAll()
-    check('saved: Hive merges, the merge checks, the install and the push after merging, in project.json', !!(await lib.until(async () => saved().finish === 'hiveMerges' && JSON.stringify(saved().mergeChecks) === JSON.stringify(['typecheck', 'lint']) && saved().mergeInstall === 'always' && saved().pushTarget === true && saved().style === 'rebase', HUNG_MS)), JSON.stringify(saved()))
+    check('saved: Combwork merges, the merge checks, the install and the push after merging, in project.json', !!(await lib.until(async () => saved().finish === 'hiveMerges' && JSON.stringify(saved().mergeChecks) === JSON.stringify(['typecheck', 'lint']) && saved().mergeInstall === 'always' && saved().pushTarget === true && saved().style === 'rebase', HUNG_MS)), JSON.stringify(saved()))
     for (let i = (await row('mergeChecks').locator('.workflow-check').count()) - 1; i >= 0; i--) await row('mergeChecks').locator('.workflow-check').nth(i).getByRole('button', { name: 'Remove' }).click()
     check('with no merge checks, the install row is not shown', !!(await lib.until(async () => (await row('mergeInstall').count()) === 0, HUNG_MS)))
     await discard()

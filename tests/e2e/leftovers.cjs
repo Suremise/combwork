@@ -112,7 +112,7 @@ const lingering = () => (fs.existsSync(lingerFile) ? fs.readFileSync(lingerFile,
       const l = await listed()
       return l?.processes.length === 2 && l
     }, 15000)
-    check('Hive lists the two it left, by pid, as node processes', !!found && two.every((p) => found.processes.some((x) => x.pid === p)) && found.processes.every((x) => x.label.startsWith('node ')), JSON.stringify(found))
+    check('Combwork lists the two it left, by pid, as node processes', !!found && two.every((p) => found.processes.some((x) => x.pid === p)) && found.processes.every((x) => x.label.startsWith('node ')), JSON.stringify(found))
     check("the stranger's process isn't listed", !!found && !found.processes.some((x) => x.pid === stranger.pid))
     // Its pane's ⋯ (#977): an amber badge, "2 left running" in its name's description, and an entry whose menu ends them.
     const more = page.locator('.pane-header-bar .pane-more').first()
@@ -148,7 +148,7 @@ const lingering = () => (fs.existsSync(lingerFile) ? fs.readFileSync(lingerFile,
     await app.evaluate(() => (process.env.HIVE_TEST_JOB_KILL_FAILS = '1'))
     const refused = await leaveRunning(1)
     const offer = page.locator('.toast', { hasText: "couldn't end it by itself" })
-    check("a refused End leaves it listed, offered, and says Hive couldn't end it", (await lib.until(async () => (await listed())?.processes.length === 1, 15000)) && (await offer.first().waitFor({ timeout: 10000 }).then(() => true, () => false)) && refused.every(alive))
+    check("a refused End leaves it listed, offered, and says Combwork couldn't end it", (await lib.until(async () => (await listed())?.processes.length === 1, 15000)) && (await offer.first().waitFor({ timeout: 10000 }).then(() => true, () => false)) && refused.every(alive))
     await app.evaluate(() => delete process.env.HIVE_TEST_JOB_KILL_FAILS)
     await openLeftovers(1)
     await page.getByText('End It', { exact: true }).click()
@@ -169,7 +169,7 @@ const lingering = () => (fs.existsSync(lingerFile) ? fs.readFileSync(lingerFile,
     const q = fs.existsSync(asked) ? JSON.parse(fs.readFileSync(asked, 'utf8')) : null
     check('quitting asks about what the agent left running', !!q && /left 1 process running/.test(q.message) && /site · Website: node /.test(q.detail) && q.buttons[0] === 'End Them', JSON.stringify(q))
     check('and End Them ends it', await lib.until(() => atQuit.every((p) => !alive(p)), 10000))
-    check("the stranger's process outlives Hive", alive(stranger.pid), `checked ${Math.round((Date.now() - strangerAt) / 1000)} s after it started`)
+    check("the stranger's process outlives Combwork", alive(stranger.pid), `checked ${Math.round((Date.now() - strangerAt) / 1000)} s after it started`)
   } finally {
     await app.close().catch(() => undefined)
     lib.endExactly([...ids.values()])
@@ -191,9 +191,9 @@ const lingering = () => (fs.existsSync(lingerFile) ? fs.readFileSync(lingerFile,
       await lib.until(async () => !(await live2()), 15000)
     }
     const notice = p2.locator('.toast', { hasText: "Combwork can't keep track of agents' processes" })
-    check('Hive says once that it can’t track agents’ processes', (await notice.first().waitFor({ timeout: 5000 }).then(() => notice.count(), () => 0)) === 1)
+    check('Combwork says once that it can’t track agents’ processes', (await notice.first().waitFor({ timeout: 5000 }).then(() => notice.count(), () => 0)) === 1)
     const diag = await inv2('app:diagnostics')
-    check('Diagnostics says why', /Agents' processes: not tracked: The PowerShell helper of Hive's process tracker didn't start within 3 seconds/.test(diag), diag.split('\n').find((l) => l.includes("Agents' processes")))
+    check('Diagnostics says why', /Agents' processes: not tracked: The PowerShell helper of Combwork's process tracker didn't start within 3 seconds/.test(diag), diag.split('\n').find((l) => l.includes("Agents' processes")))
   } finally {
     await second.app.close().catch(() => undefined)
     lib.endExactly([...ids.values()])

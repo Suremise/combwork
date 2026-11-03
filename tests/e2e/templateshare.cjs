@@ -183,7 +183,7 @@ const check = (name, ok, extra = '') => {
   await tab.waitFor({ timeout: 5000 })
   // Each row's name and the badge saying where it is kept.
   const tabRows = async () => tab.locator('.template-row .label').evaluateAll((els) => els.map((el) => `${el.firstChild.textContent.trim()}: ${el.querySelector('.badge')?.textContent.trim() ?? ''}`))
-  check("the project's tab lists its own, the workspace's and Hive's, each with its scope", !!(await lib.until(async () => JSON.stringify(await tabRows()) === JSON.stringify(['Solo: alpha', 'Team: alpha', 'Team: Workspace', ...HIVE_NAMES.map((n) => `${n}: Hive`)]), 5000)), JSON.stringify(await tabRows()))
+  check("the project's tab lists its own, the workspace's and Combwork's, each with its scope", !!(await lib.until(async () => JSON.stringify(await tabRows()) === JSON.stringify(['Solo: alpha', 'Team: alpha', 'Team: Workspace', ...HIVE_NAMES.map((n) => `${n}: Combwork`)]), 5000)), JSON.stringify(await tabRows()))
   await userRow(tab, 'Solo').click()
   const tabDetail = page.locator('.split-main .template-detail')
   const ids = JSON.stringify(projectCfg(alpha).agents.map((a) => a.id))
@@ -420,7 +420,7 @@ const check = (name, ok, extra = '') => {
     await shot(`quit-asks-${theme}`)
   }
   await quitDialog.getByRole('button', { name: 'Save and quit' }).click()
-  check('…Save and quit saves it, then Hive quits', !!(await q.untilDecided(8000)) && teamNow().name === 'Team at quit', JSON.stringify(teamNow().name))
+  check('…Save and quit saves it, then Combwork quits', !!(await q.untilDecided(8000)) && teamNow().name === 'Team at quit', JSON.stringify(teamNow().name))
   await q.gone(30000)
   console.log(failed ? `${failed} check(s) failed` : 'all checks passed')
   process.exit(failed ? 1 : 0)

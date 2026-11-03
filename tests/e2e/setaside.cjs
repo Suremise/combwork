@@ -21,7 +21,7 @@ const check = (name, ok, extra = '') => {
   console.log(`${ok ? 'PASS' : 'FAIL'} ${name}${ok || !extra ? '' : ` (${extra})`}`)
 }
 
-/** A card file as an older Hive saves it in `.hive/tasks`. */
+/** A card file as an older Combwork saves it in `.hive/tasks`. */
 const olderCard = (number, fields) =>
   JSON.stringify({ number, title: `Card ${number}`, description: '', project: 'alpha', agent: null, column: 'todo', order: number, labels: [], blocked: null, blockedBy: [], links: [], comments: [], history: [], archived: false, createdAt: '2026-10-05T09:30:00.000Z', createdBy: 'You', updatedAt: '2026-10-05T09:30:00.000Z', ...fields }, null, 2) + '\n'
 
@@ -46,7 +46,7 @@ const olderCard = (number, fields) =>
     // whose number the board has, and a damaged one.
     await lib.openWorkspace(inv, page, other)
     const free = Number(JSON.parse(fs.readFileSync(path.join(stub, 'board.json'), 'utf8')).next)
-    fs.writeFileSync(path.join(stub, `${free}.json`), olderCard(free, { title: 'Made in the older Hive', description: 'Written **while** the workspace was open in 0.8.\n\nIt has a second paragraph.', labels: ['old'], comments: [{ at: '2026-10-05T09:31:00.000Z', by: 'You', text: 'A comment from then', id: 'c1' }] }))
+    fs.writeFileSync(path.join(stub, `${free}.json`), olderCard(free, { title: 'Made in the older Combwork', description: 'Written **while** the workspace was open in 0.8.\n\nIt has a second paragraph.', labels: ['old'], comments: [{ at: '2026-10-05T09:31:00.000Z', by: 'You', text: 'A comment from then', id: 'c1' }] }))
     fs.writeFileSync(path.join(stub, `${one.number}.json`), olderCard(one.number, { title: 'Also made as #1', createdBy: 'Assistant', column: 'review' }))
     fs.writeFileSync(path.join(stub, `${free + 1}.json`), '{ damaged')
     await lib.openWorkspace(inv, page, ws)
@@ -78,7 +78,7 @@ const olderCard = (number, fields) =>
     const added = (await inv('tasks:list')).find((c) => c.number === free)
     const last = added?.history?.at(-1)
     check('it is on the board under its old number, as it was', added?.title === 'Made in the older Combwork' && added.labels.join() === 'old' && added.comments.length === 1, JSON.stringify(added))
-    check('its history says where it came from, by Repair', last?.by === 'Repair' && last.what === `Added from an older Hive, where it was made as #${free}`, JSON.stringify(last))
+    check('its history says where it came from, by Repair', last?.by === 'Repair' && last.what === `Added from an older Combwork, where it was made as #${free}`, JSON.stringify(last))
 
     // Add the clashing one: the next free number; #1 and the link to it unchanged.
     await row(`${one.number}.json`).getByRole('button', { name: 'Add to Board' }).click()

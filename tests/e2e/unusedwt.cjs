@@ -91,7 +91,7 @@ function pathWithoutGit() {
   // Its ⓘ says where they come from, without promising a template gives them back (#1562: 1.0's agents get no worktree).
   await section.locator('h2 .info-icon').first().hover()
   const tipText = async () => (await page.locator('.tip:visible').allInnerTexts()).join(' ')
-  check('…its ⓘ: removed agents (by hand or by a template), made outside Hive, which can go; no template gives them back', !!(await lib.until(async () => /when a template's agents replaced it.*made outside Hive.*Loading a template gives none of them to its agents\. Those merged into/s.test(await tipText()), 5000)) && !/gives them back/.test(await tipText()), await tipText())
+  check('…its ⓘ: removed agents (by hand or by a template), made outside Combwork, which can go; no template gives them back', !!(await lib.until(async () => /when a template's agents replaced it.*made outside Combwork.*Loading a template gives none of them to its agents\. Those merged into/s.test(await tipText()), 5000)) && !/gives them back/.test(await tipText()), await tipText())
   await shot('changes-tip')
   await page.mouse.move(0, 0)
   const row = (wt) => section.locator(`.unused-wt[data-path="${wt.worktree.path.replace(/\\/g, '\\\\')}"]`)

@@ -452,7 +452,7 @@ const lineOf = (head) => head.evaluate((el) => `${el.querySelector('.progress-re
   const R1 = { agentName: 'R1', agentId: reviewer.id }
   const REV2 = '0123e4979f1c2b3a4d5e6f708192a3b4c5d6e7f8'
   // The merge queue's runs as queueChecks.ts names them, "<key> · <check> · <revision>", with no check name of their own.
-  const queued = (card, label, revision = REV) => ({ card: card.number, title: `${card.key} · ${label} · ${revision.slice(0, 7)}`, command: `npm run ${label}`, revision, source: 'hive', agentName: 'Hive (merge queue)' })
+  const queued = (card, label, revision = REV) => ({ card: card.number, title: `${card.key} · ${label} · ${revision.slice(0, 7)}`, command: `npm run ${label}`, revision, source: 'hive', agentName: 'Combwork (merge queue)' })
   const busy = [
     ran('b-unit', 1, 40, { card: b.number, title: 'unit', command: 'npm test' }),
     ran('b-review', 3, 20, { card: b.number, title: 'Review lint', command: 'npm run lint', copy: 'copy-7', ...R1 }),
@@ -512,7 +512,7 @@ const lineOf = (head) => head.evaluate((el) => `${el.querySelector('.progress-re
     check(`${b.key}'s: 4 runs · all passed, with a pass's icon`, (await headText(b.number)) === `${b.key} | Lane hover | 4 runs · all passed` && (await head(b.number).locator('.progress-card-icon.codicon-pass').count()) === 1, await headText(b.number))
     const rows = (card) => group(card).locator('.progress-card-items > .progress-recent-item > .progress-recent, .progress-card-items > .progress-run-group > .progress-group-head')
     const lines = async (card) => Promise.all((await rows(card).all()).map((h) => lineOf(h)))
-    const aLines = ['Hive (merge queue) · lint, typecheck', 'B1 · final typecheck ×2 · all passed', 'B1 · cardloop on base c0ffee1', 'R1 · Review delivery typecheck', 'B1 · unit: 6 files ×3 · 2 failed, then passed']
+    const aLines = ['Combwork (merge queue) · lint, typecheck', 'B1 · final typecheck ×2 · all passed', 'B1 · cardloop on base c0ffee1', 'R1 · Review delivery typecheck', 'B1 · unit: 6 files ×3 · 2 failed, then passed']
     check(`${a.key}'s runs, a line each, newest first: the merge queue's checks in one, its key left out of a title`, JSON.stringify(await lines(a.number)) === JSON.stringify(aLines), JSON.stringify(await lines(a.number)))
     // The queue's titles carry the key and revision (HR6's round 1): opened, its runs name only their check.
     await group(a.number).locator('.progress-run-group').filter({ hasText: 'Combwork (merge queue)' }).locator('.progress-group-head').click()

@@ -96,7 +96,7 @@ const check = (name, ok, extra = '') => {
       await lib.openWorkspace(inv, page, scratch.ws)
       const prepared = await inv('antivirus:prepare', 'add')
       const { result } = await inv('antivirus:apply', prepared.id)
-      check('before: Hive excluded the workspace, the user the worktrees', result.outcome === 'done' && JSON.stringify(result.added) === JSON.stringify([scratch.ws, tests]), JSON.stringify(result))
+      check('before: Combwork excluded the workspace, the user the worktrees', result.outcome === 'done' && JSON.stringify(result.added) === JSON.stringify([scratch.ws, tests]), JSON.stringify(result))
       check('…and Repair’s move can’t be asked for from Settings', !!(await inv('antivirus:prepare', 'move').then(() => null, (e) => String(e.message ?? e))))
     } finally {
       await app.close()
@@ -125,8 +125,8 @@ const check = (name, ok, extra = '') => {
     try {
       await lib.openWorkspace(inv, page, tools.ws)
       const plan = await inv('workspace:moveDefender')
-      check('the plan: Hive’s exclusion of the old workspace moves to the new one; the user’s of the old worktrees is only named', JSON.stringify([plan?.remove, plan?.add, plan?.theirs]) === JSON.stringify([[scratch.ws], [tools.ws], [scratch.trees]]), JSON.stringify(plan))
-      check('…its states from Hive’s administrator read', plan?.exclusionsFrom === 'admin-check' && JSON.stringify(plan.old.map((p) => p.state)) === JSON.stringify(['excluded', 'excluded']) && JSON.stringify(plan.now.map((p) => p.state)) === JSON.stringify(['not-excluded', 'not-excluded']), JSON.stringify(plan))
+      check('the plan: Combwork’s exclusion of the old workspace moves to the new one; the user’s of the old worktrees is only named', JSON.stringify([plan?.remove, plan?.add, plan?.theirs]) === JSON.stringify([[scratch.ws], [tools.ws], [scratch.trees]]), JSON.stringify(plan))
+      check('…its states from Combwork’s administrator read', plan?.exclusionsFrom === 'admin-check' && JSON.stringify(plan.old.map((p) => p.state)) === JSON.stringify(['excluded', 'excluded']) && JSON.stringify(plan.now.map((p) => p.state)) === JSON.stringify(['not-excluded', 'not-excluded']), JSON.stringify(plan))
       const before = changes().length
       // Defender's read held (slow): the plan shows, but Repair waits for it, so the box's default can't be skipped.
       await app.evaluate(() => {
@@ -143,29 +143,29 @@ const check = (name, ok, extra = '') => {
       await lib.until(async () => (await dialog.locator('.repair-defender').count()) === 1, HUNG_MS)
       check('…then Repair can be chosen', !!(await lib.until(() => dialog.getByRole('button', { name: 'Repair', exact: true }).isEnabled(), HUNG_MS)))
       const box = dialog.locator('.repair-defender input[type="checkbox"]')
-      check('the table has a Microsoft Defender group: the workspace’s exclusion to move, each folder with its state', /Microsoft Defender/i.test(await textOf(dialog)) && (await textOf(dialog)).includes(`The workspace (every project in it): was ${scratch.ws} (Excluded), now ${tools.ws} (Scanned); will move Hive's exclusion`), await textOf(dialog))
-      check('…the worktrees’ exclusion is the user’s: named, not changed', (await textOf(dialog)).includes(`Its worktrees: was ${scratch.trees} (Excluded), now ${tools.trees} (Scanned); will yours: change it in Windows Security`) && /Hive never changes yours/.test(await textOf(dialog)), await textOf(dialog))
-      check('…the box under the table, ticked: one administrator prompt', (await box.isChecked()) && /Move Hive's exclusion to the new folders \(one administrator prompt\)/.test(await textOf(dialog)), await textOf(dialog))
-      check('…saying where the states come from: Hive’s administrator read, with its date, read again before any change', /As Defender listed its exclusions with administrator rights, .+\. Repair's administrator prompt reads Defender's list again before it changes anything\./.test(await textOf(dialog)), await textOf(dialog))
+      check('the table has a Microsoft Defender group: the workspace’s exclusion to move, each folder with its state', /Microsoft Defender/i.test(await textOf(dialog)) && (await textOf(dialog)).includes(`The workspace (every project in it): was ${scratch.ws} (Excluded), now ${tools.ws} (Scanned); will move Combwork's exclusion`), await textOf(dialog))
+      check('…the worktrees’ exclusion is the user’s: named, not changed', (await textOf(dialog)).includes(`Its worktrees: was ${scratch.trees} (Excluded), now ${tools.trees} (Scanned); will yours: change it in Windows Security`) && /Combwork never changes yours/.test(await textOf(dialog)), await textOf(dialog))
+      check('…the box under the table, ticked: one administrator prompt', (await box.isChecked()) && /Move Combwork's exclusion to the new folders \(one administrator prompt\)/.test(await textOf(dialog)), await textOf(dialog))
+      check('…saying where the states come from: Combwork’s administrator read, with its date, read again before any change', /As Defender listed its exclusions with administrator rights, .+\. Repair's administrator prompt reads Defender's list again before it changes anything\./.test(await textOf(dialog)), await textOf(dialog))
       check('opening the dialog changed nothing', changes().length === before, JSON.stringify(changes().slice(before)))
       await page.screenshot({ path: path.join(lib.WORK, 'repairdefender-plan-dark.png') })
       await box.uncheck()
-      check('unticked: the workspace’s row leaves Hive’s exclusion', !!(await lib.until(async () => (await textOf(dialog)).includes("; will leave Hive's exclusion as it is"), HUNG_MS)), await textOf(dialog))
+      check('unticked: the workspace’s row leaves Combwork’s exclusion', !!(await lib.until(async () => (await textOf(dialog)).includes("; will leave Combwork's exclusion as it is"), HUNG_MS)), await textOf(dialog))
       await inv('settings:update', { appearance: { theme: 'light' } })
       await lib.until(() => page.evaluate(() => document.documentElement.dataset.theme === 'light'), HUNG_MS)
       await box.check()
-      await lib.until(async () => (await textOf(dialog)).includes("; will move Hive's exclusion"), HUNG_MS)
+      await lib.until(async () => (await textOf(dialog)).includes("; will move Combwork's exclusion"), HUNG_MS)
       await page.screenshot({ path: path.join(lib.WORK, 'repairdefender-plan-light.png') })
 
       await dialog.getByRole('button', { name: 'Repair', exact: true }).click()
-      check('Repair moves them: the report says so', !!(await lib.until(async () => /Moved Hive's exclusions to the new folders: 1 removed, 1 added\./.test(await textOf(dialog)), HUNG_MS)), await textOf(dialog))
+      check('Repair moves them: the report says so', !!(await lib.until(async () => /Moved Combwork's exclusions to the new folders: 1 removed, 1 added\./.test(await textOf(dialog)), HUNG_MS)), await textOf(dialog))
       await page.screenshot({ path: path.join(lib.WORK, 'repairdefender-report-light.png') })
       const moves = changes('move')
-      check('…in one elevated run: exactly Hive’s old entry removed and the new workspace added', moves.length === 1 && JSON.stringify(moves[0].remove) === JSON.stringify([scratch.ws]) && JSON.stringify(moves[0].paths) === JSON.stringify([tools.ws]), JSON.stringify(changes()))
+      check('…in one elevated run: exactly Combwork’s old entry removed and the new workspace added', moves.length === 1 && JSON.stringify(moves[0].remove) === JSON.stringify([scratch.ws]) && JSON.stringify(moves[0].paths) === JSON.stringify([tools.ws]), JSON.stringify(changes()))
       check('…the user’s exclusion left alone', JSON.stringify(changes('move-requested').map((c) => [c.remove, c.paths])) === JSON.stringify([[[scratch.ws], [tools.ws]]]), JSON.stringify(changes('move-requested')))
       const s = await inv('antivirus:status', true)
       const state = (p) => s.paths.find((x) => x.path === p)
-      check('the Antivirus status follows: the new workspace excluded, as Hive’s; its worktrees scanned', state(tools.ws)?.state === 'excluded' && state(tools.ws)?.addedByHive && state(tools.trees)?.state === 'not-excluded' && !state(tools.trees)?.addedByHive, JSON.stringify(s.paths))
+      check('the Antivirus status follows: the new workspace excluded, as Combwork’s; its worktrees scanned', state(tools.ws)?.state === 'excluded' && state(tools.ws)?.addedByHive && state(tools.trees)?.state === 'not-excluded' && !state(tools.trees)?.addedByHive, JSON.stringify(s.paths))
       await inv('settings:update', { appearance: { theme: 'dark' } })
       await lib.until(() => page.evaluate(() => document.documentElement.dataset.theme === 'dark'), HUNG_MS)
       await page.screenshot({ path: path.join(lib.WORK, 'repairdefender-report-dark.png') })
@@ -189,7 +189,7 @@ const check = (name, ok, extra = '') => {
       await dialog.locator('.btn.primary', { hasText: 'Close' }).click()
       const prepared = await inv('antivirus:prepare', 'add')
       const { result } = await inv('antivirus:apply', prepared.id)
-      check('Hive’s Add excludes Third and its worktrees', result.outcome === 'done' && JSON.stringify(result.added) === JSON.stringify([third.ws, third.trees, tests]), JSON.stringify(result))
+      check('Combwork’s Add excludes Third and its worktrees', result.outcome === 'done' && JSON.stringify(result.added) === JSON.stringify([third.ws, third.trees, tests]), JSON.stringify(result))
     } finally {
       await app.close()
     }
@@ -208,12 +208,12 @@ const check = (name, ok, extra = '') => {
       check('a policy keeps the change from applying: Repair says so, as a failure', report.failed.some((l) => /Defender accepted the change but 3 folders aren't as asked/.test(l)) && !report.done.some((l) => /exclusions/.test(l)), JSON.stringify(report))
       check('…one elevated run, for both kinds', JSON.stringify(changes('move').slice(-1).map((c) => [c.remove, c.paths])) === JSON.stringify([[[third.ws, third.trees], [fourth.ws, fourth.trees]]]), JSON.stringify(changes('move')))
       const s = await inv('antivirus:status', true)
-      check('…and nothing of the new folders is remembered as Hive’s', s.paths.every((p) => !p.path.startsWith(fourth.ws) || !p.addedByHive), JSON.stringify(s.paths))
+      check('…and nothing of the new folders is remembered as Combwork’s', s.paths.every((p) => !p.path.startsWith(fourth.ws) || !p.addedByHive), JSON.stringify(s.paths))
       // Hive's Add for Fourth: the workspace (its worktrees folder is the user's).
       setFixture({ exclusions: [scratch.trees, tools.ws, third.ws, third.trees, fourth.trees] })
       const prepared = await inv('antivirus:prepare', 'add')
       const { result } = await inv('antivirus:apply', prepared.id)
-      check('Hive’s Add excludes Fourth', result.outcome === 'done' && JSON.stringify(result.added) === JSON.stringify([fourth.ws, tests]), JSON.stringify(result))
+      check('Combwork’s Add excludes Fourth', result.outcome === 'done' && JSON.stringify(result.added) === JSON.stringify([fourth.ws, tests]), JSON.stringify(result))
     } finally {
       await app.close()
     }
@@ -235,18 +235,18 @@ const check = (name, ok, extra = '') => {
     try {
       await lib.openWorkspace(inv, page, inner.ws)
       let dialog = await openRepair(page)
-      check('the list hidden, no administrator read: Hive’s own exclusion moves; the states are what Hive knows, said so', (await textOf(dialog)).includes(`The workspace (every project in it): was ${fourth.ws} (Added by Hive), now ${inner.ws} (Unknown); will move Hive's exclusion`) && /Defender shows its exclusions only to administrators: these states are what Hive knows/.test(await textOf(dialog)), await textOf(dialog))
-      check('…a folder of unknown state, with no exclusion of Hive’s, is never said to be scanned', (await textOf(dialog)).includes(`Its worktrees: was ${fourth.trees} (Unknown); will nothing (no exclusion of Hive's)`) && !/Defender scans it/.test(await textOf(dialog)), await textOf(dialog))
+      check('the list hidden, no administrator read: Combwork’s own exclusion moves; the states are what Combwork knows, said so', (await textOf(dialog)).includes(`The workspace (every project in it): was ${fourth.ws} (Added by Combwork), now ${inner.ws} (Unknown); will move Combwork's exclusion`) && /Defender shows its exclusions only to administrators: these states are what Combwork knows/.test(await textOf(dialog)), await textOf(dialog))
+      check('…a folder of unknown state, with no exclusion of Combwork’s, is never said to be scanned', (await textOf(dialog)).includes(`Its worktrees: was ${fourth.trees} (Unknown); will nothing (no exclusion of Combwork's)`) && !/Defender scans it/.test(await textOf(dialog)), await textOf(dialog))
       await page.screenshot({ path: path.join(lib.WORK, 'repairdefender-plan-unknown.png') })
       await dialog.getByRole('button', { name: 'Cancel' }).click()
       await lib.until(async () => (await dialog.count()) === 0, HUNG_MS)
       // Defender's list shown now: the new workspace is Excluded, but only through the entry Repair removes.
       setFixture({ exclusions: machine }, { exclusions: machine })
       dialog = await openRepair(page)
-      check('the list shown: the new workspace Excluded through Hive’s old entry, still to move, and said to be the list now', (await textOf(dialog)).includes(`The workspace (every project in it): was ${fourth.ws} (Excluded), now ${inner.ws} (Excluded); will move Hive's exclusion`) && /As Defender lists its exclusions now\./.test(await textOf(dialog)), await textOf(dialog))
+      check('the list shown: the new workspace Excluded through Combwork’s old entry, still to move, and said to be the list now', (await textOf(dialog)).includes(`The workspace (every project in it): was ${fourth.ws} (Excluded), now ${inner.ws} (Excluded); will move Combwork's exclusion`) && /As Defender lists its exclusions now\./.test(await textOf(dialog)), await textOf(dialog))
       const before = changes('move-requested').length
       await dialog.getByRole('button', { name: 'Repair', exact: true }).click()
-      check('Repair removes the old entry and excludes the new workspace, no longer covered', !!(await lib.until(async () => /Moved Hive's exclusions to the new folders: 1 removed, 1 added\./.test(await textOf(dialog)), HUNG_MS)), await textOf(dialog))
+      check('Repair removes the old entry and excludes the new workspace, no longer covered', !!(await lib.until(async () => /Moved Combwork's exclusions to the new folders: 1 removed, 1 added\./.test(await textOf(dialog)), HUNG_MS)), await textOf(dialog))
       check('…in one elevated run', JSON.stringify(changes('move-requested').slice(before).map((c) => [c.remove, c.paths])) === JSON.stringify([[[fourth.ws], [inner.ws]]]), JSON.stringify(changes().slice(-4)))
     } finally {
       await app.close()
@@ -269,13 +269,13 @@ const check = (name, ok, extra = '') => {
     const { app, page, inv } = await launch()
     try {
       await lib.openWorkspace(inv, page, fifth.ws)
-      check('before: Hive’s exclusions of Inner and Tools are recorded, both folders gone', ours(inner.ws) && ours(tools.ws) && !fs.existsSync(inner.ws) && !fs.existsSync(tools.ws))
+      check('before: Combwork’s exclusions of Inner and Tools are recorded, both folders gone', ours(inner.ws) && ours(tools.ws) && !fs.existsSync(inner.ws) && !fs.existsSync(tools.ws))
       const report = await inv('workspace:moveRepair', { defender: true })
       check('Repair with its prompt declined: said, the rest done', report.skipped.some((l) => /prompt was declined/.test(l)) && report.failed.length === 0, JSON.stringify(report))
       check('…and the move is recorded as repaired: Repair offers no Defender move again', !(await inv('workspace:movePlan')), JSON.stringify(await inv('workspace:movePlan')))
       const s = await inv('antivirus:status', true)
       const gone = (s.gone ?? []).map((g) => g.path)
-      check('the status lists Hive’s exclusions of folders that are gone, unconfirmed (the list hidden)', gone.includes(inner.ws) && gone.includes(tools.ws) && (s.gone ?? []).every((g) => g.state === 'added') && !gone.includes(scratch.trees) && !gone.includes(fifth.ws), JSON.stringify(s.gone))
+      check('the status lists Combwork’s exclusions of folders that are gone, unconfirmed (the list hidden)', gone.includes(inner.ws) && gone.includes(tools.ws) && (s.gone ?? []).every((g) => g.state === 'added') && !gone.includes(scratch.trees) && !gone.includes(fifth.ws), JSON.stringify(s.gone))
     } finally {
       await app.close()
     }
@@ -304,7 +304,7 @@ const check = (name, ok, extra = '') => {
       const panel = page.locator('.antivirus')
       const gonePanel = panel.locator('.antivirus-gone')
       const goneText = async () => (await gonePanel.innerText().catch(() => '')).replace(/\s+/g, ' ')
-      check('Settings → Workspace → Antivirus scanning lists them under their own heading, each Added by Hive', !!(await lib.until(async () => /Hive’s exclusions of folders that are gone/.test(await goneText()), HUNG_MS)) && (await goneText()).includes(`${inner.ws} Added by Hive`) && (await goneText()).includes(`${tools.ws} Added by Hive`) && /no longer exist \(moved or deleted\)/.test(await goneText()), await goneText())
+      check('Settings → Workspace → Antivirus scanning lists them under their own heading, each Added by Combwork', !!(await lib.until(async () => /Combwork’s exclusions of folders that are gone/.test(await goneText()), HUNG_MS)) && (await goneText()).includes(`${inner.ws} Added by Combwork`) && (await goneText()).includes(`${tools.ws} Added by Combwork`) && /no longer exist \(moved or deleted\)/.test(await goneText()), await goneText())
       await gonePanel.scrollIntoViewIfNeeded()
       await page.screenshot({ path: path.join(lib.WORK, 'repairdefender-gone-dark.png') })
       await inv('settings:update', { appearance: { theme: 'light' } })
@@ -317,14 +317,14 @@ const check = (name, ok, extra = '') => {
       const removeDialog = page.locator('.dialog', { hasText: 'Remove the exclusions Combwork added?' })
       await lib.until(async () => (await removeDialog.count()) === 1, HUNG_MS)
       const listedNow = await removeDialog.locator('.dialog-list li').allInnerTexts()
-      check('Remove lists them, Hive’s alone', listedNow.includes(inner.ws) && listedNow.includes(tools.ws) && !listedNow.includes(scratch.trees) && !listedNow.includes(fourth.trees), JSON.stringify(listedNow))
+      check('Remove lists them, Combwork’s alone', listedNow.includes(inner.ws) && listedNow.includes(tools.ws) && !listedNow.includes(scratch.trees) && !listedNow.includes(fourth.trees), JSON.stringify(listedNow))
       const before = changes('remove-requested').length
       await removeDialog.locator('.btn.primary').click()
       check('…one elevated run asks Defender to remove exactly the entries it lists', !!(await lib.until(async () => changes('remove-requested').length === before + 1, HUNG_MS)) && JSON.stringify([...changes('remove-requested').at(-1).paths].sort()) === JSON.stringify([inner.ws, tools.ws].sort()), JSON.stringify(changes().slice(-2)))
       // config.json is saved a moment after a change: waited for.
       check('…then the panel lists none, and Combwork no longer records them', !!(await lib.until(async () => (await gonePanel.count()) === 0 && !ours(inner.ws) && !ours(tools.ws), HUNG_MS)), await panel.innerText())
       const after = await inv('antivirus:status', true)
-      check('…nor Hive’s other gone ones Defender no longer lists (forgotten once the list is read)', !(after.gone ?? []).length && !!(await lib.until(() => !ours(third.ws), HUNG_MS)), JSON.stringify({ gone: after.gone, added: JSON.parse(fs.readFileSync(path.join(userData, 'config.json'), 'utf8')).antivirus?.added }))
+      check('…nor Combwork’s other gone ones Defender no longer lists (forgotten once the list is read)', !(after.gone ?? []).length && !!(await lib.until(() => !ours(third.ws), HUNG_MS)), JSON.stringify({ gone: after.gone, added: JSON.parse(fs.readFileSync(path.join(userData, 'config.json'), 'utf8')).antivirus?.added }))
     } finally {
       await app.close()
     }

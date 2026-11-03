@@ -65,7 +65,7 @@ const check = (name, ok, extra = '') => {
     return (fs.existsSync(f) ? fs.readFileSync(f, 'utf8').trim().split('\n').filter(Boolean).map((l) => JSON.parse(l)) : []).filter((w) => w.agent === agent).map((w) => ({ ...w, raw: w.text, text: lib.unkey(w.text) }))
   }
   const script = (agent, lines) => fs.writeFileSync(path.join(claudeHome, `fake-wakes-${agent}.txt`), lines.join('\n') + '\n')
-  /** The fake drops the next n Enters that would send a line from Hive ("[Hive]…"), as Codex did once (#376). */
+  /** The fake drops the next n Enters that would send a line from Combwork ("[Hive]…"), as Codex did once (#376). */
   const dropEnters = (agent, n) => fs.writeFileSync(path.join(claudeHome, `fake-drop-enters-${agent}.txt`), String(n))
   /** What an agent is doing, for a failed check: its state, its terminal's last lines and the log's (#539). */
   const why = async (id) => {
@@ -127,7 +127,7 @@ const check = (name, ok, extra = '') => {
   dropEnters('Reviewer', 1)
   await inv('tasks:update', c1, { column: 'review' })
   check('its wake is taken after Enter is pressed again', !!(await until(async () => wakes('Reviewer').length === 1, 20000)), JSON.stringify(wakes('Reviewer')))
-  check('…Hive says it pressed Enter again', /wasn't taken: pressed Enter again/.test(hiveLog()))
+  check('…Combwork says it pressed Enter again', /wasn't taken: pressed Enter again/.test(hiveLog()))
   check('…and the reviewer works, then watches again', !!(await until(async () => (await live(reviewer.id))?.status === 'watching', 15000)))
   await lib.sleep(4500) // on purpose: longer than the grace, to see no flag comes
   check('a reviewer that keeps watching is never flagged', !(await stalledOf(c1)) && !(await live(reviewer.id))?.notWatching, String(await stalledOf(c1)))
@@ -140,10 +140,10 @@ const check = (name, ok, extra = '') => {
   script('Reviewer', [`work 1 then ${wait(c1, { column: 'passed' })}`])
   await inv('tasks:update', c1, { column: 'doing' })
   await inv('tasks:update', c1, { column: 'review' })
-  const reason = `Reviewer hasn't taken the wake Hive typed for #${c1}: it waits in its prompt.`
+  const reason = `Reviewer hasn't taken the wake Combwork typed for #${c1}: it waits in its prompt.`
   check('a wake never taken: after the grace, the card is stalled, saying who and why', !!(await until(async () => (await stalledOf(c1)) === reason, 30000)), String(await stalledOf(c1)))
   check('…naming the card by key alone (#1219, HI-1661)', lib.KEYED.test(String(await rawStalled(c1))), String(await rawStalled(c1)))
-  check('…the line was never sent, and Hive says so', !!(await until(async () => /still wasn't taken/.test(hiveLog()), 8000)) && wakes('Reviewer').length === 1)
+  check('…the line was never sent, and Combwork says so', !!(await until(async () => /still wasn't taken/.test(hiveLog()), 8000)) && wakes('Reviewer').length === 1)
   check('…the reviewer shows idle, with the card it left', ['ready', 'finished'].includes((await live(reviewer.id))?.status) && JSON.stringify((await live(reviewer.id))?.notWatching) === JSON.stringify([c1]), JSON.stringify(await live(reviewer.id)))
   await page.getByRole('button', { name: 'Task Board' }).click()
   const tile = page.locator(`.task-card[data-task="${c1}"]`)
@@ -151,7 +151,7 @@ const check = (name, ok, extra = '') => {
   await page.screenshot({ path: path.join(lib.WORK, 'loopwatch-stalled.png') })
   // Windows notifications only: each tell() also logs an `entry` line (HI-2320), not a second notice (HI-2369). Any line
   // counts for "isn't watching" below, a bell-only notice too.
-  const told = () => notices().filter((n) => n.kind === 'notification' && /hasn't taken a line Hive typed/.test(JSON.stringify(n)))
+  const told = () => notices().filter((n) => n.kind === 'notification' && /hasn't taken a line Combwork typed/.test(JSON.stringify(n)))
   check('one notice tells the user', !!(await until(async () => told().length === 1, 5000)), JSON.stringify(notices()))
   await lib.sleep(4000) // on purpose: longer than the grace, to see no second notice comes
   check('…only once, and none saying it isn\'t watching (#777)', told().length === 1 && !notices().some((n) => /isn't watching/.test(n.title ?? '')), JSON.stringify(notices()))
@@ -168,7 +168,7 @@ const check = (name, ok, extra = '') => {
   // had when it read it (#650: in section 2, with the wake whose line it took then), and the reviewer is idle again before
   // anything else is typed to it, or the next line lands while it works and is lost (#571).
   const loopWake = `[Hive] #${c1} (Builder's card) is in Review. You review this card in its loop`
-  check("…and Hive's loop wake for it reaches the reviewer, which is idle again", !!(await until(async () => wakes('Reviewer').some((w) => w.text.includes(loopWake)) && ['ready', 'finished'].includes((await live(reviewer.id))?.status), 15000)), `${JSON.stringify(wakes('Reviewer').map((w) => w.text.slice(0, 60)))} ${await why(reviewer.id)}`)
+  check("…and Combwork's loop wake for it reaches the reviewer, which is idle again", !!(await until(async () => wakes('Reviewer').some((w) => w.text.includes(loopWake)) && ['ready', 'finished'].includes((await live(reviewer.id))?.status), 15000)), `${JSON.stringify(wakes('Reviewer').map((w) => w.text.slice(0, 60)))} ${await why(reviewer.id)}`)
   await inv('tasks:update', c1, { project: 'beta' })
   check('moved to another project: no longer stalled, and the mark leaves the agent', !!(await until(async () => !(await stalledOf(c1)) && !(await live(reviewer.id))?.notWatching, 8000)), JSON.stringify({ stalled: await stalledOf(c1), mark: (await live(reviewer.id))?.notWatching }))
 

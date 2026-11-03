@@ -172,7 +172,7 @@ const log = (profile) => { try { return fs.readFileSync(path.join(scratch, profi
   release = null
   await page.locator('.settings button', { hasText: 'Check Now' }).click(); await lib.until(async () => (await inv('update:state')).status === 'error', 10000)
   st = await inv('update:state')
-  check('404 → "no release published yet"', st.status === 'error' && /No release of Hive has been published yet/.test(st.error), st.error)
+  check('404 → "no release published yet"', st.status === 'error' && /No release of Combwork has been published yet/.test(st.error), st.error)
   check('error dialog shown', await page.locator('.dialog', { hasText: 'No release of Combwork has been published yet' }).count() === 1)
   await page.screenshot({ path: path.join(scratch, 'upd-5-error.png') })
   await app.close()
@@ -182,7 +182,7 @@ const log = (profile) => { try { return fs.readFileSync(path.join(scratch, profi
   st = await inv('update:state')
   check('dev build: disabled', st.status === 'disabled' && /installed app/.test(st.error))
   await page.keyboard.press('F1'); await sleep(400)
-  await page.locator('.split-list .row', { hasText: 'About Hive' }).click(); await sleep(400)
+  await page.locator('.split-list .row', { hasText: 'About Combwork' }).click(); await sleep(400)
   check('About shows the update status', /installed app/.test(await page.locator('.about-update').innerText()))
   await page.screenshot({ path: path.join(scratch, 'upd-6-about.png') })
   await app.close()
@@ -194,7 +194,7 @@ const log = (profile) => { try { return fs.readFileSync(path.join(scratch, profi
   check('#1647: the release is downloaded', await waitFor(async () => (await inv('update:state')).status === 'ready', HUNG_MS))
   await inv('update:install')
   check('#1647: Restart and Update over a local build of its version: not installed, and said so', await waitFor(async () => (await page.locator('.toast', { hasText: "Combwork 9.1.1 wasn't installed" }).count()) === 1, HUNG_MS) && (await inv('update:state')).notInstalled === 'notNewer')
-  check('#1647: …and Hive is still running', (await inv('update:state')).status === 'ready' && !/would install/.test(log('upd-e')))
+  check('#1647: …and Combwork is still running', (await inv('update:state')).status === 'ready' && !/would install/.test(log('upd-e')))
   await page.screenshot({ path: path.join(scratch, 'upd-7-not-installed.png') })
   const exitedE = exits(app)
   await inv('app:quit')
@@ -246,7 +246,7 @@ const log = (profile) => { try { return fs.readFileSync(path.join(scratch, profi
   await inv('app:quit')
   check('#1647: quitting asks first (an agent is running)', await waitFor(async () => (await page.locator('.dialog', { hasText: 'Quit Combwork?' }).count()) === 1, HUNG_MS))
   await page.locator('.dialog button', { hasText: 'Cancel' }).click()
-  check('#1647: a cancelled quit installs nothing, and Hive goes on', await waitFor(async () => (await inv('app:quitState')).request === null, HUNG_MS) && !/would install/.test(log('upd-g')) && (await inv('session:live')).length === 1)
+  check('#1647: a cancelled quit installs nothing, and Combwork goes on', await waitFor(async () => (await inv('app:quitState')).request === null, HUNG_MS) && !/would install/.test(log('upd-g')) && (await inv('session:live')).length === 1)
   // HI-2427: Restart and Update while an ordinary quit's dialog waits only brings that dialog forward; Cancel there
   // leaves no install or restart for the next quit, the one below that goes ahead (it installs on quit, never "and
   // restart").
@@ -255,7 +255,7 @@ const log = (profile) => { try { return fs.readFileSync(path.join(scratch, profi
   await inv('update:install', '9.1.1')
   check('HI-2427: Restart and Update during an open quit dialog asks nothing more', await waitFor(async () => /Restart and Update while a question is open/.test(log('upd-g')), HUNG_MS) && (await page.locator('.dialog', { hasText: 'Quit Combwork?' }).count()) === 1)
   await page.locator('.dialog button', { hasText: 'Cancel' }).click()
-  check('HI-2427: cancelled, nothing installs and Hive goes on', await waitFor(async () => (await inv('app:quitState')).request === null, HUNG_MS) && !/would install/.test(log('upd-g')) && (await inv('session:live')).length === 1)
+  check('HI-2427: cancelled, nothing installs and Combwork goes on', await waitFor(async () => (await inv('app:quitState')).request === null, HUNG_MS) && !/would install/.test(log('upd-g')) && (await inv('session:live')).length === 1)
   const exitedG = exits(app)
   await inv('app:quit')
   await waitFor(async () => (await page.locator('.dialog', { hasText: 'Quit Combwork?' }).count()) === 1, HUNG_MS)

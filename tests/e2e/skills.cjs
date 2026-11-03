@@ -18,7 +18,7 @@ const sleep = lib.sleep
 const HUNG_MS = 10000
 /** Whether fn() comes true (checked until it does, up to HUNG_MS). */
 const becomes = async (fn) => !!(await lib.until(fn, HUNG_MS))
-/** The bundled skills from before Hive kept track of them (an existing workspace without them deleted them), and the newer ones. */
+/** The bundled skills from before Combwork kept track of them (an existing workspace without them deleted them), and the newer ones. */
 const EARLIER = ['handover', 'merge-ready', 'pick-up', 'review-agent-work', 'split-work', 'workspace-note']
 const NEWER = ['board-hygiene', 'card-loop', 'coordinate-agents', 'generalist', 'journal', 'licence-audit', 'run-lanes', 'triage-report', 'tune-settings', 'use-hive-api', 'work-on-card']
 const BUNDLED = [...EARLIER, ...NEWER]
@@ -75,7 +75,7 @@ const check = (name, ok, extra = '') => {
   await page.keyboard.press('Control+Shift+K')
   check('Skills view lists them', await becomes(async () => (await page.locator('.skill-row').count()) === BUNDLED.length), String(await page.locator('.skill-row').count()))
   const viewWarning = await page.locator('.sidebar .skills-warning').allInnerTexts()
-  check('Skills view: the warning over the list (#120)', viewWarning.length === 1 && viewWarning[0].trim() === 'Warning: Editing these skills may change agent behaviour in Hive', JSON.stringify(viewWarning))
+  check('Skills view: the warning over the list (#120)', viewWarning.length === 1 && viewWarning[0].trim() === 'Warning: Editing these skills may change agent behaviour in Combwork', JSON.stringify(viewWarning))
   await page.screenshot({ path: path.join(lib.WORK, 'skills-view.png') })
 
   // Edited → changed → Revert to default → same.
@@ -203,7 +203,7 @@ const check = (name, ok, extra = '') => {
   await lib.until(async () => (await pick.count()) === 1, 10000)
   const pickOptions = await pick.locator('option').allInnerTexts()
   check('project tab: a dropdown of the providers, starting on the default one', pickOptions.length === 2 && pickOptions[0].startsWith('Claude Code') && pickOptions[1].startsWith('Codex') && (await pick.inputValue()) === 'claude-code', JSON.stringify({ pickOptions, value: await pick.inputValue() }))
-  const hiveToggle = page.locator('.skill-group-toggle', { hasText: 'Hive' }).first()
+  const hiveToggle = page.locator('.skill-group-toggle', { hasText: 'Combwork' }).first()
   const providerToggle = page.locator('.skill-provider-toggle')
   check('project tab: Combwork skills at the top, open', (await hiveToggle.getAttribute('aria-expanded')) === 'true' && (await page.locator('.split-list .skill-row', { hasText: 'workspace-note' }).count()) === 1)
   check('…then that provider’s skills only, folded', (await page.locator('.skill-provider').count()) === 1 && /claude code skills/i.test(await providerToggle.innerText()) && (await providerToggle.getAttribute('aria-expanded')) === 'false' && (await page.locator('.skill-provider .skill-group', { hasText: 'Local' }).count()) === 0)
@@ -278,7 +278,7 @@ const check = (name, ok, extra = '') => {
     const bar = split?.querySelector('.editor-toolbar')
     return w && host && bar ? { text: w.textContent.trim(), between: bar.getBoundingClientRect().bottom <= w.getBoundingClientRect().top + 0.5 && w.getBoundingClientRect().bottom <= host.getBoundingClientRect().top + 0.5 } : null
   })
-  check('editing a Hive skill: the same warning, above the editor (#120)', editWarning?.text === 'Warning: Editing these skills may change agent behaviour in Hive' && editWarning.between, JSON.stringify(editWarning))
+  check('editing a Combwork skill: the same warning, above the editor (#120)', editWarning?.text === 'Warning: Editing these skills may change agent behaviour in Combwork' && editWarning.between, JSON.stringify(editWarning))
   await page.screenshot({ path: path.join(lib.WORK, 'skills-edit.png') })
   await inv('settings:update', { appearance: { theme: 'light' } })
   await sleep(300)

@@ -109,7 +109,7 @@ process.on('uncaughtException', (e) => {
   await crash()
   check('a second crash asks', !!(await until(async () => (await boxes()).some((b) => /stopped working/.test(b.message)), 10000)))
   const asked = (await boxes()).find((b) => /stopped working/.test(b.message))
-  check('with Reload, Open Logs and Quit Hive', asked?.buttons === 'Reload,Open Logs,Quit Hive', asked?.buttons)
+  check('with Reload, Open Logs and Quit Combwork', asked?.buttons === 'Reload,Open Logs,Quit Combwork', asked?.buttons)
   check('Reload brings the page back', !!(await pageBack()))
   check('the agent is still running after both', (await liveMain())?.status === 'finished')
 

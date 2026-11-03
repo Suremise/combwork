@@ -35,7 +35,7 @@ const has = (p) => /;AC\)/.test(sddl(p))
 const userData = path.join(lib.WORK, 'installdir-profile')
 const notifyLog = path.join(lib.WORK, 'installdir-notify.log')
 
-/** Starts Hive on a test folder it can't fix and returns its exit code and the message it recorded. */
+/** Starts Combwork on a test folder it can't fix and returns its exit code and the message it recorded. */
 async function cantStart(dir, vars = {}) {
   fs.rmSync(notifyLog, { force: true })
   const env = lib.hiveEnv({ HIVE_USER_DATA: userData, HIVE_API_PORT: lib.port(47883), HIVE_TEST_INSTALL_DIR: dir, HIVE_TEST_NOTIFY_LOG: notifyLog, ...vars })
@@ -92,7 +92,7 @@ function pasted(message) {
   const app = await _electron.launch({ executablePath: lib.ELECTRON, args: [lib.ROOT], cwd: lib.ROOT, env })
   const page = await app.firstWindow()
   await lib.appReady(page)
-  check('Hive started', true)
+  check('Combwork started', true)
   check('it added ALL APPLICATION PACKAGES to the folder, read and inherited', /\(A;OICI;0x1200a9;;;AC\)/.test(sddl(fixable)), sddl(fixable))
   check('and to the file Electron checks, read', /\(A;;0x1200a9;;;AC\)/.test(sddl(icu)), sddl(icu))
   await app.close()
@@ -108,9 +108,9 @@ function pasted(message) {
   run(locked, '/grant', FOLDER_ENTRY)
   check("the locked folder's permissions can't be changed", lacks(locked), sddl(locked))
   const a = await cantStart(locked, { HIVE_TEST_DIALOG_SNAPSHOT: snapshot })
-  check('Hive quit with an error instead of starting', a.code === 1, String(a.code))
+  check('Combwork quit with an error instead of starting', a.code === 1, String(a.code))
   check("it told the user Combwork can't start", a.message?.title === "Combwork can't start", JSON.stringify(a.notes))
-  check('naming the folder', !!a.message?.body.includes(`the folder Hive is installed in:\n${locked}\n`), a.message?.body)
+  check('naming the folder', !!a.message?.body.includes(`the folder Combwork is installed in:\n${locked}\n`), a.message?.body)
   const pa = pasted(a.message)
   check('with the command to run in PowerShell, exactly', JSON.stringify(pa.calls) === JSON.stringify([[locked, '/grant', FOLDER_ENTRY]]), pa.detail)
   // Drawn without its text and buttons, the window is about 3 KB; with them, over 10 KB.
@@ -128,9 +128,9 @@ function pasted(message) {
   run(lockedIcu, '/grant', FILE_ENTRY)
   check("the locked icudtl.dat's permissions can't be changed", lacks(lockedIcu), sddl(lockedIcu))
   const b = await cantStart(fileLocked)
-  check('Hive quit with an error instead of starting', b.code === 1, String(b.code))
+  check('Combwork quit with an error instead of starting', b.code === 1, String(b.code))
   check('having added the entry to the folder', has(fileLocked), sddl(fileLocked))
-  check('naming the file that still lacks it', !!b.message?.body.includes(`a file in the folder Hive is installed in:\n${lockedIcu}\n`), b.message?.body)
+  check('naming the file that still lacks it', !!b.message?.body.includes(`a file in the folder Combwork is installed in:\n${lockedIcu}\n`), b.message?.body)
   const pb = pasted(b.message)
   check('with the command for the folder, then the file', JSON.stringify(pb.calls) === JSON.stringify([[fileLocked, '/grant', FOLDER_ENTRY], [lockedIcu, '/grant', FILE_ENTRY]]), pb.detail)
 

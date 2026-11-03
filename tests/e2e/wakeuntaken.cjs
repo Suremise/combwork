@@ -70,7 +70,7 @@ const check = (name, ok, extra = '') => {
     await lib.typeLine(inv, lib.ptyKey(alpha, id), claudeHome, null, text, { live: () => live(id) })
   }
   const idle = async (id) => ['ready', 'finished'].includes((await live(id))?.status)
-  /** Hive's window for a typed wake to be taken, from now on (HIVE_TEST_WAKE_TAKE_MS, read at each wake). */
+  /** Combwork's window for a typed wake to be taken, from now on (HIVE_TEST_WAKE_TAKE_MS, read at each wake). */
   const takeWindow = (ms) => app.evaluate((_, v) => void (process.env.HIVE_TEST_WAKE_TAKE_MS = v), String(ms))
 
   await page.getByText('alpha', { exact: true }).first().click()
@@ -105,20 +105,20 @@ const check = (name, ok, extra = '') => {
   check('not taken after Enter again: the agent is marked', !!marked && marked.text.startsWith(`[Hive] New in your inbox: 1 card event (${named}) (m`) && /^\[Hive\] New in your inbox: 1 card event \(.+\) \(m\d+\)\./.test(marked.text), JSON.stringify(marked))
   // Hive's two Enters were pressed before it marked the agent, but the CLI may not have read them yet (#664, under load).
   const drops = () => fs.readFileSync(path.join(claudeHome, 'fake-drop-enters-Watcher.txt'), 'utf8').trim()
-  check('Hive pressed Enter twice, never a third time (the CLI dropped both)', !!(await until(async () => drops() === '0', HUNG_MS)) && wakes().length === 1, JSON.stringify({ left: drops(), wakes: wakes().length }))
+  check('Combwork pressed Enter twice, never a third time (the CLI dropped both)', !!(await until(async () => drops() === '0', HUNG_MS)) && wakes().length === 1, JSON.stringify({ left: drops(), wakes: wakes().length }))
   check('the log says: Enter again, still not taken', /wasn't taken: pressed Enter again/.test(hiveLog()) && /still wasn't taken/.test(hiveLog()))
   check('its pane says so', !!(await until(async () => (await page.locator('.pane-status', { hasText: "A line Combwork typed wasn't taken" }).count()) >= 1, HUNG_MS)))
   await page.screenshot({ path: path.join(lib.WORK, 'wakeuntaken-marked.png') })
-  const toldOf = () => notices().filter((n) => /hasn't taken a line Hive typed/.test(JSON.stringify(n)))
+  const toldOf = () => notices().filter((n) => /hasn't taken a line Combwork typed/.test(JSON.stringify(n)))
   const told = (await until(async () => toldOf().length > 0 && toldOf(), HUNG_MS)) || []
   check('the user is told once', told.length === 1, JSON.stringify(notices()))
 
   // The user presses Enter in its terminal: the line goes in, and the mark goes.
   await inv('pty:write', lib.ptyKey(alpha, agent.id), '\r')
-  check("the user's Enter submits the line Hive typed", !!(await until(async () => wakes().length === 2 && /Second change/.test(wakes()[1]), HUNG_MS)), JSON.stringify(wakes()))
+  check("the user's Enter submits the line Combwork typed", !!(await until(async () => wakes().length === 2 && /Second change/.test(wakes()[1]), HUNG_MS)), JSON.stringify(wakes()))
   check('…sent by the third Enter it got (two dropped)', !!(await until(async () => wakeRecords()[1]?.enter === 3, HUNG_MS)), JSON.stringify(wakeRecords()))
   check('…and the mark is gone', !!(await until(async () => !(await live(agent.id))?.untakenLine, HUNG_MS)))
-  check('still told only once', notices().filter((n) => /hasn't taken a line Hive typed/.test(JSON.stringify(n))).length === 1)
+  check('still told only once', notices().filter((n) => /hasn't taken a line Combwork typed/.test(JSON.stringify(n))).length === 1)
 
   await app.close()
   console.log(failed ? `\n${failed} FAILED` : '\nALL PASSED')

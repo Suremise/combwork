@@ -36,7 +36,7 @@ const logText = () => (fs.existsSync(logFile) ? fs.readFileSync(logFile, 'utf8')
 /** The log since the last start: this run's lines. */
 const thisRun = () => {
   const text = logText()
-  const at = text.lastIndexOf('] Hive ')
+  const at = text.lastIndexOf('] Combwork ')
   return at < 0 ? '' : text.slice(text.lastIndexOf('\n', at) + 1)
 }
 /**
@@ -61,7 +61,7 @@ process.on('uncaughtException', (e) => {
 const identities = []
 let claudeEnv = null
 
-/** Starts a copy of Hive on the profile, with its workspace restored. */
+/** Starts a copy of Combwork on the profile, with its workspace restored. */
 async function start(extra = {}) {
   const env = lib.hiveEnv({ HIVE_USER_DATA: userData, ...claudeEnv, ...extra })
   const app = await _electron.launch({ executablePath: lib.ELECTRON, args: [lib.ROOT], cwd: lib.ROOT, env })
@@ -104,7 +104,7 @@ const liveAgent = async (inv, agentId) => (await inv('session:live')).find((l) =
       current = await start()
       const { app, page, inv } = current
       check('a first start finds no earlier run', /The last run quit normally/.test(await inv('app:diagnostics')))
-      check('the running Hive keeps its marker', !!(await lib.until(() => marker()?.pid > 0, HUNG_MS)), JSON.stringify(marker()))
+      check('the running Combwork keeps its marker', !!(await lib.until(() => marker()?.pid > 0, HUNG_MS)), JSON.stringify(marker()))
       await lib.openWorkspace(inv, page, ws)
       await page.getByText('alpha', { exact: true }).first().click()
       agent = await lib.soloAgent(inv, proj, { name: 'Steady' })
@@ -141,7 +141,7 @@ const liveAgent = async (inv, agentId) => (await inv('session:live')).find((l) =
       check('…and is not shown meanwhile',(await notice(page)) === '')
       fs.writeFileSync(release, '')
       const text = await lib.until(() => notice(page), HUNG_MS)
-      check('the next start says Hive closed unexpectedly, when it was last seen', !!text && text.includes(`Hive was last seen on`) && text.includes(` at ${shownTime(left.lastSeen)}.`), text)
+      check('the next start says Combwork closed unexpectedly, when it was last seen', !!text && text.includes(`Combwork was last seen on`) && text.includes(` at ${shownTime(left.lastSeen)}.`), text)
       check('…which agent was running where, and that nothing was resumed', /One agent was running in alpha\. Nothing was resumed\./.test(text), text)
       check('…with Resume All and Show Overview', /Resume All/.test(text) && /Show Overview/.test(text), text)
       check('…and the merge left half done, with the folder it was in', text.includes(`Steady was merging main (#7): check ${proj} for a merge left half done (git status there)`), text)
@@ -150,7 +150,7 @@ const liveAgent = async (inv, agentId) => (await inv('session:live')).find((l) =
       const home = (await inv('workspace:refresh'))?.assistant?.path
       const told = () => {
         try {
-          return require('./storeDocs.cjs').deliveriesOf(home).find((r) => r.agentId === 'assistant' && r.from?.kind === 'hive' && /Hive closed unexpectedly: last seen/.test(r.body))
+          return require('./storeDocs.cjs').deliveriesOf(home).find((r) => r.agentId === 'assistant' && r.from?.kind === 'hive' && /Combwork closed unexpectedly: last seen/.test(r.body))
         } catch {
           return null
         }
