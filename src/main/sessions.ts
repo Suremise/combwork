@@ -997,11 +997,6 @@ interface Place {
   foreign: boolean
 }
 
-/**
- * The workspace's skills (their list and each one's revision) and MCP servers, read once for the agents whose launch
- * settings are worked out together (#1002): a refresh worked out every running agent's, reading them all again for each
- * one. The first read is made in the caller's workspace; one set of reads is never used for another workspace.
- */
 /** A session's dialect chain as pinned at its launch (HI-2443): the chain, what it was resolved from, and its key (chainKey). */
 interface PinnedDialect {
   chain: ResolvedChain & { slot: ModelSlot }
@@ -1023,6 +1018,11 @@ function launchDialectOf(d: PinnedDialect, guidance: string): LaunchDialect {
   }
 }
 
+/**
+ * The workspace's skills (their list and each one's revision), MCP servers and dialect files (HI-2443), read once for
+ * the agents whose launch settings are worked out together (#1002): a refresh worked out every running agent's, reading
+ * them all again for each one. The first read is made in the caller's workspace; one set of reads is never used for another workspace.
+ */
 export class LaunchReads {
   private skillList: Promise<SkillInfo[]> | null = null
   private serverList: Promise<McpServerInfo[]> | null = null
@@ -2725,8 +2725,9 @@ class SessionManager {
     const notGiven = Object.fromEntries(Object.entries(eff.skillProblems).map(([name, why]) => [name, { revision: null, problem: inDefaultDialect(() => say(SESSION.skillNotGiven, { why })), lasting: true as const }]))
     const record = launchRecord(eff.skillHashes, { ...delivered, ...notGiven })
     state.launchSignature = this.signature({ ...eff, skillHashes: record.settled })
-    // Its dialect chain (HI-2443): each layer's file, "model unknown", and the guidance revision as said in it.
-    const dialect = l.dialect ? launchDialectOf(l.dialect, chainGuidanceRevision()) : undefined
+    // Its dialect chain (HI-2443): each layer's file, "model unknown", and the guidance revision as said in it. Only
+    // where a dialect is set (a text overridden, or a file picked): speaking the Default, its record is as before.
+    const dialect = l.dialect && (l.dialect.chain.hash || l.dialect.input.pick !== 'auto') ? launchDialectOf(l.dialect, chainGuidanceRevision()) : undefined
     state.launched = { guidance: GUIDANCE_REVISION, skills: record.skills, ...(record.problems ? { problems: record.problems } : {}), ...(dialect ? { dialect } : {}) }
     // Performance metrics: what Hive gave this session, exact sizes. The session contract once (whichever way the
     // provider gets it); the skills that reached it, measured on their copies; the ones asked for that didn't.

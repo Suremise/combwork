@@ -200,7 +200,7 @@ function initialize(def) {
   const plainMcp = JSON.parse(fs.readFileSync(plain.opts['--mcp-config'], 'utf8')).mcpServers.hive
   const d4 = (await agentNow(clara.id))?.live?.launched
   check('…gets no dialect file, in its hive server or its shell', !plainMcp.env.HIVE_DIALECT_FILE && !plain.env?.HIVE_DIALECT_FILE, JSON.stringify(plain.env))
-  check('…and its launch record says the Default: no hash, the Default\'s guidance revision', d4?.dialect?.hash === '' && d4.dialect.guidance === d4.guidance, JSON.stringify(d4))
+  check('…and its launch record is as before a dialect: no dialect in it (the Default)', !!d4 && !('dialect' in d4), JSON.stringify(d4))
   check('…and Hive\'s own English', (await noRouteSaid(plain.token)).startsWith('No route for GET'), await noRouteSaid(plain.token))
   await page.screenshot({ path: path.join(lib.WORK, 'dialectlaunch.png') })
 

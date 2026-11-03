@@ -1835,9 +1835,9 @@ export interface LaunchDialect {
   hash: string
   /** Hive's guidance revision as said in this chain: the Default's (`guidance`) unless the chain changes its text. */
   guidance: string
-  /** The real model ID Auto matched by; absent with `modelUnknown`, or when the agent picked a file. */
+  /** The real model ID it launched with, which Auto matches by; absent when Hive couldn't name it. */
   model?: string
-  /** Hive couldn't name the model, so Auto left the model slot empty ("model unknown"). */
+  /** Hive couldn't name the model, so Auto left the model slot empty ("model unknown"); never with a file picked. */
   modelUnknown?: true
   /** The file the agent picked, when it did (its Dialect setting). */
   pick?: string
@@ -2471,6 +2471,7 @@ export interface LiveSessionState {
    * copy it reads, and why a skill isn't as asked for (a folder of the user's has its name, an old copy kept while in use),
    * and the dialect chain it speaks (HI-2443).
    */
+  /** `dialect`: only where a dialect is set (a text overridden, or a file picked); absent, it speaks the Default. */
   launched?: { guidance: string; skills: Record<string, string>; problems?: Record<string, string>; dialect?: LaunchDialect }
   /** Finished or waiting since its pane was last on screen in a focused window (the renderer marks it seen). */
   unseen: boolean
