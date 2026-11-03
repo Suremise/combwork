@@ -754,6 +754,7 @@ export const UNIT_SCANS = [
   { test: 'tests/actionHandlers.test.ts', paths: ['locales/de/'] },
   { test: 'tests/gitInit.test.ts', paths: ['locales/de/'] },
   { test: 'tests/progressQueue.test.ts', paths: ['locales/de/'] },
+  { test: 'tests/settingsTools.test.ts', paths: ['locales/de/'] },
   { test: 'tests/skillDescriptions.test.ts', paths: ['locales/de/', 'resources/skills/'] },
   { test: 'tests/benchmark.test.ts', paths: ['locales/pl/'] },
   { test: 'tests/flightRecorder.test.ts', paths: ['locales/pl/'] },
