@@ -425,11 +425,16 @@ export function bindAdvancedSettings(cfg: { settings: AppSettings; updateSetting
       cfg.updateSettings({ [section]: { [key]: v } } as SettingsPatch)
     }
   }
+  // Compared in the change's turn (HI-2418): a write still landing (the first start's) would make the value read now
+  // stale, and a change made meanwhile be skipped as the file's already.
   const toFile = (s: AppSettings): void => {
     for (const d of bound) {
       const v = settingOf(d, s)
-      if (v === advanced.get(d.id)) continue
-      void advanced.set(d.id, v).catch((e) => log.warn(`Couldn't keep ${d.id} in advanced.json`, e))
+      void advanced
+        .transact(async () => {
+          if (v !== advanced.get(d.id)) await advanced.setNow(d.id, v)
+        })
+        .catch((e) => log.warn(`Couldn't keep ${d.id} in advanced.json`, e))
     }
   }
   // The first start: the setting as it was is the file's, unless the file already says.

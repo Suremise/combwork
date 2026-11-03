@@ -339,6 +339,35 @@ describe('the advanced store', () => {
     }
   })
 
+  it('keeps a change to the developer switch made while its last value is still being written (HI-2418)', async () => {
+    const dir = tempDir('hive-advanced-bound-')
+    const file = join(dir, 'advanced.json')
+    let settings = mergeDefaults(structuredClone(DEFAULT_SETTINGS), { advanced: { showDeveloperFeatures: true } }) as AppSettings
+    const listeners: ((s: AppSettings) => void)[] = []
+    const cfg = {
+      get settings() {
+        return settings
+      },
+      updateSettings: (patch: Parameters<typeof mergeDefaults>[1]) => {
+        settings = mergeDefaults(structuredClone(settings), patch) as AppSettings
+        for (const l of listeners) l(settings)
+        return settings
+      },
+      onSettingsChanged: (fn: (s: AppSettings) => void) => void listeners.push(fn)
+    }
+    try {
+      advanced.load(dir)
+      // The first start writes the setting (on) to the file; turned off before that write is taken in, the off is kept.
+      bindAdvancedSettings(cfg as never)
+      cfg.updateSettings({ advanced: { showDeveloperFeatures: false } })
+      await vi.waitFor(() => expect(existsSync(file) && read(file).values).toEqual({}), { timeout: 10_000 })
+      await vi.waitFor(() => expect(advanced.get('hive.showDeveloperFeatures')).toBe(false), { timeout: 10_000 })
+      expect(settings.advanced.showDeveloperFeatures).toBe(false)
+    } finally {
+      advanced.stop()
+    }
+  })
+
   it('records each CLI found together: versions learnt at once both reach the file; changes at once all land', async () => {
     const { s, dir, file } = store()
     s.load(dir)
