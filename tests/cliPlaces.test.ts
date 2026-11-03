@@ -3,9 +3,9 @@
 // of it (the junction followed, an 8.3 name kept; checked with Claude Code 2.1.296, Codex 0.162.1, Copilot 1.0.95).
 // Hive finds a folder's sessions by place, whichever name it has now. Each test uses a junction, which makes another name
 // on any machine (tests/pathAliases.ts), and an 8.3 name where the volume makes them.
-import { appendFileSync, existsSync, mkdirSync, readFileSync, writeFileSync } from 'fs'
+import { appendFileSync, existsSync, mkdirSync, readFileSync, statSync, utimesSync, writeFileSync } from 'fs'
 import { join } from 'path'
-import { afterEach, describe, expect, it } from 'vitest'
+import { afterEach, describe, expect, it, vi } from 'vitest'
 import { junction, shortPath } from './pathAliases'
 import { tempDir } from './tempDir'
 
@@ -114,6 +114,67 @@ describe("Claude Code's transcript folder (#493)", () => {
     writeFileSync(join(dir, `${ID}.jsonl`), '{"type":"user"}\n')
     expect(await claude.transcriptPath(p.real, ID)).toBe(join(dir, `${ID}.jsonl`))
     expect((await claude.listSessions(p.via)).map((s) => s.id)).toEqual([ID])
+  })
+
+  // A folder's time is a clock tick's: a change in the tick it was read in leaves the time as it was. Setting the time
+  // back after a change is that, every time.
+  it('finds a folder Claude Code makes in the tick the projects folder was read in, and a transcript added so (HI-2446)', async () => {
+    const p = place()
+    process.env.CLAUDE_CONFIG_DIR = join(p.base, 'claude-home')
+    const projects = join(process.env.CLAUDE_CONFIG_DIR, 'projects')
+    mkdirSync(join(projects, encodeProjectPath(join(p.base, 'Other'))), { recursive: true })
+    const claude = new ClaudeCodeAdapter()
+    // Whole milliseconds, so that setting it again gives the very time read (a stat's has a fraction). The clock stays
+    // at that time too, so each read is in its tick however long the test takes.
+    const tick = new Date()
+    vi.useFakeTimers({ toFake: ['Date'] })
+    vi.setSystemTime(tick)
+    try {
+      utimesSync(projects, tick, tick)
+      expect(await claude.transcriptPath(p.real, ID)).toBeNull()
+      const dir = join(projects, encodeProjectPath(p.real))
+      mkdirSync(dir)
+      writeFileSync(join(dir, `${ID}.jsonl`), '{"type":"user"}\n')
+      utimesSync(projects, tick, tick)
+      expect(statSync(projects).mtimeMs).toBe(tick.getTime())
+      expect(await claude.transcriptPath(p.real, ID)).toBe(join(dir, `${ID}.jsonl`))
+      // The same in a transcript folder: its second session, added in the tick its names were read in.
+      utimesSync(dir, tick, tick)
+      expect((await claude.listSessions(p.real)).map((s) => s.id)).toEqual([ID])
+      writeFileSync(join(dir, `${ID2}.jsonl`), '{"type":"user"}\n')
+      utimesSync(dir, tick, tick)
+      expect(statSync(dir).mtimeMs).toBe(tick.getTime())
+      expect((await claude.listSessions(p.real)).map((s) => s.id).sort()).toEqual([ID, ID2].sort())
+    } finally {
+      vi.useRealTimers()
+    }
+  })
+
+  it('keeps the names of a projects folder that has settled while its time is unchanged (#1649)', async () => {
+    const p = place()
+    process.env.CLAUDE_CONFIG_DIR = join(p.base, 'claude-home')
+    const projects = join(process.env.CLAUDE_CONFIG_DIR, 'projects')
+    mkdirSync(join(projects, encodeProjectPath(join(p.base, 'Other'))), { recursive: true })
+    // Read a minute after its time: settled, whatever the real clock says.
+    const old = new Date(Date.now() - 60_000)
+    vi.useFakeTimers({ toFake: ['Date'] })
+    vi.setSystemTime(old.getTime() + 60_000)
+    try {
+      utimesSync(projects, old, old)
+      const claude = new ClaudeCodeAdapter()
+      expect(await claude.transcriptPath(p.real, ID)).toBeNull()
+      const dir = join(projects, encodeProjectPath(p.real))
+      mkdirSync(dir)
+      writeFileSync(join(dir, `${ID}.jsonl`), '{"type":"user"}\n')
+      // Its time as it was: its names are the kept ones, so the new folder isn't seen until the time changes.
+      utimesSync(projects, old, old)
+      expect(await claude.transcriptPath(p.real, ID)).toBeNull()
+      const later = new Date(old.getTime() + 1000)
+      utimesSync(projects, later, later)
+      expect(await claude.transcriptPath(p.real, ID)).toBe(join(dir, `${ID}.jsonl`))
+    } finally {
+      vi.useRealTimers()
+    }
   })
 
   it("copies a moved folder's data from every folder it is kept under, the first one winning", async () => {

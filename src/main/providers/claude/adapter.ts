@@ -40,6 +40,13 @@ const log = createLogger('claude-code')
 const SUB_CACHE = 2000
 /** Transcripts looked at at once while listing a folder's sessions (HI-1681), and skills copied at once for a launch (HI-1694): each waits on the disk, one after another was slow under load. */
 const LIST_AT_ONCE = 8
+/**
+ * A folder's time is a clock tick's (HI-2446): Windows stamps it from a coarse clock, so a change made in the tick its
+ * names were read in leaves its time as it was (a quarter of quick second changes did). Names read this soon after the
+ * folder's time aren't kept: the next lookup reads them again, until the folder has been still this long.
+ */
+const SETTLED_MS = 2000
+const settled = (mtime: number, readAt: number): boolean => readAt - mtime >= SETTLED_MS
 /** A launch's preparation this slow is logged with where its time went (HI-1694). */
 const SLOW_PREPARE_MS = 500
 /**
@@ -914,7 +921,7 @@ export class ClaudeCodeAdapter implements ProviderAdapter {
   }
 
   /**
-   * The folders of ~/.claude/projects, read again only when it changed (#1649): a session list looks up each session's
+   * The folders of ~/.claude/projects, read again only when it changed (#1649) or hadn't settled (`SETTLED_MS`): a session list looks up each session's
    * transcript, and reading 500 folders' names for each of 400 sessions took most of a second. A folder's time changes
    * when one is added, removed or renamed in it. Null when it can't be read. Lookups made while one checks share its
    * check (HI-1681): a list looks a few sessions up at once.
@@ -929,8 +936,9 @@ export class ClaudeCodeAdapter implements ProviderAdapter {
     try {
       const mtime = (await stat(root)).mtimeMs
       if (this.projectNames?.root === root && this.projectNames.mtime === mtime) return this.projectNames.names
+      const readAt = Date.now()
       const names = await readdir(root)
-      this.projectNames = { root, mtime, names }
+      this.projectNames = settled(mtime, readAt) ? { root, mtime, names } : null
       return names
     } catch {
       return null
@@ -1028,7 +1036,7 @@ export class ClaudeCodeAdapter implements ProviderAdapter {
   }
 
   /**
-   * A transcript folder's names, read again only when the folder's time changed (HI-1681): it changes as a transcript
+   * A transcript folder's names, read again only when the folder's time changed (HI-1681) or hadn't settled: it changes as a transcript
    * is added, removed or renamed in it, not as one grows, so a session list reads each folder's names once per change.
    */
   private names = new Map<string, { mtime: number; names: string[] }>()
@@ -1037,9 +1045,10 @@ export class ClaudeCodeAdapter implements ProviderAdapter {
       const mtime = (await stat(dir)).mtimeMs
       const c = this.names.get(dir)
       if (c && c.mtime === mtime) return c.names
+      const readAt = Date.now()
       const names = await readdir(dir)
       this.names.delete(dir)
-      this.names.set(dir, { mtime, names })
+      if (settled(mtime, readAt)) this.names.set(dir, { mtime, names })
       if (this.names.size > SUB_CACHE) this.names.delete(this.names.keys().next().value!)
       return names
     } catch {
