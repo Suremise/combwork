@@ -192,7 +192,7 @@ export const AREAS = [
   { paths: ['src/main/guidance.ts', 'src/shared/hiveGuidance.ts', 'src/shared/toolReplies.ts', 'src/shared/hiveToolLoad.ts', 'src/main/mcp/'], suites: ['skilldelivery', 'replysize', 'mcp', 'bridgereport', 'cardloop', 'slotguidance'] },
   // Agent text (HI-2065): the module every agent message is said through, and its extracted catalogue and schema; the
   // canary runs through the built hive-mcp.js in agentguidance.
-  { paths: ['src/shared/agentText/', 'agent-text/catalogue/', 'agent-text/schema/'], suites: ['agentguidance', 'replysize', 'mcp', 'skilldelivery', 'bridgereport'] },
+  { paths: ['src/shared/agentText/', 'agent-text/catalogue/', 'agent-text/schema/', 'src/main/apiText.ts', 'src/main/sessionText.ts'], suites: ['agentguidance', 'replysize', 'mcp', 'skilldelivery', 'bridgereport'] },
   // HI-2245: a builder's card watch and hive_lane next saying its card in Review has unsubmitted commits.
   { paths: ['src/main/unsubmitted.ts', 'src/shared/unsubmitted.ts'], suites: ['replysize', 'cardloop'] },
   // HI-2285: a lane's builder watching its own card while nothing waits on it: its watch's reply, and the stall.
