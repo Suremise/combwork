@@ -1,0 +1,195 @@
+{
+  "copy.assign.noLauncher": {
+    "placeholders": {}
+  },
+  "copy.assign.noLease": {
+    "placeholders": {}
+  },
+  "copy.assign.notOwn": {
+    "placeholders": {}
+  },
+  "copy.assign.notPut": {
+    "placeholders": {}
+  },
+  "copy.assign.returned": {
+    "placeholders": {}
+  },
+  "copy.error.checkout": {
+    "placeholders": {
+      "error": "plain"
+    }
+  },
+  "copy.error.clean": {
+    "placeholders": {
+      "error": "plain"
+    }
+  },
+  "copy.error.closed": {
+    "placeholders": {}
+  },
+  "copy.error.interrupted": {
+    "placeholders": {}
+  },
+  "copy.error.notListed": {
+    "placeholders": {}
+  },
+  "copy.error.setupExit": {
+    "placeholders": {
+      "code": "plain"
+    }
+  },
+  "copy.error.setupNoStart": {
+    "placeholders": {
+      "command": "plain"
+    }
+  },
+  "copy.error.setupNotEnded": {
+    "placeholders": {}
+  },
+  "copy.error.setupTimedOut": {
+    "placeholders": {}
+  },
+  "copy.error.worktreeAdd": {
+    "placeholders": {
+      "error": "plain"
+    }
+  },
+  "copy.held.job": {
+    "placeholders": {
+      "job": "plain"
+    }
+  },
+  "copy.held.process": {
+    "placeholders": {}
+  },
+  "copy.inUse.all": {
+    "placeholders": {
+      "size": "plain",
+      "count": "plural"
+    }
+  },
+  "copy.inUse.longest": {
+    "placeholders": {
+      "all": "plain",
+      "copy": "plain",
+      "time": "plain",
+      "kind": "plain",
+      "card": "plain"
+    }
+  },
+  "copy.inUse.minutes": {
+    "placeholders": {
+      "n": "plain"
+    }
+  },
+  "copy.inUse.returned": {
+    "placeholders": {
+      "all": "plain",
+      "copy": "plain",
+      "ago": "plain",
+      "held": "select",
+      "by": "plain"
+    }
+  },
+  "copy.isolated.noLease": {
+    "placeholders": {}
+  },
+  "copy.isolated.noSupervisor": {
+    "placeholders": {}
+  },
+  "copy.isolated.notLeased": {
+    "placeholders": {
+      "error": "plain"
+    }
+  },
+  "copy.isolated.setupFailed": {
+    "placeholders": {
+      "copy": "plain",
+      "error": "plain"
+    }
+  },
+  "copy.isolated.stillInUse": {
+    "placeholders": {
+      "copy": "plain",
+      "by": "plain"
+    }
+  },
+  "copy.isolated.waitCopy": {
+    "placeholders": {}
+  },
+  "copy.isolated.waitSetup": {
+    "placeholders": {}
+  },
+  "copy.refusal.noCopy": {
+    "placeholders": {
+      "size": "plain",
+      "count": "plural"
+    }
+  },
+  "copy.refusal.off": {
+    "placeholders": {}
+  },
+  "copy.refusal.returned": {
+    "placeholders": {
+      "copy": "plain"
+    }
+  },
+  "copy.refusal.setupFailed": {
+    "placeholders": {
+      "copy": "plain",
+      "error": "plain"
+    }
+  },
+  "copy.refusal.stillInUse": {
+    "placeholders": {
+      "copy": "plain",
+      "by": "plain"
+    }
+  },
+  "copy.review.ended": {
+    "placeholders": {}
+  },
+  "copy.review.leaseFailed": {
+    "placeholders": {
+      "error": "plain"
+    }
+  },
+  "copy.review.noRevision": {
+    "placeholders": {}
+  },
+  "copy.review.none": {
+    "placeholders": {
+      "why": "plain"
+    }
+  },
+  "copy.review.notGoing": {
+    "placeholders": {}
+  },
+  "copy.review.ready": {
+    "placeholders": {
+      "named": "select",
+      "card": "plain",
+      "folder": "plain",
+      "revision": "plain"
+    }
+  },
+  "copy.review.settingUp": {
+    "placeholders": {}
+  },
+  "copy.review.stalled": {
+    "placeholders": {
+      "card": "plain",
+      "agent": "plain",
+      "minutes": "plain",
+      "why": "plain"
+    }
+  },
+  "copy.review.waiting": {
+    "placeholders": {
+      "why": "plain"
+    }
+  },
+  "copy.review.workflowOff": {
+    "placeholders": {}
+  }
+}

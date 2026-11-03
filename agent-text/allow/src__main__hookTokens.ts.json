@@ -1,9 +1,0 @@
-{
-  "prose|error|Not a run id.": 1,
-  "prose|return|Refused a hook call for run {}: {}": 1,
-  "prose|return|Refused a hook call naming a run this Hive didn't start": 1,
-  "prose|return|Refused a hook call that named no launch": 1,
-  "prose|return|its token didn't match the launch's": 1,
-  "prose|return|that launch has ended": 1,
-  "prose|var|(not ours)": 1
-}

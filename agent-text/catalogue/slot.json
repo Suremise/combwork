@@ -1,0 +1,294 @@
+{
+  "slot.archive.exit": {
+    "text": "exited with code {code}",
+    "note": "Why a slot is kept, not removed: its archive command failed. {code} is its exit code."
+  },
+  "slot.archive.noStart": {
+    "text": "couldn't start",
+    "note": "Why a slot is kept, not removed: its archive command couldn't be started."
+  },
+  "slot.archive.notEnded": {
+    "text": "processes it started could not be ended",
+    "note": "Why a slot is kept, not removed: its archive command ended, but processes it started still run."
+  },
+  "slot.archive.timedOut": {
+    "text": "ran out of time",
+    "note": "Why a slot is kept, not removed: its archive command reached its time limit."
+  },
+  "slot.check.noBase": {
+    "text": "no merge base with {target}",
+    "note": "Why Hive can't tell whether a slot's work is merged: it shares no history with its target branch."
+  },
+  "slot.check.noBranch": {
+    "text": "no {target}",
+    "note": "Why Hive can't tell whether a slot's work is merged: its target branch doesn't exist. {target} is its name."
+  },
+  "slot.check.noTarget": {
+    "text": "no target branch",
+    "note": "Why Hive can't tell whether a slot's work is merged: the project has no default branch."
+  },
+  "slot.error.closed": {
+    "text": "the workspace closed",
+    "note": "A slot's setup or preparation stopped: its workspace closed. Kept on the slot as its error."
+  },
+  "slot.error.deleting": {
+    "text": "the project is being deleted",
+    "note": "Why a slot isn't ready: the project's Delete holds its slots (#1447). The end of slot.refusal.notReady (\"… isn't ready (…)\")."
+  },
+  "slot.error.gitRead": {
+    "text": "git couldn't read {what}",
+    "note": "A slot's setup or preparation error: git couldn't read a branch or HEAD. {what} is the branch's name, or HEAD."
+  },
+  "slot.error.interrupted": {
+    "text": "its setup was interrupted",
+    "note": "A slot's setup error, kept on the slot, when the setup was taken over from a Hive that is gone (#1429). Read by agents and in the log."
+  },
+  "slot.error.notListed": {
+    "text": "its folder is there but git does not list it as a worktree",
+    "note": "A slot's setup error: its folder exists but isn't a worktree git knows, so Hive leaves it alone."
+  },
+  "slot.error.opLost": {
+    "text": "the operation no longer holds {slot}",
+    "note": "An operation on a slot stopped because another took the slot over (#1429). Caught by the pool; in the log if it ever escapes."
+  },
+  "slot.error.setupExit": {
+    "text": "its setup exited with code {code}",
+    "note": "A slot's setup error: its setup command failed. {code} is its exit code."
+  },
+  "slot.error.setupNoStart": {
+    "text": "its setup couldn't start: {command}",
+    "note": "A slot's setup error: its setup command couldn't be started. {command} is the command."
+  },
+  "slot.error.setupNotEnded": {
+    "text": "processes its setup started could not be ended",
+    "note": "A slot's setup error: its setup command ended, but processes it started are still running."
+  },
+  "slot.error.setupTimedOut": {
+    "text": "its setup ran out of time",
+    "note": "A slot's setup error: its setup command reached its time limit (Settings → Advanced)."
+  },
+  "slot.error.worktreeAdd": {
+    "text": "git worktree add: {error}",
+    "note": "A slot's setup error: `git worktree add` failed. {error} is git's first line, else failed."
+  },
+  "slot.hold.byHand": {
+    "text": "its slot {slot} is free, for a Resume by hand",
+    "note": "As slot.hold.draining: the slot is free, and the user resumes the conversation."
+  },
+  "slot.hold.changed": {
+    "text": "its slot {slot} changed since it ran",
+    "note": "As slot.hold.draining: the slot's checkout changed since the conversation ran there."
+  },
+  "slot.hold.draining": {
+    "text": "its last session there is still ending",
+    "note": "Why a builder's conversation in its slot can't resume yet: the end of slot.place.cantResume."
+  },
+  "slot.hold.gone": {
+    "text": "its slot {slot} is gone",
+    "note": "As slot.hold.draining: the slot's folder is gone."
+  },
+  "slot.hold.otherSlot": {
+    "text": "its agent keeps another slot ({slot})",
+    "note": "As slot.hold.draining: one agent, one slot (HI-1762)."
+  },
+  "slot.hold.otherWork": {
+    "text": "its slot {slot} holds other work now",
+    "note": "As slot.hold.draining: the slot was lent for other work since."
+  },
+  "slot.hold.reviews": {
+    "text": "its agent reviews now",
+    "note": "As slot.hold.draining: the agent is reviewing."
+  },
+  "slot.laneEnd.merged": {
+    "text": "{card} merged at {commit}",
+    "note": "A card in slot.laneEnd.note's list: merged, with its merge commit's first 12 characters."
+  },
+  "slot.laneEnd.more": {
+    "text": "and {count} more",
+    "note": "The end of slot.laneEnd.note's list, past its first 20 cards. {count} is digits."
+  },
+  "slot.laneEnd.notMerged": {
+    "text": "{card} not merged",
+    "note": "A card in slot.laneEnd.note's list: not merged."
+  },
+  "slot.laneEnd.note": {
+    "text": "{abandoned, select, yes {Lane {lane} was abandoned} other {Lane {lane} is finished}}{listed, select, yes {: {list}} other {}}. Your session ends once this turn does; Hive resumes it for your next lane. Close the lane's work in your reply, then end your turn.",
+    "note": "The note a lane's builder is given as its lane ends (HI-1706): each card (slot.laneEnd.merged or notMerged, joined by \"; \"), and that its session ends with its turn. Cut at 2000 characters."
+  },
+  "slot.place.cantResume": {
+    "text": "Hive can't give {card} to {agent} yet: its conversation in {slot} can't resume now ({why}).",
+    "note": "A card's notice and its builder's wake: the builder's conversation in its slot can't resume yet. {why} is one of slot.hold.*, or why the slot is held. Kept on the card, so said in the Default."
+  },
+  "slot.place.notReady": {
+    "text": "Hive couldn't get {slot} ready: {error}",
+    "note": "Why a builder's start ended (a card's stall): its slot couldn't be prepared for the card. Kept, so said in the Default."
+  },
+  "slot.place.notReadyFor": {
+    "text": "Hive couldn't get {slot} ready for {card}: {error}",
+    "note": "A card's notice and its builder's wake: its slot couldn't be prepared for it. Kept on the card, so said in the Default."
+  },
+  "slot.place.resumeEnded": {
+    "text": "its conversation in {slot} didn't resume ({tries} tries): {why}",
+    "note": "Why a builder's start ended (a card's stall): resuming its conversation failed every try. Kept, so said in the Default."
+  },
+  "slot.place.resumeFailed": {
+    "text": "Hive couldn't resume {agent}'s conversation in {slot} for {card} (three tries): {why}. Resume {agent} from Sessions, or start it fresh, and Hive gives it {card}.",
+    "note": "A card's notice and its builder's wake: resuming its conversation failed three times. Kept on the card, so said in the Default."
+  },
+  "slot.prepare.branchUnread": {
+    "text": "git couldn't read {slot}'s branch",
+    "note": "Why a slot couldn't be prepared for its card: git couldn't read the branch it is on."
+  },
+  "slot.prepare.busy": {
+    "text": "{slot} is busy: being set up, a command of its still running, or another session in it",
+    "note": "Why a slot's preparation for its card waits (#1438): something else has the slot now."
+  },
+  "slot.prepare.filesUnread": {
+    "text": "git couldn't read {slot}'s files",
+    "note": "Why a slot couldn't be prepared for its card: git couldn't say whether it has changes."
+  },
+  "slot.prepare.leaseEnded": {
+    "text": "its lease has ended",
+    "note": "Why a slot couldn't be prepared for its card: the lease it was lent under ended."
+  },
+  "slot.prepare.switchFailed": {
+    "text": "git switch: {error}",
+    "note": "Why a slot couldn't be prepared for its card: `git switch` failed. {error} is git's first line, else failed."
+  },
+  "slot.prepare.takenOver": {
+    "text": "{slot}'s preparation was taken over",
+    "note": "Why a slot's preparation for its card waits: another operation took the slot over (#1429)."
+  },
+  "slot.prepare.uncommitted": {
+    "text": "{slot} has changes that aren't committed",
+    "note": "Why a slot couldn't be prepared for its card: switching its branch would lose changes."
+  },
+  "slot.refusal.aSlot": {
+    "text": "a slot",
+    "note": "The slot named in slot.refusal.notReady when the start named none and the project is being deleted (\"a slot isn't ready (the project is being deleted)\")."
+  },
+  "slot.refusal.agentLeased": {
+    "text": "this agent already builds in {slot} for {what}",
+    "note": "A start refused: one agent, one slot (HI-1762). {what} is the card's key or slot.refusal.lane."
+  },
+  "slot.refusal.busy": {
+    "text": "{slot} has a session or a process in it",
+    "note": "A start's wait: something still runs in a free slot, so it isn't lent."
+  },
+  "slot.refusal.inUse": {
+    "text": "{slot} is in use by {agent} for {what}",
+    "note": "A start's wait: the slot named is lent to another agent. {what} is the card's key or slot.refusal.lane."
+  },
+  "slot.refusal.lane": {
+    "text": "lane {lane}",
+    "note": "What a slot is lent for when it is a lane, not a card: the end of slot.refusal.inUse and slot.refusal.agentLeased."
+  },
+  "slot.refusal.noSlot": {
+    "text": "no slot free: the pool's {size} {count, plural, =1 {slot is} other {slots are}} in use",
+    "note": "A start's wait: every slot of the pool is lent. {size} is the pool's size as digits; {count} the same number, choosing the plural."
+  },
+  "slot.refusal.notReady": {
+    "text": "{slot} isn't ready ({why})",
+    "note": "A start's wait or refusal: the slot isn't ready. {why} is its setup's error, else its state."
+  },
+  "slot.refusal.setupFailed": {
+    "text": "{slot}'s setup failed: {error}",
+    "note": "A start refused: the slot's setup failed. {error} is why (one of slot.error.*, git's or the command's)."
+  },
+  "slot.refusal.warming": {
+    "text": "{slot} is being set up",
+    "note": "A start's wait: the slot's setup is running."
+  },
+  "slot.release.both": {
+    "text": "{slot} is both kept for {agent} (kind: carried) and held by a run (kind: writer): say which to release.",
+    "note": "Release refused: the slot has both, and the call named neither. carried and writer are the kind argument's values."
+  },
+  "slot.release.carriedChanged": {
+    "text": "{slot} changed meanwhile: it is no longer kept for {agent}. Look again.",
+    "note": "Release of kind carried refused: the slot changed since it was looked at."
+  },
+  "slot.release.confirm": {
+    "text": "Releasing {slot}'s writer needs confirm: '{' slot: \"{slot}\", run: \"<its run>\" '}', the slot and run the user agreed to release (list shows them).",
+    "note": "Release of kind writer refused: it needs the user's confirmation of the slot and run they were shown. The braces show the argument's shape."
+  },
+  "slot.release.noSlot": {
+    "text": "No slot {slot} in this project{listed, select, yes { (its slots: {slots})} other {}}.",
+    "note": "Release refused: the project has no slot of that name. {slots} lists the slots it has, when it has any."
+  },
+  "slot.release.notCarried": {
+    "text": "{slot} isn't kept for an agent (no carried lease).",
+    "note": "Release of kind carried refused: no agent keeps the slot."
+  },
+  "slot.release.nothing": {
+    "text": "{slot} has nothing to release: it is kept for no agent and no run holds it.",
+    "note": "Release refused: the slot is neither kept for an agent nor held by a run."
+  },
+  "slot.release.writerChanged": {
+    "text": "{slot} changed meanwhile: no run holds it now. Look again.",
+    "note": "Release of kind writer refused: the run that held the slot has gone since."
+  },
+  "slot.remove.failed": {
+    "text": "git worktree remove failed",
+    "note": "Why a slot is kept, not removed: `git worktree remove` refused and said nothing."
+  },
+  "slot.run.closed": {
+    "text": "the workspace closed",
+    "note": "A slot's or copy's setup error: its workspace closed before its command ran."
+  },
+  "slot.run.noJob": {
+    "text": "its job couldn't be made: {problem}",
+    "note": "A slot's or copy's setup error: the job its command runs in couldn't be made. {problem} is why."
+  },
+  "slot.run.noSupervisor": {
+    "text": "Hive's process supervisor isn't running, so it can't run a slot's commands",
+    "note": "A slot's or copy's setup error: Hive runs their commands in a job of its own, and can't now."
+  },
+  "slot.start.leaseEnded": {
+    "text": "its slot's lease {lease} ended while the start took it: the start tries again",
+    "note": "A start's wait: the slot's lease ended between taking it and recording its target."
+  },
+  "slot.start.ownSlotWaits": {
+    "text": "{agent}'s own slot {slot}, its run still there, {because}: this start waits for it rather than take a second slot",
+    "note": "A start's wait (HI-1762): the builder's own run still writes in a slot that can't be taken over now. {because} is one of slot.takeover.*."
+  },
+  "slot.takeover.busy": {
+    "text": "is being set up or changed",
+    "note": "As slot.takeover.gone: an operation holds the slot."
+  },
+  "slot.takeover.changed": {
+    "text": "changed while it was taken over",
+    "note": "As slot.takeover.gone: the slot changed while the start took it over, twice."
+  },
+  "slot.takeover.gone": {
+    "text": "is gone",
+    "note": "Why the slot a builder's own run still writes in can't be taken over by its start (HI-1787): the end of slot.start.ownSlotWaits after the slot's name."
+  },
+  "slot.takeover.holdsLease": {
+    "text": "can't be taken over while its agent holds another lease",
+    "note": "As slot.takeover.gone: one agent, one slot (HI-1762)."
+  },
+  "slot.takeover.job": {
+    "text": "has a command of its own running",
+    "note": "As slot.takeover.gone: a command of the slot's (its setup, an archive) runs."
+  },
+  "slot.takeover.lent": {
+    "text": "is lent again",
+    "note": "As slot.takeover.gone: another lease has it."
+  },
+  "slot.takeover.notReady": {
+    "text": "isn't ready ({state})",
+    "note": "As slot.takeover.gone: the slot isn't lent. {state} is its state's id (ready, dirty…)."
+  },
+  "slot.takeover.otherHive": {
+    "text": "is held by another Hive's run",
+    "note": "As slot.takeover.gone: a run of another Hive (another profile) holds it."
+  },
+  "slot.takeover.otherRun": {
+    "text": "has another run in it now",
+    "note": "As slot.takeover.gone: another run writes there now."
+  },
+  "slot.takeover.setupFailed": {
+    "text": "couldn't be set up",
+    "note": "As slot.takeover.gone: its setup failed."
+  }
+}

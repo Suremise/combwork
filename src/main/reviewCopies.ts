@@ -23,8 +23,9 @@ import { advanced } from './advanced'
 import { leaveMessage } from './agentMessages'
 import { setReviewCopyWaitReason } from './cardStall'
 import { copiesFor, setReviewCopyHooks } from './copiesApp'
-import { copiesDirOf, copyRefusalText, FIRST_WAIT_MS, type CopyLease, type CopyPool } from './copies'
+import { COPY_TEXT, copiesDirOf, copyRefusalText, FIRST_WAIT_MS, type CopyLease, type CopyPool } from './copies'
 import { samePlace } from './fsutil'
+import { agentMsg, say } from '../shared/agentText'
 import { createLogger, userText } from './logger'
 import { sessions } from './sessions'
 import { cardNamesOf, scopeOfHost } from './projectKeys'
@@ -87,27 +88,45 @@ interface Waiting {
 /** How long a review waits for a copy before a lane watch counts its card stalled (HI-1764). */
 export const COPY_WAIT_STALL_MS = 5 * 60_000
 
+/** Review copies' agent text (dialects, HI-2447): the line a reviewer gets about its copy, and why it waits. */
+const T = {
+  minutes: agentMsg({ id: 'copy.inUse.minutes', text: '{n} min', note: 'How long, in whole minutes: in copy.inUse.returned and copy.inUse.longest.' }),
+  all: agentMsg({ id: 'copy.inUse.all', text: "the pool's {size} {count, plural, =1 {copy is} other {copies are}} in use", note: "Why a reviewer waits for a review copy (HI-1764): every copy is in use. {size} is the pool's size as digits; {count} the same number, choosing the plural." }),
+  returned: agentMsg({ id: 'copy.inUse.returned', text: '{all}; {copy}, returned {ago} ago, is {held, select, yes {held back by {by}} other {being freed}}', note: 'copy.inUse.all, then the copy likely to come free first: one given back, and what still holds it ({by}: copy.held.*, a run or an agent), else being freed. {ago} is copy.inUse.minutes.' }),
+  longest: agentMsg({ id: 'copy.inUse.longest', text: '{all}; the longest lent, {copy}, for {time} (a {kind} of {card})', note: "copy.inUse.all, then the copy lent longest: {time} is copy.inUse.minutes, {kind} the lease's kind (review or check), {card} the card's key." }),
+  ready: agentMsg({ id: 'copy.review.ready', text: "{named, select, yes {{card}'s review copy is ready. } other {}}Review in {folder} at {revision}: read and run commands there, with it as their working directory; your session stays where it is.", note: "A reviewer's review copy (#1435): in start review's reply, or its later message (which names the card first). {revision} is the submission's first 12 characters." }),
+  waiting: agentMsg({ id: 'copy.review.waiting', text: 'Waiting for a review copy ({why}): Hive tells you when one is ready, with its folder. Meanwhile git can show the submission from where you are.', note: "Start review's reply while no review copy is free yet. {why} is why (copy.inUse.*, copy.refusal.*)." }),
+  none: agentMsg({ id: 'copy.review.none', text: "No review copy ({why}): review the builder's work read-only from where you are.", note: 'Start review\'s reply, or a later message, when the reviewer gets no review copy. {why} is why.' }),
+  notGoing: agentMsg({ id: 'copy.review.notGoing', text: 'the review is not going', note: 'Why a reviewer gets no review copy: its review of the card has ended or not started. The end of copy.review.none.' }),
+  noRevision: agentMsg({ id: 'copy.review.noRevision', text: 'the card has no submitted revision', note: 'Why a reviewer gets no review copy: nothing was submitted to review. The end of copy.review.none.' }),
+  settingUp: agentMsg({ id: 'copy.review.settingUp', text: 'one is being set up', note: 'Why a reviewer waits for a review copy: its copy is being set up. The end of copy.review.waiting.' }),
+  ended: agentMsg({ id: 'copy.review.ended', text: 'the review ended', note: 'Why a reviewer gets no review copy: its review ended while the copy was set up. The end of copy.review.none.' }),
+  leaseFailed: agentMsg({ id: 'copy.review.leaseFailed', text: "it couldn't be leased: {error}", note: 'Why a reviewer gets no review copy: leasing it failed. The end of copy.review.none.' }),
+  stalled: agentMsg({ id: 'copy.review.stalled', text: "{card}'s review by {agent} has waited {minutes} min for a review copy: {why}.", note: "Why a card in Review is stalled (HI-1764), in a lane watch and the Agent API's stalled: its reviewer is kept from reviewing. {minutes} is whole minutes." }),
+  workflowOff: agentMsg({ id: 'copy.review.workflowOff', text: "workflow rules aren't enforced (Settings → Advanced, Workflow rules are enforced)", note: 'Why a reviewer gets no review copy: the advanced setting is off. Names the setting as the window shows it.' })
+}
+
 /**
  * Why every copy is in use, for a waiting reviewer (HI-1764: it was told only "pending"), in one short clause (the reply
  * stays lean): how many there are, then the copy most likely to come free first, with since when: a returned one and what
  * holds it back, else the one lent longest and what for. Agent-facing.
  */
 export function copiesInUseText(held: ReturnType<CopyPool['inUse']>, name: (card: number) => string, now = Date.now()): string {
-  const ago = (iso: string): string => `${Math.max(0, Math.round((now - Date.parse(iso)) / 60_000))} min`
-  const all = `the pool's ${held.length} ${held.length === 1 ? 'copy is' : 'copies are'} in use` // i18n-ignore: agent-facing
+  const ago = (iso: string): string => say(T.minutes, { n: String(Math.max(0, Math.round((now - Date.parse(iso)) / 60_000))) })
+  const all = say(T.all, { size: String(held.length), count: held.length })
   const back = held.filter((h) => h.returned).sort((a, b) => a.returned!.localeCompare(b.returned!))[0]
-  if (back) return `${all}; ${back.copy}, returned ${ago(back.returned!)} ago, is ${back.by ? `held back by ${back.by}` : 'being freed'}` // i18n-ignore: agent-facing
+  if (back) return say(T.returned, { all, copy: back.copy, ago: ago(back.returned!), held: back.by ? 'yes' : 'no', by: back.by ?? '' })
   const lent = [...held].sort((a, b) => a.from.localeCompare(b.from))[0]
-  return lent ? `${all}; the longest lent, ${lent.copy}, for ${ago(lent.from)} (a ${lent.kind} of ${name(lent.card)})` : all // i18n-ignore: agent-facing
+  return lent ? say(T.longest, { all, copy: lent.copy, time: ago(lent.from), kind: lent.kind, card: name(lent.card) }) : all
 }
 
 const key = (card: number, agent: string): string => `${card}|${agent}`
 
 /** The line an agent's start review reply, or its later message, gives for a copy. */
 export function reviewCopyText(a: ReviewCopyAnswer, card?: string): string {
-  if (a.is === 'ready') return `${card !== undefined ? `${card}'s review copy is ready. ` : ''}Review in ${a.folder} at ${a.revision.slice(0, 12)}: read and run commands there, with it as their working directory; your session stays where it is.` // i18n-ignore: agent-facing
-  if (a.is === 'waiting') return `Waiting for a review copy (${a.why}): Hive tells you when one is ready, with its folder. Meanwhile git can show the submission from where you are.` // i18n-ignore: agent-facing
-  return `No review copy (${a.why}): review the builder's work read-only from where you are.` // i18n-ignore: agent-facing
+  if (a.is === 'ready') return say(T.ready, { named: card !== undefined ? 'yes' : 'no', card: card ?? '', folder: a.folder, revision: a.revision.slice(0, 12) })
+  if (a.is === 'waiting') return say(T.waiting, { why: a.why })
+  return say(T.none, { why: a.why })
 }
 
 /** One project's review copies: the leases start review makes, the reviews waiting for one, and their returns. */
@@ -137,8 +156,8 @@ export class ReviewCopies {
     const off = this.deps.off()
     if (off) return { is: 'none', why: off }
     const now = await this.deps.review(card, agent.id)
-    if (!now.going) return { is: 'none', why: 'the review is not going' } // i18n-ignore: agent-facing
-    if (!now.revision || now.submission === null) return { is: 'none', why: 'the card has no submitted revision' } // i18n-ignore: agent-facing
+    if (!now.going) return { is: 'none', why: say(T.notGoing) }
+    if (!now.revision || now.submission === null) return { is: 'none', why: say(T.noRevision) }
     const pool = await this.deps.pool()
     const k = key(card, agent.id)
     const going = this.waiting.get(k)
@@ -155,7 +174,7 @@ export class ReviewCopies {
     }
     if (!w) {
       while (this.waiting.size >= MAX_WAITING) this.waiting.delete(this.waiting.keys().next().value!)
-      w = { card, agent, revision: now.revision, submission: now.submission, why: 'one is being set up', leasing: null, told: false, since: Date.now() } // i18n-ignore: agent-facing
+      w = { card, agent, revision: now.revision, submission: now.submission, why: say(T.settingUp), leasing: null, told: false, since: Date.now() }
       this.waiting.set(k, w)
     }
     const leasing = this.attempt(w)
@@ -196,7 +215,7 @@ export class ReviewCopies {
       if (this.waiting.get(k) !== w || !still?.going || still.revision !== w.revision || off) {
         await pool.returnCopy(r.lease.id, off ? 'off' : 'abandoned')
         if (this.waiting.get(k) === w) this.waiting.delete(k)
-        const none: ReviewCopyAnswer = { is: 'none', why: off ?? 'the review ended' } // i18n-ignore: agent-facing
+        const none: ReviewCopyAnswer = { is: 'none', why: off ?? say(T.ended) }
         if (off && w.told) await this.deps.tell(w.agent, w.card, `${this.named(w.card)}: ${reviewCopyText(none)}`).catch(() => undefined)
         return none
       }
@@ -279,7 +298,7 @@ async function reviewOf(ws: WorkspaceService, projectPath: string, card: number,
 export function copyWaitStall(c: { number: number; key?: string; column: string }, waits: ReturnType<ReviewCopies['waits']>, now = Date.now()): string | null {
   if (c.column !== 'review') return null
   const w = waits.find((x) => x.card === c.number && now - x.since >= COPY_WAIT_STALL_MS)
-  return w ? `${c.key ?? `#${c.number}`}'s review by ${w.name} has waited ${Math.round((now - w.since) / 60_000)} min for a review copy: ${w.why}.` : null // i18n-ignore: agent-facing (the Agent API's stalled)
+  return w ? say(T.stalled, { card: c.key ?? `#${c.number}`, agent: w.name, minutes: String(Math.round((now - w.since) / 60_000)), why: w.why }) : null
 }
 
 /** copyWaitStall over the reviews waiting in a workspace (by its folder): the lane watches' (cardStall.ts). */
@@ -298,8 +317,8 @@ setReviewCopyWaitReason(reviewCopyWaitReason)
 
 /** Why review copies are off now (agent-facing): either switch in Settings → Advanced. Null while both are on. */
 function reviewCopiesOff(): string | null {
-  if (advanced.get(COPIES_REVIEW) === false) return 'review copies are off (Settings → Advanced, Reviewers review in review copies)' // i18n-ignore: agent-facing
-  if (advanced.get<boolean>(WORKFLOW_ENFORCE) === false) return "workflow rules aren't enforced (Settings → Advanced, Workflow rules are enforced)" // i18n-ignore: agent-facing
+  if (advanced.get(COPIES_REVIEW) === false) return say(COPY_TEXT.off)
+  if (advanced.get<boolean>(WORKFLOW_ENFORCE) === false) return say(T.workflowOff)
   return null
 }
 
@@ -311,6 +330,7 @@ export function reviewCopiesFor(ws: WorkspaceService, projectPath: string): Revi
   const rc = new ReviewCopies({
     pool: () => copiesFor(ws, projectPath),
     review: (card, agent) => reviewOf(ws, projectPath, card, agent),
+    // agent-protocol: the sender is the product's name, Hive
     tell: async (agent, card, text) => void (await leaveMessage(projectPath, agent.id, agent.name, { kind: 'hive', name: 'Hive' }, text, card)), // i18n-ignore: the sender's name agents read
     cardName: (card) => cardNamesOf(ws, scopeOfHost(projectPath))(card),
     note: async (card, text) => {
@@ -333,7 +353,7 @@ export async function reviewCopyOnStart(ws: WorkspaceService, projectPath: strin
   if (!sessions.grantedDirs(projectPath, agent.id).some((d) => samePlace(d, folder))) return null
   const a = await reviewCopiesFor(ws, projectPath)
     .start(card, agent)
-    .catch((e: Error): ReviewCopyAnswer => ({ is: 'none', why: `it couldn't be leased: ${e.message}` })) // i18n-ignore: agent-facing
+    .catch((e: Error): ReviewCopyAnswer => ({ is: 'none', why: say(T.leaseFailed, { error: e.message }) }))
   return reviewCopyText(a)
 }
 

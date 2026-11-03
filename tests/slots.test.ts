@@ -17,6 +17,7 @@ import { admitted } from './admitted'
 import { boardFile, closeBoard, workspaceDb } from '../src/main/boardStore'
 import { fileSlotConn, IDLE_MS, INTERRUPTED, lockHash, nextSlotName, PORT_FLOOR, quiet, setBuilderCount, builderCountOf, SlotPool, slotEnv, slotName, slotOptionsOf, SlotStore, type OpHolder, type SlotRun, type SlotRunEnd } from '../src/main/slots'
 import { BoundedLog, execCommand, FILE_IO } from '../src/main/workflow/queueChecks'
+import { say } from '../src/shared/agentText'
 import { claimIn, type ClaimRefused } from '../src/main/agentFolders'
 import { commit, gitRepo, sh } from './workflow/harness'
 import { junction } from './pathAliases'
@@ -1053,12 +1054,12 @@ describe('operations own a slot while it changes (HR1 round 1)', { timeout: 90_0
     w.dead.add(1)
     await b.pool.refresh()
     expect(w.steer.settledJobs).toEqual([job])
-    expect(w.store.slot('slot-a')).toMatchObject({ state: 'creating', warmError: INTERRUPTED, op: null, job: null })
+    expect(w.store.slot('slot-a')).toMatchObject({ state: 'creating', warmError: say(INTERRUPTED), op: null, job: null })
     expect(w.store.leaseOf({ card: 1 })).toBeNull()
     // A "comes back" (its command ends): every write it tries is refused, and the slot stays as B left it.
     gate.open()
     expect(await lending).toEqual({ ok: false, refusal: { why: 'warming', slot: 'slot-a' } })
-    expect(w.store.slot('slot-a')).toMatchObject({ state: 'creating', warmError: INTERRUPTED, op: null })
+    expect(w.store.slot('slot-a')).toMatchObject({ state: 'creating', warmError: say(INTERRUPTED), op: null })
     // The card asks again: a new slot, never the interrupted one.
     expect((await lent({ ...w, pool: b.pool }, { agent: 'a1', card: 1 })).slot.name).toBe('slot-b')
   })
@@ -1072,7 +1073,7 @@ describe('operations own a slot while it changes (HR1 round 1)', { timeout: 90_0
     w.dead.add(1)
     w.steer.settle = false
     await b.pool.refresh()
-    expect(w.store.slot('slot-a')).toMatchObject({ state: 'creating', warmError: INTERRUPTED, op: null, job: expect.stringMatching(/^slot-/) })
+    expect(w.store.slot('slot-a')).toMatchObject({ state: 'creating', warmError: say(INTERRUPTED), op: null, job: expect.stringMatching(/^slot-/) })
     expect(w.store.leaseOf({ card: 1 })).toBeNull()
     expect(await b.pool.lend({ agent: 'a2', card: 2 })).toEqual({ ok: false, refusal: { why: 'noSlot', size: 1 } })
     expect(await b.pool.remove('slot-a')).toMatchObject({ why: 'busy' })
