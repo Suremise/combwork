@@ -13,7 +13,7 @@ import { fileURLToPath } from 'url'
 import { MANIFEST, manifestStale } from './testedClis.mjs'
 import { recordBuild } from './buildFact.mjs'
 import { makeRelease } from './distCopy.mjs'
-import { DIALECT_CHECKS, dialectReleaseProblem, lastReleaseTag } from './dialectRelease.mjs'
+import { dialectCheckArgs, dialectReleaseProblem, lastReleaseTag } from './dialectRelease.mjs'
 
 const pkg = JSON.parse(readFileSync(new URL('../package.json', import.meta.url), 'utf8'))
 const args = process.argv.slice(2)
@@ -59,7 +59,7 @@ if (dialectsOnly) {
     process.exit(1)
   }
   console.log(`A dialect-only patch of ${tag}: ${changed.filter((f) => f.startsWith('resources/dialects/')).length} dialect file(s) changed. Running the dialect checks…`)
-  if (spawnSync('npx', ['vitest', 'run', ...DIALECT_CHECKS], { stdio: 'inherit', cwd: root, shell: true }).status !== 0) process.exit(1)
+  if (spawnSync('npx', dialectCheckArgs(), { stdio: 'inherit', cwd: root, shell: true }).status !== 0) process.exit(1)
 } else {
   // The CLI versions this release was tested with (#365): made from the real tier's run record on this code.
   const manifestFile = new URL(`../${MANIFEST}`, import.meta.url)

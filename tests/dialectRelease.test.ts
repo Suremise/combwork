@@ -6,7 +6,7 @@ import { existsSync, mkdirSync, rmSync, writeFileSync } from 'fs'
 import { join } from 'path'
 import { afterAll, describe, expect, it } from 'vitest'
 // @ts-expect-error: a plain .mjs module without types
-import { DIALECT_CHECKS, dialectReleaseProblem, lastReleaseTag } from '../scripts/dialectRelease.mjs'
+import { DIALECT_CHECKS, dialectCheckArgs, dialectReleaseProblem, lastReleaseTag } from '../scripts/dialectRelease.mjs'
 import { tempDir } from './tempDir'
 
 type Files = Record<string, string>
@@ -86,6 +86,8 @@ describe('a dialect-only release (scripts/dialectRelease.mjs)', () => {
   it('runs dialect checks that exist, the shipped files’ among them', () => {
     expect(DIALECT_CHECKS).toContain('tests/dialectsShipped.test.ts')
     for (const f of DIALECT_CHECKS as string[]) expect(existsSync(join(__dirname, '..', f)), f).toBe(true)
+    // Never from Vitest's module cache: it would keep an old schema's glob (HI-2442 r1).
+    expect(dialectCheckArgs()).toEqual(['vitest', 'run', '--fsModuleCache=false', ...DIALECT_CHECKS])
   })
 })
 

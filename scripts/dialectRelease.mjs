@@ -17,6 +17,13 @@ export const DIALECT_RELEASE_ALSO = ['CHANGELOG.md', 'package.json', 'package-lo
 /** The unit tests a dialect-only release runs before it builds: the shipped files, the service that loads them, the bundled sync. */
 export const DIALECT_CHECKS = ['tests/dialectsShipped.test.ts', 'tests/dialects.test.ts', 'tests/bundled.test.ts']
 
+/**
+ * The command that runs them: Vitest with its file-system module cache off. That cache keeps a module's transform
+ * across runs, and the schema's `import.meta.glob` (src/main/dialects/schema.ts) isn't redone when an area's schema
+ * file is added, so a checkout that ran the tests before would check the dialects against an old schema (HI-2442 r1).
+ */
+export const dialectCheckArgs = () => ['vitest', 'run', '--fsModuleCache=false', ...DIALECT_CHECKS]
+
 const RELEASE = /^v(\d+)\.(\d+)\.(\d+)$/
 
 /** The newest release tag (`v1.0.0`, never a pre-release's) of those given (the tags HEAD contains), or null. */

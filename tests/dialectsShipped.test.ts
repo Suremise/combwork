@@ -1,9 +1,10 @@
 // The dialect files Hive ships (HI-2442, dialects card 8; plans/2026-11-03-dialects-design.md, section 3, decision 8):
 // the five model files (Opus 5.5, Haiku 5.5 and Sonnet 5.5 for Claude Code; GPT-6.1 Sol and GPT-6 Astra for Codex),
-// each with its real model ID, and the CLI and API files, all empty until a change is measured; in Hive's own format,
-// passing the schema; and synced into a workspace by the bundled kind (card 6, HI-2439): a fresh workspace gets them
-// all, an untouched copy follows an update, an edited one is kept. A dialect-only release runs this file first
-// (scripts/dialectRelease.mjs).
+// each with its real model ID, and the CLI and API files; in Hive's own format, passing the schema; and synced into a
+// workspace by the bundled kind (card 6, HI-2439): a fresh workspace gets them all, an untouched copy follows an update,
+// an edited one is kept. A dialect-only release runs this file first (scripts/dialectRelease.mjs) and may change no
+// test (HR2, HI-2442 r1), so it checks what any shipped file must be, whatever its texts: a measured override (HI-2282)
+// or another model's file passes it unchanged, as long as each override says why.
 import { existsSync, mkdirSync, readdirSync, readFileSync, rmSync, writeFileSync } from 'fs'
 import { join } from 'path'
 import { afterAll, beforeAll, describe, expect, it, vi } from 'vitest'
@@ -17,7 +18,7 @@ import { tempDir } from './tempDir'
 
 const RES = join(__dirname, '..', 'resources', 'dialects')
 
-/** What Hive ships, by id (`<folder>/<label>`): each file's name and, for a model file, its model ID. */
+/** What Hive ships at least (decision 8, "those 5 for now"), by id (`<folder>/<label>`): each file's name and, for a model file, its model ID. */
 const SHIPPED: Record<string, { name: string; model?: string }> = {
   'api/cli': { name: 'API' },
   'claude-code/cli': { name: 'Claude Code' },
@@ -37,25 +38,41 @@ const shippedIds = (): string[] =>
     .sort()
 const read = (id: string): string => readFileSync(join(RES, `${id}.json`), 'utf8').replace(/\r\n/g, '\n')
 
+const parsed = (id: string): DialectFile => {
+  const p = parseDialectFile(read(id))
+  expect('file' in p, `${id}: a dialect file`).toBe(true)
+  return (p as { file: DialectFile }).file
+}
+
 describe('the dialect files Hive ships', () => {
-  it('are the five model files, a CLI file for each CLI and the API file', () => {
-    expect(shippedIds()).toEqual(Object.keys(SHIPPED).sort())
+  it('include the five model files, a CLI file for each CLI and the API file, in no other folders', () => {
+    const ids = shippedIds()
+    for (const id of Object.keys(SHIPPED)) expect(ids, id).toContain(id)
+    expect([...new Set(ids.map((id) => id.split('/')[0]))].sort()).toEqual(['api', 'claude-code', 'codex', 'copilot'])
   })
 
-  it('each carry their name and real model ID, in the form Hive writes, and pass the schema', () => {
-    const schema = agentTextSchema()
+  it('the five carry their name and real model ID', () => {
     for (const [id, want] of Object.entries(SHIPPED)) {
-      const parsed = parseDialectFile(read(id))
-      expect('file' in parsed, id).toBe(true)
-      const f = (parsed as { file: DialectFile }).file
+      const f = parsed(id)
       expect({ name: f.name, model: f.model }, id).toEqual({ name: want.name, model: want.model })
-      expect(read(id), `${id}: as dialectFileText writes it`).toBe(dialectFileText(f))
-      expect(checkTexts(f, schema).outdated, id).toEqual([])
     }
   })
 
-  it('are empty: a change is shipped only once measured, on its own card', () => {
-    for (const id of Object.keys(SHIPPED)) expect((parseDialectFile(read(id)) as { file: DialectFile }).file.texts, id).toEqual({})
+  it('each are in the form Hive writes and pass the schema; a model file names its model, a CLI file none', () => {
+    const schema = agentTextSchema()
+    for (const id of shippedIds()) {
+      const f = parsed(id)
+      expect(read(id), `${id}: as dialectFileText writes it`).toBe(dialectFileText(f))
+      expect(checkTexts(f, schema).outdated, id).toEqual([])
+      // Hive ships no test copy: a file in a CLI folder other than cli.json is a model file.
+      if (id.endsWith('/cli')) expect(f.model, id).toBeUndefined()
+      else expect(f.model, id).toMatch(/\S/)
+    }
+  })
+
+  it('ship an override only with why: a change goes in once measured, on its own card', () => {
+    for (const id of shippedIds())
+      for (const [text, entry] of Object.entries(parsed(id).texts)) expect(typeof entry.why === 'string' && entry.why.trim() !== '', `${id}: ${text} says why`).toBe(true)
   })
 
   it("name models the CLI's own pickers offer", () => {
@@ -74,13 +91,9 @@ describe('the dialect files Hive ships', () => {
       expect(folder.cli?.path, name).toBe(`${name}/cli.json`)
       for (const f of [folder.cli!, ...folder.files]) expect({ broken: f.broken, claimTaken: f.claimTaken, outdated: f.outdated, on: f.on }, f.path).toEqual({ broken: undefined, claimTaken: undefined, outdated: [], on: true })
     }
-    for (const [id, want] of Object.entries(SHIPPED)) {
-      if (!want.model) continue
-      const folder = id.split('/')[0]
-      expect(autoModelFile(set.folders[folder].files, want.model)?.path, id).toBe(`${id}.json`)
-    }
+    for (const [name, folder] of Object.entries(set.folders)) for (const f of folder.files) expect(autoModelFile(folder.files, f.model!)?.path, `${name}: ${f.path}`).toBe(f.path)
+    // The API's slot has no model file under it (decision 12).
     expect(set.folders.api.files).toEqual([])
-    expect(set.folders.copilot.files).toEqual([])
   })
 })
 
