@@ -28,13 +28,13 @@ const HUNG_MS = 10000
 
 describe('the name rules', () => {
   it("a project's prefix is its initials", () => {
-    expect(['hive', 'hive-desktop', 'amberLight', 'Amberlight', '2nd go', '---'].map(projectPrefix)).toEqual(['H', 'HD', 'AL', 'A', '2G', 'P'])
+    expect(['hive', 'hive-desktop', 'ambrosiaLabs', 'Ambrosialabs', '2nd go', '---'].map(projectPrefix)).toEqual(['H', 'HD', 'AL', 'A', '2G', 'P'])
   })
 
   it('suggests a free name: the prefix before a short code, then longer ones, a word with its project, else a number', () => {
     expect(suggestAgentName('B1', 'hive', ['B1'])).toBe('HB1')
-    expect(suggestAgentName('B1', 'amberlight', ['B1', 'AB1'])).toBe('AMB1')
-    expect(suggestAgentName('B1', 'amberlight', ['b1', 'ab1', 'amb1'])).toBe('AMBB1')
+    expect(suggestAgentName('B1', 'ambrosia', ['B1', 'AB1'])).toBe('AMB1')
+    expect(suggestAgentName('B1', 'ambrosia', ['b1', 'ab1', 'amb1'])).toBe('AMBB1')
     expect(suggestAgentName('Builder', 'beta', ['Builder'])).toBe('Builder (beta)')
     expect(suggestAgentName('Builder', 'beta', ['Builder', 'builder (BETA)'])).toBe('Builder (beta) 2')
     expect(suggestAgentName('X', 'x', ['X', 'XX'])).toBe('XX 2')
@@ -59,10 +59,10 @@ describe('the name rules', () => {
   })
 
   it('finds a name taken (case and spacing aside), not by the agent being renamed; lists duplicates by project', () => {
-    const all = [{ project: 'hive', name: 'B1', id: 'a' }, { project: 'amber', name: 'b1 ', id: 'b' }, { project: 'hive', name: 'R1', id: 'c' }]
+    const all = [{ project: 'hive', name: 'B1', id: 'a' }, { project: 'ambrosia', name: 'b1 ', id: 'b' }, { project: 'hive', name: 'R1', id: 'c' }]
     expect(nameTaken(' B1', all)?.project).toBe('hive')
     expect(nameTaken('r1', all, { project: 'HIVE', id: 'c' })).toBeNull()
-    expect(nameTaken('r1', all, { project: 'amber', id: 'c' })?.id).toBe('c')
+    expect(nameTaken('r1', all, { project: 'ambrosia', id: 'c' })?.id).toBe('c')
     expect(duplicateAgentNames(all)).toEqual([{ name: 'B1', agents: [all[1], all[0]] }])
   })
 })

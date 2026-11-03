@@ -42,7 +42,7 @@ function lettersOf(name: string): string[] {
 
 /**
  * The key Hive suggests for a project named `name`, given the keys others hold: its first two letters (hive is HI,
- * amberlight AM, website WE); on a clash other 2-letter pairs of its letters, the first letter kept first; then 3 and 4
+ * ambrosia AM, website WE); on a clash other 2-letter pairs of its letters, the first letter kept first; then 3 and 4
  * letters of its name; then any free pair. Always one that keyProblem accepts.
  */
 export function suggestKey(name: string, projectId: string, held: readonly KeyHeld[]): string {

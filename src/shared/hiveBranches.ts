@@ -1,5 +1,5 @@
 // The branches Hive makes for worktree agents (#703, Darren's decision on #702): hive/<workspace>/<project>/<agent>, e.g.
-// hive/HIVE/amberlight/amb1, always in full, so several workspaces can share a repository, even with projects of the same
+// hive/HIVE/ambrosia/amb1, always in full, so several workspaces can share a repository, even with projects of the same
 // name, and never take each other's branches. Branches from before (hive/<agent>) stay Hive's: template reuse,
 // unused-worktree clean-up and Add Agent's reuse of an unused worktree recognise both forms.
 import { slugify } from './defaults'

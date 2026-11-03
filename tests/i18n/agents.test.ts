@@ -71,7 +71,7 @@ describe('the agents area', () => {
     const branch = (ahead: number, dirty: number) => ({ ahead, dirty, base: 'main', branch: 'hive/b1' }) as never
     for (const [a, d] of [[0, 0], [1, 0], [3, 1], [0, 2]]) expect(unmergedWork(branch(a, d), tr), `${a}/${d}`).toEqual(unmergedWork(branch(a, d)))
     expect(sessionLabel({ id: '3f9a1c2b-0000', name: null } as never, 'hive', tr)).toBe(sessionLabel({ id: '3f9a1c2b-0000', name: null } as never, 'hive'))
-    const owner = { name: 'B1', project: 'amberlight' } as never
+    const owner = { name: 'B1', project: 'ambrosia' } as never
     expect(nameTakenMessage('b1', owner, 'B1 (hive)', tr)).toBe(nameTakenMessage('b1', owner, 'B1 (hive)'))
     for (const n of ['', '   ', 'x'.repeat(200), 'Fine']) expect(agentNameProblem(n, tr), n).toBe(agentNameProblem(n))
     for (const d of PROVIDERS) for (const mode of ['auto', 'acceptEdits']) expect(modeCaveat(d.id, mode as never, 'haiku', { supportsAuto: false }, tr)).toBe(modeCaveat(d.id, mode as never, 'haiku', { supportsAuto: false }))

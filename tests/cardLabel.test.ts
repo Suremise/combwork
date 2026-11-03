@@ -56,7 +56,7 @@ describe("the board's search by key", () => {
   })
 
   it('a moved card by the name it kept in the project it left (round 1, finding 1)', () => {
-    // AM-12 was HI-3 before it moved to amberlight.
+    // AM-12 was HI-3 before it moved to ambrosia.
     const moved = { 'HI-3': 40 }
     expect([am12, am3, hi12, ws].filter((c) => cardMatches(c, 'hi-3', keys, moved)).map((c) => cardLabel(c))).toEqual(['AM-12'])
     expect([am12, am3, hi12, ws].filter((c) => cardMatches(c, 'HI-', keys, moved)).map((c) => cardLabel(c))).toEqual(['HI-12'])

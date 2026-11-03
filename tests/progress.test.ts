@@ -906,13 +906,13 @@ describe('progress rules', () => {
     })
     // Hive's own slot, as its folder may be written (another case, forward slashes, a trailing separator), and another project's.
     const hive = slot('C:/ws/Hive/', 'hb3', true, ['hb2'])
-    const amber = slot('C:\\ws\\amberlight', 'amb2', true)
+    const ambrosia = slot('C:\\ws\\ambrosia', 'amb2', true)
     // A turn not claimed yet isn't a merge.
     const turn = slot('C:\\ws\\hive', 'hb1', false)
-    const slots = [hive, amber, turn]
-    expect(filterMergeSlots(slots, SHOW_ALL)).toEqual([hive, amber])
+    const slots = [hive, ambrosia, turn]
+    expect(filterMergeSlots(slots, SHOW_ALL)).toEqual([hive, ambrosia])
     expect(filterMergeSlots(slots, { project: 'c:\\ws\\hive' })).toEqual([hive])
-    expect(filterMergeSlots(slots, { project: 'c:\\ws\\amberlight' })).toEqual([amber])
+    expect(filterMergeSlots(slots, { project: 'c:\\ws\\ambrosia' })).toEqual([ambrosia])
     // An agent: the slot it holds, or one it waits for; none for an agent in neither.
     expect(filterMergeSlots(slots, { project: 'c:\\ws\\hive', agent: 'hb3' })).toEqual([hive])
     expect(filterMergeSlots(slots, { project: 'c:\\ws\\hive', agent: 'hb2' })).toEqual([hive])

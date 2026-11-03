@@ -851,7 +851,7 @@ Nothing private is added: no prompt or message text and no setting's value, the 
 
 | `kind` | What the Assistant did | Example `action` (without `id` and `at`) |
 |---|---|---|
-| `start-task` | Started a card on an agent (`hive_start_task`) | `{ "kind": "start-task", "ok": true, "card": 741, "project": "amberlight", "agent": { "id": "a-3f9c01d2", "name": "AMB1" }, "column": "doing", "text": "Started #741 on AMB1 in amberlight: …" }` |
+| `start-task` | Started a card on an agent (`hive_start_task`) | `{ "kind": "start-task", "ok": true, "card": 741, "project": "ambrosia", "agent": { "id": "a-3f9c01d2", "name": "AMB1" }, "column": "doing", "text": "Started #741 on AMB1 in ambrosia: …" }` |
 | `prompt-agent` | Gave an agent a task (`hive_prompt_agent`) | `{ "kind": "prompt-agent", "ok": true, "project": "hive", "agent": { "id": "a-7b21e4aa", "name": "B1" } }` |
 | `message-agent` | Left an agent a message, maybe tied to a card (`hive_message_agent`); also a message of its that was refused or dropped as stale (`ok: false`) | `{ "kind": "message-agent", "ok": true, "project": "hive", "agent": { "id": "a-7b21e4aa", "name": "B1" }, "card": 12 }` |
 | `cancel-messages` | Cancelled the messages waiting for an agent | `{ "kind": "cancel-messages", "ok": true, "project": "hive", "agent": { "id": "a-7b21e4aa", "name": "B1" } }` |
