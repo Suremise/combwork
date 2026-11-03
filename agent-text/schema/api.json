@@ -1,0 +1,1719 @@
+{
+  "api.activity.safeguardNotDetected": {
+    "placeholders": {}
+  },
+  "api.agent.alreadyRunning": {
+    "placeholders": {
+      "agent": "plain"
+    }
+  },
+  "api.agent.freshFailed": {
+    "placeholders": {
+      "agent": "plain",
+      "error": "plain",
+      "stopped": "select"
+    }
+  },
+  "api.agent.freshNotStarted": {
+    "placeholders": {
+      "agent": "plain",
+      "why": "plain"
+    }
+  },
+  "api.agent.freshWhyControl": {
+    "placeholders": {}
+  },
+  "api.agent.freshWhySession": {
+    "placeholders": {}
+  },
+  "api.agent.inputDisabled": {
+    "placeholders": {}
+  },
+  "api.agent.mcpServersArg": {
+    "placeholders": {
+      "error": "plain"
+    }
+  },
+  "api.agent.messageCardArg": {
+    "placeholders": {}
+  },
+  "api.agent.messageNotRunning": {
+    "placeholders": {
+      "agent": "plain"
+    }
+  },
+  "api.agent.messageNotTyped": {
+    "placeholders": {
+      "agent": "plain",
+      "why": "plain"
+    }
+  },
+  "api.agent.messageTooLong": {
+    "placeholders": {
+      "max": "plain",
+      "length": "plain"
+    }
+  },
+  "api.agent.noConversation": {
+    "placeholders": {
+      "agent": "plain"
+    }
+  },
+  "api.agent.noSessions": {
+    "placeholders": {}
+  },
+  "api.agent.none": {
+    "placeholders": {}
+  },
+  "api.agent.notPinned": {
+    "placeholders": {}
+  },
+  "api.agent.notRunning": {
+    "placeholders": {}
+  },
+  "api.agent.ownProjectOnly": {
+    "placeholders": {
+      "what": "plain",
+      "project": "plain"
+    }
+  },
+  "api.agent.promptBackground": {
+    "placeholders": {
+      "agent": "plain",
+      "total": "plain",
+      "tasks": "plural"
+    }
+  },
+  "api.agent.promptFailed": {
+    "placeholders": {
+      "agent": "plain",
+      "error": "plain"
+    }
+  },
+  "api.agent.promptNotRunning": {
+    "placeholders": {
+      "agent": "plain"
+    }
+  },
+  "api.agent.promptNotTaken": {
+    "placeholders": {
+      "agent": "plain"
+    }
+  },
+  "api.agent.promptPending": {
+    "placeholders": {
+      "agent": "plain"
+    }
+  },
+  "api.agent.promptSignIn": {
+    "placeholders": {
+      "agent": "plain"
+    }
+  },
+  "api.agent.promptStarting": {
+    "placeholders": {
+      "agent": "plain"
+    }
+  },
+  "api.agent.promptUserTyping": {
+    "placeholders": {
+      "agent": "plain"
+    }
+  },
+  "api.agent.promptWaiting": {
+    "placeholders": {
+      "agent": "plain",
+      "said": "select",
+      "message": "plain"
+    }
+  },
+  "api.agent.promptWatching": {
+    "placeholders": {
+      "agent": "plain",
+      "waiting": "plain",
+      "watch": "select"
+    }
+  },
+  "api.agent.promptWorking": {
+    "placeholders": {
+      "agent": "plain"
+    }
+  },
+  "api.agent.providerOff": {
+    "placeholders": {
+      "provider": "plain"
+    }
+  },
+  "api.agent.sayWhich": {
+    "placeholders": {}
+  },
+  "api.agent.stopAskDeclined": {
+    "placeholders": {
+      "agent": "plain"
+    }
+  },
+  "api.agent.stopAskTimedOut": {
+    "placeholders": {
+      "agent": "plain",
+      "seconds": "plain"
+    }
+  },
+  "api.agent.stopAskWithdrawn": {
+    "placeholders": {
+      "agent": "plain"
+    }
+  },
+  "api.agent.stopNotAllowed": {
+    "placeholders": {
+      "level": "plain"
+    }
+  },
+  "api.agent.textRequired": {
+    "placeholders": {}
+  },
+  "api.agent.unknown": {
+    "placeholders": {}
+  },
+  "api.agent.unknownNamed": {
+    "placeholders": {
+      "name": "plain"
+    }
+  },
+  "api.agent.usePromptAgent": {
+    "placeholders": {}
+  },
+  "api.agent.useStartAgent": {
+    "placeholders": {}
+  },
+  "api.agent.useStopAgent": {
+    "placeholders": {}
+  },
+  "api.agent.waitingOnCards": {
+    "placeholders": {}
+  },
+  "api.agent.workflowRoleArg": {
+    "placeholders": {}
+  },
+  "api.attachment.alreadyAttached": {
+    "placeholders": {}
+  },
+  "api.attachment.ambiguous": {
+    "placeholders": {
+      "card": "plain",
+      "name": "plain",
+      "listed": "select",
+      "choices": "plain"
+    }
+  },
+  "api.attachment.attached": {
+    "placeholders": {}
+  },
+  "api.attachment.badName": {
+    "placeholders": {}
+  },
+  "api.attachment.changed": {
+    "placeholders": {
+      "card": "plain",
+      "name": "plain"
+    }
+  },
+  "api.attachment.fromCard": {
+    "placeholders": {}
+  },
+  "api.attachment.fromComment": {
+    "placeholders": {
+      "by": "plain",
+      "at": "plain"
+    }
+  },
+  "api.attachment.fromGoneComment": {
+    "placeholders": {}
+  },
+  "api.attachment.fromSession": {
+    "placeholders": {}
+  },
+  "api.attachment.listArg": {
+    "placeholders": {}
+  },
+  "api.attachment.missing": {
+    "placeholders": {
+      "card": "plain",
+      "name": "plain"
+    }
+  },
+  "api.attachment.moveFirst": {
+    "placeholders": {}
+  },
+  "api.attachment.offset": {
+    "placeholders": {
+      "size": "plain"
+    }
+  },
+  "api.attachment.outside": {
+    "placeholders": {
+      "card": "plain",
+      "name": "plain"
+    }
+  },
+  "api.attachment.unknown": {
+    "placeholders": {
+      "card": "plain",
+      "name": "plain",
+      "listed": "select",
+      "choices": "plain"
+    }
+  },
+  "api.card.atEnd": {
+    "placeholders": {
+      "position": "plain"
+    }
+  },
+  "api.card.before": {
+    "placeholders": {
+      "card": "plain"
+    }
+  },
+  "api.card.changedIt": {
+    "placeholders": {}
+  },
+  "api.card.columnRequired": {
+    "placeholders": {}
+  },
+  "api.card.commented": {
+    "placeholders": {}
+  },
+  "api.card.confirmKindArg": {
+    "placeholders": {}
+  },
+  "api.card.confirmedNoCode": {
+    "placeholders": {}
+  },
+  "api.card.keptCode": {
+    "placeholders": {}
+  },
+  "api.card.laneArg": {
+    "placeholders": {}
+  },
+  "api.card.laneArgField": {
+    "placeholders": {
+      "field": "plain"
+    }
+  },
+  "api.card.laneNeedsProject": {
+    "placeholders": {}
+  },
+  "api.card.laneNoColumn": {
+    "placeholders": {}
+  },
+  "api.card.laneOwnOnly": {
+    "placeholders": {}
+  },
+  "api.card.lanePosition": {
+    "placeholders": {}
+  },
+  "api.card.madeKind": {
+    "placeholders": {
+      "kind": "plain"
+    }
+  },
+  "api.card.movedAt": {
+    "placeholders": {
+      "at": "plain"
+    }
+  },
+  "api.card.movedTo": {
+    "placeholders": {
+      "column": "plain",
+      "placed": "select",
+      "at": "plain"
+    }
+  },
+  "api.card.movedToEnd": {
+    "placeholders": {
+      "position": "plain",
+      "column": "plain"
+    }
+  },
+  "api.card.notANumber": {
+    "placeholders": {
+      "value": "plain"
+    }
+  },
+  "api.card.onlyUserArchives": {
+    "placeholders": {}
+  },
+  "api.card.overrideArg": {
+    "placeholders": {}
+  },
+  "api.card.recordedDecision": {
+    "placeholders": {}
+  },
+  "api.card.reviewerRemoved": {
+    "placeholders": {
+      "agent": "plain"
+    }
+  },
+  "api.card.saidCode": {
+    "placeholders": {}
+  },
+  "api.card.saidCommented": {
+    "placeholders": {}
+  },
+  "api.card.saidKind": {
+    "placeholders": {
+      "kind": "plain"
+    }
+  },
+  "api.card.saidNoCode": {
+    "placeholders": {}
+  },
+  "api.card.saidReviewed": {
+    "placeholders": {}
+  },
+  "api.card.saidSkipsReview": {
+    "placeholders": {}
+  },
+  "api.card.setReviewed": {
+    "placeholders": {}
+  },
+  "api.card.setSkipReview": {
+    "placeholders": {}
+  },
+  "api.card.stayInProject": {
+    "placeholders": {
+      "project": "plain"
+    }
+  },
+  "api.card.titleRequired": {
+    "placeholders": {}
+  },
+  "api.card.unknown": {
+    "placeholders": {
+      "card": "plain"
+    }
+  },
+  "api.card.unknownColumn": {
+    "placeholders": {
+      "column": "plain",
+      "choices": "plain"
+    }
+  },
+  "api.card.unknownPosition": {
+    "placeholders": {
+      "position": "plain"
+    }
+  },
+  "api.card.unknownReview": {
+    "placeholders": {
+      "review": "plain"
+    }
+  },
+  "api.card.unknownView": {
+    "placeholders": {
+      "view": "plain"
+    }
+  },
+  "api.change.activateProject": {
+    "placeholders": {
+      "project": "plain"
+    }
+  },
+  "api.change.addAgent": {
+    "placeholders": {
+      "project": "plain"
+    }
+  },
+  "api.change.addConnection": {
+    "placeholders": {}
+  },
+  "api.change.cancelMessages": {
+    "placeholders": {
+      "agent": "plain",
+      "project": "plain"
+    }
+  },
+  "api.change.chooseConnections": {
+    "placeholders": {
+      "project": "plain"
+    }
+  },
+  "api.change.chooseConnectionsAny": {
+    "placeholders": {}
+  },
+  "api.change.commentTask": {
+    "placeholders": {
+      "card": "plain"
+    }
+  },
+  "api.change.createProject": {
+    "placeholders": {
+      "name": "plain"
+    }
+  },
+  "api.change.createTask": {
+    "placeholders": {
+      "title": "plain"
+    }
+  },
+  "api.change.deactivateProject": {
+    "placeholders": {
+      "project": "plain"
+    }
+  },
+  "api.change.endALane": {
+    "placeholders": {}
+  },
+  "api.change.endLane": {
+    "placeholders": {
+      "lane": "plain"
+    }
+  },
+  "api.change.handOver": {
+    "placeholders": {
+      "from": "plain",
+      "to": "plain",
+      "project": "plain"
+    }
+  },
+  "api.change.intent": {
+    "placeholders": {
+      "kind": "select",
+      "card": "plain"
+    }
+  },
+  "api.change.joinLane": {
+    "placeholders": {
+      "project": "plain"
+    }
+  },
+  "api.change.listTemplates": {
+    "placeholders": {}
+  },
+  "api.change.loadATemplate": {
+    "placeholders": {}
+  },
+  "api.change.loadTemplate": {
+    "placeholders": {
+      "template": "plain",
+      "project": "plain"
+    }
+  },
+  "api.change.loadUnnamedTemplate": {
+    "placeholders": {
+      "project": "plain"
+    }
+  },
+  "api.change.messageAgent": {
+    "placeholders": {
+      "agent": "plain",
+      "project": "plain"
+    }
+  },
+  "api.change.onlyAssistant": {
+    "placeholders": {
+      "what": "plain"
+    }
+  },
+  "api.change.pauseAQueue": {
+    "placeholders": {}
+  },
+  "api.change.pauseQueue": {
+    "placeholders": {
+      "project": "plain"
+    }
+  },
+  "api.change.pauseTeam": {
+    "placeholders": {}
+  },
+  "api.change.planTemplate": {
+    "placeholders": {}
+  },
+  "api.change.promptAgent": {
+    "placeholders": {
+      "agent": "plain",
+      "project": "plain",
+      "fresh": "select"
+    }
+  },
+  "api.change.readTeam": {
+    "placeholders": {}
+  },
+  "api.change.releaseSlot": {
+    "placeholders": {
+      "slot": "plain",
+      "project": "plain"
+    }
+  },
+  "api.change.removeFromQueueAny": {
+    "placeholders": {}
+  },
+  "api.change.reorderTasks": {
+    "placeholders": {
+      "total": "plain",
+      "count": "plural",
+      "column": "plain"
+    }
+  },
+  "api.change.resumeAQueue": {
+    "placeholders": {}
+  },
+  "api.change.resumeQueue": {
+    "placeholders": {
+      "project": "plain"
+    }
+  },
+  "api.change.resumeTeam": {
+    "placeholders": {}
+  },
+  "api.change.retryFresh": {
+    "placeholders": {
+      "lane": "plain"
+    }
+  },
+  "api.change.retryFreshAny": {
+    "placeholders": {}
+  },
+  "api.change.retryMergeAny": {
+    "placeholders": {}
+  },
+  "api.change.setting": {
+    "placeholders": {
+      "path": "plain",
+      "where": "select",
+      "project": "plain"
+    }
+  },
+  "api.change.startAgent": {
+    "placeholders": {
+      "agent": "plain",
+      "project": "plain"
+    }
+  },
+  "api.change.startLane": {
+    "placeholders": {
+      "project": "plain"
+    }
+  },
+  "api.change.startTask": {
+    "placeholders": {
+      "card": "plain",
+      "on": "select",
+      "agent": "plain",
+      "inProject": "select",
+      "project": "plain"
+    }
+  },
+  "api.change.stopAgent": {
+    "placeholders": {
+      "agent": "plain",
+      "project": "plain"
+    }
+  },
+  "api.change.undoMessage": {
+    "placeholders": {}
+  },
+  "api.change.undoOne": {
+    "placeholders": {}
+  },
+  "api.change.updateAgent": {
+    "placeholders": {
+      "agent": "plain",
+      "project": "plain"
+    }
+  },
+  "api.change.updateConnection": {
+    "placeholders": {}
+  },
+  "api.change.updateTask": {
+    "placeholders": {
+      "card": "plain"
+    }
+  },
+  "api.check.isolatedAgentsOnly": {
+    "placeholders": {}
+  },
+  "api.check.isolatedNeedsCard": {
+    "placeholders": {}
+  },
+  "api.check.isolatedNeedsCheck": {
+    "placeholders": {}
+  },
+  "api.check.leaseArgs": {
+    "placeholders": {}
+  },
+  "api.check.noVcs": {
+    "placeholders": {}
+  },
+  "api.check.onlyIsolated": {
+    "placeholders": {}
+  },
+  "api.check.waiting": {
+    "placeholders": {
+      "what": "plain"
+    }
+  },
+  "api.connection.context200k": {
+    "placeholders": {}
+  },
+  "api.connection.controlOff": {
+    "placeholders": {}
+  },
+  "api.connection.nameAccount": {
+    "placeholders": {}
+  },
+  "api.connection.namesOn": {
+    "placeholders": {
+      "account": "plain",
+      "connections": "plain"
+    }
+  },
+  "api.connection.needsName": {
+    "placeholders": {}
+  },
+  "api.connection.noAccount": {
+    "placeholders": {
+      "name": "plain"
+    }
+  },
+  "api.connection.noAccountOn": {
+    "placeholders": {}
+  },
+  "api.connection.noneNamed": {
+    "placeholders": {
+      "name": "plain"
+    }
+  },
+  "api.connection.noneNamedUsable": {
+    "placeholders": {
+      "name": "plain"
+    }
+  },
+  "api.connection.noneNamedUsableShort": {
+    "placeholders": {
+      "name": "plain"
+    }
+  },
+  "api.connection.nothingToChange": {
+    "placeholders": {}
+  },
+  "api.connection.oldFields": {
+    "placeholders": {
+      "fields": "plain",
+      "on": "plain"
+    }
+  },
+  "api.connection.severalAccounts": {
+    "placeholders": {
+      "name": "plain",
+      "ids": "plain"
+    }
+  },
+  "api.connection.severalNamed": {
+    "placeholders": {
+      "name": "plain",
+      "ids": "plain"
+    }
+  },
+  "api.console.anAgent": {
+    "placeholders": {}
+  },
+  "api.console.detailMax": {
+    "placeholders": {
+      "max": "plain"
+    }
+  },
+  "api.console.notReadable": {
+    "placeholders": {}
+  },
+  "api.console.off": {
+    "placeholders": {}
+  },
+  "api.console.projectWithAgent": {
+    "placeholders": {}
+  },
+  "api.console.saySource": {
+    "placeholders": {}
+  },
+  "api.console.sourceArg": {
+    "placeholders": {}
+  },
+  "api.console.unknownKinds": {
+    "placeholders": {
+      "kinds": "plain",
+      "known": "plain"
+    }
+  },
+  "api.delivery.byAssistant": {
+    "placeholders": {}
+  },
+  "api.delivery.fromAssistant": {
+    "placeholders": {}
+  },
+  "api.delivery.fromUser": {
+    "placeholders": {}
+  },
+  "api.doc.headingRow": {
+    "placeholders": {
+      "slug": "plain",
+      "heading": "plain",
+      "line": "plain"
+    }
+  },
+  "api.doc.hidden": {
+    "placeholders": {
+      "path": "plain"
+    }
+  },
+  "api.doc.noHeadings": {
+    "placeholders": {
+      "doc": "plain"
+    }
+  },
+  "api.doc.noSection": {
+    "placeholders": {
+      "asked": "plain",
+      "doc": "plain",
+      "list": "plain"
+    }
+  },
+  "api.doc.notFound": {
+    "placeholders": {
+      "path": "plain"
+    }
+  },
+  "api.doc.notMarkdown": {
+    "placeholders": {
+      "path": "plain"
+    }
+  },
+  "api.doc.outside": {
+    "placeholders": {
+      "path": "plain",
+      "where": "select"
+    }
+  },
+  "api.doc.pathRequired": {
+    "placeholders": {}
+  },
+  "api.doc.projectRequired": {
+    "placeholders": {}
+  },
+  "api.doc.severalSections": {
+    "placeholders": {
+      "doc": "plain",
+      "asked": "plain",
+      "list": "plain"
+    }
+  },
+  "api.doc.tooBig": {
+    "placeholders": {
+      "path": "plain",
+      "megabytes": "plain"
+    }
+  },
+  "api.done.activated": {
+    "placeholders": {
+      "project": "plain"
+    }
+  },
+  "api.done.addedAgent": {
+    "placeholders": {
+      "agent": "plain",
+      "project": "plain",
+      "started": "select",
+      "error": "plain"
+    }
+  },
+  "api.done.addedAgentBrief": {
+    "placeholders": {
+      "agent": "plain",
+      "project": "plain",
+      "started": "select"
+    }
+  },
+  "api.done.addedConnection": {
+    "placeholders": {
+      "connection": "plain",
+      "account": "plain"
+    }
+  },
+  "api.done.alreadyStopped": {
+    "placeholders": {
+      "agent": "plain",
+      "project": "plain"
+    }
+  },
+  "api.done.cancelledMessages": {
+    "placeholders": {
+      "n": "plural",
+      "agent": "plain",
+      "project": "plain",
+      "total": "plain"
+    }
+  },
+  "api.done.cardAdded": {
+    "placeholders": {
+      "card": "plain",
+      "inProject": "select",
+      "project": "plain",
+      "title": "plain"
+    }
+  },
+  "api.done.cardChanged": {
+    "placeholders": {
+      "card": "plain",
+      "title": "plain",
+      "changed": "select",
+      "what": "plain"
+    }
+  },
+  "api.done.cardStarted": {
+    "placeholders": {
+      "card": "plain",
+      "added": "select",
+      "agent": "plain",
+      "project": "plain",
+      "title": "plain"
+    }
+  },
+  "api.done.commented": {
+    "placeholders": {
+      "card": "plain"
+    }
+  },
+  "api.done.connectionsChosen": {
+    "placeholders": {
+      "project": "plain",
+      "changed": "plain",
+      "skipped": "plural",
+      "skippedTotal": "plain"
+    }
+  },
+  "api.done.createdProject": {
+    "placeholders": {
+      "name": "plain"
+    }
+  },
+  "api.done.freshRetried": {
+    "placeholders": {
+      "retried": "plural",
+      "lane": "plain",
+      "total": "plain"
+    }
+  },
+  "api.done.handingOver": {
+    "placeholders": {
+      "from": "plain",
+      "to": "plain",
+      "project": "plain",
+      "latest": "select"
+    }
+  },
+  "api.done.intent": {
+    "placeholders": {
+      "card": "plain",
+      "title": "plain",
+      "kind": "select",
+      "moved": "select",
+      "from": "plain",
+      "to": "plain"
+    }
+  },
+  "api.done.laneEnded": {
+    "placeholders": {
+      "lane": "plain",
+      "project": "plain",
+      "state": "plain"
+    }
+  },
+  "api.done.laneJoined": {
+    "placeholders": {
+      "hasReviewer": "select",
+      "reviewer": "plain",
+      "lane": "plain",
+      "project": "plain"
+    }
+  },
+  "api.done.laneStarted": {
+    "placeholders": {
+      "lane": "plain",
+      "did": "plain",
+      "project": "plain",
+      "builder": "plain",
+      "hasReviewer": "select",
+      "reviewer": "plain",
+      "cards": "plain",
+      "putBack": "select",
+      "note": "plain"
+    }
+  },
+  "api.done.messaged": {
+    "placeholders": {
+      "typed": "select",
+      "agent": "plain",
+      "project": "plain",
+      "id": "plain",
+      "tied": "select",
+      "card": "plain",
+      "round": "plain"
+    }
+  },
+  "api.done.notRunning": {
+    "placeholders": {
+      "agent": "plain",
+      "project": "plain"
+    }
+  },
+  "api.done.prompted": {
+    "placeholders": {
+      "agent": "plain",
+      "project": "plain",
+      "given": "select",
+      "id": "plain"
+    }
+  },
+  "api.done.promptedFresh": {
+    "placeholders": {
+      "agent": "plain",
+      "project": "plain"
+    }
+  },
+  "api.done.queuePaused": {
+    "placeholders": {
+      "target": "plain",
+      "project": "plain"
+    }
+  },
+  "api.done.queueResumed": {
+    "placeholders": {
+      "resumed": "select",
+      "target": "plain",
+      "project": "plain",
+      "hasReason": "select",
+      "reason": "plain"
+    }
+  },
+  "api.done.reordered": {
+    "placeholders": {
+      "cards": "plain",
+      "column": "plain"
+    }
+  },
+  "api.done.slotReleased": {
+    "placeholders": {
+      "slot": "plain",
+      "project": "plain",
+      "kind": "select",
+      "agent": "plain",
+      "ended": "select"
+    }
+  },
+  "api.done.startedAgent": {
+    "placeholders": {
+      "resumed": "select",
+      "agent": "plain",
+      "project": "plain"
+    }
+  },
+  "api.done.stoppedAgent": {
+    "placeholders": {
+      "agent": "plain",
+      "project": "plain"
+    }
+  },
+  "api.done.teamPaused": {
+    "placeholders": {
+      "pause": "plain"
+    }
+  },
+  "api.done.teamResumed": {
+    "placeholders": {
+      "was": "select"
+    }
+  },
+  "api.done.templateLoaded": {
+    "placeholders": {
+      "template": "plain",
+      "project": "plain",
+      "agents": "plain",
+      "workflow": "select",
+      "options": "plain"
+    }
+  },
+  "api.done.undid": {
+    "placeholders": {
+      "undone": "plain",
+      "total": "plain",
+      "count": "plural",
+      "skipped": "plural",
+      "skippedTotal": "plain"
+    }
+  },
+  "api.done.updatedAgent": {
+    "placeholders": {
+      "agent": "plain",
+      "project": "plain",
+      "live": "select"
+    }
+  },
+  "api.done.updatedConnection": {
+    "placeholders": {
+      "connection": "plain"
+    }
+  },
+  "api.handover.busy": {
+    "placeholders": {
+      "agent": "plain"
+    }
+  },
+  "api.handover.failedLine": {
+    "placeholders": {
+      "project": "plain"
+    }
+  },
+  "api.handover.noTools": {
+    "placeholders": {}
+  },
+  "api.handover.noneYet": {
+    "placeholders": {
+      "project": "plain"
+    }
+  },
+  "api.handover.started": {
+    "placeholders": {
+      "ask": "select",
+      "from": "plain",
+      "to": "plain"
+    }
+  },
+  "api.handover.toRequired": {
+    "placeholders": {}
+  },
+  "api.handover.userTyping": {
+    "placeholders": {
+      "agent": "plain"
+    }
+  },
+  "api.http.apiOff": {
+    "placeholders": {}
+  },
+  "api.http.badToken": {
+    "placeholders": {}
+  },
+  "api.http.bodyJson": {
+    "placeholders": {}
+  },
+  "api.http.bodyTooLarge": {
+    "placeholders": {}
+  },
+  "api.http.crossOrigin": {
+    "placeholders": {}
+  },
+  "api.http.eventsForCallers": {
+    "placeholders": {}
+  },
+  "api.http.noRoute": {
+    "placeholders": {
+      "method": "plain",
+      "path": "plain"
+    }
+  },
+  "api.http.portInUse": {
+    "placeholders": {
+      "port": "plain"
+    }
+  },
+  "api.http.tokenFileNote": {
+    "placeholders": {}
+  },
+  "api.http.viewerReadOnly": {
+    "placeholders": {}
+  },
+  "api.inbox.ackArg": {
+    "placeholders": {}
+  },
+  "api.inbox.noInbox": {
+    "placeholders": {}
+  },
+  "api.inbox.readArg": {
+    "placeholders": {}
+  },
+  "api.intent.actionsArg": {
+    "placeholders": {
+      "max": "plain",
+      "kinds": "plain",
+      "reasonMax": "plain"
+    }
+  },
+  "api.intent.askAssistantAgentsOnly": {
+    "placeholders": {}
+  },
+  "api.intent.checklistArg": {
+    "placeholders": {
+      "max": "plain",
+      "stepMax": "plain"
+    }
+  },
+  "api.intent.connectionNewAgentOnly": {
+    "placeholders": {}
+  },
+  "api.intent.fieldRequired": {
+    "placeholders": {
+      "field": "plain"
+    }
+  },
+  "api.intent.fieldText": {
+    "placeholders": {
+      "field": "plain"
+    }
+  },
+  "api.intent.followUpArg": {
+    "placeholders": {}
+  },
+  "api.intent.mergeArg": {
+    "placeholders": {}
+  },
+  "api.intent.passArg": {
+    "placeholders": {}
+  },
+  "api.intent.pathsArg": {
+    "placeholders": {}
+  },
+  "api.intent.pathsRequired": {
+    "placeholders": {}
+  },
+  "api.intent.revisionArg": {
+    "placeholders": {}
+  },
+  "api.intent.submissionArg": {
+    "placeholders": {}
+  },
+  "api.intent.testsArg": {
+    "placeholders": {
+      "problem": "plain"
+    }
+  },
+  "api.intent.unknownAskKind": {
+    "placeholders": {
+      "value": "plain",
+      "kinds": "plain"
+    }
+  },
+  "api.intent.unknownFailKind": {
+    "placeholders": {
+      "value": "plain"
+    }
+  },
+  "api.intent.unknownStep": {
+    "placeholders": {
+      "value": "plain",
+      "steps": "plain"
+    }
+  },
+  "api.journal.entryId": {
+    "placeholders": {}
+  },
+  "api.journal.noEntry": {
+    "placeholders": {
+      "entry": "plain"
+    }
+  },
+  "api.journal.off": {
+    "placeholders": {}
+  },
+  "api.journal.onlyAssistant": {
+    "placeholders": {}
+  },
+  "api.lane.agentStartsOwn": {
+    "placeholders": {}
+  },
+  "api.lane.applyNowArg": {
+    "placeholders": {}
+  },
+  "api.lane.briefMax": {
+    "placeholders": {
+      "max": "plain"
+    }
+  },
+  "api.lane.briefText": {
+    "placeholders": {}
+  },
+  "api.lane.builderRequired": {
+    "placeholders": {}
+  },
+  "api.lane.cardsArg": {
+    "placeholders": {}
+  },
+  "api.lane.mergeCommitArg": {
+    "placeholders": {}
+  },
+  "api.lane.mergeCommitIgnored": {
+    "placeholders": {}
+  },
+  "api.lane.nextIsAgents": {
+    "placeholders": {}
+  },
+  "api.lane.noReviewerNamed": {
+    "placeholders": {
+      "reviewer": "plain",
+      "project": "plain"
+    }
+  },
+  "api.lane.noWatch": {
+    "placeholders": {}
+  },
+  "api.lane.poolArg": {
+    "placeholders": {}
+  },
+  "api.lane.poolNoReviewer": {
+    "placeholders": {}
+  },
+  "api.lane.poolStartedBy": {
+    "placeholders": {}
+  },
+  "api.lane.projectRequired": {
+    "placeholders": {}
+  },
+  "api.lane.unknown": {
+    "placeholders": {
+      "lane": "plain"
+    }
+  },
+  "api.mcp.connectedOnlyBridge": {
+    "placeholders": {}
+  },
+  "api.mcp.earlierLaunch": {
+    "placeholders": {}
+  },
+  "api.mcp.reportMax": {
+    "placeholders": {
+      "max": "plain"
+    }
+  },
+  "api.mcp.reportOnlyBridge": {
+    "placeholders": {}
+  },
+  "api.mergeSlot.moveName": {
+    "placeholders": {}
+  },
+  "api.mergeSlot.noBranch": {
+    "placeholders": {}
+  },
+  "api.mergeSlot.onlyAgents": {
+    "placeholders": {}
+  },
+  "api.mergeSlot.onlyRunning": {
+    "placeholders": {}
+  },
+  "api.metrics.ownProject": {
+    "placeholders": {
+      "project": "plain"
+    }
+  },
+  "api.metrics.roleArg": {
+    "placeholders": {}
+  },
+  "api.metrics.scopeNeedsProject": {
+    "placeholders": {}
+  },
+  "api.note.expectedRevision": {
+    "placeholders": {}
+  },
+  "api.note.notFound": {
+    "placeholders": {}
+  },
+  "api.note.pathRequired": {
+    "placeholders": {}
+  },
+  "api.note.titleContentRequired": {
+    "placeholders": {}
+  },
+  "api.note.workspaceNotesReadOnly": {
+    "placeholders": {
+      "path": "plain"
+    }
+  },
+  "api.notify.sayProject": {
+    "placeholders": {}
+  },
+  "api.notify.targetArg": {
+    "placeholders": {}
+  },
+  "api.notify.targetBoth": {
+    "placeholders": {}
+  },
+  "api.notify.targetNames": {
+    "placeholders": {}
+  },
+  "api.own.activating": {
+    "placeholders": {}
+  },
+  "api.own.deactivating": {
+    "placeholders": {}
+  },
+  "api.own.handingOver": {
+    "placeholders": {}
+  },
+  "api.own.lane": {
+    "placeholders": {}
+  },
+  "api.own.listingSkills": {
+    "placeholders": {}
+  },
+  "api.own.mergeQueue": {
+    "placeholders": {}
+  },
+  "api.own.mergeSlot": {
+    "placeholders": {}
+  },
+  "api.own.readingActivity": {
+    "placeholders": {}
+  },
+  "api.own.readingDeliveries": {
+    "placeholders": {}
+  },
+  "api.own.readingDocs": {
+    "placeholders": {}
+  },
+  "api.own.readingMergeSlot": {
+    "placeholders": {}
+  },
+  "api.own.readingSessions": {
+    "placeholders": {}
+  },
+  "api.own.readingSlots": {
+    "placeholders": {}
+  },
+  "api.own.starting": {
+    "placeholders": {}
+  },
+  "api.own.stopping": {
+    "placeholders": {}
+  },
+  "api.own.typing": {
+    "placeholders": {}
+  },
+  "api.project.nameRequired": {
+    "placeholders": {}
+  },
+  "api.project.stopBeforeDeactivating": {
+    "placeholders": {}
+  },
+  "api.project.vcsGit": {
+    "placeholders": {
+      "root": "plain",
+      "subfolder": "select"
+    }
+  },
+  "api.project.vcsUnsupported": {
+    "placeholders": {
+      "name": "plain"
+    }
+  },
+  "api.provider.notInstalled": {
+    "placeholders": {}
+  },
+  "api.queue.notAgents": {
+    "placeholders": {
+      "what": "plain"
+    }
+  },
+  "api.queue.projectRequired": {
+    "placeholders": {}
+  },
+  "api.queue.targetArg": {
+    "placeholders": {}
+  },
+  "api.queue.targetRequired": {
+    "placeholders": {
+      "listed": "select",
+      "targets": "plain"
+    }
+  },
+  "api.settings.changedBrief": {
+    "placeholders": {
+      "path": "plain",
+      "where": "select",
+      "project": "plain"
+    }
+  },
+  "api.settings.changedLine": {
+    "placeholders": {
+      "path": "plain",
+      "where": "select",
+      "project": "plain",
+      "old": "plain",
+      "new": "plain"
+    }
+  },
+  "api.settings.controlOff": {
+    "placeholders": {
+      "path": "plain"
+    }
+  },
+  "api.settings.line": {
+    "placeholders": {
+      "path": "plain",
+      "where": "select",
+      "project": "plain"
+    }
+  },
+  "api.settings.notAllowed": {
+    "placeholders": {}
+  },
+  "api.settings.notAllowedReason": {
+    "placeholders": {}
+  },
+  "api.settings.onlyAssistant": {
+    "placeholders": {
+      "path": "plain"
+    }
+  },
+  "api.settings.projectNeedsName": {
+    "placeholders": {}
+  },
+  "api.settings.readOnly": {
+    "placeholders": {
+      "readOnly": "plain"
+    }
+  },
+  "api.settings.sayProject": {
+    "placeholders": {
+      "setting": "plain"
+    }
+  },
+  "api.settings.scopeIs": {
+    "placeholders": {
+      "scopes": "plain"
+    }
+  },
+  "api.settings.sessionEnded": {
+    "placeholders": {}
+  },
+  "api.settings.turnedOff": {
+    "placeholders": {
+      "path": "plain"
+    }
+  },
+  "api.settings.userOnly": {
+    "placeholders": {}
+  },
+  "api.settings.userOnlyReason": {
+    "placeholders": {}
+  },
+  "api.skill.fileOutside": {
+    "placeholders": {
+      "file": "plain"
+    }
+  },
+  "api.skill.fileTooBig": {
+    "placeholders": {
+      "file": "plain",
+      "kilobytes": "plain"
+    }
+  },
+  "api.skill.noFile": {
+    "placeholders": {
+      "skill": "plain",
+      "file": "plain"
+    }
+  },
+  "api.skill.unknown": {
+    "placeholders": {
+      "name": "plain"
+    }
+  },
+  "api.slot.heldGone": {
+    "placeholders": {
+      "pid": "plain"
+    }
+  },
+  "api.slot.heldThisHive": {
+    "placeholders": {}
+  },
+  "api.slot.kindArg": {
+    "placeholders": {}
+  },
+  "api.slot.notAgents": {
+    "placeholders": {}
+  },
+  "api.status.hooksMissing": {
+    "placeholders": {
+      "state": "plain"
+    }
+  },
+  "api.status.notSignedIn": {
+    "placeholders": {}
+  },
+  "api.status.retryWait": {
+    "placeholders": {
+      "state": "plain"
+    }
+  },
+  "api.status.signInExpired": {
+    "placeholders": {
+      "reason": "plain"
+    }
+  },
+  "api.status.unknownState": {
+    "placeholders": {
+      "state": "plain"
+    }
+  },
+  "api.team.notAgents": {
+    "placeholders": {
+      "what": "plain"
+    }
+  },
+  "api.team.otherNotParked": {
+    "placeholders": {}
+  },
+  "api.team.otherNotPaused": {
+    "placeholders": {}
+  },
+  "api.template.onlyAssistant": {
+    "placeholders": {
+      "what": "plain"
+    }
+  },
+  "api.template.workflowArg": {
+    "placeholders": {}
+  },
+  "api.undo.nameOne": {
+    "placeholders": {}
+  },
+  "api.undo.noneLeft": {
+    "placeholders": {}
+  },
+  "api.undo.onlyAssistant": {
+    "placeholders": {}
+  },
+  "api.watch.agentsArg": {
+    "placeholders": {}
+  },
+  "api.watch.agentsWithLanes": {
+    "placeholders": {}
+  },
+  "api.watch.cancelled": {
+    "placeholders": {
+      "kind": "plain"
+    }
+  },
+  "api.watch.cancelledOne": {
+    "placeholders": {
+      "kind": "select"
+    }
+  },
+  "api.watch.laneWakes": {
+    "placeholders": {}
+  },
+  "api.watch.lanesAlone": {
+    "placeholders": {}
+  },
+  "api.watch.limitMinutes": {
+    "placeholders": {
+      "max": "plain"
+    }
+  },
+  "api.watch.maxAgents": {
+    "placeholders": {
+      "max": "plain"
+    }
+  },
+  "api.watch.noAgentWorking": {
+    "placeholders": {}
+  },
+  "api.watch.noCardWatch": {
+    "placeholders": {}
+  },
+  "api.watch.noCardWatchToCancel": {
+    "placeholders": {}
+  },
+  "api.watch.noWatchToCancel": {
+    "placeholders": {}
+  },
+  "api.watch.noneToCancel": {
+    "placeholders": {}
+  },
+  "api.watch.notYourself": {
+    "placeholders": {}
+  },
+  "api.watch.sinceArg": {
+    "placeholders": {}
+  },
+  "api.watch.timeoutRange": {
+    "placeholders": {
+      "max": "plain"
+    }
+  },
+  "api.watch.timeoutSeconds": {
+    "placeholders": {}
+  },
+  "api.watch.tooManyWaits": {
+    "placeholders": {
+      "running": "plain"
+    }
+  },
+  "api.watch.usageAlone": {
+    "placeholders": {}
+  },
+  "api.watch.usageMax": {
+    "placeholders": {
+      "max": "plain"
+    }
+  },
+  "api.watch.usageNoAccount": {
+    "placeholders": {
+      "name": "plain"
+    }
+  },
+  "api.watch.usagePercent": {
+    "placeholders": {}
+  },
+  "api.watch.usageShape": {
+    "placeholders": {}
+  },
+  "api.watch.usageWakes": {
+    "placeholders": {}
+  },
+  "api.watch.wakeOnlyAgents": {
+    "placeholders": {}
+  },
+  "api.workspace.agentNotOpen": {
+    "placeholders": {}
+  },
+  "api.workspace.assistantNotOpen": {
+    "placeholders": {}
+  },
+  "api.workspace.closed": {
+    "placeholders": {}
+  },
+  "api.workspace.noneOpen": {
+    "placeholders": {}
+  },
+  "api.workspace.projectInSeveral": {
+    "placeholders": {
+      "project": "plain",
+      "workspace": "plain"
+    }
+  },
+  "api.workspace.sayWhich": {
+    "placeholders": {}
+  },
+  "api.workspace.severalNamed": {
+    "placeholders": {
+      "name": "plain",
+      "paths": "plain"
+    }
+  },
+  "api.workspace.unknown": {
+    "placeholders": {
+      "name": "plain"
+    }
+  },
+  "api.workspace.unknownProject": {
+    "placeholders": {
+      "name": "plain"
+    }
+  }
+}
