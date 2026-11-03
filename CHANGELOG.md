@@ -1,11 +1,5 @@
 # Release Notes
 
-## Unreleased
-
-### Fixes
-
-- **File locks hold back a Codex edit made as a shell command.** Codex sometimes applies its patch by running `apply_patch` in a shell rather than as its own edit, and that edit went through even when another agent held the file. Hive now reads the files from the patch and locks, asks or warns as it does for any other edit (HI-2408).
-
 ## 1.0.0 — 2026-11-03
 
 **Hive 1.0 runs your board by your project's rules.** Choose how a card goes from Todo to Done (who reviews it, which checks pass first, who merges it, where it is built) with the Solo, Pair or Team presets; agents tell Hive what they did, and Hive moves the card, asks you only what's yours to answer, and can merge approved work itself, each card in its own slot. Agents run on connections Hive keeps (several sign-ins side by side), one notification system tells each thing once, and the Activity view shows what every agent is doing now.
@@ -266,6 +260,7 @@ Every change Hive makes to how a CLI behaves now has a switch in Settings → Ad
 - **A running agent's footer names its connection, not its account.** With two connections on one account, both agents' footers named the account (*Codex-1*), whichever connection supplied their model. The footer and its hover now name the connection each agent started on (*Codex-1 Astra*), and its rows mark it ⟳ when another on the same account has been chosen since (HI-2397).
 - **The Agent API says which connection a running agent launched on.** An agent row's `launchedConnection` named only the account, so two agents on two connections of one account looked the same to the Assistant and to agents. It now also gives `connection`, the connection the run launched with (HI-2406).
 - **Each git Hive runs is one process with Git for Windows 2.56 too.** Its UCRT64 build keeps the real git in another folder, so Hive went back to starting every git through Git for Windows' launcher; it now finds it there as well (HI-2400).
+- **File locks hold back a Codex edit made as a shell command.** Codex sometimes applies its patch by running `apply_patch` in a shell rather than as its own edit, and that edit went through even when another agent held the file. Hive now reads the files from the patch and locks, asks or warns as it does for any other edit (HI-2408).
 - **Allow on a file lock's notification stays until you answer.** With File locks on **Ask me**, a Codex agent stopped by another agent's file ends its reply within seconds to wait for you, and in the release candidates that took the notification's **Allow** away, or left it doing nothing. Allow now stays until you answer, and Hive then tells the agent to go ahead. If the other agent finishes with the file first, the notification no longer asks, and Hive tells the agent to try again (HI-2386).
 - **A branch merged into the project folder's branch no longer lands on the folder's card.** With cards worked in the project folder itself (no slots), merging a branch into the folder's branch noted every commit it brought in on a card there: those naming a card on that card (often one long done), the rest on the folder's only unfinished card. Only the branch's own commits count now, the merge commit among them; the merged branch's commits stay with their own cards (HI-2382).
 - **A big merge or checkout no longer freezes Hive's window.** With a card worked in the project folder itself (no slots), a merge bringing thousands of commits into the folder's branch held Hive for up to a minute while it noted each commit on the card (3,536 commits: 40 s). It now notes them in batches, and Hive stays responsive meanwhile (HI-2379).
