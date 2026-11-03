@@ -111,7 +111,10 @@ const lines = (f) => (fs.existsSync(f) ? fs.readFileSync(f, 'utf8').trim().split
     check('…and the banner goes', !!(await lib.until(async () => (await banner.count()) === 0, HUNG_MS)))
     const again = await inv('connections:switchAffected')
     check('…its own connection, now: nothing more to switch', !again.some((r) => r.agentId === 'a-one'), JSON.stringify(again))
+    // Back to the project, its tabs shown, as connectiondefaults leaves Settings.
     await page.keyboard.press('Escape')
+    await page.locator('.project-row', { hasText: 'alpha' }).first().click()
+    await page.locator('.tabs .tab', { hasText: 'Session' }).first().waitFor({ state: 'visible', timeout: HUNG_MS })
     await inv('session:stop', alpha, 'a-one')
     await lib.until(async () => !(await live('a-one')), HUNG_MS)
 
