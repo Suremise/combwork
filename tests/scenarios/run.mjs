@@ -5,6 +5,7 @@
 //   npm run scenarios -- --provider fake-copilot          # the real Copilot CLI offline against a scripted model: the same
 //   npm run scenarios -- --provider claude-code --model haiku --budget 2      # model trials (opt-in, cost tokens)
 //   npm run scenarios -- --provider codex --model gpt-5.6-luna --only work-on-card,review-card
+//   npm run scenarios -- --dialect "my/Opus 5.5 v2.json" --only work-on-card   # a dialect file in the model slot (HI-2439)
 //   npm run scenarios -- --only work-on-card --signed-out   # the fake signed out: the trial is skipped for the environment
 //   npm run scenarios -- --only work-on-card --signed-out=launch   # its OAuth expired: it exits at launch, skipped too
 //   npm run scenarios -- --only work-on-card --signed-out=late   # signed out, shown only once the prompt is sent: skipped too
@@ -67,7 +68,7 @@ process.on('exit', () => {
 })
 const lib = require('../e2e/lib.cjs')
 const runContext = require('../e2e/runContext.cjs')
-const { runScenario, sourceFingerprint, claudeSignedIn, environmentAdvice, CLAUDE_TEST_HOME, PROVIDERS } = require('./harness.cjs')
+const { runScenario, dialectForRun, dialectRecord, sourceFingerprint, claudeSignedIn, environmentAdvice, CLAUDE_TEST_HOME, PROVIDERS } = require('./harness.cjs')
 const { copilotInstalled } = require('../e2e/fake-copilot-api.cjs')
 const { SCENARIOS, FIXTURES_VERSION } = require('./scenarios.cjs')
 const { benchmarkOf, pruneResults, saveBaseline, resultsFolder, releaseResults, writeResults, parseBudget, budgetGate, spendText } = require('./benchmark.cjs')
@@ -97,6 +98,16 @@ if (!PROVIDERS[provider]) {
   console.error(`Unknown provider "${provider}": fake, fake-codex, fake-copilot, claude-code or codex.`)
   process.exit(2)
 }
+// --dialect <file> (HI-2439): a dialect file in the model slot of every agent of the provider's CLI, its chain recorded
+// in the results. Without it, the shipped files (all empty): the Default, which releases test.
+let dialect = null
+try {
+  dialect = dialectForRun(arg('dialect', ''), provider)
+} catch (e) {
+  console.error(`--dialect: ${e.message}`)
+  process.exit(2)
+}
+if (dialect) console.log(`Dialect ${dialect.path}: ${dialect.overrides} override(s), chain ${dialect.hash || '(the Default)'}${dialect.outdated.length ? `; outdated, falling through: ${dialect.outdated.join(', ')}` : ''}`)
 // The fake Claude Code acting out an expired sign-in: to check that a trial the environment stops is skipped (#302).
 // --signed-out=launch: its OAuth session can't be refreshed, so it exits before its session starts (#577).
 // --signed-out=late: it shows it isn't logged in only once the prompt is sent, which it doesn't take (#1321).
@@ -274,7 +285,7 @@ const metaNow = (complete) => ({
   source: sourceAtStart,
   ...(complete ? {} : { incomplete: `${results.length} of ${trials.length} trials` }),
   guidance: results.find((r) => r.guidance?.atStart)?.guidance.atStart.revision ?? null,
-  provider, model: model ?? '(default)', effort: effort ?? '(default)', mode: PROVIDERS[provider].mode, repeats, budgetUsd: budget, when: new Date().toISOString(), spentUsd: Math.round(spent * 1000) / 1000, unknownCostTrials })
+  provider, model: model ?? '(default)', effort: effort ?? '(default)', mode: PROVIDERS[provider].mode, ...(dialect ? { dialect: dialectRecord(dialect) } : {}), repeats, budgetUsd: budget, when: new Date().toISOString(), spentUsd: Math.round(spent * 1000) / 1000, unknownCostTrials })
 // Each trial's result written as it ends (#1457): a run cut short keeps what it had.
 // Should even that fail (the folder kept going, or another error), the run goes on: what it has stays in memory and the
 // next trial's write tries again; the writes at the end fail the run.
@@ -307,7 +318,7 @@ for (const [i, { sc, sample, name }] of trials.entries()) {
     continue
   }
   process.stdout.write(`${sc.id} (${provider}${repeats > 1 ? `, ${sample}/${repeats}` : ''})… `)
-  const r = await runScenario(sc, provider, { model, effort, keep, workRoot, port: lane.first, evidence, signedOut, timeoutMs: fake ? 60000 : 360000 })
+  const r = await runScenario(sc, provider, { model, effort, dialect, keep, workRoot, port: lane.first, evidence, signedOut, timeoutMs: fake ? 60000 : 360000 })
   r.sample = sample
   if (r.environment) {
     // Not a result of the scenario: no checks, and no cost assumed.
@@ -357,6 +368,7 @@ save(
     `# Scenarios: ${provider}${model ? ` (${model})` : ''}${repeats > 1 ? `, ${repeats} samples each` : ''}`,
     '',
     `Fixtures v${FIXTURES_VERSION}; source ${meta.source.head}${meta.source.dirty ? ` + changes ${meta.source.dirty}` : ''}; guidance ${meta.guidance}; CLI ${cli}; ${meta.when}; spent ${spendText(meta)}.`,
+    ...(dialect ? ['', `Dialect: ${dialect.path} (${dialect.overrides} override(s)), chain ${dialect.files.join(' → ')}, hash ${dialect.hash || '(the Default)'}.`] : []),
     '',
     '| Scenario | Result | Checks | Skills read | Hive tools | Hive’s cost | Provider cost, time |',
     '|---|---|---|---|---|---|---|',

@@ -158,8 +158,19 @@ npm run scenarios -- --provider codex --repeat 3 --budget 2                     
 npm run scenarios -- --provider claude-code --model haiku --budget 2            # model trials: opt-in
 npm run scenarios -- --provider codex --model gpt-5.6-luna --budget 2           # Codex, in its test home
 npm run scenarios -- --only work-on-card,review-card --keep                     # some scenarios, keeping their folders
+npm run scenarios -- --dialect "Opus 5.5 v2.json" --provider claude-code --model opus --repeat 2   # a dialect's trial
 node tests/scenarios/measure.cjs              # what sessions are given about Hive, measured from real launches
 ```
+
+**A dialect** (HI-2439; plans/2026-11-03-dialects-design.md, section 6): `--dialect <file>` puts a dialect file in the
+model slot of every agent of the provider's CLI, as a test copy in each scenario workspace's `.hive/dialects/<CLI>/`.
+The file is checked against the schema first, as Hive checks one (`src/main/dialects/format.ts`): one that isn't a
+dialect stops the run; outdated overrides are listed and fall through. `results.json` (its `meta` and each result) and
+`summary.md` record the chain's files and hash, and the benchmark's label names it, so Performance → Compare tells a
+dialect's run from the Default's. Without `--dialect` the shipped files run, all empty: the Default, which releases
+test. Hive applies the file to sessions once dialects are wired into them (card 6b, HI-2065); until then a run records
+the chain it gives. A change to a shipped file goes in only with model trials for its model against that model's
+baseline (`--repeat 2` at least).
 
 The scenarios run the dev build in `out/`. A run first checks it is built from the source as it is now (the e2e
 runner's build stamp, `tests/e2e/build.mjs`) and rebuilds it if not, so a run or a baseline never measures other code.
