@@ -702,9 +702,9 @@ describe('whether the dev build is from this source (build.mjs)', () => {
   })
 
   // What npm run dist does, in order (makeDist, #281): the steps it is given record what it does, in turn.
-  const distSteps = ({ stamped = true } = {}) => {
+  const distSteps = ({ stamped = true, refuse = null as string | null } = {}) => {
     const done: string[] = []
-    const lines = makeDist({
+    const made = makeDist({
       root: 'R',
       here: true,
       run: (cmd: string) => void done.push(`run ${cmd}`),
@@ -717,15 +717,24 @@ describe('whether the dev build is from this source (build.mjs)', () => {
       clear: (d: string) => void done.push(`clear ${d.replace(/\\/g, '/')}`),
       finish: (o: { here: boolean; before: string; after: string }) => (done.push(`finish here=${o.here} ${o.before}->${o.after}`), ['done']),
       warn: (m: string) => void done.push(`warn ${m.trim()}`),
-      stampApp: (r: string, o: { local: boolean }) => void done.push(`stamp ${r} local=${o.local}`)
+      stampApp: (r: string, o: { local: boolean }) => void done.push(`stamp ${r} local=${o.local}`),
+      claim: (d: string, kind: string) => (done.push(`claim ${d.replace(/\\/g, '/')} ${kind}`), refuse),
+      unclaim: (d: string, kind: string) => void done.push(`unclaim ${d.replace(/\\/g, '/')} ${kind}`)
     })
-    return { done, lines }
+    return { done, lines: made.lines, refused: made.refused }
   }
 
   it('npm run dist drops the earlier build records before it builds, builds out/ stamped, then packages and finishes', () => {
     const { done, lines } = distSteps()
-    expect(done).toEqual(['identity', 'clear R/dist', 'buildStamped R', 'run npm run build', 'stamp R local=true', 'run npx electron-builder --win --publish never', 'identity', 'finish here=true id->id'])
+    expect(done).toEqual(['identity', 'claim R/dist dist', 'clear R/dist', 'buildStamped R', 'run npm run build', 'stamp R local=true', 'run npx electron-builder --win --publish never', 'identity', 'finish here=true id->id', 'unclaim R/dist dist'])
     expect(lines).toEqual(['done'])
+  })
+
+  it('…holding its dist from before the records go until it ends, and builds nothing while another build holds it (HI-2417)', () => {
+    const { done, lines, refused } = distSteps({ refuse: 'Not built: npm run release is building in R/dist' })
+    expect(refused).toBe('Not built: npm run release is building in R/dist')
+    expect(lines).toBeUndefined()
+    expect(done).toEqual(['identity', 'claim R/dist dist'])
   })
 
   it('…and says so when the source changed while it built (out/ not stamped)', () => {
