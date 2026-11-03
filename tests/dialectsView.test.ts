@@ -7,7 +7,7 @@ import { join } from 'path'
 import { afterAll, describe, expect, it } from 'vitest'
 import { changedAnywhere, changedHere, inheritedText, layerValues, shownText, type DialectFile, type DialectLayer } from '../src/shared/dialects'
 import { deleteDialect, saveDialect, saveDialectRaw, type DialectSchema } from '../src/main/dialects'
-import { forgetPicks, pickOfToken, rememberPick, spendPick } from '../src/main/dialects/view'
+import { dialectFileView, forgetPicks, listDialects, pickOfToken, rememberPick, spendPick } from '../src/main/dialects/view'
 import { tempDir } from './tempDir'
 
 const SCHEMA: DialectSchema = { 'a.plain': {}, 'a.named': { project: 'plain' } }
@@ -134,5 +134,22 @@ describe('import tokens', () => {
     const many = Array.from({ length: 9 }, (_, i) => rememberPick(`f${i}`, 5, 'W', 100 + i))
     expect(pickOfToken(many[0], 5, 'W', 200)).toBeNull()
     expect(pickOfToken(many[8], 5, 'W', 200)).toBe('f8')
+  })
+})
+
+describe('the Workspace file before it is made', () => {
+  it('is listed and opens empty, its first Save making it; Hive writes nothing until then', async () => {
+    const hive = join(base, `h-${++n}`)
+    mkdirSync(join(hive, 'dialects', 'claude-code'), { recursive: true })
+    writeFileSync(join(hive, 'dialects', 'claude-code', 'cli.json'), '{ "name": "Claude Code", "texts": {} }')
+    const rows = await listDialects(hive)
+    expect(rows[0]).toMatchObject({ path: 'workspace.json', kind: 'workspace', overrides: 0, on: true })
+    const view = await dialectFileView(hive, 'workspace.json')
+    expect(view).toMatchObject({ raw: '', file: { name: 'Workspace', texts: {} }, below: [] })
+    expect(() => readFileSync(join(hive, 'dialects', 'workspace.json'))).toThrow()
+    expect(await dialectFileView(hive, 'claude-code/Missing.json')).toBeNull()
+    const dir = join(hive, 'dialects')
+    expect(await saveDialect(dir, 'workspace.json', { name: 'Workspace', texts: {} }, SCHEMA, { base: view!.raw })).toBeNull()
+    expect(text(dir, 'workspace.json')).toContain('"Workspace"')
   })
 })

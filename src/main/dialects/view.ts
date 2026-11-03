@@ -9,7 +9,7 @@ import { join } from 'path'
 import { readFile } from 'original-fs/promises'
 import type { DialectCatalogue, DialectCatalogueText, DialectFileView, DialectKind, DialectLayer, DialectRow } from '../../shared/dialects'
 import { bundledIds, bundledStatus } from '../bundled'
-import { API_FOLDER, checkTexts, parseDialectFile } from './format'
+import { API_FOLDER, WORKSPACE_FILE, checkTexts, parseDialectFile } from './format'
 import type { LoadedDialect } from './chain'
 import { agentTextSchema } from './schema'
 import { dialectsDir, loadDialects, placeOf } from './store'
@@ -75,16 +75,19 @@ async function rowOf(dir: string, f: LoadedDialect, shipped: ReadonlySet<string>
   }
 }
 
+/** The Workspace file before anything is saved in it: Hive never makes it unasked, and the first Save does. */
+const EMPTY_WORKSPACE: LoadedDialect = { path: WORKSPACE_FILE, name: 'Workspace', texts: {}, outdated: [], on: true }
+
 /**
- * A workspace's dialect files as the view lists them: the Workspace file, then each folder (its CLI file first, then
- * its model files and test copies by name), the API's last. A folder's own CLI file that is missing has no row.
+ * A workspace's dialect files as the view lists them: the Workspace file (shown empty while it isn't there yet, so
+ * its layer can be edited), then each folder (its CLI file first, then its model files and test copies by name), the
+ * API's last. A folder's own CLI file that is missing has no row.
  */
 export async function listDialects(hiveDir: string): Promise<DialectRow[]> {
   const dir = dialectsDir(hiveDir)
   const set = await loadDialects(dir, agentTextSchema())
   const shipped = await shippedIds()
-  const files: LoadedDialect[] = []
-  if (set.workspace) files.push(set.workspace)
+  const files: LoadedDialect[] = [set.workspace ?? EMPTY_WORKSPACE]
   const folders = Object.keys(set.folders).sort((a, b) => (a === API_FOLDER ? 1 : b === API_FOLDER ? -1 : a < b ? -1 : 1))
   for (const name of folders) {
     const f = set.folders[name]
@@ -106,13 +109,15 @@ export async function dialectFileView(hiveDir: string, path: string): Promise<Di
   const place = placeOf(path)
   if (!place) return null
   const dir = dialectsDir(hiveDir)
-  const raw = await readFile(join(dir, ...path.split('/')), 'utf8').catch(() => null)
-  if (raw === null) return null
+  const read = await readFile(join(dir, ...path.split('/')), 'utf8').catch(() => null)
+  // The Workspace file not made yet: empty, and its first Save (from the base '') makes it.
+  if (read === null && place.kind !== 'workspace') return null
+  const raw = read ?? ''
   const set = await loadDialects(dir, agentTextSchema())
   const folder = place.kind === 'folder' ? set.folders[place.folder] : undefined
-  const loaded = place.kind === 'workspace' ? set.workspace : place.cli ? (folder?.cli ?? null) : (folder?.files.find((f) => f.path === path) ?? null)
+  const loaded = place.kind === 'workspace' ? (set.workspace ?? EMPTY_WORKSPACE) : place.cli ? (folder?.cli ?? null) : (folder?.files.find((f) => f.path === path) ?? null)
   if (!loaded) return null
-  const parsed = parseDialectFile(raw)
+  const parsed = read === null ? { file: { name: EMPTY_WORKSPACE.name, texts: {} } } : parseDialectFile(raw)
   const file = 'file' in parsed ? parsed.file : null
   const below: DialectLayer[] = []
   if (place.kind === 'folder' && !place.cli) below.push(layerOf('cli', folder?.cli ?? null))
