@@ -1,0 +1,81 @@
+{
+  "doorbell.count.answer": {
+    "placeholders": {
+      "n": "plural",
+      "cards": "plain"
+    }
+  },
+  "doorbell.count.cardEvent": {
+    "placeholders": {
+      "n": "plural",
+      "cards": "plain"
+    }
+  },
+  "doorbell.count.handover": {
+    "placeholders": {
+      "n": "plural",
+      "cards": "plain"
+    }
+  },
+  "doorbell.count.message": {
+    "placeholders": {
+      "n": "plural",
+      "cards": "plain"
+    }
+  },
+  "doorbell.count.notice": {
+    "placeholders": {
+      "n": "plural",
+      "cards": "plain"
+    }
+  },
+  "doorbell.count.task": {
+    "placeholders": {
+      "n": "plural",
+      "cards": "plain"
+    }
+  },
+  "doorbell.ids.more": {
+    "placeholders": {
+      "ids": "plain",
+      "more": "plain"
+    }
+  },
+  "doorbell.lanes.count": {
+    "placeholders": {
+      "n": "plural"
+    }
+  },
+  "doorbell.lanes.namesMore": {
+    "placeholders": {
+      "names": "plain",
+      "more": "plain"
+    }
+  },
+  "doorbell.notice.checkpoint": {
+    "placeholders": {
+      "what": "plain",
+      "n": "plural",
+      "ack": "select"
+    }
+  },
+  "doorbell.notice.doorbell": {
+    "placeholders": {
+      "what": "plain",
+      "n": "plural",
+      "ack": "select"
+    }
+  },
+  "doorbell.notice.drain": {
+    "placeholders": {
+      "what": "plain",
+      "ack": "select",
+      "n": "plural"
+    }
+  },
+  "doorbell.notice.lanesUnwatched": {
+    "placeholders": {
+      "shown": "plain"
+    }
+  }
+}

@@ -2,7 +2,7 @@ import { randomBytes } from 'crypto'
 import { rename, writeFile } from 'original-fs/promises'
 import { basename, dirname, join, resolve } from 'path'
 import { projectAgents } from '../shared/defaults'
-import { cardChange, carriedOver, ownCut, changesBetween, handoffsSince, hearsHandoffs, isDecisionEntry, changesSince, entryWithin, ENTRY_KEY, limitLine, markOf, movedIntoSince, seenOf, readMark, readSavedCondition, WAKE_MAX_BYTES, wakeAbout, watchLabel, cardWakeLine, userNameOf, releasedLine, withLanesTail, RELEASE_REASONS, type Released, type ReplyNote, alreadyThere, cardOver, encodeSince, WATCH_DEFAULT_LIMIT_MINUTES, WATCH_MAX_CARDS, WATCH_MAX_LIMIT_MINUTES, type Baseline, type CardChange, type CardMark, type ReviewWhere, type Seen, type WatchChange, type WatchCondition } from '../shared/watch'
+import { cardChange, carriedOver, ownCut, changesBetween, handoffsSince, hearsHandoffs, decisionLine, historyVerdict, reviewStep, changesSince, entryWithin, ENTRY_KEY, limitLine, markOf, movedIntoSince, seenOf, readMark, readSavedCondition, WAKE_MAX_BYTES, wakeAbout, watchLabel, cardWakeLine, userNameOf, releasedLine, withLanesTail, RELEASE_REASONS, type Released, type ReplyNote, alreadyThere, cardOver, encodeSince, WATCH_DEFAULT_LIMIT_MINUTES, WATCH_MAX_CARDS, WATCH_MAX_LIMIT_MINUTES, type Baseline, type CardChange, type CardMark, type ReviewWhere, type Seen, type WatchChange, type WatchCondition } from '../shared/watch'
 import { loopReviewerOf, poolCard } from './loopReviewer'
 import { agentBusy, agentEvent, agentLimitLine, agentMarkOf, agentPart, agentWakeLine, agentWatchLabel, readSavedAgentCondition, readSavedAgentMark, replyFirstLine, replyPart, REPLY_CHARS, type AgentEvent, type AgentMark, type AgentNow, type AgentWatchCondition, type WatchedAgent } from '../shared/agentWatch'
 import { isProjectId, type ProjectIdIndex } from '../shared/projectIds'
@@ -2016,7 +2016,10 @@ export function watchToldDecisions(projectPath: string, agentId: string, card: T
   if (watchCovers(projectPath, agentId, card.number, 'decision', card.column)) return 'all'
   const t = toldOf(projectPath, agentId, card.number)?.hand
   if (!t) return null
-  const added = (h: TaskCard['history'][number]): boolean => isDecisionEntry(h.what) && !h.what.startsWith('Removed') && !(h.what.startsWith('Recorded') && h.by === self)
+  const added = (h: TaskCard['history'][number]): boolean => {
+    const d = decisionLine(h)
+    return d !== null && d !== 'removed' && !(d === 'recorded' && h.by === self)
+  }
   return { untold: card.history.filter((h) => added(h) && !entryWithin(card.history, h, t.h)).length }
 }
 
@@ -2528,8 +2531,8 @@ function releaseOf(rec: WatchRecord, n: number, card: TaskCard | null, ctx: Rele
   if ((on.role === 'reviewer' || on.role === 'awaiting') && reviewer) return { number: n, why: 'reviewer', detail: reviewer }
   // Its review taken from it (not ended by its own verdict): stopped, or cleared by someone else.
   if (on.role === 'reviewer' && !card.review) {
-    const last = card.history.findLast((h) => /^(Started reviewing|Review (passed|failed)|Review by .* stopped)/.test(h.what))
-    if (!last || !(/^Review (passed|failed)/.test(last.what) && last.by === rec.watcherName)) return { number: n, why: 'reviewer', detail: null }
+    const last = card.history.findLast((h) => reviewStep(h) !== null)
+    if (!last || !(historyVerdict(last) !== null && last.by === rec.watcherName)) return { number: n, why: 'reviewer', detail: null }
   }
   // Waiting for it in Review: its agent was replaced by another, or by none (its work goes to another lane, or nowhere).
   const was = rec.marks[n]?.agent

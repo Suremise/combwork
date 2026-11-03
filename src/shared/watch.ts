@@ -10,7 +10,8 @@
  * `column` is a move into it, or any other change listed ("verdict or into Done"); a card already there is met at once
  * too (#434). Only `fresh` waits for the next move into it: a card there must leave and come back.
  */
-import type { TaskCard, TaskColumn } from './types'
+import type { StoredText, TaskCard, TaskColumn } from './types'
+import { HISTORY } from './taskHistory'
 import { COLUMN_CHOICES, COLUMN_IDS, TASK_COLUMNS, columnLabel, isLoopStepEntry } from './tasks'
 import { cardRef } from './projectKeys'
 import { CAME_BACK } from './workflow/queue'
@@ -64,8 +65,6 @@ export interface CardMark {
   archived: boolean
 }
 
-const VERDICT = /^Review (passed|failed)/
-
 const COLUMNS: readonly string[] = COLUMN_IDS
 const isObj = (v: unknown): v is Record<string, unknown> => !!v && typeof v === 'object' && !Array.isArray(v)
 const isTime = (v: unknown): v is number => typeof v === 'number' && Number.isFinite(v) && v >= 0
@@ -98,30 +97,99 @@ export function readSavedCondition(v: unknown): WatchCondition | null {
 export function markOf(card: TaskCard | null): CardMark {
   if (!card) return { column: 'gone', comment: 0, verdict: 0, agent: '', archived: false }
   const last = card.comments.at(-1)
-  const verdict = card.history.filter((h) => VERDICT.test(h.what)).at(-1)
+  const verdict = card.history.filter((h) => verdictOf(h) !== null).at(-1)
   return { column: card.column, comment: last ? Date.parse(last.at) || 0 : 0, verdict: verdict ? Date.parse(verdict.at) || 0 : 0, agent: card.agent ?? '', archived: card.archived }
 }
 
 /**
- * Whether a card moved into `column` after `since` (ISO), by its history ("Moved to Review", "Moved to the top of Review",
- * "Moved to Review, before #3"): a card that left and came back looks the same as one that never moved, by its marks.
+ * Whether a card moved into `column` after `since` (ISO), by its history (moved there, to its top or bottom, or before
+ * another card in it; made there): a card that left and came back looks the same as one that never moved, by its marks.
  */
 export function movedIntoSince(card: TaskCard | null, column: TaskColumn, since: string): boolean {
   if (!card) return false
-  const w = columnLabel(column)
   // A failed card returned for review without leaving Review (#214) comes back into it as much as one moved there.
-  const re = new RegExp(`^(Moved to (the (top|bottom) of )?${w}\\b|Created in ${w}\\b${column === 'review' ? '|Returned for review\\b' : ''})`)
-  return card.history.some((h) => h.at > since && re.test(h.what))
+  return card.history.some((h) => h.at > since && intoColumn(h) === column)
 }
 
-/** History that puts a card in a column, and which. */
+/**
+ * What a history line says, for watches (dialects, HI-2437): by its message's id and values (`whatText`, #845), never its
+ * words, which a dialect may change. A line from before #845 has only its English (`what`), stored once and never said
+ * again: it is read by that English, the protocol of those old lines (decision 5: no migration).
+ */
+type HistoryLine = { what: string; whatText?: StoredText }
+const H = HISTORY
+const said = (e: HistoryLine): StoredText | null => (e.whatText && typeof e.whatText.id === 'string' ? e.whatText : null)
+const isId = (e: HistoryLine, ...ms: { id: string }[]): boolean => {
+  const s = said(e)
+  return !!s && ms.some((m) => m.id === s.id)
+}
+/** The lines that move a card into the column their `column` value names (placing it before another, or Nth, isn't one). */
+const MOVES = [H.moved, H.movedTop, H.movedBottom, H.movedBefore]
+const columnValue = (s: StoredText): TaskColumn | null => {
+  const c = s.values?.column
+  return typeof c === 'string' && (COLUMN_IDS as readonly string[]).includes(c) ? (c as TaskColumn) : null
+}
+
+// The English of lines from before #845, as they were written then.
+// agent-protocol: stored history lines from before #845, matched by their fixed English
 const INTO_COLUMN = new RegExp(String.raw`^(?:Moved to (?:the (?:top|bottom) of )?|Created in )(${TASK_COLUMNS.map((c) => c.label).join('|')})\b|^(Returned for review)\b`)
 const COLUMN_OF: Record<string, TaskColumn> = Object.fromEntries(TASK_COLUMNS.map((c) => [c.label, c.id]))
-const intoColumn = (what: string): TaskColumn | null => {
-  const m = INTO_COLUMN.exec(what)
+const MOVED_TO = /^Moved to (?:the (?:top|bottom) of )?(On Hold|Todo|Doing|Review|Passed|Done)\b/
+const VERDICT = /^Review (passed|failed)/
+const HANDS = /^(Given to|Taken from)\b/
+
+/** The column a history line puts a card in (a move, made there, returned for review), else null. */
+const intoColumn = (e: HistoryLine): TaskColumn | null => {
+  const s = said(e)
+  if (s) return s.id === H.returned.id ? 'review' : s.id === H.created.id || MOVES.some((m) => m.id === s.id) ? columnValue(s) : null
+  const m = INTO_COLUMN.exec(e.what)
   return m ? (m[2] ? 'review' : COLUMN_OF[m[1]]) : null
 }
-const HANDS = /^(Given to|Taken from)\b/
+/** The column a line moves a card to (not made there, nor returned for review), else null. */
+const movedTo = (e: HistoryLine): TaskColumn | null => {
+  const s = said(e)
+  if (s) return MOVES.some((m) => m.id === s.id) ? columnValue(s) : null
+  const m = MOVED_TO.exec(e.what)
+  return m ? COLUMN_OF[m[1]] : null
+}
+/** A review's verdict in a line, else null. */
+const verdictOf = (e: HistoryLine): 'passed' | 'failed' | null => {
+  const s = said(e)
+  if (s) return s.id === H.reviewPassed.id ? 'passed' : s.id === H.reviewFailed.id ? 'failed' : null
+  const m = VERDICT.exec(e.what)
+  return m ? (m[1] as 'passed' | 'failed') : null
+}
+/** Given to an agent or taken from one. */
+const hands = (e: HistoryLine): boolean => (said(e) ? isId(e, H.given, H.takenFrom, H.takenFromAgent, H.takenFromOf, H.takenFromOfWorkspace) : HANDS.test(e.what))
+
+// agent-protocol: stored history lines from before #845, matched by their fixed English
+const REVIEW_STEP = /^(?:(Started reviewing)|Review (passed|failed)|(Review by .* stopped))/
+const REVIEW_STEP_WHOLE = /^(?:(Started reviewing)|Review (passed|failed))$/
+/**
+ * A review's step in a line: started, its verdict, or stopped (by the user, or its session ended), else null. A line
+ * from before #845 is read by its English: by how it starts, or with `whole`, only a started or a verdict line that is
+ * nothing more ("Review passed"), as each caller read them before.
+ */
+export function reviewStep(e: HistoryLine, whole = false): 'started' | 'passed' | 'failed' | 'stopped' | null {
+  const s = said(e)
+  if (s) return s.id === H.reviewStarted.id ? 'started' : s.id === H.reviewStopped.id || s.id === H.reviewEnded.id ? 'stopped' : verdictOf(e)
+  const m = (whole ? REVIEW_STEP_WHOLE : REVIEW_STEP).exec(e.what)
+  return !m ? null : m[1] ? 'started' : m[2] ? (m[2] as 'passed' | 'failed') : 'stopped'
+}
+
+/** Marked blocked, in a line. */
+export const historyBlocked = (e: HistoryLine): boolean => (said(e) ? isId(e, H.blocked) : BLOCKED.test(e.what))
+/** A review's verdict, in a line read whole (a line from before #845: "Review passed", nothing more). */
+export const historyWholeVerdict = (e: HistoryLine): boolean => {
+  const s = reviewStep(e, true)
+  return s === 'passed' || s === 'failed'
+}
+/** Returned for review (#214), in a line. */
+export const historyReturned = (e: HistoryLine): boolean => (said(e) ? isId(e, H.returned) : RETURNED_ANY.test(e.what))
+// agent-protocol: a stored history line from before #845, matched by its fixed English
+const RETURNED_ANY = /^Returned for review/
+
+export { intoColumn as historyIntoColumn, movedTo as historyMovedTo, verdictOf as historyVerdict }
 
 /**
  * Where a watch's view of a card's history or comments ends (#224): the last entry it counted. By the entry's id
@@ -202,10 +270,10 @@ export function carriedOver(card: TaskCard, told: Baseline, self: string): CardM
   const own = <T extends { by: string }>(xs: T[]): boolean => xs.length > 0 && xs.every((x) => x.by === self)
   const now = markOf(card)
   return {
-    column: own(h.filter((e) => intoColumn(e.what))) ? now.column : told.mark.column,
+    column: own(h.filter((e) => intoColumn(e))) ? now.column : told.mark.column,
     comment: own(c) ? now.comment : told.mark.comment,
-    verdict: own(h.filter((e) => VERDICT.test(e.what))) ? now.verdict : told.mark.verdict,
-    agent: own(h.filter((e) => HANDS.test(e.what))) ? now.agent : told.mark.agent,
+    verdict: own(h.filter((e) => verdictOf(e) !== null)) ? now.verdict : told.mark.verdict,
+    agent: own(h.filter((e) => hands(e))) ? now.agent : told.mark.agent,
     archived: told.mark.archived
   }
 }
@@ -231,12 +299,12 @@ export function ownCut(card: TaskCard, self: string, after: string, told?: Basel
   const history = upTo(card.history, hi)
   const comments = upTo(card.comments, ci)
   // Its column then: the last move in what it had seen (none kept: as it is now).
-  const into = history.findLast((e) => intoColumn(e.what))
-  const cut = { ...card, history, comments, column: into ? intoColumn(into.what)! : card.column }
+  const into = history.findLast((e) => intoColumn(e))
+  const cut = { ...card, history, comments, column: into ? intoColumn(into)! : card.column }
   // Its agent then isn't kept by id (a history line names a board name): given to someone or taken from it by another
   // since, the agent it had is unknown (HR1's round 1 finding: the agent as it is now swallowed that reassignment), so the
   // watch counts it; else the card's agent as it is now, unchanged since.
-  const handed = card.history.slice(history.length).some((e) => HANDS.test(e.what) && e.by !== self)
+  const handed = card.history.slice(history.length).some((e) => hands(e) && e.by !== self)
   return { mark: { ...markOf(cut), ...(handed ? { agent: AGENT_UNKNOWN } : {}) }, seen: seenOf(cut) }
 }
 
@@ -262,30 +330,37 @@ export function changesSince(card: TaskCard | null, base: Baseline & { since: st
   // over from a wake can say the card was there when it has left and come back since (told in Review, then Doing).
   // The watcher's own moves aren't news (HI-2015: a builder's submission moving its card into Review woke its watch):
   // a column changed only by its moves since doesn't count, nor a move into the column of its own.
-  const moves = h.filter((e) => intoColumn(e.what))
+  const moves = h.filter((e) => intoColumn(e))
   const ownMoves = !!base.watcher && moves.length > 0 && moves.every((e) => e.by === base.watcher)
-  const moved = !!cond.column && h.some((e) => intoColumn(e.what) === cond.column && e.by !== base.watcher)
+  const moved = !!cond.column && h.some((e) => intoColumn(e) === cond.column && e.by !== base.watcher)
   // HI-2143: a watch on any move counts a card that left and came back (HR2's on HI-2122, begun in Review: passed,
   // returned by the merge queue, submitted again, in Review once more), unless every move since was its own.
   const back = !cond.column && moves.length > 0 && !ownMoves
   if (kinds.has('column') && ((now.column !== base.mark.column && !ownMoves) || moved || back) && (!cond.column || now.column === cond.column)) out.push('column')
   if (kinds.has('comment') && c.length) out.push('comment')
-  if (kinds.has('verdict') && h.some((e) => VERDICT.test(e.what))) out.push('verdict')
+  if (kinds.has('verdict') && h.some((e) => verdictOf(e) !== null)) out.push('verdict')
   if (kinds.has('agent') && now.agent !== base.mark.agent) out.push('agent')
   // Blocked since, and still (#726): a block lifted again meanwhile has nothing left to tell.
-  if (cond.blocked && card.blocked && h.some((e) => BLOCKED.test(e.what))) out.push('blocked')
+  if (cond.blocked && card.blocked && h.some((e) => historyBlocked(e))) out.push('blocked')
   out.push(...handoffsIn(h, cond, base.watcher))
   return out
 }
 
+// The English of lines from before #845 (intoColumn's, above, says why).
+// agent-protocol: stored history lines from before #845, matched by their fixed English
 const BLOCKED = /^Blocked: /
 /** A reviewer's request to the card's builder (#912), and a decision the user recorded, changed or removed, in a card's history. */
 const REQUEST = /^Asked the builder: /
 /** A builder's reply to its reviewer (HI-2302): counted as a loop step, its wake's kind. */
 const REPLY = /^Replied to the reviewer: /
 const DECISION = /^(Recorded a decision|Changed a decision|Removed a decision)\b/
-/** Whether a history entry is a decision recorded, changed or removed. */
-export const isDecisionEntry = (what: string): boolean => DECISION.test(what)
+/** Whether a history entry is a decision recorded, changed or removed, and which (null: none). */
+export function decisionLine(e: HistoryLine): 'recorded' | 'changed' | 'removed' | null {
+  const s = said(e)
+  if (s) return s.id === H.decision.id ? 'recorded' : s.id === H.decisionChanged.id ? 'changed' : s.id === H.decisionRemoved.id ? 'removed' : null
+  const m = DECISION.exec(e.what)
+  return m ? (m[1] === 'Recorded a decision' ? 'recorded' : m[1] === 'Changed a decision' ? 'changed' : 'removed') : null
+}
 
 /**
  * Whether a watch counts a reviewer's request and a decision (#1272, SPEC §16.8.2): one that counts a verdict, a move or
@@ -296,10 +371,10 @@ export const hearsHandoffs = (cond: Pick<WatchCondition, 'changes' | 'column' | 
   !(cond.column && !cond.moveInto) && (!cond.changes.length || cond.changes.some((c) => c === 'verdict' || c === 'column' || c === 'comment'))
 
 /** The requests and decisions among history entries new to a watch (`watcher`: its board name; its own aren't news). */
-function handoffsIn(h: readonly { by: string; what: string }[], cond: Pick<WatchCondition, 'changes' | 'column' | 'moveInto'>, watcher?: string): WatchChange[] {
+function handoffsIn(h: readonly (HistoryLine & { by: string })[], cond: Pick<WatchCondition, 'changes' | 'column' | 'moveInto'>, watcher?: string): WatchChange[] {
   if (!hearsHandoffs(cond)) return []
   const others = watcher ? h.filter((e) => e.by !== watcher) : h
-  return [...(others.some((e) => REQUEST.test(e.what)) ? ['request' as const] : []), ...(others.some((e) => DECISION.test(e.what)) ? ['decision' as const] : []), ...(others.some((e) => isLoopStepEntry(e.what) || REPLY.test(e.what)) ? ['step' as const] : [])]
+  return [...(others.some((e) => (said(e) ? isId(e, H.reviewerRequest) : REQUEST.test(e.what))) ? ['request' as const] : []), ...(others.some((e) => decisionLine(e) !== null) ? ['decision' as const] : []), ...(others.some((e) => (said(e) ? isId(e, H.loopStep, H.builderReply) : isLoopStepEntry(e.what) || REPLY.test(e.what))) ? ['step' as const] : [])]
 }
 
 /**
@@ -309,8 +384,15 @@ function handoffsIn(h: readonly { by: string; what: string }[], cond: Pick<Watch
 export const handoffsSince = (card: TaskCard | null, since: string, cond: Pick<WatchCondition, 'changes' | 'column' | 'moveInto'>, watcher?: string): WatchChange[] =>
   card ? handoffsIn(card.history.filter((e) => e.at > since), cond, watcher) : []
 
-/** A card's return for review in its history: "Returned for review, round 2". */
+/** A card's return for review in its history ("Returned for review, round 2"): its round, else null. */
+// agent-protocol: a stored history line from before #845, matched by its fixed English
 const RETURNED = /^Returned for review, round (\d+)/
+function returnedRound(e: HistoryLine): number | null {
+  const s = said(e)
+  if (s) return s.id === H.returned.id && Number.isFinite(Number(s.values?.round)) ? Number(s.values!.round) : null
+  const m = RETURNED.exec(e.what)
+  return m ? Number(m[1]) : null
+}
 
 /**
  * Whether a card in Review can be returned for review (#214): its latest review failed, and nothing has started another
@@ -319,11 +401,11 @@ const RETURNED = /^Returned for review, round (\d+)/
  */
 export function returnRound(card: TaskCard): number | null {
   if (card.column !== 'review' || card.archived || card.review) return null
-  const i = card.history.findLastIndex((h) => VERDICT.test(h.what))
-  if (i < 0 || VERDICT.exec(card.history[i].what)![1] !== 'failed') return null
-  if (card.history.slice(i + 1).some((h) => NEW_ROUND.test(h.what))) return null
-  const passed = card.history.findLastIndex((h) => h.what.startsWith('Review passed'))
-  return card.history.slice(passed + 1).filter((h) => h.what.startsWith('Review failed')).length + 1
+  const i = card.history.findLastIndex((h) => verdictOf(h) !== null)
+  if (i < 0 || verdictOf(card.history[i]) !== 'failed') return null
+  if (card.history.slice(i + 1).some((h) => newRound(h))) return null
+  const passed = card.history.findLastIndex((h) => verdictOf(h) === 'passed')
+  return card.history.slice(passed + 1).filter((h) => verdictOf(h) === 'failed').length + 1
 }
 
 /**
@@ -432,10 +514,13 @@ export interface WakeAbout {
  * History that starts another round of work or review (back to work, in Review again, a review started, another agent),
  * after which an earlier verdict no longer speaks for the card.
  */
+// agent-protocol: stored history lines from before #845, matched by their fixed English
 const NEW_ROUND = /^(Moved to (the (top|bottom) of )?(On Hold|Todo|Doing|Review)\b|Created in |Given to |Taken from |Moved to the workspace|Started reviewing|Returned for review)/
-
-const INTO_REVIEW = /^(Moved to (the (top|bottom) of )?Review\b|Created in Review\b|Returned for review\b)/
-const TO_DOING = /^Moved to (the (top|bottom) of )?Doing\b/
+const ROUND_COLUMNS: readonly (TaskColumn | null)[] = ['hold', 'todo', 'doing', 'review']
+function newRound(e: HistoryLine): boolean {
+  if (!said(e)) return NEW_ROUND.test(e.what)
+  return ROUND_COLUMNS.includes(movedTo(e) ?? null) || hands(e) || isId(e, H.created, H.toWorkspace, H.reviewStarted, H.returned)
+}
 
 /** A wake's context for the agent `watcher` (its id), from the card as it is now. */
 export function wakeAbout(card: TaskCard | null, changes: WatchChange[] | 'gone', watcher: string): WakeAbout {
@@ -443,17 +528,17 @@ export function wakeAbout(card: TaskCard | null, changes: WatchChange[] | 'gone'
   const owner = card.agent && card.agent !== watcher ? (card.agentName ?? card.agent) : null
   // The latest verdict, only while nothing has started another round since (back to Doing, reviewed again, reassigned):
   // one from an earlier build never speaks for work done after it. History is in the order it happened.
-  const i = card.history.findLastIndex((h) => VERDICT.test(h.what))
+  const i = card.history.findLastIndex((h) => verdictOf(h) !== null)
   // A failed card's move back to Doing in the verdict's own change is its verdict's doing (HI-1946), not another round.
-  const itsMove = (h: TaskCard['history'][number]): boolean => h.at === card.history[i].at && h.by === card.history[i].by && TO_DOING.test(h.what)
-  const current = i >= 0 && !card.history.slice(i + 1).some((h) => NEW_ROUND.test(h.what) && !itsMove(h)) ? card.history[i] : null
-  const passed = current ? VERDICT.exec(current.what)![1] === 'passed' : false
+  const itsMove = (h: TaskCard['history'][number]): boolean => h.at === card.history[i].at && h.by === card.history[i].by && movedTo(h) === 'doing'
+  const current = i >= 0 && !card.history.slice(i + 1).some((h) => newRound(h) && !itsMove(h)) ? card.history[i] : null
+  const passed = current ? verdictOf(current) === 'passed' : false
   // Passed or Done on another agent's card names its review only when that review passed it; moved there by hand, none.
   const wanted = changes.includes('verdict') || (!!owner && (card.column === 'passed' || card.column === 'done') && passed)
   // Into Review by a return for review (#214): its latest arrival there says so.
-  const arrival = changes.includes('column') && card.column === 'review' ? card.history.findLast((h) => INTO_REVIEW.test(h.what)) : undefined
-  const returned = arrival ? RETURNED.exec(arrival.what) : null
-  return { owner, verdict: wanted && current ? { passed, by: current.by } : null, ...(returned ? { returned: Number(returned[1]) } : {}) }
+  const arrival = changes.includes('column') && card.column === 'review' ? card.history.findLast((h) => intoColumn(h) === 'review') : undefined
+  const returned = arrival ? returnedRound(arrival) : null
+  return { owner, verdict: wanted && current ? { passed, by: current.by } : null, ...(returned !== null ? { returned } : {}) }
 }
 
 /** The most characters a name takes in a wake line (an agent's, a reviewer's, a comment's author): one line, cut with "…". */

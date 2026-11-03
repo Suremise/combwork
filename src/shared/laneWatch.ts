@@ -1,9 +1,8 @@
 import type { LaneState, LaneStatus, SessionStatus, TaskCard, TaskColumn } from './types'
 import { laneStatusText } from './lanes'
 import { columnLabel } from './tasks'
-import { brief, cardPart, WAKE_MAX_BYTES, WATCH_CHANGES, WATCH_MAX_CARDS, type CardChange, type WatchChange } from './watch'
+import { brief, cardPart, historyBlocked, historyVerdict, WAKE_MAX_BYTES, WATCH_CHANGES, WATCH_MAX_CARDS, type CardChange, type WatchChange } from './watch'
 import { cardRef } from './projectKeys'
-import { HISTORY } from './taskHistory'
 // Types only: agentWatch loads the translations, which hive-mcp (toolReplies imports this) never does.
 import type { AgentEvent, WatchedAgent } from './agentWatch'
 
@@ -100,13 +99,10 @@ export interface LaneHit {
   parts: { n: number | null; event: LaneEvent; text: string; detail?: string }[]
 }
 
-const VERDICT_FAILED = /^Review failed\b/
-const VERDICT_PASSED = /^Review passed\b/
-
 /** A card's latest failed and passed verdicts: when, and by whom ("R1 (alpha)"). */
 export function verdictsOf(card: Pick<TaskCard, 'history'>): { failed: { at: string; by: string } | null; passed: { at: string; by: string } | null } {
-  const f = card.history.findLast((h) => VERDICT_FAILED.test(h.what))
-  const p = card.history.findLast((h) => VERDICT_PASSED.test(h.what))
+  const f = card.history.findLast((h) => historyVerdict(h) === 'failed')
+  const p = card.history.findLast((h) => historyVerdict(h) === 'passed')
   return { failed: f ? { at: f.at, by: f.by } : null, passed: p ? { at: p.at, by: p.by } : null }
 }
 
@@ -128,7 +124,7 @@ export function laneCardMark(card: (Pick<TaskCard, 'column' | 'blocked' | 'histo
  */
 export function blockNewsAt(card: Pick<TaskCard, 'blocked' | 'history'> & Partial<Pick<TaskCard, 'comments' | 'agentName'>>): string {
   if (!card.blocked) return ''
-  const set = card.history.findLast((h) => h.whatText?.id === HISTORY.blocked.id || h.what.startsWith('Blocked: '))?.at ?? ''
+  const set = card.history.findLast((h) => historyBlocked(h))?.at ?? ''
   const name = card.agentName
   // A comment's author is its agent's name and project: "HB2 (hive)".
   const said = name ? (card.comments?.findLast((c) => c.by === name || c.by.startsWith(`${name} (`))?.at ?? '') : ''

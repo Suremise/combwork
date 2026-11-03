@@ -1,11 +1,11 @@
 import { basename } from 'path'
-import { HISTORY } from '../shared/taskHistory'
 import { workStartedAt } from '../shared/tasks'
 import type { TaskCard } from '../shared/types'
 import { onHiveEvent } from './events'
 import { liveDecisionCards } from './tasks'
 import type { WorkspaceService } from './workspace'
 import { cardRef } from '../shared/projectKeys'
+import { historyBlocked, historyWholeVerdict } from '../shared/watch'
 
 /**
  * The "new decision" flag (#357): a hive tool's reply to an agent working on a card (in Doing, its agent), asking the
@@ -65,10 +65,10 @@ function board(ws: WorkspaceService): Promise<{ cards: TaskCard[]; generations: 
 }
 
 /** A review verdict this agent gave on the card (its name on the board), the latest: when it last finished reviewing it. */
-const lastVerdict = (c: TaskCard, self: string): number => Date.parse(c.history.findLast((h) => h.by === self && /^Review (passed|failed)$/.test(h.what))?.at ?? '') || 0
+const lastVerdict = (c: TaskCard, self: string): number => Date.parse(c.history.findLast((h) => h.by === self && historyWholeVerdict(h))?.at ?? '') || 0
 
 /** When the card was last blocked (ms), or 0. */
-const blockedAt = (c: TaskCard): number => Date.parse(c.history.findLast((h) => h.whatText?.id === HISTORY.blocked.id || h.what.startsWith('Blocked: '))?.at ?? '') || 0
+const blockedAt = (c: TaskCard): number => Date.parse(c.history.findLast((h) => historyBlocked(h))?.at ?? '') || 0
 
 /**
  * Where an agent's view of a card's decisions starts (ms), or null when the card isn't one of its: a card it works on (in

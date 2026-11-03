@@ -3,7 +3,7 @@ import { projectAgents } from '../shared/defaults'
 import { pendingStep } from '../shared/tasks'
 import type { LaneInfo, TaskCard, TaskHistoryEntry } from '../shared/types'
 import { HISTORY, storedText } from '../shared/taskHistory'
-import { ANSWER_MAX, cardChange, isReturnNote, LOOP_WAKE_KINDS, laneNextWords, loopStepWords, loopWakeLine, wakeAbout, type LoopWakeKind, type WakeAbout } from '../shared/watch'
+import { ANSWER_MAX, cardChange, historyMovedTo, historyReturned, reviewStep, isReturnNote, LOOP_WAKE_KINDS, laneNextWords, loopStepWords, loopWakeLine, wakeAbout, type LoopWakeKind, type WakeAbout } from '../shared/watch'
 import { boardRead } from './boardStore'
 import { onHiveEvent } from './events'
 import { laneNow, onLanesWritten } from './lanes'
@@ -310,8 +310,8 @@ function stillDue(p: Wake & { agentId: string }, card: TaskCard | null, inLane: 
   // (A wake made again keeps only its handoff's id and time: its line is the card's.)
   const handoff = p.since ? (p.since.whatText ?? card.history.find((h) => h.id === p.since!.id)?.whatText) : undefined
   const followUp = handoff?.id === 'tasks.history.followUpSubmitted'
-  if (p.kind === 'review' && followUp) return card.column === 'review' && !(card.review && card.review.since > p.since!.at) && !since.some((h) => /^(Started reviewing|Review (passed|failed))$/.test(h.what))
-  if (p.kind === 'review') return card.column === 'review' && !card.review && !since.some((h) => /^(Started reviewing|Review (passed|failed))$/.test(h.what))
+  if (p.kind === 'review' && followUp) return card.column === 'review' && !(card.review && card.review.since > p.since!.at) && !since.some((h) => reviewActed(h))
+  if (p.kind === 'review') return card.column === 'review' && !card.review && !since.some((h) => reviewActed(h))
   // The user's answer, to whoever waits on it (the card's agent or the one that asked): due until it reads it (its
   // receipt ends it), wherever the card is now (an answer that moved it to Done is told too, #1630). Not on the agent's
   // acting on the card meanwhile (HI-1721: HB2 submitted its next round before reading the user's answer on HI-1694).
@@ -321,7 +321,13 @@ function stillDue(p: Wake & { agentId: string }, card: TaskCard | null, inLane: 
   // Its reply (HI-2302), while the card is still in Review.
   if (toReviewer(p.kind)) return !since.some((h) => same(h.by, p.agentName)) && (p.kind !== 'step' || !!pendingStep(card)) && (p.kind !== 'reply' || card.column === 'review')
   if (card.agent !== p.agentId || (card.column === 'done' && !inLane)) return false
-  return !since.some((h) => same(h.by, p.agentName) || /^(Moved to (the (top|bottom) of )?Review\b|Returned for review|Started reviewing)/.test(h.what))
+  return !since.some((h) => same(h.by, p.agentName) || historyMovedTo(h) === 'review' || historyReturned(h) || reviewStep(h) === 'started')
+}
+
+/** A review started or a verdict given (by the line's message; a line from before #845 by its whole English). */
+const reviewActed = (h: TaskCard['history'][number]): boolean => {
+  const s = reviewStep(h, true)
+  return s === 'started' || s === 'passed' || s === 'failed'
 }
 
 /** Counts the board's and lanes' changes: a wake checked or typed while one lands is stopped and worked out again. */
