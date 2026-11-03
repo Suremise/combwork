@@ -58,7 +58,7 @@ async function project(): Promise<{ p: string; wt: { path: string; branch: strin
   return { p, wt }
 }
 
-const readsHead = (args: string[]): boolean => args.includes('rev-parse') && args.includes('--abbrev-ref') && args.includes('HEAD')
+const readsHead = (args: string[]): boolean => args.includes('rev-parse') && args.includes('--symbolic-full-name') && args.includes('HEAD')
 
 describe('the checked-out branch', () => {
   it('counts against it when git reads it', async () => {
