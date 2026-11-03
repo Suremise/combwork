@@ -135,6 +135,7 @@ export async function writeAll(fh: FileHandle, text: string): Promise<number> {
 /** Why a recording failed, the first time: in English for its file, and as the window shows it. */
 function failure(r: Recording, e: unknown): void {
   if (r.error !== undefined) return
+  // window: the developer console's recording (Help → Developer Console)
   r.error = englishError(e)
   r.shown = shownError(e)
 }

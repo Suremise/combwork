@@ -3,10 +3,12 @@ import { basename, join } from 'path'
 import { mkdir, writeFile } from 'original-fs/promises'
 import { projectAgents } from '../shared/defaults'
 import { ASSISTANT_AGENT_ID } from '../shared/assistant'
-import { englishText, forAgents, withValues, type Text, type TextPart, type TextValues } from '../shared/advanced'
+import { agentText, englishText, forAgents, saidText, withValues, type Text, type TextPart, type TextValues } from '../shared/advanced'
+import { agentMsg, currentChain, inDefaultDialect, overridesAny } from '../shared/agentText'
+import { RETURNED_COMMENT, returnedCommentFrom } from './workflow/queueState'
 import { msg, tr, type Msg } from '../shared/i18n'
 import { COLUMN_CHOICES, TASK_COLUMNS, cardMatches, isTaskColumn, restoreOrders, searchedWords, sortCards } from '../shared/tasks'
-import { HISTORY, storedLineText, storedText } from '../shared/taskHistory'
+import { HISTORY, setStoredAgentRenderer, setStoredForAgents, storedAgentText, storedIds, storedLineText, storedText } from '../shared/taskHistory'
 import { MAX_CONTEXT, MAX_CONTEXT_REF, parseDocRef } from '../shared/docRefs'
 import { contextProblems } from './docSections'
 import { providerMessage } from '../shared/providers'
@@ -43,6 +45,16 @@ import { cardRef } from '../shared/projectKeys'
 import { projectPreferences } from './workflow/preferences'
 
 const log = createLogger('tasks')
+
+/**
+ * Where agents' words for a board refusal differ from the window's (#910: the window says card, agents read the words
+ * the Agent API always gave): agent messages (dialects, HI-2440), the agent branch of `forAgents`.
+ */
+const BOARD_AGENT = {
+  unknownTask: agentMsg({ id: 'board.agent.unknownTask', text: 'Unknown task #{n}', note: '#910: the words the Agent API always gave (the window says card). Also what a confined agent is told about a card outside its project.' }),
+  needsTitle: agentMsg({ id: 'board.agent.needsTitle', text: 'A task needs a title.', note: '#910: the words the Agent API always gave (the window says card).' }),
+  chooseProject: agentMsg({ id: 'board.agent.chooseProject', text: 'Choose a project before giving the task to an agent.', note: '#910: the words the Agent API always gave (the window says card).' })
+}
 
 /**
  * The board's refusals (#846, E10b of #677) are HiveErrors: the window reads them in its language, agents (the Agent API,
@@ -88,9 +100,9 @@ export const scopeOf = (a: TaskActor): string | null => (a.kind === 'agent' && a
 export const inScope = (c: { project: string }, scope: string | null): boolean => scope === null || (!!c.project && c.project.toLowerCase() === scope.toLowerCase())
 
 /** What a confined agent is told about a card outside its project: the same as for one that doesn't exist. */
-export const unknownTask = (n: number): Error => new HiveError(forAgents(withValues(ERR.unknownTask, { card: cardRef(n) }), `Unknown task #${n}`), { kind: 'notFound' }) // i18n-ignore: agent-facing: the Agent API's words, as before (#910)
+export const unknownTask = (n: number): Error => new HiveError(forAgents(withValues(ERR.unknownTask, { card: cardRef(n) }), saidText(BOARD_AGENT.unknownTask, { n: String(n) })), { kind: 'notFound' })
 /** An empty title: the window says card; agents read the words they always did (#910). */
-const needsTitle = (): HiveError => new HiveError(forAgents(ERR.needsTitle, 'A task needs a title.'), { kind: 'invalid' }) // i18n-ignore: agent-facing: the Agent API's words, as before (#910)
+const needsTitle = (): HiveError => new HiveError(forAgents(ERR.needsTitle, saidText(BOARD_AGENT.needsTitle)), { kind: 'invalid' })
 
 /** The calling agent, when a card of `project` going into Doing with no agent named should be given to it. */
 const selfIn = (actor: TaskActor, project: string): string | null =>
@@ -121,6 +133,7 @@ export class TaskConflictError extends HiveError {
  */
 export class WorkflowRefusedError extends TaskConflictError {
   constructor(readonly refusal: Refusal) {
+    // agent-text: REFUSALS
     super(withValues(REFUSALS[refusal.rule].message, refusal.values as Record<string, string | number>))
   }
 }
@@ -870,7 +883,7 @@ async function projectName(name: string | undefined): Promise<string> {
 
 /** An agent of the project, by id or name: its id and name. */
 async function agentOf(project: string, agent: string): Promise<{ id: string; name: string }> {
-  if (!project) throw new HiveError(forAgents(msg({ id: 'tasks.error.chooseProject', defaultMessage: 'Choose a project before giving the card to an agent.', description: "An error: a card of the whole workspace (no project) can't be given to an agent: agents belong to a project." }), 'Choose a project before giving the task to an agent.'), { kind: 'invalid' }) // i18n-ignore: agent-facing: the Agent API's words, as before (#910)
+  if (!project) throw new HiveError(forAgents(msg({ id: 'tasks.error.chooseProject', defaultMessage: 'Choose a project before giving the card to an agent.', description: "An error: a card of the whole workspace (no project) can't be given to an agent: agents belong to a project." }), saidText(BOARD_AGENT.chooseProject)), { kind: 'invalid' })
   const cfg = await workspace.projectConfig(join(workspace.path!, project))
   const a = projectAgents(cfg).find((x) => x.id === agent || x.name.toLowerCase() === agent.toLowerCase())
   if (!a) throw hiveError(UNKNOWN_AGENT, { agent, project }, { kind: 'notFound' })
@@ -1261,13 +1274,40 @@ const COLUMN_WORD = Object.fromEntries(TASK_COLUMNS.map((c) => [c.id, c.label]))
  * that name, which the message's column select says through its `other {{column}}`, as every board message's does.
  */
 export function agentEnglish(m: Msg, values?: TextValues): string {
-  if (!values) return englishText(m)
-  const named = (k: string, v: TextPart): TextPart => ((k === 'column' || k === 'other') && isTaskColumn(v) ? COLUMN_WORD[v] : v)
-  return englishText(withValues(m, Object.fromEntries(Object.entries(values).map(([k, v]) => [k, named(k, v)]))))
+  return englishText(agentColumns(m, values)) // agent-stored: a history line's `what`, re-rendered for each reader by storedForAgents
 }
 
-/** A board error naming columns: the window's words in its language, agents' English as before (agentEnglish). */
-export const columnError = (m: Msg, values: TextValues, options?: { kind?: HiveErrorKind }): HiveError => new HiveError(forAgents(withValues(m, values), agentEnglish(m, values)), options)
+/** A board message with agents' column names for its values (agentEnglish): text to say for agents, or store. */
+export function agentColumns(m: Msg, values?: TextValues): Text {
+  if (!values) return m
+  const named = (k: string, v: TextPart): TextPart => ((k === 'column' || k === 'other') && isTaskColumn(v) ? COLUMN_WORD[v] : v)
+  return withValues(m, Object.fromEntries(Object.entries(values).map(([k, v]) => [k, named(k, v)])))
+}
+
+/**
+ * A stored line or comment for an agent (dialects, HI-2440): said again in the reader's chain where the chain overrides
+ * a message it names (its own, or one stored inside its values), whatever wording the English had when it was stored:
+ * with no such override, a line reads exactly as stored. An id this Hive doesn't know (storedLineText's null) reads as
+ * stored too. A comment whose agents' English is worded apart from its window message (`agent`, HI-2087's return) is
+ * said again from its own data: as stored unless the chain changes what it says.
+ */
+// agent-text: HISTORY (each line by its stored id)
+setStoredForAgents((english, stored) => {
+  const s = stored as Partial<StoredText> | null
+  if (s?.agent) {
+    if (!currentChain()) return english
+    const said = storedAgentText(s.agent)
+    return said === null || said === inDefaultDialect(() => storedAgentText(s.agent!)) ? english : said
+  }
+  // Compatibility: a return comment written before its data was kept (HI-2440 round 3) can't be said again: as stored.
+  if (s?.id === HISTORY.queueReturned.id) return english
+  if (!overridesAny(storedIds(stored))) return english
+  return storedLineText(stored, (m, values) => agentText(agentColumns(m, values)), lineMessage) ?? english
+})
+setStoredAgentRenderer(RETURNED_COMMENT, returnedCommentFrom)
+
+/** A board error naming columns: the window's words in its language, agents' as before (agentColumns), in their dialect. */
+export const columnError = (m: Msg, values: TextValues, options?: { kind?: HiveErrorKind }): HiveError => new HiveError(forAgents(withValues(m, values), agentColumns(m, values)), options)
 
 const unknownColumn = (column: unknown): HiveError => hiveError(ERR.unknownColumn, { column: String(column), choices: COLUMN_CHOICES }, { kind: 'invalid' })
 
@@ -2554,6 +2594,7 @@ export async function commentAsHive(n: number, said: string | StoredText | { tex
     const card = await getTask(n, ws)
     // `key` (HI-2014): the comment's id, written once on the card: a retry finds it and writes nothing.
     if (card.archived || !still(card) || (key && card.comments.some((c) => c.id === key))) return false
+    // Agents' English beside the window's message (and, where it is worded apart, what it is said from: `agent`).
     if (typeof said !== 'string' && 'shown' in said) addComment(card, BY.hive, said.text, said.shown, key)
     else addComment(card, BY.hive, typeof said === 'string' ? said : englishSaid(said), typeof said === 'string' ? undefined : said, key)
     await saveCard(ws, n, card)

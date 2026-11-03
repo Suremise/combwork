@@ -71,7 +71,10 @@ describe('the merge queue', () => {
     expect(comments).toHaveLength(1)
     expect(String(comments[0].payload.text)).toMatch(new RegExp(`^${card.key} came back from the merge queue: a conflict with main in src/x.txt \\(1 conflict, line 1\\)\\..* Merge main into your worktree`))
     const shown = comments[0].payload.shown as StoredText
-    expect(shown).toEqual({ id: 'tasks.history.queueReturned', values: { reason: 'conflict', target: 'main', check: '', files: 'src/x.txt' } })
+    const { agent, ...message } = shown
+    expect(message).toEqual({ id: 'tasks.history.queueReturned', values: { reason: 'conflict', target: 'main', check: '', files: 'src/x.txt' } })
+    // HI-2440: and what its English is said from, so a reader's dialect says it again when the card is read.
+    expect(agent).toEqual({ render: 'queue.returned', data: { key: card.key, failure: expect.objectContaining({ reason: 'conflict', target: 'main', conflicts: f?.conflicts }) } })
     expect(tr(HISTORY.queueReturned, shown.values as never)).toBe("Came back from the merge queue: a conflict with main (in src/x.txt). The card's Work section shows the run.")
   })
 

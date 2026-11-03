@@ -1193,6 +1193,7 @@ export class Workflow {
   askUser(w: Write, kind: ForYouKind, gate: string, text: string | StoredText, o: { asker?: string | null; unbound?: boolean; revision?: string; checklist?: string[]; entry?: string; result?: string; actions?: AskAction[]; tests?: string[] } = {}): string {
     const s = w.state()
     // Hive's own requests are messages (FOR_YOU): the English for agents and the Agent API, the message for the window.
+    // agent-later: HI-2464 says For-you requests and workflow notices in each reader's dialect
     const english = typeof text === 'string' ? text : workflowEnglish(text)
     const shown = typeof text === 'string' ? {} : { requestText: text }
     const request = `${w.card.key}/r${s.lastSeq + 1}`

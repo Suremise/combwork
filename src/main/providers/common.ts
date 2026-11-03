@@ -2,7 +2,7 @@ import { execFile } from 'child_process'
 import { existsSync, readFileSync, statSync } from 'original-fs'
 import { appendFile, mkdir, readdir, readFile, writeFile } from 'original-fs/promises'
 import { basename, delimiter, dirname, isAbsolute, join, resolve as resolvePath } from 'path'
-import { englishText, shownText, type TextPart } from '../../shared/advanced'
+import { agentField, englishText, shownText, type TextPart } from '../../shared/advanced'
 import { msg, tr } from '../../shared/i18n'
 import type { AgentInstallInfo, ReadinessIssue, RecacheEstimate, SessionUsage } from '../../shared/types'
 import { readFirstLineOf } from '../transcriptFiles'
@@ -474,6 +474,7 @@ const INSTALL_TEXT = new Map<string, TextPart>()
 
 /** Text for a provider's install info: its English, remembered as data so the window can be shown it in its language. */
 export function installText(t: TextPart): string {
+  // agent-stored: agentInstallInfo says it again for each agent, from INSTALL_TEXT
   const english = englishText(t)
   INSTALL_TEXT.set(english, t)
   return english
@@ -481,10 +482,16 @@ export function installText(t: TextPart): string {
 
 /** A provider's install info as the window shows it: its readiness and notes in the language shown (#797). */
 export function shownInstallInfo(info: AgentInstallInfo): AgentInstallInfo {
-  const shown = (s: string): string => {
+  return installInfoIn(info, (s) => {
     const t = INSTALL_TEXT.get(s)
     return t === undefined ? s : shownText(t)
-  }
+  })
+}
+
+/** A provider's install info as an agent reads it (the Agent API's status): Hive's own words in its dialect (dialects, HI-2440). */
+export const agentInstallInfo = (info: AgentInstallInfo): AgentInstallInfo => installInfoIn(info, (s) => agentField(s, INSTALL_TEXT.get(s)))
+
+function installInfoIn(info: AgentInstallInfo, shown: (s: string) => string): AgentInstallInfo {
   return {
     ...info,
     ...(info.updateRetry ? { updateRetry: { message: shown(info.updateRetry.message), label: shown(info.updateRetry.label) } } : {}),

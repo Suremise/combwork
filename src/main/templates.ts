@@ -52,7 +52,7 @@ import { sessions } from './sessions'
 import { workspace, workspaceOf } from './workspace'
 import * as wt from './worktrees'
 import { legacySetupPending, legacyWorktree } from '../shared/agentFolders'
-import { englishText, listOf, shownText, withValues, type Text, type TextPart, type TextValues } from '../shared/advanced'
+import { agentText, englishText, listOf, shownText, withValues, type Text, type TextPart, type TextValues } from '../shared/advanced'
 import { msg, tr, type Msg } from '../shared/i18n'
 import { errorText, HiveError } from './hiveError'
 import { trash } from './trash'
@@ -160,7 +160,8 @@ async function readOne(d: TemplateDest, file: string): Promise<TemplateEntry | n
   if (!isAgentTemplate(t)) {
     const name = raw && typeof raw === 'object' && typeof (raw as { name?: unknown }).name === 'string' ? String((raw as { name: string }).name).slice(0, TEMPLATE_NAME_MAX) : file.replace(/\.json$/, '')
     // Why, in English for the log and a refusal's message, and as text the window shows in its language (#870).
-    return { ...where, file, name, savedAt: null, layout: 'auto', agents: [], problem: englishText(t), problemText: t }
+    // agent-stored: agentField says it for each agent where the template is listed (templateApi.ts rowOf)
+    return { ...where, file, name, savedAt: null, layout: 'auto', agents: [], problem: englishText(t), problemText: t } // agent-text: readTemplate
   }
   return { ...where, file, name: t.name, savedAt: t.savedAt || null, layout: t.layout, ...(t.description ? { description: t.description } : {}), agents: t.agents, ...extras(t) }
 }
@@ -285,6 +286,7 @@ export async function saveTemplate(projectPath: string, scope: TemplateScope, na
   const t = templateFrom(clean, agents, cfg.layout, (a) => agentProvider(a, config.settings), new Date(), presetOf(cfg), key ?? undefined)
   // What is saved must load: read as a file is.
   const checked = readTemplate(JSON.parse(JSON.stringify({ ...t, ...(own ? { workflow: { [own.platform]: own.section } } : {}) })))
+  // agent-text: readTemplate
   if (!isAgentTemplate(checked)) throw new TemplateError(checked, { kind: 'invalid' })
   return changing(d, async () => {
     // The same name: its file (replaced when asked). Another name whose file name would be the same: a file of its own.
@@ -339,6 +341,7 @@ export async function updateTemplate(ref: TemplateRef, edited: unknown, savedAt:
   const { pairs: sent, ...rest } = (edited && typeof edited === 'object' ? edited : {}) as { pairs?: unknown }
   const base = { ...rest, version: TEMPLATE_VERSION, name: clean, savedAt: new Date().toISOString() }
   const checked = readTemplate(base)
+  // agent-text: readTemplate
   if (!isAgentTemplate(checked)) throw new TemplateError(checked, { kind: 'invalid' })
   return changing(ref, async () => {
     const now = await usable(ref)
@@ -417,6 +420,7 @@ export async function readImport(path: string): Promise<AgentTemplate> {
     throw refusal(msg({ id: 'content.templates.importNotJson', defaultMessage: "It isn't a Hive agent template (not JSON).", description: "An error importing a template: the file isn't JSON." }))
   }
   const t = readTemplate(raw)
+  // agent-text: readTemplate
   if (!isAgentTemplate(t)) throw new TemplateError(t)
   return t
 }
@@ -521,7 +525,7 @@ export async function templatePlan(projectPath: string, scope: TemplateScope, fi
  */
 export async function templatePlanEnglish(projectPath: string, scope: TemplateScope, file: string, from?: string, names?: string[]): Promise<{ plan: TemplateLoadPlan; why: string[] }> {
   const { plan, why } = await planFor(projectPath, scope, file, from, names, undefined, 'agent')
-  return { plan, why: why.map((w) => englishText(w)) }
+  return { plan, why: why.map((w) => agentText(w)) }
 }
 
 /**
@@ -700,6 +704,7 @@ export async function loadTemplateWith(projectPath: string, scope: TemplateScope
     // The plan's reads of the repository, which staging goes on using (#732).
     const reads = new wt.RepoReads(projectPath)
     const { plan, why } = await planFor(projectPath, scope, file, o.from, o.names, reads, by)
+    // agent-text: planFor
     if (why.length) throw new TemplateError({ lines: [msg({ id: 'content.templates.cantLoad', defaultMessage: "The template can't be loaded yet:", description: "An error loading a template, above the list of what stops it (each line a reason)." }), ...why.map((item) => withValues(msg({ id: 'content.templates.bullet', defaultMessage: '• {item}', description: 'A line of a list of reasons: a bullet, then the reason {item}.' }), { item }))] })
     const changed = (ids: string[]): boolean => !Array.isArray(expected) || ids.length !== expected.length || ids.some((id, i) => id !== expected[i])
     if (changed(plan.remove.map((a) => a.id))) throw refusal(msg({ id: 'content.templates.changedSince', defaultMessage: "The project's agents changed since you looked: open the template again.", description: "An error loading a template: the project's agents changed after the Load template dialog showed them." }), undefined, 'conflict')

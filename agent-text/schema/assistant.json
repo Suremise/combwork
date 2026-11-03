@@ -1,0 +1,63 @@
+{
+  "assistant.template.agentNoName": {
+    "placeholders": {
+      "n": "plain"
+    }
+  },
+  "assistant.template.badMcp": {
+    "placeholders": {
+      "name": "plain"
+    }
+  },
+  "assistant.template.badName": {
+    "placeholders": {
+      "max": "plain"
+    }
+  },
+  "assistant.template.badPairs": {
+    "placeholders": {}
+  },
+  "assistant.template.badRole": {
+    "placeholders": {
+      "name": "plain"
+    }
+  },
+  "assistant.template.badToken": {
+    "placeholders": {
+      "name": "plain",
+      "token": "plain"
+    }
+  },
+  "assistant.template.from09": {
+    "placeholders": {}
+  },
+  "assistant.template.longNote": {
+    "placeholders": {
+      "name": "plain",
+      "max": "number"
+    }
+  },
+  "assistant.template.newer": {
+    "placeholders": {}
+  },
+  "assistant.template.noAgents": {
+    "placeholders": {}
+  },
+  "assistant.template.noVersion": {
+    "placeholders": {}
+  },
+  "assistant.template.notTemplate": {
+    "placeholders": {}
+  },
+  "assistant.template.sameName": {
+    "placeholders": {
+      "name": "plain"
+    }
+  },
+  "assistant.template.tooMany": {
+    "placeholders": {
+      "count": "plain",
+      "max": "plain"
+    }
+  }
+}

@@ -74,6 +74,7 @@ const UNREAD = msg({ id: 'providers.autoCompact.unreadReason', defaultMessage: "
 /** A setting labelled an estimate, with why: clauses, joined as the language joins a list. */
 const ESTIMATE = msg({ id: 'providers.autoCompact.estimate', defaultMessage: 'an estimate: {unsure}', description: "Where Claude Code's auto-compaction setting comes from, in the context tooltip of an agent's footer: it is an estimate, in brackets after the window. {unsure} lists why, clauses joined as a list (\"managed policies Hive can't read … could change it and Claude Code's settings.json couldn't be read (EACCES)\")." })
 /** A default's label in English (#797): the window is shown it in its language. */
+// window: the context meter's estimate (agents aren't told it)
 export const UNREAD_SOURCES = englishText(withValues(ESTIMATE, { unsure: listOf([UNREAD]) }))
 
 /**

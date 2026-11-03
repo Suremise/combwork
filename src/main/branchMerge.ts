@@ -110,6 +110,7 @@ export async function mergeBranch(projectPath: string, branch: string, opts: { t
   if (folder) {
     const live = sessions.liveStates().find((s) => s.cwd && samePlace(s.cwd, folder) && s.projectPath.toLowerCase() === projectPath.toLowerCase())
     const name = live ? (projectAgents(await workspace.projectConfig(projectPath)).find((a) => a.id === live.agentId)?.name ?? live.agentId) : ''
+    // agent-text: mergeBlocked
     if (live && mergeBlocked(name, live.status)) throw new HiveError(capturedText((t) => mergeBlocked(name, live.status, t))!, { kind: 'conflict' })
   }
   const result = await mergeInProject(projectPath, { path: folder, branch, base: opts.target }, { squash: opts.squash, message: opts.message, target: opts.target })

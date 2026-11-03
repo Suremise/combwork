@@ -125,20 +125,35 @@ export function setAgentTextProblemReporter(fn: (text: string) => void): void {
  * Never call it at module scope (the chain is known per call): keep the descriptor, and say it when the text is sent.
  */
 export function say(m: AgentMsg, values?: AgentValues): string {
-  const override = currentChain()?.texts[m.id]
-  if (override !== undefined && override !== m.text) {
-    try {
-      return formatIcu(override, values)
-    } catch (e) {
-      // The dialect's fault: the code's English, reported once.
-      const key = `${m.id}:${override}`
-      if (!reported.has(key)) {
-        reported.add(key)
-        onProblem(`agent text ${m.id}: its override doesn't format (${e instanceof IcuError ? e.message : String(e)}); the Default's English is used`)
-      }
+  return overrideOf(m.id, m.text, values) ?? formatIcu(m.text, values)
+}
+
+/**
+ * The current chain's override of a text, formatted with its values; undefined where the chain has none (or one the
+ * same as `english`), or one that doesn't format (the dialect's fault: reported once, and the caller says its English).
+ * `say()` uses it for agent messages, and `agentText()` (shared/advanced.ts) for the window's messages agents also read.
+ */
+export function overrideOf(id: string, english: string, values?: AgentValues): string | undefined {
+  const override = currentChain()?.texts[id]
+  if (override === undefined || override === english) return undefined
+  try {
+    return formatIcu(override, values)
+  } catch (e) {
+    const key = `${id}:${override}`
+    if (!reported.has(key)) {
+      reported.add(key)
+      onProblem(`agent text ${id}: its override doesn't format (${e instanceof IcuError ? e.message : String(e)}); the Default's English is used`)
     }
+    return undefined
   }
-  return formatIcu(m.text, values)
+}
+
+/** Whether the current chain overrides any of these ids: stored English is re-rendered only where it does. */
+export function overridesAny(ids: Iterable<string>): boolean {
+  const texts = currentChain()?.texts
+  if (!texts) return false
+  for (const id of ids) if (Object.hasOwn(texts, id)) return true
+  return false
 }
 
 const lists = new Intl.ListFormat('en-GB', { type: 'conjunction' })

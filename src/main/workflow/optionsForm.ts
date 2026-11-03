@@ -20,7 +20,7 @@ import { PLATFORM_NAME, SWITCH_REFUSED } from '../../shared/platform/switching'
 import { listLanes } from '../lanes'
 import { createLogger, userText } from '../logger'
 import * as G from '../platform/git'
-import { englishText, linesOf, withValues, type Text } from '../../shared/advanced'
+import { agentText, linesOf, withValues, type Text } from '../../shared/advanced'
 import { msg } from '../../shared/i18n/msg'
 import { tr } from '../../shared/i18n'
 import { MERGE_ANSWER, OPTION_TEXT, VALUE_TEXT } from '../../shared/workflow/optionTexts'
@@ -173,7 +173,7 @@ const IM = {
 }
 
 /** A problem in English (the Assistant's tools, the log); an inheriting project's names it (#1422). */
-export const problemEnglish = (p: WorkflowProblem): string => (p.kind === 'inheritor' ? `${englishText(withValues(IM.inheritor, { project: p.project }))} ${problemText(p.problem)}` : problemText(p))
+export const problemEnglish = (p: WorkflowProblem): string => (p.kind === 'inheritor' ? `${agentText(withValues(IM.inheritor, { project: p.project }))} ${problemText(p.problem)}` : problemText(p))
 
 /** A problem as text for the window (its message, in the user's language), or its English reason; an inheriting project's on two lines. */
 export const problemShown = (p: WorkflowProblem): Text => (p.kind === 'inheritor' ? linesOf([withValues(IM.inheritor, { project: p.project }), problemShownOf(p.problem)]) : problemShownOf(p))
@@ -259,6 +259,7 @@ export async function checkWorkflowChange(ws: WorkspaceService, projectPath: str
 /** Options that can't be saved: refused with every reason, each a whole sentence of its own (in the window's language there). */
 export class WorkflowRefused extends HiveError {
   constructor(readonly problems: WorkflowProblem[]) {
+    // agent-text: problemShown
     super({ lines: problems.map(problemShown) }, { kind: 'invalid' })
   }
 }

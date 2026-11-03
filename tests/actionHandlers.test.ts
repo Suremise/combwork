@@ -637,7 +637,7 @@ describe('notices (#1266, §16.11.4)', () => {
     await worker.runActions(w)
     expect(st.notices).toHaveLength(1)
     expect(JSON.stringify(st.notices[0].body)).toContain('"shown":"AL-9 is approved: OK to merge?"')
-    expect(JSON.stringify(st.notices[0].body)).toContain('"english":"AL-9 is approved: OK to merge?"')
+    expect(JSON.stringify(st.notices[0].body)).toContain('"agent":"AL-9 is approved: OK to merge?"')
   })
 
   it("a lane's failed review, a card blocked and its merge due are told; a lane already running starts from now; nothing new tells nothing", async () => {

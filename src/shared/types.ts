@@ -56,6 +56,12 @@ export interface StoredText {
   id: string
   /** A value can be a message of its own (#866: a CLI's sentence in a comment Hive writes), formatted in the same language. */
   values?: Record<string, string | number | StoredText>
+  /**
+   * On Hive's comment whose English for agents is worded apart from this message (HI-2087: the queue's return): what
+   * that English is said from, so a reader's dialect says it again when it is read (HI-2440): the renderer's name
+   * (`storedAgentRenderer`, shared/taskHistory.ts) and its data, kept as JSON.
+   */
+  agent?: { render: string; data: unknown }
 }
 /** The window's text as data beside an English field (above), by name: what the Agent API leaves out of its replies. */
 export type WindowTextField =

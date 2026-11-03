@@ -103,6 +103,7 @@ export function planNotice(provider: ProviderId, l: Pick<PlanLimit, 'usedPercent
   const values = { share: Math.round(l.usedPercent) / 100, provider: providerName(provider), ...usedWindow(l), label: l.label, connection: connection ?? '' }
   const m = connection ? USED_ON : USED
   const body = `${level >= 95 ? tr(msg({ id: 'main.plan.pause', defaultMessage: 'Sessions will pause when it runs out.', description: 'A plan-usage notice, at 95% used or more.' })) : tr(msg({ id: 'main.plan.close', defaultMessage: 'You are getting close to the limit.', description: 'A plan-usage notice, below 95% used.' }))}${resetText(l.resetsAt)}`
+  // agent-later: HI-2465 says the events stream's titles in each caller's dialect
   return { title: tr(m, values), body, apiTitle: englishText({ m, values }) }
 }
 

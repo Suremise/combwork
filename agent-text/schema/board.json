@@ -1,0 +1,45 @@
+{
+  "board.agent.agentBusy": {
+    "placeholders": {
+      "agent": "plain",
+      "status": "select"
+    }
+  },
+  "board.agent.chooseProject": {
+    "placeholders": {}
+  },
+  "board.agent.needsTitle": {
+    "placeholders": {}
+  },
+  "board.agent.unknownTask": {
+    "placeholders": {
+      "n": "plain"
+    }
+  },
+  "board.error.inUse": {
+    "placeholders": {}
+  },
+  "board.error.newer": {
+    "placeholders": {}
+  },
+  "board.error.noBackup": {
+    "placeholders": {}
+  },
+  "board.error.noWorkspace": {
+    "placeholders": {}
+  },
+  "board.error.stopAgentsFirst": {
+    "placeholders": {}
+  },
+  "board.error.unavailable": {
+    "placeholders": {
+      "error": "plain"
+    }
+  },
+  "board.error.upgradeFirst": {
+    "placeholders": {}
+  },
+  "board.error.upgradeFirstStart": {
+    "placeholders": {}
+  }
+}

@@ -11,7 +11,7 @@
  * too (#434). Only `fresh` waits for the next move into it: a card there must leave and come back.
  */
 import type { StoredText, TaskCard, TaskColumn } from './types'
-import { HISTORY } from './taskHistory'
+import { HISTORY, storedForAgents } from './taskHistory'
 import { COLUMN_CHOICES, COLUMN_IDS, TASK_COLUMNS, columnLabel, isLoopStepEntry } from './tasks'
 import { cardRef } from './projectKeys'
 import { CAME_BACK } from './workflow/queue'
@@ -679,7 +679,7 @@ const firstLine = (text: string, max = 160): string => {
 export function cardChange(n: number, card: TaskCard | null, changes: WatchChange[] | 'gone'): CardChange {
   const last = card?.comments.at(-1)
   const by = card ? ([...card.history].sort((a, b) => a.at.localeCompare(b.at)).at(-1)?.by ?? null) : null
-  return { number: n, column: card ? card.column : 'gone', changes, by, comment: last ? { by: last.by, firstLine: firstLine(last.text) } : null, ...(changes === 'gone' && card?.archived ? { archived: true } : {}), ...(changes !== 'gone' && changes.includes('blocked') && card?.blocked ? { blocked: card.blocked } : {}) }
+  return { number: n, column: card ? card.column : 'gone', changes, by, comment: last ? { by: last.by, firstLine: firstLine(storedForAgents(last.text, last.hiveText)) } : null, ...(changes === 'gone' && card?.archived ? { archived: true } : {}), ...(changes !== 'gone' && changes.includes('blocked') && card?.blocked ? { blocked: card.blocked } : {}) }
 }
 
 const columnWord = (c: TaskColumn | 'gone'): string => (c === 'gone' ? 'gone' : columnLabel(c))

@@ -3,6 +3,8 @@
 // writes, per area (an id's first part: `contract.inbox.rule` → contract), so cards extracting different areas never
 // write the same file:
 //   - agent-text/catalogue/<area>.json: id → { text, note }, the Default layer (the code's English and why it is worded so);
+//     a window message agents read too (HI-2440, agentTextBoth.mjs) keeps its UI id and adds `audience: "both"`, its
+//     description as its note;
 //   - agent-text/schema/<area>.json: id → { placeholders: { name: kind } }, what a dialect's override must keep exactly
 //     (kind: plain, number, plural or select).
 // Never edit them by hand: change the message in the code and run this. `--check` writes nothing and exits 1 when one is
@@ -14,6 +16,7 @@ import { parse } from '@babel/parser'
 import traverseModule from '@babel/traverse'
 import { parse as parseIcu, TYPE } from '@formatjs/icu-messageformat-parser'
 import { ROOT, rootArg, sourceFiles, writeKeepingEndings } from './i18nExtract.mjs'
+import { analyzeBoth } from './agentTextBoth.mjs'
 
 const traverse = traverseModule.default ?? traverseModule
 
@@ -60,8 +63,24 @@ export function messagesIn(rel, code) {
   return out
 }
 
-/** Every agent message in the source, by id. Throws on two messages with one id and different text or note. */
+/**
+ * Every message agents read, by id: the agent messages, and the window's messages agents also read (HI-2440: `audience:
+ * "both"`, by their UI id, found by agentTextBoth.mjs). Throws on two messages with one id and different text or note, or
+ * a mark that leads nowhere.
+ */
 export function extractAgentMessages(root = ROOT) {
+  const own = extractOwnMessages(root)
+  const both = analyzeBoth(root)
+  if (both.problems.length) throw new Error(both.problems.join('; '))
+  for (const [id, d] of Object.entries(both.messages)) {
+    if (own[id]) throw new Error(`An agent message and a window message agents read share the id "${id}" (${d.at})`)
+    own[id] = { text: d.text, ...(d.note === undefined ? {} : { note: d.note }), audience: 'both' }
+  }
+  return own
+}
+
+/** The agent messages declared with agentMsg(), by id. Throws on two messages with one id and different text or note. */
+export function extractOwnMessages(root = ROOT) {
   const out = {}
   for (const rel of sourceFiles(root)) {
     const code = readFileSync(join(root, rel), 'utf8')

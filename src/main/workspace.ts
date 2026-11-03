@@ -1130,6 +1130,7 @@ export class WorkspaceService {
     if (raw === null || raw === undefined) delete own[id]
     else {
       const checked = checkAdvanced(def, raw)
+      // agent-text: checkAdvanced
       if ('error' in checked) throw new HiveError(checked.errorText, { kind: 'invalid' })
       own[id] = checked.value
     }

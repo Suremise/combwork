@@ -8,6 +8,7 @@ import { nameTaken, suggestTemplateAgentName } from '../shared/agentNames'
 import { workspaceAgents } from './agentNames'
 import { noteChange } from './assistantChanges'
 import { HiveError } from './hiveError'
+import { agentField } from '../shared/advanced'
 import { projectKeyOf } from './projectKeys'
 import { applyConnections, connectionsPlan, listAllTemplates, listTemplates, loadTemplateWith, templatePlanEnglish } from './templates'
 import { answerFor, loadFallback, optionNamed, type ConnectionAnswers, type ConnectionOption } from '../shared/templateConnections'
@@ -80,7 +81,7 @@ const rowOf = (e: TemplateEntry): TemplateRow => ({
   name: e.name,
   agents: e.agents.length,
   workflow: TEMPLATE_PLATFORMS.filter((p) => !!e.workflow?.[p]),
-  ...(e.problem ? { problem: e.problem } : {})
+  ...(e.problem ? { problem: agentField(e.problem, e.problemText) } : {})
 })
 
 /** The templates a project can use (Hive's own, the workspace's and its own), as rows. */
@@ -106,7 +107,7 @@ export async function findTemplate(projectPath: string, a: { template?: unknown;
   if (!found.length) throw refused(say(T.none, { template, scoped: a.scope ? 'yes' : 'no', scope: a.scope ? String(a.scope) : '', fromProject: from ? 'yes' : 'no', from: from ? (a.from as string) : '' }), 'notFound')
   if (found.length > 1) throw refused(say(T.several, { template, choices: found.map((e) => `${e.scope}${e.scope === 'project' && e.project ? ` ${basename(e.project)}` : ''}: ${e.file}`).join('; ') }), 'conflict')
   const e = found[0]
-  if (e.problem) throw refused(say(T.unusable, { name: e.name, problem: e.problem }), 'conflict')
+  if (e.problem) throw refused(say(T.unusable, { name: e.name, problem: agentField(e.problem, e.problemText) }), 'conflict')
   return e
 }
 
@@ -448,9 +449,11 @@ export async function applyForAssistant(projectPath: string, connections: unknow
   // Each agent by its id, and the apply bound to these agents (`expected`): one added, removed or moved since refuses it.
   const agents = plan.agents.map((a) => ({ ...a, key: a.id }))
   const asked = answersOf(connections, agents)
+  // agent-text: answersOf
   if (asked.problems.length) throw refused(asked.problems.join(' '), 'invalid')
   if (!asked.answers.all && !Object.keys(asked.answers.roles ?? {}).length && !Object.keys(asked.answers.agents ?? {}).length) throw refused(say(T.connRequired, { roles: ROLE_KEYS.join(', '), agents: plan.agents.map((a) => `${a.name} (${a.role})`).join(', '), usable: plan.options.map((o) => `${o.name} (${o.id})`).join(', ') || say(T.connNone) }), 'invalid')
   const named = namedConnections(answerFor(agents, asked.answers, () => undefined), plan.options)
+  // agent-text: namedConnections
   if (named.problems.length) throw refused(named.problems.join(' '), 'conflict')
   const done = await applyConnections(projectPath, asked.answers, { expected: plan.agents.map((a) => a.id), check: () => guard?.(), changed: (was, now) => noteConnection(ws, basename(projectPath), was, now) })
   const byName = new Map(plan.agents.map((a, i) => [a.name, named.names[i]]))

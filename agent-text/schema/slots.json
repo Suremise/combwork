@@ -1,0 +1,37 @@
+{
+  "slots.release.changed": {
+    "placeholders": {
+      "slot": "plain"
+    }
+  },
+  "slots.release.live": {
+    "placeholders": {
+      "slot": "plain"
+    }
+  },
+  "slots.release.notEnded": {
+    "placeholders": {
+      "slot": "plain"
+    }
+  },
+  "slots.release.otherHive": {
+    "placeholders": {
+      "slot": "plain",
+      "pid": "plain"
+    }
+  },
+  "slots.setting.bad": {
+    "placeholders": {}
+  },
+  "slots.setting.badSize": {
+    "placeholders": {
+      "min": "number",
+      "max": "number"
+    }
+  },
+  "slots.setting.badText": {
+    "placeholders": {
+      "max": "number"
+    }
+  }
+}

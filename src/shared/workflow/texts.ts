@@ -139,6 +139,7 @@ export const SLOT_NOTICES = {
 const BY_ID = new Map<string, Msg>([...Object.values(FOR_YOU), FOR_YOU_KIND, ROUND_CHOICE, ...Object.values(UNREADABLE), ...Object.values(MOVE_NAMES), ...Object.values(RULE_NAMES), ...Object.values(SLOT_NOTICES)].map((m) => [m.id, m]))
 
 /** The workflow's message of an id: null for one this Hive doesn't know (a record from a newer one). */
+// agent-text: FOR_YOU, FOR_YOU_KIND, ROUND_CHOICE, UNREADABLE, MOVE_NAMES, RULE_NAMES, SLOT_NOTICES (stored by id in history and refusals, said when read)
 export const workflowMessage = (id: string): Msg | null => BY_ID.get(id) ?? null
 
 /** A workflow message and its values as they are kept in a fact: its id and values, never its English. */
@@ -177,4 +178,5 @@ export function unreadWhy(field: string, of: { unknown: Record<string, string>; 
 }
 
 /** A stored workflow text in English (agents, the Agent API, the log); its id when this Hive doesn't know it. */
+// agent-later: HI-2464 says For-you requests and workflow notices in each reader's dialect
 export const workflowEnglish = (s: StoredText): string => workflowLine(s, (m, values) => englishText(values ? { m, values } : m)) ?? s.id

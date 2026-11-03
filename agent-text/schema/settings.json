@@ -1,0 +1,117 @@
+{
+  "settings.advanced.error.badPattern": {
+    "placeholders": {
+      "title": "plain",
+      "why": "plain"
+    }
+  },
+  "settings.advanced.error.boolean": {
+    "placeholders": {
+      "title": "plain"
+    }
+  },
+  "settings.advanced.error.choice": {
+    "placeholders": {
+      "title": "plain",
+      "choices": "plain"
+    }
+  },
+  "settings.advanced.error.field": {
+    "placeholders": {
+      "title": "plain"
+    }
+  },
+  "settings.advanced.error.list": {
+    "placeholders": {
+      "title": "plain"
+    }
+  },
+  "settings.advanced.error.matchesAll": {
+    "placeholders": {
+      "title": "plain"
+    }
+  },
+  "settings.advanced.error.number": {
+    "placeholders": {
+      "title": "plain",
+      "min": "plain",
+      "max": "plain"
+    }
+  },
+  "settings.advanced.error.oneLine": {
+    "placeholders": {
+      "title": "plain",
+      "most": "plain"
+    }
+  },
+  "settings.advanced.error.pattern": {
+    "placeholders": {
+      "title": "plain"
+    }
+  },
+  "settings.advanced.error.text": {
+    "placeholders": {
+      "title": "plain"
+    }
+  },
+  "settings.advanced.miss.field": {
+    "placeholders": {
+      "cli": "plain",
+      "version": "plain",
+      "field": "plain",
+      "fields": "plain"
+    }
+  },
+  "settings.advanced.miss.list": {
+    "placeholders": {
+      "cli": "plain",
+      "version": "plain",
+      "missing": "plain",
+      "fields": "plain"
+    }
+  },
+  "settings.advanced.miss.text": {
+    "placeholders": {
+      "cli": "plain",
+      "version": "plain",
+      "shown": "plain"
+    }
+  },
+  "settings.advanced.takes.boolean": {
+    "placeholders": {}
+  },
+  "settings.advanced.takes.choice": {
+    "placeholders": {
+      "choices": "plain"
+    }
+  },
+  "settings.advanced.takes.field": {
+    "placeholders": {}
+  },
+  "settings.advanced.takes.list": {
+    "placeholders": {}
+  },
+  "settings.advanced.takes.number": {
+    "placeholders": {
+      "unit": "select",
+      "min": "plain",
+      "max": "plain"
+    }
+  },
+  "settings.advanced.takes.pattern": {
+    "placeholders": {}
+  },
+  "settings.advanced.takes.patternFlags": {
+    "placeholders": {
+      "flags": "plain"
+    }
+  },
+  "settings.advanced.takes.text": {
+    "placeholders": {}
+  },
+  "settings.advanced.workspaceProblem": {
+    "placeholders": {
+      "problem": "plain"
+    }
+  }
+}

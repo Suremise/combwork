@@ -148,3 +148,79 @@ describe("Hive's own source", () => {
     expect(r.stdout).toContain('NEW AGENT TEXT src/shared/toolReplies.ts:2  prose|var|Another reply text')
   }, 60_000)
 })
+
+// HI-2440: the window's messages agents read. Every call that reads text is followed to its messages (or marked), and
+// English formatted for agents outside the agent-text module fails, unless it is the log's, the window's, or stored and
+// said again for each reader by a renderer the mark names.
+describe("the guard's rules for window messages agents read", () => {
+  const ADVANCED = 'src/shared/advanced.ts'
+  const STUB = `export const englishText = (t: unknown): string => String(t)\nexport const agentText = (t: unknown): string => String(t)\nexport const withValues = (m: unknown, values: unknown) => ({ m, values })\n`
+  const M = `import { msg } from '../shared/i18n'\nexport const M = { gone: msg({ id: 'main.test.gone', defaultMessage: 'It is gone.', description: 'test' }), busy: msg({ id: 'main.test.busy', defaultMessage: '{agent} is busy.', description: 'test' }) }\n`
+  const lines = (r: Result, re: RegExp): string[] => r.lines.filter((l) => re.test(l))
+  // @ts-expect-error: a plain .mjs module without types
+  const both = async (root: string) => (await import('../scripts/agentTextBoth.mjs')).analyzeBoth(root) as { messages: Record<string, unknown>; unresolved: unknown[] }
+
+  it('fails a new call it cannot follow; a mark naming the table passes it, and its messages are followed into the catalogue', async () => {
+    const t = tree({ [ADVANCED]: STUB, 'src/main/texts.ts': M, [OTHER]: `import { HiveError } from './hiveError'\nimport { M } from './texts'\nexport const a = () => new HiveError(M.gone)\n` })
+    expect(t.run().exit).toBe(0)
+    expect(Object.keys((await both(t.root)).messages)).toEqual(['main.test.gone'])
+    t.write(OTHER, `import { HiveError } from './hiveError'\nimport { M } from './texts'\nexport const a = () => new HiveError(M.gone)\nexport const b = (o: { text: never }) => new HiveError(o.text)\n`)
+    const r = t.run()
+    expect(r.exit).toBe(1)
+    expect(lines(r, /^NEW AGENT TEXT/)).toEqual(['NEW AGENT TEXT src/main/somewhere.ts:4  unresolved|HiveError|o.text'])
+    t.write(OTHER, `import { HiveError } from './hiveError'\nimport { M } from './texts'\nexport const a = () => new HiveError(M.gone)\n// agent-text: M.busy\nexport const b = (o: { text: never }) => new HiveError(o.text)\n`)
+    expect(t.run().exit).toBe(0)
+    expect(Object.keys((await both(t.root)).messages).sort()).toEqual(['main.test.busy', 'main.test.gone'])
+  }, 60_000)
+
+  it('follows a wrapper to its callers, and fails a mark that leads nowhere', async () => {
+    const t = tree({ [ADVANCED]: STUB, 'src/main/texts.ts': M, [OTHER]: `import { HiveError } from './hiveError'\nimport { withValues } from '../shared/advanced'\nimport { M } from './texts'\nconst refuse = (m: never, agent: string) => new HiveError(withValues(m, { agent }))\nexport const a = () => refuse(M.busy as never, 'HB1')\n` })
+    expect(t.run().exit).toBe(0)
+    expect(Object.keys((await both(t.root)).messages)).toEqual(['main.test.busy'])
+    t.write(OTHER, `import { HiveError } from './hiveError'\nconst refuse = (m: never) => new HiveError(m)\n// agent-text: NOTHING_HERE\nexport const a = (o: { t: never }) => refuse(o.t)\n`)
+    const r = t.run()
+    expect(r.exit).toBe(1)
+    expect(lines(r, /^MARK LEADS NOWHERE/)).toEqual([expect.stringMatching(/^MARK LEADS NOWHERE src\/main\/somewhere\.ts:3 {2}agent-text: NOTHING_HERE/)])
+  }, 60_000)
+
+  it('knows a formatter or HiveError by what it is, not what it is called: an import alias, a namespace, a re-export', async () => {
+    const ERROR = 'src/main/hiveError.ts'
+    const t = tree({ [ADVANCED]: STUB, [ERROR]: `export class HiveError extends Error {}\n`, 'src/main/texts.ts': M, [OTHER]: `import { M } from './texts'\nexport const a = () => M.gone\n` })
+    expect(t.run().exit).toBe(0)
+    t.write(OTHER, `import { M } from './texts'\nimport { englishText as render, agentText as forAgent } from '../shared/advanced'\nimport { HiveError as Refused } from './hiveError'\nexport const a = () => ({ error: render(M.gone) })\nexport const b = (o: { text: never }) => forAgent(o.text)\nexport const c = (o: { text: never }) => new Refused(o.text)\nexport const d = () => forAgent(M.busy)\n`)
+    let r = t.run()
+    expect(r.exit).toBe(1)
+    expect(lines(r, /^NEW AGENT TEXT/).sort()).toEqual(['NEW AGENT TEXT src/main/somewhere.ts:4  oneway|englishText|M.gone', 'NEW AGENT TEXT src/main/somewhere.ts:5  unresolved|forAgent|o.text', 'NEW AGENT TEXT src/main/somewhere.ts:6  unresolved|Refused|o.text'])
+    expect(Object.keys((await both(t.root)).messages).sort()).toEqual(['main.test.busy', 'main.test.gone'])
+    // A namespace import, and a re-export under another name.
+    t.write('src/main/fmt.ts', `export { englishText as fmt } from '../shared/advanced'\n`)
+    t.write(OTHER, `import { M } from './texts'\nimport * as A from '../shared/advanced'\nimport { fmt } from './fmt'\nexport const a = () => ({ error: A.englishText(M.gone) })\nexport const b = () => ({ error: fmt(M.busy) })\n`)
+    r = t.run()
+    expect(lines(r, /^NEW AGENT TEXT/).sort()).toEqual(['NEW AGENT TEXT src/main/somewhere.ts:4  oneway|englishText|M.gone', 'NEW AGENT TEXT src/main/somewhere.ts:5  oneway|englishText|M.busy'])
+    // A function of the same name that isn't the formatter is no such call.
+    t.write(OTHER, `const englishText = (s: string): string => s.toUpperCase()\nexport const a = () => ({ error: englishText('ok') })\n`)
+    expect(t.run().exit).toBe(0)
+  }, 60_000)
+
+  it("fails English formatted for agents outside the agent-text module; the log, the window and a stored text's renderer pass", () => {
+    const t = tree({ [ADVANCED]: STUB, 'src/main/texts.ts': M, [OTHER]: `import { M } from './texts'\nimport { agentText } from '../shared/advanced'\nexport const r = () => ({ reason: agentText(M.gone) })\n` })
+    expect(t.run().exit).toBe(0)
+    const with_ = (line: string) => `import { M } from './texts'\nimport { englishText } from '../shared/advanced'\n${line}\n`
+    t.write(OTHER, with_('export const r = () => ({ reason: englishText(M.gone) })'))
+    const r = t.run()
+    expect(r.exit).toBe(1)
+    expect(lines(r, /^NEW AGENT TEXT/)).toEqual(['NEW AGENT TEXT src/main/somewhere.ts:3  oneway|englishText|M.gone'])
+    t.write(OTHER, with_('export const r = (log: { warn: (s: string) => void }) => log.warn(`why: ${englishText(M.gone)}`)'))
+    expect(t.run().exit).toBe(0)
+    t.write(OTHER, with_('export const r = () => ({ reason: englishText(M.gone) }) // window: Help → Diagnostics'))
+    expect(t.run().exit).toBe(0)
+    t.write(OTHER, with_('// agent-stored: sayItAgain\nexport const r = () => ({ reason: englishText(M.gone) })'))
+    expect(lines(t.run(), /^STORED WITHOUT A RENDERER/)).toEqual([expect.stringMatching(/somewhere\.ts:4 /)])
+    t.write(OTHER, with_('// agent-stored: sayItAgain\nexport const r = () => ({ reason: englishText(M.gone) })\nexport function sayItAgain(s: string): string { return s }'))
+    expect(t.run().exit).toBe(0)
+    t.write(OTHER, with_('// agent-later: someday\nexport const r = () => ({ reason: englishText(M.gone) })'))
+    expect(lines(t.run(), /^LATER WITHOUT A CARD/)).toHaveLength(1)
+    t.write(OTHER, with_('// agent-later: HI-9999 says it in each reader\'s dialect\nexport const r = () => ({ reason: englishText(M.gone) })'))
+    expect(t.run().exit).toBe(0)
+  }, 60_000)
+})

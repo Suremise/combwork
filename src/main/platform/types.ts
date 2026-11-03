@@ -22,6 +22,7 @@ export type Maybe<T> = T | Unknown
 /** An answer that couldn't be read: what, as one of texts.ts's UNREADABLE messages and its values. */
 export function unknown<Id extends string>(m: Msg<Id>, ...values: MessageArgs<Id>): Unknown {
   const v = values[0] as Record<string, string | number> | undefined
+  // agent-stored: refusalBody says whatText again for each reader (refusals' values take whatText before what)
   return { unknown: true, what: englishText(v ? { m, values: v } : m), whatText: workflowText(m, ...values) }
 }
 export const isUnknown = (v: unknown): v is Unknown => !!v && typeof v === 'object' && (v as Unknown).unknown === true

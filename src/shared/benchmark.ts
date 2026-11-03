@@ -701,6 +701,8 @@ export function summaryOf(report: unknown, project?: string): ExportSummary {
     rangeMs: num(coverage.rangeMs) ?? Math.max(0, Date.parse(to) - Date.parse(from) || 0),
     filters: { ...(typeof filters.role === 'string' ? { role: text(filters.role, 20) } : {}), ...(typeof filters.provider === 'string' ? { provider: text(filters.provider, 40) } : {}), ...(filters.own === true ? { own: true } : {}) },
     totals: Object.fromEntries(Object.entries(totals).filter(([k]) => !unknown.has(k))),
+    // agent-text: partialText
+    // window: benchmarks are the window's (Help → Benchmarks) and their saved files'; no agent reads them
     partial: partialWhy.map((w) => englishText(partialText(w))),
     partialWhy
   }
@@ -733,6 +735,7 @@ export interface Refusal {
 
 export type ParseResult = { artifact: Artifact } | Refusal | { projectPart: { project: string } }
 
+// window: benchmarks are the window's (Help → Benchmarks) and their saved files'; no agent reads them
 const refuse = (t: Text): Refusal => ({ error: englishText(t), errorText: t })
 
 /**
@@ -796,7 +799,7 @@ export function parseArtifact(textValue: string, scope: CompareScope, opts: { us
     if (!names.some((n) => n.toLowerCase() === scope.project.toLowerCase())) return refuse(said(M.noPart, { project: scope.project }))
     if (!opts.useProjectPart) return { projectPart: { project: scope.project } }
     // i18n-ignore: a kept comparison's default name, stored in its file and renamed by the user (#1104: stays as written)
-    return { artifact: { ...base, label: `Export ${range}, ${scope.project}’s part`, labelKind: 'export', scope, derived: englishText(M.projectPart), summary: summaryOf(report, scope.project) } }
+    return { artifact: { ...base, label: `Export ${range}, ${scope.project}’s part`, labelKind: 'export', scope, derived: englishText(M.projectPart), summary: summaryOf(report, scope.project) } } // window: benchmarks are the window's and their saved files'; no agent reads them
   }
   return refuse(M.unknownSchema)
 }
@@ -1180,9 +1183,11 @@ function agentDeltas(b: Sample[], r: Sample[]): AgentCallsDelta[] | null {
 }
 
 /** A scenario's notes, in English and as text. */
+// window: benchmarks are the window's (Help → Benchmarks) and their saved files'; no agent reads them
 const told = (notes: Text[]): { notes: string[]; notesText: Text[] } => ({ notes: notes.map((t) => englishText(t)), notesText: notes })
 
 /** A comparison's reasons and notes, in English and as text. */
+// window: benchmarks are the window's (Help → Benchmarks) and their saved files'; no agent reads them
 const why = (reasons: Text[], notes: Text[]): Pick<Comparison, 'reasons' | 'notes' | 'reasonsText' | 'notesText'> => ({ reasons: reasons.map((t) => englishText(t)), reasonsText: reasons, ...told(notes) })
 
 const sameScope = (a: CompareScope, b: CompareScope): boolean => compareScopeKey(a) === compareScopeKey(b)

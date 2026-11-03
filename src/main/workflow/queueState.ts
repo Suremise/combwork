@@ -426,8 +426,26 @@ const COMMENT_FILES = 10
 export function returnedComment(key: string, f: FactData['IntegrationFailed']): { text: string; shown: StoredText } {
   const reason = f.reason === 'checks' ? (f.check === 'install' ? 'install' : f.transient ? 'checksEnv' : f.check ? 'checks' : 'checksSome') : f.reason
   const files = f.files?.length ? `${f.files.slice(0, COMMENT_FILES).join(', ')}${f.files.length > COMMENT_FILES ? ', …' : ''}` : 'none'
-  // A comment is stored, and any reader reads it: in the Default until stored text is said when read (dialects, 5b).
-  return { text: inDefaultDialect(() => returnedText(key, f, COMMENT_MAX, COMMENT_LINES)), shown: storedText(HISTORY.queueReturned, { reason, target: f.target, check: f.check ?? '', files }) }
+  // Stored in the Default, for any reader; what it is said from is kept beside it, so a reader's dialect says it again
+  // when it is read (storedForAgents, HI-2440).
+  // Of its log, only the lines the comment quotes (lastLines reads the same from them): a comment stays small.
+  const kept: FactData['IntegrationFailed'] = f.log ? { ...f, log: f.log.split(/\r?\n/).map((l) => l.trim()).filter(Boolean).slice(-COMMENT_LINES).join('\n') } : f
+  const agent = { render: RETURNED_COMMENT, data: { key, failure: kept } }
+  return { text: inDefaultDialect(() => returnedCommentFrom(agent.data)!), shown: { ...storedText(HISTORY.queueReturned, { reason, target: f.target, check: f.check ?? '', files }), agent } }
+}
+
+/** The return comment's renderer, by the name its stored data keeps (HI-2440). */
+export const RETURNED_COMMENT = 'queue.returned'
+
+/** A return comment's English from its stored data, in the current chain; null for data that isn't one. */
+export function returnedCommentFrom(data: unknown): string | null {
+  const d = data as { key?: unknown; failure?: unknown } | null
+  if (!d || typeof d.key !== 'string' || !d.failure || typeof d.failure !== 'object') return null
+  try {
+    return returnedText(d.key, d.failure as FactData['IntegrationFailed'], COMMENT_MAX, COMMENT_LINES)
+  } catch {
+    return null
+  }
 }
 
 /** A card that left the queue, not approved any more (#1354): why, and what to do next (`to`: where it went). */

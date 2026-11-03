@@ -6,13 +6,14 @@
  *
  * The contract, for every service that converts its errors (E10b–f, #842):
  * - **Throw** `hiveError(msg({ id: '<area>.<name>', defaultMessage, description }), values)`, or `new HiveError(text)` for
- *   text built with `withValues`/`listOf`/`linesOf`. Its `message` is the English, formatted at once: the Agent API's
- *   `{ error }`, `errorStatus()`'s patterns, Hive's log and every `catch` that reads `.message` see exactly what they saw
- *   before, so nothing agent-facing changes. Where the window's words change and agents' must not (#910), the text is
- *   `forAgents(text, english)`: the window shows `text`, and the message is `english`, word for word.
+ *   text built with `withValues`/`listOf`/`linesOf`. Its `message` is the Default's English, formatted at once:
+ *   `errorStatus()`'s patterns, Hive's log and every `catch` that reads `.message` see exactly what they saw before.
+ *   Where the window's words change and agents' must not (#910), the text is `forAgents(text, agent)`: the window shows
+ *   `text`, and agents read `agent`, an agent message (`saidText`) or the message with agents' values.
  * - **The window** gets it in its language: IPC (`ipc.ts`) formats `text` when a call fails (`shownError()`). Electron
  *   sends the renderer only an error's message, so the window gets formatted text, never the descriptor.
- * - **The Agent API** answers with `englishError()` (servers.ts), the English whatever language Hive shows.
+ * - **The Agent API** answers with `agentError()` (servers.ts `apiErrorReply`): its text in the caller's dialect
+ *   (dialects, HI-2440: each message's override in the request's chain, else its English), whatever language Hive shows.
  * - **An error inside another error's text** (a cause, a value): pass `errorText(e)` as the value, not `e.message`, so it
  *   follows the outer one's language: the descriptor of a HiveError, the message of any other error (Node's, a CLI's).
  * - **`kind`** (optional) gives the Agent API's status at once (`invalid` 400, `forbidden` 403, `notFound` 404, `conflict`
@@ -23,7 +24,7 @@
  * - **Not a HiveError**: a code the window matches (`new Error('CONFLICT')`, `'CANCELLED'`), and text only agents or the
  *   log read (they stay English strings with `// i18n-ignore: <reason>`).
  */
-import { englishText, shownText, withValues, type Text, type TextPart, type TextValues } from '../shared/advanced'
+import { agentText, englishText, shownText, withValues, type Text, type TextPart, type TextValues } from '../shared/advanced'
 import type { Msg, Values } from '../shared/i18n'
 import type { HiveErrorData, HiveErrorKind } from '../shared/types'
 
@@ -76,8 +77,14 @@ export const shownError = (e: unknown): string => shownText(errorText(e))
  */
 export const windowError = (e: unknown): unknown => (e instanceof HiveError ? new Error(shownError(e), { cause: e }) : e)
 
-/** An error in English, whatever language Hive shows: what agents are told (the Agent API) and the log. */
+/** An error in English, whatever language Hive shows or dialect a reader has: the log's. */
 export const englishError = (e: unknown): string => englishText(errorText(e))
+
+/**
+ * An error as an agent is told it (dialects, HI-2440): a HiveError's text in the current chain (the request's scope, a
+ * wake's), any other error's message as it is. The Agent API's error reply says it.
+ */
+export const agentError = (e: unknown): string => agentText(errorText(e))
 
 /**
  * The text a shared helper written for the window gives, as data: for a helper that formats one message with the `tr`
@@ -88,6 +95,7 @@ export function capturedText(fn: (t: Tr) => string | null | undefined): Text | n
   let last: Text | null = null
   const capture = (m: Msg, values?: Values): string => {
     last = values ? withValues(m, Object.fromEntries(Object.entries(values).map(([k, v]) => [k, typeof v === 'number' ? v : String(v ?? '')]))) : m
+    // agent-protocol: the helper's own message, found where capturedText's callers name the helper (their agent-text marks)
     return englishText(last)
   }
   return fn(capture as Tr) == null ? null : last

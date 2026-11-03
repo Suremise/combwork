@@ -38,6 +38,7 @@ export interface SkillHeader {
 /** A header's problem: its English (agents', sessions' and the log's) and its text for the window (#849). */
 function problemOf(m: Msg, values?: TextValues): { problem: string; problemText: Text } {
   const text = values ? withValues(m, values) : m
+  // agent-stored: agentField says it for each agent where the skill is listed (servers.ts skillRow)
   return { problem: englishText(text), problemText: text }
 }
 

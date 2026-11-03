@@ -53,9 +53,9 @@ import { withRepoLock } from './repoLock'
 import { branchOfRef, git, type GitResult } from './git'
 import { gitProblem, gitTool } from './gitTool'
 import { gitProblemData } from '../shared/gitTool'
-import { englishText, linesOf, listOf, shownText, withValues, type Text, type TextPart, type TextValues } from '../shared/advanced'
+import { linesOf, listOf, shownText, withValues, type Text, type TextPart, type TextValues } from '../shared/advanced'
 import { fmt, msg, tr, type Msg } from '../shared/i18n'
-import { HiveError } from './hiveError'
+import { errorText, HiveError } from './hiveError'
 import { changingFolder } from './folderFence'
 import { createLogger, userText } from './logger'
 import { mergeSlots } from './mergeSlotHost'
@@ -605,7 +605,8 @@ async function scrubbed(projectPath: string, e: unknown, urls: string[]): Promis
   // A HiveError's text is cleaned part by part (git's words are values), so the window's language never brings one back.
   if (e instanceof HiveError) {
     const text = scrubText(e.text, secrets) as Text
-    return englishText(text) === e.message ? e : new HiveError(text, e.kind ? { kind: e.kind } : undefined)
+    // agent-protocol: the same error's text with its secrets cleaned out: its messages are found where it was thrown
+    return JSON.stringify(text) === JSON.stringify(e.text) ? e : new HiveError(text, e.kind ? { kind: e.kind } : undefined)
   }
   const message = scrubSecrets(e.message, secrets)
   return message === e.message ? e : new Error(message)
@@ -618,8 +619,10 @@ function scrubText(t: TextPart, secrets: string[]): TextPart {
   if ('list' in t) return { ...t, list: t.list.map((x) => scrubText(x, secrets)) }
   if ('lines' in t) return { lines: t.lines.map((x) => scrubText(x, secrets)) }
   if ('cap' in t) return { cap: scrubText(t.cap, secrets) }
-  if ('shown' in t) return { shown: scrubText(t.shown, secrets), english: scrubSecrets(t.english, secrets) }
-  return { m: t.m, values: Object.fromEntries(Object.entries(t.values).map(([k, v]) => [k, scrubText(v, secrets)])) }
+  if ('shown' in t) return 'agent' in t ? { shown: scrubText(t.shown, secrets), agent: scrubText(t.agent, secrets) } : { shown: scrubText(t.shown, secrets), english: scrubSecrets(t.english, secrets) }
+  const values = t.values && Object.fromEntries(Object.entries(t.values).map(([k, v]) => [k, scrubText(v, secrets)]))
+  if ('said' in t) return values ? { said: t.said, values } : { said: t.said }
+  return { m: t.m, values: values! }
 }
 
 /**
@@ -686,6 +689,7 @@ async function changed(projectPath: string): Promise<void> {
 async function summaryOf(projectPath: string): Promise<GitRepoSummary> {
   const s = await repoSummary(projectPath)
   // Git's problem as data; else (it changed meanwhile) the summary's English as it is.
+  // agent-text: gitProblemData
   if (s.gitProblem) throw new HiveError(gitProblemData(gitTool()) ?? linesOf([s.gitProblem]))
   if (!s.isRepo) throw refusal(msg({ id: 'service.gitRepo.notRepo', defaultMessage: "{folder} isn't a git repository.", description: 'An error in the Git view: the project folder {folder} is not in a git repository.' }), { folder: projectPath })
   const parent = parentRepoData(s)
@@ -1394,6 +1398,7 @@ async function updateLocked(projectPath: string, branch: string, how: BranchUpda
   return fenced(async () => {
     // Checked again under the locks: nothing changes between this and git starting.
     const plan = await branchUpdatePlan(projectPath, branch)
+    // agent-text: branchUpdatePlan
     if (plan.blocked) throw new HiveError(linesOf([plan.blocked]))
     if (plan.behind === 0) return tr(UPDATE.upToDate, { branch, target: plan.target })
     // The target branch's commit, read now (HR4's round 1, finding 2): git is given it, never the name, which a tag of the
@@ -1455,13 +1460,13 @@ async function updateLocked(projectPath: string, branch: string, how: BranchUpda
         const { error, undone } = await undo(tmp, was, r, true)
         // Not undone: kept as git left it, as the error says. Undone: removed, and said if it couldn't be.
         const left = undone ? await removed() : null
-        throw left ? new HiveError(linesOf([error.message, left])) : error
+        throw left ? new HiveError(linesOf([errorText(error), withValues(UPDATE.temporaryLeft, { folder: tmp })])) : error
       }
       head = (await git(tmp, ['rev-parse', 'HEAD'])).out.trim()
       // Moved only from the commit it was updated from: a branch that moved meanwhile is left as it is.
       const moved = (await git(projectPath, ['update-ref', `refs/heads/${branch}`, head, was])).ok
       note = await removed()
-      if (!moved) throw note ? new HiveError(linesOf([tr(UPDATE.moved, { branch }), note])) : refusal(UPDATE.moved, { branch })
+      if (!moved) throw note ? new HiveError(linesOf([withValues(UPDATE.moved, { branch }), withValues(UPDATE.temporaryLeft, { folder: tmp })])) : refusal(UPDATE.moved, { branch })
     }
     // What it was asked to do, done: the target's commit is in the branch now.
     if (!(await git(projectPath, ['merge-base', '--is-ancestor', target, head])).ok) throw refusal(UPDATE.missed, { branch, target: plan.target })

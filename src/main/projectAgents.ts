@@ -82,6 +82,7 @@ function connectionFor(projectPath: string, cli: ProviderId, named: string | nul
  * HiveError: a refusal by the project's state (its agents per project, an agent at work), so the Agent API answers 409,
  * never 500 (HI-1952).
  */
+// agent-text: agentLimitText, mergeBlocked
 const helperError = (fn: Parameters<typeof capturedText>[0]): HiveError => new HiveError(capturedText(fn)!, { kind: 'conflict' })
 
 /** Branches and worktrees for the Add Agent dialog. */

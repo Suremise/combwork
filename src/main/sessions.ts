@@ -187,6 +187,7 @@ const M = {
  * compares, and `statusText`, which the window shows in its language), the CLI's words as they came, or null to clear it.
  */
 function setStatus(st: LiveSessionState, text: TextPart | null): void {
+  // agent-stored: agentField says it for each agent where the status is sent (servers.ts statusMessageOf)
   st.statusMessage = text === null ? undefined : englishText(text)
   st.statusText = text === null || typeof text === 'string' || typeof text === 'number' ? undefined : text
 }
@@ -3316,6 +3317,7 @@ class SessionManager {
       let stoppedWhy: Text | null = null
       const stop = (text: Text): string => {
         stoppedWhy = text
+        // log: KeysStopped's why, the log line's (the window's notice says stoppedWhy)
         return englishText(text)
       }
       try {
@@ -3799,6 +3801,7 @@ class SessionManager {
     const st = l.state
     const id = liveId(st.projectPath, st.agentId)
     const text = msg({ id: 'session.status.inputBlocked', defaultMessage: 'Something on its screen is taking its keys: answer it there, then Try again', description: "An agent's status: Hive typed into its coding agent's input and nothing reached it (a dialog or question of the coding agent's own, which Hive doesn't recognise, takes the keys). The user answers it in the agent's terminal. Try again is the button beside this status: keep its name as it is translated there." })
+    // agent-stored: agentField says it for each agent where its status is sent (setStatus keeps its text)
     const ask: Ask = { kind: 'question', blocking: true, message: englishText(text), text }
     const at = Date.now()
     l.inputBlocked = { runId: st.runId, ask, box: this.boxNow(l), since: at }
@@ -4552,6 +4555,7 @@ class SessionManager {
     if (r.tracked) return { go: true }
     // The gate's script prints its reason in English (launchGate.ts).
     if (r.reason === STOPPED_BEFORE_START) return { go: false, reason: r.reason }
+    // agent-text: trackLaunch
     this.untracked(r.text ?? r.reason)
     return { go: true }
   }
@@ -4559,6 +4563,7 @@ class SessionManager {
   /** Whether a launch can go through its gate, its processes tracked (#507); when not, said once (untracked). */
   private async trackingReady(): Promise<boolean> {
     const ok = await trackingReady()
+    // agent-text: trackingProblemText
     if (!ok && process.platform === 'win32') this.untracked(trackingProblemText())
     return ok
   }
@@ -5017,6 +5022,7 @@ class SessionManager {
     const text = tools.length
       ? withValues(msg({ id: 'session.status.safeguardAsksTools', defaultMessage: 'A safety classifier stopped a response: {provider} asks what to do (its last tool calls: {tools})', description: "An agent's status: its CLI's safety classifier stopped a response, and the CLI asks the user what to do. {provider} is the coding agent's name; {tools} the names of its last tool calls, as they came." }), { provider, tools: tools.join(', ') })
       : withValues(msg({ id: 'session.status.safeguardAsks', defaultMessage: 'A safety classifier stopped a response: {provider} asks what to do', description: "An agent's status: its CLI's safety classifier stopped a response, and the CLI asks the user what to do. {provider} is the coding agent's name." }), { provider })
+    // agent-stored: agentField says it for each agent where its status is sent (setStatus keeps its text)
     return { ...ask, message: englishText(text), text }
   }
 
@@ -5058,6 +5064,7 @@ class SessionManager {
             // Already told it waits: told again, now saying why (a notice, without a second chime).
             const ask = await this.safeguardPrompt(l, g.ask, g.at)
             l.waitingOn = ask
+            // agent-text: safeguardPrompt
             setStatus(st, ask.text ?? ask.message)
             this.emitState(st)
             this.notify(st.projectPath, withValues(M.needsInput, { agent: this.label(st) }), ask.text ?? ask.message, 'notice', undefined, st.agentId)
@@ -5108,6 +5115,7 @@ class SessionManager {
     const question = l.adapter.idleQuestion(l.screen.text())
     if (question && !l.idleAsk && AT_PROMPT.has(st.status)) {
       const text = withValues(msg({ id: 'session.status.cliAsks', defaultMessage: '{provider} asks: {question}', description: "An agent's status: its coding agent ({provider}, e.g. Claude Code) shows a question of its own on its screen and waits for the user to answer it there. {question} is the question, in the coding agent's own words (English)." }), { provider: l.adapter.descriptor.name, question })
+      // agent-stored: agentField says it for each agent where its status is sent (setStatus keeps its text)
       const ask: Ask = { kind: 'question', blocking: true, message: englishText(text), text }
       l.idleAsk = ask
       log.info(`${userText(this.label(st))}: its CLI asks on its screen: ${question}`)
@@ -5473,6 +5481,7 @@ class SessionManager {
     const st = this.liveFor(projectPath, agentId)
     if (!st || st.runId !== runId || !st.failedTurn) return
     const failed = failedTurnStep(st.failedTurn.message)
+    // agent-text: failedTurnStep (and the callers' messages: outageResume.ts marks them)
     setStatus(st, text ?? failed.messageText ?? failed.message ?? null)
     this.emitState(st)
   }
@@ -6662,6 +6671,7 @@ class SessionManager {
             const said = ev?.kind === 'signIn' && ev.message?.slice(0, 500)
             // The CLI's own message, or Hive's (its English for agents, its text for the window).
             const hive = said ? null : withValues(msg({ id: 'session.signIn.notSignedIn', defaultMessage: "{provider} isn't signed in.", description: "Why an agent's turn stopped, when its CLI didn't say: its sign-in was refused. {provider} is the coding agent's name." }), { provider: l.adapter.descriptor.name })
+            // agent-stored: agentField says it for each agent where the status is sent (servers.ts statusMessageOf)
             st.signIn = { message: said || englishText(hive!), since: new Date().toISOString(), ...(hive ? { messageText: hive } : {}) }
           }
           this.signInLost(st)
@@ -6809,6 +6819,7 @@ class SessionManager {
    */
   private notify(projectPath: string, titleText: Text, bodyText: TextPart, kind: 'finished' | 'waiting' | 'notice', agentName?: string, agentId?: string, action?: { label: Text; command: string; args?: unknown[] }): void {
     const title = shownText(titleText)
+    // agent-later: HI-2465 says the events stream's titles in each caller's dialect
     const apiTitle = englishText(titleText)
     const body = shownText(bodyText)
     if (kind !== 'notice') {
@@ -6847,6 +6858,7 @@ class SessionManager {
    */
   notice(projectPath: string, title: Text, body: TextPart, action?: { label: Text; command: string; args?: unknown[] }, extra?: { kind?: 'needsYou' | 'work'; offer?: string; target?: ToastTarget }): void {
     if (!extra?.kind && !extra?.offer && !extra?.target) return this.notify(projectPath, title, body, 'notice', undefined, undefined, action)
+    // agent-later: HI-2465 says the events stream's titles in each caller's dialect
     this.deliver(projectPath, shownText(title), shownText(body), extra.kind ?? 'work', undefined, undefined, englishText(title), action && { label: shownText(action.label), command: action.command, ...(action.args ? { args: action.args } : {}) }, extra)
   }
 

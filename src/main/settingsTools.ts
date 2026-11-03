@@ -7,7 +7,7 @@ import { projectProviderConfig, providerSettings } from '../shared/providers'
 import { SETTINGS_CATALOG, checkSettingValue, effortTakes, settingDefault, settingEntry, settingKind, settingOptions, settingPatch, settingPath, settingValue, settingValueText, shownSettingPath, workflowTakes, PLATFORM_SETTING_KEY, type SettingContext, type SettingEntry, type SettingScope } from '../shared/settingsCatalog'
 import { checkOptions, problemText, workflowChanged } from './workflow/rulesets'
 import { checkPlatformSwitch, oldRulesLine, setPlatform } from './workflow/platformSwitch'
-import { englishError, HiveError } from './hiveError'
+import { agentError, HiveError } from './hiveError'
 import { levelOwn, setLevelOptions } from './workflow/levels'
 import { setSlotDefault } from './slotSettings'
 import { workflowWrite } from './workflow/writes'
@@ -321,7 +321,7 @@ async function switchSetting(value: unknown, projectPath: string | null, guard?:
     const r = await setPlatform(workspace, projectPath, value, { ...(guard ? { guard } : {}) })
     return { old: r.from, new: r.to, ...(note && r.from !== r.to ? { note } : {}) }
   } catch (err) {
-    throw err instanceof HiveError ? new SettingRefused(409, `${englishError(err)} Tell the user, or leave it as it is.`) : err // i18n-ignore: the Assistant's tools (English)
+    throw err instanceof HiveError ? new SettingRefused(409, `${agentError(err)} Tell the user, or leave it as it is.`) : err // i18n-ignore: the Assistant's tools (English)
   }
 }
 
