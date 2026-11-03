@@ -922,9 +922,10 @@ export async function remoteTracking(projectPath: string, remote: string): Promi
 }
 
 async function trackingRemote(projectPath: string, remote: string): Promise<string[]> {
-  const r = await git(projectPath, ['for-each-ref', '--format=%(refname:short)%00%(upstream:remotename)', 'refs/heads'])
+  // By whole refs: `refname:short` says heads/x beside a tag x (HI-2426).
+  const r = await git(projectPath, ['for-each-ref', '--format=%(refname)%00%(upstream:remotename)', 'refs/heads'])
   if (!r.ok) throw commandFailed('git for-each-ref', r) // i18n-ignore: a git command, as it is
-  return r.out.split(/\r?\n/).map((l) => l.split('\0')).filter((f) => f[1] === remote).map((f) => f[0])
+  return r.out.split(/\r?\n/).map((l) => l.split('\0')).filter((f) => f[1] === remote).map((f) => branchOfRef(f[0])).filter((b): b is string => !!b)
 }
 
 /**

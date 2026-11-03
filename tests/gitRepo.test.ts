@@ -169,6 +169,8 @@ describe('the summary', () => {
     const info = await repo.repoInfo(proj)
     expect(info.branches.map((b) => [b.name, b.current, b.upstream])).toEqual([['main', true, 'origin/main']])
     expect([info.remoteBranches, info.remoteRows?.map((r) => [r.remote, r.branch])]).toEqual([['origin/main'], [['origin', 'main']]])
+    // And the branches a remote's removal names.
+    expect(await repo.remoteTracking(proj, 'origin')).toEqual(['main'])
   })
 
   it('says a folder without git is no repository, and a detached HEAD by its commit', async () => {

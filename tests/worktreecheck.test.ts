@@ -102,6 +102,12 @@ describe('worktreeCheck', () => {
     // A tag named as origin's branch: still origin's default, by its whole ref (git's short name is remotes/origin/trunk, HI-2426).
     run(m.project, 'tag', 'origin/trunk')
     expect(await primaryBranch(m.project)).toBe('trunk')
+    // …and a tag named as a local branch: still that branch (refname:short lists it as heads/trunk).
+    run(m.project, 'tag', 'trunk')
+    expect(await primaryBranch(m.project)).toBe('trunk')
+    run(m.project, 'symbolic-ref', '-d', 'refs/remotes/origin/HEAD')
+    run(m.project, 'tag', 'master')
+    expect(await primaryBranch(m.project)).toBe('master')
     rmSync(root, { recursive: true, force: true })
     const n = await makeProject('develop')
     const wt = await n.tree('x')

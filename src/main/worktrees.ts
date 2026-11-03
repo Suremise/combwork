@@ -79,11 +79,14 @@ export async function localBranches(cwd: string): Promise<string[]> {
   return localBranchesStrict(cwd).catch(() => [])
 }
 
-/** The local branches; throws when git can't list them (#353: a removal never takes an unknown main branch for none). */
+/**
+ * The local branches; throws when git can't list them (#353: a removal never takes an unknown main branch for none). By
+ * their whole refs: `refname:short` says heads/main beside a tag main, and main would be no branch here (HI-2426).
+ */
 async function localBranchesStrict(cwd: string): Promise<string[]> {
-  const r = await git(cwd, ['for-each-ref', '--format=%(refname:short)', 'refs/heads'])
+  const r = await git(cwd, ['for-each-ref', '--format=%(refname)', 'refs/heads'])
   if (!r.ok) throw hiveError(M.listBranches, { why: gitWhy(r.err, 'for-each-ref') })
-  return r.out.split(/\r?\n/).map((l) => l.trim()).filter(Boolean)
+  return r.out.split(/\r?\n/).map((l) => branchOfRef(l)).filter((b): b is string => !!b)
 }
 
 /** The project's worktrees (including the project folder itself), from `git worktree list`; none when git can't list them. */

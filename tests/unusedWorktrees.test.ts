@@ -341,7 +341,7 @@ describe('listing', () => {
       gitTestHooks.started = undefined
     }
     const count = (re: RegExp): number => by.filter((a) => re.test(a)).length
-    return { worktrees: count(/^worktree list/), branches: count(/^for-each-ref --format=%\(refname:short\) refs\/heads$/), originHead: count(/^symbolic-ref /), mainTip: count(/^rev-parse --verify --quiet refs\/heads\/main\^\{commit\}$/) }
+    return { worktrees: count(/^worktree list/), branches: count(/^for-each-ref --format=%\(refname\) refs\/heads$/), originHead: count(/^symbolic-ref /), mainTip: count(/^rev-parse --verify --quiet refs\/heads\/main\^\{commit\}$/) }
   }
   const ONCE = { worktrees: 1, branches: 1, originHead: 1, mainTip: 1 }
 
