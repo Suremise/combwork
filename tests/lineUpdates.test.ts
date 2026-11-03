@@ -164,7 +164,10 @@ const update = (w: WS) => step('update', () => inWorkspace(w, () => lines.update
 const laneStatus = async (w: WS, lane: string) => (await lanes.getLane(w, lane)).status
 
 describe("an agent's branch between a lane's cards (#1271)", () => {
-  it('after a squash, the next card waits; Hive brings the branch up to date; two squashed cards in a row each review only their own work', async () => {
+  // GIT_HEAVY_MS (HI-2025's rule): two cards squash-merged through real git on a real board, the branch brought up to date
+  // between them; 4.0 s alone, 9.6 s beside three spinner workers, and past 20 s in HI-2453's proof beside two (every step
+  // slow, about 2 to 4 s each, none hung).
+  it('after a squash, the next card waits; Hive brings the branch up to date; two squashed cards in a row each review only their own work', { timeout: GIT_HEAVY_MS }, async () => {
     // No review step (HI-1963: 16 workflow steps timed out at 20 s in a multi-file run): what each card would be reviewed
     // on is its submission, checked below; the other tests here go through the review.
     const { w, repo, wt, cards, lane } = await workspace(UNREVIEWED)
