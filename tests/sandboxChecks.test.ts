@@ -64,12 +64,12 @@ test('build folder: the common folder of both installers; different drives and t
   assert.throws(() => buildRoot('D:\\Hive-Setup-0.6.0.exe', null), /drive root/)
 })
 
-test('--only: anything but fresh or upgrade is refused before anything runs', () => {
-  assert.throws(() => plan(['--only', 'frseh', '--installer', 'x']), /--only is fresh or upgrade, not "frseh"/)
+test('--only: anything but fresh, upgrade or manual is refused before anything runs', () => {
+  assert.throws(() => plan(['--only', 'frseh', '--installer', 'x']), /--only is fresh or upgrade or manual, not "frseh"/)
   const s = scratch('only')
   const r = runner(['--only', 'frseh', '--installer', 'x', '--report', path.join(s.dir, 'report')], s.env())
   assert.strictEqual(r.status, 2)
-  assert.match(r.stderr, /NOT RUN: --only is fresh or upgrade/)
+  assert.match(r.stderr, /NOT RUN: --only is fresh or upgrade or manual/)
   assert.deepStrictEqual(s.read().calls, [], 'wsb or the server was called')
 })
 

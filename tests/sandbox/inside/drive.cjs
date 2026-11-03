@@ -21,8 +21,14 @@ const { _electron } = require(process.env.PW_CORE || 'C:\\tools\\playwright')
 
 const [step, prefix] = process.argv.slice(2)
 const OUT = 'C:\\out'
-const HIVE_EXE = path.join(process.env.LOCALAPPDATA, 'Programs', 'Hive', 'Hive.exe')
-const PROFILE = path.join(process.env.APPDATA, 'Hive')
+// The installed app (HI-2460): Combwork's when it is installed, else Hive Desktop's (1.0, before an upgrade). Its
+// profile: Combwork's folder when it is there, else Hive's (HI-2461's fallback, and 1.0's own).
+const COMBWORK_EXE = path.join(process.env.LOCALAPPDATA, 'Programs', 'Combwork', 'Combwork.exe')
+const HIVE1_EXE = path.join(process.env.LOCALAPPDATA, 'Programs', 'Hive', 'Hive.exe')
+const HIVE_EXE = fs.existsSync(COMBWORK_EXE) ? COMBWORK_EXE : HIVE1_EXE
+const PROFILE = [path.join(process.env.APPDATA, 'Combwork'), path.join(process.env.APPDATA, 'Hive')].find((p) => fs.existsSync(p)) ?? path.join(process.env.APPDATA, HIVE_EXE === COMBWORK_EXE ? 'Combwork' : 'Hive')
+// A file the upgrade must carry across in the local profile folder (accounts live there), written before it.
+const LOCAL_MARK = 'sandbox-mark.txt'
 const MARK = { userName: 'Sandbox Check', theme: 'light' }
 const res = { step, prefix, at: new Date().toISOString(), checks: [], facts: {}, shots: [] }
 const save = () => fs.writeFileSync(path.join(OUT, `${prefix}.json`), JSON.stringify(res, null, 2))
@@ -39,7 +45,7 @@ const inv = (channel, ...args) => page.evaluate(([c, a]) => window.hive.invoke(c
 
 /** Hive instances already running from the install folder (the installer's --force-run starts one): closed by PID. */
 function closeRunningHive() {
-  const out = ps(`$p = Get-CimInstance Win32_Process -Filter "Name='Hive.exe'" | Where-Object { $_.ExecutablePath -eq '${HIVE_EXE.replace(/'/g, "''")}' }; foreach ($x in $p) { $g = Get-Process -Id $x.ProcessId -ErrorAction SilentlyContinue; if ($g -and $g.MainWindowHandle -ne 0) { [void]$g.CloseMainWindow() } }; Start-Sleep -Seconds 3; $p = Get-CimInstance Win32_Process -Filter "Name='Hive.exe'" | Where-Object { $_.ExecutablePath -eq '${HIVE_EXE.replace(/'/g, "''")}' }; foreach ($x in $p) { Stop-Process -Id $x.ProcessId -Force -ErrorAction SilentlyContinue }; @($p).Count`)
+  const out = ps(`$p = Get-CimInstance Win32_Process -Filter "Name='${path.basename(HIVE_EXE)}'" | Where-Object { $_.ExecutablePath -eq '${HIVE_EXE.replace(/'/g, "''")}' }; foreach ($x in $p) { $g = Get-Process -Id $x.ProcessId -ErrorAction SilentlyContinue; if ($g -and $g.MainWindowHandle -ne 0) { [void]$g.CloseMainWindow() } }; Start-Sleep -Seconds 3; $p = Get-CimInstance Win32_Process -Filter "Name='${path.basename(HIVE_EXE)}'" | Where-Object { $_.ExecutablePath -eq '${HIVE_EXE.replace(/'/g, "''")}' }; foreach ($x in $p) { Stop-Process -Id $x.ProcessId -Force -ErrorAction SilentlyContinue }; @($p).Count`)
   return Number(out) || 0
 }
 
@@ -94,6 +100,18 @@ async function providerSetup() {
   return (await until(async () => (await dialog.count()) === 1, 10_000)) ? dialog : null
 }
 
+/** HKCU's Run values that start Hive.exe or Combwork.exe (Launch at login): [{ name, command }]. */
+function runValues() {
+  try {
+    const out = ps("$k = 'HKCU:\\Software\\Microsoft\\Windows\\CurrentVersion\\Run'; if (Test-Path $k) { $i = Get-Item $k; @($i.Property | ForEach-Object { [ordered]@{ name = $_; command = [string]$i.GetValue($_) } } | Where-Object { $_.command -match 'Hive\\.exe|Combwork\\.exe' }) | ConvertTo-Json -Compress }")
+    if (!out) return []
+    const v = JSON.parse(out)
+    return Array.isArray(v) ? v : [v]
+  } catch {
+    return []
+  }
+}
+
 const bodyText = () => page.evaluate(() => document.body.innerText)
 const statusWarnings = () => page.$$eval('.statusbar .status-item.warn', els => els.map(e => (e.innerText || e.getAttribute('title') || '').trim()))
 
@@ -103,8 +121,10 @@ const steps = {
     const health = await api('/v1/health')
     res.facts.version = health.version
     res.facts.profileExists = fs.existsSync(PROFILE)
-    check('1.start-screen', 'First launch shows the start screen ("Hive Desktop")', (await page.locator('.welcome h1', { hasText: 'Hive Desktop' }).count()) > 0, (await bodyText()).slice(0, 400))
-    check('1.profile', 'The profile is %APPDATA%\\Hive', fs.existsSync(path.join(PROFILE, 'config.json')), PROFILE)
+    // The app's own name (productName: HI-2458's), as the start screen should show it.
+    res.facts.appName = await app.evaluate(({ app: a }) => a.getName())
+    check('1.start-screen', `First launch shows the start screen ("${res.facts.appName}")`, (await page.locator('.welcome h1', { hasText: res.facts.appName }).count()) > 0, (await bodyText()).slice(0, 400))
+    check('1.profile', `The profile is ${PROFILE}`, fs.existsSync(path.join(PROFILE, 'config.json')), PROFILE)
     const text = await bodyText()
     const banner = (await page.locator('.providers-banner').allInnerTexts()).join(' | ')
     res.facts.banner = banner
@@ -223,9 +243,16 @@ const steps = {
   async mark() {
     await launch()
     res.facts.version = (await api('/v1/health')).version
-    await inv('settings:update', { general: { userName: MARK.userName }, appearance: { theme: MARK.theme } })
-    const saved = await until(async () => { const c = readConfig(); return c?.settings?.general?.userName === MARK.userName && c.settings.appearance?.theme === MARK.theme && c }, 10_000)
-    check('4.settings-saved', `Before the upgrade: user name "${MARK.userName}" and the ${MARK.theme} theme saved`, saved, JSON.stringify(readConfig()?.settings?.general))
+    // Launch at login on too (HI-2460): 1.0 registers its Hive.exe, which the upgrade replaces with Combwork.exe.
+    await inv('settings:update', { general: { userName: MARK.userName, launchAtLogin: true }, appearance: { theme: MARK.theme } })
+    const saved = await until(async () => { const c = readConfig(); return c?.settings?.general?.userName === MARK.userName && c.settings.general.launchAtLogin === true && c.settings.appearance?.theme === MARK.theme && c }, 10_000)
+    check('4.settings-saved', `Before the upgrade: user name "${MARK.userName}", the ${MARK.theme} theme and Launch at login saved`, saved, JSON.stringify(readConfig()?.settings?.general))
+    // Something in the local profile folder (where accounts live), for the upgrade to carry across.
+    const local = path.join(process.env.LOCALAPPDATA, 'Hive')
+    fs.mkdirSync(local, { recursive: true })
+    fs.writeFileSync(path.join(local, LOCAL_MARK), 'kept across the upgrade')
+    res.facts.runBefore = runValues()
+    check('4.login-registered', 'Before the upgrade: Launch at login starts Hive.exe', res.facts.runBefore.some((v) => /\\Hive\.exe/i.test(v.command)), JSON.stringify(res.facts.runBefore))
     await shot('before-upgrade')
   },
 
@@ -237,6 +264,23 @@ const steps = {
     res.facts.settings = { userName: c?.settings?.general?.userName, theme: c?.settings?.appearance?.theme, lastRunVersion: c?.lastRunVersion }
     check('4.settings-kept', 'Settings kept: user name and theme', res.facts.settings.userName === MARK.userName && res.facts.settings.theme === MARK.theme, JSON.stringify(res.facts.settings))
     check('4.theme-applied', 'The window is in the kept theme', (await page.evaluate(() => document.documentElement.dataset.theme)) === MARK.theme, 'theme not applied')
+    // HI-2460: the app that runs is Combwork's, from its moved profile folders, with the local data and the installer's record.
+    res.facts.exe = HIVE_EXE
+    res.facts.profile = PROFILE
+    check('4.combwork-runs', 'Combwork.exe runs after the upgrade, from %APPDATA%\\Combwork', HIVE_EXE === COMBWORK_EXE && PROFILE === path.join(process.env.APPDATA, 'Combwork'), `${HIVE_EXE}, ${PROFILE}`)
+    const localNew = path.join(process.env.LOCALAPPDATA, 'Combwork')
+    check('4.local-moved', 'The local folder moved with its data: %LOCALAPPDATA%\\Combwork, no %LOCALAPPDATA%\\Hive', fs.existsSync(path.join(localNew, LOCAL_MARK)) && !fs.existsSync(path.join(process.env.LOCALAPPDATA, 'Hive')), fs.readdirSync(process.env.LOCALAPPDATA).filter((n) => /hive|combwork/i.test(n)).join(', '))
+    check('4.roaming-moved', 'The roaming folder moved: no %APPDATA%\\Hive left', !fs.existsSync(path.join(process.env.APPDATA, 'Hive')), fs.readdirSync(process.env.APPDATA).filter((n) => /hive|combwork/i.test(n)).join(', '))
+    let rec = null
+    try { rec = JSON.parse(fs.readFileSync(path.join(localNew, 'profile-move.json'), 'utf8')) } catch { /* below */ }
+    res.facts.record = rec
+    check('4.record', "The installer's record arrived with the local folder (v 1, by installer)", rec?.v === 1 && rec.by === 'installer' && /\\Hive$/i.test(String(rec.from)), JSON.stringify(rec))
+    // Its Launch at login: written for Combwork.exe at start (loginItem.ts), Hive Desktop's removed by the installer.
+    const runs = await until(() => { const v = runValues(); return v.some((x) => /\\Combwork\.exe/i.test(x.command)) && v }, 15_000)
+    res.facts.runAfter = runs || runValues()
+    check('4.login-moved', 'Launch at login starts Combwork.exe, and nothing starts Hive.exe', !!runs && !runs.some((x) => /\\Hive\.exe/i.test(x.command)), JSON.stringify(res.facts.runAfter))
+    const fallback = await page.locator('.toast', { hasText: 'from before Combwork' }).count()
+    check('4.no-fallback', 'No notice that Hive runs from its old folders', fallback === 0, `${fallback} such notice(s)`)
     await shot('after-upgrade-light')
     await theme('dark')
     await shot('after-upgrade-dark')

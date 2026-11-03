@@ -14,11 +14,12 @@ const SCENARIOS = {
   1: 'Fresh install and first launch',
   2: 'First run with no coding-agent CLIs',
   3: 'A CLI appearing while Hive runs (fake CLI)',
-  4: 'Upgrade from the previous release (--updated /S --force-run)',
+  4: 'Upgrade from the previous release, running, as its updater runs the installer (--updated /S --force-run)',
   5: 'Uninstall',
-  6: 'A new workspace in the fresh install (for the fresh-install comparison)'
+  6: 'A new workspace in the fresh install (for the fresh-install comparison)',
+  7: 'Install by hand over the previous release, running (/S --force-run)'
 }
-const KINDS = ['fresh', 'upgrade']
+const KINDS = ['fresh', 'upgrade', 'manual']
 
 // What each run kind must produce: the drivers' check ids and facts, and the screenshots.
 const REQUIRED = {
@@ -30,12 +31,18 @@ const REQUIRED = {
     },
     shots: ['s1-desktop.jpg', 's1-installed-apps.jpg', 's1-start-dark.png', 's1-start-light.png', 's1-agent-setup-dark.png', 's1-agent-setup-light.png', 's3-missing-dark.png', 's3-found-dark.png', 's3-found-light.png', 's6-workspace.png', 's6-workspace-overview.png', 's6-skills.png', 's6-mcp-servers.png', 's6-hive-assistant.png', 's5-desktop.jpg']
   },
-  upgrade: {
+  upgrade: overPrevious(4, 's4'),
+  manual: overPrevious(7, 's7')
+}
+
+/** An upgrade over the previous release (scenario n, its files' prefix pre): the drivers' checks (HI-2460's too) and shots. */
+function overPrevious(n, pre) {
+  return {
     drivers: {
-      's4-mark': { scenario: 4, ids: ['4.settings-saved'], facts: ['version'] },
-      's4-after': { scenario: 4, ids: ['4.settings-kept', '4.theme-applied'], facts: ['version'] }
+      [`${pre}-mark`]: { scenario: n, ids: ['4.settings-saved', '4.login-registered'], facts: ['version'] },
+      [`${pre}-after`]: { scenario: n, ids: ['4.settings-kept', '4.theme-applied', '4.combwork-runs', '4.local-moved', '4.roaming-moved', '4.record', '4.login-moved', '4.no-fallback'], facts: ['version'] }
     },
-    shots: ['s4-mark-before-upgrade.png', 's4-desktop-before.jpg', 's4-desktop-after.jpg', 's4-after-after-upgrade-light.png', 's4-after-after-upgrade-dark.png']
+    shots: [`${pre}-mark-before-upgrade.png`, `${pre}-desktop-before.jpg`, `${pre}-desktop-after.jpg`, `${pre}-after-after-upgrade-light.png`, `${pre}-after-after-upgrade-dark.png`]
   }
 }
 
@@ -43,6 +50,8 @@ const entriesOf = s => (s?.uninstallEntries ? [].concat(s.uninstallEntries) : []
 const shortcutsOf = s => (s?.shortcuts ? [].concat(s.shortcuts) : [])
 const inDesktop = l => /\\Desktop$/i.test(l.folder)
 const inStart = l => /Start Menu\\Programs$/i.test(l.folder)
+/** Whether a shortcut's target is `<name>.exe` in its own install folder (Programs\\<name>). */
+const exeIn = (target, name) => new RegExp(`\\\\${name}\\\\${name}\\.exe$`, 'i').test(String(target))
 
 /** Shortcuts as a short text: "Hive Desktop (Desktop, Start menu)". */
 const describeShortcuts = list => list.map(l => `${l.name} (${inDesktop(l) ? 'Desktop' : inStart(l) ? 'Start menu' : l.folder})`).join(', ') || 'none'
@@ -72,6 +81,8 @@ function evaluate(meta, files) {
     return d
   }
   const version = meta.installerVersion
+  // The build's names (checks.cjs appNames: HI-2458's productName, HI-2460's shortcut and exe).
+  const app = meta.app || { productName: 'Hive Desktop', shortcutName: 'Hive Desktop', exeName: 'Hive' }
 
   const unknown = ran.filter(k => !KINDS.includes(k))
   if ((!asked.length) || unknown.length) add(0, 'The scenarios asked for ran', false, unknown.length ? `unknown: ${unknown.join(', ')}` : 'none ran')
@@ -87,10 +98,10 @@ function evaluate(meta, files) {
     if (run) add(1, `Silent install (/S) succeeds (${run.seconds} s)`, run.exitCode === 0, `exit ${run.exitCode}`)
     if (st) {
       const e = entriesOf(st)
-      add(1, `One Installed-apps entry: "Hive Desktop ${version}"`, e.length === 1 && e[0].displayName === `Hive Desktop ${version}`, JSON.stringify(e.map(x => x.displayName)))
-      add(1, 'Installed in %LOCALAPPDATA%\\Programs\\Hive (Hive.exe, Uninstall Hive.exe)', st.installDir?.hiveExe && st.installDir?.uninstaller, JSON.stringify(st.installDir))
+      add(1, `One Installed-apps entry: "${app.productName} ${version}"`, e.length === 1 && e[0].displayName === `${app.productName} ${version}`, JSON.stringify(e.map(x => x.displayName)))
+      add(1, `Installed in %LOCALAPPDATA%\\Programs\\${app.exeName} (${app.exeName}.exe, Uninstall ${app.exeName}.exe)`, st.installDir?.hiveExe && st.installDir?.uninstaller && st.installDir?.exe === `${app.exeName}.exe`, JSON.stringify(st.installDir))
       const l = shortcutsOf(st)
-      add(1, 'Shortcuts named "Hive Desktop" on the Desktop and in the Start menu', l.length >= 2 && l.every(x => x.name === 'Hive Desktop' && /\\Hive\\Hive\.exe$/i.test(x.target)) && l.some(inDesktop) && l.some(inStart), describeShortcuts(l))
+      add(1, `Shortcuts named "${app.shortcutName}" on the Desktop and in the Start menu`, l.length >= 2 && l.every(x => x.name === app.shortcutName && exeIn(x.target, app.exeName)) && l.some(inDesktop) && l.some(inStart), describeShortcuts(l))
     }
     const s1 = driver('fresh', 's1')
     if (s1?.facts?.version !== undefined) add(1, `The app reports version ${version}`, s1.facts.version === version, `reports ${s1.facts.version}`)
@@ -98,41 +109,46 @@ function evaluate(meta, files) {
     driver('fresh', 's6')
     const run5 = need(5, 's5-run')
     const st5 = need(5, 's5-state')
-    if (run5) add(5, `Silent uninstall ("Uninstall Hive.exe" /S) succeeds (${run5.seconds} s)`, run5.exitCode === 0, `exit ${run5.exitCode}`)
+    if (run5) add(5, `Silent uninstall ("Uninstall ${app.exeName}.exe" /S) succeeds (${run5.seconds} s)`, run5.exitCode === 0, `exit ${run5.exitCode}`)
     if (st5) {
       add(5, 'The Installed-apps entry is gone', !entriesOf(st5).length, JSON.stringify(entriesOf(st5).map(x => x.displayName)))
       add(5, 'The install folder is gone', st5.installDir?.exists === false, st5.installDir?.path)
       add(5, 'The shortcuts are gone', !shortcutsOf(st5).length, describeShortcuts(shortcutsOf(st5)))
-      add(5, 'The profile (%APPDATA%\\Hive) is kept (deleteAppDataOnUninstall: false)', st5.profileDir?.exists === true, JSON.stringify(st5.profileDir))
+      add(5, `The profile (${st5.profileDir?.path}) is kept (deleteAppDataOnUninstall: false)`, st5.profileDir?.exists === true, JSON.stringify(st5.profileDir))
     }
   }
 
-  if (ran.includes('upgrade')) {
-    const prevRun = need(4, 's4-prev-run')
-    const prevSt = need(4, 's4-prev-state')
-    if (prevRun) add(4, `The previous release installs (${prevRun.seconds} s)`, prevRun.exitCode === 0, `exit ${prevRun.exitCode}`)
+  for (const [kind, n, pre] of [['upgrade', 4, 's4'], ['manual', 7, 's7']]) {
+    if (!ran.includes(kind)) continue
+    const prevRun = need(n, `${pre}-prev-run`)
+    const prevSt = need(n, `${pre}-prev-state`)
+    if (prevRun) add(n, `The previous release installs (${prevRun.seconds} s)`, prevRun.exitCode === 0, `exit ${prevRun.exitCode}`)
     const prevNames = entriesOf(prevSt).map(x => x.displayName)
-    driver('upgrade', 's4-mark')
-    const newRun = need(4, 's4-new-run')
-    const newSt = need(4, 's4-new-state')
+    driver(kind, `${pre}-mark`)
+    const newRun = need(n, `${pre}-new-run`)
+    const newSt = need(n, `${pre}-new-state`)
     if (newRun) {
-      add(4, `The new build installs over it with --updated /S --force-run (${newRun.seconds} s)`, newRun.exitCode === 0, `exit ${newRun.exitCode}`)
-      add(4, '--force-run starts Hive after the update', newRun.hiveRunning === true, 'no Hive.exe running from the install folder')
+      add(n, `The new build installs over it, running, with ${newRun.arguments} (${newRun.seconds} s)`, newRun.exitCode === 0, `exit ${newRun.exitCode}`)
+      add(n, `--force-run starts ${app.exeName}.exe after the install`, newRun.hiveRunning === true && [].concat(newRun.running || []).includes('combwork'), `running: ${JSON.stringify(newRun.running)}`)
+      add(n, 'Hive Desktop no longer runs', ![].concat(newRun.running || []).includes('hive'), `running: ${JSON.stringify(newRun.running)}`)
     }
     if (newSt) {
       const e = entriesOf(newSt)
-      add(4, `One Installed-apps entry after the upgrade: "Hive Desktop ${version}"`, e.length === 1 && e[0].displayName === `Hive Desktop ${version}`, `before: ${JSON.stringify(prevNames)}; after: ${JSON.stringify(e.map(x => x.displayName))}`)
+      // HI-2460: Hive Desktop's entry gone, one of the new app's: "nobody ends up with both installed".
+      add(n, `One Installed-apps entry after the upgrade: "${app.productName} ${version}", no Hive Desktop`, e.length === 1 && e[0].displayName === `${app.productName} ${version}`, `before: ${JSON.stringify(prevNames)}; after: ${JSON.stringify(e.map(x => x.displayName))}`)
       const l = shortcutsOf(newSt)
-      add(4, `Shortcuts renamed or kept: only "Hive Desktop", on the Desktop and in the Start menu (before: ${describeShortcuts(shortcutsOf(prevSt))})`, l.length >= 2 && l.every(x => x.name === 'Hive Desktop') && l.some(inDesktop) && l.some(inStart), describeShortcuts(l))
-      add(4, 'Same install folder, Hive.exe there', newSt.installDir?.hiveExe, JSON.stringify(newSt.installDir))
-      // Test builds carry the previous release's version number: the app code's hash shows the new build went in.
-      const before = prevSt?.installDir?.appAsarSha256
-      const now = newSt.installDir?.appAsarSha256
-      if (meta.sameInstaller) add(4, 'The installed app code is this build\'s', now && now === before, `${before} → ${now}`)
-      else add(4, `The installed app code changed (app.asar ${String(before).slice(0, 12)}… → ${String(now).slice(0, 12)}…)`, before && now && before !== now, `${before} → ${now}`)
+      add(n, `Shortcuts: only "${app.shortcutName}", starting ${app.exeName}.exe, on the Desktop and in the Start menu (before: ${describeShortcuts(shortcutsOf(prevSt))})`, l.length >= 2 && l.every(x => x.name === app.shortcutName && exeIn(x.target, app.exeName)) && l.some(inDesktop) && l.some(inStart), describeShortcuts(l))
+      const ins = newSt.installs || {}
+      add(n, `Installed in %LOCALAPPDATA%\\Programs\\${app.exeName}; Hive Desktop's folder gone`, ins.combwork?.hiveExe === true && ins.hive?.exists === false, JSON.stringify(ins))
+      add(n, `The installed app code is the new build's (app.asar ${String(ins.combwork?.appAsarSha256).slice(0, 12)}…)`, !!ins.combwork?.appAsarSha256, JSON.stringify(ins.combwork))
+      const pr = newSt.profiles || {}
+      add(n, 'The profile folders moved: %APPDATA%\\Combwork and %LOCALAPPDATA%\\Combwork, no Hive folders left', pr.roamingCombwork?.exists && pr.localCombwork?.exists && !pr.roamingHive?.exists && !pr.localHive?.exists, JSON.stringify({ roaming: [pr.roamingCombwork?.exists, pr.roamingHive?.exists], local: [pr.localCombwork?.exists, pr.localHive?.exists] }))
+      add(n, "The installer's record is in %LOCALAPPDATA%\\Combwork", /"by"\s*:\s*"installer"/.test(String(pr.localCombwork?.record)), String(pr.localCombwork?.record))
+      const run = [].concat(newSt.run || [])
+      add(n, "Hive Desktop's Launch at login removed by the installer", !run.some(v => /\\Hive\.exe/i.test(v.command)), JSON.stringify(run))
     }
-    const after = driver('upgrade', 's4-after')
-    if (after?.facts?.version !== undefined) add(4, `After the upgrade the app reports ${version}`, after.facts.version === version, `reports ${after.facts.version}`)
+    const after = driver(kind, `${pre}-after`)
+    if (after?.facts?.version !== undefined) add(n, `After the upgrade the app reports ${version}`, after.facts.version === version, `reports ${after.facts.version}`)
   }
 
   for (const id of meta.leftRunning || []) add(0, `CLEANUP: Sandbox ${id} confirmed stopped`, false, `CLEANUP NOT CONFIRMED: Sandbox ${id} may still be running`)
@@ -140,7 +156,7 @@ function evaluate(meta, files) {
 
   const passed = checks.filter(c => c.ok).length
   const differences = []
-  if (ran.includes('upgrade') && meta.previousVersion === meta.installerVersion) {
+  if ((ran.includes('upgrade') || ran.includes('manual')) && meta.previousVersion === meta.installerVersion) {
     differences.push(`The previous release and this build both say **${meta.installerVersion}**: the in-app updater (no downgrades, only newer versions) would not offer this build, so the upgrade check is a reinstall over it, run by hand with the updater's arguments. The "Hive Desktop updated to …" notice can't show.`)
   }
   const s1 = files.s1
