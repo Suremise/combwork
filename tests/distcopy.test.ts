@@ -6,7 +6,7 @@ import { join, resolve } from 'path'
 import { pathToFileURL } from 'url'
 import { afterAll, describe, expect, it } from 'vitest'
 // @ts-expect-error: a plain .mjs module without types
-import { checkoutOf, clearDistInfo, copySet, copyToMain, finishDist, installerFiles, planCopy, provenanceProblem, readUnpackedInfo } from '../scripts/distCopy.mjs'
+import { checkoutOf, clearDistInfo, copySet, copyToMain, finishDist, installerFiles, makeRelease, planCopy, provenanceProblem, readUnpackedInfo } from '../scripts/distCopy.mjs'
 // @ts-expect-error: a plain .mjs module without types
 import { packagedStatus } from './e2e/runner.mjs'
 import { tempDir } from './tempDir'
@@ -224,5 +224,90 @@ console.log(copyToMain({ root: ${JSON.stringify(root)}, version: '9.9.9', info: 
     expect(readUnpackedInfo(join(main, 'dist'))).toBeNull()
     expect(existsSync(join(main, 'dist', 'build-info.json'))).toBe(false)
     expect(existsSync(join(main, 'dist', 'win-unpacked', 'artifact-code.txt'))).toBe(true)
+  })
+})
+
+// npm run release builds in its own checkout's dist (scripts/release.mjs) by npm run dist's rules (HI-2411): makeRelease,
+// with the build, the app's stamp and the upload faked.
+describe('a release build in dist (makeRelease)', () => {
+  const base = tempDir('hive-release-')
+  afterAll(() => rmSync(base, { recursive: true, force: true }))
+  let n = 0
+  type Ident = { version: string; code: string; head: string; branch: string | null }
+  const ident = (code: string): Ident => ({ version: '9.9.9', code, head: 'c'.repeat(40), branch: 'main' })
+  const exe = (root: string) => join(root, 'dist', 'Hive-Setup-9.9.9.exe')
+  /** A checkout whose dist holds what an earlier build left: an installer built from code (and its build-info.json unless info is false). */
+  const checkout = (earlier?: { code: string; info?: boolean }) => {
+    const root = join(base, `r${++n}`)
+    mkdirSync(join(root, 'dist'), { recursive: true })
+    if (earlier) {
+      writeFileSync(exe(root), `installer from ${earlier.code}`)
+      if (earlier.info !== false) writeFileSync(join(root, 'dist', 'build-info.json'), JSON.stringify({ ...ident(earlier.code), builtAt: '2026-11-02T21:59:00Z' }))
+    }
+    return root
+  }
+  /** makeRelease with fakes: steps lists what ran, in order; the "upload" writes the installer as electron-builder does. */
+  const release = (root: string, { code = 'new', after = code, replace = false } = {}) => {
+    const steps: string[] = []
+    const idents = [ident(code), ident(after)]
+    const made = makeRelease({
+      root,
+      replace,
+      identity: () => idents.shift(),
+      run: (cmd: string) => steps.push(cmd),
+      stampApp: (_root: string, id: { version: string; commit: string; local: boolean }) => steps.push(`stamp local=${id.local}`),
+      publish: () => {
+        steps.push('publish')
+        writeFileSync(exe(root), `installer from ${code}`)
+      }
+    })
+    return { made, steps }
+  }
+  const buildInfo = (root: string) => JSON.parse(readFileSync(join(root, 'dist', 'build-info.json'), 'utf8'))
+
+  it('builds, stamps it a release, uploads, and leaves build-info.json describing the uploaded installer', () => {
+    const root = checkout()
+    const { made, steps } = release(root)
+    expect(steps).toEqual(['npm run build', 'stamp local=false', 'publish'])
+    expect(made.refused).toBeUndefined()
+    expect(made.lines).toEqual([`Installer: ${exe(root)}`])
+    expect(buildInfo(root)).toMatchObject({ ...ident('new'), builtIn: root })
+    // No copy lock left behind.
+    expect(readdirSync(join(root, 'dist')).filter((f) => f.endsWith('.lock'))).toEqual([])
+  })
+
+  it('never builds over a same-named installer from other code, or from code it can’t tell, unless --replace', () => {
+    // As seen on 3 Nov 2026: npm run dist's build of other code, with its build-info.json.
+    const other = checkout({ code: 'old' })
+    const refused = release(other)
+    expect(refused.steps).toEqual([])
+    expect(refused.made.refused).toMatch(/^Not built: .*Hive-Setup-9\.9\.9\.exe is already there, built from other code: old \(main\) at 2026-11-02T21:59:00Z, where this one is new \(main\)\. .*--replace/)
+    expect(readFileSync(exe(other), 'utf8')).toBe('installer from old')
+    expect(buildInfo(other).code).toBe('old')
+    // No build-info.json beside it: can't tell, so not built over either.
+    const unknown = checkout({ code: 'old', info: false })
+    expect(release(unknown).made.refused).toMatch(/can't tell \(no build-info\.json\)/)
+    expect(readFileSync(exe(unknown), 'utf8')).toBe('installer from old')
+    // --replace builds over it, and the record follows the installer.
+    const replaced = release(other, { replace: true })
+    expect(replaced.steps).toEqual(['npm run build', 'stamp local=false', 'publish'])
+    expect(readFileSync(exe(other), 'utf8')).toBe('installer from new')
+    expect(buildInfo(other).code).toBe('new')
+  })
+
+  it('builds over one of the same code without a word', () => {
+    const root = checkout({ code: 'new' })
+    const { made, steps } = release(root)
+    expect(made.refused).toBeUndefined()
+    expect(steps).toContain('publish')
+    expect(buildInfo(root).code).toBe('new')
+  })
+
+  it('code that changed while it was built: no build-info.json, and none left from before', () => {
+    const root = checkout({ code: 'new' })
+    const { made } = release(root, { code: 'new', after: 'new+edit' })
+    expect(made.lines[0]).toMatch(/^The build's code can't be told: the code changed .*No build-info\.json was written: build again once the code stays put\.$/)
+    expect(made.lines[1]).toBe(`Installer: ${exe(root)} (unlabelled)`)
+    expect(existsSync(join(root, 'dist', 'build-info.json'))).toBe(false)
   })
 })

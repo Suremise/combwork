@@ -1,16 +1,24 @@
 // Builds the installer and uploads it to a DRAFT GitHub release for the version in package.json,
 // with latest.yml (what the updater reads) and the .blockmap (for smaller downloads). Uses the GitHub
 // CLI's login. Nothing reaches users until the draft is reviewed and published on GitHub.
-// See RELEASING.md.
+// It builds in this checkout's dist by npm run dist's rules (HI-2411; makeRelease in distCopy.mjs): it never builds over
+// an installer of the same name there built from other code without --replace, and writes dist/build-info.json for the
+// installer it uploaded. See RELEASING.md.
 import { execSync, spawnSync } from 'child_process'
 import { existsSync, readFileSync } from 'fs'
 import { join } from 'path'
 import { fileURLToPath } from 'url'
 import { MANIFEST, manifestStale } from './testedClis.mjs'
 import { recordBuild } from './buildFact.mjs'
-import { writeAppIdentity } from './appIdentity.mjs'
+import { makeRelease } from './distCopy.mjs'
 
 const pkg = JSON.parse(readFileSync(new URL('../package.json', import.meta.url), 'utf8'))
+const args = process.argv.slice(2)
+const unknown = args.filter((a) => a !== '--replace')
+if (unknown.length) {
+  console.error(`Unknown option ${unknown.join(' ')}: --replace builds over an installer of the same name in dist built from other code.`)
+  process.exit(2)
+}
 let token
 try {
   token = execSync('gh auth token', { stdio: ['ignore', 'pipe', 'ignore'] }).toString().trim()
@@ -38,27 +46,34 @@ if (stale) {
 if (spawnSync('node', ['scripts/licenses.mjs', '--check'], { stdio: 'inherit', cwd: new URL('..', import.meta.url) }).status !== 0) process.exit(1)
 
 console.log(`Building Hive Desktop ${pkg.version} and uploading a draft release…`)
-const run = (cmd, args) => {
-  const r = spawnSync(cmd, args, { stdio: 'inherit', shell: true, env: { ...process.env, GH_TOKEN: token } })
+const root = fileURLToPath(new URL('..', import.meta.url))
+const run = (cmd) => {
+  const r = spawnSync(cmd, { cwd: root, stdio: 'inherit', shell: true, env: { ...process.env, GH_TOKEN: token } })
   if (r.status !== 0) process.exit(r.status ?? 1)
 }
-run('npm', ['run', 'build'])
-// A release says so (#1647): its identity file local: false, and its installer never waits for another (installer.nsh).
-writeAppIdentity(fileURLToPath(new URL('..', import.meta.url)), { version: pkg.version, commit: execSync('git rev-parse HEAD').toString().trim(), local: false })
-// Create the draft first: electron-builder uploads the files in parallel and, with no release yet,
-// each upload creates its own draft (you end up with two drafts, the files split between them).
 const tag = `v${pkg.version}`
-const view = spawnSync('gh', ['release', 'view', tag, '--json', 'isDraft'], { shell: true, env: { ...process.env, GH_TOKEN: token } })
-const exists = view.status === 0
-// Only ever upload to a draft: a published release is what installed copies update from.
-if (exists && JSON.parse(view.stdout.toString() || '{}').isDraft !== true) {
-  console.error(`${tag} is already published. Bump the version in package.json for a new release.`)
+const publish = () => {
+  // Create the draft first: electron-builder uploads the files in parallel and, with no release yet,
+  // each upload creates its own draft (you end up with two drafts, the files split between them).
+  const view = spawnSync('gh', ['release', 'view', tag, '--json', 'isDraft'], { shell: true, env: { ...process.env, GH_TOKEN: token } })
+  const exists = view.status === 0
+  // Only ever upload to a draft: a published release is what installed copies update from.
+  if (exists && JSON.parse(view.stdout.toString() || '{}').isDraft !== true) {
+    console.error(`${tag} is already published. Bump the version in package.json for a new release.`)
+    process.exit(1)
+  }
+  if (!exists) run(`gh release create ${tag} --draft --title "Hive Desktop ${pkg.version}" --notes ""`)
+  run('npx electron-builder --win --publish always')
+}
+// The build, the draft and the upload, by npm run dist's rules (makeRelease): a release says so in its identity file
+// (local: false, #1647), and dist/build-info.json describes what it uploaded. run() exits first on any failure.
+const made = makeRelease({ root, replace: args.includes('--replace'), run, publish })
+if (made.refused) {
+  console.error(made.refused)
   process.exit(1)
 }
-if (!exists) run('gh', ['release', 'create', tag, '--draft', '--title', `"Hive Desktop ${pkg.version}"`, '--notes', '""'])
-run('npx', ['electron-builder', '--win', '--publish', 'always'])
-console.log(`\nDraft release v${pkg.version} uploaded. Review it at https://github.com/Suremise/hive-desktop/releases and publish it there.`)
-// The uploaded build, recorded in Hive's journal (buildFact.mjs, #1534): run() exits first on any failure.
-const root = fileURLToPath(new URL('..', import.meta.url))
+console.log(`\n${made.lines.join('\n')}`)
+console.log(`\nDraft release ${tag} uploaded. Review it at https://github.com/Suremise/hive-desktop/releases and publish it there.`)
+// The uploaded build, recorded in Hive's journal (buildFact.mjs, #1534).
 const git = (...a) => execSync(`git ${a.join(' ')}`, { cwd: root }).toString().trim()
 console.log(await recordBuild({ root, version: pkg.version, commit: git('rev-parse', 'HEAD'), branch: git('branch', '--show-current') || null, installer: join(root, 'dist', `Hive-Setup-${pkg.version}.exe`), by: 'release' }))
