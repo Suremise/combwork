@@ -1536,6 +1536,12 @@
       "path": "plain"
     }
   },
+  "settings.agent.error.notSettableHere": {
+    "placeholders": {
+      "title": "plain",
+      "path": "plain"
+    }
+  },
   "settings.agent.error.oneLine": {
     "placeholders": {
       "title": "plain",
