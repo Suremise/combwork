@@ -247,7 +247,7 @@ describe('a release build in dist (makeRelease)', () => {
     return root
   }
   /** makeRelease with fakes: steps lists what ran, in order; the "upload" writes the installer as electron-builder does. */
-  const release = (root: string, { code = 'new', after = code, replace = false } = {}) => {
+  const release = (root: string, { code = 'new', after = code, replace = false }: { code?: string; after?: string; replace?: boolean } = {}) => {
     const steps: string[] = []
     const idents = [ident(code), ident(after)]
     const made = makeRelease({
