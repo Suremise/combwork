@@ -189,6 +189,25 @@ export function newestComments<T extends { comments: unknown[] }>(v: T, n: numbe
   return { ...v, comments: v.comments.slice(omitted), commentsOmitted: omitted }
 }
 
+/**
+ * GET /v1/tasks/{n}'s `comments=` (HI-2412): null when absent, else a whole number from 0 (0: none of them, all counted in
+ * commentsOmitted); anything else is a string saying what's wrong.
+ */
+export function commentsParam(raw: string | null): number | null | { error: string } {
+  if (raw === null) return null
+  const n = raw.trim() === '' ? NaN : Number(raw)
+  return Number.isInteger(n) && n >= 0 ? n : { error: `comments must be a whole number from 0: "${raw}"` }
+}
+
+/**
+ * hive_read_task's query for GET /v1/tasks/{n} (HI-2412): `comments` passes through whenever it is given, 0 included (0
+ * reads none of them), so the API answers it or says what's wrong with it, never falling back to every comment.
+ */
+export function readTaskQuery(a: { history?: unknown; comments?: unknown; summary?: unknown; attachments?: unknown }): string {
+  const c = a.comments === undefined || a.comments === null ? '' : `comments=${typeof a.comments === 'number' && Number.isFinite(a.comments) ? Math.floor(a.comments) : encodeURIComponent(String(a.comments))}`
+  return [a.history ? '' : 'history=false', c, a.summary ? 'summary=true' : '', a.attachments === true ? 'attachments=true' : ''].filter(Boolean).join('&')
+}
+
 /** What a change did to a card (reply: "short"): the changes in words and where the card is now. */
 export interface TaskChange {
   number: number

@@ -18,7 +18,7 @@ import { AGENT_WAIT_MAX_SECONDS, WAIT_MAX_SECONDS } from '../../shared/watch'
 import { LANE_EVENTS } from '../../shared/laneWatch'
 import { CLAIM_WAIT_MAX_SECONDS, CLAIM_WAIT_SECONDS } from '../../shared/mergeSlot'
 import { REPLY_MS, STOP_ASK_MS, agentApiCall } from './agentApiCall'
-import { MAX_ROWS, refusedText, type Refused, connectionListText, connectionChangedText, type ConnectionPublic, templateListText, templatePlanText, templateLoadedText, connectionsAppliedText, type TemplatePlanPublic, type TemplateLoadPublic, type ConnectionsAppliedPublic,agentWatchText, attachmentText, type AttachmentReply, changeListText, messageQueuedText, type ChangeGroupListed, undoText, type UndoneListed, intentText, type IntentDone, askedAssistantText, type AskedAssistant, notifiedText, journalEntryText, journalRecallText, type JournalEntryDetail, type JournalRow, batchText, consoleEventsText, consoleSourcesText, changedText, claimText, createdText, docOutlineText, docSectionText, type DocHeadingRow, mergeSlotText, noteText, queueResumedText, queueText, teamText, type TeamPublic, queuesText, releasableText, slotReleasedText, type ReleasablePublic, notesListText, noteWrittenText, projectListText, projectStatusReply, releaseText, reorderText, settingChangedText, settingListText, settingText, skillListText, taskListText, taskWaitText, type NoteEntry, type ProjectRow, type SettingDetail, type SettingRow, type SkillRow, type TaskBatch, type TaskChange, type TaskReorder, type TaskRow } from '../../shared/toolReplies'
+import { MAX_ROWS, refusedText, type Refused, connectionListText, connectionChangedText, type ConnectionPublic, templateListText, templatePlanText, templateLoadedText, connectionsAppliedText, type TemplatePlanPublic, type TemplateLoadPublic, type ConnectionsAppliedPublic,agentWatchText, attachmentText, type AttachmentReply, changeListText, messageQueuedText, type ChangeGroupListed, undoText, type UndoneListed, intentText, type IntentDone, askedAssistantText, type AskedAssistant, notifiedText, journalEntryText, journalRecallText, type JournalEntryDetail, type JournalRow, batchText, consoleEventsText, consoleSourcesText, changedText, claimText, createdText, docOutlineText, docSectionText, type DocHeadingRow, mergeSlotText, noteText, queueResumedText, queueText, teamText, type TeamPublic, queuesText, releasableText, slotReleasedText, type ReleasablePublic, notesListText, noteWrittenText, projectListText, readTaskQuery, projectStatusReply, releaseText, reorderText, settingChangedText, settingListText, settingText, skillListText, taskListText, taskWaitText, type NoteEntry, type ProjectRow, type SettingDetail, type SettingRow, type SkillRow, type TaskBatch, type TaskChange, type TaskReorder, type TaskRow } from '../../shared/toolReplies'
 import type { LaneInfo, MergeSlotInfo } from '../../shared/types'
 import type { QueuePublic } from '../../shared/workflow/queue'
 import { LOOP_STEPS } from '../../shared/workflow/facts'
@@ -778,7 +778,8 @@ const tools: Tool[] = [
         const lq = [a.summary ? 'summary=true' : '', all].filter(Boolean).join('&')
         return api('GET', `/v1/tasks/${n}/comments/latest${lq ? `?${lq}` : ''}`)
       }
-      const q = [a.history ? '' : 'history=false', Number(a.comments) > 0 ? `comments=${Math.floor(Number(a.comments))}` : '', a.summary ? 'summary=true' : '', all].filter(Boolean).join('&')
+      // comments: 0 is passed through too (HI-2412): none of them, with the count left out.
+      const q = readTaskQuery(a)
       return api('GET', `/v1/tasks/${n}${q ? `?${q}` : ''}`)
     }
   },

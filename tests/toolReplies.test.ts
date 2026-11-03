@@ -9,12 +9,15 @@ import {
   modelInUse,
   retryWaitsView,
   messageQueuedText,
+  newestComments,
   notifiedText,
   changedText,
+  commentsParam,
   createdText,
   noteText,
   notesListText,
   progressLabel,
+  readTaskQuery,
   projectListText,
   projectStatusReply,
   releaseText,
@@ -281,5 +284,33 @@ describe('hive_notify (HI-1961)', () => {
     expect(notifiedText({})).toBe('Notification shown.')
     expect(notifiedText({ opens: 'HB4' })).toBe('Notification shown; a click opens HB4.')
     expect(notifiedText({ opens: 'HI-12' })).toBe('Notification shown; a click opens HI-12.')
+  })
+})
+
+// HI-2412: comments: 0 reads none of a card's comments (all counted), never falling back to every one.
+describe('a card read narrowed to its newest comments', () => {
+  const card = { comments: ['a', 'b', 'c'] }
+
+  it('hive_read_task passes comments through whenever it is given, 0 included', () => {
+    expect(readTaskQuery({ comments: 0 })).toBe('history=false&comments=0')
+    expect(readTaskQuery({ comments: 2 })).toBe('history=false&comments=2')
+    expect(readTaskQuery({ comments: 2.7, summary: true, attachments: true, history: true })).toBe('comments=2&summary=true&attachments=true')
+    expect(readTaskQuery({})).toBe('history=false')
+    // Not a number: passed on for the API to refuse, not dropped into a full read.
+    expect(readTaskQuery({ comments: -1 })).toBe('history=false&comments=-1')
+    expect(readTaskQuery({ comments: 'none' })).toBe('history=false&comments=none')
+  })
+
+  it('the API takes a whole number from 0 and refuses anything else', () => {
+    expect(commentsParam(null)).toBeNull()
+    expect(commentsParam('0')).toBe(0)
+    expect(commentsParam('2')).toBe(2)
+    for (const bad of ['-1', '1.5', '', 'none']) expect(commentsParam(bad)).toEqual({ error: `comments must be a whole number from 0: "${bad}"` })
+  })
+
+  it('0 keeps none and counts them all; a positive n keeps the newest n', () => {
+    expect(newestComments(card, 0)).toEqual({ comments: [], commentsOmitted: 3 })
+    expect(newestComments(card, 2)).toEqual({ comments: ['b', 'c'], commentsOmitted: 1 })
+    expect(newestComments(card, 5)).toEqual({ comments: ['a', 'b', 'c'], commentsOmitted: 0 })
   })
 })
