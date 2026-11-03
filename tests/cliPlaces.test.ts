@@ -5,7 +5,7 @@
 // on any machine (tests/pathAliases.ts), and an 8.3 name where the volume makes them.
 import { appendFileSync, existsSync, mkdirSync, readFileSync, statSync, utimesSync, writeFileSync } from 'fs'
 import { join } from 'path'
-import { afterEach, describe, expect, it } from 'vitest'
+import { afterEach, describe, expect, it, vi } from 'vitest'
 import { junction, shortPath } from './pathAliases'
 import { tempDir } from './tempDir'
 
@@ -124,24 +124,30 @@ describe("Claude Code's transcript folder (#493)", () => {
     const projects = join(process.env.CLAUDE_CONFIG_DIR, 'projects')
     mkdirSync(join(projects, encodeProjectPath(join(p.base, 'Other'))), { recursive: true })
     const claude = new ClaudeCodeAdapter()
-    // Whole milliseconds, so that setting it again gives the very time read (a stat's has a fraction).
+    // Whole milliseconds, so that setting it again gives the very time read (a stat's has a fraction). The clock stays
+    // at that time too, so each read is in its tick however long the test takes.
     const tick = new Date()
-    utimesSync(projects, tick, tick)
-    expect(await claude.transcriptPath(p.real, ID)).toBeNull()
-    const dir = join(projects, encodeProjectPath(p.real))
-    mkdirSync(dir)
-    writeFileSync(join(dir, `${ID}.jsonl`), '{"type":"user"}\n')
-    utimesSync(projects, tick, tick)
-    expect(statSync(projects).mtimeMs).toBe(tick.getTime())
-    expect(await claude.transcriptPath(p.real, ID)).toBe(join(dir, `${ID}.jsonl`))
-    // The same in a transcript folder: its second session, added in the tick its names were read in.
-    const was = new Date()
-    utimesSync(dir, was, was)
-    expect((await claude.listSessions(p.real)).map((s) => s.id)).toEqual([ID])
-    writeFileSync(join(dir, `${ID2}.jsonl`), '{"type":"user"}\n')
-    utimesSync(dir, was, was)
-    expect(statSync(dir).mtimeMs).toBe(was.getTime())
-    expect((await claude.listSessions(p.real)).map((s) => s.id).sort()).toEqual([ID, ID2].sort())
+    vi.useFakeTimers({ toFake: ['Date'] })
+    vi.setSystemTime(tick)
+    try {
+      utimesSync(projects, tick, tick)
+      expect(await claude.transcriptPath(p.real, ID)).toBeNull()
+      const dir = join(projects, encodeProjectPath(p.real))
+      mkdirSync(dir)
+      writeFileSync(join(dir, `${ID}.jsonl`), '{"type":"user"}\n')
+      utimesSync(projects, tick, tick)
+      expect(statSync(projects).mtimeMs).toBe(tick.getTime())
+      expect(await claude.transcriptPath(p.real, ID)).toBe(join(dir, `${ID}.jsonl`))
+      // The same in a transcript folder: its second session, added in the tick its names were read in.
+      utimesSync(dir, tick, tick)
+      expect((await claude.listSessions(p.real)).map((s) => s.id)).toEqual([ID])
+      writeFileSync(join(dir, `${ID2}.jsonl`), '{"type":"user"}\n')
+      utimesSync(dir, tick, tick)
+      expect(statSync(dir).mtimeMs).toBe(tick.getTime())
+      expect((await claude.listSessions(p.real)).map((s) => s.id).sort()).toEqual([ID, ID2].sort())
+    } finally {
+      vi.useRealTimers()
+    }
   })
 
   it('keeps the names of a projects folder that has settled while its time is unchanged (#1649)', async () => {
