@@ -4032,8 +4032,25 @@ class SessionManager {
    * conversation: only while it may (#1057, handOverCheck.ts: idle, not merging, on no running lane's card), checked as
    * it is asked and again just before the conversation ends.
    */
-  async handOver(projectPath: string, fromAgentId: string, toAgentId: string, opts: { handover: boolean }): Promise<void> {
+  /**
+   * Hands an agent's work over (to another agent, or to itself in a new conversation). `allowed` throws once the caller
+   * may no longer have it (HI-2420: the Assistant's Control or session, as newConversation's): checked before each step
+   * that acts (asking for the handover, ending the conversation, giving or launching the target), while each line is
+   * typed, and as the target's launch spawns. Once it throws, nothing more is done.
+   */
+  async handOver(projectPath: string, fromAgentId: string, toAgentId: string, opts: { handover: boolean; allowed?: () => void }): Promise<void> {
     projectPath = workspace.assertProject(projectPath)
+    const allowed = opts.allowed
+    const holds = allowed
+      ? (): boolean => {
+          try {
+            allowed()
+            return true
+          } catch {
+            return false
+          }
+        }
+      : undefined
     // To itself: the agent carries on in a new conversation (a long transcript made short again).
     const self = fromAgentId === toAgentId
     if (!this.hiveMcp(projectPath)) throw hiveError(msg({ id: 'session.handOver.noTools', defaultMessage: 'Handing over needs Hive\'s tools in sessions: turn on "Provide Hive tools to sessions" in Settings → Agent API.', description: 'Hand Over to… is refused: agents need Hive\'s tools to write and read a handover. "Provide Hive tools to sessions" is a setting in Settings → Agent API: keep its name as Hive shows it.' }), undefined, { kind: 'conflict' })
@@ -4059,6 +4076,8 @@ class SessionManager {
       const known = new Map((await this.recentHandovers(projectPath, 20)).map((h) => [h.relPath, h.modified]))
       const want = source.sessionId
       const isNew = (h: HandoverRef): boolean => (!known.has(h.relPath) || h.modified > known.get(h.relPath)!) && (!want || h.session === want)
+      // The caller's authority, after the reads above, before anything is said or asked.
+      allowed?.()
       toast(
         'info',
         tr(msg({ id: 'session.handOver.writing', defaultMessage: '{agent} is writing a handover', description: "A notice's title: an agent writes a handover of its work (Hand Over to…). {agent} is its name." }), { agent: from.name }),
@@ -4080,7 +4099,7 @@ class SessionManager {
         // i18n-ignore: typed to the agent (agent-facing text stays English)
         body: `Please write a handover of this work with the hive_create_handover tool, so that ${self ? 'you can continue it in a new conversation' : `another agent (${to.name}) can continue it`}: the goal, what is done, decisions made and why, the current state, open problems and the next steps. Then stop.`,
         need: 'free'
-      })
+      }, holds)
       const t0 = Date.now()
       let idleSince = 0
       for (;;) {
@@ -4119,9 +4138,10 @@ class SessionManager {
         const starts = l.turnStarts ?? []
         return starts.filter((t) => t >= askedAt).length > 1 || starts.some((t) => t > writtenAt) || (a?.state === 'running' && a.startedAt > writtenAt)
       }
-      const allowed = sameLaunch() && !otherWork() && (await this.handOverAllowed(projectPath, fromAgentId, true).catch(() => false))
-      // And with nothing awaited between this and the stop, its launch and its work once more.
-      if (!allowed || !sameLaunch() || otherWork()) throw hiveError(M.handOverMomentLost, { agent: from.name, handover }, { kind: 'conflict' })
+      const may = sameLaunch() && !otherWork() && (await this.handOverAllowed(projectPath, fromAgentId, true).catch(() => false))
+      // And with nothing awaited between this and the stop, its launch and its work once more, and the caller's authority.
+      if (!may || !sameLaunch() || otherWork()) throw hiveError(M.handOverMomentLost, { agent: from.name, handover }, { kind: 'conflict' })
+      allowed?.()
     }
     if (self && this.live.has(liveId(projectPath, fromAgentId)) && !(await this.endConversation(projectPath, fromAgentId))) throw hiveError(msg({ id: 'session.handOver.didntStop', defaultMessage: '{agent} didn\'t stop. Stop it, then start it and ask it to read the handover "{handover}".', description: "Handing over to the same agent failed: it didn't stop to start a new conversation. {agent} is its name, {handover} the handover's path in the shared notes." }), { agent: from.name, handover }, { kind: 'conflict' })
     // The target: given the message in its running session, or started with it as its launch's task (#782), as a task
@@ -4129,14 +4149,16 @@ class SessionManager {
     // before it takes input), and the next hand-over from it was refused.
     const target = this.live.get(liveId(projectPath, toAgentId))?.state ?? null
     if (target && target.status !== 'ready' && target.status !== 'finished') throw hiveError(M.handOverBusy, { agent: to.name }, { kind: 'conflict' })
+    // The caller's authority, after every await above (the handover's read, a conversation's end), before the target is given it.
+    allowed?.()
     // i18n-ignore: given to the agent (agent-facing text stays English)
     const nd: NewDelivery = { agentId: toAgentId, agentName: to.name, kind: 'handover', from: HIVE_SENDER, body: `Read the handover "${handover}" with the hive_read_shared_note tool and continue the work from it. It was written by ${self ? 'you, in your previous conversation' : from.name}.` }
     // The sessions are linked with the launch's conversation as it is recorded (#782: Codex names it only with its first
     // prompt, which a question at start can hold off for minutes), never by a wait here that could give up first.
     if (target) {
-      await this.delivery().now(projectPath, { ...nd, need: 'free' })
+      await this.delivery().now(projectPath, { ...nd, need: 'free' }, holds)
       if (fromSession) await this.linkHandover(projectPath, toAgentId, target.runId, fromSession)
-    } else await this.delivery().launch(projectPath, nd, (line) => this.start(projectPath, { agentId: toAgentId, prompt: line, ...(fromSession ? { handedOverFrom: fromSession } : {}), ...(self ? { keepWatch: true } : {}) }))
+    } else await this.delivery().launch(projectPath, nd, (line) => this.start(projectPath, { agentId: toAgentId, prompt: line, ...(fromSession ? { handedOverFrom: fromSession } : {}), ...(self ? { keepWatch: true } : {}), ...(allowed ? { allowed } : {}) }))
   }
 
   /**

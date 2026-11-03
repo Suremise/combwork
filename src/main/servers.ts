@@ -909,9 +909,10 @@ route('POST', '/v1/projects/:name/handover', async ({ params, body }) => {
   // To itself it ends its conversation (#1057): not while it works, merges or is on a running card loop's card.
   if (from === to && !(await sessions.handOverAllowed(p, from))) throw new HttpError(409, `${name(from)} is working, merging or on a card loop's card: its conversation isn't ended now. Hand it over when it has finished.`)
   const act: ActivityTarget = { kind: 'hand-over', project: basename(p), agent: { id: from, name: name(from) }, toAgent: { id: to, name: name(to) } }
-  const start = async (): Promise<void> => {
+  // `allowed`: the Assistant's guard, carried into the hand-over (HI-2420, HR1's round 1): checked before each of its steps.
+  const start = async (allowed?: () => void): Promise<void> => {
     // It can take minutes (the handover is written first): answer now, report failures in Hive.
-    void sessions.handOver(p, from, to, { handover }).catch((e) => {
+    void sessions.handOver(p, from, to, { handover, ...(allowed ? { allowed } : {}) }).catch((e) => {
       handOverFailedToast(p, name(to), e)
       if (own) assistant.record(own, act, `Hand over in ${basename(p)}`, (e as Error).message, { reason: publicReason(undefined) })
     })
@@ -926,10 +927,10 @@ route('POST', '/v1/projects/:name/handover', async ({ params, body }) => {
     for (const id of [from, to]) {
       if (sessions.userMayBeTyping(p, id)) throw new HttpError(409, `The user has just typed in ${name(id)}'s terminal and may still be writing there. Ask the user before handing over.`)
     }
-    // Its guard checked again as it is set off (HI-2420), synchronously after it. From there it runs on its own for
-    // minutes, reported in Hive, as the user's does: the change is the hand-over begun.
+    // Its guard checked as it is set off (HI-2420), and carried into it: the hand-over takes minutes, and each of its steps
+    // (asking for the handover, ending a conversation, giving or launching the target) checks it again.
     guard()
-    await start()
+    await start(guard)
     return {
       done: `Handing ${name(from)}'s work over to ${name(to)} in ${basename(p)}${handover ? '' : ' (from the latest handover)'}`,
       result: { ok: true, note: `Hive ${handover ? `asks ${name(from)} for a handover, waits until it exists, then ` : ''}starts ${name(to)} on it. Use hive_wait_for_agents to follow; problems show as notifications and in your actions.` }
