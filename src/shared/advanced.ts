@@ -187,7 +187,7 @@ export interface AdvancedDef {
   default: string | number | string[] | boolean
   /** A pattern's flags: part of the default, not of the value. */
   flags?: string
-  /** A `list` of folders (HI-2480): full paths (a %VARIABLE% at the start allowed), separated by semicolons, none at all allowed. */
+  /** A `list` of folders (HI-2480): full paths (a %VARIABLE% at the start allowed), separated by semicolons; none is the default, not a value. */
   paths?: boolean
   /** A `choice` value's choices, in the order Settings lists them. */
   choices?: readonly AdvancedChoice[]
@@ -3109,9 +3109,12 @@ export function checkAdvanced(def: AdvancedDef, raw: unknown): { value: string |
     }
     case 'list': {
       if (def.paths) {
-        // Folders (HI-2480): semicolons apart, as Windows lists paths (a comma can be in a folder's name); none is a value.
+        // Folders (HI-2480): semicolons apart, as Windows lists paths (a comma can be in a folder's name). An empty list is
+        // only the default as written ([]): text with no folder is refused, and Settings' empty box resets instead. A
+        // workspace's [] counts as Hive's list (extraFolders), as its emptied box does.
+        if (Array.isArray(raw) && !raw.length) return { value: [] }
         const folders = Array.isArray(raw) ? raw.map((x) => (typeof x === 'string' ? x.trim() : x)).filter((x) => x !== '') : typeof raw === 'string' ? raw.split(';').map((s) => s.trim()).filter(Boolean) : null
-        if (!folders || folders.length > (def.max ?? 10) || folders.some((x) => typeof x !== 'string' || x.length > MAX_FOLDER || !FOLDER.test(x))) return refused(withValues(NOT_TAKEN.folders, { title, most: String(def.max ?? 10) }))
+        if (!folders || !folders.length || folders.length > (def.max ?? 10) || folders.some((x) => typeof x !== 'string' || x.length > MAX_FOLDER || !FOLDER.test(x))) return refused(withValues(NOT_TAKEN.folders, { title, most: String(def.max ?? 10) }))
         return { value: folders as string[] }
       }
       const list = Array.isArray(raw) ? raw : typeof raw === 'string' ? raw.split(',').map((s) => s.trim()).filter(Boolean) : null

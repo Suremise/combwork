@@ -21,7 +21,7 @@ const store = await import('../src/main/boardStore')
 const att = await import('../src/main/cardAttachments')
 const { advanced } = await import('../src/main/advanced')
 const { planCleanup, planPurge } = await import('../src/shared/storage')
-const { CARD_ATTACHMENT_FOLDERS_ID, CARD_ATTACHMENT_MAX_ID, advancedDef, checkAdvanced } = await import('../src/shared/advanced')
+const { CARD_ATTACHMENT_FOLDERS_ID, CARD_ATTACHMENT_MAX_ID, advancedDef, advancedText, checkAdvanced } = await import('../src/shared/advanced')
 const { attachmentMarkdown, attachmentRefs, escapeLinkText, withAttachmentPaths, withStoredIds } = await import('../src/shared/cardAttachments')
 
 advanced.load(join(base, 'profile'))
@@ -379,6 +379,9 @@ describe('where a file may come from (HI-1700, s13 §2)', () => {
       await w.setAdvanced(CARD_ATTACHMENT_FOLDERS_ID, '%HIVE_NOT_SET_2480%\\x')
       expect(att.extraFolders(w)).toEqual([])
       await expect(att.attachableSource(w, agent, zip)).rejects.toThrow(/not a file that can be attached/)
+      // A workspace's [] (written by hand or the API) is Hive's list, as its emptied box in Settings is.
+      await w.setAdvanced(CARD_ATTACHMENT_FOLDERS_ID, [])
+      expect(att.extraFolders(w)).toEqual([root])
       await w.setAdvanced(CARD_ATTACHMENT_FOLDERS_ID, null)
       expect(att.extraFolders(w)).toEqual([root])
     } finally {
@@ -389,13 +392,17 @@ describe('where a file may come from (HI-1700, s13 §2)', () => {
     }
   })
 
-  it('more folders takes full paths, separated by semicolons, or none; anything else is refused, saying what it takes', async () => {
+  it('more folders takes full paths, separated by semicolons; anything else is refused, saying what it takes', async () => {
     const def = advancedDef(CARD_ATTACHMENT_FOLDERS_ID)!
     expect(def).toMatchObject({ kind: 'list', paths: true, default: [], workspace: true })
     expect(checkAdvanced(def, 'C:\\Evidence; D:/runs;\\\\server\\share\\x; %LOCALAPPDATA%\\combwork-cli')).toEqual({ value: ['C:\\Evidence', 'D:/runs', '\\\\server\\share\\x', '%LOCALAPPDATA%\\combwork-cli'] })
     expect(checkAdvanced(def, 'C:\\a, b\\c')).toEqual({ value: ['C:\\a, b\\c'] })
+    // As shown and read back (Settings' box joins a list of folders with "; "): every folder kept apart.
+    const two = ['C:\\Evidence, runs', 'D:\\Runs']
+    expect(checkAdvanced(def, advancedText(def, two))).toEqual({ value: two })
+    // Empty only as the default is written (HI-2480 round 2): text with no folder is refused (Settings' empty box resets).
     expect(checkAdvanced(def, [])).toEqual({ value: [] })
-    for (const bad of ['evidence', 'C:\\a; relative\\b', '..\\up', ['C:\\a', 3], Array.from({ length: 21 }, (_, i) => `C:\\f${i}`)]) {
+    for (const bad of ['evidence', 'C:\\a; relative\\b', '..\\up', ['C:\\a', 3], Array.from({ length: 21 }, (_, i) => `C:\\f${i}`), '', ' ; ', ['', ' ']]) {
       const r = checkAdvanced(def, bad)
       expect('error' in r && r.error, JSON.stringify(bad)).toBe('Card attachments: more folders takes up to 20 folders, each a full path (C:\\…, \\\\server\\…, or starting with a variable such as %LOCALAPPDATA%), separated by semicolons.')
     }

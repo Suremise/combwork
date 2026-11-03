@@ -192,7 +192,9 @@ function throughHive(real: string): { hive: string; next: string | undefined } |
 export const attachTestHooks: { temp: string | null } = { temp: null }
 
 export function extraFolders(ws: WorkspaceService): string[] {
-  const listed = advanced.get<string[]>(CARD_ATTACHMENT_FOLDERS_ID, ws.config?.advanced ?? null)
+  // A workspace's empty list is Hive's list, as Settings' emptied box for the workspace is (round 2: one meaning).
+  const own = advanced.get<string[]>(CARD_ATTACHMENT_FOLDERS_ID, ws.config?.advanced ?? null)
+  const listed = Array.isArray(own) && own.length ? own : advanced.get<string[]>(CARD_ATTACHMENT_FOLDERS_ID, null)
   if (!Array.isArray(listed)) return []
   const env = new Map(Object.entries(process.env).map(([k, v]) => [k.toLowerCase(), v]))
   return listed.flatMap((f) => {

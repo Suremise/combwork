@@ -273,7 +273,8 @@ function InboxAvailableNote() {
 
 /** The value's box: a switch, a number field, or text saved on Enter or leaving it (empty: back to the default, or Settings'). */
 function ValueBox({ def, value, label, placeholder, onCommit }: { def: AdvancedDef; value: unknown; label: string; placeholder?: string; onCommit: (v: unknown) => Promise<void> }) {
-  const shown = (v: unknown): string => (v === null || v === undefined ? '' : Array.isArray(v) ? v.join(', ') : String(v))
+  // A list of folders is written semicolons apart, as it is read back (HI-2480: a comma can be in a folder's name).
+  const shown = (v: unknown): string => (v === null || v === undefined ? '' : Array.isArray(v) ? v.join(def.paths ? '; ' : ', ') : String(v))
   const [draft, setDraft] = useState(shown(value))
   useEffect(() => setDraft(shown(value)), [value])
   // A workspace's own switch or choice (HI-2344): a select whose first option follows Settings' value (null, so no
