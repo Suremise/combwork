@@ -117,6 +117,9 @@ import { workspaceNotesFor } from './workspaceNotes'
 import { skillOff } from '../shared/skillDelivery'
 import { samePath } from '../shared/movePaths'
 import { GUIDANCE_REVISION, launchParts, launchRecord } from './guidance'
+import { say } from '../shared/agentText'
+import { inDefaultDialect } from '../shared/agentText/asyncScope'
+import { SESSION } from './sessionText'
 import { reportPlanUsage } from './planUsage'
 import { devConsole, sessionSourceId } from './devConsole'
 import { flightRecorder } from './flightRecorder'
@@ -658,9 +661,7 @@ function goAheadPrompt(cwd: string, goAheads: GoAhead[]): string {
     const paths = goAheads.filter((g) => (g.allowed !== undefined) === allowed).map((g) => g.path)
     if (!paths.length) continue
     const files = paths.map((p) => placeRelative(cwd, p) || basename(p)).join(', ')
-    const many = paths.length > 1
-    // i18n-ignore: typed to the agent (agent-facing text stays English)
-    said.push(allowed ? `The user allowed you to edit ${files} while the other agent works on ${many ? 'them' : 'it'}. Go ahead with the ${many ? 'edits' : 'edit'}.` : `The other agent has finished with ${files}, so Hive no longer asks the user about ${many ? 'them' : 'it'}. Try the ${many ? 'edits' : 'edit'} again.`)
+    said.push(say(allowed ? SESSION.lock.goAhead : SESSION.lock.claimEnded, { files, count: paths.length }))
   }
   return said.join(' ')
 }
@@ -1161,9 +1162,9 @@ const SIGN_IN_RECHECK_MS = 60_000
 const SIGNED_IN_AGAIN = msg({ id: 'session.status.signedInAgain', defaultMessage: 'Stopped while signed out', description: "An agent's status once its CLI is signed in again: its turn stopped while the CLI's sign-in had expired, and Resume carries it on." })
 /** What Resume (n) types into such an agent. */
 /** Hive's own deliveries come from it (#649). */
+// agent-protocol: the app's name, as a delivery's sender
 const HIVE_SENDER = { kind: 'hive', name: 'Hive' } as const // i18n-ignore: the sender's name in deliveries, which agents read
-// i18n-ignore: typed to the agent (agent-facing text stays English)
-const CARRY_ON_PROMPT = 'Your last turn stopped because your sign-in had expired. It is renewed now: carry on where you left off.'
+const CARRY_ON_PROMPT = SESSION.carryOn
 
 class SessionManager {
   private live = new Map<string, LiveSession>()
@@ -2625,8 +2626,8 @@ class SessionManager {
     l.newerThanTested = info.tested?.installed === 'newer'
     // What it was given: Hive's guidance revision and each skill as delivered (the Agent API's project status shows
     // them). A skill not delivered as asked (kept old copy, failed copy) leaves it needing a restart.
-    // i18n-ignore: what the Agent API's project status says of a skill (agent-facing text stays English)
-    const notGiven = Object.fromEntries(Object.entries(eff.skillProblems).map(([name, why]) => [name, { revision: null, problem: `nobody gets it: ${why}`, lasting: true as const }]))
+    // Stored with the launch record, for any reader: said in the Default (as guidance.ts's "it was not delivered").
+    const notGiven = Object.fromEntries(Object.entries(eff.skillProblems).map(([name, why]) => [name, { revision: null, problem: inDefaultDialect(() => say(SESSION.skillNotGiven, { why })), lasting: true as const }]))
     const record = launchRecord(eff.skillHashes, { ...delivered, ...notGiven })
     state.launchSignature = this.signature({ ...eff, skillHashes: record.settled })
     state.launched = { guidance: GUIDANCE_REVISION, skills: record.skills, ...(record.problems ? { problems: record.problems } : {}) }
@@ -4096,8 +4097,8 @@ class SessionManager {
         conversation: source.sessionId || null,
         kind: 'handover',
         from: HIVE_SENDER,
-        // i18n-ignore: typed to the agent (agent-facing text stays English)
-        body: `Please write a handover of this work with the hive_create_handover tool, so that ${self ? 'you can continue it in a new conversation' : `another agent (${to.name}) can continue it`}: the goal, what is done, decisions made and why, the current state, open problems and the next steps. Then stop.`,
+        // A delivery's body is stored: said in the Default until stored records are said when read (5b, 6b).
+        body: inDefaultDialect(() => say(SESSION.handover.ask, { self: self ? 'yes' : 'no', to: to.name })),
         need: 'free'
       }, holds)
       const t0 = Date.now()
@@ -4151,8 +4152,8 @@ class SessionManager {
     if (target && target.status !== 'ready' && target.status !== 'finished') throw hiveError(M.handOverBusy, { agent: to.name }, { kind: 'conflict' })
     // The caller's authority, after every await above (the handover's read, a conversation's end), before the target is given it.
     allowed?.()
-    // i18n-ignore: given to the agent (agent-facing text stays English)
-    const nd: NewDelivery = { agentId: toAgentId, agentName: to.name, kind: 'handover', from: HIVE_SENDER, body: `Read the handover "${handover}" with the hive_read_shared_note tool and continue the work from it. It was written by ${self ? 'you, in your previous conversation' : from.name}.` }
+    // A delivery's body is stored: said in the Default until stored records are said when read (5b, 6b).
+    const nd: NewDelivery = { agentId: toAgentId, agentName: to.name, kind: 'handover', from: HIVE_SENDER, body: inDefaultDialect(() => say(SESSION.handover.read, { handover, self: self ? 'yes' : 'no', from: from.name })) }
     // The sessions are linked with the launch's conversation as it is recorded (#782: Codex names it only with its first
     // prompt, which a question at start can hold off for minutes), never by a wait here that could give up first.
     if (target) {
@@ -5461,7 +5462,7 @@ class SessionManager {
     const st = stalled()
     if (!st) throw hiveError(msg({ id: 'session.carryOn.already', defaultMessage: 'It has already carried on.', description: 'Resume is refused for an agent whose turn a refused sign-in stopped: it carried on by itself meanwhile.' }), undefined, { kind: 'conflict' })
     // A control notice for this launch (#649), given now or not at all: never once it has carried on by itself.
-    await this.delivery().now(projectPath, { agentId, kind: 'control', from: HIVE_SENDER, body: CARRY_ON_PROMPT, source: 'carry-on', ref: st.runId, need: 'stalled', forRun: st.runId }, () => !!stalled())
+    await this.delivery().now(projectPath, { agentId, kind: 'control', from: HIVE_SENDER, body: inDefaultDialect(() => say(CARRY_ON_PROMPT)), source: 'carry-on', ref: st.runId, need: 'stalled', forRun: st.runId }, () => !!stalled())
   }
 
   /**
@@ -5505,6 +5506,7 @@ class SessionManager {
     if (workspace.isAssistantHome(st.projectPath)) return ASSISTANT_NAME
     const project = basename(st.projectPath)
     const count = workspaceOf(st.projectPath).info()?.projects.find((p) => p.path.toLowerCase() === st.projectPath.toLowerCase())?.agents.length ?? 1
+    // agent-protocol: a fallback name, never seen (every launch has its agent's name)
     return count > 1 ? `${project} · ${st.agentName ?? 'Agent'}` : project // i18n-ignore: a fallback name, never seen (every launch has its agent's name)
   }
 
@@ -5675,13 +5677,12 @@ class SessionManager {
       const holder = held && held.liveId !== id ? this.live.get(held.liveId) : undefined
       if (!holder || now - held!.at >= LOCK_TTL_MS) continue
       const rel = placeRelative(holder.state.cwd, abs) || basename(abs)
-      const who = holder.state.agentName ?? 'Another agent' // i18n-ignore: in the lock's replies to the agent (agent-facing)
+      const who = holder.state.agentName ?? say(SESSION.lock.anotherAgent)
       log.info(`Lock: ${userText(l.state.agentName)} → ${userText(rel)} held by ${userText(who)} (${mode})`)
       const block = { key: keys.get(abs)!, file: abs, holderLiveId: held!.liveId, holderRunId: holder.state.runId }
       if (mode === 'warn') {
         decided('warned', who)
-        // i18n-ignore: the lock's reply to the agent (agent-facing)
-        return this.editAccepted(id, files, l.adapter.lockReply({ kind: 'warn', context: `Note: ${who} is also editing ${rel} right now. Check the file's current content before changing it, and keep your edit small.` }), keys)
+        return this.editAccepted(id, files, l.adapter.lockReply({ kind: 'warn', context: say(SESSION.lock.warn, { holder: who, file: rel }) }), keys)
       }
       if (mode === 'ask' && !l.adapter.descriptor.capabilities.lockAsk) {
         // The CLI can't show its own approval for this, so Hive asks the user and the agent waits.
@@ -5705,13 +5706,12 @@ class SessionManager {
             { offer: `lock:${key}#${this.lockAsked.get(key)}` }
           )
         }
-        // i18n-ignore: the lock's reply to the agent (agent-facing)
-        const asked = `${who} is editing ${rel} right now (Hive file lock). Hive has asked the user whether you may edit it too. Stop and wait: don't work around this. When the user says go ahead, try the edit again.`
+        const asked = say(SESSION.lock.asked, { holder: who, file: rel })
         decided('asked', asked, { ...block, kind: 'asked' })
         return l.adapter.lockReply({ kind: 'deny', reason: asked })
       }
-      // i18n-ignore: the lock's reply to the agent, or its CLI's own question (agent- and CLI-facing)
-      const reason = `${who} is editing ${rel} right now (Hive file lock). Work on something else, or wait until ${who} has finished its task, then try again.`
+      // The lock's reply to the agent, or its CLI's own question.
+      const reason = say(SESSION.lock.blocked, { holder: who, file: rel })
       decided(mode === 'ask' ? 'asked' : 'blocked', reason, { ...block, kind: mode === 'ask' ? 'asked' : 'blocked' })
       return l.adapter.lockReply({ kind: mode === 'ask' ? 'ask' : 'deny', reason })
     }
@@ -5930,8 +5930,8 @@ class SessionManager {
       }
     // Its delivery, if it was given one, no longer holds: cancelled now, rather than at its next try.
     const l = this.live.get(id)
-    // i18n-ignore: a delivery's record, which agents and the log read
-    if (had && l) void this.deliveries?.cancel(l.state.projectPath, 'go-ahead', l.state.runId, 'cancelled: the go-ahead was dropped').catch(() => undefined)
+    // A delivery's record, which agents and the log read: stored, said in the Default.
+    if (had && l) void this.deliveries?.cancel(l.state.projectPath, 'go-ahead', l.state.runId, inDefaultDialect(() => say(SESSION.lock.goAheadDropped))).catch(() => undefined)
   }
 
   private publishLocks(id: string): void {
@@ -6833,7 +6833,7 @@ class SessionManager {
       }
       const assistant = workspace.isAssistantHome(projectPath)
       // i18n-ignore: a fallback name, never seen (every agent that finishes has its name)
-      this.finishes.add({ projectPath, project: assistant ? ASSISTANT_NAME : basename(projectPath), agent: assistant ? ASSISTANT_NAME : (agentName ?? 'Agent'), ...(agentId ? { agentId } : {}), title, apiTitle, body })
+      this.finishes.add({ projectPath, project: assistant ? ASSISTANT_NAME : basename(projectPath), agent: assistant ? ASSISTANT_NAME : (agentName ?? 'Agent'), ...(agentId ? { agentId } : {}), title, apiTitle, body }) // agent-protocol: a fallback name, never seen
       return
     }
     this.deliver(projectPath, title, body, notifyKind, agentId, agentName, apiTitle, action && { label: shownText(action.label), command: action.command, ...(action.args ? { args: action.args } : {}) })
@@ -7744,7 +7744,8 @@ class SessionManager {
   async bulk(projectPath: string, action: SessionBulkAction, sessionIds: string[]): Promise<SessionBulkResult> {
     projectPath = workspace.assertSessionHost(projectPath)
     // i18n-ignore: refusals no person sees (the window sends only these)
-    if (action !== 'archive' && action !== 'unarchive' && action !== 'delete') throw new Error(`Unknown action: ${String(action)}`)
+    if (action !== 'archive' && action !== 'unarchive' && action !== 'delete') throw new Error(`Unknown action: ${String(action)}`) // agent-protocol: a programming error nobody sees
+    // agent-protocol: a programming error no person or agent sees (the window sends a list)
     if (!Array.isArray(sessionIds)) throw new Error('sessionIds: a list of session ids') // i18n-ignore: a refusal no person sees (the window sends a list)
     const ids = [...new Set(sessionIds)]
     // Hive's own sessions, read once for the whole action (#1659), not once for each.
@@ -8122,7 +8123,8 @@ class SessionManager {
       ...(sub ? { sub } : {}),
       id: sessionId,
       agent: provider,
-      name: usage?.title ?? `Adopted session ${sessionId.slice(0, 8)}`, // i18n-ignore: a session's stored name, which agents read and the user can rename
+      // A session's stored name, which agents read and the user can rename: said in the Default.
+      name: usage?.title ?? inDefaultDialect(() => say(SESSION.adopted, { id: sessionId.slice(0, 8) })),
       titleAtRename: usage?.customTitle ?? null,
       createdAt: usage?.firstActivity ?? new Date().toISOString(),
       lastActiveAt: usage?.lastActivity ?? new Date().toISOString(),

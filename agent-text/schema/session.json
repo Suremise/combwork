@@ -1,0 +1,64 @@
+{
+  "session.adopted": {
+    "placeholders": {
+      "id": "plain"
+    }
+  },
+  "session.carryOn": {
+    "placeholders": {}
+  },
+  "session.handover.ask": {
+    "placeholders": {
+      "self": "select",
+      "to": "plain"
+    }
+  },
+  "session.handover.read": {
+    "placeholders": {
+      "handover": "plain",
+      "self": "select",
+      "from": "plain"
+    }
+  },
+  "session.lock.anotherAgent": {
+    "placeholders": {}
+  },
+  "session.lock.asked": {
+    "placeholders": {
+      "holder": "plain",
+      "file": "plain"
+    }
+  },
+  "session.lock.blocked": {
+    "placeholders": {
+      "holder": "plain",
+      "file": "plain"
+    }
+  },
+  "session.lock.claimEnded": {
+    "placeholders": {
+      "files": "plain",
+      "count": "plural"
+    }
+  },
+  "session.lock.goAhead": {
+    "placeholders": {
+      "files": "plain",
+      "count": "plural"
+    }
+  },
+  "session.lock.goAheadDropped": {
+    "placeholders": {}
+  },
+  "session.lock.warn": {
+    "placeholders": {
+      "holder": "plain",
+      "file": "plain"
+    }
+  },
+  "session.skillNotGiven": {
+    "placeholders": {
+      "why": "plain"
+    }
+  }
+}
