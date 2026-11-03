@@ -323,8 +323,9 @@ same code while every required check still runs:
   phase of five merges took hours) and was the load Hive crashed under (#988). Every card has already passed review
   with its focused suites, which its reviewer checked. A pre-merge run still goes first in the slot queue (#558). A
   real suite skipped for the environment doesn't block a merge, but the record says so and the reviewer decides
-  whether it must run again first. The full unit run (`npm test`, about 7 minutes) is a release's final checks, and
-  on request; CI runs only the unit tests.
+  whether it must run again first. The full unit run (`npm test`, about 7 minutes) is a release's checks, and on
+  request, never a card's while building (AGENTS.md, Tests per card: no builder or reviewer runs or asks for it); CI
+  runs only the unit tests.
 - **The full set runs at checkpoints**: `npm run e2e -- --all --build --record` **on the integration branch when the
   lanes go quiet** (a phase's end, overnight with the load capped, before a long pause; a failure is carded at once and
   bisected over the merge commits since the last full run), for **every RC and release** (RELEASING.md, with the real
@@ -332,8 +333,9 @@ same code while every required check still runs:
   (`--all --only-real`) **after updating Claude Code or Codex**. `--affected` (below) stays a tool for picking the
   suites a change needs, such as a review round's fixes, and isn't any merge's gate.
 - **A flake fix, or a change to a suite's waits**, is proven by focused repeats under load (the `investigate-flake`
-  skill): the suite with its neighbours (its area's suites in `affected.mjs`, filling the four jobs) five times,
-  `npm run e2e -- <suite> <neighbours> --build --record --repeat 5`. The full-set check is the next quiet-time or
+  skill): the suite with its neighbours (its area's suites in `affected.mjs`, filling the four jobs) three times,
+  `npm run e2e -- <suite> <neighbours> --build --record --repeat 3` (at most 2 spinner workers; a flake seen only
+  under a full run's load waits for the release window unless it blocks merges: AGENTS.md, Tests per card). The full-set check is the next quiet-time or
   release run (above), not the card's or the merge's; the full set repeated (`--all --repeat 5`) runs only when the
   user asks: it holds a heavy slot for over an hour while other lanes queue, and under that load it fails on their
   flakes (a failure in another lane's suite is a card of its own, not a reason to fail the fix).
