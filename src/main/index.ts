@@ -484,19 +484,31 @@ function ask(e: HiveWindow, req: { sessions: QuitSession[]; unsaved: string[]; s
   })
 }
 
-async function requestQuit(opts: { force?: boolean } = {}): Promise<void> {
+/**
+ * Quitting, asking first as Confirm on quit and unsaved files say. `intent` is Restart and Update's ('update') or
+ * Restart Hive's ('restart'): it belongs to this request only (HI-2427), set for the quit once it goes ahead.
+ */
+async function requestQuit(opts: { force?: boolean; intent?: 'update' | 'restart' } = {}): Promise<void> {
+  const forUpdate = opts.intent === 'update'
+  const forRelaunch = opts.intent === 'restart'
+  // A quit under way, or waiting for its agents: it goes ahead with this request's install or restart too (cancelling
+  // a waiting quit forgets it).
+  if (quitting || pendingQuit) {
+    installOnQuit ||= forUpdate
+    relaunchOnQuit ||= forRelaunch
+  }
   if (quitting) return
   // Already waiting to quit: asking again means "now", after the final look at unsaved files (HI-2336).
   if (pendingQuit) return finishPendingQuit()
   const asking = hiveWindows().find((e) => e.question)
   if (asking) {
-    // A dialog is already open: just bring it forward.
+    // A dialog is already open: just bring it forward. Its answer is about what it asked: this request's install or
+    // restart is dropped, never kept for a later quit (HI-2427); its notice keeps Restart and Update.
+    if (opts.intent) log.info(`${forUpdate ? 'Restart and Update' : 'Restart Hive'} while a question is open: brought it forward, not kept for a later quit`)
     showWindow(asking.win)
     return
   }
   // Only a quit that goes ahead from here on installs the update, or restarts; a cancelled one forgets it.
-  const forUpdate = installOnQuit
-  const forRelaunch = relaunchOnQuit
   installOnQuit = false
   relaunchOnQuit = false
   const live = sessions.liveStates()
@@ -1222,10 +1234,7 @@ app.whenReady().then(async () => {
   usageHistory.start()
   registerIpc(appInfo, {
     quit: () => void requestQuit(),
-    restart: () => {
-      relaunchOnQuit = true
-      void requestQuit()
-    },
+    restart: () => void requestQuit({ intent: 'restart' }),
     decide: (from, choice, dontAskAgain) => {
       const e = hiveWindows().find((x) => x.win === from)
       if (dontAskAgain && (choice === 'now' || choice === 'wait') && e?.question?.scope === 'app') config.updateSettings({ general: { confirmOnQuit: 'never' } })
@@ -1305,10 +1314,7 @@ app.whenReady().then(async () => {
     if (e.type === 'session-exit') void endExitedReviews(e.projectPath, e.agentId)?.catch((err) => log.warn('ending the reviews of a session that ended', err))
   })
   initUpdater({
-    restart: () => {
-      installOnQuit = true
-      void requestQuit()
-    }
+    restart: () => void requestQuit({ intent: 'update' })
   })
   void providerService.refresh()
   void checkGit()

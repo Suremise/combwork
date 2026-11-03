@@ -1873,7 +1873,7 @@ Under **Hive**, seven more switches cover what Hive does with a pane's keys and 
 Hive keeps itself up to date from its GitHub releases. By default it checks shortly after starting and every six hours, downloads a new version in the background, and installs it the next time you quit Hive — it never restarts on its own, so your agents are never interrupted.
 
 - While a new version downloads, the status bar shows the progress; when it's ready it says **Restart to update to X.Y.Z**. Click it to see what's new.
-- **Restart and Update** (in that dialog, the notification or the tray menu) closes Hive, installs the update and opens Hive again. If agents are working, Hive asks first, and you can let them finish; cancel, and the notification keeps its button for later. Stopped sessions can be resumed as usual.
+- **Restart and Update** (in that dialog, the notification or the tray menu) closes Hive, installs the update and opens Hive again. If agents are working, Hive asks first, and you can let them finish; cancel, and the notification keeps its button for later. Chosen while Hive's quit dialog is already open, it only brings that dialog forward: choose it again once the dialog is closed. Stopped sessions can be resumed as usual.
 - **Skip This Version** stops Hive offering that version; the next one is offered as normal.
 - **Hive is now Hive Desktop** (0.5.0). The update renames the Start menu and desktop shortcuts and the entry in **Installed apps** to **Hive Desktop**. Nothing else moves: Hive stays installed in `%LOCALAPPDATA%\Programs\Hive` as `Hive.exe`, and your settings and conversations stay in `%APPDATA%\Hive`. A taskbar pin keeps working.
 - **Help → Check for Updates…** checks straight away and tells you the result.

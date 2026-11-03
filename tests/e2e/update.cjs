@@ -247,12 +247,21 @@ const log = (profile) => { try { return fs.readFileSync(path.join(scratch, profi
   check('#1647: quitting asks first (an agent is running)', await waitFor(async () => (await page.locator('.dialog', { hasText: 'Quit Hive?' }).count()) === 1, HUNG_MS))
   await page.locator('.dialog button', { hasText: 'Cancel' }).click()
   check('#1647: a cancelled quit installs nothing, and Hive goes on', await waitFor(async () => (await inv('app:quitState')).request === null, HUNG_MS) && !/would install/.test(log('upd-g')) && (await inv('session:live')).length === 1)
+  // HI-2427: Restart and Update while an ordinary quit's dialog waits only brings that dialog forward; Cancel there
+  // leaves no install or restart for the next quit, the one below that goes ahead (it installs on quit, never "and
+  // restart").
+  await inv('app:quit')
+  await waitFor(async () => (await page.locator('.dialog', { hasText: 'Quit Hive?' }).count()) === 1, HUNG_MS)
+  await inv('update:install', '9.1.1')
+  check('HI-2427: Restart and Update during an open quit dialog asks nothing more', await waitFor(async () => /Restart and Update while a question is open/.test(log('upd-g')), HUNG_MS) && (await page.locator('.dialog', { hasText: 'Quit Hive?' }).count()) === 1)
+  await page.locator('.dialog button', { hasText: 'Cancel' }).click()
+  check('HI-2427: cancelled, nothing installs and Hive goes on', await waitFor(async () => (await inv('app:quitState')).request === null, HUNG_MS) && !/would install/.test(log('upd-g')) && (await inv('session:live')).length === 1)
   const exitedG = exits(app)
   await inv('app:quit')
   await waitFor(async () => (await page.locator('.dialog', { hasText: 'Quit Hive?' }).count()) === 1, HUNG_MS)
   await inv('app:quitDecision', 'now', false).catch(() => undefined)
   await exitedG()
-  check('#1647: the quit that goes ahead installs it over the older copy (test mode: no install)', /Test mode: would install 9.1.1 \(on quit\)/.test(log('upd-g')), log('upd-g').split('\n').filter((l) => /updates\]|exit\]/.test(l)).slice(-5).join(' | '))
+  check('#1647, HI-2427: the quit that goes ahead installs it over the older copy, on quit only (test mode: no install)', /Test mode: would install 9.1.1 \(on quit\)/.test(log('upd-g')) && !/would install 9.1.1 and restart/.test(log('upd-g')), log('upd-g').split('\n').filter((l) => /updates\]|exit\]/.test(l)).slice(-5).join(' | '))
 
   server.close()
   // The download cache is outside hive-test (no housekeeping there), so it goes, but never at the cost of a suite whose
