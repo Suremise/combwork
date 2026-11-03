@@ -1392,7 +1392,7 @@
     "description": "An advanced setting's title (Settings → Advanced, under GitHub Copilot): the footer Copilot shows in a mode. {mode} is the mode's name."
   },
   "settings.advanced.data.desc": {
-    "defaultMessage": "Hive keeps its settings in %APPDATA%\\Hive\\config.json.",
+    "defaultMessage": "Hive keeps its settings in %APPDATA%\\Combwork\\config.json.",
     "description": "What the setting \"Settings file\" does, under its title (Settings → Advanced)."
   },
   "settings.advanced.data.tip": {
@@ -2480,7 +2480,7 @@
     "description": "What the setting \"Access token\" does, under its title (Settings → Agent API)."
   },
   "settings.agentApi.token.tip": {
-    "defaultMessage": "Stored in %APPDATA%\\Hive\\agent-api.json, for your own scripts. Agents never get it: each session gets a token of its own, in the file that HIVE_API_TOKEN_FILE names.",
+    "defaultMessage": "Stored in %APPDATA%\\Combwork\\agent-api.json, for your own scripts. Agents never get it: each session gets a token of its own, in the file that HIVE_API_TOKEN_FILE names.",
     "description": "The info tip of the setting \"Access token\" (Settings → Agent API): more on what it does and when it applies. HIVE_API_TOKEN_FILE is an environment variable name: keep it as it is."
   },
   "settings.agentApi.token.title": {
@@ -2492,7 +2492,7 @@
     "description": "What the setting \"Viewer tokens\" does, under its title (Settings → Agent API)."
   },
   "settings.agentApi.viewers.tip": {
-    "defaultMessage": "Name each one for its app. Stored in %APPDATA%\\Hive\\agent-api-viewers.json. Revoking one cuts its app off at once. Apps find a running Hive by %APPDATA%\\Hive\\agent-api-discovery.json (the address, no token).",
+    "defaultMessage": "Name each one for its app. Stored in %APPDATA%\\Combwork\\agent-api-viewers.json. Revoking one cuts its app off at once. Apps find a running Hive by %APPDATA%\\Combwork\\agent-api-discovery.json (the address, no token).",
     "description": "The info tip of the setting \"Viewer tokens\" (Settings → Agent API): more on what it does and when it applies."
   },
   "settings.agentApi.viewers.title": {

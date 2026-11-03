@@ -2,7 +2,7 @@ import { readFileSync } from 'fs'
 import { createRequire } from 'module'
 import { load } from 'js-yaml'
 import { describe, expect, it } from 'vitest'
-import { APP_NAME, DEV_APP_NAME, appName, profileFolder } from '../src/shared/appName'
+import { APP_NAME, DEV_APP_NAME, appName, legacyProfileFolder, profileFolder } from '../src/shared/appName'
 import { RELEASES_REPO } from '../src/shared/defaults'
 
 // #443: the app is displayed as "Hive Desktop", and nothing users have stored moves. These pin the names Windows and
@@ -33,10 +33,15 @@ describe('the app name (#443)', () => {
     expect(pkg.name).toBe('hive')
   })
 
-  it('keeps the profile folders %APPDATA%\\Hive and Hive-Dev, set in main rather than taken from productName', () => {
-    expect(profileFolder(true)).toBe('Hive')
-    expect(profileFolder(false)).toBe('Hive-Dev')
-    expect(read('src/main/index.ts')).toMatch(/else app\.setPath\('userData', join\(app\.getPath\('appData'\), profileFolder\(app\.isPackaged\)\)\)/)
+  it("names the profile folders Combwork and Combwork-Dev (HI-2461), Hive's and Hive-Dev's the fallback, set in main rather than taken from productName", () => {
+    expect(profileFolder(true)).toBe('Combwork')
+    expect(profileFolder(false)).toBe('Combwork-Dev')
+    expect(legacyProfileFolder(true)).toBe('Hive')
+    expect(legacyProfileFolder(false)).toBe('Hive-Dev')
+    const index = read('src/main/index.ts')
+    expect(index).toContain('chooseProfile(roamingParent, legacyProfileFolder(packaged), profileFolder(packaged))')
+    expect(index).toContain("else chooseProfiles(app.getPath('appData'), process.env.LOCALAPPDATA || join(app.getPath('home'), 'AppData', 'Local'), app.isPackaged)")
+    expect(index).toContain("app.setPath('userData', roaming.use)")
   })
 
   it('keeps the install folder %LOCALAPPDATA%\\Programs\\Hive, as electron-builder names it', () => {

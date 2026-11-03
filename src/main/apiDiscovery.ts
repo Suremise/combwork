@@ -8,7 +8,7 @@ const log = createLogger('api')
 
 /**
  * The discovery file (#620): how another app (Apiary) finds a running Hive's Agent API without reading Hive's private
- * config. `%APPDATA%\Hive\agent-api-discovery.json` (the profile's folder) holds the URL and port, never a token; Hive
+ * config. `%APPDATA%\Combwork\agent-api-discovery.json` (the profile's folder) holds the URL and port, never a token; Hive
  * writes it while the Agent API listens and removes it when the API stops listening or Hive quits. A file left by a
  * Hive that ended without quitting names a process that is gone: a client checks with GET /v1/health.
  */

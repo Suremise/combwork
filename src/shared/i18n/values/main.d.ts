@@ -251,6 +251,11 @@ interface HiveMessageValues {
   'main.plan.resetsOn': { when: string | number }
   'main.plan.used': { share: number; provider: string | number; window: string; hours: number; label: string | number }
   'main.plan.usedOn': { share: number; window: string; hours: number; label: string | number; connection: string | number }
+  'main.profileMove.fallbackBody': { n: number; folders: string | number }
+  'main.profileMove.fallbackBodyDev': { n: number; name: string | number; folders: string | number }
+  'main.profileMove.fallbackTitle': undefined
+  'main.profileMove.signInBody': { names: string | number; n: number }
+  'main.profileMove.signInTitle': { n: number }
   'main.quit.closed': undefined
   'main.quit.closedBody': { n: number }
   'main.quit.dialogTitle': undefined

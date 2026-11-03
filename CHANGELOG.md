@@ -2,6 +2,10 @@
 
 ## Unreleased
 
+### Changed
+
+- **Your data folders are now Combwork's** (HI-2461), part of the app's rename to Combwork: `%APPDATA%\Hive` becomes `%APPDATA%\Combwork`, and `%LOCALAPPDATA%\Hive` (accounts and their sign-ins) becomes `%LOCALAPPDATA%\Combwork`. The installer renames them while Hive is closed, with your settings, usage and logs. Until they are renamed, Hive keeps running from the old folders and a notice at start says so. After the move, a connection whose sign-in didn't carry across is named once, so you can sign in to it again.
+
 ### Fixed
 
 - **Why a viewer token can't be made is in your language** (HI-2459). Settings → Agent API → Viewer tokens said why it couldn't make one (no name, a name too long or already taken, too many tokens) in English whatever language Hive showed.

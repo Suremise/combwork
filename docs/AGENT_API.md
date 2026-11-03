@@ -15,8 +15,8 @@ There are two ways to use it:
 |---|---|
 | Base URL | `http://127.0.0.1:47821` (port configurable in **Settings → Agent API**) |
 | Auth | `Authorization: Bearer <token>` |
-| Token | Settings → Agent API → Access token, or `%APPDATA%\Hive\agent-api.json`; for an app that only shows Hive, a **viewer token** (below) |
-| Finding Hive | `%APPDATA%\Hive\agent-api-discovery.json`, while the API listens (below) |
+| Token | Settings → Agent API → Access token, or `%APPDATA%\Combwork\agent-api.json`; for an app that only shows Hive, a **viewer token** (below) |
+| Finding Hive | `%APPDATA%\Combwork\agent-api-discovery.json`, while the API listens (below) |
 | Format | JSON request and response bodies (`Content-Type: application/json`) |
 
 Sessions started from Hive receive these environment variables, so an agent can call the API with no configuration. An agent's token works like the workspace token, except on the task board, where it confines the agent to its own project's cards (see **Task board**):
@@ -35,13 +35,13 @@ Sessions started from Hive receive these environment variables, so an agent can 
 
 ### Viewer tokens and the discovery file
 
-An app that shows Hive, such as Apiary, reads it with a **viewer token**: read-only, for the whole workspace. The user makes one in **Settings → Agent API → Viewer tokens**, named for its app, and pastes it into the app once; revoking it there refuses its next request and ends its open event stream. Viewer tokens are kept in `%APPDATA%\Hive\agent-api-viewers.json`, never in a project.
+An app that shows Hive, such as Apiary, reads it with a **viewer token**: read-only, for the whole workspace. The user makes one in **Settings → Agent API → Viewer tokens**, named for its app, and pastes it into the app once; revoking it there refuses its next request and ends its open event stream. Viewer tokens are kept in `%APPDATA%\Combwork\agent-api-viewers.json`, never in a project.
 
 - A viewer sees what the workspace token sees: every `GET` route and the event stream (`GET /v1/events`), every project. `GET /v1/status` gives its `caller` as `{ "role": "viewer", "name": "Apiary", "scope": "workspace", "readOnly": true }`.
 - **Every other request is refused (403)**, before its body is read or its route looked up: every `POST`, `PUT`, `PATCH` and `DELETE`, including the waits (`POST /v1/tasks/wait`, `POST /v1/agents/wait`) and progress reports. It changes nothing.
 - It works while the Agent API is on, as the workspace token does.
 
-The **discovery file**, `agent-api-discovery.json` in Hive's profile (`%APPDATA%\Hive`; the development build's is `%APPDATA%\Hive-Dev`), tells another app where a running Hive's API is, without reading Hive's private `config.json`:
+The **discovery file**, `agent-api-discovery.json` in Hive's profile (`%APPDATA%\Combwork`; the development build's is `%APPDATA%\Combwork-Dev`; before 1.1, `Hive` and `Hive-Dev`), tells another app where a running Hive's API is, without reading Hive's private `config.json`:
 
 ```json
 { "app": "Hive", "version": "0.6.1", "api": 4, "url": "http://127.0.0.1:47821", "port": 47821, "pid": 12345, "startedAt": "2026-10-11T19:30:00.000Z", "note": "…" }

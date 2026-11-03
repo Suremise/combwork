@@ -1,5 +1,5 @@
 // Turns a developer console recording into a test fixture (#638): `npm run console-fixture -- <recording.jsonl> <fixture.json>`.
-// The recording is one Hive wrote (Developer Console → Record, in %APPDATA%\Hive\console-recordings), without text: one
+// The recording is one Hive wrote (Developer Console → Record, in %APPDATA%\Combwork\console-recordings), without text: one
 // with prompt and reply text is refused. The fixture keeps what the CLI sent and what Hive made of it (hooks, status
 // lines, transcript reads, terminal markers, launch and exit), in order, with every absolute path as "<path>", and the
 // CLI's and Hive's versions. Contract suites compare what a CLI sends now with it (tests/fixtures/console/README.md).

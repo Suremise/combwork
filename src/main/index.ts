@@ -36,7 +36,9 @@ import { handoversFor } from './notes'
 import { assistantInstructions } from './modes'
 import { ASSISTANT_NAME, assistantModeId } from '../shared/assistant'
 import { MARKED_LOG } from '../shared/redact'
-import { APP_NAME, DEV_APP_NAME, appName, profileFolder } from '../shared/appName'
+import { APP_NAME, DEV_APP_NAME, appName, legacyProfileFolder, profileFolder } from '../shared/appName'
+import { chooseProfile, choiceLine, setProfileChoices } from './profileFolders'
+import { startProfileNotices } from './profileNotices'
 import { PROVIDERS, dangerModes, labelList, projectProviderConfig, providerSettings } from '../shared/providers'
 import { projectAgents } from '../shared/defaults'
 import { setDateStyle } from '../shared/dates'
@@ -137,9 +139,26 @@ let quitting = false
 // Development builds use their own profile (and Agent API port, see servers.ts) so they can run
 // alongside the installed Hive — e.g. while developing Hive from a session inside Hive.
 // HIVE_USER_DATA overrides the profile folder for tests. The installed app's is set too: Electron would name it after
-// productName, "Hive Desktop", but users' settings and conversations are in %APPDATA%\Hive (#443).
-if (process.env.HIVE_USER_DATA) app.setPath('userData', process.env.HIVE_USER_DATA)
-else app.setPath('userData', join(app.getPath('appData'), profileFolder(app.isPackaged)))
+// productName. The profile folders are Combwork's (HI-2461), which the installer moves Hive's to (HI-2460); while
+// Combwork's isn't there, Hive's is used (profileFolders.ts: it only looks, never moves or deletes), and a notice says so.
+const profileLines: string[] = []
+const chooseProfiles = (roamingParent: string, localParent: string, packaged: boolean): void => {
+  const roaming = chooseProfile(roamingParent, legacyProfileFolder(packaged), profileFolder(packaged))
+  const local = chooseProfile(localParent, legacyProfileFolder(packaged), profileFolder(packaged))
+  setProfileChoices({ roaming, local })
+  for (const c of [roaming, local]) {
+    const line = choiceLine(c, userText)
+    if (line) profileLines.push(line)
+  }
+  app.setPath('userData', roaming.use)
+}
+// A test copy of the choice (unpackaged only): made in HIVE_TEST_PROFILE_CHOOSE's appdata and localappdata folders,
+// never the real ones, with a dev build's names.
+if (process.env.HIVE_USER_DATA && !app.isPackaged && process.env.HIVE_TEST_PROFILE_CHOOSE) {
+  const base = resolve(process.env.HIVE_TEST_PROFILE_CHOOSE)
+  chooseProfiles(join(base, 'appdata'), join(base, 'localappdata'), false)
+} else if (process.env.HIVE_USER_DATA) app.setPath('userData', process.env.HIVE_USER_DATA)
+else chooseProfiles(app.getPath('appData'), process.env.LOCALAPPDATA || join(app.getPath('home'), 'AppData', 'Local'), app.isPackaged)
 // Key masking as the profile's files say, before the first line is logged (HI-1855): strict only where a key may be.
 startCoverageEarly()
 // Every way out from here on is logged (#985).
@@ -969,6 +988,7 @@ app.whenReady().then(async () => {
   Menu.setApplicationMenu(null)
   // Says the log marks the user's own text (userText()), so Copy Diagnostics can tell this run's lines from older ones.
   log.info(`Hive ${app.getVersion()} starting (Electron ${process.versions.electron}; ${MARKED_LOG})`)
+  for (const line of profileLines) log.info(line)
   logCrashDumps()
   // The last run's marker (#984): still there, it ended without quitting; then this run's own.
   // The agents a restart or quit recorded (HI-1707), read first: the unexpected-close notice leaves those to it.
@@ -1287,12 +1307,14 @@ app.whenReady().then(async () => {
       void offerRestoredLeftovers().catch((e) => log.warn('offering what agents left running before Hive restarted', e))
       void tellUnexpectedClose().catch((e) => log.warn('telling Hive closed unexpectedly', e))
       void startRestartRecovery().catch((e) => log.warn('resuming the agents a restart recorded', e))
+      void startProfileNotices().catch((e) => log.warn('telling which profile folders Hive uses', e))
     }, 1500)
   })
   if (!first) {
     void offerRestoredLeftovers().catch((e) => log.warn('offering what agents left running before Hive restarted', e))
     void tellUnexpectedClose().catch((e) => log.warn('telling Hive closed unexpectedly', e))
     void startRestartRecovery().catch((e) => log.warn('resuming the agents a restart recorded', e))
+    void startProfileNotices().catch((e) => log.warn('telling which profile folders Hive uses', e))
   }
   createTray(() => lastFocused()?.win ?? null, {
     quit: () => void requestQuit(),
