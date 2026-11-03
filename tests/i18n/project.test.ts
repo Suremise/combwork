@@ -154,7 +154,7 @@ describe('the sentences once built by hand read as before, in English', () => {
   })
 
   it('the banners', () => {
-    expect(tr(m('project.banner.restartNeeded'), { many: 'yes', agent: 'One' })).toBe("Skills, MCP servers or settings changed since One's session started. Restart the session to apply them — the conversation continues.")
+    expect(tr(m('project.banner.restartNeeded'), { many: 'yes', agent: 'One' })).toBe("Skills, MCP servers, dialects or settings changed since One's session started. Restart the session to apply them — the conversation continues.")
     expect(tr(m('project.banner.dangerous'), { modes: 'Bypass', count: 1 })).toBe('Bypass is on in this project: the agent runs every command and edit without asking.')
   })
 
