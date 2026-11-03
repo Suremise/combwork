@@ -1625,25 +1625,33 @@ export class Workflow {
     return this.ok(card, 'review', 'review', { submission: sub.id, revision: sub.revision, base: sub.base, files: sub.files, ...focusedForReview(sub.focused) })
   }
 
-  /** The agents that may be reviewing now (cfg.reviewersPresent), read before a write: for an agent's start of a review only. */
-  private async reviewersPresent(actor: Actor): Promise<ReadonlyMap<string, string> | null> {
-    return agentOf(actor) && this.cfg.reviewersPresent && this.enforced() ? this.cfg.reviewersPresent().catch(() => null) : null
+  /**
+   * The agents that may be reviewing now (cfg.reviewersPresent), read before a write: for an agent's start of a review
+   * only (null: not checked). `unknown` when they couldn't be read (HR1's round 1): never taken for gone.
+   */
+  private async reviewersPresent(actor: Actor): Promise<ReadonlyMap<string, string> | 'unknown' | null> {
+    if (!agentOf(actor) || !this.cfg.reviewersPresent || !this.enforced()) return null
+    return this.cfg.reviewersPresent().catch(() => 'unknown' as const)
   }
 
   /**
    * HI-2487: another reviewer's review of the submission in progress refuses an agent's start of it (a stale wake once
    * took HI-2444's from HR2): one that started it, has given no verdict, and is still here (`present`). With G1b = 2, as
-   * many may review at once as there are passes still needed. The user's start takes a review over; with the rules off,
-   * or the agents present unread, nothing refuses.
+   * many may review at once as there are passes still needed. The user's own review in progress holds it too, and the
+   * user's start takes any over; with the rules off, nothing refuses. Who is present unread (`unknown`), a review that
+   * would hold it refuses as unknown (HR1's round 1: never taken for its reviewer gone).
    */
-  private reviewTaken(w: Write, submission: number, agent: string | null, present: ReadonlyMap<string, string> | null): GuardRefusal | null {
+  private reviewTaken(w: Write, submission: number, agent: string | null, present: ReadonlyMap<string, string> | 'unknown' | null): GuardRefusal | null {
     if (!agent || !present || !this.enforced()) return null
-    const others = reviewsInProgress(w.tx.facts(w.card.id), submission, (id) => present.has(id)).filter((x) => x.reviewer !== agent)
     const needed = Math.max(1, (w.ruleset?.options.reviewers ?? 1) - passingReviewers(w.state()).length)
+    const holding = (here: (id: string) => boolean) => reviewsInProgress(w.tx.facts(w.card.id), submission, here).filter((x) => x.reviewer !== agent)
+    if (present === 'unknown') return holding(() => true).length < needed ? null : { rule: 'platform.unknown', values: { card: w.card.key, what: workflowText(UNREADABLE.reviewers, { card: w.card.key }), rule: 'review.inProgress' } }
+    const others = holding((id) => present.has(id))
     if (others.length < needed) return null
     const first = others[0]
     const minutes = Math.max(0, Math.floor((Date.now() - Date.parse(first.since)) / 60_000)) || 0
-    return { rule: 'review.inProgress', values: { card: w.card.key, reviewer: present.get(first.reviewer) ?? first.reviewer, submission, minutes } }
+    const name = first.reviewer === 'user' ? 'the user' : (present.get(first.reviewer) ?? first.reviewer) // i18n-ignore: a name in a refusal's values, as agents read it
+    return { rule: 'review.inProgress', values: { card: w.card.key, reviewer: name, submission, minutes } }
   }
 
   /** verdict (§16.7.2): always recorded; a pass may finish, ask the user, or go stale at once if the head moved to another change. */

@@ -381,6 +381,7 @@ interface HiveMessageValues {
   'workflow.rule.move.doingNobody': undefined
   'workflow.rule.requeue.allowed': undefined
   'workflow.rule.review.decisionsReceived': undefined
+  'workflow.rule.review.inProgress': undefined
   'workflow.rule.review.notAuthor': undefined
   'workflow.rule.start.dependenciesIntegrated': undefined
   'workflow.rule.start.notBlocked': undefined
@@ -479,6 +480,7 @@ interface HiveMessageValues {
   'workflow.unreadable.pathOutside': { path: string | number }
   'workflow.unreadable.replay': { revision: string | number; onto: string | number }
   'workflow.unreadable.replayedFiles': undefined
+  'workflow.unreadable.reviewers': { card: string | number }
   'workflow.unreadable.revision': { revision: string | number }
   'workflow.unreadable.revisionIn': { folder: string | number }
   'workflow.unreadable.state': { folder: string | number }

@@ -131,8 +131,9 @@ export function submissionReviewers(facts: readonly { kind: string; seq: number;
 
 /**
  * The reviews of a submission in progress (HI-2487): each reviewer that started it (`ReviewStarted`) and has given it no
- * verdict since, among `present` (one of the project's agents with its session running; the user's never counts: it
- * takes a review over), with when it started, oldest first. A start again (a follow-up's, its own) keeps its first time.
+ * verdict since, with when it started, oldest first: the user's (HR1's round 1: a review the user took is the user's
+ * until its verdict), and an agent's among `present` (one of the project's agents with its session running). A start
+ * again (a follow-up's, its own) keeps its first time.
  */
 export function reviewsInProgress(facts: readonly { kind: string; seq: number; at?: string; data: unknown }[], submission: number, present: (id: string) => boolean): { reviewer: string; since: string }[] {
   const on = new Map<string, string>()
@@ -143,7 +144,7 @@ export function reviewsInProgress(facts: readonly { kind: string; seq: number; a
     if (f.kind === 'ReviewStarted' && !on.has(d.reviewer)) on.set(d.reviewer, f.at ?? '')
     else if (f.kind === 'Verdict' || f.kind === 'ReviewerReleased') on.delete(d.reviewer)
   }
-  return [...on].filter(([r]) => r !== 'user' && present(r)).map(([reviewer, since]) => ({ reviewer, since }))
+  return [...on].filter(([r]) => r === 'user' || present(r)).map(([reviewer, since]) => ({ reviewer, since }))
 }
 
 /** Who reviews a card now: its latest submission's reviewer with no verdict yet (submissionReviewers), else null. */

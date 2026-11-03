@@ -285,9 +285,10 @@ describe("the pool's choice (#1443)", () => {
     const f = (seq: number, kind: string, reviewer: string, at: string, submission = 5) => ({ seq, kind, at, data: { reviewer, submission } })
     const here = (id: string) => id !== 'gone'
     const facts = [f(6, 'ReviewerAssigned', 'R1', 't6'), f(7, 'ReviewStarted', 'R1', 't7'), f(8, 'ReviewStarted', 'R2', 't8'), f(9, 'ReviewStarted', 'R1', 't9'), f(10, 'ReviewStarted', 'gone', 't10'), f(11, 'ReviewStarted', 'user', 't11'), f(12, 'ReviewStarted', 'R3', 't12', 4)]
-    expect(reviewsInProgress(facts, 5, here)).toEqual([{ reviewer: 'R1', since: 't7' }, { reviewer: 'R2', since: 't8' }])
+    // The user's counts, always present (HR1's round 1: a review the user took is the user's until its verdict).
+    expect(reviewsInProgress(facts, 5, here)).toEqual([{ reviewer: 'R1', since: 't7' }, { reviewer: 'R2', since: 't8' }, { reviewer: 'user', since: 't11' }])
     // A verdict ends its reviewer's; one only given (not started) isn't in progress.
-    expect(reviewsInProgress([...facts, f(13, 'Verdict', 'R1', 't13')], 5, here)).toEqual([{ reviewer: 'R2', since: 't8' }])
+    expect(reviewsInProgress([...facts, f(13, 'Verdict', 'R1', 't13'), f(14, 'Verdict', 'user', 't14')], 5, here)).toEqual([{ reviewer: 'R2', since: 't8' }])
     expect(reviewsInProgress([f(6, 'ReviewerAssigned', 'R1', 't6')], 5, here)).toEqual([])
   })
 })

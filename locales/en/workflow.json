@@ -1519,6 +1519,10 @@
     "defaultMessage": "The reviewer has read every decision",
     "description": "A rule of the workflow, named where a move skips or can't check it (glossary 2.5: reviewer)."
   },
+  "workflow.rule.review.inProgress": {
+    "defaultMessage": "One reviewer at a time",
+    "description": "A rule of the workflow, named where a move can't check it (HI-2487): a reviewer agent doesn't start a review another reviewer is still doing; only the user takes one over."
+  },
   "workflow.rule.review.notAuthor": {
     "defaultMessage": "Nobody reviews their own work",
     "description": "A rule of the workflow, named where a move skips or can't check it (glossary 2.6: N2, G2)."
@@ -1910,6 +1914,10 @@
   "workflow.unreadable.replayedFiles": {
     "defaultMessage": "the files of the change applied again",
     "description": "What Hive couldn't read, the object of \"Hive couldn't read …\": the result of applying the change again on another commit, to tell whether two revisions are the same change."
+  },
+  "workflow.unreadable.reviewers": {
+    "defaultMessage": "whether the reviewers of {card} are still running",
+    "description": "What Hive couldn't read, the object of \"Hive couldn't read …\" (HI-2487): which of the agents reviewing the card are still in the project with their sessions running. {card} is a card key like AM-12."
   },
   "workflow.unreadable.revision": {
     "defaultMessage": "the revision {revision}",

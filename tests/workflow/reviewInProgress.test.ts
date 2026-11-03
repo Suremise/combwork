@@ -33,6 +33,39 @@ describe('a review in progress (HI-2487)', () => {
     expect(r.values).toMatchObject({ reviewer: 'R1', minutes: 0 })
     expect(r.message).toMatch(/^R1 is reviewing AM-\d+'s submission \d+, and has been for less than a minute\.$/)
     moved(await e.wf.startReview(card.key, 'user'))
+    // Then it is the user's (HR1's round 1): R1's start again, or R2's, is refused, naming the user.
+    expect(refusedBy(await e.wf.startReview(card.key, R1), 'review.inProgress').values).toMatchObject({ reviewer: 'the user' })
+    refusedBy(await e.wf.startReview(card.key, R2), 'review.inProgress')
+  })
+
+  it("the user's review first holds an agent's start, by start review and by a verdict that starts one", async () => {
+    const e = pair()
+    const card = await inReview(e)
+    moved(await e.wf.startReview(card.key, 'user'))
+    refusedBy(await e.wf.startReview(card.key, R1), 'review.inProgress')
+    refusedBy(await e.wf.verdict(card.key, R1, { pass: true, comment: 'ok', startReview: true }), 'review.inProgress')
+    expect(e.store.facts(card.id).filter((f) => f.kind === 'ReviewStarted')).toHaveLength(1)
+  })
+
+  it("who is present unread: a review in progress refuses as unknown, never taken for its reviewer gone; with none, the start goes on", async () => {
+    let fail = false
+    env = setup({ ...preset('git', 'pair'), preChecks: [], mergeChecks: [], finish: 'agentMerges' } as never, {
+      reviewersPresent: async () => {
+        if (fail) throw new Error('project config temporarily unreadable')
+        return new Map([['R1', 'R1'], ['R2', 'R2']])
+      }
+    })
+    const e = env
+    const card = await inReview(e)
+    fail = true
+    // Nobody reviewing yet: nothing to hold it.
+    moved(await e.wf.startReview(card.key, R1))
+    const r = refusedBy(await e.wf.startReview(card.key, R2), 'platform.unknown')
+    expect(r.message).toMatch(/couldn't read whether the reviewers of AM-\d+ are still running/)
+    refusedBy(await e.wf.verdict(card.key, R2, { pass: true, comment: 'ok', startReview: true }), 'platform.unknown')
+    expect(e.store.facts(card.id).filter((f) => f.kind === 'ReviewStarted')).toHaveLength(1)
+    // The user's takeover needs no presence.
+    moved(await e.wf.startReview(card.key, 'user'))
   })
 
   it('two reviewers per card: two review at once, a third is refused; a pass leaves room for one more only', async () => {

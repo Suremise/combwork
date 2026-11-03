@@ -185,8 +185,9 @@ describe('a card by intent (#1267)', () => {
       // a2's session stopped: the review is free again.
       running.delete('a2')
       expect(await refused(act(w, card, other, { kind: 'startReview' }))).toBeNull()
-      // The user's start always takes it over, a3's review running.
+      // The user's start always takes it over, a3's review running; then it is the user's, a3's start again refused (HR1's round 1).
       expect(await refused(act(w, card, user, { kind: 'startReview' }))).toBeNull()
+      expect(await refused(act(w, card, other, { kind: 'startReview' }))).toBe('review.inProgress')
       // With the rules off, nothing refuses it.
       running.add('a2')
       await advanced.set(ENFORCE, false)
