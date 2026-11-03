@@ -25,7 +25,7 @@ import { setReviewCopyWaitReason } from './cardStall'
 import { copiesFor, setReviewCopyHooks } from './copiesApp'
 import { COPY_TEXT, copiesDirOf, copyRefusalText, FIRST_WAIT_MS, type CopyLease, type CopyPool } from './copies'
 import { samePlace } from './fsutil'
-import { agentMsg, say } from '../shared/agentText'
+import { agentMsg, inDialectOf, say } from '../shared/agentText'
 import { createLogger, userText } from './logger'
 import { sessions } from './sessions'
 import { cardNamesOf, scopeOfHost } from './projectKeys'
@@ -48,6 +48,19 @@ export interface Reviewer {
 /** What a start review came to: a copy (its folder and revision), waiting for one, or none (why). */
 export type ReviewCopyAnswer = { is: 'ready'; copy: string; folder: string; revision: string } | { is: 'waiting'; why: string } | { is: 'none'; why: string }
 
+/**
+ * A reason as data (dialects, HI-2447): what it says is rendered when it is read, in its reader's scope, from what it
+ * holds (a refusal, a snapshot of the copies in use), never another reader's text. A wait is kept and read by others (a
+ * lane watch's stall, a later start), and a lease under way is shared by every start that waits on it.
+ */
+export type Reason = () => string
+
+/** A start's answer as kept and shared: its reasons still data. */
+type Answer = { is: 'ready'; copy: string; folder: string; revision: string } | { is: 'waiting'; why: Reason } | { is: 'none'; why: Reason }
+
+/** An answer for its reader, rendered in the reader's scope. */
+const shown = (a: Answer): ReviewCopyAnswer => (a.is === 'ready' ? a : { is: a.is, why: a.why() })
+
 /** A card's review as it is now, for one reviewer: whether its review is going, and the submission it reviews. */
 export interface ReviewNow {
   going: boolean
@@ -59,8 +72,8 @@ export interface ReviewCopyDeps {
   pool: () => Promise<CopyPool>
   /** The card's review now: whether `agent` (its id) has its review going on it, and the card's latest submission. */
   review: (card: number, agent: string) => Promise<ReviewNow>
-  /** Tells a reviewer that waited its copy is ready (its inbox). */
-  tell: (agent: Reviewer, card: number, text: string) => Promise<void>
+  /** Tells a reviewer that waited its copy is ready (its inbox): `text` is composed in the reviewer's own dialect. */
+  tell: (agent: Reviewer, card: number, text: () => string) => Promise<void>
   /** How the reviewer's texts name a card (HI-1661: its key); `#N` by default. */
   cardName?: (card: number) => string
   /** A line of the card's history, for the window. */
@@ -68,7 +81,7 @@ export interface ReviewCopyDeps {
   /** How long a start waits for a copy before replying that it waits (a first copy's setup takes minutes). */
   firstWaitMs?: number
   /** Why review copies are off now (a switch), read at each step; null while they are on. */
-  off: () => string | null
+  off: () => Reason | null
 }
 
 interface Waiting {
@@ -76,9 +89,10 @@ interface Waiting {
   agent: Reviewer
   revision: string
   submission: number
-  why: string
+  /** Why it waits, read by whoever asks (its reviewer's next start, a lane watch's stall). */
+  why: Reason
   /** A lease under way (its reset or setup), never two at once. */
-  leasing: Promise<ReviewCopyAnswer> | null
+  leasing: Promise<Answer> | null
   /** Whether it was told it waits: it is told again once it has a copy. */
   told: boolean
   /** When it began waiting (ms): a lane watch counts a wait past COPY_WAIT_STALL_MS as stalled (HI-1764). */
@@ -141,7 +155,7 @@ export class ReviewCopies {
 
   /** The reviews waiting for a copy now (cards and reviewers), since when (ms) and why. */
   waits(): { card: number; agent: string; name: string; since: number; why: string }[] {
-    return [...this.waiting.values()].map((w) => ({ card: w.card, agent: w.agent.id, name: w.agent.name, since: w.since, why: w.why }))
+    return [...this.waiting.values()].map((w) => ({ card: w.card, agent: w.agent.id, name: w.agent.name, since: w.since, why: w.why() }))
   }
 
   private mine(pool: CopyPool, card: number, agent: string): CopyLease[] {
@@ -154,7 +168,7 @@ export class ReviewCopies {
    */
   async start(card: number, agent: Reviewer): Promise<ReviewCopyAnswer> {
     const off = this.deps.off()
-    if (off) return { is: 'none', why: off }
+    if (off) return { is: 'none', why: off() }
     const now = await this.deps.review(card, agent.id)
     if (!now.going) return { is: 'none', why: say(T.notGoing) }
     if (!now.revision || now.submission === null) return { is: 'none', why: say(T.noRevision) }
@@ -174,39 +188,44 @@ export class ReviewCopies {
     }
     if (!w) {
       while (this.waiting.size >= MAX_WAITING) this.waiting.delete(this.waiting.keys().next().value!)
-      w = { card, agent, revision: now.revision, submission: now.submission, why: say(T.settingUp), leasing: null, told: false, since: Date.now() }
+      w = { card, agent, revision: now.revision, submission: now.submission, why: () => say(T.settingUp), leasing: null, told: false, since: Date.now() }
       this.waiting.set(k, w)
     }
     const leasing = this.attempt(w)
     let timer: NodeJS.Timeout | undefined
     const first = await Promise.race([leasing, new Promise<null>((r) => (timer = setTimeout(() => r(null), this.deps.firstWaitMs ?? FIRST_WAIT_MS)))])
     clearTimeout(timer)
-    if (first && first.is !== 'waiting') return first
+    if (first && first.is !== 'waiting') return shown(first)
     // Still leasing (a setup), or none free: it waits, said on the card once.
     if (!w.told && this.waiting.get(k) === w) {
       w.told = true
       await this.deps.note(card, storedText(HISTORY.reviewCopyWaiting, { agent: agent.name })).catch(() => undefined)
     }
-    return { is: 'waiting', why: first?.is === 'waiting' ? first.why : w.why }
+    return { is: 'waiting', why: (first?.is === 'waiting' ? first.why : w.why)() }
   }
 
   /** One try at leasing a waiting review's copy (never two at once): ready (and told, when it was told it waits), waiting, or none. */
-  private attempt(w: Waiting): Promise<ReviewCopyAnswer> {
+  private attempt(w: Waiting): Promise<Answer> {
     if (w.leasing) return w.leasing
     const k = key(w.card, w.agent.id)
-    const run = async (): Promise<ReviewCopyAnswer> => {
+    const run = async (): Promise<Answer> => {
       const pool = await this.deps.pool()
       const r = await pool.leaseCopy({ kind: 'review', card: w.card, revision: w.revision, agent: w.agent.id, ref: String(w.submission) })
       if (!r.ok) {
         const why = r.refusal.why
         if (why === 'noCopy' || why === 'stillInUse' || why === 'returned') {
           // Past Settings → Advanced's bound, what still uses the copy held back (copies.ts); before it, what holds each.
-          w.why = why === 'stillInUse' ? copyRefusalText(r.refusal) : copiesInUseText(pool.inUse(), (c) => this.named(c))
+          // Kept as data: what it says is its reader's (the copies in use as they are now, the minutes until now).
+          const refusal = r.refusal
+          const held = pool.inUse()
+          const at = Date.now()
+          w.why = why === 'stillInUse' ? () => copyRefusalText(refusal) : () => copiesInUseText(held, (c) => this.named(c), at)
           return { is: 'waiting', why: w.why }
         }
         if (this.waiting.get(k) === w) this.waiting.delete(k)
-        const none: ReviewCopyAnswer = { is: 'none', why: copyRefusalText(r.refusal) }
-        if (w.told) await this.deps.tell(w.agent, w.card, `${this.named(w.card)}: ${reviewCopyText(none)}`).catch(() => undefined)
+        const refusal = r.refusal
+        const none: Answer = { is: 'none', why: () => copyRefusalText(refusal) }
+        if (w.told) await this.deps.tell(w.agent, w.card, () => `${this.named(w.card)}: ${reviewCopyText(shown(none))}`).catch(() => undefined)
         return none
       }
       // Its review may have ended while the copy was set up, or review copies been turned off: returned, never handed over.
@@ -215,14 +234,14 @@ export class ReviewCopies {
       if (this.waiting.get(k) !== w || !still?.going || still.revision !== w.revision || off) {
         await pool.returnCopy(r.lease.id, off ? 'off' : 'abandoned')
         if (this.waiting.get(k) === w) this.waiting.delete(k)
-        const none: ReviewCopyAnswer = { is: 'none', why: off ?? say(T.ended) }
-        if (off && w.told) await this.deps.tell(w.agent, w.card, `${this.named(w.card)}: ${reviewCopyText(none)}`).catch(() => undefined)
+        const none: Answer = { is: 'none', why: off ?? (() => say(T.ended)) }
+        if (off && w.told) await this.deps.tell(w.agent, w.card, () => `${this.named(w.card)}: ${reviewCopyText(shown(none))}`).catch(() => undefined)
         return none
       }
       this.waiting.delete(k)
-      const got: ReviewCopyAnswer = { is: 'ready', copy: r.copy.name, folder: r.copy.folder, revision: w.revision }
+      const got: Answer = { is: 'ready', copy: r.copy.name, folder: r.copy.folder, revision: w.revision }
       await this.deps.note(w.card, storedText(HISTORY.reviewCopyLeased, { agent: w.agent.name, copy: r.copy.name, revision: w.revision.slice(0, 12) })).catch(() => undefined)
-      if (w.told) await this.deps.tell(w.agent, w.card, reviewCopyText(got, this.named(w.card))).catch((e) => log.warn(`Could not tell ${userText(w.agent.name)} its review copy is ready`, e))
+      if (w.told) await this.deps.tell(w.agent, w.card, () => reviewCopyText(shown(got), this.named(w.card))).catch((e) => log.warn(`Could not tell ${userText(w.agent.name)} its review copy is ready`, e))
       return got
     }
     const p = run().finally(() => {
@@ -240,7 +259,7 @@ export class ReviewCopies {
       // Turned off while it waited: dropped, and told (a lease under way is handled where it ends).
       if (off) {
         this.waiting.delete(k)
-        if (w.told) await this.deps.tell(w.agent, w.card, `${this.named(w.card)}: ${reviewCopyText({ is: 'none', why: off })}`).catch(() => undefined)
+        if (w.told) await this.deps.tell(w.agent, w.card, () => `${this.named(w.card)}: ${reviewCopyText({ is: 'none', why: off() })}`).catch(() => undefined)
         continue
       }
       const now = await this.deps.review(w.card, w.agent.id).catch(() => null)
@@ -315,11 +334,20 @@ export function reviewCopyWaitReason(c: { number: number; key?: string; column: 
 // Given to cardStall as this loads, rather than imported by it (HI-1785).
 setReviewCopyWaitReason(reviewCopyWaitReason)
 
-/** Why review copies are off now (agent-facing): either switch in Settings → Advanced. Null while both are on. */
-function reviewCopiesOff(): string | null {
-  if (advanced.get(COPIES_REVIEW) === false) return say(COPY_TEXT.off)
-  if (advanced.get<boolean>(WORKFLOW_ENFORCE) === false) return say(T.workflowOff)
+/** Why review copies are off now (agent-facing, said by its reader): either switch in Settings → Advanced. Null while both are on. */
+function reviewCopiesOff(): Reason | null {
+  if (advanced.get(COPIES_REVIEW) === false) return () => say(COPY_TEXT.off)
+  if (advanced.get<boolean>(WORKFLOW_ENFORCE) === false) return () => say(T.workflowOff)
   return null
+}
+
+/**
+ * A message to a reviewer about its review copy, in its inbox: composed in the reviewer's own dialect, as it is made in
+ * the background (the pools' look) as often as not, where no scope is open.
+ */
+export async function tellReviewer(projectPath: string, agent: Reviewer, card: number, text: () => string): Promise<void> {
+  // agent-protocol: the sender is the product's name, Hive
+  await leaveMessage(projectPath, agent.id, agent.name, { kind: 'hive', name: 'Hive' }, inDialectOf({ projectPath, agentId: agent.id }, text), card) // i18n-ignore: the sender's name agents read
 }
 
 /** A project's review copies in a workspace (made on first use, for the workspace's life). */
@@ -330,8 +358,7 @@ export function reviewCopiesFor(ws: WorkspaceService, projectPath: string): Revi
   const rc = new ReviewCopies({
     pool: () => copiesFor(ws, projectPath),
     review: (card, agent) => reviewOf(ws, projectPath, card, agent),
-    // agent-protocol: the sender is the product's name, Hive
-    tell: async (agent, card, text) => void (await leaveMessage(projectPath, agent.id, agent.name, { kind: 'hive', name: 'Hive' }, text, card)), // i18n-ignore: the sender's name agents read
+    tell: (agent, card, text) => tellReviewer(projectPath, agent, card, text),
     cardName: (card) => cardNamesOf(ws, scopeOfHost(projectPath))(card),
     note: async (card, text) => {
       const { noteOnCard } = await import('./tasks')
