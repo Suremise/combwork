@@ -2,6 +2,7 @@ import { basename, dirname, join, resolve } from 'path'
 import { writeFile } from 'original-fs/promises'
 import { randomBytes } from 'crypto'
 import { app } from 'electron'
+import { agentMsg, inDialectOf, say } from '../shared/agentText'
 import { ASSISTANT_AGENT_ID } from '../shared/assistant'
 import { HIVE_DIR } from '../shared/defaults'
 import {
@@ -139,9 +140,52 @@ export const overdueMs = (): number => {
 /** The run a delivery made for a launch is offered into until that launch has started (launchWith). */
 const LAUNCHING = 'launching'
 
-/** Why a delivery may repeat when it is offered once more (#649). */
-const AGAIN_RESTART = 'Hive restarted while offering it'
-const AGAIN_LAUNCH = 'its session ended or restarted before it was read'
+/**
+ * What Hive says of a delivery (agent text, HI-2437): why it may repeat when it is offered once more (#649, said to its
+ * agent with the doorbell), why it ended or went back (its `detail`, which its sender reads), and why one isn't made.
+ */
+const T = {
+  againRestart: agentMsg({ id: 'inbox.again.restart', text: 'Hive restarted while offering it', note: 'Why a delivery may repeat (#649), after the doorbell (inbox.offer.again): Hive stopped while it was being offered.' }),
+  againLaunch: agentMsg({ id: 'inbox.again.launch', text: 'its session ended or restarted before it was read', note: 'Why a delivery may repeat (#649), after the doorbell (inbox.offer.again), and in why it is uncertain (inbox.ended.uncertain).' }),
+  uncertainRestart: agentMsg({ id: 'inbox.ended.uncertainRestart', text: 'may not have reached it: Hive stopped while offering it', note: "Why a delivery is uncertain (#649), as its sender reads it: Hive stopped while it was being offered; it is offered once more." }),
+  uncertain: agentMsg({ id: 'inbox.ended.uncertain', text: 'may not have reached it: {why}', note: 'Why a delivery is uncertain (#649), as its sender reads it; it is offered once more. why: inbox.again.launch.' }),
+  notAcked: agentMsg({ id: 'inbox.ended.notAcked', text: 'received, never acked', note: 'Why a delivery expired, as its sender reads it: its agent read it and never acked it.' }),
+  replaced: agentMsg({ id: 'inbox.ended.replaced', text: 'replaced by a newer one', note: "Why a delivery was cancelled, as its sender reads it: an action's newer delivery replaced it." }),
+  cancelledBy: agentMsg({ id: 'inbox.ended.cancelledBy', text: 'cancelled by {by}', note: 'Why a delivery was cancelled, as its sender reads it. by: who cancelled it (the user, an agent by name).' }),
+  tooLongAgain: agentMsg({ id: 'inbox.ended.tooLong', text: 'cancelled: made again, it was too long to keep', note: 'Why a delivery was cancelled, as its sender reads it: made again from its source just before it was given, it was too long (#649).' }),
+  notWanted: agentMsg({ id: 'inbox.ended.notWanted', text: 'cancelled: no longer wanted', note: 'Why a delivery was cancelled, as its sender reads it: what made it (its producer) no longer wants it given (#649).' }),
+  doorbellLost: agentMsg({ id: 'inbox.ended.doorbellLost', text: 'its doorbell was lost before its CLI took it', note: 'Why a delivery waits again, as its sender reads it: the line typed into its agent was lost before its CLI took it; it rings once more.' }),
+  controlDown: agentMsg({ id: 'inbox.refused.controlDown', text: 'the user turned Settings → Assistant → Control down', note: "Why a delivery the Assistant left was refused, as its sender reads it: Control no longer lets it message agents." }),
+  assistantEnded: agentMsg({ id: 'inbox.refused.assistantEnded', text: "the Assistant's session that left it ended", note: 'Why a delivery the Assistant left was refused, as its sender reads it.' }),
+  noInbox: agentMsg({ id: 'inbox.refused.noInbox', text: '{name} has no inbox: turn on the Agent API', note: "Why an agent that can't read an inbox is given no delivery (#650's decision), as its sender sees it. name: the agent's name." }),
+  late: agentMsg({ id: 'inbox.expired.late', text: 'not received in time', note: 'Why a delivery expired, as its sender reads it: not read before its expiry.' }),
+  runEnded: agentMsg({ id: 'inbox.expired.sessionEnded', text: 'the session it was for has ended', note: 'Why a delivery for one launch of its agent expired, as its sender reads it.' }),
+  otherConversation: agentMsg({ id: 'inbox.expired.otherConversation', text: 'its agent is in another conversation now', note: "Why a delivery for one conversation of its agent expired, as its sender reads it." }),
+  staleGone: agentMsg({ id: 'inbox.stale.gone', text: '{card} is gone', note: "Why a delivery tied to a card's round is stale (#652), as its sender reads it. card: the card (HI-12)." }),
+  staleArchived: agentMsg({ id: 'inbox.stale.archived', text: '{card} was archived', note: "Why a delivery tied to a card's round is stale (#652). card: the card (HI-12)." }),
+  stalePassed: agentMsg({ id: 'inbox.stale.passed', text: '{card} passed review', note: "Why a delivery tied to a card's round is stale (#652). card: the card (HI-12)." }),
+  staleDone: agentMsg({ id: 'inbox.stale.done', text: '{card} is done', note: "Why a delivery tied to a card's round is stale (#652). card: the card (HI-12)." }),
+  staleLeft: agentMsg({ id: 'inbox.stale.left', text: '{card} left Doing and Review', note: "Why a delivery tied to a card's round is stale (#652). card: the card (HI-12)." }),
+  staleRound: agentMsg({ id: 'inbox.stale.round', text: '{card} is in round {round} now', note: "Why a delivery tied to a card's round is stale (#652): the card has moved to a later round. card: the card (HI-12); round: its round now." }),
+  roundUnread: agentMsg({ id: 'inbox.round.unreadable', text: "Hive couldn't read {card} now.", note: "Why a message tied to a card's round (#652) isn't made: the card can't be read now (its workspace closed). card: the card (HI-12)." }),
+  roundNoCard: agentMsg({ id: 'inbox.round.noCard', text: 'There is no card {card}.', note: "Why a message tied to a card's round (#652) isn't made. card: the card asked for (HI-12)." }),
+  roundStale: agentMsg({ id: 'inbox.round.notInRound', text: '{why}: a message tied to its round needs it in Doing or Review.', note: "Why a message tied to a card's round (#652) isn't made. why: why the card has no round under way (inbox.stale.*)." }),
+  notSent: agentMsg({ id: 'inbox.create.notSent', text: 'Not sent: {why}.', note: 'Why a delivery the Assistant left is refused when it is made. why: inbox.refused.controlDown or .assistantEnded.' }),
+  tooLong: agentMsg({ id: 'inbox.create.tooLong', text: 'It is too long to give an agent ({length} characters, at most {max}).', note: "Why a delivery isn't made: its text is too long. length: its length; max: the most a delivery holds." }),
+  badKey: agentMsg({ id: 'inbox.create.badKey', text: 'Not a delivery Hive can keep: its source or key is too long.', note: "Why a delivery isn't made: what names its producer is too long to keep." }),
+  projectFull: agentMsg({ id: 'inbox.create.projectFull', text: 'This project already has {max} deliveries waiting or not acked, the most Hive keeps.', note: "Why a delivery isn't made: its project has as many live deliveries as Hive keeps. max: that many." }),
+  full: agentMsg({ id: 'inbox.create.full', text: "This project's deliveries are full (what waits for its agents and isn't acked): wait until they are received and acked, or cancel some.", note: "Why a delivery isn't made: its project's deliveries are full (the file's budget)." }),
+  notSaved: agentMsg({ id: 'inbox.save.failed', text: "Hive couldn't save the deliveries ({error}): nothing changed.", note: 'Why a change to deliveries (a message, a read, an ack, a cancel) failed. error: why the save failed (inbox.save.tooMany, .dbReplaced, or a system error).' }),
+  tooMany: agentMsg({ id: 'inbox.save.tooMany', text: 'too many deliveries to keep in this project', note: "Why the deliveries couldn't be saved, in inbox.save.failed." }),
+  dbReplaced: agentMsg({ id: 'inbox.save.dbReplaced', text: "the workspace's database was replaced since these deliveries were read", note: "Why the deliveries couldn't be saved, in inbox.save.failed: an upgrade or a restore replaced the database." }),
+  readFailed: agentMsg({ id: 'inbox.load.failed', text: 'Could not read the deliveries ({error})', note: "Why a project's deliveries couldn't be read, from its file from before #1018. error: the system's error." }),
+  changed: agentMsg({ id: 'inbox.given.changed', text: 'what it was for changed meanwhile', note: "Why a delivery wanted now (a task, a handover's step) wasn't given: its caller no longer wants it." }),
+  notTyped: agentMsg({ id: 'inbox.given.notTyped', text: 'Hive could not type it', note: "Why a delivery wanted now (a task, a handover's step) wasn't given, when nothing more is known." })
+}
+
+/** A delivery wanted now that wasn't given: its detail's opening, which deliverNow takes off again to say why. */
+// agent-protocol: a fixed opening deliverNow strips from the detail (NotGiven says only why)
+const NOT_GIVEN = 'not given: '
 
 interface Store {
   host: string
@@ -370,7 +414,7 @@ function transactAfter<P, T>(store: Store, read: () => Promise<P>, plan: (d: Dra
         }
         // The caller's authority refused it (HI-2420): its own refusal, nothing saved.
         if (d.refused !== undefined) throw d.refused
-        throw new NotSaved(`Hive couldn't save the deliveries (${(e as Error).message}): nothing changed.`, { cause: e })
+        throw new NotSaved(say(T.notSaved, { error: (e as Error).message }), { cause: e })
       }
       const was = new Set(store.records)
       store.records = d.records
@@ -457,7 +501,7 @@ export function load(host: string): Promise<Store> {
       const store: Store = { host, place, records: read.records, next: read.next, invalid: read.invalid, lock: Promise.resolve(), offering: new Set(), confirming: new Map(), rungAgain: new Set(), launches: new Map(), hooks: new Map(), gen, base: read.base }
       // Restored before anything else sees it (a second load waits for this one).
       await transact(store, (d) => {
-        for (const r of [...d.records]) if (r.state === 'offered') set(store, d, r, 'uncertain', 'may not have reached it: Hive stopped while offering it', undefined, { again: AGAIN_RESTART })
+        for (const r of [...d.records]) if (r.state === 'offered') set(store, d, r, 'uncertain', say(T.uncertainRestart), undefined, { again: inDialectOf({ projectPath: store.host, agentId: r.agentId }, () => say(T.againRestart)) })
         recheck(store, d)
       }).catch((e) => log.warn('restoring deliveries', e))
       if (stores.has(k)) return stores.get(k)!
@@ -558,7 +602,7 @@ async function readFileOf(host: string): Promise<{ deliveries: unknown[]; next: 
     got = await readCapped(file, MAX_FILE_BYTES)
   } catch (e) {
     if ((e as NodeJS.ErrnoException).code === 'ENOENT') return null
-    throw new Error(`Could not read the deliveries (${(e as Error).message})`, { cause: e })
+    throw new Error(say(T.readFailed, { error: (e as Error).message }), { cause: e })
   }
   let data: { next?: unknown; deliveries?: unknown; invalid?: unknown } | null = null
   try {
@@ -619,12 +663,13 @@ async function save(store: Store, d: Draft): Promise<void> {
   }
   // What is written is what reads back (#649): one check, readDelivery's, for saving and restoring alike; a record it
   // wouldn't read back fails the save (nothing changes), never a delivery lost on the next start.
+  // agent-protocol: a mistake in Hive's code (a record it made that doesn't read back), for the log and its bug report
   for (const r of d.records) if (!readDelivery(JSON.parse(JSON.stringify(r)))) throw new Error(`delivery ${r.id} isn't one Hive could read back`)
   const text = fileText(d)
-  if (Buffer.byteLength(text) > MAX_FILE_BYTES) throw new Error('too many deliveries to keep in this project')
+  if (Buffer.byteLength(text) > MAX_FILE_BYTES) throw new Error(say(T.tooMany))
   // Read from a database since replaced (the upgrade to 1.0, a restore): never saved over what the file has now.
   const guard = (): void => {
-    if (store.gen !== dbGenerationAt(store.place.key)) throw new Error("the workspace's database was replaced since these deliveries were read") // i18n-ignore: a save refused for the log; the transaction's NotSaved says it
+    if (store.gen !== dbGenerationAt(store.place.key)) throw new Error(say(T.dbReplaced))
     try {
       d.commit?.()
     } catch (e) {
@@ -659,7 +704,7 @@ async function save(store: Store, d: Draft): Promise<void> {
 /** Ended deliveries beyond what is kept (per agent, by age) go; received ones never acked expire after a week. */
 function prune(store: Store, d: Draft): void {
   const now = Date.now()
-  for (const r of [...d.records]) if (r.state === 'received' && needsAck(r.kind) && now - Date.parse(r.received ?? r.created) > KEEP_RECEIVED_MS) set(store, d, r, 'expired', 'received, never acked')
+  for (const r of [...d.records]) if (r.state === 'received' && needsAck(r.kind) && now - Date.parse(r.received ?? r.created) > KEEP_RECEIVED_MS) set(store, d, r, 'expired', say(T.notAcked))
   const ended = new Map<string, DeliveryRecord[]>()
   for (const r of d.records) if (!isLive(r)) ended.set(r.agentId, [...(ended.get(r.agentId) ?? []), r])
   const drop = new Set<DeliveryRecord>()
@@ -707,6 +752,7 @@ function set(store: Store, d: Draft, r: DeliveryRecord, to: DeliveryState, detai
   put(d, r, out)
   if ((to === 'refused' || to === 'stale') && r.from.kind === 'assistant') {
     const ws = r.from.workspace
+    // agent-protocol: the Assistant's activity list in its panel (the window's, in English), not text for an agent
     d.after.push(() => assistant.record(ws, { kind: 'message-agent', project: basename(store.host), agent: { id: r.agentId, name: r.agentName ?? r.agentId }, ...(r.card ? { card: r.card } : {}) }, `A message for ${r.agentName ?? r.agentId} (${r.id}) was ${to === 'stale' ? 'dropped as stale' : 'refused'}`, detail ?? 'its sender may no longer send it', { reason: to === 'stale' ? 'Dropped as stale' : 'Refused' }))
   }
   if (to === 'refused' || to === 'expired' || to === 'cancelled' || to === 'uncertain' || to === 'stale') d.after.push(() => log.info(`Delivery ${r.id} for ${userText(r.agentName ?? r.agentId)} ${to}${detail ? `: ${userText(detail)}` : ''}`))
@@ -719,7 +765,7 @@ function set(store: Store, d: Draft, r: DeliveryRecord, to: DeliveryState, detai
   // taken, so its mark goes, in the launch it was offered into; a mark of another line's stays (round 1 finding).
   if ((to === 'received' || to === 'acked') && r.state === 'offered' && r.offerRun) {
     const run = r.offerRun
-    d.after.push(() => sessions.lineTaken(store.host, r.agentId, run, r.id, `${r.id}, which it rang for, was read`)) // i18n-ignore: for the log
+    d.after.push(() => sessions.lineTaken(store.host, r.agentId, run, r.id, `${r.id}, which it rang for, was read`)) // agent-protocol: for the log
   }
   else if (to === 'refused' || to === 'expired' || to === 'cancelled' || to === 'stale') tell(store, d, out, 'ended')
   return true
@@ -737,8 +783,8 @@ export const setClockForTests = (fn: (() => number) | null): void => {
 /** Why this sender may no longer send what it left (null: it may). Asked at every step: before it is offered, before each piece and Enter. */
 let senderRefusal = (from: DeliverySender): string | null => {
   if (from.kind !== 'assistant') return null
-  if (!assistant.allows('agents')) return 'the user turned Settings → Assistant → Control down'
-  if (sessions.liveFor(assistant.assistantHome(from.workspace), ASSISTANT_AGENT_ID)?.runId !== from.launch) return "the Assistant's session that left it ended"
+  if (!assistant.allows('agents')) return say(T.controlDown)
+  if (sessions.liveFor(assistant.assistantHome(from.workspace), ASSISTANT_AGENT_ID)?.runId !== from.launch) return say(T.assistantEnded)
   return null
 }
 /**
@@ -778,7 +824,7 @@ export const setInboxProjectForTests = (fn: ((host: string) => Promise<InboxProj
   inboxProject = fn ?? ownProject
 }
 /** Why an agent that can't read an inbox is given no delivery (#650's decision), as its sender sees it. */
-const noInbox = (name: string): string => `${name} has no inbox: turn on the Agent API`
+const noInbox = (name: string): string => say(T.noInbox, { name })
 /** A delivery refused because its agent can't read an inbox: the message says so, and what to do. */
 export class NoInbox extends Error {}
 /** For tests: whether agents can read their inbox (null: as the settings say). */
@@ -797,10 +843,10 @@ function whyNot(store: Store, r: DeliveryRecord): { to: 'refused' | 'expired'; w
   // Its agent can't read an inbox (the Agent API turned off since it was made): refused, never typed instead.
   if (!readsInbox(store.host, r.agentId)) return { to: 'refused', why: noInbox(r.agentName ?? r.agentId) }
   // Held by its team's pause (HI-2081): its time stands still while it is held, and is moved on at the resume.
-  if (Date.parse(r.expires) <= clock() && !pauseHeld(store, r)) return { to: 'expired', why: 'not received in time' }
+  if (Date.parse(r.expires) <= clock() && !pauseHeld(store, r)) return { to: 'expired', why: say(T.late) }
   const live = sessions.liveFor(store.host, r.agentId)
-  if (r.forRun && live?.runId !== r.forRun) return { to: 'expired', why: 'the session it was for has ended' }
-  if (r.conversation && live?.sessionId && live.sessionId !== r.conversation) return { to: 'expired', why: 'its agent is in another conversation now' }
+  if (r.forRun && live?.runId !== r.forRun) return { to: 'expired', why: say(T.runEnded) }
+  if (r.conversation && live?.sessionId && live.sessionId !== r.conversation) return { to: 'expired', why: say(T.otherConversation) }
   return null
 }
 
@@ -833,7 +879,7 @@ function recheck(store: Store, d: Draft, agentId?: string): void {
       // (load) finds one left like that, and makes it uncertain.
       if (run === LAUNCHING) continue
       if (run && sessions.liveFor(store.host, r.agentId)?.runId !== run) {
-        set(store, d, r, 'uncertain', `may not have reached it: ${AGAIN_LAUNCH}`, undefined, { again: AGAIN_LAUNCH })
+        set(store, d, r, 'uncertain', say(T.uncertain, { why: say(T.againLaunch) }), undefined, { again: inDialectOf({ projectPath: store.host, agentId: r.agentId }, () => say(T.againLaunch)) })
         continue
       }
     }
@@ -901,7 +947,7 @@ export function actionDelivered(host: string, action: number): boolean {
   const mine = (s: Store): boolean => s.place.workspace.toLowerCase() === resolve(ws.path!).toLowerCase()
   if ([...stores.values()].some((s) => mine(s) && s.records.some((r) => r.action === action))) return true
   try {
-    return !!workspaceDb(ws.path).reader.prepare('SELECT 1 FROM deliveries WHERE action = ?').get(action) // i18n-ignore: SQL
+    return !!workspaceDb(ws.path).reader.prepare('SELECT 1 FROM deliveries WHERE action = ?').get(action) // agent-protocol: SQL
   } catch {
     // A board waiting for its upgrade has no deliveries table: none made.
     return false
@@ -920,14 +966,14 @@ export async function createDelivery(host: string, nd: NewDelivery, hooks?: Deli
   const store = await load(host)
   const r = await transact(store, (d) => {
     const why = senderRefusal(nd.from)
-    if (why) throw new Error(`Not sent: ${why}.`)
+    if (why) throw new Error(say(T.notSent, { why }))
     // An action's delivery already made (two runs of it at once here): that one.
     const made = nd.action ? d.records.find((x) => x.action === nd.action) : undefined
     if (made) return made
     let had = nd.source && nd.ref !== undefined ? d.records.find((x) => x.source === nd.source && x.ref === nd.ref && x.agentId === nd.agentId && isWaiting(x)) : undefined
     // An action's own delivery: the one waiting is replaced by a new one (each action keeps its own row).
     if (had && nd.action && nd.replace) {
-      set(store, d, had, 'cancelled', 'replaced by a newer one')
+      set(store, d, had, 'cancelled', say(T.replaced))
       had = undefined
     }
     if (had) {
@@ -949,8 +995,8 @@ export async function createDelivery(host: string, nd: NewDelivery, hooks?: Deli
 /** A new delivery's checks before anything is read: refused (an Error) as createDelivery says; its meta and name as kept. */
 function checkedNew(host: string, nd: NewDelivery): { meta: DeliveryRecord['meta']; agentName: string | undefined } {
   // Only what reads back is saved (readDelivery's limits): a longer text is refused here, never lost on a restart.
-  if (nd.body.length > DELIVERY_BODY_MAX_CHARS) throw new Error(`It is too long to give an agent (${nd.body.length} characters, at most ${DELIVERY_BODY_MAX_CHARS}).`)
-  if ((nd.ref?.length ?? 0) > 300 || (nd.source?.length ?? 0) > 40) throw new Error('Not a delivery Hive can keep: its source or key is too long.')
+  if (nd.body.length > DELIVERY_BODY_MAX_CHARS) throw new Error(say(T.tooLong, { length: String(nd.body.length), max: String(DELIVERY_BODY_MAX_CHARS) }))
+  if ((nd.ref?.length ?? 0) > 300 || (nd.source?.length ?? 0) > 40) throw new Error(say(T.badKey))
   const meta = nd.meta && Object.fromEntries(Object.entries(nd.meta).slice(0, 20).map(([k, v]) => [k.slice(0, 40), typeof v === 'string' ? v.slice(0, 500) : v]))
   const agentName = nd.agentName?.slice(0, 300)
   // An agent that can't read an inbox is given none (#650's decision): refused now, with the reason its sender sees.
@@ -960,8 +1006,9 @@ function checkedNew(host: string, nd: NewDelivery): { meta: DeliveryRecord['meta
 
 /** A new delivery added to a draft, within its limits (how many wait, how many are live, the file's budget), or refused. */
 function addNew(d: Draft, nd: NewDelivery, meta: DeliveryRecord['meta'], agentName: string | undefined): DeliveryRecord {
+  // agent-protocol: for the log; its caller says it in its own words (agentMessages.ts)
   if (nd.maxWaiting !== undefined && d.records.filter((x) => x.agentId === nd.agentId && x.kind === nd.kind && isWaiting(x)).length >= nd.maxWaiting) throw new TooManyWaiting(`${nd.maxWaiting} already wait`)
-  if (d.records.filter(isLive).length >= MAX_LIVE_PER_HOST) throw new DeliveriesFull(`This project already has ${MAX_LIVE_PER_HOST} deliveries waiting or not acked, the most Hive keeps.`)
+  if (d.records.filter(isLive).length >= MAX_LIVE_PER_HOST) throw new DeliveriesFull(say(T.projectFull, { max: String(MAX_LIVE_PER_HOST) }))
   const seq = d.next++
   const rec: DeliveryRecord = {
     id: `m${seq}`,
@@ -988,7 +1035,7 @@ function addNew(d: Draft, nd: NewDelivery, meta: DeliveryRecord['meta'], agentNa
   d.records.push(rec)
   d.dirty = true
   // Within the file's budget (ended ones' history makes room first), or not made at all.
-  if (!makeRoom(d)) throw new DeliveriesFull("This project's deliveries are full (what waits for its agents and isn't acked): wait until they are received and acked, or cancel some.")
+  if (!makeRoom(d)) throw new DeliveriesFull(say(T.full))
   return rec
 }
 
@@ -1009,7 +1056,7 @@ export const setInLeaveForTests = (fn: (() => Promise<void> | void) | null): voi
  * replace, action, launch or hooks). Null: nothing saved, the workspace's upgrade to 1.0 waiting.
  */
 export async function leaveDelivery(host: string, nd: NewDelivery): Promise<DeliveryRecord | null> {
-  if (nd.replace || nd.action || nd.launching) throw new Error('A delivery left this way is a new one only') // i18n-ignore: a mistake in Hive's code, never shown
+  if (nd.replace || nd.action || nd.launching) throw new Error('A delivery left this way is a new one only') // agent-protocol: a mistake in Hive's code, never shown
   // The host where it really is now, and its workspace's place, recorded as it enters, before anything is awaited: a
   // junction removed or pointed elsewhere meanwhile redirects neither the write nor its reconciliation (#1395).
   const real = realPath(host)
@@ -1060,7 +1107,7 @@ function leftOnLease(host: string, place: HostPlace, nd: NewDelivery, meta: Deli
         const saved = saveDeliveryChanges(w, place.scope, { put: [rec as unknown as Record<string, unknown>], removed: read.records.filter((r) => !now.has(r.id)).map((r) => r.id), base: read.base })
         const to = saved.renamed.get(rec.id)
         if (to) Object.assign(rec, to)
-        const value = w.prepare("INSERT INTO store_meta (store, scope, key, value) VALUES ('deliveries', ?, ?, ?) ON CONFLICT(store, scope, key) DO UPDATE SET value = excluded.value") // i18n-ignore: SQL
+        const value = w.prepare("INSERT INTO store_meta (store, scope, key, value) VALUES ('deliveries', ?, ?, ?) ON CONFLICT(store, scope, key) DO UPDATE SET value = excluded.value") // agent-protocol: SQL
         value.run(place.scope, 'next', JSON.stringify(Math.max(d.next, rec.seq + 1)))
         log.info(`Delivery ${rec.id} (${rec.kind}) for ${userText(nd.agentName ?? nd.agentId)} left for when its workspace opens`)
         return rec
@@ -1119,7 +1166,7 @@ export async function cancelDeliveries(host: string, agentId: string, by: string
     let count = 0
     for (const r of [...d.records]) {
       if (r.agentId !== agentId || (kinds && !kinds.includes(r.kind)) || (match && !match(r))) continue
-      if (cancellable(r) && set(store, d, r, 'cancelled', `cancelled by ${by}`)) count++
+      if (cancellable(r) && set(store, d, r, 'cancelled', say(T.cancelledBy, { by }))) count++
     }
     return count
   })
@@ -1193,7 +1240,7 @@ export async function readInbox(host: string, agentId: string): Promise<{ items:
     if (!r.missed) break
   }
   show(store, agentId)
-  return { items: inboxItems(given), unacked: unacked ?? [] }
+  return { items: inDialectOf({ projectPath: host, agentId }, () => inboxItems(given)), unacked: unacked ?? [] }
 }
 
 /**
@@ -1246,7 +1293,7 @@ function applyFresh(store: Store, d: Draft, fresh: Map<string, Fresh>, by: HandO
     if (!r || !isUnread(r)) continue
     if ('cancel' in f) set(store, d, r, 'cancelled', f.cancel)
     else if (r.state === 'offered' && eligible(store, r, by)) continue
-    else if (f.body.length > DELIVERY_BODY_MAX_CHARS) set(store, d, r, 'cancelled', 'cancelled: made again, it was too long to keep')
+    else if (f.body.length > DELIVERY_BODY_MAX_CHARS) set(store, d, r, 'cancelled', say(T.tooLongAgain))
     else if (f.body !== r.body || (f.meta && JSON.stringify(f.meta) !== JSON.stringify(r.meta))) put(d, r, { ...r, body: f.body, ...(f.meta ? { meta: f.meta } : {}) })
   }
 }
@@ -1289,7 +1336,7 @@ const producerHolds = (store: Store, r: DeliveryRecord): boolean => (r.state ===
  */
 async function mayGive(store: Store, records: readonly DeliveryRecord[], by: HandOut = 'offer'): Promise<(d: Draft) => (r: DeliveryRecord) => boolean> {
   const fresh = await refreshAll(store, records)
-  for (const r of records) if (!fresh.has(r.id) && !producerHolds(store, r)) fresh.set(r.id, { cancel: 'cancelled: no longer wanted' })
+  for (const r of records) if (!fresh.has(r.id) && !producerHolds(store, r)) fresh.set(r.id, { cancel: say(T.notWanted) })
   return (d) => {
     applyFresh(store, d, fresh, by)
     return (r) => isUnread(r) && eligible(store, r, by)
@@ -1315,13 +1362,13 @@ export const roundOf = (card: TaskCard): number => reviewRounds(card).failures +
  * it is still relevant: the card in Doing or Review, in that round.
  */
 export function staleWhy(card: TaskCard | null, n: number, round: number): string | null {
-  if (!card) return `${cardRef(n)} is gone`
-  if (card.archived) return `${cardRef(n)} was archived`
-  if (card.column === 'passed') return `${cardRef(n)} passed review`
-  if (card.column === 'done') return `${cardRef(n)} is done`
-  if (card.column !== 'doing' && card.column !== 'review') return `${cardRef(n)} left Doing and Review`
+  if (!card) return say(T.staleGone, { card: cardRef(n) })
+  if (card.archived) return say(T.staleArchived, { card: cardRef(n) })
+  if (card.column === 'passed') return say(T.stalePassed, { card: cardRef(n) })
+  if (card.column === 'done') return say(T.staleDone, { card: cardRef(n) })
+  if (card.column !== 'doing' && card.column !== 'review') return say(T.staleLeft, { card: cardRef(n) })
   const now = roundOf(card)
-  return now > round ? `${cardRef(n)} is in round ${now} now` : null
+  return now > round ? say(T.staleRound, { card: cardRef(n), round: String(now) }) : null
 }
 
 /** A card as the board has it now (null: it is gone; undefined: Hive can't tell, its workspace closed or the card unreadable). */
@@ -1343,11 +1390,11 @@ export const setCardReaderForTests = (fn: ((host: string, n: number) => Promise<
  */
 export async function roundNow(host: string, n: number): Promise<number> {
   const card = await cardNow(host, n)
-  if (card === undefined) throw new Error(`Hive couldn't read ${cardRef(n)} now.`)
-  if (!card) throw new Error(`There is no card ${cardRef(n)}.`)
+  if (card === undefined) throw new Error(say(T.roundUnread, { card: cardRef(n) }))
+  if (!card) throw new Error(say(T.roundNoCard, { card: cardRef(n) }))
   const round = roundOf(card)
   const why = staleWhy(card, n, round)
-  if (why) throw new Error(`${why}: a message tied to its round needs it in Doing or Review.`)
+  if (why) throw new Error(say(T.roundStale, { why }))
   return round
 }
 
@@ -1472,7 +1519,7 @@ function planOffer(store: Store, d: Draft, items: readonly DeliveryRecord[], tar
   const now = items.map((r) => byId(d.records, r.id)).filter((r): r is DeliveryRecord => !!r && isWaiting(r) && !whyNot(store, r))
   if (!now.length) return null
   // A watching agent is told its watch carries on, unless the line is its own watch's wake (whose receipt ends it).
-  const line = withCardNames(workspaceFor(store.host), () => offerLine(now, now.some((r) => r.source === 'watch') ? null : label), scopeOfHost(store.host))
+  const line = withCardNames(workspaceFor(store.host), () => inDialectOf({ projectPath: store.host, agentId: now[0].agentId }, () => offerLine(now, now.some((r) => r.source === 'watch') ? null : label)), scopeOfHost(store.host))
   const was = new Map(now.map((r) => [r.id, r]))
   for (const r of now) set(store, d, r, 'offered', undefined, undefined, { offerRun: target.runId })
   return { ids: now.map((r) => r.id), was, line, runId: target.runId, sessionId: target.sessionId, need: needOf(now) }
@@ -1498,16 +1545,16 @@ function offerHolds(store: Store, o: Offer, records: readonly DeliveryRecord[] =
  */
 function whyOfferFails(store: Store, o: Offer): string | null {
   const live = sessions.liveFor(store.host, o.ids.length ? (byId(store.records, o.ids[0])?.agentId ?? '') : '')
-  if (!live || live.runId !== o.runId) return 'its launch changed'
-  if (o.sessionId && live.sessionId && live.sessionId !== o.sessionId) return 'its conversation changed'
+  if (!live || live.runId !== o.runId) return 'its launch changed' // agent-protocol: for the log (#1504: why an offer was put off)
+  if (o.sessionId && live.sessionId && live.sessionId !== o.sessionId) return 'its conversation changed' // agent-protocol: for the log (#1504: why an offer was put off)
   for (const id of o.ids) {
     const r = byId(store.records, id)
-    if (r?.state !== 'offered' || r.offerRun !== o.runId) return `${id} is no longer offered by it (${r?.state ?? 'gone'})`
+    if (r?.state !== 'offered' || r.offerRun !== o.runId) return `${id} is no longer offered by it (${r?.state ?? 'gone'})` // agent-protocol: for the log (#1504: why an offer was put off)
     const not = whyNot(store, r)
-    if (not) return `${id} may no longer be given out (${not})`
-    if (!sourceHolds(store, r, 'offer')) return `${id} is no longer wanted by its source (${r.source})`
-    if (!producerHolds(store, r)) return `${id} is no longer wanted by its producer`
-    if (pauseHeld(store, r)) return `${id} is held while the team is paused`
+    if (not) return `${id} may no longer be given out (${not})` // agent-protocol: for the log (#1504: why an offer was put off)
+    if (!sourceHolds(store, r, 'offer')) return `${id} is no longer wanted by its source (${r.source})` // agent-protocol: for the log (#1504: why an offer was put off)
+    if (!producerHolds(store, r)) return `${id} is no longer wanted by its producer` // agent-protocol: for the log (#1504: why an offer was put off)
+    if (pauseHeld(store, r)) return `${id} is held while the team is paused` // agent-protocol: for the log (#1504: why an offer was put off)
   }
   return null
 }
@@ -1530,7 +1577,7 @@ function unoffer(store: Store, o: Offer): Promise<void> {
 
 /** The launch the line was typed into ended (or another began) before its CLI took it: what it carried is uncertain now. */
 function lost(store: Store): void {
-  transactSoon(store, 'checking deliveries', (d) => recheck(store, d))
+  transactSoon(store, 'checking deliveries', (d) => recheck(store, d)) // agent-protocol: for the log
 }
 
 /** While the confirmation checks its CLI took the line: until then a cancel can still end it (and no Enter comes). */
@@ -1546,7 +1593,8 @@ async function refreshAll(store: Store, items: readonly DeliveryRecord[]): Promi
     if (!fn) continue
     try {
       // Its line names cards by key, its host's workspace's (#1219).
-      const got = await withCardNames(workspaceFor(store.host), () => fn(r, store.host), scopeOfHost(store.host))
+      // Said in the dialect of the agent it is for (HI-2437).
+      const got = await inDialectOf({ projectPath: store.host, agentId: r.agentId }, () => withCardNames(workspaceFor(store.host), () => fn(r, store.host), scopeOfHost(store.host)))
       if (got) out.set(r.id, got)
     } catch (e) {
       log.warn(`making delivery ${r.id} again`, e)
@@ -1658,7 +1706,7 @@ async function offerOnce(host: string, agentId: string, only?: string, tries = 1
   // Why the line was put off as it was typed, when the offer stopped holding (#1504: Deliver Now gave up silently).
   let putOff: string | null = null
   const wanted = (): boolean => {
-    const why = whyOfferFails(store, o) ?? (o.ids.every((id) => store.offering.has(id)) ? null : 'its offer was ended') ?? (!wake || wakesOn() ? null : 'idle wakes were turned off')
+    const why = whyOfferFails(store, o) ?? (o.ids.every((id) => store.offering.has(id)) ? null : 'its offer was ended') ?? (!wake || wakesOn() ? null : 'idle wakes were turned off') // agent-protocol: for the log (#1504: why an offer was put off)
     if (why) putOff ??= why
     return !why
   }
@@ -1755,7 +1803,7 @@ export async function deliverNow(host: string, nd: NewDelivery, holds?: () => bo
       // Put off because its folder began changing meanwhile: held until that is done, then typed.
       if (!(await heldByFolder())) break
     }
-    throw new NotGiven(whyNoLine(host, nd.agentId, nd.need ?? 'idle') ?? (holds && !holds() ? 'what it was for changed meanwhile' : 'Hive could not type it'))
+    throw new NotGiven(whyNoLine(host, nd.agentId, nd.need ?? 'idle') ?? (holds && !holds() ? say(T.changed) : say(T.notTyped)))
   }
   /**
    * Waits while the agent's hive tools are connecting (#865 round 3: a task given in the second after it became ready):
@@ -1776,7 +1824,7 @@ export async function deliverNow(host: string, nd: NewDelivery, holds?: () => bo
       const now = deliveryNow(host, rec.id)
       if (!now || !isWaiting(now)) break
       if ((await heldByFolder()) || (await heldByTools())) continue
-      why = whyNoLine(host, nd.agentId, nd.need ?? 'idle') ?? (holds && !holds() ? 'what it was for changed meanwhile' : null)
+      why = whyNoLine(host, nd.agentId, nd.need ?? 'idle') ?? (holds && !holds() ? say(T.changed) : null)
       if (why) break
       if (await offerNow(host, nd.agentId, rec.id)) break
       if (await heldByFolder()) continue
@@ -1785,10 +1833,10 @@ export async function deliverNow(host: string, nd: NewDelivery, holds?: () => bo
   } finally {
     const now = deliveryNow(host, rec.id)
     if (now && isWaiting(now)) {
-      why ??= whyNoLine(host, nd.agentId, nd.need ?? 'idle') ?? 'Hive could not type it'
+      why ??= whyNoLine(host, nd.agentId, nd.need ?? 'idle') ?? say(T.notTyped)
       await transact(store, (d) => {
         const r = byId(d.records, rec.id)
-        if (r && isWaiting(r)) set(store, d, r, 'cancelled', `not given: ${why}`)
+        if (r && isWaiting(r)) set(store, d, r, 'cancelled', NOT_GIVEN + why)
       }).catch(() => undefined)
       show(store, nd.agentId)
     }
@@ -1796,7 +1844,7 @@ export async function deliverNow(host: string, nd: NewDelivery, holds?: () => bo
   const out = deliveryNow(host, rec.id) ?? rec
   if (out.state === 'cancelled' || out.state === 'refused' || out.state === 'expired') {
     store.hooks.delete(rec.id)
-    throw new NotGiven(out.detail?.replace(/^not given: /, '') ?? why ?? out.state)
+    throw new NotGiven((out.detail?.startsWith(NOT_GIVEN) ? out.detail.slice(NOT_GIVEN.length) : out.detail) ?? why ?? out.state)
   }
   return out
 }
@@ -1818,12 +1866,12 @@ export async function launchWith<T extends { runId: string }>(host: string, nd: 
   store.offering.add(rec.id)
   let run: T
   try {
-    run = await start(withCardNames(workspaceFor(store.host), () => offerLine([rec], null), scopeOfHost(store.host)))
+    run = await start(withCardNames(workspaceFor(store.host), () => inDialectOf({ projectPath: store.host, agentId: nd.agentId }, () => offerLine([rec], null)), scopeOfHost(store.host)))
   } catch (e) {
     store.offering.delete(rec.id)
     await transact(store, (d) => {
       const r = byId(d.records, rec.id)
-      if (r?.state === 'offered' && r.offerRun === LAUNCHING) set(store, d, r, 'cancelled', `not given: ${(e as Error).message}`)
+      if (r?.state === 'offered' && r.offerRun === LAUNCHING) set(store, d, r, 'cancelled', NOT_GIVEN + (e as Error).message)
     }).catch((err) => log.warn("cancelling a launch's task", err))
     show(store, nd.agentId)
     throw e
@@ -1864,7 +1912,7 @@ export async function followAgent(host: string, agentId: string): Promise<void> 
 /** Follows each loaded host's deliveries (received, uncertain, ended), offers what waits, and refreshes the panes (overdue). */
 function tick(): void {
   for (const store of stores.values()) {
-    if (store.records.some((r) => isUnread(r) && (whyNot(store, r) || r.state === 'offered'))) transactSoon(store, 'checking deliveries', (d) => recheck(store, d))
+    if (store.records.some((r) => isUnread(r) && (whyNot(store, r) || r.state === 'offered'))) transactSoon(store, 'checking deliveries', (d) => recheck(store, d)) // agent-protocol: for the log
     const agents = new Set(store.records.filter(isLive).map((r) => r.agentId))
     for (const a of agents) {
       show(store, a)
@@ -1884,7 +1932,7 @@ async function ringLostLine(host: string, agentId: string, runId: string, ids: r
     for (const id of ids) {
       const r = byId(d.records, id)
       const run = r ? (store.launches.get(r.id) ?? r.offerRun) : null
-      if (r && r.agentId === agentId && r.state === 'offered' && !store.offering.has(r.id) && run === runId) set(store, d, r, 'queued', 'its doorbell was lost before its CLI took it')
+      if (r && r.agentId === agentId && r.state === 'offered' && !store.offering.has(r.id) && run === runId) set(store, d, r, 'queued', say(T.doorbellLost))
     }
   })
   show(store, agentId)
@@ -1917,7 +1965,7 @@ export function initDeliveries(): void {
     void load(projectPath)
       .then((store) => {
         // A doorbell let pass, a launch ended: what was offered rings once more, or is uncertain.
-        if (store.records.some((r) => r.agentId === agentId && r.state === 'offered')) transactSoon(store, 'checking deliveries', (d) => recheck(store, d, agentId))
+        if (store.records.some((r) => r.agentId === agentId && r.state === 'offered')) transactSoon(store, 'checking deliveries', (d) => recheck(store, d, agentId)) // agent-protocol: for the log
         show(store, agentId)
         // Idle for a message or a card event (watching, or its turn over while its own background tasks run, #726) too.
         if (readyFor(e.state, 'stalled') || readyFor(e.state) || status === 'watching') setTimeout(() => void offerNow(projectPath, agentId).catch((err) => log.warn('offering deliveries', err)), 500).unref?.()

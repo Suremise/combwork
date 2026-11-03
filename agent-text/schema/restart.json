@@ -1,0 +1,27 @@
+{
+  "restart.closed.assistant": {
+    "placeholders": {
+      "lastSeen": "plain",
+      "agentCount": "plural",
+      "agents": "plain",
+      "resumed": "plain",
+      "still": "plural"
+    }
+  },
+  "restart.closed.fact": {
+    "placeholders": {
+      "lastSeen": "plain",
+      "agentCount": "plain"
+    }
+  },
+  "restart.closed.nothingResumed": {
+    "placeholders": {}
+  },
+  "restart.closed.resumed": {
+    "placeholders": {
+      "resumed": "plain",
+      "failed": "plural",
+      "held": "plural"
+    }
+  }
+}

@@ -26,6 +26,44 @@ const { freshFolder } = require('../e2e/evidence.cjs')
 const { startFakeCopilotApi, copilotTestEnv } = require('../e2e/fake-copilot-api.cjs')
 const claudeSignedIn = () => fs.existsSync(path.join(CLAUDE_TEST_HOME, '.credentials.json'))
 
+/**
+ * `--dialect <file>` (dialects, HI-2439; plans/2026-11-03-dialects-design.md, section 6): a dialect file for the
+ * provider's CLI, checked against the schema as Hive checks one (src/main/dialects/format.ts, loaded in plain Node), and
+ * the chain it gives in the model slot (its files and hash, as the launch record will hold them). Each trial's workspace
+ * gets it as a test copy in `.hive/dialects/<CLI>/` (placeDialect). Null with no --dialect: the shipped files, all
+ * empty, so the Default. Throws, saying why, for a file that isn't a dialect.
+ * Until card 6b wires the dialects into sessions, Hive doesn't apply the file yet: the run records the chain it gives.
+ */
+function dialectForRun(file, providerKey) {
+  if (!file) return null
+  const { parseDialectFile, checkTexts, schemaOf, dialectFileText } = require('../../src/main/dialects/format.ts')
+  const { resolveChain } = require('../../src/main/dialects/chain.ts')
+  const p = PROVIDERS[providerKey]
+  const parsed = parseDialectFile(fs.readFileSync(file, 'utf8'))
+  if (parsed.problem) throw new Error(`${file} isn't a dialect file (${parsed.problem.problem}${parsed.problem.field ? `: ${parsed.problem.field}` : ''})`)
+  const schemaDir = path.join(lib.ROOT, 'agent-text', 'schema')
+  const schema = schemaOf(fs.readdirSync(schemaDir).filter((f) => f.endsWith('.json')).map((f) => JSON.parse(fs.readFileSync(path.join(schemaDir, f), 'utf8'))))
+  const { texts, outdated } = checkTexts(parsed.file, schema)
+  const label = path.basename(file).replace(/\.json$/i, '')
+  // A test copy: no model, so Auto never picks it; the run puts it in the model slot of every agent of the CLI.
+  const { model: _model, ...copy } = parsed.file
+  const at = `${p.provider}/${label}.json`
+  const loaded = { path: at, name: copy.name, texts, outdated, on: true }
+  const chain = resolveChain({ workspace: null, folders: { [p.provider]: { cli: null, files: [loaded] } } }, { kind: 'session', cli: p.provider, modelFile: loaded })
+  return { source: path.resolve(file), path: at, text: dialectFileText(copy), overrides: Object.keys(texts).length, outdated: outdated.map((o) => `${o.id} (${o.problem})`), files: chain.files, hash: chain.hash }
+}
+
+/** Puts a run's dialect (dialectForRun) into a scenario workspace: `.hive/dialects/<CLI>/<label>.json`. */
+function placeDialect(dialect, ws) {
+  if (!dialect) return
+  const dest = path.join(ws, '.hive', 'dialects', ...dialect.path.split('/'))
+  fs.mkdirSync(path.dirname(dest), { recursive: true })
+  fs.writeFileSync(dest, dialect.text)
+}
+
+/** What a result records of its run's dialect: the file it came from, and its chain (files and hash). */
+const dialectRecord = (dialect) => (dialect ? { source: dialect.source, path: dialect.path, files: dialect.files, hash: dialect.hash, overrides: dialect.overrides, ...(dialect.outdated.length ? { outdated: dialect.outdated } : {}) } : null)
+
 /** The CLI each provider runs here: the fakes, or the real standalone CLIs, each in its test home. */
 const PROVIDERS = {
   fake: { provider: 'claude-code', fake: true, executable: path.join(lib.ROOT, 'tests', 'e2e', 'fake-claude', 'fake-claude.cmd'), mode: 'bypassPermissions' },
@@ -457,6 +495,8 @@ async function runScenario(sc, providerKey, opts = {}) {
   if (providerKey === 'fake-codex') fs.writeFileSync(path.join(fakeCodexHome, 'fake-code-mode.txt'), '')
   lib.gitProject(alpha, { 'README.md': '# alpha\n\nA small project for Hive scenarios.\n', 'math.js': 'module.exports = {}\n', ...sc.files })
   for (const other of sc.projects ?? []) lib.gitProject(path.join(ws, other), { 'README.md': `# ${other}\n` })
+  // The run's dialect (--dialect), for the trial's CLI.
+  placeDialect(opts.dialect, ws)
   // The fake trusts these folders; the real Claude Code asks (answered below); Codex reads its test home's trust list.
   fs.writeFileSync(path.join(fakeHome, 'fake-trusted.json'), JSON.stringify([alpha.toLowerCase(), ws.toLowerCase()]))
   // A fake that acts out an expired sign-in: each prompt's turn ends with "Login expired · Please run /login".
@@ -519,7 +559,7 @@ async function runScenario(sc, providerKey, opts = {}) {
     await standIn?.close().catch(() => undefined)
     throw e
   }
-  const result = { scenario: sc.id, title: sc.title, provider: providerKey, model: opts.model ?? '(default)', role: sc.role ?? 'agent', control: sc.role === 'assistant' ? (sc.control ?? 'projects') : undefined, cliVersion: null, guidance: null, checks: [], observed: null, usage: null, measures: null, metricsOverheadMs: 0, seconds: 0, error: null }
+  const result = { scenario: sc.id, title: sc.title, provider: providerKey, model: opts.model ?? '(default)', role: sc.role ?? 'agent', control: sc.role === 'assistant' ? (sc.control ?? 'projects') : undefined, cliVersion: null, guidance: null, ...(opts.dialect ? { dialect: dialectRecord(opts.dialect) } : {}), checks: [], observed: null, usage: null, measures: null, metricsOverheadMs: 0, seconds: 0, error: null }
   try {
     const info = await lib.waitForProvider(inv, p.provider, 60000)
     result.cliVersion = info.version ?? null
@@ -1093,4 +1133,4 @@ async function runScenario(sc, providerKey, opts = {}) {
   return result
 }
 
-module.exports = { runScenario, forgetClaudeMemory, observeTranscript, tokenSightings, knownTokens, maskTokens, retainedObserved, skillRefsOf, readMcpLog, allCallsReported, sourceFingerprint, metricsTotals, measuresOf, trialEnvironment, promptRefused, promptNotTaken, relaunchTrust, keptReply, REPLY_KEPT, cliNotices, launchEnded, startFailureIn, claudeAuthStatus, parseAuthStatus, environmentAdvice, PROVIDERS, CLAUDE_TEST_HOME, claudeSignedIn }
+module.exports = { runScenario, dialectForRun, dialectRecord,forgetClaudeMemory, observeTranscript, tokenSightings, knownTokens, maskTokens, retainedObserved, skillRefsOf, readMcpLog, allCallsReported, sourceFingerprint, metricsTotals, measuresOf, trialEnvironment, promptRefused, promptNotTaken, relaunchTrust, keptReply, REPLY_KEPT, cliNotices, launchEnded, startFailureIn, claudeAuthStatus, parseAuthStatus, environmentAdvice, PROVIDERS, CLAUDE_TEST_HOME, claudeSignedIn }

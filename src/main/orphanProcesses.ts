@@ -2,6 +2,7 @@ import { basename } from 'path'
 import { app } from 'electron'
 import { ORPHAN_NOTICE } from '../shared/advanced'
 import { commandText, filetimeMs, type ActivityProcess } from '../shared/activity'
+import { agentMsg, inDialectOf, say } from '../shared/agentText'
 import { NOTICE_PREFIX } from '../shared/doorbell'
 import { msg, tr } from '../shared/i18n'
 import { durationText } from '../shared/tasks'
@@ -246,8 +247,26 @@ export function orphanLinesFor(projectPath: string, agentId: string): string {
   const due = orphansOf(projectPath, agentId).filter((o) => o.shown && !o.told)
   if (!due.length) return ''
   for (const o of due) o.told = true
-  const each = due.map((o) => `pid ${o.pid} ${o.command ?? o.label ? `\`${cut(o.command ?? o.label ?? '', 200)}\`` : '(its command line could not be read)'} (running ${Math.round((Date.now() - (filetimeMs(o.created) ?? Date.now())) / 60_000)} min)`) // i18n-ignore: agent-facing (a hook notice to the agent)
-  return `${NOTICE_PREFIX}${due.length === 1 ? 'A process your command started is' : `${due.length} processes your commands started are`} still running with the shell that started ${due.length === 1 ? 'it' : 'them'} gone: ${each.join('; ')}. End ${due.length === 1 ? 'it' : 'them'} if not needed; Hive won't.` // i18n-ignore: agent-facing (a hook notice to the agent)
+  return inDialectOf({ projectPath, agentId }, () => {
+    const each = due.map((o) => {
+      const command = o.command ?? o.label
+      return say(T.process, { pid: String(o.pid), known: command ? 'yes' : 'no', command: command ? cut(command, 200) : '', min: String(Math.round((Date.now() - (filetimeMs(o.created) ?? Date.now())) / 60_000)) })
+    })
+    return NOTICE_PREFIX + say(T.running, { n: due.length, count: String(due.length), list: each.join('; ') })
+  })
+}
+
+const T = {
+  process: agentMsg({
+    id: 'notice.orphan.process',
+    text: 'pid {pid} {known, select, yes {`{command}`} other {(its command line could not be read)}} (running {min} min)',
+    note: 'One process an agent\'s command left running, in the orphan notice\'s list (HI-2111). pid: its process id; known: yes when its command line was read; command: that command line, cut to 200 characters; min: how many minutes it has run.'
+  }),
+  running: agentMsg({
+    id: 'notice.orphan.running',
+    text: '{n, plural, one {A process your command started is} other {{count} processes your commands started are}} still running with the shell that started {n, plural, one {it} other {them}} gone: {list}. End {n, plural, one {it} other {them}} if not needed; Hive won\'t.',
+    note: 'After "[Hive] ", at the agent\'s next tool call or turn\'s end: processes its commands started still run with their shell gone (HI-2111), told once; Hive doesn\'t end them. n and count: how many; list: each process (notice.orphan.process), joined by "; ".'
+  })
 }
 
 /** For tests: a launch's orphans as a look would leave them (null: forgotten). */

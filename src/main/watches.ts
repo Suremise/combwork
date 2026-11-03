@@ -2,7 +2,7 @@ import { randomBytes } from 'crypto'
 import { rename, writeFile } from 'original-fs/promises'
 import { basename, dirname, join, resolve } from 'path'
 import { projectAgents } from '../shared/defaults'
-import { cardChange, carriedOver, ownCut, changesBetween, handoffsSince, hearsHandoffs, isDecisionEntry, changesSince, entryWithin, ENTRY_KEY, limitLine, markOf, movedIntoSince, seenOf, readMark, readSavedCondition, WAKE_MAX_BYTES, wakeAbout, watchLabel, cardWakeLine, userNameOf, releasedLine, withLanesTail, RELEASE_REASONS, type Released, type ReplyNote, alreadyThere, cardOver, encodeSince, WATCH_DEFAULT_LIMIT_MINUTES, WATCH_MAX_CARDS, WATCH_MAX_LIMIT_MINUTES, type Baseline, type CardChange, type CardMark, type ReviewWhere, type Seen, type WatchChange, type WatchCondition } from '../shared/watch'
+import { cardChange, carriedOver, ownCut, changesBetween, handoffsSince, hearsHandoffs, decisionLine, historyVerdict, reviewStep, changesSince, entryWithin, ENTRY_KEY, limitLine, markOf, movedIntoSince, seenOf, readMark, readSavedCondition, WAKE_MAX_BYTES, wakeAbout, watchLabel, cardWakeLine, userNameOf, releasedLine, withLanesTail, RELEASE_REASONS, type Released, type ReplyNote, alreadyThere, cardOver, encodeSince, WATCH_DEFAULT_LIMIT_MINUTES, WATCH_MAX_CARDS, WATCH_MAX_LIMIT_MINUTES, type Baseline, type CardChange, type CardMark, type ReviewWhere, type Seen, type WatchChange, type WatchCondition } from '../shared/watch'
 import { loopReviewerOf, poolCard } from './loopReviewer'
 import { agentBusy, agentEvent, agentLimitLine, agentMarkOf, agentPart, agentWakeLine, agentWatchLabel, readSavedAgentCondition, readSavedAgentMark, replyFirstLine, replyPart, REPLY_CHARS, type AgentEvent, type AgentMark, type AgentNow, type AgentWatchCondition, type WatchedAgent } from '../shared/agentWatch'
 import { isProjectId, type ProjectIdIndex } from '../shared/projectIds'
@@ -38,6 +38,8 @@ import { namedBy } from '../shared/projectKeys'
 import { projectPreferences } from './workflow/preferences'
 import { forYouOfCards } from './workflow/cardWork'
 import type { ForYouItem } from '../shared/workflow/workView'
+import { NOTICE_PREFIX } from '../shared/doorbell'
+import { agentMsg, inDialectOf, say, type AgentMsg, type DialectSession } from '../shared/agentText'
 
 /**
  * Wake-on-change watches (#128): an agent registers what it waits for on the board (hive_wait_for_tasks with wake), ends
@@ -61,6 +63,31 @@ import type { ForYouItem } from '../shared/workflow/workView'
 const log = createLogger('watches')
 /** The user, as the Assistant's wake lines name them (#426): Settings → General → Your name. */
 const userName = (): string => userNameOf(config.settings.general?.userName)
+
+const T = {
+  usageLabel: agentMsg({ id: 'wake.watch.usageLabel', text: 'Waiting for usage: {accounts}', note: 'HI-2195: a usage watch\'s label (alone), as replies and the agent\'s watch show it. accounts: each account with its share and limit ("Max 1 at 98% of its weekly limit").' }),
+  withUsage: agentMsg({ id: 'wake.watch.withUsage', text: '{label}, and usage: {accounts}', note: 'HI-2195: a watch\'s label with a usage watch beside its cards or lanes. label: the watch\'s own label; accounts: as in wake.watch.usageLabel.' }),
+  tooMany: agentMsg({ id: 'wake.watch.tooMany', text: 'This workspace already has {max} watches, the most Hive keeps: wait for some to end', note: 'An agent, lane or usage watch refused: the workspace has as many watches as Hive keeps. max: how many.' }),
+  tooBig: agentMsg({ id: 'wake.watch.tooBig', text: 'Too many watches to keep in this workspace: wait for some to end', note: 'An agent or lane watch refused: the watches would no longer fit the file Hive keeps them in.' }),
+  notSaved: agentMsg({ id: 'wake.watch.notSaved', text: 'Could not save the watch: {error}', note: 'A watch refused: it could not be saved. error: why (the system\'s or Hive\'s own error, as it is).' }),
+  notCancelled: agentMsg({ id: 'wake.watch.notCancelled', text: 'Could not cancel the watch: {error}', note: 'An agent\'s watch not cancelled: the change could not be saved. error: why (as it is).' }),
+  notEnded: agentMsg({ id: 'wake.watch.notEnded', text: 'Could not end the watch ({why}): {error}', note: "HI-2197: an agent's watch not ended as a new conversation starts, or as Hive gives it a card in a slot (a start's reply): the change could not be saved. why: why it was being ended (the log's words); error: why it failed." }),
+  wakeNotCancelled: agentMsg({ id: 'wake.watch.wakeNotCancelled', text: 'Could not cancel the wake of the watch ({why}): {error}', note: "HI-2197: an agent's watch ended, but the wake it had handed over couldn't be cancelled (the watch is put back). why: why it was being ended (the log's words); error: why it failed." }),
+  cancelled: agentMsg({ id: 'inbox.watchEnded.cancelled', text: 'cancelled: {why}', note: "Why a watch's wake (a delivery) was cancelled, as its record says it. why: inbox.watchEnded.*, or why the watch was ended (the log's words)." }),
+  replaced: agentMsg({ id: 'inbox.watchEnded.replaced', text: 'its watch was replaced', note: "Why a watch's wake was cancelled: the agent set another watch (in inbox.watchEnded.cancelled)." }),
+  watchCancelled: agentMsg({ id: 'inbox.watchEnded.watchCancelled', text: 'its watch was cancelled', note: "Why a watch's wake was cancelled: the agent or the user cancelled the watch (in inbox.watchEnded.cancelled)." }),
+  watchEnded: agentMsg({ id: 'inbox.watchEnded.ended', text: 'its watch has ended', note: "Why a watch's wake was cancelled just before it was given: its watch has ended meanwhile." }),
+  repliesOff: agentMsg({ id: 'inbox.watchEnded.repliesOff', text: "the user's replies are no longer told", note: "#418, #1099: why a wake telling the Assistant a reply of the user's to an agent was cancelled: Settings → Assistant → Tell the Assistant when I reply to an agent was turned off." }),
+  notSavedWake: agentMsg({ id: 'inbox.watchEnded.notSaved', text: "cancelled: its watch couldn't be saved", note: "Why a watch's wake was cancelled as it was handed over: the watch could not be saved with it (it fires again)." }),
+  againTyping: agentMsg({ id: 'inbox.again.typing', text: 'Hive restarted while typing it', note: "Why a watch's wake may repeat (#649), after the doorbell (inbox.offer.again): Hive stopped while typing it." }),
+  itsBuilder: agentMsg({ id: 'wake.card.itsBuilder', text: 'its builder', note: 'HI-2143: who submitted a card again after the merge queue returned it, in a wake to whoever watches or reviews it, when the card names no agent.' })
+}
+
+/** "its builder", for a card submitted again that names no agent (HI-2143; loopWakes.ts too). */
+export const itsBuilder = (): string => say(T.itsBuilder)
+
+/** The session a watch's wake is for: its agent, in its host (a project, or the Assistant's home). */
+const sessionOf = (rec: Pick<WatchRecord, 'projectPath' | 'agentId'>): DialectSession => ({ projectPath: rec.projectPath, agentId: rec.agentId })
 
 interface WatchRecord {
   id: string
@@ -276,7 +303,7 @@ const jsonBytes = (s: string): number => Buffer.byteLength(JSON.stringify(s))
  * its own project's cards (another's, or one moved there, by number), the Assistant every card.
  */
 function lineFor(store: Store, rec: WatchRecord, make: () => string): string {
-  return fitLine(withCardNames(store.ws, make, rec.scope))
+  return inDialectOf(sessionOf(rec), () => fitLine(withCardNames(store.ws, make, rec.scope)))
 }
 
 function fitLine(line: string): string {
@@ -300,6 +327,7 @@ const loading = new Map<string, Promise<Store>>()
  */
 const fileOf = (path: string): string => join(path, '.hive', 'watches.json')
 const same = (a: string, b: string): boolean => a.toLowerCase() === b.toLowerCase()
+// agent-protocol: servers.ts gives this reply its status by its words (/workspace was closed/)
 const closedError = (): Error => new Error('The workspace was closed')
 
 /** What an agent may see of the board: its own project's cards, or every card for the Assistant. */
@@ -404,6 +432,7 @@ function load(ws: WorkspaceService): Promise<Store> {
           over.unshift(list.pop()!)
           sum -= sizes.pop()!
         }
+        // agent-protocol: servers.ts gives this reply its status by its words (/card watches/)
         if (over.length && !(await setAside(store, over))) throw new Error('The card watches file is too big, and its extra watches could not be set aside')
       }
       store.dirty = true
@@ -473,6 +502,7 @@ async function readFileOf(path: string, open: () => boolean): Promise<Saved | nu
     got = await readCapped(file, MAX_FILE_BYTES)
   } catch (e) {
     if ((e as NodeJS.ErrnoException).code === 'ENOENT') return null
+    // agent-protocol: servers.ts gives this reply its status by its words (/card watches/)
     throw new Error(`Could not read the card watches (${(e as Error).message})`, { cause: e })
   }
   const aside = async (why: string): Promise<Saved> => {
@@ -482,6 +512,7 @@ async function readFileOf(path: string, open: () => boolean): Promise<Saved | nu
         if (!open()) throw closedError()
       }, renameOnce)
     } catch (e) {
+      // agent-protocol: servers.ts gives this reply its status by its words (/card watches/)
       throw new Error(`The card watches file is ${why} and couldn't be set aside (${(e as Error).message}): it was left as it is`, { cause: e })
     }
     log.warn(`The watches file was ${why}: set aside as ${userText(to)}`)
@@ -692,6 +723,7 @@ async function setAside(store: Store, watches: WatchRecord[] = []): Promise<bool
 async function save(store: Store): Promise<void> {
   checkAlive(store)
   const text = fileText(store, store.list)
+  // agent-protocol: servers.ts gives this reply its status by its words (/card watches/)
   if (Buffer.byteLength(text) > MAX_FILE_BYTES) throw new Error('Too many card watches to keep in this workspace')
   await saveTable(store.path, 'watches', store.list.map(entryOf), { invalid: store.invalid.length ? JSON.stringify(store.invalid) : null }, () => checkAlive(store))
   store.dirty = false
@@ -714,7 +746,7 @@ function infoOf(r: WatchRecord): TaskWatchInfo {
   const info = kindInfoOf(r)
   // A usage watch (HI-2195): alone, its accounts are its label; beside cards or lanes, they follow theirs.
   if (!r.usage) return info
-  return usageOnly(r) ? { ...info, usage: true, label: `Waiting for usage: ${usageWatchLabel(r.usage)}` } : { ...info, usage: true, label: `${info.label}, and usage: ${usageWatchLabel(r.usage)}` }
+  return usageOnly(r) ? { ...info, usage: true, label: say(T.usageLabel, { accounts: usageWatchLabel(r.usage) }) } : { ...info, usage: true, label: say(T.withUsage, { label: info.label, accounts: usageWatchLabel(r.usage) }) }
 }
 
 /** A usage watch alone (HI-2195): no cards, agents or lanes. */
@@ -746,6 +778,7 @@ const agentKey = (projectPath: string, agentId: string): string => `${projectPat
  * did itself after a wake isn't news to its next watch. Null when it can't be known (then that watch starts from now).
  */
 async function boardName(ws: WorkspaceService, projectPath: string, agentId: string): Promise<string | null> {
+  // agent-protocol: the Assistant's name on the board (a history line's author), never translated
   if (ws.isAssistantHome(projectPath)) return 'Assistant'
   const def = await ws
     .projectConfig(projectPath)
@@ -825,10 +858,10 @@ type CardReads = Map<number, Promise<TaskCard | null>>
  * Ends a watch's wake (the watch was cancelled or replaced): the line being made isn't handed over, and the delivery it
  * was handed over as is cancelled (its typing stops before Enter; a line its CLI hasn't taken is cleared, #647).
  */
-const stopDelivery = (store: Store, rec: WatchRecord | undefined, why = 'its watch was replaced'): void => {
+const stopDelivery = (store: Store, rec: WatchRecord | undefined, why: AgentMsg = T.replaced): void => {
   const d = rec && store.delivering.get(rec.id)
   if (d) d.cancelled = true
-  if (rec?.fired?.delivery) inBackground('cancelling a wake', cancelFromSource(rec.projectPath, 'watch', wakeRef(rec), `cancelled: ${why}`))
+  if (rec?.fired?.delivery) inBackground('cancelling a wake', cancelFromSource(rec.projectPath, 'watch', wakeRef(rec), inDialectOf(sessionOf(rec), () => say(T.cancelled, { why: say(why) }))))
 }
 
 export type WatchResult = ({ watching: TaskWatchInfo } | { already: CardChange }) & { lanesLeft?: string[] }
@@ -859,6 +892,7 @@ export async function registerWatch(ws: WorkspaceService, projectPath: string, a
   const store = await load(ws)
   // A wake whose line its CLI has taken is received first, so this watch starts from what it told (#649).
   await followAgent(projectPath, agentId)
+  // agent-protocol: servers.ts gives this reply its status by its opening (/Not a project/)
   if (!hostedIn(ws, store.path, projectPath)) throw new Error(`Not a project of this workspace: ${projectPath}`)
   const scope = scopeFor(ws, projectPath)
   const self = await boardName(ws, projectPath, agentId)
@@ -907,6 +941,7 @@ export async function registerWatch(ws: WorkspaceService, projectPath: string, a
     const old = recordOf(store, projectPath, agentId)
     const before = store.list
     // The limit holds for what Hive writes as for what it reads: replacing an agent's watch is always allowed.
+    // agent-protocol: servers.ts gives this reply its status by its words (/card watches/)
     if (!already && !old && store.list.length >= MAX_WATCHES) throw new Error(`This workspace already has ${MAX_WATCHES} card watches, the most Hive keeps: wait for some to end`)
     const minutes = Math.min(WATCH_MAX_LIMIT_MINUTES, Math.max(1, Math.round(limitMinutes)))
     // The Assistant's: the user's replies to its cards' agents from what its last wake told (#418).
@@ -915,6 +950,7 @@ export async function registerWatch(ws: WorkspaceService, projectPath: string, a
     const next = [...store.list.filter((x) => x !== old), ...(rec ? [rec] : [])]
     // Every watch must be able to fire, be typed and end within the file's limit: make room, else refuse.
     if (rec && budget(store, next) > MAX_FILE_BYTES && !((await setAside(store)) && budget(store, next) <= MAX_FILE_BYTES))
+      // agent-protocol: servers.ts gives this reply its status by its words (/card watches/)
       throw new Error('Too many card watches to keep in this workspace: wait for some to end')
     store.list = next
     if (old || rec) {
@@ -922,7 +958,7 @@ export async function registerWatch(ws: WorkspaceService, projectPath: string, a
         await save(store)
       } catch (e) {
         store.list = before
-        throw new Error(`Could not save the watch: ${(e as Error).message}`, { cause: e })
+        throw new Error(say(T.notSaved, { error: (e as Error).message }), { cause: e })
       }
     }
     stopDelivery(store, old)
@@ -977,9 +1013,9 @@ export async function cancelWatch(ws: WorkspaceService, projectPath: string, age
       await save(store)
     } catch (e) {
       store.list = before
-      throw new Error(`Could not cancel the watch: ${(e as Error).message}`, { cause: e })
+      throw new Error(say(T.notCancelled, { error: (e as Error).message }), { cause: e })
     }
-    stopDelivery(store, rec, 'its watch was cancelled')
+    stopDelivery(store, rec, T.watchCancelled)
     return true
   })
   if (had) sessions.watchChanged(projectPath, agentId)
@@ -1010,7 +1046,7 @@ export async function endWatchOf(projectPath: string, agentId: string, why: stri
       await save(store)
     } catch (e) {
       store.list = before
-      throw new Error(`Could not end the watch (${why}): ${(e as Error).message}`, { cause: e })
+      throw new Error(say(T.notEnded, { why, error: (e as Error).message }), { cause: e })
     }
     const d = store.delivering.get(r.id)
     if (d) d.cancelled = true
@@ -1022,7 +1058,7 @@ export async function endWatchOf(projectPath: string, agentId: string, why: stri
   if (rec.fired?.delivery) {
     try {
       await testHooks.beforeWakeCancel?.()
-      await cancelFromSource(rec.projectPath, 'watch', wakeRef(rec), `cancelled: ${why}`)
+      await cancelFromSource(rec.projectPath, 'watch', wakeRef(rec), inDialectOf(sessionOf(rec), () => say(T.cancelled, { why })))
     } catch (e) {
       // Its wake not cancelled: the watch is put back (unless the agent has another by now), so the next try ends both.
       await locked(store, async () => {
@@ -1031,7 +1067,7 @@ export async function endWatchOf(projectPath: string, agentId: string, why: stri
         await saveQuietly(store)
       })
       sessions.watchChanged(projectPath, agentId)
-      throw new Error(`Could not cancel the wake of the watch (${why}): ${(e as Error).message}`, { cause: e })
+      throw new Error(say(T.wakeNotCancelled, { why, error: (e as Error).message }), { cause: e })
     }
   }
   return infoOf(rec).label
@@ -1209,7 +1245,8 @@ async function tellReplyNow(store: Store, reply: Reply): Promise<void> {
   // Claimed only if nothing has picked it meanwhile (a watch that started and fired during the lookup tells it).
   if (!home || reply.owner || !tellReplies() || generation !== replyGeneration) return
   reply.owner = 'sending'
-  const line = `[Hive] ${replyPart(reply.agentName, `(${basename(resolve(reply.projectPath))})`, reply.text, REPLY_CHARS, userName())}.` // i18n-ignore: agent-facing: what the Assistant reads (#1099)
+  // In the Assistant's dialect: what it reads (#1099).
+  const line = inDialectOf({ projectPath: home, agentId: ASSISTANT_AGENT_ID }, () => `${NOTICE_PREFIX}${replyPart(reply.agentName, `(${basename(resolve(reply.projectPath))})`, reply.text, REPLY_CHARS, userName())}.`)
   let id: string
   try {
     id = (await createDelivery(home, { agentId: ASSISTANT_AGENT_ID, kind: 'card-event', from: HIVE, body: line, source: 'reply', ref: `reply:${reply.seq}`, meta: { generation, run: RUN } })).id
@@ -1237,7 +1274,7 @@ const replyHolds = (r: DeliveryRecord): boolean => tellReplies() && (r.meta?.run
 
 /** The replies' part in their deliveries (#1099): offered and handed out (hive_inbox) only while replyHolds. */
 registerSource('reply', {
-  refresh: async (r) => (replyHolds(r) ? null : { cancel: "the user's replies are no longer told" }),
+  refresh: async (r, host) => (replyHolds(r) ? null : { cancel: inDialectOf({ projectPath: host, agentId: r.agentId }, () => say(T.repliesOff)) }),
   holds: (r) => replyHolds(r)
 })
 /** The latest reply of the user's to an agent after `from`, for the Assistant's watch (null scope) only. */
@@ -1274,10 +1311,10 @@ export async function revokeReplies(): Promise<void> {
   dropReplies()
   // Replies told on their own (#1099) and not read yet are withdrawn too: every one in each open workspace's Assistant's
   // deliveries, kept in memory or not (the 'reply' source refuses those made before this, also while one is being made).
-  for (const store of [...stores.values()]) if (alive(store) && store.ws.assistantHome) inBackground('withdrawing replies', cancelFromSource(store.ws.assistantHome, 'reply', null, "cancelled: the user's replies are no longer told"))
+  for (const store of [...stores.values()]) if (alive(store) && store.ws.assistantHome) inBackground('withdrawing replies', cancelFromSource(store.ws.assistantHome, 'reply', null, inDialectOf({ projectPath: store.ws.assistantHome, agentId: ASSISTANT_AGENT_ID }, () => say(T.cancelled, { why: say(T.repliesOff) }))))
   // A wake handed over as a delivery that tells one is cancelled now (its typing stops; a line its CLI hasn't taken is
   // cleared): its watch fires again, made without the reply (#649).
-  for (const [id, h] of handed) if (h.told.replies) inBackground('withdrawing a reply', cancelFromSource(h.rec.projectPath, 'watch', wakeRef(h.rec), "cancelled: the user's replies are no longer told").then(() => handed.delete(id)))
+  for (const [id, h] of handed) if (h.told.replies) inBackground('withdrawing a reply', cancelFromSource(h.rec.projectPath, 'watch', wakeRef(h.rec), inDialectOf(sessionOf(h.rec), () => say(T.cancelled, { why: say(T.repliesOff) }))).then(() => handed.delete(id)))
   for (const store of [...stores.values()]) {
     // One handed over as a delivery is cancelled by its source's check (watchSource.refresh), and fires again.
     if (!alive(store) || !store.list.some((r) => r.fired?.replies && !r.fired.sending && !r.fired.delivery)) continue
@@ -1355,9 +1392,12 @@ export async function registerAgentWatch(ws: WorkspaceService, projectPath: stri
   // A wake whose line its CLI has taken is received first, so this watch starts from what it told (#649).
   await followAgent(projectPath, agentId)
   const store = await load(ws)
+  // agent-protocol: servers.ts gives this reply its status by its opening (/Not a project/)
   if (!hostedIn(ws, store.path, projectPath)) throw new Error(`Not a project of this workspace: ${projectPath}`)
   for (const a of cond.agents) {
+    // agent-protocol: servers.ts gives this reply its status by its opening (/Not a project/)
     if (!mayWatch(ws, store.path, projectPath, a.projectPath)) throw new Error(`Not a project of this workspace: ${a.project}`)
+    // agent-protocol: servers.ts gives this reply its status by its opening (/^You can't watch yourself/)
     if (same(a.projectPath, projectPath) && a.agentId === agentId) throw new Error("You can't watch yourself: nothing would wake you")
   }
   const result = await locked(store, async (): Promise<AgentWatchResult> => {
@@ -1382,20 +1422,20 @@ export async function registerAgentWatch(ws: WorkspaceService, projectPath: stri
     }
     const old = recordOf(store, projectPath, agentId)
     const before = store.list
-    if (!already.length && !old && store.list.length >= MAX_WATCHES) throw new Error(`This workspace already has ${MAX_WATCHES} watches, the most Hive keeps: wait for some to end`)
+    if (!already.length && !old && store.list.length >= MAX_WATCHES) throw new Error(say(T.tooMany, { max: String(MAX_WATCHES) }))
     const minutes = Math.min(WATCH_MAX_LIMIT_MINUTES, Math.max(1, Math.round(limitMinutes)))
     const followed = { ...cond, agents: cond.agents.map((a) => ({ ...a, ...projectIdOf(ws, a.projectPath) })) }
     const rec: WatchRecord | null = already.length ? null : { id: randomBytes(6).toString('hex'), projectPath, ...projectIdOf(ws, projectPath), agentId, scope, cond: NO_CARDS, agents: followed, agentMarks, marks: {}, current: {}, since, limitMinutes: minutes, limitAt: new Date(Date.now() + minutes * 60_000).toISOString() }
     const next = [...store.list.filter((x) => x !== old), ...(rec ? [rec] : [])]
     if (rec && budget(store, next) > MAX_FILE_BYTES && !((await setAside(store)) && budget(store, next) <= MAX_FILE_BYTES))
-      throw new Error('Too many watches to keep in this workspace: wait for some to end')
+      throw new Error(say(T.tooBig))
     store.list = next
     if (old || rec) {
       try {
         await save(store)
       } catch (e) {
         store.list = before
-        throw new Error(`Could not save the watch: ${(e as Error).message}`, { cause: e })
+        throw new Error(say(T.notSaved, { error: (e as Error).message }), { cause: e })
       }
     }
     stopDelivery(store, old)
@@ -1430,7 +1470,7 @@ async function evaluateAgents(store: Store): Promise<void> {
       const hits = agentHits(rec)
       if (!hits.length) continue
       // A lane watch's agents (HI-1987) fire it as a lane watch: its line, made again as it is handed over, tells its lanes too.
-      const line = rec.lanes ? laneWakeLine([], { agents: laneAgentsOf(hits), watching: rec.cond.cards.length > 0, following: true }) : agentWakeLine(hits, userName())
+      const line = inDialectOf(sessionOf(rec), () => (rec.lanes ? laneWakeLine([], { agents: laneAgentsOf(hits), watching: rec.cond.cards.length > 0, following: true }) : agentWakeLine(hits, userName())))
       rec.fired = { line: lineFor(store, rec, () => line), at: new Date().toISOString(), cards: [], agents: hits.map((h) => agentKey(h.agent.projectPath, h.agent.agentId)), ...(rec.lanes ? { lanes: true as const } : {}), ...(hits.some((h) => h.reply !== undefined) ? { replies: true as const } : {}) }
       changed = true
     }
@@ -1469,13 +1509,14 @@ export type UsageWatchResult = ({ watching: TaskWatchInfo } | { already: string[
 export async function registerUsageWatch(ws: WorkspaceService, projectPath: string, agentId: string, usage: UsageWatch[], limitMinutes = WATCH_DEFAULT_LIMIT_MINUTES): Promise<UsageWatchResult> {
   await followAgent(projectPath, agentId)
   const store = await load(ws)
+  // agent-protocol: servers.ts gives this reply its status by its opening (/Not a project/)
   if (!hostedIn(ws, store.path, projectPath)) throw new Error(`Not a project of this workspace: ${projectPath}`)
   const result = await locked(store, async (): Promise<UsageWatchResult> => {
     await assertNotPlacing(ws, projectPath, agentId, scopeFor(ws, projectPath))
     const already = usageHits(usage, (a) => config.get().connectionPlanUsage?.[a]?.limits, Date.now())
     const old = recordOf(store, projectPath, agentId)
     const before = store.list
-    if (!already.length && !old && store.list.length >= MAX_WATCHES) throw new Error(`This workspace already has ${MAX_WATCHES} watches, the most Hive keeps: wait for some to end`)
+    if (!already.length && !old && store.list.length >= MAX_WATCHES) throw new Error(say(T.tooMany, { max: String(MAX_WATCHES) }))
     const minutes = Math.min(WATCH_MAX_LIMIT_MINUTES, Math.max(1, Math.round(limitMinutes)))
     const rec: WatchRecord | null = already.length ? null : { id: randomBytes(6).toString('hex'), projectPath, ...projectIdOf(ws, projectPath), agentId, scope: scopeFor(ws, projectPath), cond: NO_CARDS, usage, marks: {}, current: {}, since: new Date().toISOString(), limitMinutes: minutes, limitAt: new Date(Date.now() + minutes * 60_000).toISOString() }
     store.list = [...store.list.filter((x) => x !== old), ...(rec ? [rec] : [])]
@@ -1484,7 +1525,7 @@ export async function registerUsageWatch(ws: WorkspaceService, projectPath: stri
         await save(store)
       } catch (e) {
         store.list = before
-        throw new Error(`Could not save the watch: ${(e as Error).message}`, { cause: e })
+        throw new Error(say(T.notSaved, { error: (e as Error).message }), { cause: e })
       }
     }
     stopDelivery(store, old)
@@ -1687,7 +1728,11 @@ interface LaneRound {
  * from when the watch began). Lanes no longer followed (an ended one told) leave an "all" watch's marks. With them, the
  * cards beside its lanes as a card watch checks its cards, and the agents waiting for the user (#726).
  */
-async function laneRound(store: Store, rec: WatchRecord, board: LaneBoard = laneBoard(store.ws)): Promise<LaneRound> {
+function laneRound(store: Store, rec: WatchRecord, board: LaneBoard = laneBoard(store.ws)): Promise<LaneRound> {
+  // Its hits' texts in the dialect of the agent its line is for.
+  return inDialectOf(sessionOf(rec), () => laneRoundFor(store, rec, board))
+}
+async function laneRoundFor(store: Store, rec: WatchRecord, board: LaneBoard): Promise<LaneRound> {
   const cond = rec.lanes!
   const nows = await lanesNow(store, rec, board)
   const listed = await listLanes(store.ws, { all: true })
@@ -1839,16 +1884,20 @@ export async function registerLaneWatch(ws: WorkspaceService, projectPath: strin
   const waitsFrom = latestWaitSeq()
   await followAgent(projectPath, agentId)
   const store = await load(ws)
+  // agent-protocol: servers.ts gives this reply its status by its opening (/Not a project/)
   if (!hostedIn(ws, store.path, projectPath)) throw new Error(`Not a project of this workspace: ${projectPath}`)
   const scope = scopeFor(ws, projectPath)
   const self = await boardName(ws, projectPath, agentId)
   for (const a of extra.agents?.agents ?? []) {
+    // agent-protocol: servers.ts gives this reply its status by its opening (/Not a project/)
     if (!mayWatch(ws, store.path, projectPath, a.projectPath)) throw new Error(`Not a project of this workspace: ${a.project}`)
+    // agent-protocol: servers.ts gives this reply its status by its opening (/^You can't watch yourself/)
     if (same(a.projectPath, projectPath) && a.agentId === agentId) throw new Error("You can't watch yourself: nothing would wake you")
   }
   if (cond.ids !== 'all') {
     const known = (await listLanes(ws, { all: true })).filter((l) => scope === null || same(l.project, scope))
     const unknown = cond.ids.filter((id) => !known.some((l) => l.id === id))
+    // agent-protocol: servers.ts gives this reply its status by its opening (/^No such lane/)
     if (unknown.length) throw new Error(`No such lane${unknown.length === 1 ? '' : 's'}: ${unknown.join(', ')} (hive_lane list gives the lanes and their ids)`)
   }
   const result = await locked(store, async (): Promise<LaneWatchResult> => {
@@ -1940,17 +1989,17 @@ export async function registerLaneWatch(ws: WorkspaceService, projectPath: strin
     // call began.
     const waitSeq = (old?.lanes ? old.waitSeq : undefined) ?? told?.waitSeq ?? waitsFrom
     const before = store.list
-    if (!old && store.list.length >= MAX_WATCHES) throw new Error(`This workspace already has ${MAX_WATCHES} watches, the most Hive keeps: wait for some to end`)
+    if (!old && store.list.length >= MAX_WATCHES) throw new Error(say(T.tooMany, { max: String(MAX_WATCHES) }))
     const minutes = Math.min(WATCH_MAX_LIMIT_MINUTES, Math.max(1, Math.round(limitMinutes)))
     const rec: WatchRecord = { id: randomBytes(6).toString('hex'), projectPath, ...projectIdOf(ws, projectPath), agentId, scope, cond: cardCond, lanes: cond, laneMarks, laneSince, waitSeq, ...(followed.length ? { agents: { ignoreBackground: wanted!.ignoreBackground, agents: followed }, agentMarks } : {}), marks, current, since, ...from, limitMinutes: minutes, limitAt: new Date(Date.now() + minutes * 60_000).toISOString() }
     const next = [...store.list.filter((x) => x !== old), rec]
-    if (budget(store, next) > MAX_FILE_BYTES && !((await setAside(store)) && budget(store, next) <= MAX_FILE_BYTES)) throw new Error('Too many watches to keep in this workspace: wait for some to end')
+    if (budget(store, next) > MAX_FILE_BYTES && !((await setAside(store)) && budget(store, next) <= MAX_FILE_BYTES)) throw new Error(say(T.tooBig))
     store.list = next
     try {
       await save(store)
     } catch (e) {
       store.list = before
-      throw new Error(`Could not save the watch: ${(e as Error).message}`, { cause: e })
+      throw new Error(say(T.notSaved, { error: (e as Error).message }), { cause: e })
     }
     stopDelivery(store, old)
     if (toldNow.size) noteToldAgents(store, watcher, toldNow)
@@ -1967,6 +2016,7 @@ export async function registerLaneWatch(ws: WorkspaceService, projectPath: strin
 /** Typing a wake stopped: it tells a reply of the user's, and they turned telling replies off meanwhile (#418). */
 class RepliesRevoked extends Error {
   constructor() {
+    // agent-protocol: RepliesRevoked's message is only the log's (a wake put off), never an agent's
     super('The user turned off telling the Assistant their replies.')
   }
 }
@@ -2016,7 +2066,10 @@ export function watchToldDecisions(projectPath: string, agentId: string, card: T
   if (watchCovers(projectPath, agentId, card.number, 'decision', card.column)) return 'all'
   const t = toldOf(projectPath, agentId, card.number)?.hand
   if (!t) return null
-  const added = (h: TaskCard['history'][number]): boolean => isDecisionEntry(h.what) && !h.what.startsWith('Removed') && !(h.what.startsWith('Recorded') && h.by === self)
+  const added = (h: TaskCard['history'][number]): boolean => {
+    const d = decisionLine(h)
+    return d !== null && d !== 'removed' && !(d === 'recorded' && h.by === self)
+  }
   return { untold: card.history.filter((h) => added(h) && !entryWithin(card.history, h, t.h)).length }
 }
 
@@ -2071,6 +2124,7 @@ function toldOf(projectPath: string, agentId: string, n: number): { h: string | 
 }
 
 /** Hive's own deliveries come from it. */
+// agent-protocol: the sender's name a delivery is labelled with (deliveries name their senders)
 const HIVE = { kind: 'hive', name: 'Hive' } as const
 
 /** A watch's wake's key among its deliveries: the watch and when it fired (a restart finds the one it made). */
@@ -2133,8 +2187,9 @@ registerSource('watch', {
   refresh: async (r, host) => {
     const w = watchOf(host, r)
     // Its workspace's watches not loaded yet: decided once they are (it isn't typed meanwhile).
-    if (!w) return storeFor(host) ? { cancel: 'its watch has ended' } : null
-    if (!repliesHold(handed.get(handedKey(host, r.id))?.told)) return { cancel: "the user's replies are no longer told" }
+    const why = (m: AgentMsg): string => inDialectOf({ projectPath: host, agentId: r.agentId }, () => say(m))
+    if (!w) return storeFor(host) ? { cancel: why(T.watchEnded) } : null
+    if (!repliesHold(handed.get(handedKey(host, r.id))?.told)) return { cancel: why(T.repliesOff) }
     return null
   },
   holds: (r, host) => !!watchOf(host, r) && repliesHold(handed.get(handedKey(host, r.id))?.told),
@@ -2188,6 +2243,7 @@ function toldBy(store: Store, rec: WatchRecord, told: Told): void {
   // The developer console (#636): the wake as it was received (its line is in the agent's own events, as input).
   devConsole.capture([store.ws.path && hiveSourceId(store.ws.path), sessionSourceId(rec.projectPath, rec.agentId)], () => {
     const what = rec.lanes ? 'lanes' : rec.agents ? `${rec.agents.agents.length} agent(s)` : rec.cond.cards.map((n) => `#${n}`).join(', ')
+    // agent-protocol: the developer console's summary of a wake, not said to an agent
     return { kind: 'watch', name: 'wake', raw: { cards: rec.cond.cards, agents: rec.agents?.agents.length ?? 0, lanes: !!rec.lanes, firedAt: rec.fired?.at ?? null }, made: { typed: true, replies: told.replies }, safe: { raw: { firedAt: true } }, summary: `watch woke ${rec.agentId} (${what})` }
   })
   noteToldByWatch(rec.projectPath, rec.agentId, told.ofCards, !agentOnly(rec) && hearsHandoffs(rec.cond))
@@ -2252,7 +2308,11 @@ async function followDelivered(store: Store): Promise<void> {
  * starts, never on "typed". Cancelled or replaced meanwhile, its delivery is cancelled too. A card its line tells about
  * is checked again first: one that has left the agent's view is told as gone.
  */
-async function deliver(store: Store, rec: WatchRecord): Promise<void> {
+function deliver(store: Store, rec: WatchRecord): Promise<void> {
+  // Its line made in the dialect of the agent it is for.
+  return inDialectOf(sessionOf(rec), () => deliverFor(store, rec))
+}
+async function deliverFor(store: Store, rec: WatchRecord): Promise<void> {
   if (!rec.fired || rec.fired.delivery || store.delivering.has(rec.id) || !alive(store)) return
   // Changes landing together are told together: a watch fired by a change waits a moment before its line is made (#224).
   const due = Date.parse(rec.fired.at) + (testHooks.settleMs ?? SETTLE_MS)
@@ -2400,7 +2460,7 @@ async function deliver(store: Store, rec: WatchRecord): Promise<void> {
     // rather than making another (the same watch and fire make the same one). Not saved: not handed over (tried again).
     const given = await locked(store, async () => {
       if (!current() || !rec.fired || rec.fired.delivery) return null
-      const d = await createDelivery(rec.projectPath, { agentId: rec.agentId, kind: 'card-event', from: HIVE, body: line, ...(rec.fired.cards.length ? { card: rec.fired.cards[0] } : {}), source: 'watch', ref: wakeRef(rec), replace: true, ...(returned ? { meta: { [returned]: true } } : {}), ...(rec.fired.again ? { again: 'Hive restarted while typing it' } : {}) })
+      const d = await createDelivery(rec.projectPath, { agentId: rec.agentId, kind: 'card-event', from: HIVE, body: line, ...(rec.fired.cards.length ? { card: rec.fired.cards[0] } : {}), source: 'watch', ref: wakeRef(rec), replace: true, ...(returned ? { meta: { [returned]: true } } : {}), ...(rec.fired.again ? { again: say(T.againTyping) } : {}) })
       rec.fired.line = line
       rec.fired.delivery = d.id
       // A lane watch's marks move only once its line is received: pending with it until then (saved, for a restart).
@@ -2410,7 +2470,7 @@ async function deliver(store: Store, rec: WatchRecord): Promise<void> {
       } catch (e) {
         delete rec.fired.delivery
         delete rec.fired.laneMarks
-        await cancelFromSource(rec.projectPath, 'watch', wakeRef(rec), "cancelled: its watch couldn't be saved").catch(() => undefined)
+        await cancelFromSource(rec.projectPath, 'watch', wakeRef(rec), say(T.notSavedWake)).catch(() => undefined)
         throw e
       }
       handed.set(handedKey(rec.projectPath, d.id), { store, rec, told: { cards: told, agents: toldAgents, reply: toldReply, laneAt: laneToldAt, laneMarks: laneTold, laneAgents: laneAgentsTold, waitSeq: waitTold, ofCards: toldOfCards, endedAt, replies: telling, generation } })
@@ -2440,7 +2500,12 @@ async function deliver(store: Store, rec: WatchRecord): Promise<void> {
 }
 
 /** Checks one watch against the board: whether it fires now. Its cards are read as its scope sees them. */
-async function check(store: Store, rec: WatchRecord, cards?: CardReads, ctx: ReleaseContext = NO_CONTEXT): Promise<{ moved: boolean; hits: CardChange[]; told: Record<string, Baseline>; replies: { seq: number; note: ReplyNote }[]; released: Released[] }> {
+function check(store: Store, rec: WatchRecord, cards?: CardReads, ctx: ReleaseContext = NO_CONTEXT): Promise<CheckResult> {
+  // What it reads into texts (a return's reason, who submitted again) in the dialect of the agent the watch is for.
+  return inDialectOf(sessionOf(rec), () => checkFor(store, rec, cards, ctx))
+}
+type CheckResult = { moved: boolean; hits: CardChange[]; told: Record<string, Baseline>; replies: { seq: number; note: ReplyNote }[]; released: Released[] }
+async function checkFor(store: Store, rec: WatchRecord, cards: CardReads | undefined, ctx: ReleaseContext): Promise<CheckResult> {
   const hits: CardChange[] = []
   // Cards the watcher's part in has ended (#420).
   const released: Released[] = []
@@ -2491,7 +2556,7 @@ async function check(store: Store, rec: WatchRecord, cards?: CardReads, ctx: Rel
       }
       // HI-2143: back in Review, submitted again after that return: for whoever watches it but its builder, led by that.
       if (kinds !== 'gone' && kinds.includes('column') && card && card.column === 'review' && card.agent !== rec.agentId && card.project && store.path) {
-        const again = await resubmittedOf(store.ws, join(store.path, card.project), n, card.agentName ?? card.agent ?? 'its builder').catch(() => null)
+        const again = await resubmittedOf(store.ws, join(store.path, card.project), n, card.agentName ?? card.agent ?? itsBuilder()).catch(() => null)
         if (again) about.resubmitted = again
       }
       hits.push({ ...cardChange(n, card, kinds), about })
@@ -2528,8 +2593,8 @@ function releaseOf(rec: WatchRecord, n: number, card: TaskCard | null, ctx: Rele
   if ((on.role === 'reviewer' || on.role === 'awaiting') && reviewer) return { number: n, why: 'reviewer', detail: reviewer }
   // Its review taken from it (not ended by its own verdict): stopped, or cleared by someone else.
   if (on.role === 'reviewer' && !card.review) {
-    const last = card.history.findLast((h) => /^(Started reviewing|Review (passed|failed)|Review by .* stopped)/.test(h.what))
-    if (!last || !(/^Review (passed|failed)/.test(last.what) && last.by === rec.watcherName)) return { number: n, why: 'reviewer', detail: null }
+    const last = card.history.findLast((h) => reviewStep(h) !== null)
+    if (!last || !(historyVerdict(last) !== null && last.by === rec.watcherName)) return { number: n, why: 'reviewer', detail: null }
   }
   // Waiting for it in Review: its agent was replaced by another, or by none (its work goes to another lane, or nowhere).
   const was = rec.marks[n]?.agent

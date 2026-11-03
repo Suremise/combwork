@@ -1,8 +1,11 @@
 /**
  * Pausing the team before an update (HI-2081, SPEC §16.10.9): a workspace's hold on Hive's own automation (lane starts,
  * loop and watch wakes, the reviewer pool's hand-outs, the new conversations Hive starts by itself, the merge queue's
- * next entry), and what still runs before it is safe to install. No imports: hive-mcp.js and the window read it too.
+ * next entry), and what still runs before it is safe to install. hive-mcp.js and the window read it too: it imports only
+ * the agent text module and the notices' prefix, which need no Node module.
  */
+import { agentMsg, say } from './agentText'
+import { NOTICE_PREFIX } from './doorbell'
 
 /** A workspace's pause, held in memory by the running Hive (HI-2156): its epoch, since when, and who paused it. */
 export interface TeamPause {
@@ -59,12 +62,20 @@ export interface TeamPauseState {
 /** A lane held by its workspace's pause shows this (its LaneWaitReason). */
 export const TEAM_PAUSE_REASON = 'teamPause' as const
 
+const T = {
+  pausing: agentMsg({
+    id: 'notice.team.paused',
+    text: 'The team is pausing for an update. Finish this turn, end the runs you started (tests, builds, dev servers, test copies of Hive), commit your work, then end your turn. Until the team resumes Hive starts no card and sends you no card events or watch wakes; a message or an answer can still reach you.',
+    note: "HI-2081: the notice each running agent is given once per team pause, true to what the hold does (HR1's s8 check): no card starts or events, while a message or an answer still comes."
+  })
+}
+
 /**
  * The line each running agent is given once per pause (its delivery's source `team-pause`, ref the pause's id): Hive's own
  * words, true to what the hold does (HR1's s8 check): no card starts or events, while a message or an answer still comes.
+ * Said per agent, in its dialect (main/teamPause.ts sets the scope).
  */
-export const TEAM_PAUSE_LINE =
-  '[Hive] The team is pausing for an update. Finish this turn, end the runs you started (tests, builds, dev servers, test copies of Hive), commit your work, then end your turn. Until the team resumes Hive starts no card and sends you no card events or watch wakes; a message or an answer can still reach you.' // i18n-ignore: agent-facing, the line each running agent is given
+export const teamPauseLine = (): string => NOTICE_PREFIX + say(T.pausing)
 
 /** The delivery sources a pause holds (Hive's own wakes and hand-outs); the rest (messages, decisions, notices) still go. */
 export const PAUSE_HELD_SOURCES: readonly string[] = ['loop', 'watch', 'pool-review']

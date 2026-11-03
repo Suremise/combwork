@@ -12,12 +12,14 @@ import { RETIRED_PERSONAS, projectAgents } from '../shared/defaults'
 import { ASSISTANT_AGENT_ID, LEGACY_MODES_DIR, MODES_DIR } from '../shared/assistant'
 import { toast } from './events'
 import { atMost } from '../shared/atMost'
+import { dialectsDir } from './dialects/store'
 
 /**
- * Keeps a workspace's copies of Hive's bundled skills and the Assistant's modes up to date, without overriding the user:
+ * Keeps a workspace's copies of Hive's bundled skills, the Assistant's modes and the dialect files (HI-2439) up to date,
+ * without overriding the user:
  * - a bundled item the workspace was never given is added (a new workspace, or one Hive added since);
  * - a copy the user never changed (a version Hive shipped, older than this one) is updated in place;
- * - a copy the user changed is kept as it is (the Skills and Modes views offer Revert, and say when the copy
+ * - a copy the user changed is kept as it is (the Skills, Modes and Dialects views offer Revert, and say when the copy
  *   came from an older version);
  * - an item the user deleted stays deleted (the views offer Restore).
  * `.hive/bundled.json` records which items the workspace has been given and the version each copy came from.
@@ -32,18 +34,24 @@ const SLOW_SYNC_MS = 1000
 /** A bundled item's update this slow says its time (HI-1694). */
 const SLOW_ITEM_MS = 500
 
-export type BundledKind = 'skills' | 'modes'
+/**
+ * What Hive bundles: skills (a folder each), modes (a file each) and dialect files (`dialects`, HI-2439: a file each,
+ * in a CLI's folder, its id `<folder>/<label>`, such as "claude-code/Opus 5.5").
+ */
+export type BundledKind = 'skills' | 'modes' | 'dialects'
 
 /** What `.hive/bundled.json` holds: per item, the shipped version its copy was made from (null: not Hive's copy). */
 interface Manifest {
   skills: Record<string, { from: string | null }>
   modes: Record<string, { from: string | null }>
+  dialects: Record<string, { from: string | null }>
 }
 
 /** Items that shipped before Hive kept a manifest: missing from a workspace without one, they were deleted by the user. */
 const BEFORE_MANIFEST: Record<BundledKind, string[]> = {
   skills: ['handover', 'merge-ready', 'pick-up', 'review-agent-work', 'split-work', 'workspace-note'],
-  modes: ['orchestrator', 'overseer', 'planner', 'reviewer']
+  modes: ['orchestrator', 'overseer', 'planner', 'reviewer'],
+  dialects: []
 }
 
 const history = HISTORY as Record<BundledKind, Record<string, string[]>>
@@ -52,11 +60,24 @@ export function bundledDir(kind: BundledKind): string {
   return join(resourcesDir(), kind)
 }
 
-/** A bundled item's path: a skill's folder, a mode's file. */
-const itemPath = (dir: string, kind: BundledKind, id: string): string => join(dir, kind === 'skills' ? id : `${id}.md`)
+/** A bundled item's path: a skill's folder, a mode's file, a dialect file (its id is `<folder>/<label>`). */
+const itemPath = (dir: string, kind: BundledKind, id: string): string => join(dir, kind === 'skills' ? id : kind === 'modes' ? `${id}.md` : `${id}.json`)
+
+/** A dialect file's folders, as Hive ships them: a provider's id, or `api`. */
+const DIALECT_FOLDER = /^[a-z0-9][a-z0-9-]*$/
+
+/** The dialect files a folder of them holds, as ids (`<folder>/<label>`). */
+async function dialectIds(dir: string): Promise<string[]> {
+  const ids: string[] = []
+  for (const f of (await readdir(dir, { withFileTypes: true }).catch(() => [])).filter((e) => e.isDirectory() && DIALECT_FOLDER.test(e.name))) {
+    for (const e of await readdir(join(dir, f.name), { withFileTypes: true }).catch(() => [])) if (e.isFile() && e.name.endsWith('.json') && !e.name.startsWith('.')) ids.push(`${f.name}/${e.name.slice(0, -5)}`)
+  }
+  return ids.sort()
+}
 
 /** The items this version of Hive ships. */
 export async function bundledIds(kind: BundledKind): Promise<string[]> {
+  if (kind === 'dialects') return dialectIds(bundledDir(kind))
   try {
     const entries = await readdir(bundledDir(kind), { withFileTypes: true })
     return kind === 'skills'
@@ -120,20 +141,23 @@ function manifestOf(file: unknown): Manifest | null {
   if (!m || typeof m !== 'object') return null
   const part = (v: unknown): Manifest['skills'] => (v && typeof v === 'object' ? (v as Manifest['skills']) : {})
   // Until 0.9.3 the modes were personas, and so was their key (#1084).
-  return { skills: part(m.skills), modes: part(m.modes ?? (m as { personas?: unknown }).personas) }
+  return { skills: part(m.skills), modes: part(m.modes ?? (m as { personas?: unknown }).personas), dialects: part(m.dialects) }
 }
 
 /** Changes the manifest under its lock (another window's sync or a Restore may be writing it). */
 function changeManifest(fn: (m: Manifest) => void): Promise<void> {
   const path = manifestPath()
   return withFileLock(path, async () => {
-    const m = (await readManifest()) ?? { skills: {}, modes: {} }
+    const m = (await readManifest()) ?? { skills: {}, modes: {}, dialects: {} }
     fn(m)
     await writeJsonAtomic(path, m)
   })
 }
 
-const folderOf = (kind: BundledKind): string => (kind === 'skills' ? workspace.skillsDir : workspace.modesDir)
+const folderOf = (kind: BundledKind): string => (kind === 'skills' ? workspace.skillsDir : kind === 'modes' ? workspace.modesDir : dialectsDir(workspace.hiveDir))
+
+/** What an item is called in the log. */
+const itemWord = (kind: BundledKind): string => (kind === 'skills' ? 'skill' : kind === 'modes' ? 'mode' : 'dialect file') // i18n-ignore: the log's words for a bundled item
 
 /**
  * Puts this Hive's version of an item in the workspace (swapIn: a skill's folder or a mode's file, all at once). An
@@ -145,32 +169,42 @@ async function install(kind: BundledKind, id: string, expected?: string | null):
   await swapIn(itemPath(bundledDir(kind), kind, id), itemPath(folderOf(kind), kind, id), { expected })
 }
 
-/** A swap's leftover old copy is disposable when it is a version Hive shipped of that item (nothing of the user's). */
-function shippedVersion(kind: BundledKind): (old: string, name: string) => Promise<boolean> {
-  return async (old, name) => (history[kind][kind === 'skills' ? name : name.replace(/\.md$/, '')] ?? []).includes(await contentHash(old))
+/**
+ * A swap's leftover old copy is disposable when it is a version Hive shipped of that item (nothing of the user's).
+ * `folder`: a dialect file's folder, the first part of its id.
+ */
+function shippedVersion(kind: BundledKind, folder?: string): (old: string, name: string) => Promise<boolean> {
+  const idOf = (name: string): string => (kind === 'skills' ? name : kind === 'modes' ? name.replace(/\.md$/, '') : `${folder}/${name.replace(/\.json$/, '')}`)
+  return async (old, name) => (history[kind][idOf(name)] ?? []).includes(await contentHash(old))
+}
+
+/** Cleans what a crash in a swap left where a kind's items are swapped in: its folder, and each dialect folder in it. */
+async function cleanKind(kind: BundledKind, folder: string): Promise<void> {
+  if (kind !== 'dialects') return cleanSwaps(folder, shippedVersion(kind))
+  for (const f of (await readdir(folder, { withFileTypes: true }).catch(() => [])).filter((e) => e.isDirectory() && DIALECT_FOLDER.test(e.name))) await cleanSwaps(join(folder, f.name), shippedVersion(kind, f.name))
 }
 
 /**
- * Brings the workspace's bundled skills and modes up to date (each time it opens; `fresh` for a workspace Hive has
+ * Brings the workspace's bundled skills, modes and dialect files up to date (each time it opens; `fresh` for a workspace Hive has
  * just set up). One item that can't be updated (a file in it open) is left as it is until the next time; the others go
  * ahead.
  */
 export async function syncBundled(opts: { fresh?: boolean } = {}): Promise<void> {
   const started = performance.now()
-  const changed = { skills: 0, modes: 0 }
+  const changed = { skills: 0, modes: 0, dialects: 0 }
   await withFileLock(manifestPath(), async () => {
     await moveLegacyModes()
     const file = await readJson<unknown>(manifestPath(), null)
     const before = manifestOf(file)
     // A copy: compared with the file when it is written.
-    const m: Manifest = before ? structuredClone(before) : { skills: {}, modes: {} }
-    const ids = { skills: await bundledIds('skills'), modes: await bundledIds('modes') }
-    for (const kind of ['skills', 'modes'] as const) {
+    const m: Manifest = before ? structuredClone(before) : { skills: {}, modes: {}, dialects: {} }
+    const ids = { skills: await bundledIds('skills'), modes: await bundledIds('modes'), dialects: await bundledIds('dialects') }
+    for (const kind of ['skills', 'modes', 'dialects'] as const) {
       const folder = folderOf(kind)
       // A workspace Hive has just set up has empty folders: nothing in it was deleted.
       const hadFolder = !opts.fresh && existsSync(folder)
       // What a crash in a swap left: an old copy that isn't a shipped version (the user's) is kept, renamed beside it.
-      await cleanSwaps(folder, shippedVersion(kind))
+      await cleanKind(kind, folder)
       const syncItem = async (id: string): Promise<void> => {
         const t0 = performance.now()
         const dest = itemPath(folder, kind, id)
@@ -187,7 +221,7 @@ export async function syncBundled(opts: { fresh?: boolean } = {}): Promise<void>
             changed[kind]++
             // Its time when slow (HI-1694: 1.3 s each on a 0.9 workspace's first open, where the files take milliseconds).
             const ms = performance.now() - t0
-            log.info(`${action === 'add' ? 'Added' : 'Updated'} the bundled ${kind === 'skills' ? 'skill' : 'mode'} ${userText(id)}${ms > SLOW_ITEM_MS ? ` (${Math.round(ms)} ms)` : ''}`)
+            log.info(`${action === 'add' ? 'Added' : 'Updated'} the bundled ${itemWord(kind)} ${userText(id)}${ms > SLOW_ITEM_MS ? ` (${Math.round(ms)} ms)` : ''}`)
           } else if (action === 'deleted') m[kind][id] ??= { from: null }
           else if (copy === shipped) m[kind][id] = { from: shipped }
           // A changed copy keeps the version it came from; one Hive never gave (a same-name folder of the user's) has none.
@@ -195,10 +229,10 @@ export async function syncBundled(opts: { fresh?: boolean } = {}): Promise<void>
         } catch (e) {
           // The user changed it meanwhile: it is theirs now, as the next scan will see; the manifest isn't changed.
           if (e instanceof SwapAbandoned) {
-            log.info(`Left the bundled ${kind === 'skills' ? 'skill' : 'mode'} ${userText(id)} as it is: it changed while Hive was ${action === 'add' ? 'adding' : 'updating'} it`)
+            log.info(`Left the bundled ${itemWord(kind)} ${userText(id)} as it is: it changed while Hive was ${action === 'add' ? 'adding' : 'updating'} it`)
             return
           }
-          log.warn(`Could not ${action === 'add' ? 'add' : 'update'} the bundled ${kind === 'skills' ? 'skill' : 'mode'} ${userText(id)}; trying again next time`, e)
+          log.warn(`Could not ${action === 'add' ? 'add' : 'update'} the bundled ${itemWord(kind)} ${userText(id)}; trying again next time`, e)
         }
       }
       // A few at once (HI-1694): one after another, a 0.9 workspace's 19 took 20 s on a scanned drive.
@@ -209,7 +243,7 @@ export async function syncBundled(opts: { fresh?: boolean } = {}): Promise<void>
     if (JSON.stringify(m) !== JSON.stringify(file)) await writeJsonAtomic(manifestPath(), m)
   })
   const ms = performance.now() - started
-  if (ms > SLOW_SYNC_MS) log.info(`bringing the bundled skills and modes up to date took ${(ms / 1000).toFixed(1)} s: ${changed.skills} skill(s) and ${changed.modes} mode(s) added or updated`)
+  if (ms > SLOW_SYNC_MS) log.info(`bringing the bundled skills, modes and dialect files up to date took ${(ms / 1000).toFixed(1)} s: ${changed.skills} skill(s), ${changed.modes} mode(s) and ${changed.dialects} dialect file(s) added or updated`)
 }
 
 /**

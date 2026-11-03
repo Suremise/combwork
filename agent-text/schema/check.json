@@ -1,0 +1,72 @@
+{
+  "check.link.cardForm": {
+    "placeholders": {}
+  },
+  "check.link.checkForm": {
+    "placeholders": {}
+  },
+  "check.link.checkNeedsCard": {
+    "placeholders": {}
+  },
+  "check.link.focusedForm": {
+    "placeholders": {}
+  },
+  "check.link.folder": {
+    "placeholders": {}
+  },
+  "check.link.noCommand": {
+    "placeholders": {
+      "project": "plain",
+      "name": "plain"
+    }
+  },
+  "check.link.noContentRevision": {
+    "placeholders": {
+      "card": "plain",
+      "named": "plain"
+    }
+  },
+  "check.link.notACommit": {
+    "placeholders": {
+      "named": "plain",
+      "folder": "plain"
+    }
+  },
+  "check.link.notCheckedOut": {
+    "placeholders": {
+      "named": "plain",
+      "head": "plain"
+    }
+  },
+  "check.link.notContentRevision": {
+    "placeholders": {
+      "named": "plain",
+      "card": "plain",
+      "hash": "plain"
+    }
+  },
+  "check.link.nothingCheckedOut": {
+    "placeholders": {
+      "folder": "plain",
+      "named": "plain"
+    }
+  },
+  "check.link.otherCopy": {
+    "placeholders": {
+      "copy": "plain",
+      "held": "plain",
+      "card": "plain"
+    }
+  },
+  "check.link.revisionForm": {
+    "placeholders": {}
+  },
+  "check.link.revisionNeedsFolder": {
+    "placeholders": {}
+  },
+  "check.link.unknownCard": {
+    "placeholders": {
+      "card": "plain"
+    }
+  }
+}

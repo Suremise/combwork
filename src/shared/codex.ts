@@ -1,6 +1,7 @@
 import { EFFORT_TEXT, OLDER_VERSIONS } from './claude'
 import { withCliOwn } from './cliOwnMode'
 import { msg } from './i18n/msg'
+import { agentMsg, say } from './agentText'
 import type { ModeOption, ModelGroup, ProviderDescriptor } from './providers'
 
 /**
@@ -11,12 +12,26 @@ import type { ModeOption, ModelGroup, ProviderDescriptor } from './providers'
 export const CODEX = 'codex'
 
 /** The presets of Codex's /permissions menu, in its order (checked with Codex 0.159). */
+/** Codex's permission modes as agents and the Agent API read them (dialects, HI-2065): said when read (the getters below), so in the reader's dialect. The window has its own messages (`text`). */
+const M = {
+  readOnlyLabel: agentMsg({ id: 'mode.codex.readOnly.label', text: 'Read only', note: "Codex's permission mode read-only: its name, as agents and the Agent API read it (the window has its own message)." }),
+  readOnlyDescription: agentMsg({ id: 'mode.codex.readOnly.desc', text: 'Reads workspace files; asks before any edit or internet access.', note: "What Codex's permission mode read-only does, as agents and the Agent API read it (the window has its own message)." }),
+  askDescription: agentMsg({ id: 'mode.codex.ask.desc', text: 'Reads and edits workspace files and runs commands in its sandbox; asks before internet access or edits outside the workspace.', note: "What Codex's permission mode ask does, as agents and the Agent API read it (the window has its own message)." }),
+  approveForMeDescription: agentMsg({ id: 'mode.codex.approveForMe.desc', text: 'An automatic reviewer approves safe actions itself and only asks about ones it thinks are risky.', note: "What Codex's permission mode approve-for-me does, as agents and the Agent API read it (the window has its own message)." }),
+  fullAccessLabel: agentMsg({ id: 'mode.codex.fullAccess.label', text: 'Full access', note: "Codex's permission mode full-access: its name, as agents and the Agent API read it (the window has its own message)." }),
+  fullAccessDescription: agentMsg({ id: 'mode.codex.fullAccess.desc', text: 'No sandbox and no approvals: edits anything and uses the internet without asking. Use only in disposable environments.', note: "What Codex's permission mode full-access does, as agents and the Agent API read it (the window has its own message)." })
+}
+
 // The English labels and descriptions are what agents and the Agent API read; `text` is the window's (#800).
 export const CODEX_PERMISSION_MODES: ModeOption[] = [
   {
     value: 'read-only',
-    label: 'Read only', // i18n-ignore: agent-facing English (text is the window's)
-    description: 'Reads workspace files; asks before any edit or internet access.', // i18n-ignore: agent-facing English (text is the window's)
+    get label() {
+      return say(M.readOnlyLabel)
+    },
+    get description() {
+      return say(M.readOnlyDescription)
+    },
     text: {
       label: msg({ id: 'agents.codex.readOnly', defaultMessage: 'Read only', description: "Codex's permission preset: it only reads. Keep it short." }),
       description: msg({ id: 'agents.codex.readOnlyDescription', defaultMessage: 'Reads workspace files; asks before any edit or internet access.', description: "What Codex's Read only permission preset does (the mode picker)." })
@@ -24,8 +39,11 @@ export const CODEX_PERMISSION_MODES: ModeOption[] = [
   },
   {
     value: 'ask',
+    // agent-protocol: also Codex's own preset name, matched in its "Permission selection requested" line (the codex adapter's modeFromOutput)
     label: 'Ask for approval', // i18n-ignore: agent-facing English (text is the window's)
-    description: 'Reads and edits workspace files and runs commands in its sandbox; asks before internet access or edits outside the workspace.', // i18n-ignore: agent-facing English (text is the window's)
+    get description() {
+      return say(M.askDescription)
+    },
     text: {
       label: msg({ id: 'agents.codex.ask', defaultMessage: 'Ask for approval', description: "Codex's permission preset: it asks before internet access or edits outside the workspace. Keep it short." }),
       description: msg({ id: 'agents.codex.askDescription', defaultMessage: 'Reads and edits workspace files and runs commands in its sandbox; asks before internet access or edits outside the workspace.', description: "What Codex's Ask for approval permission preset does (the mode picker)." })
@@ -33,8 +51,11 @@ export const CODEX_PERMISSION_MODES: ModeOption[] = [
   },
   {
     value: 'approve-for-me',
+    // agent-protocol: also Codex's own preset name, matched in its "Permission selection requested" line (the codex adapter's modeFromOutput)
     label: 'Approve for me', // i18n-ignore: agent-facing English (text is the window's)
-    description: 'An automatic reviewer approves safe actions itself and only asks about ones it thinks are risky.', // i18n-ignore: agent-facing English (text is the window's)
+    get description() {
+      return say(M.approveForMeDescription)
+    },
     reviewed: true,
     text: {
       label: msg({ id: 'agents.codex.approveForMe', defaultMessage: 'Approve for me', description: "Codex's permission preset: its own reviewer approves safe actions. Keep it short." }),
@@ -43,8 +64,12 @@ export const CODEX_PERMISSION_MODES: ModeOption[] = [
   },
   {
     value: 'full-access',
-    label: 'Full access', // i18n-ignore: agent-facing English (text is the window's)
-    description: 'No sandbox and no approvals: edits anything and uses the internet without asking. Use only in disposable environments.', // i18n-ignore: agent-facing English (text is the window's)
+    get label() {
+      return say(M.fullAccessLabel)
+    },
+    get description() {
+      return say(M.fullAccessDescription)
+    },
     danger: true,
     text: {
       label: msg({ id: 'agents.codex.fullAccess', defaultMessage: 'Full access', description: "Codex's permission preset with no guardrails. Keep it short." }),

@@ -1,5 +1,7 @@
 import { OUTAGE_CHECK_FIRST_SECONDS, OUTAGE_CHECK_MOST_SECONDS, OUTAGE_RESUME, OUTAGE_RESUMES_PER_HOUR, OUTAGE_WAIT_MINUTES, outageCheckUrlId } from '../shared/advanced'
 import { formatTime } from '../shared/dates'
+import { agentMsg, inDialectOf, say, type AgentMsg, type AgentValues } from '../shared/agentText'
+import { ASSISTANT_AGENT_ID } from '../shared/assistant'
 import { msg, tr } from '../shared/i18n'
 import type { LiveSessionState } from '../shared/types'
 import { getAccount } from './accounts'
@@ -41,6 +43,14 @@ const M = {
   timedOutStatus: msg({ id: 'session.status.connectionNotBack', defaultMessage: "Stopped: its connection didn't come back", description: "An agent's status once Hive stopped waiting for its connection to come back." })
 }
 
+/** What the Assistant is told (agent messages, said in its dialect). */
+const A = {
+  resumed: agentMsg({ id: 'notice.outage.resumed', text: "{agent}'s connection dropped at {dropped}; it came back at {back} and Hive resumed it.", note: "HI-1612: the Assistant's notice that an agent's dropped connection came back and Hive resumed it. agent: its name; dropped, back: times of day (notice.outage.clock)." }),
+  gaveUp: agentMsg({ id: 'notice.outage.gaveUp', text: "{agent}'s connection dropped again after {resumes} resumes in an hour: Hive stopped resuming it. The PC's network may not have recovered; the user was told the likely fixes (ipconfig /renew, ipconfig /flushdns, a restart).", note: "HI-1612: the Assistant's notice that Hive stopped resuming an agent whose connection kept dropping. agent: its name; resumes: how many in the past hour. ipconfig /renew and /flushdns are Windows commands." }),
+  timedOut: agentMsg({ id: 'notice.outage.timedOut', text: "{agent}'s connection didn't come back within {minutes} minutes: Hive stopped waiting. The user was told the likely fixes.", note: "HI-1612: the Assistant's notice that Hive stopped waiting for an agent's connection. agent: its name; minutes: how long it waited." }),
+  after: agentMsg({ id: 'notice.outage.after', text: '(Settings → Advanced: Resume agents after a connection drops.)', note: "HI-1612: what ends the Assistant's connection notices: the setting that turns these resumes on and off." })
+}
+
 /** An agent of a launch, as the wait names it. */
 function agentOf(st: LiveSessionState): OutageAgent | null {
   if (!st.projectPath || !st.failedTurn) return null
@@ -65,10 +75,11 @@ function nameOf(a: OutageAgent): string {
 /** Each waiting agent's Progress run. */
 const runs = new Map<string, { id: string; caller: Parameters<typeof progress.start>[0] }>()
 
-/** A line for the Assistant (agents resumed together come in one notice: assistantNotes.ts). */
-function tellAssistant(a: OutageAgent, line: string): void {
+/** A line for the Assistant (agents resumed together come in one notice: assistantNotes.ts), said in its dialect. */
+function tellAssistant(a: OutageAgent, line: AgentMsg, values: () => AgentValues): void {
   if (a.assistant) return
-  noteForAssistant(a.projectPath, line, '(Settings → Advanced: Resume agents after a connection drops.)') // i18n-ignore: the Assistant's inbox (agent-facing, English)
+  const said = inDialectOf({ projectPath: workspaceOf(a.projectPath).assistantHome, agentId: ASSISTANT_AGENT_ID }, () => ({ line: say(line, values()), after: say(A.after) }))
+  noteForAssistant(a.projectPath, said.line, said.after)
 }
 
 function startRun(a: OutageAgent): void {
@@ -114,7 +125,7 @@ const hiveHost: OutageHost = {
     switch (end.kind) {
       case 'resumed':
         finishRun(a, { ok: true, summary: tr(M.resumedSummary, { dropped: formatTime(end.droppedAt), back: formatTime(end.backAt) }) })
-        tellAssistant(a, `${name}'s connection dropped at ${clock(end.droppedAt)}; it came back at ${clock(end.backAt)} and Hive resumed it.`) // i18n-ignore: the Assistant's inbox (agent-facing, English)
+        tellAssistant(a, A.resumed, () => ({ agent: name, dropped: clock(end.droppedAt), back: clock(end.backAt) }))
         break
       case 'cancelled':
         sessions.connectionWait(a.projectPath, a.agentId, a.runId, null)
@@ -128,7 +139,7 @@ const hiveHost: OutageHost = {
         const title = tr(gaveUp ? M.gaveUpTitle : M.timedOutTitle, { agent: name })
         const body = gaveUp ? tr(M.gaveUpBody, { n: end.resumes }) : tr(M.timedOutBody, { minutes: end.minutes })
         toast('warning', title, body, undefined, a.projectPath)
-        tellAssistant(a, gaveUp ? `${name}'s connection dropped again after ${end.resumes} resumes in an hour: Hive stopped resuming it. The PC's network may not have recovered; the user was told the likely fixes (ipconfig /renew, ipconfig /flushdns, a restart).` : `${name}'s connection didn't come back within ${end.minutes} minutes: Hive stopped waiting. The user was told the likely fixes.`) // i18n-ignore: the Assistant's inbox (agent-facing, English)
+        tellAssistant(a, gaveUp ? A.gaveUp : A.timedOut, (): AgentValues => (end.kind === 'gaveUp' ? { agent: name, resumes: String(end.resumes) } : { agent: name, minutes: String(end.minutes) }))
         break
       }
     }

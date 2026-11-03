@@ -1,3 +1,5 @@
+import { agentMsg, inDialectOf, say } from '../shared/agentText'
+import { ASSISTANT_AGENT_ID } from '../shared/assistant'
 import { providerDescriptor } from '../shared/providers'
 import type { LiveSessionState } from '../shared/types'
 import { noteForAssistant } from './assistantNotes'
@@ -14,28 +16,33 @@ import { workspaceOf } from './workspace'
  */
 const log = createLogger('sessions')
 
-/** Its line for the Assistant's inbox (agent-facing: English). */
+const T = {
+  line: agentMsg({
+    id: 'notice.retry.waiting',
+    text: "{agent} ({cli}) has been waiting {minutes} min to retry its model request: {why, select, network {it can't reach {cli}'s service} rate {{cli}'s service is refusing its requests as too many for now (429, a request-rate limit, not its usage limit)} status {its requests are refused (HTTP {status})} other {its requests fail}} ({max, select, yes {try {attempt} of {of}} other {try {attempt}}}).{why, select, rate { Each request sends the whole conversation: if its context is large, a new conversation (a handover, then a fresh session) sends less. Only a suggestion for the user; nothing is needed if it recovers.} other {}}",
+    note: "HI-1973: the Assistant's notice of an agent whose CLI has waited a while to retry its model request. agent: its name; cli: its CLI's name; minutes: how long; why: network (it can't reach the service), rate (429: a request-rate limit, never the account's usage limit), status (status: the HTTP status) or other; attempt: its try, of: the most when max is yes."
+  }),
+  after: agentMsg({ id: 'notice.retry.after', text: '(Settings → Advanced: Retry wait: tell the Assistant after.)', note: "HI-1973: what ends the Assistant's retry wait notices: the setting that says when it is told." })
+}
+
+/** Its line for the Assistant's inbox (agent-facing: an agent message). */
 export function retryNoticeLine(st: LiveSessionState, now = Date.now()): string | null {
   const w = st.retryWait
   if (!w) return null
   const cli = providerDescriptor(st.provider).name
   const minutes = Math.max(1, Math.round((now - Date.parse(w.since)) / 60_000))
-  const tries = w.max !== null ? `try ${w.attempt} of ${w.max}` : `try ${w.attempt}` // i18n-ignore: the Assistant's inbox (agent-facing, English)
-  // i18n-ignore: the Assistant's inbox (agent-facing, English)
-  const why = w.network ? `it can't reach ${cli}'s service` : w.status === 429 ? `${cli}'s service is refusing its requests as too many for now (429, a request-rate limit, not its usage limit)` : w.status !== null ? `its requests are refused (HTTP ${w.status})` : 'its requests fail'
-  // i18n-ignore: the Assistant's inbox (agent-facing, English)
-  const hint = !w.network && w.status === 429 ? ' Each request sends the whole conversation: if its context is large, a new conversation (a handover, then a fresh session) sends less. Only a suggestion for the user; nothing is needed if it recovers.' : ''
-  // i18n-ignore: the Assistant's inbox (agent-facing, English)
-  return `${st.agentName ?? st.agentId} (${cli}) has been waiting ${minutes} min to retry its model request: ${why} (${tries}).${hint}`
+  const why = w.network ? 'network' : w.status === 429 ? 'rate' : w.status !== null ? 'status' : 'other'
+  return say(T.line, { agent: st.agentName ?? st.agentId, cli, minutes: String(minutes), why, status: String(w.status ?? ''), max: w.max !== null ? 'yes' : 'no', attempt: String(w.attempt), of: String(w.max ?? '') })
 }
 
 export function startRetryNotice(): void {
   sessions.retryOverdue = (st) => {
     if (workspaceOf(st.projectPath).isAssistantHome(st.projectPath)) return
-    const line = retryNoticeLine(st)
-    if (!line) return
+    // Said in the Assistant's dialect: it is the one told.
+    const said = inDialectOf({ projectPath: workspaceOf(st.projectPath).assistantHome, agentId: ASSISTANT_AGENT_ID }, () => ({ line: retryNoticeLine(st), after: say(T.after) }))
+    if (!said.line) return
     log.info(`${userText(st.agentName ?? st.agentId)}: told the Assistant its retry wait goes on`)
-    noteForAssistant(st.projectPath, line, '(Settings → Advanced: Retry wait: tell the Assistant after.)') // i18n-ignore: the Assistant's inbox (agent-facing, English)
+    noteForAssistant(st.projectPath, said.line, said.after)
   }
 }
 

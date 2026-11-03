@@ -1,4 +1,5 @@
 import { app } from 'electron'
+import { agentMsg, say } from '../shared/agentText'
 import type { DeliveryNeed } from '../shared/deliveries'
 import { createLogger, userText } from './logger'
 import { folderChanging, folderSteady } from './folderFence'
@@ -74,6 +75,23 @@ export function onLineComing(fn: (projectPath: string, agentId: string) => boole
 /** Whether another line of Hive's has an agent now: one being typed, or a watch's being made (#1432: Deliver Now waits for it). */
 export const lineBusy = (projectPath: string, agentId: string): boolean => writing.has(agentKey(projectPath, agentId)) || lineComing(projectPath, agentId)
 
+/** Why Hive could not type a line into an agent now (whyNoLine), in the reply of the call that wanted it: said in its caller's dialect. */
+const T = {
+  notRunning: agentMsg({ id: 'inbox.noLine.notRunning', text: "it isn't running", note: 'Why Hive could not type a line (a delivery given now, Deliver Now) into an agent, in the reply of the call that wanted it: the agent named.' }),
+  typing: agentMsg({ id: 'inbox.noLine.typing', text: 'Hive is already typing a line into it', note: 'Why Hive could not type a line into an agent now, in the reply of the call that wanted it.' }),
+  hooksMissing: agentMsg({ id: 'inbox.noLine.hooksMissing', text: "its CLI's hooks aren't reaching Hive, so Hive can't tell when it is free", note: 'Why Hive could not type a line into an agent now, in the reply of the call that wanted it.' }),
+  inputBlocked: agentMsg({ id: 'inbox.noLine.inputBlocked', text: 'something on its screen is taking its keys, and it waits for the user to answer it there', note: 'Why Hive could not type a line into an agent now (HI-2191), in the reply of the call that wanted it.' }),
+  watching: agentMsg({ id: 'inbox.noLine.watching', text: 'it is waiting on cards, and takes no new work until it is woken', note: 'Why Hive could not type a line into an agent now: it waits on a watch, in the reply of the call that wanted it.' }),
+  status: agentMsg({ id: 'inbox.noLine.status', text: 'it is {status}', note: "Why Hive could not type a line into an agent now, in the reply of the call that wanted it. status: the agent's status, as Hive names it (working, starting…)." }),
+  userTyping: agentMsg({ id: 'inbox.noLine.userTyping', text: 'the user has just typed in its terminal and may still be writing there', note: 'Why Hive could not type a line into an agent now, in the reply of the call that wanted it.' }),
+  lineWaiting: agentMsg({ id: 'inbox.noLine.lineWaiting', text: "its CLI hasn't taken the line Hive typed before", note: 'Why Hive could not type a line into an agent now, in the reply of the call that wanted it.' }),
+  cliAsks: agentMsg({ id: 'inbox.noLine.cliAsks', text: 'its CLI shows a question for the user, which a line would answer', note: 'Why Hive could not type a line into an agent now (HI-1959), in the reply of the call that wanted it.' }),
+  launchTask: agentMsg({ id: 'inbox.noLine.launchTask', text: "its CLI hasn't taken its launch's task yet", note: 'Why Hive could not type a line into an agent now, in the reply of the call that wanted it.' }),
+  toolsWaiting: agentMsg({ id: 'inbox.noLine.toolsWaiting', text: "its hive tools haven't connected yet", note: 'Why Hive could not type a line into an agent now (#865), in the reply of the call that wanted it.' }),
+  folder: agentMsg({ id: 'inbox.noLine.folder', text: 'its folder is being changed ({what})', note: "Why Hive could not type a line into an agent now (#646), in the reply of the call that wanted it. what: what is changing the agent's folder (a Git switch or pull)." }),
+  wakeFirst: agentMsg({ id: 'inbox.noLine.wakeFirst', text: "a watch's wake goes first", note: "Why Hive could not type a line into an agent now (#1432): a watch's wake is being made for it, in the reply of the call that wanted it." })
+}
+
 /**
  * Whether a line of Hive's could be typed into an agent now (typeLine's own conditions, before it asks what is wanted):
  * it can take one (`need`), nobody types there, no earlier line is waiting there, no line is being typed and none of a
@@ -81,23 +99,23 @@ export const lineBusy = (projectPath: string, agentId: string): boolean => writi
  */
 export function whyNoLine(projectPath: string, agentId: string, need: DeliveryNeed = 'idle'): string | null {
   const st = sessions.liveFor(projectPath, agentId)
-  if (!st) return "it isn't running" // i18n-ignore: the reply of an agent's call (deliveries.ts, agent-facing)
-  if (writing.has(agentKey(projectPath, agentId))) return 'Hive is already typing a line into it' // i18n-ignore: the reply of an agent's call (deliveries.ts, agent-facing)
-  if (st.hooksMissing) return "its CLI's hooks aren't reaching Hive, so Hive can't tell when it is free" // i18n-ignore: the reply of an agent's call (deliveries.ts, agent-facing)
+  if (!st) return say(T.notRunning)
+  if (writing.has(agentKey(projectPath, agentId))) return say(T.typing)
+  if (st.hooksMissing) return say(T.hooksMissing)
   // Something on its screen takes its keys (HI-2191): it waits for the user to answer it there.
-  if (sessions.inputBlocked(projectPath, agentId)) return 'something on its screen is taking its keys, and it waits for the user to answer it there' // i18n-ignore: the reply of an agent's call (deliveries.ts, agent-facing)
-  if (!readyFor(st, need)) return st.status === 'watching' ? 'it is waiting on cards, and takes no new work until it is woken' : `it is ${st.status}` // i18n-ignore: the reply of an agent's call (deliveries.ts, agent-facing)
-  if (sessions.userMayBeTyping(projectPath, agentId)) return 'the user has just typed in its terminal and may still be writing there' // i18n-ignore: the reply of an agent's call (deliveries.ts, agent-facing)
-  if (sessions.lineWaiting(projectPath, agentId)) return "its CLI hasn't taken the line Hive typed before" // i18n-ignore: the reply of an agent's call (deliveries.ts, agent-facing)
+  if (sessions.inputBlocked(projectPath, agentId)) return say(T.inputBlocked)
+  if (!readyFor(st, need)) return st.status === 'watching' ? say(T.watching) : say(T.status, { status: st.status })
+  if (sessions.userMayBeTyping(projectPath, agentId)) return say(T.userTyping)
+  if (sessions.lineWaiting(projectPath, agentId)) return say(T.lineWaiting)
   // Its CLI's own question on its screen (HI-1959), before its status says so: Enter would answer it.
-  if (sessions.cliAsks(projectPath, agentId)) return 'its CLI shows a question for the user, which a line would answer' // i18n-ignore: the reply of an agent's call (deliveries.ts, agent-facing)
-  if (sessions.launchTaskWaiting(projectPath, agentId)) return "its CLI hasn't taken its launch's task yet" // i18n-ignore: the reply of an agent's call (deliveries.ts, agent-facing)
+  if (sessions.cliAsks(projectPath, agentId)) return say(T.cliAsks)
+  if (sessions.launchTaskWaiting(projectPath, agentId)) return say(T.launchTask)
   // A doorbell before its hive tools have connected is a turn that can't read the inbox (#865: a resumed Claude Code).
-  if (sessions.hiveToolsWaiting(projectPath, agentId)) return "its hive tools haven't connected yet" // i18n-ignore: the reply of an agent's call (deliveries.ts, agent-facing)
+  if (sessions.hiveToolsWaiting(projectPath, agentId)) return say(T.toolsWaiting)
   // Its folder being changed under it (#646: a Git switch or pull): no turn of Hive's starts there until that is done.
   const changing = folderChanging(st.cwd)
-  if (changing) return `its folder is being changed (${changing})` // i18n-ignore: the reply of an agent's call (deliveries.ts, agent-facing)
-  if (lineComing(projectPath, agentId)) return "a watch's wake goes first" // i18n-ignore: the reply of an agent's call (deliveries.ts, agent-facing)
+  if (changing) return say(T.folder, { what: changing })
+  if (lineComing(projectPath, agentId)) return say(T.wakeFirst)
   return null
 }
 export const canTypeLine = (projectPath: string, agentId: string, need: DeliveryNeed = 'idle'): boolean => whyNoLine(projectPath, agentId, need) === null

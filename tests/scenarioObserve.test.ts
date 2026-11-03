@@ -2056,8 +2056,8 @@ describe('coordinator-lanes-to-end scoring', () => {
 // The coordinator scenarios' simulated wakes end as Hive's real one to the Assistant does while lanes run (#402).
 describe("the scenarios' simulated wake", () => {
   it("ends with Hive's own lanes-running tail", async () => {
-    const { LANES_RUNNING_TAIL } = await import('../src/shared/watch')
-    expect(helpers.LANES_RUNNING_TAIL).toBe(LANES_RUNNING_TAIL)
+    const { lanesRunningTail } = await import('../src/shared/watch')
+    expect(helpers.LANES_RUNNING_TAIL).toBe(lanesRunningTail())
   })
 })
 

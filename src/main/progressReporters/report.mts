@@ -146,6 +146,7 @@ export class ProgressRun {
     const step = count(start.step, this.maxStep)
     const estimateMs = count(start.estimateMs, MAX_ESTIMATE_MS)
     const body = {
+      // agent-protocol: a run's stored title when it has none, the same for every reader (the window's panel too)
       title: clip(start.title.trim() || 'Run', MAX_TITLE),
       ...(total !== undefined ? { total } : {}),
       ...(step !== undefined ? { step } : {}),
@@ -168,6 +169,7 @@ export class ProgressRun {
     this.chain = this.id
     this.lines = target ? undefined : opts.lines
     if (this.lines && total !== undefined) this.line(step ?? 0, start.stepName, total)
+    // agent-protocol: a step line the wrapper parses (stepLine), never shown
     if (this.lines && start.waiting) this.lines(`##hive-progress wait=${clip(start.waiting, MAX_TITLE)}`)
   }
 
@@ -176,6 +178,7 @@ export class ProgressRun {
     const starting = Math.min(step + 1, this.maxStep)
     if (starting === this.lineStep && name === undefined && total === undefined) return
     this.lineStep = starting
+    // agent-protocol: a step line the wrapper parses (stepLine), never shown
     this.lines!(`##hive-progress step=${starting}${total !== undefined ? ` total=${total}` : ''}${name ? ` name=${clip(name, MAX_TITLE)}` : ''}`)
   }
 
@@ -191,6 +194,7 @@ export class ProgressRun {
       this.maxStep = total
     }
     if (this.lines && !this.finished) {
+      // agent-protocol: a step line the wrapper parses (stepLine), never shown
       if (u.waiting !== undefined) this.lines(`##hive-progress wait=${clip(u.waiting, MAX_TITLE)}`.trimEnd())
       const step = count(u.step, this.maxStep)
       if (step !== undefined || u.stepName !== undefined || total !== undefined) this.line(step ?? Math.max(0, this.lineStep - 1), u.stepName, total)
@@ -236,6 +240,7 @@ export class ProgressRun {
    * finish that got no reply is sent once more after `retry` ms: a 409 then says the first one arrived.
    */
   async finish(ok: boolean, summary?: string, finishWaitMs = 3000, more: ProgressFinishMore = {}, retry?: number): Promise<unknown> {
+    // agent-protocol: a step line the wrapper parses (stepLine), never shown
     if (this.lines && more.logPath && !this.finished) this.lines(`##hive-progress log=${clip(more.logPath, MAX_LOG_PATH)}`)
     if (!this.target || this.finished) return null
     this.finished = true
@@ -291,6 +296,7 @@ export class ProgressRun {
     try {
       const res = await this.fetchImpl(t.url + path, {
         method,
+        // agent-protocol: HTTP's Authorization header
         headers: { Authorization: `Bearer ${t.token}`, 'Content-Type': 'application/json', ...(t.workspace ? { 'X-Hive-Workspace': encodeURIComponent(t.workspace) } : {}) },
         body: JSON.stringify(body),
         signal: AbortSignal.timeout(timeoutMs)
@@ -339,12 +345,12 @@ export interface RunLink {
  * connection was refused or not allowed (Hive isn't running, or this process may not reach it: a sandbox); `failed`,
  * anything else (an older Hive without the call, an error), with what happened.
  */
-export type Unreachable = { unreachable: true; why: 'slow' | 'refused' | 'failed'; detail: string }
+export type Unreachable = { unreachable: true; why: 'slow' | 'refused' | 'failed'; detail: string; status?: number | null }
 
 /** Why a call threw: a timeout, a refused or forbidden connection, or something else (its message). */
 function unreachableOf(e: unknown): Unreachable {
   const err = e as { name?: string; message?: string; code?: string; cause?: { code?: string; message?: string } }
-  if (err?.name === 'TimeoutError' || err?.name === 'AbortError') return { unreachable: true, why: 'slow', detail: 'no reply in time' }
+  if (err?.name === 'TimeoutError' || err?.name === 'AbortError') return { unreachable: true, why: 'slow', detail: err.name }
   const code = err?.cause?.code ?? err?.code
   if (code === 'ECONNREFUSED' || code === 'EACCES' || code === 'EPERM') return { unreachable: true, why: 'refused', detail: code }
   return { unreachable: true, why: 'failed', detail: err?.cause?.message ?? err?.message ?? String(e) }
@@ -368,6 +374,7 @@ async function resolveOnce(target: ProgressTarget, ask: RunAsk, opts: { fetch?: 
   try {
     const res = await fetchImpl(`${target.url}/v1/progress/resolve`, {
       method: 'POST',
+      // agent-protocol: HTTP's Authorization header
       headers: { Authorization: `Bearer ${target.token}`, 'Content-Type': 'application/json', ...(target.workspace ? { 'X-Hive-Workspace': encodeURIComponent(target.workspace) } : {}) },
       body: JSON.stringify(ask),
       signal: AbortSignal.timeout(opts.timeoutMs ?? 5000)
@@ -392,31 +399,36 @@ async function resolveOnce(target: ProgressTarget, ask: RunAsk, opts: { fetch?: 
     if (res.status === 400 && body && typeof body.error === 'string') return { refused: body.error }
     // An isolated run with no check copy free yet (#1435): what it waits for, to ask again.
     if (res.status === 409 && body && typeof body.wait === 'string') return { wait: body.wait, ...(typeof body.ticket === 'string' && body.ticket ? { ticket: body.ticket } : {}) }
-    return { unreachable: true, why: 'failed', detail: `Hive answered ${res.status ?? 'with an error'}` }
+    // Hive answered, with no link: its status (null: none), which the wrapper words (HI-2065: no agent text here).
+    return { unreachable: true, why: 'failed', detail: '', status: res.status ?? null }
   } catch (e) {
     return unreachableOf(e)
   }
 }
+
+/** How an isolated run's launcher was put in its copy's job: true, or Hive's reason, its status, or why it couldn't be reached. */
+export type IsolatedAssign = true | { error: string } | { status: number } | { unreachable: string }
 
 /**
  * Has Hive put an isolated run's launcher (its pid, started between the two clock readings) in its check copy's job
  * (#1435, POST /v1/progress/isolated), before the launcher is told to run the command: true once it is; what went wrong
  * otherwise (the launcher is then ended having run nothing).
  */
-export async function assignIsolated(target: ProgressTarget, a: { lease: string; pid: number; after: number; before: number }, opts: { fetch?: Fetch; timeoutMs?: number } = {}): Promise<true | string> {
+export async function assignIsolated(target: ProgressTarget, a: { lease: string; pid: number; after: number; before: number }, opts: { fetch?: Fetch; timeoutMs?: number } = {}): Promise<IsolatedAssign> {
   const fetchImpl = opts.fetch ?? (globalThis.fetch as unknown as Fetch)
   try {
     const res = await fetchImpl(`${target.url}/v1/progress/isolated`, {
       method: 'POST',
+      // agent-protocol: HTTP's Authorization header
       headers: { Authorization: `Bearer ${target.token}`, 'Content-Type': 'application/json', ...(target.workspace ? { 'X-Hive-Workspace': encodeURIComponent(target.workspace) } : {}) },
       body: JSON.stringify(a),
       signal: AbortSignal.timeout(opts.timeoutMs ?? 15000)
     })
     if (res.ok) return true
     const body = (await res.json().catch(() => null)) as Record<string, unknown> | null
-    return typeof body?.error === 'string' ? body.error : `Hive answered ${res.status}`
+    return typeof body?.error === 'string' ? { error: body.error } : { status: res.status ?? 0 }
   } catch (e) {
-    return `Hive couldn't be reached (${(e as Error).message})`
+    return { unreachable: (e as Error).message }
   }
 }
 

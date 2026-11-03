@@ -1,0 +1,85 @@
+{
+  "prompt.card.attachments": {
+    "placeholders": {
+      "paths": "plain",
+      "more": "select",
+      "moreCount": "plain"
+    }
+  },
+  "prompt.card.backFrom": {
+    "placeholders": {
+      "column": "plain"
+    }
+  },
+  "prompt.card.commentCut": {
+    "placeholders": {
+      "start": "plain"
+    }
+  },
+  "prompt.card.comments": {
+    "placeholders": {
+      "n": "plural",
+      "count": "plain",
+      "again": "select"
+    }
+  },
+  "prompt.card.dependsOn": {
+    "placeholders": {
+      "cards": "plain"
+    }
+  },
+  "prompt.card.latestComment": {
+    "placeholders": {
+      "by": "plain",
+      "date": "plain",
+      "comment": "plain"
+    }
+  },
+  "prompt.card.skill.laneBuilder": {
+    "placeholders": {}
+  },
+  "prompt.card.skill.workOnCard": {
+    "placeholders": {}
+  },
+  "prompt.card.start": {
+    "placeholders": {
+      "card": "plain",
+      "title": "plain"
+    }
+  },
+  "prompt.context.broken": {
+    "placeholders": {
+      "n": "plural",
+      "problems": "plain"
+    }
+  },
+  "prompt.context.howToRead": {
+    "placeholders": {
+      "ok": "select"
+    }
+  },
+  "prompt.context.item": {
+    "placeholders": {
+      "ref": "plain",
+      "size": "plain"
+    }
+  },
+  "prompt.context.problem": {
+    "placeholders": {
+      "ref": "plain",
+      "problem": "select",
+      "closest": "select",
+      "headings": "plain"
+    }
+  },
+  "prompt.context.readFirst": {
+    "placeholders": {
+      "list": "plain"
+    }
+  },
+  "prompt.context.readFirstNoTools": {
+    "placeholders": {
+      "list": "plain"
+    }
+  }
+}

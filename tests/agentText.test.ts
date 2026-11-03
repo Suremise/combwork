@@ -18,6 +18,18 @@ import { launchRecord, skillRevisions } from '../src/main/guidance'
 import * as skills from '../src/main/skills'
 import * as revisions from '../src/main/revisions'
 import { createWorkspaceService, disposeWorkspaceService, inWorkspace } from '../src/main/workspace'
+import { cardPart, cardWakeLine, laneNextWords, limitLine, LOOP_WAKE_KINDS, loopStepWords, loopWakeLine, readCondition, releasedLine, wakeLine, wakeLines, watchLabel, withLanesTail, type CardChange, type Released, type ReviewWhere } from '../src/shared/watch'
+import { inboxNotice, isDoorbell, unwatchedLanesNotice, type NoticeItem } from '../src/shared/doorbell'
+import { ackText, inboxItems, inboxText, offerLine, type DeliveryRecord } from '../src/shared/deliveries'
+import { relayLine } from '../src/main/answerRelay'
+import { decisionLine } from '../src/main/decisionWakes'
+import { cardDecisions } from '../src/main/decisionNotices'
+import { laneLimitLine, laneWakeLine, laneWatchLabel, readLaneCards, readLaneCondition } from '../src/shared/laneWatch'
+import { agentLimitLine, agentWatchLabel, replyPart } from '../src/shared/agentWatch'
+import { usageLimitLine, usageWakeLine, usageWatchLabel } from '../src/shared/usageWatch'
+import { restartingLine, resumeNote as restartResumeNote } from '../src/shared/restartResume'
+import { resumeNote as outageResumeNote } from '../src/main/outageCore'
+import { teamPauseLine } from '../src/shared/teamPause'
 // @ts-expect-error: a plain .mjs module without types
 import { extractAgentMessages, extractDrift, messageProblems, readCatalogue } from '../scripts/agentTextExtract.mjs'
 
@@ -212,6 +224,202 @@ describe('the canary dialect over the session contract (card 1)', () => {
     expect(canaryProblems('⟦contract.docs.outline⟧x', ids)).toEqual(['unbalanced markers'])
   })
 })
+
+describe('the canary dialect over wakes, doorbells and the inbox (card 4, HI-2437)', () => {
+  const ids = new Set(Object.keys(catalogue))
+  /** Protocol, outside the catalogue: Hive's fixed prefixes, and the user's name when they set none. */
+  const PROTOCOL = ['[Hive]', 'New in your inbox:', 'User']
+  const NAMES = ['Codex', 'Claudette', 'Reviewer', 'Builder', 'Sam', 'Fix the parser', 'needs logs', 'Round one failed', 'design text', 'waiting on the API']
+  type Said = { name: string; text: string; values?: string[] }
+  const change = (n: number, over: Partial<CardChange> = {}): CardChange => ({ number: n, column: 'review', changes: ['column'], by: 'Codex', comment: null, ...over })
+  const commented = (n: number, text = 'Round one failed', over: Partial<CardChange> = {}): CardChange => change(n, { comment: { by: 'Codex', firstLine: text }, ...over })
+
+  /** Every kind of wake line watch.ts makes, and the doorbell's notices, with what fills them. */
+  function wakeTexts(): Said[] {
+    const out: Said[] = []
+    const add = (name: string, text: string, values: string[] = []): void => void out.push({ name, text, values })
+    // A card watch's line: each part of where a card is.
+    add('plain', wakeLine(change(1)))
+    add('comment, more', wakeLine(commented(1), 2))
+    add('owner, passed', wakeLine(change(1, { column: 'passed', changes: ['verdict'], about: { owner: 'Claudette', verdict: { passed: true, by: 'Codex' } } })))
+    add('failed, returned', wakeLine(change(1, { changes: ['column'], about: { owner: null, verdict: { passed: false, by: 'Codex' }, returned: 2 } })))
+    add('blocked, handoffs', wakeLine(change(1, { changes: ['blocked', 'request', 'decision', 'step'], blocked: 'waiting on the API' })))
+    add('archived', wakeLine(change(1, { changes: 'gone', column: 'gone', archived: true })))
+    add('gone', wakeLine(change(1, { changes: 'gone', column: 'gone' })))
+    add('long comment', wakeLine(commented(1, 'needs logs '.repeat(200))))
+    // Several cards, as each gives way to fit.
+    add('many', wakeLines([commented(1), change(2, { changes: ['blocked'], blocked: 'waiting on the API' })]))
+    add('part, no reason', cardPart(change(1, { changes: ['blocked'], blocked: 'waiting on the API' }), 0))
+    add('resubmitted', cardPart(change(1, { about: { owner: null, verdict: null, resubmitted: 'x' } }), 0))
+    const flags = (n: number): CardChange => change(n, { changes: ['blocked', 'request', 'decision', 'step'], blocked: 'waiting on the API', about: { owner: 'Claudette', verdict: { passed: n % 2 === 0, by: 'Codex' } } })
+    // Lines that give way to fit, at each size (the canary's markers lengthen them, so each shape is reached at some size).
+    const others = [change(30, { changes: 'gone', column: 'gone', archived: true }), change(31, { changes: 'gone', column: 'gone' }), change(32, { about: { owner: null, verdict: null, returned: 3 } })]
+    for (let n = 2; n <= 60; n++) add(`many ${n}`, wakeLines(Array.from({ length: n }, (_, i) => flags(i + 1))))
+    for (let n = 0; n <= 6; n++) add(`many gone ${n}`, wakeLines([...Array.from({ length: n }, (_, i) => flags(i + 1)), ...others]))
+    add('numbers, more', wakeLines(Array.from({ length: 200 }, (_, i) => flags(i + 1))))
+    // Loop wakes, each kind, and a lane's next card.
+    for (const kind of LOOP_WAKE_KINDS) add(`loop ${kind}`, loopWakeLine(commented(1), kind, 'needs logs'))
+    for (const next of ['paused', 'last', ...(['hiveStarts', 'start', 'started', 'waits'] as const).map((is) => ({ card: 9, title: 'Fix the parser', is }))] as const) add(`next ${JSON.stringify(next)}`, loopWakeLine(change(1, { column: 'done' }), 'done', undefined, laneNextWords(next)))
+    for (const step of ['design', 'followUp', 'proceed', 'ok', 'gaps']) for (const of of ['design', 'followUp']) add(`step ${step} ${of}`, loopWakeLine(change(1), 'step', loopStepWords(step, 'design text', 'd1', of)), ['d1'])
+    // The Assistant's card wake with the user's replies, and cards that left a watch.
+    const replies = [{ agentName: 'Sam', cards: [1, 2], text: 'needs logs' }]
+    add('replies', cardWakeLine([], replies, [], 'User').line)
+    add('replies, changes', cardWakeLine([commented(3)], replies, [{ number: 4, why: 'reassigned', detail: 'Sam' }], 'User').line)
+    for (let n = 1; n <= 40; n++) add(`replies ${n}`, cardWakeLine(Array.from({ length: n }, (_, i) => flags(i + 1)), replies, [{ number: 50, why: 'done', detail: null }], 'User').line)
+    add('replies, too many', cardWakeLine([], Array.from({ length: 200 }, (_, i) => ({ agentName: `Sam${'x'.repeat(30)}${i}`, cards: [i + 1], text: 'needs logs' })), [], 'User').line, ['Sam', 'x'])
+    const released: Released[] = [
+      { number: 1, why: 'reassigned', detail: 'Sam' },
+      { number: 2, why: 'reassigned', detail: null },
+      { number: 3, why: 'reviewer', detail: 'Reviewer' },
+      { number: 4, why: 'reviewer', detail: null },
+      { number: 5, why: 'blocked', detail: 'waiting on the API' },
+      { number: 6, why: 'done', detail: null },
+      { number: 7, why: 'laneEnded', detail: 'abandoned' },
+      { number: 8, why: 'laneEnded', detail: null }
+    ]
+    for (const r of released) add(`released ${r.why} ${r.detail}`, releasedLine([r]))
+    add('released', releasedLine(released))
+    add('released, two', releasedLine(released.slice(0, 2)))
+    add('released, too many', releasedLine(Array.from({ length: 60 }, (_, i) => ({ number: i + 1, why: 'blocked', detail: 'waiting on the API '.repeat(10) }))))
+    add('released, over, too many', releasedLine(Array.from({ length: 60 }, (_, i) => ({ number: i + 1, why: 'laneEnded', detail: null }))))
+    // A watch's limit passing: each place a card can be, and each step.
+    const where: ReviewWhere[] = [
+      { number: 11, state: 'reviewing', reviewer: 'Reviewer' },
+      { number: 12, state: 'assigned', reviewer: 'Reviewer' },
+      { number: 13, state: 'pool' },
+      { number: 14, state: 'review' },
+      { number: 15, state: 'waits', on: [16] },
+      { number: 16, state: 'working', reviewer: 'Builder' }
+    ]
+    add('limit', limitLine({ cards: [1, 11, 12, 13, 14, 15, 16, 20], changes: ['column'] }, 90, [released[0]], where))
+    add('limit, minutes', limitLine({ cards: [20], changes: ['column'] }, 30))
+    add('limit, one each', limitLine({ cards: [11, 15], changes: ['column'] }, 30, [], [where[0], where[4]]))
+    for (const w of where) add(`limit ${w.state}`, limitLine({ cards: [w.number, 30], changes: ['column'] }, 30, [released[1]], [w]))
+    for (let n = 1; n <= 12; n++) add(`limit short ${n}`, limitLine({ cards: Array.from({ length: n * 2 }, (_, i) => i + 9), changes: ['column'] }, 30, [], Array.from({ length: n * 2 }, (_, i) => ({ number: i + 9, ...(i % 2 ? { state: 'waits' as const, on: [99] } : { state: 'assigned' as const, reviewer: 'Reviewer' }) }))))
+    add('limit, short', limitLine({ cards: Array.from({ length: 20 }, (_, i) => i + 1), changes: ['column'] }, 30, released, Array.from({ length: 12 }, (_, i) => ({ number: i + 9, state: 'assigned', reviewer: 'Reviewer'.repeat(5) }))), ['Reviewer'])
+    add('limit, too long', limitLine({ cards: Array.from({ length: 20 }, (_, i) => i + 1), changes: ['column'] }, 30, Array.from({ length: 60 }, (_, i) => ({ number: i + 1, why: 'blocked', detail: 'waiting on the API '.repeat(10) }))))
+    add('label', watchLabel({ cards: [1, 2] }))
+    add('label, column', watchLabel({ cards: [1], column: 'review' }))
+    for (const args of [{}, { cards: Array.from({ length: 30 }, (_, i) => i + 1) }, { cards: [1], column: 'x' }, { cards: [1], changes: ['x'] }, { cards: [1], column: 'review', changes: ['comment'] }, { cards: [1], fresh: 'x' }, { cards: [1], fresh: true }]) {
+      const r = readCondition(args)
+      if (typeof r === 'string') add(`condition ${JSON.stringify(args)}`, r, ['column', 'comment', 'verdict', 'agent', 'hold', 'todo', 'doing', 'review', 'passed', 'done'])
+    }
+    add('lanes tail', withLanesTail(wakeLine(change(1))))
+    // The doorbell and the inbox's notices.
+    const kinds = ['task', 'handover', 'answer', 'rebrief', 'card-event', 'control'] as const
+    const items = (n: number, ack = true): NoticeItem[] => Array.from({ length: n }, (_, i) => ({ id: `m${i + 1}`, kind: ack ? kinds[i % kinds.length] : 'card-event', ...(i % 2 ? { card: i + 1 } : {}) }))
+    const ms = Array.from({ length: 40 }, (_, i) => `m${i + 1}`)
+    for (const at of ['checkpoint', 'drain', 'doorbell'] as const) {
+      add(`notice ${at} one`, inboxNotice(at, items(1)), ms)
+      add(`notice ${at} many`, inboxNotice(at, items(30)), ms)
+      add(`notice ${at} events`, inboxNotice(at, items(2, false)), ms)
+      add(`notice ${at} event`, inboxNotice(at, items(1, false)), ms)
+    }
+    add('lanes', unwatchedLanesNotice(['HB1', 'HB2']), ['HB1', 'HB2'])
+    add('lanes, more', unwatchedLanesNotice(Array.from({ length: 14 }, (_, i) => `HB${i}`)), Array.from({ length: 14 }, (_, i) => `HB${i}`))
+    add('lanes, nameless', unwatchedLanesNotice(['🐝']))
+    add('lanes, nameless two', unwatchedLanesNotice(['🐝', '🐝🐝']))
+    return out
+  }
+
+  /** What a builder said, in the canary chain: no word outside the catalogue, and the ids it said. */
+  function check(texts: Said[]): Set<string> {
+    const seen = new Set<string>()
+    for (const { name, text, values } of texts) {
+      expect(canaryProblems(text, ids, [...PROTOCOL, ...NAMES, ...(values ?? [])]), name).toEqual([])
+      for (const m of text.matchAll(/⟦([^/⟧][^⟧]*)⟧/g)) seen.add(m[1])
+    }
+    return seen
+  }
+
+  it("finds every word of watch.ts's wakes and the doorbell in the catalogue, and says each of their texts", () => {
+    setProcessChain(chain(canaryTexts(catalogue)))
+    const seen = check(wakeTexts())
+    // Each text watch.ts and doorbell.ts declare shows in some wake. (wake.many.count is the last resort for a line no
+    // card's key fits in, past any watch's size.)
+    const own = [...ids].filter((id) => id.startsWith('doorbell.') || WATCH_IDS.has(id))
+    expect(own.filter((id) => !seen.has(id) && id !== 'wake.many.count')).toEqual([])
+  })
+
+  it('prints counts as the code did, with no thousands separators (no ICU #)', () => {
+    const events = (n: number): NoticeItem[] => Array.from({ length: n }, (_, i) => ({ id: `m${i + 1}`, kind: 'card-event' }))
+    expect(inboxNotice('doorbell', events(1500))).toMatch(/^\[Hive\] New in your inbox: 1500 card events \(m1, /)
+    expect(unwatchedLanesNotice(Array.from({ length: 1200 }, () => '🐝'))).toContain('(1200 lanes)')
+    expect(wakeLine(change(1), 1200)).toContain(' (and 1200 more watched cards changed)')
+  })
+
+  it('says a wake in the dialect of the session it is for', () => {
+    setChainResolver((scope) => (scope.kind === 'session' && scope.session.agentId === 'a2' ? chain({ 'wake.card.ended': '. Watch over.', 'doorbell.notice.doorbell': '{what}: read {n, plural, one {it} other {them}}.' }) : null))
+    const line = (agentId: string): string => inDialectOf({ projectPath: 'C:/ws/p', agentId }, () => wakeLine(change(1)))
+    expect(line('a1')).toBe('[Hive] #1 is in Review. Your card watch has ended: carry on (hive_read_task with latestComment for the comment in full).')
+    expect(line('a2')).toBe('[Hive] #1 is in Review. Watch over.')
+    // The doorbell's fixed opening stays, so isDoorbell still finds it.
+    const bell = inDialectOf({ projectPath: 'C:/ws/p', agentId: 'a2' }, () => inboxNotice('doorbell', [{ id: 'm1', kind: 'task' }]))
+    expect(bell).toBe('[Hive] New in your inbox: 1 task (m1): read it.')
+    expect(isDoorbell(bell)).toBe(true)
+  })
+})
+
+describe("the canary dialect over the inbox's, lane, agent and usage watches' and Hive's notices' builders (card 4)", () => {
+  const ids = new Set(Object.keys(catalogue))
+  const PROTOCOL = ['[Hive]', 'New in your inbox:', 'User']
+  const VALUES = ['HB1', 'HB2', 'alpha', 'Ship it', 'Yes', 'hello', 'Anthropic', 'greet', 'l-1', '1.0.0', '1.0.1', 'UTC', 'nope', 'x']
+  const ms = Array.from({ length: 30 }, (_, i) => `m${i + 1}`)
+  const record = (n: number, over: Partial<DeliveryRecord> = {}): DeliveryRecord => ({ id: `m${n}`, seq: n, agentId: 'a1', conversation: null, kind: 'card-event', from: { kind: 'hive', name: 'Hive' }, card: 7, body: 'hello', state: 'offered', created: '2026-11-03T10:00:00.000Z', expires: '2026-11-04T10:00:00.000Z', ...over })
+  const agent = { projectPath: 'C:/ws/alpha', agentId: 'b1', name: 'HB1', project: 'alpha' }
+
+  function texts(): { name: string; text: string; values?: string[] }[] {
+    const out: { name: string; text: string; values?: string[] }[] = []
+    const add = (name: string, text: string | null | undefined, values: string[] = []): void => void out.push({ name, text: text ?? '', values })
+    // The inbox (shared/deliveries.ts) and the user's answers relayed to the Assistant (answerRelay.ts).
+    add('offer', offerLine([record(1), record(2, { kind: 'task', again: 'Hive restarted while offering it' })], 'Waiting for #12'), ['Hive restarted while offering it'])
+    add('offer, no watch', offerLine([record(1)], null))
+    add('inbox', inboxText(inboxItems([record(1), record(2), record(3, { kind: 'task', card: 9 })]), ['m1']), ['Hive'])
+    add('inbox, empty', inboxText([], ['m3']))
+    add('ack', ackText(['m1'], ['m9'], ['m2'], true))
+    add('ack, unread', ackText([], [], ['m2', 'm3']))
+    for (const outcome of ['approved', 'declined', 'answered'] as const)
+      for (const need of ['done', null] as const) add(`relay ${outcome} ${need}`, relayLine({ card: 12, key: '#12', project: 'alpha', asker: 'a1', askerName: 'HB1', request: 'r1', question: 'Ship it', outcome, ...(outcome !== 'declined' ? { reply: 'Yes', ...(outcome === 'approved' ? { decision: 'Yes' } : {}) } : {}), need }))
+    // Decisions (decisionWakes.ts, decisionNotices.ts).
+    add('decisions', decisionLine(new Map([[7, { count: 1 }], [9, { count: 3 }]]), new Set([7])))
+    add('decision', decisionLine(new Map([[7, { count: 2 }]])))
+    add('decision notice', cardDecisions(7, 2))
+    // Lane, agent and usage watches.
+    add('lane label', laneWatchLabel({ ids: 'all', events: [] }, [4], [{ name: 'HB2' }]))
+    add('lane label, ids', laneWatchLabel({ ids: ['l-1'], events: [] }))
+    add('lane limit', laneLimitLine({ ids: ['l-1', 'l-2'], events: [] }, 90, [4], [{ name: 'HB2' }]), ['l-2'])
+    add('lane waits', laneWakeLine([], { cards: [], waits: [{ name: 'HB1', project: 'alpha', card: 12, what: 'Ship it' }, { name: 'HB2', project: 'alpha', card: null, what: null }], watching: true, following: true }))
+    add('lane cards', readLaneCards({ cards: 'x' }) as string)
+    add('lane changes', readLaneCards({ changes: ['nope'] }) as string, ['column', 'comment', 'verdict', 'agent'])
+    add('lane lanes', readLaneCondition({ lanes: 5 }) as string)
+    add('lane events', readLaneCondition({ lanes: 'all', events: ['nope'] }) as string, ['failed', 'passed', 'blocked', 'unblocked', 'reblocked', 'stalled', 'moved', 'merge-due', 'ended', 'abandoned', 'waiting', 'paused-merge', 'paused-user'])
+    add('agent label', agentWatchLabel({ agents: [agent], ignoreBackground: false }))
+    add('agent limit', agentLimitLine({ agents: [agent], ignoreBackground: false }, 45))
+    add('agent reply', replyPart('HB1', '(alpha)', 'hello'))
+    const usage = [{ account: 'a', name: 'Anthropic', percent: 98, limit: 'weekly' as const }]
+    add('usage label', usageWatchLabel(usage))
+    add('usage wake', usageWakeLine(['Anthropic']))
+    add('usage limit', usageLimitLine(usage, 60))
+    // Hive's notices: restarts, outages, a team pause.
+    add('restarting', restartingLine())
+    add('resumed', restartResumeNote({ from: '1.0.0', at: '2026-11-03T10:00:00Z', status: 'watching', card: { label: '#12', round: 2 }, lane: { id: 'l-1', name: 'greet', role: 'builder' } }, '1.0.1', 'update'))
+    add('resumed, quit', restartResumeNote({ from: '1.0.0', at: '2026-11-03T10:00:00Z', status: 'working' }, '1.0.0', 'quit'))
+    add('outage', outageResumeNote(Date.parse('2026-10-25T11:47:00Z'), Date.parse('2026-10-25T11:57:00Z')))
+    add('team pause', teamPauseLine())
+    return out
+  }
+
+  it('finds every word of them in the catalogue', () => {
+    setProcessChain(chain(canaryTexts(catalogue)))
+    for (const { name, text, values } of texts()) {
+      expect(text, name).not.toBe('')
+      expect(canaryProblems(text, ids, [...PROTOCOL, ...VALUES, ...ms, ...(values ?? [])]), name).toEqual([])
+    }
+  })
+})
+
+/** The ids watch.ts declares (its wake lines' W). */
+const WATCH_IDS = new Set([...readFileSync(join(ROOT, 'src', 'shared', 'watch.ts'), 'utf8').matchAll(/agentMsg\(\{ id: '([^']+)'/g)].map((m) => m[1]))
 
 describe('the skill status lines in guidance.ts', () => {
   // HI-2433 round 1: callers asking at once share one scan, which must hold no text; each caller says its skills'

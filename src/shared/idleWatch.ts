@@ -1,5 +1,5 @@
 // HI-2285: a lane's builder watching its own card while nothing on it waits on anyone. Agent-facing English throughout
-// (the card watch's reply, the Agent API's and lane watches' `stalled`): every line is marked for the i18n guard.
+// (the card watch's reply, the Agent API's and lane watches' `stalled`): agent messages (shared/agentText).
 //
 // On 1 Nov CB1 committed CL-5's plan, watched CL-5 for a comment and ended its turn: no question to the user, no design
 // step for the reviewer, the card in Doing and not submitted. Watching counted as waiting, so nothing told anyone, and
@@ -9,8 +9,18 @@
 
 import { cardName } from './projectKeys'
 import { shortDuration } from './progress'
-import { pendingStep } from './tasks'
+import { columnSince, pendingStep } from './tasks'
 import type { TaskCard } from './types'
+import { agentMsg, say } from './agentText'
+
+const T = {
+  reply: agentMsg({
+    id: 'wake.idle.reply',
+    text: "Nothing waits on {card}: it is in Doing and not submitted, with no question open for the user and no design step out for the reviewer, so nobody will change it for you. Carry on with its work now rather than end your turn; if you need someone, ask: hive_ask_user for the user, hive_loop_step with a design for the reviewer, or hive_submit once it is ready. Keep this watch only for something you asked for that Hive doesn't track (a comment you requested): if you only watch it, {card} shows as stalled after {after}.",
+    note: "HI-2285: hive_wait_for_tasks's warning to a lane's builder watching only its own card while nothing on it waits on anyone (CB1 watched CL-5 for a comment and ended its turn). card: its name (HI-12); after: how long until it shows as stalled (5 min)."
+  }),
+  stalled: agentMsg({ id: 'wake.idle.stalled', text: '{agent} only watches {card} ({since}), and nothing waits on it: no question for the user, no design step, not submitted.', note: "HI-2285: why a lane's card is stalled (the Agent API, lane watches): its builder (agent) only watches it. card: its name; since: for how long (7 min)." })
+}
 
 /** How long a lane's builder may only watch its own card with nothing waiting on it before the card is stalled. */
 export const IDLE_WATCH_STALL_MS = 5 * 60_000
@@ -29,20 +39,23 @@ export function nothingWaitsOn(card: IdleCard, builder: string, forYouOpen: bool
 /** The card watch's reply when the builder watches only such a card: what's wrong and what to do instead. */
 export function idleWatchText(card: Pick<TaskCard, 'number' | 'key'>): string {
   const name = cardName(card)
-  return `Nothing waits on ${name}: it is in Doing and not submitted, with no question open for the user and no design step out for the reviewer, so nobody will change it for you. Carry on with its work now rather than end your turn; if you need someone, ask: hive_ask_user for the user, hive_loop_step with a design for the reviewer, or hive_submit once it is ready. Keep this watch only for something you asked for that Hive doesn't track (a comment you requested): if you only watch it, ${name} shows as stalled after ${shortDuration(IDLE_WATCH_STALL_MS)}.` // i18n-ignore: agent-facing (hive_wait_for_tasks's reply)
+  return say(T.reply, { card: name, after: shortDuration(IDLE_WATCH_STALL_MS) })
 }
 
 /**
  * Why a running lane's card is stalled by its builder only watching it with nothing waiting on it (`nothingWaitsOn`
  * already true), or null: the lane active (a paused one parks its agents), the card the lane's and its builder's, the
  * builder's turn over (status watching) with a card watch on this card alone (`watchesMore`: usage, lanes or agents beside
- * it, a wait on more than the card), for IDLE_WATCH_STALL_MS since the watch began. Agent-facing.
+ * it, a wait on more than the card), for IDLE_WATCH_STALL_MS since the later of the watch's start and the card's coming
+ * into Doing (HI-2445: a watch kept through Review, as a builder waits for its verdict, isn't idle time in Doing; a failed
+ * verdict flagged HI-2433 the instant it sent it back, its builder's wake still on its way). Agent-facing.
  */
 export function idleWatchReason(card: IdleCard, lane: { builder: string; state?: string; cards: { number: number }[] } | null | undefined, watcher: { name: string; agentId: string; cards: number[]; watchesMore?: boolean; status?: string; watchSince?: string } | undefined, now = Date.now()): string | null {
   if (!lane || lane.state !== 'active' || !watcher || card.agent !== lane.builder || watcher.agentId !== lane.builder) return null
   if (!lane.cards.some((c) => c.number === card.number)) return null
   if (watcher.status !== 'watching' || watcher.watchesMore || watcher.cards.length !== 1 || watcher.cards[0] !== card.number) return null
-  const since = Date.parse(watcher.watchSince ?? '')
+  const watched = Date.parse(watcher.watchSince ?? '')
+  const since = Math.max(watched, Date.parse(columnSince(card) ?? '') || 0)
   if (!Number.isFinite(since) || now - since < IDLE_WATCH_STALL_MS) return null
-  return `${watcher.name} only watches ${cardName(card)} (${shortDuration(now - since)}), and nothing waits on it: no question for the user, no design step, not submitted.` // i18n-ignore: agent-facing (the Agent API's stalled)
+  return say(T.stalled, { agent: watcher.name, card: cardName(card), since: shortDuration(now - since) })
 }

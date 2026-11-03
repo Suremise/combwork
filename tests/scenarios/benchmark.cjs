@@ -322,7 +322,8 @@ function benchmarkOf(meta, results, appVersion) {
     app: { name: 'Hive', version: appVersion },
     createdAt: meta.when,
     scope: { kind: 'workspace' },
-    label: `${meta.provider}${meta.model && meta.model !== '(default)' ? ` ${meta.model}` : ''}, fixtures v${meta.fixturesVersion}`,
+    // A run with --dialect (HI-2439) says which, so Performance → Compare tells it from the Default's.
+    label: `${meta.provider}${meta.model && meta.model !== '(default)' ? ` ${meta.model}` : ''}, fixtures v${meta.fixturesVersion}${meta.dialect ? `, dialect ${meta.dialect.path} ${meta.dialect.hash || 'Default'}` : ''}`,
     run: {
       fixturesVersion: meta.fixturesVersion,
       provider: meta.provider,

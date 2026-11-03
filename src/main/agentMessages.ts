@@ -1,6 +1,14 @@
 import type { DeliverySender, DeliveryState } from '../shared/deliveries'
 import { createDelivery, cancelDeliveries, deliveryNow, offerNow, roundNow, TooManyWaiting, waitingCount } from './deliveries'
 import { sessions } from './sessions'
+import { agentMsg, say } from '../shared/agentText'
+
+const T = {
+  notRunning: agentMsg({ id: 'inbox.message.notRunning', text: '{agent} isn\'t running.', note: '#530: a message left for an agent (hive_message_agent) refused: the agent isn\'t running. agent: its name.' }),
+  noText: agentMsg({ id: 'inbox.message.noText', text: 'text is required', note: 'A message left for an agent refused: its text (the tool\'s argument, text) is empty.' }),
+  tooLong: agentMsg({ id: 'inbox.message.tooLong', text: 'A message is at most {max} characters (this one has {n}).', note: 'A message left for an agent refused: too long. max: the most; n: its length.' }),
+  tooMany: agentMsg({ id: 'inbox.message.tooMany', text: '{agent} already has {max} messages waiting, the most Hive keeps for an agent: wait until they are delivered (hive_agent_activity), or cancel them.', note: 'A message left for an agent refused: as many as Hive keeps for it already wait. agent: its name; max: how many.' })
+}
 
 /**
  * Messages left for an agent (#530: hive_message_agent), now deliveries (#647, deliveries.ts): a re-brief for the work it
@@ -33,13 +41,13 @@ const fateOf = (s: DeliveryState): MessageFate => (s === 'offered' || s === 'rec
  */
 export async function leaveMessage(projectPath: string, agentId: string, agentName: string, from: DeliverySender, text: string, card?: number): Promise<{ id: string; fate: MessageFate; queued: number; detail?: string; round?: number }> {
   const st = sessions.liveFor(projectPath, agentId)
-  if (!st) throw new Error(`${agentName} isn't running.`)
+  if (!st) throw new Error(say(T.notRunning, { agent: agentName }))
   const t = text.trim()
-  if (!t) throw new Error('text is required')
-  if (t.length > MESSAGE_MAX_CHARS) throw new Error(`A message is at most ${MESSAGE_MAX_CHARS} characters (this one has ${t.length}).`)
+  if (!t) throw new Error(say(T.noText))
+  if (t.length > MESSAGE_MAX_CHARS) throw new Error(say(T.tooLong, { max: String(MESSAGE_MAX_CHARS), n: String(t.length) }))
   const round = card ? await roundNow(projectPath, card) : undefined
   const r = await createDelivery(projectPath, { agentId, agentName, conversation: st.sessionId || null, kind: 'rebrief', from, ...(card ? { card, round } : {}), body: t, maxWaiting: MAX_QUEUED }).catch((e) => {
-    if (e instanceof TooManyWaiting) throw new Error(`${agentName} already has ${MAX_QUEUED} messages waiting, the most Hive keeps for an agent: wait until they are delivered (hive_agent_activity), or cancel them.`)
+    if (e instanceof TooManyWaiting) throw new Error(say(T.tooMany, { agent: agentName, max: String(MAX_QUEUED) }))
     throw e
   })
   await offerNow(projectPath, agentId)

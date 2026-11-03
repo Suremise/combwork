@@ -28,7 +28,14 @@ const check = (name, ok, extra = '') => {
 
 /** The hive server of a launch's MCP config, started as its CLI would start it, asked to initialize: its result. */
 function initialize(def) {
+  return requests(def, [{ method: 'initialize', params: { protocolVersion: '2025-06-18', capabilities: {}, clientInfo: { name: 'e2e', version: '1' } } }]).then(([r]) => r?.result ?? null)
+}
+
+/** The same server, sent requests in turn (ids 1, 2…): each reply (its result or error), null for one that never came. */
+function requests(def, list) {
   return new Promise((resolve) => {
+    const replies = Array.from({ length: list.length }, () => null)
+    let got = 0
     const p = spawn(def.command, def.args ?? [], { env: lib.childEnv(def.env ?? {}), windowsHide: true, stdio: ['pipe', 'pipe', 'ignore'] })
     let buf = ''
     const done = (v) => {
@@ -36,8 +43,8 @@ function initialize(def) {
       p.kill()
       resolve(v)
     }
-    const timer = setTimeout(() => done(null), HUNG_MS)
-    p.on('error', () => done(null))
+    const timer = setTimeout(() => done(replies), HUNG_MS)
+    p.on('error', () => done(replies))
     p.stdout.on('data', (d) => {
       buf += d
       let i
@@ -46,14 +53,29 @@ function initialize(def) {
         buf = buf.slice(i + 1)
         try {
           const m = JSON.parse(line)
-          if (m.id === 1) done(m.result ?? null)
+          if (Number.isInteger(m.id) && m.id >= 1 && m.id <= list.length && !replies[m.id - 1]) {
+            replies[m.id - 1] = m
+            if (++got === list.length) done(replies)
+          }
         } catch {
           // not a reply of its
         }
       }
     })
-    p.stdin.write(JSON.stringify({ jsonrpc: '2.0', id: 1, method: 'initialize', params: { protocolVersion: '2025-06-18', capabilities: {}, clientInfo: { name: 'e2e', version: '1' } } }) + '\n')
+    list.forEach((r, i) => p.stdin.write(JSON.stringify({ jsonrpc: '2.0', id: i + 1, ...r }) + '\n'))
   })
+}
+
+/** Every description in a tool list: each tool's, and its parameters' at any depth, with where it is. */
+function descriptions(tools) {
+  const out = []
+  const walk = (v, at) => {
+    if (!v || typeof v !== 'object') return
+    if (typeof v.description === 'string') out.push([at, v.description])
+    for (const [k, x] of Object.entries(v)) if (k !== 'description' && k !== 'enum') walk(x, `${at}.${k}`)
+  }
+  for (const t of tools ?? []) walk(t, t.name)
+  return out
 }
 
 /**
@@ -135,6 +157,27 @@ function packagesRequired(entry) {
     const canary = await initialize({ ...on, env: { ...on.env, HIVE_DIALECT_FILE: dialectFile, HIVE_DIALECT: 'canary' } })
     const problems = typeof canary?.instructions === 'string' ? canaryProblems(canary.instructions, new Set(Object.keys(catalogue)), ['alpha']) : ['no instructions']
     check("canary: the server reads the dialect file, and every word of its instructions is the catalogue's", problems.length === 0 && canary.instructions.includes('⟦contract.agent.host⟧'), `${problems.join('; ')} | ${String(canary?.instructions).slice(0, 300)}`)
+
+    // Its tool lists (HI-2434), for each role, Control level and switch, and the errors its own code gives: every
+    // description and error word the catalogue's. Nothing here needs Hive: the lists and these errors come before any call.
+    const ids = new Set(Object.keys(catalogue))
+    const canaryEnv = { ...on.env, HIVE_DIALECT_FILE: dialectFile, HIVE_DIALECT: 'canary' }
+    const assistant = (control) => ({ HIVE_ROLE: 'assistant', HIVE_PROJECT: '', HIVE_ASSISTANT_CONTROL: control, HIVE_ASSISTANT_SETTINGS: '1', HIVE_JOURNAL: '1', HIVE_DEV_CONSOLE: '1' })
+    const roles = [
+      ['agent', { HIVE_DEV_CONSOLE: '1' }, [['hive_lane', { action: 'nope' }], ['hive_merge_slot', { action: 'nope' }], ['hive_queue', { action: 'pause' }], ['hive_nope', {}]]],
+      ['assistant at Look and advise', assistant('look'), []],
+      ['assistant at Agents', assistant('agents'), []],
+      ['assistant at Projects', assistant('projects'), [['hive_team', { action: 'nope' }], ['hive_connection', { action: 'nope' }], ['hive_release_slot', { action: 'nope', project: 'alpha' }], ['hive_template', { action: 'nope', project: 'alpha' }]]]
+    ]
+    for (const [role, roleEnv, calls] of roles) {
+      const [listed, ...answers] = await requests({ ...on, env: { ...canaryEnv, ...roleEnv } }, [{ method: 'tools/list', params: {} }, ...calls.map(([name, args]) => ({ method: 'tools/call', params: { name, arguments: args } }))])
+      const all = descriptions(listed?.result?.tools)
+      const wrong = all.flatMap(([at, d]) => canaryProblems(d, ids, ['alpha']).map((p) => `${at}: ${p}`))
+      check(`canary: every description in the ${role}'s tool list is the catalogue's`, all.length > 50 && wrong.length === 0, `${all.length} descriptions; ${wrong.slice(0, 3).join(' | ')}`)
+      const errors = answers.map((a) => a?.result?.content?.[0]?.text ?? a?.error?.message ?? '')
+      const bad = errors.flatMap((t, i) => (t.startsWith('⟦tool.') ? canaryProblems(t, ids) : ['no error in markers']).map((p) => `${calls[i][0]}: ${p} (${t.slice(0, 120)})`))
+      if (calls.length) check(`canary: the ${role}'s errors from its own code are the catalogue's`, bad.length === 0, bad.join(' | '))
+    }
 
     // ---- Off: the same server, its tools still there, no instructions.
     await inv('advanced:set', GUIDANCE, false)

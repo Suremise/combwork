@@ -2,6 +2,7 @@ import { msg, type Msg } from './i18n/msg'
 import { withAttachmentPaths, type CardAttachment } from './cardAttachments'
 import type { AgentInfo, BoardColumnId, BoardFold, ContextProblem, ProgressRun, TaskCard, TaskColumn } from './types'
 import { cardLabel, cardName, cardRef } from './projectKeys'
+import { agentMsg, say } from './agentText'
 
 /**
  * The window's tr() (#798), passed in: agent scripts (hive-mcp.js) import this module and must not load the
@@ -16,13 +17,21 @@ export type Tr = typeof import('./i18n').tr
  * is merged. Their labels and descriptions are English, as agents, the Agent API and card history name them; the window
  * shows COLUMN_TEXT's.
  */
-export const TASK_COLUMNS: { id: TaskColumn; label: string; description: string }[] = [
-  { id: 'hold', label: 'On Hold', description: 'Parked: nobody picks these up until they move to Todo. Only you and the Assistant put cards here.' }, // i18n-ignore: agent-facing column name (COLUMN_TEXT is the window's)
-  { id: 'todo', label: 'Todo', description: 'Ready to start.' }, // i18n-ignore: agent-facing column name (COLUMN_TEXT is the window's)
-  { id: 'doing', label: 'Doing', description: 'Being worked on: its agent shows what it is doing now.' }, // i18n-ignore: agent-facing column name (COLUMN_TEXT is the window's)
-  { id: 'review', label: 'Review', description: 'Work done, waiting for its review.' }, // i18n-ignore: agent-facing column name (COLUMN_TEXT is the window's)
-  { id: 'passed', label: 'Passed', description: 'Passed its review, waiting to be merged. A reviewer moves a card here when it passes.' }, // i18n-ignore: agent-facing column name (COLUMN_TEXT is the window's)
-  { id: 'done', label: 'Done', description: 'Merged: its builder moves it here after merging (or you do). Archive cards when you no longer need to see them.' } // i18n-ignore: agent-facing column name (COLUMN_TEXT is the window's)
+// The columns' names as agents read them (COLUMN_TEXT is the window's). Protocol, not wording (dialects, HI-2438): card
+// history's lines quote them and are matched by them (watch.ts's INTO_COLUMN, cardCosts' COLUMN_BY_LABEL).
+export const TASK_COLUMNS: { id: TaskColumn; label: string }[] = [
+  // agent-protocol: a column's name, matched in card history (watch.ts)
+  { id: 'hold', label: 'On Hold' }, // i18n-ignore: a column's name agents read (COLUMN_TEXT is the window's)
+  // agent-protocol: a column's name, matched in card history (watch.ts)
+  { id: 'todo', label: 'Todo' }, // i18n-ignore: a column's name agents read (COLUMN_TEXT is the window's)
+  // agent-protocol: a column's name, matched in card history (watch.ts)
+  { id: 'doing', label: 'Doing' }, // i18n-ignore: a column's name agents read (COLUMN_TEXT is the window's)
+  // agent-protocol: a column's name, matched in card history (watch.ts)
+  { id: 'review', label: 'Review' }, // i18n-ignore: a column's name agents read (COLUMN_TEXT is the window's)
+  // agent-protocol: a column's name, matched in card history (watch.ts)
+  { id: 'passed', label: 'Passed' }, // i18n-ignore: a column's name agents read (COLUMN_TEXT is the window's)
+  // agent-protocol: a column's name, matched in card history (watch.ts)
+  { id: 'done', label: 'Done' } // i18n-ignore: a column's name agents read (COLUMN_TEXT is the window's)
 ]
 
 export const isTaskColumn = (v: unknown): v is TaskColumn => typeof v === 'string' && TASK_COLUMNS.some((c) => c.id === v)
@@ -89,7 +98,8 @@ export const columnName = (c: TaskColumn, tr?: Tr): string => (tr && COLUMN_TEXT
 
 /** The column ids, in order, and as an error message lists them ("hold, todo, doing, review, passed or done"). */
 export const COLUMN_IDS: readonly TaskColumn[] = TASK_COLUMNS.map((c) => c.id)
-export const COLUMN_CHOICES = `${COLUMN_IDS.slice(0, -1).join(', ')} or ${COLUMN_IDS.at(-1)}` // i18n-ignore: agent-facing (the Agent API's errors)
+// agent-protocol: the column ids an error lists as a value ("hold, todo, doing, review, passed or done"); the error's own words are its message's
+export const COLUMN_CHOICES = `${COLUMN_IDS.slice(0, -1).join(', ')} or ${COLUMN_IDS.at(-1)}` // i18n-ignore: the column ids agents' errors list (agent-protocol above)
 /** The board's columns in order: the task columns with Merging after Approved (#1420), as a fold keeps them (#1662). */
 export const BOARD_COLUMN_IDS: readonly BoardColumnId[] = COLUMN_IDS.flatMap((c): BoardColumnId[] => (c === 'passed' ? [c, 'merging'] : [c]))
 
@@ -153,6 +163,38 @@ export function columnColor(colors: Partial<Record<TaskColumn, string>> | undefi
   return typeof v === 'string' && /^#[0-9a-f]{6}$/i.test(v) ? v : DEFAULT_COLUMN_COLORS[c]
 }
 
+/** The Agent API's stall reasons (its `stalled`), as agents read them: the window says its own (tr, board.stalled.*). */
+const ST = {
+  noAgent: agentMsg({ id: 'stall.doing.noAgent', text: 'In Doing, but no agent has it.', note: 'A card in Doing that no agent has (#170).' }),
+  startWaiting: agentMsg({ id: 'stall.doing.startWaiting', text: '{agent} waits to start: {why}', note: "HI-2304: the card's agent can't start in its slot yet. why: what holds the slot, in English (\"slot-a is held by WindowsSandboxServer, left running by MB1's last run\")." }),
+  startFailed: agentMsg({ id: 'stall.doing.startFailed', text: "{agent}'s start failed: {why}", note: "HI-1976: the card's agent couldn't be started. why: the failure, in Hive's or the CLI's own words." }),
+  removed: agentMsg({ id: 'stall.agent.removed', text: '{agent} was removed.', note: "The card's agent (or reviewer) was removed from the project." }),
+  removedUnnamed: agentMsg({ id: 'stall.agent.removedUnnamed', text: 'Its agent was removed.', note: "The card's agent was removed from the project, its name not kept." }),
+  notRunning: agentMsg({ id: 'stall.agent.notRunning', text: "{agent} isn't running.", note: "The card's agent (or reviewer) has no session running." }),
+  wakeUntaken: agentMsg({ id: 'stall.loop.wakeUntaken', text: "{agent} hasn't taken the wake Hive typed for {card}: it waits in its prompt.", note: "#777: the agent watched the card, and its wake waits untaken in its prompt (its CLI didn't take the line)." }),
+  notWatching: agentMsg({ id: 'stall.loop.notWatching', text: "{agent} isn't watching {card}: its turn ended with no card watch.", note: '#376: the agent looping on the card ended its turn with no card watch, so nothing wakes it.' }),
+  reviewWait: agentMsg({
+    id: 'stall.review.wait',
+    text: "{agent} is watching {card} but hasn't started reviewing it{state, select, silent { (it shows working, but has been silent for {silentMinutes} min: state unknown)} busy { (it is working on something else)} other {}}: in Review for {waited}.",
+    note: "A card waiting in Review: its reviewer watches it but hasn't started. state: silent (it shows working, but has said nothing for silentMinutes), busy (working on something else) or none. waited: a duration (stall.duration.*)."
+  }),
+  noVerdict: agentMsg({ id: 'stall.review.noVerdict', text: '{agent} started reviewing {card} but has given no verdict, and has only been watching it for {waited}.', note: 'A card in Review: its reviewer started the review, then went back to watching without a verdict. waited: a duration (stall.duration.*).' }),
+  laneOrder: agentMsg({
+    id: 'stall.lane.orderWait',
+    text: '{reviewer} is waiting for {other}, before {card} in the lane, while {builder} waits on the review of {card}: each has waited on the other for {waited}.',
+    note: "A lane deadlocked: its reviewer waits for a card before this one in the lane, while its builder waits for this card's verdict. waited: a duration (stall.duration.*)."
+  }),
+  followUpWait: agentMsg({ id: 'stall.loop.followUpWait', text: '{builder} posted a follow-up on {card} for its reviewer to check and has waited {waited}: nobody has answered it (hive_loop_step ok or gaps).', note: '#1467: the builder posted a follow-up for its reviewer to check, and nobody answered. waited: a duration (stall.duration.*).' }),
+  designWait: agentMsg({
+    id: 'stall.loop.designWait',
+    text: "{builder} posted a design on {card} for its reviewer to check and has waited {waited}: nobody has answered it, and it hasn't gone ahead as posted (hive_loop_step proceed).",
+    note: "#1382: the builder posted a design for its reviewer to check before building; nobody answered, and it didn't go ahead once its wait was over. waited: a duration (stall.duration.*)."
+  }),
+  minutes: agentMsg({ id: 'stall.duration.minutes', text: '{minutes} min', note: 'A stall\'s duration under an hour: "40 min".' }),
+  hours: agentMsg({ id: 'stall.duration.hours', text: '{hours} h', note: 'A stall\'s duration in whole hours: "2 h".' }),
+  hoursMinutes: agentMsg({ id: 'stall.duration.hoursMinutes', text: '{hours} h {minutes} min', note: 'A stall\'s duration over an hour: "5 h 5 min".' })
+}
+
 /**
  * Why nobody is working on a Doing card, or null when someone is (or it isn't in Doing): it has no agent, its agent
  * was removed, or its agent isn't running. `agentNow` is its agent as it is now (null when removed). An agent that
@@ -161,7 +203,7 @@ export function columnColor(colors: Partial<Record<TaskColumn, string>> | undefi
  */
 export function stalledReason(card: Pick<TaskCard, 'column' | 'archived' | 'agent' | 'agentName'>, agentNow: { name: string; running: boolean } | null, tr?: Tr): string | null {
   if (card.archived || card.column !== 'doing') return null
-  if (!card.agent) return tr ? tr(msg({ id: 'board.stalled.noAgent', defaultMessage: 'In Active, but no agent has it.', description: 'Why a card in the Active column is stalled (on the card). Active is the column.' })) : 'In Doing, but no agent has it.' // i18n-ignore: agent-facing (the Agent API's stalled)
+  if (!card.agent) return tr ? tr(msg({ id: 'board.stalled.noAgent', defaultMessage: 'In Active, but no agent has it.', description: 'Why a card in the Active column is stalled (on the card). Active is the column.' })) : say(ST.noAgent)
   if (!agentNow) return removedText(card.agentName, tr)
   if (!agentNow.running) return notRunningText(agentNow.name, tr)
   return null
@@ -189,7 +231,7 @@ export function stallAgentOf(agent: Pick<AgentInfo, 'name' | 'live' | 'start'>):
 export function startWaitingReason(c: Pick<TaskCard, 'column' | 'archived' | 'agent'>, agentNow: StallAgent | null, tr?: Tr): string | null {
   if (c.archived || c.column !== 'doing' || !c.agent || !agentNow || agentNow.running || !agentNow.waiting) return null
   if (tr) return tr(msg({ id: 'board.stalled.startWaiting', defaultMessage: '{agent} waits to start: {why}', description: "Why a card in the Active column is stalled (HI-2304): Hive can't start its agent in its slot yet, because the slot is held by processes a run left running there; it starts the agent once the slot is free. {agent} is the agent's name; {why} says what holds the slot, in English (\"slot-a is held by WindowsSandboxServer, left running by MB1's last run\")." }), { agent: agentNow.name, why: agentNow.waiting })
-  return `${agentNow.name} waits to start: ${agentNow.waiting}` // i18n-ignore: agent-facing (the Agent API's stalled)
+  return say(ST.startWaiting, { agent: agentNow.name, why: agentNow.waiting })
 }
 
 /**
@@ -199,18 +241,18 @@ export function startWaitingReason(c: Pick<TaskCard, 'column' | 'archived' | 'ag
 export function startFailedReason(c: Pick<TaskCard, 'column' | 'archived' | 'agent'>, agentNow: StallAgent | null, tr?: Tr): string | null {
   if (c.archived || c.column !== 'doing' || !c.agent || !agentNow || agentNow.running || !agentNow.failed) return null
   if (tr) return tr(msg({ id: 'board.stalled.startFailed', defaultMessage: "{agent}'s start failed: {why}", description: "Why a card in the Active column is stalled: its agent couldn't be started. {agent} is the agent's name; {why} is the reason, in English as Hive or the agent's CLI gave it." }), { agent: agentNow.name, why: agentNow.failed })
-  return `${agentNow.name}'s start failed: ${agentNow.failed}` // i18n-ignore: agent-facing (the Agent API's stalled)
+  return say(ST.startFailed, { agent: agentNow.name, why: agentNow.failed })
 }
 
 /** "<agent> was removed." (no name kept: "Its agent was removed."), in the window's language with tr, else English. */
 function removedText(name: string | null | undefined, tr?: Tr): string {
   if (tr) return name ? tr(msg({ id: 'board.stalled.removed', defaultMessage: '{agent} was removed.', description: "Why a card's work or review is stalled: its agent was removed from the project. {agent} is the agent's name." }), { agent: name }) : tr(msg({ id: 'board.stalled.removedUnnamed', defaultMessage: 'Its agent was removed.', description: "Why a card's work is stalled: its agent (name unknown) was removed from the project." }))
-  return `${name ?? 'Its agent'} was removed.` // i18n-ignore: agent-facing (the Agent API's stalled)
+  return name != null ? say(ST.removed, { agent: name }) : say(ST.removedUnnamed)
 }
 
 /** "<agent> isn't running.", in the window's language with tr, else English. */
 const notRunningText = (name: string, tr?: Tr): string =>
-  tr ? tr(msg({ id: 'board.stalled.notRunning', defaultMessage: "{agent} isn't running.", description: "Why a card's work or review is stalled: its agent's session isn't running. {agent} is the agent's name." }), { agent: name }) : `${name} isn't running.` // i18n-ignore: agent-facing (the Agent API's stalled)
+  tr ? tr(msg({ id: 'board.stalled.notRunning', defaultMessage: "{agent} isn't running.", description: "Why a card's work or review is stalled: its agent's session isn't running. {agent} is the agent's name." }), { agent: name }) : say(ST.notRunning, { agent: name })
 
 /** An agent as the stall check reads it: its cards left with no live watch, and whether a wake of Hive's waits untaken in its prompt (#777). */
 export interface NotWatchingAgent {
@@ -239,10 +281,10 @@ export function notWatchingReason(card: Pick<TaskCard, 'number' | 'column' | 'ar
   // #777: it did watch the card; its wake, which Hive typed, waits untaken in its prompt (its CLI didn't take the line).
   if (a.untaken) {
     if (tr) return tr(msg({ id: 'board.stalled.wakeUntaken', defaultMessage: "{agent} hasn't taken the wake Hive typed for {card}: it waits in its prompt.", description: 'Why a card in a card loop is stalled: the agent watched the card, and Hive typed its wake line into the agent\'s terminal, but the agent\'s CLI never sent it. {agent} is its name, {card} the card\'s name: its key, such as AM-12, or #12 for a card with none.' }), { agent: a.name, card: cardLabel(card) })
-    return `${a.name} hasn't taken the wake Hive typed for ${cardName(card)}: it waits in its prompt.` // i18n-ignore: agent-facing (the Agent API's stalled)
+    return say(ST.wakeUntaken, { agent: a.name, card: cardName(card) })
   }
   if (tr) return tr(msg({ id: 'board.stalled.notWatching', defaultMessage: "{agent} isn't watching {card}: its turn ended with no card watch.", description: 'Why a card in a card loop is stalled: the agent looping on it stopped without waiting for the card to change. {agent} is its name, {card} the card’s name: its key, such as AM-12, or #12 for a card with none. A card watch is what wakes an agent when a card changes.' }), { agent: a.name, card: cardLabel(card) })
-  return `${a.name} isn't watching ${cardName(card)}: its turn ended with no card watch.` // i18n-ignore: agent-facing (the Agent API's stalled)
+  return say(ST.notWatching, { agent: a.name, card: cardName(card) })
 }
 
 /** The longest a comment's summary line runs before it is cut (#532). */
@@ -294,12 +336,12 @@ export function reviewWaitReason(card: Pick<TaskCard, 'number' | 'column' | 'arc
     if (w.status === 'working') return tr(msg({ id: 'board.stalled.reviewWaitBusy', defaultMessage: "{agent} is watching {card} but hasn't started reviewing it (it is working on something else): in Review for {waited}.", description: "Why a card waiting in Review is stalled: its reviewer watches it but is busy with other work. {agent} is the reviewer's name, {card} the card’s name: its key, such as AM-12, or #12 for a card with none, {waited} how long it has waited (\"40 min\", \"2 h 5 min\")." }), values)
     return tr(msg({ id: 'board.stalled.reviewWait', defaultMessage: "{agent} is watching {card} but hasn't started reviewing it: in Review for {waited}.", description: "Why a card waiting in Review is stalled: its reviewer watches it but hasn't started. {agent} is the reviewer's name, {card} the card’s name: its key, such as AM-12, or #12 for a card with none, {waited} how long it has waited (\"40 min\", \"2 h 5 min\")." }), values)
   }
-  const state = w.silentMinutes !== undefined ? ` (it shows working, but has been silent for ${w.silentMinutes} min: state unknown)` : w.status === 'working' ? ' (it is working on something else)' : '' // i18n-ignore: agent-facing (the Agent API's stalled)
-  return `${w.name} is watching ${cardName(card)} but hasn't started reviewing it${state}: in Review for ${minutesText(min)}.` // i18n-ignore: agent-facing (the Agent API's stalled)
+  const state = w.silentMinutes !== undefined ? 'silent' : w.status === 'working' ? 'busy' : 'none'
+  return say(ST.reviewWait, { agent: w.name, card: cardName(card), state, silentMinutes: String(w.silentMinutes ?? ''), waited: minutesText(min) })
 }
 
 /** Whole minutes as the Agent API's stall reasons say them: "40 min", "5 h 5 min", "2 h". */
-const minutesText = (min: number): string => (min < 60 ? `${min} min` : `${Math.floor(min / 60)} h${min % 60 ? ` ${min % 60} min` : ''}`)
+const minutesText = (min: number): string => (min < 60 ? say(ST.minutes, { minutes: String(min) }) : min % 60 ? say(ST.hoursMinutes, { hours: String(Math.floor(min / 60)), minutes: String(min % 60) }) : say(ST.hours, { hours: String(Math.floor(min / 60)) }))
 
 /**
  * A card's builder's job for it (HI-1993), as a review's stall reads it: running (its builder has a Progress run open
@@ -354,7 +396,7 @@ export function reviewVerdictWaitReason(card: Pick<TaskCard, 'number' | 'column'
   if (!(ms >= REVIEW_WAIT_STALL_MS)) return null
   const min = Math.round(ms / 60_000)
   if (tr) return tr(msg({ id: 'board.stalled.reviewVerdictWait', defaultMessage: '{agent} started reviewing {card} but has given no verdict, and has only been watching it for {waited}.', description: "Why a card in Review is stalled: its reviewer started its review, then went back to waiting on the card without passing or failing it (it may have left a question in a comment). {agent} is the reviewer's name, {card} the card’s name: its key, such as AM-12, or #12 for a card with none, {waited} how long it has only been watching (\"40 min\", \"2 h 5 min\")." }), { agent: w.name, card: cardLabel(card), waited: durationText(min * 60_000, tr) })
-  return `${w.name} started reviewing ${cardName(card)} but has given no verdict, and has only been watching it for ${minutesText(min)}.` // i18n-ignore: agent-facing (the Agent API's stalled)
+  return say(ST.noVerdict, { agent: w.name, card: cardName(card), waited: minutesText(min) })
 }
 
 /** A card's running lane as the lane-order stall reads it: its builder's and reviewer's agent ids, its cards in order and where each is. */
@@ -412,7 +454,7 @@ export function laneOrderWaitReason(card: Pick<TaskCard, 'number' | 'column' | '
   const min = Math.round(d.ms / 60_000)
   const other = d.waitsFor
   if (tr) return tr(msg({ id: 'board.stalled.laneOrderWait', defaultMessage: '{reviewer} is waiting for {other}, before {card} in the lane, while {builder} waits on the review of {card}: each has waited on the other for {waited}.', description: "Why a card in Review is stalled: its lane is deadlocked. The lane's reviewer ({reviewer}, an agent's name) waits for another card that comes before this one in the lane ({other}), while the lane's builder ({builder}, an agent's name) waits for this card's verdict. {card} and {other} are cards' names: a key, such as AM-12, or #12 for a card with none; {waited} how long both have been waiting so (\"40 min\", \"2 h 5 min\")." }), { reviewer: d.reviewer.name, builder: d.builder.name, card: cardLabel(card), other: cardLabel(other), waited: durationText(min * 60_000, tr) })
-  return `${d.reviewer.name} is waiting for ${cardName(other)}, before ${cardName(card)} in the lane, while ${d.builder.name} waits on the review of ${cardName(card)}: each has waited on the other for ${minutesText(min)}.` // i18n-ignore: agent-facing (the Agent API's stalled)
+  return say(ST.laneOrder, { reviewer: d.reviewer.name, other: cardName(other), card: cardName(card), builder: d.builder.name, waited: minutesText(min) })
 }
 
 /**
@@ -506,10 +548,10 @@ export function loopStepWaitReason(card: Pick<TaskCard, 'number' | 'column' | 'a
   const min = Math.round(d.ms / 60_000)
   if (d.step === 'followUp') {
     if (tr) return tr(msg({ id: 'board.stalled.followUpWait', defaultMessage: "{builder} posted a follow-up on {card} for its reviewer to check and has waited {waited}: nobody has answered it.", description: "Why a card in Review or Passed is stalled (#1467): in a card loop, its builder ({builder}, an agent's name) posted a follow-up for its reviewer to check (a change asked of reviewed work, such as a screenshot's), and is only waiting; no reviewer answered. {card} is the card’s name: its key, such as AM-12, or #12 for a card with none; {waited} how long (\"40 min\", \"2 h 5 min\")." }), { builder: d.builder.name, card: cardLabel(card), waited: durationText(min * 60_000, tr) })
-    return `${d.builder.name} posted a follow-up on ${cardName(card)} for its reviewer to check and has waited ${minutesText(min)}: nobody has answered it (hive_loop_step ok or gaps).` // i18n-ignore: agent-facing (the Agent API's stalled)
+    return say(ST.followUpWait, { builder: d.builder.name, card: cardName(card), waited: minutesText(min) })
   }
   if (tr) return tr(msg({ id: 'board.stalled.loopStepWait', defaultMessage: "{builder} posted a design on {card} for its reviewer to check and has waited {waited}: nobody has answered it, and it hasn't gone ahead as posted.", description: "Why a card in Doing is stalled (#1382): in a card loop, its builder ({builder}, an agent's name) posted a design for its reviewer to check before building, and is only waiting; no reviewer answered, and the builder didn't go ahead once its wait (Card loops → Design check wait) was over. {card} is the card’s name: its key, such as AM-12, or #12 for a card with none; {waited} how long (\"40 min\", \"2 h 5 min\")." }), { builder: d.builder.name, card: cardLabel(card), waited: durationText(min * 60_000, tr) })
-  return `${d.builder.name} posted a design on ${cardName(card)} for its reviewer to check and has waited ${minutesText(min)}: nobody has answered it, and it hasn't gone ahead as posted (hive_loop_step proceed).` // i18n-ignore: agent-facing (the Agent API's stalled)
+  return say(ST.designWait, { builder: d.builder.name, card: cardName(card), waited: minutesText(min) })
 }
 
 /**
@@ -688,8 +730,48 @@ export interface ContextLine {
   problem?: ContextProblem
 }
 
+/** The prompt a card starts with (taskPrompt), and its "Read these first" (contextText, problemText). */
+const PR = {
+  start: agentMsg({ id: 'prompt.card.start', text: 'Work on task {card} from the Hive task board: {title}', note: "The first line of a card's start prompt. card: its key (AM-12), or #12 for a card with none." }),
+  backFrom: agentMsg({ id: 'prompt.card.backFrom', text: 'It was in {column} and is back in Doing for more work.', note: 'More work on a card from Review, Passed or Done. column: the column it came from, by its name (Review, Passed, Done).' }),
+  dependsOn: agentMsg({ id: 'prompt.card.dependsOn', text: 'It depends on {cards}.', note: 'The cards it is blocked by, joined with commas (AM-3, AM-4).' }),
+  attachments: agentMsg({
+    id: 'prompt.card.attachments',
+    text: 'Its attachments (open them by path): {paths}{more, select, yes {, and {moreCount} more (hive_read_task lists them)} other {}}.',
+    note: 'HI-1700: the paths of up to 10 of its attachments, joined with commas; more: yes when it has more than that, moreCount of them.'
+  }),
+  latestComment: agentMsg({ id: 'prompt.card.latestComment', text: 'Its latest comment ({by}, {date}):\n\n{comment}', note: 'More work on a card: the feedback it came back with. by: who wrote it; date: YYYY-MM-DD; comment: its text (prompt.card.commentCut when long).' }),
+  commentCut: agentMsg({ id: 'prompt.card.commentCut', text: '{start}… (cut short: hive_read_task has it all)', note: 'A latest comment over 4,000 characters: its start, cut.' }),
+  workOnCard: agentMsg({ id: 'prompt.card.skill.workOnCard', text: 'Use the work-on-card skill.', note: "With Hive's tools: how to carry a card through is the work-on-card skill's, so the prompt only points there." }),
+  laneBuilder: agentMsg({ id: 'prompt.card.skill.laneBuilder', text: "Use the card-loop skill as this lane's builder.", note: "HI-2047: a running lane's builder works its cards in turn with card-loop (which does each with work-on-card), not work-on-card as well." }),
+  comments: agentMsg({
+    id: 'prompt.card.comments',
+    text: 'The card has {n, plural, one {{count} comment} other {{count} comments}}: read {again, select, yes {the rest} other {them}} with hive_read_task.',
+    note: 'After the skill line, when the card has comments. count: how many (n, as text); again: yes for more work on a card, whose latest comment the prompt carries.'
+  }),
+  readFirst: agentMsg({ id: 'prompt.context.readFirst', text: 'Read these first: {list}.', note: '#818: the doc sections the card says to read first (prompt.context.item), joined with commas; the agent fetches what it needs.' }),
+  readFirstNoTools: agentMsg({ id: 'prompt.context.readFirstNoTools', text: "Read these sections of the project's docs first: {list}.", note: "#818: as prompt.context.readFirst, for an agent without Hive's tools." }),
+  item: agentMsg({ id: 'prompt.context.item', text: '{ref} ({size} characters)', note: 'A doc section to read first, with its size: "1.2k", "56k".' }),
+  broken: agentMsg({
+    id: 'prompt.context.broken',
+    text: '{n, plural, one {This reference no longer resolves} other {These references no longer resolve}}: {problems}. Ask the user which section is meant, or read the closest.',
+    note: '#819: never silently nothing: the references that no longer resolve (prompt.context.problem), joined with "; ".'
+  }),
+  howToRead: agentMsg({
+    id: 'prompt.context.howToRead',
+    text: 'hive_read_section reads {ok, select, yes {each} other {the closest}} as the card has it (path: the file; heading: # and the slug{ok, select, yes { after it, none for a whole file} other {}}; from: "project").',
+    note: "#818, #819: from the copy the card was checked against, the project's, whatever folder the agent works in. ok: yes when some references resolve (else only the closest headings are named)."
+  }),
+  problem: agentMsg({
+    id: 'prompt.context.problem',
+    text: '{ref} ({problem, select, notFound {no such file} noHeading {no such heading} ambiguous {several headings have its text} invalid {not a doc section} outside {not in the project} hidden {in Hive\'s or git\'s own folder} notMarkdown {not Markdown} tooBig {too big to read} other {}}{closest, select, yes {; {problem, select, ambiguous {they are} other {closest}}: {headings}} other {}})',
+    note: 'Why a reference doesn\'t resolve: "docs/PLAN.md#setup (no such heading; closest: #install)". headings: the closest, each as #slug, joined with commas.'
+  })
+}
+
 /** A size in characters, short: "840", "3.2k", "56k". */
-const charsShort = (n: number): string => (n < 1000 ? String(n) : n < 10_000 ? `${(n / 1000).toFixed(1)}k` : `${Math.round(n / 1000)}k`) // i18n-ignore: agent-facing: sizes in the prompt an agent starts a card with
+// agent-protocol: a size's figure, a value of prompt.context.item
+const charsShort = (n: number): string => (n < 1000 ? String(n) : n < 10_000 ? `${(n / 1000).toFixed(1)}k` : `${Math.round(n / 1000)}k`) // i18n-ignore: sizes in the prompt agents start a card with (agent-protocol above)
 
 /**
  * The start prompt's "Read these first" (#818): each reference with its size, not the sections themselves (the agent
@@ -699,20 +781,19 @@ const charsShort = (n: number): string => (n < 1000 ? String(n) : n < 10_000 ? `
 function contextText(lines: ContextLine[], withTools: boolean): string {
   const ok = lines.filter((l) => !l.problem)
   const broken = lines.flatMap((l) => (l.problem ? [l.problem] : []))
-  const list = ok.map((l) => `${l.ref}${l.size !== undefined ? ` (${charsShort(l.size)} characters)` : ''}`).join(', ')
-  const parts = ok.length ? [withTools ? `Read these first: ${list}.` : `Read these sections of the project's docs first: ${list}.`] : [] // i18n-ignore: agent-facing: the prompt an agent starts a card with
+  const list = ok.map((l) => (l.size !== undefined ? say(PR.item, { ref: l.ref, size: charsShort(l.size) }) : l.ref)).join(', ')
+  const parts = ok.length ? [say(withTools ? PR.readFirst : PR.readFirstNoTools, { list })] : []
   // Never silently nothing (#819): what doesn't resolve now is named, with why and the closest headings.
-  if (broken.length) parts.push(`${broken.length === 1 ? 'This reference no longer resolves' : 'These references no longer resolve'}: ${broken.map(problemText).join('; ')}. Ask the user which section is meant, or read the closest.`) // i18n-ignore: agent-facing: the prompt an agent starts a card with
+  if (broken.length) parts.push(say(PR.broken, { n: broken.length, problems: broken.map(problemText).join('; ') }))
   // How to read them, for those that resolve and the closest headings alike (#818, #819): from the copy the card was
   // checked against, the project's, whatever folder the agent works in.
-  if (withTools) parts.push(`hive_read_section reads ${ok.length ? 'each' : 'the closest'} as the card has it (path: the file; heading: # and the slug${ok.length ? ' after it, none for a whole file' : ''}; from: "project").`) // i18n-ignore: agent-facing: the prompt an agent starts a card with
+  if (withTools) parts.push(say(PR.howToRead, { ok: ok.length ? 'yes' : 'no' }))
   return parts.join(' ')
 }
 
 /** Why a reference doesn't resolve, for an agent (English): "docs/PLAN.md#setup (no such heading; closest: #install)". */
 export function problemText(p: ContextProblem): string {
-  const why = { notFound: 'no such file', noHeading: 'no such heading', ambiguous: 'several headings have its text', invalid: 'not a doc section', outside: 'not in the project', hidden: "in Hive's or git's own folder", notMarkdown: 'not Markdown', tooBig: 'too big to read' }[p.problem] // i18n-ignore: agent-facing: the prompt an agent starts a card with
-  return `${p.ref} (${why}${p.closest?.length ? `; ${p.problem === 'ambiguous' ? 'they are' : 'closest'}: ${p.closest.map((s) => `#${s}`).join(', ')}` : ''})` // i18n-ignore: agent-facing: the prompt an agent starts a card with
+  return say(PR.problem, { ref: p.ref, problem: p.problem, closest: p.closest?.length ? 'yes' : 'no', headings: (p.closest ?? []).map((s) => `#${s}`).join(', ') })
 }
 
 /** How much of a card's latest comment a restarted card's prompt carries (the rest is a hive_read_task away). */
@@ -738,28 +819,35 @@ export function rawTaskPrompt(card: Pick<TaskCard, 'title' | 'description'>, not
 const PROMPT_ATTACHMENTS_MAX = 10
 
 /** The skill a running lane's builder is pointed at as it starts a lane card (HI-2047), by Hive's start or its own (HI-2092). */
-export const LANE_BUILDER_SKILL = "Use the card-loop skill as this lane's builder." // i18n-ignore: agent-facing: the prompt an agent starts a card with
+export const laneBuilderSkill = (): string => say(PR.laneBuilder)
 
 export function taskPrompt(card: TaskCard, withTools: boolean, opts: { from?: TaskColumn; note?: string; context?: ContextLine[]; attachments?: Pick<CardAttachment, 'id' | 'path'>[]; inLane?: boolean } = {}): string {
   // Its attachments (HI-1700): the text's links to them as their paths, and their paths listed.
   const files = opts.attachments ?? []
   const paths = (t: string): string => (files.length ? withAttachmentPaths(t, files) : t)
-  const parts = [`Work on task ${cardName(card)} from the Hive task board: ${card.title}`] // i18n-ignore: agent-facing: the prompt an agent starts a card with
+  const parts = [say(PR.start, { card: cardName(card), title: card.title })]
   const again = opts.from === 'review' || opts.from === 'passed' || opts.from === 'done'
-  if (again) parts.push(`It was in ${columnLabel(opts.from!)} and is back in Doing for more work.`) // i18n-ignore: agent-facing: the prompt an agent starts a card with
+  if (again) parts.push(say(PR.backFrom, { column: columnLabel(opts.from!) }))
   if (opts.note?.trim()) parts.push(opts.note.trim())
   if (card.description.trim()) parts.push(paths(card.description.trim()))
-  if (card.blockedBy.length) parts.push(`It depends on ${card.blockedBy.map((n) => `${cardRef(n)}`).join(', ')}.`) // i18n-ignore: agent-facing: the prompt an agent starts a card with
+  if (card.blockedBy.length) parts.push(say(PR.dependsOn, { cards: card.blockedBy.map((n) => `${cardRef(n)}`).join(', ') }))
   const context = opts.context ?? (card.context ?? []).map((ref) => ({ ref }))
   if (context.length) parts.push(contextText(context, withTools))
-  if (files.length) parts.push(`Its attachments (open them by path): ${files.slice(0, PROMPT_ATTACHMENTS_MAX).map((a) => a.path).join(', ')}${files.length > PROMPT_ATTACHMENTS_MAX ? `, and ${files.length - PROMPT_ATTACHMENTS_MAX} more (hive_read_task lists them)` : ''}.`) // i18n-ignore: agent-facing: the prompt an agent starts a card with
+  if (files.length)
+    parts.push(
+      say(PR.attachments, {
+        paths: files.slice(0, PROMPT_ATTACHMENTS_MAX).map((a) => a.path).join(', '),
+        more: files.length > PROMPT_ATTACHMENTS_MAX ? 'yes' : 'no',
+        moreCount: String(files.length - PROMPT_ATTACHMENTS_MAX)
+      })
+    )
   const latest = card.comments[card.comments.length - 1]
   if (again && latest?.text.trim()) {
     const text = paths(latest.text.trim())
-    parts.push(`Its latest comment (${latest.by}, ${latest.at.slice(0, 10)}):\n\n${text.length > PROMPT_COMMENT_MAX ? `${text.slice(0, PROMPT_COMMENT_MAX)}… (cut short: hive_read_task has it all)` : text}`) // i18n-ignore: agent-facing: the prompt an agent starts a card with
+    parts.push(say(PR.latestComment, { by: latest.by, date: latest.at.slice(0, 10), comment: text.length > PROMPT_COMMENT_MAX ? say(PR.commentCut, { start: text.slice(0, PROMPT_COMMENT_MAX) }) : text }))
   }
   // A running lane's builder (HI-2047) works its cards in turn with card-loop, which does each with work-on-card.
-  const skill = opts.inLane ? LANE_BUILDER_SKILL : 'Use the work-on-card skill.' // i18n-ignore: agent-facing: the prompt an agent starts a card with
-  if (withTools) parts.push(`${skill}${card.comments.length ? ` The card has ${card.comments.length} comment${card.comments.length === 1 ? '' : 's'}: read ${again ? 'the rest' : 'them'} with hive_read_task.` : ''}`) // i18n-ignore: agent-facing: the prompt an agent starts a card with
+  const skill = say(opts.inLane ? PR.laneBuilder : PR.workOnCard)
+  if (withTools) parts.push(card.comments.length ? `${skill} ${say(PR.comments, { n: card.comments.length, count: String(card.comments.length), again: again ? 'yes' : 'no' })}` : skill)
   return parts.join('\n\n')
 }

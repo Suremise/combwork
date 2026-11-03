@@ -23,6 +23,8 @@ import { onAction } from './workflow/actionWorker'
 import { finishAccepts } from './workflow/finish'
 import type { Workflow } from './workflow/runtime'
 import { workflowFor } from './workflow/service'
+import { agentMsg, inDefaultDialect, say } from '../shared/agentText'
+import type { StoredText } from '../shared/types'
 import { cardRef } from '../shared/projectKeys'
 import { HISTORY, storedText } from '../shared/taskHistory'
 import type { FinishHow, FinishStepId } from '../shared/workflow/facts'
@@ -32,8 +34,25 @@ const log = createLogger('finish')
 /** The steps a finish records once each: one not recorded yet is owed. */
 const STEPS: readonly FinishStepId[] = ['requests', 'dependents', 'lane', 'wake', 'journal']
 
-/** How a card reached Done, as the journal says it (agent-facing English). */
-const HOW: Record<FinishHow, string> = { queue: 'merged by the merge queue', reported: 'merged, reported by its builder', unchecked: 'reported merged by its builder, not checked', accepted: 'accepted', override: 'moved there by an override', board: 'moved there on the board' } // i18n-ignore: the journal's English
+/** What the finish writes for agents (dialects, HI-2438): stored, so said in the Default (Hive renders stored text when read). */
+const A = {
+  done: agentMsg({
+    id: 'finish.journal.done',
+    text: '{card} "{title}" is Done ({how, select, queue {merged by the merge queue} reported {merged, reported by its builder} unchecked {reported merged by its builder, not checked} accepted {accepted} override {moved there by an override} other {moved there on the board}}), by {byUser, select, yes {You} other {{by}}}',
+    note: "The journal's fact of a card reaching Done (HI-2014), the Assistant's to read. how: how it got there (FinishHow: queue, reported, unchecked, accepted, override, board). byUser: yes when the user moved it; by: else who did (an agent's name, or hive). Written once per finish: its summary and detail are the once-check's key, so it is always the Default's."
+  }),
+  cancelled: agentMsg({
+    id: 'finish.cancel.cardDone',
+    text: 'its card reaching Done',
+    note: "Who cancelled the Assistant's unread asks on a card that reached Done, as the delivery records it: cancelled by …"
+  })
+}
+
+/** The journal's fact of a finish (stored: the Default's words, whatever scope it runs in). */
+export const doneFact = (card: string, title: string, how: FinishHow, by: string): string => inDefaultDialect(() => say(A.done, doneValues(card, title, how, by)))
+const doneValues = (card: string, title: string, how: FinishHow, by: string): Record<string, string> => ({ card, title, how, byUser: by === 'user' ? 'yes' : 'no', by })
+/** The fact's message, stored beside its English summary, to be said in each reader's dialect when read (5b, 6b). */
+export const doneFactText = (card: string, title: string, how: FinishHow, by: string): StoredText => ({ id: A.done.id, values: doneValues(card, title, how, by) })
 
 /** The comment's id on a dependent for a finish (HI-2014): one per parent finish, so a retry finds it. */
 export const dependentNoteId = (key: string, finish: number): string => `finish-${key}-${finish}`
@@ -62,7 +81,7 @@ export async function runFinish(ws: WorkspaceService, wf: Workflow, projectPath:
   }
   await step('requests', async () => {
     if (!ws.assistantHome) return
-    await cancelDeliveries(ws.assistantHome, 'assistant', 'its card reaching Done', undefined, (r) => r.source === 'assistant-ask' && r.card === n && r.created <= at && current()) // i18n-ignore: a delivery's cancel reason (agent-facing)
+    await cancelDeliveries(ws.assistantHome, 'assistant', inDefaultDialect(() => say(A.cancelled)), undefined, (r) => r.source === 'assistant-ask' && r.card === n && r.created <= at && current())
   })
   await step('dependents', async () => {
     const f = wf.state(card).finished
@@ -83,7 +102,8 @@ export async function runFinish(ws: WorkspaceService, wf: Workflow, projectPath:
     const f = wf.state(card).finished
     if (!f || !current()) return
     const by = wf.store.facts(n).find((x) => x.seq === finish)?.actor ?? 'hive'
-    journalFact(ws, { summary: `${cardRef(n)} "${card.title}" is Done (${HOW[f.how]}), by ${by === 'user' ? 'You' : by}`, detail: `finish ${finish}`, project: basename(projectPath), links: [{ type: 'card', ref: String(n) }], tags: ['done'] }, { type: 'card', ref: String(n) }) // i18n-ignore: a journal fact (the Assistant's, English)
+    // agent-protocol: the detail names the finish by its number, the once-check's key (writeEntryOnce)
+    journalFact(ws, { summary: doneFact(cardRef(n), card.title, f.how, by), summaryText: doneFactText(cardRef(n), card.title, f.how, by), detail: `finish ${finish}`, project: basename(projectPath), links: [{ type: 'card', ref: String(n) }], tags: ['done'] }, { type: 'card', ref: String(n) }) // i18n-ignore: the journal's detail for agents, protocol (agent-protocol above)
   })
   await settleSlotCards(ws, projectPath).catch((e) => log.warn(`#${n}'s finish: its slot`, e))
 }
