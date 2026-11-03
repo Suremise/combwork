@@ -442,7 +442,7 @@ export function bindAdvancedSettings(cfg: { settings: AppSettings; updateSetting
   cfg.onSettingsCheck((next, prev) => {
     for (const d of bound) {
       const v = settingOf(d, next)
-      if (v !== settingOf(d, prev) && v !== advanced.get(d.id)) throw new Error(`${d.setting} is kept in advanced.json too: change it with updateSettingsChecked`)
+      if (v !== settingOf(d, prev) && v !== advanced.get(d.id)) throw new Error(`${d.setting} is kept in advanced.json too: change it with updateSettingsChecked`) // i18n-ignore: a developer's mistake (a new writer), for the log
     }
   })
 }
