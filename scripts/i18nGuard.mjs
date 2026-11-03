@@ -40,30 +40,24 @@ import { pathToFileURL } from 'url'
 import { parse } from '@babel/parser'
 import traverseModule from '@babel/traverse'
 import { ROOT, rootArg, sourceFiles } from './i18nExtract.mjs'
+import { isAgentFile } from './agentTextFiles.mjs'
 
 const traverse = traverseModule.default ?? traverseModule
 
 export const ALLOW_DIR = 'i18n/allow'
 
-/** Files whose text is never translated, and why (plans/2026-10-14-i18n-manifest.md, Excluded). */
+/**
+ * Files whose text is never translated, and why (plans/2026-10-14-i18n-manifest.md, Excluded). The agent-facing files
+ * are the agent-text guard's (scripts/agentTextFiles.mjs, HI-2065), and left out here too.
+ */
 export const EXCLUDED = [
-  [/^src\/main\/mcp\//, 'agent-facing: the hive MCP server'],
-  [/^src\/main\/progressReporters\//, 'agent-facing: hive-progress output'],
-  [/^src\/main\/(agentMessages|agentTokens|apiDiscovery|buildFacts|cardBusy|decisionNotices|decisionWakes|deliveries|guidance|hookTokens|inboxNotices|journal|journalService|loopWakes|mergeSlots|servers|settingsTools|slotRelease|startView|taskBatch|teamParked|templateApi|viewerTokens|watchGuards|watches)\.ts$/, 'agent-facing: tool replies, guidance, wakes, inbox and the Agent API'],
-  [/^src\/shared\/(agentMcp|assistant|assistantActivity|assistantTools|buildFacts|deliveries|doorbell|hiveGuidance|hiveToolLoad|instructions|journal|laneBrief|lanes|laneWatch|mergeSlot|startView|toolReplies|unsubmitted|usageWatch|watch)\.ts$/, 'agent-facing: tool replies, guidance, wakes, inbox and the Agent API'],
   [/^src\/main\/(launchGate|screenRecognition|terminalScreen)\.ts$/, "CLI-facing: a CLI's screen and text (#367)"],
   [/^src\/shared\/windowHealth\.ts$/, "hive.log's lines of a window's long tasks and hangs (HI-1775): English, as main's stall warnings are"],
   // The 1.0 workflow core's files with no text the window shows (#1264): the rest of src/main/workflow and platform is
   // checked, its window text messages in src/shared/workflow (refusals.ts, texts.ts) kept as data beside the English.
   [/^src\/main\/workflow\/factStore\.ts$/, "the fact log's SQL, no text"],
-  [/^src\/main\/workflow\/cardWork\.ts$/, "SQL, and the Agent API's rows of a card's facts (agent-facing)"],
-  [/^src\/main\/workflow\/runLink\.ts$/, "agent-facing: hive-progress's card, revision and check, and its refusals"],
-  [/^src\/main\/workflow\/queueState\.ts$/, 'agent-facing: where a card is with the merge queue, in card reads, lane replies and wakes (#1354)'],
   [/^src\/main\/workflow\/queueJobs\.ts$/, "the merge queue's job supervisor and launcher: their C#, PowerShell and protocol, no text (#1360)"],
-  [/^src\/main\/workflow\/queueJobs\.ts$/, "the merge queue's job supervisor and launcher: their C#, PowerShell and protocol, no text (#1360)"],
-  [/^src\/main\/(copies|slotJobs)\.ts$/, "the copies pool's SQL, its refusals and held reasons in English for agents and the log; settling jobs: no window text (#1435)"],
-  [/^src\/main\/slots\.ts$/, "the slot pool's SQL, and its refusals and kept reasons in English for agents and the log: no window text (#1429)"],
-  [/^src\/shared\/restartResume\.ts$/, "agent-facing: the lines agents are given as Hive restarts, and the installer request's checks for the log (HI-1707)"],
+  [/^src\/shared\/agentText\//, "agent text's module (HI-2065): agents' text is its callers' messages; its own is ICU errors for the log and the extract script"],
   [/^src\/shared\/appName\.ts$/, 'brand names'],
   [/^src\/shared\/redact\.ts$/, 'log markers'],
   [/^src\/main\/freshPath\.ts$/, 'a registry key, not text'],
@@ -78,7 +72,7 @@ export const EXCLUDED = [
   // Developer views (the developer console, Performance) are translated too (Darren, 19 Oct, #1104).
   [/\.test\.tsx?$/, 'test-only']
 ]
-export const isExcluded = (rel) => EXCLUDED.some(([re]) => re.test(rel))
+export const isExcluded = (rel) => isAgentFile(rel) || EXCLUDED.some(([re]) => re.test(rel))
 
 // --- The sinks.
 
@@ -274,8 +268,8 @@ function inLog(p) {
   return false
 }
 
-/** The prose strings in a parsed file: { line, start, text, kind }, the text in full (it is the site's identity). */
-function proseItems(ast) {
+/** The prose strings in a parsed file: { line, start, text, kind }, the text in full (it is the site's identity). The agent-text guard reads them too. */
+export function proseItems(ast) {
   const items = []
   const push = (p, text) => {
     const ctx = contextOf(p)
@@ -323,11 +317,12 @@ export function sitesOf(file, code) {
     if (!(lines[start.line - 1] ?? '').slice(0, start.column).trim()) exempt.add(end.line + 1)
   }
   const ignored = (line) => exempt.has(line)
-  // Descriptors: the exact source ranges of msg({...}) calls (not whole lines: other text can share the line).
+  // Descriptors: the exact source ranges of msg({...}) calls (not whole lines: other text can share the line), and of
+  // agentMsg({...}) calls, agents' text, which the agent-text guard checks (HI-2065).
   const msgRanges = []
   traverse(ast, {
     'CallExpression|OptionalCallExpression'(p) {
-      if (calleeName(p.node.callee) === 'msg') msgRanges.push([p.node.start, p.node.end])
+      if (calleeName(p.node.callee) === 'msg' || calleeName(p.node.callee) === 'agentMsg') msgRanges.push([p.node.start, p.node.end])
     }
   })
   const inMsg = (at) => at !== undefined && at !== null && msgRanges.some(([a, b]) => at >= a && at < b)
@@ -407,8 +402,9 @@ export function defaultBaseRef(root = ROOT) {
  * The allowlists of the merge base of HEAD and ref: what this branch started from, so a list pruned on the base since
  * doesn't count as this branch's growth. On the base branch itself (the merge base is HEAD), its previous commit's.
  * Returns null where there's none to compare with: no such ref, no earlier commit, or a base from before the guard.
+ * `dir`: the lists' folder (the agent-text guard's are agent-text/allow).
  */
-export function baseLists(root, ref) {
+export function baseLists(root, ref, dir = ALLOW_DIR) {
   if (!gitOk(root, ['rev-parse', '--verify', '-q', `${ref}^{commit}`])) return null
   const head = git(root, ['rev-parse', 'HEAD']).trim()
   let base = git(root, ['merge-base', 'HEAD', ref]).trim()
@@ -416,7 +412,7 @@ export function baseLists(root, ref) {
     if (!gitOk(root, ['rev-parse', '--verify', '-q', 'HEAD^'])) return null
     base = git(root, ['rev-parse', 'HEAD^']).trim()
   }
-  const names = git(root, ['ls-tree', '-r', '--name-only', base, '--', ALLOW_DIR]).split('\n').filter((n) => n.endsWith('.json'))
+  const names = git(root, ['ls-tree', '-r', '--name-only', base, '--', dir]).split('\n').filter((n) => n.endsWith('.json'))
   if (!names.length) return { base, lists: null }
   // One git process for every list: cat-file --batch prints "<sha> blob <size>\n<content>\n" for each.
   const out = Buffer.from(execFileSync('git', ['cat-file', '--batch'], { cwd: root, input: names.map((n) => `${base}:${n}\n`).join(''), maxBuffer: 256 * 1024 * 1024 }))
@@ -425,7 +421,7 @@ export function baseLists(root, ref) {
   for (const name of names) {
     const nl = out.indexOf(10, at)
     const size = Number(out.subarray(at, nl).toString('utf8').split(' ')[2])
-    lists.set(name.slice(ALLOW_DIR.length + 1), JSON.parse(out.subarray(nl + 1, nl + 1 + size).toString('utf8')))
+    lists.set(name.slice(dir.length + 1), JSON.parse(out.subarray(nl + 1, nl + 1 + size).toString('utf8')))
     at = nl + 1 + size + 1
   }
   return { base, lists }

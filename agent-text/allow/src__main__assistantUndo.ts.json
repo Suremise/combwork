@@ -1,0 +1,13 @@
+{
+  "prose|call|No change of the Assistant's {} is kept (changes are kept 7 days).": 1,
+  "prose|call|No changes of the Assistant's are kept for message {} (they are kept 7 days).": 1,
+  "prose|call|You undid {} of {} of the Assistant's changes": 1,
+  "prose|error|Settings → Assistant → Control → Change settings is off: the user can undo it in your panel.": 1,
+  "prose|error|{}: its agents weren't put back (agent names are unique across the workspace).": 1,
+  "prose|prop:other|Assistant": 1,
+  "prose|prop:other|You": 1,
+  "prose|return|{} is now {}'s agent": 1,
+  "prose|var|An agent has no model, effort, mode or context of its own any more: its connection holds them, which the user changes.": 1,
+  "prose|var|It was saved, but not as it was: read it again.": 1,
+  "prose|var|Stop the agent before its provider goes back.": 1
+}

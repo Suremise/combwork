@@ -1,0 +1,19 @@
+{
+  "prose|call|it has folders more than {} deep": 2,
+  "prose|call|it has more than {} files and folders": 2,
+  "prose|call|{} changed before it could be removed": 1,
+  "prose|call|{} changed before it could be replaced": 1,
+  "prose|call|{} changed while it was being removed": 2,
+  "prose|call|{} changed while it was being replaced": 2,
+  "prose|call|{} changed while it was being replaced; the edited copy is kept beside it": 2,
+  "prose|call|{} was put back while it was being replaced": 1,
+  "prose|return|a file in it went while it was being copied": 1,
+  "prose|return|it could not be copied{}": 1,
+  "prose|return|it is over {} MB": 1,
+  "prose|return|it is too big for Hive to check ({})": 1,
+  "prose|return|its folder in the workspace could not be read (access denied)": 1,
+  "prose|return|its folder in the workspace is gone": 1,
+  "prose|return|the link {} is": 1,
+  "prose|return|the links {} are": 1,
+  "prose|return|{} missing from its copy: Windows didn't let Hive make {} (a link to a file needs a privilege)": 1
+}

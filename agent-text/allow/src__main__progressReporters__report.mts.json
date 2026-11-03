@@ -1,0 +1,12 @@
+{
+  "prose|call|##hive-progress log={}": 1,
+  "prose|call|##hive-progress step={}{}{}": 1,
+  "prose|call|##hive-progress wait={}": 1,
+  "prose|call|Run": 1,
+  "prose|prop:other|Bearer {}": 3,
+  "prose|prop:text|Hive answered {}": 1,
+  "prose|prop:text|no reply in time": 1,
+  "prose|prop:text|with an error": 1,
+  "prose|return|Hive answered {}": 1,
+  "prose|return|Hive couldn't be reached ({})": 1
+}

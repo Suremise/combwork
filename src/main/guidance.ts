@@ -1,4 +1,6 @@
-import { assistantSkillsLine, controlRules, hiveInstructions, journalRule } from '../shared/hiveGuidance'
+import { agentMsg, say, type AgentMsg, type AgentValues } from '../shared/agentText'
+import { inDefaultDialect } from '../shared/agentText/asyncScope'
+import { assistantSkillsLine, controlRules, hiveInstructions, journalRule, sessionContract } from '../shared/hiveGuidance'
 import { taskPrompt } from '../shared/tasks'
 import type { SkillInfo } from '../shared/types'
 import { ContentTooLarge, hashText } from './fsutil'
@@ -14,21 +16,32 @@ import { currentWorkspace, inWorkspace, type WorkspaceService } from './workspac
  * copy of a skill) without prompts, tokens or paths: a revision of Hive's own guidance text, and each Hive skill's.
  */
 
-/** A hash of Hive's guidance text (the session contracts, the control rules, a card's prompt): changes when its wording does. */
-export const GUIDANCE_REVISION = hashText(
-  [
-    hiveInstructions('{project}', 'agent'),
-    hiveInstructions('{project}', 'agent', false),
-    hiveInstructions('', 'assistant'),
-    controlRules('look'),
-    controlRules('agents'),
-    controlRules('projects'),
-    journalRule(['{scope}']),
-    assistantSkillsLine(true),
-    taskPrompt({ number: 0, title: '{title}', description: '', blockedBy: [], comments: [] } as never, true),
-    taskPrompt({ number: 0, title: '{title}', description: '', blockedBy: [], comments: [] } as never, true, { inLane: true })
-  ].join('\n')
+/**
+ * A hash of Hive's guidance text (the session contracts, the control rules, a card's prompt): changes when its wording
+ * does. The Default's: a dialect's own revision is its chain's hash.
+ */
+export const GUIDANCE_REVISION = inDefaultDialect(() =>
+  hashText(
+    [
+      hiveInstructions('{project}', 'agent'),
+      hiveInstructions('{project}', 'agent', false),
+      hiveInstructions('', 'assistant'),
+      controlRules('look'),
+      controlRules('agents'),
+      controlRules('projects'),
+      journalRule(['{scope}']),
+      assistantSkillsLine(true),
+      taskPrompt({ number: 0, title: '{title}', description: '', blockedBy: [], comments: [] } as never, true),
+      taskPrompt({ number: 0, title: '{title}', description: '', blockedBy: [], comments: [] } as never, true, { inLane: true })
+    ].join('\n')
+  )
 )
+
+const S = {
+  notDelivered: agentMsg({ id: 'contract.skill.notDelivered', text: 'it was not delivered', note: "Why a skill a launch asked for isn't as asked: its launch didn't deliver it (the launch record, the Agent API's status)." }),
+  nobody: agentMsg({ id: 'contract.skill.nobody', text: 'nobody gets it: {why}', note: "A Hive skill whose header can't be read or names an unknown audience (the Agent API's status). why: the problem." }),
+  tooBig: agentMsg({ id: 'contract.skill.tooBig', text: 'too big to check: {why}', note: "A Hive skill too big to hash (the Agent API's status). why: its size and the limit." })
+}
 
 /**
  * What a session was given, from what it asked for (each skill's source revision) and what its launch delivered:
@@ -43,7 +56,9 @@ export function launchRecord(requested: Record<string, string>, delivered: Recor
   const problems: Record<string, string> = {}
   const settled: Record<string, string> = {}
   for (const [name, wanted] of Object.entries(requested)) {
-    const d = delivered[name] ?? { revision: null, problem: 'it was not delivered' }
+    // Stored with the session and read by any caller (its project's status): the Default's words, as stored history's
+    // English is, until stored records are said when read (dialects, cards 5b and 6b).
+    const d = delivered[name] ?? { revision: null, problem: inDefaultDialect(() => say(S.notDelivered)) }
     if (d.revision) skills[name] = d.revision
     if (d.problem) problems[name] = d.problem
     settled[name] = d.lasting ? wanted : (d.revision ?? '')
@@ -64,13 +79,21 @@ export interface SkillRevision {
   updateAvailable?: true
 }
 
-const scans = new WeakMap<WorkspaceService, { lifetime: AbortSignal; scan: () => Promise<SkillRevision[]> }>()
+/** A scanned skill: its problems as messages and values, not yet said (a scan is shared by callers of any dialect). */
+type ScannedRevision = Omit<SkillRevision, 'problem'> & { problems: [AgentMsg, AgentValues][] }
+
+const scans = new WeakMap<WorkspaceService, { lifetime: AbortSignal; scan: () => Promise<ScannedRevision[]> }>()
 
 /**
  * The workspace's Hive skills with their revisions (the Agent API's status). Revisions are kept between calls
- * (revisions.ts); callers asking at the same time share one scan.
+ * (revisions.ts); callers asking at the same time share one scan, which holds no text: each caller says its problems in
+ * its own dialect once the scan is done (HI-2433).
  */
-export function skillRevisions(): Promise<SkillRevision[]> {
+export async function skillRevisions(): Promise<SkillRevision[]> {
+  return (await scannedRevisions()).map(({ problems, ...r }) => (problems.length ? { ...r, problem: problems.map(([m, v]) => say(m, v)).join('; ') } : r))
+}
+
+function scannedRevisions(): Promise<ScannedRevision[]> {
   const w = currentWorkspace()
   let s = scans.get(w)
   if (!s || s.lifetime !== w.lifetime) {
@@ -96,19 +119,19 @@ export function skillRevisions(): Promise<SkillRevision[]> {
   return s.scan()
 }
 
-async function scanRevisions(): Promise<SkillRevision[]> {
-  const out: SkillRevision[] = []
+async function scanRevisions(): Promise<ScannedRevision[]> {
+  const out: ScannedRevision[] = []
   for (const s of await hiveSkills()) {
-    const r: SkillRevision = { name: s.name, audience: s.audience ?? 'agents', revision: '' }
+    const r: ScannedRevision = { name: s.name, audience: s.audience ?? 'agents', revision: '', problems: [] }
     // Nobody gets it (its header is broken or its audience unknown): its audience is none, and why.
     if (s.problem) {
       r.audience = 'none'
-      r.problem = `nobody gets it: ${s.problem}`
+      r.problems.push([S.nobody, { why: s.problem }])
     }
     try {
       r.revision = await revisionOf(s.path)
     } catch (e) {
-      if (e instanceof ContentTooLarge) r.problem = [r.problem, `too big to check: ${e.message}`].filter(Boolean).join('; ')
+      if (e instanceof ContentTooLarge) r.problems.push([S.tooBig, { why: e.message }])
     }
     if (s.bundled === 'same' || s.bundled === 'changed') r.bundled = s.bundled
     if (s.updateAvailable) r.updateAvailable = true
@@ -126,9 +149,9 @@ async function scanRevisions(): Promise<SkillRevision[]> {
  */
 export function launchParts(guidance: string, role: 'agent' | 'assistant', project: string, assistant: { text: string; modeText: string } | null, notes = ''): { guidanceBytes: number; guidanceChars: number; customBytes: number; customChars: number; roleBytes: number; roleChars: number; modeBytes: number; modeChars: number } {
   // The contract as the session got it: with long commands wrapped or not (Settings → General), and for the Assistant
-  // with its journal's skills line when the journal is on (withJournal, HI-2048), whose rule after it is then custom.
-  const contracts = [true, false].map((p) => hiveInstructions(role === 'assistant' ? '' : project, role, p))
-  const candidates = role === 'assistant' ? contracts.flatMap((c) => [c, c.replace(assistantSkillsLine(false), assistantSkillsLine(true))]) : contracts
+  // with its journal's skills line when the journal is on (sessionContract's journal, HI-2048), whose rule after it is then custom.
+  const name = role === 'assistant' ? '' : project
+  const candidates = [true, false].flatMap((p) => (role === 'assistant' ? [false, true] : [false]).map((journal) => sessionContract(name, role, p, undefined, journal)))
   const contract = guidance ? candidates.find((c) => guidance.startsWith(c)) : ''
   const core = contract || guidance
   const custom = guidance.slice(core.length) + notes.trim()

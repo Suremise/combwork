@@ -1,0 +1,14 @@
+{
+  "prose|assign|and {}": 1,
+  "prose|return|Not in your inbox: {}.": 1,
+  "prose|return|Nothing new.{}": 1,
+  "prose|return|{} (with {} more {}: read the card)": 1,
+  "prose|var|(Your watch is still on, {}{}: do what this asks, then end your turn, and Hive wakes you when it changes.)": 1,
+  "prose|var|({} again: {}, so {} may repeat.)": 1,
+  "prose|var|Acked {}.": 1,
+  "prose|var|Not read before: {}, not acked: ack {} once you have acted on {}.": 1,
+  "prose|var|Not read yet: {}: read {} with hive_inbox first.": 1,
+  "prose|var|Nothing acked.": 1,
+  "prose|var|Received before, not acked yet: {}.": 1,
+  "prose|var|{} {}, read the card": 1
+}

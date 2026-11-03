@@ -1,0 +1,22 @@
+{
+  "prose|call|The other agent has finished with {}, so Hive no longer asks the user about {}. Try the {} again.": 1,
+  "prose|call|The user allowed you to edit {} while the other agent works on {}. Go ahead with the {}.": 1,
+  "prose|call|cancelled: the go-ahead was dropped": 1,
+  "prose|error|Unknown action: {}": 1,
+  "prose|error|sessionIds: a list of session ids": 1,
+  "prose|prop:other|Agent": 1,
+  "prose|prop:other|Note: {} is also editing {} right now. Check the file's current content before changing it, and keep your edit small.": 1,
+  "prose|prop:other|nobody gets it: {}": 1,
+  "prose|prop:text|Adopted session {}": 1,
+  "prose|prop:text|Hive": 1,
+  "prose|prop:text|Please write a handover of this work with the hive_create_handover tool, so that {}: the goal, what is done, decisions made and why, the current state, open problems and the next steps. Then stop.": 1,
+  "prose|prop:text|Read the handover \"{}\" with the hive_read_shared_note tool and continue the work from it. It was written by {}.": 1,
+  "prose|prop:text|another agent ({}) can continue it": 1,
+  "prose|prop:text|you can continue it in a new conversation": 1,
+  "prose|prop:text|you, in your previous conversation": 1,
+  "prose|return|Agent": 1,
+  "prose|var|Another agent": 1,
+  "prose|var|Your last turn stopped because your sign-in had expired. It is renewed now: carry on where you left off.": 1,
+  "prose|var|{} is editing {} right now (Hive file lock). Hive has asked the user whether you may edit it too. Stop and wait: don't work around this. When the user says go ahead, try the edit again.": 1,
+  "prose|var|{} is editing {} right now (Hive file lock). Work on something else, or wait until {} has finished its task, then try again.": 1
+}

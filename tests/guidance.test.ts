@@ -6,7 +6,7 @@ import { execFileSync } from 'child_process'
 import { existsSync, readdirSync, readFileSync } from 'fs'
 import { join } from 'path'
 import { describe, expect, it } from 'vitest'
-import { controlRules, hiveInstructions, journalRule, withJournal, withLatestHandover } from '../src/shared/hiveGuidance'
+import { controlRules, hiveInstructions, journalRule, withLatestHandover } from '../src/shared/hiveGuidance'
 import { taskPrompt } from '../src/shared/tasks'
 import { ASSISTANT_ONLY_TOOLS, assistantTools } from '../src/shared/assistantTools'
 import { parseSkillFrontmatter, skillFor } from '../src/main/skills'
@@ -128,8 +128,8 @@ describe('the session contract', () => {
   })
 
   it("adds the journal's rule and scope while the journal is on, and nothing while it is off (#1032)", () => {
-    expect(withJournal(assistant, null)).toBe(assistant)
-    const on = withJournal(assistant, ['decision', 'plan'])
+    expect(hiveInstructions('', 'assistant', true, undefined, null)).toBe(assistant)
+    const on = hiveInstructions('', 'assistant', true, undefined, ['decision', 'plan'])
     // HI-2048 (K12): its skills line leaves out handover while the journal is on; the rest is as it was.
     const skillsOff = assistant.split('\n').find((l) => l.startsWith("Hive's skills cover"))!
     expect(skillsOff).toMatch(/, handover, pick-up and workspace-note\.$/)
@@ -147,7 +147,7 @@ describe('the session contract', () => {
     expect(catalog.get('journal')?.text).toMatch(/asked for one, say so in a line/)
     // An agent's contract has no such line: it only gains the rule.
     const agentContract = hiveInstructions('web')
-    expect(withJournal(agentContract, ['decision']).startsWith(agentContract)).toBe(true)
+    expect(hiveInstructions('web', 'agent', true, undefined, ['decision']).startsWith(agentContract)).toBe(true)
     expect(catalog.get('journal')?.audience).toBe('assistant')
     for (const t of toolsNamed(rule)) expect(assistantTools('projects', false, true), t).toContain(t)
     expect(journalRule(['decision', 'plan', 'event', 'incident', 'insight', 'preference', 'moment']).length).toBeLessThan(600)

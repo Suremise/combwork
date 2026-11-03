@@ -1,0 +1,7 @@
+{
+  "prose|call|Work from {}": 1,
+  "prose|call|{}: work from {}": 1,
+  "prose|return|Agent {}": 1,
+  "prose|var|Merge branch {} into {} and resolve the conflicts in: {}. Keep the intent of both sides; ask me if it isn't clear which to keep. Commit the merge when done.": 1,
+  "prose|var|the current branch": 1
+}

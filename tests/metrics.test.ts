@@ -1252,15 +1252,15 @@ describe('#116 round 1: filters, coverage, attribution, unknown usage, guidance 
     expect([assistant.customBytes, assistant.roleBytes, assistant.modeBytes]).toEqual([0, utf8Bytes(text) - utf8Bytes(mode), utf8Bytes(mode)])
     // The Assistant's journal (HI-2112): off, the contract is all core; on, its skills line changes inside the contract
     // (HI-2048), which is still core, and its rule after it is custom.
-    const { withJournal, journalRule } = await import('../src/shared/hiveGuidance')
+    const { journalRule } = await import('../src/shared/hiveGuidance')
     const assistantCore = hiveInstructions('', 'assistant')
-    expect(launchParts(withJournal(assistantCore, null), 'assistant', 'assistant', null)).toMatchObject({ guidanceBytes: utf8Bytes(assistantCore), customBytes: 0 })
-    const journalOn = withJournal(assistantCore, ['decision', 'plan'])
+    expect(launchParts(hiveInstructions('', 'assistant', true, undefined, null), 'assistant', 'assistant', null)).toMatchObject({ guidanceBytes: utf8Bytes(assistantCore), customBytes: 0 })
+    const journalOn = hiveInstructions('', 'assistant', true, undefined, ['decision', 'plan'])
     expect(journalOn.startsWith(assistantCore)).toBe(false)
     const rule = `\n${journalRule(['decision', 'plan'])}`
     expect(launchParts(journalOn, 'assistant', 'assistant', null)).toMatchObject({ guidanceBytes: utf8Bytes(journalOn) - utf8Bytes(rule), customBytes: utf8Bytes(rule) })
     // Without long commands wrapped too (Settings → General).
-    const unwrapped = withJournal(hiveInstructions('', 'assistant', false), ['decision'])
+    const unwrapped = hiveInstructions('', 'assistant', false, undefined, ['decision'])
     expect(launchParts(unwrapped, 'assistant', 'assistant', null).customBytes).toBe(utf8Bytes(`\n${journalRule(['decision'])}`))
     // Text that isn't as expected is counted whole, never split by guesswork.
     expect(launchParts('something else', 'agent', 'alpha', null)).toMatchObject({ guidanceBytes: 14, customBytes: 0 })

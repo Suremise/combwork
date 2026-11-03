@@ -1,0 +1,10 @@
+{
+  "prose|prop:text|Hive closed unexpectedly (last seen {}); {} agent(s) of this workspace were running": 1,
+  "prose|return|Hive closed unexpectedly: last seen {}. {}{} Check for card loops and lanes that stalled and tell the user; don't restart or stop anything yourself.": 1,
+  "prose|return|No agents were running.": 1,
+  "prose|return|{} agent(s) were running: {}. {}": 1,
+  "prose|var|; {} left stopped (their slots are free, to resume by hand, or hold other work)": 1,
+  "prose|var|Hive resumed {} of them (the user's setting){}{}.": 1,
+  "prose|var|Nothing was resumed: the user decides.": 1,
+  "prose|var|{} process(es) the agents started are still running; the user can stop them from Hive's notice.": 1
+}

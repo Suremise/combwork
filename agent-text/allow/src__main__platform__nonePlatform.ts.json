@@ -1,0 +1,3 @@
+{
+  "prose|var|left out of {}'s revision: {} (under .hive, .git or a folder the project excludes, never part of a card's work); declare its paths again without them": 1
+}

@@ -1,0 +1,15 @@
+{
+  "prose|return|Hive is already typing a line into it": 1,
+  "prose|return|a watch's wake goes first": 1,
+  "prose|return|it is waiting on cards, and takes no new work until it is woken": 1,
+  "prose|return|it is {}": 1,
+  "prose|return|it isn't running": 1,
+  "prose|return|its CLI hasn't taken its launch's task yet": 1,
+  "prose|return|its CLI hasn't taken the line Hive typed before": 1,
+  "prose|return|its CLI shows a question for the user, which a line would answer": 1,
+  "prose|return|its CLI's hooks aren't reaching Hive, so Hive can't tell when it is free": 1,
+  "prose|return|its folder is being changed ({})": 1,
+  "prose|return|its hive tools haven't connected yet": 1,
+  "prose|return|something on its screen is taking its keys, and it waits for the user to answer it there": 1,
+  "prose|return|the user has just typed in its terminal and may still be writing there": 1
+}

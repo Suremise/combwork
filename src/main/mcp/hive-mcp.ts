@@ -8,10 +8,12 @@
  * each later turn. A change confirms what changed, a listing returns a short line per item, full detail comes on
  * request; structured reads are compact JSON. Each tool's description says what its reply holds and how to get more.
  */
+// The session's dialect (HI-2065), loaded before any text below is said: first, on purpose.
+import '../../shared/agentText/processDialect'
 import { AsyncLocalStorage } from 'async_hooks'
 import { appendFileSync, readFileSync } from 'fs'
 import { createInterface } from 'readline'
-import { hiveInstructions, withJournal, withLatestHandover } from '../../shared/hiveGuidance'
+import { hiveInstructions, withLatestHandover } from '../../shared/hiveGuidance'
 import { AGENT_ONLY_TOOLS, ASSISTANT_ONLY_TOOLS, assistantTools, controlAllows } from '../../shared/assistantTools'
 import { COLUMN_IDS } from '../../shared/tasks'
 import { AGENT_WAIT_MAX_SECONDS, WAIT_MAX_SECONDS } from '../../shared/watch'
@@ -1107,7 +1109,7 @@ const FULL = new Set(alwaysLoaded(ASSISTANT))
 const JOURNAL_SCOPE = ASSISTANT && JOURNAL ? (process.env.HIVE_JOURNAL_SCOPE ?? '').split(',').filter(Boolean) : null
 // The skills the session isn't given (#1431: switched off in Skills), which its instructions don't name.
 const SKILLS_OFF = new Set((process.env.HIVE_SKILLS_OFF ?? '').split(',').map((n) => n.trim().toLowerCase()).filter(Boolean))
-const INSTRUCTIONS = withJournal(hiveInstructions(PROJECT, ASSISTANT ? 'assistant' : 'agent', process.env.HIVE_PROGRESS_COMMANDS !== '0', SKILLS_OFF), JOURNAL_SCOPE)
+const INSTRUCTIONS = hiveInstructions(PROJECT, ASSISTANT ? 'assistant' : 'agent', process.env.HIVE_PROGRESS_COMMANDS !== '0', SKILLS_OFF, JOURNAL_SCOPE)
 
 /** A project agent given Hive's tools without its guidance (#1285: Settings → Advanced, Hive's guidance for agents). */
 const GUIDED = ASSISTANT || process.env.HIVE_GUIDANCE !== '0'

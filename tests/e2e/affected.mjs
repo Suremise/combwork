@@ -190,6 +190,9 @@ export const AREAS = [
   { paths: ['src/main/workspaceMove.ts', 'src/main/viewPrefs.ts', 'src/shared/movePaths.ts', 'src/renderer/src/components/MoveRepair.tsx', 'src/main/agentWorktree.ts', 'src/shared/projectIds.ts', 'src/main/beforeIds.ts', 'src/main/leftovers.ts', 'src/main/projectRename.ts', 'src/main/projectNames.ts'], suites: ['wsmove', 'wtrecreate', 'projectrename', 'repairbranches', 'repairdefender'] },
   { paths: ['src/main/bundled.ts', 'src/main/bundledHistory.json', 'src/main/skills.ts', 'src/main/revisions.ts', 'src/renderer/src/components/Skills.tsx', 'src/shared/skillDescriptions.ts', 'src/shared/skillLinks.ts'], suites: ['skills', 'skillaudience', 'skilldelivery'] },
   { paths: ['src/main/guidance.ts', 'src/shared/hiveGuidance.ts', 'src/shared/toolReplies.ts', 'src/shared/hiveToolLoad.ts', 'src/main/mcp/'], suites: ['skilldelivery', 'replysize', 'mcp', 'bridgereport', 'cardloop', 'slotguidance'] },
+  // Agent text (HI-2065): the module every agent message is said through, and its extracted catalogue and schema; the
+  // canary runs through the built hive-mcp.js in agentguidance.
+  { paths: ['src/shared/agentText/', 'agent-text/catalogue/', 'agent-text/schema/'], suites: ['agentguidance', 'replysize', 'mcp', 'skilldelivery', 'bridgereport'] },
   // HI-2245: a builder's card watch and hive_lane next saying its card in Review has unsubmitted commits.
   { paths: ['src/main/unsubmitted.ts', 'src/shared/unsubmitted.ts'], suites: ['replysize', 'cardloop'] },
   // HI-2285: a lane's builder watching its own card while nothing waits on it: its watch's reply, and the stall.
@@ -585,12 +588,13 @@ const FAKE_FIXTURES = ['tests/fixtures/claude-initialize.json', 'tests/fixtures/
  * file from there, which tests/e2esuites.test.ts checks), and the sleeps checker (npm run test:waits: its unit test
  * and a scenario use it, no e2e suite). The i18n tooling too (#768): extracting, checking and counting translations and
  * the guard against new hard-coded text (npm test and CI run them; the app never reads them, nor the guard's allowlists
- * in i18n/allow/), and each area's i18n unit tests (tests/i18n/). tests/progressReport.mts and tests/runTemp.mts are the runners' and in
+ * in i18n/allow/), and each area's i18n unit tests (tests/i18n/). Agent text's extract script and guard likewise
+ * (HI-2065), with the guard's lists in agent-text/allow/. tests/progressReport.mts and tests/runTemp.mts are the runners' and in
  * EVERYTHING. The 1.0 workflow core spike (#1118) too: nothing in the app loads it, and tests/workflow runs its
  * scenarios; the phase that wires it into the app (P3, P4) gives it an area (the 1.0 schema, src/main/schema, has the
  * board's since its cards step, #1209, as the fact store and the actions worker do since #1215).
  */
-export const UNIT_ONLY = ['vitest.config.ts', '.github/workflows/ci.yml', 'scripts/testWaits.mjs', 'scripts/i18nExtract.mjs', 'scripts/i18nValues.mjs', 'scripts/i18nCheck.mjs', 'scripts/i18nCoverage.mjs', 'scripts/i18nGuard.mjs', 'i18n/allow/', 'tests/i18n/', 'tests/workflow/', 'src/shared/workflow/', 'src/shared/platform/', 'src/main/workflow/', 'src/main/platform/']
+export const UNIT_ONLY = ['vitest.config.ts', '.github/workflows/ci.yml', 'scripts/testWaits.mjs', 'scripts/i18nExtract.mjs', 'scripts/i18nValues.mjs', 'scripts/i18nCheck.mjs', 'scripts/i18nCoverage.mjs', 'scripts/i18nGuard.mjs', 'i18n/allow/', 'scripts/agentTextExtract.mjs', 'scripts/agentTextGuard.mjs', 'scripts/agentTextFiles.mjs', 'agent-text/allow/', 'tests/i18n/', 'tests/workflow/', 'src/shared/workflow/', 'src/shared/platform/', 'src/main/workflow/', 'src/main/platform/']
 
 /** Whether a file is a unit test (tests/*.test.ts, their helpers and fixtures, UNIT_ONLY): npm test covers it, no e2e suite. */
 export const unitTest = (f) => /^tests\/[^/]+\.ts$/i.test(f) || under(f, UNIT_ONLY) || (/^tests\/fixtures\//i.test(f) && !FAKE_FIXTURES.includes(f))
@@ -726,6 +730,11 @@ export const UNIT_SCANS = [
   { test: 'tests/i18nCatalogues.test.ts', paths: ['locales/', 'src/shared/i18n/values/'] },
   { test: 'tests/i18nCatalogues.test.ts', paths: ['src/'], lines: ['msg\\(', '\\btr\\(', 'tRich\\(', 'defaultMessage', 'description', '\\bid:'] },
   { test: 'tests/i18nGuard.test.ts', paths: ['src/', 'i18n/allow/'] },
+  // Agent text (HI-2065): the guard against new hard-coded agent text over src/ and its lists; the catalogue and schema
+  // extracted from the agentMsg() descriptors, current.
+  { test: 'tests/agentTextGuard.test.ts', paths: ['src/', 'agent-text/allow/'] },
+  { test: 'tests/agentText.test.ts', paths: ['agent-text/catalogue/', 'agent-text/schema/'] },
+  { test: 'tests/agentText.test.ts', paths: ['src/'], lines: ['agentMsg\\('] },
   { test: 'tests/i18nshots.test.ts', paths: ['tests/e2e/i18nshots/', 'tests/e2e/i18nshots.cjs'] },
   // German or Polish read from locales/ to check a screen in that language.
   { test: 'tests/actionHandlers.test.ts', paths: ['locales/de/'] },

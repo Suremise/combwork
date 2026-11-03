@@ -12,11 +12,13 @@
     "resolveJsonModule": true,
     "isolatedModules": true,
     "noEmit": true,
+    "allowImportingTsExtensions": true,
     "paths": {
       "@shared/*": ["./src/shared/*"],
       "@docs/*": ["./docs/*"],
       "@root/*": ["./*"]
     }
   },
-  "include": ["src/renderer/src/**/*", "src/shared/**/*", "src/preload/*.d.ts"]
+  "include": ["src/renderer/src/**/*", "src/shared/**/*", "src/preload/*.d.ts"],
+  "exclude": ["src/shared/agentText/asyncScope.ts", "src/shared/agentText/processDialect.ts"]
 }

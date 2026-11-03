@@ -1,0 +1,12 @@
+{
+  "prose|return|Silent {} min · state unknown": 1,
+  "prose|return|Status unknown: no hooks from {}": 1,
+  "prose|return|retrying at {}": 1,
+  "prose|return|try {}": 1,
+  "prose|return|{} of {}": 1,
+  "prose|var|Can't reach {}": 1,
+  "prose|var|Rate-limited ({})": 1,
+  "prose|var|Request failed": 1,
+  "prose|var|Request failed ({})": 1,
+  "prose|var|its provider": 1
+}

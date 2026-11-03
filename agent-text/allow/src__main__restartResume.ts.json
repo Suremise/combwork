@@ -1,0 +1,6 @@
+{
+  "prose|var|Hive restarted{}{}. Resumed: {}.{} Each resumed agent was told where it was; check their lanes carry on.": 1,
+  "prose|var|Not resumed: {}.": 1,
+  "prose|var|after a quit": 1,
+  "prose|var|for an update": 1
+}

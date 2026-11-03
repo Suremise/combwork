@@ -1,0 +1,6 @@
+{
+  "prose|return|[Hive] {} since you last read {}: read {} (hive_read_task) at your next checkpoint.": 1,
+  "prose|return|each card": 1,
+  "prose|return|the card": 1,
+  "prose|return|{} has {} new decision{}": 1
+}

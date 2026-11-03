@@ -31,7 +31,7 @@ import { initConnections } from './accounts'
 import { initConnectionMoves } from './connectionMoves'
 import { initUsageMoves } from './usageMoves'
 import { checkGit } from './gitTool'
-import { handoverSession, hiveInstructions, withJournal, withLatestHandover, wrapsLongCommands } from '../shared/hiveGuidance'
+import { handoverSession, hiveInstructions, withLatestHandover, wrapsLongCommands } from '../shared/hiveGuidance'
 import { handoversFor } from './notes'
 import { assistantInstructions } from './modes'
 import { ASSISTANT_NAME, assistantModeId } from '../shared/assistant'
@@ -1092,7 +1092,7 @@ app.whenReady().then(async () => {
       if (!sessions.hiveMcp(projectPath)) return ''
       if (workspace.isAssistantHome(projectPath)) {
         const journal = journalSettingsOf(workspaceOf(projectPath))
-        return withJournal(hiveInstructions('', 'assistant'), journal.enabled ? journal.scope : null)
+        return hiveInstructions('', 'assistant', true, undefined, journal.enabled ? journal.scope : null)
       }
       // Hive's tools without its guidance (#1285, #966 row 13): the Assistant above always has its own.
       if (!advanced.get<boolean>(HIVE_GUIDANCE)) return ''

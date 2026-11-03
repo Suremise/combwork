@@ -16,7 +16,8 @@ import { UNIT_SCANS } from './e2e/affected.mjs'
 const root = join(__dirname, '..')
 const script: string = JSON.parse(readFileSync(join(root, 'package.json'), 'utf8')).scripts['check:repo']
 const FILES = '((?:tests\\/[\\w/]+\\.test\\.ts ?)+)'
-const SHAPE = new RegExp(`^node scripts\\/i18nGuard\\.mjs && vitest run ${FILES} && vitest run ${FILES} -t "([^"]+)"$`)
+// The agent-text guard and its catalogue's freshness (HI-2065) beside the i18n guard's.
+const SHAPE = new RegExp(`^node scripts\\/i18nGuard\\.mjs && node scripts\\/agentTextGuard\\.mjs && node scripts\\/agentTextExtract\\.mjs --check && vitest run ${FILES} && vitest run ${FILES} -t "([^"]+)"$`)
 const shape = SHAPE.exec(script)
 const list = (s: string | undefined): string[] => s?.trim().split(' ') ?? []
 const whole = list(shape?.[1])
@@ -39,7 +40,7 @@ function alternatives(pattern: string): string[] {
 }
 
 describe('npm run check:repo', () => {
-  it('runs the i18n guard, the repo-wide test files, then the tree-reading tests of more files by name', () => {
+  it("runs the i18n guard, the agent-text guard and its catalogue's check, the repo-wide test files, then the tree-reading tests of more files by name", () => {
     expect(shape, script).not.toBeNull()
   })
 

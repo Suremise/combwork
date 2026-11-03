@@ -1,0 +1,5 @@
+{
+  "prose|call|A title says the outcome or the problem in words: retitle it without {} (hive_update_task with title), keeping {} in the description.": 1,
+  "prose|call|Titles over {} characters are cut in git and on the board: consider a shorter one (the detail belongs in the description).": 1,
+  "prose|var|{} and {}": 1
+}

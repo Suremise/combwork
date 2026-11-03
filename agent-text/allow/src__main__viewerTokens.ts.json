@@ -1,0 +1,7 @@
+{
+  "prose|error|A viewer token's name is at most {} characters": 1,
+  "prose|error|Give the viewer token a name, such as the app it is for": 1,
+  "prose|error|Hive keeps at most {} viewer tokens: revoke one first": 1,
+  "prose|error|There is already a viewer token named \"{}\"": 1,
+  "prose|prop:text|Read-only Agent API tokens. Make and revoke them in Settings → Agent API → Viewer tokens.": 1
+}
