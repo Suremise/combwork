@@ -34,7 +34,7 @@ function initialize(def) {
 /** The same server, sent requests in turn (ids 1, 2…): each reply (its result or error), null for one that never came. */
 function requests(def, list) {
   return new Promise((resolve) => {
-    const replies = new Array(list.length).fill(null)
+    const replies = Array.from({ length: list.length }, () => null)
     let got = 0
     const p = spawn(def.command, def.args ?? [], { env: lib.childEnv(def.env ?? {}), windowsHide: true, stdio: ['pipe', 'pipe', 'ignore'] })
     let buf = ''
@@ -169,8 +169,8 @@ function packagesRequired(entry) {
       ['assistant at Agents', assistant('agents'), []],
       ['assistant at Projects', assistant('projects'), [['hive_team', { action: 'nope' }], ['hive_connection', { action: 'nope' }], ['hive_release_slot', { action: 'nope', project: 'alpha' }], ['hive_template', { action: 'nope', project: 'alpha' }]]]
     ]
-    for (const [role, env, calls] of roles) {
-      const [listed, ...answers] = await requests({ ...on, env: { ...canaryEnv, ...env } }, [{ method: 'tools/list', params: {} }, ...calls.map(([name, args]) => ({ method: 'tools/call', params: { name, arguments: args } }))])
+    for (const [role, roleEnv, calls] of roles) {
+      const [listed, ...answers] = await requests({ ...on, env: { ...canaryEnv, ...roleEnv } }, [{ method: 'tools/list', params: {} }, ...calls.map(([name, args]) => ({ method: 'tools/call', params: { name, arguments: args } }))])
       const all = descriptions(listed?.result?.tools)
       const wrong = all.flatMap(([at, d]) => canaryProblems(d, ids, ['alpha']).map((p) => `${at}: ${p}`))
       check(`canary: every description in the ${role}'s tool list is the catalogue's`, all.length > 50 && wrong.length === 0, `${all.length} descriptions; ${wrong.slice(0, 3).join(' | ')}`)
