@@ -4354,7 +4354,9 @@ Whether a conversation may resume there is its **hold** (none: it may):
   B1's session is still in it*, *…: a process still has a file or folder in it open*) and its project's pass looks
   again after a pause (1 s, doubling, at most 30 s) and at once when a session there ends or goes idle, until the lane
   is lent one or no slot is held: a process ending tells Hive nothing. While the slot is still held and is the only
-  one it could have, the look writes no lease.
+  one it could have, the look writes no lease. Its cached holder and retry belong to the workspace's current lifetime:
+  closing the workspace or removing the project forgets them, without clearing another live workspace's holds;
+  stopping the slot-card service clears all of its held-slot status and retries (HI-2469). Reopening looks afresh.
   **Windows Sandbox's broker in a held slot** (HI-2467): Windows refuses to rename a folder that is a process's current
   folder, and Windows Sandbox's broker (`WindowsSandboxServer.exe`) keeps the folder it was started in as its own long
   after the Sandbox and the session that started it have ended: a Sandbox started through the windows-sandbox MCP

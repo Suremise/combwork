@@ -1585,6 +1585,80 @@ describe('Hive quitting (#1628)', { timeout: 60_000 }, () => {
     expect(heldRetryOf(e.home, e.project)).toBeNull()
   })
 
+  it.each(['close', 'remove project', 'stop'] as const)('HI-2469: %s forgets a still-held lane and its retry, with other live workspaces preserved', async (action) => {
+    const e = (env = setup({ platform: 'git', review: 'none', finish: 'agentMerges', folder: 'slots', target: 'main' }, { autoRun: false }))
+    state.wf = e.wf
+    state.waiting = [{ id: 'lane-1', project: 'project', builder: { id: 'b1', name: 'B1' }, cards: [7], slotWait: { since: '2026-10-25T00:00:00.000Z' } }]
+    state.pool = {
+      leaseOf: () => null,
+      leasesOf: () => [],
+      lend: async () => ({ ok: false, refusal: { why: 'busy', slot: 'slot-a', held: 'process' } })
+    }
+    const life = new AbortController()
+    const otherLife = new AbortController()
+    let projects = [{ name: 'project', path: e.project }]
+    const ws = { path: e.home, lifetime: life.signal, info: () => ({ projects }), projectConfig: async () => ({ agents: [] }) } as never
+    const otherPath = `${e.home}-other`
+    const other = { path: otherPath, lifetime: otherLife.signal, info: () => ({ projects: [{ name: 'project', path: e.project }] }), projectConfig: async () => ({ agents: [] }) } as never
+    startSlotCards()
+    try {
+      await settleSlotCards(ws, e.project)
+      await settleSlotCards(other, e.project)
+      for (const path of [e.home, otherPath]) {
+        expect(laneSlotHeld(path, 'lane-1')).toEqual({ slot: 'slot-a', held: 'process' })
+        expect(heldRetryOf(path, e.project)).toEqual({ tries: 1, waiting: true })
+      }
+      if (action === 'close') life.abort()
+      else if (action === 'remove project') {
+        projects = []
+        tellListeners({ type: 'workspace-changed', workspace: null })
+      } else stopSlotCards()
+      expect(laneSlotHeld(e.home, 'lane-1')).toBeNull()
+      expect(heldRetryOf(e.home, e.project)).toBeNull()
+      if (action === 'stop') {
+        expect(laneSlotHeld(otherPath, 'lane-1')).toBeNull()
+        expect(heldRetryOf(otherPath, e.project)).toBeNull()
+      } else {
+        expect(laneSlotHeld(otherPath, 'lane-1')).toEqual({ slot: 'slot-a', held: 'process' })
+        expect(heldRetryOf(otherPath, e.project)).toEqual({ tries: 1, waiting: true })
+      }
+      expect(state.calls).toEqual([])
+    } finally {
+      life.abort()
+      otherLife.abort()
+      stopSlotCards()
+    }
+  })
+
+  it.each(['close', 'stop'] as const)('HI-2469: a lend finishing after %s cannot restore cached status or its retry', async (action) => {
+    const e = (env = setup({ platform: 'git', review: 'none', finish: 'agentMerges', folder: 'slots', target: 'main' }, { autoRun: false }))
+    state.wf = e.wf
+    state.waiting = [{ id: 'lane-1', project: 'project', builder: { id: 'b1', name: 'B1' }, cards: [7], slotWait: { since: '2026-10-25T00:00:00.000Z' } }]
+    let release!: () => void
+    const held = new Promise<void>((resolve) => (release = resolve))
+    const lend = vi.fn(async () => {
+      await held
+      return { ok: false, refusal: { why: 'busy', slot: 'slot-a', held: 'process' } }
+    })
+    state.pool = { leaseOf: () => null, leasesOf: () => [], lend }
+    const life = new AbortController()
+    const ws = { path: e.home, lifetime: life.signal, info: () => ({ projects: [{ name: 'project', path: e.project }] }), projectConfig: async () => ({ agents: [] }) } as never
+    const pass = settleSlotCards(ws, e.project)
+    try {
+      await vi.waitFor(() => expect(lend).toHaveBeenCalledOnce(), { timeout: HUNG_MS })
+      if (action === 'close') life.abort()
+      else stopSlotCards()
+      release()
+      await pass
+      expect(laneSlotHeld(e.home, 'lane-1')).toBeNull()
+      expect(heldRetryOf(e.home, e.project)).toBeNull()
+    } finally {
+      release()
+      await pass
+      life.abort()
+    }
+  })
+
   it('a pass that never ends holds the quit only for its bound', async () => {
     const { go } = await heldPass()
     await quitSlotCards(10)
