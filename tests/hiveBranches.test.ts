@@ -17,10 +17,10 @@ const gitTakes = (name: string): boolean => {
 }
 
 describe('the full form', () => {
-  const home = { workspace: 'HIVE', project: 'amberlight' }
+  const home = { workspace: 'HIVE', project: 'ambrosia' }
 
   it("is hive/<workspace>/<project>/<agent>: the folders' names as they are, the agent's slug", () => {
-    expect(hiveBranch(home, 'AMB1')).toBe('hive/HIVE/amberlight/amb1')
+    expect(hiveBranch(home, 'AMB1')).toBe('hive/HIVE/ambrosia/amb1')
     expect(hiveBranch({ workspace: 'My Work', project: 'web app' }, 'Builder 2')).toBe('hive/My-Work/web-app/builder-2')
     expect(oldHiveBranch('AMB1')).toBe('hive/amb1')
   })
@@ -39,17 +39,17 @@ describe('the full form', () => {
 })
 
 describe("a branch Hive made for an agent", () => {
-  const home = { workspace: 'HIVE', project: 'amberlight' }
+  const home = { workspace: 'HIVE', project: 'ambrosia' }
 
   it('is recognised in either form: hive/<slug> from before as Hive made it, and the full form here, case aside', () => {
     expect(hiveBranchNumber('hive/amb1', home, 'AMB1')).toBe(0)
     expect(hiveBranchNumber('hive/amb1-2', home, 'AMB1')).toBe(2)
-    expect(hiveBranchNumber('hive/HIVE/amberlight/amb1', home, 'AMB1')).toBe(0)
-    expect(hiveBranchNumber('hive/hive/Amberlight/amb1-3', home, 'amb1')).toBe(3)
+    expect(hiveBranchNumber('hive/HIVE/ambrosia/amb1', home, 'AMB1')).toBe(0)
+    expect(hiveBranchNumber('hive/hive/Ambrosia/amb1-3', home, 'amb1')).toBe(3)
     // In a workspace part Hive gave this project (recorded): this project's; one that only looks numbered isn't (round 3:
     // another workspace may be called HIVE-2).
-    expect(hiveBranchNumber('hive/HIVE-2/amberlight/amb1', { ...home, spaces: ['HIVE-2'] }, 'AMB1')).toBe(0)
-    expect(hiveBranchNumber('hive/HIVE-2/amberlight/amb1', home, 'AMB1')).toBeNull()
+    expect(hiveBranchNumber('hive/HIVE-2/ambrosia/amb1', { ...home, spaces: ['HIVE-2'] }, 'AMB1')).toBe(0)
+    expect(hiveBranchNumber('hive/HIVE-2/ambrosia/amb1', home, 'AMB1')).toBeNull()
     expect(hiveBranchNumber('hive/My-Work/web-app/b1', { workspace: 'My Work', project: 'web app' }, 'B1')).toBe(0)
   })
 
@@ -59,25 +59,25 @@ describe("a branch Hive made for an agent", () => {
     expect(hiveBranchNumber('hive/b--1-2', home, 'B--1')).toBe(2)
     expect(hiveBranchNumber('hive/b-1', home, 'B--1')).toBeNull()
     // The full form uses the new rules: B--1's part is b-1.
-    expect(hiveBranch(home, 'B--1')).toBe('hive/HIVE/amberlight/b-1')
-    expect(hiveBranchNumber('hive/HIVE/amberlight/b-1', home, 'B--1')).toBe(0)
+    expect(hiveBranch(home, 'B--1')).toBe('hive/HIVE/ambrosia/b-1')
+    expect(hiveBranchNumber('hive/HIVE/ambrosia/b-1', home, 'B--1')).toBe(0)
   })
 
   it("isn't another agent's, another workspace's or project's (two workspaces in one repository), or a branch not Hive's", () => {
-    for (const b of ['hive/OTHER/amberlight/amb1', 'hive/HIVE/other/amb1', 'hive/HIVEX/amberlight/amb1', 'feature/amb1', 'hive/HIVE/amb1', 'hive/a/b/c/d', 'main', 'hive', 'hive/amb10', 'hive/HIVE/amberlight/amb1-x']) expect(hiveBranchNumber(b, home, 'AMB1')).toBeNull()
+    for (const b of ['hive/OTHER/ambrosia/amb1', 'hive/HIVE/other/amb1', 'hive/HIVEX/ambrosia/amb1', 'feature/amb1', 'hive/HIVE/amb1', 'hive/a/b/c/d', 'main', 'hive', 'hive/amb10', 'hive/HIVE/ambrosia/amb1-x']) expect(hiveBranchNumber(b, home, 'AMB1')).toBeNull()
   })
 
   it("Add Agent's new worktree on an agent's full-form branch may find the branch Hive made for that name before; any other only itself", () => {
-    expect(reusableBranches('hive/HIVE/amberlight/amb1', home, 'AMB1')).toEqual(['hive/HIVE/amberlight/amb1', 'hive/amb1'])
-    expect(reusableBranches('hive/HIVE/amberlight/b-1', home, 'B--1')).toEqual(['hive/HIVE/amberlight/b-1', 'hive/b--1'])
+    expect(reusableBranches('hive/HIVE/ambrosia/amb1', home, 'AMB1')).toEqual(['hive/HIVE/ambrosia/amb1', 'hive/amb1'])
+    expect(reusableBranches('hive/HIVE/ambrosia/b-1', home, 'B--1')).toEqual(['hive/HIVE/ambrosia/b-1', 'hive/b--1'])
     // Without the name, or for another agent's or workspace's branch: only itself.
-    expect(reusableBranches('hive/HIVE/amberlight/amb1', home)).toEqual(['hive/HIVE/amberlight/amb1'])
-    expect(reusableBranches('hive/HIVE/amberlight/amb2', home, 'AMB1')).toEqual(['hive/HIVE/amberlight/amb2'])
-    expect(reusableBranches('hive/OTHER/amberlight/amb1', home, 'AMB1')).toEqual(['hive/OTHER/amberlight/amb1'])
+    expect(reusableBranches('hive/HIVE/ambrosia/amb1', home)).toEqual(['hive/HIVE/ambrosia/amb1'])
+    expect(reusableBranches('hive/HIVE/ambrosia/amb2', home, 'AMB1')).toEqual(['hive/HIVE/ambrosia/amb2'])
+    expect(reusableBranches('hive/OTHER/ambrosia/amb1', home, 'AMB1')).toEqual(['hive/OTHER/ambrosia/amb1'])
     expect(reusableBranches('feature/x', home, 'X')).toEqual(['feature/x'])
     // With a recorded part: the same agent's branch in each of the project's own parts, the current one first, then before #703.
-    expect(reusableBranches('hive/HIVE-2/amberlight/amb1', { ...home, spaces: ['HIVE-2'] }, 'AMB1')).toEqual(['hive/HIVE-2/amberlight/amb1', 'hive/HIVE/amberlight/amb1', 'hive/amb1'])
-    expect(reusableBranches('hive/HIVE-2/amberlight/amb1', home, 'AMB1')).toEqual(['hive/HIVE-2/amberlight/amb1'])
+    expect(reusableBranches('hive/HIVE-2/ambrosia/amb1', { ...home, spaces: ['HIVE-2'] }, 'AMB1')).toEqual(['hive/HIVE-2/ambrosia/amb1', 'hive/HIVE/ambrosia/amb1', 'hive/amb1'])
+    expect(reusableBranches('hive/HIVE-2/ambrosia/amb1', home, 'AMB1')).toEqual(['hive/HIVE-2/ambrosia/amb1'])
   })
 })
 
@@ -87,7 +87,7 @@ describe('the workspace part for new branches (#703 rounds 2 and 3)', () => {
     expect(chooseSpace(home, ['main', 'hive/b1', 'hive/ws/alpha/b1'])).toEqual({ space: 'ws', isNew: false })
     expect(chooseSpace(home, ['main', 'hive/ws'])).toEqual({ space: 'ws-2', isNew: true })
     expect(chooseSpace(home, ['hive/WS', 'hive/ws-2/alpha'])).toEqual({ space: 'ws-3', isNew: true })
-    expect(chooseSpace({ workspace: 'HIVE', project: 'amberlight' }, ['hive/hive'])).toEqual({ space: 'HIVE-2', isNew: true })
+    expect(chooseSpace({ workspace: 'HIVE', project: 'ambrosia' }, ['hive/hive'])).toEqual({ space: 'HIVE-2', isNew: true })
     expect(hiveBranch({ ...home, space: chooseSpace(home, ['hive/ws']).space }, 'New')).toBe('hive/ws-2/alpha/new')
   })
 

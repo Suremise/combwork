@@ -35,7 +35,7 @@ const { config } = await import('../src/main/config')
 const accounts = await import('../src/main/accounts')
 
 const wsPath = join(base, 'ws')
-const p = join(wsPath, 'amberlight')
+const p = join(wsPath, 'ambrosia')
 const id = `${p.toLowerCase()}#amb1`
 const s = sessions as unknown as { live: Map<string, { configuredMode?: string | null }>; runs: Map<string, string>; modeOffers: Map<string, unknown>; modeOfferTimer: NodeJS.Timeout | null }
 let w: ReturnType<typeof createWorkspaceService>

@@ -1,7 +1,7 @@
 // Agent names from patterns (#1440, SPEC §16.10.6), fake Claude Code, the Assistant off: two projects keyed AM
-// (amberlight) and AP (apiary) each load Hive's Team 3×3 without a rename (AM-B1… and AP-B1…, Load template ready at
-// once); amberlight's agents saved as a template with "Use the project key in names" keep patterns ({key}-B{n}), and
-// without it fixed names; the fixed-name one loaded into apiary has every name taken by amberlight's, so free names are
+// (ambrosia) and AP (apiary) each load Hive's Team 3×3 without a rename (AM-B1… and AP-B1…, Load template ready at
+// once); ambrosia's agents saved as a template with "Use the project key in names" keep patterns ({key}-B{n}), and
+// without it fixed names; the fixed-name one loaded into apiary has every name taken by ambrosia's, so free names are
 // filled in (AP-B1…, the key swapped), one edited to a taken name greys Load template out until it is fixed; loaded,
 // apiary's agents have apiary's names. Editing the pattern template's description only keeps its patterns and pairs (HR3,
 // round 1), and it loads into apiary with apiary's names. Each row's partner ("with AP-R1") follows the names in the
@@ -24,7 +24,7 @@ const userData = path.join(lib.WORK, 'templatenames-profile')
 const ws = path.join(lib.WORK, 'templatenames-ws')
 const claudeHome = path.join(lib.WORK, 'templatenames-claude-home')
 const shots = path.join(lib.WORK, 'templatenames-shots')
-const amber = path.join(ws, 'amberlight')
+const ambrosia = path.join(ws, 'ambrosia')
 const apiary = path.join(ws, 'apiary')
 let failed = 0
 const check = (name, ok, extra = '') => {
@@ -36,11 +36,11 @@ const until = (fn, ms) => lib.until(fn, ms, 200)
 ;(async () => {
   for (const d of [userData, ws, ws + '.worktrees', claudeHome, shots]) fs.rmSync(d, { recursive: true, force: true })
   for (const d of [claudeHome, shots]) fs.mkdirSync(d, { recursive: true })
-  for (const p of [amber, apiary]) {
+  for (const p of [ambrosia, apiary]) {
     lib.gitProject(p)
     lib.git(p, ['branch', '-M', 'main'])
   }
-  fs.writeFileSync(path.join(claudeHome, 'fake-trusted.json'), JSON.stringify([ws.toLowerCase(), amber.toLowerCase(), apiary.toLowerCase()]))
+  fs.writeFileSync(path.join(claudeHome, 'fake-trusted.json'), JSON.stringify([ws.toLowerCase(), ambrosia.toLowerCase(), apiary.toLowerCase()]))
   // Claude Code only: Codex stays off, so Hive's templates' reviewers run on Claude Code (#1436).
   lib.enableProviders(userData)
   const cfgFile = path.join(userData, 'config.json')
@@ -62,7 +62,7 @@ const until = (fn, ms) => lib.until(fn, ms, 200)
     const agentsOf = (p) => JSON.parse(fs.readFileSync(path.join(p, '.hive', 'project.json'), 'utf8')).agents ?? []
     const names = (p) => agentsOf(p).map((a) => a.name)
     const keys = async () => Object.fromEntries((await inv('project:keys')).map((k) => [path.basename(k.projectPath), k.key]))
-    check('the projects have their keys: amberlight AM, apiary AP', !!(await until(async () => JSON.stringify(await keys()) === JSON.stringify({ amberlight: 'AM', apiary: 'AP' }), HUNG_MS)), JSON.stringify(await keys()))
+    check('the projects have their keys: ambrosia AM, apiary AP', !!(await until(async () => JSON.stringify(await keys()) === JSON.stringify({ ambrosia: 'AM', apiary: 'AP' }), HUNG_MS)), JSON.stringify(await keys()))
     const select = async (name) => {
       // (Clicking Projects while it shows would hide the sidebar.)
       if ((await page.locator('.project-row', { hasText: name }).count()) === 0) await page.locator('.activity-btn[aria-label="Projects"]').click()
@@ -103,7 +103,7 @@ const until = (fn, ms) => lib.until(fn, ms, 200)
     const team = ['B1', 'B2', 'B3', 'R1', 'R2', 'R3']
 
     // --- Hive's Team 3×3 into each project: its key's names, nothing to rename, Load template ready at once.
-    for (const [p, name, key] of [[amber, 'amberlight', 'AM'], [apiary, 'apiary', 'AP']]) {
+    for (const [p, name, key] of [[ambrosia, 'ambrosia', 'AM'], [apiary, 'apiary', 'AP']]) {
       await select(name)
       const d = await openLoad('Team 3×3')
       const want = team.map((n) => `${key}-${n}`)
@@ -113,8 +113,8 @@ const until = (fn, ms) => lib.until(fn, ms, 200)
       check(`${name}: loaded with those names`, !!(await until(async () => JSON.stringify(names(p)) === JSON.stringify(want), HUNG_MS)), JSON.stringify(names(p)))
     }
 
-    // --- amberlight saved as a template: with the key in names (offered, ticked), patterns; without, fixed names.
-    await select('amberlight')
+    // --- ambrosia saved as a template: with the key in names (offered, ticked), patterns; without, fixed names.
+    await select('ambrosia')
     const save = async (name, patterns) => {
       await lib.addMenuRun(page, 'Templates')
       await until(async () => (await menuItem('Save Template…').count()) === 1, HUNG_MS)
@@ -137,7 +137,7 @@ const until = (fn, ms) => lib.until(fn, ms, 200)
     // Written once the save is done (HI-1910: it reads the project's workflow first), never read before.
     check('…unticked: fixed names', !!(await until(async () => fs.existsSync(path.join(ws, '.hive', 'templates', 'am-fixed.json')), HUNG_MS)) && JSON.stringify(file('am-fixed.json').agents.map((a) => a.name)) === JSON.stringify(team.map((n) => `AM-${n}`)))
 
-    // --- The pattern template edited in the Templates view, its description only: shown with amberlight's names, edited
+    // --- The pattern template edited in the Templates view, its description only: shown with ambrosia's names, edited
     // as its patterns, saved with them and its pairs unchanged (HR3, #1440 round 1: the editor once saved the names shown).
     const patterns = JSON.stringify(file('am-team.json').agents.map((a) => a.name))
     const pairsBefore = JSON.stringify(file('am-team.json').pairs)
@@ -155,14 +155,14 @@ const until = (fn, ms) => lib.until(fn, ms, 200)
     await editor.getByRole('button', { name: 'Save Template' }).click()
     check('…saved with the description: its patterns and pairs as they were', !!(await until(async () => file('am-team.json').description === 'Three builders, three reviewers.', HUNG_MS)) && JSON.stringify(file('am-team.json').agents.map((a) => a.name)) === patterns && JSON.stringify(file('am-team.json').pairs) === pairsBefore, JSON.stringify(file('am-team.json')))
 
-    // --- The fixed-name template into apiary: every name is amberlight's, so free ones are filled in (AP-B1…).
+    // --- The fixed-name template into apiary: every name is ambrosia's, so free ones are filled in (AP-B1…).
     await select('apiary')
     let d = await openLoad('AM fixed')
-    check('every name taken by amberlight: free names filled in (the key swapped), none marked, Load template ready', JSON.stringify(await boxes(d)) === JSON.stringify(team.map((n) => `AP-${n}`)) && (await d.locator('.template-plan-table .field-error').count()) === 0 && (await loadButton(d).isEnabled()) && /Free names are filled in below/.test(await d.locator('[data-names-taken]').innerText()), JSON.stringify(await boxes(d)))
-    // One edited to a name amberlight has: marked, Load template greyed out; fixed, ready again.
+    check('every name taken by ambrosia: free names filled in (the key swapped), none marked, Load template ready', JSON.stringify(await boxes(d)) === JSON.stringify(team.map((n) => `AP-${n}`)) && (await d.locator('.template-plan-table .field-error').count()) === 0 && (await loadButton(d).isEnabled()) && /Free names are filled in below/.test(await d.locator('[data-names-taken]').innerText()), JSON.stringify(await boxes(d)))
+    // One edited to a name ambrosia has: marked, Load template greyed out; fixed, ready again.
     const second = d.locator('.template-plan-name-input').nth(1)
     await second.fill('AM-B2')
-    check('a name edited to one amberlight has is marked, and Load template greyed out', !!(await until(async () => JSON.stringify(await d.locator('.template-plan-table .field-error').allInnerTexts()) === '["amberlight has an agent called AM-B2."]' && (await loadButton(d).isDisabled()), HUNG_MS)), JSON.stringify(await d.locator('.template-plan-table .field-error').allInnerTexts()))
+    check('a name edited to one ambrosia has is marked, and Load template greyed out', !!(await until(async () => JSON.stringify(await d.locator('.template-plan-table .field-error').allInnerTexts()) === '["ambrosia has an agent called AM-B2."]' && (await loadButton(d).isDisabled()), HUNG_MS)), JSON.stringify(await d.locator('.template-plan-table .field-error').allInnerTexts()))
     // Each partner by the name in its box (the Assistant, on round 2's screenshots): AP-B1 with AP-R1, AP-R2 with AM-B2 as typed.
     check('"with …" follows the names in the boxes', !!(await until(async () => JSON.stringify(await partners(d)) === JSON.stringify(['AP-R1', 'AP-R2', 'AP-R3', 'AP-B1', 'AM-B2', 'AP-B3']), HUNG_MS)), JSON.stringify(await partners(d)))
     check('English: every column shows, nothing to scroll sideways', !!(await settled(d)) && (await fits(d)))
@@ -211,7 +211,7 @@ const until = (fn, ms) => lib.until(fn, ms, 200)
     await loadButton(d).click()
     check('…paired as saved', !!(await until(async () => JSON.stringify(agentsOf(apiary).map((a) => a.pairedWith ?? null)) === JSON.stringify(['AP-R1', 'AP-R2', 'AP-R3', 'AP-B1', 'AP-B2', 'AP-B3']), HUNG_MS)), JSON.stringify(agentsOf(apiary).map((a) => a.pairedWith ?? null)))
 
-    // --- Add Agent from Template: its name asked for, filled in free (AM-B1 is amberlight's: AP's taken too, so another).
+    // --- Add Agent from Template: its name asked for, filled in free (AM-B1 is ambrosia's: AP's taken too, so another).
     await lib.addMenuRun(page, 'Add Agent from Template')
     await until(async () => (await page.locator('.menu .menu-item').count()) > 3, HUNG_MS)
     const amFixed = page.locator('.menu .menu-header', { hasText: 'AM fixed' })
@@ -224,7 +224,7 @@ const until = (fn, ms) => lib.until(fn, ms, 200)
     check('Add Agent from Template asks for its name, filled in free, with its role and coding agent', !['AM-B1', 'AP-B1'].includes(filled) && /Builder · suggests Claude Code/.test(await ask.innerText()), `${filled} | ${await ask.innerText()}`)
     await box.fill('AM-B1')
     await ask.getByRole('button', { name: 'Add Agent' }).click()
-    check('…a name another agent has is refused there, naming whose', !!(await until(async () => /There is already an agent called "AM-B1" in amberlight/.test(await ask.innerText().catch(() => '')), HUNG_MS)))
+    check('…a name another agent has is refused there, naming whose', !!(await until(async () => /There is already an agent called "AM-B1" in ambrosia/.test(await ask.innerText().catch(() => '')), HUNG_MS)))
     await box.fill('Extra builder')
     await ask.getByRole('button', { name: 'Add Agent' }).click()
     check('…a free one is added', !!(await until(async () => names(apiary).includes('Extra builder'), HUNG_MS)), JSON.stringify(names(apiary)))

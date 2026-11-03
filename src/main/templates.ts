@@ -495,7 +495,7 @@ async function namesIn(projectPath: string, agents: readonly TemplateAgent[]): P
   return templateAgentNames(agents, key ?? '')
 }
 
-/** Names another project's agents have, in a refusal: "B1, R1 are already agents in amberlight: … rename them" (and nothing changed, at the load's end). */
+/** Names another project's agents have, in a refusal: "B1, R1 are already agents in ambrosia: … rename them" (and nothing changed, at the load's end). */
 function takenText(taken: { name: string; project: string }[], nothingChanged = false): Text {
   const where = listOf([...new Set(taken.map((t) => t.project))])
   return withValues(nothingChanged ? M.takenNothing : M.taken, { names: listOf(taken.map((t) => t.name)), count: taken.length, projects: where })

@@ -11,7 +11,7 @@ import { groupProgressRuns, progressRunTitle, progressRunsIn, type AgentProcess 
 const agent = (name: string, project: string, extra: Partial<RunningAgent> = {}): RunningAgent => ({ workspace: 'D:/ws', projectPath: `D:/ws/${project}`, project, agentId: name.toLowerCase(), agentName: name, provider: 'claude-code', sessionId: `s-${name}`, ...extra })
 const lastSeen = '2026-10-17T03:02:56.000Z'
 const HUNG_MS = 10_000
-const marker = (over: Record<string, unknown> = {}): string => JSON.stringify({ version: 1, pid: 42, startedAt: '2026-10-17T01:00:00.000Z', lastSeen: '2026-10-17T03:02:56.000Z', hive: '0.9.0', workspaces: ['D:/ws'], agents: [agent('B1', 'hive'), agent('R1', 'amberlight')], ...over })
+const marker = (over: Record<string, unknown> = {}): string => JSON.stringify({ version: 1, pid: 42, startedAt: '2026-10-17T01:00:00.000Z', lastSeen: '2026-10-17T03:02:56.000Z', hive: '0.9.0', workspaces: ['D:/ws'], agents: [agent('B1', 'hive'), agent('R1', 'ambrosia')], ...over })
 
 describe('the running marker (#984)', () => {
   it('reads back what a running Hive wrote', () => {
@@ -46,7 +46,7 @@ describe('the running marker (#984)', () => {
   })
 
   it('names each project once, in the order met', () => {
-    expect(projectsOf([agent('B1', 'hive'), agent('R1', 'amberlight'), agent('B2', 'hive')])).toEqual(['hive', 'amberlight'])
+    expect(projectsOf([agent('B1', 'hive'), agent('R1', 'ambrosia'), agent('B2', 'hive')])).toEqual(['hive', 'ambrosia'])
   })
 })
 
@@ -54,8 +54,8 @@ describe('the notice (#984)', () => {
   setDateStyle({ date: 'ymd', time: '24h' })
 
   it('says when, what was running where, and that nothing was resumed', () => {
-    const text = unexpectedCloseText({ lastSeen, agents: [agent('B1', 'hive'), agent('R1', 'amberlight')], dump: false, merges: [] }, null)
-    expect(text).toMatch(/^Hive was last seen on .+ at .+\. 2 agents were running in hive and amberlight\. Nothing was resumed\.$/)
+    const text = unexpectedCloseText({ lastSeen, agents: [agent('B1', 'hive'), agent('R1', 'ambrosia')], dump: false, merges: [] }, null)
+    expect(text).toMatch(/^Hive was last seen on .+ at .+\. 2 agents were running in hive and ambrosia\. Nothing was resumed\.$/)
     expect(text).not.toMatch(/crash dump/)
   })
 

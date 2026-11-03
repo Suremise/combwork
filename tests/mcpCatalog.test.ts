@@ -153,7 +153,7 @@ describe('installing and updating (HI-545)', () => {
   const trashDir = join(base, 'trash')
   const wasTrash = process.env.HIVE_TEST_TRASH_DIR
   let wsPath: string
-  let amber: string
+  let ambrosia: string
   let apiary: string
   let share: string
   let w: ReturnType<typeof createWorkspaceService>
@@ -199,10 +199,10 @@ describe('installing and updating (HI-545)', () => {
   beforeEach(async () => {
     wsPath = tempDir('hive-mcp-catalog-ws-')
     share = tempDir('hive-mcp-catalog-share-')
-    amber = join(wsPath, 'amberlight')
+    ambrosia = join(wsPath, 'ambrosia')
     apiary = join(wsPath, 'apiary')
     mkdirSync(mcpDir(), { recursive: true })
-    for (const p of [amber, apiary]) {
+    for (const p of [ambrosia, apiary]) {
       mkdirSync(join(p, '.hive'), { recursive: true })
       writeFileSync(join(p, '.hive', 'project.json'), JSON.stringify({ version: 2, agents: [agent], mcp: { disabled: [], enabled: [], model: 3 } }))
     }
@@ -236,8 +236,8 @@ describe('installing and updating (HI-545)', () => {
     expect(m).toMatchObject({ projects: [], assistant: false })
     expect(readFileSync(join(mcpDir(), 'demo', 'server.js'), 'utf8')).toBe('// demo 1.0.0')
     expect(await row()).toMatchObject({ installed: '1.0.0', update: false })
-    await addTo(amber)
-    const def = (await launched(amber)).demo
+    await addTo(ambrosia)
+    const def = (await launched(ambrosia)).demo
     expect(def?.args?.[0]).toMatch(/demo[\\/]server\.js$/)
     expect('catalog' in (def ?? {})).toBe(false)
   })
@@ -255,32 +255,32 @@ describe('installing and updating (HI-545)', () => {
 
   it('updates keeping the places shown and the user\'s env values, and is offered only for a higher version', async () => {
     await install()
-    await addTo(amber)
+    await addTo(ambrosia)
     // The user's own value for its token.
     const file = join(mcpDir(), 'demo.json')
     writeFileSync(file, JSON.stringify({ ...JSON.parse(readFileSync(file, 'utf8')), env: { DEMO_TOKEN: 'mine' } }, null, 2))
     publish('1.1.0', 'server2.js', { DEMO_TOKEN: '${DEMO_TOKEN}', NEW_KEY: 'x' })
     expect(await row()).toMatchObject({ installed: '1.0.0', update: true })
     const u = await prepareUpdate()
-    expect(u.places).toEqual({ projects: [amber], assistant: false })
+    expect(u.places).toEqual({ projects: [ambrosia], assistant: false })
     expect(await run(() => catalog.updateCatalogServer(u.p.id, u.shown, u.places))).toEqual({})
-    const def = (await launched(amber)).demo
+    const def = (await launched(ambrosia)).demo
     expect(def?.args?.[0]).toMatch(/server2\.js$/)
     expect(def?.env).toEqual({ DEMO_TOKEN: 'mine', NEW_KEY: 'x' })
-    expect(projectMcp(amber).enabled).toEqual(['demo'])
+    expect(projectMcp(ambrosia).enabled).toEqual(['demo'])
     expect(await row()).toMatchObject({ installed: '1.1.0', update: false })
   })
 
   it('writes nothing when a place is removed or added, or the definition edited, while the update waits; nothing is re-added', async () => {
     await install()
-    await addTo(amber)
+    await addTo(ambrosia)
     publish('1.1.0', 'server2.js')
     await pages()
-    // Removed meanwhile: refused, and amberlight isn't given it back.
+    // Removed meanwhile: refused, and ambrosia isn't given it back.
     let u = await prepareUpdate()
-    await run(() => mcp.removeMcpFrom({ project: amber }, 'demo'))
+    await run(() => mcp.removeMcpFrom({ project: ambrosia }, 'demo'))
     expect((await run(() => catalog.updateCatalogServer(u.p.id, u.shown, u.places))).stale).toContain('Where demo is added changed while the update waited')
-    expect(projectMcp(amber).enabled).toEqual([])
+    expect(projectMcp(ambrosia).enabled).toEqual([])
     expect(readFileSync(join(mcpDir(), 'demo.json'), 'utf8')).toContain('server.js')
     // Added meanwhile: refused, so apiary never runs a definition it wasn't shown.
     u = await prepareUpdate()
@@ -297,16 +297,16 @@ describe('installing and updating (HI-545)', () => {
 
   it("refuses an update while a project's settings are partway through a save, writing nothing", async () => {
     await install()
-    await addTo(amber)
+    await addTo(ambrosia)
     publish('1.1.0', 'server2.js')
     await pages()
     const u = await prepareUpdate()
-    const settings = join(amber, '.hive', 'project.json')
+    const settings = join(ambrosia, '.hive', 'project.json')
     const saved = readFileSync(settings, 'utf8')
     writeFileSync(settings, '{')
-    await expect(run(() => catalog.updateCatalogServer(u.p.id, u.shown, u.places))).rejects.toThrow("Couldn't read the settings of amberlight")
+    await expect(run(() => catalog.updateCatalogServer(u.p.id, u.shown, u.places))).rejects.toThrow("Couldn't read the settings of ambrosia")
     writeFileSync(settings, saved)
-    expect((await launched(amber)).demo?.args?.[0]).toMatch(/demo[\\/]server\.js$/)
+    expect((await launched(ambrosia)).demo?.args?.[0]).toMatch(/demo[\\/]server\.js$/)
   })
 
   it('gives a workspace closed during the download nothing, and drops what it held', async () => {

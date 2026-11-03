@@ -1166,7 +1166,7 @@ export const mcpErrorText = (server: Pick<McpServerInfo, 'error' | 'errorText'>)
 
 /**
  * Where a workspace MCP server is added (HI-2059), in words, from the projects as the window has them: "Added in
- * Amberlight", "Added in Amberlight and for the Hive Assistant", "Added for the Hive Assistant only" or "Not added
+ * Ambrosia", "Added in Ambrosia and for the Hive Assistant", "Added for the Hive Assistant only" or "Not added
  * anywhere". A hidden project it is added to counts, unnamed.
  */
 export function mcpWhereText(server: Pick<McpServerInfo, 'def' | 'projects' | 'assistant'>, projects: readonly ProjectInfo[]): string {

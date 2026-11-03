@@ -3,7 +3,7 @@ import type { Tr } from './tasks'
 
 // Agent names are unique across the workspace (#702): two projects' agents called B1 can't be told apart on the board,
 // in notifications or by the Assistant. Adding, renaming and loading a template refuse a name another agent of the
-// workspace has, suggesting one with the project's prefix (B1 in amberlight: AB1); names from before stay, flagged once.
+// workspace has, suggesting one with the project's prefix (B1 in ambrosia: AB1); names from before stay, flagged once.
 
 /** An agent of the workspace, by name: its project's folder name, and its id. */
 export interface NamedAgent {
@@ -25,7 +25,7 @@ export function nameTaken(name: string, agents: readonly NamedAgent[], self?: { 
   return agents.find((a) => sameAgentName(a.name, name) && !(self && a.id === self.id && a.project.toLowerCase() === self.project.toLowerCase())) ?? null
 }
 
-/** The project's initials, upper case: hive → H, hive-desktop → HD, amberLight → AL. */
+/** The project's initials, upper case: hive → H, hive-desktop → HD, ambrosiaLabs → AL. */
 export function projectPrefix(project: string): string {
   const words = project.replace(/([a-z0-9])([A-Z])/g, '$1 $2').split(/[^A-Za-z0-9]+/).filter(Boolean)
   return words.map((w) => w[0]).join('').toUpperCase() || 'P'
@@ -39,7 +39,7 @@ const fit = (base: string, suffix: string): string => `${base.slice(0, Math.max(
 
 /**
  * A free name for an agent called `name` in `project` (#702): the project's prefix in front of a short code (B1 in
- * amberlight: AB1, then AMB1, AMBB1…), a word with the project after it ("Builder (amberlight)"), else numbered. Every
+ * ambrosia: AB1, then AMB1, AMBB1…), a word with the project after it ("Builder (ambrosia)"), else numbered. Every
  * name tried fits AGENT_NAME_MAX (a long name is cut short, never refused), and the numbers end: each one differs, and
  * at most `taken.length` of them are taken.
  */
@@ -75,7 +75,7 @@ export function suggestTemplateAgentName(name: string, project: string, projectK
   return suggestAgentName(name, project, taken)
 }
 
-/** "There is already an agent called "B1" in amberlight…": the refusal, with a free name to use instead. */
+/** "There is already an agent called "B1" in ambrosia…": the refusal, with a free name to use instead. */
 export function nameTakenMessage(name: string, owner: NamedAgent, suggestion: string, tr?: Tr): string {
   if (tr) return tr(msg({ id: 'agents.name.taken', defaultMessage: 'There is already an agent called "{agent}" in {project}. Agent names are unique across the workspace: try "{suggestion}".', description: "Why an agent name can't be used: another agent ({agent}, in {project}) has it. {suggestion} is a free name to use instead." }), { agent: owner.name, project: owner.project, suggestion })
   return `There is already an agent called "${owner.name}" in ${owner.project}. Agent names are unique across the workspace: try "${suggestion}".` // i18n-ignore: English for main's error (the window passes tr)

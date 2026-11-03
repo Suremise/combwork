@@ -20,7 +20,7 @@ const { providerService } = await import('../src/main/providerService')
 const { config } = await import('../src/main/config')
 
 const wsPath = join(base, 'ws')
-const p = join(wsPath, 'amberlight')
+const p = join(wsPath, 'ambrosia')
 const s = sessions as unknown as { live: Map<string, { workflow?: string; state: { runId: string } }>; runs: Map<string, string> }
 let w: ReturnType<typeof createWorkspaceService>
 const run = <T>(fn: () => Promise<T>): Promise<T> => inWorkspace(w, fn)

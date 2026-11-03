@@ -14,8 +14,8 @@ const SOURCES = ['src/main/servers.ts', 'src/main/taskBatch.ts', 'src/main/deliv
 
 describe("the Assistant's activity fields", () => {
   it('keeps only the documented fields, each only when well formed', () => {
-    const a = { kind: 'start-task', card: 741, project: 'amberlight', agent: { id: 'a-1', name: 'AMB1', prompt: 'secret' }, column: 'doing', text: 'secret', brief: 'secret' } as never
-    expect(activityFields(a)).toEqual({ kind: 'start-task', card: 741, project: 'amberlight', agent: { id: 'a-1', name: 'AMB1' }, column: 'doing' })
+    const a = { kind: 'start-task', card: 741, project: 'ambrosia', agent: { id: 'a-1', name: 'AMB1', prompt: 'secret' }, column: 'doing', text: 'secret', brief: 'secret' } as never
+    expect(activityFields(a)).toEqual({ kind: 'start-task', card: 741, project: 'ambrosia', agent: { id: 'a-1', name: 'AMB1' }, column: 'doing' })
     expect(activityFields({ kind: 'reorder-tasks', cards: [3, 'x' as never] })).toEqual({ kind: 'reorder-tasks' })
     expect(activityFields({ kind: 'update-task', card: -1 })).toEqual({ kind: 'update-task' })
     // An unknown kind sends nothing at all.
