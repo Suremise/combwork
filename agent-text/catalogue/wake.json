@@ -112,7 +112,7 @@
     "note": "#1272: in a wake's brackets: the user recorded or changed a decision on the card."
   },
   "wake.card.ended": {
-    "text": "{more, plural, =0 {} one { (and # more watched card changed)} other { (and # more watched cards changed)}}. Your card watch has ended: carry on (hive_read_task with latestComment for the comment in full).",
+    "text": "{more, plural, =0 {} one { (and {count} more watched card changed)} other { (and {count} more watched cards changed)}}. Your card watch has ended: carry on (hive_read_task with latestComment for the comment in full).",
     "note": "The end of a card watch's wake line, after the card and where it is now. more: other watched cards that changed too."
   },
   "wake.card.gone": {
@@ -448,7 +448,7 @@
     "note": "#226: a wake line naming its cards by key alone (\"HI-1, HI-2\"); short is its end (wake.many.short)."
   },
   "wake.many.numbersMore": {
-    "text": "{cards} and {more, plural, one {# more watched card} other {# more watched cards}} changed{short}",
+    "text": "{cards} and {more, plural, one {{count} more watched card} other {{count} more watched cards}} changed{short}",
     "note": "#226: a wake line naming as many cards as fit, the rest counted; short is its end (wake.many.short)."
   },
   "wake.many.short": {

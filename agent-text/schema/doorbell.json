@@ -2,36 +2,42 @@
   "doorbell.count.answer": {
     "placeholders": {
       "n": "plural",
+      "count": "plain",
       "cards": "plain"
     }
   },
   "doorbell.count.cardEvent": {
     "placeholders": {
       "n": "plural",
+      "count": "plain",
       "cards": "plain"
     }
   },
   "doorbell.count.handover": {
     "placeholders": {
       "n": "plural",
+      "count": "plain",
       "cards": "plain"
     }
   },
   "doorbell.count.message": {
     "placeholders": {
       "n": "plural",
+      "count": "plain",
       "cards": "plain"
     }
   },
   "doorbell.count.notice": {
     "placeholders": {
       "n": "plural",
+      "count": "plain",
       "cards": "plain"
     }
   },
   "doorbell.count.task": {
     "placeholders": {
       "n": "plural",
+      "count": "plain",
       "cards": "plain"
     }
   },
@@ -43,7 +49,8 @@
   },
   "doorbell.lanes.count": {
     "placeholders": {
-      "n": "plural"
+      "n": "plural",
+      "count": "plain"
     }
   },
   "doorbell.lanes.namesMore": {

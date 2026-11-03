@@ -550,7 +550,7 @@ export function wakeAbout(card: TaskCard | null, changes: WatchChange[] | 'gone'
  */
 const W = {
   lanesRunning: agentMsg({ id: 'wake.card.lanesRunning', text: 'Lanes are still running (hive_lane list): before you end your turn, watch them again in one lane watch, with any card outside them as cards (hive_wait_for_tasks with lanes ["all"], cards, wake; run-lanes).', note: "#402: what the Assistant's card wake ends with while lanes run: its watch has ended, and the lanes still need one. Kept whole: the rest of the line is cut to make room." }),
-  cardEnded: agentMsg({ id: 'wake.card.ended', text: '{more, plural, =0 {} one { (and # more watched card changed)} other { (and # more watched cards changed)}}. Your card watch has ended: carry on (hive_read_task with latestComment for the comment in full).', note: "The end of a card watch's wake line, after the card and where it is now. more: other watched cards that changed too." }),
+  cardEnded: agentMsg({ id: 'wake.card.ended', text: '{more, plural, =0 {} one { (and {count} more watched card changed)} other { (and {count} more watched cards changed)}}. Your card watch has ended: carry on (hive_read_task with latestComment for the comment in full).', note: "The end of a card watch's wake line, after the card and where it is now. more: other watched cards that changed too." }),
   withComment: agentMsg({ id: 'wake.card.withComment', text: '{head}; latest comment by {by}: "{comment}"{tail}', note: "A wake line with the card's latest comment: head is the card and where it is now, by the comment's author, comment its first line (cut with … to fit), tail what to do." }),
   archived: agentMsg({ id: 'wake.card.archived', text: 'was archived (off the board: only the user brings it back)', note: '#351: after the card\'s key, in a wake: it was archived.' }),
   gone: agentMsg({ id: 'wake.card.gone', text: 'is gone from your board (archived, deleted or moved to another project)', note: "After the card's key, in a wake: the card is out of the agent's view." }),
@@ -569,7 +569,7 @@ const W = {
   manyEnded: agentMsg({ id: 'wake.many.ended', text: '. Your card watch has ended: carry on (hive_read_task with latestComment on each card for its comment in full).', note: '#224: the end of a wake line telling several watched cards.' }),
   manyShort: agentMsg({ id: 'wake.many.short', text: '. Your card watch has ended. Details were left out to fit: read each card (hive_read_task) before you carry on.', note: '#226: the end of a wake line telling too many cards to say each in full.' }),
   numbersChanged: agentMsg({ id: 'wake.many.numbers', text: '{cards} changed{short}', note: '#226: a wake line naming its cards by key alone ("HI-1, HI-2"); short is its end (wake.many.short).' }),
-  numbersMore: agentMsg({ id: 'wake.many.numbersMore', text: '{cards} and {more, plural, one {# more watched card} other {# more watched cards}} changed{short}', note: '#226: a wake line naming as many cards as fit, the rest counted; short is its end (wake.many.short).' }),
+  numbersMore: agentMsg({ id: 'wake.many.numbersMore', text: '{cards} and {more, plural, one {{count} more watched card} other {{count} more watched cards}} changed{short}', note: '#226: a wake line naming as many cards as fit, the rest counted; short is its end (wake.many.short).' }),
   countChanged: agentMsg({ id: 'wake.many.count', text: '{n} watched cards changed{short}', note: '#226: a wake line counting its cards, when not even their keys fit; short is its end.' }),
   briefGone: agentMsg({ id: 'wake.brief.gone', text: '{card} {archived, select, yes {archived} other {gone}}', note: '#226: a card in a few words, in a wake too long to tell each in full: archived, or gone from view.' }),
   briefReturned: agentMsg({ id: 'wake.brief.returned', text: '{card} returned for review (round {round})', note: '#226: a card in a few words: returned for review.' }),
@@ -690,7 +690,7 @@ const columnWord = (c: TaskColumn | 'gone'): string => (c === 'gone' ? 'gone' : 
  * comment's author and first line, then what to do. Kept to one short line (the CLI sends a new line at once).
  */
 export function wakeLine(change: CardChange, more = 0): string {
-  return lineOf(change, say(W.cardEnded, { more }))
+  return lineOf(change, say(W.cardEnded, { more, count: String(more) }))
 }
 
 /**
@@ -895,7 +895,7 @@ export function wakeLines(changes: CardChange[]): string {
   if (jsonBytes(numbers) <= WAKE_MAX_BYTES) return numbers
   // More cards than a watch can have (WATCH_MAX_CARDS): as many numbers as fit, the rest counted.
   for (let shown = changes.length - 1; shown >= 1; shown--) {
-    const line = NOTICE_PREFIX + say(W.numbersMore, { cards: cards(changes.slice(0, shown).map((c) => c.number)), more: changes.length - shown, short })
+    const line = NOTICE_PREFIX + say(W.numbersMore, { cards: cards(changes.slice(0, shown).map((c) => c.number)), more: changes.length - shown, count: String(changes.length - shown), short })
     if (jsonBytes(line) <= WAKE_MAX_BYTES) return line
   }
   return NOTICE_PREFIX + say(W.countChanged, { n: String(changes.length), short })

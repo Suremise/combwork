@@ -35,12 +35,12 @@ export const DOORBELL_PREFIX = `${NOTICE_PREFIX}New in your inbox: `
 export const isDoorbell = (text: string): boolean => text.startsWith(DOORBELL_PREFIX)
 
 const T = {
-  task: agentMsg({ id: 'doorbell.count.task', text: '{n, plural, one {# task} other {# tasks}}{cards}', note: 'Tasks waiting in the inbox, in a notice\'s counts. cards: " (HI-12, HI-14)", the cards they are about, or nothing.' }),
-  handover: agentMsg({ id: 'doorbell.count.handover', text: '{n, plural, one {# handover} other {# handovers}}{cards}', note: 'Handovers waiting in the inbox, in a notice\'s counts. cards: " (HI-12)", or nothing.' }),
-  answer: agentMsg({ id: 'doorbell.count.answer', text: '{n, plural, one {# answer} other {# answers}}{cards}', note: "The user's answers waiting in the inbox, in a notice's counts. cards: \" (HI-12)\", or nothing." }),
-  rebrief: agentMsg({ id: 'doorbell.count.message', text: '{n, plural, one {# message} other {# messages}}{cards}', note: 'Messages (from the user, an agent or Hive: a brief, a lane change) waiting in the inbox, in a notice\'s counts. cards: " (HI-12)", or nothing.' }),
-  'card-event': agentMsg({ id: 'doorbell.count.cardEvent', text: '{n, plural, one {# card event} other {# card events}}{cards}', note: 'Card events (a wake: a watched card changed) waiting in the inbox, in a notice\'s counts. cards: " (HI-12)", or nothing.' }),
-  control: agentMsg({ id: 'doorbell.count.notice', text: '{n, plural, one {# notice} other {# notices}}{cards}', note: "Hive's notices waiting in the inbox, in a notice's counts. cards: \" (HI-12)\", or nothing." }),
+  task: agentMsg({ id: 'doorbell.count.task', text: '{n, plural, one {{count} task} other {{count} tasks}}{cards}', note: 'Tasks waiting in the inbox, in a notice\'s counts. cards: " (HI-12, HI-14)", the cards they are about, or nothing.' }),
+  handover: agentMsg({ id: 'doorbell.count.handover', text: '{n, plural, one {{count} handover} other {{count} handovers}}{cards}', note: 'Handovers waiting in the inbox, in a notice\'s counts. cards: " (HI-12)", or nothing.' }),
+  answer: agentMsg({ id: 'doorbell.count.answer', text: '{n, plural, one {{count} answer} other {{count} answers}}{cards}', note: "The user's answers waiting in the inbox, in a notice's counts. cards: \" (HI-12)\", or nothing." }),
+  rebrief: agentMsg({ id: 'doorbell.count.message', text: '{n, plural, one {{count} message} other {{count} messages}}{cards}', note: 'Messages (from the user, an agent or Hive: a brief, a lane change) waiting in the inbox, in a notice\'s counts. cards: " (HI-12)", or nothing.' }),
+  'card-event': agentMsg({ id: 'doorbell.count.cardEvent', text: '{n, plural, one {{count} card event} other {{count} card events}}{cards}', note: 'Card events (a wake: a watched card changed) waiting in the inbox, in a notice\'s counts. cards: " (HI-12)", or nothing.' }),
+  control: agentMsg({ id: 'doorbell.count.notice', text: '{n, plural, one {{count} notice} other {{count} notices}}{cards}', note: "Hive's notices waiting in the inbox, in a notice's counts. cards: \" (HI-12)\", or nothing." }),
   idsMore: agentMsg({ id: 'doorbell.ids.more', text: '{ids} and {more} more', note: 'Delivery ids in a notice past the first 20: the first 20 ("m1, m2"), then how many more.' }),
   checkpoint: agentMsg({
     id: 'doorbell.notice.checkpoint',
@@ -63,7 +63,7 @@ const T = {
     note: "After \"[Hive] \": the Assistant's notice as its turn ends with lanes running and no watch on them (HI-2069). shown: the builders' names (\"HB1, HB2 and 3 more\"), or how many lanes (lanesCount)."
   }),
   namesMore: agentMsg({ id: 'doorbell.lanes.namesMore', text: '{names} and {more} more', note: "The lanes' builders past the first 10, in the unwatched lanes notice: the first 10 (\"HB1, HB2\"), then how many more." }),
-  lanesCount: agentMsg({ id: 'doorbell.lanes.count', text: '{n, plural, one {# lane} other {# lanes}}', note: "The unwatched lanes notice's count of lanes when no builder's name is left to show (an emoji's)." })
+  lanesCount: agentMsg({ id: 'doorbell.lanes.count', text: '{n, plural, one {{count} lane} other {{count} lanes}}', note: "The unwatched lanes notice's count of lanes when no builder's name is left to show (an emoji's)." })
 }
 const ORDER: readonly DeliveryKind[] = ['task', 'handover', 'answer', 'rebrief', 'card-event', 'control']
 
@@ -74,7 +74,7 @@ export function noticeCounts(items: readonly NoticeItem[]): string {
     const of = items.filter((i) => i.kind === kind)
     if (!of.length) continue
     const cards = [...new Set(of.map((i) => i.card).filter((c): c is number => Number.isInteger(c) && c! > 0))].sort((a, b) => a - b)
-    parts.push(say(T[kind], { n: of.length, cards: cards.length ? ` (${cards.map((c) => `${cardRef(c)}`).join(', ')})` : '' }))
+    parts.push(say(T[kind], { n: of.length, count: String(of.length), cards: cards.length ? ` (${cards.map((c) => `${cardRef(c)}`).join(', ')})` : '' }))
   }
   return agentList(parts)
 }
@@ -111,6 +111,6 @@ export function unwatchedLanesNotice(builders: readonly string[]): string {
   const names = [...new Set(cleaned.filter(Boolean))]
   const more = Math.max(0, names.length - 10) + cleaned.filter((n) => !n).length
   const listed = names.slice(0, 10).join(', ')
-  const shown = names.length ? (more ? say(T.namesMore, { names: listed, more: String(more) }) : listed) : say(T.lanesCount, { n: more })
+  const shown = names.length ? (more ? say(T.namesMore, { names: listed, more: String(more) }) : listed) : say(T.lanesCount, { n: more, count: String(more) })
   return NOTICE_PREFIX + say(T.lanes, { shown })
 }

@@ -341,6 +341,13 @@ describe('the canary dialect over wakes, doorbells and the inbox (card 4, HI-243
     expect(own.filter((id) => !seen.has(id) && id !== 'wake.many.count')).toEqual([])
   })
 
+  it('prints counts as the code did, with no thousands separators (no ICU #)', () => {
+    const events = (n: number): NoticeItem[] => Array.from({ length: n }, (_, i) => ({ id: `m${i + 1}`, kind: 'card-event' }))
+    expect(inboxNotice('doorbell', events(1500))).toMatch(/^\[Hive\] New in your inbox: 1500 card events \(m1, /)
+    expect(unwatchedLanesNotice(Array.from({ length: 1200 }, () => '🐝'))).toContain('(1200 lanes)')
+    expect(wakeLine(change(1), 1200)).toContain(' (and 1200 more watched cards changed)')
+  })
+
   it('says a wake in the dialect of the session it is for', () => {
     setChainResolver((scope) => (scope.kind === 'session' && scope.session.agentId === 'a2' ? chain({ 'wake.card.ended': '. Watch over.', 'doorbell.notice.doorbell': '{what}: read {n, plural, one {it} other {them}}.' }) : null))
     const line = (agentId: string): string => inDialectOf({ projectPath: 'C:/ws/p', agentId }, () => wakeLine(change(1)))

@@ -145,7 +145,8 @@
   },
   "wake.card.ended": {
     "placeholders": {
-      "more": "plural"
+      "more": "plural",
+      "count": "plain"
     }
   },
   "wake.card.gone": {
@@ -579,6 +580,7 @@
     "placeholders": {
       "cards": "plain",
       "more": "plural",
+      "count": "plain",
       "short": "plain"
     }
   },
