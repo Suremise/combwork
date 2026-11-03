@@ -3932,7 +3932,7 @@ export interface LaneStatus {
   blocked?: string
   /** you: what the user is asked for (the open request's kind, #1279). */
   ask?: 'approve' | 'decide' | 'test' | 'signIn' | 'other'
-  /** hooks: the agent whose hooks aren't arriving, by name; startWait: the builder. */
+  /** hooks: the agent whose hooks aren't arriving, by name; startWait: the builder; slot (`held` session, HI-2466): the agent whose session holds the slot. */
   agent?: string
   /** startWait (HI-2029): why its card isn't started yet (LaneStartWhy); `fresh` (HI-2034): `agent` is owed its new conversation. */
   why?: 'busy' | 'watching' | 'queued' | 'failed' | 'refused' | 'fresh' | 'dependencies'
@@ -3941,8 +3941,10 @@ export interface LaneStatus {
   /** startWait `fresh` (HI-2034): no more automatic tries, and why (the user retries it, or ends the lane); the reason a failure gave. */
   freshBlocked?: 'timeout' | 'uncertain' | 'failed'
   freshWhy?: string
-  /** preparing (#1446): the slot being prepared. */
+  /** preparing (#1446): the slot being prepared; slot (HI-2466): the free slot it was refused as held. */
   slot?: string
+  /** slot (HI-2466): what holds that free slot, a session or a process (a file or folder in it open); Hive tries again until it is free. */
+  held?: 'session' | 'process'
   /**
    * When this wait began (HI-1926, epoch ms): when Hive first saw this reason for this card (and ask), kept while they
    * stay the same. `atLeast`: Hive didn't see it begin (it was already waiting when this Hive first listed the lane), so

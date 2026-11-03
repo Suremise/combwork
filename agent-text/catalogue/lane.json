@@ -419,6 +419,10 @@
     "text": "waiting for a slot",
     "note": "A lane started with no slot free waits for one to be lent to it (#1438)."
   },
+  "lane.status.slotHeld": {
+    "text": "waiting for {slot}: {held, select, session {{agent}'s session is still in it} other {a process still has a file or folder in it open}}",
+    "note": "HI-2466: a lane waiting for a slot, the only free one ({slot}) held: a session of the agent {agent} still runs in it, or (other) a process holds it. Hive tries again until it is free."
+  },
   "lane.status.stale": {
     "text": "stale: {card} must be submitted again",
     "note": "A lane's card's pass no longer holds (its work changed since): it is submitted again."

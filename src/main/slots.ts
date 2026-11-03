@@ -83,7 +83,7 @@ const T = {
   inUse: agentMsg({ id: 'slot.refusal.inUse', text: '{slot} is in use by {agent} for {what}', note: "A start's wait: the slot named is lent to another agent. {what} is the card's key or slot.refusal.lane." }),
   agentLeased: agentMsg({ id: 'slot.refusal.agentLeased', text: 'this agent already builds in {slot} for {what}', note: 'A start refused: one agent, one slot (HI-1762). {what} is the card\'s key or slot.refusal.lane.' }),
   warming: agentMsg({ id: 'slot.refusal.warming', text: '{slot} is being set up', note: "A start's wait: the slot's setup is running." }),
-  busy: agentMsg({ id: 'slot.refusal.busy', text: '{slot} has a session or a process in it', note: "A start's wait: something still runs in a free slot, so it isn't lent." }),
+  busy: agentMsg({ id: 'slot.refusal.busy', text: '{held, select, session {{slot} still has a session in it} process {{slot} still has a process running in it (a file or a folder in it open)} other {{slot} has a session or a process in it}}', note: "A start's wait: something still runs in a free slot, so it isn't lent (HI-2466: held, what: a session, a process, or not known). Hive tries again until it is free." }),
   notReady: agentMsg({ id: 'slot.refusal.notReady', text: "{slot} isn't ready ({why})", note: "A start's wait or refusal: the slot isn't ready. {why} is its setup's error, else its state." }),
   setupFailed: agentMsg({ id: 'slot.refusal.setupFailed', text: "{slot}'s setup failed: {error}", note: "A start refused: the slot's setup failed. {error} is why (one of slot.error.*, git's or the command's)." }),
   opLost: agentMsg({ id: 'slot.error.opLost', text: 'the operation no longer holds {slot}', note: "An operation on a slot stopped because another took the slot over (#1429). Caught by the pool; in the log if it ever escapes." }),
@@ -199,9 +199,13 @@ export type SlotRefusal =
   | { why: 'inUse'; slot: string; agent: string; card: number | null; lane: string | null }
   | { why: 'agentLeased'; slot: string; card: number | null; lane: string | null }
   | { why: 'warming'; slot: string }
-  | { why: 'busy'; slot: string }
+  /** HI-2466: what holds it, where the lend looked (a session in it, else a process: a file or folder in it open). */
+  | { why: 'busy'; slot: string; held?: SlotHeld }
   | { why: 'notReady'; slot: string; state: SlotState; error: string | null }
   | { why: 'setupFailed'; slot: string; error: string; log: string | null }
+
+/** What holds a free slot so it can't be lent now (HI-2466): a session running in it, or another process. */
+export type SlotHeld = 'session' | 'process'
 
 export type LendResult = { ok: true; lease: SlotLease; slot: Slot } | { ok: false; refusal: SlotRefusal }
 
@@ -236,7 +240,7 @@ export function refusalText(r: SlotRefusal, name: (agent: string) => string = (a
     case 'warming':
       return say(T.warming, { slot: r.slot })
     case 'busy':
-      return say(T.busy, { slot: r.slot })
+      return say(T.busy, { slot: r.slot, held: r.held ?? 'other' }) // i18n-ignore: a select key
     case 'notReady':
       return say(T.notReady, { slot: r.slot, why: r.error ?? r.state })
     case 'setupFailed':
@@ -1296,7 +1300,8 @@ export class SlotPool {
    * Lends a slot to a card or a lane for its builder: a ready one looked at again, else a new one while the pool is
    * under its size, warmed before it is given. Refused, with why, when none is free, the slot asked for is in use, the
    * agent already builds in another, the card's slot is being set up, or a new slot's setup failed (its lease then ended
-   * `setupFailed`).
+   * `setupFailed`). None lent with a free one passed over as held (a session or a process in it): `busy`, naming it
+   * (HI-2466), not `noSlot`.
    */
   async lend(req: LeaseRequest, o: { target?: string; install?: boolean } = {}): Promise<LendResult> {
     if ((req.card === undefined) === (req.lane === undefined)) throw new Error('a lease is for a card or a lane') // agent-protocol: a programming error (its caller's), never an agent's or the user's
@@ -1305,6 +1310,9 @@ export class SlotPool {
     const target = o.target ?? (await this.defaultTarget())
     const holder = await this.deps.holder.self()
     const skip = new Set<string>()
+    // A free slot passed over because something holds it (HI-2466): said, rather than "every slot in use", when no
+    // other can be lent, so its caller knows the wait ends once that is gone (and looks again).
+    let held: SlotRefusal | null = null
     const size = await this.size()
     for (;;) {
       const token = newToken()
@@ -1312,7 +1320,7 @@ export class SlotPool {
       // slot: a refresh meanwhile never takes a reservation just committed for one whose holder is gone.
       const out = await this.op(token, async (): Promise<LendResult | 'skip'> => {
         const taken = await this.store.take(req, { size, root: this.deps.root, target, token, holder, skip })
-        if (!taken.ok) return taken
+        if (!taken.ok) return held && taken.refusal.why === 'noSlot' ? { ok: false, refusal: held } : taken
         if (taken.again) {
           // Its lease already: handed over only once the slot is ready (another Hive may be warming it).
           const s = taken.slot
@@ -1322,10 +1330,11 @@ export class SlotPool {
         }
         const done = await this.warm(taken.slot, taken.lease, token, taken.fresh, target, o.install !== false)
         if (done === 'ready') return { ok: true, lease: this.store.lease(taken.lease.id)!, slot: this.store.slot(taken.slot.name)! }
-        if (done !== 'skip') return { ok: false, refusal: done }
+        if (done !== 'skip' && done.why !== 'busy') return { ok: false, refusal: done }
         skip.add(taken.slot.name)
+        if (done !== 'skip') held ??= done
         // The slot asked for by name, passed over: refused once, never reserved again and again.
-        return req.slot ? { ok: false, refusal: { why: 'busy', slot: taken.slot.name } } : 'skip'
+        return req.slot ? { ok: false, refusal: done !== 'skip' ? done : { why: 'busy', slot: taken.slot.name } } : 'skip'
       })
       if (out !== 'skip') return out
     }
@@ -1667,8 +1676,9 @@ export class SlotPool {
   }
 
   /**
-   * The warming operation of a lease (`token` holds the slot): a free slot looked at again (dirty, a session or a process
-   * in it: marked and `skip`ped, its lease ended), made if new or gone, installed again if its lock files changed; then
+   * The warming operation of a lease (`token` holds the slot): a free slot looked at again (dirty: marked and `skip`ped;
+   * a session or a process in it: `busy`, saying which, HI-2466; either way its lease ended), made if new or gone,
+   * installed again if its lock files changed; then
    * `ready` (the slot `lent`, or looked at if the lease ended meanwhile). A failure leaves the slot not ready with why,
    * its lease ended `setupFailed`; an operation taken over meanwhile stops (`warming`).
    */
@@ -1706,7 +1716,12 @@ export class SlotPool {
           // Free since its last lease: what is in it now, not what was there then.
           const d = await G.dirty(slot.folder)
           if (isUnknown(d) || d.length) return await pass('dirty', 'notClean')
-          if (this.deps.sessionIn?.(slot.folder) || !(await quiet(slot.folder))) return await pass('ready', 'busy')
+          // Held (a session in it, or a process: a file or folder in it open): passed over, saying what holds it.
+          const session = !!this.deps.sessionIn?.(slot.folder)
+          if (session || !(await quiet(slot.folder))) {
+            await pass('ready', 'busy')
+            return { why: 'busy', slot: name, held: session ? 'session' : 'process' }
+          }
         }
       }
       if (this.closed) return await fail(sayStored(T.closed))

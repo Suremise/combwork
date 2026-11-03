@@ -32,7 +32,7 @@ import { SLOTS_DELETE_MERGED, SLOTS_RENAME_ADOPTED } from '../shared/advanced'
 import { basename } from 'path'
 import type { AgentDef, LaneSlotInfo, LiveSessionState } from '../shared/types'
 import type { ResumeHold } from '../shared/agentFolders'
-import type { LaneRecord } from '../shared/lanes'
+import type { LaneRecord, LaneSlotHeld } from '../shared/lanes'
 import { app } from 'electron'
 import type { DatabaseSync } from 'node:sqlite'
 import { advanced } from './advanced'
@@ -43,10 +43,10 @@ import { deliveriesOf, deliverNow, launchWith } from './deliveries'
 import { onHiveEvent } from './events'
 import { onLineFreed, whyNoLine } from './lineWriter'
 import { changingFolder, folderChanging, folderSteady } from './folderFence'
-import { samePlace } from './fsutil'
+import { containsPlace, samePlace } from './fsutil'
 import { samePath } from '../shared/movePaths'
 import { git } from './git'
-import { lanesWaitingForSlot, onLanesWritten, rawLanes, setLaneSlots, setLaneSlotWait } from './lanes'
+import { lanesWaitingForSlot, laneViewsChanged, onLanesWritten, rawLanes, setLaneSlotHeld, setLaneSlots, setLaneSlotWait } from './lanes'
 import { createLogger, userText } from './logger'
 import * as G from './platform/git'
 import { observer } from './platform/observe'
@@ -56,7 +56,7 @@ import { isResuming, onResumeEntry } from './restartResume'
 import { sessions } from './sessions'
 import { startBegun, startEnded, startWaits } from './agentStarts'
 import { holder, poolFor, setSlotFreed } from './slotsApp'
-import { quiet as quietFolder, refusalText, setBuilderCount, type Slot, type SlotLease, type SlotPool } from './slots'
+import { quiet as quietFolder, refusalText, setBuilderCount, type Slot, type SlotLease, type SlotPool, type SlotRefusal } from './slots'
 import { carriedOf, keptFor, keptGoing } from './slotMigration'
 import { getTask } from './tasks'
 import { HiveError } from './hiveError'
@@ -352,19 +352,33 @@ interface Retry {
   drop: () => void
 }
 const retiring = new Map<string, Retry>()
+/**
+ * Lanes waiting for a slot whose only free slot was held (HI-2466: a session or a process in it, the lend's `busy`), by
+ * project: the pass looked at again as `retiring` is, the pause at most HELD_RETRY_MAX_MS, until the lane is lent one or
+ * no slot is held. What holds it can end with no event (a CLI's child process closing after its session ended): before,
+ * such a lane waited for a slot that had come free, and nothing looked again.
+ */
+const heldRetries = new Map<string, Retry>()
+/** The longest pause between a held slot's looks (HI-2466). */
+const HELD_RETRY_MAX_MS = 30_000
 const retireKey = (ws: WorkspaceService, projectPath: string): string => `${(ws.path ?? '').toLowerCase()}\n${projectPath.toLowerCase()}`
 
 /** A retirement found busy: another pass asked for after its pause, unless one already waits. */
 function retireLater(ws: WorkspaceService, projectPath: string): void {
+  passLater(retiring, ws, projectPath, 60_000)
+}
+
+/** Another pass of a project asked for after a pause that grows with each try (1 s, doubling, at most `maxMs`), unless one already waits. */
+function passLater(retries: Map<string, Retry>, ws: WorkspaceService, projectPath: string, maxMs: number): void {
   if (ended(ws)) return
   const key = retireKey(ws, projectPath)
-  let r = retiring.get(key)
-  if (r && r.life !== ws.lifetime) forget(key, r)
-  r = retiring.get(key)
+  let r = retries.get(key)
+  if (r && r.life !== ws.lifetime) forget(retries, key, r)
+  r = retries.get(key)
   if (!r) {
-    const made: Retry = { tries: 0, timer: null, life: ws.lifetime, drop: () => forget(key, made) }
+    const made: Retry = { tries: 0, timer: null, life: ws.lifetime, drop: () => forget(retries, key, made) }
     made.life.addEventListener('abort', made.drop, { once: true })
-    retiring.set(key, made)
+    retries.set(key, made)
     r = made
   }
   if (r.timer) return
@@ -374,16 +388,16 @@ function retireLater(ws: WorkspaceService, projectPath: string): void {
   r.timer = setTimeout(() => {
     at.timer = null
     if (!life.aborted) void settleSlotCards(ws, projectPath)
-  }, Math.min(60_000, 1000 * 2 ** (r.tries - 1)))
+  }, Math.min(maxMs, 1000 * 2 ** (r.tries - 1)))
   r.timer.unref?.()
 }
 
 /** A retry forgotten: its pass no longer waits, nor its lifetime's listener. */
-function forget(key: string, r: Retry): void {
+function forget(retries: Map<string, Retry>, key: string, r: Retry): void {
   if (r.timer) clearTimeout(r.timer)
   r.timer = null
   r.life.removeEventListener('abort', r.drop)
-  if (retiring.get(key) === r) retiring.delete(key)
+  if (retries.get(key) === r) retries.delete(key)
 }
 
 /** A project's retirement retry as it stands (tests), by its workspace's folder: its tries and whether a pass waits; null: none. */
@@ -392,11 +406,61 @@ export function retireWaitOf(wsPath: string, projectPath: string): { tries: numb
   return r ? { tries: r.tries, waiting: !!r.timer } : null
 }
 
+/** A project's held-slot retry as it stands (tests, HI-2466): its tries and whether a pass waits; null: none. */
+export function heldRetryOf(wsPath: string, projectPath: string): { tries: number; waiting: boolean } | null {
+  const r = heldRetries.get(`${wsPath.toLowerCase()}\n${projectPath.toLowerCase()}`)
+  return r ? { tries: r.tries, waiting: !!r.timer } : null
+}
+
 /** No retirement busy any more (the pass found none): its tries forgotten, a pass still waiting left to run. */
 function retiredNow(ws: WorkspaceService, projectPath: string): void {
+  settledNow(retiring, ws, projectPath)
+}
+
+/** A retry's cause gone (the pass found none): its tries forgotten, a pass still waiting left to run. */
+function settledNow(retries: Map<string, Retry>, ws: WorkspaceService, projectPath: string): void {
   const key = retireKey(ws, projectPath)
-  const r = retiring.get(key)
-  if (r && !r.timer) forget(key, r)
+  const r = retries.get(key)
+  if (r && !r.timer) forget(retries, key, r)
+}
+
+/**
+ * The free slot each lane waiting for one was last refused as held, and what holds it (HI-2466), by
+ * "<workspace>\n<lane>", with the lane's workspace, project (lower-cased) and id: for its status (lanes.ts' slotView).
+ * Set and cleared by its project's pass as it tries.
+ */
+const laneHolds = new Map<string, LaneSlotHeld & { ws: string; project: string; lane: string }>()
+const laneHoldKey = (wsPath: string, lane: string): string => `${wsPath.toLowerCase()}\n${lane}`
+
+/** Lane `lane`'s held slot as its last try found it, or null (lanes.ts reads it into the lane's status). */
+export function laneSlotHeld(wsPath: string, lane: string): LaneSlotHeld | null {
+  const h = laneHolds.get(laneHoldKey(wsPath, lane))
+  return h ? { slot: h.slot, held: h.held, ...(h.agent ? { agent: h.agent } : {}) } : null
+}
+
+/**
+ * A waiting lane's slot as its last lend found it held (HI-2466), still held now and the only one it could be lent: what
+ * holds it, as the lend would say it (a session in it, else a process: the pool's own look, slots.ts quiet); else null,
+ * and the lane's lend is tried. Never a lend, so a slot held for long writes no lease each time it is looked at.
+ */
+async function laneSlotStillHeld(ws: WorkspaceService, pool: SlotPool, lane: string): Promise<Extract<SlotRefusal, { why: 'busy' }> | null> {
+  const was = laneHolds.get(laneHoldKey(ws.path ?? '', lane))
+  if (!was) return null
+  const slots = pool.slots()
+  const free = (s: Slot): boolean => s.state === 'ready' && !s.op && !s.job && !s.writer && !s.warmError && !pool.openLease(s.name)
+  const slot = slots.find((s) => s.name === was.slot)
+  if (!slot || !free(slot) || slots.some((s) => s !== slot && free(s)) || slots.length < (await pool.size())) return null
+  if (sessions.liveStates().some((x) => !!x.cwd && containsPlace(slot.folder, x.cwd))) return { why: 'busy', slot: slot.name, held: 'session' } // i18n-ignore: a refusal's code (refusalText words it)
+  return (await quietFolder(slot.folder)) ? null : { why: 'busy', slot: slot.name, held: 'process' } // i18n-ignore: a refusal's code (refusalText words it)
+}
+
+/** What holds a slot, as a lend's `busy` refusal says (HI-2466), with the agent whose session is in it, by name, where that is known. */
+function heldOf(pool: SlotPool, r: Extract<SlotRefusal, { why: 'busy' }>): LaneSlotHeld {
+  const held = r.held ?? 'process'
+  if (held !== 'session') return { slot: r.slot, held }
+  const folder = pool.slots().find((s) => s.name === r.slot)?.folder
+  const s = folder ? sessions.liveStates().find((x) => !!x.cwd && containsPlace(folder, x.cwd)) : undefined
+  return { slot: r.slot, held, ...(s?.agentName ? { agent: s.agentName } : {}) }
 }
 
 /** A start's end of its builder's left carried lease (endLeftCarried), its retry asked for when the slot was busy. */
@@ -1644,12 +1708,44 @@ async function lendLaneSlot(ws: WorkspaceService, projectPath: string, lane: str
  * its agents (its builder and reviewer now) started once (laneStart's, by their brief's delivery identity), then its
  * wait cleared. Only with the rules on; a lane ended or abandoned meanwhile isn't running, so it is never started.
  * Once none is free, no later lane is lent one, but a lane that needs none (only no-code cards, HI-2338) still starts.
+ * A lend refused because the free slot is held (HI-2466: a session or a process in it) is kept for the lane's status
+ * and tried again by a later pass (`heldRetries`), as nothing may say when what holds it has gone.
  */
 async function startWaitingLanes(ws: WorkspaceService, projectPath: string, pool: SlotPool): Promise<void> {
   const name = ws.info()?.projects.find((p) => p.path.toLowerCase() === projectPath.toLowerCase())?.name
   const waiting = (await lanesWaitingForSlot(ws)).filter((l) => l.project.toLowerCase() === name?.toLowerCase()).sort((a, b) => a.slotWait!.since.localeCompare(b.slotWait!.since))
   // The rules off, or Hive quitting (#1628): looked at again after each await, nothing more lent or started.
   const stopped = (): boolean => !workflowEnforced() || ended(ws)
+  // Each lane's held slot as this pass finds it (HI-2466); the lanes no longer waiting forgotten. The window told of a change.
+  const wsPath = ws.path ?? ''
+  const project = projectPath.toLowerCase()
+  let holdsChanged = false
+  const setHold = (lane: string, h: LaneSlotHeld | null): void => {
+    const key = laneHoldKey(wsPath, lane)
+    const was = laneHolds.get(key)
+    if (h ? was && was.slot === h.slot && was.held === h.held && was.agent === h.agent : !was) return
+    if (h) laneHolds.set(key, { ...h, ws: wsPath.toLowerCase(), project, lane })
+    else laneHolds.delete(key)
+    holdsChanged = true
+  }
+  const ids = new Set(waiting.map((l) => l.id))
+  for (const h of [...laneHolds.values()]) if (h.ws === wsPath.toLowerCase() && h.project === project && !ids.has(h.lane)) setHold(h.lane, null)
+  let held = false
+  try {
+    await lendWaiting(ws, projectPath, pool, waiting, stopped, (lane, r) => {
+      if (r?.why === 'busy') held = true
+      setHold(lane, r?.why === 'busy' ? heldOf(pool, r) : null)
+    })
+  } finally {
+    // A held slot looked at again after a pause, until it is lent or held no more; otherwise its tries forgotten.
+    if (held && !stopped()) passLater(heldRetries, ws, projectPath, HELD_RETRY_MAX_MS)
+    else if (!held) settledNow(heldRetries, ws, projectPath)
+    if (holdsChanged && !ended(ws)) laneViewsChanged(ws)
+  }
+}
+
+/** startWaitingLanes' lends and starts, in order: `tried` told each lane's lend (its refusal, or null once it has a slot). */
+async function lendWaiting(ws: WorkspaceService, projectPath: string, pool: SlotPool, waiting: LaneRecord[], stopped: () => boolean, tried: (lane: string, refusal: SlotRefusal | null) => void): Promise<void> {
   // No slot could be lent (HR1 on HI-2338): the lanes after it are visited only for those that need none, so an earlier
   // code lane keeps its place for the next free slot.
   let full = false
@@ -1680,13 +1776,25 @@ async function startWaitingLanes(ws: WorkspaceService, projectPath: string, pool
       }
     }
     if (stopped()) return
+    if (lease) tried(lane.id, null)
     if (!lease) {
+      // Its held slot still held, and no other to lend (HI-2466): left waiting with no lend tried, so a retry writes no
+      // lease that ends at once.
+      const still = await laneSlotStillHeld(ws, pool, lane.id)
+      if (stopped()) return
+      if (still) {
+        tried(lane.id, still)
+        full = true
+        continue
+      }
       const r = await pool.lend({ lane: lane.id, agent: lane.builder.id }, { install: false })
       if (!r.ok) {
+        tried(lane.id, r.refusal)
         full = true
         continue
       }
       lease = r.lease
+      tried(lane.id, null)
       log.info(`Lent ${userText(r.slot.name)} to lane ${lane.id}, which waited for a slot (lease ${r.lease.id})`)
       // Its carried lease kept for a card it has left ends now that the lane holds its own (HI-1731).
       await endLeftCarriedNow(ws, projectPath, pool, lane.builder.id, { lane: lane.id }, r.lease.id)
@@ -1791,6 +1899,15 @@ export function startSlotCards(): void {
     return ws ? projectAgents(await ws.projectConfig(projectPath)).filter(builds).length : 0
   })
   setLaneSlots(laneSlot)
+  setLaneSlotHeld(laneSlotHeld)
+  // A lane's free slot held by a session (HI-2466): its agent's session ending or going idle may free it, so the
+  // project's pass looks again at once rather than at its next pause.
+  const offSessions = onHiveEvent((e) => {
+    const where = e.type === 'session-exit' ? e.projectPath : e.type === 'session-status' && (e.state.status === 'ready' || e.state.status === 'finished') ? e.state.projectPath : null
+    if (!where) return
+    const ws = workspaceFor(where)
+    if (ws?.path && heldRetries.has(retireKey(ws, where))) void settleSlotCards(ws, where)
+  })
   setSlotFreed((ws, project) => {
     for (const l of slotFreed) l(project)
     void settleSlotCards(ws, project)
@@ -1828,6 +1945,8 @@ export function startSlotCards(): void {
   hourly.unref?.()
   stop = () => {
     offLanes()
+    offSessions()
+    setLaneSlotHeld(null)
     offOpen()
     offAdvanced()
     offBoard()

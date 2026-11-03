@@ -265,6 +265,8 @@ export const AREAS = [
   // The Progress panel's stages, legend, Solo's lanes, links and old rules marks (#1421).
   { paths: ['tests/e2e/lanesslots.cjs', 'src/renderer/src/components/ProgressLanes.tsx', 'src/renderer/src/laneSource.ts', 'src/shared/laneBar.ts', 'src/shared/lanes.ts', 'src/main/lanes.ts', 'src/main/slotCards.ts', 'src/shared/progressTabs.ts', 'src/renderer/src/components/Progress.tsx'], suites: ['lanesslots'] },
   { paths: ['src/shared/laneStages.ts', 'src/renderer/src/projectStages.ts', 'tests/e2e/lanestages.cjs'], suites: ['lanestages', 'progresslanes'] },
+  // HI-2466: a lane waiting for a slot that something still holds, lent it once it is free.
+  { paths: ['tests/e2e/laneslotretry.cjs', 'src/main/slotCards.ts', 'src/main/slots.ts', 'src/main/lanes.ts', 'src/shared/lanes.ts'], suites: ['laneslotretry'] },
   { paths: ['tests/e2e/laneend.cjs', 'tests/e2e/cliquit.cjs', 'src/main/slotsApp.ts', 'src/main/sessions.ts', 'src/main/deliveries.ts', 'src/main/providers/claude/adapter.ts', 'src/main/providers/codex/adapter.ts'], suites: ['laneend', 'slotsessions', 'cliquit'] },
   // A watch from a builder's previous conversation, and an agent's watch guards (HI-2197).
   { paths: ['tests/e2e/stalewatch.cjs', 'src/main/watchGuards.ts', 'src/main/watches.ts', 'src/main/cardIntents.ts'], suites: ['stalewatch'] },

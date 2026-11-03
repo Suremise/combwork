@@ -172,8 +172,8 @@
     "note": "A start refused: one agent, one slot (HI-1762). {what} is the card's key or slot.refusal.lane."
   },
   "slot.refusal.busy": {
-    "text": "{slot} has a session or a process in it",
-    "note": "A start's wait: something still runs in a free slot, so it isn't lent."
+    "text": "{held, select, session {{slot} still has a session in it} process {{slot} still has a process running in it (a file or a folder in it open)} other {{slot} has a session or a process in it}}",
+    "note": "A start's wait: something still runs in a free slot, so it isn't lent (HI-2466: held, what: a session, a process, or not known). Hive tries again until it is free."
   },
   "slot.refusal.inUse": {
     "text": "{slot} is in use by {agent} for {what}",

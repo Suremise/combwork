@@ -205,6 +205,16 @@ export interface LaneStartWait {
   waitsFor?: string
 }
 
+/**
+ * The free slot a lane waiting for a slot was last refused as held (HI-2466), and what holds it: a session (`agent`,
+ * its agent's name) or a process (a file or folder in it open). Hive tries the lend again until it is free.
+ */
+export interface LaneSlotHeld {
+  slot: string
+  held: 'session' | 'process'
+  agent?: string
+}
+
 /** Whether a lane reads its cards as it left them (ended or abandoned, with its snapshot) rather than from the board. */
 export const isFrozen = (rec: Pick<LaneRecord, 'state' | 'frozen'>): boolean => !running(rec) && !!rec.frozen
 
@@ -222,7 +232,7 @@ const unrecordedCard = (n: number, card: TaskCard | null): LaneCard => ({ number
  * (currentCard); an ended lane without its record has none. A card held elsewhere (HI-1821: another agent's, or, given
  * to none, another lane's: `owners`, main's owner lane by card) is never its current card nor why it waits.
  */
-export function laneView(rec: LaneRecord, cards: ReadonlyMap<number, TaskCard | null>, names?: ReadonlyMap<string, string>, facts?: ReadonlyMap<number, LaneCardFacts> | null, atLimit?: ReadonlySet<number>, line?: number | null, hooksOut?: ReadonlySet<string>, rulesetNow?: string | null, rulesetStages?: StageId[] | null, slot?: { slot: string | null; waiting: boolean; info?: LaneSlotInfo | null } | null, owners?: ReadonlyMap<number, string | null>, startWait?: LaneStartWait | null, teamPaused = false): LaneInfo {
+export function laneView(rec: LaneRecord, cards: ReadonlyMap<number, TaskCard | null>, names?: ReadonlyMap<string, string>, facts?: ReadonlyMap<number, LaneCardFacts> | null, atLimit?: ReadonlySet<number>, line?: number | null, hooksOut?: ReadonlySet<string>, rulesetNow?: string | null, rulesetStages?: StageId[] | null, slot?: { slot: string | null; waiting: boolean; info?: LaneSlotInfo | null; held?: LaneSlotHeld | null } | null, owners?: ReadonlyMap<number, string | null>, startWait?: LaneStartWait | null, teamPaused = false): LaneInfo {
   const unrecorded = !running(rec) && !rec.frozen
   // A card at its round limit waits for the user's answer (§16.11.4, `atLimit`: the main side's facts): it pauses the lane.
   const live = (n: number): LaneCard => ({ ...laneCard(n, cards.get(n) ?? null, { lane: rec.id, builder: rec.builder.id, owner: owners?.get(n) }), ...(atLimit?.has(n) ? { roundLimit: true } : {}) })
@@ -237,8 +247,9 @@ export function laneView(rec: LaneRecord, cards: ReadonlyMap<number, TaskCard | 
   const deaf = running(rec) && !unrecorded ? [rec.builder, rec.reviewer].find((a): a is LaneAgent => !!a && !!hooksOut?.has(a.id)) : undefined
   const hooks = deaf && !(found && USERS.has(found.reason)) ? { reason: 'hooks' as const, card: current, agent: named(deaf).name } : null
   // Waiting for a slot (#1438, `slot`: the main side's): lent none yet, so nothing of it can start; only what already
-  // waits for the user, or its hooks, says more.
-  const noSlot = running(rec) && !unrecorded && slot?.waiting && !(found && USERS.has(found.reason)) ? { reason: 'slot' as const, card: current } : null
+  // waits for the user, or its hooks, says more. A free slot held (HI-2466): which, and what holds it.
+  const held = slot?.held ?? null
+  const noSlot = running(rec) && !unrecorded && slot?.waiting && !(found && USERS.has(found.reason)) ? { reason: 'slot' as const, card: current, ...(held ? { slot: held.slot, held: held.held, ...(held.agent ? { agent: held.agent } : {}) } : {}) } : null
   // Its slot being prepared (#1446: G15's warming, its setup or an install): said when nothing else is, never pausing.
   const preparing = running(rec) && !unrecorded && slot?.info?.state === 'preparing' ? { reason: 'preparing' as const, card: current, slot: slot.info.name } : null
   // Its card due to start and not started yet (HI-2029, laneStarts.ts: `startWait`), only while that card is the current
@@ -400,6 +411,7 @@ const L = {
   hooks: agentMsg({ id: 'lane.status.hooks', text: "paused: {agent}'s hooks aren't arriving", note: "A lane pauses while its builder's or reviewer's hooks aren't arriving (#1336): nothing is typed into that agent." }),
   checkCopy: agentMsg({ id: 'lane.status.checkCopy', text: 'waiting for a check copy for {card}', note: "A lane waits for a check copy (a copy at the card's revision for its checks)." }),
   slot: agentMsg({ id: 'lane.status.slot', text: 'waiting for a slot', note: 'A lane started with no slot free waits for one to be lent to it (#1438).' }),
+  slotHeld: agentMsg({ id: 'lane.status.slotHeld', text: "waiting for {slot}: {held, select, session {{agent}'s session is still in it} other {a process still has a file or folder in it open}}", note: 'HI-2466: a lane waiting for a slot, the only free one ({slot}) held: a session of the agent {agent} still runs in it, or (other) a process holds it. Hive tries again until it is free.' }),
   teamPause: agentMsg({ id: 'lane.status.teamPause', text: 'paused: the team is pausing', note: "The workspace's team is paused (before an update, HI-2081): nothing of a lane moves until it resumes." }),
   preparing: agentMsg({ id: 'lane.status.preparing', text: 'waiting: preparing {slot}', note: "A lane's slot is being prepared (warming, its setup or an install, #1446); {slot} is its name." }),
   freshTimeout: agentMsg({ id: 'lane.status.fresh.timeout', text: "{agent}'s new conversation didn't start (it wasn't free in time): retry it from the lane's row, or end the lane", note: "An agent owed a new conversation for its lane (HI-2034) wasn't free within the wait: no more automatic tries until the user retries it." }),
@@ -493,7 +505,7 @@ export function laneStatusText(s: LaneStatus): string {
     case 'checkCopy':
       return say(L.checkCopy, { card })
     case 'slot':
-      return say(L.slot)
+      return s.slot && s.held ? say(L.slotHeld, { slot: s.slot, held: s.held, agent: s.agent ?? say(L.anAgent) }) : say(L.slot)
     case 'teamPause':
       return say(L.teamPause)
     case 'preparing':
