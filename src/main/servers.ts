@@ -648,7 +648,7 @@ async function assistantChange<T>(need: AssistantControl, what: Said, act: Activ
   // What is recorded (its activity, undo's records) is said in the Default; its refusals in the caller's scope.
   const stored = sayStored(what)
   const line = stored.charAt(0).toUpperCase() + stored.slice(1)
-  const guard = await asRefused(async () => assistant.admit(ws, assistantCallerToken() ?? '', need, sayNow(what), act))
+  const guard = await asRefused(async () => assistant.admit(ws, assistantCallerToken() ?? '', need, what, act))
   try {
     // `said`: what the line quotes (a prompt, a message), which the Agent API's event stream leaves out.
     // `brief`: the line in Hive's own words when `done` carries an error's text (#763: the stream never does).
@@ -732,7 +732,7 @@ function assistantMay(need: AssistantControl, what: Said, act: ActivityTarget): 
   const ws = assistantCaller()
   if (!ws) return
   try {
-    assistant.refuseUnlessAllowed(ws, need, sayNow(what), act)
+    assistant.refuseUnlessAllowed(ws, need, what, act)
   } catch (e) {
     throw httpOf(e)
   }
@@ -1529,7 +1529,7 @@ route('POST', '/v1/projects/:name/agents/:agent/stop', async ({ params, body, si
       if (how === 'no') throw new HttpError(409, say(API.agent.stopAskDeclined, { agent: a.name }))
       // The answer can come minutes later: only the run the user was asked about, and only if Control still allows it.
       if (sessions.liveFor(p, agentId)?.runId !== st.runId) return { done: [API.done.alreadyStopped, { agent: a.name, project: basename(p) }], result: { ok: true, wasRunning: false } }
-      if (!assistant.allows('agents')) throw new HttpError(403, say(API.agent.stopNotAllowed, { level: assistant.LEVEL_NAME[assistant.controlLevel()] }))
+      if (!assistant.allows('agents')) throw new HttpError(403, say(API.agent.stopNotAllowed, { level: assistant.levelName(assistant.controlLevel()) }))
     }
     // Control and the Assistant's session that asked, checked again just before the stop (HI-2328).
     guard()

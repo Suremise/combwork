@@ -256,7 +256,7 @@ describe("the Hive Assistant's batch (through its change boundary)", () => {
   const singles = (n: number): number => {
     for (let i = 0; i < n; i++) {
       try {
-        control.admit(wsPath, token, 'agents', `activate the project batch (${i + 1})`, { kind: 'activate-project', project: 'batch' })
+        control.admit(wsPath, token, 'agents', [{ id: 'test.what', text: 'activate the project batch ({n})' }, { n: String(i + 1) }], { kind: 'activate-project', project: 'batch' })
       } catch {
         return i
       }
