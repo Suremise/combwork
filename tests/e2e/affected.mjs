@@ -547,6 +547,9 @@ export const AREAS = [
   // Hive's bundled skills and modes, read at runtime (not documentation).
   { paths: ['resources/skills/', 'src/main/bundledHistory.json'], suites: ['skills', 'skillaudience', 'skilldelivery', 'cardloop', 'replysize', 'slotguidance'] },
   { paths: ['resources/modes/', 'src/main/assistantMode.ts'], suites: ['assistant', 'assistant-control', 'assistantend', 'assistantmode', 'assistantresume'] },
+  // The shipped dialect files (HI-2442): synced into each workspace as it opens, beside the skills and modes; nothing
+  // reads them in a session until dialects card 6b.
+  { paths: ['resources/dialects/'], suites: ['skills', 'openspeed'] },
   // Bundled into the Docs view (About's licence pages, Release Notes, the Agent API reference).
   { paths: ['docs/', 'CHANGELOG.md', 'LICENSE', 'THIRD_PARTY_NOTICES.md', 'scripts/licenses.mjs', 'scripts/licenseText.mjs', 'scripts/thirdPartyNotices.mjs', 'scripts/notices/'], suites: ['about'] },
   // The i18n screenshot route (#769): its case files (each area's, found by name), the translations it shows (every
@@ -593,9 +596,10 @@ const FAKE_FIXTURES = ['tests/fixtures/claude-initialize.json', 'tests/fixtures/
  * EVERYTHING. The 1.0 workflow core spike (#1118) too: nothing in the app loads it, and tests/workflow runs its
  * scenarios; the phase that wires it into the app (P3, P4) gives it an area (the 1.0 schema, src/main/schema, has the
  * board's since its cards step, #1209, as the fact store and the actions worker do since #1215). The dialects service
- * (src/main/dialects, HI-2439) too, until card 6b wires it into sessions and gives it an area.
+ * (src/main/dialects, HI-2439) too, until card 6b wires it into sessions and gives it an area, and the dialect-only
+ * release's rules (scripts/dialectRelease.mjs, HI-2442: release.mjs runs them, tests/dialectRelease.test.ts tests them).
  */
-export const UNIT_ONLY = ['src/main/dialects/','vitest.config.ts', '.github/workflows/ci.yml', 'scripts/testWaits.mjs', 'scripts/i18nExtract.mjs', 'scripts/i18nValues.mjs', 'scripts/i18nCheck.mjs', 'scripts/i18nCoverage.mjs', 'scripts/i18nGuard.mjs', 'i18n/allow/', 'scripts/agentTextExtract.mjs', 'scripts/agentTextGuard.mjs', 'scripts/agentTextFiles.mjs', 'agent-text/allow/', 'tests/i18n/', 'tests/workflow/', 'src/shared/workflow/', 'src/shared/platform/', 'src/main/workflow/', 'src/main/platform/']
+export const UNIT_ONLY = ['src/main/dialects/', 'scripts/dialectRelease.mjs', 'vitest.config.ts', '.github/workflows/ci.yml', 'scripts/testWaits.mjs', 'scripts/i18nExtract.mjs', 'scripts/i18nValues.mjs', 'scripts/i18nCheck.mjs', 'scripts/i18nCoverage.mjs', 'scripts/i18nGuard.mjs', 'i18n/allow/', 'scripts/agentTextExtract.mjs', 'scripts/agentTextGuard.mjs', 'scripts/agentTextFiles.mjs', 'agent-text/allow/', 'tests/i18n/', 'tests/workflow/', 'src/shared/workflow/', 'src/shared/platform/', 'src/main/workflow/', 'src/main/platform/']
 
 /** Whether a file is a unit test (tests/*.test.ts, their helpers and fixtures, UNIT_ONLY): npm test covers it, no e2e suite. */
 export const unitTest = (f) => /^tests\/[^/]+\.ts$/i.test(f) || under(f, UNIT_ONLY) || (/^tests\/fixtures\//i.test(f) && !FAKE_FIXTURES.includes(f))
@@ -762,6 +766,8 @@ export const UNIT_SCANS = [
   { test: 'tests/retention.test.ts', paths: ['resources/skills/'] },
   { test: 'tests/bundled.test.ts', paths: ['resources/', 'src/main/bundledHistory.json'] },
   { test: 'tests/bundledrace.test.ts', paths: ['resources/'] },
+  // The shipped dialect files (HI-2442): each one's form, model and schema, and their sync into a workspace.
+  { test: 'tests/dialectsShipped.test.ts', paths: ['resources/dialects/', 'src/main/bundledHistory.json'] },
   { test: 'tests/guidance.test.ts', paths: ['resources/skills/', 'resources/modes/', '.claude/skills/', '.agents/skills/', 'AGENTS.md', 'RELEASING.md', 'docs/AGENT_API.md', 'tests/scenarios/scenarios.cjs', 'src/main/mcp/hive-mcp.ts'] },
   // THIRD_PARTY_NOTICES.md is generated from what ships (package.json's dependencies, the renderer's libraries).
   { test: 'tests/licenses.test.ts', paths: ['package.json', 'package-lock.json', 'THIRD_PARTY_NOTICES.md', 'LICENSE', 'scripts/thirdPartyNotices.mjs', 'scripts/licenseText.mjs', 'scripts/licenses.mjs', 'scripts/notices/'] },
