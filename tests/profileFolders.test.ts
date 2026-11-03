@@ -127,6 +127,26 @@ describe('the fallback notice (HI-2461)', () => {
   })
 })
 
+describe("a start between the installer's record and its rename (HI-2460)", () => {
+  it("runs on Hive's folders, says so, and never checks sign-ins: the record waits in Hive's folder, untouched", async () => {
+    const { setProfileChoices } = await import('../src/main/profileFolders')
+    const { startProfileNotices } = await import('../src/main/profileNotices')
+    toasts.length = 0
+    const p = tempDir('pf-interval-')
+    mkdirSync(join(p, 'appdata', 'Hive-Dev'), { recursive: true })
+    const oldLocal = join(p, 'localappdata', 'Hive-Dev')
+    mkdirSync(oldLocal, { recursive: true })
+    const rec = JSON.stringify({ v: 1, from: oldLocal, movedAt: '2026-11-03T21:00:00.000Z', by: 'installer' })
+    writeFileSync(join(oldLocal, MOVE_RECORD), rec)
+    accounts.list = [{ id: 'a-out', name: 'Work' }]
+    setProfileChoices({ roaming: chooseProfile(join(p, 'appdata'), 'Hive-Dev', 'Combwork-Dev'), local: chooseProfile(join(p, 'localappdata'), 'Hive-Dev', 'Combwork-Dev') })
+    await startProfileNotices()
+    expect(toasts.map((t) => t.title)).toEqual(['Hive is using its data folders from before Combwork'])
+    expect(readFileSync(join(oldLocal, MOVE_RECORD), 'utf8')).toBe(rec)
+    setProfileChoices({ roaming: null, local: null })
+  })
+})
+
 describe('the sign-in check after the installer moved the folder (HI-2461, HI-2460)', () => {
   const record = { v: 1, from: 'C:\\Users\\x\\AppData\\Local\\Hive', movedAt: '2026-11-03T21:00:00.000Z', by: 'installer', extra: { kept: true } }
   const answers: Record<string, { loggedIn: boolean | null } | null | 'throw'> = {}

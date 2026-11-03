@@ -3,7 +3,8 @@
 // - after the installer moved the local folder (HI-2460), once: the connections that show signed out, by name.
 //
 // The installer's record of its move is `profile-move.json` in the new local folder, `{ v: 1, from, movedAt, by:
-// "installer" }`, written after its rename succeeded (the contract HI-2460 shares). The app reads it for this check only
+// "installer" }` (the contract HI-2460 shares): the installer puts it in the old local folder just before renaming that
+// folder, so it arrives with the rename (a start in between runs on the fallback, which never reads it). The app reads it for this check only
 // and records it done (`signInChecked`), keeping every field it has; the names already said (`signInNamed`) are kept
 // too, so a check that couldn't finish (a connection whose check failed) is tried again next start without saying a name
 // twice. A record that can't be read, or isn't the installer's, is left exactly as it is. Hive never signs in for the
