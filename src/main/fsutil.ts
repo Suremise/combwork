@@ -237,7 +237,7 @@ type KeptGot<T> = { value: T; primary: boolean }
  * The one rule for a holder (HR3's, round 2): its guard is let go only when the value it is given is the file's own
  * settings, and set (or kept) whenever it is anything else. Used by every read, async and sync, at its end.
  */
-function held<T>(path: string, holder: object | undefined, got: KeptGot<T>): T {
+function heldBy<T>(path: string, holder: object | undefined, got: KeptGot<T>): T {
   if (!holder) return got.value
   const k = path.toLowerCase()
   const set = staleHolders.get(k)
@@ -285,10 +285,10 @@ function unreadableValue<T>(path: string, e: unknown, bak: string | null, fallba
  * that save once it finishes (#1600); one that is there but can't be read throws KeptFileUnreadable (HI-2414).
  */
 export async function readKeptJson<T>(path: string, fallback: T, opts: KeptReadOptions = {}): Promise<T> {
-  return held(path, opts.holder, await readKeptNow(path, fallback, opts))
+  return heldBy(path, opts.holder, await readKeptNow(path, fallback, opts))
 }
 
-/** readKeptJson's read, each outcome saying whether it is the file's own settings (HI-2414: `held` decides from that alone). */
+/** readKeptJson's read, each outcome saying whether it is the file's own settings (HI-2414: `heldBy` decides from that alone). */
 async function readKeptNow<T>(path: string, fallback: T, opts: KeptReadOptions): Promise<KeptGot<T>> {
   const refuse = opts.unsettled === 'throw'
   const standIn = (value: T): KeptGot<T> => ({ value, primary: false })
@@ -364,7 +364,7 @@ export async function readKeptJsonByStat<T, D>(path: string, fallback: T, derive
     // Read again: the most recently read now.
     keptByStat.set(key, kept)
     // The file's own settings (HI-2414): its holder can save it again.
-    held(path, opts.holder, { value: null, primary: true })
+    heldBy(path, opts.holder, { value: null, primary: true })
     return structuredClone(kept.derived) as D
   }
   if (!st) return derive(await readKeptJson(path, fallback, opts))
@@ -376,7 +376,7 @@ export async function readKeptJsonByStat<T, D>(path: string, fallback: T, derive
   } catch {
     return derive(await readKeptJson(path, fallback, opts))
   }
-  held(path, opts.holder, { value: null, primary: true })
+  heldBy(path, opts.holder, { value: null, primary: true })
   const derived = derive(value)
   if (st.mtimeMs < asked - KEPT_RACY_MS) {
     keptByStat.set(key, { mtimeMs: st.mtimeMs, size: st.size, ino: st.ino, derive, derived: structuredClone(derived) })
@@ -391,7 +391,7 @@ export async function readKeptJsonByStat<T, D>(path: string, fallback: T, derive
 /** The same, for reads at startup that must be synchronous (config.json). */
 export function readKeptJsonSync<T>(path: string, fallback: T, opts: { holder?: object } = {}): T {
   // Marked (HI-1692): read at start, and settled with pauses when it doesn't parse.
-  return timedStep(`kept file read ${basename(path)}`, () => held(path, opts.holder, readKeptSyncNow(path, fallback, opts.holder)))
+  return timedStep(`kept file read ${basename(path)}`, () => heldBy(path, opts.holder, readKeptSyncNow(path, fallback, opts.holder)))
 }
 
 function readBakSync(path: string): string | null {
