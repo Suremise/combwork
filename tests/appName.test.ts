@@ -27,7 +27,7 @@ describe('the app name (#443, HI-2458)', () => {
     expect(builder.win.executableName).toBe('Combwork')
     expect(builder.nsis.shortcutName).toBe('Combwork')
     expect(builder.nsis.artifactName).toBe('Combwork-Setup-${version}.${ext}')
-    expect(builder.publish).toMatchObject({ owner: 'Suremise', repo: 'hive-desktop' })
+    expect(builder.publish).toMatchObject({ owner: 'Suremise', repo: 'combwork' })
     expect(builder.publish).toMatchObject(RELEASES_REPO) // the updater's feed (HI-2311)
     // electron-updater's download cache (%LOCALAPPDATA%\hive-updater) is named after package.json's name.
     expect(pkg.name).toBe('hive')

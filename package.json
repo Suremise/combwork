@@ -7,10 +7,10 @@
   "author": "Darren Marshall",
   "license": "MIT",
   "private": true,
-  "homepage": "https://github.com/Suremise/hive-desktop",
+  "homepage": "https://github.com/Suremise/combwork",
   "repository": {
     "type": "git",
-    "url": "https://github.com/Suremise/hive-desktop.git"
+    "url": "https://github.com/Suremise/combwork.git"
   },
   "scripts": {
     "dev": "electron-vite dev",

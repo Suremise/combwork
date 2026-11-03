@@ -33,7 +33,7 @@ npmRebuild: false
 publish:
   provider: github
   owner: Suremise
-  repo: hive-desktop
+  repo: combwork
   releaseType: draft
 win:
   target:

@@ -579,8 +579,8 @@ function McpCatalogSources() {
         <div className="toggle-item" data-catalog-source="ours">
           <Icon name="package" />
           <div className="ti-text">
-            <div className="ti-name">{'Suremise/hive-mcp' /* i18n-ignore: the catalogue's name */}</div>
-            <div className="ti-desc">{tr(msg({ id: 'settings.mcpCatalogs.ours', defaultMessage: "Combwork's own catalogue, checked by Combwork.", description: 'Settings → MCP Catalogues (HI-545): under the name of Hive’s own catalogue (Suremise/hive-mcp).' }))}</div>
+            <div className="ti-name">{'Suremise/combwork-mcp' /* i18n-ignore: the catalogue's name */}</div>
+            <div className="ti-desc">{tr(msg({ id: 'settings.mcpCatalogs.ours', defaultMessage: "Combwork's own catalogue, checked by Combwork.", description: 'Settings → MCP Catalogues (HI-545): under the name of Hive’s own catalogue (Suremise/combwork-mcp).' }))}</div>
           </div>
           <Switch checked={saved.oursOn} label={tr(msg({ id: 'settings.mcpCatalogs.oursSwitch', defaultMessage: "Combwork's own catalogue listed", description: "Settings → MCP Catalogues (HI-545): the switch of Hive's own catalogue, for screen readers." }))} onChange={(v) => save({ ...saved, oursOn: v })} />
         </div>

@@ -11,7 +11,7 @@ import { pathToFileURL } from 'url'
 import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, it, vi } from 'vitest'
 import { strToU8, zipSync } from 'fflate'
 import * as electron from 'electron'
-import { catalogRowShown, checkRequirements, compareVersions, editionOf, readCatalog, type PcFacts } from '../src/shared/mcpCatalog'
+import { OUR_CATALOG_URL, OUR_OLD_CATALOG_URLS, catalogRowShown, checkRequirements, compareVersions, editionOf, readCatalog, type PcFacts } from '../src/shared/mcpCatalog'
 import { tempDir } from './tempDir'
 
 const base = tempDir('hive-mcp-catalog-')
@@ -377,6 +377,35 @@ describe('installing and updating (HI-545)', () => {
     expect(u.p.existing?.name).toBe('demo-cat')
     expect(await run(() => catalog.updateCatalogServer(u.p.id, u.shown, u.places))).toEqual({})
     expect((await run(() => mcp.listMcp(true))).find((x) => x.name === 'demo-cat')?.def?.args?.[0]).toBe('${HIVE_MCP_DIR}/demo-cat/server2.js')
+  })
+
+  it("takes ours at its old address (Suremise/hive-mcp) as ours: a server installed from there is installed, with its update, and the old address is never another source (HI-2472)", async () => {
+    const zip = zipSync({ 'demo/hive-mcp.json': strToU8(JSON.stringify({ command: 'node', args: ['${HIVE_MCP_DIR}/demo/server.js'] })), 'demo/server.js': strToU8('// demo 1.1.0') })
+    const ours = { schemaVersion: 1, name: 'Suremise/combwork-mcp', servers: [entry({ version: '1.1.0', zip: { url: 'https://example.com/demo-1.1.0.zip', sha256: sha(zip), size: zip.length } })] }
+    catalog.testHooks.fetch = (async (url: string) =>
+      url === OUR_CATALOG_URL ? new Response(JSON.stringify(ours), { status: 200 }) : url === 'https://example.com/demo-1.1.0.zip' ? new Response(Buffer.from(zip), { status: 200 }) : new Response('missing', { status: 404 })) as never
+    try {
+      // Installed from ours when its address was the old one, and listed as a source of the user's then.
+      const old = OUR_OLD_CATALOG_URLS[0]
+      mkdirSync(join(mcpDir(), 'demo'), { recursive: true })
+      writeFileSync(join(mcpDir(), 'demo', 'server.js'), '// demo 1.0.0')
+      writeFileSync(join(mcpDir(), 'demo.json'), JSON.stringify({ command: 'node', args: ['${HIVE_MCP_DIR}/demo/server.js'], catalog: { source: old, name: 'demo', version: '1.0.0', sha256: 'b'.repeat(64) } }))
+      config.update((c) => {
+        c.settings.mcpCatalogs = { oursOn: true, sources: [{ url: old, on: true }] }
+      })
+      // Ours once, at its new address; the old one isn't listed again.
+      expect(catalog.catalogSources()).toEqual([{ url: OUR_CATALOG_URL, ours: true, noted: true }])
+      const [p] = await pages()
+      expect(p).toMatchObject({ url: OUR_CATALOG_URL, ours: true })
+      expect(p.rows.find((r) => r.name === 'demo')).toMatchObject({ installed: '1.0.0', update: true })
+      // Its update is found by where it came from: the server installed from the old address.
+      const prepared = await run(() => catalog.prepareCatalogServer(OUR_CATALOG_URL, 'demo'))
+      expect(prepared.existing).toMatchObject({ name: 'demo', version: '1.0.0' })
+      // Adding the old address as a source of one's own: listed already.
+      expect(() => catalog.setCatalogSources({ oursOn: true, sources: [{ url: old, on: true }] })).toThrow('listed already')
+    } finally {
+      catalog.testHooks.fetch = undefined
+    }
   })
 
   it("shows a requirement whose probe failed or timed out as not checkable, never as met", async () => {

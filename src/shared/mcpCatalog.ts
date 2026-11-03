@@ -8,7 +8,16 @@ import type { McpCatalogCheck, McpCatalogFilter, McpCatalogRequires, McpCatalogS
 
 export const CATALOG_SCHEMA_VERSION = 1
 /** Ours, first in every list and on unless turned off (11 and 14 Oct decisions). */
-export const OUR_CATALOG_URL = 'https://github.com/Suremise/hive-mcp/releases/latest/download/catalog.json'
+export const OUR_CATALOG_URL = 'https://github.com/Suremise/combwork-mcp/releases/latest/download/catalog.json'
+/**
+ * Ours at its earlier addresses (HI-2472: the mcp repo was Suremise/hive-mcp, which GitHub redirects): servers
+ * installed from it there are still ours, and none is listed again as someone else's.
+ */
+export const OUR_OLD_CATALOG_URLS: readonly string[] = ['https://github.com/Suremise/hive-mcp/releases/latest/download/catalog.json']
+/** Whether a catalogue address is ours, now or before. */
+export const isOurCatalogUrl = (url: string): boolean => url === OUR_CATALOG_URL || OUR_OLD_CATALOG_URLS.includes(url)
+/** Whether two addresses are the same catalogue: the same address, or ours by any of its addresses. */
+export const sameCatalogSource = (a: string, b: string): boolean => a === b || (isOurCatalogUrl(a) && isOurCatalogUrl(b))
 
 const OSES = ['windows', 'macos', 'linux']
 const EDITIONS = ['Home', 'Pro', 'Enterprise', 'Education'] // i18n-ignore: Windows' editions as catalogues name them (ids)

@@ -77,7 +77,7 @@ export const commandLabel = (c: Command): string => c.liveLabel?.() ?? c.label
 export const commandCategory = (c: Pick<Command, 'category'>): string => tr(CATEGORY_TEXT[c.category])
 
 /** CONTRIBUTING's section on fixing a translation (Help → Improve This Translation). */
-const TRANSLATING_URL = 'https://github.com/Suremise/hive-desktop/blob/main/CONTRIBUTING.md#fix-a-translation'
+const TRANSLATING_URL = 'https://github.com/Suremise/combwork/blob/main/CONTRIBUTING.md#fix-a-translation'
 
 /** More than one window is open: File → Exit closes them all. */
 const severalWindows = (): boolean => get().windowCount > 1

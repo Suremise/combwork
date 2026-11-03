@@ -4,9 +4,9 @@
 
 <p align="center"><strong>Your AI coding agents, organised.</strong><br>Run Claude Code, Codex and GitHub Copilot CLI agents across your projects, on your own accounts or a model server you choose.</p>
 
-<p align="center"><a href="https://github.com/Suremise/hive-desktop/actions/workflows/ci.yml"><img src="https://github.com/Suremise/hive-desktop/actions/workflows/ci.yml/badge.svg" alt="CI"></a> <a href="https://github.com/Suremise/hive-desktop/releases/latest"><img src="https://img.shields.io/github/v/release/Suremise/hive-desktop" alt="Latest release"></a> <a href="LICENSE"><img src="https://img.shields.io/badge/licence-MIT-blue.svg" alt="Licence: MIT"></a></p>
+<p align="center"><a href="https://github.com/Suremise/combwork/actions/workflows/ci.yml"><img src="https://github.com/Suremise/combwork/actions/workflows/ci.yml/badge.svg" alt="CI"></a> <a href="https://github.com/Suremise/combwork/releases/latest"><img src="https://img.shields.io/github/v/release/Suremise/combwork" alt="Latest release"></a> <a href="LICENSE"><img src="https://img.shields.io/badge/licence-MIT-blue.svg" alt="Licence: MIT"></a></p>
 
-<p align="center"><strong><a href="https://surmise.it">Website</a></strong> · <a href="https://surmise.it/docs/user-guide/">User Guide</a> · <a href="https://github.com/Suremise/hive-desktop/releases/latest">Download</a></p>
+<p align="center"><strong><a href="https://surmise.it">Website</a></strong> · <a href="https://surmise.it/docs/user-guide/">User Guide</a> · <a href="https://github.com/Suremise/combwork/releases/latest">Download</a></p>
 
 ---
 
@@ -97,7 +97,7 @@ The seven languages besides English were translated by AI, and Combwork says so 
 
 ## Install
 
-Download `Combwork-Setup-<version>.exe` (`Hive-Setup-<version>.exe` for releases before the rename) from the [latest release](https://github.com/Suremise/hive-desktop/releases/latest) and run it. The installer is not code-signed, so Windows SmartScreen may warn you; choose **More info → Run anyway**. After that Combwork keeps itself up to date.
+Download `Combwork-Setup-<version>.exe` (`Hive-Setup-<version>.exe` for releases before the rename) from the [latest release](https://github.com/Suremise/combwork/releases/latest) and run it. The installer is not code-signed, so Windows SmartScreen may warn you; choose **More info → Run anyway**. After that Combwork keeps itself up to date.
 
 **Upgrading from 0.9.3?** The upgrade is one way: back up your workspace's `.hive` folder and your agents' worktrees first, and close every 0.9.3 Combwork on the workspace. Combwork asks before it upgrades a workspace's board; the [release notes](CHANGELOG.md) and [Upgrading to 1.0](docs/USER_GUIDE.md#upgrading-to-10) say what changes.
 

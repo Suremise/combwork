@@ -5,7 +5,7 @@
 Please report a security problem in Hive privately, never in a public issue, pull request or discussion.
 
 Use GitHub's private vulnerability reporting: on the repository's **Security** tab, click **Report a vulnerability**,
-or go straight to [the form](https://github.com/Suremise/hive-desktop/security/advisories/new). Only the maintainer
+or go straight to [the form](https://github.com/Suremise/combwork/security/advisories/new). Only the maintainer
 sees what you send.
 
 Please include:
@@ -27,4 +27,4 @@ Code, OpenAI for Codex, GitHub for the Copilot CLI.
 ## Supported versions
 
 Only the latest release gets security fixes. Installed copies of Hive update themselves from
-[GitHub Releases](https://github.com/Suremise/hive-desktop/releases), so keeping updates on is the way to get them.
+[GitHub Releases](https://github.com/Suremise/combwork/releases), so keeping updates on is the way to get them.
