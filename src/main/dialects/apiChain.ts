@@ -3,8 +3,10 @@
  * no session (a script, curl, a viewer) is said Hive's text in, API → Workspace → Default. A session's chain is pinned
  * at its launch; this one has no launch, so it follows the files: loaded once, kept, and loaded again when the
  * workspace sees its dialects folder change (workspace.ts's watch). Agent text's resolver is synchronous, so the Agent
- * API makes sure it is loaded before it serves such a caller (`apiChainReady`).
+ * API makes sure it is loaded before it serves such a caller (`apiChainReady`), and binds the request's workspace for
+ * the whole request (`inApiWorkspace`), its early and error replies too.
  */
+import { AsyncLocalStorage } from 'async_hooks'
 import { createLogger } from '../logger'
 import { resolveChain, type ResolvedChain } from './chain'
 import { agentTextSchema } from './schema'
@@ -64,6 +66,21 @@ export function apiChainChanged(hiveDir: string): void {
   if (!e) return
   e.generation++
   void load(hiveDir, e)
+}
+
+/** The .hive folder of the workspace the current Agent API request is for (null: none it names, so the Default). */
+const requestDir = new AsyncLocalStorage<string | null>()
+
+/**
+ * Runs an Agent API request of a caller with no session for its workspace (HR1 on HI-2443): the one the request names
+ * or the only one open, decided once from the request, never from which window has the focus. Null: the Default.
+ */
+export const inApiWorkspace = <T>(hiveDir: string | null, fn: () => T): T => requestDir.run(hiveDir, fn)
+
+/** The API chain of the current request's workspace (inApiWorkspace); null: the Default. */
+export function requestApiChain(): ResolvedChain | null {
+  const dir = requestDir.getStore()
+  return dir ? apiChain(dir) : null
 }
 
 /** A workspace closed: its chain is forgotten. */

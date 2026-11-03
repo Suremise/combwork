@@ -2,9 +2,12 @@
 // chain is pinned at its launch, so an edit applies at its next launch and shows "restart to apply" meanwhile; an
 // agent's Dialect setting picks the file in its model slot (a test copy here, which Auto never picks); the launch record
 // shows the chain; hive-mcp.js gets the chain's texts through HIVE_DIALECT_FILE; the Agent API speaks each caller's
-// chain (an agent's pinned one, the API chain for the workspace token, which follows the files). Runs the fake Claude
-// Code and the fake Codex (whose session contract Hive says itself, as developer_instructions). Dev build, throwaway
-// profile, workspace, CLAUDE_CONFIG_DIR and CODEX_HOME.
+// chain (an agent's pinned one, the API chain for the workspace token, which follows the files), and with two windows
+// the workspace the request names, never the focused window's (HR1 on HI-2443); a launch with no dialect and a model
+// Hive can't name says "model unknown", and one it can name records nothing new. Runs the fake Claude Code (with no
+// model catalogue, FAKE_CLAUDE_MODELS=fail, so the CLI's default model is unknown) and the fake Codex (whose session
+// contract Hive says itself, as developer_instructions). Dev build, throwaway profile, workspaces, CLAUDE_CONFIG_DIR
+// and CODEX_HOME.
 const lib = require('./lib.cjs')
 const { _electron } = require('playwright-core')
 const { spawn } = require('child_process')
@@ -15,6 +18,7 @@ const HUNG_MS = 20000
 
 const userData = path.join(lib.WORK, 'dialectlaunch-profile')
 const ws = path.join(lib.WORK, 'dialectlaunch-ws')
+const wsB = path.join(lib.WORK, 'dialectlaunch-ws-b')
 const claudeHome = path.join(lib.WORK, 'dialectlaunch-claude-home')
 const codexHome = path.join(lib.WORK, 'dialectlaunch-codex-home')
 const proj = path.join(ws, 'alpha')
@@ -66,7 +70,7 @@ function initialize(def) {
 }
 
 ;(async () => {
-  for (const d of [userData, ws, claudeHome, codexHome]) fs.rmSync(d, { recursive: true, force: true })
+  for (const d of [userData, ws, wsB, claudeHome, codexHome]) fs.rmSync(d, { recursive: true, force: true })
   fs.mkdirSync(claudeHome, { recursive: true })
   fs.mkdirSync(codexHome, { recursive: true })
   fs.writeFileSync(path.join(codexHome, 'config.toml'), '[windows]\nsandbox = "unelevated"\n')
@@ -88,7 +92,7 @@ function initialize(def) {
   cfg.settings.agentApi = { ...cfg.settings.agentApi, enabled: true }
   fs.writeFileSync(cfgFile, JSON.stringify(cfg, null, 2))
 
-  const env = lib.hiveEnv({ HIVE_USER_DATA: userData, HIVE_API_PORT: PORT, CLAUDE_CONFIG_DIR: claudeHome, CODEX_HOME: codexHome })
+  const env = lib.hiveEnv({ HIVE_USER_DATA: userData, HIVE_API_PORT: PORT, CLAUDE_CONFIG_DIR: claudeHome, CODEX_HOME: codexHome, FAKE_CLAUDE_MODELS: 'fail' })
   const app = await _electron.launch({ executablePath: lib.ELECTRON, args: [lib.ROOT], cwd: lib.ROOT, env })
   const page = await app.firstWindow()
   page.on('pageerror', (e) => check('no page errors', false, e.message))
@@ -124,10 +128,14 @@ function initialize(def) {
       return null
     }
   }, HUNG_MS)
-  const noRouteSaid = async (token) => {
-    const r = await fetch(`http://127.0.0.1:${PORT}/v1/no-such-route`, { headers: { Authorization: `Bearer ${token}` } })
+  // What the API says: a route it doesn't have (api.http.noRoute), or with `body` a POST of a body that isn't JSON
+  // (api.http.bodyJson, refused before its route runs); `at` names the workspace by query, `header` by X-Hive-Workspace.
+  const said = async (token, { at, header, body } = {}) => {
+    const url = `http://127.0.0.1:${PORT}${body !== undefined ? '/v1/tasks' : '/v1/no-such-route'}${at ? `?workspace=${encodeURIComponent(at)}` : ''}`
+    const r = await fetch(url, { method: body !== undefined ? 'POST' : 'GET', headers: { Authorization: `Bearer ${token}`, ...(header ? { 'X-Hive-Workspace': encodeURIComponent(header) } : {}) }, ...(body !== undefined ? { body } : {}) })
     return (await r.json().catch(() => ({}))).error ?? `(status ${r.status})`
   }
+  const noRouteSaid = (token) => said(token)
   const claudeLaunch = () => fs.readFileSync(path.join(claudeHome, 'fake-launches.jsonl'), 'utf8').trim().split('\n').map((l) => JSON.parse(l)).filter((l) => l.env?.HIVE_AGENT === 'Clara').at(-1)
   const codexTold = () => {
     const l = fs.readFileSync(path.join(codexHome, 'fake-launches.jsonl'), 'utf8').trim().split('\n').map((x) => JSON.parse(x)).filter((x) => x.agent === 'Cody').at(-1)
@@ -200,12 +208,35 @@ function initialize(def) {
   const plainMcp = JSON.parse(fs.readFileSync(plain.opts['--mcp-config'], 'utf8')).mcpServers.hive
   const d4 = (await agentNow(clara.id))?.live?.launched
   check('…gets no dialect file, in its hive server or its shell', !plainMcp.env.HIVE_DIALECT_FILE && !plain.env?.HIVE_DIALECT_FILE, JSON.stringify(plain.env))
-  check('…and its launch record is as before a dialect: no dialect in it (the Default)', !!d4 && !('dialect' in d4), JSON.stringify(d4))
+  check('…and its launch record says only "model unknown" (Auto, no model chosen, none the CLI names: decision Q4)', JSON.stringify(d4?.dialect) === JSON.stringify({ modelUnknown: true }), JSON.stringify(d4))
   check('…and Hive\'s own English', (await noRouteSaid(plain.token)).startsWith('No route for GET'), await noRouteSaid(plain.token))
+  // A model Hive can name: a launch with no dialect records nothing of one (as before dialects).
+  await lib.setLaunch(inv, proj, clara.id, { model: 'claude-opus-5-5' })
+  check('Clara restarts on a model Hive can name', !!(await restart(clara.id)))
+  const d5 = (await agentNow(clara.id))?.live?.launched
+  check('…and her launch record has no dialect in it (the Default, its model known)', !!d5 && !('dialect' in d5), JSON.stringify(d5))
   await page.screenshot({ path: path.join(lib.WORK, 'dialectlaunch.png') })
-
   for (const id of [clara.id, cody.id]) await inv('session:stop', proj, id).catch(() => undefined)
   await lib.until(async () => (await inv('session:live')).length === 0, 15000)
+
+  // --- Two windows, two workspaces (HR1 on HI-2443): a caller with no session is said the wording of the workspace its
+  // request names, whichever window has the focus, its early and error replies too; naming none of two, the Default.
+  writeWorkspace('WS-HOST-1', 'A-ROUTE')
+  check("workspace A's API chain follows its edit", !!(await until(async () => (await said(wsToken, { at: ws })).startsWith('A-ROUTE '), HUNG_MS)), await said(wsToken, { at: ws }))
+  fs.mkdirSync(path.join(wsB, '.hive', 'dialects'), { recursive: true })
+  fs.writeFileSync(path.join(wsB, '.hive', 'dialects', 'workspace.json'), dialectFile('Workspace', { 'api.http.noRoute': noRoute('B-ROUTE'), 'api.http.bodyJson': 'B-JSON' }))
+  const next = app.waitForEvent('window')
+  await inv('window:new')
+  const second = await next
+  await lib.appReady(second)
+  const inv2 = (ch, ...a) => second.evaluate(([c, x]) => window.hive.invoke(c, ...x), [ch, a])
+  await lib.openWorkspace(inv2, second, wsB)
+  // B's window opened last: a request naming no workspace would fall back to it by focus.
+  check("?workspace= naming A is said A's text, with B's window opened last", (await said(wsToken, { at: ws })).startsWith('A-ROUTE GET'), await said(wsToken, { at: ws }))
+  check("?workspace= naming B is said B's", (await said(wsToken, { at: wsB })).startsWith('B-ROUTE GET'), await said(wsToken, { at: wsB }))
+  check("X-Hive-Workspace naming A is said A's, and naming B, B's", (await said(wsToken, { header: ws })).startsWith('A-ROUTE GET') && (await said(wsToken, { header: wsB })).startsWith('B-ROUTE GET'), `${await said(wsToken, { header: ws })} | ${await said(wsToken, { header: wsB })}`)
+  check('naming neither of the two open: the Default', (await said(wsToken)).startsWith('No route for GET'), await said(wsToken))
+  check("an error reply (a body that isn't JSON) is said in the named workspace's wording: B's, and A's Default", (await said(wsToken, { at: wsB, body: '{' })) === 'B-JSON' && (await said(wsToken, { at: ws, body: '{' })) === 'Body must be JSON', `${await said(wsToken, { at: wsB, body: '{' })} | ${await said(wsToken, { at: ws, body: '{' })}`)
   await app.close()
   console.log(failed ? `${failed} check(s) failed` : 'all checks passed')
   process.exit(failed ? 1 : 0)

@@ -7,7 +7,7 @@ import { join } from 'path'
 import { afterAll, describe, expect, it } from 'vitest'
 import { inDialectOf, setChainResolver, type DialectChain } from '../src/shared/agentText'
 import { chainKey, loadDialects, pickOf, sessionChainOf, type DialectFile, type DialectSchema } from '../src/main/dialects'
-import { apiChain, apiChainChanged, apiChainReady, forgetApiChain } from '../src/main/dialects/apiChain'
+import { apiChain, apiChainChanged, apiChainReady, forgetApiChain, inApiWorkspace, requestApiChain } from '../src/main/dialects/apiChain'
 import { chainGuidanceRevision, GUIDANCE_REVISION } from '../src/main/guidance'
 import { tempDir } from './tempDir'
 
@@ -104,6 +104,29 @@ describe('the API chain', () => {
     expect(apiChain(hive)?.texts[id]).toBe('three {method} {path}')
     expect(apiChain(hive)?.files).toEqual(['api/cli.json', 'workspace.json'])
     forgetApiChain(hive)
+  })
+})
+
+describe('the API chain of a request (HR1 on HI-2443)', () => {
+  it('is the chain of the workspace the request is bound to, through its awaits; bound to none, or unbound, the Default', async () => {
+    const id = 'api.http.noRoute'
+    const a = folder()
+    const b = folder()
+    for (const [hive, mark] of [[a, 'A'], [b, 'B']]) {
+      mkdirSync(join(hive, 'dialects'), { recursive: true })
+      writeFileSync(join(hive, 'dialects', 'workspace.json'), JSON.stringify({ name: 'x', texts: { [id]: { text: `${mark} {method} {path}`, why: 'a test' } } }))
+      await apiChainReady(hive)
+    }
+    const after = async (dir: string | null) =>
+      inApiWorkspace(dir, async () => {
+        // Across an await: the binding holds through the request's async work.
+        await Promise.resolve()
+        return requestApiChain()?.texts[id] ?? null
+      })
+    expect(await Promise.all([after(a), after(b), after(null)])).toEqual(['A {method} {path}', 'B {method} {path}', null])
+    expect(requestApiChain()).toBeNull()
+    forgetApiChain(a)
+    forgetApiChain(b)
   })
 })
 

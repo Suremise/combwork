@@ -121,7 +121,7 @@ import { chainGuidanceRevision, GUIDANCE_REVISION, launchParts, launchRecord } f
 import { say, setChainResolver } from '../shared/agentText'
 import { inDefaultDialect, inDialectOf } from '../shared/agentText/asyncScope'
 import { agentTextSchema, chainKey, dialectsDir, loadDialects, pickOf, sessionChainOf, writeDialectFile, type DialectSet, type ModelSlot, type ResolvedChain, type SessionDialect } from './dialects'
-import { apiChain, apiChainChanged, forgetApiChain } from './dialects/apiChain'
+import { apiChainChanged, forgetApiChain, requestApiChain } from './dialects/apiChain'
 import { SESSION } from './sessionText'
 import { reportPlanUsage } from './planUsage'
 import { devConsole, sessionSourceId } from './devConsole'
@@ -134,7 +134,7 @@ import { metricsHandle, recordLaunch } from './metrics'
 import { headerOf } from './revisions'
 import { utf8Bytes } from '../shared/metrics'
 import { cardNamesOf, scopeOfHost } from './projectKeys'
-import { currentWorkspace, inWorkspace, workspace, workspaceFor, workspaceOf, WorkspaceService, type SessionsFile } from './workspace'
+import { inWorkspace, workspace, workspaceFor, workspaceOf, WorkspaceService, type SessionsFile } from './workspace'
 import { ServerMarks } from './serverMarks'
 import { usageHistory, type StoredUsage } from './usageHistory'
 import { journalSettingsOf } from './journalService'
@@ -2725,9 +2725,10 @@ class SessionManager {
     const notGiven = Object.fromEntries(Object.entries(eff.skillProblems).map(([name, why]) => [name, { revision: null, problem: inDefaultDialect(() => say(SESSION.skillNotGiven, { why })), lasting: true as const }]))
     const record = launchRecord(eff.skillHashes, { ...delivered, ...notGiven })
     state.launchSignature = this.signature({ ...eff, skillHashes: record.settled })
-    // Its dialect chain (HI-2443): each layer's file, "model unknown", and the guidance revision as said in it. Only
-    // where a dialect is set (a text overridden, or a file picked): speaking the Default, its record is as before.
-    const dialect = l.dialect && (l.dialect.chain.hash || l.dialect.input.pick !== 'auto') ? launchDialectOf(l.dialect, chainGuidanceRevision()) : undefined
+    // Its dialect chain (HI-2443): each layer's file, "model unknown", and the guidance revision as said in it, where a
+    // dialect is set (a text overridden, or a file picked). Speaking the Default, its record is as before, but for
+    // "model unknown" (decision Q4), said compactly: the status every agent reads carries it (replysize).
+    const dialect = !l.dialect ? undefined : l.dialect.chain.hash || l.dialect.input.pick !== 'auto' ? launchDialectOf(l.dialect, chainGuidanceRevision()) : l.dialect.chain.modelUnknown ? { modelUnknown: true as const } : undefined
     state.launched = { guidance: GUIDANCE_REVISION, skills: record.skills, ...(record.problems ? { problems: record.problems } : {}), ...(dialect ? { dialect } : {}) }
     // Performance metrics: what Hive gave this session, exact sizes. The session contract once (whichever way the
     // provider gets it); the skills that reached it, measured on their copies; the ones asked for that didn't.
@@ -2738,7 +2739,7 @@ class SessionManager {
       role: workspace.isAssistantHome(projectPath) ? 'assistant' : 'agent',
       workflow: l.workflow,
       // Split by its dialect chain where one overrides text (HI-2443), so Compare tells it from the Default's.
-      ...(dialect?.hash ? { dialect: dialect.hash } : {}),
+      ...(dialect && 'hash' in dialect && dialect.hash ? { dialect: dialect.hash } : {}),
       ...parts,
       skills: given.length,
       skillCatalogBytes: deliveredSizes.catalog,
@@ -8262,14 +8263,8 @@ export const sessions = new SessionManager()
 WorkspaceService.closingListeners.add((path) => serverMarks.closing(path))
 onLanguageChange(() => sessions.relabel())
 // Agent text's chain resolver (dialects, HI-2443): a session's chain is the one pinned at its launch; a caller with no
-// session (the Agent API's scripts and viewers) gets its workspace's API chain, which follows the files.
-setChainResolver((scope) => {
-  if (scope.kind === 'session') return sessions.pinnedChain(scope.session.projectPath, scope.session.agentId)
-  try {
-    return apiChain(currentWorkspace().hiveDir)
-  } catch {
-    return null
-  }
-})
+// session (the Agent API's scripts and viewers) gets the API chain of the workspace its request is for, which follows
+// the files (servers.ts binds it: inApiWorkspace).
+setChainResolver((scope) => (scope.kind === 'session' ? sessions.pinnedChain(scope.session.projectPath, scope.session.agentId) : requestApiChain()))
 WorkspaceService.dialectsListeners.add((ws) => apiChainChanged(ws.hiveDir))
 WorkspaceService.closingListeners.add((path) => forgetApiChain(join(path, HIVE_DIR)))

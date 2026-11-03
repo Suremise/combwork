@@ -137,7 +137,7 @@ export async function diagnostics(opts: { recording?: boolean } = {}): Promise<s
   const running = agents.flatMap((a) => (a.live ? [a.live] : []))
   const older = running.filter((l) => l.launched && l.launched.guidance !== GUIDANCE_REVISION).length
   // Agents on a dialect (HI-2443): how many, and on how many chains; never the files' names (the user's own labels).
-  const onDialect = running.flatMap((l) => (l.launched?.dialect?.hash ? [l.launched.dialect.hash] : []))
+  const onDialect = running.flatMap((l) => (l.launched?.dialect && 'hash' in l.launched.dialect && l.launched.dialect.hash ? [l.launched.dialect.hash] : []))
   const dialectLine = onDialect.length ? [`- Dialects: ${onDialect.length} running agent${onDialect.length === 1 ? '' : 's'} on ${new Set(onDialect).size} chain${new Set(onDialect).size === 1 ? '' : 's'} other than the Default`] : [] // i18n-ignore: Copy Diagnostics' report: a bug report for the maintainer, in English (the design keeps diagnostics content English)
 
   const header = [

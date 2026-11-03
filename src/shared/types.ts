@@ -2471,8 +2471,11 @@ export interface LiveSessionState {
    * copy it reads, and why a skill isn't as asked for (a folder of the user's has its name, an old copy kept while in use),
    * and the dialect chain it speaks (HI-2443).
    */
-  /** `dialect`: only where a dialect is set (a text overridden, or a file picked); absent, it speaks the Default. */
-  launched?: { guidance: string; skills: Record<string, string>; problems?: Record<string, string>; dialect?: LaunchDialect }
+  /**
+   * `dialect`: its chain where a dialect is set (a text overridden, or a file picked); on the Default, only
+   * `{ modelUnknown: true }` where Hive couldn't name its model (decision Q4); absent otherwise.
+   */
+  launched?: { guidance: string; skills: Record<string, string>; problems?: Record<string, string>; dialect?: LaunchDialect | { modelUnknown: true } }
   /** Finished or waiting since its pane was last on screen in a focused window (the renderer marks it seen). */
   unseen: boolean
   /** Its wake-on-change watch, while it has one (status `watching` while its turn has ended). */
