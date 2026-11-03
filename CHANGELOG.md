@@ -4,7 +4,7 @@
 
 ### Added
 
-- **Agents can attach files to cards from a folder you choose** (HI-2480). Agents, the Assistant and scripts could attach only files from their project's folders, the workspace and the temp folder, so evidence kept in a folder of your own had to be copied into Temp first. **Settings → Advanced → Card attachments: more folders** lists more folders they may attach from, for all of Hive or just the workspace (`%LOCALAPPDATA%\…` works). Another project's folders and Hive's own stay off limits. A refused file now says which folders are accepted and where to add one.
+- **Agents can attach files to cards from a folder you choose** (HI-2480). Agents, the Assistant and scripts could attach only files from their project's folders, the workspace and the temp folder, so evidence kept in a folder of your own had to be copied into Temp first. **Settings → Advanced → Card attachments: more folders** lists more folders they may attach from, for all of Hive or just the workspace (`%LOCALAPPDATA%\…` works). Only you can change it, not the Assistant, and another project's folders and Hive's own stay off limits. A refused file now says which folders are accepted and where to add one.
 
 ### Fixed
 

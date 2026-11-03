@@ -11,7 +11,9 @@ import { applySetting, revertSetting } from '../src/main/settingsTools'
 import { inWorkspace } from '../src/main/workspace'
 import { setLanguage } from '../src/shared/i18n'
 import type { WorkspaceConfig } from '../src/shared/types'
-import { settingChangeTexts, settingEntry, settingPath, shownSettingPath } from '../src/shared/settingsCatalog'
+import { settingChangeTexts, settingEntry, settingPath, settingReadOnly, shownSettingPath } from '../src/shared/settingsCatalog'
+import { advanced } from '../src/main/advanced'
+import { CARD_ATTACHMENT_FOLDERS_ID } from '../src/shared/advanced'
 
 const prices = settingEntry('codex.prices')!
 const mine = { 'gpt-7': { input: 1, cachedInput: 0.1, output: 5 } }
@@ -103,6 +105,17 @@ describe("the settings tools on a provider's prices", () => {
         setLanguage('en', {})
       }
     })
+  })
+
+  // HI-2480 round 2: where agents may attach files from is a permission: the Assistant reads it and never sets it.
+  it("Card attachments: more folders is the user's: read and explained, never set by the Assistant, Hive's or a workspace's", async () => {
+    for (const id of ['advanced.hive.cards.attachmentFolders', 'workspace.advanced.hive.cards.attachmentFolders']) {
+      const e = settingEntry(id)!
+      expect(e, id).toMatchObject({ sensitive: true })
+      expect(settingReadOnly(e), id).toMatch(/^It decides which folders agents, the Assistant and scripts may attach files to cards from: only the user can change it, in /)
+      await expect(applySetting(e, ['C:\\Evidence'], null), id).rejects.toMatchObject({ status: 403 })
+    }
+    expect(advanced.get(CARD_ATTACHMENT_FOLDERS_ID)).toEqual([])
   })
 
   it("Revert of a table edit leaves the removed models as they are then", async () => {

@@ -1725,6 +1725,11 @@
       "path": "plain"
     }
   },
+  "settings.agent.sensitive.attachmentFolders": {
+    "placeholders": {
+      "path": "plain"
+    }
+  },
   "settings.agent.sensitive.backgroundSessions": {
     "placeholders": {
       "path": "plain"
