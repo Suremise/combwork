@@ -203,6 +203,8 @@ const until = async (fn, ms = 10000) => {
           if (done) break
           got.text += Buffer.from(value).toString('utf8')
         }
+        // Ended by Hive (not by stop(), whose abort rejects the read instead).
+        got.done = true
       })
       .catch(() => undefined)
     got.stop = () => ctl.abort()
@@ -299,11 +301,21 @@ const until = async (fn, ms = 10000) => {
   r = await as('POST', `/v1/projects/alpha/stop?agent=${encodeURIComponent(alma.id)}`)
   check('…and stops it', r.status === 200 && !!(await until(async () => !(await almaLive()), 10000)), JSON.stringify(r))
 
-  // --- Once the agent stops, its token stops working.
+  // --- Once the agent stops, its token stops working, and an event stream it opened ends (HI-2416), as a revoked
+  // viewer's does; one with the workspace token stays open.
+  const endsWith = listen(agentToken)
+  const staysOpen = listen(workspaceToken)
+  check('a stream opened with its token before it stops is open', !!(await until(async () => endsWith.status === 200 && endsWith.text.includes(': connected'))), `${endsWith.status}`)
+  await until(async () => staysOpen.status === 200)
   await inv('session:stop', alpha, agent.id).catch(() => undefined)
   await until(async () => !(await live()), 10000)
   r = await as('GET', '/v1/tasks')
   check('its token ends with it', r.status === 401, JSON.stringify(r))
+  check('…and so does the stream it opened (HI-2416)', !!(await until(async () => endsWith.done)), endsWith.text.slice(-200))
+  check("…the workspace token's stream stays open", !staysOpen.done)
+  r = await fetch(`http://127.0.0.1:${PORT}/v1/events`, { headers: { Authorization: `Bearer ${agentToken}` } })
+  check('…and a new stream with its token is refused', r.status === 401, String(r.status))
+  staysOpen.stop()
 
   await app.close()
   console.log(failed ? `${failed} check(s) failed` : 'all checks passed')
