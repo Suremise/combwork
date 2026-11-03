@@ -58,6 +58,7 @@
   "service.files.outside": "Le chemin est hors du projet",
   "service.files.throughLink": "Le chemin mène hors du projet (par un lien)",
   "service.fsutil.keptBusy": "{file} est en cours d’enregistrement par un autre programme : rien n’a été modifié. Réessaie dans un instant.",
+  "service.fsutil.keptUnreadable": "Impossible de lire {file} : rien n’a été modifié. Réessaie dans un instant.",
   "service.fsutil.notCopied": "Impossible de copier {name}",
   "service.git.exitCode": "code de sortie {code}",
   "service.git.failed": "{command} a échoué : {why}",

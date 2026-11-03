@@ -455,7 +455,7 @@ export class WorkspaceService {
     }
     const fresh = !existsSync(join(abs, HIVE_DIR))
     await this.ensureWorkspaceStructure()
-    this.wsConfig = loadedConfig(await readKeptJson(join(this.hiveDir, 'workspace.json'), {}))
+    this.wsConfig = loadedConfig(await readKeptJson(join(this.hiveDir, 'workspace.json'), {}, { holder: this }))
     // Its open point's commands hold its agents back until they are done (HI-1954): reserved here, before anything hears
     // of the open (the recent list, workspace-changed, onOpened), so no start slips in ahead of them.
     this.openGate = this.wsConfig.commands?.onOpen.run.length && WorkspaceService.runsCommands() ? new OpenGate(this.generation, this.life.signal) : null
@@ -666,7 +666,7 @@ export class WorkspaceService {
     const file = join(this.hiveDir, 'workspace.json')
     const data = this.wsConfig
     this.configSaves++
-    const run = this.savingConfig.then(() => writeKeptJson(file, data)).finally(() => {
+    const run = this.savingConfig.then(() => writeKeptJson(file, data, { holder: this })).finally(() => {
       this.configSaves--
       this.configWritten = JSON.stringify(data, null, 2) + '\n'
     })
@@ -688,7 +688,7 @@ export class WorkspaceService {
       .then(async () => {
         const next = { ...data, ...change(data) }
         text = JSON.stringify(next, null, 2) + '\n'
-        await writeKeptJson(file, next)
+        await writeKeptJson(file, next, { holder: this })
         // Worked out again: the settings may have changed in memory while it was written (their own save is after this one).
         Object.assign(data, change(data))
       })
@@ -928,7 +928,7 @@ export class WorkspaceService {
     const text = await readFile(file, 'utf8').catch(() => '')
     // Hive's own save, or a save started meanwhile (its settings are newer), or another workspace opened since.
     if (text === this.configWritten || this.configSaves || generation !== this.generation) return
-    this.wsConfig = loadedConfig(await readKeptJson(file, {}))
+    this.wsConfig = loadedConfig(await readKeptJson(file, {}, { holder: this }))
     this.emit({ type: 'skills-changed' })
     this.scheduleRefresh()
   }

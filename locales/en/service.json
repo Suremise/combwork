@@ -235,6 +235,10 @@
     "defaultMessage": "{file} is being saved by something else: nothing was changed. Try again in a moment.",
     "description": "An error: one of Hive's settings or records files ({file}: its path) was still being written by another program (an editor, a script), so Hive's change to it wasn't made."
   },
+  "service.fsutil.keptUnreadable": {
+    "defaultMessage": "{file} couldn't be read: nothing was changed. Try again in a moment.",
+    "description": "An error: one of Hive's settings or records files ({file}: its path) is there but couldn't be read (another program had it locked, or a disk error), so Hive's change to it wasn't made and the file was left as it is."
+  },
   "service.fsutil.notCopied": {
     "defaultMessage": "{name} could not be copied",
     "description": "An error putting back one of Hive's skills or modes: its copy couldn't be made ({name}: its folder or file name); nothing was replaced."

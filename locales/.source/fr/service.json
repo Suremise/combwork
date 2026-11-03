@@ -58,6 +58,7 @@
   "service.files.outside": "Path is outside the project",
   "service.files.throughLink": "Path leads outside the project (through a link)",
   "service.fsutil.keptBusy": "{file} is being saved by something else: nothing was changed. Try again in a moment.",
+  "service.fsutil.keptUnreadable": "{file} couldn't be read: nothing was changed. Try again in a moment.",
   "service.fsutil.notCopied": "{name} could not be copied",
   "service.git.exitCode": "exit code {code}",
   "service.git.failed": "{command} failed: {why}",

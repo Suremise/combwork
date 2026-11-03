@@ -58,6 +58,7 @@
   "service.files.outside": "La ruta está fuera del proyecto",
   "service.files.throughLink": "La ruta sale del proyecto (a través de un vínculo)",
   "service.fsutil.keptBusy": "Otro programa está guardando {file}: no se ha cambiado nada. Vuelve a intentarlo en un momento.",
+  "service.fsutil.keptUnreadable": "No se ha podido leer {file}: no se ha cambiado nada. Vuelve a intentarlo en un momento.",
   "service.fsutil.notCopied": "No se pudo copiar {name}",
   "service.git.exitCode": "código de salida {code}",
   "service.git.failed": "Falló {command}: {why}",
