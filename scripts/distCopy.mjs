@@ -3,7 +3,8 @@
 // (the worktree keeps its own). It never replaces an installer of the same name built from other code without saying
 // so: build-info.json beside each says what it was built from, and is only written when that is certain (the code
 // didn't change while it was built). Several worktrees can copy at once: a lock in the main dist makes each check and
-// copy the whole set in turn. npm run release builds in its own checkout's dist by the same rules (makeRelease, HI-2411).
+// copy the whole set in turn. npm run release builds in its own checkout's dist by the same rules (makeRelease, HI-2411),
+// and each build holds the dist it builds in until it ends (claimDist, HI-2417).
 // Kept apart from dist.mjs and release.mjs so tests/distcopy.test.ts can check it with a temporary repository and
 // worktrees, and with the build and upload faked.
 import { execFileSync } from 'child_process'
@@ -171,9 +172,10 @@ export function copyToMain({ root, version, info, here = false, replace = false 
   let plan
   try {
     plan = withCopyLock(to, () => {
-      // A release building in the main dist owns it until it ends (makeRelease, HI-2411): even --replace waits for it.
-      const release = releaseClaim(to)
-      if (release) return { busy: `npm run release is building there (pid ${release.pid}, since ${release.at})` }
+      // A build in the main dist owns it until it ends (a release, HI-2411, or npm run dist there, HI-2417): even
+      // --replace waits for it.
+      const building = buildClaim(to)
+      if (building) return { busy: `npm run ${building.kind} is building there (pid ${building.pid}, since ${building.at})` }
       const p = planCopy({ version, from, to, info, mainHead, replace })
       if (!p.refuse) copySet(from, to, p.copy)
       return p
@@ -181,7 +183,7 @@ export function copyToMain({ root, version, info, here = false, replace = false 
   } catch (e) {
     return [`Not copied to the main checkout: ${e.message}.`, `Installer: ${join(from, `Hive-Setup-${version}.exe`)} (this worktree).`]
   }
-  if (plan.busy) return [`Not copied to the main checkout: ${plan.busy}.`, `Installer: ${join(from, `Hive-Setup-${version}.exe`)} (this worktree). Run npm run dist again once the release has ended to copy it.`]
+  if (plan.busy) return [`Not copied to the main checkout: ${plan.busy}.`, `Installer: ${join(from, `Hive-Setup-${version}.exe`)} (this worktree). Run npm run dist again once that build has ended to copy it.`]
   if (plan.refuse) return [`Not copied to the main checkout: ${plan.refuse}.`, `Installer: ${join(from, `Hive-Setup-${version}.exe`)} (this worktree). Run again with --replace to copy it over anyway.`]
   return [`Installer: ${join(to, `Hive-Setup-${version}.exe`)} (copied from this worktree, which keeps its own)`, ...(plan.note ? [`Note: ${plan.note}.`] : [])]
 }
@@ -217,18 +219,28 @@ export function clearDistInfo(dist) {
  * build is made from; removes an earlier build's records (build-info.json and win-unpacked's own: a build that fails part
  * way would leave an installer and a dist/win-unpacked they describe wrongly); builds out/ and stamps it (buildStamped,
  * under the worktree's build lock); packages the installer; then finishDist. run(cmd) runs a command and exits on
- * failure. Returns finishDist's lines.
+ * failure. Electron-builder writes straight into the checkout's dist, so from before the records go until it ends it
+ * holds that dist (claim: DIST_CLAIM, HI-2417), and refuses to start while a release or another npm run dist holds it:
+ * one in the main checkout would otherwise replace the installer a release there is uploading. Returns { refused: why }
+ * (nothing built) or { lines }, finishDist's.
  */
-export function makeDist({ root, here = false, replace = false, run, buildStamped, identity = buildIdentity, clear = clearDistInfo, finish = finishDist, warn = console.warn, stampApp = writeAppIdentity }) {
+export function makeDist({ root, here = false, replace = false, run, buildStamped, identity = buildIdentity, clear = clearDistInfo, finish = finishDist, warn = console.warn, stampApp = writeAppIdentity, claim = claimDist, unclaim = giveUpClaim }) {
+  const dist = join(root, 'dist')
   // What the build is made from, before and after: an edit or a commit while it runs leaves its code unknown.
   const before = identity(root)
-  clear(join(root, 'dist'))
-  const { stamped } = buildStamped({ root, runBuild: () => run('npm run build') })
-  if (!stamped) warn("\nThe source changed while it was building: out/ isn't stamped as this source's (npm run e2e -- --build rebuilds it).\n")
-  // A local build says so (#1647): the app's identity file and its installer's wait for another Hive installer.
-  stampApp(root, { version: before.version, commit: before.head, local: true })
-  run('npx electron-builder --win --publish never')
-  return finish({ root, before, after: identity(root), here, replace })
+  const refused = claim(dist, 'dist', { code: before.code })
+  if (refused) return { refused }
+  try {
+    clear(dist)
+    const { stamped } = buildStamped({ root, runBuild: () => run('npm run build') })
+    if (!stamped) warn("\nThe source changed while it was building: out/ isn't stamped as this source's (npm run e2e -- --build rebuilds it).\n")
+    // A local build says so (#1647): the app's identity file and its installer's wait for another Hive installer.
+    stampApp(root, { version: before.version, commit: before.head, local: true })
+    run('npx electron-builder --win --publish never')
+    return { lines: finish({ root, before, after: identity(root), here, replace }) }
+  } finally {
+    unclaim(dist, 'dist')
+  }
 }
 
 /**
@@ -255,12 +267,15 @@ export function finishDist({ root, before, after, builtAt = new Date().toISOStri
 }
 
 /**
- * A release's claim on the dist it builds in (makeRelease, HI-2411): `.release-build.json`, naming its process. The
- * build takes minutes, longer than the copy lock may be held (withCopyLock's staleMs), so the release takes the claim
- * under that lock with its check, and holds it, not the lock, until it ends; a worktree's copy there (copyToMain) and
- * another release refuse while it stands.
+ * A build's claim on the dist it builds in, naming its process: a release's (makeRelease, HI-2411) is
+ * `.release-build.json`, npm run dist's (makeDist, HI-2417) `.dist-build.json`. The build takes minutes, longer than
+ * the copy lock may be held (withCopyLock's staleMs), so each takes its claim under that lock with its checks (claimDist),
+ * and holds it, not the lock, until it ends; while either stands, a worktree's copy there (copyToMain), a release and
+ * another npm run dist there refuse.
  */
 export const RELEASE_CLAIM = '.release-build.json'
+export const DIST_CLAIM = '.dist-build.json'
+const CLAIMS = { release: RELEASE_CLAIM, dist: DIST_CLAIM }
 
 /** Whether process pid is running (EPERM: it is, as another user's). */
 export function pidAlive(pid) {
@@ -273,14 +288,14 @@ export function pidAlive(pid) {
 }
 
 /**
- * The release claim standing on dir ({ pid, at, code }), or null: none, unreadable, or left by a release that ended
- * without removing it (its process is gone: release.mjs exits on a failed step; or older than maxAgeMs, should its pid
- * have been reused).
+ * The claim of kind ('release' or 'dist') standing on dir ({ pid, at, code }), or null: none, unreadable, or left by a
+ * build that ended without removing it (its process is gone: release.mjs and dist.mjs exit on a failed step; or older
+ * than maxAgeMs, should its pid have been reused).
  */
-export function releaseClaim(dir, { alive = pidAlive, now = Date.now(), maxAgeMs = 6 * 3_600_000 } = {}) {
+function standingClaim(dir, kind, { alive = pidAlive, now = Date.now(), maxAgeMs = 6 * 3_600_000 } = {}) {
   let claim
   try {
-    claim = JSON.parse(readFileSync(join(dir, RELEASE_CLAIM), 'utf8'))
+    claim = JSON.parse(readFileSync(join(dir, CLAIMS[kind]), 'utf8'))
   } catch {
     return null
   }
@@ -289,12 +304,45 @@ export function releaseClaim(dir, { alive = pidAlive, now = Date.now(), maxAgeMs
   return Number.isNaN(at) || now - at > maxAgeMs ? null : claim
 }
 
+/** The release claim standing on dir ({ pid, at, code }), or null (standingClaim). */
+export const releaseClaim = (dir, opts) => standingClaim(dir, 'release', opts)
+
+/** The build holding dir, a release's claim or npm run dist's ({ kind: 'release' | 'dist', pid, at, code }), or null. */
+export function buildClaim(dir, opts) {
+  for (const kind of Object.keys(CLAIMS)) {
+    const claim = standingClaim(dir, kind, opts)
+    if (claim) return { ...claim, kind }
+  }
+  return null
+}
+
+/**
+ * Takes the claim of kind on dist for this process, under the copy lock: refuses, returning why, while a build holds
+ * it (buildClaim), or when check (run in the same hold) returns a problem; null once taken. giveUpClaim removes it.
+ */
+export function claimDist(dist, kind, { code = null, check = () => null } = {}) {
+  return withCopyLock(dist, () => {
+    const other = buildClaim(dist)
+    if (other) return `Not built: ${other.kind === kind ? 'another ' : ''}npm run ${other.kind} is building in ${dist} (pid ${other.pid}, since ${other.at}). Run again once it has ended.`
+    const problem = check()
+    if (problem) return problem
+    writeFileSync(join(dist, CLAIMS[kind]), JSON.stringify({ pid: process.pid, at: new Date().toISOString(), code }, null, 2))
+    return null
+  })
+}
+
+/** Gives up this build's claim of kind on dist (claimDist), under the copy lock. */
+export function giveUpClaim(dist, kind) {
+  withCopyLock(dist, () => rmSync(join(dist, CLAIMS[kind]), { force: true }))
+}
+
 /**
  * What npm run release does once its own checks pass (scripts/release.mjs gives it the real steps; tests give fakes,
  * HI-2411), by dist's rules. It builds in its checkout's own dist, so under the dist's copy lock (which worktrees copying
  * there take too) it first refuses (unless replace) to build over an installer of the same name there built from other
- * code or from code it can't tell (replaceProblem), or while another release holds the dist; otherwise it takes the
- * release claim (RELEASE_CLAIM) in the same hold, so no copy lands between that check and its build. Then it removes an
+ * code or from code it can't tell (replaceProblem), or while another release or an npm run dist holds the dist;
+ * otherwise it takes the release claim (RELEASE_CLAIM) in the same hold, so no copy lands between that check and its
+ * build (claimDist). Then it removes an
  * earlier build's records (clearDistInfo); builds out/ (run), stamps the app as a release (local: false, #1647), and
  * publishes (publish: the draft and electron-builder's upload); then finishDist without a copy, so
  * dist/build-info.json describes the installer it uploaded; and gives up its claim (a failed step that exits leaves it
@@ -302,15 +350,13 @@ export function releaseClaim(dir, { alive = pidAlive, now = Date.now(), maxAgeMs
  */
 export function makeRelease({ root, replace = false, run, publish, identity = buildIdentity, clear = clearDistInfo, finish = finishDist, stampApp = writeAppIdentity }) {
   const dist = join(root, 'dist')
-  const claimFile = join(dist, RELEASE_CLAIM)
   const before = identity(root)
-  const refused = withCopyLock(dist, () => {
-    const other = releaseClaim(dist)
-    if (other) return `Not built: another npm run release is building in ${dist} (pid ${other.pid}, since ${other.at}). Run again once it has ended.`
-    const problem = replaceProblem({ dir: dist, version: before.version, info: before, replace })
-    if (problem) return `Not built: ${problem}. Move it aside to keep it, or run again with --replace to build over it.`
-    writeFileSync(claimFile, JSON.stringify({ pid: process.pid, at: new Date().toISOString(), code: before.code }, null, 2))
-    return null
+  const refused = claimDist(dist, 'release', {
+    code: before.code,
+    check: () => {
+      const problem = replaceProblem({ dir: dist, version: before.version, info: before, replace })
+      return problem ? `Not built: ${problem}. Move it aside to keep it, or run again with --replace to build over it.` : null
+    }
   })
   if (refused) return { refused }
   try {
@@ -320,6 +366,6 @@ export function makeRelease({ root, replace = false, run, publish, identity = bu
     publish()
     return { lines: finish({ root, before, after: identity(root), copy: false }) }
   } finally {
-    withCopyLock(dist, () => rmSync(claimFile, { force: true }))
+    giveUpClaim(dist, 'release')
   }
 }

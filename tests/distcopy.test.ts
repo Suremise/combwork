@@ -6,7 +6,7 @@ import { join, resolve } from 'path'
 import { pathToFileURL } from 'url'
 import { afterAll, describe, expect, it } from 'vitest'
 // @ts-expect-error: a plain .mjs module without types
-import { checkoutOf, clearDistInfo, copySet, copyToMain, finishDist, installerFiles, makeRelease, planCopy, provenanceProblem, readUnpackedInfo, releaseClaim, RELEASE_CLAIM } from '../scripts/distCopy.mjs'
+import { checkoutOf, clearDistInfo, copySet, copyToMain, DIST_CLAIM, finishDist, installerFiles, makeDist, makeRelease, planCopy, provenanceProblem, readUnpackedInfo, releaseClaim, RELEASE_CLAIM } from '../scripts/distCopy.mjs'
 // @ts-expect-error: a plain .mjs module without types
 import { packagedStatus } from './e2e/runner.mjs'
 import { tempDir } from './tempDir'
@@ -228,7 +228,7 @@ console.log(copyToMain({ root: ${JSON.stringify(root)}, version: '9.9.9', info: 
 })
 
 // npm run release builds in its own checkout's dist (scripts/release.mjs) by npm run dist's rules (HI-2411): makeRelease,
-// with the build, the app's stamp and the upload faked.
+// with the build, the app's stamp and the upload faked; and npm run dist's own claim on its dist (makeDist, HI-2417).
 describe('a release build in dist (makeRelease)', () => {
   const base = tempDir('hive-release-')
   afterAll(() => rmSync(base, { recursive: true, force: true }))
@@ -267,6 +267,24 @@ describe('a release build in dist (makeRelease)', () => {
     })
     return { made, steps }
   }
+  /** makeDist with fakes, in root's own dist: steps lists what ran; electron-builder "writes" the installer. */
+  const localDist = (root: string, { code = 'local', during }: { code?: string; during?: () => void } = {}) => {
+    const steps: string[] = []
+    const made = makeDist({
+      root,
+      identity: () => ident(code),
+      run: (cmd: string) => {
+        steps.push(cmd)
+        if (cmd.startsWith('npx electron-builder')) writeFileSync(exe(root), `installer from ${code}`)
+        during?.()
+      },
+      buildStamped: ({ runBuild }: { runBuild: () => void }) => (runBuild(), { stamped: true, waited: false }),
+      stampApp: (_root: string, id: { local: boolean }) => steps.push(`stamp local=${id.local}`),
+      warn: () => {}
+    })
+    return { made, steps }
+  }
+  const live = (root: string, file: string) => writeFileSync(join(root, 'dist', file), JSON.stringify({ pid: process.pid, at: new Date().toISOString(), code: 'other' }))
   const buildInfo = (root: string) => JSON.parse(readFileSync(join(root, 'dist', 'build-info.json'), 'utf8'))
 
   it('builds, stamps it a release, uploads, and leaves build-info.json describing the uploaded installer', () => {
@@ -334,7 +352,7 @@ describe('a release build in dist (makeRelease)', () => {
     const { made } = release(main, { during: () => copies.push(copyToMain({ root: wt, version: '9.9.9', info: wtInfo }), copyToMain({ root: wt, version: '9.9.9', info: wtInfo, replace: true })) })
     for (const lines of copies) {
       expect(lines[0]).toMatch(/^Not copied to the main checkout: npm run release is building there \(pid \d+, since .+\)\.$/)
-      expect(lines[1]).toMatch(/Run npm run dist again once the release has ended/)
+      expect(lines[1]).toMatch(/Run npm run dist again once that build has ended/)
     }
     // The release's own installer and record, and its claim gone.
     expect(made.lines).toEqual([`Installer: ${exe(main)}`])
@@ -359,6 +377,69 @@ describe('a release build in dist (makeRelease)', () => {
     writeFileSync(claim, JSON.stringify({ pid: 2 ** 30, at: new Date().toISOString(), code: 'other' }))
     expect(release(root).made.lines).toEqual([`Installer: ${exe(root)}`])
     expect(existsSync(claim)).toBe(false)
+  })
+
+  it('npm run dist builds nothing in a dist a release is building in (HI-2417)', () => {
+    // As a release would leave it part way: its installer and record, and its claim, with its process alive.
+    const root = checkout({ code: 'new' })
+    live(root, RELEASE_CLAIM)
+    const { made, steps } = localDist(root)
+    expect(steps).toEqual([])
+    expect(made.lines).toBeUndefined()
+    expect(made.refused).toMatch(/^Not built: npm run release is building in .*dist \(pid \d+, since .+\)\. Run again once it has ended\.$/)
+    expect(readFileSync(exe(root), 'utf8')).toBe('installer from new')
+    expect(buildInfo(root).code).toBe('new')
+    expect(existsSync(join(root, 'dist', DIST_CLAIM))).toBe(false)
+    // Once the release has gone (its process too), it builds.
+    writeFileSync(join(root, 'dist', RELEASE_CLAIM), JSON.stringify({ pid: 2 ** 30, at: new Date().toISOString(), code: 'other' }))
+    expect(localDist(root).made.lines).toEqual([`Installer: ${exe(root)}`])
+    expect(buildInfo(root).code).toBe('local')
+  })
+
+  it('while npm run dist builds, a release, another npm run dist and a worktree’s copy there are refused; after, its claim is gone', () => {
+    const main = join(base, 'git-main-dist')
+    const wt = join(base, 'git-wt-dist')
+    const git = (cwd: string, ...a: string[]) => execFileSync('git', ['-c', 'user.name=t', '-c', 'user.email=t@t', ...a], { cwd, encoding: 'utf8' }).trim()
+    mkdirSync(main)
+    git(main, 'init', '-q', '-b', 'main')
+    writeFileSync(join(main, 'a.txt'), 'a\n')
+    git(main, 'add', '.')
+    git(main, 'commit', '-qm', 'one')
+    git(main, 'worktree', 'add', '-q', '-b', 'hive/agent', wt)
+    mkdirSync(join(wt, 'dist'))
+    for (const f of installerFiles('9.9.9').filter((x: string) => x !== 'build-info.json')) writeFileSync(join(wt, 'dist', f), `${f} from wt`)
+    const wtInfo = { ...ident('wt'), branch: 'hive/agent', builtAt: '2026-11-03T03:00:00Z' }
+    writeFileSync(join(wt, 'dist', 'build-info.json'), JSON.stringify(wtInfo))
+    const seen: { release?: ReturnType<typeof release>; again?: ReturnType<typeof localDist>; copy?: string[] } = {}
+    const { made } = localDist(main, {
+      during: () => {
+        if (seen.release) return
+        seen.release = release(main, { replace: true })
+        seen.again = localDist(main)
+        seen.copy = copyToMain({ root: wt, version: '9.9.9', info: wtInfo, replace: true })
+      }
+    })
+    expect(seen.release!.steps).toEqual([])
+    expect(seen.release!.made.refused).toMatch(/^Not built: npm run dist is building in .* \(pid \d+, since .+\)\. Run again once it has ended\.$/)
+    expect(seen.again!.steps).toEqual([])
+    expect(seen.again!.made.refused).toMatch(/^Not built: another npm run dist is building in /)
+    expect(seen.copy![0]).toMatch(/^Not copied to the main checkout: npm run dist is building there \(pid \d+, since .+\)\.$/)
+    expect(seen.copy![1]).toMatch(/Run npm run dist again once that build has ended/)
+    // Its own installer and record, and its claim gone: a release can start.
+    expect(made.lines).toEqual([`Installer: ${exe(main)}`])
+    expect(buildInfo(main).code).toBe('local')
+    expect(existsSync(join(main, 'dist', DIST_CLAIM))).toBe(false)
+    expect(release(main, { replace: true }).made.refused).toBeUndefined()
+  })
+
+  it('npm run dist gives up its claim when a step fails; one its ended build left behind holds nothing', () => {
+    const root = checkout()
+    const failing = () => makeDist({ root, identity: () => ident('local'), warn: () => {}, stampApp: () => {}, buildStamped: () => ({ stamped: true }), run: () => { throw new Error('packaging failed') } })
+    expect(failing).toThrow('packaging failed')
+    expect(existsSync(join(root, 'dist', DIST_CLAIM))).toBe(false)
+    writeFileSync(join(root, 'dist', DIST_CLAIM), JSON.stringify({ pid: 2 ** 30, at: new Date().toISOString(), code: 'other' }))
+    expect(release(root).made.refused).toBeUndefined()
+    expect(localDist(root, { code: 'new' }).made.refused).toBeUndefined()
   })
 
   it('a step that fails gives up the claim', () => {

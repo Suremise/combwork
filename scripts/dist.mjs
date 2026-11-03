@@ -41,7 +41,13 @@ const notices = () => (existsSync(noticesFile) ? readFileSync(noticesFile, 'utf8
 const noticesBefore = notices()
 // An earlier build's records go first, so a build that fails part way leaves nothing vouching for its installer and
 // dist/win-unpacked, and the e2e runner's packaged checks say so (tests/e2e/runner.mjs packagedStatus): makeDist.
-const lines = makeDist({ root, here: args.includes('--here'), replace: args.includes('--replace'), run, buildStamped })
+// It refuses, building nothing, while a release or another npm run dist builds in this checkout's dist (HI-2417).
+const made = makeDist({ root, here: args.includes('--here'), replace: args.includes('--replace'), run, buildStamped })
+if (made.refused) {
+  console.error(`\n${made.refused}`)
+  process.exit(1)
+}
+const { lines } = made
 if (notices() !== noticesBefore) lines.push('THIRD_PARTY_NOTICES.md changed: the build regenerated it for changed dependencies. Commit it (the unit tests fail until it is).')
 const recorded = await recordDist({ root, lines, kind })
 if (recorded) lines.push(recorded)
