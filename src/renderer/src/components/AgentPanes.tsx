@@ -37,7 +37,7 @@ import { offerTip } from '../tips'
 import { chooseFocus } from '../deferredFocus'
 import { onStripMenu, takeStripMenu, type StripMenu } from '../stripMenus'
 import { ModeBadge } from './PermissionMode'
-import { contextLines, projectProviderConfig, providerDescriptor, providerName, providerSettings } from '@shared/providers'
+import { contextLines, providerDescriptor, providerName } from '@shared/providers'
 import { safeguardText } from '@shared/safeguards'
 import { unpricedModel, unpricedText } from '@shared/prices'
 import { hooksMissingNote, hooksMissingText, retryWaitText, unknownStateText } from '@shared/runtime'
@@ -1551,8 +1551,6 @@ export function PaneFooter({
   const providers = useStore((s) => s.providers)
   const { usage, pending } = useLiveUsageState(project, a.id)
   const provider = agentProviderOf(a)
-  const pc = projectProviderConfig(project.config, provider)
-  const ps = providerSettings(settings, provider)
   const live = a.live
   // Who the connection it runs on is signed in as (HI-1756), for its hover.
   const connections = useConnections()
@@ -1561,7 +1559,7 @@ export function PaneFooter({
   // What runs (#248): the session's reported model while it runs (status line, else its transcript), else what the choice
   // resolves to; the choice itself in the tooltip when it reads differently (an alias).
   // A running session's from its own launch (HI-1996), never the settings as they are now; a new session's from them.
-  const chose = footerChoices(a, pc, ps, live)
+  const chose = footerChoices(a, live)
   const shown = agentModelShown(provider, chose.model, chose.modelGlobal, providers[provider], live ? live.modelId || usage?.model || null : null)
   // On a server connection (HI-1772): the server's real model, with the Claude names it stands in for, and no effort.
   const onServer = live?.launchedConnection?.server

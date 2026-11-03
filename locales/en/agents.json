@@ -953,7 +953,7 @@
   },
   "agents.model.inherited": {
     "defaultMessage": "{model} (default)",
-    "description": "An agent's model when the agent didn't choose it (it comes from the project or Settings): {model} is its name (\"Opus 5.5\")."
+    "description": "An agent's model when nothing chose it, so its coding agent (CLI) runs its own default: {model} is its name (\"Opus 5.5\"). A model chosen on the agent's connection is shown without this."
   },
   "agents.models.fallback": {
     "defaultMessage": "Fallback ({provider} couldn't be asked){edited, select, yes {, as you edited it} other {}}",

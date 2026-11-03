@@ -3,6 +3,9 @@
 ## Unreleased
 
 - **A signer that wants your passphrase pauses the merge queue as "Signing waits for you" with newer Git too.** Newer Git (Git for Windows 2.56, for one) prints the signer's message only after the signer has stopped, and the queue read that as "Signing failed" with the wrong advice. Now it reads it as the signer's, and a hook's words still never count (HI-2399).
+### Fixes
+
+- **An agent's footer no longer marks its connection's model *(default)*.** A model chosen on the agent's connection showed as, say, *GPT-6 Astra (default)* once the agent was running, as if its CLI had picked it. It now shows plainly before and after the agent starts; *(default)* means only that the CLI runs its own default (HI-2398).
 
 ## 1.0.0 — 2026-11-02
 
