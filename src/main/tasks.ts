@@ -1299,7 +1299,8 @@ export const DOING_NOBODY_NEW = msg({ id: 'tasks.error.doingNobodyNew', defaultM
 
 async function createTaskLocked(
   input: { title: string; description?: string; project?: string; agent?: string | null; column?: TaskColumn; labels?: string[]; blocked?: string | null; blockedBy?: number[]; links?: number[]; context?: string[]; kind?: CardKind; skipReview?: string },
-  actor: TaskActor
+  actor: TaskActor,
+  opts: { commit?: () => void } = {}
 ): Promise<TaskCard> {
   if (!workspace.path) throw hiveError(ERR.noWorkspace, undefined, { kind: 'conflict' })
   const title = text(input.title, MAX_TITLE, 'title').trim()
@@ -1361,6 +1362,9 @@ async function createTaskLocked(
     updatedAt: now
   }
   const store = kind === 'no-code' ? FactStore.forBoard(ws, { project: card.project, key: '' }) : null
+  // The last thing before the write, after every await above (HI-2415): a caller whose authority can change meanwhile
+  // (the Assistant's control and session, assistantChange's guard) checks it here, so a revoked one makes no card.
+  opts.commit?.()
   await saveCard(ws, n, card, null, store && !proposes ? () => store.updateCard(n, { kind }) : undefined)
   if (store && proposes) store.tx((tx) => tx.append(n, { kind: 'KindProposed', actor: actorOf(actor), source: 'recorded', data: { kind } }))
   if (skipReason !== null) {
@@ -2694,7 +2698,8 @@ function addComment(c: TaskCard, by: string, t: string, hiveText?: StoredText, i
   c.updatedAt = at
 }
 
-export async function commentTask(n: number, comment: string, actor: TaskActor): Promise<TaskCard> {
+/** Comments on a card. `commit`: a revocable caller's last check before the write (HI-2415, as updateTask's). */
+export async function commentTask(n: number, comment: string, actor: TaskActor, opts: { commit?: () => void } = {}): Promise<TaskCard> {
   const ws = workspace
   const t = commentText(comment)
   return recordingAs(actor, () => boardLock(ws, async () => {
@@ -2702,6 +2707,7 @@ export async function commentTask(n: number, comment: string, actor: TaskActor):
     if (!inScope(c, scopeOf(actor))) throw unknownTask(n)
     if (c.archived && actor.kind !== 'user') throw new TaskPermissionError(withValues(ERR.archived, { card: cardRef(n) }))
     addComment(c, actorName(actor), t)
+    opts.commit?.()
     await saveCard(ws, n, c)
     changed(ws)
     return c
@@ -2739,9 +2745,10 @@ export interface ChangeAttachments {
  * A card's change (`run`: a new card, a change, a comment) with files attached in the same change of the board (HI-1700,
  * s11 §4): published after it, the draft links in the text it made (the new comment's, else the description's) given the
  * stored ids and a link added for each file the text doesn't name; all of it saved, or none (the files go again). The
- * staging is removed whatever happens. Without files, just `run`.
+ * staging is removed whatever happens. Without files, just `run`. `commit`: a revocable caller's check (HI-2415), made
+ * again before the files' own write, after their publish's awaits (`run` makes its own).
  */
-export async function changeWithAttachments(actor: TaskActor, files: ChangeAttachments | null, where: 'comment' | 'description', run: () => Promise<TaskCard>): Promise<TaskCard & { attached?: { name: string; path: string; added: boolean }[] }> {
+export async function changeWithAttachments(actor: TaskActor, files: ChangeAttachments | null, where: 'comment' | 'description', run: () => Promise<TaskCard>, commit?: () => void): Promise<TaskCard & { attached?: { name: string; path: string; added: boolean }[] }> {
   if (!files) return run()
   const ws = workspace
   try {
@@ -2770,6 +2777,7 @@ export async function changeWithAttachments(actor: TaskActor, files: ChangeAttac
       const fresh = pub.attachments.filter((_a, i) => pub.added[i]).map((a) => a.id)
       if (comment?.id) linkToComment(ws, n, fresh.filter((id) => inComment.has(id)), comment.id)
       linkToComment(ws, n, fresh.filter((id) => !inComment.has(id)), 'description')
+      commit?.()
       await saveCard(ws, n, card, before)
       changed(ws)
       return { ...card, attached: pub.attachments.map((a, i) => ({ name: a.name, path: a.path, added: pub.added[i] })) }

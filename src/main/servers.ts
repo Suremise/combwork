@@ -3022,7 +3022,8 @@ route('POST', '/v1/tasks', async ({ body }) => {
   // Files to keep with it (HI-1700): the list checked now; copied inside the operation that makes the card, once its
   // project is known to be allowed, and published with it.
   const paths = attachmentList(body)
-  const create = () => withAttachments(paths, typeof input.project === 'string' && input.project ? input.project : callerScope(), (files) => tasks.changeWithAttachments(actor, files, 'description', () => tasks.createTask(input, actor)))
+  // `commit`: the Assistant's guard (HI-2415), checked again just before each write, after the awaits a queued change waits on.
+  const create = (commit?: () => void) => withAttachments(paths, typeof input.project === 'string' && input.project ? input.project : callerScope(), (files) => tasks.changeWithAttachments(actor, files, 'description', () => tasks.createTask(input, actor, { commit }), commit))
   // A long title is kept, with a line suggesting a shorter one (HI-1872), or one with what belongs in the description (HI-2061).
   const nudge = titleNudge(title, actor, titleKeys())
   const reply = async (c: TaskCard) => ({ ...(shortReply(body) ? await taskChange(c, attachedLines(c)) : await taskView(c)), ...(nudge ? { nudge } : {}) })
@@ -3033,8 +3034,8 @@ route('POST', '/v1/tasks', async ({ body }) => {
   // Made in Doing with nobody on it (HI-2062): refused before the user is asked to approve it (checked again as it is made).
   if (project && input.column === 'doing' && !input.agent) throw new tasks.TaskConflictError(tasks.DOING_NOBODY_NEW)
   const given = await knownAgent(project, input.agent)
-  return placing(await assistantChange('agents', `add the task "${clip(title, 60)}" to the board`, { kind: 'create-task', ...(project ? { project } : {}), ...(given ? { agent: given } : {}) }, async () => {
-    const c = await create()
+  return placing(await assistantChange('agents', `add the task "${clip(title, 60)}" to the board`, { kind: 'create-task', ...(project ? { project } : {}), ...(given ? { agent: given } : {}) }, async (guard) => {
+    const c = await create(guard)
     return { done: `Added ${cardName(c)} to the board${c.project ? ` (${c.project})` : ''}: ${clip(c.title, 80)}`, act: { card: c.number, column: c.column, ...(c.project ? { project: c.project } : {}), agent: await cardAgent(c) }, result: await reply(c) }
   }))
 })
@@ -3073,7 +3074,7 @@ route('PATCH', '/v1/tasks/:n', async ({ params, body }) => {
       changes.push(skipReview !== false ? 'Skips review' : 'Reviewed')
     }
     // A change and its comment are saved together: a card watch woken by the change names this comment.
-    const c = Object.keys(patch).length ? await tasks.updateTask(n, patch, actor, { said: changes, comment: comment || undefined, commit }) : comment ? await tasks.commentTask(n, comment, actor) : await tasks.readTask(n, actor)
+    const c = Object.keys(patch).length ? await tasks.updateTask(n, patch, actor, { said: changes, comment: comment || undefined, commit }) : comment ? await tasks.commentTask(n, comment, actor, { commit }) : await tasks.readTask(n, actor)
     if (comment) changes.push('Commented')
     return c
   }
@@ -3084,7 +3085,7 @@ route('PATCH', '/v1/tasks/:n', async ({ params, body }) => {
   const once = (commit?: () => void): Promise<TaskCard> => (kind !== undefined || confirmKind !== undefined || skipReview !== undefined ? tasks.cardBatch(workspace, () => write(commit)) : write(commit))
   const apply = async (commit?: () => void): Promise<TaskCard> => {
     // Its files copied here, inside the operation (the Assistant's: once admitted), to the card's own project.
-    const c = await withAttachments(paths, paths ? ((await tasks.readTask(n, actor)).project ?? null) : null, (files) => tasks.changeWithAttachments(actor, files, comment ? 'comment' : 'description', () => once(commit)))
+    const c = await withAttachments(paths, paths ? ((await tasks.readTask(n, actor)).project ?? null) : null, (files) => tasks.changeWithAttachments(actor, files, comment ? 'comment' : 'description', () => once(commit), commit))
     changes.push(...attachedLines(c))
     return c
   }
@@ -3283,10 +3284,11 @@ route('POST', '/v1/tasks/:n/comments', async ({ params, body }) => {
   const text = typeof body?.text === 'string' ? body.text : ''
   const actor = await taskActor()
   const paths = attachmentList(body)
-  const comment = async () => withAttachments(paths, paths ? ((await tasks.readTask(n, actor)).project ?? null) : null, (files) => tasks.changeWithAttachments(actor, files, 'comment', () => tasks.commentTask(n, text, actor)))
+  // `commit`: the Assistant's guard (HI-2415), checked again just before each write.
+  const comment = async (commit?: () => void) => withAttachments(paths, paths ? ((await tasks.readTask(n, actor)).project ?? null) : null, (files) => tasks.changeWithAttachments(actor, files, 'comment', () => tasks.commentTask(n, text, actor, { commit }), commit))
   const reply = async (c: TaskCard) => (shortReply(body) ? taskChange(c, ['Commented', ...attachedLines(c)]) : taskView(c))
   if (actor.kind !== 'assistant') return reply(await comment())
-  return assistantChange('agents', `comment on ${cardRef(n)}`, { kind: 'comment-task', card: n }, async () => ({ done: `Commented on ${cardRef(n)}`, result: await reply(await comment()) }))
+  return assistantChange('agents', `comment on ${cardRef(n)}`, { kind: 'comment-task', card: n }, async (guard) => ({ done: `Commented on ${cardRef(n)}`, result: await reply(await comment(guard)) }))
 })
 
 /** Bounded waits running now, per caller (an agent, the Assistant, a script): at most WAITS_PER_CALLER at a time. */
