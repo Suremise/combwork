@@ -1,5 +1,11 @@
 # Release Notes
 
+## Unreleased
+
+### Fixes
+
+- **A background task's end is no longer reported as your reply.** When a Claude Code agent's background task ended soon after you pressed Enter in its pane (answering a permission question, say), Hive could tell the Hive Assistant that you had replied to the agent with the task's notification. Only what you send counts as your reply now (HI-2410).
+
 ## 1.0.0 — 2026-11-03
 
 **Hive 1.0 runs your board by your project's rules.** Choose how a card goes from Todo to Done (who reviews it, which checks pass first, who merges it, where it is built) with the Solo, Pair or Team presets; agents tell Hive what they did, and Hive moves the card, asks you only what's yours to answer, and can merge approved work itself, each card in its own slot. Agents run on connections Hive keeps (several sign-ins side by side), one notification system tells each thing once, and the Activity view shows what every agent is doing now.

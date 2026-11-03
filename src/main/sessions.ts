@@ -6581,7 +6581,8 @@ class SessionManager {
         case 'prompted':
           l.prompts = (l.prompts ?? 0) + 1
           if (workspace.isAssistantHome(st.projectPath)) this.onAssistantPrompt(st.projectPath)
-          if (ev?.kind === 'prompt') this.noteUserReply(l, ev.text)
+          // A turn its CLI started by itself (HI-2410) is never the user's reply, whatever Enter they pressed before it.
+          if (ev?.kind === 'prompt' && !ev.cli) this.noteUserReply(l, ev.text)
           if (l.state.untakenLine) this.clearUntaken(l, 'its CLI took a prompt') // i18n-ignore: for the log
           break
         case 'compactBegan':

@@ -149,6 +149,8 @@
   "settings.advanced.claude-code.override.statusLine.title": "Hive's status line in place of yours",
   "settings.advanced.claude-code.prompt.clearKeySeconds.desc": "Claude Code's Ctrl+U deletes one row of a draft that wraps onto several, so before Hive types into it, it presses Ctrl+U a key at a time until the input box (Screen: input box) shows empty. This is how long Hive waits for Claude Code to show each key's effect. Not shown in time, Hive types nothing and tries again later: too short, and a busy Claude Code makes Hive put its messages off more often.",
   "settings.advanced.claude-code.prompt.clearKeySeconds.title": "Clearing the input: wait for each key",
+  "settings.advanced.claude-code.prompt.cliTurn.desc": "What a prompt hook's text starts with when Claude Code starts a turn by itself, such as when a background task ends. Hive never reports such a turn to the Hive Assistant as your reply. Wrong, a background task's end soon after you pressed Enter in the agent's pane can be reported as your reply.",
+  "settings.advanced.claude-code.prompt.cliTurn.title": "Prompt hook: Claude Code's own turn",
   "settings.advanced.claude-code.retry.attemptField.desc": "The field of that entry with which try it is (1, 2…). Wrong, a waiting agent just shows Working.",
   "settings.advanced.claude-code.retry.attemptField.title": "Transcript: retry entry's try field",
   "settings.advanced.claude-code.retry.checkAfterSeconds.desc": "How long a working Claude Code session has to go without a hook before Hive looks at the end of its transcript for a wait to retry its model request, then every 15 seconds while it stays quiet.",

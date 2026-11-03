@@ -143,6 +143,8 @@
   "settings.advanced.claude-code.override.statusLine.title": "自分のステータスラインの代わりにHiveのものを使う",
   "settings.advanced.claude-code.prompt.clearKeySeconds.desc": "Claude CodeのCtrl+Uは、複数行に折り返した下書きの1行しか消しません。そのためHiveは入力する前に、入力欄（画面：入力欄）が空と表示されるまでCtrl+Uを1回ずつ押します。これは、Claude Codeが各キーの結果を表示するまでHiveが待つ時間です。時間内に表示されなければ、Hiveは何も入力せず、後でやり直します。短すぎると、Claude Codeが忙しいときにHiveがメッセージを後回しにする回数が増えます。",
   "settings.advanced.claude-code.prompt.clearKeySeconds.title": "入力の消去：キーごとの待ち時間",
+  "settings.advanced.claude-code.prompt.cliTurn.desc": "Claude Codeが自分でターンを始めたとき（バックグラウンドタスクが終わったときなど）に、プロンプトフックのテキストが何で始まるかです。Hiveはそのようなターンを、あなたの返信としてHive Assistantに伝えることはありません。間違っていると、エージェントのペインでEnterキーを押した直後にバックグラウンドタスクが終わったとき、それがあなたの返信として伝えられることがあります。",
+  "settings.advanced.claude-code.prompt.cliTurn.title": "プロンプトフック：Claude Code自身のターン",
   "settings.advanced.claude-code.retry.attemptField.desc": "そのエントリの、何回目の試行か（1、2…）を示すフィールド。間違っていると、待機中のエージェントは「作業中」とだけ表示されます。",
   "settings.advanced.claude-code.retry.attemptField.title": "トランスクリプト：エントリの試行のフィールド",
   "settings.advanced.claude-code.retry.checkAfterSeconds.desc": "作業中のClaude Codeセッションがフックなしでどれだけ経過したら、Hiveがトランスクリプトの末尾でモデルへのリクエストの再試行待ちを探すか。その後は静かな間15秒ごとに確認します。",

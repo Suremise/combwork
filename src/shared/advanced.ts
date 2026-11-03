@@ -1779,6 +1779,17 @@ const SOURCES: readonly AdvancedSource[] = [
     applies: 'now',
     samples: [{ from: `${FIX}/screen-claude-2.1.296-idle.txt`, version: '2.1.296', text: '✻ Worked for 0s · done 2:19' }] // i18n-ignore: a CLI's recorded text (#367)
   },
+  // A turn Claude Code starts by itself (HI-2410): its prompt hook is like the user's but for the text.
+  {
+    id: 'claude-code.prompt.cliTurn',
+    group: 'claude-code',
+    title: msg({ id: 'settings.advanced.claude-code.prompt.cliTurn.title', defaultMessage: "Prompt hook: Claude Code's own turn", description: "An advanced setting's title (Settings → Advanced), listed under its CLI or Hive." }),
+    desc: msg({ id: 'settings.advanced.claude-code.prompt.cliTurn.desc', defaultMessage: "What a prompt hook's text starts with when Claude Code starts a turn by itself, such as when a background task ends. Hive never reports such a turn to the Hive Assistant as your reply. Wrong, a background task's end soon after you pressed Enter in the agent's pane can be reported as your reply.", description: 'What the advanced setting "Prompt hook: Claude Code\'s own turn" is for, and what goes wrong when it is wrong (Settings → Advanced).' }),
+    kind: 'pattern',
+    default: String.raw`^\s*<task-notification>`,
+    applies: 'now',
+    samples: [{ from: `${FIX}/advanced/prompt-task-notification-claude-2.1.317.json`, version: '2.1.317', text: '<task-notification>\n<task-id>bfrybgkuv</task-id>' }] // i18n-ignore: a CLI's recorded text (#367)
+  },
   {
     id: 'claude-code.safeguard.note',
     group: 'claude-code',

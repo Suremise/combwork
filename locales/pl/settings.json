@@ -143,6 +143,8 @@
   "settings.advanced.claude-code.override.statusLine.title": "Pasek stanu Hive zamiast Twojego",
   "settings.advanced.claude-code.prompt.clearKeySeconds.desc": "Ctrl+U w Claude Code usuwa tylko jeden wiersz szkicu zawiniętego na kilka wierszy, więc zanim Hive coś tam wpisze, naciska Ctrl+U po jednym razie, aż pole wpisywania (Ekran: pole wpisywania) będzie puste. To czas, przez jaki Hive czeka, aż Claude Code pokaże efekt każdego klawisza. Jeśli nie pokaże go na czas, Hive nic nie wpisuje i próbuje ponownie później: przy zbyt krótkim czasie Hive częściej odkłada wiadomości, gdy Claude Code jest zajęty.",
   "settings.advanced.claude-code.prompt.clearKeySeconds.title": "Czyszczenie pola wpisywania: czekaj na każdy klawisz",
+  "settings.advanced.claude-code.prompt.cliTurn.desc": "Od czego zaczyna się tekst hooka promptu, gdy Claude Code sam rozpoczyna turę, na przykład po zakończeniu zadania w tle. Hive nigdy nie zgłasza takiej tury Hive Assistant jako Twojej odpowiedzi. Błędne: koniec zadania w tle tuż po naciśnięciu przez Ciebie Enter w panelu agenta może zostać zgłoszony jako Twoja odpowiedź.",
+  "settings.advanced.claude-code.prompt.cliTurn.title": "Hook promptu: własna tura Claude Code",
   "settings.advanced.claude-code.retry.attemptField.desc": "Pole tego wpisu z numerem próby (1, 2…). Błędne: czekający agent pokazuje tylko „Pracuje”.",
   "settings.advanced.claude-code.retry.attemptField.title": "Transkrypcja: pole próby we wpisie",
   "settings.advanced.claude-code.retry.checkAfterSeconds.desc": "Jak długo pracująca sesja Claude Code musi pozostać bez hooka, zanim Hive poszuka na końcu jej transkrypcji oczekiwania na ponowienie zapytania do modelu; potem co 15 sekund, dopóki pozostaje cicha.",
