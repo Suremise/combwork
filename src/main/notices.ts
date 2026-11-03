@@ -1,4 +1,4 @@
-import { englishText } from '../shared/advanced'
+import { englishText, type Text } from '../shared/advanced'
 import { msg, tr } from '../shared/i18n'
 import { asksYou } from '../shared/inbox'
 import { emit, onHiveEvent } from './events'
@@ -8,9 +8,9 @@ const CLOSED = msg({ id: 'main.quit.closed', defaultMessage: 'Hive has closed', 
 const CLOSED_BODY = msg({ id: 'main.quit.closedBody', defaultMessage: '{n, plural, one {# session was stopped. Resume it from Hive next time; nothing was lost.} other {# sessions were stopped. Resume them from Hive next time; nothing was lost.}}', description: 'The notice after Hive quit: how many sessions it stopped.' })
 
 /** The notice after Hive quit without asking: in the language shown, its title in English for the Agent API too. */
-export function closedNotice(stopped: number): { title: string; body: string; apiTitle: string } {
-  // agent-later: HI-2465 says the events stream's titles in each caller's dialect
-  return { title: tr(CLOSED), body: tr(CLOSED_BODY, { n: stopped }), apiTitle: englishText(CLOSED) }
+export function closedNotice(stopped: number): { title: string; body: string; apiTitle: string; apiTitleText: Text } {
+  // agent-stored: agentField says the events stream's title again in each caller's dialect, from apiTitleText (apiEvents.ts, HI-2465)
+  return { title: tr(CLOSED), body: tr(CLOSED_BODY, { n: stopped }), apiTitle: englishText(CLOSED), apiTitleText: CLOSED }
 }
 
 const ANSWERED = msg({ id: 'main.notify.answered', defaultMessage: 'Answered', description: "What a notification that an agent waited for you (or asked you something) says once it no longer does (HI-2320): answered, or it moved on. Shown under its title, in the pop-up and the bell's list. Keep it short." })

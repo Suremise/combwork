@@ -706,8 +706,8 @@ async function quitNow(tellUser: boolean): Promise<void> {
   // Quitting without a dialog (or after waiting): say where the sessions went, as a Windows notification when no Hive
   // window is focused (HI-2320: its windows are closing, so never a pop-up; nothing while you are looking at Hive).
   if (tellUser && stopped > 0) {
-    const { title, body, apiTitle } = closedNotice(stopped)
-    tell({ kind: 'quit', title, message: body, apiTitle, onWindowsClick: () => undefined })
+    const { title, body, apiTitle, apiTitleText } = closedNotice(stopped)
+    tell({ kind: 'quit', title, message: body, apiTitle, apiTitleText, onWindowsClick: () => undefined })
   }
   // The slots' passes (#1628): none starts as the sessions stop (no builder placed), and one running ends before the
   // boards close (will-quit); what it didn't get to is the next start's.

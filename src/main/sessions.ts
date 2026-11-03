@@ -95,7 +95,7 @@ import type { DeliveryHooks, NewDelivery } from './deliveries'
 import { readyFor } from './readiness'
 import { HAND_OVER_TEXT, handOverNow } from '../shared/handOver'
 import { NOTICE_PREFIX } from '../shared/doorbell'
-import { FinishBatcher, finishedApiTitle, finishedNotice } from '../shared/bursts'
+import { FinishBatcher, finishedApiTitle, finishedApiTitleText, finishedNotice } from '../shared/bursts'
 import { notifyRoute, type NotifyRoute } from '../shared/notify'
 import { askOffer, focusedHive, notifyPending, offerOpen, resolveOffer, resolveOffers, tell } from './notify'
 import { OUTCOME } from './outcomes'
@@ -6952,7 +6952,7 @@ class SessionManager {
    */
   private notify(projectPath: string, titleText: Text, bodyText: TextPart, kind: 'finished' | 'waiting' | 'notice', agentName?: string, agentId?: string, action?: { label: Text; command: string; args?: unknown[] }): void {
     const title = shownText(titleText)
-    // agent-later: HI-2465 says the events stream's titles in each caller's dialect
+    // agent-stored: agentField says the events stream's title again in each caller's dialect, from apiTitleText (apiEvents.ts, HI-2465)
     const apiTitle = englishText(titleText)
     const body = shownText(bodyText)
     if (kind !== 'notice') {
@@ -6977,10 +6977,10 @@ class SessionManager {
       }
       const assistant = workspace.isAssistantHome(projectPath)
       // i18n-ignore: a fallback name, never seen (every agent that finishes has its name)
-      this.finishes.add({ projectPath, project: assistant ? ASSISTANT_NAME : basename(projectPath), agent: assistant ? ASSISTANT_NAME : (agentName ?? 'Agent'), ...(agentId ? { agentId } : {}), title, apiTitle, body }) // agent-protocol: a fallback name, never seen
+      this.finishes.add({ projectPath, project: assistant ? ASSISTANT_NAME : basename(projectPath), agent: assistant ? ASSISTANT_NAME : (agentName ?? 'Agent'), ...(agentId ? { agentId } : {}), title, apiTitle, apiTitleText: titleText, body }) // agent-protocol: a fallback name, never seen
       return
     }
-    this.deliver(projectPath, title, body, notifyKind, agentId, agentName, apiTitle, action && { label: shownText(action.label), command: action.command, ...(action.args ? { args: action.args } : {}) })
+    this.deliver(projectPath, title, body, notifyKind, agentId, agentName, apiTitle, action && { label: shownText(action.label), command: action.command, ...(action.args ? { args: action.args } : {}) }, { apiTitleText: titleText })
   }
 
   /**
@@ -6991,8 +6991,8 @@ class SessionManager {
    */
   notice(projectPath: string, title: Text, body: TextPart, action?: { label: Text; command: string; args?: unknown[] }, extra?: { kind?: 'needsYou' | 'work'; offer?: string; target?: ToastTarget }): void {
     if (!extra?.kind && !extra?.offer && !extra?.target) return this.notify(projectPath, title, body, 'notice', undefined, undefined, action)
-    // agent-later: HI-2465 says the events stream's titles in each caller's dialect
-    this.deliver(projectPath, shownText(title), shownText(body), extra.kind ?? 'work', undefined, undefined, englishText(title), action && { label: shownText(action.label), command: action.command, ...(action.args ? { args: action.args } : {}) }, extra)
+    // agent-stored: agentField says the events stream's title again in each caller's dialect, from apiTitleText (apiEvents.ts, HI-2465)
+    this.deliver(projectPath, shownText(title), shownText(body), extra.kind ?? 'work', undefined, undefined, englishText(title), action && { label: shownText(action.label), command: action.command, ...(action.args ? { args: action.args } : {}) }, { ...extra, apiTitleText: title })
   }
 
   /** Where a notice about this project goes now: the settings, and the Hive window the user is using (notifyRoute), with why for the log. */
@@ -7005,7 +7005,7 @@ class SessionManager {
    * longer asking resolves it; its link is the agent's pane, or the project. `apiTitle`: its title in English, when
    * `title` is translated.
    */
-  private deliver(projectPath: string, title: string, body: string, kind: NotifyKind, agentId?: string, agentName?: string, apiTitle?: string, action?: ToastAction, extra?: { offer?: string; target?: ToastTarget }): void {
+  private deliver(projectPath: string, title: string, body: string, kind: NotifyKind, agentId?: string, agentName?: string, apiTitle?: string, action?: ToastAction, extra?: { offer?: string; target?: ToastTarget; apiTitleText?: TextPart }): void {
     const assistant = workspace.isAssistantHome(projectPath)
     const target: ToastTarget | undefined = extra?.target ?? (agentId ? { kind: 'agent', projectPath, agentId, name: assistant ? ASSISTANT_NAME : (agentName ?? this.agentName(projectPath, agentId)), project: assistant ? ASSISTANT_NAME : basename(projectPath) } : undefined)
     const offer = extra?.offer ?? (kind === 'needsYou' && agentId ? askOffer(projectPath, agentId) : undefined)
@@ -7014,6 +7014,7 @@ class SessionManager {
       title,
       message: body,
       apiTitle,
+      ...(extra?.apiTitleText !== undefined ? { apiTitleText: extra.apiTitleText } : {}),
       projectPath,
       ...(agentId ? { agentId } : {}),
       ...(target ? { target } : {}),
@@ -7077,7 +7078,8 @@ class SessionManager {
         if (!group.length) continue
         const { title, body } = finishedNotice(group)
         const one = group.length === 1 ? group[0] : null
-        this.deliver(group[0].projectPath, title, body, 'finished', one?.agentId, one?.agent, finishedApiTitle(group))
+        const apiTitleText = finishedApiTitleText(group)
+        this.deliver(group[0].projectPath, title, body, 'finished', one?.agentId, one?.agent, finishedApiTitle(group), undefined, apiTitleText !== undefined ? { apiTitleText } : undefined)
       }
     },
     Date.now,
