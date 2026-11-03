@@ -6,7 +6,8 @@
 // effort, mode and context200k refused naming the connections to use (decision D), an unrelated change keeping it and
 // null giving its CLI's first usable one; a card started on a new agent takes connection the same way, provider refused
 // (HI-2121); hive_connection makes and changes a connection only with Change settings on;
-// the status shows the chosen connection and the account it runs on. The fake Claude Code signs in, no browser.
+// the status shows the chosen connection and the account it runs on, with the connection on it the run launched with
+// (HI-2406: two on one account told apart). The fake Claude Code signs in, no browser.
 const lib = require('./lib.cjs')
 const fs = require('fs')
 const path = require('path')
@@ -182,6 +183,25 @@ const lines = (f) => (fs.existsSync(f) ? fs.readFileSync(f, 'utf8').trim().split
     const byAgent = await api('POST', '/v1/connections', { account: 'Max 1', name: 'Sneaky' }, agentToken)
     check('a project agent may not make connections (403)', byAgent.status === 403, JSON.stringify(byAgent))
     await inv('settings:update', { assistant: { changeSettings: false } })
+
+    // --- HI-2406: two runs on one account (Max 1), each on its own connection: the status names the connection each
+    // launched with, beside the account, for the workspace and for a project agent (both usable here).
+    const sonnet = await inv('connection:add', max1.id, { name: 'Max 1 · Sonnet', model: 'sonnet' })
+    const viaid = (await api('GET', '/v1/projects/alpha')).body.agents.find((a) => a.name === 'Viaid')
+    await api('PATCH', `/v1/projects/alpha/agents/${viaid.id}`, { connection: sonnet.id })
+    await inv('session:start', alpha, { agentId: viaid.id })
+    const runs = async (token) => {
+      const agents = (await api('GET', '/v1/projects/alpha', null, token)).body?.agents ?? []
+      return Object.fromEntries(['a-one', viaid.id].map((id) => [id, agents.find((a) => a.id === id)?.launchedConnection ?? null]))
+    }
+    const both = await lib.until(async () => {
+      const r = await runs()
+      return r[viaid.id]?.connection ? r : null
+    }, HUNG_MS)
+    const named = (r) => !!r && r['a-one']?.id === max1.id && r['a-one']?.name === 'Max 1' && r['a-one']?.connection?.id === c1 && r['a-one']?.connection?.name === 'Max 1' && r[viaid.id]?.id === max1.id && r[viaid.id]?.connection?.id === sonnet.id && r[viaid.id]?.connection?.name === 'Max 1 · Sonnet'
+    check('the status: One and Viaid both run on Max 1, each naming the connection it launched with (HI-2406)', named(both), JSON.stringify(both))
+    const asAgent = await runs(agentToken)
+    check('…and so for a project agent: both are usable in its workspace', named(asAgent), JSON.stringify(asAgent))
 
     // Every session the suite started, Bystart's too.
     const left = await stopAll()

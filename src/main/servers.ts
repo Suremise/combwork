@@ -1198,16 +1198,22 @@ function connectionArg(body: any, projectPath: string): { connection: string | n
 /**
  * An agent row's connection fields (HI-2108): `connection`, the one chosen as saved (its id, its name, and `problem`
  * when it can't be used here: removed, or its account off here, so it runs on its CLI's first usable one), or null for
- * none; `launchedConnection`, the account its run is on; `switchPending`. A project agent is never told the name of one
+ * none; `launchedConnection`, the account its run is on, with the connection on it the run launched with (HI-2406:
+ * `connection`, its id, and its name, now or as then); `switchPending`. A project agent is never told the name of one
  * that can't be used in its workspace.
  */
 function agentConnectionFields(p: string, a: AgentInfo, cli: ProviderId): Record<string, unknown> {
   const c = getConnection(a.connection)
   const problem = a.connection ? (c ? connectionProblem(c.account, cli, p) : 'missing') : null
   const shown = !!c && (!problem || !agentCaller())
+  const lc = a.live?.launchedConnection
+  // The connection the run launched with (HI-2397): its name as now, or as then once removed, never one not usable here to an agent.
+  const ran = lc?.connection
+  const ranNow = ran ? getConnection(ran.id) : undefined
+  const ranNamed = !agentCaller() || (!!ranNow && !connectionProblem(ranNow.account, cli, p))
   return {
     connection: a.connection ? { id: a.connection, name: shown ? c!.name : null, ...(problem ? { problem } : {}) } : null,
-    launchedConnection: a.live?.launchedConnection ? { id: a.live.launchedConnection.id, name: a.live.launchedConnection.name, ...(a.live.launchedConnection.note ? { note: a.live.launchedConnection.note } : {}) } : null,
+    launchedConnection: lc ? { id: lc.id, name: lc.name, ...(ran ? { connection: { id: ran.id, name: ranNamed ? (ranNow?.name ?? ran.name) : null } } : {}), ...(lc.note ? { note: lc.note } : {}) } : null,
     ...(a.live?.switchPending ? { switchPending: true } : {})
   }
 }
