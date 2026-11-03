@@ -38,7 +38,7 @@ import { cardRequests, commentsParam, laneOrderNote, modelInUse, newestComments,
 import * as assistant from './assistantControl'
 import { STOP_ASK_MS } from './mcp/agentApiCall'
 import { SettingRefused, applySetting, checkedValue, entryOf, projectOf, restartText, settingDetail, settingRows } from './settingsTools'
-import { settingChangeTexts, settingPath, type SettingEntry, type SettingScope } from '../shared/settingsCatalog'
+import { agentTitle, settingChangeTexts, settingPath, settingReadOnly, type SettingEntry, type SettingScope } from '../shared/settingsCatalog'
 import { addAgent, updateAgent } from './projectAgents'
 import { DOC_MAX, SHARED_PREFIX, readDoc } from './docSections'
 import { docOutline, findHeading, sectionText, type DocHeading } from '../shared/docSections'
@@ -1045,13 +1045,15 @@ route('PATCH', '/v1/settings/:id', ({ params, body }) =>
  * and listed in its panel with old → new for Revert. Other callers can't.
  */
 async function settingsChange(e: SettingEntry, value: unknown, projectPath: string | null) {
+  // Where it is, as the caller reads it; and as records keep it, in the Default (dialects, HI-2441).
   const path = settingPath(e)
+  const storedPath = inDefaultDialect(() => settingPath(e))
   // Where: a project's setting names its project (` in webapp`).
   const where = projectPath ? { where: 'project', project: basename(projectPath) } : { where: 'none', project: '' }
   const ws = assistantCaller()
   if (!ws) throw new HttpError(403, say(API.settings.onlyAssistant, { path }))
   // Recorded lines are said in the Default (stored); refusals in the caller's scope.
-  const line = sayStored([API.settings.line, { path, ...where }])
+  const line = sayStored([API.settings.line, { path: storedPath, ...where }])
   // Which setting, never its value (#763).
   const act: ActivityTarget = { kind: 'setting', settingId: e.id, ...(projectPath ? { project: basename(projectPath) } : {}) }
   if (config.settings.assistant?.changeSettings !== true) {
@@ -1060,7 +1062,7 @@ async function settingsChange(e: SettingEntry, value: unknown, projectPath: stri
   }
   if (e.sensitive) {
     assistant.record(ws, act, line, sayStored([API.settings.userOnly]), { reason: sayStored([API.settings.userOnlyReason]) })
-    throw new HttpError(403, say(API.settings.readOnly, { readOnly: e.readOnly ?? '' }))
+    throw new HttpError(403, say(API.settings.readOnly, { readOnly: settingReadOnly(e) ?? '' }))
   }
   // Checked before the change: a value it can't take is the Assistant's to fix.
   await settingsCall(() => checkedValue(e, value, projectPath))
@@ -1077,16 +1079,17 @@ async function settingsChange(e: SettingEntry, value: unknown, projectPath: stri
     const r = await applySetting(e, value, projectPath, stillAllowed)
     // What changed, as the list and the reply show it: a table's changed entries, not its size.
     const { oldText, newText } = settingChangeTexts(e, r.old, r.new, r.removed)
+    const stored = inDefaultDialect(() => settingChangeTexts(e, r.old, r.new, r.removed))
     const changed = JSON.stringify(r.old) !== JSON.stringify(r.new) || !!r.removed
     if (changed) {
       // The event stream says which setting, not its values (`brief`).
-      assistant.record(ws, act, sayStored([API.settings.changedLine, { path, ...where, old: oldText, new: newText }]), undefined, { brief: sayStored([API.settings.changedBrief, { path, ...where }]), setting: { id: e.id, ...(projectPath ? { project: projectPath } : {}), path, old: r.old, new: r.new, ...(r.removed ? { removed: r.removed } : {}), oldText, newText } })
+      assistant.record(ws, act, sayStored([API.settings.changedLine, { path: storedPath, ...where, old: stored.oldText, new: stored.newText }]), undefined, { brief: sayStored([API.settings.changedBrief, { path: storedPath, ...where }]), setting: { id: e.id, ...(projectPath ? { project: projectPath } : {}), path: storedPath, old: r.old, new: r.new, ...(r.removed ? { removed: r.removed } : {}), oldText: stored.oldText, newText: stored.newText } })
       // For undo (#1282): its value (and a provider's removed models) as it was and as set.
       const fields = [{ field: 'value', old: r.old, new: r.new }, ...(r.removed ? [{ field: 'removed', old: r.removed.old, new: r.removed.new }] : [])]
-      await recordingChanges(ws, 'setting', sayStored([API.change.setting, { path, ...where }]), () => noteChange(requireWorkspace(), { kind: 'setting', project: projectPath ? basename(projectPath) : null, target: e.id, fields }))
+      await recordingChanges(ws, 'setting', sayStored([API.change.setting, { path: storedPath, ...where }]), () => noteChange(requireWorkspace(), { kind: 'setting', project: projectPath ? basename(projectPath) : null, target: e.id, fields }))
     }
     const restart = restartText(e)
-    return { id: e.id, title: e.title, path, ...(projectPath ? { project: basename(projectPath) } : {}), changed, old: oldText, new: newText, ...(restart ? { restart } : {}), ...(r.note ? { note: r.note } : {}) }
+    return { id: e.id, title: agentTitle(e), path, ...(projectPath ? { project: basename(projectPath) } : {}), changed, old: oldText, new: newText, ...(restart ? { restart } : {}), ...(r.note ? { note: r.note } : {}) }
   } catch (err) {
     assistant.record(ws, act, line, (err as Error).message, { reason: publicReason(statusOf(err)) })
     throw err instanceof SettingRefused ? httpFrom(err.status, err) : err

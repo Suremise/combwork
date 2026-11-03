@@ -6,7 +6,7 @@ import { join } from 'path'
 import { describe, expect, it } from 'vitest'
 import { DEFAULT_PROJECT_CONFIG, DEFAULT_SETTINGS, mergeDefaults } from '../src/shared/defaults'
 import { PROVIDERS, dangerModes, defaultProviderSettings, labelList, modeAllowed, offeredModes } from '../src/shared/providers'
-import { APP_SETTINGS_CATALOG, PROJECT_SETTINGS_CATALOG, PROJECT_SETTINGS_SECTIONS, SETTINGS_CATALOG, SETTINGS_SECTIONS, checkSettingValue, settingDefault, settingEntry, settingKind, settingChangeTexts, settingPatch, settingPath, settingValue, settingValueText } from '../src/shared/settingsCatalog'
+import { APP_SETTINGS_CATALOG, PROJECT_SETTINGS_CATALOG, PROJECT_SETTINGS_SECTIONS, SETTINGS_CATALOG, SETTINGS_SECTIONS, checkSettingValue, settingDefault, settingEntry, settingHelps, settingKind, settingChangeTexts, settingReadOnly, settingPatch, settingPath, settingValue, settingValueText } from '../src/shared/settingsCatalog'
 import type { AppSettings } from '../src/shared/types'
 
 const ids = new Set(SETTINGS_CATALOG.map((e) => e.id))
@@ -28,11 +28,11 @@ const LAUNCH_FIELDS = ['defaultModel', 'defaultEffort', 'defaultPermissionMode',
 describe('the settings catalog', () => {
   it("calls the Assistant's working mode a mode, never a persona, wherever the user or an agent reads it (#375)", () => {
     const shown = [
-      ...SETTINGS_CATALOG.flatMap((e) => [e.title, e.desc, e.tip, e.helps, e.readOnly, e.docs, ...(e.options ?? []).map((o) => o.label)]),
+      ...SETTINGS_CATALOG.flatMap((e) => [e.title, e.desc, e.tip, settingHelps(e), settingReadOnly(e), e.docs, ...(e.options ?? []).map((o) => o.label)]),
       ...[...SETTINGS_SECTIONS, ...PROJECT_SETTINGS_SECTIONS].flatMap((x) => [x.label, x.desc])
     ].filter((t): t is string => !!t)
     expect(shown.filter((t) => /persona/i.test(t))).toEqual([])
-    expect(settingEntry('assistant.mode')?.readOnly).toContain('working mode')
+    expect(settingReadOnly(settingEntry('assistant.mode')!)).toContain('working mode')
   })
 
   it("a tip giving a setting's range takes it from the setting, as values, not written into the words (#911)", () => {
@@ -153,13 +153,13 @@ describe('the settings catalog', () => {
     const ro = (id: string) => !!entry(id).sensitive
     for (const id of ['agentApi.enabled', 'agentApi.port', 'agentApi.allowSessionInput', 'agentApi.provideHiveMcp', 'assistant.control', 'assistant.typingPause', 'claude-code.enableDangerousMode', 'claude-code.executablePath', 'codex.executablePath', 'project.worktreeSetup', 'claude-code.allowBackgroundSessions']) expect(ro(id), id).toBe(true)
     for (const id of ['general.progressPanel', 'sessions.transcriptWarnMB', 'workflow.git.fileLocks', 'copilot.checkUpdatesOnLaunch', 'project.compactSuggestTokens', 'assistant.panelSide', 'assistant.compactSuggestTokens']) expect(ro(id), id).toBe(false)
-    expect(entry('assistant.control').readOnly).toMatch(/only the user can change it, in Settings → Assistant → Control/)
+    expect(settingReadOnly(entry('assistant.control'))).toMatch(/only the user can change it, in Settings → Assistant → Control/)
   })
 
   it("keeps the user's commands to the user (HI-1368, HI-1954): sensitive, and the tools read their names but never set them", () => {
     for (const id of ['general.commands', 'general.onQuit', 'workspace.commands', 'workspace.onOpen', 'workspace.onClose']) {
       expect(entry(id).sensitive, id).toBe(true)
-      expect(entry(id).readOnly, id).toMatch(/Its commands run on this machine by themselves or by hand: the user saves them, the Assistant may only propose/)
+      expect(settingReadOnly(entry(id)), id).toMatch(/Its commands run on this machine by themselves or by hand: the user saves them, the Assistant may only propose/)
       expect(settingKind(entry(id)), id).toBeNull()
       expect(entry(id).docs, id).toBe(id.endsWith('commands') ? 'commands' : 'close-commands')
       expect(settingDefault(entry(id)), id).toEqual([])
@@ -175,7 +175,7 @@ describe('the settings catalog', () => {
   it('keeps buttons, statuses and lists of things out of the values the tools set; keybindings are read-only', () => {
     for (const id of ['advanced.reset', 'agentApi.token', 'workspace.hiddenProjects', 'claude-code.status', 'project.reset']) expect(entry(id).action, id).toBe(true)
     expect(settingKind(entry('keybindings.editor'))).toBeNull()
-    expect(entry('keybindings.editor').readOnly).toMatch(/Shortcuts are read-only to the Assistant for now/)
+    expect(settingReadOnly(entry('keybindings.editor'))).toMatch(/Shortcuts are read-only to the Assistant for now/)
     for (const id of ['claude-code.prices', 'codex.modelFallback', 'claude-code.effortFallback', 'board.colors']) expect(settingKind(entry(id)), id).toBe('table')
   })
 

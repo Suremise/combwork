@@ -1,4 +1,814 @@
 {
+  "settings.accounts.list.desc": {
+    "placeholders": {}
+  },
+  "settings.accounts.list.tip": {
+    "placeholders": {}
+  },
+  "settings.accounts.list.title": {
+    "placeholders": {}
+  },
+  "settings.advanced.claude-code.accounts.dropEnv.desc": {
+    "placeholders": {}
+  },
+  "settings.advanced.claude-code.accounts.dropEnv.title": {
+    "placeholders": {}
+  },
+  "settings.advanced.claude-code.accounts.emailField.desc": {
+    "placeholders": {}
+  },
+  "settings.advanced.claude-code.accounts.emailField.title": {
+    "placeholders": {}
+  },
+  "settings.advanced.claude-code.accounts.loggedInField.desc": {
+    "placeholders": {}
+  },
+  "settings.advanced.claude-code.accounts.loggedInField.title": {
+    "placeholders": {}
+  },
+  "settings.advanced.claude-code.accounts.loginFiles.desc": {
+    "placeholders": {}
+  },
+  "settings.advanced.claude-code.accounts.loginFiles.title": {
+    "placeholders": {}
+  },
+  "settings.advanced.claude-code.accounts.onboardedField.desc": {
+    "placeholders": {}
+  },
+  "settings.advanced.claude-code.accounts.onboardedField.title": {
+    "placeholders": {}
+  },
+  "settings.advanced.claude-code.accounts.orgField.desc": {
+    "placeholders": {}
+  },
+  "settings.advanced.claude-code.accounts.orgField.title": {
+    "placeholders": {}
+  },
+  "settings.advanced.claude-code.accounts.planField.desc": {
+    "placeholders": {}
+  },
+  "settings.advanced.claude-code.accounts.planField.title": {
+    "placeholders": {}
+  },
+  "settings.advanced.claude-code.accounts.statusSeconds.desc": {
+    "placeholders": {}
+  },
+  "settings.advanced.claude-code.accounts.statusSeconds.title": {
+    "placeholders": {}
+  },
+  "settings.advanced.claude-code.accounts.trustField.desc": {
+    "placeholders": {}
+  },
+  "settings.advanced.claude-code.accounts.trustField.title": {
+    "placeholders": {}
+  },
+  "settings.advanced.claude-code.autoModeSetup.offer.desc": {
+    "placeholders": {}
+  },
+  "settings.advanced.claude-code.autoModeSetup.offer.title": {
+    "placeholders": {}
+  },
+  "settings.advanced.claude-code.connections.remoteModels.desc": {
+    "placeholders": {}
+  },
+  "settings.advanced.claude-code.connections.remoteModels.title": {
+    "placeholders": {}
+  },
+  "settings.advanced.claude-code.exit.command.desc": {
+    "placeholders": {}
+  },
+  "settings.advanced.claude-code.exit.command.title": {
+    "placeholders": {}
+  },
+  "settings.advanced.claude-code.exit.graceSeconds.desc": {
+    "placeholders": {
+      "took": "plural"
+    }
+  },
+  "settings.advanced.claude-code.exit.graceSeconds.title": {
+    "placeholders": {}
+  },
+  "settings.advanced.claude-code.hooks.knownEvents.desc": {
+    "placeholders": {}
+  },
+  "settings.advanced.claude-code.hooks.knownEvents.title": {
+    "placeholders": {}
+  },
+  "settings.advanced.claude-code.hooks.knownFields.desc": {
+    "placeholders": {}
+  },
+  "settings.advanced.claude-code.hooks.knownFields.title": {
+    "placeholders": {}
+  },
+  "settings.advanced.claude-code.hooks.preToolUseTimeoutSeconds.desc": {
+    "placeholders": {}
+  },
+  "settings.advanced.claude-code.hooks.preToolUseTimeoutSeconds.title": {
+    "placeholders": {}
+  },
+  "settings.advanced.claude-code.hooks.timeoutSeconds.desc": {
+    "placeholders": {}
+  },
+  "settings.advanced.claude-code.hooks.timeoutSeconds.title": {
+    "placeholders": {}
+  },
+  "settings.advanced.claude-code.memory.realPath.desc": {
+    "placeholders": {}
+  },
+  "settings.advanced.claude-code.memory.realPath.title": {
+    "placeholders": {}
+  },
+  "settings.advanced.claude-code.memory.setting.desc": {
+    "placeholders": {}
+  },
+  "settings.advanced.claude-code.memory.setting.title": {
+    "placeholders": {}
+  },
+  "settings.advanced.claude-code.mouse.rightClickToCli.desc": {
+    "placeholders": {}
+  },
+  "settings.advanced.claude-code.mouse.rightClickToCli.title": {
+    "placeholders": {}
+  },
+  "settings.advanced.claude-code.outage.connectionError.desc": {
+    "placeholders": {}
+  },
+  "settings.advanced.claude-code.outage.connectionError.title": {
+    "placeholders": {}
+  },
+  "settings.advanced.claude-code.override.mcpIsolation.desc": {
+    "placeholders": {}
+  },
+  "settings.advanced.claude-code.override.mcpIsolation.title": {
+    "placeholders": {}
+  },
+  "settings.advanced.claude-code.override.preApproveHiveTools.desc": {
+    "placeholders": {}
+  },
+  "settings.advanced.claude-code.override.preApproveHiveTools.title": {
+    "placeholders": {}
+  },
+  "settings.advanced.claude-code.override.promptSnapshotOff.desc": {
+    "placeholders": {}
+  },
+  "settings.advanced.claude-code.override.promptSnapshotOff.title": {
+    "placeholders": {}
+  },
+  "settings.advanced.claude-code.override.statusLine.desc": {
+    "placeholders": {}
+  },
+  "settings.advanced.claude-code.override.statusLine.title": {
+    "placeholders": {}
+  },
+  "settings.advanced.claude-code.prompt.clearKeySeconds.desc": {
+    "placeholders": {}
+  },
+  "settings.advanced.claude-code.prompt.clearKeySeconds.title": {
+    "placeholders": {}
+  },
+  "settings.advanced.claude-code.prompt.cliTurn.desc": {
+    "placeholders": {}
+  },
+  "settings.advanced.claude-code.prompt.cliTurn.title": {
+    "placeholders": {}
+  },
+  "settings.advanced.claude-code.retry.attemptField.desc": {
+    "placeholders": {}
+  },
+  "settings.advanced.claude-code.retry.attemptField.title": {
+    "placeholders": {}
+  },
+  "settings.advanced.claude-code.retry.checkAfterSeconds.desc": {
+    "placeholders": {}
+  },
+  "settings.advanced.claude-code.retry.checkAfterSeconds.title": {
+    "placeholders": {}
+  },
+  "settings.advanced.claude-code.retry.maxField.desc": {
+    "placeholders": {}
+  },
+  "settings.advanced.claude-code.retry.maxField.title": {
+    "placeholders": {}
+  },
+  "settings.advanced.claude-code.retry.statusField.desc": {
+    "placeholders": {}
+  },
+  "settings.advanced.claude-code.retry.statusField.title": {
+    "placeholders": {}
+  },
+  "settings.advanced.claude-code.retry.subtype.desc": {
+    "placeholders": {}
+  },
+  "settings.advanced.claude-code.retry.subtype.title": {
+    "placeholders": {}
+  },
+  "settings.advanced.claude-code.retry.waitField.desc": {
+    "placeholders": {}
+  },
+  "settings.advanced.claude-code.retry.waitField.title": {
+    "placeholders": {}
+  },
+  "settings.advanced.claude-code.safeguard.note.desc": {
+    "placeholders": {}
+  },
+  "settings.advanced.claude-code.safeguard.note.title": {
+    "placeholders": {}
+  },
+  "settings.advanced.claude-code.safeguard.prompt.desc": {
+    "placeholders": {}
+  },
+  "settings.advanced.claude-code.safeguard.prompt.title": {
+    "placeholders": {}
+  },
+  "settings.advanced.claude-code.screen.idleQuestion.desc": {
+    "placeholders": {}
+  },
+  "settings.advanced.claude-code.screen.idleQuestion.title": {
+    "placeholders": {}
+  },
+  "settings.advanced.claude-code.screen.input.desc": {
+    "placeholders": {}
+  },
+  "settings.advanced.claude-code.screen.input.title": {
+    "placeholders": {}
+  },
+  "settings.advanced.claude-code.signIn.stopError.desc": {
+    "placeholders": {}
+  },
+  "settings.advanced.claude-code.signIn.stopError.title": {
+    "placeholders": {}
+  },
+  "settings.advanced.claude-code.statusLine.fiveHour.desc": {
+    "placeholders": {}
+  },
+  "settings.advanced.claude-code.statusLine.fiveHour.title": {
+    "placeholders": {}
+  },
+  "settings.advanced.claude-code.statusLine.knownFields.desc": {
+    "placeholders": {}
+  },
+  "settings.advanced.claude-code.statusLine.knownFields.title": {
+    "placeholders": {}
+  },
+  "settings.advanced.claude-code.statusLine.rateLimits.desc": {
+    "placeholders": {}
+  },
+  "settings.advanced.claude-code.statusLine.rateLimits.title": {
+    "placeholders": {}
+  },
+  "settings.advanced.claude-code.statusLine.usedPercent.desc": {
+    "placeholders": {}
+  },
+  "settings.advanced.claude-code.statusLine.usedPercent.title": {
+    "placeholders": {}
+  },
+  "settings.advanced.claude-code.statusLine.weekly.desc": {
+    "placeholders": {}
+  },
+  "settings.advanced.claude-code.statusLine.weekly.title": {
+    "placeholders": {}
+  },
+  "settings.advanced.claude-code.subagent.descriptionField.desc": {
+    "placeholders": {}
+  },
+  "settings.advanced.claude-code.subagent.descriptionField.title": {
+    "placeholders": {}
+  },
+  "settings.advanced.claude-code.subagent.idField.desc": {
+    "placeholders": {}
+  },
+  "settings.advanced.claude-code.subagent.idField.title": {
+    "placeholders": {}
+  },
+  "settings.advanced.claude-code.subagent.launched.desc": {
+    "placeholders": {}
+  },
+  "settings.advanced.claude-code.subagent.launched.title": {
+    "placeholders": {}
+  },
+  "settings.advanced.claude-code.subagent.resumedField.desc": {
+    "placeholders": {}
+  },
+  "settings.advanced.claude-code.subagent.resumedField.title": {
+    "placeholders": {}
+  },
+  "settings.advanced.claude-code.trust.prompt.desc": {
+    "placeholders": {}
+  },
+  "settings.advanced.claude-code.trust.prompt.title": {
+    "placeholders": {}
+  },
+  "settings.advanced.claude-code.turnScreen.done.desc": {
+    "placeholders": {}
+  },
+  "settings.advanced.claude-code.turnScreen.done.title": {
+    "placeholders": {}
+  },
+  "settings.advanced.claudeFooter.desc": {
+    "placeholders": {
+      "mode": "plain",
+      "footer": "plain"
+    }
+  },
+  "settings.advanced.claudeFooter.title": {
+    "placeholders": {
+      "mode": "plain"
+    }
+  },
+  "settings.advanced.codex.accounts.accountField.desc": {
+    "placeholders": {}
+  },
+  "settings.advanced.codex.accounts.accountField.title": {
+    "placeholders": {}
+  },
+  "settings.advanced.codex.accounts.dropEnv.desc": {
+    "placeholders": {}
+  },
+  "settings.advanced.codex.accounts.dropEnv.title": {
+    "placeholders": {}
+  },
+  "settings.advanced.codex.accounts.emailField.desc": {
+    "placeholders": {}
+  },
+  "settings.advanced.codex.accounts.emailField.title": {
+    "placeholders": {}
+  },
+  "settings.advanced.codex.accounts.loginFiles.desc": {
+    "placeholders": {}
+  },
+  "settings.advanced.codex.accounts.loginFiles.title": {
+    "placeholders": {}
+  },
+  "settings.advanced.codex.accounts.planField.desc": {
+    "placeholders": {}
+  },
+  "settings.advanced.codex.accounts.planField.title": {
+    "placeholders": {}
+  },
+  "settings.advanced.codex.accounts.readMethod.desc": {
+    "placeholders": {}
+  },
+  "settings.advanced.codex.accounts.readMethod.title": {
+    "placeholders": {}
+  },
+  "settings.advanced.codex.accounts.statusSeconds.desc": {
+    "placeholders": {}
+  },
+  "settings.advanced.codex.accounts.statusSeconds.title": {
+    "placeholders": {}
+  },
+  "settings.advanced.codex.accounts.unelevatedSandbox.desc": {
+    "placeholders": {}
+  },
+  "settings.advanced.codex.accounts.unelevatedSandbox.title": {
+    "placeholders": {}
+  },
+  "settings.advanced.codex.appServer.closeSeconds.desc": {
+    "placeholders": {}
+  },
+  "settings.advanced.codex.appServer.closeSeconds.title": {
+    "placeholders": {}
+  },
+  "settings.advanced.codex.exit.command.desc": {
+    "placeholders": {}
+  },
+  "settings.advanced.codex.exit.command.title": {
+    "placeholders": {}
+  },
+  "settings.advanced.codex.exit.graceSeconds.desc": {
+    "placeholders": {
+      "took": "plural"
+    }
+  },
+  "settings.advanced.codex.exit.graceSeconds.title": {
+    "placeholders": {}
+  },
+  "settings.advanced.codex.fullAccess.answerSeconds.desc": {
+    "placeholders": {}
+  },
+  "settings.advanced.codex.fullAccess.answerSeconds.title": {
+    "placeholders": {}
+  },
+  "settings.advanced.codex.fullAccess.warning.desc": {
+    "placeholders": {}
+  },
+  "settings.advanced.codex.fullAccess.warning.title": {
+    "placeholders": {}
+  },
+  "settings.advanced.codex.fullAccess.warningAfterSeconds.desc": {
+    "placeholders": {}
+  },
+  "settings.advanced.codex.fullAccess.warningAfterSeconds.title": {
+    "placeholders": {}
+  },
+  "settings.advanced.codex.hooks.knownEvents.desc": {
+    "placeholders": {}
+  },
+  "settings.advanced.codex.hooks.knownEvents.title": {
+    "placeholders": {}
+  },
+  "settings.advanced.codex.hooks.knownFields.desc": {
+    "placeholders": {}
+  },
+  "settings.advanced.codex.hooks.knownFields.title": {
+    "placeholders": {}
+  },
+  "settings.advanced.codex.hooks.listMethod.desc": {
+    "placeholders": {}
+  },
+  "settings.advanced.codex.hooks.listMethod.title": {
+    "placeholders": {}
+  },
+  "settings.advanced.codex.hooks.listSeconds.desc": {
+    "placeholders": {}
+  },
+  "settings.advanced.codex.hooks.listSeconds.title": {
+    "placeholders": {}
+  },
+  "settings.advanced.codex.hooks.preToolUseTimeoutSeconds.desc": {
+    "placeholders": {}
+  },
+  "settings.advanced.codex.hooks.preToolUseTimeoutSeconds.title": {
+    "placeholders": {}
+  },
+  "settings.advanced.codex.hooks.timeoutSeconds.desc": {
+    "placeholders": {
+      "most": "plural"
+    }
+  },
+  "settings.advanced.codex.hooks.timeoutSeconds.title": {
+    "placeholders": {}
+  },
+  "settings.advanced.codex.mcp.startupTimeoutSeconds.desc": {
+    "placeholders": {}
+  },
+  "settings.advanced.codex.mcp.startupTimeoutSeconds.title": {
+    "placeholders": {}
+  },
+  "settings.advanced.codex.mcp.toolTimeoutSeconds.desc": {
+    "placeholders": {}
+  },
+  "settings.advanced.codex.mcp.toolTimeoutSeconds.title": {
+    "placeholders": {}
+  },
+  "settings.advanced.codex.mouse.rightClickToCli.desc": {
+    "placeholders": {}
+  },
+  "settings.advanced.codex.mouse.rightClickToCli.title": {
+    "placeholders": {}
+  },
+  "settings.advanced.codex.outage.connectionError.desc": {
+    "placeholders": {}
+  },
+  "settings.advanced.codex.outage.connectionError.title": {
+    "placeholders": {}
+  },
+  "settings.advanced.codex.override.mcpIsolation.desc": {
+    "placeholders": {}
+  },
+  "settings.advanced.codex.override.mcpIsolation.title": {
+    "placeholders": {}
+  },
+  "settings.advanced.codex.override.preApproveHiveTools.desc": {
+    "placeholders": {}
+  },
+  "settings.advanced.codex.override.preApproveHiveTools.title": {
+    "placeholders": {}
+  },
+  "settings.advanced.codex.override.terminalTitle.desc": {
+    "placeholders": {}
+  },
+  "settings.advanced.codex.override.terminalTitle.title": {
+    "placeholders": {}
+  },
+  "settings.advanced.codex.prompt.drawnSeconds.desc": {
+    "placeholders": {}
+  },
+  "settings.advanced.codex.prompt.drawnSeconds.title": {
+    "placeholders": {}
+  },
+  "settings.advanced.codex.prompt.newlineKey.altEnter": {
+    "placeholders": {}
+  },
+  "settings.advanced.codex.prompt.newlineKey.auto": {
+    "placeholders": {}
+  },
+  "settings.advanced.codex.prompt.newlineKey.ctrlJ": {
+    "placeholders": {}
+  },
+  "settings.advanced.codex.prompt.newlineKey.desc": {
+    "placeholders": {}
+  },
+  "settings.advanced.codex.prompt.newlineKey.spaces": {
+    "placeholders": {}
+  },
+  "settings.advanced.codex.prompt.newlineKey.title": {
+    "placeholders": {}
+  },
+  "settings.advanced.codex.promptInput.timeoutSeconds.desc": {
+    "placeholders": {}
+  },
+  "settings.advanced.codex.promptInput.timeoutSeconds.title": {
+    "placeholders": {}
+  },
+  "settings.advanced.codex.queue.hint.desc": {
+    "placeholders": {}
+  },
+  "settings.advanced.codex.queue.hint.title": {
+    "placeholders": {}
+  },
+  "settings.advanced.codex.rateLimits.field.desc": {
+    "placeholders": {}
+  },
+  "settings.advanced.codex.rateLimits.field.title": {
+    "placeholders": {}
+  },
+  "settings.advanced.codex.rateLimits.usedPercent.desc": {
+    "placeholders": {}
+  },
+  "settings.advanced.codex.rateLimits.usedPercent.title": {
+    "placeholders": {}
+  },
+  "settings.advanced.codex.rateLimits.windowMinutes.desc": {
+    "placeholders": {}
+  },
+  "settings.advanced.codex.rateLimits.windowMinutes.title": {
+    "placeholders": {}
+  },
+  "settings.advanced.codex.ready.placeholder.desc": {
+    "placeholders": {}
+  },
+  "settings.advanced.codex.ready.placeholder.title": {
+    "placeholders": {}
+  },
+  "settings.advanced.codex.retry.checkAfterSeconds.desc": {
+    "placeholders": {}
+  },
+  "settings.advanced.codex.retry.checkAfterSeconds.title": {
+    "placeholders": {}
+  },
+  "settings.advanced.codex.retry.logTarget.desc": {
+    "placeholders": {}
+  },
+  "settings.advanced.codex.retry.logTarget.title": {
+    "placeholders": {}
+  },
+  "settings.advanced.codex.retry.pattern.desc": {
+    "placeholders": {}
+  },
+  "settings.advanced.codex.retry.pattern.title": {
+    "placeholders": {}
+  },
+  "settings.advanced.codex.signIn.expired.desc": {
+    "placeholders": {}
+  },
+  "settings.advanced.codex.signIn.expired.title": {
+    "placeholders": {}
+  },
+  "settings.advanced.codex.subagent.item.desc": {
+    "placeholders": {}
+  },
+  "settings.advanced.codex.subagent.item.title": {
+    "placeholders": {}
+  },
+  "settings.advanced.codex.subagent.started.desc": {
+    "placeholders": {}
+  },
+  "settings.advanced.codex.subagent.started.title": {
+    "placeholders": {}
+  },
+  "settings.advanced.codex.subagent.taskField.desc": {
+    "placeholders": {}
+  },
+  "settings.advanced.codex.subagent.taskField.title": {
+    "placeholders": {}
+  },
+  "settings.advanced.codex.subagent.threadField.desc": {
+    "placeholders": {}
+  },
+  "settings.advanced.codex.subagent.threadField.title": {
+    "placeholders": {}
+  },
+  "settings.advanced.codex.title.items.desc": {
+    "placeholders": {}
+  },
+  "settings.advanced.codex.title.items.title": {
+    "placeholders": {}
+  },
+  "settings.advanced.codex.trust.perLaunch.desc": {
+    "placeholders": {}
+  },
+  "settings.advanced.codex.trust.perLaunch.title": {
+    "placeholders": {}
+  },
+  "settings.advanced.codex.trust.prompt.desc": {
+    "placeholders": {}
+  },
+  "settings.advanced.codex.trust.prompt.title": {
+    "placeholders": {}
+  },
+  "settings.advanced.codex.turnScreen.working.desc": {
+    "placeholders": {}
+  },
+  "settings.advanced.codex.turnScreen.working.title": {
+    "placeholders": {}
+  },
+  "settings.advanced.codexPermissions.desc": {
+    "placeholders": {
+      "label": "plain",
+      "mode": "plain"
+    }
+  },
+  "settings.advanced.codexPermissions.title": {
+    "placeholders": {
+      "label": "plain"
+    }
+  },
+  "settings.advanced.copilot.compaction.conversationTokens.desc": {
+    "placeholders": {}
+  },
+  "settings.advanced.copilot.compaction.conversationTokens.title": {
+    "placeholders": {}
+  },
+  "settings.advanced.copilot.compaction.summary.desc": {
+    "placeholders": {}
+  },
+  "settings.advanced.copilot.compaction.summary.title": {
+    "placeholders": {}
+  },
+  "settings.advanced.copilot.compaction.systemTokens.desc": {
+    "placeholders": {}
+  },
+  "settings.advanced.copilot.compaction.systemTokens.title": {
+    "placeholders": {}
+  },
+  "settings.advanced.copilot.compaction.toolTokens.desc": {
+    "placeholders": {}
+  },
+  "settings.advanced.copilot.compaction.toolTokens.title": {
+    "placeholders": {}
+  },
+  "settings.advanced.copilot.exit.armed.desc": {
+    "placeholders": {}
+  },
+  "settings.advanced.copilot.exit.armed.title": {
+    "placeholders": {}
+  },
+  "settings.advanced.copilot.exit.graceSeconds.desc": {
+    "placeholders": {
+      "took": "plural"
+    }
+  },
+  "settings.advanced.copilot.exit.graceSeconds.title": {
+    "placeholders": {}
+  },
+  "settings.advanced.copilot.hooks.knownEvents.desc": {
+    "placeholders": {}
+  },
+  "settings.advanced.copilot.hooks.knownEvents.title": {
+    "placeholders": {}
+  },
+  "settings.advanced.copilot.hooks.knownFields.desc": {
+    "placeholders": {}
+  },
+  "settings.advanced.copilot.hooks.knownFields.title": {
+    "placeholders": {}
+  },
+  "settings.advanced.copilot.hooks.preToolUseTimeoutSeconds.desc": {
+    "placeholders": {}
+  },
+  "settings.advanced.copilot.hooks.preToolUseTimeoutSeconds.title": {
+    "placeholders": {}
+  },
+  "settings.advanced.copilot.hooks.timeoutSeconds.desc": {
+    "placeholders": {}
+  },
+  "settings.advanced.copilot.hooks.timeoutSeconds.title": {
+    "placeholders": {}
+  },
+  "settings.advanced.copilot.mouse.rightClickToCli.desc": {
+    "placeholders": {}
+  },
+  "settings.advanced.copilot.mouse.rightClickToCli.title": {
+    "placeholders": {}
+  },
+  "settings.advanced.copilot.outage.connectionError.desc": {
+    "placeholders": {}
+  },
+  "settings.advanced.copilot.outage.connectionError.title": {
+    "placeholders": {}
+  },
+  "settings.advanced.copilot.override.allMcpInstructions.desc": {
+    "placeholders": {}
+  },
+  "settings.advanced.copilot.override.allMcpInstructions.title": {
+    "placeholders": {}
+  },
+  "settings.advanced.copilot.override.mcpIsolation.desc": {
+    "placeholders": {}
+  },
+  "settings.advanced.copilot.override.mcpIsolation.title": {
+    "placeholders": {}
+  },
+  "settings.advanced.copilot.override.noAutoUpdate.desc": {
+    "placeholders": {}
+  },
+  "settings.advanced.copilot.override.noAutoUpdate.title": {
+    "placeholders": {}
+  },
+  "settings.advanced.copilot.override.preApproveHiveTools.desc": {
+    "placeholders": {}
+  },
+  "settings.advanced.copilot.override.preApproveHiveTools.title": {
+    "placeholders": {}
+  },
+  "settings.advanced.copilot.override.stripGitHubTokens.desc": {
+    "placeholders": {}
+  },
+  "settings.advanced.copilot.override.stripGitHubTokens.title": {
+    "placeholders": {}
+  },
+  "settings.advanced.copilot.question.field.desc": {
+    "placeholders": {}
+  },
+  "settings.advanced.copilot.question.field.title": {
+    "placeholders": {}
+  },
+  "settings.advanced.copilot.question.tool.desc": {
+    "placeholders": {}
+  },
+  "settings.advanced.copilot.question.tool.title": {
+    "placeholders": {}
+  },
+  "settings.advanced.copilot.ready.footer.desc": {
+    "placeholders": {}
+  },
+  "settings.advanced.copilot.ready.footer.title": {
+    "placeholders": {}
+  },
+  "settings.advanced.copilot.retry.context.desc": {
+    "placeholders": {}
+  },
+  "settings.advanced.copilot.retry.context.title": {
+    "placeholders": {}
+  },
+  "settings.advanced.copilot.retry.message.desc": {
+    "placeholders": {}
+  },
+  "settings.advanced.copilot.retry.message.title": {
+    "placeholders": {}
+  },
+  "settings.advanced.copilot.signIn.errorMessage.desc": {
+    "placeholders": {}
+  },
+  "settings.advanced.copilot.signIn.errorMessage.title": {
+    "placeholders": {}
+  },
+  "settings.advanced.copilot.signIn.errorType.desc": {
+    "placeholders": {}
+  },
+  "settings.advanced.copilot.signIn.errorType.title": {
+    "placeholders": {}
+  },
+  "settings.advanced.copilot.signIn.hookMessage.desc": {
+    "placeholders": {}
+  },
+  "settings.advanced.copilot.signIn.hookMessage.title": {
+    "placeholders": {}
+  },
+  "settings.advanced.copilot.trust.prompt.desc": {
+    "placeholders": {}
+  },
+  "settings.advanced.copilot.trust.prompt.title": {
+    "placeholders": {}
+  },
+  "settings.advanced.copilot.turnFailed.errorType.desc": {
+    "placeholders": {}
+  },
+  "settings.advanced.copilot.turnFailed.errorType.title": {
+    "placeholders": {}
+  },
+  "settings.advanced.copilotFooter.desc": {
+    "placeholders": {
+      "mode": "plain",
+      "footer": "plain",
+      "shared": "select"
+    }
+  },
+  "settings.advanced.copilotFooter.title": {
+    "placeholders": {
+      "mode": "plain"
+    }
+  },
+  "settings.advanced.data.desc": {
+    "placeholders": {}
+  },
+  "settings.advanced.data.tip": {
+    "placeholders": {}
+  },
+  "settings.advanced.data.title": {
+    "placeholders": {}
+  },
   "settings.advanced.error.badPattern": {
     "placeholders": {
       "title": "plain",
@@ -54,6 +864,507 @@
       "title": "plain"
     }
   },
+  "settings.advanced.hive.accounts.usageMoves.desc": {
+    "placeholders": {}
+  },
+  "settings.advanced.hive.accounts.usageMoves.title": {
+    "placeholders": {}
+  },
+  "settings.advanced.hive.assistant.startView.desc": {
+    "placeholders": {}
+  },
+  "settings.advanced.hive.assistant.startView.title": {
+    "placeholders": {}
+  },
+  "settings.advanced.hive.cards.attachmentMax.desc": {
+    "placeholders": {}
+  },
+  "settings.advanced.hive.cards.attachmentMax.title": {
+    "placeholders": {}
+  },
+  "settings.advanced.hive.cards.titleNudgeChars.desc": {
+    "placeholders": {}
+  },
+  "settings.advanced.hive.cards.titleNudgeChars.title": {
+    "placeholders": {}
+  },
+  "settings.advanced.hive.console.showText.desc": {
+    "placeholders": {}
+  },
+  "settings.advanced.hive.console.showText.title": {
+    "placeholders": {}
+  },
+  "settings.advanced.hive.copies.quietWaitMinutes.desc": {
+    "placeholders": {}
+  },
+  "settings.advanced.hive.copies.quietWaitMinutes.title": {
+    "placeholders": {}
+  },
+  "settings.advanced.hive.copies.review.desc": {
+    "placeholders": {}
+  },
+  "settings.advanced.hive.copies.review.title": {
+    "placeholders": {}
+  },
+  "settings.advanced.hive.disableHardwareAcceleration.desc": {
+    "placeholders": {}
+  },
+  "settings.advanced.hive.disableHardwareAcceleration.title": {
+    "placeholders": {}
+  },
+  "settings.advanced.hive.focused.pickSeconds.desc": {
+    "placeholders": {}
+  },
+  "settings.advanced.hive.focused.pickSeconds.title": {
+    "placeholders": {}
+  },
+  "settings.advanced.hive.guidance.desc": {
+    "placeholders": {}
+  },
+  "settings.advanced.hive.guidance.title": {
+    "placeholders": {}
+  },
+  "settings.advanced.hive.heapSnapshotNearLimit.desc": {
+    "placeholders": {}
+  },
+  "settings.advanced.hive.heapSnapshotNearLimit.title": {
+    "placeholders": {}
+  },
+  "settings.advanced.hive.hooks.missingSeconds.desc": {
+    "placeholders": {}
+  },
+  "settings.advanced.hive.hooks.missingSeconds.title": {
+    "placeholders": {}
+  },
+  "settings.advanced.hive.inbox.checkpoints.desc": {
+    "placeholders": {}
+  },
+  "settings.advanced.hive.inbox.checkpoints.title": {
+    "placeholders": {}
+  },
+  "settings.advanced.hive.inbox.idleWakes.desc": {
+    "placeholders": {}
+  },
+  "settings.advanced.hive.inbox.idleWakes.title": {
+    "placeholders": {}
+  },
+  "settings.advanced.hive.inbox.stopContinuation.desc": {
+    "placeholders": {}
+  },
+  "settings.advanced.hive.inbox.stopContinuation.title": {
+    "placeholders": {}
+  },
+  "settings.advanced.hive.journal.builds.desc": {
+    "placeholders": {}
+  },
+  "settings.advanced.hive.journal.builds.title": {
+    "placeholders": {}
+  },
+  "settings.advanced.hive.lanes.endWaitMinutes.desc": {
+    "placeholders": {}
+  },
+  "settings.advanced.hive.lanes.endWaitMinutes.title": {
+    "placeholders": {}
+  },
+  "settings.advanced.hive.lanes.freshStartWaitMinutes.desc": {
+    "placeholders": {}
+  },
+  "settings.advanced.hive.lanes.freshStartWaitMinutes.title": {
+    "placeholders": {}
+  },
+  "settings.advanced.hive.lanes.gentleEnd.desc": {
+    "placeholders": {}
+  },
+  "settings.advanced.hive.lanes.gentleEnd.title": {
+    "placeholders": {}
+  },
+  "settings.advanced.hive.lanes.unwatchedNotice.desc": {
+    "placeholders": {}
+  },
+  "settings.advanced.hive.lanes.unwatchedNotice.title": {
+    "placeholders": {}
+  },
+  "settings.advanced.hive.lanes.waitReviewerMinutes.desc": {
+    "placeholders": {}
+  },
+  "settings.advanced.hive.lanes.waitReviewerMinutes.title": {
+    "placeholders": {}
+  },
+  "settings.advanced.hive.lanes.waitYouMinutes.desc": {
+    "placeholders": {}
+  },
+  "settings.advanced.hive.lanes.waitYouMinutes.title": {
+    "placeholders": {}
+  },
+  "settings.advanced.hive.lostLine.steadySeconds.desc": {
+    "placeholders": {}
+  },
+  "settings.advanced.hive.lostLine.steadySeconds.title": {
+    "placeholders": {}
+  },
+  "settings.advanced.hive.mcp.connectSeconds.desc": {
+    "placeholders": {}
+  },
+  "settings.advanced.hive.mcp.connectSeconds.title": {
+    "placeholders": {}
+  },
+  "settings.advanced.hive.mcp.replySeconds.desc": {
+    "placeholders": {}
+  },
+  "settings.advanced.hive.mcp.replySeconds.title": {
+    "placeholders": {}
+  },
+  "settings.advanced.hive.mcpCatalog.downloadSeconds.desc": {
+    "placeholders": {}
+  },
+  "settings.advanced.hive.mcpCatalog.downloadSeconds.title": {
+    "placeholders": {}
+  },
+  "settings.advanced.hive.mcpCatalog.fetchSeconds.desc": {
+    "placeholders": {}
+  },
+  "settings.advanced.hive.mcpCatalog.fetchSeconds.title": {
+    "placeholders": {}
+  },
+  "settings.advanced.hive.mcpCatalog.probeSeconds.desc": {
+    "placeholders": {}
+  },
+  "settings.advanced.hive.mcpCatalog.probeSeconds.title": {
+    "placeholders": {}
+  },
+  "settings.advanced.hive.merge.lockWaitSeconds.desc": {
+    "placeholders": {}
+  },
+  "settings.advanced.hive.merge.lockWaitSeconds.title": {
+    "placeholders": {}
+  },
+  "settings.advanced.hive.none.baselineSeconds.desc": {
+    "placeholders": {}
+  },
+  "settings.advanced.hive.none.baselineSeconds.title": {
+    "placeholders": {}
+  },
+  "settings.advanced.hive.notes.deliverWorkspaceNotes.desc": {
+    "placeholders": {}
+  },
+  "settings.advanced.hive.notes.deliverWorkspaceNotes.title": {
+    "placeholders": {}
+  },
+  "settings.advanced.hive.notes.workspaceNotesMax.desc": {
+    "placeholders": {}
+  },
+  "settings.advanced.hive.notes.workspaceNotesMax.title": {
+    "placeholders": {}
+  },
+  "settings.advanced.hive.outage.checkFirstSeconds.desc": {
+    "placeholders": {}
+  },
+  "settings.advanced.hive.outage.checkFirstSeconds.title": {
+    "placeholders": {}
+  },
+  "settings.advanced.hive.outage.checkMostSeconds.desc": {
+    "placeholders": {}
+  },
+  "settings.advanced.hive.outage.checkMostSeconds.title": {
+    "placeholders": {}
+  },
+  "settings.advanced.hive.outage.checkUrl.claude-code.desc": {
+    "placeholders": {}
+  },
+  "settings.advanced.hive.outage.checkUrl.claude-code.title": {
+    "placeholders": {}
+  },
+  "settings.advanced.hive.outage.checkUrl.codex.desc": {
+    "placeholders": {}
+  },
+  "settings.advanced.hive.outage.checkUrl.codex.title": {
+    "placeholders": {}
+  },
+  "settings.advanced.hive.outage.checkUrl.copilot.desc": {
+    "placeholders": {}
+  },
+  "settings.advanced.hive.outage.checkUrl.copilot.title": {
+    "placeholders": {}
+  },
+  "settings.advanced.hive.outage.notConnection.desc": {
+    "placeholders": {}
+  },
+  "settings.advanced.hive.outage.notConnection.title": {
+    "placeholders": {}
+  },
+  "settings.advanced.hive.outage.resume.desc": {
+    "placeholders": {}
+  },
+  "settings.advanced.hive.outage.resume.title": {
+    "placeholders": {}
+  },
+  "settings.advanced.hive.outage.resumesPerHour.desc": {
+    "placeholders": {}
+  },
+  "settings.advanced.hive.outage.resumesPerHour.title": {
+    "placeholders": {}
+  },
+  "settings.advanced.hive.outage.waitMinutes.desc": {
+    "placeholders": {}
+  },
+  "settings.advanced.hive.outage.waitMinutes.title": {
+    "placeholders": {}
+  },
+  "settings.advanced.hive.processes.orphanNotice.desc": {
+    "placeholders": {}
+  },
+  "settings.advanced.hive.processes.orphanNotice.title": {
+    "placeholders": {}
+  },
+  "settings.advanced.hive.progress.lanesShown.desc": {
+    "placeholders": {}
+  },
+  "settings.advanced.hive.progress.lanesShown.title": {
+    "placeholders": {}
+  },
+  "settings.advanced.hive.progress.replySeconds.desc": {
+    "placeholders": {}
+  },
+  "settings.advanced.hive.progress.replySeconds.title": {
+    "placeholders": {}
+  },
+  "settings.advanced.hive.prompt.asTyped.desc": {
+    "placeholders": {}
+  },
+  "settings.advanced.hive.prompt.asTyped.title": {
+    "placeholders": {}
+  },
+  "settings.advanced.hive.prompt.clearDraft.desc": {
+    "placeholders": {}
+  },
+  "settings.advanced.hive.prompt.clearDraft.title": {
+    "placeholders": {}
+  },
+  "settings.advanced.hive.prompt.rawCardStart.desc": {
+    "placeholders": {}
+  },
+  "settings.advanced.hive.prompt.rawCardStart.title": {
+    "placeholders": {}
+  },
+  "settings.advanced.hive.queue.checkMinutes.desc": {
+    "placeholders": {}
+  },
+  "settings.advanced.hive.queue.checkMinutes.title": {
+    "placeholders": {}
+  },
+  "settings.advanced.hive.queue.checkedOutTarget.ask": {
+    "placeholders": {}
+  },
+  "settings.advanced.hive.queue.checkedOutTarget.auto": {
+    "placeholders": {}
+  },
+  "settings.advanced.hive.queue.checkedOutTarget.desc": {
+    "placeholders": {}
+  },
+  "settings.advanced.hive.queue.checkedOutTarget.title": {
+    "placeholders": {}
+  },
+  "settings.advanced.hive.queue.focusedJobs.desc": {
+    "placeholders": {}
+  },
+  "settings.advanced.hive.queue.focusedJobs.title": {
+    "placeholders": {}
+  },
+  "settings.advanced.hive.queue.networkCodes.desc": {
+    "placeholders": {}
+  },
+  "settings.advanced.hive.queue.networkCodes.title": {
+    "placeholders": {}
+  },
+  "settings.advanced.hive.queue.signSeconds.desc": {
+    "placeholders": {}
+  },
+  "settings.advanced.hive.queue.signSeconds.title": {
+    "placeholders": {}
+  },
+  "settings.advanced.hive.recorder.afterSeconds.desc": {
+    "placeholders": {}
+  },
+  "settings.advanced.hive.recorder.afterSeconds.title": {
+    "placeholders": {}
+  },
+  "settings.advanced.hive.recorder.keep.desc": {
+    "placeholders": {}
+  },
+  "settings.advanced.hive.recorder.keep.title": {
+    "placeholders": {}
+  },
+  "settings.advanced.hive.recorder.minutes.desc": {
+    "placeholders": {}
+  },
+  "settings.advanced.hive.recorder.minutes.title": {
+    "placeholders": {}
+  },
+  "settings.advanced.hive.recorder.pattern.desc": {
+    "placeholders": {}
+  },
+  "settings.advanced.hive.recorder.pattern.title": {
+    "placeholders": {}
+  },
+  "settings.advanced.hive.recorder.safeguard.desc": {
+    "placeholders": {}
+  },
+  "settings.advanced.hive.recorder.safeguard.title": {
+    "placeholders": {}
+  },
+  "settings.advanced.hive.recorder.stalled.desc": {
+    "placeholders": {}
+  },
+  "settings.advanced.hive.recorder.stalled.title": {
+    "placeholders": {}
+  },
+  "settings.advanced.hive.recorder.unknown.desc": {
+    "placeholders": {}
+  },
+  "settings.advanced.hive.recorder.unknown.title": {
+    "placeholders": {}
+  },
+  "settings.advanced.hive.recorder.version.desc": {
+    "placeholders": {}
+  },
+  "settings.advanced.hive.recorder.version.title": {
+    "placeholders": {}
+  },
+  "settings.advanced.hive.restart.resumeAfterUpdate.desc": {
+    "placeholders": {}
+  },
+  "settings.advanced.hive.restart.resumeAfterUpdate.title": {
+    "placeholders": {}
+  },
+  "settings.advanced.hive.restart.resumeReadySeconds.desc": {
+    "placeholders": {}
+  },
+  "settings.advanced.hive.restart.resumeReadySeconds.title": {
+    "placeholders": {}
+  },
+  "settings.advanced.hive.retry.tellAssistantAfterSeconds.desc": {
+    "placeholders": {}
+  },
+  "settings.advanced.hive.retry.tellAssistantAfterSeconds.title": {
+    "placeholders": {}
+  },
+  "settings.advanced.hive.sessions.terminalType.desc": {
+    "placeholders": {}
+  },
+  "settings.advanced.hive.sessions.terminalType.title": {
+    "placeholders": {}
+  },
+  "settings.advanced.hive.showDeveloperFeatures.desc": {
+    "placeholders": {}
+  },
+  "settings.advanced.hive.showDeveloperFeatures.title": {
+    "placeholders": {}
+  },
+  "settings.advanced.hive.skills.removeIdleCopies.desc": {
+    "placeholders": {}
+  },
+  "settings.advanced.hive.skills.removeIdleCopies.everywhere": {
+    "placeholders": {}
+  },
+  "settings.advanced.hive.skills.removeIdleCopies.never": {
+    "placeholders": {}
+  },
+  "settings.advanced.hive.skills.removeIdleCopies.slots": {
+    "placeholders": {}
+  },
+  "settings.advanced.hive.skills.removeIdleCopies.title": {
+    "placeholders": {}
+  },
+  "settings.advanced.hive.slots.deleteMergedLines.desc": {
+    "placeholders": {}
+  },
+  "settings.advanced.hive.slots.deleteMergedLines.title": {
+    "placeholders": {}
+  },
+  "settings.advanced.hive.slots.removeIdle.desc": {
+    "placeholders": {}
+  },
+  "settings.advanced.hive.slots.removeIdle.title": {
+    "placeholders": {}
+  },
+  "settings.advanced.hive.slots.renameAdopted.desc": {
+    "placeholders": {}
+  },
+  "settings.advanced.hive.slots.renameAdopted.title": {
+    "placeholders": {}
+  },
+  "settings.advanced.hive.slots.setupMinutes.desc": {
+    "placeholders": {}
+  },
+  "settings.advanced.hive.slots.setupMinutes.title": {
+    "placeholders": {}
+  },
+  "settings.advanced.hive.terminal.allKeysToCli.desc": {
+    "placeholders": {}
+  },
+  "settings.advanced.hive.terminal.allKeysToCli.title": {
+    "placeholders": {}
+  },
+  "settings.advanced.hive.terminal.ctrlCVToCli.desc": {
+    "placeholders": {}
+  },
+  "settings.advanced.hive.terminal.ctrlCVToCli.title": {
+    "placeholders": {}
+  },
+  "settings.advanced.hive.terminal.osc52.allow": {
+    "placeholders": {}
+  },
+  "settings.advanced.hive.terminal.osc52.ask": {
+    "placeholders": {}
+  },
+  "settings.advanced.hive.terminal.osc52.block": {
+    "placeholders": {}
+  },
+  "settings.advanced.hive.terminal.osc52.desc": {
+    "placeholders": {}
+  },
+  "settings.advanced.hive.terminal.osc52.title": {
+    "placeholders": {}
+  },
+  "settings.advanced.hive.usage.timelineDetailDays.desc": {
+    "placeholders": {}
+  },
+  "settings.advanced.hive.usage.timelineDetailDays.title": {
+    "placeholders": {}
+  },
+  "settings.advanced.hive.wait.agentsMaxSeconds.desc": {
+    "placeholders": {}
+  },
+  "settings.advanced.hive.wait.agentsMaxSeconds.title": {
+    "placeholders": {}
+  },
+  "settings.advanced.hive.wait.cardMaxSeconds.desc": {
+    "placeholders": {}
+  },
+  "settings.advanced.hive.wait.cardMaxSeconds.title": {
+    "placeholders": {}
+  },
+  "settings.advanced.hive.workflow.enforce.desc": {
+    "placeholders": {}
+  },
+  "settings.advanced.hive.workflow.enforce.title": {
+    "placeholders": {}
+  },
+  "settings.advanced.hive.workflow.updateAgentBranch.desc": {
+    "placeholders": {}
+  },
+  "settings.advanced.hive.workflow.updateAgentBranch.title": {
+    "placeholders": {}
+  },
+  "settings.advanced.logs.desc": {
+    "placeholders": {}
+  },
+  "settings.advanced.logs.tip": {
+    "placeholders": {}
+  },
+  "settings.advanced.logs.title": {
+    "placeholders": {}
+  },
   "settings.advanced.miss.field": {
     "placeholders": {
       "cli": "plain",
@@ -76,6 +1387,18 @@
       "version": "plain",
       "shown": "plain"
     }
+  },
+  "settings.advanced.reset.desc": {
+    "placeholders": {}
+  },
+  "settings.advanced.reset.tip": {
+    "placeholders": {}
+  },
+  "settings.advanced.reset.title": {
+    "placeholders": {}
+  },
+  "settings.advanced.showDeveloperFeatures.tip": {
+    "placeholders": {}
   },
   "settings.advanced.takes.boolean": {
     "placeholders": {}
@@ -109,9 +1432,1988 @@
   "settings.advanced.takes.text": {
     "placeholders": {}
   },
+  "settings.advanced.values.desc": {
+    "placeholders": {}
+  },
+  "settings.advanced.values.tip": {
+    "placeholders": {}
+  },
+  "settings.advanced.values.title": {
+    "placeholders": {}
+  },
   "settings.advanced.workspaceProblem": {
     "placeholders": {
       "problem": "plain"
     }
+  },
+  "settings.advancedRow.tip": {
+    "placeholders": {
+      "takes": "plain",
+      "cli": "select",
+      "group": "plain",
+      "tried": "select"
+    }
+  },
+  "settings.advancedRow.title": {
+    "placeholders": {
+      "group": "plain",
+      "title": "plain"
+    }
+  },
+  "settings.advancedRow.workspaceDesc": {
+    "placeholders": {
+      "desc": "plain"
+    }
+  },
+  "settings.advancedRow.workspaceTitle": {
+    "placeholders": {
+      "title": "plain"
+    }
+  },
+  "settings.agent.error.boolean": {
+    "placeholders": {
+      "title": "plain"
+    }
+  },
+  "settings.agent.error.choice": {
+    "placeholders": {
+      "title": "plain",
+      "choices": "plain"
+    }
+  },
+  "settings.agent.error.colorBad": {
+    "placeholders": {
+      "title": "plain",
+      "column": "plain",
+      "columns": "plain"
+    }
+  },
+  "settings.agent.error.colorsShape": {
+    "placeholders": {
+      "title": "plain",
+      "example": "plain",
+      "columns": "plain"
+    }
+  },
+  "settings.agent.error.effort": {
+    "placeholders": {
+      "title": "plain",
+      "levels": "plain"
+    }
+  },
+  "settings.agent.error.effortType": {
+    "placeholders": {
+      "title": "plain",
+      "levels": "plain"
+    }
+  },
+  "settings.agent.error.fallbackEntry": {
+    "placeholders": {
+      "title": "plain"
+    }
+  },
+  "settings.agent.error.fallbackShape": {
+    "placeholders": {
+      "title": "plain",
+      "shape": "plain"
+    }
+  },
+  "settings.agent.error.isAction": {
+    "placeholders": {}
+  },
+  "settings.agent.error.notNumber": {
+    "placeholders": {
+      "title": "plain",
+      "hasOff": "select",
+      "off": "plain",
+      "inherit": "select"
+    }
+  },
+  "settings.agent.error.notSettable": {
+    "placeholders": {
+      "title": "plain",
+      "why": "plain",
+      "path": "plain"
+    }
+  },
+  "settings.agent.error.oneLine": {
+    "placeholders": {
+      "title": "plain",
+      "most": "plain"
+    }
+  },
+  "settings.agent.error.priceBad": {
+    "placeholders": {
+      "title": "plain",
+      "model": "plain"
+    }
+  },
+  "settings.agent.error.pricesShape": {
+    "placeholders": {
+      "title": "plain",
+      "shape": "plain"
+    }
+  },
+  "settings.agent.error.range": {
+    "placeholders": {
+      "title": "plain",
+      "min": "plain",
+      "max": "plain",
+      "hasOff": "select",
+      "off": "plain"
+    }
+  },
+  "settings.agent.error.text": {
+    "placeholders": {
+      "title": "plain"
+    }
+  },
+  "settings.agent.error.unknownAdvanced": {
+    "placeholders": {
+      "title": "plain"
+    }
+  },
+  "settings.agent.error.workflow": {
+    "placeholders": {
+      "title": "plain",
+      "what": "plain"
+    }
+  },
+  "settings.agent.helps.agents.backgroundTaskMinutes": {
+    "placeholders": {}
+  },
+  "settings.agent.helps.agents.leftoverProcesses": {
+    "placeholders": {}
+  },
+  "settings.agent.helps.appearance.terminalFontSize": {
+    "placeholders": {}
+  },
+  "settings.agent.helps.appearance.uiFontSize": {
+    "placeholders": {}
+  },
+  "settings.agent.helps.assistant.compactSuggestTokens": {
+    "placeholders": {}
+  },
+  "settings.agent.helps.assistant.panelSide": {
+    "placeholders": {}
+  },
+  "settings.agent.helps.board.archiveDoneDays": {
+    "placeholders": {}
+  },
+  "settings.agent.helps.general.confirmOnQuit": {
+    "placeholders": {}
+  },
+  "settings.agent.helps.general.dateFormat": {
+    "placeholders": {}
+  },
+  "settings.agent.helps.general.keepAwake": {
+    "placeholders": {}
+  },
+  "settings.agent.helps.general.language": {
+    "placeholders": {}
+  },
+  "settings.agent.helps.general.progressCommands": {
+    "placeholders": {}
+  },
+  "settings.agent.helps.general.progressPanel": {
+    "placeholders": {}
+  },
+  "settings.agent.helps.general.showTips": {
+    "placeholders": {}
+  },
+  "settings.agent.helps.notifications.chimeEnabled": {
+    "placeholders": {}
+  },
+  "settings.agent.helps.notifications.desktopNotifications": {
+    "placeholders": {}
+  },
+  "settings.agent.helps.notifications.flashOnWaiting": {
+    "placeholders": {}
+  },
+  "settings.agent.helps.notifications.suggestFreshStart": {
+    "placeholders": {}
+  },
+  "settings.agent.helps.notifications.whileFocused": {
+    "placeholders": {}
+  },
+  "settings.agent.helps.project.cardAttachmentCleanup": {
+    "placeholders": {}
+  },
+  "settings.agent.helps.project.compactSuggestTokens": {
+    "placeholders": {}
+  },
+  "settings.agent.helps.project.slotCopy": {
+    "placeholders": {}
+  },
+  "settings.agent.helps.project.transcriptWarnMB": {
+    "placeholders": {}
+  },
+  "settings.agent.helps.sessions.backupRetention": {
+    "placeholders": {}
+  },
+  "settings.agent.helps.sessions.backupTranscripts": {
+    "placeholders": {}
+  },
+  "settings.agent.helps.sessions.compactSuggestTokens": {
+    "placeholders": {}
+  },
+  "settings.agent.helps.sessions.confirmStop": {
+    "placeholders": {}
+  },
+  "settings.agent.helps.sessions.defaultView": {
+    "placeholders": {}
+  },
+  "settings.agent.helps.sessions.followTranscripts": {
+    "placeholders": {}
+  },
+  "settings.agent.helps.sessions.resumeAfterUnexpectedClose": {
+    "placeholders": {}
+  },
+  "settings.agent.helps.sessions.tileOrder": {
+    "placeholders": {}
+  },
+  "settings.agent.helps.sessions.transcriptWarnMB": {
+    "placeholders": {}
+  },
+  "settings.agent.helps.workflow.git.slotCopy": {
+    "placeholders": {}
+  },
+  "settings.agent.option.automatic": {
+    "placeholders": {}
+  },
+  "settings.agent.option.default": {
+    "placeholders": {}
+  },
+  "settings.agent.readOnly.keybindings": {
+    "placeholders": {
+      "path": "plain"
+    }
+  },
+  "settings.agent.sensitive.agentApi": {
+    "placeholders": {
+      "path": "plain"
+    }
+  },
+  "settings.agent.sensitive.assistantPermissions": {
+    "placeholders": {
+      "path": "plain"
+    }
+  },
+  "settings.agent.sensitive.assistantRuns": {
+    "placeholders": {
+      "path": "plain"
+    }
+  },
+  "settings.agent.sensitive.backgroundSessions": {
+    "placeholders": {
+      "path": "plain"
+    }
+  },
+  "settings.agent.sensitive.commands": {
+    "placeholders": {
+      "path": "plain"
+    }
+  },
+  "settings.agent.sensitive.maxAgents": {
+    "placeholders": {
+      "path": "plain"
+    }
+  },
+  "settings.agent.sensitive.permissionMode": {
+    "placeholders": {
+      "path": "plain"
+    }
+  },
+  "settings.agent.sensitive.prerelease": {
+    "placeholders": {
+      "path": "plain"
+    }
+  },
+  "settings.agent.sensitive.whatRuns": {
+    "placeholders": {
+      "path": "plain"
+    }
+  },
+  "settings.agent.sensitive.worktreeSetup": {
+    "placeholders": {
+      "path": "plain"
+    }
+  },
+  "settings.agent.takes.aValue": {
+    "placeholders": {}
+  },
+  "settings.agent.takes.branch": {
+    "placeholders": {}
+  },
+  "settings.agent.takes.commands": {
+    "placeholders": {
+      "example": "plain"
+    }
+  },
+  "settings.agent.takes.effortDefault": {
+    "placeholders": {}
+  },
+  "settings.agent.takes.effortLevels": {
+    "placeholders": {
+      "levels": "plain",
+      "base": "plain"
+    }
+  },
+  "settings.agent.takes.effortNone": {
+    "placeholders": {
+      "base": "plain"
+    }
+  },
+  "settings.agent.takes.excluded": {
+    "placeholders": {}
+  },
+  "settings.agent.takes.identity": {
+    "placeholders": {
+      "shape": "plain"
+    }
+  },
+  "settings.agent.takes.mergeChecks": {
+    "placeholders": {}
+  },
+  "settings.agent.takes.okBefore": {
+    "placeholders": {
+      "shape": "plain"
+    }
+  },
+  "settings.agent.takes.oneOf": {
+    "placeholders": {
+      "choices": "plain"
+    }
+  },
+  "settings.agent.takes.orInherit": {
+    "placeholders": {
+      "what": "plain"
+    }
+  },
+  "settings.agent.takes.preChecks": {
+    "placeholders": {}
+  },
+  "settings.agent.takes.stageNames": {
+    "placeholders": {
+      "example": "plain"
+    }
+  },
+  "settings.agent.takes.trueFalse": {
+    "placeholders": {}
+  },
+  "settings.agent.takes.wholeNumber": {
+    "placeholders": {
+      "min": "plain",
+      "max": "plain"
+    }
+  },
+  "settings.agent.tool.levelsRefused": {
+    "placeholders": {
+      "problems": "plain"
+    }
+  },
+  "settings.agent.tool.more.advancedDesc": {
+    "placeholders": {}
+  },
+  "settings.agent.tool.more.advancedTitle": {
+    "placeholders": {}
+  },
+  "settings.agent.tool.more.value": {
+    "placeholders": {
+      "n": "plain"
+    }
+  },
+  "settings.agent.tool.more.workflowDesc": {
+    "placeholders": {}
+  },
+  "settings.agent.tool.more.workflowTitle": {
+    "placeholders": {}
+  },
+  "settings.agent.tool.noPlatform": {
+    "placeholders": {
+      "project": "plain"
+    }
+  },
+  "settings.agent.tool.noSetting": {
+    "placeholders": {
+      "id": "plain"
+    }
+  },
+  "settings.agent.tool.optionsRefused": {
+    "placeholders": {
+      "problems": "plain"
+    }
+  },
+  "settings.agent.tool.projectSetting": {
+    "placeholders": {
+      "id": "plain"
+    }
+  },
+  "settings.agent.tool.restart.assistant": {
+    "placeholders": {}
+  },
+  "settings.agent.tool.restart.hive": {
+    "placeholders": {}
+  },
+  "settings.agent.tool.restart.sessions": {
+    "placeholders": {}
+  },
+  "settings.agent.tool.reverted": {
+    "placeholders": {
+      "path": "plain",
+      "inProject": "select",
+      "project": "plain"
+    }
+  },
+  "settings.agent.tool.switchRefused": {
+    "placeholders": {
+      "error": "plain"
+    }
+  },
+  "settings.agent.tool.takes.advanced": {
+    "placeholders": {
+      "takes": "plain",
+      "scope": "select"
+    }
+  },
+  "settings.agent.tool.takes.colors": {
+    "placeholders": {}
+  },
+  "settings.agent.tool.takes.default": {
+    "placeholders": {}
+  },
+  "settings.agent.tool.takes.fallback": {
+    "placeholders": {
+      "shape": "plain"
+    }
+  },
+  "settings.agent.tool.takes.nothing": {
+    "placeholders": {}
+  },
+  "settings.agent.tool.takes.number": {
+    "placeholders": {
+      "min": "plain",
+      "max": "plain",
+      "hasOff": "select",
+      "off": "plain",
+      "inherit": "select"
+    }
+  },
+  "settings.agent.tool.takes.oneOf": {
+    "placeholders": {
+      "choices": "plain"
+    }
+  },
+  "settings.agent.tool.takes.prices": {
+    "placeholders": {
+      "shape": "plain"
+    }
+  },
+  "settings.agent.tool.takes.slotCopy": {
+    "placeholders": {}
+  },
+  "settings.agent.tool.takes.text": {
+    "placeholders": {
+      "inherit": "select"
+    }
+  },
+  "settings.agent.tool.takes.trueFalse": {
+    "placeholders": {}
+  },
+  "settings.agent.tool.usersToChange": {
+    "placeholders": {
+      "path": "plain"
+    }
+  },
+  "settings.agent.value.empty": {
+    "placeholders": {}
+  },
+  "settings.agent.value.hiveList": {
+    "placeholders": {}
+  },
+  "settings.agent.value.hivePrice": {
+    "placeholders": {}
+  },
+  "settings.agent.value.none": {
+    "placeholders": {}
+  },
+  "settings.agent.value.off": {
+    "placeholders": {
+      "off": "plain"
+    }
+  },
+  "settings.agent.value.older": {
+    "placeholders": {
+      "label": "plain"
+    }
+  },
+  "settings.agent.value.removed": {
+    "placeholders": {}
+  },
+  "settings.agent.value.size": {
+    "placeholders": {
+      "n": "plain",
+      "kind": "select"
+    }
+  },
+  "settings.agentApi.allowSessionInput.confirm.message": {
+    "placeholders": {}
+  },
+  "settings.agentApi.allowSessionInput.confirm.title": {
+    "placeholders": {}
+  },
+  "settings.agentApi.allowSessionInput.desc": {
+    "placeholders": {}
+  },
+  "settings.agentApi.allowSessionInput.tip": {
+    "placeholders": {}
+  },
+  "settings.agentApi.allowSessionInput.title": {
+    "placeholders": {}
+  },
+  "settings.agentApi.devConsole.desc": {
+    "placeholders": {}
+  },
+  "settings.agentApi.devConsole.tip": {
+    "placeholders": {}
+  },
+  "settings.agentApi.devConsole.title": {
+    "placeholders": {}
+  },
+  "settings.agentApi.enabled.desc": {
+    "placeholders": {}
+  },
+  "settings.agentApi.enabled.tip": {
+    "placeholders": {}
+  },
+  "settings.agentApi.enabled.title": {
+    "placeholders": {}
+  },
+  "settings.agentApi.port.desc": {
+    "placeholders": {}
+  },
+  "settings.agentApi.port.tip": {
+    "placeholders": {}
+  },
+  "settings.agentApi.port.title": {
+    "placeholders": {}
+  },
+  "settings.agentApi.provideHiveMcp.desc": {
+    "placeholders": {}
+  },
+  "settings.agentApi.provideHiveMcp.tip": {
+    "placeholders": {}
+  },
+  "settings.agentApi.provideHiveMcp.title": {
+    "placeholders": {}
+  },
+  "settings.agentApi.status.tip": {
+    "placeholders": {}
+  },
+  "settings.agentApi.status.title": {
+    "placeholders": {}
+  },
+  "settings.agentApi.token.desc": {
+    "placeholders": {}
+  },
+  "settings.agentApi.token.tip": {
+    "placeholders": {}
+  },
+  "settings.agentApi.token.title": {
+    "placeholders": {}
+  },
+  "settings.agentApi.viewers.desc": {
+    "placeholders": {}
+  },
+  "settings.agentApi.viewers.tip": {
+    "placeholders": {}
+  },
+  "settings.agentApi.viewers.title": {
+    "placeholders": {}
+  },
+  "settings.agents.backgroundTaskMinutes.desc": {
+    "placeholders": {}
+  },
+  "settings.agents.backgroundTaskMinutes.tip": {
+    "placeholders": {
+      "min": "number",
+      "max": "plural"
+    }
+  },
+  "settings.agents.backgroundTaskMinutes.title": {
+    "placeholders": {}
+  },
+  "settings.agents.leftoverProcesses.desc": {
+    "placeholders": {}
+  },
+  "settings.agents.leftoverProcesses.option.ask": {
+    "placeholders": {}
+  },
+  "settings.agents.leftoverProcesses.option.end": {
+    "placeholders": {}
+  },
+  "settings.agents.leftoverProcesses.tip": {
+    "placeholders": {}
+  },
+  "settings.agents.leftoverProcesses.title": {
+    "placeholders": {}
+  },
+  "settings.appearance.terminalCursorBlink.desc": {
+    "placeholders": {}
+  },
+  "settings.appearance.terminalCursorBlink.tip": {
+    "placeholders": {}
+  },
+  "settings.appearance.terminalCursorBlink.title": {
+    "placeholders": {}
+  },
+  "settings.appearance.terminalFontFamily.desc": {
+    "placeholders": {}
+  },
+  "settings.appearance.terminalFontFamily.tip": {
+    "placeholders": {}
+  },
+  "settings.appearance.terminalFontFamily.title": {
+    "placeholders": {}
+  },
+  "settings.appearance.terminalFontSize.desc": {
+    "placeholders": {}
+  },
+  "settings.appearance.terminalFontSize.tip": {
+    "placeholders": {}
+  },
+  "settings.appearance.terminalFontSize.title": {
+    "placeholders": {}
+  },
+  "settings.appearance.terminalScrollback.desc": {
+    "placeholders": {}
+  },
+  "settings.appearance.terminalScrollback.tip": {
+    "placeholders": {}
+  },
+  "settings.appearance.terminalScrollback.title": {
+    "placeholders": {}
+  },
+  "settings.appearance.theme.desc": {
+    "placeholders": {}
+  },
+  "settings.appearance.theme.option.dark": {
+    "placeholders": {}
+  },
+  "settings.appearance.theme.option.light": {
+    "placeholders": {}
+  },
+  "settings.appearance.theme.option.system": {
+    "placeholders": {}
+  },
+  "settings.appearance.theme.tip": {
+    "placeholders": {}
+  },
+  "settings.appearance.theme.title": {
+    "placeholders": {}
+  },
+  "settings.appearance.uiFontSize.desc": {
+    "placeholders": {}
+  },
+  "settings.appearance.uiFontSize.tip": {
+    "placeholders": {}
+  },
+  "settings.appearance.uiFontSize.title": {
+    "placeholders": {}
+  },
+  "settings.assistant.changeSettings.desc": {
+    "placeholders": {}
+  },
+  "settings.assistant.changeSettings.tip": {
+    "placeholders": {}
+  },
+  "settings.assistant.changeSettings.title": {
+    "placeholders": {}
+  },
+  "settings.assistant.compactSuggestTokens.desc": {
+    "placeholders": {}
+  },
+  "settings.assistant.compactSuggestTokens.off": {
+    "placeholders": {}
+  },
+  "settings.assistant.compactSuggestTokens.tip": {
+    "placeholders": {}
+  },
+  "settings.assistant.compactSuggestTokens.title": {
+    "placeholders": {}
+  },
+  "settings.assistant.control.desc": {
+    "placeholders": {}
+  },
+  "settings.assistant.control.option.agents": {
+    "placeholders": {}
+  },
+  "settings.assistant.control.option.look": {
+    "placeholders": {}
+  },
+  "settings.assistant.control.option.projects": {
+    "placeholders": {}
+  },
+  "settings.assistant.control.tip": {
+    "placeholders": {}
+  },
+  "settings.assistant.control.tip.agents": {
+    "placeholders": {}
+  },
+  "settings.assistant.control.tip.inbox": {
+    "placeholders": {}
+  },
+  "settings.assistant.control.tip.look": {
+    "placeholders": {}
+  },
+  "settings.assistant.control.tip.projects": {
+    "placeholders": {}
+  },
+  "settings.assistant.control.title": {
+    "placeholders": {}
+  },
+  "settings.assistant.enterEndsPause.desc": {
+    "placeholders": {}
+  },
+  "settings.assistant.enterEndsPause.tip": {
+    "placeholders": {}
+  },
+  "settings.assistant.enterEndsPause.title": {
+    "placeholders": {}
+  },
+  "settings.assistant.journal.desc": {
+    "placeholders": {}
+  },
+  "settings.assistant.journal.tip": {
+    "placeholders": {}
+  },
+  "settings.assistant.journal.title": {
+    "placeholders": {}
+  },
+  "settings.assistant.mcp.descAdded": {
+    "placeholders": {}
+  },
+  "settings.assistant.mcp.title": {
+    "placeholders": {}
+  },
+  "settings.assistant.mode.desc": {
+    "placeholders": {}
+  },
+  "settings.assistant.mode.tip": {
+    "placeholders": {}
+  },
+  "settings.assistant.mode.title": {
+    "placeholders": {}
+  },
+  "settings.assistant.panelSide.desc": {
+    "placeholders": {}
+  },
+  "settings.assistant.panelSide.option.left": {
+    "placeholders": {}
+  },
+  "settings.assistant.panelSide.option.right": {
+    "placeholders": {}
+  },
+  "settings.assistant.panelSide.tip": {
+    "placeholders": {}
+  },
+  "settings.assistant.panelSide.title": {
+    "placeholders": {}
+  },
+  "settings.assistant.tellReplies.desc": {
+    "placeholders": {}
+  },
+  "settings.assistant.tellReplies.tip": {
+    "placeholders": {}
+  },
+  "settings.assistant.tellReplies.title": {
+    "placeholders": {}
+  },
+  "settings.assistant.typingPause.desc": {
+    "placeholders": {}
+  },
+  "settings.assistant.typingPause.off": {
+    "placeholders": {}
+  },
+  "settings.assistant.typingPause.tip": {
+    "placeholders": {}
+  },
+  "settings.assistant.typingPause.title": {
+    "placeholders": {}
+  },
+  "settings.board.archiveDoneDays.desc": {
+    "placeholders": {}
+  },
+  "settings.board.archiveDoneDays.off": {
+    "placeholders": {}
+  },
+  "settings.board.archiveDoneDays.tip": {
+    "placeholders": {}
+  },
+  "settings.board.archiveDoneDays.title": {
+    "placeholders": {}
+  },
+  "settings.board.colors.desc": {
+    "placeholders": {}
+  },
+  "settings.board.colors.tip": {
+    "placeholders": {}
+  },
+  "settings.board.colors.title": {
+    "placeholders": {}
+  },
+  "settings.board.columnColors.desc": {
+    "placeholders": {}
+  },
+  "settings.board.columnColors.tip": {
+    "placeholders": {}
+  },
+  "settings.board.columnColors.title": {
+    "placeholders": {}
+  },
+  "settings.general.closeToTray.desc": {
+    "placeholders": {}
+  },
+  "settings.general.closeToTray.tip": {
+    "placeholders": {}
+  },
+  "settings.general.closeToTray.title": {
+    "placeholders": {}
+  },
+  "settings.general.commands.desc": {
+    "placeholders": {}
+  },
+  "settings.general.commands.tip": {
+    "placeholders": {}
+  },
+  "settings.general.commands.title": {
+    "placeholders": {}
+  },
+  "settings.general.confirmOnQuit.desc": {
+    "placeholders": {}
+  },
+  "settings.general.confirmOnQuit.option.always": {
+    "placeholders": {}
+  },
+  "settings.general.confirmOnQuit.option.never": {
+    "placeholders": {}
+  },
+  "settings.general.confirmOnQuit.option.working": {
+    "placeholders": {}
+  },
+  "settings.general.confirmOnQuit.tip": {
+    "placeholders": {}
+  },
+  "settings.general.confirmOnQuit.title": {
+    "placeholders": {}
+  },
+  "settings.general.dateFormat.desc": {
+    "placeholders": {}
+  },
+  "settings.general.dateFormat.option.dmy": {
+    "placeholders": {}
+  },
+  "settings.general.dateFormat.option.mdy": {
+    "placeholders": {}
+  },
+  "settings.general.dateFormat.option.system": {
+    "placeholders": {}
+  },
+  "settings.general.dateFormat.option.ymd": {
+    "placeholders": {}
+  },
+  "settings.general.dateFormat.tip": {
+    "placeholders": {}
+  },
+  "settings.general.dateFormat.title": {
+    "placeholders": {}
+  },
+  "settings.general.keepAwake.desc": {
+    "placeholders": {}
+  },
+  "settings.general.keepAwake.option.always": {
+    "placeholders": {}
+  },
+  "settings.general.keepAwake.option.never": {
+    "placeholders": {}
+  },
+  "settings.general.keepAwake.option.pluggedIn": {
+    "placeholders": {}
+  },
+  "settings.general.keepAwake.tip": {
+    "placeholders": {}
+  },
+  "settings.general.keepAwake.title": {
+    "placeholders": {}
+  },
+  "settings.general.launchAtLogin.desc": {
+    "placeholders": {}
+  },
+  "settings.general.launchAtLogin.tip": {
+    "placeholders": {}
+  },
+  "settings.general.launchAtLogin.title": {
+    "placeholders": {}
+  },
+  "settings.general.minimizeToTray.desc": {
+    "placeholders": {}
+  },
+  "settings.general.minimizeToTray.tip": {
+    "placeholders": {}
+  },
+  "settings.general.minimizeToTray.title": {
+    "placeholders": {}
+  },
+  "settings.general.onQuit.desc": {
+    "placeholders": {}
+  },
+  "settings.general.onQuit.tip": {
+    "placeholders": {}
+  },
+  "settings.general.onQuit.title": {
+    "placeholders": {}
+  },
+  "settings.general.progressCommands.desc": {
+    "placeholders": {}
+  },
+  "settings.general.progressCommands.disabled": {
+    "placeholders": {}
+  },
+  "settings.general.progressCommands.tip": {
+    "placeholders": {}
+  },
+  "settings.general.progressCommands.title": {
+    "placeholders": {}
+  },
+  "settings.general.progressPanel.desc": {
+    "placeholders": {}
+  },
+  "settings.general.progressPanel.tip": {
+    "placeholders": {}
+  },
+  "settings.general.progressPanel.title": {
+    "placeholders": {}
+  },
+  "settings.general.reopenLastWorkspace.desc": {
+    "placeholders": {}
+  },
+  "settings.general.reopenLastWorkspace.tip": {
+    "placeholders": {}
+  },
+  "settings.general.reopenLastWorkspace.title": {
+    "placeholders": {}
+  },
+  "settings.general.showTips.desc": {
+    "placeholders": {}
+  },
+  "settings.general.showTips.tip": {
+    "placeholders": {}
+  },
+  "settings.general.showTips.title": {
+    "placeholders": {}
+  },
+  "settings.general.startMinimized.desc": {
+    "placeholders": {}
+  },
+  "settings.general.startMinimized.tip": {
+    "placeholders": {}
+  },
+  "settings.general.startMinimized.title": {
+    "placeholders": {}
+  },
+  "settings.general.timeFormat.desc": {
+    "placeholders": {}
+  },
+  "settings.general.timeFormat.option.12h": {
+    "placeholders": {}
+  },
+  "settings.general.timeFormat.option.24h": {
+    "placeholders": {}
+  },
+  "settings.general.timeFormat.tip": {
+    "placeholders": {}
+  },
+  "settings.general.timeFormat.title": {
+    "placeholders": {}
+  },
+  "settings.general.userName.desc": {
+    "placeholders": {}
+  },
+  "settings.general.userName.placeholder": {
+    "placeholders": {}
+  },
+  "settings.general.userName.tip": {
+    "placeholders": {}
+  },
+  "settings.general.userName.title": {
+    "placeholders": {}
+  },
+  "settings.keybindings.editor.desc": {
+    "placeholders": {}
+  },
+  "settings.keybindings.editor.tip": {
+    "placeholders": {}
+  },
+  "settings.keybindings.editor.title": {
+    "placeholders": {}
+  },
+  "settings.mcpCatalogs.sources.desc": {
+    "placeholders": {}
+  },
+  "settings.mcpCatalogs.sources.title": {
+    "placeholders": {}
+  },
+  "settings.notifications.bannerPosition.desc": {
+    "placeholders": {}
+  },
+  "settings.notifications.bannerPosition.option.bottomCenter": {
+    "placeholders": {}
+  },
+  "settings.notifications.bannerPosition.option.bottomLeft": {
+    "placeholders": {}
+  },
+  "settings.notifications.bannerPosition.option.bottomRight": {
+    "placeholders": {}
+  },
+  "settings.notifications.bannerPosition.option.topCenter": {
+    "placeholders": {}
+  },
+  "settings.notifications.bannerPosition.option.topLeft": {
+    "placeholders": {}
+  },
+  "settings.notifications.bannerPosition.option.topRight": {
+    "placeholders": {}
+  },
+  "settings.notifications.bannerPosition.tip": {
+    "placeholders": {}
+  },
+  "settings.notifications.bannerPosition.title": {
+    "placeholders": {}
+  },
+  "settings.notifications.bannerScope.desc": {
+    "placeholders": {}
+  },
+  "settings.notifications.bannerScope.option.all": {
+    "placeholders": {}
+  },
+  "settings.notifications.bannerScope.option.none": {
+    "placeholders": {}
+  },
+  "settings.notifications.bannerScope.option.project": {
+    "placeholders": {}
+  },
+  "settings.notifications.bannerScope.option.workspace": {
+    "placeholders": {}
+  },
+  "settings.notifications.bannerScope.tip": {
+    "placeholders": {}
+  },
+  "settings.notifications.bannerScope.title": {
+    "placeholders": {}
+  },
+  "settings.notifications.bannerSeconds.desc": {
+    "placeholders": {}
+  },
+  "settings.notifications.bannerSeconds.tip": {
+    "placeholders": {}
+  },
+  "settings.notifications.bannerSeconds.title": {
+    "placeholders": {}
+  },
+  "settings.notifications.chimeEnabled.desc": {
+    "placeholders": {}
+  },
+  "settings.notifications.chimeEnabled.tip": {
+    "placeholders": {}
+  },
+  "settings.notifications.chimeEnabled.title": {
+    "placeholders": {}
+  },
+  "settings.notifications.chimeSound.desc": {
+    "placeholders": {}
+  },
+  "settings.notifications.chimeSound.tip": {
+    "placeholders": {}
+  },
+  "settings.notifications.chimeSound.title": {
+    "placeholders": {}
+  },
+  "settings.notifications.chimeVolume.desc": {
+    "placeholders": {}
+  },
+  "settings.notifications.chimeVolume.tip": {
+    "placeholders": {}
+  },
+  "settings.notifications.chimeVolume.title": {
+    "placeholders": {}
+  },
+  "settings.notifications.desktopNotifications.desc": {
+    "placeholders": {}
+  },
+  "settings.notifications.desktopNotifications.tip": {
+    "placeholders": {}
+  },
+  "settings.notifications.desktopNotifications.title": {
+    "placeholders": {}
+  },
+  "settings.notifications.flashOnWaiting.desc": {
+    "placeholders": {}
+  },
+  "settings.notifications.flashOnWaiting.tip": {
+    "placeholders": {}
+  },
+  "settings.notifications.flashOnWaiting.title": {
+    "placeholders": {}
+  },
+  "settings.notifications.notifyOnFinished.desc": {
+    "placeholders": {}
+  },
+  "settings.notifications.notifyOnFinished.tip": {
+    "placeholders": {}
+  },
+  "settings.notifications.notifyOnFinished.title": {
+    "placeholders": {}
+  },
+  "settings.notifications.notifyOnWaiting.desc": {
+    "placeholders": {}
+  },
+  "settings.notifications.notifyOnWaiting.tip": {
+    "placeholders": {}
+  },
+  "settings.notifications.notifyOnWaiting.title": {
+    "placeholders": {}
+  },
+  "settings.notifications.suggestFreshStart.desc": {
+    "placeholders": {}
+  },
+  "settings.notifications.suggestFreshStart.tip": {
+    "placeholders": {}
+  },
+  "settings.notifications.suggestFreshStart.title": {
+    "placeholders": {}
+  },
+  "settings.notifications.taskbarCount.desc": {
+    "placeholders": {}
+  },
+  "settings.notifications.taskbarCount.tip": {
+    "placeholders": {}
+  },
+  "settings.notifications.taskbarCount.title": {
+    "placeholders": {}
+  },
+  "settings.notifications.waitingBannerStays.desc": {
+    "placeholders": {}
+  },
+  "settings.notifications.waitingBannerStays.tip": {
+    "placeholders": {}
+  },
+  "settings.notifications.waitingBannerStays.title": {
+    "placeholders": {}
+  },
+  "settings.option.inherit": {
+    "placeholders": {}
+  },
+  "settings.option.off": {
+    "placeholders": {}
+  },
+  "settings.option.on": {
+    "placeholders": {}
+  },
+  "settings.path.level": {
+    "placeholders": {
+      "section": "plain",
+      "part": "plain",
+      "title": "plain"
+    }
+  },
+  "settings.path.project": {
+    "placeholders": {
+      "section": "plain",
+      "title": "plain"
+    }
+  },
+  "settings.path.settings": {
+    "placeholders": {
+      "section": "plain",
+      "title": "plain"
+    }
+  },
+  "settings.path.versionControl": {
+    "placeholders": {
+      "title": "plain"
+    }
+  },
+  "settings.project.agents.desc": {
+    "placeholders": {
+      "max": "number"
+    }
+  },
+  "settings.project.agents.title": {
+    "placeholders": {}
+  },
+  "settings.project.cardAttachmentCleanup.desc": {
+    "placeholders": {}
+  },
+  "settings.project.cardAttachmentCleanup.option.3": {
+    "placeholders": {}
+  },
+  "settings.project.cardAttachmentCleanup.option.30": {
+    "placeholders": {}
+  },
+  "settings.project.cardAttachmentCleanup.option.7": {
+    "placeholders": {}
+  },
+  "settings.project.cardAttachmentCleanup.option.90": {
+    "placeholders": {}
+  },
+  "settings.project.cardAttachmentCleanup.option.off": {
+    "placeholders": {}
+  },
+  "settings.project.cardAttachmentCleanup.tip": {
+    "placeholders": {}
+  },
+  "settings.project.cardAttachmentCleanup.title": {
+    "placeholders": {}
+  },
+  "settings.project.chime.desc": {
+    "placeholders": {}
+  },
+  "settings.project.chime.tip": {
+    "placeholders": {}
+  },
+  "settings.project.chime.title": {
+    "placeholders": {}
+  },
+  "settings.project.compactSuggestTokens.desc": {
+    "placeholders": {}
+  },
+  "settings.project.compactSuggestTokens.off": {
+    "placeholders": {}
+  },
+  "settings.project.compactSuggestTokens.tip": {
+    "placeholders": {}
+  },
+  "settings.project.compactSuggestTokens.title": {
+    "placeholders": {}
+  },
+  "settings.project.inboxCheckpoints.desc": {
+    "placeholders": {}
+  },
+  "settings.project.inboxCheckpoints.tip": {
+    "placeholders": {}
+  },
+  "settings.project.inboxCheckpoints.title": {
+    "placeholders": {}
+  },
+  "settings.project.inboxIdleWakes.desc": {
+    "placeholders": {}
+  },
+  "settings.project.inboxIdleWakes.tip": {
+    "placeholders": {}
+  },
+  "settings.project.inboxIdleWakes.title": {
+    "placeholders": {}
+  },
+  "settings.project.inboxStopContinuation.desc": {
+    "placeholders": {}
+  },
+  "settings.project.inboxStopContinuation.tip": {
+    "placeholders": {}
+  },
+  "settings.project.inboxStopContinuation.title": {
+    "placeholders": {}
+  },
+  "settings.project.key.title": {
+    "placeholders": {}
+  },
+  "settings.project.keybindings.desc": {
+    "placeholders": {}
+  },
+  "settings.project.keybindings.title": {
+    "placeholders": {}
+  },
+  "settings.project.metadata.desc": {
+    "placeholders": {}
+  },
+  "settings.project.metadata.title": {
+    "placeholders": {}
+  },
+  "settings.project.reset.desc": {
+    "placeholders": {}
+  },
+  "settings.project.reset.title": {
+    "placeholders": {}
+  },
+  "settings.project.storage.desc": {
+    "placeholders": {}
+  },
+  "settings.project.storage.title": {
+    "placeholders": {}
+  },
+  "settings.project.suggestFreshStart.desc": {
+    "placeholders": {}
+  },
+  "settings.project.suggestFreshStart.tip": {
+    "placeholders": {}
+  },
+  "settings.project.suggestFreshStart.title": {
+    "placeholders": {}
+  },
+  "settings.project.transcriptWarnMB.desc": {
+    "placeholders": {}
+  },
+  "settings.project.transcriptWarnMB.off": {
+    "placeholders": {}
+  },
+  "settings.project.transcriptWarnMB.tip": {
+    "placeholders": {}
+  },
+  "settings.project.transcriptWarnMB.title": {
+    "placeholders": {}
+  },
+  "settings.project.workflow.platform.desc": {
+    "placeholders": {}
+  },
+  "settings.project.workflow.platform.git": {
+    "placeholders": {}
+  },
+  "settings.project.workflow.platform.none": {
+    "placeholders": {}
+  },
+  "settings.project.workflow.platform.title": {
+    "placeholders": {}
+  },
+  "settings.project.worktreeSetup.desc": {
+    "placeholders": {}
+  },
+  "settings.project.worktreeSetup.tip": {
+    "placeholders": {}
+  },
+  "settings.project.worktreeSetup.title": {
+    "placeholders": {}
+  },
+  "settings.projectSection.advanced.desc": {
+    "placeholders": {}
+  },
+  "settings.projectSection.advanced.label": {
+    "placeholders": {}
+  },
+  "settings.projectSection.agents.desc": {
+    "placeholders": {}
+  },
+  "settings.projectSection.agents.label": {
+    "placeholders": {}
+  },
+  "settings.projectSection.general.desc": {
+    "placeholders": {}
+  },
+  "settings.projectSection.general.label": {
+    "placeholders": {}
+  },
+  "settings.projectSection.keys.desc": {
+    "placeholders": {}
+  },
+  "settings.projectSection.keys.label": {
+    "placeholders": {}
+  },
+  "settings.projectSection.sessions.desc": {
+    "placeholders": {}
+  },
+  "settings.projectSection.sessions.label": {
+    "placeholders": {}
+  },
+  "settings.projectSection.storage.desc": {
+    "placeholders": {}
+  },
+  "settings.projectSection.storage.label": {
+    "placeholders": {}
+  },
+  "settings.provider.allowBackgroundSessions.desc": {
+    "placeholders": {
+      "provider": "plain"
+    }
+  },
+  "settings.provider.allowBackgroundSessions.tip": {
+    "placeholders": {
+      "provider": "plain",
+      "cli": "plain"
+    }
+  },
+  "settings.provider.allowBackgroundSessions.title": {
+    "placeholders": {}
+  },
+  "settings.provider.checkUpdatesOnLaunch.desc": {
+    "placeholders": {}
+  },
+  "settings.provider.checkUpdatesOnLaunch.tip": {
+    "placeholders": {
+      "provider": "plain"
+    }
+  },
+  "settings.provider.checkUpdatesOnLaunch.title": {
+    "placeholders": {}
+  },
+  "settings.provider.costSource.desc": {
+    "placeholders": {
+      "provider": "plain"
+    }
+  },
+  "settings.provider.costSource.option.prices": {
+    "placeholders": {}
+  },
+  "settings.provider.costSource.option.reported": {
+    "placeholders": {
+      "provider": "plain"
+    }
+  },
+  "settings.provider.costSource.tip": {
+    "placeholders": {
+      "provider": "plain"
+    }
+  },
+  "settings.provider.costSource.title": {
+    "placeholders": {}
+  },
+  "settings.provider.effortFallback.desc": {
+    "placeholders": {
+      "provider": "plain"
+    }
+  },
+  "settings.provider.effortFallback.tip": {
+    "placeholders": {
+      "provider": "plain"
+    }
+  },
+  "settings.provider.effortFallback.title": {
+    "placeholders": {}
+  },
+  "settings.provider.enableDangerousMode.confirm.detail": {
+    "placeholders": {}
+  },
+  "settings.provider.enableDangerousMode.confirm.message": {
+    "placeholders": {
+      "provider": "plain"
+    }
+  },
+  "settings.provider.enableDangerousMode.confirm.title": {
+    "placeholders": {
+      "n": "plural",
+      "names": "plain"
+    }
+  },
+  "settings.provider.enableDangerousMode.desc": {
+    "placeholders": {
+      "choices": "plain"
+    }
+  },
+  "settings.provider.enableDangerousMode.quoted": {
+    "placeholders": {
+      "mode": "plain"
+    }
+  },
+  "settings.provider.enableDangerousMode.tip": {
+    "placeholders": {
+      "n": "plural",
+      "names": "plain"
+    }
+  },
+  "settings.provider.enableDangerousMode.title": {
+    "placeholders": {
+      "n": "plural",
+      "names": "plain"
+    }
+  },
+  "settings.provider.enabled.desc": {
+    "placeholders": {
+      "provider": "plain"
+    }
+  },
+  "settings.provider.enabled.tip": {
+    "placeholders": {
+      "provider": "plain"
+    }
+  },
+  "settings.provider.enabled.title": {
+    "placeholders": {
+      "provider": "plain"
+    }
+  },
+  "settings.provider.executablePath.desc": {
+    "placeholders": {
+      "provider": "plain",
+      "cli": "plain"
+    }
+  },
+  "settings.provider.executablePath.placeholder": {
+    "placeholders": {}
+  },
+  "settings.provider.executablePath.tip": {
+    "placeholders": {}
+  },
+  "settings.provider.executablePath.title": {
+    "placeholders": {}
+  },
+  "settings.provider.modelFallback.desc": {
+    "placeholders": {
+      "provider": "plain"
+    }
+  },
+  "settings.provider.modelFallback.tip": {
+    "placeholders": {}
+  },
+  "settings.provider.modelFallback.title": {
+    "placeholders": {}
+  },
+  "settings.provider.prices.descEstimated": {
+    "placeholders": {
+      "provider": "plain"
+    }
+  },
+  "settings.provider.prices.descReported": {
+    "placeholders": {
+      "provider": "plain"
+    }
+  },
+  "settings.provider.prices.tip": {
+    "placeholders": {
+      "checked": "plain",
+      "provider": "plain"
+    }
+  },
+  "settings.provider.prices.title": {
+    "placeholders": {}
+  },
+  "settings.provider.status.tip": {
+    "placeholders": {
+      "provider": "plain"
+    }
+  },
+  "settings.provider.status.title": {
+    "placeholders": {}
+  },
+  "settings.providers.list.desc": {
+    "placeholders": {}
+  },
+  "settings.providers.list.tip": {
+    "placeholders": {}
+  },
+  "settings.providers.list.title": {
+    "placeholders": {}
+  },
+  "settings.section.accounts.desc": {
+    "placeholders": {}
+  },
+  "settings.section.accounts.label": {
+    "placeholders": {}
+  },
+  "settings.section.advanced.desc": {
+    "placeholders": {}
+  },
+  "settings.section.advanced.label": {
+    "placeholders": {}
+  },
+  "settings.section.agentApi.desc": {
+    "placeholders": {}
+  },
+  "settings.section.agentApi.label": {
+    "placeholders": {}
+  },
+  "settings.section.agents.desc": {
+    "placeholders": {}
+  },
+  "settings.section.agents.label": {
+    "placeholders": {}
+  },
+  "settings.section.appearance.desc": {
+    "placeholders": {}
+  },
+  "settings.section.appearance.label": {
+    "placeholders": {}
+  },
+  "settings.section.assistant.desc": {
+    "placeholders": {}
+  },
+  "settings.section.assistant.label": {
+    "placeholders": {}
+  },
+  "settings.section.board.desc": {
+    "placeholders": {}
+  },
+  "settings.section.board.label": {
+    "placeholders": {}
+  },
+  "settings.section.general.desc": {
+    "placeholders": {}
+  },
+  "settings.section.general.label": {
+    "placeholders": {}
+  },
+  "settings.section.keybindings.desc": {
+    "placeholders": {}
+  },
+  "settings.section.keybindings.label": {
+    "placeholders": {}
+  },
+  "settings.section.mcpCatalogs.desc": {
+    "placeholders": {}
+  },
+  "settings.section.mcpCatalogs.label": {
+    "placeholders": {}
+  },
+  "settings.section.notifications.desc": {
+    "placeholders": {}
+  },
+  "settings.section.notifications.label": {
+    "placeholders": {}
+  },
+  "settings.section.provider.desc": {
+    "placeholders": {
+      "provider": "plain"
+    }
+  },
+  "settings.section.providers.desc": {
+    "placeholders": {}
+  },
+  "settings.section.providers.label": {
+    "placeholders": {}
+  },
+  "settings.section.sessions.desc": {
+    "placeholders": {}
+  },
+  "settings.section.sessions.label": {
+    "placeholders": {}
+  },
+  "settings.section.updates.desc": {
+    "placeholders": {}
+  },
+  "settings.section.updates.label": {
+    "placeholders": {}
+  },
+  "settings.section.workflow.desc": {
+    "placeholders": {}
+  },
+  "settings.section.workflow.label": {
+    "placeholders": {}
+  },
+  "settings.section.workspace.desc": {
+    "placeholders": {}
+  },
+  "settings.section.workspace.label": {
+    "placeholders": {}
+  },
+  "settings.sessions.backupRetention.desc": {
+    "placeholders": {}
+  },
+  "settings.sessions.backupRetention.option.d180": {
+    "placeholders": {}
+  },
+  "settings.sessions.backupRetention.option.d30": {
+    "placeholders": {}
+  },
+  "settings.sessions.backupRetention.option.d365": {
+    "placeholders": {}
+  },
+  "settings.sessions.backupRetention.option.d90": {
+    "placeholders": {}
+  },
+  "settings.sessions.backupRetention.option.off": {
+    "placeholders": {}
+  },
+  "settings.sessions.backupRetention.tip": {
+    "placeholders": {}
+  },
+  "settings.sessions.backupRetention.title": {
+    "placeholders": {}
+  },
+  "settings.sessions.backupTranscripts.desc": {
+    "placeholders": {}
+  },
+  "settings.sessions.backupTranscripts.tip": {
+    "placeholders": {}
+  },
+  "settings.sessions.backupTranscripts.title": {
+    "placeholders": {}
+  },
+  "settings.sessions.cacheTtl.desc": {
+    "placeholders": {}
+  },
+  "settings.sessions.cacheTtl.option.1h": {
+    "placeholders": {}
+  },
+  "settings.sessions.cacheTtl.option.5m": {
+    "placeholders": {}
+  },
+  "settings.sessions.cacheTtl.option.auto": {
+    "placeholders": {}
+  },
+  "settings.sessions.cacheTtl.tip": {
+    "placeholders": {}
+  },
+  "settings.sessions.cacheTtl.title": {
+    "placeholders": {}
+  },
+  "settings.sessions.compactSuggestTokens.desc": {
+    "placeholders": {}
+  },
+  "settings.sessions.compactSuggestTokens.off": {
+    "placeholders": {}
+  },
+  "settings.sessions.compactSuggestTokens.tip": {
+    "placeholders": {}
+  },
+  "settings.sessions.compactSuggestTokens.title": {
+    "placeholders": {}
+  },
+  "settings.sessions.confirmStop.desc": {
+    "placeholders": {}
+  },
+  "settings.sessions.confirmStop.tip": {
+    "placeholders": {}
+  },
+  "settings.sessions.confirmStop.title": {
+    "placeholders": {}
+  },
+  "settings.sessions.defaultView.desc": {
+    "placeholders": {}
+  },
+  "settings.sessions.defaultView.option.panes": {
+    "placeholders": {}
+  },
+  "settings.sessions.defaultView.option.tiles": {
+    "placeholders": {}
+  },
+  "settings.sessions.defaultView.tip": {
+    "placeholders": {}
+  },
+  "settings.sessions.defaultView.title": {
+    "placeholders": {}
+  },
+  "settings.sessions.followTranscripts.desc": {
+    "placeholders": {}
+  },
+  "settings.sessions.followTranscripts.tip": {
+    "placeholders": {}
+  },
+  "settings.sessions.followTranscripts.title": {
+    "placeholders": {}
+  },
+  "settings.sessions.overviewRefresh.desc": {
+    "placeholders": {}
+  },
+  "settings.sessions.overviewRefresh.option.live": {
+    "placeholders": {}
+  },
+  "settings.sessions.overviewRefresh.option.manual": {
+    "placeholders": {}
+  },
+  "settings.sessions.overviewRefresh.option.minute": {
+    "placeholders": {}
+  },
+  "settings.sessions.overviewRefresh.tip": {
+    "placeholders": {}
+  },
+  "settings.sessions.overviewRefresh.title": {
+    "placeholders": {}
+  },
+  "settings.sessions.recordPerformance.desc": {
+    "placeholders": {}
+  },
+  "settings.sessions.recordPerformance.tip": {
+    "placeholders": {}
+  },
+  "settings.sessions.recordPerformance.title": {
+    "placeholders": {}
+  },
+  "settings.sessions.resetPerformance.desc": {
+    "placeholders": {}
+  },
+  "settings.sessions.resetPerformance.tip": {
+    "placeholders": {}
+  },
+  "settings.sessions.resetPerformance.title": {
+    "placeholders": {}
+  },
+  "settings.sessions.resumeAfterUnexpectedClose.desc": {
+    "placeholders": {}
+  },
+  "settings.sessions.resumeAfterUnexpectedClose.tip": {
+    "placeholders": {}
+  },
+  "settings.sessions.resumeAfterUnexpectedClose.title": {
+    "placeholders": {}
+  },
+  "settings.sessions.tileOrder.desc": {
+    "placeholders": {}
+  },
+  "settings.sessions.tileOrder.option.panes": {
+    "placeholders": {}
+  },
+  "settings.sessions.tileOrder.option.urgency": {
+    "placeholders": {}
+  },
+  "settings.sessions.tileOrder.tip": {
+    "placeholders": {}
+  },
+  "settings.sessions.tileOrder.title": {
+    "placeholders": {}
+  },
+  "settings.sessions.transcriptWarnMB.desc": {
+    "placeholders": {}
+  },
+  "settings.sessions.transcriptWarnMB.off": {
+    "placeholders": {}
+  },
+  "settings.sessions.transcriptWarnMB.tip": {
+    "placeholders": {}
+  },
+  "settings.sessions.transcriptWarnMB.title": {
+    "placeholders": {}
+  },
+  "settings.sessions.usageCacheClear.desc": {
+    "placeholders": {}
+  },
+  "settings.sessions.usageCacheClear.tip": {
+    "placeholders": {}
+  },
+  "settings.sessions.usageCacheClear.title": {
+    "placeholders": {}
+  },
+  "settings.sessions.usageCacheSize.desc": {
+    "placeholders": {}
+  },
+  "settings.sessions.usageCacheSize.tip": {
+    "placeholders": {
+      "min": "number",
+      "max": "number"
+    }
+  },
+  "settings.sessions.usageCacheSize.title": {
+    "placeholders": {}
+  },
+  "settings.slotCopy.desc": {
+    "placeholders": {}
+  },
+  "settings.slotCopy.title": {
+    "placeholders": {}
+  },
+  "settings.updates.checkAutomatically.desc": {
+    "placeholders": {}
+  },
+  "settings.updates.checkAutomatically.tip": {
+    "placeholders": {}
+  },
+  "settings.updates.checkAutomatically.title": {
+    "placeholders": {}
+  },
+  "settings.updates.downloadAutomatically.desc": {
+    "placeholders": {}
+  },
+  "settings.updates.downloadAutomatically.tip": {
+    "placeholders": {}
+  },
+  "settings.updates.downloadAutomatically.title": {
+    "placeholders": {}
+  },
+  "settings.updates.install.desc": {
+    "placeholders": {}
+  },
+  "settings.updates.install.option.auto": {
+    "placeholders": {}
+  },
+  "settings.updates.install.option.manual": {
+    "placeholders": {}
+  },
+  "settings.updates.install.tip": {
+    "placeholders": {}
+  },
+  "settings.updates.install.title": {
+    "placeholders": {}
+  },
+  "settings.updates.prerelease.desc": {
+    "placeholders": {}
+  },
+  "settings.updates.prerelease.tip": {
+    "placeholders": {}
+  },
+  "settings.updates.prerelease.title": {
+    "placeholders": {}
+  },
+  "settings.updates.status.tip": {
+    "placeholders": {}
+  },
+  "settings.updates.status.title": {
+    "placeholders": {}
+  },
+  "settings.workflow.hiveDefaults.desc": {
+    "placeholders": {}
+  },
+  "settings.workflow.hiveDefaults.tip": {
+    "placeholders": {}
+  },
+  "settings.workflow.hiveDefaults.title": {
+    "placeholders": {}
+  },
+  "settings.workflow.workspaceDefaults.desc": {
+    "placeholders": {}
+  },
+  "settings.workflow.workspaceDefaults.tip": {
+    "placeholders": {}
+  },
+  "settings.workflow.workspaceDefaults.title": {
+    "placeholders": {}
+  },
+  "settings.workspace.antivirus.desc": {
+    "placeholders": {}
+  },
+  "settings.workspace.antivirus.tip": {
+    "placeholders": {}
+  },
+  "settings.workspace.antivirus.title": {
+    "placeholders": {}
+  },
+  "settings.workspace.commands.desc": {
+    "placeholders": {}
+  },
+  "settings.workspace.commands.tip": {
+    "placeholders": {}
+  },
+  "settings.workspace.commands.title": {
+    "placeholders": {}
+  },
+  "settings.workspace.hiddenProjects.desc": {
+    "placeholders": {}
+  },
+  "settings.workspace.hiddenProjects.tip": {
+    "placeholders": {}
+  },
+  "settings.workspace.hiddenProjects.title": {
+    "placeholders": {}
+  },
+  "settings.workspace.onClose.desc": {
+    "placeholders": {}
+  },
+  "settings.workspace.onClose.tip": {
+    "placeholders": {}
+  },
+  "settings.workspace.onClose.title": {
+    "placeholders": {}
+  },
+  "settings.workspace.onOpen.desc": {
+    "placeholders": {}
+  },
+  "settings.workspace.onOpen.tip": {
+    "placeholders": {}
+  },
+  "settings.workspace.onOpen.title": {
+    "placeholders": {}
+  },
+  "settings.workspace.storage.desc": {
+    "placeholders": {}
+  },
+  "settings.workspace.storage.tip": {
+    "placeholders": {}
+  },
+  "settings.workspace.storage.title": {
+    "placeholders": {}
   }
 }
