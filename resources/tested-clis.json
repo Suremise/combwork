@@ -1,17 +1,17 @@
 {
   "codex": {
     "version": "0.166.0",
-    "testedAt": "2026-11-02",
-    "record": "a8ae21d4de18"
+    "testedAt": "2026-11-03",
+    "record": "d8ded464ee63"
   },
   "claude-code": {
-    "version": "2.1.316",
-    "testedAt": "2026-11-02",
-    "record": "a8ae21d4de18"
+    "version": "2.1.317",
+    "testedAt": "2026-11-03",
+    "record": "d8ded464ee63"
   },
   "copilot": {
     "version": "1.0.105",
-    "testedAt": "2026-11-02",
-    "record": "a8ae21d4de18"
+    "testedAt": "2026-11-03",
+    "record": "d8ded464ee63"
   }
 }
