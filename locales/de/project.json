@@ -16,7 +16,7 @@
   "project.banner.dangerous": "{modes} {count, plural, one {ist} other {sind}} in diesem Projekt aktiv: Der Agent führt jeden Befehl und jede Änderung ohne Nachfrage aus.",
   "project.banner.dangerousMode": "{agent}: {mode}",
   "project.banner.restart": "Sitzung neu starten",
-  "project.banner.restartNeeded": "Skills, MCP-Server oder Einstellungen haben sich seit dem Start {many, select, yes {der Sitzung von {agent}} other {dieser Sitzung}} geändert. Starte die Sitzung neu, um sie zu übernehmen – die Unterhaltung geht weiter.",
+  "project.banner.restartNeeded": "Skills, MCP-Server, Dialekte oder Einstellungen haben sich seit dem Start {many, select, yes {der Sitzung von {agent}} other {dieser Sitzung}} geändert. Starte die Sitzung neu, um sie zu übernehmen – die Unterhaltung geht weiter.",
   "project.banner.restartWhenDone": "Neu starten, wenn sein Durchgang vorbei ist",
   "project.banner.switchFailed": "Der Neustart konnte nicht eingeplant werden",
   "project.banner.unmanagedMcp": "Dieses Projekt definiert MCP-Server, die nicht im Arbeitsbereich sind: <b>{names}</b>. Sie bleiben deaktiviert, bis sie in den Arbeitsbereich kopiert werden.",

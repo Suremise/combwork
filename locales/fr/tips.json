@@ -192,6 +192,8 @@
   "tips.designCheck.title": "Fais vérifier une conception avant de construire",
   "tips.developerConsole.text": "Active Paramètres → Avancé → Afficher les fonctions pour développeurs, puis Aide → Console de développement ouvre une fenêtre à part : choisis un agent et vois chaque hook et chaque ligne d’état à côté de ce que Hive en a compris, expurgés. Filtre, cherche et mets en pause pendant qu’elle tourne.",
   "tips.developerConsole.title": "Voir ce qu’une CLI envoie à Hive",
+  "tips.dialects.text": "La vue Dialectes montre chaque texte que Hive donne aux agents, et permet à un modèle, une CLI ou l’espace de travail d’en formuler certains à sa façon. Duplique un fichier pour tester une modification sur un seul agent (Paramètres de l’agent → Dialecte) ; elle s’applique au prochain lancement de l’agent.",
+  "tips.dialects.title": "Ajuster les mots que Hive donne aux agents",
   "tips.editTemplates.text": "Sélectionne un modèle dans la vue Modèles et choisis Modifier… : ajoute, copie, réordonne ou retire ses agents, modifie chacun dans la boîte de dialogue Paramètres de l’agent (son bouton Enregistrer enregistre aussi le modèle), renomme-le et choisis sa disposition.",
   "tips.editTemplates.title": "Modifier un modèle sur place",
   "tips.fileLinks.text": "Les chemins de fichiers qu’affiche un agent, comme src/app.ts:42, sont des liens : fais Ctrl+clic sur l’un d’eux pour ouvrir le fichier dans l’onglet Fichiers à cette ligne.",

@@ -22,7 +22,7 @@
   "project.banner.dangerous": "{modes} {count, plural, one {is} other {are}} on in this project: the agent runs every command and edit without asking.",
   "project.banner.dangerousMode": "{agent}: {mode}",
   "project.banner.restart": "Restart session",
-  "project.banner.restartNeeded": "Skills, MCP servers or settings changed since {many, select, yes {{agent}'s} other {this}} session started. Restart the session to apply them — the conversation continues.",
+  "project.banner.restartNeeded": "Skills, MCP servers, dialects or settings changed since {many, select, yes {{agent}'s} other {this}} session started. Restart the session to apply them — the conversation continues.",
   "project.banner.restartWhenDone": "Restart When Its Turn Is Over",
   "project.banner.switchFailed": "Couldn't arrange the restart",
   "project.banner.unmanagedMcp": "This project defines MCP servers that are not in the workspace: <b>{names}</b>. They stay disabled until copied to the workspace.",

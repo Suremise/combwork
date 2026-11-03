@@ -156,6 +156,7 @@
   "shell.command.view.board": "Show Task Board",
   "shell.command.view.compactSidebar": "Toggle Compact Sidebar",
   "shell.command.view.devTools": "Toggle Developer Tools",
+  "shell.command.view.dialects": "Show Dialects",
   "shell.command.view.fullScreen": "Toggle Full Screen",
   "shell.command.view.mcp": "Show MCP Servers",
   "shell.command.view.modes": "Show Assistant Modes",

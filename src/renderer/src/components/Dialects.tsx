@@ -460,7 +460,12 @@ export function DialectView() {
       </div>
     )
   }
-  return <DialectFilePane key={scope} ws={wsPath} view={loaded.data} catalogue={catalogue} usage={usage} />
+  // Filling the main area, as the Skills view's page does: the texts scroll inside it.
+  return (
+    <div style={{ position: 'absolute', inset: 0, display: 'flex', flexDirection: 'column' }}>
+      <DialectFilePane key={scope} ws={wsPath} view={loaded.data} catalogue={catalogue} usage={usage} />
+    </div>
+  )
 }
 
 function DialectFilePane({ ws, view, catalogue, usage }: { ws: string; view: DialectFileView; catalogue: DialectCatalogue | null; usage: DialectUsage[] }) {
@@ -513,8 +518,12 @@ function DialectFilePane({ ws, view, catalogue, usage }: { ws: string; view: Dia
     if (jsonTimer.current) clearTimeout(jsonTimer.current)
   }, [])
   const typeJson = (text: string): void => {
+    // The editor reports its own content as a change too (shown first, or put back after a reload): text that is what
+    // it already shows is no edit, and starts no draft.
+    const d0 = drafts.get(key)
+    if (text === (pendingJson.current ?? d0?.json ?? (d0?.file ? dialectFileText(d0.file) : d0 ? jsonShown : view.file ? dialectFileText(view.file) : view.raw))) return
     pendingJson.current = text
-    const d = drafts.get(key) ?? { base: view.raw, file: view.file, json: null, jsonProblem: null }
+    const d = d0 ?? { base: view.raw, file: view.file, json: null, jsonProblem: null }
     // Shown as typed at once; read as a file a moment later.
     edit({ ...d, json: text })
     if (jsonTimer.current) clearTimeout(jsonTimer.current)
@@ -770,7 +779,7 @@ function DialectTextRow({ id, entry, problem, view, file, expanded, onToggle, ch
   const layers = layerValues(id, file, view.below, entry?.text)
   const placeholders = Object.keys(entry?.placeholders ?? {})
   return (
-    <div className={cx('dialect-text', inherited && !problem && 'inherited', problem && 'outdated', expanded && 'expanded')} data-text={id} data-source={shown.source.from}>
+    <div className={cx('dialect-text', inherited && !problem && 'inherited', problem && 'outdated', expanded && 'expanded')} data-text-id={id} data-source={shown.source.from}>
       <button className="dialect-text-head" aria-expanded={expanded} onClick={onToggle}>
         <code className="dialect-id">{id}</code>
         <span className="dialect-value">{problem ? (ownText ?? '') : (shown.text ?? '')}</span>

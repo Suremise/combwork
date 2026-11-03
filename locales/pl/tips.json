@@ -192,6 +192,8 @@
   "tips.designCheck.title": "Daj sprawdzić projekt przed budowaniem",
   "tips.developerConsole.text": "Włącz Ustawienia → Zaawansowane → Pokazuj funkcje deweloperskie, a Pomoc → Konsola deweloperska otworzy osobne okno: wybierz agenta i zobacz każdy hook i linię statusu obok tego, co Hive z nich odczytał, z ukrytymi danymi. Filtruj, szukaj i wstrzymuj na bieżąco.",
   "tips.developerConsole.title": "Zobacz, co CLI wysyła do Hive",
+  "tips.dialects.text": "Widok Dialekty pokazuje każdy tekst, który Hive przekazuje agentom, i pozwala modelowi, CLI lub obszarowi roboczemu sformułować część z nich po swojemu. Zduplikuj plik, aby wypróbować zmianę na jednym agencie (Ustawienia agenta → Dialekt); zmiana obowiązuje od następnego uruchomienia agenta.",
+  "tips.dialects.title": "Dostosuj słowa, które Hive przekazuje agentom",
   "tips.editTemplates.text": "Zaznacz szablon w widoku Szablony i wybierz Edytuj…: dodawaj, kopiuj, zmieniaj kolejność lub usuwaj jego agentów, zmieniaj każdego w oknie Ustawienia agenta (jego Zapisz zapisuje też szablon), zmień nazwę szablonu i wybierz jego układ.",
   "tips.editTemplates.title": "Edytuj szablon na miejscu",
   "tips.fileLinks.text": "Ścieżki plików wypisywane przez agenta, np. src/app.ts:42, są linkami: kliknij z Ctrl, żeby otworzyć plik w tym wierszu w zakładce Pliki.",

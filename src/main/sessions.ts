@@ -2519,7 +2519,7 @@ class SessionManager {
         const d = l.dialect!
         const agent = await workspaceOf(st.projectPath).savedAgent(st.projectPath, st.agentId).catch(() => undefined)
         const moved = agent ? await this.dialectMoved(st.projectPath, agent, l, reads) : false
-        return { projectPath: st.projectPath, agentId: st.agentId, agent: this.label(st), cli: d.input.cli, files: d.chain.layers.flatMap((x) => (x.file ? [x.file] : [])), moved }
+        return { projectPath: st.projectPath, agentId: st.agentId, agent: agent?.name ?? this.label(st), cli: d.input.cli, files: d.chain.layers.flatMap((x) => (x.file ? [x.file] : [])), moved }
       })
     )
   }

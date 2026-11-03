@@ -2,6 +2,10 @@
 
 ## Unreleased
 
+### Added
+
+- **Dialects: tune the words Hive gives agents** (HI-2065, HI-2443, HI-2444). Everything Hive says to agents, from its guidance to its tools' replies and wakes, is now a list of texts a **dialect file** can reword for one model, one CLI or the whole workspace, leaving the rest as Hive wrote it. The new **Dialects** view in the activity bar shows every text with where it comes from, saves a change only once it has the placeholders it needs, and flags texts an update made outdated. Duplicate a file to try a change on one agent (Agent Settings → **Dialect**), then **Use for a Model** to give it to every agent on that model. A change applies at each agent's next launch; the files show **Restart to apply** until then. Hive ships empty files for Opus 5.5, Haiku 5.5, Sonnet 5.5, GPT-6.1 Sol and GPT-6 Astra.
+
 ### Fixed
 
 - **Why a viewer token can't be made is in your language** (HI-2459). Settings → Agent API → Viewer tokens said why it couldn't make one (no name, a name too long or already taken, too many tokens) in English whatever language Hive showed.

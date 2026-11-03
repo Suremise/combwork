@@ -192,6 +192,8 @@
   "tips.designCheck.title": "Einen Entwurf vor dem Bauen prüfen lassen",
   "tips.developerConsole.text": "Schalte Einstellungen → Erweitert → „Entwicklerfunktionen anzeigen“ ein; dann öffnet Hilfe → Entwicklerkonsole ein eigenes Fenster: Wähle einen Agenten und sieh jeden Hook und jede Statuszeile neben dem, was Hive daraus gemacht hat, geschwärzt. Filtern, suchen und pausieren geht während des Laufs.",
   "tips.developerConsole.title": "Sehen, was eine CLI an Hive sendet",
+  "tips.dialects.text": "Die Ansicht „Dialekte“ zeigt jeden Text, den Hive Agenten gibt, und lässt ein Modell, eine CLI oder den Arbeitsbereich einige davon auf eigene Weise formulieren. Dupliziere eine Datei, um eine Änderung an einem Agenten auszuprobieren (Agent-Einstellungen → Dialekt); sie gilt ab dem nächsten Start des Agenten.",
+  "tips.dialects.title": "Die Worte anpassen, die Hive Agenten gibt",
   "tips.editTemplates.text": "Wähle in der Ansicht „Vorlagen“ eine Vorlage und dann „Bearbeiten…“: Füge Agenten hinzu, kopiere, sortiere oder entferne sie, ändere jeden im Dialog „Agent-Einstellungen“ (sein „Speichern“ speichert auch die Vorlage), benenne sie um und wähle ihr Layout.",
   "tips.editTemplates.title": "Eine Vorlage direkt bearbeiten",
   "tips.fileLinks.text": "Dateipfade, die ein Agent ausgibt, etwa src/app.ts:42, sind Links: Strg+Klick öffnet die Datei im Tab „Dateien“ an dieser Zeile.",

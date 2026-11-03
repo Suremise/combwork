@@ -155,6 +155,7 @@
   "shell.command.view.board": "タスクボードを表示",
   "shell.command.view.compactSidebar": "サイドバーのコンパクト表示を切り替え",
   "shell.command.view.devTools": "開発者ツールの表示を切り替え",
+  "shell.command.view.dialects": "ダイアレクトを表示",
   "shell.command.view.fullScreen": "全画面表示を切り替え",
   "shell.command.view.mcp": "MCPサーバーを表示",
   "shell.command.view.modes": "アシスタントのモードを表示",

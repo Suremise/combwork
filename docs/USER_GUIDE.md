@@ -1413,6 +1413,31 @@ Every Hive skill for agents is delivered to them, unless you switch it off. **De
 
 **Where Codex and Copilot copies go, and when they're removed.** Codex and Copilot read Hive's skills from copies in the folder an agent works in (its worktree, a slot, or the project folder), and those copies stay after the session, so a CLI you start there yourself would still see them. Hive records each copy it makes, and once the last of Hive's agents in a folder stops, it removes its copies there as **Settings → Advanced → Remove Hive's skill copies when no agent works in the folder** says: **Slots only** (the default) removes them in every folder but the project folder, **Everywhere** in the project folder too, **Never** nowhere (as before). Hive also tidies them as a workspace opens, for folders whose agents have gone. It only removes a copy its record and the copy's own marker both say it made, and that nobody has changed since: never a skill of yours, and never a copy you've edited. Reviewers' sessions run in the project folder, so the review copies they read get none. Claude Code's launch folder leaves nothing in your folders.
 
+## Dialects <a id="dialects"></a>
+
+Everything Hive says to agents (its guidance, its tools' descriptions and replies, its wakes and refusals) is a list of texts in English, Hive's **Default**. A **dialect file** words some of them its own way, for one model, one CLI or the whole workspace, and leaves the rest to the Default. Use it to tune how Hive talks to a model that misreads something, and measure the change before you keep it.
+
+**The chain.** Each agent's text comes from four layers, the first that has a text winning:
+
+1. its **model file**: in `.hive/dialects/<CLI>/`, the file whose `model` is the real model ID the agent runs (an alias such as `opus` is resolved; a `[1m]` suffix or a snapshot date falls back to the base ID), or the file its **Dialect** setting picks;
+2. its **CLI file**, `.hive/dialects/<CLI>/cli.json`;
+3. the **Workspace** file, `.hive/dialects/workspace.json`, for every agent;
+4. the **Default**.
+
+Scripts and other callers of the Agent API with no agent session get the **API** file (`api/cli.json`) over the Workspace file. When Hive can't name the model an agent runs, its model slot is empty and its launch record says "model unknown". Hive ships empty model files for Opus 5.5, Haiku 5.5, Sonnet 5.5, GPT-6.1 Sol and GPT-6 Astra, and empty CLI and API files: a change goes into what Hive ships only once it's measured.
+
+**The Dialects view** (in the activity bar) lists the Workspace file, each CLI's files (its CLI file, its model files and its test copies) and the API file. Each row says what the file applies to, how many running agents use it now, and its state: shipped as Hive ships it, **Edited** (shipped and changed here: **Revert to Shipped** puts it back), **Yours** (a copy or an import), or how many of its texts are **outdated**. Its switch turns it off without changing it: its texts then fall through to the layer below.
+
+Select a file to see **every text**, even when the file is empty, grouped by area. A text the file changes shows as written; one it doesn't is dimmed, with where it comes from ("from Workspace", "from Codex CLI", "from Default"). Click a text to see each layer's value, its note from Hive's code and the placeholders it must have. **Change Here** starts this file's own wording from the text it inherits; **Remove Override** goes back to inheriting it. Search, and **Show** (All texts, Changed in this file, Changed anywhere), narrow the list. The **JSON** tab shows the whole file to edit as text: what you type must read as a dialect file before the Texts tab can show it.
+
+**Save** checks only that each text exists and has exactly the placeholders it needs (`{project}`, `{count}`…), as written in the Default; nothing checks what a text says. A file that fails isn't saved, and the view lists each text and what's wrong, keeping your changes to fix. A file changed outside Hive while you edit it is said, never overwritten: **Reload** takes the file as it is now, **Keep My Changes** lets your next Save replace it. Changes apply at each agent's **next launch**: until it restarts, an agent keeps the wording it started with, and the file shows **Restart to apply** with the agents it affects (the project's restart banner names dialects too).
+
+**Outdated texts.** After a Hive update, a text whose id was removed or renamed, or whose placeholders changed, no longer applies: it's listed first, under **Outdated**, with what's wrong and the Default now beside it (or "No current Default" for a text Hive no longer has), and falls through to the layer below until you edit or remove it. Hive never rewrites it.
+
+**Files.** **Duplicate** makes a **test copy** beside a model file: the same texts and no model, so no agent uses it until one picks it. **Use for a Model** gives a test copy a model ID: agents on Auto running that model get it from their next launch, and the file that had the model keeps its texts as a test copy. **Import Dialect File** adds a file from disk to a CLI's folder (as a test copy if its model is already claimed there); **Export** writes a file as it is; **Delete** moves a copy or import to the Recycle Bin (the Workspace, CLI and shipped files can't be deleted).
+
+**Per agent.** Agent Settings → **Dialect**: **Auto** (the file for the model it runs) or a file of its CLI's folder, to try a test copy on one agent beside the others. A change of the agent's CLI sets it back to Auto. The Agent API's project status shows each running agent's chain in `launched.dialect`.
+
 ## MCP servers <a id="mcp-servers"></a>
 
 MCP servers give agents extra tools. Each server is a JSON file in `Workspace/.hive/mcp`:

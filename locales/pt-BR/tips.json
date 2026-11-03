@@ -192,6 +192,8 @@
   "tips.designCheck.title": "Peça a verificação de um design antes de construir",
   "tips.developerConsole.text": "Ative Configurações → Avançado → Mostrar recursos de desenvolvedor, e Ajuda → Console do desenvolvedor abre uma janela própria: escolha um agente e veja cada hook e linha de status ao lado do que o Hive entendeu deles, com dados sensíveis ocultos. Filtre, pesquise e pause enquanto ele roda.",
   "tips.developerConsole.title": "Veja o que uma CLI envia ao Hive",
+  "tips.dialects.text": "A visão Dialetos mostra todos os textos que o Hive dá aos agentes e permite que um modelo, uma CLI ou o espaço de trabalho redija alguns deles do seu jeito. Duplique um arquivo para experimentar uma alteração num agente (Configurações do agente → Dialeto); ela vale a partir do próximo início do agente.",
+  "tips.dialects.title": "Ajuste as palavras que o Hive dá aos agentes",
   "tips.editTemplates.text": "Selecione um modelo na visualização Modelos e escolha Editar…: adicione, copie, reordene ou remova os agentes dele, altere cada um no diálogo Configurações do agente (o Salvar dele também salva o modelo), renomeie o modelo e escolha o layout.",
   "tips.editTemplates.title": "Edite um modelo ali mesmo",
   "tips.fileLinks.text": "Caminhos de arquivo que um agente imprime, como src/app.ts:42, são links: use Ctrl+clique em um para abrir o arquivo na aba Arquivos, naquela linha.",
