@@ -1650,8 +1650,9 @@ export class Workflow {
     if (others.length < needed) return null
     const first = others[0]
     const minutes = Math.max(0, Math.floor((Date.now() - Date.parse(first.since)) / 60_000)) || 0
-    const name = first.reviewer === 'user' ? 'the user' : (present.get(first.reviewer) ?? first.reviewer) // i18n-ignore: a name in a refusal's values, as agents read it
-    return { rule: 'review.inProgress', values: { card: w.card.key, reviewer: name, submission, minutes } }
+    // The user's review: said by the message's own words (`who`), translated; an agent's by its name.
+    const user = first.reviewer === 'user'
+    return { rule: 'review.inProgress', values: { card: w.card.key, who: user ? 'user' : 'agent', reviewer: user ? '' : (present.get(first.reviewer) ?? first.reviewer), submission, minutes } }
   }
 
   /** verdict (§16.7.2): always recorded; a pass may finish, ask the user, or go stale at once if the head moved to another change. */

@@ -30,11 +30,13 @@ describe('a review in progress (HI-2487)', () => {
     const card = await inReview(e)
     moved(await e.wf.startReview(card.key, R1))
     const r = refusedBy(await e.wf.startReview(card.key, R2), 'review.inProgress')
-    expect(r.values).toMatchObject({ reviewer: 'R1', minutes: 0 })
+    expect(r.values).toMatchObject({ who: 'agent', reviewer: 'R1', minutes: 0 })
     expect(r.message).toMatch(/^R1 is reviewing AM-\d+'s submission \d+, and has been for less than a minute\.$/)
     moved(await e.wf.startReview(card.key, 'user'))
     // Then it is the user's (HR1's round 1): R1's start again, or R2's, is refused, naming the user.
-    expect(refusedBy(await e.wf.startReview(card.key, R1), 'review.inProgress').values).toMatchObject({ reviewer: 'the user' })
+    const byUser = refusedBy(await e.wf.startReview(card.key, R1), 'review.inProgress')
+    expect(byUser.values).toMatchObject({ who: 'user', reviewer: '' })
+    expect([byUser.message, byUser.next]).toEqual([expect.stringMatching(/^The user is reviewing AM-\d+'s submission \d+, and has been for less than a minute\.$/), expect.stringMatching(/^Leave it to the user: don't review AM-\d+ or give it a verdict\.$/)])
     refusedBy(await e.wf.startReview(card.key, R2), 'review.inProgress')
   })
 
