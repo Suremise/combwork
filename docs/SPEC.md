@@ -1757,7 +1757,8 @@ that starts after the upgrade loses the mark and is a 1.0 card from then on [Dar
   migrated) is undone, the card back where it was, "wasn't started: its project builds each card in a slot…", never its
   agent launched in the project folder. A Start of a card already Active with no slot (a start from before this fix) is
   refused the same way, the card left Active: "Put it back to Todo, then start it again" [HR2's round 1]. The user's
-  Start across the rules, with its reason, starts where the agent is.
+  Start across the rules, with its reason, starts where the agent is. A no-code card is never such a start: it takes no
+  slot (HI-2335), so its Start (the user's, the Assistant's or a lane's) starts where its agent is [HI-2395].
 
 **P3 records facts from today's moves, refusing nothing** [#1216]: every card change writes its facts in its own
 transaction (into Doing with an agent `Started`; into Review `Submitted`; a review's start and verdict; each column change
@@ -3272,7 +3273,10 @@ card's test-merge ref goes once its entry has an outcome, and its submissions' p
        then pauses `hookTimedOut`. The signer, or nothing known in a repository that signs, pauses `signingWaits`,
        "signing waits for you".
      - **A signer that exited non-zero:** pauses `signingWaits` when **its own** text says it needs a passphrase, a
-       pinentry or a terminal, and `signing` otherwise, with its text and git's.
+       pinentry or a terminal, and `signing` otherwise, with its text and git's. Its own text is what it wrote while
+       it ran (Git for Windows 2.45 lets the signer write to stderr), and git's text right after it exited, before any
+       other child starts (HI-2399: a newer git, such as Git for Windows 2.56, captures the signer's stderr and reprints it then, as
+       `error: gpg failed to sign the data:` and gpg's lines). A hook's text is never either.
    - **After any of these:** the queue's worktree is left clean at the expected revision (`merge --abort`,
      `reset --hard`, `clean`), and nothing in the target changes.
    - **The pause:** keeps git's message in its own words (`workflow_queue_pauses.message`, the 1.0 group's 15th

@@ -262,8 +262,8 @@ describe("a commit's stream, git's trace in it (#1350)", () => {
     const s = readCommitStream(stream('passing-hook-then-signer'))
     expect(s.traced).toBe(true)
     expect(s.children.filter((c) => c.kind !== 'other')).toEqual([
-      { kind: 'hook', name: 'commit-msg', code: 0, text: 'passphrase policy validation passed\n' },
-      { kind: 'signer', code: 2, text: 'gpg: signing failed: No secret key\n' }
+      { kind: 'hook', name: 'commit-msg', code: 0, text: 'passphrase policy validation passed\n', after: '' },
+      { kind: 'signer', code: 2, text: 'gpg: signing failed: No secret key\n', after: 'error: gpg failed to sign the data\nfatal: failed to write commit object\n' }
     ])
     expect(s.git).toContain('error: gpg failed to sign the data')
     const o = commitFailed(failed(stream('passing-hook-then-signer')), true)
@@ -271,8 +271,50 @@ describe("a commit's stream, git's trace in it (#1350)", () => {
     expect('message' in o && o.message).toBe('gpg: signing failed: No secret key\nerror: gpg failed to sign the data\nfatal: failed to write commit object')
   })
 
+  it("HI-2399: a newer git reprints the signer's text after it exits (`gpg failed to sign the data:`): read as the signer's, never a hook's", () => {
+    // As a newer git (Git for Windows 2.56) writes it (gpg-interface.c sign_buffer_gpg): the signer run with --status-fd=2, its stderr captured,
+    // nothing of it written while it runs, then git's error with it once it has exited.
+    const ev = ({ event, ...rest }: { event: string } & Record<string, unknown>): string => JSON.stringify({ event, sid: 'T', time: 't', ...rest })
+    const newer = (hookSays: string, gpgSays: string): string =>
+      [
+        ev({ event: 'version' }),
+        ev({ event: 'child_start', child_id: 1, child_class: 'hook', hook_name: 'commit-msg', argv: ['.git/hooks/commit-msg'] }),
+        hookSays,
+        ev({ event: 'child_exit', child_id: 1, code: 0 }),
+        ev({ event: 'child_start', child_id: 2, argv: ['gpg', '--status-fd=2', '-bsau', 'me'] }),
+        ev({ event: 'child_exit', child_id: 2, code: 2 }),
+        `error: gpg failed to sign the data:\n${gpgSays}`,
+        'fatal: failed to write commit object'
+      ].join('\n') + '\n'
+    const waits = newer('No secret key needed for this message', 'gpg: signing failed: Inappropriate ioctl for device')
+    const signer = readCommitStream(waits).children.find((c) => c.kind === 'signer')
+    expect(signer).toMatchObject({ code: 2, text: '', after: 'error: gpg failed to sign the data:\ngpg: signing failed: Inappropriate ioctl for device\nfatal: failed to write commit object\n' })
+    expect(commitFailed(failed(waits), true)).toMatchObject({ pause: 'signingWaits', message: expect.stringContaining('Inappropriate ioctl for device') })
+    // A hook that passed saying "passphrase" never makes a signer with no secret key wait.
+    const fails = newer('passphrase policy validation passed', 'gpg: signing failed: No secret key')
+    const o = commitFailed(failed(fails), true)
+    expect(o).toMatchObject({ pause: 'signing' })
+    expect('message' in o && o.message).toBe('error: gpg failed to sign the data:\ngpg: signing failed: No secret key\nfatal: failed to write commit object')
+    // git's text after a hook that passed, before the signer starts, is never the signer's.
+    const before = [ev({ event: 'version' }), ev({ event: 'child_start', child_id: 1, child_class: 'hook', hook_name: 'commit-msg', argv: ['h'] }), ev({ event: 'child_exit', child_id: 1, code: 0 }), 'hint: pinentry'].join('\n') + '\n'
+    const after = [ev({ event: 'child_start', child_id: 2, argv: ['gpg', '--status-fd=2', '-bsau', 'me'] }), ev({ event: 'child_exit', child_id: 2, code: 2 }), 'error: gpg failed to sign the data:\ngpg: signing failed: No secret key'].join('\n') + '\n'
+    expect(commitFailed(failed(before + after), true)).toMatchObject({ pause: 'signing' })
+  })
+
   it('the reverse: a hook that passed saying "No secret key", and a signer that needs a terminal → signing waits', () => {
     expect(commitFailed(failed(stream('passing-hook-then-signer-waits')), true)).toMatchObject({ pause: 'signingWaits', message: expect.stringContaining('Inappropriate ioctl for device') })
+  })
+
+  it('HI-2399: recorded with git 2.56, where git reprints the signer\'s text after it exits: the same diagnoses as 2.45\'s', () => {
+    const s = readCommitStream(stream('passing-hook-then-signer-2.56'))
+    expect(s.children.filter((c) => c.kind !== 'other')).toEqual([
+      { kind: 'hook', name: 'commit-msg', code: 0, text: 'passphrase policy validation passed\n', after: '' },
+      { kind: 'signer', code: 2, text: '', after: 'error: gpg failed to sign the data:\ngpg: signing failed: No secret key\n\nfatal: failed to write commit object\n' }
+    ])
+    const o = commitFailed(failed(stream('passing-hook-then-signer-2.56')), true)
+    expect(o).toMatchObject({ pause: 'signing' })
+    expect('message' in o && o.message).toBe('error: gpg failed to sign the data:\ngpg: signing failed: No secret key\n\nfatal: failed to write commit object')
+    expect(commitFailed(failed(stream('passing-hook-then-signer-waits-2.56')), true)).toMatchObject({ pause: 'signingWaits', message: expect.stringContaining('Inappropriate ioctl for device') })
   })
 
   it("a failing hook whose last line has no newline, an event-looking fragment before git's own event: returned with its text intact, no event in it", () => {

@@ -3,6 +3,7 @@
 ## Unreleased
 
 - **Leaner card reads for agents** (HI-2402): reading a card's latest comment, its newest comments or its summary no longer brings back every file attached to the card, only those of the comments read, with a count of the rest. A busy card's latest step costs agents far fewer tokens; a full read still lists them all.
+- **A signer that wants your passphrase pauses the merge queue as "Signing waits for you" with newer Git too.** Newer Git (Git for Windows 2.56, for one) prints the signer's message only after the signer has stopped, and the queue read that as "Signing failed" with the wrong advice. Now it reads it as the signer's, and a hook's words still never count (HI-2399).
 
 ## 1.0.0 — 2026-11-02
 
@@ -93,7 +94,7 @@
 
 ### Slots and review copies
 
-- **A no-code card takes no slot.** It changes nothing, so it starts where its agent is, even when every slot is in use, and a lane's no-code card leaves the lane's slot to the lane. Code cards still wait for a free slot (HI-2335).
+- **A no-code card takes no slot.** It changes nothing, so it starts where its agent is, even when every slot is in use, and a lane's no-code card leaves the lane's slot to the lane. That holds however it's started: from the window, by the Hive Assistant or by its lane, no longer refused as having got no slot (HI-2395). Code cards still wait for a free slot (HI-2335).
 - **A lane of only no-code cards starts at once.** Started from the window or by the Hive Assistant, it no longer waits for a free slot: its agents start where they are. If one of its cards becomes a code card later, that card gets the lane a slot when it starts (HI-2338).
 - **Each card in a slot, on a branch of its own.** With **Where cards are built → Each card in its own folder**, Hive keeps a pool of worktrees per project (*slots*), set up by the project's setup script as Hive's own runs, and lends one to each card or lane: the card's branch is made there from the target (`hive/AM/AM-12-fix-the-login`), the builder works there in a new conversation, and a lane keeps its slot from card to card. With every slot in use, the card waits for one. A card's branch is deleted once it is merged, and idle slots are removed only when nothing would be lost (Settings → Advanced) (#1429, #1438).
 - **Agents aren't pinned to worktrees.** Add Agent puts an agent in the project folder; a builder takes a slot for each card. Beside an agent's name: **in slot-b**, **carried: hb2** (its old worktree, kept for it), or **home: hr4** (a reviewer's old one). A conversation always resumes where it was made; once its slot holds other work, Hive says why and offers **Read Transcript** and **Start Fresh with a Handover** (#1434, #1442, #1451).

@@ -10,7 +10,8 @@
 //    line, merged, is deleted (LineDeleted on card 1);
 // 3. with one slot (Maximum agents: 1), a second lane waits ("waiting for a slot", paused) and starts in slot-a once
 //    the first ends, its builder there; the first's builder is stopped. HI-2335: meanwhile, slot-a lent, a generalist
-//    in the project folder starts a no-code card there, and its code card is still refused start.slotAvailable.
+//    in the project folder starts a no-code card there, and its code card is still refused start.slotAvailable;
+//    HI-2395: the window's Start of that no-code card (a direct start) starts it there too, not refused for no slot.
 //    HI-2338: a third lane, of only no-code cards, starts at once with no slot (not waiting, nothing lent, its agents in
 //    the project folder), and its no-code card is Done there; its next card, made code, waits for a slot at its start;
 // 4. HI-2014 (Legible's LE-249): the second lane's card 3, committed and not merged, moved to Done by the user's override:
@@ -270,6 +271,13 @@ const installs = () => (fs.existsSync(setupLog) ? fs.readFileSync(setupLog, 'utf
     const sGc = await intent(tg1, cGc, 'start')
     check('…while its code card still waits for a slot (start.slotAvailable)', sGc.status === 409 && sGc.body?.rule === 'start.slotAvailable' && (await card(cGc))?.column === 'todo', JSON.stringify(sGc.body))
     check('G1 puts its no-code card back: nothing of a slot to give back', (await intent(tg1, cG, 'put-back', { why: 'done looking' })).status === 200 && (await slotNow())?.lease?.lane === started.lane.id)
+    // HI-2395: the window's Start of it (a direct start, as the Assistant's hive_start_task) isn't refused as having got
+    // no slot: it starts where G1 is, nothing lent; G1 puts it back again.
+    const dG = await inv('tasks:start', cG, { kind: 'agent', agentId: g1.id }).catch((e) => ({ error: String(e?.message ?? e) }))
+    const directG = (await inv('tasks:facts', cG)).findLast((f) => f.kind === 'Started')?.data
+    check("the window's Start of the no-code card starts it where G1 is, not refused for no slot (HI-2395)", !dG?.error && !dG?.ask && dG?.agentId === g1.id && (await card(cG))?.column === 'doing' && directG?.folder === 'project' && !directG.lease, JSON.stringify({ dG, directG }))
+    check("…slot-a still the first lane's, nothing else lent", (await slotNow())?.lease?.lane === started.lane.id && (await slots()).filter((x) => x.lease).length === 1, JSON.stringify(await slots()))
+    check('…and G1 puts it back', (await intent(tg1, cG, 'put-back', { why: 'done looking again' })).status === 200 && (await card(cG))?.column === 'todo')
     // HI-2338: every slot still lent, a lane of only no-code cards from the window starts at once, with no slot.
     const third = await inv('lanes:start', alpha, { builder: b3.id, reviewer: r3.id, cards: [cL1, cL2] })
     check('a lane of only no-code cards starts with every slot lent: not waiting, no slot, both agents started', !third.waitingForSlot && !third.slot && third.started.length === 2 && third.started.every((s) => s.how !== 'failed'), JSON.stringify(third))
